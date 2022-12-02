@@ -84,6 +84,7 @@ use crate::{
         },
         guard::Guard,
         logger::{LogLevelWriter, LogWriterAdapter, RemoteLogConfig, RemoteLogWriter},
+        npb_bandwidth_watcher::NpbBandwidthWatcher,
         stats::{self, Countable, RefCountable, StatsOption},
     },
 };
@@ -753,6 +754,7 @@ pub struct Components {
     pub handler_builders: Vec<Arc<Mutex<Vec<PacketHandlerBuilder>>>>,
     pub compressed_otel_uniform_sender: UniformSenderThread,
     pub policy_setter: PolicySetter,
+    pub npb_bandwidth_watcher: Box<Arc<NpbBandwidthWatcher>>,
     max_memory: u64,
     tap_mode: TapMode,
     agent_mode: RunningMode,
@@ -830,6 +832,7 @@ impl Components {
                 y.start();
             })
         });
+        self.npb_bandwidth_watcher.start();
         info!("Started components.");
     }
 
@@ -849,6 +852,7 @@ impl Components {
         let ctrl_ip = config_handler.ctrl_ip;
         let ctrl_mac = config_handler.ctrl_mac;
         let max_memory = config_handler.candidate_config.environment.max_memory;
+        let feature_flags = FeatureFlags::from(&yaml_config.feature_flags);
 
         let mut stats_sender = UniformSenderThread::new(
             stats::DFSTATS_SENDER_ID,
@@ -861,8 +865,10 @@ impl Components {
         stats_sender.start();
 
         trident_process_check();
-        #[cfg(target_os = "linux")]
-        core_file_check();
+        if feature_flags.contains(FeatureFlags::CORE) {
+            #[cfg(target_os = "linux")]
+            core_file_check();
+        }
         controller_ip_check(&static_config.controller_ips);
         check(free_space_checker(
             &static_config.log_file,
@@ -884,10 +890,7 @@ impl Components {
             }
         }
 
-        info!(
-            "Agent run with feature-flags: {:?}.",
-            FeatureFlags::from(&yaml_config.feature_flags)
-        );
+        info!("Agent run with feature-flags: {:?}.", feature_flags);
         // Currently, only loca-mode + ebpf collector is supported, and ebpf collector is not
         // applicable to fastpath, so the number of queues is 1
         // =================================================================================
@@ -1141,7 +1144,7 @@ impl Components {
         }));
 
         let npb_bps_limit = Arc::new(LeakyBucket::new(Some(
-            config_handler.candidate_config.npb.bps_threshold,
+            config_handler.candidate_config.sender.npb_bps_threshold,
         )));
         let mut handler_builders = Vec::new();
 
@@ -1579,6 +1582,21 @@ impl Components {
             config_handler.port(),
         );
 
+        let sender_config = config_handler.sender().load();
+        let (npb_bandwidth_watcher, npb_bandwidth_watcher_counter) = NpbBandwidthWatcher::new(
+            sender_config.bandwidth_probe_interval.as_secs(),
+            sender_config.npb_bps_threshold,
+            sender_config.server_tx_bandwidth_threshold,
+            npb_bps_limit.clone(),
+            exception_handler.clone(),
+        );
+        synchronizer.add_flow_acl_listener(npb_bandwidth_watcher.clone());
+        stats_collector.register_countable(
+            "npb_bandwidth_watcher",
+            Countable::Ref(Arc::downgrade(&npb_bandwidth_watcher_counter) as Weak<dyn RefCountable>),
+            Default::default(),
+        );
+
         Ok(Components {
             config: candidate_config.clone(),
             rx_leaky_bucket,
@@ -1620,6 +1638,7 @@ impl Components {
             compressed_otel_uniform_sender,
             agent_mode,
             policy_setter,
+            npb_bandwidth_watcher,
         })
     }
 
@@ -1820,6 +1839,7 @@ impl Components {
             })
         });
         self.pcap_manager.stop();
+        self.npb_bandwidth_watcher.stop();
         info!("Stopped components.")
     }
 }
