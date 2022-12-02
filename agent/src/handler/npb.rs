@@ -36,7 +36,7 @@ use crate::config::NpbConfig;
 use crate::proto::trident::VlanMode;
 use crate::sender::npb_sender::NpbPacketSender;
 use crate::utils::stats::{self, StatsOption};
-use npb_handler::{NOT_SUPPORT, NpbHandler, NpbHandlerCounter, StatsNpbHandlerCounter};
+use npb_handler::{NpbHandler, NpbHandlerCounter, StatsNpbHandlerCounter, NOT_SUPPORT};
 use public::{
     counter::Countable,
     debug::QueueDebugger,

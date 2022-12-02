@@ -206,7 +206,6 @@ pub struct NpbConfig {
     pub enable_qos_bypass: bool,
     pub output_vlan: u16,
     pub mtu: u32,
-    pub bps_threshold: u64,
     pub vlan_mode: trident::VlanMode,
     pub socket_type: trident::SocketType,
 }
@@ -782,7 +781,6 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 output_vlan: conf.output_vlan,
                 vlan_mode: conf.npb_vlan_mode,
                 dedup_enabled: conf.npb_dedup_enabled,
-                bps_threshold: conf.npb_bps_threshold,
                 socket_type: conf.npb_socket_type,
             },
             collector: CollectorConfig {
@@ -1389,7 +1387,9 @@ impl ConfigHandler {
 
         if candidate_config.environment.max_memory != new_config.environment.max_memory {
             if let Some(ref components) = components {
-                components.policy_setter.set_memory_limit(new_config.environment.max_memory);
+                components
+                    .policy_setter
+                    .set_memory_limit(new_config.environment.max_memory);
             }
         }
 
@@ -1681,6 +1681,42 @@ impl ConfigHandler {
                     restart_dispatcher = true;
                 }
             }
+
+            if let Some(components) = &components {
+                if candidate_config.sender.bandwidth_probe_interval
+                    != new_config.sender.bandwidth_probe_interval
+                {
+                    info!(
+                        "Npb tx interface bandwidth probe interval set to {}s.",
+                        new_config.sender.bandwidth_probe_interval.as_secs()
+                    );
+                    components
+                        .npb_bandwidth_watcher
+                        .set_interval(new_config.sender.bandwidth_probe_interval.as_secs());
+                }
+                if candidate_config.sender.server_tx_bandwidth_threshold
+                    != new_config.sender.server_tx_bandwidth_threshold
+                {
+                    info!(
+                        "Npb tx interface bandwidth threshold set to {}.",
+                        new_config.sender.server_tx_bandwidth_threshold
+                    );
+                    components
+                        .npb_bandwidth_watcher
+                        .set_nic_rate(new_config.sender.server_tx_bandwidth_threshold);
+                }
+                if candidate_config.sender.npb_bps_threshold != new_config.sender.npb_bps_threshold
+                {
+                    info!(
+                        "Npb bps threshold set to {}.",
+                        new_config.sender.npb_bps_threshold
+                    );
+                    components
+                        .npb_bandwidth_watcher
+                        .set_npb_rate(new_config.sender.npb_bps_threshold);
+                }
+            }
+
             info!(
                 "sender config change from {:#?} to {:#?}",
                 candidate_config.sender, new_config.sender
@@ -1822,9 +1858,6 @@ impl ConfigHandler {
 
         if candidate_config.npb != new_config.npb {
             fn dispatcher_callback(handler: &ConfigHandler, components: &mut Components) {
-                components
-                    .npb_bps_limit
-                    .set_rate(Some(handler.candidate_config.npb.bps_threshold));
                 let dispatcher_builders = &components.handler_builders;
                 for e in dispatcher_builders {
                     let mut builders = e.lock().unwrap();
