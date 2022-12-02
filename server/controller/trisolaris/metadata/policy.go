@@ -124,10 +124,6 @@ func (p *Policy) toSerializeString() {
 	}
 }
 
-func (p *Policy) addPcapFlowACL(flowACL *trident.FlowAcl) {
-	p.pcapFlowACLs = append(p.pcapFlowACLs, flowACL)
-}
-
 func (p *Policy) addFlowACL(flowACL *trident.FlowAcl, aclType int) {
 	p.flowACLs = append(p.flowACLs, flowACL)
 	if p.billingMethod == BILLING_METHOD_LICENSE {
@@ -186,6 +182,10 @@ func (p *Policy) getAllSerializeString() []byte {
 	return p.serializeString
 }
 
+func (p *Policy) getAllVersion() uint64 {
+	return p.version
+}
+
 func (p *Policy) initVersion(version uint64) {
 	p.version = version
 	p.npbVersion = version + 100
@@ -211,14 +211,6 @@ func (p *Policy) setVersion(other *Policy) {
 	} else {
 		p.pcapVersion = other.pcapVersion
 	}
-}
-
-func (p *Policy) getPcapVersion() uint64 {
-	return p.pcapVersion
-}
-
-func (p *Policy) getPcapSerializeString() []byte {
-	return p.pcapSerializeString
 }
 
 func (p *Policy) merger(other *Policy) {
@@ -322,13 +314,11 @@ func (op *PolicyDataOP) updateDropletPolicy(data *Policy) {
 }
 
 func (op *PolicyDataOP) getDropletPolicyVersion() uint64 {
-	dropletPolicy := op.getDropletPolicy()
-	return dropletPolicy.getPcapVersion()
+	return op.getDropletPolicy().getAllVersion()
 }
 
 func (op *PolicyDataOP) getDropletPolicyStr() []byte {
-	dropletPolicy := op.getDropletPolicy()
-	return dropletPolicy.getPcapSerializeString()
+	return op.getDropletPolicy().getAllSerializeString()
 }
 
 func (op *PolicyDataOP) getVTapPolicyVersion(vtapID int, functions mapset.Set) uint64 {
@@ -701,7 +691,7 @@ func (op *PolicyDataOP) generatePolicies() {
 					Vlan:        proto.Uint32(uint32(acl.Vlan)),
 					NpbActions:  dropletNpbActions,
 				}
-				dropletPolicy.addPcapFlowACL(dropletFlowACL)
+				dropletPolicy.addFlowACL(dropletFlowACL, appInt)
 			}
 		}
 		// generat agent policy
