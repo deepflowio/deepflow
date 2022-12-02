@@ -64,7 +64,7 @@ pub struct KrpcInfo {
     //trace info
     trace_id: String,
     span_id: String,
-
+    parent_span_id: String,
     status: L7ResponseStatus,
 }
 
@@ -83,6 +83,7 @@ impl KrpcInfo {
         if let Some(t) = k.trace {
             self.trace_id = t.trace_id;
             self.span_id = t.span_id;
+            self.parent_span_id = t.parent_span_id;
         }
 
         if self.ret_code == 0 {
@@ -162,6 +163,7 @@ impl From<KrpcInfo> for L7ProtocolSendLog {
             trace_info: Some(TraceInfo {
                 trace_id: Some(k.trace_id),
                 span_id: Some(k.span_id),
+                parent_span_id: Some(k.parent_span_id),
                 ..Default::default()
             }),
             ext_info: Some(ExtendedInfo {

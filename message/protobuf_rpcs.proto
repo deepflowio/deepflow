@@ -12,6 +12,7 @@ message KrpcMeta {
 
     message Trace {
         string traceId = 2;
+	string parentSpanId = 3;
         string spanId = 4;
     }
 
