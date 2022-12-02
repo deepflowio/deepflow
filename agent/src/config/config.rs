@@ -34,6 +34,7 @@ use tokio::runtime::Builder;
 
 use crate::common::decapsulate::TunnelType;
 use crate::common::l7_protocol_log::get_all_protocol;
+use crate::common::l7_protocol_log::L7ProtocolParserInterface;
 use crate::common::{
     enums::TapType, DEFAULT_LOG_FILE, L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT,
     L7_PROTOCOL_INFERENCE_TTL,
@@ -516,7 +517,9 @@ impl Default for YamlConfig {
             l7_protocol_enabled: {
                 let mut protos = vec![];
                 for i in get_all_protocol() {
-                    protos.push(i.as_string());
+                    if i.parse_default() {
+                        protos.push(i.as_string());
+                    }
                 }
                 protos
             },

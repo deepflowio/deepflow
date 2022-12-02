@@ -449,6 +449,12 @@ pub trait L7ProtocolParserInterface {
     fn parsable_on_udp(&self) -> bool {
         true
     }
+
+    // is parse default? use for config init.
+    fn parse_default(&self) -> bool {
+        true
+    }
+
     fn reset(&mut self);
 }
 
