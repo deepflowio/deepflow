@@ -30,8 +30,8 @@ use crate::common::enums::TapType;
 use crate::common::lookup_key::LookupKey;
 use crate::common::platform_data::PlatformData;
 use crate::common::TapPort;
-use crate::proto::common::TridentType;
 use crate::utils::environment::is_tt_workload;
+use public::proto::common::TridentType;
 use public::utils::net::MacAddr;
 
 pub const FROM_CONTROLLER: u16 = 1;

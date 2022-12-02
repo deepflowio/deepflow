@@ -1,2 +1,8 @@
 Cargo.lock
 /target
+
+
+# generated protobuf files
+src/proto/*.rs
+src/proto/integration/opentelemetry*.rs
+!src/proto/mod.rs

@@ -16,7 +16,7 @@
 
 use super::L7ResponseStatus;
 
-use crate::proto::flow_log;
+use public::proto::flow_log;
 
 #[derive(Default, Debug)]
 pub struct L7Request {

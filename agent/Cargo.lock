@@ -594,6 +594,7 @@ dependencies = [
  "pcap 0.10.1",
  "pcap 0.9.2",
  "pcap-sys",
+ "pcap_assembler",
  "pnet",
  "prost",
  "public",
@@ -1661,6 +1662,7 @@ name = "packet_sequence_block"
 version = "0.1.0"
 dependencies = [
  "prost",
+ "public",
 ]
 
 [[package]]
@@ -1758,6 +1760,14 @@ dependencies = [
  "libc",
  "pkg-config",
  "winapi",
+]
+
+[[package]]
+name = "pcap_assembler"
+version = "0.1.0"
+dependencies = [
+ "prost",
+ "public",
 ]
 
 [[package]]
@@ -2068,6 +2078,7 @@ dependencies = [
  "parking_lot 0.11.2",
  "pcap 0.10.1",
  "pnet",
+ "prost",
  "regex",
  "serde",
  "serde_json",
@@ -2075,6 +2086,7 @@ dependencies = [
  "socket2",
  "thiserror",
  "tonic",
+ "tonic-build",
  "windows",
 ]
 

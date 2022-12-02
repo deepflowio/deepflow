@@ -700,9 +700,9 @@ mod tests {
     use crate::flow_generator::flow_node::FlowNode;
     use crate::flow_generator::{FlowTimeout, TcpTimeout};
     use crate::flow_generator::{FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC, TIME_UNIT};
-    use crate::proto::common::TridentType;
     use crate::rpc::get_timestamp;
     use crate::utils::test::Capture;
+    use public::proto::common::TridentType;
 
     const FILE_DIR: &'static str = "resources/test/flow_generator";
 

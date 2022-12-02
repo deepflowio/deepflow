@@ -30,10 +30,10 @@ use cadence::{
 use log::{debug, info, warn};
 use prost::Message;
 pub use public::counter::*;
+use public::sender::{SendMessageType, Sendable};
 
 use crate::common::DEFAULT_INGESTER_PORT;
-use crate::proto::stats;
-use crate::sender::SendItem;
+use public::proto::stats;
 use public::queue::{bounded, Receiver, Sender};
 
 const STATS_PREFIX: &'static str = "deepflow_agent";
@@ -78,11 +78,6 @@ pub struct Batch {
 }
 
 impl Batch {
-    pub fn encode(&self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
-        let pb_stats: stats::Stats = self.to_stats();
-        pb_stats.encode(buf).map(|_| pb_stats.encoded_len())
-    }
-
     fn to_stats(&self) -> stats::Stats {
         let mut tag_names = vec![];
         let mut tag_values = vec![];
@@ -126,6 +121,20 @@ impl Batch {
     }
 }
 
+#[derive(Debug)]
+pub struct ArcBatch(Arc<Batch>);
+
+impl Sendable for ArcBatch {
+    fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
+        let pb_stats: stats::Stats = self.0.to_stats();
+        pb_stats.encode(buf).map(|_| pb_stats.encoded_len())
+    }
+
+    fn message_type(&self) -> SendMessageType {
+        SendMessageType::DeepflowStats
+    }
+}
+
 pub struct Collector {
     hostname: Arc<Mutex<String>>,
 
@@ -138,8 +147,8 @@ pub struct Collector {
     running: Arc<(Mutex<bool>, Condvar)>,
     thread: Mutex<Option<JoinHandle<()>>>,
 
-    sender: Arc<Sender<SendItem>>,
-    receiver: Arc<Receiver<SendItem>>,
+    sender: Arc<Sender<ArcBatch>>,
+    receiver: Arc<Receiver<ArcBatch>>,
 }
 
 impl Collector {
@@ -186,7 +195,7 @@ impl Collector {
         return s;
     }
 
-    pub fn get_receiver(&self) -> Arc<Receiver<SendItem>> {
+    pub fn get_receiver(&self) -> Arc<Receiver<ArcBatch>> {
         self.receiver.clone()
     }
 
@@ -338,8 +347,7 @@ impl Collector {
                                     points,
                                     timestamp: now,
                                 });
-                                if let Err(_) = sender.send(SendItem::DeepflowStats(batch.clone()))
-                                {
+                                if let Err(_) = sender.send(ArcBatch(batch.clone())) {
                                     debug!(
                                         "stats to send queue failed because queue have terminated"
                                     );

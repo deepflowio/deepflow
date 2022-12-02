@@ -37,8 +37,8 @@ use crate::common::policy::{Acl, Cidr, IpGroupData, PeerConnection};
 use crate::common::FeatureFlags;
 use crate::common::FlowAclListener;
 use crate::common::MetaPacket;
-use crate::proto::common::TridentType;
 use npb_pcap_policy::PolicyData;
+use public::proto::common::TridentType;
 use public::queue::Sender;
 
 pub struct PolicyMonitor {

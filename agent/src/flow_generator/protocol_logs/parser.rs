@@ -31,8 +31,8 @@ use arc_swap::access::Access;
 use log::{info, warn};
 
 use super::{
-    AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, DnsLog, DubboLog, KafkaLog,
-    LogMessageType, MqttLog, MysqlLog, RedisLog,
+    AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, BoxAppProtoLogsData, DnsLog, DubboLog,
+    KafkaLog, LogMessageType, MqttLog, MysqlLog, RedisLog,
 };
 
 use crate::{
@@ -48,7 +48,6 @@ use crate::{
         FLOW_METRICS_PEER_SRC,
     },
     metric::document::TapSide,
-    sender::SendItem,
     utils::stats::{Counter, CounterType, CounterValue, RefCountable},
 };
 use public::{
@@ -223,14 +222,14 @@ struct SessionQueue {
     log_rate: Arc<LeakyBucket>,
 
     counter: Arc<SessionAggrCounter>,
-    output_queue: DebugSender<SendItem>,
+    output_queue: DebugSender<BoxAppProtoLogsData>,
     config: LogParserAccess,
 }
 
 impl SessionQueue {
     fn new(
         counter: Arc<SessionAggrCounter>,
-        output_queue: DebugSender<SendItem>,
+        output_queue: DebugSender<BoxAppProtoLogsData>,
         config: LogParserAccess,
         log_rate: Arc<LeakyBucket>,
     ) -> Self {
@@ -462,7 +461,7 @@ impl SessionQueue {
                 .fetch_sub(map.len() as u64, Ordering::Relaxed);
             let v = map
                 .into_values()
-                .map(|item| SendItem::L7FlowLog(Box::new(item)))
+                .map(|item| BoxAppProtoLogsData(Box::new(item)))
                 .collect();
             if let Err(Error::Terminated(..)) = self.output_queue.send_all(v) {
                 warn!("output queue terminated");
@@ -512,7 +511,7 @@ impl SessionQueue {
         }
 
         if let Err(Error::Terminated(..)) =
-            self.output_queue.send(SendItem::L7FlowLog(Box::new(item)))
+            self.output_queue.send(BoxAppProtoLogsData(Box::new(item)))
         {
             warn!("output queue terminated");
         }
@@ -551,7 +550,7 @@ impl AppLogs {
 
 pub struct AppProtoLogsParser {
     input_queue: Arc<Receiver<Box<MetaAppProto>>>,
-    output_queue: DebugSender<SendItem>,
+    output_queue: DebugSender<BoxAppProtoLogsData>,
     id: u32,
     running: Arc<AtomicBool>,
     thread: Mutex<Option<JoinHandle<()>>>,
@@ -565,7 +564,7 @@ pub struct AppProtoLogsParser {
 impl AppProtoLogsParser {
     pub fn new(
         input_queue: Receiver<Box<MetaAppProto>>,
-        output_queue: DebugSender<SendItem>,
+        output_queue: DebugSender<BoxAppProtoLogsData>,
         id: u32,
         config: LogParserAccess,
         log_rate: Arc<LeakyBucket>,

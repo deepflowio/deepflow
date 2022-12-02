@@ -28,8 +28,9 @@ use super::error::Error;
 use super::matched_field::{MatchedFieldv4, MatchedFieldv6, MatchedFlag};
 use super::port_range::{PortRange, PortRangeList};
 use super::{IPV4_MAX_MASK_LEN, IPV6_MAX_MASK_LEN, MIN_MASK_LEN};
-use crate::proto::trident;
 use npb_pcap_policy::{ActionFlags, NpbAction, NpbTunnelType, PolicyData, TapSide};
+
+use public::proto::trident;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum GroupType {

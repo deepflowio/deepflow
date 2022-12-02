@@ -381,3 +381,7 @@ pub const MIN_MASK_LEN: u8 = 0;
 // 静态配置项默认值
 pub const L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT: usize = 50;
 pub const L7_PROTOCOL_INFERENCE_TTL: usize = 60;
+
+// RawPcap
+pub const PCAP_MAGIC: u32 = 0xa1b2c3d4;
+pub const RECORD_HEADER_LEN: usize = 16;

@@ -45,8 +45,8 @@ use crate::common::{IPV4_SRC_OFFSET, IPV6_SRC_OFFSET};
 use crate::config::NpbConfig;
 #[cfg(unix)]
 use crate::dispatcher::af_packet::{Options, Tpacket};
-use crate::proto::trident::SocketType;
 use crate::utils::stats::{self, StatsOption};
+use public::proto::trident::SocketType;
 use public::queue::Receiver;
 #[cfg(unix)]
 use public::utils::net::{

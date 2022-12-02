@@ -1,8 +1,8 @@
 pub mod opentelemetry {
     pub mod proto {
-        pub mod resource {
+        pub mod common {
             pub mod v1 {
-                include!("opentelemetry.proto.resource.v1.rs");
+                include!("opentelemetry.proto.common.v1.rs");
             }
         }
         pub mod trace {
@@ -10,9 +10,9 @@ pub mod opentelemetry {
                 include!("opentelemetry.proto.trace.v1.rs");
             }
         }
-        pub mod common {
+        pub mod resource {
             pub mod v1 {
-                include!("opentelemetry.proto.common.v1.rs");
+                include!("opentelemetry.proto.resource.v1.rs");
             }
         }
     }

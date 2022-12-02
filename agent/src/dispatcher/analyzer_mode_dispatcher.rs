@@ -39,9 +39,9 @@ use crate::{
     },
     flow_generator::FlowMap,
     handler::{MiniPacket, PacketHandler},
-    proto::trident::IfMacSource,
     rpc::get_timestamp,
 };
+use public::proto::trident::IfMacSource;
 use public::utils::net::{Link, MacAddr};
 
 // BILD to reduce the processing flow of Trident tunnel traffic, the tunnel traffic will be marked

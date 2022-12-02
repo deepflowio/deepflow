@@ -16,7 +16,7 @@
 
 use std::mem::swap;
 
-use crate::proto::metric;
+use public::proto::metric;
 
 const FLOW_ID: u32 = 1;
 const USAGE_ID: u32 = 4;

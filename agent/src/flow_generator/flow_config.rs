@@ -20,7 +20,7 @@ use std::{
     time::Duration,
 };
 
-use crate::proto::common::TridentType;
+use public::proto::common::TridentType;
 
 pub const TIMEOUT_OTHERS: Duration = Duration::from_secs(5);
 pub const TIMEOUT_ESTABLISHED: Duration = Duration::from_secs(300);

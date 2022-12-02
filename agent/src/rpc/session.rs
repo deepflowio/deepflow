@@ -29,8 +29,8 @@ use tonic::transport::{Channel, Endpoint};
 
 use crate::common::{DEFAULT_CONTROLLER_PORT, DEFAULT_CONTROLLER_TLS_PORT};
 use crate::exception::ExceptionHandler;
-use crate::proto::trident::{self, Exception};
 use crate::utils::stats::{self, AtomicTimeStats, StatsOption};
+use public::proto::trident::{self, Exception};
 
 use public::counter::{Countable, Counter, CounterType, CounterValue, RefCountable};
 

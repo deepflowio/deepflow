@@ -23,15 +23,15 @@ use std::{
 };
 
 use log::{info, warn};
+use packet_sequence_block::BoxedPacketSequenceBlock;
 
 // Enterprise Edition Feature: packet-sequence
 use crate::flow_generator::packet_sequence::consts;
-use crate::sender::SendItem;
 use public::queue::{DebugSender, Error, Receiver};
 
 pub struct PacketSequenceParser {
     input_queue: Arc<Receiver<Box<packet_sequence_block::PacketSequenceBlock>>>,
-    output_queue: DebugSender<SendItem>,
+    output_queue: DebugSender<BoxedPacketSequenceBlock>,
     id: u32,
     running: Arc<AtomicBool>,
     thread: Mutex<Option<JoinHandle<()>>>,
@@ -40,7 +40,7 @@ pub struct PacketSequenceParser {
 impl PacketSequenceParser {
     pub fn new(
         input_queue: Receiver<Box<packet_sequence_block::PacketSequenceBlock>>,
-        output_queue: DebugSender<SendItem>,
+        output_queue: DebugSender<BoxedPacketSequenceBlock>,
         id: u32,
     ) -> Self {
         PacketSequenceParser {
@@ -65,11 +65,11 @@ impl PacketSequenceParser {
             while running.load(Ordering::Relaxed) {
                 match input_queue.recv_n(consts::QUEUE_BATCH_SIZE, Some(consts::RCV_TIMEOUT)) {
                     Ok(packet_sequence_blocks) => {
-                        let v = packet_sequence_blocks
+                        let packet_sequence_blocks = packet_sequence_blocks
                             .into_iter()
-                            .map(|item| SendItem::PacketSequenceBlock(item))
+                            .map(|f| BoxedPacketSequenceBlock(f))
                             .collect();
-                        if let Err(_) = output_queue.send_all(v) {
+                        if let Err(_) = output_queue.send_all(packet_sequence_blocks) {
                             warn!(
                                 "packet sequence block to queue failed maybe queue have terminated"
                             );

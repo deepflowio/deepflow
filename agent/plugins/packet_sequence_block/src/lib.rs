@@ -17,6 +17,8 @@
 //! Enterprise Edition Feature: packet-sequence
 use std::time::Duration;
 
+use public::sender::{SendMessageType, Sendable};
+
 #[derive(Debug, Default, PartialEq)]
 pub struct PacketData {}
 
@@ -39,9 +41,18 @@ impl PacketSequenceBlock {
     pub fn reverse_needed_for_new_packet(&mut self) {
         unimplemented!();
     }
+}
 
-    pub fn encode(self, _: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
-        unimplemented!();
+#[derive(Debug)]
+pub struct BoxedPacketSequenceBlock(pub Box<PacketSequenceBlock>);
+
+impl Sendable for BoxedPacketSequenceBlock {
+    fn encode(self, _: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
+        Ok(0)
+    }
+
+    fn message_type(&self) -> SendMessageType {
+        SendMessageType::PacketSequenceBlock
     }
 }
 

@@ -35,7 +35,7 @@ use super::process::{
 use crate::common::NORMAL_EXIT_WITH_RESTART;
 use crate::config::handler::EnvironmentAccess;
 use crate::exception::ExceptionHandler;
-use crate::proto::trident::Exception;
+use public::proto::trident::Exception;
 
 const CHECK_INTERVAL: Duration = Duration::from_secs(1);
 

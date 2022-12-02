@@ -33,15 +33,13 @@ use super::{
     tap_port::TapPort,
 };
 
-use crate::proto::flow_log;
-use crate::{
-    common::endpoint::EPC_FROM_INTERNET, metric::document::Direction, proto::common::TridentType,
-};
+use crate::{common::endpoint::EPC_FROM_INTERNET, metric::document::Direction};
 use crate::{
     flow_generator::protocol_logs::{duration_to_micros, to_string_format},
     flow_generator::FlowState,
     metric::document::TapSide,
 };
+use public::proto::{common::TridentType, flow_log};
 use public::utils::net::MacAddr;
 
 pub use public::enums::L4Protocol;

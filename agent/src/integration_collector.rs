@@ -32,6 +32,7 @@ use hyper::{
 };
 use log::{debug, error, info, log_enabled, warn, Level};
 use prost::Message;
+use public::sender::{SendMessageType, Sendable};
 use tokio::{
     runtime::{Builder, Runtime},
     select,
@@ -41,42 +42,61 @@ use tokio::{
 };
 
 use crate::exception::ExceptionHandler;
-use crate::proto::integration::opentelemetry::proto::{
+use public::counter::{Counter, CounterType, CounterValue, OwnedCountable};
+use public::proto::integration::opentelemetry::proto::{
     common::v1::any_value::Value,
     common::v1::{AnyValue, KeyValue},
     trace::v1::TracesData,
 };
-use crate::proto::trident::Exception;
-use crate::sender::SendItem;
-use public::counter::{Counter, CounterType, CounterValue, OwnedCountable};
+use public::proto::trident::Exception;
 use public::queue::{DebugSender, Error};
 
 type GenericError = Box<dyn std::error::Error + Send + Sync>;
 
 const NOT_FOUND: &[u8] = b"Not Found";
 const GZIP: &str = "gzip";
+const OPEN_TELEMETRY: u32 = 20220607;
+const OPEN_TELEMETRY_COMPRESSED: u32 = 20221024;
+const PROMETHEUS: u32 = 20220613;
+const TELEGRAF: u32 = 20220613;
 
 // Otel的protobuf数据
 // ingester使用该proto https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/trace/v1/trace.proto进行解析
 #[derive(Debug, PartialEq)]
 pub struct OpenTelemetry(Vec<u8>);
 
-impl OpenTelemetry {
-    pub fn encode(mut self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
+impl Sendable for OpenTelemetry {
+    fn encode(mut self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
         let length = self.0.len();
         buf.append(&mut self.0);
         Ok(length)
+    }
+
+    fn message_type(&self) -> SendMessageType {
+        SendMessageType::OpenTelemetry
+    }
+
+    fn version(&self) -> u32 {
+        OPEN_TELEMETRY
     }
 }
 
 #[derive(Debug, PartialEq)]
 pub struct OpenTelemetryCompressed(Vec<u8>);
 
-impl OpenTelemetryCompressed {
-    pub fn encode(mut self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
+impl Sendable for OpenTelemetryCompressed {
+    fn encode(mut self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
         let length = self.0.len();
         buf.append(&mut self.0);
         Ok(length)
+    }
+
+    fn message_type(&self) -> SendMessageType {
+        SendMessageType::OpenTelemetryCompressed
+    }
+
+    fn version(&self) -> u32 {
+        OPEN_TELEMETRY_COMPRESSED
     }
 }
 
@@ -85,11 +105,19 @@ impl OpenTelemetryCompressed {
 #[derive(Debug, PartialEq)]
 pub struct PrometheusMetric(Vec<u8>);
 
-impl PrometheusMetric {
-    pub fn encode(mut self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
+impl Sendable for PrometheusMetric {
+    fn encode(mut self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
         let length = self.0.len();
         buf.append(&mut self.0);
         Ok(length)
+    }
+
+    fn message_type(&self) -> SendMessageType {
+        SendMessageType::Prometheus
+    }
+
+    fn version(&self) -> u32 {
+        PROMETHEUS
     }
 }
 
@@ -97,11 +125,19 @@ impl PrometheusMetric {
 #[derive(Debug, PartialEq)]
 pub struct TelegrafMetric(Vec<u8>);
 
-impl TelegrafMetric {
-    pub fn encode(mut self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
+impl Sendable for TelegrafMetric {
+    fn encode(mut self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
         let length = self.0.len();
         buf.append(&mut self.0);
         Ok(length)
+    }
+
+    fn message_type(&self) -> SendMessageType {
+        SendMessageType::Telegraf
+    }
+
+    fn version(&self) -> u32 {
+        TELEGRAF
     }
 }
 
@@ -202,10 +238,10 @@ fn compress_data(input: Vec<u8>) -> std::io::Result<Vec<u8>> {
 async fn handler(
     peer_addr: SocketAddr,
     req: Request<Body>,
-    otel_sender: DebugSender<SendItem>,
-    compressed_otel_sender: DebugSender<SendItem>,
-    prometheus_sender: DebugSender<SendItem>,
-    telegraf_sender: DebugSender<SendItem>,
+    otel_sender: DebugSender<OpenTelemetry>,
+    compressed_otel_sender: DebugSender<OpenTelemetryCompressed>,
+    prometheus_sender: DebugSender<PrometheusMetric>,
+    telegraf_sender: DebugSender<TelegrafMetric>,
     exception_handler: ExceptionHandler,
     compressed: bool,
     counter: Arc<CompressedMetric>,
@@ -240,15 +276,13 @@ async fn handler(
                 counter
                     .compressed
                     .fetch_add(compressed_data.len() as u64, Ordering::Relaxed);
-                if let Err(Error::Terminated(..)) = compressed_otel_sender.send(
-                    SendItem::ExternalOtelCompressed(OpenTelemetryCompressed(compressed_data)),
-                ) {
+                if let Err(Error::Terminated(..)) =
+                    compressed_otel_sender.send(OpenTelemetryCompressed(compressed_data))
+                {
                     warn!("sender queue has terminated");
                 }
             } else {
-                if let Err(Error::Terminated(..)) =
-                    otel_sender.send(SendItem::ExternalOtel(OpenTelemetry(decode_data)))
-                {
+                if let Err(Error::Terminated(..)) = otel_sender.send(OpenTelemetry(decode_data)) {
                     warn!("sender queue has terminated");
                 }
             }
@@ -266,9 +300,7 @@ async fn handler(
                 };
             let mut metric = vec![0u8; whole_body.remaining()];
             whole_body.copy_to_slice(metric.as_mut_slice());
-            if let Err(Error::Terminated(..)) =
-                prometheus_sender.send(SendItem::ExternalProm(PrometheusMetric(metric)))
-            {
+            if let Err(Error::Terminated(..)) = prometheus_sender.send(PrometheusMetric(metric)) {
                 warn!("sender queue has terminated");
             }
 
@@ -289,9 +321,7 @@ async fn handler(
                     debug!("telegraf metric: {}", r)
                 }
             }
-            if let Err(Error::Terminated(..)) =
-                telegraf_sender.send(SendItem::ExternalTelegraf(TelegrafMetric(metric)))
-            {
+            if let Err(Error::Terminated(..)) = telegraf_sender.send(TelegrafMetric(metric)) {
                 warn!("sender queue has terminated");
             }
             Ok(Response::builder().body(Body::empty()).unwrap())
@@ -355,10 +385,10 @@ pub struct MetricServer {
     running: Arc<AtomicBool>,
     rt: Runtime,
     thread: Arc<Mutex<Option<JoinHandle<()>>>>,
-    otel_sender: DebugSender<SendItem>,
-    compressed_otel_sender: DebugSender<SendItem>,
-    prometheus_sender: DebugSender<SendItem>,
-    telegraf_sender: DebugSender<SendItem>,
+    otel_sender: DebugSender<OpenTelemetry>,
+    compressed_otel_sender: DebugSender<OpenTelemetryCompressed>,
+    prometheus_sender: DebugSender<PrometheusMetric>,
+    telegraf_sender: DebugSender<TelegrafMetric>,
     port: Arc<AtomicU16>,
     exception_handler: ExceptionHandler,
     server_shutdown_tx: Mutex<Option<mpsc::Sender<()>>>,
@@ -368,10 +398,10 @@ pub struct MetricServer {
 
 impl MetricServer {
     pub fn new(
-        otel_sender: DebugSender<SendItem>,
-        compressed_otel_sender: DebugSender<SendItem>,
-        prometheus_sender: DebugSender<SendItem>,
-        telegraf_sender: DebugSender<SendItem>,
+        otel_sender: DebugSender<OpenTelemetry>,
+        compressed_otel_sender: DebugSender<OpenTelemetryCompressed>,
+        prometheus_sender: DebugSender<PrometheusMetric>,
+        telegraf_sender: DebugSender<TelegrafMetric>,
         port: u16,
         exception_handler: ExceptionHandler,
         compressed: bool,

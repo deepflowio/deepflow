@@ -38,10 +38,10 @@ use crate::{
         AppProtoHead, Error, LogMessageType, Result,
     },
     perf_impl,
-    proto::protobuf_rpc::KrpcMeta,
 };
 
 use super::ProtobufRpcInfo;
+use public::proto::protobuf_rpc::KrpcMeta;
 
 const KRPC_FIX_HDR_LEN: usize = 8;
 const KRPC_DIR_REQ: i32 = 1;

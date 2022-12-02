@@ -47,7 +47,6 @@ use crate::{
             RecvEngine, DEFAULT_BLOCK_SIZE, FRAME_SIZE_MAX, FRAME_SIZE_MIN, POLL_TIMEOUT,
         },
     },
-    proto::trident::TapMode,
 };
 
 use public::{
@@ -55,6 +54,7 @@ use public::{
     enums::{EthernetType, IpProtocol},
     error::Error,
     netns::{InterfaceInfo, NsFile},
+    proto::trident::TapMode,
     utils::net::{addr_list, MacAddr},
 };
 

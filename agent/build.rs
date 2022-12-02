@@ -18,39 +18,6 @@ use std::{env, error::Error, path::PathBuf, process::Command, str};
 
 use chrono::prelude::*;
 
-fn generate_protobuf() -> Result<(), Box<dyn Error>> {
-    tonic_build::configure()
-        .build_server(false)
-        .out_dir("src/proto")
-        .compile(
-            &[
-                "../message/common.proto",
-                "../message/trident.proto",
-                "../message/metric.proto",
-                "../message/flow_log.proto",
-                "../message/stats.proto",
-                "../message/protobuf_rpcs.proto",
-            ],
-            &["../message"],
-        )?;
-    tonic_build::configure()
-        .build_server(false)
-        .out_dir("src/proto/integration")
-        // FIXME: wait for newer api to pin codegen file
-        // .include_file("mod.rs")
-        .compile(
-            &["../message/opentelemetry/opentelemetry/proto/trace/v1/trace.proto"],
-            &["../message/opentelemetry"],
-        )?;
-
-    // FIXME: Wait for the rustfmt ignore attribute to be removed in stable rust support
-    Command::new("cargo")
-        .args(["fmt", "--", "src/proto/*.rs", "src/proto/integration/*.rs"])
-        .spawn()?;
-
-    Ok(())
-}
-
 fn get_branch() -> Result<String, Box<dyn Error>> {
     if let Ok(branch) = env::var("GITHUB_REF_NAME") {
         return Ok(branch);
@@ -180,7 +147,6 @@ fn set_linkage() -> Result<(), Box<dyn Error>> {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    generate_protobuf()?;
     set_build_info()?;
     let target_os = env::var("CARGO_CFG_TARGET_OS")?;
     if target_os.as_str() == "linux" {

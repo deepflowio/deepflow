@@ -51,7 +51,7 @@ use std::{
 };
 
 use crate::common::policy::Acl;
-use crate::proto::common::TridentType;
+use public::proto::common::TridentType;
 
 use policy::{Cidr, IpGroupData, PeerConnection};
 

@@ -32,10 +32,13 @@ use super::consts::*;
 use super::round_to_minute;
 
 use crate::collector::acc_flow::U16Set;
-use crate::common::{enums::TapType, flow::CloseType, tagged_flow::TaggedFlow};
+use crate::common::{
+    enums::TapType,
+    flow::CloseType,
+    tagged_flow::{BoxedTaggedFlow, TaggedFlow},
+};
 use crate::config::handler::CollectorAccess;
 use crate::rpc::get_timestamp;
-use crate::sender::SendItem;
 use crate::utils::stats::{Counter, CounterType, CounterValue, RefCountable};
 use public::queue::{DebugSender, Error, Receiver};
 
@@ -54,7 +57,7 @@ pub struct FlowAggrCounter {
 pub struct FlowAggrThread {
     id: usize,
     input: Arc<Receiver<Arc<TaggedFlow>>>,
-    output: DebugSender<SendItem>,
+    output: DebugSender<BoxedTaggedFlow>,
     config: CollectorAccess,
 
     thread_handle: Option<JoinHandle<()>>,
@@ -69,7 +72,7 @@ impl FlowAggrThread {
     pub fn new(
         id: usize,
         input: Receiver<Arc<TaggedFlow>>,
-        output: DebugSender<SendItem>,
+        output: DebugSender<BoxedTaggedFlow>,
         config: CollectorAccess,
         ntp_diff: Arc<AtomicI64>,
     ) -> (Self, Arc<FlowAggrCounter>) {
@@ -137,7 +140,7 @@ pub struct FlowAggr {
 impl FlowAggr {
     pub fn new(
         input: Arc<Receiver<Arc<TaggedFlow>>>,
-        output: DebugSender<SendItem>,
+        output: DebugSender<BoxedTaggedFlow>,
         running: Arc<AtomicBool>,
         config: CollectorAccess,
         ntp_diff: Arc<AtomicI64>,
@@ -321,9 +324,9 @@ struct ThrottlingQueue {
 
     last_flush_time: Duration,
     period_count: usize,
-    output: DebugSender<SendItem>,
+    output: DebugSender<BoxedTaggedFlow>,
 
-    stashs: Vec<SendItem>,
+    stashs: Vec<BoxedTaggedFlow>,
 }
 
 impl ThrottlingQueue {
@@ -332,7 +335,7 @@ impl ThrottlingQueue {
     const MIN_L4_LOG_COLLECT_NPS_THRESHOLD: u64 = 100;
     const MAX_L4_LOG_COLLECT_NPS_THRESHOLD: u64 = 1000000;
 
-    pub fn new(output: DebugSender<SendItem>, config: CollectorAccess) -> Self {
+    pub fn new(output: DebugSender<BoxedTaggedFlow>, config: CollectorAccess) -> Self {
         let t: u64 = config.load().l4_log_collect_nps_threshold * Self::THROTTLE_BUCKET;
         Self {
             config,
@@ -368,12 +371,12 @@ impl ThrottlingQueue {
 
         self.period_count += 1;
         if self.stashs.len() < self.throttle as usize {
-            self.stashs.push(SendItem::L4FlowLog(Box::new(f)));
+            self.stashs.push(BoxedTaggedFlow(Box::new(f)));
             true
         } else {
             let r = self.small_rng.gen_range(0..self.period_count);
             if r < self.throttle as usize {
-                self.stashs[r] = SendItem::L4FlowLog(Box::new(f));
+                self.stashs[r] = BoxedTaggedFlow(Box::new(f));
             }
             false
         }

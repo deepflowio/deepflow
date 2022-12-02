@@ -50,14 +50,14 @@ use crate::common::NORMAL_EXIT_WITH_RESTART;
 use crate::common::{FlowAclListener, PlatformData as VInterface, DEFAULT_CONTROLLER_PORT};
 use crate::config::RuntimeConfig;
 use crate::exception::ExceptionHandler;
-use crate::proto::common::TridentType;
-use crate::proto::trident::{self as tp, Exception, TapMode};
 use crate::rpc::session::Session;
 use crate::trident::{self, ChangedConfig, RunningMode, TridentState, VersionInfo};
 use crate::utils::{
     environment::{get_executable_path, is_tt_pod, running_in_container},
     stats,
 };
+use public::proto::common::TridentType;
+use public::proto::trident::{self as tp, Exception, TapMode};
 use public::utils::net::{addr_list, is_unicast_link_local, MacAddr};
 
 const DEFAULT_SYNC_INTERVAL: Duration = Duration::from_secs(60);
@@ -661,7 +661,7 @@ impl Synchronizer {
             exception_handler.set(Exception::InvalidConfiguration);
             return;
         }
-        let runtime_config = runtime_config.unwrap();
+        let mut runtime_config = runtime_config.unwrap();
         // FIXME: Confirm the kvm resource classification and then cancel the comment
         // When the ee version compiles the ce crate, it will be false, only ce version
         // will be true
@@ -670,6 +670,10 @@ impl Synchronizer {
             runtime_config.platform_enabled = false;
         }
          */
+        // CE-AGENT always set pcap-assembler disabled
+        if static_config.version_info.name == env!("AGENT_NAME") {
+            runtime_config.yaml_config.pcap.enabled = false;
+        }
         let _ = escape_tx.send(Duration::from_secs(runtime_config.max_escape));
 
         max_memory.store(runtime_config.max_memory, Ordering::Relaxed);

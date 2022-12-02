@@ -41,17 +41,18 @@ use crate::{
     },
     config::handler::CollectorAccess,
     metric::{
-        document::{Code, Direction, Document, DocumentFlag, TagType, Tagger, TapSide},
+        document::{
+            BoxedDocument, Code, Direction, Document, DocumentFlag, TagType, Tagger, TapSide,
+        },
         meter::{FlowMeter, Meter, UsageMeter},
     },
-    proto::common::TridentType,
     rpc::get_timestamp,
-    sender::SendItem,
     utils::stats::{
         self, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption,
     },
 };
 use public::{
+    proto::common::TridentType,
     queue::{DebugSender, Error, Receiver},
     utils::net::MacAddr,
 };
@@ -294,7 +295,7 @@ impl StashKey {
 }
 
 struct Stash {
-    sender: DebugSender<SendItem>,
+    sender: DebugSender<BoxedDocument>,
     counter: Arc<CollectorCounter>,
     start_time: Duration,
     slot_interval: u64,
@@ -305,7 +306,11 @@ struct Stash {
 }
 
 impl Stash {
-    fn new(ctx: Context, sender: DebugSender<SendItem>, counter: Arc<CollectorCounter>) -> Self {
+    fn new(
+        ctx: Context,
+        sender: DebugSender<BoxedDocument>,
+        counter: Arc<CollectorCounter>,
+    ) -> Self {
         let (slot_interval, doc_flag) = match ctx.metric_type {
             MetricsType::SECOND => (1, DocumentFlag::PER_SECOND_METRICS),
             _ => (60, DocumentFlag::NONE),
@@ -821,7 +826,7 @@ impl Stash {
             .map(|(_, mut doc)| {
                 doc.timestamp = self.start_time.as_secs() as u32;
                 doc.flags |= self.doc_flag;
-                SendItem::Metrics(Box::new(doc))
+                BoxedDocument(Box::new(doc))
             })
             .collect::<Vec<_>>();
         let mut index = 0;
@@ -855,7 +860,7 @@ pub struct Collector {
     running: Arc<AtomicBool>,
     thread: Mutex<Option<JoinHandle<()>>>,
     receiver: Arc<Receiver<Box<AccumulatedFlow>>>,
-    sender: DebugSender<SendItem>,
+    sender: DebugSender<BoxedDocument>,
 
     context: Context,
 }
@@ -864,7 +869,7 @@ impl Collector {
     pub fn new(
         id: u32,
         receiver: Receiver<Box<AccumulatedFlow>>,
-        sender: DebugSender<SendItem>,
+        sender: DebugSender<BoxedDocument>,
         metric_type: MetricsType,
         delay_seconds: u32,
         stats: &Arc<stats::Collector>,

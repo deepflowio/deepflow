@@ -44,11 +44,11 @@ use crate::{
     error::{Error, Result},
     exception::ExceptionHandler,
     platform::kubernetes::resource_watcher::ResourceWatcherFactory,
-    proto::{
-        common::KubernetesApiInfo,
-        trident::{Exception, KubernetesApiSyncRequest},
-    },
     rpc::Session,
+};
+use public::proto::{
+    common::KubernetesApiInfo,
+    trident::{Exception, KubernetesApiSyncRequest},
 };
 
 /*

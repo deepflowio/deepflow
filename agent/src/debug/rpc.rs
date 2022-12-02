@@ -22,9 +22,9 @@ use tokio::runtime::{Builder, Runtime};
 
 use crate::config::RuntimeConfig;
 use crate::exception::ExceptionHandler;
-use crate::proto::trident::SyncResponse;
 use crate::rpc::{RunningConfig, Session, StaticConfig, Status, Synchronizer};
 use public::debug::{Error, Result};
+use public::proto::trident::SyncResponse;
 
 pub struct RpcDebugger {
     session: Arc<Session>,
