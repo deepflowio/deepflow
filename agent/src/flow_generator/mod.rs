@@ -57,3 +57,4 @@ const SERVICE_TABLE_IPV4_CAPACITY: usize = 2048;
 const SERVICE_TABLE_IPV6_CAPACITY: usize = 256;
 const L7_RRT_CACHE_CAPACITY: usize = 4096;
 const L7_PROTOCOL_UNKNOWN_LIMIT: Duration = Duration::from_secs(60);
+const EBPF_MINIMUM_TIMEOUT: Duration = Duration::from_secs(1);
