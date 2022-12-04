@@ -85,8 +85,10 @@ func GetAnalyzers(filter map[string]interface{}) (resp []model.Analyzer, err err
 	}
 
 	analyzerIPToVtapCount := make(map[string]int)
+	analyzerIPToCurVtapCount := make(map[string]int)
 	for _, vtap := range vtaps {
 		analyzerIPToVtapCount[vtap.AnalyzerIP]++
+		analyzerIPToCurVtapCount[vtap.CurAnalyzerIP]++
 	}
 
 	for _, analyzer := range analyzers {
@@ -121,6 +123,10 @@ func GetAnalyzers(filter map[string]interface{}) (resp []model.Analyzer, err err
 		// vtap_count
 		if vtapCount, ok := analyzerIPToVtapCount[analyzer.IP]; ok {
 			analyzerResp.VtapCount = vtapCount
+		}
+		// cur_vtap_count
+		if vtapCount, ok := analyzerIPToCurVtapCount[analyzer.IP]; ok {
+			analyzerResp.CurVtapCount = vtapCount
 		}
 		// region
 		var azConns []*mysql.AZAnalyzerConnection

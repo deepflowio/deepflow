@@ -1,0 +1,8 @@
+# agent name
+name: xxxxxxxx
+# tap_mode
+tap_mode: 0
+# enable/disable
+enable: 1
+# vtap_group_id
+vtap_group_id: g-xxxxxxxx

@@ -23,7 +23,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"unicode"
 
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
@@ -147,7 +146,7 @@ func listDomain(cmd *cobra.Command, args []string, output string) {
 			name := d.Get("NAME").MustString()
 			var nameChineseCount int
 			for _, b := range name {
-				if unicode.Is(unicode.Han, b) {
+				if common.IsChineseChar(string(b)) {
 					nameChineseCount += 1
 				}
 			}
