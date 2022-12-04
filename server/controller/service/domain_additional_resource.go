@@ -21,49 +21,61 @@ import (
 	"fmt"
 	"net"
 
+	mapset "github.com/deckarep/golang-set/v2"
+	"gorm.io/gorm"
+
+	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/model"
-	"gorm.io/gorm"
 )
 
-func ApplyDomainAddtionalResource(reqData map[string][]model.AdditionalResourceDomain) error {
-	log.Infof("apply domain addtional resources: %#v", reqData)
-	domains, err := formatData(reqData)
+type addtionalResourceToolDataSet struct {
+	regionUUID             string
+	azUUIDs                []string
+	vpcUUIDs               []string
+	subnetUUIDToType       map[string]int
+	subnetToCIDRToCIDRUUID map[string]map[string]string
+	hostIPToUUID           map[string]string
+	additionalAZs          []model.AdditionalResourceAZ
+	additionalVPCs         []model.AdditionalResourceVPC
+	additionalSubnets      []model.AdditionalResourceSubnet
+	additionalHosts        []model.AdditionalResourceHost
+	additionalCHosts       []model.AdditionalResourceChost
+}
+
+func newAddtionalResourceToolDataSet(regionUUID string) *addtionalResourceToolDataSet {
+	return &addtionalResourceToolDataSet{
+		regionUUID:             regionUUID,
+		subnetUUIDToType:       make(map[string]int),
+		subnetToCIDRToCIDRUUID: make(map[string]map[string]string),
+		hostIPToUUID:           make(map[string]string),
+	}
+}
+
+func ApplyDomainAddtionalResource(reqData model.AdditionalResource) error {
+	log.Infof("apply domain additinal resource: %#v", reqData)
+	domainUUIDToToolDataSet, err := generateToolDataSet(reqData)
 	if err != nil {
 		return err
 	}
-
-	var dbItems []mysql.DomainAdditionalResource
-	for _, domain := range domains {
-		var dbDomain mysql.Domain
-		err := mysql.Db.Where("lcuuid = ?", domain.Lcuuid).Take(&dbDomain).Error
-		if err != nil {
-			return NewError(
-				common.RESOURCE_NOT_FOUND,
-				fmt.Sprintf("domain (lcuuid: %s) not found in db: %s", domain.Lcuuid, err.Error()),
-			)
-		}
-		if len(domain.AZs) == 0 && len(domain.VPCs) == 0 && len(domain.Networks) == 0 && len(domain.Hosts) == 0 && len(domain.VMs) == 0 {
-			log.Info("domain (lcuuid: %s) has no additional resources to apply", domain.Lcuuid)
-			continue
-		}
-		content, err := json.Marshal(domain)
-		if err != nil {
-			return NewError(
-				common.SERVER_ERROR,
-				fmt.Sprintf("json marshal (%#v) failed: %s", domain, err.Error()),
-			)
-		}
-		dbItem := mysql.DomainAdditionalResource{
-			Domain:  domain.Lcuuid,
-			Content: string(content),
-		}
-		dbItems = append(dbItems, dbItem)
+	log.Infof("generated tool data set: %#v", domainUUIDToToolDataSet)
+	domainUUIDToCloudModelData, err := generateCloudModelData(domainUUIDToToolDataSet)
+	if err != nil {
+		return err
 	}
+	log.Infof("generated cloud model data: %#v", domainUUIDToCloudModelData)
+	dbItems, err := generateDataToInsertDB(domainUUIDToCloudModelData)
+	if err != nil {
+		return err
+	}
+	err = fullUpdateDB(dbItems)
+	return nil
+}
 
+func fullUpdateDB(dbItems []mysql.DomainAdditionalResource) error {
 	// Full update, delete all data before inserting
-	err = mysql.Db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.DomainAdditionalResource{}).Error
+	err := mysql.Db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.DomainAdditionalResource{}).Error
 	if err != nil {
 		return NewError(
 			common.SERVER_ERROR,
@@ -80,214 +92,513 @@ func ApplyDomainAddtionalResource(reqData map[string][]model.AdditionalResourceD
 	return nil
 }
 
-func formatData(data map[string][]model.AdditionalResourceDomain) ([]model.AdditionalResourceDomain, error) {
-	for _, domain := range data["domains"] {
-		azLcuuids, err := getDomainAZLcuuidsIncludingDBData(domain)
+func generateDataToInsertDB(domainUUIDToCloudModelData map[string]*cloudmodel.AdditionalResource) ([]mysql.DomainAdditionalResource, error) {
+	var dbItems []mysql.DomainAdditionalResource
+	for domainUUID, cloudMD := range domainUUIDToCloudModelData {
+		content, err := json.Marshal(cloudMD)
 		if err != nil {
-			return nil, err
+			return nil, NewError(
+				common.SERVER_ERROR,
+				fmt.Sprintf("json marshal domain (uuid: %s) cloud data (detail: %#v) failed: %s", domainUUID, cloudMD, err.Error()),
+			)
 		}
-		vpcLcuuids, err := getDomainVPCLcuuidsIncludingDBData(domain)
-		if err != nil {
-			return nil, err
+		dbItem := mysql.DomainAdditionalResource{
+			Domain:  domainUUID,
+			Content: string(content),
 		}
-		networkLcuuidToNetType := make(map[string]int)
-		subnetLcuuidToNetworkLcuuid := make(map[string]string)
-		for _, network := range domain.Networks {
-			if network.AZLcuuid != "" && !common.Contains(azLcuuids, network.AZLcuuid) {
+		dbItems = append(dbItems, dbItem)
+	}
+	return dbItems, nil
+}
+
+func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*addtionalResourceToolDataSet, error) {
+	domainUUIDs := getDomainUUIDsUsedByAdditionalResource(additionalRsc)
+
+	domainUUIDToToolDataSet := make(map[string]*addtionalResourceToolDataSet)
+	domainUUIDToRegionUUID, err := getRegionDataFromDB(domainUUIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	for domainUUID, regionUUID := range domainUUIDToRegionUUID {
+		domainUUIDToToolDataSet[domainUUID] = newAddtionalResourceToolDataSet(regionUUID)
+	}
+
+	domainUUIDToAZUUIDs, err := getAZDataFromDB(domainUUIDs)
+	if err != nil {
+		return nil, err
+	}
+	for domainUUID, azUUIDs := range domainUUIDToAZUUIDs {
+		domainUUIDToToolDataSet[domainUUID].azUUIDs = azUUIDs
+	}
+	for _, az := range additionalRsc.AZs {
+		toolDS, ok := domainUUIDToToolDataSet[az.DomainUUID]
+		if !ok {
+			return nil, NewError(
+				common.RESOURCE_NOT_FOUND,
+				fmt.Sprintf("az (name: %s) domain (uuid: %s) not found", az.Name, az.DomainUUID),
+			)
+		}
+		toolDS.azUUIDs = append(toolDS.azUUIDs, az.UUID)
+		toolDS.additionalAZs = append(toolDS.additionalAZs, az)
+	}
+
+	domainUUIDToVPCUUIDs, err := getVPCDataFromDB(domainUUIDs)
+	if err != nil {
+		return nil, err
+	}
+	for domainUUID, vpcUUIDs := range domainUUIDToVPCUUIDs {
+		domainUUIDToToolDataSet[domainUUID].vpcUUIDs = vpcUUIDs
+	}
+	for _, vpc := range additionalRsc.VPCs {
+		toolDS, ok := domainUUIDToToolDataSet[vpc.DomainUUID]
+		if !ok {
+			return nil, NewError(
+				common.RESOURCE_NOT_FOUND,
+				fmt.Sprintf("vpc (name: %s) domain (uuid: %s) not found", vpc.Name, vpc.DomainUUID),
+			)
+		}
+		toolDS.vpcUUIDs = append(toolDS.vpcUUIDs, vpc.UUID)
+		toolDS.additionalVPCs = append(toolDS.additionalVPCs, vpc)
+	}
+
+	domainUUIDToSubnetInfoMap, domainUUIDToSubnetCIDRInfoMap, err := getSubnetDataFromDB(domainUUIDs)
+	if err != nil {
+		return nil, err
+	}
+	for domainUUID, subnetUUIDToType := range domainUUIDToSubnetInfoMap {
+		domainUUIDToToolDataSet[domainUUID].subnetUUIDToType = subnetUUIDToType
+	}
+	for domainUUID, subnetToCIDRToCIDRUUID := range domainUUIDToSubnetCIDRInfoMap {
+		domainUUIDToToolDataSet[domainUUID].subnetToCIDRToCIDRUUID = subnetToCIDRToCIDRUUID
+	}
+	for _, subnet := range additionalRsc.Subnets {
+		toolDS, ok := domainUUIDToToolDataSet[subnet.DomainUUID]
+		if !ok {
+			return nil, NewError(
+				common.RESOURCE_NOT_FOUND,
+				fmt.Sprintf("subnet (name: %s) domain (uuid: %s) not found", subnet.Name, subnet.DomainUUID),
+			)
+		}
+		if subnet.AZUUID != "" && !common.Contains(toolDS.azUUIDs, subnet.AZUUID) {
+			return nil, NewError(
+				common.RESOURCE_NOT_FOUND,
+				fmt.Sprintf("subnet (name: %s) az (uuid: %s) not found", subnet.Name, subnet.AZUUID),
+			)
+		}
+		if !common.Contains(toolDS.vpcUUIDs, subnet.VPCUUID) {
+			return nil, NewError(
+				common.RESOURCE_NOT_FOUND,
+				fmt.Sprintf("subnet (name: %s) vpc (uuid: %s) not found", subnet.Name, subnet.VPCUUID),
+			)
+		}
+		netType := subnet.Type
+		if netType == 0 {
+			netType = common.NETWORK_TYPE_LAN
+		}
+		toolDS.subnetUUIDToType[subnet.UUID] = netType
+		toolDS.additionalSubnets = append(toolDS.additionalSubnets, subnet)
+
+		toolDS.subnetToCIDRToCIDRUUID[subnet.UUID] = make(map[string]string)
+		for _, cidr := range subnet.CIDRs {
+			cidr := formatCIDR(cidr)
+			if cidr == "" {
 				return nil, NewError(
-					common.INVALID_POST_DATA,
-					fmt.Sprintf("domain (lcuuid: %s) network (lcuuid: %s) az lcuuid: %s not found",
-						domain.Lcuuid, network.Lcuuid, network.AZLcuuid,
-					),
+					common.INVALID_PARAMETERS,
+					fmt.Sprintf("subnet (name: %s) cidr: %s is invalid", subnet.Name, cidr),
 				)
 			}
-			if !common.Contains(vpcLcuuids, network.VPCLcuuid) {
+			toolDS.subnetToCIDRToCIDRUUID[subnet.UUID][cidr] = common.GenerateUUID(subnet.UUID + cidr)
+		}
+	}
+
+	domainUUIDToHostIPMap, err := getDataInfoFromDB(domainUUIDs)
+	if err != nil {
+		return nil, err
+	}
+	for domainUUID, hostIPMap := range domainUUIDToHostIPMap {
+		domainUUIDToToolDataSet[domainUUID].hostIPToUUID = hostIPMap
+	}
+	for _, host := range additionalRsc.Hosts {
+		toolDS, ok := domainUUIDToToolDataSet[host.DomainUUID]
+		if !ok {
+			return nil, NewError(
+				common.RESOURCE_NOT_FOUND,
+				fmt.Sprintf("host (name: %s) domain (uuid: %s) not found", host.Name, host.DomainUUID),
+			)
+		}
+		if !common.Contains(toolDS.azUUIDs, host.AZUUID) {
+			return nil, NewError(
+				common.RESOURCE_NOT_FOUND,
+				fmt.Sprintf("host (name: %s) az (uuid: %s) not found", host.Name, host.AZUUID),
+			)
+		}
+		toolDS.hostIPToUUID[host.IP] = host.UUID
+		toolDS.additionalHosts = append(toolDS.additionalHosts, host)
+		for _, vif := range host.VInterfaces {
+			if _, ok := toolDS.subnetUUIDToType[vif.SubnetUUID]; !ok {
 				return nil, NewError(
-					common.INVALID_POST_DATA,
-					fmt.Sprintf("domain (lcuuid: %s) network (lcuuid: %s) vpc lcuuid: %s not found",
-						domain.Lcuuid, network.Lcuuid, network.VPCLcuuid,
-					),
+					common.RESOURCE_NOT_FOUND,
+					fmt.Sprintf("host (name: %s) vinterface (mac: %s) subnet (uuid: %s) not found", host.Name, vif.Mac, vif.SubnetUUID),
 				)
 			}
-			networkLcuuidToNetType[network.Lcuuid] = network.NetType
-			for i := range network.Subnets {
-				formattedCIDR := formatCIDR(network.Subnets[i].CIDR)
-				if formattedCIDR == "" {
+			for _, ip := range vif.IPs {
+				ip := formatIP(ip)
+				if ip == "" {
 					return nil, NewError(
 						common.INVALID_PARAMETERS,
-						fmt.Sprintf("domain (lcuuid: %s) network (lcuuid: %s) subnet (lcuuid: %s) cidr: %s is invalid",
-							domain.Lcuuid, network.Lcuuid, network.Subnets[i].Lcuuid, network.Subnets[i].CIDR,
-						),
+						fmt.Sprintf("host (name: %s) vinterface (mac: %s) ip: %s is invalid", host.Name, vif.Mac, ip),
 					)
 				}
-				network.Subnets[i].NetworkLcuuid = network.Lcuuid
-				network.Subnets[i].VPCLcuuid = network.VPCLcuuid
-				subnetLcuuidToNetworkLcuuid[network.Subnets[i].Lcuuid] = network.Subnets[i].NetworkLcuuid
-			}
-		}
-
-		for _, host := range domain.Hosts {
-			if !common.Contains(azLcuuids, host.AZLcuuid) {
-				return nil, NewError(
-					common.INVALID_POST_DATA,
-					fmt.Sprintf("domain (lcuuid: %s) host (lcuuid: %s) az lcuuid: %s not found",
-						domain.Lcuuid, host.Lcuuid, host.AZLcuuid,
-					),
-				)
-			}
-			host.Type = common.HOST_TYPE_VM
-			if host.HType == 0 {
-				host.HType = common.HOST_HTYPE_KVM
-			}
-			for vifIndex := range host.VInterfaces {
-				if len(host.VInterfaces[vifIndex].IPs) == 0 {
-					return nil, NewError(
-						common.INVALID_POST_DATA,
-						fmt.Sprintf(
-							"domain (lcuuid: %s) host (lcuuid: %s) vinterface (mac: %s) has no ips",
-							domain.Lcuuid, host.Lcuuid, host.VInterfaces[vifIndex].Mac,
-						),
-					)
-				}
-				host.VInterfaces[vifIndex].Lcuuid = common.GenerateUUID(domain.Lcuuid + host.VInterfaces[vifIndex].Mac)
-				var networkLcuuid string
-				for ipIndex := range host.VInterfaces[vifIndex].IPs {
-					formattedIP := formatIP(host.VInterfaces[vifIndex].IPs[ipIndex].IP)
-					if formattedIP == "" {
-						return nil, NewError(
-							common.INVALID_PARAMETERS,
-							fmt.Sprintf("domain (lcuuid: %s) host (lcuuid: %s) vinterface (mac: %s) ip: %s is invalid",
-								domain.Lcuuid, host.Lcuuid, host.VInterfaces[vifIndex].Mac, host.VInterfaces[vifIndex].IPs[ipIndex].IP,
-							),
-						)
-					}
-					host.VInterfaces[vifIndex].IPs[ipIndex].IP = formattedIP
-					networkLcuuidTmp, ok := subnetLcuuidToNetworkLcuuid[host.VInterfaces[vifIndex].IPs[ipIndex].SubnetLcuuid]
-					if !ok {
-						return nil, NewError(
-							common.RESOURCE_NOT_FOUND,
-							fmt.Sprintf("domain (lcuuid: %s) host (lcuuid: %s) vinterface (mac: %s) ip: %#v subnet not found",
-								domain.Lcuuid, host.Lcuuid, host.VInterfaces[vifIndex].Mac, host.VInterfaces[vifIndex].IPs[ipIndex],
-							),
-						)
-					}
-					if networkLcuuid == "" {
-						networkLcuuid = networkLcuuidTmp
-					} else if networkLcuuidTmp != networkLcuuid {
-						return nil, NewError(
-							common.INVALID_POST_DATA,
-							fmt.Sprintf("domain (lcuuid: %s) host (lcuuid: %s) vinterface (mac: %s) ips' subnets must be in same network",
-								domain.Lcuuid, host.Lcuuid, host.VInterfaces[vifIndex].Mac,
-							),
-						)
-					}
-					host.VInterfaces[vifIndex].IPs[ipIndex].Lcuuid = common.GenerateUUID(host.VInterfaces[vifIndex].Lcuuid + host.VInterfaces[vifIndex].IPs[ipIndex].IP)
-					host.VInterfaces[vifIndex].IPs[ipIndex].RegionLcuuid = host.RegionLcuuid
-					host.VInterfaces[vifIndex].IPs[ipIndex].VInterfaceLcuuid = host.VInterfaces[vifIndex].Lcuuid
-				}
-				host.VInterfaces[vifIndex].NetworkLcuuid = networkLcuuid
-				t, ok := networkLcuuidToNetType[host.VInterfaces[vifIndex].NetworkLcuuid]
-				if !ok {
-					return nil, NewError(
-						common.RESOURCE_NOT_FOUND,
-						fmt.Sprintf("domain (lcuuid: %s) host (lcuuid: %s) vinterface: %#v network not found",
-							domain.Lcuuid, host.Lcuuid, host.VInterfaces[vifIndex],
-						),
-					)
-				}
-				host.VInterfaces[vifIndex].Type = t
-				host.VInterfaces[vifIndex].DeviceType = common.VIF_DEVICE_TYPE_HOST
-				host.VInterfaces[vifIndex].DeviceLcuuid = host.Lcuuid
-				host.VInterfaces[vifIndex].RegionLcuuid = host.RegionLcuuid
-			}
-		}
-
-		for _, vm := range domain.VMs {
-			if !common.Contains(azLcuuids, vm.AZLcuuid) {
-				return nil, NewError(
-					common.INVALID_POST_DATA,
-					fmt.Sprintf("domain (lcuuid: %s) vm (lcuuid: %s) az lcuuid: %s not found",
-						domain.Lcuuid, vm.Lcuuid, vm.AZLcuuid,
-					),
-				)
-			}
-			if !common.Contains(vpcLcuuids, vm.VPCLcuuid) {
-				return nil, NewError(
-					common.INVALID_POST_DATA,
-					fmt.Sprintf("domain (lcuuid: %s) vm (lcuuid: %s) vpc lcuuid: %s not found",
-						domain.Lcuuid, vm.Lcuuid, vm.VPCLcuuid,
-					),
-				)
-			}
-			vm.State = common.VM_STATE_RUNNING
-			if vm.HType == 0 {
-				vm.HType = common.VM_HTYPE_VM_C
-			}
-			for vifIndex := range vm.VInterfaces {
-				if len(vm.VInterfaces[vifIndex].IPs) == 0 {
-					return nil, NewError(
-						common.INVALID_POST_DATA,
-						fmt.Sprintf(
-							"domain (lcuuid: %s) vm (lcuuid: %s) vinterface (mac: %s) has no ips",
-							domain.Lcuuid, vm.Lcuuid, vm.VInterfaces[vifIndex].Mac,
-						),
-					)
-				}
-
-				vm.VInterfaces[vifIndex].Lcuuid = common.GenerateUUID(domain.Lcuuid + vm.VInterfaces[vifIndex].Mac)
-				var networkLcuuid string
-				for ipIndex := range vm.VInterfaces[vifIndex].IPs {
-					formattedIP := formatIP(vm.VInterfaces[vifIndex].IPs[ipIndex].IP)
-					if formattedIP == "" {
-						return nil, NewError(
-							common.INVALID_PARAMETERS,
-							fmt.Sprintf("domain (lcuuid: %s) vm (lcuuid: %s) vinterface (mac: %s) ip: %s is invalid",
-								domain.Lcuuid, vm.Lcuuid, vm.VInterfaces[vifIndex].Mac, vm.VInterfaces[vifIndex].IPs[ipIndex].IP,
-							),
-						)
-					}
-					vm.VInterfaces[vifIndex].IPs[ipIndex].IP = formattedIP
-					networkLcuuidTmp, ok := subnetLcuuidToNetworkLcuuid[vm.VInterfaces[vifIndex].IPs[ipIndex].SubnetLcuuid]
-					if !ok {
-						return nil, NewError(
-							common.RESOURCE_NOT_FOUND,
-							fmt.Sprintf("domain (lcuuid: %s) vm (lcuuid: %s) vinterface (mac: %s) ip: %#v subnet not found",
-								domain.Lcuuid, vm.Lcuuid, vm.VInterfaces[vifIndex].Mac, vm.VInterfaces[vifIndex].IPs[ipIndex],
-							),
-						)
-					}
-					if networkLcuuid == "" {
-						networkLcuuid = networkLcuuidTmp
-					} else if networkLcuuidTmp != networkLcuuid {
-						return nil, NewError(
-							common.INVALID_POST_DATA,
-							fmt.Sprintf("domain (lcuuid: %s) vm (lcuuid: %s) vinterface (mac: %s) ips' subnets must be in same network",
-								domain.Lcuuid, vm.Lcuuid, vm.VInterfaces[vifIndex].Mac,
-							),
-						)
-					}
-					vm.VInterfaces[vifIndex].IPs[ipIndex].Lcuuid = common.GenerateUUID(vm.VInterfaces[vifIndex].Lcuuid + vm.VInterfaces[vifIndex].IPs[ipIndex].IP)
-					vm.VInterfaces[vifIndex].IPs[ipIndex].RegionLcuuid = vm.RegionLcuuid
-					vm.VInterfaces[vifIndex].IPs[ipIndex].VInterfaceLcuuid = vm.VInterfaces[vifIndex].Lcuuid
-				}
-				vm.VInterfaces[vifIndex].NetworkLcuuid = networkLcuuid
-				t, ok := networkLcuuidToNetType[vm.VInterfaces[vifIndex].NetworkLcuuid]
-				if !ok {
-					return nil, NewError(
-						common.RESOURCE_NOT_FOUND,
-						fmt.Sprintf("domain (lcuuid: %s) vm (lcuuid: %s) vinterface: %#v network not found",
-							domain.Lcuuid, vm.Lcuuid, vm.VInterfaces[vifIndex],
-						),
-					)
-				}
-				vm.VInterfaces[vifIndex].Type = t
-				vm.VInterfaces[vifIndex].DeviceType = common.VIF_DEVICE_TYPE_HOST
-				vm.VInterfaces[vifIndex].DeviceLcuuid = vm.Lcuuid
-				vm.VInterfaces[vifIndex].RegionLcuuid = vm.RegionLcuuid
 			}
 		}
 	}
-	return data["domains"], nil
+
+	for _, chost := range additionalRsc.CHosts {
+		toolDS, ok := domainUUIDToToolDataSet[chost.DomainUUID]
+		if !ok {
+			return nil, NewError(
+				common.RESOURCE_NOT_FOUND,
+				fmt.Sprintf("chost (name: %s) domain (uuid: %s) not found", chost.Name, chost.DomainUUID),
+			)
+		}
+		if !common.Contains(toolDS.azUUIDs, chost.AZUUID) {
+			return nil, NewError(
+				common.RESOURCE_NOT_FOUND,
+				fmt.Sprintf("chost (name: %s) az (uuid: %s) not found", chost.Name, chost.AZUUID),
+			)
+		}
+		if !common.Contains(toolDS.vpcUUIDs, chost.VPCUUID) {
+			return nil, NewError(
+				common.RESOURCE_NOT_FOUND,
+				fmt.Sprintf("chost (name: %s) vpc (uuid: %s) not found", chost.Name, chost.VPCUUID),
+			)
+		}
+		if _, ok := toolDS.hostIPToUUID[chost.HostIP]; !ok && chost.HostIP != "" {
+			return nil, NewError(
+				common.RESOURCE_NOT_FOUND,
+				fmt.Sprintf("chost (name: %s) host (ip: %s) not found", chost.Name, chost.HostIP),
+			)
+		}
+		toolDS.additionalCHosts = append(toolDS.additionalCHosts, chost)
+		for _, vif := range chost.VInterfaces {
+			if _, ok := toolDS.subnetUUIDToType[vif.SubnetUUID]; !ok {
+				return nil, NewError(
+					common.RESOURCE_NOT_FOUND,
+					fmt.Sprintf("chost (name: %s) vinterface (mac: %s) subnet (uuid: %s) not found", chost.Name, vif.Mac, vif.SubnetUUID),
+				)
+			}
+		}
+	}
+	return domainUUIDToToolDataSet, nil
+}
+
+func getDomainUUIDsUsedByAdditionalResource(additionalRsc model.AdditionalResource) []string {
+	domainUUIDs := mapset.NewSet[string]()
+	for _, az := range additionalRsc.AZs {
+		domainUUIDs.Add(az.DomainUUID)
+	}
+	for _, vpc := range additionalRsc.VPCs {
+		domainUUIDs.Add(vpc.DomainUUID)
+	}
+	for _, subnet := range additionalRsc.Subnets {
+		domainUUIDs.Add(subnet.DomainUUID)
+	}
+	for _, host := range additionalRsc.Hosts {
+		domainUUIDs.Add(host.DomainUUID)
+	}
+	for _, chost := range additionalRsc.CHosts {
+		domainUUIDs.Add(chost.DomainUUID)
+	}
+	return domainUUIDs.ToSlice()
+}
+
+func generateCloudModelData(domainUUIDToToolDataSet map[string]*addtionalResourceToolDataSet) (map[string]*cloudmodel.AdditionalResource, error) {
+	domainUUIDToCloudModelData := make(map[string]*cloudmodel.AdditionalResource)
+	for domainUUID, toolDS := range domainUUIDToToolDataSet {
+		cloudMD := &cloudmodel.AdditionalResource{}
+		for _, az := range toolDS.additionalAZs {
+			cloudMD.AZs = append(
+				cloudMD.AZs,
+				cloudmodel.AZ{
+					Lcuuid:       az.UUID,
+					Name:         az.Name,
+					RegionLcuuid: toolDS.regionUUID,
+				},
+			)
+		}
+		for _, vpc := range toolDS.additionalVPCs {
+			cloudMD.VPCs = append(
+				cloudMD.VPCs,
+				cloudmodel.VPC{
+					Lcuuid:       vpc.UUID,
+					Name:         vpc.Name,
+					RegionLcuuid: toolDS.regionUUID,
+				},
+			)
+		}
+		for _, subnet := range toolDS.additionalSubnets {
+			cloudMD.Subnets = append(
+				cloudMD.Subnets,
+				cloudmodel.Network{
+					Lcuuid:       subnet.UUID,
+					Name:         subnet.Name,
+					NetType:      toolDS.subnetUUIDToType[subnet.UUID],
+					VPCLcuuid:    subnet.VPCUUID,
+					AZLcuuid:     subnet.AZUUID,
+					RegionLcuuid: toolDS.regionUUID,
+				},
+			)
+			for _, cidr := range subnet.CIDRs {
+				cloudMD.SubnetCIDRs = append(
+					cloudMD.SubnetCIDRs,
+					cloudmodel.Subnet{
+						Lcuuid:        toolDS.subnetToCIDRToCIDRUUID[subnet.UUID][cidr],
+						CIDR:          cidr,
+						Name:          cidr,
+						NetworkLcuuid: subnet.UUID,
+						VPCLcuuid:     subnet.VPCUUID,
+					},
+				)
+			}
+		}
+		for _, host := range toolDS.additionalHosts {
+			htype := host.Type
+			if htype == 0 {
+				htype = common.HOST_HTYPE_KVM
+			}
+			cloudMD.Hosts = append(
+				cloudMD.Hosts,
+				cloudmodel.Host{
+					Lcuuid:       host.UUID,
+					Name:         host.Name,
+					IP:           host.IP,
+					Type:         common.HOST_TYPE_VM,
+					HType:        htype,
+					AZLcuuid:     host.AZUUID,
+					RegionLcuuid: toolDS.regionUUID,
+				},
+			)
+			for _, vif := range host.VInterfaces {
+				vifUUID := common.GenerateUUID(vif.SubnetUUID + vif.Mac)
+				cloudMD.VInterfaces = append(
+					cloudMD.VInterfaces,
+					cloudmodel.VInterface{
+						Lcuuid:        vifUUID,
+						Mac:           vif.Mac,
+						Type:          toolDS.subnetUUIDToType[vif.SubnetUUID],
+						DeviceType:    common.VIF_DEVICE_TYPE_HOST,
+						DeviceLcuuid:  host.UUID,
+						NetworkLcuuid: vif.SubnetUUID,
+						RegionLcuuid:  toolDS.regionUUID,
+					},
+				)
+				for _, ip := range vif.IPs {
+					var subnetCIDRUUID string
+					for cidr, uuid := range toolDS.subnetToCIDRToCIDRUUID[vif.SubnetUUID] {
+						if isIPInCIDR(cidr, ip) {
+							subnetCIDRUUID = uuid
+							break
+						}
+					}
+					if subnetCIDRUUID == "" {
+						return nil, NewError(
+							common.RESOURCE_NOT_FOUND,
+							fmt.Sprintf("host (name: %s) vinterface (mac: %s) ip: %s is not in any cidr", host.Name, vif.Mac, ip),
+						)
+					}
+					cloudMD.IPs = append(
+						cloudMD.IPs,
+						cloudmodel.IP{
+							Lcuuid:       common.GenerateUUID(vifUUID + ip),
+							IP:           ip,
+							SubnetLcuuid: subnetCIDRUUID,
+							RegionLcuuid: toolDS.regionUUID,
+						},
+					)
+				}
+			}
+		}
+		for _, chost := range toolDS.additionalCHosts {
+			htype := chost.Type
+			if htype == 0 {
+				htype = common.VM_HTYPE_BM_C
+			}
+			cloudMD.CHosts = append(
+				cloudMD.CHosts,
+				cloudmodel.VM{
+					Lcuuid:       chost.UUID,
+					Name:         chost.Name,
+					LaunchServer: chost.HostIP,
+					HType:        htype,
+					State:        common.VM_STATE_RUNNING,
+					VPCLcuuid:    chost.VPCUUID,
+					AZLcuuid:     chost.AZUUID,
+					RegionLcuuid: toolDS.regionUUID,
+				},
+			)
+			for _, vif := range chost.VInterfaces {
+				vifUUID := common.GenerateUUID(vif.SubnetUUID + vif.Mac)
+				cloudMD.VInterfaces = append(
+					cloudMD.VInterfaces,
+					cloudmodel.VInterface{
+						Lcuuid:        vifUUID,
+						Mac:           vif.Mac,
+						Type:          toolDS.subnetUUIDToType[vif.SubnetUUID],
+						DeviceType:    common.VIF_DEVICE_TYPE_VM,
+						DeviceLcuuid:  chost.UUID,
+						NetworkLcuuid: vif.SubnetUUID,
+						RegionLcuuid:  toolDS.regionUUID,
+					},
+				)
+				for _, ip := range vif.IPs {
+					var subnetCIDRUUID string
+					for cidr, uuid := range toolDS.subnetToCIDRToCIDRUUID[vif.SubnetUUID] {
+						if isIPInCIDR(cidr, ip) {
+							subnetCIDRUUID = uuid
+							break
+						}
+					}
+					if subnetCIDRUUID == "" {
+						return nil, NewError(
+							common.RESOURCE_NOT_FOUND,
+							fmt.Sprintf("chost (name: %s) vinterface (mac: %s) ip: %s is not in any cidr", chost.Name, vif.Mac, ip),
+						)
+					}
+					cloudMD.IPs = append(
+						cloudMD.IPs,
+						cloudmodel.IP{
+							Lcuuid:       common.GenerateUUID(vifUUID + ip),
+							IP:           ip,
+							SubnetLcuuid: subnetCIDRUUID,
+							RegionLcuuid: toolDS.regionUUID,
+						},
+					)
+				}
+			}
+		}
+		domainUUIDToCloudModelData[domainUUID] = cloudMD
+	}
+	return domainUUIDToCloudModelData, nil
+}
+
+func getRegionDataFromDB(domainUUIDs []string) (map[string]string, error) {
+	var dbItems []mysql.Domain
+	err := mysql.Db.Where("lcuuid IN (?)", domainUUIDs).Find(&dbItems).Error
+	if err != nil {
+		return nil, NewError(
+			common.SERVER_ERROR,
+			fmt.Sprintf("db query domain failed: %s", err.Error()),
+		)
+	}
+	domainUUIDToRegionUUID := make(map[string]string)
+	for _, domain := range dbItems {
+		conf := make(map[string]interface{})
+		err := json.Unmarshal([]byte(domain.Config), &conf)
+		if err != nil {
+			return nil, NewError(
+				common.SERVER_ERROR,
+				fmt.Sprintf("get domain (uuid: %s) region info failed: %s", domain.Lcuuid, err.Error()),
+			)
+		}
+		domainUUIDToRegionUUID[domain.Lcuuid] = conf["region_uuid"].(string)
+	}
+	return domainUUIDToRegionUUID, nil
+}
+
+func getAZDataFromDB(domainUUIDs []string) (map[string][]string, error) {
+	var azs []mysql.AZ
+	err := mysql.Db.Where("domain IN (?)", domainUUIDs).Find(&azs).Error
+	if err != nil {
+		return nil, NewError(
+			common.SERVER_ERROR,
+			fmt.Sprintf("db query az failed: %s", err.Error()),
+		)
+	}
+	domainUUIDToAZUUIDs := make(map[string][]string)
+	for _, az := range azs {
+		domainUUIDToAZUUIDs[az.Domain] = append(domainUUIDToAZUUIDs[az.Domain], az.Lcuuid)
+	}
+	return domainUUIDToAZUUIDs, nil
+}
+
+func getVPCDataFromDB(domainUUIDs []string) (map[string][]string, error) {
+	var vpcs []mysql.VPC
+	err := mysql.Db.Where("domain IN (?)", domainUUIDs).Find(&vpcs).Error
+	if err != nil {
+		return nil, NewError(
+			common.SERVER_ERROR,
+			fmt.Sprintf("db query vpc failed: %s", err.Error()),
+		)
+	}
+	domainUUIDToVPCUUIDs := make(map[string][]string)
+	for _, vpc := range vpcs {
+		domainUUIDToVPCUUIDs[vpc.Domain] = append(domainUUIDToVPCUUIDs[vpc.Domain], vpc.Lcuuid)
+	}
+	return domainUUIDToVPCUUIDs, nil
+}
+
+func getSubnetDataFromDB(domainUUIDs []string) (map[string]map[string]int, map[string]map[string]map[string]string, error) {
+	var subnets []mysql.Network
+	err := mysql.Db.Where("domain IN (?)", domainUUIDs).Find(&subnets).Error
+	if err != nil {
+		return nil, nil, NewError(
+			common.SERVER_ERROR,
+			fmt.Sprintf("db query subnet failed: %s", err.Error()),
+		)
+	}
+	domainUUIDToSubnetInfoMap := make(map[string]map[string]int)
+	domainUUIDToSubnetCIDRInfoMap := make(map[string]map[string]map[string]string)
+	for _, subnet := range subnets {
+		_, ok := domainUUIDToSubnetInfoMap[subnet.Domain]
+		if !ok {
+			domainUUIDToSubnetInfoMap[subnet.Domain] = make(map[string]int)
+			domainUUIDToSubnetCIDRInfoMap[subnet.Domain] = make(map[string]map[string]string)
+		}
+		domainUUIDToSubnetInfoMap[subnet.Domain][subnet.Lcuuid] = subnet.NetType
+
+		subnetCIDRToUUID := make(map[string]string)
+		var subnetCIDRs []mysql.Subnet
+		err := mysql.Db.Where("vl2id = ?", subnet.ID).Find(&subnetCIDRs).Error
+		if err != nil {
+			return nil, nil, NewError(
+				common.SERVER_ERROR,
+				fmt.Sprintf("db query subnet_cidr failed: %s", err.Error()),
+			)
+		}
+		for _, subnetCIDR := range subnetCIDRs {
+			cidr := ipAndStrMaskToCIDR(subnetCIDR.Prefix, subnetCIDR.Netmask)
+			if cidr == "" {
+				return nil, nil, NewError(
+					common.SERVER_ERROR,
+					fmt.Sprintf("format db subnet_cidr (uuid: %s) failed", subnetCIDR.Lcuuid),
+				)
+			}
+			subnetCIDRToUUID[cidr] = subnetCIDR.Lcuuid
+		}
+		domainUUIDToSubnetCIDRInfoMap[subnet.Domain][subnet.Lcuuid] = subnetCIDRToUUID
+	}
+	return domainUUIDToSubnetInfoMap, domainUUIDToSubnetCIDRInfoMap, nil
+}
+
+func getDataInfoFromDB(domainUUIDs []string) (map[string]map[string]string, error) {
+	var hosts []mysql.Host
+	err := mysql.Db.Where("domain IN (?)", domainUUIDs).Find(&hosts).Error
+	if err != nil {
+		return nil, NewError(
+			common.SERVER_ERROR,
+			fmt.Sprintf("db query host failed: %s", err.Error()),
+		)
+	}
+	domainUUIDToHostIPMap := make(map[string]map[string]string)
+	for _, host := range hosts {
+		_, ok := domainUUIDToHostIPMap[host.Domain]
+		if !ok {
+			domainUUIDToHostIPMap[host.Domain] = make(map[string]string)
+		}
+		domainUUIDToHostIPMap[host.Domain][host.IP] = host.Lcuuid
+	}
+	return domainUUIDToHostIPMap, nil
 }
 
 func formatIP(ip string) string {
@@ -306,40 +617,20 @@ func formatCIDR(cidr string) string {
 	return c.String()
 }
 
-func getDomainAZLcuuidsIncludingDBData(domain model.AdditionalResourceDomain) ([]string, error) {
-	var azLcuuids []string
-	var dbAZs []mysql.AZ
-	err := mysql.Db.Where("domain = ?", domain.Lcuuid).Find(&dbAZs).Error
-	if err != nil {
-		return nil, NewError(
-			common.SERVER_ERROR,
-			fmt.Sprintf("check domain (lcuuid: %s) failed: %s", domain.Lcuuid, err.Error()),
-		)
+func ipAndStrMaskToCIDR(ip, mask string) string {
+	maskIP := net.ParseIP(mask).To4()
+	if maskIP == nil {
+		maskIP = net.ParseIP(mask).To16()
 	}
-	for _, a := range dbAZs {
-		azLcuuids = append(azLcuuids, a.Lcuuid)
+	if maskIP == nil {
+		return ""
 	}
-	for _, a := range domain.AZs {
-		azLcuuids = append(azLcuuids, a.Lcuuid)
-	}
-	return azLcuuids, nil
+	maskInt, _ := net.IPMask(maskIP).Size()
+	return fmt.Sprintf("%s/%d", ip, maskInt)
 }
 
-func getDomainVPCLcuuidsIncludingDBData(domain model.AdditionalResourceDomain) ([]string, error) {
-	var vpcLcuuids []string
-	var dbVPCs []mysql.VPC
-	err := mysql.Db.Where("domain = ?", domain.Lcuuid).Find(&dbVPCs).Error
-	if err != nil {
-		return nil, NewError(
-			common.SERVER_ERROR,
-			fmt.Sprintf("check domain (lcuuid: %s) failed: %s", domain.Lcuuid, err.Error()),
-		)
-	}
-	for _, v := range dbVPCs {
-		vpcLcuuids = append(vpcLcuuids, v.Lcuuid)
-	}
-	for _, v := range domain.VPCs {
-		vpcLcuuids = append(vpcLcuuids, v.Lcuuid)
-	}
-	return vpcLcuuids, nil
+func isIPInCIDR(cidr, ip string) bool {
+	i := net.ParseIP(ip)
+	_, c, _ := net.ParseCIDR(cidr)
+	return c.Contains(i)
 }

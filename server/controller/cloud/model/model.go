@@ -532,6 +532,17 @@ type Resource struct {
 	SubDomainResources     map[string]SubDomainResource
 }
 
+type AdditionalResource struct {
+	AZs         []AZ
+	VPCs        []VPC
+	Subnets     []Network
+	SubnetCIDRs []Subnet
+	Hosts       []Host
+	CHosts      []VM
+	VInterfaces []VInterface
+	IPs         []IP
+}
+
 type BasicInfo struct {
 	Lcuuid          string        `json:"lcuuid"`
 	Name            string        `json:"name"`
