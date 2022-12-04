@@ -171,7 +171,7 @@ func updateSubDomain(c *gin.Context) {
 
 func applyDomainAddtionalResource(c *gin.Context) {
 	var err error
-	var data map[string][]model.AdditionalResourceDomain
+	var data model.AdditionalResource
 
 	// invalidate request body
 	err = c.ShouldBindBodyWith(&data, binding.JSON)

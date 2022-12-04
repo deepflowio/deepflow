@@ -338,86 +338,61 @@ type SubDomainUpdate struct {
 }
 
 type AdditionalResourceAZ struct {
-	Name         string `json:"name" yaml:"name" binding:"required"`
-	Lcuuid       string `json:"lcuuid" yaml:"lcuuid" binding:"required"`
-	RegionLcuuid string `json:"region_lcuuid" yaml:"region_lcuuid" binding:"required"`
+	Name       string `json:"name" yaml:"name" binding:"required"`
+	UUID       string `json:"uuid" yaml:"uuid" binding:"required"`
+	DomainUUID string `json:"domain_uuid" yaml:"domain_uuid" binding:"required"`
 }
 
 type AdditionalResourceVPC struct {
-	Name         string `json:"name" yaml:"name" binding:"required"`
-	Lcuuid       string `json:"lcuuid" yaml:"lcuuid" binding:"required"`
-	RegionLcuuid string `json:"region_lcuuid" yaml:"region_lcuuid" binding:"required"`
-}
-
-type AdditionalResourceNetwork struct {
-	Name         string                     `json:"name" yaml:"name" binding:"required"`
-	Lcuuid       string                     `json:"lcuuid" yaml:"lcuuid" binding:"required"`
-	IsVIP        bool                       `json:"is_vip" yaml:"is_vip"`
-	NetType      int                        `json:"net_type" yaml:"net_type" binding:"required"`
-	VPCLcuuid    string                     `json:"vpc_lcuuid" yaml:"vpc_lcuuid" binding:"required"`
-	AZLcuuid     string                     `json:"az_lcuuid" yaml:"az_lcuuid"`
-	RegionLcuuid string                     `json:"region_lcuuid" yaml:"region_lcuuid" binding:"required"`
-	Subnets      []AdditionalResourceSubnet `json:"subnets" yaml:"subnets"`
+	Name       string `json:"name" yaml:"name" binding:"required"`
+	UUID       string `json:"uuid" yaml:"uuid" binding:"required"`
+	DomainUUID string `json:"domain_uuid" yaml:"domain_uuid" binding:"required"`
 }
 
 type AdditionalResourceSubnet struct {
-	Name          string `json:"name" yaml:"name" binding:"required"`
-	Lcuuid        string `json:"lcuuid" yaml:"lcuuid" binding:"required"`
-	CIDR          string `json:"cidr" yaml:"cidr" binding:"required"`
-	GatewayIP     string `json:"gateway_ip" yaml:"gateway_ip"`
-	NetworkLcuuid string `json:"network_lcuuid" yaml:"network_lcuuid"`
-	VPCLcuuid     string `json:"vpc_lcuuid" yaml:"vpc_lcuuid"`
+	Name       string   `json:"name" yaml:"name" binding:"required"`
+	UUID       string   `json:"uuid" yaml:"uuid" binding:"required"`
+	IsVIP      bool     `json:"is_vip" yaml:"is_vip"`
+	Type       int      `json:"type" yaml:"type"`
+	VPCUUID    string   `json:"vpc_uuid" yaml:"vpc_uuid" binding:"required"`
+	AZUUID     string   `json:"az_uuid" yaml:"az_uuid"`
+	DomainUUID string   `json:"domain_uuid" yaml:"domain_uuid" binding:"required"`
+	CIDRs      []string `json:"cidrs" yaml:"cidrs"`
 }
 
 type AdditionalResourceHost struct {
-	Name         string                         `json:"name" yaml:"name" binding:"required"`
-	Lcuuid       string                         `json:"lcuuid" yaml:"lcuuid" binding:"required"`
-	IP           string                         `json:"ip" yaml:"ip" binding:"required"`
-	Type         int                            `json:"type" yaml:"type"`
-	HType        int                            `json:"htype" yaml:"htype"`
-	AZLcuuid     string                         `json:"az_lcuuid" yaml:"az_lcuuid" binding:"required"`
-	RegionLcuuid string                         `json:"region_lcuuid" yaml:"region_lcuuid" binding:"required"`
-	VInterfaces  []AdditionalResourceVInterface `json:"vinterfaces" yaml:"vinterfaces"`
+	Name        string                         `json:"name" yaml:"name" binding:"required"`
+	UUID        string                         `json:"uuid" yaml:"uuid" binding:"required"`
+	IP          string                         `json:"ip" yaml:"ip" binding:"required"`
+	Type        int                            `json:"type" yaml:"type"`
+	AZUUID      string                         `json:"az_uuid" yaml:"az_uuid" binding:"required"`
+	DomainUUID  string                         `json:"domain_uuid" yaml:"domain_uuid" binding:"required"`
+	VInterfaces []AdditionalResourceVInterface `json:"vinterfaces" yaml:"vinterfaces"`
 }
 
-type AdditionalResourceVM struct {
-	Name         string                         `json:"name" yaml:"name" binding:"required"`
-	Lcuuid       string                         `json:"lcuuid" yaml:"lcuuid" binding:"required"`
-	LaunchServer string                         `json:"launch_server" yaml:"launch_server" binding:"required"`
-	HType        int                            `json:"htype" yaml:"htype"`
-	State        int                            `json:"state" yaml:"state"`
-	VPCLcuuid    string                         `json:"vpc_lcuuid" yaml:"vpc_lcuuid" binding:"required"`
-	AZLcuuid     string                         `json:"az_lcuuid" yaml:"az_lcuuid" binding:"required"`
-	RegionLcuuid string                         `json:"region_lcuuid" yaml:"region_lcuuid" binding:"required"`
-	VInterfaces  []AdditionalResourceVInterface `json:"vinterfaces" yaml:"vinterfaces"`
+type AdditionalResourceChost struct {
+	Name        string                         `json:"name" yaml:"name" binding:"required"`
+	UUID        string                         `json:"uuid" yaml:"uuid" binding:"required"`
+	HostIP      string                         `json:"host_ip" yaml:"host_ip"`
+	Type        int                            `json:"type" yaml:"type"`
+	VPCUUID     string                         `json:"vpc_uuid" yaml:"vpc_uuid" binding:"required"`
+	AZUUID      string                         `json:"az_uuid" yaml:"az_uuid" binding:"required"`
+	DomainUUID  string                         `json:"domain_uuid" yaml:"domain_uuid" binding:"required"`
+	VInterfaces []AdditionalResourceVInterface `json:"vinterfaces" yaml:"vinterfaces"`
 }
 
 type AdditionalResourceVInterface struct {
-	Lcuuid        string                 `json:"lcuuid" yaml:"lcuuid"`
-	Type          int                    `json:"type" yaml:"type"`
-	Mac           string                 `json:"mac" yaml:"mac" binding:"required"`
-	DeviceLcuuid  string                 `json:"device_lcuuid" yaml:"device_lcuuid"`
-	DeviceType    int                    `json:"device_type" yaml:"device_type"`
-	NetworkLcuuid string                 `json:"network_lcuuid" yaml:"network_lcuuid" binding:"required"`
-	RegionLcuuid  string                 `json:"region_lcuuid" yaml:"region_lcuuid"`
-	IPs           []AdditionalResourceIP `json:"ips" yaml:"ips"`
+	SubnetUUID string   `json:"subnet_uuid" yaml:"subnet_uuid" binding:"required"`
+	Mac        string   `json:"mac" yaml:"mac" binding:"required"`
+	IPs        []string `json:"ips" yaml:"ips"`
 }
 
-type AdditionalResourceIP struct {
-	Lcuuid           string `json:"lcuuid" yaml:"lcuuid"`
-	VInterfaceLcuuid string `json:"vinterface_lcuuid" yaml:"vinterface_lcuuid"`
-	IP               string `json:"ip" yaml:"ip" binding:"required"`
-	SubnetLcuuid     string `json:"subnet_lcuuid" yaml:"subnet_lcuuid" binding:"required"`
-	RegionLcuuid     string `json:"region_lcuuid" yaml:"region_lcuuid"`
-}
-
-type AdditionalResourceDomain struct {
-	Lcuuid   string                      `json:"lcuuid" yaml:"lcuuid" binding:"required"`
-	AZs      []AdditionalResourceAZ      `json:"azs" yaml:"azs"`
-	VPCs     []AdditionalResourceVPC     `json:"vpcs" yaml:"vpcs"`
-	Networks []AdditionalResourceNetwork `json:"networks" yaml:"networks"`
-	Hosts    []AdditionalResourceHost    `json:"hosts" yaml:"hosts"`
-	VMs      []AdditionalResourceVM      `json:"vms" yaml:"vms"`
+type AdditionalResource struct {
+	AZs     []AdditionalResourceAZ     `json:"azs" yaml:"azs"`
+	VPCs    []AdditionalResourceVPC    `json:"vpcs" yaml:"vpcs"`
+	Subnets []AdditionalResourceSubnet `json:"subnets" yaml:"subnets"`
+	Hosts   []AdditionalResourceHost   `json:"hosts" yaml:"hosts"`
+	CHosts  []AdditionalResourceChost  `json:"chosts" yaml:"chosts"`
 }
 
 type VTapGroupConfiguration struct {
