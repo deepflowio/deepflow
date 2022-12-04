@@ -105,14 +105,14 @@ pub struct MetaPacket<'a> {
     pub is_active_service: bool,
     pub queue_hash: u8,
 
-    // for xflow
+    /********** for xFlow (NetFlow/sFlow/NetStream) **********/
     pub packet_count: u64,
     pub packet_bytes: u64,
     pub start_time: Duration,
     pub end_time: Duration,
     pub source_ip: u32,
 
-    // for ebpf
+    /********** for eBPF (tracepoint/kprobe/uprobe) **********/
     pub ebpf_type: EbpfType,
     pub raw_from_ebpf: Vec<u8>,
 
