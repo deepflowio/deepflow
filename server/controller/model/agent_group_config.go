@@ -16,6 +16,11 @@
 
 package model
 
+import _ "embed"
+
+//go:embed agent_group_config_example.yaml
+var YamlAgentGroupConfig []byte
+
 type StaticConfig struct {
 	ProxyControllerPort              *uint16                            `yaml:"proxy-controller-port,omitempty"`
 	LogLevel                         *string                            `yaml:"log-level,omitempty"`

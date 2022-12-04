@@ -695,5 +695,5 @@ func DeleteVTapGroupConfigByFilter(args map[string]string) (string, error) {
 }
 
 func GetVTapGroupExampleConfig() (string, error) {
-	return string(model.YamlVTapGroupConfig), nil
+	return string(model.YamlAgentGroupConfig), nil
 }
