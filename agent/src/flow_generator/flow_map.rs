@@ -42,10 +42,10 @@ use super::{
     perf::{FlowPerf, FlowPerfCounter, L7RrtCache},
     protocol_logs::MetaAppProto,
     service_table::{ServiceKey, ServiceTable},
-    FlowMapKey, FlowNode, FlowState, FlowTimeKey, COUNTER_FLOW_ID_MASK, FLOW_METRICS_PEER_DST,
-    FLOW_METRICS_PEER_SRC, L7_PROTOCOL_UNKNOWN_LIMIT, L7_RRT_CACHE_CAPACITY, QUEUE_BATCH_SIZE,
-    SERVICE_TABLE_IPV4_CAPACITY, SERVICE_TABLE_IPV6_CAPACITY, STATISTICAL_INTERVAL,
-    THREAD_FLOW_ID_MASK, TIMER_FLOW_ID_MASK, TIME_MAX_INTERVAL, TIME_UNIT,
+    FlowMapKey, FlowNode, FlowState, FlowTimeKey, COUNTER_FLOW_ID_MASK, EBPF_MINIMUM_TIMEOUT,
+    FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC, L7_PROTOCOL_UNKNOWN_LIMIT, L7_RRT_CACHE_CAPACITY,
+    QUEUE_BATCH_SIZE, SERVICE_TABLE_IPV4_CAPACITY, SERVICE_TABLE_IPV6_CAPACITY,
+    STATISTICAL_INTERVAL, THREAD_FLOW_ID_MASK, TIMER_FLOW_ID_MASK, TIME_MAX_INTERVAL, TIME_UNIT,
 };
 
 use crate::{
@@ -224,6 +224,25 @@ impl FlowMap {
                 .unwrap();
             let mut node = nodes.swap_remove(index);
 
+            if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
+                if node.timeout == EBPF_MINIMUM_TIMEOUT
+                    && self
+                        .rrt_cache
+                        .borrow_mut()
+                        .has_residual_request(node.tagged_flow.flow.flow_id)
+                {
+                    // if there has remaining requests to be aggregated, timeout should be longer.
+                    node.timeout = self.parse_config.load().l7_log_session_aggr_timeout;
+                } else if node.timeout > EBPF_MINIMUM_TIMEOUT
+                    && !self
+                        .rrt_cache
+                        .borrow_mut()
+                        .has_residual_request(node.tagged_flow.flow.flow_id)
+                {
+                    // if there is no remaining requests to be aggregated, timeout them as soon as possible.
+                    node.timeout = EBPF_MINIMUM_TIMEOUT;
+                }
+            }
             let timeout = node.recent_time + node.timeout;
             if timestamp >= timeout {
                 // 超时Flow将被删除然后把统计信息发送队列下游
@@ -351,6 +370,51 @@ impl FlowMap {
         // rust 版本用了std的hashmap自动处理扩容，所以无需执行policy_gettelr
     }
 
+    fn append_to_block(&self, node: &mut FlowNode, meta_packet: &MetaPacket) {
+        if node.packet_sequence_block.is_some() {
+            if !node
+                .packet_sequence_block
+                .as_ref()
+                .unwrap()
+                .check(self.config.load().packet_sequence_block_size)
+            {
+                // if the packet_sequence_block is no enough to push one more packet, then send it to the queue
+                if let Err(_) = self
+                    .packet_sequence_queue
+                    .as_ref()
+                    .unwrap()
+                    .send(Box::new(node.packet_sequence_block.take().unwrap()))
+                {
+                    warn!("packet sequence block to queue failed maybe queue have terminated");
+                }
+                node.packet_sequence_block =
+                    Some(packet_sequence_block::PacketSequenceBlock::default());
+            }
+        } else {
+            node.packet_sequence_block =
+                Some(packet_sequence_block::PacketSequenceBlock::default());
+        }
+
+        let mini_meta_packet = packet_sequence_block::MiniMetaPacket::new(
+            node.tagged_flow.flow.flow_id,
+            meta_packet.direction as u8,
+            meta_packet.lookup_key.timestamp,
+            meta_packet.payload_len,
+            meta_packet.tcp_data.seq,
+            meta_packet.tcp_data.ack,
+            meta_packet.tcp_data.win_size,
+            meta_packet.tcp_data.mss,
+            meta_packet.tcp_data.flags.bits(),
+            meta_packet.tcp_data.win_scale,
+            meta_packet.tcp_data.sack_permitted,
+            &meta_packet.tcp_data.sack,
+        );
+        node.packet_sequence_block
+            .as_mut()
+            .unwrap()
+            .append_packet(mini_meta_packet, self.config.load().packet_sequence_flag);
+    }
+
     fn update_tcp_node(
         &mut self,
         mut node: Box<FlowNode>,
@@ -368,49 +432,7 @@ impl FlowMap {
 
         // Enterprise Edition Feature: packet-sequence
         if self.packet_sequence_enabled {
-            // FIXME: move this code block to a function
-            if node.packet_sequence_block.is_some() {
-                if !node
-                    .packet_sequence_block
-                    .as_ref()
-                    .unwrap()
-                    .check(self.config.load().packet_sequence_block_size)
-                {
-                    // if the packet_sequence_block is no enough to push one more packet, then send it to the queue
-                    if let Err(_) = self
-                        .packet_sequence_queue
-                        .as_ref()
-                        .unwrap()
-                        .send(Box::new(node.packet_sequence_block.take().unwrap()))
-                    {
-                        warn!("packet sequence block to queue failed maybe queue have terminated");
-                    }
-                    node.packet_sequence_block =
-                        Some(packet_sequence_block::PacketSequenceBlock::default());
-                }
-            } else {
-                node.packet_sequence_block =
-                    Some(packet_sequence_block::PacketSequenceBlock::default());
-            }
-
-            let mini_meta_packet = packet_sequence_block::MiniMetaPacket::new(
-                node.tagged_flow.flow.flow_id,
-                meta_packet.direction as u8,
-                timestamp.clone(),
-                meta_packet.payload_len,
-                meta_packet.tcp_data.seq,
-                meta_packet.tcp_data.ack,
-                meta_packet.tcp_data.win_size,
-                meta_packet.tcp_data.mss,
-                meta_packet.tcp_data.flags.bits(),
-                meta_packet.tcp_data.win_scale,
-                meta_packet.tcp_data.sack_permitted,
-                &meta_packet.tcp_data.sack,
-            );
-            node.packet_sequence_block
-                .as_mut()
-                .unwrap()
-                .append_packet(mini_meta_packet, self.config.load().packet_sequence_flag);
+            self.append_to_block(&mut node, meta_packet);
         }
 
         if flow_closed {
@@ -433,6 +455,7 @@ impl FlowMap {
         if peers[FLOW_METRICS_PEER_SRC].packet_count > 0
             && peers[FLOW_METRICS_PEER_DST].packet_count > 0
         {
+            // For udp, eBPF and Packet data use the same timeout
             node.timeout = self.config.load().flow_timeout.closing;
         }
         meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
@@ -472,19 +495,19 @@ impl FlowMap {
     }
 
     fn update_tcp_flow(&mut self, meta_packet: &mut MetaPacket, node: &mut FlowNode) -> bool {
-        if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
-            // For eBPF data, since we don't know when the Flow will terminate at present, the
-            // fixed timeout parameter is used uniformly, and the Flow will not be closed due to
-            // the arrival of the packet.
-            // FIXME: We should check whether there are any remaining requests to be aggregated and
-            // close the flow as soon as possible.
-            return false;
-        }
-
         let direction = meta_packet.direction;
         let pkt_tcp_flags = meta_packet.tcp_data.flags;
         node.tagged_flow.flow.flow_metrics_peers[direction as usize].tcp_flags |= pkt_tcp_flags;
         self.update_flow(node, meta_packet);
+        if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
+            // For eBPF data, since we don't know when the Flow will terminate at present, the
+            // fixed timeout parameter is used uniformly, and the Flow will not be closed due to
+            // the arrival of the packet.
+            // In addition, because eBPF data does not have L4 information, the remaining steps of
+            // direction correction, state machine maintenance, SEQ acquisition, etc., do not
+            // need to be performed.
+            return false;
+        }
 
         // 有特殊包时更新ServiceTable并矫正流方向：SYN+ACK或SYN
         if pkt_tcp_flags.bits() & TcpFlags::SYN.bits() != 0 {
@@ -680,6 +703,11 @@ impl FlowMap {
                 FlowMetricsPeer::default(),
             ],
             signal_source: meta_packet.signal_source,
+            is_active_service: if meta_packet.signal_source == SignalSource::EBPF {
+                true // Data coming from eBPF means it must be an active service
+            } else {
+                false
+            },
             ..Default::default()
         };
         tagged_flow.flow = flow;
@@ -804,6 +832,11 @@ impl FlowMap {
             }
         }
 
+        // The ebpf data has no l3 and l4 information, so it can be returned directly
+        if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
+            return;
+        }
+
         let flow = &mut node.tagged_flow.flow;
         let flow_metrics_peer = &mut flow.flow_metrics_peers[meta_packet.direction as usize];
         flow_metrics_peer.packet_count += 1;
@@ -849,18 +882,14 @@ impl FlowMap {
 
     fn new_tcp_node(&mut self, meta_packet: &mut MetaPacket) -> FlowNode {
         let mut node = self.init_flow(meta_packet);
+        meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
         let mut reverse = false;
         if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
-            // eBPF data has no L4 info
-            // Data coming from eBPF means it must be an active service
-            meta_packet.is_active_service = true;
-            // eBPF data currently does not have socket closing information, we uniformly use the
-            // timeout parameter of session aggregation so that the aggregation will not be
-            // affected.
-            node.timeout = self.parse_config.load().l7_log_session_aggr_timeout;
+            // For ebpf data, initialize a short timeout to make it timeout
+            // when there is no residual data to be aggregated as soon as possible.
+            node.timeout = EBPF_MINIMUM_TIMEOUT;
         } else {
             reverse = self.update_l4_direction(meta_packet, &mut node, true, true);
-            meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
 
             let pkt_tcp_flags = meta_packet.tcp_data.flags;
             if pkt_tcp_flags.is_invalid() {
@@ -878,27 +907,7 @@ impl FlowMap {
 
         // Enterprise Edition Feature: packet-sequence
         if self.packet_sequence_enabled {
-            // FIXME: move this code block to a function
-            node.packet_sequence_block =
-                Some(packet_sequence_block::PacketSequenceBlock::default());
-            let mini_meta_packet = packet_sequence_block::MiniMetaPacket::new(
-                node.tagged_flow.flow.flow_id,
-                meta_packet.direction as u8,
-                meta_packet.lookup_key.timestamp.clone(),
-                meta_packet.payload_len,
-                meta_packet.tcp_data.seq,
-                meta_packet.tcp_data.ack,
-                meta_packet.tcp_data.win_size,
-                meta_packet.tcp_data.mss,
-                meta_packet.tcp_data.flags.bits(),
-                meta_packet.tcp_data.win_scale,
-                meta_packet.tcp_data.sack_permitted,
-                &meta_packet.tcp_data.sack,
-            );
-            node.packet_sequence_block
-                .as_mut()
-                .unwrap()
-                .append_packet(mini_meta_packet, self.config.load().packet_sequence_flag);
+            self.append_to_block(&mut node, meta_packet);
         }
         node
     }
@@ -942,12 +951,10 @@ impl FlowMap {
 
     fn new_udp_node(&mut self, meta_packet: &mut MetaPacket) -> FlowNode {
         let mut node = self.init_flow(meta_packet);
+        meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
         node.flow_state = FlowState::Established;
         let mut reverse = false;
         if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
-            // eBPF data has no L4 info
-            // Data coming from eBPF means it must be an active service
-            meta_packet.is_active_service = true;
             // eBPF data currently does not have socket closing information, we uniformly use the
             // timeout parameter of active UDP flow so that the aggregation will not be affected.
             node.timeout = self.config.load().flow_timeout.closing;
@@ -955,7 +962,6 @@ impl FlowMap {
             // opening timeout
             node.timeout = self.config.load().flow_timeout.opening;
             reverse = self.update_l4_direction(meta_packet, &mut node, true, true);
-            meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
         }
         if self.config.load().collector_enabled {
             self.collect_metric(&mut node, meta_packet, !reverse);
@@ -1213,11 +1219,11 @@ impl FlowMap {
 
     fn update_flow_direction(&mut self, node: &mut FlowNode, meta_packet: Option<&mut MetaPacket>) {
         if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
-            // the data from ebpf doesn't need to update_flow_direction, it only update it's direction in FlowPerf::l7_parse
-            // FIXME: when direction update in l7_parse, the underlay flow must also be reversed, so we can get the right metrics
+            // the data from ebpf doesn't need to update_flow_direction,
+            // it only update it's direction in FlowPerf::l7_parse,
+            // don't correct the direction for the second time
             return;
         }
-
         let flow_key = &node.tagged_flow.flow.flow_key;
         let src_epc_id = node.tagged_flow.flow.flow_metrics_peers[0].l3_epc_id as i16;
         let dst_epc_id = node.tagged_flow.flow.flow_metrics_peers[1].l3_epc_id as i16;

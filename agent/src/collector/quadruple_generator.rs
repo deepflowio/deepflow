@@ -365,13 +365,12 @@ impl SubQuadGen {
         connection: &mut ConcurrentConnection,
         possible_host: &mut PossibleHost,
     ) {
+        if flows.len() == 0 || flows[0].tagged_flow.flow.signal_source == SignalSource::EBPF {
+            // eBPF data has no L4 info
+            // A SubQuadGen only process one type of data, so here we can return.
+            return;
+        }
         for acc_flow in flows.iter_mut() {
-            if acc_flow.tagged_flow.flow.signal_source == SignalSource::EBPF {
-                // eBPF data has no L4 info
-                // A SubQuadGen only process one type of data, so here we can break.
-                break;
-            }
-
             acc_flow.is_active_host0 = Self::check_active_host(
                 possible_host,
                 &acc_flow.tagged_flow.flow.flow_metrics_peers[0],
