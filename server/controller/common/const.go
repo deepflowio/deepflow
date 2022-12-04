@@ -166,6 +166,7 @@ const (
 )
 
 const (
+	DEFAULT_DOMAIN        = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 	DEFAULT_REGION        = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 	DEFAULT_AZ            = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 	DEFAULT_VTAP_GROUP_ID = 1
