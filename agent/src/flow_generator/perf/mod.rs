@@ -329,12 +329,12 @@ impl FlowPerf {
         if packet.signal_source == SignalSource::EBPF && self.server_port != 0 {
             // if the packet from eBPF and it's server_port is not equal to 0,
             // We can get the packet's direction by comparing self.server_port with packet.lookup_key.dst_port
+            // When check_payload() fails, the server_port value is still 0, and the flow direction cannot be corrected.
             packet.direction = if self.server_port == packet.lookup_key.dst_port {
                 PacketDirection::ClientToServer
             } else {
                 PacketDirection::ServerToClient
             };
-            // FIXME: Is it possible that the server_port of eBPF data is 0?
         }
 
         let mut rrt = 0;
