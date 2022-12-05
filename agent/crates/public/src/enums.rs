@@ -299,7 +299,7 @@ impl HeaderType {
     pub const L4: HeaderType = HeaderType::Ipv4Tcp;
     pub const L4Ipv6: HeaderType = HeaderType::Ipv6Tcp;
 
-    pub fn min_packet_size(self) -> usize {
+    pub const fn min_packet_size(self) -> usize {
         match self {
             Self::Eth => 14,               // 不包括DOT1Q
             Self::Arp => 14 + 28,          // 不包括DOT1Q
@@ -314,7 +314,7 @@ impl HeaderType {
         }
     }
 
-    pub fn min_header_size(self) -> usize {
+    pub const fn min_header_size(self) -> usize {
         match self {
             Self::Eth => 14,
             Self::Arp => 28,
