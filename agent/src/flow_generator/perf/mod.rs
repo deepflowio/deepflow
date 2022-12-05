@@ -166,15 +166,6 @@ impl FlowPerf {
         }
     }
 
-    fn get_rrt(&mut self) -> u64 {
-        if let Some(perf) = self.l7.as_mut() {
-            if let Some((head, _)) = perf.app_proto_head() {
-                return head.rrt;
-            }
-        }
-        0
-    }
-
     fn is_skip_l7_protocol_parse(&self, proto: &L7ProtocolParser, port: u16) -> bool {
         if self.protocol_bitmap.is_disabled(proto.protocol()) {
             return true;
@@ -182,12 +173,13 @@ impl FlowPerf {
         proto.is_skip_parse_by_port_bitmap(&self.l7_protocol_parse_port_bitmap, port)
     }
 
+    // retur rrt
     fn l7_parse_perf(
         &mut self,
         packet: &MetaPacket,
         flow_id: u64,
         app_table: &mut AppTable,
-    ) -> Result<()> {
+    ) -> Result<u64> {
         if self.is_skip {
             return Err(Error::L7ProtocolParseLimit);
         }
@@ -196,6 +188,22 @@ impl FlowPerf {
         }
         let perf_parser = self.l7.as_mut().unwrap();
         let ret = perf_parser.parse(packet, flow_id);
+
+        // TODO 目前rrt由perf计算， 用于聚合时计算slot，后面perf 抽象出来后，将去掉perf，rrt由log parser计算
+        // =======================================================================================
+        // TODO now rrt is calculate by perf parse, use for calculate slot index on session merge.
+        // when log parse implement perf parse, rrt will calculate from log parse.
+        let rrt = if ret.is_ok() {
+            let rrt = if let Some((head, _)) = perf_parser.app_proto_head() {
+                head.rrt
+            } else {
+                0
+            };
+            rrt
+        } else {
+            0
+        };
+
         if ret.is_ok() {
             perf_parser.reset();
         }
@@ -208,7 +216,8 @@ impl FlowPerf {
                 self.is_skip = app_table.set_protocol(packet, L7ProtocolEnum::default());
             }
         }
-        return ret;
+        ret?;
+        Ok(rrt)
     }
 
     fn l7_parse_log(
@@ -259,7 +268,7 @@ impl FlowPerf {
         app_table: &mut AppTable,
         is_parse_perf: bool,
         is_parse_log: bool,
-    ) -> Result<Vec<L7ProtocolInfo>> {
+    ) -> Result<(Vec<L7ProtocolInfo>, u64)> {
         if self.is_skip {
             return Err(Error::L7ProtocolCheckLimit);
         }
@@ -281,19 +290,21 @@ impl FlowPerf {
                     self.l7_protocol_enum = i.l7_protocl_enum();
                     self.server_port = packet.lookup_key.dst_port;
 
+                    let mut rrt = 0;
                     if is_parse_perf {
                         // perf 没有抽象出来,这里可能返回None，对于返回None即不解析perf，只解析log
                         self.l7 = Self::l7_new(i.protocol(), self.rrt_cache.clone());
                         if self.l7.is_some() {
-                            self.l7_parse_perf(packet, flow_id, app_table)?;
+                            rrt = self.l7_parse_perf(packet, flow_id, app_table)?;
                         }
                     }
 
                     if is_parse_log {
                         self.l7_protocol_log_parser = Some(i);
-                        return self.l7_parse_log(packet, app_table, &param);
+                        let ret = self.l7_parse_log(packet, app_table, &param)?;
+                        return Ok((ret, rrt));
                     }
-                    return Ok(vec![]);
+                    return Ok((vec![], 0));
                 }
             }
 
@@ -326,18 +337,17 @@ impl FlowPerf {
             // FIXME: Is it possible that the server_port of eBPF data is 0?
         }
 
+        let mut rrt = 0;
         if self.l7.is_some() && is_parse_perf {
-            self.l7_parse_perf(packet, flow_id, app_table)?;
+            rrt = self.l7_parse_perf(packet, flow_id, app_table)?;
             if !is_parse_log {
-                return Ok((vec![], 0));
+                return Ok((vec![], rrt));
             }
         }
 
         if self.l7_protocol_log_parser.is_some() && is_parse_log {
-            return Ok((
-                self.l7_parse_log(packet, app_table, &ParseParam::from(&*packet))?,
-                self.get_rrt(),
-            ));
+            let ret = self.l7_parse_log(packet, app_table, &ParseParam::from(&*packet))?;
+            return Ok((ret, rrt));
         }
 
         if self.is_from_app {
@@ -348,10 +358,7 @@ impl FlowPerf {
             return Err(Error::L7ProtocolUnknown);
         }
 
-        return Ok((
-            self.l7_check(packet, flow_id, app_table, is_parse_perf, is_parse_log)?,
-            self.get_rrt(),
-        ));
+        self.l7_check(packet, flow_id, app_table, is_parse_perf, is_parse_log)
     }
 
     pub fn new(

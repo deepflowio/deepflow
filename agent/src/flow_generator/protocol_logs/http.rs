@@ -253,7 +253,7 @@ impl HttpInfo {
         (self.is_req_end, self.is_resp_end)
     }
 
-    fn get_l7_protocol_with_tls(&self) -> L7Protocol {
+    pub fn get_l7_protocol_with_tls(&self) -> L7Protocol {
         match self.proto {
             L7Protocol::Http1 => {
                 if self.is_tls {
