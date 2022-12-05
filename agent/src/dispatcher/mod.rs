@@ -891,7 +891,7 @@ impl DispatcherBuilder {
         dispatcher.init();
         #[cfg(target_os = "linux")]
         if let Some(ns) = current_ns {
-            let _ = NetNs::setns(&ns)?;
+            let _ = NetNs::setns(&ns, Some(NetNs::CURRENT_NS_PATH))?;
         }
         Ok(Dispatcher {
             flavor: Mutex::new(Some(dispatcher)),

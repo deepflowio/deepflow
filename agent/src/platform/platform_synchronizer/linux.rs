@@ -322,7 +322,7 @@ impl PlatformSynchronizer {
             raw_ip_addrs.push(raw_host_ip_addr.unwrap_or_default());
         }
         if let Some(ns) = current_ns {
-            if let Err(e) = NetNs::setns(&ns) {
+            if let Err(e) = NetNs::setns(&ns, Some(NetNs::CURRENT_NS_PATH)) {
                 warn!("restore net namespace failed: {}", e);
                 return;
             }
