@@ -45,7 +45,7 @@ const (
 	RECV_BUFSIZE_64K          = 1 << 16 // 64k
 	RECV_BUFSIZE_256K         = 1 << 18 // 256k
 	RECV_BUFSIZE_512K         = 1 << 19 // 512k
-	RECV_BUFSIZE_MAX          = datatype.MESSAGE_FRAME_SIZE_MAX * 2
+	RECV_BUFSIZE_MAX          = 1 << 24 // 16M, the maximum size of the PCAP packet will be greater than 8M
 	RECV_TIMEOUT              = 30 * time.Second
 	QUEUE_CACHE_FLUSH_TIMEOUT = 3
 	DROP_DETECT_WINDOW_SIZE   = 1024
@@ -119,15 +119,17 @@ func minPowerOfTwo(v int) int {
 	return v
 }
 
-func AcquireRecvBuffer(length int) *RecvBuffer {
+func AcquireRecvBuffer(length int) (*RecvBuffer, bool) {
+	isNew := false
 	index := getBufferPoolIndex(length)
 	buf := recvBufferPools[index].Get().(*RecvBuffer)
 	if len(buf.Buffer) < length {
 		length = minPowerOfTwo(length)
 		buf.Buffer = make([]byte, length)
+		isNew = true
 	}
 
-	return buf
+	return buf, isNew
 }
 
 func ReleaseRecvBuffer(b *RecvBuffer) {
@@ -394,7 +396,7 @@ type ReceiverCounter struct {
 	UDPDropped      uint64 `statsd:"udp_dropped"`
 	UDPDisorder     uint64 `statsd:"udp_disorder"`      // 乱序个数
 	UDPDisorderSize uint64 `statsd:"udp_disorder_size"` // 乱序最大范围
-
+	NewBufferCount  uint64 `statsd:"new_buffer_count"`  // If the received data is large, you need to alloc memory, record the times.
 }
 
 func NewReceiver(
@@ -662,7 +664,7 @@ func (r *Receiver) ProcessUDPServer() {
 	flowHeader := &datatype.FlowHeader{}
 	r.setUDPTimeout()
 	for !r.exit {
-		recvBuffer := AcquireRecvBuffer(RECV_BUFSIZE_2K)
+		recvBuffer, _ := AcquireRecvBuffer(RECV_BUFSIZE_2K)
 		size, remoteAddr, err := r.UDPConn.ReadFromUDP(recvBuffer.Buffer)
 		if err != nil || size < datatype.MESSAGE_HEADER_LEN {
 			ReleaseRecvBuffer(recvBuffer)
@@ -870,7 +872,10 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 			r.logTCPReceiveInvalidData(fmt.Sprintf("TCP client(%s) wrong frame size(%d)", conn.RemoteAddr().String(), baseHeader.FrameSize))
 			return
 		}
-		recvBuffer := AcquireRecvBuffer(dataLen)
+		recvBuffer, isNew := AcquireRecvBuffer(dataLen)
+		if isNew {
+			r.counter.NewBufferCount++
+		}
 		if err := ReadN(conn, recvBuffer.Buffer[:dataLen]); err != nil {
 			atomic.AddUint64(&r.counter.Invalid, 1)
 			ReleaseRecvBuffer(recvBuffer)
