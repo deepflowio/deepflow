@@ -351,10 +351,14 @@ impl UniformSender {
             } else {
                 if self.counter.dropped.load(Ordering::Relaxed) == 0 {
                     self.exception_handler.set(Exception::AnalyzerSocketError);
-                    error!(
-                        "{} sender tcp connection to {}:{} failed",
-                        self.name, self.dst_ip, self.dst_port,
-                    );
+                    if self.dst_ip.is_unspecified() {
+                        error!("'analyzer_ip' is not assigned, please check whether the Agent is successfully registered");
+                    } else {
+                        error!(
+                            "{} sender tcp connection to {}:{} failed",
+                            self.name, self.dst_ip, self.dst_port,
+                        );
+                    }
                 }
                 self.counter.dropped.fetch_add(1, Ordering::Relaxed);
                 return;
