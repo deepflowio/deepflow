@@ -23,9 +23,9 @@ import (
 )
 
 const (
-	VALUE_TYPE_INT     = "int"
-	VALUE_TYPE_STRING  = "string"
-	VALUE_TYPE_FLOAT64 = "float64"
+	VALUE_TYPE_INT     = "Int"
+	VALUE_TYPE_STRING  = "String"
+	VALUE_TYPE_FLOAT64 = "Float64"
 )
 
 func TransType(typeName string, value interface{}) (interface{}, string, error) {
