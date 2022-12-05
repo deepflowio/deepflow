@@ -22,15 +22,13 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowys/deepflow/server/controller/recorder/common"
 	"github.com/deepflowys/deepflow/server/controller/recorder/db"
-	"github.com/deepflowys/deepflow/server/controller/recorder/event"
-	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
 type NATGateway struct {
 	UpdaterBase[cloudmodel.NATGateway, mysql.NATGateway, *cache.NATGateway]
 }
 
-func NewNATGateway(wholeCache *cache.Cache, cloudData []cloudmodel.NATGateway, eventQueue *queue.OverwriteQueue) *NATGateway {
+func NewNATGateway(wholeCache *cache.Cache, cloudData []cloudmodel.NATGateway) *NATGateway {
 	updater := &NATGateway{
 		UpdaterBase[cloudmodel.NATGateway, mysql.NATGateway, *cache.NATGateway]{
 			cache:        wholeCache,
@@ -41,7 +39,6 @@ func NewNATGateway(wholeCache *cache.Cache, cloudData []cloudmodel.NATGateway, e
 	}
 	updater.dataGenerator = updater
 	updater.cacheHandler = updater
-	updater.eventProducer = event.NewNATGateway(&wholeCache.ToolDataSet, eventQueue)
 	return updater
 }
 

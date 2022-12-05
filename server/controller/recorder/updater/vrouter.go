@@ -22,15 +22,13 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowys/deepflow/server/controller/recorder/common"
 	"github.com/deepflowys/deepflow/server/controller/recorder/db"
-	"github.com/deepflowys/deepflow/server/controller/recorder/event"
-	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
 type VRouter struct {
 	UpdaterBase[cloudmodel.VRouter, mysql.VRouter, *cache.VRouter]
 }
 
-func NewVRouter(wholeCache *cache.Cache, cloudData []cloudmodel.VRouter, eventQueue *queue.OverwriteQueue) *VRouter {
+func NewVRouter(wholeCache *cache.Cache, cloudData []cloudmodel.VRouter) *VRouter {
 	updater := &VRouter{
 		UpdaterBase[cloudmodel.VRouter, mysql.VRouter, *cache.VRouter]{
 			cache:        wholeCache,
@@ -41,7 +39,6 @@ func NewVRouter(wholeCache *cache.Cache, cloudData []cloudmodel.VRouter, eventQu
 	}
 	updater.dataGenerator = updater
 	updater.cacheHandler = updater
-	updater.eventProducer = event.NewVRouter(&wholeCache.ToolDataSet, eventQueue)
 	return updater
 }
 

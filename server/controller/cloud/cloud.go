@@ -18,6 +18,7 @@ package cloud
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"time"
 
@@ -29,6 +30,7 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/cloud/platform"
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	controllermodel "github.com/deepflowys/deepflow/server/controller/model"
 	"github.com/deepflowys/deepflow/server/controller/statsd"
 )
 
@@ -135,6 +137,7 @@ func (c *Cloud) getCloudData() {
 	} else {
 		c.getKubernetesData()
 	}
+	c.appendAddtionalResourcesData()
 }
 
 func (c *Cloud) run() {
@@ -276,4 +279,152 @@ func (c *Cloud) runKubernetesGatherTask() {
 			}
 		}
 	}
+}
+
+func (c *Cloud) appendAddtionalResourcesData() {
+	var dbItem mysql.DomainAdditionalResource
+	result := mysql.Db.Where("domain = ?", c.basicInfo.Lcuuid).Find(&dbItem)
+	if result.Error != nil {
+		log.Errorf("domain (lcuuid: %s) db query additional resources failed: %s", c.basicInfo.Lcuuid, result.Error.Error())
+		return
+	} else if result.RowsAffected == 0 {
+		log.Infof("domain (lcuuid: %s) has no additional resources to append", c.basicInfo.Lcuuid)
+		return
+	}
+	var additionalResource controllermodel.AdditionalResourceDomain
+	err := json.Unmarshal([]byte(dbItem.Content), &additionalResource)
+	if err != nil {
+		log.Errorf("domain (lcuuid: %s) json unmarshal content failed: %s", err.Error())
+		return
+	}
+	for _, additionalAZ := range additionalResource.AZs {
+		c.resource.AZs = append(
+			c.resource.AZs,
+			model.AZ{
+				Lcuuid:       additionalAZ.Lcuuid,
+				Name:         additionalAZ.Name,
+				RegionLcuuid: additionalAZ.RegionLcuuid,
+			},
+		)
+	}
+	for _, additionalVPC := range additionalResource.VPCs {
+		c.resource.VPCs = append(
+			c.resource.VPCs,
+			model.VPC{
+				Lcuuid:       additionalVPC.Lcuuid,
+				Name:         additionalVPC.Name,
+				RegionLcuuid: additionalVPC.RegionLcuuid,
+			},
+		)
+	}
+	for _, additionalNetwork := range additionalResource.Networks {
+		c.resource.Networks = append(
+			c.resource.Networks,
+			model.Network{
+				Lcuuid:       additionalNetwork.Lcuuid,
+				Name:         additionalNetwork.Name,
+				IsVIP:        additionalNetwork.IsVIP,
+				NetType:      additionalNetwork.NetType,
+				VPCLcuuid:    additionalNetwork.VPCLcuuid,
+				AZLcuuid:     additionalNetwork.AZLcuuid,
+				RegionLcuuid: additionalNetwork.RegionLcuuid,
+			},
+		)
+		for _, additionalSubnet := range additionalNetwork.Subnets {
+			c.resource.Subnets = append(
+				c.resource.Subnets,
+				model.Subnet{
+					Lcuuid:        additionalSubnet.Lcuuid,
+					Name:          additionalSubnet.Name,
+					CIDR:          additionalSubnet.CIDR,
+					GatewayIP:     additionalSubnet.GatewayIP,
+					VPCLcuuid:     additionalSubnet.VPCLcuuid,
+					NetworkLcuuid: additionalSubnet.NetworkLcuuid,
+				},
+			)
+
+		}
+	}
+	for _, additionalHost := range additionalResource.Hosts {
+		c.resource.Hosts = append(
+			c.resource.Hosts,
+			model.Host{
+				Lcuuid:       additionalHost.Lcuuid,
+				Name:         additionalHost.Name,
+				IP:           additionalHost.IP,
+				Type:         additionalHost.Type,
+				HType:        additionalHost.HType,
+				AZLcuuid:     additionalHost.AZLcuuid,
+				RegionLcuuid: additionalHost.RegionLcuuid,
+			},
+		)
+		for _, additionalVIF := range additionalHost.VInterfaces {
+			c.resource.VInterfaces = append(
+				c.resource.VInterfaces,
+				model.VInterface{
+					Lcuuid:        additionalVIF.Lcuuid,
+					Type:          additionalVIF.Type,
+					Mac:           additionalVIF.Mac,
+					DeviceLcuuid:  additionalVIF.DeviceLcuuid,
+					DeviceType:    additionalVIF.DeviceType,
+					NetworkLcuuid: additionalVIF.NetworkLcuuid,
+					RegionLcuuid:  additionalVIF.RegionLcuuid,
+				},
+			)
+			for _, additionalIP := range additionalVIF.IPs {
+				c.resource.IPs = append(
+					c.resource.IPs,
+					model.IP{
+						Lcuuid:           additionalIP.Lcuuid,
+						VInterfaceLcuuid: additionalIP.VInterfaceLcuuid,
+						IP:               additionalIP.IP,
+						SubnetLcuuid:     additionalIP.SubnetLcuuid,
+						RegionLcuuid:     additionalIP.RegionLcuuid,
+					},
+				)
+			}
+		}
+	}
+	for _, additionalVM := range additionalResource.VMs {
+		c.resource.VMs = append(
+			c.resource.VMs,
+			model.VM{
+				Lcuuid:       additionalVM.Lcuuid,
+				Name:         additionalVM.Name,
+				LaunchServer: additionalVM.LaunchServer,
+				HType:        additionalVM.HType,
+				State:        additionalVM.State,
+				VPCLcuuid:    additionalVM.VPCLcuuid,
+				AZLcuuid:     additionalVM.AZLcuuid,
+				RegionLcuuid: additionalVM.RegionLcuuid,
+			},
+		)
+		for _, additionalVIF := range additionalVM.VInterfaces {
+			c.resource.VInterfaces = append(
+				c.resource.VInterfaces,
+				model.VInterface{
+					Lcuuid:        additionalVIF.Lcuuid,
+					Type:          additionalVIF.Type,
+					Mac:           additionalVIF.Mac,
+					DeviceLcuuid:  additionalVIF.DeviceLcuuid,
+					DeviceType:    additionalVIF.DeviceType,
+					NetworkLcuuid: additionalVIF.NetworkLcuuid,
+					RegionLcuuid:  additionalVIF.RegionLcuuid,
+				},
+			)
+			for _, additionalIP := range additionalVIF.IPs {
+				c.resource.IPs = append(
+					c.resource.IPs,
+					model.IP{
+						Lcuuid:           additionalIP.Lcuuid,
+						VInterfaceLcuuid: additionalIP.VInterfaceLcuuid,
+						IP:               additionalIP.IP,
+						SubnetLcuuid:     additionalIP.SubnetLcuuid,
+						RegionLcuuid:     additionalIP.RegionLcuuid,
+					},
+				)
+			}
+		}
+	}
+	return
 }

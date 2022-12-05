@@ -27,13 +27,13 @@ import (
 )
 
 type PodNode struct {
-	EventManager[cloudmodel.PodNode, mysql.PodNode, *cache.PodNode]
+	EventManagerBase
 	deviceType int
 }
 
 func NewPodNode(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *PodNode {
 	mng := &PodNode{
-		EventManager[cloudmodel.PodNode, mysql.PodNode, *cache.PodNode]{
+		EventManagerBase{
 			resourceType: RESOURCE_TYPE_POD_NODE_EN,
 			ToolDataSet:  toolDS,
 			Queue:        eq,
@@ -46,6 +46,7 @@ func NewPodNode(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *PodNode {
 func (p *PodNode) ProduceByAdd(items []*mysql.PodNode) {
 	for _, item := range items {
 		var opts []eventapi.TagFieldOption
+		var domainLcuuid string
 		info, err := p.ToolDataSet.GetPodNodeInfoByID(item.ID)
 		if err != nil {
 			log.Error(err)
@@ -54,6 +55,7 @@ func (p *PodNode) ProduceByAdd(items []*mysql.PodNode) {
 				eventapi.TagAZID(info.AZID),
 				eventapi.TagRegionID(info.RegionID),
 			}...)
+			domainLcuuid = info.DomainLcuuid
 		}
 		opts = append(opts, []eventapi.TagFieldOption{
 			eventapi.TagPodNodeID(item.ID),
@@ -61,14 +63,28 @@ func (p *PodNode) ProduceByAdd(items []*mysql.PodNode) {
 			eventapi.TagPodClusterID(item.PodClusterID),
 		}...)
 
-		p.createAndPutEvent(
-			item.Lcuuid,
-			eventapi.RESOURCE_EVENT_TYPE_CREATE,
-			item.Name,
-			p.deviceType,
-			item.ID,
-			opts...,
-		)
+		l3DeviceOpts, ok := getL3DeviceOptionsByPodNodeID(p.ToolDataSet, item.ID)
+		if ok {
+			opts = append(opts, l3DeviceOpts...)
+			p.createAndEnqueue(
+				item.Lcuuid,
+				eventapi.RESOURCE_EVENT_TYPE_CREATE,
+				item.Name,
+				p.deviceType,
+				item.ID,
+				opts...,
+			)
+		} else {
+			p.enqueueIfInsertIntoMySQLFailed(
+				item.Lcuuid,
+				domainLcuuid,
+				eventapi.RESOURCE_EVENT_TYPE_CREATE,
+				item.Name,
+				p.deviceType,
+				item.ID,
+				opts...,
+			)
+		}
 	}
 }
 
@@ -90,6 +106,6 @@ func (p *PodNode) ProduceByDelete(lcuuids []string) {
 			log.Error(nameByIDNotFound(p.resourceType, id))
 		}
 
-		p.createAndPutEvent(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, p.deviceType, id)
+		p.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, p.deviceType, id)
 	}
 }

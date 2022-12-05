@@ -22,15 +22,13 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowys/deepflow/server/controller/recorder/common"
 	"github.com/deepflowys/deepflow/server/controller/recorder/db"
-	"github.com/deepflowys/deepflow/server/controller/recorder/event"
-	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
 type PodNode struct {
 	UpdaterBase[cloudmodel.PodNode, mysql.PodNode, *cache.PodNode]
 }
 
-func NewPodNode(wholeCache *cache.Cache, cloudData []cloudmodel.PodNode, eventQueue *queue.OverwriteQueue) *PodNode {
+func NewPodNode(wholeCache *cache.Cache, cloudData []cloudmodel.PodNode) *PodNode {
 	updater := &PodNode{
 		UpdaterBase[cloudmodel.PodNode, mysql.PodNode, *cache.PodNode]{
 			cache:        wholeCache,
@@ -41,7 +39,6 @@ func NewPodNode(wholeCache *cache.Cache, cloudData []cloudmodel.PodNode, eventQu
 	}
 	updater.dataGenerator = updater
 	updater.cacheHandler = updater
-	updater.eventProducer = event.NewPodNode(&wholeCache.ToolDataSet, eventQueue)
 	return updater
 }
 

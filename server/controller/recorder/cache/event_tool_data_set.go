@@ -117,6 +117,7 @@ type redisInstanceInfo struct {
 }
 
 type podNodeInfo struct {
+	DomainLcuuid string
 	Name         string
 	RegionID     int
 	AZID         int
@@ -134,6 +135,7 @@ type podServiceInfo struct {
 }
 
 type podInfo struct {
+	DomainLcuuid   string
 	Name           string
 	RegionID       int
 	AZID           int
@@ -178,7 +180,8 @@ func NewEventToolDataSet() EventToolDataSet {
 		lanIPLcuuidToVInterfaceID: make(map[string]int),
 		lanIPLcuuidToIP:           make(map[string]string),
 
-		podNodeIDToVMID: make(map[int]int),
+		vmPodNodeConnectionLcuuidToPodNodeID: make(map[string]int),
+		podNodeIDToVMID:                      make(map[int]int),
 	}
 }
 

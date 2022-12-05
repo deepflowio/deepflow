@@ -25,6 +25,7 @@ import (
 
 	"github.com/google/gopacket/layers"
 
+	"github.com/deepflowys/deepflow/server/libs/logger"
 	"github.com/deepflowys/deepflow/server/libs/policy"
 	api "github.com/deepflowys/deepflow/server/libs/reciter-api"
 )
@@ -55,7 +56,7 @@ func TestSimpleGroups(t *testing.T) {
 		{L3EpcID: 1, GroupID: 4, CIDRs: []string{"172.21.0.0/16"}, Protocol: policy.PROTO_ALL, ServerPorts: "444,25-123"},
 		{GroupID: 5, PodGroupID: 1234, Protocol: policy.PROTO_ALL, ServerPorts: "444,25-123"},
 	}
-	labeler := NewGroupLabeler(nil, rawGroupMaps)
+	labeler := NewGroupLabeler(nil, rawGroupMaps, 1<<10, "")
 	var result []uint16
 	result = labeler.Query(1, binary.BigEndian.Uint32([]byte{172, 16, 2, 233}), 0)
 	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
@@ -71,24 +72,24 @@ func TestSimpleGroups(t *testing.T) {
 	if len(result) != 0 {
 		t.Error("group查询不正确")
 	}
-	result = labeler.QueryServer(1, binary.BigEndian.Uint32([]byte{172, 16, 2, 233}), 0, layers.IPProtocolTCP, 150)
+	result = labeler.QueryService(1, binary.BigEndian.Uint32([]byte{172, 16, 2, 233}), 0, layers.IPProtocolTCP, 150)
 	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
 	if len(result) != 2 || result[0] != 1 || result[1] != 3 {
-		t.Error("group查询不正确")
+		t.Error("group查询不正确", result)
 	}
-	result = labeler.QueryServer(1, binary.BigEndian.Uint32([]byte{172, 16, 2, 233}), 0, layers.IPProtocolTCP, 250)
+	result = labeler.QueryService(1, binary.BigEndian.Uint32([]byte{172, 16, 2, 233}), 0, layers.IPProtocolTCP, 250)
 	if len(result) != 1 || result[0] != 1 {
-		t.Error("group查询不正确")
+		t.Error("group查询不正确", result)
 	}
-	result = labeler.QueryServer(1, binary.BigEndian.Uint32([]byte{172, 21, 2, 233}), 0, layers.IPProtocolIPv6HopByHop, 444)
+	result = labeler.QueryService(1, binary.BigEndian.Uint32([]byte{172, 21, 2, 233}), 0, layers.IPProtocolIPv6HopByHop, 444)
 	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
 	if len(result) != 2 || result[0] != 2 || result[1] != 4 {
-		t.Error("group查询不正确")
+		t.Error("group查询不正确", result)
 	}
-	result = labeler.QueryServer(1, binary.BigEndian.Uint32([]byte{172, 21, 2, 233}), 1234, layers.IPProtocolIPv6HopByHop, 444)
+	result = labeler.QueryService(1, binary.BigEndian.Uint32([]byte{172, 21, 2, 233}), 1234, layers.IPProtocolIPv6HopByHop, 444)
 	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
 	if len(result) != 3 || result[0] != 2 || result[1] != 4 || result[2] != 5 {
-		t.Error("group查询不正确")
+		t.Error("group查询不正确", result)
 	}
 }
 
@@ -99,21 +100,21 @@ func TestDuplicateIDGroups(t *testing.T) {
 		{L3EpcID: 51, GroupID: 233, CIDRs: []string{"172.20.0.0/16"}, Protocol: uint16(layers.IPProtocolTCP), ServerPorts: "22"},
 		{L3EpcID: 1, GroupID: 233, CIDRs: []string{"172.21.0.0/16"}, Protocol: policy.PROTO_ALL, ServerPorts: "444,25-123"},
 	}
-	labeler := NewGroupLabeler(nil, rawGroupMaps)
+	labeler := NewGroupLabeler(nil, rawGroupMaps, 1<<10, "")
 	var result []uint16
-	result = labeler.QueryServer(1, binary.BigEndian.Uint32([]byte{172, 16, 2, 233}), 0, layers.IPProtocolTCP, 123)
+	result = labeler.QueryService(1, binary.BigEndian.Uint32([]byte{172, 16, 2, 233}), 0, layers.IPProtocolTCP, 123)
 	if len(result) != 1 || result[0] != 233 {
 		t.Error("group查询不正确")
 	}
-	result = labeler.QueryServer(51, binary.BigEndian.Uint32([]byte{172, 20, 2, 233}), 0, layers.IPProtocolTCP, 22)
+	result = labeler.QueryService(51, binary.BigEndian.Uint32([]byte{172, 20, 2, 233}), 0, layers.IPProtocolTCP, 22)
 	if len(result) != 1 || result[0] != 233 {
 		t.Error("group查询不正确")
 	}
-	result = labeler.QueryServer(1, binary.BigEndian.Uint32([]byte{172, 16, 2, 233}), 0, layers.IPProtocolTCP, 22)
+	result = labeler.QueryService(1, binary.BigEndian.Uint32([]byte{172, 16, 2, 233}), 0, layers.IPProtocolTCP, 22)
 	if len(result) != 0 {
 		t.Error("group查询不正确")
 	}
-	result = labeler.QueryServer(51, binary.BigEndian.Uint32([]byte{172, 20, 2, 233}), 0, layers.IPProtocolTCP, 321)
+	result = labeler.QueryService(51, binary.BigEndian.Uint32([]byte{172, 20, 2, 233}), 0, layers.IPProtocolTCP, 321)
 	if len(result) != 0 {
 		t.Error("group查询不正确")
 	}
@@ -127,7 +128,7 @@ func TestSimpleIPv6Groups(t *testing.T) {
 		{L3EpcID: 1, GroupID: 4, CIDRs: []string{"deaf:beef:feed:babe::/64"}, Protocol: policy.PROTO_ALL, ServerPorts: "444,25-123"},
 		{GroupID: 5, PodGroupID: 1234, Protocol: policy.PROTO_ALL, ServerPorts: "444,25-123"},
 	}
-	labeler := NewGroupLabeler(nil, rawGroupMaps)
+	labeler := NewGroupLabeler(nil, rawGroupMaps, 1<<10, "")
 	var ip [net.IPv6len]byte
 	ip[net.IPv6len-1] = 1
 	var result []uint16
@@ -150,22 +151,22 @@ func TestSimpleIPv6Groups(t *testing.T) {
 		t.Error("group查询不正确")
 	}
 	binary.BigEndian.PutUint64(ip[:], 0xbabefacebeefcafe)
-	result = labeler.QueryServerIPv6(1, ip[:], 0, layers.IPProtocolTCP, 150)
+	result = labeler.QueryServiceIPv6(1, ip[:], 0, layers.IPProtocolTCP, 150)
 	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
 	if len(result) != 2 || result[0] != 1 || result[1] != 3 {
 		t.Error("group查询不正确")
 	}
-	result = labeler.QueryServerIPv6(1, ip[:], 0, layers.IPProtocolTCP, 250)
+	result = labeler.QueryServiceIPv6(1, ip[:], 0, layers.IPProtocolTCP, 250)
 	if len(result) != 1 || result[0] != 1 {
 		t.Error("group查询不正确")
 	}
 	binary.BigEndian.PutUint64(ip[:], 0xdeafbeeffeedbabe)
-	result = labeler.QueryServerIPv6(1, ip[:], 0, layers.IPProtocolIPv6HopByHop, 444)
+	result = labeler.QueryServiceIPv6(1, ip[:], 0, layers.IPProtocolIPv6HopByHop, 444)
 	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
 	if len(result) != 2 || result[0] != 2 || result[1] != 4 {
 		t.Error("group查询不正确")
 	}
-	result = labeler.QueryServerIPv6(1, ip[:], 1234, layers.IPProtocolIPv6HopByHop, 444)
+	result = labeler.QueryServiceIPv6(1, ip[:], 1234, layers.IPProtocolIPv6HopByHop, 444)
 	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
 	if len(result) != 3 || result[0] != 2 || result[1] != 4 || result[2] != 5 {
 		t.Error("group查询不正确")
@@ -178,7 +179,7 @@ func TestOverlappingGroups(t *testing.T) {
 		{L3EpcID: 1, GroupID: 2, CIDRs: []string{"10.128.0.0/9"}},
 		{L3EpcID: 1, GroupID: 3, CIDRs: []string{"10.16.0.0/16", "10.130.0.0/24"}},
 	}
-	labeler := NewGroupLabeler(nil, rawGroupMaps)
+	labeler := NewGroupLabeler(nil, rawGroupMaps, 1<<10, "")
 	var result []uint16
 	result = labeler.Query(1, binary.BigEndian.Uint32([]byte{10, 16, 2, 233}), 0)
 	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
@@ -204,7 +205,7 @@ func TestIPRangeGroups(t *testing.T) {
 		{L3EpcID: 1, GroupID: 3, CIDRs: []string{"10.16.0.0/16", "10.130.0.0/24"}},
 		{L3EpcID: 1, GroupID: 4, IPRanges: []string{"10.128.0.0-10.130.3.232"}},
 	}
-	labeler := NewGroupLabeler(nil, rawGroupMaps)
+	labeler := NewGroupLabeler(nil, rawGroupMaps, 1<<10, "")
 	var result []uint16
 	result = labeler.Query(1, binary.BigEndian.Uint32([]byte{10, 16, 2, 233}), 0)
 	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
@@ -223,14 +224,14 @@ func TestIPRangeGroups(t *testing.T) {
 	}
 }
 
-func TestIPv6RangeGroups(t *testing.T) {
+func IPv6RangeGroups(t *testing.T) {
 	rawGroupMaps := []api.GroupIDMap{
 		{L3EpcID: 1, GroupID: 1, CIDRs: []string{"babe:face::/32"}},
 		{L3EpcID: 1, GroupID: 2, IPRanges: []string{"babe:face:beef:bea0::-babe:face:beef:beaf:ffff:ffff:ffff:ffff"}},
 		{L3EpcID: 1, GroupID: 3, CIDRs: []string{"babe:face:beef:cafe::/64", "babe:face:beef:bead::/80"}},
 		{L3EpcID: 1, GroupID: 4, IPRanges: []string{"babe:face:beef:bea0::-babe:face:beef:bead:233::dead:beae"}},
 	}
-	labeler := NewGroupLabeler(nil, rawGroupMaps)
+	labeler := NewGroupLabeler(nil, rawGroupMaps, 1<<10, "")
 	var ip [net.IPv6len]byte
 	ip[net.IPv6len-1] = 1
 	var result []uint16
@@ -263,7 +264,7 @@ func TestMixedIPGroups(t *testing.T) {
 		{L3EpcID: 1, GroupID: 3, CIDRs: []string{"10.16.0.0/16", "10.130.0.0/24", "babe:face:beef:cafe::/64", "babe:face:beef:bead::/80"}},
 		{L3EpcID: 1, GroupID: 4, IPRanges: []string{"10.128.0.0-10.130.3.232", "babe:face:beef:bea0::-babe:face:beef:bead:233::dead:beae"}},
 	}
-	labeler := NewGroupLabeler(nil, rawGroupMaps)
+	labeler := NewGroupLabeler(nil, rawGroupMaps, 1<<10, "")
 	var ip [net.IPv6len]byte
 	ip[net.IPv6len-1] = 1
 	var result []uint16
@@ -311,7 +312,7 @@ func TestAnyRuleGroups(t *testing.T) {
 		{L3EpcID: 2, GroupID: 1, IPRanges: []string{"0.0.0.0-255.255.255.255"}},
 		{L3EpcID: 0, GroupID: 2, IPRanges: []string{"10.128.0.0-10.255.255.255"}},
 	}
-	labeler := NewGroupLabeler(nil, rawGroupMaps)
+	labeler := NewGroupLabeler(nil, rawGroupMaps, 1<<10, "")
 	var result []uint16
 	result = labeler.Query(2, binary.BigEndian.Uint32([]byte{10, 16, 2, 233}), 0)
 	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
@@ -359,10 +360,31 @@ func TestPortFilter(t *testing.T) {
 		{3, layers.IPProtocolUDP, 0, true},
 		{3, layers.IPProtocolIPv6HopByHop, 350, false},
 	}
-	filter := newPortFilter(nil, groupIDMap)
+	filter := newPortFilter(nil, groupIDMap, 1000, "")
 	for _, tc := range testcases {
 		if filter.check(tc.groupIDIndex, tc.protocol, tc.serverPort) != tc.match {
 			t.Errorf("%v查询结果不正确", tc)
 		}
+	}
+}
+
+func BenchmarkService10000(b *testing.B) {
+	services := make([]api.GroupIDMap, 10000)
+	for i, _ := range services {
+		svc := &services[i]
+		svc.GroupID = uint16(i)
+		svc.L3EpcID = int32(i % 10)
+		svc.CIDRs = []string{"172.16.0.0/16", "172.20.0.0/16", "10.0.0.0/8"}
+		svc.IPRanges = []string{"10.0.0.0-11.0.0.0", "192.168.1.1-192.168.10.1"}
+		svc.Protocol = policy.PROTO_ALL
+		svc.ServerPorts = "22,12000-13000,30000-40000"
+		svc.ServiceID = uint32(i)
+	}
+	l, _ := logger.GetPrefixLogger("test", "")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		t := NewGroupLabeler(l, services, 1<<20, "test")
+		t.portFilter.fastMap.Close()
 	}
 }

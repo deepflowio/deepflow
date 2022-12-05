@@ -14,18 +14,16 @@
  * limitations under the License.
  */
 
-package example
+package synchronize
 
-var YamlDomainFileReader = []byte(`
-# 名称
-name: filereader
-# 配置文件录入
-type: filereader
-config:
-  # 所属区域标识
-  region_uuid: ffffffff-ffff-ffff-ffff-ffffffffffff
-  # 资源同步控制器
-  #controller_ip: 127.0.0.1
-  # YAML文件路径
-  path: /xxx/xxx/xxx.yaml
-`)
+import (
+	context "golang.org/x/net/context"
+	"google.golang.org/grpc/peer"
+)
+
+func getRemote(ctx context.Context) string {
+	remote := ""
+	peerIP, _ := peer.FromContext(ctx)
+	remote = peerIP.Addr.String()
+	return remote
+}

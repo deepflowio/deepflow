@@ -55,17 +55,18 @@ type L7Base struct {
 	ServerPort uint16 `json:"server_port"`
 
 	// 流信息
-	FlowID      uint64 `json:"flow_id"`
-	TapType     uint8  `json:"tap_type"`
-	TapPortType uint8  `json:"tap_port_type"`
-	TunnelType  uint8  `json:"tunnel_type"`
-	TapPort     uint32 `json:"tap_port"`
-	TapSide     string `json:"tap_side"`
-	VtapID      uint16 `json:"vtap_id"`
-	ReqTcpSeq   uint32 `json:"req_tcp_seq"`
-	RespTcpSeq  uint32 `json:"resp_tcp_seq"`
-	StartTime   int64  `json:"start_time"` // us
-	EndTime     int64  `json:"end_time"`   // us
+	FlowID       uint64 `json:"flow_id"`
+	TapType      uint8  `json:"tap_type"`
+	TapPortType  uint8  `json:"tap_port_type"`
+	SignalSource uint16 `json:"signal_source"`
+	TunnelType   uint8  `json:"tunnel_type"`
+	TapPort      uint32 `json:"tap_port"`
+	TapSide      string `json:"tap_side"`
+	VtapID       uint16 `json:"vtap_id"`
+	ReqTcpSeq    uint32 `json:"req_tcp_seq"`
+	RespTcpSeq   uint32 `json:"resp_tcp_seq"`
+	StartTime    int64  `json:"start_time"` // us
+	EndTime      int64  `json:"end_time"`   // us
 
 	ProcessID0             uint32
 	ProcessID1             uint32
@@ -100,6 +101,7 @@ func L7BaseColumns() []*ckdb.Column {
 		ckdb.NewColumn("flow_id", ckdb.UInt64).SetIndex(ckdb.IndexMinmax),
 		ckdb.NewColumn("tap_type", ckdb.UInt8).SetIndex(ckdb.IndexSet),
 		ckdb.NewColumn("tap_port_type", ckdb.UInt8).SetIndex(ckdb.IndexNone),
+		ckdb.NewColumn("signal_source", ckdb.UInt16).SetIndex(ckdb.IndexNone),
 		ckdb.NewColumn("tunnel_type", ckdb.UInt8).SetIndex(ckdb.IndexNone),
 		ckdb.NewColumn("tap_port", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 		ckdb.NewColumn("tap_side", ckdb.LowCardinalityString),
@@ -172,6 +174,9 @@ func (f *L7Base) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 	if err := block.WriteUInt8(f.TapPortType); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(f.SignalSource); err != nil {
 		return err
 	}
 	if err := block.WriteUInt8(f.TunnelType); err != nil {
@@ -614,6 +619,12 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	b.TapType = uint8(l.TapType)
 	tunnelType := datatype.TunnelType(0)
 	b.TapPort, b.TapPortType, tunnelType = datatype.TapPort(l.TapPort).SplitToPortTypeTunnel()
+	b.SignalSource = uint16(datatype.SIGNAL_SOURCE_PACKET)
+	if b.TapPortType == datatype.TAPPORT_FROM_OTEL {
+		b.SignalSource = uint16(datatype.SIGNAL_SOURCE_OTEL)
+	} else if b.TapPortType == datatype.TAPPORT_FROM_EBPF {
+		b.SignalSource = uint16(datatype.SIGNAL_SOURCE_EBPF)
+	}
 	b.TunnelType = uint8(tunnelType)
 	b.TapSide = zerodoc.TAPSideEnum(l.TapSide).String()
 	b.VtapID = uint16(l.VtapId)
@@ -679,39 +690,39 @@ func ProtoLogToL7FlowLog(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfo
 	return h
 }
 
-func addExtraFields(names, values []string, name, value string) ([]string, []string) {
-	if value != "" {
-		return append(names, name), append(values, value)
-	}
-	return names, values
-}
-
-func L7FlowLogToFlowTagInterfaces(l *L7FlowLog) ([]interface{}, []interface{}) {
-	fields := make([]interface{}, 0, 2*len(l.AttributeNames))
-	fieldValues := make([]interface{}, 0, 2*len(l.AttributeValues))
+func L7FlowLogToFlowTagInterfaces(l *L7FlowLog, fields, fieldValues *[]interface{}) ([]interface{}, []interface{}) {
 	time := uint32(l.L7Base.EndTime / US_TO_S_DEVISOR)
 	db, table := common.FLOW_LOG_DB, common.L7_FLOW_ID.String()
 
-	extraFieldNames := make([]string, 0, 3)
-	extraFieldValues := make([]string, 0, 3)
-	extraFieldNames, extraFieldValues = addExtraFields(extraFieldNames, extraFieldValues, "service_name", l.ServiceName)
-	extraFieldNames, extraFieldValues = addExtraFields(extraFieldNames, extraFieldValues, "endpoint", l.Endpoint)
-	extraFieldNames, extraFieldValues = addExtraFields(extraFieldNames, extraFieldValues, "service_instance_id", l.ServiceInstanceId)
-	for i, name := range extraFieldNames {
-		fieldValues = append(fieldValues, flow_tag.NewTagFieldValue(time, db, table, l.L3EpcID0, l.PodNSID0, flow_tag.FieldTag, name, extraFieldValues[i]))
-		fieldValues = append(fieldValues, flow_tag.NewTagFieldValue(time, db, table, l.L3EpcID1, l.PodNSID1, flow_tag.FieldTag, name, extraFieldValues[i]))
+	extraFieldNames := []string{"service_name", "endpoint", "service_instance_id"}
+	extraFieldValues := []string{l.ServiceName, l.Endpoint, l.ServiceInstanceId}
+
+	L3EpcIDs := []int32{l.L3EpcID0, l.L3EpcID1}
+	PodNSIDs := []uint16{l.PodNSID0, l.PodNSID1}
+	if l.L3EpcID0 == l.L3EpcID1 && l.PodNSID0 == l.PodNSID1 {
+		L3EpcIDs = L3EpcIDs[:1]
+		PodNSIDs = PodNSIDs[:1]
 	}
 
-	for i, name := range l.AttributeNames {
-		fields = append(fields, flow_tag.NewTagField(time, db, table, l.L3EpcID0, l.PodNSID0, flow_tag.FieldTag, name))
-		fieldValues = append(fieldValues, flow_tag.NewTagFieldValue(time, db, table, l.L3EpcID0, l.PodNSID0, flow_tag.FieldTag, name, l.AttributeValues[i]))
+	for i, L3EpcID := range L3EpcIDs {
+		PodNSID := PodNSIDs[i]
+		for i, name := range extraFieldNames {
+			if extraFieldValues[i] == "" {
+				continue
+			}
+			*fieldValues = append(*fieldValues, flow_tag.NewTagFieldValue(time, db, table, L3EpcID, PodNSID, flow_tag.FieldTag, name, extraFieldValues[i]))
+		}
 
-		fields = append(fields, flow_tag.NewTagField(time, db, table, l.L3EpcID1, l.PodNSID1, flow_tag.FieldTag, name))
-		fieldValues = append(fieldValues, flow_tag.NewTagFieldValue(time, db, table, l.L3EpcID1, l.PodNSID1, flow_tag.FieldTag, name, l.AttributeValues[i]))
+		for i, name := range l.AttributeNames {
+			*fields = append(*fields, flow_tag.NewTagField(time, db, table, L3EpcID, PodNSID, flow_tag.FieldTag, name))
+			if l.AttributeValues[i] != "" {
+				*fieldValues = append(*fieldValues, flow_tag.NewTagFieldValue(time, db, table, L3EpcID, PodNSID, flow_tag.FieldTag, name, l.AttributeValues[i]))
+			}
+		}
+		for _, name := range l.MetricsNames {
+			*fields = append(*fields, flow_tag.NewTagField(time, db, table, L3EpcID, PodNSID, flow_tag.FieldMetrics, name))
+		}
 	}
-	for _, name := range l.MetricsNames {
-		fields = append(fields, flow_tag.NewTagField(time, db, table, l.L3EpcID0, l.PodNSID0, flow_tag.FieldMetrics, name))
-		fields = append(fields, flow_tag.NewTagField(time, db, table, l.L3EpcID1, l.PodNSID1, flow_tag.FieldMetrics, name))
-	}
-	return fields, fieldValues
+
+	return *fields, *fieldValues
 }

@@ -105,15 +105,22 @@ type VtapInfo struct {
 }
 
 type Counter struct {
-	GrpcRequestTime    int64 `statsd:"grpc-request-time"`
-	UpdateServiceTime  int64 `statsd:"update-service-time"`
-	UpdatePlatformTime int64 `statsd:"update-platform-time"`
-	UpdateCount        int64 `statsd:"update-count"`
+	GrpcRequestTime        int64 `statsd:"grpc-request-time"`
+	UpdateServiceTime      int64 `statsd:"update-service-time"`
+	UpdatePlatformTime     int64 `statsd:"update-platform-time"`
+	UpdateCount            int64 `statsd:"update-count"`
+	UpdateServiceUnmarshal int64 `statsd:"update-service-unmarshal-time"`
+	UpdateServiceLabeler   int64 `statsd:"update-service-labeler-time"`
+	UpdateServicesCount    int64 `statsd:"update-services-count"`
 
 	IP4TotalCount int64 `statsd:"ip4-total-count"`
 	IP4HitCount   int64 `statsd:"ip4-hit-count"`
 	IP6TotalCount int64 `statsd:"ip6-total-count"`
 	IP6HitCount   int64 `statsd:"ip6-hit-count"`
+	IP4MissCount  int64 `statsd:"ip4-miss-count"`
+	IP6MissCount  int64 `statsd:"ip6-miss-count"`
+	MacMissCount  int64 `statsd:"mac-miss-count"`
+	EpcMissCount  int64 `statsd:"epc-miss-count"`
 }
 
 type PlatformInfoTable struct {
@@ -325,7 +332,8 @@ func (t *PlatformInfoTable) IPV4InfoAddLru(info *Info, key uint64) {
 	}
 	var missCount uint64 = 1
 	t.epcIDIPV4Lru.Add(key, &missCount)
-	log.Infof("can't find IPV4Info from epcID(%d) ip(%s)", key>>32, utils.IpFromUint32(uint32(key)).String())
+	log.Debugf("can't find IPV4Info from epcID(%d) ip(%s)", key>>32, utils.IpFromUint32(uint32(key)).String())
+	t.counter.IP4MissCount++
 }
 
 func (t *PlatformInfoTable) IPV4InfoStat(lruItem interface{}) {
@@ -363,7 +371,8 @@ func (t *PlatformInfoTable) InfoMissStat(mac uint64) {
 	} else {
 		var missCount uint64 = 1
 		t.macMissCount[mac] = &missCount
-		log.Infof("can't find info from mac(%x)", mac)
+		log.Debugf("can't find info from mac(%x)", mac)
+		t.counter.MacMissCount++
 	}
 }
 
@@ -404,7 +413,8 @@ func (t *PlatformInfoTable) baseInfoMissStat(epcID int32) {
 	} else {
 		var missCount uint64 = 1
 		t.epcIDBaseMissCount[epcID] = &missCount
-		log.Infof("can't find baseInfo from epcID(%d)", epcID)
+		log.Debug("can't find baseInfo from epcID(%d)", epcID)
+		t.counter.EpcMissCount++
 	}
 }
 
@@ -482,7 +492,8 @@ func (t *PlatformInfoTable) IPV6InfoAddLru(info *Info, key []byte) {
 	}
 	var missCount uint64 = 1
 	t.epcIDIPV6Lru.Add(key, &missCount)
-	log.Infof("can't find IPV6Info from epcID(%d) ip(%s)", int32(binary.LittleEndian.Uint16(key[:4])), net.IP(key[4:]).String())
+	log.Debugf("can't find IPV6Info from epcID(%d) ip(%s)", int32(binary.LittleEndian.Uint16(key[:4])), net.IP(key[4:]).String())
+	t.counter.IP6MissCount++
 }
 
 func (t *PlatformInfoTable) IPV6InfoStat(lruItem interface{}) {
@@ -608,7 +619,7 @@ func (t *PlatformInfoTable) String() string {
 		sb.WriteString("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n")
 	}
 	epcIP4s := make([]uint64, 0)
-	for epcIP, _ := range t.epcIDIPV4Infos {
+	for epcIP := range t.epcIDIPV4Infos {
 		epcIP4s = append(epcIP4s, epcIP)
 	}
 	sort.Slice(epcIP4s, func(i, j int) bool {
@@ -629,7 +640,7 @@ func (t *PlatformInfoTable) String() string {
 		sb.WriteString("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n")
 	}
 	epcIP6s := make([][EpcIDIPV6_LEN]byte, 0)
-	for epcIP, _ := range t.epcIDIPV6Infos {
+	for epcIP := range t.epcIDIPV6Infos {
 		epcIP6s = append(epcIP6s, epcIP)
 	}
 	sort.Slice(epcIP6s, func(i, j int) bool {
@@ -720,7 +731,7 @@ func (t *PlatformInfoTable) String() string {
 		sb.WriteString("\n7 *epcID           regionID  hitcount (若1,2,3都无法匹配到平台信息，则只使用epcID匹配到Region信息的统计)\n")
 		sb.WriteString("---------------------------------------\n")
 		epcIDs := make([]int32, 0, len(t.epcIDBaseInfos))
-		for epcID, _ := range t.epcIDBaseInfos {
+		for epcID := range t.epcIDBaseInfos {
 			epcIDs = append(epcIDs, epcID)
 		}
 		sort.Slice(epcIDs, func(i, j int) bool {
@@ -844,6 +855,7 @@ func (t *PlatformInfoTable) QueryIPv6IsKeyServiceAndID(l3EpcID int32, ipv6 net.I
 }
 
 func (t *PlatformInfoTable) updateServices(response *trident.SyncResponse) bool {
+	unmarshalStart := time.Now()
 	groupsData := trident.Groups{}
 	if compressed := response.GetGroups(); compressed != nil {
 		if err := groupsData.Unmarshal(compressed); err != nil {
@@ -851,9 +863,14 @@ func (t *PlatformInfoTable) updateServices(response *trident.SyncResponse) bool 
 			return false
 		}
 	}
-	services := make([]api.GroupIDMap, 0, len(groupsData.GetSvcs()))
+	t.counter.UpdateServiceUnmarshal += int64(time.Since(unmarshalStart))
+	services := make([]api.GroupIDMap, 0, len(groupsData.GetSvcs())*2)
 	serviceIndex := 0
 	for _, svc := range groupsData.GetSvcs() {
+		// 目前只支持pod的service查询service_id
+		if svc.GetType() != trident.ServiceType_POD_SERVICE {
+			continue
+		}
 		groupIDMap := api.GroupIDMap{
 			GroupID:     uint16(serviceIndex),
 			L3EpcID:     int32(svc.GetEpcId()),
@@ -864,65 +881,32 @@ func (t *PlatformInfoTable) updateServices(response *trident.SyncResponse) bool 
 			ServiceID:   svc.GetId(),
 		}
 
-		// 目前只支持pod的service查询service_id
-		if svc.GetType() != trident.ServiceType_POD_SERVICE {
-			groupIDMap.ServiceID = 0
-		} else {
-			// serverPorts 默认增加0端口，当只用vpc和ip时用0端口也能匹配服务id
-			if groupIDMap.ServerPorts == "" {
-				groupIDMap.ServerPorts = "0"
-			} else {
-				groupIDMap.ServerPorts += ",0"
-			}
-		}
 		services = append(services, groupIDMap)
 		log.Debugf("svc: %+v", groupIDMap)
 		serviceIndex++
-		// 增加支持若查询时的protocol为0，则忽略protocol的匹配
-		groupIDMapProtoIgnore := groupIDMap
-		groupIDMapProtoIgnore.Protocol = 0
-		groupIDMapProtoIgnore.GroupID = uint16(serviceIndex)
-		if !servicesHasGroupIDMap(services, groupIDMapProtoIgnore) { // 防止重复增加
+		if groupIDMap.Protocol != 0 {
+			// 增加支持若查询时的protocol为0，则忽略protocol的匹配
+			groupIDMapProtoIgnore := groupIDMap
+			groupIDMapProtoIgnore.Protocol = 0
+			groupIDMapProtoIgnore.GroupID = uint16(serviceIndex)
 			services = append(services, groupIDMapProtoIgnore)
 			serviceIndex++
 			log.Debugf("svc protocol ignore: %+v", groupIDMapProtoIgnore)
 		}
 	}
+
 	if t.serviceLabeler != nil &&
 		t.serviceLabeler.portFilter != nil &&
 		t.serviceLabeler.portFilter.fastMap != nil {
 		t.serviceLabeler.portFilter.fastMap.NoStats()
 	}
+	labelerStart := time.Now()
 	t.serviceLabeler = NewGroupLabeler(t.serviceLabelerLogger, services, t.serviceLabelerLruCap, t.moduleName)
+	t.counter.UpdateServiceLabeler += int64(time.Since(labelerStart))
+	t.counter.UpdateServicesCount += int64(len(services))
 	t.services = services
 
 	return true
-}
-
-func stringsEqual(s1, s2 []string) bool {
-	if len(s1) != len(s2) {
-		return false
-	}
-	for i, v := range s1 {
-		if v != s2[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func servicesHasGroupIDMap(services []api.GroupIDMap, g api.GroupIDMap) bool {
-	for _, s := range services {
-		if s.L3EpcID == g.L3EpcID &&
-			stringsEqual(s.CIDRs, g.CIDRs) &&
-			stringsEqual(s.IPRanges, g.IPRanges) &&
-			s.Protocol == g.Protocol &&
-			s.ServerPorts == g.ServerPorts &&
-			s.ServiceID == g.ServiceID {
-			return true
-		}
-	}
-	return false
 }
 
 func (t *PlatformInfoTable) Reload() error {

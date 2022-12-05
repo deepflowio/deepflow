@@ -47,7 +47,7 @@ type Model struct {
 	Havings   *Filters
 	Orders    *Orders
 	Limit     *Limit
-	Callbacks map[string]func(columns []interface{}, values []interface{}) []interface{}
+	Callbacks map[string]func(*common.Result) error
 	//Havings Havings
 	MetricsLevelFlag int //Metrics是否需要拆层的标识
 	HasAggFunc       bool
@@ -63,12 +63,12 @@ func NewModel() *Model {
 		Havings:    &Filters{},
 		Orders:     &Orders{},
 		Limit:      &Limit{},
-		Callbacks:  map[string]func(columns []interface{}, values []interface{}) []interface{}{},
+		Callbacks:  map[string]func(*common.Result) error{},
 		HasAggFunc: false,
 	}
 }
 
-func (m *Model) AddCallback(col string, f func(columns []interface{}, values []interface{}) []interface{}) {
+func (m *Model) AddCallback(col string, f func(*common.Result) error) {
 	_, ok := m.Callbacks[col]
 	if !ok {
 		m.Callbacks[col] = f
@@ -165,7 +165,7 @@ func (v *View) ToString() string {
 	return buf.String()
 }
 
-func (v *View) GetCallbacks() (callbacks map[string]func(columns []interface{}, values []interface{}) []interface{}) {
+func (v *View) GetCallbacks() (callbacks map[string]func(*common.Result) error) {
 	return v.Model.Callbacks
 }
 
@@ -217,10 +217,9 @@ func (v *View) trans() {
 			}
 		}
 	}
+	// 存在类似histogram三层算子时，将newTag这种必须返回的Tag加入最外层
 	if len(metricsLevelTop) > 0 {
 		metricsLevelTop = append(metricsLevelTop, tagsLevelTop...)
-	} else {
-		metricsLevelMetrics = append(metricsLevelMetrics, tagsLevelTop...)
 	}
 	// 计算层拆层的情况下，默认类型的group中with只放在最里层
 	for _, node := range v.Model.Groups.groups {

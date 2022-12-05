@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/deepflowys/deepflow/server/querier/common"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/view"
 )
 
@@ -43,39 +44,94 @@ func TestTimeFill(t *testing.T) {
 	values := []interface{}{
 		[]interface{}{
 			1645092000,
-			1,
+			"1",
 			2,
+		},
+		[]interface{}{
+			1645092000,
+			"0",
+			3,
+		},
+		[]interface{}{
+			1645113600,
+			"1",
+			1,
+		},
+		[]interface{}{
+			1645113600,
+			"0",
+			4,
 		},
 	}
 	want := []interface{}{
 		[]interface{}{
 			1645070400,
-			0,
+			"0",
 			0,
 		},
 		[]interface{}{
 			1645092000,
-			1,
-			2,
+			"0",
+			3,
 		},
 		[]interface{}{
 			1645113600,
-			0,
-			0,
+			"0",
+			4,
 		},
 		[]interface{}{
 			1645135200,
-			0,
+			"0",
 			0,
 		},
 		[]interface{}{
 			1645156800,
+			"0",
 			0,
+		},
+		[]interface{}{
+			1645070400,
+			"1",
+			0,
+		},
+		[]interface{}{
+			1645092000,
+			"1",
+			2,
+		},
+		[]interface{}{
+			1645113600,
+			"1",
+			1,
+		},
+		[]interface{}{
+			1645135200,
+			"1",
+			0,
+		},
+		[]interface{}{
+			1645156800,
+			"1",
 			0,
 		},
 	}
-	newValues := callback(columns, values)
-	if !reflect.DeepEqual(newValues, want) {
-		t.Errorf("Callback: TimeFill, columns: %v, values: %v, newValues: %v, want: %v", columns, values, newValues, want)
+	result := &common.Result{
+		Columns: columns,
+		Values:  values,
+		Schemas: common.ColumnSchemas{&common.ColumnSchema{
+			Type:      common.COLUMN_SCHEMA_TYPE_TAG,
+			ValueType: "Int",
+		}, &common.ColumnSchema{
+			Type:      common.COLUMN_SCHEMA_TYPE_TAG,
+			ValueType: "String",
+		}, &common.ColumnSchema{
+			Type:      common.COLUMN_SCHEMA_TYPE_METRICS,
+			ValueType: "Int",
+		},
+		},
+	}
+	callback(result)
+	if !reflect.DeepEqual(result.Values, want) {
+		t.Errorf("Callback: TimeFill, columns: %v, values: %v, newValues: %v, want: %v", columns, values, result.Values, want)
 	}
 }

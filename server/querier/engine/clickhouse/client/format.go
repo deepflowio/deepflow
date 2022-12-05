@@ -22,23 +22,29 @@ import (
 	"time"
 )
 
-func TransType(typeName string, value interface{}) (interface{}, error) {
+const (
+	VALUE_TYPE_INT     = "Int"
+	VALUE_TYPE_STRING  = "String"
+	VALUE_TYPE_FLOAT64 = "Float64"
+)
+
+func TransType(typeName string, value interface{}) (interface{}, string, error) {
 	switch typeName {
 	case "UInt64":
-		return int(value.(uint64)), nil
+		return int(value.(uint64)), VALUE_TYPE_INT, nil
 	case "UInt32":
-		return int(value.(uint32)), nil
+		return int(value.(uint32)), VALUE_TYPE_INT, nil
 	case "DateTime":
-		return value.(time.Time).String(), nil
+		return value.(time.Time).String(), VALUE_TYPE_STRING, nil
 	case "IPv4", "IPv6":
-		return value.(net.IP).String(), nil
+		return value.(net.IP).String(), VALUE_TYPE_STRING, nil
 	case "Float64":
 		// NaN, Inf
 		if math.IsNaN(value.(float64)) || value.(float64) == math.Inf(1) || value.(float64) == math.Inf(-1) {
-			return nil, nil
+			return nil, VALUE_TYPE_FLOAT64, nil
 		}
-		return value.(float64), nil
+		return value.(float64), VALUE_TYPE_FLOAT64, nil
 	default:
-		return value, nil
+		return value, typeName, nil
 	}
 }

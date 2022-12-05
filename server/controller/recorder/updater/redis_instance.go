@@ -22,15 +22,13 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowys/deepflow/server/controller/recorder/common"
 	"github.com/deepflowys/deepflow/server/controller/recorder/db"
-	"github.com/deepflowys/deepflow/server/controller/recorder/event"
-	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
 type RedisInstance struct {
 	UpdaterBase[cloudmodel.RedisInstance, mysql.RedisInstance, *cache.RedisInstance]
 }
 
-func NewRedisInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RedisInstance, eventQueue *queue.OverwriteQueue) *RedisInstance {
+func NewRedisInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RedisInstance) *RedisInstance {
 	updater := &RedisInstance{
 		UpdaterBase[cloudmodel.RedisInstance, mysql.RedisInstance, *cache.RedisInstance]{
 			cache:        wholeCache,
@@ -41,7 +39,6 @@ func NewRedisInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RedisInsta
 	}
 	updater.dataGenerator = updater
 	updater.cacheHandler = updater
-	updater.eventProducer = event.NewRedisInstance(&wholeCache.ToolDataSet, eventQueue)
 	return updater
 }
 

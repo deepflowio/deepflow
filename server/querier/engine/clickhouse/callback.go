@@ -18,18 +18,25 @@ package clickhouse
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/deepflowys/deepflow/server/libs/utils"
-
+	"github.com/deepflowys/deepflow/server/querier/common"
+	"github.com/deepflowys/deepflow/server/querier/config"
+	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/client"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/tag"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/view"
 )
 
+var TIME_FILL_LIMIT_DEFAULT = 20
+
 type Callback struct {
 	Args     []interface{}
-	Function func([]interface{}) func(columns []interface{}, values []interface{}) []interface{}
+	Function func([]interface{}) func(*common.Result) error
 	Column   string
 }
 
@@ -37,101 +44,143 @@ func (c *Callback) Format(m *view.Model) {
 	m.AddCallback(c.Column, c.Function(c.Args))
 }
 
-func TimeFill(args []interface{}) func(columns []interface{}, values []interface{}) (newValues []interface{}) {
-	// group by time时的补点
-	return func(columns []interface{}, values []interface{}) (newValues []interface{}) {
+func TimeFill(args []interface{}) func(result *common.Result) error { // group by time时的补点
+	return func(result *common.Result) error {
 		m := args[0].(*view.Model)
+		seriesSort := &client.SeriesSort{
+			Series:    []*client.Series{},
+			SortIndex: []int{},
+			Reverse:   []bool{},
+			Schemas:   result.Schemas,
+		}
+		for _, value := range result.Values {
+			seriesSort.Series = append(seriesSort.Series, &client.Series{Values: value.([]interface{})})
+		}
 		var timeFieldIndex int
-		// 取出time字段对应的下标
-		for i, column := range columns {
+		// get time field index
+		for i, column := range result.Columns {
 			if column.(string) == strings.Trim(m.Time.Alias, "`") {
 				timeFieldIndex = i
 				break
 			}
 		}
-		// start和end取整
-		start := (int(m.Time.TimeStart)+3600*8)/m.Time.Interval*m.Time.Interval - 3600*8
-		end := (int(m.Time.TimeEnd)+3600*8)/m.Time.Interval*m.Time.Interval - 3600*8
-		// 获取排序
-		orderby := "asc"
+		reverse := false
 		for _, node := range m.Orders.Orders {
 			order := node.(*view.Order)
 			if strings.Trim(order.SortBy, "`") == strings.Trim(m.Time.Alias, "`") {
-				orderby = order.OrderBy
+				if order.OrderBy == "desc" {
+					reverse = true
+				}
 				break
 			}
 		}
+		for i, schema := range result.Schemas {
+			if i == timeFieldIndex {
+				continue
+			}
+			if schema.Type == common.COLUMN_SCHEMA_TYPE_TAG {
+				seriesSort.SortIndex = append(seriesSort.SortIndex, i)
+				seriesSort.Reverse = append(seriesSort.Reverse, false)
+			}
+		}
+		seriesSort.SortIndex = append(seriesSort.SortIndex, timeFieldIndex)
+		seriesSort.Reverse = append(seriesSort.Reverse, reverse)
+		sort.Sort(seriesSort)
+		groups := client.Group(seriesSort.Series, seriesSort.SortIndex[:len(seriesSort.SortIndex)-1], result.Schemas)
+
+		// fix start and end
+		start := (int(m.Time.TimeStart)+3600*8)/m.Time.Interval*m.Time.Interval - 3600*8
+		end := (int(m.Time.TimeEnd)+3600*8)/m.Time.Interval*m.Time.Interval - 3600*8
 		end += (m.Time.WindowSize - 1) * m.Time.Interval
-		// 补点后切片长度
+		// length after fix
 		intervalLength := (end-start)/m.Time.Interval + 1
 		if intervalLength < 1 {
 			log.Errorf("Callback Time Fill Error: intervalLength(%d) < 1", intervalLength)
-			return []interface{}{}
+			return errors.New(fmt.Sprintf("Callback Time Fill Error: intervalLength(%d) < 1", intervalLength))
 		}
-		newValues = make([]interface{}, intervalLength)
-		// 将查询数据结果写入newValues切片
-		for _, value := range values {
-			record := value.([]interface{})
-			// 获取record在补点切片中的位置
-			var timeIndex int
-			if orderby == "asc" {
-				timeIndex = (record[timeFieldIndex].(int) - start) / m.Time.Interval
-			} else {
-				timeIndex = (end - record[timeFieldIndex].(int)) / m.Time.Interval
-			}
-			if timeIndex >= intervalLength || timeIndex < 0 {
+		resultNewValues := []interface{}{}
+		timeFillLimit := TIME_FILL_LIMIT_DEFAULT
+		if config.Cfg != nil {
+			timeFillLimit = config.Cfg.TimeFillLimit
+		}
+		for i, group := range groups {
+			if timeFillLimit > 0 && i >= timeFillLimit {
+				for _, series := range group.Series {
+					resultNewValues = append(resultNewValues, series.Values)
+				}
 				continue
 			}
-			newValues[timeIndex] = value
-		}
-		var timestamp int
-		// 针对newValues中缺少的时间点进行补点
-		for i, value := range newValues {
-			if value == nil {
-				newValue := make([]interface{}, len(columns))
-				if m.Time.Fill != "null" {
-					for i := range newValue {
-						if intField, err := strconv.Atoi(m.Time.Fill); err == nil {
-							newValue[i] = int(intField)
-						} else {
-							newValue[i] = m.Time.Fill
+			newValues := make([]interface{}, intervalLength)
+			// data from ck insert to newValues
+			for _, series := range group.Series {
+				record := series.Values
+				// get localtion of record in newValues
+				var timeIndex int
+				if !reverse {
+					timeIndex = (record[timeFieldIndex].(int) - start) / m.Time.Interval
+				} else {
+					timeIndex = (end - record[timeFieldIndex].(int)) / m.Time.Interval
+				}
+				if timeIndex >= intervalLength || timeIndex < 0 {
+					continue
+				}
+				newValues[timeIndex] = series.Values
+			}
+			var timestamp int
+			// fill point
+			for i, value := range newValues {
+				if value == nil {
+					newValue := make([]interface{}, len(result.Columns))
+					for valueIndex, groupIndex := range group.GroupIndex {
+						newValue[groupIndex] = group.GroupValues[valueIndex]
+					}
+					if m.Time.Fill != "null" {
+						for i := range newValue {
+							if newValue[i] != nil {
+								continue
+							}
+							if intField, err := strconv.Atoi(m.Time.Fill); err == nil {
+								newValue[i] = int(intField)
+							} else {
+								newValue[i] = m.Time.Fill
+							}
 						}
 					}
+					if !reverse {
+						timestamp = start + i*m.Time.Interval
+					} else {
+						timestamp = end - i*m.Time.Interval
+					}
+					newValue[timeFieldIndex] = timestamp
+					newValues[i] = newValue
 				}
-				if orderby == "asc" {
-					timestamp = start + i*m.Time.Interval
-				} else {
-					timestamp = end - i*m.Time.Interval
-				}
-				newValue[timeFieldIndex] = timestamp
-				newValues[i] = newValue
 			}
+			resultNewValues = append(resultNewValues, newValues...)
 		}
-		return newValues
+		result.Values = resultNewValues
+		return nil
 	}
 }
 
-func MacTranslate(args []interface{}) func(columns []interface{}, values []interface{}) (newValues []interface{}) {
-	return func(columns []interface{}, values []interface{}) (newValues []interface{}) {
-		newValues = make([]interface{}, len(values))
+func MacTranslate(args []interface{}) func(result *common.Result) error {
+	return func(result *common.Result) error {
+		newValues := make([]interface{}, len(result.Values))
 		var macIndex int
 		var macTypeIndex int
 		macTypeIndex = -1
-		for i, column := range columns {
+		for i, column := range result.Columns {
 			if column.(string) == args[1].(string) {
 				macIndex = i
 				break
 			}
 		}
-		for i, column := range columns {
+		for i, column := range result.Columns {
 			if column.(string) == "tap_port_type" {
 				macTypeIndex = i
 				break
 			}
 		}
-		for i, value := range values {
-			newValues[i] = value
-		}
+		copy(newValues, result.Values)
 		for i, newValue := range newValues {
 			newValueSlice := newValue.([]interface{})
 			switch newValueSlice[macIndex].(type) {
@@ -154,20 +203,22 @@ func MacTranslate(args []interface{}) func(columns []interface{}, values []inter
 				}
 			}
 		}
-		return newValues
+		result.Values = newValues
+		return nil
 	}
 }
 
-func ExternalTagsFormat(args []interface{}) func(columns []interface{}, values []interface{}) (newValues []interface{}) {
-	return func(columns []interface{}, values []interface{}) (newValues []interface{}) {
+func ExternalTagsFormat(args []interface{}) func(result *common.Result) error {
+	return func(result *common.Result) error {
+		newValues := []interface{}{}
 		var tagsIndex int
-		for i, column := range columns {
+		for i, column := range result.Columns {
 			if column.(string) == args[0].(string) {
 				tagsIndex = i
 				break
 			}
 		}
-		for _, newValue := range values {
+		for _, newValue := range result.Values {
 			newValueSlice := newValue.([]interface{})
 			tagsMap := make(map[string]interface{})
 			for _, tagValue := range newValueSlice[tagsIndex].([][]interface{}) {
@@ -178,11 +229,13 @@ func ExternalTagsFormat(args []interface{}) func(columns []interface{}, values [
 			tagsStr, err := json.Marshal(tagsMap)
 			if err != nil {
 				log.Error(err)
-				return newValues
+				result.Values = newValues
+				return err
 			}
 			newValueSlice[tagsIndex] = string(tagsStr)
 			newValues = append(newValues, newValueSlice)
 		}
-		return newValues
+		result.Values = newValues
+		return nil
 	}
 }

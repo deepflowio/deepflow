@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/deepflowys/deepflow/server/querier/common"
 	"github.com/deepflowys/deepflow/server/querier/config"
 	ckcommon "github.com/deepflowys/deepflow/server/querier/engine/clickhouse/common"
 
@@ -123,6 +124,8 @@ func GetMetricsByDBTableStatic(db string, table string, where string) (map[strin
 			return GetL4PacketMetrics(), err
 		case "l7_flow_log":
 			return GetL7FlowLogMetrics(), err
+		case "l7_packet":
+			return GetL7PacketMetrics(), err
 		}
 	case "flow_metrics":
 		switch table {
@@ -155,6 +158,8 @@ func GetMetricsByDBTable(db string, table string, where string, ctx context.Cont
 			return GetL4FlowLogMetrics(), err
 		case "l4_packet":
 			return GetL4PacketMetrics(), err
+		case "l7_packet":
+			return GetL7PacketMetrics(), err
 		case "l7_flow_log":
 			metrics := make(map[string]*Metrics)
 			loads := GetL7FlowLogMetrics()
@@ -224,7 +229,7 @@ func GetMetricsDescriptionsByDBTable(db string, table string, where string, ctx 
 	return values, nil
 }
 
-func GetMetricsDescriptions(db string, table string, where string, ctx context.Context) (map[string][]interface{}, error) {
+func GetMetricsDescriptions(db string, table string, where string, ctx context.Context) (*common.Result, error) {
 	var values []interface{}
 	if table == "" {
 		var tables []interface{}
@@ -260,9 +265,9 @@ func GetMetricsDescriptions(db string, table string, where string, ctx context.C
 	columns := []interface{}{
 		"name", "is_agg", "display_name", "unit", "type", "category", "operators", "permissions", "table",
 	}
-	return map[string][]interface{}{
-		"columns": columns,
-		"values":  values,
+	return &common.Result{
+		Columns: columns,
+		Values:  values,
 	}, nil
 }
 
@@ -316,6 +321,9 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) erro
 		case "l4_packet":
 			metrics = L4_PACKET_METRICS
 			replaceMetrics = L4_PACKET_METRICS_REPLACE
+		case "l7_packet":
+			metrics = L7_PACKET_METRICS
+			replaceMetrics = L7_PACKET_METRICS_REPLACE
 		case "l7_flow_log":
 			metrics = L7_FLOW_LOG_METRICS
 			replaceMetrics = L7_FLOW_LOG_METRICS_REPLACE

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+use lru::LruCache;
 use prost::Message;
 use public::{
     bytes::read_u16_be,
@@ -36,6 +37,7 @@ use crate::{
         },
         AppProtoHead, Error, LogMessageType, Result,
     },
+    perf_impl,
     proto::protobuf_rpc::KrpcMeta,
 };
 
@@ -62,7 +64,7 @@ pub struct KrpcInfo {
     //trace info
     trace_id: String,
     span_id: String,
-
+    parent_span_id: String,
     status: L7ResponseStatus,
 }
 
@@ -81,6 +83,7 @@ impl KrpcInfo {
         if let Some(t) = k.trace {
             self.trace_id = t.trace_id;
             self.span_id = t.span_id;
+            self.parent_span_id = t.parent_span_id;
         }
 
         if self.ret_code == 0 {
@@ -160,6 +163,7 @@ impl From<KrpcInfo> for L7ProtocolSendLog {
             trace_info: Some(TraceInfo {
                 trace_id: Some(k.trace_id),
                 span_id: Some(k.span_id),
+                parent_span_id: Some(k.parent_span_id),
                 ..Default::default()
             }),
             ext_info: Some(ExtendedInfo {
@@ -172,16 +176,30 @@ impl From<KrpcInfo> for L7ProtocolSendLog {
     }
 }
 
-#[derive(Default, Debug, Clone, Serialize)]
+#[derive(Debug, Serialize)]
 pub struct KrpcLog {
     info: KrpcInfo,
     perf_stats: Option<PerfStats>,
 
     parsed: bool,
 
-    // (log_type, timestamp), use for calculate perf
-    previous_log_info: (LogMessageType, u64),
+    // <session_id,(type,time)>, use for calculate perf
+    #[serde(skip)]
+    previous_log_info: LruCache<u32, (LogMessageType, u64)>,
 }
+
+impl Default for KrpcLog {
+    fn default() -> Self {
+        Self {
+            previous_log_info: LruCache::new(100),
+            info: KrpcInfo::default(),
+            perf_stats: None,
+            parsed: false,
+        }
+    }
+}
+
+perf_impl!(KrpcLog);
 
 impl KrpcLog {
     pub fn new() -> Self {
@@ -194,6 +212,8 @@ impl L7ProtocolParserInterface for KrpcLog {
         if !param.ebpf_type.is_raw_protocol() {
             return false;
         }
+        self.info.start_time = param.time;
+        self.info.end_time = param.time;
         self.parsed = self.parse_payload(payload, param).is_ok();
         self.parsed && self.info.msg_type == LogMessageType::Request
     }
@@ -211,6 +231,8 @@ impl L7ProtocolParserInterface for KrpcLog {
                 ProtobufRpcInfo::KrpcInfo(self.info.clone()),
             )]);
         }
+        self.info.start_time = param.time;
+        self.info.end_time = param.time;
         if payload.len() < KRPC_FIX_HDR_LEN || &payload[..2] != b"KR" {
             return Err(Error::L7ProtocolUnknown);
         }
@@ -225,20 +247,13 @@ impl L7ProtocolParserInterface for KrpcLog {
         };
         self.info.fill_from_pb(hdr)?;
         match self.info.msg_type {
-            LogMessageType::Request => self.update_perf(1, 0, 0, 0, 0),
-            LogMessageType::Response => self.update_perf(
-                0,
-                1,
-                0,
-                {
-                    if self.info.ret_code != 0 {
-                        1
-                    } else {
-                        0
-                    }
-                },
-                param.time,
-            ),
+            LogMessageType::Request => self.perf_inc_req(),
+            LogMessageType::Response => {
+                self.perf_inc_resp(param.time);
+                if self.info.ret_code != 0 {
+                    self.perf_inc_resp_err();
+                }
+            }
             _ => unreachable!(),
         }
 
@@ -257,8 +272,10 @@ impl L7ProtocolParserInterface for KrpcLog {
 
     fn reset(&mut self) {
         self.parsed = false;
-        self.previous_log_info.0 = self.info.msg_type;
-        self.previous_log_info.1 = self.info.start_time;
+        self.previous_log_info.put(
+            self.info.session_id().unwrap_or_default(),
+            (self.info.msg_type, self.info.start_time),
+        );
         self.info = KrpcInfo::default();
     }
 
@@ -268,11 +285,8 @@ impl L7ProtocolParserInterface for KrpcLog {
 }
 
 impl L7FlowPerf for KrpcLog {
-    fn parse(&mut self, packet: &MetaPacket, _flow_id: u64) -> Result<()> {
-        if let Some(payload) = packet.get_l4_payload() {
-            self.parse_payload(payload, &ParseParam::from(packet))?;
-        }
-        Ok(())
+    fn parse(&mut self, _packet: &MetaPacket, _flow_id: u64) -> Result<()> {
+        unreachable!()
     }
 
     fn data_updated(&self) -> bool {
@@ -303,41 +317,6 @@ impl L7FlowPerf for KrpcLog {
             return Some((h, 0));
         }
         None
-    }
-}
-
-impl KrpcLog {
-    fn update_perf(
-        &mut self,
-        req_count: u32,
-        resp_count: u32,
-        req_err: u32,
-        resp_err: u32,
-        time: u64,
-    ) {
-        if self.perf_stats.is_none() {
-            self.perf_stats = Some(PerfStats::default());
-        }
-        let perf = self.perf_stats.as_mut().unwrap();
-        perf.update_perf(req_count, resp_count, req_err, resp_err, {
-            if time != 0 {
-                if self.previous_log_info.0 == LogMessageType::Request
-                    && self.info.msg_type == LogMessageType::Response
-                    && time > self.previous_log_info.1
-                {
-                    time - self.previous_log_info.1
-                } else if self.previous_log_info.0 == LogMessageType::Response
-                    && self.info.msg_type == LogMessageType::Request
-                    && self.previous_log_info.1 > time
-                {
-                    self.previous_log_info.1 - time
-                } else {
-                    0
-                }
-            } else {
-                0
-            }
-        });
     }
 }
 

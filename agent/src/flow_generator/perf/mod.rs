@@ -38,7 +38,7 @@ use super::app_table::AppTable;
 use super::error::{Error, Result};
 use super::protocol_logs::{AppProtoHead, PostgresqlLog, ProtobufRpcWrapLog};
 
-use crate::common::flow::PacketDirection;
+use crate::common::flow::{PacketDirection, SignalSource};
 use crate::common::l7_protocol_info::L7ProtocolInfo;
 use crate::common::l7_protocol_log::{
     get_all_protocol, get_parse_bitmap, L7ProtocolBitmap, L7ProtocolParser,
@@ -102,6 +102,17 @@ pub enum L7FlowPerfTable {
     HttpPerfData,
     PostgresqlLog,
     ProtobufRpcWrapLog,
+}
+
+impl L7FlowPerfTable {
+    // TODO will remove when perf abstruct to log parse
+    pub fn reset(&mut self) {
+        match self {
+            L7FlowPerfTable::ProtobufRpcWrapLog(p) => p.reset(),
+            L7FlowPerfTable::PostgresqlLog(p) => p.reset(),
+            _ => {}
+        }
+    }
 }
 
 pub struct FlowPerf {
@@ -180,8 +191,15 @@ impl FlowPerf {
         if self.is_skip {
             return Err(Error::L7ProtocolParseLimit);
         }
+        if packet.get_l4_payload().is_none() {
+            return Err(Error::ZeroPayloadLen);
+        }
+        let perf_parser = self.l7.as_mut().unwrap();
+        let ret = perf_parser.parse(packet, flow_id);
+        if ret.is_ok() {
+            perf_parser.reset();
+        }
 
-        let ret = self.l7.as_mut().unwrap().parse(packet, flow_id);
         if !self.is_success {
             if ret.is_ok() {
                 app_table.set_protocol(packet, self.l7_protocol_enum);
@@ -231,7 +249,7 @@ impl FlowPerf {
             return ret;
         }
 
-        return Err(Error::L7ProtocolUnknown);
+        return Err(Error::ZeroPayloadLen);
     }
 
     fn l7_check(
@@ -297,7 +315,7 @@ impl FlowPerf {
         is_parse_perf: bool,
         is_parse_log: bool,
     ) -> Result<(Vec<L7ProtocolInfo>, u64)> {
-        if !packet.ebpf_type.is_none() && self.server_port != 0 {
+        if packet.signal_source == SignalSource::EBPF && self.server_port != 0 {
             // if the packet from eBPF and it's server_port is not equal to 0,
             // We can get the packet's direction by comparing self.server_port with packet.lookup_key.dst_port
             packet.direction = if self.server_port == packet.lookup_key.dst_port {
@@ -308,11 +326,14 @@ impl FlowPerf {
             // FIXME: Is it possible that the server_port of eBPF data is 0?
         }
 
-        if self.l7.is_some() {
+        if self.l7.is_some() && is_parse_perf {
             self.l7_parse_perf(packet, flow_id, app_table)?;
+            if !is_parse_log {
+                return Ok((vec![], 0));
+            }
         }
 
-        if self.l7_protocol_log_parser.is_some() {
+        if self.l7_protocol_log_parser.is_some() && is_parse_log {
             return Ok((
                 self.l7_parse_log(packet, app_table, &ParseParam::from(&*packet))?,
                 self.get_rrt(),

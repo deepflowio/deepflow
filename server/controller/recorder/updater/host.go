@@ -22,15 +22,13 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowys/deepflow/server/controller/recorder/db"
-	"github.com/deepflowys/deepflow/server/controller/recorder/event"
-	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
 type Host struct {
 	UpdaterBase[cloudmodel.Host, mysql.Host, *cache.Host]
 }
 
-func NewHost(wholeCache *cache.Cache, cloudData []cloudmodel.Host, eventQueue *queue.OverwriteQueue) *Host {
+func NewHost(wholeCache *cache.Cache, cloudData []cloudmodel.Host) *Host {
 	updater := &Host{
 		UpdaterBase[cloudmodel.Host, mysql.Host, *cache.Host]{
 			cache:        wholeCache,
@@ -41,7 +39,6 @@ func NewHost(wholeCache *cache.Cache, cloudData []cloudmodel.Host, eventQueue *q
 	}
 	updater.dataGenerator = updater
 	updater.cacheHandler = updater
-	updater.eventProducer = event.NewHost(&wholeCache.ToolDataSet, eventQueue)
 	return updater
 }
 

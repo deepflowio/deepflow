@@ -14,22 +14,27 @@
  * limitations under the License.
  */
 
-package example
+package listener
 
-var YamlDomainQingCloud = []byte(`
-# 名称
-name: qingcloud
-# 云平台类型
-type: qingcloud
-config:
-  # 所属区域标识
-  region_uuid: ffffffff-ffff-ffff-ffff-ffffffffffff
-  # 资源同步控制器
-  #controller_ip: 127.0.0.1
-  # API 密钥 ID
-  # 在青云主页面右上角-API密钥-API密钥管理-API密钥ID
-  secret_id: xxxxxxxx
-  # API 密钥 KEY
-  # API密钥ID对应的API密钥KEY
-  secret_key: xxxxxxx
-`)
+import (
+	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowys/deepflow/server/controller/recorder/event"
+	"github.com/deepflowys/deepflow/server/libs/queue"
+)
+
+type Domain struct {
+	cache         *cache.Cache
+	eventProducer *event.Domain
+}
+
+func NewDomain(domainLcuuid string, c *cache.Cache, eq *queue.OverwriteQueue) *Domain {
+	lisener := &Domain{
+		cache:         c,
+		eventProducer: event.NewDomain(domainLcuuid, &c.ToolDataSet, eq),
+	}
+	return lisener
+}
+
+func (p *Domain) OnUpdatersCompeleted() {
+	p.eventProducer.ProduceFromMySQL()
+}

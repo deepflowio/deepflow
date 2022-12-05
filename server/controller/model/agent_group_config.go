@@ -16,6 +16,11 @@
 
 package model
 
+import _ "embed"
+
+//go:embed agent_group_config_example.yaml
+var YamlAgentGroupConfig []byte
+
 type StaticConfig struct {
 	ProxyControllerPort              *uint16                            `yaml:"proxy-controller-port,omitempty"`
 	LogLevel                         *string                            `yaml:"log-level,omitempty"`
@@ -76,6 +81,9 @@ type StaticConfig struct {
 	ExternalAgentHttpProxyCompressed *bool                              `yaml:"external-agent-http-proxy-compressed,omitempty"`
 	FeatureFlags                     []string                           `yaml:"feature-flags,omitempty"`
 	L7ProtocolPorts                  map[string]string                  `yaml:"l7-protocol-ports,omitempty"`
+	EbpfKprobeWhitelist              struct {
+		PortList string `yaml:"port-list,omitempty"`
+	} `yaml:"ebpf-kprobe-whitelist,omitempty"`
 }
 
 type XflowCollectorConfig struct {

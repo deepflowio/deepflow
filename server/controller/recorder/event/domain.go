@@ -14,16 +14,26 @@
  * limitations under the License.
  */
 
-package example
+package event
 
-var YamlDomainGenesis = []byte(`
-# 名称
-name: agent_sync
-# 云平台类型
-type: agent_sync
-config:
-  # 所属区域标识
-  region_uuid: ffffffff-ffff-ffff-ffff-ffffffffffff
-  # 资源同步控制器
-  #controller_ip: 127.0.0.1
-`)
+import (
+	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowys/deepflow/server/libs/queue"
+)
+
+type Domain struct {
+	SubDomain
+}
+
+func NewDomain(domainLcuuid string, toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *Domain {
+	return &Domain{
+		SubDomain{
+			domainLcuuid,
+			"",
+			EventManagerBase{
+				ToolDataSet: toolDS,
+				Queue:       eq,
+			},
+		},
+	}
+}

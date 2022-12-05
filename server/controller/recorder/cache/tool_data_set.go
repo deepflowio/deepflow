@@ -731,6 +731,7 @@ func (t *ToolDataSet) addPodNode(item *mysql.PodNode) {
 	t.podNodeLcuuidToID[item.Lcuuid] = item.ID
 	t.podNodeIDToLcuuid[item.ID] = item.Lcuuid
 	t.podNodeIDToInfo[item.ID] = &podNodeInfo{
+		DomainLcuuid: item.Domain,
 		Name:         item.Name,
 		VPCID:        item.VPCID,
 		PodClusterID: item.PodClusterID,
@@ -784,6 +785,7 @@ func (t *ToolDataSet) addVMPodNodeConnection(item *mysql.VMPodNodeConnection) {
 func (t *ToolDataSet) deleteVMPodNodeConnection(lcuuid string) {
 	podNodeID, _ := t.GetPodNodeIDByVMPodNodeConnectionLcuuid(lcuuid)
 	delete(t.podNodeIDToVMID, podNodeID)
+	delete(t.vmPodNodeConnectionLcuuidToPodNodeID, lcuuid)
 	log.Info(deleteFromToolMap(RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, lcuuid))
 }
 
@@ -898,6 +900,7 @@ func (f *ToolDataSet) deletePodReplicaSet(lcuuid string) {
 func (t *ToolDataSet) addPod(item *mysql.Pod) {
 	t.podLcuuidToID[item.Lcuuid] = item.ID
 	t.podIDToInfo[item.ID] = &podInfo{
+		DomainLcuuid:   item.Domain,
 		Name:           item.Name,
 		VPCID:          item.VPCID,
 		PodClusterID:   item.PodClusterID,
@@ -1261,7 +1264,7 @@ func (t *ToolDataSet) GetDeviceIDByDeviceLcuuid(deviceType int, deviceLcuuid str
 	}
 }
 
-func (t *ToolDataSet) GetDeviceNameByDeviceID(deviceType, deviceID int) (string, error) {
+func (t *ToolDataSet) GetDeviceNameByDeviceID(deviceType, deviceID int) (string, error) { // TODO 统一风格，使用bool
 	if deviceType == common.VIF_DEVICE_TYPE_HOST {
 		return t.GetHostNameByID(deviceID)
 	} else if deviceType == common.VIF_DEVICE_TYPE_VM {

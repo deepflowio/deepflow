@@ -15,17 +15,17 @@ RUN yum install make epel-release centos-release-scl -y && yum -y install jq
 RUN  yum install curl devtoolset-8-gcc devtoolset-8-gdb devtoolset-8-gcc-c++ devtoolset-8-binutils openssl-devel libpcap-devel perl-Digest-MD5 elfutils-libelf-devel-static glibc-static zlib-static git -y && \
      echo "source /opt/rh/devtoolset-8/enable" >> /etc/profile && \
      curl  https://sh.rustup.rs -so restup.sh; bash restup.sh -y
-RUN  curl http://cloud.deepservice.yunshan.net:1080/kernel/protoc --silent -O && chmod a+x protoc && mv protoc /usr/bin/ && whereis protoc && protoc --version
+RUN  curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/protoc --silent -O && chmod a+x protoc && mv protoc /usr/bin/ && whereis protoc && protoc --version
 
-RUN  curl http://cloud.deepservice.yunshan.net:1080/kernel/llvm-clang-11.0.0-2.el7.x86_64.rpm --silent -O && \
+RUN  curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/llvm-clang-11.0.0-2.el7.x86_64.rpm --silent -O && \
      yum --disablerepo=* localinstall -y ./llvm-clang-*.rpm && rm -rf llvm-clang-*.rpm && \
-     curl http://cloud.deepservice.yunshan.net:1080/kernel/libdwarf-0.4.1-1.el7.x86_64.rpm --silent -O && \
+     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/libdwarf-0.4.1-1.el7.x86_64.rpm --silent -O && \
      yum --disablerepo=* localinstall -y ./libdwarf-*.rpm && rm -rf libdwarf-*.rpm && \
-     curl http://cloud.deepservice.yunshan.net:1080/kernel/bddisasm-1.34.10-1.el7.x86_64.rpm --silent -O && \
+     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/bddisasm-1.34.10-1.el7.x86_64.rpm --silent -O && \
      yum --disablerepo=* localinstall -y ./bddisasm-*.rpm && rm -rf bddisasm-*.rpm && \
-     curl http://cloud.deepservice.yunshan.net:1080/kernel/bcc-bpf-0.25.0-2.el7.x86_64.rpm --silent -O && \
+     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/bcc-bpf-0.25.0-2.el7.x86_64.rpm --silent -O && \
      yum --disablerepo=* localinstall -y ./bcc-bpf-*.rpm && rm -rf bcc-bpf-*.rpm && \
-     curl http://cloud.deepservice.yunshan.net:1080/kernel/libGoReSym-0.0.1-2.el7.x86_64.rpm --silent -O && \
+     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/libGoReSym-0.0.1-2.el7.x86_64.rpm --silent -O && \
      yum --disablerepo=* localinstall -y ./libGoReSym-*.rpm && rm -rf libGoReSym-*.rpm && \
      yum clean all
 
@@ -37,9 +37,9 @@ RUN  curl http://cloud.deepservice.yunshan.net:1080/kernel/llvm-clang-11.0.0-2.e
 RUN yum -y install https://forensics.cert.org/cert-forensics-tools-release-el7.rpm  && \
     yum -y install musl-libc musl-libc-static musl-clang musl-gcc  && \
     cd /usr/x86_64-linux-musl/lib64  && \
-    curl http://cloud.deepservice.yunshan.net:1080/kernel/deepflow-agent-depends/libbcc_bpf.a --silent -O && \
-    curl http://cloud.deepservice.yunshan.net:1080/kernel/deepflow-agent-depends/libpcap.a --silent -O && \
-    curl http://cloud.deepservice.yunshan.net:1080/kernel/deepflow-agent-depends/libz.a --silent -O && \
+    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/musl/libbcc_bpf.a --silent -O && \
+    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/musl/libpcap.a --silent -O && \
+    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/musl/libz.a --silent -O && \
     cd /usr/x86_64-linux-musl/include  && \
     ln -s /usr/include/bcc bcc && \
     ln -s /usr/include/asm asm  && \

@@ -1,4 +1,4 @@
-FROM ghcr.io/deepflowys/rust-build:1.15 as builder
+FROM ghcr.io/deepflowys/rust-build:1.17 as builder
 COPY .  /deepflow/
 WORKDIR /deepflow/agent
 ARG GITHUB_REF_NAME

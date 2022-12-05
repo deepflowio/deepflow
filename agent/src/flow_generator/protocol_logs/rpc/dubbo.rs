@@ -398,7 +398,7 @@ impl DubboLog {
         let mut para_index = 0;
         let payload_len = payload.len();
 
-        while n < BODY_PARAM_MAX {
+        while n < BODY_PARAM_MAX && para_index < payload_len {
             let (offset, para_len) = get_req_param_len(&payload[para_index..]);
             para_index += offset;
             if para_len == 0 || para_len + para_index > payload_len {

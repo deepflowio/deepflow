@@ -37,9 +37,8 @@ use super::{
 
 use crate::{
     common::{
-        ebpf::EbpfType,
         enums::EthernetType,
-        flow::{get_uniq_flow_id_in_one_minute, PacketDirection},
+        flow::{get_uniq_flow_id_in_one_minute, PacketDirection, SignalSource},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         MetaPacket, TaggedFlow,
     },
@@ -81,6 +80,7 @@ impl MetaAppProto {
         l7_info: L7ProtocolInfo,
         head: AppProtoHead,
     ) -> Option<Self> {
+        let is_src = meta_packet.lookup_key.l2_end_0;
         let mut base_info = AppProtoLogsBaseInfo {
             start_time: meta_packet.lookup_key.timestamp,
             end_time: meta_packet.lookup_key.timestamp,
@@ -88,6 +88,7 @@ impl MetaAppProto {
             vtap_id: flow.flow.flow_key.vtap_id,
             tap_type: flow.flow.flow_key.tap_type,
             tap_port: flow.flow.flow_key.tap_port,
+            signal_source: flow.flow.signal_source,
             tap_side: flow.flow.tap_side,
             head,
             protocol: meta_packet.lookup_key.proto,
@@ -116,8 +117,17 @@ impl MetaAppProto {
             syscall_trace_id_thread_1: 0,
             syscall_cap_seq_0: 0,
             syscall_cap_seq_1: 0,
-            ebpf_type: EbpfType::None,
+            ebpf_type: meta_packet.ebpf_type,
         };
+
+        if is_src {
+            base_info.process_id_0 = meta_packet.process_id;
+            base_info.process_kname_0 = meta_packet.process_name.clone();
+        } else {
+            base_info.process_id_1 = meta_packet.process_id;
+            base_info.process_kname_1 = meta_packet.process_name.clone();
+        }
+
         if flow.flow.tap_side == TapSide::Local {
             base_info.mac_src = flow.flow.flow_key.mac_src;
             base_info.mac_dst = flow.flow.flow_key.mac_dst;
@@ -134,6 +144,11 @@ impl MetaAppProto {
             base_info.l3_epc_id_src = flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].l3_epc_id;
             base_info.l3_epc_id_dst = flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].l3_epc_id;
             base_info.req_tcp_seq = meta_packet.tcp_data.seq;
+
+            // ebpf info
+            base_info.syscall_trace_id_request = meta_packet.syscall_trace_id;
+            base_info.syscall_trace_id_thread_0 = meta_packet.thread_id;
+            base_info.syscall_cap_seq_0 = meta_packet.cap_seq;
         } else {
             swap(&mut base_info.ip_src, &mut base_info.ip_dst);
             swap(&mut base_info.port_src, &mut base_info.port_dst);
@@ -141,6 +156,11 @@ impl MetaAppProto {
             base_info.l3_epc_id_src = flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].l3_epc_id;
             base_info.l3_epc_id_dst = flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].l3_epc_id;
             base_info.resp_tcp_seq = meta_packet.tcp_data.seq;
+
+            // ebpf info
+            base_info.syscall_trace_id_response = meta_packet.syscall_trace_id;
+            base_info.syscall_trace_id_thread_1 = meta_packet.thread_id;
+            base_info.syscall_cap_seq_1 = meta_packet.cap_seq;
         }
 
         Some(Self {
@@ -267,7 +287,8 @@ impl SessionQueue {
             // request = response - RRT
             (item.base_info.start_time - Duration::from_micros(item.base_info.head.rrt)).as_secs()
         } else {
-            item.base_info.start_time.as_secs()
+            // if req and rrt not 0, maybe ebpf disorder, the slot time is resp time and req should add the rrt.
+            (item.base_info.start_time + Duration::from_micros(item.base_info.head.rrt)).as_secs()
         };
         if slot_time < self.aggregate_start_time.as_secs() {
             if self
@@ -302,7 +323,7 @@ impl SessionQueue {
 
         // 因为数组提前分配hashmap, slot < self.window_size 所以必然存在
         let map = time_window.get_mut(slot).unwrap();
-        let key = if item.base_info.tap_port.is_from_ebpf() {
+        let key = if item.base_info.signal_source == SignalSource::EBPF {
             // if the l7 log from ebpf, use AppProtoLogsData::ebpf_flow_session_id()
             item.ebpf_flow_session_id()
         } else {

@@ -152,7 +152,7 @@ func initCmd(cmd *cobra.Command, cmds []CmdExecute) {
 	paramData.RpcIP = server.IP
 	paramData.RpcPort = strconv.Itoa(int(server.RpcPort))
 	addr := net.JoinHostPort(paramData.RpcIP, paramData.RpcPort)
-	conn, err := grpc.Dial(addr, grpc.WithInsecure())
+	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithMaxMsgSize(1024*1024*200))
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -255,10 +255,10 @@ func Uint64ToMac(v uint64) net.HardwareAddr {
 
 func formatString(data *trident.Interface) string {
 	buffer := bytes.Buffer{}
-	format := "Mac: %s EpcId: %d DeviceType: %d DeviceId: %d IfType: %d" +
+	format := "Id: %d Mac: %s EpcId: %d DeviceType: %d DeviceId: %d IfType: %d" +
 		" LaunchServer: %s LaunchServerId: %d RegionId: %d AzId: %d, PodGroupId: %d, " +
 		"PodNsId: %d, PodId: %d PodClusterId: %d IsVipInterface: %t "
-	buffer.WriteString(fmt.Sprintf(format, Uint64ToMac(data.GetMac()), data.GetEpcId(),
+	buffer.WriteString(fmt.Sprintf(format, data.GetId(), Uint64ToMac(data.GetMac()), data.GetEpcId(),
 		data.GetDeviceType(), data.GetDeviceId(), data.GetIfType(),
 		data.GetLaunchServer(), data.GetLaunchServerId(), data.GetRegionId(),
 		data.GetAzId(), data.GetPodGroupId(), data.GetPodNsId(), data.GetPodId(),

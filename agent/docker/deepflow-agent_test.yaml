@@ -30,7 +30,7 @@ spec:
       hostPID: true
       containers:
         - name: deepflow-agent
-          image: docker.nexus.yunshan.net/deepflow-agent:latest
+          image: deepflow-agent:latest
           imagePullPolicy: Always
           securityContext:
             privileged: true

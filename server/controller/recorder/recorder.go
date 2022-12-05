@@ -29,6 +29,7 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowys/deepflow/server/controller/recorder/config"
+	"github.com/deepflowys/deepflow/server/controller/recorder/listener"
 	"github.com/deepflowys/deepflow/server/controller/recorder/updater"
 	"github.com/deepflowys/deepflow/server/libs/queue"
 )
@@ -162,55 +163,121 @@ func (r *Recorder) refreshDomain(cloudData cloudmodel.Resource) {
 
 	// 指定创建及更新操作的资源顺序
 	// 基本原则：无依赖资源优先；实时性需求高资源优先
+	listener := listener.NewDomain(r.domainLcuuid, r.cacheMng.DomainCache, r.eventQueue)
 	domainUpdatersInUpdateOrder := r.getDomainUpdatersInOrder(cloudData)
 	r.executeUpdators(domainUpdatersInUpdateOrder)
+	listener.OnUpdatersCompeleted()
 	log.Infof("domain (lcuuid: %s, name: %s) refresh completed", r.domainLcuuid, r.domainName)
 }
 
 func (r *Recorder) getDomainUpdatersInOrder(cloudData cloudmodel.Resource) []updater.ResourceUpdater {
+	podListener := listener.NewPod(r.cacheMng.DomainCache, r.eventQueue)
+	pod := updater.NewPod(r.cacheMng.DomainCache, cloudData.Pods)
+	pod.RegisterCallbacks(podListener.OnUpdaterAdded, podListener.OnUpdaterUpdated, podListener.OnUpdaterDeleted)
+
+	podNodeListener := listener.NewPodNode(r.cacheMng.DomainCache, r.eventQueue)
+	podNode := updater.NewPodNode(r.cacheMng.DomainCache, cloudData.PodNodes)
+	podNode.RegisterCallbacks(
+		podNodeListener.OnUpdaterAdded, podNodeListener.OnUpdaterUpdated, podNodeListener.OnUpdaterDeleted)
+
+	podServiceListener := listener.NewPodService(r.cacheMng.DomainCache, r.eventQueue)
+	podService := updater.NewPodService(r.cacheMng.DomainCache, cloudData.PodServices)
+	podService.RegisterCallbacks(
+		podServiceListener.OnUpdaterAdded, podServiceListener.OnUpdaterUpdated, podServiceListener.OnUpdaterDeleted)
+
+	ip := updater.NewIP(r.cacheMng.DomainCache, cloudData.IPs)
+	lanIPListener := listener.NewLANIP(r.cacheMng.DomainCache, r.eventQueue)
+	ip.GetLANIP().RegisterCallbacks(
+		lanIPListener.OnUpdaterAdded, lanIPListener.OnUpdaterUpdated, lanIPListener.OnUpdaterDeleted)
+	wanIPListener := listener.NewWANIP(r.cacheMng.DomainCache, r.eventQueue)
+	ip.GetWANIP().RegisterCallbacks(
+		wanIPListener.OnUpdaterAdded, wanIPListener.OnUpdaterUpdated, wanIPListener.OnUpdaterDeleted)
+
+	dhcpPortListener := listener.NewDHCPPort(r.cacheMng.DomainCache, r.eventQueue)
+	dhcpPort := updater.NewDHCPPort(r.cacheMng.DomainCache, cloudData.DHCPPorts)
+	dhcpPort.RegisterCallbacks(
+		dhcpPortListener.OnUpdaterAdded, dhcpPortListener.OnUpdaterUpdated, dhcpPortListener.OnUpdaterDeleted)
+
+	hostListener := listener.NewHost(r.cacheMng.DomainCache, r.eventQueue)
+	host := updater.NewHost(r.cacheMng.DomainCache, cloudData.Hosts)
+	host.RegisterCallbacks(
+		hostListener.OnUpdaterAdded, hostListener.OnUpdaterUpdated, hostListener.OnUpdaterDeleted)
+
+	lbListener := listener.NewLB(r.cacheMng.DomainCache, r.eventQueue)
+	lb := updater.NewLB(r.cacheMng.DomainCache, cloudData.LBs)
+	lb.RegisterCallbacks(lbListener.OnUpdaterAdded, lbListener.OnUpdaterUpdated, lbListener.OnUpdaterDeleted)
+
+	natGateWayListener := listener.NewNATGateway(r.cacheMng.DomainCache, r.eventQueue)
+	natGateway := updater.NewNATGateway(r.cacheMng.DomainCache, cloudData.NATGateways)
+	natGateway.RegisterCallbacks(
+		natGateWayListener.OnUpdaterAdded, natGateWayListener.OnUpdaterUpdated, natGateWayListener.OnUpdaterDeleted)
+
+	rdsInstanceListener := listener.NewRDSInstance(r.cacheMng.DomainCache, r.eventQueue)
+	rdsInstance := updater.NewRDSInstance(r.cacheMng.DomainCache, cloudData.RDSInstances)
+	rdsInstance.RegisterCallbacks(
+		rdsInstanceListener.OnUpdaterAdded, rdsInstanceListener.OnUpdaterUpdated, rdsInstanceListener.OnUpdaterDeleted)
+
+	redisInstanceListener := listener.NewRedisInstance(r.cacheMng.DomainCache, r.eventQueue)
+	redisInstance := updater.NewRedisInstance(r.cacheMng.DomainCache, cloudData.RedisInstances)
+	redisInstance.RegisterCallbacks(redisInstanceListener.OnUpdaterAdded,
+		redisInstanceListener.OnUpdaterUpdated, redisInstanceListener.OnUpdaterDeleted)
+
+	vmListener := listener.NewVM(r.cacheMng.DomainCache, r.eventQueue)
+	vm := updater.NewVM(r.cacheMng.DomainCache, cloudData.VMs)
+	vm.RegisterCallbacks(vmListener.OnUpdaterAdded, vmListener.OnUpdaterUpdated, vmListener.OnUpdaterDeleted)
+
+	vRouterListener := listener.NewVRouter(r.cacheMng.DomainCache, r.eventQueue)
+	vRouter := updater.NewVRouter(r.cacheMng.DomainCache, cloudData.VRouters)
+	vRouter.RegisterCallbacks(
+		vRouterListener.OnUpdaterAdded, vRouterListener.OnUpdaterUpdated, vRouterListener.OnUpdaterDeleted)
+
 	return []updater.ResourceUpdater{
 		updater.NewRegion(r.cacheMng.DomainCache, cloudData.Regions),
 		updater.NewAZ(r.cacheMng.DomainCache, cloudData.AZs),
 		updater.NewSubDomain(r.cacheMng.DomainCache, cloudData.SubDomains),
 		updater.NewVPC(r.cacheMng.DomainCache, cloudData.VPCs),
-		updater.NewHost(r.cacheMng.DomainCache, cloudData.Hosts, r.eventQueue),
-		updater.NewVM(r.cacheMng.DomainCache, cloudData.VMs, r.eventQueue),
+		host,
+		vm,
 		updater.NewPodCluster(r.cacheMng.DomainCache, cloudData.PodClusters),
-		updater.NewPodNode(r.cacheMng.DomainCache, cloudData.PodNodes, r.eventQueue),
+		podNode,
 		updater.NewPodNamespace(r.cacheMng.DomainCache, cloudData.PodNamespaces),
 		updater.NewPodIngress(r.cacheMng.DomainCache, cloudData.PodIngresses),
 		updater.NewPodIngressRule(r.cacheMng.DomainCache, cloudData.PodIngressRules),
-		updater.NewPodService(r.cacheMng.DomainCache, cloudData.PodServices, r.eventQueue),
+		podService,
 		updater.NewPodIngressRuleBackend(r.cacheMng.DomainCache, cloudData.PodIngressRuleBackends),
 		updater.NewPodServicePort(r.cacheMng.DomainCache, cloudData.PodServicePorts),
 		updater.NewPodGroup(r.cacheMng.DomainCache, cloudData.PodGroups),
 		updater.NewPodGroupPort(r.cacheMng.DomainCache, cloudData.PodGroupPorts),
 		updater.NewPodReplicaSet(r.cacheMng.DomainCache, cloudData.PodReplicaSets),
-		updater.NewPod(r.cacheMng.DomainCache, cloudData.Pods, r.eventQueue),
+		pod,
 		updater.NewNetwork(r.cacheMng.DomainCache, cloudData.Networks),
 		updater.NewSubnet(r.cacheMng.DomainCache, cloudData.Subnets),
-		updater.NewVRouter(r.cacheMng.DomainCache, cloudData.VRouters, r.eventQueue),
+		vRouter,
 		updater.NewRoutingTable(r.cacheMng.DomainCache, cloudData.RoutingTables),
-		updater.NewDHCPPort(r.cacheMng.DomainCache, cloudData.DHCPPorts, r.eventQueue),
+		dhcpPort,
 		updater.NewSecurityGroup(r.cacheMng.DomainCache, cloudData.SecurityGroups),
 		updater.NewSecurityGroupRule(r.cacheMng.DomainCache, cloudData.SecurityGroupRules),
 		updater.NewVMSecurityGroup(r.cacheMng.DomainCache, cloudData.VMSecurityGroups),
-		updater.NewNATGateway(r.cacheMng.DomainCache, cloudData.NATGateways, r.eventQueue),
+		natGateway,
 		updater.NewNATVMConnection(r.cacheMng.DomainCache, cloudData.NATVMConnections),
 		updater.NewNATRule(r.cacheMng.DomainCache, cloudData.NATRules),
-		updater.NewLB(r.cacheMng.DomainCache, cloudData.LBs, r.eventQueue),
+		lb,
 		updater.NewLBVMConnection(r.cacheMng.DomainCache, cloudData.LBVMConnections),
 		updater.NewLBListener(r.cacheMng.DomainCache, cloudData.LBListeners),
 		updater.NewLBTargetServer(r.cacheMng.DomainCache, cloudData.LBTargetServers),
-		updater.NewRDSInstance(r.cacheMng.DomainCache, cloudData.RDSInstances, r.eventQueue),
-		updater.NewRedisInstance(r.cacheMng.DomainCache, cloudData.RedisInstances, r.eventQueue),
+		rdsInstance,
+		redisInstance,
 		updater.NewPeerConnection(r.cacheMng.DomainCache, cloudData.PeerConnections),
 		updater.NewCEN(r.cacheMng.DomainCache, cloudData.CENs),
 		updater.NewVInterface(r.cacheMng.DomainCache, cloudData.VInterfaces),
 		updater.NewFloatingIP(r.cacheMng.DomainCache, cloudData.FloatingIPs),
-		updater.NewIP(r.cacheMng.DomainCache, cloudData.IPs, r.eventQueue),
+		ip,
 		updater.NewVMPodNodeConnection(r.cacheMng.DomainCache, cloudData.VMPodNodeConnections), // VMPodNodeConnection需放在最后
 	}
+}
+
+func (r *Recorder) registerDomainCallbacks(cloudData cloudmodel.Resource, domainCache *cache.Cache) {
+
 }
 
 func (r *Recorder) shouldRefreshSubDomain(lcuuid string, cloudData cloudmodel.SubDomainResource) bool {
@@ -236,8 +303,10 @@ func (r *Recorder) refreshSubDomains(cloudSubDomainResourceMap map[string]cloudm
 
 		r.updateSubDomainSyncedAt(subDomainLcuuid)
 
+		listener := listener.NewSubDomain(r.domainLcuuid, subDomainLcuuid, r.cacheMng.DomainCache, r.eventQueue)
 		subDomainUpdatersInUpdateOrder := r.getSubDomainUpdatersInOrder(subDomainLcuuid, subDomainResource, nil)
 		r.executeUpdators(subDomainUpdatersInUpdateOrder)
+		listener.OnUpdatersCompeleted()
 
 		log.Infof("sub_domain (lcuuid: %s) sync refresh completed", subDomainLcuuid)
 	}
@@ -254,27 +323,51 @@ func (r *Recorder) refreshSubDomains(cloudSubDomainResourceMap map[string]cloudm
 	}
 }
 
-func (r *Recorder) getSubDomainUpdatersInOrder(subDomainLcuuid string, cloudData cloudmodel.SubDomainResource, subDomainCache *cache.Cache) []updater.ResourceUpdater {
+func (r *Recorder) getSubDomainUpdatersInOrder(subDomainLcuuid string, cloudData cloudmodel.SubDomainResource,
+	subDomainCache *cache.Cache) []updater.ResourceUpdater {
 	if subDomainCache == nil {
 		subDomainCache = r.cacheMng.CreateSubDomainCacheIfNotExists(subDomainLcuuid)
 	}
+
+	podListener := listener.NewPod(subDomainCache, r.eventQueue)
+	pod := updater.NewPod(subDomainCache, cloudData.Pods)
+	pod.RegisterCallbacks(podListener.OnUpdaterAdded, podListener.OnUpdaterUpdated, podListener.OnUpdaterDeleted)
+
+	podNodeListener := listener.NewPodNode(subDomainCache, r.eventQueue)
+	podNode := updater.NewPodNode(subDomainCache, cloudData.PodNodes)
+	podNode.RegisterCallbacks(
+		podNodeListener.OnUpdaterAdded, podNodeListener.OnUpdaterUpdated, podNodeListener.OnUpdaterDeleted)
+
+	podServiceListener := listener.NewPodService(subDomainCache, r.eventQueue)
+	podService := updater.NewPodService(subDomainCache, cloudData.PodServices)
+	podService.RegisterCallbacks(
+		podServiceListener.OnUpdaterAdded, podServiceListener.OnUpdaterUpdated, podServiceListener.OnUpdaterDeleted)
+
+	ip := updater.NewIP(subDomainCache, cloudData.IPs)
+	lanIPListener := listener.NewLANIP(subDomainCache, r.eventQueue)
+	ip.GetLANIP().RegisterCallbacks(
+		lanIPListener.OnUpdaterAdded, lanIPListener.OnUpdaterUpdated, lanIPListener.OnUpdaterDeleted)
+	wanIPListener := listener.NewWANIP(subDomainCache, r.eventQueue)
+	ip.GetWANIP().RegisterCallbacks(
+		wanIPListener.OnUpdaterAdded, wanIPListener.OnUpdaterUpdated, wanIPListener.OnUpdaterDeleted)
+
 	return []updater.ResourceUpdater{
 		updater.NewPodCluster(subDomainCache, cloudData.PodClusters),
-		updater.NewPodNode(subDomainCache, cloudData.PodNodes, r.eventQueue),
+		podNode,
 		updater.NewPodNamespace(subDomainCache, cloudData.PodNamespaces),
 		updater.NewPodIngress(subDomainCache, cloudData.PodIngresses),
 		updater.NewPodIngressRule(subDomainCache, cloudData.PodIngressRules),
-		updater.NewPodService(subDomainCache, cloudData.PodServices, r.eventQueue),
+		podService,
 		updater.NewPodIngressRuleBackend(subDomainCache, cloudData.PodIngressRuleBackends),
 		updater.NewPodServicePort(subDomainCache, cloudData.PodServicePorts),
 		updater.NewPodGroup(subDomainCache, cloudData.PodGroups),
 		updater.NewPodGroupPort(subDomainCache, cloudData.PodGroupPorts),
 		updater.NewPodReplicaSet(subDomainCache, cloudData.PodReplicaSets),
-		updater.NewPod(subDomainCache, cloudData.Pods, r.eventQueue),
+		pod,
 		updater.NewNetwork(subDomainCache, cloudData.Networks),
 		updater.NewSubnet(subDomainCache, cloudData.Subnets),
 		updater.NewVInterface(subDomainCache, cloudData.VInterfaces),
-		updater.NewIP(subDomainCache, cloudData.IPs, r.eventQueue),
+		ip,
 		updater.NewVMPodNodeConnection(subDomainCache, cloudData.VMPodNodeConnections), // VMPodNodeConnection需放在最后
 	}
 }
