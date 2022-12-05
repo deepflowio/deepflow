@@ -205,16 +205,29 @@ func (s *SyncStorage) storeToDatabase() {
 
 func (s *SyncStorage) refreshDatabase(ageTime time.Duration) {
 	for {
-		time.Sleep(ageTime)
-		s.dirty = true
 		// clean genesis storage invalid data
 		var vTaps []model.Vtap
+		var vTapIDs map[int]bool
+		var storages, invalidStorages []model.GenesisStorage
 		mysql.Db.Find(&vTaps)
-		var vTapIDs []int
+		mysql.Db.Where("node_ip = ?", os.Getenv(common.NODE_IP_KEY)).Find(&storages)
 		for _, v := range vTaps {
-			vTapIDs = append(vTapIDs, v.ID)
+			vTapIDs[v.ID] = false
 		}
-		mysql.Db.Where("vtap_id NOT IN ?", vTapIDs).Delete(&model.GenesisStorage{})
+		for _, s := range storages {
+			if _, ok := vTapIDs[int(s.VtapID)]; !ok {
+				invalidStorages = append(invalidStorages, s)
+			}
+		}
+		err := mysql.Db.Delete(&invalidStorages).Error
+		if err != nil {
+			log.Errorf("clean genesis storage invalid data failed: %s", err)
+		} else {
+			log.Info("clean genesis storage invalid data success")
+		}
+
+		time.Sleep(ageTime)
+		s.dirty = true
 	}
 }
 
