@@ -766,6 +766,7 @@ vtap_group_id: g-xxxxxx
 
   ## List of Application Protocols
   ## Note: Turning off some protocol identification can reduce deepflow-agent resource consumption.
+  ##   ProtobufRPC is disabled by default, note that ebpf-kprobe-whitelist must be configured to enable it.
   #l7-protocol-enabled:
   #- HTTP ## for both HTTP and HTTP_TLS
   #- HTTP2 ## for HTTP2, HTTP2_TLS and gRPC
