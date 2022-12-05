@@ -497,7 +497,7 @@ impl HttpPerfData {
         let perf_stats = self.perf_stats.get_or_insert(PerfStats::default());
         if let L7ProtocolInfo::HttpInfo(h) = log.parse_payload(payload, param)?.get(0).unwrap() {
             self.session_data.httpv2_headers.stream_id = h.stream_id.unwrap_or_default();
-            self.session_data.l7_proto = h.proto;
+            self.session_data.l7_proto = h.get_l7_protocol_with_tls();
             if let Some(code) = h.status_code {
                 match code as u16 {
                     HTTP_STATUS_CLIENT_ERROR_MIN..=HTTP_STATUS_CLIENT_ERROR_MAX => {

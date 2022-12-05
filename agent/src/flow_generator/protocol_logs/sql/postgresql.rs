@@ -104,12 +104,6 @@ impl L7ProtocolInfoInterface for PostgreInfo {
 
     fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
         if let L7ProtocolInfo::PostgreInfo(pg) = other {
-            if pg.start_time < self.start_time {
-                self.start_time = pg.start_time;
-            }
-            if pg.end_time > self.end_time {
-                self.end_time = pg.end_time;
-            }
             match pg.msg_type {
                 LogMessageType::Request => {
                     self.req_type = pg.req_type;
@@ -196,8 +190,6 @@ perf_impl!(PostgresqlLog);
 
 impl L7ProtocolParserInterface for PostgresqlLog {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
-        self.info.start_time = param.time;
-        self.info.end_time = param.time;
         self.set_msg_type(param.direction);
         self.info.is_tls = param.is_tls();
         if self.check_is_ssl_req(payload) {
@@ -230,7 +222,7 @@ impl L7ProtocolParserInterface for PostgresqlLog {
         self.info.end_time = param.time;
         self.set_msg_type(param.direction);
         self.parse(payload, param)?;
-
+        self.revert_info_time(param.direction, param.time);
         Ok(if self.info.ignore {
             vec![]
         } else {
@@ -244,10 +236,7 @@ impl L7ProtocolParserInterface for PostgresqlLog {
 
     fn reset(&mut self) {
         if !self.info.ignore {
-            self.previous_log_info.put(
-                self.info.session_id().unwrap_or_default(),
-                (self.info.msg_type, self.info.start_time),
-            );
+            self.save_info_time();
         }
         self.info = PostgreInfo::default();
         self.parsed = false;

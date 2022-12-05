@@ -24,7 +24,7 @@ use serde::Serialize;
 
 use crate::{
     common::{
-        flow::{FlowPerfStats, L7PerfStats},
+        flow::{FlowPerfStats, L7PerfStats, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
         MetaPacket,
@@ -105,13 +105,6 @@ impl L7ProtocolInfoInterface for KrpcInfo {
         if let L7ProtocolInfo::ProtobufRpcInfo(rpc_info) = other {
             #[allow(irrefutable_let_patterns)]
             if let ProtobufRpcInfo::KrpcInfo(k) = rpc_info {
-                if k.start_time < self.start_time {
-                    self.start_time = k.start_time;
-                }
-                if k.end_time > self.end_time {
-                    self.end_time = k.end_time;
-                }
-
                 self.ret_code = k.ret_code;
                 self.status = k.status;
 
@@ -257,6 +250,7 @@ impl L7ProtocolParserInterface for KrpcLog {
             _ => unreachable!(),
         }
 
+        self.revert_info_time(param.direction, param.time);
         Ok(vec![L7ProtocolInfo::ProtobufRpcInfo(
             ProtobufRpcInfo::KrpcInfo(self.info.clone()),
         )])
@@ -272,10 +266,7 @@ impl L7ProtocolParserInterface for KrpcLog {
 
     fn reset(&mut self) {
         self.parsed = false;
-        self.previous_log_info.put(
-            self.info.session_id().unwrap_or_default(),
-            (self.info.msg_type, self.info.start_time),
-        );
+        self.save_info_time();
         self.info = KrpcInfo::default();
     }
 
