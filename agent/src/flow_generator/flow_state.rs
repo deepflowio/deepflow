@@ -768,6 +768,7 @@ mod tests {
                     is_local_ip: false,
                 },
             },
+            residual_request: 0,
             next_tcp_seq0: 0,
             next_tcp_seq1: 0,
             packet_in_tick: false,
