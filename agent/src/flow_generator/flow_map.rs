@@ -224,25 +224,6 @@ impl FlowMap {
                 .unwrap();
             let mut node = nodes.swap_remove(index);
 
-            if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
-                if node.timeout == EBPF_MINIMUM_TIMEOUT
-                    && self
-                        .rrt_cache
-                        .borrow_mut()
-                        .has_residual_request(node.tagged_flow.flow.flow_id)
-                {
-                    // if there has remaining requests to be aggregated, timeout should be longer.
-                    node.timeout = self.parse_config.load().l7_log_session_aggr_timeout;
-                } else if node.timeout > EBPF_MINIMUM_TIMEOUT
-                    && !self
-                        .rrt_cache
-                        .borrow_mut()
-                        .has_residual_request(node.tagged_flow.flow.flow_id)
-                {
-                    // if there is no remaining requests to be aggregated, timeout them as soon as possible.
-                    node.timeout = EBPF_MINIMUM_TIMEOUT;
-                }
-            }
             let timeout = node.recent_time + node.timeout;
             if timestamp >= timeout {
                 // 超时Flow将被删除然后把统计信息发送队列下游
@@ -311,7 +292,7 @@ impl FlowMap {
 
         let pkt_timestamp = meta_packet.lookup_key.timestamp;
         match node_map.get_mut(&pkt_key) {
-            // 找到Flow,更新
+            // 找到一组可能的 FlowNode
             Some(nodes) => {
                 let (ignore_l2_end, ignore_tor_mac, trident_type) = {
                     let guard = self.config.load();
@@ -325,6 +306,7 @@ impl FlowMap {
                     node.match_node(meta_packet, ignore_l2_end, ignore_tor_mac, trident_type)
                 });
                 if index.is_none() {
+                    // 没有找到严格匹配的 FlowNode，插入新 Node
                     let node = Box::new(self.new_flow_node(meta_packet));
                     let time_key = FlowTimeKey::new(pkt_timestamp, pkt_key);
                     time_set.insert(time_key);
@@ -353,7 +335,7 @@ impl FlowMap {
                     node_map.remove(&pkt_key);
                 }
             }
-            // 未找到Flow，需要插入新的节点
+            // 未找到匹配的 FlowNode，需要插入新的节点
             None => {
                 let node = Box::new(self.new_flow_node(meta_packet));
 
@@ -430,6 +412,17 @@ impl FlowMap {
             self.collect_metric(&mut node, meta_packet, direction);
         }
 
+        // After collect_metric() is called for eBPF MetaPacket, its direction is determined.
+        if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
+            if meta_packet.direction == PacketDirection::ClientToServer {
+                self.residual_request++
+            } else {
+                self.residual_request--
+            }
+            // For eBPF Flow, we use residual_request to directly judge whether timeout is needed.
+            flow_closed == self.residual_request == 0;
+        }
+
         // Enterprise Edition Feature: packet-sequence
         if self.packet_sequence_enabled {
             self.append_to_block(&mut node, meta_packet);
@@ -500,12 +493,9 @@ impl FlowMap {
         node.tagged_flow.flow.flow_metrics_peers[direction as usize].tcp_flags |= pkt_tcp_flags;
         self.update_flow(node, meta_packet);
         if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
-            // For eBPF data, since we don't know when the Flow will terminate at present, the
-            // fixed timeout parameter is used uniformly, and the Flow will not be closed due to
-            // the arrival of the packet.
-            // In addition, because eBPF data does not have L4 information, the remaining steps of
-            // direction correction, state machine maintenance, SEQ acquisition, etc., do not
-            // need to be performed.
+            // Because eBPF data does not have L4 information, the remaining steps of direction
+            // correction, state machine maintenance, SEQ acquisition, etc., do not need to be
+            // performed.
             return false;
         }
 
@@ -885,9 +875,8 @@ impl FlowMap {
         meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
         let mut reverse = false;
         if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
-            // For ebpf data, initialize a short timeout to make it timeout
-            // when there is no residual data to be aggregated as soon as possible.
-            node.timeout = EBPF_MINIMUM_TIMEOUT;
+            // Initialize a timeout long enough for eBPF Flow to enable successful session aggregation.
+            node.timeout = self.parse_config.load().l7_log_session_aggr_timeout;
         } else {
             reverse = self.update_l4_direction(meta_packet, &mut node, true, true);
 
@@ -903,6 +892,15 @@ impl FlowMap {
 
         if self.config.load().collector_enabled {
             self.collect_metric(&mut node, meta_packet, !reverse);
+        }
+
+        // After collect_metric() is called for eBPF MetaPacket, its direction is determined.
+        if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
+            if meta_packet.direction == PacketDirection::ClientToServer {
+                self.residual_request++
+            } else {
+                self.residual_request--
+            }
         }
 
         // Enterprise Edition Feature: packet-sequence
@@ -953,14 +951,11 @@ impl FlowMap {
         let mut node = self.init_flow(meta_packet);
         meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
         node.flow_state = FlowState::Established;
+        // For eBPF UDP Flow, there is no special treatment for timeout.
+        node.timeout = self.config.load().flow_timeout.opening; // use opening timeout
         let mut reverse = false;
-        if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
-            // eBPF data currently does not have socket closing information, we uniformly use the
-            // timeout parameter of active UDP flow so that the aggregation will not be affected.
-            node.timeout = self.config.load().flow_timeout.closing;
-        } else {
-            // opening timeout
-            node.timeout = self.config.load().flow_timeout.opening;
+        if node.tagged_flow.flow.signal_source != SignalSource::EBPF {
+            // eBPF Flow only use server_port to correct the direction.
             reverse = self.update_l4_direction(meta_packet, &mut node, true, true);
         }
         if self.config.load().collector_enabled {
@@ -1219,9 +1214,8 @@ impl FlowMap {
 
     fn update_flow_direction(&mut self, node: &mut FlowNode, meta_packet: Option<&mut MetaPacket>) {
         if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
-            // the data from ebpf doesn't need to update_flow_direction,
-            // it only update it's direction in FlowPerf::l7_parse,
-            // don't correct the direction for the second time
+            // The direction of eBPF Flow is determined when FlowPerf::l7_parse is called for the
+            // first time, and no further correction is required.
             return;
         }
         let flow_key = &node.tagged_flow.flow.flow_key;

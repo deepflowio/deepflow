@@ -151,6 +151,9 @@ pub struct FlowNode {
     pub policy_data_cache: [PolicyData; 2],
     pub endpoint_data_cache: EndpointData,
 
+    // Only for eBPF TCP Flow, used to help confirm whether the Flow can be timed out.
+    pub residual_request: i32,
+
     pub next_tcp_seq0: u32,
     pub next_tcp_seq1: u32,
     pub policy_in_tick: [bool; 2],
