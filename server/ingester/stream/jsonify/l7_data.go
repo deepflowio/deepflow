@@ -529,6 +529,7 @@ func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData) {
 	if l.TraceInfo != nil {
 		h.SpanId = l.TraceInfo.SpanId
 		h.TraceId = l.TraceInfo.TraceId
+		h.ParentSpanId = l.TraceInfo.ParentSpanId
 	}
 
 	// 处理内置协议特殊情况
