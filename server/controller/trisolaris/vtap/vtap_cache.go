@@ -359,6 +359,15 @@ func (c *VTapCache) GetVTapHost() string {
 	return ""
 }
 
+func (c *VTapCache) GetConfigSyncInterval() int {
+	config := c.GetVTapConfig()
+	if config == nil {
+		return DefaultSyncInterval
+	}
+
+	return config.SyncInterval
+}
+
 func (c *VTapCache) updateVTapHost(host string) {
 	c.name = &host
 }
