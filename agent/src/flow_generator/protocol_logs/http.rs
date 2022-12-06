@@ -21,9 +21,9 @@ use log::debug;
 use serde::Serialize;
 
 use super::pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo};
-use super::value_is_default;
 use super::LogMessageType;
 use super::{consts::*, AppProtoHead, L7ResponseStatus};
+use super::{decode_new_rpc_trace_context, value_is_default};
 
 use crate::{
     common::{
@@ -1010,6 +1010,14 @@ impl HttpLog {
             TraceType::Uber => Self::decode_uber_id(payload, id_type),
             TraceType::Sw6 | TraceType::Sw8 => Self::decode_skywalking_id(payload, id_type),
             TraceType::TraceParent => Self::decode_traceparent(payload, id_type),
+            TraceType::NewRpcTraceCtx => {
+                let ctx = decode_new_rpc_trace_context(payload.as_bytes());
+                match id_type {
+                    Self::SPAN_ID => Some(ctx.span_id),
+                    Self::TRACE_ID => Some(ctx.trace_id),
+                    _ => None,
+                }
+            }
         }
     }
 

@@ -155,6 +155,7 @@ const (
 	L7_PROTOCOL_DUBBO        L7Protocol = 40
 	L7_PROTOCOL_GRPC         L7Protocol = 41
 	L7_PROTOCOL_PROTOBUF_RPC L7Protocol = 42
+	L7_PROTOCOL_SOFARPC      L7Protocol = 43
 	L7_PROTOCOL_MYSQL        L7Protocol = 60
 	L7_PROTOCOL_POSTGRE      L7Protocol = 61
 	L7_PROTOCOL_REDIS        L7Protocol = 80
@@ -615,6 +616,8 @@ func (p L7Protocol) String() string {
 		formatted = "gRPC"
 	case L7_PROTOCOL_PROTOBUF_RPC:
 		formatted = "ProtobufRPC"
+	case L7_PROTOCOL_SOFARPC:
+		formatted = "SofaRPC"
 	case L7_PROTOCOL_KAFKA:
 		formatted = "Kafka"
 	case L7_PROTOCOL_MQTT:
