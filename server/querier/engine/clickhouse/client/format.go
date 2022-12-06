@@ -29,6 +29,12 @@ const (
 	VALUE_TYPE_FLOAT64 = "Float64"
 )
 
+var VALUE_TYPE_MAP = map[string]int{
+	VALUE_TYPE_INT:     0,
+	VALUE_TYPE_STRING:  1,
+	VALUE_TYPE_FLOAT64: 2,
+}
+
 func TransType(typeName string, value interface{}) (interface{}, string, error) {
 	switch typeName {
 	case "UInt64":
@@ -46,7 +52,7 @@ func TransType(typeName string, value interface{}) (interface{}, string, error) 
 		}
 		return value.(float64), VALUE_TYPE_FLOAT64, nil
 	default:
-		if strings.Contains(typeName, "String") {
+		if strings.Contains(typeName, "String") && !strings.Contains(typeName, "Array") {
 			return value.(string), VALUE_TYPE_STRING, nil
 		}
 		return value, typeName, nil
