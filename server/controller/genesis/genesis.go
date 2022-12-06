@@ -21,7 +21,6 @@ import (
 	"compress/zlib"
 	"context"
 	"errors"
-	"fmt"
 	"net"
 	"os"
 	"sync"

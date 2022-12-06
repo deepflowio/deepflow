@@ -240,8 +240,8 @@ func (d *Decoder) sendOpenMetetry(vtapID uint16, tracesData *v1.TracesData) {
 		} else {
 			d.fieldsBuf, d.fieldValuesBuf = d.fieldsBuf[:0], d.fieldValuesBuf[:0]
 			d.flowTagWriter.WriteFieldsAndFieldValues(jsonify.L7FlowLogToFlowTagInterfaces(l, &d.fieldsBuf, &d.fieldValuesBuf))
-			l.Release()
 		}
+		l.Release()
 	}
 }
 
@@ -272,7 +272,7 @@ func (d *Decoder) sendFlow(flow *pb.TaggedFlow) {
 	d.counter.Count++
 	l := jsonify.TaggedFlowToL4FlowLog(flow, d.platformData)
 	if !d.throttler.Send(l) {
-		d.counter.Count++
+		d.counter.DropCount++
 	}
 }
 
@@ -291,8 +291,8 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 	} else {
 		d.fieldsBuf, d.fieldValuesBuf = d.fieldsBuf[:0], d.fieldValuesBuf[:0]
 		d.flowTagWriter.WriteFieldsAndFieldValues(jsonify.L7FlowLogToFlowTagInterfaces(l, &d.fieldsBuf, &d.fieldValuesBuf))
-		l.Release()
 	}
+	l.Release()
 	proto.Release()
 
 	switch datatype.L7Protocol(proto.Base.Head.Proto) {

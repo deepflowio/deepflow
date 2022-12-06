@@ -696,6 +696,7 @@ mod tests {
     };
     use crate::common::flow::{CloseType, PacketDirection};
     use crate::common::tagged_flow::TaggedFlow;
+    use crate::config::RuntimeConfig;
     use crate::flow_generator::flow_map::_new_flow_map_and_receiver;
     use crate::flow_generator::flow_node::FlowNode;
     use crate::flow_generator::{FlowTimeout, TcpTimeout};
@@ -768,6 +769,7 @@ mod tests {
                     is_local_ip: false,
                 },
             },
+            residual_request: 0,
             next_tcp_seq0: 0,
             next_tcp_seq1: 0,
             packet_in_tick: false,
@@ -779,10 +781,15 @@ mod tests {
         peers[FLOW_METRICS_PEER_SRC].total_packet_count = 1;
         peers[FLOW_METRICS_PEER_DST].total_packet_count = 1;
 
+        let config = (&RuntimeConfig::default()).into();
         for data in init_test_case() {
             flow_node.flow_state = data.cur_state;
-            let closed =
-                flow_map.update_flow_state_machine(&mut flow_node, data.tcp_flags, data.pkt_dir);
+            let closed = flow_map.update_flow_state_machine(
+                &config,
+                &mut flow_node,
+                data.tcp_flags,
+                data.pkt_dir,
+            );
             assert!(
                 closed == data.closed
                     && flow_node.flow_state == data.next_state
