@@ -25,7 +25,6 @@ import (
 
 	"github.com/google/gopacket/layers"
 
-	"github.com/deepflowys/deepflow/message/trident"
 	"github.com/deepflowys/deepflow/server/ingester/common"
 	"github.com/deepflowys/deepflow/server/ingester/stream/geo"
 	"github.com/deepflowys/deepflow/server/libs/ckdb"
@@ -1076,30 +1075,12 @@ func (k *KnowledgeGraph) fill(
 		k.EpcID1 = l2Info1.L2EpcID
 	}
 
-	if isIPv6 {
-		// 0端如果是clusterIP或后端podIP需要匹配service_id
-		if k.L3DeviceType0 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
-			k.PodID0 != 0 {
-			_, k.ServiceID0 = platformData.QueryIPv6IsKeyServiceAndID(l3EpcID0, ip60, protocol, 0)
-		}
-		// 1端如果是NodeIP,clusterIP或后端podIP需要匹配service_id
-		if k.L3DeviceType1 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
-			k.PodID1 != 0 ||
-			k.PodNodeID1 != 0 {
-			_, k.ServiceID1 = platformData.QueryIPv6IsKeyServiceAndID(l3EpcID1, ip61, protocol, port)
-		}
-	} else {
-		// 0端如果是clusterIP或后端podIP需要匹配service_id
-		if k.L3DeviceType0 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
-			k.PodID0 != 0 {
-			_, k.ServiceID0 = platformData.QueryIsKeyServiceAndID(l3EpcID0, ip40, protocol, 0)
-		}
-		// 1端如果是NodeIP,clusterIP或后端podIP需要匹配service_id
-		if k.L3DeviceType1 == uint8(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
-			k.PodID1 != 0 ||
-			k.PodNodeID1 != 0 {
-			_, k.ServiceID1 = platformData.QueryIsKeyServiceAndID(l3EpcID1, ip41, protocol, port)
-		}
+	// 0端如果是clusterIP或后端podIP需要匹配service_id
+	if common.IsPodServiceIP(zerodoc.DeviceType(k.L3DeviceType0), k.PodID0, 0) {
+		k.ServiceID0 = platformData.QueryService(k.L3DeviceType0, uint32(k.PodClusterID0), k.PodGroupID0, l3EpcID0, isIPv6, ip40, ip60, protocol, 0)
+	}
+	if common.IsPodServiceIP(zerodoc.DeviceType(k.L3DeviceType1), k.PodID1, k.PodNodeID1) {
+		k.ServiceID1 = platformData.QueryService(k.L3DeviceType1, uint32(k.PodClusterID1), k.PodGroupID1, l3EpcID1, isIPv6, ip41, ip61, protocol, port)
 	}
 
 	k.ResourceGl0ID0, k.ResourceGl0Type0 = common.GetResourceGl0(k.PodID0, k.PodNodeID0, k.L3DeviceID0, k.L3DeviceType0, k.L3EpcID0)
