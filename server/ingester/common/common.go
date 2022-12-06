@@ -21,10 +21,12 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/deepflowys/deepflow/message/trident"
 	"github.com/deepflowys/deepflow/server/libs/datatype"
 	"github.com/deepflowys/deepflow/server/libs/grpc"
 	"github.com/deepflowys/deepflow/server/libs/queue"
 	"github.com/deepflowys/deepflow/server/libs/stats"
+	"github.com/deepflowys/deepflow/server/libs/zerodoc"
 
 	clickhouse "github.com/ClickHouse/clickhouse-go/v2"
 	logging "github.com/op/go-logging"
@@ -107,4 +109,9 @@ func GetResourceGl2(serviceID, podGroupID, podNodeID, l3DeviceID uint32, l3Devic
 		return serviceID, ServiceType
 	}
 	return GetResourceGl1(podGroupID, podNodeID, l3DeviceID, l3DeviceType, l3EpcID)
+}
+
+func IsPodServiceIP(deviceType zerodoc.DeviceType, podId, podNodeId uint32) bool {
+	// 如果是NodeIP,clusterIP或后端podIP需要匹配service_id
+	return deviceType == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) || podId != 0 || podNodeId != 0
 }

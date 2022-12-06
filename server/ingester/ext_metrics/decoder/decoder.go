@@ -30,7 +30,6 @@ import (
 	"github.com/prometheus/prometheus/prompb"
 	"github.com/prometheus/prometheus/storage/remote"
 
-	"github.com/deepflowys/deepflow/message/trident"
 	"github.com/deepflowys/deepflow/server/ingester/common"
 	"github.com/deepflowys/deepflow/server/ingester/ext_metrics/config"
 	"github.com/deepflowys/deepflow/server/ingester/ext_metrics/dbwriter"
@@ -365,14 +364,8 @@ func (d *Decoder) fillExtMetricsBase(m *dbwriter.ExtMetrics, vtapID uint16, podN
 			t.PodID = info.PodID
 		}
 
-		if t.L3DeviceType == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
-			t.PodID != 0 ||
-			t.PodNodeID != 0 {
-			if t.IsIPv6 == 1 {
-				_, t.ServiceID = d.platformData.QueryIPv6IsKeyServiceAndID(t.L3EpcID, t.IP6, 0, 0)
-			} else {
-				_, t.ServiceID = d.platformData.QueryIsKeyServiceAndID(t.L3EpcID, t.IP, 0, 0)
-			}
+		if common.IsPodServiceIP(t.L3DeviceType, t.PodID, t.PodNodeID) {
+			t.ServiceID = d.platformData.QueryService(uint8(t.L3DeviceType), uint32(t.PodClusterID), t.PodGroupID, t.L3EpcID, t.IsIPv6 == 1, t.IP, t.IP6, 0, 0)
 		}
 		t.ResourceGl0ID, t.ResourceGl0Type = common.GetResourceGl0(t.PodID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
 		t.ResourceGl1ID, t.ResourceGl1Type = common.GetResourceGl1(t.PodGroupID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)

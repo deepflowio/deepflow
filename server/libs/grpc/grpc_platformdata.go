@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/google/gopacket/layers"
 	"github.com/spf13/cobra"
 	"github.com/vishvananda/netlink"
 
@@ -37,9 +36,7 @@ import (
 	"github.com/deepflowys/deepflow/message/trident"
 	"github.com/deepflowys/deepflow/server/libs/datatype"
 	"github.com/deepflowys/deepflow/server/libs/hmap/lru"
-	"github.com/deepflowys/deepflow/server/libs/logger"
 	"github.com/deepflowys/deepflow/server/libs/receiver"
-	api "github.com/deepflowys/deepflow/server/libs/reciter-api"
 	"github.com/deepflowys/deepflow/server/libs/stats"
 	"github.com/deepflowys/deepflow/server/libs/utils"
 )
@@ -150,11 +147,8 @@ type PlatformInfoTable struct {
 	runtimeEnv        utils.RuntimeEnv
 	pcapDataMountPath string
 
-	versionGroups        uint64
-	serviceLabeler       *GroupLabeler
-	serviceLabelerLogger *logger.PrefixLogger
-	serviceLabelerLruCap int
-	services             []api.GroupIDMap
+	versionGroups uint64
+	*ServiceTable
 
 	podNameInfos map[string][]*PodInfo
 	vtapIdInfos  map[uint32]*VtapInfo
@@ -289,24 +283,23 @@ func (t *PlatformInfoTable) QueryIPV6InfosPair(epcID0 int32, ipv60 net.IP, epcID
 
 func NewPlatformInfoTable(ips []net.IP, port, rpcMaxMsgSize, serviceLabelerLruCap int, moduleName, pcapDataPath, nodeIP string, receiver *receiver.Receiver) *PlatformInfoTable {
 	table := &PlatformInfoTable{
-		receiver:             receiver,
-		bootTime:             uint32(time.Now().Unix()),
-		GrpcSession:          &GrpcSession{},
-		epcIDIPV4Lru:         lru.NewU64LRU("epcIDIPV4_"+moduleName, LruSlotSize, LruCap),
-		epcIDIPV6Lru:         lru.NewU160LRU("epcIDIPV6_"+moduleName, LruSlotSize, LruCap),
-		epcIDIPV4Infos:       make(map[uint64]*Info),
-		epcIDIPV6Infos:       make(map[[EpcIDIPV6_LEN]byte]*Info),
-		macInfos:             make(map[uint64]*Info),
-		macMissCount:         make(map[uint64]*uint64),
-		epcIDIPV4CidrInfos:   make(map[int32][]*CidrInfo),
-		epcIDIPV6CidrInfos:   make(map[int32][]*CidrInfo),
-		epcIDBaseInfos:       make(map[int32]*BaseInfo),
-		epcIDBaseMissCount:   make(map[int32]*uint64),
-		moduleName:           moduleName,
-		runtimeEnv:           utils.GetRuntimeEnv(),
-		pcapDataMountPath:    utils.Mountpoint(pcapDataPath),
-		serviceLabelerLogger: logger.WrapWithPrefixLogger("serviceLabeler", log),
-		serviceLabelerLruCap: serviceLabelerLruCap,
+		receiver:           receiver,
+		bootTime:           uint32(time.Now().Unix()),
+		GrpcSession:        &GrpcSession{},
+		epcIDIPV4Lru:       lru.NewU64LRU("epcIDIPV4_"+moduleName, LruSlotSize, LruCap),
+		epcIDIPV6Lru:       lru.NewU160LRU("epcIDIPV6_"+moduleName, LruSlotSize, LruCap),
+		epcIDIPV4Infos:     make(map[uint64]*Info),
+		epcIDIPV6Infos:     make(map[[EpcIDIPV6_LEN]byte]*Info),
+		macInfos:           make(map[uint64]*Info),
+		macMissCount:       make(map[uint64]*uint64),
+		epcIDIPV4CidrInfos: make(map[int32][]*CidrInfo),
+		epcIDIPV6CidrInfos: make(map[int32][]*CidrInfo),
+		epcIDBaseInfos:     make(map[int32]*BaseInfo),
+		epcIDBaseMissCount: make(map[int32]*uint64),
+		moduleName:         moduleName,
+		runtimeEnv:         utils.GetRuntimeEnv(),
+		pcapDataMountPath:  utils.Mountpoint(pcapDataPath),
+		ServiceTable:       NewServiceTable(nil),
 
 		podNameInfos:    make(map[string][]*PodInfo),
 		vtapIdInfos:     make(map[uint32]*VtapInfo),
@@ -762,6 +755,8 @@ func (t *PlatformInfoTable) HandleSimpleCommand(op uint16, arg string) string {
 		return t.peerConnectionsString()
 	} else if arg == "comm_vtaps-" {
 		return t.communicationVtapsString()
+	} else if arg == "service-" {
+		return t.ServiceTable.String()
 	}
 
 	all := t.String()
@@ -809,51 +804,6 @@ func Lookup(host net.IP) (net.IP, error) {
 	return src, nil
 }
 
-// is_key_service查询
-//
-//	使用 epcid+ip+port 查询is_key_service
-//
-// service_id 查询, 只支持查询pod_service类型的服务
-//
-//	1，使用 epcid+clusterIP(device_type为POD_SERVICE) + port(可选) 查询
-//	2，使用 epcid+后端podIP(pod_id 非0) + port(可选) 查询
-//	3，使用 epcid+nodeIP(pod_node_id 非0)+port(必选) 查询
-func (t *PlatformInfoTable) QueryIsKeyServiceAndID(l3EpcID int32, ipv4 uint32, protocol layers.IPProtocol, serverPort uint16) (bool, uint32) {
-	if t.serviceLabeler == nil {
-		return false, 0
-	}
-	// serverPort为0时，也忽略protocol
-	if serverPort == 0 {
-		protocol = 0
-	}
-	// l3EpcID is in range [-2, 65533], change to int16 is safty
-	serviceIdxs := t.serviceLabeler.QueryService(int16(l3EpcID), ipv4, 0, protocol, serverPort)
-	for _, i := range serviceIdxs {
-		if t.services[i].ServiceID > 0 {
-			return true, t.services[i].ServiceID
-		}
-	}
-	return len(serviceIdxs) > 0, 0
-}
-
-func (t *PlatformInfoTable) QueryIPv6IsKeyServiceAndID(l3EpcID int32, ipv6 net.IP, protocol layers.IPProtocol, serverPort uint16) (bool, uint32) {
-	if t.serviceLabeler == nil {
-		return false, 0
-	}
-	// serverPort为0时，也忽略protocol
-	if serverPort == 0 {
-		protocol = 0
-	}
-	// l3EpcID is in range [-2, 65533], change to int16 is safty
-	serviceIdxs := t.serviceLabeler.QueryServiceIPv6(int16(l3EpcID), ipv6, 0, protocol, serverPort)
-	for _, i := range serviceIdxs {
-		if t.services[i].ServiceID > 0 {
-			return true, t.services[i].ServiceID
-		}
-	}
-	return len(serviceIdxs) > 0, 0
-}
-
 func (t *PlatformInfoTable) updateServices(response *trident.SyncResponse) bool {
 	unmarshalStart := time.Now()
 	groupsData := trident.Groups{}
@@ -864,47 +814,10 @@ func (t *PlatformInfoTable) updateServices(response *trident.SyncResponse) bool 
 		}
 	}
 	t.counter.UpdateServiceUnmarshal += int64(time.Since(unmarshalStart))
-	services := make([]api.GroupIDMap, 0, len(groupsData.GetSvcs())*2)
-	serviceIndex := 0
-	for _, svc := range groupsData.GetSvcs() {
-		// 目前只支持pod的service查询service_id
-		if svc.GetType() != trident.ServiceType_POD_SERVICE {
-			continue
-		}
-		groupIDMap := api.GroupIDMap{
-			GroupID:     uint16(serviceIndex),
-			L3EpcID:     int32(svc.GetEpcId()),
-			CIDRs:       svc.GetIps(),
-			IPRanges:    svc.GetIpRanges(),
-			Protocol:    uint16(svc.GetProtocol()),
-			ServerPorts: svc.GetServerPorts(),
-			ServiceID:   svc.GetId(),
-		}
-
-		services = append(services, groupIDMap)
-		log.Debugf("svc: %+v", groupIDMap)
-		serviceIndex++
-		if groupIDMap.Protocol != 0 {
-			// 增加支持若查询时的protocol为0，则忽略protocol的匹配
-			groupIDMapProtoIgnore := groupIDMap
-			groupIDMapProtoIgnore.Protocol = 0
-			groupIDMapProtoIgnore.GroupID = uint16(serviceIndex)
-			services = append(services, groupIDMapProtoIgnore)
-			serviceIndex++
-			log.Debugf("svc protocol ignore: %+v", groupIDMapProtoIgnore)
-		}
-	}
-
-	if t.serviceLabeler != nil &&
-		t.serviceLabeler.portFilter != nil &&
-		t.serviceLabeler.portFilter.fastMap != nil {
-		t.serviceLabeler.portFilter.fastMap.NoStats()
-	}
-	labelerStart := time.Now()
-	t.serviceLabeler = NewGroupLabeler(t.serviceLabelerLogger, services, t.serviceLabelerLruCap, t.moduleName)
-	t.counter.UpdateServiceLabeler += int64(time.Since(labelerStart))
-	t.counter.UpdateServicesCount += int64(len(services))
-	t.services = services
+	tableStart := time.Now()
+	t.ServiceTable = NewServiceTable(groupsData.GetSvcs())
+	t.counter.UpdateServiceLabeler += int64(time.Since(tableStart))
+	t.counter.UpdateServicesCount += int64(len(groupsData.GetSvcs()))
 
 	return true
 }
