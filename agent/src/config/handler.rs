@@ -42,6 +42,7 @@ use super::{
 };
 
 use crate::common::l7_protocol_log::L7ProtocolBitmap;
+use crate::flow_generator::protocol_logs::NEW_RPC_TRACE_CTX_KEY;
 #[cfg(target_os = "linux")]
 use crate::{
     common::DEFAULT_CPU_CFS_PERIOD_US,
@@ -512,6 +513,7 @@ pub enum TraceType {
     Uber,
     Sw6,
     Sw8,
+    NewRpcTraceCtx,
     TraceParent,
     Customize(String),
 }
@@ -534,13 +536,17 @@ impl From<&str> for TraceType {
     // Example 2: " sw8"
     fn from(t: &str) -> TraceType {
         let format_t = Self::format_str(t);
-        match format_t.to_lowercase().as_str() {
+        let format_t_l = format_t.to_lowercase();
+        match format_t_l.as_str() {
             TRACE_TYPE_XB3 => TraceType::XB3,
             TRACE_TYPE_XB3SPAN => TraceType::XB3Span,
             TRACE_TYPE_UBER => TraceType::Uber,
             TRACE_TYPE_SW6 => TraceType::Sw6,
             TRACE_TYPE_SW8 => TraceType::Sw8,
             TRACE_TYPE_TRACE_PARENT => TraceType::TraceParent,
+            _ if format_t_l.as_str() == std::str::from_utf8(NEW_RPC_TRACE_CTX_KEY).unwrap() => {
+                TraceType::NewRpcTraceCtx
+            }
             _ if t.len() > 0 => TraceType::Customize(format_t.to_string()),
             _ => TraceType::Disabled,
         }
@@ -569,6 +575,9 @@ impl TraceType {
             TraceType::Sw6 => context.to_lowercase() == TRACE_TYPE_SW6,
             TraceType::Sw8 => context.to_lowercase() == TRACE_TYPE_SW8,
             TraceType::TraceParent => context.to_lowercase() == TRACE_TYPE_TRACE_PARENT,
+            _ if context.to_lowercase() == std::str::from_utf8(NEW_RPC_TRACE_CTX_KEY).unwrap() => {
+                true
+            }
             TraceType::Customize(tag) => context.to_lowercase() == tag.to_lowercase(),
             _ => false,
         }

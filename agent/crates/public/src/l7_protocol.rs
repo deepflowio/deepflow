@@ -34,6 +34,7 @@ pub enum L7Protocol {
     Dubbo = 40,
     Grpc = 41,
     ProtobufRPC = 42,
+    SofaRPC = 43,
 
     // SQL
     MySQL = 60,
