@@ -17,13 +17,15 @@
 use std::fmt;
 
 use prost::Message;
+use public::sender::{SendMessageType, Sendable};
 use serde::Serialize;
 
 use super::flow::Flow;
 use super::tag::Tag;
 
-use crate::proto::flow_log;
+use public::proto::flow_log;
 
+const FLOW_LOG_VERSION: u32 = 20220128;
 #[derive(Serialize, Default, Clone, Debug)]
 pub struct TaggedFlow {
     #[serde(flatten)]
@@ -40,26 +42,43 @@ impl TaggedFlow {
         self.flow.reverse(false);
         self.tag.reverse();
     }
+}
 
-    pub fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
+impl fmt::Display for TaggedFlow {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "flow:{}\n\t tag:{:?}", self.flow, self.tag)
+    }
+}
+
+#[derive(Debug)]
+pub struct BoxedTaggedFlow(pub Box<TaggedFlow>);
+
+impl Sendable for BoxedTaggedFlow {
+    fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
         let pb_tagged_flow = flow_log::TaggedFlow {
-            flow: Some(self.flow.into()),
+            flow: Some(self.0.flow.into()),
         };
         pb_tagged_flow
             .encode(buf)
             .map(|_| pb_tagged_flow.encoded_len())
     }
 
-    pub fn to_kv_string(&self, dst: &mut String) {
-        let json = serde_json::to_string(&self).unwrap();
+    fn to_kv_string(&self, dst: &mut String) {
+        let json = serde_json::to_string(&(*self.0)).unwrap();
         dst.push_str(&json);
         dst.push('\n');
     }
-}
 
-impl fmt::Display for TaggedFlow {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "flow:{}\n\t tag:{:?}", self.flow, self.tag)
+    fn file_name(&self) -> &str {
+        "l4_flow_log"
+    }
+
+    fn message_type(&self) -> SendMessageType {
+        SendMessageType::TaggedFlow
+    }
+
+    fn version(&self) -> u32 {
+        FLOW_LOG_VERSION
     }
 }
 
@@ -127,7 +146,8 @@ mod tests {
         tflow.flow.is_active_service = true;
 
         let mut buf: Vec<u8> = vec![];
-        let encoded_len = tflow.encode(&mut buf).unwrap();
+        let boxflow = BoxedTaggedFlow(Box::new(tflow));
+        let encoded_len = boxflow.encode(&mut buf).unwrap();
         let rlt: Result<flow_log::TaggedFlow, prost::DecodeError> =
             Message::decode(buf.as_slice().get(..encoded_len).unwrap());
 

@@ -155,6 +155,7 @@ impl<const N: usize> Default for MatchedFieldN<N> {
 
 impl<const N: usize> MatchedFieldN<N> {
     const IPV4_ADDR_LEN: usize = 4;
+    pub const SIZE: usize = MATCHED_FIELD_OTHER_SIZE + N * 2;
     pub fn bit_size(&self) -> usize {
         return (self.src_ip.len() * 2 + MATCHED_FIELD_OTHER_SIZE) * (u8::BITS as usize);
     }

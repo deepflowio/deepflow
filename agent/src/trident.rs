@@ -21,6 +21,7 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::path::Path;
 use std::path::PathBuf;
 use std::process;
+use std::sync::atomic::AtomicI64;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, Condvar, Mutex, Weak,
@@ -37,19 +38,28 @@ use flexi_logger::{
     colored_opt_format, Age, Cleanup, Criterion, FileSpec, Logger, LoggerHandle, Naming,
 };
 use log::{info, warn};
+use packet_sequence_block::BoxedPacketSequenceBlock;
+use pcap_assembler::{BoxedPcapBatch, PcapAssembler};
+use public::packet::MiniPacket;
+use public::queue::DebugSender;
 use regex::Regex;
 
+use crate::config::PcapConfig;
 #[cfg(target_os = "linux")]
 use crate::ebpf_dispatcher::EbpfCollector;
 use crate::handler::{NpbBuilder, PacketHandlerBuilder};
-use crate::integration_collector::MetricServer;
-use crate::pcap::WorkerManager;
+use crate::integration_collector::{
+    MetricServer, OpenTelemetry, OpenTelemetryCompressed, PrometheusMetric, TelegrafMetric,
+};
+use crate::metric::document::BoxedDocument;
 #[cfg(target_os = "linux")]
 use crate::platform::ApiWatcher;
+use crate::sender::get_sender_id;
 #[cfg(target_os = "linux")]
 use crate::utils::cgroups::Cgroups;
 #[cfg(target_os = "linux")]
 use crate::utils::environment::core_file_check;
+use crate::utils::stats::ArcBatch;
 use crate::{
     collector::Collector,
     collector::{
@@ -57,9 +67,11 @@ use crate::{
         MetricsType,
     },
     common::{
-        enums::TapType, tagged_flow::TaggedFlow, tap_types::TapTyper, FeatureFlags,
-        DEFAULT_CONF_FILE, DEFAULT_INGESTER_PORT, DEFAULT_LOG_RETENTION, FREE_SPACE_REQUIREMENT,
-        NORMAL_EXIT_WITH_RESTART,
+        enums::TapType,
+        tagged_flow::{BoxedTaggedFlow, TaggedFlow},
+        tap_types::TapTyper,
+        FeatureFlags, DEFAULT_CONF_FILE, DEFAULT_INGESTER_PORT, DEFAULT_LOG_RETENTION,
+        FREE_SPACE_REQUIREMENT, NORMAL_EXIT_WITH_RESTART,
     },
     config::{
         handler::{ConfigHandler, DispatcherConfig, ModuleConfig, PortAccess},
@@ -70,13 +82,14 @@ use crate::{
         self, recv_engine::bpf, BpfOptions, Dispatcher, DispatcherBuilder, DispatcherListener,
     },
     exception::ExceptionHandler,
-    flow_generator::{AppProtoLogsParser, PacketSequenceParser},
+    flow_generator::{
+        protocol_logs::BoxAppProtoLogsData, AppProtoLogsParser, PacketSequenceParser,
+    },
     monitor::Monitor,
     platform::{LibvirtXmlExtractor, PlatformSynchronizer},
-    policy::Policy,
-    proto::trident::{self, IfMacSource, TapMode},
+    policy::{Policy, PolicySetter},
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
-    sender::{uniform_sender::UniformSenderThread, SendItem, SendMessageType},
+    sender::uniform_sender::UniformSenderThread,
     utils::{
         environment::{
             check, controller_ip_check, free_memory_check, free_space_checker, get_ctrl_ip_and_mac,
@@ -84,6 +97,7 @@ use crate::{
         },
         guard::Guard,
         logger::{LogLevelWriter, LogWriterAdapter, RemoteLogConfig, RemoteLogWriter},
+        npb_bandwidth_watcher::NpbBandwidthWatcher,
         stats::{self, Countable, RefCountable, StatsOption},
     },
 };
@@ -94,7 +108,9 @@ use public::utils::net::link_by_name;
 use public::{
     debug::QueueDebugger,
     netns::NsFile,
+    proto::trident::{self, IfMacSource, TapMode},
     queue,
+    sender::SendMessageType,
     utils::net::{get_route_src_ip, links_by_name_regex, MacAddr},
     LeakyBucket,
 };
@@ -726,15 +742,14 @@ pub struct Components {
     pub dispatcher_listeners: Vec<DispatcherListener>,
     pub log_parsers: Vec<AppProtoLogsParser>,
     pub collectors: Vec<CollectorThread>,
-    pub l4_flow_uniform_sender: UniformSenderThread,
-    pub metrics_uniform_sender: UniformSenderThread,
-    pub l7_flow_uniform_sender: UniformSenderThread,
-    pub stats_sender: UniformSenderThread,
+    pub l4_flow_uniform_sender: UniformSenderThread<BoxedTaggedFlow>,
+    pub metrics_uniform_sender: UniformSenderThread<BoxedDocument>,
+    pub l7_flow_uniform_sender: UniformSenderThread<BoxAppProtoLogsData>,
+    pub stats_sender: UniformSenderThread<ArcBatch>,
     pub platform_synchronizer: PlatformSynchronizer,
     #[cfg(target_os = "linux")]
     pub api_watcher: Arc<ApiWatcher>,
     pub debugger: Debugger,
-    pub pcap_manager: WorkerManager,
     #[cfg(target_os = "linux")]
     pub ebpf_collector: Option<Box<EbpfCollector>>,
     pub running: AtomicBool,
@@ -742,16 +757,20 @@ pub struct Components {
     #[cfg(target_os = "linux")]
     pub cgroups_controller: Arc<Cgroups>,
     pub external_metrics_server: MetricServer,
-    pub otel_uniform_sender: UniformSenderThread,
-    pub prometheus_uniform_sender: UniformSenderThread,
-    pub telegraf_uniform_sender: UniformSenderThread,
+    pub otel_uniform_sender: UniformSenderThread<OpenTelemetry>,
+    pub prometheus_uniform_sender: UniformSenderThread<PrometheusMetric>,
+    pub telegraf_uniform_sender: UniformSenderThread<TelegrafMetric>,
     pub packet_sequence_parsers: Vec<PacketSequenceParser>, // Enterprise Edition Feature: packet-sequence
-    pub packet_sequence_uniform_sender: UniformSenderThread, // Enterprise Edition Feature: packet-sequence
+    pub packet_sequence_uniform_sender: UniformSenderThread<BoxedPacketSequenceBlock>, // Enterprise Edition Feature: packet-sequence
     pub exception_handler: ExceptionHandler,
     pub domain_name_listener: DomainNameListener,
     pub npb_bps_limit: Arc<LeakyBucket>,
     pub handler_builders: Vec<Arc<Mutex<Vec<PacketHandlerBuilder>>>>,
-    pub compressed_otel_uniform_sender: UniformSenderThread,
+    pub compressed_otel_uniform_sender: UniformSenderThread<OpenTelemetryCompressed>,
+    pub pcap_assemblers: Vec<PcapAssembler>,
+    pub pcap_batch_uniform_sender: UniformSenderThread<BoxedPcapBatch>,
+    pub policy_setter: PolicySetter,
+    pub npb_bandwidth_watcher: Box<Arc<NpbBandwidthWatcher>>,
     max_memory: u64,
     tap_mode: TapMode,
     agent_mode: RunningMode,
@@ -764,7 +783,6 @@ impl Components {
         }
         info!("Staring components.");
         self.libvirt_xml_extractor.start();
-        self.pcap_manager.start();
         if matches!(self.agent_mode, RunningMode::Managed) {
             self.platform_synchronizer.start();
             #[cfg(target_os = "linux")]
@@ -822,6 +840,7 @@ impl Components {
             if self.config.metric_server.enabled {
                 self.external_metrics_server.start();
             }
+            self.pcap_batch_uniform_sender.start();
         }
         self.domain_name_listener.start();
         self.handler_builders.iter().for_each(|x| {
@@ -829,6 +848,10 @@ impl Components {
                 y.start();
             })
         });
+        self.npb_bandwidth_watcher.start();
+        for p in self.pcap_assemblers.iter() {
+            p.start();
+        }
         info!("Started components.");
     }
 
@@ -848,6 +871,7 @@ impl Components {
         let ctrl_ip = config_handler.ctrl_ip;
         let ctrl_mac = config_handler.ctrl_mac;
         let max_memory = config_handler.candidate_config.environment.max_memory;
+        let feature_flags = FeatureFlags::from(&yaml_config.feature_flags);
 
         let mut stats_sender = UniformSenderThread::new(
             stats::DFSTATS_SENDER_ID,
@@ -860,8 +884,10 @@ impl Components {
         stats_sender.start();
 
         trident_process_check();
-        #[cfg(target_os = "linux")]
-        core_file_check();
+        if feature_flags.contains(FeatureFlags::CORE) {
+            #[cfg(target_os = "linux")]
+            core_file_check();
+        }
         controller_ip_check(&static_config.controller_ips);
         check(free_space_checker(
             &static_config.log_file,
@@ -883,10 +909,7 @@ impl Components {
             }
         }
 
-        info!(
-            "Agent run with feature-flags: {:?}.",
-            FeatureFlags::from(&yaml_config.feature_flags)
-        );
+        info!("Agent run with feature-flags: {:?}.", feature_flags);
         // Currently, only loca-mode + ebpf collector is supported, and ebpf collector is not
         // applicable to fastpath, so the number of queues is 1
         // =================================================================================
@@ -899,6 +922,8 @@ impl Components {
             FeatureFlags::from(&yaml_config.feature_flags),
         );
         synchronizer.add_flow_acl_listener(Box::new(policy_setter));
+        policy_setter.set_memory_limit(max_memory);
+
         // TODO: collector enabled
         // TODO: packet handler builders
 
@@ -939,19 +964,6 @@ impl Components {
         };
         let debugger = Debugger::new(context);
         let queue_debugger = debugger.clone_queue();
-
-        let (pcap_sender, pcap_receiver, _) = queue::bounded_with_debug(
-            config_handler.candidate_config.pcap.queue_size as usize,
-            "1-mini-meta-packet-to-pcap",
-            &queue_debugger,
-        );
-
-        let pcap_manager = WorkerManager::new(
-            config_handler.pcap(),
-            vec![pcap_receiver],
-            stats_collector.clone(),
-            synchronizer.ntp_diff(),
-        );
 
         let rx_leaky_bucket = Arc::new(LeakyBucket::new(match candidate_config.tap_mode {
             TapMode::Analyzer => None,
@@ -1000,7 +1012,7 @@ impl Components {
             "static analyzer ip: {} actual analyzer ip {}",
             yaml_config.analyzer_ip, candidate_config.sender.dest_ip
         );
-        let sender_id = 0usize;
+        let sender_id = get_sender_id() as usize;
         let l4_flow_aggr_queue_name = "3-flow-to-collector-sender";
         let (l4_flow_aggr_sender, l4_flow_aggr_receiver, counter) = queue::bounded_with_debug(
             yaml_config.flow_sender_queue_size as usize,
@@ -1024,7 +1036,7 @@ impl Components {
             exception_handler.clone(),
         );
 
-        let sender_id = 1usize;
+        let sender_id = get_sender_id() as usize;
         let metrics_queue_name = "2-doc-to-collector-sender";
         let (metrics_sender, metrics_receiver, counter) = queue::bounded_with_debug(
             yaml_config.collector_sender_queue_size,
@@ -1048,7 +1060,7 @@ impl Components {
             exception_handler.clone(),
         );
 
-        let sender_id = 2usize;
+        let sender_id = get_sender_id() as usize;
         let proto_log_queue_name = "3-protolog-to-collector-sender";
         let (proto_log_sender, proto_log_receiver, counter) = queue::bounded_with_debug(
             yaml_config.flow_sender_queue_size,
@@ -1103,7 +1115,7 @@ impl Components {
         )));
 
         // Enterprise Edition Feature: packet-sequence
-        let sender_id = 6; // TODO sender_id should be generated automatically
+        let sender_id = get_sender_id() as usize; // TODO sender_id should be generated automatically
         let packet_sequence_queue_name = "packet_sequence_block-to-sender";
         let (packet_sequence_uniform_output, packet_sequence_uniform_input, counter) =
             queue::bounded_with_debug(
@@ -1138,7 +1150,7 @@ impl Components {
         }));
 
         let npb_bps_limit = Arc::new(LeakyBucket::new(Some(
-            config_handler.candidate_config.npb.bps_threshold,
+            config_handler.candidate_config.sender.npb_bps_threshold,
         )));
         let mut handler_builders = Vec::new();
 
@@ -1158,6 +1170,32 @@ impl Components {
                 src_interfaces_and_namespaces.push(("".into(), ns));
             }
         }
+
+        let mut pcap_assemblers = vec![];
+        let sender_id = get_sender_id() as usize;
+        let pcap_batch_queue = "2-pcap-batch-to-sender";
+        let (pcap_batch_sender, pcap_batch_receiver, pcap_batch_counter) =
+            queue::bounded_with_debug(
+                yaml_config.packet_sequence_queue_size,
+                pcap_batch_queue,
+                &queue_debugger,
+            );
+        stats_collector.register_countable(
+            "queue",
+            Countable::Owned(Box::new(pcap_batch_counter)),
+            vec![
+                StatsOption::Tag("module", pcap_batch_queue.to_string()),
+                StatsOption::Tag("index", sender_id.to_string()),
+            ],
+        );
+        let pcap_batch_uniform_sender = UniformSenderThread::new(
+            sender_id,
+            pcap_batch_queue,
+            Arc::new(pcap_batch_receiver),
+            config_handler.sender(),
+            stats_collector.clone(),
+            exception_handler.clone(),
+        );
 
         for (i, (src_interface, netns)) in src_interfaces_and_namespaces.into_iter().enumerate() {
             let (flow_sender, flow_receiver, counter) = queue::bounded_with_debug(
@@ -1229,9 +1267,18 @@ impl Components {
                 i as u32,
             );
             packet_sequence_parsers.push(packet_sequence_parser);
+            let (pcap_assembler, mini_packet_sender) = build_pcap_assembler(
+                &yaml_config.pcap,
+                &stats_collector,
+                pcap_batch_sender.clone(),
+                &queue_debugger,
+                synchronizer.ntp_diff(),
+                i,
+            );
+            pcap_assemblers.push(pcap_assembler);
 
             let handler_builder = Arc::new(Mutex::new(vec![
-                PacketHandlerBuilder::Pcap(pcap_sender.clone()),
+                PacketHandlerBuilder::Pcap(mini_packet_sender),
                 PacketHandlerBuilder::Npb(NpbBuilder::new(
                     i,
                     &config_handler.candidate_config.npb,
@@ -1451,7 +1498,7 @@ impl Components {
         #[cfg(target_os = "linux")]
         let cgroups_controller: Arc<Cgroups> = Arc::new(Cgroups { cgroup: None });
 
-        let sender_id = 3;
+        let sender_id = get_sender_id() as usize;
         let otel_queue_name = "otel-to-sender";
         let (otel_sender, otel_receiver, counter) = queue::bounded_with_debug(
             yaml_config.external_metrics_sender_queue_size,
@@ -1475,7 +1522,7 @@ impl Components {
             exception_handler.clone(),
         );
 
-        let sender_id = 4;
+        let sender_id = get_sender_id() as usize;
         let prometheus_queue_name = "prometheus-to-sender";
         let (prometheus_sender, prometheus_receiver, counter) = queue::bounded_with_debug(
             yaml_config.external_metrics_sender_queue_size,
@@ -1499,7 +1546,7 @@ impl Components {
             exception_handler.clone(),
         );
 
-        let sender_id = 5;
+        let sender_id = get_sender_id() as usize;
         let telegraf_queue_name = "telegraf-to-sender";
         let (telegraf_sender, telegraf_receiver, counter) = queue::bounded_with_debug(
             yaml_config.external_metrics_sender_queue_size,
@@ -1523,7 +1570,7 @@ impl Components {
             exception_handler.clone(),
         );
 
-        let sender_id = 6;
+        let sender_id = get_sender_id() as usize;
         let compressed_otel_queue_name = "compressed-otel-to-sender";
         let (compressed_otel_sender, compressed_otel_receiver, counter) = queue::bounded_with_debug(
             yaml_config.external_metrics_sender_queue_size,
@@ -1576,6 +1623,21 @@ impl Components {
             config_handler.port(),
         );
 
+        let sender_config = config_handler.sender().load();
+        let (npb_bandwidth_watcher, npb_bandwidth_watcher_counter) = NpbBandwidthWatcher::new(
+            sender_config.bandwidth_probe_interval.as_secs(),
+            sender_config.npb_bps_threshold,
+            sender_config.server_tx_bandwidth_threshold,
+            npb_bps_limit.clone(),
+            exception_handler.clone(),
+        );
+        synchronizer.add_flow_acl_listener(npb_bandwidth_watcher.clone());
+        stats_collector.register_countable(
+            "npb_bandwidth_watcher",
+            Countable::Ref(Arc::downgrade(&npb_bandwidth_watcher_counter) as Weak<dyn RefCountable>),
+            Default::default(),
+        );
+
         Ok(Components {
             config: candidate_config.clone(),
             rx_leaky_bucket,
@@ -1594,7 +1656,6 @@ impl Components {
             #[cfg(target_os = "linux")]
             api_watcher,
             debugger,
-            pcap_manager,
             log_parsers,
             #[cfg(target_os = "linux")]
             ebpf_collector,
@@ -1615,7 +1676,11 @@ impl Components {
             npb_bps_limit,
             handler_builders,
             compressed_otel_uniform_sender,
+            pcap_assemblers,
+            pcap_batch_uniform_sender,
             agent_mode,
+            policy_setter,
+            npb_bandwidth_watcher,
         })
     }
 
@@ -1623,8 +1688,8 @@ impl Components {
         id: usize,
         stats_collector: Arc<stats::Collector>,
         flow_receiver: queue::Receiver<Box<TaggedFlow>>,
-        l4_flow_aggr_sender: Option<queue::DebugSender<SendItem>>,
-        metrics_sender: queue::DebugSender<SendItem>,
+        l4_flow_aggr_sender: Option<queue::DebugSender<BoxedTaggedFlow>>,
+        metrics_sender: queue::DebugSender<BoxedDocument>,
         metrics_type: MetricsType,
         config_handler: &ConfigHandler,
         queue_debugger: &QueueDebugger,
@@ -1815,7 +1880,51 @@ impl Components {
                 y.stop();
             })
         });
-        self.pcap_manager.stop();
+        self.npb_bandwidth_watcher.stop();
+        for p in self.pcap_assemblers.iter() {
+            p.stop();
+        }
+        self.packet_sequence_uniform_sender.stop();
         info!("Stopped components.")
     }
+}
+
+fn build_pcap_assembler(
+    config: &PcapConfig,
+    stats_collector: &stats::Collector,
+    pcap_batch_sender: DebugSender<BoxedPcapBatch>,
+    queue_debugger: &QueueDebugger,
+    ntp_diff: Arc<AtomicI64>,
+    id: usize,
+) -> (PcapAssembler, DebugSender<MiniPacket>) {
+    let mini_packet_queue = "1-mini-meta-packet-to-pcap";
+    let (mini_packet_sender, mini_packet_receiver, mini_packet_counter) = queue::bounded_with_debug(
+        config.queue_size as usize,
+        mini_packet_queue,
+        &queue_debugger,
+    );
+    let pcap_assembler = PcapAssembler::new(
+        id as u32,
+        config.enabled,
+        config.buffer_size,
+        config.flow_buffer_size,
+        Duration::from_secs(config.flush_interval as u64),
+        pcap_batch_sender,
+        mini_packet_receiver,
+        ntp_diff,
+    );
+    stats_collector.register_countable(
+        "pcap_assembler",
+        Countable::Ref(Arc::downgrade(&pcap_assembler.counter) as Weak<dyn RefCountable>),
+        vec![StatsOption::Tag("id", id.to_string())],
+    );
+    stats_collector.register_countable(
+        "queue",
+        Countable::Owned(Box::new(mini_packet_counter)),
+        vec![
+            StatsOption::Tag("module", mini_packet_queue.to_string()),
+            StatsOption::Tag("index", id.to_string()),
+        ],
+    );
+    (pcap_assembler, mini_packet_sender)
 }

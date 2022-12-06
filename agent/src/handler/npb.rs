@@ -33,14 +33,14 @@ use crate::common::{
     IPV6_HEADER_SIZE, UDP_HEADER_SIZE, VLAN_HEADER_SIZE, VXLAN_HEADER_SIZE,
 };
 use crate::config::NpbConfig;
-use crate::proto::trident::VlanMode;
 use crate::sender::npb_sender::NpbPacketSender;
 use crate::utils::stats::{self, StatsOption};
-use npb_handler::{NpbHandler, NpbHandlerCounter, StatsNpbHandlerCounter};
+use npb_handler::{NpbHandler, NpbHandlerCounter, StatsNpbHandlerCounter, NOT_SUPPORT};
 use public::{
     counter::Countable,
     debug::QueueDebugger,
     leaky_bucket::LeakyBucket,
+    proto::trident::VlanMode,
     queue::{bounded_with_debug, DebugSender},
     utils::net::MacAddr,
 };
@@ -233,7 +233,7 @@ impl NpbBuilder {
     pub fn build_with(&self, id: usize, if_index: u32, mac: MacAddr) -> NpbHandler {
         let counter = Arc::new(NpbHandlerCounter::default());
 
-        if !NpbHandler::DISABLE {
+        if !NOT_SUPPORT {
             info!(
                 "Build with npb packet handler with id: {} if_index: {} mac: {}",
                 id, if_index, mac

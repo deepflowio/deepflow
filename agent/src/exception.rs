@@ -19,7 +19,7 @@ use std::sync::{
     Arc,
 };
 
-use crate::proto::trident::Exception;
+use public::proto::trident::Exception;
 
 #[derive(Clone, Debug, Default)]
 pub struct ExceptionHandler(Arc<AtomicU64>);

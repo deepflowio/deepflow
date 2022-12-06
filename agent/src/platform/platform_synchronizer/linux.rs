@@ -42,7 +42,6 @@ use crate::{
         },
         InterfaceEntry, LibvirtXmlExtractor,
     },
-    proto::trident::{self, Exception},
     rpc::Session,
     utils::{command::*, environment::is_tt_pod},
 };
@@ -50,6 +49,7 @@ use crate::{
 use public::{
     consts::NORMAL_EXIT_WITH_RESTART,
     netns::{InterfaceInfo, NetNs, NsFile},
+    proto::trident::{self, Exception},
 };
 
 const SHA1_DIGEST_LEN: usize = 20;
@@ -322,7 +322,7 @@ impl PlatformSynchronizer {
             raw_ip_addrs.push(raw_host_ip_addr.unwrap_or_default());
         }
         if let Some(ns) = current_ns {
-            if let Err(e) = NetNs::setns(&ns) {
+            if let Err(e) = NetNs::setns(&ns, Some(NetNs::CURRENT_NS_PATH)) {
                 warn!("restore net namespace failed: {}", e);
                 return;
             }
@@ -766,7 +766,7 @@ impl PlatformSynchronizer {
 }
 
 mod config {
-    use crate::proto::common;
+    use public::proto::common;
     pub struct StaticConfig;
     impl StaticConfig {
         pub fn get_trident_type(&self) -> common::TridentType {

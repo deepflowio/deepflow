@@ -22,6 +22,8 @@ use bitflags::bitflags;
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
+pub const NOT_SUPPORT: bool = true;
+
 bitflags! {
     #[derive(Default)]
     pub struct TapSide: u8 {
@@ -221,6 +223,8 @@ impl PolicyData {
     pub fn dedup(&mut self, packet: &dyn DedupOperator) {
         let _ = self.dedup_npb_actions(packet);
     }
+
+    pub fn set_action_flags(&mut self, _actions: &NpbAction) {}
 }
 
 pub trait DedupOperator: Send + Sync {

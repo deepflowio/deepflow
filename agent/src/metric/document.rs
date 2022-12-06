@@ -27,9 +27,13 @@ use crate::common::{
     flow::L7Protocol,
     tap_port::TapPort,
 };
-use crate::proto::metric;
-use public::utils::net::MacAddr;
+use public::proto::metric;
+use public::{
+    sender::{SendMessageType, Sendable},
+    utils::net::MacAddr,
+};
 
+const METRICS_VERSION: u32 = 20220117;
 #[derive(Debug)]
 pub struct Document {
     pub timestamp: u32,
@@ -70,6 +74,24 @@ impl From<Document> for metric::Document {
             meter: Some(d.meter.into()),
             flags: d.flags.bits(),
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct BoxedDocument(pub Box<Document>);
+
+impl Sendable for BoxedDocument {
+    fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
+        let pb_doc: metric::Document = (*self.0).into();
+        pb_doc.encode(buf).map(|_| pb_doc.encoded_len())
+    }
+
+    fn message_type(&self) -> SendMessageType {
+        SendMessageType::Metrics
+    }
+
+    fn version(&self) -> u32 {
+        METRICS_VERSION
     }
 }
 

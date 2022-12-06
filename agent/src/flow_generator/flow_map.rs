@@ -69,7 +69,6 @@ use crate::{
         FlowAccess, FlowConfig, ModuleConfig, RuntimeConfig,
     },
     policy::{Policy, PolicyGetter},
-    proto::common::TridentType,
     rpc::get_timestamp,
     utils::stats::{self, Countable, StatsOption},
 };
@@ -78,6 +77,7 @@ use public::{
     bitmap::Bitmap,
     counter::{Counter, CounterType, CounterValue, RefCountable},
     debug::QueueDebugger,
+    proto::common::TridentType,
     queue::{self, DebugSender, Receiver},
     utils::net::MacAddr,
 };
@@ -322,12 +322,12 @@ impl FlowMap {
                 // 2. 更新Flow状态，判断是否已结束
                 // 设置timestamp_key为流的相同，time_set根据key来删除
                 let time_key = FlowTimeKey::new(Duration::from_nanos(node.timestamp_key), pkt_key);
+                meta_packet.flow_id = node.tagged_flow.flow.flow_id;
                 match meta_packet.lookup_key.proto {
                     IpProtocol::Tcp => {
                         self.update_tcp_node(node, meta_packet, time_key, &mut time_set, nodes)
                     }
                     IpProtocol::Udp => self.update_udp_node(node, meta_packet, nodes),
-
                     _ => self.update_other_node(node, meta_packet, nodes),
                 };
                 if nodes.is_empty() {
@@ -973,11 +973,13 @@ impl FlowMap {
 
     fn new_flow_node(&mut self, meta_packet: &mut MetaPacket) -> FlowNode {
         self.stats_counter.new.fetch_add(1, Ordering::Relaxed);
-        match meta_packet.lookup_key.proto {
+        let node = match meta_packet.lookup_key.proto {
             IpProtocol::Tcp => self.new_tcp_node(meta_packet),
             IpProtocol::Udp => self.new_udp_node(meta_packet),
             _ => self.new_other_node(meta_packet),
-        }
+        };
+        meta_packet.flow_id = node.tagged_flow.flow.flow_id;
+        node
     }
 
     fn flush_queue(&mut self, now: Duration) {

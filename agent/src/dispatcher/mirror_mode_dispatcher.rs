@@ -46,13 +46,13 @@ use crate::{
     flow_generator::FlowMap,
     handler::PacketHandlerBuilder,
     handler::{MiniPacket, PacketHandler},
-    proto::{common::TridentType, trident::IfMacSource},
     rpc::get_timestamp,
     utils::environment::is_tt_hyper_v_compute,
 };
 use packet_dedup::PacketDedupMap;
 #[cfg(windows)]
 use public::packet::Packet;
+use public::proto::{common::TridentType, trident::IfMacSource};
 use public::utils::net::{Link, MacAddr};
 
 const IF_INDEX_MAX_SIZE: usize = 1000;
@@ -435,7 +435,7 @@ impl MirrorModeDispatcher {
             }
 
             let original_length = packet.data.len() - decap_length;
-            let overlay_packet = &mut packet.data[decap_length..packet.capture_length as usize];
+            let overlay_packet = &mut packet.data[decap_length..decap_length + original_length];
 
             // Only virtual network traffic goes to remove duplicates
             #[cfg(target_os = "linux")]

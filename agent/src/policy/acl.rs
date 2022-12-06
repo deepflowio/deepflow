@@ -18,7 +18,7 @@ use std::fmt;
 
 use crate::common::enums::TapType;
 use crate::common::policy::{NpbAction, PolicyData};
-use crate::proto::trident::FlowAcl;
+use public::proto::trident::FlowAcl;
 
 use super::port_range::{PortRange, PortRangeList};
 
