@@ -127,9 +127,8 @@ pub struct FlowPerf {
     protocol_bitmap: L7ProtocolBitmap,
     l7_protocol_enum: L7ProtocolEnum,
 
-    // Only for eBPF data, the server_port will be set in l7_check() method,
-    // it checks the first request packet's payload,
-    // and then set self.server_port = packet.lookup_key.dst_port,
+    // Only for eBPF data, the server_port will be set in l7_check() method, it checks the first
+    // request packet's payload, and then set self.server_port = packet.lookup_key.dst_port,
     // we use the server_port to judge packet's direction.
     pub server_port: u16,
 
@@ -327,9 +326,9 @@ impl FlowPerf {
         is_parse_log: bool,
     ) -> Result<(Vec<L7ProtocolInfo>, u64)> {
         if packet.signal_source == SignalSource::EBPF && self.server_port != 0 {
-            // if the packet from eBPF and it's server_port is not equal to 0,
-            // We can get the packet's direction by comparing self.server_port with packet.lookup_key.dst_port
-            // When check_payload() fails, the server_port value is still 0, and the flow direction cannot be corrected.
+            // if the packet from eBPF and it's server_port is not equal to 0, We can get the packet's
+            // direction by comparing self.server_port with packet.lookup_key.dst_port When check_payload()
+            // fails, the server_port value is still 0, and the flow direction cannot be corrected.
             packet.direction = if self.server_port == packet.lookup_key.dst_port {
                 PacketDirection::ClientToServer
             } else {
