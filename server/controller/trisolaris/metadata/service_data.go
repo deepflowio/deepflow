@@ -18,34 +18,25 @@ package metadata
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
-	mapset "github.com/deckarep/golang-set"
 	"github.com/golang/protobuf/proto"
 
 	"github.com/deepflowys/deepflow/message/trident"
 	. "github.com/deepflowys/deepflow/server/controller/common"
 	models "github.com/deepflowys/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowys/deepflow/server/controller/trisolaris/utils"
 )
 
 type ServiceRawData struct {
 	podServiceIDToPodServicePorts map[int][]*models.PodServicePort
-	podServiceIDToPodNodeIPs      map[int][]string
 	podGroupIDToPodGroupPorts     map[int][]*models.PodGroupPort
-	podGroupIDToPodIPs            map[int][]string
-	podClusterIDToVPCID           map[int]int
 	lbIDToVPCID                   map[int]int
 }
 
 func newServiceRawData() *ServiceRawData {
 	return &ServiceRawData{
 		podServiceIDToPodServicePorts: make(map[int][]*models.PodServicePort),
-		podServiceIDToPodNodeIPs:      make(map[int][]string),
 		podGroupIDToPodGroupPorts:     make(map[int][]*models.PodGroupPort),
-		podGroupIDToPodIPs:            make(map[int][]string),
-		podClusterIDToVPCID:           make(map[int]int),
 		lbIDToVPCID:                   make(map[int]int),
 	}
 }
@@ -53,106 +44,19 @@ func newServiceRawData() *ServiceRawData {
 type ServiceDataOP struct {
 	serviceRawData *ServiceRawData
 	metaData       *MetaData
-	services       []*trident.Service
+	services       []*trident.ServiceInfo
 }
 
 func newServiceDataOP(metaData *MetaData) *ServiceDataOP {
 	return &ServiceDataOP{
 		serviceRawData: newServiceRawData(),
 		metaData:       metaData,
-		services:       []*trident.Service{},
+		services:       []*trident.ServiceInfo{},
 	}
-}
-
-func (r *ServiceRawData) ConvertDBIP(dbDataCache *DBDataCache) map[int][]string {
-	vinterfaces := dbDataCache.GetVInterfaces()
-	podVIFIDs := mapset.NewSet()
-	podVIFs := make([]*models.VInterface, 0, len(vinterfaces)/2)
-	for _, vinterface := range vinterfaces {
-		if vinterface.DeviceType == VIF_DEVICE_TYPE_POD {
-			podVIFIDs.Add(vinterface.ID)
-			podVIFs = append(podVIFs, vinterface)
-		}
-	}
-
-	podVIFIDToIPs := make(map[int][]string)
-	lanIPs := dbDataCache.GetLANIPs()
-	for _, lanIP := range lanIPs {
-		if podVIFIDs.Contains(lanIP.VInterfaceID) {
-			if _, ok := podVIFIDToIPs[lanIP.VInterfaceID]; ok {
-				podVIFIDToIPs[lanIP.VInterfaceID] = append(
-					podVIFIDToIPs[lanIP.VInterfaceID], lanIP.IP)
-			} else {
-				podVIFIDToIPs[lanIP.VInterfaceID] = []string{lanIP.IP}
-			}
-		}
-	}
-
-	wanIPs := dbDataCache.GetWANIPs()
-	for _, wanIP := range wanIPs {
-		if podVIFIDs.Contains(wanIP.VInterfaceID) {
-			if _, ok := podVIFIDToIPs[wanIP.VInterfaceID]; ok {
-				podVIFIDToIPs[wanIP.VInterfaceID] = append(
-					podVIFIDToIPs[wanIP.VInterfaceID], wanIP.IP)
-			} else {
-				podVIFIDToIPs[wanIP.VInterfaceID] = []string{wanIP.IP}
-			}
-		}
-	}
-
-	podIDToIPs := make(map[int][]string)
-	for _, podVIF := range podVIFs {
-		if ips, ok := podVIFIDToIPs[podVIF.ID]; ok {
-			if _, ok := podIDToIPs[podVIF.DeviceID]; ok {
-				podIDToIPs[podVIF.DeviceID] = append(
-					podIDToIPs[podVIF.DeviceID], ips...)
-			} else {
-				podIDToIPs[podVIF.DeviceID] = ips[:]
-			}
-		}
-	}
-
-	return podIDToIPs
 }
 
 func (r *ServiceRawData) ConvertDBData(dbDataCache *DBDataCache) {
-	idToPodNode := make(map[int]*models.PodNode)
-	podClusterIDToPodNodes := make(map[int][]*models.PodNode)
-	podIDToIPs := r.ConvertDBIP(dbDataCache)
-	podNodes := dbDataCache.GetPodNodes()
-	for _, podNode := range podNodes {
-		idToPodNode[podNode.ID] = podNode
-		if _, ok := podClusterIDToPodNodes[podNode.PodClusterID]; ok {
-			podClusterIDToPodNodes[podNode.PodClusterID] = append(
-				podClusterIDToPodNodes[podNode.PodClusterID], podNode)
-		} else {
-			podClusterIDToPodNodes[podNode.PodClusterID] = []*models.PodNode{podNode}
-		}
-	}
-
-	podGroupIDToPods := make(map[int][]*models.Pod)
-	pods := dbDataCache.GetPods()
-	for _, pod := range pods {
-		if _, ok := podGroupIDToPods[pod.PodGroupID]; ok {
-			podGroupIDToPods[pod.PodGroupID] = append(
-				podGroupIDToPods[pod.PodGroupID], pod)
-		} else {
-			podGroupIDToPods[pod.PodGroupID] = []*models.Pod{pod}
-		}
-		ips, ok := podIDToIPs[pod.ID]
-		if ok == false {
-			continue
-		}
-		if _, ok := r.podGroupIDToPodIPs[pod.PodGroupID]; ok {
-			r.podGroupIDToPodIPs[pod.PodGroupID] = append(
-				r.podGroupIDToPodIPs[pod.PodGroupID], ips...)
-		} else {
-			r.podGroupIDToPodIPs[pod.PodGroupID] = ips[:]
-		}
-	}
-
-	podServicePorts := dbDataCache.GetPodServicePorts()
-	for _, psp := range podServicePorts {
+	for _, psp := range dbDataCache.GetPodServicePorts() {
 		if _, ok := r.podServiceIDToPodServicePorts[psp.PodServiceID]; ok {
 			r.podServiceIDToPodServicePorts[psp.PodServiceID] = append(
 				r.podServiceIDToPodServicePorts[psp.PodServiceID], psp)
@@ -161,78 +65,16 @@ func (r *ServiceRawData) ConvertDBData(dbDataCache *DBDataCache) {
 		}
 	}
 
-	podServiceIDToPodGroupIDs := make(map[int][]int)
-	podGroupPorts := dbDataCache.GetPodGroupPorts()
-	for _, pgp := range podGroupPorts {
+	for _, pgp := range dbDataCache.GetPodGroupPorts() {
 		if _, ok := r.podGroupIDToPodGroupPorts[pgp.PodGroupID]; ok {
 			r.podGroupIDToPodGroupPorts[pgp.PodGroupID] = append(
 				r.podGroupIDToPodGroupPorts[pgp.PodGroupID], pgp)
 		} else {
 			r.podGroupIDToPodGroupPorts[pgp.PodGroupID] = []*models.PodGroupPort{pgp}
 		}
-		if _, ok := podServiceIDToPodGroupIDs[pgp.PodServiceID]; ok {
-			podServiceIDToPodGroupIDs[pgp.PodServiceID] = append(
-				podServiceIDToPodGroupIDs[pgp.PodServiceID], pgp.PodGroupID)
-		} else {
-			podServiceIDToPodGroupIDs[pgp.PodServiceID] = []int{pgp.PodGroupID}
-		}
 	}
 
-	podClusters := dbDataCache.GetPodClusters()
-	for _, pc := range podClusters {
-		r.podClusterIDToVPCID[pc.ID] = pc.VPCID
-	}
-
-	podServices := dbDataCache.GetPodServices()
-	for _, ps := range podServices {
-		if ps.Type == POD_SERVICE_TYPE_NODEPORT {
-			pns, ok := podClusterIDToPodNodes[ps.PodClusterID]
-			if ok == false {
-				continue
-			}
-			for _, pn := range pns {
-				if pn.IP == "" {
-					continue
-				}
-				if podNodeIPs, ok := r.podServiceIDToPodNodeIPs[ps.ID]; ok {
-					if !Find[string](podNodeIPs, pn.IP) {
-						r.podServiceIDToPodNodeIPs[ps.ID] = append(
-							r.podServiceIDToPodNodeIPs[ps.ID], pn.IP)
-					}
-				} else {
-					r.podServiceIDToPodNodeIPs[ps.ID] = []string{pn.IP}
-				}
-			}
-		} else {
-			pgIDs, ok := podServiceIDToPodGroupIDs[ps.ID]
-			if ok == false {
-				continue
-			}
-			for _, pgID := range pgIDs {
-				pods, ok := podGroupIDToPods[pgID]
-				if ok == false {
-					continue
-				}
-				for _, pod := range pods {
-					pn, ok := idToPodNode[pod.PodNodeID]
-					if ok == false || pn.IP == "" {
-						continue
-					}
-					if podNodeIPs, ok := r.podServiceIDToPodNodeIPs[ps.ID]; ok {
-						if !Find[string](podNodeIPs, pn.IP) {
-							r.podServiceIDToPodNodeIPs[ps.ID] = append(
-								r.podServiceIDToPodNodeIPs[ps.ID], pn.IP)
-						}
-					} else {
-						r.podServiceIDToPodNodeIPs[ps.ID] = []string{pn.IP}
-					}
-				}
-			}
-		}
-	}
-
-	lbs := dbDataCache.GetLBs()
-	for _, lb := range lbs {
+	for _, lb := range dbDataCache.GetLBs() {
 		r.lbIDToVPCID[lb.ID] = lb.VPCID
 	}
 }
@@ -252,115 +94,171 @@ func ipToCidr(ip string) string {
 
 }
 
-var protocol_string_to_int = map[string]int{
-	"ALL":   256,
-	"HTTP":  6,
-	"HTTPS": 6,
-	"TCP":   6,
-	"UDP":   17,
+var protocol_string_to_int = map[string]trident.ServiceProtocol{
+	"ALL":   trident.ServiceProtocol_ANY,
+	"HTTP":  trident.ServiceProtocol_TCP_SERVICE,
+	"HTTPS": trident.ServiceProtocol_TCP_SERVICE,
+	"TCP":   trident.ServiceProtocol_TCP_SERVICE,
+	"UDP":   trident.ServiceProtocol_UDP_SERVICE,
 }
 
-func getProtocol(protocol string) uint32 {
+func getProtocol(protocol string) trident.ServiceProtocol {
 	if protocol, ok := protocol_string_to_int[protocol]; ok {
-		return uint32(protocol)
+		return protocol
 	}
-	return 256
+	return trident.ServiceProtocol_ANY
 }
 
 func serviceToProto(
-	vpcID int, ips []string, protocol string, serverPorts string,
-	serviceType int, serviceID int) *trident.Service {
+	vpcID int, ips []string, protocol trident.ServiceProtocol, serverPorts []uint32,
+	serviceType trident.ServiceType, serviceID int) *trident.ServiceInfo {
 
-	if len(ips) == 0 {
-		log.Debugf("service(id=%d, type=%d) no ips ", serviceID, serviceType)
-		return nil
-	}
-	if serverPorts == "" {
-		log.Debugf("service(id=%d, type=%d) no server_ports.", serviceID, serviceType)
-		return nil
-	}
-	cidrs := make([]string, 0, len(ips))
-	for _, ip := range ips {
-		cidrs = append(cidrs, ipToCidr(ip))
-	}
-	sType := trident.ServiceType(serviceType)
-	return &trident.Service{
+	return &trident.ServiceInfo{
 		EpcId:       proto.Uint32(uint32(vpcID)),
-		Ips:         cidrs,
-		Protocol:    proto.Uint32(getProtocol(protocol)),
-		ServerPorts: proto.String(serverPorts),
-		Type:        &sType,
+		Ips:         ips,
+		Protocol:    &protocol,
+		ServerPorts: serverPorts,
+		Type:        &serviceType,
 		Id:          proto.Uint32(uint32(serviceID)),
 	}
 }
 
+func podGroupToProto(
+	podGroupId int, protocol trident.ServiceProtocol, serverPorts []uint32,
+	serviceType trident.ServiceType, serviceID int) *trident.ServiceInfo {
+
+	return &trident.ServiceInfo{
+		PodGroupId:  proto.Uint32(uint32(podGroupId)),
+		Protocol:    &protocol,
+		ServerPorts: serverPorts,
+		Type:        &serviceType,
+		Id:          proto.Uint32(uint32(serviceID)),
+	}
+}
+
+func NodeToProto(
+	podClusterId int, protocol trident.ServiceProtocol, serverPorts []uint32,
+	serviceType trident.ServiceType, serviceID int) *trident.ServiceInfo {
+
+	return &trident.ServiceInfo{
+		PodClusterId: proto.Uint32(uint32(podClusterId)),
+		Protocol:     &protocol,
+		ServerPorts:  serverPorts,
+		Type:         &serviceType,
+		Id:           proto.Uint32(uint32(serviceID)),
+	}
+}
+
+type GroupKey struct {
+	protocol     trident.ServiceProtocol
+	podServiceID int
+}
+
+type NodeKey struct {
+	podClusterID int
+	protocol     trident.ServiceProtocol
+	podServiceID int
+}
+
+// All traversals are guaranteed to be in order
 func (s *ServiceDataOP) generateService() {
 	dbDataCache := s.metaData.GetDBDataCache()
-	services := []*trident.Service{}
+	services := []*trident.ServiceInfo{}
 	rData := s.serviceRawData
+	groupKeys := []GroupKey{}
 	for _, podGroup := range dbDataCache.GetPodGroups() {
-		vpcID := rData.podClusterIDToVPCID[podGroup.PodClusterID]
 		ports, ok := rData.podGroupIDToPodGroupPorts[podGroup.ID]
 		if ok == false {
 			continue
 		}
-		podIPs, ok := rData.podGroupIDToPodIPs[podGroup.ID]
-		if ok == false {
-			log.Debugf("pod group(id=%d) no pod ips", podGroup.ID)
-			continue
-		}
+		keyToPorts := make(map[GroupKey][]uint32)
 		for _, port := range ports {
-			service := serviceToProto(
-				vpcID,
-				podIPs,
-				port.Protocol,
-				strconv.Itoa(port.Port),
-				int(trident.ServiceType_POD_SERVICE),
-				port.PodServiceID,
-			)
-			if service != nil {
+			key := GroupKey{
+				protocol:     getProtocol(port.Protocol),
+				podServiceID: port.PodServiceID,
+			}
+			if _, ok := keyToPorts[key]; ok {
+				keyToPorts[key] = append(keyToPorts[key], uint32(port.Port))
+			} else {
+				groupKeys = append(groupKeys, key)
+				keyToPorts[key] = []uint32{uint32(port.Port)}
+			}
+		}
+		for index := range groupKeys {
+			if valuse, ok := keyToPorts[groupKeys[index]]; ok {
+				service := podGroupToProto(
+					podGroup.ID,
+					groupKeys[index].protocol,
+					valuse,
+					trident.ServiceType_POD_SERVICE_POD_GROUP,
+					groupKeys[index].podServiceID,
+				)
 				services = append(services, service)
 			}
 		}
 	}
 
+	nodeKeys := []NodeKey{}
+	nodeServiceInfo := make(map[NodeKey][]uint32)
 	for _, podService := range dbDataCache.GetPodServices() {
-		ports, ok := rData.podServiceIDToPodServicePorts[podService.ID]
+		podServiceports, ok := rData.podServiceIDToPodServicePorts[podService.ID]
 		if ok == false {
 			continue
 		}
 		if podService.ServiceClusterIP == "" {
-			log.Debugf("pod service(id=%d) no ips", podService.ID)
+			log.Debugf("pod service(id=%d) has no service_cluster_ip", podService.ID)
 			continue
 		}
-		nodeIPs, ok := rData.podServiceIDToPodNodeIPs[podService.ID]
-		if ok == false {
-			log.Debugf("pod service(id=%d) no node ips", podService.ID)
-		}
-		ips := []string{podService.ServiceClusterIP}
-		for _, port := range ports {
-			service := serviceToProto(podService.VPCID,
-				ips,
-				port.Protocol,
-				strconv.Itoa(port.Port),
-				int(trident.ServiceType_POD_SERVICE),
-				port.PodServiceID,
-			)
-			if service != nil {
-				services = append(services, service)
+		protocols := []trident.ServiceProtocol{}
+		protocolToPorts := make(map[trident.ServiceProtocol][]uint32)
+		for _, podServiceport := range podServiceports {
+			protocol := getProtocol(podServiceport.Protocol)
+			if _, ok := protocolToPorts[protocol]; ok {
+				protocolToPorts[protocol] = append(protocolToPorts[protocol], uint32(podServiceport.Port))
+			} else {
+				protocols = append(protocols, protocol)
+				protocolToPorts[protocol] = []uint32{uint32(podServiceport.Port)}
 			}
-			if podService.Type == POD_SERVICE_TYPE_NODEPORT && len(nodeIPs) > 0 {
-				service := serviceToProto(podService.VPCID,
-					nodeIPs,
-					port.Protocol,
-					strconv.Itoa(port.NodePort),
-					int(trident.ServiceType_POD_SERVICE),
-					port.PodServiceID,
-				)
-				if service != nil {
-					services = append(services, service)
+			if podService.Type == POD_SERVICE_TYPE_NODEPORT {
+				key := NodeKey{
+					podClusterID: podService.PodClusterID,
+					protocol:     protocol,
+					podServiceID: podServiceport.PodServiceID,
+				}
+				if _, ok := nodeServiceInfo[key]; ok {
+					nodeServiceInfo[key] = append(nodeServiceInfo[key], uint32(podServiceport.NodePort))
+				} else {
+					nodeKeys = append(nodeKeys, key)
+					nodeServiceInfo[key] = []uint32{uint32(podServiceport.NodePort)}
 				}
 			}
+		}
+
+		ips := []string{podService.ServiceClusterIP}
+		for index := range protocols {
+			if ports, ok := protocolToPorts[protocols[index]]; ok {
+				service := serviceToProto(
+					podService.VPCID,
+					ips,
+					protocols[index],
+					ports,
+					trident.ServiceType_POD_SERVICE_IP,
+					podService.ID,
+				)
+				services = append(services, service)
+			}
+		}
+	}
+	for index := range nodeKeys {
+		if values, ok := nodeServiceInfo[nodeKeys[index]]; ok {
+			service := NodeToProto(
+				nodeKeys[index].podClusterID,
+				nodeKeys[index].protocol,
+				values,
+				trident.ServiceType_POD_SERVICE_NODE,
+				nodeKeys[index].podServiceID,
+			)
+			services = append(services, service)
 		}
 	}
 
@@ -370,44 +268,42 @@ func (s *ServiceDataOP) generateService() {
 		if lbListener.IPs != "" {
 			ips = strings.Split(lbListener.IPs, ",")
 		}
-		service := serviceToProto(vpcID,
+		service := serviceToProto(
+			vpcID,
 			ips,
-			lbListener.Protocol,
-			strconv.Itoa(lbListener.Port),
-			int(trident.ServiceType_LB_SERVICE),
+			getProtocol(lbListener.Protocol),
+			[]uint32{uint32(lbListener.Port)},
+			trident.ServiceType_LB_SERVICE,
 			lbListener.ID,
 		)
-		if service != nil {
-			services = append(services, service)
-		}
+		services = append(services, service)
 	}
 
 	for _, lbts := range dbDataCache.GetLBTargetServers() {
 		vpcID := rData.lbIDToVPCID[lbts.LBID]
 		var ips []string
 		if lbts.IP == "" {
-			log.Debugf("lb target server(id=%d no ips)", lbts.ID)
+			log.Debugf("lb_target_server(id=%d) has no ips", lbts.ID)
 			continue
 		} else {
 			ips = []string{lbts.IP}
 		}
 
-		service := serviceToProto(vpcID,
+		service := serviceToProto(
+			vpcID,
 			ips,
-			lbts.Protocol,
-			strconv.Itoa(lbts.Port),
-			int(trident.ServiceType_LB_SERVICE),
+			getProtocol(lbts.Protocol),
+			[]uint32{uint32(lbts.Port)},
+			trident.ServiceType_LB_SERVICE,
 			lbts.LBListenerID,
 		)
-		if service != nil {
-			services = append(services, service)
-		}
+		services = append(services, service)
 	}
 	s.services = services
 	log.Debugf("service have %d", len(s.services))
 }
 
-func (s *ServiceDataOP) GetServiceData() []*trident.Service {
+func (s *ServiceDataOP) GetServiceData() []*trident.ServiceInfo {
 	return s.services
 }
 
