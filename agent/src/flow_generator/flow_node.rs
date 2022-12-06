@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use std::{net::IpAddr, time::Duration};
+use std::{net::IpAddr, sync::Arc, time::Duration};
 
 use super::{perf::FlowPerf, FlowState, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC};
 use crate::common::flow::SignalSource;
@@ -123,7 +123,7 @@ pub struct FlowNode {
     pub meta_flow_perf: Option<FlowPerf>,
 
     pub policy_data_cache: [PolicyData; 2],
-    pub endpoint_data_cache: EndpointData,
+    pub endpoint_data_cache: [Arc<EndpointData>; 2],
 
     // Only for eBPF TCP Flow, used to help confirm whether the Flow can be timed out.
     pub residual_request: i32,
