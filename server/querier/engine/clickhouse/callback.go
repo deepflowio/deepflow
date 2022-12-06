@@ -78,6 +78,9 @@ func TimeFill(args []interface{}) func(result *common.Result) error { // group b
 			if i == timeFieldIndex {
 				continue
 			}
+			if _, ok := client.VALUE_TYPE_MAP[schema.ValueType]; !ok {
+				continue
+			}
 			if schema.Type == common.COLUMN_SCHEMA_TYPE_TAG {
 				seriesSort.SortIndex = append(seriesSort.SortIndex, i)
 				seriesSort.Reverse = append(seriesSort.Reverse, false)
