@@ -632,18 +632,29 @@ impl Stash {
             l7_protocol: acc_flow.l7_protocol,
             ..Default::default()
         };
+        let l7_metrics_enabled = self.context.config.load().l7_metrics_enabled;
         if tagger.direction == Direction::ServerToClient
             || tagger.direction == Direction::ClientToServer
         {
             let key = StashKey::new(&tagger, ip, None);
             self.add(key, tagger.clone(), Meter::Flow(flow_meter));
-            if tagger.l7_protocol != L7Protocol::Unknown
-                && self.context.config.load().l7_metrics_enabled
-            {
+            if tagger.l7_protocol != L7Protocol::Unknown && l7_metrics_enabled {
                 tagger.code |= Code::L7_PROTOCOL;
                 let key = StashKey::new(&tagger, ip, None);
                 self.add(key, tagger, Meter::App(acc_flow.app_meter.clone()));
             }
+        } else if (tagger.direction == Direction::ClientProcessToServer
+            || tagger.direction == Direction::ServerProcessToClient)
+            && (tagger.l7_protocol == L7Protocol::Http1TLS
+                || tagger.l7_protocol == L7Protocol::Http2TLS)
+            && l7_metrics_enabled
+        {
+            // We don’t want duplicate records in the single-ended metrics table (vtap_app_port).
+            // We have already collected metrics data of almost all types of protocols from Packet,
+            // so we only need to supplement the metrics of XX_TLS through eBPF data.
+            tagger.code |= Code::L7_PROTOCOL;
+            let key = StashKey::new(&tagger, ip, None);
+            self.add(key, tagger, Meter::App(acc_flow.app_meter.clone()));
         }
     }
 
