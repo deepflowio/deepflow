@@ -17,7 +17,7 @@
 use bitflags::bitflags;
 use std::{net::IpAddr, net::Ipv4Addr, sync::Arc};
 
-use super::{enums::TapType, lookup_key::LookupKey, platform_data::PlatformData};
+use super::platform_data::PlatformData;
 
 pub const EPC_FROM_DEEPFLOW: i32 = -1;
 pub const EPC_FROM_INTERNET: i32 = -2;
@@ -106,13 +106,6 @@ pub struct EndpointData {
 }
 
 impl EndpointData {
-    pub fn set_l2_end(&mut self, key: &LookupKey) {
-        if key.tap_type == TapType::Cloud {
-            self.src_info.l2_end = key.l2_end_0;
-            self.dst_info.l2_end = key.l2_end_1;
-        }
-    }
-
     pub fn reversed(&self) -> EndpointData {
         EndpointData {
             src_info: self.dst_info.clone(),
