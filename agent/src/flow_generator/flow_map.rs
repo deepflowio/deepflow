@@ -328,7 +328,6 @@ impl FlowMap {
                         self.update_tcp_node(node, meta_packet, time_key, &mut time_set, nodes)
                     }
                     IpProtocol::Udp => self.update_udp_node(node, meta_packet, nodes),
-
                     _ => self.update_other_node(node, meta_packet, nodes),
                 };
                 if nodes.is_empty() {
