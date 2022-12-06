@@ -62,7 +62,6 @@ use crate::{
         meta_packet::{MetaPacket, MetaPacketTcpHeader},
         tagged_flow::TaggedFlow,
         tap_port::TapPort,
-        FeatureFlags,
     },
     config::{
         handler::{L7LogDynamicConfig, LogParserAccess, LogParserConfig},
@@ -1390,7 +1389,7 @@ pub fn _reverse_meta_packet(packet: &mut MetaPacket) {
 pub fn _new_flow_map_and_receiver(
     trident_type: TridentType,
 ) -> (FlowMap, Receiver<Box<TaggedFlow>>) {
-    let (_, mut policy_getter) = Policy::new(1, 0, 1 << 10, false, FeatureFlags::NONE);
+    let (_, mut policy_getter) = Policy::new(1, 0, 1 << 10, false);
     policy_getter.disable();
     let queue_debugger = QueueDebugger::new();
     let (output_queue_sender, output_queue_receiver, _) =

@@ -25,7 +25,6 @@ use log::{info, warn};
 use super::fast_path::FastPath;
 use super::{Error as PError, Result as PResult};
 use crate::common::endpoint::{EndpointData, FeatureFlags};
-use crate::common::feature;
 use crate::common::lookup_key::LookupKey;
 use crate::common::matched_field::{MatchedField, MatchedFieldN, MatchedFieldv4, MatchedFieldv6};
 use crate::common::platform_data::PlatformData;
@@ -250,7 +249,6 @@ pub struct FirstPath {
     fast_disable: bool,
     queue_count: usize,
 
-    features: feature::FeatureFlags,
     memory_limit: AtomicU64,
 }
 
@@ -263,13 +261,7 @@ impl FirstPath {
     const POLICY_LIMIT: u64 = 500000;
     const MEMORY_LIMIT: u64 = 1 << 20;
 
-    pub fn new(
-        queue_count: usize,
-        level: usize,
-        map_size: usize,
-        fast_disable: bool,
-        features: feature::FeatureFlags,
-    ) -> FirstPath {
+    pub fn new(queue_count: usize, level: usize, map_size: usize, fast_disable: bool) -> FirstPath {
         FirstPath {
             group_ip_map: Some(HashMap::new()),
             vector_4: Vector4::default(),
@@ -290,7 +282,6 @@ impl FirstPath {
             fast: FastPath::new(queue_count, map_size),
             queue_count,
             fast_disable,
-            features,
             memory_limit: AtomicU64::new(0),
         }
     }
@@ -327,7 +318,7 @@ impl FirstPath {
     }
 
     pub fn update_ip_group(&mut self, groups: &Vec<Arc<IpGroupData>>) {
-        if self.features.contains(feature::FeatureFlags::POLICY) && !NOT_SUPPORT {
+        if !NOT_SUPPORT {
             self.generate_group_ip_map(groups);
         }
 
@@ -589,7 +580,7 @@ impl FirstPath {
     }
 
     pub fn update_acl(&mut self, acls: &Vec<Arc<Acl>>, check: bool) -> PResult<()> {
-        if self.features.contains(feature::FeatureFlags::POLICY) && !NOT_SUPPORT {
+        if !NOT_SUPPORT {
             let mut valid_acls = Vec::new();
 
             for acl in acls {
@@ -692,7 +683,7 @@ impl FirstPath {
     ) -> Option<(Arc<PolicyData>, Arc<EndpointData>)> {
         let mut policy = PolicyData::default();
 
-        if self.features.contains(feature::FeatureFlags::POLICY) && !NOT_SUPPORT {
+        if !NOT_SUPPORT {
             self.get_policy_from_table(key, &endpoints, &mut policy);
         }
 
@@ -744,8 +735,44 @@ mod tests {
 
     use npb_pcap_policy::{NpbAction, NpbTunnelType, TapSide};
 
+    fn update_ip_group(first: &mut FirstPath, groups: &Vec<Arc<IpGroupData>>) {
+        first.generate_group_ip_map(groups);
+        first.fast.generate_mask_table_from_group(groups);
+        first.fast.generate_mask_table();
+    }
+
+    fn update_acl(first: &mut FirstPath, acls: &Vec<Arc<Acl>>) -> PResult<()> {
+        let mut valid_acls = Vec::new();
+        for acl in acls {
+            let mut valid_acl = (**acl).clone();
+            valid_acl.reset();
+            valid_acls.push(valid_acl);
+        }
+        first.generate_first_table(&mut valid_acls)?;
+        first.fast.generate_interest_table(acls);
+        Ok(())
+    }
+
+    fn first_get(
+        first: &mut FirstPath,
+        key: &mut LookupKey,
+        endpoints: EndpointData,
+    ) -> Option<(Arc<PolicyData>, Arc<EndpointData>)> {
+        let mut policy = PolicyData::default();
+
+        first.get_policy_from_table(key, &endpoints, &mut policy);
+        first.fast.add_policy(key, &policy, endpoints);
+
+        policy.format_npb_action();
+        if key.feature_flag.contains(FeatureFlags::DEDUP) {
+            policy.dedup(key);
+        }
+
+        return Some((Arc::new(policy), Arc::new(endpoints)));
+    }
+
     fn generate_table() -> PResult<FirstPath> {
-        let mut first = FirstPath::new(1, 8, 1 << 16, false, feature::FeatureFlags::POLICY);
+        let mut first = FirstPath::new(1, 8, 1 << 16, false);
         let acl = Acl::new(
             1,
             vec![10],
@@ -762,11 +789,14 @@ mod tests {
             ),
         );
 
-        first.update_ip_group(&vec![
-            Arc::new(IpGroupData::new(10, 2, "192.168.2.1/32")),
-            Arc::new(IpGroupData::new(20, 20, "192.168.2.5/31")),
-        ]);
-        first.update_acl(&vec![Arc::new(acl)], true)?;
+        update_ip_group(
+            &mut first,
+            &vec![
+                Arc::new(IpGroupData::new(10, 2, "192.168.2.1/32")),
+                Arc::new(IpGroupData::new(20, 20, "192.168.2.5/31")),
+            ],
+        );
+        update_acl(&mut first, &vec![Arc::new(acl)])?;
 
         Ok(first)
     }
@@ -828,13 +858,13 @@ mod tests {
             tap_type: TapType::Cloud,
             ..Default::default()
         };
-        let (policy, _) = first.first_get(&mut key, endpotins).unwrap();
+        let (policy, _) = first_get(&mut first, &mut key, endpotins).unwrap();
         assert_eq!(policy.npb_actions.len(), 1);
         assert_eq!(policy.acl_id, 1);
 
         key.l2_end_0 = true;
         key.l3_end_0 = true;
-        let (policy, _) = first.first_get(&mut key, endpotins).unwrap();
+        let (policy, _) = first_get(&mut first, &mut key, endpotins).unwrap();
         assert_eq!(policy.npb_actions.len(), 1);
         assert_eq!(policy.acl_id, 1);
 
@@ -845,13 +875,13 @@ mod tests {
         key.reverse();
         endpotins.src_info.l3_epc_id = 20;
         endpotins.dst_info.l3_epc_id = 2;
-        let (policy, _) = first.first_get(&mut key, endpotins).unwrap();
+        let (policy, _) = first_get(&mut first, &mut key, endpotins).unwrap();
         assert_eq!(policy.npb_actions.len(), 1);
         assert_eq!(policy.acl_id, 1);
 
         key.l2_end_1 = false;
         key.l3_end_1 = false;
-        let (policy, _) = first.first_get(&mut key, endpotins).unwrap();
+        let (policy, _) = first_get(&mut first, &mut key, endpotins).unwrap();
         assert_eq!(policy.npb_actions.len(), 1);
         assert_eq!(policy.acl_id, 1);
 
