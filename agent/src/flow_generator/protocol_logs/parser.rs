@@ -257,7 +257,14 @@ impl SessionQueue {
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap();
         // 每秒检测是否flush, 若超过2倍slot时间未收到数据，则发送1个slot的数据
-        if (now - self.last_flush_time).as_secs() < 2 * SLOT_WIDTH {
+        let interval = now.saturating_sub(self.last_flush_time);
+        // mean subtracting overflow, but `self.last_flush_time` only assign by `now` local variable, so
+        // it mean get get time error
+        if interval.is_zero() {
+            warn!("SystemTime::now call error check host associated time syscall");
+            return;
+        }
+        if interval.as_secs() < 2 * SLOT_WIDTH {
             return;
         }
         let mut time_window = match self.time_window.take() {
