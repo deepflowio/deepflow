@@ -19,6 +19,7 @@ package cloud
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"sync"
 	"time"
 
@@ -121,6 +122,16 @@ func (c *Cloud) GetStatter() statsd.StatsdStatter {
 	}
 }
 
+func (c *Cloud) getCloudGatherInterval() int {
+	var cloudSyncConfig mysql.SysConfiguration
+	if ret := mysql.Db.Where("param_name = cloud_sync_timer").First(&cloudSyncConfig); ret.Error != nil {
+		log.Warning("get cloud_sync_timer failed")
+		return int(c.cfg.CloudGatherInterval)
+	}
+	valueInt, _ := strconv.Atoi(cloudSyncConfig.Value)
+	return valueInt
+}
+
 func (c *Cloud) getCloudData() {
 	if c.basicInfo.Type != common.KUBERNETES {
 		var err error
@@ -150,7 +161,8 @@ func (c *Cloud) run() {
 	c.getCloudData()
 	log.Infof("cloud (%s) assemble data complete", c.basicInfo.Name)
 
-	ticker := time.NewTicker(time.Second * time.Duration(c.cfg.CloudGatherInterval))
+	cloudGatherInterval := c.getCloudGatherInterval()
+	ticker := time.NewTicker(time.Second * time.Duration(cloudGatherInterval))
 LOOP:
 	for {
 		select {
@@ -164,6 +176,15 @@ LOOP:
 
 			c.taskCost.TaskCost[c.basicInfo.Lcuuid] = []int{int(time.Now().Sub(startTime).Seconds())}
 			statsd.MetaStatsd.RegisterStatsdTable(c)
+
+			// check if cloud sync timer changed
+			curCloudGatherInterval := c.getCloudGatherInterval()
+			if curCloudGatherInterval != cloudGatherInterval {
+				ticker.Stop()
+				log.Info("cloud_gather_interval from %d changed to %d", cloudGatherInterval, curCloudGatherInterval)
+				cloudGatherInterval = curCloudGatherInterval
+				ticker = time.NewTicker(time.Second * time.Duration(cloudGatherInterval))
+			}
 		case <-c.cCtx.Done():
 			break LOOP
 		}
