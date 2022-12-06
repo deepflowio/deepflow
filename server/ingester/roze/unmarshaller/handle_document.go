@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/deepflowys/deepflow/message/trident"
 	"github.com/deepflowys/deepflow/server/ingester/common"
 	"github.com/deepflowys/deepflow/server/libs/app"
 	"github.com/deepflowys/deepflow/server/libs/datatype"
@@ -103,47 +102,11 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 			t.PodGroupID1 = info1.PodGroupID
 			t.PodID1 = info1.PodID
 			t.PodClusterID1 = uint16(info1.PodClusterID)
-			serviceID := uint32(0)
-			isKeyService := false
-			if t.IsIPv6 != 0 {
-				// 如果存在port，需要设置is_key_service, 并获取service_id
+			if common.IsPodServiceIP(t.L3DeviceType1, t.PodID1, t.PodNodeID1) {
 				if t.Code&PortAddCode != 0 {
-					isKeyService, serviceID = platformData.QueryIPv6IsKeyServiceAndID(t.L3EpcID1, t.IP61, t.Protocol, t.ServerPort)
-					if isKeyService {
-						t.IsKeyService = 1
-					}
+					t.ServiceID1 = platformData.QueryService(uint8(t.L3DeviceType1), uint32(t.PodClusterID1), t.PodGroupID1, t.L3EpcID1, t.IsIPv6 == 1, t.IP1, t.IP61, t.Protocol, t.ServerPort)
 				} else {
-					// 没有port,如果是cluserIP 或 pod_IP，需要获取service_id
-					if t.L3DeviceType1 == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
-						t.PodID1 != 0 {
-						_, serviceID = platformData.QueryIPv6IsKeyServiceAndID(t.L3EpcID1, t.IP61, t.Protocol, 0)
-					}
-				}
-				// 如果是pod服务，需要设置service_id
-				if t.L3DeviceType1 == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
-					t.PodID1 != 0 ||
-					t.PodNodeID1 != 0 {
-					t.ServiceID1 = serviceID
-				}
-			} else {
-				// 如果存在port，需要设置is_key_service, 并获取service_id
-				if t.Code&PortAddCode != 0 {
-					isKeyService, serviceID = platformData.QueryIsKeyServiceAndID(t.L3EpcID1, t.IP1, t.Protocol, t.ServerPort)
-					if isKeyService {
-						t.IsKeyService = 1
-					}
-				} else {
-					// 没有port,如果是cluserIP 或 pod_IP，需要获取service_id
-					if t.L3DeviceType1 == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
-						t.PodID1 != 0 {
-						_, serviceID = platformData.QueryIsKeyServiceAndID(t.L3EpcID1, t.IP1, t.Protocol, 0)
-					}
-				}
-				// 如果是pod服务，需要设置service_id
-				if t.L3DeviceType1 == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
-					t.PodID1 != 0 ||
-					t.PodNodeID1 != 0 {
-					t.ServiceID1 = serviceID
+					t.ServiceID1 = platformData.QueryService(uint8(t.L3DeviceType1), uint32(t.PodClusterID1), t.PodGroupID1, t.L3EpcID1, t.IsIPv6 == 1, t.IP1, t.IP61, t.Protocol, 0)
 				}
 			}
 			if info == nil {
@@ -200,49 +163,13 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 		t.PodGroupID = info.PodGroupID
 		t.PodID = info.PodID
 		t.PodClusterID = uint16(info.PodClusterID)
-		isKeyService := false
-		serviceID := uint32(0)
-		if t.IsIPv6 != 0 {
-			// 在0端, 有port无edge的数据需计算isKeyService，如:vtap_flow_port
+		if common.IsPodServiceIP(t.L3DeviceType, t.PodID, t.PodNodeID) {
+			// 在0端, 有port无edge的数据计算serviceid，如:vtap_flow_port
 			if t.Code&PortAddCode != 0 && t.Code&EdgeCode == 0 {
-				isKeyService, serviceID = platformData.QueryIPv6IsKeyServiceAndID(t.L3EpcID, t.IP6, t.Protocol, t.ServerPort)
-				if isKeyService {
-					t.IsKeyService = 1
-				}
+				t.ServiceID = platformData.QueryService(uint8(t.L3DeviceType), uint32(t.PodClusterID), t.PodGroupID, t.L3EpcID, t.IsIPv6 == 1, t.IP, t.IP6, t.Protocol, t.ServerPort)
 			} else {
-				// 有port有edge, 无port无edge，无port有edge
-				// 如果是cluserIP 或 pod_IP，需要获取service_id
-				if t.L3DeviceType == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
-					t.PodID != 0 {
-					_, serviceID = platformData.QueryIPv6IsKeyServiceAndID(t.L3EpcID, t.IP6, t.Protocol, 0)
-				}
-			}
-			// 如果是pod服务，需要设置service_id
-			if t.L3DeviceType == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
-				t.PodID != 0 ||
-				t.PodNodeID != 0 {
-				t.ServiceID = serviceID
-			}
-		} else {
-			// 在0端, 有port无edge的数据需计算isKeyService，如:vtap_flow_port
-			if t.Code&PortAddCode != 0 && t.Code&EdgeCode == 0 {
-				isKeyService, serviceID = platformData.QueryIsKeyServiceAndID(t.L3EpcID, t.IP, t.Protocol, t.ServerPort)
-				if isKeyService {
-					t.IsKeyService = 1
-				}
-			} else {
-				// 有port有edge, 无port无edge，无port有edge
-				// 如果是cluserIP 或 pod_IP，需要获取service_id
-				if t.L3DeviceType == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
-					t.PodID != 0 {
-					_, serviceID = platformData.QueryIsKeyServiceAndID(t.L3EpcID, t.IP, t.Protocol, 0)
-				}
-			}
-			// 如果是pod服务，需要设置service_id
-			if t.L3DeviceType == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
-				t.PodID != 0 ||
-				t.PodNodeID != 0 {
-				t.ServiceID = serviceID
+				// 有edge
+				t.ServiceID = platformData.QueryService(uint8(t.L3DeviceType), uint32(t.PodClusterID), t.PodGroupID, t.L3EpcID, t.IsIPv6 == 1, t.IP, t.IP6, t.Protocol, 0)
 			}
 		}
 		if info1 == nil && (t.Code&EdgeCode == EdgeCode) {
