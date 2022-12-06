@@ -42,6 +42,7 @@ use super::{
 };
 
 use crate::common::l7_protocol_log::L7ProtocolBitmap;
+use crate::flow_generator::protocol_logs::SOFA_NEW_RPC_TRACE_CTX_KEY;
 #[cfg(target_os = "linux")]
 use crate::{
     common::DEFAULT_CPU_CFS_PERIOD_US,
@@ -513,6 +514,7 @@ pub enum TraceType {
     Sw6,
     Sw8,
     TraceParent,
+    NewRpcTraceContext,
     Customize(String),
 }
 
@@ -541,6 +543,7 @@ impl From<&str> for TraceType {
             TRACE_TYPE_SW6 => TraceType::Sw6,
             TRACE_TYPE_SW8 => TraceType::Sw8,
             TRACE_TYPE_TRACE_PARENT => TraceType::TraceParent,
+            SOFA_NEW_RPC_TRACE_CTX_KEY => TraceType::NewRpcTraceContext,
             _ if t.len() > 0 => TraceType::Customize(format_t.to_string()),
             _ => TraceType::Disabled,
         }
@@ -569,6 +572,7 @@ impl TraceType {
             TraceType::Sw6 => context.to_lowercase() == TRACE_TYPE_SW6,
             TraceType::Sw8 => context.to_lowercase() == TRACE_TYPE_SW8,
             TraceType::TraceParent => context.to_lowercase() == TRACE_TYPE_TRACE_PARENT,
+            TraceType::NewRpcTraceContext => context.to_lowercase() == SOFA_NEW_RPC_TRACE_CTX_KEY,
             TraceType::Customize(tag) => context.to_lowercase() == tag.to_lowercase(),
             _ => false,
         }

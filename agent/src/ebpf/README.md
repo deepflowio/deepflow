@@ -23,6 +23,7 @@ The following protocols are currently probed:
 - HTTP2
 - DUBBO
 - GRPC
+- SOFARPC
 - MYSQL
 - POSTGRESQL
 - REDIS

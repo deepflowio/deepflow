@@ -22,8 +22,8 @@ use serde::Serialize;
 
 use super::pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo};
 use super::value_is_default;
-use super::LogMessageType;
 use super::{consts::*, AppProtoHead, L7ResponseStatus};
+use super::{decode_new_rpc_trace_context_with_type, LogMessageType};
 
 use crate::{
     common::{
@@ -505,8 +505,8 @@ fn parse_http1_header(payload: &[u8], limit: Option<usize>) -> Vec<&[u8]> {
 }
 
 impl HttpLog {
-    const TRACE_ID: u8 = 0;
-    const SPAN_ID: u8 = 1;
+    pub const TRACE_ID: u8 = 0;
+    pub const SPAN_ID: u8 = 1;
 
     pub fn new(config: &LogParserAccess) -> Self {
         Self {
@@ -1001,8 +1001,8 @@ impl HttpLog {
         None
     }
 
-    fn decode_id(payload: &str, trace_type: &str, id_type: u8) -> Option<String> {
-        let trace_type = TraceType::from(trace_type);
+    fn decode_id(payload: &str, trace_key: &str, id_type: u8) -> Option<String> {
+        let trace_type = TraceType::from(trace_key);
         match trace_type {
             TraceType::Disabled | TraceType::XB3 | TraceType::XB3Span | TraceType::Customize(_) => {
                 Some(payload.to_owned())
@@ -1010,6 +1010,13 @@ impl HttpLog {
             TraceType::Uber => Self::decode_uber_id(payload, id_type),
             TraceType::Sw6 | TraceType::Sw8 => Self::decode_skywalking_id(payload, id_type),
             TraceType::TraceParent => Self::decode_traceparent(payload, id_type),
+            TraceType::NewRpcTraceContext => {
+                /*
+                    referer https://github.com/sofastack/sofa-rpc/blob/7931102255d6ea95ee75676d368aad37c56b57ee/tracer/tracer-opentracing-resteasy/src/main/java/com/alipay/sofa/rpc/tracer/sofatracer/RestTracerAdapter.java#L75
+                    in new version of sofarpc, use new_rpc_trace_context header store trace info
+                */
+                decode_new_rpc_trace_context_with_type(payload.as_bytes(), id_type)
+            }
         }
     }
 
