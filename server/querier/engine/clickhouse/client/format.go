@@ -19,6 +19,7 @@ package client
 import (
 	"math"
 	"net"
+	"strings"
 	"time"
 )
 
@@ -45,6 +46,9 @@ func TransType(typeName string, value interface{}) (interface{}, string, error) 
 		}
 		return value.(float64), VALUE_TYPE_FLOAT64, nil
 	default:
+		if strings.Contains(typeName, "String") {
+			return value.(string), VALUE_TYPE_STRING, nil
+		}
 		return value, typeName, nil
 	}
 }
