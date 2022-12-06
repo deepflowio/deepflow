@@ -99,7 +99,7 @@ func (g *GroupProto) updateGroups(groups []byte) {
 	g.groups.Store(groups)
 }
 
-func (g *GroupProto) generateGroupProto(groupsProto []*trident.Group, svcs []*trident.Service) {
+func (g *GroupProto) generateGroupProto(groupsProto []*trident.Group, svcs []*trident.ServiceInfo) {
 	groups := &trident.Groups{
 		Groups: groupsProto,
 		Svcs:   svcs,
