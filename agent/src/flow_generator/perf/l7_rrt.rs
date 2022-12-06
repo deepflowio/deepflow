@@ -99,16 +99,6 @@ impl L7RrtCache {
         }
     }
 
-    pub fn has_residual_request(&mut self, key: u64) -> bool {
-        if let Some(t) = self.double_key_cache.get(&key) {
-            t.len() > 0
-        } else if self.single_key_cache.get(&key).is_some() {
-            true
-        } else {
-            false
-        }
-    }
-
     pub fn clear(&mut self) {
         self.double_key_cache.clear();
         self.single_key_cache.clear();
