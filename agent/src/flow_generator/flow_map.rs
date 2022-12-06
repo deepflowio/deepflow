@@ -776,33 +776,7 @@ impl FlowMap {
             next_tcp_seq0: 0,
             next_tcp_seq1: 0,
             policy_data_cache: Default::default(),
-            endpoint_data_cache: EndpointData {
-                src_info: EndpointInfo {
-                    real_ip: Ipv4Addr::UNSPECIFIED.into(),
-                    l2_epc_id: 0,
-                    l3_epc_id: 0,
-                    l2_end: false,
-                    l3_end: false,
-                    is_device: false,
-                    is_vip_interface: false,
-                    is_vip: false,
-                    is_local_mac: false,
-                    is_local_ip: false,
-                },
-
-                dst_info: EndpointInfo {
-                    real_ip: Ipv4Addr::UNSPECIFIED.into(),
-                    l2_epc_id: 0,
-                    l3_epc_id: 0,
-                    l2_end: false,
-                    l3_end: false,
-                    is_device: false,
-                    is_vip_interface: false,
-                    is_vip: false,
-                    is_local_mac: false,
-                    is_local_ip: false,
-                },
-            },
+            endpoint_data_cache: Default::default(),
             packet_sequence_block: None, // Enterprise Edition Feature: packet-sequence
             residual_request: 0,
         };
@@ -892,12 +866,12 @@ impl FlowMap {
                 PacketDirection::ClientToServer => {
                     meta_packet
                         .endpoint_data
-                        .replace(Arc::new(node.endpoint_data_cache.clone()));
+                        .replace(node.endpoint_data_cache[0].clone());
                 }
                 PacketDirection::ServerToClient => {
                     meta_packet
                         .endpoint_data
-                        .replace(Arc::new(node.endpoint_data_cache.reversed()));
+                        .replace(node.endpoint_data_cache[1].clone());
                 }
             }
             if let Some(endpoint_data) = meta_packet.endpoint_data.as_ref() {
@@ -1305,12 +1279,12 @@ impl FlowMap {
         let lookup_key = &meta_packet.lookup_key;
         let src_key = ServiceKey::new(
             lookup_key.src_ip,
-            node.endpoint_data_cache.src_info.l3_epc_id as i16,
+            node.endpoint_data_cache[0].src_info.l3_epc_id as i16,
             lookup_key.src_port,
         );
         let dst_key = ServiceKey::new(
             lookup_key.dst_ip,
-            node.endpoint_data_cache.dst_info.l3_epc_id as i16,
+            node.endpoint_data_cache[0].dst_info.l3_epc_id as i16,
             lookup_key.dst_port,
         );
         let (mut src_score, mut dst_score) = match lookup_key.proto {
@@ -1353,12 +1327,12 @@ impl FlowMap {
             // ip_src, port_src and ip_dst, port_dst directly without swapping them.
             let src_key = ServiceKey::new(
                 flow_key.ip_src,
-                node.endpoint_data_cache.src_info.l3_epc_id as i16,
+                node.endpoint_data_cache[0].src_info.l3_epc_id as i16,
                 flow_key.port_src,
             );
             let dst_key = ServiceKey::new(
                 flow_key.ip_dst,
-                node.endpoint_data_cache.dst_info.l3_epc_id as i16,
+                node.endpoint_data_cache[0].dst_info.l3_epc_id as i16,
                 flow_key.port_dst,
             );
 
@@ -1403,7 +1377,7 @@ impl FlowMap {
     fn reverse_flow(node: &mut FlowNode, is_first_packet: bool) {
         node.policy_in_tick.swap(0, 1);
         node.policy_data_cache.swap(0, 1);
-        node.endpoint_data_cache = node.endpoint_data_cache.reversed();
+        node.endpoint_data_cache.swap(0, 1);
         node.tagged_flow.flow.reverse(is_first_packet);
         node.tagged_flow.tag.reverse();
         if let Some(meta_flow_perf) = node.meta_flow_perf.as_mut() {
@@ -1446,23 +1420,21 @@ impl FlowMap {
         meta_packet: &mut MetaPacket,
     ) {
         // update endpoint
-        match meta_packet.direction {
-            PacketDirection::ClientToServer => {
-                if meta_packet.endpoint_data.is_some() {
-                    node.endpoint_data_cache = **(meta_packet.endpoint_data.as_ref().unwrap());
+        if let Some(data) = meta_packet.endpoint_data.as_ref() {
+            match meta_packet.direction {
+                PacketDirection::ClientToServer => {
+                    node.endpoint_data_cache[0] = data.clone();
+                    node.endpoint_data_cache[1] = Arc::new(data.reversed());
                 }
-            }
-            PacketDirection::ServerToClient => {
-                if let Some(endpoint_data) =
-                    meta_packet.endpoint_data.as_ref().map(|e| e.reversed())
-                {
-                    node.endpoint_data_cache = endpoint_data;
+                PacketDirection::ServerToClient => {
+                    node.endpoint_data_cache[1] = data.clone();
+                    node.endpoint_data_cache[0] = Arc::new(data.reversed());
                 }
             }
         }
 
         {
-            let src_info = node.endpoint_data_cache.src_info;
+            let src_info = node.endpoint_data_cache[0].src_info;
             let peer_src = &mut node.tagged_flow.flow.flow_metrics_peers[0];
             peer_src.is_device = src_info.is_device;
             peer_src.is_vip_interface = src_info.is_vip_interface;
@@ -1477,7 +1449,7 @@ impl FlowMap {
             peer_src.is_local_ip = src_info.is_local_ip;
         }
         {
-            let dst_info = node.endpoint_data_cache.dst_info;
+            let dst_info = node.endpoint_data_cache[0].dst_info;
             let peer_dst = &mut node.tagged_flow.flow.flow_metrics_peers[1];
             peer_dst.is_device = dst_info.is_device;
             peer_dst.is_vip_interface = dst_info.is_vip_interface;
