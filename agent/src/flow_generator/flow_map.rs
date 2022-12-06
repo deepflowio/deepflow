@@ -42,10 +42,10 @@ use super::{
     perf::{FlowPerf, FlowPerfCounter, L7RrtCache},
     protocol_logs::MetaAppProto,
     service_table::{ServiceKey, ServiceTable},
-    FlowMapKey, FlowNode, FlowState, FlowTimeKey, COUNTER_FLOW_ID_MASK, EBPF_MINIMUM_TIMEOUT,
-    FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC, L7_PROTOCOL_UNKNOWN_LIMIT, L7_RRT_CACHE_CAPACITY,
-    QUEUE_BATCH_SIZE, SERVICE_TABLE_IPV4_CAPACITY, SERVICE_TABLE_IPV6_CAPACITY,
-    STATISTICAL_INTERVAL, THREAD_FLOW_ID_MASK, TIMER_FLOW_ID_MASK, TIME_MAX_INTERVAL, TIME_UNIT,
+    FlowMapKey, FlowNode, FlowState, FlowTimeKey, COUNTER_FLOW_ID_MASK, FLOW_METRICS_PEER_DST,
+    FLOW_METRICS_PEER_SRC, L7_PROTOCOL_UNKNOWN_LIMIT, L7_RRT_CACHE_CAPACITY, QUEUE_BATCH_SIZE,
+    SERVICE_TABLE_IPV4_CAPACITY, SERVICE_TABLE_IPV6_CAPACITY, STATISTICAL_INTERVAL,
+    THREAD_FLOW_ID_MASK, TIMER_FLOW_ID_MASK, TIME_MAX_INTERVAL, TIME_UNIT,
 };
 
 use crate::{
@@ -406,7 +406,7 @@ impl FlowMap {
         slot_nodes: &mut Vec<Box<FlowNode>>,
     ) {
         let timestamp = meta_packet.lookup_key.timestamp;
-        let flow_closed = self.update_tcp_flow(meta_packet, &mut node);
+        let mut flow_closed = self.update_tcp_flow(meta_packet, &mut node);
         if self.config.load().collector_enabled {
             let direction = meta_packet.direction == PacketDirection::ClientToServer;
             self.collect_metric(&mut node, meta_packet, direction);
@@ -415,12 +415,12 @@ impl FlowMap {
         // After collect_metric() is called for eBPF MetaPacket, its direction is determined.
         if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
             if meta_packet.direction == PacketDirection::ClientToServer {
-                self.residual_request++
+                node.residual_request += 1;
             } else {
-                self.residual_request--
+                node.residual_request -= 1;
             }
             // For eBPF Flow, we use residual_request to directly judge whether timeout is needed.
-            flow_closed == self.residual_request == 0;
+            flow_closed = node.residual_request == 0;
         }
 
         // Enterprise Edition Feature: packet-sequence
@@ -748,6 +748,7 @@ impl FlowMap {
                 },
             },
             packet_sequence_block: None, // Enterprise Edition Feature: packet-sequence
+            residual_request: 0,
         };
         // 标签
         (self.policy_getter).lookup(meta_packet, self.id as usize);
@@ -897,9 +898,9 @@ impl FlowMap {
         // After collect_metric() is called for eBPF MetaPacket, its direction is determined.
         if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
             if meta_packet.direction == PacketDirection::ClientToServer {
-                self.residual_request++
+                node.residual_request += 1;
             } else {
-                self.residual_request--
+                node.residual_request -= 1;
             }
         }
 
