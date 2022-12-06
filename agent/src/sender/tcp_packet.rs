@@ -29,14 +29,15 @@ use std::{
 
 use log::{info, warn};
 
-use super::{ERR_INTERVAL, RCV_TIMEOUT, SEQUENCE_OFFSET};
-
 use crate::utils::{
     bytes::write_u64_be,
     stats::{Counter, CounterType, CounterValue, RefCountable},
 };
 use public::queue::{Error, Receiver};
 
+const SEQUENCE_OFFSET: usize = 8;
+const RCV_TIMEOUT: Duration = Duration::from_secs(1);
+const ERR_INTERVAL: Duration = Duration::from_secs(30);
 #[derive(Default)]
 pub struct TcpPacketCounter {
     id: u32,

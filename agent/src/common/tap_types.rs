@@ -24,7 +24,7 @@ use std::{
 
 use log::warn;
 
-use crate::proto::trident;
+use public::proto::trident;
 
 use super::{enums::TapType, XflowKey};
 

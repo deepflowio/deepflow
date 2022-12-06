@@ -56,7 +56,6 @@ use crate::{
     flow_generator::MetaAppProto,
     handler::PacketHandlerBuilder,
     policy::PolicyGetter,
-    proto::trident::{Exception, IfMacSource, TapMode},
     rpc::get_timestamp,
     utils::{bytes::read_u16_be, stats::Collector},
 };
@@ -64,6 +63,7 @@ use crate::{
 use public::{
     netns::NsFile,
     packet::Packet,
+    proto::trident::{Exception, IfMacSource, TapMode},
     queue::DebugSender,
     utils::net::{self, get_route_src_ip, Link, MacAddr},
     LeakyBucket,
@@ -732,7 +732,7 @@ impl BaseDispatcherListener {
         let mut added = Vec::new();
         for (i, key) in keys.iter().enumerate() {
             if pipelines.contains_key(key)
-                && pipelines.get(key).unwrap().lock().unwrap().vm_mac != vm_macs[i]
+                && pipelines.get(key).unwrap().lock().unwrap().vm_mac == vm_macs[i]
             {
                 // vm mac already checked
                 continue;

@@ -30,12 +30,9 @@ use ring::digest;
 use tokio::runtime::{Builder, Runtime};
 
 use crate::{
-    config::handler::PlatformAccess,
-    exception::ExceptionHandler,
-    proto::trident::{self, Exception, GenesisSyncRequest, GenesisSyncResponse},
-    rpc::Session,
-    utils::command::*,
+    config::handler::PlatformAccess, exception::ExceptionHandler, rpc::Session, utils::command::*,
 };
+use public::proto::trident::{self, Exception, GenesisSyncRequest, GenesisSyncResponse};
 
 const SHA1_DIGEST_LEN: usize = 20;
 

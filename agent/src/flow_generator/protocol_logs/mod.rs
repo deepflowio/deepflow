@@ -60,11 +60,13 @@ use crate::{
     flow_generator::error::Error,
     flow_generator::error::Result,
     metric::document::TapSide,
-    proto::flow_log,
 };
+use public::proto::flow_log;
+use public::sender::{SendMessageType, Sendable};
 use public::utils::net::MacAddr;
 
 const NANOS_PER_MICRO: u64 = 1000;
+const FLOW_LOG_VERSION: u32 = 20220128;
 
 #[derive(Serialize, Debug, PartialEq, Copy, Clone, Eq)]
 #[repr(u8)]
@@ -483,19 +485,6 @@ impl AppProtoLogsData {
         return self.base_info.head.msg_type == LogMessageType::Response;
     }
 
-    pub fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
-        let mut pb_proto_logs_data = flow_log::AppProtoLogsData {
-            base: Some(self.base_info.into()),
-            ..Default::default()
-        };
-
-        let log: L7ProtocolSendLog = self.special_info.into();
-        log.fill_app_proto_log(&mut pb_proto_logs_data);
-        pb_proto_logs_data
-            .encode(buf)
-            .map(|_| pb_proto_logs_data.encoded_len())
-    }
-
     pub fn ebpf_flow_session_id(&self) -> u64 {
         // 取flow_id(即ebpf底层的socket id)的高8位(cpu id)+低24位(socket id的变化增量), 作为聚合id的高32位
         // |flow_id 高8位| flow_id 低24位|proto 8 位|session 低24位|
@@ -559,11 +548,41 @@ impl AppProtoLogsData {
     pub fn need_protocol_merge(&self) -> bool {
         self.special_info.need_merge()
     }
+}
 
-    pub fn to_kv_string(&self, dst: &mut String) {
-        let json = serde_json::to_string(&self).unwrap();
-        dst.push_str(&json);
-        dst.push('\n');
+#[derive(Debug)]
+pub struct BoxAppProtoLogsData(pub Box<AppProtoLogsData>);
+
+impl Sendable for BoxAppProtoLogsData {
+    fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
+        let mut pb_proto_logs_data = flow_log::AppProtoLogsData {
+            base: Some(self.0.base_info.into()),
+            ..Default::default()
+        };
+
+        let log: L7ProtocolSendLog = self.0.special_info.into();
+        log.fill_app_proto_log(&mut pb_proto_logs_data);
+        pb_proto_logs_data
+            .encode(buf)
+            .map(|_| pb_proto_logs_data.encoded_len())
+    }
+
+    fn file_name(&self) -> &str {
+        "l7_flow_log"
+    }
+
+    fn message_type(&self) -> SendMessageType {
+        SendMessageType::ProtocolLog
+    }
+
+    fn to_kv_string(&self, kv_string: &mut String) {
+        let json = serde_json::to_string(&(*self.0)).unwrap();
+        kv_string.push_str(&json);
+        kv_string.push('\n');
+    }
+
+    fn version(&self) -> u32 {
+        FLOW_LOG_VERSION
     }
 }
 
