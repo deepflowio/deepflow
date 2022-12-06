@@ -335,8 +335,8 @@ enum ServiceType {
 
 enum ServiceProtocol {
     ANY = 0;
-    TCP = 1;
-    UDP = 2;
+    TCP_SERVICE = 1;
+    UDP_SERVICE = 2;
 }
 
 message ServiceInfo {
@@ -348,7 +348,7 @@ message ServiceInfo {
     repeated string ips = 6;                          // Available when type in [POD_SERVICE_IP, LB_SERVICE], list of IP addresses
     // 7: reserve for cidrs
     // 8: reserve for ip-ranges
-    optional ServiceProtocl protocol = 9 [default = ANY];
+    optional ServiceProtocol protocol = 9 [default = ANY];
     repeated uint32 server_ports = 10;
 }
 
