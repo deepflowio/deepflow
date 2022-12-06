@@ -59,6 +59,7 @@ func Execute(version string) {
 	root.AddCommand(RegisterRecorderCommand())
 	root.AddCommand(RegisterTrisolarisCommand())
 	root.AddCommand(RegisterVPCCommend())
+	root.AddCommand(RegisterServerCommand())
 
 	cmd.RegisterIngesterCommand(root)
 
