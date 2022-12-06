@@ -919,7 +919,6 @@ impl Components {
             yaml_config.first_path_level as usize,
             yaml_config.fast_path_map_size,
             false,
-            FeatureFlags::from(&yaml_config.feature_flags),
         );
         synchronizer.add_flow_acl_listener(Box::new(policy_setter));
         policy_setter.set_memory_limit(max_memory);
