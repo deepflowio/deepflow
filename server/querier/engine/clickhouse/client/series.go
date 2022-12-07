@@ -51,7 +51,7 @@ func (s *SeriesSort) Swap(i, j int) {
 }
 
 func (s *SeriesSort) Less(i, j int) bool {
-	for _, sortIndex := range s.SortIndex {
+	for index, sortIndex := range s.SortIndex {
 		if SeriesEq(s.Series[i], s.Series[j], sortIndex, s.Schemas[sortIndex].ValueType) {
 			continue
 		}
@@ -59,15 +59,15 @@ func (s *SeriesSort) Less(i, j int) bool {
 		case VALUE_TYPE_INT:
 			iValue := s.Series[i].Values[sortIndex].(int)
 			jValue := s.Series[j].Values[sortIndex].(int)
-			return SeriesValueLess(iValue, jValue, s.Reverse[sortIndex])
+			return SeriesValueLess(iValue, jValue, s.Reverse[index])
 		case VALUE_TYPE_STRING:
 			iValue := s.Series[i].Values[sortIndex].(string)
 			jValue := s.Series[j].Values[sortIndex].(string)
-			return SeriesValueLess(iValue, jValue, s.Reverse[sortIndex])
+			return SeriesValueLess(iValue, jValue, s.Reverse[index])
 		case VALUE_TYPE_FLOAT64:
 			iValue := s.Series[i].Values[sortIndex].(float64)
 			jValue := s.Series[j].Values[sortIndex].(float64)
-			return SeriesValueLess(iValue, jValue, s.Reverse[sortIndex])
+			return SeriesValueLess(iValue, jValue, s.Reverse[index])
 		}
 	}
 	return false

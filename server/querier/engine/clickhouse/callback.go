@@ -46,6 +46,9 @@ func (c *Callback) Format(m *view.Model) {
 
 func TimeFill(args []interface{}) func(result *common.Result) error { // group by time时的补点
 	return func(result *common.Result) error {
+		if result.Values == nil || len(result.Values) == 0 {
+			return nil
+		}
 		m := args[0].(*view.Model)
 		seriesSort := &client.SeriesSort{
 			Series:    []*client.Series{},
@@ -76,6 +79,9 @@ func TimeFill(args []interface{}) func(result *common.Result) error { // group b
 		}
 		for i, schema := range result.Schemas {
 			if i == timeFieldIndex {
+				continue
+			}
+			if _, ok := client.VALUE_TYPE_MAP[schema.ValueType]; !ok {
 				continue
 			}
 			if schema.Type == common.COLUMN_SCHEMA_TYPE_TAG {

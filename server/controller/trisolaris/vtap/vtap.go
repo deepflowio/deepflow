@@ -984,10 +984,10 @@ func (v *VTapInfo) updateCacheToDB() {
 		cacheVTap.ResetTSDBSyncFlag()
 		if (dbVTap.State != VTAP_STATE_PENDING && controller.IP == dbVTap.ControllerIP) || (dbVTap.Type == VTAP_TYPE_TUNNEL_DECAPSULATION && controller.NodeType == CONTROLLER_NODE_TYPE_MASTER) {
 			now := time.Now()
-			if now.Sub(cacheVTap.GetCachedAt()).Seconds() < 60*2 {
+			if now.Sub(cacheVTap.GetCachedAt()).Seconds() < float64(cacheVTap.GetConfigSyncInterval()*2) {
 				// 如果时间差小于同步时间间隔，则认为刚启动,
 				// 或新添加vtap，不进行状态更新
-			} else if now.Sub(vtapSyncedControllerAt).Seconds() > 60*8 {
+			} else if now.Sub(vtapSyncedControllerAt).Seconds() > float64(cacheVTap.GetConfigSyncInterval()*8) {
 				if dbVTap.State != VTAP_STATE_NOT_CONNECTED {
 					dbVTap.State = VTAP_STATE_NOT_CONNECTED
 					filterFlag = true
