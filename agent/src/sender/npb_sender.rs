@@ -21,16 +21,17 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
 use std::os::unix::io::FromRawFd;
 #[cfg(windows)]
 use std::os::windows::io::{FromRawSocket, RawSocket};
+use std::sync::atomic::AtomicU64;
 use std::sync::{
-    atomic::{AtomicBool, AtomicUsize, Ordering},
-    Arc, Mutex, Weak,
+    atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering},
+    Arc, Mutex, RwLock, Weak,
 };
+use std::thread::{sleep, spawn, JoinHandle};
 use std::time::Duration;
 
 #[cfg(unix)]
 use libc::{c_int, socket, AF_INET, AF_INET6, SOCK_RAW};
 use log::{info, warn};
-use public::counter::{Countable, CounterType, CounterValue, OwnedCountable};
 use socket2::{SockAddr, Socket};
 #[cfg(windows)]
 use windows::Win32::Networking::WinSock::socket;
@@ -46,6 +47,8 @@ use crate::config::NpbConfig;
 #[cfg(unix)]
 use crate::dispatcher::af_packet::{Options, Tpacket};
 use crate::utils::stats::{self, StatsOption};
+use npb_handler::NOT_SUPPORT;
+use public::counter::{Countable, CounterType, CounterValue, OwnedCountable};
 use public::proto::trident::SocketType;
 use public::queue::Receiver;
 #[cfg(unix)]
@@ -91,36 +94,29 @@ fn serialize_seq(
 #[cfg(unix)]
 #[derive(Debug)]
 struct AfpacketSender {
-    af_packet: Tpacket,
+    af_packet: Option<Tpacket>,
     underlay_dst_mac: MacAddr,
     underlay_src_mac: MacAddr,
     underlay_src_ip: IpAddr,
-    seq: u32,
+    if_name: String,
+    remote: IpAddr,
+
+    last_arp_update: u64,
 }
 
 #[cfg(unix)]
 impl AfpacketSender {
-    fn new(
-        if_name: String,
-        underlay_src_ip: IpAddr,
-        underlay_src_mac: MacAddr,
-        underlay_dst_mac: MacAddr,
-    ) -> Result<Self, &'static str> {
-        let mut options = Options::default();
-        options.iface = if_name.clone();
-        let af_packet = Tpacket::new(options.clone());
-        if af_packet.is_err() {
-            return Err("Afpacket error");
+    const ARP_UPDATE_INTERVAL: u64 = 300 * 1000000000;
+    fn new(remote: &IpAddr) -> AfpacketSender {
+        Self {
+            af_packet: None,
+            underlay_dst_mac: MacAddr::ZERO,
+            underlay_src_mac: MacAddr::ZERO,
+            underlay_src_ip: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            if_name: String::new(),
+            remote: remote.clone(),
+            last_arp_update: 0,
         }
-        info!("Npb AfpacketSender init with {:?}.", options);
-
-        Ok(Self {
-            af_packet: af_packet.unwrap(),
-            underlay_src_ip,
-            underlay_src_mac,
-            underlay_dst_mac,
-            seq: 1,
-        })
     }
 
     fn serialize_underlay(&self, underlay_l2_opt_size: usize, packet: &mut Vec<u8>) {
@@ -142,20 +138,64 @@ impl AfpacketSender {
         }
     }
 
-    fn send(&mut self, underlay_l2_opt_size: usize, mut packet: Vec<u8>) -> IOResult<usize> {
+    fn check_arp(&mut self, now: u64, arp: &Arc<NpbArpTable>) -> IOResult<u32> {
+        if self.af_packet.is_some() && self.last_arp_update + Self::ARP_UPDATE_INTERVAL < now {
+            let seq = arp.lookup_counter(&self.remote);
+            return Ok(seq);
+        }
+        self.last_arp_update = now;
+
+        let entry = arp.lookup(&self.remote);
+        if entry.is_none() {
+            return Err(IOError::new(
+                ErrorKind::Other,
+                format!("Arp not found: {}", self.remote),
+            ));
+        }
+        let (src_mac, dst_mac, src_ip, if_name) = entry.unwrap();
+        if if_name != self.if_name {
+            let options = Options {
+                iface: if_name.clone(),
+                ..Default::default()
+            };
+            let af_packet = Tpacket::new(options.clone());
+            if af_packet.is_err() {
+                return Err(IOError::new(
+                    ErrorKind::Other,
+                    format!("Afpacket init failed with: {:?}", options),
+                ));
+            }
+            info!("Npb Afpacket sender init with: {:?}.", options);
+            self.af_packet.replace(af_packet.unwrap());
+            self.if_name = if_name;
+        }
+        self.underlay_dst_mac = dst_mac;
+        self.underlay_src_mac = src_mac;
+        self.underlay_src_ip = src_ip;
+        let seq = arp.lookup_counter(&self.remote);
+        Ok(seq)
+    }
+
+    fn send(
+        &mut self,
+        timestamp: u64,
+        underlay_l2_opt_size: usize,
+        mut packet: Vec<u8>,
+        arp: &Arc<NpbArpTable>,
+    ) -> IOResult<usize> {
+        let seq = self.check_arp(timestamp, arp)?;
         self.serialize_underlay(underlay_l2_opt_size, &mut packet);
         serialize_seq(
             &mut packet,
-            self.seq,
+            seq,
             underlay_l2_opt_size,
             self.underlay_src_ip.is_ipv6(),
         );
-        self.seq += 1;
-        let n = self.af_packet.write(&packet.as_slice());
+        let n = self.af_packet.as_mut().unwrap().write(&packet.as_slice());
         if n > 0 {
             return Ok(n as usize);
         }
-        return Err(IOError::new(ErrorKind::Other, "Afpacket write error."));
+        return Err(IOError::new(ErrorKind::Other, "Afpacket write error"));
     }
 
     fn close(&mut self) {}
@@ -164,15 +204,15 @@ impl AfpacketSender {
 #[derive(Debug)]
 struct IpSender {
     socket: Socket,
-    seq: u32,
     underlay_is_ipv6: bool,
 
+    dst_ip: IpAddr,
     remote: SockAddr,
 }
 
 impl IpSender {
     #[cfg(windows)]
-    fn new(remote: IpAddr, protocol: u8) -> IOResult<Self> {
+    fn new(remote: &IpAddr, protocol: u8) -> IOResult<Self> {
         let socket = unsafe {
             if remote.is_ipv6() {
                 socket(AF_INET6, SOCK_RAW as i32, protocol as i32)
@@ -189,17 +229,17 @@ impl IpSender {
         info!("Npb IpSender init with {} {}.", remote, protocol);
         Ok(Self {
             socket,
-            seq: 1,
             underlay_is_ipv6: remote.is_ipv6(),
             remote: match remote {
                 IpAddr::V4(ip) => SockAddr::from(SocketAddrV4::new(ip, 0)),
                 IpAddr::V6(ip) => SockAddr::from(SocketAddrV6::new(ip, 0, 0, 0)),
             },
+            dst_ip: remote.clone(),
         })
     }
 
     #[cfg(unix)]
-    fn new(remote: IpAddr, protocol: u8) -> IOResult<Self> {
+    fn new(remote: &IpAddr, protocol: u8) -> IOResult<Self> {
         let fd = unsafe {
             if remote.is_ipv6() {
                 socket(AF_INET6, SOCK_RAW, protocol as c_int)
@@ -208,7 +248,7 @@ impl IpSender {
             }
         };
         if fd < 0 {
-            return Err(IOError::new(ErrorKind::Other, "socket error."));
+            return Err(IOError::new(ErrorKind::Other, "socket error"));
         }
         let socket = unsafe { Socket::from_raw_fd(fd) };
         socket.set_send_buffer_size(30 << 20)?;
@@ -216,11 +256,11 @@ impl IpSender {
         info!("Npb IpSender init with {} {}.", remote, protocol);
         Ok(Self {
             socket,
-            seq: 1,
             underlay_is_ipv6: remote.is_ipv6(),
+            dst_ip: remote.clone(),
             remote: match remote {
-                IpAddr::V4(ip) => SockAddr::from(SocketAddrV4::new(ip, 0)),
-                IpAddr::V6(ip) => SockAddr::from(SocketAddrV6::new(ip, 0, 0, 0)),
+                IpAddr::V4(ip) => SockAddr::from(SocketAddrV4::new(ip.clone(), 0)),
+                IpAddr::V6(ip) => SockAddr::from(SocketAddrV6::new(ip.clone(), 0, 0, 0)),
             },
         })
     }
@@ -230,14 +270,15 @@ impl IpSender {
         underlay_l2_opt_size: usize,
         header_size: usize,
         mut packet: Vec<u8>,
+        arp: &Arc<NpbArpTable>,
     ) -> IOResult<usize> {
+        let seq = arp.lookup_counter(&self.dst_ip);
         serialize_seq(
             &mut packet,
-            self.seq,
+            seq,
             underlay_l2_opt_size,
             self.underlay_is_ipv6,
         );
-        self.seq += 1;
         self.socket
             .send_to(&packet.as_slice()[header_size..], &self.remote)
     }
@@ -255,14 +296,16 @@ enum NpbSender {
 impl NpbSender {
     fn send(
         &mut self,
+        timestamp: u64,
         underlay_l2_opt_size: usize,
         header_size: usize,
         packet: Vec<u8>,
+        arp: &Arc<NpbArpTable>,
     ) -> IOResult<usize> {
         match self {
-            Self::IpSender(s) => s.send(underlay_l2_opt_size, header_size, packet),
+            Self::IpSender(s) => s.send(underlay_l2_opt_size, header_size, packet, arp),
             #[cfg(unix)]
-            Self::RawSender(s) => s.send(underlay_l2_opt_size, packet),
+            Self::RawSender(s) => s.send(timestamp, underlay_l2_opt_size, packet, arp),
         }
     }
 }
@@ -310,12 +353,231 @@ impl OwnedCountable for StatsNpbSenderCounter {
     }
 }
 
+#[derive(Debug)]
+pub struct ArpEntry {
+    counter: AtomicU32,
+    dst_mac: MacAddr,
+    src_mac: MacAddr,
+    src_ip: IpAddr,
+    dst_ip: IpAddr,
+    if_name: String,
+
+    aging: AtomicU64,
+}
+
+const ARP_STALE_TIME: u64 = 60;
+const ARP_INTERVAL: u64 = 1;
+const ARP_AGING_TIME: u64 = 300;
+
+impl ArpEntry {
+    fn update(&mut self, new_entry: Self) {
+        self.aging = new_entry.aging;
+
+        if self.dst_mac == new_entry.dst_mac
+            && self.src_mac == new_entry.src_mac
+            && self.src_ip == new_entry.src_ip
+            && self.if_name == new_entry.if_name
+        {
+            return;
+        }
+
+        self.dst_mac = new_entry.dst_mac;
+        self.src_mac = new_entry.src_mac;
+        self.src_ip = new_entry.src_ip;
+        self.if_name = new_entry.if_name;
+        info!("Arp entry change to {}", self);
+    }
+}
+
+impl Default for ArpEntry {
+    fn default() -> Self {
+        ArpEntry {
+            src_ip: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            dst_ip: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            aging: AtomicU64::new(ARP_AGING_TIME),
+            counter: AtomicU32::new(1),
+            if_name: String::new(),
+            dst_mac: MacAddr::ZERO,
+            src_mac: MacAddr::ZERO,
+        }
+    }
+}
+
+impl std::fmt::Display for ArpEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Local: {} {} Remote: {} {} If: {} Aging: {}s Counter: {}",
+            self.src_mac,
+            self.src_ip,
+            self.dst_mac,
+            self.dst_ip,
+            self.if_name,
+            self.aging.load(Ordering::Relaxed),
+            self.counter.load(Ordering::Relaxed)
+        )
+    }
+}
+
+impl TryFrom<&IpAddr> for ArpEntry {
+    type Error = String;
+
+    fn try_from(remote: &IpAddr) -> Result<Self, Self::Error> {
+        let local_addr = get_route_src_ip_and_mac(remote);
+        if local_addr.is_err() {
+            return Err(format!("Route error: {:?}.", local_addr.unwrap_err()));
+        }
+        let if_name = get_route_src_ip_interface_name(remote);
+        if if_name.is_err() {
+            return Err(format!("Route error: {:?}.", if_name.unwrap_err()));
+        }
+        let neighbor = neighbor_lookup(remote.clone());
+        if neighbor.is_err() {
+            return Err(format!("Route error: {:?}.", neighbor.unwrap_err()));
+        }
+        let (src_ip, src_mac) = local_addr.unwrap();
+
+        Ok(Self {
+            counter: AtomicU32::new(1),
+            dst_mac: neighbor.unwrap().dest_mac_addr,
+            src_mac,
+            src_ip,
+            dst_ip: remote.clone(),
+            if_name: if_name.unwrap(),
+            ..Default::default()
+        })
+    }
+}
+
+pub struct NpbArpTable {
+    table: Arc<RwLock<HashMap<IpAddr, ArpEntry>>>,
+    is_running: Arc<AtomicBool>,
+
+    thread_handler: Mutex<Option<JoinHandle<()>>>,
+}
+
+impl NpbArpTable {
+    pub fn new() -> Self {
+        NpbArpTable {
+            table: Arc::new(RwLock::new(HashMap::new())),
+            thread_handler: Mutex::new(None),
+            is_running: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    pub fn add(&self, remote: &IpAddr) {
+        if self.table.read().unwrap().contains_key(remote) {
+            return;
+        }
+
+        self.table.write().unwrap().insert(
+            remote.clone(),
+            ArpEntry {
+                dst_ip: remote.clone(),
+                aging: AtomicU64::new(ARP_STALE_TIME),
+                ..Default::default()
+            },
+        );
+    }
+
+    pub fn lookup(&self, remote: &IpAddr) -> Option<(MacAddr, MacAddr, IpAddr, String)> {
+        if let Some(entry) = self.table.read().unwrap().get(&remote) {
+            if entry.if_name.is_empty() {
+                return None;
+            }
+            return Some((
+                entry.src_mac,
+                entry.dst_mac,
+                entry.src_ip,
+                entry.if_name.clone(),
+            ));
+        }
+        self.add(remote);
+        return None;
+    }
+
+    pub fn lookup_counter(&self, remote: &IpAddr) -> u32 {
+        let table = self.table.read().unwrap();
+        return table
+            .get(&remote)
+            .unwrap()
+            .counter
+            .fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn run(table: Arc<RwLock<HashMap<IpAddr, ArpEntry>>>, is_running: Arc<AtomicBool>) {
+        let mut lookup_ips = vec![];
+        let mut timeout_ips = vec![];
+        while is_running.load(Ordering::Relaxed) {
+            sleep(Duration::from_secs(ARP_INTERVAL));
+
+            for (dst_ip, entry) in table.read().unwrap().iter() {
+                let aging = entry.aging.fetch_sub(ARP_INTERVAL, Ordering::Relaxed);
+                if aging <= ARP_STALE_TIME {
+                    if aging > ARP_INTERVAL {
+                        lookup_ips.push((false, dst_ip.clone()));
+                    } else if aging == ARP_INTERVAL {
+                        lookup_ips.push((true, dst_ip.clone()));
+                    } else {
+                        timeout_ips.push(dst_ip.clone());
+                    }
+                }
+            }
+
+            // Remove all timeout entrys.
+            for key in &timeout_ips {
+                table.write().unwrap().remove(key);
+            }
+
+            // Lookup all stale entrys.
+            for (last_lookup, key) in &lookup_ips {
+                let entry = ArpEntry::try_from(key);
+                if entry.is_ok() {
+                    let entry = entry.unwrap();
+                    table.write().unwrap().get_mut(key).unwrap().update(entry);
+                } else if *last_lookup {
+                    warn!("Arp lookup {} error: {:?}.", key, entry.unwrap_err());
+                }
+            }
+
+            timeout_ips.clear();
+            lookup_ips.clear();
+        }
+    }
+
+    pub fn start(&self) {
+        if self.is_running.load(Ordering::Relaxed) || NOT_SUPPORT {
+            return;
+        }
+        info!("Arp table starting...");
+        self.is_running.store(true, Ordering::Relaxed);
+        let table = self.table.clone();
+        let is_running = self.is_running.clone();
+        self.thread_handler.lock().unwrap().replace(spawn(move || {
+            Self::run(table, is_running);
+        }));
+    }
+
+    pub fn stop(&self) {
+        if !self.is_running.load(Ordering::Relaxed) || NOT_SUPPORT {
+            return;
+        }
+        info!("Arp table stopping...");
+        self.is_running.store(false, Ordering::Relaxed);
+        if let Some(handler) = self.thread_handler.lock().unwrap().take() {
+            let _ = handler.join();
+        }
+    }
+}
+
 pub struct NpbConnectionPool {
     connections: HashMap<(u128, u8), NpbSender>,
     socket_type: SocketType,
     underlay_is_ipv6: bool,
 
     counter: Arc<NpbSenderCounter>,
+
+    arp: Arc<NpbArpTable>,
 }
 
 impl NpbConnectionPool {
@@ -323,6 +585,7 @@ impl NpbConnectionPool {
         id: usize,
         underlay_is_ipv6: bool,
         socket_type: SocketType,
+        arp: Arc<NpbArpTable>,
         stats_collector: Arc<stats::Collector>,
     ) -> Self {
         let counter = Arc::new(NpbSenderCounter::default());
@@ -347,10 +610,13 @@ impl NpbConnectionPool {
             socket_type,
             underlay_is_ipv6,
             counter,
+            arp,
         }
     }
 
-    fn create_sender(&self, remote: IpAddr, protocol: u8) -> Result<NpbSender, String> {
+    fn create_sender(&self, remote: &IpAddr, protocol: u8) -> Result<NpbSender, String> {
+        // Trigger to create ARP table entry.
+        self.arp.add(remote);
         match self.socket_type {
             SocketType::Udp => {
                 let sender = IpSender::new(remote, protocol);
@@ -360,39 +626,17 @@ impl NpbConnectionPool {
                 Ok(NpbSender::IpSender(sender.unwrap()))
             }
             #[cfg(unix)]
-            SocketType::RawUdp => {
-                let local_addr = get_route_src_ip_and_mac(&remote);
-                if local_addr.is_err() {
-                    return Err(format!(
-                        "Afpacket route error: {:?}.",
-                        local_addr.unwrap_err()
-                    ));
-                }
-                let if_name = get_route_src_ip_interface_name(&remote);
-                if if_name.is_err() {
-                    return Err(format!("Afpacket route error: {:?}.", if_name.unwrap_err()));
-                }
-                let neighbor = neighbor_lookup(remote);
-                if neighbor.is_err() {
-                    return Err(format!(
-                        "Afpacket route error: {:?}.",
-                        neighbor.unwrap_err()
-                    ));
-                }
-                let (underlay_src_ip, underlay_src_mac) = local_addr.unwrap();
-                let sender = AfpacketSender::new(
-                    if_name.unwrap(),
-                    underlay_src_ip,
-                    underlay_src_mac,
-                    neighbor.unwrap().dest_mac_addr,
-                )?;
-                Ok(NpbSender::RawSender(sender))
-            }
+            SocketType::RawUdp => Ok(NpbSender::RawSender(AfpacketSender::new(remote))),
             _ => panic!("NPB not support socket type: {:?}.", self.socket_type),
         }
     }
 
-    fn send_to(&mut self, underlay_l2_opt_size: usize, packet: Vec<u8>) -> IOResult<usize> {
+    fn send_to(
+        &mut self,
+        timestamp: u64,
+        underlay_l2_opt_size: usize,
+        packet: Vec<u8>,
+    ) -> IOResult<usize> {
         let (remote, key, header_size) = if self.underlay_is_ipv6 {
             let offset = IPV6_DST_OFFSET + underlay_l2_opt_size;
             let header_size = IPV6_PACKET_SIZE + underlay_l2_opt_size;
@@ -425,25 +669,39 @@ impl NpbConnectionPool {
 
         let mut conn = self.connections.get_mut(&key);
         if conn.is_some() {
-            return conn
-                .as_mut()
-                .unwrap()
-                .send(underlay_l2_opt_size, header_size, packet);
+            return conn.as_mut().unwrap().send(
+                timestamp,
+                underlay_l2_opt_size,
+                header_size,
+                packet,
+                &self.arp,
+            );
         }
 
-        let conn = self.create_sender(remote, key.1);
+        let conn = self.create_sender(&remote, key.1);
         if conn.is_err() {
             return Err(IOError::new(ErrorKind::Other, conn.unwrap_err()));
         }
         let mut conn = conn.unwrap();
-        let ret = conn.send(underlay_l2_opt_size, header_size, packet);
+        let ret = conn.send(
+            timestamp,
+            underlay_l2_opt_size,
+            header_size,
+            packet,
+            &self.arp,
+        );
         self.connections.insert(key, conn);
         return ret;
     }
 
-    pub fn send(&mut self, underlay_l2_opt_size: usize, packet: Vec<u8>) -> IOResult<usize> {
+    pub fn send(
+        &mut self,
+        timestamp: u64,
+        underlay_l2_opt_size: usize,
+        packet: Vec<u8>,
+    ) -> IOResult<usize> {
         let bytes = packet.len();
-        let ret = self.send_to(underlay_l2_opt_size, packet);
+        let ret = self.send_to(timestamp, underlay_l2_opt_size, packet);
         if ret.is_err() {
             return ret;
         }
@@ -459,15 +717,17 @@ impl NpbConnectionPool {
 
 pub struct NpbPacketSender {
     connections: Mutex<NpbConnectionPool>,
-    receiver: Receiver<(usize, Vec<u8>)>,
+    receiver: Receiver<(u64, usize, Vec<u8>)>,
     disable: AtomicBool,
 }
 
 impl NpbPacketSender {
+    const LOG_INTERVAL: u64 = 300 * 1000000000;
     pub fn new(
         id: usize,
-        receiver: Receiver<(usize, Vec<u8>)>,
+        receiver: Receiver<(u64, usize, Vec<u8>)>,
         config: &NpbConfig,
+        arp: Arc<NpbArpTable>,
         stats_collector: Arc<stats::Collector>,
     ) -> Self {
         NpbPacketSender {
@@ -475,6 +735,7 @@ impl NpbPacketSender {
                 id,
                 config.underlay_is_ipv6,
                 config.socket_type,
+                arp.clone(),
                 stats_collector,
             )),
             receiver,
@@ -483,19 +744,21 @@ impl NpbPacketSender {
     }
 
     pub fn run(&self) {
+        let mut last_timestamp = 0;
         while !self.disable.load(Ordering::Relaxed) {
             let packet = self.receiver.recv(Some(Duration::from_secs(1)));
             if packet.is_err() {
                 continue;
             }
-            let (underlay_l2_opt_size, packet) = packet.unwrap();
-            let ret = self
-                .connections
-                .lock()
-                .unwrap()
-                .send(underlay_l2_opt_size, packet);
-            if ret.is_err() {
-                warn!("Npb packet sender error: {:?}.", ret);
+            let (timestamp, underlay_l2_opt_size, packet) = packet.unwrap();
+            let ret =
+                self.connections
+                    .lock()
+                    .unwrap()
+                    .send(timestamp, underlay_l2_opt_size, packet);
+            if ret.is_err() && last_timestamp + Self::LOG_INTERVAL < timestamp {
+                last_timestamp = timestamp;
+                info!("Npb packet sender error: {:?}.", ret);
             }
         }
     }

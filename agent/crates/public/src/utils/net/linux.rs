@@ -249,7 +249,6 @@ fn arp_lookup(
 fn to_multi_address(addr: Ipv6Addr) -> SockAddr {
     let suffix = addr.segments();
     let multi = Ipv6Addr::new(0xff02, 0, 0, 0, 0, 1, 0xff00 | suffix[6], suffix[7]);
-    warn!("npb xxxxxxxxx {}", multi);
     SockAddr::from(SocketAddrV6::new(multi, 0, 0, 0))
 }
 
