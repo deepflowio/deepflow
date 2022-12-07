@@ -161,12 +161,16 @@ pub struct PolicyData {
 }
 
 impl PolicyData {
-    pub fn new(npb_actions: Vec<NpbAction>, acl_id: u32, action_flags: ActionFlags) -> Self {
-        Self {
-            npb_actions,
+    pub fn new(npb_actions: Vec<NpbAction>, acl_id: u32) -> Self {
+        let mut policy = Self {
+            npb_actions: npb_actions.clone(),
             acl_id,
-            action_flags,
+            ..Default::default()
+        };
+        for action in &npb_actions {
+            policy.set_action_flags(action);
         }
+        return policy;
     }
 
     pub fn contain_npb(&self) -> bool {
