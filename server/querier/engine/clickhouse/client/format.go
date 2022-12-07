@@ -36,6 +36,8 @@ var VALUE_TYPE_MAP = map[string]int{
 
 func TransType(typeName string, value interface{}) (interface{}, string, error) {
 	switch typeName {
+	case "Int8":
+		return int(value.(int8)), VALUE_TYPE_INT, nil
 	case "UInt64":
 		return int(value.(uint64)), VALUE_TYPE_INT, nil
 	case "UInt32":
