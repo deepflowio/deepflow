@@ -18,12 +18,10 @@ use std::env;
 use std::fmt;
 use std::mem;
 use std::net::{IpAddr, Ipv4Addr};
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process;
-use std::sync::atomic::AtomicI64;
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
+    atomic::{AtomicBool, AtomicI64, Ordering},
     Arc, Condvar, Mutex, Weak,
 };
 use std::thread::{self, JoinHandle};
@@ -89,7 +87,7 @@ use crate::{
     platform::{LibvirtXmlExtractor, PlatformSynchronizer},
     policy::{Policy, PolicySetter},
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
-    sender::uniform_sender::UniformSenderThread,
+    sender::{npb_sender::NpbArpTable, uniform_sender::UniformSenderThread},
     utils::{
         environment::{
             check, controller_ip_check, free_memory_check, free_space_checker, get_ctrl_ip_and_mac,
@@ -772,6 +770,7 @@ pub struct Components {
     pub pcap_batch_uniform_sender: UniformSenderThread<BoxedPcapBatch>,
     pub policy_setter: PolicySetter,
     pub npb_bandwidth_watcher: Box<Arc<NpbBandwidthWatcher>>,
+    pub npb_arp_table: Arc<NpbArpTable>,
     max_memory: u64,
     tap_mode: TapMode,
     agent_mode: RunningMode,
@@ -853,6 +852,7 @@ impl Components {
         for p in self.pcap_assemblers.iter() {
             p.start();
         }
+        self.npb_arp_table.start();
         info!("Started components.");
     }
 
@@ -1155,6 +1155,7 @@ impl Components {
             config_handler.candidate_config.sender.npb_bps_threshold,
         )));
         let mut handler_builders = Vec::new();
+        let npb_arp_table = Arc::new(NpbArpTable::new());
 
         let mut src_interfaces_and_namespaces = vec![];
         for src_if in yaml_config.src_interfaces.iter() {
@@ -1288,6 +1289,7 @@ impl Components {
                     &config_handler.candidate_config.npb,
                     &queue_debugger,
                     npb_bps_limit.clone(),
+                    npb_arp_table.clone(),
                     stats_collector.clone(),
                 )),
             ]));
@@ -1685,6 +1687,7 @@ impl Components {
             agent_mode,
             policy_setter,
             npb_bandwidth_watcher,
+            npb_arp_table,
         })
     }
 
@@ -1889,6 +1892,7 @@ impl Components {
             p.stop();
         }
         self.packet_sequence_uniform_sender.stop();
+        self.npb_arp_table.stop();
         info!("Stopped components.")
     }
 }
