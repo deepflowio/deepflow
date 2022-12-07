@@ -19,10 +19,10 @@ use std::{
     fmt::Debug,
     io::{self, Write},
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
-        Arc,
+        atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
+        Arc, Weak,
     },
-    time::{Duration, SystemTime},
+    time::{Duration, Instant, SystemTime},
 };
 
 use enum_dispatch::enum_dispatch;
@@ -53,6 +53,10 @@ use openshift_openapi::api::route::v1::Route;
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
 use tokio::{runtime::Handle, sync::Mutex, task::JoinHandle, time};
+
+use crate::utils::stats::{
+    self, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption,
+};
 
 const LIST_INTERVAL: Duration = Duration::from_secs(600);
 const REFRESH_INTERVAL: Duration = Duration::from_secs(3600);
@@ -93,6 +97,41 @@ pub enum GenericResourceWatcher {
     Route(ResourceWatcher<Route>),
 }
 
+#[derive(Default)]
+pub struct WatcherCounter {
+    list_count: AtomicU32,
+    list_length: AtomicU32,
+    list_cost_time_sum: AtomicU64, // ns
+}
+
+impl RefCountable for WatcherCounter {
+    fn get_counters(&self) -> Vec<Counter> {
+        let list_count = self.list_count.swap(0, Ordering::Relaxed);
+        let list_avg_cost_time = self
+            .list_cost_time_sum
+            .swap(0, Ordering::Relaxed)
+            .checked_div(list_count as u64)
+            .unwrap_or_default();
+        let list_avg_length = self
+            .list_length
+            .swap(0, Ordering::Relaxed)
+            .checked_div(list_count)
+            .unwrap_or_default();
+        vec![
+            (
+                "list_avg_length",
+                CounterType::Gauged,
+                CounterValue::Unsigned(list_avg_length as u64),
+            ),
+            (
+                "list_avg_cost_time",
+                CounterType::Counted,
+                CounterValue::Unsigned(list_avg_cost_time),
+            ),
+        ]
+    }
+}
+
 // 发生错误，需要重新构造实例
 #[derive(Clone)]
 pub struct ResourceWatcher<K> {
@@ -103,6 +142,7 @@ pub struct ResourceWatcher<K> {
     version: Arc<AtomicU64>,
     runtime: Handle,
     ready: Arc<AtomicBool>,
+    stats_counter: Arc<WatcherCounter>,
 }
 
 impl<K> Watcher for ResourceWatcher<K>
@@ -118,10 +158,17 @@ where
         let ready = self.ready.clone();
 
         let api = self.api.clone();
+        let stats_counter = self.stats_counter.clone();
 
-        let handle = self
-            .runtime
-            .spawn(Self::process(entries, version, api, kind, err_msg, ready));
+        let handle = self.runtime.spawn(Self::process(
+            entries,
+            version,
+            api,
+            kind,
+            err_msg,
+            ready,
+            stats_counter,
+        ));
 
         info!("{} watcher started", self.kind);
         Some(handle)
@@ -166,6 +213,7 @@ where
             err_msg: Arc::new(Mutex::new(None)),
             runtime,
             ready: Default::default(),
+            stats_counter: Default::default(),
         }
     }
 
@@ -176,19 +224,27 @@ where
         kind: &'static str,
         err_msg: Arc<Mutex<Option<String>>>,
         ready: Arc<AtomicBool>,
+        stats_counter: Arc<WatcherCounter>,
     ) {
         let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
-        Self::get_list_entry(&mut encoder, &entries, &version, kind, &api, &err_msg).await;
+        Self::get_list_entry(
+            &mut encoder,
+            &entries,
+            &version,
+            kind,
+            &api,
+            &err_msg,
+            &stats_counter,
+        )
+        .await;
         ready.store(true, Ordering::Relaxed);
         info!("{} watcher ready", kind);
 
         let mut ticker = time::interval(LIST_INTERVAL);
 
         let mut stream = runtime::watcher(api.clone(), ListParams::default()).boxed();
-
         let mut last_update = SystemTime::now();
         let mut last_refresh = SystemTime::now();
-
         let mut event_counter = EventCounter::default();
 
         loop {
@@ -210,15 +266,17 @@ where
                     ).await;
                 }
                 _ = ticker.tick() => {
-                    if last_update.elapsed().unwrap() < LIST_INTERVAL
+                     if last_update.elapsed().unwrap() < LIST_INTERVAL
                         && last_refresh.elapsed().unwrap() < REFRESH_INTERVAL
                     {
                         continue;
                     }
-
                     last_update = SystemTime::now();
                     last_refresh = SystemTime::now();
-                    Self::get_list_entry(&mut encoder, &entries, &version, kind, &api, &err_msg).await;
+                    let now = Instant::now();
+                    Self::get_list_entry(&mut encoder, &entries, &version, kind, &api, &err_msg, &stats_counter).await;
+                    stats_counter.list_cost_time_sum.fetch_add(now.elapsed().as_nanos() as u64, Ordering::Relaxed);
+                    stats_counter.list_count.fetch_add(1, Ordering::Relaxed);
                 }
             }
         }
@@ -231,9 +289,13 @@ where
         kind: &str,
         api: &Api<K>,
         err_msg: &Arc<Mutex<Option<String>>>,
+        stats_counter: &WatcherCounter,
     ) {
         match api.list(&ListParams::default()).await {
             Ok(object_list) => {
+                stats_counter
+                    .list_length
+                    .fetch_add(object_list.items.len() as u32, Ordering::Relaxed);
                 info!(
                     "k8s {} watcher list entry.len={}",
                     kind,
@@ -707,119 +769,104 @@ impl ResourceWatcherFactory {
         Self { client, runtime }
     }
 
+    fn new_watcher_inner<K>(
+        &self,
+        kind: &'static str,
+        stats_collector: &stats::Collector,
+        namespace: Option<&str>,
+    ) -> ResourceWatcher<K>
+    where
+        K: Clone + Debug + DeserializeOwned + Resource + Serialize + Trimmable,
+        K: Metadata<Ty = ObjectMeta>,
+        <K as Resource>::DynamicType: Default,
+    {
+        let watcher = ResourceWatcher::new(
+            match namespace {
+                Some(namespace) => Api::namespaced(self.client.clone(), namespace),
+                None => Api::all(self.client.clone()),
+            },
+            kind,
+            self.runtime.clone(),
+        );
+        stats_collector.register_countable(
+            "resource_watcher",
+            Countable::Ref(Arc::downgrade(&watcher.stats_counter) as Weak<dyn RefCountable>),
+            vec![StatsOption::Tag("kind", watcher.kind.to_string())],
+        );
+        watcher
+    }
+
     pub fn new_watcher(
         &self,
         resource: &'static str,
         kind: &'static str,
         namespace: Option<&str>,
+        stats_collector: &stats::Collector,
     ) -> Option<GenericResourceWatcher> {
-        match resource {
+        let watcher = match resource {
             // 特定namespace不支持Node/Namespace资源
-            "nodes" => Some(GenericResourceWatcher::Node(ResourceWatcher::new(
-                Api::all(self.client.clone()),
+            "nodes" => {
+                GenericResourceWatcher::Node(self.new_watcher_inner(kind, stats_collector, None))
+            }
+            "namespaces" => GenericResourceWatcher::Namespace(self.new_watcher_inner(
                 kind,
-                self.runtime.clone(),
-            ))),
-            "namespaces" => Some(GenericResourceWatcher::Namespace(ResourceWatcher::new(
-                Api::all(self.client.clone()),
-                kind,
-                self.runtime.clone(),
-            ))),
-            "services" => Some(GenericResourceWatcher::Service(ResourceWatcher::new(
-                match namespace {
-                    Some(namespace) => Api::namespaced(self.client.clone(), namespace),
-                    None => Api::all(self.client.clone()),
-                },
-                kind,
-                self.runtime.clone(),
-            ))),
-            "deployments" => Some(GenericResourceWatcher::Deployment(ResourceWatcher::new(
-                match namespace {
-                    Some(namespace) => Api::namespaced(self.client.clone(), namespace),
-                    None => Api::all(self.client.clone()),
-                },
-                kind,
-                self.runtime.clone(),
-            ))),
-            "pods" => Some(GenericResourceWatcher::Pod(ResourceWatcher::new(
-                match namespace {
-                    Some(namespace) => Api::namespaced(self.client.clone(), namespace),
-                    None => Api::all(self.client.clone()),
-                },
-                kind,
-                self.runtime.clone(),
-            ))),
-            "statefulsets" => Some(GenericResourceWatcher::StatefulSet(ResourceWatcher::new(
-                match namespace {
-                    Some(namespace) => Api::namespaced(self.client.clone(), namespace),
-                    None => Api::all(self.client.clone()),
-                },
-                kind,
-                self.runtime.clone(),
-            ))),
-            "daemonsets" => Some(GenericResourceWatcher::DaemonSet(ResourceWatcher::new(
-                match namespace {
-                    Some(namespace) => Api::namespaced(self.client.clone(), namespace),
-                    None => Api::all(self.client.clone()),
-                },
-                kind,
-                self.runtime.clone(),
-            ))),
-            "replicationcontrollers" => Some(GenericResourceWatcher::ReplicationController(
-                ResourceWatcher::new(
-                    match namespace {
-                        Some(namespace) => Api::namespaced(self.client.clone(), namespace),
-                        None => Api::all(self.client.clone()),
-                    },
-                    kind,
-                    self.runtime.clone(),
-                ),
+                stats_collector,
+                None,
             )),
-            "replicasets" => Some(GenericResourceWatcher::ReplicaSet(ResourceWatcher::new(
-                match namespace {
-                    Some(namespace) => Api::namespaced(self.client.clone(), namespace),
-                    None => Api::all(self.client.clone()),
-                },
+            "services" => GenericResourceWatcher::Service(self.new_watcher_inner(
                 kind,
-                self.runtime.clone(),
-            ))),
-            "v1ingresses" => Some(GenericResourceWatcher::V1Ingress(ResourceWatcher::new(
-                match namespace {
-                    Some(namespace) => Api::namespaced(self.client.clone(), namespace),
-                    None => Api::all(self.client.clone()),
-                },
-                kind,
-                self.runtime.clone(),
-            ))),
-            "v1beta1ingresses" => Some(GenericResourceWatcher::V1beta1Ingress(
-                ResourceWatcher::new(
-                    match namespace {
-                        Some(namespace) => Api::namespaced(self.client.clone(), namespace),
-                        None => Api::all(self.client.clone()),
-                    },
-                    kind,
-                    self.runtime.clone(),
-                ),
+                stats_collector,
+                namespace,
             )),
-            "extv1beta1ingresses" => Some(GenericResourceWatcher::ExtV1beta1Ingress(
-                ResourceWatcher::new(
-                    match namespace {
-                        Some(namespace) => Api::namespaced(self.client.clone(), namespace),
-                        None => Api::all(self.client.clone()),
-                    },
-                    kind,
-                    self.runtime.clone(),
-                ),
-            )),
-            "routes" => Some(GenericResourceWatcher::Route(ResourceWatcher::new(
-                match namespace {
-                    Some(namespace) => Api::namespaced(self.client.clone(), namespace),
-                    None => Api::all(self.client.clone()),
-                },
+            "deployments" => GenericResourceWatcher::Deployment(self.new_watcher_inner(
                 kind,
-                self.runtime.clone(),
-            ))),
-            _ => None,
-        }
+                stats_collector,
+                namespace,
+            )),
+            "pods" => GenericResourceWatcher::Pod(self.new_watcher_inner(
+                kind,
+                stats_collector,
+                namespace,
+            )),
+            "statefulsets" => GenericResourceWatcher::StatefulSet(self.new_watcher_inner(
+                kind,
+                stats_collector,
+                namespace,
+            )),
+            "daemonsets" => GenericResourceWatcher::DaemonSet(self.new_watcher_inner(
+                kind,
+                stats_collector,
+                namespace,
+            )),
+            "replicationcontrollers" => GenericResourceWatcher::ReplicationController(
+                self.new_watcher_inner(kind, stats_collector, namespace),
+            ),
+            "replicasets" => GenericResourceWatcher::ReplicaSet(self.new_watcher_inner(
+                kind,
+                stats_collector,
+                namespace,
+            )),
+            "v1ingresses" => GenericResourceWatcher::V1Ingress(self.new_watcher_inner(
+                kind,
+                stats_collector,
+                namespace,
+            )),
+            "v1beta1ingresses" => GenericResourceWatcher::V1beta1Ingress(self.new_watcher_inner(
+                kind,
+                stats_collector,
+                namespace,
+            )),
+            "extv1beta1ingresses" => GenericResourceWatcher::ExtV1beta1Ingress(
+                self.new_watcher_inner(kind, stats_collector, namespace),
+            ),
+            "routes" => GenericResourceWatcher::Route(self.new_watcher_inner(
+                kind,
+                stats_collector,
+                namespace,
+            )),
+            _ => return None,
+        };
+
+        Some(watcher)
     }
 }
