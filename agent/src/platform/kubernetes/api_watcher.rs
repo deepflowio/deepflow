@@ -45,6 +45,7 @@ use crate::{
     exception::ExceptionHandler,
     platform::kubernetes::resource_watcher::ResourceWatcherFactory,
     rpc::Session,
+    utils::stats,
 };
 use public::proto::{
     common::KubernetesApiInfo,
@@ -109,6 +110,7 @@ pub struct ApiWatcher {
     apiserver_version: Arc<Mutex<Info>>,
     session: Arc<Session>,
     exception_handler: ExceptionHandler,
+    stats_collector: Arc<stats::Collector>,
 }
 
 impl ApiWatcher {
@@ -116,6 +118,7 @@ impl ApiWatcher {
         config: PlatformAccess,
         session: Arc<Session>,
         exception_handler: ExceptionHandler,
+        stats_collector: Arc<stats::Collector>,
     ) -> Self {
         // worker_threads = min(min(3 * CPU_CORE + 0, THREAD_THRESHOLD), RESOURCES.len())
         let mut sys = System::new();
@@ -148,6 +151,7 @@ impl ApiWatcher {
             err_msgs: Arc::new(Mutex::new(vec![])),
             watchers: Arc::new(Mutex::new(HashMap::new())),
             exception_handler,
+            stats_collector,
         }
     }
 
@@ -213,6 +217,7 @@ impl ApiWatcher {
         let err_msgs = self.err_msgs.clone();
         let watchers = self.watchers.clone();
         let exception_handler = self.exception_handler.clone();
+        let stats_collector = self.stats_collector.clone();
 
         let handle = thread::spawn(move || {
             Self::run(
@@ -224,6 +229,7 @@ impl ApiWatcher {
                 err_msgs,
                 watchers,
                 exception_handler,
+                stats_collector,
             )
         });
         self.thread.lock().unwrap().replace(handle);
@@ -235,6 +241,7 @@ impl ApiWatcher {
         apiserver_version: &Arc<Mutex<Info>>,
         err_msgs: &Arc<Mutex<Vec<String>>>,
         namespace: Option<&str>,
+        stats_collector: &stats::Collector,
     ) -> Result<(HashMap<String, GenericResourceWatcher>, Vec<JoinHandle<()>>)> {
         let mut config = Config::infer().await.map_err(|e| {
             Error::KubernetesApiWatcher(format!("failed to infer kubernetes config: {}", e))
@@ -289,6 +296,7 @@ impl ApiWatcher {
                         RESOURCES[index],
                         PB_RESOURCES[index],
                         namespace,
+                        stats_collector,
                     ) {
                         watchers.insert(resource_name, watcher);
                     }
@@ -349,6 +357,7 @@ impl ApiWatcher {
                                 RESOURCES[index],
                                 PB_RESOURCES[index],
                                 namespace,
+                                stats_collector,
                             ) {
                                 watchers.insert(resource_name, watcher);
                             }
@@ -358,22 +367,37 @@ impl ApiWatcher {
                     }
                 }
                 let ingress_watcher = if is_openshift_route {
-                    watcher_factory.new_watcher("routes", PB_INGRESS, namespace)
+                    watcher_factory.new_watcher("routes", PB_INGRESS, namespace, stats_collector)
                 } else if ingress_groups
                     .iter()
                     .any(|g| g.as_str() == "networking.k8s.io/v1")
                 {
-                    watcher_factory.new_watcher("v1ingresses", PB_INGRESS, namespace)
+                    watcher_factory.new_watcher(
+                        "v1ingresses",
+                        PB_INGRESS,
+                        namespace,
+                        stats_collector,
+                    )
                 } else if ingress_groups
                     .iter()
                     .any(|g| g.as_str() == "networking.k8s.io/v1beta1")
                 {
-                    watcher_factory.new_watcher("v1beta1ingresses", PB_INGRESS, namespace)
+                    watcher_factory.new_watcher(
+                        "v1beta1ingresses",
+                        PB_INGRESS,
+                        namespace,
+                        stats_collector,
+                    )
                 } else if ingress_groups
                     .iter()
                     .any(|g| g.as_str() == "extensions/v1beta1")
                 {
-                    watcher_factory.new_watcher("extv1beta1ingresses", PB_INGRESS, namespace)
+                    watcher_factory.new_watcher(
+                        "extv1beta1ingresses",
+                        PB_INGRESS,
+                        namespace,
+                        stats_collector,
+                    )
                 } else {
                     None
                 };
@@ -423,9 +447,12 @@ impl ApiWatcher {
                     if watchers.contains_key(resource) {
                         continue;
                     }
-                    if let Some(watcher) =
-                        watcher_factory.new_watcher(resource, PB_RESOURCES[index], namespace)
-                    {
+                    if let Some(watcher) = watcher_factory.new_watcher(
+                        resource,
+                        PB_RESOURCES[index],
+                        namespace,
+                        stats_collector,
+                    ) {
                         if let Some(handle) = watcher.start() {
                             task_handles.push(handle);
                         }
@@ -434,9 +461,14 @@ impl ApiWatcher {
                 }
 
                 let ingress_watcher = if is_openshift_route {
-                    watcher_factory.new_watcher("routes", PB_INGRESS, namespace)
+                    watcher_factory.new_watcher("routes", PB_INGRESS, namespace, stats_collector)
                 } else {
-                    watcher_factory.new_watcher("v1ingresses", PB_INGRESS, namespace)
+                    watcher_factory.new_watcher(
+                        "v1ingresses",
+                        PB_INGRESS,
+                        namespace,
+                        stats_collector,
+                    )
                 };
 
                 if let Some(watcher) = ingress_watcher {
@@ -627,6 +659,7 @@ impl ApiWatcher {
         err_msgs: Arc<Mutex<Vec<String>>>,
         watchers: Arc<Mutex<HashMap<String, GenericResourceWatcher>>>,
         exception_handler: ExceptionHandler,
+        stats_collector: Arc<stats::Collector>,
     ) {
         info!("kubernetes api watcher starting");
 
@@ -640,6 +673,7 @@ impl ApiWatcher {
                 &apiserver_version,
                 &err_msgs,
                 ns,
+                &stats_collector,
             )) {
                 Ok(r) => break r,
                 Err(e) => {
