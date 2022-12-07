@@ -48,6 +48,8 @@ use super::{
     THREAD_FLOW_ID_MASK, TIMER_FLOW_ID_MASK, TIME_MAX_INTERVAL, TIME_UNIT,
 };
 
+#[cfg(target_os = "linux")]
+use crate::config::handler::EbpfAccess;
 use crate::{
     common::{
         endpoint::{EndpointData, EndpointInfo, EPC_FROM_DEEPFLOW, EPC_FROM_INTERNET},
@@ -101,6 +103,7 @@ pub struct FlowMap {
     last_queue_flush: Duration,
     config: FlowAccess,
     parse_config: LogParserAccess,
+    ebpf_config: Option<EbpfAccess>, // TODO: We only need its epc_id，epc_id is not only useful for ebpf, consider moving it to FlowConfig
     rrt_cache: Rc<RefCell<L7RrtCache>>,
     flow_perf_counter: Arc<FlowPerfCounter>,
     ntp_diff: Arc<AtomicI64>,
@@ -119,6 +122,7 @@ impl FlowMap {
         ntp_diff: Arc<AtomicI64>,
         config: FlowAccess,
         parse_config: LogParserAccess,
+        ebpf_config: Option<EbpfAccess>,
         packet_sequence_queue: Option<DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>>, // Enterprise Edition Feature: packet-sequence
         stats_collector: &stats::Collector,
         from_ebpf: bool,
@@ -163,6 +167,7 @@ impl FlowMap {
             last_queue_flush: Duration::ZERO,
             config,
             parse_config,
+            ebpf_config,
             rrt_cache: Rc::new(RefCell::new(L7RrtCache::new(L7_RRT_CACHE_CAPACITY))),
             flow_perf_counter,
             ntp_diff,
@@ -278,7 +283,12 @@ impl FlowMap {
     pub fn inject_meta_packet(&mut self, meta_packet: &mut MetaPacket) {
         if !self.inject_flush_ticker(meta_packet.lookup_key.timestamp) {
             // 补充由于超时导致未查询策略，用于其它流程（如PCAP存储）
-            (self.policy_getter).lookup(meta_packet, self.id as usize);
+            let local_ecp_id = if self.ebpf_config.is_some() {
+                self.ebpf_config.as_ref().unwrap().load().epc_id as i32
+            } else {
+                0
+            };
+            (self.policy_getter).lookup(meta_packet, self.id as usize, local_ecp_id);
             return;
         }
 
@@ -758,8 +768,13 @@ impl FlowMap {
             packet_sequence_block: None, // Enterprise Edition Feature: packet-sequence
             residual_request: 0,
         };
+        let local_ecp_id = if self.ebpf_config.is_some() {
+            self.ebpf_config.as_ref().unwrap().load().epc_id as i32
+        } else {
+            0
+        };
         // 标签
-        (self.policy_getter).lookup(meta_packet, self.id as usize);
+        (self.policy_getter).lookup(meta_packet, self.id as usize, local_ecp_id);
         self.update_endpoint_and_policy_data(&mut node, meta_packet);
 
         let l7_proto_enum = self.app_table.get_protocol(meta_packet);
@@ -805,7 +820,12 @@ impl FlowMap {
 
         if !node.policy_in_tick[meta_packet.direction as usize] {
             node.policy_in_tick[meta_packet.direction as usize] = true;
-            (self.policy_getter).lookup(meta_packet, self.id as usize);
+            let local_ecp_id = if self.ebpf_config.is_some() {
+                self.ebpf_config.as_ref().unwrap().load().epc_id as i32
+            } else {
+                0
+            };
+            (self.policy_getter).lookup(meta_packet, self.id as usize, local_ecp_id);
             self.update_endpoint_and_policy_data(node, meta_packet);
         } else {
             // copy endpoint and policy data
@@ -874,7 +894,12 @@ impl FlowMap {
         }
         // 这里需要查询策略，建立ARP表
         if meta_packet.is_ndp_response() {
-            (self.policy_getter).lookup(meta_packet, self.id as usize);
+            let local_ecp_id = if self.ebpf_config.is_some() {
+                self.ebpf_config.as_ref().unwrap().load().epc_id as i32
+            } else {
+                0
+            };
+            (self.policy_getter).lookup(meta_packet, self.id as usize, local_ecp_id);
         }
     }
 
@@ -1428,6 +1453,7 @@ pub fn _new_flow_map_and_receiver(
         Map::new(current_config.clone(), |config| -> &LogParserConfig {
             &config.log_parser
         }),
+        None,
         Some(packet_sequence_queue), // Enterprise Edition Feature: packet-sequence
         &stats::Collector::new(&vec!["127.0.0.1".to_string()]),
         false,

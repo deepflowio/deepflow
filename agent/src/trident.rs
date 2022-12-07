@@ -1481,7 +1481,7 @@ impl Components {
             ebpf_collector = EbpfCollector::new(
                 ebpf_dispatcher_id,
                 synchronizer.ntp_diff(),
-                &config_handler.candidate_config.ebpf,
+                config_handler.ebpf(),
                 config_handler.log_parser(),
                 config_handler.flow(),
                 policy_getter,

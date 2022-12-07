@@ -20,6 +20,7 @@ use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
+use arc_swap::access::Access;
 use libc::c_int;
 use log::{debug, error, info, warn};
 
@@ -29,7 +30,7 @@ use crate::common::l7_protocol_log::{
 };
 use crate::common::meta_packet::MetaPacket;
 use crate::common::TaggedFlow;
-use crate::config::handler::{EbpfConfig, LogParserAccess};
+use crate::config::handler::{EbpfAccess, EbpfConfig, LogParserAccess};
 use crate::config::{FlowAccess, UprobeProcRegExp};
 use crate::ebpf::{self, set_allow_port_bitmap};
 use crate::flow_generator::{FlowMap, MetaAppProto};
@@ -185,7 +186,7 @@ struct EbpfDispatcher {
     log_parser_config: LogParserAccess,
     flow_map_config: FlowAccess,
 
-    config: EbpfConfig,
+    config: EbpfAccess,
     output: DebugSender<Box<MetaAppProto>>, // Send MetaAppProtos to the AppProtoLogsParser
     flow_output: DebugSender<Box<TaggedFlow>>, // Send TaggedFlows to the QuadrupleGenerator
     stats_collector: Arc<stats::Collector>,
@@ -197,9 +198,9 @@ impl EbpfDispatcher {
     fn on_config_change(&mut self, config: &EbpfConfig) {
         info!(
             "ebpf collector config change from {:#?} to {:#?}.",
-            self.config, config
+            *self.config.load(),
+            config
         );
-        self.config = config.clone();
     }
 
     fn run(&mut self, sync_counter: SyncEbpfCounter) {
@@ -211,10 +212,12 @@ impl EbpfDispatcher {
             self.time_diff.clone(),
             self.flow_map_config.clone(),
             self.log_parser_config.clone(),
+            Some(self.config.clone()),
             None, // Enterprise Edition Feature: packet-sequence
             &self.stats_collector,
             true, // from_ebpf
         );
+        let ebpf_config = self.config.load();
         while unsafe { SWITCH } {
             let mut packet = self.receiver.recv(Some(Duration::from_millis(1)));
             if packet.is_err() {
@@ -225,7 +228,7 @@ impl EbpfDispatcher {
 
             let packet = packet.as_mut().unwrap();
             packet.timestamp_adjust(self.time_diff.load(Ordering::Relaxed));
-            packet.set_loopback_mac(self.config.ctrl_mac);
+            packet.set_loopback_mac(ebpf_config.ctrl_mac);
             flow_map.inject_meta_packet(&mut *packet);
         }
     }
@@ -425,7 +428,7 @@ impl EbpfCollector {
     pub fn new(
         dispatcher_id: usize,
         time_diff: Arc<AtomicI64>,
-        config: &EbpfConfig,
+        config: EbpfAccess,
         log_parser_config: LogParserAccess,
         flow_map_config: FlowAccess,
         policy_getter: PolicyGetter,
@@ -434,7 +437,8 @@ impl EbpfCollector {
         queue_debugger: &QueueDebugger,
         stats_collector: Arc<stats::Collector>,
     ) -> Result<Box<Self>> {
-        if config.ebpf_disabled {
+        let ebpf_config = config.load();
+        if ebpf_config.ebpf_disabled {
             info!("ebpf collector disabled.");
             return Err(Error::EbpfDisabled);
         }
@@ -443,11 +447,11 @@ impl EbpfCollector {
             bounded_with_debug(4096, "1-ebpf-packet-to-ebpf-collector", queue_debugger);
 
         Self::ebpf_init(
-            config,
+            &ebpf_config,
             sender,
-            &config.ebpf_uprobe_proc_regexp,
-            config.l7_protocol_enabled_bitmap,
-            config.ebpf_kprobe_whitelist_port.clone(),
+            &ebpf_config.ebpf_uprobe_proc_regexp,
+            ebpf_config.l7_protocol_enabled_bitmap,
+            ebpf_config.ebpf_kprobe_whitelist_port.clone(),
         )?;
         Self::ebpf_on_config_change(ebpf::CAP_LEN_MAX);
 
@@ -458,7 +462,7 @@ impl EbpfCollector {
                 time_diff,
                 receiver,
                 policy_getter,
-                config: config.clone(),
+                config,
                 log_parser_config,
                 output,
                 flow_output,
