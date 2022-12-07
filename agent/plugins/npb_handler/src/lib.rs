@@ -24,6 +24,8 @@ use public::{
     queue::DebugSender,
 };
 
+pub const NOT_SUPPORT: bool = true;
+
 #[derive(Debug)]
 pub enum NpbMode {
     L2,
@@ -101,7 +103,7 @@ impl NpbHandler {
         _overlay_vlan: bool,
         _bps_limit: Arc<LeakyBucket>,
         _counter: Arc<NpbHandlerCounter>,
-        _sender: DebugSender<(usize, Vec<u8>)>,
+        _sender: DebugSender<(u64, usize, Vec<u8>)>,
     ) -> Self {
         NpbHandler {}
     }

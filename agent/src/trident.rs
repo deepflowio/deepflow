@@ -76,7 +76,9 @@ use crate::{
     policy::Policy,
     proto::trident::{self, IfMacSource, TapMode},
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
-    sender::{uniform_sender::UniformSenderThread, SendItem, SendMessageType},
+    sender::{
+        npb_sender::NpbArpTable, uniform_sender::UniformSenderThread, SendItem, SendMessageType,
+    },
     utils::{
         environment::{
             check, controller_ip_check, free_memory_check, free_space_checker, get_ctrl_ip_and_mac,
@@ -752,6 +754,7 @@ pub struct Components {
     pub npb_bps_limit: Arc<LeakyBucket>,
     pub handler_builders: Vec<Arc<Mutex<Vec<PacketHandlerBuilder>>>>,
     pub compressed_otel_uniform_sender: UniformSenderThread,
+    pub npb_arp_table: Arc<NpbArpTable>,
     max_memory: u64,
     tap_mode: TapMode,
     agent_mode: RunningMode,
@@ -829,6 +832,7 @@ impl Components {
                 y.start();
             })
         });
+        self.npb_arp_table.start();
         info!("Started components.");
     }
 
@@ -1141,6 +1145,7 @@ impl Components {
             config_handler.candidate_config.npb.bps_threshold,
         )));
         let mut handler_builders = Vec::new();
+        let npb_arp_table = Arc::new(NpbArpTable::new());
 
         let mut src_interfaces_and_namespaces = vec![];
         for src_if in yaml_config.src_interfaces.iter() {
@@ -1237,6 +1242,7 @@ impl Components {
                     &config_handler.candidate_config.npb,
                     &queue_debugger,
                     npb_bps_limit.clone(),
+                    npb_arp_table.clone(),
                     stats_collector.clone(),
                 )),
             ]));
@@ -1557,6 +1563,7 @@ impl Components {
             handler_builders,
             compressed_otel_uniform_sender,
             agent_mode,
+            npb_arp_table,
         })
     }
 
@@ -1753,6 +1760,7 @@ impl Components {
             })
         });
         self.pcap_manager.stop();
+        self.npb_arp_table.stop();
         info!("Stopped components.")
     }
 }
