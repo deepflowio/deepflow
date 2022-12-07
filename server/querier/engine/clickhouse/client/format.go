@@ -38,6 +38,16 @@ func TransType(typeName string, value interface{}) (interface{}, string, error) 
 	switch typeName {
 	case "Int8":
 		return int(value.(int8)), VALUE_TYPE_INT, nil
+	case "Int16":
+		return int(value.(int16)), VALUE_TYPE_INT, nil
+	case "Int32":
+		return int(value.(int32)), VALUE_TYPE_INT, nil
+	case "Int64":
+		return int(value.(int64)), VALUE_TYPE_INT, nil
+	case "UInt8":
+		return int(value.(uint8)), VALUE_TYPE_INT, nil
+	case "UInt16":
+		return int(value.(uint16)), VALUE_TYPE_INT, nil
 	case "UInt64":
 		return int(value.(uint64)), VALUE_TYPE_INT, nil
 	case "UInt32":
