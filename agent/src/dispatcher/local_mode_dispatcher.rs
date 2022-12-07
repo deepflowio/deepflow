@@ -62,6 +62,7 @@ impl LocalModeDispatcher {
         let time_diff = base.ntp_diff.load(Ordering::Relaxed);
         let mut prev_timestamp = get_timestamp(time_diff);
 
+        #[cfg(target_os = "linux")]
         let mut flow_map = FlowMap::new(
             base.id as u32,
             base.flow_output_queue.clone(),
@@ -71,6 +72,19 @@ impl LocalModeDispatcher {
             base.flow_map_config.clone(),
             base.log_parse_config.clone(),
             None,
+            Some(base.packet_sequence_output_queue.clone()), // Enterprise Edition Feature: packet-sequence
+            &base.stats,
+            false, // !from_ebpf
+        );
+        #[cfg(target_os = "windows")]
+        let mut flow_map = FlowMap::new(
+            base.id as u32,
+            base.flow_output_queue.clone(),
+            base.policy_getter,
+            base.log_output_queue.clone(),
+            base.ntp_diff.clone(),
+            base.flow_map_config.clone(),
+            base.log_parse_config.clone(),
             Some(base.packet_sequence_output_queue.clone()), // Enterprise Edition Feature: packet-sequence
             &base.stats,
             false, // !from_ebpf
