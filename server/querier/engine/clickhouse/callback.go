@@ -194,10 +194,10 @@ func MacTranslate(args []interface{}) func(result *common.Result) error {
 				newMac := utils.Uint64ToMac(uint64((newValueSlice[macIndex]).(int))).String()
 				if args[0].(string) == "tap_port" && macTypeIndex != -1 {
 					newMac = strings.TrimPrefix(newMac, "00:00:")
-					if newValueSlice[macTypeIndex].(uint8) == tag.TAP_PORT_MAC_0 || newValueSlice[macTypeIndex].(uint8) == tag.TAP_PORT_MAC_1 {
+					if newValueSlice[macTypeIndex].(int) == tag.TAP_PORT_MAC_0 || newValueSlice[macTypeIndex].(int) == tag.TAP_PORT_MAC_1 {
 						newValueSlice[macIndex] = newMac
 						newValues[i] = newValueSlice
-					} else if newValueSlice[macTypeIndex].(uint8) == tag.TAP_PORT_IPV4 {
+					} else if newValueSlice[macTypeIndex].(int) == tag.TAP_PORT_IPV4 {
 						newIP := utils.IpFromUint32(uint32((newValueSlice[macIndex]).(int)))
 						newIPString := newIP.String()
 						newValueSlice[macIndex] = newIPString
