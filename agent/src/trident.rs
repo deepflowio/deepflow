@@ -445,6 +445,7 @@ impl Trident {
             match components.as_mut() {
                 None => {
                     let mut comp = Components::new(
+                        &version_info,
                         &config_handler,
                         stats_collector.clone(),
                         &session,
@@ -856,6 +857,7 @@ impl Components {
     }
 
     fn new(
+        version_info: &VersionInfo,
         config_handler: &ConfigHandler,
         stats_collector: Arc<stats::Collector>,
         session: &Arc<Session>,
@@ -1268,6 +1270,8 @@ impl Components {
             );
             packet_sequence_parsers.push(packet_sequence_parser);
             let (pcap_assembler, mini_packet_sender) = build_pcap_assembler(
+                // CE-AGENT always set pcap-assembler disabled
+                version_info.name != env!("AGENT_NAME"),
                 &yaml_config.pcap,
                 &stats_collector,
                 pcap_batch_sender.clone(),
@@ -1890,6 +1894,7 @@ impl Components {
 }
 
 fn build_pcap_assembler(
+    enabled: bool,
     config: &PcapConfig,
     stats_collector: &stats::Collector,
     pcap_batch_sender: DebugSender<BoxedPcapBatch>,
@@ -1905,7 +1910,7 @@ fn build_pcap_assembler(
     );
     let pcap_assembler = PcapAssembler::new(
         id as u32,
-        config.enabled,
+        enabled,
         config.buffer_size,
         config.flow_buffer_size,
         Duration::from_secs(config.flush_interval as u64),
