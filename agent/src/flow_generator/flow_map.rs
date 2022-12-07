@@ -426,7 +426,7 @@ impl FlowMap {
         slot_nodes: &mut Vec<Box<FlowNode>>,
     ) {
         let timestamp = meta_packet.lookup_key.timestamp;
-        let mut flow_closed = self.update_tcp_flow(config, meta_packet, &mut node);
+        let flow_closed = self.update_tcp_flow(config, meta_packet, &mut node);
         if config.collector_enabled {
             let direction = meta_packet.direction == PacketDirection::ClientToServer;
             self.collect_metric(config, &mut node, meta_packet, direction);
@@ -439,8 +439,13 @@ impl FlowMap {
             } else {
                 node.residual_request -= 1;
             }
-            // For eBPF Flow, we use residual_request to directly judge whether timeout is needed.
-            flow_closed = node.residual_request == 0;
+            // For eBPF data, timeout as soon as possible when there are no unaggregated requests.
+            // Considering that eBPF data may be out of order, wait for an additional 2s timeout.
+            if node.residual_request == 0 {
+                node.timeout = self.config.load().flow_timeout.closed_fin;
+            } else {
+                node.timeout = self.parse_config.load().l7_log_session_aggr_timeout;
+            }
         }
 
         // Enterprise Edition Feature: packet-sequence
