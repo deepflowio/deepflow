@@ -60,17 +60,14 @@ func RegisterGenesisCommand() *cobra.Command {
 	}
 	k8sInfo.Flags().StringVarP(&k8sType, "type", "t", "", "k8s info resource type: '*version.Info | *v1.Pod | *v1.ConfigMap | *v1.Namespace | \n*v1.Service | *v1.Deployment | *v1.DaemonSet | *v1.ReplicaSet | *v1beta1.Ingress'")
 
-	var serverIP string
 	agentInfo := &cobra.Command{
 		Use:     "agent",
 		Short:   "genesis agent info",
-		Example: "deepflow-ctl genesis agent -s server_ip [host_ip]",
+		Example: "deepflow-ctl genesis agent -i node_ip [host_ip]",
 		Run: func(cmd *cobra.Command, args []string) {
-			agentInfo(cmd, args, serverIP)
+			agentInfo(cmd, args)
 		},
 	}
-	agentInfo.Flags().StringVarP(&serverIP, "server ip", "s", "", "deepflow-server ip")
-	agentInfo.MarkFlagRequired("server ip")
 
 	genesis.AddCommand(syncInfo)
 	genesis.AddCommand(k8sInfo)
@@ -308,12 +305,13 @@ func tableVinterface(response *simplejson.Json, table *tablewriter.Table) {
 	table.Render()
 }
 
-func agentInfo(cmd *cobra.Command, args []string, serverIP string) {
+func agentInfo(cmd *cobra.Command, args []string) {
 	if len(args) == 0 {
 		args = []string{""}
 	}
 
-	url := fmt.Sprintf("http://%s:%d/v1/agent-stats/%s/", serverIP, 20417, args[0])
+	server := common.GetServerInfo(cmd)
+	url := fmt.Sprintf("http://%s:%d/v1/agent-stats/%s/", server.IP, server.Port, args[0])
 	response, err := common.CURLPerform("GET", url, nil, "")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
