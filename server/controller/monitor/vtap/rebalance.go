@@ -70,8 +70,9 @@ func (r *RebalanceCheck) controllerRebalance() {
 
 	for _, controller := range controllers {
 		// check if need rebalance
-		if controller.VtapCount == 0 && controller.State == common.HOST_STATE_COMPLETE && len(controller.Azs) != 0 {
-			log.Info("need rebalance vtap for controller (%s)", controller.IP)
+		if controller.VtapCount == 0 && controller.VTapMax > 0 &&
+			controller.State == common.HOST_STATE_COMPLETE && len(controller.Azs) != 0 {
+			log.Infof("need rebalance vtap for controller (%s)", controller.IP)
 			args := map[string]interface{}{
 				"check": false,
 				"type":  "controller",
@@ -80,7 +81,7 @@ func (r *RebalanceCheck) controllerRebalance() {
 				log.Error(err)
 			} else {
 				data, _ := json.Marshal(result)
-				log.Infof("exec rebalance: %v", data)
+				log.Infof("exec rebalance: %s", string(data))
 			}
 			break
 		}
@@ -96,7 +97,8 @@ func (r *RebalanceCheck) analyzerRebalance() {
 	}
 
 	for _, analyzer := range analyzers {
-		if analyzer.VtapCount == 0 && analyzer.State == common.HOST_STATE_COMPLETE && len(analyzer.Azs) != 0 {
+		if analyzer.VtapCount == 0 && analyzer.VTapMax > 0 &&
+			analyzer.State == common.HOST_STATE_COMPLETE && len(analyzer.Azs) != 0 {
 			log.Info("need rebalance vtap for analyzer (%s)", analyzer.IP)
 			args := map[string]interface{}{
 				"check": false,
@@ -106,7 +108,7 @@ func (r *RebalanceCheck) analyzerRebalance() {
 				log.Error(err)
 			} else {
 				data, _ := json.Marshal(result)
-				log.Infof("exec rebalance: %v", data)
+				log.Infof("exec rebalance: %s", string(data))
 			}
 			break
 		}
