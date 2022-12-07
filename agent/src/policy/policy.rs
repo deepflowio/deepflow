@@ -31,6 +31,7 @@ use super::{
 };
 use crate::common::endpoint::EndpointData;
 use crate::common::enums::TapType;
+use crate::common::flow::SignalSource;
 use crate::common::lookup_key::LookupKey;
 use crate::common::platform_data::PlatformData;
 use crate::common::policy::{Acl, Cidr, IpGroupData, PeerConnection};
@@ -132,11 +133,27 @@ impl Policy {
         // TODO: 根据TTL添加forward表
     }
 
-    pub fn lookup(&mut self, packet: &mut MetaPacket, index: usize) {
+    pub fn lookup(&mut self, packet: &mut MetaPacket, index: usize, local_epc_id: i32) {
         packet.lookup_key.fast_index = index;
         self.lookup_l3(packet);
 
         let key = &mut packet.lookup_key;
+
+        if packet.signal_source == SignalSource::EBPF {
+            let (l3_epc_id_0, l3_epc_id_1) = if key.l2_end_0 {
+                (local_epc_id, 0)
+            } else {
+                (0, local_epc_id)
+            };
+            packet.endpoint_data = Some(Arc::new(self.lookup_all_by_epc(
+                key.src_ip,
+                key.dst_ip,
+                l3_epc_id_0,
+                l3_epc_id_1,
+            )));
+            packet.policy_data = Some(Arc::new(PolicyData::default())); // Only endpoint is required for ebpf data
+            return;
+        }
 
         // 策略查序会改变端口，为不影响后续业务， 这里保存
         let src_port = key.src_port;
@@ -190,7 +207,7 @@ impl Policy {
         dst: IpAddr,
         l3_epc_id_src: i32,
         l3_epc_id_dst: i32,
-    ) -> i32 {
+    ) -> EndpointData {
         // TODO：可能也需要走fast提升性能
         let endpoints =
             self.labeler
@@ -202,11 +219,7 @@ impl Policy {
             endpoints.dst_info.l3_epc_id,
         );
 
-        if l3_epc_id_src > 0 {
-            endpoints.dst_info.l3_epc_id
-        } else {
-            endpoints.src_info.l3_epc_id
-        }
+        endpoints
     }
 
     pub fn update_interfaces(
@@ -285,11 +298,11 @@ impl PolicyGetter {
         self.switch = false;
     }
 
-    pub fn lookup(&mut self, packet: &mut MetaPacket, index: usize) {
+    pub fn lookup(&mut self, packet: &mut MetaPacket, index: usize, local_epc_id: i32) {
         if !self.switch {
             return;
         }
-        self.policy().lookup(packet, index);
+        self.policy().lookup(packet, index, local_epc_id);
     }
 
     pub fn lookup_all_by_key(
@@ -305,7 +318,7 @@ impl PolicyGetter {
         dst: IpAddr,
         l3_epc_id_src: i32,
         l3_epc_id_dst: i32,
-    ) -> i32 {
+    ) -> EndpointData {
         self.policy()
             .lookup_all_by_epc(src, dst, l3_epc_id_src, l3_epc_id_dst)
     }
