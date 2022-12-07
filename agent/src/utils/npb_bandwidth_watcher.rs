@@ -30,7 +30,7 @@ use crate::common::policy::{Acl, Cidr, IpGroupData, PeerConnection};
 use crate::common::FlowAclListener;
 use crate::exception::ExceptionHandler;
 use crate::utils::stats::{Counter, CounterType, CounterValue, RefCountable};
-use npb_pcap_policy::NpbTunnelType;
+use npb_pcap_policy::{NpbTunnelType, NOT_SUPPORT};
 use public::proto::{common::TridentType, trident::Exception};
 use public::utils::net::get_route_src_ip_interface_name;
 use public::LeakyBucket;
@@ -260,7 +260,7 @@ impl NpbBandwidthWatcher {
     }
 
     pub fn start(&self) {
-        if self.watcher.is_running.load(Relaxed) {
+        if self.watcher.is_running.load(Relaxed) || NOT_SUPPORT {
             return;
         }
         let watcher = self.watcher.clone();
@@ -279,6 +279,9 @@ impl NpbBandwidthWatcher {
     }
 
     pub fn stop(&self) {
+        if !self.watcher.is_running.load(Relaxed) || NOT_SUPPORT {
+            return;
+        }
         self.watcher.is_running.store(false, Relaxed);
         if let Some(handler) = self.thread_handler.lock().unwrap().take() {
             let _ = handler.join();
@@ -297,6 +300,10 @@ impl FlowAclListener for Arc<NpbBandwidthWatcher> {
         _cidrs: &Vec<Arc<Cidr>>,
         acls: &Vec<Arc<Acl>>,
     ) -> Result<(), String> {
+        if NOT_SUPPORT {
+            return Ok(());
+        }
+
         let mut ips = vec![];
         acls.iter().for_each(|x| {
             for action in &x.npb_actions {
