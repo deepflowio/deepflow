@@ -26,6 +26,7 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/config"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/model"
 	mconfig "github.com/deepflowys/deepflow/server/controller/monitor/config"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris/refresh"
 )
@@ -178,6 +179,7 @@ func (c *ControllerCheck) healthCheck() {
 		}
 	}
 
+	controllerIPs := []string{}
 	for ip, dfhostCheck := range checkExceptionControllers {
 		if dfhostCheck.duration() > int64(c.cfg.ExceptionTimeFrame) {
 			mysql.Db.Delete(mysql.AZControllerConnection{}, "controller_ip = ?", ip)
@@ -188,8 +190,10 @@ func (c *ControllerCheck) healthCheck() {
 				log.Infof("delete controller(%s), exception lasts for %d seconds", ip, dfhostCheck.duration())
 				delete(checkExceptionControllers, ip)
 			}
+			controllerIPs = append(controllerIPs, ip)
 		}
 	}
+	c.cleanExceptionControllerData(controllerIPs)
 	log.Info("controller health check end")
 }
 
@@ -341,4 +345,26 @@ func (c *ControllerCheck) azConnectionCheck() {
 		}
 	}
 	log.Info("az connection check end")
+}
+
+func (c *ControllerCheck) cleanExceptionControllerData(controllerIPs []string) {
+	if len(controllerIPs) == 0 {
+		return
+	}
+
+	// delete genesis vinterface on invalid controller
+	err := mysql.Db.Where("node_ip IN ?", controllerIPs).Delete(&model.GenesisVinterface{}).Error
+	if err != nil {
+		log.Errorf("clean controllers (%s) genesis vinterface failed: %s", controllerIPs, err)
+	} else {
+		log.Infof("controllers (%s) invalid, clean genesis vinterface", controllerIPs)
+	}
+
+	// delete genesis storage on invalid controller
+	err = mysql.Db.Where("node_ip IN ?", controllerIPs).Delete(&model.GenesisStorage{}).Error
+	if err != nil {
+		log.Errorf("clean controllers (%s) genesis storage failed: %s", controllerIPs, err)
+	} else {
+		log.Infof("controllers (%s) invalid, clean genesis storage", controllerIPs)
+	}
 }

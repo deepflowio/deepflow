@@ -125,7 +125,7 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 	var azControllerConns []mysql.AZControllerConnection
 	var currentRegion string
 
-	mysql.Db.Find(&controllers)
+	mysql.Db.Where("state <> ?", common.CONTROLLER_STATE_EXCEPTION).Find(&controllers)
 	mysql.Db.Find(&azControllerConns)
 
 	controllerIPToRegion := make(map[string]string)
@@ -339,75 +339,80 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 
 	localK8sDatas := g.GetKubernetesData()
 	k8sInfo, ok := localK8sDatas[clusterID]
-	if !ok {
 
-		var controllers []mysql.Controller
-		var azControllerConns []mysql.AZControllerConnection
-		var currentRegion string
+	var controllers []mysql.Controller
+	var azControllerConns []mysql.AZControllerConnection
+	var currentRegion string
 
-		nodeIP := os.Getenv(common.NODE_IP_KEY)
-		mysql.Db.Find(&azControllerConns)
-		mysql.Db.Where("ip <> ?", nodeIP).Find(&controllers)
+	nodeIP := os.Getenv(common.NODE_IP_KEY)
+	mysql.Db.Find(&azControllerConns)
+	mysql.Db.Where("ip <> ? AND state <> ?", nodeIP, common.CONTROLLER_STATE_EXCEPTION).Find(&controllers)
 
-		controllerIPToRegion := make(map[string]string)
-		for _, conn := range azControllerConns {
-			if nodeIP == conn.ControllerIP {
-				currentRegion = conn.Region
-			}
-			controllerIPToRegion[conn.ControllerIP] = conn.Region
+	controllerIPToRegion := make(map[string]string)
+	for _, conn := range azControllerConns {
+		if nodeIP == conn.ControllerIP {
+			currentRegion = conn.Region
+		}
+		controllerIPToRegion[conn.ControllerIP] = conn.Region
+	}
+
+	retFlag := false
+	for _, controller := range controllers {
+		// skip other region controller
+		if region, ok := controllerIPToRegion[controller.IP]; !ok || region != currentRegion {
+			continue
 		}
 
-		retFlag := false
-		for _, controller := range controllers {
-			// skip other region controller
-			if region, ok := controllerIPToRegion[controller.IP]; !ok || region != currentRegion {
-				continue
-			}
-
-			// use pod ip communication in internal region
-			serverIP := controller.PodIP
-			if serverIP == "" {
-				serverIP = controller.IP
-			}
-			grpcServer := net.JoinHostPort(serverIP, g.grpcPort)
-			conn, err := grpc.Dial(grpcServer, grpc.WithInsecure(), grpc.WithMaxMsgSize(g.grpcMaxMSGLength))
-			if err != nil {
-				log.Error("create grpc connection faild:" + err.Error())
-				continue
-			}
-			defer conn.Close()
-
-			client := api.NewControllerClient(conn)
-			req := &api.GenesisSharingK8SRequest{
-				ClusterId: &clusterID,
-			}
-			ret, err := client.GenesisSharingK8S(context.Background(), req)
-			if err != nil {
-				log.Warningf("get genesis sharing k8s faild (%s)", err.Error())
-			} else {
-				retFlag = true
-				epochStr := ret.GetEpoch()
-				epoch, err := time.ParseInLocation(common.GO_BIRTHDAY, epochStr, time.Local)
-				if err != nil {
-					log.Error("genesis api sharing k8s format timestr faild:" + err.Error())
-					return k8sResp, err
-				}
-				entries := ret.GetEntries()
-				errorMsg := ret.GetErrorMsg()
-				if errorMsg != "" {
-					log.Warningf("cluster id (%s) Error: %s", clusterID, errorMsg)
-				}
-				k8sInfo = KubernetesInfo{
-					Epoch:    epoch,
-					Entries:  entries,
-					ErrorMSG: errorMsg,
-				}
-				break
-			}
+		// use pod ip communication in internal region
+		serverIP := controller.PodIP
+		if serverIP == "" {
+			serverIP = controller.IP
 		}
-		if !retFlag {
-			return k8sResp, errors.New("no vtap report cluster id:" + clusterID)
+		grpcServer := net.JoinHostPort(serverIP, g.grpcPort)
+		conn, err := grpc.Dial(grpcServer, grpc.WithInsecure(), grpc.WithMaxMsgSize(g.grpcMaxMSGLength))
+		if err != nil {
+			log.Error("create grpc connection faild:" + err.Error())
+			continue
 		}
+		defer conn.Close()
+
+		client := api.NewControllerClient(conn)
+		req := &api.GenesisSharingK8SRequest{
+			ClusterId: &clusterID,
+		}
+		ret, err := client.GenesisSharingK8S(context.Background(), req)
+		if err != nil {
+			log.Errorf("get (%s) genesis sharing k8s failed (%s) ", serverIP, err.Error())
+			continue
+		}
+		entries := ret.GetEntries()
+		if len(entries) == 0 {
+			log.Warningf("genesis sharing k8s node (%s) entries length is 0", serverIP)
+			continue
+		}
+		epochStr := ret.GetEpoch()
+		epoch, err := time.ParseInLocation(common.GO_BIRTHDAY, epochStr, time.Local)
+		if err != nil {
+			log.Error("genesis api sharing k8s format timestr faild:" + err.Error())
+			return k8sResp, err
+		}
+		errorMsg := ret.GetErrorMsg()
+		if errorMsg != "" {
+			log.Warningf("cluster id (%s) Error: %s", clusterID, errorMsg)
+		}
+		if !epoch.After(k8sInfo.Epoch) {
+			continue
+		}
+
+		retFlag = true
+		k8sInfo = KubernetesInfo{
+			Epoch:    epoch,
+			Entries:  entries,
+			ErrorMSG: errorMsg,
+		}
+	}
+	if !ok && !retFlag {
+		return k8sResp, errors.New("no vtap report cluster id:" + clusterID)
 	}
 
 	g.mutex.Lock()
