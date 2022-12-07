@@ -588,7 +588,6 @@ impl Default for PortConfig {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct PcapConfig {
-    pub enabled: bool,
     pub queue_size: u32,
     pub flush_interval: u32, // unit(second)
     pub buffer_size: u64,
@@ -598,7 +597,6 @@ pub struct PcapConfig {
 impl Default for PcapConfig {
     fn default() -> Self {
         PcapConfig {
-            enabled: false,
             queue_size: 65536,
             flush_interval: 60,        // 1min
             buffer_size: 8388608,      // 8M

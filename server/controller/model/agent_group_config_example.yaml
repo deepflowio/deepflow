@@ -590,8 +590,6 @@ vtap_group_id: g-xxxxxx
   ## PCAP ##
   ##########
   #pcap:
-    #enabled: false
-
     ## Queue Size to PCAP Generator
     ## Default: 65536. Range: [65536, +oo)
     ## Note: the length of the following queues:
