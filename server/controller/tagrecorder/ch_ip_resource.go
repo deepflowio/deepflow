@@ -134,7 +134,7 @@ func (i *ChIPResource) generateNewData() (map[IPResourceKey]mysql.ChIPResource, 
 	if redis.Redisdb == nil {
 		return keyToItem, false
 	}
-	res, err := redis.Redisdb.HGetAll("ip").Result()
+	res, err := redis.Redisdb.HGetAll("deepflow_dimension_resource_ip").Result()
 	if err != nil {
 		log.Error(err)
 		return nil, false
