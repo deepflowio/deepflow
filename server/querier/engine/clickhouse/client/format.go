@@ -19,7 +19,6 @@ package client
 import (
 	"math"
 	"net"
-	"strings"
 	"time"
 )
 
@@ -51,10 +50,9 @@ func TransType(typeName string, value interface{}) (interface{}, string, error) 
 			return nil, VALUE_TYPE_FLOAT64, nil
 		}
 		return value.(float64), VALUE_TYPE_FLOAT64, nil
+	case "LowCardinality(String)":
+		return value.(string), VALUE_TYPE_STRING, nil
 	default:
-		if strings.Contains(typeName, "String") && !strings.Contains(typeName, "Array") {
-			return value.(string), VALUE_TYPE_STRING, nil
-		}
 		return value, typeName, nil
 	}
 }
