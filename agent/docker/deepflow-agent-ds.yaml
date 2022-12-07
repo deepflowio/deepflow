@@ -35,6 +35,7 @@ spec:
               subPath: ""
             - name: netns # required to access net namespace info
               mountPath: /var/run/netns
+              mountPropagation: HostToContainer
       volumes:
         - name: sys-kernel-debug
           hostPath:
