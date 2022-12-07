@@ -124,7 +124,7 @@ func (c *Cloud) GetStatter() statsd.StatsdStatter {
 
 func (c *Cloud) getCloudGatherInterval() int {
 	var cloudSyncConfig mysql.SysConfiguration
-	if ret := mysql.Db.Where("param_name = cloud_sync_timer").First(&cloudSyncConfig); ret.Error != nil {
+	if ret := mysql.Db.Where("param_name = ?", "cloud_sync_timer").First(&cloudSyncConfig); ret.Error != nil {
 		log.Warning("get cloud_sync_timer failed")
 		return int(c.cfg.CloudGatherInterval)
 	}
