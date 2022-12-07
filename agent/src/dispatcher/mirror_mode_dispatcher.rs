@@ -358,6 +358,7 @@ impl MirrorModeDispatcher {
         let time_diff = self.base.ntp_diff.load(Ordering::Relaxed);
         let mut prev_timestamp = get_timestamp(time_diff);
 
+        #[cfg(target_os = "linux")]
         let mut flow_map = FlowMap::new(
             self.base.id as u32,
             self.base.flow_output_queue.clone(),
@@ -367,6 +368,19 @@ impl MirrorModeDispatcher {
             self.base.flow_map_config.clone(),
             self.base.log_parse_config.clone(),
             None,
+            Some(self.base.packet_sequence_output_queue.clone()), // Enterprise Edition Feature: packet-sequence
+            &self.base.stats,
+            false, // !from_ebpf
+        );
+        #[cfg(target_os = "windows")]
+        let mut flow_map = FlowMap::new(
+            self.base.id as u32,
+            self.base.flow_output_queue.clone(),
+            self.base.policy_getter,
+            self.base.log_output_queue.clone(),
+            self.base.ntp_diff.clone(),
+            self.base.flow_map_config.clone(),
+            self.base.log_parse_config.clone(),
             Some(self.base.packet_sequence_output_queue.clone()), // Enterprise Edition Feature: packet-sequence
             &self.base.stats,
             false, // !from_ebpf

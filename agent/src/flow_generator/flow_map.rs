@@ -103,6 +103,7 @@ pub struct FlowMap {
     last_queue_flush: Duration,
     config: FlowAccess,
     parse_config: LogParserAccess,
+    #[cfg(target_os = "linux")]
     ebpf_config: Option<EbpfAccess>, // TODO: We only need its epc_id，epc_id is not only useful for ebpf, consider moving it to FlowConfig
     rrt_cache: Rc<RefCell<L7RrtCache>>,
     flow_perf_counter: Arc<FlowPerfCounter>,
@@ -122,7 +123,7 @@ impl FlowMap {
         ntp_diff: Arc<AtomicI64>,
         config: FlowAccess,
         parse_config: LogParserAccess,
-        ebpf_config: Option<EbpfAccess>,
+        #[cfg(target_os = "linux")] ebpf_config: Option<EbpfAccess>,
         packet_sequence_queue: Option<DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>>, // Enterprise Edition Feature: packet-sequence
         stats_collector: &stats::Collector,
         from_ebpf: bool,
@@ -167,6 +168,7 @@ impl FlowMap {
             last_queue_flush: Duration::ZERO,
             config,
             parse_config,
+            #[cfg(target_os = "linux")]
             ebpf_config,
             rrt_cache: Rc::new(RefCell::new(L7RrtCache::new(L7_RRT_CACHE_CAPACITY))),
             flow_perf_counter,
@@ -283,11 +285,14 @@ impl FlowMap {
     pub fn inject_meta_packet(&mut self, meta_packet: &mut MetaPacket) {
         if !self.inject_flush_ticker(meta_packet.lookup_key.timestamp) {
             // 补充由于超时导致未查询策略，用于其它流程（如PCAP存储）
+            #[cfg(target_os = "linux")]
             let local_ecp_id = if self.ebpf_config.is_some() {
                 self.ebpf_config.as_ref().unwrap().load().epc_id as i32
             } else {
                 0
             };
+            #[cfg(target_os = "windows")]
+            let local_ecp_id = 0;
             (self.policy_getter).lookup(meta_packet, self.id as usize, local_ecp_id);
             return;
         }
@@ -768,11 +773,15 @@ impl FlowMap {
             packet_sequence_block: None, // Enterprise Edition Feature: packet-sequence
             residual_request: 0,
         };
+        #[cfg(target_os = "linux")]
         let local_ecp_id = if self.ebpf_config.is_some() {
             self.ebpf_config.as_ref().unwrap().load().epc_id as i32
         } else {
             0
         };
+        #[cfg(target_os = "windows")]
+        let local_ecp_id = 0;
+
         // 标签
         (self.policy_getter).lookup(meta_packet, self.id as usize, local_ecp_id);
         self.update_endpoint_and_policy_data(&mut node, meta_packet);
@@ -820,11 +829,14 @@ impl FlowMap {
 
         if !node.policy_in_tick[meta_packet.direction as usize] {
             node.policy_in_tick[meta_packet.direction as usize] = true;
+            #[cfg(target_os = "linux")]
             let local_ecp_id = if self.ebpf_config.is_some() {
                 self.ebpf_config.as_ref().unwrap().load().epc_id as i32
             } else {
                 0
             };
+            #[cfg(target_os = "windows")]
+            let local_ecp_id = 0;
             (self.policy_getter).lookup(meta_packet, self.id as usize, local_ecp_id);
             self.update_endpoint_and_policy_data(node, meta_packet);
         } else {
@@ -894,11 +906,15 @@ impl FlowMap {
         }
         // 这里需要查询策略，建立ARP表
         if meta_packet.is_ndp_response() {
+            #[cfg(target_os = "linux")]
             let local_ecp_id = if self.ebpf_config.is_some() {
                 self.ebpf_config.as_ref().unwrap().load().epc_id as i32
             } else {
                 0
             };
+            #[cfg(target_os = "windows")]
+            let local_ecp_id = 0;
+
             (self.policy_getter).lookup(meta_packet, self.id as usize, local_ecp_id);
         }
     }
@@ -1441,6 +1457,7 @@ pub fn _new_flow_map_and_receiver(
     config.flow.l7_log_tap_types[0] = true;
     config.flow.trident_type = trident_type;
     let current_config = Arc::new(ArcSwap::from_pointee(config));
+    #[cfg(target_os = "linux")]
     let flow_map = FlowMap::new(
         0,
         output_queue_sender,
@@ -1454,6 +1471,23 @@ pub fn _new_flow_map_and_receiver(
             &config.log_parser
         }),
         None,
+        Some(packet_sequence_queue), // Enterprise Edition Feature: packet-sequence
+        &stats::Collector::new(&vec!["127.0.0.1".to_string()]),
+        false,
+    );
+    #[cfg(target_os = "windows")]
+    let flow_map = FlowMap::new(
+        0,
+        output_queue_sender,
+        policy_getter,
+        app_proto_log_queue,
+        Arc::new(AtomicI64::new(0)),
+        Map::new(current_config.clone(), |config| -> &FlowConfig {
+            &config.flow
+        }),
+        Map::new(current_config.clone(), |config| -> &LogParserConfig {
+            &config.log_parser
+        }),
         Some(packet_sequence_queue), // Enterprise Edition Feature: packet-sequence
         &stats::Collector::new(&vec!["127.0.0.1".to_string()]),
         false,
