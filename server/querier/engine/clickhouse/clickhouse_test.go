@@ -175,7 +175,7 @@ var (
 		output: "SELECT SUM(byte_tx) AS `max_byte` FROM flow_log.`l4_flow_log` ORDER BY length(tap_side) desc,`length(tap_side)` asc LIMIT 10000",
 	}, {
 		input:  "select Enum(tap_side) from l7_flow_log limit 0, 50",
-		output: "WITH dictGetOrDefault(flow_tag.string_enum_map, 'name', ('tap_side',tap_side), tap_side) AS `enum(tap_side)` SELECT `enum(tap_side)` FROM flow_log.`l7_flow_log` LIMIT 0, 50",
+		output: "WITH dictGetOrDefault(flow_tag.string_enum_map, 'name', ('tap_side',tap_side), tap_side) AS `Enum(tap_side)` SELECT `Enum(tap_side)` FROM flow_log.`l7_flow_log` LIMIT 0, 50",
 	}, {
 		input:  "select Avg(`byte_tx`) AS `Avg(byte_tx)`,icon_id(chost_0) as `xx`,region_0 from vtap_flow_edge_port group by region_0 limit 1",
 		output: "SELECT `xx`, region_0, AVG(`_sum_byte_tx`) AS `Avg(byte_tx)` FROM (WITH dictGet(flow_tag.device_map, 'icon_id', (toUInt64(1),toUInt64(l3_device_id_0))) AS `xx` SELECT `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, SUM(byte_tx) AS `_sum_byte_tx` FROM flow_metrics.`vtap_flow_edge_port` WHERE (region_id_0!=0) GROUP BY `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`) GROUP BY `xx`, `region_0` LIMIT 1",

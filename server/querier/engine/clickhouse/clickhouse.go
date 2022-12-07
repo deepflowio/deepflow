@@ -553,10 +553,10 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 	// func(field/tag)
 	case *sqlparser.FuncExpr:
 		// 二级运算符
-		if as == "" {
-			as = strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", "")
-		}
 		if common.IsValueInSliceString(sqlparser.String(expr.Name), view.MATH_FUNCTIONS) {
+			if as == "" {
+				as = strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", "")
+			}
 			binFunction, err := e.parseSelectBinaryExpr(expr)
 			if err != nil {
 				return err
@@ -570,7 +570,11 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 			return err
 		}
 		name = strings.Trim(name, "`")
-		function, levelFlag, unit, err := GetAggFunc(name, args, as, e.DB, e.Table, e.Context)
+		functionAs := as
+		if as == "" {
+			functionAs = strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", "")
+		}
+		function, levelFlag, unit, err := GetAggFunc(name, args, functionAs, e.DB, e.Table, e.Context)
 		if err != nil {
 			return err
 		}
