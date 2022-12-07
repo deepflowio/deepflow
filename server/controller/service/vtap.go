@@ -715,9 +715,9 @@ func vtapAnalyzerRebalance(azs []mysql.AZ, ifCheck bool) (*model.VTapRebalanceRe
 		}
 		// 获取数据节点当前已分配的采集器信息
 		analyzerIPToVTaps := make(map[string][]*mysql.VTap)
-		for i, vtap := range azVTaps {
+		for _, vtap := range azVTaps {
 			analyzerIPToVTaps[vtap.AnalyzerIP] = append(
-				analyzerIPToVTaps[vtap.AnalyzerIP], azVTaps[i],
+				analyzerIPToVTaps[vtap.AnalyzerIP], vtap,
 			)
 		}
 		// 获取数据节点当前剩余可用采集器个数
