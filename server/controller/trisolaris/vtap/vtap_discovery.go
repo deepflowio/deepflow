@@ -276,6 +276,8 @@ func (l *VTapLKData) LookUpVTapByPodNode(db *gorm.DB) *VTapLKResult {
 		VIF_DEVICE_TYPE_POD_NODE,
 		podNodeIDs)
 	if err != nil {
+		log.Errorf("failed to register agent(%s) by querying DB table vinterface(mac=%s, region=%s, devicetype=%d, deviceid in (%v)) without finding data, err: %s",
+			l.getKey(), l.ctrlMac, l.region, VIF_DEVICE_TYPE_POD_NODE, podNodeIDs, err)
 		if len(vmIDs) > 0 {
 			matchVif, err = vifMgr.GetVInterfaceFromDeviceIDs(
 				l.ctrlMac,
@@ -283,13 +285,11 @@ func (l *VTapLKData) LookUpVTapByPodNode(db *gorm.DB) *VTapLKResult {
 				VIF_DEVICE_TYPE_VM,
 				vmIDs)
 			if err != nil {
-				log.Errorf("failed to register agent(%s) by querying DB table vinterface(mac=%s, region=%s, devicetype=%d, deviceid in (%s)) without finding data, err: %s",
+				log.Errorf("failed to register agent(%s) by querying DB table vinterface(mac=%s, region=%s, devicetype=%d, deviceid in (%v)) without finding data, err: %s",
 					l.getKey(), l.ctrlMac, l.region, VIF_DEVICE_TYPE_VM, vmIDs, err)
 				return nil
 			}
 		} else {
-			log.Errorf("failed to register agent(%s) by querying DB table vinterface(mac=%s, region=%s, devicetype=%d, deviceid in (%s)) without finding data, err: %s",
-				l.getKey(), l.ctrlMac, l.region, VIF_DEVICE_TYPE_POD_NODE, podNodeIDs, err)
 			return nil
 		}
 	}
@@ -572,7 +572,7 @@ func (l *VTapLKData) LookUpLocalVTapByIP(db *gorm.DB) *VTapLKResult {
 	}
 	vm, err := dbmgr.DBMgr[models.VM](db).GetFirstFromBatchIDs(deviceIDs)
 	if err != nil {
-		log.Errorf("failed to register agent(%s) by querying DB table vm(id=%v) without finding data, err: %s", l.getKey(), deviceIDs, err)
+		log.Errorf("failed to register agent(%s) by querying DB table vm(id in %v) without finding data, err: %s", l.getKey(), deviceIDs, err)
 		return nil
 	}
 	var (
