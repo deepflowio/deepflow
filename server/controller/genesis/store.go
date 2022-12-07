@@ -300,8 +300,6 @@ func (k *KubernetesStorage) Clear() {
 
 func (k *KubernetesStorage) Add(k8sInfo KubernetesInfo) {
 	k.mutex.Lock()
-	defer k.mutex.Unlock()
-
 	kInfo, ok := k.kubernetesData[k8sInfo.ClusterID]
 	// trident上报消息中version未变化时，只更新epoch和error_msg
 	if ok && kInfo.Version == k8sInfo.Version {
@@ -310,6 +308,12 @@ func (k *KubernetesStorage) Add(k8sInfo KubernetesInfo) {
 		k.kubernetesData[k8sInfo.ClusterID] = kInfo
 	} else {
 		k.kubernetesData[k8sInfo.ClusterID] = k8sInfo
+	}
+	k.mutex.Unlock()
+
+	result, err := k.fetch()
+	if err == nil {
+		k.channel <- result
 	}
 }
 
