@@ -305,10 +305,10 @@ jobs:
           username: "deepflowce"
           password: "${{ secrets.REGISTRY_PASS }}"
 
-      - name: Log in to ALIYUN Docker Registry
+      - name: Log in to ALIYUN HongKong Docker Registry
         uses: docker/login-action@v2
         with:
-          registry: "registry.cn-beijing.aliyuncs.com"
+          registry: "registry.cn-hongkong.aliyuncs.com"
           username: "${{ secrets.REGISTRY_ALIYUN_USER }}"
           password: "${{ secrets.REGISTRY_PASS }}"
 
@@ -317,7 +317,7 @@ jobs:
           echo "IMAGE_TAG_PREFIX=${{ github.ref_name }}"|sed 's|main|latest|' >> $GITHUB_ENV
           echo "IMAGE_TAG=$(git rev-list --count HEAD)" >> $GITHUB_ENV
 
-      - name: Build and push deepflow agent images
+      - name: Build and push deepflow agent images to ghcr and dockerhub
         uses: docker/build-push-action@v2
         with:
           context: .
@@ -327,9 +327,36 @@ jobs:
           tags: |
             "ghcr.io/${{ github.repository_owner }}/deepflow-ce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}-${{ env.IMAGE_TAG }}"
             "ghcr.io/${{ github.repository_owner }}/deepflow-ce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}"
+            "deepflowce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}"
+
+      - name: Build and push deepflow agent images to hongkong aliyun 
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true 
+          file: agent/docker/dockerfile 
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            "registry.cn-hongkong.aliyuncs.com/deepflow-ce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}-${{ env.IMAGE_TAG }}"
+            "registry.cn-hongkong.aliyuncs.com/deepflow-ce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}"
+
+      - name: Log in to ALIYUN Docker Registry
+        uses: docker/login-action@v2
+        with:
+          registry: "registry.cn-beijing.aliyuncs.com"
+          username: "${{ secrets.REGISTRY_ALIYUN_USER }}"
+          password: "${{ secrets.REGISTRY_PASS }}"
+
+      - name: Build and push deepflow agent images to beijing aliyun 
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true 
+          file: agent/docker/dockerfile 
+          platforms: linux/amd64,linux/arm64
+          tags: |
             "registry.cn-beijing.aliyuncs.com/deepflow-ce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}-${{ env.IMAGE_TAG }}"
             "registry.cn-beijing.aliyuncs.com/deepflow-ce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}"
-            "deepflowce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}"
 
       - uses: manyuanrong/setup-ossutil@v2.0
         with:
