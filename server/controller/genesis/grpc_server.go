@@ -18,7 +18,6 @@ package genesis
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"time"
 
@@ -285,7 +284,7 @@ func (g *SynchronizerServer) GenesisSharingK8S(ctx context.Context, request *con
 		}, nil
 	}
 
-	return &controller.GenesisSharingK8SResponse{}, errors.New("GenesisSharingK8s api not found k8s data")
+	return &controller.GenesisSharingK8SResponse{}, nil
 }
 
 func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *controller.GenesisSharingSyncRequest) (*controller.GenesisSharingSyncResponse, error) {
