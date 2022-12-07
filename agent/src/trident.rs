@@ -948,6 +948,7 @@ impl Components {
             config_handler.platform(),
             session.clone(),
             exception_handler.clone(),
+            stats_collector.clone(),
         ));
 
         let context = ConstructDebugCtx {
