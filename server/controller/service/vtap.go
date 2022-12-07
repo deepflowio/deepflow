@@ -515,6 +515,10 @@ func execAZRebalance(
 			// 判断当前分配的控制器/数据节点是否与原有一致，如果不一致更新result数据
 			reallocHostIP := hostAvailableVTapNum[0].Key
 			if hostType == "controller" {
+				log.Infof(
+					"rebalance vtap (%s) controller_ip from (%s) to (%s)",
+					vtap.Name, vtap.ControllerIP, reallocHostIP,
+				)
 				if vtap.ControllerIP == reallocHostIP {
 					continue
 				}
@@ -522,6 +526,10 @@ func execAZRebalance(
 					mysql.Db.Model(vtap).Update("controller_ip", reallocHostIP)
 				}
 			} else {
+				log.Infof(
+					"rebalance vtap (%s) analyzer_ip from (%s) to (%s)",
+					vtap.Name, vtap.AnalyzerIP, reallocHostIP,
+				)
 				if vtap.AnalyzerIP == reallocHostIP {
 					continue
 				}
@@ -707,9 +715,9 @@ func vtapAnalyzerRebalance(azs []mysql.AZ, ifCheck bool) (*model.VTapRebalanceRe
 		}
 		// 获取数据节点当前已分配的采集器信息
 		analyzerIPToVTaps := make(map[string][]*mysql.VTap)
-		for _, vtap := range azVTaps {
+		for i, vtap := range azVTaps {
 			analyzerIPToVTaps[vtap.AnalyzerIP] = append(
-				analyzerIPToVTaps[vtap.AnalyzerIP], vtap,
+				analyzerIPToVTaps[vtap.AnalyzerIP], azVTaps[i],
 			)
 		}
 		// 获取数据节点当前剩余可用采集器个数
