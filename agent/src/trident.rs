@@ -89,7 +89,7 @@ use crate::{
     platform::{LibvirtXmlExtractor, PlatformSynchronizer},
     policy::{Policy, PolicySetter},
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
-    sender::uniform_sender::UniformSenderThread,
+    sender::{npb_sender::NpbArpTable, uniform_sender::UniformSenderThread},
     utils::{
         environment::{
             check, controller_ip_check, free_memory_check, free_space_checker, get_ctrl_ip_and_mac,
@@ -768,6 +768,7 @@ pub struct Components {
     pub npb_bps_limit: Arc<LeakyBucket>,
     pub handler_builders: Vec<Arc<Mutex<Vec<PacketHandlerBuilder>>>>,
     pub compressed_otel_uniform_sender: UniformSenderThread<OpenTelemetryCompressed>,
+    pub npb_arp_table: Arc<NpbArpTable>,
     pub pcap_assemblers: Vec<PcapAssembler>,
     pub pcap_batch_uniform_sender: UniformSenderThread<BoxedPcapBatch>,
     pub policy_setter: PolicySetter,
@@ -853,6 +854,7 @@ impl Components {
         for p in self.pcap_assemblers.iter() {
             p.start();
         }
+        self.npb_arp_table.start();
         info!("Started components.");
     }
 
@@ -1155,6 +1157,7 @@ impl Components {
             config_handler.candidate_config.sender.npb_bps_threshold,
         )));
         let mut handler_builders = Vec::new();
+        let npb_arp_table = Arc::new(NpbArpTable::new());
 
         let mut src_interfaces_and_namespaces = vec![];
         for src_if in yaml_config.src_interfaces.iter() {
@@ -1288,6 +1291,7 @@ impl Components {
                     &config_handler.candidate_config.npb,
                     &queue_debugger,
                     npb_bps_limit.clone(),
+                    npb_arp_table.clone(),
                     stats_collector.clone(),
                 )),
             ]));
@@ -1685,6 +1689,7 @@ impl Components {
             agent_mode,
             policy_setter,
             npb_bandwidth_watcher,
+            npb_arp_table,
         })
     }
 
@@ -1889,6 +1894,7 @@ impl Components {
             p.stop();
         }
         self.packet_sequence_uniform_sender.stop();
+        self.npb_arp_table.stop();
         info!("Stopped components.")
     }
 }
