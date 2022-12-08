@@ -666,7 +666,7 @@ impl BaseDispatcherListener {
         let bpf_builder = bpf::Builder {
             is_ipv6: self.options.is_ipv6,
             vxlan_flags: self.options.vxlan_flags,
-            vxlan_port: self.options.vxlan_port,
+            npb_port: self.options.npb_port,
             controller_port: self.options.controller_port,
             controller_tls_port: self.options.controller_tls_port,
             proxy_controller_port: self.proxy_controller_port,

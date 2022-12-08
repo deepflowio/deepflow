@@ -24,6 +24,7 @@ use std::time::Duration;
 use log::{error, info, warn};
 use md5::{Digest, Md5};
 use public::bitmap::Bitmap;
+use public::consts::NPB_DEFAULT_PORT;
 use public::utils::bitmap::parse_u16_range_list_to_bitmap;
 use serde::{
     de::{self, Unexpected},
@@ -270,7 +271,6 @@ pub struct YamlConfig {
     pub dpdk_pmd_core_id: u32,
     pub dpdk_ring_port: String,
     pub xflow_collector: XflowGeneratorConfig,
-    pub vxlan_port: u16,
     pub vxlan_flags: u8,
     pub collector_sender_queue_size: usize,
     pub collector_sender_queue_count: usize,
@@ -312,6 +312,7 @@ pub struct YamlConfig {
     // hashmap<protocolName, portRange>
     pub l7_protocol_ports: HashMap<String, String>,
     pub ebpf_kprobe_whitelist: EbpfKprobeWhitelist,
+    pub npb_port: u16,
 }
 
 impl YamlConfig {
@@ -431,6 +432,9 @@ impl YamlConfig {
                 .unwrap()
                 .to_string();
         }
+        if c.npb_port == 0 {
+            c.npb_port = NPB_DEFAULT_PORT;
+        }
 
         if let Err(e) = c.validate() {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string()));
@@ -488,7 +492,6 @@ impl Default for YamlConfig {
             dpdk_pmd_core_id: 0,
             dpdk_ring_port: "dpdkr0".into(),
             xflow_collector: Default::default(),
-            vxlan_port: 4789,
             vxlan_flags: 0xff,
             // default size changes according to tap_mode
             collector_sender_queue_size: 1 << 16,
@@ -540,6 +543,7 @@ impl Default for YamlConfig {
             log_file: DEFAULT_LOG_FILE.into(),
             l7_protocol_ports: HashMap::from([(String::from("DNS"), String::from("53"))]),
             ebpf_kprobe_whitelist: EbpfKprobeWhitelist::default(),
+            npb_port: NPB_DEFAULT_PORT,
         }
     }
 }

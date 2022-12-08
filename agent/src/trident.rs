@@ -1100,7 +1100,7 @@ impl Components {
         let bpf_builder = bpf::Builder {
             is_ipv6: ctrl_ip.is_ipv6(),
             vxlan_flags: yaml_config.vxlan_flags,
-            vxlan_port: yaml_config.vxlan_port,
+            npb_port: yaml_config.npb_port,
             controller_port: static_config.controller_port,
             controller_tls_port: static_config.controller_tls_port,
             proxy_controller_port: candidate_config.dispatcher.proxy_controller_port,
@@ -1339,7 +1339,7 @@ impl Components {
                     tap_mode: candidate_config.tap_mode,
                     tap_mac_script: yaml_config.tap_mac_script.clone(),
                     is_ipv6: ctrl_ip.is_ipv6(),
-                    vxlan_port: yaml_config.vxlan_port,
+                    npb_port: yaml_config.npb_port,
                     vxlan_flags: yaml_config.vxlan_flags,
                     controller_port: static_config.controller_port,
                     controller_tls_port: static_config.controller_tls_port,

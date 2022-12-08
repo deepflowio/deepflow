@@ -32,7 +32,7 @@ use std::time::Duration;
 #[cfg(unix)]
 use libc::{c_int, socket, AF_INET, AF_INET6, SOCK_RAW};
 use log::{info, warn};
-use socket2::{SockAddr, Socket};
+use socket2::{Domain, SockAddr, Socket, Type};
 #[cfg(windows)]
 use windows::Win32::Networking::WinSock::socket;
 
@@ -47,7 +47,13 @@ use crate::config::NpbConfig;
 #[cfg(unix)]
 use crate::dispatcher::af_packet::{Options, Tpacket};
 use crate::utils::stats::{self, StatsOption};
-use npb_handler::NOT_SUPPORT;
+use npb_handler::{NpbHeader, NOT_SUPPORT};
+use public::bytes::read_u32_be;
+use public::consts::{
+    ERSPAN6_FLAGS_OFFSET, ERSPAN6_KEY_OFFSET, ERSPAN6_PACKET_SIZE, ERSPAN_FLAGS_OFFSET,
+    ERSPAN_KEY_OFFSET, ERSPAN_PACKET_SIZE, VXLAN6_FLAGS_OFFSET, VXLAN6_PACKET_SIZE,
+    VXLAN6_VNI_OFFSET, VXLAN_FLAGS_OFFSET, VXLAN_PACKET_SIZE, VXLAN_VNI_OFFSET,
+};
 use public::counter::{Countable, CounterType, CounterValue, OwnedCountable};
 use public::proto::trident::SocketType;
 use public::queue::Receiver;
@@ -205,6 +211,7 @@ impl AfpacketSender {
 struct IpSender {
     socket: Socket,
     underlay_is_ipv6: bool,
+    underlay_header_size: usize,
 
     dst_ip: IpAddr,
     remote: SockAddr,
@@ -230,6 +237,11 @@ impl IpSender {
         Ok(Self {
             socket,
             underlay_is_ipv6: remote.is_ipv6(),
+            underlay_header_size: if remote.is_ipv6() {
+                IPV6_PACKET_SIZE
+            } else {
+                IPV4_PACKET_SIZE
+            },
             remote: match remote {
                 IpAddr::V4(ip) => SockAddr::from(SocketAddrV4::new(ip, 0)),
                 IpAddr::V6(ip) => SockAddr::from(SocketAddrV6::new(ip, 0, 0, 0)),
@@ -257,6 +269,11 @@ impl IpSender {
         Ok(Self {
             socket,
             underlay_is_ipv6: remote.is_ipv6(),
+            underlay_header_size: if remote.is_ipv6() {
+                IPV6_PACKET_SIZE
+            } else {
+                IPV4_PACKET_SIZE
+            },
             dst_ip: remote.clone(),
             remote: match remote {
                 IpAddr::V4(ip) => SockAddr::from(SocketAddrV4::new(ip.clone(), 0)),
@@ -268,10 +285,10 @@ impl IpSender {
     fn send(
         &mut self,
         underlay_l2_opt_size: usize,
-        header_size: usize,
         mut packet: Vec<u8>,
         arp: &Arc<NpbArpTable>,
     ) -> IOResult<usize> {
+        let header_size = self.underlay_header_size + underlay_l2_opt_size;
         let seq = arp.lookup_counter(&self.dst_ip);
         serialize_seq(
             &mut packet,
@@ -287,10 +304,135 @@ impl IpSender {
 }
 
 #[derive(Debug)]
+struct TcpSender {
+    socket: Option<Socket>,
+    underlay_is_ipv6: bool,
+
+    overlay_packet_offset: usize,
+    direction_offset: usize,
+    vni_offset: usize,
+    is_vxlan: bool,
+
+    dst_ip: IpAddr,
+    remote: SockAddr,
+}
+
+impl TcpSender {
+    const CONNECT_TIMEOUT: u64 = 100;
+
+    fn get_tunnel_info(&self, buffer: &[u8], underlay_l2_opt_size: usize) -> (u8, u32) {
+        let flags = buffer[self.direction_offset + underlay_l2_opt_size];
+        let vni = read_u32_be(&buffer[self.vni_offset + underlay_l2_opt_size..]);
+        if self.is_vxlan {
+            (flags & 0x1, vni & 0xffffff)
+        } else {
+            ((flags >> 3) & 0x1, vni)
+        }
+    }
+
+    fn new(dst_ip: &IpAddr, protocol: u8, dst_port: u16) -> Self {
+        let (overlay_packet_offset, direction_offset, vni_offset, is_vxlan) = if dst_ip.is_ipv6() {
+            if protocol != 17 {
+                (
+                    ERSPAN6_PACKET_SIZE,
+                    ERSPAN6_FLAGS_OFFSET,
+                    ERSPAN6_KEY_OFFSET,
+                    false,
+                )
+            } else {
+                (
+                    VXLAN6_PACKET_SIZE,
+                    VXLAN6_FLAGS_OFFSET,
+                    VXLAN6_VNI_OFFSET,
+                    true,
+                )
+            }
+        } else {
+            if protocol != 17 {
+                (
+                    ERSPAN_PACKET_SIZE,
+                    ERSPAN_FLAGS_OFFSET,
+                    ERSPAN_KEY_OFFSET,
+                    false,
+                )
+            } else {
+                (
+                    VXLAN_PACKET_SIZE,
+                    VXLAN_FLAGS_OFFSET,
+                    VXLAN_VNI_OFFSET,
+                    true,
+                )
+            }
+        };
+        Self {
+            socket: None,
+            underlay_is_ipv6: dst_ip.is_ipv6(),
+            overlay_packet_offset,
+            direction_offset,
+            vni_offset,
+            is_vxlan,
+            remote: match dst_ip {
+                IpAddr::V4(ip) => SockAddr::from(SocketAddrV4::new(ip.clone(), dst_port)),
+                IpAddr::V6(ip) => SockAddr::from(SocketAddrV6::new(ip.clone(), dst_port, 0, 0)),
+            },
+            dst_ip: dst_ip.clone(),
+        }
+    }
+
+    fn connect_check(&mut self) -> IOResult<()> {
+        if self.socket.is_some() {
+            return Ok(());
+        }
+        let domain = if self.underlay_is_ipv6 {
+            Domain::IPV6
+        } else {
+            Domain::IPV4
+        };
+        let socket = Socket::new(domain, Type::STREAM, None)?;
+        socket.connect_timeout(&self.remote, Duration::from_millis(Self::CONNECT_TIMEOUT))?;
+        socket.set_nonblocking(true)?;
+        socket.set_keepalive(true)?;
+        self.socket.replace(socket);
+        info!("Npb TcpSender init with {}.", self.dst_ip);
+        Ok(())
+    }
+
+    fn send(
+        &mut self,
+        timestamp: u64,
+        underlay_l2_opt_size: usize,
+        mut packet: Vec<u8>,
+        arp: &Arc<NpbArpTable>,
+    ) -> IOResult<usize> {
+        self.connect_check()?;
+        let seq = arp.lookup_counter(&self.dst_ip);
+        serialize_seq(
+            &mut packet,
+            seq,
+            underlay_l2_opt_size,
+            self.underlay_is_ipv6,
+        );
+        let header_size = self.overlay_packet_offset + underlay_l2_opt_size - NpbHeader::SIZEOF;
+        let (direction, vni) = self.get_tunnel_info(&packet, underlay_l2_opt_size);
+        let packet = &mut packet.as_mut_slice()[header_size..];
+        let header = NpbHeader::new(packet.len() as u16, direction, vni, timestamp);
+        let _ = header.encode(packet);
+        let n = self.socket.as_ref().unwrap().send(packet);
+        if n.is_err() {
+            self.socket = None;
+        }
+        return n;
+    }
+
+    fn close(&mut self) {}
+}
+
+#[derive(Debug)]
 enum NpbSender {
     IpSender(IpSender),
     #[cfg(unix)]
     RawSender(AfpacketSender),
+    TcpSender(TcpSender),
 }
 
 impl NpbSender {
@@ -298,14 +440,14 @@ impl NpbSender {
         &mut self,
         timestamp: u64,
         underlay_l2_opt_size: usize,
-        header_size: usize,
         packet: Vec<u8>,
         arp: &Arc<NpbArpTable>,
     ) -> IOResult<usize> {
         match self {
-            Self::IpSender(s) => s.send(underlay_l2_opt_size, header_size, packet, arp),
+            Self::IpSender(s) => s.send(underlay_l2_opt_size, packet, arp),
             #[cfg(unix)]
             Self::RawSender(s) => s.send(timestamp, underlay_l2_opt_size, packet, arp),
+            Self::TcpSender(s) => s.send(timestamp, underlay_l2_opt_size, packet, arp),
         }
     }
 }
@@ -573,6 +715,7 @@ impl NpbArpTable {
 pub struct NpbConnectionPool {
     connections: HashMap<(u128, u8), NpbSender>,
     socket_type: SocketType,
+    npb_port: u16,
     underlay_is_ipv6: bool,
 
     counter: Arc<NpbSenderCounter>,
@@ -585,6 +728,7 @@ impl NpbConnectionPool {
         id: usize,
         underlay_is_ipv6: bool,
         socket_type: SocketType,
+        npb_port: u16,
         arp: Arc<NpbArpTable>,
         stats_collector: Arc<stats::Collector>,
     ) -> Self {
@@ -608,6 +752,7 @@ impl NpbConnectionPool {
         Self {
             connections: HashMap::new(),
             socket_type,
+            npb_port,
             underlay_is_ipv6,
             counter,
             arp,
@@ -625,9 +770,17 @@ impl NpbConnectionPool {
                 }
                 Ok(NpbSender::IpSender(sender.unwrap()))
             }
+            SocketType::Tcp => Ok(NpbSender::TcpSender(TcpSender::new(
+                remote,
+                protocol,
+                self.npb_port,
+            ))),
             #[cfg(unix)]
             SocketType::RawUdp => Ok(NpbSender::RawSender(AfpacketSender::new(remote))),
-            _ => panic!("NPB not support socket type: {:?}.", self.socket_type),
+            _ => Err(format!(
+                "NPB not support socket type: {:?} in protocol {}.",
+                self.socket_type, protocol
+            )),
         }
     }
 
@@ -637,9 +790,8 @@ impl NpbConnectionPool {
         underlay_l2_opt_size: usize,
         packet: Vec<u8>,
     ) -> IOResult<usize> {
-        let (remote, key, header_size) = if self.underlay_is_ipv6 {
+        let (remote, key) = if self.underlay_is_ipv6 {
             let offset = IPV6_DST_OFFSET + underlay_l2_opt_size;
-            let header_size = IPV6_PACKET_SIZE + underlay_l2_opt_size;
             let ip = Ipv6Addr::from(
                 *<&[u8; 16]>::try_from(&packet[offset..offset + IPV6_ADDR_LEN]).unwrap(),
             );
@@ -649,11 +801,9 @@ impl NpbConnectionPool {
                     u128::from(ip),
                     packet[IPV6_PROTO_OFFSET + underlay_l2_opt_size],
                 ),
-                header_size,
             )
         } else {
             let offset = IPV4_DST_OFFSET + underlay_l2_opt_size;
-            let header_size = IPV4_PACKET_SIZE + underlay_l2_opt_size;
             let ip = Ipv4Addr::from(
                 *<&[u8; 4]>::try_from(&packet[offset..offset + IPV4_ADDR_LEN]).unwrap(),
             );
@@ -663,19 +813,15 @@ impl NpbConnectionPool {
                     u32::from(ip) as u128,
                     packet[IPV4_PROTO_OFFSET + underlay_l2_opt_size],
                 ),
-                header_size,
             )
         };
 
         let mut conn = self.connections.get_mut(&key);
         if conn.is_some() {
-            return conn.as_mut().unwrap().send(
-                timestamp,
-                underlay_l2_opt_size,
-                header_size,
-                packet,
-                &self.arp,
-            );
+            return conn
+                .as_mut()
+                .unwrap()
+                .send(timestamp, underlay_l2_opt_size, packet, &self.arp);
         }
 
         let conn = self.create_sender(&remote, key.1);
@@ -683,13 +829,7 @@ impl NpbConnectionPool {
             return Err(IOError::new(ErrorKind::Other, conn.unwrap_err()));
         }
         let mut conn = conn.unwrap();
-        let ret = conn.send(
-            timestamp,
-            underlay_l2_opt_size,
-            header_size,
-            packet,
-            &self.arp,
-        );
+        let ret = conn.send(timestamp, underlay_l2_opt_size, packet, &self.arp);
         self.connections.insert(key, conn);
         return ret;
     }
@@ -735,6 +875,7 @@ impl NpbPacketSender {
                 id,
                 config.underlay_is_ipv6,
                 config.socket_type,
+                config.npb_port,
                 arp.clone(),
                 stats_collector,
             )),

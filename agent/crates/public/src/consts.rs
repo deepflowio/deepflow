@@ -175,6 +175,7 @@ pub const TCP_PACKET_SIZE: usize = IPV4_PACKET_SIZE + TCP_HEADER_SIZE; // 54
 pub const IPV6_HEADER_ADJUST: usize = IPV6_HEADER_SIZE - IPV4_HEADER_SIZE;
 
 pub const NPB_VXLAN_FLAGS: u8 = 0xff;
+pub const NPB_DEFAULT_PORT: u16 = 4789;
 
 pub const TCP_OPT_FLAG_WIN_SCALE: u8 = 0b1;
 pub const TCP_OPT_FLAG_MSS: u8 = 0b10;
