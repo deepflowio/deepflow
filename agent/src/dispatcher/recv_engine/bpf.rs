@@ -80,7 +80,7 @@ impl BpfBuilder {
 pub(crate) struct Builder {
     pub is_ipv6: bool,
     pub vxlan_flags: u8,
-    pub vxlan_port: u16,
+    pub npb_port: u16,
     pub controller_port: u16,
     pub analyzer_port: u16,
     pub proxy_controller_port: u16,
@@ -181,12 +181,14 @@ impl Builder {
                 off: UDP_DST_OFFSET as u32,
                 size: PORT_LEN as u32,
             }))
-            .append(BpfSyntax::JumpIf(JumpIf {
-                cond: JumpTest::JumpNotEqual,
-                val: self.vxlan_port as u32,
-                skip_true: 6,
-                ..Default::default()
-            }))
+            .branch(
+                JumpIf {
+                    cond: JumpTest::JumpNotEqual,
+                    val: self.npb_port as u32,
+                    ..Default::default()
+                },
+                Self::bypass_modifier,
+            )
             .append(BpfSyntax::LoadIndirect(LoadIndirect {
                 off: VXLAN_FLAGS_OFFSET as u32,
                 size: 1,
@@ -194,29 +196,53 @@ impl Builder {
             .append(BpfSyntax::JumpIf(JumpIf {
                 cond: JumpTest::JumpEqual,
                 val: self.vxlan_flags as u32,
-                skip_true: 3,
-                skip_false: 4,
+                skip_true: 8,
+                skip_false: 9,
+            }))
+            .append(BpfSyntax::JumpIf(JumpIf {
+                cond: JumpTest::JumpNotEqual,
+                val: IpProtocol::Gre as u32,
+                skip_true: 2,
+                ..Default::default()
+            }))
+            .append(BpfSyntax::LoadIndirect(LoadIndirect {
+                off: GRE4_PROTO_OFFSET as u32,
+                size: GRE_PROTO_LEN as u32,
+            }))
+            .append(BpfSyntax::JumpIf(JumpIf {
+                cond: JumpTest::JumpEqual,
+                val: GRE_PROTO_ERSPAN_III as u32,
+                skip_true: 5,
+                skip_false: 6,
             }))
             .branch(
                 JumpIf {
                     cond: JumpTest::JumpNotEqual,
-                    val: IpProtocol::Gre as u32,
+                    val: IpProtocol::Tcp as u32,
                     ..Default::default()
                 },
                 Self::bypass_modifier,
             )
             .append(BpfSyntax::LoadIndirect(LoadIndirect {
-                off: GRE4_PROTO_OFFSET as u32,
-                size: GRE_PROTO_LEN as u32,
+                off: TCP_DST_OFFSET as u32,
+                size: PORT_LEN as u32,
             }))
-            .branch(
-                JumpIf {
-                    cond: JumpTest::JumpEqual,
-                    val: GRE_PROTO_ERSPAN_III as u32,
-                    ..Default::default()
-                },
-                Self::drop_modifier,
-            )
+            .append(BpfSyntax::JumpIf(JumpIf {
+                cond: JumpTest::JumpEqual,
+                val: self.npb_port as u32,
+                skip_true: 2,
+                ..Default::default()
+            }))
+            .append(BpfSyntax::LoadIndirect(LoadIndirect {
+                off: TCP_SRC_OFFSET as u32,
+                size: PORT_LEN as u32,
+            }))
+            .append(BpfSyntax::JumpIf(JumpIf {
+                cond: JumpTest::JumpNotEqual,
+                val: self.npb_port as u32,
+                skip_true: 1,
+                ..Default::default()
+            }))
             .append(BpfSyntax::RetConstant(RetConstant { val: 0 }));
 
         return bpf_builder.build();
@@ -240,12 +266,14 @@ impl Builder {
                 off: UDP6_DST_OFFSET as u32,
                 size: PORT_LEN as u32,
             }))
-            .append(BpfSyntax::JumpIf(JumpIf {
-                cond: JumpTest::JumpNotEqual,
-                val: self.vxlan_port as u32,
-                skip_true: 6,
-                ..Default::default()
-            }))
+            .branch(
+                JumpIf {
+                    cond: JumpTest::JumpNotEqual,
+                    val: self.npb_port as u32,
+                    ..Default::default()
+                },
+                Self::bypass_modifier,
+            )
             .append(BpfSyntax::LoadIndirect(LoadIndirect {
                 off: VXLAN6_FLAGS_OFFSET as u32,
                 size: 1,
@@ -253,29 +281,53 @@ impl Builder {
             .append(BpfSyntax::JumpIf(JumpIf {
                 cond: JumpTest::JumpEqual,
                 val: self.vxlan_flags as u32,
-                skip_true: 3,
-                skip_false: 4,
+                skip_true: 8,
+                skip_false: 9,
+            }))
+            .append(BpfSyntax::JumpIf(JumpIf {
+                cond: JumpTest::JumpNotEqual,
+                val: IpProtocol::Gre as u32,
+                skip_true: 2,
+                ..Default::default()
+            }))
+            .append(BpfSyntax::LoadIndirect(LoadIndirect {
+                off: GRE6_PROTO_OFFSET as u32,
+                size: GRE_PROTO_LEN as u32,
+            }))
+            .append(BpfSyntax::JumpIf(JumpIf {
+                cond: JumpTest::JumpEqual,
+                val: GRE_PROTO_ERSPAN_III as u32,
+                skip_true: 5,
+                skip_false: 6,
             }))
             .branch(
                 JumpIf {
                     cond: JumpTest::JumpNotEqual,
-                    val: IpProtocol::Gre as u32,
+                    val: IpProtocol::Tcp as u32,
                     ..Default::default()
                 },
                 Self::bypass_modifier,
             )
             .append(BpfSyntax::LoadIndirect(LoadIndirect {
-                off: GRE6_PROTO_OFFSET as u32,
-                size: GRE_PROTO_LEN as u32,
+                off: TCP6_DST_OFFSET as u32,
+                size: PORT_LEN as u32,
             }))
-            .branch(
-                JumpIf {
-                    cond: JumpTest::JumpEqual,
-                    val: GRE_PROTO_ERSPAN_III as u32,
-                    ..Default::default()
-                },
-                Self::drop_modifier,
-            )
+            .append(BpfSyntax::JumpIf(JumpIf {
+                cond: JumpTest::JumpEqual,
+                val: self.npb_port as u32,
+                skip_true: 2,
+                ..Default::default()
+            }))
+            .append(BpfSyntax::LoadIndirect(LoadIndirect {
+                off: TCP6_SRC_OFFSET as u32,
+                size: PORT_LEN as u32,
+            }))
+            .append(BpfSyntax::JumpIf(JumpIf {
+                cond: JumpTest::JumpNotEqual,
+                val: self.npb_port as u32,
+                skip_true: 1,
+                ..Default::default()
+            }))
             .append(BpfSyntax::RetConstant(RetConstant { val: 0 }));
 
         return bpf_builder.build();
@@ -696,8 +748,11 @@ impl Builder {
         // 不采集分发的VXLAN流量
         conditions.push(format!(
             "not (udp and dst port {} and udp[8:1]={:#x})",
-            self.vxlan_port, self.vxlan_flags
+            self.npb_port, self.vxlan_flags
         ));
+
+        // 不采集分发的TCP流量
+        conditions.push(format!("not (tcp and port {})", self.npb_port,));
 
         // 不采集分发的ERSPANIII
         conditions.push(format!(
@@ -725,7 +780,7 @@ mod tests {
         let builder = Builder {
             is_ipv6: false,
             vxlan_flags: 0xff,
-            vxlan_port: 1122,
+            npb_port: 1122,
             controller_port: 3344,
             controller_tls_port: 5566,
             proxy_controller_port: 7788,
@@ -744,10 +799,10 @@ mod tests {
             "jneq #33024,2",
             "ldx #4",
             "ldh [x + 12]",
-            "jneq #2048,45",
+            "jneq #2048,50",
             "ldh [x + 20]",
             "and #8191",
-            "jneq #0,42",
+            "jneq #0,47",
             "ldb [x + 23]",
             "jeq #6,1",
             "jneq #17,9",
@@ -783,12 +838,17 @@ mod tests {
             "ldb [x + 23]",
             "jneq #17,4",
             "ldh [x + 36]",
-            "jneq #1122,6",
+            "jneq #1122,11",
             "ldb [x + 42]",
-            "jeq #255,3,4",
-            "jneq #47,3",
+            "jeq #255,8,9",
+            "jneq #47,2",
             "ldh [x + 36]",
-            "jneq #8939,1",
+            "jeq #8939,5,6",
+            "jneq #6,5",
+            "ldh [x + 36]",
+            "jeq #1122,2",
+            "ldh [x + 34]",
+            "jneq #1122,1",
             "ret #0",
         ];
 
@@ -802,7 +862,7 @@ mod tests {
         let builder = Builder {
             is_ipv6: true,
             vxlan_flags: 0xff,
-            vxlan_port: 1122,
+            npb_port: 1122,
             controller_port: 3344,
             controller_tls_port: 5566,
             proxy_controller_port: 7788,
@@ -825,7 +885,7 @@ mod tests {
             "jneq #33024,2",
             "ldx #4",
             "ldh [x + 12]",
-            "jneq #34525,54",
+            "jneq #34525,59",
             "ldb [x + 20]",
             "jeq #6,1",
             "jneq #17,9",
@@ -873,12 +933,17 @@ mod tests {
             "ldb [x + 20]",
             "jneq #17,4",
             "ldh [x + 56]",
-            "jneq #1122,6",
+            "jneq #1122,11",
             "ldb [x + 62]",
-            "jeq #255,3,4",
-            "jneq #47,3",
+            "jeq #255,8,9",
+            "jneq #47,2",
             "ldh [x + 56]",
-            "jneq #8939,1",
+            "jeq #8939,5,6",
+            "jneq #6,5",
+            "ldh [x + 56]",
+            "jeq #1122,2",
+            "ldh [x + 54]",
+            "jneq #1122,1",
             "ret #0",
         ];
 

@@ -428,7 +428,7 @@ pub struct Options {
     pub tap_mac_script: String,
     pub is_ipv6: bool,
     pub vxlan_flags: u8,
-    pub vxlan_port: u16,
+    pub npb_port: u16,
     pub controller_port: u16,
     pub controller_tls_port: u16,
 }

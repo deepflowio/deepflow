@@ -123,3 +123,25 @@ impl NpbHandler {
     ) {
     }
 }
+
+#[derive(Default)]
+pub struct NpbHeader;
+
+impl NpbHeader {
+    pub const SIZEOF: usize = 16;
+
+    pub fn new(_: u16, _: u8, _: u32, _: u64) -> Self {
+        NpbHeader::default()
+    }
+
+    pub fn encode(&self, _buffer: &mut [u8]) -> usize {
+        Self::SIZEOF
+    }
+}
+
+impl TryFrom<&[u8]> for NpbHeader {
+    type Error = bool;
+    fn try_from(_buffer: &[u8]) -> Result<Self, Self::Error> {
+        Ok(NpbHeader::default())
+    }
+}
