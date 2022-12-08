@@ -597,14 +597,15 @@ vtap_group_id: g-xxxxxx
     #queue-size: 65536
 
     ## Pcap buffer size for each flow
-    ## Default: 1M
+    ## Default: 64K
     ## Note: buffer flushes when one of the flows reach this limit
-    #flow-buffer-size: 1048576
+    #flow-buffer-size: 65536
 
     ## Total pcap buffer size
-    ## Default: 8M
+    ## Default: 96K
     ## Note: buffer flushes when total data size reach this limit
-    #buffer-size: 8388608
+    ##       cannot exceed sender buffer size 128K
+    #buffer-size: 98304
 
     ## Flow flush interval
     ## Default: 1m
