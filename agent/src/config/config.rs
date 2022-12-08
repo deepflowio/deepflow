@@ -598,9 +598,9 @@ impl Default for PcapConfig {
     fn default() -> Self {
         PcapConfig {
             queue_size: 65536,
-            flush_interval: 60,        // 1min
-            buffer_size: 8388608,      // 8M
-            flow_buffer_size: 1048576, // 1M
+            flush_interval: 60,         // 1min
+            buffer_size: 96 << 10,      // 96K
+            flow_buffer_size: 64 << 10, // 64K
         }
     }
 }
