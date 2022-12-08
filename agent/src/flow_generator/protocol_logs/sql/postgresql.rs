@@ -312,7 +312,9 @@ impl PostgresqlLog {
             if let Some((tag, len)) = read_block(sub_payload) {
                 offset += len + 5; // len(data) + len 4B + tag 1B
                 match self.info.msg_type {
-                    LogMessageType::Request => self.on_req_block(tag, &sub_payload[5..5 + len])?,
+                    LogMessageType::Request => {
+                        self.on_req_block(tag, &sub_payload[5..5 + len], param.time)?
+                    }
                     LogMessageType::Response => {
                         self.on_resp_block(tag, &sub_payload[5..5 + len], param.time)?
                     }
@@ -339,13 +341,13 @@ impl PostgresqlLog {
             && read_u64_be(payload) == SSL_REQ
     }
 
-    fn on_req_block(&mut self, tag: char, data: &[u8]) -> Result<()> {
+    fn on_req_block(&mut self, tag: char, data: &[u8], time: u64) -> Result<()> {
         match tag {
             'Q' => {
                 self.info.req_type = tag;
                 self.info.context = strip_string_end_with_zero(data)?;
                 self.info.ignore = false;
-                self.perf_inc_req();
+                self.perf_inc_req(time);
                 Ok(())
             }
             'P' => {
@@ -363,7 +365,7 @@ impl PostgresqlLog {
                     if let Some(idx) = data.iter().position(|x| *x == 0x0) {
                         self.info.context = String::from_utf8_lossy(&data[..idx]).to_string();
                         if is_postgresql(&self.info.context) {
-                            self.perf_inc_req();
+                            self.perf_inc_req(time);
                             return Ok(());
                         }
                     }

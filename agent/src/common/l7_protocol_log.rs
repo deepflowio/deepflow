@@ -200,8 +200,8 @@ macro_rules! perf_impl {
                 });
             }
 
-            fn perf_inc_req(&mut self) {
-                self.update_perf(1, 0, 0, 0, 0);
+            fn perf_inc_req(&mut self, time: u64) {
+                self.update_perf(1, 0, 0, 0, time);
             }
 
             fn perf_inc_resp(&mut self, time: u64) {
