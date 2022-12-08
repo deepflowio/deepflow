@@ -112,7 +112,7 @@ impl NpbBuilder {
         let mut buffer = [0u8; UDP_HEADER_SIZE];
         let mut udp_header = MutableUdpPacket::new(&mut buffer).unwrap();
         udp_header.set_source(49152);
-        udp_header.set_destination(config.vxlan_port);
+        udp_header.set_destination(config.npb_port);
         return buffer.to_vec();
     }
 
@@ -303,11 +303,12 @@ impl NpbBuilder {
 #[cfg(test)]
 mod test {
     use super::*;
+    use public::consts::NPB_DEFAULT_PORT;
 
     #[test]
     fn test_pseudo_vxlan() {
         let config = NpbConfig {
-            vxlan_port: 4789,
+            npb_port: NPB_DEFAULT_PORT,
             vxlan_flags: 0x08,
             output_vlan: 0,
             enable_qos_bypass: false,
@@ -326,7 +327,7 @@ mod test {
 
         let config = NpbConfig {
             output_vlan: 4097,
-            vxlan_port: 4789,
+            npb_port: NPB_DEFAULT_PORT,
             vxlan_flags: 0xff,
             enable_qos_bypass: false,
             underlay_is_ipv6: false,
@@ -345,7 +346,7 @@ mod test {
 
         let config = NpbConfig {
             output_vlan: 4097,
-            vxlan_port: 4789,
+            npb_port: NPB_DEFAULT_PORT,
             vxlan_flags: 0xff,
             underlay_is_ipv6: true,
             enable_qos_bypass: false,
