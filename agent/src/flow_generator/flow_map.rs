@@ -429,7 +429,7 @@ impl FlowMap {
         let flow_closed = self.update_tcp_flow(config, meta_packet, &mut node);
         if config.collector_enabled {
             let direction = meta_packet.direction == PacketDirection::ClientToServer;
-            self.collect_metric(config, &mut node, meta_packet, direction);
+            self.collect_metric(config, &mut node, meta_packet, direction, false);
         }
 
         // After collect_metric() is called for eBPF MetaPacket, its direction is determined.
@@ -442,7 +442,7 @@ impl FlowMap {
             // For eBPF data, timeout as soon as possible when there are no unaggregated requests.
             // Considering that eBPF data may be out of order, wait for an additional 2s timeout.
             if node.residual_request == 0 {
-                node.timeout = self.config.load().flow_timeout.closed_fin;
+                node.timeout = config.flow_timeout.closed_fin;
             } else {
                 node.timeout = self.parse_config.load().l7_log_session_aggr_timeout;
             }
@@ -484,6 +484,7 @@ impl FlowMap {
                 &mut node,
                 meta_packet,
                 meta_packet.direction == PacketDirection::ClientToServer,
+                false,
             );
         }
 
@@ -945,7 +946,7 @@ impl FlowMap {
         }
 
         if config.collector_enabled {
-            self.collect_metric(config, &mut node, meta_packet, !reverse);
+            self.collect_metric(config, &mut node, meta_packet, !reverse, true);
         }
 
         // After collect_metric() is called for eBPF MetaPacket, its direction is determined.
@@ -970,7 +971,9 @@ impl FlowMap {
         node: &mut FlowNode,
         meta_packet: &mut MetaPacket,
         is_first_packet_direction: bool,
+        no_stats: bool,
     ) {
+        let flow = &node.tagged_flow.flow;
         let mut info = None;
         if let Some(perf) = node.meta_flow_perf.as_mut() {
             let flow_id = node.tagged_flow.flow.flow_id;
@@ -995,6 +998,19 @@ impl FlowMap {
                 Err(e) => debug!("{}", e),
             }
         }
+        // For ebpf data, after perf.parse(), meta_packet's direction
+        // is determined. Here we determine whether to reverse flow.
+        if meta_packet.signal_source == SignalSource::EBPF {
+            if flow.flow_key.ip_src == meta_packet.lookup_key.src_ip
+                && meta_packet.direction == PacketDirection::ServerToClient
+            {
+                Self::reverse_flow(node, no_stats);
+            } else if flow.flow_key.ip_src != meta_packet.lookup_key.src_ip
+                && meta_packet.direction == PacketDirection::ClientToServer
+            {
+                Self::reverse_flow(node, no_stats);
+            }
+        }
         if let Some((info, rrt)) = info {
             for i in info.into_iter() {
                 self.write_to_app_proto_log(config, node, &meta_packet, i, rrt);
@@ -1014,7 +1030,7 @@ impl FlowMap {
             reverse = self.update_l4_direction(meta_packet, &mut node, true, true);
         }
         if config.collector_enabled {
-            self.collect_metric(config, &mut node, meta_packet, !reverse);
+            self.collect_metric(config, &mut node, meta_packet, !reverse, true);
         }
         node
     }
