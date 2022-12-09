@@ -172,7 +172,7 @@ impl FlowPerf {
         proto.is_skip_parse_by_port_bitmap(&self.l7_protocol_parse_port_bitmap, port)
     }
 
-    // retur rrt
+    // return rrt
     fn l7_parse_perf(
         &mut self,
         packet: &MetaPacket,
