@@ -36,6 +36,7 @@ require (
 	github.com/deepflowys/deepflow/server/controller/monitor/license v0.0.0-00010101000000-000000000000
 	github.com/deepflowys/deepflow/server/controller/service/configuration v0.0.0-00010101000000-000000000000
 	github.com/deepflowys/deepflow/server/querier/engine/clickhouse/packet_batch v0.0.0-00010101000000-000000000000
+	github.com/deepflowys/tempopb v0.0.0-20221209022705-ef5ed506f43c
 	github.com/docker/go-units v0.4.0
 	github.com/gin-gonic/gin v1.8.1
 	github.com/go-redis/redis v6.15.9+incompatible
@@ -50,6 +51,7 @@ require (
 	github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
 	github.com/olivere/elastic v6.2.37+incompatible
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
+	github.com/openshift/api v0.0.0-20210422150128-d8a48168c81c // indirect
 	github.com/openshift/client-go v0.0.0-20210422153130-25c8450d1535
 	github.com/pebbe/zmq4 v1.2.9
 	github.com/pkg/errors v0.9.1
@@ -71,9 +73,9 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.7.0
 	go.opentelemetry.io/otel/sdk v1.7.0
 	go.opentelemetry.io/proto/otlp v0.18.0
-	golang.org/x/net v0.0.0-20220722155237-a158d28d115b
-	golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab
-	google.golang.org/grpc v1.47.0
+	golang.org/x/net v0.0.0-20220921155015-db77216a4ee9
+	golang.org/x/sys v0.0.0-20220919091848-fb04ddd9f9c8
+	google.golang.org/grpc v1.49.0
 	gopkg.in/alexcesaro/statsd.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0
 	gorm.io/driver/mysql v1.3.4
@@ -90,7 +92,6 @@ require (
 	github.com/fortytw2/leaktest v1.3.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.10.2 // indirect
 	github.com/ionos-cloud/sdk-go/v6 v6.1.0 // indirect
-	github.com/openshift/api v0.0.0-20210422150128-d8a48168c81c // indirect
 	github.com/signalfx/splunk-otel-go v1.1.0 // indirect
 	github.com/signalfx/splunk-otel-go/instrumentation/database/sql/splunksql v1.1.0 // indirect
 	github.com/signalfx/splunk-otel-go/instrumentation/internal v1.1.0 // indirect
@@ -194,8 +195,8 @@ require (
 	golang.org/x/time v0.0.0-20220224211638-0e9765cccd65 // indirect
 	golang.org/x/tools v0.1.12 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/genproto v0.0.0-20220628213854-d9e0b6570c03 // indirect
-	google.golang.org/protobuf v1.28.0 // indirect
+	google.golang.org/genproto v0.0.0-20220920201722-2b89144ce006 // indirect
+	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.66.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
