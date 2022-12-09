@@ -442,7 +442,7 @@ impl FlowMap {
             // For eBPF data, timeout as soon as possible when there are no unaggregated requests.
             // Considering that eBPF data may be out of order, wait for an additional 2s timeout.
             if node.residual_request == 0 {
-                node.timeout = self.config.load().flow_timeout.closed_fin;
+                node.timeout = config.flow_timeout.closed_fin;
             } else {
                 node.timeout = self.parse_config.load().l7_log_session_aggr_timeout;
             }
@@ -955,6 +955,25 @@ impl FlowMap {
             } else {
                 node.residual_request -= 1;
             }
+            // For ebpf data, after collect_metric(), meta_packet's direction
+            // is determined. Here we determine whether to reverse flow.
+            if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
+                if node.tagged_flow.flow.flow_key.ip_src == meta_packet.lookup_key.src_ip
+                    && node.tagged_flow.flow.flow_key.port_src == meta_packet.lookup_key.src_port
+                {
+                    // If flow_key.ip_src and flow_key.port_src of node.tagged_flow.flow are the same as
+                    // that of meta_packet, but the direction of meta_packet is S2C, reverse flow
+                    if meta_packet.direction == PacketDirection::ServerToClient {
+                        Self::reverse_flow(&mut node, true);
+                    }
+                } else {
+                    // If flow_key.ip_src or flow_key.port_src of node.tagged_flow.flow is different
+                    // from that of meta_packet, and the direction of meta_packet is C2S, reverse flow
+                    if meta_packet.direction == PacketDirection::ClientToServer {
+                        Self::reverse_flow(&mut node, true);
+                    }
+                }
+            }
         }
 
         // Enterprise Edition Feature: packet-sequence
@@ -1015,6 +1034,25 @@ impl FlowMap {
         }
         if config.collector_enabled {
             self.collect_metric(config, &mut node, meta_packet, !reverse);
+        }
+        // For ebpf data, after collect_metric(), meta_packet's direction
+        // is determined. Here we determine whether to reverse flow.
+        if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
+            if node.tagged_flow.flow.flow_key.ip_src == meta_packet.lookup_key.src_ip
+                && node.tagged_flow.flow.flow_key.port_src == meta_packet.lookup_key.src_port
+            {
+                // If flow_key.ip_src and flow_key.port_src of node.tagged_flow.flow are the same as
+                // that of meta_packet, but the direction of meta_packet is S2C, reverse flow
+                if meta_packet.direction == PacketDirection::ServerToClient {
+                    Self::reverse_flow(&mut node, true);
+                }
+            } else {
+                // If flow_key.ip_src or flow_key.port_src of node.tagged_flow.flow is different
+                // from that of meta_packet, and the direction of meta_packet is C2S, reverse flow
+                if meta_packet.direction == PacketDirection::ClientToServer {
+                    Self::reverse_flow(&mut node, true);
+                }
+            }
         }
         node
     }
