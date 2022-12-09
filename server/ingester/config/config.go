@@ -57,11 +57,17 @@ const (
 	DefaultStatsInterval           = 10 // s
 )
 
+type DatabaseTable struct {
+	Database      string `yaml:"database"`
+	TablesContain string `yaml:"tables-contain"`
+}
+
 type CKDiskMonitor struct {
-	CheckInterval int    `yaml:"check-interval"` // s
-	UsedPercent   int    `yaml:"used-percent"`   // 0-100
-	FreeSpace     int    `yaml:"free-space"`     // Gb
-	DiskPrefix    string `yaml:"disk-prefix"`
+	CheckInterval int             `yaml:"check-interval"` // s
+	UsedPercent   int             `yaml:"used-percent"`   // 0-100
+	FreeSpace     int             `yaml:"free-space"`     // Gb
+	DiskPrefix    string          `yaml:"disk-prefix"`
+	PriorityDrops []DatabaseTable `yaml:"priority-drops"`
 }
 
 type Disk struct {
@@ -331,14 +337,20 @@ func Load(path string) *Config {
 		LogFile:  "/var/log/deepflow/server.log",
 		LogLevel: "info",
 		Base: Config{
-			ControllerIPs:        []string{DefaultContrallerIP},
-			ControllerPort:       DefaultControllerPort,
-			CKDBAuth:             Auth{"default", ""},
-			StreamRozeEnabled:    true,
-			UDPReadBuffer:        64 << 20,
-			TCPReadBuffer:        4 << 20,
-			TCPReaderBuffer:      1 << 20,
-			CKDiskMonitor:        CKDiskMonitor{DefaultCheckInterval, DefaultDiskUsedPercent, DefaultDiskFreeSpace, DefaultDFDiskPrefix},
+			ControllerIPs:     []string{DefaultContrallerIP},
+			ControllerPort:    DefaultControllerPort,
+			CKDBAuth:          Auth{"default", ""},
+			StreamRozeEnabled: true,
+			UDPReadBuffer:     64 << 20,
+			TCPReadBuffer:     4 << 20,
+			TCPReaderBuffer:   1 << 20,
+			CKDiskMonitor: CKDiskMonitor{
+				DefaultCheckInterval,
+				DefaultDiskUsedPercent,
+				DefaultDiskFreeSpace,
+				DefaultDFDiskPrefix,
+				[]DatabaseTable{{"flow_log", ""}, {"flow_metrics", "1s_local"}},
+			},
 			Influxdb:             HostPort{DefaultInfluxdbHost, DefaultInfluxdbPort},
 			ListenPort:           DefaultListenPort,
 			GrpcBufferSize:       DefaultGrpcBufferSize,
