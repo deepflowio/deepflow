@@ -30,7 +30,7 @@ require (
 	github.com/cactus/go-statsd-client/v5 v5.0.0
 	github.com/deckarep/golang-set v1.8.0
 	github.com/deckarep/golang-set/v2 v2.1.0
-	github.com/deepflowys/deepflow/message v0.0.0-20221130050757-dee9feae06bf
+	github.com/deepflowys/deepflow/message v0.0.0-20221207123223-6d7e30f19f07
 	github.com/deepflowys/deepflow/server/controller/cloud/platform v0.0.0-00010101000000-000000000000
 	github.com/deepflowys/deepflow/server/controller/db/mysql/migrator v0.0.0-00010101000000-000000000000
 	github.com/deepflowys/deepflow/server/controller/monitor/license v0.0.0-00010101000000-000000000000
