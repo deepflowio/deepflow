@@ -1,28 +1,28 @@
 # 名称
-name: huawei
+name: huawei  # required
 # 云平台类型
-type: huawei
+type: huawei  # required
 config:
   # 所属区域标识
-  region_uuid: ffffffff-ffff-ffff-ffff-ffffffffffff
+  region_uuid: ffffffff-ffff-ffff-ffff-ffffffffffff  # required
   # 资源同步控制器
-  #controller_ip: 127.0.0.1
+  #controller_ip: 127.0.0.1  # optional
   # 账号名
   # 在华为云页面，访问控制台-我的凭证页面上找到 帐号名
-  account_name: xxxxxx
+  account_name: xxxxxx  # required
   # IAM用户名
   # 在华为云页面，访问控制台-我的凭证页面上找到 IAM用户名
-  iam_name: xxxxxx
+  iam_name: xxxxxx  # required
   # IAM用户密码
   # 登录华为云页面的密码
-  password: xxxxxx
+  password: xxxxxx  # required
   # 项目ID
   # 控制台-我的凭证-项目列表页面上其中一个项目ID
-  project_id: xxxxxx
+  project_id: xxxxxx  # required
   # 项目
   # 项目ID对应的项目名称
-  region_name: xxxxxx
+  region_name: xxxxxx  # required
   # 区域白名单，多个区域名称之间以英文逗号分隔
-  #include_regions:
+  #include_regions: xxxxx,xxxxxx  # optional
   # 区域黑名单，多个区域名称之间以英文逗号分隔
-  #exclude_regions:
+  #exclude_regions: xxxxx,xxxxxx  # optional

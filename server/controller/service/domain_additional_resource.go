@@ -410,10 +410,11 @@ func generateCloudModelData(domainUUIDToToolDataSet map[string]*addtionalResourc
 					cloudMD.IPs = append(
 						cloudMD.IPs,
 						cloudmodel.IP{
-							Lcuuid:       common.GenerateUUID(vifUUID + ip),
-							IP:           ip,
-							SubnetLcuuid: subnetCIDRUUID,
-							RegionLcuuid: toolDS.regionUUID,
+							Lcuuid:           common.GenerateUUID(vifUUID + ip),
+							IP:               ip,
+							VInterfaceLcuuid: vifUUID,
+							SubnetLcuuid:     subnetCIDRUUID,
+							RegionLcuuid:     toolDS.regionUUID,
 						},
 					)
 				}
@@ -468,10 +469,11 @@ func generateCloudModelData(domainUUIDToToolDataSet map[string]*addtionalResourc
 					cloudMD.IPs = append(
 						cloudMD.IPs,
 						cloudmodel.IP{
-							Lcuuid:       common.GenerateUUID(vifUUID + ip),
-							IP:           ip,
-							SubnetLcuuid: subnetCIDRUUID,
-							RegionLcuuid: toolDS.regionUUID,
+							Lcuuid:           common.GenerateUUID(vifUUID + ip),
+							IP:               ip,
+							VInterfaceLcuuid: vifUUID,
+							SubnetLcuuid:     subnetCIDRUUID,
+							RegionLcuuid:     toolDS.regionUUID,
 						},
 					)
 				}

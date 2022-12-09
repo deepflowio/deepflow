@@ -31,7 +31,7 @@ hosts:
   domain_uuid: xxxx        # required
   vinterfaces:             # optional. network interfaces
   - mac: xx:xx:xx:xx:xx:xx # required
-    subnet_uuid: xxxx   # required
+    subnet_uuid: xxxx      # required
     ips: ["x.x.x.x"]       # optional
 
 # chost, cloud/legacy host, including vm (virtual mechine) and bm (bare metal)
@@ -45,5 +45,5 @@ chosts:
   domain_uuid: xxxx        # required
   vinterfaces:             # optional. chost interfaces
   - mac: xx:xx:xx:xx:xx:xx # required
-    subnet_uuid: xxxx   # required
+    subnet_uuid: xxxx      # required
     ips: ["x.x.x.x"]       # required

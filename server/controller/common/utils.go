@@ -177,14 +177,24 @@ func CURLPerform(method string, url string, body map[string]interface{}) (*simpl
 
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Errorf("curl (%s) failed, (%v)", url, err)
+		log.Errorf("curl: %s failed, (%v)", url, err)
 		return errResponse, err
-	} else if resp.StatusCode != http.StatusOK {
-		log.Warning("curl (%s) failed, (%v)", url, resp)
-		defer resp.Body.Close()
-		return errResponse, errors.New(fmt.Sprintf("curl (%s) failed", url))
 	}
+
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		errMsg := fmt.Sprintf("curl: %s failed, response detail: %+v", url, resp)
+		if respBytes, err := ioutil.ReadAll(resp.Body); err == nil {
+			if response, err := simplejson.NewJson(respBytes); err == nil {
+				description := response.Get("DESCRIPTION").MustString()
+				if description != "" {
+					errMsg += fmt.Sprintf(", description: %s", description)
+				}
+			}
+		}
+		log.Error(errMsg)
+		return errResponse, errors.New(errMsg)
+	}
 
 	respBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -201,7 +211,7 @@ func CURLPerform(method string, url string, body map[string]interface{}) (*simpl
 	optStatus := response.Get("OPT_STATUS").MustString()
 	if optStatus != "" && optStatus != SUCCESS {
 		description := response.Get("DESCRIPTION").MustString()
-		log.Errorf("curl (%s) failed, (%s)", url, description)
+		log.Errorf("curl: %s failed, (%s)", url, description)
 		return errResponse, errors.New(description)
 	}
 
@@ -283,7 +293,7 @@ func GetMasterControllerHostPort() (masterIP string, httpPort, grpcPort int, err
 			}
 		}
 		if !respGetted {
-			log.Error("request all controllers in master reigon faield")
+			err = errors.New(fmt.Sprintf("request all controllers in master reigon failed: %s", err.Error()))
 			return
 		}
 	}
