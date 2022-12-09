@@ -32,11 +32,12 @@ import (
 var log = logging.MustGetLogger("monitor")
 
 type Monitor struct {
-	cfg                        *config.Config
-	checkInterval              int
-	freeSpaceThreshold         int
-	usedPercentThreshold       int
-	diskPrefix                 string
+	cfg                  *config.Config
+	checkInterval        int
+	freeSpaceThreshold   int
+	usedPercentThreshold int
+	diskPrefix           string
+
 	primaryConn, secondaryConn *sql.DB
 	primaryAddr, secondaryAddr string
 	username, password         string
@@ -154,6 +155,20 @@ func (m *Monitor) isDisksNeedClean(diskInfos []*DiskInfo) bool {
 	return true
 }
 
+func (m *Monitor) isPriorityDrop(database, table string) bool {
+	for _, priorityDrop := range m.cfg.CKDiskMonitor.PriorityDrops {
+		if database == priorityDrop.Database {
+			if priorityDrop.TablesContain == "" {
+				return true
+			}
+			if strings.Contains(table, priorityDrop.TablesContain) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (m *Monitor) getMinPartitions(connect *sql.DB) ([]Partition, error) {
 	sql := fmt.Sprintf("SELECT min(partition),count(distinct partition),database,table,min(min_time),max(max_time),sum(rows),sum(bytes_on_disk) FROM system.parts WHERE disk_name LIKE '%s' and active=1 GROUP BY database,table ORDER BY database,table ASC",
 		m.diskPrefix+"%")
@@ -161,7 +176,7 @@ func (m *Monitor) getMinPartitions(connect *sql.DB) ([]Partition, error) {
 	if err != nil {
 		return nil, err
 	}
-	partitions := []Partition{}
+	partitions, partitionsPriorityDrop := []Partition{}, []Partition{}
 	for rows.Next() {
 		var (
 			partition, database, table   string
@@ -174,9 +189,14 @@ func (m *Monitor) getMinPartitions(connect *sql.DB) ([]Partition, error) {
 		}
 		log.Debugf("partition: %s, count: %d, database: %s, table: %s, minTime: %s, maxTime: %s, rows: %d, bytesOnDisk: %d", partition, count, database, table, minTime, maxTime, rowCount, bytesOnDisk)
 		// 只删除partition数量2个以上的partition中最小的一个
-		if count > 1 {
-			partitions = append(partitions, Partition{partition, database, table, minTime, maxTime, rowCount, bytesOnDisk})
+		if count > 1 && m.isPriorityDrop(database, table) {
+			partition := Partition{partition, database, table, minTime, maxTime, rowCount, bytesOnDisk}
+			partitions = append(partitions, partition)
+			partitionsPriorityDrop = append(partitionsPriorityDrop, partition)
 		}
+	}
+	if len(partitionsPriorityDrop) > 0 {
+		return partitionsPriorityDrop, nil
 	}
 	return partitions, nil
 }

@@ -331,6 +331,11 @@ ingester:
   #  used-percent: 90    # 磁盘占用率阈值
   #  free-space: 50      # 磁盘空闲阈值(单位: GB)
   #  disk-prefix: path_  # Only monitor the disks starting with 'disk-prefix', check the disks 'select * from system.disks'
+  #  priority-drops:     # set which database and table data will be deleted first when disk is full
+  #  - database: flow_log
+  #    tables-contain:      # tables name containing the string will be priority-dropped. If it is empty, it means all the tables under the database
+  #  - database: flow_metrics
+  #    tables-contain: 1s_local
 
   ## stream,roze模块是否启用，默认启用, 若不启用(表示处于单独的控制器)
   #stream-roze-enabled: true
