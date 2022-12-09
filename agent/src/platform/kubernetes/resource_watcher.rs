@@ -60,14 +60,7 @@ use crate::utils::stats::{
 
 const LIST_INTERVAL: Duration = Duration::from_secs(600);
 const REFRESH_INTERVAL: Duration = Duration::from_secs(3600);
-const MAX_EVENT_COUNT: u16 = 1024;
-
-#[derive(Default)]
-struct EventCounter {
-    applied: u16,
-    deleted: u16,
-    restarted: u16,
-}
+const SLEEP_INTERVAL: Duration = Duration::from_secs(5);
 
 #[enum_dispatch]
 pub trait Watcher {
@@ -102,6 +95,10 @@ pub struct WatcherCounter {
     list_count: AtomicU32,
     list_length: AtomicU32,
     list_cost_time_sum: AtomicU64, // ns
+    list_error: AtomicU32,
+    watch_applied: AtomicU32,
+    watch_deleted: AtomicU32,
+    watch_restarted: AtomicU32,
 }
 
 impl RefCountable for WatcherCounter {
@@ -128,6 +125,26 @@ impl RefCountable for WatcherCounter {
                 CounterType::Counted,
                 CounterValue::Unsigned(list_avg_cost_time),
             ),
+            (
+                "list_error",
+                CounterType::Gauged,
+                CounterValue::Unsigned(self.list_error.swap(0, Ordering::Relaxed) as u64),
+            ),
+            (
+                "watch_applied",
+                CounterType::Gauged,
+                CounterValue::Unsigned(self.watch_applied.swap(0, Ordering::Relaxed) as u64),
+            ),
+            (
+                "watch_deleted",
+                CounterType::Gauged,
+                CounterValue::Unsigned(self.watch_deleted.swap(0, Ordering::Relaxed) as u64),
+            ),
+            (
+                "watch_restarted",
+                CounterType::Gauged,
+                CounterValue::Unsigned(self.watch_restarted.swap(0, Ordering::Relaxed) as u64),
+            ),
         ]
     }
 }
@@ -145,31 +162,33 @@ pub struct ResourceWatcher<K> {
     stats_counter: Arc<WatcherCounter>,
 }
 
+struct ProcessArg<K> {
+    entries: Arc<Mutex<HashMap<String, Vec<u8>>>>,
+    version: Arc<AtomicU64>,
+    api: Api<K>,
+    kind: &'static str,
+    err_msg: Arc<Mutex<Option<String>>>,
+    ready: Arc<AtomicBool>,
+    stats_counter: Arc<WatcherCounter>,
+}
+
 impl<K> Watcher for ResourceWatcher<K>
 where
     K: Clone + Debug + DeserializeOwned + Resource + Serialize + Trimmable,
     K: Metadata<Ty = ObjectMeta>,
 {
     fn start(&self) -> Option<JoinHandle<()>> {
-        let entries = self.entries.clone();
-        let version = self.version.clone();
-        let kind = self.kind;
-        let err_msg = self.err_msg.clone();
-        let ready = self.ready.clone();
+        let args = ProcessArg {
+            entries: self.entries.clone(),
+            version: self.version.clone(),
+            kind: self.kind,
+            err_msg: self.err_msg.clone(),
+            ready: self.ready.clone(),
+            api: self.api.clone(),
+            stats_counter: self.stats_counter.clone(),
+        };
 
-        let api = self.api.clone();
-        let stats_counter = self.stats_counter.clone();
-
-        let handle = self.runtime.spawn(Self::process(
-            entries,
-            version,
-            api,
-            kind,
-            err_msg,
-            ready,
-            stats_counter,
-        ));
-
+        let handle = self.runtime.spawn(Self::process(args));
         info!("{} watcher started", self.kind);
         Some(handle)
     }
@@ -217,93 +236,54 @@ where
         }
     }
 
-    async fn process(
-        entries: Arc<Mutex<HashMap<String, Vec<u8>>>>,
-        version: Arc<AtomicU64>,
-        api: Api<K>,
-        kind: &'static str,
-        err_msg: Arc<Mutex<Option<String>>>,
-        ready: Arc<AtomicBool>,
-        stats_counter: Arc<WatcherCounter>,
-    ) {
+    async fn process(args: ProcessArg<K>) {
         let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
-        Self::get_list_entry(
-            &mut encoder,
-            &entries,
-            &version,
-            kind,
-            &api,
-            &err_msg,
-            &stats_counter,
-        )
-        .await;
-        ready.store(true, Ordering::Relaxed);
-        info!("{} watcher ready", kind);
+        Self::get_list_entry(&args, &mut encoder).await;
+        args.ready.store(true, Ordering::Relaxed);
+        info!("{} watcher ready", args.kind);
 
-        let mut ticker = time::interval(LIST_INTERVAL);
-
-        let mut stream = runtime::watcher(api.clone(), ListParams::default()).boxed();
         let mut last_update = SystemTime::now();
-        let mut last_refresh = SystemTime::now();
-        let mut event_counter = EventCounter::default();
+        let mut stream = runtime::watcher(args.api.clone(), ListParams::default()).boxed();
 
+        // If the watch is successful, keep updating the entry with the watch. If the watch is not successful,
+        // update the entry with the full amount every 10 minutes.
         loop {
-            // 当 `select!` 执行的时候， 多个通道有待处理的消息，只有一个通道有一个值弹出。所有其他通道保持不变，
-            // 它们的消息保留在这些通道中，直到下一次循环迭代。没有消息丢失。
-            // select 和 tokio::spawn 一起用的话，因为tokio runtime 调度 spawn 的task 可能与select 调度是
-            // 同时运行在不同操作系统线程select 用于在单个task下多路复用 async futures
-            tokio::select! {
-                maybe_event = stream.try_next() => {
-                    Self::resolve_event(
-                        &mut encoder,
-                        maybe_event,
-                        &mut last_update,
-                        &entries,
-                        &version,
-                        kind,
-                        &err_msg,
-                        &mut event_counter
-                    ).await;
-                }
-                _ = ticker.tick() => {
-                     if last_update.elapsed().unwrap() < LIST_INTERVAL
-                        && last_refresh.elapsed().unwrap() < REFRESH_INTERVAL
-                    {
-                        continue;
-                    }
-                    last_update = SystemTime::now();
-                    last_refresh = SystemTime::now();
-                    let now = Instant::now();
-                    Self::get_list_entry(&mut encoder, &entries, &version, kind, &api, &err_msg, &stats_counter).await;
-                    stats_counter.list_cost_time_sum.fetch_add(now.elapsed().as_nanos() as u64, Ordering::Relaxed);
-                    stats_counter.list_count.fetch_add(1, Ordering::Relaxed);
-                }
+            while let Ok(Some(event)) = stream.try_next().await {
+                Self::resolve_event(&args, &mut encoder, event).await;
             }
+            if last_update.elapsed().unwrap() >= LIST_INTERVAL {
+                Self::full_sync(&args, &mut encoder).await;
+                last_update = SystemTime::now();
+            }
+            time::sleep(SLEEP_INTERVAL).await;
         }
     }
 
-    async fn get_list_entry(
-        encoder: &mut ZlibEncoder<Vec<u8>>,
-        entries: &Arc<Mutex<HashMap<String, Vec<u8>>>>,
-        version: &Arc<AtomicU64>,
-        kind: &str,
-        api: &Api<K>,
-        err_msg: &Arc<Mutex<Option<String>>>,
-        stats_counter: &WatcherCounter,
-    ) {
-        match api.list(&ListParams::default()).await {
+    async fn full_sync(args: &ProcessArg<K>, encoder: &mut ZlibEncoder<Vec<u8>>) {
+        let now = Instant::now();
+        Self::get_list_entry(args, encoder).await;
+        args.stats_counter
+            .list_cost_time_sum
+            .fetch_add(now.elapsed().as_nanos() as u64, Ordering::Relaxed);
+        args.stats_counter
+            .list_count
+            .fetch_add(1, Ordering::Relaxed);
+    }
+
+    async fn get_list_entry(args: &ProcessArg<K>, encoder: &mut ZlibEncoder<Vec<u8>>) {
+        match args.api.list(&ListParams::default()).await {
             Ok(object_list) => {
-                stats_counter
+                args.stats_counter
                     .list_length
                     .fetch_add(object_list.items.len() as u32, Ordering::Relaxed);
                 info!(
                     "k8s {} watcher list entry.len={}",
-                    kind,
+                    args.kind,
                     object_list.items.len()
                 );
                 // 检查内存和List API查询结果是否一致
                 {
-                    let entries_lock = entries.lock().await;
+                    let entries_lock = args.entries.lock().await;
                     if object_list.items.len() == entries_lock.len() {
                         let mut identical = true;
                         for object in object_list.items.iter() {
@@ -321,7 +301,7 @@ where
                     }
                 }
 
-                debug!("reload {} data", kind);
+                debug!("reload {} data", args.kind);
 
                 let mut new_entries = HashMap::new();
 
@@ -338,7 +318,7 @@ where
                                     Err(e) => {
                                         warn!(
                                         "failed to compress {} resource with UID({}) error: {} ",
-                                        kind,
+                                        args.kind,
                                         trim_object.meta().uid.as_ref().unwrap(),
                                         e
                                     );
@@ -352,7 +332,7 @@ where
                         }
                         Err(e) => warn!(
                             "failed serialized resource {} UID({}) to json Err: {}",
-                            kind,
+                            args.kind,
                             trim_object.meta().uid.as_ref().unwrap(),
                             e
                         ),
@@ -360,98 +340,54 @@ where
                 }
 
                 if !new_entries.is_empty() {
-                    *entries.lock().await = new_entries;
-                    version.fetch_add(1, Ordering::SeqCst);
+                    *args.entries.lock().await = new_entries;
+                    args.version.fetch_add(1, Ordering::SeqCst);
                 }
             }
             Err(err) => {
-                let msg = format!("{} watcher list failed: {}", kind, err);
+                args.stats_counter
+                    .list_error
+                    .fetch_add(1, Ordering::Relaxed);
+                let msg = format!("{} watcher list failed: {}", args.kind, err);
                 warn!("{}", msg);
-                err_msg.lock().await.replace(msg);
+                args.err_msg.lock().await.replace(msg);
             }
         }
     }
 
     async fn resolve_event(
+        args: &ProcessArg<K>,
         encoder: &mut ZlibEncoder<Vec<u8>>,
-        maybe_event: Result<Option<Event<K>>, runtime::watcher::Error>,
-        last_update: &mut SystemTime,
-        entries: &Arc<Mutex<HashMap<String, Vec<u8>>>>,
-        version: &Arc<AtomicU64>,
-        kind: &str,
-        err_msg: &Arc<Mutex<Option<String>>>,
-        event_counter: &mut EventCounter,
+        event: Event<K>,
     ) {
-        match maybe_event {
-            Ok(Some(event)) => {
-                match event {
-                    Event::Applied(object) => {
-                        event_counter.applied += 1;
-                        Self::insert_object(encoder, object, entries, version, kind).await;
-                    }
-                    Event::Deleted(mut object) => {
-                        if let Some(uid) = object.meta_mut().uid.take() {
-                            event_counter.deleted += 1;
-                            // 只有删除时检查是否需要更新版本号，其余消息直接更新map内容
-                            if entries.lock().await.remove(&uid).is_some() {
-                                version.fetch_add(1, Ordering::SeqCst);
-                            }
-                        }
-                    }
-                    // 按照语义重启后应该拿改key对应最新的state，所以只取restart的最后一个
-                    // restarted 存储的是某个key对应的object在重启过程中不同状态
-                    Event::Restarted(mut objects) => {
-                        if let Some(object) = objects.pop() {
-                            event_counter.restarted += 1;
-                            Self::insert_object(encoder, object, entries, version, kind).await;
-                        }
-                    }
-                }
-                if event_counter.applied >= MAX_EVENT_COUNT {
-                    info!(
-                        "k8s {} watcher has {} applied events",
-                        kind, event_counter.applied
-                    );
-                    event_counter.applied = 0;
-                } else if event_counter.deleted >= MAX_EVENT_COUNT {
-                    info!(
-                        "k8s {} watcher has {} deleted events",
-                        kind, event_counter.deleted
-                    );
-                    event_counter.deleted = 0;
-                } else if event_counter.restarted >= MAX_EVENT_COUNT {
-                    info!(
-                        "k8s {} watcher has {} restarted events",
-                        kind, event_counter.restarted
-                    );
-                    event_counter.restarted = 0;
-                }
-                *last_update = SystemTime::now();
+        match event {
+            Event::Applied(object) => {
+                Self::insert_object(encoder, object, &args.entries, &args.version, &args.kind)
+                    .await;
+                args.stats_counter
+                    .watch_applied
+                    .fetch_add(1, Ordering::Relaxed);
             }
-            Ok(None) => (),
-            Err(err) => {
-                // 因为watcher 链接中断会有自动重连, 错误附在事件上,存储对应报错信息
-                debug!("{} watcher retry watch", kind);
-                match err {
-                    runtime::watcher::Error::WatchStartFailed(_) => {
-                        let msg = format!("{} watcher watch failed: {}", kind, err);
-                        warn!("{}", msg);
-                        err_msg.lock().await.replace(msg);
+            Event::Deleted(mut object) => {
+                if let Some(uid) = object.meta_mut().uid.take() {
+                    // 只有删除时检查是否需要更新版本号，其余消息直接更新map内容
+                    if args.entries.lock().await.remove(&uid).is_some() {
+                        args.version.fetch_add(1, Ordering::SeqCst);
                     }
-                    // 正常的超时
-                    runtime::watcher::Error::WatchError(err_res)
-                        if err_res.message.contains("RST_STREAM") =>
-                    {
-                        debug!("{} watcher timeout retry watch", kind)
-                    }
-                    runtime::watcher::Error::TooManyObjects
-                    | runtime::watcher::Error::WatchError(_)
-                    | runtime::watcher::Error::InitialListFailed(_)
-                    | runtime::watcher::Error::WatchFailed(_) => {
-                        let msg = format!("{} watcher watch failed: {}", kind, err);
-                        warn!("{}", msg);
-                        err_msg.lock().await.replace(msg);
-                    }
+                    args.stats_counter
+                        .watch_deleted
+                        .fetch_add(1, Ordering::Relaxed);
+                }
+            }
+            Event::Restarted(mut objects) => {
+                // 按照语义重启后应该拿改key对应最新的state，所以只取restart的最后一个
+                // restarted 存储的是某个key对应的object在重启过程中不同状态
+                if let Some(object) = objects.pop() {
+                    Self::insert_object(encoder, object, &args.entries, &args.version, &args.kind)
+                        .await;
+                    args.stats_counter
+                        .watch_restarted
+                        .fetch_add(1, Ordering::Relaxed);
                 }
             }
         }
