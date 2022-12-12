@@ -487,6 +487,10 @@ impl FlowMap {
             );
         }
 
+        if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
+            self.update_udp_is_active(&mut node, meta_packet.direction);
+        }
+
         slot_nodes.push(node);
     }
 
@@ -666,6 +670,14 @@ impl FlowMap {
 
         let mut tagged_flow = TaggedFlow::default();
         let lookup_key = &meta_packet.lookup_key;
+        let is_active_service = if meta_packet.signal_source == SignalSource::EBPF {
+            match lookup_key.proto {
+                IpProtocol::Tcp => true, // Tcp data coming from eBPF means it must be an active service
+                _ => false,
+            }
+        } else {
+            false
+        };
         let flow = Flow {
             flow_key: FlowKey {
                 vtap_id: config.vtap_id,
@@ -721,11 +733,7 @@ impl FlowMap {
                 FlowMetricsPeer::default(),
             ],
             signal_source: meta_packet.signal_source,
-            is_active_service: if meta_packet.signal_source == SignalSource::EBPF {
-                true // Data coming from eBPF means it must be an active service
-            } else {
-                false
-            },
+            is_active_service,
             ..Default::default()
         };
         tagged_flow.flow = flow;
@@ -1053,6 +1061,7 @@ impl FlowMap {
                     Self::reverse_flow(&mut node, true);
                 }
             }
+            self.update_udp_is_active(&mut node, meta_packet.direction);
         }
         node
     }
@@ -1311,6 +1320,31 @@ impl FlowMap {
 
         node.tagged_flow.flow.is_active_service = ServiceTable::is_active_service(dst_score);
         return reverse;
+    }
+
+    // just for ebpf, tcp flow.is_active_service is always true,
+    // but udp flow.is_active_service still needs to continue to judge.
+    fn update_udp_is_active(&mut self, node: &mut FlowNode, direction: PacketDirection) {
+        // If it is already an active service, we do not need to continue to query.
+        if !node.tagged_flow.flow.is_active_service {
+            let flow_key = &node.tagged_flow.flow.flow_key;
+            // Because the flow direction is already correct, we can use flow_key's
+            // ip_src, port_src and ip_dst, port_dst directly without swapping them.
+            let src_key = ServiceKey::new(
+                flow_key.ip_src,
+                node.endpoint_data_cache.src_info.l3_epc_id as i16,
+                flow_key.port_src,
+            );
+            let dst_key = ServiceKey::new(
+                flow_key.ip_dst,
+                node.endpoint_data_cache.dst_info.l3_epc_id as i16,
+                flow_key.port_dst,
+            );
+
+            node.tagged_flow.flow.is_active_service = self
+                .service_table
+                .is_ebpf_active_udp_service(src_key, dst_key, direction);
+        }
     }
 
     fn update_flow_direction(&mut self, node: &mut FlowNode, meta_packet: Option<&mut MetaPacket>) {
