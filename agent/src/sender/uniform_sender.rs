@@ -105,7 +105,7 @@ struct Encoder<T> {
 }
 
 impl<T: Sendable> Encoder<T> {
-    const BUFFER_LEN: usize = 8192;
+    const BUFFER_LEN: usize = 512 << 10;
     pub fn new(id: usize, msg_type: SendMessageType, vtap_id: u16) -> Self {
         Self {
             id,
