@@ -28,10 +28,10 @@ import (
 	"github.com/deepflowys/deepflow/server/ingester/droplet/labeler"
 	"github.com/deepflowys/deepflow/server/ingester/droplet/profiler"
 	"github.com/deepflowys/deepflow/server/ingester/droplet/queue"
+	"github.com/deepflowys/deepflow/server/ingester/flow_log/flow_log"
+	"github.com/deepflowys/deepflow/server/ingester/flow_metrics/flow_metrics"
 	"github.com/deepflowys/deepflow/server/ingester/ingesterctl"
 	"github.com/deepflowys/deepflow/server/ingester/ingesterctl/rpc"
-	"github.com/deepflowys/deepflow/server/ingester/roze/roze"
-	"github.com/deepflowys/deepflow/server/ingester/stream/stream"
 	"github.com/deepflowys/deepflow/server/libs/debug"
 	"github.com/deepflowys/deepflow/server/libs/receiver"
 )
@@ -48,17 +48,17 @@ func RegisterIngesterCommand(root *cobra.Command) {
 		Use:   "droplet",
 		Short: "Droplet debug commands",
 	}
-	rozeCmd := &cobra.Command{
-		Use:   "roze",
-		Short: "Roze debug commands",
+	flowMetricsCmd := &cobra.Command{
+		Use:   "metircs",
+		Short: "FlowMetrics debug commands",
 	}
-	streamCmd := &cobra.Command{
-		Use:   "stream",
-		Short: "Stream debug commands",
+	flowLogCmd := &cobra.Command{
+		Use:   "flow",
+		Short: "Flow log debug commands",
 	}
 
 	root.AddCommand(ingesterCmd)
-	ingesterCmd.AddCommand(dropletCmd, rozeCmd, streamCmd)
+	ingesterCmd.AddCommand(dropletCmd, flowMetricsCmd, flowLogCmd)
 	ingesterCmd.AddCommand(profiler.RegisterProfilerCommand())
 	ingesterCmd.AddCommand(debug.RegisterLogLevelCommand())
 	ingesterCmd.AddCommand(RegisterTimeConvertCommand())
@@ -74,15 +74,15 @@ func RegisterIngesterCommand(root *cobra.Command) {
 	dropletCmd.AddCommand(labeler.RegisterCommand(ingesterctl.INGESTERCTL_LABELER))
 	dropletCmd.AddCommand(rpc.RegisterRpcCommand())
 
-	rozeCmd.AddCommand(queue.RegisterCommand(ingesterctl.INGESTERCTL_ROZE_QUEUE, []string{"1-recv-unmarshall"}))
-	rozeCmd.AddCommand(debug.ClientRegisterSimple(roze.CMD_PLATFORMDATA, debug.CmdHelper{"platformData [filter]", "show roze platform data statistics"}, nil))
-	rozeCmd.AddCommand(receiver.RegisterTridentStatusCommand())
+	flowMetricsCmd.AddCommand(queue.RegisterCommand(ingesterctl.INGESTERCTL_FLOW_METRICS_QUEUE, []string{"1-recv-unmarshall"}))
+	flowMetricsCmd.AddCommand(debug.ClientRegisterSimple(flow_metrics.CMD_PLATFORMDATA, debug.CmdHelper{"platformData [filter]", "show flow metrics platform data statistics"}, nil))
+	flowMetricsCmd.AddCommand(receiver.RegisterTridentStatusCommand())
 
-	streamCmd.AddCommand(queue.RegisterCommand(ingesterctl.INGESTERCTL_STREAM_QUEUE, []string{
+	flowLogCmd.AddCommand(queue.RegisterCommand(ingesterctl.INGESTERCTL_FLOW_LOG_QUEUE, []string{
 		"1-receive-to-decode-l4",
 		"1-receive-to-decode-l7",
 	}))
-	streamCmd.AddCommand(debug.ClientRegisterSimple(stream.CMD_PLATFORMDATA, debug.CmdHelper{"platformData [filter]", "show stream platform data statistics"}, nil))
+	flowLogCmd.AddCommand(debug.ClientRegisterSimple(flow_log.CMD_PLATFORMDATA, debug.CmdHelper{"platformData [filter]", "show flow log platform data statistics"}, nil))
 
 	root.GenBashCompletionFile("/usr/share/bash-completion/completions/deepflow-ctl")
 }

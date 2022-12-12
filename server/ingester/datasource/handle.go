@@ -21,8 +21,8 @@ import (
 	"strings"
 
 	basecommon "github.com/deepflowys/deepflow/server/ingester/common"
+	"github.com/deepflowys/deepflow/server/ingester/flow_log/common"
 	"github.com/deepflowys/deepflow/server/ingester/pkg/ckwriter"
-	"github.com/deepflowys/deepflow/server/ingester/stream/common"
 	"github.com/deepflowys/deepflow/server/libs/ckdb"
 	"github.com/deepflowys/deepflow/server/libs/zerodoc"
 
