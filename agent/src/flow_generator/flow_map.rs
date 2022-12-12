@@ -446,6 +446,9 @@ impl FlowMap {
             } else {
                 node.timeout = self.parse_config.load().l7_log_session_aggr_timeout;
             }
+            // For ebpf data, after collect_metric(), meta_packet's direction
+            // is determined. Here we determine whether to reverse flow.
+            Self::need_reverse_ebpf(&mut node, meta_packet);
         }
 
         // Enterprise Edition Feature: packet-sequence
@@ -488,6 +491,9 @@ impl FlowMap {
         }
 
         if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
+            // For ebpf data, after collect_metric(), meta_packet's direction
+            // is determined. Here we determine whether to reverse flow.
+            Self::need_reverse_ebpf(&mut node, meta_packet);
             self.update_udp_is_active(&mut node, meta_packet.direction);
         }
 
@@ -932,65 +938,6 @@ impl FlowMap {
         }
     }
 
-    fn new_tcp_node(&mut self, config: &FlowConfig, meta_packet: &mut MetaPacket) -> FlowNode {
-        let mut node = self.init_flow(config, meta_packet);
-        meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
-        let mut reverse = false;
-        if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
-            // Initialize a timeout long enough for eBPF Flow to enable successful session aggregation.
-            node.timeout = self.parse_config.load().l7_log_session_aggr_timeout;
-        } else {
-            reverse = self.update_l4_direction(meta_packet, &mut node, true, true);
-
-            let pkt_tcp_flags = meta_packet.tcp_data.flags;
-            if pkt_tcp_flags.is_invalid() {
-                // exception timeout
-                node.timeout = config.flow_timeout.exception;
-                node.flow_state = FlowState::Exception;
-            }
-            self.update_flow_state_machine(config, &mut node, pkt_tcp_flags, meta_packet.direction);
-            self.update_syn_or_syn_ack_seq(&mut node, meta_packet);
-        }
-
-        if config.collector_enabled {
-            self.collect_metric(config, &mut node, meta_packet, !reverse);
-        }
-
-        // After collect_metric() is called for eBPF MetaPacket, its direction is determined.
-        if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
-            if meta_packet.direction == PacketDirection::ClientToServer {
-                node.residual_request += 1;
-            } else {
-                node.residual_request -= 1;
-            }
-            // For ebpf data, after collect_metric(), meta_packet's direction
-            // is determined. Here we determine whether to reverse flow.
-            if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
-                if node.tagged_flow.flow.flow_key.ip_src == meta_packet.lookup_key.src_ip
-                    && node.tagged_flow.flow.flow_key.port_src == meta_packet.lookup_key.src_port
-                {
-                    // If flow_key.ip_src and flow_key.port_src of node.tagged_flow.flow are the same as
-                    // that of meta_packet, but the direction of meta_packet is S2C, reverse flow
-                    if meta_packet.direction == PacketDirection::ServerToClient {
-                        Self::reverse_flow(&mut node, true);
-                    }
-                } else {
-                    // If flow_key.ip_src or flow_key.port_src of node.tagged_flow.flow is different
-                    // from that of meta_packet, and the direction of meta_packet is C2S, reverse flow
-                    if meta_packet.direction == PacketDirection::ClientToServer {
-                        Self::reverse_flow(&mut node, true);
-                    }
-                }
-            }
-        }
-
-        // Enterprise Edition Feature: packet-sequence
-        if self.packet_sequence_enabled {
-            self.append_to_block(&mut node, meta_packet);
-        }
-        node
-    }
-
     fn collect_metric(
         &mut self,
         config: &FlowConfig,
@@ -1029,6 +976,49 @@ impl FlowMap {
         }
     }
 
+    fn new_tcp_node(&mut self, config: &FlowConfig, meta_packet: &mut MetaPacket) -> FlowNode {
+        let mut node = self.init_flow(config, meta_packet);
+        meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
+        let mut reverse = false;
+        if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
+            // Initialize a timeout long enough for eBPF Flow to enable successful session aggregation.
+            node.timeout = self.parse_config.load().l7_log_session_aggr_timeout;
+        } else {
+            reverse = self.update_l4_direction(meta_packet, &mut node, true, true);
+
+            let pkt_tcp_flags = meta_packet.tcp_data.flags;
+            if pkt_tcp_flags.is_invalid() {
+                // exception timeout
+                node.timeout = config.flow_timeout.exception;
+                node.flow_state = FlowState::Exception;
+            }
+            self.update_flow_state_machine(config, &mut node, pkt_tcp_flags, meta_packet.direction);
+            self.update_syn_or_syn_ack_seq(&mut node, meta_packet);
+        }
+
+        if config.collector_enabled {
+            self.collect_metric(config, &mut node, meta_packet, !reverse);
+        }
+
+        // After collect_metric() is called for eBPF MetaPacket, its direction is determined.
+        if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
+            if meta_packet.direction == PacketDirection::ClientToServer {
+                node.residual_request += 1;
+            } else {
+                node.residual_request -= 1;
+            }
+            // For ebpf data, after collect_metric(), meta_packet's direction
+            // is determined. Here we determine whether to reverse flow.
+            Self::need_reverse_ebpf(&mut node, meta_packet);
+        }
+
+        // Enterprise Edition Feature: packet-sequence
+        if self.packet_sequence_enabled {
+            self.append_to_block(&mut node, meta_packet);
+        }
+        node
+    }
+
     fn new_udp_node(&mut self, config: &FlowConfig, meta_packet: &mut MetaPacket) -> FlowNode {
         let mut node = self.init_flow(config, meta_packet);
         meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
@@ -1046,21 +1036,7 @@ impl FlowMap {
         // For ebpf data, after collect_metric(), meta_packet's direction
         // is determined. Here we determine whether to reverse flow.
         if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
-            if node.tagged_flow.flow.flow_key.ip_src == meta_packet.lookup_key.src_ip
-                && node.tagged_flow.flow.flow_key.port_src == meta_packet.lookup_key.src_port
-            {
-                // If flow_key.ip_src and flow_key.port_src of node.tagged_flow.flow are the same as
-                // that of meta_packet, but the direction of meta_packet is S2C, reverse flow
-                if meta_packet.direction == PacketDirection::ServerToClient {
-                    Self::reverse_flow(&mut node, true);
-                }
-            } else {
-                // If flow_key.ip_src or flow_key.port_src of node.tagged_flow.flow is different
-                // from that of meta_packet, and the direction of meta_packet is C2S, reverse flow
-                if meta_packet.direction == PacketDirection::ClientToServer {
-                    Self::reverse_flow(&mut node, true);
-                }
-            }
+            Self::need_reverse_ebpf(&mut node, meta_packet);
             self.update_udp_is_active(&mut node, meta_packet.direction);
         }
         node
@@ -1388,6 +1364,24 @@ impl FlowMap {
                 .as_mut()
                 .unwrap()
                 .reverse_needed_for_new_packet();
+        }
+    }
+
+    fn need_reverse_ebpf(node: &mut FlowNode, meta_packet: &mut MetaPacket) {
+        if node.tagged_flow.flow.flow_key.ip_src == meta_packet.lookup_key.src_ip
+            && node.tagged_flow.flow.flow_key.port_src == meta_packet.lookup_key.src_port
+        {
+            // If flow_key.ip_src and flow_key.port_src of node.tagged_flow.flow are the same as
+            // that of meta_packet, but the direction of meta_packet is S2C, reverse flow
+            if meta_packet.direction == PacketDirection::ServerToClient {
+                Self::reverse_flow(node, true);
+            }
+        } else {
+            // If flow_key.ip_src or flow_key.port_src of node.tagged_flow.flow is different
+            // from that of meta_packet, and the direction of meta_packet is C2S, reverse flow
+            if meta_packet.direction == PacketDirection::ClientToServer {
+                Self::reverse_flow(node, true);
+            }
         }
     }
 
