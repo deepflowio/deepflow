@@ -28,34 +28,34 @@ subgraph deepflow-agent
 end
 
 subgraph deepflow-server.ingester
-  roze.decoder
-  stream.decoder.1["stream.decoder"]
-  stream.decoder.2["stream.decoder"]
-  stream.decoder.3["stream.decoder"]
-  stream.decoder.4["stream.decoder"]
+  flow_metrics.decoder
+  flow_log.decoder.1["flow_log.decoder"]
+  flow_log.decoder.2["flow_log.decoder"]
+  flow_log.decoder.3["flow_log.decoder"]
+  flow_log.decoder.4["flow_log.decoder"]
   ext_metrics.decoder.1["ext_metrics.decoder"]
   ext_metrics.decoder.2["ext_metrics.decoder"]
   ext_metrics.decoder.3["ext_metrics.decoder"]
   ingester.queue.1(["queue"])
   ingester.queue.2(["queue"])
   ingester.queue.3(["queue"])
-  roze.dbwriter
-  stream.dbwriter
+  flow_metrics.dbwriter
+  flow_log.dbwriter
   ext_metrics.dbwriter
 end
 
 Kernel -->|cBPF/AF_PACKET| Dispatcher
-Dispatcher --> agent.queue.1 -->|Metrics| UniformSender.1 -->|"tcp(pb)"| roze.decoder -->|Document| ingester.queue.1 --> roze.dbwriter
-Dispatcher --> agent.queue.2 -->|L4FlowLog| UniformSender.2 -->|"tcp(pb)"| stream.decoder.1 -->|L4FlowLog| ingester.queue.2 --> stream.dbwriter
-Dispatcher --> agent.queue.3 -->|L7FlowLog| UniformSender.3 -->|"tcp(pb)"| stream.decoder.2 -->|L7FlowLog| ingester.queue.2
+Dispatcher --> agent.queue.1 -->|Metrics| UniformSender.1 -->|"tcp(pb)"| flow_metrics.decoder -->|Document| ingester.queue.1 --> flow_metrics.dbwriter
+Dispatcher --> agent.queue.2 -->|L4FlowLog| UniformSender.2 -->|"tcp(pb)"| flow_log.decoder.1 -->|L4FlowLog| ingester.queue.2 --> flow_log.dbwriter
+Dispatcher --> agent.queue.3 -->|L7FlowLog| UniformSender.3 -->|"tcp(pb)"| flow_log.decoder.2 -->|L7FlowLog| ingester.queue.2
 
 Kernel -->|eBPF| EbpfCollector
 EbpfCollector --> agent.queue.3
 
 otel-collector -->|OTLP| IntegrationCollector
 otel-javaagent/sdk -->|OTLP| IntegrationCollector
-IntegrationCollector --> agent.queue.4 -->|"zip(OTLP)"| UniformSender.4 -->|"tcp(zip(OTLP))"| stream.decoder.3 -->|L7FlowLog| ingester.queue.2
-IntegrationCollector --> agent.queue.5 -->|OTLP| UniformSender.5 -->|"tcp(OTLP)"| stream.decoder.4 -->|L7FlowLog| ingester.queue.2
+IntegrationCollector --> agent.queue.4 -->|"zip(OTLP)"| UniformSender.4 -->|"tcp(zip(OTLP))"| flow_log.decoder.3 -->|L7FlowLog| ingester.queue.2
+IntegrationCollector --> agent.queue.5 -->|OTLP| UniformSender.5 -->|"tcp(OTLP)"| flow_log.decoder.4 -->|L7FlowLog| ingester.queue.2
 
 prometheus-server -->|prom-pb| IntegrationCollector
 telegraf -->|influxdb| IntegrationCollector
@@ -64,8 +64,8 @@ IntegrationCollector --> agent.queue.7 -->|influxdb| UniformSender.7 -->|"tcp(in
 
 XXX -->|XXXCounter| StatsdClient -->|"tcp(pb)"| ext_metrics.decoder.3 -->|ExtMetrics| ingester.queue.3
 
-roze.dbwriter -->|flow_metrics| ClickHouse
-stream.dbwriter -->|flow_log| ClickHouse
+flow_metrics.dbwriter -->|flow_metrics| ClickHouse
+flow_log.dbwriter -->|flow_log| ClickHouse
 ext_metrics.dbwriter -->|ext_metrics| ClickHouse
 ```
 
@@ -98,14 +98,14 @@ EbpfCollector -->|MetaPacket| queue.10([queue]) --> EbpfRunner -->|AppProtoLogsD
 ```mermaid
 flowchart TD
 
-subgraph ingester.roze
+subgraph ingester.flow_metrics
   direction LR
-  roze.receiver --> roze.queue([queue]) --> roze.decoder
+  flow_metrics.receiver --> flow_metrics.queue([queue]) --> flow_metrics.decoder
 end
 
-subgraph ingester.stream
+subgraph ingester.flow_log
   direction LR
-  stream.receiver --> stream.([queue]) --> stream.decoder --> throttler
+  flow_log.receiver --> flow_log.([queue]) --> flow_log.decoder --> throttler
 end
 
 subgraph ingester.ext_metrics

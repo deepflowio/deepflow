@@ -121,7 +121,7 @@ type Config struct {
 	ControllerIPs         []string        `yaml:"controller-ips,flow"`
 	ControllerPort        uint16          `yaml:"controller-port"`
 	CKDBAuth              Auth            `yaml:"ckdb-auth"`
-	StreamRozeEnabled     bool            `yaml:"stream-roze-enabled"`
+	IngesterEnabled       bool            `yaml:"ingester-enabled"`
 	UDPReadBuffer         int             `yaml:"udp-read-buffer"`
 	TCPReadBuffer         int             `yaml:"tcp-read-buffer"`
 	Profiler              bool            `yaml:"profiler"`
@@ -336,12 +336,12 @@ func Load(path string) *Config {
 		LogFile:  "/var/log/deepflow/server.log",
 		LogLevel: "info",
 		Base: Config{
-			ControllerIPs:     []string{DefaultContrallerIP},
-			ControllerPort:    DefaultControllerPort,
-			CKDBAuth:          Auth{"default", ""},
-			StreamRozeEnabled: true,
-			UDPReadBuffer:     64 << 20,
-			TCPReadBuffer:     4 << 20,
+			ControllerIPs:   []string{DefaultContrallerIP},
+			ControllerPort:  DefaultControllerPort,
+			CKDBAuth:        Auth{"default", ""},
+			IngesterEnabled: true,
+			UDPReadBuffer:   64 << 20,
+			TCPReadBuffer:   4 << 20,
 			CKDiskMonitor: CKDiskMonitor{
 				DefaultCheckInterval,
 				DefaultDiskUsedPercent,
