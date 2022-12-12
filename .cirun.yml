@@ -276,6 +276,6 @@ runners:
       - "en-west-1"
       - "en-west-1"
       - "en-west-1"
-    preemptible: true
+    preemptible: false
     labels:
       - "cirun-aws-amd64-16c"

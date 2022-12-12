@@ -272,7 +272,7 @@ impl FlowMap {
             nodes.push(node);
             time_set.insert(removed_key);
         }
-
+        Self::update_stats_counter(&self.stats_counter, &node_map);
         self.node_map.replace(node_map);
         self.time_set.replace(time_set);
 
@@ -364,7 +364,7 @@ impl FlowMap {
                 node_map.insert(pkt_key, vec![node]);
             }
         }
-
+        Self::update_stats_counter(&self.stats_counter, &node_map);
         self.node_map.replace(node_map);
         self.time_set.replace(time_set);
         // go实现只有插入node的时候，插入的节点数目大于ring buffer 的capacity 才会执行policy_getter,
@@ -442,7 +442,7 @@ impl FlowMap {
             // For eBPF data, timeout as soon as possible when there are no unaggregated requests.
             // Considering that eBPF data may be out of order, wait for an additional 2s timeout.
             if node.residual_request == 0 {
-                node.timeout = self.config.load().flow_timeout.closed_fin;
+                node.timeout = config.flow_timeout.closed_fin;
             } else {
                 node.timeout = self.parse_config.load().l7_log_session_aggr_timeout;
             }
@@ -955,6 +955,25 @@ impl FlowMap {
             } else {
                 node.residual_request -= 1;
             }
+            // For ebpf data, after collect_metric(), meta_packet's direction
+            // is determined. Here we determine whether to reverse flow.
+            if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
+                if node.tagged_flow.flow.flow_key.ip_src == meta_packet.lookup_key.src_ip
+                    && node.tagged_flow.flow.flow_key.port_src == meta_packet.lookup_key.src_port
+                {
+                    // If flow_key.ip_src and flow_key.port_src of node.tagged_flow.flow are the same as
+                    // that of meta_packet, but the direction of meta_packet is S2C, reverse flow
+                    if meta_packet.direction == PacketDirection::ServerToClient {
+                        Self::reverse_flow(&mut node, true);
+                    }
+                } else {
+                    // If flow_key.ip_src or flow_key.port_src of node.tagged_flow.flow is different
+                    // from that of meta_packet, and the direction of meta_packet is C2S, reverse flow
+                    if meta_packet.direction == PacketDirection::ClientToServer {
+                        Self::reverse_flow(&mut node, true);
+                    }
+                }
+            }
         }
 
         // Enterprise Edition Feature: packet-sequence
@@ -1016,6 +1035,25 @@ impl FlowMap {
         if config.collector_enabled {
             self.collect_metric(config, &mut node, meta_packet, !reverse);
         }
+        // For ebpf data, after collect_metric(), meta_packet's direction
+        // is determined. Here we determine whether to reverse flow.
+        if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
+            if node.tagged_flow.flow.flow_key.ip_src == meta_packet.lookup_key.src_ip
+                && node.tagged_flow.flow.flow_key.port_src == meta_packet.lookup_key.src_port
+            {
+                // If flow_key.ip_src and flow_key.port_src of node.tagged_flow.flow are the same as
+                // that of meta_packet, but the direction of meta_packet is S2C, reverse flow
+                if meta_packet.direction == PacketDirection::ServerToClient {
+                    Self::reverse_flow(&mut node, true);
+                }
+            } else {
+                // If flow_key.ip_src or flow_key.port_src of node.tagged_flow.flow is different
+                // from that of meta_packet, and the direction of meta_packet is C2S, reverse flow
+                if meta_packet.direction == PacketDirection::ClientToServer {
+                    Self::reverse_flow(&mut node, true);
+                }
+            }
+        }
         node
     }
 
@@ -1035,6 +1073,9 @@ impl FlowMap {
             _ => self.new_other_node(config, meta_packet),
         };
         meta_packet.flow_id = node.tagged_flow.flow.flow_id;
+        self.stats_counter
+            .concurrent
+            .fetch_add(1, Ordering::Relaxed);
         node
     }
 
@@ -1156,6 +1197,9 @@ impl FlowMap {
             }
         }
 
+        self.stats_counter
+            .concurrent
+            .fetch_sub(1, Ordering::Relaxed);
         self.push_to_flow_stats_queue(config, node.tagged_flow);
     }
 
@@ -1386,17 +1430,43 @@ impl FlowMap {
         }
         node.tagged_flow.tag.policy_data = node.policy_data_cache.clone();
     }
+
+    fn update_stats_counter(
+        stats_counter: &FlowMapCounter,
+        node_map: &HashMap<FlowMapKey, Vec<Box<FlowNode>>>,
+    ) {
+        stats_counter
+            .slots
+            .swap(node_map.len() as u64, Ordering::Relaxed);
+        let max_depth = node_map.values().map(|c| c.len()).max();
+        let _ = stats_counter.slot_max_depth.fetch_update(
+            Ordering::Relaxed,
+            Ordering::Relaxed,
+            |pre_max_depth| match max_depth {
+                Some(max_depth) if max_depth as u64 > pre_max_depth => Some(max_depth as u64),
+                _ => None,
+            },
+        );
+    }
 }
 
 #[derive(Default)]
 pub struct FlowMapCounter {
-    new: AtomicU64,
-    closed: AtomicU64,
-    drop_by_window: AtomicU64,
+    new: AtomicU64,            // the number of  created flow
+    closed: AtomicU64,         // the number of closed flow
+    drop_by_window: AtomicU64, // times of flush wihich drop by window
+    concurrent: AtomicU64,     // current the number of FlowNode
+    slots: AtomicU64,          //  current the length of HashMap
+    slot_max_depth: AtomicU64, //  the max length of  Vec<FlowNode>
+    slot_avg_depth: AtomicU64, // the avg length of  Vec<FlowNode>
 }
 
 impl RefCountable for FlowMapCounter {
     fn get_counters(&self) -> Vec<Counter> {
+        let concurrent = self.concurrent.load(Ordering::Relaxed);
+        let slots = self.slots.swap(0, Ordering::Relaxed);
+        let slots_avg_depth = concurrent.checked_div(slots).unwrap_or_default();
+
         vec![
             (
                 "new",
@@ -1413,6 +1483,22 @@ impl RefCountable for FlowMapCounter {
                 CounterType::Gauged,
                 CounterValue::Unsigned(self.drop_by_window.swap(0, Ordering::Relaxed)),
             ),
+            (
+                "concurrent",
+                CounterType::Gauged,
+                CounterValue::Unsigned(concurrent),
+            ),
+            (
+                "slot_max_depth",
+                CounterType::Gauged,
+                CounterValue::Unsigned(self.slot_max_depth.swap(0, Ordering::Relaxed)),
+            ),
+            (
+                "slots_avg_depth",
+                CounterType::Gauged,
+                CounterValue::Unsigned(slots_avg_depth),
+            ),
+            ("slots", CounterType::Gauged, CounterValue::Unsigned(slots)),
         ]
     }
 }
