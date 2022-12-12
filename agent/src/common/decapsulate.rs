@@ -30,6 +30,7 @@ use public::proto::trident::DecapType;
 #[derive(Serialize, Debug, Clone, Copy, PartialEq, PartialOrd, TryFromPrimitive)]
 #[repr(u8)]
 pub enum TunnelType {
+    // The maximum value here is 15
     None = DecapType::None as u8,
     Vxlan = DecapType::Vxlan as u8,
     Ipip = DecapType::Ipip as u8,

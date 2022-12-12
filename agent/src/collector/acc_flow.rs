@@ -36,16 +36,18 @@ pub struct AccumulatedFlow {
     pub app_meter: AppMeter,
     pub key: QgKey,
     pub time_in_second: Duration,
-    pub nat_src_ip: IpAddr,
-    pub nat_dst_ip: IpAddr,
+    pub nat_real_ip_0: IpAddr,
+    pub nat_real_ip_1: IpAddr,
+    pub nat_real_port_0: u16,
+    pub nat_real_port_1: u16,
 }
 
 impl fmt::Display for AccumulatedFlow {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "AccumulatedFlow: time: {:?}, flow_meter: {:?}, app_meter: {:?}, nat_src_ip: {:?}, nat_dst_ip: {:?}", 
-            self.time_in_second, &self.flow_meter, &self.app_meter, &self.nat_src_ip, &self.nat_dst_ip,
+            "AccumulatedFlow: time: {:?}, flow_meter: {:?}, app_meter: {:?}, nat_real_ip_0: {:?}, nat_real_ip_1: {:?}, nat_real_port_0: {}, nat_real_port_1: {}", 
+            self.time_in_second, &self.flow_meter, &self.app_meter, &self.nat_real_ip_0, &self.nat_real_ip_1,  &self.nat_real_port_0, &self.nat_real_port_1,
         )
     }
 }

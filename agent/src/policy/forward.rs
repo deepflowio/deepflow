@@ -168,7 +168,11 @@ impl Forward {
                 let value = L3Item {
                     epc_id: platform.epc_id,
                     tap_type: TapType::Cloud,
-                    tap_port: TapPort::from_local_mac(TunnelType::None, 0),
+                    tap_port: TapPort::from_local_mac(
+                        TapPort::NAT_SOURCE_NONE,
+                        TunnelType::None,
+                        0,
+                    ),
                     last: Duration::from_secs(0),
                     from: FROM_CONTROLLER,
                     ip: ip.raw_ip,
@@ -238,7 +242,11 @@ impl Forward {
                 let value = L3Item {
                     epc_id: 0,
                     tap_type: TapType::Cloud,
-                    tap_port: TapPort::from_local_mac(TunnelType::None, 0),
+                    tap_port: TapPort::from_local_mac(
+                        TapPort::NAT_SOURCE_NONE,
+                        TunnelType::None,
+                        0,
+                    ),
                     last: Duration::from_secs(0),
                     from: FROM_CONFIG,
                     ip: ip.ip(),
@@ -397,7 +405,7 @@ mod tests {
         forward.add(
             0,
             &key,
-            TapPort::from_local_mac(TunnelType::None, 0xccddeeff),
+            TapPort::from_local_mac(TapPort::NAT_SOURCE_NONE, TunnelType::None, 0xccddeeff),
             FROM_TRAFFIC_TTL,
         );
 
