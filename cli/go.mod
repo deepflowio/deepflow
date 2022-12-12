@@ -4,8 +4,8 @@ go 1.18
 
 require (
 	github.com/bitly/go-simplejson v0.5.0
-	github.com/deepflowys/deepflow/message v0.0.0-20221202074739-84e6c36c2709
-	github.com/deepflowys/deepflow/server v0.0.0-20221202074739-84e6c36c2709
+	github.com/deepflowys/deepflow/message v0.0.0-20221207123223-6d7e30f19f07
+	github.com/deepflowys/deepflow/server v0.0.0-20221212023728-ed00cfdb114c
 	github.com/ghodss/yaml v1.0.0
 	github.com/golang/protobuf v1.5.2
 	github.com/mattn/go-runewidth v0.0.14
@@ -13,7 +13,7 @@ require (
 	github.com/spf13/cobra v1.5.0
 	github.com/vishvananda/netlink v1.1.0
 	golang.org/x/net v0.1.0
-	google.golang.org/grpc v1.47.0
+	google.golang.org/grpc v1.49.0
 )
 
 require (
@@ -44,8 +44,8 @@ require (
 	go.opentelemetry.io/proto/otlp v0.18.0 // indirect
 	golang.org/x/sys v0.1.0 // indirect
 	golang.org/x/text v0.4.0 // indirect
-	google.golang.org/genproto v0.0.0-20220628213854-d9e0b6570c03 // indirect
-	google.golang.org/protobuf v1.28.0 // indirect
+	google.golang.org/genproto v0.0.0-20220920201722-2b89144ce006 // indirect
+	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/alexcesaro/statsd.v2 v2.0.0 // indirect
 )
 
