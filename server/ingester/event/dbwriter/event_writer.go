@@ -45,7 +45,7 @@ type tableInfo struct {
 
 type EventWriter struct {
 	msgType           datatype.MessageType
-	ckdbAddr          string
+	ckdbAddrs         []string
 	ckdbUsername      string
 	ckdbPassword      string
 	ckdbCluster       string
@@ -63,7 +63,7 @@ func (w *EventWriter) Write(m interface{}) {
 
 func NewEventWriter(eventType common.EventType, config *config.Config) (*EventWriter, error) {
 	w := &EventWriter{
-		ckdbAddr:          config.Base.CKDB.ActualAddr,
+		ckdbAddrs:         config.Base.CKDB.ActualAddrs,
 		ckdbUsername:      config.Base.CKDBAuth.Username,
 		ckdbPassword:      config.Base.CKDBAuth.Password,
 		ckdbCluster:       config.Base.CKDB.ClusterName,
@@ -74,8 +74,8 @@ func NewEventWriter(eventType common.EventType, config *config.Config) (*EventWr
 	}
 	table := GenEventCKTable(eventType, w.ckdbCluster, w.ckdbStoragePolicy, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, EVENT_DB, eventType.TableName()))
 
-	ckwriter, err := ckwriter.NewCKWriter(w.ckdbAddr, "", w.ckdbUsername, w.ckdbPassword,
-		eventType.TableName(), table, false, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
+	ckwriter, err := ckwriter.NewCKWriter(w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
+		eventType.TableName(), table, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
 	if err != nil {
 		return nil, err
 	}
