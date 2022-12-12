@@ -38,7 +38,7 @@ type DbWriter struct {
 	ckwriters []*ckwriter.CKWriter
 }
 
-func NewDbWriter(primaryAddr, user, password, clusterName, storagePolicy string, ckWriterCfg config.CKWriterConfig, flowMetricsTtl flowmetricsconfig.FlowMetricsTTL, coldStorages map[string]*ckdb.ColdStorage) (*DbWriter, error) {
+func NewDbWriter(addrs []string, user, password, clusterName, storagePolicy string, ckWriterCfg config.CKWriterConfig, flowMetricsTtl flowmetricsconfig.FlowMetricsTTL, coldStorages map[string]*ckdb.ColdStorage) (*DbWriter, error) {
 	ckwriters := []*ckwriter.CKWriter{}
 	tables := zerodoc.GetMetricsTables(ckdb.MergeTree, common.CK_VERSION, clusterName, storagePolicy, flowMetricsTtl.VtapFlow1M, flowMetricsTtl.VtapFlow1S, flowMetricsTtl.VtapApp1M, flowMetricsTtl.VtapApp1S, coldStorages)
 	for _, table := range tables {
@@ -50,7 +50,7 @@ func NewDbWriter(primaryAddr, user, password, clusterName, storagePolicy string,
 		} else if table.ID >= uint8(zerodoc.VTAP_APP_PORT_1M) && table.ID <= uint8(zerodoc.VTAP_APP_EDGE_PORT_1M) {
 			counterName = "app_1m"
 		}
-		ckwriter, err := ckwriter.NewCKWriter(primaryAddr, "", user, password, counterName, table, false,
+		ckwriter, err := ckwriter.NewCKWriter(addrs, user, password, counterName, table,
 			ckWriterCfg.QueueCount, ckWriterCfg.QueueSize, ckWriterCfg.BatchSize, ckWriterCfg.FlushTimeout)
 		if err != nil {
 			log.Error(err)

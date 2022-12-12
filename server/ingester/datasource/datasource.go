@@ -37,7 +37,7 @@ const (
 )
 
 type DatasourceManager struct {
-	ckAddr           string // 需要修改数据源的clickhouse地址, 支持多个
+	ckAddrs          []string // 需要修改数据源的clickhouse地址, 支持多个
 	user             string
 	password         string
 	readTimeout      int
@@ -52,7 +52,7 @@ type DatasourceManager struct {
 
 func NewDatasourceManager(cfg *config.Config, readTimeout int) *DatasourceManager {
 	return &DatasourceManager{
-		ckAddr:            cfg.CKDB.ActualAddr,
+		ckAddrs:           cfg.CKDB.ActualAddrs,
 		user:              cfg.CKDBAuth.Username,
 		password:          cfg.CKDBAuth.Password,
 		readTimeout:       readTimeout,

@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/deepflowys/deepflow/server/ingester/common"
@@ -42,23 +43,24 @@ const (
 )
 
 type CKWriter struct {
-	primaryAddr   string
-	secondaryAddr string
-	user          string
-	password      string
-	table         *ckdb.Table
-	queueCount    int
-	queueSize     int    // 队列长度
-	batchSize     int    // 累积多少行数据，一起写入
-	flushTimeout  int    // 超时写入： 单位秒
-	counterName   string // 写入成功失败的统计数据表名称，若写入失败，会根据该数据上报告警
+	addrs        []string
+	user         string
+	password     string
+	table        *ckdb.Table
+	queueCount   int
+	queueSize    int    // 队列长度
+	batchSize    int    // 累积多少行数据，一起写入
+	flushTimeout int    // 超时写入： 单位秒
+	counterName  string // 写入成功失败的统计数据表名称，若写入失败，会根据该数据上报告警
 
-	name       string // 数据库名-表名 用作 queue名字和counter名字
-	prepare    string // 写入数据时，先执行prepare
-	conns      []clickhouse.Conn
-	dataQueues queue.FixedMultiQueue
-	counters   []Counter
-	putCounter int
+	name         string // 数据库名-表名 用作 queue名字和counter名字
+	prepare      string // 写入数据时，先执行prepare
+	conns        []clickhouse.Conn
+	connCount    uint64
+	dataQueues   queue.FixedMultiQueue
+	counters     []Counter
+	putCounter   int
+	writeCounter uint64
 
 	wg   sync.WaitGroup
 	exit bool
@@ -105,45 +107,28 @@ func InitTable(addr, user, password string, t *ckdb.Table) error {
 	return nil
 }
 
-func initReplicaTable(addr, user, password string, t *ckdb.Table) {
-	for {
-		if err := InitTable(addr, user, password, t); err != nil {
-			log.Warningf("Init replica(%s) table failed, will retry after one minute. %s", addr, err)
-			time.Sleep(time.Minute)
-			continue
-		}
-		return
+func NewCKWriter(addrs []string, user, password, counterName string, table *ckdb.Table, queueCount, queueSize, batchSize, flushTimeout int) (*CKWriter, error) {
+	log.Infof("New CK writer: Addrs=%v, user=%s, database=%s, table=%s, queueCount=%d, queueSize=%d, batchSize=%d, flushTimeout=%ds",
+		addrs, user, table.Database, table.LocalName, queueCount, queueSize, batchSize, flushTimeout)
+
+	if len(addrs) == 0 {
+		return nil, fmt.Errorf("addrs is empty")
 	}
-}
 
-func NewCKWriter(primaryAddr, secondaryAddr, user, password, counterName string, table *ckdb.Table, replicaEnabled bool, queueCount, queueSize, batchSize, flushTimeout int) (*CKWriter, error) {
-	log.Infof("New CK writer: primaryAddr=%s, secondaryAddr=%s, user=%s, database=%s, table=%s, replica=%v, queueCount=%d, queueSize=%d, batchSize=%d, flushTimeout=%ds",
-		primaryAddr, secondaryAddr, user, table.Database, table.LocalName, replicaEnabled, queueCount, queueSize, batchSize, flushTimeout)
-
-	conns := make([]clickhouse.Conn, queueCount)
 	var err error
 
-	// primary clickhouse的初始化创建表
-	if err = InitTable(primaryAddr, user, password, table); err != nil {
-		return nil, err
-	}
-
-	// secondaryAddr作为replica clickhouse, 只需要初始化建表
-	if replicaEnabled {
-		if err := InitTable(secondaryAddr, user, password, table); err != nil {
-			// replica 创建table失败，每隔1分钟后台重试创建
-			go initReplicaTable(secondaryAddr, user, password, table)
-		}
-	} else if len(secondaryAddr) > 0 {
-		// FIXME secondaryAddr也作为primary clickhouse时, 只支持初始化建表, 不支持写入
-		if err = InitTable(secondaryAddr, user, password, table); err != nil {
+	// clickhouse的初始化创建表
+	for _, addr := range addrs {
+		if err = InitTable(addr, user, password, table); err != nil {
 			return nil, err
 		}
 	}
 
-	for i := 0; i < queueCount; i++ {
+	addrCount := len(addrs)
+	conns := make([]clickhouse.Conn, addrCount)
+	for i := 0; i < addrCount; i++ {
 		if conns[i], err = clickhouse.Open(&clickhouse.Options{
-			Addr: []string{primaryAddr},
+			Addr: []string{addrs[i]},
 			Auth: clickhouse.Auth{
 				Database: "default",
 				Username: user,
@@ -162,18 +147,18 @@ func NewCKWriter(primaryAddr, secondaryAddr, user, password, counterName string,
 		common.QUEUE_STATS_MODULE_INGESTER)
 
 	return &CKWriter{
-		primaryAddr:   primaryAddr,
-		secondaryAddr: secondaryAddr,
-		table:         table,
-		queueCount:    queueCount,
-		queueSize:     queueSize,
-		batchSize:     batchSize,
-		flushTimeout:  flushTimeout,
-		counterName:   counterName,
+		addrs:        addrs,
+		table:        table,
+		queueCount:   queueCount,
+		queueSize:    queueSize,
+		batchSize:    batchSize,
+		flushTimeout: flushTimeout,
+		counterName:  counterName,
 
 		name:       name,
 		prepare:    table.MakePrepareTableInsertSQL(),
 		conns:      conns,
+		connCount:  uint64(len(conns)),
 		dataQueues: dataQueues,
 		counters:   make([]Counter, queueCount),
 	}, nil
@@ -236,38 +221,44 @@ func (w *CKWriter) queueProcess(queueID int) {
 	}
 }
 
-func (w *CKWriter) ResetConnection(queueID int) error {
+func (w *CKWriter) ResetConnection(connID int) error {
 	var err error
-	if !IsNil(w.conns[queueID]) {
-		w.conns[queueID].Close()
-		w.conns[queueID] = nil
+	if !IsNil(w.conns[connID]) {
+		w.conns[connID].Close()
+		w.conns[connID] = nil
 	}
-	if w.conns[queueID], err = clickhouse.Open(&clickhouse.Options{
-		Addr: []string{w.primaryAddr},
+	w.conns[connID], err = clickhouse.Open(&clickhouse.Options{
+		Addr: []string{w.addrs[connID]},
 		Auth: clickhouse.Auth{
 			Database: "default",
 			Username: w.user,
 			Password: w.password,
 		},
-	}); err != nil {
-		return err
-	}
-	return nil
+	})
+	return err
 }
 
 func (w *CKWriter) Write(queueID int, items []CKItem) {
-	if err := w.writeItems(queueID, items); err != nil {
-		if w.counters[queueID].WriteFailedCount == 0 {
+	connID := int(atomic.AddUint64(&w.writeCounter, 1) % w.connCount)
+	if err := w.writeItems(connID, items); err != nil {
+		// Prevent frequent log writing
+		logEnabled := w.counters[queueID].WriteFailedCount == 0
+		if logEnabled {
 			log.Warningf("write table(%s.%s) failed, will retry write(%d) items: %s", w.table.Database, w.table.LocalName, len(items), err)
-			if err := w.ResetConnection(queueID); err != nil {
-				log.Warningf("reconnect clickhouse failed: %s", err)
-				time.Sleep(time.Minute)
-			} else {
+		}
+		if err := w.ResetConnection(connID); err != nil {
+			log.Warningf("reconnect clickhouse failed: %s", err)
+			time.Sleep(time.Second * 10)
+		} else {
+			if logEnabled {
 				log.Infof("reconnect clickhouse success: %s %s", w.table.Database, w.table.LocalName)
 			}
+		}
 
-			// 写失败重连后重试一次, 规避偶尔写失败问题
-			if err = w.writeItems(queueID, items); err != nil {
+		// 写失败重连后重试一次, 规避偶尔写失败问题
+		err = w.writeItems(connID, items)
+		if logEnabled {
+			if err != nil {
 				log.Warningf("retry write table(%s.%s) failed, drop(%d) items: %s", w.table.Database, w.table.LocalName, len(items), err)
 			} else {
 				log.Infof("retry write table(%s.%s) success, write(%d) items", w.table.Database, w.table.LocalName, len(items))
@@ -298,17 +289,17 @@ func IsNil(i interface{}) bool {
 	return false
 }
 
-func (w *CKWriter) writeItems(queueID int, items []CKItem) error {
+func (w *CKWriter) writeItems(connID int, items []CKItem) error {
 	if len(items) == 0 {
 		return nil
 	}
-	ck := w.conns[queueID]
+	ck := w.conns[connID]
 	if IsNil(ck) {
-		if err := w.ResetConnection(queueID); err != nil {
-			time.Sleep(time.Minute)
-			return fmt.Errorf("can not ck to clickhouse: %s", err)
+		if err := w.ResetConnection(connID); err != nil {
+			time.Sleep(time.Second * 10)
+			return fmt.Errorf("can not connect to clickhouse: %s", err)
 		}
-		ck = w.conns[queueID]
+		ck = w.conns[connID]
 	}
 
 	batch, err := ck.PrepareBatch(context.Background(), w.prepare)
@@ -319,13 +310,11 @@ func (w *CKWriter) writeItems(queueID int, items []CKItem) error {
 	ckdbBlock := ckdb.NewBlock(batch)
 	for _, item := range items {
 		item.WriteBlock(ckdbBlock)
-		err := ckdbBlock.WriteAll()
-		if err != nil {
+		if err := ckdbBlock.WriteAll(); err != nil {
 			return fmt.Errorf("item write block failed: %s", err)
 		}
 	}
-	err = ckdbBlock.Send()
-	if err != nil {
+	if err = ckdbBlock.Send(); err != nil {
 		return fmt.Errorf("send write block failed: %s", err)
 	} else {
 		log.Debugf("batch write success, table (%s.%s) commit %d items", w.table.Database, w.table.LocalName, len(items))

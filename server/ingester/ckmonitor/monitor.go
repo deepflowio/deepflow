@@ -38,10 +38,10 @@ type Monitor struct {
 	usedPercentThreshold int
 	diskPrefix           string
 
-	primaryConn, secondaryConn *sql.DB
-	primaryAddr, secondaryAddr string
-	username, password         string
-	exit                       bool
+	Conns              common.DBs
+	Addrs              []string
+	username, password string
+	exit               bool
 }
 
 type DiskInfo struct {
@@ -62,12 +62,12 @@ func NewCKMonitor(cfg *config.Config) (*Monitor, error) {
 		usedPercentThreshold: cfg.CKDiskMonitor.UsedPercent,
 		freeSpaceThreshold:   cfg.CKDiskMonitor.FreeSpace << 30, // GB
 		diskPrefix:           cfg.CKDiskMonitor.DiskPrefix,
-		primaryAddr:          cfg.CKDB.ActualAddr,
+		Addrs:                cfg.CKDB.ActualAddrs,
 		username:             cfg.CKDBAuth.Username,
 		password:             cfg.CKDBAuth.Password,
 	}
 	var err error
-	m.primaryConn, err = common.NewCKConnection(m.primaryAddr, m.username, m.password)
+	m.Conns, err = common.NewCKConnections(m.Addrs, m.username, m.password)
 	if err != nil {
 		return nil, err
 	}
@@ -75,28 +75,24 @@ func NewCKMonitor(cfg *config.Config) (*Monitor, error) {
 	return m, nil
 }
 
-func (m *Monitor) updateConnection(connect *sql.DB, addr string) *sql.DB {
-	if addr == "" {
-		return nil
-	}
-
-	if connect == nil || connect.Ping() != nil {
-		if connect != nil {
-			connect.Close()
-		}
-		connectNew, err := common.NewCKConnection(addr, m.username, m.password)
-		if err != nil {
-			log.Warning(err)
-		}
-		return connectNew
-	}
-	return connect
-}
-
 // 如果clickhouse重启等，需要自动更新连接
 func (m *Monitor) updateConnections() {
-	m.primaryConn = m.updateConnection(m.primaryConn, m.primaryAddr)
-	m.secondaryConn = m.updateConnection(m.secondaryConn, m.secondaryAddr)
+	if len(m.Addrs) == 0 {
+		return
+	}
+
+	var err error
+	for i, connect := range m.Conns {
+		if connect == nil || connect.Ping() != nil {
+			if connect != nil {
+				connect.Close()
+			}
+			m.Conns[i], err = common.NewCKConnection(m.Addrs[i], m.username, m.password)
+			if err != nil {
+				log.Warning(err)
+			}
+		}
+	}
 }
 
 func (m *Monitor) getDiskInfos(connect *sql.DB) ([]*DiskInfo, error) {
@@ -250,7 +246,7 @@ func (m *Monitor) start() {
 		}
 
 		m.updateConnections()
-		for _, connect := range []*sql.DB{m.primaryConn, m.secondaryConn} {
+		for _, connect := range m.Conns {
 			if connect == nil {
 				continue
 			}

@@ -17,7 +17,6 @@
 package config
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -107,7 +106,7 @@ type CKWriterConfig struct {
 type CKDB struct {
 	External            bool   `yaml:"external"`
 	Host                string `yaml:"host"`
-	ActualAddr          string
+	ActualAddrs         []string
 	Watcher             *Watcher
 	Port                int    `yaml:"port"`
 	EndpointTCPPortName string `yaml:"endpoint-tcp-port-name"`
@@ -230,27 +229,29 @@ func (c *Config) Validate() error {
 			}
 		}
 
-		endpoint, err := watcher.GetMyClickhouseEndpoint()
+		endpoints, err := watcher.GetMyClickhouseEndpoints()
 		if err != nil {
 			log.Warningf("get clickhouse endpoints(%s) failed, err: %s", c.CKDB.Host, err)
 			continue
 		}
-		c.CKDB.ActualAddr = fmt.Sprintf("%s:%d", endpoint.Host, endpoint.Port)
+		for _, endpoint := range endpoints {
+			c.CKDB.ActualAddrs = append(c.CKDB.ActualAddrs, fmt.Sprintf("%s:%d", endpoint.Host, endpoint.Port))
+		}
 		c.CKDB.Watcher = watcher
-		log.Infof("get clickhouse actual address: %s", c.CKDB.ActualAddr)
+		log.Infof("get clickhouse actual address: %s", c.CKDB.ActualAddrs)
 
-		conn, err := common.NewCKConnection(c.CKDB.ActualAddr, c.CKDBAuth.Username, c.CKDBAuth.Password)
+		conns, err := common.NewCKConnections(c.CKDB.ActualAddrs, c.CKDBAuth.Username, c.CKDBAuth.Password)
 		if err != nil {
-			log.Warningf("connect to clickhouse %s failed, err: %s", c.CKDB.ActualAddr, err)
+			log.Warningf("connect to clickhouse %s failed, err: %s", c.CKDB.ActualAddrs, err)
 			continue
 		}
 
-		if err := CheckCluster(conn, c.CKDB.ClusterName); err != nil {
+		if err := CheckCluster(conns, c.CKDB.ClusterName); err != nil {
 			log.Errorf("get clickhouse cluster(%s) info from table 'system.clusters' failed, err: %s", c.CKDB.ClusterName, err)
 			continue
 		}
 
-		if err := CheckStoragePolicy(conn, c.CKDB.StoragePolicy); err != nil {
+		if err := CheckStoragePolicy(conns, c.CKDB.StoragePolicy); err != nil {
 			log.Errorf("get clickhouse storage policy(%s) info from table 'system.storage_polices' failed, err: %s", c.CKDB.StoragePolicy, err)
 			continue
 		}
@@ -376,9 +377,9 @@ func Load(path string) *Config {
 	return &config.Base
 }
 
-func CheckCluster(conn *sql.DB, clusterName string) error {
+func CheckCluster(conns common.DBs, clusterName string) error {
 	sql := fmt.Sprintf("SELECT host_address,port FROM system.clusters WHERE cluster='%s'", clusterName)
-	rows, err := conn.Query(sql)
+	rows, err := conns.Query(sql)
 	if err != nil {
 		return err
 	}
@@ -391,9 +392,9 @@ func CheckCluster(conn *sql.DB, clusterName string) error {
 	return fmt.Errorf("cluster '%s' not find", clusterName)
 }
 
-func CheckStoragePolicy(conn *sql.DB, storagePolicy string) error {
+func CheckStoragePolicy(conns common.DBs, storagePolicy string) error {
 	sql := fmt.Sprintf("SELECT policy_name FROM system.storage_policies WHERE policy_name='%s'", storagePolicy)
-	rows, err := conn.Query(sql)
+	rows, err := conns.Query(sql)
 	if err != nil {
 		return err
 	}
