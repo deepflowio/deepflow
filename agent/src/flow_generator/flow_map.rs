@@ -694,7 +694,7 @@ impl FlowMap {
         } else {
             false
         };
-        let flow = Flow {
+        let mut flow = Flow {
             flow_key: FlowKey {
                 vtap_id: config.vtap_id,
                 mac_src: lookup_key.src_mac,
@@ -752,6 +752,10 @@ impl FlowMap {
             is_active_service,
             ..Default::default()
         };
+        if let Some(real_ip) = meta_packet.nat_client_ip {
+            flow.flow_metrics_peers[0].nat_real_ip = real_ip;
+            flow.flow_metrics_peers[0].nat_real_port = meta_packet.nat_client_port;
+        }
         tagged_flow.flow = flow;
 
         // FlowMap信息
@@ -815,6 +819,17 @@ impl FlowMap {
         (self.policy_getter).lookup(meta_packet, self.id as usize, local_ecp_id);
         self.update_endpoint_and_policy_data(&mut node, meta_packet);
 
+        if let Some(endpoints) = &meta_packet.endpoint_data {
+            if endpoints.src_info.is_vip || endpoints.dst_info.is_vip {
+                meta_packet.tap_port.set_nat_source(TapPort::NAT_SOURCE_VIP);
+                node.tagged_flow
+                    .flow
+                    .flow_key
+                    .tap_port
+                    .set_nat_source(TapPort::NAT_SOURCE_VIP);
+            }
+        }
+
         let l7_proto_enum = self.app_table.get_protocol(meta_packet);
 
         if config.collector_enabled {
@@ -868,6 +883,17 @@ impl FlowMap {
             let local_ecp_id = 0;
             (self.policy_getter).lookup(meta_packet, self.id as usize, local_ecp_id);
             self.update_endpoint_and_policy_data(node, meta_packet);
+
+            if let Some(endpoints) = &meta_packet.endpoint_data {
+                if endpoints.src_info.is_vip || endpoints.dst_info.is_vip {
+                    meta_packet.tap_port.set_nat_source(TapPort::NAT_SOURCE_VIP);
+                    node.tagged_flow
+                        .flow
+                        .flow_key
+                        .tap_port
+                        .set_nat_source(TapPort::NAT_SOURCE_VIP);
+                }
+            }
         } else {
             // copy endpoint and policy data
             meta_packet.policy_data.replace(Arc::new(
@@ -907,6 +933,10 @@ impl FlowMap {
         flow_metrics_peer.last = pkt_timestamp;
         if flow_metrics_peer.first.is_zero() {
             flow_metrics_peer.first = pkt_timestamp;
+        }
+        if let Some(real_ip) = meta_packet.nat_client_ip {
+            flow_metrics_peer.nat_real_ip = real_ip;
+            flow_metrics_peer.nat_real_port = meta_packet.nat_client_port;
         }
 
         if meta_packet.vlan > 0 {
@@ -1287,8 +1317,13 @@ impl FlowMap {
             // TCP/UDP
             IpProtocol::Tcp => {
                 let flags = meta_packet.tcp_data.flags;
-                self.service_table
-                    .get_tcp_score(is_first_packet, flags, src_key, dst_key)
+                self.service_table.get_tcp_score(
+                    is_first_packet,
+                    meta_packet.nat_client_ip.is_some(),
+                    flags,
+                    src_key,
+                    dst_key,
+                )
             }
             IpProtocol::Udp => self
                 .service_table
@@ -1353,7 +1388,7 @@ impl FlowMap {
         let (mut src_score, mut dst_score) = match flow_key.proto {
             IpProtocol::Tcp => {
                 self.service_table
-                    .get_tcp_score(false, TcpFlags::empty(), src_key, dst_key)
+                    .get_tcp_score(false, false, TcpFlags::empty(), src_key, dst_key)
             }
             IpProtocol::Udp => self.service_table.get_udp_score(false, src_key, dst_key),
             _ => return,

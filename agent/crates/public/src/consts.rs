@@ -186,6 +186,11 @@ pub const TCP_OPT_FLAG_SACK: u8 = 0x38; // 0011 1000, 同时也表示SACK的字�
 pub const TCP_OPT_WIN_SCALE_LEN: usize = 3;
 pub const TCP_OPT_MSS_LEN: usize = 4;
 
+pub const TCP_OPT_ADDRESS: u8 = 254;
+pub const TCP_TOA_LEN: usize = 8;
+pub const TCP_TOA_PORT_OFFSET: usize = 2;
+pub const TCP_TOA_IP_OFFSET: usize = 4;
+
 pub const VLAN_ID_MASK: u16 = 0xfff;
 
 pub mod arp {

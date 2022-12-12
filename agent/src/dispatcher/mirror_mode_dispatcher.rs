@@ -544,10 +544,15 @@ impl MirrorModeDispatcher {
         mac: u32,
         npb_dedup: bool,
     ) {
-        if is_tt_hyper_v_compute(trident_type) {
-            meta_packet.tap_port = TapPort::from_local_mac(tunnel_type, mac);
+        let nat_source = if meta_packet.nat_client_ip.is_some() {
+            TapPort::NAT_SOURCE_TOA
         } else {
-            meta_packet.tap_port = TapPort::from_local_mac(tunnel_type, key);
+            TapPort::NAT_SOURCE_NONE
+        };
+        if is_tt_hyper_v_compute(trident_type) {
+            meta_packet.tap_port = TapPort::from_local_mac(nat_source, tunnel_type, mac);
+        } else {
+            meta_packet.tap_port = TapPort::from_local_mac(nat_source, tunnel_type, key);
         }
 
         BaseDispatcher::prepare_flow(meta_packet, TapType::Cloud, false, queue_hash, npb_dedup)

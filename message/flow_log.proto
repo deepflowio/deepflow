@@ -88,6 +88,9 @@ message FlowMetricsPeer {
     uint32 is_device = 14;
     uint32 is_vip_interface = 15;
     uint32 is_vip = 16;
+
+    uint32 real_ip = 20;
+    uint32 real_port = 21;
 }
 
 message TunnelField {
