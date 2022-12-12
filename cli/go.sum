@@ -89,8 +89,8 @@ github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ3
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/deepflowys/deepflow/message v0.0.0-20221207123223-6d7e30f19f07 h1:tGn7N9PqE2q+pHrnr4WD646cbPOYeOuAeVx/vSyLtYs=
-github.com/deepflowys/deepflow/message v0.0.0-20221207123223-6d7e30f19f07/go.mod h1:mSlcdrl/mmrjBdG+xcqhGXC0BTK26G98ekXxNDgOyQ4=
+github.com/deepflowys/deepflow/message v0.0.0-20221212023728-ed00cfdb114c h1:+d0R0idEbTV8DWLRE6GrqJg8o/HAF7VKbdQEoP2G8mc=
+github.com/deepflowys/deepflow/message v0.0.0-20221212023728-ed00cfdb114c/go.mod h1:mSlcdrl/mmrjBdG+xcqhGXC0BTK26G98ekXxNDgOyQ4=
 github.com/deepflowys/deepflow/server v0.0.0-20221209091532-1ea5b53ec60c h1:iGwusAsbzy8WVp5bJqkrluohzp2t7RP/3eyHCbjTvAA=
 github.com/deepflowys/deepflow/server v0.0.0-20221209091532-1ea5b53ec60c/go.mod h1:I0Tc7ZWVlND2ucWnjCQjv/Tiv/bRu1b72ic4i0s87SI=
 github.com/docker/go-units v0.4.0 h1:3uh0PgVws3nIA0Q+MwDC8yjEPf9zjRfZZWXZYDct3Tw=
