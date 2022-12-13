@@ -120,11 +120,16 @@ struct socket_info_t {
 } __attribute__((packed));
 
 struct trace_info_t {
+	/*
+	 * Whether traceID is zero ?
+	 * For the client to actively send request, set traceID to zero.
+	 */
+	bool is_trace_id_zero;
 	__u32 update_time; // 从系统开机开始到创建/更新时的间隔时间单位是秒
 	__u32 peer_fd;	   // 用于socket之间的关联
 	__u64 thread_trace_id; // 线程追踪ID
 	__u64 socket_id; // Records the socket associated when tracing was created (记录创建追踪时关联的socket)
-};
+} __attribute__((packed));
 
 struct allow_port_bitmap {
 	__u8 bitmap[65536 / 8];
