@@ -30,7 +30,7 @@ use super::port_range::{PortRange, PortRangeList};
 use super::{IPV4_MAX_MASK_LEN, IPV6_MAX_MASK_LEN, MIN_MASK_LEN};
 use npb_pcap_policy::{NpbAction, NpbTunnelType, PolicyData, TapSide};
 
-use crate::proto::trident;
+use public::proto::trident;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum GroupType {
@@ -366,6 +366,21 @@ pub struct Fieldv4 {
     pub mask: MatchedFieldv4,
 }
 
+impl Fieldv4 {
+    pub const SIZE: usize = MatchedFieldv4::SIZE * 2;
+
+    pub fn get_all_table_index(
+        &self,
+        mask_vector: &MatchedFieldv4,
+        min: usize,
+        max: usize,
+        vector_bits: &Vec<usize>,
+    ) -> Vec<u16> {
+        self.field
+            .get_all_table_index(mask_vector, &self.mask, min, max, vector_bits)
+    }
+}
+
 impl fmt::Display for Fieldv4 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -395,6 +410,21 @@ impl fmt::Display for Fieldv4 {
 pub struct Fieldv6 {
     pub field: MatchedFieldv6,
     pub mask: MatchedFieldv6,
+}
+
+impl Fieldv6 {
+    pub const SIZE: usize = MatchedFieldv6::SIZE * 2;
+
+    pub fn get_all_table_index(
+        &self,
+        mask_vector: &MatchedFieldv6,
+        min: usize,
+        max: usize,
+        vector_bits: &Vec<usize>,
+    ) -> Vec<u16> {
+        self.field
+            .get_all_table_index(mask_vector, &self.mask, min, max, vector_bits)
+    }
 }
 
 impl fmt::Display for Fieldv6 {
@@ -438,7 +468,7 @@ pub struct Acl {
     pub match_field: Vec<Arc<Fieldv4>>,
     pub match_field6: Vec<Arc<Fieldv6>>,
 
-    pub policy: PolicyData,
+    pub policy: Arc<PolicyData>,
 }
 
 impl Acl {
@@ -459,14 +489,10 @@ impl Acl {
             src_port_ranges,
             dst_port_ranges,
             proto: Self::PROTOCOL_ANY,
-            npb_actions: vec![actions],
+            npb_actions: vec![actions.clone()],
+            policy: Arc::new(PolicyData::new(vec![actions], id)),
             ..Default::default()
         }
-    }
-
-    pub fn init_policy(&mut self) {
-        self.policy
-            .merge_npb_action(&self.npb_actions, self.id, None);
     }
 
     pub fn reset(&mut self) {
@@ -674,7 +700,7 @@ impl TryFrom<trident::FlowAcl> for Acl {
                 dst_ports.unwrap_err()
             ));
         }
-        let npb_actions = a
+        let npb_actions: Vec<NpbAction> = a
             .npb_actions
             .iter()
             .map(|n| {
@@ -707,7 +733,8 @@ impl TryFrom<trident::FlowAcl> for Acl {
             src_port_ranges: src_ports.unwrap().element().to_vec(),
             dst_port_ranges: dst_ports.unwrap().element().to_vec(),
             proto: (a.protocol.unwrap_or_default() & 0xffff) as u16,
-            npb_actions,
+            npb_actions: npb_actions.clone(),
+            policy: Arc::new(PolicyData::new(npb_actions, a.id.unwrap_or_default())),
             ..Default::default()
         })
     }

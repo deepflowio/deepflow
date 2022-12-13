@@ -529,6 +529,7 @@ func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData) {
 	if l.TraceInfo != nil {
 		h.SpanId = l.TraceInfo.SpanId
 		h.TraceId = l.TraceInfo.TraceId
+		h.ParentSpanId = l.TraceInfo.ParentSpanId
 	}
 
 	// 处理内置协议特殊情况
@@ -541,8 +542,8 @@ func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData) {
 			}
 			h.RequestId = &h.requestId
 		}
-	case datatype.L7_PROTOCOL_PROTOBUF_RPC:
-		// assume protobuf rpc Always have request_id and maybe equal to 0
+	case datatype.L7_PROTOCOL_PROTOBUF_RPC, datatype.L7_PROTOCOL_SOFARPC:
+		// assume protobuf and sofa rpc Always have request_id and maybe equal to 0
 		h.RequestId = &h.requestId
 	}
 }

@@ -21,11 +21,13 @@ use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::common::meta_packet::MetaPacket;
-use crate::pcap::PcapPacket;
+use log::debug;
+
 use npb_handler::{NpbHandler, NpbMode};
-use npb_pcap_policy::PolicyData;
-use public::{queue::DebugSender, utils::net::MacAddr};
+use npb_pcap_policy::{NpbTunnelType, PolicyData};
+use public::{enums::HeaderType, packet, queue::DebugSender, utils::net::MacAddr};
+
+use crate::common::meta_packet::MetaPacket;
 
 pub struct IpInfo {
     pub mac: MacAddr,
@@ -58,6 +60,11 @@ pub struct MiniPacket<'a> {
     // IPV6
     ipv6_last_option_offset: usize,
     ipv6_fragment_option_offset: usize,
+    // RawPcap
+    flow_id: u64,
+    header_type: HeaderType,
+    l2_l3_opt_size: usize,
+    packet_len: usize,
 }
 
 impl<'a> MiniPacket<'a> {
@@ -77,19 +84,65 @@ impl<'a> MiniPacket<'a> {
             },
             ipv6_last_option_offset: meta_packet.offset_ipv6_last_option,
             ipv6_fragment_option_offset: meta_packet.offset_ipv6_fragment_option,
+            flow_id: meta_packet.flow_id,
+            header_type: meta_packet.header_type,
+            l2_l3_opt_size: meta_packet.l2_l3_opt_size,
+            packet_len: meta_packet.packet_len,
         }
     }
 }
 
 pub enum PacketHandler {
-    Pcap(DebugSender<PcapPacket>),
+    // pcap_assembler sender, use for send mini packet to assemble
+    Pcap(DebugSender<packet::MiniPacket>),
     Npb(NpbHandler),
 }
 
 impl PacketHandler {
     pub fn handle(&mut self, packet: &MiniPacket) {
         match self {
-            Self::Pcap(_) => {}
+            Self::Pcap(sender) => {
+                if packet.policy.is_none()
+                    || !packet.policy.as_ref().unwrap().contain_pcap()
+                    || packet.flow_id == 0
+                {
+                    return;
+                }
+                let payload_offset = packet.header_type.min_header_size()
+                    + packet.l2_l3_opt_size
+                    + packet.l4_opt_size;
+                let policy = packet.policy.as_ref().unwrap();
+                let mut max_raw_len = 0;
+                // find longest payload
+                for action in policy.npb_actions.iter() {
+                    if action.tunnel_type() != NpbTunnelType::Pcap {
+                        continue;
+                    }
+                    let mut raw_len = payload_offset + action.payload_slice() as usize;
+                    if raw_len > packet.packet.len() {
+                        raw_len = packet.packet.len();
+                    }
+                    if raw_len > packet.packet_len {
+                        // only get packet_size in padding situation
+                        raw_len = packet.packet_len;
+                    }
+                    if raw_len > max_raw_len {
+                        max_raw_len = raw_len;
+                    }
+                }
+                if max_raw_len == 0 {
+                    return;
+                }
+
+                let mini_packet = packet::MiniPacket {
+                    packet: packet.packet[..max_raw_len].to_vec(),
+                    flow_id: packet.flow_id,
+                    timestamp: Duration::from_nanos(packet.timestamp),
+                };
+                if let Err(e) = sender.send(mini_packet) {
+                    debug!("send mini packet to pcap assembler error: {e:?}");
+                }
+            }
             Self::Npb(n) => n.handle(
                 packet.policy.as_ref(),
                 &packet.npb_mode,
@@ -107,7 +160,7 @@ impl PacketHandler {
 }
 
 pub enum PacketHandlerBuilder {
-    Pcap(DebugSender<PcapPacket>),
+    Pcap(DebugSender<packet::MiniPacket>),
     Npb(Box<NpbBuilder>),
 }
 
@@ -121,9 +174,7 @@ impl PacketHandlerBuilder {
 
     pub fn stop(&mut self) {
         match self {
-            PacketHandlerBuilder::Pcap(s) => {
-                let _ = s.send(PcapPacket::Terminated);
-            }
+            PacketHandlerBuilder::Pcap(_) => {}
             PacketHandlerBuilder::Npb(b) => {
                 b.stop();
             }
@@ -132,7 +183,7 @@ impl PacketHandlerBuilder {
 
     pub fn start(&mut self) {
         match self {
-            PacketHandlerBuilder::Pcap(_s) => {}
+            PacketHandlerBuilder::Pcap(_) => {}
             PacketHandlerBuilder::Npb(b) => {
                 b.start();
             }

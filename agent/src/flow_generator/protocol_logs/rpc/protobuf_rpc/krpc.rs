@@ -24,7 +24,7 @@ use serde::Serialize;
 
 use crate::{
     common::{
-        flow::{FlowPerfStats, L7PerfStats},
+        flow::{FlowPerfStats, L7PerfStats, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
         MetaPacket,
@@ -38,10 +38,10 @@ use crate::{
         AppProtoHead, Error, LogMessageType, Result,
     },
     perf_impl,
-    proto::protobuf_rpc::KrpcMeta,
 };
 
 use super::ProtobufRpcInfo;
+use public::proto::protobuf_rpc::KrpcMeta;
 
 const KRPC_FIX_HDR_LEN: usize = 8;
 const KRPC_DIR_REQ: i32 = 1;
@@ -94,6 +94,11 @@ impl KrpcInfo {
 
         Ok(())
     }
+
+    fn is_heartbeat(&self) -> bool {
+        // reference https://github.com/bruceran/krpc/blob/master/doc/develop.md#krpc%E7%BD%91%E7%BB%9C%E5%8C%85%E5%8D%8F%E8%AE%AE
+        self.sequence == 0 && self.msg_id == 1 && self.serv_id == 1
+    }
 }
 
 impl L7ProtocolInfoInterface for KrpcInfo {
@@ -105,13 +110,6 @@ impl L7ProtocolInfoInterface for KrpcInfo {
         if let L7ProtocolInfo::ProtobufRpcInfo(rpc_info) = other {
             #[allow(irrefutable_let_patterns)]
             if let ProtobufRpcInfo::KrpcInfo(k) = rpc_info {
-                if k.start_time < self.start_time {
-                    self.start_time = k.start_time;
-                }
-                if k.end_time > self.end_time {
-                    self.end_time = k.end_time;
-                }
-
                 self.ret_code = k.ret_code;
                 self.status = k.status;
 
@@ -139,9 +137,7 @@ impl L7ProtocolInfoInterface for KrpcInfo {
     }
 
     fn skip_send(&self) -> bool {
-        // filter heartbreat
-        // reference https://github.com/bruceran/krpc/blob/master/doc/develop.md#krpc%E7%BD%91%E7%BB%9C%E5%8C%85%E5%8D%8F%E8%AE%AE
-        self.sequence == 0 && self.msg_id == 1 && self.serv_id == 1
+        false
     }
 }
 
@@ -205,18 +201,6 @@ impl KrpcLog {
     pub fn new() -> Self {
         Self::default()
     }
-}
-
-impl L7ProtocolParserInterface for KrpcLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
-        if !param.ebpf_type.is_raw_protocol() {
-            return false;
-        }
-        self.info.start_time = param.time;
-        self.info.end_time = param.time;
-        self.parsed = self.parse_payload(payload, param).is_ok();
-        self.parsed && self.info.msg_type == LogMessageType::Request
-    }
 
     /*
         krpc hdr reference https://github.com/bruceran/krpc/blob/master/doc/develop.md#krpc%E7%BD%91%E7%BB%9C%E5%8C%85%E5%8D%8F%E8%AE%AE
@@ -225,11 +209,20 @@ impl L7ProtocolParserInterface for KrpcLog {
         1  |-----KR---------|----- headLen--------|
         2  |---------------packetLen--------------|
     */
-    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+    fn parse(
+        &mut self,
+        payload: &[u8],
+        param: &ParseParam,
+        strict: bool,
+    ) -> Result<Vec<L7ProtocolInfo>> {
         if self.parsed {
-            return Ok(vec![L7ProtocolInfo::ProtobufRpcInfo(
-                ProtobufRpcInfo::KrpcInfo(self.info.clone()),
-            )]);
+            return if self.info.is_heartbeat() {
+                Ok(vec![])
+            } else {
+                Ok(vec![L7ProtocolInfo::ProtobufRpcInfo(
+                    ProtobufRpcInfo::KrpcInfo(self.info.clone()),
+                )])
+            };
         }
         self.info.start_time = param.time;
         self.info.end_time = param.time;
@@ -238,16 +231,32 @@ impl L7ProtocolParserInterface for KrpcLog {
         }
 
         let hdr_len = read_u16_be(&payload[2..]) as usize;
-        if hdr_len == 0 || hdr_len + KRPC_FIX_HDR_LEN > payload.len() {
-            return Err(Error::L7ProtocolUnknown);
+
+        let pb_paylaod = if hdr_len + KRPC_FIX_HDR_LEN > payload.len() {
+            // if hdr_len + KRPC_FIX_HDR_LEN > payload.len() likely ebpf not read full data from syscall, pb parse to the payload end.
+            if strict {
+                return Err(Error::L7ProtocolUnknown);
+            }
+            &payload[KRPC_FIX_HDR_LEN..payload.len()]
+        } else {
+            &payload[KRPC_FIX_HDR_LEN..KRPC_FIX_HDR_LEN + hdr_len]
+        };
+
+        let mut hdr = KrpcMeta::default();
+        if let Err(_) = hdr.merge(pb_paylaod) {
+            if strict {
+                return Err(Error::L7ProtocolUnknown);
+            }
         }
 
-        let Ok(hdr) = KrpcMeta::decode(&payload[KRPC_FIX_HDR_LEN..KRPC_FIX_HDR_LEN + hdr_len]) else {
-            return Err(Error::L7ProtocolUnknown);
-        };
         self.info.fill_from_pb(hdr)?;
+
+        // filter heartbreat
+        if self.info.is_heartbeat() {
+            return Ok(vec![]);
+        }
         match self.info.msg_type {
-            LogMessageType::Request => self.perf_inc_req(),
+            LogMessageType::Request => self.perf_inc_req(param.time),
             LogMessageType::Response => {
                 self.perf_inc_resp(param.time);
                 if self.info.ret_code != 0 {
@@ -257,9 +266,26 @@ impl L7ProtocolParserInterface for KrpcLog {
             _ => unreachable!(),
         }
 
+        self.revert_info_time(param.direction, param.time);
         Ok(vec![L7ProtocolInfo::ProtobufRpcInfo(
             ProtobufRpcInfo::KrpcInfo(self.info.clone()),
         )])
+    }
+}
+
+impl L7ProtocolParserInterface for KrpcLog {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+        if !param.ebpf_type.is_raw_protocol() {
+            return false;
+        }
+        self.info.start_time = param.time;
+        self.info.end_time = param.time;
+        self.parsed = self.parse(payload, param, true).is_ok();
+        self.parsed && self.info.msg_type == LogMessageType::Request
+    }
+
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+        self.parse(payload, param, false)
     }
 
     fn protocol(&self) -> L7Protocol {
@@ -272,10 +298,7 @@ impl L7ProtocolParserInterface for KrpcLog {
 
     fn reset(&mut self) {
         self.parsed = false;
-        self.previous_log_info.put(
-            self.info.session_id().unwrap_or_default(),
-            (self.info.msg_type, self.info.start_time),
-        );
+        self.save_info_time();
         self.info = KrpcInfo::default();
     }
 

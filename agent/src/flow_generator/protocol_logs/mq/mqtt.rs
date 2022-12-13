@@ -43,8 +43,8 @@ use crate::{
         error::{Error, Result},
         protocol_logs::pb_adapter::{L7ProtocolSendLog, L7Request, L7Response},
     },
-    proto::flow_log::MqttTopic,
 };
+use public::proto::flow_log::MqttTopic;
 
 #[derive(Serialize, Clone, Debug)]
 pub struct MqttInfo {

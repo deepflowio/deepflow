@@ -23,13 +23,31 @@ import (
 )
 
 const (
-	VALUE_TYPE_INT     = "int"
-	VALUE_TYPE_STRING  = "string"
-	VALUE_TYPE_FLOAT64 = "float64"
+	VALUE_TYPE_INT     = "Int"
+	VALUE_TYPE_STRING  = "String"
+	VALUE_TYPE_FLOAT64 = "Float64"
 )
+
+var VALUE_TYPE_MAP = map[string]int{
+	VALUE_TYPE_INT:     0,
+	VALUE_TYPE_STRING:  1,
+	VALUE_TYPE_FLOAT64: 2,
+}
 
 func TransType(typeName string, value interface{}) (interface{}, string, error) {
 	switch typeName {
+	case "Int8":
+		return int(value.(int8)), VALUE_TYPE_INT, nil
+	case "Int16":
+		return int(value.(int16)), VALUE_TYPE_INT, nil
+	case "Int32":
+		return int(value.(int32)), VALUE_TYPE_INT, nil
+	case "Int64":
+		return int(value.(int64)), VALUE_TYPE_INT, nil
+	case "UInt8":
+		return int(value.(uint8)), VALUE_TYPE_INT, nil
+	case "UInt16":
+		return int(value.(uint16)), VALUE_TYPE_INT, nil
 	case "UInt64":
 		return int(value.(uint64)), VALUE_TYPE_INT, nil
 	case "UInt32":
@@ -44,6 +62,8 @@ func TransType(typeName string, value interface{}) (interface{}, string, error) 
 			return nil, VALUE_TYPE_FLOAT64, nil
 		}
 		return value.(float64), VALUE_TYPE_FLOAT64, nil
+	case "LowCardinality(String)":
+		return value.(string), VALUE_TYPE_STRING, nil
 	default:
 		return value, typeName, nil
 	}

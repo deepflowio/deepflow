@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::io;
 use std::net::{IpAddr, ToSocketAddrs};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Duration;
 
 use log::{error, info, warn};
@@ -39,12 +39,12 @@ use crate::common::{
     enums::TapType, DEFAULT_LOG_FILE, L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT,
     L7_PROTOCOL_INFERENCE_TTL,
 };
-use crate::proto::{
+use crate::rpc::Session;
+use crate::trident::RunningMode;
+use public::proto::{
     common,
     trident::{self, KubernetesClusterIdRequest, TapMode},
 };
-use crate::rpc::Session;
-use crate::trident::RunningMode;
 
 const K8S_CA_CRT_PATH: &str = "/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 const MINUTE: Duration = Duration::from_secs(60);
@@ -333,11 +333,16 @@ impl YamlConfig {
         if c.pcap.queue_size < 1 << 16 {
             c.pcap.queue_size = 1 << 16;
         }
-        if c.pcap.queue_count < 1 || c.pcap.queue_count > 16 {
-            c.pcap.queue_count = 1;
-        } else {
-            c.pcap.queue_count = c.pcap.queue_count.next_power_of_two();
+        if c.pcap.flow_buffer_size <= 0 {
+            c.pcap.flow_buffer_size = 1 << 20;
         }
+        if c.pcap.buffer_size <= 0 {
+            c.pcap.buffer_size = 1 << 23;
+        }
+        if c.pcap.flush_interval < MINUTE.as_secs() as u32 {
+            c.pcap.flush_interval = MINUTE.as_secs() as u32;
+        }
+
         if c.flow.flush_interval < Duration::from_secs(1)
             || c.flow.flush_interval > Duration::from_secs(10)
         {
@@ -583,36 +588,19 @@ impl Default for PortConfig {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct PcapConfig {
-    pub enabled: bool,
     pub queue_size: u32,
-    pub queue_count: u32,
-    pub tcpip_checksum: bool,
-    pub block_size_kb: u32,
-    pub max_concurrent_files: u32,
-    pub max_file_size_mb: u32,
-    pub max_directory_size_gb: u32,
-    pub disk_free_space_margin_gb: u32,
-    #[serde(with = "humantime_serde")]
-    pub max_file_period: Duration,
-    pub file_directory: PathBuf,
-    pub server_port: u32,
+    pub flush_interval: u32, // unit(second)
+    pub buffer_size: u64,
+    pub flow_buffer_size: u32,
 }
 
 impl Default for PcapConfig {
     fn default() -> Self {
         PcapConfig {
-            enabled: false,
             queue_size: 65536,
-            queue_count: 1,
-            tcpip_checksum: false,
-            block_size_kb: 64,
-            max_concurrent_files: 5000,
-            max_file_size_mb: 250,
-            max_directory_size_gb: 100,
-            disk_free_space_margin_gb: 10,
-            max_file_period: Duration::from_secs(300),
-            file_directory: "/var/lib/pcap".into(),
-            server_port: 20205,
+            flush_interval: 60,         // 1min
+            buffer_size: 96 << 10,      // 96K
+            flow_buffer_size: 64 << 10, // 64K
         }
     }
 }

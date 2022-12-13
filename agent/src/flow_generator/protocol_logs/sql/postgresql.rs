@@ -104,12 +104,6 @@ impl L7ProtocolInfoInterface for PostgreInfo {
 
     fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
         if let L7ProtocolInfo::PostgreInfo(pg) = other {
-            if pg.start_time < self.start_time {
-                self.start_time = pg.start_time;
-            }
-            if pg.end_time > self.end_time {
-                self.end_time = pg.end_time;
-            }
             match pg.msg_type {
                 LogMessageType::Request => {
                     self.req_type = pg.req_type;
@@ -196,8 +190,6 @@ perf_impl!(PostgresqlLog);
 
 impl L7ProtocolParserInterface for PostgresqlLog {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
-        self.info.start_time = param.time;
-        self.info.end_time = param.time;
         self.set_msg_type(param.direction);
         self.info.is_tls = param.is_tls();
         if self.check_is_ssl_req(payload) {
@@ -230,7 +222,7 @@ impl L7ProtocolParserInterface for PostgresqlLog {
         self.info.end_time = param.time;
         self.set_msg_type(param.direction);
         self.parse(payload, param)?;
-
+        self.revert_info_time(param.direction, param.time);
         Ok(if self.info.ignore {
             vec![]
         } else {
@@ -244,10 +236,7 @@ impl L7ProtocolParserInterface for PostgresqlLog {
 
     fn reset(&mut self) {
         if !self.info.ignore {
-            self.previous_log_info.put(
-                self.info.session_id().unwrap_or_default(),
-                (self.info.msg_type, self.info.start_time),
-            );
+            self.save_info_time();
         }
         self.info = PostgreInfo::default();
         self.parsed = false;
@@ -323,7 +312,9 @@ impl PostgresqlLog {
             if let Some((tag, len)) = read_block(sub_payload) {
                 offset += len + 5; // len(data) + len 4B + tag 1B
                 match self.info.msg_type {
-                    LogMessageType::Request => self.on_req_block(tag, &sub_payload[5..5 + len])?,
+                    LogMessageType::Request => {
+                        self.on_req_block(tag, &sub_payload[5..5 + len], param.time)?
+                    }
                     LogMessageType::Response => {
                         self.on_resp_block(tag, &sub_payload[5..5 + len], param.time)?
                     }
@@ -350,13 +341,13 @@ impl PostgresqlLog {
             && read_u64_be(payload) == SSL_REQ
     }
 
-    fn on_req_block(&mut self, tag: char, data: &[u8]) -> Result<()> {
+    fn on_req_block(&mut self, tag: char, data: &[u8], time: u64) -> Result<()> {
         match tag {
             'Q' => {
                 self.info.req_type = tag;
                 self.info.context = strip_string_end_with_zero(data)?;
                 self.info.ignore = false;
-                self.perf_inc_req();
+                self.perf_inc_req(time);
                 Ok(())
             }
             'P' => {
@@ -374,7 +365,7 @@ impl PostgresqlLog {
                     if let Some(idx) = data.iter().position(|x| *x == 0x0) {
                         self.info.context = String::from_utf8_lossy(&data[..idx]).to_string();
                         if is_postgresql(&self.info.context) {
-                            self.perf_inc_req();
+                            self.perf_inc_req(time);
                             return Ok(());
                         }
                     }

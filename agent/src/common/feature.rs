@@ -19,8 +19,7 @@ use bitflags::bitflags;
 bitflags! {
     pub struct FeatureFlags: u64 {
         const NONE = 0;
-        const POLICY = 1<<0;
-        const OPENSSL = 1<<1;
+        const CORE = 1<<2;
    }
 }
 
@@ -29,8 +28,7 @@ impl From<&Vec<String>> for FeatureFlags {
         let mut features = FeatureFlags::NONE;
         for flag in flags {
             match flag.to_lowercase().as_str() {
-                "policy" => features.set(FeatureFlags::POLICY, true),
-                "openssl" => features.set(FeatureFlags::OPENSSL, true),
+                "core" => features.set(FeatureFlags::CORE, true),
                 _ => {}
             }
         }
@@ -45,8 +43,8 @@ mod test {
 
     #[test]
     fn test_feature_flags() {
-        let flags = vec!["PoLicy".to_string()];
+        let flags = vec!["CoRe".to_string()];
         let feature = FeatureFlags::from(&flags);
-        assert_eq!(feature.contains(FeatureFlags::POLICY), true);
+        assert_eq!(feature.contains(FeatureFlags::CORE), true);
     }
 }

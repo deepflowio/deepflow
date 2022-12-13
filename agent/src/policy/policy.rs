@@ -31,14 +31,14 @@ use super::{
 };
 use crate::common::endpoint::EndpointData;
 use crate::common::enums::TapType;
+use crate::common::flow::SignalSource;
 use crate::common::lookup_key::LookupKey;
 use crate::common::platform_data::PlatformData;
 use crate::common::policy::{Acl, Cidr, IpGroupData, PeerConnection};
-use crate::common::FeatureFlags;
 use crate::common::FlowAclListener;
 use crate::common::MetaPacket;
-use crate::proto::common::TridentType;
 use npb_pcap_policy::PolicyData;
+use public::proto::common::TridentType;
 use public::queue::Sender;
 
 pub struct PolicyMonitor {
@@ -85,11 +85,10 @@ impl Policy {
         level: usize,
         map_size: usize,
         fast_disable: bool,
-        features: FeatureFlags,
     ) -> (PolicySetter, PolicyGetter) {
         let policy = Box::into_raw(Box::new(Policy {
             labeler: Labeler::default(),
-            table: FirstPath::new(queue_count, level, map_size, fast_disable, features),
+            table: FirstPath::new(queue_count, level, map_size, fast_disable),
             forward: Forward::new(queue_count),
             queue_count,
             first_hit: 0,
@@ -134,11 +133,27 @@ impl Policy {
         // TODO: 根据TTL添加forward表
     }
 
-    pub fn lookup(&mut self, packet: &mut MetaPacket, index: usize) {
+    pub fn lookup(&mut self, packet: &mut MetaPacket, index: usize, local_epc_id: i32) {
         packet.lookup_key.fast_index = index;
         self.lookup_l3(packet);
 
         let key = &mut packet.lookup_key;
+
+        if packet.signal_source == SignalSource::EBPF {
+            let (l3_epc_id_0, l3_epc_id_1) = if key.l2_end_0 {
+                (local_epc_id, 0)
+            } else {
+                (0, local_epc_id)
+            };
+            packet.endpoint_data = Some(Arc::new(self.lookup_all_by_epc(
+                key.src_ip,
+                key.dst_ip,
+                l3_epc_id_0,
+                l3_epc_id_1,
+            )));
+            packet.policy_data = Some(Arc::new(PolicyData::default())); // Only endpoint is required for ebpf data
+            return;
+        }
 
         // 策略查序会改变端口，为不影响后续业务， 这里保存
         let src_port = key.src_port;
@@ -192,7 +207,7 @@ impl Policy {
         dst: IpAddr,
         l3_epc_id_src: i32,
         l3_epc_id_dst: i32,
-    ) -> i32 {
+    ) -> EndpointData {
         // TODO：可能也需要走fast提升性能
         let endpoints =
             self.labeler
@@ -204,11 +219,7 @@ impl Policy {
             endpoints.dst_info.l3_epc_id,
         );
 
-        if l3_epc_id_src > 0 {
-            endpoints.dst_info.l3_epc_id
-        } else {
-            endpoints.src_info.l3_epc_id
-        }
+        endpoints
     }
 
     pub fn update_interfaces(
@@ -263,6 +274,10 @@ impl Policy {
     pub fn get_hits(&self) -> (usize, usize) {
         (self.first_hit, self.fast_hit)
     }
+
+    pub fn set_memory_limit(&self, limit: u64) {
+        self.table.set_memory_limit(limit);
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -283,11 +298,11 @@ impl PolicyGetter {
         self.switch = false;
     }
 
-    pub fn lookup(&mut self, packet: &mut MetaPacket, index: usize) {
+    pub fn lookup(&mut self, packet: &mut MetaPacket, index: usize, local_epc_id: i32) {
         if !self.switch {
             return;
         }
-        self.policy().lookup(packet, index);
+        self.policy().lookup(packet, index, local_epc_id);
     }
 
     pub fn lookup_all_by_key(
@@ -303,7 +318,7 @@ impl PolicyGetter {
         dst: IpAddr,
         l3_epc_id_src: i32,
         l3_epc_id_dst: i32,
-    ) -> i32 {
+    ) -> EndpointData {
         self.policy()
             .lookup_all_by_epc(src, dst, l3_epc_id_src, l3_epc_id_dst)
     }
@@ -341,14 +356,17 @@ impl FlowAclListener for PolicySetter {
         peers: &Vec<Arc<PeerConnection>>,
         cidrs: &Vec<Arc<Cidr>>,
         acls: &Vec<Arc<Acl>>,
-    ) {
+    ) -> Result<(), String> {
         self.update_interfaces(trident_type, platform_data);
         self.update_ip_group(ip_groups);
         self.update_peer_connections(peers);
         self.update_cidr(cidrs);
-        let _ = self.update_acl(acls, true);
+        if let Err(e) = self.update_acl(acls, true) {
+            return Err(format!("{}", e));
+        }
 
         self.flush();
+        Ok(())
     }
 
     // TODO: 用于区别于不同的FlowAclListener
@@ -411,6 +429,10 @@ impl PolicySetter {
     pub fn get_hits(&self) -> (usize, usize) {
         return self.policy().get_hits();
     }
+
+    pub fn set_memory_limit(&self, limit: u64) {
+        self.policy().set_memory_limit(limit)
+    }
 }
 
 #[cfg(test)]
@@ -421,16 +443,13 @@ mod test {
     use ipnet::IpNet;
 
     use super::*;
-    use crate::common::endpoint::FeatureFlags;
-    use crate::common::feature;
     use crate::common::platform_data::IpSubnet;
     use crate::common::policy::{Cidr, CidrType};
     use public::utils::net::MacAddr;
 
     #[test]
     fn test_policy_normal() {
-        let (mut setter, mut getter) =
-            Policy::new(10, 0, 1024, false, feature::FeatureFlags::POLICY);
+        let (mut setter, mut getter) = Policy::new(10, 0, 1024, false);
         let interface: PlatformData = PlatformData {
             mac: 0x002233445566,
             ips: vec![IpSubnet {
@@ -457,7 +476,6 @@ mod test {
             dst_ip: IpAddr::from("172.29.20.200".parse::<Ipv4Addr>().unwrap()),
             src_port: 22,
             dst_port: 88,
-            feature_flag: FeatureFlags::NONE,
             ..Default::default()
         };
 

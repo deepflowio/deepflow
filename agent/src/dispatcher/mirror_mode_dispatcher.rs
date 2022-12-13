@@ -46,13 +46,13 @@ use crate::{
     flow_generator::FlowMap,
     handler::PacketHandlerBuilder,
     handler::{MiniPacket, PacketHandler},
-    proto::{common::TridentType, trident::IfMacSource},
     rpc::get_timestamp,
     utils::environment::is_tt_hyper_v_compute,
 };
 use packet_dedup::PacketDedupMap;
 #[cfg(windows)]
 use public::packet::Packet;
+use public::proto::{common::TridentType, trident::IfMacSource};
 use public::utils::net::{Link, MacAddr};
 
 const IF_INDEX_MAX_SIZE: usize = 1000;
@@ -358,6 +358,21 @@ impl MirrorModeDispatcher {
         let time_diff = self.base.ntp_diff.load(Ordering::Relaxed);
         let mut prev_timestamp = get_timestamp(time_diff);
 
+        #[cfg(target_os = "linux")]
+        let mut flow_map = FlowMap::new(
+            self.base.id as u32,
+            self.base.flow_output_queue.clone(),
+            self.base.policy_getter,
+            self.base.log_output_queue.clone(),
+            self.base.ntp_diff.clone(),
+            self.base.flow_map_config.clone(),
+            self.base.log_parse_config.clone(),
+            None,
+            Some(self.base.packet_sequence_output_queue.clone()), // Enterprise Edition Feature: packet-sequence
+            &self.base.stats,
+            false, // !from_ebpf
+        );
+        #[cfg(target_os = "windows")]
         let mut flow_map = FlowMap::new(
             self.base.id as u32,
             self.base.flow_output_queue.clone(),
@@ -435,7 +450,7 @@ impl MirrorModeDispatcher {
             }
 
             let original_length = packet.data.len() - decap_length;
-            let overlay_packet = &mut packet.data[decap_length..packet.capture_length as usize];
+            let overlay_packet = &mut packet.data[decap_length..decap_length + original_length];
 
             // Only virtual network traffic goes to remove duplicates
             #[cfg(target_os = "linux")]

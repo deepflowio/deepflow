@@ -325,25 +325,36 @@ message Group {
 }
 
 enum ServiceType {
-    POD_SERVICE = 0;
-    LB_SERVICE = 1;
-    NAT_SERVICE = 2;
-    RG_SERVICE = 3;
+    POD_SERVICE_NODE = 1;      // (pod_cluster_id, protocol, server_port)
+    POD_SERVICE_POD_GROUP = 2; // (pod_group_id, protocol, server_port)
+    POD_SERVICE_IP = 3;        // (epc_id, ip, protocol, server_port)
+    LB_SERVICE = 4;            // (epc_id, ip, protocol, server_port)
+    // NAT_SERVICE = 5;
+    // RG_SERVICE = 6;
 }
 
-message Service {
-    optional uint32 epc_id = 2 [default = 0];
-    repeated string ips = 5;
-    repeated string ip_ranges = 6;
-    optional uint32 protocol = 7 [default = 256];
-    optional string server_ports = 8; // 格式: 22,80,22-80
-    optional ServiceType type = 9;
-    optional uint32 id = 10;
+enum ServiceProtocol {
+    ANY = 0;
+    TCP_SERVICE = 1;
+    UDP_SERVICE = 2;
+}
+
+message ServiceInfo {
+    optional ServiceType type = 1;
+    optional uint32 id = 2;
+    optional uint32 pod_cluster_id = 3 [default = 0]; // Availabel when type == POD_SERVICE_NODE
+    optional uint32 pod_group_id = 4 [default = 0];   // Availabel when type == POD_SERVICE_POD_GROUP
+    optional uint32 epc_id = 5 [default = 0];         // Availabel when type in [POD_SERVICE_IP, LB_SERVICE]
+    repeated string ips = 6;                          // Available when type in [POD_SERVICE_IP, LB_SERVICE], list of IP addresses
+    // 7: reserve for cidrs
+    // 8: reserve for ip-ranges
+    optional ServiceProtocol protocol = 9 [default = ANY];
+    repeated uint32 server_ports = 10;
 }
 
 message Groups {
     repeated Group groups = 1;
-    repeated Service svcs = 2; // 仅下发给数据节点
+    repeated ServiceInfo svcs = 3; // reply to ingester only
 }
 
 message PeerConnection {
@@ -457,9 +468,9 @@ message SyncResponse {
 
     repeated Segment local_segments = 10;
     repeated Segment remote_segments = 11;
-    optional bytes platform_data = 12;  // 仅变化时下发
-    optional bytes flow_acls = 13;      // 仅变化时下发
-    optional bytes groups = 15;         // 仅变化时下发
+    optional bytes platform_data = 12; // serialized result of `message PlatformData`, transmitted only when the content changes
+    optional bytes flow_acls = 13;     // serialized result of `message FlowAcls`, transmitted only when the content changes
+    optional bytes groups = 15;        // serialized result of `message Groups`, transmitted only when the content changes
     repeated TapType tap_types = 16;
     repeated PodIp  pod_ips = 17; // pod_name到vpc + ip的映射关系, 仅下发给数据节点
     repeated VtapIp vtap_ips = 18; // vtap_id到vpc + ip的映射关系, 仅下发给数据节点
@@ -571,7 +582,7 @@ message KubernetesAPISyncResponse {
 
 message KubernetesClusterIDRequest {
     optional string ca_md5 = 1; // md5 of /run/secrets/[kubernetes.io/serviceaccount/ca.crt
-    optional string kubernetes_cluster_name = 46; // get that from deepflow-agent.yaml 
+    optional string kubernetes_cluster_name = 46; // get that from deepflow-agent.yaml
 }
 
 message KubernetesClusterIDResponse {

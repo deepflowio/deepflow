@@ -17,20 +17,18 @@
 use std::{net::IpAddr, time::Duration};
 
 use super::{perf::FlowPerf, FlowState, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC};
-use crate::{
-    common::{
-        decapsulate::TunnelType,
-        endpoint::EndpointData,
-        enums::{EthernetType, TapType, TcpFlags},
-        flow::{FlowMetricsPeer, PacketDirection},
-        lookup_key::LookupKey,
-        meta_packet::MetaPacket,
-        tagged_flow::TaggedFlow,
-        TapPort,
-    },
-    proto::common::TridentType,
+use crate::common::{
+    decapsulate::TunnelType,
+    endpoint::EndpointData,
+    enums::{EthernetType, TapType, TcpFlags},
+    flow::{FlowMetricsPeer, PacketDirection},
+    lookup_key::LookupKey,
+    meta_packet::MetaPacket,
+    tagged_flow::TaggedFlow,
+    TapPort,
 };
 use npb_pcap_policy::PolicyData;
+use public::proto::common::TridentType;
 use public::utils::net::MacAddr;
 
 #[repr(u8)]
@@ -152,6 +150,9 @@ pub struct FlowNode {
 
     pub policy_data_cache: [PolicyData; 2],
     pub endpoint_data_cache: EndpointData,
+
+    // Only for eBPF TCP Flow, used to help confirm whether the Flow can be timed out.
+    pub residual_request: i32,
 
     pub next_tcp_seq0: u32,
     pub next_tcp_seq1: u32,

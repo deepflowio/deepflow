@@ -20,14 +20,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/deepflowys/deepflow/server/libs/utils"
 	"github.com/deepflowys/deepflow/server/querier/common"
+	"github.com/deepflowys/deepflow/server/querier/config"
+	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/client"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/tag"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/view"
 )
+
+var TIME_FILL_LIMIT_DEFAULT = 20
 
 type Callback struct {
 	Args     []interface{}
@@ -39,77 +44,126 @@ func (c *Callback) Format(m *view.Model) {
 	m.AddCallback(c.Column, c.Function(c.Args))
 }
 
-func TimeFill(args []interface{}) func(result *common.Result) error {
-	// group by time时的补点
+func TimeFill(args []interface{}) func(result *common.Result) error { // group by time时的补点
 	return func(result *common.Result) error {
+		if result.Values == nil || len(result.Values) == 0 {
+			return nil
+		}
 		m := args[0].(*view.Model)
+		seriesSort := &client.SeriesSort{
+			Series:    []*client.Series{},
+			SortIndex: []int{},
+			Reverse:   []bool{},
+			Schemas:   result.Schemas,
+		}
+		for _, value := range result.Values {
+			seriesSort.Series = append(seriesSort.Series, &client.Series{Values: value.([]interface{})})
+		}
 		var timeFieldIndex int
-		// 取出time字段对应的下标
+		// get time field index
 		for i, column := range result.Columns {
 			if column.(string) == strings.Trim(m.Time.Alias, "`") {
 				timeFieldIndex = i
 				break
 			}
 		}
-		// start和end取整
-		start := (int(m.Time.TimeStart)+3600*8)/m.Time.Interval*m.Time.Interval - 3600*8
-		end := (int(m.Time.TimeEnd)+3600*8)/m.Time.Interval*m.Time.Interval - 3600*8
-		// 获取排序
-		orderby := "asc"
+		reverse := false
 		for _, node := range m.Orders.Orders {
 			order := node.(*view.Order)
 			if strings.Trim(order.SortBy, "`") == strings.Trim(m.Time.Alias, "`") {
-				orderby = order.OrderBy
+				if order.OrderBy == "desc" {
+					reverse = true
+				}
 				break
 			}
 		}
+		for i, schema := range result.Schemas {
+			if i == timeFieldIndex {
+				continue
+			}
+			if _, ok := client.VALUE_TYPE_MAP[schema.ValueType]; !ok {
+				continue
+			}
+			if schema.Type == common.COLUMN_SCHEMA_TYPE_TAG {
+				seriesSort.SortIndex = append(seriesSort.SortIndex, i)
+				seriesSort.Reverse = append(seriesSort.Reverse, false)
+			}
+		}
+		seriesSort.SortIndex = append(seriesSort.SortIndex, timeFieldIndex)
+		seriesSort.Reverse = append(seriesSort.Reverse, reverse)
+		sort.Sort(seriesSort)
+		groups := client.Group(seriesSort.Series, seriesSort.SortIndex[:len(seriesSort.SortIndex)-1], result.Schemas)
+
+		// fix start and end
+		start := (int(m.Time.TimeStart)+3600*8)/m.Time.Interval*m.Time.Interval - 3600*8
+		end := (int(m.Time.TimeEnd)+3600*8)/m.Time.Interval*m.Time.Interval - 3600*8
 		end += (m.Time.WindowSize - 1) * m.Time.Interval
-		// 补点后切片长度
+		// length after fix
 		intervalLength := (end-start)/m.Time.Interval + 1
 		if intervalLength < 1 {
 			log.Errorf("Callback Time Fill Error: intervalLength(%d) < 1", intervalLength)
 			return errors.New(fmt.Sprintf("Callback Time Fill Error: intervalLength(%d) < 1", intervalLength))
 		}
-		newValues := make([]interface{}, intervalLength)
-		// 将查询数据结果写入newValues切片
-		for _, value := range result.Values {
-			record := value.([]interface{})
-			// 获取record在补点切片中的位置
-			var timeIndex int
-			if orderby == "asc" {
-				timeIndex = (record[timeFieldIndex].(int) - start) / m.Time.Interval
-			} else {
-				timeIndex = (end - record[timeFieldIndex].(int)) / m.Time.Interval
-			}
-			if timeIndex >= intervalLength || timeIndex < 0 {
+		resultNewValues := []interface{}{}
+		timeFillLimit := TIME_FILL_LIMIT_DEFAULT
+		if config.Cfg != nil {
+			timeFillLimit = config.Cfg.TimeFillLimit
+		}
+		for i, group := range groups {
+			if timeFillLimit > 0 && i >= timeFillLimit {
+				for _, series := range group.Series {
+					resultNewValues = append(resultNewValues, series.Values)
+				}
 				continue
 			}
-			newValues[timeIndex] = value
-		}
-		var timestamp int
-		// 针对newValues中缺少的时间点进行补点
-		for i, value := range newValues {
-			if value == nil {
-				newValue := make([]interface{}, len(result.Columns))
-				if m.Time.Fill != "null" {
-					for i := range newValue {
-						if intField, err := strconv.Atoi(m.Time.Fill); err == nil {
-							newValue[i] = int(intField)
-						} else {
-							newValue[i] = m.Time.Fill
+			newValues := make([]interface{}, intervalLength)
+			// data from ck insert to newValues
+			for _, series := range group.Series {
+				record := series.Values
+				// get localtion of record in newValues
+				var timeIndex int
+				if !reverse {
+					timeIndex = (record[timeFieldIndex].(int) - start) / m.Time.Interval
+				} else {
+					timeIndex = (end - record[timeFieldIndex].(int)) / m.Time.Interval
+				}
+				if timeIndex >= intervalLength || timeIndex < 0 {
+					continue
+				}
+				newValues[timeIndex] = series.Values
+			}
+			var timestamp int
+			// fill point
+			for i, value := range newValues {
+				if value == nil {
+					newValue := make([]interface{}, len(result.Columns))
+					for valueIndex, groupIndex := range group.GroupIndex {
+						newValue[groupIndex] = group.GroupValues[valueIndex]
+					}
+					if m.Time.Fill != "null" {
+						for i := range newValue {
+							if newValue[i] != nil {
+								continue
+							}
+							if intField, err := strconv.Atoi(m.Time.Fill); err == nil {
+								newValue[i] = int(intField)
+							} else {
+								newValue[i] = m.Time.Fill
+							}
 						}
 					}
+					if !reverse {
+						timestamp = start + i*m.Time.Interval
+					} else {
+						timestamp = end - i*m.Time.Interval
+					}
+					newValue[timeFieldIndex] = timestamp
+					newValues[i] = newValue
 				}
-				if orderby == "asc" {
-					timestamp = start + i*m.Time.Interval
-				} else {
-					timestamp = end - i*m.Time.Interval
-				}
-				newValue[timeFieldIndex] = timestamp
-				newValues[i] = newValue
 			}
+			resultNewValues = append(resultNewValues, newValues...)
 		}
-		result.Values = newValues
+		result.Values = resultNewValues
 		return nil
 	}
 }
@@ -132,9 +186,7 @@ func MacTranslate(args []interface{}) func(result *common.Result) error {
 				break
 			}
 		}
-		for i, value := range result.Values {
-			newValues[i] = value
-		}
+		copy(newValues, result.Values)
 		for i, newValue := range newValues {
 			newValueSlice := newValue.([]interface{})
 			switch newValueSlice[macIndex].(type) {
@@ -142,10 +194,10 @@ func MacTranslate(args []interface{}) func(result *common.Result) error {
 				newMac := utils.Uint64ToMac(uint64((newValueSlice[macIndex]).(int))).String()
 				if args[0].(string) == "tap_port" && macTypeIndex != -1 {
 					newMac = strings.TrimPrefix(newMac, "00:00:")
-					if newValueSlice[macTypeIndex].(uint8) == tag.TAP_PORT_MAC_0 || newValueSlice[macTypeIndex].(uint8) == tag.TAP_PORT_MAC_1 {
+					if newValueSlice[macTypeIndex].(int) == tag.TAP_PORT_MAC_0 || newValueSlice[macTypeIndex].(int) == tag.TAP_PORT_MAC_1 {
 						newValueSlice[macIndex] = newMac
 						newValues[i] = newValueSlice
-					} else if newValueSlice[macTypeIndex].(uint8) == tag.TAP_PORT_IPV4 {
+					} else if newValueSlice[macTypeIndex].(int) == tag.TAP_PORT_IPV4 {
 						newIP := utils.IpFromUint32(uint32((newValueSlice[macIndex]).(int)))
 						newIPString := newIP.String()
 						newValueSlice[macIndex] = newIPString

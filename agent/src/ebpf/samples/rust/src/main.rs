@@ -169,6 +169,8 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
             proto_tag.push_str("MQTT");
         } else if sk_proto_safe(sd) == SOCK_DATA_DUBBO {
             proto_tag.push_str("DUBBO");
+        } else if sk_proto_safe(sd) == SOCK_DATA_SOFARPC {
+            proto_tag.push_str("SOFARPC");
         }
 
         println!("+ --------------------------------- +");
@@ -257,6 +259,7 @@ fn main() {
         enable_ebpf_protocol(SOCK_DATA_TLS_HTTP1 as c_int);
         enable_ebpf_protocol(SOCK_DATA_TLS_HTTP2 as c_int);
         enable_ebpf_protocol(SOCK_DATA_DUBBO as c_int);
+        enable_ebpf_protocol(SOCK_DATA_SOFARPC as c_int);
         enable_ebpf_protocol(SOCK_DATA_MYSQL as c_int);
         enable_ebpf_protocol(SOCK_DATA_POSTGRESQL as c_int);
         enable_ebpf_protocol(SOCK_DATA_REDIS as c_int);

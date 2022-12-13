@@ -590,8 +590,6 @@ vtap_group_id: g-xxxxxx
   ## PCAP ##
   ##########
   #pcap:
-    #enabled: false
-
     ## Queue Size to PCAP Generator
     ## Default: 65536. Range: [65536, +oo)
     ## Note: the length of the following queues:
@@ -599,14 +597,15 @@ vtap_group_id: g-xxxxxx
     #queue-size: 65536
 
     ## Pcap buffer size for each flow
-    ## Default: 1M
+    ## Default: 64K
     ## Note: buffer flushes when one of the flows reach this limit
-    #flow-buffer-size: 1048576
+    #flow-buffer-size: 65536
 
     ## Total pcap buffer size
-    ## Default: 1M
+    ## Default: 96K
     ## Note: buffer flushes when total data size reach this limit
-    #buffer-size: 1048576
+    ##       cannot exceed sender buffer size 128K
+    #buffer-size: 98304
 
     ## Flow flush interval
     ## Default: 1m
@@ -766,10 +765,12 @@ vtap_group_id: g-xxxxxx
 
   ## List of Application Protocols
   ## Note: Turning off some protocol identification can reduce deepflow-agent resource consumption.
+  ##   ProtobufRPC is disabled by default, note that ebpf-kprobe-whitelist must be configured to enable it.
   #l7-protocol-enabled:
   #- HTTP ## for both HTTP and HTTP_TLS
   #- HTTP2 ## for HTTP2, HTTP2_TLS and gRPC
   #- ProtobufRPC ## for krpc .. 
+  #- SofaRPC
   #- Dubbo
   #- MySQL
   #- PostgreSQL
@@ -786,6 +787,7 @@ vtap_group_id: g-xxxxxx
     #"HTTP": "1-65535" # for both HTTP and HTTP_TLS
     #"HTTP2": "1-65535" # for HTTP2, HTTP2_TLS and gRPC
     #"ProtobufRPC": "1-65535"
+    #"SofaRPC": "1-65535"
     #"Dubbo": "1-65535"
     #"MySQL": "1-65535"
     #"PostgreSQL": "1-65535"

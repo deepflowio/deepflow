@@ -50,14 +50,14 @@ use crate::common::NORMAL_EXIT_WITH_RESTART;
 use crate::common::{FlowAclListener, PlatformData as VInterface, DEFAULT_CONTROLLER_PORT};
 use crate::config::RuntimeConfig;
 use crate::exception::ExceptionHandler;
-use crate::proto::common::TridentType;
-use crate::proto::trident::{self as tp, Exception, TapMode};
 use crate::rpc::session::Session;
 use crate::trident::{self, ChangedConfig, RunningMode, TridentState, VersionInfo};
 use crate::utils::{
     environment::{get_executable_path, is_tt_pod, running_in_container},
     stats,
 };
+use public::proto::common::TridentType;
+use public::proto::trident::{self as tp, Exception, TapMode};
 use public::utils::net::{addr_list, is_unicast_link_local, MacAddr};
 
 const DEFAULT_SYNC_INTERVAL: Duration = Duration::from_secs(60);
@@ -371,7 +371,11 @@ impl Status {
         return resp.skip_interface.iter().map(|i| i.mac.unwrap()).collect();
     }
 
-    fn trigger_flow_acl(&self, trident_type: TridentType, listener: &mut Box<dyn FlowAclListener>) {
+    fn trigger_flow_acl(
+        &self,
+        trident_type: TridentType,
+        listener: &mut Box<dyn FlowAclListener>,
+    ) -> Result<(), String> {
         listener.flow_acl_change(
             trident_type,
             &self.ip_groups,
@@ -379,7 +383,7 @@ impl Status {
             &self.peers,
             &self.cidrs,
             &self.acls,
-        );
+        )
     }
 }
 
@@ -692,10 +696,12 @@ impl Synchronizer {
             let last = SystemTime::now();
             info!("Grpc version ip-groups: {}, interfaces, peer-connections and cidrs: {}, flow-acls: {}",
             status.version_groups, status.version_platform_data, status.version_acls);
-            let policy_error = false;
+            let mut policy_error = false;
             for listener in flow_acl_listener.lock().unwrap().iter_mut() {
-                // TODO: error handling
-                status.trigger_flow_acl(runtime_config.trident_type, listener);
+                if let Err(e) = status.trigger_flow_acl(runtime_config.trident_type, listener) {
+                    warn!("OnPolicyChange: {}.", e);
+                    policy_error = true;
+                }
             }
             if policy_error {
                 warn!("OnPolicyChange error, set exception TOO_MANY_POLICIES.");

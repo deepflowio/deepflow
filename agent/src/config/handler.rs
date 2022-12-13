@@ -42,6 +42,7 @@ use super::{
 };
 
 use crate::common::l7_protocol_log::L7ProtocolBitmap;
+use crate::flow_generator::protocol_logs::SOFA_NEW_RPC_TRACE_CTX_KEY;
 #[cfg(target_os = "linux")]
 use crate::{
     common::DEFAULT_CPU_CFS_PERIOD_US,
@@ -55,11 +56,6 @@ use crate::{
     exception::ExceptionHandler,
     flow_generator::{FlowTimeout, TcpTimeout},
     handler::PacketHandlerBuilder,
-    proto::trident::{self, CaptureSocketType},
-    proto::{
-        common::TridentType,
-        trident::{Exception, IfMacSource, SocketType, TapMode},
-    },
     trident::{Components, RunningMode},
     utils::{
         environment::{free_memory_check, get_ctrl_ip_and_mac},
@@ -68,6 +64,11 @@ use crate::{
 };
 
 use public::bitmap::Bitmap;
+use public::proto::{
+    common::TridentType,
+    trident::{self, CaptureSocketType, Exception, IfMacSource, SocketType, TapMode},
+};
+
 #[cfg(target_os = "windows")]
 use public::utils::net::links_by_name_regex;
 use public::utils::net::MacAddr;
@@ -206,7 +207,6 @@ pub struct NpbConfig {
     pub enable_qos_bypass: bool,
     pub output_vlan: u16,
     pub mtu: u32,
-    pub bps_threshold: u64,
     pub vlan_mode: trident::VlanMode,
     pub socket_type: trident::SocketType,
 }
@@ -514,6 +514,7 @@ pub enum TraceType {
     Sw6,
     Sw8,
     TraceParent,
+    NewRpcTraceContext,
     Customize(String),
 }
 
@@ -542,6 +543,7 @@ impl From<&str> for TraceType {
             TRACE_TYPE_SW6 => TraceType::Sw6,
             TRACE_TYPE_SW8 => TraceType::Sw8,
             TRACE_TYPE_TRACE_PARENT => TraceType::TraceParent,
+            SOFA_NEW_RPC_TRACE_CTX_KEY => TraceType::NewRpcTraceContext,
             _ if t.len() > 0 => TraceType::Customize(format_t.to_string()),
             _ => TraceType::Disabled,
         }
@@ -570,6 +572,7 @@ impl TraceType {
             TraceType::Sw6 => context.to_lowercase() == TRACE_TYPE_SW6,
             TraceType::Sw8 => context.to_lowercase() == TRACE_TYPE_SW8,
             TraceType::TraceParent => context.to_lowercase() == TRACE_TYPE_TRACE_PARENT,
+            TraceType::NewRpcTraceContext => context.to_lowercase() == SOFA_NEW_RPC_TRACE_CTX_KEY,
             TraceType::Customize(tag) => context.to_lowercase() == tag.to_lowercase(),
             _ => false,
         }
@@ -782,7 +785,6 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 output_vlan: conf.output_vlan,
                 vlan_mode: conf.npb_vlan_mode,
                 dedup_enabled: conf.npb_dedup_enabled,
-                bps_threshold: conf.npb_bps_threshold,
                 socket_type: conf.npb_socket_type,
             },
             collector: CollectorConfig {
@@ -1387,6 +1389,14 @@ impl ConfigHandler {
             candidate_config.diagnose = new_config.diagnose;
         }
 
+        if candidate_config.environment.max_memory != new_config.environment.max_memory {
+            if let Some(ref components) = components {
+                components
+                    .policy_setter
+                    .set_memory_limit(new_config.environment.max_memory);
+            }
+        }
+
         if candidate_config.tap_mode != TapMode::Analyzer
             && static_config.kubernetes_cluster_id.is_empty()
         {
@@ -1472,7 +1482,6 @@ impl ConfigHandler {
             }
 
             if candidate_config.environment.max_memory != new_config.environment.max_memory {
-                // TODO policy.SetMemoryLimit(cfg.MaxMemory)
                 info!(
                     "memory limit set to {}",
                     ByteSize::b(new_config.environment.max_memory).to_string_as(true)
@@ -1676,6 +1685,42 @@ impl ConfigHandler {
                     restart_dispatcher = true;
                 }
             }
+
+            if let Some(components) = &components {
+                if candidate_config.sender.bandwidth_probe_interval
+                    != new_config.sender.bandwidth_probe_interval
+                {
+                    info!(
+                        "Npb tx interface bandwidth probe interval set to {}s.",
+                        new_config.sender.bandwidth_probe_interval.as_secs()
+                    );
+                    components
+                        .npb_bandwidth_watcher
+                        .set_interval(new_config.sender.bandwidth_probe_interval.as_secs());
+                }
+                if candidate_config.sender.server_tx_bandwidth_threshold
+                    != new_config.sender.server_tx_bandwidth_threshold
+                {
+                    info!(
+                        "Npb tx interface bandwidth threshold set to {}.",
+                        new_config.sender.server_tx_bandwidth_threshold
+                    );
+                    components
+                        .npb_bandwidth_watcher
+                        .set_nic_rate(new_config.sender.server_tx_bandwidth_threshold);
+                }
+                if candidate_config.sender.npb_bps_threshold != new_config.sender.npb_bps_threshold
+                {
+                    info!(
+                        "Npb bps threshold set to {}.",
+                        new_config.sender.npb_bps_threshold
+                    );
+                    components
+                        .npb_bandwidth_watcher
+                        .set_npb_rate(new_config.sender.npb_bps_threshold);
+                }
+            }
+
             info!(
                 "sender config change from {:#?} to {:#?}",
                 candidate_config.sender, new_config.sender
@@ -1817,9 +1862,6 @@ impl ConfigHandler {
 
         if candidate_config.npb != new_config.npb {
             fn dispatcher_callback(handler: &ConfigHandler, components: &mut Components) {
-                components
-                    .npb_bps_limit
-                    .set_rate(Some(handler.candidate_config.npb.bps_threshold));
                 let dispatcher_builders = &components.handler_builders;
                 for e in dispatcher_builders {
                     let mut builders = e.lock().unwrap();

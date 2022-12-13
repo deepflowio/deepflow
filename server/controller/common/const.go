@@ -78,7 +78,8 @@ const (
 	CONTROLLER_NODE_TYPE_MASTER = 1
 	CONTROLLER_NODE_TYPE_SLAVE  = 2
 
-	CONTROLLER_STATE_NORMAL = 2
+	CONTROLLER_STATE_NORMAL    = 2
+	CONTROLLER_STATE_EXCEPTION = 4
 )
 
 const (
@@ -165,6 +166,7 @@ const (
 )
 
 const (
+	DEFAULT_DOMAIN        = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 	DEFAULT_REGION        = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 	DEFAULT_AZ            = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 	DEFAULT_VTAP_GROUP_ID = 1

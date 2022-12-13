@@ -796,9 +796,10 @@ func (k *KubernetesRpcUpdater) run() {
 	for {
 		info := k.outputQueue.Get().(K8SRPCMessage)
 		if info.msgType == genesiscommon.TYPE_EXIT {
+			log.Warningf("from (%s) vtap_id (%v) type (%v)", info.peer, info.vtapID, info.msgType)
 			break
 		}
-		log.Debugf("from %s vtap_id %v received cluster_id %s", info.peer, info.vtapID, info.message.GetClusterId())
+		log.Debugf("from %s vtap_id %v received cluster_id %s version %s", info.peer, info.vtapID, info.message.GetClusterId(), info.message.GetVersion())
 		// 更新和保存内存数据
 		k8sInfo := KubernetesInfo{
 			Epoch:     time.Now(),

@@ -33,15 +33,13 @@ use super::{
     tap_port::TapPort,
 };
 
-use crate::proto::flow_log;
-use crate::{
-    common::endpoint::EPC_FROM_INTERNET, metric::document::Direction, proto::common::TridentType,
-};
+use crate::{common::endpoint::EPC_FROM_INTERNET, metric::document::Direction};
 use crate::{
     flow_generator::protocol_logs::{duration_to_micros, to_string_format},
     flow_generator::FlowState,
     metric::document::TapSide,
 };
+use public::proto::{common::TridentType, flow_log};
 use public::utils::net::MacAddr;
 
 pub use public::enums::L4Protocol;
@@ -995,6 +993,23 @@ pub fn get_direction(
     trident_type: TridentType,
     cloud_gateway_traffic: bool, // 从static config 获取
 ) -> (Direction, Direction, bool) {
+    let src_ep = &flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC];
+    let dst_ep = &flow.flow_metrics_peers[FLOW_METRICS_PEER_DST];
+    // For eBPF data, the direction can be calculated directly through l2_end,
+    // and its l2_end has been set in MetaPacket::from_ebpf().
+    if flow.signal_source == SignalSource::EBPF {
+        let (mut src_direct, mut dst_direct) = (
+            Direction::ClientProcessToServer,
+            Direction::ServerProcessToClient,
+        );
+        if src_ep.is_l2_end {
+            dst_direct = Direction::None
+        } else if dst_ep.is_l2_end {
+            src_direct = Direction::None
+        }
+        return (src_direct, dst_direct, false);
+    }
+
     // 返回值分别为统计点对应的zerodoc.DirectionEnum以及及是否添加追踪数据的开关，在微软
     // 云MUX场景中，云内和云外通过VIP通信，在MUX和宿主机中采集到的流量IP地址为VIP，添加追
     // 踪数据后会将VIP替换为实际虚拟机的IP。
@@ -1353,8 +1368,6 @@ pub fn get_direction(
 
     // 全景图统计
     let tunnel = &flow.tunnel;
-    let src_ep = &flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC];
-    let dst_ep = &flow.flow_metrics_peers[FLOW_METRICS_PEER_DST];
     let is_vip = src_ep.is_vip || dst_ep.is_vip;
     let (mut src_direct, _, is_extra_tracing_doc0) = inner(
         flow_key.tap_type,

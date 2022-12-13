@@ -33,14 +33,14 @@ use crate::common::{
     IPV6_HEADER_SIZE, UDP_HEADER_SIZE, VLAN_HEADER_SIZE, VXLAN_HEADER_SIZE,
 };
 use crate::config::NpbConfig;
-use crate::proto::trident::VlanMode;
-use crate::sender::npb_sender::NpbPacketSender;
+use crate::sender::npb_sender::{NpbArpTable, NpbPacketSender};
 use crate::utils::stats::{self, StatsOption};
-use npb_handler::{NpbHandler, NpbHandlerCounter, StatsNpbHandlerCounter};
+use npb_handler::{NpbHandler, NpbHandlerCounter, StatsNpbHandlerCounter, NOT_SUPPORT};
 use public::{
     counter::Countable,
     debug::QueueDebugger,
     leaky_bucket::LeakyBucket,
+    proto::trident::VlanMode,
     queue::{bounded_with_debug, DebugSender},
     utils::net::MacAddr,
 };
@@ -54,9 +54,10 @@ pub struct NpbBuilder {
     underlay_has_vlan: bool,
     overlay_vlan_mode: VlanMode,
 
-    sender: DebugSender<(usize, Vec<u8>)>,
+    sender: DebugSender<(u64, usize, Vec<u8>)>,
 
     npb_packet_sender: Option<Arc<NpbPacketSender>>,
+    arp: Arc<NpbArpTable>,
 
     pseudo_tunnel_header: [Vec<u8>; 2],
 
@@ -175,6 +176,7 @@ impl NpbBuilder {
             self.id,
             receiver,
             config,
+            self.arp.clone(),
             self.stats_collector.clone(),
         ));
 
@@ -199,6 +201,7 @@ impl NpbBuilder {
         config: &NpbConfig,
         queue_debugger: &QueueDebugger,
         npb_bps_limit: Arc<LeakyBucket>,
+        arp: Arc<NpbArpTable>,
         stats_collector: Arc<stats::Collector>,
     ) -> Box<Self> {
         let (sender, receiver, _) =
@@ -216,6 +219,7 @@ impl NpbBuilder {
                 id,
                 receiver,
                 &config,
+                arp.clone(),
                 stats_collector.clone(),
             ))),
             pseudo_tunnel_header: [
@@ -223,6 +227,7 @@ impl NpbBuilder {
                 Self::create_pseudo_erspan_packet(config),
             ],
             thread_handle: Mutex::new(None),
+            arp,
             stats_collector,
             bps_limit: npb_bps_limit,
         });
@@ -233,7 +238,7 @@ impl NpbBuilder {
     pub fn build_with(&self, id: usize, if_index: u32, mac: MacAddr) -> NpbHandler {
         let counter = Arc::new(NpbHandlerCounter::default());
 
-        if !NpbHandler::DISABLE {
+        if !NOT_SUPPORT {
             info!(
                 "Build with npb packet handler with id: {} if_index: {} mac: {}",
                 id, if_index, mac

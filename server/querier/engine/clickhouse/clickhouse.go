@@ -38,6 +38,8 @@ import (
 
 var log = logging.MustGetLogger("clickhouse")
 
+var DEFAULT_LIMIT = "10000"
+
 type CHEngine struct {
 	Model         *view.Model
 	Statements    []Statement
@@ -98,7 +100,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 			for _, stmt := range e.Statements {
 				stmt.Format(e.Model)
 			}
-			FormatInnerTime(e.Model)
+			FormatLimit(e.Model)
 			// 使用Model生成View
 			e.View = view.NewView(e.Model)
 			chSql := e.ToSQLString()
@@ -130,7 +132,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	for _, stmt := range e.Statements {
 		stmt.Format(e.Model)
 	}
-	FormatInnerTime(e.Model)
+	FormatModel(e.Model)
 	// 使用Model生成View
 	e.View = view.NewView(e.Model)
 	chSql := e.ToSQLString()
@@ -255,7 +257,7 @@ func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
 				if strings.HasPrefix(sqlparser.String(colName), "pod_ingress") || strings.HasPrefix(sqlparser.String(colName), "lb_listener") {
 					errStr := fmt.Sprintf("%s is not supported by select", sqlparser.String(colName))
 					return errors.New(errStr)
-				} else if strings.HasPrefix(sqlparser.String(colName), "is_internet") || strings.HasPrefix(sqlparser.String(colName), "`tags") || strings.HasPrefix(sqlparser.String(colName), "`metrics") || strings.HasPrefix(sqlparser.String(colName), "`attributes") || strings.HasPrefix(sqlparser.String(colName), "packet_batch") {
+				} else if strings.HasPrefix(sqlparser.String(colName), "is_internet") || sqlparser.String(colName) == "tags" || sqlparser.String(colName) == "metrics" || sqlparser.String(colName) == "attributes" || sqlparser.String(colName) == "packet_batch" {
 					if as != "" {
 						errStr := fmt.Sprintf("%s does not support as", sqlparser.String(colName))
 						return errors.New(errStr)
@@ -422,7 +424,7 @@ func (e *CHEngine) ToSQLString() string {
 		for _, stmt := range e.Statements {
 			stmt.Format(e.Model)
 		}
-		FormatInnerTime(e.Model)
+		FormatLimit(e.Model)
 		// 使用Model生成View
 		e.View = view.NewView(e.Model)
 	}
@@ -529,7 +531,7 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 	if as != "" {
 		e.ColumnSchemas = append(e.ColumnSchemas, common.NewColumnSchema(as))
 	} else {
-		e.ColumnSchemas = append(e.ColumnSchemas, common.NewColumnSchema(chCommon.ParseAlias(item.Expr)))
+		e.ColumnSchemas = append(e.ColumnSchemas, common.NewColumnSchema(strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", "")))
 	}
 	//var args []string
 	switch expr := item.Expr.(type) {
@@ -552,6 +554,9 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 	case *sqlparser.FuncExpr:
 		// 二级运算符
 		if common.IsValueInSliceString(sqlparser.String(expr.Name), view.MATH_FUNCTIONS) {
+			if as == "" {
+				as = strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", "")
+			}
 			binFunction, err := e.parseSelectBinaryExpr(expr)
 			if err != nil {
 				return err
@@ -565,7 +570,11 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 			return err
 		}
 		name = strings.Trim(name, "`")
-		function, levelFlag, unit, err := GetAggFunc(name, args, as, e.DB, e.Table, e.Context)
+		functionAs := as
+		if as == "" {
+			functionAs = strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", "")
+		}
+		function, levelFlag, unit, err := GetAggFunc(name, args, functionAs, e.DB, e.Table, e.Context)
 		if err != nil {
 			return err
 		}
@@ -597,6 +606,9 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 		return errors.New(fmt.Sprintf("function: %s not support", sqlparser.String(expr)))
 	// field +=*/ field 运算符
 	case *sqlparser.BinaryExpr:
+		if as == "" {
+			as = strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", "")
+		}
 		binFunction, err := e.parseSelectBinaryExpr(expr)
 		if err != nil {
 			return err
@@ -866,4 +878,19 @@ func LoadDbDescriptions(dbDescriptions map[string]interface{}) error {
 		return errors.New("clickhouse not has tag")
 	}
 	return nil
+}
+
+func FormatModel(m *view.Model) {
+	FormatInnerTime(m)
+	FormatLimit(m)
+}
+
+func FormatLimit(m *view.Model) {
+	if m.Limit.Limit == "" {
+		defaultLimit := DEFAULT_LIMIT
+		if config.Cfg != nil {
+			defaultLimit = config.Cfg.Limit
+		}
+		m.Limit.Limit = defaultLimit
+	}
 }

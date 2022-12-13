@@ -15,19 +15,22 @@
  */
 
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc, RwLock,
+};
 
-use log::warn;
+use log::{info, warn};
 
 use super::fast_path::FastPath;
-use super::Result as PResult;
+use super::{Error as PError, Result as PResult};
 use crate::common::endpoint::{EndpointData, FeatureFlags};
-use crate::common::feature;
 use crate::common::lookup_key::LookupKey;
 use crate::common::matched_field::{MatchedField, MatchedFieldN, MatchedFieldv4, MatchedFieldv6};
 use crate::common::platform_data::PlatformData;
 use crate::common::policy::{Acl, Cidr, Fieldv4, Fieldv6, IpGroupData, IpSegment};
-use npb_pcap_policy::{DirectionType, PolicyData};
+use crate::utils::process::get_memory_rss;
+use npb_pcap_policy::{DirectionType, PolicyData, NOT_SUPPORT};
 
 struct Vector<const N: usize> {
     min_bit: usize,
@@ -50,7 +53,40 @@ impl<const N: usize> Default for Vector<N> {
 }
 
 type Vector6 = Vector<16>;
+
+impl Vector6 {
+    fn calc_vector_table_memory(&mut self, acls: &Vec<Acl>) -> u64 {
+        let mut num = 0;
+        for acl in acls {
+            for node in &acl.match_field6 {
+                num += node
+                    .get_all_table_index(&self.mask, self.min_bit, self.max_bit, &self.vector_bits)
+                    .len();
+            }
+        }
+        self.count = num;
+
+        num as u64 * TABLE_ITEM_SIZE
+    }
+}
+
 type Vector4 = Vector<4>;
+
+impl Vector4 {
+    fn calc_vector_table_memory(&mut self, acls: &Vec<Acl>) -> u64 {
+        let mut num = 0;
+        for acl in acls {
+            for node in &acl.match_field {
+                num += node
+                    .get_all_table_index(&self.mask, self.min_bit, self.max_bit, &self.vector_bits)
+                    .len();
+            }
+        }
+        self.count = num;
+
+        num as u64 * TABLE_ITEM_SIZE
+    }
+}
 
 impl<const N: usize> Vector<N> {
     // 初始索引，当比特位越能均分策略该值越小，例如：
@@ -167,11 +203,11 @@ impl<const N: usize> Vector<N> {
         for i in 0..u16::MAX as usize {
             for bit_offset in &table[i] {
                 vector_bits.push(*bit_offset);
-                if vector_bits.len() == u16::BITS as usize {
+                if vector_bits.len() >= vector_size {
                     break;
                 }
             }
-            if vector_bits.len() == u16::BITS as usize {
+            if vector_bits.len() >= vector_size {
                 break;
             }
         }
@@ -183,16 +219,18 @@ impl<const N: usize> Vector<N> {
     }
 }
 
+const TABLE_ITEM_SIZE: u64 = 8 + 8 + 8 + 4 + 1;
+
 #[derive(Clone, Debug)]
 struct Table4Item {
     field: Arc<Fieldv4>,
-    policy: PolicyData,
+    policy: Arc<PolicyData>,
 }
 
 #[derive(Clone, Debug)]
 struct Table6Item {
     field: Arc<Fieldv6>,
-    policy: PolicyData,
+    policy: Arc<PolicyData>,
 }
 
 pub struct FirstPath {
@@ -204,13 +242,14 @@ pub struct FirstPath {
     table_6: RwLock<Vec<Vec<Table6Item>>>,
 
     level: usize,
+    current_level: usize,
 
     fast: FastPath,
 
     fast_disable: bool,
     queue_count: usize,
 
-    features: feature::FeatureFlags,
+    memory_limit: AtomicU64,
 }
 
 impl FirstPath {
@@ -219,14 +258,10 @@ impl FirstPath {
     const LEVEL_MIN: usize = 1;
     const LEVEL_MAX: usize = 16;
     const TABLE_SIZE: usize = 1 << Self::VECTOR_MASK_SIZE_MAX;
+    const POLICY_LIMIT: u64 = 500000;
+    const MEMORY_LIMIT: u64 = 1 << 20;
 
-    pub fn new(
-        queue_count: usize,
-        level: usize,
-        map_size: usize,
-        fast_disable: bool,
-        features: feature::FeatureFlags,
-    ) -> FirstPath {
+    pub fn new(queue_count: usize, level: usize, map_size: usize, fast_disable: bool) -> FirstPath {
         FirstPath {
             group_ip_map: Some(HashMap::new()),
             vector_4: Vector4::default(),
@@ -242,11 +277,12 @@ impl FirstPath {
                     .collect::<Vec<Vec<Table6Item>>>(),
             ),
             level,
+            current_level: level,
 
             fast: FastPath::new(queue_count, map_size),
             queue_count,
             fast_disable,
-            features,
+            memory_limit: AtomicU64::new(0),
         }
     }
 
@@ -282,7 +318,7 @@ impl FirstPath {
     }
 
     pub fn update_ip_group(&mut self, groups: &Vec<Arc<IpGroupData>>) {
-        if self.features.contains(feature::FeatureFlags::POLICY) {
+        if !NOT_SUPPORT {
             self.generate_group_ip_map(groups);
         }
 
@@ -333,8 +369,18 @@ impl FirstPath {
         return false;
     }
 
+    fn memory_check(&self, size: u64) -> bool {
+        let Ok(current) = get_memory_rss() else {
+            warn!("Cannot check policy memory: Get process memory failed.");
+            return true;
+        };
+        let memory_limit = self.memory_limit.load(Ordering::Relaxed);
+
+        memory_limit == 0 || current + size < memory_limit
+    }
+
     fn generate_acl_bits(&mut self, acls: &mut Vec<Acl>) -> PResult<u64> {
-        let memory = 0;
+        let mut memory = 0;
         for acl in acls {
             let mut src_ips = Vec::new();
             let mut dst_ips = Vec::new();
@@ -369,20 +415,70 @@ impl FirstPath {
                 dst_ips.append(&mut vec![IpSegment::IPV4_ANY, IpSegment::IPV6_ANY]);
             }
 
+            let (mut src_ipv4_count, mut src_ipv6_count) = (0, 0);
+            let (mut dst_ipv4_count, mut dst_ipv6_count) = (0, 0);
+            for ip in &src_ips {
+                if ip.is_ipv6() {
+                    src_ipv6_count += 1;
+                } else {
+                    src_ipv4_count += 1;
+                }
+            }
+            for ip in &dst_ips {
+                if ip.is_ipv6() {
+                    dst_ipv6_count += 1;
+                } else {
+                    dst_ipv4_count += 1;
+                }
+            }
+            let mut need_memory = Fieldv4::SIZE
+                * src_ipv4_count
+                * dst_ipv4_count
+                * acl.src_port_ranges.len().max(1)
+                * acl.dst_port_ranges.len().max(1);
+            need_memory += Fieldv6::SIZE
+                * src_ipv6_count
+                * dst_ipv6_count
+                * acl.src_port_ranges.len().max(1)
+                * acl.dst_port_ranges.len().max(1);
+            if !self.memory_check(need_memory as u64) {
+                warn!(
+                    "Memory will exceed limit {} bytes, policy {} probably need memory {} bytes.",
+                    self.memory_limit.load(Ordering::Relaxed),
+                    acl.id,
+                    need_memory
+                );
+                return Err(PError::ExceedMemoryLimit);
+            }
+            memory += need_memory as u64;
+
             acl.generate_match(&src_ips, &dst_ips);
-            acl.init_policy();
         }
 
         Ok(memory)
     }
 
-    fn vector_size(&self, acls: &Vec<Acl>, _memory_exceeded: bool) -> usize {
+    fn vector_size(&mut self, acls: &Vec<Acl>, memory_exceeded: bool) -> usize {
         let mut sum = 0;
         acls.iter()
             .for_each(|x| sum += x.match_field.len() + x.match_field6.len());
 
-        for vector_size in Self::VECTOR_MASK_SIZE_MAX..Self::VECTOR_MASK_SIZE_MIN {
-            if sum >> self.level >= 1 << vector_size {
+        let mut limit = Self::POLICY_LIMIT;
+        let memory_limit = self.memory_limit.load(Ordering::Relaxed);
+        if memory_limit != 0 && memory_limit < Self::MEMORY_LIMIT {
+            limit = (Self::POLICY_LIMIT * memory_limit) / Self::MEMORY_LIMIT;
+        }
+
+        if sum <= limit as usize && !memory_exceeded && self.current_level != self.level {
+            warn!(
+                "Policy count {} less than limit {}, change memory level to {}.",
+                sum, limit, self.level
+            );
+            self.current_level = self.level;
+        }
+
+        for vector_size in (Self::VECTOR_MASK_SIZE_MIN..Self::VECTOR_MASK_SIZE_MAX).rev() {
+            if sum >> self.current_level >= 1 << vector_size {
                 return vector_size;
             }
         }
@@ -396,9 +492,8 @@ impl FirstPath {
 
         for acl in acls {
             for v4 in &acl.match_field {
-                for index in v4.field.get_all_table_index(
+                for index in v4.get_all_table_index(
                     &self.vector_4.mask,
-                    &v4.mask,
                     self.vector_4.min_bit,
                     self.vector_4.max_bit,
                     &self.vector_4.vector_bits,
@@ -423,9 +518,8 @@ impl FirstPath {
 
         for acl in acls {
             for v6 in &acl.match_field6 {
-                for index in v6.field.get_all_table_index(
+                for index in v6.get_all_table_index(
                     &self.vector_6.mask,
-                    &v6.mask,
                     self.vector_6.min_bit,
                     self.vector_6.max_bit,
                     &self.vector_6.vector_bits,
@@ -444,19 +538,49 @@ impl FirstPath {
     }
 
     fn generate_first_table(&mut self, acls: &mut Vec<Acl>) -> PResult<()> {
-        self.generate_acl_bits(acls)?;
+        let acl_memory = self.generate_acl_bits(acls)?;
 
-        let vector_size = self.vector_size(acls, false);
-        self.vector_4.init(acls, vector_size);
-        self.vector_6.init(acls, vector_size);
+        let (mut vector_4, mut vector_6) = (Vector4::default(), Vector6::default());
+        let mut ok = true;
+        let mut vector_size = 0;
+
+        while self.current_level < Self::LEVEL_MAX && (!ok || vector_size == 0) {
+            vector_size = self.vector_size(acls, !ok);
+            vector_4.init(acls, vector_size);
+            vector_6.init(acls, vector_size);
+
+            let mut need_memory = vector_4.calc_vector_table_memory(acls);
+            need_memory += vector_6.calc_vector_table_memory(acls);
+            let mut policy_count = 0;
+            acls.iter()
+                .for_each(|x| policy_count += x.match_field.len() + x.match_field6.len());
+            let item_count = vector_4.count + vector_6.count;
+            info!("Policy memory level {}, policy count {}, item count {} + {} = {}, vector size {}, probably need memory {}B bytes.",
+                self.current_level, policy_count, vector_4.count, vector_6.count, item_count, vector_size, need_memory + acl_memory);
+            ok = self.memory_check(need_memory);
+            if !ok {
+                if self.current_level < Self::LEVEL_MAX && item_count > policy_count {
+                    self.current_level += 1;
+                    warn!(
+                        "Policy memory limit {}B will be exceed, change memory level to {}.",
+                        self.memory_limit.load(Ordering::Relaxed),
+                        self.current_level
+                    );
+                    continue;
+                }
+                return Err(PError::ExceedMemoryLimit);
+            }
+        }
+
+        self.vector_4 = vector_4;
+        self.vector_6 = vector_6;
         self.generate_table4(acls)?;
         self.generate_table6(acls)?;
-
         Ok(())
     }
 
     pub fn update_acl(&mut self, acls: &Vec<Arc<Acl>>, check: bool) -> PResult<()> {
-        if self.features.contains(feature::FeatureFlags::POLICY) {
+        if !NOT_SUPPORT {
             let mut valid_acls = Vec::new();
 
             for acl in acls {
@@ -559,7 +683,7 @@ impl FirstPath {
     ) -> Option<(Arc<PolicyData>, Arc<EndpointData>)> {
         let mut policy = PolicyData::default();
 
-        if self.features.contains(feature::FeatureFlags::POLICY) {
+        if !NOT_SUPPORT {
             self.get_policy_from_table(key, &endpoints, &mut policy);
         }
 
@@ -594,6 +718,10 @@ impl FirstPath {
         }
         return None;
     }
+
+    pub fn set_memory_limit(&self, limit: u64) {
+        self.memory_limit.store(limit, Ordering::Relaxed);
+    }
 }
 
 #[cfg(test)]
@@ -607,8 +735,44 @@ mod tests {
 
     use npb_pcap_policy::{NpbAction, NpbTunnelType, TapSide};
 
+    fn update_ip_group(first: &mut FirstPath, groups: &Vec<Arc<IpGroupData>>) {
+        first.generate_group_ip_map(groups);
+        first.fast.generate_mask_table_from_group(groups);
+        first.fast.generate_mask_table();
+    }
+
+    fn update_acl(first: &mut FirstPath, acls: &Vec<Arc<Acl>>) -> PResult<()> {
+        let mut valid_acls = Vec::new();
+        for acl in acls {
+            let mut valid_acl = (**acl).clone();
+            valid_acl.reset();
+            valid_acls.push(valid_acl);
+        }
+        first.generate_first_table(&mut valid_acls)?;
+        first.fast.generate_interest_table(acls);
+        Ok(())
+    }
+
+    fn first_get(
+        first: &mut FirstPath,
+        key: &mut LookupKey,
+        endpoints: EndpointData,
+    ) -> Option<(Arc<PolicyData>, Arc<EndpointData>)> {
+        let mut policy = PolicyData::default();
+
+        first.get_policy_from_table(key, &endpoints, &mut policy);
+        first.fast.add_policy(key, &policy, endpoints);
+
+        policy.format_npb_action();
+        if key.feature_flag.contains(FeatureFlags::DEDUP) {
+            policy.dedup(key);
+        }
+
+        return Some((Arc::new(policy), Arc::new(endpoints)));
+    }
+
     fn generate_table() -> PResult<FirstPath> {
-        let mut first = FirstPath::new(1, 8, 1 << 16, false, feature::FeatureFlags::POLICY);
+        let mut first = FirstPath::new(1, 8, 1 << 16, false);
         let acl = Acl::new(
             1,
             vec![10],
@@ -625,11 +789,14 @@ mod tests {
             ),
         );
 
-        first.update_ip_group(&vec![
-            Arc::new(IpGroupData::new(10, 2, "192.168.2.1/32")),
-            Arc::new(IpGroupData::new(20, 20, "192.168.2.5/31")),
-        ]);
-        first.update_acl(&vec![Arc::new(acl)], true)?;
+        update_ip_group(
+            &mut first,
+            &vec![
+                Arc::new(IpGroupData::new(10, 2, "192.168.2.1/32")),
+                Arc::new(IpGroupData::new(20, 20, "192.168.2.5/31")),
+            ],
+        );
+        update_acl(&mut first, &vec![Arc::new(acl)])?;
 
         Ok(first)
     }
@@ -691,13 +858,13 @@ mod tests {
             tap_type: TapType::Cloud,
             ..Default::default()
         };
-        let (policy, _) = first.first_get(&mut key, endpotins).unwrap();
+        let (policy, _) = first_get(&mut first, &mut key, endpotins).unwrap();
         assert_eq!(policy.npb_actions.len(), 1);
         assert_eq!(policy.acl_id, 1);
 
         key.l2_end_0 = true;
         key.l3_end_0 = true;
-        let (policy, _) = first.first_get(&mut key, endpotins).unwrap();
+        let (policy, _) = first_get(&mut first, &mut key, endpotins).unwrap();
         assert_eq!(policy.npb_actions.len(), 1);
         assert_eq!(policy.acl_id, 1);
 
@@ -708,13 +875,13 @@ mod tests {
         key.reverse();
         endpotins.src_info.l3_epc_id = 20;
         endpotins.dst_info.l3_epc_id = 2;
-        let (policy, _) = first.first_get(&mut key, endpotins).unwrap();
+        let (policy, _) = first_get(&mut first, &mut key, endpotins).unwrap();
         assert_eq!(policy.npb_actions.len(), 1);
         assert_eq!(policy.acl_id, 1);
 
         key.l2_end_1 = false;
         key.l3_end_1 = false;
-        let (policy, _) = first.first_get(&mut key, endpotins).unwrap();
+        let (policy, _) = first_get(&mut first, &mut key, endpotins).unwrap();
         assert_eq!(policy.npb_actions.len(), 1);
         assert_eq!(policy.acl_id, 1);
 

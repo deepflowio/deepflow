@@ -26,7 +26,7 @@ use super::MetaPacket;
 use crate::config::handler::LogParserAccess;
 use crate::flow_generator::protocol_logs::{
     get_protobuf_rpc_parser, DnsLog, DubboLog, HttpLog, KafkaLog, MqttLog, MysqlLog, PostgresqlLog,
-    ProtobufRpcWrapLog, RedisLog,
+    ProtobufRpcWrapLog, RedisLog, SofaRpcLog,
 };
 use crate::flow_generator::Result;
 
@@ -46,106 +46,12 @@ use public::l7_protocol::{L7Protocol, L7ProtocolEnum, ProtobufRpcProtocol};
  more specifically, traversal all protocol from get_all_protocol,check the payload and then parse it,
  get the L7ProtocolInfo enum, finally convert to L7ProtocolSendLog struct and send to server.
 
+ the parser flow:
 
- ebpf处理过程为:
-
- ebpf protocol parse process:
-
-
-                                   payload:&[u8]
-                                         |
-                                         |
-                                    MetaPacket
-                                         |
-                                         |
-                                         |
-                                      check()
-                                         |
-                                         |
-                           traversal all implement protocol
-                                         |
-                                         |
-                                         |
-                        L7ProtocolParser::check_payload()
-                                  |           |
-                                  |           |
-                                  v           v
-                     <-----------true       false-------->set protocol as unknown, then ignore the packet.
-                    |
-                    |
-                    v
-       L7ProtocolParser::parse_payload()
-                    |
-                    |
-         |<---------v---------->Vec<L7ProtocolInfo>-------->
-         |                                                 |
-         v                                                 |
- raise err, ignore the packet                              v
-                                                      for each info
-                                                           |
-                                                           |
-                                                           v
-                           find the req/resp in SessionAggr, only find 2 slot(include current slot)
-                                                           |
-                                                           |
-                           | <------found req/resp <------ v------> not found ------->save in current slot , wait req/resp
-                           |
-                           |
-                           v
-             L7ProtocolInfo::merge_log(req/resp)   (merge req and resp to session)
-                           |
-                           |
-                           v
-               ! L7ProtocolInfo::skip_send()
-                           |
-                           v
-                    send to server
-
-
-about SessionAggr:
-
-    [
-        hashmap< key = u64, value = L7protocolLog >, (represent 60s)
-        hashmap< key = u64, value = L7protocolLog >, (represent 60s)
-        ....
-    ]
-
-    it is time slot array(default length 16) + hashmap struct, every time slot repersent 60s time.
-
-    key is u64 : | flow_id hight 8 bit | flow_id low 24 bit | proto 8 bit | session low 24 bit |
-
-    flow_id: from ebpf socket_id, distinguish the socket fd.
-    proto:   protocol number, such as: tcp=6 udp=17
-    session: depend on the protocol, for example http2:stream_id,  dns:transaction_id.
-
-
-
-about check():
-    check() will travsal all protocol from get_all_protocol() to determine what protocol belong to the payload.
-    first, check the bitmap(describe follow) is ignore the protocol ? then call L7ProtocolParser::check_payload() to check.
-
-about parse_payload()
-    it use same struct in L7ProtocolParser::check_payload().
-
-about bitmap:
-    u128, every bit repersent the protocol shoud check or not(1 indicate check, 0 for ignore), the number of protocol as follow:
-
-    Http1 = 20,
-    Http2 = 21,
-    Http1TLS = 22,
-    Http2TLS = 23,
-    Dubbo = 40,
-    Mysql = 60,
-    Postgresql = 61,
-    Redis = 80,
-    Kafka = 100,
-    Mqtt = 101,
-    Dns = 120,
-
- TODO: cbpf 处理过程
- hint: check 和 parse 是同一个结构，check可以把解析结果保存下来,避免重复解析.
-       check and parse use same struct. so it can save information and prevent duplicate parse.
-
+    check_payload -> parse_payload -> reset --
+                        /|\                  |
+                         |                   |
+                         |_____next packet___|
 */
 
 #[macro_export]
@@ -167,8 +73,10 @@ macro_rules! parse_common {
 
         // the current msg type
         msg_type: LogMessageType,
-        // the current msg time
+
+        // the msg time
         start_time: u64,
+        end_time: u64,
 
     }
 
@@ -188,12 +96,24 @@ macro_rules! parse_common {
     impl L7ProtocolParserInterface for xxxLog {
         // ... other fn
 
+         fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+            // set the info time
+            self.info.start_time = param.time;
+            self.info.end_time = param.time;
+
+            // ...parse payload
+
+            // revert the info time before return Ok().
+            self.revert_info_time(param.direction, param.time);
+            Ok(...)
+
+         }
+
         fn reset(&mut self) {
-            // ... reset other field
-            self.previous_log_info.put(
-                self.info.session_id().unwrap_or_default(),
-                (self.info.msg_type, self.info.start_time),
-            );
+            // save the current log info before reset log
+            self.save_info_rrt();
+
+            // ... reset log
         }
     }
 */
@@ -201,6 +121,43 @@ macro_rules! parse_common {
 macro_rules! perf_impl {
     ($log_struct:ident) => {
         impl $log_struct {
+            fn save_info_time(&mut self){
+                let time = match self.info.msg_type{
+                    LogMessageType::Response =>self.info.end_time,
+                    LogMessageType::Request =>self.info.start_time,
+                    _=>return,
+                };
+
+                self.previous_log_info.put(
+                    self.info.session_id().unwrap_or_default(),
+                    (self.info.msg_type, time),
+                );
+            }
+
+            // revert the rrt from previous_log_info
+            fn revert_info_time(&mut self, direction: PacketDirection, cur_time: u64) {
+                let Some((ref prev_typ,ref prev_time)) = self.previous_log_info.get(&self.info.session_id().unwrap_or_default()) else{
+                    return ;
+                };
+                match direction {
+                    // current is req and previous is resp and previous time gt current time,
+                    // likely ebpf disorder, revert the info end time
+                    PacketDirection::ClientToServer
+                        if *prev_typ == LogMessageType::Response && *prev_time > cur_time =>
+                    {
+                        self.info.end_time = *prev_time;
+                    }
+
+                    // current is resp and previous is req and current info time gt previous info time, revert the info start.
+                    PacketDirection::ServerToClient
+                        if *prev_typ == LogMessageType::Request && cur_time > *prev_time =>
+                    {
+                        self.info.start_time = *prev_time;
+                    }
+                    _ => {}
+                }
+            }
+
             fn update_perf(
                 &mut self,
                 req_count: u32,
@@ -243,8 +200,8 @@ macro_rules! perf_impl {
                 });
             }
 
-            fn perf_inc_req(&mut self) {
-                self.update_perf(1, 0, 0, 0, 0);
+            fn perf_inc_req(&mut self, time: u64) {
+                self.update_perf(1, 0, 0, 0, time);
             }
 
             fn perf_inc_resp(&mut self, time: u64) {
@@ -382,6 +339,7 @@ all_protocol!(
     // http have two version but one parser, can not place in macro param.
     DNS,DnsParser,DnsLog::default;
     ProtobufRPC,ProtobufRpcParser,ProtobufRpcWrapLog::new;
+    SofaRPC,SofaRpcParser,SofaRpcLog::new;
     MySQL,MysqlParser,MysqlLog::default;
     Kafka,KafkaParser,KafkaLog::new;
     Redis,RedisParser,RedisLog::default;
