@@ -51,6 +51,8 @@ use super::parse_ip_slice;
 use super::{Addr, Link, LinkFlags, MacAddr, NeighborEntry, Route};
 use super::{Error, Result};
 
+pub const IF_TYPE_IPVLAN: &'static str = "ipvlan";
+
 const RCV_TIMEOUT: Duration = Duration::from_millis(500);
 
 const NETLINK_ERROR_NOADDR: i32 = -19;
