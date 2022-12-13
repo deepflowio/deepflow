@@ -448,7 +448,7 @@ impl FlowMap {
             }
             // For ebpf data, after collect_metric(), meta_packet's direction
             // is determined. Here we determine whether to reverse flow.
-            Self::need_reverse_ebpf(&mut node, meta_packet);
+            Self::rectify_ebpf_flow_direction(&mut node, meta_packet);
         }
 
         // Enterprise Edition Feature: packet-sequence
@@ -493,7 +493,7 @@ impl FlowMap {
         if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
             // For ebpf data, after collect_metric(), meta_packet's direction
             // is determined. Here we determine whether to reverse flow.
-            Self::need_reverse_ebpf(&mut node, meta_packet);
+            Self::rectify_ebpf_flow_direction(&mut node, meta_packet);
             self.update_udp_is_active(&mut node, meta_packet.direction);
         }
 
@@ -1009,7 +1009,7 @@ impl FlowMap {
             }
             // For ebpf data, after collect_metric(), meta_packet's direction
             // is determined. Here we determine whether to reverse flow.
-            Self::need_reverse_ebpf(&mut node, meta_packet);
+            Self::rectify_ebpf_flow_direction(&mut node, meta_packet);
         }
 
         // Enterprise Edition Feature: packet-sequence
@@ -1036,7 +1036,7 @@ impl FlowMap {
         // For ebpf data, after collect_metric(), meta_packet's direction
         // is determined. Here we determine whether to reverse flow.
         if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
-            Self::need_reverse_ebpf(&mut node, meta_packet);
+            Self::rectify_ebpf_flow_direction(&mut node, meta_packet);
             self.update_udp_is_active(&mut node, meta_packet.direction);
         }
         node
@@ -1367,7 +1367,7 @@ impl FlowMap {
         }
     }
 
-    fn need_reverse_ebpf(node: &mut FlowNode, meta_packet: &mut MetaPacket) {
+    fn rectify_ebpf_flow_direction(node: &mut FlowNode, meta_packet: &mut MetaPacket) {
         if node.tagged_flow.flow.flow_key.ip_src == meta_packet.lookup_key.src_ip
             && node.tagged_flow.flow.flow_key.port_src == meta_packet.lookup_key.src_port
         {
