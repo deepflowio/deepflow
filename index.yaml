@@ -3,7 +3,7 @@ entries:
   deepflow:
   - apiVersion: v2
     appVersion: 6.1.8
-    created: "2022-12-13T08:44:47.829087414Z"
+    created: "2022-12-13T08:56:03.408278252Z"
     dependencies:
     - condition: clickhouse.enabled
       name: clickhouse
@@ -22,7 +22,7 @@ entries:
       repository: https://grafana.github.io/helm-charts
       version: 6.*.*
     description: An automated observability platform for cloud-native developers.
-    digest: b6cd7449ab71e338c250b312866e82cfb375d4f5567b2e933dbe55b02470d653
+    digest: c3ad266d0bf9fda014065c632233024b99e84a6f41121fd3a3dd2a5b338c7b24
     home: https://github.com/deepflowys/deepflow
     icon: https://raw.githubusercontent.com/deepflowys/deepflow-charts/main/deepflow.svg
     keywords:
@@ -2327,6 +2327,26 @@ entries:
     version: 0.1.030
   deepflow-agent:
   - apiVersion: v2
+    appVersion: 6.1.8
+    created: "2022-12-13T08:56:03.503822159Z"
+    description: An automated observability platform for cloud-native developers.
+    digest: 6ddf11acc71049c57630b61c9d69746f06e64693efe8b75d07a7ed4ce3422b10
+    home: https://github.com/deepflowys/deepflow
+    icon: https://raw.githubusercontent.com/deepflowys/deepflow-charts/main/deepflow.svg
+    keywords:
+    - deepflow
+    kubeVersion: '>=1.16.0-0'
+    maintainers:
+    - name: deepflow
+      url: https://github.com/deepflowys/deepflow
+    name: deepflow-agent
+    sources:
+    - https://github.com/deepflowys/deepflow
+    type: application
+    urls:
+    - https://github.com/deepflowys/deepflow-charts/releases/download/deepflow-agent-6.1.8/deepflow-agent-6.1.8.tgz
+    version: 6.1.8
+  - apiVersion: v2
     appVersion: 6.1.7
     created: "2022-12-07T09:02:40.911499132Z"
     description: An automated observability platform for cloud-native developers.
@@ -3543,4 +3563,4 @@ entries:
     urls:
     - https://github.com/deepflowys/deepflow-charts/releases/download/deepflow-agent-0.1.030/deepflow-agent-0.1.030.tgz
     version: 0.1.030
-generated: "2022-12-13T08:44:47.817999155Z"
+generated: "2022-12-13T08:56:03.502733361Z"
