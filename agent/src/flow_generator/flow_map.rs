@@ -442,7 +442,7 @@ impl FlowMap {
             // For eBPF data, timeout as soon as possible when there are no unaggregated requests.
             // Considering that eBPF data may be out of order, wait for an additional 2s timeout.
             if node.residual_request == 0 {
-                node.timeout = self.config.load().flow_timeout.closed_fin;
+                node.timeout = config.flow_timeout.closed_fin;
             } else {
                 node.timeout = self.parse_config.load().l7_log_session_aggr_timeout;
             }
@@ -485,6 +485,10 @@ impl FlowMap {
                 meta_packet,
                 meta_packet.direction == PacketDirection::ClientToServer,
             );
+        }
+
+        if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
+            self.update_udp_is_active(&mut node, meta_packet.direction);
         }
 
         slot_nodes.push(node);
@@ -666,6 +670,14 @@ impl FlowMap {
 
         let mut tagged_flow = TaggedFlow::default();
         let lookup_key = &meta_packet.lookup_key;
+        let is_active_service = if meta_packet.signal_source == SignalSource::EBPF {
+            match lookup_key.proto {
+                IpProtocol::Tcp => true, // Tcp data coming from eBPF means it must be an active service
+                _ => false,
+            }
+        } else {
+            false
+        };
         let flow = Flow {
             flow_key: FlowKey {
                 vtap_id: config.vtap_id,
@@ -721,11 +733,7 @@ impl FlowMap {
                 FlowMetricsPeer::default(),
             ],
             signal_source: meta_packet.signal_source,
-            is_active_service: if meta_packet.signal_source == SignalSource::EBPF {
-                true // Data coming from eBPF means it must be an active service
-            } else {
-                false
-            },
+            is_active_service,
             ..Default::default()
         };
         tagged_flow.flow = flow;
@@ -955,6 +963,25 @@ impl FlowMap {
             } else {
                 node.residual_request -= 1;
             }
+            // For ebpf data, after collect_metric(), meta_packet's direction
+            // is determined. Here we determine whether to reverse flow.
+            if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
+                if node.tagged_flow.flow.flow_key.ip_src == meta_packet.lookup_key.src_ip
+                    && node.tagged_flow.flow.flow_key.port_src == meta_packet.lookup_key.src_port
+                {
+                    // If flow_key.ip_src and flow_key.port_src of node.tagged_flow.flow are the same as
+                    // that of meta_packet, but the direction of meta_packet is S2C, reverse flow
+                    if meta_packet.direction == PacketDirection::ServerToClient {
+                        Self::reverse_flow(&mut node, true);
+                    }
+                } else {
+                    // If flow_key.ip_src or flow_key.port_src of node.tagged_flow.flow is different
+                    // from that of meta_packet, and the direction of meta_packet is C2S, reverse flow
+                    if meta_packet.direction == PacketDirection::ClientToServer {
+                        Self::reverse_flow(&mut node, true);
+                    }
+                }
+            }
         }
 
         // Enterprise Edition Feature: packet-sequence
@@ -1015,6 +1042,26 @@ impl FlowMap {
         }
         if config.collector_enabled {
             self.collect_metric(config, &mut node, meta_packet, !reverse);
+        }
+        // For ebpf data, after collect_metric(), meta_packet's direction
+        // is determined. Here we determine whether to reverse flow.
+        if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
+            if node.tagged_flow.flow.flow_key.ip_src == meta_packet.lookup_key.src_ip
+                && node.tagged_flow.flow.flow_key.port_src == meta_packet.lookup_key.src_port
+            {
+                // If flow_key.ip_src and flow_key.port_src of node.tagged_flow.flow are the same as
+                // that of meta_packet, but the direction of meta_packet is S2C, reverse flow
+                if meta_packet.direction == PacketDirection::ServerToClient {
+                    Self::reverse_flow(&mut node, true);
+                }
+            } else {
+                // If flow_key.ip_src or flow_key.port_src of node.tagged_flow.flow is different
+                // from that of meta_packet, and the direction of meta_packet is C2S, reverse flow
+                if meta_packet.direction == PacketDirection::ClientToServer {
+                    Self::reverse_flow(&mut node, true);
+                }
+            }
+            self.update_udp_is_active(&mut node, meta_packet.direction);
         }
         node
     }
@@ -1273,6 +1320,31 @@ impl FlowMap {
 
         node.tagged_flow.flow.is_active_service = ServiceTable::is_active_service(dst_score);
         return reverse;
+    }
+
+    // just for ebpf, tcp flow.is_active_service is always true,
+    // but udp flow.is_active_service still needs to continue to judge.
+    fn update_udp_is_active(&mut self, node: &mut FlowNode, direction: PacketDirection) {
+        // If it is already an active service, we do not need to continue to query.
+        if !node.tagged_flow.flow.is_active_service {
+            let flow_key = &node.tagged_flow.flow.flow_key;
+            // Because the flow direction is already correct, we can use flow_key's
+            // ip_src, port_src and ip_dst, port_dst directly without swapping them.
+            let src_key = ServiceKey::new(
+                flow_key.ip_src,
+                node.endpoint_data_cache.src_info.l3_epc_id as i16,
+                flow_key.port_src,
+            );
+            let dst_key = ServiceKey::new(
+                flow_key.ip_dst,
+                node.endpoint_data_cache.dst_info.l3_epc_id as i16,
+                flow_key.port_dst,
+            );
+
+            node.tagged_flow.flow.is_active_service = self
+                .service_table
+                .is_ebpf_active_udp_service(src_key, dst_key, direction);
+        }
     }
 
     fn update_flow_direction(&mut self, node: &mut FlowNode, meta_packet: Option<&mut MetaPacket>) {
