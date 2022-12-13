@@ -41,7 +41,7 @@ use num_enum::IntoPrimitive;
 use regex::Regex;
 
 use super::{Error, InterfaceInfo, Result};
-use crate::utils::net::{addr_list, link_list, links_by_name_regex, Link};
+use crate::utils::net::{addr_list, link_list, links_by_name_regex, Link, IF_TYPE_IPVLAN};
 
 #[derive(IntoPrimitive)]
 #[repr(u16)]
@@ -240,21 +240,29 @@ impl NetNs {
                 };
 
                 for link in links {
-                    if link.link_netnsid.is_none() {
-                        trace!("{:?} has no link-netnsid", link);
-                        continue;
-                    }
                     let mut tap_ns = None;
-                    for (ns, nsfp) in interested_files.iter() {
-                        match socket.get_nsid_by_file(nsfp) {
-                            Ok(id) if id == link.link_netnsid.unwrap() as i32 => {
-                                tap_ns = Some(ns);
-                                break;
+                    if link.link_netnsid.is_none() {
+                        match link.if_type.as_ref() {
+                            Some(if_type) if if_type == IF_TYPE_IPVLAN => {
+                                tap_ns = Some(&NsFile::Root)
                             }
-                            Err(e) => {
-                                debug!("get_nsid_by_file() failed for ns {:?}: {:?}", ns, e);
+                            _ => {
+                                trace!("{:?} has no link-netnsid", link);
+                                continue;
                             }
-                            _ => (),
+                        }
+                    } else {
+                        for (ns, nsfp) in interested_files.iter() {
+                            match socket.get_nsid_by_file(nsfp) {
+                                Ok(id) if id == link.link_netnsid.unwrap() as i32 => {
+                                    tap_ns = Some(ns);
+                                    break;
+                                }
+                                Err(e) => {
+                                    debug!("get_nsid_by_file() failed for ns {:?}: {:?}", ns, e);
+                                }
+                                _ => (),
+                            }
                         }
                     }
                     if tap_ns.is_none() {
