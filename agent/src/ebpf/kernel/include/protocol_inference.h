@@ -835,8 +835,6 @@ static __inline enum message_type infer_redis_message(const char *buf,
 	return MSG_UNKNOWN;
 }
 
-
-
 // 伪代码参考自
 // http://public.dhe.ibm.com/software/dw/webservices/ws-mqtt/mqtt-v3r1.html?spm=a2c4g.11186623.0.0.76157c1cveWwvz
 //
