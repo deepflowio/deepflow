@@ -26,7 +26,7 @@ use super::MetaPacket;
 use crate::config::handler::LogParserAccess;
 use crate::flow_generator::protocol_logs::{
     get_protobuf_rpc_parser, DnsLog, DubboLog, HttpLog, KafkaLog, MqttLog, MysqlLog, PostgresqlLog,
-    ProtobufRpcWrapLog, RedisLog,
+    ProtobufRpcWrapLog, RedisLog, SofaRpcLog,
 };
 use crate::flow_generator::Result;
 
@@ -339,6 +339,7 @@ all_protocol!(
     // http have two version but one parser, can not place in macro param.
     DNS,DnsParser,DnsLog::default;
     ProtobufRPC,ProtobufRpcParser,ProtobufRpcWrapLog::new;
+    SofaRPC,SofaRpcParser,SofaRpcLog::new;
     MySQL,MysqlParser,MysqlLog::default;
     Kafka,KafkaParser,KafkaLog::new;
     Redis,RedisParser,RedisLog::default;

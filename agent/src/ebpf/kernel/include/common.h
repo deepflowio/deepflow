@@ -56,6 +56,7 @@ enum traffic_protocol {
 	PROTO_TLS_HTTP1 = 22,
 	PROTO_TLS_HTTP2 = 23,
 	PROTO_DUBBO = 40,
+	PROTO_SOFARPC = 43,
 	PROTO_MYSQL = 60,
 	PROTO_POSTGRESQL = 61,
 	PROTO_REDIS = 80,
@@ -69,5 +70,11 @@ struct protocol_message_t {
 	enum traffic_protocol protocol;
 	enum message_type type;
 };
+
+struct trace_key_t {
+	__u32 tgid;
+	__u32 pid;
+	__u64 goid;
+} __attribute__((packed));
 
 #endif /* DF_BPF_COMMON_H */

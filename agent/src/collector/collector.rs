@@ -61,8 +61,8 @@ const MINUTE: u64 = 60;
 
 #[derive(Default)]
 pub struct CollectorCounter {
-    window_delay: AtomicU64,
-    flow_delay: AtomicU64,
+    window_delay: AtomicI64,
+    flow_delay: AtomicI64,
     out: AtomicU64,
     drop_before_window: AtomicU64,
     drop_inactive: AtomicU64,
@@ -76,12 +76,12 @@ impl RefCountable for CollectorCounter {
             (
                 "window-delay",
                 CounterType::Counted,
-                CounterValue::Unsigned(self.window_delay.swap(0, Ordering::Relaxed)),
+                CounterValue::Signed(self.window_delay.swap(0, Ordering::Relaxed)),
             ),
             (
                 "flow-delay",
                 CounterType::Counted,
-                CounterValue::Unsigned(self.flow_delay.swap(0, Ordering::Relaxed)),
+                CounterValue::Signed(self.flow_delay.swap(0, Ordering::Relaxed)),
             ),
             (
                 "out",
@@ -376,7 +376,7 @@ impl Stash {
 
         let start_time = self.start_time.as_secs();
         if time_in_second > start_time {
-            let delay = (timestamp - self.start_time).as_nanos() as u64;
+            let delay = (timestamp.as_nanos() as i128 - self.start_time.as_nanos() as i128) as i64;
             let _ =
                 self.counter
                     .window_delay
@@ -391,7 +391,7 @@ impl Stash {
             debug!("collector window moved interval={:?} is_tick={} sys_ts={:?} flow_ts={} window={:?}", self.slot_interval, false, timestamp, time_in_second, self.start_time);
             self.start_time = Duration::from_secs(time_in_second);
         }
-        let delay = (timestamp - Duration::from_secs(time_in_second)).as_nanos() as u64;
+        let delay = (timestamp.as_nanos() as i128 - 1000_000_000 * (time_in_second as i128)) as i64;
         let _ = self
             .counter
             .flow_delay
@@ -532,8 +532,7 @@ impl Stash {
     // 非活跃的服务并且是SFlow，NetFlow的数据，忽略服务端口
     // 非TCP/UDP的流量时，忽略服务端
     fn ignore_server_port(flow: &Flow, inactive_server_port_enabled: bool) -> bool {
-        if (!flow.is_active_service
-            && (!inactive_server_port_enabled || flow.signal_source != SignalSource::Packet))
+        if (!flow.is_active_service && !inactive_server_port_enabled)
             || (flow.flow_key.proto != IpProtocol::Tcp && flow.flow_key.proto != IpProtocol::Udp)
         {
             return true;

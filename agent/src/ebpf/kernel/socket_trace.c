@@ -97,8 +97,8 @@ BPF_HASH(active_read_args_map, __u64, struct data_args_t)
 // Key is {pid + fd}. value is struct socket_info_t
 BPF_HASH(socket_info_map, __u64, struct socket_info_t)
 
-// Key is {tgid, pid}. value is trace_info_t
-BPF_HASH(trace_map, __u64, struct trace_info_t)
+// Key is struct trace_key_t. value is trace_info_t
+BPF_HASH(trace_map, struct trace_key_t, struct trace_info_t)
 
 // Stores the identity used to fit the kernel, key: 0, vlaue:{tgid, pid}
 MAP_ARRAY(adapt_kern_uid_map, __u32, __u64, 1)
@@ -155,10 +155,28 @@ static __u32 __inline get_tcp_read_seq_from_fd(int fd)
 	return tcp_seq;
 }
 
-#include "uprobe_base_bpf.c" // get_go_version
+#include "uprobe_base_bpf.c"
 #include "include/protocol_inference.h"
 #define EVENT_BURST_NUM            16
 #define CONN_PERSIST_TIME_MAX_NS   100000000000ULL
+
+static __inline struct trace_key_t get_trace_key(void)
+{
+	__u64 pid_tgid = bpf_get_current_pid_tgid();
+	__u64 goid = get_rw_goid();
+
+	struct trace_key_t key = {};
+
+	key.tgid = (__u32)(pid_tgid >> 32);
+
+	if (goid) {
+		key.goid = goid;
+	} else {
+		key.pid = (__u32)pid_tgid;
+	}
+
+	return key;
+}
 
 static __inline unsigned int __retry_get_sock_flags(void *sk,
 						    int offset)
@@ -587,7 +605,8 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 				   struct trace_conf_t *trace_conf,
 				   struct trace_stats *trace_stats,
 				   __u64 *thread_trace_id,
-				   __u64 time_stamp) {
+				   __u64 time_stamp,
+				   struct trace_key_t *trace_key) {
 	/*
 	 * ==========================================
 	 * Thread-Trace-ID (Single Redirect Trace)
@@ -631,6 +650,37 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 	 *                        ......
 	 * 采用的策略是：沿用上次trace_info保存的traceID。
 	 */
+
+	/*
+	 * Socket A actively sends a request as a client (traceID is 0), 
+	 * and associates socket B with the thread ID. Socket B receives a
+	 * response as the client, create new traceID as the starting point
+	 * for the entire tracking process. There is a problem in tracking
+	 * down like this, and a closed loop cannot be formed. This is due to
+	 * receiving a response from socket B to start the trace, but not being
+	 * able to get a request from socket B to finish the entire trace.
+	 *
+	 * (socket A) -- request ->
+	 *            |
+	 *       (socket B) <- response (traceID-1) [The starting point of trace]
+	 *               |
+	 *             (socket C) -- request -> (traceID-1)
+	 *                    |
+	 *                  (socket D) <- response (traceID-2)
+	 *                         |
+	 *                      (socket E) -- request -> (traceID-2)
+	 *                            ... ...  (Can't finish the whole trace)
+	 *
+	 * In order to avoid invalid association of the client, the behavior of creating
+	 * a new trace on socket B is cancelled.
+	 *
+	 * (socket A) ------- request -------->
+	 *        |
+	 *     thread-ID
+	 *        |
+	 *      (socket B) <---- response (Here, not create new trace.)
+	 */
+
 	__u64 pre_trace_id = 0;
 	if (is_socket_info_valid(socket_info_ptr) &&
 	    conn_info->direction == socket_info_ptr->direction &&
@@ -641,6 +691,26 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 	}
 
 	if (conn_info->direction == T_INGRESS) {
+		if (trace_info_ptr) {
+			/*
+			 * The following scenarios do not track:
+			 * ---------------------------------------
+			 *                 [traceID : 0]
+			 * (client-socket) request -> 
+			 *       |
+			 *     thread-ID
+			 *       |
+			 *     (client-socket) <- response
+			 */
+			if (trace_info_ptr->is_trace_id_zero &&
+			    conn_info->message_type == MSG_RESPONSE) {
+				*thread_trace_id = 0;
+				trace_map__delete(trace_key);
+				trace_stats->trace_map_count--;
+				return;
+			}
+		}
+
 		struct trace_info_t trace_info = { 0 };
 		*thread_trace_id = trace_info.thread_trace_id =
 				(pre_trace_id == 0 ? ++trace_conf->thread_trace_id : pre_trace_id);
@@ -651,13 +721,27 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 			    socket_info_ptr->peer_fd != 0)
 				trace_info.peer_fd = socket_info_ptr->peer_fd;
 		}
+		trace_info.is_trace_id_zero = false;
 		trace_info.update_time = time_stamp / NS_PER_SEC;
 		trace_info.socket_id = socket_id;
-		trace_map__update(&pid_tgid, &trace_info);
+		trace_map__update(trace_key, &trace_info);
 		if (!trace_info_ptr)
 			trace_stats->trace_map_count++;
 	} else { /* direction == T_EGRESS */
 		if (trace_info_ptr) {
+			/*
+			 * Skip the scene below:
+			 * ------------------------------------------------
+			 * (client-socket) request [traceID : 0] ->
+			 *        |
+			 *      thread-ID
+			 *	  |
+			 * 	(client-socket) request [traceID : 0] ->
+			 */
+			if (trace_info_ptr->is_trace_id_zero) {
+				*thread_trace_id = 0;
+				return;
+			}
 			/*
 			 * 追踪在不同socket之间进行，而对于在同一个socket的情况进行忽略。
 			 */
@@ -667,10 +751,25 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 				*thread_trace_id = 0;
 			}
 
+			trace_map__delete(trace_key);
 			trace_stats->trace_map_count--;
+		} else {
+			/*
+			 * Record the scene below:
+			 * ------------------------------------------------
+			 * (client-socket) request [traceID : 0] ->
+			 */
+			if (conn_info->message_type == MSG_REQUEST) {
+				*thread_trace_id = 0;
+				struct trace_info_t trace_info = { 0 };
+				trace_info.is_trace_id_zero = true;
+				trace_info.update_time = time_stamp / NS_PER_SEC;
+				trace_map__update(trace_key, &trace_info);
+				trace_stats->trace_map_count++;
+			} else {
+				*thread_trace_id = 0;
+			}	
 		}
-
-		trace_map__delete(&pid_tgid);
 	}
 }
 
@@ -780,8 +879,8 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	if (trace_stats == NULL)
 		return -1;
 
-	struct trace_info_t *trace_info_ptr =
-				trace_map__lookup(&pid_tgid);
+	struct trace_key_t trace_key = get_trace_key();
+	struct trace_info_t *trace_info_ptr = trace_map__lookup(&trace_key);
 
 	struct socket_info_t *socket_info_ptr = conn_info->socket_info_ptr;
 	// 'socket_id' used to resolve non-tracing between the same socket
@@ -794,11 +893,11 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 		socket_id = socket_info_ptr->uid;
 	}
 
-	// (jiping) set thread_trace_id = 0 for go process
 	if (conn_info->message_type != MSG_PRESTORE &&
-	    conn_info->message_type != MSG_RECONFIRM && !get_go_version())
-		trace_process(socket_info_ptr, conn_info, socket_id, pid_tgid, trace_info_ptr,
-			      trace_conf, trace_stats, &thread_trace_id, time_stamp);
+	    conn_info->message_type != MSG_RECONFIRM)
+		trace_process(socket_info_ptr, conn_info, socket_id, pid_tgid,
+			      trace_info_ptr, trace_conf , trace_stats,
+			      &thread_trace_id, time_stamp, &trace_key);
 
 	if (!is_socket_info_valid(socket_info_ptr)) {
 		if (socket_info_ptr && conn_info->direction == T_EGRESS) {
@@ -1497,8 +1596,8 @@ TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx *ctx) {
 	if (!(comm[0] == 'n' && comm[1] == 'g' && comm[2] == 'i' &&
 	      comm[3] == 'n' && comm[4] == 'x' && comm[5] == '\0'))
 		return 0;
-
-	struct trace_info_t *trace = trace_map__lookup(&id);
+	struct trace_key_t key = get_trace_key();
+	struct trace_info_t *trace = trace_map__lookup(&key);
 	if (trace && trace->peer_fd != 0 && trace->peer_fd != (__u32)fd) {
 		struct socket_info_t sk_info = { 0 };
 		sk_info.peer_fd = trace->peer_fd;

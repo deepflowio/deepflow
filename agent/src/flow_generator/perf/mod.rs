@@ -36,7 +36,7 @@ use public::l7_protocol::L7ProtocolEnum;
 
 use super::app_table::AppTable;
 use super::error::{Error, Result};
-use super::protocol_logs::{AppProtoHead, PostgresqlLog, ProtobufRpcWrapLog};
+use super::protocol_logs::{AppProtoHead, PostgresqlLog, ProtobufRpcWrapLog, SofaRpcLog};
 
 use crate::common::flow::{PacketDirection, SignalSource};
 use crate::common::l7_protocol_info::L7ProtocolInfo;
@@ -102,6 +102,7 @@ pub enum L7FlowPerfTable {
     HttpPerfData,
     PostgresqlLog,
     ProtobufRpcWrapLog,
+    SofaRpcLog,
 }
 
 impl L7FlowPerfTable {
@@ -110,6 +111,7 @@ impl L7FlowPerfTable {
         match self {
             L7FlowPerfTable::ProtobufRpcWrapLog(p) => p.reset(),
             L7FlowPerfTable::PostgresqlLog(p) => p.reset(),
+            L7FlowPerfTable::SofaRpcLog(p) => p.reset(),
             _ => {}
         }
     }
@@ -150,6 +152,7 @@ impl FlowPerf {
         match protocol {
             L7Protocol::DNS => Some(L7FlowPerfTable::from(DnsPerfData::new(rrt_cache.clone()))),
             L7Protocol::ProtobufRPC => Some(L7FlowPerfTable::from(ProtobufRpcWrapLog::new())),
+            L7Protocol::SofaRPC => Some(L7FlowPerfTable::from(SofaRpcLog::new())),
             L7Protocol::Dubbo => Some(L7FlowPerfTable::from(DubboPerfData::new(rrt_cache.clone()))),
             L7Protocol::Kafka => Some(L7FlowPerfTable::from(KafkaPerfData::new(rrt_cache.clone()))),
             L7Protocol::MQTT => Some(L7FlowPerfTable::from(MqttPerfData::new(rrt_cache.clone()))),

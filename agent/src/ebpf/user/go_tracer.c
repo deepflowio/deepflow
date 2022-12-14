@@ -167,13 +167,25 @@ static struct symbol syms[] = {
 		.symbol = "runtime.casgstatus",
 		.probe_func = "runtime_casgstatus",
 		.is_probe_ret = false,
-	},	
+	},
+	{
+		.type = GO_UPROBE,
+		.symbol = "runtime.newproc1",
+		.probe_func = "enter_runtime_newproc1",
+		.is_probe_ret = false,
+	},
+	{
+		.type = GO_UPROBE,
+		.symbol = "runtime.newproc1",
+		.probe_func = "exit_runtime_newproc1",
+		.is_probe_ret = true,
+	},
 	{
 		.type = GO_UPROBE,
 		.symbol = "crypto/tls.(*Conn).Write",
 		.probe_func = "uprobe_go_tls_write_enter",
 		.is_probe_ret = false,
-	},	
+	},
 	{
 		.type = GO_UPROBE,
 		.symbol = "crypto/tls.(*Conn).Write",

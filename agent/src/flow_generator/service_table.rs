@@ -20,6 +20,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use lru::LruCache;
 
 use crate::common::enums::TcpFlags;
+use crate::common::flow::PacketDirection;
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum ServiceKey {
@@ -223,6 +224,43 @@ impl ServiceTable {
 
     pub fn is_active_service(dst_score: u8) -> bool {
         dst_score == Self::MAX_SCORE
+    }
+
+    pub fn is_ebpf_active_udp_service(
+        &mut self,
+        src_key: ServiceKey,
+        dst_key: ServiceKey,
+        direction: PacketDirection,
+    ) -> bool {
+        if direction == PacketDirection::ClientToServer {
+            // if direction is ClientToServer, use dst_key which contains server ip and server port
+            return match dst_key {
+                ServiceKey::V4(dst_key) => {
+                    let mut dst_score = 0;
+                    if let Some(score) = self.ipv4.get(&dst_key) {
+                        dst_score = *score;
+                    }
+                    dst_score > 0
+                }
+                ServiceKey::V6(dst_key) => {
+                    let mut dst_score = 0;
+                    if let Some(score) = self.ipv6.get(&dst_key) {
+                        dst_score = *score;
+                    }
+                    dst_score > 0
+                }
+            };
+        } else {
+            match src_key {
+                ServiceKey::V4(src_key) => {
+                    self.ipv4.put(src_key, 1);
+                }
+                ServiceKey::V6(src_key) => {
+                    self.ipv6.put(src_key, 1);
+                }
+            }
+            return true;
+        }
     }
 
     fn get_first_packet_score(&mut self, src_key: ServiceKey, dst_key: ServiceKey) -> (u8, u8) {
