@@ -49,6 +49,11 @@ pub fn write_u16_be(bs: &mut [u8], v: u16) {
     bs[0..2].copy_from_slice(v.to_be_bytes().as_slice())
 }
 
+pub fn write_u32_be(bs: &mut [u8], v: u32) {
+    assert!(bs.len() >= 4);
+    bs[0..4].copy_from_slice(v.to_be_bytes().as_slice())
+}
+
 pub fn write_u64_be(bs: &mut [u8], v: u64) {
     assert!(bs.len() >= 8);
     bs[0..8].copy_from_slice(v.to_be_bytes().as_slice())
