@@ -87,6 +87,13 @@ jobs:
           # ossutil cp -rf cli/bin/deepflow-ctl.darwin-amd64 oss://deepflow-ce/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/osx/amd64/deepflow-ctl
           # ossutil cp -rf cli/bin/deepflow-ctl.darwin-arm64 oss://deepflow-ce/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/osx/arm64/deepflow-ctl
 
+      - name: upload cli v6.1.8 artifacts
+        if: "startsWith(github.ref, 'refs/tags/')"
+        run: |
+          ossutil cp -rf cli/bin/deepflow-ctl.linux-amd64 oss://deepflow-ce/bin/ctl/v6.1.8/linux/amd64/deepflow-ctl
+          ossutil cp -rf cli/bin/deepflow-ctl.linux-arm64 oss://deepflow-ce/bin/ctl/v6.1.8/linux/arm64/deepflow-ctl
+
+
       # - name: Prepare for upload package
       #   shell: bash
       #   run: |

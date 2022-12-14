@@ -371,11 +371,11 @@ jobs:
           ossutil cp -rf agent/artifacts-deb.zip oss://deepflow-ce/deb/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/arm64/deepflow-agent-deb.zip
           ossutil cp -rf agent/output/target/aarch64-unknown-linux-musl/release/deepflow-agent-ctl oss://deepflow-ce/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/linux/arm64/deepflow-agent-ctl
           ossutil cp -rf agent/bin-package/deepflow-agent.tar.gz  oss://deepflow-ce/bin/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/arm64/deepflow-agent.tar.gz
-          
-      - name: upload agent stable artifacts
+
+      - name: upload agent v6.1.8 artifacts
         if: "startsWith(github.ref, 'refs/tags/')"
         run: |
-          ossutil cp -rf agent/artifacts-rpm.zip oss://deepflow-ce/rpm/agent/stable/linux/arm64/deepflow-agent-rpm.zip
-          ossutil cp -rf agent/artifacts-deb.zip oss://deepflow-ce/deb/agent/stable/linux/arm64/deepflow-agent-deb.zip
-          ossutil cp -rf agent/output/target/aarch64-unknown-linux-musl/release/deepflow-agent-ctl oss://deepflow-ce/bin/ctl/stable/linux/arm64/deepflow-agent-ctl
-          ossutil cp -rf agent/bin-package/deepflow-agent.tar.gz  oss://deepflow-ce/bin/agent/stable/linux/arm64/deepflow-agent.tar.gz
+          ossutil cp -rf agent/artifacts-rpm.zip oss://deepflow-ce/rpm/agent/v6.1.8/linux/arm64/deepflow-agent-rpm.zip
+          ossutil cp -rf agent/artifacts-deb.zip oss://deepflow-ce/deb/agent/v6.1.8/linux/arm64/deepflow-agent-deb.zip
+          ossutil cp -rf agent/output/target/aarch64-unknown-linux-musl/release/deepflow-agent-ctl oss://deepflow-ce/bin/ctl/v6.1.8/linux/arm64/deepflow-agent-ctl
+          ossutil cp -rf agent/bin-package/deepflow-agent.tar.gz  oss://deepflow-ce/bin/agent/v6.1.8/linux/arm64/deepflow-agent.tar.gz
