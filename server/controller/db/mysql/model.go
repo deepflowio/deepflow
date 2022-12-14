@@ -1239,3 +1239,22 @@ type PcapPolicy struct {
 func (PcapPolicy) TableName() string {
 	return "pcap_policy"
 }
+
+type DialTestTask struct {
+	ID            int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name          string    `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
+	Protocol      int       `gorm:"column:protocol;type:int;not null" json:"PROTOCOL"` // 1.ICMP
+	Host          string    `gorm:"column:host;type:varchar(256);not null" json:"HOST"`
+	OvertimeTime  int       `gorm:"column:overtime_time;type:int;default:2000" json:"OVERTIME_TIME"`
+	Payload       int       `gorm:"column:payload;type:int;default:64" json:"PAYLOAD"`
+	TTL           int       `gorm:"column:ttl;type:smallint;default:64" json:"TTL"`
+	DialLocation  string    `gorm:"column:dial_location;type:varchar(256);not null" json:"DIAL_LOCATION"`
+	DialFrequency int       `gorm:"column:dial_frequency;type:int;default:1000" json:"DIAL_FREQUENCY"`
+	PCAP          []byte    `gorm:"column:pcap;type:mediumblob" json:"PCAP"`
+	CreatedAt     time.Time `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
+	UpdatedAt     time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
+}
+
+func (DialTestTask) TableName() string {
+	return "dial_test_task"
+}
