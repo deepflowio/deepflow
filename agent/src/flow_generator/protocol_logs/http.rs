@@ -935,14 +935,11 @@ impl HttpLog {
                 self.info.span_id = id;
             }
         }
-        if !self.l7_log_dynamic_config.x_request_id_origin.is_empty()
-            && key_bytes == self.l7_log_dynamic_config.x_request_id_lower.as_bytes()
-        {
+        if key_bytes == self.l7_log_dynamic_config.x_request_id.as_bytes() {
             self.info.x_request_id = String::from_utf8_lossy(val.as_ref()).into_owned();
         }
         if direction == PacketDirection::ClientToServer
-            && !self.l7_log_dynamic_config.proxy_client_origin.is_empty()
-            && key_bytes == self.l7_log_dynamic_config.proxy_client_lower.as_bytes()
+            && key_bytes == self.l7_log_dynamic_config.proxy_client.as_bytes()
         {
             self.info.client_ip = String::from_utf8_lossy(val.as_ref()).into_owned();
         }
@@ -1207,6 +1204,8 @@ pub fn get_http_resp_info(line_info: &str) -> Result<(String, u16)> {
 mod tests {
     use crate::common::MetaPacket;
     use crate::utils::test::Capture;
+
+    use std::collections::HashSet;
     use std::fs;
     use std::mem::size_of;
     use std::path::Path;
@@ -1236,17 +1235,17 @@ mod tests {
                 None => continue,
             };
 
+            let mut trace_set = HashSet::new();
+            trace_set.insert(TraceType::Sw8.to_checker_string());
+            let mut span_set = HashSet::new();
+            span_set.insert(TraceType::Sw8.to_checker_string());
             let mut http = HttpLog::default();
-            http.l7_log_dynamic_config = L7LogDynamicConfig {
-                proxy_client_origin: "".to_string(),
-                proxy_client_lower: "".to_string(),
-                proxy_client_with_colon: "".to_string(),
-                x_request_id_origin: "".to_string(),
-                x_request_id_lower: "".to_string(),
-                x_request_id_with_colon: "".to_string(),
-                trace_types: vec![TraceType::Sw8],
-                span_types: vec![TraceType::Sw8],
-            };
+            http.l7_log_dynamic_config = L7LogDynamicConfig::new(
+                "".to_owned(),
+                "".to_owned(),
+                vec![TraceType::Sw8],
+                vec![TraceType::Sw8],
+            );
             let _ = http.parse(
                 payload,
                 packet.lookup_key.proto,
