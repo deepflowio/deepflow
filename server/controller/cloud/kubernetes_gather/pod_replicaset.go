@@ -72,6 +72,7 @@ func (k *KubernetesGather) getReplicaSetsAndReplicaSetControllers() (podRSs []mo
 		labelSlice := cloudcommon.StringInterfaceMapKVs(labels, ":")
 		labelString := strings.Join(labelSlice, ", ")
 		if !k.podGroupLcuuids.Contains(podGroupLcuuid) {
+			podGroupLcuuid = uID
 			// ReplicaSetController类型名称去掉最后的'-' + hash值
 			targetIndex := strings.LastIndex(name, "-")
 			newName := name[:targetIndex]

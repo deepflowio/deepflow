@@ -107,9 +107,19 @@ func getInfo(cmd *cobra.Command, domainLcuuid, domainName, resource string) {
 		resources := strings.Split(resource, ",")
 		for _, r := range resources {
 			fmt.Println(r)
-			rData := data.Get(r)
-			for i := range rData.MustArray() {
-				common.PrettyPrint(rData.GetIndex(i))
+			domainData := data.Get(r)
+			for i := range domainData.MustArray() {
+				common.PrettyPrint(domainData.GetIndex(i))
+			}
+			subDomainResources := data.Get("SubDomainResources").MustMap()
+			for _, subDomainData := range subDomainResources {
+				rscData, ok := subDomainData.(map[string]interface{})[r]
+				if !ok {
+					continue
+				}
+				for _, d := range rscData.([]interface{}) {
+					common.PrettyPrint(d)
+				}
 			}
 		}
 	}

@@ -58,9 +58,9 @@ use public::counter::{Countable, CounterType, CounterValue, OwnedCountable};
 use public::proto::trident::SocketType;
 use public::queue::Receiver;
 #[cfg(unix)]
+use public::utils::net::MAC_ADDR_LEN;
 use public::utils::net::{
     get_route_src_ip_and_mac, get_route_src_ip_interface_name, neighbor_lookup, MacAddr,
-    MAC_ADDR_LEN,
 };
 
 #[cfg(windows)]
@@ -243,8 +243,8 @@ impl IpSender {
                 IPV4_PACKET_SIZE
             },
             remote: match remote {
-                IpAddr::V4(ip) => SockAddr::from(SocketAddrV4::new(ip, 0)),
-                IpAddr::V6(ip) => SockAddr::from(SocketAddrV6::new(ip, 0, 0, 0)),
+                IpAddr::V4(ip) => SockAddr::from(SocketAddrV4::new(ip.clone(), 0)),
+                IpAddr::V6(ip) => SockAddr::from(SocketAddrV6::new(ip.clone(), 0, 0, 0)),
             },
             dst_ip: remote.clone(),
         })
