@@ -566,14 +566,16 @@ impl TraceType {
 
     fn check(&self, context: &str) -> bool {
         match &*self {
-            TraceType::XB3 => context.to_lowercase() == TRACE_TYPE_XB3,
-            TraceType::XB3Span => context.to_lowercase() == TRACE_TYPE_XB3SPAN,
-            TraceType::Uber => context.to_lowercase() == TRACE_TYPE_UBER,
-            TraceType::Sw6 => context.to_lowercase() == TRACE_TYPE_SW6,
-            TraceType::Sw8 => context.to_lowercase() == TRACE_TYPE_SW8,
-            TraceType::TraceParent => context.to_lowercase() == TRACE_TYPE_TRACE_PARENT,
-            TraceType::NewRpcTraceContext => context.to_lowercase() == SOFA_NEW_RPC_TRACE_CTX_KEY,
-            TraceType::Customize(tag) => context.to_lowercase() == tag.to_lowercase(),
+            TraceType::XB3 => context.to_ascii_lowercase() == TRACE_TYPE_XB3,
+            TraceType::XB3Span => context.to_ascii_lowercase() == TRACE_TYPE_XB3SPAN,
+            TraceType::Uber => context.to_ascii_lowercase() == TRACE_TYPE_UBER,
+            TraceType::Sw6 => context.to_ascii_lowercase() == TRACE_TYPE_SW6,
+            TraceType::Sw8 => context.to_ascii_lowercase() == TRACE_TYPE_SW8,
+            TraceType::TraceParent => context.to_ascii_lowercase() == TRACE_TYPE_TRACE_PARENT,
+            TraceType::NewRpcTraceContext => {
+                context.to_ascii_lowercase() == SOFA_NEW_RPC_TRACE_CTX_KEY
+            }
+            TraceType::Customize(tag) => context.to_ascii_lowercase() == tag.to_ascii_lowercase(),
             _ => false,
         }
     }
