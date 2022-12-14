@@ -32,11 +32,11 @@ vtap_group_id: g-xxxxxx
 #max_collect_pps: 200
 
 ## NPB (Packet Broker) Traffic Limit
-## Unit: Mbps. Default: 1000. Range: [1, 10000]
+## Unit: Mbps. Default: 1000. Range: [1, 100000]
 #max_npb_bps: 1000
 
 ## NPB (Packet Broker) Circuit Breaker Threshold
-## Unit: Mbps. Default: 0. Range: [0, 10000]
+## Unit: Mbps. Default: 0. Range: [0, 100000]
 ## Note: When the outbound direction of the NPB interface
 ##   reaches or exceeds the threshold, the distribution will be
 ##   stopped, and then the distribution will be resumed if the
