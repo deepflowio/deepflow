@@ -15,6 +15,7 @@
  */
 
 use std::cmp::{max, min};
+use std::collections::HashSet;
 use std::fmt;
 use std::net::IpAddr;
 use std::net::Ipv4Addr;
@@ -578,6 +579,20 @@ impl TraceType {
         }
     }
 
+    pub fn to_checker_string(&self) -> String {
+        match self {
+            &TraceType::XB3 => TRACE_TYPE_XB3.into(),
+            &TraceType::XB3Span => TRACE_TYPE_XB3SPAN.into(),
+            &TraceType::Uber => TRACE_TYPE_UBER.into(),
+            &TraceType::Sw6 => TRACE_TYPE_SW6.into(),
+            &TraceType::Sw8 => TRACE_TYPE_SW8.into(),
+            &TraceType::TraceParent => TRACE_TYPE_TRACE_PARENT.into(),
+            &TraceType::NewRpcTraceContext => SOFA_NEW_RPC_TRACE_CTX_KEY.into(),
+            &TraceType::Customize(ref tag) => tag.to_ascii_lowercase(),
+            _ => "".into(),
+        }
+    }
+
     pub fn to_string(&self) -> String {
         match &*self {
             TraceType::XB3 => TRACE_TYPE_XB3.to_string(),
@@ -600,34 +615,54 @@ impl Default for TraceType {
 
 #[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct L7LogDynamicConfig {
-    pub proxy_client_origin: String,
-    pub proxy_client_lower: String,
-    pub proxy_client_with_colon: String,
-    pub x_request_id_origin: String,
-    pub x_request_id_lower: String,
-    pub x_request_id_with_colon: String,
+    // in lowercase
+    pub proxy_client: String,
+    // in lowercase
+    pub x_request_id: String,
 
     pub trace_types: Vec<TraceType>,
     pub span_types: Vec<TraceType>,
+
+    trace_set: HashSet<String>,
+    span_set: HashSet<String>,
 }
 
 impl L7LogDynamicConfig {
-    pub fn is_trace_id(&self, context: &str) -> bool {
-        for trace in &self.trace_types {
-            if trace.check(context) {
-                return true;
-            }
+    pub fn new(
+        mut proxy_client: String,
+        mut x_request_id: String,
+        trace_types: Vec<TraceType>,
+        span_types: Vec<TraceType>,
+    ) -> Self {
+        proxy_client.make_ascii_lowercase();
+        x_request_id.make_ascii_lowercase();
+
+        let mut trace_set = HashSet::new();
+        for t in trace_types.iter() {
+            trace_set.insert(t.to_checker_string());
         }
-        return false;
+
+        let mut span_set = HashSet::new();
+        for t in span_types.iter() {
+            span_set.insert(t.to_checker_string());
+        }
+
+        Self {
+            proxy_client,
+            x_request_id,
+            trace_types,
+            span_types,
+            trace_set,
+            span_set,
+        }
+    }
+
+    pub fn is_trace_id(&self, context: &str) -> bool {
+        self.trace_set.contains(context)
     }
 
     pub fn is_span_id(&self, context: &str) -> bool {
-        for span in &self.span_types {
-            if span.check(context) {
-                return true;
-            }
-        }
-        return false;
+        self.span_set.contains(context)
     }
 }
 
@@ -839,26 +874,18 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
             log_parser: LogParserConfig {
                 l7_log_collect_nps_threshold: conf.l7_log_collect_nps_threshold,
                 l7_log_session_aggr_timeout: conf.yaml_config.l7_log_session_aggr_timeout,
-                l7_log_dynamic: L7LogDynamicConfig {
-                    proxy_client_origin: conf.http_log_proxy_client.to_string(),
-                    proxy_client_lower: conf.http_log_proxy_client.to_string().to_lowercase(),
-                    proxy_client_with_colon: format!("{}: ", conf.http_log_proxy_client),
-
-                    x_request_id_origin: conf.http_log_x_request_id.to_string(),
-                    x_request_id_lower: conf.http_log_x_request_id.to_string().to_lowercase(),
-                    x_request_id_with_colon: format!("{}: ", conf.http_log_x_request_id),
-
-                    trace_types: conf
-                        .http_log_trace_id
+                l7_log_dynamic: L7LogDynamicConfig::new(
+                    conf.http_log_proxy_client.to_string().to_ascii_lowercase(),
+                    conf.http_log_x_request_id.to_string().to_ascii_lowercase(),
+                    conf.http_log_trace_id
                         .split(',')
                         .map(|item| TraceType::from(item))
                         .collect(),
-                    span_types: conf
-                        .http_log_span_id
+                    conf.http_log_span_id
                         .split(',')
                         .map(|item| TraceType::from(item))
                         .collect(),
-                },
+                ),
             },
             debug: DebugConfig {
                 vtap_id: conf.vtap_id as u16,
