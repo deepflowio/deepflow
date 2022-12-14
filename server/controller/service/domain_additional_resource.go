@@ -54,23 +54,21 @@ func newAddtionalResourceToolDataSet(regionUUID string) *addtionalResourceToolDa
 }
 
 func ApplyDomainAddtionalResource(reqData model.AdditionalResource) error {
-	log.Infof("apply domain additinal resource: %#v", reqData)
+	log.Infof("apply domain additional resource: %#v", reqData)
 	domainUUIDToToolDataSet, err := generateToolDataSet(reqData)
 	if err != nil {
 		return err
 	}
-	log.Infof("generated tool data set: %#v", domainUUIDToToolDataSet)
 	domainUUIDToCloudModelData, err := generateCloudModelData(domainUUIDToToolDataSet)
 	if err != nil {
 		return err
 	}
-	log.Infof("generated cloud model data: %#v", domainUUIDToCloudModelData)
 	dbItems, err := generateDataToInsertDB(domainUUIDToCloudModelData)
 	if err != nil {
 		return err
 	}
 	err = fullUpdateDB(dbItems)
-	return nil
+	return err
 }
 
 func fullUpdateDB(dbItems []mysql.DomainAdditionalResource) error {
@@ -79,16 +77,17 @@ func fullUpdateDB(dbItems []mysql.DomainAdditionalResource) error {
 	if err != nil {
 		return NewError(
 			common.SERVER_ERROR,
-			fmt.Sprintf("apply domain additional resources failed: %s", err.Error()),
+			fmt.Sprintf("apply domain additional resources failed, delete error: %s", err.Error()),
 		)
 	}
 	err = mysql.Db.Create(&dbItems).Error
 	if err != nil {
 		return NewError(
 			common.SERVER_ERROR,
-			fmt.Sprintf("apply domain additional resources failed: %s", err.Error()),
+			fmt.Sprintf("apply domain additional resources failed, insert error: %s", err.Error()),
 		)
 	}
+	log.Debugf("apply domain additional resources success: %#v", dbItems)
 	return nil
 }
 
@@ -480,6 +479,7 @@ func generateCloudModelData(domainUUIDToToolDataSet map[string]*addtionalResourc
 			}
 		}
 		domainUUIDToCloudModelData[domainUUID] = cloudMD
+		log.Debugf("domain (uuid: %s) cloud data: %#v", cloudMD)
 	}
 	return domainUUIDToCloudModelData, nil
 }
