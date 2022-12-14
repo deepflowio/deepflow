@@ -206,7 +206,7 @@ pub struct NpbBandwidthWatcher {
 
 impl NpbBandwidthWatcher {
     const BANDWIDTH_DEFAULT: u64 = 0;
-    const BANDWIDTH_MAX: u64 = 10000000000; // 10 Gbps
+    const BANDWIDTH_MAX: u64 = 100_000_000_000; // 100 Gbps
     const INTERVAL_DEFAULT: u64 = 10;
     const INTERVAL_MIN: u64 = 1;
     const INTERVAL_MAX: u64 = 60;
@@ -243,14 +243,23 @@ impl NpbBandwidthWatcher {
         self.watcher.npb_bps_threshold.store(threshold, Relaxed);
     }
 
-    pub fn set_nic_rate(&self, threshold: u64) {
+    pub fn set_nic_rate(&self, mut threshold: u64) {
+        if threshold > Self::BANDWIDTH_MAX {
+            info!(
+                "Invalid npb bandwidth threshold {} set to default value {}",
+                threshold,
+                Self::BANDWIDTH_DEFAULT
+            );
+            threshold = Self::BANDWIDTH_DEFAULT
+        }
+
         self.watcher.nic_bps_threshold.store(threshold, Relaxed);
     }
 
     pub fn set_interval(&self, mut interval: u64) {
         if interval < Self::INTERVAL_MIN || interval > Self::INTERVAL_MAX {
             info!(
-                "Invalid interfval {} set to default value {}",
+                "Invalid interval {} set to default value {}",
                 interval,
                 Self::INTERVAL_DEFAULT
             );
