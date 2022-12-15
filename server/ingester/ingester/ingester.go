@@ -28,6 +28,7 @@ import (
 	"github.com/deepflowys/deepflow/server/ingester/ckmonitor"
 	"github.com/deepflowys/deepflow/server/ingester/datasource"
 	"github.com/deepflowys/deepflow/server/libs/debug"
+	"github.com/deepflowys/deepflow/server/libs/grpc"
 	"github.com/deepflowys/deepflow/server/libs/logger"
 	"github.com/deepflowys/deepflow/server/libs/pool"
 	"github.com/deepflowys/deepflow/server/libs/receiver"
@@ -59,8 +60,9 @@ import (
 var log = logging.MustGetLogger("ingester")
 
 const (
-	INFLUXDB_RELAY_PORT = 20048
-	PROFILER_PORT       = 9526
+	INFLUXDB_RELAY_PORT          = 20048
+	PROFILER_PORT                = 9526
+	MAX_SLAVE_PLATFORMDATA_COUNT = 32
 )
 
 func Start(configPath string, shared *servercommon.ControllerIngesterShared) []io.Closer {
@@ -149,20 +151,36 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 		err = issu.RunRenameTable(ds)
 		checkError(err)
 
+		// platformData manager init
+		controllers := make([]net.IP, len(cfg.ControllerIPs))
+		for i, ipString := range cfg.ControllerIPs {
+			controllers[i] = net.ParseIP(ipString)
+			if controllers[i].To4() != nil {
+				controllers[i] = controllers[i].To4()
+			}
+		}
+		platformDataManager := grpc.NewPlatformDataManager(
+			controllers,
+			int(cfg.ControllerPort),
+			MAX_SLAVE_PLATFORMDATA_COUNT,
+			cfg.GrpcBufferSize,
+			cfg.NodeIP,
+			receiver)
+
 		// 写遥测数据
-		flowMetrics, err := flowmetrics.NewFlowMetrics(flowMetricsConfig, receiver)
+		flowMetrics, err := flowmetrics.NewFlowMetrics(flowMetricsConfig, receiver, platformDataManager)
 		checkError(err)
 		flowMetrics.Start()
 		closers = append(closers, flowMetrics)
 
 		// 写流日志数据
-		flowLog, err := flowlog.NewFlowLog(flowLogConfig, receiver)
+		flowLog, err := flowlog.NewFlowLog(flowLogConfig, receiver, platformDataManager)
 		checkError(err)
 		flowLog.Start()
 		closers = append(closers, flowLog)
 
 		// 写ext_metrics数据
-		extMetrics, err := ext_metrics.NewExtMetrics(extMetricsConfig, receiver)
+		extMetrics, err := ext_metrics.NewExtMetrics(extMetricsConfig, receiver, platformDataManager)
 		checkError(err)
 		extMetrics.Start()
 		closers = append(closers, extMetrics)
