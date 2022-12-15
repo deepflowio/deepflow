@@ -436,12 +436,9 @@ impl<'a> MetaPacket<'a> {
                 let vlan_tag =
                     read_u16_be(&packet[FIELD_OFFSET_ETH_TYPE + VLAN_HEADER_SIZE + ETH_TYPE_LEN..]);
                 self.vlan = vlan_tag & VLAN_ID_MASK;
-                eth_type = EthernetType::try_from(read_u16_be(
+                eth_type = EthernetType::from(read_u16_be(
                     &packet[FIELD_OFFSET_ETH_TYPE + vlan_tag_size..],
-                ))
-                .map_err(|e| {
-                    error::Error::ParsePacketFailed(format!("parse eth_type failed: {}", e))
-                })?;
+                ));
             }
         }
         self.lookup_key.eth_type = eth_type;
@@ -521,9 +518,7 @@ impl<'a> MetaPacket<'a> {
                 let label = read_u32_be(&packet[FIELD_OFFSET_PAYLOAD_LEN + vlan_tag_size..]);
                 self.data_offset_ihl_or_fl4b |= ((label >> 16) & 0xf) as u8;
                 let r = self.update_ip6_opt(vlan_tag_size);
-                ip_protocol = IpProtocol::try_from(r.0).map_err(|e| {
-                    error::Error::ParsePacketFailed(format!("parse ip_protocol failed: {}", e))
-                })?;
+                ip_protocol = IpProtocol::from(r.0);
                 let options_length = r.1;
                 self.l2_l3_opt_size += options_length;
                 self.packet_len = payload as usize
@@ -592,10 +587,7 @@ impl<'a> MetaPacket<'a> {
                 self.l2_l3_opt_size = vlan_tag_size + l3_opt_size as usize;
                 self.l3_payload_len = self.packet_len - (packet.len() - size_checker as usize);
 
-                ip_protocol = IpProtocol::try_from(packet[IPV4_PROTO_OFFSET + vlan_tag_size])
-                    .map_err(|e| {
-                        error::Error::ParsePacketFailed(format!("parse ip_protocol failed: {}", e))
-                    })?;
+                ip_protocol = IpProtocol::from(packet[IPV4_PROTO_OFFSET + vlan_tag_size]);
                 self.lookup_key.proto = ip_protocol;
 
                 let frag = read_u16_be(&packet[FIELD_OFFSET_FRAG + vlan_tag_size..]);
@@ -747,8 +739,6 @@ impl<'a> MetaPacket<'a> {
                     if let IpAddr::V6(ip) = self.lookup_key.src_ip {
                         self.nd_reply_or_arp_request =
                             self.nd_reply_or_arp_request && !is_unicast_link_local(&ip);
-                    } else {
-                        unreachable!()
                     }
                 }
                 self.payload_len =

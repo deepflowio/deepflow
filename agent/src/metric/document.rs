@@ -352,7 +352,7 @@ impl From<Tagger> for metric::MiniTag {
                 mac1: t.mac.into(),
                 direction: t.direction as u32,
                 tap_side: TapSide::from(t.direction) as u32,
-                protocol: t.protocol as u32,
+                protocol: u8::from(t.protocol) as u32,
                 acl_gid: t.acl_gid as u32,
                 server_port: t.server_port as u32,
                 vtap_id: t.vtap_id as u32,

@@ -109,9 +109,9 @@ impl Builder {
     fn skip_ethernet(&self) -> BpfBuilder {
         let mut bpf_builder = BpfBuilder::default();
         let eth_type = if self.is_ipv6 {
-            EthernetType::Ipv6 as u32
+            u16::from(EthernetType::Ipv6) as u32
         } else {
-            EthernetType::Ipv4 as u32
+            u16::from(EthernetType::Ipv4) as u32
         };
 
         bpf_builder
@@ -121,7 +121,7 @@ impl Builder {
             }))
             .append(BpfSyntax::JumpIf(JumpIf {
                 cond: JumpTest::JumpNotEqual,
-                val: EthernetType::Dot1Q as u32,
+                val: u16::from(EthernetType::Dot1Q) as u32,
                 skip_true: 2,
                 skip_false: 0,
             }))
@@ -173,7 +173,7 @@ impl Builder {
             }))
             .append(BpfSyntax::JumpIf(JumpIf {
                 cond: JumpTest::JumpNotEqual,
-                val: IpProtocol::Udp as u32,
+                val: u8::from(IpProtocol::Udp) as u32,
                 skip_true: 4,
                 ..Default::default()
             }))
@@ -201,7 +201,7 @@ impl Builder {
             }))
             .append(BpfSyntax::JumpIf(JumpIf {
                 cond: JumpTest::JumpNotEqual,
-                val: IpProtocol::Gre as u32,
+                val: u8::from(IpProtocol::Gre) as u32,
                 skip_true: 2,
                 ..Default::default()
             }))
@@ -218,7 +218,7 @@ impl Builder {
             .branch(
                 JumpIf {
                     cond: JumpTest::JumpNotEqual,
-                    val: IpProtocol::Tcp as u32,
+                    val: u8::from(IpProtocol::Tcp) as u32,
                     ..Default::default()
                 },
                 Self::bypass_modifier,
@@ -258,7 +258,7 @@ impl Builder {
             }))
             .append(BpfSyntax::JumpIf(JumpIf {
                 cond: JumpTest::JumpNotEqual,
-                val: IpProtocol::Udp as u32,
+                val: u8::from(IpProtocol::Udp) as u32,
                 skip_true: 4,
                 ..Default::default()
             }))
@@ -286,7 +286,7 @@ impl Builder {
             }))
             .append(BpfSyntax::JumpIf(JumpIf {
                 cond: JumpTest::JumpNotEqual,
-                val: IpProtocol::Gre as u32,
+                val: u8::from(IpProtocol::Gre) as u32,
                 skip_true: 2,
                 ..Default::default()
             }))
@@ -303,7 +303,7 @@ impl Builder {
             .branch(
                 JumpIf {
                     cond: JumpTest::JumpNotEqual,
-                    val: IpProtocol::Tcp as u32,
+                    val: u8::from(IpProtocol::Tcp) as u32,
                     ..Default::default()
                 },
                 Self::bypass_modifier,
@@ -356,14 +356,14 @@ impl Builder {
             }))
             .append(BpfSyntax::JumpIf(JumpIf {
                 cond: JumpTest::JumpNotEqual,
-                val: IpProtocol::Tcp as u32,
+                val: u8::from(IpProtocol::Tcp) as u32,
                 skip_false: 1,
                 ..Default::default()
             }))
             .branch(
                 JumpIf {
                     cond: JumpTest::JumpNotEqual,
-                    val: IpProtocol::Udp as u32,
+                    val: u8::from(IpProtocol::Udp) as u32,
                     ..Default::default()
                 },
                 Self::bypass_modifier,
@@ -460,7 +460,7 @@ impl Builder {
             }))
             .append(BpfSyntax::JumpIf(JumpIf {
                 cond: JumpTest::JumpNotEqual,
-                val: IpProtocol::Tcp as u32,
+                val: u8::from(IpProtocol::Tcp) as u32,
                 skip_true: 2,
                 ..Default::default()
             }))
@@ -477,7 +477,7 @@ impl Builder {
             .branch(
                 JumpIf {
                     cond: JumpTest::JumpNotEqual,
-                    val: IpProtocol::Udp as u32,
+                    val: u8::from(IpProtocol::Udp) as u32,
                     ..Default::default()
                 },
                 Self::bypass_modifier,
@@ -521,7 +521,7 @@ impl Builder {
             }))
             .append(BpfSyntax::JumpIf(JumpIf {
                 cond: JumpTest::JumpNotEqual,
-                val: IpProtocol::Tcp as u32,
+                val: u8::from(IpProtocol::Tcp) as u32,
                 skip_true: 2,
                 ..Default::default()
             }))
@@ -538,7 +538,7 @@ impl Builder {
             .branch(
                 JumpIf {
                     cond: JumpTest::JumpNotEqual,
-                    val: IpProtocol::Udp as u32,
+                    val: u8::from(IpProtocol::Udp) as u32,
                     ..Default::default()
                 },
                 Self::bypass_modifier,
@@ -589,7 +589,7 @@ impl Builder {
             }))
             .append(BpfSyntax::JumpIf(JumpIf {
                 cond: JumpTest::JumpNotEqual,
-                val: IpProtocol::Tcp as u32,
+                val: u8::from(IpProtocol::Tcp) as u32,
                 skip_true: 2,
                 ..Default::default()
             }))
@@ -606,7 +606,7 @@ impl Builder {
             .branch(
                 JumpIf {
                     cond: JumpTest::JumpNotEqual,
-                    val: IpProtocol::Udp as u32,
+                    val: u8::from(IpProtocol::Udp) as u32,
                     ..Default::default()
                 },
                 Self::bypass_modifier,
@@ -646,7 +646,7 @@ impl Builder {
             }))
             .append(BpfSyntax::JumpIf(JumpIf {
                 cond: JumpTest::JumpNotEqual,
-                val: IpProtocol::Tcp as u32,
+                val: u8::from(IpProtocol::Tcp) as u32,
                 skip_true: 2,
                 ..Default::default()
             }))
@@ -663,7 +663,7 @@ impl Builder {
             .branch(
                 JumpIf {
                     cond: JumpTest::JumpNotEqual,
-                    val: IpProtocol::Udp as u32,
+                    val: u8::from(IpProtocol::Udp) as u32,
                     ..Default::default()
                 },
                 Self::bypass_modifier,
