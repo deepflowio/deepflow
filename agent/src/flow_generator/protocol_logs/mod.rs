@@ -287,7 +287,7 @@ impl From<AppProtoLogsBaseInfo> for flow_log::AppProtoLogsBaseInfo {
             l3_epc_id_dst: f.l3_epc_id_dst,
             port_src: f.port_src as u32,
             port_dst: f.port_dst as u32,
-            protocol: f.protocol as u32,
+            protocol: u8::from(f.protocol) as u32,
             is_vip_interface_src: f.is_vip_interface_src as u32,
             is_vip_interface_dst: f.is_vip_interface_dst as u32,
             req_tcp_seq: f.req_tcp_seq,
