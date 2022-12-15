@@ -272,7 +272,7 @@ impl FlowMap {
             nodes.push(node);
             time_set.insert(removed_key);
         }
-        Self::update_stats_counter(&self.stats_counter, &node_map);
+        Self::update_stats_counter(&self.stats_counter, node_map.len() as u64, 0);
         self.node_map.replace(node_map);
         self.time_set.replace(time_set);
 
@@ -310,9 +310,11 @@ impl FlowMap {
         };
 
         let pkt_timestamp = meta_packet.lookup_key.timestamp;
+        let max_depth;
         match node_map.get_mut(&pkt_key) {
             // 找到一组可能的 FlowNode
             Some(nodes) => {
+                max_depth = nodes.len();
                 let ignore_l2_end = config.ignore_l2_end;
                 let ignore_tor_mac = config.ignore_tor_mac;
                 let trident_type = config.trident_type;
@@ -325,6 +327,11 @@ impl FlowMap {
                     let time_key = FlowTimeKey::new(pkt_timestamp, pkt_key);
                     time_set.insert(time_key);
                     nodes.push(node);
+                    Self::update_stats_counter(
+                        &self.stats_counter,
+                        node_map.len() as u64,
+                        1 + max_depth as u64,
+                    );
                     self.node_map.replace(node_map);
                     self.time_set.replace(time_set);
                     return;
@@ -362,9 +369,11 @@ impl FlowMap {
                 time_set.insert(time_key);
 
                 node_map.insert(pkt_key, vec![node]);
+
+                max_depth = 1;
             }
         }
-        Self::update_stats_counter(&self.stats_counter, &node_map);
+        Self::update_stats_counter(&self.stats_counter, node_map.len() as u64, max_depth as u64);
         self.node_map.replace(node_map);
         self.time_set.replace(time_set);
         // go实现只有插入node的时候，插入的节点数目大于ring buffer 的capacity 才会执行policy_getter,
@@ -1454,22 +1463,9 @@ impl FlowMap {
         node.tagged_flow.tag.policy_data = node.policy_data_cache.clone();
     }
 
-    fn update_stats_counter(
-        stats_counter: &FlowMapCounter,
-        node_map: &HashMap<FlowMapKey, Vec<Box<FlowNode>>>,
-    ) {
-        stats_counter
-            .slots
-            .swap(node_map.len() as u64, Ordering::Relaxed);
-        let max_depth = node_map.values().map(|c| c.len()).max();
-        let _ = stats_counter.slot_max_depth.fetch_update(
-            Ordering::Relaxed,
-            Ordering::Relaxed,
-            |pre_max_depth| match max_depth {
-                Some(max_depth) if max_depth as u64 > pre_max_depth => Some(max_depth as u64),
-                _ => None,
-            },
-        );
+    fn update_stats_counter(c: &FlowMapCounter, slots: u64, max_depth: u64) {
+        c.slots.swap(slots, Ordering::Relaxed);
+        c.slot_max_depth.fetch_max(max_depth, Ordering::Relaxed);
     }
 }
 
