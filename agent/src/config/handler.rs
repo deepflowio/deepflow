@@ -615,7 +615,7 @@ impl Default for TraceType {
     }
 }
 
-#[derive(Default, Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, Debug)]
 pub struct L7LogDynamicConfig {
     // in lowercase
     pub proxy_client: String,
@@ -628,6 +628,17 @@ pub struct L7LogDynamicConfig {
     trace_set: HashSet<String>,
     span_set: HashSet<String>,
 }
+
+impl PartialEq for L7LogDynamicConfig {
+    fn eq(&self, other: &Self) -> bool {
+        self.proxy_client == other.proxy_client
+            && self.x_request_id == other.x_request_id
+            && self.trace_types == other.trace_types
+            && self.span_types == other.span_types
+    }
+}
+
+impl Eq for L7LogDynamicConfig {}
 
 impl L7LogDynamicConfig {
     pub fn new(
