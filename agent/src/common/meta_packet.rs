@@ -17,10 +17,11 @@
 use std::fmt;
 use std::mem;
 use std::net::{IpAddr, Ipv4Addr};
+use std::ptr;
 use std::sync::Arc;
 use std::time::Duration;
 #[cfg(target_os = "linux")]
-use std::{error::Error, ffi::CStr, net::Ipv6Addr};
+use std::{error::Error, net::Ipv6Addr};
 
 use pnet::packet::{
     icmp::{IcmpType, IcmpTypes},
@@ -46,8 +47,8 @@ use crate::error;
 use crate::{
     common::ebpf::GO_HTTP2_UPROBE,
     ebpf::{
-        MSG_REQUEST_END, MSG_RESPONSE_END, SK_BPF_DATA, SOCK_DATA_HTTP2, SOCK_DATA_TLS_HTTP2,
-        SOCK_DIR_RCV, SOCK_DIR_SND,
+        MSG_REQUEST_END, MSG_RESPONSE_END, PACKET_KNAME_MAX_PADDING, SK_BPF_DATA, SOCK_DATA_HTTP2,
+        SOCK_DATA_TLS_HTTP2, SOCK_DIR_RCV, SOCK_DIR_SND,
     },
 };
 use npb_handler::NpbMode;
@@ -126,7 +127,7 @@ pub struct MetaPacket<'a> {
     pub process_id: u32,
     pub thread_id: u32,
     pub syscall_trace_id: u64,
-    pub process_name: String,
+    pub process_kname: [u8; PACKET_KNAME_MAX_PADDING], // kernel process name
     // for PcapAssembler
     pub flow_id: u64,
 }
@@ -850,14 +851,17 @@ impl<'a> MetaPacket<'a> {
         packet.thread_id = data.thread_id;
         packet.syscall_trace_id = data.syscall_trace_id_call;
         #[cfg(target_arch = "aarch64")]
-        let process_name = CStr::from_ptr(data.process_name.as_ptr() as *const u8)
-            .to_str()?
-            .to_string();
+        ptr::copy(
+            data.process_kname.as_ptr() as *const u8,
+            packet.process_kname.as_mut_ptr() as *mut u8,
+            PACKET_KNAME_MAX_PADDING,
+        );
         #[cfg(target_arch = "x86_64")]
-        let process_name = CStr::from_ptr(data.process_name.as_ptr() as *const i8)
-            .to_str()?
-            .to_string();
-        packet.process_name = process_name;
+        ptr::copy(
+            data.process_kname.as_ptr() as *const i8,
+            packet.process_kname.as_mut_ptr() as *mut i8,
+            PACKET_KNAME_MAX_PADDING,
+        );
         packet.socket_id = data.socket_id;
         packet.tcp_data.seq = data.tcp_seq as u32;
         packet.ebpf_type = EbpfType::from(data.source);
