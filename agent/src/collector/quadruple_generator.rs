@@ -1066,7 +1066,7 @@ impl QuadrupleGenerator {
         key[OFFSET_TAP_PORT + 5] = u16::from(tagged_flow.flow.flow_key.tap_type) as u8;
         key[OFFSET_TAP_PORT + 6] = tunnel_type as u8;
         key[OFFSET_TAP_PORT + 7] = tagged_flow.flow.tap_side as u8;
-        key[OFFSET_PROTOCOL] = tagged_flow.flow.flow_key.proto as u8;
+        key[OFFSET_PROTOCOL] = u8::from(tagged_flow.flow.flow_key.proto);
         // 对于sflow, netflow流量，仅当确定目的IP是服务端时，将目的端口作为查询key
         if tagged_flow.flow.signal_source == SignalSource::Packet
             || tagged_flow.flow.is_active_service
