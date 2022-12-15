@@ -535,9 +535,9 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 		submit_data->tcp_seq = sd->tcp_seq;
 		submit_data->cap_seq = sd->data_seq;
 		submit_data->syscall_trace_id_call = sd->thread_trace_id;
-		safe_buf_copy(submit_data->process_name, sizeof(submit_data->process_name),
+		safe_buf_copy(submit_data->process_kname, sizeof(submit_data->process_kname),
 		              sd->comm, sizeof(sd->comm));
-		submit_data->process_name[sizeof(submit_data->process_name) -
+		submit_data->process_kname[sizeof(submit_data->process_kname) -
 					  1] = '\0';
 		submit_data->msg_type = sd->msg_type;
 
