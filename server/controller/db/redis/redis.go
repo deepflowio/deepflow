@@ -18,28 +18,37 @@ package redis
 
 import (
 	"fmt"
-	"github.com/go-redis/redis"
 	"time"
+
+	"github.com/go-redis/redis"
 )
 
-var Redisdb *redis.Client
+var RedisDB redis.UniversalClient
 
 type RedisConfig struct {
-	DimensionResourceDatabase int    `default:"2" yaml:"dimension_resource_database"`
-	Host                      string `default:"redis" yaml:"host"`
-	Port                      uint32 `default:"6379" yaml:"port"`
-	Password                  string `default:"deepflow" yaml:"password"`
-	TimeOut                   uint32 `default:"30" yaml:"timeout"`
-	Enabled                   bool   `default:"false" yaml:"enabled"`
+	DimensionResourceDatabase int      `default:"2" yaml:"dimension_resource_database"`
+	Host                      []string `default:"" yaml:"host"` // TODO add default value
+	Port                      uint32   `default:"6379" yaml:"port"`
+	Password                  string   `default:"deepflow" yaml:"password"`
+	TimeOut                   uint32   `default:"30" yaml:"timeout"`
+	Enabled                   bool     `default:"false" yaml:"enabled"`
 }
 
-func InitRedis(cfg RedisConfig) (err error) {
-	Redisdb = redis.NewClient(&redis.Options{
-		Addr:        fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
+func createUniversalRedisClient(cfg RedisConfig) redis.UniversalClient {
+	var addrs []string
+	for i := range cfg.Host {
+		addrs = append(addrs, fmt.Sprintf("%s:%d", cfg.Host[i], cfg.Port))
+	}
+	return redis.NewUniversalClient(&redis.UniversalOptions{
+		Addrs:       addrs,
 		Password:    cfg.Password,
 		DB:          cfg.DimensionResourceDatabase,
 		DialTimeout: time.Duration(cfg.TimeOut) * time.Second,
 	})
-	_, err = Redisdb.Ping().Result()
+}
+
+func InitRedis(cfg RedisConfig) (err error) {
+	RedisDB = createUniversalRedisClient(cfg)
+	_, err = RedisDB.Ping().Result()
 	return
 }

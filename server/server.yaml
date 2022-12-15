@@ -52,7 +52,8 @@ controller:
     enabled: true
     dimension_resource_database: 2
     password: deepflow
-    host: redis
+    host:
+      - redis
     port: 6379
     timeout: 30
 

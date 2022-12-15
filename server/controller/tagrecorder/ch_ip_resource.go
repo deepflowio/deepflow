@@ -131,10 +131,10 @@ func (i *ChIPResource) generateNewData() (map[IPResourceKey]mysql.ChIPResource, 
 	lbIdToUidMap := getLBIdToUidMap()
 	natgwIdToUidMap := getNatgwIdToUidMap()
 	vpcIdToUidMap := getVPCIdToUidMap()
-	if redis.Redisdb == nil {
+	if redis.RedisDB == nil {
 		return keyToItem, false
 	}
-	res, err := redis.Redisdb.HGetAll("deepflow_dimension_resource_ip").Result()
+	res, err := redis.RedisDB.HGetAll("deepflow_dimension_resource_ip").Result()
 	if err != nil {
 		log.Error(err)
 		return nil, false
