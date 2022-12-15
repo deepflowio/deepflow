@@ -559,9 +559,15 @@ impl TunnelInfo {
 
         packet.copy_within(0..l2_len, start);
         if !overlay_ipv6 {
-            bytes::write_u16_be(&mut packet[start + l2_len - 2..], EthernetType::Ipv4 as u16);
+            bytes::write_u16_be(
+                &mut packet[start + l2_len - 2..],
+                u16::from(EthernetType::Ipv4),
+            );
         } else {
-            bytes::write_u16_be(&mut packet[start + l2_len - 2..], EthernetType::Ipv6 as u16);
+            bytes::write_u16_be(
+                &mut packet[start + l2_len - 2..],
+                u16::from(EthernetType::Ipv6),
+            );
         }
         // l2已经做过解析，这个去除掉已经解析的l2长度
         start - l2_len
