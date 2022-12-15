@@ -49,7 +49,7 @@ func TestJsonify(t *testing.T) {
 }
 
 func TestZeroToNull(t *testing.T) {
-	pf := grpc.NewPlatformInfoTable(nil, 0, 0, "", "", "", nil)
+	pf := grpc.NewPlatformInfoTable(nil, 0, 0, 0, "", "", nil, true, nil)
 	taggedFlow := pb.TaggedFlow{
 		Flow: &pb.Flow{
 			FlowKey:        &pb.FlowKey{},

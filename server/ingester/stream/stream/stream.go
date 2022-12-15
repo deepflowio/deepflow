@@ -17,7 +17,6 @@
 package stream
 
 import (
-	"net"
 	"strconv"
 	"time"
 
@@ -61,15 +60,8 @@ type Logger struct {
 	FlowLogWriter *dbwriter.FlowLogWriter
 }
 
-func NewStream(config *config.Config, recv *receiver.Receiver) (*Stream, error) {
+func NewStream(config *config.Config, recv *receiver.Receiver, platformDataManager *grpc.PlatformDataManager) (*Stream, error) {
 	manager := dropletqueue.NewManager(ingesterctl.INGESTERCTL_STREAM_QUEUE)
-	controllers := make([]net.IP, len(config.Base.ControllerIPs))
-	for i, ipString := range config.Base.ControllerIPs {
-		controllers[i] = net.ParseIP(ipString)
-		if controllers[i].To4() != nil {
-			controllers[i] = controllers[i].To4()
-		}
-	}
 	geo.NewGeoTree()
 
 	flowLogWriter, err := dbwriter.NewFlowLogWriter(
@@ -79,14 +71,14 @@ func NewStream(config *config.Config, recv *receiver.Receiver) (*Stream, error) 
 	if err != nil {
 		return nil, err
 	}
-	l4FlowLogger := NewL4FlowLogger(config, controllers, manager, recv, flowLogWriter)
+	l4FlowLogger := NewL4FlowLogger(config, platformDataManager, manager, recv, flowLogWriter)
 	flowTagWriter, err := flow_tag.NewFlowTagWriter(common.FLOW_LOG_DB, common.FLOW_LOG_DB, config.FlowLogTTL.L7FlowLog, dbwriter.DefaultPartition, config.Base, &config.CKWriterConfig)
 	if err != nil {
 		return nil, err
 	}
-	l7FlowLogger := NewL7FlowLogger(config, controllers, manager, recv, flowLogWriter, flowTagWriter)
-	otelLogger := NewLogger(datatype.MESSAGE_TYPE_OPENTELEMETRY, config, controllers, manager, recv, flowLogWriter, common.L7_FLOW_ID, flowTagWriter)
-	otelCompressedLogger := NewLogger(datatype.MESSAGE_TYPE_OPENTELEMETRY_COMPRESSED, config, controllers, manager, recv, flowLogWriter, common.L7_FLOW_ID, flowTagWriter)
+	l7FlowLogger := NewL7FlowLogger(config, platformDataManager, manager, recv, flowLogWriter, flowTagWriter)
+	otelLogger := NewLogger(datatype.MESSAGE_TYPE_OPENTELEMETRY, config, platformDataManager, manager, recv, flowLogWriter, common.L7_FLOW_ID, flowTagWriter)
+	otelCompressedLogger := NewLogger(datatype.MESSAGE_TYPE_OPENTELEMETRY_COMPRESSED, config, platformDataManager, manager, recv, flowLogWriter, common.L7_FLOW_ID, flowTagWriter)
 	l4PacketLogger := NewLogger(datatype.MESSAGE_TYPE_PACKETSEQUENCE, config, nil, manager, recv, flowLogWriter, common.L4_PACKET_ID, nil)
 	return &Stream{
 		StreamConfig:         config,
@@ -98,7 +90,7 @@ func NewStream(config *config.Config, recv *receiver.Receiver) (*Stream, error) 
 	}, nil
 }
 
-func NewLogger(msgType datatype.MessageType, config *config.Config, controllers []net.IP, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter, flowLogId common.FlowLogID, flowTagWriter *flow_tag.FlowTagWriter) *Logger {
+func NewLogger(msgType datatype.MessageType, config *config.Config, platformDataManager *grpc.PlatformDataManager, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter, flowLogId common.FlowLogID, flowTagWriter *flow_tag.FlowTagWriter) *Logger {
 	queueCount := config.DecoderQueueCount
 	decodeQueues := manager.NewQueues(
 		"1-receive-to-decode-"+datatype.MessageTypeString[msgType],
@@ -119,8 +111,8 @@ func NewLogger(msgType datatype.MessageType, config *config.Config, controllers 
 			flowLogWriter,
 			int(flowLogId),
 		)
-		if controllers != nil {
-			platformDatas[i] = grpc.NewPlatformInfoTable(controllers, int(config.Base.ControllerPort), config.Base.GrpcBufferSize, config.Base.ServiceLabelerLruCap, "stream-"+datatype.MessageTypeString[msgType]+"-"+strconv.Itoa(i), "", config.Base.NodeIP, nil)
+		if platformDataManager != nil {
+			platformDatas[i], _ = platformDataManager.NewPlatformInfoTable(false, "stream-"+datatype.MessageTypeString[msgType]+"-"+strconv.Itoa(i))
 			if i == 0 {
 				debug.ServerRegisterSimple(CMD_PLATFORMDATA, platformDatas[i])
 			}
@@ -142,7 +134,7 @@ func NewLogger(msgType datatype.MessageType, config *config.Config, controllers 
 	}
 }
 
-func NewL4FlowLogger(config *config.Config, controllers []net.IP, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter) *Logger {
+func NewL4FlowLogger(config *config.Config, platformDataManager *grpc.PlatformDataManager, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter) *Logger {
 	msgType := datatype.MESSAGE_TYPE_TAGGEDFLOW
 	queueCount := config.DecoderQueueCount
 	queueSuffix := "-l4"
@@ -171,7 +163,7 @@ func NewL4FlowLogger(config *config.Config, controllers []net.IP, manager *dropl
 			flowLogWriter,
 			int(common.L4_FLOW_ID),
 		)
-		platformDatas[i] = grpc.NewPlatformInfoTable(controllers, int(config.Base.ControllerPort), config.Base.GrpcBufferSize, config.Base.ServiceLabelerLruCap, "stream-l4-log-"+strconv.Itoa(i), "", config.Base.NodeIP, nil)
+		platformDatas[i], _ = platformDataManager.NewPlatformInfoTable(false, "stream-l4-log-"+strconv.Itoa(i))
 		if i == 0 {
 			debug.ServerRegisterSimple(CMD_PLATFORMDATA, platformDatas[i])
 		}
@@ -192,7 +184,7 @@ func NewL4FlowLogger(config *config.Config, controllers []net.IP, manager *dropl
 	}
 }
 
-func NewL7FlowLogger(config *config.Config, controllers []net.IP, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter, flowTagWriter *flow_tag.FlowTagWriter) *Logger {
+func NewL7FlowLogger(config *config.Config, platformDataManager *grpc.PlatformDataManager, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter, flowTagWriter *flow_tag.FlowTagWriter) *Logger {
 	queueSuffix := "-l7"
 	queueCount := config.DecoderQueueCount
 	msgType := datatype.MESSAGE_TYPE_PROTOCOLLOG
@@ -222,7 +214,7 @@ func NewL7FlowLogger(config *config.Config, controllers []net.IP, manager *dropl
 			flowLogWriter,
 			int(common.L7_FLOW_ID),
 		)
-		platformDatas[i] = grpc.NewPlatformInfoTable(controllers, int(config.Base.ControllerPort), config.Base.GrpcBufferSize, config.Base.ServiceLabelerLruCap, "stream-l7-log-"+strconv.Itoa(i), "", config.Base.NodeIP, nil)
+		platformDatas[i], _ = platformDataManager.NewPlatformInfoTable(false, "stream-l7-log-"+strconv.Itoa(i))
 		decoders[i] = decoder.NewDecoder(
 			i,
 			msgType,
