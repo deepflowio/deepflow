@@ -573,9 +573,9 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 			if strings.HasPrefix(tag, "label.") {
 				labelTag := strings.TrimPrefix(tag, "label.")
 				if whereSql != "" {
-					whereSql += fmt.Sprintf("AND 'key'='%s'", labelTag)
+					whereSql += fmt.Sprintf(" AND `key`='%s'", labelTag)
 				} else {
-					whereSql = fmt.Sprintf("WHERE 'key'='%s'", labelTag)
+					whereSql = fmt.Sprintf("WHERE `key`='%s'", labelTag)
 				}
 				sql = fmt.Sprintf("SELECT value, value AS display_name FROM k8s_label_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 			} else {
@@ -638,9 +638,9 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 		} else if strings.HasPrefix(tag, "label.") {
 			labelTag := strings.TrimPrefix(tag, "label.")
 			if whereSql != "" {
-				whereSql += fmt.Sprintf("AND 'key'='%s'", labelTag)
+				whereSql += fmt.Sprintf(" AND `key`='%s'", labelTag)
 			} else {
-				whereSql = fmt.Sprintf("WHERE 'key'='%s'", labelTag)
+				whereSql = fmt.Sprintf("WHERE `key`='%s'", labelTag)
 			}
 			sql = fmt.Sprintf("SELECT value, value AS display_name FROM k8s_label_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		}
