@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+use std::mem;
 use std::str;
 
 use arc_swap::access::Access;
@@ -467,14 +468,17 @@ impl L7ProtocolParserInterface for HttpLog {
 
     fn reset(&mut self) {
         self.info = HttpInfo::default();
-        let conf = self.l7_log_dynamic_config.clone();
-        match self.proto {
-            L7Protocol::Http1 => *self = Self::new_v1(),
-            L7Protocol::Http2 => *self = Self::new_v2(false),
-            L7Protocol::Grpc => *self = Self::new_v2(true),
+        let mut new_log = match self.proto {
+            L7Protocol::Http1 => Self::new_v1(),
+            L7Protocol::Http2 => Self::new_v2(false),
+            L7Protocol::Grpc => Self::new_v2(true),
             _ => unreachable!(),
-        }
-        self.l7_log_dynamic_config = conf;
+        };
+        mem::swap(
+            &mut new_log.l7_log_dynamic_config,
+            &mut self.l7_log_dynamic_config,
+        );
+        *self = new_log
     }
 }
 
@@ -575,11 +579,14 @@ impl HttpLog {
     }
 
     pub fn update_config(&mut self, config: &LogParserAccess) {
-        self.l7_log_dynamic_config = config.load().l7_log_dynamic.clone();
-        debug!(
-            "http log update l7 log dynamic config to {:#?}",
-            self.l7_log_dynamic_config
-        );
+        let new_config = &config.load().l7_log_dynamic;
+        if &self.l7_log_dynamic_config != new_config {
+            self.l7_log_dynamic_config = new_config.clone();
+            debug!(
+                "http log update l7 log dynamic config to {:#?}",
+                self.l7_log_dynamic_config
+            );
+        }
     }
 
     fn reset_logs(&mut self) {
@@ -935,14 +942,11 @@ impl HttpLog {
                 self.info.span_id = id;
             }
         }
-        if !self.l7_log_dynamic_config.x_request_id_origin.is_empty()
-            && key_bytes == self.l7_log_dynamic_config.x_request_id_lower.as_bytes()
-        {
+        if key_bytes == self.l7_log_dynamic_config.x_request_id.as_bytes() {
             self.info.x_request_id = String::from_utf8_lossy(val.as_ref()).into_owned();
         }
         if direction == PacketDirection::ClientToServer
-            && !self.l7_log_dynamic_config.proxy_client_origin.is_empty()
-            && key_bytes == self.l7_log_dynamic_config.proxy_client_lower.as_bytes()
+            && key_bytes == self.l7_log_dynamic_config.proxy_client.as_bytes()
         {
             self.info.client_ip = String::from_utf8_lossy(val.as_ref()).into_owned();
         }
@@ -1207,6 +1211,8 @@ pub fn get_http_resp_info(line_info: &str) -> Result<(String, u16)> {
 mod tests {
     use crate::common::MetaPacket;
     use crate::utils::test::Capture;
+
+    use std::collections::HashSet;
     use std::fs;
     use std::mem::size_of;
     use std::path::Path;
@@ -1236,17 +1242,17 @@ mod tests {
                 None => continue,
             };
 
+            let mut trace_set = HashSet::new();
+            trace_set.insert(TraceType::Sw8.to_checker_string());
+            let mut span_set = HashSet::new();
+            span_set.insert(TraceType::Sw8.to_checker_string());
             let mut http = HttpLog::default();
-            http.l7_log_dynamic_config = L7LogDynamicConfig {
-                proxy_client_origin: "".to_string(),
-                proxy_client_lower: "".to_string(),
-                proxy_client_with_colon: "".to_string(),
-                x_request_id_origin: "".to_string(),
-                x_request_id_lower: "".to_string(),
-                x_request_id_with_colon: "".to_string(),
-                trace_types: vec![TraceType::Sw8],
-                span_types: vec![TraceType::Sw8],
-            };
+            http.l7_log_dynamic_config = L7LogDynamicConfig::new(
+                "".to_owned(),
+                "".to_owned(),
+                vec![TraceType::Sw8],
+                vec![TraceType::Sw8],
+            );
             let _ = http.parse(
                 payload,
                 packet.lookup_key.proto,

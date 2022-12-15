@@ -137,7 +137,7 @@ fn sk_l4proto_safe(sd: *mut SK_BPF_DATA) -> &'static str {
 
 fn process_name_safe(sd: *mut SK_BPF_DATA) -> String {
     unsafe {
-        let v = &(*sd).process_name;
+        let v = &(*sd).process_kname;
         String::from_utf8_lossy(v).to_string()
     }
 }

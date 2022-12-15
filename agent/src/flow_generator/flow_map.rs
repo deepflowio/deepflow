@@ -272,7 +272,7 @@ impl FlowMap {
             nodes.push(node);
             time_set.insert(removed_key);
         }
-        Self::update_stats_counter(&self.stats_counter, &node_map);
+        Self::update_stats_counter(&self.stats_counter, node_map.len() as u64, 0);
         self.node_map.replace(node_map);
         self.time_set.replace(time_set);
 
@@ -310,9 +310,11 @@ impl FlowMap {
         };
 
         let pkt_timestamp = meta_packet.lookup_key.timestamp;
+        let max_depth;
         match node_map.get_mut(&pkt_key) {
             // 找到一组可能的 FlowNode
             Some(nodes) => {
+                max_depth = nodes.len();
                 let ignore_l2_end = config.ignore_l2_end;
                 let ignore_tor_mac = config.ignore_tor_mac;
                 let trident_type = config.trident_type;
@@ -325,6 +327,11 @@ impl FlowMap {
                     let time_key = FlowTimeKey::new(pkt_timestamp, pkt_key);
                     time_set.insert(time_key);
                     nodes.push(node);
+                    Self::update_stats_counter(
+                        &self.stats_counter,
+                        node_map.len() as u64,
+                        1 + max_depth as u64,
+                    );
                     self.node_map.replace(node_map);
                     self.time_set.replace(time_set);
                     return;
@@ -362,9 +369,11 @@ impl FlowMap {
                 time_set.insert(time_key);
 
                 node_map.insert(pkt_key, vec![node]);
+
+                max_depth = 1;
             }
         }
-        Self::update_stats_counter(&self.stats_counter, &node_map);
+        Self::update_stats_counter(&self.stats_counter, node_map.len() as u64, max_depth as u64);
         self.node_map.replace(node_map);
         self.time_set.replace(time_set);
         // go实现只有插入node的时候，插入的节点数目大于ring buffer 的capacity 才会执行policy_getter,
@@ -429,7 +438,7 @@ impl FlowMap {
         let flow_closed = self.update_tcp_flow(config, meta_packet, &mut node);
         if config.collector_enabled {
             let direction = meta_packet.direction == PacketDirection::ClientToServer;
-            self.collect_metric(config, &mut node, meta_packet, direction);
+            self.collect_metric(config, &mut node, meta_packet, direction, false);
         }
 
         // After collect_metric() is called for eBPF MetaPacket, its direction is determined.
@@ -446,9 +455,6 @@ impl FlowMap {
             } else {
                 node.timeout = self.parse_config.load().l7_log_session_aggr_timeout;
             }
-            // For ebpf data, after collect_metric(), meta_packet's direction
-            // is determined. Here we determine whether to reverse flow.
-            Self::rectify_ebpf_flow_direction(&mut node, meta_packet);
         }
 
         // Enterprise Edition Feature: packet-sequence
@@ -487,13 +493,11 @@ impl FlowMap {
                 &mut node,
                 meta_packet,
                 meta_packet.direction == PacketDirection::ClientToServer,
+                false,
             );
         }
 
         if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
-            // For ebpf data, after collect_metric(), meta_packet's direction
-            // is determined. Here we determine whether to reverse flow.
-            Self::rectify_ebpf_flow_direction(&mut node, meta_packet);
             self.update_udp_is_active(&mut node, meta_packet.direction);
         }
 
@@ -544,7 +548,7 @@ impl FlowMap {
 
         // 有特殊包时更新ServiceTable并矫正流方向：SYN+ACK或SYN
         if pkt_tcp_flags.bits() & TcpFlags::SYN.bits() != 0 {
-            self.update_l4_direction(meta_packet, node, false, false);
+            self.update_l4_direction(meta_packet, node, false);
             self.update_syn_or_syn_ack_seq(node, meta_packet);
         }
 
@@ -944,6 +948,7 @@ impl FlowMap {
         node: &mut FlowNode,
         meta_packet: &mut MetaPacket,
         is_first_packet_direction: bool,
+        is_first_packet: bool,
     ) {
         let mut info = None;
         if let Some(perf) = node.meta_flow_perf.as_mut() {
@@ -970,6 +975,11 @@ impl FlowMap {
             }
         }
         if let Some((info, rrt)) = info {
+            if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
+                // For ebpf data, after perf.parse() success, meta_packet's direction
+                // is determined. Here we determine whether to reverse flow.
+                Self::rectify_ebpf_flow_direction(node, meta_packet, is_first_packet);
+            }
             for i in info.into_iter() {
                 self.write_to_app_proto_log(config, node, &meta_packet, i, rrt);
             }
@@ -984,7 +994,7 @@ impl FlowMap {
             // Initialize a timeout long enough for eBPF Flow to enable successful session aggregation.
             node.timeout = self.parse_config.load().l7_log_session_aggr_timeout;
         } else {
-            reverse = self.update_l4_direction(meta_packet, &mut node, true, true);
+            reverse = self.update_l4_direction(meta_packet, &mut node, true);
 
             let pkt_tcp_flags = meta_packet.tcp_data.flags;
             if pkt_tcp_flags.is_invalid() {
@@ -997,7 +1007,7 @@ impl FlowMap {
         }
 
         if config.collector_enabled {
-            self.collect_metric(config, &mut node, meta_packet, !reverse);
+            self.collect_metric(config, &mut node, meta_packet, !reverse, true);
         }
 
         // After collect_metric() is called for eBPF MetaPacket, its direction is determined.
@@ -1007,9 +1017,6 @@ impl FlowMap {
             } else {
                 node.residual_request -= 1;
             }
-            // For ebpf data, after collect_metric(), meta_packet's direction
-            // is determined. Here we determine whether to reverse flow.
-            Self::rectify_ebpf_flow_direction(&mut node, meta_packet);
         }
 
         // Enterprise Edition Feature: packet-sequence
@@ -1028,16 +1035,10 @@ impl FlowMap {
         let mut reverse = false;
         if node.tagged_flow.flow.signal_source != SignalSource::EBPF {
             // eBPF Flow only use server_port to correct the direction.
-            reverse = self.update_l4_direction(meta_packet, &mut node, true, true);
+            reverse = self.update_l4_direction(meta_packet, &mut node, true);
         }
         if config.collector_enabled {
-            self.collect_metric(config, &mut node, meta_packet, !reverse);
-        }
-        // For ebpf data, after collect_metric(), meta_packet's direction
-        // is determined. Here we determine whether to reverse flow.
-        if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
-            Self::rectify_ebpf_flow_direction(&mut node, meta_packet);
-            self.update_udp_is_active(&mut node, meta_packet.direction);
+            self.collect_metric(config, &mut node, meta_packet, !reverse, true);
         }
         node
     }
@@ -1255,7 +1256,6 @@ impl FlowMap {
         meta_packet: &mut MetaPacket,
         node: &mut FlowNode,
         is_first_packet: bool,
-        no_stats: bool,
     ) -> bool {
         let lookup_key = &meta_packet.lookup_key;
         let src_key = ServiceKey::new(
@@ -1289,7 +1289,7 @@ impl FlowMap {
         if !ServiceTable::is_client_to_server(src_score, dst_score) {
             mem::swap(&mut src_score, &mut dst_score);
 
-            Self::reverse_flow(node, no_stats);
+            Self::reverse_flow(node, is_first_packet);
             meta_packet.direction = meta_packet.direction.reversed();
             reverse = true;
         }
@@ -1355,11 +1355,11 @@ impl FlowMap {
         node.tagged_flow.flow.is_active_service = ServiceTable::is_active_service(dst_score);
     }
 
-    fn reverse_flow(node: &mut FlowNode, no_stats: bool) {
+    fn reverse_flow(node: &mut FlowNode, is_first_packet: bool) {
         node.policy_in_tick.swap(0, 1);
         node.policy_data_cache.swap(0, 1);
         node.endpoint_data_cache = node.endpoint_data_cache.reversed();
-        node.tagged_flow.flow.reverse(no_stats);
+        node.tagged_flow.flow.reverse(is_first_packet);
         node.tagged_flow.tag.reverse();
         if let Some(meta_flow_perf) = node.meta_flow_perf.as_mut() {
             meta_flow_perf.reverse(None);
@@ -1373,20 +1373,24 @@ impl FlowMap {
         }
     }
 
-    fn rectify_ebpf_flow_direction(node: &mut FlowNode, meta_packet: &mut MetaPacket) {
+    fn rectify_ebpf_flow_direction(
+        node: &mut FlowNode,
+        meta_packet: &mut MetaPacket,
+        is_first_packet: bool,
+    ) {
         if node.tagged_flow.flow.flow_key.ip_src == meta_packet.lookup_key.src_ip
             && node.tagged_flow.flow.flow_key.port_src == meta_packet.lookup_key.src_port
         {
             // If flow_key.ip_src and flow_key.port_src of node.tagged_flow.flow are the same as
             // that of meta_packet, but the direction of meta_packet is S2C, reverse flow
             if meta_packet.direction == PacketDirection::ServerToClient {
-                Self::reverse_flow(node, true);
+                Self::reverse_flow(node, is_first_packet);
             }
         } else {
             // If flow_key.ip_src or flow_key.port_src of node.tagged_flow.flow is different
             // from that of meta_packet, and the direction of meta_packet is C2S, reverse flow
             if meta_packet.direction == PacketDirection::ClientToServer {
-                Self::reverse_flow(node, true);
+                Self::reverse_flow(node, is_first_packet);
             }
         }
     }
@@ -1459,22 +1463,9 @@ impl FlowMap {
         node.tagged_flow.tag.policy_data = node.policy_data_cache.clone();
     }
 
-    fn update_stats_counter(
-        stats_counter: &FlowMapCounter,
-        node_map: &HashMap<FlowMapKey, Vec<Box<FlowNode>>>,
-    ) {
-        stats_counter
-            .slots
-            .swap(node_map.len() as u64, Ordering::Relaxed);
-        let max_depth = node_map.values().map(|c| c.len()).max();
-        let _ = stats_counter.slot_max_depth.fetch_update(
-            Ordering::Relaxed,
-            Ordering::Relaxed,
-            |pre_max_depth| match max_depth {
-                Some(max_depth) if max_depth as u64 > pre_max_depth => Some(max_depth as u64),
-                _ => None,
-            },
-        );
+    fn update_stats_counter(c: &FlowMapCounter, slots: u64, max_depth: u64) {
+        c.slots.swap(slots, Ordering::Relaxed);
+        c.slot_max_depth.fetch_max(max_depth, Ordering::Relaxed);
     }
 }
 
