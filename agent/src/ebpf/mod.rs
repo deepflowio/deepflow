@@ -27,6 +27,9 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 // 最大长度
 pub const CAP_LEN_MAX: usize = 8192;
 
+// process_kname is up to 16 bytes, if the length of process_kname exceeds 15, the ending char is '\0'
+pub const PACKET_KNAME_MAX_PADDING: usize = 15;
+
 //方向
 #[allow(dead_code)]
 pub const SOCK_DIR_SND: u8 = 0;
@@ -132,7 +135,7 @@ pub struct SK_BPF_DATA {
     pub coroutine_id: u64, // CoroutineID, i.e., golang goroutine id
     pub source: u8,        // SYSCALL,GO_TLS_UPROBE,GO_HTTP2_UPROBE
 
-    pub process_name: [u8; 16usize], //进程或线程名字，占用16bytes
+    pub process_kname: [u8; 16usize], //进程或线程名字，占用16bytes
 
     pub tuple: tuple_t, // Socket五元组信息
 
@@ -223,12 +226,12 @@ impl fmt::Display for SK_BPF_DATA {
         };
         unsafe {
             #[cfg(target_arch = "aarch64")]
-            let process_name = CStr::from_ptr(self.process_name.as_ptr() as *const u8)
+            let process_kname = CStr::from_ptr(self.process_kname.as_ptr() as *const u8)
                 .to_str()
                 .unwrap();
 
             #[cfg(target_arch = "x86_64")]
-            let process_name = CStr::from_ptr(self.process_name.as_ptr() as *const i8)
+            let process_kname = CStr::from_ptr(self.process_kname.as_ptr() as *const i8)
                 .to_str()
                 .unwrap();
 
@@ -243,7 +246,7 @@ impl fmt::Display for SK_BPF_DATA {
                 self.timestamp,
                 self.socket_id,
                 self.cap_seq,
-                process_name,
+                process_kname,
                 self.process_id,
                 self.thread_id,
                 self.msg_type,
