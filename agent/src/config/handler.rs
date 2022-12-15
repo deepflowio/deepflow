@@ -15,6 +15,7 @@
  */
 
 use std::cmp::{max, min};
+use std::collections::HashSet;
 use std::fmt;
 use std::net::IpAddr;
 use std::net::Ipv4Addr;
@@ -31,16 +32,14 @@ use cgroups_rs::{CpuResources, MemoryResources, Resources};
 use flexi_logger::writers::FileLogWriter;
 use flexi_logger::{Age, Cleanup, Criterion, FileSpec, LoggerHandle, Naming};
 use log::{info, warn, Level};
-use public::utils::bitmap::parse_u16_range_list_to_bitmap;
 use sysinfo::SystemExt;
 
 #[cfg(target_os = "linux")]
-use super::config::UprobeProcRegExp;
+use super::config::EbpfYamlConfig;
 use super::{
     config::{Config, PcapConfig, PortConfig, YamlConfig},
     ConfigError, IngressFlavour, KubernetesPollerType, RuntimeConfig,
 };
-
 use crate::common::l7_protocol_log::L7ProtocolBitmap;
 use crate::flow_generator::protocol_logs::SOFA_NEW_RPC_TRACE_CTX_KEY;
 #[cfg(target_os = "linux")]
@@ -449,20 +448,28 @@ pub struct EbpfConfig {
     pub l7_log_session_timeout: Duration,
     pub l7_protocol_inference_max_fail_count: usize,
     pub l7_protocol_inference_ttl: usize,
-    pub log_path: String,
     pub l7_log_tap_types: [bool; 256],
     pub ctrl_mac: MacAddr,
-    pub ebpf_disabled: bool,
     pub l7_protocol_enabled_bitmap: L7ProtocolBitmap,
-    pub ebpf_uprobe_proc_regexp: UprobeProcRegExp,
     pub l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
-    // the port which ebpf kprobe not check l7 protocol, submit to agent directly
-    pub ebpf_kprobe_whitelist_port: Option<Bitmap>,
+    pub ebpf: EbpfYamlConfig,
 }
 
 #[cfg(target_os = "linux")]
 impl fmt::Debug for EbpfConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let l7_protocol_parse_port_bitmap = self
+            .l7_protocol_parse_port_bitmap
+            .iter()
+            .map(|(title, bitmap)| {
+                let ports = bitmap
+                    .get_raw()
+                    .iter()
+                    .filter(|x| **x != 0)
+                    .collect::<Vec<_>>();
+                (title.clone(), ports.clone())
+            })
+            .collect::<Vec<_>>();
         f.debug_struct("EbpfConfig")
             .field("collector_enabled", &self.collector_enabled)
             .field("l7_metrics_enabled", &self.l7_metrics_enabled)
@@ -475,7 +482,6 @@ impl fmt::Debug for EbpfConfig {
                 &self.l7_protocol_inference_max_fail_count,
             )
             .field("l7_protocol_inference_ttl", &self.l7_protocol_inference_ttl)
-            .field("log_path", &self.log_path)
             .field(
                 "l7_log_tap_types",
                 &self
@@ -486,7 +492,15 @@ impl fmt::Debug for EbpfConfig {
                     .collect::<Vec<_>>(),
             )
             .field("ctrl_mac", &self.ctrl_mac)
-            .field("ebpf-disabled", &self.ebpf_disabled)
+            .field(
+                "l7_protocol_enabled_bitmap",
+                &self.l7_protocol_enabled_bitmap,
+            )
+            .field(
+                "l7_protocol_parse_port_bitmap",
+                &l7_protocol_parse_port_bitmap,
+            )
+            .field("ebpf", &self.ebpf)
             .finish()
     }
 }
@@ -580,6 +594,20 @@ impl TraceType {
         }
     }
 
+    pub fn to_checker_string(&self) -> String {
+        match self {
+            &TraceType::XB3 => TRACE_TYPE_XB3.into(),
+            &TraceType::XB3Span => TRACE_TYPE_XB3SPAN.into(),
+            &TraceType::Uber => TRACE_TYPE_UBER.into(),
+            &TraceType::Sw6 => TRACE_TYPE_SW6.into(),
+            &TraceType::Sw8 => TRACE_TYPE_SW8.into(),
+            &TraceType::TraceParent => TRACE_TYPE_TRACE_PARENT.into(),
+            &TraceType::NewRpcTraceContext => SOFA_NEW_RPC_TRACE_CTX_KEY.into(),
+            &TraceType::Customize(ref tag) => tag.to_ascii_lowercase(),
+            _ => "".into(),
+        }
+    }
+
     pub fn to_string(&self) -> String {
         match &*self {
             TraceType::XB3 => TRACE_TYPE_XB3.to_string(),
@@ -600,36 +628,67 @@ impl Default for TraceType {
     }
 }
 
-#[derive(Default, Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, Debug)]
 pub struct L7LogDynamicConfig {
-    pub proxy_client_origin: String,
-    pub proxy_client_lower: String,
-    pub proxy_client_with_colon: String,
-    pub x_request_id_origin: String,
-    pub x_request_id_lower: String,
-    pub x_request_id_with_colon: String,
+    // in lowercase
+    pub proxy_client: String,
+    // in lowercase
+    pub x_request_id: String,
 
     pub trace_types: Vec<TraceType>,
     pub span_types: Vec<TraceType>,
+
+    trace_set: HashSet<String>,
+    span_set: HashSet<String>,
 }
 
+impl PartialEq for L7LogDynamicConfig {
+    fn eq(&self, other: &Self) -> bool {
+        self.proxy_client == other.proxy_client
+            && self.x_request_id == other.x_request_id
+            && self.trace_types == other.trace_types
+            && self.span_types == other.span_types
+    }
+}
+
+impl Eq for L7LogDynamicConfig {}
+
 impl L7LogDynamicConfig {
-    pub fn is_trace_id(&self, context: &str) -> bool {
-        for trace in &self.trace_types {
-            if trace.check(context) {
-                return true;
-            }
+    pub fn new(
+        mut proxy_client: String,
+        mut x_request_id: String,
+        trace_types: Vec<TraceType>,
+        span_types: Vec<TraceType>,
+    ) -> Self {
+        proxy_client.make_ascii_lowercase();
+        x_request_id.make_ascii_lowercase();
+
+        let mut trace_set = HashSet::new();
+        for t in trace_types.iter() {
+            trace_set.insert(t.to_checker_string());
         }
-        return false;
+
+        let mut span_set = HashSet::new();
+        for t in span_types.iter() {
+            span_set.insert(t.to_checker_string());
+        }
+
+        Self {
+            proxy_client,
+            x_request_id,
+            trace_types,
+            span_types,
+            trace_set,
+            span_set,
+        }
+    }
+
+    pub fn is_trace_id(&self, context: &str) -> bool {
+        self.trace_set.contains(context)
     }
 
     pub fn is_span_id(&self, context: &str) -> bool {
-        for span in &self.span_types {
-            if span.check(context) {
-                return true;
-            }
-        }
-        return false;
+        self.span_set.contains(context)
     }
 }
 
@@ -841,26 +900,18 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
             log_parser: LogParserConfig {
                 l7_log_collect_nps_threshold: conf.l7_log_collect_nps_threshold,
                 l7_log_session_aggr_timeout: conf.yaml_config.l7_log_session_aggr_timeout,
-                l7_log_dynamic: L7LogDynamicConfig {
-                    proxy_client_origin: conf.http_log_proxy_client.to_string(),
-                    proxy_client_lower: conf.http_log_proxy_client.to_string().to_lowercase(),
-                    proxy_client_with_colon: format!("{}: ", conf.http_log_proxy_client),
-
-                    x_request_id_origin: conf.http_log_x_request_id.to_string(),
-                    x_request_id_lower: conf.http_log_x_request_id.to_string().to_lowercase(),
-                    x_request_id_with_colon: format!("{}: ", conf.http_log_x_request_id),
-
-                    trace_types: conf
-                        .http_log_trace_id
+                l7_log_dynamic: L7LogDynamicConfig::new(
+                    conf.http_log_proxy_client.to_string().to_ascii_lowercase(),
+                    conf.http_log_x_request_id.to_string().to_ascii_lowercase(),
+                    conf.http_log_trace_id
                         .split(',')
                         .map(|item| TraceType::from(item))
                         .collect(),
-                    span_types: conf
-                        .http_log_span_id
+                    conf.http_log_span_id
                         .split(',')
                         .map(|item| TraceType::from(item))
                         .collect(),
-                },
+                ),
             },
             debug: DebugConfig {
                 vtap_id: conf.vtap_id as u16,
@@ -887,7 +938,6 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 vtap_id: conf.vtap_id as u16,
                 epc_id: conf.epc_id,
                 l7_log_session_timeout: conf.yaml_config.l7_log_session_aggr_timeout,
-                log_path: conf.yaml_config.ebpf_log_file.clone(),
                 l7_log_packet_size: CAP_LEN_MAX.min(conf.l7_log_packet_size as usize),
                 l7_log_tap_types: {
                     let mut tap_types = [false; 256];
@@ -909,20 +959,11 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 } else {
                     MacAddr::ZERO
                 },
-                ebpf_disabled: conf.yaml_config.ebpf_disabled,
-                ebpf_uprobe_proc_regexp: conf.yaml_config.ebpf_uprobe_proc_regexp,
                 l7_protocol_enabled_bitmap: L7ProtocolBitmap::from(
                     &conf.yaml_config.l7_protocol_enabled,
                 ),
                 l7_protocol_parse_port_bitmap,
-                ebpf_kprobe_whitelist_port: {
-                    let whitelist = &conf.yaml_config.ebpf_kprobe_whitelist;
-                    if whitelist.port_list.is_empty() {
-                        None
-                    } else {
-                        parse_u16_range_list_to_bitmap(&whitelist.port_list, false)
-                    }
-                },
+                ebpf: conf.yaml_config.ebpf.clone(),
             },
             metric_server: MetricServerConfig {
                 enabled: conf.external_agent_http_proxy_enabled,

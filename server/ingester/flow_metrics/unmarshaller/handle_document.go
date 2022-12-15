@@ -104,9 +104,9 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 			t.PodClusterID1 = uint16(info1.PodClusterID)
 			if common.IsPodServiceIP(t.L3DeviceType1, t.PodID1, t.PodNodeID1) {
 				if t.Code&PortAddCode != 0 {
-					t.ServiceID1 = platformData.QueryService(uint8(t.L3DeviceType1), uint32(t.PodClusterID1), t.PodGroupID1, t.L3EpcID1, t.IsIPv6 == 1, t.IP1, t.IP61, t.Protocol, t.ServerPort)
+					t.ServiceID1 = platformData.QueryService(t.PodID1, t.PodNodeID1, uint32(t.PodClusterID1), t.PodGroupID1, t.L3EpcID1, t.IsIPv6 == 1, t.IP1, t.IP61, t.Protocol, t.ServerPort)
 				} else {
-					t.ServiceID1 = platformData.QueryService(uint8(t.L3DeviceType1), uint32(t.PodClusterID1), t.PodGroupID1, t.L3EpcID1, t.IsIPv6 == 1, t.IP1, t.IP61, t.Protocol, 0)
+					t.ServiceID1 = platformData.QueryService(t.PodID1, t.PodNodeID1, uint32(t.PodClusterID1), t.PodGroupID1, t.L3EpcID1, t.IsIPv6 == 1, t.IP1, t.IP61, t.Protocol, 0)
 				}
 			}
 			if info == nil {
@@ -166,10 +166,10 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 		if common.IsPodServiceIP(t.L3DeviceType, t.PodID, t.PodNodeID) {
 			// 在0端, 有port无edge的数据计算serviceid，如:vtap_flow_port
 			if t.Code&PortAddCode != 0 && t.Code&EdgeCode == 0 {
-				t.ServiceID = platformData.QueryService(uint8(t.L3DeviceType), uint32(t.PodClusterID), t.PodGroupID, t.L3EpcID, t.IsIPv6 == 1, t.IP, t.IP6, t.Protocol, t.ServerPort)
+				t.ServiceID = platformData.QueryService(t.PodID, t.PodNodeID, uint32(t.PodClusterID), t.PodGroupID, t.L3EpcID, t.IsIPv6 == 1, t.IP, t.IP6, t.Protocol, t.ServerPort)
 			} else {
 				// 有edge
-				t.ServiceID = platformData.QueryService(uint8(t.L3DeviceType), uint32(t.PodClusterID), t.PodGroupID, t.L3EpcID, t.IsIPv6 == 1, t.IP, t.IP6, t.Protocol, 0)
+				t.ServiceID = platformData.QueryService(t.PodID, t.PodNodeID, uint32(t.PodClusterID), t.PodGroupID, t.L3EpcID, t.IsIPv6 == 1, t.IP, t.IP6, t.Protocol, 0)
 			}
 		}
 		if info1 == nil && (t.Code&EdgeCode == EdgeCode) {
