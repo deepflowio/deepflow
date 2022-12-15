@@ -35,7 +35,7 @@ use crate::{
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
             L7ResponseStatus,
         },
-        AppProtoHead, Error, LogMessageType, Result,
+        AppProtoHead, Error, HttpLog, LogMessageType, Result,
     },
     perf_impl,
 };
@@ -52,10 +52,10 @@ const CMD_CODE_HEARTBEAT: u16 = 0;
 const CMD_CODE_REQ: u16 = 1;
 const CMD_CODE_RESP: u16 = 2;
 
-const SERVICE_KEY: &'static [u8] = b"sofa_head_target_service";
-const METHOD_KEY: &'static [u8] = b"sofa_head_method_name";
-const TRACE_ID_KEY: &'static [u8] = b"rpc_trace_context.sofaTraceId";
-pub const NEW_RPC_TRACE_CTX_KEY: &'static [u8] = b"new_rpc_trace_context";
+const SERVICE_KEY: &'static str = "sofa_head_target_service";
+const METHOD_KEY: &'static str = "sofa_head_method_name";
+const TRACE_ID_KEY: &'static str = "rpc_trace_context.sofaTraceId";
+pub const SOFA_NEW_RPC_TRACE_CTX_KEY: &'static str = "new_rpc_trace_context";
 
 struct Hdr {
     proto: u8,
@@ -266,16 +266,42 @@ perf_impl!(SofaRpcLog);
 
 impl L7ProtocolParserInterface for SofaRpcLog {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
-        self.parsed = self.parse_payload(payload, param).is_ok()
+        self.parsed = self.parse_with_strict(payload, param, true).is_ok()
             && self.info.msg_type == LogMessageType::Request
             && self.info.cmd_code != CMD_CODE_HEARTBEAT;
         self.parsed
     }
 
-    fn parse_payload(
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+        self.parse_with_strict(payload, param, false)
+    }
+
+    fn protocol(&self) -> L7Protocol {
+        L7Protocol::SofaRPC
+    }
+
+    fn reset(&mut self) {
+        self.parsed = false;
+        self.save_info_time();
+
+        self.info = SofaRpcInfo::default();
+    }
+
+    fn parsable_on_udp(&self) -> bool {
+        false
+    }
+}
+
+impl SofaRpcLog {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    fn parse_with_strict(
         &mut self,
         mut payload: &[u8],
         param: &ParseParam,
+        strict: bool,
     ) -> Result<Vec<L7ProtocolInfo>> {
         if self.parsed {
             return Ok(vec![L7ProtocolInfo::SofaRpcInfo(self.info.clone())]);
@@ -300,13 +326,14 @@ impl L7ProtocolParserInterface for SofaRpcLog {
         self.info.msg_type = match hdr.typ {
             TYPE_REQ => {
                 payload = &payload[REQ_HDR_LEN..];
-                self.info.req_len = hdr.content_len;
+                self.info.req_len = hdr.content_len + (hdr.hdr_len as u32) + (hdr.class_len as u32);
                 LogMessageType::Request
             }
             TYPE_RESP => {
                 payload = &payload[RESP_HDR_LEN..];
                 self.info.resp_code = hdr.resp_code;
-                self.info.resp_len = hdr.content_len;
+                self.info.resp_len =
+                    hdr.content_len + (hdr.hdr_len as u32) + (hdr.class_len as u32);
                 if self.info.resp_code == 8 {
                     self.perf_inc_req_err();
                     self.info.status = L7ResponseStatus::ClientError;
@@ -331,11 +358,17 @@ impl L7ProtocolParserInterface for SofaRpcLog {
 
         if hdr.hdr_len != 0 {
             let hdr_len = hdr.hdr_len as usize;
-            if hdr_len as usize > payload.len() {
-                return Err(Error::L7ProtocolUnknown);
-            }
-            let sofa_hdr = SofaHdr::from(&payload[..hdr_len]);
+            let hdr_payload = if hdr_len as usize > payload.len() {
+                // if hdr_len as usize > payload.len() likey ebpf not read full data from java process, parse hdr to payload end
+                if strict {
+                    return Err(Error::L7ProtocolUnknown);
+                }
+                payload
+            } else {
+                &payload[..hdr_len]
+            };
 
+            let sofa_hdr = SofaHdr::from(hdr_payload);
             self.info.target_serv = sofa_hdr.service;
             self.info.method = sofa_hdr.method;
             self.info.trace_id = sofa_hdr.trace_id;
@@ -350,27 +383,6 @@ impl L7ProtocolParserInterface for SofaRpcLog {
         }
         self.revert_info_time(param.direction, param.time);
         Ok(vec![L7ProtocolInfo::SofaRpcInfo(self.info.clone())])
-    }
-
-    fn protocol(&self) -> L7Protocol {
-        L7Protocol::SofaRPC
-    }
-
-    fn reset(&mut self) {
-        self.parsed = false;
-        self.save_info_time();
-
-        self.info = SofaRpcInfo::default();
-    }
-
-    fn parsable_on_udp(&self) -> bool {
-        false
-    }
-}
-
-impl SofaRpcLog {
-    pub fn new() -> Self {
-        Self::default()
     }
 
     fn fill_with_trace_ctx(&mut self, ctx: String) {
@@ -434,6 +446,18 @@ struct SofaHdr {
     new_rpc_trace_context: String,
 }
 
+/*
+    referer https://github.com/sofastack/sofa-rpc/blob/7931102255d6ea95ee75676d368aad37c56b57ee/tracer/tracer-opentracing/src/main/java/com/alipay/sofa/rpc/tracer/sofatracer/RpcSofaTracer.java#L192
+    sofarpc only have two trace type
+
+    1. when version >= 5.1.0, use header like
+       new_rpc_trace_context: tcid=ac11000116703149173111002125786&spid=0&pspid=1&sample=true&
+
+    2. when version < 5.1.0  use header
+       rpc_trace_context.sofaTraceId: ${trace_id}
+
+    the const var define in source: https://github.com/sofastack/sofa-rpc/blob/7931102255d6ea95ee75676d368aad37c56b57ee/core/api/src/main/java/com/alipay/sofa/rpc/common/RemotingConstants.java
+*/
 impl From<&[u8]> for SofaHdr {
     fn from(mut payload: &[u8]) -> Self {
         let mut ret = Self {
@@ -443,11 +467,14 @@ impl From<&[u8]> for SofaHdr {
             new_rpc_trace_context: "".to_string(),
         };
         while let Some((key, val)) = read_b32_kv(&mut payload) {
-            match key {
+            let Ok(key_str) = std::str::from_utf8(key) else{
+                return ret;
+            };
+            match key_str {
                 SERVICE_KEY => ret.service = String::from_utf8_lossy(val).to_string(),
                 METHOD_KEY => ret.method = String::from_utf8_lossy(val).to_string(),
                 TRACE_ID_KEY => ret.trace_id = String::from_utf8_lossy(val).to_string(),
-                NEW_RPC_TRACE_CTX_KEY => {
+                SOFA_NEW_RPC_TRACE_CTX_KEY => {
                     ret.new_rpc_trace_context = String::from_utf8_lossy(val).to_string()
                 }
                 _ => {}
@@ -510,6 +537,21 @@ pub fn decode_new_rpc_trace_context(mut payload: &[u8]) -> RpcTraceContext {
     ctx
 }
 
+pub fn decode_new_rpc_trace_context_with_type(mut payload: &[u8], id_type: u8) -> Option<String> {
+    while let Some((key, val)) = read_url_param_kv(&mut payload) {
+        match key {
+            RPC_TRACE_CONTEXT_TCID if id_type == HttpLog::TRACE_ID => {
+                return Some(String::from_utf8_lossy(val).to_string())
+            }
+            RPC_TRACE_CONTEXT_SPID if id_type == HttpLog::SPAN_ID => {
+                return Some(String::from_utf8_lossy(val).to_string())
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
 fn read_url_param_kv<'a>(payload: &mut &'a [u8]) -> Option<(&'a [u8], &'a [u8])> {
     let Ok((rest, key)) = payload.split_at_position::<_,()>(|b| b == b'=')else{
         return None;
@@ -568,8 +610,8 @@ mod test {
     }
 
     #[test]
-    fn test_sofarpc() {
-        let pcap_file = Path::new("resources/test/flow_generator/sofarpc/sofarpc.pcap");
+    fn test_sofarpc_old() {
+        let pcap_file = Path::new("resources/test/flow_generator/sofarpc/sofa-old.pcap");
         let capture = Capture::load_pcap(pcap_file, None);
         let mut p = capture.as_meta_packets();
         p[0].direction = PacketDirection::ClientToServer;
@@ -587,17 +629,14 @@ mod test {
         if let L7ProtocolInfo::SofaRpcInfo(k) = &req_info {
             assert_eq!(k.msg_type, LogMessageType::Request);
             assert_eq!(k.cmd_code, CMD_CODE_REQ);
-            assert_eq!(k.method, "checkInInterAcct");
-            assert_eq!(k.req_id, 19452);
-            assert_eq!(k.trace_id, "0f360537166901489829759151");
-            assert_eq!(k.span_id, "0.74");
-            assert_eq!(k.parent_span_id, "0");
+            assert_eq!(k.method, "testSuccess");
+            assert_eq!(k.req_id, 2);
+            assert_eq!(k.trace_id, "0a2200ce167089845152310016143");
+            assert_eq!(k.span_id, "");
+            assert_eq!(k.parent_span_id, "");
             assert_eq!(k.proto, PROTO_BOLT_V1);
-            assert_eq!(k.req_len, 1722);
-            assert_eq!(
-                k.target_serv,
-                "com.cebbank.poin.trade.service.IARestService:1.0"
-            );
+            assert_eq!(k.req_len, 874);
+            assert_eq!(k.target_serv, "com.mycompany.app.common.ServInterface:1.0");
         } else {
             unreachable!()
         }
@@ -615,10 +654,64 @@ mod test {
         if let L7ProtocolInfo::SofaRpcInfo(k) = &resp_info {
             assert_eq!(k.msg_type, LogMessageType::Response);
             assert_eq!(k.cmd_code, CMD_CODE_RESP);
-            assert_eq!(k.req_id, 19452);
+            assert_eq!(k.req_id, 2);
             assert_eq!(k.proto, PROTO_BOLT_V1);
             assert_eq!(k.resp_code, 0);
-            assert_eq!(k.resp_len, 171);
+            assert_eq!(k.resp_len, 210);
+        } else {
+            unreachable!()
+        }
+    }
+
+    #[test]
+    fn test_sofarpc_new() {
+        let pcap_file = Path::new("resources/test/flow_generator/sofarpc/sofa-new.pcap");
+        let capture = Capture::load_pcap(pcap_file, None);
+        let mut p = capture.as_meta_packets();
+        p[0].direction = PacketDirection::ClientToServer;
+        p[1].direction = PacketDirection::ServerToClient;
+        let mut parser = SofaRpcLog::new();
+
+        let req_param = &mut ParseParam::from(&p[0]);
+        let req_payload = p[0].get_l4_payload().unwrap();
+        assert_eq!(parser.check_payload(req_payload, req_param), true);
+        let req_info = parser
+            .parse_payload(req_payload, req_param)
+            .unwrap()
+            .remove(0);
+
+        if let L7ProtocolInfo::SofaRpcInfo(k) = &req_info {
+            assert_eq!(k.msg_type, LogMessageType::Request);
+            assert_eq!(k.cmd_code, CMD_CODE_REQ);
+            assert_eq!(k.method, "testSuccess");
+            assert_eq!(k.req_id, 2);
+            assert_eq!(k.trace_id, "0a2200ce1670900283956100813525");
+            assert_eq!(k.span_id, "0");
+            assert_eq!(k.parent_span_id, "");
+            assert_eq!(k.proto, PROTO_BOLT_V1);
+            assert_eq!(k.req_len, 730);
+            assert_eq!(k.target_serv, "com.mycompany.app.common.ServInterface:1.0");
+        } else {
+            unreachable!()
+        }
+
+        parser.reset();
+
+        let resp_param = &mut ParseParam::from(&p[1]);
+        let resp_payload = p[1].get_l4_payload().unwrap();
+
+        let resp_info = parser
+            .parse_payload(resp_payload, resp_param)
+            .unwrap()
+            .remove(0);
+
+        if let L7ProtocolInfo::SofaRpcInfo(k) = &resp_info {
+            assert_eq!(k.msg_type, LogMessageType::Response);
+            assert_eq!(k.cmd_code, CMD_CODE_RESP);
+            assert_eq!(k.req_id, 2);
+            assert_eq!(k.proto, PROTO_BOLT_V1);
+            assert_eq!(k.resp_code, 0);
+            assert_eq!(k.resp_len, 210);
         } else {
             unreachable!()
         }

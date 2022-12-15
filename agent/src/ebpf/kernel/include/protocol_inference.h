@@ -666,12 +666,12 @@ static __inline enum message_type infer_sofarpc_message(const char *buf,
 		return MSG_UNKNOWN;
 
 	switch (type) {
-		case TYPE_REQ:
-			return MSG_REQUEST;
-		case TYPE_RESP:
-			return MSG_RESPONSE;
-		default:
-			return MSG_UNKNOWN;
+	case TYPE_REQ:
+		return MSG_REQUEST;
+	case TYPE_RESP:
+		return MSG_RESPONSE;
+	default:
+		return MSG_UNKNOWN;
 	}
 	return MSG_UNKNOWN;
 }
@@ -1345,10 +1345,6 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_DUBBO;
 	} else if ((inferred_message.type =
-		    infer_sofarpc_message(infer_buf, count,
-					conn_info)) != MSG_UNKNOWN){
-		inferred_message.protocol = PROTO_SOFARPC;
-	} else if ((inferred_message.type =
 		    infer_dns_message(infer_buf, count,
 				      conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_DNS;
@@ -1390,9 +1386,6 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 	}
 
 	if ((inferred_message.type =
-	     infer_http2_message(buf, count, conn_info)) != MSG_UNKNOWN) {
-		inferred_message.protocol = PROTO_HTTP2;
-	} else if ((inferred_message.type =
 		    infer_mysql_message(infer_buf, count,
 					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_MYSQL;
@@ -1401,7 +1394,15 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_KAFKA;
 	} else if ((inferred_message.type =
-		    infer_postgre_message(infer_buf, count,
+		    infer_sofarpc_message(infer_buf, count,
+					conn_info)) != MSG_UNKNOWN){
+		inferred_message.protocol = PROTO_SOFARPC;
+	} else if ((inferred_message.type =
+	    	infer_http2_message(buf, count, 
+					conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_HTTP2;
+	}   else if ((inferred_message.type =
+			infer_postgre_message(infer_buf, count,
 					conn_info)) != MSG_UNKNOWN){
 		inferred_message.protocol = PROTO_POSTGRESQL;
 	}
