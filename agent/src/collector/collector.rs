@@ -178,7 +178,7 @@ impl StashKey {
                 fast_id |= (tagger.l7_protocol as u128) << 64;
                 fast_id |= 1 << 59;
                 fast_id |= (tagger.l3_epc_id as u16 as u128)
-                    | (tagger.protocol as u128) << 16
+                    | (u8::from(tagger.protocol) as u128) << 16
                     | (tagger.direction as u128) << 24
                     | (tagger.server_port as u128) << 32
                     | (u16::from(tagger.tap_type) as u128) << 48
@@ -187,7 +187,7 @@ impl StashKey {
             Self::SINGLE_MAC_IP_PORT => {
                 fast_id |= 1 << 59;
                 fast_id |= (tagger.l3_epc_id as u16 as u128)
-                    | (tagger.protocol as u128) << 16
+                    | (u8::from(tagger.protocol) as u128) << 16
                     | (tagger.direction as u128) << 24
                     | (tagger.server_port as u128) << 32
                     | (u16::from(tagger.tap_type) as u128) << 48
@@ -195,7 +195,7 @@ impl StashKey {
             }
             Self::SINGLE_IP_PORT => {
                 fast_id |= (tagger.l3_epc_id as u16 as u128)
-                    | (tagger.protocol as u128) << 16
+                    | (u8::from(tagger.protocol) as u128) << 16
                     | (tagger.direction as u128) << 24
                     | (tagger.server_port as u128) << 32
                     | (u16::from(tagger.tap_type) as u128) << 48
@@ -203,7 +203,7 @@ impl StashKey {
             }
             Self::SINGLE_IP_PORT_APP => {
                 fast_id |= (tagger.l3_epc_id as u16 as u128)
-                    | (tagger.protocol as u128) << 16
+                    | (u8::from(tagger.protocol) as u128) << 16
                     | (tagger.direction as u128) << 24
                     | (tagger.server_port as u128) << 32
                     | (u16::from(tagger.tap_type) as u128) << 48
@@ -230,7 +230,7 @@ impl StashKey {
                 let tap_port_reserve = (tagger.l7_protocol as u32) << 8 | 3 << 16 | 1 << 19;
                 fast_id |= (tagger.l3_epc_id as u16 as u128)
                     | (tagger.l3_epc_id1 as u16 as u128) << 16
-                    | (tagger.protocol as u128) << 32
+                    | (u8::from(tagger.protocol) as u128) << 32
                     | (tagger.server_port as u128) << 40
                     | (tagger.direction as u128) << 56;
                 fast_id |= (tagger
@@ -243,7 +243,7 @@ impl StashKey {
                 let tap_port_reserve = 2 << 16 | 1 << 19;
                 fast_id |= (tagger.l3_epc_id as u16 as u128)
                     | (tagger.l3_epc_id1 as u16 as u128) << 16
-                    | (tagger.protocol as u128) << 32
+                    | (u8::from(tagger.protocol) as u128) << 32
                     | (tagger.server_port as u128) << 40
                     | (tagger.direction as u128) << 56;
                 fast_id |= (tagger
@@ -256,7 +256,7 @@ impl StashKey {
                 let tap_port_reserve = 1 << 16;
                 fast_id |= (tagger.l3_epc_id as u16 as u128)
                     | (tagger.l3_epc_id1 as u16 as u128) << 16
-                    | (tagger.protocol as u128) << 32
+                    | (u8::from(tagger.protocol) as u128) << 32
                     | (tagger.server_port as u128) << 40
                     | (tagger.direction as u128) << 56;
                 fast_id |= (tagger
@@ -269,7 +269,7 @@ impl StashKey {
                 let tap_port_reserve = 4 << 16;
                 fast_id |= (tagger.l3_epc_id as u16 as u128)
                     | (tagger.l3_epc_id1 as u16 as u128) << 16
-                    | (tagger.protocol as u128) << 32
+                    | (u8::from(tagger.protocol) as u128) << 32
                     | (tagger.server_port as u128) << 40
                     | (tagger.direction as u128) << 56;
                 fast_id |= (tagger

@@ -182,7 +182,7 @@ impl From<FlowKey> for flow_log::FlowKey {
             ip6_dst: ip6_dst.octets().to_vec(),
             port_src: f.port_src as u32,
             port_dst: f.port_dst as u32,
-            proto: f.proto as u32,
+            proto: u8::from(f.proto) as u32,
         }
     }
 }
@@ -963,7 +963,7 @@ impl From<Flow> for flow_log::Flow {
             start_time: f.start_time.as_nanos() as u64,
             end_time: f.end_time.as_nanos() as u64,
             duration: f.duration.as_nanos() as u64,
-            eth_type: f.eth_type as u32,
+            eth_type: u16::from(f.eth_type) as u32,
             vlan: f.vlan as u32,
             has_perf_stats: f.flow_perf_stats.is_some() as u32,
             perf_stats: {

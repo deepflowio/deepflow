@@ -289,6 +289,7 @@ impl FastPath {
 
         let acl_id = policy.acl_id;
         let (key_0, key_1) = self.generate_map_key(packet);
+        let proto = u8::from(packet.proto) as usize;
         let key = (key_0 as u128) << 64 | key_1 as u128;
         let table = self.policy_table[packet.fast_index * u16::from(packet.tap_type) as usize]
             .as_mut()
@@ -301,13 +302,13 @@ impl FastPath {
         }
 
         if let Some(item) = table.get_mut(&key) {
-            item.protocol_table[packet.proto as usize] = Some(Arc::new(forward.clone()));
+            item.protocol_table[proto] = Some(Arc::new(forward.clone()));
         } else {
             let mut item = PolicyTableItem {
                 store: EndpointStore::from(endpoints),
                 protocol_table: unsafe { std::mem::zeroed() },
             };
-            item.protocol_table[packet.proto as usize] = Some(Arc::new(forward.clone()));
+            item.protocol_table[proto] = Some(Arc::new(forward.clone()));
             table.put(key, item);
 
             self.policy_count += 1;
@@ -326,7 +327,7 @@ impl FastPath {
         let (key_0, key_1) = (key_1, key_0);
         let key = (key_0 as u128) << 64 | key_1 as u128;
         if let Some(item) = table.get_mut(&key) {
-            item.protocol_table[packet.proto as usize] = Some(Arc::new(backward.clone()));
+            item.protocol_table[proto] = Some(Arc::new(backward.clone()));
         } else {
             let endpoints = EndpointData {
                 src_info: endpoints.dst_info,
@@ -337,7 +338,7 @@ impl FastPath {
                 protocol_table: unsafe { std::mem::zeroed() },
             };
 
-            item.protocol_table[packet.proto as usize] = Some(Arc::new(backward.clone()));
+            item.protocol_table[proto] = Some(Arc::new(backward.clone()));
             table.put(key, item);
 
             self.policy_count += 1;
@@ -359,7 +360,7 @@ impl FastPath {
             .as_mut()
             .unwrap();
         if let Some(item) = table.get(&key) {
-            if let Some(policy) = &item.protocol_table[packet.proto as usize] {
+            if let Some(policy) = &item.protocol_table[u8::from(packet.proto) as usize] {
                 return Some((
                     Arc::clone(policy),
                     item.store.get(

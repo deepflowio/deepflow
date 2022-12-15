@@ -112,7 +112,7 @@ impl LookupKey {
         dst_port: u16,
     ) {
         f.set(MatchedFlag::TapType, u16::from(tap_type));
-        f.set(MatchedFlag::Proto, proto as u16);
+        f.set(MatchedFlag::Proto, u8::from(proto) as u16);
         f.set_ip(MatchedFlag::SrcIp, src_ip);
         f.set_ip(MatchedFlag::DstIp, dst_ip);
         f.set(MatchedFlag::SrcEpc, src_epc);
@@ -204,7 +204,7 @@ impl fmt::Display for LookupKey {
             self.l2_end_0,
             self.dst_mac,
             self.l2_end_1,
-            self.eth_type as u16,
+            u16::from(self.eth_type),
             self.src_ip,
             self.src_port,
             self.l3_end_0,

@@ -560,7 +560,7 @@ impl TapTypeHandler {
                 }
             }
         }
-        Ok((tap_type, eth_type.try_into()?, l2_len))
+        Ok((tap_type, EthernetType::from(eth_type), l2_len))
     }
 }
 
