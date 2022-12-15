@@ -35,7 +35,7 @@ struct socket_bpf_data {
 	uint32_t thread_id;	   // pid in kernel struct task_struct, main thread iff pid==tgid
 	uint64_t coroutine_id;	   // CoroutineID, i.e., golang goroutine id
 	uint8_t source;		   // syscall,go_tls_uprobe,go_http2_uprobe
-	uint8_t  process_name[16]; // 进程名字
+	uint8_t  process_kname[16]; // 进程名字
 
 	struct __tuple_t tuple;	   // Socket五元组信息
 	uint64_t socket_id;	   // Socket的唯一标识，从启动时的时钟开始自增1
