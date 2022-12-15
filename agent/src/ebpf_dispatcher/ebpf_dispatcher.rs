@@ -31,16 +31,16 @@ use crate::common::l7_protocol_log::{
 use crate::common::meta_packet::MetaPacket;
 use crate::common::TaggedFlow;
 use crate::config::handler::{EbpfAccess, EbpfConfig, LogParserAccess};
-use crate::config::{FlowAccess, UprobeProcRegExp};
+use crate::config::FlowAccess;
 use crate::ebpf::{self, set_allow_port_bitmap};
 use crate::flow_generator::{FlowMap, MetaAppProto};
 use crate::policy::PolicyGetter;
 use crate::utils::stats;
-use public::bitmap::Bitmap;
 use public::counter::{Counter, CounterType, CounterValue, OwnedCountable};
 use public::{
     debug::QueueDebugger,
     queue::{bounded_with_debug, DebugSender, Receiver},
+    utils::bitmap::parse_u16_range_list_to_bitmap,
 };
 
 pub struct EbpfCounter {
@@ -277,13 +277,11 @@ impl EbpfCollector {
     fn ebpf_init(
         config: &EbpfConfig,
         sender: DebugSender<Box<MetaPacket<'static>>>,
-        uprobe_proc_regexp: &UprobeProcRegExp,
         l7_protocol_enabled_bitmap: L7ProtocolBitmap,
-        kprobe_port_whitelist: Option<Bitmap>,
     ) -> Result<()> {
         // ebpf内核模块初始化
         unsafe {
-            let log_file = config.log_path.clone();
+            let log_file = config.ebpf.log_file.clone();
             let log_file = if !log_file.is_empty() {
                 CString::new(log_file.as_bytes())
                     .unwrap()
@@ -293,14 +291,14 @@ impl EbpfCollector {
                 std::ptr::null()
             };
 
-            if !uprobe_proc_regexp.golang.is_empty() {
+            if !config.ebpf.uprobe_proc_regexp.golang.is_empty() {
                 info!(
                     "ebpf set golang uprobe proc regexp: {}",
-                    uprobe_proc_regexp.golang.as_str()
+                    config.ebpf.uprobe_proc_regexp.golang.as_str()
                 );
                 ebpf::set_feature_regex(
                     ebpf::FEATURE_UPROBE_GOLANG,
-                    CString::new(uprobe_proc_regexp.golang.as_str().as_bytes())
+                    CString::new(config.ebpf.uprobe_proc_regexp.golang.as_str().as_bytes())
                         .unwrap()
                         .as_c_str()
                         .as_ptr(),
@@ -309,14 +307,14 @@ impl EbpfCollector {
                 info!("ebpf golang uprobe proc regexp is empty, skip set")
             }
 
-            if !uprobe_proc_regexp.openssl.is_empty() {
+            if !config.ebpf.uprobe_proc_regexp.openssl.is_empty() {
                 info!(
                     "ebpf set openssl uprobe proc regexp: {}",
-                    uprobe_proc_regexp.openssl.as_str()
+                    config.ebpf.uprobe_proc_regexp.openssl.as_str()
                 );
                 ebpf::set_feature_regex(
                     ebpf::FEATURE_UPROBE_OPENSSL,
-                    CString::new(uprobe_proc_regexp.openssl.as_str().as_bytes())
+                    CString::new(config.ebpf.uprobe_proc_regexp.openssl.as_str().as_bytes())
                         .unwrap()
                         .as_c_str()
                         .as_ptr(),
@@ -325,17 +323,24 @@ impl EbpfCollector {
                 info!("ebpf openssl uprobe proc regexp is empty, skip set")
             }
 
-            if !uprobe_proc_regexp.golang_symbol.is_empty() {
+            if !config.ebpf.uprobe_proc_regexp.golang_symbol.is_empty() {
                 info!(
                     "ebpf set golang symbol uprobe proc regexp: {}",
-                    uprobe_proc_regexp.golang_symbol.as_str()
+                    config.ebpf.uprobe_proc_regexp.golang_symbol.as_str()
                 );
                 ebpf::set_feature_regex(
                     ebpf::FEATURE_UPROBE_GOLANG_SYMBOL,
-                    CString::new(uprobe_proc_regexp.golang_symbol.as_str().as_bytes())
-                        .unwrap()
-                        .as_c_str()
-                        .as_ptr(),
+                    CString::new(
+                        config
+                            .ebpf
+                            .uprobe_proc_regexp
+                            .golang_symbol
+                            .as_str()
+                            .as_bytes(),
+                    )
+                    .unwrap()
+                    .as_c_str()
+                    .as_ptr(),
                 );
             } else {
                 info!("ebpf golang symbol proc regexp is empty, skip set")
@@ -348,23 +353,26 @@ impl EbpfCollector {
                 }
             }
 
-            if let Some(b) = kprobe_port_whitelist {
-                set_allow_port_bitmap(b.get_raw_ptr());
+            let white_list = &config.ebpf.kprobe_whitelist;
+            if !white_list.port_list.is_empty() {
+                if let Some(b) = parse_u16_range_list_to_bitmap(&white_list.port_list, false) {
+                    set_allow_port_bitmap(b.get_raw_ptr());
+                }
             }
 
             if ebpf::bpf_tracer_init(log_file, true) != 0 {
-                info!("ebpf bpf_tracer_init error: {}", config.log_path);
+                info!("ebpf bpf_tracer_init error: {}", config.ebpf.log_file);
                 return Err(Error::EbpfInitError);
             }
 
             if ebpf::running_socket_tracer(
-                Self::ebpf_callback, /* 回调接口 rust -> C */
-                1,                   /* 工作线程数，是指用户态有多少线程参与数据处理 */
-                128,                 /* 内核共享内存占用的页框数量, 值为2的次幂。用于perf数据传递 */
-                65536,               /* 环形缓存队列大小，值为2的次幂。e.g: 2,4,8,16,32,64,128 */
-                524288, /* 设置用于socket追踪的hash表项最大值，取决于实际场景中并发请求数量 */
-                524288, /* 设置用于线程追踪会话的hash表项最大值，SK_BPF_DATA结构的syscall_trace_id_session关联这个哈希表 */
-                520000, /* socket map表项进行清理的最大阈值，当前map的表项数量超过这个值进行map清理操作 */
+                Self::ebpf_callback,                       /* 回调接口 rust -> C */
+                config.ebpf.thread_num as i32, /* 工作线程数，是指用户态有多少线程参与数据处理 */
+                config.ebpf.perf_pages_count as u32, /* 内核共享内存占用的页框数量, 值为2的次幂。用于perf数据传递 */
+                config.ebpf.ring_size as u32, /* 环形缓存队列大小，值为2的次幂。e.g: 2,4,8,16,32,64,128 */
+                config.ebpf.max_socket_entries as u32, /* 设置用于socket追踪的hash表项最大值，取决于实际场景中并发请求数量 */
+                config.ebpf.max_trace_entries as u32, /* 设置用于线程追踪会话的hash表项最大值，SK_BPF_DATA结构的syscall_trace_id_session关联这个哈希表 */
+                config.ebpf.socket_map_max_reclaim as u32, /* socket map表项进行清理的最大阈值，当前map的表项数量超过这个值进行map清理操作 */
             ) != 0
             {
                 return Err(Error::EbpfRunningError);
@@ -438,7 +446,7 @@ impl EbpfCollector {
         stats_collector: Arc<stats::Collector>,
     ) -> Result<Box<Self>> {
         let ebpf_config = config.load();
-        if ebpf_config.ebpf_disabled {
+        if ebpf_config.ebpf.disabled {
             info!("ebpf collector disabled.");
             return Err(Error::EbpfDisabled);
         }
@@ -446,13 +454,7 @@ impl EbpfCollector {
         let (sender, receiver, _) =
             bounded_with_debug(4096, "1-ebpf-packet-to-ebpf-collector", queue_debugger);
 
-        Self::ebpf_init(
-            &ebpf_config,
-            sender,
-            &ebpf_config.ebpf_uprobe_proc_regexp,
-            ebpf_config.l7_protocol_enabled_bitmap,
-            ebpf_config.ebpf_kprobe_whitelist_port.clone(),
-        )?;
+        Self::ebpf_init(&ebpf_config, sender, ebpf_config.l7_protocol_enabled_bitmap)?;
         Self::ebpf_on_config_change(ebpf::CAP_LEN_MAX);
 
         info!("ebpf collector initialized.");

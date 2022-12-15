@@ -29,6 +29,10 @@ impl Bitmap {
         return Bitmap(vec![if init_all_true { 255 } else { 0 }; (max_pos / 8) + 1]);
     }
 
+    pub fn get_raw(&self) -> &Vec<u8> {
+        &self.0
+    }
+
     pub fn get_raw_ptr(&self) -> *const u8 {
         self.0.as_ptr()
     }
