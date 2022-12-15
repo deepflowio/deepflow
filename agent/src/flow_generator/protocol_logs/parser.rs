@@ -121,10 +121,12 @@ impl MetaAppProto {
 
         if is_src {
             base_info.process_id_0 = meta_packet.process_id;
-            base_info.process_kname_0 = meta_packet.process_name.clone();
+            base_info.process_kname_0 =
+                String::from_utf8(meta_packet.process_kname.into()).expect("Found invalid UTF-8");
         } else {
             base_info.process_id_1 = meta_packet.process_id;
-            base_info.process_kname_1 = meta_packet.process_name.clone();
+            base_info.process_kname_1 =
+                String::from_utf8(meta_packet.process_kname.into()).expect("Found invalid UTF-8");
         }
 
         if flow.flow.tap_side == TapSide::Local {
