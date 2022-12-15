@@ -68,7 +68,7 @@ func toServiceProtocol(protocol layers.IPProtocol) trident.ServiceProtocol {
 	}
 }
 
-func (s *ServiceTable) QueryService(l3DeviceType uint8, podClusterID, podGroupID uint32, epcID int32, isIPv6 bool, ipv4 uint32, ipv6 net.IP, protocol layers.IPProtocol, serverPort uint16) uint32 {
+func (s *ServiceTable) QueryService(podID, podNodeID, podClusterID, podGroupID uint32, epcID int32, isIPv6 bool, ipv4 uint32, ipv6 net.IP, protocol layers.IPProtocol, serverPort uint16) uint32 {
 	if epcID <= 0 {
 		return 0
 	}
@@ -77,17 +77,17 @@ func (s *ServiceTable) QueryService(l3DeviceType uint8, podClusterID, podGroupID
 		protocol = 0
 	}
 	serviceProtocol := toServiceProtocol(protocol)
-	switch trident.DeviceType(l3DeviceType) {
-	case trident.DeviceType_DEVICE_TYPE_POD_NODE:
-		return s.podClusterIDTable[genPodXIDKey(podClusterID, serviceProtocol, serverPort)]
-	case trident.DeviceType_DEVICE_TYPE_POD:
+
+	if podID != 0 {
 		return s.podGroupIDTable[genPodXIDKey(podGroupID, serviceProtocol, serverPort)]
-	default:
-		if isIPv6 {
-			return s.epcIDIPv6Table[genEpcIDIPv6Key(epcID, ipv6, serviceProtocol, serverPort)]
-		}
-		return s.epcIDIPv4Table[serviceProtocol][genEpcIDIPv4Key(epcID, ipv4, serverPort)]
+	} else if podNodeID != 0 {
+		return s.podClusterIDTable[genPodXIDKey(podClusterID, serviceProtocol, serverPort)]
 	}
+
+	if isIPv6 {
+		return s.epcIDIPv6Table[genEpcIDIPv6Key(epcID, ipv6, serviceProtocol, serverPort)]
+	}
+	return s.epcIDIPv4Table[serviceProtocol][genEpcIDIPv4Key(epcID, ipv4, serverPort)]
 }
 
 func NewServiceTable(grpcServices []*trident.ServiceInfo) *ServiceTable {
