@@ -17,7 +17,6 @@
 package ext_metrics
 
 import (
-	"net"
 	"strconv"
 	"time"
 
@@ -56,25 +55,18 @@ type Metricsor struct {
 	Writer              *dbwriter.ExtMetricsWriter
 }
 
-func NewExtMetrics(config *config.Config, recv *receiver.Receiver) (*ExtMetrics, error) {
+func NewExtMetrics(config *config.Config, recv *receiver.Receiver, platformDataManager *grpc.PlatformDataManager) (*ExtMetrics, error) {
 	manager := dropletqueue.NewManager(ingesterctl.INGESTERCTL_EXTMETRICS_QUEUE)
-	controllers := make([]net.IP, len(config.Base.ControllerIPs))
-	for i, ipString := range config.Base.ControllerIPs {
-		controllers[i] = net.ParseIP(ipString)
-		if controllers[i].To4() != nil {
-			controllers[i] = controllers[i].To4()
-		}
-	}
 
-	telegraf, err := NewMetricsor(datatype.MESSAGE_TYPE_TELEGRAF, dbwriter.EXT_METRICS_DB, config, controllers, manager, recv, true)
+	telegraf, err := NewMetricsor(datatype.MESSAGE_TYPE_TELEGRAF, dbwriter.EXT_METRICS_DB, config, platformDataManager, manager, recv, true)
 	if err != nil {
 		return nil, err
 	}
-	prometheus, err := NewMetricsor(datatype.MESSAGE_TYPE_PROMETHEUS, dbwriter.EXT_METRICS_DB, config, controllers, manager, recv, true)
+	prometheus, err := NewMetricsor(datatype.MESSAGE_TYPE_PROMETHEUS, dbwriter.EXT_METRICS_DB, config, platformDataManager, manager, recv, true)
 	if err != nil {
 		return nil, err
 	}
-	deepflowStats, err := NewMetricsor(datatype.MESSAGE_TYPE_DFSTATS, dbwriter.DEEPFLOW_SYSTEM_DB, config, controllers, manager, recv, false)
+	deepflowStats, err := NewMetricsor(datatype.MESSAGE_TYPE_DFSTATS, dbwriter.DEEPFLOW_SYSTEM_DB, config, platformDataManager, manager, recv, false)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +78,7 @@ func NewExtMetrics(config *config.Config, recv *receiver.Receiver) (*ExtMetrics,
 	}, nil
 }
 
-func NewMetricsor(msgType datatype.MessageType, db string, config *config.Config, controllers []net.IP, manager *dropletqueue.Manager, recv *receiver.Receiver, platformDataEnabled bool) (*Metricsor, error) {
+func NewMetricsor(msgType datatype.MessageType, db string, config *config.Config, platformDataManager *grpc.PlatformDataManager, manager *dropletqueue.Manager, recv *receiver.Receiver, platformDataEnabled bool) (*Metricsor, error) {
 	queueCount := config.DecoderQueueCount
 	decodeQueues := manager.NewQueues(
 		"1-receive-to-decode-"+msgType.String(),
@@ -105,9 +97,12 @@ func NewMetricsor(msgType datatype.MessageType, db string, config *config.Config
 	platformDatas := make([]*grpc.PlatformInfoTable, queueCount)
 	for i := 0; i < queueCount; i++ {
 		if platformDataEnabled {
-			platformDatas[i] = grpc.NewPlatformInfoTable(controllers, int(config.Base.ControllerPort), config.Base.GrpcBufferSize, config.Base.ServiceLabelerLruCap, "ext-metrics-"+msgType.String()+"-"+strconv.Itoa(i), "", config.Base.NodeIP, nil)
+			platformDatas[i], err = platformDataManager.NewPlatformInfoTable(false, "ext-metrics-"+msgType.String()+"-"+strconv.Itoa(i))
 			if i == 0 {
 				debug.ServerRegisterSimple(CMD_PLATFORMDATA_EXT_METRICS, platformDatas[i])
+			}
+			if err != nil {
+				return nil, err
 			}
 		}
 		decoders[i] = decoder.NewDecoder(

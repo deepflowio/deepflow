@@ -102,13 +102,11 @@ type VtapInfo struct {
 }
 
 type Counter struct {
-	GrpcRequestTime        int64 `statsd:"grpc-request-time"`
-	UpdateServiceTime      int64 `statsd:"update-service-time"`
-	UpdatePlatformTime     int64 `statsd:"update-platform-time"`
-	UpdateCount            int64 `statsd:"update-count"`
-	UpdateServiceUnmarshal int64 `statsd:"update-service-unmarshal-time"`
-	UpdateServiceLabeler   int64 `statsd:"update-service-labeler-time"`
-	UpdateServicesCount    int64 `statsd:"update-services-count"`
+	GrpcRequestTime     int64 `statsd:"grpc-request-time"`
+	UpdateServiceTime   int64 `statsd:"update-service-time"`
+	UpdatePlatformTime  int64 `statsd:"update-platform-time"`
+	UpdateCount         int64 `statsd:"update-count"`
+	UpdateServicesCount int64 `statsd:"update-services-count"`
 
 	IP4TotalCount int64 `statsd:"ip4-total-count"`
 	IP4HitCount   int64 `statsd:"ip4-hit-count"`
@@ -121,6 +119,10 @@ type Counter struct {
 }
 
 type PlatformInfoTable struct {
+	manager  *PlatformDataManager
+	isMaster bool
+	index    int
+
 	receiver         *receiver.Receiver
 	regionID         uint32
 	otherRegionCount int64
@@ -143,9 +145,8 @@ type PlatformInfoTable struct {
 	versionPlatformData uint64
 	ctlIP               string
 
-	hostname          string
-	runtimeEnv        utils.RuntimeEnv
-	pcapDataMountPath string
+	hostname   string
+	runtimeEnv utils.RuntimeEnv
 
 	versionGroups uint64
 	*ServiceTable
@@ -170,6 +171,11 @@ func (t *PlatformInfoTable) GetCounter() interface{} {
 func (t *PlatformInfoTable) ClosePlatformInfoTable() {
 	t.GrpcSession.Close()
 	t.Closable.Close()
+	if t.isMaster {
+		t.manager.masterTable = nil
+	} else {
+		t.manager.slaveTables[t.index] = nil
+	}
 }
 
 func (t *PlatformInfoTable) QueryRegionID() uint32 {
@@ -281,8 +287,58 @@ func (t *PlatformInfoTable) QueryIPV6InfosPair(epcID0 int32, ipv60 net.IP, epcID
 	return
 }
 
-func NewPlatformInfoTable(ips []net.IP, port, rpcMaxMsgSize, serviceLabelerLruCap int, moduleName, pcapDataPath, nodeIP string, receiver *receiver.Receiver) *PlatformInfoTable {
+type PlatformDataManager struct {
+	masterTable       *PlatformInfoTable
+	slaveTables       []*PlatformInfoTable
+	slaveCount        uint32
+	maxSlaveTableSize int
+
+	ips           []net.IP
+	port          int
+	rpcMaxMsgSize int
+	nodeIP        string
+	receiver      *receiver.Receiver
+}
+
+func NewPlatformDataManager(ips []net.IP, port, maxSlaveTableSize, rpcMaxMsgSize int, nodeIP string, receiver *receiver.Receiver) *PlatformDataManager {
+	return &PlatformDataManager{
+		slaveTables:       make([]*PlatformInfoTable, maxSlaveTableSize),
+		maxSlaveTableSize: maxSlaveTableSize,
+		ips:               ips,
+		port:              port,
+		rpcMaxMsgSize:     rpcMaxMsgSize,
+		nodeIP:            nodeIP,
+		receiver:          receiver,
+	}
+}
+
+func (m *PlatformDataManager) NewPlatformInfoTable(isMaster bool, moudleName string) (*PlatformInfoTable, error) {
+	if isMaster {
+		if m.masterTable != nil {
+			err := fmt.Errorf("new platformData table  %s failed, master table already added", moudleName)
+			log.Error(err)
+			return nil, err
+		}
+		m.masterTable = NewPlatformInfoTable(m.ips, m.port, 0, m.rpcMaxMsgSize, moudleName, m.nodeIP, m.receiver, isMaster, m)
+		return m.masterTable, nil
+	}
+
+	index := int(atomic.AddUint32(&m.slaveCount, 1)) - 1
+	if index >= m.maxSlaveTableSize {
+		err := fmt.Errorf("new platformData table %s failed, slave talbes has reached the maximum capacity(%d) and cannot be added", moudleName, m.maxSlaveTableSize)
+		log.Error(err)
+		return nil, err
+	}
+	m.slaveTables[index] = NewPlatformInfoTable(m.ips, m.port, index, m.rpcMaxMsgSize, moudleName, m.nodeIP, m.receiver, isMaster, m)
+	return m.slaveTables[index], nil
+}
+
+func NewPlatformInfoTable(ips []net.IP, port, index, rpcMaxMsgSize int, moduleName, nodeIP string, receiver *receiver.Receiver, isMaster bool, manager *PlatformDataManager) *PlatformInfoTable {
 	table := &PlatformInfoTable{
+		manager:  manager,
+		isMaster: isMaster,
+		index:    index,
+
 		receiver:           receiver,
 		bootTime:           uint32(time.Now().Unix()),
 		GrpcSession:        &GrpcSession{},
@@ -298,7 +354,6 @@ func NewPlatformInfoTable(ips []net.IP, port, rpcMaxMsgSize, serviceLabelerLruCa
 		epcIDBaseMissCount: make(map[int32]*uint64),
 		moduleName:         moduleName,
 		runtimeEnv:         utils.GetRuntimeEnv(),
-		pcapDataMountPath:  utils.Mountpoint(pcapDataPath),
 		ServiceTable:       NewServiceTable(nil),
 
 		podNameInfos:    make(map[string][]*PodInfo),
@@ -308,7 +363,13 @@ func NewPlatformInfoTable(ips []net.IP, port, rpcMaxMsgSize, serviceLabelerLruCa
 		counter:         &Counter{},
 	}
 	runOnce := func() {
-		if err := table.Reload(); err != nil {
+		var err error
+		if table.isMaster {
+			err = table.ReloadMaster()
+		} else {
+			err = table.ReloadSlave()
+		}
+		if err != nil {
 			log.Warning(err)
 		}
 	}
@@ -604,8 +665,8 @@ func (t *PlatformInfoTable) String() string {
 	sb := &strings.Builder{}
 
 	sb.WriteString(fmt.Sprintf("RegionID:%d   Drop Other RegionID Data Count:%d\n", t.regionID, t.otherRegionCount))
-	sb.WriteString(fmt.Sprintf("moduleName:%s ctlIP:%s hostname:%s RegionID:%d pcapDataMountPath:%s\n",
-		t.moduleName, t.ctlIP, t.hostname, t.regionID, t.pcapDataMountPath))
+	sb.WriteString(fmt.Sprintf("moduleName:%s ctlIP:%s hostname:%s RegionID:%d\n",
+		t.moduleName, t.ctlIP, t.hostname, t.regionID))
 	sb.WriteString(fmt.Sprintf("ARCH:%s OS:%s Kernel:%s CPUNum:%d MemorySize:%d\n", t.runtimeEnv.Arch, t.runtimeEnv.OS, t.runtimeEnv.KernelVersion, t.runtimeEnv.CpuNum, t.runtimeEnv.MemorySize))
 	if len(t.epcIDIPV4Infos) > 0 {
 		sb.WriteString("\n1 *epcID  *ipv4           mac          host            hostID  regionID  deviceType  deviceID    subnetID  podNodeID podNSID podGroupID podID podClusterID azID isVip isWan hitCount (ipv4平台信息)\n")
@@ -804,25 +865,107 @@ func Lookup(host net.IP) (net.IP, error) {
 	return src, nil
 }
 
-func (t *PlatformInfoTable) updateServices(response *trident.SyncResponse) bool {
-	unmarshalStart := time.Now()
-	groupsData := trident.Groups{}
-	if compressed := response.GetGroups(); compressed != nil {
-		if err := groupsData.Unmarshal(compressed); err != nil {
-			log.Warningf("unmarshal grpc compressed groups failed as %v", err)
-			return false
-		}
-	}
-	t.counter.UpdateServiceUnmarshal += int64(time.Since(unmarshalStart))
-	tableStart := time.Now()
+func (t *PlatformInfoTable) updateServices(groupsData *trident.Groups) {
 	t.ServiceTable = NewServiceTable(groupsData.GetSvcs())
-	t.counter.UpdateServiceLabeler += int64(time.Since(tableStart))
 	t.counter.UpdateServicesCount += int64(len(groupsData.GetSvcs()))
-
-	return true
 }
 
-func (t *PlatformInfoTable) Reload() error {
+func (t *PlatformInfoTable) updatePlatformData(platformData *trident.PlatformData) {
+	newEpcIDIPV4Infos := make(map[uint64]*Info)
+	newEpcIDIPV6Infos := make(map[[EpcIDIPV6_LEN]byte]*Info)
+	newMacInfos := make(map[uint64]*Info)
+	newEpcIDBaseInfos := make(map[int32]*BaseInfo)
+	newEpcIDIPV4CidrInfos := make(map[int32][]*CidrInfo)
+	newEpcIDIPV6CidrInfos := make(map[int32][]*CidrInfo)
+
+	for _, intf := range platformData.GetInterfaces() {
+		updateInterfaceInfos(newEpcIDIPV4Infos, newEpcIDIPV6Infos, newMacInfos, newEpcIDBaseInfos, intf)
+	}
+	for _, cidr := range platformData.GetCidrs() {
+		updateCidrInfos(newEpcIDIPV4CidrInfos, newEpcIDIPV6CidrInfos, newEpcIDBaseInfos, cidr)
+	}
+	t.updatePeerConnections(platformData.GetPeerConnections())
+
+	t.epcIDIPV4Infos = newEpcIDIPV4Infos
+	t.epcIDIPV4CidrInfos = newEpcIDIPV4CidrInfos
+	t.epcIDIPV4Lru.NoStats()
+	t.epcIDIPV4Lru = lru.NewU64LRU("epcIDIPV4_"+t.moduleName, LruSlotSize, LruCap)
+
+	t.epcIDIPV6Infos = newEpcIDIPV6Infos
+	t.epcIDIPV6CidrInfos = newEpcIDIPV6CidrInfos
+	t.epcIDIPV6Lru.NoStats()
+	t.epcIDIPV6Lru = lru.NewU160LRU("epcIDIPV6_"+t.moduleName, LruSlotSize, LruCap)
+
+	t.macInfos = newMacInfos
+	t.macMissCount = make(map[uint64]*uint64)
+
+	t.epcIDBaseInfos = newEpcIDBaseInfos
+	t.epcIDBaseMissCount = make(map[int32]*uint64)
+}
+
+func (t *PlatformInfoTable) updateOthers(response *trident.SyncResponse) {
+	vtapIps := response.GetVtapIps()
+	if vtapIps != nil {
+		t.updateVtapIps(vtapIps)
+	}
+	podIps := response.GetPodIps()
+	if podIps != nil {
+		t.updatePodIps(podIps)
+	}
+
+	if config := response.GetConfig(); config != nil {
+		t.regionID = config.GetRegionId()
+	} else {
+		log.Warning("get regionID failed")
+	}
+}
+
+func (t *PlatformInfoTable) ReloadSlave() error {
+	if t.manager == nil || t.manager.masterTable == nil {
+		return nil
+	}
+
+	masterTable := t.manager.masterTable
+
+	newGroupsVersion := masterTable.versionGroups
+	if newGroupsVersion != t.versionGroups {
+		t.versionGroups, t.ServiceTable = newGroupsVersion, masterTable.ServiceTable
+		log.Infof("Update slave(%s) rpc groups version %d -> %d ", t.moduleName, t.versionGroups, newGroupsVersion)
+	}
+
+	newVersion := masterTable.versionPlatformData
+	if newVersion != t.versionPlatformData {
+		log.Infof("Update slave(%s) rpc platformdata version %d -> %d  regionID=%d", t.moduleName, t.versionPlatformData, newVersion, t.regionID)
+		t.peerConnections = masterTable.peerConnections
+
+		t.epcIDIPV4Infos = masterTable.epcIDIPV4Infos
+		t.epcIDIPV4CidrInfos = masterTable.epcIDIPV4CidrInfos
+		t.epcIDIPV4Lru.NoStats()
+		t.epcIDIPV4Lru = lru.NewU64LRU("epcIDIPV4_"+t.moduleName, LruSlotSize, LruCap)
+
+		t.epcIDIPV6Infos = masterTable.epcIDIPV6Infos
+		t.epcIDIPV6CidrInfos = masterTable.epcIDIPV6CidrInfos
+		t.epcIDIPV6Lru.NoStats()
+		t.epcIDIPV6Lru = lru.NewU160LRU("epcIDIPV6_"+t.moduleName, LruSlotSize, LruCap)
+
+		t.macInfos = masterTable.macInfos
+		t.macMissCount = make(map[uint64]*uint64)
+
+		t.epcIDBaseInfos = masterTable.epcIDBaseInfos
+		t.epcIDBaseMissCount = make(map[int32]*uint64)
+
+		t.versionPlatformData = newVersion
+		t.otherRegionCount = 0
+	}
+
+	t.vtapIdInfos = masterTable.vtapIdInfos
+	t.podNameInfos = masterTable.podNameInfos
+	t.regionID = masterTable.regionID
+
+	return nil
+}
+
+func (t *PlatformInfoTable) ReloadMaster() error {
 	t.counter.UpdateCount++
 	var response *trident.SyncResponse
 	start := time.Now()
@@ -856,9 +999,6 @@ func (t *PlatformInfoTable) Reload() error {
 			Arch:                proto.String(t.runtimeEnv.Arch),
 			Os:                  proto.String(t.runtimeEnv.OS),
 			KernelVersion:       proto.String(t.runtimeEnv.KernelVersion),
-			TsdbReportInfo: &trident.TsdbReportInfo{
-				PcapDataMountPath: proto.String(t.pcapDataMountPath),
-			},
 		}
 		client := trident.NewSynchronizerClient(t.GetClient())
 		// 分析器请求消息接口，用于stream, roze
@@ -868,9 +1008,9 @@ func (t *PlatformInfoTable) Reload() error {
 	if err != nil {
 		return err
 	}
-
 	grpcRequestTime := int64(time.Since(start))
 	t.counter.GrpcRequestTime += grpcRequestTime
+
 	if status := response.GetStatus(); status != trident.Status_SUCCESS {
 		return fmt.Errorf("grpc response failed. responseStatus is %v", status)
 	}
@@ -878,77 +1018,44 @@ func (t *PlatformInfoTable) Reload() error {
 	newGroupsVersion := response.GetVersionGroups()
 	if newGroupsVersion != t.versionGroups {
 		log.Infof("Update rpc groups version %d -> %d ", t.versionGroups, newGroupsVersion)
-		if t.updateServices(response) {
+		groupsData := trident.Groups{}
+		if compressed := response.GetGroups(); compressed != nil {
+			if err := groupsData.Unmarshal(compressed); err != nil {
+				log.Warningf("unmarshal grpc compressed groups failed as %v", err)
+			}
+		}
+
+		if len(groupsData.GetSvcs()) > 0 {
+			t.updateServices(&groupsData)
 			t.versionGroups = newGroupsVersion
 		}
 	}
-	updateServiceTime := int64(time.Since(start)) - grpcRequestTime
-	t.counter.UpdateServiceTime += updateServiceTime
-
-	vtapIps := response.GetVtapIps()
-	if vtapIps != nil {
-		t.updateVtapIps(vtapIps)
-	}
-	podIps := response.GetPodIps()
-	if podIps != nil {
-		t.updatePodIps(podIps)
-	}
+	serviceTime := int64(time.Since(start)) - grpcRequestTime
+	t.counter.UpdateServiceTime += serviceTime
 
 	newVersion := response.GetVersionPlatformData()
-	if newVersion == t.versionPlatformData {
-		t.counter.UpdatePlatformTime += int64(time.Since(start)) - grpcRequestTime - updateServiceTime
-		return nil
-	}
+	if newVersion != t.versionPlatformData {
+		platformData := trident.PlatformData{}
+		isUnmarshalSuccess := false
+		if plarformCompressed := response.GetPlatformData(); plarformCompressed != nil {
+			if err := platformData.Unmarshal(plarformCompressed); err != nil {
+				log.Warningf("unmarshal grpc compressed platformData failed as %v", err)
+			} else {
+				isUnmarshalSuccess = true
+			}
+		}
 
-	platformData := trident.PlatformData{}
-	if plarformCompressed := response.GetPlatformData(); plarformCompressed != nil {
-		if err := platformData.Unmarshal(plarformCompressed); err != nil {
-			log.Warningf("unmarshal grpc compressed platformData failed as %v", err)
-			return err
+		if isUnmarshalSuccess {
+			log.Infof("Update rpc platformdata version %d -> %d  regionID=%d", t.versionPlatformData, newVersion, t.regionID)
+			t.updatePlatformData(&platformData)
+			t.versionPlatformData = newVersion
+			t.otherRegionCount = 0
 		}
 	}
+	platformTime := int64(time.Since(start)) - grpcRequestTime - serviceTime
+	t.counter.UpdatePlatformTime += platformTime
 
-	if config := response.GetConfig(); config != nil {
-		t.regionID = config.GetRegionId()
-	} else {
-		log.Warning("get regionID failed")
-	}
-
-	log.Infof("Update rpc platformdata version %d -> %d  regionID=%d", t.versionPlatformData, newVersion, t.regionID)
-	t.versionPlatformData = newVersion
-	t.otherRegionCount = 0
-
-	newEpcIDIPV4Infos := make(map[uint64]*Info)
-	newEpcIDIPV6Infos := make(map[[EpcIDIPV6_LEN]byte]*Info)
-	newMacInfos := make(map[uint64]*Info)
-	newEpcIDBaseInfos := make(map[int32]*BaseInfo)
-	newEpcIDIPV4CidrInfos := make(map[int32][]*CidrInfo)
-	newEpcIDIPV6CidrInfos := make(map[int32][]*CidrInfo)
-	for _, intf := range platformData.GetInterfaces() {
-		updateInterfaceInfos(newEpcIDIPV4Infos, newEpcIDIPV6Infos, newMacInfos, newEpcIDBaseInfos, intf)
-	}
-	for _, cidr := range platformData.GetCidrs() {
-		updateCidrInfos(newEpcIDIPV4CidrInfos, newEpcIDIPV6CidrInfos, newEpcIDBaseInfos, cidr)
-	}
-	t.updatePeerConnections(platformData.GetPeerConnections())
-
-	t.epcIDIPV4Infos = newEpcIDIPV4Infos
-	t.epcIDIPV4CidrInfos = newEpcIDIPV4CidrInfos
-	t.epcIDIPV4Lru.NoStats()
-	t.epcIDIPV4Lru = lru.NewU64LRU("epcIDIPV4_"+t.moduleName, LruSlotSize, LruCap)
-
-	t.epcIDIPV6Infos = newEpcIDIPV6Infos
-	t.epcIDIPV6CidrInfos = newEpcIDIPV6CidrInfos
-	t.epcIDIPV6Lru.NoStats()
-	t.epcIDIPV6Lru = lru.NewU160LRU("epcIDIPV6_"+t.moduleName, LruSlotSize, LruCap)
-
-	t.macInfos = newMacInfos
-	t.macMissCount = make(map[uint64]*uint64)
-
-	t.epcIDBaseInfos = newEpcIDBaseInfos
-	t.epcIDBaseMissCount = make(map[int32]*uint64)
-
-	t.counter.UpdatePlatformTime += int64(time.Since(start)) - grpcRequestTime - updateServiceTime
+	t.updateOthers(response)
 	return nil
 }
 
@@ -1372,8 +1479,9 @@ func RegisterPlatformDataCommand(ips []net.IP, port int) *cobra.Command {
 		Use:   "platformData",
 		Short: "get platformData from controller",
 		Run: func(cmd *cobra.Command, args []string) {
-			table := NewPlatformInfoTable(ips, port, 41943040, 1<<10, "debug", "", "", nil)
-			table.Reload()
+			m := NewPlatformDataManager(ips, port, 16, 41943040, "", nil)
+			table, _ := m.NewPlatformInfoTable(true, "test")
+			table.ReloadMaster()
 			fmt.Println(table)
 		},
 	})

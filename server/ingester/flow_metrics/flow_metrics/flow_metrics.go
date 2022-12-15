@@ -17,7 +17,6 @@
 package flow_metrics
 
 import (
-	"net"
 	_ "net/http/pprof"
 	"strconv"
 	"time"
@@ -48,16 +47,8 @@ type FlowMetrics struct {
 	dbwriter      *dbwriter.DbWriter
 }
 
-func NewFlowMetrics(cfg *config.Config, recv *receiver.Receiver) (*FlowMetrics, error) {
+func NewFlowMetrics(cfg *config.Config, recv *receiver.Receiver, platformDataManager *grpc.PlatformDataManager) (*FlowMetrics, error) {
 	flowMetrics := FlowMetrics{}
-
-	controllers := make([]net.IP, len(cfg.Base.ControllerIPs))
-	for i, ipString := range cfg.Base.ControllerIPs {
-		controllers[i] = net.ParseIP(ipString)
-		if controllers[i].To4() != nil {
-			controllers[i] = controllers[i].To4()
-		}
-	}
 
 	manager := queue.NewManager(ingesterctl.INGESTERCTL_FLOW_METRICS_QUEUE)
 	unmarshallQueueCount := int(cfg.UnmarshallQueueCount)
@@ -82,10 +73,13 @@ func NewFlowMetrics(cfg *config.Config, recv *receiver.Receiver) (*FlowMetrics, 
 	for i := 0; i < unmarshallQueueCount; i++ {
 		if i == 0 {
 			// 只第一个上报数据节点信息
-			flowMetrics.platformDatas[i] = grpc.NewPlatformInfoTable(controllers, int(cfg.Base.ControllerPort), cfg.Base.GrpcBufferSize, cfg.Base.ServiceLabelerLruCap, "roze", cfg.Pcap.FileDirectory, cfg.Base.NodeIP, recv)
+			flowMetrics.platformDatas[i], err = platformDataManager.NewPlatformInfoTable(true, "roze")
 			debug.ServerRegisterSimple(CMD_PLATFORMDATA, flowMetrics.platformDatas[i])
 		} else {
-			flowMetrics.platformDatas[i] = grpc.NewPlatformInfoTable(controllers, int(cfg.Base.ControllerPort), cfg.Base.GrpcBufferSize, cfg.Base.ServiceLabelerLruCap, "flowMetrics-"+strconv.Itoa(i), "", cfg.Base.NodeIP, nil)
+			flowMetrics.platformDatas[i], err = platformDataManager.NewPlatformInfoTable(false, "flowMetrics-"+strconv.Itoa(i))
+		}
+		if err != nil {
+			return nil, err
 		}
 		flowMetrics.unmarshallers[i] = unmarshaller.NewUnmarshaller(i, flowMetrics.platformDatas[i], cfg.DisableSecondWrite, libqueue.QueueReader(unmarshallQueues.FixedMultiQueue[i]), flowMetrics.dbwriter)
 	}
