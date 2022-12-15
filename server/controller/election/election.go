@@ -21,11 +21,13 @@ package election
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
 	logging "github.com/op/go-logging"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -183,7 +185,7 @@ func Start(ctx context.Context, cfg *config.ControllerConfig) {
 	go checkLeaderValid(ctx, lock)
 
 	// start the leader election code loop
-	leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
+	le, err := leaderelection.NewLeaderElector(leaderelection.LeaderElectionConfig{
 		Lock: lock,
 		// IMPORTANT: you MUST ensure that any code you have that
 		// is protected by the lease must terminate **before**
@@ -216,4 +218,10 @@ func Start(ctx context.Context, cfg *config.ControllerConfig) {
 			},
 		},
 	})
+	if err != nil {
+		log.Errorf("failed to create election: %v", err)
+		time.Sleep(1 * time.Second)
+		os.Exit(1)
+	}
+	wait.UntilWithContext(ctx, le.Run, 0)
 }
