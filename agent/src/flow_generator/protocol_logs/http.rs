@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+use std::mem;
 use std::str;
 
 use arc_swap::access::Access;
@@ -467,14 +468,17 @@ impl L7ProtocolParserInterface for HttpLog {
 
     fn reset(&mut self) {
         self.info = HttpInfo::default();
-        let conf = self.l7_log_dynamic_config.clone();
-        match self.proto {
-            L7Protocol::Http1 => *self = Self::new_v1(),
-            L7Protocol::Http2 => *self = Self::new_v2(false),
-            L7Protocol::Grpc => *self = Self::new_v2(true),
+        let mut new_log = match self.proto {
+            L7Protocol::Http1 => Self::new_v1(),
+            L7Protocol::Http2 => Self::new_v2(false),
+            L7Protocol::Grpc => Self::new_v2(true),
             _ => unreachable!(),
-        }
-        self.l7_log_dynamic_config = conf;
+        };
+        mem::swap(
+            &mut new_log.l7_log_dynamic_config,
+            &mut self.l7_log_dynamic_config,
+        );
+        *self = new_log
     }
 }
 
@@ -575,11 +579,14 @@ impl HttpLog {
     }
 
     pub fn update_config(&mut self, config: &LogParserAccess) {
-        self.l7_log_dynamic_config = config.load().l7_log_dynamic.clone();
-        debug!(
-            "http log update l7 log dynamic config to {:#?}",
-            self.l7_log_dynamic_config
-        );
+        let new_config = &config.load().l7_log_dynamic;
+        if &self.l7_log_dynamic_config != new_config {
+            self.l7_log_dynamic_config = new_config.clone();
+            debug!(
+                "http log update l7 log dynamic config to {:#?}",
+                self.l7_log_dynamic_config
+            );
+        }
     }
 
     fn reset_logs(&mut self) {
