@@ -41,7 +41,6 @@ pub use sql::{
 
 use std::{
     fmt,
-    mem::swap,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     str,
     time::Duration,
@@ -56,7 +55,6 @@ use crate::{
         ebpf::EbpfType,
         enums::{IpProtocol, TapType},
         flow::{L7Protocol, PacketDirection, SignalSource},
-        meta_packet::MetaPacket,
         tap_port::TapPort,
     },
     flow_generator::error::Error,
@@ -308,114 +306,6 @@ impl From<AppProtoLogsBaseInfo> for flow_log::AppProtoLogsBaseInfo {
 }
 
 impl AppProtoLogsBaseInfo {
-    pub fn from_ebpf(
-        packet: &MetaPacket,
-        head: AppProtoHead,
-        vtap_id: u16,
-        local_epc: i32,
-        remote_epc: i32,
-    ) -> Self {
-        let is_src = packet.lookup_key.l2_end_0;
-        let direction = packet.direction;
-        let mut info = Self {
-            start_time: packet.lookup_key.timestamp,
-            end_time: packet.lookup_key.timestamp,
-            flow_id: packet.socket_id,
-            tap_port: packet.tap_port,
-            signal_source: packet.signal_source,
-            tap_type: TapType::Cloud,
-            is_ipv6: packet.lookup_key.dst_ip.is_ipv6(),
-            tap_side: if is_src {
-                TapSide::ClientProcess
-            } else {
-                TapSide::ServerProcess
-            },
-
-            mac_src: packet.lookup_key.src_mac,
-            mac_dst: packet.lookup_key.dst_mac,
-            ip_src: packet.lookup_key.src_ip,
-            ip_dst: packet.lookup_key.dst_ip,
-            port_src: packet.lookup_key.src_port,
-            port_dst: packet.lookup_key.dst_port,
-            protocol: packet.lookup_key.proto,
-
-            ebpf_type: packet.ebpf_type,
-            process_id_0: if is_src { packet.process_id } else { 0 },
-            process_id_1: if !is_src { packet.process_id } else { 0 },
-            process_kname_0: if is_src {
-                packet.process_name.clone()
-            } else {
-                "".to_string()
-            },
-            process_kname_1: if !is_src {
-                packet.process_name.clone()
-            } else {
-                "".to_string()
-            },
-
-            syscall_trace_id_request: if direction == PacketDirection::ClientToServer {
-                packet.syscall_trace_id
-            } else {
-                0
-            },
-            syscall_trace_id_response: if direction == PacketDirection::ServerToClient {
-                packet.syscall_trace_id
-            } else {
-                0
-            },
-            req_tcp_seq: if direction == PacketDirection::ClientToServer {
-                packet.tcp_data.seq
-            } else {
-                0
-            },
-            resp_tcp_seq: if direction == PacketDirection::ServerToClient {
-                packet.tcp_data.seq
-            } else {
-                0
-            },
-            syscall_trace_id_thread_0: if direction == PacketDirection::ClientToServer {
-                packet.thread_id
-            } else {
-                0
-            },
-            syscall_trace_id_thread_1: if direction == PacketDirection::ServerToClient {
-                packet.thread_id
-            } else {
-                0
-            },
-            syscall_cap_seq_0: if direction == PacketDirection::ClientToServer {
-                packet.cap_seq
-            } else {
-                0
-            },
-            syscall_cap_seq_1: if direction == PacketDirection::ServerToClient {
-                packet.cap_seq
-            } else {
-                0
-            },
-            vtap_id,
-            head,
-            l3_epc_id_src: if is_src { local_epc } else { remote_epc },
-            l3_epc_id_dst: if is_src { remote_epc } else { local_epc },
-            is_vip_interface_src: false,
-            is_vip_interface_dst: false,
-        };
-        if direction == PacketDirection::ServerToClient {
-            swap(&mut info.mac_src, &mut info.mac_dst);
-            swap(&mut info.ip_src, &mut info.ip_dst);
-            swap(&mut info.l3_epc_id_src, &mut info.l3_epc_id_dst);
-            swap(&mut info.port_src, &mut info.port_dst);
-            swap(&mut info.process_id_0, &mut info.process_id_1);
-            swap(&mut info.process_kname_0, &mut info.process_kname_1);
-            info.tap_side = if info.tap_side == TapSide::ClientProcess {
-                TapSide::ServerProcess
-            } else {
-                TapSide::ClientProcess
-            };
-        }
-
-        info
-    }
     // 请求调用回应来合并
     fn merge(&mut self, log: AppProtoLogsBaseInfo) {
         // adjust protocol when change, now only use for http2 change to grpc.
