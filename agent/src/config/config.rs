@@ -241,6 +241,38 @@ pub struct EbpfKprobeWhitelist {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+pub struct EbpfYamlConfig {
+    pub disabled: bool,
+    pub log_file: String,
+    pub kprobe_whitelist: EbpfKprobeWhitelist,
+    #[serde(rename = "uprobe-process-name-regexs")]
+    pub uprobe_proc_regexp: UprobeProcRegExp,
+    pub thread_num: usize,
+    pub perf_pages_count: usize,
+    pub ring_size: usize,
+    pub max_socket_entries: usize,
+    pub max_trace_entries: usize,
+    pub socket_map_max_reclaim: usize,
+}
+
+impl Default for EbpfYamlConfig {
+    fn default() -> Self {
+        EbpfYamlConfig {
+            disabled: false,
+            log_file: String::new(),
+            thread_num: 1,
+            perf_pages_count: 128,
+            ring_size: 65536,
+            max_socket_entries: 524288,
+            max_trace_entries: 524288,
+            socket_map_max_reclaim: 520000,
+            kprobe_whitelist: EbpfKprobeWhitelist::default(),
+            uprobe_proc_regexp: UprobeProcRegExp::default(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct YamlConfig {
     #[serde(with = "LevelDef")]
@@ -290,7 +322,6 @@ pub struct YamlConfig {
     pub l7_log_session_aggr_timeout: Duration,
     pub tap_mac_script: String,
     pub cloud_gateway_traffic: bool,
-    pub ebpf_log_file: String,
     pub kubernetes_namespace: String,
     pub external_metrics_sender_queue_size: usize,
     pub l7_protocol_inference_max_fail_count: usize,
@@ -300,10 +331,8 @@ pub struct YamlConfig {
     pub packet_sequence_queue_count: usize, // Enterprise Edition Feature: packet-sequence
     pub packet_sequence_flag: u8,          // Enterprise Edition Feature: packet-sequence
     pub feature_flags: Vec<String>,
-    pub ebpf_disabled: bool,
     pub l7_protocol_enabled: Vec<String>,
-    #[serde(rename = "ebpf-uprobe-process-name-regexs")]
-    pub ebpf_uprobe_proc_regexp: UprobeProcRegExp,
+    pub ebpf: EbpfYamlConfig,
     pub external_agent_http_proxy_compressed: bool,
     pub standalone_data_file_size: u32,
     pub standalone_data_file_dir: String,
@@ -311,7 +340,6 @@ pub struct YamlConfig {
     #[serde(rename = "l7-protocol-ports")]
     // hashmap<protocolName, portRange>
     pub l7_protocol_ports: HashMap<String, String>,
-    pub ebpf_kprobe_whitelist: EbpfKprobeWhitelist,
 }
 
 impl YamlConfig {
@@ -432,6 +460,13 @@ impl YamlConfig {
                 .to_string();
         }
 
+        if !c.ebpf.ring_size.is_power_of_two() {
+            c.ebpf.ring_size = c.ebpf.ring_size.next_power_of_two()
+        }
+        if !c.ebpf.perf_pages_count.is_power_of_two() {
+            c.ebpf.perf_pages_count = c.ebpf.perf_pages_count.next_power_of_two()
+        }
+
         if let Err(e) = c.validate() {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string()));
         }
@@ -507,7 +542,6 @@ impl Default for YamlConfig {
             l7_log_session_aggr_timeout: Duration::from_secs(120),
             tap_mac_script: "".into(),
             cloud_gateway_traffic: false,
-            ebpf_log_file: "".into(),
             kubernetes_namespace: "".into(),
             external_metrics_sender_queue_size: 1 << 12,
             l7_protocol_inference_max_fail_count: L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT,
@@ -517,8 +551,6 @@ impl Default for YamlConfig {
             packet_sequence_queue_count: 1, // Enterprise Edition Feature: packet-sequence
             packet_sequence_flag: 0,        // Enterprise Edition Feature: packet-sequence
             feature_flags: vec![],
-            ebpf_disabled: false,
-            ebpf_uprobe_proc_regexp: UprobeProcRegExp::default(),
             l7_protocol_enabled: {
                 let mut protos = vec![];
                 for i in get_all_protocol() {
@@ -539,7 +571,7 @@ impl Default for YamlConfig {
 
             log_file: DEFAULT_LOG_FILE.into(),
             l7_protocol_ports: HashMap::from([(String::from("DNS"), String::from("53"))]),
-            ebpf_kprobe_whitelist: EbpfKprobeWhitelist::default(),
+            ebpf: EbpfYamlConfig::default(),
         }
     }
 }
