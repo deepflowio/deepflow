@@ -127,6 +127,7 @@ pub struct MetaPacket<'a> {
     pub process_id: u32,
     pub thread_id: u32,
     pub syscall_trace_id: u64,
+    #[cfg(target_os = "linux")]
     pub process_kname: [u8; PACKET_KNAME_MAX_PADDING], // kernel process name
     // for PcapAssembler
     pub flow_id: u64,
