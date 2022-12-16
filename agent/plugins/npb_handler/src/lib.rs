@@ -17,7 +17,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Weak};
 
-use npb_pcap_policy::PolicyData;
+use npb_pcap_policy::{NpbTunnelType, PolicyData};
 use public::{
     counter::{CounterType, CounterValue, OwnedCountable},
     leaky_bucket::LeakyBucket,
@@ -98,7 +98,7 @@ impl NpbHandler {
     pub fn new(
         _id: usize,
         _mtu: usize,
-        _pseudo_tunnel_header: [Vec<u8>; 2],
+        _pseudo_tunnel_header: [Vec<u8>; NpbTunnelType::Max as usize],
         _underlay_vlan_header_size: usize,
         _overlay_vlan: bool,
         _bps_limit: Arc<LeakyBucket>,
@@ -125,7 +125,9 @@ impl NpbHandler {
 }
 
 #[derive(Default)]
-pub struct NpbHeader;
+pub struct NpbHeader {
+    pub total_length: u16,
+}
 
 impl NpbHeader {
     pub const SIZEOF: usize = 16;
@@ -135,6 +137,10 @@ impl NpbHeader {
     }
 
     pub fn encode(&self, _buffer: &mut [u8]) -> usize {
+        Self::SIZEOF
+    }
+
+    pub fn decode(&mut self, _buffer: &[u8]) -> usize {
         Self::SIZEOF
     }
 }
