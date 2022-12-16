@@ -49,6 +49,7 @@ type GenesisSyncRpcUpdater struct {
 	hostIPsMap            map[string]int
 	localIPRanges         []netaddr.IPPrefix
 	excludeIPRanges       []netaddr.IPPrefix
+	multiNSMode           bool
 	genesisSyncDataByPeer map[uint32]GenesisSyncDataOperation
 }
 
@@ -105,6 +106,7 @@ func NewGenesisSyncRpcUpdater(storage *SyncStorage, queue queue.QueueReader, cfg
 		hostIPsMap:            hostIPsMap,
 		localIPRanges:         localIPRanges,
 		excludeIPRanges:       excludeIPRanges,
+		multiNSMode:           cfg.MultiNSMode,
 		genesisSyncDataByPeer: map[uint32]GenesisSyncDataOperation{},
 	}
 }
@@ -246,7 +248,7 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info *trident.GenesisPlatfor
 			}
 			vIF.DeviceName = fmt.Sprintf("namespace-%s", iface.GetDeviceId())
 			vIF.DeviceType = genesiscommon.DEVICE_TYPE_DOCKER_CONTAINER
-			if _, ok := rootNSMacs[vIF.Mac]; ok {
+			if _, ok := rootNSMacs[vIF.Mac]; ok && v.multiNSMode {
 				vIF.DeviceType = genesiscommon.DEVICE_TYPE_DOCKER_HOST
 			}
 		} else if deviceType == genesiscommon.DEVICE_TYPE_KVM_HOST {
