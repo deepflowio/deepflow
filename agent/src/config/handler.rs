@@ -15,7 +15,7 @@
  */
 
 use std::cmp::{max, min};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::net::IpAddr;
 use std::net::Ipv4Addr;
@@ -452,24 +452,13 @@ pub struct EbpfConfig {
     pub ctrl_mac: MacAddr,
     pub l7_protocol_enabled_bitmap: L7ProtocolBitmap,
     pub l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
+    pub l7_protocol_ports: HashMap<String, String>,
     pub ebpf: EbpfYamlConfig,
 }
 
 #[cfg(target_os = "linux")]
 impl fmt::Debug for EbpfConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let l7_protocol_parse_port_bitmap = self
-            .l7_protocol_parse_port_bitmap
-            .iter()
-            .map(|(title, bitmap)| {
-                let ports = bitmap
-                    .get_raw()
-                    .iter()
-                    .filter(|x| **x != 0)
-                    .collect::<Vec<_>>();
-                (title.clone(), ports.clone())
-            })
-            .collect::<Vec<_>>();
         f.debug_struct("EbpfConfig")
             .field("collector_enabled", &self.collector_enabled)
             .field("l7_metrics_enabled", &self.l7_metrics_enabled)
@@ -496,10 +485,7 @@ impl fmt::Debug for EbpfConfig {
                 "l7_protocol_enabled_bitmap",
                 &self.l7_protocol_enabled_bitmap,
             )
-            .field(
-                "l7_protocol_parse_port_bitmap",
-                &l7_protocol_parse_port_bitmap,
-            )
+            .field("l7_protocol_ports", &self.l7_protocol_ports)
             .field("ebpf", &self.ebpf)
             .finish()
     }
@@ -963,6 +949,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     &conf.yaml_config.l7_protocol_enabled,
                 ),
                 l7_protocol_parse_port_bitmap,
+                l7_protocol_ports: conf.yaml_config.l7_protocol_ports.clone(),
                 ebpf: conf.yaml_config.ebpf.clone(),
             },
             metric_server: MetricServerConfig {
