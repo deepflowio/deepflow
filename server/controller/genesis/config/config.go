@@ -24,4 +24,5 @@ type GenesisConfig struct {
 	ExcludeIPRanges         []string `yaml:"exclude_ip_ranges"`
 	QueueLengths            int      `default:"60" yaml:"queue_length"`
 	DataPersistenceInterval int      `default:"60" yaml:"data_persistence_interval"`
+	MultiNSMode             bool     `default:"false" yaml:"multi_ns_mode"`
 }
