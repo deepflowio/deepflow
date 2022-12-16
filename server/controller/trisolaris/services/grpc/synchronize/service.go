@@ -120,3 +120,7 @@ func (s *service) KubernetesAPISync(ctx context.Context, in *api.KubernetesAPISy
 	}()
 	return genesis.Synchronizer.KubernetesAPISync(ctx, in)
 }
+
+func (s *service) GPIDSync(ctx context.Context, in *api.GPIDSyncRequest) (*api.GPIDSyncResponse, error) {
+	return &api.GPIDSyncResponse{}, nil
+}
