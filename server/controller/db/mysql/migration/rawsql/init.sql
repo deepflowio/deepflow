@@ -18,7 +18,7 @@ TRUNCATE TABLE resource_event;
 CREATE TABLE IF NOT EXISTS domain_additional_resource (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     domain              CHAR(64) DEFAULT '',
-    content             TEXT,
+    content             MEDIUMTEXT,
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE domain_additional_resource;

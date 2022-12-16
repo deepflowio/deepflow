@@ -182,7 +182,7 @@ impl From<FlowKey> for flow_log::FlowKey {
             ip6_dst: ip6_dst.octets().to_vec(),
             port_src: f.port_src as u32,
             port_dst: f.port_dst as u32,
-            proto: f.proto as u32,
+            proto: u8::from(f.proto) as u32,
         }
     }
 }
@@ -843,9 +843,9 @@ impl Flow {
 
     // FIXME 注意：由于FlowGenerator中TcpPerfStats在Flow方向调整之后才获取到，
     // 因此这里不包含对TcpPerfStats的反向。
-    pub fn reverse(&mut self, no_stats: bool) {
+    pub fn reverse(&mut self, is_first_packet: bool) {
         // 如果没有统计数据不需要标记reversed来反向数据
-        self.reversed = !self.reversed && !no_stats;
+        self.reversed = !self.reversed && !is_first_packet;
         self.tap_side = TapSide::Rest;
         self.tunnel.reverse();
         self.flow_key.reverse();
@@ -963,7 +963,7 @@ impl From<Flow> for flow_log::Flow {
             start_time: f.start_time.as_nanos() as u64,
             end_time: f.end_time.as_nanos() as u64,
             duration: f.duration.as_nanos() as u64,
-            eth_type: f.eth_type as u32,
+            eth_type: u16::from(f.eth_type) as u32,
             vlan: f.vlan as u32,
             has_perf_stats: f.flow_perf_stats.is_some() as u32,
             perf_stats: {

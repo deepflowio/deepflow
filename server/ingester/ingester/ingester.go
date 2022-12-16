@@ -47,13 +47,13 @@ import (
 	"github.com/deepflowys/deepflow/server/ingester/event/event"
 	extmetricscfg "github.com/deepflowys/deepflow/server/ingester/ext_metrics/config"
 	"github.com/deepflowys/deepflow/server/ingester/ext_metrics/ext_metrics"
+	flowlogcfg "github.com/deepflowys/deepflow/server/ingester/flow_log/config"
+	flowlog "github.com/deepflowys/deepflow/server/ingester/flow_log/flow_log"
+	flowmetricscfg "github.com/deepflowys/deepflow/server/ingester/flow_metrics/config"
+	flowmetrics "github.com/deepflowys/deepflow/server/ingester/flow_metrics/flow_metrics"
 	"github.com/deepflowys/deepflow/server/ingester/ingesterctl"
 	pcapcfg "github.com/deepflowys/deepflow/server/ingester/pcap/config"
 	"github.com/deepflowys/deepflow/server/ingester/pcap/pcap"
-	rozecfg "github.com/deepflowys/deepflow/server/ingester/roze/config"
-	"github.com/deepflowys/deepflow/server/ingester/roze/roze"
-	streamcfg "github.com/deepflowys/deepflow/server/ingester/stream/config"
-	"github.com/deepflowys/deepflow/server/ingester/stream/stream"
 )
 
 var log = logging.MustGetLogger("ingester")
@@ -116,14 +116,14 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 
 	closers := droplet.Start(dropletConfig, receiver)
 
-	if cfg.StreamRozeEnabled {
-		streamConfig := streamcfg.Load(cfg, configPath)
-		bytes, _ = yaml.Marshal(streamConfig)
-		log.Infof("stream config:\n%s", string(bytes))
+	if cfg.IngesterEnabled {
+		flowLogConfig := flowlogcfg.Load(cfg, configPath)
+		bytes, _ = yaml.Marshal(flowLogConfig)
+		log.Infof("flow log config:\n%s", string(bytes))
 
-		rozeConfig := rozecfg.Load(cfg, configPath)
-		bytes, _ = yaml.Marshal(rozeConfig)
-		log.Infof("roze config:\n%s", string(bytes))
+		flowMetricsConfig := flowmetricscfg.Load(cfg, configPath)
+		bytes, _ = yaml.Marshal(flowMetricsConfig)
+		log.Infof("flow metrics config:\n%s", string(bytes))
 
 		extMetricsConfig := extmetricscfg.Load(cfg, configPath)
 		bytes, _ = yaml.Marshal(extMetricsConfig)
@@ -138,7 +138,7 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 		log.Infof("pcap config:\n%s", string(bytes))
 
 		// 创建、修改、删除数据源及其存储时长
-		ds := datasource.NewDatasourceManager(cfg, rozeConfig.CKReadTimeout)
+		ds := datasource.NewDatasourceManager(cfg, flowMetricsConfig.CKReadTimeout)
 		ds.Start()
 		closers = append(closers, ds)
 
@@ -150,16 +150,16 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 		checkError(err)
 
 		// 写遥测数据
-		roze, err := roze.NewRoze(rozeConfig, receiver)
+		flowMetrics, err := flowmetrics.NewFlowMetrics(flowMetricsConfig, receiver)
 		checkError(err)
-		roze.Start()
-		closers = append(closers, roze)
+		flowMetrics.Start()
+		closers = append(closers, flowMetrics)
 
 		// 写流日志数据
-		stream, err := stream.NewStream(streamConfig, receiver)
+		flowLog, err := flowlog.NewFlowLog(flowLogConfig, receiver)
 		checkError(err)
-		stream.Start()
-		closers = append(closers, stream)
+		flowLog.Start()
+		closers = append(closers, flowLog)
 
 		// 写ext_metrics数据
 		extMetrics, err := ext_metrics.NewExtMetrics(extMetricsConfig, receiver)
@@ -185,7 +185,7 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 		cm.Start()
 		closers = append(closers, cm)
 
-		// 等roze,stream初始化建表完成,再执行issu
+		// 初始化建表完成,再执行issu
 		time.Sleep(time.Second)
 		err = issu.Start()
 		checkError(err)

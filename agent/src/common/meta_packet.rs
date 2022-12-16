@@ -17,10 +17,11 @@
 use std::fmt;
 use std::mem;
 use std::net::{IpAddr, Ipv4Addr};
+use std::ptr;
 use std::sync::Arc;
 use std::time::Duration;
 #[cfg(target_os = "linux")]
-use std::{error::Error, ffi::CStr, net::Ipv6Addr};
+use std::{error::Error, net::Ipv6Addr};
 
 use pnet::packet::{
     icmp::{IcmpType, IcmpTypes},
@@ -46,8 +47,8 @@ use crate::error;
 use crate::{
     common::ebpf::GO_HTTP2_UPROBE,
     ebpf::{
-        MSG_REQUEST_END, MSG_RESPONSE_END, SK_BPF_DATA, SOCK_DATA_HTTP2, SOCK_DATA_TLS_HTTP2,
-        SOCK_DIR_RCV, SOCK_DIR_SND,
+        MSG_REQUEST_END, MSG_RESPONSE_END, PACKET_KNAME_MAX_PADDING, SK_BPF_DATA, SOCK_DATA_HTTP2,
+        SOCK_DATA_TLS_HTTP2, SOCK_DIR_RCV, SOCK_DIR_SND,
     },
 };
 use npb_handler::NpbMode;
@@ -126,7 +127,8 @@ pub struct MetaPacket<'a> {
     pub process_id: u32,
     pub thread_id: u32,
     pub syscall_trace_id: u64,
-    pub process_name: String,
+    #[cfg(target_os = "linux")]
+    pub process_kname: [u8; PACKET_KNAME_MAX_PADDING], // kernel process name
     // for PcapAssembler
     pub flow_id: u64,
 }
@@ -436,12 +438,9 @@ impl<'a> MetaPacket<'a> {
                 let vlan_tag =
                     read_u16_be(&packet[FIELD_OFFSET_ETH_TYPE + VLAN_HEADER_SIZE + ETH_TYPE_LEN..]);
                 self.vlan = vlan_tag & VLAN_ID_MASK;
-                eth_type = EthernetType::try_from(read_u16_be(
+                eth_type = EthernetType::from(read_u16_be(
                     &packet[FIELD_OFFSET_ETH_TYPE + vlan_tag_size..],
-                ))
-                .map_err(|e| {
-                    error::Error::ParsePacketFailed(format!("parse eth_type failed: {}", e))
-                })?;
+                ));
             }
         }
         self.lookup_key.eth_type = eth_type;
@@ -521,9 +520,7 @@ impl<'a> MetaPacket<'a> {
                 let label = read_u32_be(&packet[FIELD_OFFSET_PAYLOAD_LEN + vlan_tag_size..]);
                 self.data_offset_ihl_or_fl4b |= ((label >> 16) & 0xf) as u8;
                 let r = self.update_ip6_opt(vlan_tag_size);
-                ip_protocol = IpProtocol::try_from(r.0).map_err(|e| {
-                    error::Error::ParsePacketFailed(format!("parse ip_protocol failed: {}", e))
-                })?;
+                ip_protocol = IpProtocol::from(r.0);
                 let options_length = r.1;
                 self.l2_l3_opt_size += options_length;
                 self.packet_len = payload as usize
@@ -592,10 +589,7 @@ impl<'a> MetaPacket<'a> {
                 self.l2_l3_opt_size = vlan_tag_size + l3_opt_size as usize;
                 self.l3_payload_len = self.packet_len - (packet.len() - size_checker as usize);
 
-                ip_protocol = IpProtocol::try_from(packet[IPV4_PROTO_OFFSET + vlan_tag_size])
-                    .map_err(|e| {
-                        error::Error::ParsePacketFailed(format!("parse ip_protocol failed: {}", e))
-                    })?;
+                ip_protocol = IpProtocol::from(packet[IPV4_PROTO_OFFSET + vlan_tag_size]);
                 self.lookup_key.proto = ip_protocol;
 
                 let frag = read_u16_be(&packet[FIELD_OFFSET_FRAG + vlan_tag_size..]);
@@ -747,8 +741,6 @@ impl<'a> MetaPacket<'a> {
                     if let IpAddr::V6(ip) = self.lookup_key.src_ip {
                         self.nd_reply_or_arp_request =
                             self.nd_reply_or_arp_request && !is_unicast_link_local(&ip);
-                    } else {
-                        unreachable!()
                     }
                 }
                 self.payload_len =
@@ -860,14 +852,17 @@ impl<'a> MetaPacket<'a> {
         packet.thread_id = data.thread_id;
         packet.syscall_trace_id = data.syscall_trace_id_call;
         #[cfg(target_arch = "aarch64")]
-        let process_name = CStr::from_ptr(data.process_name.as_ptr() as *const u8)
-            .to_str()?
-            .to_string();
+        ptr::copy(
+            data.process_kname.as_ptr() as *const u8,
+            packet.process_kname.as_mut_ptr() as *mut u8,
+            PACKET_KNAME_MAX_PADDING,
+        );
         #[cfg(target_arch = "x86_64")]
-        let process_name = CStr::from_ptr(data.process_name.as_ptr() as *const i8)
-            .to_str()?
-            .to_string();
-        packet.process_name = process_name;
+        ptr::copy(
+            data.process_kname.as_ptr() as *const i8,
+            packet.process_kname.as_mut_ptr() as *mut i8,
+            PACKET_KNAME_MAX_PADDING,
+        );
         packet.socket_id = data.socket_id;
         packet.tcp_data.seq = data.tcp_seq as u32;
         packet.ebpf_type = EbpfType::from(data.source);

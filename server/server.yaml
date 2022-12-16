@@ -52,7 +52,8 @@ controller:
     enabled: true
     dimension_resource_database: 2
     password: deepflow
-    host: redis
+    host:
+      - redis
     port: 6379
     timeout: 30
 
@@ -337,8 +338,8 @@ ingester:
   #  - database: flow_metrics
   #    tables-contain: 1s_local
 
-  ## stream,roze模块是否启用，默认启用, 若不启用(表示处于单独的控制器)
-  #stream-roze-enabled: true
+  ## ingester模块是否启用，默认启用, 若不启用(表示处于单独的控制器)
+  #ingester-enabled: true
 
   # whether to enable deepflow-aget syslog to write to files in syslog-directory
   #agent-log-to-file: false
@@ -431,7 +432,7 @@ ingester:
   #  ## pcap文件存储的文件夹
   #  file-directory: /var/lib/pcap
 
-  ## ########################### roze config #############################################
+  ## ########################### flow metrics config #############################################
 
   ## 是否不写入秒级数据: 默认: false(写入)
   #disable-second-write: false

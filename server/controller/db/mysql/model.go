@@ -62,7 +62,7 @@ type ResourceEvent struct {
 type DomainAdditionalResource struct {
 	ID        int       `gorm:"primaryKey;autoIncrement;unique;column:id;type:int;not null" json:"ID"`
 	Domain    string    `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN"`
-	Content   string    `gorm:"column:content;type:text" json:"CONTENT"`
+	Content   string    `gorm:"column:content;type:mediumtext" json:"CONTENT"`
 	CreatedAt time.Time `gorm:"autoCreateTime;column:created_at;type:datetime" json:"CREATED_AT"`
 }
 

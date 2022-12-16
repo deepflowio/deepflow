@@ -5,15 +5,15 @@ go 1.18
 require (
 	github.com/bitly/go-simplejson v0.5.0
 	github.com/deepflowys/deepflow/message v0.0.0-20221212023728-ed00cfdb114c
-	github.com/deepflowys/deepflow/server v0.0.0-20221209091532-1ea5b53ec60c
+	github.com/deepflowys/deepflow/server v0.0.0-20221214084703-c6bdbeeca4e7
 	github.com/ghodss/yaml v1.0.0
 	github.com/golang/protobuf v1.5.2
 	github.com/mattn/go-runewidth v0.0.14
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/spf13/cobra v1.5.0
 	github.com/vishvananda/netlink v1.1.0
-	golang.org/x/net v0.1.0
-	google.golang.org/grpc v1.47.0
+	golang.org/x/net v0.3.0
+	google.golang.org/grpc v1.49.0
 )
 
 require (
@@ -42,10 +42,10 @@ require (
 	go.opentelemetry.io/otel v1.11.0 // indirect
 	go.opentelemetry.io/otel/trace v1.11.0 // indirect
 	go.opentelemetry.io/proto/otlp v0.18.0 // indirect
-	golang.org/x/sys v0.1.0 // indirect
-	golang.org/x/text v0.4.0 // indirect
-	google.golang.org/genproto v0.0.0-20220628213854-d9e0b6570c03 // indirect
-	google.golang.org/protobuf v1.28.0 // indirect
+	golang.org/x/sys v0.3.0 // indirect
+	golang.org/x/text v0.5.0 // indirect
+	google.golang.org/genproto v0.0.0-20220920201722-2b89144ce006 // indirect
+	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/alexcesaro/statsd.v2 v2.0.0 // indirect
 )
 
@@ -73,7 +73,7 @@ require (
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	golang.org/x/oauth2 v0.0.0-20220622183110-fd043fe589d2 // indirect
-	golang.org/x/term v0.1.0 // indirect
+	golang.org/x/term v0.3.0 // indirect
 	golang.org/x/time v0.0.0-20220224211638-0e9765cccd65 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
