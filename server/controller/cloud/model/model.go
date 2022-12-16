@@ -460,6 +460,18 @@ type Pod struct {
 	SubDomainLcuuid     string    `json:"sub_domain_lcuuid" binding:"required"`
 }
 
+type Process struct {
+	Lcuuid      string    `json:"lcuuid" binding:"required"`
+	Name        string    `json:"name"`
+	VTapID      int       `json:"vtap_id" binding:"required"`
+	PID         int       `json:"pid" binding:"required"`
+	ProcessName string    `json:"process_name" binding:"required"`
+	CommandLine string    `json:"command_line"`
+	UserName    string    `json:"user_name"`
+	StartTime   time.Time `json:"start_time" binding:"required"`
+	OsAppTags   string    `json:"os_app_tags"`
+}
+
 type SubDomainResource struct {
 	Verified               bool `json:"verified"`
 	ErrorState             int
@@ -529,6 +541,7 @@ type Resource struct {
 	PodIngresses           []PodIngress
 	PodIngressRules        []PodIngressRule
 	PodIngressRuleBackends []PodIngressRuleBackend
+	Processes              []Process
 	SubDomainResources     map[string]SubDomainResource
 }
 

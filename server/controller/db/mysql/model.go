@@ -66,6 +66,21 @@ type DomainAdditionalResource struct {
 	CreatedAt time.Time `gorm:"autoCreateTime;column:created_at;type:datetime" json:"CREATED_AT"`
 }
 
+type Process struct {
+	Base           `gorm:"embedded"`
+	SoftDeleteBase `gorm:"embedded"`
+	Name           string    `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
+	VTapID         int       `gorm:"column:vtap_id;type:int;not null;default:0" json:"VTAP_ID"`
+	PID            int       `gorm:"column:pid;type:int;not null;default:0" json:"PID"`
+	ProcessName    string    `gorm:"column:process_name;type:varchar(256);default:''" json:"PROCESS_NAME"`
+	CommandLine    string    `gorm:"column:command_line;type:text" json:"COMMAND_LINE"`
+	UserName       string    `gorm:"column:user_name;type:varchar(256);default:''" json:"USER_NAME"`
+	StartTime      time.Time `gorm:"autoCreateTime;column:start_time;type:datetime" json:"START_TIME"`
+	OsAppTags      string    `gorm:"column:os_app_tags;type:text" json:"OS_APP_TAGS"`
+	SubDomain      string    `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
+	Domain         string    `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN"`
+}
+
 type Domain struct {
 	Base         `gorm:"embedded"`
 	OperatedTime `gorm:"embedded"`
