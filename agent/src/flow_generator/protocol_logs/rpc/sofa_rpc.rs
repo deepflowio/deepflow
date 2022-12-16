@@ -217,7 +217,7 @@ impl From<SofaRpcInfo> for L7ProtocolSendLog {
             req: L7Request {
                 req_type: s.method.clone(),
                 resource: s.target_serv.clone(),
-                endpoint: format!("{}/{}", s.method, s.target_serv.clone()),
+                endpoint: format!("{}/{}", s.target_serv.clone(), s.method),
                 ..Default::default()
             },
             resp: L7Response {
