@@ -547,7 +547,19 @@ message InterfaceInfo {
     optional string device_name = 6;
 
     optional string netns = 7 [default = ""];
-;
+}
+
+message ProcessInfo {
+    optional string name = 1;
+    optional uint64 pid = 2;
+    optional string process_name = 3;
+    optional string cmdline = 4;
+    optional string user = 5;
+    optional uint32 start_time = 6;
+}
+
+message GenesisProcessData {
+    repeated ProcessInfo process_entries = 5;
 }
 
 message GenesisSyncRequest {
@@ -562,6 +574,7 @@ message GenesisSyncRequest {
     optional string nat_ip = 6;
 
     optional GenesisPlatformData platform_data = 9;
+    optional GenesisProcessData process_data = 10;
 }
 
 message GenesisSyncResponse {
@@ -614,7 +627,6 @@ message GPIDSyncRequestLocalEntry {
     optional string ip = 2;
     optional uint32 port = 3;
     optional RoleType role = 4;
-    optional uint32 vtap_id = 5;
     optional uint64 pid = 6;
 }
 
@@ -632,8 +644,11 @@ message GPIDSyncResponseEntry {
 }
 
 message GPIDSyncRequest {
-    repeated GPIDSyncRequestLocalEntry local_entries = 1;
-    repeated GPIDSyncRequestPeerEntry peer_entries = 2;
+    optional string ctrl_ip = 1;
+    optional string ctrl_mac = 2;
+    optional uint32 vtap_id = 3;
+    repeated GPIDSyncRequestLocalEntry local_entries = 11;
+    repeated GPIDSyncRequestPeerEntry peer_entries = 12;
 }
 
 message GPIDSyncResponse {
