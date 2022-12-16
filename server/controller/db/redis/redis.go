@@ -20,10 +20,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/baidubce/bce-sdk-go/util/log"
 	"github.com/go-redis/redis"
+	"github.com/op/go-logging"
 )
 
+var log = logging.MustGetLogger("db.redis")
 var RedisDB redis.UniversalClient
 
 type RedisConfig struct {
