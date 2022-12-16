@@ -89,9 +89,9 @@ type XflowCollectorConfig struct {
 type PCapConfig struct {
 	QueueSize      *int `yaml:"queue-size,omitempty"`
 	QueueCount     *int `yaml:"queue-count,omitempty"`
-	FlowBufferSize *int `yaml:"flow-buffer-size"`
-	BufferSize     *int `yaml:"buffer-size"`
-	FlushInterval  *int `yaml:"flush-interval"`
+	FlowBufferSize *int `yaml:"flow-buffer-size,omitempty"`
+	BufferSize     *int `yaml:"buffer-size,omitempty"`
+	FlushInterval  *int `yaml:"flush-interval,omitempty"`
 }
 
 type TripleMapConfig struct {
