@@ -242,6 +242,7 @@ pub struct EbpfKprobeWhitelist {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "kebab-case")]
 pub struct EbpfYamlConfig {
     pub disabled: bool,
     pub log_file: String,
@@ -1036,13 +1037,6 @@ impl RuntimeConfig {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
                 "invalid collector_socket_type {:?}",
                 self.collector_socket_type
-            )));
-        }
-
-        if self.npb_socket_type == trident::SocketType::Tcp {
-            return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "invalid npb_socket_type {:?}",
-                self.npb_socket_type
             )));
         }
 
