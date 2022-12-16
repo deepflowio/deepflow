@@ -14,6 +14,7 @@ service Synchronizer {
     rpc GenesisSync (GenesisSyncRequest) returns (GenesisSyncResponse) {}
     rpc KubernetesAPISync (KubernetesAPISyncRequest) returns (KubernetesAPISyncResponse) {}
     rpc GetKubernetesClusterID (KubernetesClusterIDRequest) returns (KubernetesClusterIDResponse) {}
+    rpc GPIDSync (GPIDSyncRequest) returns (GPIDSyncResponse) {}
 }
 
 enum State {
@@ -601,4 +602,40 @@ message Pcap {
 message PcapBatch {
     optional uint32 magic = 1;
     repeated Pcap batches = 2;
+}
+
+enum RoleType {
+    ROLE_CLIENT = 1;
+    ROLE_SERVER = 2;
+}
+
+message GPIDSyncRequestLocalEntry {
+    optional uint32 epc_id = 1;
+    optional string ip = 2;
+    optional uint32 port = 3;
+    optional RoleType role = 4;
+    optional uint32 vtap_id = 5;
+    optional uint64 pid = 6;
+}
+
+message GPIDSyncRequestPeerEntry {
+    optional uint32 epc_id = 1;
+    optional string ip = 2;
+}
+
+message GPIDSyncResponseEntry {
+    optional uint32 epc_id = 1;
+    optional string ip = 2;
+    optional uint32 port = 3;
+    optional RoleType role = 4;
+    optional uint64 gpid = 5;
+}
+
+message GPIDSyncRequest {
+    repeated GPIDSyncRequestLocalEntry local_entries = 1;
+    repeated GPIDSyncRequestPeerEntry peer_entries = 2;
+}
+
+message GPIDSyncResponse {
+    repeated GPIDSyncResponseEntry entries = 1;
 }
