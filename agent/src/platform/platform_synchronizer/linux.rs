@@ -607,6 +607,7 @@ impl PlatformSynchronizer {
             version: Some(version),
             trident_type: Some(trident_type as i32),
             platform_data: Some(platform_data),
+            process_data: None,
             source_ip: Some(ctrl_ip.to_string()),
             vtap_id: Some(vtap_id as u32),
             kubernetes_cluster_id: Some(
@@ -689,6 +690,7 @@ impl PlatformSynchronizer {
                         args.config.load().kubernetes_cluster_id.to_string(),
                     ),
                     platform_data: None,
+                    process_data: None,
                     nat_ip: None,
                 };
 
