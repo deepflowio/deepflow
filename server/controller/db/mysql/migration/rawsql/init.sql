@@ -23,6 +23,22 @@ CREATE TABLE IF NOT EXISTS domain_additional_resource (
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE domain_additional_resource;
 
+CREATE TABLE IF NOT EXISTS process (
+    id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name                VARCHAR(256) DEFAULT '',
+    vtap_id             INTEGER NOT NULL DEFAULT 0,
+    device_type         INTEGER NOT NULL DEFAULT 0 COMMENT '0.unknown 1.vm 14.pod_node',
+    device_id           INTEGER NOT NULL DEFAULT 0,
+    pid                 INTEGER NOT NULL,
+    process_name        VARCHAR(256) DEFAULT '',
+    cmdline             TEXT,
+    user_name           VARCHAR(256) DEFAULT '',
+    start_time          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    deleted_at          DATETIME DEFAULT NULL,
+)
+TRUNCATE TABLE process;
 
 CREATE TABLE IF NOT EXISTS host_device (
     id                  INTEGER NOT NULL AUTO_INCREMENT,
