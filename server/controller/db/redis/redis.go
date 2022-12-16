@@ -21,8 +21,10 @@ import (
 	"time"
 
 	"github.com/go-redis/redis"
+	"github.com/op/go-logging"
 )
 
+var log = logging.MustGetLogger("db.redis")
 var RedisDB redis.UniversalClient
 
 type RedisConfig struct {
@@ -32,19 +34,52 @@ type RedisConfig struct {
 	Password                  string   `default:"deepflow" yaml:"password"`
 	TimeOut                   uint32   `default:"30" yaml:"timeout"`
 	Enabled                   bool     `default:"false" yaml:"enabled"`
+	ClusterEnabled            bool     `default:"false" yaml:"cluster_enabled"`
 }
 
-func createUniversalRedisClient(cfg RedisConfig) redis.UniversalClient {
+func generateAddrs(cfg RedisConfig) []string {
 	var addrs []string
 	for i := range cfg.Host {
 		addrs = append(addrs, fmt.Sprintf("%s:%d", cfg.Host[i], cfg.Port))
 	}
-	return redis.NewUniversalClient(&redis.UniversalOptions{
-		Addrs:       addrs,
+	return addrs
+}
+
+func generateSimpleAddr(cfg RedisConfig) string {
+	return generateAddrs(cfg)[0]
+}
+
+func createSimpleClient(cfg RedisConfig) redis.UniversalClient {
+	addr := generateSimpleAddr(cfg)
+	log.Infof("redis addr: %v", addr)
+	return redis.NewClient(&redis.Options{
+		Addr:        addr,
 		Password:    cfg.Password,
 		DB:          cfg.DimensionResourceDatabase,
 		DialTimeout: time.Duration(cfg.TimeOut) * time.Second,
 	})
+}
+
+func generateClusterAddrs(cfg RedisConfig) []string {
+	return generateAddrs(cfg)
+}
+
+func createClusterClient(cfg RedisConfig) redis.UniversalClient {
+	addrs := generateClusterAddrs(cfg)
+	log.Infof("redis addrs: %v", addrs)
+	return redis.NewClusterClient(&redis.ClusterOptions{
+		Addrs:       addrs,
+		Password:    cfg.Password,
+		DialTimeout: time.Duration(cfg.TimeOut) * time.Second,
+	})
+}
+
+func createUniversalRedisClient(cfg RedisConfig) redis.UniversalClient {
+	if cfg.ClusterEnabled {
+		return createClusterClient(cfg)
+	} else {
+		return createSimpleClient(cfg)
+	}
 }
 
 func InitRedis(cfg RedisConfig) (err error) {
