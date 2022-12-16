@@ -16,8 +16,10 @@
 
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
+use std::vec;
 
 use log::info;
+use npb_pcap_policy::NpbTunnelType;
 use pnet::packet::{
     ethernet::{EtherTypes, MutableEthernetPacket},
     gre::MutableGrePacket,
@@ -27,15 +29,17 @@ use pnet::packet::{
     udp::MutableUdpPacket,
     vlan::{ClassesOfService, MutableVlanPacket},
 };
+use public::enums::IpProtocol;
 
 use crate::common::{
     erspan, vxlan, ERSPAN_HEADER_SIZE, ETH_HEADER_SIZE, GRE_HEADER_SIZE, IPV4_HEADER_SIZE,
-    IPV6_HEADER_SIZE, UDP_HEADER_SIZE, VLAN_HEADER_SIZE, VXLAN_HEADER_SIZE,
+    IPV6_HEADER_SIZE, TCP6_PACKET_SIZE, TCP_PACKET_SIZE, UDP_HEADER_SIZE, VLAN_HEADER_SIZE,
+    VXLAN_HEADER_SIZE,
 };
 use crate::config::NpbConfig;
 use crate::sender::npb_sender::{NpbArpTable, NpbPacketSender};
 use crate::utils::stats::{self, StatsOption};
-use npb_handler::{NpbHandler, NpbHandlerCounter, StatsNpbHandlerCounter, NOT_SUPPORT};
+use npb_handler::{NpbHandler, NpbHandlerCounter, NpbHeader, StatsNpbHandlerCounter, NOT_SUPPORT};
 use public::{
     counter::Countable,
     debug::QueueDebugger,
@@ -59,7 +63,7 @@ pub struct NpbBuilder {
     npb_packet_sender: Option<Arc<NpbPacketSender>>,
     arp: Arc<NpbArpTable>,
 
-    pseudo_tunnel_header: [Vec<u8>; 2],
+    pseudo_tunnel_header: [Vec<u8>; NpbTunnelType::Max as usize],
 
     thread_handle: Mutex<Option<JoinHandle<()>>>,
 
@@ -162,6 +166,19 @@ impl NpbBuilder {
         return l2;
     }
 
+    fn create_pseudo_tcp_packet(config: &NpbConfig) -> Vec<u8> {
+        let mut packet_size = if !config.underlay_is_ipv6 {
+            TCP_PACKET_SIZE + NpbHeader::SIZEOF
+        } else {
+            TCP6_PACKET_SIZE + NpbHeader::SIZEOF
+        };
+        if config.output_vlan > 0 {
+            packet_size += VLAN_HEADER_SIZE;
+        }
+
+        vec![u8::from(IpProtocol::Tcp); packet_size]
+    }
+
     pub fn on_config_change(&mut self, config: &NpbConfig, queue_debugger: &QueueDebugger) {
         if self.npb_packet_sender.is_none() {
             return;
@@ -187,6 +204,9 @@ impl NpbBuilder {
         self.pseudo_tunnel_header = [
             Self::create_pseudo_vxlan_packet(config),
             Self::create_pseudo_erspan_packet(config),
+            vec![],
+            vec![],
+            Self::create_pseudo_tcp_packet(config),
         ];
         self.npb_packet_sender = Some(npb_packet_sender);
         self.sender = sender;
@@ -225,6 +245,9 @@ impl NpbBuilder {
             pseudo_tunnel_header: [
                 Self::create_pseudo_vxlan_packet(config),
                 Self::create_pseudo_erspan_packet(config),
+                vec![],
+                vec![],
+                Self::create_pseudo_tcp_packet(config),
             ],
             thread_handle: Mutex::new(None),
             arp,

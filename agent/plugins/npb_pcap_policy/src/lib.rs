@@ -77,6 +77,9 @@ pub enum NpbTunnelType {
     VxLan,
     GreErspan,
     Pcap,
+    NpbDrop,
+    TcpNpb,
+    Max,
 }
 
 impl NpbTunnelType {
