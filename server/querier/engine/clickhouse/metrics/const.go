@@ -59,7 +59,7 @@ const (
 var METRICS_TYPE_UNLAY_FUNCTIONS = map[int][]string{
 	METRICS_TYPE_COUNTER:    []string{view.FUNCTION_SUM},
 	METRICS_TYPE_GAUGE:      []string{},
-	METRICS_TYPE_DELAY:      []string{view.FUNCTION_AVG, view.FUNCTION_MAX, view.FUNCTION_MIN},
+	METRICS_TYPE_DELAY:      []string{view.FUNCTION_AVG, view.FUNCTION_MAX, view.FUNCTION_MIN, view.FUNCTION_LAST},
 	METRICS_TYPE_PERCENTAGE: []string{},
 	METRICS_TYPE_QUOTIENT:   []string{},
 	METRICS_TYPE_TAG:        []string{view.FUNCTION_UNIQ, view.FUNCTION_UNIQ_EXACT},

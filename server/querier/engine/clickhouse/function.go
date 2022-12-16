@@ -145,7 +145,7 @@ func (f *BinaryFunction) Trans(m *view.Model) view.Node {
 		fieldFunc := field.Trans(m)
 		fields = append(fields, fieldFunc)
 	}
-	if f.Name == view.FUCNTION_HISTOGRAM {
+	if f.Name == view.FUNCTION_HISTOGRAM {
 		hisInnerName := fields[0].(view.Function).GetDefaultAlias(true)
 		hisInnerName = fmt.Sprintf("`%s`", strings.Trim(hisInnerName, "`"))
 		fields[0].(view.Function).SetAlias(hisInnerName, true)

@@ -45,7 +45,8 @@ const (
 	FUNCTION_UNIQ_EXACT  = "UniqExact"
 	FUNCTION_PERSECOND   = "PerSecond"
 	FUNCTION_PERCENTAG   = "Percentage"
-	FUCNTION_HISTOGRAM   = "Histogram"
+	FUNCTION_HISTOGRAM   = "Histogram"
+	FUNCTION_LAST        = "Last"
 )
 
 // 对外提供的算子与数据库实际算子转换
@@ -65,11 +66,12 @@ var FUNC_NAME_MAP map[string]string = map[string]string{
 	FUNCTION_COUNT:       "COUNT",
 	FUNCTION_UNIQ:        "uniq",
 	FUNCTION_UNIQ_EXACT:  "uniqExact",
+	FUNCTION_LAST:        "last_value",
 }
 
 var MATH_FUNCTIONS = []string{
 	FUNCTION_DIV, FUNCTION_PLUS, FUNCTION_MINUS, FUNCTION_MULTIPLY,
-	FUNCTION_PERCENTAG, FUNCTION_PERSECOND, FUCNTION_HISTOGRAM,
+	FUNCTION_PERCENTAG, FUNCTION_PERSECOND, FUNCTION_HISTOGRAM,
 }
 
 func GetFunc(name string) Function {
@@ -88,7 +90,7 @@ func GetFunc(name string) Function {
 		return &PercentageFunction{DefaultFunction: DefaultFunction{Name: name}}
 	case FUNCTION_PERSECOND:
 		return &PerSecondFunction{DefaultFunction: DefaultFunction{Name: name}}
-	case FUCNTION_HISTOGRAM:
+	case FUNCTION_HISTOGRAM:
 		return &HistogramFunction{DefaultFunction: DefaultFunction{Name: name}}
 	default:
 		return &DefaultFunction{Name: name}
