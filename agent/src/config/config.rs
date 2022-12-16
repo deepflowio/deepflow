@@ -241,6 +241,7 @@ pub struct EbpfKprobeWhitelist {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "kebab-case")]
 pub struct EbpfYamlConfig {
     pub disabled: bool,
     pub log_file: String,
