@@ -549,6 +549,11 @@ message InterfaceInfo {
     optional string netns = 7 [default = ""];
 }
 
+message Tag {
+    optional string key = 1;
+    optional string value = 2;
+}
+
 message ProcessInfo {
     optional string name = 1;
     optional uint64 pid = 2;
@@ -556,6 +561,7 @@ message ProcessInfo {
     optional string cmdline = 4;
     optional string user = 5;
     optional uint32 start_time = 6;
+    repeated Tag os_app_tags = 11;
 }
 
 message GenesisProcessData {
