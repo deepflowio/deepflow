@@ -119,6 +119,7 @@ impl MetaAppProto {
             ebpf_type: meta_packet.ebpf_type,
         };
 
+        #[cfg(target_os = "linux")]
         if is_src {
             base_info.process_id_0 = meta_packet.process_id;
             base_info.process_kname_0 =
