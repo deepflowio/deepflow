@@ -1248,7 +1248,7 @@ static __inline enum message_type infer_kafka_message(const char *buf,
 
 static __inline bool drop_msg_by_comm(void)
 {
-	char comm[16];
+	char comm[TASK_COMM_LEN];
 
 	if (bpf_get_current_comm(&comm, sizeof(comm)))
 		return false;
