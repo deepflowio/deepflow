@@ -77,4 +77,8 @@ struct trace_key_t {
 	__u64 goid;
 } __attribute__((packed));
 
+enum {
+	TASK_COMM_LEN = 16,
+};
+
 #endif /* DF_BPF_COMMON_H */

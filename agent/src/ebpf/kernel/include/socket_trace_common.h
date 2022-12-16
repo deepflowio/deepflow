@@ -40,7 +40,7 @@ struct __socket_data {
 	__u32 tgid; // 进程号
 	__u64 coroutine_id; // CoroutineID, i.e., golang goroutine id
 	__u8 source; // SYSCALL,GO_TLS_UPROBE,GO_HTTP2_UPROBE
-	__u8  comm[16]; // 进程或线程名
+	__u8 comm[TASK_COMM_LEN]; // 进程或线程名
 
 	/* 连接（socket）信息 */
 	__u64 socket_id;     /* 通信socket唯一ID， 从启动时的时钟开始自增1 */
@@ -197,7 +197,7 @@ struct event_meta {
 struct process_event_t {
 	struct event_meta meta;
 	__u32 pid; // process ID
-	__u8 name[16]; // process name
+	__u8 name[TASK_COMM_LEN]; // process name
 };
 
 #define GO_VERSION(a, b, c) (((a) << 16) + ((b) << 8) + ((c) > 255 ? 255 : (c)))

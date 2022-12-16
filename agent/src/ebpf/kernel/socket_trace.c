@@ -1589,7 +1589,7 @@ TPPROG(sys_enter_getppid) (struct syscall_comm_enter_ctx *ctx) {
 TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx *ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	__u64 fd = (__u64)ctx->ret;
-	char comm[16];
+	char comm[TASK_COMM_LEN];
 	bpf_get_current_comm(comm, sizeof(comm));
 
 	// 试用于nginx负载均衡场景
