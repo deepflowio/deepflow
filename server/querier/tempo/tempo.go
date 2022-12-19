@@ -201,6 +201,12 @@ func ConvertL7TracingRespToProto(data map[string]interface{}, argTraceId string)
 			log.Errorf("parentSpanId(%s) Decode Error", parentSpanId)
 			log.Error(err)
 		}
+		traceId = strings.ReplaceAll(traceId, "-", "")
+		if len(traceId) >= 32 {
+			traceId = traceId[:32]
+		} else {
+			log.Errorf("traceId(%s) Decode Error", traceId)
+		}
 		traceIdBytes, _ := hex.DecodeString(traceId)
 		spanName := trace["endpoint"].(string)
 		if spanName == "" {
