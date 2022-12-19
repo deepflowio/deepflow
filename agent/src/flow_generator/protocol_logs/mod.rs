@@ -23,8 +23,8 @@ pub mod pb_adapter;
 mod rpc;
 mod sql;
 pub use self::http::{
-    check_http_method, get_http_request_version, get_http_resp_info, is_http_v1_payload, HttpInfo,
-    HttpLog, Httpv2Headers,
+    check_http_method, get_http_request_version, get_http_resp_info, is_http_v1_payload,
+    parse_http1_header, HttpInfo, HttpLog, Httpv2Headers,
 };
 use self::pb_adapter::L7ProtocolSendLog;
 pub use dns::{DnsInfo, DnsLog};
