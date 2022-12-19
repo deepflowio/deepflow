@@ -50,6 +50,7 @@ controller:
   # redis相关配置
   redis:
     enabled: true
+    cluster_enabled: false
     dimension_resource_database: 2
     password: deepflow
     host:
@@ -188,6 +189,11 @@ querier:
     timeout: 60
     # user-password:
   
+  # deepflow-app相关配置
+  deepflow-app:
+    host: deepflow-app
+    port: 20418
+
   otel-endpoint: otel-agent.open-telemetry:4317
   limit: 10000
   time-fill-limit: 20
