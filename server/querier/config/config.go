@@ -39,7 +39,7 @@ type QuerierConfig struct {
 	LogLevel      string      `default:"info" yaml:"log-level"`
 	ListenPort    int         `default:"20416" yaml:"listen-port"`
 	Clickhouse    Clickhouse  `yaml:clickhouse`
-	DeepflowApp   DeepflowApp `yaml:deepflow-app`
+	DeepflowApp   DeepflowApp `yaml:"deepflow-app"`
 	Language      string      `default:"en" yaml:"language"`
 	OtelEndpoint  string      `default:"http://${K8S_NODE_IP_FOR_DEEPFLOW}:38086/api/v1/otel/trace" yaml:"otel-endpoint"`
 	Limit         string      `default:"10000" yaml:"limit"`
