@@ -320,7 +320,11 @@ impl SofaRpcLog {
         self.info.cmd_code = hdr.cmd_code;
         if self.info.cmd_code == CMD_CODE_HEARTBEAT {
             // skip heartbeat
-            return Ok(vec![]);
+            return if strict {
+                Err(Error::L7ProtocolUnknown)
+            } else {
+                Ok(vec![])
+            };
         }
         self.info.req_id = hdr.req_id;
         self.info.msg_type = match hdr.typ {
@@ -352,7 +356,11 @@ impl SofaRpcLog {
         }
 
         if hdr.class_len as usize > payload.len() {
-            return Err(Error::L7ProtocolUnknown);
+            return if strict {
+                Err(Error::L7ProtocolUnknown)
+            } else {
+                Ok(vec![L7ProtocolInfo::SofaRpcInfo(self.info.clone())])
+            };
         }
         payload = &payload[hdr.class_len as usize..];
 
@@ -373,7 +381,7 @@ impl SofaRpcLog {
             self.info.method = sofa_hdr.method;
             self.info.trace_id = sofa_hdr.trace_id;
 
-            if self.info.target_serv.is_empty() || self.info.method.is_empty() {
+            if strict && (self.info.target_serv.is_empty() || self.info.method.is_empty()) {
                 return Err(Error::L7ProtocolUnknown);
             }
 
