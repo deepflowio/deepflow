@@ -73,6 +73,7 @@ const (
 	GetKubernetesClusterID
 	GenesisSync
 	KubernetesAPISync
+	GPIDSync
 	MaxApiType
 )
 
@@ -84,6 +85,7 @@ var ApiTypeToName = map[ApiType]string{
 	GetKubernetesClusterID: "GetKubernetesClusterID",
 	GenesisSync:            "GenesisSync",
 	KubernetesAPISync:      "KubernetesAPISync",
+	GPIDSync:               "GPIDSync",
 }
 
 var grpcCounters [MaxApiType]*GrpcCounter
