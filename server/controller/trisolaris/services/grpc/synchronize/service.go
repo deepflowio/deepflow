@@ -35,6 +35,7 @@ type service struct {
 	ntpEvent                 *NTPEvent
 	upgradeEvent             *UpgradeEvent
 	kubernetesClusterIDEvent *KubernetesClusterIDEvent
+	processInfoEvent         *ProcessInfoEvent
 }
 
 func init() {
@@ -43,10 +44,11 @@ func init() {
 
 func newService() *service {
 	return &service{
-		vTapEvent:    NewVTapEvent(),
-		tsdbEvent:    NewTSDBEvent(),
-		ntpEvent:     NewNTPEvent(),
-		upgradeEvent: NewUpgradeEvent(),
+		vTapEvent:        NewVTapEvent(),
+		tsdbEvent:        NewTSDBEvent(),
+		ntpEvent:         NewNTPEvent(),
+		upgradeEvent:     NewUpgradeEvent(),
+		processInfoEvent: NewprocessInfoEvent(),
 	}
 }
 
@@ -122,5 +124,13 @@ func (s *service) KubernetesAPISync(ctx context.Context, in *api.KubernetesAPISy
 }
 
 func (s *service) GPIDSync(ctx context.Context, in *api.GPIDSyncRequest) (*api.GPIDSyncResponse, error) {
-	return &api.GPIDSyncResponse{}, nil
+	startTime := time.Now()
+	defer func() {
+		statsd.AddGrpcCostStatsd(statsd.GPIDSync, int(time.Now().Sub(startTime).Milliseconds()))
+	}()
+	return s.processInfoEvent.GPIDSync(ctx, in)
+}
+
+func (s *service) ShareGPIDLocalData(ctx context.Context, in *api.GPIDSyncRequest) (*api.GPIDSyncResponse, error) {
+	return s.processInfoEvent.ShareGPIDLocalData(ctx, in)
 }

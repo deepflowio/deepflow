@@ -45,6 +45,11 @@ func (obj *_DBMgr[M]) Gets() (results []*M, err error) {
 	return
 }
 
+func (obj *_DBMgr[M]) GetFields(fields []string) (results []*M, err error) {
+	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Select(fields).Find(&results).Error
+	return
+}
+
 // GetBatchFromType 批量查找type类型数据
 func (obj *_DBMgr[M]) GetBatchFromTypes(types []int) (results []*M, err error) {
 	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`type` IN (?)", types).Find(&results).Error
