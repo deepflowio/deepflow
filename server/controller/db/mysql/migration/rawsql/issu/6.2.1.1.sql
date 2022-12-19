@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS process (
     lcuuid              CHAR(64) DEFAULT '',
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    deleted_at          DATETIME DEFAULT NULL,
+    deleted_at          DATETIME DEFAULT NULL
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 
 UPDATE db_version SET version = '6.2.1.1';
