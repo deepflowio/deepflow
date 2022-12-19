@@ -48,6 +48,7 @@ import (
 	trouter "github.com/deepflowys/deepflow/server/controller/trisolaris/server/http"
 
 	_ "github.com/deepflowys/deepflow/server/controller/grpc/controller"
+	_ "github.com/deepflowys/deepflow/server/controller/trisolaris/services/grpc/debug"
 	_ "github.com/deepflowys/deepflow/server/controller/trisolaris/services/grpc/healthcheck"
 	_ "github.com/deepflowys/deepflow/server/controller/trisolaris/services/grpc/synchronize"
 	_ "github.com/deepflowys/deepflow/server/controller/trisolaris/services/http/cache"

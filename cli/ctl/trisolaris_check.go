@@ -53,29 +53,29 @@ type CmdExecute func(response *trident.SyncResponse)
 
 func regiterCommand() []*cobra.Command {
 	platformDataCmd := &cobra.Command{
-		Use:   "platformData",
-		Short: "get platformData from deepflow-server",
+		Use:   "platformdata",
+		Short: "get platformdata from deepflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
 			initCmd(cmd, []CmdExecute{platformData})
 		},
 	}
 	ipGroupsCmd := &cobra.Command{
-		Use:   "ipGroups",
-		Short: "get ipGroups from deepflow-servr",
+		Use:   "ipgroups",
+		Short: "get ipgroups from deepflow-servr",
 		Run: func(cmd *cobra.Command, args []string) {
 			initCmd(cmd, []CmdExecute{ipGroups})
 		},
 	}
 	flowAclsCmd := &cobra.Command{
-		Use:   "flowAcls",
-		Short: "get flowAcls from deepflow-server",
+		Use:   "flowacls",
+		Short: "get flowacls from deepflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
 			initCmd(cmd, []CmdExecute{flowAcls})
 		},
 	}
 	tapTypesCmd := &cobra.Command{
-		Use:   "tapTypes",
-		Short: "get tapTypes from deepflow-server",
+		Use:   "taptypes",
+		Short: "get taptypes from deepflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
 			initCmd(cmd, []CmdExecute{tapTypes})
 		},
@@ -88,8 +88,8 @@ func regiterCommand() []*cobra.Command {
 		},
 	}
 	vpcIPCmd := &cobra.Command{
-		Use:   "vpcIP",
-		Short: "get vpcIP from deepflow-server",
+		Use:   "vpcip",
+		Short: "get vpcip from deepflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
 			initCmd(cmd, []CmdExecute{vpcIP})
 		},
@@ -102,8 +102,8 @@ func regiterCommand() []*cobra.Command {
 		},
 	}
 	skipInterfaceCmd := &cobra.Command{
-		Use:   "skipInterface",
-		Short: "get skipInterface from deepflow-server",
+		Use:   "skipinterface",
+		Short: "get skipinterface from deepflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
 			initCmd(cmd, []CmdExecute{skipInterface})
 		},
@@ -115,6 +115,29 @@ func regiterCommand() []*cobra.Command {
 			initCmd(cmd, []CmdExecute{localServers})
 		},
 	}
+	gpidSyncCmd := &cobra.Command{
+		Use:   "gpidsync",
+		Short: "get gpidsync from deepflow-server",
+		Run: func(cmd *cobra.Command, args []string) {
+			gpidSync(cmd)
+		},
+	}
+	gpidGlobalCmd := &cobra.Command{
+		Use:   "gpidgloballocaldata",
+		Short: "get gpidgloballocaldata from deepflow-server",
+		Run: func(cmd *cobra.Command, args []string) {
+			gpidGlobalLocalData(cmd)
+		},
+	}
+
+	gpidVTapCmd := &cobra.Command{
+		Use:   "gpidvtaplocaldata",
+		Short: "get gpidvtaplocaldata from deepflow-server",
+		Run: func(cmd *cobra.Command, args []string) {
+			gpidVTapLocalData(cmd)
+		},
+	}
+
 	allCmd := &cobra.Command{
 		Use:   "all",
 		Short: "get all data from deepflow-server",
@@ -125,7 +148,8 @@ func regiterCommand() []*cobra.Command {
 	}
 
 	commands := []*cobra.Command{platformDataCmd, ipGroupsCmd, flowAclsCmd,
-		tapTypesCmd, configCmd, segmentsCmd, vpcIPCmd, skipInterfaceCmd, localServersCmd, allCmd}
+		tapTypesCmd, configCmd, segmentsCmd, vpcIPCmd, skipInterfaceCmd,
+		localServersCmd, gpidSyncCmd, gpidGlobalCmd, gpidVTapCmd, allCmd}
 	return commands
 }
 
@@ -147,7 +171,7 @@ func RegisterTrisolarisCommand() *cobra.Command {
 	return trisolarisCmd
 }
 
-func initCmd(cmd *cobra.Command, cmds []CmdExecute) {
+func getConn(cmd *cobra.Command) *grpc.ClientConn {
 	server := common.GetServerInfo(cmd)
 	paramData.RpcIP = server.IP
 	paramData.RpcPort = strconv.Itoa(int(server.RpcPort))
@@ -155,6 +179,15 @@ func initCmd(cmd *cobra.Command, cmds []CmdExecute) {
 	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithMaxMsgSize(1024*1024*200))
 	if err != nil {
 		fmt.Println(err)
+		return nil
+	}
+
+	return conn
+}
+
+func initCmd(cmd *cobra.Command, cmds []CmdExecute) {
+	conn := getConn(cmd)
+	if conn == nil {
 		return
 	}
 	defer conn.Close()
@@ -170,7 +203,7 @@ func initCmd(cmd *cobra.Command, cmds []CmdExecute) {
 		fmt.Printf("type(%s) muste be in [trident, analyzer]", paramData.Type)
 		return
 	}
-	fmt.Printf("request trisolaris(%s), params(%+v)\n", addr, paramData)
+	fmt.Printf("request trisolaris(%s), params(%+v)\n", conn.Target(), paramData)
 	c := trident.NewSynchronizerClient(conn)
 	reqData := &trident.SyncRequest{
 		CtrlIp:              &paramData.CtrlIP,
@@ -180,6 +213,7 @@ func initCmd(cmd *cobra.Command, cmds []CmdExecute) {
 		ProcessName:         &name,
 	}
 	var response *trident.SyncResponse
+	var err error
 	if paramData.Type == "trident" {
 		response, err = c.Sync(context.Background(), reqData)
 	} else {
@@ -191,6 +225,77 @@ func initCmd(cmd *cobra.Command, cmds []CmdExecute) {
 	}
 	for _, cmd := range cmds {
 		cmd(response)
+	}
+}
+
+func gpidSync(cmd *cobra.Command) {
+	conn := getConn(cmd)
+	if conn == nil {
+		return
+	}
+	defer conn.Close()
+	fmt.Printf("request trisolaris(%s), params(%+v)\n", conn.Target(), paramData)
+	c := trident.NewSynchronizerClient(conn)
+	reqData := &trident.GPIDSyncRequest{
+		CtrlIp:  &paramData.CtrlIP,
+		CtrlMac: &paramData.CtrlMac,
+	}
+	response, err := c.GPIDSync(context.Background(), reqData)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println("gpid:")
+	for index, entry := range response.GetEntries() {
+		JsonFormat(index+1, entry)
+	}
+}
+
+func gpidGlobalLocalData(cmd *cobra.Command) {
+	conn := getConn(cmd)
+	if conn == nil {
+		return
+	}
+	defer conn.Close()
+	fmt.Printf("request trisolaris(%s), params(%+v)\n", conn.Target(), paramData)
+	c := trident.NewDebugClient(conn)
+	reqData := &trident.GPIDSyncRequest{}
+	response, err := c.DebugGPIDGlobalLocalData(context.Background(), reqData)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println("GPIDGlobalLocalData:")
+	for index, entry := range response.GetEntries() {
+		JsonFormat(index+1, entry)
+	}
+}
+
+func gpidVTapLocalData(cmd *cobra.Command) {
+	conn := getConn(cmd)
+	if conn == nil {
+		return
+	}
+	defer conn.Close()
+	fmt.Printf("request trisolaris(%s), params(%+v)\n", conn.Target(), paramData)
+	c := trident.NewDebugClient(conn)
+	reqData := &trident.GPIDSyncRequest{
+		CtrlIp:  &paramData.CtrlIP,
+		CtrlMac: &paramData.CtrlMac,
+	}
+	response, err := c.DebugGPIDVTapLocalData(context.Background(), reqData)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Printf("response(ctrl_ip: %s ctrl_mac: %s vtap_id: %d)\n", response.GetCtrlIp(), response.GetCtrlMac(), response.GetVtapId())
+	fmt.Println("LocalEntries:")
+	for index, entry := range response.GetLocalEntries() {
+		JsonFormat(index+1, entry)
+	}
+	fmt.Println("PeerEntries:")
+	for index, entry := range response.GetPeerEntries() {
+		JsonFormat(index+1, entry)
 	}
 }
 

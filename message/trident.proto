@@ -15,6 +15,13 @@ service Synchronizer {
     rpc KubernetesAPISync (KubernetesAPISyncRequest) returns (KubernetesAPISyncResponse) {}
     rpc GetKubernetesClusterID (KubernetesClusterIDRequest) returns (KubernetesClusterIDResponse) {}
     rpc GPIDSync (GPIDSyncRequest) returns (GPIDSyncResponse) {}
+    rpc ShareGPIDLocalData(GPIDSyncRequest) returns (GPIDSyncResponse) {}
+}
+
+// debug service
+service Debug {
+    rpc DebugGPIDGlobalLocalData (GPIDSyncRequest) returns(GPIDGlobalLocalData) {}
+    rpc DebugGPIDVTapLocalData (GPIDSyncRequest) returns(GPIDSyncRequest) {}
 }
 
 enum State {
@@ -662,4 +669,8 @@ message GPIDSyncRequest {
 
 message GPIDSyncResponse {
     repeated GPIDSyncResponseEntry entries = 1;
+}
+
+message GPIDGlobalLocalData {
+    repeated trident.GPIDSyncRequestLocalEntry  entries = 1;
 }

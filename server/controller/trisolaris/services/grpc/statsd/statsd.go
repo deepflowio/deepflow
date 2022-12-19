@@ -73,6 +73,7 @@ const (
 	GetKubernetesClusterID
 	GenesisSync
 	KubernetesAPISync
+	GPIDSync
 	MaxApiType
 )
 
@@ -84,9 +85,11 @@ var ApiTypeToName = map[ApiType]string{
 	GetKubernetesClusterID: "GetKubernetesClusterID",
 	GenesisSync:            "GenesisSync",
 	KubernetesAPISync:      "KubernetesAPISync",
+	GPIDSync:               "GPIDSync",
 }
 
 var grpcCounters [MaxApiType]*GrpcCounter
+var gpidCounter = NewGPIDCounter()
 
 func AddGrpcCostStatsd(apiType ApiType, cost int) {
 	if apiType >= MaxApiType {
@@ -98,6 +101,14 @@ func AddGrpcCostStatsd(apiType ApiType, cost int) {
 	}
 }
 
+func AddGPIDReceiveCounter(count uint64) {
+	gpidCounter.AddReceiveCount(count)
+}
+
+func AddGPIDSendCounter(count uint64) {
+	gpidCounter.AddSendCount(count)
+}
+
 func Start() {
 	for apiType, name := range ApiTypeToName {
 		grpcCounters[apiType] = NewGrpcCounter()
@@ -105,5 +116,10 @@ func Start() {
 		if err != nil {
 			log.Error(err)
 		}
+	}
+
+	err := stats.RegisterCountableWithModulePrefix("controller.", "trisolaris", gpidCounter, stats.OptionStatTags{"grpc_type": "GPIDCount"})
+	if err != nil {
+		log.Error(err)
 	}
 }
