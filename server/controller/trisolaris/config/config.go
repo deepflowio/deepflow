@@ -55,6 +55,7 @@ type Config struct {
 	GrpcPort                       int
 	IngesterPort                   int
 	PodClusterInternalIPToIngester int
+	GrpcMaxMessageLength           int
 }
 
 func (c *Config) Convert() {
@@ -103,4 +104,12 @@ func (c *Config) SetBillingMethod(billingMethod string) {
 
 func (c *Config) SetPodClusterInternalIPToIngester(value int) {
 	c.PodClusterInternalIPToIngester = value
+}
+
+func (c *Config) SetGrpcMaxMessageLength(maxLen int) {
+	c.GrpcMaxMessageLength = maxLen
+}
+
+func (c *Config) GetGrpcMaxMessageLength() int {
+	return c.GrpcMaxMessageLength
 }

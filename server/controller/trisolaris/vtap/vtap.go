@@ -104,6 +104,9 @@ type VTapInfo struct {
 	vTapIPs *atomic.Value // []*trident.VtapIp
 
 	localClusterID *string
+
+	processInfo *ProcessInfo
+	dbVTapIDs   mapset.Set
 }
 
 func NewVTapInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config) *VTapInfo {
@@ -140,6 +143,8 @@ func NewVTapInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config) *
 		db:                             db,
 		config:                         cfg,
 		vTapIPs:                        &atomic.Value{},
+		processInfo:                    NewProcessInfo(db, cfg),
+		dbVTapIDs:                      mapset.NewSet(),
 	}
 }
 
@@ -590,13 +595,16 @@ func GetKey(vtap *models.VTap) string {
 func (v *VTapInfo) updateVTapInfo() {
 	dbKeyToVTap := make(map[string]*models.VTap)
 	dbKeys := mapset.NewSet()
+	dbVTapIDs := mapset.NewSet()
 	if v.vtaps != nil {
 		for _, vTap := range v.vtaps {
 			key := GetKey(vTap)
 			dbKeyToVTap[key] = vTap
 			dbKeys.Add(key)
+			dbVTapIDs.Add(vTap.ID)
 		}
 	}
+	v.dbVTapIDs = dbVTapIDs
 	cacheKeys := v.vTapCaches.GetKeySet()
 	addVTaps := dbKeys.Difference(cacheKeys)
 	delVTaps := cacheKeys.Difference(dbKeys)
@@ -665,6 +673,10 @@ func (v *VTapInfo) generateVTapIP() {
 	}
 	log.Debug(vTapIPs)
 	v.updateVTapIPs(vTapIPs)
+}
+
+func (v *VTapInfo) GetProcessInfo() *ProcessInfo {
+	return v.processInfo
 }
 
 func (v *VTapInfo) GenerateVTapCache() {
@@ -1116,6 +1128,7 @@ func (v *VTapInfo) TimedRefreshVTapCache() {
 	v.InitData()
 	go v.monitorDataChanged()
 	go v.monitorVTapRegister()
+	go v.processInfo.TimedGenerateGPIDInfo()
 	interval := time.Duration(v.config.VTapCacheRefreshInterval)
 	tickerVTapCache := time.NewTicker(interval * time.Second).C
 	for {
@@ -1123,6 +1136,7 @@ func (v *VTapInfo) TimedRefreshVTapCache() {
 		case <-tickerVTapCache:
 			log.Info("start generate vtap cache data from timed")
 			v.GenerateVTapCache()
+			v.processInfo.DeleteVTapExpiredData(v.dbVTapIDs)
 			log.Info("end generate vtap cache data from timed")
 		case <-v.chVTapCacheRefresh:
 			log.Info("start generate vtap cache data from rpc")

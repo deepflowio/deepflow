@@ -17,6 +17,12 @@ service Synchronizer {
     rpc GPIDSync (GPIDSyncRequest) returns (GPIDSyncResponse) {}
 }
 
+// debug service
+service Debug {
+    rpc DebugGPIDGlobalLocalData (GPIDSyncRequest) returns(GPIDGlobalLocalData) {}
+    rpc DebugGPIDVTapLocalData (GPIDSyncRequest) returns(GPIDSyncRequest) {}
+}
+
 enum State {
     ENVIRONMENT_CHECK = 0; // 检查运行环境
     DISABLED          = 1; // 禁用
@@ -659,4 +665,8 @@ message GPIDSyncRequest {
 
 message GPIDSyncResponse {
     repeated GPIDSyncResponseEntry entries = 1;
+}
+
+message GPIDGlobalLocalData {
+    repeated trident.GPIDSyncRequestLocalEntry  entries = 1;
 }
