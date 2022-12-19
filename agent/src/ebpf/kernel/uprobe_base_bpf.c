@@ -482,7 +482,8 @@ int exit_runtime_newproc1(struct pt_regs *ctx)
 	}
 
 	struct go_key key = { .tgid = tgid, .goid = goid };
-	bpf_map_update_elem(&go_ancerstor_map, &key, &caller->goid, BPF_ANY);
+	goid = caller->goid;
+	bpf_map_update_elem(&go_ancerstor_map, &key, &goid, BPF_ANY);
 
 	bpf_map_delete_elem(&pid_tgid_callerid_map, &pid_tgid);
 	return 0;
