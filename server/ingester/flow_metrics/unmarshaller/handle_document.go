@@ -167,7 +167,7 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 			// 在0端, 有port无edge的数据计算serviceid，如:vtap_flow_port
 			if t.Code&PortAddCode != 0 && t.Code&EdgeCode == 0 {
 				t.ServiceID = platformData.QueryService(t.PodID, t.PodNodeID, uint32(t.PodClusterID), t.PodGroupID, t.L3EpcID, t.IsIPv6 == 1, t.IP, t.IP6, t.Protocol, t.ServerPort)
-			} else {
+			} else if common.IsPodServiceIP(t.L3DeviceType, t.PodID, 0) { //On the 0 side, if it is just Pod Node, there is no need to match the service
 				// 有edge
 				t.ServiceID = platformData.QueryService(t.PodID, t.PodNodeID, uint32(t.PodClusterID), t.PodGroupID, t.L3EpcID, t.IsIPv6 == 1, t.IP, t.IP6, t.Protocol, 0)
 			}
