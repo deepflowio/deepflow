@@ -38,20 +38,19 @@ import (
 var log = logging.MustGetLogger("cloud.genesis")
 
 type Genesis struct {
-	defaultVpc        bool
-	ipV4CIDRMaxMask   int
-	ipV6CIDRMaxMask   int
-	Name              string
-	Lcuuid            string
-	UuidGenerate      string
-	regionUuid        string
-	azLcuuid          string
-	defaultVpcName    string
-	defaultRegionName string
-	ips               []cloudmodel.IP
-	subnets           []cloudmodel.Subnet
-	genesisData       genesis.GenesisSyncData
-	cloudStatsd       statsd.CloudStatsd
+	defaultVpc      bool
+	ipV4CIDRMaxMask int
+	ipV6CIDRMaxMask int
+	Name            string
+	Lcuuid          string
+	UuidGenerate    string
+	regionUuid      string
+	azLcuuid        string
+	defaultVpcName  string
+	ips             []cloudmodel.IP
+	subnets         []cloudmodel.Subnet
+	genesisData     genesis.GenesisSyncData
+	cloudStatsd     statsd.CloudStatsd
 }
 
 func NewGenesis(domain mysql.Domain, cfg config.CloudConfig) (*Genesis, error) {
@@ -69,15 +68,14 @@ func NewGenesis(domain mysql.Domain, cfg config.CloudConfig) (*Genesis, error) {
 		ipV6MaxMask = 64
 	}
 	return &Genesis{
-		ipV4CIDRMaxMask:   ipV4MaxMask,
-		ipV6CIDRMaxMask:   ipV6MaxMask,
-		Name:              domain.Name,
-		Lcuuid:            domain.Lcuuid,
-		UuidGenerate:      domain.DisplayName,
-		defaultVpcName:    cfg.GenesisDefaultVpcName,
-		defaultRegionName: cfg.GenesisDefaultRegionName,
-		regionUuid:        config.Get("region_uuid").MustString(),
-		genesisData:       genesis.GenesisSyncData{},
+		ipV4CIDRMaxMask: ipV4MaxMask,
+		ipV6CIDRMaxMask: ipV6MaxMask,
+		Name:            domain.Name,
+		Lcuuid:          domain.Lcuuid,
+		UuidGenerate:    domain.DisplayName,
+		defaultVpcName:  cfg.GenesisDefaultVpcName,
+		regionUuid:      config.Get("region_uuid").MustString(),
+		genesisData:     genesis.GenesisSyncData{},
 		cloudStatsd: statsd.CloudStatsd{
 			APICount: make(map[string][]int),
 			APICost:  make(map[string][]int),
@@ -281,11 +279,6 @@ func (g *Genesis) GetCloudData() (cloudmodel.Resource, error) {
 
 	g.generateIPsAndSubnets()
 
-	regions, err := g.getRegion()
-	if err != nil {
-		return cloudmodel.Resource{}, err
-	}
-
 	az, err := g.getAZ()
 	if err != nil {
 		return cloudmodel.Resource{}, err
@@ -339,7 +332,6 @@ func (g *Genesis) GetCloudData() (cloudmodel.Resource, error) {
 		VMs:         vms,
 		VPCs:        vpcs,
 		Hosts:       hosts,
-		Regions:     regions,
 		Subnets:     subnets,
 		Networks:    networks,
 		VInterfaces: vinterfaces,
