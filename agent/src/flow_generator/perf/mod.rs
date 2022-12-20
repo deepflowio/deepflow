@@ -291,6 +291,7 @@ impl FlowPerf {
                 if i.check_payload(payload, &param) {
                     self.l7_protocol_enum = i.l7_protocl_enum();
                     self.server_port = packet.lookup_key.dst_port;
+                    packet.direction = PacketDirection::ClientToServer;
 
                     let mut rrt = 0;
                     if is_parse_perf {
