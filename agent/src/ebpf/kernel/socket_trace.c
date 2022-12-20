@@ -160,10 +160,14 @@ static __u32 __inline get_tcp_read_seq_from_fd(int fd)
 #define EVENT_BURST_NUM            16
 #define CONN_PERSIST_TIME_MAX_NS   100000000000ULL
 
-static __inline struct trace_key_t get_trace_key(void)
+static __inline struct trace_key_t get_trace_key(__u64 timeout)
 {
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
-	__u64 goid = get_rw_goid();
+	__u64 goid = 0;
+
+	if (timeout){
+		goid = get_rw_goid(timeout * NS_PER_SEC);
+	}
 
 	struct trace_key_t key = {};
 
@@ -879,7 +883,8 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	if (trace_stats == NULL)
 		return -1;
 
-	struct trace_key_t trace_key = get_trace_key();
+	__u32 timeout = trace_conf->go_tracing_timeout;
+	struct trace_key_t trace_key = get_trace_key(timeout);
 	struct trace_info_t *trace_info_ptr = trace_map__lookup(&trace_key);
 
 	struct socket_info_t *socket_info_ptr = conn_info->socket_info_ptr;
@@ -1033,7 +1038,7 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	} else
 		v->extra_data_count = 0;
 
-	v->coroutine_id = extra->coroutine_id;
+	v->coroutine_id = trace_key.goid;
 	v->source = extra->source;
 
 	struct tail_calls_context *context = (struct tail_calls_context *)v->data;
@@ -1596,7 +1601,9 @@ TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx *ctx) {
 	if (!(comm[0] == 'n' && comm[1] == 'g' && comm[2] == 'i' &&
 	      comm[3] == 'n' && comm[4] == 'x' && comm[5] == '\0'))
 		return 0;
-	struct trace_key_t key = get_trace_key();
+
+	// nginx is not a go process, disable go tracking
+	struct trace_key_t key = get_trace_key(0);
 	struct trace_info_t *trace = trace_map__lookup(&key);
 	if (trace && trace->peer_fd != 0 && trace->peer_fd != (__u32)fd) {
 		struct socket_info_t sk_info = { 0 };

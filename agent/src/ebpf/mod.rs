@@ -325,6 +325,7 @@ extern "C" {
      * @return the set maximum buffer size value on success, < 0 on failure.
      */
     pub fn set_data_limit_max(limit_size: c_int) -> c_int;
+    pub fn set_go_tracing_timeout(timeout: c_int) -> c_int;
     pub fn set_allow_port_bitmap(bitmap: *const c_uchar) -> c_int;
     pub fn enable_ebpf_protocol(protocol: c_int) -> c_int;
     pub fn set_feature_regex(idx: c_int, pattern: *const c_char) -> c_int;

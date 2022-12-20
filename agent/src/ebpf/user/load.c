@@ -392,7 +392,7 @@ add_program:
 
 		new_prog->name = strdup(sym_name);
 		if (new_prog->name == NULL) {
-			ebpf_debug("strdup() failed.\n");
+			ebpf_warning("strdup() failed.\n");
 			return ETR_NOMEM;
 		}
 
@@ -403,7 +403,7 @@ add_program:
 				suffix = "_tp";
 			new_prog->name = calloc(1, strlen(sym_name) + strlen(suffix) + 1);
 			if (new_prog->name == NULL) {
-				ebpf_debug("calloc() failed.\n");
+				ebpf_warning("calloc() failed.\n");
 				return ETR_NOMEM;
 			}
 
@@ -423,7 +423,7 @@ add_program:
 				  0 /*EBPF_LOG_LEVEL, log_buf, LOG_BUF_SZ */ );
 
 		if (new_prog->prog_fd < 0) {
-			ebpf_debug("bcc_prog_load() failed.\n");
+			ebpf_warning("bcc_prog_load() failed. name: %s\n", new_prog->name);
 			return ETR_NOMEM;
 		}
 
