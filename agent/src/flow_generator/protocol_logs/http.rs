@@ -482,7 +482,7 @@ impl L7ProtocolParserInterface for HttpLog {
     }
 }
 
-fn parse_http1_header(payload: &[u8], limit: Option<usize>) -> Vec<&[u8]> {
+pub fn parse_http1_header(payload: &[u8], limit: Option<usize>) -> Vec<&[u8]> {
     let mut lines = Vec::new();
     let mut p = payload;
     let l = limit.unwrap_or(usize::MAX);
@@ -651,12 +651,12 @@ impl HttpLog {
         }
 
         let val_offset = HTTPV2_CUSTOM_DATA_MIN_LENGTH + key_len;
-        let key = Vec::from(&payload[HTTPV2_CUSTOM_DATA_MIN_LENGTH..val_offset]);
-        let val = Vec::from(&payload[val_offset..val_offset + val_len]);
-        self.on_header(&key, &val, direction);
-        if key.as_slice() == b"content-length" {
+        let key = &payload[HTTPV2_CUSTOM_DATA_MIN_LENGTH..val_offset];
+        let val = &payload[val_offset..val_offset + val_len];
+        self.on_header(key, val, direction);
+        if key == b"content-length" {
             self.info.req_content_length = Some(
-                str::from_utf8(val.as_slice())
+                str::from_utf8(val)
                     .unwrap_or_default()
                     .parse::<u32>()
                     .unwrap_or_default(),
@@ -719,11 +719,7 @@ impl HttpLog {
                 str::from_utf8(&body_line[col_index + 1..]),
             ) {
                 let lower_key = key.to_ascii_lowercase();
-                self.on_header(
-                    &lower_key.as_bytes().to_vec(),
-                    &String::from(value).trim().as_bytes().to_vec(),
-                    direction,
-                );
+                self.on_header(lower_key.as_bytes(), value.trim().as_bytes(), direction);
                 if &lower_key == "content-length" {
                     content_length = Some(value.trim_start().parse::<u32>().unwrap_or_default());
                 }
@@ -810,7 +806,7 @@ impl HttpLog {
 
                 for (key, val) in header_list.iter() {
                     self.on_header(key, val, direction);
-                    if key.as_slice() == b"content-length" {
+                    if key == b"content-length" {
                         content_length = Some(
                             str::from_utf8(val.as_slice())
                                 .unwrap_or_default()
@@ -882,37 +878,37 @@ impl HttpLog {
         Err(Error::HttpHeaderParseFailed)
     }
 
-    fn on_header(&mut self, key: &Vec<u8>, val: &Vec<u8>, direction: PacketDirection) {
-        let val_str = String::from_utf8_lossy(val.as_slice()).into_owned();
-        match key.as_slice() {
-            b":method" => {
+    fn on_header(&mut self, key: &[u8], val: &[u8], direction: PacketDirection) {
+        // key must be valid utf8
+        let Ok(key) = str::from_utf8(key) else {
+            return;
+        };
+
+        match key {
+            ":method" => {
                 self.info.msg_type = LogMessageType::Request;
-                self.info.method = val_str
+                self.info.method = String::from_utf8_lossy(val).into_owned();
             }
-            b":status" => {
+            ":status" => {
                 self.info.msg_type = LogMessageType::Response;
-                let code = str::from_utf8(val.as_slice())
+                let code = str::from_utf8(val)
                     .unwrap_or_default()
                     .parse::<u16>()
                     .unwrap_or_default();
                 self.info.status_code = Some(code as i32);
                 self.set_status(code);
             }
-            b"host" | b":authority" => self.info.host = val_str,
-            b":path" => self.info.path = val_str,
-            b"content-type" => {
+            "host" | ":authority" => self.info.host = String::from_utf8_lossy(val).into_owned(),
+            ":path" => self.info.path = String::from_utf8_lossy(val).into_owned(),
+            "content-type" => {
                 // change to grpc protocol
-                if val_str.starts_with("application/grpc") {
+                if val.starts_with(b"application/grpc") {
                     self.proto = L7Protocol::Grpc;
                     self.info.proto = L7Protocol::Grpc;
                 }
             }
-            b"user-agent" => {
-                self.info.user_agent = Some(val_str);
-            }
-            b"referer" => {
-                self.info.referer = Some(val_str);
-            }
+            "user-agent" => self.info.user_agent = Some(String::from_utf8_lossy(val).into_owned()),
+            "referer" => self.info.referer = Some(String::from_utf8_lossy(val).into_owned()),
             _ => {}
         }
 
@@ -920,35 +916,28 @@ impl HttpLog {
             return;
         }
 
-        let key = String::from_utf8_lossy(key.as_ref()).into_owned();
-        let key_str = key.as_str();
-        let key_bytes = key.as_bytes();
+        // value must be valid utf8 from here
+        let Ok(val) = str::from_utf8(val) else {
+            return;
+        };
 
-        if self.l7_log_dynamic_config.is_trace_id(key_str) {
-            if let Some(id) = Self::decode_id(
-                &String::from_utf8_lossy(val.as_ref()),
-                key_str,
-                Self::TRACE_ID,
-            ) {
+        if self.l7_log_dynamic_config.is_trace_id(key) {
+            if let Some(id) = Self::decode_id(val, key, Self::TRACE_ID) {
                 self.info.trace_id = id;
             }
         }
-        if self.l7_log_dynamic_config.is_span_id(key_str) {
-            if let Some(id) = Self::decode_id(
-                &String::from_utf8_lossy(val.as_ref()),
-                key_str,
-                Self::SPAN_ID,
-            ) {
+        if self.l7_log_dynamic_config.is_span_id(key) {
+            if let Some(id) = Self::decode_id(val, key, Self::SPAN_ID) {
                 self.info.span_id = id;
             }
         }
-        if key_bytes == self.l7_log_dynamic_config.x_request_id.as_bytes() {
-            self.info.x_request_id = String::from_utf8_lossy(val.as_ref()).into_owned();
+        if key == &self.l7_log_dynamic_config.x_request_id {
+            self.info.x_request_id = val.to_owned();
         }
         if direction == PacketDirection::ClientToServer
-            && key_bytes == self.l7_log_dynamic_config.proxy_client.as_bytes()
+            && key == &self.l7_log_dynamic_config.proxy_client
         {
-            self.info.client_ip = String::from_utf8_lossy(val.as_ref()).into_owned();
+            self.info.client_ip = val.to_owned();
         }
     }
 
@@ -1109,16 +1098,12 @@ const HTTP_METHODS: [&'static str; 15] = [
 ];
 const RESPONSE_PREFIX: &'static str = "HTTP/";
 
-fn has_prefix(s: &[u8], prefix: &[u8]) -> bool {
-    s.len() >= prefix.len() && &s[..prefix.len()] == prefix
-}
-
 pub fn is_http_v1_payload(buf: &[u8]) -> bool {
-    if has_prefix(buf, RESPONSE_PREFIX.as_bytes()) {
+    if buf.starts_with(RESPONSE_PREFIX.as_bytes()) {
         return true;
     }
     for m in HTTP_METHODS {
-        if has_prefix(buf, m.as_bytes()) {
+        if buf.starts_with(m.as_bytes()) {
             return true;
         }
     }

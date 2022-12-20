@@ -32,7 +32,8 @@ use crate::{
         perf::L7FlowPerf,
         protocol_logs::{
             check_http_method, consts::*, get_http_request_version, get_http_resp_info,
-            is_http_v1_payload, AppProtoHead, Httpv2Headers, L7ResponseStatus, LogMessageType,
+            is_http_v1_payload, parse_http1_header, AppProtoHead, Httpv2Headers, L7ResponseStatus,
+            LogMessageType,
         },
         HttpLog,
     },
@@ -207,21 +208,6 @@ impl HttpPerfData {
         }
     }
 
-    fn parse_lines(payload: &[u8]) -> Vec<String> {
-        let mut lines = Vec::new();
-        let mut line = String::new();
-        for i in 0..payload.len() {
-            let ch = payload[i] as char;
-            if i > 2 && ch == '\n' && payload[i - 1] as char == '\r' {
-                lines.push(line.clone());
-                line.clear();
-            } else if ch != '\r' {
-                line.push(ch);
-            }
-        }
-        return lines;
-    }
-
     fn parse_http_v1(
         &mut self,
         payload: &[u8],
@@ -233,12 +219,14 @@ impl HttpPerfData {
             return Err(Error::HttpHeaderParseFailed);
         }
 
-        let lines = Self::parse_lines(payload);
+        let lines = parse_http1_header(payload, Some(1));
         if lines.len() == 0 {
             return Err(Error::HttpHeaderParseFailed);
         }
 
-        let line_info = lines[0].as_str();
+        let Ok(line_info) = str::from_utf8(lines[0]) else {
+            return Err(Error::HttpHeaderParseFailed);
+        };
 
         if direction == PacketDirection::ServerToClient {
             // HTTP响应行：HTTP/1.1 404 Not Found.
