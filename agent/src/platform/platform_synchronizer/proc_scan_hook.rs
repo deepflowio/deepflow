@@ -14,23 +14,22 @@
  * limitations under the License.
  */
 
-#[cfg(target_os = "linux")]
-mod kubernetes;
-mod libvirt_xml_extractor;
-mod platform_synchronizer;
+use super::ProcessData;
 
-#[cfg(target_os = "linux")]
-pub use kubernetes::{ActivePoller, ApiWatcher, GenericPoller, Poller};
-pub use libvirt_xml_extractor::LibvirtXmlExtractor;
-pub use platform_synchronizer::PlatformSynchronizer;
-pub use platform_synchronizer::ProcRegRewrite;
+pub fn proc_scan_hook(_: &mut Vec<ProcessData>) {
+    // the hook logic here
 
-use public::utils::net::MacAddr;
+    /*
+        use super::get_self_proc;
 
-#[derive(Default, Debug, Clone, PartialEq, Eq)]
-pub struct InterfaceEntry {
-    pub name: String,
-    pub mac: MacAddr,
-    pub domain_uuid: String,
-    pub domain_name: String,
+        let Ok(self_proc) = get_self_proc() else{
+            return
+        };
+
+        info!("self proc: {#?}",self_proc);
+
+        for i in _.iter_mut() {
+            // handle every process
+        }
+    */
 }
