@@ -351,6 +351,10 @@ static __inline void http2_fill_common_socket(struct http2_header_data *data,
 	// 0 means that the function returns during execution
 	send_buffer->pid = 0;
 
+	// When the function implementation is too complex, the compiled
+	// bytecode cannot pass the verification of some kernels (4.14).
+	// Split the complex function and reduce the complexity of the
+	// generated syntax tree to pass the verification
 	__u64 id = bpf_get_current_pid_tgid();
 	if (!http2_fill_common_socket_1(data, send_buffer, id))
 		return;
