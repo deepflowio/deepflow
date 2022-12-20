@@ -18,7 +18,8 @@ mod config;
 pub mod handler;
 
 pub use config::{
-    Config, ConfigError, FlowGeneratorConfig, IngressFlavour, KubernetesPollerType, PcapConfig,
-    RuntimeConfig, TripleMapConfig, UprobeProcRegExp, XflowGeneratorConfig, YamlConfig,
+    Config, ConfigError, FlowGeneratorConfig, IngressFlavour, KubernetesPollerType, OsProcRegexp,
+    PcapConfig, RuntimeConfig, TripleMapConfig, UprobeProcRegExp, XflowGeneratorConfig, YamlConfig,
+    OS_PROC_REGEXP_MATCH_TYPE_CMD, OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME,
 };
 pub use handler::{DispatcherConfig, FlowAccess, FlowConfig, ModuleConfig, NpbConfig};
