@@ -574,7 +574,6 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 
 	if (nr < buf->events_num) {
 		int lost = buf->events_num - nr;
-		ebpf_info("%s, ring_sp_enqueue lost %d.\n", __func__, lost);
 		atomic64_add(&q->enqueue_lost, lost);
 		if (lost == buf->events_num) {
 			free(socket_data_buff);
@@ -1295,6 +1294,7 @@ struct socket_trace_stats socket_tracer_stats(void)
 		return stats;
 
 	stats.kern_lost = atomic64_read(&t->lost);
+	atomic64_init(&t->lost);
 	stats.worker_num = t->dispatch_workers_nr;
 	stats.perf_pages_cnt = t->perf_pages_cnt;
 	stats.queue_capacity = t->queues[0].ring_size;
@@ -1323,6 +1323,11 @@ struct socket_trace_stats socket_tracer_stats(void)
 		    atomic64_read(&t->queues[i].burst_count);
 		stats.mem_alloc_fail_count +=
 		    atomic64_read(&t->queues[i].heap_get_failed);
+
+		atomic64_init(&t->queues[i].enqueue_lost);
+		atomic64_init(&t->queues[i].enqueue_nr);
+		atomic64_init(&t->queues[i].dequeue_nr);
+		atomic64_init(&t->queues[i].heap_get_failed);
 	}
 
 	stats.is_adapt_success = t->adapt_success;
