@@ -250,7 +250,7 @@ vtap_group_id: g-xxxxxx
 #http_log_span_id: traceparent, sw8
 
 ## Protocol Identification Maximun Packet Length
-## Default: 1024. Range: [256, 1500]
+## Default: 1024. Range: [256, 8192]
 ## Note: The maximum data length used for application protocol identification,
 ##   note that the effective value is less than or equal to the value of
 ##   capture_packet_size.
@@ -876,23 +876,37 @@ vtap_group_id: g-xxxxxx
       ## Format: x-y, z
       #port-list:
 
-    ## The number of worker threads refers to how many threads participate in data processing in user mode
+    ## eBPF work-thread number
+    ## Default: 1. Range: [1, Number of CPU logical cores on the host]
+    ## Note: The number of worker threads refers to how many threads participate in data processing in user-space.
     #thread-num: 1
 
-    ## The number of page occupied by the shared memory of the kernel. The value is a power of 2. Used for perf data transfer
+    ## eBPF perf pages count
+    ## Default: 128. Range: [32, 512]
+    ## Note: The number of page occupied by the shared memory of the kernel. The value is 2^n ( n range [5, 9] ). Used for perf data transfer.
+    ##   If the value is between 2^n and 2^(n+1), it will be automatically adjusted by the ebpf configurator to the minimum value (2^n).
     #perf-pages-count: 128
 
-    ## The size of the ring cache queue, which is a power of 2. e.g: 2,4,8,16,32,64,128
+    ## eBPF dispatch ring size
+    ## Default: 65536. Range: [8192, 131072]
+    ## Note: The size of the ring cache queue, The value is 2^n ( n range [13, 17] ).
+    ##   If the value is between 2^n and 2^(n+1), it will be automatically adjusted by the ebpf configurator to the minimum value (2^n).
     #ring-size: 65536
 
-    ## Set the maximum value of hash table entries for socket tracking, depending on the number of concurrent requests in the actual scenario
+    ## eBPF max socket entries
+    ## Default: 524288. Range: [100000, 2000000]
+    ## Note: Set the maximum value of hash table entries for socket tracking, depending on the number of concurrent requests in the actual scenario
     #max-socket-entries: 524288
 
-    ## Set the maximum value of hash table entries for thread tracking sessions.
-    #max-trace-entries: 524288
-
-    ## The maximum threshold for cleaning socket map table entries
+    ## eBPF socket map max reclaim
+    ## Default: 520000. Range: [100000, 2000000]
+    ## Note: The maximum threshold for cleaning socket map table entries.
     #socket-map-max-reclaim: 520000
+
+    ## eBPF max trace entries
+    ## Default: 524288. Range: [100000, 2000000]
+    ## Note: Set the maximum value of hash table entries for thread/coroutine tracking sessions.
+    #max-trace-entries: 524288
 
   ######################################
   ## Agent Running in Standalone Mode ##
