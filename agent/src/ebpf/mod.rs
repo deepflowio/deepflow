@@ -135,7 +135,7 @@ pub struct SK_BPF_DATA {
     pub coroutine_id: u64, // CoroutineID, i.e., golang goroutine id
     pub source: u8,        // SYSCALL,GO_TLS_UPROBE,GO_HTTP2_UPROBE
 
-    pub process_kname: [u8; 16usize], //进程或线程名字，占用16bytes
+    pub process_kname: [u8; PACKET_KNAME_MAX_PADDING + 1], //进程或线程名字，占用16bytes
 
     pub tuple: tuple_t, // Socket五元组信息
 
