@@ -461,15 +461,16 @@ type Pod struct {
 }
 
 type Process struct {
-	Lcuuid      string    `json:"lcuuid" binding:"required"`
-	Name        string    `json:"name"`
-	VTapID      int       `json:"vtap_id" binding:"required"`
-	PID         int       `json:"pid" binding:"required"`
-	ProcessName string    `json:"process_name" binding:"required"`
-	CommandLine string    `json:"command_line"`
-	UserName    string    `json:"user_name"`
-	StartTime   time.Time `json:"start_time" binding:"required"`
-	OsAppTags   string    `json:"os_app_tags"`
+	Lcuuid          string    `json:"lcuuid" binding:"required"`
+	Name            string    `json:"name"`
+	VTapID          int       `json:"vtap_id" binding:"required"`
+	PID             int       `json:"pid" binding:"required"`
+	ProcessName     string    `json:"process_name" binding:"required"`
+	CommandLine     string    `json:"command_line"`
+	UserName        string    `json:"user_name"`
+	StartTime       time.Time `json:"start_time" binding:"required"`
+	OsAppTags       string    `json:"os_app_tags"`
+	SubDomainLcuuid string    `json:"sub_domain_lcuuid"`
 }
 
 type SubDomainResource struct {
