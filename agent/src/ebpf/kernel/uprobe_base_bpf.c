@@ -217,11 +217,9 @@ static __inline __u64 get_current_goroutine(void)
 	return 0;
 }
 
-static __inline bool is_final_ancestor(__u32 tgid, __u64 goid, __u64 now)
+static __inline bool is_final_ancestor(__u32 tgid, __u64 goid, __u64 now,
+				       __u64 timeout)
 {
-	// 30s
-	static const __u64 TIMEOUT = 30000000000;
-
 	struct go_key key = { .tgid = tgid, .goid = goid };
 
 	__u64 *ts = bpf_map_lookup_elem(&go_rw_ts_map, &key);
@@ -229,7 +227,7 @@ static __inline bool is_final_ancestor(__u32 tgid, __u64 goid, __u64 now)
 		return false;
 	}
 
-	return now < *ts + TIMEOUT;
+	return now < *ts + timeout;
 }
 
 // Try to find an ancestor coroutine that can represent this request.
@@ -237,7 +235,7 @@ static __inline bool is_final_ancestor(__u32 tgid, __u64 goid, __u64 now)
 //  1. There have been socket read or write operations in the recent period of time
 //  2. All of its ancestor coroutines do not satisfy condition 1
 // If no such coroutine exists, mark itself as a coroutine that can represent the request and return.
-static __inline __u64 get_rw_goid(void)
+static __inline __u64 get_rw_goid(__u64 timeout)
 {
 	__u32 tgid = (__u32)(bpf_get_current_pid_tgid() >> 32);
 	__u64 ts = bpf_ktime_get_ns();
@@ -250,8 +248,8 @@ static __inline __u64 get_rw_goid(void)
 
 	int idx = 0;
 #pragma unroll
-	for (idx = 0; idx < 8; ++idx) {
-		if (is_final_ancestor(tgid, ancestor, ts)) {
+	for (idx = 0; idx < 6; ++idx) {
+		if (is_final_ancestor(tgid, ancestor, ts, timeout)) {
 			return ancestor;
 		}
 		struct go_key key = { .tgid = tgid, .goid = ancestor };

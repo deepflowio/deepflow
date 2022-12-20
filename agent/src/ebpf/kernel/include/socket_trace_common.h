@@ -84,6 +84,7 @@ struct trace_conf_t {
 	__u64 coroutine_trace_id;  // 同一协程的数据转发关联
 	__u64 thread_trace_id; // 同一进程/线程的数据转发关联，用于多事务流转场景
 	__u32 data_limit_max;  // Maximum number of data transfers
+	__u32 go_tracing_timeout;
 };
 
 struct trace_stats {

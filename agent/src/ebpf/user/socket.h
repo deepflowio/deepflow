@@ -161,6 +161,7 @@ struct extra_event {
 };
 
 int set_data_limit_max(int limit_size);
+int set_go_tracing_timeout(int timeout);
 struct socket_trace_stats socket_tracer_stats(void);
 int running_socket_tracer(l7_handle_fn handle,
 			  int thread_nr,

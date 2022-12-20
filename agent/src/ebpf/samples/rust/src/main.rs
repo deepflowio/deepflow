@@ -277,8 +277,8 @@ fn main() {
         );
 
         let allow_port = 443;
-        let mut allow_port_bitmap:[u8;65536/8] = [0;65536/8];
-        allow_port_bitmap[allow_port/8] |= 1<<(allow_port%8);
+        let mut allow_port_bitmap: [u8; 65536 / 8] = [0; 65536 / 8];
+        allow_port_bitmap[allow_port / 8] |= 1 << (allow_port % 8);
         set_allow_port_bitmap(allow_port_bitmap.as_ptr());
 
         // The first parameter passed by a null pointer can be
@@ -311,8 +311,12 @@ fn main() {
             ::std::process::exit(1);
         }
 
-	// test data limit max
-	set_data_limit_max(10000);
+        // test data limit max
+        set_data_limit_max(10000);
+
+        // test go traceing timeout,
+        // Defaults to 120 seconds if the function is not called
+        //set_go_tracing_timeout(120);
 
         bpf_tracer_finish();
 
