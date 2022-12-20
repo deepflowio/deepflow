@@ -64,4 +64,7 @@
 // execute/exit events delayed processing time, unit: second
 #define PROC_EVENT_DELAY_HANDLE_DEF     60
 
+// seconds
+#define GO_TRACING_TIMEOUT_DEFAULT      120
+
 #endif /* DF_EBPF_CONFIG_H */
