@@ -124,6 +124,7 @@ type Config struct {
 	IngesterEnabled       bool            `yaml:"ingester-enabled"`
 	UDPReadBuffer         int             `yaml:"udp-read-buffer"`
 	TCPReadBuffer         int             `yaml:"tcp-read-buffer"`
+	TCPReaderBuffer       int             `yaml:"tcp-reader-buffer"`
 	Profiler              bool            `yaml:"profiler"`
 	MaxCPUs               int             `yaml:"max-cpus"`
 	CKDiskMonitor         CKDiskMonitor   `yaml:"ck-disk-monitor"`
@@ -342,6 +343,7 @@ func Load(path string) *Config {
 			IngesterEnabled: true,
 			UDPReadBuffer:   64 << 20,
 			TCPReadBuffer:   4 << 20,
+			TCPReaderBuffer: 1 << 20,
 			CKDiskMonitor: CKDiskMonitor{
 				DefaultCheckInterval,
 				DefaultDiskUsedPercent,

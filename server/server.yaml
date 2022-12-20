@@ -368,6 +368,9 @@ ingester:
   ## tcp socket receiver buffer: 4M
   #tcp-read-buffer: 4194304
 
+  ## tcp socket reader buffer: 1M
+  #tcp-reader-buffer: 1048576
+
   ## Rpc synchronization recv/send msg buffer(unit: Byte)
   #grpc-buffer-size: 41943040
 
