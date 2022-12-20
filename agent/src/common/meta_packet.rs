@@ -210,7 +210,7 @@ impl<'a> MetaPacket<'a> {
     fn update_tcp_opt(&mut self) {
         let packet = self.raw.as_ref().unwrap();
         let mut offset = self.header_type.min_packet_size() + self.l2_l3_opt_size;
-        let payload_offset = offset + self.l4_opt_size;
+        let payload_offset = (offset + self.l4_opt_size).min(packet.len());
 
         while offset + 1 < payload_offset {
             // 如果不足2B，EOL和NOP都可以忽略
