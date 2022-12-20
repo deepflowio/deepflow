@@ -16,6 +16,7 @@
 
 use std::{
     net::IpAddr,
+    path::Path,
     process,
     sync::{
         atomic::{AtomicU64, Ordering},
@@ -33,7 +34,10 @@ use ring::digest;
 use tokio::runtime::{Builder, Runtime};
 
 use crate::{
-    config::{handler::PlatformAccess, KubernetesPollerType},
+    config::{
+        handler::{OsProcScanConfig, PlatformAccess},
+        KubernetesPollerType,
+    },
     exception::ExceptionHandler,
     handler,
     platform::{
@@ -49,22 +53,27 @@ use crate::{
 use public::{
     consts::NORMAL_EXIT_WITH_RESTART,
     netns::{InterfaceInfo, NetNs, NsFile},
-    proto::trident::{self, Exception},
+    proto::{
+        common::TridentType,
+        trident::{self, Exception, GenesisProcessData, ProcessInfo},
+    },
 };
 
-const SHA1_DIGEST_LEN: usize = 20;
+use super::{calc_process_datas_sha1, linux_process::get_all_process, ProcessData};
 
-struct ProcessArgs {
-    config: PlatformAccess,
-    running: Arc<Mutex<bool>>,
-    version: Arc<AtomicU64>,
-    session: Arc<Session>,
-    sniffer: Arc<sniffer_builder::Sniffer>,
-    timer: Arc<Condvar>,
-    xml_extractor: Arc<LibvirtXmlExtractor>,
-    kubernetes_poller: Arc<GenericPoller>,
-    exception_handler: ExceptionHandler,
-    extra_netns_regex: Arc<Mutex<Option<Regex>>>,
+pub const SHA1_DIGEST_LEN: usize = 20;
+
+pub(super) struct ProcessArgs {
+    pub(super) config: PlatformAccess,
+    pub(super) running: Arc<Mutex<bool>>,
+    pub(super) version: Arc<AtomicU64>,
+    pub(super) session: Arc<Session>,
+    pub(super) sniffer: Arc<sniffer_builder::Sniffer>,
+    pub(super) timer: Arc<Condvar>,
+    pub(super) xml_extractor: Arc<LibvirtXmlExtractor>,
+    pub(super) kubernetes_poller: Arc<GenericPoller>,
+    pub(super) exception_handler: ExceptionHandler,
+    pub(super) extra_netns_regex: Arc<Mutex<Option<Regex>>>,
 }
 
 #[derive(Default)]
@@ -87,6 +96,7 @@ struct HashArgs {
     raw_info_hash: [u8; SHA1_DIGEST_LEN],
     lldp_info_hash: [u8; SHA1_DIGEST_LEN],
     xml_interfaces_hash: [u8; SHA1_DIGEST_LEN],
+    process_data_hash: [u8; SHA1_DIGEST_LEN],
 }
 
 pub struct PlatformSynchronizer {
@@ -268,13 +278,16 @@ impl PlatformSynchronizer {
         hash_args: &mut HashArgs,
         self_interface_infos: &mut Vec<InterfaceInfo>,
         self_xml_interfaces: &mut Vec<InterfaceEntry>,
+        process_info: &mut Vec<ProcessData>,
+        process_info_enabled: bool,
+        platform_enabled: bool,
+        proc_scan_conf: &OsProcScanConfig,
         process_args: &ProcessArgs,
         self_kubernetes_version: &mut u64,
         self_last_ip_update_timestamp: &mut Duration,
         netns: &Vec<NsFile>,
+        libvirt_xml_path: &Path,
     ) {
-        let platform_enabled = process_args.config.load().enabled;
-
         let mut changed = 0;
 
         let mut hash_handle = digest::Context::new(&digest::SHA1_FOR_LEGACY_USE_ONLY);
@@ -336,7 +349,7 @@ impl PlatformSynchronizer {
         let mut raw_vlan_config = None;
 
         if platform_enabled {
-            raw_all_vm_xml = get_all_vm_xml(process_args.config.load().libvirt_xml_path.as_path())
+            raw_all_vm_xml = get_all_vm_xml(libvirt_xml_path)
                 .map_err(|err| debug!("get_all_vm_xml error:{}", err))
                 .ok();
 
@@ -426,6 +439,17 @@ impl PlatformSynchronizer {
             }
         }
 
+        if process_info_enabled {
+            *process_info = get_all_process(proc_scan_conf);
+            process_info.sort_by_key(|p| p.pid);
+            let proc_sha1 = calc_process_datas_sha1(&*process_info);
+            if proc_sha1 != hash_args.process_data_hash {
+                debug!("proc info changed");
+                hash_args.process_data_hash = proc_sha1;
+                changed += 1;
+            }
+        }
+
         let new_kubernetes_version = process_args.kubernetes_poller.get_version();
         if new_kubernetes_version != *self_kubernetes_version {
             debug!("kubernetes info changed");
@@ -493,6 +517,7 @@ impl PlatformSynchronizer {
                         .copy_from_slice(&xml_interface_hash);
                 }
             }
+
             info!(
                 "Platform information changed to version {}",
                 process_args.version.fetch_add(1, Ordering::SeqCst) + 1
@@ -505,16 +530,15 @@ impl PlatformSynchronizer {
         process_args: &ProcessArgs,
         self_interface_infos: &Vec<InterfaceInfo>,
         self_xml_interfaces: &Vec<InterfaceEntry>,
+        proc_data: &Vec<ProcessData>,
         vtap_id: u16,
         version: u64,
         rt: &Runtime,
+        ctrl_ip: IpAddr,
+        trident_type: TridentType,
+        platform_enabled: bool,
+        kubernetes_cluster_id: String,
     ) -> Result<u64, tonic::Status> {
-        let config_guard = process_args.config.load();
-        let trident_type = config_guard.trident_type;
-        let ctrl_ip = config_guard.source_ip;
-        let platform_enabled = config_guard.enabled;
-        drop(config_guard);
-
         let (mut ips, mut lldp_infos) = (vec![], vec![]);
 
         let mut raw_all_vm_xml = None;
@@ -603,21 +627,34 @@ impl PlatformSynchronizer {
             interfaces,
         };
 
+        let process_data = GenesisProcessData {
+            process_entries: proc_data.iter().map(|p| ProcessInfo::from(p)).collect(),
+        };
+
         let msg = trident::GenesisSyncRequest {
             version: Some(version),
             trident_type: Some(trident_type as i32),
             platform_data: Some(platform_data),
-            process_data: None,
+            process_data: Some(process_data),
             source_ip: Some(ctrl_ip.to_string()),
             vtap_id: Some(vtap_id as u32),
-            kubernetes_cluster_id: Some(
-                process_args.config.load().kubernetes_cluster_id.to_string(),
-            ),
+            kubernetes_cluster_id: Some(kubernetes_cluster_id),
             nat_ip: None,
         };
 
         rt.block_on(process_args.session.grpc_genesis_sync_with_statsd(msg))
             .map(|r| r.into_inner().version())
+    }
+
+    // whether need to scan the process info
+    fn process_info_enabled(t: TridentType) -> bool {
+        match t {
+            TridentType::TtPublicCloud
+            | TridentType::TtPhysicalMachine
+            | TridentType::TtHostPod
+            | TridentType::TtVmPod => true,
+            _ => false,
+        }
     }
 
     fn process(args: ProcessArgs) {
@@ -633,6 +670,7 @@ impl PlatformSynchronizer {
 
         let mut interface_infos = vec![];
         let mut xml_interfaces = vec![];
+        let mut process_data = vec![];
 
         let mut netns = vec![];
 
@@ -650,25 +688,36 @@ impl PlatformSynchronizer {
                 thread::sleep(Duration::from_secs(1));
                 process::exit(NORMAL_EXIT_WITH_RESTART);
             }
+
+            let config_guard = args.config.load();
+            let trident_type = config_guard.trident_type;
+            let process_info_enabled = Self::process_info_enabled(trident_type);
+            let platform_enabled = config_guard.enabled;
+            let proc_scan_conf = &config_guard.os_proc_scan_conf;
+            let cur_vtap_id = config_guard.vtap_id;
+            let trident_type = config_guard.trident_type;
+            let ctrl_ip = config_guard.source_ip.clone();
+            let poll_interval = config_guard.sync_interval;
+            let kubernetes_cluster_id = config_guard.kubernetes_cluster_id.clone();
+            let libvirt_xml_path = config_guard.libvirt_xml_path.clone();
+
             Self::query_platform(
                 &mut platform_args,
                 &mut hash_args,
                 &mut interface_infos,
                 &mut xml_interfaces,
+                &mut process_data,
+                process_info_enabled,
+                platform_enabled,
+                proc_scan_conf,
                 &args,
                 &mut kubernetes_version,
                 &mut last_ip_update_timestamp,
                 &netns,
+                libvirt_xml_path.as_path(),
             );
 
             let cur_version = args.version.load(Ordering::SeqCst);
-
-            let config_guard = args.config.load();
-            let cur_vtap_id = config_guard.vtap_id;
-            let trident_type = config_guard.trident_type;
-            let ctrl_ip = config_guard.source_ip;
-            let poll_interval = config_guard.sync_interval;
-            drop(config_guard);
 
             if cur_version == init_version {
                 // 避免信息同步先于信息采集
@@ -686,9 +735,7 @@ impl PlatformSynchronizer {
                     trident_type: Some(trident_type as i32),
                     source_ip: Some(ctrl_ip.to_string()),
                     vtap_id: Some(cur_vtap_id as u32),
-                    kubernetes_cluster_id: Some(
-                        args.config.load().kubernetes_cluster_id.to_string(),
-                    ),
+                    kubernetes_cluster_id: Some(kubernetes_cluster_id.clone()),
                     platform_data: None,
                     process_data: None,
                     nat_ip: None,
@@ -730,9 +777,14 @@ impl PlatformSynchronizer {
                 &args,
                 &interface_infos,
                 &xml_interfaces,
+                &process_data,
                 cur_vtap_id,
                 cur_version,
                 &rt,
+                ctrl_ip,
+                trident_type,
+                platform_enabled,
+                kubernetes_cluster_id.clone(),
             ) {
                 Ok(version) => last_version = version,
                 Err(e) => {

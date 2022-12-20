@@ -38,6 +38,7 @@ use super::{
 };
 use crate::common::l7_protocol_log::L7ProtocolBitmap;
 use crate::flow_generator::protocol_logs::SOFA_NEW_RPC_TRACE_CTX_KEY;
+use crate::platform::ProcRegRewrite;
 use crate::{
     common::{decapsulate::TunnelTypeBitmap, enums::TapType},
     dispatcher::recv_engine,
@@ -213,6 +214,16 @@ impl Default for NpbConfig {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
+pub struct OsProcScanConfig {
+    pub os_proc_root: String,
+    pub os_proc_socket_sync_interval: u32, // for sec
+    pub os_proc_socket_min_lifetime: u32,  // for sec
+    pub os_proc_regex: Vec<ProcRegRewrite>,
+    pub os_app_tag_exec_user: String,
+    pub os_app_tag_exec: Vec<String>,
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct PlatformConfig {
     pub sync_interval: Duration,
     pub kubernetes_cluster_id: String,
@@ -228,6 +239,7 @@ pub struct PlatformConfig {
     pub namespace: Option<String>,
     pub thread_threshold: u32,
     pub tap_mode: TapMode,
+    pub os_proc_scan_conf: OsProcScanConfig,
 }
 
 #[derive(Clone, PartialEq, Debug, Eq)]
@@ -878,6 +890,22 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 },
                 thread_threshold: conf.thread_threshold,
                 tap_mode: conf.tap_mode,
+                os_proc_scan_conf: OsProcScanConfig {
+                    os_proc_root: conf.yaml_config.os_proc_root.clone(),
+                    os_proc_socket_sync_interval: conf.yaml_config.os_proc_socket_sync_interval,
+                    os_proc_socket_min_lifetime: conf.yaml_config.os_proc_socket_min_lifetime,
+                    os_proc_regex: {
+                        let mut v = vec![];
+                        for i in &conf.yaml_config.os_proc_regex {
+                            if let Ok(r) = ProcRegRewrite::try_from(i) {
+                                v.push(r);
+                            }
+                        }
+                        v
+                    },
+                    os_app_tag_exec_user: conf.yaml_config.os_app_tag_exec_user.clone(),
+                    os_app_tag_exec: conf.yaml_config.os_app_tag_exec.clone(),
+                },
             },
             flow: (&conf).into(),
             log_parser: LogParserConfig {
