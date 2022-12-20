@@ -196,14 +196,10 @@ static __inline void report_http2_header(struct pt_regs *ctx)
 	return;
 }
 
-// Fill all fields except data in buffer->send_buffer
-static __inline void http2_fill_common_socket(struct http2_header_data *data,
-					      struct __socket_data *send_buffer)
+static __inline bool
+http2_fill_common_socket_1(struct http2_header_data *data,
+			   struct __socket_data *send_buffer, __u64 id)
 {
-	// Assigned at the end of the function,
-	// 0 means that the function returns during execution
-	send_buffer->pid = 0;
-
 	// source, coroutine_id, timestamp, comm
 	send_buffer->source = DATA_SOURCE_GO_HTTP2_UPROBE;
 	send_buffer->coroutine_id = get_current_goroutine();
@@ -237,15 +233,14 @@ static __inline void http2_fill_common_socket(struct http2_header_data *data,
 
 	// Refer to the logic of process_data in socket_trace.c to
 	// obtain quintuple information
-	__u64 id = bpf_get_current_pid_tgid();
 	__u32 tgid = id >> 32;
 	__u32 k0 = 0;
 	struct member_fields_offset *offset = members_offset__lookup(&k0);
 	if (!offset)
-		return;
+		return false;
 
 	if (unlikely(!offset->ready))
-		return;
+		return false;
 
 	send_buffer->tuple.l4_protocol = IPPROTO_TCP;
 	void *sk = get_socket_from_fd(data->fd, offset);
@@ -292,17 +287,27 @@ static __inline void http2_fill_common_socket(struct http2_header_data *data,
 		send_buffer->tuple.addr_len = 16;
 		break;
 	default:
-		return;
+		return false;
 	}
+	send_buffer->tgid = tgid;
+	return true;
+}
+
+static __inline bool
+http2_fill_common_socket_2(struct http2_header_data *data,
+			   struct __socket_data *send_buffer, __u64 id)
+{
+	__u32 tgid = id >> 32;
+	__u32 k0 = 0;
 
 	// trace_conf, generator for socket_id
 	struct trace_conf_t *trace_conf = trace_conf_map__lookup(&k0);
 	if (trace_conf == NULL)
-		return;
+		return false;
 
 	struct trace_stats *trace_stats = trace_stats_map__lookup(&k0);
 	if (trace_stats == NULL)
-		return;
+		return false;
 
 	// Update and get socket_id
 	__u64 conn_key;
@@ -335,8 +340,24 @@ static __inline void http2_fill_common_socket(struct http2_header_data *data,
 		      trace_info_ptr, trace_conf, trace_stats,
 		      &send_buffer->thread_trace_id, send_buffer->timestamp,
 		      &trace_key);
+	return true;
+}
 
-	send_buffer->tgid = tgid;
+// Fill all fields except data in buffer->send_buffer
+static __inline void http2_fill_common_socket(struct http2_header_data *data,
+					      struct __socket_data *send_buffer)
+{
+	// Assigned at the end of the function,
+	// 0 means that the function returns during execution
+	send_buffer->pid = 0;
+
+	__u64 id = bpf_get_current_pid_tgid();
+	if (!http2_fill_common_socket_1(data, send_buffer, id))
+		return;
+
+	if (!http2_fill_common_socket_2(data, send_buffer, id))
+		return;
+
 	send_buffer->pid = (__u32)id;
 }
 
