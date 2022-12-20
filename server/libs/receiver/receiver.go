@@ -17,8 +17,10 @@
 package receiver
 
 import (
+	"bufio"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"sort"
@@ -371,6 +373,7 @@ type Receiver struct {
 	UDPConn          *net.UDPConn
 	UDPReadBuffer    int
 	TCPReadBuffer    int
+	TCPReaderBuffer  int
 	TCPListener      net.Listener
 	TCPAddress       string
 	lastUDPFlushTime int64
@@ -400,18 +403,19 @@ type ReceiverCounter struct {
 }
 
 func NewReceiver(
-	listenPort, UDPReadBuffer, TCPReadBuffer int, // 监听端口，默认同时监听tcp和upd的端口
+	listenPort, UDPReadBuffer, TCPReadBuffer, TCPReaderBuffer int, // 监听端口，默认同时监听tcp和upd的端口
 ) *Receiver {
 	receiver := &Receiver{
-		handlers:      make([]*Handler, datatype.MESSAGE_TYPE_MAX),
-		serverType:    BOTH,
-		UDPAddress:    &net.UDPAddr{Port: listenPort},
-		UDPReadBuffer: UDPReadBuffer,
-		TCPReadBuffer: TCPReadBuffer,
-		TCPAddress:    fmt.Sprintf("0.0.0.0:%d", listenPort),
-		timeNow:       time.Now().Unix(),
-		counter:       &ReceiverCounter{},
-		status:        &AdapterStatus{},
+		handlers:        make([]*Handler, datatype.MESSAGE_TYPE_MAX),
+		serverType:      BOTH,
+		UDPAddress:      &net.UDPAddr{Port: listenPort},
+		UDPReadBuffer:   UDPReadBuffer,
+		TCPReadBuffer:   TCPReadBuffer,
+		TCPReaderBuffer: TCPReaderBuffer,
+		TCPAddress:      fmt.Sprintf("0.0.0.0:%d", listenPort),
+		timeNow:         time.Now().Unix(),
+		counter:         &ReceiverCounter{},
+		status:          &AdapterStatus{},
 	}
 	receiver.status.init()
 
@@ -789,12 +793,12 @@ func (r *Receiver) getMetricsTimestamp(buffer []byte) uint32 {
 }
 
 // 固定读取buffer长度的数据
-func ReadN(conn net.Conn, buffer []byte) error {
+func ReadN(r *bufio.Reader, buffer []byte) error {
 	total := 0
 	for total < len(buffer) {
-		n, err := conn.Read(buffer[total:])
+		n, err := r.Read(buffer[total:])
 		if err != nil {
-			if err.Error() == "EOF" {
+			if err == io.EOF {
 				return fmt.Errorf("%s, %s", err.Error(), SOCKET_READ_ERROR)
 			}
 			return err
@@ -813,8 +817,9 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 	baseHeaderBuffer := make([]byte, datatype.MESSAGE_HEADER_LEN)
 	flowHeader := &datatype.FlowHeader{}
 	flowHeaderBuffer := make([]byte, datatype.FLOW_HEADER_LEN)
+	reader := bufio.NewReaderSize(conn, r.TCPReaderBuffer)
 	for !r.exit {
-		if err := ReadN(conn, baseHeaderBuffer); err != nil {
+		if err := ReadN(reader, baseHeaderBuffer); err != nil {
 			log.Warningf("TCP client(%s) connection read error.%s", conn.RemoteAddr().String(), err.Error())
 			return
 		}
@@ -825,7 +830,7 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 		}
 		// 收到只含包头的空包丢弃
 		if baseHeader.FrameSize == datatype.MESSAGE_HEADER_LEN+datatype.FLOW_HEADER_LEN {
-			if err := ReadN(conn, flowHeaderBuffer); err != nil {
+			if err := ReadN(reader, flowHeaderBuffer); err != nil {
 				log.Warningf("TCP client(%s) connection read error.%s", conn.RemoteAddr().String(), err.Error())
 			} else if r.counter.Invalid == 0 {
 				log.Infof("TCP client(%s) connection read empty content packet", conn.RemoteAddr().String())
@@ -842,7 +847,7 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 		headerLen := datatype.MESSAGE_HEADER_LEN
 		metricsTimestamp, vtapID, sequence := uint32(0), uint16(0), uint64(0)
 		if baseHeader.Type.HeaderType() == datatype.HEADER_TYPE_LT_VTAP {
-			if err := ReadN(conn, flowHeaderBuffer); err != nil {
+			if err := ReadN(reader, flowHeaderBuffer); err != nil {
 				atomic.AddUint64(&r.counter.Invalid, 1)
 				log.Warningf("TCP client(%s) connection read error.%s", conn.RemoteAddr().String(), err.Error())
 				return
@@ -876,7 +881,7 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 		if isNew {
 			r.counter.NewBufferCount++
 		}
-		if err := ReadN(conn, recvBuffer.Buffer[:dataLen]); err != nil {
+		if err := ReadN(reader, recvBuffer.Buffer[:dataLen]); err != nil {
 			atomic.AddUint64(&r.counter.Invalid, 1)
 			ReleaseRecvBuffer(recvBuffer)
 			log.Warningf("TCP client(%s) connection read error.%s", conn.RemoteAddr().String(), err.Error())
