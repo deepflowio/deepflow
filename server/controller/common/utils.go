@@ -305,6 +305,46 @@ func GetMasterControllerHostPort() (masterIP string, httpPort, grpcPort int, err
 	return
 }
 
+func GetVTapSubDomainMappingByDomain(domain string) (map[int]string, error) {
+	vtapIDToSubDomain := make(map[int]string)
+
+	var azs []mysql.AZ
+	err := mysql.Db.Where("domain = ?", domain).Find(&azs).Error
+	if err != nil {
+		return vtapIDToSubDomain, err
+	}
+	azLcuuids := []string{}
+	for _, az := range azs {
+		azLcuuids = append(azLcuuids, az.Lcuuid)
+	}
+
+	var podNodes []mysql.PodNode
+	err = mysql.Db.Where("domain = ?", domain).Find(&podNodes).Error
+	if err != nil {
+		return vtapIDToSubDomain, err
+	}
+	podNodeIDToSubDomain := make(map[int]string)
+	for _, podNode := range podNodes {
+		podNodeIDToSubDomain[podNode.ID] = podNode.SubDomain
+	}
+
+	var vtaps []mysql.VTap
+	err = mysql.Db.Where("az IN {?}", azLcuuids).Find(&vtaps).Error
+	if err != nil {
+		return vtapIDToSubDomain, err
+	}
+	for _, vtap := range vtaps {
+		vtapIDToSubDomain[vtap.ID] = ""
+		if vtap.Type == VTAP_TYPE_POD_HOST || vtap.Type == VTAP_TYPE_POD_VM {
+			if subDomain, ok := podNodeIDToSubDomain[vtap.LaunchServerID]; ok {
+				vtapIDToSubDomain[vtap.ID] = subDomain
+			}
+		}
+	}
+
+	return vtapIDToSubDomain, nil
+}
+
 func IsTCPActive(ip string, port int) error {
 	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", ip, port), 2*time.Second)
 	if err != nil {
