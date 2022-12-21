@@ -282,6 +282,10 @@ impl<T> Sender<T> {
         unsafe { &*self.counter }
     }
 
+    pub fn size(&self) -> usize {
+        self.counter().queue.size
+    }
+
     pub fn terminated(&self) -> bool {
         self.counter().queue.terminated()
     }
@@ -311,6 +315,30 @@ impl<T> Sender<T> {
                 Err(Error::Terminated(..)) => Err(Error::Terminated(None, Some(msgs))),
                 _ => unreachable!(),
             }
+        }
+    }
+
+    pub fn send_in_batch(&self, mut msgs: Vec<T>, batch_size: usize) -> Result<(), Error<T>> {
+        let mut sended = 0;
+        unsafe {
+            for chunk in msgs.chunks(batch_size) {
+                match self.counter().queue.raw_send(chunk.as_ptr(), chunk.len()) {
+                    Ok(_) => {
+                        sended += chunk.len();
+                        continue;
+                    }
+                    Err(Error::Terminated(..)) => {
+                        let unsends = msgs.drain(sended..).collect();
+                        // msgs has been sent successfully, preventing repeated release
+                        msgs.set_len(0);
+                        return Err(Error::Terminated(None, Some(unsends)));
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            // drop the vector without dropping elements within
+            msgs.set_len(0);
+            Ok(())
         }
     }
 }
@@ -573,6 +601,65 @@ mod tests {
                 sum += c;
             }
             assert_eq!(sum, 550, "expected: 550, result: {}", sum);
+        }
+
+        let c = c.load(Ordering::Acquire);
+        assert_eq!(c, 0, "new/drop count mismatch: new - drop = {}", c);
+    }
+
+    #[test]
+    fn batch_sender() {
+        let c = Arc::new(AtomicUsize::new(0));
+
+        {
+            let (s, r, _) = bounded(1024);
+            for i in 0..10 {
+                let sender = s.clone();
+                thread::spawn(move || {
+                    if i % 2 == 0 {
+                        for j in 1..=10 {
+                            sender.send(j).unwrap();
+                        }
+                    } else {
+                        sender
+                            .send_in_batch(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 3)
+                            .unwrap();
+                    }
+                });
+            }
+            mem::drop(s);
+
+            let mut sum = 0;
+            for c in r {
+                sum += c;
+            }
+            assert_eq!(sum, 550, "expected: 550, result: {}", sum);
+        }
+
+        let c = c.load(Ordering::Acquire);
+        assert_eq!(c, 0, "new/drop count mismatch: new - drop = {}", c);
+    }
+
+    #[test]
+    fn batch_overwrite() {
+        let c = Arc::new(AtomicUsize::new(0));
+
+        {
+            let (s, r, _) = bounded(3);
+
+            s.send_in_batch(
+                vec![
+                    CountedU64::new(42, c.clone()),
+                    CountedU64::new(43, c.clone()),
+                    CountedU64::new(44, c.clone()),
+                    CountedU64::new(45, c.clone()),
+                ],
+                2,
+            )
+            .unwrap();
+            r.recv_n(3, None).unwrap();
+            let co = r.recv(None).unwrap();
+            assert_eq!(co, 45, "expected: 45, result: {}", co);
         }
 
         let c = c.load(Ordering::Acquire);
