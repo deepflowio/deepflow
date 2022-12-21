@@ -174,6 +174,7 @@ type VM struct {
 	CreateMethod   int    `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
 	HType          int    `gorm:"column:htype;type:int;default:1" json:"HTYPE"`                 // 1.vm-c 2.bm-c 3.vm-n 4.bm-n 5.vm-s 6.bm-s
 	LaunchServer   string `gorm:"index:state_server_index;column:launch_server;type:char(64);default:''" json:"LAUNCH_SERVER"`
+	CloudTags      string `gorm:"column:cloud_tags;type:text;default:''" json:"CLOUD_TAGS"` // separated by ,
 	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
 	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"`
@@ -631,6 +632,7 @@ type PodNamespace struct {
 	SoftDeleteBase `gorm:"embedded"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
 	Alias          string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS"`
+	CloudTags      string `gorm:"column:cloud_tags;type:text;default:''" json:"CLOUD_TAGS"` // separated by ,
 	PodClusterID   int    `gorm:"column:pod_cluster_id;type:int;default:null" json:"POD_CLUSTER_ID"`
 	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"`
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`

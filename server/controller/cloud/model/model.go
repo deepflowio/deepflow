@@ -53,6 +53,7 @@ type VM struct {
 	HType        int       `json:"htype" binding:"required"`
 	State        int       `json:"state" binding:"required"`
 	LaunchServer string    `json:"launch_server" binding:"required"`
+	CloudTags    string    `json:"cloud_tags"`
 	CreatedAt    time.Time `json:"created_at"`
 	VPCLcuuid    string    `json:"vpc_lcuuid" binding:"required"`
 	AZLcuuid     string    `json:"az_lcuuid" binding:"required"`
@@ -346,6 +347,7 @@ type PodNode struct {
 type PodNamespace struct {
 	Lcuuid           string `json:"lcuuid" binding:"required"`
 	Name             string `json:"name" binding:"required"`
+	CloudTags        string `json:"cloud_tags"`
 	PodClusterLcuuid string `json:"pod_cluster_lcuuid" binding:"required"`
 	AZLcuuid         string `json:"az_lcuuid" binding:"required"`
 	RegionLcuuid     string `json:"region_lcuuid" binding:"required"`
