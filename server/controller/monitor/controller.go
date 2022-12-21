@@ -357,14 +357,6 @@ func (c *ControllerCheck) cleanExceptionControllerData(controllerIPs []string) {
 	if err != nil {
 		log.Errorf("clean controllers (%s) genesis vinterface failed: %s", controllerIPs, err)
 	} else {
-		log.Infof("controllers (%s) invalid, clean genesis vinterface", controllerIPs)
-	}
-
-	// delete genesis storage on invalid controller
-	err = mysql.Db.Where("node_ip IN ?", controllerIPs).Delete(&model.GenesisStorage{}).Error
-	if err != nil {
-		log.Errorf("clean controllers (%s) genesis storage failed: %s", controllerIPs, err)
-	} else {
-		log.Infof("controllers (%s) invalid, clean genesis storage", controllerIPs)
+		log.Infof("clean controllers (%s) genesis vinterface success", controllerIPs)
 	}
 }
