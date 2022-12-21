@@ -113,6 +113,19 @@ message GenesisSyncVinterface {
     optional string last_seen = 14;
 }
 
+message GenesisSyncProcess {
+    optional uint32 vtap_id = 1;
+    optional uint64 pid = 2;
+    optional string lcuuid = 3;
+    optional string name = 4;
+    optional string process_name = 5;
+    optional string cmd_line = 6;
+    optional string user = 7;
+    optional string os_app_tags = 8;
+    optional string node_ip = 9;
+    optional string start_time = 10;
+}
+
 message GenesisSyncData{
     repeated GenesisSyncIP ip = 1;
     repeated GenesisSyncHost host = 2;
@@ -122,6 +135,7 @@ message GenesisSyncData{
     repeated GenesisSyncVm vm = 6;
     repeated GenesisSyncVpc vpc = 7;
     repeated GenesisSyncVinterface vinterface = 8;
+    repeated GenesisSyncProcess process = 9;
 }
 
 message GenesisSharingSyncRequest {
