@@ -223,7 +223,7 @@ impl PlatformSynchronizer {
             kubernetes_cluster_id: Some(
                 process_args.config.load().kubernetes_cluster_id.to_string(),
             ),
-            nat_ip: None,
+            ..Default::default()
         };
 
         rt.block_on(process_args.session.grpc_genesis_sync_with_statsd(msg))
@@ -270,8 +270,7 @@ impl PlatformSynchronizer {
                     kubernetes_cluster_id: Some(
                         args.config.load().kubernetes_cluster_id.to_string(),
                     ),
-                    platform_data: None,
-                    nat_ip: None,
+                    ..Default::default()
                 };
 
                 match rt.block_on(args.session.grpc_genesis_sync_with_statsd(msg)) {
