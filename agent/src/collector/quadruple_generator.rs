@@ -410,7 +410,7 @@ impl SubQuadGen {
             let mut v4_flows: Vec<Box<AccumulatedFlow>> =
                 stash.v4_flows.into_values().map(Box::new).collect();
             Self::set_connection(&mut v4_flows, connection, possible_host);
-            if let Err(_) = self.output.send_all(v4_flows) {
+            if let Err(_) = self.output.send_large(v4_flows) {
                 debug!("qg push v4 flows to queue failed maybe queue have terminated");
             }
         }
@@ -419,7 +419,7 @@ impl SubQuadGen {
             let mut v6_flows: Vec<Box<AccumulatedFlow>> =
                 stash.v6_flows.into_values().map(Box::new).collect();
             Self::set_connection(&mut v6_flows, connection, possible_host);
-            if let Err(_) = self.output.send_all(v6_flows) {
+            if let Err(_) = self.output.send_large(v6_flows) {
                 debug!("qg push v6 flows to queue failed maybe queue have terminated");
             }
         }
