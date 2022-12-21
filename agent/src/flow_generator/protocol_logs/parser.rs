@@ -120,14 +120,26 @@ impl MetaAppProto {
         };
 
         #[cfg(target_os = "linux")]
-        if is_src {
-            base_info.process_id_0 = meta_packet.process_id;
-            base_info.process_kname_0 =
-                String::from_utf8(meta_packet.process_kname.into()).expect("Found invalid UTF-8");
-        } else {
-            base_info.process_id_1 = meta_packet.process_id;
-            base_info.process_kname_1 =
-                String::from_utf8(meta_packet.process_kname.into()).expect("Found invalid UTF-8");
+        if meta_packet.signal_source == SignalSource::EBPF {
+            let mut end_index = meta_packet.process_kname.len();
+            for (i, char) in meta_packet.process_kname.iter().enumerate() {
+                if *char == b'\0' {
+                    end_index = i;
+                    break;
+                }
+            }
+            let process_name = meta_packet.process_kname[..end_index]
+                .iter()
+                .map(|x| if x.is_ascii_graphic() { *x } else { b'.' })
+                .collect::<Vec<u8>>();
+            let process_name = String::from_utf8(process_name).unwrap();
+            if is_src {
+                base_info.process_id_0 = meta_packet.process_id;
+                base_info.process_kname_0 = process_name;
+            } else {
+                base_info.process_id_1 = meta_packet.process_id;
+                base_info.process_kname_1 = process_name;
+            }
         }
 
         if flow.flow.tap_side == TapSide::Local {
