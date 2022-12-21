@@ -41,33 +41,6 @@ enum MatchMac {
 }
 
 /*
-    FlowTimeKey是用在时间集合流节点映射表的唯一标识。
-    timestamp_key是一个时间戳的纳秒数，是每条flow的唯一时间标识，用作时间集合的排序，会随着流创建和定时刷新而变化。
-    因为定时刷新和删除流都需要节点映射表的对应流节点,所以需要存一个FlowMapKey来找到节点对应的流slot，因为FlowMapKey用静态FlowKey，tap_port和tap_port生成,
-    在复杂的网络环境可能相同，需要通过FlowNode.match_node方法找到对应的节点。
-*/
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(super) struct FlowTimeKey {
-    // 作为时间集合的标识
-    // 超过这个时间2554-07-22 07:34:33 GMT+0800 (中国标准时间)会溢出
-    pub timestamp_key: u64,
-    pub map_key: FlowMapKey,
-}
-
-impl FlowTimeKey {
-    pub fn new(timestamp: Duration, map_key: FlowMapKey) -> Self {
-        Self {
-            timestamp_key: timestamp.as_nanos() as u64,
-            map_key,
-        }
-    }
-
-    pub fn reset_timestamp_key(&mut self, timestamp: u64) {
-        self.timestamp_key = timestamp;
-    }
-}
-
-/*
     FlowMapKey是流节点映射表的唯一标识,由Jenkins64算法哈希得到，因为FlowMap处理复杂网络环境，
     所以有可能key对应多个流节点的情况，需要根据流节点的match_node方法在映射表唯一标识一条流。
 */

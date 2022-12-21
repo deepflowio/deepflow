@@ -29,7 +29,7 @@ pub use app_table::AppTable;
 pub use error::{Error, Result};
 pub use flow_config::{FlowMapConfig, FlowMapRuntimeConfig, FlowTimeout, TcpTimeout};
 pub use flow_map::FlowMap;
-use flow_node::{FlowMapKey, FlowNode, FlowTimeKey};
+use flow_node::{FlowMapKey, FlowNode};
 pub use flow_state::FlowState;
 pub use packet_sequence::PacketSequenceParser; // Enterprise Edition Feature: packet-sequence
 pub use perf::L7RrtCache;

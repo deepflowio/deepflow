@@ -289,6 +289,7 @@ pub struct FlowConfig {
     pub collector_enabled: bool,
     pub l7_log_tap_types: [bool; 256],
 
+    pub hash_slots: u32,
     pub packet_delay: Duration,
     pub flush_interval: Duration,
     pub flow_timeout: FlowTimeout,
@@ -332,6 +333,7 @@ impl From<&RuntimeConfig> for FlowConfig {
                 }
                 tap_types
             },
+            hash_slots: flow_config.hash_slots,
             packet_delay: conf.yaml_config.packet_delay,
             flush_interval: flow_config.flush_interval,
             flow_timeout: FlowTimeout::from(TcpTimeout {
