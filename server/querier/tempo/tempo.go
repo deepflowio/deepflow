@@ -20,6 +20,7 @@ import (
 	//"github.com/k0kubun/pp"
 	logging "github.com/op/go-logging"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
@@ -123,6 +124,7 @@ func ConvertL7TracingRespToProto(data map[string]interface{}, argTraceId string)
 		req.Batches = append(req.Batches, rsSpans)
 	}
 	traces := data["tracing"]
+	idMap := map[string][]byte{}
 	for _, t := range traces.([]interface{}) {
 		trace, ok := t.(map[string]interface{})
 		if !ok {
@@ -174,40 +176,18 @@ func ConvertL7TracingRespToProto(data map[string]interface{}, argTraceId string)
 		}
 		spanId := trace["deepflow_span_id"].(string)
 		spanId = strings.ReplaceAll(spanId, "0x", "")
-		spanId = strings.ReplaceAll(spanId, ".", "0")
-		if len(spanId) >= 16 {
-			spanId = spanId[:16]
-		} else {
-			spanId = ""
-			log.Errorf("spanId(%s) length Error", spanId)
-		}
-		spanIdBytes, err := hex.DecodeString(spanId)
-		if err != nil {
-			log.Errorf("spanId(%s) Decode Error", spanId)
-			log.Error(err)
-		}
+		//spanId = strings.ReplaceAll(spanId, ".", "0")
+		spanIdBytes := decodeIdBytes(spanId, 8, idMap)
+
 		//spanIdBytes := []byte{0xab, 0xb5, 0xcf, 0x60, 0x03, 0x2b, 0xc5, 0xfe}
 		parentSpanId := trace["deepflow_parent_span_id"].(string)
 		parentSpanId = strings.ReplaceAll(parentSpanId, "0x", "")
-		parentSpanId = strings.ReplaceAll(parentSpanId, ".", "0")
-		if len(parentSpanId) >= 16 {
-			parentSpanId = parentSpanId[:16]
-		} else {
-			parentSpanId = ""
-			log.Errorf("parentSpanId(%s) length Error", parentSpanId)
-		}
-		parentSpanIdBytes, err := hex.DecodeString(parentSpanId)
-		if err != nil {
-			log.Errorf("parentSpanId(%s) Decode Error", parentSpanId)
-			log.Error(err)
-		}
+		//parentSpanId = strings.ReplaceAll(parentSpanId, ".", "0")
+		parentSpanIdBytes := decodeIdBytes(parentSpanId, 8, idMap)
+
 		traceId = strings.ReplaceAll(traceId, "-", "")
-		if len(traceId) >= 32 {
-			traceId = traceId[:32]
-		} else {
-			log.Errorf("traceId(%s) Decode Error", traceId)
-		}
-		traceIdBytes, _ := hex.DecodeString(traceId)
+		traceIdBytes := decodeIdBytes(traceId, 16, idMap)
+
 		spanName := trace["endpoint"].(string)
 		if spanName == "" {
 			spanName = trace["request_resource"].(string)
@@ -415,4 +395,26 @@ func TraceSearch(args *common.TempoParams) (resp map[string]interface{}, debug m
 	}
 	resp["traces"] = respValues
 	return resp, debug, err
+}
+
+func decodeIdBytes(id string, length int, idMap map[string][]byte) []byte {
+	idBytes := []byte{}
+	if len(id) == length*2 {
+		idBytes, _ = hex.DecodeString(id)
+		if len(idBytes) != length {
+			log.Errorf("traceId(%s) Decode Error", id)
+		}
+	}
+	if len(idBytes) != length {
+		log.Warningf("traceId(%s) length Error", id)
+		if ib, ok := idMap[id]; ok {
+			idBytes = ib
+		} else {
+			randIdBytes := make([]byte, length)
+			rand.Read(randIdBytes[:])
+			idMap[id] = randIdBytes
+			return randIdBytes
+		}
+	}
+	return idBytes
 }
