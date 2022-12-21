@@ -496,6 +496,7 @@ type SubDomainResource struct {
 	PodGroupPorts          []PodGroupPort
 	PodReplicaSets         []PodReplicaSet
 	Pods                   []Pod
+	Processes              []Process
 }
 
 type Resource struct {

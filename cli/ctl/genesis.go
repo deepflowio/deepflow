@@ -47,7 +47,7 @@ func RegisterGenesisCommand() *cobra.Command {
 			syncInfo(cmd, syncType)
 		},
 	}
-	syncInfo.Flags().StringVarP(&syncType, "type", "t", "vinterface", "genesis sync type: 'vm | vpc | host | port | lldp | ip | network | vinterface'\ndefault: vinterface")
+	syncInfo.Flags().StringVarP(&syncType, "type", "t", "vinterface", "genesis sync type: 'vm | vpc | host | port | lldp | ip | network | vinterface | process'\ndefault: vinterface")
 
 	var k8sType string
 	k8sInfo := &cobra.Command{
@@ -115,6 +115,8 @@ func syncInfo(cmd *cobra.Command, resType string) {
 		tableIp(response, table)
 	case "vinterface":
 		tableVinterface(response, table)
+	case "process":
+		tableProcess(response, table)
 	}
 }
 
@@ -298,6 +300,27 @@ func tableVinterface(response *simplejson.Json, table *tablewriter.Table) {
 		tableItem = append(tableItem, data.Get("HOST_IP").MustString())
 		tableItem = append(tableItem, strconv.Itoa(data.Get("VTAP_ID").MustInt()))
 		tableItem = append(tableItem, data.Get("IPS").MustString())
+		tableItems = append(tableItems, tableItem)
+	}
+
+	table.AppendBulk(tableItems)
+	table.Render()
+}
+
+func tableProcess(response *simplejson.Json, table *tablewriter.Table) {
+	table.SetHeader([]string{"PID", "NAME", "PROCESS_NAME", "CMD_LINE", "USER", "OS_APP_TAGS", "START_TIME"})
+
+	tableItems := [][]string{}
+	for i := range response.Get("DATA").MustArray() {
+		data := response.Get("DATA").GetIndex(i)
+		tableItem := []string{}
+		tableItem = append(tableItem, data.Get("PID").MustString())
+		tableItem = append(tableItem, data.Get("NAME").MustString())
+		tableItem = append(tableItem, data.Get("PROCESS_NAME").MustString())
+		tableItem = append(tableItem, data.Get("CMD_LINE").MustString())
+		tableItem = append(tableItem, data.Get("USER").MustString())
+		tableItem = append(tableItem, data.Get("OS_APP_TAGS").MustString())
+		tableItem = append(tableItem, data.Get("START_TIME").MustString())
 		tableItems = append(tableItems, tableItem)
 	}
 

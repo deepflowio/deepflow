@@ -69,6 +69,7 @@ type GenesisSyncData struct {
 	Ports       []model.GenesisPort
 	Networks    []model.GenesisNetwork
 	Vinterfaces []model.GenesisVinterface
+	Processes   []model.GenesisProcess
 }
 type GenesisSyncDataOperation struct {
 	IPlastseens *GenesisSyncTypeOperation[model.GenesisIP]
@@ -79,9 +80,10 @@ type GenesisSyncDataOperation struct {
 	Ports       *GenesisSyncTypeOperation[model.GenesisPort]
 	Networks    *GenesisSyncTypeOperation[model.GenesisNetwork]
 	Vinterfaces *GenesisSyncTypeOperation[model.GenesisVinterface]
+	Processes   *GenesisSyncTypeOperation[model.GenesisProcess]
 }
 
-type GenesisSyncTypeOperation[T model.GenesisVinterface | model.GenesisVpc | model.GenesisHost | model.GenesisVM | model.GenesisNetwork | model.GenesisPort | model.GenesisLldp | model.GenesisIP] struct {
+type GenesisSyncTypeOperation[T model.GenesisVinterface | model.GenesisVpc | model.GenesisHost | model.GenesisVM | model.GenesisNetwork | model.GenesisPort | model.GenesisLldp | model.GenesisIP | model.GenesisProcess] struct {
 	mutex    sync.Mutex
 	lastSeen map[string]time.Time
 	dataDict map[string]T
@@ -283,6 +285,18 @@ func NewLldpInfoPlatformDataOperation(dataList []model.GenesisLldp) *GenesisSync
 		vMap[data.Lcuuid] = data
 	}
 	return &GenesisSyncTypeOperation[model.GenesisLldp]{
+		mutex:    sync.Mutex{},
+		lastSeen: map[string]time.Time{},
+		dataDict: vMap,
+	}
+}
+
+func NewProcessPlatformDataOperation(dataList []model.GenesisProcess) *GenesisSyncTypeOperation[model.GenesisProcess] {
+	vMap := map[string]model.GenesisProcess{}
+	for _, data := range dataList {
+		vMap[data.Lcuuid] = data
+	}
+	return &GenesisSyncTypeOperation[model.GenesisProcess]{
 		mutex:    sync.Mutex{},
 		lastSeen: map[string]time.Time{},
 		dataDict: vMap,

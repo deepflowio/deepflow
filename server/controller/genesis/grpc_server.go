@@ -42,16 +42,17 @@ func isInterestedHost(tType tridentcommon.TridentType) bool {
 }
 
 type TridentStats struct {
-	VtapID                   uint32
-	IP                       string
-	Proxy                    string
-	K8sVersion               uint64
-	SyncVersion              uint64
-	K8sLastSeen              time.Time
-	SyncLastSeen             time.Time
-	K8sClusterID             string
-	SyncTridentType          tridentcommon.TridentType
-	GenesisSyncDataOperation *trident.GenesisPlatformData
+	VtapID                          uint32
+	IP                              string
+	Proxy                           string
+	K8sVersion                      uint64
+	SyncVersion                     uint64
+	K8sLastSeen                     time.Time
+	SyncLastSeen                    time.Time
+	K8sClusterID                    string
+	SyncTridentType                 tridentcommon.TridentType
+	GenesisSyncDataOperation        *trident.GenesisPlatformData
+	GenesisSyncProcessDataOperation *trident.GenesisProcessData
 }
 
 type SynchronizerServer struct {
@@ -122,12 +123,19 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *trident.G
 	stats.SyncVersion = version
 	stats.SyncTridentType = tType
 	stats.SyncLastSeen = time.Now()
+	processData := request.GetProcessData()
 	platformData := request.GetPlatformData()
 	if vtapID != 0 {
-		if tStats, ok := g.tridentStatsMap.Load(vtapID); ok && platformData == nil {
-			stats.GenesisSyncDataOperation = tStats.(TridentStats).GenesisSyncDataOperation
+		if tStats, ok := g.tridentStatsMap.Load(vtapID); ok {
+			if platformData == nil {
+				stats.GenesisSyncDataOperation = tStats.(TridentStats).GenesisSyncDataOperation
+			}
+			if processData == nil {
+				stats.GenesisSyncProcessDataOperation = tStats.(TridentStats).GenesisSyncProcessDataOperation
+			}
 		} else {
 			stats.GenesisSyncDataOperation = platformData
+			stats.GenesisSyncProcessDataOperation = processData
 		}
 		g.tridentStatsMap.Store(vtapID, stats)
 	}
@@ -424,6 +432,25 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *co
 		gSyncVinterfaces = append(gSyncVinterfaces, gVinterface)
 	}
 
+	gSyncProcesses := []*controller.GenesisSyncProcess{}
+	for _, p := range gSyncData.Processes {
+		pData := p
+		pStartTime := pData.StartTime.Format(controllercommon.GO_BIRTHDAY)
+		gProcess := &controller.GenesisSyncProcess{
+			VtapId:      &pData.VtapID,
+			Pid:         &pData.PID,
+			Lcuuid:      &pData.Lcuuid,
+			Name:        &pData.Name,
+			ProcessName: &pData.ProcessName,
+			CmdLine:     &pData.CMDLine,
+			User:        &pData.User,
+			OsAppTags:   &pData.OSAPPTags,
+			NodeIp:      &pData.NodeIP,
+			StartTime:   &pStartTime,
+		}
+		gSyncProcesses = append(gSyncProcesses, gProcess)
+	}
+
 	return &controller.GenesisSharingSyncResponse{
 		Data: &controller.GenesisSyncData{
 			Ip:         gSyncIPs,
@@ -434,6 +461,7 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *co
 			Vm:         gSyncVms,
 			Vpc:        gSyncVpcs,
 			Vinterface: gSyncVinterfaces,
+			Process:    gSyncProcesses,
 		},
 	}, nil
 }
