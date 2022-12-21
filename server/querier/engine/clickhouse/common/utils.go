@@ -204,7 +204,8 @@ func GetExtTables(db string, ctx context.Context) (values []interface{}) {
 	}
 	sql := ""
 	if db == "ext_metrics" {
-		sql = "select virtual_table_name from ext_metrics.metrics group by virtual_table_name"
+		sql = "select table from ext_metrics_custom_field group by table"
+		chClient.DB = "flow_tag"
 	} else {
 		sql = "show tables"
 	}
