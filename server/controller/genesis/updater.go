@@ -19,14 +19,12 @@ package genesis
 import (
 	"context"
 	"fmt"
+	"inet.af/netaddr"
 	"strconv"
 	"strings"
 	"time"
 
-	"inet.af/netaddr"
-
 	tridentcommon "github.com/deepflowys/deepflow/message/common"
-	"github.com/deepflowys/deepflow/message/trident"
 	"github.com/deepflowys/deepflow/server/controller/common"
 	genesiscommon "github.com/deepflowys/deepflow/server/controller/genesis/common"
 	"github.com/deepflowys/deepflow/server/controller/genesis/config"
@@ -111,19 +109,19 @@ func NewGenesisSyncRpcUpdater(storage *SyncStorage, queue queue.QueueReader, cfg
 	}
 }
 
-func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info *trident.GenesisPlatformData, peer string, vtapID uint32, k8sClusterID, deviceType string) []model.GenesisVinterface {
+func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info VIFRPCMessage, peer string, vtapID uint32, k8sClusterID, deviceType string) []model.GenesisVinterface {
 	var isContainer bool
 	if deviceType == genesiscommon.DEVICE_TYPE_DOCKER_HOST {
 		isContainer = true
 	}
 	epoch := time.Now()
 	VIFs := []model.GenesisVinterface{}
-	ipAddrs := info.GetRawIpAddrs()
+	ipAddrs := info.message.GetPlatformData().GetRawIpAddrs()
 	if len(ipAddrs) == 0 {
 		log.Errorf("get sync data (raw ip addrs) empty")
 		return []model.GenesisVinterface{}
 	}
-	netNSs := info.GetRawIpNetns()
+	netNSs := info.message.GetPlatformData().GetRawIpNetns()
 	if len(netNSs) == 0 {
 		netNSs = []string{""}
 		ipAddrs = ipAddrs[:1]
@@ -187,7 +185,7 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info *trident.GenesisPlatfor
 	}
 
 	deviceIDToMinMAC := map[string]uint64{}
-	for _, iface := range info.Interfaces {
+	for _, iface := range info.message.GetPlatformData().Interfaces {
 		ifaceMAC := iface.GetMac()
 		ifaceDeviceID := iface.GetDeviceId()
 		if iMac, ok := deviceIDToMinMAC[ifaceDeviceID]; ok {
@@ -202,7 +200,7 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info *trident.GenesisPlatfor
 	for key, value := range deviceIDToMinMAC {
 		deviceIDToUUID[key] = common.GetUUID(key+fmt.Sprintf("%d", value), uuid.Nil)
 	}
-	for _, iface := range info.Interfaces {
+	for _, iface := range info.message.GetPlatformData().Interfaces {
 		vIF := model.GenesisVinterface{
 			Name: iface.GetName(),
 			Mac:  genesiscommon.Uint64ToMac(iface.GetMac()).String(),
@@ -268,9 +266,9 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info *trident.GenesisPlatfor
 	return VIFs
 }
 
-func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(info *trident.GenesisPlatformData, peer, natIP string, vtapID uint32) GenesisSyncDataOperation {
-	hostName := strings.Trim(info.GetRawHostname(), " \n")
-	ipAddrs := info.GetRawIpAddrs()
+func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(info VIFRPCMessage, peer, natIP string, vtapID uint32) GenesisSyncDataOperation {
+	hostName := strings.Trim(info.message.GetPlatformData().GetRawHostname(), " \n")
+	ipAddrs := info.message.GetPlatformData().GetRawIpAddrs()
 	if len(ipAddrs) == 0 {
 		log.Errorf("get sync data (raw ip addrs) empty")
 		return GenesisSyncDataOperation{}
@@ -404,6 +402,7 @@ func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(info *trident.GenesisP
 	for _, n := range nameToNetwork {
 		networks = append(networks, n)
 	}
+
 	return GenesisSyncDataOperation{
 		VMs:         NewVMPlatformDataOperation(vms),
 		VPCs:        NewVpcPlatformDataOperation(vpcs),
@@ -413,19 +412,44 @@ func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(info *trident.GenesisP
 	}
 }
 
-func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info *trident.GenesisPlatformData, peer string, vtapID uint32) GenesisSyncDataOperation {
-	rawVM := strings.Trim(info.GetRawAllVmXml(), " ")
-	rawOVSInterface := strings.Trim(info.GetRawOvsInterfaces(), " ")
-	rawOVSPorts := strings.Trim(info.GetRawOvsPorts(), " ")
+func (v *GenesisSyncRpcUpdater) ParseProcessInfo(info VIFRPCMessage, vtapID uint32) []model.GenesisProcess {
+	processes := []model.GenesisProcess{}
+	for _, p := range info.message.GetProcessData().GetProcessEntries() {
+		var osAppTagSlice []string
+		for _, tag := range p.GetOsAppTags() {
+			osAppTagSlice = append(osAppTagSlice, tag.GetKey()+":"+tag.GetValue())
+		}
+		osAppTagString := strings.Join(osAppTagSlice, ",")
+		startTime := time.Unix(int64(p.GetStartTime()), 0)
+		pID := p.GetPid()
+		processes = append(processes, model.GenesisProcess{
+			Lcuuid:      common.GetUUID(strconv.Itoa(int(pID))+strconv.Itoa(int(vtapID)), uuid.Nil),
+			PID:         pID,
+			Name:        p.GetName(),
+			ProcessName: p.GetProcessName(),
+			CMDLine:     p.GetCmdline(),
+			User:        p.GetUser(),
+			VtapID:      vtapID,
+			OSAPPTags:   osAppTagString,
+			StartTime:   startTime,
+		})
+	}
+	return processes
+}
+
+func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer string, vtapID uint32) GenesisSyncDataOperation {
+	rawVM := strings.Trim(info.message.GetPlatformData().GetRawAllVmXml(), " ")
+	rawOVSInterface := strings.Trim(info.message.GetPlatformData().GetRawOvsInterfaces(), " ")
+	rawOVSPorts := strings.Trim(info.message.GetPlatformData().GetRawOvsPorts(), " ")
 	ovsMode := false
 	if rawOVSPorts != "" {
 		ovsMode = true
 	}
-	rawHostName := strings.Trim(info.GetRawHostname(), " \n")
-	rawVMStates := strings.Trim(info.GetRawVmStates(), " ")
-	rawBrctlShow := strings.Trim(info.GetRawBrctlShow(), " ")
-	rawVlanConfig := strings.Trim(info.GetRawVlanConfig(), " ")
-	tIPs := info.GetIps()
+	rawHostName := strings.Trim(info.message.GetPlatformData().GetRawHostname(), " \n")
+	rawVMStates := strings.Trim(info.message.GetPlatformData().GetRawVmStates(), " ")
+	rawBrctlShow := strings.Trim(info.message.GetPlatformData().GetRawBrctlShow(), " ")
+	rawVlanConfig := strings.Trim(info.message.GetPlatformData().GetRawVlanConfig(), " ")
+	tIPs := info.message.GetPlatformData().GetIps()
 	if ovsMode {
 		rawBrctlShow = ""
 		rawVlanConfig = ""
@@ -666,7 +690,7 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info *trident.GenesisPlatfo
 	}
 
 	lldps := []model.GenesisLldp{}
-	for _, l := range info.GetLldpInfo() {
+	for _, l := range info.message.GetPlatformData().GetLldpInfo() {
 		lldp := model.GenesisLldp{}
 		lldp.Lcuuid = common.GetUUID(peer+l.GetManagementAddress()+l.GetPortId(), uuid.Nil)
 		lldp.HostIP = peer
@@ -691,38 +715,53 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info *trident.GenesisPlatfo
 	}
 }
 
-func (v *GenesisSyncRpcUpdater) UnmarshalProtobuf(info *trident.GenesisPlatformData, peer string, vtapID uint32, k8sClusterID string) GenesisSyncDataOperation {
-	vifs := v.ParseVinterfaceInfo(info, peer, vtapID, k8sClusterID, genesiscommon.DEVICE_TYPE_KVM_HOST)
+func (v *GenesisSyncRpcUpdater) UnmarshalProtobuf(info VIFRPCMessage) GenesisSyncDataOperation {
 	genesisSyncDataOper := GenesisSyncDataOperation{}
+	vifs := v.ParseVinterfaceInfo(info, info.peer, info.vtapID, info.message.GetKubernetesClusterId(), genesiscommon.DEVICE_TYPE_KVM_HOST)
 	vinterfaces := NewVinterfacePlatformDataOperation(vifs)
-	if _, ok := v.hostIPsMap[peer]; ok && info.GetPlatformEnabled() {
-		genesisSyncDataOper = v.ParseKVMPlatformInfo(info, peer, vtapID)
+	pProcess := v.ParseProcessInfo(info, info.vtapID)
+	processes := NewProcessPlatformDataOperation(pProcess)
+
+	if _, ok := v.hostIPsMap[info.peer]; ok && info.message.GetPlatformData().GetPlatformEnabled() {
+		genesisSyncDataOper = v.ParseKVMPlatformInfo(info, info.peer, info.vtapID)
 	}
+
 	genesisSyncDataOper.Vinterfaces = vinterfaces
+	genesisSyncDataOper.Processes = processes
 
 	return genesisSyncDataOper
 }
 
-func (v *GenesisSyncRpcUpdater) UnmarshalKubernetesProtobuf(info *trident.GenesisPlatformData, peer, natIP string, vtapID uint32, k8sClusterID string) GenesisSyncDataOperation {
-	vifs := v.ParseVinterfaceInfo(info, peer, vtapID, k8sClusterID, genesiscommon.DEVICE_TYPE_DOCKER_HOST)
+func (v *GenesisSyncRpcUpdater) UnmarshalKubernetesProtobuf(info VIFRPCMessage) GenesisSyncDataOperation {
 	genesisSyncDataOper := GenesisSyncDataOperation{}
+	vifs := v.ParseVinterfaceInfo(info, info.peer, info.vtapID, info.message.GetKubernetesClusterId(), genesiscommon.DEVICE_TYPE_DOCKER_HOST)
 	vinterfaces := NewVinterfacePlatformDataOperation(vifs)
-	if info.GetPlatformEnabled() {
-		genesisSyncDataOper = v.ParseHostAsVmPlatformInfo(info, peer, natIP, vtapID)
+	pProcess := v.ParseProcessInfo(info, info.vtapID)
+	processes := NewProcessPlatformDataOperation(pProcess)
+
+	if info.message.GetPlatformData().GetPlatformEnabled() {
+		genesisSyncDataOper = v.ParseHostAsVmPlatformInfo(info, info.peer, info.message.GetNatIp(), info.vtapID)
 	}
+
 	genesisSyncDataOper.Vinterfaces = vinterfaces
+	genesisSyncDataOper.Processes = processes
 
 	return genesisSyncDataOper
 }
 
-func (v *GenesisSyncRpcUpdater) UnmarshalWorkloadProtobuf(info *trident.GenesisPlatformData, peer, natIP string, vtapID uint32, k8sClusterID, tridentType string) GenesisSyncDataOperation {
-	vifs := v.ParseVinterfaceInfo(info, peer, vtapID, k8sClusterID, tridentType)
+func (v *GenesisSyncRpcUpdater) UnmarshalWorkloadProtobuf(info VIFRPCMessage, tridentType string) GenesisSyncDataOperation {
 	genesisSyncDataOper := GenesisSyncDataOperation{}
+	vifs := v.ParseVinterfaceInfo(info, info.peer, info.vtapID, info.message.GetKubernetesClusterId(), tridentType)
 	vinterfaces := NewVinterfacePlatformDataOperation(vifs)
-	if info.GetPlatformEnabled() {
-		genesisSyncDataOper = v.ParseHostAsVmPlatformInfo(info, peer, natIP, vtapID)
+	pProcess := v.ParseProcessInfo(info, info.vtapID)
+	processes := NewProcessPlatformDataOperation(pProcess)
+
+	if info.message.GetPlatformData().GetPlatformEnabled() {
+		genesisSyncDataOper = v.ParseHostAsVmPlatformInfo(info, info.peer, info.message.GetNatIp(), info.vtapID)
 	}
+
 	genesisSyncDataOper.Vinterfaces = vinterfaces
+	genesisSyncDataOper.Processes = processes
 
 	return genesisSyncDataOper
 }
@@ -746,18 +785,15 @@ func (v *GenesisSyncRpcUpdater) run() {
 				}
 			}
 		} else if info.msgType == genesiscommon.TYPE_UPDATE {
-			infoData := info.message.GetPlatformData()
 			tridentType := info.message.GetTridentType()
-			natIP := info.message.GetNatIp()
-			k8sClusterID := info.message.GetKubernetesClusterId()
 			if tridentType == tridentcommon.TridentType_TT_PHYSICAL_MACHINE {
-				genesisSyncDataOper = v.UnmarshalWorkloadProtobuf(infoData, info.peer, natIP, info.vtapID, k8sClusterID, genesiscommon.DEVICE_TYPE_PHYSICAL_MACHINE)
+				genesisSyncDataOper = v.UnmarshalWorkloadProtobuf(info, genesiscommon.DEVICE_TYPE_PHYSICAL_MACHINE)
 			} else if tridentType == tridentcommon.TridentType_TT_PUBLIC_CLOUD {
-				genesisSyncDataOper = v.UnmarshalWorkloadProtobuf(infoData, info.peer, natIP, info.vtapID, k8sClusterID, genesiscommon.DEVICE_TYPE_PUBLIC_CLOUD)
+				genesisSyncDataOper = v.UnmarshalWorkloadProtobuf(info, genesiscommon.DEVICE_TYPE_PUBLIC_CLOUD)
 			} else if tridentType == tridentcommon.TridentType_TT_HOST_POD || tridentType == tridentcommon.TridentType_TT_VM_POD {
-				genesisSyncDataOper = v.UnmarshalKubernetesProtobuf(infoData, info.peer, natIP, info.vtapID, k8sClusterID)
+				genesisSyncDataOper = v.UnmarshalKubernetesProtobuf(info)
 			} else {
-				genesisSyncDataOper = v.UnmarshalProtobuf(infoData, info.peer, info.vtapID, k8sClusterID)
+				genesisSyncDataOper = v.UnmarshalProtobuf(info)
 			}
 			if info.vtapID != 0 {
 				v.genesisSyncDataByPeer[info.vtapID] = genesisSyncDataOper

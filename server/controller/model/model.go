@@ -695,6 +695,24 @@ func (GenesisVpc) TableName() string {
 	return "go_genesis_vpc"
 }
 
+type GenesisProcess struct {
+	ID          int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	VtapID      uint32    `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
+	PID         uint64    `gorm:"column:pid;type:int;default:null" json:"PID"`
+	Lcuuid      string    `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
+	Name        string    `gorm:"column:name;type:varchar(256);default:null" json:"NAME"`
+	ProcessName string    `gorm:"column:process_name;type:varchar(256);default:null" json:"PROCESS_NAME"`
+	CMDLine     string    `gorm:"column:cmd_line;type:text;default:null" json:"CMD_LINE"`
+	User        string    `gorm:"column:user;type:varchar(256);default:null" json:"USER"`
+	OSAPPTags   string    `gorm:"column:os_app_tags;type:text;default:null" json:"OS_APP_TAGS"`
+	NodeIP      string    `gorm:"column:node_ip;type:char(48);default:null" json:"NODE_IP"`
+	StartTime   time.Time `gorm:"column:start_time;type:datetime;not null;default:CURRENT_TIMESTAMP" json:"START_TIME"`
+}
+
+func (GenesisProcess) TableName() string {
+	return "go_genesis_process"
+}
+
 type GenesisStorage struct {
 	ID     int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	VtapID uint32 `gorm:"column:vtap_id;type:int" json:"VTAP_ID"`

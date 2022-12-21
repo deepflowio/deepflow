@@ -935,6 +935,48 @@ vtap_group_id: g-xxxxxx
   ## Note: Note that this configuration is only used in standalone mode.
   #log-file: /var/log/deepflow-agent/deepflow-agent.log
 
+
+  #####################
+  ## Proc Monitoring ##
+  #####################
+  ## the proc fs mount path, default /proc
+  #os-proc-root: /proc
+
+  ## socket scan and sync interval, for second, default 10s
+  #os-proc-socket-sync-interval: 10
+
+  ## socket uptime threshold, for second, default 3s
+  #os-proc-socket-min-lifetime: 3
+
+  ## the command execute and read the yaml from stdout, default is empty array.
+  ## follow is the yaml example :
+  ##  - pid: 1
+  ##    tags:
+  ##    - key: xxx
+  ##      value: xxx
+  ##  - pid: 2
+  ##    tags:
+  ##    - key: xxx
+  ##      value: xxx
+  #os-app-tag-exec: ["cat", "/tmp/tag.yaml"]
+
+  ## the user who should execute the `os-app-tag-exec` command, default is deepflow.
+  #os-app-tag-exec-user: deepflow
+
+  ########################
+  ## Proc regexp config ##
+  ########################
+  #os-proc-regex:
+
+    ## the match reg
+    #- match-regex:
+
+    ## one of process_name, cmdline
+    #  match-type:
+
+    ## replace the process name or cmd use regexp replace
+    #  rewrite-name:
+
   #################
   ## FeatureFlag ##
   #################

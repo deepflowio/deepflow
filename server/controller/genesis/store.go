@@ -79,6 +79,9 @@ func (s *SyncStorage) Renew(data GenesisSyncDataOperation) {
 	if data.Vinterfaces != nil {
 		s.genesisSyncInfo.Vinterfaces.Renew(data.Vinterfaces.Fetch(), now)
 	}
+	if data.Processes != nil {
+		s.genesisSyncInfo.Processes.Renew(data.Processes.Fetch(), now)
+	}
 }
 
 func (s *SyncStorage) Update(data GenesisSyncDataOperation, vtapID uint32) {
@@ -119,6 +122,10 @@ func (s *SyncStorage) Update(data GenesisSyncDataOperation, vtapID uint32) {
 		updateFlag = true
 		s.genesisSyncInfo.Vinterfaces.Update(data.Vinterfaces.Fetch(), now)
 	}
+	if data.Processes != nil {
+		updateFlag = true
+		s.genesisSyncInfo.Processes.Update(data.Processes.Fetch(), now)
+	}
 	if updateFlag && vtapID != 0 {
 		// push immediately after update
 		s.fetch()
@@ -144,6 +151,7 @@ func (s *SyncStorage) fetch() {
 		IPLastSeens: s.genesisSyncInfo.IPlastseens.Fetch(),
 		Networks:    s.genesisSyncInfo.Networks.Fetch(),
 		Vinterfaces: s.genesisSyncInfo.Vinterfaces.Fetch(),
+		Processes:   s.genesisSyncInfo.Processes.Fetch(),
 	}
 }
 
@@ -161,6 +169,7 @@ func (s *SyncStorage) loadFromDatabase(ageTime time.Duration) {
 	var ipLastSeens []model.GenesisIP
 	var networks []model.GenesisNetwork
 	var vinterfaces []model.GenesisVinterface
+	var processes []model.GenesisProcess
 
 	s.genesisSyncInfo.VMs = NewVMPlatformDataOperation(vms)
 	s.genesisSyncInfo.VMs.Load(now, ageTime)
@@ -186,6 +195,9 @@ func (s *SyncStorage) loadFromDatabase(ageTime time.Duration) {
 	s.genesisSyncInfo.Vinterfaces = NewVinterfacePlatformDataOperation(vinterfaces)
 	s.genesisSyncInfo.Vinterfaces.Load(now, ageTime)
 
+	s.genesisSyncInfo.Processes = NewProcessPlatformDataOperation(processes)
+	s.genesisSyncInfo.Processes.Load(now, ageTime)
+
 	s.fetch()
 }
 
@@ -201,6 +213,7 @@ func (s *SyncStorage) storeToDatabase() {
 	s.genesisSyncInfo.IPlastseens.Save()
 	s.genesisSyncInfo.Networks.Save()
 	s.genesisSyncInfo.Vinterfaces.Save()
+	s.genesisSyncInfo.Processes.Save()
 }
 
 func (s *SyncStorage) refreshDatabase(ageTime time.Duration) {
@@ -249,6 +262,7 @@ func (s *SyncStorage) run() {
 		hasChange = hasChange || s.genesisSyncInfo.Ports.Age(now, ageTime)
 		hasChange = hasChange || s.genesisSyncInfo.Networks.Age(now, ageTime)
 		hasChange = hasChange || s.genesisSyncInfo.IPlastseens.Age(now, ageTime)
+		hasChange = hasChange || s.genesisSyncInfo.Processes.Age(now, ageTime)
 		hasChange = hasChange || s.genesisSyncInfo.Vinterfaces.Age(now, time.Duration(s.cfg.VinterfaceAgingTime)*time.Second)
 		hasChange = hasChange || s.dirty
 		s.dirty = false

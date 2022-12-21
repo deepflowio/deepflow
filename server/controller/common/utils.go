@@ -329,7 +329,7 @@ func GetVTapSubDomainMappingByDomain(domain string) (map[int]string, error) {
 	}
 
 	var vtaps []mysql.VTap
-	err = mysql.Db.Where("az IN {?}", azLcuuids).Find(&vtaps).Error
+	err = mysql.Db.Where("az IN ?", azLcuuids).Find(&vtaps).Error
 	if err != nil {
 		return vtapIDToSubDomain, err
 	}

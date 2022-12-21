@@ -110,7 +110,7 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, e
 			if podGroups.GetIndex(0).Get("abstract").MustBool() {
 				abstractNodes[hostIP] = 0
 			} else {
-				log.Infof("pod (%s) node not found", name)
+				log.Infof("pod (%s) hostIP (%s) not found in node", hostIP, name)
 				continue
 			}
 		}

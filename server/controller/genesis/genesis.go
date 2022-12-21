@@ -317,6 +317,28 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 			}
 			retGenesisSyncData.Vinterfaces = append(retGenesisSyncData.Vinterfaces, gVinterface)
 		}
+
+		genesisSyncProcesses := genesisSyncData.GetProcess()
+		for _, p := range genesisSyncProcesses {
+			if _, ok := vtapIDMap[p.GetVtapId()]; !ok {
+				continue
+			}
+			pStartTimeStr := p.GetStartTime()
+			pStartTime, _ := time.ParseInLocation(common.GO_BIRTHDAY, pStartTimeStr, time.Local)
+			gProcess := model.GenesisProcess{
+				VtapID:      p.GetVtapId(),
+				PID:         p.GetPid(),
+				Lcuuid:      p.GetLcuuid(),
+				Name:        p.GetName(),
+				ProcessName: p.GetProcessName(),
+				CMDLine:     p.GetCmdLine(),
+				User:        p.GetUser(),
+				OSAPPTags:   p.GetOsAppTags(),
+				NodeIP:      p.GetNodeIp(),
+				StartTime:   pStartTime,
+			}
+			retGenesisSyncData.Processes = append(retGenesisSyncData.Processes, gProcess)
+		}
 	}
 	return retGenesisSyncData, nil
 }

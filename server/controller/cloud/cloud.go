@@ -31,6 +31,7 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/cloud/platform"
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/genesis"
 	"github.com/deepflowys/deepflow/server/controller/statsd"
 )
 
@@ -148,6 +149,7 @@ func (c *Cloud) getCloudData() {
 		c.getKubernetesData()
 	}
 	c.appendAddtionalResourcesData()
+	c.appendResourceProcess()
 }
 
 func (c *Cloud) run() {
@@ -193,7 +195,7 @@ LOOP:
 }
 
 func (c *Cloud) startKubernetesGatherTask() {
-	log.Info("cloud (%s) kubernetes gather task started", c.basicInfo.Name)
+	log.Infof("cloud (%s) kubernetes gather task started", c.basicInfo.Name)
 	c.runKubernetesGatherTask()
 	go func() {
 		for range time.Tick(time.Duration(c.cfg.KubernetesGatherInterval) * time.Second) {
@@ -326,4 +328,53 @@ func (c *Cloud) appendAddtionalResourcesData() {
 	c.resource.VInterfaces = append(c.resource.VInterfaces, additionalResource.VInterfaces...)
 	c.resource.IPs = append(c.resource.IPs, additionalResource.IPs...)
 	return
+}
+
+func (c *Cloud) appendResourceProcess() {
+
+	if genesis.GenesisService == nil {
+		log.Error("genesis service is nil")
+		return
+	}
+
+	genesisSyncData, err := genesis.GenesisService.GetGenesisSyncResponse()
+	if err != nil {
+		log.Errorf("get genesis sync data failed: %s", err.Error())
+		return
+	}
+
+	vtapIDToLcuuid, err := common.GetVTapSubDomainMappingByDomain(c.basicInfo.Lcuuid)
+	if err != nil {
+		log.Errorf("domain (%s) add process failed: %s", c.basicInfo.Name, err.Error())
+		return
+	}
+
+	for _, sProcess := range genesisSyncData.Processes {
+		lcuuid, ok := vtapIDToLcuuid[int(sProcess.VtapID)]
+		if !ok {
+			continue
+		}
+		process := model.Process{
+			Lcuuid:      sProcess.Lcuuid,
+			Name:        sProcess.Name,
+			VTapID:      int(sProcess.VtapID),
+			PID:         int(sProcess.PID),
+			ProcessName: sProcess.ProcessName,
+			CommandLine: sProcess.CMDLine,
+			UserName:    sProcess.User,
+			StartTime:   sProcess.StartTime,
+			OsAppTags:   sProcess.OSAPPTags,
+		}
+		if lcuuid == "" {
+			c.resource.Processes = append(c.resource.Processes, process)
+			continue
+		}
+		subDomainResource, ok := c.resource.SubDomainResources[lcuuid]
+		if !ok {
+			continue
+		}
+		process.SubDomainLcuuid = subDomainResource.PodNodes[0].SubDomainLcuuid
+		subDomainResource.Processes = append(subDomainResource.Processes, process)
+		c.resource.SubDomainResources[lcuuid] = subDomainResource
+	}
 }

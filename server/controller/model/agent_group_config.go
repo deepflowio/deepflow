@@ -79,6 +79,12 @@ type StaticConfig struct {
 	FeatureFlags                     []string              `yaml:"feature-flags,omitempty"`
 	L7ProtocolPorts                  map[string]string     `yaml:"l7-protocol-ports,omitempty"`
 	Ebpf                             *EbpfConfig           `yaml:"ebpf,omitempty"`
+	OsAppTagExecUser                 *string               `yaml:"os-app-tag-exec-user"`
+	OsAppTagExec                     *string               `yaml:"os-app-tag-exec"`
+	OsProcRoot                       *string               `yaml:"os-proc-root;omitempty"`
+	OsProcSocketSyncInterval         *int                  `yaml:"os-proc-socket-sync-interval"`
+	OsProcSocketMinLifetime          *int                  `yaml:"os-proc-socket-min-lifetime"`
+	OsProcRegex                      *OsProcRegex          `yaml:"os-proc-regex"`
 }
 
 type XflowCollectorConfig struct {
@@ -139,4 +145,10 @@ type EbpfConfig struct {
 	MaxTraceEntries         *int                               `yaml:"max-trace-entries,omitempty"`
 	SocketMapMaxReclaim     *int                               `yaml:"socket-map-max-reclaim,omitempty"`
 	GoTracingTimeout        *int                               `yaml:"go-tracing-timeout,omitempty"`
+}
+
+type OsProcRegex struct {
+	MatchRegex  *string `yaml:"match-regex,omitempty"`
+	MatchType   *string `yaml:"match-type,omitempty"`
+	RewriteName *string `yaml:"rewrite-name,omitempty"`
 }
