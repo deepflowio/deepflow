@@ -1140,6 +1140,15 @@ impl FlowMap {
         timeout: Duration,
         meta_packet: Option<&mut MetaPacket>,
     ) {
+        // For ebpf data, if server_port is 0, it means that parsed data failed,
+        // the node's info maybe wrong which should not be reported.
+        if meta_packet.is_some()
+            && meta_packet.as_ref().unwrap().signal_source == SignalSource::EBPF
+            && node.meta_flow_perf.is_some()
+            && node.meta_flow_perf.as_ref().unwrap().server_port == 0
+        {
+            return;
+        }
         // 统计数据输出前矫正流方向
         self.update_flow_direction(&mut node, meta_packet);
 
