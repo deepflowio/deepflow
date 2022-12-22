@@ -1828,7 +1828,9 @@ impl ConfigHandler {
         }
 
         #[cfg(target_os = "linux")]
-        if candidate_config.ebpf != new_config.ebpf {
+        if candidate_config.ebpf != new_config.ebpf
+            && candidate_config.tap_mode != TapMode::Analyzer
+        {
             info!(
                 "ebpf config change from {:#?} to {:#?}",
                 candidate_config.ebpf, new_config.ebpf
