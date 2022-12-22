@@ -47,3 +47,19 @@ func getDbBy() string {
 func PromReaderExecute(req *prompb.ReadRequest, ctx context.Context) (resp *prompb.ReadResponse, err error) {
 	return prometheus.PromReaderExecute(req, ctx)
 }
+
+func PromQueryExecute(args *common.PromQueryParams, ctx context.Context) (jsonData map[string]interface{}, debug map[string]interface{}, err error) {
+	result, debug, err := prometheus.PromQueryExecute(args, ctx)
+	if result != nil {
+		jsonData = result.ToJson()
+	}
+	return jsonData, debug, err
+}
+
+func PromQueryRangeExecute(args *common.PromQueryRangeParams, ctx context.Context) (jsonData map[string]interface{}, debug map[string]interface{}, err error) {
+	result, debug, err := prometheus.PromQueryRangeExecute(args, ctx)
+	if result != nil {
+		jsonData = result.ToJson()
+	}
+	return jsonData, debug, err
+}
