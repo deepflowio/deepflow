@@ -43,7 +43,7 @@ impl<T: Debug> DebugSender<T> {
         self.sender.send(msg)
     }
 
-    pub fn send_all(&self, msgs: Vec<T>) -> Result<(), Error<T>> {
+    fn send_debug(&self, msgs: &Vec<T>) {
         if self.debug.1.load(Ordering::Relaxed) {
             for chunk in msgs.chunks(QUEUE_LEN) {
                 if let Err(e) = self.debug.0.send_all(
@@ -56,7 +56,16 @@ impl<T: Debug> DebugSender<T> {
                 }
             }
         }
+    }
+
+    pub fn send_all(&self, msgs: Vec<T>) -> Result<(), Error<T>> {
+        self.send_debug(&msgs);
         self.sender.send_all(msgs)
+    }
+
+    pub fn send_large(&self, msgs: Vec<T>) -> Result<(), Error<T>> {
+        self.send_debug(&msgs);
+        self.sender.send_large(msgs)
     }
 }
 

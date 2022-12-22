@@ -313,6 +313,22 @@ impl<T> Sender<T> {
             }
         }
     }
+
+    pub fn send_large(&self, mut msgs: Vec<T>) -> Result<(), Error<T>> {
+        const SEND_BATCH: usize = 1024;
+        unsafe {
+            for chunk in msgs.chunks(SEND_BATCH) {
+                match self.counter().queue.raw_send(chunk.as_ptr(), chunk.len()) {
+                    Ok(_) => continue,
+                    Err(Error::Terminated(..)) => return Err(Error::Terminated(None, Some(msgs))),
+                    _ => unreachable!(),
+                }
+            }
+            // drop the vector without dropping elements within
+            msgs.set_len(0);
+            Ok(())
+        }
+    }
 }
 
 impl<T> Clone for Sender<T> {
