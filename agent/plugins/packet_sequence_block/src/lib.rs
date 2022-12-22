@@ -26,7 +26,11 @@ pub struct PacketData {}
 pub struct PacketSequenceBlock {}
 
 impl PacketSequenceBlock {
-    pub fn check(&self, _: usize) -> bool {
+    pub fn new(_: u32) -> Self {
+        unimplemented!();
+    }
+
+    pub fn check(&self, _: usize, _: u32) -> bool {
         unimplemented!();
     }
 
