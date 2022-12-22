@@ -125,6 +125,7 @@ func ConvertL7TracingRespToProto(data map[string]interface{}, argTraceId string)
 	}
 	traces := data["tracing"]
 	idMap := map[string][]byte{}
+	networkParentMap := map[string]string{}
 	for _, t := range traces.([]interface{}) {
 		trace, ok := t.(map[string]interface{})
 		if !ok {
@@ -132,13 +133,27 @@ func ConvertL7TracingRespToProto(data map[string]interface{}, argTraceId string)
 		}
 		serviceUid, ok := trace[L7_TRACING_SERVICE_UID]
 		var rsSpans *traceProto.ResourceSpans
+
+		spanId := trace["deepflow_span_id"].(string)
+		parentSpanId := trace["deepflow_parent_span_id"].(string)
 		if ok && serviceUid != nil {
 			if rsSpans, ok = resourceUidMap[serviceUid.(string)]; !ok {
+				networkParentMap[spanId] = parentSpanId
 				continue
 			}
 		} else {
+			networkParentMap[spanId] = parentSpanId
 			continue
 		}
+		// skip network span, find parent
+		for {
+			if npi, ok := networkParentMap[parentSpanId]; ok {
+				parentSpanId = npi
+			} else {
+				break
+			}
+		}
+
 		var attrs map[string]interface{}
 		if traceAttrs, ok := trace["attributes"]; ok && traceAttrs != nil {
 			json.Unmarshal([]byte(trace["attributes"].(string)), &attrs)
@@ -174,17 +189,15 @@ func ConvertL7TracingRespToProto(data map[string]interface{}, argTraceId string)
 		if traceId == "" {
 			traceId = argTraceId
 		}
-		spanId := trace["deepflow_span_id"].(string)
+
 		spanId = strings.ReplaceAll(spanId, "0x", "")
 		//spanId = strings.ReplaceAll(spanId, ".", "0")
 		spanIdBytes := decodeIdBytes(spanId, 8, idMap)
 
 		//spanIdBytes := []byte{0xab, 0xb5, 0xcf, 0x60, 0x03, 0x2b, 0xc5, 0xfe}
-		parentSpanId := trace["deepflow_parent_span_id"].(string)
 		parentSpanId = strings.ReplaceAll(parentSpanId, "0x", "")
 		//parentSpanId = strings.ReplaceAll(parentSpanId, ".", "0")
 		parentSpanIdBytes := decodeIdBytes(parentSpanId, 8, idMap)
-
 		traceId = strings.ReplaceAll(traceId, "-", "")
 		traceIdBytes := decodeIdBytes(traceId, 16, idMap)
 
