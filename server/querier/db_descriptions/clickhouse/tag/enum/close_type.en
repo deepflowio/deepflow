@@ -1,16 +1,16 @@
-# Value , DisplayName
-0       , Unknown
-1       , Normal
-5       , Force Report
-13      , Est. - Client Port Reuse
-7       , Est. - Client SYN Repeat
-18      , Est. - Client Other RST
-10      , Est. - Server SYN Repeat
-15      , Est. - Server Direct RST
-19      , Est. - Server Other RST
-9       , Transfer - Client RST
-2       , Transfer - Server RST
-17      , Transfer - Server Queue Overflow
-3       , Transfer - Flow Timeout
-11      , Close - Client Half Close
-8       , Close - Server Half Close
+# Value , DisplayName                        , Description
+0       , Unknown                            ,
+1       , Normal                             ,
+5       , Force Report                       ,
+13      , Est. - Client Port Reuse           ,
+7       , Est. - Client SYN Repeat           ,
+18      , Est. - Client Other RST            ,
+10      , Est. - Server SYN Repeat           ,
+15      , Est. - Server Direct RST           ,
+19      , Est. - Server Other RST            ,
+9       , Transfer - Client RST              ,
+2       , Transfer - Server RST              ,
+17      , Transfer - Server Queue Overflow   ,
+3       , Transfer - Flow Timeout            ,
+11      , Close - Client Half Close          ,
+8       , Close - Server Half Close          ,

@@ -1,8 +1,8 @@
-# Value         , DisplayName
-create          , Creation
-delete          , Deletion
-update-state    , State Change
-migrate         , Migration
-recreate        , Recreation
-add-ip          , Add IP
-remove-ip       , Del IP
+# Value         , DisplayName    , Description
+create          , Creation       ,
+delete          , Deletion       ,
+update-state    , State Change   ,
+migrate         , Migration      ,
+recreate        , Recreation     ,
+add-ip          , Add IP         ,
+remove-ip       , Del IP         ,

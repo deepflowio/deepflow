@@ -1,4 +1,4 @@
-# Value , DisplayName
-0       , Request
-1       , Response
-2       , Session
+# Value , DisplayName   , Description
+0       , Request       ,
+1       , Response      ,
+2       , Session       ,
