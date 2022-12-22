@@ -179,6 +179,10 @@ pub struct UniformSenderThread<T> {
     running: Arc<AtomicBool>,
     stats: Arc<Collector>,
     exception_handler: ExceptionHandler,
+
+    // if true, cache message for batch sending
+    // can be turned off if message already cached
+    cached: bool,
 }
 
 impl<T: Sendable> UniformSenderThread<T> {
@@ -189,6 +193,7 @@ impl<T: Sendable> UniformSenderThread<T> {
         config: SenderAccess,
         stats: Arc<Collector>,
         exception_handler: ExceptionHandler,
+        cached: bool,
     ) -> Self {
         let running = Arc::new(AtomicBool::new(false));
         Self {
@@ -200,6 +205,7 @@ impl<T: Sendable> UniformSenderThread<T> {
             running,
             stats,
             exception_handler,
+            cached,
         }
     }
 
@@ -220,6 +226,7 @@ impl<T: Sendable> UniformSenderThread<T> {
             self.running.clone(),
             self.stats.clone(),
             self.exception_handler.clone(),
+            self.cached,
         );
         self.thread_handle = Some(thread::spawn(move || uniform_sender.process()));
         info!("{} uniform sender id: {} started", self.name, self.id);
@@ -263,6 +270,8 @@ pub struct UniformSender<T> {
     file_path: String,
     pre_file_path: String,
     written_size: u64,
+
+    cached: bool,
 }
 
 impl<T: Sendable> UniformSender<T> {
@@ -277,6 +286,7 @@ impl<T: Sendable> UniformSender<T> {
         running: Arc<AtomicBool>,
         stats: Arc<Collector>,
         exception_handler: ExceptionHandler,
+        cached: bool,
     ) -> Self {
         Self {
             id,
@@ -298,6 +308,7 @@ impl<T: Sendable> UniformSender<T> {
             file_path: String::new(),
             pre_file_path: String::new(),
             written_size: 0,
+            cached,
         }
     }
 
@@ -520,7 +531,7 @@ impl<T: Sendable> UniformSender<T> {
 
     pub fn handle_target_server(&mut self, send_item: T) -> std::io::Result<()> {
         self.encoder.cache_to_sender(send_item);
-        if self.encoder.buffer_len() > Encoder::<T>::BUFFER_LEN {
+        if !self.cached || self.encoder.buffer_len() > Encoder::<T>::BUFFER_LEN {
             self.check_or_register_counterable(self.encoder.header.msg_type);
             self.update_dst_ip_and_port();
             self.encoder
