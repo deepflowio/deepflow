@@ -275,7 +275,8 @@ impl LocalModeDispatcher {
             }
 
             if let Some(policy) = meta_packet.policy_data.as_ref() {
-                if policy.acl_id > 0 {
+                if policy.acl_id > 0 && !base.tap_interface_whitelist.has(packet.if_index as usize)
+                {
                     // 如果匹配策略则认为需要拷贝整个包
                     base.tap_interface_whitelist.add(packet.if_index as usize);
                 }
@@ -332,6 +333,14 @@ impl LocalModeDispatcherListener {
 
     pub fn on_vm_change(&self, _: &[MacAddr]) {}
 
+    pub fn id(&self) -> usize {
+        return self.base.id;
+    }
+
+    pub fn reset_bpf_white_list(&self) {
+        self.base.reset_whitelist.store(true, Ordering::Relaxed);
+    }
+
     pub fn on_tap_interface_change(
         &self,
         interfaces: &Vec<Link>,
@@ -372,7 +381,7 @@ impl LocalModeDispatcherListener {
             &interfaces,
             if_mac_source,
             trident_type,
-            &self.base.options.tap_mac_script,
+            &self.base.options.lock().unwrap().tap_mac_script,
         );
         self.base.on_vm_change(&keys, &macs);
         self.base.on_tap_interface_change(interfaces, if_mac_source);
