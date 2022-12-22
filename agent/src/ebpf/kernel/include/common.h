@@ -71,12 +71,6 @@ struct protocol_message_t {
 	enum message_type type;
 };
 
-struct trace_key_t {
-	__u32 tgid;
-	__u32 pid;
-	__u64 goid;
-} __attribute__((packed));
-
 enum {
 	TASK_COMM_LEN = 16,
 };
