@@ -387,13 +387,12 @@ impl FlowMap {
     }
 
     fn append_to_block(&self, node: &mut FlowNode, meta_packet: &MetaPacket) {
+        const MINUTE: u64 = 60;
         if node.packet_sequence_block.is_some() {
-            if !node
-                .packet_sequence_block
-                .as_ref()
-                .unwrap()
-                .check(self.config.load().packet_sequence_block_size)
-            {
+            if !node.packet_sequence_block.as_ref().unwrap().check(
+                self.config.load().packet_sequence_block_size,
+                (meta_packet.lookup_key.timestamp.as_secs() / MINUTE) as u32,
+            ) {
                 // if the packet_sequence_block is no enough to push one more packet, then send it to the queue
                 if let Err(_) = self
                     .packet_sequence_queue
@@ -403,12 +402,14 @@ impl FlowMap {
                 {
                     warn!("packet sequence block to queue failed maybe queue have terminated");
                 }
-                node.packet_sequence_block =
-                    Some(packet_sequence_block::PacketSequenceBlock::default());
+                node.packet_sequence_block = Some(packet_sequence_block::PacketSequenceBlock::new(
+                    (meta_packet.lookup_key.timestamp.as_secs() / MINUTE) as u32,
+                ));
             }
         } else {
-            node.packet_sequence_block =
-                Some(packet_sequence_block::PacketSequenceBlock::default());
+            node.packet_sequence_block = Some(packet_sequence_block::PacketSequenceBlock::new(
+                (meta_packet.lookup_key.timestamp.as_secs() / MINUTE) as u32,
+            ));
         }
 
         let mini_meta_packet = packet_sequence_block::MiniMetaPacket::new(
