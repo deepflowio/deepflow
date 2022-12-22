@@ -286,6 +286,10 @@ static bool bpf_offset_map_collect(struct bpf_tracer *tracer,
 static int socktrace_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
 				 void **out, size_t * outsize)
 {
+	struct bpf_tracer *t = find_bpf_tracer(SK_TRACER_NAME);
+	if (t == NULL)
+		return -1;
+
 	*outsize = sizeof(struct bpf_socktrace_params) +
 	    sizeof(struct bpf_offset_param) * sys_cpus_count;
 
@@ -299,10 +303,6 @@ static int socktrace_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
 	struct bpf_offset_param_array *array = &params->offset_array;
 	array->count = sys_cpus_count;
 
-	struct bpf_tracer *t = find_bpf_tracer(SK_TRACER_NAME);
-	if (t == NULL)
-		return -1;
-
 	params->kern_socket_map_max = conf_max_socket_entries;
 	params->kern_trace_map_max = conf_max_trace_entries;
 	params->tracer_state = t->state;
@@ -312,6 +312,9 @@ static int socktrace_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
 	if (bpf_stats_map_collect(t, &stats_total)) {
 		params->kern_socket_map_used = stats_total.socket_map_count;
 		params->kern_trace_map_used = stats_total.trace_map_count;
+		// Calibrate map statistics
+		params->kern_socket_map_used -= socket_map_reclaim_count;
+		params->kern_trace_map_used -= trace_map_reclaim_count;
 	}
 
 	if (!bpf_offset_map_collect(t, array)) {
@@ -624,6 +627,10 @@ static void reclaim_trace_map(struct bpf_tracer *tracer, uint32_t timeout)
 			if (uptime - value.update_time > timeout) {
 				bpf_delete_elem(map_fd, &next_trace_key);
 				reclaim_count++;
+				if (reclaim_count >= 
+				    (conf_max_trace_entries * RECLAIM_TRACE_MAP_SCALE)) {
+					break;
+				}
 			}
 		}
 
@@ -656,6 +663,10 @@ static void reclaim_socket_map(struct bpf_tracer *tracer, uint32_t timeout)
 			if (uptime - value.update_time > timeout) {
 				bpf_delete_elem(map_fd, &next_conn_key);
 				sockets_reclaim_count++;
+				if (sockets_reclaim_count >=
+				    conf_socket_map_max_reclaim) {
+					break;
+				}
 			}
 		}
 		conn_key = next_conn_key;
@@ -672,17 +683,17 @@ static int check_map_exceeded(void)
 	if (t == NULL)
 		return -1;
 
-	uint64_t kern_socket_map_used = 0, kern_trace_map_used = 0;
+	int64_t kern_socket_map_used = 0, kern_trace_map_used = 0;
 
 	struct trace_stats stats_total;
 
 	if (bpf_stats_map_collect(t, &stats_total)) {
 		kern_socket_map_used = stats_total.socket_map_count;
 		kern_trace_map_used = stats_total.trace_map_count;
+		// Calibrate map statistics
+		kern_socket_map_used -= socket_map_reclaim_count;
+		kern_trace_map_used -= trace_map_reclaim_count;
 	}
-	// 校准map的统计数量
-	kern_socket_map_used -= socket_map_reclaim_count;
-	kern_trace_map_used -= trace_map_reclaim_count;
 
 	if (kern_socket_map_used >= conf_socket_map_max_reclaim) {
 		ebpf_info("Current socket map used %u exceed"
@@ -692,7 +703,7 @@ static int check_map_exceeded(void)
 	}
 
 	if (kern_trace_map_used >=
-	    (uint64_t) (conf_max_trace_entries * RECLAIM_TRACE_MAP_SCALE)) {
+	    (int64_t) (conf_max_trace_entries * RECLAIM_TRACE_MAP_SCALE)) {
 		ebpf_info("Current trace map used %u exceed"
 			  " reclaim_map_max %u,reclaim map\n",
 			  kern_trace_map_used,
@@ -1344,6 +1355,9 @@ struct socket_trace_stats socket_tracer_stats(void)
 	if (bpf_stats_map_collect(t, &stats_total)) {
 		stats.kern_socket_map_used = stats_total.socket_map_count;
 		stats.kern_trace_map_used = stats_total.trace_map_count;
+		// Calibrate map statistics
+		stats.kern_socket_map_used -= socket_map_reclaim_count;
+		stats.kern_trace_map_used -= trace_map_reclaim_count;
 	}
 
 	int i;

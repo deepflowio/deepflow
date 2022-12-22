@@ -120,6 +120,12 @@ struct socket_info_t {
 	__u64 uid; // socket唯一标识ID
 } __attribute__((packed));
 
+struct trace_key_t {
+	__u32 tgid;
+	__u32 pid;
+	__u64 goid;
+} __attribute__((packed));
+
 struct trace_info_t {
 	/*
 	 * Whether traceID is zero ?
