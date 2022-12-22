@@ -1335,7 +1335,7 @@ impl Components {
                 .handler_builders(handler_builder)
                 .ctrl_mac(ctrl_mac)
                 .leaky_bucket(rx_leaky_bucket.clone())
-                .options(Arc::new(dispatcher::Options {
+                .options(Arc::new(Mutex::new(dispatcher::Options {
                     #[cfg(target_os = "linux")]
                     af_packet_blocks: config_handler.candidate_config.dispatcher.af_packet_blocks,
                     #[cfg(target_os = "linux")]
@@ -1354,7 +1354,7 @@ impl Components {
                         .dispatcher
                         .capture_packet_size as usize,
                     ..Default::default()
-                }))
+                })))
                 .bpf_options(bpf_options.clone())
                 .default_tap_type(
                     (yaml_config.default_tap_type as u16)
@@ -1410,6 +1410,7 @@ impl Components {
                 &vec![],
             );
             dispatcher_listener.on_vm_change(&vm_mac_addrs);
+            synchronizer.add_flow_acl_listener(Box::new(dispatcher_listener.clone()));
 
             dispatchers.push(dispatcher);
             dispatcher_listeners.push(dispatcher_listener);
