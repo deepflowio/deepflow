@@ -151,6 +151,9 @@ impl FlowMap {
             Countable::Ref(Arc::downgrade(&flow_perf_counter) as Weak<dyn RefCountable>),
             vec![StatsOption::Tag("id", format!("{}", id))],
         );
+        let start_time = get_timestamp(ntp_diff.load(Ordering::Relaxed))
+            - config_guard.packet_delay
+            - Duration::from_secs(1);
         Self {
             node_map: Some(HashMap::with_capacity(config_guard.hash_slots as usize)),
             time_set: Some(vec![
@@ -171,8 +174,8 @@ impl FlowMap {
                 config_guard.l7_protocol_inference_ttl,
             ),
             policy_getter,
-            start_time: Duration::ZERO,
-            start_time_in_unit: 0,
+            start_time,
+            start_time_in_unit: start_time.as_secs(),
             hash_slots: config_guard.hash_slots as usize,
             time_window_size,
             total_flow: 0,
