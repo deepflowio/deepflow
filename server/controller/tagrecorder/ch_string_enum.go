@@ -53,14 +53,16 @@ func (e *ChStringEnum) generateNewData() (map[StringEnumTagKey]mysql.ChStringEnu
 		for _, valueAndName := range tagValues {
 			tagValue := valueAndName.([]interface{})[0]
 			tagDisplayName := valueAndName.([]interface{})[1]
+			tagDescription := valueAndName.([]interface{})[2]
 			key := StringEnumTagKey{
 				TagName:  tagName,
 				TagValue: tagValue.(string),
 			}
 			keyToItem[key] = mysql.ChStringEnum{
-				TagName: tagName,
-				Value:   tagValue.(string),
-				Name:    tagDisplayName.(string),
+				TagName:     tagName,
+				Value:       tagValue.(string),
+				Name:        tagDisplayName.(string),
+				Description: tagDescription.(string),
 			}
 		}
 	}
@@ -82,6 +84,9 @@ func (e *ChStringEnum) generateUpdateInfo(oldItem, newItem mysql.ChStringEnum) (
 	}
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name
+	}
+	if oldItem.Description != newItem.Description {
+		updateInfo["description"] = newItem.Description
 	}
 	if len(updateInfo) > 0 {
 		return updateInfo, true

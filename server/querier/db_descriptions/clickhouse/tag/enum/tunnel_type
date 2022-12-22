@@ -1,5 +1,5 @@
-# Value , DisplayName
-0       , N/A
-1       , VXLAN
-2       , IPIP
-3       , GRE
+# Value , DisplayName  , Description
+0       , N/A          ,
+1       , VXLAN        ,
+2       , IPIP         ,
+3       , GRE          ,

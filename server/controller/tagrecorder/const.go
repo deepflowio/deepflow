@@ -376,7 +376,8 @@ const (
 		"(\n" +
 		"    `tag_name` String,\n" +
 		"    `value` String,\n" +
-		"    `name` String\n" +
+		"    `name` String,\n" +
+		"    `description` String\n" +
 		")\n" +
 		"PRIMARY KEY tag_name, value\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
@@ -386,7 +387,8 @@ const (
 		"(\n" +
 		"    `tag_name` String,\n" +
 		"    `value` UInt64,\n" +
-		"    `name` String\n" +
+		"    `name` String,\n" +
+		"    `description` String\n" +
 		")\n" +
 		"PRIMARY KEY tag_name, value\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +

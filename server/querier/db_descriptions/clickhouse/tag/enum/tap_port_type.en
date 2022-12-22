@@ -1,10 +1,10 @@
-# Value , DisplayName
-0       , Local NIC
-1       , NFV Gateway NIC
-2       , ERSPAN
-3       , ERSPAN (IPv6)
-4       , Traffic Mirror
-5       , NetFlow
-6       , sFlow
-7       , eBPF
-8       , OTel
+# Value , DisplayName           , Description
+0       , Local NIC             ,
+1       , NFV Gateway NIC       ,
+2       , ERSPAN                ,
+3       , ERSPAN (IPv6)         ,
+4       , Traffic Mirror        ,
+5       , NetFlow               ,
+6       , sFlow                 ,
+7       , eBPF                  ,
+8       , OTel                  ,
