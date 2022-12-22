@@ -744,7 +744,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"",
 		)}
 	// enum_tag
-	for _, enumName := range []string{"close_type", "eth_type", "signal_source", "is_ipv4", "l7_ip_protocol", "type", "l7_protocol", "protocol", "response_status", "server_port", "status", "tap_port_type", "tcp_flags_bit", "tunnel_tier", "tunnel_type", "instance_type"} {
+	for _, enumName := range []string{"close_type", "eth_type", "signal_source", "is_ipv4", "l7_ip_protocol", "type", "l7_protocol", "protocol", "response_status", "server_port", "status", "tap_port_type", "tcp_flags_bit", "tunnel_tier", "tunnel_type", "instance_type", "nat_source"} {
 		tagResourceMap[enumName] = map[string]*Tag{
 			"enum": NewTag(
 				"dictGetOrDefault(flow_tag.int_enum_map, 'name', ('%s',toUInt64("+enumName+")), "+enumName+")",
