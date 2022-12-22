@@ -565,7 +565,11 @@ impl From<L7PerfStats> for flow_log::L7PerfStats {
 
 #[derive(Debug, Clone, Copy)]
 pub struct FlowMetricsPeer {
-    pub nat_real_ip: IpAddr, // IsVIP为true，通过MAC查询对应的IP
+    // This field is valid for the following two scenarios:
+    // VIP: Mac query acquisition
+    // TOA: Parsing tcp options
+    pub nat_real_ip: IpAddr,
+    pub nat_real_port: u16,
 
     pub byte_count: u64,         // 每个流统计周期（目前是自然秒）清零
     pub l3_byte_count: u64,      // 每个流统计周期的L3载荷量
@@ -592,6 +596,23 @@ pub fn serialize_flow_metrics<S>(v: &[FlowMetricsPeer; 2], serializer: S) -> Res
 where
     S: Serializer,
 {
+    let real_ip_0 = match v[0].nat_real_ip {
+        IpAddr::V4(ip) => u32::from(ip),
+        IpAddr::V6(ip) if ip.to_ipv4().is_some() => {
+            let ip = ip.to_ipv4().unwrap();
+            u32::from(ip)
+        }
+        _ => 0,
+    };
+    let real_ip_1 = match v[1].nat_real_ip {
+        IpAddr::V4(ip) => u32::from(ip),
+        IpAddr::V6(ip) if ip.to_ipv4().is_some() => {
+            let ip = ip.to_ipv4().unwrap();
+            u32::from(ip)
+        }
+        _ => 0,
+    };
+
     #[derive(Serialize)]
     struct Ser {
         byte_tx: u64,
@@ -612,6 +633,10 @@ where
         l2_end_1: bool,
         l3_end_0: bool,
         l3_end_1: bool,
+        real_ip_0: u32,
+        real_ip_1: u32,
+        real_port_src: u16,
+        real_port_dst: u16,
 
         #[serde(serialize_with = "to_string_format")]
         tcp_flags_bit_0: TcpFlags,
@@ -639,6 +664,10 @@ where
         l3_end_1: v[1].is_l3_end,
         tcp_flags_bit_0: v[0].tcp_flags,
         tcp_flags_bit_1: v[1].tcp_flags,
+        real_ip_0,
+        real_ip_1,
+        real_port_src: v[0].nat_real_port,
+        real_port_dst: v[1].nat_real_port,
     };
     serializer.serialize_newtype_struct("flow_metrics", &s)
 }
@@ -647,6 +676,7 @@ impl Default for FlowMetricsPeer {
     fn default() -> Self {
         FlowMetricsPeer {
             nat_real_ip: Ipv4Addr::UNSPECIFIED.into(),
+            nat_real_port: 0,
             byte_count: 0,
             l3_byte_count: 0,
             l4_byte_count: 0,
@@ -699,6 +729,11 @@ impl FlowMetricsPeer {
 
 impl From<FlowMetricsPeer> for flow_log::FlowMetricsPeer {
     fn from(m: FlowMetricsPeer) -> Self {
+        let real_ip = match m.nat_real_ip {
+            IpAddr::V4(i) => u32::from(i),
+            IpAddr::V6(i) if i.to_ipv4().is_some() => u32::from(i.to_ipv4().unwrap()),
+            _ => 0,
+        };
         flow_log::FlowMetricsPeer {
             byte_count: m.byte_count,
             l3_byte_count: m.l3_byte_count,
@@ -717,6 +752,8 @@ impl From<FlowMetricsPeer> for flow_log::FlowMetricsPeer {
             tcp_flags: m.tcp_flags.bits() as u32,
             is_vip_interface: m.is_vip_interface as u32,
             is_vip: m.is_vip as u32,
+            real_ip,
+            real_port: m.nat_real_port as u32,
         }
     }
 }
@@ -1018,17 +1055,17 @@ pub fn get_direction(
         tunnel: &TunnelField,
         l2_end: bool,
         l3_end: bool,
-        is_vip: bool,
         is_unicast: bool,
         is_local_mac: bool,
         is_local_ip: bool,
         l3_epc_id: i32,
         cloud_gateway_traffic: bool, // 从static config 获取
         trident_type: TridentType,
+        nat_source: u8,
     ) -> (Direction, Direction, bool) {
         let is_ep = l2_end && l3_end;
         let tunnel_tier = tunnel.tier;
-        let mut add_tracing_doc = false;
+        let mut add_tracing_doc = nat_source == TapPort::NAT_SOURCE_TOA;
 
         match trident_type {
             TridentType::TtDedicatedPhysicalMachine => {
@@ -1085,7 +1122,7 @@ pub fn get_direction(
                 if l2_end {
                     // SNAT、LB Backend
                     // IP地址为VIP: 将双端(若不是vip_iface)的VIP替换为其MAC对对应的RIP,生成另一份doc
-                    add_tracing_doc = is_vip;
+                    add_tracing_doc = nat_source == TapPort::NAT_SOURCE_VIP || add_tracing_doc;
                     return (
                         Direction::ClientHypervisorToServer,
                         Direction::ServerHypervisorToClient,
@@ -1104,7 +1141,7 @@ pub fn get_direction(
                 }
 
                 if l2_end && is_unicast {
-                    if !is_vip {
+                    if nat_source != TapPort::NAT_SOURCE_VIP {
                         // Router
                         // windows hyper-v场景采集到的流量ttl还未减1，这里需要屏蔽ttl避免l3end为true
                         // 注意c/s方向与0/1相反
@@ -1115,7 +1152,7 @@ pub fn get_direction(
                         );
                     } else {
                         //MUX
-                        add_tracing_doc = tunnel_tier > 0;
+                        add_tracing_doc = tunnel_tier > 0 || add_tracing_doc;
                         return (
                             Direction::ServerGatewayHypervisorToClient,
                             Direction::ClientGatewayHypervisorToServer,
@@ -1129,7 +1166,7 @@ pub fn get_direction(
                 // VIP：
                 //     微软ACS云内SLB通信场景，在VM内采集的流量无隧道IP地址使用VIP,
                 //     将对端的VIP替换为其mac对应的RIP，生成另一份doc
-                add_tracing_doc = is_vip;
+                add_tracing_doc = nat_source == TapPort::NAT_SOURCE_VIP || add_tracing_doc;
                 if is_ep {
                     return (
                         Direction::ClientToServer,
@@ -1368,32 +1405,32 @@ pub fn get_direction(
 
     // 全景图统计
     let tunnel = &flow.tunnel;
-    let is_vip = src_ep.is_vip || dst_ep.is_vip;
+    let nat_source = flow.flow_key.tap_port.get_nat_source();
     let (mut src_direct, _, is_extra_tracing_doc0) = inner(
         flow_key.tap_type,
         tunnel,
         src_ep.is_l2_end,
         src_ep.is_l3_end,
-        is_vip,
         true,
         src_ep.is_local_mac,
         src_ep.is_local_ip,
         src_ep.l3_epc_id,
         cloud_gateway_traffic,
         trident_type,
+        nat_source,
     );
     let (_, mut dst_direct, is_extra_tracing_doc1) = inner(
         flow_key.tap_type,
         tunnel,
         dst_ep.is_l2_end,
         dst_ep.is_l3_end,
-        is_vip,
         MacAddr::is_unicast(flow_key.mac_dst),
         dst_ep.is_local_mac,
         dst_ep.is_local_ip,
         dst_ep.l3_epc_id,
         cloud_gateway_traffic,
         trident_type,
+        nat_source,
     );
     // 双方向都有统计位置优先级为：client/server侧 > L2End侧 > IsLocalMac侧 > 其他
     if src_direct != Direction::None && dst_direct != Direction::None {

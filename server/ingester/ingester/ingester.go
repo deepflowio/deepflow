@@ -114,7 +114,7 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 	bytes, _ = yaml.Marshal(dropletConfig)
 	log.Infof("droplet config:\n%s", string(bytes))
 
-	receiver := receiver.NewReceiver(int(cfg.ListenPort), cfg.UDPReadBuffer, cfg.TCPReadBuffer)
+	receiver := receiver.NewReceiver(int(cfg.ListenPort), cfg.UDPReadBuffer, cfg.TCPReadBuffer, cfg.TCPReaderBuffer)
 
 	closers := droplet.Start(dropletConfig, receiver)
 

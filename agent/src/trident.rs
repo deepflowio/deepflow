@@ -882,6 +882,7 @@ impl Components {
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
+            true,
         );
         stats_sender.start();
 
@@ -1036,6 +1037,7 @@ impl Components {
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
+            true,
         );
 
         let sender_id = get_sender_id() as usize;
@@ -1060,6 +1062,7 @@ impl Components {
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
+            true,
         );
 
         let sender_id = get_sender_id() as usize;
@@ -1084,6 +1087,7 @@ impl Components {
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
+            true,
         );
 
         // Dispatcher
@@ -1141,6 +1145,7 @@ impl Components {
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
+            true,
         );
 
         let bpf_options = Arc::new(Mutex::new(BpfOptions {
@@ -1198,6 +1203,7 @@ impl Components {
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
+            false,
         );
 
         for (i, (src_interface, netns)) in src_interfaces_and_namespaces.into_iter().enumerate() {
@@ -1427,7 +1433,7 @@ impl Components {
         #[allow(unused)]
         let mut ebpf_collector = None;
         #[cfg(target_os = "linux")]
-        {
+        if config_handler.candidate_config.tap_mode != TapMode::Analyzer {
             let ebpf_dispatcher_id = dispatchers.len();
             let (flow_sender, flow_receiver, counter) = queue::bounded_with_debug(
                 yaml_config.flow_queue_size,
@@ -1526,6 +1532,7 @@ impl Components {
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
+            true,
         );
 
         let sender_id = get_sender_id() as usize;
@@ -1550,6 +1557,7 @@ impl Components {
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
+            true,
         );
 
         let sender_id = get_sender_id() as usize;
@@ -1574,6 +1582,7 @@ impl Components {
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
+            true,
         );
 
         let sender_id = get_sender_id() as usize;
@@ -1598,6 +1607,7 @@ impl Components {
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
+            true,
         );
 
         let (external_metrics_server, external_metrics_counter) = MetricServer::new(

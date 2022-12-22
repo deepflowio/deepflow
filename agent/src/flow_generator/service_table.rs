@@ -100,6 +100,7 @@ impl ServiceTable {
     pub fn get_tcp_score(
         &mut self,
         is_first_packet: bool,
+        has_toa: bool,
         tcp_flags: TcpFlags,
         src_key: ServiceKey,
         dst_key: ServiceKey,
@@ -122,8 +123,8 @@ impl ServiceTable {
                 _ => unimplemented!(),
             }
             (src_score, dst_score)
-        } else if tcp_flags.contains(TcpFlags::SYN) {
-            // 一旦发送SYN，即被认为是客户端
+        } else if tcp_flags.contains(TcpFlags::SYN) || has_toa {
+            // It must be the client when packet has SYN or TOA.
             src_score = Self::MIN_SCORE;
 
             match (src_key, dst_key) {
@@ -424,53 +425,54 @@ mod tests {
         let mut table = ServiceTable::new(10, 10);
         for (src_key, dst_key) in key_pairs {
             let (src_score, dst_score) =
-                table.get_tcp_score(true, TcpFlags::SYN_ACK, src_key, dst_key);
+                table.get_tcp_score(true, false, TcpFlags::SYN_ACK, src_key, dst_key);
             assert!(
                 src_score == ServiceTable::MAX_SCORE && dst_score == ServiceTable::MIN_SCORE,
                 "对SYN|ACK判断不正确"
             );
             let (src_score, dst_score) =
-                table.get_tcp_score(false, TcpFlags::SYN_ACK, src_key, dst_key);
+                table.get_tcp_score(false, false, TcpFlags::SYN_ACK, src_key, dst_key);
             assert!(
                 src_score == ServiceTable::MAX_SCORE && dst_score == ServiceTable::MIN_SCORE,
                 "对SYN|ACK判断不正确"
             );
 
             let (src_score, dst_score) =
-                table.get_tcp_score(true, TcpFlags::empty(), src_key, dst_key);
+                table.get_tcp_score(true, false, TcpFlags::empty(), src_key, dst_key);
             assert!(
                 src_score == ServiceTable::MAX_SCORE && dst_score == ServiceTable::MIN_SCORE,
                 "其它Flag首包预期不能改变SYN|ACK的Score"
             );
 
             let (src_score, dst_score) =
-                table.get_tcp_score(false, TcpFlags::empty(), src_key, dst_key);
+                table.get_tcp_score(false, false, TcpFlags::empty(), src_key, dst_key);
             assert!(
                 src_score == ServiceTable::MAX_SCORE && dst_score == ServiceTable::MIN_SCORE,
                 "其它Flag非首包预期不能改变SYN|ACK的Score"
             );
 
-            let (src_score, dst_score) = table.get_tcp_score(true, TcpFlags::SYN, src_key, dst_key);
+            let (src_score, dst_score) =
+                table.get_tcp_score(true, false, TcpFlags::SYN, src_key, dst_key);
             assert!(
                 src_score == ServiceTable::MIN_SCORE && dst_score == ServiceTable::MIN_SCORE + 1,
                 "对SYN判断不正确"
             );
 
             let (src_score, dst_score) =
-                table.get_tcp_score(false, TcpFlags::SYN, src_key, dst_key);
+                table.get_tcp_score(false, false, TcpFlags::SYN, src_key, dst_key);
             assert!(
                 src_score == ServiceTable::MIN_SCORE && dst_score == ServiceTable::MIN_SCORE + 1,
                 "对SYN判断不正确"
             );
             let (src_score, dst_score) =
-                table.get_tcp_score(true, TcpFlags::empty(), src_key, dst_key);
+                table.get_tcp_score(true, false, TcpFlags::empty(), src_key, dst_key);
             assert!(
                 src_score == ServiceTable::MIN_SCORE && dst_score == ServiceTable::MIN_SCORE + 2,
                 "对其它Flag首包的判断不正确"
             );
 
             let (src_score, dst_score) =
-                table.get_tcp_score(false, TcpFlags::empty(), src_key, dst_key);
+                table.get_tcp_score(false, false, TcpFlags::empty(), src_key, dst_key);
             assert!(
                 src_score == ServiceTable::MIN_SCORE && dst_score == ServiceTable::MIN_SCORE + 2,
                 "对其它Flag非首包的判断不正确"

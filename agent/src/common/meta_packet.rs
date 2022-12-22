@@ -43,6 +43,7 @@ use super::{
 };
 
 use crate::error;
+use crate::utils::bytes::{read_u16_be, read_u32_be};
 #[cfg(target_os = "linux")]
 use crate::{
     common::ebpf::GO_HTTP2_UPROBE,
@@ -131,6 +132,10 @@ pub struct MetaPacket<'a> {
     pub process_kname: [u8; PACKET_KNAME_MAX_PADDING], // kernel process name
     // for PcapAssembler
     pub flow_id: u64,
+
+    /********** For NAT (currently only TOA) ***********/
+    pub nat_client_ip: Option<IpAddr>,
+    pub nat_client_port: u16,
 }
 
 impl<'a> MetaPacket<'a> {
@@ -262,6 +267,16 @@ impl<'a> MetaPacket<'a> {
                         &packet[self.tcp_opt_sack_offset..self.tcp_opt_sack_offset + sack_size],
                     );
                     self.tcp_data.sack.replace(sack);
+                }
+                // TOA: https://github.com/Huawei/TCP_option_address/blob/master/src/toa.h
+                TcpOptionNumber(TCP_OPT_ADDRESS) => {
+                    if assume_length == TCP_TOA_LEN {
+                        self.nat_client_port = read_u16_be(&packet[offset + TCP_TOA_PORT_OFFSET..]);
+                        self.nat_client_ip = Some(IpAddr::from(Ipv4Addr::from(read_u32_be(
+                            &packet[offset + TCP_TOA_IP_OFFSET..],
+                        ))));
+                    }
+                    offset += assume_length;
                 }
                 _ => offset += assume_length,
             }
@@ -485,7 +500,7 @@ impl<'a> MetaPacket<'a> {
             }
             EthernetType::Ipv6 => {
                 is_ipv6 = true;
-                size_checker -= HeaderType::Ipv6.min_header_size() as isize;
+                size_checker -= (HeaderType::Ipv6.min_header_size() + IPV6_HEADER_ADJUST) as isize;
                 if size_checker < 0 {
                     return Ok(());
                 }
@@ -531,6 +546,7 @@ impl<'a> MetaPacket<'a> {
 
                 size_checker -= options_length as isize;
                 if size_checker < 0 {
+                    self.npb_ignore_l4 = true;
                     return Ok(());
                 }
                 self.l3_payload_len = size_checker as usize;

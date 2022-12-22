@@ -54,6 +54,8 @@ static uint32_t conf_max_trace_entries;
  */
 static uint32_t socket_data_limit_max;
 
+static uint32_t go_tracing_timeout = GO_TRACING_TIMEOUT_DEFAULT;
+
 // socket map 进行回收的最大阈值，超过这个值进行map回收。
 static uint32_t conf_socket_map_max_reclaim;
 
@@ -900,6 +902,38 @@ int set_data_limit_max(int limit_size)
 	return set_val;
 }
 
+int set_go_tracing_timeout(int timeout)
+{
+	go_tracing_timeout = timeout;
+
+	struct bpf_tracer *tracer = find_bpf_tracer(SK_TRACER_NAME);
+	if (tracer == NULL) {
+		return 0;
+	}
+
+	int cpu;
+	int nr_cpus = get_num_possible_cpus();
+	struct trace_conf_t values[nr_cpus];
+	memset(values, 0, sizeof(values));
+
+	if (!bpf_table_get_value(tracer, MAP_TRACE_CONF_NAME, 0, values)) {
+		ebpf_warning("Get map '%s' failed.\n", MAP_TRACE_CONF_NAME);
+		return ETR_NOTEXIST;
+	}
+
+	for (cpu = 0; cpu < nr_cpus; cpu++) {
+		values[cpu].go_tracing_timeout = timeout;
+	}
+
+	if (!bpf_table_set_value
+	    (tracer, MAP_TRACE_CONF_NAME, 0, (void *)&values)) {
+		ebpf_warning("Set '%s' failed\n", MAP_TRACE_CONF_NAME);
+		return ETR_UPDATE_MAP_FAILD;
+	}
+
+	return 0;
+}
+
 static void __insert_output_prog_to_map(struct bpf_tracer *tracer,
 					const char *map_name,
 					const char *prog_name,
@@ -1079,6 +1113,7 @@ int running_socket_tracer(l7_handle_fn handle,
 		t_conf[cpu].coroutine_trace_id = t_conf[cpu].socket_id;
 		t_conf[cpu].thread_trace_id = t_conf[cpu].socket_id;
 		t_conf[cpu].data_limit_max = socket_data_limit_max;
+		t_conf[cpu].go_tracing_timeout = go_tracing_timeout;
 	}
 
 	if (!bpf_table_set_value(tracer, MAP_TRACE_CONF_NAME, 0, (void *)&t_conf))

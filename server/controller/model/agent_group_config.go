@@ -138,4 +138,5 @@ type EbpfConfig struct {
 	MaxSocketEntries        *int                               `yaml:"max-socket-entries,omitempty"`
 	MaxTraceEntries         *int                               `yaml:"max-trace-entries,omitempty"`
 	SocketMapMaxReclaim     *int                               `yaml:"socket-map-max-reclaim,omitempty"`
+	GoTracingTimeout        *int                               `yaml:"go-tracing-timeout,omitempty"`
 }

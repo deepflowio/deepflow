@@ -410,7 +410,7 @@ impl SubQuadGen {
             let mut v4_flows: Vec<Box<AccumulatedFlow>> =
                 stash.v4_flows.into_values().map(Box::new).collect();
             Self::set_connection(&mut v4_flows, connection, possible_host);
-            if let Err(_) = self.output.send_all(v4_flows) {
+            if let Err(_) = self.output.send_large(v4_flows) {
                 debug!("qg push v4 flows to queue failed maybe queue have terminated");
             }
         }
@@ -419,7 +419,7 @@ impl SubQuadGen {
             let mut v6_flows: Vec<Box<AccumulatedFlow>> =
                 stash.v6_flows.into_values().map(Box::new).collect();
             Self::set_connection(&mut v6_flows, connection, possible_host);
-            if let Err(_) = self.output.send_all(v6_flows) {
+            if let Err(_) = self.output.send_large(v6_flows) {
                 debug!("qg push v6 flows to queue failed maybe queue have terminated");
             }
         }
@@ -514,8 +514,10 @@ impl SubQuadGen {
                 &tagged_flow,
             );
         } else {
-            let nat_real_ip0 = tagged_flow.flow.flow_metrics_peers[0].nat_real_ip;
-            let nat_real_ip1 = tagged_flow.flow.flow_metrics_peers[1].nat_real_ip;
+            let nat_real_ip_0 = tagged_flow.flow.flow_metrics_peers[0].nat_real_ip;
+            let nat_real_port_0 = tagged_flow.flow.flow_metrics_peers[0].nat_real_port;
+            let nat_real_ip_1 = tagged_flow.flow.flow_metrics_peers[1].nat_real_ip;
+            let nat_real_port_1 = tagged_flow.flow.flow_metrics_peers[1].nat_real_port;
             let l7_protocol = if let Some(p) = tagged_flow.flow.flow_perf_stats.as_ref() {
                 p.l7_protocol
             } else {
@@ -529,8 +531,10 @@ impl SubQuadGen {
                 policy_ids: policy_ids.clone(),
                 flow_meter: *flow_meter,
                 time_in_second,
-                nat_src_ip: nat_real_ip0,
-                nat_dst_ip: nat_real_ip1,
+                nat_real_ip_0,
+                nat_real_ip_1,
+                nat_real_port_0,
+                nat_real_port_1,
                 key: key.clone(),
                 app_meter: *app_meter,
             };
@@ -1159,8 +1163,10 @@ mod test {
             app_meter: AppMeter::default(),
             key: QuadrupleGenerator::get_key(&tagged_flow),
             time_in_second: Duration::from_secs(0),
-            nat_src_ip: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
-            nat_dst_ip: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            nat_real_ip_0: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            nat_real_port_0: 0,
+            nat_real_ip_1: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            nat_real_port_1: 0,
         }
     }
 
