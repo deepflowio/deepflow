@@ -39,6 +39,8 @@ import (
 
 func QueryRouter(e *gin.Engine) {
 	e.POST("/v1/query/", executeQuery())
+	e.GET("/v1/prom/query", promQuery())
+	e.GET("/v1/prom/query_range", promQueryRange())
 
 	// api router for prometheus
 	e.POST("/api/v1/prom/read", promReader())
@@ -49,6 +51,7 @@ func QueryRouter(e *gin.Engine) {
 	e.GET("/api/search/tags", tempoTagsReader())
 	e.GET("/api/search/tag/:tagName/values", tempoTagValuesReader())
 	e.GET("/api/search", tempoSearchReader())
+
 }
 
 func executeQuery() gin.HandlerFunc {
@@ -71,6 +74,48 @@ func executeQuery() gin.HandlerFunc {
 			args.Sql, _ = json["sql"].(string)
 		}
 		result, debug, err := service.Execute(&args)
+		if err == nil && args.Debug != "true" {
+			debug = nil
+		}
+		JsonResponse(c, result, debug, err)
+	})
+}
+
+func promQuery() gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		args := common.PromQueryParams{}
+		args.Context = c.Request.Context()
+		args.Debug = c.Query("debug")
+		args.QueryUUID = c.Query("query_uuid")
+		if args.QueryUUID == "" {
+			query_uuid := uuid.New()
+			args.QueryUUID = query_uuid.String()
+		}
+		args.Promql = c.Query("query")
+		args.Time = c.Query("time")
+		result, debug, err := service.PromQueryExecute(&args, c.Request.Context())
+		if err == nil && args.Debug != "true" {
+			debug = nil
+		}
+		JsonResponse(c, result, debug, err)
+	})
+}
+
+func promQueryRange() gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		args := common.PromQueryRangeParams{}
+		args.Context = c.Request.Context()
+		args.Debug = c.Query("debug")
+		args.QueryUUID = c.Query("query_uuid")
+		if args.QueryUUID == "" {
+			query_uuid := uuid.New()
+			args.QueryUUID = query_uuid.String()
+		}
+		args.Promql = c.Query("query")
+		args.StartTime = c.Query("start")
+		args.EndTime = c.Query("end")
+		args.Step = c.Query("step")
+		result, debug, err := service.PromQueryRangeExecute(&args, c.Request.Context())
 		if err == nil && args.Debug != "true" {
 			debug = nil
 		}
