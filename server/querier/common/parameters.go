@@ -14,6 +14,24 @@ type QuerierParams struct {
 	Context    context.Context
 }
 
+type PromQueryParams struct {
+	Debug     string
+	QueryUUID string
+	Promql    string
+	Time      string
+	Context   context.Context
+}
+
+type PromQueryRangeParams struct {
+	Debug     string
+	QueryUUID string
+	Promql    string
+	StartTime string
+	EndTime   string
+	Step      string
+	Context   context.Context
+}
+
 type TempoParams struct {
 	TraceId     string
 	StartTime   string
