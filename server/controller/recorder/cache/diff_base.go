@@ -69,6 +69,7 @@ type DiffBaseDataSet struct {
 	PodGroupPorts          map[string]*PodGroupPort
 	PodReplicaSets         map[string]*PodReplicaSet
 	Pods                   map[string]*Pod
+	Process                map[string]*Process
 }
 
 func NewDiffBaseDataSet() DiffBaseDataSet {
@@ -115,6 +116,7 @@ func NewDiffBaseDataSet() DiffBaseDataSet {
 		PodGroupPorts:          make(map[string]*PodGroupPort),
 		PodReplicaSets:         make(map[string]*PodReplicaSet),
 		Pods:                   make(map[string]*Pod),
+		Process:                make(map[string]*Process),
 	}
 }
 
@@ -924,6 +926,23 @@ func (b *DiffBaseDataSet) deleteVMPodNodeConnection(lcuuid string) {
 	log.Info(deleteDiffBase(RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, lcuuid))
 }
 
+func (b *DiffBaseDataSet) addProcess(dbItem *mysql.Process, seq int) {
+	b.Process[dbItem.Lcuuid] = &Process{
+		DiffBase: DiffBase{
+			Sequence: seq,
+			Lcuuid:   dbItem.Lcuuid,
+		},
+		Name:      dbItem.Name,
+		OsAppTags: dbItem.OsAppTags,
+	}
+	log.Info(addDiffBase(RESOURCE_TYPE_PROCESS_EN, b.Process[dbItem.Lcuuid]))
+}
+
+func (b *DiffBaseDataSet) deleteProcess(lcuuid string) {
+	delete(b.Process, lcuuid)
+	log.Info(deleteDiffBase(RESOURCE_TYPE_PROCESS_EN, lcuuid))
+}
+
 type DiffBase struct {
 	Sequence int    `json:"sequence"`
 	Lcuuid   string `json:"lcuuid"`
@@ -1573,4 +1592,16 @@ type NATVMConnection struct {
 
 type LBVMConnection struct {
 	DiffBase
+}
+
+type Process struct {
+	DiffBase
+	Name      string `json:"name"`
+	OsAppTags string `json:"os_app_tags"`
+}
+
+func (p *Process) Update(cloudItem *cloudmodel.Process) {
+	p.Name = cloudItem.Name
+	p.OsAppTags = cloudItem.OsAppTags
+	log.Info(updateDiffBase(RESOURCE_TYPE_PROCESS_EN, p))
 }

@@ -62,7 +62,7 @@ func (t *SuiteTest) TestHandleAddVRouterSucess() {
 	defer monkey.Reset()
 	assert.Equal(t.T(), len(cache_.VRouters), 0)
 
-	updater := NewVRouter(cache_, []cloudmodel.VRouter{cloudItem}, nil)
+	updater := NewVRouter(cache_, []cloudmodel.VRouter{cloudItem})
 	updater.HandleAddAndUpdate()
 
 	var addedItem *mysql.VRouter
@@ -83,7 +83,7 @@ func (t *SuiteTest) TestHandleUpdateVRouterSucess() {
 	})
 	defer monkey.Reset()
 
-	updater := NewVRouter(cache_, []cloudmodel.VRouter{cloudItem}, nil)
+	updater := NewVRouter(cache_, []cloudmodel.VRouter{cloudItem})
 	updater.HandleAddAndUpdate()
 
 	var addedItem *mysql.VRouter
@@ -100,7 +100,7 @@ func (t *SuiteTest) TestHandleUpdateVRouterSucess() {
 func (t *SuiteTest) TestHandleDeleteVRouterSucess() {
 	cache, cloudItem := t.getVRouterMock(true)
 
-	updater := NewVRouter(cache, []cloudmodel.VRouter{cloudItem}, nil)
+	updater := NewVRouter(cache, []cloudmodel.VRouter{cloudItem})
 	updater.HandleDelete()
 
 	var addedItem *mysql.VRouter

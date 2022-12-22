@@ -184,6 +184,7 @@ func (c *Cache) Refresh() {
 	c.refreshVInterfaces()
 	c.refreshWANIPs()
 	c.refreshLANIPs()
+	c.refreshProcesses()
 }
 
 func (c *Cache) AddRegion(item *mysql.Region) {
@@ -1468,4 +1469,27 @@ func (c *Cache) refreshPods() {
 	}
 
 	c.AddPods(pods)
+}
+
+func (c *Cache) AddProcesses(items []*mysql.Process) {
+	for _, item := range items {
+		c.DiffBaseDataSet.addProcess(item, c.Sequence)
+	}
+}
+
+func (c *Cache) DeleteProcesses(lcuuids []string) {
+	for _, lcuuid := range lcuuids {
+		c.DiffBaseDataSet.deleteProcess(lcuuid)
+	}
+}
+
+func (c *Cache) refreshProcesses() {
+	log.Infof(refreshResource(RESOURCE_TYPE_PROCESS_EN))
+	var processes []*mysql.Process
+	if err := mysql.Db.Where(c.getConditionDomain()).Find(&processes).Error; err != nil {
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_PROCESS_EN, err))
+		return
+	}
+
+	c.AddProcesses(processes)
 }
