@@ -488,6 +488,40 @@ var ColumnAdd618 = []*ColumnAdds{
 	},
 }
 
+var u8ColumnNameAdd620 = []string{"nat_source"}
+var flowMetricsTableAdd620 = []string{
+	"vtap_flow_edge_port.1m", "vtap_flow_edge_port.1m_local",
+	"vtap_flow_edge_port.1s", "vtap_flow_edge_port.1s_local",
+	"vtap_app_edge_port.1m", "vtap_app_edge_port.1m_local",
+	"vtap_app_edge_port.1s", "vtap_app_edge_port.1s_local",
+}
+var ColumnAdd620 = []*ColumnAdds{
+	&ColumnAdds{
+		Dbs:         []string{"flow_metrics"},
+		Tables:      flowMetricsTableAdd620,
+		ColumnNames: u8ColumnNameAdd620,
+		ColumnType:  ckdb.UInt8,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l4_flow_log", "l4_flow_log_local", "l7_flow_log", "l7_flow_log_local"},
+		ColumnNames: u8ColumnNameAdd620,
+		ColumnType:  ckdb.UInt8,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l4_flow_log", "l4_flow_log_local"},
+		ColumnNames: []string{"nat_real_ip_0", "nat_real_ip_1"},
+		ColumnType:  ckdb.IPv4,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l4_flow_log", "l4_flow_log_local"},
+		ColumnNames: []string{"nat_real_port_0", "nat_real_port_1"},
+		ColumnType:  ckdb.UInt16,
+	},
+}
+
 func getTables(connect *sql.DB, db, tableName string) ([]string, error) {
 	sql := fmt.Sprintf("SHOW TABLES IN %s", db)
 	rows, err := connect.Query(sql)
@@ -636,8 +670,19 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo) ([]*Colum
 		},
 	}
 
-	for _, adds := range columnAddss612 {
-		columnAdds = append(columnAdds, getColumnAdds(adds)...)
+	var columnAddss620 = []*ColumnAdds{
+		&ColumnAdds{
+			Dbs:         []string{d.db},
+			Tables:      []string{d.name, d.name + "_agg"},
+			ColumnNames: u8ColumnNameAdd620,
+			ColumnType:  ckdb.UInt8,
+		},
+	}
+
+	for _, version := range [][]*ColumnAdds{columnAddss612, columnAddss620} {
+		for _, addrs := range version {
+			columnAdds = append(columnAdds, getColumnAdds(addrs)...)
+		}
 	}
 
 	for _, addColumn := range columnAdds {
@@ -712,7 +757,7 @@ func NewCKIssu(cfg *config.Config) (*Issu, error) {
 		password:    cfg.CKDBAuth.Password,
 	}
 
-	allVersionAdds := [][]*ColumnAdds{ColumnAdd612, ColumnAdd613, ColumnAdd615, ColumnAdd618}
+	allVersionAdds := [][]*ColumnAdds{ColumnAdd612, ColumnAdd613, ColumnAdd615, ColumnAdd618, ColumnAdd620}
 	i.columnAdds = []*ColumnAdd{}
 	for _, versionAdd := range allVersionAdds {
 		for _, adds := range versionAdd {

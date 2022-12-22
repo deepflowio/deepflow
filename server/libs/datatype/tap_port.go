@@ -37,15 +37,39 @@ const (
 const (
 	_FROM_OFFSET        = 60
 	_TUNNEL_TYPE_OFFSET = 32
+	_NAT_SOURCE_OFFSET  = 36
 	_RESERVED_OFFSET    = 40
 
-	_RESERVED_MASK = 0xfffff
+	_RESERVED_MASK    = 0xfffff
+	_TUNNEL_TYPE_MASK = 0xf
+	_NAT_SOURCE_MASK  = 0xf
 )
 
-// 64     60         40         32                                    0
-// +------+----------+----------+-------------------------------------+
-// | from | RESERVED | TUN_TYPE |              ip/id/mac              |
-// +------+----------+----------+-------------------------------------+
+type NATSource uint8
+
+const (
+	NAT_SOURCE_NONE NATSource = iota
+	NAT_SOURCE_VIP
+	NAT_SOURCE_TOA
+)
+
+func (n NATSource) String() string {
+	switch n {
+	case NAT_SOURCE_NONE:
+		return "none"
+	case NAT_SOURCE_VIP:
+		return "VIP"
+	case NAT_SOURCE_TOA:
+		return "TOA"
+	default:
+		return "NATSource unknown"
+	}
+}
+
+// 64     60         40           36         32                                    0
+// +------+----------+------------+----------+-------------------------------------+
+// | from | RESERVED | NAT SOURCE | TUN_TYPE |              ip/id/mac              |
+// +------+----------+------------+----------+-------------------------------------+
 // 注意ip/id/mac不能超过32bit，否则数据存储、四元组聚合都会有歧义
 type TapPort uint64
 
@@ -80,8 +104,8 @@ func FromID(tunnelType TunnelType, id int) TapPort {
 }
 
 // TapPort、TapPortType、TunnelType
-func (p TapPort) SplitToPortTypeTunnel() (uint32, uint8, TunnelType) {
-	return uint32(p), uint8(p >> _FROM_OFFSET), TunnelType(p >> 32)
+func (p TapPort) SplitToPortTypeTunnel() (uint32, uint8, NATSource, TunnelType) {
+	return uint32(p), uint8(p >> _FROM_OFFSET), NATSource(p >> _NAT_SOURCE_OFFSET & _NAT_SOURCE_MASK), TunnelType(p >> _TUNNEL_TYPE_OFFSET & _TUNNEL_TYPE_MASK)
 }
 
 // 用于编码后做为Map Key
@@ -90,7 +114,7 @@ func (p TapPort) SetReservedBytes(v uint32) TapPort {
 }
 
 func (p TapPort) String() string {
-	tapPort, tapPortType, tunnelType := p.SplitToPortTypeTunnel()
+	tapPort, tapPortType, _, tunnelType := p.SplitToPortTypeTunnel()
 	switch tapPortType {
 	case TAPPORT_FROM_LOCAL_MAC:
 		return fmt.Sprintf("LMAC@%s@%02x:%02x:%02x:%02x",
