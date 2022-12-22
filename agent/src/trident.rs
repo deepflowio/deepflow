@@ -1429,7 +1429,7 @@ impl Components {
         #[allow(unused)]
         let mut ebpf_collector = None;
         #[cfg(target_os = "linux")]
-        {
+        if config_handler.candidate_config.tap_mode != TapMode::Analyzer {
             let ebpf_dispatcher_id = dispatchers.len();
             let (flow_sender, flow_receiver, counter) = queue::bounded_with_debug(
                 yaml_config.flow_queue_size,
