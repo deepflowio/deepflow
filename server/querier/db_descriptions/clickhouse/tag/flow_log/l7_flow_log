@@ -85,6 +85,7 @@ end_time                  , end_time                  , end_time                
 signal_source             , signal_source             , signal_source              , int_enum       , l7_signal_source      , Capture Info      , 111
 tap                       , tap                       , tap                        , resource       ,                       , Capture Info      , 110
 vtap                      , vtap                      , vtap                       , resource       ,                       , Capture Info      , 111
+nat_source                , nat_source                , nat_source                 , int_enum       , nat_source            , Capture Info      , 111
 tap_port                  , tap_port                  , tap_port                   , mac            ,                       , Capture Info      , 111
 tap_port_name             , tap_port_name             , tap_port_name              , string         ,                       , Capture Info      , 111
 tap_port_type             , tap_port_type             , tap_port_type              , int_enum       , tap_port_type         , Capture Info      , 111

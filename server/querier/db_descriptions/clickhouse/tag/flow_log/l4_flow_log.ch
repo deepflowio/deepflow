@@ -76,6 +76,7 @@ is_new_flow           , 新建流                       ,
 signal_source         , 信号源                       ,
 tap                   , 采集点                       , Traffic Access Point，流量采集点，使用固定值（虚拟网络）表示云内流量，其他值表示传统 IDC 流量（支持最多 254 个自定义值表示镜像分光的位置）。
 vtap                  , 采集器                       ,
+nat_source            , NAT 源                       ,
 tap_port              , 采集位置标识                 , 当采集位置类型为本地网卡时，此值表示采集网卡的 MAC 地址后缀（后四字节）。
 tap_port_name         , 采集位置名称                 , 当采集位置类型为本地网卡时，此值表示采集网卡的名称。
 tap_port_type         , 采集位置类型                 , 表示流量采集位置的类型，包括本地网卡（云内流量）、云网关网卡（云网关流量）、分光镜像（传统 IDC 流量）等。
@@ -83,3 +84,5 @@ tap_side              , 路径统计位置                 , 采集位置在流�
 l2_end                , 二层边界                     , 表示是否是在客户端网卡或服务端网卡处采集的流量。
 l3_end                , 三层边界                     , 表示是否是在客户端或服务端所在二层网络内采集的流量。
 has_pcap              , PCAP 文件                    , 是否存储了 PCAP 文件
+nat_real_ip           , NAT IP 地址                  , NAT 作用前（后）的真实 IP 地址，该值从 TOA（TCP Option Address）中提取，或者根据云平台中 VIP 与 RIP 的映射信息计算。
+nat_real_port         , NAT Port                     , NAT 作用前的真实端口号，该值从 TOA（TCP Option Address）中提取。

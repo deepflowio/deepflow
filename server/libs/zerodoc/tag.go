@@ -1053,6 +1053,7 @@ func GenTagColumns(code Code) []*ckdb.Column {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("tap_port_type", ckdb.UInt8).SetIndex(ckdb.IndexNone).SetComment("采集位置标识类型 0: MAC，1: IPv4, 2: IPv6, 3: ID, 4: NetFlow, 5: SFlow"))
 		columns = append(columns, ckdb.NewColumnWithGroupBy("tunnel_type", ckdb.UInt8).SetIndex(ckdb.IndexNone).SetComment("隧道封装类型 0：--，1：VXLAN，2：IPIP，3：GRE"))
 		columns = append(columns, ckdb.NewColumnWithGroupBy("tap_port", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("采集位置标识 若tap_type为3: 虚拟网络流量源, 表示虚拟接口MAC地址低4字节 00000000~FFFFFFFF"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("nat_source", ckdb.UInt8).SetComment("0: NONE, 1: VIP, 2: TOA"))
 	}
 	if code&TAPSide != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("tap_side", ckdb.LowCardinalityString).SetComment("流量采集位置(c: 客户端(0侧)采集, s: 服务端(1侧)采集)"))
@@ -1419,7 +1420,7 @@ func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) error {
 		}
 	}
 	if code&TAPPort != 0 {
-		tapPort, tapPortType, tunnelType := t.TAPPort.SplitToPortTypeTunnel()
+		tapPort, tapPortType, natSource, tunnelType := t.TAPPort.SplitToPortTypeTunnel()
 		if err := block.WriteUInt8(tapPortType); err != nil {
 			return err
 		}
@@ -1427,6 +1428,9 @@ func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) error {
 			return err
 		}
 		if err := block.WriteUInt32(tapPort); err != nil {
+			return err
+		}
+		if err := block.WriteUInt8(uint8(natSource)); err != nil {
 			return err
 		}
 	}

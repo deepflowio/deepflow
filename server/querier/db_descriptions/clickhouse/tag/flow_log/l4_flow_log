@@ -76,6 +76,7 @@ is_new_flow         , is_new_flow          , is_new_flow           , bool       
 signal_source       , signal_source        , signal_source         , int_enum     , l4_signal_source     , Capture Info         , 111
 tap                 , tap                  , tap                   , resource     ,                      , Capture Info         , 110
 vtap                , vtap                 , vtap                  , resource     ,                      , Capture Info         , 111
+nat_source          , nat_source           , nat_source            , int_enum     , nat_source           , Capture Info         , 111
 tap_port            , tap_port             , tap_port              , mac          ,                      , Capture Info         , 111
 tap_port_name       , tap_port_name        , tap_port_name         , string       ,                      , Capture Info         , 111
 tap_port_type       , tap_port_type        , tap_port_type         , int_enum     , tap_port_type        , Capture Info         , 111
@@ -83,3 +84,5 @@ tap_side            , tap_side             , tap_side              , string_enum
 l2_end              , l2_end_0             , l2_end_1              , bool         ,                      , Capture Info         , 111
 l3_end              , l3_end_0             , l3_end_1              , bool         ,                      , Capture Info         , 111
 has_pcap            , has_pcap             , has_pcap              , bool         ,                      , Capture Info         , 111
+nat_real_ip         , nat_real_ip_0        , nat_real_ip_1         , ip           ,                      , Capture Info         , 111
+nat_real_port       , nat_real_port_0      , nat_real_port_1       , int          ,                      , Capture Info         , 111

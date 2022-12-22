@@ -85,10 +85,10 @@ func (f *DataLinkLayer) WriteBlock(block *ckdb.Block) error {
 }
 
 type NetworkLayer struct {
-	IP40         uint32 `json: "ip4_0"`
-	IP41         uint32 `json: "ip4_1"`
-	IP60         net.IP `json: "ip6_0"`
-	IP61         net.IP `json: "ip6_1"`
+	IP40         uint32 `json:"ip4_0"`
+	IP41         uint32 `json:"ip4_1"`
+	IP60         net.IP `json:"ip6_0"`
+	IP61         net.IP `json:"ip6_1"`
 	IsIPv4       bool   `json:"is_ipv4"`
 	Protocol     uint8  `json:"protocol"`
 	TunnelTier   uint8  `json:"tunnel_tier,omitempty"`
@@ -542,6 +542,7 @@ type FlowInfo struct {
 	SignalSource uint16 `json:"signal_source"`
 	FlowID       uint64 `json:"flow_id"`
 	TapType      uint16 `json:"tap_type"`
+	NatSource    uint8  `json:"nat_source"`
 	TapPortType  uint8  `json:"tap_port_type"` // 0: MAC, 1: IPv4, 2:IPv6, 3: ID
 	TapPort      uint32 `json:"tap_port"`
 	TapSide      string `json:"tap_side"`
@@ -556,6 +557,11 @@ type FlowInfo struct {
 	IsNewFlow    uint8  `json:"is_new_flow"`
 	Status       uint8  `json:"status"`
 	AclGids      []uint16
+
+	NatRealIP0   uint32
+	NatRealIP1   uint32
+	NatRealPort0 uint16
+	NatRealPort1 uint16
 }
 
 var FlowInfoColumns = []*ckdb.Column{
@@ -564,6 +570,7 @@ var FlowInfoColumns = []*ckdb.Column{
 	ckdb.NewColumn("signal_source", ckdb.UInt16),
 	ckdb.NewColumn("flow_id", ckdb.UInt64).SetIndex(ckdb.IndexMinmax),
 	ckdb.NewColumn("tap_type", ckdb.UInt16),
+	ckdb.NewColumn("nat_source", ckdb.UInt8),
 	ckdb.NewColumn("tap_port_type", ckdb.UInt8),
 	ckdb.NewColumn("tap_port", ckdb.UInt32),
 	ckdb.NewColumn("tap_side", ckdb.LowCardinalityString),
@@ -579,6 +586,10 @@ var FlowInfoColumns = []*ckdb.Column{
 	ckdb.NewColumn("is_new_flow", ckdb.UInt8),
 	ckdb.NewColumn("status", ckdb.UInt8).SetComment("状态 0:正常, 1:异常 ,2:不存在，3:服务端异常, 4:客户端异常"),
 	ckdb.NewColumn("acl_gids", ckdb.ArrayUInt16),
+	ckdb.NewColumn("nat_real_ip_0", ckdb.IPv4),
+	ckdb.NewColumn("nat_real_ip_1", ckdb.IPv4),
+	ckdb.NewColumn("nat_real_port_0", ckdb.UInt16),
+	ckdb.NewColumn("nat_real_port_1", ckdb.UInt16),
 }
 
 func (f *FlowInfo) WriteBlock(block *ckdb.Block) error {
@@ -592,6 +603,9 @@ func (f *FlowInfo) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 	if err := block.WriteUInt16(f.TapType); err != nil {
+		return err
+	}
+	if err := block.WriteUInt8(f.NatSource); err != nil {
 		return err
 	}
 	if err := block.WriteUInt8(f.TapPortType); err != nil {
@@ -637,6 +651,18 @@ func (f *FlowInfo) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 	if err := block.WriteArrayUint16(f.AclGids); err != nil {
+		return err
+	}
+	if err := block.WriteIPv4(f.NatRealIP0); err != nil {
+		return err
+	}
+	if err := block.WriteIPv4(f.NatRealIP1); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(f.NatRealPort0); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(f.NatRealPort1); err != nil {
 		return err
 	}
 
@@ -1122,7 +1148,9 @@ func (i *FlowInfo) Fill(f *pb.Flow) {
 	i.SignalSource = uint16(f.SignalSource)
 	i.FlowID = f.FlowId
 	i.TapType = uint16(f.FlowKey.TapType)
-	i.TapPort, i.TapPortType, _ = datatype.TapPort(f.FlowKey.TapPort).SplitToPortTypeTunnel()
+	var natSource datatype.NATSource
+	i.TapPort, i.TapPortType, natSource, _ = datatype.TapPort(f.FlowKey.TapPort).SplitToPortTypeTunnel()
+	i.NatSource = uint8(natSource)
 	i.TapSide = zerodoc.TAPSideEnum(f.TapSide).String()
 	i.VtapID = uint16(f.FlowKey.VtapId)
 
@@ -1140,6 +1168,10 @@ func (i *FlowInfo) Fill(f *pb.Flow) {
 	for _, v := range f.AclGids {
 		i.AclGids = append(i.AclGids, uint16(v))
 	}
+	i.NatRealIP0 = f.MetricsPeerSrc.RealIp
+	i.NatRealIP1 = f.MetricsPeerDst.RealIp
+	i.NatRealPort0 = uint16(f.MetricsPeerSrc.RealPort)
+	i.NatRealPort1 = uint16(f.MetricsPeerDst.RealPort)
 }
 
 func (m *Metrics) Fill(f *pb.Flow) {

@@ -57,6 +57,7 @@ type L7Base struct {
 	// 流信息
 	FlowID       uint64 `json:"flow_id"`
 	TapType      uint8  `json:"tap_type"`
+	NatSource    uint8  `json:"nat_source"`
 	TapPortType  uint8  `json:"tap_port_type"`
 	SignalSource uint16 `json:"signal_source"`
 	TunnelType   uint8  `json:"tunnel_type"`
@@ -100,6 +101,7 @@ func L7BaseColumns() []*ckdb.Column {
 		// 流信息
 		ckdb.NewColumn("flow_id", ckdb.UInt64).SetIndex(ckdb.IndexMinmax),
 		ckdb.NewColumn("tap_type", ckdb.UInt8).SetIndex(ckdb.IndexSet),
+		ckdb.NewColumn("nat_source", ckdb.UInt8).SetIndex(ckdb.IndexSet),
 		ckdb.NewColumn("tap_port_type", ckdb.UInt8).SetIndex(ckdb.IndexNone),
 		ckdb.NewColumn("signal_source", ckdb.UInt16).SetIndex(ckdb.IndexNone),
 		ckdb.NewColumn("tunnel_type", ckdb.UInt8).SetIndex(ckdb.IndexNone),
@@ -171,6 +173,9 @@ func (f *L7Base) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 	if err := block.WriteUInt8(f.TapType); err != nil {
+		return err
+	}
+	if err := block.WriteUInt8(f.NatSource); err != nil {
 		return err
 	}
 	if err := block.WriteUInt8(f.TapPortType); err != nil {
@@ -619,7 +624,9 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	b.FlowID = l.FlowId
 	b.TapType = uint8(l.TapType)
 	tunnelType := datatype.TunnelType(0)
-	b.TapPort, b.TapPortType, tunnelType = datatype.TapPort(l.TapPort).SplitToPortTypeTunnel()
+	var natSource datatype.NATSource
+	b.TapPort, b.TapPortType, natSource, tunnelType = datatype.TapPort(l.TapPort).SplitToPortTypeTunnel()
+	b.NatSource = uint8(natSource)
 	b.SignalSource = uint16(datatype.SIGNAL_SOURCE_PACKET)
 	if b.TapPortType == datatype.TAPPORT_FROM_OTEL {
 		b.SignalSource = uint16(datatype.SIGNAL_SOURCE_OTEL)
