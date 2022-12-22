@@ -250,6 +250,7 @@ CREATE TABLE IF NOT EXISTS vm (
     create_method       INTEGER DEFAULT 0 COMMENT '0.learning 1.user_defined',
     htype               INTEGER DEFAULT 1 COMMENT '1.vm-c 2.bm-c 3.vm-n 4.bm-n 5.vm-s 6.bm-s',
     launch_server       CHAR(64) DEFAULT '',
+    cloud_tags          TEXT COMMENT 'separated by ,',
     epc_id              INTEGER DEFAULT 0,
     domain              CHAR(64) DEFAULT '',
     az                  CHAR(64) DEFAULT '',
@@ -459,7 +460,7 @@ TRUNCATE TABLE sys_configuration;
 set @lcuuid = (select uuid());
 INSERT INTO sys_configuration (`id`,`param_name`, `value`, `comments`, `lcuuid`) VALUES (1, 'cloud_sync_timer', '60', 'unit: s', @lcuuid);
 set @lcuuid = (select uuid());
-INSERT INTO sys_configuration (`id`,`param_name`, `value`, `comments`, `lcuuid`) VALUES (2, 'pcap_data_retention', '7', 'unit: day', @lcuuid);
+INSERT INTO sys_configuration (`id`,`param_name`, `value`, `comments`, `lcuuid`) VALUES (2, 'pcap_data_retention', '3', 'unit: day', @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO sys_configuration (`id`,`param_name`, `value`, `comments`, `lcuuid`) VALUES (3, 'system_data_retention', '7', 'unit: day', @lcuuid);
 set @lcuuid = (select uuid());
@@ -796,6 +797,7 @@ CREATE TABLE IF NOT EXISTS pod_namespace (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '',
     alias               CHAR(64) DEFAULT '',
+    cloud_tags          TEXT COMMENT 'separated by ,',
     pod_cluster_id      INTEGER DEFAULT NULL,
     az                  CHAR(64) DEFAULT '',
     region              CHAR(64) DEFAULT '',

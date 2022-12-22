@@ -198,8 +198,13 @@ static __inline void report_http2_header(struct pt_regs *ctx)
 
 static __inline bool
 http2_fill_common_socket_1(struct http2_header_data *data,
-			   struct __socket_data *send_buffer, __u64 id)
+			   struct __socket_data *send_buffer)
 {
+	// Assigned at the end of the function,
+	// 0 means that the function returns during execution
+	send_buffer->pid = 0;
+
+	__u64 id = bpf_get_current_pid_tgid();
 	// source, coroutine_id, timestamp, comm
 	send_buffer->source = DATA_SOURCE_GO_HTTP2_UPROBE;
 	send_buffer->coroutine_id = get_current_goroutine();
@@ -295,8 +300,9 @@ http2_fill_common_socket_1(struct http2_header_data *data,
 
 static __inline bool
 http2_fill_common_socket_2(struct http2_header_data *data,
-			   struct __socket_data *send_buffer, __u64 id)
+			   struct __socket_data *send_buffer)
 {
+	__u64 id = bpf_get_current_pid_tgid();
 	__u32 tgid = id >> 32;
 	__u32 k0 = 0;
 
@@ -328,7 +334,8 @@ http2_fill_common_socket_2(struct http2_header_data *data,
 		trace_stats->socket_map_count++;
 	}
 
-	struct trace_key_t trace_key = get_trace_key();
+	__u32 timeout = trace_conf->go_tracing_timeout;
+	struct trace_key_t trace_key = get_trace_key(timeout);
 	struct trace_info_t *trace_info_ptr = trace_map__lookup(&trace_key);
 
 	struct conn_info_t conn_info = {
@@ -340,6 +347,7 @@ http2_fill_common_socket_2(struct http2_header_data *data,
 		      trace_info_ptr, trace_conf, trace_stats,
 		      &send_buffer->thread_trace_id, send_buffer->timestamp,
 		      &trace_key);
+	send_buffer->pid = (__u32)id;
 	return true;
 }
 
@@ -347,18 +355,16 @@ http2_fill_common_socket_2(struct http2_header_data *data,
 static __inline void http2_fill_common_socket(struct http2_header_data *data,
 					      struct __socket_data *send_buffer)
 {
-	// Assigned at the end of the function,
-	// 0 means that the function returns during execution
-	send_buffer->pid = 0;
-
-	__u64 id = bpf_get_current_pid_tgid();
-	if (!http2_fill_common_socket_1(data, send_buffer, id))
+	// When the function implementation is too complex, the compiled
+	// bytecode cannot pass the verification of some kernels (4.14).
+	// Split the complex function and reduce the complexity of the
+	// generated syntax tree to pass the verification
+	if (!http2_fill_common_socket_1(data, send_buffer))
 		return;
 
-	if (!http2_fill_common_socket_2(data, send_buffer, id))
+	if (!http2_fill_common_socket_2(data, send_buffer))
 		return;
 
-	send_buffer->pid = (__u32)id;
 }
 
 // 填充 buffer->send_buffer.data
@@ -595,6 +601,7 @@ int uprobe_go_http2ClientConn_writeHeaders(struct pt_regs *ctx)
 
 	http2_fill_common_socket(&data, send_buffer);
 	http2_fill_buffer_and_send(&data, buffer, send_buffer);
+
 	return 0;
 }
 
