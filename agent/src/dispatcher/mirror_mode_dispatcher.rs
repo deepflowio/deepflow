@@ -136,6 +136,14 @@ impl MirrorModeDispatcherListener {
     pub(super) fn on_config_change(&mut self, config: &DispatcherConfig) {
         self.base.on_config_change(config)
     }
+
+    pub fn id(&self) -> usize {
+        return self.base.id;
+    }
+
+    pub fn reset_bpf_white_list(&self) {
+        self.base.reset_whitelist.store(true, Ordering::Relaxed);
+    }
 }
 
 #[cfg(target_os = "linux")]
