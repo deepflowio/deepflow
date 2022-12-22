@@ -182,28 +182,26 @@ func (w *FlowTagWriter) WriteFieldsAndFieldValues(fields, fieldValues []interfac
 	fieldsCount, fieldValuesCount := len(fields), len(fieldValues)
 	fields = w.cache.CacheOrDropFields(fields)
 	if len(fields) != 0 {
-		if w.counter.FieldCount == 0 {
-			flushValues := w.cache.CheckOrFlushFields()
-			if len(flushValues) > 0 {
-				w.ckwriters[TagField].Put(flushValues...)
-			}
-			w.counter.FieldCount += int64(len(flushValues))
-		}
 		w.ckwriters[TagField].Put(fields...)
 		w.counter.FieldCount += int64(len(fields))
+	} else {
+		flushValues := w.cache.CheckOrFlushFields()
+		if len(flushValues) > 0 {
+			w.ckwriters[TagField].Put(flushValues...)
+		}
+		w.counter.FieldCount += int64(len(flushValues))
 	}
 
 	fieldValues = w.cache.CacheOrDropFieldValues(fieldValues)
 	if len(fieldValues) != 0 {
-		if w.counter.FieldValueCount == 0 {
-			flushValues := w.cache.CheckOrFlushFieldValues()
-			if len(flushValues) > 0 {
-				w.ckwriters[TagFieldValue].Put(flushValues...)
-			}
-			w.counter.FieldValueCount += int64(len(flushValues))
-		}
 		w.ckwriters[TagFieldValue].Put(fieldValues...)
 		w.counter.FieldValueCount += int64(len(fieldValues))
+	} else {
+		flushValues := w.cache.CheckOrFlushFieldValues()
+		if len(flushValues) > 0 {
+			w.ckwriters[TagFieldValue].Put(flushValues...)
+		}
+		w.counter.FieldValueCount += int64(len(flushValues))
 	}
 	w.counter.FieldCacheHitCount += int64(fieldsCount - len(fields))
 	w.counter.FieldValueCacheHitCount += int64(fieldValuesCount - len(fieldValues))
