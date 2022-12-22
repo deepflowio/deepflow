@@ -35,7 +35,7 @@ type MySQLModel interface {
 		mysql.PodNode | mysql.VMPodNodeConnection | mysql.PodNamespace | mysql.PodIngress |
 		mysql.PodIngressRule | mysql.PodIngressRuleBackend | mysql.PodService |
 		mysql.PodServicePort | mysql.PodGroup | mysql.PodGroupPort | mysql.PodReplicaSet |
-		mysql.Pod
+		mysql.Pod | mysql.Process
 
 	GetLcuuid() string
 	GetID() int
@@ -53,7 +53,7 @@ type CloudModel interface {
 		cloudmodel.PodNode | cloudmodel.VMPodNodeConnection | cloudmodel.PodNamespace | cloudmodel.PodIngress |
 		cloudmodel.PodIngressRule | cloudmodel.PodIngressRuleBackend | cloudmodel.PodService |
 		cloudmodel.PodServicePort | cloudmodel.PodGroup | cloudmodel.PodGroupPort | cloudmodel.PodReplicaSet |
-		cloudmodel.Pod
+		cloudmodel.Pod | cloudmodel.Process
 }
 
 // 资源用于比对的缓存对象
@@ -68,7 +68,7 @@ type DiffBase[MT MySQLModel] interface {
 		*cache.PodNode | *cache.VMPodNodeConnection | *cache.PodNamespace | *cache.PodIngress |
 		*cache.PodIngressRule | *cache.PodIngressRuleBackend | *cache.PodService |
 		*cache.PodServicePort | *cache.PodGroup | *cache.PodGroupPort | *cache.PodReplicaSet |
-		*cache.Pod
+		*cache.Pod | *cache.Process
 
 	GetSequence() int
 	SetSequence(sequence int)

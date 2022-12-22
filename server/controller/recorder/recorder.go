@@ -250,6 +250,7 @@ func (r *Recorder) getDomainUpdatersInOrder(cloudData cloudmodel.Resource) []upd
 		updater.NewPodGroupPort(r.cacheMng.DomainCache, cloudData.PodGroupPorts),
 		updater.NewPodReplicaSet(r.cacheMng.DomainCache, cloudData.PodReplicaSets),
 		pod,
+		updater.NewProcess(r.cacheMng.DomainCache, cloudData.Processes),
 		updater.NewNetwork(r.cacheMng.DomainCache, cloudData.Networks),
 		updater.NewSubnet(r.cacheMng.DomainCache, cloudData.Subnets),
 		vRouter,
@@ -274,10 +275,6 @@ func (r *Recorder) getDomainUpdatersInOrder(cloudData cloudmodel.Resource) []upd
 		ip,
 		updater.NewVMPodNodeConnection(r.cacheMng.DomainCache, cloudData.VMPodNodeConnections), // VMPodNodeConnection需放在最后
 	}
-}
-
-func (r *Recorder) registerDomainCallbacks(cloudData cloudmodel.Resource, domainCache *cache.Cache) {
-
 }
 
 func (r *Recorder) shouldRefreshSubDomain(lcuuid string, cloudData cloudmodel.SubDomainResource) bool {
