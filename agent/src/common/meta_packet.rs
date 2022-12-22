@@ -485,7 +485,7 @@ impl<'a> MetaPacket<'a> {
             }
             EthernetType::Ipv6 => {
                 is_ipv6 = true;
-                size_checker -= HeaderType::Ipv6.min_header_size() as isize;
+                size_checker -= (HeaderType::Ipv6.min_header_size() + IPV6_HEADER_ADJUST) as isize;
                 if size_checker < 0 {
                     return Ok(());
                 }
@@ -531,6 +531,7 @@ impl<'a> MetaPacket<'a> {
 
                 size_checker -= options_length as isize;
                 if size_checker < 0 {
+                    self.npb_ignore_l4 = true;
                     return Ok(());
                 }
                 self.l3_payload_len = size_checker as usize;
