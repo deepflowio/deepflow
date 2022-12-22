@@ -365,6 +365,14 @@ impl EbpfCollector {
                 return Err(Error::EbpfInitError);
             }
 
+            if ebpf::set_go_tracing_timeout(config.ebpf.go_tracing_timeout as c_int) != 0 {
+                info!(
+                    "ebpf set_go_tracing_timeout error: {}",
+                    config.ebpf.log_file
+                );
+                return Err(Error::EbpfInitError);
+            }
+
             if ebpf::running_socket_tracer(
                 Self::ebpf_callback,                       /* 回调接口 rust -> C */
                 config.ebpf.thread_num as i32, /* 工作线程数，是指用户态有多少线程参与数据处理 */
