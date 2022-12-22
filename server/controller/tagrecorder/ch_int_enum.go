@@ -54,6 +54,7 @@ func (e *ChIntEnum) generateNewData() (map[IntEnumTagKey]mysql.ChIntEnum, bool) 
 		for _, valueAndName := range tagValues {
 			tagValue := valueAndName.([]interface{})[0]
 			tagDisplayName := valueAndName.([]interface{})[1]
+			tagDescription := valueAndName.([]interface{})[2]
 			tagValueInt, err := strconv.Atoi(tagValue.(string))
 			if err == nil {
 				key := IntEnumTagKey{
@@ -61,9 +62,10 @@ func (e *ChIntEnum) generateNewData() (map[IntEnumTagKey]mysql.ChIntEnum, bool) 
 					TagValue: tagValueInt,
 				}
 				keyToItem[key] = mysql.ChIntEnum{
-					TagName: tagName,
-					Value:   tagValueInt,
-					Name:    tagDisplayName.(string),
+					TagName:     tagName,
+					Value:       tagValueInt,
+					Name:        tagDisplayName.(string),
+					Description: tagDescription.(string),
 				}
 			}
 
@@ -87,6 +89,9 @@ func (e *ChIntEnum) generateUpdateInfo(oldItem, newItem mysql.ChIntEnum) (map[st
 	}
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name
+	}
+	if oldItem.Description != newItem.Description {
+		updateInfo["description"] = newItem.Description
 	}
 	if len(updateInfo) > 0 {
 		return updateInfo, true

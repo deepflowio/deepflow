@@ -114,12 +114,14 @@ func NewTagDescription(
 type TagEnum struct {
 	Value       interface{}
 	DisplayName interface{}
+	Description interface{}
 }
 
-func NewTagEnum(value, displayName interface{}) *TagEnum {
+func NewTagEnum(value, displayName, description interface{}) *TagEnum {
 	return &TagEnum{
 		Value:       value,
 		DisplayName: displayName,
+		Description: description,
 	}
 }
 
@@ -197,11 +199,11 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 				// 如果是int/int_enum，则将value转为interface
 				if tagType == "int" || tagType == "int_enum" || tagType == "bit_enum" {
 					value, _ := strconv.Atoi(enumValue[0].(string))
-					tagIntEnums = append(tagIntEnums, NewTagEnum(enumValue[0], enumValue[1]))
-					tagEnums = append(tagEnums, NewTagEnum(value, enumValue[1]))
+					tagIntEnums = append(tagIntEnums, NewTagEnum(enumValue[0], enumValue[1], enumValue[2]))
+					tagEnums = append(tagEnums, NewTagEnum(value, enumValue[1], enumValue[2]))
 				} else if tagType == "string_enum" {
-					tagStringEnums = append(tagEnums, NewTagEnum(enumValue[0], enumValue[1]))
-					tagEnums = append(tagEnums, NewTagEnum(enumValue[0], enumValue[1]))
+					tagStringEnums = append(tagEnums, NewTagEnum(enumValue[0], enumValue[1], enumValue[2]))
+					tagEnums = append(tagEnums, NewTagEnum(enumValue[0], enumValue[1], enumValue[2]))
 				}
 			}
 			if len(tagIntEnums) != 0 {
@@ -337,7 +339,7 @@ func GetEnumTagValues(db, table, sql string) (map[string][]interface{}, error) {
 		for key, tagValue := range TAG_INT_ENUMS {
 			tagValues := []interface{}{}
 			for _, value := range tagValue {
-				tagValues = append(tagValues, []interface{}{value.Value, value.DisplayName})
+				tagValues = append(tagValues, []interface{}{value.Value, value.DisplayName, value.Description})
 			}
 			response[key] = tagValues
 		}
@@ -346,7 +348,7 @@ func GetEnumTagValues(db, table, sql string) (map[string][]interface{}, error) {
 		for key, tagValue := range TAG_STRING_ENUMS {
 			tagValues := []interface{}{}
 			for _, value := range tagValue {
-				tagValues = append(tagValues, []interface{}{value.Value, value.DisplayName})
+				tagValues = append(tagValues, []interface{}{value.Value, value.DisplayName, value.Description})
 			}
 			response[key] = tagValues
 		}
@@ -442,7 +444,7 @@ func GetTagValues(db, table, sql string) (*common.Result, []string, error) {
 	if strings.Contains(strings.ToLower(sql), "like") || strings.Contains(strings.ToLower(sql), "regexp") {
 		orderBy = "length(display_name)"
 	}
-	sql = fmt.Sprintf("SELECT value,name AS display_name FROM %s WHERE tag_name='%s' %s GROUP BY value, display_name ORDER BY %s ASC %s", table, tag, whereSql, orderBy, limitSql)
+	sql = fmt.Sprintf("SELECT value,name AS display_name, description FROM %s WHERE tag_name='%s' %s GROUP BY value, display_name, description ORDER BY %s ASC %s", table, tag, whereSql, orderBy, limitSql)
 	log.Debug(sql)
 	sqlList = append(sqlList, sql)
 	return nil, sqlList, nil

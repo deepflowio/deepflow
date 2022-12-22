@@ -289,15 +289,17 @@ type ChK8sLabels struct {
 }
 
 type ChStringEnum struct {
-	TagName string `gorm:"primaryKey;column:tag_name;type:varchar(256);default:null" json:"TAG_NAME"`
-	Value   string `gorm:"primaryKey;column:value;type:varchar(256);default:null" json:"VALUE"`
-	Name    string `gorm:"column:name;type:varchar(256);default:null" json:"NAME"`
+	TagName     string `gorm:"primaryKey;column:tag_name;type:varchar(256);default:null" json:"TAG_NAME"`
+	Value       string `gorm:"primaryKey;column:value;type:varchar(256);default:null" json:"VALUE"`
+	Name        string `gorm:"column:name;type:varchar(256);default:null" json:"NAME"`
+	Description string `gorm:"column:description;type:varchar(256);default:null" json:"DESCRIPTION"`
 }
 
 type ChIntEnum struct {
-	TagName string `gorm:"primaryKey;column:tag_name;type:varchar(256);default:null" json:"TAG_NAME"`
-	Value   int    `gorm:"primaryKey;column:value;type:int;default:0" json:"VALUE"`
-	Name    string `gorm:"column:name;type:varchar(256);default:null" json:"NAME"`
+	TagName     string `gorm:"primaryKey;column:tag_name;type:varchar(256);default:null" json:"TAG_NAME"`
+	Value       int    `gorm:"primaryKey;column:value;type:int;default:0" json:"VALUE"`
+	Name        string `gorm:"column:name;type:varchar(256);default:null" json:"NAME"`
+	Description string `gorm:"column:description;type:varchar(256);default:null" json:"DESCRIPTION"`
 }
 
 type ChNodeType struct {

@@ -1,4 +1,4 @@
-# Value , DisplayName
-0      , Packet
-3      , eBPF
-4      , OTel
+# Value , DisplayName   , Description
+0      , Packet         ,
+3      , eBPF           ,
+4      , OTel           ,
