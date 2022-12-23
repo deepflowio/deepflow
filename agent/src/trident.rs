@@ -754,7 +754,7 @@ pub struct Components {
     pub running: AtomicBool,
     pub stats_collector: Arc<stats::Collector>,
     #[cfg(target_os = "linux")]
-    pub cgroups_controller: Arc<Cgroups>,
+    pub cgroups_controller: Option<Cgroups>,
     pub external_metrics_server: MetricServer,
     pub otel_uniform_sender: UniformSenderThread<OpenTelemetry>,
     pub prometheus_uniform_sender: UniformSenderThread<PrometheusMetric>,
@@ -1436,7 +1436,7 @@ impl Components {
         #[allow(unused)]
         let mut ebpf_collector = None;
         #[cfg(target_os = "linux")]
-        if config_handler.candidate_config.tap_mode != TapMode::Analyzer {
+        if candidate_config.tap_mode != TapMode::Analyzer {
             let ebpf_dispatcher_id = dispatchers.len();
             let (flow_sender, flow_receiver, counter) = queue::bounded_with_debug(
                 yaml_config.flow_queue_size,
@@ -1511,7 +1511,31 @@ impl Components {
             }
         }
         #[cfg(target_os = "linux")]
-        let cgroups_controller: Arc<Cgroups> = Arc::new(Cgroups { cgroup: None });
+        let mut cgroups_controller = None;
+        #[cfg(target_os = "linux")]
+        if candidate_config.tap_mode != TapMode::Analyzer && !running_in_container() {
+            match Cgroups::new(process::id() as u64) {
+                Ok(cg_controller) => {
+                    if let Err(e) = cg_controller.apply(
+                        candidate_config.environment.max_cpus,
+                        candidate_config.environment.max_memory,
+                    ) {
+                        warn!("apply cgroup resource failed, {:?}, agent restart...", e);
+                        thread::sleep(Duration::from_secs(1));
+                        process::exit(1);
+                    }
+                    cgroups_controller = Some(cg_controller);
+                }
+                Err(e) => {
+                    warn!(
+                        "initialize cgroup controller failed, {:?}, agent restart...",
+                        e
+                    );
+                    thread::sleep(Duration::from_secs(1));
+                    process::exit(1);
+                }
+            };
+        }
 
         let sender_id = get_sender_id() as usize;
         let otel_queue_name = "otel-to-sender";
@@ -1879,12 +1903,14 @@ impl Components {
             ebpf_collector.stop();
         }
         #[cfg(target_os = "linux")]
-        match self.cgroups_controller.stop() {
-            Ok(_) => {
-                info!("stopped cgroups_controller");
-            }
-            Err(e) => {
-                warn!("stop cgroups_controller failed: {}", e);
+        if self.cgroups_controller.is_some() {
+            match self.cgroups_controller.as_ref().unwrap().stop() {
+                Ok(_) => {
+                    info!("stopped cgroups_controller");
+                }
+                Err(e) => {
+                    warn!("stop cgroups_controller failed: {}", e);
+                }
             }
         }
 
