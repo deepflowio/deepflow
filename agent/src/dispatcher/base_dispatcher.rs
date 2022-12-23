@@ -77,7 +77,7 @@ pub(super) struct BaseDispatcher {
     pub(super) src_interface: String,
     pub(super) ctrl_mac: MacAddr,
 
-    pub(super) options: Arc<Options>,
+    pub(super) options: Arc<Mutex<Options>>,
     pub(super) bpf_options: Arc<Mutex<BpfOptions>>,
 
     pub(super) leaky_bucket: Arc<LeakyBucket>,
@@ -163,6 +163,7 @@ impl BaseDispatcher {
             netns: self.netns.clone(),
             npb_dedup_enabled: self.npb_dedup_enabled.clone(),
             log_id: self.log_id.clone(),
+            reset_whitelist: self.reset_whitelist.clone(),
         }
     }
 
@@ -184,10 +185,11 @@ impl BaseDispatcher {
 
         let bpf_options = self.bpf_options.lock().unwrap();
         #[cfg(target_os = "linux")]
-        if let Err(e) = self
-            .engine
-            .set_bpf(bpf_options.get_bpf_instructions(&tap_interfaces))
-        {
+        if let Err(e) = self.engine.set_bpf(bpf_options.get_bpf_instructions(
+            &tap_interfaces,
+            &self.tap_interface_whitelist,
+            self.options.lock().unwrap().snap_len,
+        )) {
             warn!("set_bpf failed: {}", e);
         }
         #[cfg(target_os = "windows")]
@@ -565,7 +567,7 @@ impl TapTypeHandler {
 }
 
 #[derive(Default)]
-pub(super) struct TapInterfaceWhitelist {
+pub struct TapInterfaceWhitelist {
     whitelist: HashSet<usize>,
     updated: bool,
     last_sync: Duration,
@@ -608,11 +610,11 @@ impl TapInterfaceWhitelist {
 }
 
 #[derive(Clone)]
-pub(super) struct BaseDispatcherListener {
+pub struct BaseDispatcherListener {
     pub id: usize,
     pub src_interface: String,
     pub src_interface_index: usize,
-    pub options: Arc<Options>,
+    pub options: Arc<Mutex<Options>>,
     pub bpf_options: Arc<Mutex<BpfOptions>>,
     pub handler_builders: Arc<Mutex<Vec<PacketHandlerBuilder>>>,
     pub pipelines: Arc<Mutex<HashMap<u32, Arc<Mutex<Pipeline>>>>>,
@@ -622,6 +624,7 @@ pub(super) struct BaseDispatcherListener {
     pub platform_poller: Arc<GenericPoller>,
     pub tunnel_type_bitmap: Arc<Mutex<TunnelTypeBitmap>>,
     pub npb_dedup_enabled: Arc<AtomicBool>,
+    pub reset_whitelist: Arc<AtomicBool>,
     capture_bpf: String,
     proxy_controller_ip: IpAddr,
     analyzer_ip: IpAddr,
@@ -648,6 +651,7 @@ impl BaseDispatcherListener {
             && self.proxy_controller_port == config.proxy_controller_port
             && self.analyzer_ip == config.analyzer_ip
             && self.analyzer_port == config.analyzer_port
+            && self.options.lock().unwrap().snap_len == config.capture_packet_size as usize
         {
             return;
         }
@@ -656,6 +660,7 @@ impl BaseDispatcherListener {
         self.proxy_controller_port = config.proxy_controller_port;
         self.analyzer_ip = config.analyzer_ip;
         self.analyzer_port = config.analyzer_port;
+        self.options.lock().unwrap().snap_len = config.capture_packet_size as usize;
 
         let source_ip = get_route_src_ip(&self.analyzer_ip);
         if source_ip.is_err() {
@@ -663,12 +668,13 @@ impl BaseDispatcherListener {
             return;
         }
 
+        let options = self.options.lock().unwrap();
         let bpf_builder = bpf::Builder {
-            is_ipv6: self.options.is_ipv6,
-            vxlan_flags: self.options.vxlan_flags,
-            npb_port: self.options.npb_port,
-            controller_port: self.options.controller_port,
-            controller_tls_port: self.options.controller_tls_port,
+            is_ipv6: options.is_ipv6,
+            vxlan_flags: options.vxlan_flags,
+            npb_port: options.npb_port,
+            controller_port: options.controller_port,
+            controller_tls_port: options.controller_tls_port,
             proxy_controller_port: self.proxy_controller_port,
             analyzer_source_ip: source_ip.unwrap(),
             analyzer_port: self.analyzer_port,
@@ -782,7 +788,7 @@ impl BaseDispatcherListener {
 #[cfg(target_os = "linux")]
 impl BaseDispatcherListener {
     fn on_afpacket_change(&mut self, config: &DispatcherConfig) {
-        if self.options.af_packet_version != config.capture_socket_type.into() {
+        if self.options.lock().unwrap().af_packet_version != config.capture_socket_type.into() {
             // TODO：目前通过进程退出的方式修改AfPacket版本，后面需要支持动态修改
             info!("Afpacket version update, deepflow-agent restart...");
             process::exit(1);
