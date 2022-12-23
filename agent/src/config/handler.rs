@@ -1911,6 +1911,9 @@ impl ConfigHandler {
                         }
                     }
                 }
+                components.npb_arp_table.set_need_resolve_mac(
+                    handler.candidate_config.npb.socket_type == SocketType::RawUdp,
+                );
             }
             if components.is_some() {
                 callbacks.push(dispatcher_callback);
