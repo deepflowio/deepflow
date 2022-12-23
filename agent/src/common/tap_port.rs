@@ -21,10 +21,10 @@ use serde::Serialize;
 
 use super::decapsulate::TunnelType;
 
-// 64     60         40         32                                    0
-// +------+----------+----------+-------------------------------------+
-// | from | RESERVED | TUN_TYPE |              ip/id/mac              |
-// +------+----------+----------+-------------------------------------+
+// 64     60         40           36         32                                    0
+// +------+----------+------------+----------+-------------------------------------+
+// | from | RESERVED | NAT SOURCE | TUN_TYPE |              ip/id/mac              |
+// +------+----------+------------+----------+-------------------------------------+
 // 注意ip/id/mac不能超过32bit，否则数据存储、四元组聚合都会有歧义
 #[derive(Serialize, Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub struct TapPort(pub u64);
@@ -40,8 +40,15 @@ impl TapPort {
     pub const FROM_EBPF: u8 = 7;
     pub const FROM_OTEL: u8 = 8;
 
+    pub const NAT_SOURCE_NONE: u8 = 0;
+    pub const NAT_SOURCE_VIP: u8 = 1;
+    pub const NAT_SOURCE_TOA: u8 = 2;
+
     const TUNNEL_TYPE_OFFSET: u64 = 32;
+    const TUNNEL_TYPE_MASK: u64 = 0xf;
     const FROM_OFFSET: u64 = 60;
+    const NAT_SOURCE_OFFSET: u64 = 36;
+    const NAT_SOURCE_MASK: u64 = 0xf;
     const RESERVED_OFFSET: u8 = 40;
     const RESERVED_MASK: u32 = 0xfffff;
 
@@ -49,10 +56,20 @@ impl TapPort {
         (self.0 >> Self::FROM_OFFSET) as u8 == w
     }
 
-    pub fn from_local_mac(tunnel_type: TunnelType, mac: u32) -> Self {
+    pub fn get_nat_source(&self) -> u8 {
+        ((self.0 >> Self::NAT_SOURCE_OFFSET) & Self::NAT_SOURCE_MASK) as u8
+    }
+
+    pub fn set_nat_source(&mut self, w: u8) {
+        self.0 &= !((Self::NAT_SOURCE_MASK as u64) << Self::NAT_SOURCE_OFFSET);
+        self.0 |= (w as u64) << Self::NAT_SOURCE_OFFSET;
+    }
+
+    pub fn from_local_mac(nat_source: u8, tunnel_type: TunnelType, mac: u32) -> Self {
         Self(
             mac as u64
-                | ((tunnel_type as u64) << Self::TUNNEL_TYPE_OFFSET)
+                | ((tunnel_type as u64 & Self::TUNNEL_TYPE_MASK) << Self::TUNNEL_TYPE_OFFSET)
+                | ((nat_source as u64) << Self::NAT_SOURCE_OFFSET)
                 | ((Self::FROM_LOCAL_MAC as u64) << Self::FROM_OFFSET),
         )
     }
@@ -68,7 +85,7 @@ impl TapPort {
     pub fn from_gateway_mac(tunnel_type: TunnelType, mac: u32) -> Self {
         Self(
             mac as u64
-                | ((tunnel_type as u64) << Self::TUNNEL_TYPE_OFFSET)
+                | ((tunnel_type as u64 & Self::TUNNEL_TYPE_MASK) << Self::TUNNEL_TYPE_OFFSET)
                 | ((Self::FROM_GATEWAY_MAC as u64) << Self::FROM_OFFSET),
         )
     }
@@ -88,7 +105,7 @@ impl TapPort {
     pub fn from_id(tunnel_type: TunnelType, id: u32) -> Self {
         Self(
             id as u64
-                | ((tunnel_type as u64) << Self::TUNNEL_TYPE_OFFSET)
+                | ((tunnel_type as u64 & Self::TUNNEL_TYPE_MASK) << Self::TUNNEL_TYPE_OFFSET)
                 | ((Self::FROM_ID as u64) << Self::FROM_OFFSET),
         )
     }
@@ -101,7 +118,7 @@ impl TapPort {
         (
             self.0 as u32,
             (self.0 >> Self::FROM_OFFSET) as u8,
-            ((self.0 >> Self::TUNNEL_TYPE_OFFSET) as u8)
+            (((self.0 >> Self::TUNNEL_TYPE_OFFSET) & Self::TUNNEL_TYPE_MASK) as u8)
                 .try_into()
                 .unwrap_or(TunnelType::None),
         )

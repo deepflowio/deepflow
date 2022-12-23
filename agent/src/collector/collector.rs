@@ -214,10 +214,10 @@ impl StashKey {
             // edge data
             // fast_id
             //
-            // 128    124        104        96          64          56           40         32         16        0
-            // +------+----------+----------+-----------+-----------+------------+----------+----------+---------+
-            // | from | RESERVED | TUN_TYPE | ip/id/mac | Direction | ServerPort | Protocol | L3EpcID1 | L3EpcId |
-            // +------+----------+----------+-----------+-----------+------------+----------+----------+---------+
+            // 128    124        104          100        96          64          56           40         32         16        0
+            // +------+----------+------------+----------+-----------+-----------+------------+----------+----------+---------+
+            // | from | RESERVED | NAT SOURCE | TUN_TYPE | ip/id/mac | Direction | ServerPort | Protocol | L3EpcID1 | L3EpcId |
+            // +------+----------+------------+----------+-----------+-----------+------------+----------+----------+---------+
             //          /
             //         /
             //        /
@@ -674,11 +674,11 @@ impl Stash {
         let (src_ip, dst_ip) = {
             let (mut src_ip, mut dst_ip) = (flow.flow_key.ip_src, flow.flow_key.ip_dst);
             if is_extra_tracing_doc {
-                if !acc_flow.nat_src_ip.is_unspecified() {
-                    src_ip = acc_flow.nat_src_ip;
+                if !acc_flow.nat_real_ip_0.is_unspecified() {
+                    src_ip = acc_flow.nat_real_ip_0;
                 }
-                if !acc_flow.nat_dst_ip.is_unspecified() {
-                    dst_ip = acc_flow.nat_dst_ip;
+                if !acc_flow.nat_real_ip_1.is_unspecified() {
+                    dst_ip = acc_flow.nat_real_ip_1;
                 }
             }
 
@@ -812,7 +812,7 @@ impl Stash {
         //     需要有RIP即natSrcIp和natDstIp
         // 其他场景直接返回
         if !is_extra_tracing_doc
-            || (acc_flow.nat_src_ip.is_unspecified() && acc_flow.nat_dst_ip.is_unspecified())
+            || (acc_flow.nat_real_ip_0.is_unspecified() && acc_flow.nat_real_ip_1.is_unspecified())
         {
             return;
         }
