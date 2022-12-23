@@ -154,6 +154,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(p *metadata.PlatformDataOP, c *
 			}
 			domainAllData.Merge(domainData)
 		}
+		domainAllData.MergePeerConnProtos(p.GetNoDomainPlatformData())
 		domainAllData.GeneratePlatformDataResult()
 		v.platformDataType1.setPlatformDataCache(vTapGroupLcuuid, domainAllData)
 		c.setVTapPlatformData(domainAllData)
@@ -215,6 +216,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(p *metadata.PlatformDataOP, c *
 				}
 				domainAllData.Merge(domainData)
 			}
+			domainAllData.MergePeerConnProtos(p.GetNoDomainPlatformData())
 			domainAllData.GeneratePlatformDataResult()
 			c.setVTapPlatformData(domainAllData)
 			v.platformDataBMDedicated.setPlatformDataCache(vTapGroupLcuuid, domainAllData)
@@ -255,6 +257,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(p *metadata.PlatformDataOP, c *
 			}
 		}
 
+		domainAllData.MergePeerConnProtos(p.GetNoDomainPlatformData())
 		domainAllData.GeneratePlatformDataResult()
 		c.setVTapPlatformData(domainAllData)
 		v.platformDataType3.setPlatformDataCache(key, domainAllData)

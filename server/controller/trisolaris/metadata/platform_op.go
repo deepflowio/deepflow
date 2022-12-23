@@ -209,6 +209,10 @@ func (p *PlatformDataOP) generateVInterfaces() {
 	p.updateDomainInterfaceProto(dipData)
 }
 
+func (p *PlatformDataOP) GetNoDomainPeerConns() TPeerConnections {
+	return p.getDomainPeerConnProto().getNoDomainPeerConns()
+}
+
 func (p *PlatformDataOP) generatePeerConnections() {
 	dbDataCache := p.metaData.GetDBDataCache()
 	peerConns := dbDataCache.GetPeerConnections()
@@ -447,7 +451,18 @@ func (p *PlatformDataOP) generateDomainPlatformData() {
 		cidrs := domainCIDRProto.domainOrSubdomainToCIDRs[subDomain.Lcuuid]
 		domainDataOnlyPod := NewPlatformData(subDomain.Name, subDomain.Lcuuid, 0, DOMAIN_TO_PLATFORM_DATA_ONLY_POD)
 		domainDataOnlyPod.setPlatformData(interfaces, peerConnections, cidrs)
-		dToPDOnlyPod[subDomain.Name] = domainDataOnlyPod
+		dToPDOnlyPod[subDomain.Lcuuid] = domainDataOnlyPod
+	}
+
+	noDomainData := NewPlatformData("no domain", "", 0, NO_DOMAIN_TO_PLATFORM)
+	noDomainData.setPlatformData(nil, domainPeerConnProto.getNoDomainPeerConns(), nil)
+	oldNoDOmainDat := p.GetNoDomainPlatformData()
+	if oldNoDOmainDat == nil {
+		noDomainData.initVersion()
+		p.updateNoDomainPlatformData(noDomainData)
+	} else if !noDomainData.equal(oldNoDOmainDat) {
+		noDomainData.setVersion(oldNoDOmainDat.GetVersion() + 1)
+		p.updateNoDomainPlatformData(noDomainData)
 	}
 
 	if !p.GetDomainToAllPlatformData().checkVersion(dToAPData) {

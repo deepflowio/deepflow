@@ -286,6 +286,10 @@ func platformData(response *trident.SyncResponse) {
 			for index, entry := range platform.PeerConnections {
 				JsonFormat(index+1, entry)
 			}
+			fmt.Println("cidrs:")
+			for index, entry := range platform.Cidrs {
+				JsonFormat(index+1, entry)
+			}
 		}
 	}
 }
