@@ -172,10 +172,14 @@ func (t *Tencent) getResponse(service, version, action, regionName, resultKey st
 	offset, limit := 0, 100
 	// simple config
 	cpf := profile.NewClientProfile()
+	// sdk debug
+	// cpf.Debug = true
 	cpf.HttpProfile.Endpoint = service + ".tencentcloudapi.com"
 	cpf.HttpProfile.ReqMethod = "POST"
-	cpf.NetworkFailureMaxRetries = 3
+	cpf.NetworkFailureMaxRetries = 1
 	cpf.NetworkFailureRetryDuration = profile.ExponentialBackoff
+	cpf.RateLimitExceededMaxRetries = 1
+	cpf.RateLimitExceededRetryDuration = profile.ExponentialBackoff
 	// create common client
 	client := tcommon.NewCommonClient(t.credential, regionName, cpf)
 
