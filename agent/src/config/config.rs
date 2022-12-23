@@ -461,11 +461,23 @@ impl YamlConfig {
                 .to_string();
         }
 
-        if !c.ebpf.ring_size.is_power_of_two() {
-            c.ebpf.ring_size = c.ebpf.ring_size.next_power_of_two()
+        if c.ebpf.thread_num == 0 {
+            c.ebpf.thread_num = 1;
         }
-        if !c.ebpf.perf_pages_count.is_power_of_two() {
-            c.ebpf.perf_pages_count = c.ebpf.perf_pages_count.next_power_of_two()
+        if c.ebpf.perf_pages_count < 32 || c.ebpf.perf_pages_count > 512 {
+            c.ebpf.perf_pages_count = 128
+        }
+        if c.ebpf.ring_size < 8192 || c.ebpf.ring_size > 131072 {
+            c.ebpf.ring_size = 65536;
+        }
+        if c.ebpf.max_socket_entries < 100000 || c.ebpf.max_socket_entries > 2000000 {
+            c.ebpf.max_socket_entries = 524288;
+        }
+        if c.ebpf.socket_map_max_reclaim < 100000 || c.ebpf.socket_map_max_reclaim > 2000000 {
+            c.ebpf.socket_map_max_reclaim = 520000;
+        }
+        if c.ebpf.max_trace_entries < 100000 || c.ebpf.max_trace_entries > 2000000 {
+            c.ebpf.max_trace_entries = 524288;
         }
 
         if let Err(e) = c.validate() {
