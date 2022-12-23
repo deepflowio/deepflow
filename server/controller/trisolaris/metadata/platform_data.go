@@ -112,6 +112,9 @@ func (f *PlatformData) GeneratePlatformDataResult() {
 	f.platformDataHash = h64.Sum64()
 }
 func (f *PlatformData) Merge(other *PlatformData) {
+	if other == nil {
+		return
+	}
 	f.interfaceProtos = append(f.interfaceProtos, other.interfaceProtos...)
 	f.peerConnProtos = append(f.peerConnProtos, other.peerConnProtos...)
 	f.cidrProtos = append(f.cidrProtos, other.cidrProtos...)
@@ -122,6 +125,9 @@ func (f *PlatformData) Merge(other *PlatformData) {
 }
 
 func (f *PlatformData) MergeInterfaces(other *PlatformData) {
+	if other == nil {
+		return
+	}
 	f.interfaceProtos = append(f.interfaceProtos, other.interfaceProtos...)
 	f.version += other.version
 	if len(other.domain) != 0 {
@@ -129,7 +135,22 @@ func (f *PlatformData) MergeInterfaces(other *PlatformData) {
 	}
 }
 
+func (f *PlatformData) MergePeerConnProtos(other *PlatformData) {
+	if other == nil {
+		return
+	}
+	f.peerConnProtos = append(f.peerConnProtos, other.peerConnProtos...)
+	f.version += other.version
+	if len(other.domain) != 0 {
+		f.mergeDomains = append(f.mergeDomains, other.domain)
+	}
+}
+
 func (f *PlatformData) equal(other *PlatformData) bool {
+	if other == nil {
+		return false
+	}
+
 	if f.platformDataHash != other.platformDataHash {
 		return false
 	}

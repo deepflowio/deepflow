@@ -27,20 +27,32 @@ type DomainPeerConnsData map[string]TPeerConnections
 type DomainPeerConnProto struct {
 	domainToPeerConns DomainPeerConnsData
 	peerConns         TPeerConnections
+	noDomainPeerConns TPeerConnections
 }
+
+const noDomain = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 
 func NewDomainPeerConnProto(length int) *DomainPeerConnProto {
 	return &DomainPeerConnProto{
 		domainToPeerConns: make(DomainPeerConnsData),
 		peerConns:         make(TPeerConnections, 0, length),
+		noDomainPeerConns: make(TPeerConnections, 0, length),
 	}
 }
 
 func (d *DomainPeerConnProto) addData(domain string, data *trident.PeerConnection) {
 	d.peerConns = append(d.peerConns, data)
+	if domain == "" || domain == noDomain {
+		d.noDomainPeerConns = append(d.noDomainPeerConns, data)
+		return
+	}
 	if _, ok := d.domainToPeerConns[domain]; ok {
 		d.domainToPeerConns[domain] = append(d.domainToPeerConns[domain], data)
 	} else {
 		d.domainToPeerConns[domain] = []*trident.PeerConnection{data}
 	}
+}
+
+func (d *DomainPeerConnProto) getNoDomainPeerConns() TPeerConnections {
+	return d.noDomainPeerConns
 }
