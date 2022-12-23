@@ -542,19 +542,24 @@ impl TryFrom<&IpAddr> for ArpEntry {
     }
 }
 
+// NPB ARP table has the following functions:
+// 1. Provide npb packet counter
+// 2. Provide mac address
 pub struct NpbArpTable {
     table: Arc<RwLock<HashMap<IpAddr, ArpEntry>>>,
     is_running: Arc<AtomicBool>,
+    need_resolve_mac: Arc<AtomicBool>,
 
     thread_handler: Mutex<Option<JoinHandle<()>>>,
 }
 
 impl NpbArpTable {
-    pub fn new() -> Self {
+    pub fn new(need_resolve_mac: bool) -> Self {
         NpbArpTable {
             table: Arc::new(RwLock::new(HashMap::new())),
             thread_handler: Mutex::new(None),
             is_running: Arc::new(AtomicBool::new(false)),
+            need_resolve_mac: Arc::new(AtomicBool::new(need_resolve_mac)),
         }
     }
 
@@ -598,11 +603,23 @@ impl NpbArpTable {
             .fetch_add(1, Ordering::Relaxed);
     }
 
-    fn run(table: Arc<RwLock<HashMap<IpAddr, ArpEntry>>>, is_running: Arc<AtomicBool>) {
+    pub fn set_need_resolve_mac(&self, need_resolve_mac: bool) {
+        self.need_resolve_mac
+            .store(need_resolve_mac, Ordering::Relaxed);
+    }
+
+    fn run(
+        table: Arc<RwLock<HashMap<IpAddr, ArpEntry>>>,
+        is_running: Arc<AtomicBool>,
+        need_resolve_mac: Arc<AtomicBool>,
+    ) {
         let mut lookup_ips = vec![];
         let mut timeout_ips = vec![];
         while is_running.load(Ordering::Relaxed) {
             sleep(Duration::from_secs(ARP_INTERVAL));
+            if !need_resolve_mac.load(Ordering::Relaxed) {
+                continue;
+            }
 
             for (dst_ip, entry) in table.read().unwrap().iter() {
                 let aging = entry.aging.fetch_sub(ARP_INTERVAL, Ordering::Relaxed);
@@ -646,8 +663,9 @@ impl NpbArpTable {
         self.is_running.store(true, Ordering::Relaxed);
         let table = self.table.clone();
         let is_running = self.is_running.clone();
+        let need_resolve_mac = self.need_resolve_mac.clone();
         self.thread_handler.lock().unwrap().replace(spawn(move || {
-            Self::run(table, is_running);
+            Self::run(table, is_running, need_resolve_mac);
         }));
     }
 

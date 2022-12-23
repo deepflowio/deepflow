@@ -106,7 +106,7 @@ use public::utils::net::link_by_name;
 use public::{
     debug::QueueDebugger,
     netns::NsFile,
-    proto::trident::{self, IfMacSource, TapMode},
+    proto::trident::{self, IfMacSource, SocketType, TapMode},
     queue,
     sender::SendMessageType,
     utils::net::{get_route_src_ip, links_by_name_regex, MacAddr},
@@ -1160,7 +1160,9 @@ impl Components {
             config_handler.candidate_config.sender.npb_bps_threshold,
         )));
         let mut handler_builders = Vec::new();
-        let npb_arp_table = Arc::new(NpbArpTable::new());
+        let npb_arp_table = Arc::new(NpbArpTable::new(
+            config_handler.candidate_config.npb.socket_type == SocketType::RawUdp,
+        ));
 
         let mut src_interfaces_and_namespaces = vec![];
         for src_if in yaml_config.src_interfaces.iter() {
