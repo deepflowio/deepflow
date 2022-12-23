@@ -469,14 +469,8 @@ impl YamlConfig {
         if c.ebpf.thread_num == 0 {
             c.ebpf.thread_num = 1;
         }
-        if !c.ebpf.perf_pages_count.is_power_of_two() {
-            c.ebpf.perf_pages_count = c.ebpf.perf_pages_count.next_power_of_two()
-        }
         if c.ebpf.perf_pages_count < 32 || c.ebpf.perf_pages_count > 512 {
             c.ebpf.perf_pages_count = 128
-        }
-        if !c.ebpf.ring_size.is_power_of_two() {
-            c.ebpf.ring_size = c.ebpf.ring_size.next_power_of_two()
         }
         if c.ebpf.ring_size < 8192 || c.ebpf.ring_size > 131072 {
             c.ebpf.ring_size = 65536;
