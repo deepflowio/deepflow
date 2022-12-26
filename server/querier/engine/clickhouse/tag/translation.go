@@ -698,6 +698,17 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"toUInt64(tap_port) IN (SELECT tap_port FROM flow_tag.vtap_port_map WHERE name %s %s)",
 			"toUInt64(tap_port) IN (SELECT tap_port FROM flow_tag.vtap_port_map WHERE %s(name,%s))",
 		)}
+	// Nat Real IP
+	for _, suffix := range []string{"", "_0", "_1"} {
+		NatRealIPSuffix := "nat_real_ip" + suffix
+		tagResourceMap[NatRealIPSuffix] = map[string]*Tag{
+			"default": NewTag(
+				"IPv4NumToString("+NatRealIPSuffix+")",
+				"",
+				"hex("+NatRealIPSuffix+") %s %s",
+				"",
+			)}
+	}
 	// Tunnel IP
 	tagResourceMap["tunnel_tx_ip_0"] = map[string]*Tag{
 		"default": NewTag(
