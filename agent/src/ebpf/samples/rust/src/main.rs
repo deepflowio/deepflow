@@ -27,6 +27,7 @@ use std::time::{Duration, UNIX_EPOCH};
 extern "C" {
     fn print_dns_info(data: *mut c_char, len: c_uint);
     fn print_uprobe_http2_info(data: *mut c_char, len: c_uint);
+    fn print_io_event_info(data: *mut c_char, len: c_uint);
 }
 
 fn flow_info(sd: *mut SK_BPF_DATA) -> String {
@@ -171,6 +172,8 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
             proto_tag.push_str("DUBBO");
         } else if sk_proto_safe(sd) == SOCK_DATA_SOFARPC {
             proto_tag.push_str("SOFARPC");
+        } else {
+            proto_tag.push_str("UNSPEC");
         }
 
         println!("+ --------------------------------- +");
@@ -221,6 +224,8 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
                 print_dns_info((*sd).cap_data, (*sd).cap_len);
             } else if (*sd).source == 2 {
                 print_uprobe_http2_info((*sd).cap_data, (*sd).cap_len);
+            } else if (*sd).source == 4 {
+                print_io_event_info((*sd).cap_data, (*sd).cap_len);
             } else {
                 for x in data.into_iter() {
                     if x < 32 || x > 126 {
@@ -276,10 +281,12 @@ fn main() {
             CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
         );
 
-        let allow_port = 443;
-        let mut allow_port_bitmap: [u8; 65536 / 8] = [0; 65536 / 8];
-        allow_port_bitmap[allow_port / 8] |= 1 << (allow_port % 8);
-        set_allow_port_bitmap(allow_port_bitmap.as_ptr());
+        /*
+            let allow_port = 443;
+            let mut allow_port_bitmap: [u8; 65536 / 8] = [0; 65536 / 8];
+            allow_port_bitmap[allow_port / 8] |= 1 << (allow_port % 8);
+            set_allow_port_bitmap(allow_port_bitmap.as_ptr());
+        */
 
         // The first parameter passed by a null pointer can be
         // filled with std::ptr::null()
