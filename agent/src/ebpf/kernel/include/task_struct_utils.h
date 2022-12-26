@@ -199,4 +199,56 @@ static __inline void *get_socket_from_fd(int fd_num,
 	return NULL;
 }
 
+static __inline void *fd_to_file(int fd_num,
+				 struct member_fields_offset *offset)
+{
+	if (!offset) {
+		return NULL;
+	}
+
+	struct task_struct *task = (struct task_struct *)bpf_get_current_task();
+	void *file = get_socket_file_addr_with_check(
+		task, fd_num, offset->task__files_offset);
+	return file;
+}
+
+static __inline __u32 file_to_i_mode(void *file)
+{
+	if (!file) {
+		return 0;
+	}
+
+	void *f_inode = NULL;
+	bpf_probe_read(&f_inode, sizeof(f_inode),
+		       file + STRUCT_FILE_F_INODE_OFFSET);
+
+	if (!f_inode) {
+		return 0;
+	}
+
+	__u32 i_mode = 0;
+	bpf_probe_read(&i_mode, sizeof(i_mode),
+		       f_inode + STRUCT_INODE_I_MODE_OFFSET);
+	return i_mode;
+}
+
+static __inline char *file_to_name(void *file)
+{
+	if (!file) {
+		return 0;
+	}
+
+	void *dentry = NULL;
+	bpf_probe_read(&dentry, sizeof(dentry),
+		       file + STRUCT_FILE_DENTRY_OFFSET);
+
+	if (!dentry) {
+		return 0;
+	}
+
+	char *name = NULL;
+	bpf_probe_read(&name, sizeof(name), dentry + STRUCT_DENTRY_NAME_OFFSET);
+	return name;
+}
+
 #endif /* DF_TASK_STRUCT_UTILS_H */

@@ -140,6 +140,7 @@ enum process_data_extra_source {
 	DATA_SOURCE_GO_TLS_UPROBE,
 	DATA_SOURCE_GO_HTTP2_UPROBE,
 	DATA_SOURCE_OPENSSL_UPROBE,
+	DATA_SOURCE_IO_EVENT,
 };
 
 struct process_data_extra {
@@ -195,6 +196,7 @@ struct data_args_t {
 	// Timestamp for enter syscall function.
 	__u64 enter_ts;
 	__u32 tcp_seq; // Used to record the entry of syscalls
+	ssize_t bytes_count; // io event
 } __attribute__ ((packed));
 
 struct syscall_comm_enter_ctx {

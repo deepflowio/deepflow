@@ -967,6 +967,10 @@ static void insert_output_prog_to_map(struct bpf_tracer *tracer)
 				    PROG_OUTPUT_DATA_NAME_FOR_TP,
 				    0);
 	__insert_output_prog_to_map(tracer,
+				    MAP_PROGS_JMP_TP_NAME,
+				    PROG_IO_EVENT_NAME_FOR_TP,
+				    1);
+	__insert_output_prog_to_map(tracer,
 				    MAP_PROGS_JMP_KP_NAME,
 				    PROG_OUTPUT_DATA_NAME_FOR_KP,
 				    0);
@@ -1534,16 +1538,15 @@ static unsigned char *read_name(unsigned char *reader, unsigned char *buffer,
 	return name;
 }
 
-struct http2_buffer_header {
-	__u32 fd;
-	__u32 stream_id;
-	__u32 header_len;
-	__u32 value_len;
-};
-
 void print_uprobe_http2_info(const char *data, int len)
 {
-	struct http2_buffer_header header;
+	struct {
+		__u32 fd;
+		__u32 stream_id;
+		__u32 header_len;
+		__u32 value_len;
+	} __attribute__((packed)) header;
+
 	char key[1024] = { 0 };
 	char value[1024] = { 0 };
 	memcpy(&header, data, sizeof(header));
@@ -1559,6 +1562,25 @@ void print_uprobe_http2_info(const char *data, int len)
 	memcpy(&value, data + value_start, header.value_len);
 
 	printf("header=[%s:%s]\n", key, value);
+	fflush(stdout);
+	return;
+}
+
+void print_io_event_info(const char *data, int len)
+{
+	struct {
+		__u32 bytes_count;
+		__u32 operation;
+		__u64 latency;
+		char filename[64];
+	} __attribute__((packed)) event;
+
+	memcpy(&event, data, sizeof(event));
+
+	printf("bytes_count=[%u]\n", event.bytes_count);
+	printf("operation=[%u]\n", event.operation);
+	printf("latency=[%llu]\n", event.latency);
+	printf("filename=[%s]\n", event.filename);
 	fflush(stdout);
 	return;
 }
