@@ -2,6 +2,7 @@ package aliyun
 
 import (
 	"errors"
+	"time"
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
 	cbn "github.com/aliyun/alibaba-cloud-sdk-go/services/cbn"
 	ecs "github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
@@ -25,6 +26,8 @@ func (a *Aliyun) get{{$typed_name}}Response(region string, request *{{$service}}
 	var resp []*simplejson.Json
 
 	client, _ := {{$service}}.NewClientWithAccessKey(region, a.secretID, a.secretKey)
+
+	request.SetConnectTimeout(time.Duration(a.httpTimeout) * time.Second)
 
 {{- if eq .call_num "multi" }}
 	pageNum := 1

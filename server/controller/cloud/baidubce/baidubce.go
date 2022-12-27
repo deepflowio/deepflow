@@ -30,6 +30,7 @@ import (
 	logging "github.com/op/go-logging"
 
 	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
+	cloudconfig "github.com/deepflowys/deepflow/server/controller/cloud/config"
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
@@ -44,6 +45,7 @@ type BaiduBce struct {
 	secretID     string
 	secretKey    string
 	endpoint     string
+	httpTimeout  int
 
 	// 以下两个字段的作用：消除公有云的无资源的区域和可用区
 	regionLcuuidToResourceNum map[string]int
@@ -52,7 +54,7 @@ type BaiduBce struct {
 	debugger *cloudcommon.Debugger
 }
 
-func NewBaiduBce(domain mysql.Domain) (*BaiduBce, error) {
+func NewBaiduBce(domain mysql.Domain, cfg cloudconfig.CloudConfig) (*BaiduBce, error) {
 	config, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
 		log.Error(err)
@@ -90,6 +92,7 @@ func NewBaiduBce(domain mysql.Domain) (*BaiduBce, error) {
 		secretID:     secretID,
 		secretKey:    decryptSecretKey,
 		endpoint:     endpoint,
+		httpTimeout:  cfg.HTTPTimeout,
 
 		regionLcuuidToResourceNum: make(map[string]int),
 		azLcuuidToResourceNum:     make(map[string]int),

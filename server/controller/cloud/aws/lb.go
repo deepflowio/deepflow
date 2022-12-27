@@ -37,7 +37,7 @@ func (a *Aws) getLoadBalances(region awsRegion) ([]model.LB, []model.LBListener,
 	var lbListeners []model.LBListener
 	var lbTargetServers []model.LBTargetServer
 
-	v2ClientConfig, _ := config.LoadDefaultConfig(context.TODO(), a.credential, config.WithRegion(region.name))
+	v2ClientConfig, _ := config.LoadDefaultConfig(context.TODO(), a.credential, config.WithRegion(region.name), config.WithHTTPClient(a.httpClient))
 
 	var retLBs []types.LoadBalancerDescription
 	var marker string

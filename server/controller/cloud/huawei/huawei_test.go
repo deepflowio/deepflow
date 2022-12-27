@@ -31,7 +31,7 @@ func TestHuaWei(t *testing.T) {
 			DisplayName: "test_huawei",
 		}
 
-		huawei, _ := NewHuaWei(domain, &config.CloudConfig{})
+		huawei, _ := NewHuaWei(domain, config.CloudConfig{})
 		data, _ := huawei.GetCloudData()
 		Convey("huaweiResource number should be equal", func() {
 			So(len(data.VPCs), ShouldEqual, 3)

@@ -51,21 +51,21 @@ func NewPlatform(domain mysql.Domain, cfg config.CloudConfig) (Platform, error) 
 
 	switch domain.Type {
 	case common.ALIYUN:
-		platform, err = aliyun.NewAliyun(domain)
+		platform, err = aliyun.NewAliyun(domain, cfg)
 	case common.AWS:
-		platform, err = aws.NewAws(domain)
+		platform, err = aws.NewAws(domain, cfg)
 	case common.AGENT_SYNC:
 		platform, err = genesis.NewGenesis(domain, cfg)
 	case common.QINGCLOUD:
-		platform, err = qingcloud.NewQingCloud(domain)
+		platform, err = qingcloud.NewQingCloud(domain, cfg)
 	case common.BAIDU_BCE:
-		platform, err = baidubce.NewBaiduBce(domain)
+		platform, err = baidubce.NewBaiduBce(domain, cfg)
 	case common.TENCENT:
-		platform, err = tencent.NewTencent(domain)
+		platform, err = tencent.NewTencent(domain, cfg)
 	case common.KUBERNETES:
 		platform, err = kubernetes.NewKubernetes(domain)
 	case common.HUAWEI:
-		platform, err = huawei.NewHuaWei(domain, &cfg)
+		platform, err = huawei.NewHuaWei(domain, cfg)
 	case common.FILEREADER:
 		platform, err = filereader.NewFileReader(domain)
 	// TODO: other platform

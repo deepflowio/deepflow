@@ -22,11 +22,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/bitly/go-simplejson"
+	cloudconfig "github.com/deepflowys/deepflow/server/controller/cloud/config"
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
@@ -46,6 +48,7 @@ type Aws struct {
 	uuidGenerate         string
 	includeRegions       []string
 	excludeRegions       []string
+	httpClient           *http.BuildableClient
 	azLcuuidMap          map[string]int
 	vpcOrSubnetToRouter  map[string]string
 	vmIDToPrivateIP      map[string]string
@@ -65,7 +68,7 @@ type awsGressRule struct {
 	rule      types.IpPermission
 }
 
-func NewAws(domain mysql.Domain) (*Aws, error) {
+func NewAws(domain mysql.Domain, cfg cloudconfig.CloudConfig) (*Aws, error) {
 	config, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
 		log.Error(err)
@@ -104,6 +107,8 @@ func NewAws(domain mysql.Domain) (*Aws, error) {
 	}
 	sort.Strings(includeRegions)
 
+	httpClient := http.NewBuildableClient().WithTimeout(time.Second * time.Duration(cfg.HTTPTimeout))
+
 	return &Aws{
 		// TODO: display_name后期需要修改为uuid_generate
 		name:           domain.Name,
@@ -111,6 +116,7 @@ func NewAws(domain mysql.Domain) (*Aws, error) {
 		uuidGenerate:   domain.DisplayName,
 		excludeRegions: excludeRegions,
 		includeRegions: includeRegions,
+		httpClient:     httpClient,
 		regionUUID:     config.Get("region_uuid").MustString(),
 		credential:     awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(secretID, decryptSecretKey, "")),
 
@@ -123,7 +129,7 @@ func NewAws(domain mysql.Domain) (*Aws, error) {
 }
 
 func (a *Aws) CheckAuth() error {
-	awsClientConfig, err := awsconfig.LoadDefaultConfig(context.TODO(), a.credential, awsconfig.WithRegion(REGION_NAME))
+	awsClientConfig, err := awsconfig.LoadDefaultConfig(context.TODO(), a.credential, awsconfig.WithRegion(REGION_NAME), awsconfig.WithHTTPClient(a.httpClient))
 	if err != nil {
 		log.Error("client config failed (%s)", err.Error())
 		return err
@@ -190,7 +196,7 @@ func (a *Aws) GetCloudData() (model.Resource, error) {
 	for _, region := range regionList {
 		log.Infof("region (%s) collect starting", region.name)
 
-		clientConfig, err := awsconfig.LoadDefaultConfig(context.TODO(), a.credential, awsconfig.WithRegion(region.name))
+		clientConfig, err := awsconfig.LoadDefaultConfig(context.TODO(), a.credential, awsconfig.WithRegion(region.name), awsconfig.WithHTTPClient(a.httpClient))
 		if err != nil {
 			log.Error("client config failed (%s)", err.Error())
 			return model.Resource{}, err

@@ -33,6 +33,7 @@ func (b *BaiduBce) getRegionAndAZs() ([]model.Region, []model.AZ, map[string]str
 	log.Debug("get regions starting")
 
 	bccClient, _ := bcc.NewClient(b.secretID, b.secretKey, "bcc."+b.endpoint)
+	bccClient.Config.ConnectionTimeoutInMillis = b.httpTimeout * 1000
 	result, err := bccClient.ListZone()
 	if err != nil {
 		log.Error(err)

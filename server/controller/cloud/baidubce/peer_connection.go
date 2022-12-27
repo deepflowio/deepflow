@@ -29,6 +29,7 @@ func (b *BaiduBce) getPeerConnections(region model.Region, vpcIdToLcuuid map[str
 	log.Debug("get peer_connections starting")
 
 	vpcClient, _ := vpc.NewClient(b.secretID, b.secretKey, "bcc."+b.endpoint)
+	vpcClient.Config.ConnectionTimeoutInMillis = b.httpTimeout * 1000
 	marker := ""
 	args := &vpc.ListPeerConnsArgs{}
 	results := make([]*vpc.ListPeerConnsResult, 0)
