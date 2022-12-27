@@ -37,6 +37,7 @@ type HuaWei struct {
 	lcuuid          string
 	lcuuidGenerate  string
 	name            string
+	httpTimeout     int
 	config          *Config
 	projectTokenMap map[Project]*Token // 缓存各项目的token
 	toolDataSet     *ToolDataSet       // 处理资源数据时，构建的需要提供给其他资源使用的工具数据
@@ -44,7 +45,7 @@ type HuaWei struct {
 	debugger        *cloudcommon.Debugger
 }
 
-func NewHuaWei(domain mysql.Domain, globalCloudCfg *config.CloudConfig) (*HuaWei, error) {
+func NewHuaWei(domain mysql.Domain, globalCloudCfg config.CloudConfig) (*HuaWei, error) {
 	conf := &Config{}
 	err := conf.LoadFromString(domain.Config)
 	if err != nil {
@@ -56,6 +57,7 @@ func NewHuaWei(domain mysql.Domain, globalCloudCfg *config.CloudConfig) (*HuaWei
 		// TODO: display_name后期需要修改为uuid_generate
 		lcuuidGenerate:  domain.DisplayName,
 		name:            domain.Name,
+		httpTimeout:     globalCloudCfg.HTTPTimeout,
 		config:          conf,
 		projectTokenMap: make(map[Project]*Token),
 		debugger:        cloudcommon.NewDebugger(domain.Name),
@@ -186,7 +188,7 @@ func (h *HuaWei) getRawData(url, token, resultKey string) (jsonList []*simplejso
 
 	noLimitKeys := []string{"projects", "regions", "availabilityZoneInfo"}
 	if common.Contains(noLimitKeys, resultKey) {
-		resp, err := cloudcommon.RequestGet(url, token)
+		resp, err := cloudcommon.RequestGet(url, token, time.Duration(h.httpTimeout))
 		if err != nil {
 			return []*simplejson.Json{}, err
 		}
@@ -204,7 +206,7 @@ func (h *HuaWei) getRawData(url, token, resultKey string) (jsonList []*simplejso
 			} else {
 				url = fmt.Sprintf("%s?limit=%d&marker=%s", baseURL, limit, marker)
 			}
-			resp, err := cloudcommon.RequestGet(url, token)
+			resp, err := cloudcommon.RequestGet(url, token, time.Duration(h.httpTimeout))
 			if err != nil {
 				return []*simplejson.Json{}, err
 			}

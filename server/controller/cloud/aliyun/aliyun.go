@@ -27,6 +27,7 @@ import (
 	logging "github.com/op/go-logging"
 
 	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
+	cloudconfig "github.com/deepflowys/deepflow/server/controller/cloud/config"
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
@@ -41,6 +42,7 @@ type Aliyun struct {
 	secretID       string
 	secretKey      string
 	regionName     string
+	httpTimeout    int
 	includeRegions []string
 	excludeRegions []string
 
@@ -51,7 +53,7 @@ type Aliyun struct {
 	debugger *cloudcommon.Debugger
 }
 
-func NewAliyun(domain mysql.Domain) (*Aliyun, error) {
+func NewAliyun(domain mysql.Domain, cfg cloudconfig.CloudConfig) (*Aliyun, error) {
 	config, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
 		log.Error(err)
@@ -99,6 +101,7 @@ func NewAliyun(domain mysql.Domain) (*Aliyun, error) {
 		regionName:     "cn-beijing",
 		excludeRegions: excludeRegions,
 		includeRegions: includeRegions,
+		httpTimeout:    cfg.HTTPTimeout,
 
 		regionLcuuidToResourceNum: make(map[string]int),
 		azLcuuidToResourceNum:     make(map[string]int),

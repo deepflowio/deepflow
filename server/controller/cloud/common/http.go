@@ -38,7 +38,7 @@ func GetUnverifyHTTPClient(timeout time.Duration) *http.Client {
 	}
 }
 
-func RequestGet(url, token string) (jsonResp *simplejson.Json, err error) {
+func RequestGet(url, token string, timeout time.Duration) (jsonResp *simplejson.Json, err error) {
 	log.Infof("url: %s", url)
 	log.Debugf("token: %s", token)
 	req, err := http.NewRequest("GET", url, nil)
@@ -51,7 +51,7 @@ func RequestGet(url, token string) (jsonResp *simplejson.Json, err error) {
 	req.Header.Set("Accept", "application/json, text/plain")
 
 	// TODO: 通过配置文件获取API超时时间
-	client := GetUnverifyHTTPClient(time.Second * 60)
+	client := GetUnverifyHTTPClient(time.Second * timeout)
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Errorf("request failed: %s", err.Error())
@@ -77,7 +77,7 @@ func RequestGet(url, token string) (jsonResp *simplejson.Json, err error) {
 	return
 }
 
-func RequestPost(url string, body map[string]interface{}) (jsonResp *simplejson.Json, err error) {
+func RequestPost(url string, timeout time.Duration, body map[string]interface{}) (jsonResp *simplejson.Json, err error) {
 	log.Infof("url: %s", url)
 	log.Debugf("body: %+v", body)
 	bodyStr, _ := json.Marshal(&body)
@@ -89,7 +89,7 @@ func RequestPost(url string, body map[string]interface{}) (jsonResp *simplejson.
 	req.Header.Set("content-type", "application/json")
 
 	// TODO: 通过配置文件获取API超时时间
-	client := GetUnverifyHTTPClient(time.Second * 60)
+	client := GetUnverifyHTTPClient(time.Second * timeout)
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Errorf("request failed: %s", err.Error())
