@@ -377,9 +377,14 @@ func GetHostNics(hosts []model.Host, domainName, uuidGenerate, portNameRegex str
 	// 遍历宿主机生成网段、接口和IP信息
 	vpcLcuuidToSubnets := make(map[string][]model.Subnet)
 	for _, host := range hosts {
-		vinterfaces, ok := hostIPToVInterfaces[host.IP]
+		vtapCtrlIP, ok := vtapLaunchServerToCtrlIP[host.IP]
 		if !ok {
-			log.Debugf("no ip in host (%s) response", host.IP)
+			log.Debugf("no vtap with launch_server (%s)", host.IP)
+			continue
+		}
+		vinterfaces, ok := hostIPToVInterfaces[vtapCtrlIP]
+		if !ok {
+			log.Debugf("no host (%s) vinterfaces in response", host.IP)
 			continue
 		}
 		vpcLcuuid := GetBasicVPCLcuuid(uuidGenerate, host.RegionLcuuid)
