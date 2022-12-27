@@ -15,7 +15,7 @@
  */
 
 mod dns;
-mod http;
+pub mod http;
 pub mod l7_rrt;
 mod mq;
 mod rpc;
