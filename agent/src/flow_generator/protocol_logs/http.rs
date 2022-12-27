@@ -482,32 +482,6 @@ impl L7ProtocolParserInterface for HttpLog {
     }
 }
 
-pub fn parse_http1_header(payload: &[u8], limit: Option<usize>) -> Vec<&[u8]> {
-    let mut lines = Vec::new();
-    let mut p = payload;
-    let l = limit.unwrap_or(usize::MAX);
-    while lines.len() < l {
-        let mut next_index = None;
-        for (i, c) in p.iter().enumerate() {
-            if i > 0 && *c == b'\n' && p[i - 1] == b'\r' {
-                if i == 1 {
-                    // the case of \r\n\r\n
-                    return lines;
-                }
-                lines.push(&p[0..i - 1]);
-                next_index = Some(i + 1);
-                break;
-            }
-        }
-        match next_index {
-            None => return lines,
-            Some(i) if i >= p.len() => return lines,
-            Some(i) => p = &p[i..],
-        }
-    }
-    return lines;
-}
-
 impl HttpLog {
     pub const TRACE_ID: u8 = 0;
     pub const SPAN_ID: u8 = 1;
@@ -555,17 +529,13 @@ impl HttpLog {
             return false;
         }
 
-        let lines = parse_http1_header(payload, Some(1));
-        if lines.len() == 0 {
-            // 没有/r/n认为一定不是HTTPv1
+        let mut headers = parse_v1_headers(payload);
+        let Some(first_line) = headers.next() else {
+            // request is not http v1 without '\r\n'
             return false;
-        }
+        };
 
-        let line = String::from_utf8_lossy(lines[0]).into_owned();
-        if is_http_req_line(line) {
-            return true;
-        }
-        false
+        is_http_req_line(first_line)
     }
 
     pub fn http2_check_protocol(&mut self, payload: &[u8], param: &ParseParam) -> bool {
@@ -674,16 +644,17 @@ impl HttpLog {
         if !is_http_v1_payload(payload) {
             return Err(Error::HttpHeaderParseFailed);
         }
-        let lines = parse_http1_header(payload, None);
-        if lines.len() == 0 {
+
+        let mut headers = parse_v1_headers(payload);
+        let Some(first_line) = headers.next() else {
             return Err(Error::HttpHeaderParseFailed);
-        }
+        };
 
         if direction == PacketDirection::ServerToClient {
             // HTTP响应行：HTTP/1.1 404 Not Found.
-            let (version, status_code) = get_http_resp_info(str::from_utf8(lines[0])?)?;
+            let (version, status_code) = get_http_resp_info(first_line)?;
 
-            self.info.version = version;
+            self.info.version = version.to_owned();
             self.info.status_code = Some(status_code as i32);
 
             self.info.msg_type = LogMessageType::Response;
@@ -691,21 +662,20 @@ impl HttpLog {
             self.set_status(status_code);
         } else {
             // HTTP请求行：GET /background.png HTTP/1.0
-            let contexts: Vec<&str> = str::from_utf8(lines[0])?.split(" ").collect();
-            if contexts.len() != 3 {
+            let Ok((method, path, version)) = get_http_request_info(first_line) else {
                 return Err(Error::HttpHeaderParseFailed);
-            }
+            };
 
-            self.info.method = contexts[0].to_string();
-            self.info.path = contexts[1].to_string();
-            self.info.version = get_http_request_version(contexts[2])?.to_string();
+            self.info.method = method.to_owned();
+            self.info.path = path.to_owned();
+            self.info.version = get_http_request_version(version)?.to_owned();
 
             self.info.msg_type = LogMessageType::Request;
         }
 
         let mut content_length: Option<u32> = None;
-        for body_line in &lines[1..] {
-            let col_index = body_line.iter().position(|x| *x == b':');
+        for body_line in headers {
+            let col_index = body_line.find(':');
             if col_index.is_none() {
                 continue;
             }
@@ -714,15 +684,13 @@ impl HttpLog {
                 continue;
             }
 
-            if let (Ok(key), Ok(value)) = (
-                str::from_utf8(&body_line[..col_index]),
-                str::from_utf8(&body_line[col_index + 1..]),
-            ) {
-                let lower_key = key.to_ascii_lowercase();
-                self.on_header(lower_key.as_bytes(), value.trim().as_bytes(), direction);
-                if &lower_key == "content-length" {
-                    content_length = Some(value.trim_start().parse::<u32>().unwrap_or_default());
-                }
+            let key = &body_line[..col_index];
+            let value = &body_line[col_index + 1..];
+
+            let lower_key = key.to_ascii_lowercase();
+            self.on_header(lower_key.as_bytes(), value.trim().as_bytes(), direction);
+            if &lower_key == "content-length" {
+                content_length = Some(value.trim_start().parse::<u32>().unwrap_or_default());
             }
         }
 
@@ -1111,23 +1079,22 @@ pub fn is_http_v1_payload(buf: &[u8]) -> bool {
 }
 
 // check first line is http request line
-pub fn is_http_req_line(line: String) -> bool {
-    if line.len() < 14 {
-        // less len: `GET / HTTP/1.1`
+pub fn is_http_req_line(line: &str) -> bool {
+    if line.len() < "GET / HTTP/1.1".len() {
         return false;
     }
 
     // consider use prefix tree in future
     for i in HTTP_METHODS.iter() {
         if line.starts_with(i) {
-            let end = &line.as_bytes()[line.len() - 8..];
+            let end = &line[line.len() - 8..];
             match end {
-                b"HTTP/0.9" | b"HTTP/1.0" | b"HTTP/1.1" => return true,
+                "HTTP/0.9" | "HTTP/1.0" | "HTTP/1.1" => return true,
                 _ => return false,
             }
         }
     }
-    return false;
+    false
 }
 
 // 参考：https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
@@ -1140,21 +1107,6 @@ pub fn check_http_method(method: &str) -> Result<()> {
     }
 }
 
-// HTTP请求行：GET /background.png HTTP/1.0
-pub fn get_http_method(line_info: &[u8]) -> Result<(String, usize)> {
-    // 截取请求行第一个空格前，进行method匹配
-    if line_info.len() < HTTP_METHOD_AND_SPACE_MAX_OFFSET {
-        return Err(Error::HttpHeaderParseFailed);
-    }
-    let line_str = str::from_utf8(line_info).unwrap_or_default();
-    if let Some(space_index) = line_str.find(' ') {
-        let method = &line_str[..space_index];
-        check_http_method(method)?;
-        return Ok((method.to_string(), space_index));
-    }
-    Err(Error::HttpHeaderParseFailed)
-}
-
 pub fn get_http_request_version(version: &str) -> Result<&str> {
     // 参考：https://baike.baidu.com/item/HTTP/243074?fr=aladdin#2
     // HTTPv1版本只有1.0及1.1
@@ -1165,31 +1117,90 @@ pub fn get_http_request_version(version: &str) -> Result<&str> {
     }
 }
 
-pub fn get_http_resp_info(line_info: &str) -> Result<(String, u16)> {
-    if line_info.len() < HTTP_RESP_MIN_LEN {
+pub fn get_http_request_info(line_info: &str) -> Result<(&str, &str, &str)> {
+    let line_info = line_info.as_bytes();
+    let mut iter = line_info.splitn(3, |c| c.is_ascii_whitespace());
+    let method = iter.next();
+    let path = iter.next();
+    let version = iter.next();
+    if version.is_none() {
         return Err(Error::HttpHeaderParseFailed);
     }
-    // HTTP响应行：HTTP/1.1 404 Not Found.
-    let mut params = line_info.split(' ');
-    // version解析
-    let version = match params.next().unwrap_or_default() {
-        HTTP_V1_0_VERSION => "1.0".to_string(),
-        HTTP_V1_1_VERSION => "1.1".to_string(),
+    unsafe {
+        // safe because line_info is utf8
+        Ok((
+            str::from_utf8_unchecked(method.unwrap()),
+            str::from_utf8_unchecked(path.unwrap()),
+            str::from_utf8_unchecked(version.unwrap()),
+        ))
+    }
+}
+
+pub fn get_http_resp_info(line_info: &str) -> Result<(&str, u16)> {
+    const VERSION_LEN: usize = HTTP_V1_0_VERSION.len();
+    const CODE_OFFSET: usize = VERSION_LEN + 1;
+    const CODE_LEN: usize = 3;
+    if line_info.len() < HTTP_RESP_MIN_LEN || !line_info.is_ascii() {
+        return Err(Error::HttpHeaderParseFailed);
+    }
+    // HTTP response line: HTTP/1.1 404 Not Found.
+    let version = match &line_info[..VERSION_LEN] {
+        HTTP_V1_0_VERSION => "1.0",
+        HTTP_V1_1_VERSION => "1.1",
         _ => return Err(Error::HttpHeaderParseFailed),
     };
 
-    // 响应码值校验
-    // 参考：https://baike.baidu.com/item/HTTP%E7%8A%B6%E6%80%81%E7%A0%81/5053660?fr=aladdin
-    let status_code = params
-        .next()
-        .unwrap_or_default()
-        .parse::<u16>()
-        .unwrap_or_default();
+    // response code validating
+    // ref: https://baike.baidu.com/item/HTTP%E7%8A%B6%E6%80%81%E7%A0%81/5053660?fr=aladdin
+    let Ok(status_code) = (&line_info[CODE_OFFSET..CODE_OFFSET + CODE_LEN]).parse::<u16>() else {
+        return Err(Error::HttpHeaderParseFailed);
+    };
 
     if status_code < HTTP_STATUS_CODE_MIN || status_code > HTTP_STATUS_CODE_MAX {
         return Err(Error::HttpHeaderParseFailed);
     }
     Ok((version, status_code))
+}
+
+pub struct V1HeaderIterator<'a>(&'a [u8]);
+
+impl<'a> Iterator for V1HeaderIterator<'a> {
+    type Item = &'a str;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        const SEP: &'static str = "\r\n";
+        let mut end = 0;
+        loop {
+            if end + SEP.len() > self.0.len() {
+                return None;
+            }
+            match &self.0[end] {
+                b'\r' if self.0[end + 1] == b'\n' => break,
+                b'\n' if end >= 1 && self.0[end - 1] == b'\r' => {
+                    end -= 1;
+                    break;
+                }
+                c if !c.is_ascii() => return None,
+                _ => (),
+            }
+            // the length of SEP is 2 so step 2 is ok
+            end += 2;
+        }
+        if end == 0 {
+            None
+        } else {
+            let result = unsafe {
+                // this is safe because all bytes are checked to be ascii
+                str::from_utf8_unchecked(&self.0[..end])
+            };
+            self.0 = &self.0[end + 2..];
+            Some(result)
+        }
+    }
+}
+
+pub fn parse_v1_headers(payload: &[u8]) -> V1HeaderIterator<'_> {
+    V1HeaderIterator(payload)
 }
 
 #[cfg(test)]
@@ -1249,7 +1260,7 @@ mod tests {
             let mut is_http = http.http1_check_protocol(payload, param);
             is_http |= http.http2_check_protocol(payload, param);
 
-            output.push_str(&format!("{:?} is_http: {}\r\n", http.info, is_http));
+            output.push_str(&format!("{:?} is_http: {}\n", http.info, is_http));
         }
         output
     }
@@ -1347,6 +1358,32 @@ mod tests {
                 h.parse_http2_go_uprobe(&payload, PacketDirection::ClientToServer, None, None);
             assert_eq!(res.is_ok(), true);
             println!("{:#?}", h);
+        }
+    }
+
+    #[test]
+    fn get_http_v1_header_from_payload() {
+        let testcases = vec![
+            vec![
+                "POST /query?1590632942 HTTP/1.1",
+                "Host: rq.cct.cloud.duba.net",
+                "Accept: */*",
+                "Content-Length: 85",
+                "Content-Type: application/x-www-form-urlencoded",
+            ],
+            vec!["aaaa\rbbb", "ccc", "\rddd"],
+            vec![],
+        ];
+        for expected in testcases {
+            let mut payload = expected.join("\r\n").as_bytes().to_owned();
+            payload.extend("\r\n\r\n".as_bytes());
+            // add some garbage
+            payload.extend(&[1, 2, 3, 4, 5, 6, 7, 8, 9]);
+            let mut iter = parse_v1_headers(&payload);
+            for h in expected {
+                assert_eq!(h, iter.next().unwrap());
+            }
+            assert_eq!(None, iter.next());
         }
     }
 }
