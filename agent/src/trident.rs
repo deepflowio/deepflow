@@ -377,6 +377,27 @@ impl Trident {
         );
         synchronizer.start();
 
+        #[cfg(target_os = "linux")]
+        let mut cgroups_controller = None;
+        #[cfg(target_os = "linux")]
+        if config_handler.candidate_config.tap_mode != TapMode::Analyzer && !running_in_container()
+        {
+            match Cgroups::new(process::id() as u64, config_handler.environment()) {
+                Ok(cg_controller) => {
+                    cg_controller.start();
+                    cgroups_controller = Some(cg_controller);
+                }
+                Err(e) => {
+                    warn!(
+                        "initialize cgroup controller failed, {:?}, agent restart...",
+                        e
+                    );
+                    thread::sleep(Duration::from_secs(1));
+                    process::exit(1);
+                }
+            };
+        }
+
         let log_dir = Path::new(config_handler.static_config.log_file.as_str());
         let log_dir = log_dir.parent().unwrap().to_str().unwrap();
         let guard = Guard::new(
@@ -405,6 +426,12 @@ impl Trident {
                         c.stop();
                         guard.stop();
                         monitor.stop();
+                        #[cfg(target_os = "linux")]
+                        if let Some(cg_controller) = cgroups_controller {
+                            if let Err(e) = cg_controller.stop() {
+                                warn!("stop cgroup controller failed, {:?}", e);
+                            }
+                        }
                     }
                     return Ok(());
                 }
@@ -755,8 +782,6 @@ pub struct Components {
     pub ebpf_collector: Option<Box<EbpfCollector>>,
     pub running: AtomicBool,
     pub stats_collector: Arc<stats::Collector>,
-    #[cfg(target_os = "linux")]
-    pub cgroups_controller: Option<Cgroups>,
     pub external_metrics_server: MetricServer,
     pub otel_uniform_sender: UniformSenderThread<OpenTelemetry>,
     pub prometheus_uniform_sender: UniformSenderThread<PrometheusMetric>,
@@ -1511,32 +1536,6 @@ impl Components {
                 );
             }
         }
-        #[cfg(target_os = "linux")]
-        let mut cgroups_controller = None;
-        #[cfg(target_os = "linux")]
-        if candidate_config.tap_mode != TapMode::Analyzer && !running_in_container() {
-            match Cgroups::new(process::id() as u64) {
-                Ok(cg_controller) => {
-                    if let Err(e) = cg_controller.apply(
-                        candidate_config.environment.max_cpus,
-                        candidate_config.environment.max_memory,
-                    ) {
-                        warn!("apply cgroup resource failed, {:?}, agent restart...", e);
-                        thread::sleep(Duration::from_secs(1));
-                        process::exit(1);
-                    }
-                    cgroups_controller = Some(cg_controller);
-                }
-                Err(e) => {
-                    warn!(
-                        "initialize cgroup controller failed, {:?}, agent restart...",
-                        e
-                    );
-                    thread::sleep(Duration::from_secs(1));
-                    process::exit(1);
-                }
-            };
-        }
 
         let sender_id = get_sender_id() as usize;
         let otel_queue_name = "otel-to-sender";
@@ -1705,8 +1704,6 @@ impl Components {
             ebpf_collector,
             stats_collector,
             running: AtomicBool::new(false),
-            #[cfg(target_os = "linux")]
-            cgroups_controller,
             external_metrics_server,
             exception_handler,
             max_memory,
@@ -1902,17 +1899,6 @@ impl Components {
         #[cfg(target_os = "linux")]
         if let Some(ebpf_collector) = self.ebpf_collector.as_mut() {
             ebpf_collector.stop();
-        }
-        #[cfg(target_os = "linux")]
-        if self.cgroups_controller.is_some() {
-            match self.cgroups_controller.as_ref().unwrap().stop() {
-                Ok(_) => {
-                    info!("stopped cgroups_controller");
-                }
-                Err(e) => {
-                    warn!("stop cgroups_controller failed: {}", e);
-                }
-            }
         }
 
         self.external_metrics_server.stop();

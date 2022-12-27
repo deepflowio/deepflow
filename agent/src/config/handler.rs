@@ -20,10 +20,7 @@ use std::fmt;
 use std::net::IpAddr;
 use std::net::Ipv4Addr;
 use std::path::PathBuf;
-#[cfg(target_os = "linux")]
-use std::process;
 use std::sync::Arc;
-use std::thread;
 use std::time::Duration;
 
 use arc_swap::{access::Map, ArcSwap};
@@ -57,7 +54,7 @@ use crate::{
 use crate::{
     dispatcher::recv_engine::af_packet::OptTpacketVersion,
     ebpf::CAP_LEN_MAX,
-    utils::{cgroups::Cgroups, environment::is_tt_pod, environment::is_tt_workload},
+    utils::{environment::is_tt_pod, environment::is_tt_workload},
 };
 
 use public::bitmap::Bitmap;
@@ -1424,39 +1421,6 @@ impl ConfigHandler {
         }
 
         if candidate_config.tap_mode != TapMode::Analyzer && !running_in_container() {
-            #[cfg(target_os = "linux")]
-            {
-                let max_memory_change =
-                    candidate_config.environment.max_memory != new_config.environment.max_memory;
-                let max_cpu_change =
-                    candidate_config.environment.max_cpus != new_config.environment.max_cpus;
-                if max_memory_change || max_cpu_change {
-                    fn cgroup_callback(handler: &ConfigHandler, components: &mut Components) {
-                        if components.cgroups_controller.is_none() {
-                            components.cgroups_controller = match Cgroups::new(process::id() as u64)
-                            {
-                                Ok(cg_controller) => Some(cg_controller),
-                                Err(e) => {
-                                    warn!("initialize cgroup controller failed, {:?}, agent restart...", e);
-                                    thread::sleep(Duration::from_secs(1));
-                                    process::exit(1);
-                                }
-                            };
-                        };
-
-                        if let Err(e) = components.cgroups_controller.as_mut().unwrap().apply(
-                            handler.candidate_config.environment.max_cpus,
-                            handler.candidate_config.environment.max_memory,
-                        ) {
-                            warn!("apply cgroup resource failed, {:?}, agent restart...", e);
-                            thread::sleep(Duration::from_secs(1));
-                            process::exit(1);
-                        }
-                    }
-                    callbacks.push(cgroup_callback);
-                }
-            }
-
             if candidate_config.environment.max_memory != new_config.environment.max_memory {
                 info!(
                     "memory limit set to {}",
