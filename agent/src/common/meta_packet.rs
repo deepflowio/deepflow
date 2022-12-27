@@ -268,8 +268,7 @@ impl<'a> MetaPacket<'a> {
                     );
                     self.tcp_data.sack.replace(sack);
                 }
-                // TOA: https://github.com/Huawei/TCP_option_address/blob/master/src/toa.h
-                TcpOptionNumber(TCP_OPT_ADDRESS) => {
+                TcpOptionNumber(TCP_OPT_ADDRESS_HUAWEI) | TcpOptionNumber(TCP_OPT_ADDRESS_IPVS) => {
                     if assume_length == TCP_TOA_LEN {
                         self.nat_client_port = read_u16_be(&packet[offset + TCP_TOA_PORT_OFFSET..]);
                         self.nat_client_ip = Some(IpAddr::from(Ipv4Addr::from(read_u32_be(
