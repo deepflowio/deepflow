@@ -125,17 +125,10 @@ func AppMeterColumns() []*ckdb.Column {
 	return columns
 }
 
-func (m *AppMeter) WriteBlock(block *ckdb.Block) error {
-	if err := m.AppTraffic.WriteBlock(block); err != nil {
-		return err
-	}
-	if err := m.AppLatency.WriteBlock(block); err != nil {
-		return err
-	}
-	if err := m.AppAnomaly.WriteBlock(block); err != nil {
-		return err
-	}
-	return nil
+func (m *AppMeter) WriteBlock(block *ckdb.Block) {
+	m.AppTraffic.WriteBlock(block)
+	m.AppLatency.WriteBlock(block)
+	m.AppAnomaly.WriteBlock(block)
 }
 
 type AppTraffic struct {
@@ -187,14 +180,8 @@ func AppTrafficColumns() []*ckdb.Column {
 }
 
 // WriteBlock和LatencyColumns的列需要按顺序一一对应
-func (t *AppTraffic) WriteBlock(block *ckdb.Block) error {
-	if err := block.WriteUInt32(t.Request); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(t.Response); err != nil {
-		return err
-	}
-	return nil
+func (t *AppTraffic) WriteBlock(block *ckdb.Block) {
+	block.Write(t.Request, t.Response)
 }
 
 type AppLatency struct {
@@ -253,17 +240,8 @@ func AppLatencyColumns() []*ckdb.Column {
 }
 
 // WriteBlock和LatencyColumns的列需要按顺序一一对应
-func (l *AppLatency) WriteBlock(block *ckdb.Block) error {
-	if err := block.WriteUInt32(l.RRTMax); err != nil {
-		return err
-	}
-	if err := block.WriteFloat64(float64(l.RRTSum)); err != nil {
-		return err
-	}
-	if err := block.WriteUInt64(uint64(l.RRTCount)); err != nil {
-		return err
-	}
-	return nil
+func (l *AppLatency) WriteBlock(block *ckdb.Block) {
+	block.Write(l.RRTMax, float64(l.RRTSum), uint64(l.RRTCount))
 }
 
 type AppAnomaly struct {
@@ -331,17 +309,6 @@ func AppAnomalyColumns() []*ckdb.Column {
 }
 
 // WriteBlock的列和AnomalyColumns需要按顺序一一对应
-func (a *AppAnomaly) WriteBlock(block *ckdb.Block) error {
-	values := []uint64{
-		APPANOMALY_CLIENT_ERROR: uint64(a.ClientError),
-		APPANOMALY_SERVER_ERROR: uint64(a.ServerError),
-		APPANOMALY_TIMEOUT:      uint64(a.Timeout),
-		APPANOMALY_ERROR:        uint64(a.ClientError + a.ServerError),
-	}
-	for _, v := range values {
-		if err := block.WriteUInt64(v); err != nil {
-			return err
-		}
-	}
-	return nil
+func (a *AppAnomaly) WriteBlock(block *ckdb.Block) {
+	block.Write(uint64(a.ClientError), uint64(a.ServerError), uint64(a.Timeout), uint64(a.ClientError+a.ServerError))
 }
