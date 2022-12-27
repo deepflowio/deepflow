@@ -34,7 +34,8 @@ func (t *Tencent) analysisProtocolPort(region tencentRegion, serviceID ...string
 	}
 
 	filters := map[string]interface{}{
-		"service-template-id": serviceID,
+		"Name":   "service-template-id",
+		"Values": serviceID,
 	}
 	resp, err := t.getResponse("vpc", "2017-03-12", "DescribeServiceTemplates", region.name, "ServiceTemplateSet", true, map[string]interface{}{}, filters)
 	if err != nil {
@@ -68,7 +69,8 @@ func (t *Tencent) analysisIPAddress(region tencentRegion, addressID ...string) m
 	}
 
 	filters := map[string]interface{}{
-		"address-template-id": addressID,
+		"Name":   "address-template-id",
+		"Values": addressID,
 	}
 	resp, err := t.getResponse("vpc", "2017-03-12", "DescribeAddressTemplates", region.name, "AddressTemplateSet", true, map[string]interface{}{}, filters)
 	if err != nil {
@@ -171,7 +173,8 @@ func (t *Tencent) getSecurityGroups(region tencentRegion) ([]model.SecurityGroup
 			if sGroupID != "" {
 				stIDs := []string{}
 				sFilters := map[string]interface{}{
-					"service-template-group-id": sGroupID,
+					"Name":   "service-template-group-id",
+					"Values": []string{sGroupID},
 				}
 				stgResp, err := t.getResponse("vpc", "2017-03-12", "DescribeServiceTemplateGroups", region.name, "ServiceTemplateGroupSet", true, map[string]interface{}{}, sFilters)
 				if err != nil {
@@ -199,7 +202,8 @@ func (t *Tencent) getSecurityGroups(region tencentRegion) ([]model.SecurityGroup
 			if aGroupID != "" {
 				atIDs := []string{}
 				aFilters := map[string]interface{}{
-					"address-template-group-id": aGroupID,
+					"Name":   "address-template-group-id",
+					"Values": []string{aGroupID},
 				}
 				atgResp, err := t.getResponse("vpc", "2017-03-12", "DescribeAddressTemplateGroups", region.name, "AddressTemplateGroupSet", true, map[string]interface{}{}, aFilters)
 				if err != nil {
