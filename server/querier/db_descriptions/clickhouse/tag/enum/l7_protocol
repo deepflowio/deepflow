@@ -8,7 +8,7 @@
 40      , Dubbo
 41      , gRPC
 42      , ProtobufRPC
-43      , SofaRPC
+43      , SOFARPC
 60      , MySQL
 61      , PostgreSQL
 80      , Redis

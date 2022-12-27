@@ -166,16 +166,22 @@ func (t *Tencent) CheckAuth() error {
 func (t *Tencent) getResponse(service, version, action, regionName, resultKey string, pages bool, params map[string]interface{}, filters ...map[string]interface{}) ([]*simplejson.Json, error) {
 	var responses []*simplejson.Json
 	var err error
+	var totalCount int
+
 	startTime := time.Now()
-	count := 0
-	sumCount := 0
+	// tencent api 3.0 limit max 100
 	offset, limit := 0, 100
 	// simple config
 	cpf := profile.NewClientProfile()
+	// sdk debug
+	// cpf.Debug = true
 	cpf.HttpProfile.Endpoint = service + ".tencentcloudapi.com"
 	cpf.HttpProfile.ReqMethod = "POST"
-	cpf.NetworkFailureMaxRetries = 3
+	// cpf.HttpProfile.ReqTimeout = 60
+	cpf.NetworkFailureMaxRetries = 1
 	cpf.NetworkFailureRetryDuration = profile.ExponentialBackoff
+	cpf.RateLimitExceededMaxRetries = 1
+	cpf.RateLimitExceededRetryDuration = profile.ExponentialBackoff
 	// create common client
 	client := tcommon.NewCommonClient(t.credential, regionName, cpf)
 
@@ -235,30 +241,28 @@ func (t *Tencent) getResponse(service, version, action, regionName, resultKey st
 			return []*simplejson.Json{}, errors.New(errMsg)
 		}
 
-		if len(resultSet.MustArray()) == 0 && len(resultSet.MustMap()) > 0 {
+		if len(resultSet.MustMap()) > 0 {
 			responses = append(responses, resultSet)
+			totalCount = 1
 		} else {
 			for r := range resultSet.MustArray() {
 				responses = append(responses, resultSet.GetIndex(r))
 			}
+			totalCount = len(resultSet.MustArray())
 		}
 
-		var totalCount int
-		totalC, ok := respJson.Get("Response").CheckGet("TotalCount")
-		if !ok {
-			totalCount = 1
-		} else {
-			totalCount = totalC.MustInt()
-		}
-		sumCount = totalCount + (limit * count)
-		if !pages || (totalCount < limit) {
-			log.Debugf("request tencent action (%s): total count is (%v)", action, sumCount)
+		if !pages {
 			break
 		}
 
-		count += 1
-		offset += 100
+		totalCount = respJson.Get("Response").Get("TotalCount").MustInt()
+		offset += limit
+		if totalCount <= offset {
+			break
+		}
 	}
+
+	log.Debugf("request tencent action (%s): total count is (%v)", action, totalCount)
 
 	if !strings.Contains(common.CloudMonitorExceptionAPI[common.TENCENT_EN], action) {
 		cost := time.Now().Sub(startTime).Milliseconds()
@@ -268,9 +272,9 @@ func (t *Tencent) getResponse(service, version, action, regionName, resultKey st
 			t.cloudStatsd.APICost[action] = append(t.cloudStatsd.APICost[action], int(cost))
 		}
 		if _, ok := t.cloudStatsd.APICount[action]; !ok {
-			t.cloudStatsd.APICount[action] = []int{sumCount}
+			t.cloudStatsd.APICount[action] = []int{totalCount}
 		} else {
-			t.cloudStatsd.APICount[action] = append(t.cloudStatsd.APICount[action], sumCount)
+			t.cloudStatsd.APICount[action] = append(t.cloudStatsd.APICount[action], totalCount)
 		}
 	}
 	t.debugger.WriteJson(resultKey, regionName, responses)
