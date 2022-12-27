@@ -155,22 +155,10 @@ func FlowMeterColumns() []*ckdb.Column {
 	return columns
 }
 
-func (m *FlowMeter) WriteBlock(block *ckdb.Block) error {
-	if err := m.Traffic.WriteBlock(block); err != nil {
-		return err
-	}
-	if err := m.Latency.WriteBlock(block); err != nil {
-		return err
-	}
-	if err := m.Performance.WriteBlock(block); err != nil {
-		return err
-	}
-	if err := m.Anomaly.WriteBlock(block); err != nil {
-		return err
-	}
-	if err := m.FlowLoad.WriteBlock(block); err != nil {
-		return err
-	}
-
-	return nil
+func (m *FlowMeter) WriteBlock(block *ckdb.Block) {
+	m.Traffic.WriteBlock(block)
+	m.Latency.WriteBlock(block)
+	m.Performance.WriteBlock(block)
+	m.Anomaly.WriteBlock(block)
+	m.FlowLoad.WriteBlock(block)
 }

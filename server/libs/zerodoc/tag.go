@@ -1069,388 +1069,189 @@ func GenTagColumns(code Code) []*ckdb.Column {
 }
 
 // 顺序需要和GenTagColumns的一致
-func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) error {
+func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) {
 	code := t.Code
 
-	if err := block.WriteDateTime(time); err != nil {
-		return err
-	}
-
-	if err := block.WriteUInt8(t.GlobalThreadID); err != nil {
-		return err
-	}
+	block.WriteDateTime(time)
+	block.Write(t.GlobalThreadID)
 
 	if code&ACLGID != 0 {
-		if err := block.WriteUInt16(t.ACLGID); err != nil {
-			return err
-		}
+		block.Write(t.ACLGID)
 	}
 	if code&AZID != 0 {
-		if err := block.WriteUInt16(t.AZID); err != nil {
-			return err
-		}
+		block.Write(t.AZID)
 	}
 
 	if code&AZIDPath != 0 {
-		if err := block.WriteUInt16(t.AZID); err != nil {
-			return err
-		}
-		if err := block.WriteUInt16(t.AZID1); err != nil {
-			return err
-		}
+		block.Write(t.AZID, t.AZID1)
 	}
 
 	if code&Direction != 0 {
 		if t.Direction.IsClientToServer() {
-			if err := block.WriteString("c2s"); err != nil {
-				return err
-			}
+			block.Write("c2s")
 		} else {
-			if err := block.WriteString("s2c"); err != nil {
-				return err
-			}
+			block.Write("s2c")
 		}
 	}
 
 	if code&HostID != 0 {
-		if err := block.WriteUInt16(t.HostID); err != nil {
-			return err
-		}
+		block.Write(t.HostID)
 	}
 	if code&HostIDPath != 0 {
-		if err := block.WriteUInt16(t.HostID); err != nil {
-			return err
-		}
-		if err := block.WriteUInt16(t.HostID1); err != nil {
-			return err
-		}
+		block.Write(t.HostID, t.HostID1)
 	}
 	if code&IP != 0 {
-		if err := block.WriteIPv4(t.IP); err != nil {
-			return err
-		}
-		if len(t.IP6) == 0 {
-			t.IP6 = net.IPv6zero
-		}
-		if err := block.WriteIPv6(t.IP6); err != nil {
-			return err
-		}
-		if err := block.WriteUInt8(1 - t.IsIPv6); err != nil {
-			return err
-		}
+		block.WriteIPv4(t.IP)
+		block.WriteIPv6(t.IP6)
+		block.Write(1 - t.IsIPv6)
 	}
 	if code&IPPath != 0 {
-		if err := block.WriteIPv4(t.IP); err != nil {
-			return err
-		}
-		if err := block.WriteIPv4(t.IP1); err != nil {
-			return err
-		}
-		if len(t.IP6) == 0 {
-			t.IP6 = net.IPv6zero
-		}
-		if err := block.WriteIPv6(t.IP6); err != nil {
-			return err
-		}
-		if len(t.IP61) == 0 {
-			t.IP61 = net.IPv6zero
-		}
-		if err := block.WriteIPv6(t.IP61); err != nil {
-			return err
-		}
-		if err := block.WriteUInt8(1 - t.IsIPv6); err != nil {
-			return err
-		}
+		block.WriteIPv4(t.IP)
+		block.WriteIPv4(t.IP1)
+		block.WriteIPv6(t.IP6)
+		block.WriteIPv6(t.IP61)
+		block.Write(1 - t.IsIPv6)
 	}
 
 	if code&IsKeyService != 0 {
-		if err := block.WriteUInt8(t.IsKeyService); err != nil {
-			return err
-		}
+		block.Write(t.IsKeyService)
 	}
 
 	if code&L3Device != 0 {
-		if err := block.WriteUInt32(t.L3DeviceID); err != nil {
-			return err
-		}
-		if err := block.WriteUInt8(uint8(t.L3DeviceType)); err != nil {
-			return err
-		}
+		block.Write(t.L3DeviceID, uint8(t.L3DeviceType))
 	}
 	if code&L3DevicePath != 0 {
-		if err := block.WriteUInt32(t.L3DeviceID); err != nil {
-			return err
-		}
-		if err := block.WriteUInt32(t.L3DeviceID1); err != nil {
-			return err
-		}
-		if err := block.WriteUInt8(uint8(t.L3DeviceType)); err != nil {
-			return err
-		}
-		if err := block.WriteUInt8(uint8(t.L3DeviceType1)); err != nil {
-			return err
-		}
+		block.Write(t.L3DeviceID, t.L3DeviceID1, uint8(t.L3DeviceType), uint8(t.L3DeviceType1))
 	}
 
 	if code&L3EpcID != 0 {
-		if err := block.WriteInt32(t.L3EpcID); err != nil {
-			return err
-		}
+		block.Write(t.L3EpcID)
 	}
 	if code&L3EpcIDPath != 0 {
-		if err := block.WriteInt32(t.L3EpcID); err != nil {
-			return err
-		}
-
-		if err := block.WriteInt32(t.L3EpcID1); err != nil {
-			return err
-		}
+		block.Write(t.L3EpcID, t.L3EpcID1)
 	}
 
 	if code&L7Protocol != 0 {
-		if err := block.WriteUInt8(uint8(t.L7Protocol)); err != nil {
-			return err
-		}
+		block.Write(uint8(t.L7Protocol))
 	}
 
 	if code&MAC != 0 {
 		// 不存
-		// if err := block.WriteUInt64(t.MAC); err != nil {
-		//     return err
-		// }
-		//
+		// block.Write(t.MAC)
 	}
 	if code&MACPath != 0 {
 		// 不存
-		// if err := block.WriteUInt64(t.MAC); err != nil {
-		//     return err
-		// }
-		//
-		// if err := block.WriteUInt64(t.MAC1); err != nil {
-		//     return err
-		// }
-		//
+		// block.Writes(t.MAC, t.MAC1)
 	}
 
 	if code&PodClusterID != 0 {
-		if err := block.WriteUInt16(t.PodClusterID); err != nil {
-			return err
-		}
+		block.Write(t.PodClusterID)
 	}
 
 	if code&PodClusterIDPath != 0 {
-		if err := block.WriteUInt16(t.PodClusterID); err != nil {
-			return err
-		}
-
-		if err := block.WriteUInt16(t.PodClusterID1); err != nil {
-			return err
-		}
+		block.Write(t.PodClusterID, t.PodClusterID1)
 	}
 
 	if code&PodGroupID != 0 {
-		if err := block.WriteUInt32(t.PodGroupID); err != nil {
-			return err
-		}
+		block.Write(t.PodGroupID)
 	}
 
 	if code&PodGroupIDPath != 0 {
-		if err := block.WriteUInt32(t.PodGroupID); err != nil {
-			return err
-		}
-
-		if err := block.WriteUInt32(t.PodGroupID1); err != nil {
-			return err
-		}
+		block.Write(t.PodGroupID, t.PodGroupID1)
 	}
 
 	if code&PodID != 0 {
-		if err := block.WriteUInt32(t.PodID); err != nil {
-			return err
-		}
+		block.Write(t.PodID)
 	}
 
 	if code&PodIDPath != 0 {
-		if err := block.WriteUInt32(t.PodID); err != nil {
-			return err
-		}
-
-		if err := block.WriteUInt32(t.PodID1); err != nil {
-			return err
-		}
+		block.Write(t.PodID, t.PodID1)
 	}
 
 	if code&PodNodeID != 0 {
-		if err := block.WriteUInt32(t.PodNodeID); err != nil {
-			return err
-		}
+		block.Write(t.PodNodeID)
 	}
 
 	if code&PodNodeIDPath != 0 {
-		if err := block.WriteUInt32(t.PodNodeID); err != nil {
-			return err
-		}
-
-		if err := block.WriteUInt32(t.PodNodeID1); err != nil {
-			return err
-		}
+		block.Write(t.PodNodeID, t.PodNodeID1)
 	}
 
 	if code&PodNSID != 0 {
-		if err := block.WriteUInt16(t.PodNSID); err != nil {
-			return err
-		}
+		block.Write(t.PodNSID)
 	}
 	if code&PodNSIDPath != 0 {
-		if err := block.WriteUInt16(t.PodNSID); err != nil {
-			return err
-		}
-
-		if err := block.WriteUInt16(t.PodNSID1); err != nil {
-			return err
-		}
+		block.Write(t.PodNSID, t.PodNSID1)
 	}
 	if code&Protocol != 0 {
-		if err := block.WriteUInt8(uint8(t.Protocol)); err != nil {
-			return err
-		}
+		block.Write(uint8(t.Protocol))
 	}
 
 	if code&RegionID != 0 {
-		if err := block.WriteUInt16(t.RegionID); err != nil {
-			return err
-		}
+		block.Write(t.RegionID)
 	}
 	if code&RegionIDPath != 0 {
-		if err := block.WriteUInt16(t.RegionID); err != nil {
-			return err
-		}
-
-		if err := block.WriteUInt16(t.RegionID1); err != nil {
-			return err
-		}
+		block.Write(t.RegionID, t.RegionID1)
 	}
 
 	if code&Resource != 0 || code&ResourcePath != 0 {
-		if err := block.WriteUInt32(t.ResourceGl0ID); err != nil {
-			return err
-		}
-		if err := block.WriteUInt8(t.ResourceGl0Type); err != nil {
-			return err
-		}
-		if err := block.WriteUInt32(t.ResourceGl1ID); err != nil {
-			return err
-		}
-		if err := block.WriteUInt8(t.ResourceGl1Type); err != nil {
-			return err
-		}
-		if err := block.WriteUInt32(t.ResourceGl2ID); err != nil {
-			return err
-		}
-		if err := block.WriteUInt8(t.ResourceGl2Type); err != nil {
-			return err
-		}
+		block.Write(
+			t.ResourceGl0ID,
+			t.ResourceGl0Type,
+			t.ResourceGl1ID,
+			t.ResourceGl1Type,
+			t.ResourceGl2ID,
+			t.ResourceGl2Type,
+		)
 	}
 
 	if code&ResourcePath != 0 {
-		if err := block.WriteUInt32(t.ResourceGl0ID1); err != nil {
-			return err
-		}
-		if err := block.WriteUInt8(t.ResourceGl0Type1); err != nil {
-			return err
-		}
-		if err := block.WriteUInt32(t.ResourceGl1ID1); err != nil {
-			return err
-		}
-		if err := block.WriteUInt8(t.ResourceGl1Type1); err != nil {
-			return err
-		}
-		if err := block.WriteUInt32(t.ResourceGl2ID1); err != nil {
-			return err
-		}
-		if err := block.WriteUInt8(t.ResourceGl2Type1); err != nil {
-			return err
-		}
+		block.Write(
+			t.ResourceGl0ID1,
+			t.ResourceGl0Type1,
+			t.ResourceGl1ID1,
+			t.ResourceGl1Type1,
+			t.ResourceGl2ID1,
+			t.ResourceGl2Type1,
+		)
 	}
 
 	if code&ServiceID != 0 {
-		if err := block.WriteUInt32(t.ServiceID); err != nil {
-			return err
-		}
+		block.Write(t.ServiceID)
 	}
 	if code&ServiceIDPath != 0 {
-		if err := block.WriteUInt32(t.ServiceID); err != nil {
-			return err
-		}
-
-		if err := block.WriteUInt32(t.ServiceID1); err != nil {
-			return err
-		}
+		block.Write(t.ServiceID, t.ServiceID1)
 	}
 
 	if code&ServerPort != 0 {
-		if err := block.WriteUInt16(t.ServerPort); err != nil {
-			return err
-		}
+		block.Write(t.ServerPort)
 	}
 
 	if code&SubnetID != 0 {
-		if err := block.WriteUInt16(t.SubnetID); err != nil {
-			return err
-		}
+		block.Write(t.SubnetID)
 	}
 	if code&SubnetIDPath != 0 {
-		if err := block.WriteUInt16(t.SubnetID); err != nil {
-			return err
-		}
-		if err := block.WriteUInt16(t.SubnetID1); err != nil {
-			return err
-		}
+		block.Write(t.SubnetID, t.SubnetID1)
 	}
 	if code&TagType != 0 && code&TagValue != 0 {
-		if err := block.WriteUInt8(t.TagType); err != nil {
-			return err
-		}
-
+		block.Write(t.TagType)
 		switch t.TagType {
 		case TAG_TYPE_TUNNEL_IP_ID:
-			if err := block.WriteString(strconv.FormatUint(uint64(t.TagValue), 10)); err != nil {
-				return err
-			}
+			block.Write(strconv.FormatUint(uint64(t.TagValue), 10))
 		}
 	}
 	if code&TAPPort != 0 {
 		tapPort, tapPortType, natSource, tunnelType := t.TAPPort.SplitToPortTypeTunnel()
-		if err := block.WriteUInt8(tapPortType); err != nil {
-			return err
-		}
-		if err := block.WriteUInt8(uint8(tunnelType)); err != nil {
-			return err
-		}
-		if err := block.WriteUInt32(tapPort); err != nil {
-			return err
-		}
-		if err := block.WriteUInt8(uint8(natSource)); err != nil {
-			return err
-		}
+		block.Write(tapPortType, uint8(tunnelType), tapPort, uint8(natSource))
 	}
 	if code&TAPSide != 0 {
-		if err := block.WriteString(t.TAPSide.String()); err != nil {
-			return err
-		}
+		block.Write(t.TAPSide.String())
 	}
 	if code&TAPType != 0 {
-		if err := block.WriteUInt8(uint8(t.TAPType)); err != nil {
-			return err
-		}
+		block.Write(uint8(t.TAPType))
 	}
 	if code&VTAPID != 0 {
-		if err := block.WriteUInt16(t.VTAPID); err != nil {
-			return err
-		}
+		block.Write(t.VTAPID)
 	}
-
-	return nil
 }
 
 const TAP_PORT_STR_LEN = 8

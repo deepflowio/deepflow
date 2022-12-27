@@ -67,21 +67,12 @@ var DataLinkLayerColumns = []*ckdb.Column{
 	ckdb.NewColumn("vlan", ckdb.UInt16).SetIndex(ckdb.IndexSet),
 }
 
-func (f *DataLinkLayer) WriteBlock(block *ckdb.Block) error {
-	if err := block.WriteUInt64(f.MAC0); err != nil {
-		return err
-	}
-	if err := block.WriteUInt64(f.MAC1); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(f.EthType); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(f.VLAN); err != nil {
-		return err
-	}
-
-	return nil
+func (f *DataLinkLayer) WriteBlock(block *ckdb.Block) {
+	block.Write(
+		f.MAC0,
+		f.MAC1,
+		f.EthType,
+		f.VLAN)
 }
 
 type NetworkLayer struct {
@@ -136,98 +127,36 @@ var NetworkLayerColumns = []*ckdb.Column{
 	ckdb.NewColumn("tunnel_rx_mac_1", ckdb.UInt32),
 }
 
-func (n *NetworkLayer) WriteBlock(block *ckdb.Block) error {
-	if err := block.WriteIPv4(n.IP40); err != nil {
-		return err
-	}
-	if err := block.WriteIPv4(n.IP41); err != nil {
-		return err
-	}
-	if len(n.IP60) == 0 {
-		n.IP60 = net.IPv6zero
-	}
-	if err := block.WriteIPv6(n.IP60); err != nil {
-		return err
-	}
-	if len(n.IP61) == 0 {
-		n.IP61 = net.IPv6zero
-	}
-	if err := block.WriteIPv6(n.IP61); err != nil {
-		return err
-	}
+func (n *NetworkLayer) WriteBlock(block *ckdb.Block) {
+	block.WriteIPv4(n.IP40)
+	block.WriteIPv4(n.IP41)
+	block.WriteIPv6(n.IP60)
+	block.WriteIPv6(n.IP61)
+	block.WriteBool(n.IsIPv4)
 
-	if err := block.WriteBool(n.IsIPv4); err != nil {
-		return err
-	}
+	block.Write(
+		n.Protocol,
+		n.TunnelTier,
+		n.TunnelType,
+		n.TunnelTxID,
+		n.TunnelRxID)
 
-	if err := block.WriteUInt8(n.Protocol); err != nil {
-		return err
-	}
-	if err := block.WriteUInt8(n.TunnelTier); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(n.TunnelType); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(n.TunnelTxID); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(n.TunnelRxID); err != nil {
-		return err
-	}
-	if err := block.WriteIPv4(n.TunnelTxIP40); err != nil {
-		return err
-	}
-	if err := block.WriteIPv4(n.TunnelTxIP41); err != nil {
-		return err
-	}
-	if err := block.WriteIPv4(n.TunnelRxIP40); err != nil {
-		return err
-	}
-	if err := block.WriteIPv4(n.TunnelRxIP41); err != nil {
-		return err
-	}
-	if len(n.TunnelTxIP60) == 0 {
-		n.TunnelTxIP60 = net.IPv6zero
-	}
-	if len(n.TunnelTxIP61) == 0 {
-		n.TunnelTxIP61 = net.IPv6zero
-	}
-	if len(n.TunnelRxIP60) == 0 {
-		n.TunnelRxIP60 = net.IPv6zero
-	}
-	if len(n.TunnelRxIP61) == 0 {
-		n.TunnelRxIP61 = net.IPv6zero
-	}
-	if err := block.WriteIPv6(n.TunnelTxIP60); err != nil {
-		return err
-	}
-	if err := block.WriteIPv6(n.TunnelTxIP61); err != nil {
-		return err
-	}
-	if err := block.WriteIPv6(n.TunnelRxIP60); err != nil {
-		return err
-	}
-	if err := block.WriteIPv6(n.TunnelRxIP61); err != nil {
-		return err
-	}
-	if err := block.WriteBool(n.TunnelIsIPv4); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(n.TunnelTxMac0); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(n.TunnelTxMac1); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(n.TunnelRxMac0); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(n.TunnelRxMac1); err != nil {
-		return err
-	}
+	block.WriteIPv4(n.TunnelTxIP40)
+	block.WriteIPv4(n.TunnelTxIP41)
+	block.WriteIPv4(n.TunnelRxIP40)
+	block.WriteIPv4(n.TunnelRxIP41)
 
-	return nil
+	block.WriteIPv6(n.TunnelTxIP60)
+	block.WriteIPv6(n.TunnelTxIP61)
+	block.WriteIPv6(n.TunnelRxIP60)
+	block.WriteIPv6(n.TunnelRxIP61)
+	block.WriteBool(n.TunnelIsIPv4)
+
+	block.Write(
+		n.TunnelTxMac0,
+		n.TunnelTxMac1,
+		n.TunnelRxMac0,
+		n.TunnelRxMac1)
 }
 
 type TransportLayer struct {
@@ -253,32 +182,16 @@ var TransportLayerColumns = []*ckdb.Column{
 	ckdb.NewColumn("last_keepalive_ack", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 }
 
-func (t *TransportLayer) WriteBlock(block *ckdb.Block) error {
-	if err := block.WriteUInt16(t.ClientPort); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(t.ServerPort); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(t.TCPFlagsBit0); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(t.TCPFlagsBit1); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(t.SynSeq); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(t.SynAckSeq); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(t.LastKeepaliveSeq); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(t.LastKeepaliveAck); err != nil {
-		return err
-	}
-	return nil
+func (t *TransportLayer) WriteBlock(block *ckdb.Block) {
+	block.Write(
+		t.ClientPort,
+		t.ServerPort,
+		t.TCPFlagsBit0,
+		t.TCPFlagsBit1,
+		t.SynSeq,
+		t.SynAckSeq,
+		t.LastKeepaliveSeq,
+		t.LastKeepaliveAck)
 }
 
 type ApplicationLayer struct {
@@ -290,11 +203,8 @@ var ApplicationLayerColumns = []*ckdb.Column{
 	ckdb.NewColumn("l7_protocol", ckdb.UInt8).SetIndex(ckdb.IndexMinmax),
 }
 
-func (a *ApplicationLayer) WriteBlock(block *ckdb.Block) error {
-	if err := block.WriteUInt8(a.L7Protocol); err != nil {
-		return err
-	}
-	return nil
+func (a *ApplicationLayer) WriteBlock(block *ckdb.Block) {
+	block.Write(a.L7Protocol)
 }
 
 type Internet struct {
@@ -308,15 +218,8 @@ var InternetColumns = []*ckdb.Column{
 	ckdb.NewColumn("province_1", ckdb.LowCardinalityString),
 }
 
-func (i *Internet) WriteBlock(block *ckdb.Block) error {
-	if err := block.WriteString(i.Province0); err != nil {
-		return err
-	}
-	if err := block.WriteString(i.Province1); err != nil {
-		return err
-	}
-
-	return nil
+func (i *Internet) WriteBlock(block *ckdb.Block) {
+	block.Write(i.Province0, i.Province1)
 }
 
 type KnowledgeGraph struct {
@@ -410,131 +313,50 @@ var KnowledgeGraphColumns = []*ckdb.Column{
 	ckdb.NewColumn("resource_gl2_type_1", ckdb.UInt8),
 }
 
-func (k *KnowledgeGraph) WriteBlock(block *ckdb.Block) error {
-	if err := block.WriteUInt16(k.RegionID0); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(k.RegionID1); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(k.AZID0); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(k.AZID1); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(k.HostID0); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(k.HostID1); err != nil {
-		return err
-	}
-	if err := block.WriteUInt8(k.L3DeviceType0); err != nil {
-		return err
-	}
-	if err := block.WriteUInt8(k.L3DeviceType1); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(k.L3DeviceID0); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(k.L3DeviceID1); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(k.PodNodeID0); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(k.PodNodeID1); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(k.PodNSID0); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(k.PodNSID1); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(k.PodGroupID0); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(k.PodGroupID1); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(k.PodID0); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(k.PodID1); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(k.PodClusterID0); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(k.PodClusterID1); err != nil {
-		return err
-	}
-	if err := block.WriteInt32(k.L3EpcID0); err != nil {
-		return err
-	}
-	if err := block.WriteInt32(k.L3EpcID1); err != nil {
-		return err
-	}
-	if err := block.WriteInt32(k.EpcID0); err != nil {
-		return err
-	}
-	if err := block.WriteInt32(k.EpcID1); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(k.SubnetID0); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(k.SubnetID1); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(k.ServiceID0); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(k.ServiceID1); err != nil {
-		return err
-	}
+func (k *KnowledgeGraph) WriteBlock(block *ckdb.Block) {
+	block.Write(
+		k.RegionID0,
+		k.RegionID1,
+		k.AZID0,
+		k.AZID1,
+		k.HostID0,
+		k.HostID1,
+		k.L3DeviceType0,
+		k.L3DeviceType1,
+		k.L3DeviceID0,
+		k.L3DeviceID1,
+		k.PodNodeID0,
+		k.PodNodeID1,
+		k.PodNSID0,
+		k.PodNSID1,
+		k.PodGroupID0,
+		k.PodGroupID1,
+		k.PodID0,
+		k.PodID1,
+		k.PodClusterID0,
+		k.PodClusterID1,
+		k.L3EpcID0,
+		k.L3EpcID1,
+		k.EpcID0,
+		k.EpcID1,
+		k.SubnetID0,
+		k.SubnetID1,
+		k.ServiceID0,
+		k.ServiceID1,
 
-	if err := block.WriteUInt32(k.ResourceGl0ID0); err != nil {
-		return err
-	}
-	if err := block.WriteUInt8(k.ResourceGl0Type0); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(k.ResourceGl1ID0); err != nil {
-		return err
-	}
-	if err := block.WriteUInt8(k.ResourceGl1Type0); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(k.ResourceGl2ID0); err != nil {
-		return err
-	}
-	if err := block.WriteUInt8(k.ResourceGl2Type0); err != nil {
-		return err
-	}
+		k.ResourceGl0ID0,
+		k.ResourceGl0Type0,
+		k.ResourceGl1ID0,
+		k.ResourceGl1Type0,
+		k.ResourceGl2ID0,
+		k.ResourceGl2Type0,
 
-	if err := block.WriteUInt32(k.ResourceGl0ID1); err != nil {
-		return err
-	}
-	if err := block.WriteUInt8(k.ResourceGl0Type1); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(k.ResourceGl1ID1); err != nil {
-		return err
-	}
-	if err := block.WriteUInt8(k.ResourceGl1Type1); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(k.ResourceGl2ID1); err != nil {
-		return err
-	}
-	if err := block.WriteUInt8(k.ResourceGl2Type1); err != nil {
-		return err
-	}
-
-	return nil
+		k.ResourceGl0ID1,
+		k.ResourceGl0Type1,
+		k.ResourceGl1ID1,
+		k.ResourceGl1Type1,
+		k.ResourceGl2ID1,
+		k.ResourceGl2Type1)
 }
 
 type FlowInfo struct {
@@ -566,6 +388,7 @@ type FlowInfo struct {
 
 var FlowInfoColumns = []*ckdb.Column{
 	// 流信息
+	ckdb.NewColumn("time", ckdb.DateTime).SetComment("精度: 秒，等同end_time的秒精度"),
 	ckdb.NewColumn("close_type", ckdb.UInt16).SetIndex(ckdb.IndexSet),
 	ckdb.NewColumn("signal_source", ckdb.UInt16),
 	ckdb.NewColumn("flow_id", ckdb.UInt64).SetIndex(ckdb.IndexMinmax),
@@ -581,7 +404,6 @@ var FlowInfoColumns = []*ckdb.Column{
 	ckdb.NewColumn("l3_end_1", ckdb.UInt8).SetIndex(ckdb.IndexNone),
 	ckdb.NewColumn("start_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
 	ckdb.NewColumn("end_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
-	ckdb.NewColumn("time", ckdb.DateTime).SetComment("精度: 秒，等同end_time的秒精度"),
 	ckdb.NewColumn("duration", ckdb.UInt64).SetComment("单位: 微秒"),
 	ckdb.NewColumn("is_new_flow", ckdb.UInt8),
 	ckdb.NewColumn("status", ckdb.UInt8).SetComment("状态 0:正常, 1:异常 ,2:不存在，3:服务端异常, 4:客户端异常"),
@@ -592,81 +414,33 @@ var FlowInfoColumns = []*ckdb.Column{
 	ckdb.NewColumn("nat_real_port_1", ckdb.UInt16),
 }
 
-func (f *FlowInfo) WriteBlock(block *ckdb.Block) error {
-	if err := block.WriteUInt16(f.CloseType); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(f.SignalSource); err != nil {
-		return err
-	}
-	if err := block.WriteUInt64(f.FlowID); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(f.TapType); err != nil {
-		return err
-	}
-	if err := block.WriteUInt8(f.NatSource); err != nil {
-		return err
-	}
-	if err := block.WriteUInt8(f.TapPortType); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(f.TapPort); err != nil {
-		return err
-	}
-	if err := block.WriteString(f.TapSide); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(f.VtapID); err != nil {
-		return err
-	}
-	if err := block.WriteBool(f.L2End0); err != nil {
-		return err
-	}
-	if err := block.WriteBool(f.L2End1); err != nil {
-		return err
-	}
-	if err := block.WriteBool(f.L3End0); err != nil {
-		return err
-	}
-	if err := block.WriteBool(f.L3End1); err != nil {
-		return err
-	}
-	if err := block.WriteInt64(f.StartTime); err != nil {
-		return err
-	}
-	if err := block.WriteInt64(f.EndTime); err != nil {
-		return err
-	}
-	if err := block.WriteDateTime(uint32(f.EndTime / US_TO_S_DEVISOR)); err != nil {
-		return err
-	}
-	if err := block.WriteUInt64(f.Duration); err != nil {
-		return err
-	}
-	if err := block.WriteUInt8(f.IsNewFlow); err != nil {
-		return err
-	}
-	if err := block.WriteUInt8(f.Status); err != nil {
-		return err
-	}
-	if err := block.WriteArrayUint16(f.AclGids); err != nil {
-		return err
-	}
-	if err := block.WriteIPv4(f.NatRealIP0); err != nil {
-		return err
-	}
-	if err := block.WriteIPv4(f.NatRealIP1); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(f.NatRealPort0); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(f.NatRealPort1); err != nil {
-		return err
-	}
+func (f *FlowInfo) WriteBlock(block *ckdb.Block) {
+	block.WriteDateTime(uint32(f.EndTime / US_TO_S_DEVISOR))
+	block.Write(
+		f.CloseType,
+		f.SignalSource,
+		f.FlowID,
+		f.TapType,
+		f.NatSource,
+		f.TapPortType,
+		f.TapPort,
+		f.TapSide,
+		f.VtapID,
+		f.L2End0,
+		f.L2End1,
+		f.L3End0,
+		f.L3End1,
+		f.StartTime,
+		f.EndTime,
 
-	return nil
+		f.Duration,
+		f.IsNewFlow,
+		f.Status,
+		f.AclGids)
+
+	block.WriteIPv4(f.NatRealIP0)
+	block.WriteIPv4(f.NatRealIP1)
+	block.Write(f.NatRealPort0, f.NatRealPort1)
 }
 
 type Metrics struct {
@@ -774,147 +548,57 @@ var MetricsColumns = []*ckdb.Column{
 	ckdb.NewColumn("l7_error", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 }
 
-func (m *Metrics) WriteBlock(block *ckdb.Block) error {
-	if err := block.WriteUInt64(m.PacketTx); err != nil {
-		return err
-	}
-	if err := block.WriteUInt64(m.PacketRx); err != nil {
-		return err
-	}
-	if err := block.WriteUInt64(m.ByteTx); err != nil {
-		return err
-	}
-	if err := block.WriteUInt64(m.ByteRx); err != nil {
-		return err
-	}
-	if err := block.WriteUInt64(m.L3ByteTx); err != nil {
-		return err
-	}
-	if err := block.WriteUInt64(m.L3ByteRx); err != nil {
-		return err
-	}
-	if err := block.WriteUInt64(m.L4ByteTx); err != nil {
-		return err
-	}
-	if err := block.WriteUInt64(m.L4ByteRx); err != nil {
-		return err
-	}
-	if err := block.WriteUInt64(m.TotalPacketTx); err != nil {
-		return err
-	}
-	if err := block.WriteUInt64(m.TotalPacketRx); err != nil {
-		return err
-	}
-	if err := block.WriteUInt64(m.TotalByteTx); err != nil {
-		return err
-	}
-	if err := block.WriteUInt64(m.TotalByteRx); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(m.L7Request); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(m.L7Response); err != nil {
-		return err
-	}
+func (m *Metrics) WriteBlock(block *ckdb.Block) {
+	block.Write(
+		m.PacketTx,
+		m.PacketRx,
+		m.ByteTx,
+		m.ByteRx,
+		m.L3ByteTx,
+		m.L3ByteRx,
+		m.L4ByteTx,
+		m.L4ByteRx,
+		m.TotalPacketTx,
+		m.TotalPacketRx,
+		m.TotalByteTx,
+		m.TotalByteRx,
+		m.L7Request,
+		m.L7Response,
 
-	if err := block.WriteFloat64(float64(m.RTT)); err != nil {
-		return err
-	}
-	if err := block.WriteFloat64(float64(m.RTTClientSum)); err != nil {
-		return err
-	}
-	if err := block.WriteFloat64(float64(m.RTTServerSum)); err != nil {
-		return err
-	}
-	if err := block.WriteFloat64(float64(m.SRTSum)); err != nil {
-		return err
-	}
-	if err := block.WriteFloat64(float64(m.ARTSum)); err != nil {
-		return err
-	}
-	if err := block.WriteFloat64(float64(m.RRTSum)); err != nil {
-		return err
-	}
-	if err := block.WriteFloat64(float64(m.CITSum)); err != nil {
-		return err
-	}
+		float64(m.RTT),
+		float64(m.RTTClientSum),
+		float64(m.RTTServerSum),
+		float64(m.SRTSum),
+		float64(m.ARTSum),
+		float64(m.RRTSum),
+		float64(m.CITSum),
 
-	if err := block.WriteUInt64(uint64(m.RTTClientCount)); err != nil {
-		return err
-	}
-	if err := block.WriteUInt64(uint64(m.RTTServerCount)); err != nil {
-		return err
-	}
-	if err := block.WriteUInt64(uint64(m.SRTCount)); err != nil {
-		return err
-	}
-	if err := block.WriteUInt64(uint64(m.ARTCount)); err != nil {
-		return err
-	}
-	if err := block.WriteUInt64(uint64(m.RRTCount)); err != nil {
-		return err
-	}
-	if err := block.WriteUInt64(uint64(m.CITCount)); err != nil {
-		return err
-	}
+		uint64(m.RTTClientCount),
+		uint64(m.RTTServerCount),
+		uint64(m.SRTCount),
+		uint64(m.ARTCount),
+		uint64(m.RRTCount),
+		uint64(m.CITCount),
 
-	if err := block.WriteUInt32(m.RTTClientMax); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(m.RTTServerMax); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(m.SRTMax); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(m.ARTMax); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(m.RRTMax); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(m.CITMax); err != nil {
-		return err
-	}
+		m.RTTClientMax,
+		m.RTTServerMax,
+		m.SRTMax,
+		m.ARTMax,
+		m.RRTMax,
+		m.CITMax,
 
-	if err := block.WriteUInt32(m.RetransTx); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(m.RetransRx); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(m.ZeroWinTx); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(m.ZeroWinRx); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(m.SynCount); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(m.SynackCount); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(m.RetransSyn); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(m.RetransSynack); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(m.L7ClientError); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(m.L7ServerError); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(m.L7ServerTimeout); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(m.L7Error); err != nil {
-		return err
-	}
-	return nil
+		m.RetransTx,
+		m.RetransRx,
+		m.ZeroWinTx,
+		m.ZeroWinRx,
+		m.SynCount,
+		m.SynackCount,
+		m.RetransSyn,
+		m.RetransSynack,
+		m.L7ClientError,
+		m.L7ServerError,
+		m.L7ServerTimeout,
+		m.L7Error)
 }
 
 func parseUint32EpcID(v uint32) int32 {
@@ -1261,44 +945,16 @@ func L4FlowLogColumns() []*ckdb.Column {
 	return columns
 }
 
-func (f *L4FlowLog) WriteBlock(block *ckdb.Block) error {
-	if err := block.WriteUInt64(f._id); err != nil {
-		return err
-	}
-
-	if err := f.DataLinkLayer.WriteBlock(block); err != nil {
-		return err
-	}
-
-	if err := f.KnowledgeGraph.WriteBlock(block); err != nil {
-		return err
-	}
-
-	if err := f.NetworkLayer.WriteBlock(block); err != nil {
-		return err
-	}
-
-	if err := f.TransportLayer.WriteBlock(block); err != nil {
-		return err
-	}
-
-	if err := f.ApplicationLayer.WriteBlock(block); err != nil {
-		return err
-	}
-
-	if err := f.Internet.WriteBlock(block); err != nil {
-		return err
-	}
-
-	if err := f.FlowInfo.WriteBlock(block); err != nil {
-		return err
-	}
-
-	if err := f.Metrics.WriteBlock(block); err != nil {
-		return err
-	}
-
-	return nil
+func (f *L4FlowLog) WriteBlock(block *ckdb.Block) {
+	block.Write(f._id)
+	f.DataLinkLayer.WriteBlock(block)
+	f.KnowledgeGraph.WriteBlock(block)
+	f.NetworkLayer.WriteBlock(block)
+	f.TransportLayer.WriteBlock(block)
+	f.ApplicationLayer.WriteBlock(block)
+	f.Internet.WriteBlock(block)
+	f.FlowInfo.WriteBlock(block)
+	f.Metrics.WriteBlock(block)
 }
 
 func (f *L4FlowLog) EndTime() time.Duration {
