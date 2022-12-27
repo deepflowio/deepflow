@@ -37,29 +37,36 @@ mod policy;
 mod rpc;
 mod sender;
 pub mod trident;
-mod utils;
+pub mod utils;
 
 // for benchmarks
 #[doc(hidden)]
 pub use {
-    common::endpoint::{
-        EndpointData as _EndpointData, EndpointInfo as _EndpointInfo, FeatureFlags as _FeatureFlags,
+    common::{
+        endpoint::{
+            EndpointData as _EndpointData, EndpointInfo as _EndpointInfo,
+            FeatureFlags as _FeatureFlags,
+        },
+        enums::TcpFlags as _TcpFlags,
+        feature as _feature,
+        flow::PacketDirection as _PacketDirection,
+        lookup_key::LookupKey as _LookupKey,
+        platform_data::{IpSubnet as _IpSubnet, PlatformData as _PlatformData},
+        policy::{Acl as _Acl, Cidr as _Cidr, IpGroupData as _IpGroupData},
+        port_range::PortRange as _PortRange,
     },
-    common::enums::TcpFlags as _TcpFlags,
-    common::feature as _feature,
-    common::lookup_key::LookupKey as _LookupKey,
-    common::platform_data::{IpSubnet as _IpSubnet, PlatformData as _PlatformData},
-    common::policy::{Acl as _Acl, Cidr as _Cidr, IpGroupData as _IpGroupData},
-    common::port_range::PortRange as _PortRange,
     flow_generator::flow_map::{
         _new_flow_map_and_receiver, _new_meta_packet, _reverse_meta_packet,
     },
-    flow_generator::perf::l7_rrt::L7RrtCache as _L7RrtCache,
-    flow_generator::perf::tcp::{
-        TcpPerf as _TcpPerf, _benchmark_report, _benchmark_session_peer_seq_no_assert,
-        _meta_flow_perf_update,
+    flow_generator::perf::{
+        http::HttpPerfData as _HttpPerfData,
+        l7_rrt::L7RrtCache as _L7RrtCache,
+        tcp::{
+            TcpPerf as _TcpPerf, _benchmark_report, _benchmark_session_peer_seq_no_assert,
+            _meta_flow_perf_update,
+        },
+        FlowPerfCounter as _FlowPerfCounter, L7FlowPerf as _L7FlowPerf,
     },
-    flow_generator::perf::FlowPerfCounter as _FlowPerfCounter,
     npb_pcap_policy::{
         NpbAction as _NpbAction, NpbTunnelType as _NpbTunnelType, TapSide as _TapSide,
     },

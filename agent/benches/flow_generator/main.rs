@@ -14,21 +14,10 @@
  * limitations under the License.
  */
 
-#[cfg(target_os = "linux")]
-pub(crate) mod cgroups;
-pub(crate) mod command;
-pub(crate) mod environment;
-pub(crate) mod guard;
-pub(crate) mod hasher;
-pub(crate) mod logger;
-pub(crate) mod lru;
-pub(crate) mod npb_bandwidth_watcher;
-pub(crate) mod possible_host;
-pub(crate) mod process;
-pub(crate) mod stats;
+use criterion::*;
 
-pub use public::bytes;
+mod flow_map;
+mod perf;
 
-pub mod test;
-
-const WIN_ERROR_CODE_STR: &str = "please browse website(https://docs.microsoft.com/en-us/windows/win32/debug/system-error-codes) to get more detail";
+criterion_group!(benches, flow_map::bench, perf::bench);
+criterion_main!(benches);
