@@ -674,10 +674,10 @@ impl Stash {
         let (src_ip, dst_ip) = {
             let (mut src_ip, mut dst_ip) = (flow.flow_key.ip_src, flow.flow_key.ip_dst);
             if is_extra_tracing_doc {
-                if !acc_flow.nat_real_ip_0.is_unspecified() {
+                if src_ip != acc_flow.nat_real_ip_0 {
                     src_ip = acc_flow.nat_real_ip_0;
                 }
-                if !acc_flow.nat_real_ip_1.is_unspecified() {
+                if dst_ip != acc_flow.nat_real_ip_1 {
                     dst_ip = acc_flow.nat_real_ip_1;
                 }
             }
@@ -812,7 +812,8 @@ impl Stash {
         //     需要有RIP即natSrcIp和natDstIp
         // 其他场景直接返回
         if !is_extra_tracing_doc
-            || (acc_flow.nat_real_ip_0.is_unspecified() && acc_flow.nat_real_ip_1.is_unspecified())
+            || (acc_flow.nat_real_ip_0 == acc_flow.tagged_flow.flow.flow_key.ip_src
+                && acc_flow.nat_real_ip_1 == acc_flow.tagged_flow.flow.flow_key.ip_dst)
         {
             return;
         }
