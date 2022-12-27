@@ -117,38 +117,19 @@ func NewTagFieldValue(time uint32, db, table string, epcId int32, podNsId uint16
 	return t
 }
 
-func (t *FlowTag) WriteBlock(block *ckdb.Block) error {
-	if err := block.WriteDateTime(t.Timestamp); err != nil {
-		return err
-	}
-	if err := block.WriteString(t.table); err != nil {
-		return err
-	}
-	if err := block.WriteInt32(t.vpcId); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(t.podNsId); err != nil {
-		return err
-	}
-	if err := block.WriteString(t.fieldType.String()); err != nil {
-		return err
-	}
-	if err := block.WriteString(t.fieldName); err != nil {
-		return err
-	}
-	if err := block.WriteString(t.fieldValueType); err != nil {
-		return err
-	}
-
+func (t *FlowTag) WriteBlock(block *ckdb.Block) {
+	block.WriteDateTime(t.Timestamp)
+	block.Write(
+		t.table,
+		t.vpcId,
+		t.podNsId,
+		t.fieldType.String(),
+		t.fieldName,
+		t.fieldValueType,
+	)
 	if t.hasFieldValue {
-		if err := block.WriteString(t.fieldValue); err != nil {
-			return err
-		}
-		if err := block.WriteUInt64(t.fieldValueCount); err != nil {
-			return err
-		}
+		block.Write(t.fieldValue, t.fieldValueCount)
 	}
-	return nil
 }
 
 func (t *FlowTag) Columns() []*ckdb.Column {

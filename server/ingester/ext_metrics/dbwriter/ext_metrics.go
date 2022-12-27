@@ -43,30 +43,17 @@ type ExtMetrics struct {
 	MetricsFloatValues []float64
 }
 
-func (m *ExtMetrics) WriteBlock(block *ckdb.Block) error {
-	if err := m.Tag.WriteBlock(block, m.Timestamp); err != nil {
-		return err
-	}
+func (m *ExtMetrics) WriteBlock(block *ckdb.Block) {
+	m.Tag.WriteBlock(block, m.Timestamp)
 
 	if m.VirtualTableName != "" {
-		if err := block.WriteString(m.VirtualTableName); err != nil {
-			return err
-		}
+		block.Write(m.VirtualTableName)
 	}
-	if err := block.WriteArrayString(m.TagNames); err != nil {
-		return err
-	}
-	if err := block.WriteArrayString(m.TagValues); err != nil {
-		return err
-	}
-	if err := block.WriteArrayString(m.MetricsFloatNames); err != nil {
-		return err
-	}
-	if err := block.WriteArrayFloat64(m.MetricsFloatValues); err != nil {
-		return err
-	}
-
-	return nil
+	block.Write(
+		m.TagNames,
+		m.TagValues,
+		m.MetricsFloatNames,
+		m.MetricsFloatValues)
 }
 
 func (m *ExtMetrics) Columns() []*ckdb.Column {

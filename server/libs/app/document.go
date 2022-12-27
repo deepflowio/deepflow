@@ -159,14 +159,9 @@ func (d *Document) WriteToPB(p *pb.Document) error {
 	return nil
 }
 
-func (d *Document) WriteBlock(block *ckdb.Block) error {
-	if err := d.Tagger.(*zerodoc.Tag).WriteBlock(block, d.Timestamp); err != nil {
-		return err
-	}
-	if err := d.Meter.WriteBlock(block); err != nil {
-		return err
-	}
-	return nil
+func (d *Document) WriteBlock(block *ckdb.Block) {
+	d.Tagger.(*zerodoc.Tag).WriteBlock(block, d.Timestamp)
+	d.Meter.WriteBlock(block)
 }
 
 func (d *Document) TableID() (uint8, error) {

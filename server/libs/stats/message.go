@@ -106,23 +106,15 @@ func Decode(decoder *codec.SimpleDecoder) (*DFStats, error) {
 }
 
 func (s *DFStats) WriteBlock(block *ckdb.Block) error {
-	if err := block.WriteUInt32(s.Time); err != nil {
-		return err
-	}
+	block.Write(s.Time)
 	for _, tag := range s.Tags {
-		if err := block.WriteString(tag.Value); err != nil {
-			return err
-		}
+		block.Write(tag.Value)
 	}
 	for _, field := range s.Fields {
 		if field.Type == TypeFloat64 {
-			if err := block.WriteFloat64(*((*float64)(unsafe.Pointer(&field.Value)))); err != nil {
-				return err
-			}
+			block.Write(*((*float64)(unsafe.Pointer(&field.Value))))
 		} else {
-			if err := block.WriteInt64(field.Value); err != nil {
-				return err
-			}
+			block.Write(field.Value)
 		}
 	}
 	return nil

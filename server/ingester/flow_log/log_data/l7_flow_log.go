@@ -86,6 +86,7 @@ func L7BaseColumns() []*ckdb.Column {
 	// 知识图谱
 	columns = append(columns, KnowledgeGraphColumns...)
 	columns = append(columns,
+		ckdb.NewColumn("time", ckdb.DateTime).SetComment("精度: 秒"),
 		// 网络层
 		ckdb.NewColumn("ip4_0", ckdb.IPv4),
 		ckdb.NewColumn("ip4_1", ckdb.IPv4),
@@ -112,8 +113,6 @@ func L7BaseColumns() []*ckdb.Column {
 		ckdb.NewColumn("resp_tcp_seq", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 		ckdb.NewColumn("start_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
 		ckdb.NewColumn("end_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
-		ckdb.NewColumn("time", ckdb.DateTime).SetComment("精度: 秒"),
-		ckdb.NewColumn("end_time_s", ckdb.DateTime).SetComment("精度: 秒"),
 
 		ckdb.NewColumn("process_id_0", ckdb.Int32).SetComment("客户端进程ID"),
 		ckdb.NewColumn("process_id_1", ckdb.Int32).SetComment("服务端进程ID"),
@@ -130,123 +129,44 @@ func L7BaseColumns() []*ckdb.Column {
 	return columns
 }
 
-func (f *L7Base) WriteBlock(block *ckdb.Block) error {
-	if err := f.KnowledgeGraph.WriteBlock(block); err != nil {
-		return err
-	}
+func (f *L7Base) WriteBlock(block *ckdb.Block) {
+	f.KnowledgeGraph.WriteBlock(block)
 
-	if err := block.WriteIPv4(f.IP40); err != nil {
-		return err
-	}
-	if err := block.WriteIPv4(f.IP41); err != nil {
-		return err
-	}
-	if len(f.IP60) == 0 {
-		f.IP60 = net.IPv6zero
-	}
-	if err := block.WriteIPv6(f.IP60); err != nil {
-		return err
-	}
-	if len(f.IP61) == 0 {
-		f.IP61 = net.IPv6zero
-	}
-	if err := block.WriteIPv6(f.IP61); err != nil {
-		return err
-	}
+	block.WriteDateTime(uint32(f.EndTime / US_TO_S_DEVISOR))
+	block.WriteIPv4(f.IP40)
+	block.WriteIPv4(f.IP41)
+	block.WriteIPv6(f.IP60)
+	block.WriteIPv6(f.IP61)
+	block.WriteBool(f.IsIPv4)
 
-	if err := block.WriteBool(f.IsIPv4); err != nil {
-		return err
-	}
+	block.Write(
+		f.Protocol,
+		f.ClientPort,
+		f.ServerPort,
+		f.FlowID,
+		f.TapType,
+		f.NatSource,
+		f.TapPortType,
+		f.SignalSource,
+		f.TunnelType,
+		f.TapPort,
+		f.TapSide,
+		f.VtapID,
+		f.ReqTcpSeq,
+		f.RespTcpSeq,
+		f.StartTime,
+		f.EndTime,
 
-	if err := block.WriteUInt8(f.Protocol); err != nil {
-		return err
-	}
-
-	if err := block.WriteUInt16(f.ClientPort); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(f.ServerPort); err != nil {
-		return err
-	}
-
-	if err := block.WriteUInt64(f.FlowID); err != nil {
-		return err
-	}
-	if err := block.WriteUInt8(f.TapType); err != nil {
-		return err
-	}
-	if err := block.WriteUInt8(f.NatSource); err != nil {
-		return err
-	}
-	if err := block.WriteUInt8(f.TapPortType); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(f.SignalSource); err != nil {
-		return err
-	}
-	if err := block.WriteUInt8(f.TunnelType); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(f.TapPort); err != nil {
-		return err
-	}
-	if err := block.WriteString(f.TapSide); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(f.VtapID); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(f.ReqTcpSeq); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(f.RespTcpSeq); err != nil {
-		return err
-	}
-	if err := block.WriteInt64(f.StartTime); err != nil {
-		return err
-	}
-	if err := block.WriteInt64(f.EndTime); err != nil {
-		return err
-	}
-	if err := block.WriteDateTime(uint32(f.EndTime / US_TO_S_DEVISOR)); err != nil {
-		return err
-	}
-	if err := block.WriteDateTime(uint32(f.EndTime / US_TO_S_DEVISOR)); err != nil {
-		return err
-	}
-
-	if err := block.WriteInt32(int32(f.ProcessID0)); err != nil {
-		return err
-	}
-	if err := block.WriteInt32(int32(f.ProcessID1)); err != nil {
-		return err
-	}
-	if err := block.WriteString(f.ProcessKName0); err != nil {
-		return err
-	}
-	if err := block.WriteString(f.ProcessKName1); err != nil {
-		return err
-	}
-	if err := block.WriteUInt64(f.SyscallTraceIDRequest); err != nil {
-		return err
-	}
-	if err := block.WriteUInt64(f.SyscallTraceIDResponse); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(f.SyscallThread0); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(f.SyscallThread1); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(f.SyscallCapSeq0); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(f.SyscallCapSeq1); err != nil {
-		return err
-	}
-
-	return nil
+		int32(f.ProcessID0),
+		int32(f.ProcessID1),
+		f.ProcessKName0,
+		f.ProcessKName1,
+		f.SyscallTraceIDRequest,
+		f.SyscallTraceIDResponse,
+		f.SyscallThread0,
+		f.SyscallThread1,
+		f.SyscallCapSeq0,
+		f.SyscallCapSeq1)
 }
 
 type L7FlowLog struct {
@@ -342,112 +262,44 @@ func L7FlowLogColumns() []*ckdb.Column {
 	return l7Columns
 }
 
-func (h *L7FlowLog) WriteBlock(block *ckdb.Block) error {
-	index := 0
-	err := block.WriteUInt64(h._id)
-	if err != nil {
-		return err
-	}
-	index++
+func (h *L7FlowLog) WriteBlock(block *ckdb.Block) {
+	block.Write(h._id)
+	h.L7Base.WriteBlock(block)
 
-	if err := h.L7Base.WriteBlock(block); err != nil {
-		return nil
-	}
+	block.Write(
+		h.L7Protocol,
+		h.L7ProtocolStr,
+		h.Version,
+		h.Type,
+		h.RequestType,
+		h.RequestDomain,
+		h.RequestResource,
+		h.Endpoint,
 
-	if err := block.WriteUInt8(h.L7Protocol); err != nil {
-		return err
-	}
-	if err := block.WriteString(h.L7ProtocolStr); err != nil {
-		return err
-	}
-	if err := block.WriteString(h.Version); err != nil {
-		return err
-	}
-	if err := block.WriteUInt8(h.Type); err != nil {
-		return err
-	}
+		h.RequestId,
+		h.ResponseStatus,
+		h.ResponseCode,
+		h.ResponseException,
+		h.ResponseResult,
 
-	if err := block.WriteString(h.RequestType); err != nil {
-		return err
-	}
-	if err := block.WriteString(h.RequestDomain); err != nil {
-		return err
-	}
-	if err := block.WriteString(h.RequestResource); err != nil {
-		return err
-	}
-	if err := block.WriteString(h.Endpoint); err != nil {
-		return err
-	}
+		h.HttpProxyClient,
+		h.XRequestId,
+		h.TraceId,
+		h.SpanId,
+		h.ParentSpanId,
+		h.spanKind,
+		h.ServiceName,
+		h.ServiceInstanceId,
+		h.ResponseDuration,
+		h.RequestLength,
+		h.ResponseLength,
+		h.SqlAffectedRows,
 
-	if err := block.WriteUInt64Nullable(h.RequestId); err != nil {
-		return err
-	}
-	if err := block.WriteUInt8(h.ResponseStatus); err != nil {
-		return err
-	}
-	if err := block.WriteInt32Nullable(h.ResponseCode); err != nil {
-		return err
-	}
-	if err := block.WriteString(h.ResponseException); err != nil {
-		return err
-	}
-	if err := block.WriteString(h.ResponseResult); err != nil {
-		return err
-	}
+		h.AttributeNames,
+		h.AttributeValues,
+		h.MetricsNames,
+		h.MetricsValues)
 
-	if err := block.WriteString(h.HttpProxyClient); err != nil {
-		return err
-	}
-	if err := block.WriteString(h.XRequestId); err != nil {
-		return err
-	}
-	if err := block.WriteString(h.TraceId); err != nil {
-		return err
-	}
-	if err := block.WriteString(h.SpanId); err != nil {
-		return err
-	}
-	if err := block.WriteString(h.ParentSpanId); err != nil {
-		return err
-	}
-	if err := block.WriteUInt8Nullable(h.spanKind); err != nil {
-		return err
-	}
-	if err := block.WriteString(h.ServiceName); err != nil {
-		return err
-	}
-	if err := block.WriteString(h.ServiceInstanceId); err != nil {
-		return err
-	}
-
-	if err := block.WriteUInt64(h.ResponseDuration); err != nil {
-		return err
-	}
-	if err := block.WriteInt64Nullable(h.RequestLength); err != nil {
-		return err
-	}
-	if err := block.WriteInt64Nullable(h.ResponseLength); err != nil {
-		return err
-	}
-	if err := block.WriteUInt64Nullable(h.SqlAffectedRows); err != nil {
-		return err
-	}
-
-	if err := block.WriteArrayString(h.AttributeNames); err != nil {
-		return err
-	}
-	if err := block.WriteArrayString(h.AttributeValues); err != nil {
-		return err
-	}
-	if err := block.WriteArrayString(h.MetricsNames); err != nil {
-		return err
-	}
-	if err := block.WriteArrayFloat64(h.MetricsValues); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func base64ToHexString(str string) string {

@@ -45,5 +45,5 @@ type Meter interface {
 	Release()
 	Reverse()
 	ToReversed() Meter
-	WriteBlock(block *ckdb.Block) error // 写入clickhouse的block
+	WriteBlock(block *ckdb.Block) // 写入clickhouse的block
 }

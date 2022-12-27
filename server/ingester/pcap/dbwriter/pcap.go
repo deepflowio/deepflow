@@ -47,28 +47,14 @@ func PcapStoreColumns() []*ckdb.Column {
 	}
 }
 
-func (s *PcapStore) WriteBlock(block *ckdb.Block) error {
-	if err := block.WriteDateTime(s.Time); err != nil {
-		return err
-	}
-	if err := block.WriteInt64(s.EndTime); err != nil {
-		return err
-	}
-	if err := block.WriteUInt64(s.FlowID); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(s.VtapID); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(s.PcapCount); err != nil {
-		return err
-	}
-	if err := block.WriteArrayByte(s.PcapBatch); err != nil {
-
-		return err
-	}
-
-	return nil
+func (s *PcapStore) WriteBlock(block *ckdb.Block) {
+	block.WriteDateTime(s.Time)
+	block.Write(
+		s.EndTime,
+		s.FlowID,
+		s.VtapID,
+		s.PcapCount,
+		s.PcapBatch)
 }
 
 func (p *PcapStore) Release() {
