@@ -135,7 +135,7 @@ func listDomain(cmd *cobra.Command, args []string, output string) {
 				nameMaxSize = nameSize
 			}
 		}
-		format := "%-*s %-14s %-37s %-14s %-15s %-22s %-22s %-8s %-8s %s\n"
+		format := "%-*s %-14s %-37s %-17s %-15s %-22s %-22s %-8s %-8s %s\n"
 		header := fmt.Sprintf(
 			format, nameMaxSize, "NAME", "ID", "LCUUID", "TYPE", "CONTROLLER_IP",
 			"CREATED_AT", "SYNCED_AT", "ENABLED", "STATE", "AGENT_WATCH_K8S", // TODO translate state to readable word
