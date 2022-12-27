@@ -316,16 +316,17 @@ func (w *CKWriter) writeItems(queueID int, items []CKItem) error {
 		return err
 	}
 
-	ckdbBlock := &ckdb.Block{
-		Batch: batch,
-	}
+	ckdbBlock := ckdb.NewBlock(batch)
 	for _, item := range items {
 		if err := item.WriteBlock(ckdbBlock); err != nil {
 			return fmt.Errorf("item write block failed: %s", err)
 		}
-		ckdbBlock.ResetIndex()
+		err := ckdbBlock.WriteAll()
+		if err != nil {
+			return fmt.Errorf("item write block failed: %s", err)
+		}
 	}
-	err = ckdbBlock.Batch.Send()
+	err = ckdbBlock.Send()
 	if err != nil {
 		return fmt.Errorf("send write block failed: %s", err)
 	} else {
