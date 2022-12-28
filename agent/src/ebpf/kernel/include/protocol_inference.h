@@ -1265,6 +1265,20 @@ static __inline bool drop_msg_by_comm(void)
 	return false;
 }
 
+static __inline void save_prev_data(const char *buf,
+				    struct conn_info_t *conn_info)
+{
+	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+		*(__u32 *) conn_info->socket_info_ptr->prev_data =
+		    *(__u32 *) buf;
+		conn_info->socket_info_ptr->prev_data_len = 4;
+		conn_info->socket_info_ptr->direction = conn_info->direction;
+	} else {
+		*(__u32 *) conn_info->prev_buf = *(__u32 *) buf;
+		conn_info->prev_count = 4;
+	}
+}
+
 static __inline struct protocol_message_t infer_protocol(const char *buf,
 							 size_t count,
 							 struct conn_info_t
@@ -1313,6 +1327,143 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 	char infer_buf[DATA_BUF_MAX];
 	bpf_probe_read(&infer_buf, sizeof(infer_buf), buf);
 
+	// MySQL、Kafka推断需要之前的4字节数据
+	// MySQL and Kafka need the previous 4 bytes of data for inference
+	if (conn_info->socket_info_ptr != NULL &&
+	    conn_info->socket_info_ptr->prev_data_len != 0) {
+		if (conn_info->direction !=
+		    conn_info->socket_info_ptr->direction)
+			return inferred_message;
+
+		*(__u32 *) conn_info->prev_buf =
+		    *(__u32 *) conn_info->socket_info_ptr->prev_data;
+		conn_info->prev_count = 4;
+
+		/*
+		 * Clean up previously stored data.
+		 */
+		conn_info->socket_info_ptr->prev_data_len = 0;
+	}
+
+#ifdef LINUX_VER_5_2_PLUS
+	/*
+	 * Protocol inference fast matching.
+	 * One thread or process processes the application layer data, and the protocol
+	 * inference program has successfully concluded that the protocol is A, then
+	 * this thread or process will probably process the data of protocol A later.
+	 * We can add a cache for fast matching, use the process-ID/thread-ID
+	 * to query the protocol recorded in the cache, and match the protocol preferentially.
+	 * If the match fails, a slow match is performed (all protocol sequence matches).
+	 *
+	 * Due to the limitation of the number of eBPF instruction in kernel, this feature
+	 * is suitable for Linux5.2+
+	 */
+
+	__u32 pid = (__u32) bpf_get_current_pid_tgid();
+	__u32 cache_key = pid >> 16;
+	if (cache_key < PROTO_INFER_CACHE_SIZE) {
+		struct proto_infer_cache_t *p;
+		p = proto_infer_cache_map__lookup(&cache_key);
+		if (p == NULL)
+			return inferred_message;
+		__u16 idx = (__u16) pid;
+		switch (p->protocols[idx]) {
+		case PROTO_HTTP1:
+			if ((inferred_message.type =
+			     infer_http_message(infer_buf, count,
+						conn_info)) != MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_HTTP1;
+				return inferred_message;
+			}
+			break;
+		case PROTO_REDIS:
+			if ((inferred_message.type =
+			     infer_redis_message(infer_buf, count,
+						 conn_info)) != MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_REDIS;
+				return inferred_message;
+			}
+			break;
+		case PROTO_MQTT:
+			if ((inferred_message.type =
+			     infer_mqtt_message(infer_buf, count,
+						conn_info)) != MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_MQTT;
+				return inferred_message;
+			}
+			break;
+		case PROTO_DUBBO:
+			if ((inferred_message.type =
+			     infer_dubbo_message(infer_buf, count,
+						 conn_info)) != MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_DUBBO;
+				return inferred_message;
+			}
+			break;
+		case PROTO_DNS:
+			if ((inferred_message.type =
+			     infer_dns_message(infer_buf, count,
+					       conn_info)) != MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_DNS;
+				return inferred_message;
+			}
+			break;
+		case PROTO_MYSQL:
+			if (count == 4) {
+				save_prev_data(infer_buf, conn_info);
+				inferred_message.type = MSG_PRESTORE;
+				return inferred_message;
+			}
+			if ((inferred_message.type =
+			     infer_mysql_message(infer_buf, count,
+						 conn_info)) != MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_MYSQL;
+				return inferred_message;
+			}
+			break;
+		case PROTO_KAFKA:
+			if (count == 4) {
+				save_prev_data(infer_buf, conn_info);
+				inferred_message.type = MSG_PRESTORE;
+				return inferred_message;
+			}
+			if ((inferred_message.type =
+			     infer_kafka_message(infer_buf, count,
+						 conn_info)) != MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_KAFKA;
+				return inferred_message;
+			}
+			break;
+		case PROTO_SOFARPC:
+			if ((inferred_message.type =
+			     infer_sofarpc_message(infer_buf, count,
+						   conn_info)) != MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_SOFARPC;
+				return inferred_message;
+			}
+			break;
+		case PROTO_HTTP2:
+			if ((inferred_message.type =
+			     infer_http2_message(buf, count,
+						 conn_info)) != MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_HTTP2;
+				return inferred_message;
+			}
+			break;
+		case PROTO_POSTGRESQL:
+			if ((inferred_message.type =
+			     infer_postgre_message(infer_buf, count,
+						   conn_info)) != MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_POSTGRESQL;
+				return inferred_message;
+			}
+			break;
+		default:
+			break;
+		}
+	}
+#endif
+
 	/*
 	 * 为了提高协议推断的准确率，做了一下处理：
 	 *
@@ -1352,17 +1503,7 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 		return inferred_message;
 
 	if (count == 4) {
-		if (is_socket_info_valid(conn_info->socket_info_ptr)) {
-			*(__u32 *) conn_info->socket_info_ptr->prev_data =
-			    *(__u32 *) infer_buf;
-			conn_info->socket_info_ptr->prev_data_len = 4;
-			conn_info->socket_info_ptr->direction =
-			    conn_info->direction;
-		} else {
-			*(__u32 *) conn_info->prev_buf = *(__u32 *) infer_buf;
-			conn_info->prev_count = 4;
-		}
-
+		save_prev_data(infer_buf, conn_info);
 		inferred_message.type = MSG_PRESTORE;
 		return inferred_message;
 	}

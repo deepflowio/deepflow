@@ -685,6 +685,18 @@ impl FlowMap {
         config.l4_performance_enabled
     }
 
+    fn init_nat_info(flow: &mut Flow, meta_packet: &MetaPacket) {
+        if let Some(real_ip) = meta_packet.nat_client_ip {
+            flow.flow_metrics_peers[0].nat_real_ip = real_ip;
+            flow.flow_metrics_peers[0].nat_real_port = meta_packet.nat_client_port;
+        } else {
+            flow.flow_metrics_peers[0].nat_real_ip = meta_packet.lookup_key.src_ip;
+            flow.flow_metrics_peers[0].nat_real_port = meta_packet.lookup_key.src_port;
+        }
+        flow.flow_metrics_peers[1].nat_real_ip = meta_packet.lookup_key.dst_ip;
+        flow.flow_metrics_peers[1].nat_real_port = meta_packet.lookup_key.dst_port;
+    }
+
     fn init_flow(&mut self, config: &FlowConfig, meta_packet: &mut MetaPacket) -> FlowNode {
         meta_packet.direction = PacketDirection::ClientToServer;
 
@@ -756,10 +768,7 @@ impl FlowMap {
             is_active_service,
             ..Default::default()
         };
-        if let Some(real_ip) = meta_packet.nat_client_ip {
-            flow.flow_metrics_peers[0].nat_real_ip = real_ip;
-            flow.flow_metrics_peers[0].nat_real_port = meta_packet.nat_client_port;
-        }
+        Self::init_nat_info(&mut flow, meta_packet);
         tagged_flow.flow = flow;
 
         // FlowMap信息

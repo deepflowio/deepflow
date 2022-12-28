@@ -235,6 +235,17 @@ impl Default for UprobeProcRegExp {
     }
 }
 
+pub const OS_PROC_REGEXP_MATCH_TYPE_CMD: &'static str = "cmdline";
+pub const OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME: &'static str = "process_name";
+// use for proc scan match and replace
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Default)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct OsProcRegexp {
+    pub match_regex: String,
+    pub match_type: String, // one of cmdline or process_name
+    pub rewrite_name: String,
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Default)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct EbpfKprobeWhitelist {
@@ -344,6 +355,13 @@ pub struct YamlConfig {
     // hashmap<protocolName, portRange>
     pub l7_protocol_ports: HashMap<String, String>,
     pub npb_port: u16,
+    // process and socket scan config
+    pub os_proc_root: String,
+    pub os_proc_socket_sync_interval: u32, // for sec
+    pub os_proc_socket_min_lifetime: u32,  // for sec
+    pub os_proc_regex: Vec<OsProcRegexp>,
+    pub os_app_tag_exec_user: String,
+    pub os_app_tag_exec: Vec<String>,
 }
 
 impl YamlConfig {
@@ -371,8 +389,8 @@ impl YamlConfig {
         if c.pcap.buffer_size <= 0 {
             c.pcap.buffer_size = 1 << 23;
         }
-        if c.pcap.flush_interval < MINUTE.as_secs() as u32 {
-            c.pcap.flush_interval = MINUTE.as_secs() as u32;
+        if c.pcap.flush_interval < MINUTE {
+            c.pcap.flush_interval = MINUTE;
         }
 
         if c.flow.flush_interval < Duration::from_secs(1)
@@ -590,6 +608,16 @@ impl Default for YamlConfig {
             l7_protocol_ports: HashMap::from([(String::from("DNS"), String::from("53"))]),
             ebpf: EbpfYamlConfig::default(),
             npb_port: NPB_DEFAULT_PORT,
+            os_proc_root: "/proc".into(),
+            os_proc_socket_sync_interval: 10,
+            os_proc_socket_min_lifetime: 3,
+            os_proc_regex: vec![OsProcRegexp {
+                match_regex: ".*".into(),
+                match_type: OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME.into(),
+                rewrite_name: "".into(),
+            }],
+            os_app_tag_exec_user: "deepflow".to_string(),
+            os_app_tag_exec: vec![],
         }
     }
 }
@@ -639,7 +667,8 @@ impl Default for PortConfig {
 #[serde(default, rename_all = "kebab-case")]
 pub struct PcapConfig {
     pub queue_size: u32,
-    pub flush_interval: u32, // unit(second)
+    #[serde(with = "humantime_serde")]
+    pub flush_interval: Duration,
     pub buffer_size: u64,
     pub flow_buffer_size: u32,
 }
@@ -648,7 +677,7 @@ impl Default for PcapConfig {
     fn default() -> Self {
         PcapConfig {
             queue_size: 65536,
-            flush_interval: 60,         // 1min
+            flush_interval: Duration::from_secs(60),
             buffer_size: 96 << 10,      // 96K
             flow_buffer_size: 64 << 10, // 64K
         }
@@ -672,8 +701,6 @@ pub struct FlowGeneratorConfig {
     pub capacity: u32,
     #[serde(with = "humantime_serde")]
     pub flush_interval: Duration,
-    #[serde(rename = "flow-sender-throttle")]
-    pub sender_throttle: u32,
     #[serde(rename = "flow-aggr-queue-size")]
     pub aggr_queue_size: u32,
 
@@ -691,7 +718,6 @@ impl Default for FlowGeneratorConfig {
             hash_slots: 131072,
             capacity: 1048576,
             flush_interval: Duration::from_secs(1),
-            sender_throttle: 1024,
             aggr_queue_size: 65535,
 
             ignore_tor_mac: false,

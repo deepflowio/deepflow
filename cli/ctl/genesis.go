@@ -308,13 +308,14 @@ func tableVinterface(response *simplejson.Json, table *tablewriter.Table) {
 }
 
 func tableProcess(response *simplejson.Json, table *tablewriter.Table) {
-	table.SetHeader([]string{"PID", "NAME", "PROCESS_NAME", "USER", "START_TIME"})
+	table.SetHeader([]string{"PID", "VTAP_ID", "NAME", "PROCESS_NAME", "USER", "START_TIME"})
 
 	tableItems := [][]string{}
 	for i := range response.Get("DATA").MustArray() {
 		data := response.Get("DATA").GetIndex(i)
 		tableItem := []string{}
 		tableItem = append(tableItem, strconv.Itoa(data.Get("PID").MustInt()))
+		tableItem = append(tableItem, strconv.Itoa(data.Get("VTAP_ID").MustInt()))
 		tableItem = append(tableItem, data.Get("NAME").MustString())
 		tableItem = append(tableItem, data.Get("PROCESS_NAME").MustString())
 		tableItem = append(tableItem, data.Get("USER").MustString())

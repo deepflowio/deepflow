@@ -20,10 +20,7 @@ use std::fmt;
 use std::net::IpAddr;
 use std::net::Ipv4Addr;
 use std::path::PathBuf;
-#[cfg(target_os = "linux")]
-use std::process;
 use std::sync::Arc;
-use std::thread;
 use std::time::Duration;
 
 use arc_swap::{access::Map, ArcSwap};
@@ -41,6 +38,7 @@ use super::{
 };
 use crate::common::l7_protocol_log::L7ProtocolBitmap;
 use crate::flow_generator::protocol_logs::SOFA_NEW_RPC_TRACE_CTX_KEY;
+use crate::platform::ProcRegRewrite;
 use crate::{
     common::{decapsulate::TunnelTypeBitmap, enums::TapType},
     dispatcher::recv_engine,
@@ -57,7 +55,7 @@ use crate::{
 use crate::{
     dispatcher::recv_engine::af_packet::OptTpacketVersion,
     ebpf::CAP_LEN_MAX,
-    utils::{cgroups::Cgroups, environment::is_tt_pod, environment::is_tt_workload},
+    utils::{environment::is_tt_pod, environment::is_tt_workload},
 };
 
 use public::bitmap::Bitmap;
@@ -216,6 +214,16 @@ impl Default for NpbConfig {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
+pub struct OsProcScanConfig {
+    pub os_proc_root: String,
+    pub os_proc_socket_sync_interval: u32, // for sec
+    pub os_proc_socket_min_lifetime: u32,  // for sec
+    pub os_proc_regex: Vec<ProcRegRewrite>,
+    pub os_app_tag_exec_user: String,
+    pub os_app_tag_exec: Vec<String>,
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct PlatformConfig {
     pub sync_interval: Duration,
     pub kubernetes_cluster_id: String,
@@ -231,6 +239,7 @@ pub struct PlatformConfig {
     pub namespace: Option<String>,
     pub thread_threshold: u32,
     pub tap_mode: TapMode,
+    pub os_proc_scan_conf: OsProcScanConfig,
 }
 
 #[derive(Clone, PartialEq, Debug, Eq)]
@@ -881,6 +890,22 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 },
                 thread_threshold: conf.thread_threshold,
                 tap_mode: conf.tap_mode,
+                os_proc_scan_conf: OsProcScanConfig {
+                    os_proc_root: conf.yaml_config.os_proc_root.clone(),
+                    os_proc_socket_sync_interval: conf.yaml_config.os_proc_socket_sync_interval,
+                    os_proc_socket_min_lifetime: conf.yaml_config.os_proc_socket_min_lifetime,
+                    os_proc_regex: {
+                        let mut v = vec![];
+                        for i in &conf.yaml_config.os_proc_regex {
+                            if let Ok(r) = ProcRegRewrite::try_from(i) {
+                                v.push(r);
+                            }
+                        }
+                        v
+                    },
+                    os_app_tag_exec_user: conf.yaml_config.os_app_tag_exec_user.clone(),
+                    os_app_tag_exec: conf.yaml_config.os_app_tag_exec.clone(),
+                },
             },
             flow: (&conf).into(),
             log_parser: LogParserConfig {
@@ -1426,39 +1451,6 @@ impl ConfigHandler {
         }
 
         if candidate_config.tap_mode != TapMode::Analyzer && !running_in_container() {
-            #[cfg(target_os = "linux")]
-            {
-                let max_memory_change =
-                    candidate_config.environment.max_memory != new_config.environment.max_memory;
-                let max_cpu_change =
-                    candidate_config.environment.max_cpus != new_config.environment.max_cpus;
-                if max_memory_change || max_cpu_change {
-                    fn cgroup_callback(handler: &ConfigHandler, components: &mut Components) {
-                        if components.cgroups_controller.is_none() {
-                            components.cgroups_controller = match Cgroups::new(process::id() as u64)
-                            {
-                                Ok(cg_controller) => Some(cg_controller),
-                                Err(e) => {
-                                    warn!("initialize cgroup controller failed, {:?}, agent restart...", e);
-                                    thread::sleep(Duration::from_secs(1));
-                                    process::exit(1);
-                                }
-                            };
-                        };
-
-                        if let Err(e) = components.cgroups_controller.as_mut().unwrap().apply(
-                            handler.candidate_config.environment.max_cpus,
-                            handler.candidate_config.environment.max_memory,
-                        ) {
-                            warn!("apply cgroup resource failed, {:?}, agent restart...", e);
-                            thread::sleep(Duration::from_secs(1));
-                            process::exit(1);
-                        }
-                    }
-                    callbacks.push(cgroup_callback);
-                }
-            }
-
             if candidate_config.environment.max_memory != new_config.environment.max_memory {
                 info!(
                     "memory limit set to {}",

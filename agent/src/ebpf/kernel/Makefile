@@ -32,8 +32,8 @@ else
 endif
 ARCH := $(shell uname -m | sed 's/x86_64/x86/' | sed 's/aarch64/arm64/' | sed 's/ppc64le/powerpc/' | sed 's/mips.*/mips/')
 
-ifeq ($(LINUX_VER_5_2),1)
-	EXTRA_EBPF_CLAGS = -DLINUX_VER_5_2
+ifeq ($(LINUX_VER_5_2_PLUS),1)
+	EXTRA_EBPF_CLAGS = -DLINUX_VER_5_2_PLUS
 endif
 
 FINAL_TARGET = -emit-llvm -D__TARGET_ARCH_$(ARCH) -o ${@:.elf=.ll} -c $^ && $(LLC) -march=bpf -filetype=obj -mcpu=probe -o $@ ${@:.elf=.ll}
