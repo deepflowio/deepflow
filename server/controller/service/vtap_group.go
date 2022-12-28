@@ -19,7 +19,7 @@ package service
 import (
 	"fmt"
 
-	"github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set"
 	"github.com/google/uuid"
 
 	"github.com/deepflowys/deepflow/server/controller/common"
@@ -28,6 +28,8 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/model"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris/refresh"
 )
+
+const VTAP_GROUP_SHORT_UUID_PREFIX = "g-"
 
 func GetVtapGroups(filter map[string]interface{}) (resp []model.VtapGroup, err error) {
 	var response []model.VtapGroup
@@ -123,10 +125,20 @@ func CreateVtapGroup(vtapGroupCreate model.VtapGroupCreate, cfg *config.Controll
 		)
 	}
 
+	shortUUID := VTAP_GROUP_SHORT_UUID_PREFIX + common.GenerateShortUUID()
+	groupID := vtapGroupCreate.GroupID
+	// verify vtap group id in deepflow-ctl command model
+	if err := verifyGroupID(groupID); err != nil {
+		return model.VtapGroup{}, NewError(common.INVALID_POST_DATA, err.Error())
+	}
+	if groupID != "" {
+		shortUUID = groupID
+	}
+
 	vtapGroup := mysql.VTapGroup{}
 	lcuuid := uuid.New().String()
 	vtapGroup.Lcuuid = lcuuid
-	vtapGroup.ShortUUID = "g-" + common.GenerateShortUUID()
+	vtapGroup.ShortUUID = shortUUID
 	vtapGroup.Name = vtapGroupCreate.Name
 	mysql.Db.Create(&vtapGroup)
 
@@ -139,6 +151,26 @@ func CreateVtapGroup(vtapGroupCreate model.VtapGroupCreate, cfg *config.Controll
 	response, _ := GetVtapGroups(map[string]interface{}{"lcuuid": lcuuid})
 	refresh.RefreshCache([]string{common.VTAP_CHANGED})
 	return response[0], nil
+}
+
+func verifyGroupID(groupID string) error {
+	if groupID == "" {
+		return nil
+	}
+	if !common.IsVtapGroupShortUUID(groupID) {
+		return NewError(
+			common.INVALID_POST_DATA,
+			fmt.Sprintf("group-id(%s) invalid, requires %s prefix, number and letter length %d, such as g-1yhIguXABC",
+				groupID, VTAP_GROUP_SHORT_UUID_PREFIX, common.SHORT_UUID_LENGTH),
+		)
+	}
+
+	var vtapGroupCount int64
+	mysql.Db.Model(&mysql.VTapGroup{}).Where("short_uuid = ?", groupID).Count(&vtapGroupCount)
+	if vtapGroupCount > 0 {
+		return NewError(common.RESOURCE_ALREADY_EXIST, fmt.Sprintf("vtap_group id(%s) already exist", groupID))
+	}
+	return nil
 }
 
 func UpdateVtapGroup(lcuuid string, vtapGroupUpdate map[string]interface{}, cfg *config.ControllerConfig) (resp model.VtapGroup, err error) {

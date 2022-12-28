@@ -46,14 +46,16 @@ func RegisterAgentGroupCommand() *cobra.Command {
 	}
 	list.Flags().StringVarP(&listOutput, "output", "o", "", "output format")
 
+	var groupID string
 	create := &cobra.Command{
 		Use:     "create [name]",
 		Short:   "create agent-group",
 		Example: "deepflow-ctl agent-group create deepflow-agent-group",
 		Run: func(cmd *cobra.Command, args []string) {
-			createAgentGroup(cmd, args)
+			createAgentGroup(cmd, args, groupID)
 		},
 	}
+	create.Flags().StringVar(&groupID, "group-id", "", "agent group id with g- prefix and number and letter length 10, such as g-1yhIguXABC")
 
 	delete := &cobra.Command{
 		Use:     "delete [name]",
@@ -102,7 +104,7 @@ func listAgentGroup(cmd *cobra.Command, args []string, output string) {
 	}
 }
 
-func createAgentGroup(cmd *cobra.Command, args []string) {
+func createAgentGroup(cmd *cobra.Command, args []string, groupID string) {
 	if len(args) == 0 {
 		fmt.Fprintln(os.Stderr, "must specify name.\nExample: %s", cmd.Example)
 		return
@@ -112,7 +114,7 @@ func createAgentGroup(cmd *cobra.Command, args []string) {
 	url := fmt.Sprintf("http://%s:%d/v1/vtap-groups/", server.IP, server.Port)
 
 	// 调用采集器组API，并输出返回结果
-	body := map[string]interface{}{"name": args[0]}
+	body := map[string]interface{}{"name": args[0], "group_id": groupID}
 	_, err := common.CURLPerform("POST", url, body, "")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

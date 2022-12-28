@@ -209,6 +209,7 @@ type VtapGroupCreate struct {
 	State       int      `json:"STATE"`
 	Enable      int      `json:"ENABLE"`
 	VtapLcuuids []string `json:"VTAP_LCUUIDS"`
+	GroupID     string   `json:"GROUP_ID"`
 }
 
 type VtapGroupUpdate struct {
