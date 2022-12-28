@@ -20,7 +20,7 @@ use std::{
     process,
     sync::{
         atomic::{AtomicU64, Ordering},
-        Arc, Condvar, Mutex,
+        Arc, Condvar, Mutex, MutexGuard,
     },
     thread,
     thread::JoinHandle,
@@ -29,6 +29,7 @@ use std::{
 
 use arc_swap::access::Access;
 use log::{debug, error, info, warn};
+use parking_lot::RwLock;
 use regex::Regex;
 use ring::digest;
 use tokio::runtime::{Builder, Runtime};
@@ -46,7 +47,8 @@ use crate::{
         },
         InterfaceEntry, LibvirtXmlExtractor,
     },
-    rpc::Session,
+    policy::PolicyGetter,
+    rpc::{RunningConfig, Session},
     utils::{command::*, environment::is_tt_pod},
 };
 
@@ -55,11 +57,14 @@ use public::{
     netns::{InterfaceInfo, NetNs, NsFile},
     proto::{
         common::TridentType,
-        trident::{self, Exception, GenesisProcessData, ProcessInfo},
+        trident::{self, Exception, GenesisProcessData, GpidSyncRequest, ProcessInfo},
     },
 };
 
-use super::{calc_process_datas_sha1, linux_process::get_all_process, ProcessData};
+use super::{
+    calc_process_datas_sha1, get_all_socket, linux_process::get_all_process, process_info_enabled,
+    ProcessData,
+};
 
 pub const SHA1_DIGEST_LEN: usize = 20;
 
@@ -649,17 +654,6 @@ impl PlatformSynchronizer {
             .map(|r| r.into_inner().version())
     }
 
-    // whether need to scan the process info
-    fn process_info_enabled(t: TridentType) -> bool {
-        match t {
-            TridentType::TtPublicCloud
-            | TridentType::TtPhysicalMachine
-            | TridentType::TtHostPod
-            | TridentType::TtVmPod => true,
-            _ => false,
-        }
-    }
-
     fn process(args: ProcessArgs) {
         let rt = Builder::new_current_thread().enable_all().build().unwrap();
 
@@ -694,7 +688,7 @@ impl PlatformSynchronizer {
 
             let config_guard = args.config.load();
             let trident_type = config_guard.trident_type;
-            let process_info_enabled = Self::process_info_enabled(trident_type);
+            let process_info_enabled = process_info_enabled(trident_type);
             let platform_enabled = config_guard.enabled;
             let proc_scan_conf = &config_guard.os_proc_scan_conf;
             let cur_vtap_id = config_guard.vtap_id;
@@ -819,6 +813,148 @@ impl PlatformSynchronizer {
             return true;
         }
         false
+    }
+}
+
+pub struct SocketSynchronizer {
+    config: PlatformAccess,
+    running_config: Arc<RwLock<RunningConfig>>,
+    stop_notify: Arc<Condvar>,
+    session: Arc<Session>,
+    running: Arc<Mutex<bool>>,
+    policy_getter: Arc<Mutex<PolicyGetter>>,
+}
+
+impl SocketSynchronizer {
+    pub fn new(
+        config: PlatformAccess,
+        running_config: Arc<RwLock<RunningConfig>>,
+        policy_getter: Arc<Mutex<PolicyGetter>>,
+        session: Arc<Session>,
+    ) -> Self {
+        Self {
+            config,
+            running_config,
+            policy_getter,
+            stop_notify: Arc::new(Condvar::new()),
+            session,
+            running: Arc::new(Mutex::new(false)),
+        }
+    }
+
+    pub fn start(&mut self) {
+        let conf_guard = self.config.load();
+        if !process_info_enabled(conf_guard.trident_type) {
+            return;
+        }
+
+        let mut running_guard = self.running.lock().unwrap();
+        if *running_guard {
+            warn!("socket sync is running");
+            return;
+        }
+
+        let (running, config, running_config, policy_getter, session, stop_notify) = (
+            self.running.clone(),
+            self.config.clone(),
+            self.running_config.clone(),
+            self.policy_getter.clone(),
+            self.session.clone(),
+            self.stop_notify.clone(),
+        );
+
+        thread::Builder::new()
+            .name("socket-synchronizer".to_string())
+            .spawn(|| {
+                Self::run(
+                    running,
+                    config,
+                    running_config,
+                    policy_getter,
+                    session,
+                    stop_notify,
+                )
+            })
+            .unwrap();
+        *running_guard = true;
+
+        info!("socket info sync start");
+    }
+
+    fn run(
+        running: Arc<Mutex<bool>>,
+        config: PlatformAccess,
+        running_config: Arc<RwLock<RunningConfig>>,
+        policy_getter: Arc<Mutex<PolicyGetter>>,
+        session: Arc<Session>,
+        stop_notify: Arc<Condvar>,
+    ) {
+        let rt = Builder::new_current_thread().enable_all().build().unwrap();
+
+        loop {
+            let running_guard = running.lock().unwrap();
+            let sync_interval;
+
+            {
+                let conf_guard = config.load();
+                sync_interval = conf_guard.sync_interval;
+
+                let ctl_mac = running_config.read().ctrl_mac.clone();
+                let mut policy_getter = policy_getter.lock().unwrap();
+
+                let (local, remote) = match get_all_socket(
+                    &conf_guard.os_proc_scan_conf,
+                    &mut policy_getter,
+                    conf_guard.epc_id,
+                ) {
+                    Err(e) => {
+                        error!("fetch socket info fail: {}", e);
+                        if !Self::wait_timeout(running_guard, stop_notify.clone(), sync_interval) {
+                            return;
+                        }
+                        continue;
+                    }
+                    Ok(res) => res,
+                };
+
+                match rt.block_on(session.gpid_sync(GpidSyncRequest {
+                    ctrl_ip: Some(conf_guard.source_ip.to_string()),
+                    ctrl_mac: Some(ctl_mac),
+                    vtap_id: Some(conf_guard.vtap_id as u32),
+                    local_entries: local.into_iter().map(|x| x.into()).collect(),
+                    peer_entries: remote.into_iter().map(|x| x.into()).collect(),
+                })) {
+                    Err(e) => error!("gpid sync fail: {}", e),
+                    Ok(_) => {
+                        // TODO handle resp
+                    }
+                }
+            }
+
+            if !Self::wait_timeout(running_guard, stop_notify.clone(), sync_interval) {
+                return;
+            }
+        }
+    }
+
+    pub fn stop(&mut self) {
+        let conf_guard = self.config.load();
+        if !process_info_enabled(conf_guard.trident_type) {
+            return;
+        }
+
+        let mut running_guard = self.running.lock().unwrap();
+        if !*running_guard {
+            warn!("socket info sync not running");
+            return;
+        }
+        *running_guard = false;
+        self.stop_notify.notify_one();
+        info!("socket info sync stop");
+    }
+
+    fn wait_timeout(guard: MutexGuard<bool>, stop_notify: Arc<Condvar>, timeout: Duration) -> bool {
+        *(stop_notify.wait_timeout(guard, timeout).unwrap().0)
     }
 }
 
