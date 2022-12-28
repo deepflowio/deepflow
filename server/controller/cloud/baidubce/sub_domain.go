@@ -63,6 +63,7 @@ func (b *BaiduBce) getSubDomains(region model.Region, vpcIdToLcuuid map[string]s
 				"port_name_regex": common.DEFAULT_PORT_NAME_REGEX,
 				"vtap_id":         "",
 				"controller_ip":   "",
+				"region_uuid":     region.Lcuuid,
 			}
 			configJson, _ := json.Marshal(config)
 			retSubDomains = append(retSubDomains, model.SubDomain{
