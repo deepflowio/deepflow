@@ -686,15 +686,16 @@ impl FlowMap {
     }
 
     fn init_nat_info(flow: &mut Flow, meta_packet: &MetaPacket) {
-        if let Some(real_ip) = meta_packet.nat_client_ip {
-            flow.flow_metrics_peers[0].nat_real_ip = real_ip;
+        if meta_packet.nat_client_port > 0 {
+            flow.flow_metrics_peers[0].nat_real_ip =
+                meta_packet.nat_client_ip.as_ref().unwrap().clone();
             flow.flow_metrics_peers[0].nat_real_port = meta_packet.nat_client_port;
         } else {
-            flow.flow_metrics_peers[0].nat_real_ip = meta_packet.lookup_key.src_ip;
-            flow.flow_metrics_peers[0].nat_real_port = meta_packet.lookup_key.src_port;
+            flow.flow_metrics_peers[0].nat_real_ip = flow.flow_key.ip_src;
+            flow.flow_metrics_peers[0].nat_real_port = flow.flow_key.port_src;
         }
-        flow.flow_metrics_peers[1].nat_real_ip = meta_packet.lookup_key.dst_ip;
-        flow.flow_metrics_peers[1].nat_real_port = meta_packet.lookup_key.dst_port;
+        flow.flow_metrics_peers[1].nat_real_ip = flow.flow_key.ip_dst;
+        flow.flow_metrics_peers[1].nat_real_port = flow.flow_key.port_dst;
     }
 
     fn init_flow(&mut self, config: &FlowConfig, meta_packet: &mut MetaPacket) -> FlowNode {
@@ -947,8 +948,8 @@ impl FlowMap {
         if flow_metrics_peer.first.is_zero() {
             flow_metrics_peer.first = pkt_timestamp;
         }
-        if let Some(real_ip) = meta_packet.nat_client_ip {
-            flow_metrics_peer.nat_real_ip = real_ip;
+        if meta_packet.nat_client_port > 0 {
+            flow_metrics_peer.nat_real_ip = meta_packet.nat_client_ip.as_ref().unwrap().clone();
             flow_metrics_peer.nat_real_port = meta_packet.nat_client_port;
         }
 
@@ -1332,7 +1333,7 @@ impl FlowMap {
                 let flags = meta_packet.tcp_data.flags;
                 self.service_table.get_tcp_score(
                     is_first_packet,
-                    meta_packet.nat_client_ip.is_some(),
+                    meta_packet.tap_port.get_nat_source() == TapPort::NAT_SOURCE_TOA,
                     flags,
                     src_key,
                     dst_key,
@@ -1488,7 +1489,7 @@ impl FlowMap {
             peer_src.is_l3_end = src_info.l3_end;
             peer_src.l3_epc_id = src_info.l3_epc_id;
             peer_src.is_vip = src_info.is_vip;
-            if src_info.real_ip.is_unspecified() {
+            if !src_info.real_ip.is_unspecified() {
                 peer_src.nat_real_ip = src_info.real_ip;
             }
             peer_src.is_local_mac = src_info.is_local_mac;
@@ -1503,7 +1504,7 @@ impl FlowMap {
             peer_dst.is_l3_end = dst_info.l3_end;
             peer_dst.l3_epc_id = dst_info.l3_epc_id;
             peer_dst.is_vip = dst_info.is_vip;
-            if dst_info.real_ip.is_unspecified() {
+            if !dst_info.real_ip.is_unspecified() {
                 peer_dst.nat_real_ip = dst_info.real_ip;
             }
             peer_dst.is_local_mac = dst_info.is_local_mac;
