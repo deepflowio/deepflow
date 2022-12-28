@@ -296,14 +296,14 @@ impl FlowMap {
         if !self.inject_flush_ticker(meta_packet.lookup_key.timestamp) {
             // 补充由于超时导致未查询策略，用于其它流程（如PCAP存储）
             #[cfg(target_os = "linux")]
-            let local_ecp_id = if self.ebpf_config.is_some() {
+            let local_epc_id = if self.ebpf_config.is_some() {
                 self.ebpf_config.as_ref().unwrap().load().epc_id as i32
             } else {
                 0
             };
             #[cfg(target_os = "windows")]
-            let local_ecp_id = 0;
-            (self.policy_getter).lookup(meta_packet, self.id as usize, local_ecp_id);
+            let local_epc_id = 0;
+            (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
             return;
         }
 
@@ -807,19 +807,30 @@ impl FlowMap {
             residual_request: 0,
         };
         #[cfg(target_os = "linux")]
-        let local_ecp_id = if self.ebpf_config.is_some() {
+        let local_epc_id = if self.ebpf_config.is_some() {
             self.ebpf_config.as_ref().unwrap().load().epc_id as i32
         } else {
             0
         };
         #[cfg(target_os = "windows")]
-        let local_ecp_id = 0;
+        let local_epc_id = 0;
 
         // 标签
-        (self.policy_getter).lookup(meta_packet, self.id as usize, local_ecp_id);
+        (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
         self.update_endpoint_and_policy_data(&mut node, meta_packet);
 
-        let l7_proto_enum = self.app_table.get_protocol(meta_packet);
+        let l7_proto_enum = match meta_packet.signal_source {
+            SignalSource::EBPF => {
+                let (local_epc, remote_epc) = if meta_packet.lookup_key.l2_end_0 {
+                    (local_epc_id, 0)
+                } else {
+                    (0, local_epc_id)
+                };
+                self.app_table
+                    .get_protocol_from_ebpf(meta_packet, local_epc, remote_epc)
+            }
+            _ => self.app_table.get_protocol(meta_packet),
+        };
 
         if config.collector_enabled {
             node.meta_flow_perf = FlowPerf::new(
@@ -863,14 +874,14 @@ impl FlowMap {
         if !node.policy_in_tick[meta_packet.direction as usize] {
             node.policy_in_tick[meta_packet.direction as usize] = true;
             #[cfg(target_os = "linux")]
-            let local_ecp_id = if self.ebpf_config.is_some() {
+            let local_epc_id = if self.ebpf_config.is_some() {
                 self.ebpf_config.as_ref().unwrap().load().epc_id as i32
             } else {
                 0
             };
             #[cfg(target_os = "windows")]
-            let local_ecp_id = 0;
-            (self.policy_getter).lookup(meta_packet, self.id as usize, local_ecp_id);
+            let local_epc_id = 0;
+            (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
             self.update_endpoint_and_policy_data(node, meta_packet);
         } else {
             // copy endpoint and policy data
@@ -940,15 +951,15 @@ impl FlowMap {
         // 这里需要查询策略，建立ARP表
         if meta_packet.is_ndp_response() {
             #[cfg(target_os = "linux")]
-            let local_ecp_id = if self.ebpf_config.is_some() {
+            let local_epc_id = if self.ebpf_config.is_some() {
                 self.ebpf_config.as_ref().unwrap().load().epc_id as i32
             } else {
                 0
             };
             #[cfg(target_os = "windows")]
-            let local_ecp_id = 0;
+            let local_epc_id = 0;
 
-            (self.policy_getter).lookup(meta_packet, self.id as usize, local_ecp_id);
+            (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
         }
     }
 
@@ -963,6 +974,19 @@ impl FlowMap {
         let mut info = None;
         if let Some(perf) = node.meta_flow_perf.as_mut() {
             let flow_id = node.tagged_flow.flow.flow_id;
+            #[cfg(target_os = "linux")]
+            let local_epc_id = if self.ebpf_config.is_some() {
+                self.ebpf_config.as_ref().unwrap().load().epc_id as i32
+            } else {
+                0
+            };
+            #[cfg(target_os = "windows")]
+            let local_epc_id = 0;
+            let (local_epc, remote_epc) = if meta_packet.lookup_key.l2_end_0 {
+                (local_epc_id, 0)
+            } else {
+                (0, local_epc_id)
+            };
             match perf.parse(
                 meta_packet,
                 is_first_packet_direction,
@@ -972,6 +996,8 @@ impl FlowMap {
                 Self::l7_metrics_enabled(config),
                 Self::l7_log_parse_enabled(config, &meta_packet.lookup_key),
                 &mut self.app_table,
+                local_epc,
+                remote_epc,
             ) {
                 Ok(i) => {
                     info = Some(i);
