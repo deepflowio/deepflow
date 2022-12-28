@@ -160,6 +160,8 @@ impl<'a> MetaPacket<'a> {
             offset_ip_1: FIELD_OFFSET_DIP,
             offset_port_0: FIELD_OFFSET_SPORT,
             offset_port_1: FIELD_OFFSET_DPORT,
+            nat_client_ip: None,
+            nat_client_port: 0,
             ..Default::default()
         }
     }
