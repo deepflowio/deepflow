@@ -23,6 +23,8 @@
 #define NS_PER_US		1000ULL
 #define NS_PER_SEC		1000000000ULL
 
+#define PROTO_INFER_CACHE_SIZE  80
+
 /***********************************************************
  * map definitions
  ***********************************************************/
@@ -102,6 +104,19 @@ BPF_HASH(trace_map, struct trace_key_t, struct trace_info_t)
 
 // Stores the identity used to fit the kernel, key: 0, vlaue:{tgid, pid}
 MAP_ARRAY(adapt_kern_uid_map, __u32, __u64, 1)
+
+#ifdef LINUX_VER_5_2_PLUS
+/*
+ * Fast matching cache, used to speed up protocol inference.
+ * Due to the limitation of the number of eBPF instruction in kernel, this feature
+ * is suitable for Linux5.2+
+ * key : The high 16 bits of the process-ID/thread-ID
+ * value : struct proto_infer_cache_t
+ * The process-ID/thread-ID range [0, 5242880], if the process value exceeds the
+ * maximum value range, fast cache matching becomes invalid.
+ */
+MAP_ARRAY(proto_infer_cache_map, __u32, struct proto_infer_cache_t, PROTO_INFER_CACHE_SIZE)
+#endif
 
 static __inline bool is_protocol_enabled(int protocol)
 {
@@ -363,15 +378,8 @@ static __inline bool get_socket_info(struct __socket_data *v,
 				     void *sk,
 				     struct conn_info_t* conn_info)
 {
-	/*
-	 * 下面if判断在linux5.2版本会出现指令超限问题
-	 * 而去掉下面两个行linux5.13，Linux5.3版本（也可能有其他版本）的内核则会出现指令超限问题。
-	 * 目前的解决方案: 保留判断, 为linux5.2内核单独编译。
-	 */
-#ifndef LINUX_VER_5_2 	
 	if (v == NULL || sk == NULL)
 		return false;
-#endif
 
 	/*
 	 * Without thinking about PF_UNIX.
@@ -1040,6 +1048,18 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 
 	v->coroutine_id = trace_key.goid;
 	v->source = extra->source;
+
+#ifdef LINUX_VER_5_2_PLUS
+	__u32 cache_key = (__u32) pid_tgid >> 16;
+	if (cache_key < PROTO_INFER_CACHE_SIZE) {
+		struct proto_infer_cache_t *p;
+		p = proto_infer_cache_map__lookup(&cache_key);
+		if (p) {
+			__u16 idx = (__u16) pid_tgid;
+			p->protocols[idx] = (__u8) v->data_type;
+		}
+	}
+#endif
 
 	struct tail_calls_context *context = (struct tail_calls_context *)v->data;
 	context->max_size_limit = data_max_sz;

@@ -94,3 +94,4 @@
 |pid_tgid_callerid_map|BPF_MAP_TYPE_HASH|进程号,线程号|struct go_newproc_caller|在 runtime.newproc1 函数进出时传递参数,用于生成父子协程的映射关系|
 |go_rw_ts_map|BPF_MAP_TYPE_LRU_HASH|struct go_key|timestamp when the data was inserted into the map|保存 (线程号,协程号) 到 最近一次读写时间戳 的映射关系,时间戳用于实现读写超时|
 |go_ancerstor_map|BPF_MAP_TYPE_LRU_HASH|struct go_key|ancerstor goid|保存父子协程的映射关系|
+|__proto_infer_cache_map|BPF_MAP_TYPE_ARRAY|__u32|struct proto_infer_cache_t|Fast matching cache, used to speed up protocol inference. Suitable for Linux5.2+|

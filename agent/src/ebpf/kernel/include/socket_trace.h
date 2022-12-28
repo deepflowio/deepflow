@@ -284,4 +284,13 @@ struct tls_conn_key
 	__u64 goid;
 };
 
+// Protocol inference fast cache structure
+struct proto_infer_cache_t {
+	/*
+	 * The lower 16 bits of the process-ID/thread-ID
+	 * are used as the index and correspond to the protocol type.
+	 */
+	__u8 protocols[65536];
+};
+
 #endif /* DF_BPF_SOCKET_TRACE_H */

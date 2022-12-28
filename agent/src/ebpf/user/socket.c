@@ -32,7 +32,7 @@
 #include "config.h"
 
 #include "socket_trace_bpf_common.c"
-#include "socket_trace_bpf_5_2.c"
+#include "socket_trace_bpf_5_2_plus.c"
 
 static uint64_t socket_map_reclaim_count;	// socket map回收数量统计
 static uint64_t trace_map_reclaim_count;	// trace map回收数量统计
@@ -1022,11 +1022,11 @@ int running_socket_tracer(l7_handle_fn handle,
 		return -EINVAL;
 	}
 
-	if (major == 5 && minor == 2) {
+	if (major > 5 || (major == 5 && minor >= 2)) {
 		snprintf(bpf_load_buffer_name, NAME_LEN,
-			 "socket-trace-bpf-linux-5.2");
-		bpf_bin_buffer = (void *)socket_trace_5_2_ebpf_data;
-		buffer_sz = sizeof(socket_trace_5_2_ebpf_data);
+			 "socket-trace-bpf-linux-5.2_plus");
+		bpf_bin_buffer = (void *)socket_trace_5_2_plus_ebpf_data;
+		buffer_sz = sizeof(socket_trace_5_2_plus_ebpf_data);
 	} else {
 		snprintf(bpf_load_buffer_name, NAME_LEN,
 			 "socket-trace-bpf-linux-common");
