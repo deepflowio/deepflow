@@ -233,7 +233,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				)}
 			tagResourceMap[resourceNameSuffix] = map[string]*Tag{
 				"default": NewTag(
-					"dictGet(flow_tag.device_map, 'name', (toUInt64("+deviceTypeValueStr+"),toUInt64("+deviceIDSuffix+")))",
+					"if("+deviceTypeSuffix+"="+deviceTypeValueStr+", dictGet(flow_tag.device_map, 'name', (toUInt64("+deviceTypeValueStr+"),toUInt64("+deviceIDSuffix+"))), '')",
 					deviceIDSuffix+"!=0 AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
 					"toUInt64("+deviceIDSuffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s) AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
 					"toUInt64("+deviceIDSuffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s)) AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
@@ -245,7 +245,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 					"",
 				),
 				"icon_id": NewTag(
-					"dictGet(flow_tag.device_map, 'icon_id', (toUInt64("+deviceTypeValueStr+"),toUInt64("+deviceIDSuffix+")))",
+					"if("+deviceTypeSuffix+"="+deviceTypeValueStr+", dictGet(flow_tag.device_map, 'icon_id', (toUInt64("+deviceTypeValueStr+"),toUInt64("+deviceIDSuffix+"))), 0)",
 					"",
 					"",
 					"",
@@ -456,7 +456,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			deviceTypeValueStr := strconv.Itoa(DEVICE_MAP[relatedResourceStr])
 			if common.IsValueInSliceString(relatedResourceStr, []string{"natgw", "lb"}) {
 				idTagTranslator = "if(" + deviceTypeSuffix + "=" + deviceTypeValueStr + "," + deviceIDSuffix + ", 0)"
-				nameTagTranslator = "dictGet(flow_tag.device_map, 'name', (toUInt64(" + deviceTypeValueStr + "),toUInt64(" + deviceIDSuffix + ")))"
+				nameTagTranslator = "if(" + deviceTypeSuffix + "=" + deviceTypeValueStr + ", dictGet(flow_tag.device_map, 'name', (toUInt64(" + deviceTypeValueStr + "),toUInt64(" + deviceIDSuffix + "))), '')"
 				notNullFilter = deviceIDSuffix + "!=0 AND " + deviceTypeSuffix + "=" + deviceTypeValueStr
 				tagResourceMap[relatedResourceNameSuffix] = map[string]*Tag{
 					"node_type": NewTag(
@@ -466,7 +466,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 						"",
 					),
 					"icon_id": NewTag(
-						"dictGet(flow_tag.device_map, 'icon_id', (toUInt64("+deviceTypeValueStr+"),toUInt64("+deviceIDSuffix+")))",
+						"if("+deviceTypeSuffix+"="+deviceTypeValueStr+", dictGet(flow_tag.device_map, 'icon_id', (toUInt64("+deviceTypeValueStr+"),toUInt64("+deviceIDSuffix+"))), 0)",
 						"",
 						"",
 						"",
