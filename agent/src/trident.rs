@@ -1943,7 +1943,7 @@ fn build_pcap_assembler(
         enabled,
         config.buffer_size,
         config.flow_buffer_size,
-        Duration::from_secs(config.flush_interval as u64),
+        config.flush_interval,
         pcap_batch_sender,
         mini_packet_receiver,
         ntp_diff,
