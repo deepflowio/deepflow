@@ -389,8 +389,8 @@ impl YamlConfig {
         if c.pcap.buffer_size <= 0 {
             c.pcap.buffer_size = 1 << 23;
         }
-        if c.pcap.flush_interval < MINUTE.as_secs() as u32 {
-            c.pcap.flush_interval = MINUTE.as_secs() as u32;
+        if c.pcap.flush_interval < MINUTE {
+            c.pcap.flush_interval = MINUTE;
         }
 
         if c.flow.flush_interval < Duration::from_secs(1)
@@ -667,7 +667,8 @@ impl Default for PortConfig {
 #[serde(default, rename_all = "kebab-case")]
 pub struct PcapConfig {
     pub queue_size: u32,
-    pub flush_interval: u32, // unit(second)
+    #[serde(with = "humantime_serde")]
+    pub flush_interval: Duration,
     pub buffer_size: u64,
     pub flow_buffer_size: u32,
 }
@@ -676,7 +677,7 @@ impl Default for PcapConfig {
     fn default() -> Self {
         PcapConfig {
             queue_size: 65536,
-            flush_interval: 60,         // 1min
+            flush_interval: Duration::from_secs(60),
             buffer_size: 96 << 10,      // 96K
             flow_buffer_size: 64 << 10, // 64K
         }
@@ -700,8 +701,6 @@ pub struct FlowGeneratorConfig {
     pub capacity: u32,
     #[serde(with = "humantime_serde")]
     pub flush_interval: Duration,
-    #[serde(rename = "flow-sender-throttle")]
-    pub sender_throttle: u32,
     #[serde(rename = "flow-aggr-queue-size")]
     pub aggr_queue_size: u32,
 
@@ -719,7 +718,6 @@ impl Default for FlowGeneratorConfig {
             hash_slots: 131072,
             capacity: 1048576,
             flush_interval: Duration::from_secs(1),
-            sender_throttle: 1024,
             aggr_queue_size: 65535,
 
             ignore_tor_mac: false,
