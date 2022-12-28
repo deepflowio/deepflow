@@ -41,7 +41,7 @@ pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 // 使用中会话偶尔会超时60秒，这里调整超时时间需要大于60秒
 pub const SESSION_TIMEOUT: Duration = Duration::from_secs(120);
 
-const GRPC_CALL_ENDPOINTS: [&str; 7] = [
+const GRPC_CALL_ENDPOINTS: [&str; 8] = [
     "push",
     "query",
     "upgrade",
@@ -49,6 +49,7 @@ const GRPC_CALL_ENDPOINTS: [&str; 7] = [
     "genesis_sync",
     "kubernetes_api_sync",
     "get_kubernetes_cluster_id",
+    "gpid_sync",
 ];
 
 const PUSH_ENDPOINT: usize = 0;
@@ -58,6 +59,7 @@ const SYNC_ENDPOINT: usize = 3;
 const GENESIS_SYNC_ENDPOINT: usize = 4;
 const KUBERNETES_API_SYNC_ENDPOINT: usize = 5;
 const GET_KUBERNETES_CLUSTER_ID_ENDPOINT: usize = 6;
+const GPID_SYNC_ENDPOINT: usize = 7;
 
 struct Config {
     port: u16,
@@ -114,6 +116,32 @@ pub struct Session {
     // using semaphore to force serialized grpc calls to
     // reduce the probability
     in_use: Semaphore,
+}
+
+macro_rules! sync_grpc_call {
+    ($self:ident, $func:ident, $request:ident, $enpoint:ident) => {{
+        let _lock = $self.in_use.acquire().await.unwrap();
+        $self.update_current_server().await;
+        let client = match $self.get_client() {
+            Some(c) => c,
+            None => {
+                $self.set_request_failed(true);
+                return Err(tonic::Status::cancelled("grpc client not connected"));
+            }
+        };
+        let mut client = trident::synchronizer_client::SynchronizerClient::new(client);
+
+        let now = Instant::now();
+        let response = client.$func($request).await;
+        let now_elapsed = now.elapsed();
+        $self.counters[$enpoint].delay.update(now_elapsed);
+        debug!(
+            "grpc {:?} latency {:?}ms",
+            stringify!($func),
+            now_elapsed.as_millis(),
+        );
+        response
+    }};
 }
 
 impl Session {
@@ -255,23 +283,7 @@ impl Session {
         request: trident::SyncRequest,
     ) -> Result<tonic::Response<tonic::codec::Streaming<trident::SyncResponse>>, tonic::Status>
     {
-        let _lock = self.in_use.acquire().await.unwrap();
-        self.update_current_server().await;
-        let client = match self.get_client() {
-            Some(c) => c,
-            None => {
-                self.set_request_failed(true);
-                return Err(tonic::Status::cancelled("grpc client not connected"));
-            }
-        };
-        let mut client = trident::synchronizer_client::SynchronizerClient::new(client);
-
-        let now = Instant::now();
-        let response = client.push(request).await;
-        let now_elapsed = now.elapsed();
-        self.counters[PUSH_ENDPOINT].delay.update(now_elapsed);
-        debug!("grpc push latency {:?}ms", now_elapsed.as_millis());
-        response
+        sync_grpc_call!(self, push, request, PUSH_ENDPOINT)
     }
 
     async fn grpc_sync_inner(
@@ -322,127 +334,52 @@ impl Session {
         request: trident::UpgradeRequest,
     ) -> Result<tonic::Response<tonic::codec::Streaming<trident::UpgradeResponse>>, tonic::Status>
     {
-        let _lock = self.in_use.acquire().await.unwrap();
-        self.update_current_server().await;
-        let client = match self.get_client() {
-            Some(c) => c,
-            None => {
-                self.set_request_failed(true);
-                return Err(tonic::Status::cancelled("grpc client not connected"));
-            }
-        };
-        let mut client = trident::synchronizer_client::SynchronizerClient::new(client);
-
-        let now = Instant::now();
-        let response = client.upgrade(request).await;
-        let now_elapsed = now.elapsed();
-        self.counters[UPGRADE_ENDPOINT].delay.update(now_elapsed);
-        debug!("grpc upgrade latency {:?}ms", now_elapsed.as_millis());
-        response
+        sync_grpc_call!(self, upgrade, request, UPGRADE_ENDPOINT)
     }
 
     pub async fn grpc_query_with_statsd(
         &self,
         request: trident::NtpRequest,
     ) -> Result<tonic::Response<trident::NtpResponse>, tonic::Status> {
-        let _lock = self.in_use.acquire().await.unwrap();
-        self.update_current_server().await;
-        let client = match self.get_client() {
-            Some(c) => c,
-            None => {
-                self.set_request_failed(true);
-                return Err(tonic::Status::cancelled("grpc client not connected"));
-            }
-        };
-        let mut client = trident::synchronizer_client::SynchronizerClient::new(client);
-
-        let now = Instant::now();
-        let response = client.query(request).await;
-        let now_elapsed = now.elapsed();
-        self.counters[QUERY_ENDPOINT].delay.update(now_elapsed);
-        debug!("grpc query latency {:?}ms", now_elapsed.as_millis());
-        response
+        sync_grpc_call!(self, query, request, QUERY_ENDPOINT)
     }
 
     pub async fn grpc_genesis_sync_with_statsd(
         &self,
         request: trident::GenesisSyncRequest,
     ) -> Result<tonic::Response<trident::GenesisSyncResponse>, tonic::Status> {
-        let _lock = self.in_use.acquire().await.unwrap();
-        self.update_current_server().await;
-        let client = match self.get_client() {
-            Some(c) => c,
-            None => {
-                self.set_request_failed(true);
-                return Err(tonic::Status::cancelled("grpc client not connected"));
-            }
-        };
-        let mut client = trident::synchronizer_client::SynchronizerClient::new(client);
-
-        let now = Instant::now();
-        let response = client.genesis_sync(request).await;
-        let now_elapsed = now.elapsed();
-        self.counters[GENESIS_SYNC_ENDPOINT]
-            .delay
-            .update(now_elapsed);
-        debug!("grpc genesis_sync latency {:?}ms", now_elapsed.as_millis());
-        response
+        sync_grpc_call!(self, genesis_sync, request, GENESIS_SYNC_ENDPOINT)
     }
 
     pub async fn grpc_kubernetes_api_sync_with_statsd(
         &self,
         request: trident::KubernetesApiSyncRequest,
     ) -> Result<tonic::Response<trident::KubernetesApiSyncResponse>, tonic::Status> {
-        let _lock = self.in_use.acquire().await.unwrap();
-        self.update_current_server().await;
-        let client = match self.get_client() {
-            Some(c) => c,
-            None => {
-                self.set_request_failed(true);
-                return Err(tonic::Status::cancelled("grpc client not connected"));
-            }
-        };
-        let mut client = trident::synchronizer_client::SynchronizerClient::new(client);
-
-        let now = Instant::now();
-        let response = client.kubernetes_api_sync(request).await;
-        let now_elapsed = now.elapsed();
-        self.counters[KUBERNETES_API_SYNC_ENDPOINT]
-            .delay
-            .update(now_elapsed);
-        debug!(
-            "grpc kubernetes_api_sync latency {:?}ms",
-            now_elapsed.as_millis()
-        );
-        response
+        sync_grpc_call!(
+            self,
+            kubernetes_api_sync,
+            request,
+            KUBERNETES_API_SYNC_ENDPOINT
+        )
     }
 
     pub async fn grpc_get_kubernetes_cluster_id_with_statsd(
         &self,
         request: trident::KubernetesClusterIdRequest,
     ) -> Result<tonic::Response<trident::KubernetesClusterIdResponse>, tonic::Status> {
-        let _lock = self.in_use.acquire().await.unwrap();
-        self.update_current_server().await;
-        let client = match self.get_client() {
-            Some(c) => c,
-            None => {
-                self.set_request_failed(true);
-                return Err(tonic::Status::cancelled("grpc client not connected"));
-            }
-        };
-        let mut client = trident::synchronizer_client::SynchronizerClient::new(client);
+        sync_grpc_call!(
+            self,
+            get_kubernetes_cluster_id,
+            request,
+            GET_KUBERNETES_CLUSTER_ID_ENDPOINT
+        )
+    }
 
-        let now = Instant::now();
-        let response = client.get_kubernetes_cluster_id(request).await;
-        let now_elapsed = now.elapsed();
-        self.counters[GET_KUBERNETES_CLUSTER_ID_ENDPOINT]
-            .delay
-            .update(now_elapsed);
-        debug!(
-            "grpc get_kubernetes_cluster_id latency {:?}ms",
-            now_elapsed.as_millis()
-        );
-        response
+    pub async fn gpid_sync(
+        &self,
+        request: trident::GpidSyncRequest,
+    ) -> Result<tonic::Response<trident::GpidSyncResponse>, tonic::Status> {
+        sync_grpc_call!(self, gpid_sync, request, GPID_SYNC_ENDPOINT)
     }
 }
 

@@ -52,6 +52,7 @@ use crate::integration_collector::{
 use crate::metric::document::BoxedDocument;
 #[cfg(target_os = "linux")]
 use crate::platform::ApiWatcher;
+use crate::platform::SocketSynchronizer;
 use crate::sender::get_sender_id;
 #[cfg(target_os = "linux")]
 use crate::utils::cgroups::Cgroups;
@@ -780,6 +781,8 @@ pub struct Components {
     pub stats_sender: UniformSenderThread<ArcBatch>,
     pub platform_synchronizer: PlatformSynchronizer,
     #[cfg(target_os = "linux")]
+    pub socket_synchronizer: SocketSynchronizer,
+    #[cfg(target_os = "linux")]
     pub api_watcher: Arc<ApiWatcher>,
     pub debugger: Debugger,
     #[cfg(target_os = "linux")]
@@ -821,6 +824,8 @@ impl Components {
         }
         #[cfg(target_os = "linux")]
         self.platform_synchronizer.start_kubernetes_poller();
+        #[cfg(target_os = "linux")]
+        self.socket_synchronizer.start();
         self.debugger.start();
         self.metrics_uniform_sender.start();
         self.l7_flow_uniform_sender.start();
@@ -978,6 +983,14 @@ impl Components {
             config_handler.platform(),
             session.clone(),
             exception_handler.clone(),
+        );
+
+        #[cfg(target_os = "linux")]
+        let socket_synchronizer = SocketSynchronizer::new(
+            config_handler.platform(),
+            synchronizer.running_config.clone(),
+            Arc::new(Mutex::new(policy_getter)),
+            session.clone(),
         );
 
         #[cfg(target_os = "linux")]
@@ -1703,6 +1716,8 @@ impl Components {
             stats_sender,
             platform_synchronizer,
             #[cfg(target_os = "linux")]
+            socket_synchronizer,
+            #[cfg(target_os = "linux")]
             api_watcher,
             debugger,
             log_parsers,
@@ -1884,6 +1899,9 @@ impl Components {
             d.stop();
         }
         self.platform_synchronizer.stop();
+
+        #[cfg(target_os = "linux")]
+        self.socket_synchronizer.stop();
 
         #[cfg(target_os = "linux")]
         self.api_watcher.stop();

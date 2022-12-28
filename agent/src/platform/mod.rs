@@ -22,8 +22,8 @@ mod platform_synchronizer;
 #[cfg(target_os = "linux")]
 pub use kubernetes::{ActivePoller, ApiWatcher, GenericPoller, Poller};
 pub use libvirt_xml_extractor::LibvirtXmlExtractor;
-pub use platform_synchronizer::PlatformSynchronizer;
 pub use platform_synchronizer::ProcRegRewrite;
+pub use platform_synchronizer::{PlatformSynchronizer, SocketSynchronizer};
 
 use public::utils::net::MacAddr;
 
