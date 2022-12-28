@@ -171,7 +171,7 @@ impl AppTable {
         packet: &MetaPacket,
         local_epc: i32,
         remote_epc: i32,
-    ) -> Option<(L7ProtocolEnum, u16)> {
+    ) -> Option<L7ProtocolEnum> {
         if packet.lookup_key.is_loopback_packet() {
             return None;
         }
@@ -188,7 +188,7 @@ impl AppTable {
         };
         if dst_protocol.is_some() && dst_protocol.unwrap().get_l7_protocol() != L7Protocol::Unknown
         {
-            return Some((dst_protocol.unwrap(), packet.lookup_key.dst_port));
+            return Some(dst_protocol.unwrap());
         }
 
         let (ip, _, port) = Self::get_ip_epc_port(packet, false);
@@ -203,14 +203,14 @@ impl AppTable {
         };
         if src_protocol.is_some() && src_protocol.unwrap().get_l7_protocol() != L7Protocol::Unknown
         {
-            return Some((src_protocol.unwrap(), packet.lookup_key.src_port));
+            return Some(src_protocol.unwrap());
         }
         if src_protocol.is_none() && dst_protocol.is_none() {
             return None;
         } else if src_protocol.is_none() {
-            return Some((dst_protocol.unwrap(), packet.lookup_key.dst_port));
+            return Some(dst_protocol.unwrap());
         }
-        return Some((src_protocol.unwrap(), packet.lookup_key.src_port));
+        return Some(src_protocol.unwrap());
     }
 
     fn set_ipv4_protocol(
