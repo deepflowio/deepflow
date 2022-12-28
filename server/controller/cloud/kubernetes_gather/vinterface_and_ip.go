@@ -554,6 +554,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 					log.Errorf("vinterface,ip parse host ip (%s) error: (%s)", ipPrefix.IP().String(), err.Error())
 					continue
 				}
+
 				for _, nCIDR := range k.nodeNetworkLcuuidCIDRs.cidrs {
 					nodeIPPrefix, err := netaddr.ParseIPPrefix(nCIDR)
 					if err != nil {
@@ -565,13 +566,6 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 					}
 				}
 
-				if nodeSubnetLcuuid == "" {
-					for key, value := range subnetLcuuidToCIDR {
-						if value.Contains(hostip) {
-							nodeSubnetLcuuid = key
-						}
-					}
-				}
 				if nodeSubnetLcuuid == "" {
 					for _, pCIDR := range k.podNetworkLcuuidCIDRs.cidrs {
 						podIPPrefix, err := netaddr.ParseIPPrefix(pCIDR)
@@ -587,6 +581,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 						networkLcuuid = k.podNetworkLcuuidCIDRs.networkLcuuid
 					}
 				}
+
 				if nodeSubnetLcuuid == "" {
 					for key, value := range subnetLcuuidToCIDR {
 						if value.Contains(hostip) {
@@ -597,6 +592,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 						networkLcuuid = k.podNetworkLcuuidCIDRs.networkLcuuid
 					}
 				}
+
 				if nodeSubnetLcuuid == "" {
 					hostIPMask, _ := ipPrefix.IPNet().Mask.Size()
 					cidr, err := cloudcommon.IPAndMaskToCIDR(ipPrefix.IP().String(), hostIPMask)
@@ -609,13 +605,12 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 						Lcuuid:        nodeSubnetLcuuid,
 						Name:          cidr + "_NODE_NET",
 						CIDR:          cidr,
-						NetworkLcuuid: k.nodeNetworkLcuuidCIDRs.networkLcuuid,
+						NetworkLcuuid: networkLcuuid,
 						VPCLcuuid:     k.VPCUuid,
 					}
 					nodeSubnets = append(nodeSubnets, subnet)
-					cidrPrefix, _ := netaddr.ParseIPPrefix(cidr)
-					subnetLcuuidToCIDR[nodeSubnetLcuuid] = cidrPrefix
 				}
+
 				vinterfaceLcuuid := ""
 				if nMAC == common.VIF_DEFAULT_MAC {
 					vinterfaceLcuuid = common.GetUUID(k.UuidGenerate+nMAC+hostip.String(), uuid.Nil)
