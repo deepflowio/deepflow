@@ -724,6 +724,8 @@ impl FlowMetricsPeer {
         self.is_vip = other.is_vip;
         self.is_local_mac = other.is_local_mac;
         self.is_local_ip = other.is_local_ip;
+        self.nat_real_ip = other.nat_real_ip;
+        self.nat_real_port = other.nat_real_port;
     }
 }
 
