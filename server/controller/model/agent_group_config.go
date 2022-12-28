@@ -110,7 +110,6 @@ type FlowGeneratorConfig struct {
 	HashSlots        *int    `yaml:"flow-slots-size,omitempty"`
 	Capacity         *int    `yaml:"flow-count-limit,omitempty"`
 	FlushInterval    *string `yaml:"flush-interval,omitempty"`
-	SenderThrottle   *int    `yaml:"flow-sender-throttle,omitempty"`
 	AggrQueueSize    *int    `yaml:"flow-aggr-queue-size,omitempty"`
 
 	IgnoreTorMac *bool `yaml:"ignore-tor-mac,omitempty"`
