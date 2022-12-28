@@ -52,8 +52,8 @@ type StaticConfig struct {
 	CollectorSenderQueueCount        *int                  `yaml:"collector-sender-queue-count,omitempty"`
 	FlowSenderQueueSize              *int                  `yaml:"flow-sender-queue-size,omitempty"`
 	FlowSenderQueueCount             *int                  `yaml:"flow-sender-queue-count,omitempty"`
-	SecondFlowExtraDelaySecond       *int                  `yaml:"second-flow-extra-delay-second,omitempty"`
-	PacketDelay                      *int                  `yaml:"packet-delay,omitempty"`
+	SecondFlowExtraDelaySecond       *string               `yaml:"second-flow-extra-delay-second,omitempty"`
+	PacketDelay                      *string               `yaml:"packet-delay,omitempty"`
 	Triple                           *TripleMapConfig      `yaml:"triple,omitempty"`
 	KubernetesPollerType             *string               `yaml:"kubernetes-poller-type,omitempty"`
 	DecapErspan                      *bool                 `yaml:"decap-erspan,omitempty"`
@@ -62,7 +62,7 @@ type StaticConfig struct {
 	KubernetesNamespace              *string               `yaml:"kubernetes-namespace,omitempty"`
 	IngressFlavour                   *string               `yaml:"ingress-flavour,omitempty"`
 	GrpcBufferSize                   *int                  `yaml:"grpc-buffer-size,omitempty"`            // 单位：M
-	L7LogSessionAggrTimeout          *int                  `yaml:"l7-log-session-aggr-timeout,omitempty"` // 单位: s
+	L7LogSessionAggrTimeout          *string               `yaml:"l7-log-session-aggr-timeout,omitempty"` // 单位: s
 	TapMacScript                     *string               `yaml:"tap-mac-script,omitempty"`
 	BpfDisabled                      *bool                 `yaml:"bpf-disabled,omitempty"`
 	L7ProtocolInferenceMaxFailCount  *uint64               `yaml:"l7-protocol-inference-max-fail-count,omitempty"`
@@ -79,6 +79,12 @@ type StaticConfig struct {
 	FeatureFlags                     []string              `yaml:"feature-flags,omitempty"`
 	L7ProtocolPorts                  map[string]string     `yaml:"l7-protocol-ports,omitempty"`
 	Ebpf                             *EbpfConfig           `yaml:"ebpf,omitempty"`
+	OsAppTagExecUser                 *string               `yaml:"os-app-tag-exec-user"`
+	OsAppTagExec                     *string               `yaml:"os-app-tag-exec"`
+	OsProcRoot                       *string               `yaml:"os-proc-root;omitempty"`
+	OsProcSocketSyncInterval         *int                  `yaml:"os-proc-socket-sync-interval"`
+	OsProcSocketMinLifetime          *int                  `yaml:"os-proc-socket-min-lifetime"`
+	OsProcRegex                      *OsProcRegex          `yaml:"os-proc-regex"`
 }
 
 type XflowCollectorConfig struct {
@@ -87,11 +93,11 @@ type XflowCollectorConfig struct {
 }
 
 type PCapConfig struct {
-	QueueSize      *int `yaml:"queue-size,omitempty"`
-	QueueCount     *int `yaml:"queue-count,omitempty"`
-	FlowBufferSize *int `yaml:"flow-buffer-size,omitempty"`
-	BufferSize     *int `yaml:"buffer-size,omitempty"`
-	FlushInterval  *int `yaml:"flush-interval,omitempty"`
+	QueueSize      *int    `yaml:"queue-size,omitempty"`
+	QueueCount     *int    `yaml:"queue-count,omitempty"`
+	FlowBufferSize *int    `yaml:"flow-buffer-size,omitempty"`
+	BufferSize     *int    `yaml:"buffer-size,omitempty"`
+	FlushInterval  *string `yaml:"flush-interval,omitempty"`
 }
 
 type TripleMapConfig struct {
@@ -100,18 +106,18 @@ type TripleMapConfig struct {
 }
 
 type TcpTimeoutConfig struct {
-	EstablishedTimeout *int `yaml:"established-timeout,omitempty"`
-	ClosingRstTimeout  *int `yaml:"closing-rst-timeout,omitempty"`
-	OthersTimeout      *int `yaml:"others-timeout,omitempty"`
+	EstablishedTimeout *string `yaml:"established-timeout,omitempty"`
+	ClosingRstTimeout  *string `yaml:"closing-rst-timeout,omitempty"`
+	OthersTimeout      *string `yaml:"others-timeout,omitempty"`
 }
 
 type FlowGeneratorConfig struct {
 	TcpTimeoutConfig `yaml:",inline"`
-	HashSlots        *int `yaml:"flow-slots-size,omitempty"`
-	Capacity         *int `yaml:"flow-count-limit,omitempty"`
-	FlushInterval    *int `yaml:"flush-interval,omitempty"`
-	SenderThrottle   *int `yaml:"flow-sender-throttle,omitempty"`
-	AggrQueueSize    *int `yaml:"flow-aggr-queue-size,omitempty"`
+	HashSlots        *int    `yaml:"flow-slots-size,omitempty"`
+	Capacity         *int    `yaml:"flow-count-limit,omitempty"`
+	FlushInterval    *string `yaml:"flush-interval,omitempty"`
+	SenderThrottle   *int    `yaml:"flow-sender-throttle,omitempty"`
+	AggrQueueSize    *int    `yaml:"flow-aggr-queue-size,omitempty"`
 
 	IgnoreTorMac *bool `yaml:"ignore-tor-mac,omitempty"`
 	IgnoreL2End  *bool `yaml:"ignore-l2-end,omitempty"`
@@ -139,4 +145,10 @@ type EbpfConfig struct {
 	MaxTraceEntries         *int                               `yaml:"max-trace-entries,omitempty"`
 	SocketMapMaxReclaim     *int                               `yaml:"socket-map-max-reclaim,omitempty"`
 	GoTracingTimeout        *int                               `yaml:"go-tracing-timeout,omitempty"`
+}
+
+type OsProcRegex struct {
+	MatchRegex  *string `yaml:"match-regex,omitempty"`
+	MatchType   *string `yaml:"match-type,omitempty"`
+	RewriteName *string `yaml:"rewrite-name,omitempty"`
 }

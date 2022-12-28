@@ -106,7 +106,7 @@ use public::utils::net::link_by_name;
 use public::{
     debug::QueueDebugger,
     netns::NsFile,
-    proto::trident::{self, IfMacSource, TapMode},
+    proto::trident::{self, IfMacSource, SocketType, TapMode},
     queue,
     sender::SendMessageType,
     utils::net::{get_route_src_ip, links_by_name_regex, MacAddr},
@@ -375,6 +375,27 @@ impl Trident {
         );
         synchronizer.start();
 
+        #[cfg(target_os = "linux")]
+        let mut cgroups_controller = None;
+        #[cfg(target_os = "linux")]
+        if config_handler.candidate_config.tap_mode != TapMode::Analyzer && !running_in_container()
+        {
+            match Cgroups::new(process::id() as u64, config_handler.environment()) {
+                Ok(cg_controller) => {
+                    cg_controller.start();
+                    cgroups_controller = Some(cg_controller);
+                }
+                Err(e) => {
+                    warn!(
+                        "initialize cgroup controller failed, {:?}, agent restart...",
+                        e
+                    );
+                    thread::sleep(Duration::from_secs(1));
+                    process::exit(1);
+                }
+            };
+        }
+
         let log_dir = Path::new(config_handler.static_config.log_file.as_str());
         let log_dir = log_dir.parent().unwrap().to_str().unwrap();
         let guard = Guard::new(
@@ -403,6 +424,12 @@ impl Trident {
                         c.stop();
                         guard.stop();
                         monitor.stop();
+                        #[cfg(target_os = "linux")]
+                        if let Some(cg_controller) = cgroups_controller {
+                            if let Err(e) = cg_controller.stop() {
+                                warn!("stop cgroup controller failed, {:?}", e);
+                            }
+                        }
                     }
                     return Ok(());
                 }
@@ -753,8 +780,6 @@ pub struct Components {
     pub ebpf_collector: Option<Box<EbpfCollector>>,
     pub running: AtomicBool,
     pub stats_collector: Arc<stats::Collector>,
-    #[cfg(target_os = "linux")]
-    pub cgroups_controller: Arc<Cgroups>,
     pub external_metrics_server: MetricServer,
     pub otel_uniform_sender: UniformSenderThread<OpenTelemetry>,
     pub prometheus_uniform_sender: UniformSenderThread<PrometheusMetric>,
@@ -1160,7 +1185,9 @@ impl Components {
             config_handler.candidate_config.sender.npb_bps_threshold,
         )));
         let mut handler_builders = Vec::new();
-        let npb_arp_table = Arc::new(NpbArpTable::new());
+        let npb_arp_table = Arc::new(NpbArpTable::new(
+            config_handler.candidate_config.npb.socket_type == SocketType::RawUdp,
+        ));
 
         let mut src_interfaces_and_namespaces = vec![];
         for src_if in yaml_config.src_interfaces.iter() {
@@ -1335,7 +1362,7 @@ impl Components {
                 .handler_builders(handler_builder)
                 .ctrl_mac(ctrl_mac)
                 .leaky_bucket(rx_leaky_bucket.clone())
-                .options(Arc::new(dispatcher::Options {
+                .options(Arc::new(Mutex::new(dispatcher::Options {
                     #[cfg(target_os = "linux")]
                     af_packet_blocks: config_handler.candidate_config.dispatcher.af_packet_blocks,
                     #[cfg(target_os = "linux")]
@@ -1354,7 +1381,7 @@ impl Components {
                         .dispatcher
                         .capture_packet_size as usize,
                     ..Default::default()
-                }))
+                })))
                 .bpf_options(bpf_options.clone())
                 .default_tap_type(
                     (yaml_config.default_tap_type as u16)
@@ -1410,6 +1437,7 @@ impl Components {
                 &vec![],
             );
             dispatcher_listener.on_vm_change(&vm_mac_addrs);
+            synchronizer.add_flow_acl_listener(Box::new(dispatcher_listener.clone()));
 
             dispatchers.push(dispatcher);
             dispatcher_listeners.push(dispatcher_listener);
@@ -1433,7 +1461,7 @@ impl Components {
         #[allow(unused)]
         let mut ebpf_collector = None;
         #[cfg(target_os = "linux")]
-        if config_handler.candidate_config.tap_mode != TapMode::Analyzer {
+        if candidate_config.tap_mode != TapMode::Analyzer {
             let ebpf_dispatcher_id = dispatchers.len();
             let (flow_sender, flow_receiver, counter) = queue::bounded_with_debug(
                 yaml_config.flow_queue_size,
@@ -1507,8 +1535,6 @@ impl Components {
                 );
             }
         }
-        #[cfg(target_os = "linux")]
-        let cgroups_controller: Arc<Cgroups> = Arc::new(Cgroups { cgroup: None });
 
         let sender_id = get_sender_id() as usize;
         let otel_queue_name = "otel-to-sender";
@@ -1677,8 +1703,6 @@ impl Components {
             ebpf_collector,
             stats_collector,
             running: AtomicBool::new(false),
-            #[cfg(target_os = "linux")]
-            cgroups_controller,
             external_metrics_server,
             exception_handler,
             max_memory,
@@ -1874,15 +1898,6 @@ impl Components {
         #[cfg(target_os = "linux")]
         if let Some(ebpf_collector) = self.ebpf_collector.as_mut() {
             ebpf_collector.stop();
-        }
-        #[cfg(target_os = "linux")]
-        match self.cgroups_controller.stop() {
-            Ok(_) => {
-                info!("stopped cgroups_controller");
-            }
-            Err(e) => {
-                warn!("stop cgroups_controller failed: {}", e);
-            }
         }
 
         self.external_metrics_server.stop();

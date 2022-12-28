@@ -60,11 +60,12 @@ pub use recv_engine::{
     DEFAULT_BLOCK_SIZE, FRAME_SIZE_MAX, FRAME_SIZE_MIN, POLL_TIMEOUT,
 };
 
+use self::base_dispatcher::TapInterfaceWhitelist;
 #[cfg(target_os = "linux")]
 use crate::platform::GenericPoller;
 use crate::utils::environment::get_mac_by_name;
 use crate::{
-    common::{enums::TapType, TaggedFlow, TapTyper},
+    common::{enums::TapType, FlowAclListener, TaggedFlow, TapTyper},
     config::{
         handler::{FlowAccess, LogParserAccess},
         DispatcherConfig,
@@ -201,6 +202,34 @@ pub enum DispatcherListener {
     Mirror(MirrorModeDispatcherListener),
 }
 
+impl FlowAclListener for DispatcherListener {
+    fn flow_acl_change(
+        &mut self,
+        _: TridentType,
+        _: &Vec<Arc<crate::_IpGroupData>>,
+        _: &Vec<Arc<crate::_PlatformData>>,
+        _: &Vec<Arc<crate::common::policy::PeerConnection>>,
+        _: &Vec<Arc<crate::_Cidr>>,
+        _: &Vec<Arc<crate::_Acl>>,
+    ) -> Result<(), String> {
+        match self {
+            DispatcherListener::Local(a) => a.reset_bpf_white_list(),
+            DispatcherListener::Mirror(a) => a.reset_bpf_white_list(),
+            DispatcherListener::Analyzer(a) => a.reset_bpf_white_list(),
+        }
+        Ok(())
+    }
+
+    fn id(&self) -> usize {
+        let id = match self {
+            DispatcherListener::Local(a) => a.id(),
+            DispatcherListener::Mirror(a) => a.id(),
+            DispatcherListener::Analyzer(a) => a.id(),
+        };
+        2 + id
+    }
+}
+
 impl DispatcherListener {
     pub(super) fn netns(&self) -> NsFile {
         match self {
@@ -281,7 +310,12 @@ impl Default for BpfOptions {
 
 #[cfg(target_os = "linux")]
 impl BpfOptions {
-    fn skip_tap_interface(&self, tap_interfaces: &Vec<Link>) -> Vec<BpfSyntax> {
+    fn skip_tap_interface(
+        &self,
+        tap_interfaces: &Vec<Link>,
+        white_list: &TapInterfaceWhitelist,
+        snap_len: usize,
+    ) -> Vec<BpfSyntax> {
         let mut bpf_syntax = self.bpf_syntax.clone();
 
         bpf_syntax.push(BpfSyntax::LoadExtension(LoadExtension {
@@ -290,15 +324,22 @@ impl BpfOptions {
 
         let total = tap_interfaces.len();
         for (i, iface) in tap_interfaces.iter().enumerate() {
+            let mut skip_true = (total - i) as u8;
+            if white_list.has(iface.if_index as usize) {
+                skip_true += 1;
+            }
             bpf_syntax.push(BpfSyntax::JumpIf(JumpIf {
                 cond: JumpTest::JumpEqual,
                 val: iface.if_index,
-                skip_true: (total - i) as u8,
+                skip_true,
                 ..Default::default()
             }));
         }
 
         bpf_syntax.push(BpfSyntax::RetConstant(RetConstant { val: 0 }));
+        bpf_syntax.push(BpfSyntax::RetConstant(RetConstant {
+            val: snap_len as u32,
+        }));
         bpf_syntax.push(BpfSyntax::RetConstant(RetConstant { val: 65535 }));
 
         return bpf_syntax;
@@ -336,7 +377,12 @@ impl BpfOptions {
         return Some(prog);
     }
 
-    pub fn get_bpf_instructions(&self, tap_interfaces: &Vec<Link>) -> Vec<RawInstruction> {
+    pub fn get_bpf_instructions(
+        &self,
+        tap_interfaces: &Vec<Link>,
+        white_list: &TapInterfaceWhitelist,
+        snap_len: usize,
+    ) -> Vec<RawInstruction> {
         let mut syntaxs = vec![];
         debug!("Capture bpf set to:");
         if self.capture_bpf.len() != 0 {
@@ -392,7 +438,7 @@ impl BpfOptions {
             }
         }
 
-        let default_syntaxs = self.skip_tap_interface(tap_interfaces);
+        let default_syntaxs = self.skip_tap_interface(tap_interfaces, white_list, snap_len);
         for (i, syntax) in default_syntaxs.iter().enumerate() {
             debug!("Bpf default {:3}: {}", i + 1, syntax);
             syntaxs.push(syntax.to_instruction());
@@ -433,7 +479,7 @@ pub struct Options {
     pub controller_tls_port: u16,
 }
 
-struct Pipeline {
+pub struct Pipeline {
     vm_mac: MacAddr,
     handlers: Vec<PacketHandler>,
     timestamp: Duration,
@@ -534,7 +580,7 @@ pub struct DispatcherBuilder {
     src_interface: Option<String>,
     ctrl_mac: Option<MacAddr>,
     leaky_bucket: Option<Arc<LeakyBucket>>,
-    options: Option<Arc<Options>>,
+    options: Option<Arc<Mutex<Options>>>,
     handler_builders: Arc<Mutex<Vec<PacketHandlerBuilder>>>,
     bpf_options: Option<Arc<Mutex<BpfOptions>>>,
     default_tap_type: Option<TapType>,
@@ -585,7 +631,7 @@ impl DispatcherBuilder {
         self
     }
 
-    pub fn options(mut self, v: Arc<Options>) -> Self {
+    pub fn options(mut self, v: Arc<Mutex<Options>>) -> Self {
         self.options = Some(v);
         self
     }
@@ -697,8 +743,8 @@ impl DispatcherBuilder {
         let options = self
             .options
             .ok_or(Error::ConfigIncomplete("no options".into()))?;
-        let tap_mode = options.tap_mode;
-        let snap_len = options.snap_len;
+        let tap_mode = options.lock().unwrap().tap_mode;
+        let snap_len = options.lock().unwrap().snap_len;
         #[cfg(target_os = "windows")]
         let engine = Self::get_engine(&self.pcap_interfaces, tap_mode, &options)?;
         #[cfg(target_os = "linux")]
@@ -887,7 +933,7 @@ impl DispatcherBuilder {
             _ => {
                 return Err(Error::ConfigInvalid(format!(
                     "invalid tap mode {:?}",
-                    &base.options.tap_mode
+                    &base.options.lock().unwrap().tap_mode
                 )))
             }
         };
@@ -910,7 +956,7 @@ impl DispatcherBuilder {
     fn get_engine(
         pcap_interfaces: &Option<Vec<Link>>,
         tap_mode: TapMode,
-        options: &Arc<Options>,
+        options: &Arc<Mutex<Options>>,
     ) -> Result<RecvEngine> {
         match tap_mode {
             TapMode::Mirror | TapMode::Local => {
@@ -925,6 +971,7 @@ impl DispatcherBuilder {
                     .iter()
                     .map(|src_iface| (src_iface.device_name.as_str(), src_iface.if_index as isize))
                     .collect();
+                let options = options.lock().unwrap();
                 let win_packet =
                     WinPacket::new(src_ifaces, options.win_packet_blocks, options.snap_len)
                         .map_err(|e| error::Error::WinPcap(e.to_string()))?;
@@ -953,8 +1000,9 @@ impl DispatcherBuilder {
     fn get_engine(
         src_interface: &mut Option<String>,
         tap_mode: TapMode,
-        options: &Options,
+        options: &Arc<Mutex<Options>>,
     ) -> Result<RecvEngine> {
+        let options = options.lock().unwrap();
         match tap_mode {
             TapMode::Mirror if options.dpdk_conf.enabled => {
                 #[cfg(target_arch = "s390x")]

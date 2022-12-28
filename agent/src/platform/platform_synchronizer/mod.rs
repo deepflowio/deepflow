@@ -16,6 +16,9 @@
 
 #[cfg(target_os = "linux")]
 mod linux;
+#[cfg(target_os = "linux")]
+mod linux_process;
+mod proc_scan_hook;
 #[cfg(target_os = "windows")]
 mod windows;
 
@@ -23,3 +26,5 @@ mod windows;
 pub use self::windows::*;
 #[cfg(target_os = "linux")]
 pub use linux::*;
+#[cfg(target_os = "linux")]
+pub use linux_process::*;

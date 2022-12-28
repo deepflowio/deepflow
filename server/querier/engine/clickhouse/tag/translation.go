@@ -698,6 +698,17 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"toUInt64(tap_port) IN (SELECT tap_port FROM flow_tag.vtap_port_map WHERE name %s %s)",
 			"toUInt64(tap_port) IN (SELECT tap_port FROM flow_tag.vtap_port_map WHERE %s(name,%s))",
 		)}
+	// Nat Real IP
+	for _, suffix := range []string{"", "_0", "_1"} {
+		NatRealIPSuffix := "nat_real_ip" + suffix
+		tagResourceMap[NatRealIPSuffix] = map[string]*Tag{
+			"default": NewTag(
+				"IPv4NumToString("+NatRealIPSuffix+")",
+				"",
+				"hex("+NatRealIPSuffix+") %s %s",
+				"",
+			)}
+	}
 	// Tunnel IP
 	tagResourceMap["tunnel_tx_ip_0"] = map[string]*Tag{
 		"default": NewTag(
@@ -744,7 +755,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"",
 		)}
 	// enum_tag
-	for _, enumName := range []string{"close_type", "eth_type", "signal_source", "is_ipv4", "l7_ip_protocol", "type", "l7_protocol", "protocol", "response_status", "server_port", "status", "tap_port_type", "tcp_flags_bit", "tunnel_tier", "tunnel_type", "instance_type"} {
+	for _, enumName := range []string{"close_type", "eth_type", "signal_source", "is_ipv4", "l7_ip_protocol", "type", "l7_protocol", "protocol", "response_status", "server_port", "status", "tap_port_type", "tcp_flags_bit", "tunnel_tier", "tunnel_type", "instance_type", "nat_source"} {
 		tagResourceMap[enumName] = map[string]*Tag{
 			"enum": NewTag(
 				"dictGetOrDefault(flow_tag.int_enum_map, 'name', ('%s',toUInt64("+enumName+")), "+enumName+")",

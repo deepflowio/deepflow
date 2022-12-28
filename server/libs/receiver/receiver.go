@@ -421,7 +421,7 @@ func NewReceiver(
 
 	debug.ServerRegisterSimple(TRIDENT_ADAPTER_STATUS_CMD, receiver)
 	receiver.DropDetection.Init("receiver", DROP_DETECT_WINDOW_SIZE)
-	go receiver.timeNowTicker()
+	go receiver.timeNowAndFlushTicker()
 	return receiver
 }
 
@@ -484,7 +484,7 @@ func (r *Receiver) updateCounter(metriTimestamp uint32) {
 	}
 }
 
-func (r *Receiver) timeNowTicker() {
+func (r *Receiver) timeNowAndFlushTicker() {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
@@ -493,6 +493,7 @@ func (r *Receiver) timeNowTicker() {
 			return
 		}
 		r.timeNow = time.Now().Unix()
+		r.flushPutTCPQueues()
 	}
 }
 
@@ -500,14 +501,12 @@ func (r *Receiver) putUDPQueue(hash int, handler *Handler, buffer *RecvBuffer) {
 	hashKey := hash % handler.nQueues
 
 	queueCache := &handler.queueUDPCaches[hashKey]
+	queueCache.values = append(queueCache.values, buffer)
 	if len(queueCache.values) >= QUEUE_BATCH_NUM || r.timeNow-queueCache.timestamp > QUEUE_CACHE_FLUSH_TIMEOUT {
 		queueCache.timestamp = r.timeNow
-		if len(queueCache.values) > 0 {
-			handler.queues.Put(queue.HashKey(hashKey), queueCache.values...)
-			queueCache.values = queueCache.values[:0]
-		}
+		handler.queues.Put(queue.HashKey(hashKey), queueCache.values...)
+		queueCache.values = queueCache.values[:0]
 	}
-	queueCache.values = append(queueCache.values, buffer)
 }
 
 func (r *Receiver) putTCPQueue(hash int, handler *Handler, buffer *RecvBuffer) {
@@ -515,14 +514,12 @@ func (r *Receiver) putTCPQueue(hash int, handler *Handler, buffer *RecvBuffer) {
 
 	queueCache := &handler.queueTCPCaches[hashKey]
 	queueCache.Lock() // 存在多个tcp连接同时put，故需要加锁
+	queueCache.values = append(queueCache.values, buffer)
 	if len(queueCache.values) >= QUEUE_BATCH_NUM || r.timeNow-queueCache.timestamp > QUEUE_CACHE_FLUSH_TIMEOUT {
 		queueCache.timestamp = r.timeNow
-		if len(queueCache.values) > 0 {
-			handler.queues.Put(queue.HashKey(hashKey), queueCache.values...)
-			queueCache.values = queueCache.values[:0]
-		}
+		handler.queues.Put(queue.HashKey(hashKey), queueCache.values...)
+		queueCache.values = queueCache.values[:0]
 	}
-	queueCache.values = append(queueCache.values, buffer)
 	queueCache.Unlock()
 }
 
@@ -537,8 +534,8 @@ func (r *Receiver) flushPutUDPQueues() {
 		}
 		for i := 0; i < handler.nQueues; i++ {
 			queueCache := &handler.queueUDPCaches[i]
-			if len(queueCache.values) > 0 {
-				queueCache.timestamp = time.Now().Unix()
+			if len(queueCache.values) > 0 && r.timeNow-queueCache.timestamp > QUEUE_CACHE_FLUSH_TIMEOUT {
+				queueCache.timestamp = r.timeNow
 				handler.queues.Put(queue.HashKey(i), queueCache.values...)
 				queueCache.values = queueCache.values[:0]
 			}
@@ -558,12 +555,13 @@ func (r *Receiver) flushPutTCPQueues() {
 		}
 		for i := 0; i < handler.nQueues; i++ {
 			queueCache := &handler.queueTCPCaches[i]
-			queueCache.Lock()
-			if len(queueCache.values) > 0 {
-				queueCache.timestamp = time.Now().Unix()
-				handler.queues.Put(queue.HashKey(i), queueCache.values...)
-				queueCache.values = queueCache.values[:0]
+			if len(queueCache.values) == 0 || r.timeNow-queueCache.timestamp <= QUEUE_CACHE_FLUSH_TIMEOUT {
+				continue
 			}
+			queueCache.Lock()
+			queueCache.timestamp = r.timeNow
+			handler.queues.Put(queue.HashKey(i), queueCache.values...)
+			queueCache.values = queueCache.values[:0]
 			queueCache.Unlock()
 		}
 	}

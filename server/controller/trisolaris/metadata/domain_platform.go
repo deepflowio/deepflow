@@ -29,6 +29,8 @@ type DomainToPlatformData struct {
 	allSimplePlatformData *PlatformData
 	// 所有简化vinterface数据vtap使用，不包含POD/容器服务接口
 	allSimplePlatformDataExceptPod *PlatformData
+	//noDomain platformData
+	noDomainPlatfromData *PlatformData
 
 	// droplet data
 	// 所有完整vinterface数据除了pod， droplet使用
@@ -133,4 +135,12 @@ func (d *DomainToPlatformData) GetAZToPlatformDataOnlyPod() DomainPlatformData {
 
 func (d *DomainToPlatformData) updateAZToPlatformDataOnlyPod(data DomainPlatformData) {
 	d.azToPlatformDataOnlyPod = data
+}
+
+func (d *DomainToPlatformData) GetNoDomainPlatformData() *PlatformData {
+	return d.noDomainPlatfromData
+}
+
+func (d *DomainToPlatformData) updateNoDomainPlatformData(data *PlatformData) {
+	d.noDomainPlatfromData = data
 }

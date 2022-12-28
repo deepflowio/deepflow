@@ -20,15 +20,11 @@ use std::fmt;
 use std::net::IpAddr;
 use std::net::Ipv4Addr;
 use std::path::PathBuf;
-#[cfg(target_os = "linux")]
-use std::process;
 use std::sync::Arc;
 use std::time::Duration;
 
 use arc_swap::{access::Map, ArcSwap};
 use bytesize::ByteSize;
-#[cfg(target_os = "linux")]
-use cgroups_rs::{CpuResources, MemoryResources, Resources};
 use flexi_logger::writers::FileLogWriter;
 use flexi_logger::{Age, Cleanup, Criterion, FileSpec, LoggerHandle, Naming};
 use log::{info, warn, Level};
@@ -42,13 +38,7 @@ use super::{
 };
 use crate::common::l7_protocol_log::L7ProtocolBitmap;
 use crate::flow_generator::protocol_logs::SOFA_NEW_RPC_TRACE_CTX_KEY;
-#[cfg(target_os = "linux")]
-use crate::{
-    common::DEFAULT_CPU_CFS_PERIOD_US,
-    dispatcher::recv_engine::af_packet::OptTpacketVersion,
-    ebpf::CAP_LEN_MAX,
-    utils::{cgroups::Cgroups, environment::is_tt_pod, environment::is_tt_workload},
-};
+use crate::platform::ProcRegRewrite;
 use crate::{
     common::{decapsulate::TunnelTypeBitmap, enums::TapType},
     dispatcher::recv_engine,
@@ -57,9 +47,15 @@ use crate::{
     handler::PacketHandlerBuilder,
     trident::{Components, RunningMode},
     utils::{
-        environment::{free_memory_check, get_ctrl_ip_and_mac},
+        environment::{free_memory_check, get_ctrl_ip_and_mac, running_in_container},
         logger::RemoteLogConfig,
     },
+};
+#[cfg(target_os = "linux")]
+use crate::{
+    dispatcher::recv_engine::af_packet::OptTpacketVersion,
+    ebpf::CAP_LEN_MAX,
+    utils::{environment::is_tt_pod, environment::is_tt_workload},
 };
 
 use public::bitmap::Bitmap;
@@ -218,6 +214,16 @@ impl Default for NpbConfig {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
+pub struct OsProcScanConfig {
+    pub os_proc_root: String,
+    pub os_proc_socket_sync_interval: u32, // for sec
+    pub os_proc_socket_min_lifetime: u32,  // for sec
+    pub os_proc_regex: Vec<ProcRegRewrite>,
+    pub os_app_tag_exec_user: String,
+    pub os_app_tag_exec: Vec<String>,
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct PlatformConfig {
     pub sync_interval: Duration,
     pub kubernetes_cluster_id: String,
@@ -233,6 +239,7 @@ pub struct PlatformConfig {
     pub namespace: Option<String>,
     pub thread_threshold: u32,
     pub tap_mode: TapMode,
+    pub os_proc_scan_conf: OsProcScanConfig,
 }
 
 #[derive(Clone, PartialEq, Debug, Eq)]
@@ -883,6 +890,22 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 },
                 thread_threshold: conf.thread_threshold,
                 tap_mode: conf.tap_mode,
+                os_proc_scan_conf: OsProcScanConfig {
+                    os_proc_root: conf.yaml_config.os_proc_root.clone(),
+                    os_proc_socket_sync_interval: conf.yaml_config.os_proc_socket_sync_interval,
+                    os_proc_socket_min_lifetime: conf.yaml_config.os_proc_socket_min_lifetime,
+                    os_proc_regex: {
+                        let mut v = vec![];
+                        for i in &conf.yaml_config.os_proc_regex {
+                            if let Ok(r) = ProcRegRewrite::try_from(i) {
+                                v.push(r);
+                            }
+                        }
+                        v
+                    },
+                    os_app_tag_exec_user: conf.yaml_config.os_app_tag_exec_user.clone(),
+                    os_app_tag_exec: conf.yaml_config.os_app_tag_exec.clone(),
+                },
             },
             flow: (&conf).into(),
             log_parser: LogParserConfig {
@@ -1127,9 +1150,7 @@ impl ConfigHandler {
             candidate_config.tap_mode = new_config.tap_mode;
         }
 
-        if candidate_config.tap_mode != TapMode::Analyzer
-            && static_config.kubernetes_cluster_id.is_empty()
-        {
+        if candidate_config.tap_mode != TapMode::Analyzer && !running_in_container() {
             // Check and send out exceptions in time
             if let Err(e) = free_memory_check(new_config.environment.max_memory, exception_handler)
             {
@@ -1242,7 +1263,7 @@ impl ConfigHandler {
                                 }
                             }
                             _ => {
-                                if handler.static_config.kubernetes_cluster_id.is_empty() {
+                                if !running_in_container() {
                                     match free_memory_check(
                                         handler.candidate_config.environment.max_memory,
                                         &components.exception_handler,
@@ -1429,90 +1450,7 @@ impl ConfigHandler {
             }
         }
 
-        if candidate_config.tap_mode != TapMode::Analyzer
-            && static_config.kubernetes_cluster_id.is_empty()
-        {
-            #[cfg(target_os = "linux")]
-            {
-                let max_memory_change =
-                    candidate_config.environment.max_memory != new_config.environment.max_memory;
-                let max_cpu_change =
-                    candidate_config.environment.max_cpus != new_config.environment.max_cpus;
-                if max_memory_change || max_cpu_change {
-                    if static_config.kubernetes_cluster_id.is_empty() {
-                        // 非容器类型采集器才做资源限制
-                        fn cgroup_callback(handler: &ConfigHandler, components: &mut Components) {
-                            if components.cgroups_controller.cgroup.is_none() {
-                                match Cgroups::new() {
-                                    Ok(cc) => {
-                                        if let Some(_) = &cc.cgroup {
-                                            match cc.init(process::id() as u64) {
-                                                Ok(cgroup) => {
-                                                    components.cgroups_controller =
-                                                        Arc::new(cgroup);
-                                                }
-                                                Err(e) => {
-                                                    warn!("{}", e);
-                                                }
-                                            }
-                                        }
-                                    }
-                                    Err(e) => {
-                                        warn!("{:?}", e);
-                                    }
-                                };
-                            }
-
-                            let mut resources = Resources {
-                                memory: Default::default(),
-                                pid: Default::default(),
-                                cpu: Default::default(),
-                                devices: Default::default(),
-                                network: Default::default(),
-                                hugepages: Default::default(),
-                                blkio: Default::default(),
-                            };
-                            if handler.candidate_config.environment.max_memory != 0 {
-                                let memory_resources = MemoryResources {
-                                    kernel_memory_limit: None,
-                                    memory_hard_limit: Some(
-                                        handler.candidate_config.environment.max_memory as i64,
-                                    ),
-                                    memory_soft_limit: None,
-                                    kernel_tcp_memory_limit: None,
-                                    memory_swap_limit: None,
-                                    swappiness: None,
-                                    attrs: Default::default(),
-                                };
-                                resources.memory = memory_resources.clone();
-                            }
-                            if handler.candidate_config.environment.max_cpus != 0 {
-                                let cpu_quota = handler.candidate_config.environment.max_cpus
-                                    * DEFAULT_CPU_CFS_PERIOD_US;
-                                let cpu_resources = CpuResources {
-                                    cpus: None,
-                                    mems: None,
-                                    shares: None,
-                                    quota: Some(cpu_quota as i64),
-                                    period: Some(DEFAULT_CPU_CFS_PERIOD_US as u64),
-                                    realtime_runtime: None,
-                                    realtime_period: None,
-                                    attrs: Default::default(),
-                                };
-                                resources.cpu = cpu_resources.clone();
-                            }
-                            match components.cgroups_controller.apply(&resources) {
-                                Ok(_) => {}
-                                Err(e) => {
-                                    warn!("set cgroups failed: {}", e);
-                                }
-                            }
-                        }
-                        callbacks.push(cgroup_callback);
-                    }
-                }
-            }
-
+        if candidate_config.tap_mode != TapMode::Analyzer && !running_in_container() {
             if candidate_config.environment.max_memory != new_config.environment.max_memory {
                 info!(
                     "memory limit set to {}",
@@ -1525,8 +1463,7 @@ impl ConfigHandler {
                 info!("cpu limit set to {}", new_config.environment.max_cpus);
                 candidate_config.environment.max_cpus = new_config.environment.max_cpus;
             }
-        } else if (candidate_config.tap_mode == TapMode::Analyzer
-            || !static_config.kubernetes_cluster_id.is_empty())
+        } else if (candidate_config.tap_mode == TapMode::Analyzer || running_in_container())
             && candidate_config.environment.max_memory != 0
         {
             info!("memory set ulimit when tap_mode=analyzer or running in a K8s pod");
@@ -1911,6 +1848,9 @@ impl ConfigHandler {
                         }
                     }
                 }
+                components.npb_arp_table.set_need_resolve_mac(
+                    handler.candidate_config.npb.socket_type == SocketType::RawUdp,
+                );
             }
             if components.is_some() {
                 callbacks.push(dispatcher_callback);
@@ -1929,8 +1869,7 @@ impl ConfigHandler {
                 for dispatcher in components.dispatchers.iter() {
                     dispatcher.stop();
                 }
-                if handler.candidate_config.tap_mode != TapMode::Analyzer
-                    && handler.static_config.kubernetes_cluster_id.is_empty()
+                if handler.candidate_config.tap_mode != TapMode::Analyzer && !running_in_container()
                 {
                     match free_memory_check(
                         handler.candidate_config.environment.max_memory,

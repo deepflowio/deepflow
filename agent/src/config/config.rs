@@ -235,6 +235,17 @@ impl Default for UprobeProcRegExp {
     }
 }
 
+pub const OS_PROC_REGEXP_MATCH_TYPE_CMD: &'static str = "cmdline";
+pub const OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME: &'static str = "process_name";
+// use for proc scan match and replace
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Default)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct OsProcRegexp {
+    pub match_regex: String,
+    pub match_type: String, // one of cmdline or process_name
+    pub rewrite_name: String,
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Default)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct EbpfKprobeWhitelist {
@@ -344,6 +355,13 @@ pub struct YamlConfig {
     // hashmap<protocolName, portRange>
     pub l7_protocol_ports: HashMap<String, String>,
     pub npb_port: u16,
+    // process and socket scan config
+    pub os_proc_root: String,
+    pub os_proc_socket_sync_interval: u32, // for sec
+    pub os_proc_socket_min_lifetime: u32,  // for sec
+    pub os_proc_regex: Vec<OsProcRegexp>,
+    pub os_app_tag_exec_user: String,
+    pub os_app_tag_exec: Vec<String>,
 }
 
 impl YamlConfig {
@@ -469,14 +487,8 @@ impl YamlConfig {
         if c.ebpf.thread_num == 0 {
             c.ebpf.thread_num = 1;
         }
-        if !c.ebpf.perf_pages_count.is_power_of_two() {
-            c.ebpf.perf_pages_count = c.ebpf.perf_pages_count.next_power_of_two()
-        }
         if c.ebpf.perf_pages_count < 32 || c.ebpf.perf_pages_count > 512 {
             c.ebpf.perf_pages_count = 128
-        }
-        if !c.ebpf.ring_size.is_power_of_two() {
-            c.ebpf.ring_size = c.ebpf.ring_size.next_power_of_two()
         }
         if c.ebpf.ring_size < 8192 || c.ebpf.ring_size > 131072 {
             c.ebpf.ring_size = 65536;
@@ -596,6 +608,16 @@ impl Default for YamlConfig {
             l7_protocol_ports: HashMap::from([(String::from("DNS"), String::from("53"))]),
             ebpf: EbpfYamlConfig::default(),
             npb_port: NPB_DEFAULT_PORT,
+            os_proc_root: "/proc".into(),
+            os_proc_socket_sync_interval: 10,
+            os_proc_socket_min_lifetime: 3,
+            os_proc_regex: vec![OsProcRegexp {
+                match_regex: ".*".into(),
+                match_type: OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME.into(),
+                rewrite_name: "".into(),
+            }],
+            os_app_tag_exec_user: "deepflow".to_string(),
+            os_app_tag_exec: vec![],
         }
     }
 }
