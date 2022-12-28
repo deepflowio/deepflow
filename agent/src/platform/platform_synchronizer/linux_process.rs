@@ -15,7 +15,7 @@
  */
 
 use std::ffi::{CStr, CString};
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::{collections::HashMap, os::unix::process::CommandExt, process::Command};
 
 use libc::{getpwnam, getpwuid, passwd, uid_t};
@@ -62,6 +62,15 @@ impl ProcessData {
             dist_ctx.update(i.value.as_bytes());
         }
     }
+
+    pub(super) fn up_sec(&self, base_time: u64) -> Result<u64, ProcError> {
+        let start_time_sec = self.start_time.as_secs();
+        if base_time < self.start_time.as_secs() {
+            Err(ProcError::Other("proc start time gt base time".into()))
+        } else {
+            Ok(base_time - start_time_sec)
+        }
+    }
 }
 
 // need sort by pid before calc the hash
@@ -77,10 +86,10 @@ pub fn calc_process_datas_sha1(data: &Vec<ProcessData>) -> [u8; SHA1_DIGEST_LEN]
     ret
 }
 
-impl TryFrom<Process> for ProcessData {
+impl TryFrom<&Process> for ProcessData {
     type Error = ProcError;
 
-    fn try_from(proc: Process) -> Result<Self, Self::Error> {
+    fn try_from(proc: &Process) -> Result<Self, Self::Error> {
         let (exe, cmd, uid) = (proc.exe()?, proc.cmdline()?, proc.uid()?);
         let Some(proc_name) = exe.file_name() else {
             return Err(ProcError::Other(format!("pid {} get process name fail", proc.pid).to_string()));
@@ -168,10 +177,10 @@ impl TryFrom<&OsProcRegexp> for ProcRegRewrite {
 }
 
 impl ProcRegRewrite {
-    fn check_and_rewrite_proc(&self, proc: &mut ProcessData) -> bool {
+    pub(super) fn match_and_rewrite_proc(&self, proc: &mut ProcessData, match_only: bool) -> bool {
         let mut match_replace_fn = |reg: &Regex, s: &String, replace: &String| {
             if reg.is_match(s.as_str()) {
-                if !replace.is_empty() {
+                if !replace.is_empty() && !match_only {
                     proc.name = reg.replace_all(s.as_str(), replace).to_string();
                 }
                 true
@@ -205,11 +214,15 @@ struct OsAppTag {
 }
 
 pub(super) fn get_all_process(conf: &OsProcScanConfig) -> Vec<ProcessData> {
-    let (user, cmd, proc_root, proc_regexp) = (
+    let (user, cmd, proc_root, proc_regexp, now_sec) = (
         conf.os_app_tag_exec_user.as_str(),
         conf.os_app_tag_exec.as_slice(),
         conf.os_proc_root.as_str(),
         conf.os_proc_regex.as_slice(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
     );
 
     let mut tags_map = match get_os_app_tag_by_exec(user, cmd) {
@@ -232,12 +245,20 @@ pub(super) fn get_all_process(conf: &OsProcScanConfig) -> Vec<ProcessData> {
                 error!("get process fail: {}", err);
                 continue;
             }
-            let Ok(mut proc_data) =  ProcessData::try_from(proc.unwrap()) else {
+            let Ok(mut proc_data) =  ProcessData::try_from(proc.as_ref().unwrap()) else {
+                continue;
+            };
+            let Ok(up_sec) = proc_data.up_sec(now_sec) else {
                 continue;
             };
 
+            // filter the short live proc
+            if up_sec < u64::from(conf.os_proc_socket_min_lifetime) {
+                continue;
+            }
+
             for i in proc_regexp.iter() {
-                if i.check_and_rewrite_proc(&mut proc_data) {
+                if i.match_and_rewrite_proc(&mut proc_data, false) {
                     // fill tags
                     if let Some(tags) = tags_map.remove(&proc_data.pid) {
                         proc_data.os_app_tags = tags.tags
@@ -255,7 +276,7 @@ pub(super) fn get_all_process(conf: &OsProcScanConfig) -> Vec<ProcessData> {
 
 pub(super) fn get_self_proc() -> ProcResult<ProcessData> {
     let proc = procfs::process::Process::myself()?;
-    ProcessData::try_from(proc)
+    ProcessData::try_from(&proc)
 }
 
 // return Hashmap<pid, OsAppTag>
