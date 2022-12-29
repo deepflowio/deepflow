@@ -14,22 +14,6 @@
  * limitations under the License.
  */
 
-#[cfg(target_os = "linux")]
-mod linux;
-#[cfg(target_os = "linux")]
-mod linux_process;
-#[cfg(target_os = "linux")]
-mod proc_scan_hook;
-#[cfg(target_os = "windows")]
-mod windows;
-#[cfg(target_os = "windows")]
-mod windows_process;
+pub struct ProcessData {}
 
-#[cfg(target_os = "windows")]
-pub use self::windows::*;
-#[cfg(target_os = "linux")]
-pub use linux::*;
-#[cfg(target_os = "linux")]
-pub use linux_process::*;
-#[cfg(target_os = "windows")]
-pub use windows_process::*;
+pub enum ProcRegRewrite {}

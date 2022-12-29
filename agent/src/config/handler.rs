@@ -213,6 +213,7 @@ impl Default for NpbConfig {
     }
 }
 
+#[cfg(target_os = "linux")]
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct OsProcScanConfig {
     pub os_proc_root: String,
@@ -222,6 +223,9 @@ pub struct OsProcScanConfig {
     pub os_app_tag_exec_user: String,
     pub os_app_tag_exec: Vec<String>,
 }
+#[cfg(target_os = "windows")]
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct OsProcScanConfig {}
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct PlatformConfig {
@@ -890,6 +894,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 },
                 thread_threshold: conf.thread_threshold,
                 tap_mode: conf.tap_mode,
+                #[cfg(target_os = "linux")]
                 os_proc_scan_conf: OsProcScanConfig {
                     os_proc_root: conf.yaml_config.os_proc_root.clone(),
                     os_proc_socket_sync_interval: conf.yaml_config.os_proc_socket_sync_interval,
@@ -906,6 +911,8 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     os_app_tag_exec_user: conf.yaml_config.os_app_tag_exec_user.clone(),
                     os_app_tag_exec: conf.yaml_config.os_app_tag_exec.clone(),
                 },
+                #[cfg(target_os = "windows")]
+                os_proc_scan_conf: OsProcScanConfig {},
             },
             flow: (&conf).into(),
             log_parser: LogParserConfig {
