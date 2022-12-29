@@ -409,11 +409,16 @@ impl Stash {
 
         // PCAP和分发策略统计
         if self.context.metric_type == MetricsType::MINUTE {
-            for &id in acc_flow.policy_ids[0].list() {
+            let policy_ids = acc_flow.policy_ids[0].list();
+            let tunnel_ip_ids = acc_flow.tunnel_ip_ids[0].list();
+            for i in 0..policy_ids.len() {
+                let id = policy_ids[i];
+                let ip_id = tunnel_ip_ids[i];
+
                 let tagger = Tagger {
                     code: Code::ACL_GID | Code::TAG_TYPE | Code::TAG_VALUE | Code::VTAP_ID,
                     acl_gid: id,
-                    tag_value: 0, //FIXME: 暂时没有策略分发功能，以后补上
+                    tag_value: ip_id,
                     tag_type: TagType::TunnelIpId,
                     ..Default::default()
                 };
@@ -425,13 +430,19 @@ impl Stash {
                     l4_byte_tx: meter.traffic.l4_byte_tx,
                     ..Default::default()
                 };
-                self.add(StashKey::default(), tagger, Meter::Usage(usage_meter));
+                let key = StashKey::new(&tagger, Ipv4Addr::UNSPECIFIED.into(), None);
+                self.add(key, tagger, Meter::Usage(usage_meter));
             }
-            for &id in acc_flow.policy_ids[1].list() {
+            let policy_ids = acc_flow.policy_ids[1].list();
+            let tunnel_ip_ids = acc_flow.tunnel_ip_ids[1].list();
+            for i in 0..policy_ids.len() {
+                let id = policy_ids[i];
+                let ip_id = tunnel_ip_ids[i];
+
                 let tagger = Tagger {
                     code: Code::ACL_GID | Code::TAG_TYPE | Code::TAG_VALUE | Code::VTAP_ID,
                     acl_gid: id,
-                    tag_value: 0, //FIXME: 暂时没有策略分发功能，以后补上
+                    tag_value: ip_id,
                     tag_type: TagType::TunnelIpId,
                     ..Default::default()
                 };
@@ -444,7 +455,8 @@ impl Stash {
                     l4_byte_rx: meter.traffic.l4_byte_rx,
                     ..Default::default()
                 };
-                self.add(StashKey::default(), tagger, Meter::Usage(usage_meter));
+                let key = StashKey::new(&tagger, Ipv4Addr::UNSPECIFIED.into(), None);
+                self.add(key, tagger, Meter::Usage(usage_meter));
             }
         }
         let flow = &acc_flow.tagged_flow.flow;

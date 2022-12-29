@@ -90,7 +90,7 @@ func getMySQLModels() []interface{} {
 		&mysql.PodCluster{}, &mysql.PodNode{}, &mysql.PodNamespace{}, &mysql.VMPodNodeConnection{},
 		&mysql.PodIngress{}, &mysql.PodIngressRule{}, &mysql.PodIngressRuleBackend{},
 		&mysql.PodService{}, &mysql.PodServicePort{}, &mysql.PodGroup{}, &mysql.PodGroupPort{},
-		&mysql.PodReplicaSet{}, &mysql.Pod{},
+		&mysql.PodReplicaSet{}, &mysql.Pod{}, &mysql.Process{},
 	}
 }
 

@@ -26,6 +26,7 @@ import (
 
 	"github.com/bitly/go-simplejson"
 	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
+	cloudconfig "github.com/deepflowys/deepflow/server/controller/cloud/config"
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
@@ -57,6 +58,7 @@ type Tencent struct {
 	lcuuid               string
 	regionUUID           string
 	uuidGenerate         string
+	httpTimeout          int
 	includeRegions       []string
 	excludeRegions       []string
 	credential           *tcommon.Credential
@@ -91,7 +93,7 @@ type tencentProtocolPort struct {
 	protocol string
 }
 
-func NewTencent(domain mysql.Domain) (*Tencent, error) {
+func NewTencent(domain mysql.Domain, cfg cloudconfig.CloudConfig) (*Tencent, error) {
 	config, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
 		log.Error(err)
@@ -137,6 +139,7 @@ func NewTencent(domain mysql.Domain) (*Tencent, error) {
 		uuidGenerate:   domain.DisplayName,
 		excludeRegions: excludeRegions,
 		includeRegions: includeRegions,
+		httpTimeout:    cfg.HTTPTimeout,
 		regionUUID:     config.Get("region_uuid").MustString(),
 		credential:     tcommon.NewCredential(secretID, decryptSecretKey),
 
@@ -177,7 +180,7 @@ func (t *Tencent) getResponse(service, version, action, regionName, resultKey st
 	// cpf.Debug = true
 	cpf.HttpProfile.Endpoint = service + ".tencentcloudapi.com"
 	cpf.HttpProfile.ReqMethod = "POST"
-	// cpf.HttpProfile.ReqTimeout = 60
+	cpf.HttpProfile.ReqTimeout = t.httpTimeout
 	cpf.NetworkFailureMaxRetries = 1
 	cpf.NetworkFailureRetryDuration = profile.ExponentialBackoff
 	cpf.RateLimitExceededMaxRetries = 1

@@ -35,6 +35,7 @@ func (b *BaiduBce) getNatGateways(region model.Region, vpcIdToLcuuid map[string]
 	log.Debug("get nat_gateways starting")
 
 	vpcClient, _ := vpc.NewClient(b.secretID, b.secretKey, "bcc."+b.endpoint)
+	vpcClient.Config.ConnectionTimeoutInMillis = b.httpTimeout * 1000
 	marker := ""
 	args := &vpc.ListNatGatewayArgs{}
 	results := make([]*vpc.ListNatGatewayResult, 0)

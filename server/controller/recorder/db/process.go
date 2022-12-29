@@ -14,27 +14,29 @@
  * limitations under the License.
  */
 
-package huawei
+package db
 
 import (
-	"testing"
-
-	. "github.com/smartystreets/goconvey/convey"
-
-	"github.com/deepflowys/deepflow/server/controller/cloud/config"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/recorder/common"
 )
 
-func TestHuaWei(t *testing.T) {
-	Convey("TestHuaWei", t, func() {
-		domain := mysql.Domain{
-			DisplayName: "test_huawei",
-		}
+type Process struct {
+	OperatorBase[mysql.Process]
+}
 
-		huawei, _ := NewHuaWei(domain, config.CloudConfig{})
-		data, _ := huawei.GetCloudData()
-		Convey("huaweiResource number should be equal", func() {
-			So(len(data.VPCs), ShouldEqual, 3)
-		})
-	})
+func NewProcess() *Process {
+	operator := &Process{
+		OperatorBase[mysql.Process]{
+			resourceTypeName: common.RESOURCE_TYPE_PROCESS_EN,
+			softDelete:       true,
+			allocateID:       false,
+		},
+	}
+	operator.setter = operator
+	return operator
+}
+
+func (p *Process) setDBItemID(dbItem *mysql.Process, id int) {
+	dbItem.ID = id
 }

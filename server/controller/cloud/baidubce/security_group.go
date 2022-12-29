@@ -36,6 +36,7 @@ func (b *BaiduBce) getSecurityGroups(region model.Region, vpcIdToLcuuid map[stri
 	log.Debug("get security_groups starting")
 
 	bccClient, _ := bcc.NewClient(b.secretID, b.secretKey, "bcc."+b.endpoint)
+	bccClient.Config.ConnectionTimeoutInMillis = b.httpTimeout * 1000
 	marker := ""
 	args := &bcc_api.ListSecurityGroupArgs{}
 	results := make([]*bcc_api.ListSecurityGroupResult, 0)

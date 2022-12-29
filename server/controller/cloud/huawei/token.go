@@ -83,7 +83,7 @@ func (h *HuaWei) createToken(projectName, projectID string) (*Token, error) {
 			},
 		},
 	}
-	resp, err := cloudcommon.RequestPost(fmt.Sprintf("https://iam.%s.%s/v3/auth/tokens", projectName, h.config.URLDomain), authBody)
+	resp, err := cloudcommon.RequestPost(fmt.Sprintf("https://iam.%s.%s/v3/auth/tokens", projectName, h.config.URLDomain), time.Duration(h.httpTimeout), authBody)
 	if err != nil {
 		log.Errorf("request failed: %+v", err)
 		return nil, err

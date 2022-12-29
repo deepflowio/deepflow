@@ -34,6 +34,7 @@ import (
 	logging "github.com/op/go-logging"
 
 	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
+	cloudconfig "github.com/deepflowys/deepflow/server/controller/cloud/config"
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
@@ -51,6 +52,7 @@ type QingCloud struct {
 	secretID      string
 	secretKey     string
 	isPublicCloud bool
+	httpTimeout   int
 
 	defaultVPCName   string
 	defaultVxnetName string
@@ -75,7 +77,7 @@ type QingCloud struct {
 	debugger *cloudcommon.Debugger
 }
 
-func NewQingCloud(domain mysql.Domain) (*QingCloud, error) {
+func NewQingCloud(domain mysql.Domain, cfg cloudconfig.CloudConfig) (*QingCloud, error) {
 	config, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
 		log.Error(err)
@@ -118,6 +120,7 @@ func NewQingCloud(domain mysql.Domain) (*QingCloud, error) {
 		secretID:      secretID,
 		secretKey:     decryptSecretKey,
 		isPublicCloud: domain.Type == common.QINGCLOUD,
+		httpTimeout:   cfg.HTTPTimeout,
 
 		defaultVPCName:            domain.Name + "_default_vpc",
 		defaultVxnetName:          "vxnet-0",
@@ -201,7 +204,7 @@ func (q *QingCloud) GetResponse(action string, resultKey string, kwargs []*Param
 		}
 
 		client := &http.Client{
-			Timeout: time.Second * 300,
+			Timeout: time.Second * time.Duration(q.httpTimeout),
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			},

@@ -31,6 +31,7 @@ func (b *BaiduBce) getSubDomains(region model.Region, vpcIdToLcuuid map[string]s
 	log.Debug("get sub_domains starting")
 
 	cceClient, _ := cce.NewClient(b.secretID, b.secretKey, "cce."+b.endpoint)
+	cceClient.Config.ConnectionTimeoutInMillis = b.httpTimeout * 1000
 	marker := ""
 	args := &cce.ListClusterArgs{}
 	results := make([]*cce.ListClusterResult, 0)
