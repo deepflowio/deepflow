@@ -306,3 +306,52 @@ type ChNodeType struct {
 	ResourceType int    `gorm:"primaryKey;column:resource_type;type:int;not null" json:"RESOURCE_TYPE"`
 	NodeType     string `gorm:"column:node_type;type:varchar(256);default:null" json:"NODE_TYPE"`
 }
+
+type ChChostCloudTag struct {
+	ID    int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Key   string `gorm:"primaryKey;column:key;type:varchar(256);default:null" json:"KEY"`
+	Value string `gorm:"column:value;type:varchar(256);default:null" json:"VALUE"`
+}
+
+type ChPodNSCloudTag struct {
+	ID    int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Key   string `gorm:"primaryKey;column:key;type:varchar(256);default:null" json:"KEY"`
+	Value string `gorm:"column:value;type:varchar(256);default:null" json:"VALUE"`
+}
+
+func (ChPodNSCloudTag) TableName() string {
+	return "ch_pod_ns_cloud_tag"
+}
+
+type ChChostCloudTags struct {
+	ID        int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	CloudTags string `gorm:"column:cloud_tags;type:text;default:null" json:"CLOUD_TAGS"`
+}
+
+type ChPodNSCloudTags struct {
+	ID        int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	CloudTags string `gorm:"column:cloud_tags;type:text;default:null" json:"CLOUD_TAGS"`
+}
+
+func (ChPodNSCloudTags) TableName() string {
+	return "ch_pod_ns_cloud_tags"
+}
+
+type ChOSAppTag struct {
+	PID   int    `gorm:"primaryKey;column:pid;type:int;not null" json:"PID"`
+	Key   string `gorm:"primaryKey;column:key;type:varchar(256);default:null" json:"KEY"`
+	Value string `gorm:"column:value;type:varchar(256);default:null" json:"VALUE"`
+}
+
+func (ChOSAppTag) TableName() string {
+	return "ch_os_app_tag"
+}
+
+type ChOSAppTags struct {
+	PID       int    `gorm:"primaryKey;column:pid;type:int;not null" json:"PID"`
+	OSAPPTags string `gorm:"column:os_app_tags;type:text;default:null" json:"OS_APP_TAGS"`
+}
+
+func (ChOSAppTags) TableName() string {
+	return "ch_os_app_tags"
+}

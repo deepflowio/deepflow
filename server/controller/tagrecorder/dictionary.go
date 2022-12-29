@@ -159,6 +159,12 @@ func (c *TagRecorder) UpdateChDictionary() {
 							CH_DICTIONARY_NODE_TYPE,
 							CH_STRING_DICTIONARY_ENUM,
 							CH_INT_DICTIONARY_ENUM,
+							CH_DICTIONARY_CHOST_CLOUD_TAG,
+							CH_DICTIONARY_POD_NS_CLOUD_TAG,
+							CH_DICTIONARY_CHOST_CLOUD_TAGS,
+							CH_DICTIONARY_POD_NS_CLOUD_TAGS,
+							CH_DICTIONARY_OS_APP_TAG,
+							CH_DICTIONARY_OS_APP_TAGS,
 						)
 						chDicts := mapset.NewSet()
 						for _, dictionary := range dictionaries {
