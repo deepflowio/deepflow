@@ -59,3 +59,7 @@ func dbQueryFailed(err error) string {
 func dbSoftDeletedResourceByIDNotFound(resource string, id int) string {
 	return fmt.Sprintf("db soft deleted %s (id: %d) not found", resource, id)
 }
+
+func idByIPNotFound(resource, ip string) string {
+	return fmt.Sprintf("%s (ip: %s) id not found", resource, ip)
+}

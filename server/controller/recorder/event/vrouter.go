@@ -54,6 +54,16 @@ func (r *VRouter) ProduceByAdd(items []*mysql.VRouter) {
 				eventapi.TagRegionID(info.RegionID),
 			}...)
 		}
+
+		hostID, ok := r.ToolDataSet.GetHostIDByIP(item.GWLaunchServer)
+		if !ok {
+			log.Error(idByIPNotFound(RESOURCE_TYPE_HOST_EN, item.GWLaunchServer))
+		} else {
+			opts = append(opts, []eventapi.TagFieldOption{
+				eventapi.TagHostID(hostID),
+			}...)
+		}
+
 		opts = append(opts, []eventapi.TagFieldOption{
 			eventapi.TagVPCID(item.VPCID),
 			eventapi.TagL3DeviceType(r.deviceType),
