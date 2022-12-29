@@ -88,11 +88,15 @@ impl NpbTunnelType {
 #[derive(Debug, Clone)]
 pub struct NpbAction {
     acl_gids: Vec<u16>,
+    tunnel_ip_ids: Vec<u16>,
 }
 
 impl Default for NpbAction {
     fn default() -> Self {
-        Self { acl_gids: vec![] }
+        Self {
+            acl_gids: vec![],
+            tunnel_ip_ids: vec![],
+        }
     }
 }
 
@@ -101,12 +105,14 @@ impl NpbAction {
         acl_gid: u32,
         _id: u32,
         _tunnel_ip: IpAddr,
+        tunnel_ip_id: u16,
         _tunnel_type: NpbTunnelType,
         _tap_side: TapSide,
         _slice: u16,
     ) -> Self {
         Self {
             acl_gids: vec![acl_gid as u16],
+            tunnel_ip_ids: vec![tunnel_ip_id],
         }
     }
 
@@ -126,8 +132,11 @@ impl NpbAction {
         NpbTunnelType::VxLan
     }
 
-    pub fn add_acl_gid(&mut self, acl_gids: &[u16]) {
+    pub fn add_acl_gid(&mut self, acl_gids: &[u16], tunnel_ip_ids: &[u16]) {
         acl_gids.into_iter().for_each(|x| self.acl_gids.push(*x));
+        tunnel_ip_ids
+            .into_iter()
+            .for_each(|x| self.tunnel_ip_ids.push(*x));
     }
 
     pub fn acl_gids(&self) -> &[u16] {
@@ -136,6 +145,10 @@ impl NpbAction {
 
     pub fn tunnel_ip(&self) -> IpAddr {
         IpAddr::from(Ipv4Addr::UNSPECIFIED)
+    }
+
+    pub fn tunnel_ip_ids(&self) -> &[u16] {
+        &self.tunnel_ip_ids
     }
 
     pub fn reverse_tap_side(&mut self) {}
