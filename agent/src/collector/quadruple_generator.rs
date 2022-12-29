@@ -886,6 +886,8 @@ impl QuadrupleGenerator {
         self.key = key;
         self.policy_ids[0].clear();
         self.policy_ids[1].clear();
+        self.tunnel_ip_ids[0].clear();
+        self.tunnel_ip_ids[1].clear();
 
         let (flow_meter, app_meter) =
             Self::generate_meter(&tagged_flow, self.l7_metrics_enabled.clone());
