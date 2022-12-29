@@ -26,6 +26,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -93,7 +94,10 @@ var archDict = map[string]int{
 	"arm":   ARCH_ARM,
 }
 
-var letterRunes = []rune("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+var (
+	letterRunes                 = []rune("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	vtapGroupShortUUIDRegexp, _ = regexp.Compile(`^g-[A-Za-z0-9]{10}$`)
+)
 
 func GetOsType(os string) int {
 	for key, value := range osDict {
@@ -117,12 +121,20 @@ func GenerateUUID(str string) string {
 	return uuid.NewV5(uuid.NamespaceOID, str).String()
 }
 
+const SHORT_UUID_LENGTH int = 10
+
 func GenerateShortUUID() string {
-	b := make([]rune, 10)
+	b := make([]rune, SHORT_UUID_LENGTH)
 	for i := range b {
 		b[i] = letterRunes[rand.New(rand.NewSource(time.Now().UnixNano())).Intn(len(letterRunes))]
 	}
 	return string(b)
+}
+
+// IsVtapGroupShortUUID checks uuid consists of numbers and English letters with g- prefix.
+func IsVtapGroupShortUUID(uuid string) bool {
+	result := vtapGroupShortUUIDRegexp.FindAllStringSubmatch(uuid, -1)
+	return len(result) != 0
 }
 
 func GenerateKuberneteClusterIDByMD5(md5 string) (string, error) {
