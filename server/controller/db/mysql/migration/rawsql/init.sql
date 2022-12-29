@@ -2162,3 +2162,51 @@ CREATE TABLE IF NOT EXISTS dial_test_task (
     updated_at              DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE dial_test_task;
+
+CREATE TABLE IF NOT EXISTS ch_chost_cloud_tag (
+    `id`            INTEGER NOT NULL,
+    `key`           VARCHAR(256) NOT NULL,
+    `value`         VARCHAR(256),
+    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`, `key`)
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_chost_cloud_tag;
+
+CREATE TABLE IF NOT EXISTS ch_pod_ns_cloud_tag (
+    `id`            INTEGER NOT NULL,
+    `key`           VARCHAR(256) NOT NULL,
+    `value`         VARCHAR(256),
+    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`, `key`)
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_pod_ns_cloud_tag;
+
+CREATE TABLE IF NOT EXISTS ch_chost_cloud_tags (
+    `id`            INTEGER NOT NULL PRIMARY KEY,
+    `cloud_tags`    TEXT,
+    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_chost_cloud_tags;
+
+CREATE TABLE IF NOT EXISTS ch_pod_ns_cloud_tags (
+    `id`            INTEGER NOT NULL PRIMARY KEY,
+    `cloud_tags`    TEXT,
+    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_pod_ns_cloud_tags;
+
+CREATE TABLE IF NOT EXISTS ch_os_app_tag (
+    `pid`           INTEGER NOT NULL,
+    `key`           VARCHAR(256) NOT NULL,
+    `value`         VARCHAR(256),
+    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`pid`, `key`)
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_os_app_tag;
+
+CREATE TABLE IF NOT EXISTS ch_os_app_tags (
+    `pid`           INTEGER NOT NULL PRIMARY KEY,
+    `os_app_tags`   TEXT,
+    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_os_app_tags;
