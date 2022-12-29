@@ -436,10 +436,10 @@ func (op *PolicyDataOP) generateProtoPorts(acl *models.ACL, flowACL *trident.Flo
 	srcProtocol := PROTOCOL_ALL
 	dstProtocol := PROTOCOL_ALL
 	protocol := PROTOCOL_ALL
-	if acl.Protocol != 0 {
-		srcProtocol = acl.Protocol
-		dstProtocol = acl.Protocol
-		protocol = acl.Protocol
+	if acl.Protocol != nil {
+		srcProtocol = *acl.Protocol
+		dstProtocol = *acl.Protocol
+		protocol = *acl.Protocol
 	}
 	dstGroupType := -1
 	srcGroupType := -1
@@ -677,8 +677,8 @@ func (op *PolicyDataOP) generatePolicies() {
 				}
 				dropletNpbActions = append(dropletNpbActions, npbAction)
 				dropletProtocol := PROTOCOL_ALL
-				if acl.Protocol != 0 {
-					dropletProtocol = acl.Protocol
+				if acl.Protocol != nil {
+					dropletProtocol = *acl.Protocol
 				}
 				dropletFlowACL := &trident.FlowAcl{
 					Id:          proto.Uint32(uint32(acl.ID)),
