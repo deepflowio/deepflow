@@ -77,9 +77,10 @@ type vmInfo struct {
 }
 
 type vrouterInfo struct {
-	Name     string
-	RegionID int
-	VPCID    int
+	Name           string
+	RegionID       int
+	VPCID          int
+	GWLaunchServer string
 }
 
 type dhcpPortInfo struct {
