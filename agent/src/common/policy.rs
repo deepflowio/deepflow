@@ -710,6 +710,7 @@ impl TryFrom<trident::FlowAcl> for Acl {
                     n.tunnel_ip()
                         .parse::<IpAddr>()
                         .unwrap_or(IpAddr::V4(Ipv4Addr::UNSPECIFIED)),
+                    n.tunnel_ip_id.unwrap_or_default() as u16,
                     NpbTunnelType::new(n.tunnel_type.unwrap() as u8),
                     TapSide::new(n.tap_side.unwrap() as u8),
                     n.payload_slice() as u16,

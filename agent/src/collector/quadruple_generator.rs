@@ -481,6 +481,7 @@ impl SubQuadGen {
         flow_meter: &FlowMeter,
         app_meter: &AppMeter,
         policy_ids: &[U16Set; 2],
+        tunnel_ip_ids: &[U16Set; 2],
         time_in_second: Duration,
         key: &mut QgKey,
     ) {
@@ -511,6 +512,7 @@ impl SubQuadGen {
                 flow_meter,
                 app_meter,
                 policy_ids,
+                tunnel_ip_ids,
                 &tagged_flow,
             );
         } else {
@@ -529,6 +531,7 @@ impl SubQuadGen {
                 is_active_host0: true,
                 is_active_host1: true,
                 policy_ids: policy_ids.clone(),
+                tunnel_ip_ids: tunnel_ip_ids.clone(),
                 flow_meter: *flow_meter,
                 time_in_second,
                 nat_real_ip_0,
@@ -695,6 +698,7 @@ pub struct QuadrupleGenerator {
 
     key: QgKey,
     policy_ids: [U16Set; 2],
+    tunnel_ip_ids: [U16Set; 2],
     output_flow: Option<DebugSender<Arc<TaggedFlow>>>, // Send TaggedFlows to FlowAggr, equal to None when processing eBPF data.
 
     l7_metrics_enabled: Arc<AtomicBool>,
@@ -823,6 +827,7 @@ impl QuadrupleGenerator {
 
             key: QgKey::V6([0; IPV6_LRU_KEY_SIZE]),
             policy_ids: [U16Set::new(), U16Set::new()],
+            tunnel_ip_ids: [U16Set::new(), U16Set::new()],
             output_flow: flow_output,
 
             l7_metrics_enabled,
@@ -887,6 +892,7 @@ impl QuadrupleGenerator {
                 &flow_meter,
                 &app_meter,
                 &self.policy_ids,
+                &self.tunnel_ip_ids,
                 time_in_second,
                 &mut self.key,
             );
@@ -899,6 +905,9 @@ impl QuadrupleGenerator {
                     for gid in action.acl_gids().iter() {
                         self.policy_ids[i].add(*gid);
                     }
+                    for ip_id in action.tunnel_ip_ids().iter() {
+                        self.tunnel_ip_ids[i].add(*ip_id);
+                    }
                 }
             }
             self.minute_quad_gen.as_mut().unwrap().inject_flow(
@@ -906,6 +915,7 @@ impl QuadrupleGenerator {
                 &flow_meter,
                 &app_meter,
                 &self.policy_ids,
+                &self.tunnel_ip_ids,
                 time_in_second,
                 &mut self.key,
             );
@@ -1159,6 +1169,7 @@ mod test {
             is_active_host0: true,
             is_active_host1: true,
             policy_ids: [U16Set::new(), U16Set::new()],
+            tunnel_ip_ids: [U16Set::new(), U16Set::new()],
             flow_meter: FlowMeter::default(),
             app_meter: AppMeter::default(),
             key: QuadrupleGenerator::get_key(&tagged_flow),
@@ -1206,12 +1217,14 @@ mod test {
         let flow_meter = FlowMeter::default();
         let app_meter = AppMeter::default();
         let policy_ids = [U16Set::new(), U16Set::new()];
+        let tunnel_ip_ids = [U16Set::new(), U16Set::new()];
         let mut key = QuadrupleGenerator::get_key(&tagged_flow_arc);
         quad_gen.inject_flow(
             tagged_flow_arc.clone(),
             &flow_meter,
             &app_meter,
             &policy_ids,
+            &tunnel_ip_ids,
             window_start + Duration::from_secs(10),
             &mut key,
         );
@@ -1225,6 +1238,7 @@ mod test {
             &flow_meter,
             &app_meter,
             &policy_ids,
+            &tunnel_ip_ids,
             window_start + Duration::from_secs(15),
             &mut key,
         );

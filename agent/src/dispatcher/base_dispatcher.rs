@@ -216,7 +216,8 @@ impl BaseDispatcher {
     }
 
     pub(super) fn switch_recv_engine(&mut self, pcap_interfaces: Vec<Link>) -> Result<()> {
-        self.engine = if self.options.tap_mode == TapMode::Local {
+        let options = self.options.lock().unwrap();
+        self.engine = if options.tap_mode == TapMode::Local {
             if pcap_interfaces.is_empty() {
                 return Err(Error::WinPcap(
                     "windows pcap capture must give interface to capture packet".into(),
@@ -226,12 +227,9 @@ impl BaseDispatcher {
                 .iter()
                 .map(|src_iface| (src_iface.device_name.as_str(), src_iface.if_index as isize))
                 .collect();
-            let win_packet = WinPacket::new(
-                src_ifaces,
-                self.options.win_packet_blocks,
-                self.options.snap_len,
-            )
-            .map_err(|e| Error::WinPcap(e.to_string()))?;
+            let win_packet =
+                WinPacket::new(src_ifaces, options.win_packet_blocks, options.snap_len)
+                    .map_err(|e| Error::WinPcap(e.to_string()))?;
             info!("WinPacket init");
             self.need_update_bpf.store(true, Ordering::Relaxed);
             RecvEngine::WinPcap(Some(win_packet))
