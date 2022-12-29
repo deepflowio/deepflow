@@ -346,7 +346,7 @@ CREATE TABLE IF NOT EXISTS az (
     label               VARCHAR(64) DEFAULT '',
     region              CHAR(64) DEFAULT '',
     domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    lcuuid              CHAR(64) DEFAULT '' UNIQUE,
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted_at          DATETIME DEFAULT NULL
@@ -482,7 +482,7 @@ CREATE TABLE IF NOT EXISTS epc (
     topped              INTEGER DEFAULT 0,
     cidr                CHAR(64) DEFAULT '',
     uid                 CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT '',
+    lcuuid              CHAR(64) DEFAULT '' UNIQUE,
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted_at          DATETIME DEFAULT NULL
