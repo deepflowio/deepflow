@@ -113,9 +113,11 @@ struct conn_info_t {
 	struct __tuple_t tuple;
 	__u16 skc_family;	/* PF_INET, PF_INET6... */
 	__u16 sk_type;		/* socket type (SOCK_STREAM, etc) */
-	__u8 skc_ipv6only;
-	bool need_reconfirm;  // socket l7协议类型是否需要再次确认。
-	bool keep_data_seq;   // 保持捕获数据的序列号不变为true，否则为false。
+	__u8 skc_ipv6only : 1;
+	__u8 infer_reliable : 1; // Is protocol inference reliable?
+	__u8 padding : 6;
+	bool need_reconfirm; // socket l7协议类型是否需要再次确认。
+	bool keep_data_seq;  // 保持捕获数据的序列号不变为true，否则为false。
 	__u32 fd;
 	void *sk;
 

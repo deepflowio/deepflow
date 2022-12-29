@@ -715,7 +715,8 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 			 *     (client-socket) <- response
 			 */
 			if (trace_info_ptr->is_trace_id_zero &&
-			    conn_info->message_type == MSG_RESPONSE) {
+			    conn_info->message_type == MSG_RESPONSE &&
+			    conn_info->infer_reliable) {
 				*thread_trace_id = 0;
 				trace_map__delete(trace_key);
 				trace_stats->trace_map_count--;
