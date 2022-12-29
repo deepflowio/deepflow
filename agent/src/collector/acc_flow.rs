@@ -32,6 +32,7 @@ pub struct AccumulatedFlow {
     pub is_active_host1: bool,
 
     pub policy_ids: [U16Set; 2],
+    pub tunnel_ip_ids: [U16Set; 2],
     pub flow_meter: FlowMeter,
     pub app_meter: AppMeter,
     pub key: QgKey,
@@ -65,12 +66,15 @@ impl AccumulatedFlow {
         flow_meter: &FlowMeter,
         app_meter: &AppMeter,
         policy_ids: &[U16Set; 2],
+        tunnel_ip_ids: &[U16Set; 2],
         tagged_flow: &Arc<TaggedFlow>,
     ) {
         self.time_in_second = time_in_second;
         self.flow_meter.sequential_merge(flow_meter);
         self.policy_ids[0].merge(&policy_ids[0]);
         self.policy_ids[1].merge(&policy_ids[1]);
+        self.tunnel_ip_ids[0].merge(&tunnel_ip_ids[0]);
+        self.tunnel_ip_ids[1].merge(&tunnel_ip_ids[1]);
         // 相同服务端端口不同客户端端口的流L7Protocol可能不一致
         // 未知应用的判断需要通过流结束原因和持续时间，所以同一个流的L7Protocol可能不同这里需要更新，原则如下：
         // 1. unknown协议可以被任何协议覆盖

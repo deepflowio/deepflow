@@ -101,6 +101,7 @@ fn bench_policy(c: &mut Criterion) {
                 0,
                 100,
                 "192.168.1.100".parse::<IpAddr>().unwrap(),
+                1,
                 NpbTunnelType::VxLan,
                 TapSide::SRC,
                 0,
