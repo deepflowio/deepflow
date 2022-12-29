@@ -1373,6 +1373,7 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 			     infer_http_message(infer_buf, count,
 						conn_info)) != MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_HTTP1;
+				conn_info->infer_reliable = 1;
 				return inferred_message;
 			}
 			break;
@@ -1480,6 +1481,7 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 
 	if ((inferred_message.type =
 	     infer_http_message(infer_buf, count, conn_info)) != MSG_UNKNOWN) {
+		conn_info->infer_reliable = 1;
 		inferred_message.protocol = PROTO_HTTP1;
 	} else if ((inferred_message.type =
 		    infer_redis_message(infer_buf, count,
@@ -1506,22 +1508,6 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 		save_prev_data(infer_buf, conn_info);
 		inferred_message.type = MSG_PRESTORE;
 		return inferred_message;
-	}
-	// MySQL、Kafka推断需要之前的4字节数据
-	if (conn_info->socket_info_ptr != NULL && 
-	    conn_info->socket_info_ptr->prev_data_len != 0) {
-		if (conn_info->direction !=
-		    conn_info->socket_info_ptr->direction)
-			return inferred_message;
-
-		*(__u32 *) conn_info->prev_buf =
-		    *(__u32 *) conn_info->socket_info_ptr->prev_data;
-		conn_info->prev_count = 4;
-
-		/*
-		 * 上次存储的数据清忽略掉
-		 */
-		conn_info->socket_info_ptr->prev_data_len = 0;
 	}
 
 	if ((inferred_message.type =
