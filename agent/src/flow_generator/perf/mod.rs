@@ -181,6 +181,8 @@ impl FlowPerf {
         packet: &MetaPacket,
         flow_id: u64,
         app_table: &mut AppTable,
+        local_epc: i32,
+        remote_epc: i32,
     ) -> Result<u64> {
         if self.is_skip {
             return Err(Error::L7ProtocolParseLimit);
@@ -212,10 +214,30 @@ impl FlowPerf {
 
         if !self.is_success {
             if ret.is_ok() {
-                app_table.set_protocol(packet, self.l7_protocol_enum);
+                match packet.signal_source {
+                    SignalSource::EBPF => {
+                        app_table.set_protocol_from_ebpf(
+                            packet,
+                            self.l7_protocol_enum,
+                            local_epc,
+                            remote_epc,
+                        );
+                    }
+                    _ => {
+                        app_table.set_protocol(packet, self.l7_protocol_enum);
+                    }
+                }
                 self.is_success = true;
             } else {
-                self.is_skip = app_table.set_protocol(packet, L7ProtocolEnum::default());
+                self.is_skip = match packet.signal_source {
+                    SignalSource::EBPF => app_table.set_protocol_from_ebpf(
+                        packet,
+                        L7ProtocolEnum::default(),
+                        local_epc,
+                        remote_epc,
+                    ),
+                    _ => app_table.set_protocol(packet, L7ProtocolEnum::default()),
+                };
             }
         }
         ret?;
@@ -227,6 +249,8 @@ impl FlowPerf {
         packet: &mut MetaPacket,
         app_table: &mut AppTable,
         parse_param: &ParseParam,
+        local_epc: i32,
+        remote_epc: i32,
     ) -> Result<Vec<L7ProtocolInfo>> {
         if self.is_skip {
             return Err(Error::L7ProtocolParseLimit);
@@ -251,10 +275,30 @@ impl FlowPerf {
 
             if !self.is_success {
                 if ret.is_ok() {
-                    app_table.set_protocol(packet, self.l7_protocol_enum);
+                    match packet.signal_source {
+                        SignalSource::EBPF => {
+                            app_table.set_protocol_from_ebpf(
+                                packet,
+                                self.l7_protocol_enum,
+                                local_epc,
+                                remote_epc,
+                            );
+                        }
+                        _ => {
+                            app_table.set_protocol(packet, self.l7_protocol_enum);
+                        }
+                    }
                     self.is_success = true;
                 } else {
-                    self.is_skip = app_table.set_protocol(packet, L7ProtocolEnum::default());
+                    self.is_skip = match packet.signal_source {
+                        SignalSource::EBPF => app_table.set_protocol_from_ebpf(
+                            packet,
+                            L7ProtocolEnum::default(),
+                            local_epc,
+                            remote_epc,
+                        ),
+                        _ => app_table.set_protocol(packet, L7ProtocolEnum::default()),
+                    };
                 }
             }
             return ret;
@@ -270,6 +314,8 @@ impl FlowPerf {
         app_table: &mut AppTable,
         is_parse_perf: bool,
         is_parse_log: bool,
+        local_epc: i32,
+        remote_epc: i32,
     ) -> Result<(Vec<L7ProtocolInfo>, u64)> {
         if self.is_skip {
             return Err(Error::L7ProtocolCheckLimit);
@@ -298,20 +344,30 @@ impl FlowPerf {
                         // perf 没有抽象出来,这里可能返回None，对于返回None即不解析perf，只解析log
                         self.l7 = Self::l7_new(i.protocol(), self.rrt_cache.clone());
                         if self.l7.is_some() {
-                            rrt = self.l7_parse_perf(packet, flow_id, app_table)?;
+                            rrt = self
+                                .l7_parse_perf(packet, flow_id, app_table, local_epc, remote_epc)?;
                         }
                     }
 
                     if is_parse_log {
                         self.l7_protocol_log_parser = Some(i);
-                        let ret = self.l7_parse_log(packet, app_table, &param)?;
+                        let ret =
+                            self.l7_parse_log(packet, app_table, &param, local_epc, remote_epc)?;
                         return Ok((ret, rrt));
                     }
                     return Ok((vec![], 0));
                 }
             }
 
-            self.is_skip = app_table.set_protocol(packet, L7ProtocolEnum::default());
+            self.is_skip = match packet.signal_source {
+                SignalSource::EBPF => app_table.set_protocol_from_ebpf(
+                    packet,
+                    L7ProtocolEnum::default(),
+                    local_epc,
+                    remote_epc,
+                ),
+                _ => app_table.set_protocol(packet, L7ProtocolEnum::default()),
+            };
         }
 
         return Err(Error::L7ProtocolUnknown);
@@ -328,6 +384,8 @@ impl FlowPerf {
         app_table: &mut AppTable,
         is_parse_perf: bool,
         is_parse_log: bool,
+        local_epc: i32,
+        remote_epc: i32,
     ) -> Result<(Vec<L7ProtocolInfo>, u64)> {
         if packet.signal_source == SignalSource::EBPF && self.server_port != 0 {
             // if the packet from eBPF and it's server_port is not equal to 0, We can get the packet's
@@ -342,14 +400,20 @@ impl FlowPerf {
 
         let mut rrt = 0;
         if self.l7.is_some() && is_parse_perf {
-            rrt = self.l7_parse_perf(packet, flow_id, app_table)?;
+            rrt = self.l7_parse_perf(packet, flow_id, app_table, local_epc, remote_epc)?;
             if !is_parse_log {
                 return Ok((vec![], rrt));
             }
         }
 
         if self.l7_protocol_log_parser.is_some() && is_parse_log {
-            let ret = self.l7_parse_log(packet, app_table, &ParseParam::from(&*packet))?;
+            let ret = self.l7_parse_log(
+                packet,
+                app_table,
+                &ParseParam::from(&*packet),
+                local_epc,
+                remote_epc,
+            )?;
             return Ok((ret, rrt));
         }
 
@@ -361,7 +425,15 @@ impl FlowPerf {
             return Err(Error::L7ProtocolUnknown);
         }
 
-        self.l7_check(packet, flow_id, app_table, is_parse_perf, is_parse_log)
+        self.l7_check(
+            packet,
+            flow_id,
+            app_table,
+            is_parse_perf,
+            is_parse_log,
+            local_epc,
+            remote_epc,
+        )
     }
 
     pub fn new(
@@ -424,6 +496,8 @@ impl FlowPerf {
         l7_performance_enabled: bool,
         l7_log_parse_enabled: bool,
         app_table: &mut AppTable,
+        local_epc: i32,
+        remote_epc: i32,
     ) -> Result<(Vec<L7ProtocolInfo>, u64)> {
         if l4_performance_enabled {
             self.l4.parse(packet, is_first_packet_direction)?;
@@ -437,6 +511,8 @@ impl FlowPerf {
                 app_table,
                 l7_performance_enabled,
                 l7_log_parse_enabled,
+                local_epc,
+                remote_epc,
             );
         }
         Ok((vec![], 0))
