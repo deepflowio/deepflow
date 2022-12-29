@@ -160,7 +160,7 @@ func verifyGroupID(groupID string) error {
 	if !common.IsVtapGroupShortUUID(groupID) {
 		return NewError(
 			common.INVALID_POST_DATA,
-			fmt.Sprintf("group-id(%s) invalid, requires %s prefix, number and letter length %d, such as g-1yhIguXABC",
+			fmt.Sprintf("id(%s) invalid, requires %s prefix, number and letter length %d, such as g-1yhIguXABC",
 				groupID, VTAP_GROUP_SHORT_UUID_PREFIX, common.SHORT_UUID_LENGTH),
 		)
 	}
@@ -168,7 +168,7 @@ func verifyGroupID(groupID string) error {
 	var vtapGroupCount int64
 	mysql.Db.Model(&mysql.VTapGroup{}).Where("short_uuid = ?", groupID).Count(&vtapGroupCount)
 	if vtapGroupCount > 0 {
-		return NewError(common.RESOURCE_ALREADY_EXIST, fmt.Sprintf("vtap_group id(%s) already exist", groupID))
+		return NewError(common.RESOURCE_ALREADY_EXIST, fmt.Sprintf("id(%s) already exist", groupID))
 	}
 	return nil
 }
