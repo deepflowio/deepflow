@@ -48,14 +48,14 @@ func RegisterAgentGroupCommand() *cobra.Command {
 
 	var groupID string
 	create := &cobra.Command{
-		Use:     "create [name]",
+		Use:     "create <name>",
 		Short:   "create agent-group",
 		Example: "deepflow-ctl agent-group create deepflow-agent-group",
 		Run: func(cmd *cobra.Command, args []string) {
 			createAgentGroup(cmd, args, groupID)
 		},
 	}
-	create.Flags().StringVar(&groupID, "group-id", "", "agent group id with g- prefix and number and letter length 10, such as g-1yhIguXABC")
+	create.Flags().StringVar(&groupID, "id", "", "id must start with 'g-' prefix and have a length of 10 numbers and letters, such as g-1yhIguXABC")
 
 	delete := &cobra.Command{
 		Use:     "delete [name]",
