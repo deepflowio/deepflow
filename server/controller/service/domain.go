@@ -329,7 +329,7 @@ func createKubernetesRelatedResources(domain mysql.Domain, regionLcuuid string) 
 	az.Domain = domain.Lcuuid
 	az.Region = regionLcuuid
 	az.CreateMethod = common.CREATE_METHOD_LEARN
-	err := mysql.Db.Create(&az).Error
+	err := mysql.Db.Clauses(clause.Insert{Modifier: "IGNORE"}).Create(&az).Error
 	if err != nil {
 		log.Errorf("create az failed: %s", err)
 	}
@@ -339,7 +339,7 @@ func createKubernetesRelatedResources(domain mysql.Domain, regionLcuuid string) 
 	vpc.Domain = domain.Lcuuid
 	vpc.Region = regionLcuuid
 	vpc.CreateMethod = common.CREATE_METHOD_LEARN
-	err = mysql.Db.Create(&vpc).Error
+	err = mysql.Db.Clauses(clause.Insert{Modifier: "IGNORE"}).Create(&vpc).Error
 	if err != nil {
 		log.Errorf("create vpc failed: %s", err)
 	}
