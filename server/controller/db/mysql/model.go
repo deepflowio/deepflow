@@ -1175,7 +1175,7 @@ type ACL struct {
 	EpcID        int       `gorm:"column:epc_id;type:int;default:null" json:"EPC_ID"`
 	SrcGroupIDs  string    `gorm:"column:src_group_ids;type:text;default:null" json:"SRC_GROUP_IDS"` // separated by ,
 	DstGroupIDs  string    `gorm:"column:dst_group_ids;type:text;default:null" json:"DST_GROUP_IDS"` // separated by ,
-	Protocol     int       `gorm:"column:protocol;type:int;default:null" json:"PROTOCOL"`
+	Protocol     *int      `gorm:"column:protocol;type:int;default:null" json:"PROTOCOL"`
 	SrcPorts     string    `gorm:"column:src_ports;type:text;default:null" json:"SRC_PORTS"` // separated by ,
 	DstPorts     string    `gorm:"column:dst_ports;type:text;default:null" json:"DST_PORTS"` // separated by ,
 	Vlan         int       `gorm:"column:vlan;type:int;default:null" json:"VLAN"`
