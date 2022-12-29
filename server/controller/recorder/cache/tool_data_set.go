@@ -341,8 +341,9 @@ func (t *ToolDataSet) deleteNetwork(lcuuid string) {
 func (t *ToolDataSet) addVRouter(item *mysql.VRouter) {
 	t.vrouterLcuuidToID[item.Lcuuid] = item.ID
 	t.vrouterIDToInfo[item.ID] = &vrouterInfo{
-		Name:  item.Name,
-		VPCID: item.VPCID,
+		Name:           item.Name,
+		VPCID:          item.VPCID,
+		GWLaunchServer: item.GWLaunchServer,
 	}
 	if regionID, ok := t.GetRegionIDByLcuuid(item.Region); ok {
 		t.vrouterIDToInfo[item.ID].RegionID = regionID
@@ -359,6 +360,7 @@ func (t *ToolDataSet) updateVRouter(cloudItem *cloudmodel.VRouter) {
 		return
 	}
 	info.Name = cloudItem.Name
+	info.GWLaunchServer = cloudItem.GWLaunchServer
 	if regionID, ok := t.GetRegionIDByLcuuid(cloudItem.RegionLcuuid); ok {
 		info.RegionID = regionID
 	}

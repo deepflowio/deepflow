@@ -73,7 +73,7 @@ type Process struct {
 	VTapID         int       `gorm:"column:vtap_id;type:int;not null;default:0" json:"VTAP_ID"`
 	PID            int       `gorm:"column:pid;type:int;not null;default:0" json:"PID"`
 	ProcessName    string    `gorm:"column:process_name;type:varchar(256);default:''" json:"PROCESS_NAME"`
-	CommandLine    string    `gorm:"column:command_line;type:text" json:"COMMAND_LINE"`
+	CommandLine    string    `gorm:"column:cmdline;type:text" json:"COMMAND_LINE"`
 	UserName       string    `gorm:"column:user_name;type:varchar(256);default:''" json:"USER_NAME"`
 	StartTime      time.Time `gorm:"autoCreateTime;column:start_time;type:datetime" json:"START_TIME"`
 	OsAppTags      string    `gorm:"column:os_app_tags;type:text" json:"OS_APP_TAGS"`
@@ -1175,7 +1175,7 @@ type ACL struct {
 	EpcID        int       `gorm:"column:epc_id;type:int;default:null" json:"EPC_ID"`
 	SrcGroupIDs  string    `gorm:"column:src_group_ids;type:text;default:null" json:"SRC_GROUP_IDS"` // separated by ,
 	DstGroupIDs  string    `gorm:"column:dst_group_ids;type:text;default:null" json:"DST_GROUP_IDS"` // separated by ,
-	Protocol     int       `gorm:"column:protocol;type:int;default:null" json:"PROTOCOL"`
+	Protocol     *int      `gorm:"column:protocol;type:int;default:null" json:"PROTOCOL"`
 	SrcPorts     string    `gorm:"column:src_ports;type:text;default:null" json:"SRC_PORTS"` // separated by ,
 	DstPorts     string    `gorm:"column:dst_ports;type:text;default:null" json:"DST_PORTS"` // separated by ,
 	Vlan         int       `gorm:"column:vlan;type:int;default:null" json:"VLAN"`

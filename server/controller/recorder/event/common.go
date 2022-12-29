@@ -109,6 +109,16 @@ func getVRouterOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOpt
 		eventapi.TagL3DeviceType(common.VIF_DEVICE_TYPE_VROUTER),
 		eventapi.TagL3DeviceID(id),
 	}...)
+
+	hostID, ok := t.GetHostIDByIP(info.GWLaunchServer)
+	if !ok {
+		log.Error(idByIPNotFound(RESOURCE_TYPE_HOST_EN, info.GWLaunchServer))
+	} else {
+		opts = append(opts, []eventapi.TagFieldOption{
+			eventapi.TagHostID(hostID),
+		}...)
+	}
+
 	return opts, nil
 }
 

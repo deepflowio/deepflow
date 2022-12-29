@@ -31,9 +31,9 @@ use crate::{
         perf::stats::PerfStats,
         perf::L7FlowPerf,
         protocol_logs::{
-            check_http_method, consts::*, get_http_request_version, get_http_resp_info,
-            is_http_v1_payload, parse_http1_header, AppProtoHead, Httpv2Headers, L7ResponseStatus,
-            LogMessageType,
+            check_http_method, consts::*, get_http_request_info, get_http_request_version,
+            get_http_resp_info, is_http_v1_payload, parse_v1_headers, AppProtoHead, Httpv2Headers,
+            L7ResponseStatus, LogMessageType,
         },
         HttpLog,
     },
@@ -219,18 +219,14 @@ impl HttpPerfData {
             return Err(Error::HttpHeaderParseFailed);
         }
 
-        let lines = parse_http1_header(payload, Some(1));
-        if lines.len() == 0 {
-            return Err(Error::HttpHeaderParseFailed);
-        }
-
-        let Ok(line_info) = str::from_utf8(lines[0]) else {
+        let mut headers = parse_v1_headers(payload);
+        let Some(first_line) = headers.next() else {
             return Err(Error::HttpHeaderParseFailed);
         };
 
         if direction == PacketDirection::ServerToClient {
             // HTTP响应行：HTTP/1.1 404 Not Found.
-            let (_, status_code) = get_http_resp_info(line_info)?;
+            let (_, status_code) = get_http_resp_info(first_line)?;
             self.session_data.msg_type = LogMessageType::Response;
 
             let perf_stats = self.perf_stats.get_or_insert(PerfStats::default());
@@ -275,12 +271,11 @@ impl HttpPerfData {
             perf_stats.rrt_count += 1;
         } else {
             // HTTP请求行：GET /background.png HTTP/1.0
-            let context: Vec<&str> = line_info.split(" ").collect();
-            if context.len() != 3 {
+            let Ok((method, _, version)) = get_http_request_info(first_line) else {
                 return Err(Error::HttpHeaderParseFailed);
-            }
-            check_http_method(context[0])?;
-            get_http_request_version(context[2])?;
+            };
+            check_http_method(method)?;
+            get_http_request_version(version)?;
 
             self.session_data.msg_type = LogMessageType::Request;
 
