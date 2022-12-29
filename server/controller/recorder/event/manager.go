@@ -135,5 +135,6 @@ func (e *EventManagerBase) convertToEventBeEnqueued(ev *eventapi.ResourceEvent) 
 	event.PodServiceID = ev.PodServiceID
 	event.PodGroupID = ev.PodGroupID
 	event.PodID = ev.PodID
+	event.Description = ev.Description
 	return event
 }
