@@ -37,6 +37,7 @@ func (b *BaiduBce) getVMs(
 	log.Debug("get vms starting")
 
 	bccClient, _ := bcc.NewClient(b.secretID, b.secretKey, "bcc."+b.endpoint)
+	bccClient.Config.ConnectionTimeoutInMillis = b.httpTimeout * 1000
 	marker := ""
 	args := &bcc_api.ListInstanceArgs{}
 	results := make([]*bcc_api.ListInstanceResult, 0)
@@ -181,6 +182,7 @@ func (b *BaiduBce) getVMEnis(
 	log.Debug("get vm enis starting")
 
 	eniClient, _ := eni.NewClient(b.secretID, b.secretKey, "bcc."+b.endpoint)
+	eniClient.Config.ConnectionTimeoutInMillis = b.httpTimeout * 1000
 	for vpcId, vpcLcuuid := range vpcIdToLcuuid {
 		marker := ""
 		args := &eni.ListEniArgs{VpcId: vpcId}

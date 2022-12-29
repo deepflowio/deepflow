@@ -65,6 +65,7 @@ func (b *BaiduBce) getBLoadBalances(region model.Region, vpcIdToLcuuid map[strin
 	log.Debug("get blbs starting")
 
 	blbClient, _ := blb.NewClient(b.secretID, b.secretKey, "blb."+b.endpoint)
+	blbClient.Config.ConnectionTimeoutInMillis = b.httpTimeout * 1000
 	marker := ""
 	args := &blb.DescribeLoadBalancersArgs{}
 	results := make([]*blb.DescribeLoadBalancersResult, 0)
@@ -128,6 +129,7 @@ func (b *BaiduBce) getAppBLoadBalances(region model.Region, vpcIdToLcuuid map[st
 	log.Debug("get app_blbs starting")
 
 	appblbClient, _ := appblb.NewClient(b.secretID, b.secretKey, "blb."+b.endpoint)
+	appblbClient.Config.ConnectionTimeoutInMillis = b.httpTimeout * 1000
 	marker := ""
 	args := &appblb.DescribeLoadBalancersArgs{}
 	results := make([]*appblb.DescribeLoadBalancersResult, 0)
