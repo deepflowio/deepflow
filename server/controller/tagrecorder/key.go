@@ -86,3 +86,21 @@ type IntEnumTagKey struct {
 type NodeTypeKey struct {
 	ResourceType int
 }
+
+type CloudTagKey struct {
+	ID  int
+	Key string
+}
+
+type CloudTagsKey struct {
+	ID int
+}
+
+type OSAPPTagKey struct {
+	PID int
+	Key string
+}
+
+type OSAPPTagsKey struct {
+	PID int
+}
