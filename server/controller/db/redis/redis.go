@@ -17,10 +17,11 @@
 package redis
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v9"
 	"github.com/op/go-logging"
 )
 
@@ -82,8 +83,8 @@ func createUniversalRedisClient(cfg RedisConfig) redis.UniversalClient {
 	}
 }
 
-func InitRedis(cfg RedisConfig) (err error) {
+func InitRedis(cfg RedisConfig, ctx context.Context) (err error) {
 	RedisDB = createUniversalRedisClient(cfg)
-	_, err = RedisDB.Ping().Result()
+	_, err = RedisDB.Ping(ctx).Result()
 	return
 }
