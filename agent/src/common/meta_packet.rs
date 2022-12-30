@@ -15,7 +15,6 @@
  */
 
 use std::fmt;
-use std::mem;
 use std::net::{IpAddr, Ipv4Addr};
 use std::ptr;
 use std::sync::Arc;
@@ -68,12 +67,6 @@ pub struct MetaPacket<'a> {
     pub endpoint_data: Option<Arc<EndpointData>>,
     pub policy_data: Option<Arc<PolicyData>>,
 
-    offset_ip_0: usize,
-    offset_ip_1: usize,
-    offset_mac_0: usize,
-    offset_mac_1: usize,
-    offset_port_0: usize,
-    offset_port_1: usize,
     pub offset_ipv6_last_option: usize,
     pub offset_ipv6_fragment_option: usize,
 
@@ -89,13 +82,9 @@ pub struct MetaPacket<'a> {
 
     pub tunnel: Option<&'a TunnelInfo>,
 
-    data_offset_ihl_or_fl4b: u8,
     next_header: u8, // ipv6 header中的nextHeader字段，用于包头压缩等
 
     tcp_options_flag: u8,
-    tcp_opt_win_scale_offset: usize,
-    tcp_opt_mss_offset: usize,
-    tcp_opt_sack_offset: usize,
 
     pub tcp_data: MetaPacketTcpHeader,
     pub tap_port: TapPort, // packet与xflow复用
@@ -147,14 +136,9 @@ impl<'a> MetaPacket<'a> {
             _ => false,
         }
     }
+
     pub fn empty() -> MetaPacket<'a> {
         MetaPacket {
-            offset_mac_0: FIELD_OFFSET_SA,
-            offset_mac_1: FIELD_OFFSET_DA,
-            offset_ip_0: FIELD_OFFSET_SIP,
-            offset_ip_1: FIELD_OFFSET_DIP,
-            offset_port_0: FIELD_OFFSET_SPORT,
-            offset_port_1: FIELD_OFFSET_DPORT,
             ..Default::default()
         }
     }
@@ -222,24 +206,22 @@ impl<'a> MetaPacket<'a> {
                     if offset + TCP_OPT_MSS_LEN > payload_offset {
                         return;
                     }
-                    self.tcp_opt_mss_offset = offset + 2;
+                    let tcp_opt_mss_offset = offset + 2;
                     self.tcp_options_flag |= TCP_OPT_FLAG_MSS;
                     offset += TCP_OPT_MSS_LEN;
                     self.tcp_data.mss = u16::from_be_bytes(
-                        *<&[u8; 2]>::try_from(
-                            &packet[self.tcp_opt_mss_offset..self.tcp_opt_mss_offset + 2],
-                        )
-                        .unwrap(),
+                        *<&[u8; 2]>::try_from(&packet[tcp_opt_mss_offset..tcp_opt_mss_offset + 2])
+                            .unwrap(),
                     );
                 }
                 TcpOptionNumbers::WSCALE => {
                     if offset + TCP_OPT_WIN_SCALE_LEN > payload_offset {
                         return;
                     }
-                    self.tcp_opt_win_scale_offset = offset + 2;
+                    let tcp_opt_win_scale_offset = offset + 2;
                     self.tcp_options_flag |= TCP_OPT_FLAG_WIN_SCALE;
                     offset += TCP_OPT_WIN_SCALE_LEN;
-                    self.tcp_data.win_scale = packet[self.tcp_opt_win_scale_offset];
+                    self.tcp_data.win_scale = packet[tcp_opt_win_scale_offset];
                 }
                 TcpOptionNumbers::SACK_PERMITTED => {
                     self.tcp_options_flag |= TCP_OPT_FLAG_SACK_PERMIT;
@@ -254,12 +236,12 @@ impl<'a> MetaPacket<'a> {
                     if sack_size > 32 {
                         return;
                     }
-                    self.tcp_opt_sack_offset = offset + 2;
+                    let tcp_opt_sack_offset = offset + 2;
                     self.tcp_options_flag |= sack_size as u8;
                     offset += assume_length;
                     let mut sack = Vec::with_capacity(sack_size);
                     sack.extend_from_slice(
-                        &packet[self.tcp_opt_sack_offset..self.tcp_opt_sack_offset + sack_size],
+                        &packet[tcp_opt_sack_offset..tcp_opt_sack_offset + sack_size],
                     );
                     self.tcp_data.sack.replace(sack);
                 }
@@ -451,12 +433,10 @@ impl<'a> MetaPacket<'a> {
 
         self.header_type = HeaderType::Eth;
         self.vlan_tag_size = vlan_tag_size;
-        if dst_endpoint {
-            // inbound
-            mem::swap(&mut self.offset_mac_0, &mut self.offset_mac_1);
-        }
         let mut is_ipv6 = false;
         let ip_protocol;
+        let mut offset_port_0 = FIELD_OFFSET_SPORT;
+        let mut offset_port_1 = FIELD_OFFSET_DPORT;
         match eth_type {
             EthernetType::Arp => {
                 size_checker -= HeaderType::Arp.min_header_size() as isize;
@@ -474,42 +454,28 @@ impl<'a> MetaPacket<'a> {
                 );
                 self.nd_reply_or_arp_request =
                     read_u16_be(&packet[self.vlan_tag_size + ARP_OP_OFFSET..]) == arp::OP_REQUEST;
-                if dst_endpoint {
-                    self.offset_ip_1 = spa_offset;
-                    self.offset_ip_0 = tpa_offset;
-                } else {
-                    self.offset_ip_0 = spa_offset;
-                    self.offset_ip_1 = tpa_offset;
-                }
                 return Ok(());
             }
             EthernetType::Ipv6 => {
                 is_ipv6 = true;
+                offset_port_0 = FIELD_OFFSET_IPV6_SPORT;
+                offset_port_1 = FIELD_OFFSET_IPV6_DPORT;
                 size_checker -= (HeaderType::Ipv6.min_header_size() + IPV6_HEADER_ADJUST) as isize;
                 if size_checker < 0 {
                     return Ok(());
                 }
                 self.header_type = HeaderType::Ipv6;
-                self.offset_ip_0 = FIELD_OFFSET_IPV6_SRC + vlan_tag_size;
-                self.offset_ip_1 = FIELD_OFFSET_IPV6_DST + vlan_tag_size;
-                self.offset_port_0 = FIELD_OFFSET_IPV6_SPORT + vlan_tag_size;
-                self.offset_port_1 = FIELD_OFFSET_IPV6_DPORT + vlan_tag_size;
+                let offset_ip_0 = FIELD_OFFSET_IPV6_SRC + vlan_tag_size;
+                let offset_ip_1 = FIELD_OFFSET_IPV6_DST + vlan_tag_size;
                 self.lookup_key.src_ip = IpAddr::from(
-                    *<&[u8; 16]>::try_from(
-                        &packet[self.offset_ip_0..self.offset_ip_0 + IPV6_ADDR_LEN],
-                    )
-                    .unwrap(),
+                    *<&[u8; 16]>::try_from(&packet[offset_ip_0..offset_ip_0 + IPV6_ADDR_LEN])
+                        .unwrap(),
                 );
                 self.lookup_key.dst_ip = IpAddr::from(
-                    *<&[u8; 16]>::try_from(
-                        &packet[self.offset_ip_1..self.offset_ip_1 + IPV6_ADDR_LEN],
-                    )
-                    .unwrap(),
+                    *<&[u8; 16]>::try_from(&packet[offset_ip_1..offset_ip_1 + IPV6_ADDR_LEN])
+                        .unwrap(),
                 );
                 self.ttl = packet[IPV6_HOP_LIMIT_OFFSET + vlan_tag_size];
-                if dst_endpoint {
-                    mem::swap(&mut self.offset_ip_0, &mut self.offset_ip_1);
-                }
                 self.l2_l3_opt_size = vlan_tag_size;
                 let mut payload = read_u16_be(&packet[FIELD_OFFSET_PAYLOAD_LEN + vlan_tag_size..]);
                 // e1000网卡驱动，在开启TSO功能时，IPv6的payload可能为0
@@ -517,8 +483,6 @@ impl<'a> MetaPacket<'a> {
                 if payload == 0 {
                     payload = size_checker as u16;
                 }
-                let label = read_u32_be(&packet[FIELD_OFFSET_PAYLOAD_LEN + vlan_tag_size..]);
-                self.data_offset_ihl_or_fl4b |= ((label >> 16) & 0xf) as u8;
                 let r = self.update_ip6_opt(vlan_tag_size);
                 ip_protocol = IpProtocol::from(r.0);
                 let options_length = r.1;
@@ -543,26 +507,17 @@ impl<'a> MetaPacket<'a> {
                 }
                 self.header_type = HeaderType::Ipv4;
                 let ihl = packet[FIELD_OFFSET_IHL + vlan_tag_size] & 0xF;
-                self.data_offset_ihl_or_fl4b = ihl;
-
-                self.offset_ip_0 += vlan_tag_size;
-                self.offset_ip_1 += vlan_tag_size;
+                let offset_ip_0 = FIELD_OFFSET_SIP + vlan_tag_size;
+                let offset_ip_1 = FIELD_OFFSET_DIP + vlan_tag_size;
                 self.lookup_key.src_ip = IpAddr::from(
-                    *<&[u8; 4]>::try_from(
-                        &packet[self.offset_ip_0..self.offset_ip_0 + IPV4_ADDR_LEN],
-                    )
-                    .unwrap(),
+                    *<&[u8; 4]>::try_from(&packet[offset_ip_0..offset_ip_0 + IPV4_ADDR_LEN])
+                        .unwrap(),
                 );
                 self.lookup_key.dst_ip = IpAddr::from(
-                    *<&[u8; 4]>::try_from(
-                        &packet[self.offset_ip_1..self.offset_ip_1 + IPV4_ADDR_LEN],
-                    )
-                    .unwrap(),
+                    *<&[u8; 4]>::try_from(&packet[offset_ip_1..offset_ip_1 + IPV4_ADDR_LEN])
+                        .unwrap(),
                 );
                 self.ttl = packet[IPV4_TTL_OFFSET + vlan_tag_size];
-                if dst_endpoint {
-                    mem::swap(&mut self.offset_ip_0, &mut self.offset_ip_1);
-                }
 
                 let mut total_length =
                     read_u16_be(&packet[FIELD_OFFSET_TOTAL_LEN + vlan_tag_size..]) as usize;
@@ -706,8 +661,6 @@ impl<'a> MetaPacket<'a> {
                 }
 
                 let data_offset = packet[data_off + self.l2_l3_opt_size] >> 4;
-
-                self.data_offset_ihl_or_fl4b |= data_offset << 4;
                 let mut l4_opt_size = data_offset as isize * 4 - 20;
                 if l4_opt_size < 0 {
                     // dataOffset可能为一个错误的值
@@ -756,14 +709,8 @@ impl<'a> MetaPacket<'a> {
         }
         let packet = self.raw.as_ref().unwrap();
         if self.header_type >= HeaderType::Ipv4 {
-            self.offset_port_0 += self.l2_l3_opt_size;
-            self.offset_port_1 += self.l2_l3_opt_size;
-            self.lookup_key.src_port = read_u16_be(&packet[self.offset_port_0..]);
-            self.lookup_key.dst_port = read_u16_be(&packet[self.offset_port_1..]);
-            if dst_endpoint {
-                // inbound
-                mem::swap(&mut self.offset_port_0, &mut self.offset_port_1);
-            }
+            self.lookup_key.src_port = read_u16_be(&packet[offset_port_0 + self.l2_l3_opt_size..]);
+            self.lookup_key.dst_port = read_u16_be(&packet[offset_port_1 + self.l2_l3_opt_size..]);
         }
         const PACKET_MAX_PADDING: usize = 16;
         if self.packet_len + PACKET_MAX_PADDING < original_length {
