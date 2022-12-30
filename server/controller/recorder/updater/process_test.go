@@ -53,7 +53,7 @@ func (t *SuiteTest) TestHandleUpdateProcessSuccess() {
 
 	wantName := "process-updated"
 	wantOSAPPTags := "app:skywalking"
-	cloudItem.Name, cloudItem.OsAppTags = wantName, wantOSAPPTags
+	cloudItem.Name, cloudItem.OSAPPTags = wantName, wantOSAPPTags
 	updater.cloudData = []cloudmodel.Process{cloudItem}
 	updater.HandleAddAndUpdate()
 
@@ -61,7 +61,7 @@ func (t *SuiteTest) TestHandleUpdateProcessSuccess() {
 	dbResult := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&result)
 	assert.Equal(t.T(), dbResult.RowsAffected, int64(1))
 	assert.Equal(t.T(), wantName, result.Name)
-	assert.Equal(t.T(), wantOSAPPTags, result.OsAppTags)
+	assert.Equal(t.T(), wantOSAPPTags, result.OSAPPTags)
 }
 
 func (t *SuiteTest) TestHandleDeleteProcessSuccess() {
