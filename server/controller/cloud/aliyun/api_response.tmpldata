@@ -22,5 +22,6 @@
     {"type": "LBTargetServer", "service": "slb", "func": "DescribeHealthStatus", "request_type": "DescribeHealthStatusRequest", "result_key": "BackendServers", "call_num": "once"},
     {"type": "LBListener", "service": "slb", "func": "DescribeLoadBalancerAttribute", "request_type": "DescribeLoadBalancerAttributeRequest", "result_key": "ListenerPortsAndProtocal", "call_num": "once"},
     {"type": "Cen", "service": "cbn", "func": "DescribeCens", "request_type": "DescribeCensRequest", "result_key": "Cens", "call_num": "multi"},
-    {"type": "CenAttribute", "service": "cbn", "func": "DescribeCenAttachedChildInstances", "request_type": "DescribeCenAttachedChildInstancesRequest", "result_key": "ChildInstances", "call_num": "multi"}
+    {"type": "CenAttribute", "service": "cbn", "func": "DescribeCenAttachedChildInstances", "request_type": "DescribeCenAttachedChildInstancesRequest", "result_key": "ChildInstances", "call_num": "multi"},
+    {"type": "SubDomain", "service": "cs", "func": "DescribeClustersV1", "request_type": "DescribeClustersV1Request", "result_key": "clusters", "call_num": "multi"}
 ]
