@@ -46,6 +46,7 @@ func (b *BaiduBce) getRDSInstances(
 	log.Debug("get rds_instances starting")
 
 	rdsClient, _ := rds.NewClient(b.secretID, b.secretKey, "rds."+b.endpoint)
+	rdsClient.Config.ConnectionTimeoutInMillis = b.httpTimeout * 1000
 	marker := ""
 	args := &rds.ListRdsArgs{}
 	results := make([]*rds.ListRdsResult, 0)

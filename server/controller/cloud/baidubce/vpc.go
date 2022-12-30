@@ -31,6 +31,7 @@ func (b *BaiduBce) getVPCs(region model.Region) ([]model.VPC, map[string]string,
 	log.Debug("get vpcs starting")
 
 	vpcClient, _ := vpc.NewClient(b.secretID, b.secretKey, "bcc."+b.endpoint)
+	vpcClient.Config.ConnectionTimeoutInMillis = b.httpTimeout * 1000
 	marker := ""
 	args := &vpc.ListVPCArgs{}
 	results := make([]*vpc.ListVPCResult, 0)

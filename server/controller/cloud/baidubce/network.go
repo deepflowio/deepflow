@@ -33,6 +33,7 @@ func (b *BaiduBce) getNetworks(
 	log.Debug("get networks starting")
 
 	vpcClient, _ := vpc.NewClient(b.secretID, b.secretKey, "bcc."+b.endpoint)
+	vpcClient.Config.ConnectionTimeoutInMillis = b.httpTimeout * 1000
 	marker := ""
 	args := &vpc.ListSubnetArgs{}
 	results := make([]*vpc.ListSubnetResult, 0)
