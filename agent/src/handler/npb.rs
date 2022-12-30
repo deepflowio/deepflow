@@ -171,7 +171,7 @@ impl NpbBuilder {
         self.npb_packet_sender = None;
 
         let (sender, receiver, _) =
-            bounded_with_debug(4096, "2-packet-to-npb-sender", queue_debugger);
+            bounded_with_debug(4096, "1-packet-to-npb-sender", queue_debugger);
         let npb_packet_sender = Arc::new(NpbPacketSender::new(
             self.id,
             receiver,
@@ -205,7 +205,7 @@ impl NpbBuilder {
         stats_collector: Arc<stats::Collector>,
     ) -> Box<Self> {
         let (sender, receiver, _) =
-            bounded_with_debug(4096, "2-packet-to-npb-sender", queue_debugger);
+            bounded_with_debug(4096, "1-packet-to-npb-sender", queue_debugger);
 
         let builder = Box::new(Self {
             id,
