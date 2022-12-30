@@ -1041,7 +1041,7 @@ impl Components {
             yaml_config.analyzer_ip, candidate_config.sender.dest_ip
         );
         let sender_id = get_sender_id() as usize;
-        let l4_flow_aggr_queue_name = "3-flow-to-collector-sender";
+        let l4_flow_aggr_queue_name = "3-flowlog-to-collector-sender";
         let (l4_flow_aggr_sender, l4_flow_aggr_receiver, counter) = queue::bounded_with_debug(
             yaml_config.flow_sender_queue_size as usize,
             l4_flow_aggr_queue_name,
@@ -1066,7 +1066,7 @@ impl Components {
         );
 
         let sender_id = get_sender_id() as usize;
-        let metrics_queue_name = "2-doc-to-collector-sender";
+        let metrics_queue_name = "3-doc-to-collector-sender";
         let (metrics_sender, metrics_receiver, counter) = queue::bounded_with_debug(
             yaml_config.collector_sender_queue_size,
             metrics_queue_name,
@@ -1091,7 +1091,7 @@ impl Components {
         );
 
         let sender_id = get_sender_id() as usize;
-        let proto_log_queue_name = "3-protolog-to-collector-sender";
+        let proto_log_queue_name = "2-protolog-to-collector-sender";
         let (proto_log_sender, proto_log_receiver, counter) = queue::bounded_with_debug(
             yaml_config.flow_sender_queue_size,
             proto_log_queue_name,
@@ -1147,7 +1147,7 @@ impl Components {
 
         // Enterprise Edition Feature: packet-sequence
         let sender_id = get_sender_id() as usize; // TODO sender_id should be generated automatically
-        let packet_sequence_queue_name = "packet_sequence_block-to-sender";
+        let packet_sequence_queue_name = "2-packet-sequence-block-to-sender";
         let (packet_sequence_uniform_output, packet_sequence_uniform_input, counter) =
             queue::bounded_with_debug(
                 yaml_config.packet_sequence_queue_size,
@@ -1282,17 +1282,14 @@ impl Components {
             let (packet_sequence_sender, packet_sequence_receiver, counter) =
                 queue::bounded_with_debug(
                     yaml_config.packet_sequence_queue_size,
-                    "1-packet-sequence-block-to-uniform-collect-sender",
+                    "1-packet-sequence-block-to-parser",
                     &queue_debugger,
                 );
             stats_collector.register_countable(
                 "queue",
                 Countable::Owned(Box::new(counter)),
                 vec![
-                    StatsOption::Tag(
-                        "module",
-                        "1-packet-sequence-block-to-uniform-collect-sender".to_string(),
-                    ),
+                    StatsOption::Tag("module", "1-packet-sequence-block-to-parser".to_string()),
                     StatsOption::Tag("index", i.to_string()),
                 ],
             );
@@ -1537,7 +1534,7 @@ impl Components {
         }
 
         let sender_id = get_sender_id() as usize;
-        let otel_queue_name = "otel-to-sender";
+        let otel_queue_name = "1-otel-to-sender";
         let (otel_sender, otel_receiver, counter) = queue::bounded_with_debug(
             yaml_config.external_metrics_sender_queue_size,
             otel_queue_name,
@@ -1562,7 +1559,7 @@ impl Components {
         );
 
         let sender_id = get_sender_id() as usize;
-        let prometheus_queue_name = "prometheus-to-sender";
+        let prometheus_queue_name = "1-prometheus-to-sender";
         let (prometheus_sender, prometheus_receiver, counter) = queue::bounded_with_debug(
             yaml_config.external_metrics_sender_queue_size,
             prometheus_queue_name,
@@ -1587,7 +1584,7 @@ impl Components {
         );
 
         let sender_id = get_sender_id() as usize;
-        let telegraf_queue_name = "telegraf-to-sender";
+        let telegraf_queue_name = "1-telegraf-to-sender";
         let (telegraf_sender, telegraf_receiver, counter) = queue::bounded_with_debug(
             yaml_config.external_metrics_sender_queue_size,
             telegraf_queue_name,
@@ -1612,7 +1609,7 @@ impl Components {
         );
 
         let sender_id = get_sender_id() as usize;
-        let compressed_otel_queue_name = "compressed-otel-to-sender";
+        let compressed_otel_queue_name = "1-compressed-otel-to-sender";
         let (compressed_otel_sender, compressed_otel_receiver, counter) = queue::bounded_with_debug(
             yaml_config.external_metrics_sender_queue_size,
             compressed_otel_queue_name,
@@ -1931,7 +1928,7 @@ fn build_pcap_assembler(
     ntp_diff: Arc<AtomicI64>,
     id: usize,
 ) -> (PcapAssembler, DebugSender<MiniPacket>) {
-    let mini_packet_queue = "1-mini-meta-packet-to-pcap";
+    let mini_packet_queue = "1-mini-meta-packet-to-pcap-handler";
     let (mini_packet_sender, mini_packet_receiver, mini_packet_counter) = queue::bounded_with_debug(
         config.queue_size as usize,
         mini_packet_queue,
