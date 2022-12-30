@@ -460,7 +460,7 @@ impl EbpfCollector {
         }
         info!("ebpf collector init...");
         let (sender, receiver, _) =
-            bounded_with_debug(4096, "1-ebpf-packet-to-ebpf-collector", queue_debugger);
+            bounded_with_debug(4096, "0-ebpf-packet-to-ebpf-dispatcher", queue_debugger);
 
         Self::ebpf_init(&ebpf_config, sender, ebpf_config.l7_protocol_enabled_bitmap)?;
         Self::ebpf_on_config_change(ebpf::CAP_LEN_MAX);

@@ -130,13 +130,14 @@ impl QueueDebugger {
     }
 
     pub fn queue_names(&self) -> Vec<QueueMessage> {
-        let names = self
+        let mut names = self
             .queues
             .lock()
             .unwrap()
             .iter()
             .map(|(&c, ctx)| (String::from(c), ctx.enabled.load(Ordering::Relaxed)))
             .collect::<Vec<_>>();
+        names.sort();
         vec![QueueMessage::Names(Some(names)), QueueMessage::Fin]
     }
 
