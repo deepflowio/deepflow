@@ -882,7 +882,7 @@ impl<'a> MetaPacket<'a> {
         );
         packet.socket_id = data.socket_id;
         packet.tcp_data.seq = data.tcp_seq as u32;
-        packet.ebpf_type = EbpfType::from(data.source);
+        packet.ebpf_type = EbpfType::try_from(data.source)?;
         packet.l7_protocol_from_ebpf = L7Protocol::from(data.l7_protocol_hint as u8);
 
         // 目前只有 go uprobe http2 的方向判断能确保准确

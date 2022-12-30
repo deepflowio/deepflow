@@ -41,18 +41,20 @@ pub enum EbpfType {
     None = EBPF_TYPE_NONE, // 非 ebpf 类型.
 }
 
-impl EbpfType {
-    pub fn from(v: u8) -> Self {
-        match v {
-            GO_TLS_UPROBE | OPENSSL_UPROBE => Self::TlsUprobe,
-            GO_HTTP2_UPROBE => Self::GoHttp2Uprobe,
-            _ => {
-                // 默认当作tracepoint
-                Self::TracePoint
-            }
+impl TryFrom<u8> for EbpfType {
+    type Error = String;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            GO_TLS_UPROBE | OPENSSL_UPROBE => Ok(Self::TlsUprobe),
+            GO_HTTP2_UPROBE => Ok(Self::GoHttp2Uprobe),
+            SYSCALL => Ok(Self::TracePoint),
+            _ => Err(format!("unknown ebpf type: {}", value)),
         }
     }
+}
 
+impl EbpfType {
     // 是否原始协议数据，目前除了GoHttp2Uprobe是自定一数据格式，其他都是原始协议数据。
     // 这个主要用于 ebpf 协议遍历解析的时候快速过滤一些协议，例如GoHttp2Uprobe，除了http以外其他协议都会跳过。
     // ==========================================================================================
