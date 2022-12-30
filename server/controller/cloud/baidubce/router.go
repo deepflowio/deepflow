@@ -33,6 +33,7 @@ func (b *BaiduBce) getRouterAndTables(
 
 	// 每个VPC下一个路由表，抽象为路由器
 	vpcClient, _ := vpc.NewClient(b.secretID, b.secretKey, "bcc."+b.endpoint)
+	vpcClient.Config.ConnectionTimeoutInMillis = b.httpTimeout * 1000
 	for vpcId, vpcLcuuid := range vpcIdToLcuuid {
 		result, err := vpcClient.GetRouteTableDetail("", vpcId)
 		if err != nil {
