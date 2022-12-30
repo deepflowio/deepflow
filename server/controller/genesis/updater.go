@@ -19,10 +19,11 @@ package genesis
 import (
 	"context"
 	"fmt"
-	"inet.af/netaddr"
 	"strconv"
 	"strings"
 	"time"
+
+	"inet.af/netaddr"
 
 	tridentcommon "github.com/deepflowys/deepflow/message/common"
 	"github.com/deepflowys/deepflow/server/controller/common"

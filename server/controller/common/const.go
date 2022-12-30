@@ -165,6 +165,18 @@ const (
 	VTAP_LICENSE_FUNCTION_MAX
 )
 
+var VTAP_TYPE_TO_DEVICE_TYPE = map[int]int{
+	VTAP_TYPE_KVM:                  VIF_DEVICE_TYPE_HOST,
+	VTAP_TYPE_ESXI:                 VIF_DEVICE_TYPE_HOST,
+	VTAP_TYPE_WORKLOAD_V:           VIF_DEVICE_TYPE_VM,
+	VTAP_TYPE_WORKLOAD_P:           VIF_DEVICE_TYPE_VM,
+	VTAP_TYPE_DEDICATED:            0,
+	VTAP_TYPE_POD_HOST:             VIF_DEVICE_TYPE_POD_NODE,
+	VTAP_TYPE_POD_VM:               VIF_DEVICE_TYPE_POD_NODE,
+	VTAP_TYPE_TUNNEL_DECAPSULATION: 0,
+	VTAP_TYPE_HYPER_V:              VIF_DEVICE_TYPE_HOST,
+}
+
 const (
 	DEFAULT_DOMAIN        = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 	DEFAULT_REGION        = "ffffffff-ffff-ffff-ffff-ffffffffffff"

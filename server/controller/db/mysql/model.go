@@ -76,7 +76,7 @@ type Process struct {
 	CommandLine    string    `gorm:"column:cmdline;type:text" json:"COMMAND_LINE"`
 	UserName       string    `gorm:"column:user_name;type:varchar(256);default:''" json:"USER_NAME"`
 	StartTime      time.Time `gorm:"autoCreateTime;column:start_time;type:datetime" json:"START_TIME"`
-	OsAppTags      string    `gorm:"column:os_app_tags;type:text" json:"OS_APP_TAGS"`
+	OSAPPTags      string    `gorm:"column:os_app_tags;type:text" json:"OS_APP_TAGS"`
 	SubDomain      string    `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
 	Domain         string    `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN"`
 }

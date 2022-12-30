@@ -363,7 +363,7 @@ func (c *Cloud) appendResourceProcess() {
 			CommandLine: sProcess.CMDLine,
 			UserName:    sProcess.User,
 			StartTime:   sProcess.StartTime,
-			OsAppTags:   sProcess.OSAPPTags,
+			OSAPPTags:   sProcess.OSAPPTags,
 		}
 		if lcuuid == "" {
 			c.resource.Processes = append(c.resource.Processes, process)

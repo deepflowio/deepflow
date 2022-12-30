@@ -170,6 +170,7 @@ func Start(ctx context.Context, configPath string, shared *servercommon.Controll
 	router.VPCRouter(r)
 	trouter.RegistRouter(r)
 	configuration.ConfigurationRouter(r)
+	router.ProcessRouter(r)
 
 	grpcStart(ctx, cfg)
 
