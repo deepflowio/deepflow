@@ -49,8 +49,9 @@ func (a *Aliyun) getVPCs(region model.Region) ([]model.VPC, error) {
 				}
 			}
 
+			vpcLcuuid := common.GenerateUUID(vpcId)
 			retVPC := model.VPC{
-				Lcuuid:       common.GenerateUUID(vpcId),
+				Lcuuid:       vpcLcuuid,
 				Name:         vpcName,
 				Label:        vpcId,
 				CIDR:         cidr,
@@ -58,6 +59,7 @@ func (a *Aliyun) getVPCs(region model.Region) ([]model.VPC, error) {
 			}
 			retVPCs = append(retVPCs, retVPC)
 			a.regionLcuuidToResourceNum[retVPC.RegionLcuuid]++
+			a.vpcIDToLcuuids[vpcId] = vpcLcuuid
 		}
 	}
 	log.Debug("get vpcs complete")

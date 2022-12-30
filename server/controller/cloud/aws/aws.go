@@ -52,6 +52,7 @@ type Aws struct {
 	azLcuuidMap          map[string]int
 	vpcOrSubnetToRouter  map[string]string
 	vmIDToPrivateIP      map[string]string
+	vpcIDToLcuuid        map[string]string
 	publicIPToVinterface map[string]model.VInterface
 	credential           awsconfig.LoadOptionsFunc
 	ec2Client            *ec2.Client
@@ -124,6 +125,7 @@ func NewAws(domain mysql.Domain, cfg cloudconfig.CloudConfig) (*Aws, error) {
 		azLcuuidMap:          map[string]int{},
 		vpcOrSubnetToRouter:  map[string]string{},
 		vmIDToPrivateIP:      map[string]string{},
+		vpcIDToLcuuid:        map[string]string{},
 		publicIPToVinterface: map[string]model.VInterface{},
 	}, nil
 }
@@ -205,6 +207,7 @@ func (a *Aws) GetCloudData() (model.Resource, error) {
 
 		regionFlag := false
 		a.azLcuuidMap = map[string]int{}
+		a.vpcIDToLcuuid = map[string]string{}
 
 		vpcs, err := a.getVPCs(region)
 		if err != nil {
@@ -305,6 +308,16 @@ func (a *Aws) GetCloudData() (model.Resource, error) {
 		if len(fIPs) > 0 {
 			regionFlag = true
 			resource.FloatingIPs = append(resource.FloatingIPs, fIPs...)
+		}
+
+		// 附属容器集群
+		sDomains, err := a.getSubDomains(region)
+		if err != nil {
+			return resource, err
+		}
+		if len(sDomains) > 0 {
+			regionFlag = true
+			resource.SubDomains = append(resource.SubDomains, sDomains...)
 		}
 
 		if regionFlag && a.regionUUID == "" {
