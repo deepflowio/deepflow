@@ -105,7 +105,7 @@ func Start(ctx context.Context, configPath string, shared *servercommon.Controll
 	if isMasterController {
 		err := recorderdb.IDMNG.Start()
 		if err != nil {
-			log.Error("resource id mananger start failed")
+			log.Errorf("resource id mananger start failed: %s", err.Error())
 			time.Sleep(time.Second)
 			os.Exit(0)
 		}
@@ -115,9 +115,9 @@ func Start(ctx context.Context, configPath string, shared *servercommon.Controll
 	if cfg.RedisCfg.Enabled && cfg.TrisolarisCfg.NodeType == "master" {
 		router.SetInitStageForHealthChecker("Redis init")
 
-		err := redis.InitRedis(cfg.RedisCfg)
+		err := redis.InitRedis(cfg.RedisCfg, ctx)
 		if err != nil {
-			log.Error("connect redis failed")
+			log.Errorf("connect redis failed: %s", err.Error())
 			time.Sleep(time.Second)
 			os.Exit(0)
 		}
@@ -127,7 +127,7 @@ func Start(ctx context.Context, configPath string, shared *servercommon.Controll
 	// start statsd
 	err = statsd.NewStatsdMonitor(cfg.StatsdCfg)
 	if err != nil {
-		log.Error("cloud statsd connect telegraf failed")
+		log.Errorf("cloud statsd connect telegraf failed: %s", err.Error())
 		time.Sleep(time.Second)
 		os.Exit(0)
 	}
