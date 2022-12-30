@@ -808,6 +808,9 @@ impl HttpLog {
                 break;
             }
 
+            if httpv2_header.stream_id > 0 {
+                self.info.stream_id = Some(httpv2_header.stream_id);
+            }
             if httpv2_header.frame_length >= frame_payload.len() as u32 {
                 break;
             }
@@ -840,7 +843,9 @@ impl HttpLog {
                 self.info.resp_content_length = content_length;
             }
             self.info.version = String::from("2");
-            self.info.stream_id = Some(httpv2_header.stream_id);
+            if self.info.stream_id.is_none() {
+                self.info.stream_id = Some(httpv2_header.stream_id);
+            }
             return Ok(());
         }
         Err(Error::HttpHeaderParseFailed)
@@ -1271,6 +1276,7 @@ mod tests {
             ("httpv1.pcap", "httpv1.result"),
             ("sw8.pcap", "sw8.result"),
             ("h2c_ascii.pcap", "h2c_ascii.result"),
+            ("httpv2-stream-id.pcap", "httpv2-stream-id.result"),
         ];
         for item in files.iter() {
             let expected = fs::read_to_string(&Path::new(FILE_DIR).join(item.1)).unwrap();
