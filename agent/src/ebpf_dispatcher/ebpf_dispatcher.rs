@@ -25,6 +25,7 @@ use libc::c_int;
 use log::{debug, error, info, warn};
 
 use super::{Error, Result};
+use crate::common::ebpf::EbpfType;
 use crate::common::l7_protocol_log::{
     get_all_protocol, L7ProtocolBitmap, L7ProtocolParserInterface,
 };
@@ -268,7 +269,12 @@ impl EbpfCollector {
                 warn!("meta packet parse from ebpf error: {}", packet.unwrap_err());
                 return;
             }
-            if let Err(e) = SENDER.as_mut().unwrap().send(Box::new(packet.unwrap())) {
+            let packet = packet.unwrap();
+            if packet.ebpf_type == EbpfType::IOEvent {
+                // FIXME: Remove this code when the feature is stable
+                return;
+            }
+            if let Err(e) = SENDER.as_mut().unwrap().send(Box::new(packet)) {
                 warn!("meta packet send ebpf error: {:?}", e);
             }
         }
@@ -460,7 +466,7 @@ impl EbpfCollector {
         }
         info!("ebpf collector init...");
         let (sender, receiver, _) =
-            bounded_with_debug(4096, "1-ebpf-packet-to-ebpf-collector", queue_debugger);
+            bounded_with_debug(4096, "0-ebpf-packet-to-ebpf-dispatcher", queue_debugger);
 
         Self::ebpf_init(&ebpf_config, sender, ebpf_config.l7_protocol_enabled_bitmap)?;
         Self::ebpf_on_config_change(ebpf::CAP_LEN_MAX);
