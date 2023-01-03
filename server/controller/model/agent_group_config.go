@@ -79,6 +79,7 @@ type StaticConfig struct {
 	FeatureFlags                     []string              `yaml:"feature-flags,omitempty"`
 	L7ProtocolPorts                  map[string]string     `yaml:"l7-protocol-ports,omitempty"`
 	Ebpf                             *EbpfConfig           `yaml:"ebpf,omitempty"`
+	GuardInterval                    *string               `yaml:"guard-interval,omitempty"`
 }
 
 type XflowCollectorConfig struct {
