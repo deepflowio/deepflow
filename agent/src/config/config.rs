@@ -362,6 +362,8 @@ pub struct YamlConfig {
     pub os_proc_regex: Vec<OsProcRegexp>,
     pub os_app_tag_exec_user: String,
     pub os_app_tag_exec: Vec<String>,
+    #[serde(with = "humantime_serde")]
+    pub guard_interval: Duration,
 }
 
 impl YamlConfig {
@@ -502,6 +504,10 @@ impl YamlConfig {
         if c.ebpf.max_trace_entries < 100000 || c.ebpf.max_trace_entries > 2000000 {
             c.ebpf.max_trace_entries = 524288;
         }
+        if c.guard_interval < Duration::from_secs(1) || c.guard_interval > Duration::from_secs(3600)
+        {
+            c.guard_interval = Duration::from_secs(60);
+        }
 
         if let Err(e) = c.validate() {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string()));
@@ -618,6 +624,7 @@ impl Default for YamlConfig {
             }],
             os_app_tag_exec_user: "deepflow".to_string(),
             os_app_tag_exec: vec![],
+            guard_interval: Duration::from_secs(60),
         }
     }
 }

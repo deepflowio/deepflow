@@ -401,6 +401,7 @@ impl Trident {
         let guard = Guard::new(
             config_handler.environment(),
             log_dir.to_string(),
+            config_handler.candidate_config.yaml_config.guard_interval,
             exception_handler.clone(),
         );
         guard.start();
