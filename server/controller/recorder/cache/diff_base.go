@@ -362,7 +362,8 @@ func (b *DiffBaseDataSet) deleteVInterface(lcuuid string) {
 	log.Info(deleteDiffBase(RESOURCE_TYPE_VINTERFACE_EN, lcuuid))
 }
 
-func (b *DiffBaseDataSet) addWANIP(dbItem *mysql.WANIP, seq int) {
+func (b *DiffBaseDataSet) addWANIP(dbItem *mysql.WANIP, seq int, toolDataSet *ToolDataSet) {
+	subnetLcuuid, _ := toolDataSet.GetSubnetLcuuidByID(dbItem.SubnetID)
 	b.WANIPs[dbItem.Lcuuid] = &WANIP{
 		DiffBase: DiffBase{
 			Sequence: seq,
@@ -370,6 +371,7 @@ func (b *DiffBaseDataSet) addWANIP(dbItem *mysql.WANIP, seq int) {
 		},
 		RegionLcuuid:    dbItem.Region,
 		SubDomainLcuuid: dbItem.SubDomain,
+		SubnetLcuuid:    subnetLcuuid,
 	}
 	log.Info(addDiffBase(RESOURCE_TYPE_WAN_IP_EN, b.WANIPs[dbItem.Lcuuid]))
 }
@@ -379,13 +381,15 @@ func (b *DiffBaseDataSet) deleteWANIP(lcuuid string) {
 	log.Info(deleteDiffBase(RESOURCE_TYPE_WAN_IP_EN, lcuuid))
 }
 
-func (b *DiffBaseDataSet) addLANIP(dbItem *mysql.LANIP, seq int) {
+func (b *DiffBaseDataSet) addLANIP(dbItem *mysql.LANIP, seq int, toolDataSet *ToolDataSet) {
+	subnetLcuuid, _ := toolDataSet.GetSubnetLcuuidByID(dbItem.SubnetID)
 	b.LANIPs[dbItem.Lcuuid] = &LANIP{
 		DiffBase: DiffBase{
 			Sequence: seq,
 			Lcuuid:   dbItem.Lcuuid,
 		},
 		SubDomainLcuuid: dbItem.SubDomain,
+		SubnetLcuuid:    subnetLcuuid,
 	}
 	log.Info(addDiffBase(RESOURCE_TYPE_LAN_IP_EN, b.LANIPs[dbItem.Lcuuid]))
 }
@@ -1170,21 +1174,25 @@ type WANIP struct {
 	DiffBase
 	RegionLcuuid    string `json:"region_lcuuid"`
 	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
+	SubnetLcuuid    string `json:"subnet_lcuuid"`
 }
 
 func (w *WANIP) Update(cloudItem *cloudmodel.IP) {
 	w.RegionLcuuid = cloudItem.RegionLcuuid
 	w.SubDomainLcuuid = cloudItem.SubDomainLcuuid
+	w.SubnetLcuuid = cloudItem.SubnetLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_WAN_IP_EN, w))
 }
 
 type LANIP struct {
 	DiffBase
 	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
+	SubnetLcuuid    string `json:"subnet_lcuuid"`
 }
 
 func (l *LANIP) Update(cloudItem *cloudmodel.IP) {
 	l.SubDomainLcuuid = cloudItem.SubDomainLcuuid
+	l.SubnetLcuuid = cloudItem.SubnetLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_LAN_IP_EN, l))
 }
 
