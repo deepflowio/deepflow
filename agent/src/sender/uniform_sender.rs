@@ -228,7 +228,12 @@ impl<T: Sendable> UniformSenderThread<T> {
             self.exception_handler.clone(),
             self.cached,
         );
-        self.thread_handle = Some(thread::spawn(move || uniform_sender.process()));
+        self.thread_handle = Some(
+            thread::Builder::new()
+                .name("uniform-sender".to_owned())
+                .spawn(move || uniform_sender.process())
+                .unwrap(),
+        );
         info!("{} uniform sender id: {} started", self.name, self.id);
     }
 

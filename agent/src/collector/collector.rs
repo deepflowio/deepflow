@@ -950,25 +950,28 @@ impl Collector {
         let sender = self.sender.clone();
         let ctx = self.context.clone();
 
-        let thread = thread::spawn(move || {
-            let mut stash = Stash::new(ctx, sender, counter);
-            while running.load(Ordering::Relaxed) {
-                match receiver.recv_n(QUEUE_BATCH_SIZE, Some(RCV_TIMEOUT)) {
-                    Ok(acc_flows) => {
-                        for flow in acc_flows {
-                            let time_in_second = flow.tagged_flow.flow.flow_stat_time.as_secs();
-                            stash.collect(Some(*flow), time_in_second);
+        let thread = thread::Builder::new()
+            .name("collector".to_owned())
+            .spawn(move || {
+                let mut stash = Stash::new(ctx, sender, counter);
+                while running.load(Ordering::Relaxed) {
+                    match receiver.recv_n(QUEUE_BATCH_SIZE, Some(RCV_TIMEOUT)) {
+                        Ok(acc_flows) => {
+                            for flow in acc_flows {
+                                let time_in_second = flow.tagged_flow.flow.flow_stat_time.as_secs();
+                                stash.collect(Some(*flow), time_in_second);
+                            }
                         }
+                        Err(Error::Timeout) => stash.collect(
+                            None,
+                            get_timestamp(stash.context.ntp_diff.load(Ordering::Relaxed)).as_secs(),
+                        ),
+                        Err(Error::Terminated(..)) => break,
                     }
-                    Err(Error::Timeout) => stash.collect(
-                        None,
-                        get_timestamp(stash.context.ntp_diff.load(Ordering::Relaxed)).as_secs(),
-                    ),
-                    Err(Error::Terminated(..)) => break,
                 }
-            }
-            stash.flush_stats();
-        });
+                stash.flush_stats();
+            })
+            .unwrap();
 
         self.thread.lock().unwrap().replace(thread);
         info!("{} id=({}) started", self.context.name, self.context.id);

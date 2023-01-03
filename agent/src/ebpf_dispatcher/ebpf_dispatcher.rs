@@ -518,9 +518,12 @@ impl EbpfCollector {
 
         let sync_dispatcher = self.get_sync_dispatcher();
         let sync_counter = self.get_sync_counter();
-        self.thread_handle = Some(thread::spawn(move || {
-            sync_dispatcher.dispatcher().run(sync_counter)
-        }));
+        self.thread_handle = Some(
+            thread::Builder::new()
+                .name("ebpf-collector".to_owned())
+                .spawn(move || sync_dispatcher.dispatcher().run(sync_counter))
+                .unwrap(),
+        );
 
         debug!("ebpf collector starting ebpf-kernel.");
         Self::ebpf_start();

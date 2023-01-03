@@ -167,43 +167,49 @@ impl QueueDebugger {
             }
         };
         let queue_name = name.clone();
-        let handle = thread::spawn(move || {
-            let now = Instant::now();
+        let handle = thread::Builder::new()
+            .name("queue-debugger".to_owned())
+            .spawn(move || {
+                let now = Instant::now();
 
-            let mut idle_now = Instant::now();
-            let mut msg_counter = 0;
-            while ctx.enabled.load(Ordering::SeqCst) && now.elapsed() < dur {
-                let s = match ctx.receiver.recv(Some(QUEUE_RECV_TIMEOUT)) {
-                    Ok(s) => s,
-                    Err(Error::Terminated(..)) => {
-                        ctx.already_used.swap(false, Ordering::Relaxed);
-                        ctx.enabled.swap(false, Ordering::Relaxed);
-                        let msg =
-                            QueueMessage::Err(format!("queue {} already terminated", queue_name));
-                        let _ = send_to(&sock, conn, msg, serialize_conf);
-                        return;
-                    }
-                    Err(Error::Timeout) => {
-                        // 一个IDLE超时还没有数据，就发送消息让客户端继续等待
-                        // An IDLE timeout and there is no data, send a message to let the client continue to wait
-                        if idle_now.elapsed() > DEBUG_QUEUE_IDLE_TIMEOUT && msg_counter == 0 {
-                            let _ = send_to(&sock, conn, QueueMessage::Continue, serialize_conf);
-                            idle_now = Instant::now();
+                let mut idle_now = Instant::now();
+                let mut msg_counter = 0;
+                while ctx.enabled.load(Ordering::SeqCst) && now.elapsed() < dur {
+                    let s = match ctx.receiver.recv(Some(QUEUE_RECV_TIMEOUT)) {
+                        Ok(s) => s,
+                        Err(Error::Terminated(..)) => {
+                            ctx.already_used.swap(false, Ordering::Relaxed);
+                            ctx.enabled.swap(false, Ordering::Relaxed);
+                            let msg = QueueMessage::Err(format!(
+                                "queue {} already terminated",
+                                queue_name
+                            ));
+                            let _ = send_to(&sock, conn, msg, serialize_conf);
+                            return;
                         }
-                        msg_counter = 0;
-                        continue;
+                        Err(Error::Timeout) => {
+                            // 一个IDLE超时还没有数据，就发送消息让客户端继续等待
+                            // An IDLE timeout and there is no data, send a message to let the client continue to wait
+                            if idle_now.elapsed() > DEBUG_QUEUE_IDLE_TIMEOUT && msg_counter == 0 {
+                                let _ =
+                                    send_to(&sock, conn, QueueMessage::Continue, serialize_conf);
+                                idle_now = Instant::now();
+                            }
+                            msg_counter = 0;
+                            continue;
+                        }
+                    };
+                    msg_counter += 1;
+                    let msg = QueueMessage::Send(s);
+                    if let Err(e) = send_to(&sock, conn, msg, serialize_conf) {
+                        warn!("send queue item error: {}", e);
                     }
-                };
-                msg_counter += 1;
-                let msg = QueueMessage::Send(s);
-                if let Err(e) = send_to(&sock, conn, msg, serialize_conf) {
-                    warn!("send queue item error: {}", e);
                 }
-            }
-            ctx.already_used.swap(false, Ordering::Relaxed);
-            let msg = QueueMessage::Fin;
-            let _ = send_to(&sock, conn, msg, serialize_conf);
-        });
+                ctx.already_used.swap(false, Ordering::Relaxed);
+                let msg = QueueMessage::Fin;
+                let _ = send_to(&sock, conn, msg, serialize_conf);
+            })
+            .unwrap();
         self.threads.lock().unwrap().insert(name, handle);
     }
 

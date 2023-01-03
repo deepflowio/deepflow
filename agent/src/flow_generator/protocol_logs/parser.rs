@@ -638,35 +638,38 @@ impl AppProtoLogsParser {
         let l7_log_dynamic_is_updated = self.l7_log_dynamic_is_updated.clone();
         let log_rate = self.log_rate.clone();
 
-        let thread = thread::spawn(move || {
-            let mut session_queue =
-                SessionQueue::new(counter, output_queue, config.clone(), log_rate);
-            let mut app_logs = AppLogs::new(&config);
+        let thread = thread::Builder::new()
+            .name("protocol-logs-parser".to_owned())
+            .spawn(move || {
+                let mut session_queue =
+                    SessionQueue::new(counter, output_queue, config.clone(), log_rate);
+                let mut app_logs = AppLogs::new(&config);
 
-            while running.load(Ordering::Relaxed) {
-                match input_queue.recv_n(QUEUE_BATCH_SIZE, Some(RCV_TIMEOUT)) {
-                    Ok(app_protos) => {
-                        Self::update_l7_log_dynamic_config(
-                            l7_log_dynamic_is_updated.clone(),
-                            &config,
-                            &mut app_logs,
-                        );
-                        for app_proto in app_protos {
-                            session_queue.aggregate_session_and_send(AppProtoLogsData {
-                                base_info: (*app_proto).base_info.clone(),
-                                special_info: (*app_proto).l7_info,
-                            });
+                while running.load(Ordering::Relaxed) {
+                    match input_queue.recv_n(QUEUE_BATCH_SIZE, Some(RCV_TIMEOUT)) {
+                        Ok(app_protos) => {
+                            Self::update_l7_log_dynamic_config(
+                                l7_log_dynamic_is_updated.clone(),
+                                &config,
+                                &mut app_logs,
+                            );
+                            for app_proto in app_protos {
+                                session_queue.aggregate_session_and_send(AppProtoLogsData {
+                                    base_info: (*app_proto).base_info.clone(),
+                                    special_info: (*app_proto).l7_info,
+                                });
+                            }
                         }
-                    }
-                    Err(Error::Timeout) => {
-                        session_queue.flush_one_slot();
-                        continue;
-                    }
-                    Err(Error::Terminated(..)) => break,
-                };
-            }
-            session_queue.clear();
-        });
+                        Err(Error::Timeout) => {
+                            session_queue.flush_one_slot();
+                            continue;
+                        }
+                        Err(Error::Terminated(..)) => break,
+                    };
+                }
+                session_queue.clear();
+            })
+            .unwrap();
         self.thread.lock().unwrap().replace(thread);
         info!("app protocol logs parser (id={}) started", self.id);
     }

@@ -120,7 +120,7 @@ impl Guard {
         let log_dir = self.log_dir.clone();
         let mut over_memory_limit = false; // 是否高于内存限制，高于则不符合预期
         let mut under_sys_free_memory_limit = false; // 是否低于空闲内存限制，低于则不符合预期
-        let thread = thread::spawn(move || {
+        let thread = thread::Builder::new().name("guard".to_owned()).spawn(move || {
             loop {
                 let memory_limit = limit.load().max_memory;
                 if memory_limit != 0 {
@@ -254,7 +254,7 @@ impl Guard {
                 }
             }
             info!("guard exited");
-        });
+        }).unwrap();
 
         self.thread.lock().unwrap().replace(thread);
         info!("guard started");

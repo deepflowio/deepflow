@@ -137,7 +137,10 @@ impl PlatformSynchronizer {
             exception_handler: self.exception_handler.clone(),
         };
 
-        let handle = thread::spawn(move || Self::process(process_args));
+        let handle = thread::Builder::new()
+            .name("platform-synchronizer".to_owned())
+            .spawn(move || Self::process(process_args))
+            .unwrap();
         *self.thread.lock().unwrap() = Some(handle);
 
         info!("PlatformSynchronizer started");

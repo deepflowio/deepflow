@@ -204,9 +204,10 @@ impl Poller for ActivePoller {
         let timeout = self.interval;
         let timer = self.timer.clone();
 
-        let handle = thread::spawn(move || {
-            Self::process(timer, running, version, entries, netns_regex, timeout)
-        });
+        let handle = thread::Builder::new()
+            .name("kubernetes-poller".to_owned())
+            .spawn(move || Self::process(timer, running, version, entries, netns_regex, timeout))
+            .unwrap();
         self.thread.lock().unwrap().replace(handle);
     }
 

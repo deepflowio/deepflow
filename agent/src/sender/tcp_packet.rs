@@ -114,48 +114,51 @@ impl TcpPacketSender {
         let dst_port = self.dst_port.clone();
         let receiver = self.receiver.clone();
 
-        let thread = thread::spawn(move || {
-            let mut sequence = 0;
-            let mut last_err_time = Duration::ZERO;
-            let mut socket = None;
-            while running.load(Ordering::Relaxed) {
-                match receiver.recv(Some(RCV_TIMEOUT)) {
-                    Ok(mut pkt) => {
-                        if (socket.is_none() || reconnect.load(Ordering::Relaxed))
-                            && !Self::connect(
-                                &reconnect,
-                                &mut socket,
-                                *dst_ip.lock().unwrap(),
-                                dst_port.load(Ordering::Relaxed),
-                            )
-                        {
-                            continue;
-                        }
-
-                        sequence += 1;
-                        write_u64_be(&mut pkt[SEQUENCE_OFFSET..SEQUENCE_OFFSET + 8], sequence);
-                        match socket.as_mut().unwrap().write(&pkt) {
-                            Ok(n) => {
-                                counter.tx_bytes.fetch_add(n as u64, Ordering::Relaxed);
-                                counter.tx.fetch_add(1, Ordering::Relaxed);
+        let thread = thread::Builder::new()
+            .name("tcp-packet-sender".to_owned())
+            .spawn(move || {
+                let mut sequence = 0;
+                let mut last_err_time = Duration::ZERO;
+                let mut socket = None;
+                while running.load(Ordering::Relaxed) {
+                    match receiver.recv(Some(RCV_TIMEOUT)) {
+                        Ok(mut pkt) => {
+                            if (socket.is_none() || reconnect.load(Ordering::Relaxed))
+                                && !Self::connect(
+                                    &reconnect,
+                                    &mut socket,
+                                    *dst_ip.lock().unwrap(),
+                                    dst_port.load(Ordering::Relaxed),
+                                )
+                            {
+                                continue;
                             }
-                            Err(e) => {
-                                let now = SystemTime::now()
-                                    .duration_since(SystemTime::UNIX_EPOCH)
-                                    .unwrap();
-                                if now > last_err_time + ERR_INTERVAL {
-                                    warn!("send tcp packet failed: {}", e);
-                                    last_err_time = now;
-                                    socket.take();
+
+                            sequence += 1;
+                            write_u64_be(&mut pkt[SEQUENCE_OFFSET..SEQUENCE_OFFSET + 8], sequence);
+                            match socket.as_mut().unwrap().write(&pkt) {
+                                Ok(n) => {
+                                    counter.tx_bytes.fetch_add(n as u64, Ordering::Relaxed);
+                                    counter.tx.fetch_add(1, Ordering::Relaxed);
+                                }
+                                Err(e) => {
+                                    let now = SystemTime::now()
+                                        .duration_since(SystemTime::UNIX_EPOCH)
+                                        .unwrap();
+                                    if now > last_err_time + ERR_INTERVAL {
+                                        warn!("send tcp packet failed: {}", e);
+                                        last_err_time = now;
+                                        socket.take();
+                                    }
                                 }
                             }
                         }
+                        Err(Error::Terminated(..)) => break,
+                        Err(Error::Timeout) => continue,
                     }
-                    Err(Error::Terminated(..)) => break,
-                    Err(Error::Timeout) => continue,
                 }
-            }
-        });
+            })
+            .unwrap();
 
         self.thread.lock().unwrap().replace(thread);
         info!("tcp packet sender started");

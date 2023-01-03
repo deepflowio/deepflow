@@ -219,19 +219,22 @@ impl ApiWatcher {
         let exception_handler = self.exception_handler.clone();
         let stats_collector = self.stats_collector.clone();
 
-        let handle = thread::spawn(move || {
-            Self::run(
-                context,
-                session,
-                timer,
-                running,
-                apiserver_version,
-                err_msgs,
-                watchers,
-                exception_handler,
-                stats_collector,
-            )
-        });
+        let handle = thread::Builder::new()
+            .name("kubernetes-api-watcher".to_owned())
+            .spawn(move || {
+                Self::run(
+                    context,
+                    session,
+                    timer,
+                    running,
+                    apiserver_version,
+                    err_msgs,
+                    watchers,
+                    exception_handler,
+                    stats_collector,
+                )
+            })
+            .unwrap();
         self.thread.lock().unwrap().replace(handle);
     }
 

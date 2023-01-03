@@ -45,35 +45,38 @@ impl LeakyBucket {
         let t_running = running.clone();
         let t_rate = rate.clone();
         let t_token = token.clone();
-        let handle = thread::spawn(move || {
-            let mut rate = 0;
-            let mut quantity_per_tick = 0;
-            let mut full = 0;
-            let token = t_token;
-            while t_running.load(Ordering::Relaxed) {
-                let new_rate = t_rate.load(Ordering::Relaxed);
-                if new_rate == 0 || new_rate != rate {
-                    rate = new_rate;
-                    if rate == 0 {
-                        thread::park();
-                        continue;
+        let handle = thread::Builder::new()
+            .name("leaky-bucket".to_owned())
+            .spawn(move || {
+                let mut rate = 0;
+                let mut quantity_per_tick = 0;
+                let mut full = 0;
+                let token = t_token;
+                while t_running.load(Ordering::Relaxed) {
+                    let new_rate = t_rate.load(Ordering::Relaxed);
+                    if new_rate == 0 || new_rate != rate {
+                        rate = new_rate;
+                        if rate == 0 {
+                            thread::park();
+                            continue;
+                        }
+                        quantity_per_tick = 1.max(rate / TICK_PER_SECOND);
+                        full = quantity_per_tick * BURST_MULTIPLE;
+                        token.store(full, Ordering::Release);
                     }
-                    quantity_per_tick = 1.max(rate / TICK_PER_SECOND);
-                    full = quantity_per_tick * BURST_MULTIPLE;
-                    token.store(full, Ordering::Release);
+
+                    let _ = token.fetch_update(Ordering::Release, Ordering::Relaxed, |t| {
+                        if t + quantity_per_tick > full {
+                            None
+                        } else {
+                            Some(t + quantity_per_tick)
+                        }
+                    });
+
+                    thread::park_timeout(TICK_INTERVAL);
                 }
-
-                let _ = token.fetch_update(Ordering::Release, Ordering::Relaxed, |t| {
-                    if t + quantity_per_tick > full {
-                        None
-                    } else {
-                        Some(t + quantity_per_tick)
-                    }
-                });
-
-                thread::park_timeout(TICK_INTERVAL);
-            }
-        });
+            })
+            .unwrap();
 
         LeakyBucket {
             rate,

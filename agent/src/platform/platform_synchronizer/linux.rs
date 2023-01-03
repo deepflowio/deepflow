@@ -264,7 +264,10 @@ impl PlatformSynchronizer {
             extra_netns_regex: self.extra_netns_regex.clone(),
         };
 
-        let handle = thread::spawn(move || Self::process(process_args));
+        let handle = thread::Builder::new()
+            .name("platform-synchronizer".to_owned())
+            .spawn(move || Self::process(process_args))
+            .unwrap();
         *self.thread.lock().unwrap() = Some(handle);
 
         if is_tt_pod(self.config.load().trident_type) {

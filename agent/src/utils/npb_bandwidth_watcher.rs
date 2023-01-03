@@ -279,12 +279,14 @@ impl NpbBandwidthWatcher {
             watcher.nic_bps_threshold.load(Relaxed),
             watcher.interval.load(Relaxed),
         );
-        self.thread_handler
-            .lock()
-            .unwrap()
-            .replace(thread::spawn(move || {
-                watcher.run();
-            }));
+        self.thread_handler.lock().unwrap().replace(
+            thread::Builder::new()
+                .name("npb-bandwidth-watcher".to_owned())
+                .spawn(move || {
+                    watcher.run();
+                })
+                .unwrap(),
+        );
     }
 
     pub fn stop(&self) {
