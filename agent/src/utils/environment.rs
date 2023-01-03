@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#[cfg(target_os = "linux")]
+use std::os::unix::fs::MetadataExt;
 use std::{
     env::{self, VarError},
     fs,
@@ -327,21 +329,13 @@ pub fn core_file_check() {
         }
         let meta_data = meta_data.unwrap();
         let item = {
-            let create_time = meta_data.created();
-            if create_time.is_err() {
-                continue;
-            }
-            let create_time = create_time
-                .unwrap()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            let last_modify_time = meta_data.mtime();
             let path = entry.file_name();
             if path.to_str().is_none() {
                 continue;
             }
             (
-                create_time,
+                last_modify_time,
                 format!("{}/{}", core_path, path.to_str().unwrap().to_string()),
             )
         };
