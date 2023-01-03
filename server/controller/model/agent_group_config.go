@@ -85,6 +85,7 @@ type StaticConfig struct {
 	OsProcSocketSyncInterval         *int                  `yaml:"os-proc-socket-sync-interval"`
 	OsProcSocketMinLifetime          *int                  `yaml:"os-proc-socket-min-lifetime"`
 	OsProcRegex                      *OsProcRegex          `yaml:"os-proc-regex"`
+	GuardInterval                    *string               `yaml:"guard-interval,omitempty"`
 }
 
 type XflowCollectorConfig struct {
