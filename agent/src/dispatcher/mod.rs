@@ -153,10 +153,15 @@ impl Dispatcher {
         }
         self.terminated.store(false, Ordering::Relaxed);
         let mut flavor = self.flavor.lock().unwrap().take().unwrap();
-        self.handle.lock().unwrap().replace(thread::spawn(move || {
-            flavor.run();
-            flavor
-        }));
+        self.handle.lock().unwrap().replace(
+            thread::Builder::new()
+                .name("dispatcher".to_owned())
+                .spawn(move || {
+                    flavor.run();
+                    flavor
+                })
+                .unwrap(),
+        );
     }
 
     pub fn stop(&self) {

@@ -26,7 +26,7 @@ use std::sync::{
     atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering},
     Arc, Mutex, RwLock, Weak,
 };
-use std::thread::{sleep, spawn, JoinHandle};
+use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 #[cfg(unix)]
@@ -523,7 +523,7 @@ impl NpbArpTable {
         let mut lookup_ips = vec![];
         let mut timeout_ips = vec![];
         while is_running.load(Ordering::Relaxed) {
-            sleep(Duration::from_secs(ARP_INTERVAL));
+            thread::sleep(Duration::from_secs(ARP_INTERVAL));
             if !need_resolve_mac.load(Ordering::Relaxed) {
                 continue;
             }
@@ -571,9 +571,14 @@ impl NpbArpTable {
         let table = self.table.clone();
         let is_running = self.is_running.clone();
         let need_resolve_mac = self.need_resolve_mac.clone();
-        self.thread_handler.lock().unwrap().replace(spawn(move || {
-            Self::run(table, is_running, need_resolve_mac);
-        }));
+        self.thread_handler.lock().unwrap().replace(
+            thread::Builder::new()
+                .name("npb-sender".to_owned())
+                .spawn(move || {
+                    Self::run(table, is_running, need_resolve_mac);
+                })
+                .unwrap(),
+        );
     }
 
     pub fn stop(&self) {

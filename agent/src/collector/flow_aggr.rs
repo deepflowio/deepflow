@@ -107,7 +107,12 @@ impl FlowAggrThread {
             self.ntp_diff.clone(),
             self.metrics.clone(),
         );
-        self.thread_handle = Some(thread::spawn(move || flow_aggr.run()));
+        self.thread_handle = Some(
+            thread::Builder::new()
+                .name("flow-aggr".to_owned())
+                .spawn(move || flow_aggr.run())
+                .unwrap(),
+        );
         info!("l4 flow aggr id: {} started", self.id);
     }
 

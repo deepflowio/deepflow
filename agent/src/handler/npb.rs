@@ -281,7 +281,12 @@ impl NpbBuilder {
         self.npb_packet_sender.as_ref().unwrap().start();
 
         let sync_sender = self.npb_packet_sender.as_ref().unwrap().clone();
-        *self.thread_handle.lock().unwrap() = Some(thread::spawn(move || sync_sender.run()));
+        *self.thread_handle.lock().unwrap() = Some(
+            thread::Builder::new()
+                .name("npb-packet-sender".to_owned())
+                .spawn(move || sync_sender.run())
+                .unwrap(),
+        );
     }
 
     pub fn stop(&self) {
