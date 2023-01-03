@@ -76,7 +76,7 @@ jobs:
 
       - name: set env
         run: |
-          echo "IMAGE_TAG_PREFIX=${{ github.ref_name }}"|sed 's|main|latest|' >> $GITHUB_ENV
+          echo "IMAGE_TAG_PREFIX=${{ github.ref_name }}"|sed 's|^main$|latest|' >> $GITHUB_ENV
           echo "IMAGE_TAG=$(git rev-list --count HEAD)" >> $GITHUB_ENV
           
       - name: upload cli
