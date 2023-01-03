@@ -80,21 +80,26 @@ impl LibvirtXmlExtractor {
         let running = Arc::clone(&self.running);
         let timer = self.timer.clone();
 
-        *self.thread.lock().unwrap() = Some(thread::spawn(move || loop {
-            let (path_lock, entries) = (path.lock().unwrap(), Arc::clone(&entries));
-            if path_lock.exists() {
-                LibvirtXmlExtractor::refresh(path_lock, entries);
-            }
+        *self.thread.lock().unwrap() = Some(
+            thread::Builder::new()
+                .name("libvirt-xml-extractor".to_owned())
+                .spawn(move || loop {
+                    let (path_lock, entries) = (path.lock().unwrap(), Arc::clone(&entries));
+                    if path_lock.exists() {
+                        LibvirtXmlExtractor::refresh(path_lock, entries);
+                    }
 
-            let guard = running.lock().unwrap();
-            if !*guard {
-                break;
-            }
-            let (guard, _) = timer.wait_timeout(guard, REFRESH_INTERVAL).unwrap();
-            if !*guard {
-                break;
-            }
-        }));
+                    let guard = running.lock().unwrap();
+                    if !*guard {
+                        break;
+                    }
+                    let (guard, _) = timer.wait_timeout(guard, REFRESH_INTERVAL).unwrap();
+                    if !*guard {
+                        break;
+                    }
+                })
+                .unwrap(),
+        );
 
         info!("libvirt_xml_extractor started");
     }

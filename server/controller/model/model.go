@@ -723,3 +723,19 @@ type GenesisStorage struct {
 func (GenesisStorage) TableName() string {
 	return "go_genesis_storage"
 }
+
+type Process struct {
+	ResourceType int    `json:"RESOURCE_TYPE"` // 1: vm 14: pod node
+	ResourceName string `json:"RESOURCE_NAME"`
+	Name         string `json:"NAME"`
+	VTapName     string `json:"VTAP_NAME"`
+	GPID         int    `json:"GPID"`
+	GPName       string `json:"GP_NAME"` // equal to process.process_name
+	PID          int    `json:"PID"`
+	ProcessName  string `json:"PROCESS_NAME"`
+	CommandLine  string `json:"CMD_LINE"`
+	UserName     string `json:"USER_NAME"`
+	OSAPPTags    string `json:"OS_APP_TAGS"`
+	StartTime    string `json:"START_TIME"`
+	UpdateAt     string `json:"UPDATE_AT"`
+}

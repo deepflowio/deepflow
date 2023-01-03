@@ -24,24 +24,22 @@ use std::{
 };
 
 use arc_swap::access::Access;
-use bytesize::ByteSize;
 use chrono::prelude::*;
 use log::{debug, error, info, warn};
 
 use super::process::{
-    get_current_sys_free_memory_percentage, get_file_and_size_sum, get_memory_rss, get_process_num,
-    get_thread_num, FileAndSizeSum,
+    get_current_sys_free_memory_percentage, get_file_and_size_sum, get_process_num, get_thread_num,
+    FileAndSizeSum,
 };
 use crate::common::NORMAL_EXIT_WITH_RESTART;
 use crate::config::handler::EnvironmentAccess;
 use crate::exception::ExceptionHandler;
 use public::proto::trident::Exception;
 
-const CHECK_INTERVAL: Duration = Duration::from_secs(1);
-
 pub struct Guard {
     config: EnvironmentAccess,
     log_dir: String,
+    interval: Duration,
     thread: Mutex<Option<JoinHandle<()>>>,
     running: Arc<(Mutex<bool>, Condvar)>,
     exception_handler: ExceptionHandler,
@@ -51,11 +49,13 @@ impl Guard {
     pub fn new(
         config: EnvironmentAccess,
         log_dir: String,
+        interval: Duration,
         exception_handler: ExceptionHandler,
     ) -> Self {
         Self {
             config,
             log_dir,
+            interval,
             thread: Mutex::new(None),
             running: Arc::new((Mutex::new(false), Condvar::new())),
             exception_handler,
@@ -118,37 +118,10 @@ impl Guard {
         let running = self.running.clone();
         let exception_handler = self.exception_handler.clone();
         let log_dir = self.log_dir.clone();
-        let mut over_memory_limit = false; // 是否高于内存限制，高于则不符合预期
+        let interval = self.interval;
         let mut under_sys_free_memory_limit = false; // 是否低于空闲内存限制，低于则不符合预期
-        let thread = thread::spawn(move || {
+        let thread = thread::Builder::new().name("guard".to_owned()).spawn(move || {
             loop {
-                let memory_limit = limit.load().max_memory;
-                if memory_limit != 0 {
-                    match get_memory_rss() {
-                        Ok(memory_usage) => {
-                            if memory_usage >= memory_limit {
-                                if over_memory_limit {
-                                    error!(
-                                    "memory usage over memory limit twice, current={}, memory_limit={}, deepflow-agent restart...",
-                                    ByteSize::b(memory_usage).to_string_as(true), ByteSize::b(memory_limit).to_string_as(true)
-                                    );
-                                    thread::sleep(Duration::from_secs(1));
-                                    exit(-1);
-                                } else {
-                                    warn!(
-                                    "memory usage over memory limit, current={}, memory_limit={}",
-                                    ByteSize::b(memory_usage).to_string_as(true), ByteSize::b(memory_limit).to_string_as(true)
-                                    );
-                                    over_memory_limit = true;
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            warn!("{}", e);
-                        }
-                    }
-                }
-
                 let sys_free_memory_limit = limit.load().sys_free_memory_limit;
                 let current_sys_free_memory_percentage = get_current_sys_free_memory_percentage();
                 debug!(
@@ -248,13 +221,13 @@ impl Guard {
                 if !*running {
                     break;
                 }
-                running = timer.wait_timeout(running, CHECK_INTERVAL).unwrap().0;
+                running = timer.wait_timeout(running, interval).unwrap().0;
                 if !*running {
                     break;
                 }
             }
             info!("guard exited");
-        });
+        }).unwrap();
 
         self.thread.lock().unwrap().replace(thread);
         info!("guard started");

@@ -54,78 +54,29 @@ type EventStore struct {
 	ServiceID    uint32
 }
 
-func (e *EventStore) WriteBlock(block *ckdb.Block) error {
-	if err := block.WriteDateTime(e.Time); err != nil {
-		return err
-	}
-	if err := block.WriteString(e.Source); err != nil {
-		return err
-	}
-	if err := block.WriteUInt8(e.Tagged); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(e.InstanceType); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(e.InstanceID); err != nil {
-		return err
-	}
-	if err := block.WriteString(e.InstanceName); err != nil {
-		return err
-	}
-	if err := block.WriteString(e.EventType); err != nil {
-		return err
-	}
-	if err := block.WriteString(e.EventDescription); err != nil {
-		return err
-	}
-	if err := block.WriteArrayUInt32(e.SubnetIDs); err != nil {
-		return err
-	}
-	if err := block.WriteArrayString(e.IPs); err != nil {
-		return err
-	}
-
-	if err := block.WriteUInt16(e.RegionID); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(e.AZID); err != nil {
-		return err
-	}
-	if err := block.WriteInt32(e.L3EpcID); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(e.HostID); err != nil {
-		return err
-	}
-
-	if err := block.WriteUInt32(e.PodID); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(e.PodNodeID); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(e.PodNSID); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(e.PodClusterID); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(e.PodGroupID); err != nil {
-		return err
-	}
-
-	if err := block.WriteUInt8(e.L3DeviceType); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(e.L3DeviceID); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(e.ServiceID); err != nil {
-		return err
-	}
-
-	return nil
+func (e *EventStore) WriteBlock(block *ckdb.Block) {
+	block.WriteDateTime(e.Time)
+	block.Write(e.Source,
+		e.Tagged,
+		e.InstanceType,
+		e.InstanceID,
+		e.InstanceName,
+		e.EventType,
+		e.EventDescription,
+		e.SubnetIDs,
+		e.IPs,
+		e.RegionID,
+		e.AZID,
+		e.L3EpcID,
+		e.HostID,
+		e.PodID,
+		e.PodNodeID,
+		e.PodNSID,
+		e.PodClusterID,
+		e.PodGroupID,
+		e.L3DeviceType,
+		e.L3DeviceID,
+		e.ServiceID)
 }
 
 func (e *EventStore) Release() {

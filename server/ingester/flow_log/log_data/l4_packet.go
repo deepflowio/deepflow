@@ -45,27 +45,13 @@ func L4PacketColumns() []*ckdb.Column {
 	}
 }
 
-func (s *L4Packet) WriteBlock(block *ckdb.Block) error {
-	if err := block.WriteDateTime(uint32(s.EndTime / US_TO_S_DEVISOR)); err != nil {
-		return err
-	}
-	if err := block.WriteInt64(s.EndTime); err != nil {
-		return err
-	}
-	if err := block.WriteUInt64(s.FlowID); err != nil {
-		return err
-	}
-	if err := block.WriteUInt16(s.VtapID); err != nil {
-		return err
-	}
-	if err := block.WriteUInt32(s.PacketCount); err != nil {
-		return err
-	}
-	if err := block.WriteArrayByte(s.PacketBatch); err != nil {
-		return err
-	}
-
-	return nil
+func (s *L4Packet) WriteBlock(block *ckdb.Block) {
+	block.WriteDateTime(uint32(s.EndTime / US_TO_S_DEVISOR))
+	block.Write(s.EndTime)
+	block.Write(s.FlowID)
+	block.Write(s.VtapID)
+	block.Write(s.PacketCount)
+	block.Write(s.PacketBatch)
 }
 
 func (p *L4Packet) Release() {

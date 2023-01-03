@@ -54,7 +54,7 @@ func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysql.Pro
 		ProcessName: cloudItem.ProcessName,
 		CommandLine: cloudItem.CommandLine,
 		UserName:    cloudItem.UserName,
-		OsAppTags:   cloudItem.OsAppTags,
+		OSAPPTags:   cloudItem.OSAPPTags,
 		Domain:      p.cache.DomainLcuuid,
 		SubDomain:   cloudItem.SubDomainLcuuid,
 	}
@@ -68,8 +68,8 @@ func (p *Process) generateUpdateInfo(diffBase *cache.Process, cloudItem *cloudmo
 	if diffBase.Name != cloudItem.Name {
 		updateInfo["name"] = cloudItem.Name
 	}
-	if diffBase.OsAppTags != cloudItem.OsAppTags {
-		updateInfo["os_app_tags"] = cloudItem.OsAppTags
+	if diffBase.OSAPPTags != cloudItem.OSAPPTags {
+		updateInfo["os_app_tags"] = cloudItem.OSAPPTags
 	}
 
 	if len(updateInfo) > 0 {

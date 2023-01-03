@@ -100,7 +100,7 @@ func (c *TagRecorder) refresh(domainLcuuidToIconID map[string]int, resourceTypeT
 		NewChPodIngress(resourceTypeToIconID),
 	}
 	if c.cfg.RedisCfg.Enabled {
-		updaters = append(updaters, NewChIPResource())
+		updaters = append(updaters, NewChIPResource(c.tCtx))
 	}
 	for _, updater := range updaters {
 		updater.Refresh()

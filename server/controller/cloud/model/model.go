@@ -471,7 +471,7 @@ type Process struct {
 	CommandLine     string    `json:"command_line"`
 	UserName        string    `json:"user_name"`
 	StartTime       time.Time `json:"start_time" binding:"required"`
-	OsAppTags       string    `json:"os_app_tags"`
+	OSAPPTags       string    `json:"os_app_tags"`
 	SubDomainLcuuid string    `json:"sub_domain_lcuuid"`
 }
 

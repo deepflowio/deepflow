@@ -149,27 +149,21 @@ func UsageMeterColumns() []*ckdb.Column {
 }
 
 // WriteBlock需要和Colums的列一一对应
-func (m *UsageMeter) WriteBlock(block *ckdb.Block) error {
-	values := []uint64{
-		USAGE_PACKET_TX: m.PacketTx,
-		USAGE_PACKET_RX: m.PacketRx,
-		USAGE_PACKET:    m.PacketTx + m.PacketRx,
+func (m *UsageMeter) WriteBlock(block *ckdb.Block) {
+	block.Write(
+		m.PacketTx,
+		m.PacketRx,
+		m.PacketTx+m.PacketRx,
 
-		USAGE_BYTE_TX: m.ByteTx,
-		USAGE_BYTE_RX: m.ByteRx,
-		USAGE_BYTE:    m.ByteTx + m.ByteRx,
+		m.ByteTx,
+		m.ByteRx,
+		m.ByteTx+m.ByteRx,
 
-		USAGE_L3_BYTE_TX: m.L3ByteTx,
-		USAGE_L3_BYTE_RX: m.L3ByteRx,
-		USAGE_L4_BYTE_TX: m.L4ByteTx,
-		USAGE_L4_BYTE_RX: m.L4ByteRx,
-	}
-	for _, v := range values {
-		if err := block.WriteUInt64(v); err != nil {
-			return err
-		}
-	}
-	return nil
+		m.L3ByteTx,
+		m.L3ByteRx,
+		m.L4ByteTx,
+		m.L4ByteRx,
+	)
 }
 
 func (m *UsageMeter) Merge(other *UsageMeter) {

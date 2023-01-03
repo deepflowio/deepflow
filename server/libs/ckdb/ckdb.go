@@ -29,261 +29,51 @@ import (
 
 var log = logging.MustGetLogger("ckdb")
 
+const DEFAULT_COLUMN_COUNT = 256
+
 type Block struct {
-	Batch driver.Batch
-	index int
+	batch driver.Batch
+	items []interface{}
 }
 
-func (b *Block) ResetIndex() {
-	b.index = 0
-}
-
-func (b *Block) WriteBool(v bool) error {
-	if err := b.Batch.Column(b.index).Append([]uint8{utils.Bool2UInt8(v)}); err != nil {
-		return err
+func NewBlock(batch driver.Batch) *Block {
+	return &Block{
+		batch: batch,
+		items: make([]interface{}, 0, DEFAULT_COLUMN_COUNT),
 	}
-	b.index++
-	return nil
 }
 
-func (b *Block) WriteUInt8(v uint8) error {
-	if err := b.Batch.Column(b.index).Append([]uint8{v}); err != nil {
-		return err
-	}
-	b.index++
-	return nil
+func (b *Block) WriteAll() error {
+	err := b.batch.Append(b.items...)
+	b.items = b.items[:0]
+	return err
 }
 
-func (b *Block) WriteUInt8Nullable(v *uint8) error {
-	if err := b.Batch.Column(b.index).Append([]*uint8{v}); err != nil {
-		return err
-	}
-	b.index++
-	return nil
+func (b *Block) Send() error {
+	return b.batch.Send()
 }
 
-func (b *Block) WriteUInt16(v uint16) error {
-	if err := b.Batch.Column(b.index).Append([]uint16{v}); err != nil {
-		return err
-	}
-	b.index++
-	return nil
+func (b *Block) Write(v ...interface{}) {
+	b.items = append(b.items, v...)
 }
 
-func (b *Block) WriteUInt16Nullable(v *uint16) error {
-	if err := b.Batch.Column(b.index).Append([]*uint16{v}); err != nil {
-		return err
-	}
-	b.index++
-	return nil
+func (b *Block) WriteBool(v bool) {
+	b.items = append(b.items, utils.Bool2UInt8(v))
 }
 
-func (b *Block) WriteUInt32(v uint32) error {
-	if err := b.Batch.Column(b.index).Append([]uint32{v}); err != nil {
-		return err
-	}
-	b.index++
-	return nil
+func (b *Block) WriteDateTime(v uint32) {
+	b.items = append(b.items, time.Unix(int64(v), 0))
 }
 
-func (b *Block) WriteUInt32Nullable(v *uint32) error {
-	if err := b.Batch.Column(b.index).Append([]*uint32{v}); err != nil {
-		return err
-	}
-	b.index++
-	return nil
+func (b *Block) WriteIPv4(v uint32) {
+	b.items = append(b.items, utils.IpFromUint32(v))
 }
 
-func (b *Block) WriteUInt64(v uint64) error {
-	if err := b.Batch.Column(b.index).Append([]uint64{v}); err != nil {
-		return err
+func (b *Block) WriteIPv6(v net.IP) {
+	if len(v) == 0 {
+		v = net.IPv6zero
 	}
-	b.index++
-	return nil
-}
-
-func (b *Block) WriteUInt64Nullable(v *uint64) error {
-	if err := b.Batch.Column(b.index).Append([]*uint64{v}); err != nil {
-		return err
-	}
-	b.index++
-	return nil
-}
-
-func (b *Block) WriteInt8(v int8) error {
-	if err := b.Batch.Column(b.index).Append([]int8{v}); err != nil {
-		return err
-	}
-	b.index++
-	return nil
-}
-
-func (b *Block) WriteInt8Nullable(v *int8) error {
-	if err := b.Batch.Column(b.index).Append([]*int8{v}); err != nil {
-		return err
-	}
-	b.index++
-	return nil
-}
-
-func (b *Block) WriteInt16(v int16) error {
-	if err := b.Batch.Column(b.index).Append([]int16{v}); err != nil {
-		return err
-	}
-	b.index++
-	return nil
-}
-
-func (b *Block) WriteInt16Nullable(v *int16) error {
-	if err := b.Batch.Column(b.index).Append([]*int16{v}); err != nil {
-		return err
-	}
-	b.index++
-	return nil
-}
-
-func (b *Block) WriteInt32(v int32) error {
-	if err := b.Batch.Column(b.index).Append([]int32{v}); err != nil {
-		return err
-	}
-	b.index++
-	return nil
-}
-
-func (b *Block) WriteInt32Nullable(v *int32) error {
-	if err := b.Batch.Column(b.index).Append([]*int32{v}); err != nil {
-		return err
-	}
-	b.index++
-	return nil
-}
-
-func (b *Block) WriteInt64(v int64) error {
-	if err := b.Batch.Column(b.index).Append([]int64{v}); err != nil {
-		return err
-	}
-	b.index++
-	return nil
-}
-
-func (b *Block) WriteInt64Nullable(v *int64) error {
-	if err := b.Batch.Column(b.index).Append([]*int64{v}); err != nil {
-		return err
-	}
-	b.index++
-	return nil
-}
-
-func (b *Block) WriteFloat64(v float64) error {
-	if err := b.Batch.Column(b.index).Append([]float64{v}); err != nil {
-		return err
-	}
-	b.index++
-	return nil
-}
-
-func (b *Block) WriteFloat64Nullable(v *float64) error {
-	if err := b.Batch.Column(b.index).Append([]*float64{v}); err != nil {
-		return err
-	}
-	b.index++
-	return nil
-}
-
-func (b *Block) WriteString(v string) error {
-	if err := b.Batch.Column(b.index).Append([]string{v}); err != nil {
-		return err
-	}
-	b.index++
-	return nil
-}
-
-func (b *Block) WriteIPv4(v uint32) error {
-	if err := b.Batch.Column(b.index).Append([]net.IP{utils.IpFromUint32(v)}); err != nil {
-		return err
-	}
-	b.index++
-	return nil
-}
-
-func (b *Block) WriteIPv6(v net.IP) error {
-	if err := b.Batch.Column(b.index).Append([]net.IP{v}); err != nil {
-		return err
-	}
-	b.index++
-	return nil
-}
-
-func (b *Block) WriteArray(v interface{}) error {
-	if err := b.Batch.Column(b.index).Append([]interface{}{v}); err != nil {
-		return err
-	}
-	b.index++
-	return nil
-}
-
-func (b *Block) WriteArrayString(v []string) error {
-	if err := b.Batch.Column(b.index).Append([][]string{v}); err != nil {
-		return err
-	}
-	b.index++
-	return nil
-}
-
-func (b *Block) WriteArrayUint16(v []uint16) error {
-	if err := b.Batch.Column(b.index).Append([][]uint16{v}); err != nil {
-		return err
-	}
-	b.index++
-	return nil
-}
-
-func (b *Block) WriteArrayInt64(v []int64) error {
-	if err := b.Batch.Column(b.index).Append([][]int64{v}); err != nil {
-		return err
-	}
-	b.index++
-	return nil
-}
-
-func (b *Block) WriteArrayUInt32(v []uint32) error {
-	if err := b.Batch.Column(b.index).Append([][]uint32{v}); err != nil {
-		return err
-	}
-	b.index++
-	return nil
-}
-
-func (b *Block) WriteArrayUInt64(v []uint64) error {
-	if err := b.Batch.Column(b.index).Append([][]uint64{v}); err != nil {
-		return err
-	}
-	b.index++
-	return nil
-}
-
-func (b *Block) WriteArrayFloat64(v []float64) error {
-	if err := b.Batch.Column(b.index).Append([][]float64{v}); err != nil {
-		return err
-	}
-	b.index++
-	return nil
-}
-
-func (b *Block) WriteArrayByte(v []byte) error {
-	if err := b.Batch.Column(b.index).Append([][]byte{v}); err != nil {
-		return err
-	}
-	b.index++
-	return nil
-}
-
-func (b *Block) WriteDateTime(v uint32) error {
-	if err := b.Batch.Column(b.index).Append([]time.Time{time.Unix(int64(v), 0)}); err != nil {
-		return err
-	}
-	b.index++
-	return nil
+	b.items = append(b.items, v)
 }
 
 type ColumnType uint8

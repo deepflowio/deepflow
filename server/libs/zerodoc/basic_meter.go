@@ -184,36 +184,29 @@ func TrafficColumns() []*ckdb.Column {
 }
 
 // WriteBlock的列需和Columns 按顺序一一对应
-func (t *Traffic) WriteBlock(block *ckdb.Block) error {
-	values := []uint64{
-		TRAFFIC_PACKET_TX: t.PacketTx,
-		TRAFFIC_PACKET_RX: t.PacketRx,
-		TRAFFIC_PACKET:    t.PacketTx + t.PacketRx,
+func (t *Traffic) WriteBlock(block *ckdb.Block) {
+	block.Write(
+		t.PacketTx,
+		t.PacketRx,
+		t.PacketTx+t.PacketRx,
 
-		TRAFFIC_BYTE_TX: t.ByteTx,
-		TRAFFIC_BYTE_RX: t.ByteRx,
-		TRAFFIC_BYTE:    t.ByteTx + t.ByteRx,
+		t.ByteTx,
+		t.ByteRx,
+		t.ByteTx+t.ByteRx,
 
-		TRAFFIC_L3_BYTE_TX: t.L3ByteTx,
-		TRAFFIC_L3_BYTE_RX: t.L3ByteRx,
-		TRAFFIC_L4_BYTE_TX: t.L4ByteTx,
-		TRAFFIC_L4_BYTE_RX: t.L4ByteRx,
+		t.L3ByteTx,
+		t.L3ByteRx,
+		t.L4ByteTx,
+		t.L4ByteRx,
 
-		TRAFFIC_NEW_FLOW:    t.NewFlow,
-		TRAFFIC_CLOSED_FLOW: t.ClosedFlow,
+		t.NewFlow,
+		t.ClosedFlow,
+		uint64(t.L7Request),
+		uint64(t.L7Response),
 
-		TRAFFIC_L7_REQUEST:  uint64(t.L7Request),
-		TRAFFIC_L7_RESPONSE: uint64(t.L7Response),
-
-		TRAFFIC_SYN_COUNT:    uint64(t.SynCount),
-		TRAFFIC_SYNACK_COUNT: uint64(t.SynackCount),
-	}
-	for _, v := range values {
-		if err := block.WriteUInt64(v); err != nil {
-			return err
-		}
-	}
-	return nil
+		uint64(t.SynCount),
+		uint64(t.SynackCount),
+	)
 }
 
 type Latency struct {
@@ -409,50 +402,33 @@ func LatencyColumns() []*ckdb.Column {
 }
 
 // WriteBlock和LatencyColumns的列需要按顺序一一对应
-func (l *Latency) WriteBlock(block *ckdb.Block) error {
-	sumValues := []float64{
-		LATENCY_RTT:        float64(l.RTTSum),
-		LATENCY_RTT_CLIENT: float64(l.RTTClientSum),
-		LATENCY_RTT_SERVER: float64(l.RTTServerSum),
-		LATENCY_SRT:        float64(l.SRTSum),
-		LATENCY_ART:        float64(l.ARTSum),
-		LATENCY_RRT:        float64(l.RRTSum),
-		LATENCY_CIT:        float64(l.CITSum)}
-	counterValues := []uint64{
-		LATENCY_RTT:        uint64(l.RTTCount),
-		LATENCY_RTT_CLIENT: uint64(l.RTTClientCount),
-		LATENCY_RTT_SERVER: uint64(l.RTTServerCount),
-		LATENCY_SRT:        uint64(l.SRTCount),
-		LATENCY_ART:        uint64(l.ARTCount),
-		LATENCY_RRT:        uint64(l.RRTCount),
-		LATENCY_CIT:        uint64(l.CITCount)}
+func (l *Latency) WriteBlock(block *ckdb.Block) {
+	block.Write(
+		float64(l.RTTSum),
+		float64(l.RTTClientSum),
+		float64(l.RTTServerSum),
+		float64(l.SRTSum),
+		float64(l.ARTSum),
+		float64(l.RRTSum),
+		float64(l.CITSum),
 
-	maxValues := []uint32{
-		LATENCY_RTT:        l.RTTMax,
-		LATENCY_RTT_CLIENT: l.RTTClientMax,
-		LATENCY_RTT_SERVER: l.RTTServerMax,
-		LATENCY_SRT:        l.SRTMax,
-		LATENCY_ART:        l.ARTMax,
-		LATENCY_RRT:        l.RRTMax,
-		LATENCY_CIT:        l.CITMax}
-	for _, v := range sumValues {
-		if err := block.WriteFloat64(v); err != nil {
-			return err
-		}
-	}
+		uint64(l.RTTCount),
+		uint64(l.RTTClientCount),
+		uint64(l.RTTServerCount),
+		uint64(l.SRTCount),
+		uint64(l.ARTCount),
+		uint64(l.RRTCount),
+		uint64(l.CITCount),
 
-	for _, v := range counterValues {
-		if err := block.WriteUInt64(v); err != nil {
-			return err
-		}
-	}
+		l.RTTMax,
+		l.RTTClientMax,
+		l.RTTServerMax,
+		l.SRTMax,
+		l.ARTMax,
+		l.RRTMax,
+		l.CITMax,
+	)
 
-	for _, v := range maxValues {
-		if err := block.WriteUInt32(v); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 type Performance struct {
@@ -541,18 +517,12 @@ func PerformanceColumns() []*ckdb.Column {
 }
 
 // WriteBlock的列和PerformanceColumns需要按顺序一一对应
-func (a *Performance) WriteBlock(block *ckdb.Block) error {
-	values := []uint64{
-		a.RetransTx, a.RetransRx, a.RetransTx + a.RetransRx,
-		a.ZeroWinTx, a.ZeroWinRx, a.ZeroWinTx + a.ZeroWinRx,
+func (a *Performance) WriteBlock(block *ckdb.Block) {
+	block.Write(
+		a.RetransTx, a.RetransRx, a.RetransTx+a.RetransRx,
+		a.ZeroWinTx, a.ZeroWinRx, a.ZeroWinTx+a.ZeroWinRx,
 		uint64(a.RetransSyn), uint64(a.RetransSynack),
-	}
-	for _, v := range values {
-		if err := block.WriteUInt64(v); err != nil {
-			return err
-		}
-	}
-	return nil
+	)
 }
 
 type Anomaly struct {
@@ -744,58 +714,45 @@ func AnomalyColumns() []*ckdb.Column {
 }
 
 // WriteBlock的列和AnomalyColumns需要按顺序一一对应
-func (a *Anomaly) WriteBlock(block *ckdb.Block) error {
+func (a *Anomaly) WriteBlock(block *ckdb.Block) {
 	clientFail := a.ClientSynRepeat + a.ClientSourcePortReuse + a.ClientEstablishReset
 	serverFail := a.ServerSYNACKRepeat + a.ServerReset + a.ServerQueueLack + a.ServerEstablishReset
 	// 表示 传输-客户端/服务端重置, 传输-服务端队列溢出, 传输-客户端半关, 传输-服务端半关, 传输-连接超时次数
 	transferFail := a.ClientRstFlow + a.ServerRstFlow + a.ServerQueueLack + a.ClientHalfCloseFlow + a.ServerHalfCloseFlow + a.TCPTimeout
 	// 表示所有重置的次数之和，包含建连-客户端/服务端其他重置、建连-服务端直接重置、传输-客户端/服务端重置
 	rstFail := a.ClientEstablishReset + a.ServerEstablishReset + a.ServerReset + a.ClientRstFlow + a.ServerRstFlow
-	values := []uint64{
-		ANOMALY_CLIENT_RST_FLOW: a.ClientRstFlow,
-		ANOMALY_SERVER_RST_FLOW: a.ServerRstFlow,
 
-		ANOMALY_CLIENT_SYN_REPEAT:     a.ClientSynRepeat,
-		ANOMALY_SERVER_SYN_ACK_REPEAT: a.ServerSYNACKRepeat,
+	block.Write(
+		a.ClientRstFlow,
+		a.ServerRstFlow,
 
-		ANOMALY_CLIENT_HALF_CLOSE_FLOW: a.ClientHalfCloseFlow,
-		ANOMALY_SERVER_HALF_CLOSE_FLOW: a.ServerHalfCloseFlow,
+		a.ClientSynRepeat,
+		a.ServerSYNACKRepeat,
 
-		ANOMALY_CLIENT_SOURCE_PORT_REUSE: a.ClientSourcePortReuse,
-		ANOMALY_SERVER_RESET:             a.ServerReset,
-		ANOMALY_SERVER_QUEUE_LACK:        a.ServerQueueLack,
+		a.ClientHalfCloseFlow,
+		a.ServerHalfCloseFlow,
 
-		ANOMALY_CLIENT_ESTABLISH_OTHER_RST: a.ClientEstablishReset,
-		ANOMALY_SERVER_ESTABLISH_OTHER_RST: a.ServerEstablishReset,
+		a.ClientSourcePortReuse,
+		a.ServerReset,
+		a.ServerQueueLack,
 
-		ANOMALY_TCP_TIMEOUT: a.TCPTimeout,
+		a.ClientEstablishReset,
+		a.ServerEstablishReset,
 
-		ANOMALY_CLIENT_ESTABLISH_FAIL: clientFail,
-		ANOMALY_SERVER_ESTABLISH_FAIL: serverFail,
-		ANOMALY_TCP_ESTABLISH_FAIL:    clientFail + serverFail,
+		a.TCPTimeout,
 
-		ANOMALY_TRANSFER_FAIL: transferFail,
-		ANOMALY_RST_FAIL:      rstFail,
-	}
-	l7Values := []uint32{
-		ANOMALY_L7_CLIENT_ERROR: a.L7ClientError,
-		ANOMALY_L7_SERVER_ERROR: a.L7ServerError,
-		ANOMALY_L7_TIMEOUT:      a.L7Timeout,
-		ANOMALY_L7_ERROR:        a.L7ClientError + a.L7ServerError,
-	}
+		clientFail,
+		serverFail,
+		clientFail+serverFail,
 
-	for _, v := range values {
-		if err := block.WriteUInt64(v); err != nil {
-			return err
-		}
-	}
+		transferFail,
+		rstFail,
 
-	for _, v := range l7Values {
-		if err := block.WriteUInt32(v); err != nil {
-			return err
-		}
-	}
-	return nil
+		a.L7ClientError,
+		a.L7ServerError,
+		a.L7Timeout,
+		a.L7ClientError+a.L7ServerError,
+	)
 }
 
 type FlowLoad struct {
@@ -836,16 +793,8 @@ func FlowLoadColumns() []*ckdb.Column {
 	return ckdb.NewColumnsWithComment([][2]string{FLOW_LOAD: {"flow_load", "累计活跃连接数"}}, ckdb.UInt64)
 }
 
-func (l *FlowLoad) WriteBlock(block *ckdb.Block) error {
-	values := []uint64{
-		FLOW_LOAD: l.Load,
-	}
-	for _, v := range values {
-		if err := block.WriteUInt64(v); err != nil {
-			return err
-		}
-	}
-	return nil
+func (l *FlowLoad) WriteBlock(block *ckdb.Block) {
+	block.Write(l.Load)
 }
 
 func marshalKeyValues(b []byte, fields []string, values []uint64) int {

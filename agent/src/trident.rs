@@ -401,6 +401,7 @@ impl Trident {
         let guard = Guard::new(
             config_handler.environment(),
             log_dir.to_string(),
+            config_handler.candidate_config.yaml_config.guard_interval,
             exception_handler.clone(),
         );
         guard.start();
@@ -710,50 +711,55 @@ impl DomainNameListener {
             domain_names[0], ips[0]
         );
 
-        self.thread_handler = Some(thread::spawn(move || {
-            while !stopped.swap(false, Ordering::Relaxed) {
-                thread::sleep(Duration::from_secs(Self::INTERVAL));
+        self.thread_handler = Some(
+            thread::Builder::new()
+                .name("domain-name-listener".to_owned())
+                .spawn(move || {
+                    while !stopped.swap(false, Ordering::Relaxed) {
+                        thread::sleep(Duration::from_secs(Self::INTERVAL));
 
-                let mut changed = false;
-                for i in 0..domain_names.len() {
-                    let current = lookup_host(domain_names[i].as_str());
-                    if current.is_err() {
-                        continue;
+                        let mut changed = false;
+                        for i in 0..domain_names.len() {
+                            let current = lookup_host(domain_names[i].as_str());
+                            if current.is_err() {
+                                continue;
+                            }
+                            let current = current.unwrap();
+
+                            changed = current.iter().find(|&&x| x.to_string() == ips[i]).is_none();
+                            if changed {
+                                info!(
+                                    "Domain name {} ip {} change to {}",
+                                    domain_names[i], ips[i], current[0]
+                                );
+                                ips[i] = current[0].to_string();
+                            }
+                        }
+
+                        if changed {
+                            let (ctrl_ip, ctrl_mac) = get_ctrl_ip_and_mac(ips[0].parse().unwrap());
+                            info!(
+                                "use K8S_NODE_IP_FOR_DEEPFLOW env ip as destination_ip({})",
+                                ctrl_ip
+                            );
+
+                            synchronizer.reset_session(
+                                ips.clone(),
+                                ctrl_ip.to_string(),
+                                ctrl_mac.to_string(),
+                            );
+                            stats_collector.set_remotes(
+                                ips.iter()
+                                    .map(|item| item.parse::<IpAddr>().unwrap())
+                                    .collect(),
+                            );
+
+                            remote_log_config.set_remotes(&ips, port_config.load().analyzer_port);
+                        }
                     }
-                    let current = current.unwrap();
-
-                    changed = current.iter().find(|&&x| x.to_string() == ips[i]).is_none();
-                    if changed {
-                        info!(
-                            "Domain name {} ip {} change to {}",
-                            domain_names[i], ips[i], current[0]
-                        );
-                        ips[i] = current[0].to_string();
-                    }
-                }
-
-                if changed {
-                    let (ctrl_ip, ctrl_mac) = get_ctrl_ip_and_mac(ips[0].parse().unwrap());
-                    info!(
-                        "use K8S_NODE_IP_FOR_DEEPFLOW env ip as destination_ip({})",
-                        ctrl_ip
-                    );
-
-                    synchronizer.reset_session(
-                        ips.clone(),
-                        ctrl_ip.to_string(),
-                        ctrl_mac.to_string(),
-                    );
-                    stats_collector.set_remotes(
-                        ips.iter()
-                            .map(|item| item.parse::<IpAddr>().unwrap())
-                            .collect(),
-                    );
-
-                    remote_log_config.set_remotes(&ips, port_config.load().analyzer_port);
-                }
-            }
-        }));
+                })
+                .unwrap(),
+        );
     }
 }
 
