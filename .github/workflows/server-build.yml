@@ -90,7 +90,7 @@ jobs:
 
       - name: set env
         run: |
-          echo "IMAGE_TAG_PREFIX=${{ github.ref_name }}"|sed 's|main|latest|' >> $GITHUB_ENV
+          echo "IMAGE_TAG_PREFIX=${{ github.ref_name }}"|sed 's|^main$|latest|' >> $GITHUB_ENV
           echo "IMAGE_TAG=$(git rev-list --count HEAD)" >> $GITHUB_ENV
 
       - name: Build and push deepflow server images to ghcr and dockerhub
