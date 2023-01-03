@@ -372,7 +372,8 @@ type LANIP struct { // TODO 添加region字段
 	NetIndex     int       `gorm:"column:net_index;type:int;default:0" json:"NET_INDEX"`
 	SubDomain    string    `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
 	Domain       string    `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
-	VInterfaceID int       `gorm:"column:vifid;type:int;default:null" json:"VIFID"`
+	VInterfaceID int       `gorm:"column:vifid;type:int;default:null" json:"VINTERFACE_ID"`
+	SubnetID     int       `gorm:"column:vl2_net_id;type:int;default:0" json:"SUBNET_ID"`
 	ISP          int       `gorm:"column:isp;type:int;default:0" json:"ISP"` // Used for multi-ISP access
 	CreatedAt    time.Time `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
 	UpdatedAt    time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
@@ -390,7 +391,8 @@ type WANIP struct {
 	Gateway      string    `gorm:"column:gateway;type:char(64);default:''" json:"GATEWAY"`
 	CreateMethod int       `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
 	ISP          int       `gorm:"column:isp;type:int;default:null" json:"ISP"`
-	VInterfaceID int       `gorm:"column:vifid;type:int;default:0" json:"VIFID"`
+	VInterfaceID int       `gorm:"column:vifid;type:int;default:0" json:"VINTERFACE_ID"`
+	SubnetID     int       `gorm:"column:vl2_net_id;type:int;default:0" json:"SUBNET_ID"`
 	SubDomain    string    `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
 	Domain       string    `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
 	Region       string    `gorm:"column:region;type:char(64);default:''" json:"REGION"`

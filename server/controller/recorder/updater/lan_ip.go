@@ -67,6 +67,14 @@ func (i *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.LANIP, boo
 		))
 		return nil, false
 	}
+	subnetID, exists := i.cache.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
+	if !exists {
+		log.Error(resourceAForResourceBNotFound(
+			common.RESOURCE_TYPE_SUBNET_EN, cloudItem.SubnetLcuuid,
+			common.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid,
+		))
+		return nil, false
+	}
 	ip := common.FormatIP(cloudItem.IP)
 	if ip == "" {
 		log.Error(ipIsInvalid(
@@ -80,14 +88,27 @@ func (i *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.LANIP, boo
 		SubDomain:    cloudItem.SubDomainLcuuid,
 		NetworkID:    networkID,
 		VInterfaceID: vinterfaceID,
+		SubnetID:     subnetID,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
 }
 
-// 保留接口
 func (i *LANIP) generateUpdateInfo(diffBase *cache.LANIP, cloudItem *cloudmodel.IP) (map[string]interface{}, bool) {
-	return nil, false
+	updateInfo := make(map[string]interface{})
+	if diffBase.SubnetLcuuid != cloudItem.SubnetLcuuid {
+		subnetID, exists := i.cache.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
+		if !exists {
+			log.Error(resourceAForResourceBNotFound(
+				common.RESOURCE_TYPE_SUBNET_EN, cloudItem.SubnetLcuuid,
+				common.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid,
+			))
+			return nil, false
+		}
+		updateInfo["vl2_net_id"] = subnetID
+	}
+
+	return updateInfo, len(updateInfo) > 0
 }
 
 func (i *LANIP) addCache(dbItems []*mysql.LANIP) {
