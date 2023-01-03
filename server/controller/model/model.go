@@ -735,7 +735,7 @@ type Process struct {
 	ProcessName  string `json:"PROCESS_NAME"`
 	CommandLine  string `json:"CMD_LINE"`
 	UserName     string `json:"USER_NAME"`
-	OSAPPTags    string `jsong:"OS_APP_TAGS"`
+	OSAPPTags    string `json:"OS_APP_TAGS"`
 	StartTime    string `json:"START_TIME"`
 	UpdateAt     string `json:"UPDATE_AT"`
 }
