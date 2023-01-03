@@ -119,15 +119,6 @@ pub enum L7ProtoRawDataType {
     GoHttp2Uprobe,
 }
 
-impl L7ProtoRawDataType {
-    pub fn from_ebpf_type(t: EbpfType) -> Self {
-        match t {
-            EbpfType::TracePoint | EbpfType::TlsUprobe | EbpfType::None => Self::RawProtocol,
-            EbpfType::GoHttp2Uprobe => Self::GoHttp2Uprobe,
-        }
-    }
-}
-
 impl Default for L7ProtoRawDataType {
     fn default() -> Self {
         return Self::RawProtocol;
