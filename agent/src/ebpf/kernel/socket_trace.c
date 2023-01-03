@@ -1661,20 +1661,6 @@ TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx *ctx) {
 	return 0;
 }
 
-struct __io_event_buffer {
-	__u32 bytes_count;
-
-	// 0: write
-	// 1: read
-	__u32 operation;
-
-	// nanosecond
-	__u64 latency;
-
-	// strings terminated with \0
-	char filename[64];
-} __attribute__((packed));
-
 // Store IO event information
 MAP_PERARRAY(io_event_buffer, __u32, struct __io_event_buffer, 1)
 
@@ -1687,7 +1673,7 @@ static __inline int output_data_common(void *ctx) {
 	enum traffic_direction dir;
 	bool vecs = false;
 	int max_size = 0;
-	int k0 = 0;
+	__u32 k0 = 0;
 	char *buffer = NULL;
 
 	struct __socket_data_buffer *v_buff = bpf_map_lookup_elem(&NAME(data_buf), &k0);
@@ -1723,9 +1709,7 @@ static __inline int output_data_common(void *ctx) {
 		goto clear_args_map_1;
 
 	if (v->source == DATA_SOURCE_IO_EVENT) {
-		__u32 u32k0 = 0;
-
-		buffer = (char *)io_event_buffer__lookup(&u32k0);
+		buffer = (char *)io_event_buffer__lookup(&k0);
 		if (buffer == NULL) {
 			goto clear_args_map_1;
 		}

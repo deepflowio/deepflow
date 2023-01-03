@@ -13,10 +13,14 @@ pub const GO_HTTP2_UPROBE: u8 = 2;
 #[allow(dead_code)]
 // hook in openssl lib
 pub const OPENSSL_UPROBE: u8 = 3;
+#[allow(dead_code)]
+// hook in io event
+pub const IO_EVENT: u8 = 4;
 
 const EBPF_TYPE_TRACEPOINT: u8 = 0;
 const EBPF_TYPE_TLS_UPROBE: u8 = 1;
 const EBPF_TYPE_GO_HTTP2_UPROBE: u8 = 2;
+const EBPF_TYPE_IO_EVENT: u8 = 4;
 const EBPF_TYPE_NONE: u8 = 255;
 
 // ebpf的类型,由ebpf程序传入,对应 SK_BPF_DATA 的 source 字段
@@ -38,6 +42,7 @@ pub enum EbpfType {
     header value value (xxx bytes)
     */
     GoHttp2Uprobe = EBPF_TYPE_GO_HTTP2_UPROBE,
+    IOEvent = EBPF_TYPE_IO_EVENT,
     None = EBPF_TYPE_NONE, // 非 ebpf 类型.
 }
 
@@ -49,6 +54,7 @@ impl TryFrom<u8> for EbpfType {
             GO_TLS_UPROBE | OPENSSL_UPROBE => Ok(Self::TlsUprobe),
             GO_HTTP2_UPROBE => Ok(Self::GoHttp2Uprobe),
             SYSCALL => Ok(Self::TracePoint),
+            IO_EVENT => Ok(Self::IOEvent),
             _ => Err(format!("unknown ebpf type: {}", value)),
         }
     }
