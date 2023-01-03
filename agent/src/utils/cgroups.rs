@@ -106,33 +106,36 @@ impl Cgroups {
         let mut last_cpu = 0;
         let mut last_memory = 0;
         let cgroup = self.cgroup.clone();
-        let thread = thread::spawn(move || {
-            loop {
-                let environment = environment_config.load();
-                let max_cpus = environment.max_cpus;
-                let max_memory = environment.max_memory;
-                if max_cpus != last_cpu || max_memory != last_memory {
-                    if let Err(e) = Self::apply(cgroup.clone(), max_cpus, max_memory) {
-                        warn!("apply cgroup resource failed, {:?}, agent restart...", e);
-                        thread::sleep(Duration::from_secs(1));
-                        process::exit(1);
+        let thread = thread::Builder::new()
+            .name("cgroup-controller".to_owned())
+            .spawn(move || {
+                loop {
+                    let environment = environment_config.load();
+                    let max_cpus = environment.max_cpus;
+                    let max_memory = environment.max_memory;
+                    if max_cpus != last_cpu || max_memory != last_memory {
+                        if let Err(e) = Self::apply(cgroup.clone(), max_cpus, max_memory) {
+                            warn!("apply cgroup resource failed, {:?}, agent restart...", e);
+                            thread::sleep(Duration::from_secs(1));
+                            process::exit(1);
+                        }
+                    }
+                    last_cpu = max_cpus;
+                    last_memory = max_memory;
+
+                    let (running, timer) = &*running;
+                    let mut running = running.lock().unwrap();
+                    if !*running {
+                        break;
+                    }
+                    running = timer.wait_timeout(running, CHECK_INTERVAL).unwrap().0;
+                    if !*running {
+                        break;
                     }
                 }
-                last_cpu = max_cpus;
-                last_memory = max_memory;
-
-                let (running, timer) = &*running;
-                let mut running = running.lock().unwrap();
-                if !*running {
-                    break;
-                }
-                running = timer.wait_timeout(running, CHECK_INTERVAL).unwrap().0;
-                if !*running {
-                    break;
-                }
-            }
-            info!("cgroup controller exited");
-        });
+                info!("cgroup controller exited");
+            })
+            .unwrap();
 
         self.thread.lock().unwrap().replace(thread);
         info!("cgroup controller started");
