@@ -102,7 +102,7 @@ pub fn get_thread_num() -> Result<u32> {
     ))
 }
 
-// 仅计算当前进程及其子进程和子进程的子进程的进程数
+// Get the number of processes with the same name of the deepflow-agent
 pub fn get_process_num_by_name(name: &str) -> Result<u32> {
     get_num_from_status_file("Name:", name)
 }

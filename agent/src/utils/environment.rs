@@ -35,7 +35,7 @@ use log::{error, info, warn};
 use nom::AsBytes;
 use sysinfo::{DiskExt, System, SystemExt};
 
-use crate::common::{PROCESS_NAME, TRIDENT_PROCESS_LIMIT};
+use crate::common::PROCESS_NAME;
 use crate::error::{Error, Result};
 use crate::exception::ExceptionHandler;
 use public::proto::{common::TridentType, trident::Exception};
@@ -357,15 +357,15 @@ pub fn core_file_check() {
     }
 }
 
-pub fn trident_process_check() {
+pub fn trident_process_check(process_threshold: u32) {
     let process_num = get_process_num_by_name(PROCESS_NAME);
 
     match process_num {
         Ok(num) => {
-            if num > TRIDENT_PROCESS_LIMIT {
+            if num > process_threshold {
                 error!(
                     "the number of process exceeds the limit({} > {})",
-                    num, TRIDENT_PROCESS_LIMIT
+                    num, process_threshold
                 );
                 thread::sleep(Duration::from_secs(1));
                 process::exit(-1);
