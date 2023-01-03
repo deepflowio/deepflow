@@ -904,6 +904,10 @@ impl Components {
         let ctrl_ip = config_handler.ctrl_ip;
         let ctrl_mac = config_handler.ctrl_mac;
         let max_memory = config_handler.candidate_config.environment.max_memory;
+        let process_threshold = config_handler
+            .candidate_config
+            .environment
+            .process_threshold;
         let feature_flags = FeatureFlags::from(&yaml_config.feature_flags);
 
         let mut stats_sender = UniformSenderThread::new(
@@ -917,7 +921,7 @@ impl Components {
         );
         stats_sender.start();
 
-        trident_process_check();
+        trident_process_check(process_threshold);
         if feature_flags.contains(FeatureFlags::CORE) {
             #[cfg(target_os = "linux")]
             core_file_check();
