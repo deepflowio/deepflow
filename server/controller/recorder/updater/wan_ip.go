@@ -61,6 +61,7 @@ func (i *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.WANIP, boo
 		))
 		return nil, false
 	}
+	subnetID, _ := i.cache.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
 	ip := common.FormatIP(cloudItem.IP)
 	if ip == "" {
 		log.Error(ipIsInvalid(
@@ -73,6 +74,7 @@ func (i *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.WANIP, boo
 		Domain:       i.cache.DomainLcuuid,
 		SubDomain:    cloudItem.SubDomainLcuuid,
 		VInterfaceID: vinterfaceID,
+		SubnetID:     subnetID,
 		Region:       cloudItem.RegionLcuuid,
 		ISP:          common.WAN_IP_ISP,
 	}
@@ -92,6 +94,18 @@ func (i *WANIP) generateUpdateInfo(diffBase *cache.WANIP, cloudItem *cloudmodel.
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
 		updateInfo["region"] = cloudItem.RegionLcuuid
 	}
+	if diffBase.SubnetLcuuid != cloudItem.SubnetLcuuid {
+		subnetID, exists := i.cache.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
+		if !exists {
+			log.Error(resourceAForResourceBNotFound(
+				common.RESOURCE_TYPE_SUBNET_EN, cloudItem.SubnetLcuuid,
+				common.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid,
+			))
+			return nil, false
+		}
+		updateInfo["vl2_net_id"] = subnetID
+	}
+
 	return updateInfo, len(updateInfo) > 0
 }
 
