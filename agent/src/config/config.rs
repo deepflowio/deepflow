@@ -341,6 +341,8 @@ pub struct YamlConfig {
     #[serde(rename = "l7-protocol-ports")]
     // hashmap<protocolName, portRange>
     pub l7_protocol_ports: HashMap<String, String>,
+    #[serde(with = "humantime_serde")]
+    pub guard_interval: Duration,
 }
 
 impl YamlConfig {
@@ -479,6 +481,10 @@ impl YamlConfig {
         if c.ebpf.max_trace_entries < 100000 || c.ebpf.max_trace_entries > 2000000 {
             c.ebpf.max_trace_entries = 524288;
         }
+        if c.guard_interval < Duration::from_secs(1) || c.guard_interval > Duration::from_secs(3600)
+        {
+            c.guard_interval = Duration::from_secs(60);
+        }
 
         if let Err(e) = c.validate() {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string()));
@@ -585,6 +591,7 @@ impl Default for YamlConfig {
             log_file: DEFAULT_LOG_FILE.into(),
             l7_protocol_ports: HashMap::from([(String::from("DNS"), String::from("53"))]),
             ebpf: EbpfYamlConfig::default(),
+            guard_interval: Duration::from_secs(60),
         }
     }
 }
