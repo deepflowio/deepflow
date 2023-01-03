@@ -673,7 +673,12 @@ impl QuadrupleGeneratorThread {
             self.ntp_diff.clone(),
             self.stats.clone(),
         );
-        self.thread_handle = Some(thread::spawn(move || quadruple_generator.handler_routine()));
+        self.thread_handle = Some(
+            thread::Builder::new()
+                .name("quadruple-generator".to_owned())
+                .spawn(move || quadruple_generator.handler_routine())
+                .unwrap(),
+        );
         info!("quadruple generator id: {} started", self.id);
     }
 

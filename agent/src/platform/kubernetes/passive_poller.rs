@@ -439,9 +439,10 @@ impl Poller for PassivePoller {
         let version = self.version.clone();
         let entries = self.entries.clone();
         let tap_mode = self.config.load().tap_mode;
-        let handle = thread::spawn(move || {
-            Self::process(running, expire_timeout, version, entries, tap_mode)
-        });
+        let handle = thread::Builder::new()
+            .name("kubernetes-poller".to_owned())
+            .spawn(move || Self::process(running, expire_timeout, version, entries, tap_mode))
+            .unwrap();
         self.thread.lock().unwrap().replace(handle);
         info!("kubernetes passive poller started");
     }

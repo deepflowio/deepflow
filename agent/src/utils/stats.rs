@@ -312,120 +312,133 @@ impl Collector {
         let hostname = self.hostname.clone();
         let min_interval = self.min_interval.clone();
         let sender = self.sender.clone();
-        *self.thread.lock().unwrap() = Some(thread::spawn(move || {
-            let mut statsd_clients = vec![];
-            let mut old_remotes = vec![];
-            loop {
-                let host = hostname.lock().unwrap().clone();
-                // for early exit
-                loop {
-                    {
-                        pre_hooks.lock().unwrap().iter_mut().for_each(|hook| hook());
-                    }
-
-                    let now = SystemTime::now();
-                    let mut batches = vec![];
-                    {
-                        let mut sources = sources.lock().unwrap();
-                        let min_interval_loaded = min_interval.load(Ordering::Relaxed);
-                        // TODO: use Vec::retain_mut after stablize in rust 1.61.0
-                        sources.retain(|s| !s.countable.closed());
-                        for source in sources.iter_mut() {
-                            source.skip -= 1;
-                            if source.skip > 0 {
-                                continue;
+        *self.thread.lock().unwrap() = Some(
+            thread::Builder::new()
+                .name("stats-collector".to_owned())
+                .spawn(move || {
+                    let mut statsd_clients = vec![];
+                    let mut old_remotes = vec![];
+                    loop {
+                        let host = hostname.lock().unwrap().clone();
+                        // for early exit
+                        loop {
+                            {
+                                pre_hooks.lock().unwrap().iter_mut().for_each(|hook| hook());
                             }
-                            source.skip = (source.interval.as_secs().max(min_interval_loaded)
-                                / TICK_CYCLE.as_secs())
-                                as i64;
-                            let points = source.countable.get_counters();
-                            if !points.is_empty() {
-                                let batch = Arc::new(Batch {
-                                    module: source.module,
-                                    hostname: host.clone(),
-                                    tags: source.tags.clone(),
-                                    points,
-                                    timestamp: now,
-                                });
-                                if let Err(_) = sender.send(ArcBatch(batch.clone())) {
-                                    debug!(
+
+                            let now = SystemTime::now();
+                            let mut batches = vec![];
+                            {
+                                let mut sources = sources.lock().unwrap();
+                                let min_interval_loaded = min_interval.load(Ordering::Relaxed);
+                                // TODO: use Vec::retain_mut after stablize in rust 1.61.0
+                                sources.retain(|s| !s.countable.closed());
+                                for source in sources.iter_mut() {
+                                    source.skip -= 1;
+                                    if source.skip > 0 {
+                                        continue;
+                                    }
+                                    source.skip =
+                                        (source.interval.as_secs().max(min_interval_loaded)
+                                            / TICK_CYCLE.as_secs())
+                                            as i64;
+                                    let points = source.countable.get_counters();
+                                    if !points.is_empty() {
+                                        let batch = Arc::new(Batch {
+                                            module: source.module,
+                                            hostname: host.clone(),
+                                            tags: source.tags.clone(),
+                                            points,
+                                            timestamp: now,
+                                        });
+                                        if let Err(_) = sender.send(ArcBatch(batch.clone())) {
+                                            debug!(
                                         "stats to send queue failed because queue have terminated"
                                     );
-                                }
-                                batches.push(batch);
-                            }
-                        }
-                    }
-                    if batches.is_empty() {
-                        break;
-                    }
-
-                    match remotes.lock().unwrap().take() {
-                        Some(remotes) => {
-                            statsd_clients.clear();
-                            for remote in remotes.iter() {
-                                match Self::new_statsd_client((*remote, DEFAULT_INGESTER_PORT)) {
-                                    Ok(client) => statsd_clients.push(Some(client)),
-                                    Err(e) => {
-                                        warn!("create client to remote {} failed: {}", remote, e);
+                                        }
+                                        batches.push(batch);
                                     }
                                 }
                             }
-                            old_remotes = remotes;
-                        }
-                        None => {
-                            for (i, client) in statsd_clients.iter_mut().enumerate() {
-                                if client.is_some() {
-                                    continue;
-                                }
-                                match Self::new_statsd_client((
-                                    old_remotes[i],
-                                    DEFAULT_INGESTER_PORT,
-                                )) {
-                                    Ok(s) => {
-                                        client.replace(s);
+                            if batches.is_empty() {
+                                break;
+                            }
+
+                            match remotes.lock().unwrap().take() {
+                                Some(remotes) => {
+                                    statsd_clients.clear();
+                                    for remote in remotes.iter() {
+                                        match Self::new_statsd_client((
+                                            *remote,
+                                            DEFAULT_INGESTER_PORT,
+                                        )) {
+                                            Ok(client) => statsd_clients.push(Some(client)),
+                                            Err(e) => {
+                                                warn!(
+                                                    "create client to remote {} failed: {}",
+                                                    remote, e
+                                                );
+                                            }
+                                        }
                                     }
-                                    Err(e) => warn!(
-                                        "create client to remote {} failed: {}",
-                                        old_remotes[i], e
-                                    ),
+                                    old_remotes = remotes;
+                                }
+                                None => {
+                                    for (i, client) in statsd_clients.iter_mut().enumerate() {
+                                        if client.is_some() {
+                                            continue;
+                                        }
+                                        match Self::new_statsd_client((
+                                            old_remotes[i],
+                                            DEFAULT_INGESTER_PORT,
+                                        )) {
+                                            Ok(s) => {
+                                                client.replace(s);
+                                            }
+                                            Err(e) => warn!(
+                                                "create client to remote {} failed: {}",
+                                                old_remotes[i], e
+                                            ),
+                                        }
+                                    }
                                 }
                             }
+
+                            if statsd_clients.len() == 0 {
+                                info!("no statsd remote available");
+                                break;
+                            }
+
+                            debug!("collected: {:?}", batches);
+                            for (i, batch) in batches.into_iter().enumerate() {
+                                let client =
+                                    statsd_clients[i % statsd_clients.len()].as_ref().unwrap();
+                                for point in batch.points.iter() {
+                                    let metric_name =
+                                        format!("{}_{}", batch.module, point.0).replace("-", "_");
+                                    // use counted for gauged fields for compatibility
+                                    // will cause problem if counted fields in buffer not reset before next point
+                                    let b = client.count_with_tags(&metric_name, point.2);
+                                    Self::send_metrics(b, &host, &batch.tags);
+                                }
+                            }
+
+                            break;
+                        }
+
+                        let (running, timer) = &*running;
+                        let mut running = running.lock().unwrap();
+                        if !*running {
+                            break;
+                        }
+                        running = timer.wait_timeout(running, TICK_CYCLE).unwrap().0;
+                        if !*running {
+                            break;
                         }
                     }
-
-                    if statsd_clients.len() == 0 {
-                        info!("no statsd remote available");
-                        break;
-                    }
-
-                    debug!("collected: {:?}", batches);
-                    for (i, batch) in batches.into_iter().enumerate() {
-                        let client = statsd_clients[i % statsd_clients.len()].as_ref().unwrap();
-                        for point in batch.points.iter() {
-                            let metric_name =
-                                format!("{}_{}", batch.module, point.0).replace("-", "_");
-                            // use counted for gauged fields for compatibility
-                            // will cause problem if counted fields in buffer not reset before next point
-                            let b = client.count_with_tags(&metric_name, point.2);
-                            Self::send_metrics(b, &host, &batch.tags);
-                        }
-                    }
-
-                    break;
-                }
-
-                let (running, timer) = &*running;
-                let mut running = running.lock().unwrap();
-                if !*running {
-                    break;
-                }
-                running = timer.wait_timeout(running, TICK_CYCLE).unwrap().0;
-                if !*running {
-                    break;
-                }
-            }
-        }));
+                })
+                .unwrap(),
+        );
     }
 }
 
