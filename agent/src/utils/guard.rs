@@ -28,8 +28,7 @@ use chrono::prelude::*;
 use log::{debug, error, info, warn};
 
 use super::process::{
-    get_current_sys_free_memory_percentage, get_file_and_size_sum, get_process_num, get_thread_num,
-    FileAndSizeSum,
+    get_current_sys_free_memory_percentage, get_file_and_size_sum, get_thread_num, FileAndSizeSum,
 };
 use crate::common::NORMAL_EXIT_WITH_RESTART;
 use crate::config::handler::EnvironmentAccess;
@@ -144,29 +143,6 @@ impl Guard {
                                     );
                             under_sys_free_memory_limit = true;
                         }
-                    }
-                }
-
-                match get_process_num() {
-                    Ok(process_num) => {
-                        let process_limit = limit.load().process_threshold;
-                        if process_num > process_limit {
-                            warn!(
-                                "the number of process exceeds the limit({} > {})",
-                                process_num, process_limit
-                            );
-                            if process_num > process_limit * 2 {
-                                error!("the number of process exceeds the limit by 2 times, deepflow-agent restart...");
-                                thread::sleep(Duration::from_secs(1));
-                                exit(NORMAL_EXIT_WITH_RESTART);
-                            }
-                            exception_handler.set(Exception::ProcessThresholdExceeded);
-                        } else {
-                            exception_handler.clear(Exception::ProcessThresholdExceeded);
-                        }
-                    }
-                    Err(e) => {
-                        warn!("{}", e);
                     }
                 }
 
