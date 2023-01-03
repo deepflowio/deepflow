@@ -743,7 +743,35 @@ mod tests {
             flow_state: FlowState::Raw,
             meta_flow_perf: None,
             policy_data_cache: Default::default(),
-            endpoint_data_cache: Default::default(),
+            endpoint_data_cache: {
+                let data = EndpointData {
+                    src_info: EndpointInfo {
+                        real_ip: Ipv4Addr::UNSPECIFIED.into(),
+                        l2_epc_id: 0,
+                        l3_epc_id: 0,
+                        l2_end: false,
+                        l3_end: false,
+                        is_device: false,
+                        is_vip_interface: false,
+                        is_vip: false,
+                        is_local_mac: false,
+                        is_local_ip: false,
+                    },
+                    dst_info: EndpointInfo {
+                        real_ip: Ipv4Addr::UNSPECIFIED.into(),
+                        l2_epc_id: 0,
+                        l3_epc_id: 0,
+                        l2_end: false,
+                        l3_end: false,
+                        is_device: false,
+                        is_vip_interface: false,
+                        is_vip: false,
+                        is_local_mac: false,
+                        is_local_ip: false,
+                    },
+                };
+                [Arc::new(data), Arc::new(data.reversed())]
+            },
             residual_request: 0,
             next_tcp_seq0: 0,
             next_tcp_seq1: 0,
