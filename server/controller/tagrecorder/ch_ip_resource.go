@@ -17,6 +17,7 @@
 package tagrecorder
 
 import (
+	"context"
 	"encoding/json"
 	"strconv"
 	"strings"
@@ -27,13 +28,15 @@ import (
 
 type ChIPResource struct {
 	UpdaterBase[mysql.ChIPResource, IPResourceKey]
+	ctx context.Context
 }
 
-func NewChIPResource() *ChIPResource {
+func NewChIPResource(ctx context.Context) *ChIPResource {
 	updater := &ChIPResource{
 		UpdaterBase[mysql.ChIPResource, IPResourceKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_IP_RESOURCE,
 		},
+		ctx,
 	}
 	updater.dataGenerator = updater
 	return updater
@@ -134,7 +137,7 @@ func (i *ChIPResource) generateNewData() (map[IPResourceKey]mysql.ChIPResource, 
 	if redis.RedisDB == nil {
 		return keyToItem, false
 	}
-	res, err := redis.RedisDB.HGetAll("deepflow_dimension_resource_ip").Result()
+	res, err := redis.RedisDB.HGetAll(i.ctx, "deepflow_dimension_resource_ip").Result()
 	if err != nil {
 		log.Error(err)
 		return nil, false

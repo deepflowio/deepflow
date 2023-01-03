@@ -14,36 +14,19 @@
  * limitations under the License.
  */
 
-package zerodoc
+package router
 
 import (
-	"github.com/deepflowys/deepflow/server/libs/ckdb"
+	"github.com/gin-gonic/gin"
+
+	"github.com/deepflowys/deepflow/server/controller/service"
 )
 
-type Tagger interface {
-	SetID(string)
-	GetCode() uint64
-	SetCode(uint64)
-	GetTAPType() uint8
-	ToKVString() string
-	MarshalTo([]byte) int
-	String() string
-	Clone() Tagger
-	Release()
+func ProcessRouter(e *gin.Engine) {
+	e.GET("/v1/processes/", getProcesses)
 }
 
-type Meter interface {
-	ID() uint8
-	Name() string
-	VTAPName() string
-	ConcurrentMerge(Meter)
-	SequentialMerge(Meter)
-	ToKVString() string
-	MarshalTo([]byte) int
-	SortKey() uint64
-	Clone() Meter
-	Release()
-	Reverse()
-	ToReversed() Meter
-	WriteBlock(block *ckdb.Block) // 写入clickhouse的block
+func getProcesses(c *gin.Context) {
+	data, err := service.GetProcesses()
+	JsonResponse(c, data, err)
 }

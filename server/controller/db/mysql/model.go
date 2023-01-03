@@ -76,7 +76,7 @@ type Process struct {
 	CommandLine    string    `gorm:"column:cmdline;type:text" json:"COMMAND_LINE"`
 	UserName       string    `gorm:"column:user_name;type:varchar(256);default:''" json:"USER_NAME"`
 	StartTime      time.Time `gorm:"autoCreateTime;column:start_time;type:datetime" json:"START_TIME"`
-	OsAppTags      string    `gorm:"column:os_app_tags;type:text" json:"OS_APP_TAGS"`
+	OSAPPTags      string    `gorm:"column:os_app_tags;type:text" json:"OS_APP_TAGS"`
 	SubDomain      string    `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
 	Domain         string    `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN"`
 }
@@ -1032,7 +1032,7 @@ type VTapGroupConfiguration struct {
 	L7LogStoreTapTypes            *string `gorm:"column:l7_log_store_tap_types;type:text;default:null" json:"L7_LOG_STORE_TAP_TYPES"` // l7 log store tap types, separate by ","
 	CaptureSocketType             *int    `gorm:"column:capture_socket_type;type:int;default:null" json:"CAPTURE_SOCKET_TYPE"`
 	CaptureBpf                    *string `gorm:"column:capture_bpf;type:varchar(512);default:null" json:"CAPTURE_BPF"`
-	TapMode                       *int    `gorm:"column:tap_mode;type:int;default:0" json:"TAP_MODE"` // 0: local 1: mirror 2: physical
+	TapMode                       *int    `gorm:"column:tap_mode;type:int;default:null" json:"TAP_MODE"` // 0: local 1: mirror 2: physical
 	ThreadThreshold               *int    `gorm:"column:thread_threshold;type:int;default:null" json:"THREAD_THRESHOLD"`
 	ProcessThreshold              *int    `gorm:"column:process_threshold;type:int;default:null" json:"PROCESS_THRESHOLD"`
 	Lcuuid                        *string `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
@@ -1103,7 +1103,7 @@ type RVTapGroupConfiguration struct {
 	L7LogStoreTapTypes            string `gorm:"column:l7_log_store_tap_types;type:text;default:null" json:"L7_LOG_STORE_TAP_TYPES"` // l7 log store tap types, separate by ","
 	CaptureSocketType             int    `gorm:"column:capture_socket_type;type:int;default:null" json:"CAPTURE_SOCKET_TYPE"`
 	CaptureBpf                    string `gorm:"column:capture_bpf;type:varchar(512);default:null" json:"CAPTURE_BPF"`
-	TapMode                       int    `gorm:"column:tap_mode;type:int;default:0" json:"TAP_MODE"` // 0: local 1: mirror 2: physical
+	TapMode                       int    `gorm:"column:tap_mode;type:int;default:null" json:"TAP_MODE"` // 0: local 1: mirror 2: physical
 	ThreadThreshold               int    `gorm:"column:thread_threshold;type:int;default:null" json:"THREAD_THRESHOLD"`
 	ProcessThreshold              int    `gorm:"column:process_threshold;type:int;default:null" json:"PROCESS_THRESHOLD"`
 	Lcuuid                        string `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`

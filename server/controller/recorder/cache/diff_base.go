@@ -933,7 +933,7 @@ func (b *DiffBaseDataSet) addProcess(dbItem *mysql.Process, seq int) {
 			Lcuuid:   dbItem.Lcuuid,
 		},
 		Name:      dbItem.Name,
-		OsAppTags: dbItem.OsAppTags,
+		OSAPPTags: dbItem.OSAPPTags,
 	}
 	log.Info(addDiffBase(RESOURCE_TYPE_PROCESS_EN, b.Process[dbItem.Lcuuid]))
 }
@@ -1597,11 +1597,11 @@ type LBVMConnection struct {
 type Process struct {
 	DiffBase
 	Name      string `json:"name"`
-	OsAppTags string `json:"os_app_tags"`
+	OSAPPTags string `json:"os_app_tags"`
 }
 
 func (p *Process) Update(cloudItem *cloudmodel.Process) {
 	p.Name = cloudItem.Name
-	p.OsAppTags = cloudItem.OsAppTags
+	p.OSAPPTags = cloudItem.OSAPPTags
 	log.Info(updateDiffBase(RESOURCE_TYPE_PROCESS_EN, p))
 }
