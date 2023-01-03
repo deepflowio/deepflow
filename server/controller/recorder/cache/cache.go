@@ -470,12 +470,14 @@ func (c *Cache) refreshNetworks() []int {
 func (c *Cache) AddSubnets(items []*mysql.Subnet) {
 	for _, item := range items {
 		c.DiffBaseDataSet.addSubnet(item, c.Sequence)
+		c.ToolDataSet.addSubnet(item)
 	}
 }
 
 func (c *Cache) DeleteSubnets(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
 		c.DiffBaseDataSet.deleteSubnet(lcuuid)
+		c.ToolDataSet.deleteSubnet(lcuuid)
 	}
 }
 
@@ -621,7 +623,7 @@ func (c *Cache) refreshVInterfaces() {
 
 func (c *Cache) AddWANIPs(items []*mysql.WANIP) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addWANIP(item, c.Sequence)
+		c.DiffBaseDataSet.addWANIP(item, c.Sequence, &c.ToolDataSet)
 		c.ToolDataSet.addWANIP(item)
 	}
 }
@@ -648,7 +650,7 @@ func (c *Cache) refreshWANIPs() {
 
 func (c *Cache) AddLANIPs(items []*mysql.LANIP) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addLANIP(item, c.Sequence)
+		c.DiffBaseDataSet.addLANIP(item, c.Sequence, &c.ToolDataSet)
 		c.ToolDataSet.addLANIP(item)
 	}
 }
