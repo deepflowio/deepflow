@@ -235,6 +235,7 @@ impl L7ProtocolParserInterface for MysqlLog {
     fn reset(&mut self) {
         *self = Self {
             l7_proto: self.l7_proto,
+            command: self.command,
             ..Default::default()
         };
     }
