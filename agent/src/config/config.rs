@@ -574,7 +574,7 @@ impl Default for YamlConfig {
                 let mut protos = vec![];
                 for i in get_all_protocol() {
                     if i.parse_default() {
-                        protos.push(i.as_string());
+                        protos.push(i.as_str().to_owned());
                     }
                 }
                 protos
