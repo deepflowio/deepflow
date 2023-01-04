@@ -204,7 +204,7 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 		closers = append(closers, cm)
 
 		// 等roze,stream初始化建表完成,再执行issu
-		time.Sleep(time.Second)
+		time.Sleep(time.Second * 2)
 		err = issu.Start()
 		checkError(err)
 		closers = append(closers, issu)
