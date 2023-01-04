@@ -21,7 +21,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set"
 
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/config"
@@ -290,12 +290,20 @@ func (c *AnalyzerCheck) vtapAnalyzerAlloc(excludeIP string) {
 			sort.Slice(analyzerAvailableVTapNum, func(i, j int) bool {
 				return analyzerAvailableVTapNum[i].Value > analyzerAvailableVTapNum[j].Value
 			})
-			analyzerAvailableVTapNum[0].Value -= 1
-			analyzerIPToAvailableVTapNum[analyzerAvailableVTapNum[0].Key] -= 1
+			// Search for controllers that have capacity. If none has capacity, the collector limit is allowed.
+			index := 0
+			for i, availableVTap := range analyzerAvailableVTapNum {
+				if availableVTap.Value == 0 || analyzerIPToAvailableVTapNum[availableVTap.Key] == 0 {
+					continue
+				}
+				index = i
+			}
+			analyzerAvailableVTapNum[index].Value -= 1
+			analyzerIPToAvailableVTapNum[analyzerAvailableVTapNum[index].Key] -= 1
 
 			// 分配数据节点成功，更新数据节点IP + 清空数据节点分配失败的错误码
-			log.Infof("alloc analyzer (%s) for vtap (%s)", analyzerAvailableVTapNum[0].Key, vtap.Name)
-			mysql.Db.Model(&vtap).Update("analyzer_ip", analyzerAvailableVTapNum[0].Key)
+			log.Infof("alloc analyzer (%s) for vtap (%s)", analyzerAvailableVTapNum[index].Key, vtap.Name)
+			mysql.Db.Model(&vtap).Update("analyzer_ip", analyzerAvailableVTapNum[index].Key)
 			if vtap.Exceptions&common.VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED != 0 {
 				exceptions := vtap.Exceptions ^ common.VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED
 				mysql.Db.Model(&vtap).Update("exceptions", exceptions)

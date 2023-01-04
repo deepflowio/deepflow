@@ -237,7 +237,7 @@ func UpdateController(
 						updateVTapLcuuids = append(updateVTapLcuuids, vtap.Lcuuid)
 					}
 				} else {
-					for i := vtapMax; i < len(vtaps)-1; i++ {
+					for i := vtapMax; i < len(vtaps); i++ {
 						updateVTapLcuuids = append(updateVTapLcuuids, vtaps[i].Lcuuid)
 					}
 				}

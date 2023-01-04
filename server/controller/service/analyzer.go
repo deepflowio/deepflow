@@ -19,7 +19,7 @@ package service
 import (
 	"fmt"
 
-	"github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set"
 	"github.com/google/uuid"
 
 	"github.com/deepflowys/deepflow/server/controller/common"
@@ -198,7 +198,7 @@ func UpdateAnalyzer(
 						updateVTapLcuuids = append(updateVTapLcuuids, vtap.Lcuuid)
 					}
 				} else {
-					for i := vtapMax; i < len(vtaps)-1; i++ {
+					for i := vtapMax; i < len(vtaps); i++ {
 						updateVTapLcuuids = append(updateVTapLcuuids, vtaps[i].Lcuuid)
 					}
 				}
