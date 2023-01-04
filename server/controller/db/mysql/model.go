@@ -88,7 +88,7 @@ type Domain struct {
 	Name         string     `gorm:"column:name;type:varchar(64)" json:"NAME"`
 	IconID       int        `gorm:"column:icon_id;type:int" json:"ICON_ID"`
 	DisplayName  string     `gorm:"column:display_name;type:varchar(64);default:''" json:"DISPLAY_NAME"`
-	ClusterID    string     `gorm:"column:cluster_id;type:char(32)" json:"CLUSTER_ID"`
+	ClusterID    string     `gorm:"column:cluster_id;type:char(64)" json:"CLUSTER_ID"`
 	Type         int        `gorm:"column:type;type:int;default:0" json:"TYPE"` // 1.openstack 2.vsphere 3.nsp 4.tencent 5.filereader 6.aws 7.pingan 8.zstack 9.aliyun 10.huawei prv 11.k8s 12.simulation 13.huawei 14.qingcloud 15.qingcloud_private 16.F5 17.CMB_CMDB 18.azure 19.apsara_stack 20.tencent_tce 21.qingcloud_k8s 22.kingsoft_private 23.genesis 24.microsoft_acs 25.baidu_bce
 	Config       string     `gorm:"column:config;type:text" json:"CONFIG"`
 	ErrorMsg     string     `gorm:"column:error_msg;type:text" json:"ERROR_MSG"`
@@ -107,7 +107,7 @@ type SubDomain struct {
 	Name         string     `gorm:"column:name;type:varchar(64);default:''" json:"NAME"`
 	DisplayName  string     `gorm:"column:display_name;type:varchar(64);default:''" json:"DISPLAY_NAME"`
 	CreateMethod int        `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
-	ClusterID    string     `gorm:"column:cluster_id;type:char(32);default:''" json:"CLUSTER_ID"`
+	ClusterID    string     `gorm:"column:cluster_id;type:char(64);default:''" json:"CLUSTER_ID"`
 	Config       string     `gorm:"column:config;type:text;default:''" json:"CONFIG"`
 	ErrorMsg     string     `gorm:"column:error_msg;type:text;default:''" json:"ERROR_MSG"`
 	Enabled      int        `gorm:"column:enabled;type:int;not null;default:1" json:"ENABLED"` // 0.false 1.true
