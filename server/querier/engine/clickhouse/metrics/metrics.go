@@ -47,6 +47,7 @@ type Metrics struct {
 	IsAgg       bool   // 是否为聚合指标量
 	Permissions []bool // 指标量的权限控制
 	Table       string // 所属表
+	Description string // 描述
 }
 
 func (m *Metrics) Replace(metrics *Metrics) {
@@ -66,7 +67,7 @@ func (m *Metrics) SetIsAgg(isAgg bool) *Metrics {
 
 func NewMetrics(
 	index int, dbField string, displayname string, unit string, metricType int, category string,
-	permissions []bool, condition string, table string,
+	permissions []bool, condition string, table string, description string,
 ) *Metrics {
 	return &Metrics{
 		Index:       index,
@@ -78,6 +79,7 @@ func NewMetrics(
 		Permissions: permissions,
 		Condition:   condition,
 		Table:       table,
+		Description: description,
 	}
 }
 
@@ -100,7 +102,7 @@ func GetMetrics(field string, db string, table string, ctx context.Context) (*Me
 				return NewMetrics(
 					0, fmt.Sprintf("if(indexOf(%s, '%s')=0,null,%s[indexOf(%s, '%s')])", metrics_names_field, fieldName, metrics_values_field, metrics_names_field, fieldName),
 					field, "", METRICS_TYPE_COUNTER,
-					"metrics", []bool{true, true, true}, "", table,
+					"metrics", []bool{true, true, true}, "", table, "",
 				), true
 			}
 		}
@@ -179,7 +181,7 @@ func GetMetricsByDBTable(db string, table string, where string, ctx context.Cont
 			metrics["metrics"] = NewMetrics(
 				len(metrics), "metrics",
 				"metrics", "", METRICS_TYPE_ARRAY,
-				"metrics", []bool{true, true, true}, "", table,
+				"metrics", []bool{true, true, true}, "", table, "",
 			)
 			return metrics, err
 		}
@@ -224,6 +226,7 @@ func GetMetricsDescriptionsByDBTable(db string, table string, where string, ctx 
 		values[metrics.Index] = []interface{}{
 			field, metrics.IsAgg, metrics.DisplayName, metrics.Unit, metrics.Type,
 			metrics.Category, METRICS_OPERATORS, metrics.Permissions, metrics.Table,
+			metrics.Description,
 		}
 	}
 	return values, nil
@@ -263,7 +266,7 @@ func GetMetricsDescriptions(db string, table string, where string, ctx context.C
 		values = append(values, metrics...)
 	}
 	columns := []interface{}{
-		"name", "is_agg", "display_name", "unit", "type", "category", "operators", "permissions", "table",
+		"name", "is_agg", "display_name", "unit", "type", "category", "operators", "permissions", "table", "description",
 	}
 	return &common.Result{
 		Columns: columns,
@@ -296,9 +299,10 @@ func LoadMetrics(db string, table string, dbDescription map[string]interface{}) 
 				metricsLanguage := metricsDataLanguage.([][]interface{})[i]
 				displayName := metricsLanguage[1].(string)
 				unit := metricsLanguage[2].(string)
+				description := metricsLanguage[3].(string)
 				lm := NewMetrics(
 					i, metrics[1].(string), displayName, unit, metricType,
-					metrics[3].(string), permissions, "", table,
+					metrics[3].(string), permissions, "", table, description,
 				)
 				loadMetrics[metrics[0].(string)] = lm
 			}
