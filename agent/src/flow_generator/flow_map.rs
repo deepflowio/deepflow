@@ -101,7 +101,7 @@ pub struct FlowMap {
 
     output_queue: DebugSender<Box<TaggedFlow>>,
     out_log_queue: DebugSender<Box<MetaAppProto>>,
-    output_buffer: Vec<TaggedFlow>,
+    output_buffer: Vec<Box<TaggedFlow>>,
     last_queue_flush: Duration,
     config: FlowAccess,
     parse_config: LogParserAccess,
@@ -1118,15 +1118,11 @@ impl FlowMap {
     fn flush_queue(&mut self, config: &FlowConfig, now: Duration) {
         if now - self.last_queue_flush > config.flush_interval {
             if self.output_buffer.len() > 0 {
-                let flows = self
-                    .output_buffer
-                    .drain(..)
-                    .map(Box::new)
-                    .collect::<Vec<_>>();
-                if let Err(_) = self.output_queue.send_all(flows) {
+                if let Err(_) = self.output_queue.send_all(&mut self.output_buffer) {
                     warn!(
                         "flow-map push tagged flows to queue failed because queue have terminated"
                     );
+                    self.output_buffer.clear();
                 }
             }
             self.last_queue_flush = now;
@@ -1163,15 +1159,11 @@ impl FlowMap {
                 stats.l7_protocol = L7Protocol::Other;
             }
         }
-        self.output_buffer.push(tagged_flow);
+        self.output_buffer.push(Box::new(tagged_flow));
         if self.output_buffer.len() >= QUEUE_BATCH_SIZE {
-            let flows = self
-                .output_buffer
-                .drain(..)
-                .map(Box::new)
-                .collect::<Vec<_>>();
-            if let Err(_) = self.output_queue.send_all(flows) {
+            if let Err(_) = self.output_queue.send_all(&mut self.output_buffer) {
                 warn!("flow-map push tagged flows to queue failed because queue have terminated");
+                self.output_buffer.clear();
             }
         }
     }

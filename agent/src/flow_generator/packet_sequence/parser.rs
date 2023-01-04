@@ -64,17 +64,17 @@ impl PacketSequenceParser {
         let thread = thread::Builder::new()
             .name("packet-sequence-parser".to_owned())
             .spawn(move || {
+                let mut batch = Vec::new();
                 while running.load(Ordering::Relaxed) {
                     match input_queue.recv_n(consts::QUEUE_BATCH_SIZE, Some(consts::RCV_TIMEOUT)) {
-                        Ok(packet_sequence_blocks) => {
-                            let packet_sequence_blocks = packet_sequence_blocks
-                                .into_iter()
-                                .map(|f| BoxedPacketSequenceBlock(f))
-                                .collect();
-                            if let Err(_) = output_queue.send_all(packet_sequence_blocks) {
+                        Ok(blocks) => {
+                            batch.reserve(blocks.len());
+                            batch.extend(blocks.into_iter().map(|f| BoxedPacketSequenceBlock(f)));
+                            if let Err(_) = output_queue.send_all(&mut batch) {
                                 warn!(
-                                "packet sequence block to queue failed maybe queue have terminated"
-                            );
+                                    "packet sequence block to queue failed maybe queue have terminated"
+                                );
+                                batch.clear();
                             }
                         }
                         Err(Error::Timeout) => continue,

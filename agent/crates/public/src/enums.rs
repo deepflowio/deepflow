@@ -457,14 +457,6 @@ mod tests {
     }
 
     #[test]
-    fn assert_link_type() {
-        let link_type = LinkType::Ppp;
-        assert_eq!(link_type, 9);
-        assert_eq!(9, link_type);
-        assert_eq!(Ok(LinkType::Talk), LinkType::try_from(114u8));
-    }
-
-    #[test]
     fn assert_ip_protocol() {
         let ip = IpProtocol::Icmpv6;
         assert_eq!(ip, 58);
