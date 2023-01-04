@@ -584,7 +584,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		}
 	}
 	for _, suffix := range []string{"", "_0", "_1"} {
-		k8sLabelSuffix := "labels" + suffix
+		k8sLabelSuffix := "k8s.label" + suffix
 		podIDSuffix := "pod_id" + suffix
 		tagResourceMap[k8sLabelSuffix] = map[string]*Tag{
 			"default": NewTag(
@@ -597,7 +597,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	}
 
 	// 单个外部字段-ext_metrics
-	tagResourceMap["tag"] = map[string]*Tag{
+	tagResourceMap["tag."] = map[string]*Tag{
 		"default": NewTag(
 			"tag_values[indexOf(tag_names,'%s')]",
 			"%s != ''",
@@ -606,7 +606,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		),
 	}
 	// 单个外部字段-l7_flow_log
-	tagResourceMap["attribute"] = map[string]*Tag{
+	tagResourceMap["attribute."] = map[string]*Tag{
 		"default": NewTag(
 			"attribute_values[indexOf(attribute_names,'%s')]",
 			"%s != ''",
@@ -615,7 +615,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		),
 	}
 	// 外部字段map
-	tagResourceMap["tags"] = map[string]*Tag{
+	tagResourceMap["tag"] = map[string]*Tag{
 		"default": NewTag(
 			"arrayZip(tag_names, tag_values)",
 			"",
@@ -623,7 +623,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"",
 		),
 	}
-	tagResourceMap["attributes"] = map[string]*Tag{
+	tagResourceMap["attribute"] = map[string]*Tag{
 		"default": NewTag(
 			"arrayZip(attribute_names, attribute_values)",
 			"",

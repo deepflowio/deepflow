@@ -44,14 +44,14 @@ func GetGroup(name string, asTagMap map[string]string, db, table string) (Statem
 }
 
 func GetNotNullFilter(name string, asTagMap map[string]string, db, table string) (view.Node, bool) {
-	tagItem, ok := tag.GetTag(name, db, table, "default")
+	tagItem, ok := tag.GetTag(strings.Trim(name, "`"), db, table, "default")
 	if !ok {
 		preAsTag, ok := asTagMap[name]
 		if ok {
-			tagItem, ok = tag.GetTag(preAsTag, db, table, "default")
+			tagItem, ok = tag.GetTag(strings.Trim(preAsTag, "`"), db, table, "default")
 			if !ok {
 				preAsTag := strings.Trim(preAsTag, "`")
-				if strings.HasPrefix(preAsTag, "label.") {
+				if strings.HasPrefix(preAsTag, "k8s.label.") {
 					if strings.HasSuffix(preAsTag, "_0") {
 						tagItem, ok = tag.GetTag("k8s_label_0", db, table, "default")
 					} else if strings.HasSuffix(preAsTag, "_1") {
@@ -62,7 +62,7 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 					filter := tagItem.NotNullFilter
 					return &view.Expr{Value: "(" + filter + ")"}, true
 				} else if strings.HasPrefix(preAsTag, "tag.") || strings.HasPrefix(preAsTag, "attribute.") {
-					tagItem, ok = tag.GetTag("tag", db, table, "default")
+					tagItem, ok = tag.GetTag("tag.", db, table, "default")
 					filter := fmt.Sprintf(tagItem.NotNullFilter, name)
 					return &view.Expr{Value: "(" + filter + ")"}, true
 				} else if common.IsValueInSliceString(preAsTag, []string{"request_id", "response_code", "span_kind", "request_length", "response_length", "sql_affected_rows"}) {
@@ -78,7 +78,7 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 			return &view.Expr{Value: "(" + filter + ")"}, true
 		} else {
 			name := strings.Trim(name, "`")
-			if strings.HasPrefix(name, "label.") {
+			if strings.HasPrefix(name, "k8s.label.") {
 				if strings.HasSuffix(name, "_0") {
 					tagItem, ok = tag.GetTag("k8s_label_0", db, table, "default")
 				} else if strings.HasSuffix(name, "_1") {
@@ -89,7 +89,7 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 				filter := tagItem.NotNullFilter
 				return &view.Expr{Value: "(" + filter + ")"}, true
 			} else if strings.HasPrefix(name, "tag.") || strings.HasPrefix(name, "attribute.") {
-				tagItem, ok = tag.GetTag("tag", db, table, "default")
+				tagItem, ok = tag.GetTag("tag.", db, table, "default")
 				filter := fmt.Sprintf(tagItem.NotNullFilter, name)
 				return &view.Expr{Value: "(" + filter + ")"}, true
 			} else if common.IsValueInSliceString(name, []string{"request_id", "response_code", "span_kind", "request_length", "response_length", "sql_affected_rows"}) {
