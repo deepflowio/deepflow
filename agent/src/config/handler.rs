@@ -45,7 +45,7 @@ use crate::{
     exception::ExceptionHandler,
     flow_generator::{FlowTimeout, TcpTimeout},
     handler::PacketHandlerBuilder,
-    trident::{Components, RunningMode},
+    trident::{AgentComponents, RunningMode},
     utils::{
         environment::{free_memory_check, get_ctrl_ip_and_mac, running_in_container},
         logger::RemoteLogConfig,
@@ -1143,13 +1143,13 @@ impl ConfigHandler {
         &mut self,
         new_config: RuntimeConfig,
         exception_handler: &ExceptionHandler,
-        mut components: Option<&mut Components>,
-    ) -> Vec<fn(&ConfigHandler, &mut Components)> {
+        mut components: Option<&mut AgentComponents>,
+    ) -> Vec<fn(&ConfigHandler, &mut AgentComponents)> {
         let candidate_config = &mut self.candidate_config;
         let static_config = &self.static_config;
         let yaml_config = &mut candidate_config.yaml_config;
         let mut new_config: ModuleConfig = (static_config.clone(), new_config).try_into().unwrap();
-        let mut callbacks: Vec<fn(&ConfigHandler, &mut Components)> = vec![];
+        let mut callbacks: Vec<fn(&ConfigHandler, &mut AgentComponents)> = vec![];
         let mut restart_dispatcher = false;
 
         if candidate_config.tap_mode != new_config.tap_mode {
@@ -1262,7 +1262,7 @@ impl ConfigHandler {
             if candidate_config.dispatcher.enabled != new_config.dispatcher.enabled {
                 info!("enabled set to {}", new_config.dispatcher.enabled);
                 if new_config.dispatcher.enabled {
-                    fn start_dispatcher(handler: &ConfigHandler, components: &mut Components) {
+                    fn start_dispatcher(handler: &ConfigHandler, components: &mut AgentComponents) {
                         match handler.candidate_config.tap_mode {
                             TapMode::Analyzer => {
                                 for dispatcher in components.dispatchers.iter() {
@@ -1290,7 +1290,7 @@ impl ConfigHandler {
                     }
                     callbacks.push(start_dispatcher);
                 } else {
-                    fn stop_dispatcher(_: &ConfigHandler, components: &mut Components) {
+                    fn stop_dispatcher(_: &ConfigHandler, components: &mut AgentComponents) {
                         for dispatcher in components.dispatchers.iter() {
                             dispatcher.stop();
                         }
@@ -1326,7 +1326,10 @@ impl ConfigHandler {
                 candidate_config.dispatcher.global_pps_threshold =
                     new_config.dispatcher.global_pps_threshold;
 
-                fn leaky_bucket_callback(handler: &ConfigHandler, components: &mut Components) {
+                fn leaky_bucket_callback(
+                    handler: &ConfigHandler,
+                    components: &mut AgentComponents,
+                ) {
                     match handler.candidate_config.tap_mode {
                         TapMode::Analyzer => {
                             components.rx_leaky_bucket.set_rate(None);
@@ -1414,7 +1417,7 @@ impl ConfigHandler {
                 "stats config change from {:#?} to {:#?}",
                 candidate_config.stats, new_config.stats
             );
-            fn stats_callback(handler: &ConfigHandler, components: &mut Components) {
+            fn stats_callback(handler: &ConfigHandler, components: &mut AgentComponents) {
                 let c = &components.stats_collector;
                 c.set_hostname(handler.candidate_config.stats.host.clone());
                 c.set_min_interval(handler.candidate_config.stats.interval);
@@ -1429,7 +1432,7 @@ impl ConfigHandler {
             );
             candidate_config.debug = new_config.debug;
 
-            fn debug_callback(handler: &ConfigHandler, components: &mut Components) {
+            fn debug_callback(handler: &ConfigHandler, components: &mut AgentComponents) {
                 if handler.candidate_config.debug.enabled {
                     components.debugger.start();
                 } else {
@@ -1558,7 +1561,7 @@ impl ConfigHandler {
                 }
             }
 
-            fn quadruple_generator_callback(_: &ConfigHandler, components: &mut Components) {
+            fn quadruple_generator_callback(_: &ConfigHandler, components: &mut AgentComponents) {
                 for collector in components.collectors.iter().as_ref() {
                     collector.quadruple_generator.update_config();
                 }
@@ -1591,7 +1594,7 @@ impl ConfigHandler {
             candidate_config.platform = new_config.platform;
 
             if static_config.agent_mode == RunningMode::Managed {
-                fn platform_callback(handler: &ConfigHandler, components: &mut Components) {
+                fn platform_callback(handler: &ConfigHandler, components: &mut AgentComponents) {
                     let conf = &handler.candidate_config.platform;
                     #[cfg(target_os = "windows")]
                     if handler.candidate_config.enabled
@@ -1729,7 +1732,7 @@ impl ConfigHandler {
                     candidate_config.log_parser.l7_log_dynamic,
                     new_config.log_parser.l7_log_dynamic
                 );
-                fn l7_log_dynamic_callback(_: &ConfigHandler, components: &mut Components) {
+                fn l7_log_dynamic_callback(_: &ConfigHandler, components: &mut AgentComponents) {
                     for log_parser in components.log_parsers.iter().as_ref() {
                         log_parser.l7_log_dynamic_config_updated();
                     }
@@ -1741,7 +1744,7 @@ impl ConfigHandler {
             {
                 fn l7_log_collect_nps_threshold_callback(
                     config: &ConfigHandler,
-                    components: &mut Components,
+                    components: &mut AgentComponents,
                 ) {
                     info!(
                         "l7 log collect nps threshold set to {}",
@@ -1781,7 +1784,7 @@ impl ConfigHandler {
             );
             candidate_config.ebpf = new_config.ebpf;
 
-            fn ebpf_callback(handler: &ConfigHandler, components: &mut Components) {
+            fn ebpf_callback(handler: &ConfigHandler, components: &mut AgentComponents) {
                 if let Some(ebpf_collector) = components.ebpf_collector.as_mut() {
                     ebpf_collector.on_config_change(&handler.candidate_config.ebpf);
                 }
@@ -1824,7 +1827,10 @@ impl ConfigHandler {
                 }
             }
             if candidate_config.metric_server.compressed != new_config.metric_server.compressed {
-                fn metric_server_callback(handler: &ConfigHandler, components: &mut Components) {
+                fn metric_server_callback(
+                    handler: &ConfigHandler,
+                    components: &mut AgentComponents,
+                ) {
                     components
                         .external_metrics_server
                         .enable_compressed(handler.candidate_config.metric_server.compressed);
@@ -1839,7 +1845,7 @@ impl ConfigHandler {
         }
 
         if candidate_config.npb != new_config.npb {
-            fn dispatcher_callback(handler: &ConfigHandler, components: &mut Components) {
+            fn dispatcher_callback(handler: &ConfigHandler, components: &mut AgentComponents) {
                 let dispatcher_builders = &components.handler_builders;
                 for e in dispatcher_builders {
                     let mut builders = e.lock().unwrap();
@@ -1872,7 +1878,7 @@ impl ConfigHandler {
 
         // avoid first config changed to restart dispatcher
         if components.is_some() && restart_dispatcher && candidate_config.dispatcher.enabled {
-            fn dispatcher_callback(handler: &ConfigHandler, components: &mut Components) {
+            fn dispatcher_callback(handler: &ConfigHandler, components: &mut AgentComponents) {
                 for dispatcher in components.dispatchers.iter() {
                     dispatcher.stop();
                 }
