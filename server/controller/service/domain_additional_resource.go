@@ -30,6 +30,11 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/model"
 )
 
+const (
+	CLOUD_TAGS_RESOURCE_TYPE_CHOST  = "chost"
+	CLOUD_TAGS_RESOURCE_TYPE_POD_NS = "pod_ns"
+)
+
 type addtionalResourceToolDataSet struct {
 	regionUUID             string
 	azUUIDs                []string
@@ -42,6 +47,10 @@ type addtionalResourceToolDataSet struct {
 	additionalSubnets      []model.AdditionalResourceSubnet
 	additionalHosts        []model.AdditionalResourceHost
 	additionalCHosts       []model.AdditionalResourceChost
+	vpcIDToUUID            map[int]string
+	podClusterIDToUUID     map[int]string
+	cloudTagCHosts         []mysql.VM
+	cloudTagPodNamespaces  []mysql.PodNamespace
 }
 
 func newAddtionalResourceToolDataSet(regionUUID string) *addtionalResourceToolDataSet {
@@ -142,12 +151,15 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 		toolDS.additionalAZs = append(toolDS.additionalAZs, az)
 	}
 
-	domainUUIDToVPCUUIDs, err := getVPCDataFromDB(domainUUIDs)
+	domainUUIDToVPCUUIDs, domainUUIDToVPCIDToUUID, err := getVPCDataFromDB(domainUUIDs)
 	if err != nil {
 		return nil, err
 	}
 	for domainUUID, vpcUUIDs := range domainUUIDToVPCUUIDs {
 		domainUUIDToToolDataSet[domainUUID].vpcUUIDs = vpcUUIDs
+	}
+	for domainUUID, vpcIDToUUID := range domainUUIDToVPCIDToUUID {
+		domainUUIDToToolDataSet[domainUUID].vpcIDToUUID = vpcIDToUUID
 	}
 	for _, vpc := range additionalRsc.VPCs {
 		toolDS, ok := domainUUIDToToolDataSet[vpc.DomainUUID]
@@ -289,6 +301,71 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 			}
 		}
 	}
+
+	// store podClusterIDToUUID
+	domainUUIDToPodClusterIDToUUID, err := getPodClusterDataFromDB(domainUUIDs)
+	if err != nil {
+		return nil, err
+	}
+	for domainUUID, podClusterIDToUUID := range domainUUIDToPodClusterIDToUUID {
+		domainUUIDToToolDataSet[domainUUID].podClusterIDToUUID = podClusterIDToUUID
+	}
+	// handle chosts and pod_namespaces
+	domainUUIDToCHostNameToInfo, err := getCHostsFromDB(domainUUIDs)
+	if err != nil {
+		return nil, err
+	}
+	domainUUIDToPodNSNameToInfo, err := getPodNamespaceFromDB(domainUUIDs)
+	if err != nil {
+		return nil, err
+	}
+	for _, cloudTag := range additionalRsc.CloudTags {
+		toolDS, ok := domainUUIDToToolDataSet[cloudTag.DomainUUID]
+		if !ok {
+			return nil, NewError(
+				common.RESOURCE_NOT_FOUND,
+				fmt.Sprintf("cloud tag (resource name: %s) domain (uuid: %s) not found", cloudTag.ResourceName, cloudTag.DomainUUID),
+			)
+		}
+		if cloudTag.ResourceType == CLOUD_TAGS_RESOURCE_TYPE_CHOST {
+			chostNameToInfo, ok := domainUUIDToCHostNameToInfo[cloudTag.DomainUUID]
+			if !ok {
+				return nil, NewError(
+					common.RESOURCE_NOT_FOUND,
+					fmt.Sprintf("cloud tag (resource name: %s) domain (uuid: %s) not found", cloudTag.ResourceName, cloudTag.DomainUUID),
+				)
+			}
+			chost, ok := chostNameToInfo[cloudTag.ResourceName]
+			if !ok {
+				return nil, NewError(
+					common.INVALID_POST_DATA,
+					fmt.Sprintf("cloud tag (resource name: %s) domain (uuid: %s) not found", cloudTag.ResourceName, cloudTag.DomainUUID))
+			}
+			chost.CloudTags = convertTagsToString(cloudTag.Tags)
+			toolDS.cloudTagCHosts = append(toolDS.cloudTagCHosts, chost)
+		} else if cloudTag.ResourceType == CLOUD_TAGS_RESOURCE_TYPE_POD_NS {
+			podNSNameToInfo, ok := domainUUIDToPodNSNameToInfo[cloudTag.DomainUUID]
+			if !ok {
+				return nil, NewError(
+					common.RESOURCE_NOT_FOUND,
+					fmt.Sprintf("cloud tag (resource name: %s) domain (uuid: %s) not found", cloudTag.ResourceName, cloudTag.DomainUUID))
+			}
+			podNS, ok := podNSNameToInfo[cloudTag.ResourceName]
+			if !ok {
+				return nil, NewError(
+					common.INVALID_POST_DATA,
+					fmt.Sprintf("cloud tag (resource name: %s) domain (uuid: %s) not found", cloudTag.ResourceName, cloudTag.DomainUUID))
+			}
+			podNS.CloudTags = convertTagsToString(cloudTag.Tags)
+			toolDS.cloudTagPodNamespaces = append(toolDS.cloudTagPodNamespaces, podNS)
+		} else {
+			return nil, NewError(
+				common.INVALID_POST_DATA,
+				fmt.Sprintf("cloud tag (resource type: %s) not support", cloudTag.ResourceType),
+			)
+		}
+	}
+
 	return domainUUIDToToolDataSet, nil
 }
 
@@ -308,6 +385,9 @@ func getDomainUUIDsUsedByAdditionalResource(additionalRsc model.AdditionalResour
 	}
 	for _, chost := range additionalRsc.CHosts {
 		domainUUIDs.Add(chost.DomainUUID)
+	}
+	for _, cloudTag := range additionalRsc.CloudTags {
+		domainUUIDs.Add(cloudTag.DomainUUID)
 	}
 	return domainUUIDs.ToSlice()
 }
@@ -478,6 +558,48 @@ func generateCloudModelData(domainUUIDToToolDataSet map[string]*addtionalResourc
 				}
 			}
 		}
+
+		chostUUIDToInfo := make(map[string]*cloudmodel.VM)
+		for _, chost := range cloudMD.CHosts {
+			chostUUIDToInfo[chost.Lcuuid] = &chost
+		}
+		for _, chost := range toolDS.cloudTagCHosts {
+			chostInfo, ok := chostUUIDToInfo[chost.Lcuuid]
+			// chosts and cloud_tags modify the same chost at the same time
+			if ok {
+				chostInfo.CloudTags = chost.CloudTags
+				continue
+			}
+			cloudMD.CHosts = append(
+				cloudMD.CHosts,
+				cloudmodel.VM{
+					Lcuuid:       chost.Lcuuid,
+					Name:         chost.Name,
+					Label:        chost.Label,
+					HType:        chost.HType,
+					State:        chost.State,
+					LaunchServer: chost.LaunchServer,
+					CloudTags:    chost.CloudTags,
+					VPCLcuuid:    toolDS.vpcIDToUUID[chost.VPCID],
+					AZLcuuid:     chost.AZ,
+					RegionLcuuid: chost.Region,
+				},
+			)
+		}
+
+		for _, podNamespace := range toolDS.cloudTagPodNamespaces {
+			cloudMD.PodNamespaces = append(
+				cloudMD.PodNamespaces,
+				cloudmodel.PodNamespace{
+					Lcuuid:           podNamespace.Lcuuid,
+					Name:             podNamespace.Name,
+					CloudTags:        podNamespace.CloudTags,
+					PodClusterLcuuid: toolDS.podClusterIDToUUID[podNamespace.PodClusterID],
+					AZLcuuid:         podNamespace.AZ,
+					RegionLcuuid:     podNamespace.Region,
+					SubDomainLcuuid:  podNamespace.SubDomain,
+				})
+		}
 		domainUUIDToCloudModelData[domainUUID] = cloudMD
 		log.Debugf("domain (uuid: %s) cloud data: %#v", cloudMD)
 	}
@@ -524,20 +646,23 @@ func getAZDataFromDB(domainUUIDs []string) (map[string][]string, error) {
 	return domainUUIDToAZUUIDs, nil
 }
 
-func getVPCDataFromDB(domainUUIDs []string) (map[string][]string, error) {
+func getVPCDataFromDB(domainUUIDs []string) (map[string][]string, map[string]map[int]string, error) {
 	var vpcs []mysql.VPC
 	err := mysql.Db.Where("domain IN (?)", domainUUIDs).Find(&vpcs).Error
 	if err != nil {
-		return nil, NewError(
+		return nil, nil, NewError(
 			common.SERVER_ERROR,
 			fmt.Sprintf("db query vpc failed: %s", err.Error()),
 		)
 	}
 	domainUUIDToVPCUUIDs := make(map[string][]string)
+	domainUUIDToVPCIDToUUID := make(map[string]map[int]string)
 	for _, vpc := range vpcs {
 		domainUUIDToVPCUUIDs[vpc.Domain] = append(domainUUIDToVPCUUIDs[vpc.Domain], vpc.Lcuuid)
+		domainUUIDToVPCIDToUUID[vpc.Domain] = make(map[int]string)
+		domainUUIDToVPCIDToUUID[vpc.Domain][vpc.ID] = vpc.Lcuuid
 	}
-	return domainUUIDToVPCUUIDs, nil
+	return domainUUIDToVPCUUIDs, domainUUIDToVPCIDToUUID, nil
 }
 
 func getSubnetDataFromDB(domainUUIDs []string) (map[string]map[string]int, map[string]map[string]map[string]string, error) {
@@ -581,6 +706,23 @@ func getSubnetDataFromDB(domainUUIDs []string) (map[string]map[string]int, map[s
 		domainUUIDToSubnetCIDRInfoMap[subnet.Domain][subnet.Lcuuid] = subnetCIDRToUUID
 	}
 	return domainUUIDToSubnetInfoMap, domainUUIDToSubnetCIDRInfoMap, nil
+}
+
+func getPodClusterDataFromDB(domainUUIDs []string) (map[string]map[int]string, error) {
+	var podClusters []mysql.PodCluster
+	err := mysql.Db.Where("domain IN (?)", domainUUIDs).Find(&podClusters).Error
+	if err != nil {
+		return nil, NewError(
+			common.SERVER_ERROR,
+			fmt.Sprintf("db query pod_cluster failed: %s", err.Error()),
+		)
+	}
+	domainUUIDToPodClusterIDToUUID := make(map[string]map[int]string)
+	for _, podCluster := range podClusters {
+		domainUUIDToPodClusterIDToUUID[podCluster.Domain] = make(map[int]string)
+		domainUUIDToPodClusterIDToUUID[podCluster.Domain][podCluster.ID] = podCluster.Lcuuid
+	}
+	return domainUUIDToPodClusterIDToUUID, nil
 }
 
 func getDataInfoFromDB(domainUUIDs []string) (map[string]map[string]string, error) {
@@ -635,4 +777,54 @@ func isIPInCIDR(cidr, ip string) bool {
 	i := net.ParseIP(ip)
 	_, c, _ := net.ParseCIDR(cidr)
 	return c.Contains(i)
+}
+
+func getCHostsFromDB(domainUUIDs []string) (map[string]map[string]mysql.VM, error) {
+	var chosts []mysql.VM
+	err := mysql.Db.Where("domain IN (?)", domainUUIDs).Find(&chosts).Error
+	if err != nil {
+		return nil, NewError(
+			common.SERVER_ERROR,
+			fmt.Sprintf("db query vm failed: %s", err.Error()),
+		)
+	}
+	domainUUIDToCHostNameToInfo := make(map[string]map[string]mysql.VM)
+	for _, chost := range chosts {
+		if _, ok := domainUUIDToCHostNameToInfo[chost.Domain]; !ok {
+			domainUUIDToCHostNameToInfo[chost.Domain] = make(map[string]mysql.VM)
+		}
+		domainUUIDToCHostNameToInfo[chost.Domain][chost.Name] = chost
+	}
+	return domainUUIDToCHostNameToInfo, nil
+}
+
+func getPodNamespaceFromDB(domainUUIDs []string) (map[string]map[string]mysql.PodNamespace, error) {
+	var podNamespaces []mysql.PodNamespace
+	err := mysql.Db.Where("domain IN (?)", domainUUIDs).Find(&podNamespaces).Error
+	if err != nil {
+		return nil, NewError(
+			common.INVALID_POST_DATA,
+			fmt.Sprintf("db query pod_namespace failed: %s", err),
+		)
+	}
+	domainUUIDToPodNSNameToInfo := make(map[string]map[string]mysql.PodNamespace)
+	for _, podNamespace := range podNamespaces {
+		if _, ok := domainUUIDToPodNSNameToInfo[podNamespace.Domain]; !ok {
+			domainUUIDToPodNSNameToInfo[podNamespace.Domain] = make(map[string]mysql.PodNamespace)
+		}
+		domainUUIDToPodNSNameToInfo[podNamespace.Domain][podNamespace.Name] = podNamespace
+	}
+	return domainUUIDToPodNSNameToInfo, nil
+}
+
+func convertTagsToString(tags []model.AdditionalResourceTag) string {
+	var str string
+	for i, tag := range tags {
+		if i == 0 {
+			str = fmt.Sprintf("%s:%s", tag.Key, tag.Value)
+			continue
+		}
+		str += fmt.Sprintf("%s, %s:%s", str, tag.Key, tag.Value)
+	}
+	return str
 }

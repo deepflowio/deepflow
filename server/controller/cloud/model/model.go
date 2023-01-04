@@ -550,14 +550,15 @@ type Resource struct {
 }
 
 type AdditionalResource struct {
-	AZs         []AZ
-	VPCs        []VPC
-	Subnets     []Network
-	SubnetCIDRs []Subnet
-	Hosts       []Host
-	CHosts      []VM
-	VInterfaces []VInterface
-	IPs         []IP
+	AZs           []AZ
+	VPCs          []VPC
+	Subnets       []Network
+	SubnetCIDRs   []Subnet
+	Hosts         []Host
+	CHosts        []VM
+	VInterfaces   []VInterface
+	IPs           []IP
+	PodNamespaces []PodNamespace
 }
 
 type BasicInfo struct {

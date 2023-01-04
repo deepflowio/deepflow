@@ -47,3 +47,11 @@ chosts:
   - mac: xx:xx:xx:xx:xx:xx # required
     subnet_uuid: xxxx      # required
     ips: ["x.x.x.x"]       # required
+
+cloud_tags:
+- resource_type: xxxx # required. options: chost, pod_ns 
+  resource_name: xxxx # required
+  domain_uuid: xxxx   # required
+  tags:               # required
+  - key: xxxx         # required
+    value: xxxx       # required

@@ -63,6 +63,7 @@ func (n *PodNamespace) generateDBItemToAdd(cloudItem *cloudmodel.PodNamespace) (
 		Domain:       n.cache.DomainLcuuid,
 		Region:       cloudItem.RegionLcuuid,
 		AZ:           cloudItem.AZLcuuid,
+		CloudTags:    cloudItem.CloudTags,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
@@ -75,6 +76,9 @@ func (n *PodNamespace) generateUpdateInfo(diffBase *cache.PodNamespace, cloudIte
 	}
 	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
 		updateInfo["az"] = cloudItem.AZLcuuid
+	}
+	if diffBase.CloudTags != cloudItem.CloudTags {
+		updateInfo["cloud_tags"] = cloudItem.CloudTags
 	}
 
 	if len(updateInfo) > 0 {

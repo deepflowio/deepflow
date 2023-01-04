@@ -67,6 +67,7 @@ func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*mysql.VM, bool) {
 		Region:       cloudItem.RegionLcuuid,
 		AZ:           cloudItem.AZLcuuid,
 		VPCID:        vpcID,
+		CloudTags:    cloudItem.CloudTags,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	if !cloudItem.CreatedAt.IsZero() {
@@ -108,6 +109,9 @@ func (m *VM) generateUpdateInfo(diffBase *cache.VM, cloudItem *cloudmodel.VM) (m
 	}
 	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
 		updateInfo["az"] = cloudItem.AZLcuuid
+	}
+	if diffBase.CloudTags != cloudItem.CloudTags {
+		updateInfo["cloud_tags"] = cloudItem.CloudTags
 	}
 
 	if len(updateInfo) > 0 {
