@@ -89,6 +89,7 @@ func GetProcesses() ([]model.Process, error) {
 			CommandLine:  process.CommandLine,
 			UserName:     process.UserName,
 			OSAPPTags:    process.OSAPPTags,
+			ResourceID:   vtapIDToInfo[process.VTapID].LaunchServerID,
 			StartTime:    process.StartTime.Format(common.GO_BIRTHDAY),
 			UpdateAt:     process.UpdatedAt.Format(common.GO_BIRTHDAY),
 		}
