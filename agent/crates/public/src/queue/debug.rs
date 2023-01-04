@@ -45,24 +45,23 @@ impl<T: Debug> DebugSender<T> {
 
     fn send_debug(&self, msgs: &Vec<T>) {
         if self.debug.1.load(Ordering::Relaxed) {
+            let mut batch = Vec::with_capacity(QUEUE_LEN);
             for chunk in msgs.chunks(QUEUE_LEN) {
-                if let Err(e) = self.debug.0.send_all(
-                    chunk
-                        .iter()
-                        .map(|msg| format!("{:?}", msg))
-                        .collect::<Vec<_>>(),
-                ) {
+                batch.extend(chunk.iter().map(|msg| format!("{:?}", msg)));
+                if let Err(e) = self.debug.0.send_all(&mut batch) {
                     debug!("failed to send_all: {:?}", e);
+                    batch.clear();
                 }
             }
         }
     }
 
-    pub fn send_all(&self, msgs: Vec<T>) -> Result<(), Error<T>> {
+    pub fn send_all(&self, msgs: &mut Vec<T>) -> Result<(), Error<T>> {
         self.send_debug(&msgs);
         self.sender.send_all(msgs)
     }
 
+    #[deprecated]
     pub fn send_large(&self, msgs: Vec<T>) -> Result<(), Error<T>> {
         self.send_debug(&msgs);
         self.sender.send_large(msgs)
