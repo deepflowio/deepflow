@@ -21,7 +21,7 @@ pod_group                  , K8s 工作负载               ,
 pod                        , K8s 容器 POD               ,
 service                    , 服务                       ,
 
-labels                     , K8s Labels                 ,
+k8s.label                  , K8s Label                  ,
 
 instance                   , 实例                       ,
 instance_type              , 实例类型                   ,

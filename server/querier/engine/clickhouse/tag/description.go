@@ -261,7 +261,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 	}
 	for _, _key := range rst.Values {
 		key := _key.([]interface{})[0]
-		labelKey := "label." + key.(string)
+		labelKey := "k8s.label." + key.(string)
 		if db == "ext_metrics" || db == "event" || table == "vtap_flow_port" || table == "vtap_app_port" {
 			response.Values = append(response.Values, []interface{}{
 				labelKey, labelKey, labelKey, labelKey, "label",
@@ -320,8 +320,8 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 	}
 	if db == "ext_metrics" || db == "deepflow_system" {
 		response.Values = append(response.Values, []interface{}{
-			"tags", "tags", "tags", "tags", "map",
-			"Tag", []string{}, []bool{true, true, true}, "tags", "",
+			"tag", "tag", "tag", "tag", "map",
+			"Tag", []string{}, []bool{true, true, true}, "tag", "",
 		})
 	}
 	return response, nil
@@ -383,7 +383,7 @@ func GetTagValues(db, table, sql string) (*common.Result, []string, error) {
 		sql = showSqlList[0] + " WHERE " + showSqlList[1]
 	}
 	// K8s Labels是动态的,不需要去tag_description里确认
-	if strings.HasPrefix(tag, "label.") {
+	if strings.HasPrefix(tag, "k8s.label.") {
 		return GetTagResourceValues(db, table, sql)
 	}
 	// 外部字段是动态的,不需要去tag_description里确认
@@ -573,8 +573,8 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 			sql = fmt.Sprintf("SELECT id AS value, name AS display_name FROM vtap_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 
 		default:
-			if strings.HasPrefix(tag, "label.") {
-				labelTag := strings.TrimPrefix(tag, "label.")
+			if strings.HasPrefix(tag, "k8s.label.") {
+				labelTag := strings.TrimPrefix(tag, "k8s.label.")
 				if whereSql != "" {
 					whereSql += fmt.Sprintf(" AND `key`='%s'", labelTag)
 				} else {
@@ -638,8 +638,8 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM lb_listener_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		} else if tag == "pod_ingress" {
 			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM pod_ingress_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
-		} else if strings.HasPrefix(tag, "label.") {
-			labelTag := strings.TrimPrefix(tag, "label.")
+		} else if strings.HasPrefix(tag, "k8s.label.") {
+			labelTag := strings.TrimPrefix(tag, "k8s.label.")
 			if whereSql != "" {
 				whereSql += fmt.Sprintf(" AND `key`='%s'", labelTag)
 			} else {

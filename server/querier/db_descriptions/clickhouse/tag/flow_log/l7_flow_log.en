@@ -31,8 +31,8 @@ resource_gl1              , Instance - K8s Workload First , On the basis of 'res
 resource_gl2_type         , Type - K8s Service First      , The type of 'resource_gl2'.
 resource_gl2              , Instance - K8s Service First  , On the basis of 'resource_gl1', aggregate K8s service ClusterIP and workload into service.
 
-labels                    , K8s Labels                    ,
-attributes                , Attributes                    ,
+k8s.label                 , K8s Label                     ,
+attribute                 , Attribute                     ,
 
 ip                        , IP Address                    ,
 is_ipv4                   , IPv4 Flag                     ,

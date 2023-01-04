@@ -31,7 +31,7 @@ resource_gl1          , 资源-工作负载优先            ,
 resource_gl2_type     , 类型-服务优先                ,
 resource_gl2          , 资源-服务优先                ,
 
-labels                , K8s Labels                   ,
+k8s.label             , K8s Label                    ,
 
 eth_type              , 链路协议                     ,
 vlan                  , VLAN TAG                     ,
