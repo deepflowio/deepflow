@@ -30,7 +30,7 @@ use crate::{
     common::enums::IpProtocol,
     common::flow::PacketDirection,
     flow_generator::error::{Error, Result},
-    utils::bytes::{read_u16_be, read_u32_be},
+    utils::bytes::{read_i16_be, read_u16_be, read_u32_be},
 };
 use crate::{log_info_merge, parse_common};
 
@@ -120,12 +120,12 @@ impl KafkaInfo {
         match other.msg_type {
             LogMessageType::Response if self.api_key == KAFKA_FETCH && self.api_version >= 7 => {
                 if let Some(d) = other.resp_data {
-                    self.set_status_code(read_u16_be(&d[12..]) as i32)
+                    self.set_status_code(read_i16_be(&d[12..]) as i32)
                 }
             }
             LogMessageType::Request if other.api_key == KAFKA_FETCH && other.api_version >= 7 => {
                 if let Some(d) = self.resp_data {
-                    self.set_status_code(read_u16_be(&d[12..]) as i32)
+                    self.set_status_code(read_i16_be(&d[12..]) as i32)
                 }
             }
             _ => {}
@@ -346,7 +346,7 @@ impl KafkaLog {
         self.info.correlation_id = read_u32_be(&payload[4..]);
         self.info.msg_type = LogMessageType::Response;
         if payload.len() >= 14 {
-            self.info.resp_data = Some(payload[..14].try_into().unwrap())
+            self.info.resp_data = Some(payload[..14].try_into().unwrap());
         }
         Ok(AppProtoHead {
             proto: L7Protocol::Kafka,
