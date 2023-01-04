@@ -21,7 +21,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set"
 
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/config"
@@ -307,12 +307,20 @@ func (c *ControllerCheck) vtapControllerAlloc(excludeIP string) {
 			sort.Slice(controllerAvailableVTapNum, func(i, j int) bool {
 				return controllerAvailableVTapNum[i].Value > controllerAvailableVTapNum[j].Value
 			})
-			controllerAvailableVTapNum[0].Value -= 1
-			controllerIPToAvailableVTapNum[controllerAvailableVTapNum[0].Key] -= 1
+			// Search for controllers that have capacity. If none has capacity, the collector limit is allowed.
+			index := 0
+			for i, availableVTap := range controllerAvailableVTapNum {
+				if availableVTap.Value == 0 || controllerIPToAvailableVTapNum[availableVTap.Key] == 0 {
+					continue
+				}
+				index = i
+			}
+			controllerAvailableVTapNum[index].Value -= 1
+			controllerIPToAvailableVTapNum[controllerAvailableVTapNum[index].Key] -= 1
 
 			// 分配控制器成功，更新控制器IP + 清空控制器分配失败的错误码
-			log.Infof("alloc controller (%s) for vtap (%s)", controllerAvailableVTapNum[0].Key, vtap.Name)
-			mysql.Db.Model(&vtap).Update("controller_ip", controllerAvailableVTapNum[0].Key)
+			log.Infof("alloc controller (%s) for vtap (%s)", controllerAvailableVTapNum[index].Key, vtap.Name)
+			mysql.Db.Model(&vtap).Update("controller_ip", controllerAvailableVTapNum[index].Key)
 			if vtap.Exceptions&common.VTAP_EXCEPTION_ALLOC_CONTROLLER_FAILED != 0 {
 				exceptions := vtap.Exceptions ^ common.VTAP_EXCEPTION_ALLOC_CONTROLLER_FAILED
 				mysql.Db.Model(&vtap).Update("exceptions", exceptions)
