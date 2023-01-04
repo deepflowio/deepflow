@@ -134,11 +134,11 @@ var (
 		input:  "select byte from l4_flow_log where ip>=('1.1.1.1/24','2.2.2.2') and ip<='::/24'",
 		output: "SELECT byte_tx+byte_rx AS `byte` FROM flow_log.`l4_flow_log` PREWHERE (((if(is_ipv4=1, hex(ip4), hex(ip6)) >= hex(toIPv4('1.1.1.255'))) OR (if(is_ipv4=1, hex(ip4), hex(ip6)) >= hex(toIPv4('2.2.2.2'))))) AND (((if(is_ipv4=1, hex(ip4), hex(ip6)) <= hex(toIPv6('::'))))) LIMIT 10000",
 	}, {
-		input:  "select `label.statefulset.kubernetes.io/pod-name_0` from l4_flow_log where `label.statefulset.kubernetes.io/pod-name_0`='opensource-loki-0' group by `label.statefulset.kubernetes.io/pod-name_0`",
-		output: "SELECT dictGet(flow_tag.k8s_label_map, 'value', (toUInt64(pod_id_0),'statefulset.kubernetes.io/pod-name')) AS `label.statefulset.kubernetes.io/pod-name_0` FROM flow_log.`l4_flow_log` PREWHERE toUInt64(pod_id_0) IN (SELECT pod_id FROM flow_tag.k8s_label_map WHERE value = 'opensource-loki-0' and key='statefulset.kubernetes.io/pod-name') AND (pod_id_0!=0) GROUP BY `label.statefulset.kubernetes.io/pod-name_0` LIMIT 10000",
+		input:  "select `k8s.label.statefulset.kubernetes.io/pod-name_0` from l4_flow_log where `k8s.label.statefulset.kubernetes.io/pod-name_0`='opensource-loki-0' group by `k8s.label.statefulset.kubernetes.io/pod-name_0`",
+		output: "SELECT dictGet(flow_tag.k8s_label_map, 'value', (toUInt64(pod_id_0),'statefulset.kubernetes.io/pod-name')) AS `k8s.label.statefulset.kubernetes.io/pod-name_0` FROM flow_log.`l4_flow_log` PREWHERE toUInt64(pod_id_0) IN (SELECT pod_id FROM flow_tag.k8s_label_map WHERE value = 'opensource-loki-0' and key='statefulset.kubernetes.io/pod-name') AND (pod_id_0!=0) GROUP BY `k8s.label.statefulset.kubernetes.io/pod-name_0` LIMIT 10000",
 	}, {
-		input:  "select `label.statefulset.kubernetes.io/pod-name_0` as `label.abc` from l4_flow_log where `label.abc`='opensource-loki-0' group by `label.abc`",
-		output: "SELECT dictGet(flow_tag.k8s_label_map, 'value', (toUInt64(pod_id_0),'statefulset.kubernetes.io/pod-name')) AS `label.abc` FROM flow_log.`l4_flow_log` PREWHERE toUInt64(pod_id_0) IN (SELECT pod_id FROM flow_tag.k8s_label_map WHERE value = 'opensource-loki-0' and key='statefulset.kubernetes.io/pod-name') AND (pod_id_0!=0) GROUP BY `label.abc` LIMIT 10000",
+		input:  "select `k8s.label.statefulset.kubernetes.io/pod-name_0` as `k8s.label.abc` from l4_flow_log where `k8s.label.abc`='opensource-loki-0' group by `k8s.label.abc`",
+		output: "SELECT dictGet(flow_tag.k8s_label_map, 'value', (toUInt64(pod_id_0),'statefulset.kubernetes.io/pod-name')) AS `k8s.label.abc` FROM flow_log.`l4_flow_log` PREWHERE toUInt64(pod_id_0) IN (SELECT pod_id FROM flow_tag.k8s_label_map WHERE value = 'opensource-loki-0' and key='statefulset.kubernetes.io/pod-name') AND (pod_id_0!=0) GROUP BY `k8s.label.abc` LIMIT 10000",
 	}, {
 		input:  "select `attribute.cc` as `attribute.abc` from l7_flow_log where `attribute.abc`='opensource-loki-0' group by `attribute.abc`",
 		output: "SELECT attribute_values[indexOf(attribute_names,'cc')] AS `attribute.abc` FROM flow_log.`l7_flow_log` PREWHERE attribute_values[indexOf(attribute_names,'cc')] = 'opensource-loki-0' AND (`attribute.abc` != '') GROUP BY `attribute.abc` LIMIT 10000",
@@ -155,8 +155,8 @@ var (
 		output: "SELECT SUM(if(indexOf(metrics_float_names, 'pending')=0,null,metrics_float_values[indexOf(metrics_float_names, 'pending')])) AS `Sum(metrics.pending)` FROM deepflow_system.`deepflow_server.queue` LIMIT 10000",
 		db:     "deepflow_system",
 	}, {
-		input:  "select labels_0 from l7_flow_log",
-		output: "SELECT dictGetOrDefault(flow_tag.k8s_labels_map, 'labels', toUInt64(pod_id_0),'{}') AS `labels_0` FROM flow_log.`l7_flow_log` LIMIT 10000",
+		input:  "select `k8s.label_0` from l7_flow_log",
+		output: "SELECT dictGetOrDefault(flow_tag.k8s_labels_map, 'labels', toUInt64(pod_id_0),'{}') AS `k8s.label_0` FROM flow_log.`l7_flow_log` LIMIT 10000",
 	}, {
 		input:  "select `metrics.xxx.yyy` as xxx from l7_flow_log",
 		output: "SELECT if(indexOf(metrics_names, 'xxx.yyy')=0,null,metrics_values[indexOf(metrics_names, 'xxx.yyy')]) AS `xxx` FROM flow_log.`l7_flow_log` LIMIT 10000",

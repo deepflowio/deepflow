@@ -31,8 +31,8 @@ resource_gl1              , 资源-工作负载优先        , 在`resource_gl0`
 resource_gl2_type         , 类型-服务优先            , `resource_gl2`实例对应的类型。
 resource_gl2              , 资源-服务优先            , 在`resource_gl1`基础上，将容器服务的 ClusterIP 与工作负载聚合为服务。
 
-labels                    , K8s Labels               , K8s 自定义 Label。
-attributes                , Attributes               , OpenTelemetry Span 属性，以及应用协议特有属性。
+k8s.label                 , K8s Label                , K8s 自定义 Label。
+attribute                 , Attribute                , OpenTelemetry Span 属性，以及应用协议特有属性。
 
 ip                        , IP 地址                  ,
 is_ipv4                   , IPv4 标志                ,
