@@ -23,7 +23,7 @@ import (
 
 // 资源的MySQL orm对象
 type MySQLChModel interface {
-	mysql.ChIntEnum | mysql.ChStringEnum | mysql.ChPodIngress | mysql.ChPodGroupPort | mysql.ChPodPort | mysql.ChVTapPort | mysql.ChAZ | mysql.ChIPResource | mysql.ChK8sLabel |
+	mysql.ChOSAppTags | mysql.ChOSAppTag | mysql.ChPodNSCloudTags | mysql.ChChostCloudTags | mysql.ChPodNSCloudTag | mysql.ChChostCloudTag | mysql.ChIntEnum | mysql.ChStringEnum | mysql.ChPodIngress | mysql.ChPodGroupPort | mysql.ChPodPort | mysql.ChVTapPort | mysql.ChAZ | mysql.ChIPResource | mysql.ChK8sLabel |
 		mysql.ChLBListener | mysql.ChPodNodePort | mysql.ChIPPort | mysql.ChDevicePort | mysql.ChRegion | mysql.ChVPC |
 		mysql.ChDevice | mysql.ChIPRelation | mysql.ChPodGroup | mysql.ChNetwork | mysql.ChPod | mysql.ChPodCluster |
 		mysql.ChPodNode | mysql.ChPodNamespace | mysql.ChTapType | mysql.ChVTap | mysql.ChK8sLabels | mysql.ChNodeType
@@ -31,6 +31,6 @@ type MySQLChModel interface {
 
 // ch资源的组合key
 type ChModelKey interface {
-	IntEnumTagKey | StringEnumTagKey | VtapPortKey | IPResourceKey | K8sLabelKey | PortIDKey | PortIPKey | PortDeviceKey | IDKey | DeviceKey |
+	OSAPPTagKey | OSAPPTagsKey | CloudTagsKey | CloudTagKey | IntEnumTagKey | StringEnumTagKey | VtapPortKey | IPResourceKey | K8sLabelKey | PortIDKey | PortIPKey | PortDeviceKey | IDKey | DeviceKey |
 		IPRelationKey | TapTypeKey | K8sLabelsKey | NodeTypeKey
 }
