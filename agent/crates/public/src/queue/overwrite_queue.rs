@@ -315,7 +315,6 @@ impl<T> Sender<T> {
         }
     }
 
-    #[deprecated]
     pub fn send_large(&self, mut msgs: Vec<T>) -> Result<(), Error<T>> {
         const SEND_BATCH: usize = 1024;
         unsafe {
