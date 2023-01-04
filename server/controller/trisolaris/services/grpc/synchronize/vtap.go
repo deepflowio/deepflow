@@ -554,6 +554,7 @@ func (e *VTapEvent) noVTapResponse(in *api.SyncRequest) *api.SyncResponse {
 				MaxMemory:        proto.Uint32(uint32(gVTapInfo.GetDefaultMaxMemory())),
 			}
 		}
+		configInfo.Enabled = proto.Bool(false)
 		configInfo.TridentType = &tridentType
 		configInfo.PlatformEnabled = proto.Bool(true)
 
