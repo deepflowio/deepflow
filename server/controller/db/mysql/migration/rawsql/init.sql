@@ -299,6 +299,7 @@ CREATE TABLE IF NOT EXISTS vinterface_ip (
     gateway             CHAR(64) DEFAULT '',
     create_method       INTEGER DEFAULT 0 COMMENT '0.learning 1.user_defined',
     vl2id               INTEGER REFERENCES vl2(id),
+    vl2_net_id          INTEGER DEFAULT 0,
     net_index           INTEGER DEFAULT 0,
     sub_domain          CHAR(64) DEFAULT '',
     domain              CHAR(64) DEFAULT '',
@@ -321,6 +322,7 @@ CREATE TABLE IF NOT EXISTS ip_resource (
     userid              INTEGER DEFAULT 0,
     isp                 INTEGER,
     vifid               INTEGER DEFAULT 0,
+    vl2_net_id          INTEGER DEFAULT 0,
     sub_domain          CHAR(64) DEFAULT '',
     domain              CHAR(64) DEFAULT '',
     region              CHAR(64) DEFAULT '',
@@ -378,7 +380,7 @@ CREATE TABLE IF NOT EXISTS domain (
     name                VARCHAR(64),
     icon_id             INTEGER,
     display_name        VARCHAR(64) DEFAULT '',
-    cluster_id          CHAR(32),
+    cluster_id          CHAR(64),
     ip                  VARCHAR(64),
     role                INTEGER DEFAULT 0 COMMENT '1.BSS 2.OSS 3.OpenStack 4.VSphere',
     type                INTEGER DEFAULT 0 COMMENT '1.openstack 2.vsphere 3.nsp 4.tencent 5.filereader 6.aws 7.pingan 8.zstack 9.aliyun 10.huawei prv 11.k8s 12.simulation 13.huawei 14.qingcloud 15.qingcloud_private 16.F5 17.CMB_CMDB 18.azure 19.apsara_stack 20.tencent_tce 21.qingcloud_k8s 22.kingsoft_private 23.genesis 24.microsoft_acs 25.baidu_bce',
@@ -402,7 +404,7 @@ CREATE TABLE IF NOT EXISTS sub_domain (
     name                VARCHAR(64) DEFAULT '',
     display_name        VARCHAR(64) DEFAULT '',
     create_method       INTEGER DEFAULT 0 COMMENT '0.learning 1.user_defined',
-    cluster_id          CHAR(32) DEFAULT '',
+    cluster_id          CHAR(64) DEFAULT '',
     config              TEXT,
     error_msg           TEXT,
     enabled             INTEGER NOT NULL DEFAULT '1' COMMENT '0.false 1.true',
@@ -2160,3 +2162,51 @@ CREATE TABLE IF NOT EXISTS dial_test_task (
     updated_at              DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE dial_test_task;
+
+CREATE TABLE IF NOT EXISTS ch_chost_cloud_tag (
+    `id`            INTEGER NOT NULL,
+    `key`           VARCHAR(256) NOT NULL,
+    `value`         VARCHAR(256),
+    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`, `key`)
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_chost_cloud_tag;
+
+CREATE TABLE IF NOT EXISTS ch_pod_ns_cloud_tag (
+    `id`            INTEGER NOT NULL,
+    `key`           VARCHAR(256) NOT NULL,
+    `value`         VARCHAR(256),
+    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`, `key`)
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_pod_ns_cloud_tag;
+
+CREATE TABLE IF NOT EXISTS ch_chost_cloud_tags (
+    `id`            INTEGER NOT NULL PRIMARY KEY,
+    `cloud_tags`    TEXT,
+    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_chost_cloud_tags;
+
+CREATE TABLE IF NOT EXISTS ch_pod_ns_cloud_tags (
+    `id`            INTEGER NOT NULL PRIMARY KEY,
+    `cloud_tags`    TEXT,
+    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_pod_ns_cloud_tags;
+
+CREATE TABLE IF NOT EXISTS ch_os_app_tag (
+    `pid`           INTEGER NOT NULL,
+    `key`           VARCHAR(256) NOT NULL,
+    `value`         VARCHAR(256),
+    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`pid`, `key`)
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_os_app_tag;
+
+CREATE TABLE IF NOT EXISTS ch_os_app_tags (
+    `pid`           INTEGER NOT NULL PRIMARY KEY,
+    `os_app_tags`   TEXT,
+    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_os_app_tags;

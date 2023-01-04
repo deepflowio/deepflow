@@ -327,7 +327,7 @@ func (c *Cloud) appendAddtionalResourcesData() {
 	c.resource.VMs = append(c.resource.VMs, additionalResource.CHosts...)
 	c.resource.VInterfaces = append(c.resource.VInterfaces, additionalResource.VInterfaces...)
 	c.resource.IPs = append(c.resource.IPs, additionalResource.IPs...)
-	return
+	c.resource.PodNamespaces = append(c.resource.PodNamespaces, additionalResource.PodNamespaces...)
 }
 
 func (c *Cloud) appendResourceProcess() {
