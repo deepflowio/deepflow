@@ -14,6 +14,11 @@
  * limitations under the License.
  */
 
+pub fn read_i16_be(bs: &[u8]) -> i16 {
+    assert!(bs.len() >= 2);
+    i16::from_be_bytes(bs[..2].try_into().unwrap())
+}
+
 pub fn read_u16_be(bs: &[u8]) -> u16 {
     assert!(bs.len() >= 2);
     u16::from_be_bytes(bs[..2].try_into().unwrap())
