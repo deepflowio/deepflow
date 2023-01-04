@@ -304,7 +304,8 @@ impl<T> Sender<T> {
         }
     }
 
-    pub fn send_all(&self, mut msgs: Vec<T>) -> Result<(), Error<T>> {
+    // This method clears the Vec on success, and leave it as it is on failure
+    pub fn send_all(&self, msgs: &mut Vec<T>) -> Result<(), Error<T>> {
         unsafe {
             match self.counter().queue.raw_send(msgs.as_ptr(), msgs.len()) {
                 Ok(_) => {
@@ -312,7 +313,7 @@ impl<T> Sender<T> {
                     msgs.set_len(0);
                     Ok(())
                 }
-                Err(Error::Terminated(..)) => Err(Error::Terminated(None, Some(msgs))),
+                Err(Error::Terminated(..)) => Err(Error::Terminated(None, None)),
                 _ => unreachable!(),
             }
         }
@@ -589,7 +590,7 @@ mod tests {
                         }
                     } else {
                         sender
-                            .send_all(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+                            .send_all(&mut vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
                             .unwrap();
                     }
                 });
@@ -694,14 +695,14 @@ mod tests {
         {
             let (s, r, _) = bounded(3);
 
-            s.send_all(vec![
+            s.send_all(&mut vec![
                 CountedU64::new(42, c.clone()),
                 CountedU64::new(43, c.clone()),
                 CountedU64::new(44, c.clone()),
                 CountedU64::new(45, c.clone()),
             ])
             .unwrap();
-            s.send_all(vec![
+            s.send_all(&mut vec![
                 CountedU64::new(52, c.clone()),
                 CountedU64::new(53, c.clone()),
                 CountedU64::new(54, c.clone()),
@@ -725,7 +726,7 @@ mod tests {
         {
             let (s, r, _) = bounded(2);
 
-            s.send_all(vec![
+            s.send_all(&mut vec![
                 CountedU64::new(42, c.clone()),
                 CountedU64::new(43, c.clone()),
             ])
@@ -735,7 +736,7 @@ mod tests {
             let co = r.recv_n(2, None).unwrap();
             assert_eq!(co, vec![43, 44], "expected: [43, 44], result: {:?}", co);
 
-            s.send_all(vec![
+            s.send_all(&mut vec![
                 CountedU64::new(45, c.clone()),
                 CountedU64::new(46, c.clone()),
             ])
@@ -782,7 +783,7 @@ mod tests {
 
             while phase.load(Ordering::Acquire) < 1 {}
 
-            s.send_all(vec![
+            s.send_all(&mut vec![
                 CountedU64::new(42, c.clone()),
                 CountedU64::new(43, c.clone()),
             ])

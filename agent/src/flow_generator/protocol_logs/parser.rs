@@ -477,15 +477,17 @@ impl SessionQueue {
             Some(t) => t,
             None => return,
         };
+        let mut batch = Vec::new();
         for map in time_window.drain(..) {
             self.counter
                 .cached
                 .fetch_sub(map.len() as u64, Ordering::Relaxed);
-            let v = map
-                .into_values()
-                .map(|item| BoxAppProtoLogsData(Box::new(item)))
-                .collect();
-            if let Err(Error::Terminated(..)) = self.output_queue.send_all(v) {
+            batch.reserve(map.len());
+            batch.extend(
+                map.into_values()
+                    .map(|item| BoxAppProtoLogsData(Box::new(item))),
+            );
+            if let Err(Error::Terminated(..)) = self.output_queue.send_all(&mut batch) {
                 warn!("output queue terminated");
                 break;
             }

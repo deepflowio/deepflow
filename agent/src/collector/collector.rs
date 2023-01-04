@@ -842,27 +842,22 @@ impl Stash {
     }
 
     fn flush_stats(&mut self) {
-        let mut entries = self
-            .inner
-            .drain()
-            .map(|(_, mut doc)| {
-                doc.timestamp = self.start_time.as_secs() as u32;
-                doc.flags |= self.doc_flag;
-                BoxedDocument(Box::new(doc))
-            })
-            .collect::<Vec<_>>();
-        let mut index = 0;
-        let length = entries.len();
-        while index + QUEUE_BATCH_SIZE < length {
-            let v = entries.drain(..QUEUE_BATCH_SIZE).collect();
-            if let Err(Error::Terminated(..)) = self.sender.send_all(v) {
-                warn!("{} queue terminated", self.context.name);
-                return;
+        let mut batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
+        for (_, mut doc) in self.inner.drain() {
+            if batch.len() >= QUEUE_BATCH_SIZE {
+                if let Err(Error::Terminated(..)) = self.sender.send_all(&mut batch) {
+                    warn!("{} queue terminated", self.context.name);
+                    return;
+                }
             }
-            index += QUEUE_BATCH_SIZE;
+            doc.timestamp = self.start_time.as_secs() as u32;
+            doc.flags |= self.doc_flag;
+            batch.push(BoxedDocument(Box::new(doc)))
         }
-        if let Err(Error::Terminated(..)) = self.sender.send_all(entries) {
-            warn!("{} queue terminated", self.context.name);
+        if batch.len() > 0 {
+            if let Err(Error::Terminated(..)) = self.sender.send_all(&mut batch) {
+                warn!("{} queue terminated", self.context.name);
+            }
         }
     }
 }
