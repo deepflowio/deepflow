@@ -29,7 +29,7 @@ resource_gl1               , 资源-工作负载优先          ,
 resource_gl2_type          , 类型-服务优先              ,
 resource_gl2               , 资源-服务优先              ,
 
-labels                     , K8s Labels                 ,
+k8s.label                  , K8s Label                  ,
 
 ip                         , IP 地址                    ,
 is_ipv4                    , IPv4 标志                  ,
