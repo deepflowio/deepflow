@@ -492,7 +492,9 @@ impl Trident {
                 }
                 Some(mut components) => {
                     components.start();
-                    components.config = config_handler.candidate_config.clone();
+                    components
+                        .config
+                        .replace(config_handler.candidate_config.clone());
                     dispatcher_listener_callback(
                         &config_handler.candidate_config.dispatcher,
                         &mut components,
@@ -503,7 +505,7 @@ impl Trident {
                     for callback in callbacks {
                         callback(&config_handler, components);
                     }
-                    for listener in components.dispatcher_listeners.iter_mut() {
+                    for listener in components.dispatcher_listeners.as_mut().unwrap().iter_mut() {
                         listener.on_config_change(&config_handler.candidate_config.dispatcher);
                     }
                 }
@@ -550,7 +552,7 @@ fn dispatcher_listener_callback(
                     links
                 }
             };
-            for listener in components.dispatcher_listeners.iter() {
+            for listener in components.dispatcher_listeners.as_ref().unwrap().iter() {
                 #[cfg(target_os = "linux")]
                 let netns = listener.netns();
                 #[cfg(target_os = "linux")]
@@ -592,7 +594,7 @@ fn dispatcher_listener_callback(
             }
         }
         TapMode::Mirror => {
-            for listener in components.dispatcher_listeners.iter() {
+            for listener in components.dispatcher_listeners.as_ref().unwrap().iter() {
                 listener.on_tap_interface_change(
                     &vec![],
                     IfMacSource::IfMac,
@@ -603,7 +605,7 @@ fn dispatcher_listener_callback(
             }
         }
         TapMode::Analyzer => {
-            for listener in components.dispatcher_listeners.iter() {
+            for listener in components.dispatcher_listeners.as_ref().unwrap().iter() {
                 listener.on_tap_interface_change(
                     &vec![],
                     IfMacSource::IfMac,
@@ -620,20 +622,28 @@ fn dispatcher_listener_callback(
 
 fn parse_tap_type(components: &mut Components, tap_types: Vec<trident::TapType>) {
     let mut updated = false;
-    if components.cur_tap_types.len() != tap_types.len() {
+    if components.cur_tap_types.as_ref().unwrap().len() != tap_types.len() {
         updated = true;
     } else {
         for i in 0..tap_types.len() {
-            if components.cur_tap_types[i] != tap_types[i] {
+            if components.cur_tap_types.as_mut().unwrap()[i] != tap_types[i] {
                 updated = true;
                 break;
             }
         }
     }
     if updated {
-        components.tap_typer.on_tap_types_change(tap_types.clone());
-        components.cur_tap_types.clear();
-        components.cur_tap_types.clone_from(&tap_types);
+        components
+            .tap_typer
+            .as_ref()
+            .unwrap()
+            .on_tap_types_change(tap_types.clone());
+        components.cur_tap_types.as_mut().unwrap().clear();
+        components
+            .cur_tap_types
+            .as_mut()
+            .unwrap()
+            .clone_from(&tap_types);
     }
 }
 
@@ -764,44 +774,46 @@ impl DomainNameListener {
 }
 
 pub struct Components {
-    pub config: ModuleConfig,
-    pub rx_leaky_bucket: Arc<LeakyBucket>,
-    pub l7_log_rate: Arc<LeakyBucket>,
-    pub libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
-    pub tap_typer: Arc<TapTyper>,
-    pub cur_tap_types: Vec<trident::TapType>,
-    pub dispatchers: Vec<Dispatcher>,
-    pub dispatcher_listeners: Vec<DispatcherListener>,
-    pub log_parsers: Vec<AppProtoLogsParser>,
-    pub collectors: Vec<CollectorThread>,
-    pub l4_flow_uniform_sender: UniformSenderThread<BoxedTaggedFlow>,
-    pub metrics_uniform_sender: UniformSenderThread<BoxedDocument>,
-    pub l7_flow_uniform_sender: UniformSenderThread<BoxAppProtoLogsData>,
-    pub stats_sender: UniformSenderThread<ArcBatch>,
-    pub platform_synchronizer: PlatformSynchronizer,
+    pub config: Option<ModuleConfig>,
+    pub rx_leaky_bucket: Option<Arc<LeakyBucket>>,
+    pub l7_log_rate: Option<Arc<LeakyBucket>>,
+    pub libvirt_xml_extractor: Option<Arc<LibvirtXmlExtractor>>,
+    pub tap_typer: Option<Arc<TapTyper>>,
+    pub cur_tap_types: Option<Vec<trident::TapType>>,
+    pub dispatchers: Option<Vec<Dispatcher>>,
+    pub dispatcher_listeners: Option<Vec<DispatcherListener>>,
+    pub log_parsers: Option<Vec<AppProtoLogsParser>>,
+    pub collectors: Option<Vec<CollectorThread>>,
+    pub l4_flow_uniform_sender: Option<UniformSenderThread<BoxedTaggedFlow>>,
+    pub metrics_uniform_sender: Option<UniformSenderThread<BoxedDocument>>,
+    pub l7_flow_uniform_sender: Option<UniformSenderThread<BoxAppProtoLogsData>>,
+    pub stats_sender: Option<UniformSenderThread<ArcBatch>>,
+    pub platform_synchronizer: Option<PlatformSynchronizer>,
     #[cfg(target_os = "linux")]
     pub api_watcher: Arc<ApiWatcher>,
-    pub debugger: Debugger,
+    pub debugger: Option<Debugger>,
     #[cfg(target_os = "linux")]
     pub ebpf_collector: Option<Box<EbpfCollector>>,
     pub running: AtomicBool,
-    pub stats_collector: Arc<stats::Collector>,
-    pub external_metrics_server: MetricServer,
-    pub otel_uniform_sender: UniformSenderThread<OpenTelemetry>,
-    pub prometheus_uniform_sender: UniformSenderThread<PrometheusMetric>,
-    pub telegraf_uniform_sender: UniformSenderThread<TelegrafMetric>,
-    pub packet_sequence_parsers: Vec<PacketSequenceParser>, // Enterprise Edition Feature: packet-sequence
-    pub packet_sequence_uniform_sender: UniformSenderThread<BoxedPacketSequenceBlock>, // Enterprise Edition Feature: packet-sequence
-    pub exception_handler: ExceptionHandler,
-    pub domain_name_listener: DomainNameListener,
-    pub npb_bps_limit: Arc<LeakyBucket>,
-    pub handler_builders: Vec<Arc<Mutex<Vec<PacketHandlerBuilder>>>>,
-    pub compressed_otel_uniform_sender: UniformSenderThread<OpenTelemetryCompressed>,
-    pub pcap_assemblers: Vec<PcapAssembler>,
-    pub pcap_batch_uniform_sender: UniformSenderThread<BoxedPcapBatch>,
-    pub policy_setter: PolicySetter,
-    pub npb_bandwidth_watcher: Box<Arc<NpbBandwidthWatcher>>,
-    pub npb_arp_table: Arc<NpbArpTable>,
+    pub stats_collector: Option<Arc<stats::Collector>>,
+    pub external_metrics_server: Option<MetricServer>,
+    pub otel_uniform_sender: Option<UniformSenderThread<OpenTelemetry>>,
+    pub prometheus_uniform_sender: Option<UniformSenderThread<PrometheusMetric>>,
+    pub telegraf_uniform_sender: Option<UniformSenderThread<TelegrafMetric>>,
+    pub packet_sequence_parsers: Option<Vec<PacketSequenceParser>>, // Enterprise Edition Feature: packet-sequence
+    pub packet_sequence_uniform_sender: Option<UniformSenderThread<BoxedPacketSequenceBlock>>, // Enterprise Edition Feature: packet-sequence
+    pub exception_handler: Option<ExceptionHandler>,
+    pub domain_name_listener: Option<DomainNameListener>,
+    pub npb_bps_limit: Option<Arc<LeakyBucket>>,
+    pub handler_builders: Option<Vec<Arc<Mutex<Vec<PacketHandlerBuilder>>>>>,
+    pub compressed_otel_uniform_sender: Option<UniformSenderThread<OpenTelemetryCompressed>>,
+    pub pcap_assemblers: Option<Vec<PcapAssembler>>,
+    pub pcap_batch_uniform_sender: Option<UniformSenderThread<BoxedPcapBatch>>,
+    pub policy_setter: Option<PolicySetter>,
+    pub npb_bandwidth_watcher: Option<Box<Arc<NpbBandwidthWatcher>>>,
+    pub npb_arp_table: Option<Arc<NpbArpTable>>,
+    #[cfg(target_os = "linux")]
+    pub only_watch_k8s_resource: bool,
     max_memory: u64,
     tap_mode: TapMode,
     agent_mode: RunningMode,
@@ -813,31 +825,50 @@ impl Components {
             return;
         }
         info!("Staring components.");
-        self.libvirt_xml_extractor.start();
         if matches!(self.agent_mode, RunningMode::Managed) {
-            self.platform_synchronizer.start();
+            self.platform_synchronizer.as_ref().unwrap().start();
             #[cfg(target_os = "linux")]
-            self.api_watcher.start();
+            if running_in_container() {
+                self.api_watcher.start();
+            }
         }
         #[cfg(target_os = "linux")]
-        self.platform_synchronizer.start_kubernetes_poller();
-        self.debugger.start();
-        self.metrics_uniform_sender.start();
-        self.l7_flow_uniform_sender.start();
-        self.l4_flow_uniform_sender.start();
+        self.platform_synchronizer
+            .as_ref()
+            .unwrap()
+            .start_kubernetes_poller();
+        #[cfg(target_os = "linux")]
+        if self.only_watch_k8s_resource {
+            return;
+        }
+        self.libvirt_xml_extractor.as_ref().unwrap().start();
+        self.debugger.as_ref().unwrap().start();
+        self.metrics_uniform_sender.as_mut().unwrap().start();
+        self.l7_flow_uniform_sender.as_mut().unwrap().start();
+        self.l4_flow_uniform_sender.as_mut().unwrap().start();
 
         // Enterprise Edition Feature: packet-sequence
-        self.packet_sequence_uniform_sender.start();
-        for packet_sequence_parser in self.packet_sequence_parsers.iter() {
+        self.packet_sequence_uniform_sender
+            .as_mut()
+            .unwrap()
+            .start();
+
+        for packet_sequence_parser in self.packet_sequence_parsers.as_ref().unwrap().iter() {
             packet_sequence_parser.start();
         }
 
         if self.tap_mode != TapMode::Analyzer
-            && self.config.platform.kubernetes_cluster_id.is_empty()
+            && self
+                .config
+                .as_ref()
+                .unwrap()
+                .platform
+                .kubernetes_cluster_id
+                .is_empty()
         {
-            match free_memory_check(self.max_memory, &self.exception_handler) {
+            match free_memory_check(self.max_memory, self.exception_handler.as_ref().unwrap()) {
                 Ok(()) => {
-                    for dispatcher in self.dispatchers.iter() {
+                    for dispatcher in self.dispatchers.as_ref().unwrap().iter() {
                         dispatcher.start();
                     }
                 }
@@ -846,16 +877,16 @@ impl Components {
                 }
             }
         } else {
-            for dispatcher in self.dispatchers.iter() {
+            for dispatcher in self.dispatchers.as_ref().unwrap().iter() {
                 dispatcher.start();
             }
         }
 
-        for log_parser in self.log_parsers.iter() {
+        for log_parser in self.log_parsers.as_mut().unwrap().iter() {
             log_parser.start();
         }
 
-        for collector in self.collectors.iter_mut() {
+        for collector in self.collectors.as_mut().unwrap().iter_mut() {
             collector.start();
         }
 
@@ -864,26 +895,33 @@ impl Components {
             ebpf_collector.start();
         }
         if matches!(self.agent_mode, RunningMode::Managed) {
-            self.otel_uniform_sender.start();
-            self.compressed_otel_uniform_sender.start();
-            self.prometheus_uniform_sender.start();
-            self.telegraf_uniform_sender.start();
-            if self.config.metric_server.enabled {
-                self.external_metrics_server.start();
+            self.otel_uniform_sender.as_mut().unwrap().start();
+            self.compressed_otel_uniform_sender
+                .as_mut()
+                .unwrap()
+                .start();
+            self.prometheus_uniform_sender.as_mut().unwrap().start();
+            self.telegraf_uniform_sender.as_mut().unwrap().start();
+            if self.config.as_ref().unwrap().metric_server.enabled {
+                self.external_metrics_server.as_ref().unwrap().start();
             }
-            self.pcap_batch_uniform_sender.start();
+            self.pcap_batch_uniform_sender.as_mut().unwrap().start();
         }
-        self.domain_name_listener.start();
-        self.handler_builders.iter().for_each(|x| {
-            x.lock().unwrap().iter_mut().for_each(|y| {
-                y.start();
-            })
-        });
-        self.npb_bandwidth_watcher.start();
-        for p in self.pcap_assemblers.iter() {
+        self.domain_name_listener.as_mut().unwrap().start();
+        self.handler_builders
+            .as_ref()
+            .unwrap()
+            .iter()
+            .for_each(|x| {
+                x.lock().unwrap().iter_mut().for_each(|y| {
+                    y.start();
+                })
+            });
+        self.npb_bandwidth_watcher.as_ref().unwrap().start();
+        for p in self.pcap_assemblers.as_ref().unwrap().iter() {
             p.start();
         }
-        self.npb_arp_table.start();
+        self.npb_arp_table.as_ref().unwrap().start();
         info!("Started components.");
     }
 
@@ -909,6 +947,11 @@ impl Components {
             .environment
             .process_threshold;
         let feature_flags = FeatureFlags::from(&yaml_config.feature_flags);
+        #[cfg(target_os = "linux")]
+        let only_watch_k8s_resource = env::var("ONLY_WATCH_K8S_RESOURCE")
+            .unwrap_or("false".to_string())
+            .to_lowercase()
+            == "true";
 
         let mut stats_sender = UniformSenderThread::new(
             stats::DFSTATS_SENDER_ID,
@@ -987,6 +1030,55 @@ impl Components {
             exception_handler.clone(),
             stats_collector.clone(),
         ));
+
+        #[cfg(target_os = "linux")]
+        if only_watch_k8s_resource {
+            info!("Agent only watch k8s resource.");
+            return Ok(Components {
+                config: Some(candidate_config.clone()),
+                rx_leaky_bucket: None,
+                l7_log_rate: None,
+                libvirt_xml_extractor: None,
+                tap_typer: None,
+                cur_tap_types: None,
+                dispatchers: None,
+                dispatcher_listeners: None,
+                collectors: None,
+                l4_flow_uniform_sender: None,
+                metrics_uniform_sender: None,
+                l7_flow_uniform_sender: None,
+                stats_sender: None,
+                platform_synchronizer: Some(platform_synchronizer),
+                #[cfg(target_os = "linux")]
+                api_watcher,
+                debugger: None,
+                log_parsers: None,
+                #[cfg(target_os = "linux")]
+                ebpf_collector: None,
+                stats_collector: None,
+                running: AtomicBool::new(false),
+                external_metrics_server: None,
+                exception_handler: None,
+                max_memory,
+                otel_uniform_sender: None,
+                prometheus_uniform_sender: None,
+                telegraf_uniform_sender: None,
+                tap_mode: candidate_config.tap_mode,
+                packet_sequence_uniform_sender: None, // Enterprise Edition Feature: packet-sequence
+                packet_sequence_parsers: None,        // Enterprise Edition Feature: packet-sequence
+                domain_name_listener: None,
+                npb_bps_limit: None,
+                handler_builders: None,
+                compressed_otel_uniform_sender: None,
+                pcap_assemblers: None,
+                pcap_batch_uniform_sender: None,
+                agent_mode,
+                policy_setter: None,
+                npb_bandwidth_watcher: None,
+                npb_arp_table: None,
+                only_watch_k8s_resource,
+            });
+        }
 
         let context = ConstructDebugCtx {
             #[cfg(target_os = "linux")]
@@ -1688,47 +1780,49 @@ impl Components {
         );
 
         Ok(Components {
-            config: candidate_config.clone(),
-            rx_leaky_bucket,
-            l7_log_rate,
-            libvirt_xml_extractor,
-            tap_typer,
-            cur_tap_types: vec![],
-            dispatchers,
-            dispatcher_listeners,
-            collectors,
-            l4_flow_uniform_sender,
-            metrics_uniform_sender,
-            l7_flow_uniform_sender,
-            stats_sender,
-            platform_synchronizer,
+            config: Some(candidate_config.clone()),
+            rx_leaky_bucket: Some(rx_leaky_bucket),
+            l7_log_rate: Some(l7_log_rate),
+            libvirt_xml_extractor: Some(libvirt_xml_extractor),
+            tap_typer: Some(tap_typer),
+            cur_tap_types: Some(vec![]),
+            dispatchers: Some(dispatchers),
+            dispatcher_listeners: Some(dispatcher_listeners),
+            collectors: Some(collectors),
+            l4_flow_uniform_sender: Some(l4_flow_uniform_sender),
+            metrics_uniform_sender: Some(metrics_uniform_sender),
+            l7_flow_uniform_sender: Some(l7_flow_uniform_sender),
+            stats_sender: Some(stats_sender),
+            platform_synchronizer: Some(platform_synchronizer),
             #[cfg(target_os = "linux")]
             api_watcher,
-            debugger,
-            log_parsers,
+            debugger: Some(debugger),
+            log_parsers: Some(log_parsers),
             #[cfg(target_os = "linux")]
             ebpf_collector,
-            stats_collector,
+            stats_collector: Some(stats_collector),
             running: AtomicBool::new(false),
-            external_metrics_server,
-            exception_handler,
+            external_metrics_server: Some(external_metrics_server),
+            exception_handler: Some(exception_handler),
             max_memory,
-            otel_uniform_sender,
-            prometheus_uniform_sender,
-            telegraf_uniform_sender,
+            otel_uniform_sender: Some(otel_uniform_sender),
+            prometheus_uniform_sender: Some(prometheus_uniform_sender),
+            telegraf_uniform_sender: Some(telegraf_uniform_sender),
             tap_mode: candidate_config.tap_mode,
-            packet_sequence_uniform_sender, // Enterprise Edition Feature: packet-sequence
-            packet_sequence_parsers,        // Enterprise Edition Feature: packet-sequence
-            domain_name_listener,
-            npb_bps_limit,
-            handler_builders,
-            compressed_otel_uniform_sender,
-            pcap_assemblers,
-            pcap_batch_uniform_sender,
+            packet_sequence_uniform_sender: Some(packet_sequence_uniform_sender), // Enterprise Edition Feature: packet-sequence
+            packet_sequence_parsers: Some(packet_sequence_parsers), // Enterprise Edition Feature: packet-sequence
+            domain_name_listener: Some(domain_name_listener),
+            npb_bps_limit: Some(npb_bps_limit),
+            handler_builders: Some(handler_builders),
+            compressed_otel_uniform_sender: Some(compressed_otel_uniform_sender),
+            pcap_assemblers: Some(pcap_assemblers),
+            pcap_batch_uniform_sender: Some(pcap_batch_uniform_sender),
             agent_mode,
-            policy_setter,
-            npb_bandwidth_watcher,
-            npb_arp_table,
+            policy_setter: Some(policy_setter),
+            npb_bandwidth_watcher: Some(npb_bandwidth_watcher),
+            npb_arp_table: Some(npb_arp_table),
+            #[cfg(target_os = "linux")]
+            only_watch_k8s_resource,
         })
     }
 
@@ -1880,51 +1974,62 @@ impl Components {
             return;
         }
 
-        for d in self.dispatchers.iter_mut() {
-            d.stop();
-        }
-        self.platform_synchronizer.stop();
+        self.platform_synchronizer.as_ref().unwrap().stop();
 
         #[cfg(target_os = "linux")]
-        self.api_watcher.stop();
+        if running_in_container() {
+            self.api_watcher.stop();
+        }
+        #[cfg(target_os = "linux")]
+        if self.only_watch_k8s_resource {
+            return;
+        }
 
-        for q in self.collectors.iter_mut() {
+        for d in self.dispatchers.as_mut().unwrap().iter_mut() {
+            d.stop();
+        }
+
+        for q in self.collectors.as_mut().unwrap().iter_mut() {
             q.stop();
         }
 
-        for p in self.log_parsers.iter() {
+        for p in self.log_parsers.as_ref().unwrap().iter() {
             p.stop();
         }
 
-        self.l4_flow_uniform_sender.stop();
-        self.metrics_uniform_sender.stop();
-        self.l7_flow_uniform_sender.stop();
+        self.l4_flow_uniform_sender.as_mut().unwrap().stop();
+        self.metrics_uniform_sender.as_mut().unwrap().stop();
+        self.l7_flow_uniform_sender.as_mut().unwrap().stop();
 
-        self.libvirt_xml_extractor.stop();
-        self.debugger.stop();
+        self.libvirt_xml_extractor.as_ref().unwrap().stop();
+        self.debugger.as_ref().unwrap().stop();
         #[cfg(target_os = "linux")]
         if let Some(ebpf_collector) = self.ebpf_collector.as_mut() {
             ebpf_collector.stop();
         }
 
-        self.external_metrics_server.stop();
-        self.otel_uniform_sender.stop();
-        self.compressed_otel_uniform_sender.stop();
-        self.prometheus_uniform_sender.stop();
-        self.telegraf_uniform_sender.stop();
-        self.packet_sequence_uniform_sender.stop(); // Enterprise Edition Feature: packet-sequence
-        self.domain_name_listener.stop();
-        self.handler_builders.iter().for_each(|x| {
-            x.lock().unwrap().iter_mut().for_each(|y| {
-                y.stop();
-            })
-        });
-        self.npb_bandwidth_watcher.stop();
-        for p in self.pcap_assemblers.iter() {
+        self.external_metrics_server.as_ref().unwrap().stop();
+        self.otel_uniform_sender.as_mut().unwrap().stop();
+        self.compressed_otel_uniform_sender.as_mut().unwrap().stop();
+        self.prometheus_uniform_sender.as_mut().unwrap().stop();
+        self.telegraf_uniform_sender.as_mut().unwrap().stop();
+        self.packet_sequence_uniform_sender.as_mut().unwrap().stop(); // Enterprise Edition Feature: packet-sequence
+        self.domain_name_listener.as_mut().unwrap().stop();
+        self.handler_builders
+            .as_ref()
+            .unwrap()
+            .iter()
+            .for_each(|x| {
+                x.lock().unwrap().iter_mut().for_each(|y| {
+                    y.stop();
+                })
+            });
+        self.npb_bandwidth_watcher.as_ref().unwrap().stop();
+        for p in self.pcap_assemblers.as_ref().unwrap().iter() {
             p.stop();
         }
-        self.packet_sequence_uniform_sender.stop();
-        self.npb_arp_table.stop();
+        self.packet_sequence_uniform_sender.as_mut().unwrap().stop();
+        self.npb_arp_table.as_ref().unwrap().stop();
         info!("Stopped components.")
     }
 }

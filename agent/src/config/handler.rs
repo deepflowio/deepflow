@@ -1210,6 +1210,8 @@ impl ConfigHandler {
                 );
                 if let Some(c) = components.as_ref() {
                     c.platform_synchronizer
+                        .as_ref()
+                        .unwrap()
                         .set_netns_regex(&new_config.dispatcher.extra_netns_regex);
                 }
             }
@@ -1265,7 +1267,7 @@ impl ConfigHandler {
                     fn start_dispatcher(handler: &ConfigHandler, components: &mut Components) {
                         match handler.candidate_config.tap_mode {
                             TapMode::Analyzer => {
-                                for dispatcher in components.dispatchers.iter() {
+                                for dispatcher in components.dispatchers.as_ref().unwrap().iter() {
                                     dispatcher.start();
                                 }
                             }
@@ -1273,10 +1275,12 @@ impl ConfigHandler {
                                 if !running_in_container() {
                                     match free_memory_check(
                                         handler.candidate_config.environment.max_memory,
-                                        &components.exception_handler,
+                                        components.exception_handler.as_ref().unwrap(),
                                     ) {
                                         Ok(()) => {
-                                            for dispatcher in components.dispatchers.iter() {
+                                            for dispatcher in
+                                                components.dispatchers.as_ref().unwrap().iter()
+                                            {
                                                 dispatcher.start();
                                             }
                                         }
@@ -1291,7 +1295,7 @@ impl ConfigHandler {
                     callbacks.push(start_dispatcher);
                 } else {
                     fn stop_dispatcher(_: &ConfigHandler, components: &mut Components) {
-                        for dispatcher in components.dispatchers.iter() {
+                        for dispatcher in components.dispatchers.as_ref().unwrap().iter() {
                             dispatcher.stop();
                         }
                     }
@@ -1329,11 +1333,11 @@ impl ConfigHandler {
                 fn leaky_bucket_callback(handler: &ConfigHandler, components: &mut Components) {
                     match handler.candidate_config.tap_mode {
                         TapMode::Analyzer => {
-                            components.rx_leaky_bucket.set_rate(None);
+                            components.rx_leaky_bucket.as_ref().unwrap().set_rate(None);
                             info!("dispatcher.global pps set ulimit when tap_mode=analyzer");
                         }
                         _ => {
-                            components.rx_leaky_bucket.set_rate(Some(
+                            components.rx_leaky_bucket.as_ref().unwrap().set_rate(Some(
                                 handler.candidate_config.dispatcher.global_pps_threshold,
                             ));
                             info!(
@@ -1415,7 +1419,7 @@ impl ConfigHandler {
                 candidate_config.stats, new_config.stats
             );
             fn stats_callback(handler: &ConfigHandler, components: &mut Components) {
-                let c = &components.stats_collector;
+                let c = components.stats_collector.as_ref().unwrap();
                 c.set_hostname(handler.candidate_config.stats.host.clone());
                 c.set_min_interval(handler.candidate_config.stats.interval);
             }
@@ -1431,9 +1435,9 @@ impl ConfigHandler {
 
             fn debug_callback(handler: &ConfigHandler, components: &mut Components) {
                 if handler.candidate_config.debug.enabled {
-                    components.debugger.start();
+                    components.debugger.as_ref().unwrap().start();
                 } else {
-                    components.debugger.stop();
+                    components.debugger.as_ref().unwrap().stop();
                 }
             }
 
@@ -1453,6 +1457,7 @@ impl ConfigHandler {
             if let Some(ref components) = components {
                 components
                     .policy_setter
+                    .unwrap()
                     .set_memory_limit(new_config.environment.max_memory);
             }
         }
@@ -1559,7 +1564,7 @@ impl ConfigHandler {
             }
 
             fn quadruple_generator_callback(_: &ConfigHandler, components: &mut Components) {
-                for collector in components.collectors.iter().as_ref() {
+                for collector in components.collectors.as_ref().unwrap().iter().as_ref() {
                     collector.quadruple_generator.update_config();
                 }
             }
@@ -1608,11 +1613,19 @@ impl ConfigHandler {
                         && (handler.candidate_config.tap_mode == TapMode::Local
                             || is_tt_pod(conf.trident_type))
                     {
-                        components.platform_synchronizer.start();
+                        components.platform_synchronizer.as_ref().unwrap().start();
                         if is_tt_pod(conf.trident_type) {
-                            components.platform_synchronizer.start_kubernetes_poller();
+                            components
+                                .platform_synchronizer
+                                .as_ref()
+                                .unwrap()
+                                .start_kubernetes_poller();
                         } else {
-                            components.platform_synchronizer.stop_kubernetes_poller();
+                            components
+                                .platform_synchronizer
+                                .as_ref()
+                                .unwrap()
+                                .stop_kubernetes_poller();
                         }
                         if conf.kubernetes_api_enabled {
                             components.api_watcher.start();
@@ -1620,7 +1633,7 @@ impl ConfigHandler {
                             components.api_watcher.stop();
                         }
                     } else {
-                        components.platform_synchronizer.stop();
+                        components.platform_synchronizer.as_ref().unwrap().stop();
                         info!("PlatformSynchronizer is not enabled");
                     }
                     #[cfg(target_os = "linux")]
@@ -1672,6 +1685,8 @@ impl ConfigHandler {
                     );
                     components
                         .npb_bandwidth_watcher
+                        .as_ref()
+                        .unwrap()
                         .set_interval(new_config.sender.bandwidth_probe_interval.as_secs());
                 }
                 if candidate_config.sender.server_tx_bandwidth_threshold
@@ -1683,6 +1698,8 @@ impl ConfigHandler {
                     );
                     components
                         .npb_bandwidth_watcher
+                        .as_ref()
+                        .unwrap()
                         .set_nic_rate(new_config.sender.server_tx_bandwidth_threshold);
                 }
                 if candidate_config.sender.npb_bps_threshold != new_config.sender.npb_bps_threshold
@@ -1693,6 +1710,8 @@ impl ConfigHandler {
                     );
                     components
                         .npb_bandwidth_watcher
+                        .as_ref()
+                        .unwrap()
                         .set_npb_rate(new_config.sender.npb_bps_threshold);
                 }
             }
@@ -1730,7 +1749,7 @@ impl ConfigHandler {
                     new_config.log_parser.l7_log_dynamic
                 );
                 fn l7_log_dynamic_callback(_: &ConfigHandler, components: &mut Components) {
-                    for log_parser in components.log_parsers.iter().as_ref() {
+                    for log_parser in components.log_parsers.as_ref().unwrap().iter().as_ref() {
                         log_parser.l7_log_dynamic_config_updated();
                     }
                 }
@@ -1750,7 +1769,7 @@ impl ConfigHandler {
                             .log_parser
                             .l7_log_collect_nps_threshold
                     );
-                    components.l7_log_rate.set_rate(Some(
+                    components.l7_log_rate.as_ref().unwrap().set_rate(Some(
                         config
                             .candidate_config
                             .log_parser
@@ -1809,9 +1828,9 @@ impl ConfigHandler {
             if candidate_config.metric_server.enabled != new_config.metric_server.enabled {
                 if let Some(c) = components.as_mut() {
                     if new_config.metric_server.enabled {
-                        c.external_metrics_server.start();
+                        c.external_metrics_server.as_ref().unwrap().start();
                     } else {
-                        c.external_metrics_server.stop();
+                        c.external_metrics_server.as_ref().unwrap().stop();
                     }
                 }
             }
@@ -1820,6 +1839,8 @@ impl ConfigHandler {
             if candidate_config.metric_server.port != new_config.metric_server.port {
                 if let Some(c) = components.as_mut() {
                     c.external_metrics_server
+                        .as_ref()
+                        .unwrap()
                         .set_port(new_config.metric_server.port);
                 }
             }
@@ -1827,6 +1848,8 @@ impl ConfigHandler {
                 fn metric_server_callback(handler: &ConfigHandler, components: &mut Components) {
                     components
                         .external_metrics_server
+                        .as_ref()
+                        .unwrap()
                         .enable_compressed(handler.candidate_config.metric_server.compressed);
                 }
                 callbacks.push(metric_server_callback);
@@ -1840,7 +1863,7 @@ impl ConfigHandler {
 
         if candidate_config.npb != new_config.npb {
             fn dispatcher_callback(handler: &ConfigHandler, components: &mut Components) {
-                let dispatcher_builders = &components.handler_builders;
+                let dispatcher_builders = components.handler_builders.as_ref().unwrap();
                 for e in dispatcher_builders {
                     let mut builders = e.lock().unwrap();
                     for e in builders.iter_mut() {
@@ -1848,16 +1871,20 @@ impl ConfigHandler {
                             PacketHandlerBuilder::Npb(n) => {
                                 n.on_config_change(
                                     &handler.candidate_config.npb,
-                                    &components.debugger.clone_queue(),
+                                    &components.debugger.as_ref().unwrap().clone_queue(),
                                 );
                             }
                             _ => {}
                         }
                     }
                 }
-                components.npb_arp_table.set_need_resolve_mac(
-                    handler.candidate_config.npb.socket_type == SocketType::RawUdp,
-                );
+                components
+                    .npb_arp_table
+                    .as_ref()
+                    .unwrap()
+                    .set_need_resolve_mac(
+                        handler.candidate_config.npb.socket_type == SocketType::RawUdp,
+                    );
             }
             if components.is_some() {
                 callbacks.push(dispatcher_callback);
@@ -1873,17 +1900,17 @@ impl ConfigHandler {
         // avoid first config changed to restart dispatcher
         if components.is_some() && restart_dispatcher && candidate_config.dispatcher.enabled {
             fn dispatcher_callback(handler: &ConfigHandler, components: &mut Components) {
-                for dispatcher in components.dispatchers.iter() {
+                for dispatcher in components.dispatchers.as_ref().unwrap().iter() {
                     dispatcher.stop();
                 }
                 if handler.candidate_config.tap_mode != TapMode::Analyzer && !running_in_container()
                 {
                     match free_memory_check(
                         handler.candidate_config.environment.max_memory,
-                        &components.exception_handler,
+                        components.exception_handler.as_ref().unwrap(),
                     ) {
                         Ok(()) => {
-                            for dispatcher in components.dispatchers.iter() {
+                            for dispatcher in components.dispatchers.as_ref().unwrap().iter() {
                                 dispatcher.start();
                             }
                         }
@@ -1892,12 +1919,17 @@ impl ConfigHandler {
                         }
                     }
                 } else {
-                    for dispatcher in components.dispatchers.iter() {
+                    for dispatcher in components.dispatchers.as_ref().unwrap().iter() {
                         dispatcher.start();
                     }
                 }
             }
             callbacks.push(dispatcher_callback);
+        }
+
+        #[cfg(target_os = "linux")]
+        if components.is_some() && components.as_ref().unwrap().only_watch_k8s_resource {
+            callbacks.clear();
         }
 
         // deploy updated config
