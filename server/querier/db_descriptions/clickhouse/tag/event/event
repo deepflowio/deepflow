@@ -21,7 +21,7 @@ pod_group                  , pod_group                 , pod_group              
 pod                        , pod                       , pod                       , resource       ,                       , Universal Tag   , 111
 service                    , service                   , service                   , resource      ,                        , Universal Tag   , 111
 
-k8s.label                  , k8s.label                 , k8s.label                 , map            ,                       , K8s Label       , 111
+k8s.label                  , k8s.label                 , k8s.label                 , map            ,                       , Custom Tag      , 111
 
 instance                   , instance                  , instance                  , string         ,                       , Event Tag       , 111
 instance_type              , instance_type             , instance_type             , int_enum       , instance_type         , Event Tag       , 111
