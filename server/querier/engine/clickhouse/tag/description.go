@@ -265,12 +265,12 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 		if db == "ext_metrics" || db == "event" || table == "vtap_flow_port" || table == "vtap_app_port" {
 			response.Values = append(response.Values, []interface{}{
 				labelKey, labelKey, labelKey, labelKey, "label",
-				"K8s Labels", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
 			})
 		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
 			response.Values = append(response.Values, []interface{}{
 				labelKey, labelKey + "_0", labelKey + "_1", labelKey, "label",
-				"K8s Labels", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
 			})
 		}
 
@@ -308,20 +308,20 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 			externalTag := "tag." + tagName.(string)
 			response.Values = append(response.Values, []interface{}{
 				externalTag, externalTag, externalTag, externalTag, "tag",
-				"Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "",
+				"Native Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "",
 			})
 		} else {
 			externalTag := "attribute." + tagName.(string)
 			response.Values = append(response.Values, []interface{}{
 				externalTag, externalTag, externalTag, externalTag, "attribute",
-				"Attributes", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "",
+				"Native Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "",
 			})
 		}
 	}
 	if db == "ext_metrics" || db == "deepflow_system" {
 		response.Values = append(response.Values, []interface{}{
 			"tag", "tag", "tag", "tag", "map",
-			"Tag", []string{}, []bool{true, true, true}, "tag", "",
+			"Native Tag", []string{}, []bool{true, true, true}, "tag", "",
 		})
 	}
 	return response, nil
