@@ -80,7 +80,7 @@ type StaticConfig struct {
 	L7ProtocolPorts                  map[string]string     `yaml:"l7-protocol-ports,omitempty"`
 	Ebpf                             *EbpfConfig           `yaml:"ebpf,omitempty"`
 	OsAppTagExecUser                 *string               `yaml:"os-app-tag-exec-user"`
-	OsAppTagExec                     *string               `yaml:"os-app-tag-exec"`
+	OsAppTagExec                     []string              `yaml:"os-app-tag-exec"`
 	OsProcRoot                       *string               `yaml:"os-proc-root;omitempty"`
 	OsProcSocketSyncInterval         *int                  `yaml:"os-proc-socket-sync-interval"`
 	OsProcSocketMinLifetime          *int                  `yaml:"os-proc-socket-min-lifetime"`
