@@ -659,7 +659,9 @@ func getVPCDataFromDB(domainUUIDs []string) (map[string][]string, map[string]map
 	domainUUIDToVPCIDToUUID := make(map[string]map[int]string)
 	for _, vpc := range vpcs {
 		domainUUIDToVPCUUIDs[vpc.Domain] = append(domainUUIDToVPCUUIDs[vpc.Domain], vpc.Lcuuid)
-		domainUUIDToVPCIDToUUID[vpc.Domain] = make(map[int]string)
+		if domainUUIDToVPCIDToUUID[vpc.Domain] == nil {
+			domainUUIDToVPCIDToUUID[vpc.Domain] = make(map[int]string)
+		}
 		domainUUIDToVPCIDToUUID[vpc.Domain][vpc.ID] = vpc.Lcuuid
 	}
 	return domainUUIDToVPCUUIDs, domainUUIDToVPCIDToUUID, nil
@@ -719,7 +721,9 @@ func getPodClusterDataFromDB(domainUUIDs []string) (map[string]map[int]string, e
 	}
 	domainUUIDToPodClusterIDToUUID := make(map[string]map[int]string)
 	for _, podCluster := range podClusters {
-		domainUUIDToPodClusterIDToUUID[podCluster.Domain] = make(map[int]string)
+		if domainUUIDToPodClusterIDToUUID[podCluster.Domain] == nil {
+			domainUUIDToPodClusterIDToUUID[podCluster.Domain] = make(map[int]string)
+		}
 		domainUUIDToPodClusterIDToUUID[podCluster.Domain][podCluster.ID] = podCluster.Lcuuid
 	}
 	return domainUUIDToPodClusterIDToUUID, nil
