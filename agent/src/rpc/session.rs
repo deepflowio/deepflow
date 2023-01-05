@@ -21,6 +21,7 @@ use std::sync::{
 };
 use std::time::{Duration, Instant};
 
+use dns_lookup::lookup_host;
 use log::{debug, error, info};
 use parking_lot::RwLock;
 use rand::Rng;
@@ -264,14 +265,14 @@ impl Session {
         self.server_ip.write().set_request_failed(failed);
     }
 
-    pub fn get_proxy_server(&self) -> (Option<IpAddr>, u16) {
+    pub fn get_proxy_server(&self) -> (Option<String>, u16) {
         (
             self.server_ip.read().get_proxy_ip(),
             self.config.read().get_proxy_port(),
         )
     }
 
-    pub fn set_proxy_server(&self, ip: Option<IpAddr>, port: u16) {
+    pub fn set_proxy_server(&self, ip: Option<String>, port: u16) {
         self.server_ip.write().set_proxy_ip(ip);
         self.config.write().set_proxy_port(port);
 
@@ -388,7 +389,7 @@ struct ServerIp {
     this_controller: usize,
 
     current_ip: IpAddr,
-    proxy_ip: Option<IpAddr>,
+    proxy_ip: Option<String>,
     proxied: bool,
     request_failed: bool,
 
@@ -444,11 +445,11 @@ impl ServerIp {
         self.current_ip = ip;
     }
 
-    fn get_proxy_ip(&self) -> Option<IpAddr> {
-        self.proxy_ip
+    fn get_proxy_ip(&self) -> Option<String> {
+        self.proxy_ip.clone()
     }
 
-    fn set_proxy_ip(&mut self, ip: Option<IpAddr>) {
+    fn set_proxy_ip(&mut self, ip: Option<String>) {
         self.proxy_ip = ip;
     }
 
@@ -506,19 +507,39 @@ impl ServerIp {
         if !self.proxied {
             // 请求controller成功，改为请求proxy
             if let Some(new_ip) = self.get_proxy_ip() {
-                if new_ip == self.current_ip {
+                let ip = if new_ip.parse::<IpAddr>().is_ok() {
+                    new_ip.parse().unwrap()
+                } else {
+                    let ips = lookup_host(&new_ip);
+                    if ips.is_err() {
+                        info!("Dns lookup {} error: {:?}", &new_ip, ips);
+                        return false;
+                    }
+                    let ips = ips.unwrap();
+                    let mut index = 0;
+                    for (i, ip) in ips.iter().enumerate() {
+                        if *ip == self.current_ip {
+                            index = i;
+                            break;
+                        }
+                    }
+
+                    ips[index]
+                };
+
+                if ip == self.current_ip {
                     info!(
                         "proxy {} same as controller {}, nothing to do",
-                        new_ip, self.current_ip
+                        ip, self.current_ip
                     );
                     self.proxied = true;
                     return false;
                 }
                 info!(
                     "rpc IP changed to proxy {} from controller {}",
-                    new_ip, self.current_ip
+                    ip, self.current_ip
                 );
-                self.current_ip = new_ip.into();
+                self.current_ip = ip.into();
                 self.proxied = true;
                 true
             } else {
@@ -528,13 +549,32 @@ impl ServerIp {
         } else {
             // 这里proxy_ip一定有
             let new_ip = self.get_proxy_ip().unwrap();
-            if new_ip.ne(&self.current_ip) {
+            let ip = if new_ip.parse::<IpAddr>().is_ok() {
+                new_ip.parse().unwrap()
+            } else {
+                let ips = lookup_host(&new_ip);
+                if ips.is_err() {
+                    info!("Dns lookup {} error: {:?}", &new_ip, ips);
+                    return false;
+                }
+                let ips = ips.unwrap();
+                let mut index = 0;
+                for (i, ip) in ips.iter().enumerate() {
+                    if *ip == self.current_ip {
+                        index = i;
+                        break;
+                    }
+                }
+
+                ips[index]
+            };
+            if ip.ne(&self.current_ip) {
                 // proxy改变
                 info!(
                     "rpc IP changed to proxy {} from proxy {}",
-                    new_ip, self.current_ip
+                    ip, self.current_ip
                 );
-                self.current_ip = new_ip.into();
+                self.current_ip = ip.into();
                 true
             } else {
                 false
