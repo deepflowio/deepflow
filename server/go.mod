@@ -94,9 +94,11 @@ require (
 require (
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
+	github.com/edsrzf/mmap-go v1.1.0 // indirect
 	github.com/fortytw2/leaktest v1.3.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.10.2 // indirect
 	github.com/ionos-cloud/sdk-go/v6 v6.1.0 // indirect
+	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/signalfx/splunk-otel-go v1.1.0 // indirect
 	github.com/signalfx/splunk-otel-go/instrumentation/database/sql/splunksql v1.1.0 // indirect
 	github.com/signalfx/splunk-otel-go/instrumentation/internal v1.1.0 // indirect

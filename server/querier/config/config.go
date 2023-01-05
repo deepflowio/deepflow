@@ -40,6 +40,7 @@ type QuerierConfig struct {
 	ListenPort    int         `default:"20416" yaml:"listen-port"`
 	Clickhouse    Clickhouse  `yaml:clickhouse`
 	DeepflowApp   DeepflowApp `yaml:"deepflow-app"`
+	Prometheus    Prometheus  `yaml:"prometheus"`
 	Language      string      `default:"en" yaml:"language"`
 	OtelEndpoint  string      `default:"http://${K8S_NODE_IP_FOR_DEEPFLOW}:38086/api/v1/otel/trace" yaml:"otel-endpoint"`
 	Limit         string      `default:"10000" yaml:"limit"`
@@ -58,6 +59,10 @@ type Clickhouse struct {
 	Port           int    `default:"9000" yaml:"port"`
 	Timeout        int    `default:"60" yaml:"timeout"`
 	ConnectTimeout int    `default:"2" yaml:"connect-timeout"`
+}
+
+type Prometheus struct {
+	SeriesLimit int `default:"100" yaml:"series-limit"`
 }
 
 func (c *Config) expendEnv() {
