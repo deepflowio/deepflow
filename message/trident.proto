@@ -632,21 +632,24 @@ message GPIDSyncRequestLocalEntry {
     optional uint32 epc_id = 1;
     optional string ip = 2;
     optional uint32 port = 3;
-    optional RoleType role = 4;
+    optional ServiceProtocol proto = 4;
+    optional RoleType role = 5;
     optional uint64 pid = 6;
 }
 
 message GPIDSyncRequestPeerEntry {
     optional uint32 epc_id = 1;
     optional string ip = 2;
+    optional ServiceProtocol proto = 3;
 }
 
 message GPIDSyncResponseEntry {
     optional uint32 epc_id = 1;
     optional string ip = 2;
     optional uint32 port = 3;
-    optional RoleType role = 4;
-    optional uint64 gpid = 5;
+    optional ServiceProtocol proto = 4;
+    optional RoleType role = 5;
+    optional uint64 gpid = 6;
 }
 
 message GPIDSyncRequest {
