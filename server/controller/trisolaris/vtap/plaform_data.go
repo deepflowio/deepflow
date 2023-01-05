@@ -234,6 +234,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(p *metadata.PlatformDataOP, c *
 		}
 
 		domainToPlatformDataExceptPod := p.GetDomainToPlatformDataExceptPod()
+		domainToPlarformDataOnlyPod := p.GetDomainToPlatformDataOnlyPod()
 		domainAllData := metadata.NewPlatformData("platformDataType3", "", 0, PLATFORM_DATA_TYPE_3)
 		for _, domainLcuuid := range vtapConfig.ConvertedDomains {
 			domainData := domainToPlatformDataExceptPod[domainLcuuid]
@@ -245,7 +246,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(p *metadata.PlatformDataOP, c *
 		}
 
 		for _, podDomain := range podDomains {
-			vtapDomainData := domainToPlatformDataExceptPod[podDomain]
+			vtapDomainData := domainToPlarformDataOnlyPod[podDomain]
 			if vtapDomainData == nil {
 				log.Errorf("domain(%s) no platform data", podDomain)
 				continue
