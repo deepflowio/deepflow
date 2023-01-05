@@ -17,7 +17,7 @@
 use std::fs::{create_dir_all, rename, File, OpenOptions};
 use std::io::{BufWriter, ErrorKind, Write};
 use std::marker::PhantomData;
-use std::net::{IpAddr, Shutdown, TcpStream};
+use std::net::{Shutdown, TcpStream};
 use std::path::Path;
 use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
@@ -262,7 +262,7 @@ pub struct UniformSender<T> {
     encoder: Encoder<T>,
     last_flush: Duration,
 
-    dst_ip: IpAddr,
+    dst_ip: String,
     dst_port: u16,
     config: SenderAccess,
     reconnect: bool,
@@ -300,7 +300,7 @@ impl<T: Sendable> UniformSender<T> {
             counter: Arc::new(SenderCounter::default()),
             encoder: Encoder::new(0, SendMessageType::TaggedFlow, config.load().vtap_id),
             last_flush: Duration::ZERO,
-            dst_ip: config.load().dest_ip,
+            dst_ip: config.load().dest_ip.clone(),
             dst_port: config.load().dest_port,
             config,
             tcp_stream: None,
@@ -326,7 +326,7 @@ impl<T: Sendable> UniformSender<T> {
                 self.config.load().dest_ip
             );
             self.reconnect = true;
-            self.dst_ip = self.config.load().dest_ip;
+            self.dst_ip = self.config.load().dest_ip.clone();
         }
 
         if self.dst_port != self.config.load().dest_port {
@@ -356,7 +356,7 @@ impl<T: Sendable> UniformSender<T> {
                     debug!("{} sender tcp stream shutdown failed {}", self.name, e);
                 }
             }
-            self.tcp_stream = TcpStream::connect((self.dst_ip, self.dst_port)).ok();
+            self.tcp_stream = TcpStream::connect((self.dst_ip.clone(), self.dst_port)).ok();
             if let Some(tcp_stream) = self.tcp_stream.as_mut() {
                 if let Err(e) =
                     tcp_stream.set_write_timeout(Some(Duration::from_secs(Self::TCP_WRITE_TIMEOUT)))
@@ -372,7 +372,7 @@ impl<T: Sendable> UniformSender<T> {
             } else {
                 if self.counter.dropped.load(Ordering::Relaxed) == 0 {
                     self.exception_handler.set(Exception::AnalyzerSocketError);
-                    if self.dst_ip.is_unspecified() {
+                    if self.dst_ip.is_empty() {
                         error!("'analyzer_ip' is not assigned, please check whether the Agent is successfully registered");
                     } else {
                         error!(

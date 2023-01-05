@@ -1061,16 +1061,6 @@ impl RuntimeConfig {
             )));
         }
 
-        if !self.proxy_controller_ip.is_empty()
-            && (self.proxy_controller_ip == "0.0.0.0"
-                || self.proxy_controller_ip.parse::<IpAddr>().is_err())
-        {
-            return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "proxy-controller-ip({}) invalid",
-                self.proxy_controller_ip
-            )));
-        }
-
         if self.proxy_controller_port == 0 {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
                 "proxy-controller-port({}) invalid",
