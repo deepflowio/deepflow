@@ -203,10 +203,6 @@ impl L7ProtocolInfoInterface for SofaRpcInfo {
     fn is_tls(&self) -> bool {
         false
     }
-
-    fn skip_send(&self) -> bool {
-        false
-    }
 }
 
 impl From<SofaRpcInfo> for L7ProtocolSendLog {
