@@ -91,8 +91,12 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
     fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()>;
 
     fn app_proto_head(&self) -> Option<AppProtoHead>;
+
     fn is_tls(&self) -> bool;
-    fn skip_send(&self) -> bool;
+
+    fn skip_send(&self) -> bool {
+        false
+    }
 
     // 是否需要进一步合并，目前只有在ebpf有意义，内置协议也只有 EBPF_TYPE_GO_HTTP2_UPROBE 会用到.
     // 除非确实需要多次log合并，否则应该一律返回false
