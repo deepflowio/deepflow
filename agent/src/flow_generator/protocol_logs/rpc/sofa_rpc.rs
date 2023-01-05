@@ -420,17 +420,19 @@ impl L7FlowPerf for SofaRpcLog {
         self.perf_stats.is_some()
     }
 
-    fn copy_and_reset_data(&mut self, _: u32) -> crate::common::flow::FlowPerfStats {
+    fn copy_and_reset_data(&mut self, timeout_count: u32) -> crate::common::flow::FlowPerfStats {
         FlowPerfStats {
             l7_protocol: L7Protocol::SofaRPC,
             l7: if let Some(perf) = self.perf_stats.take() {
                 L7PerfStats {
                     request_count: perf.req_count,
                     response_count: perf.resp_count,
+                    err_client_count: perf.req_err_count,
+                    err_server_count: perf.resp_err_count,
+                    err_timeout: timeout_count,
                     rrt_count: perf.rrt_count,
                     rrt_sum: perf.rrt_sum.as_micros() as u64,
                     rrt_max: perf.rrt_max.as_micros() as u32,
-                    ..Default::default()
                 }
             } else {
                 L7PerfStats::default()
