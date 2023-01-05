@@ -125,7 +125,7 @@ pub struct Status {
     pub config_accepted: bool,
     pub new_revision: Option<String>,
 
-    pub proxy_ip: Option<IpAddr>,
+    pub proxy_ip: Option<String>,
     pub proxy_port: u16,
     pub sync_interval: Duration,
     pub ntp_enabled: bool,
@@ -678,9 +678,9 @@ impl Synchronizer {
 
         let mut status = status.write();
         status.proxy_ip = if runtime_config.proxy_controller_ip.len() > 0 {
-            runtime_config.proxy_controller_ip.parse().ok()
+            Some(runtime_config.proxy_controller_ip.clone())
         } else {
-            static_config.controller_ip.parse().ok()
+            Some(static_config.controller_ip.clone())
         };
         status.proxy_port = runtime_config.proxy_controller_port;
         status.sync_interval = Duration::from_secs(runtime_config.sync_interval);
