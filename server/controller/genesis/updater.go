@@ -19,11 +19,11 @@ package genesis
 import (
 	"context"
 	"fmt"
+	"inet.af/netaddr"
+	"net"
 	"strconv"
 	"strings"
 	"time"
-
-	"inet.af/netaddr"
 
 	tridentcommon "github.com/deepflowys/deepflow/message/common"
 	"github.com/deepflowys/deepflow/server/controller/common"
@@ -534,26 +534,23 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer st
 	macToIsExternalIP := map[string]bool{}
 	for _, tIP := range tIPs {
 		ip := model.GenesisIP{}
-		tIPStr := string(tIP.GetIp())
-		ipObj, err := netaddr.ParseIP(tIPStr)
-		if err != nil {
-			log.Warning("invalid ip address found: " + tIPStr)
+		ipObj := net.IP(tIP.GetIp())
+		nIPObj, ok := netaddr.FromStdIP(ipObj)
+		if !ok {
+			log.Warningf("ip (%s) invalid", ipObj.String())
 			continue
 		}
 		ip.IP = ipObj.String()
 		tIPLastSeen := tIP.GetLastSeen()
 		ip.LastSeen = time.Unix(int64(tIPLastSeen), 0).Local()
 		ip.VtapID = vtapID
-		macStr := genesiscommon.Uint64ToMac(tIP.GetMac()).String()
-		if _, ok := macToIPs[macStr]; ok {
-			macToIPs[macStr] = append(macToIPs[macStr], ip)
-		} else {
-			macToIPs[macStr] = []model.GenesisIP{ip}
-		}
-		cFlag := false
+		macStr := strings.ToUpper(genesiscommon.Uint64ToMac(tIP.GetMac()).String())
+		macToIPs[macStr] = append(macToIPs[macStr], ip)
+		cFlag := true
 		for _, l := range v.localIPRanges {
-			if !l.Contains(ipObj) {
-				cFlag = true
+			if l.Contains(nIPObj) {
+				cFlag = false
+				break
 			}
 		}
 		macToIsExternalIP[macStr] = cFlag

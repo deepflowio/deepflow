@@ -240,6 +240,10 @@ func GenerateCIDR(ips []netaddr.IPPrefix, maxMask int) (cirds []netaddr.IPPrefix
 		aggFlag := false
 		ipNet := ipaddr.NewPrefix(Prefix.IPNet())
 		for i, CIDR := range CIDRs {
+			if CIDR.Contains(ipNet) {
+				aggFlag = true
+				break
+			}
 			pSlice := []ipaddr.Prefix{*ipNet, *CIDR}
 			aggCIDR := ipaddr.Supernet(pSlice)
 			if aggCIDR == nil {
