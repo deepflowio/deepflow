@@ -92,6 +92,9 @@ func (m *ExtMetrics) GenCKTable(cluster, storagePolicy string, ttl int, coldStor
 	engine := ckdb.MergeTree
 
 	orderKeys := []string{}
+	if m.VirtualTableName != "" {
+		orderKeys = append(orderKeys, "virtual_table_name")
+	}
 	if m.Tag.Code&zerodoc.L3EpcID != 0 {
 		orderKeys = append(orderKeys, "l3_epc_id")
 	}
