@@ -1923,7 +1923,6 @@ impl Components {
         for p in self.pcap_assemblers.iter() {
             p.stop();
         }
-        self.packet_sequence_uniform_sender.stop();
         self.npb_arp_table.stop();
         info!("Stopped components.")
     }
