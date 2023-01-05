@@ -48,18 +48,10 @@ func PromReaderExecute(req *prompb.ReadRequest, ctx context.Context) (resp *prom
 	return prometheus.PromReaderExecute(req, ctx)
 }
 
-func PromQueryExecute(args *common.PromQueryParams, ctx context.Context) (jsonData map[string]interface{}, debug map[string]interface{}, err error) {
-	result, debug, err := prometheus.PromQueryExecute(args, ctx)
-	if result != nil {
-		jsonData = result.ToJson()
-	}
-	return jsonData, debug, err
+func PromQueryExecute(args *common.PromQueryParams, ctx context.Context) (*common.PromQueryResponse, error) {
+	return prometheus.PromQueryExecute(args, ctx)
 }
 
-func PromQueryRangeExecute(args *common.PromQueryRangeParams, ctx context.Context) (jsonData map[string]interface{}, debug map[string]interface{}, err error) {
-	result, debug, err := prometheus.PromQueryRangeExecute(args, ctx)
-	if result != nil {
-		jsonData = result.ToJson()
-	}
-	return jsonData, debug, err
+func PromQueryRangeExecute(args *common.PromQueryParams, ctx context.Context) (*common.PromQueryResponse, error) {
+	return prometheus.PromQueryRangeExecute(args, ctx)
 }
