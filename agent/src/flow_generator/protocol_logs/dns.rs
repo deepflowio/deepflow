@@ -84,10 +84,6 @@ impl L7ProtocolInfoInterface for DnsInfo {
     fn is_tls(&self) -> bool {
         self.is_tls
     }
-
-    fn skip_send(&self) -> bool {
-        false
-    }
 }
 
 impl DnsInfo {
