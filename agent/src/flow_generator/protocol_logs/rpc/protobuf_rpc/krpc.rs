@@ -135,10 +135,6 @@ impl L7ProtocolInfoInterface for KrpcInfo {
     fn is_tls(&self) -> bool {
         false
     }
-
-    fn skip_send(&self) -> bool {
-        false
-    }
 }
 
 impl From<KrpcInfo> for L7ProtocolSendLog {

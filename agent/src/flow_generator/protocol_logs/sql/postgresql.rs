@@ -133,11 +133,6 @@ impl L7ProtocolInfoInterface for PostgreInfo {
     fn is_tls(&self) -> bool {
         self.is_tls
     }
-
-    fn skip_send(&self) -> bool {
-        // if sql check fail and have no error response, very likely is protocol miscalculate.
-        self.status == L7ResponseStatus::default() && !is_postgresql(&self.context)
-    }
 }
 
 impl From<PostgreInfo> for L7ProtocolSendLog {

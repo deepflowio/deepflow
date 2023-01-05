@@ -94,10 +94,6 @@ impl L7ProtocolInfoInterface for KafkaInfo {
     fn is_tls(&self) -> bool {
         self.is_tls
     }
-
-    fn skip_send(&self) -> bool {
-        false
-    }
 }
 
 impl KafkaInfo {
