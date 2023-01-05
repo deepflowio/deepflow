@@ -66,7 +66,7 @@ func Load(base *config.Config, path string) *Config {
 			Base:           base,
 			PcapQueueCount: DefaultPcapQueueCount,
 			PcapQueueSize:  DefaultPcapQueueSize,
-			CKWriterConfig: config.CKWriterConfig{QueueCount: 1, QueueSize: 50000, BatchSize: 25600, FlushTimeout: 5},
+			CKWriterConfig: config.CKWriterConfig{QueueCount: 1, QueueSize: 50000, BatchSize: 2048, FlushTimeout: 5},
 			TTL:            DefaultPcapTTL,
 		},
 	}

@@ -306,7 +306,7 @@ ingester:
   #  l4-packet: 3
 
   ## event data write config
-  #event-ck-writer
+  #event-ck-writer:
   #  queue-count: 1      # 每个表并行写数量
   #  queue-size: 50000  # 数据队列长度
   #  batch-size: 25600   # 多少行数据同时写入
@@ -316,10 +316,10 @@ ingester:
   #event-ttl: 30
 
   ## pcap data write config
-  #pcap-ck-writer
-  #  queue-count: 1      # 每个表并行写数量
+  #pcap-ck-writer:
+  #  queue-count: 1     # 每个表并行写数量
   #  queue-size: 50000  # 数据队列长度
-  #  batch-size: 25600   # 多少行数据同时写入
+  #  batch-size: 2048   # 多少行数据同时写入
   #  flush-timeout: 5   # 超时写入时间
 
   ## pcap database data retention time(unit: day)
