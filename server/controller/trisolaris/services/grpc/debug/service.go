@@ -46,7 +46,6 @@ func (s *service) Register(gs *grpc.Server) error {
 func (s *service) DebugGPIDGlobalLocalData(ctx context.Context, in *api.GPIDSyncRequest) (*api.GPIDGlobalLocalData, error) {
 	log.Infof("receive DebugGPIDGlobalLocalData about vtap(ctrl_ip: %s, ctrl_mac: %s)",
 		in.GetCtrlIp(), in.GetCtrlMac())
-
 	processInfo := trisolaris.GetGVTapInfo().GetProcessInfo()
 	return &api.GPIDGlobalLocalData{
 		Entries: processInfo.GetGlobalLocalEntries(),

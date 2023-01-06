@@ -202,9 +202,12 @@ func (p *ProcessInfo) UpdateVTapGPIDReq(req *trident.GPIDSyncRequest) {
 }
 
 func (p *ProcessInfo) GetVTapGPIDReq(vtapID uint32) *trident.GPIDSyncRequest {
-	req := p.vtapIDToLocalGPIDReq.getReq(vtapID)
+	req := p.sendGPIDReq.getReq(vtapID)
 	if req == nil {
-		req = p.vtapIDToShareGPIDReq.getReq(vtapID)
+		req = p.vtapIDToLocalGPIDReq.getReq(vtapID)
+		if req == nil {
+			req = p.vtapIDToShareGPIDReq.getReq(vtapID)
+		}
 	}
 
 	return req
@@ -268,8 +271,87 @@ func (p *ProcessInfo) getGPIDInfoFromDB() {
 	p.vtapIDAndPIDToGPID = vtapIDAndPIDToGPID
 }
 
-func (p *ProcessInfo) GetGPIDResponse(vtapID uint32) *trident.GPIDSyncResponse {
-	return p.vtapIDToGPIDResponse[vtapID]
+func (p *ProcessInfo) GetGPIDResponseByReq(req *trident.GPIDSyncRequest) *trident.GPIDSyncResponse {
+	localEntries := req.GetLocalEntries()
+	peerEntries := req.GetPeerEntries()
+	if len(localEntries) == 0 && len(peerEntries) == 0 {
+		return &trident.GPIDSyncResponse{}
+	}
+	globalLocalEntries := p.globalLocalEntries
+	vtapIDAndPIDToGPID := p.vtapIDAndPIDToGPID
+	responseEntries := make([]*trident.GPIDSyncResponseEntry, 0, len(localEntries)+len(peerEntries))
+	peerDataKey := make(map[uint64]map[string]bool)
+	for _, entry := range peerEntries {
+		data := globalLocalEntries.getData(entry.GetEpcId(), uint32(entry.GetProtocol()), entry.GetIp())
+		if len(data) == 0 {
+			continue
+		}
+		key := generateKey(entry.GetEpcId(), uint32(entry.GetProtocol()))
+		if ipData, ok := peerDataKey[key]; ok {
+			if _, ok := ipData[entry.GetIp()]; ok {
+				continue
+			} else {
+				peerDataKey[key][entry.GetIp()] = true
+			}
+		} else {
+			peerDataKey[key] = make(map[string]bool)
+			peerDataKey[key][entry.GetIp()] = true
+		}
+		for _, globalEntry := range data {
+			if globalEntry.entry == nil {
+				continue
+			}
+			gpid := vtapIDAndPIDToGPID.getData(int(globalEntry.vtapID), int(globalEntry.entry.GetPid()))
+			if gpid == 0 {
+				continue
+			}
+			role := globalEntry.entry.GetRole()
+			protocol := globalEntry.entry.GetProtocol()
+			responseEntries = append(responseEntries, &trident.GPIDSyncResponseEntry{
+				EpcId:    proto.Uint32(globalEntry.entry.GetEpcId()),
+				Ip:       proto.String(globalEntry.entry.GetIp()),
+				Port:     proto.Uint32(globalEntry.entry.GetPort()),
+				Protocol: &protocol,
+				Role:     &role,
+				Gpid:     &gpid,
+			})
+		}
+	}
+	vtapID := int(req.GetVtapId())
+	for _, entry := range localEntries {
+		gpid := vtapIDAndPIDToGPID.getData(vtapID, int(entry.GetPid()))
+		if gpid == 0 {
+			continue
+		}
+		key := generateKey(entry.GetEpcId(), uint32(entry.GetProtocol()))
+		if ipData, ok := peerDataKey[key]; ok {
+			if _, ok := ipData[entry.GetIp()]; ok {
+				continue
+			}
+		}
+		role := entry.GetRole()
+		protocol := entry.GetProtocol()
+		responseEntries = append(responseEntries, &trident.GPIDSyncResponseEntry{
+			EpcId:    proto.Uint32(entry.GetEpcId()),
+			Ip:       proto.String(entry.GetIp()),
+			Port:     proto.Uint32(entry.GetPort()),
+			Protocol: &protocol,
+			Role:     &role,
+			Gpid:     &gpid,
+		})
+	}
+	return &trident.GPIDSyncResponse{Entries: responseEntries}
+}
+
+func (p *ProcessInfo) GetGPIDResponseByVTapID(vtapID uint32) *trident.GPIDSyncResponse {
+	var resp *trident.GPIDSyncResponse
+	req := p.GetVTapGPIDReq(vtapID)
+	if req != nil {
+		resp = p.GetGPIDResponseByReq(req)
+	} else {
+		resp = &trident.GPIDSyncResponse{}
+	}
+	return resp
 }
 
 func (p *ProcessInfo) generateGPIDResponse() {
@@ -435,10 +517,11 @@ func (p *ProcessInfo) generateData() {
 	p.sendLocalShareEntryData()
 	p.getGPIDInfoFromDB()
 	p.generateGlobalLocalEntries()
-	p.generateGPIDResponse()
+	//p.generateGPIDResponse()
 }
 
 func (p *ProcessInfo) TimedGenerateGPIDInfo() {
+	p.getGPIDInfoFromDB()
 	ticker := time.NewTicker(60 * time.Second).C
 	for {
 		select {

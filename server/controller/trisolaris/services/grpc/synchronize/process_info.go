@@ -33,7 +33,7 @@ func NewprocessInfoEvent() *ProcessInfoEvent {
 }
 
 func getResp(vtapID uint32) *api.GPIDSyncResponse {
-	resp := trisolaris.GetGVTapInfo().GetProcessInfo().GetGPIDResponse(vtapID)
+	resp := trisolaris.GetGVTapInfo().GetProcessInfo().GetGPIDResponseByVTapID(vtapID)
 	if resp == nil {
 		resp = EmptyGPIDResponse
 	}
@@ -57,14 +57,11 @@ func (e *ProcessInfoEvent) GPIDSync(ctx context.Context, in *api.GPIDSyncRequest
 
 		return EmptyGPIDResponse, nil
 	}
-
-	statsd.AddGPIDReceiveCounter(uint64(len(in.GetLocalEntries()) + len(in.GetPeerEntries())))
-
 	log.Infof("receive gpid sync data from vtap(ctrl_ip: %s, ctrl_mac: %s, vtap_id:%d)",
 		in.GetCtrlIp(), in.GetCtrlMac(), in.GetVtapId())
+	statsd.AddGPIDReceiveCounter(uint64(len(in.GetLocalEntries()) + len(in.GetPeerEntries())))
 	processInfo.UpdateVTapGPIDReq(in)
-	resp := getResp(in.GetVtapId())
-
+	resp := processInfo.GetGPIDResponseByReq(in)
 	statsd.AddGPIDSendCounter(uint64(len(resp.GetEntries())))
 	return resp, nil
 }
