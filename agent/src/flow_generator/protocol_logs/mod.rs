@@ -292,6 +292,9 @@ impl From<AppProtoLogsBaseInfo> for flow_log::AppProtoLogsBaseInfo {
             syscall_trace_id_thread_1: f.syscall_trace_id_thread_1,
             syscall_cap_seq_0: f.syscall_cap_seq_0 as u32,
             syscall_cap_seq_1: f.syscall_cap_seq_1 as u32,
+            // FIXME fill the actually gpid
+            gpid_0: 1,
+            gpid_1: 2,
         }
     }
 }

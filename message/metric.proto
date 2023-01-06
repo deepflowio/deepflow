@@ -35,6 +35,9 @@ message MiniField {
 
     uint32 tag_type = 18;
     uint32 tag_value = 19;
+
+    uint32 gpid = 20;
+    uint32 gpid1 = 21;
 }
 
 message MiniTag {
