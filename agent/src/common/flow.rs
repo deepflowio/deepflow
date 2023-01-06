@@ -756,6 +756,8 @@ impl From<FlowMetricsPeer> for flow_log::FlowMetricsPeer {
             is_vip: m.is_vip as u32,
             real_ip,
             real_port: m.nat_real_port as u32,
+            // FIXME fill the actually gpid
+            gpid: 1,
         }
     }
 }
