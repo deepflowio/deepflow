@@ -631,44 +631,56 @@ message PcapBatch {
 }
 
 enum RoleType {
+    ROLE_NONE = 0;
     ROLE_CLIENT = 1;
     ROLE_SERVER = 2;
 }
 
-message GPIDSyncRequestLocalEntry {
-    optional uint32 epc_id = 1;
-    optional string ip = 2;
-    optional uint32 port = 3;
-    optional ServiceProtocol protocol = 4;
-    optional RoleType role = 5;
-    optional uint64 pid = 6;
+message GPIDSyncEntry {
+    optional ServiceProtocol protocol = 1 [default = ANY]; // ANY means compressed
+    // server side
+    optional uint32 epc_id_1 = 2 [default = 0]; // u16
+    optional uint32 ipv4_1 = 3 [default = 0];
+    optional uint32 port_1 = 4 [default = 0];   // u16
+    optional uint32 pid_1 = 5 [default = 0];    // pid or gpid
+    // client side
+    optional uint32 epc_id_0 = 6 [default = 0]; // u16
+    optional uint32 ipv4_0 = 7 [default = 0];
+    optional uint32 port_0 = 8 [default = 0];   // u16
+    optional uint32 pid_0 = 9 [default = 0];    // pid or gpid
+    // real ip (before or after NAT)
+    optional uint32 epc_id_real = 10 [default = 0]; // u16
+    optional uint32 ipv4_real = 11 [default = 0];
+    optional uint32 port_real = 12 [default = 0];   // u16
+    optional uint32 pid_real = 13 [default = 0];    // pid or gpid
+    optional RoleType role = 14 [default = ROLE_NONE]; // role of real ip, ROLE_NONE means compressed
 }
 
-message GPIDSyncRequestPeerEntry {
-    optional uint32 epc_id = 1;
-    optional string ip = 2;
-    optional ServiceProtocol protocol = 3;
-}
-
-message GPIDSyncResponseEntry {
-    optional uint32 epc_id = 1;
-    optional string ip = 2;
-    optional uint32 port = 3;
-    optional ServiceProtocol protocol = 4;
-    optional RoleType role = 5;
-    optional uint64 gpid = 6;
+enum GPIDSyncCompressAlgorithm {
+    COMPRESS_ALRO_NONE = 0;
+    // Before assigning a value to an array, we use the following algorithm to
+    // compress the original data:
+    // 1) Data is sorted by the order of fields in the entry of the array. The
+    //    order of the fields is carefully designed. The more likely a field is
+    //    repeated, the higher its order will be.
+    // 2) For each entry, if one of its fields is equal to the corresponding
+    //    field of the previous entry, then its field is assigned a value of 0.
+    //    When a field in Protobuf have a default value of 0, this allows us
+    //    to achieve very efficient compression.
+    COMPRESS_ALGO_IGNORE_IF_EQUAL_TO_PREVIOUS = 1;
 }
 
 message GPIDSyncRequest {
     optional string ctrl_ip = 1;
     optional string ctrl_mac = 2;
     optional uint32 vtap_id = 3;
-    repeated GPIDSyncRequestLocalEntry local_entries = 11;
-    repeated GPIDSyncRequestPeerEntry peer_entries = 12;
+    optional GPIDSyncCompressAlgorithm entries_compress_algorithm = 4 [default = COMPRESS_ALRO_NONE];
+    repeated GPIDSyncEntry entries = 10;
 }
 
 message GPIDSyncResponse {
-    repeated GPIDSyncResponseEntry entries = 1;
+    optional GPIDSyncCompressAlgorithm entries_compress_algorithm = 1 [default = COMPRESS_ALRO_NONE];
+    repeated GPIDSyncEntry entries = 2;
 }
 
 message GPIDGlobalLocalData {
