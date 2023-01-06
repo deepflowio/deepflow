@@ -165,6 +165,7 @@ func (c *TagRecorder) UpdateChDictionary() {
 							CH_DICTIONARY_POD_NS_CLOUD_TAGS,
 							CH_DICTIONARY_OS_APP_TAG,
 							CH_DICTIONARY_OS_APP_TAGS,
+							CH_DICTIONARY_GPROCESS,
 						)
 						chDicts := mapset.NewSet()
 						for _, dictionary := range dictionaries {

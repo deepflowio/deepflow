@@ -30,6 +30,7 @@ resource_gl1_type         , resource_gl1_type_0       , resource_gl1_type_1     
 resource_gl1              , resource_gl1_0            , resource_gl1_1             , resource       ,                       , Universal Tag     , 111
 resource_gl2_type         , resource_gl2_type_0       , resource_gl2_type_1        , int_enum       , resource_gl2_type     , Universal Tag     , 111
 resource_gl2              , resource_gl2_0            , resource_gl2_1             , resource       ,                       , Universal Tag     , 111
+gprocess                  , gprocess_0                , gprocess_1                 , resource       ,                       , Universal Tag     , 111
 
 k8s.label                 , k8s.label_0               , k8s.label_1                , map            ,                       , Custom Tag        , 111
 attribute                 , attribute                 , attribute                  , map            ,                       , Native Tag        , 111

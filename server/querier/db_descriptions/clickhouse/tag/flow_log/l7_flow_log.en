@@ -30,6 +30,7 @@ resource_gl1_type         , Type - K8s Workload First     , The type of 'resourc
 resource_gl1              , Instance - K8s Workload First , On the basis of 'resource_gl0', aggregate the POD into a workload.
 resource_gl2_type         , Type - K8s Service First      , The type of 'resource_gl2'.
 resource_gl2              , Instance - K8s Service First  , On the basis of 'resource_gl1', aggregate K8s service ClusterIP and workload into service.
+gprocess                  , Process                       , 
 
 k8s.label                 , K8s Label                     ,
 attribute                 , Attribute                     ,

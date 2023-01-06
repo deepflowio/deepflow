@@ -53,6 +53,7 @@ const (
 	RESOURCE_TYPE_POD_GROUP_PORT    = "pod_group_port"
 	RESOURCE_TYPE_POD_INGRESS       = "pod_ingress"
 	RESOURCE_TYPE_SERVICE           = "service"
+	RESOURCE_TYPE_GPROCESS          = "gprocess"
 )
 
 const (
@@ -90,6 +91,7 @@ const (
 	RESOURCE_TYPE_CH_STRING_ENUM   = "ch_string_enum"
 	RESOURCE_TYPE_CH_INT_ENUM      = "ch_int_enum"
 	RESOURCE_TYPE_CH_NODE_TYPE     = "ch_node_type"
+	RESOURCE_TYPE_CH_GPROCESS      = "ch_gprocess"
 )
 
 const (
@@ -132,6 +134,7 @@ const (
 	CH_INT_DICTIONARY_ENUM    = "int_enum_map"
 
 	CH_DICTIONARY_NODE_TYPE = "node_type_map"
+	CH_DICTIONARY_GPROCESS  = "gprocess_map"
 )
 
 const (
@@ -532,6 +535,7 @@ var CREATE_SQL_MAP = map[string]string{
 	CH_DICTIONARY_POD_NS_CLOUD_TAGS: CREATE_CLOUD_TAGS_DICTIONARY_SQL,
 	CH_DICTIONARY_OS_APP_TAG:        CREATE_OS_APP_TAG_DICTIONARY_SQL,
 	CH_DICTIONARY_OS_APP_TAGS:       CREATE_OS_APP_TAGS_DICTIONARY_SQL,
+	CH_DICTIONARY_GPROCESS:          CREATE_DICTIONARY_SQL,
 }
 
 var VTAP_TYPE_TO_DEVICE_TYPE = map[int]int{
