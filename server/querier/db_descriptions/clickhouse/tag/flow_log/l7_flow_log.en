@@ -34,6 +34,8 @@ gprocess                  , Process                       ,
 
 k8s.label                 , K8s Label                     ,
 attribute                 , Attribute                     ,
+cloud.tag                 , Cloud Tag                     ,
+os.app                    , OS APP                        ,
 
 ip                        , IP Address                    ,
 is_ipv4                   , IPv4 Flag                     ,

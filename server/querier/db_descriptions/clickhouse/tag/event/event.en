@@ -22,6 +22,8 @@ pod                   , K8s POD                      ,
 service               , Service                      ,
 
 k8s.label             , K8s Label                    ,
+cloud.tag             , Cloud Tag                    ,
+os.app                , OS APP                       ,
 
 instance              , Instance                     ,
 instance_type         , Instance Type                ,
