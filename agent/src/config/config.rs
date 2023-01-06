@@ -537,6 +537,7 @@ impl YamlConfig {
                 parse_u16_range_list_to_bitmap(port_range, false).unwrap(),
             ));
         }
+        port_bitmap.sort_unstable_by_key(|p| p.0.clone());
         port_bitmap
     }
 }
