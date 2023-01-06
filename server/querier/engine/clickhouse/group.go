@@ -61,6 +61,26 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 					}
 					filter := tagItem.NotNullFilter
 					return &view.Expr{Value: "(" + filter + ")"}, true
+				} else if strings.HasPrefix(preAsTag, "cloud.tag.") {
+					if strings.HasSuffix(preAsTag, "_0") {
+						tagItem, ok = tag.GetTag("cloud_tag_0", db, table, "default")
+					} else if strings.HasSuffix(preAsTag, "_1") {
+						tagItem, ok = tag.GetTag("cloud_tag_1", db, table, "default")
+					} else {
+						tagItem, ok = tag.GetTag("cloud_tag", db, table, "default")
+					}
+					filter := tagItem.NotNullFilter
+					return &view.Expr{Value: "(" + filter + ")"}, true
+				} else if strings.HasPrefix(preAsTag, "os.app.") {
+					if strings.HasSuffix(preAsTag, "_0") {
+						tagItem, ok = tag.GetTag("os_app_0", db, table, "default")
+					} else if strings.HasSuffix(preAsTag, "_1") {
+						tagItem, ok = tag.GetTag("os_app_1", db, table, "default")
+					} else {
+						tagItem, ok = tag.GetTag("os_app", db, table, "default")
+					}
+					filter := tagItem.NotNullFilter
+					return &view.Expr{Value: "(" + filter + ")"}, true
 				} else if strings.HasPrefix(preAsTag, "tag.") || strings.HasPrefix(preAsTag, "attribute.") {
 					tagItem, ok = tag.GetTag("tag.", db, table, "default")
 					filter := fmt.Sprintf(tagItem.NotNullFilter, name)
@@ -85,6 +105,26 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 					tagItem, ok = tag.GetTag("k8s_label_1", db, table, "default")
 				} else {
 					tagItem, ok = tag.GetTag("k8s_label", db, table, "default")
+				}
+				filter := tagItem.NotNullFilter
+				return &view.Expr{Value: "(" + filter + ")"}, true
+			} else if strings.HasPrefix(preAsTag, "cloud.tag.") {
+				if strings.HasSuffix(preAsTag, "_0") {
+					tagItem, ok = tag.GetTag("cloud_tag_0", db, table, "default")
+				} else if strings.HasSuffix(preAsTag, "_1") {
+					tagItem, ok = tag.GetTag("cloud_tag_1", db, table, "default")
+				} else {
+					tagItem, ok = tag.GetTag("cloud_tag", db, table, "default")
+				}
+				filter := tagItem.NotNullFilter
+				return &view.Expr{Value: "(" + filter + ")"}, true
+			} else if strings.HasPrefix(preAsTag, "os.app.") {
+				if strings.HasSuffix(preAsTag, "_0") {
+					tagItem, ok = tag.GetTag("os_app_0", db, table, "default")
+				} else if strings.HasSuffix(preAsTag, "_1") {
+					tagItem, ok = tag.GetTag("os_app_1", db, table, "default")
+				} else {
+					tagItem, ok = tag.GetTag("os_app", db, table, "default")
 				}
 				filter := tagItem.NotNullFilter
 				return &view.Expr{Value: "(" + filter + ")"}, true

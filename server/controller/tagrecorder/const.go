@@ -114,9 +114,9 @@ const (
 	CH_DICTIONARY_K8S_LABELS    = "k8s_labels_map"
 
 	CH_DICTIONARY_CHOST_CLOUD_TAG   = "chost_cloud_tag_map"
-	CH_DICTIONARY_POD_NS_CLOUD_TAG  = "chost_pod_ns_tag_map"
+	CH_DICTIONARY_POD_NS_CLOUD_TAG  = "pod_ns_cloud_tag_map"
 	CH_DICTIONARY_CHOST_CLOUD_TAGS  = "chost_cloud_tags_map"
-	CH_DICTIONARY_POD_NS_CLOUD_TAGS = "chost_pod_ns_tags_map"
+	CH_DICTIONARY_POD_NS_CLOUD_TAGS = "pod_ns_cloud_tags_map"
 	CH_DICTIONARY_OS_APP_TAG        = "os_app_tag_map"
 	CH_DICTIONARY_OS_APP_TAGS       = "os_app_tags_map"
 

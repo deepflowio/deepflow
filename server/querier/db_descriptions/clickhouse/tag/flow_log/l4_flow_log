@@ -33,6 +33,8 @@ resource_gl2        , resource_gl2_0       , resource_gl2_1        , resource   
 gprocess            , gprocess_0           , gprocess_1            , resource     ,                      , Universal Tag        , 111
 
 k8s.label           , k8s.label_0          , k8s.label_1           , map          ,                      , Custom Tag           , 111
+cloud.tag           , cloud.tag_0          , cloud.tag_1           , map          ,                      , Custom Tag           , 111
+os.app              , os.app_0             , os.app_1              , map          ,                      , Custom Tag           , 111
 
 eth_type            , eth_type             , eth_type              , int_enum     , eth_type             , Data Link Layer      , 111
 vlan                , vlan                 , vlan                  , int          ,                      , Data Link Layer      , 111
