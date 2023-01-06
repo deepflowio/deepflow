@@ -79,12 +79,12 @@ type StaticConfig struct {
 	FeatureFlags                     []string              `yaml:"feature-flags,omitempty"`
 	L7ProtocolPorts                  map[string]string     `yaml:"l7-protocol-ports,omitempty"`
 	Ebpf                             *EbpfConfig           `yaml:"ebpf,omitempty"`
-	OsAppTagExecUser                 *string               `yaml:"os-app-tag-exec-user"`
-	OsAppTagExec                     []string              `yaml:"os-app-tag-exec"`
-	OsProcRoot                       *string               `yaml:"os-proc-root;omitempty"`
-	OsProcSocketSyncInterval         *int                  `yaml:"os-proc-socket-sync-interval"`
-	OsProcSocketMinLifetime          *int                  `yaml:"os-proc-socket-min-lifetime"`
-	OsProcRegex                      *OsProcRegex          `yaml:"os-proc-regex"`
+	OsAppTagExecUser                 *string               `yaml:"os-app-tag-exec-user,omitempty"`
+	OsAppTagExec                     []string              `yaml:"os-app-tag-exec,omitempty"`
+	OsProcRoot                       *string               `yaml:"os-proc-root,omitempty"`
+	OsProcSocketSyncInterval         *int                  `yaml:"os-proc-socket-sync-interval,omitempty"`
+	OsProcSocketMinLifetime          *int                  `yaml:"os-proc-socket-min-lifetime,omitempty"`
+	OsProcRegex                      *OsProcRegex          `yaml:"os-proc-regex,omitempty"`
 	GuardInterval                    *string               `yaml:"guard-interval,omitempty"`
 }
 
