@@ -20,6 +20,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"math/rand"
 	"net"
 	"strconv"
 	"strings"
@@ -51,6 +52,7 @@ const (
 	PodClusterID
 	ServiceID
 	Resource // 1<< 14
+	GPID     // 1<< 15
 
 	// Make sure the max offset <= 19
 )
@@ -71,6 +73,7 @@ const (
 	PodClusterIDPath
 	ServiceIDPath
 	ResourcePath // 1<<34
+	GPIDPath     // 1<< 35
 
 	// Make sure the max offset <= 39
 )
@@ -261,6 +264,7 @@ type Field struct {
 	ResourceGl1Type uint8
 	ResourceGl2ID   uint32
 	ResourceGl2Type uint8
+	GPID            uint32
 
 	MAC1             uint64
 	IP61             net.IP // FIXME: 合并IP61和IP1
@@ -284,6 +288,7 @@ type Field struct {
 	ResourceGl1Type1 uint8
 	ResourceGl2ID1   uint32
 	ResourceGl2Type1 uint8
+	GPID1            uint32
 
 	ACLGID       uint16
 	Direction    DirectionEnum
@@ -438,8 +443,8 @@ func MetricsTableNameToID(name string) MetricsTableID {
 }
 
 const (
-	BaseCode     = AZID | HostID | IP | L3Device | L3EpcID | PodClusterID | PodGroupID | PodID | PodNodeID | PodNSID | RegionID | SubnetID | TAPType | VTAPID | ServiceID | Resource
-	BasePathCode = AZIDPath | HostIDPath | IPPath | L3DevicePath | L3EpcIDPath | PodClusterIDPath | PodGroupIDPath | PodIDPath | PodNodeIDPath | PodNSIDPath | RegionIDPath | SubnetIDPath | TAPSide | TAPType | VTAPID | ServiceIDPath | ResourcePath
+	BaseCode     = AZID | HostID | IP | L3Device | L3EpcID | PodClusterID | PodGroupID | PodID | PodNodeID | PodNSID | RegionID | SubnetID | TAPType | VTAPID | ServiceID | Resource | GPID
+	BasePathCode = AZIDPath | HostIDPath | IPPath | L3DevicePath | L3EpcIDPath | PodClusterIDPath | PodGroupIDPath | PodIDPath | PodNodeIDPath | PodNSIDPath | RegionIDPath | SubnetIDPath | TAPSide | TAPType | VTAPID | ServiceIDPath | ResourcePath | GPIDPath
 	BasePortCode = Protocol | ServerPort | IsKeyService
 
 	VTAP_FLOW_PORT      = BaseCode | BasePortCode | Direction
@@ -565,6 +570,16 @@ func (t *Tag) MarshalTo(b []byte) int {
 		} else if t.Direction.IsServerToClient() {
 			offset += copy(b[offset:], ",direction=s2c")
 		}
+	}
+	if t.Code&GPID != 0 {
+		offset += copy(b[offset:], ",gprocess_id=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.GPID), 10))
+	}
+	if t.Code&GPIDPath != 0 {
+		offset += copy(b[offset:], ",gprocess_id_0=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.GPID), 10))
+		offset += copy(b[offset:], ",gprocess_id_1=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.GPID1), 10))
 	}
 	if t.Code&HostID != 0 {
 		offset += copy(b[offset:], ",host_id=")
@@ -887,6 +902,13 @@ func GenTagColumns(code Code) []*ckdb.Column {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("direction", ckdb.LowCardinalityString).SetComment("统计量对应的流方向. c2s: ip为客户端, s2c: ip为服务端"))
 	}
 
+	if code&GPID != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("gprocess_id", ckdb.UInt32).SetComment("全局进程ID"))
+	}
+	if code&GPIDPath != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("gprocess_id_0", ckdb.UInt32).SetComment("ip0对应的全局进程ID"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("gprocess_id_1", ckdb.UInt32).SetComment("ip1对应的全局进程ID"))
+	}
 	if code&HostID != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("host_id", ckdb.UInt16).SetComment("宿主机ID"))
 	}
@@ -1094,6 +1116,12 @@ func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) {
 		}
 	}
 
+	if code&GPID != 0 {
+		block.Write(t.GPID)
+	}
+	if code&GPIDPath != 0 {
+		block.Write(t.GPID, t.GPID1)
+	}
 	if code&HostID != 0 {
 		block.Write(t.HostID)
 	}
@@ -1321,6 +1349,9 @@ func (t *Tag) ReadFromPB(p *pb.MiniTag) {
 	t.TAPPort = datatype.TapPort(p.Field.TapPort)
 	t.TAPType = TAPTypeEnum(p.Field.TapType)
 	t.L7Protocol = datatype.L7Protocol(p.Field.L7Protocol)
+	// FIXME
+	t.GPID = uint32(rand.Intn(30))
+	t.GPID1 = uint32(rand.Intn(30))
 	t.TagType = uint8(p.Field.TagType)
 	t.TagValue = uint16(p.Field.TagValue)
 }
