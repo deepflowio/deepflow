@@ -75,6 +75,15 @@ struct tracer_sock_msg_reply {
 	char data[0];
 };
 
+struct datadump_msg {
+	bool enable;		// Whether to enable the datadump ?
+	bool is_params;		// Is it set pid or comm ?
+	bool only_stdout;	// Whether to dump data to stdout ?
+	int pid;
+	uint8_t proto;
+	char comm[16];
+};
+
 int sockopt_ctl(void *arg);
 int ctrl_init(void);
 int sockopt_register(struct tracer_sockopts *sockopts);

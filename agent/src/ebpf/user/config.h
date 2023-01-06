@@ -67,4 +67,12 @@
 // seconds
 #define GO_TRACING_TIMEOUT_DEFAULT      120
 
+#define SK_TRACER_NAME			"socket-trace"
+
+#define DATADUMP_FILE_PATH_SIZE		1024
+#define DATADUMP_FILE_PATH_PREFIX	"/var/run"
+
+// trace map回收的最大比例（指当前数量超过了整个MAP的容量的回收比例才进行回收）
+#define RECLAIM_TRACE_MAP_SCALE		0.9
+
 #endif /* DF_EBPF_CONFIG_H */

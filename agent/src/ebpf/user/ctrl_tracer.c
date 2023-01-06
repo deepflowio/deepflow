@@ -21,89 +21,92 @@
 #include "tracer.h"
 #include "socket.h"
 
-#define MFBPF_NAME           "deepflow-ebpfctl"
-#define MFBPF_VERSION        "v1.0.0"
-#define LINUX_VER_LEN        128
+#define DF_BPF_NAME           "deepflow-ebpfctl"
+#define DF_BPF_VERSION        "v1.0.0"
+#define LINUX_VER_LEN         128
 
-typedef enum mfbpf_cmd_e {
-	MFBPF_CMD_ADD,
-	MFBPF_CMD_DEL,
-	MFBPF_CMD_SET,
-	MFBPF_CMD_SHOW,
-	MFBPF_CMD_REPLACE,
-	MFBPF_CMD_FLUSH,
-	MFBPF_CMD_HELP,
-} mfbpf_cmd_t;
+typedef enum df_bpf_cmd_e {
+	DF_BPF_CMD_ADD,
+	DF_BPF_CMD_DEL,
+	DF_BPF_CMD_SET,
+	DF_BPF_CMD_ON,
+	DF_BPF_CMD_OFF,
+	DF_BPF_CMD_SHOW,
+	DF_BPF_CMD_REPLACE,
+	DF_BPF_CMD_FLUSH,
+	DF_BPF_CMD_HELP,
+} df_bpf_cmd_t;
 
-struct mfbpf_conf {
+struct df_bpf_conf {
 	int af;
 	int verbose;
 	int stats;
 	int interval;
 	int count;
 	bool color;
+	bool only_stdout;
 	char *obj;
-	mfbpf_cmd_t cmd;
+	df_bpf_cmd_t cmd;
 	int argc;
 	char **argv;
 };
 
-struct mfbpf_obj {
+struct df_bpf_obj {
 	char *name;
 	void *param;
 
 	void (*help) (void);
 	/* @conf is used to passing general config like af, verbose, ...
 	 * we have obj.parse() to handle obj specific parameters. */
-	int (*do_cmd) (struct mfbpf_obj * obj, mfbpf_cmd_t cmd,
-		       struct mfbpf_conf * conf);
+	int (*do_cmd) (struct df_bpf_obj * obj, df_bpf_cmd_t cmd,
+		       struct df_bpf_conf * conf);
 	/* the parser can be used to parse @conf into @param */
-	int (*parse) (struct mfbpf_obj * obj, struct mfbpf_conf * conf);
-	int (*check) (const struct mfbpf_obj * obj, mfbpf_cmd_t cmd);
+	int (*parse) (struct df_bpf_obj * obj, struct df_bpf_conf * conf);
+	int (*check) (const struct df_bpf_obj * obj, df_bpf_cmd_t cmd);
 };
 
 static void tracer_help(void)
 {
-	fprintf(stderr, "Usage:\n" "    %s tracer show\n", MFBPF_NAME);
+	fprintf(stderr, "Usage:\n" "    %s tracer show\n", DF_BPF_NAME);
 }
 
 static void socktrace_help(void)
 {
-	fprintf(stderr, "Usage:\n" "    %s tracer show\n", MFBPF_NAME);
+	fprintf(stderr, "Usage:\n" "    %s tracer show\n", DF_BPF_NAME);
 }
 
-static inline char *get_proto_name(uint16_t proto_id)
+static void datadump_help(void)
 {
-	switch (proto_id) {
-	case PROTO_HTTP1:
-		return "HTTP";
-	case PROTO_HTTP2:
-		return "HTTP2";
-	case PROTO_TLS_HTTP1:
-		return "TLS_HTTP1";
-	case PROTO_TLS_HTTP2:
-		return "TLS_HTTP2";
-	case PROTO_MYSQL:
-		return "MySQL";
-	case PROTO_DNS:
-		return "DNS";
-	case PROTO_REDIS:
-		return "Redis";
-	case PROTO_KAFKA:
-		return "Kafka";
-	case PROTO_MQTT:
-		return "MQTT";
-	case PROTO_DUBBO:
-		return "Dubbo";
-	case PROTO_SOFARPC:
-		return "SofaRPC";
-	case PROTO_POSTGRESQL:
-		return "PgSQL";
-	default:
-		return "Unknown";
-	}
-
-	return "Unknown";
+	fprintf(stderr, "Usage:\n" "    %s datadump {on|off} [OPTIONS]\n", DF_BPF_NAME);
+	fprintf(stderr, "    %s datadump set pid PID comm COMM proto PROTO_NUM\n", DF_BPF_NAME);
+	fprintf(stderr, "PROTO_NUM:\n");
+	fprintf(stderr, "    0:   PROTO_ALL\n");
+	fprintf(stderr, "    1:   PROTO_ORTHER\n");
+	fprintf(stderr, "    20:  PROTO_HTTP1\n");
+	fprintf(stderr, "    21:  PROTO_HTTP2\n");
+	fprintf(stderr, "    22:  PROTO_TLS_HTTP1\n");
+	fprintf(stderr, "    23:  PROTO_TLS_HTTP2\n");
+	fprintf(stderr, "    40:  PROTO_DUBBO\n");
+	fprintf(stderr, "    43:  PROTO_SOFARPC\n");
+	fprintf(stderr, "    60:  PROTO_MYSQL\n");
+	fprintf(stderr, "    61:  PROTO_POSTGRESQL\n");
+	fprintf(stderr, "    80:  PROTO_REDIS\n");
+	fprintf(stderr, "    100: PROTO_KAFKA\n");
+	fprintf(stderr, "    101: PROTO_MQTT\n");
+	fprintf(stderr, "    120: PROTO_DNS\n");
+	fprintf(stderr, "PID:\n");
+	fprintf(stderr, "    0:   all process/thread\n");
+	fprintf(stderr, "COMM:\n");
+	fprintf(stderr, "    '':  The process name or thread name is not restricted.\n");
+	fprintf(stderr, "Options:\n");
+	fprintf(stderr, "    '-O, --only-stdout':  dump to stdout only.\n");
+	fprintf(stderr, "For example:\n");
+	fprintf(stderr, "    %s datadump set pid 4567 comm curl proto 0\n",
+		DF_BPF_NAME);
+	fprintf(stderr, "    %s datadump set pid 4567 comm '' proto 20\n", DF_BPF_NAME);
+	fprintf(stderr, "    %s datadump on\n", DF_BPF_NAME);
+	fprintf(stderr, "    %s datadump on --only-stdout\n", DF_BPF_NAME);
+	fprintf(stderr, "    %s datadump off\n", DF_BPF_NAME);
 }
 
 static void tracer_dump(struct bpf_tracer_param *param)
@@ -132,8 +135,9 @@ static void tracer_dump(struct bpf_tracer_param *param)
 		    ("worker %d for queue, de %" PRIu64 " en %" PRIu64 " lost %"
 		     PRIu64 " alloc failed %" PRIu64 " burst %" PRIu64
 		     " queue size %u cap %u\n", j, rx_q->dequeue_nr,
-		     rx_q->enqueue_nr, rx_q->enqueue_lost, rx_q->heap_get_failed,
-		     rx_q->burst_count, rx_q->queue_size, rx_q->ring_capacity);
+		     rx_q->enqueue_nr, rx_q->enqueue_lost,
+		     rx_q->heap_get_failed, rx_q->burst_count, rx_q->queue_size,
+		     rx_q->ring_capacity);
 		heap_get_failed += rx_q->heap_get_failed;
 		dequeue_nr += rx_q->dequeue_nr;
 		enqueue_nr += rx_q->enqueue_nr;
@@ -153,8 +157,7 @@ static void tracer_dump(struct bpf_tracer_param *param)
 		if (btp->proto_status[j] > 0) {
 			printf("- %-10s(%d) %" PRIu64 "\n",
 			       get_proto_name((uint16_t) j),
-			       j,
-			       btp->proto_status[j]);
+			       j, btp->proto_status[j]);
 		}
 	}
 
@@ -282,22 +285,14 @@ static inline int msg_recv(int clt_fd, struct tracer_sock_msg_reply *reply_hdr,
 	return 0;
 }
 
-int mfbpf_getsockopt(sockoptid_t cmd, const void *in, size_t in_len,
-		     void **out, size_t * out_len)
+static int sockopt_send(enum sockopt_type type, sockoptid_t cmd, const void *in,
+			size_t in_len)
 {
 	struct tracer_sock_msg *msg;
-	struct tracer_sock_msg_reply reply_hdr;
 	struct sockaddr_un clt_addr;
 	int clt_fd;
 	int res;
 	size_t msg_len;
-
-	if (NULL == out || NULL == out_len) {
-		fprintf(stderr, "[%s] no pointer for info return\n", __func__);
-		return -1;
-	}
-	*out = NULL;
-	*out_len = 0;
 
 	memset(&clt_addr, 0, sizeof(struct sockaddr_un));
 	clt_addr.sun_family = AF_UNIX;
@@ -323,7 +318,7 @@ int mfbpf_getsockopt(sockoptid_t cmd, const void *in, size_t in_len,
 	memset(msg, 0, msg_len);
 	msg->version = SOCKOPT_VERSION;
 	msg->id = cmd;
-	msg->type = SOCKOPT_GET;
+	msg->type = type;
 	msg->len = in_len;
 	res = msg_send(clt_fd, msg, in, in_len);
 
@@ -332,13 +327,32 @@ int mfbpf_getsockopt(sockoptid_t cmd, const void *in, size_t in_len,
 
 	if (res) {
 		close(clt_fd);
-		return res;
+		return -1;
 	}
 
+	return clt_fd;
+}
+
+int df_bpf_getsockopt(sockoptid_t cmd, const void *in, size_t in_len,
+		      void **out, size_t * out_len)
+{
+	struct tracer_sock_msg_reply reply_hdr;
+	int clt_fd, res;
+
+	if (NULL == out || NULL == out_len) {
+		fprintf(stderr, "[%s] no pointer for info return\n", __func__);
+		return -1;
+	}
+	*out = NULL;
+	*out_len = 0;
+
+	if ((clt_fd = sockopt_send(SOCKOPT_GET, cmd, in, in_len)) <= 0) {
+		return -1;
+	}
 	res = msg_recv(clt_fd, &reply_hdr, out, out_len);
 	if (res) {
 		close(clt_fd);
-		return res;
+		return -1;
 	}
 
 	if (reply_hdr.errcode) {
@@ -352,7 +366,32 @@ int mfbpf_getsockopt(sockoptid_t cmd, const void *in, size_t in_len,
 	return 0;
 }
 
-static inline void mfbpf_sockopt_msg_free(void *msg)
+int df_bpf_setsockopt(sockoptid_t cmd, const void *in, size_t in_len)
+{
+	struct tracer_sock_msg_reply reply_hdr;
+	int clt_fd, res;
+	if ((clt_fd = sockopt_send(SOCKOPT_SET, cmd, in, in_len)) <= 0) {
+		return -1;
+	}
+
+	res = msg_recv(clt_fd, &reply_hdr, NULL, NULL);
+	if (res) {
+		close(clt_fd);
+		return -1;
+	}
+
+	if (reply_hdr.errcode) {
+		fprintf(stderr, "[%s] Server error: %s\n", __func__,
+			reply_hdr.errstr);
+		close(clt_fd);
+		return reply_hdr.errcode;
+	}
+
+	close(clt_fd);
+	return 0;
+}
+
+static inline void df_bpf_sockopt_msg_free(void *msg)
 {
 	free(msg);
 	msg = NULL;
@@ -365,8 +404,8 @@ static inline void get_kernel_version(char *buf)
 	snprintf(buf, LINUX_VER_LEN, "Linux %d.%d.%d\n", major, minor, patch);
 }
 
-static int socktrace_do_cmd(struct mfbpf_obj *obj, mfbpf_cmd_t cmd,
-			    struct mfbpf_conf *conf)
+static int socktrace_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
+			    struct df_bpf_conf *conf)
 {
 	struct bpf_socktrace_params *sk_trace_params = NULL;
 	struct bpf_offset_param_array *array = NULL;
@@ -378,10 +417,10 @@ static int socktrace_do_cmd(struct mfbpf_obj *obj, mfbpf_cmd_t cmd,
 	printf("\n\033[0;33;mLinux Version: %s\033[0m\n", linux_ver_str);
 
 	switch (conf->cmd) {
-	case MFBPF_CMD_SHOW:
+	case DF_BPF_CMD_SHOW:
 		err =
-		    mfbpf_getsockopt(SOCKOPT_GET_SOCKTRACE_SHOW, NULL,
-				     0, (void **)&sk_trace_params, &size);
+		    df_bpf_getsockopt(SOCKOPT_GET_SOCKTRACE_SHOW, NULL,
+				      0, (void **)&sk_trace_params, &size);
 		if (err != 0)
 			return err;
 
@@ -394,7 +433,7 @@ static int socktrace_do_cmd(struct mfbpf_obj *obj, mfbpf_cmd_t cmd,
 		    || size != sizeof(*sk_trace_params) +
 		    array->count * sizeof(struct bpf_offset_param)) {
 			fprintf(stderr, "corrupted response.\n");
-			mfbpf_sockopt_msg_free(sk_trace_params);
+			df_bpf_sockopt_msg_free(sk_trace_params);
 			return ETR_INVAL;
 		}
 
@@ -404,8 +443,19 @@ static int socktrace_do_cmd(struct mfbpf_obj *obj, mfbpf_cmd_t cmd,
 		       sk_trace_params->kern_socket_map_used);
 		printf("kern_trace_map_max:\t%u\n",
 		       sk_trace_params->kern_trace_map_max);
-		printf("kern_trace_map_used:\t%u\n\n",
+		printf("kern_trace_map_used:\t%u\n",
 		       sk_trace_params->kern_trace_map_used);
+		printf("datadump_enable:\t%s\n",
+		       sk_trace_params->datadump_enable ? "true" : "false");
+		printf("datadump_pid:\t%d\n",
+		       sk_trace_params->datadump_pid);
+		printf("datadump_proto:\t%d\n",
+		       sk_trace_params->datadump_proto);
+		printf("datadump_comm:\t%s\n",
+		       sk_trace_params->datadump_comm);
+		printf("datadump_file_path:\t%s\n\n",
+		       sk_trace_params->datadump_file_path);
+
 		printf
 		    ("tracer_state:\t%u [ 0 (TRACER_INIT), 1 (TRACER_RUNNING), "
 		     "2 (TRACER_STOP) ]\n\n", sk_trace_params->tracer_state);
@@ -419,25 +469,107 @@ static int socktrace_do_cmd(struct mfbpf_obj *obj, mfbpf_cmd_t cmd,
 
 		offset_dump(i - 1, &array->offsets[i - 1]);
 
-		mfbpf_sockopt_msg_free(sk_trace_params);
+		df_bpf_sockopt_msg_free(sk_trace_params);
 		return ETR_OK;
 	default:
 		return ETR_NOTSUPP;
 	}
 }
 
-static int tracer_do_cmd(struct mfbpf_obj *obj, mfbpf_cmd_t cmd,
-			 struct mfbpf_conf *conf)
+static int datadump_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
+			   struct df_bpf_conf *conf)
+{
+	switch (conf->cmd) {
+	case DF_BPF_CMD_ON:
+	case DF_BPF_CMD_OFF:
+	case DF_BPF_CMD_SET:
+		{
+			struct datadump_msg msg;
+			memset(msg.comm, 0, sizeof(msg.comm));
+			msg.is_params = false;
+			msg.only_stdout = conf->only_stdout;
+			if (conf->cmd == DF_BPF_CMD_ON
+			    || conf->cmd == DF_BPF_CMD_OFF) {
+				if (conf->argc != 0) {
+					obj->help();
+					return ETR_NOTSUPP;
+				}
+				if (conf->cmd == DF_BPF_CMD_ON) {
+					msg.enable = true;
+					printf("Set datadump on ");
+				} else {
+					msg.enable = false;
+					printf("Set datadump off ");
+				}
+			} else {
+				if (conf->argc != 6
+				    || strcmp(conf->argv[0], "pid")
+				    || strcmp(conf->argv[2], "comm")
+				    || strcmp(conf->argv[4], "proto")) {
+					obj->help();
+					return ETR_NOTSUPP;
+				}
+
+				if (conf->argv[1][0] == '0'
+				    && conf->argv[1][1] == '\0') {
+					msg.pid = 0;
+				} else {
+					msg.pid = atoi(conf->argv[1]);
+					if (msg.pid <= 0) {
+						obj->help();
+						return ETR_NOTSUPP;
+					}
+				}
+
+				if (conf->argv[5][0] == '0'
+				    && conf->argv[5][1] == '\0') {
+					msg.proto = 0;
+				} else {
+					msg.proto = atoi(conf->argv[5]);
+					if (msg.proto <= 0) {
+						obj->help();
+						return ETR_NOTSUPP;
+					}
+				}
+
+				msg.is_params = true;
+				memset(msg.comm, 0, sizeof(msg.comm));
+				if (strlen(conf->argv[3]) > 0) {
+					memcpy(msg.comm, conf->argv[3],
+					       sizeof(msg.comm) - 1);
+				}
+
+				printf("Set pid %d comm %s proto %d ", msg.pid,
+				       msg.comm, msg.proto);
+			}
+
+			if (df_bpf_setsockopt(SOCKOPT_SET_DATADUMP_ADD, &msg,
+					      sizeof(msg)) == 0) {
+				printf("Success.\n");
+			} else {
+				printf("Failed.\n");
+			}
+
+			break;
+		}
+	default:
+		return ETR_NOTSUPP;
+	}
+	return ETR_OK;
+}
+
+static int tracer_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
+			 struct df_bpf_conf *conf)
 {
 	struct bpf_tracer_param_array *array;
 	size_t size, i;
 	int err;
 
 	switch (conf->cmd) {
-	case MFBPF_CMD_SHOW:
+	case DF_BPF_CMD_SHOW:
 		err =
-		    mfbpf_getsockopt(SOCKOPT_GET_TRACER_SHOW, NULL,
-				     0, (void **)&array, &size);
+		    df_bpf_getsockopt(SOCKOPT_GET_TRACER_SHOW, NULL,
+				      0, (void **)&array, &size);
 		if (err != 0)
 			return err;
 
@@ -445,77 +577,87 @@ static int tracer_do_cmd(struct mfbpf_obj *obj, mfbpf_cmd_t cmd,
 		    || size != sizeof(*array) +
 		    array->count * sizeof(struct bpf_tracer_param)) {
 			fprintf(stderr, "corrupted response.\n");
-			mfbpf_sockopt_msg_free(array);
+			df_bpf_sockopt_msg_free(array);
 			return ETR_INVAL;
 		}
 
 		for (i = 0; i < array->count; i++)
 			tracer_dump(&array->tracers[i]);
 
-		mfbpf_sockopt_msg_free(array);
+		df_bpf_sockopt_msg_free(array);
 		return ETR_OK;
 	default:
 		return ETR_NOTSUPP;
 	}
 }
 
-struct mfbpf_obj tr_obj = {
+struct df_bpf_obj tr_obj = {
 	.name = "tracer",
 	.help = tracer_help,
 	.do_cmd = tracer_do_cmd,
 };
 
-struct mfbpf_obj socktrace_obj = {
+struct df_bpf_obj socktrace_obj = {
 	.name = "socktrace",
 	.help = socktrace_help,
 	.do_cmd = socktrace_do_cmd,
+};
+
+struct df_bpf_obj datadump_obj = {
+	.name = "datadump",
+	.help = datadump_help,
+	.do_cmd = datadump_do_cmd,
 };
 
 static void usage(void)
 {
 	fprintf(stderr,
 		"Usage:\n"
-		"    " MFBPF_NAME " [OPTIONS] OBJECT { COMMAND | help }\n"
+		"    " DF_BPF_NAME " [OPTIONS] OBJECT { COMMAND | help }\n"
 		"Parameters:\n"
-		"    OBJECT  := { tracer socktrace }\n"
-		"    COMMAND := { show list }\n"
+		"    OBJECT  := { tracer socktrace datadump }\n"
+		"    COMMAND := { show list set }\n"
 		"Options:\n"
 		"    -v, --verbose\n"
 		"    -h, --help\n" "    -V, --version\n" "    -C, --color\n");
 }
 
-static struct mfbpf_obj *mfbpf_obj_get(const char *name)
+static struct df_bpf_obj *df_bpf_obj_get(const char *name)
 {
 	if (strcmp(name, "tracer") == 0) {
 		return &tr_obj;
 	} else if (strcmp(name, "socktrace") == 0) {
 		return &socktrace_obj;
+	} else if (strcmp(name, "datadump") == 0) {
+		return &datadump_obj;
 	}
 
 	return NULL;
 }
 
-static int parse_args(int argc, char *argv[], struct mfbpf_conf *conf)
+static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 {
 	int opt;
-	struct mfbpf_obj *obj;
+	struct df_bpf_obj *obj;
 	struct option opts[] = {
 		{"verbose", no_argument, NULL, 'v'},
 		{"help", no_argument, NULL, 'h'},
 		{"version", no_argument, NULL, 'V'},
 		{"color", no_argument, NULL, 'C'},
+		{"only-stdout", no_argument, NULL, 'O'},
 		{NULL, 0, NULL, 0},
 	};
 
 	memset(conf, 0, sizeof(*conf));
 	conf->af = AF_UNSPEC;
+	conf->only_stdout = false;
 
 	if (argc <= 1) {
 		usage();
 		exit(0);
 	}
 
-	while ((opt = getopt_long(argc, argv, "vhVC", opts, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "vhVCO", opts, NULL)) != -1) {
 		switch (opt) {
 		case 'v':
 			conf->verbose = 1;
@@ -524,10 +666,13 @@ static int parse_args(int argc, char *argv[], struct mfbpf_conf *conf)
 			usage();
 			exit(0);
 		case 'V':
-			printf(MFBPF_NAME "-" MFBPF_VERSION "\n");
+			printf(DF_BPF_NAME "-" DF_BPF_VERSION "\n");
 			exit(0);
 		case 'C':
 			conf->color = true;
+			break;
+		case 'O':
+			conf->only_stdout = true;
 			break;
 		case '?':
 		default:
@@ -547,7 +692,7 @@ static int parse_args(int argc, char *argv[], struct mfbpf_conf *conf)
 
 	conf->obj = argv[0];
 	if (argc < 2) {
-		obj = mfbpf_obj_get(conf->obj);
+		obj = df_bpf_obj_get(conf->obj);
 		if (obj && obj->help)
 			obj->help();
 		else
@@ -556,10 +701,19 @@ static int parse_args(int argc, char *argv[], struct mfbpf_conf *conf)
 	}
 
 	if (strcmp(argv[1], "show") == 0 || strcmp(argv[1], "list") == 0) {
-		conf->cmd = MFBPF_CMD_SHOW;
+		conf->cmd = DF_BPF_CMD_SHOW;
+		goto show_exit;
+	} else if (strcmp(argv[1], "set") == 0) {
+		conf->cmd = DF_BPF_CMD_SET;
+		goto show_exit;
+	} else if (strcmp(argv[1], "on") == 0) {
+		conf->cmd = DF_BPF_CMD_ON;
+		goto show_exit;
+	} else if (strcmp(argv[1], "off") == 0) {
+		conf->cmd = DF_BPF_CMD_OFF;
 		goto show_exit;
 	} else if (strcmp(argv[1], "help") == 0) {
-		conf->cmd = MFBPF_CMD_HELP;
+		conf->cmd = DF_BPF_CMD_HELP;
 		goto show_exit;
 	}
 #if 0
@@ -569,7 +723,7 @@ static int parse_args(int argc, char *argv[], struct mfbpf_conf *conf)
 	}
 
 	if (strcmp(argv[1], "set") == 0 && strcmp(argv[2], "delay"))
-		conf->cmd = MFBPF_CMD_SETDELAY;
+		conf->cmd = DF_BPF_CMD_SETDELAY;
 	else {
 		usage();
 		exit(1);
@@ -588,8 +742,8 @@ show_exit:
 int main(int argc, char *argv[])
 {
 	char *prog;
-	struct mfbpf_conf conf;
-	struct mfbpf_obj *obj;
+	struct df_bpf_conf conf;
+	struct df_bpf_obj *obj;
 	int err;
 
 	if ((prog = strchr(argv[0], '/')) != NULL)
@@ -600,13 +754,13 @@ int main(int argc, char *argv[])
 	if (parse_args(argc, argv, &conf) != 0)
 		exit(1);
 
-	if ((obj = mfbpf_obj_get(conf.obj)) == NULL) {
+	if ((obj = df_bpf_obj_get(conf.obj)) == NULL) {
 		fprintf(stderr, "%s: invalid object, use `-h' for help.\n",
 			prog);
 		exit(1);
 	}
 
-	if (conf.cmd == MFBPF_CMD_HELP) {
+	if (conf.cmd == DF_BPF_CMD_HELP) {
 		if (obj->help) {
 			obj->help();
 			return ETR_OK;
