@@ -19,11 +19,14 @@ mod linux;
 #[cfg(target_os = "linux")]
 mod linux_process;
 #[cfg(target_os = "linux")]
+mod linux_socket;
 mod proc_scan_hook;
 #[cfg(target_os = "windows")]
 mod windows;
 #[cfg(target_os = "windows")]
 mod windows_process;
+
+use std::{fs::symlink_metadata, os::linux::fs::MetadataExt, path::PathBuf};
 
 #[cfg(target_os = "windows")]
 pub use self::windows::*;
@@ -31,5 +34,32 @@ pub use self::windows::*;
 pub use linux::*;
 #[cfg(target_os = "linux")]
 pub use linux_process::*;
+#[cfg(target_os = "linux")]
+pub use linux_socket::*;
+use public::proto::common::TridentType;
 #[cfg(target_os = "windows")]
 pub use windows_process::*;
+
+// return the (now_sec - sym_change_time) second
+pub(super) fn sym_uptime(now_sec: u64, path: &PathBuf) -> Result<u64, &'static str> {
+    // linux default not record the file birth time, use the change time instead of the birth time.
+    let s = symlink_metadata(path)
+        .map_err(|_| "get symlink metadate fail")?
+        .st_ctime() as u64;
+    if now_sec >= s {
+        Ok(now_sec - s)
+    } else {
+        Err("sym up time after current")
+    }
+}
+
+// whether need to scan the process info
+fn process_info_enabled(t: TridentType) -> bool {
+    match t {
+        TridentType::TtPublicCloud
+        | TridentType::TtPhysicalMachine
+        | TridentType::TtHostPod
+        | TridentType::TtVmPod => true,
+        _ => false,
+    }
+}
