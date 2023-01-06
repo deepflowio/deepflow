@@ -805,5 +805,30 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"notEmpty(acl_gids) %s %s",
 			"",
 		)}
+	// Process
+	for _, suffix := range []string{"", "_0", "_1"} {
+		GProcessSuffix := "gprocess" + suffix
+		GProcessIDSuffix := "gprocess_id" + suffix
+		tagResourceMap[GProcessSuffix] = map[string]*Tag{
+			"default": NewTag(
+				"dictGet(flow_tag.gprocess_map, 'name', toUInt64("+GProcessIDSuffix+"))",
+				"",
+				"toUInt64("+GProcessIDSuffix+") IN (SELECT id FROM flow_tag.gprocess_map WHERE name %s %s)",
+				"toUInt64("+GProcessIDSuffix+") IN (SELECT id FROM flow_tag.gprocess_map WHERE %s(name,%s))",
+			),
+			"node_type": NewTag(
+				"gprocess",
+				"",
+				"",
+				"",
+			),
+			"icon_id": NewTag(
+				"dictGet(flow_tag.gprocess_map, 'icon_id', (toUInt64("+GProcessIDSuffix+")))",
+				"",
+				"",
+				"",
+			),
+		}
+	}
 	return tagResourceMap
 }

@@ -355,3 +355,13 @@ type ChOSAppTags struct {
 func (ChOSAppTags) TableName() string {
 	return "ch_os_app_tags"
 }
+
+type ChGProcess struct {
+	ID     int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name   string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
+	IconID int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
+}
+
+func (ChGProcess) TableName() string {
+	return "ch_gprocess"
+}
