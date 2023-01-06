@@ -31,6 +31,8 @@ resource_gl2               , 资源-服务优先              ,
 gprocess                   , 进程                       ,
 
 k8s.label                  , K8s Label                  ,
+cloud.tag                  , Cloud Tag                  ,
+os.app                     , OS APP                     ,
 
 ip                         , IP 地址                    ,
 is_ipv4                    , IPv4 标志                  ,

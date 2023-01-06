@@ -34,6 +34,8 @@ gprocess                  , 进程                     ,
 
 k8s.label                 , K8s Label                , K8s 自定义 Label。
 attribute                 , Attribute                , OpenTelemetry Span 属性，以及应用协议特有属性。
+cloud.tag                 , Cloud Tag                ,
+os.app                    , OS APP                   ,
 
 ip                        , IP 地址                  ,
 is_ipv4                   , IPv4 标志                ,

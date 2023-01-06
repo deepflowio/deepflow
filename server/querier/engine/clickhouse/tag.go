@@ -51,6 +51,32 @@ func GetTagTranslator(name, alias, db, table string) (Statement, error) {
 			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.label.")
 			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
 			stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag}
+		} else if strings.HasPrefix(name, "cloud.tag.") {
+			if strings.HasSuffix(name, "_0") {
+				tagItem, ok = tag.GetTag("cloud_tag_0", db, table, "default")
+			} else if strings.HasSuffix(name, "_1") {
+				tagItem, ok = tag.GetTag("cloud_tag_1", db, table, "default")
+			} else {
+				tagItem, ok = tag.GetTag("cloud_tag", db, table, "default")
+			}
+			nameNoSuffix := strings.TrimSuffix(name, "_0")
+			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
+			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "cloud.tag.")
+			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix, nameNoPreffix, nameNoPreffix)
+			stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag}
+		} else if strings.HasPrefix(name, "os.app.") {
+			if strings.HasSuffix(name, "_0") {
+				tagItem, ok = tag.GetTag("os_app_0", db, table, "default")
+			} else if strings.HasSuffix(name, "_1") {
+				tagItem, ok = tag.GetTag("os_app_1", db, table, "default")
+			} else {
+				tagItem, ok = tag.GetTag("os_app", db, table, "default")
+			}
+			nameNoSuffix := strings.TrimSuffix(name, "_0")
+			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
+			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "os.app.")
+			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
+			stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag}
 		} else if strings.HasPrefix(name, "tag.") || strings.HasPrefix(name, "attribute.") {
 			if strings.HasPrefix(name, "tag.") {
 				tagItem, ok = tag.GetTag("tag.", db, table, "default")
@@ -131,7 +157,7 @@ func (t *SelectTag) Format(m *view.Model) {
 		}
 		m.AddCallback(t.Value, MacTranslate([]interface{}{t.Value, alias}))
 	}
-	if t.Alias == "tag" || t.Alias == "attribute" || t.Alias == "metrics" {
+	if t.Alias == "tag" || t.Alias == "attribute" || t.Alias == "metrics" || strings.Trim(t.Alias, "`") == "cloud.tag" || strings.Trim(t.Alias, "`") == "os.app" {
 		m.AddCallback(t.Alias, ExternalTagsFormat([]interface{}{t.Alias}))
 	} else if t.Value == "packet_batch" {
 		m.AddCallback(t.Value, packet_batch.PacketBatchFormat([]interface{}{}))

@@ -22,6 +22,8 @@ pod                        , K8s 容器 POD               ,
 service                    , 服务                       ,
 
 k8s.label                  , K8s Label                  ,
+cloud.tag                  , Cloud Tag                  ,
+os.app                     , OS APP                     ,
 
 instance                   , 实例                       ,
 instance_type              , 实例类型                   ,

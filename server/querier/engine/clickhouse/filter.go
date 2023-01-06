@@ -182,6 +182,62 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 							}
 							return &view.Expr{Value: filter}, nil
 						}
+					} else if strings.HasPrefix(preAsTag, "cloud.tag.") {
+						if strings.HasSuffix(preAsTag, "_0") {
+							tagItem, ok = tag.GetTag("cloud_tag_0", db, table, "default")
+						} else if strings.HasSuffix(preAsTag, "_1") {
+							tagItem, ok = tag.GetTag("cloud_tag_1", db, table, "default")
+						} else {
+							tagItem, ok = tag.GetTag("cloud_tag", db, table, "default")
+						}
+						if ok {
+							nameNoSuffix := strings.TrimSuffix(preAsTag, "_0")
+							nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
+							nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "cloud.tag.")
+							switch strings.ToLower(op) {
+							case "regexp":
+								filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value, nameNoPreffix, "match", t.Value, nameNoPreffix)
+							case "not regexp":
+								filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value, nameNoPreffix, "match", t.Value, nameNoPreffix) + ")"
+							case "not ilike":
+								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", t.Value, nameNoPreffix, "ilike", t.Value, nameNoPreffix) + ")"
+							case "not in":
+								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", t.Value, nameNoPreffix, "in", t.Value, nameNoPreffix) + ")"
+							case "!=":
+								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value, nameNoPreffix, "=", t.Value, nameNoPreffix) + ")"
+							default:
+								filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, nameNoPreffix, op, t.Value, nameNoPreffix)
+							}
+							return &view.Expr{Value: filter}, nil
+						}
+					} else if strings.HasPrefix(preAsTag, "os.app.") {
+						if strings.HasSuffix(preAsTag, "_0") {
+							tagItem, ok = tag.GetTag("os_app_0", db, table, "default")
+						} else if strings.HasSuffix(preAsTag, "_1") {
+							tagItem, ok = tag.GetTag("os_app_1", db, table, "default")
+						} else {
+							tagItem, ok = tag.GetTag("os_app", db, table, "default")
+						}
+						if ok {
+							nameNoSuffix := strings.TrimSuffix(preAsTag, "_0")
+							nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
+							nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "os.app.")
+							switch strings.ToLower(op) {
+							case "regexp":
+								filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value, nameNoPreffix)
+							case "not regexp":
+								filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value, nameNoPreffix) + ")"
+							case "not ilike":
+								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", t.Value, nameNoPreffix) + ")"
+							case "not in":
+								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", t.Value, nameNoPreffix) + ")"
+							case "!=":
+								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value, nameNoPreffix) + ")"
+							default:
+								filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, nameNoPreffix)
+							}
+							return &view.Expr{Value: filter}, nil
+						}
 					} else if strings.HasPrefix(preAsTag, "tag.") || strings.HasPrefix(preAsTag, "attribute.") {
 						if strings.HasPrefix(preAsTag, "tag.") {
 							tagItem, ok = tag.GetTag("tag.", db, table, "default")
@@ -293,6 +349,62 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 						nameNoSuffix := strings.TrimSuffix(t.Tag, "_0")
 						nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
 						nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.label.")
+						switch strings.ToLower(op) {
+						case "regexp":
+							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value, nameNoPreffix)
+						case "not regexp":
+							filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value, nameNoPreffix) + ")"
+						case "not ilike":
+							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", t.Value, nameNoPreffix) + ")"
+						case "not in":
+							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", t.Value, nameNoPreffix) + ")"
+						case "!=":
+							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value, nameNoPreffix) + ")"
+						default:
+							filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, nameNoPreffix)
+						}
+						return &view.Expr{Value: filter}, nil
+					}
+				} else if strings.HasPrefix(preAsTag, "cloud.tag.") {
+					if strings.HasSuffix(preAsTag, "_0") {
+						tagItem, ok = tag.GetTag("cloud_tag_0", db, table, "default")
+					} else if strings.HasSuffix(preAsTag, "_1") {
+						tagItem, ok = tag.GetTag("cloud_tag_1", db, table, "default")
+					} else {
+						tagItem, ok = tag.GetTag("cloud_tag", db, table, "default")
+					}
+					if ok {
+						nameNoSuffix := strings.TrimSuffix(preAsTag, "_0")
+						nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
+						nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "cloud.tag.")
+						switch strings.ToLower(op) {
+						case "regexp":
+							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value, nameNoPreffix, "match", t.Value, nameNoPreffix)
+						case "not regexp":
+							filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value, nameNoPreffix, "match", t.Value, nameNoPreffix) + ")"
+						case "not ilike":
+							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", t.Value, nameNoPreffix, "ilike", t.Value, nameNoPreffix) + ")"
+						case "not in":
+							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", t.Value, nameNoPreffix, "in", t.Value, nameNoPreffix) + ")"
+						case "!=":
+							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value, nameNoPreffix, "=", t.Value, nameNoPreffix) + ")"
+						default:
+							filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, nameNoPreffix, op, t.Value, nameNoPreffix)
+						}
+						return &view.Expr{Value: filter}, nil
+					}
+				} else if strings.HasPrefix(preAsTag, "os.app.") {
+					if strings.HasSuffix(preAsTag, "_0") {
+						tagItem, ok = tag.GetTag("os_app_0", db, table, "default")
+					} else if strings.HasSuffix(preAsTag, "_1") {
+						tagItem, ok = tag.GetTag("os_app_1", db, table, "default")
+					} else {
+						tagItem, ok = tag.GetTag("os_app", db, table, "default")
+					}
+					if ok {
+						nameNoSuffix := strings.TrimSuffix(preAsTag, "_0")
+						nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
+						nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "os.app.")
 						switch strings.ToLower(op) {
 						case "regexp":
 							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value, nameNoPreffix)
