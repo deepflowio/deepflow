@@ -90,6 +90,12 @@ impl<T> OverwriteQueue<T> {
         if self.terminated.load(Ordering::Acquire) {
             return Err(Error::Terminated(None, None));
         }
+        assert!(
+            count <= self.size,
+            "message length {} larger than queue size {}",
+            count,
+            self.size
+        );
         let _lock = self.writer_lock.lock().unwrap();
         let start = self.start.load(Ordering::Acquire);
         let raw_end = self.end.load(Ordering::Acquire);

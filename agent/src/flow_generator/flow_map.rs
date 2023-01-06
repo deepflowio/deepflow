@@ -1247,7 +1247,7 @@ impl FlowMap {
         l7_info: L7ProtocolInfo,
         rrt: u64,
     ) {
-        if self.output_buffer.len() >= QUEUE_BATCH_SIZE {
+        if self.protolog_buffer.len() >= QUEUE_BATCH_SIZE {
             self.flush_app_protolog();
         }
         // 考虑性能，最好是l7 perf解析后，满足需要的包生成log
