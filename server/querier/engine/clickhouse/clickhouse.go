@@ -529,9 +529,9 @@ func (e *CHEngine) parseSelect(tag sqlparser.SelectExpr) error {
 func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 	as := chCommon.ParseAlias(item.As)
 	if as != "" {
-		e.ColumnSchemas = append(e.ColumnSchemas, common.NewColumnSchema(as))
+		e.ColumnSchemas = append(e.ColumnSchemas, common.NewColumnSchema(as, strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", "")))
 	} else {
-		e.ColumnSchemas = append(e.ColumnSchemas, common.NewColumnSchema(strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", "")))
+		e.ColumnSchemas = append(e.ColumnSchemas, common.NewColumnSchema(strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", ""), ""))
 	}
 	//var args []string
 	switch expr := item.Expr.(type) {
