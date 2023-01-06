@@ -828,7 +828,7 @@ func convertTagsToString(tags []model.AdditionalResourceTag) string {
 			str = fmt.Sprintf("%s:%s", tag.Key, tag.Value)
 			continue
 		}
-		str += fmt.Sprintf("%s, %s:%s", str, tag.Key, tag.Value)
+		str = fmt.Sprintf("%s, %s:%s", str, tag.Key, tag.Value)
 	}
 	return str
 }
