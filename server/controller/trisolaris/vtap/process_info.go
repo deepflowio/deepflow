@@ -35,18 +35,6 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/trisolaris/dbmgr"
 )
 
-type GlobalEntry struct {
-	vtapID uint32
-	pid    uint32
-}
-
-func NewGlobalEntry(vtapID uint32, pid uint32) *GlobalEntry {
-	return &GlobalEntry{
-		vtapID: vtapID,
-		pid:    pid,
-	}
-}
-
 func generatePRKey(protocol, role uint32) uint64 {
 	return uint64(protocol)<<32 | uint64(role)
 }
@@ -60,15 +48,14 @@ func generateEPKey(epcId, port, ip uint32) uint64 {
 // (protocol + role)->(epc_id + port + ip)
 type EntryData map[uint64]EpcIDPortIPMap
 
-// (epc_id + port + ip)
-type EpcIDPortIPMap map[uint64]*GlobalEntry
+// (epc_id + port + ip): gpid
+type EpcIDPortIPMap map[uint64]uint32
 
 func (e EpcIDPortIPMap) addData(vtapID, epcID, port, pid, ip uint32) {
-	key := generateEPKey(epcID, port, ip)
-	e[key] = NewGlobalEntry(vtapID, pid)
+	e[generateEPKey(epcID, port, ip)] = vtapIDAndPIDToGPID.getData(int(vtapID), int(pid))
 }
 
-func (e EpcIDPortIPMap) getData(epcID uint32, port uint32, ip uint32) *GlobalEntry {
+func (e EpcIDPortIPMap) getData(epcID uint32, port uint32, ip uint32) uint32 {
 	key := generateEPKey(epcID, port, ip)
 	return e[key]
 }
@@ -85,14 +72,14 @@ func (d EntryData) addData(vtapID uint32, entry *trident.GPIDSyncEntry) {
 	epcIDPortIPMap.addData(vtapID, entry.GetEpcIdReal(), entry.GetPortReal(), entry.GetPidReal(), entry.GetIpv4Real())
 }
 
-func (d EntryData) getData(protocol, role, epcID, port, ip uint32) *GlobalEntry {
+func (d EntryData) getData(protocol, role, epcID, port, ip uint32) uint32 {
 	key := generatePRKey(protocol, role)
 	epcIDPortIPMap, ok := d[key]
 	if ok {
 		return epcIDPortIPMap.getData(epcID, port, ip)
 	}
 
-	return nil
+	return 0
 }
 
 func (e EntryData) getAllData() []*trident.GPIDSyncEntry {
@@ -173,12 +160,13 @@ func (p IDToGPID) addData(process *models.Process) {
 	p[generateVPKey(uint32(process.VTapID), uint32(process.PID))] = uint32(process.ID)
 }
 
+var vtapIDAndPIDToGPID IDToGPID
+
 type ProcessInfo struct {
 	sendGPIDReq          *VTapIDToReq
 	vtapIDToLocalGPIDReq *VTapIDToReq
 	vtapIDToShareGPIDReq *VTapIDToReq
 	globalLocalEntries   EntryData
-	vtapIDAndPIDToGPID   IDToGPID
 	vtapIDToGPIDResponse map[uint32]*trident.GPIDSyncResponse
 	grpcConns            map[string]*grpc.ClientConn
 	db                   *gorm.DB
@@ -191,7 +179,6 @@ func NewProcessInfo(db *gorm.DB, cfg *config.Config) *ProcessInfo {
 		vtapIDToLocalGPIDReq: NewVTapIDToReq(),
 		vtapIDToShareGPIDReq: NewVTapIDToReq(),
 		globalLocalEntries:   make(EntryData),
-		vtapIDAndPIDToGPID:   make(IDToGPID),
 		vtapIDToGPIDResponse: make(map[uint32]*trident.GPIDSyncResponse),
 		grpcConns:            make(map[string]*grpc.ClientConn),
 		db:                   db,
@@ -263,11 +250,11 @@ func (p *ProcessInfo) getGPIDInfoFromDB() {
 		log.Error(err)
 		return
 	}
-	vtapIDAndPIDToGPID := make(IDToGPID)
+	newVtapIDAndPIDToGPID := make(IDToGPID)
 	for _, process := range processes {
-		vtapIDAndPIDToGPID.addData(process)
+		newVtapIDAndPIDToGPID.addData(process)
 	}
-	p.vtapIDAndPIDToGPID = vtapIDAndPIDToGPID
+	vtapIDAndPIDToGPID = newVtapIDAndPIDToGPID
 }
 
 func (p *ProcessInfo) GetGPIDResponse(vtapID uint32) *trident.GPIDSyncResponse {
@@ -290,22 +277,12 @@ func (p *ProcessInfo) generateGPIDResponse() {
 		for _, entry := range entries {
 			role := entry.GetRole()
 			protocol := entry.GetProtocol()
-			global0 := p.globalLocalEntries.getData(uint32(protocol), uint32(role),
+			gpid0 := p.globalLocalEntries.getData(uint32(protocol), uint32(role),
 				entry.GetEpcId_0(), entry.GetPort_0(), entry.GetIpv4_0())
-			global1 := p.globalLocalEntries.getData(uint32(protocol), uint32(role),
+			gpid1 := p.globalLocalEntries.getData(uint32(protocol), uint32(role),
 				entry.GetEpcId_1(), entry.GetPort_1(), entry.GetIpv4_1())
-			globalReal := p.globalLocalEntries.getData(uint32(protocol), uint32(role),
+			gpidReal := p.globalLocalEntries.getData(uint32(protocol), uint32(role),
 				entry.GetEpcIdReal(), entry.GetPortReal(), entry.GetIpv4Real())
-			var gpid0, gpid1, gpidReal uint32
-			if global0 != nil {
-				gpid0 = p.vtapIDAndPIDToGPID.getData(int(global0.vtapID), int(global0.pid))
-			}
-			if global1 != nil {
-				gpid1 = p.vtapIDAndPIDToGPID.getData(int(global1.vtapID), int(global1.pid))
-			}
-			if globalReal != nil {
-				gpidReal = p.vtapIDAndPIDToGPID.getData(int(globalReal.vtapID), int(globalReal.pid))
-			}
 			if gpid0 == 0 && gpid1 == 0 && gpidReal == 0 {
 				continue
 			}
