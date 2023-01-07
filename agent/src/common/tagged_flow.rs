@@ -15,6 +15,7 @@
  */
 
 use std::fmt;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
 
 use prost::Message;
 use public::sender::{SendMessageType, Sendable};
@@ -22,6 +23,7 @@ use serde::Serialize;
 
 use super::flow::Flow;
 use super::tag::Tag;
+use super::TapPort;
 
 use public::proto::flow_log;
 
@@ -41,6 +43,33 @@ impl TaggedFlow {
     pub fn reverse(&mut self) {
         self.flow.reverse(false);
         self.tag.reverse();
+    }
+
+    // return ClientAddr, RealAddr
+    pub fn get_toa_info(&self) -> Option<(SocketAddr, SocketAddr)> {
+        if self.flow.flow_key.tap_port.get_nat_source() != TapPort::NAT_SOURCE_TOA {
+            return None;
+        }
+        match (
+            self.flow.flow_key.ip_src,
+            self.flow.flow_metrics_peers[0].nat_real_ip,
+        ) {
+            // now support ipv4 only
+            (IpAddr::V4(v4_src), IpAddr::V4(v4_real)) => {
+                if v4_real == Ipv4Addr::UNSPECIFIED {
+                    None
+                } else {
+                    Some((
+                        SocketAddr::V4(SocketAddrV4::new(v4_src, self.flow.flow_key.port_src)),
+                        SocketAddr::V4(SocketAddrV4::new(
+                            v4_real,
+                            self.flow.flow_metrics_peers[0].nat_real_port,
+                        )),
+                    ))
+                }
+            }
+            _ => None,
+        }
     }
 }
 

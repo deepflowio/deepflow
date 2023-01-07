@@ -50,6 +50,8 @@ type StaticConfig struct {
 	VxlanFlags                       *uint8                `yaml:"vxlan-flags,omitempty"`
 	CollectorSenderQueueSize         *int                  `yaml:"collector-sender-queue-size,omitempty"`
 	CollectorSenderQueueCount        *int                  `yaml:"collector-sender-queue-count,omitempty"`
+	ToaSenderQueueSize               *int                  `yaml:"toa-sender-queue-size,omitempty"`
+	ToaLruCacheSize                  *int                  `yaml:"toa-lru-cache-size,omitempty"`
 	FlowSenderQueueSize              *int                  `yaml:"flow-sender-queue-size,omitempty"`
 	FlowSenderQueueCount             *int                  `yaml:"flow-sender-queue-count,omitempty"`
 	SecondFlowExtraDelaySecond       *string               `yaml:"second-flow-extra-delay-second,omitempty"`

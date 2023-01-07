@@ -54,7 +54,7 @@ pub(super) fn sym_uptime(now_sec: u64, path: &PathBuf) -> Result<u64, &'static s
 }
 
 // whether need to scan the process info
-fn process_info_enabled(t: TridentType) -> bool {
+pub fn process_info_enabled(t: TridentType) -> bool {
     match t {
         TridentType::TtPublicCloud
         | TridentType::TtPhysicalMachine
