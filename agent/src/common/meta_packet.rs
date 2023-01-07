@@ -122,9 +122,9 @@ pub struct MetaPacket<'a> {
     // for PcapAssembler
     pub flow_id: u64,
 
-    /********** For NAT (currently only TOA) ***********/
-    pub nat_client_ip: Option<IpAddr>,
-    pub nat_client_port: u16,
+    /********** for GPID **********/
+    pub gpid_0: u32,
+    pub gpid_1: u32,
 }
 
 impl<'a> MetaPacket<'a> {
@@ -144,8 +144,6 @@ impl<'a> MetaPacket<'a> {
 
     pub fn empty() -> MetaPacket<'a> {
         MetaPacket {
-            nat_client_ip: None,
-            nat_client_port: 0,
             ..Default::default()
         }
     }
@@ -254,10 +252,11 @@ impl<'a> MetaPacket<'a> {
                 }
                 TcpOptionNumber(TCP_OPT_ADDRESS_HUAWEI) | TcpOptionNumber(TCP_OPT_ADDRESS_IPVS) => {
                     if assume_length == TCP_TOA_LEN {
-                        self.nat_client_port = read_u16_be(&packet[offset + TCP_TOA_PORT_OFFSET..]);
-                        self.nat_client_ip = Some(IpAddr::from(Ipv4Addr::from(read_u32_be(
-                            &packet[offset + TCP_TOA_IP_OFFSET..],
-                        ))));
+                        self.lookup_key.nat_client_port =
+                            read_u16_be(&packet[offset + TCP_TOA_PORT_OFFSET..]);
+                        self.lookup_key.nat_client_ip = Some(IpAddr::from(Ipv4Addr::from(
+                            read_u32_be(&packet[offset + TCP_TOA_IP_OFFSET..]),
+                        )));
                     }
                     offset += assume_length;
                 }

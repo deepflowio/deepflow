@@ -35,6 +35,7 @@ use ring::digest;
 use tokio::runtime::{Builder, Runtime};
 
 use crate::{
+    common::policy::GpidEntry,
     config::{
         handler::{OsProcScanConfig, PlatformAccess},
         KubernetesPollerType,
@@ -47,7 +48,7 @@ use crate::{
         },
         InterfaceEntry, LibvirtXmlExtractor,
     },
-    policy::PolicyGetter,
+    policy::{PolicyGetter, PolicySetter},
     rpc::{RunningConfig, Session},
     utils::{command::*, environment::is_tt_pod, lru::Lru},
 };
@@ -57,7 +58,9 @@ use public::{
     netns::{InterfaceInfo, NetNs, NsFile},
     proto::{
         common::TridentType,
-        trident::{self, Exception, GenesisProcessData, GpidSyncRequest, ProcessInfo},
+        trident::{
+            self, Exception, GenesisProcessData, GpidSyncRequest, GpidSyncResponse, ProcessInfo,
+        },
     },
     queue::Receiver,
 };
@@ -824,6 +827,7 @@ pub struct SocketSynchronizer {
     session: Arc<Session>,
     running: Arc<Mutex<bool>>,
     policy_getter: Arc<Mutex<PolicyGetter>>,
+    policy_setter: PolicySetter,
     lru_toa_info: Arc<Mutex<Lru<SocketAddr, SocketAddr>>>,
 }
 
@@ -832,6 +836,7 @@ impl SocketSynchronizer {
         config: PlatformAccess,
         running_config: Arc<RwLock<RunningConfig>>,
         policy_getter: Arc<Mutex<PolicyGetter>>,
+        policy_setter: PolicySetter,
         session: Arc<Session>,
         // toa info, Receiver<Box< LocalAddr, RealAddr>>
         // receiver from SubQuadGen::inject_flow()
@@ -853,6 +858,7 @@ impl SocketSynchronizer {
             config,
             running_config,
             policy_getter,
+            policy_setter,
             stop_notify: Arc::new(Condvar::new()),
             session,
             running: Arc::new(Mutex::new(false)),
@@ -872,11 +878,21 @@ impl SocketSynchronizer {
             return;
         }
 
-        let (running, config, running_config, policy_getter, session, stop_notify, lru_toa_info) = (
+        let (
+            running,
+            config,
+            running_config,
+            policy_getter,
+            policy_setter,
+            session,
+            stop_notify,
+            lru_toa_info,
+        ) = (
             self.running.clone(),
             self.config.clone(),
             self.running_config.clone(),
             self.policy_getter.clone(),
+            self.policy_setter,
             self.session.clone(),
             self.stop_notify.clone(),
             self.lru_toa_info.clone(),
@@ -884,12 +900,13 @@ impl SocketSynchronizer {
 
         thread::Builder::new()
             .name("socket-synchronizer".to_string())
-            .spawn(|| {
+            .spawn(move || {
                 Self::run(
                     running,
                     config,
                     running_config,
                     policy_getter,
+                    policy_setter,
                     session,
                     stop_notify,
                     lru_toa_info,
@@ -906,11 +923,13 @@ impl SocketSynchronizer {
         config: PlatformAccess,
         running_config: Arc<RwLock<RunningConfig>>,
         policy_getter: Arc<Mutex<PolicyGetter>>,
+        policy_setter: PolicySetter,
         session: Arc<Session>,
         stop_notify: Arc<Condvar>,
         lru_toa_info: Arc<Mutex<Lru<SocketAddr, SocketAddr>>>,
     ) {
         let rt = Builder::new_current_thread().enable_all().build().unwrap();
+        let mut last_entries: Vec<GpidEntry> = vec![];
 
         loop {
             let running_guard = running.lock().unwrap();
@@ -982,8 +1001,22 @@ impl SocketSynchronizer {
                     }),
                 ) {
                     Err(e) => error!("gpid sync fail: {}", e),
-                    Ok(_) => {
-                        // TODO handle resp
+                    Ok(response) => {
+                        let response: GpidSyncResponse = response.into_inner();
+                        let mut current_entries = vec![];
+                        for entry in response.entries.iter() {
+                            let e = GpidEntry::try_from(entry);
+                            if e.is_err() {
+                                warn!("{:?}", e);
+                                continue;
+                            }
+                            current_entries.push(e.unwrap());
+                        }
+
+                        if current_entries != last_entries {
+                            policy_setter.update_gpids(&current_entries);
+                            last_entries = current_entries
+                        }
                     }
                 }
             }

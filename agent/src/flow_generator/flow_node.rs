@@ -90,18 +90,23 @@ impl FlowMapKey {
         match lookup_key.eth_type {
             EthernetType::Ipv4 | EthernetType::Ipv6 => {
                 let lhs = Self::l3_hash(lookup_key);
-                let rhs = ((u16::from(lookup_key.tap_type) as u64) << 24 | tap_port.0) << 32
+                let rhs = ((u16::from(lookup_key.tap_type) as u64) << 24
+                    | tap_port.ignore_nat_source())
+                    << 32
                     | Self::l4_hash(lookup_key);
                 Self { lhs, rhs }
             }
             EthernetType::Arp => {
                 let lhs = Self::l3_hash(lookup_key);
-                let rhs = ((u16::from(lookup_key.tap_type) as u64) << 24 | tap_port.0 as u64) << 32
+                let rhs = ((u16::from(lookup_key.tap_type) as u64) << 24
+                    | tap_port.ignore_nat_source())
+                    << 32
                     | (u64::from(lookup_key.src_mac) ^ u64::from(lookup_key.dst_mac));
                 Self { lhs, rhs }
             }
             _ => {
-                let lhs = (u16::from(lookup_key.tap_type) as u64) << 24 | tap_port.0;
+                let lhs =
+                    (u16::from(lookup_key.tap_type) as u64) << 24 | tap_port.ignore_nat_source();
                 let rhs = u64::from(lookup_key.src_mac) ^ u64::from(lookup_key.dst_mac);
                 Self { lhs, rhs }
             }
@@ -178,7 +183,7 @@ impl FlowNode {
         let flow = &self.tagged_flow.flow;
         let flow_key = &flow.flow_key;
         let meta_lookup_key = &meta_packet.lookup_key;
-        if flow_key.tap_port != meta_packet.tap_port
+        if flow_key.tap_port.ignore_nat_source() != meta_packet.tap_port.ignore_nat_source()
             || flow_key.tap_type != meta_lookup_key.tap_type
         {
             return false;

@@ -328,7 +328,7 @@ impl AnalyzerModeDispatcher {
                 debug!("meta_packet update failed: {:?}", e);
                 continue;
             }
-            if meta_packet.nat_client_ip.is_some() {
+            if meta_packet.lookup_key.nat_client_ip.is_some() {
                 meta_packet.tap_port.set_nat_source(TapPort::NAT_SOURCE_TOA);
             }
 

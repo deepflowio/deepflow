@@ -56,6 +56,10 @@ impl TapPort {
         (self.0 >> Self::FROM_OFFSET) as u8 == w
     }
 
+    pub fn ignore_nat_source(&self) -> u64 {
+        self.0 & !((Self::NAT_SOURCE_MASK as u64) << Self::NAT_SOURCE_OFFSET)
+    }
+
     pub fn get_nat_source(&self) -> u8 {
         ((self.0 >> Self::NAT_SOURCE_OFFSET) & Self::NAT_SOURCE_MASK) as u8
     }
