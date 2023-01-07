@@ -1350,6 +1350,7 @@ func (t *Tag) ReadFromPB(p *pb.MiniTag) {
 	t.TAPType = TAPTypeEnum(p.Field.TapType)
 	t.L7Protocol = datatype.L7Protocol(p.Field.L7Protocol)
 	// FIXME
+	t.Code |= GPID
 	t.GPID = uint32(rand.Intn(30))
 	t.GPID1 = uint32(rand.Intn(30))
 	t.TagType = uint8(p.Field.TagType)
