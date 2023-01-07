@@ -902,7 +902,7 @@ impl SocketSynchronizer {
                 let ctl_mac = running_config.read().ctrl_mac.clone();
                 let mut policy_getter = policy_getter.lock().unwrap();
 
-                let (local, remote) = match get_all_socket(
+                let sock_entries = match get_all_socket(
                     &conf_guard.os_proc_scan_conf,
                     &mut policy_getter,
                     conf_guard.epc_id,
@@ -917,13 +917,25 @@ impl SocketSynchronizer {
                     Ok(res) => res,
                 };
 
-                match rt.block_on(session.gpid_sync(GpidSyncRequest {
-                    ctrl_ip: Some(conf_guard.source_ip.to_string()),
-                    ctrl_mac: Some(ctl_mac),
-                    vtap_id: Some(conf_guard.vtap_id as u32),
-                    local_entries: local.into_iter().map(|x| x.into()).collect(),
-                    peer_entries: remote.into_iter().map(|x| x.into()).collect(),
-                })) {
+                match rt.block_on(
+                    session.gpid_sync(GpidSyncRequest {
+                        ctrl_ip: Some(conf_guard.source_ip.to_string()),
+                        ctrl_mac: Some(ctl_mac),
+                        vtap_id: Some(conf_guard.vtap_id as u32),
+                        entries: sock_entries
+                            .into_iter()
+                            .filter_map(|sock| {
+                                if let Ok(e) = sock.try_into() {
+                                    Some(e)
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect(),
+                        // TODO compress_algorithm
+                        ..Default::default()
+                    }),
+                ) {
                     Err(e) => error!("gpid sync fail: {}", e),
                     Ok(_) => {
                         // TODO handle resp
