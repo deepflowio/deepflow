@@ -17,6 +17,7 @@
 use std::env;
 use std::fmt;
 use std::mem;
+use std::net::SocketAddr;
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::{Path, PathBuf};
 use std::process;
@@ -58,6 +59,7 @@ use crate::sender::get_sender_id;
 use crate::utils::cgroups::Cgroups;
 #[cfg(target_os = "linux")]
 use crate::utils::environment::core_file_check;
+use crate::utils::lru::Lru;
 use crate::utils::stats::ArcBatch;
 use crate::{
     collector::Collector,
@@ -986,14 +988,6 @@ impl Components {
         );
 
         #[cfg(target_os = "linux")]
-        let socket_synchronizer = SocketSynchronizer::new(
-            config_handler.platform(),
-            synchronizer.running_config.clone(),
-            Arc::new(Mutex::new(policy_getter)),
-            session.clone(),
-        );
-
-        #[cfg(target_os = "linux")]
         let api_watcher = Arc::new(ApiWatcher::new(
             config_handler.platform(),
             session.clone(),
@@ -1015,6 +1009,24 @@ impl Components {
         };
         let debugger = Debugger::new(context);
         let queue_debugger = debugger.clone_queue();
+
+        let (toa_sender, toa_recv, _) = queue::bounded_with_debug(
+            yaml_config.toa_sender_queue_size,
+            "socket-sync-toa-info-queue",
+            &queue_debugger,
+        );
+        #[cfg(target_os = "linux")]
+        let socket_synchronizer = SocketSynchronizer::new(
+            config_handler.platform(),
+            synchronizer.running_config.clone(),
+            Arc::new(Mutex::new(policy_getter)),
+            session.clone(),
+            toa_recv,
+            Arc::new(Mutex::new(Lru::with_capacity(
+                yaml_config.toa_lru_cache_size >> 5,
+                yaml_config.toa_lru_cache_size,
+            ))),
+        );
 
         let rx_leaky_bucket = Arc::new(LeakyBucket::new(match candidate_config.tap_mode {
             TapMode::Analyzer => None,
@@ -1467,6 +1479,7 @@ impl Components {
                 i,
                 stats_collector.clone(),
                 flow_receiver,
+                toa_sender.clone(),
                 Some(l4_flow_aggr_sender.clone()),
                 metrics_sender.clone(),
                 MetricsType::SECOND | MetricsType::MINUTE,
@@ -1500,6 +1513,7 @@ impl Components {
                 ebpf_dispatcher_id,
                 stats_collector.clone(),
                 flow_receiver,
+                toa_sender.clone(),
                 None,
                 metrics_sender.clone(),
                 MetricsType::SECOND | MetricsType::MINUTE,
@@ -1751,6 +1765,7 @@ impl Components {
         id: usize,
         stats_collector: Arc<stats::Collector>,
         flow_receiver: queue::Receiver<Box<TaggedFlow>>,
+        toa_info_sender: DebugSender<Box<(SocketAddr, SocketAddr)>>,
         l4_flow_aggr_sender: Option<queue::DebugSender<BoxedTaggedFlow>>,
         metrics_sender: queue::DebugSender<BoxedDocument>,
         metrics_type: MetricsType,
@@ -1845,6 +1860,7 @@ impl Components {
             flow_receiver,
             second_sender,
             minute_sender,
+            toa_info_sender,
             l4_log_sender_outer,
             (yaml_config.flow.hash_slots << 3) as usize, // connection_lru_capacity
             metrics_type,

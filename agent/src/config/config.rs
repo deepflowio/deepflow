@@ -320,6 +320,8 @@ pub struct YamlConfig {
     pub vxlan_flags: u8,
     pub collector_sender_queue_size: usize,
     pub collector_sender_queue_count: usize,
+    pub toa_sender_queue_size: usize,
+    pub toa_lru_cache_size: usize,
     pub flow_sender_queue_size: usize,
     pub flow_sender_queue_count: usize,
     #[serde(with = "humantime_serde")]
@@ -569,6 +571,8 @@ impl Default for YamlConfig {
             // default size changes according to tap_mode
             collector_sender_queue_size: 1 << 16,
             collector_sender_queue_count: 1,
+            toa_sender_queue_size: 1 << 16,
+            toa_lru_cache_size: 1 << 16,
             // default size changes according to tap_mode
             flow_sender_queue_size: 1 << 16,
             flow_sender_queue_count: 1,
