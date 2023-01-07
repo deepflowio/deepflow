@@ -58,7 +58,7 @@ func (e *ProcessInfoEvent) GPIDSync(ctx context.Context, in *api.GPIDSyncRequest
 		return EmptyGPIDResponse, nil
 	}
 
-	statsd.AddGPIDReceiveCounter(uint64(len(in.GetLocalEntries()) + len(in.GetPeerEntries())))
+	statsd.AddGPIDReceiveCounter(uint64(len(in.GetEntries())))
 
 	log.Infof("receive gpid sync data from vtap(ctrl_ip: %s, ctrl_mac: %s, vtap_id:%d)",
 		in.GetCtrlIp(), in.GetCtrlMac(), in.GetVtapId())
