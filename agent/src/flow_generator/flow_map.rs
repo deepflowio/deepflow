@@ -690,10 +690,14 @@ impl FlowMap {
     }
 
     fn init_nat_info(flow: &mut Flow, meta_packet: &MetaPacket) {
-        if meta_packet.nat_client_port > 0 {
-            flow.flow_metrics_peers[0].nat_real_ip =
-                meta_packet.nat_client_ip.as_ref().unwrap().clone();
-            flow.flow_metrics_peers[0].nat_real_port = meta_packet.nat_client_port;
+        if meta_packet.lookup_key.nat_client_port > 0 {
+            flow.flow_metrics_peers[0].nat_real_ip = meta_packet
+                .lookup_key
+                .nat_client_ip
+                .as_ref()
+                .unwrap()
+                .clone();
+            flow.flow_metrics_peers[0].nat_real_port = meta_packet.lookup_key.nat_client_port;
         } else {
             flow.flow_metrics_peers[0].nat_real_ip = flow.flow_key.ip_src;
             flow.flow_metrics_peers[0].nat_real_port = flow.flow_key.port_src;
@@ -874,6 +878,14 @@ impl FlowMap {
             );
         }
 
+        if meta_packet.lookup_key.nat_client_ip.is_some() {
+            node.tagged_flow
+                .flow
+                .flow_key
+                .tap_port
+                .set_nat_source(TapPort::NAT_SOURCE_TOA);
+        }
+
         if !node.policy_in_tick[meta_packet.direction as usize] {
             node.policy_in_tick[meta_packet.direction as usize] = true;
             #[cfg(target_os = "linux")]
@@ -937,9 +949,14 @@ impl FlowMap {
         if flow_metrics_peer.first.is_zero() {
             flow_metrics_peer.first = pkt_timestamp;
         }
-        if meta_packet.nat_client_port > 0 {
-            flow_metrics_peer.nat_real_ip = meta_packet.nat_client_ip.as_ref().unwrap().clone();
-            flow_metrics_peer.nat_real_port = meta_packet.nat_client_port;
+        if meta_packet.lookup_key.nat_client_port > 0 {
+            flow_metrics_peer.nat_real_ip = meta_packet
+                .lookup_key
+                .nat_client_ip
+                .as_ref()
+                .unwrap()
+                .clone();
+            flow_metrics_peer.nat_real_port = meta_packet.lookup_key.nat_client_port;
         }
         // FIXME
         if meta_packet.direction == PacketDirection::ClientToServer {

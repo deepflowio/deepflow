@@ -1020,6 +1020,7 @@ impl Components {
             config_handler.platform(),
             synchronizer.running_config.clone(),
             Arc::new(Mutex::new(policy_getter)),
+            policy_setter,
             session.clone(),
             toa_recv,
             Arc::new(Mutex::new(Lru::with_capacity(
