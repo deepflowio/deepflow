@@ -684,5 +684,5 @@ message GPIDSyncResponse {
 }
 
 message GPIDGlobalLocalData {
-    repeated trident.GPIDSyncRequestLocalEntry  entries = 1;
+    repeated trident.GPIDSyncEntry  entries = 1;
 }
