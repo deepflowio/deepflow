@@ -289,12 +289,8 @@ func gpidVTapLocalData(cmd *cobra.Command) {
 		return
 	}
 	fmt.Printf("response(ctrl_ip: %s ctrl_mac: %s vtap_id: %d)\n", response.GetCtrlIp(), response.GetCtrlMac(), response.GetVtapId())
-	fmt.Println("LocalEntries:")
-	for index, entry := range response.GetLocalEntries() {
-		JsonFormat(index+1, entry)
-	}
-	fmt.Println("PeerEntries:")
-	for index, entry := range response.GetPeerEntries() {
+	fmt.Println("Entries:")
+	for index, entry := range response.GetEntries() {
 		JsonFormat(index+1, entry)
 	}
 }
