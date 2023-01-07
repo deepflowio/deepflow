@@ -53,6 +53,9 @@ pub struct LookupKey {
     pub backward_matched: Option<MatchedField>,
     pub fast_index: usize,
     pub tunnel_id: u32,
+    /********** For NAT (currently only TOA) ***********/
+    pub nat_client_ip: Option<IpAddr>,
+    pub nat_client_port: u16,
 }
 
 impl DedupOperator for LookupKey {
@@ -95,6 +98,8 @@ impl Default for LookupKey {
             backward_matched: None,
             fast_index: 0,
             tunnel_id: 0,
+            nat_client_ip: None,
+            nat_client_port: 0,
         }
     }
 }

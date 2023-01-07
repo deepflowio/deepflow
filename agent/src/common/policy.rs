@@ -21,9 +21,10 @@ use std::sync::Arc;
 
 use ipnet::{IpNet, Ipv4Net, Ipv6Net};
 use log::warn;
+use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use super::endpoint::EPC_FROM_DEEPFLOW;
-use super::enums::TapType;
+use super::enums::{IpProtocol, TapType};
 use super::error::Error;
 use super::matched_field::{MatchedFieldv4, MatchedFieldv6, MatchedFlag};
 use super::port_range::{PortRange, PortRangeList};
@@ -842,6 +843,125 @@ impl From<&trident::PeerConnection> for PeerConnection {
             local_epc: (p.local_epc_id() & 0xffff) as i32,
             remote_epc: (p.remote_epc_id() & 0xffff) as i32,
         }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, IntoPrimitive, TryFromPrimitive)]
+#[repr(u8)]
+pub enum GpidProtocol {
+    Tcp = 0,
+    Udp = 1,
+    Max = 2,
+}
+
+impl TryFrom<trident::ServiceProtocol> for GpidProtocol {
+    type Error = Error;
+
+    fn try_from(value: trident::ServiceProtocol) -> Result<Self, Self::Error> {
+        match value {
+            trident::ServiceProtocol::Any => Err(Error::ParseGpid(format!(
+                "Parse GPIDEntry error: {:?}",
+                value
+            ))),
+            trident::ServiceProtocol::TcpService => Ok(GpidProtocol::Tcp),
+            trident::ServiceProtocol::UdpService => Ok(GpidProtocol::Udp),
+        }
+    }
+}
+
+impl TryFrom<IpProtocol> for GpidProtocol {
+    type Error = Error;
+
+    fn try_from(value: IpProtocol) -> Result<Self, Self::Error> {
+        match value {
+            IpProtocol::Tcp => Ok(GpidProtocol::Tcp),
+            IpProtocol::Udp => Ok(GpidProtocol::Udp),
+            _ => Err(Error::InvalidProtocol(format!(
+                "Invalid protocol {:?}",
+                value
+            ))),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct GpidEntry {
+    pub role: trident::RoleType,
+    pub protocol: GpidProtocol,
+    // Server side
+    pub epc_id_1: i32,
+    pub ip_1: u32, // Only support IPV4.
+    pub port_1: u16,
+    pub pid_1: u32, // PID or GPID
+    // Client side
+    pub epc_id_0: i32,
+    pub ip_0: u32, // Only support IPV4.
+    pub port_0: u16,
+    pub pid_0: u32, // PID or GPID
+    // Real ip
+    pub epc_id_real: i32,
+    pub ip_real: u32, // Only support IPV4.
+    pub port_real: u16,
+    pub pid_real: u32, // PID or GPID
+}
+
+pub fn gpid_key(ip: u32, epc_id: i32, port: u16) -> u64 {
+    let epc_id = (epc_id & 0xffff) as u64;
+    (ip as u64) << 32 | epc_id << 16 | port as u64
+}
+
+impl GpidEntry {
+    pub fn client_keys(&self) -> u64 {
+        return gpid_key(self.ip_0, self.epc_id_0, self.port_0);
+    }
+
+    pub fn server_keys(&self) -> u64 {
+        return gpid_key(self.ip_1, self.epc_id_1, self.port_1);
+    }
+
+    pub fn real_keys(&self) -> u64 {
+        return gpid_key(self.ip_real, self.epc_id_real, self.port_real);
+    }
+}
+
+impl TryFrom<&trident::GpidSyncEntry> for GpidEntry {
+    type Error = Error;
+    fn try_from(value: &trident::GpidSyncEntry) -> Result<Self, Self::Error> {
+        let protocol = GpidProtocol::try_from(value.protocol())?;
+        let mut epc_id_0 = value.epc_id_0() as i32;
+        if epc_id_0 > 0 {
+            epc_id_0 &= 0xffff;
+        } else if epc_id_0 == 0 {
+            epc_id_0 = EPC_FROM_DEEPFLOW;
+        }
+        let mut epc_id_1 = value.epc_id_1() as i32;
+        if epc_id_1 > 0 {
+            epc_id_1 &= 0xffff;
+        } else if epc_id_1 == 0 {
+            epc_id_1 = EPC_FROM_DEEPFLOW;
+        }
+        let mut epc_id_real = value.epc_id_real() as i32;
+        if epc_id_real > 0 {
+            epc_id_real &= 0xffff;
+        } else if epc_id_real == 0 {
+            epc_id_real = EPC_FROM_DEEPFLOW;
+        }
+        Ok(GpidEntry {
+            epc_id_0,
+            ip_0: value.ipv4_0(),
+            port_0: (value.port_0() & 0xffff) as u16,
+            pid_0: (value.pid_0() & 0xffffffff) as u32,
+            epc_id_1,
+            ip_1: value.ipv4_1(),
+            port_1: (value.port_1() & 0xffff) as u16,
+            pid_1: (value.pid_1() & 0xffffffff) as u32,
+            epc_id_real,
+            ip_real: value.ipv4_real(),
+            port_real: (value.port_real() & 0xffff) as u16,
+            pid_real: (value.pid_real() & 0xffffffff) as u32,
+            protocol,
+            role: value.role(),
+        })
     }
 }
 

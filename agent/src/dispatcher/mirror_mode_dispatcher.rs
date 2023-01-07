@@ -552,7 +552,7 @@ impl MirrorModeDispatcher {
         mac: u32,
         npb_dedup: bool,
     ) {
-        let nat_source = if meta_packet.nat_client_ip.is_some() {
+        let nat_source = if meta_packet.lookup_key.nat_client_ip.is_some() {
             TapPort::NAT_SOURCE_TOA
         } else {
             TapPort::NAT_SOURCE_NONE

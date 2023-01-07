@@ -24,4 +24,8 @@ pub enum Error {
     ParseIpGroupData(String),
     #[error("{0}")]
     ParsePlatformData(String),
+    #[error("{0}")]
+    ParseGpid(String),
+    #[error("{0}")]
+    InvalidProtocol(String),
 }
