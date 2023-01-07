@@ -71,12 +71,7 @@ impl TryFrom<SockEntry> for GpidSyncEntry {
     type Error = ProcError;
 
     fn try_from(s: SockEntry) -> Result<Self, Self::Error> {
-        let (pid0, pid1) = match s.role {
-            Role::Client => (Some(s.pid), None),
-            Role::Server => (None, Some(s.pid)),
-        };
-
-        let (ip0, ip1) = match (s.local.ip, s.remote.ip) {
+        let (local_ip, remote_ip) = match (s.local.ip, s.remote.ip) {
             (IpAddr::V4(v4_local), IpAddr::V4(v4_remote)) => (
                 Some(read_u32_be(&v4_local.octets())),
                 Some(read_u32_be(&v4_remote.octets())),
@@ -88,19 +83,44 @@ impl TryFrom<SockEntry> for GpidSyncEntry {
             }
         };
 
+        let (epc_0, pid_0, ip_0, port_0, epc_1, pid_1, ip_1, port_1) = match s.role {
+            // when role is client, local addr is client side and remote is server side
+            Role::Client => (
+                Some(s.local.epc_id),
+                Some(s.pid),
+                local_ip,
+                Some(s.local.port as u32),
+                Some(s.remote.epc_id),
+                None,
+                remote_ip,
+                Some(s.remote.port as u32),
+            ),
+            // when role is server, local is server side and remote is client side
+            Role::Server => (
+                Some(s.remote.epc_id),
+                None,
+                remote_ip,
+                Some(s.remote.port as u32),
+                Some(s.local.epc_id),
+                Some(s.pid),
+                local_ip,
+                Some(s.local.port as u32),
+            ),
+        };
+
         Ok(Self {
             protocol: Some(match s.proto {
                 Protocol::Tcp => ServiceProtocol::TcpService as i32,
                 Protocol::Udp => ServiceProtocol::UdpService as i32,
             }),
-            epc_id_1: Some(s.remote.epc_id),
-            ipv4_1: ip1,
-            port_1: Some(s.remote.port as u32),
-            pid_1: pid1,
-            epc_id_0: Some(s.local.epc_id),
-            ipv4_0: ip0,
-            port_0: Some(s.local.port as u32),
-            pid_0: pid0,
+            epc_id_1: epc_1,
+            ipv4_1: ip_1,
+            port_1: port_1,
+            pid_1: pid_1,
+            epc_id_0: epc_0,
+            ipv4_0: ip_0,
+            port_0: port_0,
+            pid_0: pid_0,
             // FIXME fill the real sock info
             ..Default::default()
         })
@@ -393,7 +413,7 @@ fn divide_tcp_entry(
                     netns,
                 )) || spec_addr_listen_sock.contains(&t.local_address)
                 {
-                    // sport in all_iface_listen_sock or SocketAddr in spec_addr_listen_sock, assume is serve connection
+                    // sport in all_iface_listen_sock or SocketAddr in spec_addr_listen_sock, assume is server connection
                     Role::Server
                 } else {
                     Role::Client
@@ -463,36 +483,35 @@ fn divide_udp_entry(
             if is_zero_addr(&u.remote_address) {
                 // foreign addr is zero, indicate the udp socker create use bind(), no idea to determine the local and remote, ignore
                 continue;
-            } else {
-                // foreign addr is not zero, indicate the udp socker create use connect()
-                sock_entries.push(SockEntry {
-                    pid: *pid as u32,
-                    proto: Protocol::Udp,
-                    role: Role::Client,
-                    local: SockAddrData {
-                        epc_id: local_epc_id,
-                        ip: u.local_address.ip(),
-                        port: u.local_address.port(),
-                    },
-                    remote: SockAddrData {
-                        epc_id: convert_i32_epc_id(
-                            policy_getter
-                                .lookup_all_by_epc(
-                                    u.local_address.ip(),
-                                    u.remote_address.ip(),
-                                    local_epc_id as i32,
-                                    0,
-                                )
-                                .dst_info
-                                .l3_epc_id,
-                        ),
-                        ip: u.remote_address.ip(),
-                        port: u.remote_address.port(),
-                    },
-                    // FIXME get real client from toa
-                    real_client: None,
-                });
             }
+            // foreign addr is not zero, indicate the udp socker create use connect()
+            sock_entries.push(SockEntry {
+                pid: *pid as u32,
+                proto: Protocol::Udp,
+                role: Role::Client,
+                local: SockAddrData {
+                    epc_id: local_epc_id,
+                    ip: u.local_address.ip(),
+                    port: u.local_address.port(),
+                },
+                remote: SockAddrData {
+                    epc_id: convert_i32_epc_id(
+                        policy_getter
+                            .lookup_all_by_epc(
+                                u.local_address.ip(),
+                                u.remote_address.ip(),
+                                local_epc_id as i32,
+                                0,
+                            )
+                            .dst_info
+                            .l3_epc_id,
+                    ),
+                    ip: u.remote_address.ip(),
+                    port: u.remote_address.port(),
+                },
+                // FIXME get real client from toa
+                real_client: None,
+            });
         }
     }
 }
