@@ -50,21 +50,21 @@ pub enum Protocol {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct SockAddrData {
-    epc_id: u32,
-    ip: IpAddr,
-    port: u16,
+pub(super) struct SockAddrData {
+    pub(super) epc_id: u32,
+    pub(super) ip: IpAddr,
+    pub(super) port: u16,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct SockEntry {
-    pid: u32,
-    proto: Protocol,
+pub(super) struct SockEntry {
+    pub(super) pid: u32,
+    pub(super) proto: Protocol,
     // the local addr is server or client
-    role: Role,
-    local: SockAddrData,
-    remote: SockAddrData,
-    real_client: Option<SockAddrData>,
+    pub(super) role: Role,
+    pub(super) local: SockAddrData,
+    pub(super) remote: SockAddrData,
+    pub(super) real_client: Option<SockAddrData>,
 }
 
 impl TryFrom<SockEntry> for GpidSyncEntry {
@@ -108,10 +108,10 @@ impl TryFrom<SockEntry> for GpidSyncEntry {
             ),
         };
 
-        Ok(Self {
+        let mut r = Self {
             protocol: Some(match s.proto {
-                Protocol::Tcp => ServiceProtocol::TcpService as i32,
-                Protocol::Udp => ServiceProtocol::UdpService as i32,
+                Protocol::Tcp => ServiceProtocol::TcpService.into(),
+                Protocol::Udp => ServiceProtocol::UdpService.into(),
             }),
             epc_id_1: epc_1,
             ipv4_1: ip_1,
@@ -121,9 +121,23 @@ impl TryFrom<SockEntry> for GpidSyncEntry {
             ipv4_0: ip_0,
             port_0: port_0,
             pid_0: pid_0,
-            // FIXME fill the real sock info
             ..Default::default()
-        })
+        };
+
+        if let Some(real) = s.real_client {
+            r.epc_id_real = Some(real.epc_id);
+            r.ipv4_real = Some(match real.ip {
+                IpAddr::V4(v4) => read_u32_be(&v4.octets()),
+                _ => {
+                    return Err(ProcError::Other(
+                        "unreachable: not support ipv6".to_string(),
+                    ))
+                }
+            });
+            r.port_real = Some(real.port as u32);
+        }
+
+        Ok(r)
     }
 }
 
@@ -439,7 +453,6 @@ fn divide_tcp_entry(
                     ip: t.remote_address.ip(),
                     port: t.remote_address.port(),
                 },
-                // FIXME get real client from toa
                 real_client: None,
             });
         }

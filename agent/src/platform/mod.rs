@@ -23,7 +23,7 @@ mod platform_synchronizer;
 pub use kubernetes::{ActivePoller, ApiWatcher, GenericPoller, Poller};
 pub use libvirt_xml_extractor::LibvirtXmlExtractor;
 pub use platform_synchronizer::ProcRegRewrite;
-pub use platform_synchronizer::{PlatformSynchronizer, SocketSynchronizer};
+pub use platform_synchronizer::{process_info_enabled, PlatformSynchronizer, SocketSynchronizer};
 
 use public::utils::net::MacAddr;
 

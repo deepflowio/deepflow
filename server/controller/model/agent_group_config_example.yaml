@@ -542,6 +542,11 @@ vtap_group_id: g-xxxxxx
   ## Note: The number of replicas for each output queue of the collector.
   #collector-sender-queue-count: 1
 
+  ## Queue Size of tcp option address info sync queue size
+  ## Default: 65536. Range: [1, +oo)
+  ## Note: The number of replicas for each output queue of the collector.
+  #toa-sender-queue-size: 65536
+
   ## Queue Size of FlowAggregator/SessionAggregator Output
   ## Default: 65536. Range: [65536, +oo)
   ## Note: the length of the following queues:
@@ -562,6 +567,14 @@ vtap_group_id: g-xxxxxx
   ##   - 0.2-packet-to-flowgenerator
   ##   - 0.3-packet-to-pipeline
   #analyzer-queue-size: 131072
+
+  #########
+  ## LRU ##
+  #########
+
+  ## Size of tcp option address info cache size
+  ## Default: 65536. Range: [1, +oo)
+  #toa-lru-cache-size: 65536
 
   ###########################
   ## Time Window Tolerance ##

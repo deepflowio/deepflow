@@ -15,7 +15,7 @@
  */
 
 use std::{
-    net::IpAddr,
+    net::{IpAddr, SocketAddr, SocketAddrV4},
     path::Path,
     process,
     sync::{
@@ -49,7 +49,7 @@ use crate::{
     },
     policy::PolicyGetter,
     rpc::{RunningConfig, Session},
-    utils::{command::*, environment::is_tt_pod},
+    utils::{command::*, environment::is_tt_pod, lru::Lru},
 };
 
 use public::{
@@ -59,11 +59,12 @@ use public::{
         common::TridentType,
         trident::{self, Exception, GenesisProcessData, GpidSyncRequest, ProcessInfo},
     },
+    queue::Receiver,
 };
 
 use super::{
     calc_process_datas_sha1, get_all_socket, linux_process::get_all_process, process_info_enabled,
-    ProcessData,
+    ProcessData, Role, SockAddrData,
 };
 
 pub const SHA1_DIGEST_LEN: usize = 20;
@@ -823,6 +824,7 @@ pub struct SocketSynchronizer {
     session: Arc<Session>,
     running: Arc<Mutex<bool>>,
     policy_getter: Arc<Mutex<PolicyGetter>>,
+    lru_toa_info: Arc<Mutex<Lru<SocketAddr, SocketAddr>>>,
 }
 
 impl SocketSynchronizer {
@@ -831,7 +833,22 @@ impl SocketSynchronizer {
         running_config: Arc<RwLock<RunningConfig>>,
         policy_getter: Arc<Mutex<PolicyGetter>>,
         session: Arc<Session>,
+        // toa info, Receiver<Box< LocalAddr, RealAddr>>
+        // receiver from SubQuadGen::inject_flow()
+        receiver: Receiver<Box<(SocketAddr, SocketAddr)>>,
+        // toa info cache, Lru<LocalAddr, RealAddr>
+        lru_toa_info: Arc<Mutex<Lru<SocketAddr, SocketAddr>>>,
     ) -> Self {
+        if process_info_enabled(config.load().trident_type) {
+            let lru_toa_info_clone = lru_toa_info.clone();
+            thread::Builder::new()
+                .name("socket-synchronizer-toa-recv".to_string())
+                .spawn(|| {
+                    Self::sync_toa(lru_toa_info_clone, receiver);
+                })
+                .unwrap();
+        }
+
         Self {
             config,
             running_config,
@@ -839,6 +856,7 @@ impl SocketSynchronizer {
             stop_notify: Arc::new(Condvar::new()),
             session,
             running: Arc::new(Mutex::new(false)),
+            lru_toa_info,
         }
     }
 
@@ -854,13 +872,14 @@ impl SocketSynchronizer {
             return;
         }
 
-        let (running, config, running_config, policy_getter, session, stop_notify) = (
+        let (running, config, running_config, policy_getter, session, stop_notify, lru_toa_info) = (
             self.running.clone(),
             self.config.clone(),
             self.running_config.clone(),
             self.policy_getter.clone(),
             self.session.clone(),
             self.stop_notify.clone(),
+            self.lru_toa_info.clone(),
         );
 
         thread::Builder::new()
@@ -873,6 +892,7 @@ impl SocketSynchronizer {
                     policy_getter,
                     session,
                     stop_notify,
+                    lru_toa_info,
                 )
             })
             .unwrap();
@@ -888,6 +908,7 @@ impl SocketSynchronizer {
         policy_getter: Arc<Mutex<PolicyGetter>>,
         session: Arc<Session>,
         stop_notify: Arc<Condvar>,
+        lru_toa_info: Arc<Mutex<Lru<SocketAddr, SocketAddr>>>,
     ) {
         let rt = Builder::new_current_thread().enable_all().build().unwrap();
 
@@ -914,7 +935,31 @@ impl SocketSynchronizer {
                         }
                         continue;
                     }
-                    Ok(res) => res,
+                    Ok(mut res) => {
+                        // fill toa
+                        let mut lru_toa = lru_toa_info.lock().unwrap();
+                        for se in res.iter_mut() {
+                            if se.role == Role::Server {
+                                // the client addr
+                                let sa = match se.remote.ip {
+                                    IpAddr::V4(v4) => SocketAddr::V4(SocketAddrV4::new(
+                                        v4.clone(),
+                                        se.remote.port,
+                                    )),
+                                    _ => continue,
+                                };
+                                // get real addr by client addr from toa
+                                if let Some(real_addr) = lru_toa.get_mut(&sa) {
+                                    se.real_client = Some(SockAddrData {
+                                        epc_id: 0,
+                                        ip: real_addr.ip(),
+                                        port: real_addr.port(),
+                                    });
+                                }
+                            }
+                        }
+                        res
+                    }
                 };
 
                 match rt.block_on(
@@ -967,6 +1012,18 @@ impl SocketSynchronizer {
 
     fn wait_timeout(guard: MutexGuard<bool>, stop_notify: Arc<Condvar>, timeout: Duration) -> bool {
         *(stop_notify.wait_timeout(guard, timeout).unwrap().0)
+    }
+
+    fn sync_toa(
+        lru_toa_info: Arc<Mutex<Lru<SocketAddr, SocketAddr>>>,
+        receive: Receiver<Box<(SocketAddr, SocketAddr)>>,
+    ) {
+        while let Ok(toa_info) = receive.recv(None) {
+            let (client, real) = (toa_info.0, toa_info.1);
+            let mut lru_toa = lru_toa_info.lock().unwrap();
+            lru_toa.put(client, real);
+        }
+        info!("toa sync queue close");
     }
 }
 

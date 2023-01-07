@@ -15,7 +15,7 @@
  */
 
 use std::collections::{HashMap, VecDeque};
-use std::net::IpAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::sync::{
     atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
     Arc, Weak,
@@ -26,7 +26,7 @@ use std::time::Duration;
 use arc_swap::access::Access;
 use thread::JoinHandle;
 
-use log::{debug, info, warn};
+use log::{debug, error, info, warn};
 
 use super::acc_flow::{AccumulatedFlow, U16Set};
 use super::consts::*;
@@ -42,6 +42,7 @@ use crate::config::handler::CollectorAccess;
 use crate::metric::meter::{
     AppAnomaly, AppLatency, AppMeter, AppTraffic, FlowMeter, Latency, Performance, Traffic,
 };
+use crate::platform::process_info_enabled;
 use crate::rpc::get_timestamp;
 use crate::utils::{
     lru::Lru,
@@ -554,6 +555,7 @@ pub struct QuadrupleGeneratorThread {
     input: Arc<Receiver<Box<TaggedFlow>>>,
     second_output: DebugSender<Box<AccumulatedFlow>>,
     minute_output: DebugSender<Box<AccumulatedFlow>>,
+    toa_info_output: DebugSender<Box<(SocketAddr, SocketAddr)>>,
     flow_output: Option<DebugSender<Arc<TaggedFlow>>>, // Send TaggedFlows to FlowAggr, equal to None when processing eBPF data.
     connection_lru_capacity: usize,
     metrics_type: MetricsType,
@@ -579,6 +581,7 @@ impl QuadrupleGeneratorThread {
         input: Receiver<Box<TaggedFlow>>,
         second_output: DebugSender<Box<AccumulatedFlow>>,
         minute_output: DebugSender<Box<AccumulatedFlow>>,
+        toa_info_output: DebugSender<Box<(SocketAddr, SocketAddr)>>,
         flow_output: Option<DebugSender<Arc<TaggedFlow>>>,
         connection_lru_capacity: usize,
         metrics_type: MetricsType,
@@ -595,6 +598,7 @@ impl QuadrupleGeneratorThread {
             input: Arc::new(input),
             second_output: second_output.clone(),
             minute_output: minute_output.clone(),
+            toa_info_output,
             flow_output,
             connection_lru_capacity,
             metrics_type,
@@ -656,6 +660,8 @@ impl QuadrupleGeneratorThread {
             self.input.clone(),
             self.second_output.clone(),
             self.minute_output.clone(),
+            self.toa_info_output.clone(),
+            process_info_enabled(self.config.load().trident_type),
             self.flow_output.clone(),
             self.connection_lru_capacity,
             self.metrics_type,
@@ -714,6 +720,12 @@ pub struct QuadrupleGenerator {
     ntp_diff: Arc<AtomicI64>,
 
     stats: Arc<Collector>,
+
+    // DebugSender<Box<LocalAddr, RealAddr>>
+    // send to SocketSynchronizer
+    toa_info_output: DebugSender<Box<(SocketAddr, SocketAddr)>>,
+    // use to determine whether should send the toa info
+    proc_sync_enable: bool,
 }
 
 impl QuadrupleGenerator {
@@ -722,6 +734,8 @@ impl QuadrupleGenerator {
         input: Arc<Receiver<Box<TaggedFlow>>>,
         second_output: DebugSender<Box<AccumulatedFlow>>,
         minute_output: DebugSender<Box<AccumulatedFlow>>,
+        toa_info_output: DebugSender<Box<(SocketAddr, SocketAddr)>>,
+        proc_sync_enable: bool,
         flow_output: Option<DebugSender<Arc<TaggedFlow>>>,
         connection_lru_capacity: usize,
         metrics_type: MetricsType,
@@ -841,6 +855,9 @@ impl QuadrupleGenerator {
             running,
             ntp_diff,
             stats,
+
+            toa_info_output,
+            proc_sync_enable,
         }
     }
 
@@ -1140,6 +1157,16 @@ impl QuadrupleGenerator {
                             debug!("qg push TaggedFlow to l4_flow queue failed, maybe queue have terminated");
                         }
                     }
+
+                    #[cfg(target_os = "linux")]
+                    if let Some(toa) = tagged_flow.get_toa_info() {
+                        if self.proc_sync_enable {
+                            if let Err(_) = self.toa_info_output.send(Box::new(toa)) {
+                                error!("send toa info fail");
+                            }
+                        }
+                    }
+
                     if self.collector_enabled.load(Ordering::Relaxed) {
                         self.handle(Some(tagged_flow.clone()), tagged_flow.flow.flow_stat_time);
                     }
