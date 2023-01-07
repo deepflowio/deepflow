@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS process (
     vtap_id             INTEGER NOT NULL DEFAULT 0,
     pid                 INTEGER NOT NULL DEFAULT 0,
     process_name        VARCHAR(256) DEFAULT '',
-    cmdline             TEXT,
+    command_line        TEXT,
     user_name           VARCHAR(256) DEFAULT '',
     start_time          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     os_app_tags         TEXT COMMENT 'separated by ,',

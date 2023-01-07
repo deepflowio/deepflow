@@ -73,7 +73,7 @@ type Process struct {
 	VTapID         int       `gorm:"column:vtap_id;type:int;not null;default:0" json:"VTAP_ID"`
 	PID            int       `gorm:"column:pid;type:int;not null;default:0" json:"PID"`
 	ProcessName    string    `gorm:"column:process_name;type:varchar(256);default:''" json:"PROCESS_NAME"`
-	CommandLine    string    `gorm:"column:cmdline;type:text" json:"COMMAND_LINE"`
+	CommandLine    string    `gorm:"column:command_line;type:text" json:"COMMAND_LINE"`
 	UserName       string    `gorm:"column:user_name;type:varchar(256);default:''" json:"USER_NAME"`
 	StartTime      time.Time `gorm:"autoCreateTime;column:start_time;type:datetime" json:"START_TIME"`
 	OSAPPTags      string    `gorm:"column:os_app_tags;type:text" json:"OS_APP_TAGS"`
