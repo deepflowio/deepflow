@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/bitly/go-simplejson v0.5.0
-	github.com/deepflowys/deepflow/message v0.0.0-20221212023728-ed00cfdb114c
+	github.com/deepflowys/deepflow/message v0.0.0-20230108090919-8d32a4683317
 	github.com/deepflowys/deepflow/server v0.0.0-20221214084703-c6bdbeeca4e7
 	github.com/ghodss/yaml v1.0.0
 	github.com/golang/protobuf v1.5.2
