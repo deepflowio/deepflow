@@ -928,34 +928,35 @@ impl TryFrom<&trident::GpidSyncEntry> for GpidEntry {
     type Error = Error;
     fn try_from(value: &trident::GpidSyncEntry) -> Result<Self, Self::Error> {
         let protocol = GpidProtocol::try_from(value.protocol())?;
-        let mut epc_id_0 = value.epc_id_0() as i32;
-        if epc_id_0 > 0 {
-            epc_id_0 &= 0xffff;
-        } else if epc_id_0 == 0 {
-            epc_id_0 = EPC_FROM_DEEPFLOW;
-        }
-        let mut epc_id_1 = value.epc_id_1() as i32;
-        if epc_id_1 > 0 {
-            epc_id_1 &= 0xffff;
-        } else if epc_id_1 == 0 {
-            epc_id_1 = EPC_FROM_DEEPFLOW;
-        }
-        let mut epc_id_real = value.epc_id_real() as i32;
-        if epc_id_real > 0 {
-            epc_id_real &= 0xffff;
-        } else if epc_id_real == 0 {
-            epc_id_real = EPC_FROM_DEEPFLOW;
-        }
+        // FIXME: Support epc id
+        // let mut epc_id_0 = value.epc_id_0() as i32;
+        // if epc_id_0 > 0 {
+        //     epc_id_0 &= 0xffff;
+        // } else if epc_id_0 == 0 {
+        //     epc_id_0 = EPC_FROM_DEEPFLOW;
+        // }
+        // let mut epc_id_1 = value.epc_id_1() as i32;
+        // if epc_id_1 > 0 {
+        //     epc_id_1 &= 0xffff;
+        // } else if epc_id_1 == 0 {
+        //     epc_id_1 = EPC_FROM_DEEPFLOW;
+        // }
+        // let mut epc_id_real = value.epc_id_real() as i32;
+        // if epc_id_real > 0 {
+        //     epc_id_real &= 0xffff;
+        // } else if epc_id_real == 0 {
+        //     epc_id_real = EPC_FROM_DEEPFLOW;
+        // }
         Ok(GpidEntry {
-            epc_id_0,
+            epc_id_0: 0,
             ip_0: value.ipv4_0(),
             port_0: (value.port_0() & 0xffff) as u16,
             pid_0: (value.pid_0() & 0xffffffff) as u32,
-            epc_id_1,
+            epc_id_1: 0,
             ip_1: value.ipv4_1(),
             port_1: (value.port_1() & 0xffff) as u16,
             pid_1: (value.pid_1() & 0xffffffff) as u32,
-            epc_id_real,
+            epc_id_real: 0,
             ip_real: value.ipv4_real(),
             port_real: (value.port_real() & 0xffff) as u16,
             pid_real: (value.pid_real() & 0xffffffff) as u32,

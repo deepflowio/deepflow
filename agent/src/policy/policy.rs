@@ -281,13 +281,14 @@ impl Policy {
         Ok(())
     }
 
-    fn lookup_gpid(&self, key: &mut LookupKey, endpoints: &Arc<EndpointData>) -> (u32, u32) {
+    fn lookup_gpid(&self, key: &mut LookupKey, _endpoints: &Arc<EndpointData>) -> (u32, u32) {
         if !key.is_ipv4() || (key.proto != IpProtocol::Udp && key.proto != IpProtocol::Tcp) {
             return (0, 0);
         }
         let protocol = u8::from(GpidProtocol::try_from(key.proto).unwrap()) as usize;
-        let epc_id_0 = endpoints.src_info.l3_epc_id;
-        let epc_id_1 = endpoints.src_info.l3_epc_id;
+        // FIXME: Support epc id
+        let epc_id_0 = 0;
+        let epc_id_1 = 0;
         let ip_0 = if let Some(nat_addr) = key.nat_client_ip {
             if let IpAddr::V4(addr) = nat_addr {
                 u32::from(addr)
