@@ -590,6 +590,8 @@ pub struct FlowMetricsPeer {
     pub is_vip: bool,           // 从grpc cidr中获取
     pub is_local_mac: bool,     // 同EndpointInfo中的IsLocalMac, 流日志中不需要存储
     pub is_local_ip: bool,      // 同EndpointInfo中的IsLocalIp, 流日志中不需要存储
+
+    pub gpid: u32,
 }
 
 pub fn serialize_flow_metrics<S>(v: &[FlowMetricsPeer; 2], serializer: S) -> Result<S::Ok, S::Error>
@@ -637,6 +639,8 @@ where
         real_ip_1: u32,
         real_port_src: u16,
         real_port_dst: u16,
+        gpid_0: u32,
+        gpid_1: u32,
 
         #[serde(serialize_with = "to_string_format")]
         tcp_flags_bit_0: TcpFlags,
@@ -668,6 +672,8 @@ where
         real_ip_1,
         real_port_src: v[0].nat_real_port,
         real_port_dst: v[1].nat_real_port,
+        gpid_0: v[0].gpid,
+        gpid_1: v[1].gpid,
     };
     serializer.serialize_newtype_struct("flow_metrics", &s)
 }
@@ -696,6 +702,8 @@ impl Default for FlowMetricsPeer {
             is_vip: false,
             is_local_mac: false,
             is_local_ip: false,
+
+            gpid: 0,
         }
     }
 }
@@ -756,8 +764,7 @@ impl From<FlowMetricsPeer> for flow_log::FlowMetricsPeer {
             is_vip: m.is_vip as u32,
             real_ip,
             real_port: m.nat_real_port as u32,
-            // FIXME fill the actually gpid
-            gpid: 1,
+            gpid: m.gpid,
         }
     }
 }

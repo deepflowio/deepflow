@@ -362,8 +362,8 @@ impl From<Tagger> for metric::MiniTag {
                 tag_type: t.tag_type as u32,
                 tag_value: t.tag_value as u32,
                 // FIXME fill the actually gpid
-                gpid: 1,
-                gpid1: 2,
+                gpid: 91,
+                gpid1: 136,
             }),
         }
     }
