@@ -942,7 +942,7 @@ impl FlowMap {
             flow_metrics_peer.nat_real_port = meta_packet.nat_client_port;
         }
         // FIXME
-        if meta_packet.direction == 0.into() {
+        if meta_packet.direction == PacketDirection::ClientToServer {
             flow_metrics_peer.gpid = 91
         } else {
             flow_metrics_peer.gpid = 136
