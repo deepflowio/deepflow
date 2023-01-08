@@ -168,7 +168,7 @@ impl TryFrom<&OsProcRegexp> for ProcRegRewrite {
 
         match value.match_type.as_str() {
             OS_PROC_REGEXP_MATCH_TYPE_CMD => Ok(Self::Cmd(re, value.rewrite_name.clone())),
-            OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME => {
+            "" | OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME => {
                 Ok(Self::ProcessName(re, value.rewrite_name.clone()))
             }
             _ => Err(regex::Error::__Nonexhaustive),
