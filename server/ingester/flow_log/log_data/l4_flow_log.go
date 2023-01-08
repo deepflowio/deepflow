@@ -858,9 +858,8 @@ func (i *FlowInfo) Fill(f *pb.Flow) {
 	for _, v := range f.AclGids {
 		i.AclGids = append(i.AclGids, uint16(v))
 	}
-	// FIXME
-	i.GPID0 = 12099
-	i.GPID1 = 12107
+	i.GPID0 = f.MetricsPeerSrc.Gpid
+	i.GPID1 = f.MetricsPeerDst.Gpid
 	i.NatRealIP0 = f.MetricsPeerSrc.RealIp
 	i.NatRealIP1 = f.MetricsPeerDst.RealIp
 	i.NatRealPort0 = uint16(f.MetricsPeerSrc.RealPort)
