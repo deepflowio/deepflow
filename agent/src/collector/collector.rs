@@ -112,6 +112,8 @@ struct StashKey {
     fast_id: u128,
     src_ip: IpAddr,
     dst_ip: IpAddr,
+    src_gpid: u32,
+    dst_gpid: u32,
 }
 
 impl Default for StashKey {
@@ -120,6 +122,8 @@ impl Default for StashKey {
             fast_id: 0,
             src_ip: Ipv4Addr::UNSPECIFIED.into(),
             dst_ip: Ipv4Addr::UNSPECIFIED.into(),
+            src_gpid: 0,
+            dst_gpid: 0,
         }
     }
 }
@@ -290,6 +294,8 @@ impl StashKey {
             fast_id,
             src_ip,
             dst_ip: dst_ip.unwrap_or(Ipv4Addr::UNSPECIFIED.into()),
+            src_gpid: tagger.gpid,
+            dst_gpid: tagger.gpid_1,
         }
     }
 }
@@ -610,6 +616,7 @@ impl Stash {
             },
             ip,
             l3_epc_id: side.l3_epc_id as i16,
+            gpid: side.gpid,
             protocol: flow_key.proto,
             direction,
             tap_side: TapSide::from(direction),
@@ -758,6 +765,8 @@ impl Stash {
             ip1: dst_ip,
             l3_epc_id: src_ep.l3_epc_id as i16,
             l3_epc_id1: dst_ep.l3_epc_id as i16,
+            gpid: src_ep.gpid,
+            gpid_1: dst_ep.gpid,
             protocol: flow_key.proto,
             direction,
             tap_side: TapSide::from(direction),

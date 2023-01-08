@@ -187,6 +187,10 @@ pub struct AppProtoLogsBaseInfo {
     pub req_tcp_seq: u32,
     pub resp_tcp_seq: u32,
 
+    /* GPID */
+    pub gpid_0: u32,
+    pub gpid_1: u32,
+
     /* EBPF Info */
     pub ebpf_type: EbpfType,
     #[serde(skip_serializing_if = "value_is_default")]
@@ -292,9 +296,8 @@ impl From<AppProtoLogsBaseInfo> for flow_log::AppProtoLogsBaseInfo {
             syscall_trace_id_thread_1: f.syscall_trace_id_thread_1,
             syscall_cap_seq_0: f.syscall_cap_seq_0 as u32,
             syscall_cap_seq_1: f.syscall_cap_seq_1 as u32,
-            // FIXME fill the actually gpid
-            gpid_0: 91,
-            gpid_1: 136,
+            gpid_0: f.gpid_0,
+            gpid_1: f.gpid_1,
         }
     }
 }
