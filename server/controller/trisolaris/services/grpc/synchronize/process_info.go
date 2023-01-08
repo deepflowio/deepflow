@@ -32,15 +32,6 @@ func NewprocessInfoEvent() *ProcessInfoEvent {
 	return &ProcessInfoEvent{}
 }
 
-func getResp(vtapID uint32) *api.GPIDSyncResponse {
-	resp := trisolaris.GetGVTapInfo().GetProcessInfo().GetGPIDResponse(vtapID)
-	if resp == nil {
-		resp = EmptyGPIDResponse
-	}
-
-	return resp
-}
-
 func (e *ProcessInfoEvent) GPIDSync(ctx context.Context, in *api.GPIDSyncRequest) (*api.GPIDSyncResponse, error) {
 	processInfo := trisolaris.GetGVTapInfo().GetProcessInfo()
 	if in.GetVtapId() == 0 {
@@ -50,7 +41,7 @@ func (e *ProcessInfoEvent) GPIDSync(ctx context.Context, in *api.GPIDSyncRequest
 		if vtapCache != nil {
 			log.Infof("receive debug gpid sync data by vtap(ctrl_ip: %s, ctrl_mac: %s vtap_id: %d)",
 				in.GetCtrlIp(), in.GetCtrlMac(), vtapCache.GetVTapID())
-			return getResp(uint32(vtapCache.GetVTapID())), nil
+			return processInfo.GetGPIDResponseByVtapID(vtapCache.GetVTapID()), nil
 		}
 		log.Infof("receive invalid gpid sync data from vtap(ctrl_ip: %s, ctrl_mac: %s), because vtap_id=%d(vtap is not registered)",
 			in.GetCtrlIp(), in.GetCtrlMac(), in.GetVtapId())
@@ -60,11 +51,12 @@ func (e *ProcessInfoEvent) GPIDSync(ctx context.Context, in *api.GPIDSyncRequest
 
 	statsd.AddGPIDReceiveCounter(uint64(len(in.GetEntries())))
 
-	log.Infof("receive gpid sync data from vtap(ctrl_ip: %s, ctrl_mac: %s, vtap_id:%d)",
-		in.GetCtrlIp(), in.GetCtrlMac(), in.GetVtapId())
+	log.Infof("receive gpid sync data from vtap(ctrl_ip: %s, ctrl_mac: %s, vtap_id: %d) data_len: %d",
+		in.GetCtrlIp(), in.GetCtrlMac(), in.GetVtapId(), len(in.GetEntries()))
 	processInfo.UpdateVTapGPIDReq(in)
-	resp := getResp(in.GetVtapId())
-
+	resp := processInfo.GetGPIDResponseByReq(in)
+	log.Infof("send gpid response data(len=%d) to vtap(ctrl_ip: %s, ctrl_mac: %s, vtap_id: %d)",
+		len(resp.GetEntries()), in.GetCtrlIp(), in.GetCtrlMac(), in.GetVtapId())
 	statsd.AddGPIDSendCounter(uint64(len(resp.GetEntries())))
 	return resp, nil
 }
