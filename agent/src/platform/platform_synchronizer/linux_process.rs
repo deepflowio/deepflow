@@ -303,7 +303,7 @@ fn get_os_app_tag_by_exec(
     let stdout = String::from_utf8_lossy(output.stdout.as_ref()).to_string();
 
     if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stdout.as_ref()).to_string();
+        let stderr = String::from_utf8_lossy(output.stderr.as_ref()).to_string();
         return Err(format!(
             "exit_status: {}\nstdout: {}\nstderr: {}",
             output.status, stdout, stderr
