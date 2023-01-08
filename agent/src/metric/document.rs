@@ -115,10 +115,12 @@ bitflags! {
         const IP = 1<<0;
         const L3_EPC_ID = 1<<1;
         const MAC = 1<<11;
+        const GPID = 1<<15;
 
         const IP_PATH = 1<<20;
         const L3_EPC_PATH = 1<<21;
         const MAC_PATH = 1<<31;
+        const GPID_PATH = 1<<35;
 
         const DIRECTION = 1<<40;
         const ACL_GID = 1<<41;
