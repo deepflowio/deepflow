@@ -91,6 +91,8 @@ message FlowMetricsPeer {
 
     uint32 real_ip = 20;
     uint32 real_port = 21;
+
+    uint32 gpid = 22;
 }
 
 message TunnelField {
@@ -251,6 +253,8 @@ message AppProtoLogsBaseInfo {
     uint32 syscall_trace_id_thread_1 = 32;
     uint32 syscall_cap_seq_0 = 33;
     uint32 syscall_cap_seq_1 = 34;
+    uint32 gpid_0 = 35;
+    uint32 gpid_1 = 36;
 }
 
 message AppProtoHead {

@@ -361,6 +361,9 @@ impl From<Tagger> for metric::MiniTag {
                 l7_protocol: t.l7_protocol as u32,
                 tag_type: t.tag_type as u32,
                 tag_value: t.tag_value as u32,
+                // FIXME fill the actually gpid
+                gpid: 91,
+                gpid1: 136,
             }),
         }
     }

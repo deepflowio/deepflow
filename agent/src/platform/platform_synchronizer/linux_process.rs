@@ -168,7 +168,7 @@ impl TryFrom<&OsProcRegexp> for ProcRegRewrite {
 
         match value.match_type.as_str() {
             OS_PROC_REGEXP_MATCH_TYPE_CMD => Ok(Self::Cmd(re, value.rewrite_name.clone())),
-            OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME => {
+            "" | OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME => {
                 Ok(Self::ProcessName(re, value.rewrite_name.clone()))
             }
             _ => Err(regex::Error::__Nonexhaustive),
@@ -303,7 +303,7 @@ fn get_os_app_tag_by_exec(
     let stdout = String::from_utf8_lossy(output.stdout.as_ref()).to_string();
 
     if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stdout.as_ref()).to_string();
+        let stderr = String::from_utf8_lossy(output.stderr.as_ref()).to_string();
         return Err(format!(
             "exit_status: {}\nstdout: {}\nstderr: {}",
             output.status, stdout, stderr
