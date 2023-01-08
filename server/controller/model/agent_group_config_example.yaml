@@ -984,20 +984,27 @@ vtap_group_id: g-xxxxxx
   #os-app-tag-exec-user: deepflow
 
   ## the regular expression use for match process and replace the process name
+  ## Note: will traverse over the entire array, so the previous ones will be matched first
+  ## Example:
+  ##   os-proc-regex:
+  ##     - match-regex: python3 (.*)\.py
+  ##       match-type: cmdline
+  ##       rewrite-name: $1-py-script
+  ##     - match-regex: .*
   #os-proc-regex:
 
     ## The regexp use for match the process
     ## Default: .*
     #- match-regex:
 
-    ## Regexp match field
-    ## Default: process_name
-    ## Note: one of process_name, cmdline.
+    #  # Regexp match field
+    #  # Default: process_name
+    #  # Note: one of process_name, cmdline.
     #  match-type:
-
-    ## The name will replace the process name or cmd use regexp replace
-    ## Default: ""
-    ## Note: null string will not replace.
+    #
+    #  # The name will replace the process name or cmd use regexp replace
+    #  # Default: ""
+    #  # Note: null string will not replace.
     #  rewrite-name:
 
   ####################
