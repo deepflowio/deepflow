@@ -20,7 +20,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
-	"math/rand"
 	"net"
 	"strconv"
 	"strings"
@@ -1350,8 +1349,14 @@ func (t *Tag) ReadFromPB(p *pb.MiniTag) {
 	t.TAPType = TAPTypeEnum(p.Field.TapType)
 	t.L7Protocol = datatype.L7Protocol(p.Field.L7Protocol)
 	// FIXME
-	t.GPID = uint32(rand.Intn(30))
-	t.GPID1 = uint32(rand.Intn(30))
+	if t.Code&IPPath != 0 {
+		t.Code |= GPIDPath
+		t.GPID = 12099
+		t.GPID1 = 12107
+	} else {
+		t.Code |= GPID
+		t.GPID = 12107
+	}
 	t.TagType = uint8(p.Field.TagType)
 	t.TagValue = uint16(p.Field.TagValue)
 }

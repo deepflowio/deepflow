@@ -20,7 +20,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"math/rand"
 	"net"
 	"time"
 
@@ -500,8 +499,8 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	b.StartTime = int64(l.StartTime) / int64(time.Microsecond)
 	b.EndTime = int64(l.EndTime) / int64(time.Microsecond)
 	// FIXME
-	b.GPID0 = uint32(rand.Intn(30))
-	b.GPID1 = uint32(rand.Intn(30))
+	b.GPID0 = 12099
+	b.GPID1 = 12107
 
 	// FIXME 补充填充链路追踪数据
 	b.ProcessID0 = l.ProcessId_0
