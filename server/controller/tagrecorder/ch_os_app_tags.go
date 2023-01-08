@@ -61,10 +61,10 @@ func (o *ChOSAppTags) generateNewData() (map[OSAPPTagsKey]mysql.ChOSAppTags, boo
 			return nil, false
 		}
 		key := OSAPPTagsKey{
-			PID: process.PID,
+			PID: process.ID,
 		}
 		keyToItem[key] = mysql.ChOSAppTags{
-			PID:       process.PID,
+			PID:       process.ID,
 			OSAPPTags: string(osAppTagsStr),
 		}
 	}
