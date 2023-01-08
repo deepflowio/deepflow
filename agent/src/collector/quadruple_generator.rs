@@ -1095,6 +1095,14 @@ impl QuadrupleGenerator {
         key[OFFSET_L3_EPC_ID_0 + 1] = src.l3_epc_id as u8;
         key[OFFSET_L3_EPC_ID_1] = (dst.l3_epc_id >> 8) as u8;
         key[OFFSET_L3_EPC_ID_1 + 1] = dst.l3_epc_id as u8;
+        key[OFFSET_GPID_0] = (src.gpid >> 24) as u8;
+        key[OFFSET_GPID_0 + 1] = (src.gpid >> 16) as u8;
+        key[OFFSET_GPID_0 + 2] = (src.gpid >> 8) as u8;
+        key[OFFSET_GPID_0 + 3] = src.gpid as u8;
+        key[OFFSET_GPID_1] = (dst.gpid >> 24) as u8;
+        key[OFFSET_GPID_1 + 1] = (dst.gpid >> 16) as u8;
+        key[OFFSET_GPID_1 + 2] = (dst.gpid >> 8) as u8;
+        key[OFFSET_GPID_1 + 3] = dst.gpid as u8;
         // TAP_PORT_SIZE: tap_port(4B), tap_port_type(1B), tap_type(1B), tunnel_type(1B), tap_side(1B)
         key[OFFSET_TAP_PORT] = ((tap_port as u32) >> 24) as u8;
         key[OFFSET_TAP_PORT + 1] = ((tap_port as u32) >> 16) as u8;

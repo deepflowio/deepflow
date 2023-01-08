@@ -769,9 +769,13 @@ impl FlowMap {
                     first: lookup_key.timestamp,
                     last: lookup_key.timestamp,
                     tcp_flags: meta_packet.tcp_data.flags,
+                    gpid: meta_packet.gpid_0,
                     ..Default::default()
                 },
-                FlowMetricsPeer::default(),
+                FlowMetricsPeer {
+                    gpid: meta_packet.gpid_1,
+                    ..Default::default()
+                },
             ],
             signal_source: meta_packet.signal_source,
             is_active_service,
@@ -958,11 +962,12 @@ impl FlowMap {
                 .clone();
             flow_metrics_peer.nat_real_port = meta_packet.lookup_key.nat_client_port;
         }
-        // FIXME
-        if meta_packet.direction == PacketDirection::ClientToServer {
-            flow_metrics_peer.gpid = 91
-        } else {
-            flow_metrics_peer.gpid = 136
+        if meta_packet.gpid_0 > 0 {
+            flow_metrics_peer.gpid = meta_packet.gpid_0;
+        }
+        if meta_packet.gpid_1 > 0 {
+            flow.flow_metrics_peers[meta_packet.direction.reversed() as usize].gpid =
+                meta_packet.gpid_1
         }
 
         if meta_packet.vlan > 0 {
