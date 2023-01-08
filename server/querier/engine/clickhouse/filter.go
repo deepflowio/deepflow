@@ -365,16 +365,16 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 						}
 						return &view.Expr{Value: filter}, nil
 					}
-				} else if strings.HasPrefix(preAsTag, "cloud.tag.") {
-					if strings.HasSuffix(preAsTag, "_0") {
+				} else if strings.HasPrefix(t.Tag, "cloud.tag.") {
+					if strings.HasSuffix(t.Tag, "_0") {
 						tagItem, ok = tag.GetTag("cloud_tag_0", db, table, "default")
-					} else if strings.HasSuffix(preAsTag, "_1") {
+					} else if strings.HasSuffix(t.Tag, "_1") {
 						tagItem, ok = tag.GetTag("cloud_tag_1", db, table, "default")
 					} else {
 						tagItem, ok = tag.GetTag("cloud_tag", db, table, "default")
 					}
 					if ok {
-						nameNoSuffix := strings.TrimSuffix(preAsTag, "_0")
+						nameNoSuffix := strings.TrimSuffix(t.Tag, "_0")
 						nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
 						nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "cloud.tag.")
 						switch strings.ToLower(op) {
@@ -393,16 +393,16 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 						}
 						return &view.Expr{Value: filter}, nil
 					}
-				} else if strings.HasPrefix(preAsTag, "os.app.") {
-					if strings.HasSuffix(preAsTag, "_0") {
+				} else if strings.HasPrefix(t.Tag, "os.app.") {
+					if strings.HasSuffix(t.Tag, "_0") {
 						tagItem, ok = tag.GetTag("os_app_0", db, table, "default")
-					} else if strings.HasSuffix(preAsTag, "_1") {
+					} else if strings.HasSuffix(t.Tag, "_1") {
 						tagItem, ok = tag.GetTag("os_app_1", db, table, "default")
 					} else {
 						tagItem, ok = tag.GetTag("os_app", db, table, "default")
 					}
 					if ok {
-						nameNoSuffix := strings.TrimSuffix(preAsTag, "_0")
+						nameNoSuffix := strings.TrimSuffix(t.Tag, "_0")
 						nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
 						nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "os.app.")
 						switch strings.ToLower(op) {
