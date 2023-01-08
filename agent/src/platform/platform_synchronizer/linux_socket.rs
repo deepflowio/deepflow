@@ -86,22 +86,26 @@ impl TryFrom<SockEntry> for GpidSyncEntry {
         let (epc_0, pid_0, ip_0, port_0, epc_1, pid_1, ip_1, port_1) = match s.role {
             // when role is client, local addr is client side and remote is server side
             Role::Client => (
-                Some(s.local.epc_id),
+                // TODO set epc_id
+                None,
                 Some(s.pid),
                 local_ip,
                 Some(s.local.port as u32),
-                Some(s.remote.epc_id),
+                // TODO set epc_id
+                None,
                 None,
                 remote_ip,
                 Some(s.remote.port as u32),
             ),
             // when role is server, local is server side and remote is client side
             Role::Server => (
-                Some(s.remote.epc_id),
+                // TODO set epc_id
+                None,
                 None,
                 remote_ip,
                 Some(s.remote.port as u32),
-                Some(s.local.epc_id),
+                // TODO set epc_id
+                None,
                 Some(s.pid),
                 local_ip,
                 Some(s.local.port as u32),
