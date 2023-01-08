@@ -941,6 +941,12 @@ impl FlowMap {
             flow_metrics_peer.nat_real_ip = meta_packet.nat_client_ip.as_ref().unwrap().clone();
             flow_metrics_peer.nat_real_port = meta_packet.nat_client_port;
         }
+        // FIXME
+        if meta_packet.direction == 0.into() {
+            flow_metrics_peer.gpid = 91
+        } else {
+            flow_metrics_peer.gpid = 136
+        }
 
         if meta_packet.vlan > 0 {
             flow.vlan = meta_packet.vlan;
