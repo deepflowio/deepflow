@@ -42,7 +42,7 @@ const (
 
 var TAG_RESOURCE_TYPE_DEFAULT = []string{
 	"region", "az", "pod_node", "pod_ns",
-	"pod_group", "pod", "pod_cluster", "subnet",
+	"pod_group", "pod", "pod_cluster", "subnet", "gprocess",
 }
 var TAG_RESOURCE_TYPE_AUTO = []string{"resource_gl0", "resource_gl1", "resource_gl2"}
 
