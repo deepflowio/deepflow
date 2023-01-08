@@ -19,7 +19,6 @@ package log_data
 import (
 	"fmt"
 	"math"
-	"math/rand"
 	"net"
 	"sync/atomic"
 	"time"
@@ -860,8 +859,8 @@ func (i *FlowInfo) Fill(f *pb.Flow) {
 		i.AclGids = append(i.AclGids, uint16(v))
 	}
 	// FIXME
-	i.GPID0 = uint32(rand.Intn(30))
-	i.GPID1 = uint32(rand.Intn(30))
+	i.GPID0 = 12099
+	i.GPID1 = 12107
 	i.NatRealIP0 = f.MetricsPeerSrc.RealIp
 	i.NatRealIP1 = f.MetricsPeerDst.RealIp
 	i.NatRealPort0 = uint16(f.MetricsPeerSrc.RealPort)
