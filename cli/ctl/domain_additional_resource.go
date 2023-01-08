@@ -71,12 +71,10 @@ func applyDomainAdditionalResource(cmd *cobra.Command, args []string, filename s
 
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v1/domain-additional-resources/", server.IP, server.Port)
-	resp, err := common.CURLPerform("PUT", url, body, "")
+	_, err = common.CURLPerform("PUT", url, body, "")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		return
 	}
-	fmt.Println(resp)
 }
 
 func exampleDomainAdditionalResourceConfig(cmd *cobra.Command) {

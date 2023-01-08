@@ -559,46 +559,18 @@ func generateCloudModelData(domainUUIDToToolDataSet map[string]*addtionalResourc
 			}
 		}
 
-		chostUUIDToInfo := make(map[string]*cloudmodel.VM)
-		for _, chost := range cloudMD.CHosts {
-			chostUUIDToInfo[chost.Lcuuid] = &chost
-		}
+		// TODO(weiqiang): add chosts and cloud tags at the same time
 		for _, chost := range toolDS.cloudTagCHosts {
-			chostInfo, ok := chostUUIDToInfo[chost.Lcuuid]
-			// chosts and cloud_tags modify the same chost at the same time
-			if ok {
-				chostInfo.CloudTags = chost.CloudTags
-				continue
+			if cloudMD.CHostCloudTags == nil {
+				cloudMD.CHostCloudTags = make(cloudmodel.UUIDToCloudTags)
 			}
-			cloudMD.CHosts = append(
-				cloudMD.CHosts,
-				cloudmodel.VM{
-					Lcuuid:       chost.Lcuuid,
-					Name:         chost.Name,
-					Label:        chost.Label,
-					HType:        chost.HType,
-					State:        chost.State,
-					LaunchServer: chost.LaunchServer,
-					CloudTags:    chost.CloudTags,
-					VPCLcuuid:    toolDS.vpcIDToUUID[chost.VPCID],
-					AZLcuuid:     chost.AZ,
-					RegionLcuuid: chost.Region,
-				},
-			)
+			cloudMD.CHostCloudTags[chost.Lcuuid] = chost.CloudTags
 		}
-
 		for _, podNamespace := range toolDS.cloudTagPodNamespaces {
-			cloudMD.PodNamespaces = append(
-				cloudMD.PodNamespaces,
-				cloudmodel.PodNamespace{
-					Lcuuid:           podNamespace.Lcuuid,
-					Name:             podNamespace.Name,
-					CloudTags:        podNamespace.CloudTags,
-					PodClusterLcuuid: toolDS.podClusterIDToUUID[podNamespace.PodClusterID],
-					AZLcuuid:         podNamespace.AZ,
-					RegionLcuuid:     podNamespace.Region,
-					SubDomainLcuuid:  podNamespace.SubDomain,
-				})
+			if cloudMD.PodNamespaceCloudTags == nil {
+				cloudMD.PodNamespaceCloudTags = make(cloudmodel.UUIDToCloudTags)
+			}
+			cloudMD.PodNamespaceCloudTags[podNamespace.Lcuuid] = podNamespace.CloudTags
 		}
 		domainUUIDToCloudModelData[domainUUID] = cloudMD
 		log.Debugf("domain (uuid: %s) cloud data: %#v", cloudMD)
