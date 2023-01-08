@@ -638,6 +638,7 @@ impl Stash {
             code: {
                 let mut code = Code::IP
                     | Code::L3_EPC_ID
+                    | Code::GPID
                     | Code::VTAP_ID
                     | Code::PROTOCOL
                     | Code::SERVER_PORT
@@ -785,6 +786,7 @@ impl Stash {
             code: {
                 let mut code = Code::IP_PATH
                     | Code::L3_EPC_PATH
+                    | Code::GPID_PATH
                     | Code::VTAP_ID
                     | Code::PROTOCOL
                     | Code::SERVER_PORT
@@ -1016,6 +1018,7 @@ mod tests {
             direction: Direction::ClientToServer,
             code: Code::IP
                 | Code::L3_EPC_ID
+                | Code::GPID
                 | Code::VTAP_ID
                 | Code::PROTOCOL
                 | Code::SERVER_PORT
@@ -1046,6 +1049,7 @@ mod tests {
 
         tagger.code = Code::IP_PATH
             | Code::L3_EPC_PATH
+            | Code::GPID_PATH
             | Code::VTAP_ID
             | Code::PROTOCOL
             | Code::SERVER_PORT
