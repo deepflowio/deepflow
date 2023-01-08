@@ -131,6 +131,7 @@ impl Default for StashKey {
 impl StashKey {
     const SINGLE_IP: Code = Code::IP
         .union(Code::L3_EPC_ID)
+        .union(Code::GPID)
         .union(Code::VTAP_ID)
         .union(Code::PROTOCOL)
         .union(Code::DIRECTION)
@@ -148,6 +149,7 @@ impl StashKey {
 
     const EDGE_IP: Code = Code::IP_PATH
         .union(Code::L3_EPC_PATH)
+        .union(Code::GPID_PATH)
         .union(Code::VTAP_ID)
         .union(Code::PROTOCOL)
         .union(Code::DIRECTION)
