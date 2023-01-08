@@ -631,7 +631,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
 	for _, suffix := range []string{"", "_0", "_1"} {
 		osAPPSuffix := "os_app" + suffix
-		processIDSuffix := "process_id" + suffix
+		processIDSuffix := "gprocess_id" + suffix
 		tagResourceMap[osAPPSuffix] = map[string]*Tag{
 			"default": NewTag(
 				"dictGet(flow_tag.os_app_tag_map, 'value', (toUInt64("+processIDSuffix+"),'%s'))",
@@ -643,7 +643,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	}
 	for _, suffix := range []string{"", "_0", "_1"} {
 		osAPPSuffix := "os.app" + suffix
-		processIDSuffix := "process_id" + suffix
+		processIDSuffix := "gprocess_id" + suffix
 		tagResourceMap[osAPPSuffix] = map[string]*Tag{
 			"default": NewTag(
 				"dictGetOrDefault(flow_tag.os_app_tags_map, 'os_app_tags', toUInt64("+processIDSuffix+"),'{}')",
