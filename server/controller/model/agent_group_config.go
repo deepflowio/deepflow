@@ -86,7 +86,7 @@ type StaticConfig struct {
 	OsProcRoot                       *string               `yaml:"os-proc-root,omitempty"`
 	OsProcSocketSyncInterval         *int                  `yaml:"os-proc-socket-sync-interval,omitempty"`
 	OsProcSocketMinLifetime          *int                  `yaml:"os-proc-socket-min-lifetime,omitempty"`
-	OsProcRegex                      *OsProcRegex          `yaml:"os-proc-regex,omitempty"`
+	OsProcRegex                      []*OsProcRegex        `yaml:"os-proc-regex,omitempty"`
 	GuardInterval                    *string               `yaml:"guard-interval,omitempty"`
 }
 
