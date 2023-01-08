@@ -600,25 +600,27 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
 	for _, suffix := range []string{"", "_0", "_1"} {
 		cloudTagSuffix := "cloud_tag" + suffix
-		chostIDSuffix := "chost_id" + suffix
+		deviceIDSuffix := "l3_device_id" + suffix
+		deviceTypeIDSuffix := "l3_device_type" + suffix
 		podNSIDSuffix := "pod_ns_id" + suffix
 		tagResourceMap[cloudTagSuffix] = map[string]*Tag{
 			"default": NewTag(
-				"if(dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64("+chostIDSuffix+"),'%s'))!='',dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64("+chostIDSuffix+"),'%s')), dictGet(flow_tag.pod_ns_cloud_tag_map, 'value', (toUInt64("+podNSIDSuffix+"),'%s')) )",
-				"("+chostIDSuffix+"!=0"+" AND "+podNSIDSuffix+"!=0)",
-				"((toUInt64("+chostIDSuffix+") IN (SELECT chost_id FROM flow_tag.chost_cloud_tag_map WHERE value %s %s and key='%s')) OR (toUInt64("+podNSIDSuffix+") IN (SELECT pod_ns_id FROM flow_tag.pod_ns_cloud_tag_map WHERE value %s %s and key='%s'))) ",
-				"((toUInt64("+chostIDSuffix+") IN (SELECT chost_id FROM flow_tag.chost_cloud_tag_map WHERE %s(value,%s) and key='%s')) OR (toUInt64("+podNSIDSuffix+") IN (SELECT pod_ns_id FROM flow_tag.pod_ns_cloud_tag_map WHERE %s(value,%s) and key='%s'))) ",
+				"if(if("+deviceTypeIDSuffix+"=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64("+deviceIDSuffix+"),'%s')), '')!='',if("+deviceTypeIDSuffix+"=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64("+deviceIDSuffix+"),'%s')), ''), dictGet(flow_tag.pod_ns_cloud_tag_map, 'value', (toUInt64("+podNSIDSuffix+"),'%s')) )",
+				"(("+deviceIDSuffix+"!=0 AND "+deviceTypeIDSuffix+"=1) OR "+podNSIDSuffix+"!=0)",
+				"((toUInt64("+deviceIDSuffix+") IN (SELECT chost_id FROM flow_tag.chost_cloud_tag_map WHERE value %s %s and key='%s') AND "+deviceTypeIDSuffix+"=1) OR (toUInt64("+podNSIDSuffix+") IN (SELECT pod_ns_id FROM flow_tag.pod_ns_cloud_tag_map WHERE value %s %s and key='%s'))) ",
+				"((toUInt64("+deviceIDSuffix+") IN (SELECT chost_id FROM flow_tag.chost_cloud_tag_map WHERE %s(value,%s) and key='%s') AND "+deviceTypeIDSuffix+"=1) OR (toUInt64("+podNSIDSuffix+") IN (SELECT pod_ns_id FROM flow_tag.pod_ns_cloud_tag_map WHERE %s(value,%s) and key='%s'))) ",
 			),
 		}
 	}
 	for _, suffix := range []string{"", "_0", "_1"} {
-		k8sLabelSuffix := "cloud.tag" + suffix
-		chostIDSuffix := "chost_id" + suffix
+		cloudTagSuffix := "cloud.tag" + suffix
+		deviceIDSuffix := "l3_device_id" + suffix
+		deviceTypeIDSuffix := "l3_device_type" + suffix
 		podNSIDSuffix := "pod_ns_id" + suffix
-		tagResourceMap[k8sLabelSuffix] = map[string]*Tag{
+		tagResourceMap[cloudTagSuffix] = map[string]*Tag{
 			"default": NewTag(
-				"if(dictGetOrDefault(flow_tag.chost_cloud_tags_map, 'cloud_tags', toUInt64("+chostIDSuffix+"),'{}')!='{}',dictGetOrDefault(flow_tag.chost_cloud_tags_map, 'cloud_tags', toUInt64("+chostIDSuffix+"),'{}'), dictGetOrDefault(flow_tag.pod_ns_cloud_tags_map, 'cloud_tags', toUInt64("+podNSIDSuffix+"),'{}')) ",
-				"("+chostIDSuffix+"!=0"+" AND "+podNSIDSuffix+"!=0)",
+				"if(if("+deviceTypeIDSuffix+"=1, dictGetOrDefault(flow_tag.chost_cloud_tags_map, 'cloud_tags', toUInt64("+deviceIDSuffix+"),'{}'), '{}')!='{}',if("+deviceTypeIDSuffix+"=1, dictGetOrDefault(flow_tag.chost_cloud_tags_map, 'cloud_tags', toUInt64("+deviceIDSuffix+"),'{}'), '{}'), dictGetOrDefault(flow_tag.pod_ns_cloud_tags_map, 'cloud_tags', toUInt64("+podNSIDSuffix+"),'{}')) ",
+				"(("+deviceIDSuffix+"!=0 AND "+deviceTypeIDSuffix+"=1) OR "+podNSIDSuffix+"!=0)",
 				"",
 				"",
 			),
