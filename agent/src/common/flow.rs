@@ -734,6 +734,9 @@ impl FlowMetricsPeer {
         self.is_local_ip = other.is_local_ip;
         self.nat_real_ip = other.nat_real_ip;
         self.nat_real_port = other.nat_real_port;
+        if other.gpid > 0 {
+            self.gpid = other.gpid;
+        }
     }
 }
 

@@ -95,6 +95,8 @@ impl MetaAppProto {
                 .is_vip_interface,
             is_vip_interface_dst: flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST]
                 .is_vip_interface,
+            gpid_0: flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].gpid,
+            gpid_1: flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].gpid,
             mac_src: MacAddr::ZERO,
             mac_dst: MacAddr::ZERO,
             ip_src: meta_packet.lookup_key.src_ip,
@@ -166,6 +168,7 @@ impl MetaAppProto {
         } else {
             swap(&mut base_info.ip_src, &mut base_info.ip_dst);
             swap(&mut base_info.port_src, &mut base_info.port_dst);
+            swap(&mut base_info.gpid_0, &mut base_info.gpid_1);
 
             base_info.l3_epc_id_src = flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].l3_epc_id;
             base_info.l3_epc_id_dst = flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].l3_epc_id;

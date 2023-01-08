@@ -282,6 +282,9 @@ pub struct Tagger {
     pub tap_type: TapType,
     pub l7_protocol: L7Protocol,
 
+    pub gpid: u32,
+    pub gpid_1: u32,
+
     pub tag_type: TagType,
     pub tag_value: u16,
 }
@@ -308,6 +311,9 @@ impl Default for Tagger {
             tap_port: TapPort::default(),
             tap_type: TapType::default(),
             l7_protocol: L7Protocol::default(),
+
+            gpid: 0,
+            gpid_1: 0,
 
             tag_type: TagType::default(),
             tag_value: 0,
@@ -361,9 +367,8 @@ impl From<Tagger> for metric::MiniTag {
                 l7_protocol: t.l7_protocol as u32,
                 tag_type: t.tag_type as u32,
                 tag_value: t.tag_value as u32,
-                // FIXME fill the actually gpid
-                gpid: 91,
-                gpid1: 136,
+                gpid: t.gpid,
+                gpid1: t.gpid_1,
             }),
         }
     }
