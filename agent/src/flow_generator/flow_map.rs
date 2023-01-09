@@ -769,13 +769,9 @@ impl FlowMap {
                     first: lookup_key.timestamp,
                     last: lookup_key.timestamp,
                     tcp_flags: meta_packet.tcp_data.flags,
-                    gpid: meta_packet.gpid_0,
                     ..Default::default()
                 },
-                FlowMetricsPeer {
-                    gpid: meta_packet.gpid_1,
-                    ..Default::default()
-                },
+                FlowMetricsPeer::default(),
             ],
             signal_source: meta_packet.signal_source,
             is_active_service,
@@ -818,6 +814,9 @@ impl FlowMap {
         // 标签
         (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
         self.update_endpoint_and_policy_data(&mut node, meta_packet);
+
+        node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].gpid = meta_packet.gpid_0;
+        node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].gpid = meta_packet.gpid_1;
 
         if let Some(endpoints) = &meta_packet.endpoint_data {
             if endpoints.src_info.is_vip || endpoints.dst_info.is_vip {
@@ -936,12 +935,21 @@ impl FlowMap {
             }
         }
 
+        let flow = &mut node.tagged_flow.flow;
+
+        if meta_packet.gpid_0 > 0 {
+            flow.flow_metrics_peers[meta_packet.direction as usize].gpid = meta_packet.gpid_0;
+        }
+        if meta_packet.gpid_1 > 0 {
+            flow.flow_metrics_peers[meta_packet.direction.reversed() as usize].gpid =
+                meta_packet.gpid_1
+        }
+
         // The ebpf data has no l3 and l4 information, so it can be returned directly
-        if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
+        if flow.signal_source == SignalSource::EBPF {
             return;
         }
 
-        let flow = &mut node.tagged_flow.flow;
         let flow_metrics_peer = &mut flow.flow_metrics_peers[meta_packet.direction as usize];
         flow_metrics_peer.packet_count += 1;
         flow_metrics_peer.total_packet_count += 1;
@@ -961,13 +969,6 @@ impl FlowMap {
                 .unwrap()
                 .clone();
             flow_metrics_peer.nat_real_port = meta_packet.lookup_key.nat_client_port;
-        }
-        if meta_packet.gpid_0 > 0 {
-            flow_metrics_peer.gpid = meta_packet.gpid_0;
-        }
-        if meta_packet.gpid_1 > 0 {
-            flow.flow_metrics_peers[meta_packet.direction.reversed() as usize].gpid =
-                meta_packet.gpid_1
         }
 
         if meta_packet.vlan > 0 {

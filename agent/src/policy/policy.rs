@@ -65,11 +65,20 @@ impl PolicyMonitor {
         }
     }
 
-    pub fn send_ebpf(&self, src_ip: IpAddr, dst_ip: IpAddr, src_epc: i32, dst_epc: i32) {
+    pub fn send_ebpf(
+        &self,
+        src_ip: IpAddr,
+        dst_ip: IpAddr,
+        src_port: u16,
+        dst_port: u16,
+        src_epc: i32,
+        dst_epc: i32,
+        gpids: (u32, u32),
+    ) {
         if self.enabled.load(Ordering::Relaxed) {
             let _ = self.sender.send(format!(
-                "EBPF {}:{} > {}:{}",
-                src_ip, src_epc, dst_ip, dst_epc
+                "EBPF: IP {} > {} PORT {} > {} L3EPC {} > {} GPID {} > {}",
+                src_ip, dst_ip, src_port, dst_port, src_epc, dst_epc, gpids.0, gpids.1,
             ));
         }
     }
@@ -153,18 +162,11 @@ impl Policy {
         let key = &mut packet.lookup_key;
 
         if packet.signal_source == SignalSource::EBPF {
-            let (l3_epc_id_0, l3_epc_id_1) = if key.l2_end_0 {
-                (local_epc_id, 0)
-            } else {
-                (0, local_epc_id)
-            };
-            packet.endpoint_data = Some(Arc::new(self.lookup_all_by_epc(
-                key.src_ip,
-                key.dst_ip,
-                l3_epc_id_0,
-                l3_epc_id_1,
-            )));
+            let (endpoints, gpid_0, gpid_1) = self.lookup_all_by_epc(key, local_epc_id);
+            packet.endpoint_data = Some(Arc::new(endpoints));
             packet.policy_data = Some(Arc::new(PolicyData::default())); // Only endpoint is required for ebpf data
+            packet.gpid_0 = gpid_0;
+            packet.gpid_1 = gpid_1;
             return;
         }
 
@@ -192,12 +194,21 @@ impl Policy {
         }
     }
 
-    fn send_ebpf(&self, src_ip: IpAddr, dst_ip: IpAddr, src_epc: i32, dst_epc: i32) {
+    fn send_ebpf(
+        &self,
+        src_ip: IpAddr,
+        dst_ip: IpAddr,
+        src_port: u16,
+        dst_port: u16,
+        src_epc: i32,
+        dst_epc: i32,
+        gpid: (u32, u32),
+    ) {
         if self.monitor.is_some() {
             self.monitor
                 .as_ref()
                 .unwrap()
-                .send_ebpf(src_ip, dst_ip, src_epc, dst_epc);
+                .send_ebpf(src_ip, dst_ip, src_port, dst_port, src_epc, dst_epc, gpid);
         }
     }
 
@@ -225,25 +236,50 @@ impl Policy {
         return Some((x.0, x.1, gpids.0, gpids.1));
     }
 
-    pub fn lookup_all_by_epc(
-        &mut self,
-        src: IpAddr,
-        dst: IpAddr,
-        l3_epc_id_src: i32,
-        l3_epc_id_dst: i32,
-    ) -> EndpointData {
+    fn lookup_epc_by_epc(&mut self, src: IpAddr, dst: IpAddr, l3_epc_id_src: i32) -> i32 {
         // TODO：可能也需要走fast提升性能
-        let endpoints =
-            self.labeler
-                .get_endpoint_data_by_epc(src, dst, l3_epc_id_src, l3_epc_id_dst);
+        let endpoints = self
+            .labeler
+            .get_endpoint_data_by_epc(src, dst, l3_epc_id_src, 0);
         self.send_ebpf(
             src,
             dst,
+            0,
+            0,
             endpoints.src_info.l3_epc_id,
             endpoints.dst_info.l3_epc_id,
+            (0, 0),
         );
 
-        endpoints
+        endpoints.dst_info.l3_epc_id
+    }
+
+    fn lookup_all_by_epc(
+        &mut self,
+        key: &mut LookupKey,
+        local_epc_id: i32,
+    ) -> (EndpointData, u32, u32) {
+        // TODO：可能也需要走fast提升性能
+        let (l3_epc_id_0, l3_epc_id_1) = if key.l2_end_0 {
+            (local_epc_id, 0)
+        } else {
+            (0, local_epc_id)
+        };
+        let endpoints =
+            self.labeler
+                .get_endpoint_data_by_epc(key.src_ip, key.dst_ip, l3_epc_id_0, l3_epc_id_1);
+        let gpids = self.lookup_gpid(key, &endpoints);
+        self.send_ebpf(
+            key.src_ip,
+            key.dst_ip,
+            key.src_port,
+            key.dst_port,
+            endpoints.src_info.l3_epc_id,
+            endpoints.dst_info.l3_epc_id,
+            gpids,
+        );
+
+        (endpoints, gpids.0, gpids.1)
     }
 
     pub fn update_interfaces(
@@ -283,7 +319,7 @@ impl Policy {
         Ok(())
     }
 
-    fn lookup_gpid(&self, key: &mut LookupKey, _endpoints: &Arc<EndpointData>) -> (u32, u32) {
+    fn lookup_gpid(&self, key: &mut LookupKey, _endpoints: &EndpointData) -> (u32, u32) {
         if !key.is_ipv4() || (key.proto != IpProtocol::Udp && key.proto != IpProtocol::Tcp) {
             return (0, 0);
         }
@@ -392,15 +428,8 @@ impl PolicyGetter {
         self.policy().lookup_all_by_key(key)
     }
 
-    pub fn lookup_all_by_epc(
-        &mut self,
-        src: IpAddr,
-        dst: IpAddr,
-        l3_epc_id_src: i32,
-        l3_epc_id_dst: i32,
-    ) -> EndpointData {
-        self.policy()
-            .lookup_all_by_epc(src, dst, l3_epc_id_src, l3_epc_id_dst)
+    pub fn lookup_epc_by_epc(&mut self, src: IpAddr, dst: IpAddr, l3_epc_id_src: i32) -> i32 {
+        self.policy().lookup_epc_by_epc(src, dst, l3_epc_id_src)
     }
 }
 
