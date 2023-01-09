@@ -45,6 +45,7 @@ type Aliyun struct {
 	httpTimeout    int
 	includeRegions []string
 	excludeRegions []string
+	vpcIDToLcuuids map[string]string
 
 	// 以下两个字段的作用：消除公有云的无资源的区域和可用区
 	regionLcuuidToResourceNum map[string]int
@@ -106,6 +107,8 @@ func NewAliyun(domain mysql.Domain, cfg cloudconfig.CloudConfig) (*Aliyun, error
 		regionLcuuidToResourceNum: make(map[string]int),
 		azLcuuidToResourceNum:     make(map[string]int),
 
+		vpcIDToLcuuids: map[string]string{},
+
 		debugger: cloudcommon.NewDebugger(domain.Name),
 	}, nil
 }
@@ -160,6 +163,7 @@ func (a *Aliyun) GetCloudData() (model.Resource, error) {
 	var redisInstances []model.RedisInstance
 	var rdsInstances []model.RDSInstance
 	var cens []model.CEN
+	var subDomains []model.SubDomain
 
 	regions, err := a.getRegions()
 	if err != nil {
@@ -168,6 +172,7 @@ func (a *Aliyun) GetCloudData() (model.Resource, error) {
 	}
 	for _, region := range regions {
 		log.Infof("get region (%s) data starting", region.Name)
+		a.vpcIDToLcuuids = map[string]string{}
 
 		// 可用区
 		tmpAZs, err := a.getAZs(region)
@@ -285,6 +290,14 @@ func (a *Aliyun) GetCloudData() (model.Resource, error) {
 		vinterfaces = append(vinterfaces, tmpVInterfaces...)
 		ips = append(ips, tmpIPs...)
 
+		// 附属容器集群
+		sDomains, err := a.getSubDomains(region)
+		if err != nil {
+			log.Error("get sub_domain data failed")
+			return resource, err
+		}
+		subDomains = append(subDomains, sDomains...)
+
 		log.Infof("get region (%s) data completed", region.Name)
 	}
 
@@ -310,6 +323,7 @@ func (a *Aliyun) GetCloudData() (model.Resource, error) {
 	resource.RedisInstances = redisInstances
 	resource.RDSInstances = rdsInstances
 	resource.CENs = cens
+	resource.SubDomains = subDomains
 	a.debugger.Refresh()
 	return resource, err
 }

@@ -58,13 +58,15 @@ func (a *Aws) getVPCs(region awsRegion) ([]model.VPC, error) {
 		if vpcName == "" {
 			vpcName = vpcID
 		}
+		vpcLcuuid := common.GetUUID(vpcID, uuid.Nil)
 		vpcs = append(vpcs, model.VPC{
-			Lcuuid:       common.GetUUID(vpcID, uuid.Nil),
+			Lcuuid:       vpcLcuuid,
 			Name:         vpcName,
 			CIDR:         a.getStringPointerValue(vData.CidrBlock),
 			Label:        vpcID,
 			RegionLcuuid: a.getRegionLcuuid(region.lcuuid),
 		})
+		a.vpcIDToLcuuid[vpcID] = vpcLcuuid
 	}
 	log.Debug("get vpcs complete")
 	return vpcs, nil
