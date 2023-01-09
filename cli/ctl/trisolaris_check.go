@@ -33,6 +33,7 @@ import (
 
 	"github.com/deepflowys/deepflow/cli/ctl/common"
 	"github.com/deepflowys/deepflow/message/trident"
+	"github.com/deepflowys/deepflow/server/libs/utils"
 )
 
 type ParamData struct {
@@ -53,29 +54,29 @@ type CmdExecute func(response *trident.SyncResponse)
 
 func regiterCommand() []*cobra.Command {
 	platformDataCmd := &cobra.Command{
-		Use:   "platformdata",
-		Short: "get platformdata from deepflow-server",
+		Use:   "platform-data",
+		Short: "get platform-data from deepflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
 			initCmd(cmd, []CmdExecute{platformData})
 		},
 	}
 	ipGroupsCmd := &cobra.Command{
-		Use:   "ipgroups",
-		Short: "get ipgroups from deepflow-servr",
+		Use:   "ip-groups",
+		Short: "get ip groups from deepflow-servr",
 		Run: func(cmd *cobra.Command, args []string) {
 			initCmd(cmd, []CmdExecute{ipGroups})
 		},
 	}
 	flowAclsCmd := &cobra.Command{
-		Use:   "flowacls",
-		Short: "get flowacls from deepflow-server",
+		Use:   "flow-acls",
+		Short: "get flow-acls from deepflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
 			initCmd(cmd, []CmdExecute{flowAcls})
 		},
 	}
 	tapTypesCmd := &cobra.Command{
-		Use:   "taptypes",
-		Short: "get taptypes from deepflow-server",
+		Use:   "tap-types",
+		Short: "get tap-types from deepflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
 			initCmd(cmd, []CmdExecute{tapTypes})
 		},
@@ -88,8 +89,8 @@ func regiterCommand() []*cobra.Command {
 		},
 	}
 	vpcIPCmd := &cobra.Command{
-		Use:   "vpcip",
-		Short: "get vpcip from deepflow-server",
+		Use:   "vpc-ip",
+		Short: "get vpc-ip from deepflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
 			initCmd(cmd, []CmdExecute{vpcIP})
 		},
@@ -102,39 +103,39 @@ func regiterCommand() []*cobra.Command {
 		},
 	}
 	skipInterfaceCmd := &cobra.Command{
-		Use:   "skipinterface",
-		Short: "get skipinterface from deepflow-server",
+		Use:   "skip-interface",
+		Short: "get skip-interface from deepflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
 			initCmd(cmd, []CmdExecute{skipInterface})
 		},
 	}
 	localServersCmd := &cobra.Command{
-		Use:   "localServers",
-		Short: "get localServers from deepflow-server",
+		Use:   "local-servers",
+		Short: "get local-servers from deepflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
 			initCmd(cmd, []CmdExecute{localServers})
 		},
 	}
-	gpidSyncCmd := &cobra.Command{
-		Use:   "gpidsync",
-		Short: "get gpidsync from deepflow-server",
+	gpidAgentResponseCmd := &cobra.Command{
+		Use:   "gpid-agent-response",
+		Short: "get gpid-agent-response from deepflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
-			gpidSync(cmd)
+			gpidAgentResponse(cmd)
 		},
 	}
-	gpidGlobalCmd := &cobra.Command{
-		Use:   "gpidgloballocaldata",
-		Short: "get gpidgloballocaldata from deepflow-server",
+	gpidGlobalTableCmd := &cobra.Command{
+		Use:   "gpid-global-table",
+		Short: "get gpid-global-table from deepflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
-			gpidGlobalLocalData(cmd)
+			gpidGlobalTable(cmd)
 		},
 	}
 
-	gpidVTapCmd := &cobra.Command{
-		Use:   "gpidvtaplocaldata",
-		Short: "get gpidvtaplocaldata from deepflow-server",
+	gpidAgentRequestCmd := &cobra.Command{
+		Use:   "gpid-agent-request",
+		Short: "get gpid-agent-request from deepflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
-			gpidVTapLocalData(cmd)
+			gpidAgentRequest(cmd)
 		},
 	}
 
@@ -149,7 +150,7 @@ func regiterCommand() []*cobra.Command {
 
 	commands := []*cobra.Command{platformDataCmd, ipGroupsCmd, flowAclsCmd,
 		tapTypesCmd, configCmd, segmentsCmd, vpcIPCmd, skipInterfaceCmd,
-		localServersCmd, gpidSyncCmd, gpidGlobalCmd, gpidVTapCmd, allCmd}
+		localServersCmd, gpidAgentResponseCmd, gpidGlobalTableCmd, gpidAgentRequestCmd, allCmd}
 	return commands
 }
 
@@ -228,7 +229,7 @@ func initCmd(cmd *cobra.Command, cmds []CmdExecute) {
 	}
 }
 
-func gpidSync(cmd *cobra.Command) {
+func gpidAgentResponse(cmd *cobra.Command) {
 	conn := getConn(cmd)
 	if conn == nil {
 		return
@@ -246,12 +247,28 @@ func gpidSync(cmd *cobra.Command) {
 		return
 	}
 	fmt.Println("gpid:")
-	for index, entry := range response.GetEntries() {
-		JsonFormat(index+1, entry)
+	str := formatEntries(response.Entries)
+	if str != "" {
+		fmt.Print(str)
 	}
 }
 
-func gpidGlobalLocalData(cmd *cobra.Command) {
+func formatEntries(entries []*trident.GPIDSyncEntry) string {
+	buffer := bytes.Buffer{}
+	format := "%d: {protocol: %d, epc_id_1: %d, ipv4_1: %s, port_1: %d, pid_1: %d, " +
+		"epc_id_0: %d, ipv4_0: %s, port_0: %d, pid_0: %d, epc_id_real: %d, " +
+		"ipv4_real: %d, port_real: %d, pid_real: %d, role: %d}\n"
+	for index, entry := range entries {
+		buffer.WriteString(fmt.Sprintf(format,
+			index, entry.GetProtocol(), entry.GetEpcId_1(), utils.IpFromUint32(entry.GetIpv4_1()).String(), entry.GetPort_1(), entry.GetPid_1(),
+			entry.GetEpcId_0(), utils.IpFromUint32(entry.GetIpv4_0()).String(), entry.GetPort_0(), entry.GetPid_0(), entry.GetEpcIdReal(),
+			entry.GetIpv4Real(), entry.GetPortReal(), entry.GetPidReal(), entry.GetRole()),
+		)
+	}
+	return buffer.String()
+}
+
+func gpidGlobalTable(cmd *cobra.Command) {
 	conn := getConn(cmd)
 	if conn == nil {
 		return
@@ -271,7 +288,7 @@ func gpidGlobalLocalData(cmd *cobra.Command) {
 	}
 }
 
-func gpidVTapLocalData(cmd *cobra.Command) {
+func gpidAgentRequest(cmd *cobra.Command) {
 	conn := getConn(cmd)
 	if conn == nil {
 		return
@@ -289,9 +306,10 @@ func gpidVTapLocalData(cmd *cobra.Command) {
 		return
 	}
 	fmt.Printf("response(ctrl_ip: %s ctrl_mac: %s vtap_id: %d)\n", response.GetCtrlIp(), response.GetCtrlMac(), response.GetVtapId())
-	fmt.Println("Entries:")
-	for index, entry := range response.GetEntries() {
-		JsonFormat(index+1, entry)
+	str := formatEntries(response.Entries)
+	if str != "" {
+		fmt.Println("Entries:")
+		fmt.Print(str)
 	}
 }
 
