@@ -247,24 +247,21 @@ func gpidAgentResponse(cmd *cobra.Command) {
 		return
 	}
 	fmt.Println("gpid:")
-	str := formatEntries(response.Entries)
-	if str != "" {
-		fmt.Print(str)
+	for index, entry := range response.Entries {
+		JsonFormat(index+1, formatEntries(entry))
 	}
 }
 
-func formatEntries(entries []*trident.GPIDSyncEntry) string {
+func formatEntries(entry *trident.GPIDSyncEntry) string {
 	buffer := bytes.Buffer{}
-	format := "%d: {protocol: %d, epc_id_1: %d, ipv4_1: %s, port_1: %d, pid_1: %d, " +
+	format := "{protocol: %d, epc_id_1: %d, ipv4_1: %s, port_1: %d, pid_1: %d, " +
 		"epc_id_0: %d, ipv4_0: %s, port_0: %d, pid_0: %d, epc_id_real: %d, " +
-		"ipv4_real: %d, port_real: %d, pid_real: %d, role: %d}\n"
-	for index, entry := range entries {
-		buffer.WriteString(fmt.Sprintf(format,
-			index, entry.GetProtocol(), entry.GetEpcId_1(), utils.IpFromUint32(entry.GetIpv4_1()).String(), entry.GetPort_1(), entry.GetPid_1(),
-			entry.GetEpcId_0(), utils.IpFromUint32(entry.GetIpv4_0()).String(), entry.GetPort_0(), entry.GetPid_0(), entry.GetEpcIdReal(),
-			entry.GetIpv4Real(), entry.GetPortReal(), entry.GetPidReal(), entry.GetRole()),
-		)
-	}
+		"ipv4_real: %s, port_real: %d, pid_real: %d, role: %d}"
+	buffer.WriteString(fmt.Sprintf(format,
+		entry.GetProtocol(), entry.GetEpcId_1(), utils.IpFromUint32(entry.GetIpv4_1()).String(), entry.GetPort_1(), entry.GetPid_1(),
+		entry.GetEpcId_0(), utils.IpFromUint32(entry.GetIpv4_0()).String(), entry.GetPort_0(), entry.GetPid_0(), entry.GetEpcIdReal(),
+		utils.IpFromUint32(entry.GetIpv4Real()).String(), entry.GetPortReal(), entry.GetPidReal(), entry.GetRole()),
+	)
 	return buffer.String()
 }
 
@@ -306,10 +303,9 @@ func gpidAgentRequest(cmd *cobra.Command) {
 		return
 	}
 	fmt.Printf("response(ctrl_ip: %s ctrl_mac: %s vtap_id: %d)\n", response.GetCtrlIp(), response.GetCtrlMac(), response.GetVtapId())
-	str := formatEntries(response.Entries)
-	if str != "" {
-		fmt.Println("Entries:")
-		fmt.Print(str)
+	fmt.Println("Entries:")
+	for index, entry := range response.Entries {
+		JsonFormat(index+1, formatEntries(entry))
 	}
 }
 
