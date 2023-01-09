@@ -26,7 +26,9 @@ mod windows;
 #[cfg(target_os = "windows")]
 mod windows_process;
 
-use std::{fs::symlink_metadata, os::linux::fs::MetadataExt, path::PathBuf};
+#[cfg(target_os = "linux")]
+use std::os::linux::fs::MetadataExt;
+use std::{fs::symlink_metadata, path::PathBuf};
 
 #[cfg(target_os = "windows")]
 pub use self::windows::*;
