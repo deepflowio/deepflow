@@ -443,17 +443,11 @@ fn divide_tcp_entry(
                     port: t.local_address.port(),
                 },
                 remote: SockAddrData {
-                    epc_id: convert_i32_epc_id(
-                        policy_getter
-                            .lookup_all_by_epc(
-                                t.local_address.ip(),
-                                t.remote_address.ip(),
-                                local_epc_id as i32,
-                                0,
-                            )
-                            .dst_info
-                            .l3_epc_id,
-                    ),
+                    epc_id: convert_i32_epc_id(policy_getter.lookup_epc_by_epc(
+                        t.local_address.ip(),
+                        t.remote_address.ip(),
+                        local_epc_id as i32,
+                    )),
                     ip: t.remote_address.ip(),
                     port: t.remote_address.port(),
                 },
@@ -512,17 +506,11 @@ fn divide_udp_entry(
                     port: u.local_address.port(),
                 },
                 remote: SockAddrData {
-                    epc_id: convert_i32_epc_id(
-                        policy_getter
-                            .lookup_all_by_epc(
-                                u.local_address.ip(),
-                                u.remote_address.ip(),
-                                local_epc_id as i32,
-                                0,
-                            )
-                            .dst_info
-                            .l3_epc_id,
-                    ),
+                    epc_id: convert_i32_epc_id(policy_getter.lookup_epc_by_epc(
+                        u.local_address.ip(),
+                        u.remote_address.ip(),
+                        local_epc_id as i32,
+                    )),
                     ip: u.remote_address.ip(),
                     port: u.remote_address.port(),
                 },
