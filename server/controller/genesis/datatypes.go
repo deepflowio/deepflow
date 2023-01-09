@@ -185,6 +185,9 @@ func (g *GenesisSyncTypeOperation[T]) Save() {
 	var items []T
 	for _, data := range g.dataDict {
 		tData := reflect.ValueOf(&data).Elem()
+		if tData.Type().String() == "model.GenesisProcess" && tData.FieldByName("VtapID").Uint() == 0 {
+			continue
+		}
 		nodeIP := tData.FieldByName("NodeIP")
 		nodeIPString := os.Getenv(common.NODE_IP_KEY)
 		nodeIP.SetString(nodeIPString)
