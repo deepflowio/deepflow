@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+use std::fmt::Debug;
 use std::net::IpAddr;
 
 use enum_dispatch::enum_dispatch;
@@ -537,7 +538,7 @@ pub fn get_parse_bitmap(protocol: IpProtocol, l7_enabled: L7ProtocolBitmap) -> L
     when bit set 0 should skip the protocol check.
     so the protocol number can not exceed 127.
 */
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct L7ProtocolBitmap(u128);
 
 impl L7ProtocolBitmap {
@@ -567,5 +568,17 @@ impl From<&Vec<String>> for L7ProtocolBitmap {
             }
         }
         bitmap
+    }
+}
+
+impl Debug for L7ProtocolBitmap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut p = vec![];
+        for i in get_all_protocol() {
+            if self.is_enabled(i.protocol()) {
+                p.push(i.protocol());
+            }
+        }
+        f.write_str(format!("{:#?}", p).as_str())
     }
 }
