@@ -169,16 +169,12 @@ impl Policy {
         }
 
         // 策略查序会改变端口，为不影响后续业务， 这里保存
-        let src_port = key.src_port;
-        let dst_port = key.dst_port;
         if let Some((policy, endpoints, gpid_0, gpid_1)) = self.lookup_all_by_key(key) {
             packet.policy_data = Some(policy);
             packet.endpoint_data = Some(endpoints);
             packet.gpid_0 = gpid_0;
             packet.gpid_1 = gpid_1;
         }
-        key.src_port = src_port;
-        key.dst_port = dst_port;
     }
 
     fn send(
@@ -209,7 +205,11 @@ impl Policy {
         &mut self,
         key: &mut LookupKey,
     ) -> Option<(Arc<PolicyData>, Arc<EndpointData>, u32, u32)> {
+        let src_port = key.src_port;
+        let dst_port = key.dst_port;
         if let Some(x) = self.table.fast_get(key) {
+            key.src_port = src_port;
+            key.dst_port = dst_port;
             let gpids = self.lookup_gpid(key, &x.1);
             self.fast_hit += 1;
             self.send(key, &x.0, &x.1, gpids);
@@ -218,6 +218,8 @@ impl Policy {
         self.first_hit += 1;
         let endpoints = self.labeler.get_endpoint_data(key);
         let x = self.table.first_get(key, endpoints).unwrap();
+        key.src_port = src_port;
+        key.dst_port = dst_port;
         let gpids = self.lookup_gpid(key, &x.1);
         self.send(key, &x.0, &x.1, gpids);
         return Some((x.0, x.1, gpids.0, gpids.1));
