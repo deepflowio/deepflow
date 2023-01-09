@@ -937,7 +937,9 @@ impl SocketSynchronizer {
 
             {
                 let conf_guard = config.load();
-                sync_interval = conf_guard.sync_interval;
+                sync_interval = Duration::from_secs(
+                    conf_guard.os_proc_scan_conf.os_proc_socket_sync_interval as u64,
+                );
 
                 let ctl_mac = running_config.read().ctrl_mac.clone();
                 let mut policy_getter = policy_getter.lock().unwrap();
