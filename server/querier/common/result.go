@@ -36,12 +36,12 @@ func (c *ColumnSchema) ToMap() map[string]interface{} {
 		"unit":       c.Unit,
 		"type":       c.Type,
 		"value_type": c.ValueType,
-		"preas":      c.PreAS,
+		"pre_as":     c.PreAS,
 	}
 }
 
-func NewColumnSchema(name, preas string) *ColumnSchema {
-	return &ColumnSchema{Name: strings.Trim(name, "`"), PreAS: preas}
+func NewColumnSchema(name, preAS string) *ColumnSchema {
+	return &ColumnSchema{Name: strings.Trim(name, "`"), PreAS: preAS}
 }
 
 type ColumnSchemas []*ColumnSchema
