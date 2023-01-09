@@ -28,7 +28,6 @@ func (h *HuaWei) getNetworks() ([]model.Network, []model.Subnet, []model.VInterf
 	var networks []model.Network
 	var subnets []model.Subnet
 	var vifs []model.VInterface
-	h.toolDataSet.networkLcuuidToSubnetLcuuid[common.NETWORK_ISP_LCUUID] = common.GenerateUUID(common.NETWORK_ISP_LCUUID)
 
 	requiredAttrs := []string{"id", "name", "cidr", "vpc_id", "availability_zone"}
 	for project, token := range h.projectTokenMap {

@@ -363,7 +363,10 @@ func (b *DiffBaseDataSet) deleteVInterface(lcuuid string) {
 }
 
 func (b *DiffBaseDataSet) addWANIP(dbItem *mysql.WANIP, seq int, toolDataSet *ToolDataSet) {
-	subnetLcuuid, _ := toolDataSet.GetSubnetLcuuidByID(dbItem.SubnetID)
+	var subnetLcuuid string
+	if dbItem.SubnetID != 0 {
+		subnetLcuuid, _ = toolDataSet.GetSubnetLcuuidByID(dbItem.SubnetID)
+	}
 	b.WANIPs[dbItem.Lcuuid] = &WANIP{
 		DiffBase: DiffBase{
 			Sequence: seq,
@@ -787,7 +790,10 @@ func (b *DiffBaseDataSet) deletePodIngressRuleBackend(lcuuid string) {
 }
 
 func (b *DiffBaseDataSet) addPodService(dbItem *mysql.PodService, seq int, toolDataSet *ToolDataSet) {
-	podIngressLcuuid, _ := toolDataSet.GetPodIngressLcuuidByID(dbItem.PodIngressID)
+	var podIngressLcuuid string
+	if dbItem.PodIngressID != 0 {
+		podIngressLcuuid, _ = toolDataSet.GetPodIngressLcuuidByID(dbItem.PodIngressID)
+	}
 	b.PodServices[dbItem.Lcuuid] = &PodService{
 		DiffBase: DiffBase{
 			Sequence: seq,

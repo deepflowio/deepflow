@@ -55,13 +55,15 @@ func (r *VRouter) ProduceByAdd(items []*mysql.VRouter) {
 			}...)
 		}
 
-		hostID, ok := r.ToolDataSet.GetHostIDByIP(item.GWLaunchServer)
-		if !ok {
-			log.Error(idByIPNotFound(RESOURCE_TYPE_HOST_EN, item.GWLaunchServer))
-		} else {
-			opts = append(opts, []eventapi.TagFieldOption{
-				eventapi.TagHostID(hostID),
-			}...)
+		if item.GWLaunchServer != "" {
+			hostID, ok := r.ToolDataSet.GetHostIDByIP(item.GWLaunchServer)
+			if !ok {
+				log.Error(idByIPNotFound(RESOURCE_TYPE_HOST_EN, item.GWLaunchServer))
+			} else {
+				opts = append(opts, []eventapi.TagFieldOption{
+					eventapi.TagHostID(hostID),
+				}...)
+			}
 		}
 
 		opts = append(opts, []eventapi.TagFieldOption{

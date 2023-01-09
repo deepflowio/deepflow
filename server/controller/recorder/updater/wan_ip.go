@@ -95,15 +95,19 @@ func (i *WANIP) generateUpdateInfo(diffBase *cache.WANIP, cloudItem *cloudmodel.
 		updateInfo["region"] = cloudItem.RegionLcuuid
 	}
 	if diffBase.SubnetLcuuid != cloudItem.SubnetLcuuid {
-		subnetID, exists := i.cache.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
-		if !exists {
-			log.Error(resourceAForResourceBNotFound(
-				common.RESOURCE_TYPE_SUBNET_EN, cloudItem.SubnetLcuuid,
-				common.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid,
-			))
-			return nil, false
+		if cloudItem.SubnetLcuuid == "" {
+			updateInfo["vl2_net_id"] = 0
+		} else {
+			subnetID, exists := i.cache.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
+			if !exists {
+				log.Error(resourceAForResourceBNotFound(
+					common.RESOURCE_TYPE_SUBNET_EN, cloudItem.SubnetLcuuid,
+					common.RESOURCE_TYPE_WAN_IP_EN, cloudItem.Lcuuid,
+				))
+				return nil, false
+			}
+			updateInfo["vl2_net_id"] = subnetID
 		}
-		updateInfo["vl2_net_id"] = subnetID
 	}
 
 	return updateInfo, len(updateInfo) > 0
