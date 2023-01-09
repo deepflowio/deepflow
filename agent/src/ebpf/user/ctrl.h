@@ -79,6 +79,7 @@ struct datadump_msg {
 	bool enable;		// Whether to enable the datadump ?
 	bool is_params;		// Is it set pid or comm ?
 	bool only_stdout;	// Whether to dump data to stdout ?
+	int timeout;
 	int pid;
 	uint8_t proto;
 	char comm[16];

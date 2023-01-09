@@ -43,6 +43,7 @@ struct df_bpf_conf {
 	int stats;
 	int interval;
 	int count;
+	int timeout;
 	bool color;
 	bool only_stdout;
 	char *obj;
@@ -100,12 +101,13 @@ static void datadump_help(void)
 	fprintf(stderr, "    '':  The process name or thread name is not restricted.\n");
 	fprintf(stderr, "Options:\n");
 	fprintf(stderr, "    '-O, --only-stdout':  dump to stdout only.\n");
+	fprintf(stderr, "    '-t, --timeout':      set datadump timout. Unit: second\n");
 	fprintf(stderr, "For example:\n");
 	fprintf(stderr, "    %s datadump set pid 4567 comm curl proto 0\n",
 		DF_BPF_NAME);
 	fprintf(stderr, "    %s datadump set pid 4567 comm '' proto 20\n", DF_BPF_NAME);
-	fprintf(stderr, "    %s datadump on\n", DF_BPF_NAME);
-	fprintf(stderr, "    %s datadump on --only-stdout\n", DF_BPF_NAME);
+	fprintf(stderr, "    %s datadump on --timeout 60\n", DF_BPF_NAME);
+	fprintf(stderr, "    %s datadump on --only-stdout --timeout 60\n", DF_BPF_NAME);
 	fprintf(stderr, "    %s datadump off\n", DF_BPF_NAME);
 }
 
@@ -488,6 +490,7 @@ static int datadump_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 			memset(msg.comm, 0, sizeof(msg.comm));
 			msg.is_params = false;
 			msg.only_stdout = conf->only_stdout;
+			msg.timeout = conf->timeout;
 			if (conf->cmd == DF_BPF_CMD_ON
 			    || conf->cmd == DF_BPF_CMD_OFF) {
 				if (conf->argc != 0) {
@@ -496,7 +499,12 @@ static int datadump_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 				}
 				if (conf->cmd == DF_BPF_CMD_ON) {
 					msg.enable = true;
-					printf("Set datadump on ");
+					if (msg.timeout == 0) {
+						printf("Miss --timeout setting.\n");
+						return ETR_NOTSUPP;
+					}
+					printf("Set datadump on, timeout %ds ",
+					       msg.timeout);
 				} else {
 					msg.enable = false;
 					printf("Set datadump off ");
@@ -645,19 +653,21 @@ static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 		{"version", no_argument, NULL, 'V'},
 		{"color", no_argument, NULL, 'C'},
 		{"only-stdout", no_argument, NULL, 'O'},
+		{"timeout", required_argument, NULL, 't'},
 		{NULL, 0, NULL, 0},
 	};
 
 	memset(conf, 0, sizeof(*conf));
 	conf->af = AF_UNSPEC;
 	conf->only_stdout = false;
+	conf->timeout = 0;
 
 	if (argc <= 1) {
 		usage();
 		exit(0);
 	}
 
-	while ((opt = getopt_long(argc, argv, "vhVCO", opts, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "vhVCOt:", opts, NULL)) != -1) {
 		switch (opt) {
 		case 'v':
 			conf->verbose = 1;
@@ -673,6 +683,13 @@ static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 			break;
 		case 'O':
 			conf->only_stdout = true;
+			break;
+		case 't':
+			conf->timeout = atoi(optarg);
+			if (conf->timeout <= 0) {
+				fprintf(stderr, "Invalid option: --timeout");
+				return -1;
+			}
 			break;
 		case '?':
 		default:

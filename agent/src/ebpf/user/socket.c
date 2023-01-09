@@ -54,6 +54,8 @@ static uint32_t conf_max_trace_entries;
  */
 static bool datadump_enable;
 static int datadump_pid; // If the value is 0, process-ID/thread-ID filtering is not performed.
+static uint32_t datadump_start_time;
+static uint32_t datadump_timeout;
 static char datadump_comm[16]; // If null, process or thread name filtering is not performed.
 static uint8_t datadump_proto;
 static char datadump_file_path[DATADUMP_FILE_PATH_SIZE];
@@ -397,8 +399,15 @@ static int datadump_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
 			}
 		}
 
+		if (msg->enable) {
+			datadump_start_time = get_sys_uptime();
+			datadump_timeout = msg->timeout;
+		}
+
 		datadump_enable = msg->enable;
 		if (!datadump_enable) {
+			datadump_start_time = 0;
+			datadump_timeout = 0;
 			datadump_pid = 0;
 			datadump_comm[0] = '\0';
 			datadump_proto = 0;
@@ -1876,6 +1885,18 @@ static void print_socket_data(struct socket_bpf_data *sd)
 #define OUTPUT_DATA_SIZE 128
 
 	bool output = false;
+	uint32_t passed_sec = get_sys_uptime() - datadump_start_time;
+	if (passed_sec > datadump_timeout) {
+		datadump_start_time = 0;
+		datadump_enable = false;
+		datadump_timeout = 0;
+		datadump_pid = 0;
+		datadump_comm[0] = '\0';
+		datadump_proto = 0;
+		memcpy(datadump_file_path, "stdout", 7);
+		datadump_file = stdout;
+		return;
+	}
 
 	if (datadump_pid == 0 && (strlen(datadump_comm) > 0)
 	    && (datadump_proto == 0)) {
