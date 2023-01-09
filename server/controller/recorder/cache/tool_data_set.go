@@ -272,8 +272,10 @@ func (t *ToolDataSet) addVM(item *mysql.VM) {
 	if azID, ok := t.GetAZIDByLcuuid(item.AZ); ok {
 		t.vmIDToInfo[item.ID].AZID = azID
 	}
-	if hostID, ok := t.GetHostIDByIP(item.LaunchServer); ok {
-		t.vmIDToInfo[item.ID].HostID = hostID
+	if item.LaunchServer != "" {
+		if hostID, ok := t.GetHostIDByIP(item.LaunchServer); ok {
+			t.vmIDToInfo[item.ID].HostID = hostID
+		}
 	}
 	log.Info(addToToolMap(RESOURCE_TYPE_VM_EN, item.Lcuuid))
 }
