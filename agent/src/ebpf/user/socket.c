@@ -2001,6 +2001,8 @@ static void print_socket_data(struct socket_bpf_data *sd)
 			print_dns_info(sd->cap_data, sd->cap_len);
 		} else if (sd->source == 2) {
 			print_uprobe_http2_info(sd->cap_data, sd->cap_len);
+		} else if (sd->source == 4) {
+			print_io_event_info(sd->cap_data, sd->cap_len);
 		} else {
 			int i, len = 0, __len;
 			char output_buf[OUTPUT_DATA_SIZE];
