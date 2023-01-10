@@ -19,8 +19,10 @@ package dbwriter
 import (
 	"fmt"
 
+	"github.com/deepflowys/deepflow/server/ingester/common"
 	"github.com/deepflowys/deepflow/server/libs/ckdb"
 	"github.com/deepflowys/deepflow/server/libs/pool"
+	"github.com/deepflowys/deepflow/server/libs/utils"
 )
 
 const (
@@ -43,7 +45,7 @@ func PcapStoreColumns() []*ckdb.Column {
 		ckdb.NewColumn("flow_id", ckdb.UInt64).SetIndex(ckdb.IndexMinmax),
 		ckdb.NewColumn("vtap_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
 		ckdb.NewColumn("pcap_count", ckdb.UInt32).SetIndex(ckdb.IndexNone),
-		ckdb.NewColumn("pcap_batch", ckdb.ArrayUInt8).SetIndex(ckdb.IndexNone).SetComment("data format reference: https://www.ietf.org/archive/id/draft-gharris-opsawg-pcap-01.html"),
+		ckdb.NewColumn("pcap_batch", ckdb.String).SetIndex(ckdb.IndexNone).SetComment("data format reference: https://www.ietf.org/archive/id/draft-gharris-opsawg-pcap-01.html"),
 	}
 }
 
@@ -54,7 +56,7 @@ func (s *PcapStore) WriteBlock(block *ckdb.Block) {
 		s.FlowID,
 		s.VtapID,
 		s.PcapCount,
-		s.PcapBatch)
+		utils.String(s.PcapBatch))
 }
 
 func (p *PcapStore) Release() {
@@ -87,9 +89,10 @@ func ReleasePcapStore(l *PcapStore) {
 func GenPcapCKTable(cluster, storagePolicy string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
 	timeKey := "time"
 	engine := ckdb.MergeTree
-	orderKeys := []string{"vtap_id", "flow_id", timeKey}
+	orderKeys := []string{"flow_id", "vtap_id", timeKey}
 
 	return &ckdb.Table{
+		Version:         common.CK_VERSION,
 		Database:        PCAP_DB,
 		LocalName:       PCAP_TABLE + ckdb.LOCAL_SUBFFIX,
 		GlobalName:      PCAP_TABLE,

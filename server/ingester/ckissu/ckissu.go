@@ -54,11 +54,13 @@ type TableRename struct {
 }
 
 type ColumnRename struct {
-	Db            string
-	Table         string
-	OldColumnName string
-	NewColumnName string
-	DropIndex     bool
+	Db              string
+	Table           string
+	OldColumnName   string
+	CheckColumnType bool
+	OldColumnType   string
+	NewColumnName   string
+	DropIndex       bool
 }
 
 type ColumnMod struct {
@@ -554,6 +556,53 @@ var ColumnAdd620 = []*ColumnAdds{
 		ColumnNames: []string{"gprocess_id"},
 		ColumnType:  ckdb.UInt32,
 	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l4_packet", "l4_packet_local"},
+		ColumnNames: []string{"packet_batch"},
+		ColumnType:  ckdb.String,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l7_packet", "l7_packet_local"},
+		ColumnNames: []string{"pcap_batch"},
+		ColumnType:  ckdb.String,
+	},
+}
+
+var ColumnRename620 = []*ColumnRename{
+	&ColumnRename{
+		Db:              "flow_log",
+		Table:           "l7_packet",
+		OldColumnName:   "pcap_batch",
+		CheckColumnType: true,
+		OldColumnType:   ckdb.ArrayUInt8.String(),
+		NewColumnName:   "pcap_batch_bak",
+	},
+	&ColumnRename{
+		Db:              "flow_log",
+		Table:           "l7_packet_local",
+		OldColumnName:   "pcap_batch",
+		CheckColumnType: true,
+		OldColumnType:   ckdb.ArrayUInt8.String(),
+		NewColumnName:   "pcap_batch_bak",
+	},
+	&ColumnRename{
+		Db:              "flow_log",
+		Table:           "l4_packet",
+		OldColumnName:   "packet_batch",
+		CheckColumnType: true,
+		OldColumnType:   ckdb.ArrayUInt8.String(),
+		NewColumnName:   "packet_batch_bak",
+	},
+	&ColumnRename{
+		Db:              "flow_log",
+		Table:           "l4_packet_local",
+		OldColumnName:   "packet_batch",
+		CheckColumnType: true,
+		OldColumnType:   ckdb.ArrayUInt8.String(),
+		NewColumnName:   "packet_batch_bak",
+	},
 }
 
 func getTables(connect *sql.DB, db, tableName string) ([]string, error) {
@@ -822,7 +871,7 @@ func NewCKIssu(cfg *config.Config) (*Issu, error) {
 	for _, v := range [][]*ColumnMod{ColumnMod611, ColumnMod615} {
 		i.columnMods = append(i.columnMods, v...)
 	}
-	for _, v := range [][]*ColumnRename{ColumnRename618} {
+	for _, v := range [][]*ColumnRename{ColumnRename618, ColumnRename620} {
 		i.columnRenames = append(i.columnRenames, v...)
 	}
 
@@ -908,7 +957,34 @@ func (i *Issu) addColumn(connect *sql.DB, c *ColumnAdd) error {
 	return nil
 }
 
+func (i *Issu) getColumnType(connect *sql.DB, db, table, columnName string) (string, error) {
+	sql := fmt.Sprintf("SELECT type FROM system.columns WHERE database='%s' AND table='%s' AND name='%s'",
+		db, table, columnName)
+	rows, err := connect.Query(sql)
+	if err != nil {
+		return "", err
+	}
+	var ctype string
+	for rows.Next() {
+		err := rows.Scan(&ctype)
+		if err != nil {
+			return "", err
+		}
+	}
+	return ctype, nil
+}
+
 func (i *Issu) renameColumn(connect *sql.DB, cr *ColumnRename) error {
+	if cr.CheckColumnType {
+		columnType, err := i.getColumnType(connect, cr.Db, cr.Table, cr.OldColumnName)
+		if err != nil {
+			log.Error(err)
+			return err
+		}
+		if columnType != cr.OldColumnType {
+			return nil
+		}
+	}
 	if cr.DropIndex {
 		sql := fmt.Sprintf("ALTER TABLE %s.`%s` DROP INDEX %s_idx",
 			cr.Db, cr.Table, cr.OldColumnName)
@@ -1010,6 +1086,7 @@ func (i *Issu) renameColumns(connect *sql.DB) ([]*ColumnRename, error) {
 		if version == common.CK_VERSION {
 			continue
 		}
+
 		if err := i.renameColumn(connect, renameColumn); err != nil {
 			return dones, err
 		}
