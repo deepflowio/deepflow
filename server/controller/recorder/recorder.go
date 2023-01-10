@@ -231,6 +231,11 @@ func (r *Recorder) getDomainUpdatersInOrder(cloudData cloudmodel.Resource) []upd
 	vRouter.RegisterCallbacks(
 		vRouterListener.OnUpdaterAdded, vRouterListener.OnUpdaterUpdated, vRouterListener.OnUpdaterDeleted)
 
+	processListener := listener.NewProcess(r.cacheMng.DomainCache, r.eventQueue)
+	process := updater.NewProcess(r.cacheMng.DomainCache, cloudData.Processes)
+	process.RegisterCallbacks(
+		processListener.OnUpdaterAdded, processListener.OnUpdaterUpdated, processListener.OnUpdaterDeleted)
+
 	return []updater.ResourceUpdater{
 		updater.NewRegion(r.cacheMng.DomainCache, cloudData.Regions),
 		updater.NewAZ(r.cacheMng.DomainCache, cloudData.AZs),
@@ -250,7 +255,7 @@ func (r *Recorder) getDomainUpdatersInOrder(cloudData cloudmodel.Resource) []upd
 		updater.NewPodGroupPort(r.cacheMng.DomainCache, cloudData.PodGroupPorts),
 		updater.NewPodReplicaSet(r.cacheMng.DomainCache, cloudData.PodReplicaSets),
 		pod,
-		updater.NewProcess(r.cacheMng.DomainCache, cloudData.Processes),
+		process,
 		updater.NewNetwork(r.cacheMng.DomainCache, cloudData.Networks),
 		updater.NewSubnet(r.cacheMng.DomainCache, cloudData.Subnets),
 		vRouter,
