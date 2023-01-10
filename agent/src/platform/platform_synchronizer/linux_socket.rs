@@ -32,7 +32,7 @@ use procfs::{
 use crate::{config::handler::OsProcScanConfig, policy::PolicyGetter};
 use public::{
     bytes::read_u32_be,
-    proto::trident::{GpidSyncEntry, ServiceProtocol},
+    proto::trident::{GpidSyncEntry, RoleType, ServiceProtocol},
 };
 
 use super::{sym_uptime, ProcessData};
@@ -129,6 +129,7 @@ impl TryFrom<SockEntry> for GpidSyncEntry {
         };
 
         if let Some(real) = s.real_client {
+            r.role = Some(RoleType::RoleClient.into());
             r.epc_id_real = Some(real.epc_id);
             r.ipv4_real = Some(match real.ip {
                 IpAddr::V4(v4) => read_u32_be(&v4.octets()),
