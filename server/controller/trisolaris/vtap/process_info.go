@@ -136,9 +136,32 @@ func (e EntryData) getAllData() []*trident.GPIDSyncEntry {
 	return nil
 }
 
+type CacheReq struct {
+	updateTime time.Time
+	req        *trident.GPIDSyncRequest
+}
+
+func NewCacheReq(req *trident.GPIDSyncRequest) *CacheReq {
+	return &CacheReq{
+		updateTime: time.Now(),
+		req:        req,
+	}
+}
+
+func (c *CacheReq) getReq() *trident.GPIDSyncRequest {
+	return c.req
+}
+
+func (c *CacheReq) After(r *CacheReq) bool {
+	if c == nil || r == nil {
+		return false
+	}
+	return c.updateTime.After(r.updateTime)
+}
+
 type VTapIDToReq struct {
 	sync.RWMutex
-	idToReq map[uint32]*trident.GPIDSyncRequest
+	idToReq map[uint32]*CacheReq
 }
 
 func (r *VTapIDToReq) getKeys() []uint32 {
@@ -163,21 +186,31 @@ func (r *VTapIDToReq) getSetIntKeys() mapset.Set {
 
 func (r *VTapIDToReq) updateReq(req *trident.GPIDSyncRequest) {
 	r.Lock()
-	r.idToReq[req.GetVtapId()] = req
+	r.idToReq[req.GetVtapId()] = NewCacheReq(req)
 	r.Unlock()
+}
+
+func (r *VTapIDToReq) getCacheReq(vtapID uint32) *CacheReq {
+	r.RLock()
+	cacheReq := r.idToReq[vtapID]
+	r.RUnlock()
+	return cacheReq
 }
 
 func (r *VTapIDToReq) getReq(vtapID uint32) *trident.GPIDSyncRequest {
 	r.RLock()
-	req := r.idToReq[vtapID]
+	cacheReq := r.idToReq[vtapID]
 	r.RUnlock()
-	return req
+	if cacheReq != nil {
+		return cacheReq.getReq()
+	}
+	return nil
 }
 
-func (r *VTapIDToReq) getAllReqAndClear() map[uint32]*trident.GPIDSyncRequest {
+func (r *VTapIDToReq) getAllReqAndClear() map[uint32]*CacheReq {
 	r.Lock()
 	allData := r.idToReq
-	r.idToReq = make(map[uint32]*trident.GPIDSyncRequest)
+	r.idToReq = make(map[uint32]*CacheReq)
 	r.Unlock()
 
 	return allData
@@ -191,7 +224,7 @@ func (r *VTapIDToReq) deleteData(vtapID uint32) {
 
 func NewVTapIDToReq() *VTapIDToReq {
 	return &VTapIDToReq{
-		idToReq: make(map[uint32]*trident.GPIDSyncRequest),
+		idToReq: make(map[uint32]*CacheReq),
 	}
 }
 
@@ -239,19 +272,47 @@ func (p *ProcessInfo) UpdateVTapGPIDReq(req *trident.GPIDSyncRequest) {
 }
 
 func (p *ProcessInfo) GetVTapGPIDReq(vtapID uint32) *trident.GPIDSyncRequest {
-	req := p.sendGPIDReq.getReq(vtapID)
+	var req *trident.GPIDSyncRequest
+	req = p.sendGPIDReq.getReq(vtapID)
 	if req == nil {
-		req = p.vtapIDToLocalGPIDReq.getReq(vtapID)
-		if req == nil {
-			req = p.vtapIDToShareGPIDReq.getReq(vtapID)
+		localReq := p.vtapIDToLocalGPIDReq.getCacheReq(vtapID)
+		shareReq := p.vtapIDToShareGPIDReq.getCacheReq(vtapID)
+		if localReq != nil && shareReq != nil {
+			if localReq.After(shareReq) {
+				req = localReq.getReq()
+			} else {
+				req = shareReq.getReq()
+			}
+		} else {
+			if localReq == nil {
+				req = shareReq.getReq()
+			} else {
+				req = localReq.getReq()
+			}
 		}
 	}
 
 	return req
 }
 
-func (p *ProcessInfo) UpdateGPIDReqFromShare(req *trident.GPIDSyncRequest) {
-	p.vtapIDToShareGPIDReq.updateReq(req)
+func (p *ProcessInfo) UpdateGPIDReqFromShare(shareReq *trident.ShareGPIDSyncRequests) {
+	for _, req := range shareReq.GetSyncRequests() {
+		p.vtapIDToShareGPIDReq.updateReq(req)
+	}
+}
+
+func (p *ProcessInfo) GetGPIDShareReqs() *trident.ShareGPIDSyncRequests {
+	reqs := p.sendGPIDReq.getAllReqAndClear()
+	shareSyncReqs := make([]*trident.GPIDSyncRequest, 0, len(reqs))
+	for _, req := range reqs {
+		p.vtapIDToLocalGPIDReq.updateReq(req.getReq())
+		shareSyncReqs = append(shareSyncReqs, req.getReq())
+	}
+	shareReqs := &trident.ShareGPIDSyncRequests{
+		ServerIp:     proto.String(p.config.NodeIP),
+		SyncRequests: shareSyncReqs,
+	}
+	return shareReqs
 }
 
 func (p *ProcessInfo) updateGlobalLocalEntries(data EntryData) {
@@ -265,12 +326,23 @@ func (p *ProcessInfo) GetGlobalLocalEntries() []*trident.GPIDSyncEntry {
 func (p *ProcessInfo) generateGlobalLocalEntries() {
 	globalLocalEntries := NewEntryData()
 	vtapIDs := p.vtapIDToLocalGPIDReq.getKeys()
+	shareFilter := mapset.NewSet()
 	for _, vtapID := range vtapIDs {
-		req := p.vtapIDToLocalGPIDReq.getReq(vtapID)
-		if req == nil {
+		localCacheReq := p.vtapIDToLocalGPIDReq.getCacheReq(vtapID)
+		if localCacheReq == nil {
 			continue
 		}
-		if len(req.GetEntries()) == 0 {
+		shareCacheReq := p.vtapIDToShareGPIDReq.getCacheReq(vtapID)
+		if shareCacheReq != nil {
+			if shareCacheReq.After(localCacheReq) {
+				continue
+			} else {
+				shareFilter.Add(vtapID)
+			}
+		}
+
+		req := localCacheReq.getReq()
+		if req == nil || len(req.GetEntries()) == 0 {
 			continue
 		}
 		for _, entry := range req.GetEntries() {
@@ -280,6 +352,9 @@ func (p *ProcessInfo) generateGlobalLocalEntries() {
 
 	vtapIDs = p.vtapIDToShareGPIDReq.getKeys()
 	for _, vtapID := range vtapIDs {
+		if shareFilter.Contains(vtapID) {
+			continue
+		}
 		req := p.vtapIDToShareGPIDReq.getReq(vtapID)
 		if req == nil {
 			continue
@@ -452,26 +527,29 @@ func (p *ProcessInfo) sendLocalShareEntryData() {
 	grpcConns := p.getLocalControllersConns()
 	if len(grpcConns) == 0 {
 		for _, req := range p.sendGPIDReq.getAllReqAndClear() {
-			p.vtapIDToLocalGPIDReq.updateReq(req)
+			p.vtapIDToLocalGPIDReq.updateReq(req.getReq())
 		}
 
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	for _, req := range p.sendGPIDReq.getAllReqAndClear() {
-		p.vtapIDToLocalGPIDReq.updateReq(req)
-		sendReq := &trident.GPIDSyncRequest{
-			CtrlIp:  proto.String(p.config.NodeIP),
-			VtapId:  proto.Uint32(req.GetVtapId()),
-			Entries: req.GetEntries(),
+	shareReqs := p.GetGPIDShareReqs()
+	responses := make([]*trident.ShareGPIDSyncRequests, 0, len(grpcConns))
+	for _, conn := range grpcConns {
+		client := trident.NewSynchronizerClient(conn)
+		response, err := client.ShareGPIDLocalData(ctx, shareReqs)
+		if err != nil {
+			log.Error(err)
+			continue
 		}
-		for _, conn := range grpcConns {
-			client := trident.NewSynchronizerClient(conn)
-			_, err := client.ShareGPIDLocalData(ctx, sendReq)
-			if err != nil {
-				log.Error(err)
-			}
+		responses = append(responses, response)
+	}
+
+	for _, response := range responses {
+		log.Infof("receive gpid sync data from server(%s)", response.GetServerIp())
+		for _, req := range response.GetSyncRequests() {
+			p.vtapIDToShareGPIDReq.updateReq(req)
 		}
 	}
 }
