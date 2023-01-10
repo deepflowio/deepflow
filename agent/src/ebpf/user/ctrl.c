@@ -61,16 +61,16 @@ int sockopt_register(struct tracer_sockopts *sockopts)
 
 	if (sockopts_exist(sockopts)) {
 		ebpf_info("%s: socket msg type already exist\n", __func__);
-		ebpf_info("sockopt type already exist ->\n"
-			  "\t\tget: %d - %d\n\t\tset: %d - %d\n",
+		ebpf_info("sockopt type already exist "
+			  "get: %d - %d set: %d - %d\n",
 			  sockopts->get_opt_min, sockopts->get_opt_max,
 			  sockopts->set_opt_min, sockopts->set_opt_max);
 
 		return ETR_EXIST;
 	}
 
-	ebpf_info("sockopt register succeed, type ->\n"
-		  "\t\tget: %d - %d\n\t\tset: %d - %d\n",
+	ebpf_info("sockopt register succeed, type "
+		  "get: %d - %d set: %d - %d\n",
 		  sockopts->get_opt_min, sockopts->get_opt_max,
 		  sockopts->set_opt_min, sockopts->set_opt_max);
 

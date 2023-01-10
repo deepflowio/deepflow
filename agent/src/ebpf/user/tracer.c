@@ -226,7 +226,10 @@ int tracer_bpf_load(struct bpf_tracer *tracer)
 
 	ret = ebpf_obj_load(obj);
 	if (ret != 0) {
-		ebpf_warning("bpf load \"%s\" failed, error:%s (%d)\n",
+		ebpf_warning("bpf load \"%s\" failed, error:%s (%d)."
+			     "Try the following method to see if it "
+			     "can be solved?\nCheck the selinux status "
+			     "and ensure that selinux is disabled.\n",
 			     tracer->bpf_load_name, strerror(errno), errno);
 		return ret;
 	}
