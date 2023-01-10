@@ -146,7 +146,7 @@ func (g *Genesis) generateIPsAndSubnets() {
 
 	networkIDToIPLastSeens := map[string][]model.GenesisIP{}
 	for _, ip := range validIPs {
-		networkIDToIPLastSeens[portIDToNetworkID[ip.VinterfaceLcuuid]] = append(networkIDToIPLastSeens[portIDToNetworkID[ip.Lcuuid]], ip)
+		networkIDToIPLastSeens[portIDToNetworkID[ip.VinterfaceLcuuid]] = append(networkIDToIPLastSeens[portIDToNetworkID[ip.VinterfaceLcuuid]], ip)
 	}
 
 	// 由于目前没获取dhcp信息，所以在这里用一个子网内所有ip计算出一个最小网段

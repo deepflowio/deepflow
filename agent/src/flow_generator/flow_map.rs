@@ -816,7 +816,7 @@ impl FlowMap {
         self.update_endpoint_and_policy_data(&mut node, meta_packet);
 
         node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].gpid = meta_packet.gpid_0;
-        node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].gpid = meta_packet.gpid_1;
+        node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].gpid = meta_packet.gpid_1;
 
         if let Some(endpoints) = &meta_packet.endpoint_data {
             if endpoints.src_info.is_vip || endpoints.dst_info.is_vip {
@@ -899,6 +899,15 @@ impl FlowMap {
             };
             #[cfg(target_os = "windows")]
             let local_epc_id = 0;
+            if node.tagged_flow.flow.flow_key.tap_port.get_nat_source() == TapPort::NAT_SOURCE_TOA
+                && meta_packet.direction == PacketDirection::ClientToServer
+                && meta_packet.lookup_key.nat_client_port == 0
+            {
+                let metric = &node.tagged_flow.flow.flow_metrics_peers
+                    [PacketDirection::ClientToServer as usize];
+                meta_packet.lookup_key.nat_client_ip = Some(metric.nat_real_ip.clone());
+                meta_packet.lookup_key.nat_client_port = metric.nat_real_port;
+            }
             (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
             self.update_endpoint_and_policy_data(node, meta_packet);
 
@@ -942,7 +951,7 @@ impl FlowMap {
         }
         if meta_packet.gpid_1 > 0 {
             flow.flow_metrics_peers[meta_packet.direction.reversed() as usize].gpid =
-                meta_packet.gpid_1
+                meta_packet.gpid_1;
         }
 
         // The ebpf data has no l3 and l4 information, so it can be returned directly
