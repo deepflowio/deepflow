@@ -18,6 +18,7 @@ use std::ffi::{CStr, CString};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::{collections::HashMap, os::unix::process::CommandExt, process::Command};
 
+use envmnt::{ExpandOptions, ExpansionType};
 use libc::{getpwnam, getpwuid, passwd, uid_t};
 use log::{error, warn};
 use nom::AsBytes;
@@ -166,11 +167,24 @@ impl TryFrom<&OsProcRegexp> for ProcRegRewrite {
     fn try_from(value: &OsProcRegexp) -> Result<Self, Self::Error> {
         let re = Regex::new(value.match_regex.as_str())?;
 
+        let env_rewrite = |r: String| {
+            envmnt::expand(
+                r.as_str(),
+                Some(ExpandOptions {
+                    expansion_type: Some(ExpansionType::Windows),
+                    default_to_empty: true,
+                }),
+            )
+        };
+
         match value.match_type.as_str() {
-            OS_PROC_REGEXP_MATCH_TYPE_CMD => Ok(Self::Cmd(re, value.rewrite_name.clone())),
-            "" | OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME => {
-                Ok(Self::ProcessName(re, value.rewrite_name.clone()))
+            OS_PROC_REGEXP_MATCH_TYPE_CMD => {
+                Ok(Self::Cmd(re, env_rewrite(value.rewrite_name.clone())))
             }
+            "" | OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME => Ok(Self::ProcessName(
+                re,
+                env_rewrite(value.rewrite_name.clone()),
+            )),
             _ => Err(regex::Error::__Nonexhaustive),
         }
     }
