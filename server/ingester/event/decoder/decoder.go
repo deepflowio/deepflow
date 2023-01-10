@@ -129,6 +129,7 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 
 	eventStore.SubnetIDs = append(eventStore.SubnetIDs, event.SubnetIDs...)
 	eventStore.IPs = append(eventStore.IPs, event.IPs...)
+	eventStore.GProcessID = event.GProcessID
 
 	if event.IfNeedTagged {
 		eventStore.Tagged = 1

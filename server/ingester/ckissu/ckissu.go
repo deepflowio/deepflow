@@ -548,6 +548,12 @@ var ColumnAdd620 = []*ColumnAdds{
 		ColumnNames: u32ColumnNameEdgeAdd620,
 		ColumnType:  ckdb.UInt32,
 	},
+	&ColumnAdds{
+		Dbs:         []string{"event"},
+		Tables:      []string{"event", "event_local"},
+		ColumnNames: []string{"gprocess_id"},
+		ColumnType:  ckdb.UInt32,
+	},
 }
 
 func getTables(connect *sql.DB, db, tableName string) ([]string, error) {
