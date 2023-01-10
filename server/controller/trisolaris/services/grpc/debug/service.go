@@ -54,13 +54,14 @@ func (s *service) DebugGPIDGlobalLocalData(ctx context.Context, in *api.GPIDSync
 }
 
 func (s *service) DebugGPIDVTapLocalData(ctx context.Context, in *api.GPIDSyncRequest) (*api.GPIDSyncRequest, error) {
-	log.Infof("receive DebugGPIDVTapLocalData about vtap(ctrl_ip: %s, ctrl_mac: %s)",
-		in.GetCtrlIp(), in.GetCtrlMac())
 	vtapCacheKey := in.GetCtrlIp() + "-" + in.GetCtrlMac()
 	vtapCache := trisolaris.GetGVTapInfo().GetVTapCache(vtapCacheKey)
 	if vtapCache == nil {
+		log.Info("not found vtap(ctrl_ip: %s, ctrl_mac: %s) cache", in.GetCtrlIp(), in.GetCtrlMac())
 		return &api.GPIDSyncRequest{}, nil
 	}
+	log.Infof("receive DebugGPIDVTapLocalData about vtap(ctrl_ip: %s, ctrl_mac: %s, id: %d)",
+		in.GetCtrlIp(), in.GetCtrlMac(), vtapCache.GetVTapID())
 	processInfo := trisolaris.GetGVTapInfo().GetProcessInfo()
 	req := processInfo.GetVTapGPIDReq(uint32(vtapCache.GetVTapID()))
 	if req == nil {
