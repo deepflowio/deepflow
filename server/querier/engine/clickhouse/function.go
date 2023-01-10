@@ -472,7 +472,7 @@ func (f *TagFunction) Check() error {
 			return errors.New(fmt.Sprintf("function %s not support %s", f.Name, f.Args[0]))
 		}
 	case TAG_FUNCTION_ENUM:
-		_, ok := tag.GetTag(f.Args[0], f.DB, f.Table, f.Name)
+		_, ok := tag.GetTag(strings.Trim(f.Args[0], "`"), f.DB, f.Table, f.Name)
 		if !ok {
 			return errors.New(fmt.Sprintf("function %s not support %s", f.Name, f.Args[0]))
 		}
