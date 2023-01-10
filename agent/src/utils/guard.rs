@@ -24,9 +24,13 @@ use std::{
 };
 
 use arc_swap::access::Access;
+#[cfg(target_os = "windows")]
+use bytesize::ByteSize;
 use chrono::prelude::*;
 use log::{debug, error, info, warn};
 
+#[cfg(target_os = "windows")]
+use super::process::get_memory_rss;
 use super::process::{
     get_current_sys_free_memory_percentage, get_file_and_size_sum, get_thread_num, FileAndSizeSum,
 };
@@ -118,9 +122,41 @@ impl Guard {
         let exception_handler = self.exception_handler.clone();
         let log_dir = self.log_dir.clone();
         let interval = self.interval;
-        let mut under_sys_free_memory_limit = false; // 是否低于空闲内存限制，低于则不符合预期
+        #[cfg(target_os = "windows")]
+        let mut over_memory_limit = false; // Higher than the limit does not meet expectations, just for Windows, Linux will use cgroup to limit memory
+        let mut under_sys_free_memory_limit = false; // Below the limit, it does not meet expectations
         let thread = thread::Builder::new().name("guard".to_owned()).spawn(move || {
             loop {
+                #[cfg(target_os = "windows")]
+                {
+                    let memory_limit = limit.load().max_memory;
+                    if memory_limit != 0 {
+                        match get_memory_rss() {
+                            Ok(memory_usage) => {
+                                if memory_usage >= memory_limit {
+                                    if over_memory_limit {
+                                        error!(
+                                    "memory usage over memory limit twice, current={}, memory_limit={}, deepflow-agent restart...",
+                                    ByteSize::b(memory_usage).to_string_as(true), ByteSize::b(memory_limit).to_string_as(true)
+                                    );
+                                        thread::sleep(Duration::from_secs(1));
+                                        exit(-1);
+                                    } else {
+                                        warn!(
+                                    "memory usage over memory limit, current={}, memory_limit={}",
+                                    ByteSize::b(memory_usage).to_string_as(true), ByteSize::b(memory_limit).to_string_as(true)
+                                    );
+                                        over_memory_limit = true;
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                warn!("{}", e);
+                            }
+                        }
+                    }
+                }
+
                 let sys_free_memory_limit = limit.load().sys_free_memory_limit;
                 let current_sys_free_memory_percentage = get_current_sys_free_memory_percentage();
                 debug!(
