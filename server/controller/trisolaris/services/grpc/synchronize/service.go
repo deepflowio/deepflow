@@ -131,6 +131,6 @@ func (s *service) GPIDSync(ctx context.Context, in *api.GPIDSyncRequest) (*api.G
 	return s.processInfoEvent.GPIDSync(ctx, in)
 }
 
-func (s *service) ShareGPIDLocalData(ctx context.Context, in *api.GPIDSyncRequest) (*api.GPIDSyncResponse, error) {
+func (s *service) ShareGPIDLocalData(ctx context.Context, in *api.ShareGPIDSyncRequests) (*api.ShareGPIDSyncRequests, error) {
 	return s.processInfoEvent.ShareGPIDLocalData(ctx, in)
 }

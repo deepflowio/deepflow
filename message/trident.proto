@@ -15,7 +15,7 @@ service Synchronizer {
     rpc KubernetesAPISync (KubernetesAPISyncRequest) returns (KubernetesAPISyncResponse) {}
     rpc GetKubernetesClusterID (KubernetesClusterIDRequest) returns (KubernetesClusterIDResponse) {}
     rpc GPIDSync (GPIDSyncRequest) returns (GPIDSyncResponse) {}
-    rpc ShareGPIDLocalData(GPIDSyncRequest) returns (GPIDSyncResponse) {}
+    rpc ShareGPIDLocalData(ShareGPIDSyncRequests) returns (ShareGPIDSyncRequests) {}
 }
 
 // debug service
@@ -676,6 +676,11 @@ message GPIDSyncRequest {
     optional uint32 vtap_id = 3;
     optional GPIDSyncCompressAlgorithm entries_compress_algorithm = 4 [default = COMPRESS_ALRO_NONE];
     repeated GPIDSyncEntry entries = 10;
+}
+
+message ShareGPIDSyncRequests {
+    optional string server_ip = 1;
+    repeated GPIDSyncRequest  sync_requests = 2;
 }
 
 message GPIDSyncResponse {
