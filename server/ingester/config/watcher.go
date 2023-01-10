@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"reflect"
 	"sort"
 	"time"
 
@@ -47,9 +48,9 @@ type Watcher struct {
 	myNodeName                    string
 	myPodName                     string
 	clickhouseIsExternal          bool
-	myClickhouseEndpoint          Endpoint
+	myClickhouseEndpoints         []Endpoint
 	lastNodePodNames              map[string][]string
-	lastServerEndpointMap         map[string]Endpoint
+	lastServerEndpointsMap        map[string][]Endpoint
 }
 
 func NewWatcher(myNodeName, myPodName, myPodNamespace, clickhouseEndpointKey, clickhouseEndpointTCPPortName string, clickhouseIsExternal bool, controllerIPs []string, controllerPort, grpcBufferSize int) (*Watcher, error) {
@@ -91,7 +92,7 @@ func NewWatcher(myNodeName, myPodName, myPodNamespace, clickhouseEndpointKey, cl
 		myPodName:                     myPodName,
 		clickhouseIsExternal:          clickhouseIsExternal,
 		lastNodePodNames:              make(map[string][]string),
-		lastServerEndpointMap:         make(map[string]Endpoint),
+		lastServerEndpointsMap:        make(map[string][]Endpoint),
 	}
 
 	go watcher.Run()
@@ -104,18 +105,18 @@ func (w *Watcher) Run() {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		endpoint, err := w.GetMyClickhouseEndpoint()
+		endpoints, err := w.GetMyClickhouseEndpoints()
 		if err != nil {
 			log.Warning(err)
 			continue
 		}
 
-		if w.myClickhouseEndpoint.Host == "" && w.myClickhouseEndpoint.Port == 0 {
-			w.myClickhouseEndpoint = *endpoint
+		if len(w.myClickhouseEndpoints) == 0 {
+			w.myClickhouseEndpoints = endpoints
 		}
 
-		if *endpoint != w.myClickhouseEndpoint {
-			log.Warningf("my clickhouse endpoint change from %v to %v", w.myClickhouseEndpoint, endpoint)
+		if !reflect.DeepEqual(endpoints, w.myClickhouseEndpoints) {
+			log.Warningf("my clickhouse endpoints change from %v to %v", w.myClickhouseEndpoints, endpoints)
 			sleepAndExit()
 		}
 	}
@@ -130,28 +131,40 @@ func indexOf(ss []string, s string) int {
 	return -1
 }
 
-// How to get my external clickhouse endpoint:
-// 1, Get a list of all 'deepflow-server' pods, and sort by name to find the 'index' of myself pod in it
-// 2. Get the list and total 'len' of all clickhouse endpoints, and sort by IP
-// 3, my corresponding 'clickhouse endpoint' is on position 'index%len'  in the 'clickhouse endpoints list'
-func (w *Watcher) getMyClickhouseEndpointExternal() (*Endpoint, error) {
+func (w *Watcher) getMyClickhouseEndpointsExternal() ([]Endpoint, error) {
 	podNames, err := w.getPodNames()
 	if err != nil {
 		return nil, err
-	}
-	myIndex := indexOf(podNames, w.myPodName)
-	if myIndex < 0 {
-		return nil, fmt.Errorf("can't find my pod name(%s) in pods(%v)", w.myPodName, podNames)
 	}
 	endpoints, err := w.getEndpoints()
 	if err != nil {
 		return nil, err
 	}
 
-	return &endpoints[myIndex%len(endpoints)], nil
+	return getMyClickhouseEndpoints(podNames, w.myPodName, endpoints)
 }
 
-func (w *Watcher) getMyClickhouseEndpointInternal() (*Endpoint, error) {
+// How to get my external clickhouse endpoint:
+// 1, Input a list of all 'deepflow-server' pods, and sort by name to find the 'index' of myself pod in it
+// 2. Input the list of all clickhouse endpoints, and sort by IP
+// 3, my corresponding 'clickhouse endpoint' is on position 'index%len'  in the 'clickhouse endpoints list'
+func getMyClickhouseEndpoints(podNames []string, myName string, endpoints []Endpoint) ([]Endpoint, error) {
+	myIndex := indexOf(podNames, myName)
+	if myIndex < 0 {
+		return nil, fmt.Errorf("can't find my pod name(%s) in pods(%v)", myName, podNames)
+	}
+	myEndpoints := []Endpoint{}
+	if len(podNames) >= len(endpoints) {
+		myEndpoints = []Endpoint{endpoints[myIndex%len(endpoints)]}
+	} else {
+		for i := myIndex; i < len(endpoints); i += len(podNames) {
+			myEndpoints = append(myEndpoints, endpoints[i])
+		}
+	}
+	return myEndpoints, nil
+}
+
+func (w *Watcher) getMyClickhouseEndpointsInternal() ([]Endpoint, error) {
 	nodePodNames, err := w.getNodePodNames()
 	if err != nil {
 		return nil, err
@@ -162,23 +175,32 @@ func (w *Watcher) getMyClickhouseEndpointInternal() (*Endpoint, error) {
 	}
 
 	serverEndpointMap := getServerEndpointMap(nodePodNames, nodeEndpoints)
-	if !serverEndpointMapEqual(w.lastServerEndpointMap, serverEndpointMap) {
-		log.Infof("the correspondence between Server Pod and ClickHouse Endpoint change from %+v to  %+v", w.lastServerEndpointMap, serverEndpointMap)
-		w.lastServerEndpointMap = serverEndpointMap
+	if !serverEndpointMapEqual(w.lastServerEndpointsMap, serverEndpointMap) {
+		log.Infof("the correspondence between Server Pod and ClickHouse Endpoint change from %+v to  %+v", w.lastServerEndpointsMap, serverEndpointMap)
+		w.lastServerEndpointsMap = serverEndpointMap
 	}
-	if endpoint, ok := serverEndpointMap[w.myNodeName+w.myPodName]; ok {
-		return &endpoint, nil
+	if endpoints, ok := serverEndpointMap[w.myNodeName+w.myPodName]; ok {
+		return endpoints, nil
 	}
 
 	return nil, fmt.Errorf("Can't find my clickhouse endpoint, myNodeName: %s myPodName: %s", w.myNodeName, w.myPodName)
 }
 
-func (w *Watcher) GetMyClickhouseEndpoint() (*Endpoint, error) {
+func (w *Watcher) GetMyClickhouseEndpoints() ([]Endpoint, error) {
 	if w.clickhouseIsExternal {
-		return w.getMyClickhouseEndpointExternal()
+		return w.getMyClickhouseEndpointsExternal()
 	} else {
-		return w.getMyClickhouseEndpointInternal()
+		return w.getMyClickhouseEndpointsInternal()
 	}
+}
+
+func isInEndpoints(e Endpoint, es []Endpoint) bool {
+	for _, endpoint := range es {
+		if e == endpoint {
+			return true
+		}
+	}
+	return false
 }
 
 func (w *Watcher) GetClickhouseEndpointsWithoutMyself() ([]Endpoint, error) {
@@ -188,7 +210,7 @@ func (w *Watcher) GetClickhouseEndpointsWithoutMyself() ([]Endpoint, error) {
 	}
 	endpointsWithoutMyself := []Endpoint{}
 	for _, e := range endpoints {
-		if e == w.myClickhouseEndpoint {
+		if isInEndpoints(e, w.myClickhouseEndpoints) {
 			continue
 		}
 		endpointsWithoutMyself = append(endpointsWithoutMyself, e)
@@ -317,6 +339,20 @@ func getAllEndpoints(nodeEndpointsMap map[string][]Endpoint) []Endpoint {
 	return allEndpoints
 }
 
+func getAllServers(nodePodNamesMap map[string][]string) []string {
+	allServers := make([]string, 0)
+	for node, podNames := range nodePodNamesMap {
+		for _, podName := range podNames {
+			allServers = append(allServers, node+podName)
+		}
+	}
+
+	sort.Slice(allServers, func(i, j int) bool {
+		return allServers[i] < allServers[j]
+	})
+	return allServers
+}
+
 func getUnusedEndpoints(allEndpoints, matchedEndpoints []Endpoint) []Endpoint {
 	unmatchs := make([]Endpoint, 0)
 	for _, v := range allEndpoints {
@@ -336,21 +372,21 @@ func getUnusedEndpoints(allEndpoints, matchedEndpoints []Endpoint) []Endpoint {
 	return unmatchs
 }
 
-func serverEndpointMapEqual(a, b map[string]Endpoint) bool {
+func serverEndpointMapEqual(a, b map[string][]Endpoint) bool {
 	if len(a) != len(b) {
 		return false
 	}
 
 	for k, v := range a {
-		if v != b[k] {
+		if !reflect.DeepEqual(v, b[k]) {
 			return false
 		}
 	}
 	return true
 }
 
-func getServerEndpointMap(nodePodNamesMap map[string][]string, nodeEndpointsMap map[string][]Endpoint) map[string]Endpoint {
-	serverEndpointMap := make(map[string]Endpoint)
+func getServerEndpointMap(nodePodNamesMap map[string][]string, nodeEndpointsMap map[string][]Endpoint) map[string][]Endpoint {
+	serverEndpointMap := make(map[string][]Endpoint)
 	unassignedServers := make([]string, 0)
 	usedEndpoints := make([]Endpoint, 0)
 	// 1.Prioritize allocating Endpoint on the same Node
@@ -360,22 +396,13 @@ func getServerEndpointMap(nodePodNamesMap map[string][]string, nodeEndpointsMap 
 		for i, podName := range podNames {
 			if endpointsCount > 0 {
 				endpoint := endpoints[i%endpointsCount]
-				serverEndpointMap[nodeName+podName] = endpoint
+				serverEndpointMap[nodeName+podName] = append(serverEndpointMap[nodeName+podName], endpoint)
 				usedEndpoints = append(usedEndpoints, endpoint)
 			} else {
 				unassignedServers = append(unassignedServers, nodeName+podName)
 			}
 		}
 	}
-
-	if len(unassignedServers) == 0 {
-		return serverEndpointMap
-	}
-
-	// 2.Get unassigned servers and endpoints, sort them separately, and assign them in order.
-	sort.Slice(unassignedServers, func(i, j int) bool {
-		return unassignedServers[i] < unassignedServers[j]
-	})
 
 	allEndpoints := getAllEndpoints(nodeEndpointsMap)
 	allEndpointsCount := len(allEndpoints)
@@ -385,11 +412,36 @@ func getServerEndpointMap(nodePodNamesMap map[string][]string, nodeEndpointsMap 
 
 	unusedEndpoints := getUnusedEndpoints(allEndpoints, usedEndpoints)
 	unusedEndpointsCount := len(unusedEndpoints)
+
+	if len(unassignedServers) == 0 && unusedEndpointsCount == 0 {
+		return serverEndpointMap
+	}
+
+	// 2.Get unassigned servers and endpoints, sort them separately, and assign them in order.
+	sort.Slice(unassignedServers, func(i, j int) bool {
+		return unassignedServers[i] < unassignedServers[j]
+	})
+
 	for i, key := range unassignedServers {
 		if unusedEndpointsCount > 0 {
-			serverEndpointMap[key] = unusedEndpoints[i%unusedEndpointsCount]
+			serverEndpointMap[key] = append(serverEndpointMap[key], unusedEndpoints[0])
+			unusedEndpoints = unusedEndpoints[1:]
+			unusedEndpointsCount = len(unusedEndpoints)
 		} else {
-			serverEndpointMap[key] = allEndpoints[i%allEndpointsCount]
+			serverEndpointMap[key] = append(serverEndpointMap[key], allEndpoints[i%allEndpointsCount])
+		}
+	}
+
+	if unusedEndpointsCount > 0 {
+		allServers := getAllServers(nodePodNamesMap)
+		allServersCount := len(allServers)
+		if allServersCount == 0 {
+			return serverEndpointMap
+		}
+
+		for i, unusedEndpoint := range unusedEndpoints {
+			server := allServers[i%allServersCount]
+			serverEndpointMap[server] = append(serverEndpointMap[server], unusedEndpoint)
 		}
 	}
 

@@ -33,7 +33,7 @@ type Counter struct {
 }
 
 type FlowTagWriter struct {
-	ckdbAddr     string
+	ckdbAddrs    []string
 	ckdbUsername string
 	ckdbPassword string
 	writerConfig *config.CKWriterConfig
@@ -146,7 +146,7 @@ func NewFlowTagWriter(
 	config *config.Config,
 	writerConfig *config.CKWriterConfig) (*FlowTagWriter, error) {
 	w := &FlowTagWriter{
-		ckdbAddr:     config.CKDB.ActualAddr,
+		ckdbAddrs:    config.CKDB.ActualAddrs,
 		ckdbUsername: config.CKDBAuth.Username,
 		ckdbPassword: config.CKDBAuth.Password,
 		writerConfig: writerConfig,
@@ -162,8 +162,8 @@ func NewFlowTagWriter(
 		if tagType == TagFieldValue {
 			t.hasFieldValue = true
 		}
-		w.ckwriters[tagType], err = ckwriter.NewCKWriter(w.ckdbAddr, "", w.ckdbUsername, w.ckdbPassword,
-			fmt.Sprintf("%s_%s", name, t.TableName), t.GenCKTable(config.CKDB.ClusterName, config.CKDB.StoragePolicy, ttl, partition), false, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
+		w.ckwriters[tagType], err = ckwriter.NewCKWriter(w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
+			fmt.Sprintf("%s_%s", name, t.TableName), t.GenCKTable(config.CKDB.ClusterName, config.CKDB.StoragePolicy, ttl, partition), w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
 		if err != nil {
 			return nil, err
 		}

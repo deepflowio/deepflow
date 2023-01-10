@@ -39,6 +39,53 @@ const (
 	QUEUE_STATS_MODULE_INGESTER = queue.OptionModule(MODULE_INGESTER)
 )
 
+type DBs []*sql.DB
+
+func (s DBs) Exec(query string, args ...any) (sql.Result, error) {
+	var result sql.Result
+	var err error
+	for _, conn := range s {
+		result, err = conn.Exec(query, args...)
+		if err != nil {
+			return result, err
+		}
+	}
+	return result, nil
+}
+
+func (s DBs) Query(query string, args ...any) (*sql.Rows, error) {
+	var result *sql.Rows
+	var err error
+	for _, conn := range s {
+		result, err = conn.Query(query, args...)
+		if err != nil {
+			return result, err
+		}
+	}
+	return result, nil
+}
+
+func (s DBs) Close() error {
+	for _, conn := range s {
+		if err := conn.Close(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func NewCKConnections(addrs []string, username, password string) (DBs, error) {
+	sqlDBs := DBs{}
+	for _, addr := range addrs {
+		connect, err := NewCKConnection(addr, username, password)
+		if err != nil {
+			return nil, err
+		}
+		sqlDBs = append(sqlDBs, connect)
+	}
+	return sqlDBs, nil
+}
+
 func NewCKConnection(addr, username, password string) (*sql.DB, error) {
 	connect, err := sql.Open("clickhouse", fmt.Sprintf("//%s:%s@%s", username, password, addr))
 	if err != nil {
