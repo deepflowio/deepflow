@@ -899,6 +899,15 @@ impl FlowMap {
             };
             #[cfg(target_os = "windows")]
             let local_epc_id = 0;
+            if node.tagged_flow.flow.flow_key.tap_port.get_nat_source() == TapPort::NAT_SOURCE_TOA
+                && meta_packet.direction == PacketDirection::ClientToServer
+                && meta_packet.lookup_key.nat_client_port == 0
+            {
+                let metric = &node.tagged_flow.flow.flow_metrics_peers
+                    [PacketDirection::ClientToServer as usize];
+                meta_packet.lookup_key.nat_client_ip = Some(metric.nat_real_ip.clone());
+                meta_packet.lookup_key.nat_client_port = metric.nat_real_port;
+            }
             (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
             self.update_endpoint_and_policy_data(node, meta_packet);
 
