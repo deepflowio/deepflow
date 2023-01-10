@@ -18,7 +18,7 @@ use std::collections::{HashMap, HashSet};
 #[cfg(target_os = "windows")]
 use std::ffi::CString;
 use std::mem;
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::IpAddr;
 use std::process;
 use std::sync::{
     atomic::{AtomicBool, AtomicI64, Ordering},
@@ -27,6 +27,7 @@ use std::sync::{
 use std::thread;
 use std::time::Duration;
 
+use dns_lookup::lookup_host;
 use log::{error, info, warn};
 
 #[cfg(target_os = "windows")]
@@ -154,9 +155,9 @@ impl BaseDispatcher {
             #[cfg(target_os = "linux")]
             platform_poller: self.platform_poller.clone(),
             capture_bpf: "".into(),
-            proxy_controller_ip: Ipv4Addr::UNSPECIFIED.into(),
+            proxy_controller_ip: "0.0.0.0".into(),
             proxy_controller_port: DEFAULT_CONTROLLER_PORT,
-            analyzer_ip: Ipv4Addr::UNSPECIFIED.into(),
+            analyzer_ip: "0.0.0.0".into(),
             analyzer_port: DEFAULT_INGESTER_PORT,
             tunnel_type_bitmap: self.tunnel_type_bitmap.clone(),
             handler_builders: self.handler_builder.clone(),
@@ -624,8 +625,8 @@ pub struct BaseDispatcherListener {
     pub npb_dedup_enabled: Arc<AtomicBool>,
     pub reset_whitelist: Arc<AtomicBool>,
     capture_bpf: String,
-    proxy_controller_ip: IpAddr,
-    analyzer_ip: IpAddr,
+    proxy_controller_ip: String,
+    analyzer_ip: String,
     proxy_controller_port: u16,
     analyzer_port: u16,
     pub netns: NsFile,
@@ -654,15 +655,26 @@ impl BaseDispatcherListener {
             return;
         }
         self.capture_bpf = config.capture_bpf.clone();
-        self.proxy_controller_ip = config.proxy_controller_ip;
+        self.proxy_controller_ip = config.proxy_controller_ip.clone();
         self.proxy_controller_port = config.proxy_controller_port;
-        self.analyzer_ip = config.analyzer_ip;
+        self.analyzer_ip = config.analyzer_ip.clone();
         self.analyzer_port = config.analyzer_port;
         self.options.lock().unwrap().snap_len = config.capture_packet_size as usize;
 
-        let source_ip = get_route_src_ip(&self.analyzer_ip);
+        let analyzer_ip = if self.analyzer_ip.parse::<IpAddr>().is_ok() {
+            self.analyzer_ip.parse::<IpAddr>().unwrap()
+        } else {
+            let ips = lookup_host(&self.analyzer_ip);
+            if ips.is_err() {
+                warn!("Dns lookup {} error: {:?}", self.analyzer_ip, ips);
+                return;
+            }
+            ips.unwrap()[0]
+        };
+
+        let source_ip = get_route_src_ip(&analyzer_ip);
         if source_ip.is_err() {
-            warn!("get route to {} failed", self.analyzer_ip);
+            warn!("get route to {} failed", analyzer_ip);
             return;
         }
 

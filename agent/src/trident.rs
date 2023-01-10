@@ -1322,14 +1322,27 @@ impl AgentComponents {
             true,
         );
 
+        let analyzer_ip = if candidate_config
+            .dispatcher
+            .analyzer_ip
+            .parse::<IpAddr>()
+            .is_ok()
+        {
+            candidate_config
+                .dispatcher
+                .analyzer_ip
+                .parse::<IpAddr>()
+                .unwrap()
+        } else {
+            let ips = lookup_host(&candidate_config.dispatcher.analyzer_ip)?;
+            ips[0]
+        };
+
         // Dispatcher
-        let source_ip = match get_route_src_ip(&candidate_config.dispatcher.analyzer_ip) {
+        let source_ip = match get_route_src_ip(&analyzer_ip) {
             Ok(ip) => ip,
             Err(e) => {
-                warn!(
-                    "get route to {} failed: {:?}",
-                    candidate_config.dispatcher.analyzer_ip, e
-                );
+                warn!("get route to {} failed: {:?}", &analyzer_ip, e);
                 Ipv4Addr::UNSPECIFIED.into()
             }
         };

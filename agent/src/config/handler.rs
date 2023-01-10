@@ -18,7 +18,6 @@ use std::cmp::{max, min};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::net::IpAddr;
-use std::net::Ipv4Addr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -166,7 +165,7 @@ pub struct EnvironmentConfig {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SenderConfig {
     pub mtu: u32,
-    pub dest_ip: IpAddr,
+    pub dest_ip: String,
     pub vtap_id: u16,
     pub dest_port: u16,
     pub npb_port: u16,
@@ -267,9 +266,9 @@ pub struct DispatcherConfig {
     pub tap_interface_regex: String,
     pub packet_header_enabled: bool,
     pub if_mac_source: IfMacSource,
-    pub analyzer_ip: IpAddr,
+    pub analyzer_ip: String,
     pub analyzer_port: u16,
-    pub proxy_controller_ip: IpAddr,
+    pub proxy_controller_ip: String,
     pub proxy_controller_port: u16,
     pub capture_bpf: String,
     pub max_memory: u64,
@@ -748,14 +747,16 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
             get_ctrl_ip_and_mac(static_config.controller_ips[0].parse().unwrap());
         #[cfg(target_os = "windows")]
         let (ctrl_ip, _) = get_ctrl_ip_and_mac(static_config.controller_ips[0].parse().unwrap());
-        let dest_ip = conf
-            .analyzer_ip
-            .parse::<IpAddr>()
-            .unwrap_or(Ipv4Addr::UNSPECIFIED.into());
-        let proxy_controller_ip = conf
-            .proxy_controller_ip
-            .parse()
-            .unwrap_or(static_config.controller_ips[0].parse::<IpAddr>().unwrap());
+        let dest_ip = if conf.analyzer_ip.len() > 0 {
+            conf.analyzer_ip.clone()
+        } else {
+            "0.0.0.0".to_string()
+        };
+        let proxy_controller_ip = if conf.proxy_controller_ip.len() > 0 {
+            conf.proxy_controller_ip.clone()
+        } else {
+            static_config.controller_ips[0].clone()
+        };
 
         let l7_protocol_parse_port_bitmap =
             Arc::new((&conf.yaml_config).get_protocol_port_parse_bitmap());
@@ -798,7 +799,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 tap_interface_regex: conf.tap_interface_regex.to_string(),
                 packet_header_enabled: conf.packet_header_enabled,
                 if_mac_source: conf.if_mac_source,
-                analyzer_ip: dest_ip,
+                analyzer_ip: dest_ip.clone(),
                 analyzer_port: conf.analyzer_port,
                 proxy_controller_ip,
                 proxy_controller_port: conf.proxy_controller_port,
@@ -817,7 +818,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
             },
             sender: SenderConfig {
                 mtu: conf.mtu,
-                dest_ip,
+                dest_ip: dest_ip.clone(),
                 vtap_id: conf.vtap_id as u16,
                 dest_port: conf.analyzer_port,
                 npb_port: conf.yaml_config.npb_port,
@@ -838,7 +839,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
             },
             npb: NpbConfig {
                 mtu: conf.mtu,
-                underlay_is_ipv6: dest_ip.is_ipv6(),
+                underlay_is_ipv6: ctrl_ip.is_ipv6(),
                 npb_port: conf.yaml_config.npb_port,
                 vxlan_flags: conf.yaml_config.vxlan_flags,
                 enable_qos_bypass: conf.yaml_config.enable_qos_bypass,
