@@ -22,6 +22,7 @@ import (
 	"github.com/deepflowys/deepflow/server/libs/ckdb"
 	"github.com/deepflowys/deepflow/server/libs/codec"
 	"github.com/deepflowys/deepflow/server/libs/pool"
+	"github.com/deepflowys/deepflow/server/libs/utils"
 )
 
 const BLOCK_HEAD_SIZE = 16
@@ -41,7 +42,7 @@ func L4PacketColumns() []*ckdb.Column {
 		ckdb.NewColumn("flow_id", ckdb.UInt64).SetIndex(ckdb.IndexMinmax),
 		ckdb.NewColumn("vtap_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
 		ckdb.NewColumn("packet_count", ckdb.UInt32).SetIndex(ckdb.IndexNone),
-		ckdb.NewColumn("packet_batch", ckdb.ArrayUInt8).SetIndex(ckdb.IndexNone),
+		ckdb.NewColumn("packet_batch", ckdb.String).SetIndex(ckdb.IndexNone),
 	}
 }
 
@@ -61,7 +62,7 @@ func (s *L4Packet) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteUInt32(s.PacketCount); err != nil {
 		return err
 	}
-	if err := block.WriteArrayByte(s.PacketBatch); err != nil {
+	if err := block.WriteString(utils.String(s.PacketBatch)); err != nil {
 		return err
 	}
 
