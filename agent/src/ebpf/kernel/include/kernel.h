@@ -24,6 +24,10 @@
 #define STRUCT_TASK_GROUP_LEADER_OFFSET         0x8e0
 #define STRUCT_FILES_STRUCT_FDT_OFFSET          0x20
 #define STRUCT_FILES_PRIVATE_DATA_OFFSET	0xc8
+#define STRUCT_FILE_F_INODE_OFFSET	0x20
+#define STRUCT_INODE_I_MODE_OFFSET	0x00
+#define STRUCT_FILE_DENTRY_OFFSET	0x18
+#define STRUCT_DENTRY_NAME_OFFSET	0x28
 #define STRUCT_SOCK_FAMILY_OFFSET	0x10
 #define STRUCT_SOCK_SADDR_OFFSET	0x4
 #define STRUCT_SOCK_DADDR_OFFSET	0x0
@@ -37,6 +41,26 @@
 #define STRUCT_NS_COMMON_INUM_OFFSET    0x10
 #define STRUCT_SOCK_SKC_STATE_OFFSET    0x12
 #define STRUCT_SOCK_COMMON_IPV6ONLY_OFFSET 0x13
+
+#define S_IFMT 00170000
+#define S_IFSOCK 0140000
+#define S_IFLNK 0120000
+#define S_IFREG 0100000
+#define S_IFBLK 0060000
+#define S_IFDIR 0040000
+#define S_IFCHR 0020000
+#define S_IFIFO 0010000
+#define S_ISUID 0004000
+#define S_ISGID 0002000
+#define S_ISVTX 0001000
+
+#define S_ISLNK(m) (((m)&S_IFMT) == S_IFLNK)
+#define S_ISREG(m) (((m)&S_IFMT) == S_IFREG)
+#define S_ISDIR(m) (((m)&S_IFMT) == S_IFDIR)
+#define S_ISCHR(m) (((m)&S_IFMT) == S_IFCHR)
+#define S_ISBLK(m) (((m)&S_IFMT) == S_IFBLK)
+#define S_ISFIFO(m) (((m)&S_IFMT) == S_IFIFO)
+#define S_ISSOCK(m) (((m)&S_IFMT) == S_IFSOCK)
 
 typedef __u32 __bitwise __portpair;
 typedef __u64 __bitwise __addrpair;

@@ -357,8 +357,9 @@ impl ThrottlingQueue {
     }
 
     fn flush(&mut self) {
-        if let Err(_) = self.output.send_all(self.stashs.drain(..).collect()) {
-            debug! {"l4 flow throttle push aggred flow to sender queue failed, maybe queue have terminated"};
+        if let Err(_) = self.output.send_all(&mut self.stashs) {
+            debug!("l4 flow throttle push aggred flow to sender queue failed, maybe queue have terminated");
+            self.stashs.clear();
         }
     }
 

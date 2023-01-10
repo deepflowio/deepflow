@@ -112,6 +112,8 @@ struct StashKey {
     fast_id: u128,
     src_ip: IpAddr,
     dst_ip: IpAddr,
+    src_gpid: u32,
+    dst_gpid: u32,
 }
 
 impl Default for StashKey {
@@ -120,6 +122,8 @@ impl Default for StashKey {
             fast_id: 0,
             src_ip: Ipv4Addr::UNSPECIFIED.into(),
             dst_ip: Ipv4Addr::UNSPECIFIED.into(),
+            src_gpid: 0,
+            dst_gpid: 0,
         }
     }
 }
@@ -127,6 +131,7 @@ impl Default for StashKey {
 impl StashKey {
     const SINGLE_IP: Code = Code::IP
         .union(Code::L3_EPC_ID)
+        .union(Code::GPID)
         .union(Code::VTAP_ID)
         .union(Code::PROTOCOL)
         .union(Code::DIRECTION)
@@ -144,6 +149,7 @@ impl StashKey {
 
     const EDGE_IP: Code = Code::IP_PATH
         .union(Code::L3_EPC_PATH)
+        .union(Code::GPID_PATH)
         .union(Code::VTAP_ID)
         .union(Code::PROTOCOL)
         .union(Code::DIRECTION)
@@ -290,6 +296,8 @@ impl StashKey {
             fast_id,
             src_ip,
             dst_ip: dst_ip.unwrap_or(Ipv4Addr::UNSPECIFIED.into()),
+            src_gpid: tagger.gpid,
+            dst_gpid: tagger.gpid_1,
         }
     }
 }
@@ -610,6 +618,7 @@ impl Stash {
             },
             ip,
             l3_epc_id: side.l3_epc_id as i16,
+            gpid: side.gpid,
             protocol: flow_key.proto,
             direction,
             tap_side: TapSide::from(direction),
@@ -629,6 +638,7 @@ impl Stash {
             code: {
                 let mut code = Code::IP
                     | Code::L3_EPC_ID
+                    | Code::GPID
                     | Code::VTAP_ID
                     | Code::PROTOCOL
                     | Code::SERVER_PORT
@@ -758,6 +768,8 @@ impl Stash {
             ip1: dst_ip,
             l3_epc_id: src_ep.l3_epc_id as i16,
             l3_epc_id1: dst_ep.l3_epc_id as i16,
+            gpid: src_ep.gpid,
+            gpid_1: dst_ep.gpid,
             protocol: flow_key.proto,
             direction,
             tap_side: TapSide::from(direction),
@@ -774,6 +786,7 @@ impl Stash {
             code: {
                 let mut code = Code::IP_PATH
                     | Code::L3_EPC_PATH
+                    | Code::GPID_PATH
                     | Code::VTAP_ID
                     | Code::PROTOCOL
                     | Code::SERVER_PORT
@@ -843,27 +856,22 @@ impl Stash {
     }
 
     fn flush_stats(&mut self) {
-        let mut entries = self
-            .inner
-            .drain()
-            .map(|(_, mut doc)| {
-                doc.timestamp = self.start_time.as_secs() as u32;
-                doc.flags |= self.doc_flag;
-                BoxedDocument(Box::new(doc))
-            })
-            .collect::<Vec<_>>();
-        let mut index = 0;
-        let length = entries.len();
-        while index + QUEUE_BATCH_SIZE < length {
-            let v = entries.drain(..QUEUE_BATCH_SIZE).collect();
-            if let Err(Error::Terminated(..)) = self.sender.send_all(v) {
-                warn!("{} queue terminated", self.context.name);
-                return;
+        let mut batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
+        for (_, mut doc) in self.inner.drain() {
+            if batch.len() >= QUEUE_BATCH_SIZE {
+                if let Err(Error::Terminated(..)) = self.sender.send_all(&mut batch) {
+                    warn!("{} queue terminated", self.context.name);
+                    return;
+                }
             }
-            index += QUEUE_BATCH_SIZE;
+            doc.timestamp = self.start_time.as_secs() as u32;
+            doc.flags |= self.doc_flag;
+            batch.push(BoxedDocument(Box::new(doc)))
         }
-        if let Err(Error::Terminated(..)) = self.sender.send_all(entries) {
-            warn!("{} queue terminated", self.context.name);
+        if batch.len() > 0 {
+            if let Err(Error::Terminated(..)) = self.sender.send_all(&mut batch) {
+                warn!("{} queue terminated", self.context.name);
+            }
         }
     }
 }
@@ -1010,6 +1018,7 @@ mod tests {
             direction: Direction::ClientToServer,
             code: Code::IP
                 | Code::L3_EPC_ID
+                | Code::GPID
                 | Code::VTAP_ID
                 | Code::PROTOCOL
                 | Code::SERVER_PORT
@@ -1040,6 +1049,7 @@ mod tests {
 
         tagger.code = Code::IP_PATH
             | Code::L3_EPC_PATH
+            | Code::GPID_PATH
             | Code::VTAP_ID
             | Code::PROTOCOL
             | Code::SERVER_PORT

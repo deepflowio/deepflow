@@ -34,10 +34,11 @@ func GetTagTranslator(name, alias, db, table string) (Statement, error) {
 	if alias != "" {
 		selectTag = alias
 	}
-	tagItem, ok := tag.GetTag(name, db, table, "default")
+
+	tagItem, ok := tag.GetTag(strings.Trim(name, "`"), db, table, "default")
 	if !ok {
 		name := strings.Trim(name, "`")
-		if strings.HasPrefix(name, "label.") {
+		if strings.HasPrefix(name, "k8s.label.") {
 			if strings.HasSuffix(name, "_0") {
 				tagItem, ok = tag.GetTag("k8s_label_0", db, table, "default")
 			} else if strings.HasSuffix(name, "_1") {
@@ -47,14 +48,40 @@ func GetTagTranslator(name, alias, db, table string) (Statement, error) {
 			}
 			nameNoSuffix := strings.TrimSuffix(name, "_0")
 			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "label.")
+			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.label.")
+			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
+			stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag}
+		} else if strings.HasPrefix(name, "cloud.tag.") {
+			if strings.HasSuffix(name, "_0") {
+				tagItem, ok = tag.GetTag("cloud_tag_0", db, table, "default")
+			} else if strings.HasSuffix(name, "_1") {
+				tagItem, ok = tag.GetTag("cloud_tag_1", db, table, "default")
+			} else {
+				tagItem, ok = tag.GetTag("cloud_tag", db, table, "default")
+			}
+			nameNoSuffix := strings.TrimSuffix(name, "_0")
+			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
+			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "cloud.tag.")
+			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix, nameNoPreffix, nameNoPreffix)
+			stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag}
+		} else if strings.HasPrefix(name, "os.app.") {
+			if strings.HasSuffix(name, "_0") {
+				tagItem, ok = tag.GetTag("os_app_0", db, table, "default")
+			} else if strings.HasSuffix(name, "_1") {
+				tagItem, ok = tag.GetTag("os_app_1", db, table, "default")
+			} else {
+				tagItem, ok = tag.GetTag("os_app", db, table, "default")
+			}
+			nameNoSuffix := strings.TrimSuffix(name, "_0")
+			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
+			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "os.app.")
 			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
 			stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag}
 		} else if strings.HasPrefix(name, "tag.") || strings.HasPrefix(name, "attribute.") {
 			if strings.HasPrefix(name, "tag.") {
-				tagItem, ok = tag.GetTag("tag", db, table, "default")
+				tagItem, ok = tag.GetTag("tag.", db, table, "default")
 			} else {
-				tagItem, ok = tag.GetTag("attribute", db, table, "default")
+				tagItem, ok = tag.GetTag("attribute.", db, table, "default")
 			}
 			nameNoPreffix := strings.TrimPrefix(name, "tag.")
 			nameNoPreffix = strings.TrimPrefix(nameNoPreffix, "attribute.")
@@ -130,7 +157,7 @@ func (t *SelectTag) Format(m *view.Model) {
 		}
 		m.AddCallback(t.Value, MacTranslate([]interface{}{t.Value, alias}))
 	}
-	if t.Alias == "tags" || t.Alias == "attributes" || t.Alias == "metrics" {
+	if t.Alias == "tag" || t.Alias == "attribute" || t.Alias == "metrics" || strings.Trim(t.Alias, "`") == "cloud.tag" || strings.Trim(t.Alias, "`") == "os.app" {
 		m.AddCallback(t.Alias, ExternalTagsFormat([]interface{}{t.Alias}))
 	} else if t.Value == "packet_batch" {
 		m.AddCallback(t.Value, packet_batch.PacketBatchFormat([]interface{}{}))

@@ -47,6 +47,9 @@ type ToolDataSet struct {
 	networkLcuuidToID map[string]int
 	networkIDToLcuuid map[int]string
 
+	subnetLcuuidToID map[string]int
+	subnetIDToLcuuid map[int]string
+
 	vrouterLcuuidToID map[string]int
 
 	dhcpPortLcuuidToID map[string]int
@@ -120,6 +123,9 @@ func NewToolDataSet() ToolDataSet {
 
 		networkLcuuidToID: make(map[string]int),
 		networkIDToLcuuid: make(map[int]string),
+
+		subnetLcuuidToID: make(map[string]int),
+		subnetIDToLcuuid: make(map[int]string),
 
 		vrouterLcuuidToID: make(map[string]int),
 
@@ -266,8 +272,10 @@ func (t *ToolDataSet) addVM(item *mysql.VM) {
 	if azID, ok := t.GetAZIDByLcuuid(item.AZ); ok {
 		t.vmIDToInfo[item.ID].AZID = azID
 	}
-	if hostID, ok := t.GetHostIDByIP(item.LaunchServer); ok {
-		t.vmIDToInfo[item.ID].HostID = hostID
+	if item.LaunchServer != "" {
+		if hostID, ok := t.GetHostIDByIP(item.LaunchServer); ok {
+			t.vmIDToInfo[item.ID].HostID = hostID
+		}
 	}
 	log.Info(addToToolMap(RESOURCE_TYPE_VM_EN, item.Lcuuid))
 }
@@ -336,6 +344,16 @@ func (t *ToolDataSet) deleteNetwork(lcuuid string) {
 	delete(t.networkIDToName, id)
 	delete(t.networkLcuuidToID, lcuuid)
 	log.Info(deleteFromToolMap(RESOURCE_TYPE_NETWORK_EN, lcuuid))
+}
+
+func (t *ToolDataSet) addSubnet(item *mysql.Subnet) {
+	t.subnetLcuuidToID[item.Lcuuid] = item.ID
+	log.Info(addToToolMap(RESOURCE_TYPE_SUBNET_EN, item.Lcuuid))
+}
+
+func (t *ToolDataSet) deleteSubnet(lcuuid string) {
+	delete(t.subnetLcuuidToID, lcuuid)
+	log.Info(deleteFromToolMap(RESOURCE_TYPE_SUBNET_EN, lcuuid))
 }
 
 func (t *ToolDataSet) addVRouter(item *mysql.VRouter) {
@@ -1095,6 +1113,40 @@ func (t *ToolDataSet) GetNetworkIDByLcuuid(lcuuid string) (int, bool) {
 	} else {
 		log.Error(dbResourceByLcuuidNotFound(RESOURCE_TYPE_NETWORK_EN, lcuuid))
 		return id, false
+	}
+}
+
+func (t *ToolDataSet) GetSubnetIDByLcuuid(lcuuid string) (int, bool) {
+	id, exists := t.subnetLcuuidToID[lcuuid]
+	if exists {
+		return id, true
+	}
+	log.Warning(cacheIDByLcuuidNotFound(RESOURCE_TYPE_SUBNET_EN, lcuuid))
+	var subnet mysql.Subnet
+	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&subnet)
+	if result.RowsAffected == 1 {
+		t.addSubnet(&subnet)
+		return subnet.ID, true
+	} else {
+		log.Error(dbResourceByLcuuidNotFound(RESOURCE_TYPE_SUBNET_EN, lcuuid))
+		return id, false
+	}
+}
+
+func (t *ToolDataSet) GetSubnetLcuuidByID(id int) (string, bool) {
+	lcuuid, exists := t.subnetIDToLcuuid[id]
+	if exists {
+		return lcuuid, true
+	}
+	log.Warning(cacheLcuuidByIDNotFound(RESOURCE_TYPE_SUBNET_EN, id))
+	var subnet mysql.Subnet
+	result := mysql.Db.Where("lcuuid = ?", id).Find(&subnet)
+	if result.RowsAffected == 1 {
+		t.addSubnet(&subnet)
+		return subnet.Lcuuid, true
+	} else {
+		log.Error(dbResourceByIDNotFound(RESOURCE_TYPE_SUBNET_EN, id))
+		return lcuuid, false
 	}
 }
 

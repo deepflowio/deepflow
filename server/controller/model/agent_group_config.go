@@ -50,6 +50,8 @@ type StaticConfig struct {
 	VxlanFlags                       *uint8                `yaml:"vxlan-flags,omitempty"`
 	CollectorSenderQueueSize         *int                  `yaml:"collector-sender-queue-size,omitempty"`
 	CollectorSenderQueueCount        *int                  `yaml:"collector-sender-queue-count,omitempty"`
+	ToaSenderQueueSize               *int                  `yaml:"toa-sender-queue-size,omitempty"`
+	ToaLruCacheSize                  *int                  `yaml:"toa-lru-cache-size,omitempty"`
 	FlowSenderQueueSize              *int                  `yaml:"flow-sender-queue-size,omitempty"`
 	FlowSenderQueueCount             *int                  `yaml:"flow-sender-queue-count,omitempty"`
 	SecondFlowExtraDelaySecond       *string               `yaml:"second-flow-extra-delay-second,omitempty"`
@@ -79,12 +81,13 @@ type StaticConfig struct {
 	FeatureFlags                     []string              `yaml:"feature-flags,omitempty"`
 	L7ProtocolPorts                  map[string]string     `yaml:"l7-protocol-ports,omitempty"`
 	Ebpf                             *EbpfConfig           `yaml:"ebpf,omitempty"`
-	OsAppTagExecUser                 *string               `yaml:"os-app-tag-exec-user"`
-	OsAppTagExec                     *string               `yaml:"os-app-tag-exec"`
-	OsProcRoot                       *string               `yaml:"os-proc-root;omitempty"`
-	OsProcSocketSyncInterval         *int                  `yaml:"os-proc-socket-sync-interval"`
-	OsProcSocketMinLifetime          *int                  `yaml:"os-proc-socket-min-lifetime"`
-	OsProcRegex                      *OsProcRegex          `yaml:"os-proc-regex"`
+	OsAppTagExecUser                 *string               `yaml:"os-app-tag-exec-user,omitempty"`
+	OsAppTagExec                     []string              `yaml:"os-app-tag-exec,omitempty"`
+	OsProcRoot                       *string               `yaml:"os-proc-root,omitempty"`
+	OsProcSocketSyncInterval         *int                  `yaml:"os-proc-socket-sync-interval,omitempty"`
+	OsProcSocketMinLifetime          *int                  `yaml:"os-proc-socket-min-lifetime,omitempty"`
+	OsProcRegex                      []*OsProcRegex        `yaml:"os-proc-regex,omitempty"`
+	GuardInterval                    *string               `yaml:"guard-interval,omitempty"`
 }
 
 type XflowCollectorConfig struct {

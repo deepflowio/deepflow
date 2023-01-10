@@ -327,7 +327,20 @@ func (c *Cloud) appendAddtionalResourcesData() {
 	c.resource.VMs = append(c.resource.VMs, additionalResource.CHosts...)
 	c.resource.VInterfaces = append(c.resource.VInterfaces, additionalResource.VInterfaces...)
 	c.resource.IPs = append(c.resource.IPs, additionalResource.IPs...)
-	return
+	c.appendCloudTags(additionalResource.CHostCloudTags, additionalResource.PodNamespaceCloudTags)
+}
+
+func (c *Cloud) appendCloudTags(chostCloudTags model.UUIDToCloudTags, podNamespaceCloudTags model.UUIDToCloudTags) {
+	for i, chost := range c.resource.VMs {
+		if value, ok := chostCloudTags[chost.Lcuuid]; ok {
+			c.resource.VMs[i].CloudTags = value
+		}
+	}
+	for i, podNamespace := range c.resource.PodNamespaces {
+		if value, ok := podNamespaceCloudTags[podNamespace.Lcuuid]; ok {
+			c.resource.PodNamespaces[i].CloudTags = value
+		}
+	}
 }
 
 func (c *Cloud) appendResourceProcess() {

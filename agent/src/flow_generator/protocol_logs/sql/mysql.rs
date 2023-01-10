@@ -91,14 +91,6 @@ impl L7ProtocolInfoInterface for MysqlInfo {
     fn is_tls(&self) -> bool {
         self.is_tls
     }
-
-    // use for filter the mysql protocol miscalculate.
-    fn skip_send(&self) -> bool {
-        // if sql check fail and have no error response, very likely is protocol miscalculate.
-        // skip 0 command
-        (self.status == L7ResponseStatus::default() && !is_mysql(&self.context))
-            || self.command == 0
-    }
 }
 
 impl MysqlInfo {
@@ -235,6 +227,7 @@ impl L7ProtocolParserInterface for MysqlLog {
     fn reset(&mut self) {
         *self = Self {
             l7_proto: self.l7_proto,
+            command: self.command,
             ..Default::default()
         };
     }
@@ -398,7 +391,7 @@ impl MysqlLog {
         match protocol_version_or_query_type {
             COM_QUERY | COM_STMT_PREPARE => {
                 let context = mysql_string(&payload[offset + 1..]);
-                return context.is_ascii();
+                return context.is_ascii() && is_mysql(&context);
             }
             _ => {}
         }

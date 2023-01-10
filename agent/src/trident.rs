@@ -17,6 +17,7 @@
 use std::env;
 use std::fmt;
 use std::mem;
+use std::net::SocketAddr;
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::{Path, PathBuf};
 use std::process;
@@ -52,11 +53,13 @@ use crate::integration_collector::{
 use crate::metric::document::BoxedDocument;
 #[cfg(target_os = "linux")]
 use crate::platform::ApiWatcher;
+use crate::platform::SocketSynchronizer;
 use crate::sender::get_sender_id;
 #[cfg(target_os = "linux")]
 use crate::utils::cgroups::Cgroups;
 #[cfg(target_os = "linux")]
 use crate::utils::environment::core_file_check;
+use crate::utils::lru::Lru;
 use crate::utils::stats::ArcBatch;
 use crate::{
     collector::Collector,
@@ -91,7 +94,8 @@ use crate::{
     utils::{
         environment::{
             check, controller_ip_check, free_memory_check, free_space_checker, get_ctrl_ip_and_mac,
-            kernel_check, running_in_container, tap_interface_check, trident_process_check,
+            kernel_check, running_in_container, running_in_only_watch_k8s_mode,
+            tap_interface_check, trident_process_check,
         },
         guard::Guard,
         logger::{LogLevelWriter, LogWriterAdapter, RemoteLogConfig, RemoteLogWriter},
@@ -401,6 +405,7 @@ impl Trident {
         let guard = Guard::new(
             config_handler.environment(),
             log_dir.to_string(),
+            config_handler.candidate_config.yaml_config.guard_interval,
             exception_handler.clone(),
         );
         guard.start();
@@ -465,10 +470,10 @@ impl Trident {
                 }
             }
             yaml_conf = Some(runtime_config.yaml_config.clone());
-            let callbacks =
-                config_handler.on_config(runtime_config, &exception_handler, components.as_mut());
             match components.as_mut() {
                 None => {
+                    let callbacks =
+                        config_handler.on_config(runtime_config, &exception_handler, None);
                     let mut comp = Components::new(
                         &version_info,
                         &config_handler,
@@ -481,29 +486,44 @@ impl Trident {
                         config_handler.static_config.agent_mode,
                     )?;
                     comp.start();
-                    if config_handler.candidate_config.dispatcher.tap_mode == TapMode::Analyzer {
-                        parse_tap_type(&mut comp, tap_types);
+
+                    if let Components::Agent(components) = &mut comp {
+                        if config_handler.candidate_config.dispatcher.tap_mode == TapMode::Analyzer
+                        {
+                            parse_tap_type(components, tap_types);
+                        }
+
+                        for callback in callbacks {
+                            callback(&config_handler, components);
+                        }
                     }
-                    for callback in callbacks {
-                        callback(&config_handler, &mut comp);
-                    }
+
                     components.replace(comp);
                 }
-                Some(mut components) => {
-                    components.start();
-                    components.config = config_handler.candidate_config.clone();
-                    dispatcher_listener_callback(
-                        &config_handler.candidate_config.dispatcher,
-                        &mut components,
-                        blacklist,
-                        vm_mac_addrs,
-                        tap_types,
-                    );
-                    for callback in callbacks {
-                        callback(&config_handler, components);
-                    }
-                    for listener in components.dispatcher_listeners.iter_mut() {
-                        listener.on_config_change(&config_handler.candidate_config.dispatcher);
+                Some(components) => {
+                    if let Components::Agent(components) = components {
+                        let callbacks = config_handler.on_config(
+                            runtime_config,
+                            &exception_handler,
+                            Some(components),
+                        );
+
+                        components.start();
+                        components.config = config_handler.candidate_config.clone();
+                        dispatcher_listener_callback(
+                            &config_handler.candidate_config.dispatcher,
+                            components,
+                            blacklist,
+                            vm_mac_addrs,
+                            tap_types,
+                        );
+                        for callback in callbacks {
+                            callback(&config_handler, components);
+                        }
+
+                        for listener in components.dispatcher_listeners.iter_mut() {
+                            listener.on_config_change(&config_handler.candidate_config.dispatcher);
+                        }
                     }
                 }
             }
@@ -526,7 +546,7 @@ impl Trident {
 
 fn dispatcher_listener_callback(
     conf: &DispatcherConfig,
-    components: &mut Components,
+    components: &mut AgentComponents,
     blacklist: Vec<u64>,
     vm_mac_addrs: Vec<MacAddr>,
     tap_types: Vec<trident::TapType>,
@@ -617,7 +637,7 @@ fn dispatcher_listener_callback(
     }
 }
 
-fn parse_tap_type(components: &mut Components, tap_types: Vec<trident::TapType>) {
+fn parse_tap_type(components: &mut AgentComponents, tap_types: Vec<trident::TapType>) {
     let mut updated = false;
     if components.cur_tap_types.len() != tap_types.len() {
         updated = true;
@@ -762,7 +782,98 @@ impl DomainNameListener {
     }
 }
 
-pub struct Components {
+pub enum Components {
+    Agent(AgentComponents),
+    #[cfg(target_os = "linux")]
+    Watcher(WatcherComponents),
+}
+
+#[cfg(target_os = "linux")]
+pub struct WatcherComponents {
+    pub api_watcher: Arc<ApiWatcher>,
+    pub libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
+    pub platform_synchronizer: PlatformSynchronizer,
+    pub domain_name_listener: DomainNameListener,
+    pub running: AtomicBool,
+    tap_mode: TapMode,
+    agent_mode: RunningMode,
+}
+
+#[cfg(target_os = "linux")]
+impl WatcherComponents {
+    fn new(
+        config_handler: &ConfigHandler,
+        stats_collector: Arc<stats::Collector>,
+        session: &Arc<Session>,
+        synchronizer: &Arc<Synchronizer>,
+        exception_handler: ExceptionHandler,
+        remote_log_config: RemoteLogConfig,
+        agent_mode: RunningMode,
+    ) -> Result<Self> {
+        let libvirt_xml_extractor = Arc::new(LibvirtXmlExtractor::new());
+        let candidate_config = &config_handler.candidate_config;
+        let platform_synchronizer = PlatformSynchronizer::new(
+            config_handler.platform(),
+            session.clone(),
+            libvirt_xml_extractor.clone(),
+            exception_handler.clone(),
+            candidate_config.dispatcher.extra_netns_regex.clone(),
+        );
+        let api_watcher = Arc::new(ApiWatcher::new(
+            config_handler.platform(),
+            session.clone(),
+            exception_handler.clone(),
+            stats_collector.clone(),
+        ));
+        let domain_name_listener = DomainNameListener::new(
+            stats_collector.clone(),
+            synchronizer.clone(),
+            remote_log_config,
+            config_handler.static_config.controller_domain_name.clone(),
+            config_handler.static_config.controller_ips.clone(),
+            config_handler.port(),
+        );
+
+        info!("With ONLY_WATCH_K8S_RESOURCE and IN_CONTAINER environment variables set, the agent will only watch K8s resource");
+        Ok(WatcherComponents {
+            api_watcher,
+            platform_synchronizer,
+            domain_name_listener,
+            libvirt_xml_extractor,
+            running: AtomicBool::new(false),
+            tap_mode: candidate_config.tap_mode,
+            agent_mode,
+        })
+    }
+
+    fn start(&mut self) {
+        if self.running.swap(true, Ordering::Relaxed) {
+            return;
+        }
+        info!("Staring watcher components.");
+        if matches!(self.agent_mode, RunningMode::Managed) {
+            self.platform_synchronizer.start();
+            self.api_watcher.start();
+        }
+        self.libvirt_xml_extractor.start();
+        self.platform_synchronizer.start_kubernetes_poller();
+        self.domain_name_listener.start();
+        info!("Started watcher components.");
+    }
+
+    fn stop(&mut self) {
+        if !self.running.swap(false, Ordering::Relaxed) {
+            return;
+        }
+        self.libvirt_xml_extractor.stop();
+        self.platform_synchronizer.stop();
+        self.api_watcher.stop();
+        self.domain_name_listener.stop();
+        info!("Stopped watcher components.")
+    }
+}
+
+pub struct AgentComponents {
     pub config: ModuleConfig,
     pub rx_leaky_bucket: Arc<LeakyBucket>,
     pub l7_log_rate: Arc<LeakyBucket>,
@@ -778,6 +889,8 @@ pub struct Components {
     pub l7_flow_uniform_sender: UniformSenderThread<BoxAppProtoLogsData>,
     pub stats_sender: UniformSenderThread<ArcBatch>,
     pub platform_synchronizer: PlatformSynchronizer,
+    #[cfg(target_os = "linux")]
+    pub socket_synchronizer: SocketSynchronizer,
     #[cfg(target_os = "linux")]
     pub api_watcher: Arc<ApiWatcher>,
     pub debugger: Debugger,
@@ -806,84 +919,150 @@ pub struct Components {
     agent_mode: RunningMode,
 }
 
-impl Components {
-    fn start(&mut self) {
-        if self.running.swap(true, Ordering::Relaxed) {
-            return;
-        }
-        info!("Staring components.");
-        self.libvirt_xml_extractor.start();
-        if matches!(self.agent_mode, RunningMode::Managed) {
-            self.platform_synchronizer.start();
-            #[cfg(target_os = "linux")]
-            self.api_watcher.start();
-        }
-        #[cfg(target_os = "linux")]
-        self.platform_synchronizer.start_kubernetes_poller();
-        self.debugger.start();
-        self.metrics_uniform_sender.start();
-        self.l7_flow_uniform_sender.start();
-        self.l4_flow_uniform_sender.start();
-
-        // Enterprise Edition Feature: packet-sequence
-        self.packet_sequence_uniform_sender.start();
-        for packet_sequence_parser in self.packet_sequence_parsers.iter() {
-            packet_sequence_parser.start();
-        }
-
-        if self.tap_mode != TapMode::Analyzer
-            && self.config.platform.kubernetes_cluster_id.is_empty()
-        {
-            match free_memory_check(self.max_memory, &self.exception_handler) {
-                Ok(()) => {
-                    for dispatcher in self.dispatchers.iter() {
-                        dispatcher.start();
-                    }
-                }
-                Err(e) => {
-                    warn!("{}", e);
-                }
-            }
-        } else {
-            for dispatcher in self.dispatchers.iter() {
-                dispatcher.start();
-            }
-        }
-
-        for log_parser in self.log_parsers.iter() {
-            log_parser.start();
+impl AgentComponents {
+    fn new_collector(
+        id: usize,
+        stats_collector: Arc<stats::Collector>,
+        flow_receiver: queue::Receiver<Box<TaggedFlow>>,
+        toa_info_sender: DebugSender<Box<(SocketAddr, SocketAddr)>>,
+        l4_flow_aggr_sender: Option<queue::DebugSender<BoxedTaggedFlow>>,
+        metrics_sender: queue::DebugSender<BoxedDocument>,
+        metrics_type: MetricsType,
+        config_handler: &ConfigHandler,
+        queue_debugger: &QueueDebugger,
+        synchronizer: &Arc<Synchronizer>,
+    ) -> CollectorThread {
+        let yaml_config = &config_handler.candidate_config.yaml_config;
+        let mut l4_flow_aggr_outer = None;
+        let mut l4_log_sender_outer = None;
+        if l4_flow_aggr_sender.is_some() {
+            let (l4_log_sender, l4_log_receiver, counter) = queue::bounded_with_debug(
+                yaml_config.flow.aggr_queue_size as usize,
+                "2-second-flow-to-minute-aggrer",
+                queue_debugger,
+            );
+            l4_log_sender_outer = Some(l4_log_sender);
+            stats_collector.register_countable(
+                "queue",
+                Countable::Owned(Box::new(counter)),
+                vec![
+                    StatsOption::Tag("module", "2-second-flow-to-minute-aggrer".to_string()),
+                    StatsOption::Tag("index", id.to_string()),
+                ],
+            );
+            let (l4_flow_aggr, flow_aggr_counter) = FlowAggrThread::new(
+                id,                                   // id
+                l4_log_receiver,                      // input
+                l4_flow_aggr_sender.unwrap().clone(), // output
+                config_handler.collector(),
+                synchronizer.ntp_diff(),
+            );
+            l4_flow_aggr_outer = Some(l4_flow_aggr);
+            stats_collector.register_countable(
+                "flow_aggr",
+                Countable::Ref(Arc::downgrade(&flow_aggr_counter) as Weak<dyn RefCountable>),
+                vec![StatsOption::Tag("index", id.to_string())],
+            );
         }
 
-        for collector in self.collectors.iter_mut() {
-            collector.start();
+        let (second_sender, second_receiver, counter) = queue::bounded_with_debug(
+            yaml_config.quadruple_queue_size,
+            "2-flow-with-meter-to-second-collector",
+            queue_debugger,
+        );
+        stats_collector.register_countable(
+            "queue",
+            Countable::Owned(Box::new(counter)),
+            vec![
+                StatsOption::Tag(
+                    "module",
+                    "2-flow-with-meter-to-second-collector".to_string(),
+                ),
+                StatsOption::Tag("index", id.to_string()),
+            ],
+        );
+        let (minute_sender, minute_receiver, counter) = queue::bounded_with_debug(
+            yaml_config.quadruple_queue_size,
+            "2-flow-with-meter-to-minute-collector",
+            queue_debugger,
+        );
+        stats_collector.register_countable(
+            "queue",
+            Countable::Owned(Box::new(counter)),
+            vec![
+                StatsOption::Tag(
+                    "module",
+                    "2-flow-with-meter-to-minute-collector".to_string(),
+                ),
+                StatsOption::Tag("index", id.to_string()),
+            ],
+        );
+
+        // FIXME: 应该让flowgenerator和dispatcher解耦，并提供Delay函数用于此处
+        // QuadrupleGenerator的Delay组成部分：
+        //   FlowGen中流统计数据固有的Delay：_FLOW_STAT_INTERVAL + packetDelay
+        //   FlowGen中InjectFlushTicker的额外Delay：_TIME_SLOT_UNIT
+        //   FlowGen中输出队列Flush的Delay：flushInterval
+        //   FlowGen中其它处理流程可能产生的Delay: 5s
+        let second_quadruple_tolerable_delay = (yaml_config.packet_delay.as_secs()
+            + 1
+            + yaml_config.flow.flush_interval.as_secs()
+            + COMMON_DELAY as u64)
+            + yaml_config.second_flow_extra_delay.as_secs();
+        let minute_quadruple_tolerable_delay = (60 + yaml_config.packet_delay.as_secs())
+            + 1
+            + yaml_config.flow.flush_interval.as_secs()
+            + COMMON_DELAY as u64;
+
+        let quadruple_generator = QuadrupleGeneratorThread::new(
+            id,
+            flow_receiver,
+            second_sender,
+            minute_sender,
+            toa_info_sender,
+            l4_log_sender_outer,
+            (yaml_config.flow.hash_slots << 3) as usize, // connection_lru_capacity
+            metrics_type,
+            second_quadruple_tolerable_delay,
+            minute_quadruple_tolerable_delay,
+            1 << 18, // possible_host_size
+            config_handler.collector(),
+            synchronizer.ntp_diff(),
+            stats_collector.clone(),
+        );
+
+        let (mut second_collector, mut minute_collector) = (None, None);
+        if metrics_type.contains(MetricsType::SECOND) {
+            second_collector = Some(Collector::new(
+                id as u32,
+                second_receiver,
+                metrics_sender.clone(),
+                MetricsType::SECOND,
+                second_quadruple_tolerable_delay as u32 + COMMON_DELAY, // qg processing is delayed and requires the collector component to increase the window size
+                &stats_collector,
+                config_handler.collector(),
+                synchronizer.ntp_diff(),
+            ));
+        }
+        if metrics_type.contains(MetricsType::MINUTE) {
+            minute_collector = Some(Collector::new(
+                id as u32,
+                minute_receiver,
+                metrics_sender,
+                MetricsType::MINUTE,
+                minute_quadruple_tolerable_delay as u32 + COMMON_DELAY, // qg processing is delayed and requires the collector component to increase the window size
+                &stats_collector,
+                config_handler.collector(),
+                synchronizer.ntp_diff(),
+            ));
         }
 
-        #[cfg(target_os = "linux")]
-        if let Some(ebpf_collector) = self.ebpf_collector.as_mut() {
-            ebpf_collector.start();
-        }
-        if matches!(self.agent_mode, RunningMode::Managed) {
-            self.otel_uniform_sender.start();
-            self.compressed_otel_uniform_sender.start();
-            self.prometheus_uniform_sender.start();
-            self.telegraf_uniform_sender.start();
-            if self.config.metric_server.enabled {
-                self.external_metrics_server.start();
-            }
-            self.pcap_batch_uniform_sender.start();
-        }
-        self.domain_name_listener.start();
-        self.handler_builders.iter().for_each(|x| {
-            x.lock().unwrap().iter_mut().for_each(|y| {
-                y.start();
-            })
-        });
-        self.npb_bandwidth_watcher.start();
-        for p in self.pcap_assemblers.iter() {
-            p.start();
-        }
-        self.npb_arp_table.start();
-        info!("Started components.");
+        CollectorThread::new(
+            quadruple_generator,
+            l4_flow_aggr_outer,
+            second_collector,
+            minute_collector,
+        )
     }
 
     fn new(
@@ -903,6 +1082,10 @@ impl Components {
         let ctrl_ip = config_handler.ctrl_ip;
         let ctrl_mac = config_handler.ctrl_mac;
         let max_memory = config_handler.candidate_config.environment.max_memory;
+        let process_threshold = config_handler
+            .candidate_config
+            .environment
+            .process_threshold;
         let feature_flags = FeatureFlags::from(&yaml_config.feature_flags);
 
         let mut stats_sender = UniformSenderThread::new(
@@ -916,7 +1099,7 @@ impl Components {
         );
         stats_sender.start();
 
-        trident_process_check();
+        trident_process_check(process_threshold);
         if feature_flags.contains(FeatureFlags::CORE) {
             #[cfg(target_os = "linux")]
             core_file_check();
@@ -998,6 +1181,25 @@ impl Components {
         let debugger = Debugger::new(context);
         let queue_debugger = debugger.clone_queue();
 
+        let (toa_sender, toa_recv, _) = queue::bounded_with_debug(
+            yaml_config.toa_sender_queue_size,
+            "socket-sync-toa-info-queue",
+            &queue_debugger,
+        );
+        #[cfg(target_os = "linux")]
+        let socket_synchronizer = SocketSynchronizer::new(
+            config_handler.platform(),
+            synchronizer.running_config.clone(),
+            Arc::new(Mutex::new(policy_getter)),
+            policy_setter,
+            session.clone(),
+            toa_recv,
+            Arc::new(Mutex::new(Lru::with_capacity(
+                yaml_config.toa_lru_cache_size >> 5,
+                yaml_config.toa_lru_cache_size,
+            ))),
+        );
+
         let rx_leaky_bucket = Arc::new(LeakyBucket::new(match candidate_config.tap_mode {
             TapMode::Analyzer => None,
             _ => Some(
@@ -1046,7 +1248,7 @@ impl Components {
             yaml_config.analyzer_ip, candidate_config.sender.dest_ip
         );
         let sender_id = get_sender_id() as usize;
-        let l4_flow_aggr_queue_name = "3-flow-to-collector-sender";
+        let l4_flow_aggr_queue_name = "3-flowlog-to-collector-sender";
         let (l4_flow_aggr_sender, l4_flow_aggr_receiver, counter) = queue::bounded_with_debug(
             yaml_config.flow_sender_queue_size as usize,
             l4_flow_aggr_queue_name,
@@ -1071,7 +1273,7 @@ impl Components {
         );
 
         let sender_id = get_sender_id() as usize;
-        let metrics_queue_name = "2-doc-to-collector-sender";
+        let metrics_queue_name = "3-doc-to-collector-sender";
         let (metrics_sender, metrics_receiver, counter) = queue::bounded_with_debug(
             yaml_config.collector_sender_queue_size,
             metrics_queue_name,
@@ -1096,7 +1298,7 @@ impl Components {
         );
 
         let sender_id = get_sender_id() as usize;
-        let proto_log_queue_name = "3-protolog-to-collector-sender";
+        let proto_log_queue_name = "2-protolog-to-collector-sender";
         let (proto_log_sender, proto_log_receiver, counter) = queue::bounded_with_debug(
             yaml_config.flow_sender_queue_size,
             proto_log_queue_name,
@@ -1152,7 +1354,7 @@ impl Components {
 
         // Enterprise Edition Feature: packet-sequence
         let sender_id = get_sender_id() as usize; // TODO sender_id should be generated automatically
-        let packet_sequence_queue_name = "packet_sequence_block-to-sender";
+        let packet_sequence_queue_name = "2-packet-sequence-block-to-sender";
         let (packet_sequence_uniform_output, packet_sequence_uniform_input, counter) =
             queue::bounded_with_debug(
                 yaml_config.packet_sequence_queue_size,
@@ -1287,17 +1489,14 @@ impl Components {
             let (packet_sequence_sender, packet_sequence_receiver, counter) =
                 queue::bounded_with_debug(
                     yaml_config.packet_sequence_queue_size,
-                    "1-packet-sequence-block-to-uniform-collect-sender",
+                    "1-packet-sequence-block-to-parser",
                     &queue_debugger,
                 );
             stats_collector.register_countable(
                 "queue",
                 Countable::Owned(Box::new(counter)),
                 vec![
-                    StatsOption::Tag(
-                        "module",
-                        "1-packet-sequence-block-to-uniform-collect-sender".to_string(),
-                    ),
+                    StatsOption::Tag("module", "1-packet-sequence-block-to-parser".to_string()),
                     StatsOption::Tag("index", i.to_string()),
                 ],
             );
@@ -1452,6 +1651,7 @@ impl Components {
                 i,
                 stats_collector.clone(),
                 flow_receiver,
+                toa_sender.clone(),
                 Some(l4_flow_aggr_sender.clone()),
                 metrics_sender.clone(),
                 MetricsType::SECOND | MetricsType::MINUTE,
@@ -1485,6 +1685,7 @@ impl Components {
                 ebpf_dispatcher_id,
                 stats_collector.clone(),
                 flow_receiver,
+                toa_sender.clone(),
                 None,
                 metrics_sender.clone(),
                 MetricsType::SECOND | MetricsType::MINUTE,
@@ -1542,7 +1743,7 @@ impl Components {
         }
 
         let sender_id = get_sender_id() as usize;
-        let otel_queue_name = "otel-to-sender";
+        let otel_queue_name = "1-otel-to-sender";
         let (otel_sender, otel_receiver, counter) = queue::bounded_with_debug(
             yaml_config.external_metrics_sender_queue_size,
             otel_queue_name,
@@ -1567,7 +1768,7 @@ impl Components {
         );
 
         let sender_id = get_sender_id() as usize;
-        let prometheus_queue_name = "prometheus-to-sender";
+        let prometheus_queue_name = "1-prometheus-to-sender";
         let (prometheus_sender, prometheus_receiver, counter) = queue::bounded_with_debug(
             yaml_config.external_metrics_sender_queue_size,
             prometheus_queue_name,
@@ -1592,7 +1793,7 @@ impl Components {
         );
 
         let sender_id = get_sender_id() as usize;
-        let telegraf_queue_name = "telegraf-to-sender";
+        let telegraf_queue_name = "1-telegraf-to-sender";
         let (telegraf_sender, telegraf_receiver, counter) = queue::bounded_with_debug(
             yaml_config.external_metrics_sender_queue_size,
             telegraf_queue_name,
@@ -1617,7 +1818,7 @@ impl Components {
         );
 
         let sender_id = get_sender_id() as usize;
-        let compressed_otel_queue_name = "compressed-otel-to-sender";
+        let compressed_otel_queue_name = "1-compressed-otel-to-sender";
         let (compressed_otel_sender, compressed_otel_receiver, counter) = queue::bounded_with_debug(
             yaml_config.external_metrics_sender_queue_size,
             compressed_otel_queue_name,
@@ -1685,7 +1886,7 @@ impl Components {
             Default::default(),
         );
 
-        Ok(Components {
+        Ok(AgentComponents {
             config: candidate_config.clone(),
             rx_leaky_bucket,
             l7_log_rate,
@@ -1700,6 +1901,8 @@ impl Components {
             l7_flow_uniform_sender,
             stats_sender,
             platform_synchronizer,
+            #[cfg(target_os = "linux")]
+            socket_synchronizer,
             #[cfg(target_os = "linux")]
             api_watcher,
             debugger,
@@ -1730,147 +1933,87 @@ impl Components {
         })
     }
 
-    fn new_collector(
-        id: usize,
-        stats_collector: Arc<stats::Collector>,
-        flow_receiver: queue::Receiver<Box<TaggedFlow>>,
-        l4_flow_aggr_sender: Option<queue::DebugSender<BoxedTaggedFlow>>,
-        metrics_sender: queue::DebugSender<BoxedDocument>,
-        metrics_type: MetricsType,
-        config_handler: &ConfigHandler,
-        queue_debugger: &QueueDebugger,
-        synchronizer: &Arc<Synchronizer>,
-    ) -> CollectorThread {
-        let yaml_config = &config_handler.candidate_config.yaml_config;
-        let mut l4_flow_aggr_outer = None;
-        let mut l4_log_sender_outer = None;
-        if l4_flow_aggr_sender.is_some() {
-            let (l4_log_sender, l4_log_receiver, counter) = queue::bounded_with_debug(
-                yaml_config.flow.aggr_queue_size as usize,
-                "2-second-flow-to-minute-aggrer",
-                queue_debugger,
-            );
-            l4_log_sender_outer = Some(l4_log_sender);
-            stats_collector.register_countable(
-                "queue",
-                Countable::Owned(Box::new(counter)),
-                vec![
-                    StatsOption::Tag("module", "2-second-flow-to-minute-aggrer".to_string()),
-                    StatsOption::Tag("index", id.to_string()),
-                ],
-            );
-            let (l4_flow_aggr, flow_aggr_counter) = FlowAggrThread::new(
-                id,                                   // id
-                l4_log_receiver,                      // input
-                l4_flow_aggr_sender.unwrap().clone(), // output
-                config_handler.collector(),
-                synchronizer.ntp_diff(),
-            );
-            l4_flow_aggr_outer = Some(l4_flow_aggr);
-            stats_collector.register_countable(
-                "flow_aggr",
-                Countable::Ref(Arc::downgrade(&flow_aggr_counter) as Weak<dyn RefCountable>),
-                vec![StatsOption::Tag("index", id.to_string())],
-            );
+    fn start(&mut self) {
+        if self.running.swap(true, Ordering::Relaxed) {
+            return;
+        }
+        info!("Staring agent components.");
+        self.libvirt_xml_extractor.start();
+        if matches!(self.agent_mode, RunningMode::Managed) {
+            self.platform_synchronizer.start();
+            #[cfg(target_os = "linux")]
+            if running_in_container() {
+                self.api_watcher.start();
+            }
+        }
+        #[cfg(target_os = "linux")]
+        self.platform_synchronizer.start_kubernetes_poller();
+        #[cfg(target_os = "linux")]
+        self.socket_synchronizer.start();
+        self.debugger.start();
+        self.metrics_uniform_sender.start();
+        self.l7_flow_uniform_sender.start();
+        self.l4_flow_uniform_sender.start();
+
+        // Enterprise Edition Feature: packet-sequence
+        self.packet_sequence_uniform_sender.start();
+        for packet_sequence_parser in self.packet_sequence_parsers.iter() {
+            packet_sequence_parser.start();
         }
 
-        let (second_sender, second_receiver, counter) = queue::bounded_with_debug(
-            yaml_config.quadruple_queue_size,
-            "2-flow-with-meter-to-second-collector",
-            queue_debugger,
-        );
-        stats_collector.register_countable(
-            "queue",
-            Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag(
-                    "module",
-                    "2-flow-with-meter-to-second-collector".to_string(),
-                ),
-                StatsOption::Tag("index", id.to_string()),
-            ],
-        );
-        let (minute_sender, minute_receiver, counter) = queue::bounded_with_debug(
-            yaml_config.quadruple_queue_size,
-            "2-flow-with-meter-to-minute-collector",
-            queue_debugger,
-        );
-        stats_collector.register_countable(
-            "queue",
-            Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag(
-                    "module",
-                    "2-flow-with-meter-to-minute-collector".to_string(),
-                ),
-                StatsOption::Tag("index", id.to_string()),
-            ],
-        );
-
-        // FIXME: 应该让flowgenerator和dispatcher解耦，并提供Delay函数用于此处
-        // QuadrupleGenerator的Delay组成部分：
-        //   FlowGen中流统计数据固有的Delay：_FLOW_STAT_INTERVAL + packetDelay
-        //   FlowGen中InjectFlushTicker的额外Delay：_TIME_SLOT_UNIT
-        //   FlowGen中输出队列Flush的Delay：flushInterval
-        //   FlowGen中其它处理流程可能产生的Delay: 5s
-        let second_quadruple_tolerable_delay = (yaml_config.packet_delay.as_secs()
-            + 1
-            + yaml_config.flow.flush_interval.as_secs()
-            + COMMON_DELAY as u64)
-            + yaml_config.second_flow_extra_delay.as_secs();
-        let minute_quadruple_tolerable_delay = (60 + yaml_config.packet_delay.as_secs())
-            + 1
-            + yaml_config.flow.flush_interval.as_secs()
-            + COMMON_DELAY as u64;
-
-        let quadruple_generator = QuadrupleGeneratorThread::new(
-            id,
-            flow_receiver,
-            second_sender,
-            minute_sender,
-            l4_log_sender_outer,
-            (yaml_config.flow.hash_slots << 3) as usize, // connection_lru_capacity
-            metrics_type,
-            second_quadruple_tolerable_delay,
-            minute_quadruple_tolerable_delay,
-            1 << 18, // possible_host_size
-            config_handler.collector(),
-            synchronizer.ntp_diff(),
-            stats_collector.clone(),
-        );
-
-        let (mut second_collector, mut minute_collector) = (None, None);
-        if metrics_type.contains(MetricsType::SECOND) {
-            second_collector = Some(Collector::new(
-                id as u32,
-                second_receiver,
-                metrics_sender.clone(),
-                MetricsType::SECOND,
-                second_quadruple_tolerable_delay as u32 + COMMON_DELAY, // qg processing is delayed and requires the collector component to increase the window size
-                &stats_collector,
-                config_handler.collector(),
-                synchronizer.ntp_diff(),
-            ));
-        }
-        if metrics_type.contains(MetricsType::MINUTE) {
-            minute_collector = Some(Collector::new(
-                id as u32,
-                minute_receiver,
-                metrics_sender,
-                MetricsType::MINUTE,
-                minute_quadruple_tolerable_delay as u32 + COMMON_DELAY, // qg processing is delayed and requires the collector component to increase the window size
-                &stats_collector,
-                config_handler.collector(),
-                synchronizer.ntp_diff(),
-            ));
+        if self.tap_mode != TapMode::Analyzer
+            && self.config.platform.kubernetes_cluster_id.is_empty()
+        {
+            match free_memory_check(self.max_memory, &self.exception_handler) {
+                Ok(()) => {
+                    for dispatcher in self.dispatchers.iter() {
+                        dispatcher.start();
+                    }
+                }
+                Err(e) => {
+                    warn!("{}", e);
+                }
+            }
+        } else {
+            for dispatcher in self.dispatchers.iter() {
+                dispatcher.start();
+            }
         }
 
-        CollectorThread::new(
-            quadruple_generator,
-            l4_flow_aggr_outer,
-            second_collector,
-            minute_collector,
-        )
+        for log_parser in self.log_parsers.iter() {
+            log_parser.start();
+        }
+
+        for collector in self.collectors.iter_mut() {
+            collector.start();
+        }
+
+        #[cfg(target_os = "linux")]
+        if let Some(ebpf_collector) = self.ebpf_collector.as_mut() {
+            ebpf_collector.start();
+        }
+        if matches!(self.agent_mode, RunningMode::Managed) {
+            self.otel_uniform_sender.start();
+            self.compressed_otel_uniform_sender.start();
+            self.prometheus_uniform_sender.start();
+            self.telegraf_uniform_sender.start();
+            if self.config.metric_server.enabled {
+                self.external_metrics_server.start();
+            }
+            self.pcap_batch_uniform_sender.start();
+        }
+        self.domain_name_listener.start();
+        self.handler_builders.iter().for_each(|x| {
+            x.lock().unwrap().iter_mut().for_each(|y| {
+                y.start();
+            })
+        });
+        self.npb_bandwidth_watcher.start();
+        for p in self.pcap_assemblers.iter() {
+            p.start();
+        }
+        self.npb_arp_table.start();
+        info!("Started agent components.");
     }
 
     fn stop(&mut self) {
@@ -1882,6 +2025,9 @@ impl Components {
             d.stop();
         }
         self.platform_synchronizer.stop();
+
+        #[cfg(target_os = "linux")]
+        self.socket_synchronizer.stop();
 
         #[cfg(target_os = "linux")]
         self.api_watcher.stop();
@@ -1921,9 +2067,64 @@ impl Components {
         for p in self.pcap_assemblers.iter() {
             p.stop();
         }
-        self.packet_sequence_uniform_sender.stop();
         self.npb_arp_table.stop();
-        info!("Stopped components.")
+        info!("Stopped agent components.")
+    }
+}
+
+impl Components {
+    fn start(&mut self) {
+        match self {
+            Self::Agent(a) => a.start(),
+            #[cfg(target_os = "linux")]
+            Self::Watcher(w) => w.start(),
+        }
+    }
+
+    fn new(
+        version_info: &VersionInfo,
+        config_handler: &ConfigHandler,
+        stats_collector: Arc<stats::Collector>,
+        session: &Arc<Session>,
+        synchronizer: &Arc<Synchronizer>,
+        exception_handler: ExceptionHandler,
+        remote_log_config: RemoteLogConfig,
+        vm_mac_addrs: Vec<MacAddr>,
+        agent_mode: RunningMode,
+    ) -> Result<Self> {
+        #[cfg(target_os = "linux")]
+        if running_in_only_watch_k8s_mode() {
+            let components = WatcherComponents::new(
+                config_handler,
+                stats_collector,
+                session,
+                synchronizer,
+                exception_handler,
+                remote_log_config,
+                agent_mode,
+            )?;
+            return Ok(Components::Watcher(components));
+        }
+        let components = AgentComponents::new(
+            version_info,
+            config_handler,
+            stats_collector,
+            session,
+            synchronizer,
+            exception_handler,
+            remote_log_config,
+            vm_mac_addrs,
+            agent_mode,
+        )?;
+        return Ok(Components::Agent(components));
+    }
+
+    fn stop(&mut self) {
+        match self {
+            Self::Agent(a) => a.stop(),
+            #[cfg(target_os = "linux")]
+            Self::Watcher(w) => w.stop(),
+        }
     }
 }
 
@@ -1936,7 +2137,7 @@ fn build_pcap_assembler(
     ntp_diff: Arc<AtomicI64>,
     id: usize,
 ) -> (PcapAssembler, DebugSender<MiniPacket>) {
-    let mini_packet_queue = "1-mini-meta-packet-to-pcap";
+    let mini_packet_queue = "1-mini-meta-packet-to-pcap-handler";
     let (mini_packet_sender, mini_packet_receiver, mini_packet_counter) = queue::bounded_with_debug(
         config.queue_size as usize,
         mini_packet_queue,

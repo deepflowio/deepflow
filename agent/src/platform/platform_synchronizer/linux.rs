@@ -15,12 +15,12 @@
  */
 
 use std::{
-    net::IpAddr,
+    net::{IpAddr, SocketAddr, SocketAddrV4},
     path::Path,
     process,
     sync::{
         atomic::{AtomicU64, Ordering},
-        Arc, Condvar, Mutex,
+        Arc, Condvar, Mutex, MutexGuard,
     },
     thread,
     thread::JoinHandle,
@@ -29,11 +29,13 @@ use std::{
 
 use arc_swap::access::Access;
 use log::{debug, error, info, warn};
+use parking_lot::RwLock;
 use regex::Regex;
 use ring::digest;
 use tokio::runtime::{Builder, Runtime};
 
 use crate::{
+    common::policy::GpidEntry,
     config::{
         handler::{OsProcScanConfig, PlatformAccess},
         KubernetesPollerType,
@@ -46,8 +48,9 @@ use crate::{
         },
         InterfaceEntry, LibvirtXmlExtractor,
     },
-    rpc::Session,
-    utils::{command::*, environment::is_tt_pod},
+    policy::{PolicyGetter, PolicySetter},
+    rpc::{RunningConfig, Session},
+    utils::{command::*, environment::is_tt_pod, lru::Lru},
 };
 
 use public::{
@@ -55,11 +58,17 @@ use public::{
     netns::{InterfaceInfo, NetNs, NsFile},
     proto::{
         common::TridentType,
-        trident::{self, Exception, GenesisProcessData, ProcessInfo},
+        trident::{
+            self, Exception, GenesisProcessData, GpidSyncRequest, GpidSyncResponse, ProcessInfo,
+        },
     },
+    queue::Receiver,
 };
 
-use super::{calc_process_datas_sha1, linux_process::get_all_process, ProcessData};
+use super::{
+    calc_process_datas_sha1, get_all_socket, linux_process::get_all_process, process_info_enabled,
+    ProcessData, Role, SockAddrData,
+};
 
 pub const SHA1_DIGEST_LEN: usize = 20;
 
@@ -649,17 +658,6 @@ impl PlatformSynchronizer {
             .map(|r| r.into_inner().version())
     }
 
-    // whether need to scan the process info
-    fn process_info_enabled(t: TridentType) -> bool {
-        match t {
-            TridentType::TtPublicCloud
-            | TridentType::TtPhysicalMachine
-            | TridentType::TtHostPod
-            | TridentType::TtVmPod => true,
-            _ => false,
-        }
-    }
-
     fn process(args: ProcessArgs) {
         let rt = Builder::new_current_thread().enable_all().build().unwrap();
 
@@ -694,7 +692,7 @@ impl PlatformSynchronizer {
 
             let config_guard = args.config.load();
             let trident_type = config_guard.trident_type;
-            let process_info_enabled = Self::process_info_enabled(trident_type);
+            let process_info_enabled = process_info_enabled(trident_type);
             let platform_enabled = config_guard.enabled;
             let proc_scan_conf = &config_guard.os_proc_scan_conf;
             let cur_vtap_id = config_guard.vtap_id;
@@ -819,6 +817,248 @@ impl PlatformSynchronizer {
             return true;
         }
         false
+    }
+}
+
+pub struct SocketSynchronizer {
+    config: PlatformAccess,
+    running_config: Arc<RwLock<RunningConfig>>,
+    stop_notify: Arc<Condvar>,
+    session: Arc<Session>,
+    running: Arc<Mutex<bool>>,
+    policy_getter: Arc<Mutex<PolicyGetter>>,
+    policy_setter: PolicySetter,
+    lru_toa_info: Arc<Mutex<Lru<SocketAddr, SocketAddr>>>,
+}
+
+impl SocketSynchronizer {
+    pub fn new(
+        config: PlatformAccess,
+        running_config: Arc<RwLock<RunningConfig>>,
+        policy_getter: Arc<Mutex<PolicyGetter>>,
+        policy_setter: PolicySetter,
+        session: Arc<Session>,
+        // toa info, Receiver<Box< LocalAddr, RealAddr>>
+        // receiver from SubQuadGen::inject_flow()
+        receiver: Receiver<Box<(SocketAddr, SocketAddr)>>,
+        // toa info cache, Lru<LocalAddr, RealAddr>
+        lru_toa_info: Arc<Mutex<Lru<SocketAddr, SocketAddr>>>,
+    ) -> Self {
+        if process_info_enabled(config.load().trident_type) {
+            let lru_toa_info_clone = lru_toa_info.clone();
+            thread::Builder::new()
+                .name("socket-synchronizer-toa-recv".to_string())
+                .spawn(|| {
+                    Self::sync_toa(lru_toa_info_clone, receiver);
+                })
+                .unwrap();
+        }
+
+        Self {
+            config,
+            running_config,
+            policy_getter,
+            policy_setter,
+            stop_notify: Arc::new(Condvar::new()),
+            session,
+            running: Arc::new(Mutex::new(false)),
+            lru_toa_info,
+        }
+    }
+
+    pub fn start(&mut self) {
+        let conf_guard = self.config.load();
+        if !process_info_enabled(conf_guard.trident_type) {
+            return;
+        }
+
+        let mut running_guard = self.running.lock().unwrap();
+        if *running_guard {
+            warn!("socket sync is running");
+            return;
+        }
+
+        let (
+            running,
+            config,
+            running_config,
+            policy_getter,
+            policy_setter,
+            session,
+            stop_notify,
+            lru_toa_info,
+        ) = (
+            self.running.clone(),
+            self.config.clone(),
+            self.running_config.clone(),
+            self.policy_getter.clone(),
+            self.policy_setter,
+            self.session.clone(),
+            self.stop_notify.clone(),
+            self.lru_toa_info.clone(),
+        );
+
+        thread::Builder::new()
+            .name("socket-synchronizer".to_string())
+            .spawn(move || {
+                Self::run(
+                    running,
+                    config,
+                    running_config,
+                    policy_getter,
+                    policy_setter,
+                    session,
+                    stop_notify,
+                    lru_toa_info,
+                )
+            })
+            .unwrap();
+        *running_guard = true;
+
+        info!("socket info sync start");
+    }
+
+    fn run(
+        running: Arc<Mutex<bool>>,
+        config: PlatformAccess,
+        running_config: Arc<RwLock<RunningConfig>>,
+        policy_getter: Arc<Mutex<PolicyGetter>>,
+        policy_setter: PolicySetter,
+        session: Arc<Session>,
+        stop_notify: Arc<Condvar>,
+        lru_toa_info: Arc<Mutex<Lru<SocketAddr, SocketAddr>>>,
+    ) {
+        let rt = Builder::new_current_thread().enable_all().build().unwrap();
+        let mut last_entries: Vec<GpidEntry> = vec![];
+
+        loop {
+            let running_guard = running.lock().unwrap();
+            let sync_interval;
+
+            {
+                let conf_guard = config.load();
+                sync_interval = Duration::from_secs(
+                    conf_guard.os_proc_scan_conf.os_proc_socket_sync_interval as u64,
+                );
+
+                let ctl_mac = running_config.read().ctrl_mac.clone();
+                let mut policy_getter = policy_getter.lock().unwrap();
+
+                let sock_entries = match get_all_socket(
+                    &conf_guard.os_proc_scan_conf,
+                    &mut policy_getter,
+                    conf_guard.epc_id,
+                ) {
+                    Err(e) => {
+                        error!("fetch socket info fail: {}", e);
+                        if !Self::wait_timeout(running_guard, stop_notify.clone(), sync_interval) {
+                            return;
+                        }
+                        continue;
+                    }
+                    Ok(mut res) => {
+                        // fill toa
+                        let mut lru_toa = lru_toa_info.lock().unwrap();
+                        for se in res.iter_mut() {
+                            if se.role == Role::Server {
+                                // the client addr
+                                let sa = match se.remote.ip {
+                                    IpAddr::V4(v4) => SocketAddr::V4(SocketAddrV4::new(
+                                        v4.clone(),
+                                        se.remote.port,
+                                    )),
+                                    _ => continue,
+                                };
+                                // get real addr by client addr from toa
+                                if let Some(real_addr) = lru_toa.get_mut(&sa) {
+                                    se.real_client = Some(SockAddrData {
+                                        epc_id: 0,
+                                        ip: real_addr.ip(),
+                                        port: real_addr.port(),
+                                    });
+                                }
+                            }
+                        }
+                        res
+                    }
+                };
+
+                match rt.block_on(
+                    session.gpid_sync(GpidSyncRequest {
+                        ctrl_ip: Some(conf_guard.source_ip.to_string()),
+                        ctrl_mac: Some(ctl_mac),
+                        vtap_id: Some(conf_guard.vtap_id as u32),
+                        entries: sock_entries
+                            .into_iter()
+                            .filter_map(|sock| {
+                                if let Ok(e) = sock.try_into() {
+                                    Some(e)
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect(),
+                        // TODO compress_algorithm
+                        ..Default::default()
+                    }),
+                ) {
+                    Err(e) => error!("gpid sync fail: {}", e),
+                    Ok(response) => {
+                        let response: GpidSyncResponse = response.into_inner();
+                        let mut current_entries = vec![];
+                        for entry in response.entries.iter() {
+                            let e = GpidEntry::try_from(entry);
+                            if e.is_err() {
+                                warn!("{:?}", e);
+                                continue;
+                            }
+                            current_entries.push(e.unwrap());
+                        }
+
+                        if current_entries != last_entries {
+                            policy_setter.update_gpids(&current_entries);
+                            last_entries = current_entries
+                        }
+                    }
+                }
+            }
+
+            if !Self::wait_timeout(running_guard, stop_notify.clone(), sync_interval) {
+                return;
+            }
+        }
+    }
+
+    pub fn stop(&mut self) {
+        let conf_guard = self.config.load();
+        if !process_info_enabled(conf_guard.trident_type) {
+            return;
+        }
+
+        let mut running_guard = self.running.lock().unwrap();
+        if !*running_guard {
+            warn!("socket info sync not running");
+            return;
+        }
+        *running_guard = false;
+        self.stop_notify.notify_one();
+        info!("socket info sync stop");
+    }
+
+    fn wait_timeout(guard: MutexGuard<bool>, stop_notify: Arc<Condvar>, timeout: Duration) -> bool {
+        *(stop_notify.wait_timeout(guard, timeout).unwrap().0)
+    }
+
+    fn sync_toa(
+        lru_toa_info: Arc<Mutex<Lru<SocketAddr, SocketAddr>>>,
+        receive: Receiver<Box<(SocketAddr, SocketAddr)>>,
+    ) {
+        while let Ok(toa_info) = receive.recv(None) {
+            let (client, real) = (toa_info.0, toa_info.1);
+            let mut lru_toa = lru_toa_info.lock().unwrap();
+            lru_toa.put(client, real);
+        }
+        info!("toa sync queue close");
     }
 }
 

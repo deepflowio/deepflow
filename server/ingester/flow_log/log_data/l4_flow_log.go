@@ -379,6 +379,8 @@ type FlowInfo struct {
 	IsNewFlow    uint8  `json:"is_new_flow"`
 	Status       uint8  `json:"status"`
 	AclGids      []uint16
+	GPID0        uint32
+	GPID1        uint32
 
 	NatRealIP0   uint32
 	NatRealIP1   uint32
@@ -408,6 +410,8 @@ var FlowInfoColumns = []*ckdb.Column{
 	ckdb.NewColumn("is_new_flow", ckdb.UInt8),
 	ckdb.NewColumn("status", ckdb.UInt8).SetComment("状态 0:正常, 1:异常 ,2:不存在，3:服务端异常, 4:客户端异常"),
 	ckdb.NewColumn("acl_gids", ckdb.ArrayUInt16),
+	ckdb.NewColumn("gprocess_id_0", ckdb.UInt32),
+	ckdb.NewColumn("gprocess_id_1", ckdb.UInt32),
 	ckdb.NewColumn("nat_real_ip_0", ckdb.IPv4),
 	ckdb.NewColumn("nat_real_ip_1", ckdb.IPv4),
 	ckdb.NewColumn("nat_real_port_0", ckdb.UInt16),
@@ -436,7 +440,9 @@ func (f *FlowInfo) WriteBlock(block *ckdb.Block) {
 		f.Duration,
 		f.IsNewFlow,
 		f.Status,
-		f.AclGids)
+		f.AclGids,
+		f.GPID0,
+		f.GPID1)
 
 	block.WriteIPv4(f.NatRealIP0)
 	block.WriteIPv4(f.NatRealIP1)
@@ -852,6 +858,8 @@ func (i *FlowInfo) Fill(f *pb.Flow) {
 	for _, v := range f.AclGids {
 		i.AclGids = append(i.AclGids, uint16(v))
 	}
+	i.GPID0 = f.MetricsPeerSrc.Gpid
+	i.GPID1 = f.MetricsPeerDst.Gpid
 	i.NatRealIP0 = f.MetricsPeerSrc.RealIp
 	i.NatRealIP1 = f.MetricsPeerDst.RealIp
 	i.NatRealPort0 = uint16(f.MetricsPeerSrc.RealPort)

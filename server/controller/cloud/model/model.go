@@ -550,15 +550,19 @@ type Resource struct {
 }
 
 type AdditionalResource struct {
-	AZs         []AZ
-	VPCs        []VPC
-	Subnets     []Network
-	SubnetCIDRs []Subnet
-	Hosts       []Host
-	CHosts      []VM
-	VInterfaces []VInterface
-	IPs         []IP
+	AZs                   []AZ
+	VPCs                  []VPC
+	Subnets               []Network
+	SubnetCIDRs           []Subnet
+	Hosts                 []Host
+	CHosts                []VM
+	VInterfaces           []VInterface
+	IPs                   []IP
+	CHostCloudTags        UUIDToCloudTags
+	PodNamespaceCloudTags UUIDToCloudTags
 }
+
+type UUIDToCloudTags map[string]string
 
 type BasicInfo struct {
 	Lcuuid          string        `json:"lcuuid"`

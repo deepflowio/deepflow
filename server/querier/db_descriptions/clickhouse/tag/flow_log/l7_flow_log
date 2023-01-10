@@ -30,9 +30,12 @@ resource_gl1_type         , resource_gl1_type_0       , resource_gl1_type_1     
 resource_gl1              , resource_gl1_0            , resource_gl1_1             , resource       ,                       , Universal Tag     , 111
 resource_gl2_type         , resource_gl2_type_0       , resource_gl2_type_1        , int_enum       , resource_gl2_type     , Universal Tag     , 111
 resource_gl2              , resource_gl2_0            , resource_gl2_1             , resource       ,                       , Universal Tag     , 111
+gprocess                  , gprocess_0                , gprocess_1                 , resource       ,                       , Universal Tag     , 111
 
-labels                    , labels_0                  , labels_1                   , map            ,                       , K8s Labels        , 111
-attributes                , attributes                , attributes                 , map            ,                       , Attributes        , 111
+k8s.label                 , k8s.label_0               , k8s.label_1                , map            ,                       , Custom Tag        , 111
+attribute                 , attribute                 , attribute                  , map            ,                       , Native Tag        , 111
+cloud.tag                 , cloud.tag_0               , cloud.tag_1                , map            ,                       , Custom Tag        , 111
+os.app                    , os.app_0                  , os.app_1                   , map            ,                       , Custom Tag        , 111
 
 ip                        , ip_0                      , ip_1                       , ip             ,                       , Network Layer     , 111
 is_ipv4                   , is_ipv4                   , is_ipv4                    , int_enum       , ip_type               , Network Layer     , 111

@@ -30,8 +30,11 @@ resource_gl1_type     , Type - K8s Workload First         ,
 resource_gl1          , Instance - K8s Workload First     ,
 resource_gl2_type     , Type - K8s Service First          ,
 resource_gl2          , Instance - K8s Service First      ,
+gprocess              , Process                           ,
 
-labels                , K8s Labels                        ,
+k8s.label             , K8s Label                         ,
+cloud.tag             , Cloud Tag                         ,
+os.app                , OS APP                            ,
 
 eth_type              , Ether Type                        ,
 vlan                  , VLAN TAG                          ,

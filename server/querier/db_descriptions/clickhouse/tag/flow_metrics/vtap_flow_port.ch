@@ -28,8 +28,12 @@ resource_gl1_type          , 类型-工作负载优先          ,
 resource_gl1               , 资源-工作负载优先          ,
 resource_gl2_type          , 类型-服务优先              ,
 resource_gl2               , 资源-服务优先              ,
+gprocess                   , 进程                       ,
 
-labels                     , K8s Labels                 ,
+k8s.label                  , K8s Label                  ,
+cloud.tag                  , Cloud Tag                  ,
+os.app                     , OS APP                     ,
+
 
 ip                         , IP 地址                    ,
 is_ipv4                    , IPv4 标志                  ,

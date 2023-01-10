@@ -388,12 +388,25 @@ type AdditionalResourceVInterface struct {
 	IPs        []string `json:"ips" yaml:"ips"`
 }
 
+type AdditionalResourceCloudTag struct {
+	ResourceType string                  `json:"resource_type" yaml:"resource_type" binding:"required"`
+	ResourceName string                  `json:"resource_name" yaml:"resource_name" binding:"required"`
+	DomainUUID   string                  `json:"domain_uuid" yaml:"domain_uuid" binding:"required"`
+	Tags         []AdditionalResourceTag `json:"tags" yaml:"tags" binding:"required"`
+}
+
+type AdditionalResourceTag struct {
+	Key   string `json:"key" yaml:"key" binding:"required"`
+	Value string `json:"value" yaml:"value" binding:"required"`
+}
+
 type AdditionalResource struct {
-	AZs     []AdditionalResourceAZ     `json:"azs" yaml:"azs"`
-	VPCs    []AdditionalResourceVPC    `json:"vpcs" yaml:"vpcs"`
-	Subnets []AdditionalResourceSubnet `json:"subnets" yaml:"subnets"`
-	Hosts   []AdditionalResourceHost   `json:"hosts" yaml:"hosts"`
-	CHosts  []AdditionalResourceChost  `json:"chosts" yaml:"chosts"`
+	AZs       []AdditionalResourceAZ       `json:"azs" yaml:"azs"`
+	VPCs      []AdditionalResourceVPC      `json:"vpcs" yaml:"vpcs"`
+	Subnets   []AdditionalResourceSubnet   `json:"subnets" yaml:"subnets"`
+	Hosts     []AdditionalResourceHost     `json:"hosts" yaml:"hosts"`
+	CHosts    []AdditionalResourceChost    `json:"chosts" yaml:"chosts"`
+	CloudTags []AdditionalResourceCloudTag `json:"cloud_tags" yaml:"cloud_tags"`
 }
 
 type VTapGroupConfiguration struct {
@@ -736,6 +749,7 @@ type Process struct {
 	CommandLine  string `json:"CMD_LINE"`
 	UserName     string `json:"USER_NAME"`
 	OSAPPTags    string `json:"OS_APP_TAGS"`
+	ResourceID   int    `json:"RESOURCE_ID"`
 	StartTime    string `json:"START_TIME"`
 	UpdateAt     string `json:"UPDATE_AT"`
 }

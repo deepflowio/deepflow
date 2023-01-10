@@ -73,7 +73,7 @@ type Process struct {
 	VTapID         int       `gorm:"column:vtap_id;type:int;not null;default:0" json:"VTAP_ID"`
 	PID            int       `gorm:"column:pid;type:int;not null;default:0" json:"PID"`
 	ProcessName    string    `gorm:"column:process_name;type:varchar(256);default:''" json:"PROCESS_NAME"`
-	CommandLine    string    `gorm:"column:cmdline;type:text" json:"COMMAND_LINE"`
+	CommandLine    string    `gorm:"column:command_line;type:text" json:"COMMAND_LINE"`
 	UserName       string    `gorm:"column:user_name;type:varchar(256);default:''" json:"USER_NAME"`
 	StartTime      time.Time `gorm:"autoCreateTime;column:start_time;type:datetime" json:"START_TIME"`
 	OSAPPTags      string    `gorm:"column:os_app_tags;type:text" json:"OS_APP_TAGS"`
@@ -88,7 +88,7 @@ type Domain struct {
 	Name         string     `gorm:"column:name;type:varchar(64)" json:"NAME"`
 	IconID       int        `gorm:"column:icon_id;type:int" json:"ICON_ID"`
 	DisplayName  string     `gorm:"column:display_name;type:varchar(64);default:''" json:"DISPLAY_NAME"`
-	ClusterID    string     `gorm:"column:cluster_id;type:char(32)" json:"CLUSTER_ID"`
+	ClusterID    string     `gorm:"column:cluster_id;type:char(64)" json:"CLUSTER_ID"`
 	Type         int        `gorm:"column:type;type:int;default:0" json:"TYPE"` // 1.openstack 2.vsphere 3.nsp 4.tencent 5.filereader 6.aws 7.pingan 8.zstack 9.aliyun 10.huawei prv 11.k8s 12.simulation 13.huawei 14.qingcloud 15.qingcloud_private 16.F5 17.CMB_CMDB 18.azure 19.apsara_stack 20.tencent_tce 21.qingcloud_k8s 22.kingsoft_private 23.genesis 24.microsoft_acs 25.baidu_bce
 	Config       string     `gorm:"column:config;type:text" json:"CONFIG"`
 	ErrorMsg     string     `gorm:"column:error_msg;type:text" json:"ERROR_MSG"`
@@ -107,7 +107,7 @@ type SubDomain struct {
 	Name         string     `gorm:"column:name;type:varchar(64);default:''" json:"NAME"`
 	DisplayName  string     `gorm:"column:display_name;type:varchar(64);default:''" json:"DISPLAY_NAME"`
 	CreateMethod int        `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
-	ClusterID    string     `gorm:"column:cluster_id;type:char(32);default:''" json:"CLUSTER_ID"`
+	ClusterID    string     `gorm:"column:cluster_id;type:char(64);default:''" json:"CLUSTER_ID"`
 	Config       string     `gorm:"column:config;type:text;default:''" json:"CONFIG"`
 	ErrorMsg     string     `gorm:"column:error_msg;type:text;default:''" json:"ERROR_MSG"`
 	Enabled      int        `gorm:"column:enabled;type:int;not null;default:1" json:"ENABLED"` // 0.false 1.true
@@ -372,7 +372,8 @@ type LANIP struct { // TODO 添加region字段
 	NetIndex     int       `gorm:"column:net_index;type:int;default:0" json:"NET_INDEX"`
 	SubDomain    string    `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
 	Domain       string    `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
-	VInterfaceID int       `gorm:"column:vifid;type:int;default:null" json:"VIFID"`
+	VInterfaceID int       `gorm:"column:vifid;type:int;default:null" json:"VINTERFACE_ID"`
+	SubnetID     int       `gorm:"column:vl2_net_id;type:int;default:0" json:"SUBNET_ID"`
 	ISP          int       `gorm:"column:isp;type:int;default:0" json:"ISP"` // Used for multi-ISP access
 	CreatedAt    time.Time `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
 	UpdatedAt    time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
@@ -390,7 +391,8 @@ type WANIP struct {
 	Gateway      string    `gorm:"column:gateway;type:char(64);default:''" json:"GATEWAY"`
 	CreateMethod int       `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
 	ISP          int       `gorm:"column:isp;type:int;default:null" json:"ISP"`
-	VInterfaceID int       `gorm:"column:vifid;type:int;default:0" json:"VIFID"`
+	VInterfaceID int       `gorm:"column:vifid;type:int;default:0" json:"VINTERFACE_ID"`
+	SubnetID     int       `gorm:"column:vl2_net_id;type:int;default:0" json:"SUBNET_ID"`
 	SubDomain    string    `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
 	Domain       string    `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
 	Region       string    `gorm:"column:region;type:char(64);default:''" json:"REGION"`

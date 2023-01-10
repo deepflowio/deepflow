@@ -43,6 +43,7 @@ type Issu struct {
 	primaryConnection  *sql.DB
 	primaryAddr        string
 	username, password string
+	oldVersion         string
 	exit               bool
 }
 
@@ -285,26 +286,26 @@ var ColumnAdd610 = []*ColumnAdds{
 		ColumnType:  ckdb.UInt8,
 	},
 	&ColumnAdds{
-		Dbs:         []string{"vtap_flow_port", "vtap_app_port"},
-		Tables:      []string{"1m", "1m_local", "1s", "1s_local"},
+		Dbs:         []string{"flow_metrics"},
+		Tables:      []string{"vtap_flow_port.1m", "vtap_flow_port.1m_local", "vtap_flow_port.1s", "vtap_flow_port.1s_local", "vtap_app_port.1m", "vtap_app_port.1m_local", "vtap_app_port.1s", "vtap_app_port.1s_local"},
 		ColumnNames: []string{"resource_gl0_id", "resource_gl1_id", "resource_gl2_id"},
 		ColumnType:  ckdb.UInt32,
 	},
 	&ColumnAdds{
-		Dbs:         []string{"vtap_flow_port", "vtap_app_port"},
-		Tables:      []string{"1m", "1m_local", "1s", "1s_local"},
+		Dbs:         []string{"flow_metrics"},
+		Tables:      []string{"vtap_flow_port.1m", "vtap_flow_port.1m_local", "vtap_flow_port.1s", "vtap_flow_port.1s_local", "vtap_app_port.1m", "vtap_app_port.1m_local", "vtap_app_port.1s", "vtap_app_port.1s_local"},
 		ColumnNames: []string{"resource_gl0_type", "resource_gl1_type", "resource_gl2_type"},
 		ColumnType:  ckdb.UInt8,
 	},
 	&ColumnAdds{
-		Dbs:         []string{"vtap_flow_edge_port", "vtap_app_edge_port"},
-		Tables:      []string{"1m", "1m_local", "1s", "1s_local"},
+		Dbs:         []string{"flow_metrics"},
+		Tables:      []string{"vtap_flow_edge_port.1m", "vtap_flow_edge_port.1m_local", "vtap_flow_edge_port.1s", "vtap_flow_edge_port.1s_local", "vtap_app_edge_port.1m", "vtap_app_edge_port.1m_local", "vtap_app_edge_port.1s", "vtap_app_edge_port.1s_local"},
 		ColumnNames: []string{"resource_gl0_id_0", "resource_gl1_id_0", "resource_gl2_id_0", "resource_gl0_id_1", "resource_gl1_id_1", "resource_gl2_id_1"},
 		ColumnType:  ckdb.UInt32,
 	},
 	&ColumnAdds{
-		Dbs:         []string{"vtap_flow_edge_port", "vtap_app_edge_port"},
-		Tables:      []string{"1m", "1m_local", "1s", "1s_local"},
+		Dbs:         []string{"flow_metrics"},
+		Tables:      []string{"vtap_flow_edge_port.1m", "vtap_flow_edge_port.1m_local", "vtap_flow_edge_port.1s", "vtap_flow_edge_port.1s_local", "vtap_app_edge_port.1m", "vtap_app_edge_port.1m_local", "vtap_app_edge_port.1s", "vtap_app_edge_port.1s_local"},
 		ColumnNames: []string{"resource_gl0_type_0", "resource_gl1_type_0", "resource_gl2_type_0", "resource_gl0_type_1", "resource_gl1_type_1", "resource_gl2_type_1"},
 		ColumnType:  ckdb.UInt8,
 	},
@@ -489,16 +490,25 @@ var ColumnAdd618 = []*ColumnAdds{
 }
 
 var u8ColumnNameAdd620 = []string{"nat_source"}
-var flowMetricsTableAdd620 = []string{
+var u32ColumnNameAdd620 = []string{"gprocess_id"}
+var u32ColumnNameEdgeAdd620 = []string{"gprocess_id_0", "gprocess_id_1"}
+var flowMetricsEdgeTableAdd620 = []string{
 	"vtap_flow_edge_port.1m", "vtap_flow_edge_port.1m_local",
 	"vtap_flow_edge_port.1s", "vtap_flow_edge_port.1s_local",
 	"vtap_app_edge_port.1m", "vtap_app_edge_port.1m_local",
 	"vtap_app_edge_port.1s", "vtap_app_edge_port.1s_local",
 }
+var flowMetricsTableAdd620 = []string{
+	"vtap_flow_port.1m", "vtap_flow_port.1m_local",
+	"vtap_flow_port.1s", "vtap_flow_port.1s_local",
+	"vtap_app_port.1m", "vtap_app_port.1m_local",
+	"vtap_app_port.1s", "vtap_app_port.1s_local",
+}
+
 var ColumnAdd620 = []*ColumnAdds{
 	&ColumnAdds{
 		Dbs:         []string{"flow_metrics"},
-		Tables:      flowMetricsTableAdd620,
+		Tables:      flowMetricsEdgeTableAdd620,
 		ColumnNames: u8ColumnNameAdd620,
 		ColumnType:  ckdb.UInt8,
 	},
@@ -519,6 +529,25 @@ var ColumnAdd620 = []*ColumnAdds{
 		Tables:      []string{"l4_flow_log", "l4_flow_log_local"},
 		ColumnNames: []string{"nat_real_port_0", "nat_real_port_1"},
 		ColumnType:  ckdb.UInt16,
+	},
+
+	&ColumnAdds{
+		Dbs:         []string{"flow_metrics"},
+		Tables:      flowMetricsTableAdd620,
+		ColumnNames: u32ColumnNameAdd620,
+		ColumnType:  ckdb.UInt32,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_metrics"},
+		Tables:      flowMetricsEdgeTableAdd620,
+		ColumnNames: u32ColumnNameEdgeAdd620,
+		ColumnType:  ckdb.UInt32,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l4_flow_log", "l4_flow_log_local", "l7_flow_log", "l7_flow_log_local"},
+		ColumnNames: u32ColumnNameEdgeAdd620,
+		ColumnType:  ckdb.UInt32,
 	},
 }
 
@@ -644,7 +673,7 @@ func getUserDefinedDatasourceInfos(connect *sql.DB, db, tableName string) ([]*Da
 	return dSInfos, nil
 }
 
-func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo) ([]*ColumnAdd, error) {
+func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo, isEdgeTable bool) ([]*ColumnAdd, error) {
 	// mod table agg, global
 	dones := []*ColumnAdd{}
 
@@ -677,6 +706,26 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo) ([]*Colum
 			ColumnNames: u8ColumnNameAdd620,
 			ColumnType:  ckdb.UInt8,
 		},
+	}
+
+	if isEdgeTable {
+		columnAddss620 = append(columnAddss620, []*ColumnAdds{
+			&ColumnAdds{
+				Dbs:         []string{d.db},
+				Tables:      []string{d.name, d.name + "_agg"},
+				ColumnNames: u32ColumnNameEdgeAdd620,
+				ColumnType:  ckdb.UInt32,
+			},
+		}...)
+	} else {
+		columnAddss620 = append(columnAddss620, []*ColumnAdds{
+			&ColumnAdds{
+				Dbs:         []string{d.db},
+				Tables:      []string{d.name, d.name + "_agg"},
+				ColumnNames: u32ColumnNameAdd620,
+				ColumnType:  ckdb.UInt32,
+			},
+		}...)
 	}
 
 	for _, version := range [][]*ColumnAdds{columnAddss612, columnAddss620} {
@@ -757,7 +806,7 @@ func NewCKIssu(cfg *config.Config) (*Issu, error) {
 		password:    cfg.CKDBAuth.Password,
 	}
 
-	allVersionAdds := [][]*ColumnAdds{ColumnAdd612, ColumnAdd613, ColumnAdd615, ColumnAdd618, ColumnAdd620}
+	allVersionAdds := [][]*ColumnAdds{ColumnAdd610, ColumnAdd611, ColumnAdd612, ColumnAdd613, ColumnAdd615, ColumnAdd618, ColumnAdd620}
 	i.columnAdds = []*ColumnAdd{}
 	for _, versionAdd := range allVersionAdds {
 		for _, adds := range versionAdd {
@@ -765,8 +814,12 @@ func NewCKIssu(cfg *config.Config) (*Issu, error) {
 		}
 	}
 
-	i.columnMods = ColumnMod615
-	i.columnRenames = ColumnRename618
+	for _, v := range [][]*ColumnMod{ColumnMod611, ColumnMod615} {
+		i.columnMods = append(i.columnMods, v...)
+	}
+	for _, v := range [][]*ColumnRename{ColumnRename618} {
+		i.columnRenames = append(i.columnRenames, v...)
+	}
 
 	var err error
 	i.primaryConnection, err = common.NewCKConnection(i.primaryAddr, i.username, i.password)
@@ -774,10 +827,21 @@ func NewCKIssu(cfg *config.Config) (*Issu, error) {
 		return nil, err
 	}
 
+	flowLogVersion, err := i.getTableVersion(i.primaryConnection, "flow_log", "l4_flow_log_local")
+	if err != nil {
+		return nil, err
+	}
+	i.oldVersion = flowLogVersion
+
 	return i, nil
 }
 
 func (i *Issu) RunRenameTable(ds *datasource.DatasourceManager) error {
+	if strings.Compare(i.oldVersion, "v6.1.1") >= 0 || i.oldVersion == "" {
+		return nil
+	}
+
+	i.tableRenames = TableRenames611
 	for _, tableRename := range i.tableRenames {
 		if err := i.renameTable(i.primaryConnection, tableRename); err != nil {
 			return err
@@ -1015,7 +1079,7 @@ func (i *Issu) addColumns(connect *sql.DB) ([]*ColumnAdd, error) {
 			continue
 		}
 		for _, dsInfo := range datasourceInfos {
-			adds, err := i.addColumnDatasource(connect, dsInfo)
+			adds, err := i.addColumnDatasource(connect, dsInfo, strings.Contains(tableName, "_edge_"))
 			if err != nil {
 				return nil, nil
 			}

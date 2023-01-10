@@ -49,12 +49,14 @@ type Config struct {
 	VTapCacheRefreshInterval       int  `default:"300" yaml:"vtapcache-refresh-interval"`
 	MetaDataRefreshInterval        int  `default:"60" yaml:"metadata-refresh-interval"`
 	NodeRefreshInterval            int  `default:"60" yaml:"node-refresh-interval"`
+	GPIDRefreshInterval            int  `default:"10" yaml:"gpid-refresh-interval"`
 	VTapAutoRegister               bool `default:"true" yaml:"vtap-auto-register"`
 	DefaultTapMode                 int  `yaml:"default-tap-mode"`
 	BillingMethod                  string
 	GrpcPort                       int
 	IngesterPort                   int
 	PodClusterInternalIPToIngester int
+	GrpcMaxMessageLength           int
 }
 
 func (c *Config) Convert() {
@@ -103,4 +105,12 @@ func (c *Config) SetBillingMethod(billingMethod string) {
 
 func (c *Config) SetPodClusterInternalIPToIngester(value int) {
 	c.PodClusterInternalIPToIngester = value
+}
+
+func (c *Config) SetGrpcMaxMessageLength(maxLen int) {
+	c.GrpcMaxMessageLength = maxLen
+}
+
+func (c *Config) GetGrpcMaxMessageLength() int {
+	return c.GrpcMaxMessageLength
 }

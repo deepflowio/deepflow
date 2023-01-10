@@ -95,6 +95,8 @@ impl MetaAppProto {
                 .is_vip_interface,
             is_vip_interface_dst: flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST]
                 .is_vip_interface,
+            gpid_0: flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].gpid,
+            gpid_1: flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].gpid,
             mac_src: MacAddr::ZERO,
             mac_dst: MacAddr::ZERO,
             ip_src: meta_packet.lookup_key.src_ip,
@@ -166,6 +168,7 @@ impl MetaAppProto {
         } else {
             swap(&mut base_info.ip_src, &mut base_info.ip_dst);
             swap(&mut base_info.port_src, &mut base_info.port_dst);
+            swap(&mut base_info.gpid_0, &mut base_info.gpid_1);
 
             base_info.l3_epc_id_src = flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].l3_epc_id;
             base_info.l3_epc_id_dst = flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].l3_epc_id;
@@ -477,15 +480,17 @@ impl SessionQueue {
             Some(t) => t,
             None => return,
         };
+        let mut batch = Vec::new();
         for map in time_window.drain(..) {
             self.counter
                 .cached
                 .fetch_sub(map.len() as u64, Ordering::Relaxed);
-            let v = map
-                .into_values()
-                .map(|item| BoxAppProtoLogsData(Box::new(item)))
-                .collect();
-            if let Err(Error::Terminated(..)) = self.output_queue.send_all(v) {
+            batch.reserve(map.len());
+            batch.extend(
+                map.into_values()
+                    .map(|item| BoxAppProtoLogsData(Box::new(item))),
+            );
+            if let Err(Error::Terminated(..)) = self.output_queue.send_all(&mut batch) {
                 warn!("output queue terminated");
                 break;
             }

@@ -121,10 +121,6 @@ impl L7ProtocolInfoInterface for DubboInfo {
     fn is_tls(&self) -> bool {
         self.is_tls
     }
-
-    fn skip_send(&self) -> bool {
-        false
-    }
 }
 
 impl From<DubboInfo> for L7ProtocolSendLog {

@@ -116,7 +116,7 @@ func (c *Client) DoQuery(params *QueryParams) (result *common.Result, err error)
 		if schema, ok := columnSchemaMap[column.Name()]; ok {
 			columnSchemas = append(columnSchemas, schema)
 		} else {
-			columnSchemas = append(columnSchemas, common.NewColumnSchema(column.Name()))
+			columnSchemas = append(columnSchemas, common.NewColumnSchema(column.Name(), ""))
 		}
 	}
 	var values []interface{}

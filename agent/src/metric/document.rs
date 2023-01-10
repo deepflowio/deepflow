@@ -115,10 +115,12 @@ bitflags! {
         const IP = 1<<0;
         const L3_EPC_ID = 1<<1;
         const MAC = 1<<11;
+        const GPID = 1<<15;
 
         const IP_PATH = 1<<20;
         const L3_EPC_PATH = 1<<21;
         const MAC_PATH = 1<<31;
+        const GPID_PATH = 1<<35;
 
         const DIRECTION = 1<<40;
         const ACL_GID = 1<<41;
@@ -282,6 +284,9 @@ pub struct Tagger {
     pub tap_type: TapType,
     pub l7_protocol: L7Protocol,
 
+    pub gpid: u32,
+    pub gpid_1: u32,
+
     pub tag_type: TagType,
     pub tag_value: u16,
 }
@@ -308,6 +313,9 @@ impl Default for Tagger {
             tap_port: TapPort::default(),
             tap_type: TapType::default(),
             l7_protocol: L7Protocol::default(),
+
+            gpid: 0,
+            gpid_1: 0,
 
             tag_type: TagType::default(),
             tag_value: 0,
@@ -361,6 +369,8 @@ impl From<Tagger> for metric::MiniTag {
                 l7_protocol: t.l7_protocol as u32,
                 tag_type: t.tag_type as u32,
                 tag_value: t.tag_value as u32,
+                gpid: t.gpid,
+                gpid1: t.gpid_1,
             }),
         }
     }

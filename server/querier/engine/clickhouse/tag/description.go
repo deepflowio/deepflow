@@ -261,16 +261,82 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 	}
 	for _, _key := range rst.Values {
 		key := _key.([]interface{})[0]
-		labelKey := "label." + key.(string)
+		labelKey := "k8s.label." + key.(string)
 		if db == "ext_metrics" || db == "event" || table == "vtap_flow_port" || table == "vtap_app_port" {
 			response.Values = append(response.Values, []interface{}{
 				labelKey, labelKey, labelKey, labelKey, "label",
-				"K8s Labels", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
 			})
 		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
 			response.Values = append(response.Values, []interface{}{
 				labelKey, labelKey + "_0", labelKey + "_1", labelKey, "label",
-				"K8s Labels", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+			})
+		}
+
+	}
+
+	// 查询cloud.tag
+	chostCloudTagSql := "SELECT key FROM chost_cloud_tag_map GROUP BY key"
+	chostCloudTagRst, err := chClient.DoQuery(&client.QueryParams{Sql: chostCloudTagSql})
+	if err != nil {
+		return nil, err
+	}
+	for _, _key := range chostCloudTagRst.Values {
+		key := _key.([]interface{})[0]
+		chostCloudTagKey := "cloud.tag." + key.(string)
+		if db == "ext_metrics" || db == "event" || table == "vtap_flow_port" || table == "vtap_app_port" {
+			response.Values = append(response.Values, []interface{}{
+				chostCloudTagKey, chostCloudTagKey, chostCloudTagKey, chostCloudTagKey, "cloud tag",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+			})
+		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
+			response.Values = append(response.Values, []interface{}{
+				chostCloudTagKey, chostCloudTagKey + "_0", chostCloudTagKey + "_1", chostCloudTagKey, "cloud tag",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+			})
+		}
+	}
+
+	podNSCloudTagSql := "SELECT key FROM pod_ns_cloud_tag_map GROUP BY key"
+	podNSCloudTagRst, err := chClient.DoQuery(&client.QueryParams{Sql: podNSCloudTagSql})
+	if err != nil {
+		return nil, err
+	}
+	for _, _key := range podNSCloudTagRst.Values {
+		key := _key.([]interface{})[0]
+		podNSCloudTagKey := "cloud.tag." + key.(string)
+		if db == "ext_metrics" || db == "event" || table == "vtap_flow_port" || table == "vtap_app_port" {
+			response.Values = append(response.Values, []interface{}{
+				podNSCloudTagKey, podNSCloudTagKey, podNSCloudTagKey, podNSCloudTagKey, "cloud tag",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+			})
+		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
+			response.Values = append(response.Values, []interface{}{
+				podNSCloudTagKey, podNSCloudTagKey + "_0", podNSCloudTagKey + "_1", podNSCloudTagKey, "cloud tag",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+			})
+		}
+	}
+
+	// 查询 os.app
+	osAPPTagSql := "SELECT key FROM os_app_tag_map GROUP BY key"
+	osAPPTagRst, err := chClient.DoQuery(&client.QueryParams{Sql: osAPPTagSql})
+	if err != nil {
+		return nil, err
+	}
+	for _, _key := range osAPPTagRst.Values {
+		key := _key.([]interface{})[0]
+		osAPPTagKey := "os.app." + key.(string)
+		if db == "ext_metrics" || db == "event" || table == "vtap_flow_port" || table == "vtap_app_port" {
+			response.Values = append(response.Values, []interface{}{
+				osAPPTagKey, osAPPTagKey, osAPPTagKey, osAPPTagKey, "os app",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+			})
+		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
+			response.Values = append(response.Values, []interface{}{
+				osAPPTagKey, osAPPTagKey + "_0", osAPPTagKey + "_1", osAPPTagKey, "os app",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
 			})
 		}
 
@@ -308,20 +374,20 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 			externalTag := "tag." + tagName.(string)
 			response.Values = append(response.Values, []interface{}{
 				externalTag, externalTag, externalTag, externalTag, "tag",
-				"Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "",
+				"Native Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "",
 			})
 		} else {
 			externalTag := "attribute." + tagName.(string)
 			response.Values = append(response.Values, []interface{}{
 				externalTag, externalTag, externalTag, externalTag, "attribute",
-				"Attributes", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "",
+				"Native Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "",
 			})
 		}
 	}
 	if db == "ext_metrics" || db == "deepflow_system" {
 		response.Values = append(response.Values, []interface{}{
-			"tags", "tags", "tags", "tags", "map",
-			"Tag", []string{}, []bool{true, true, true}, "tags", "",
+			"tag", "tag", "tag", "tag", "map",
+			"Native Tag", []string{}, []bool{true, true, true}, "tag", "",
 		})
 	}
 	return response, nil
@@ -383,7 +449,7 @@ func GetTagValues(db, table, sql string) (*common.Result, []string, error) {
 		sql = showSqlList[0] + " WHERE " + showSqlList[1]
 	}
 	// K8s Labels是动态的,不需要去tag_description里确认
-	if strings.HasPrefix(tag, "label.") {
+	if strings.HasPrefix(tag, "k8s.label.") || strings.HasPrefix(tag, "cloud.tag.") || strings.HasPrefix(tag, "os.app.") {
 		return GetTagResourceValues(db, table, sql)
 	}
 	// 外部字段是动态的,不需要去tag_description里确认
@@ -573,14 +639,43 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 			sql = fmt.Sprintf("SELECT id AS value, name AS display_name FROM vtap_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 
 		default:
-			if strings.HasPrefix(tag, "label.") {
-				labelTag := strings.TrimPrefix(tag, "label.")
+			if strings.HasPrefix(tag, "k8s.label.") {
+				labelTag := strings.TrimPrefix(tag, "k8s.label.")
 				if whereSql != "" {
 					whereSql += fmt.Sprintf(" AND `key`='%s'", labelTag)
 				} else {
 					whereSql = fmt.Sprintf("WHERE `key`='%s'", labelTag)
 				}
 				sql = fmt.Sprintf("SELECT value, value AS display_name FROM k8s_label_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+			} else if strings.HasPrefix(tag, "cloud.tag.") {
+				cloudTag := strings.TrimPrefix(tag, "cloud.tag.")
+				if whereSql != "" {
+					whereSql += fmt.Sprintf(" AND `key`='%s'", cloudTag)
+				} else {
+					whereSql = fmt.Sprintf("WHERE `key`='%s'", cloudTag)
+				}
+				results := &common.Result{}
+				for _, table := range []string{"chost_cloud_tag_map", "pod_ns_cloud_tag_map"} {
+					sql = fmt.Sprintf("SELECT value, value AS display_name FROM %s %s GROUP BY value, display_name ORDER BY %s ASC %s", table, whereSql, orderBy, limitSql)
+					sql = strings.ReplaceAll(sql, " like ", " ilike ")
+					sql = strings.ReplaceAll(sql, " LIKE ", " ILIKE ")
+					log.Debug(sql)
+					rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
+					if err != nil {
+						return results, sqlList, err
+					}
+					results.Values = append(results.Values, rst.Values...)
+					results.Columns = rst.Columns
+				}
+				return results, sqlList, nil
+			} else if strings.HasPrefix(tag, "os.app.") {
+				osAPPTag := strings.TrimPrefix(tag, "os.app.")
+				if whereSql != "" {
+					whereSql += fmt.Sprintf(" AND `key`='%s'", osAPPTag)
+				} else {
+					whereSql = fmt.Sprintf("WHERE `key`='%s'", osAPPTag)
+				}
+				sql = fmt.Sprintf("SELECT value, value AS display_name FROM os_app_tag_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 			} else {
 				return GetExternalTagValues(db, table, rawSql)
 			}
@@ -638,14 +733,43 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM lb_listener_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		} else if tag == "pod_ingress" {
 			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM pod_ingress_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
-		} else if strings.HasPrefix(tag, "label.") {
-			labelTag := strings.TrimPrefix(tag, "label.")
+		} else if strings.HasPrefix(tag, "k8s.label.") {
+			labelTag := strings.TrimPrefix(tag, "k8s.label.")
 			if whereSql != "" {
 				whereSql += fmt.Sprintf(" AND `key`='%s'", labelTag)
 			} else {
 				whereSql = fmt.Sprintf("WHERE `key`='%s'", labelTag)
 			}
 			sql = fmt.Sprintf("SELECT value, value AS display_name FROM k8s_label_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+		} else if strings.HasPrefix(tag, "cloud.tag.") {
+			cloudTag := strings.TrimPrefix(tag, "cloud.tag.")
+			if whereSql != "" {
+				whereSql += fmt.Sprintf(" AND `key`='%s'", cloudTag)
+			} else {
+				whereSql = fmt.Sprintf("WHERE `key`='%s'", cloudTag)
+			}
+			results := &common.Result{}
+			for _, table := range []string{"chost_cloud_tag_map", "pod_ns_cloud_tag_map"} {
+				sql = fmt.Sprintf("SELECT value, value AS display_name FROM %s %s GROUP BY value, display_name ORDER BY %s ASC %s", table, whereSql, orderBy, limitSql)
+				sql = strings.ReplaceAll(sql, " like ", " ilike ")
+				sql = strings.ReplaceAll(sql, " LIKE ", " ILIKE ")
+				log.Debug(sql)
+				rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
+				if err != nil {
+					return results, sqlList, err
+				}
+				results.Values = append(results.Values, rst.Values...)
+				results.Columns = rst.Columns
+			}
+			return results, sqlList, nil
+		} else if strings.HasPrefix(tag, "os.app.") {
+			osAPPTag := strings.TrimPrefix(tag, "os.app.")
+			if whereSql != "" {
+				whereSql += fmt.Sprintf(" AND `key`='%s'", osAPPTag)
+			} else {
+				whereSql = fmt.Sprintf("WHERE `key`='%s'", osAPPTag)
+			}
+			sql = fmt.Sprintf("SELECT value, value AS display_name FROM os_app_tag_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		}
 		if sql == "" {
 			return GetExternalTagValues(db, table, rawSql)

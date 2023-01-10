@@ -320,6 +320,8 @@ pub struct YamlConfig {
     pub vxlan_flags: u8,
     pub collector_sender_queue_size: usize,
     pub collector_sender_queue_count: usize,
+    pub toa_sender_queue_size: usize,
+    pub toa_lru_cache_size: usize,
     pub flow_sender_queue_size: usize,
     pub flow_sender_queue_count: usize,
     #[serde(with = "humantime_serde")]
@@ -362,6 +364,8 @@ pub struct YamlConfig {
     pub os_proc_regex: Vec<OsProcRegexp>,
     pub os_app_tag_exec_user: String,
     pub os_app_tag_exec: Vec<String>,
+    #[serde(with = "humantime_serde")]
+    pub guard_interval: Duration,
 }
 
 impl YamlConfig {
@@ -502,6 +506,10 @@ impl YamlConfig {
         if c.ebpf.max_trace_entries < 100000 || c.ebpf.max_trace_entries > 2000000 {
             c.ebpf.max_trace_entries = 524288;
         }
+        if c.guard_interval < Duration::from_secs(1) || c.guard_interval > Duration::from_secs(3600)
+        {
+            c.guard_interval = Duration::from_secs(60);
+        }
 
         if let Err(e) = c.validate() {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string()));
@@ -529,6 +537,7 @@ impl YamlConfig {
                 parse_u16_range_list_to_bitmap(port_range, false).unwrap(),
             ));
         }
+        port_bitmap.sort_unstable_by_key(|p| p.0.clone());
         port_bitmap
     }
 }
@@ -563,6 +572,8 @@ impl Default for YamlConfig {
             // default size changes according to tap_mode
             collector_sender_queue_size: 1 << 16,
             collector_sender_queue_count: 1,
+            toa_sender_queue_size: 1 << 16,
+            toa_lru_cache_size: 1 << 16,
             // default size changes according to tap_mode
             flow_sender_queue_size: 1 << 16,
             flow_sender_queue_count: 1,
@@ -590,7 +601,7 @@ impl Default for YamlConfig {
                 let mut protos = vec![];
                 for i in get_all_protocol() {
                     if i.parse_default() {
-                        protos.push(i.as_string());
+                        protos.push(i.as_str().to_owned());
                     }
                 }
                 protos
@@ -618,6 +629,7 @@ impl Default for YamlConfig {
             }],
             os_app_tag_exec_user: "deepflow".to_string(),
             os_app_tag_exec: vec![],
+            guard_interval: Duration::from_secs(60),
         }
     }
 }

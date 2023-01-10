@@ -292,7 +292,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 					"if("+autoTypeSuffix+" in (0,255),if(is_ipv4=1, IPv4NumToString("+ip4Suffix+"), IPv6NumToString("+ip6Suffix+")),dictGet(flow_tag.device_map, 'name', (toUInt64("+autoTypeSuffix+"),toUInt64("+autoIDSuffix+"))))",
 					"",
 					"if("+autoTypeSuffix+" in (0,255),if(is_ipv4=1, IPv4NumToString("+ip4Suffix+"), IPv6NumToString("+ip6Suffix+")) %s %s,(toUInt64("+autoIDSuffix+"),toUInt64("+autoTypeSuffix+")) IN (SELECT deviceid,devicetype FROM flow_tag.device_map WHERE name %s %s AND "+deviceTypeFilter+"))",
-					"if("+autoTypeSuffix+" in (0,255),if(is_ipv4=1, IPv4NumToString("+ip4Suffix+"), IPv6NumToString("+ip6Suffix+")) %s %s,(toUInt64("+autoIDSuffix+"),toUInt64("+autoTypeSuffix+")) IN (SELECT deviceid,devicetype FROM flow_tag.device_map WHERE %s(name,%s) AND "+deviceTypeFilter+"))",
+					"if("+autoTypeSuffix+" in (0,255),%s(if(is_ipv4=1, IPv4NumToString("+ip4Suffix+"), IPv6NumToString("+ip6Suffix+")),%s),(toUInt64("+autoIDSuffix+"),toUInt64("+autoTypeSuffix+")) IN (SELECT deviceid,devicetype FROM flow_tag.device_map WHERE %s(name,%s) AND "+deviceTypeFilter+"))",
 				),
 				"node_type": NewTag(
 					nodeTypeStrSuffix,
@@ -584,7 +584,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		}
 	}
 	for _, suffix := range []string{"", "_0", "_1"} {
-		k8sLabelSuffix := "labels" + suffix
+		k8sLabelSuffix := "k8s.label" + suffix
 		podIDSuffix := "pod_id" + suffix
 		tagResourceMap[k8sLabelSuffix] = map[string]*Tag{
 			"default": NewTag(
@@ -596,8 +596,66 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		}
 	}
 
+	// cloud tags
+	// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
+	for _, suffix := range []string{"", "_0", "_1"} {
+		cloudTagSuffix := "cloud_tag" + suffix
+		deviceIDSuffix := "l3_device_id" + suffix
+		deviceTypeIDSuffix := "l3_device_type" + suffix
+		podNSIDSuffix := "pod_ns_id" + suffix
+		tagResourceMap[cloudTagSuffix] = map[string]*Tag{
+			"default": NewTag(
+				"if(if("+deviceTypeIDSuffix+"=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64("+deviceIDSuffix+"),'%s')), '')!='',if("+deviceTypeIDSuffix+"=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64("+deviceIDSuffix+"),'%s')), ''), dictGet(flow_tag.pod_ns_cloud_tag_map, 'value', (toUInt64("+podNSIDSuffix+"),'%s')) )",
+				"(("+deviceIDSuffix+"!=0 AND "+deviceTypeIDSuffix+"=1) OR "+podNSIDSuffix+"!=0)",
+				"((toUInt64("+deviceIDSuffix+") IN (SELECT id FROM flow_tag.chost_cloud_tag_map WHERE value %s %s and key='%s') AND "+deviceTypeIDSuffix+"=1) OR (toUInt64("+podNSIDSuffix+") IN (SELECT id FROM flow_tag.pod_ns_cloud_tag_map WHERE value %s %s and key='%s'))) ",
+				"((toUInt64("+deviceIDSuffix+") IN (SELECT id FROM flow_tag.chost_cloud_tag_map WHERE %s(value,%s) and key='%s') AND "+deviceTypeIDSuffix+"=1) OR (toUInt64("+podNSIDSuffix+") IN (SELECT id FROM flow_tag.pod_ns_cloud_tag_map WHERE %s(value,%s) and key='%s'))) ",
+			),
+		}
+	}
+	for _, suffix := range []string{"", "_0", "_1"} {
+		cloudTagSuffix := "cloud.tag" + suffix
+		deviceIDSuffix := "l3_device_id" + suffix
+		deviceTypeIDSuffix := "l3_device_type" + suffix
+		podNSIDSuffix := "pod_ns_id" + suffix
+		tagResourceMap[cloudTagSuffix] = map[string]*Tag{
+			"default": NewTag(
+				"if(if("+deviceTypeIDSuffix+"=1, dictGetOrDefault(flow_tag.chost_cloud_tags_map, 'cloud_tags', toUInt64("+deviceIDSuffix+"),'{}'), '{}')!='{}',if("+deviceTypeIDSuffix+"=1, dictGetOrDefault(flow_tag.chost_cloud_tags_map, 'cloud_tags', toUInt64("+deviceIDSuffix+"),'{}'), '{}'), dictGetOrDefault(flow_tag.pod_ns_cloud_tags_map, 'cloud_tags', toUInt64("+podNSIDSuffix+"),'{}')) ",
+				"(("+deviceIDSuffix+"!=0 AND "+deviceTypeIDSuffix+"=1) OR "+podNSIDSuffix+"!=0)",
+				"",
+				"",
+			),
+		}
+	}
+
+	// os.app
+	// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
+	for _, suffix := range []string{"", "_0", "_1"} {
+		osAPPSuffix := "os_app" + suffix
+		processIDSuffix := "gprocess_id" + suffix
+		tagResourceMap[osAPPSuffix] = map[string]*Tag{
+			"default": NewTag(
+				"dictGet(flow_tag.os_app_tag_map, 'value', (toUInt64("+processIDSuffix+"),'%s'))",
+				processIDSuffix+"!=0",
+				"toUInt64("+processIDSuffix+") IN (SELECT pid FROM flow_tag.os_app_tag_map WHERE value %s %s and key='%s')",
+				"toUInt64("+processIDSuffix+") IN (SELECT pid FROM flow_tag.os_app_tag_map WHERE %s(value,%s) and key='%s')",
+			),
+		}
+	}
+	for _, suffix := range []string{"", "_0", "_1"} {
+		osAPPSuffix := "os.app" + suffix
+		processIDSuffix := "gprocess_id" + suffix
+		tagResourceMap[osAPPSuffix] = map[string]*Tag{
+			"default": NewTag(
+				"dictGetOrDefault(flow_tag.os_app_tags_map, 'os_app_tags', toUInt64("+processIDSuffix+"),'{}')",
+				processIDSuffix+"!=0",
+				"",
+				"",
+			),
+		}
+	}
+
 	// 单个外部字段-ext_metrics
-	tagResourceMap["tag"] = map[string]*Tag{
+	tagResourceMap["tag."] = map[string]*Tag{
 		"default": NewTag(
 			"tag_values[indexOf(tag_names,'%s')]",
 			"%s != ''",
@@ -606,7 +664,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		),
 	}
 	// 单个外部字段-l7_flow_log
-	tagResourceMap["attribute"] = map[string]*Tag{
+	tagResourceMap["attribute."] = map[string]*Tag{
 		"default": NewTag(
 			"attribute_values[indexOf(attribute_names,'%s')]",
 			"%s != ''",
@@ -615,7 +673,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		),
 	}
 	// 外部字段map
-	tagResourceMap["tags"] = map[string]*Tag{
+	tagResourceMap["tag"] = map[string]*Tag{
 		"default": NewTag(
 			"arrayZip(tag_names, tag_values)",
 			"",
@@ -623,7 +681,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"",
 		),
 	}
-	tagResourceMap["attributes"] = map[string]*Tag{
+	tagResourceMap["attribute"] = map[string]*Tag{
 		"default": NewTag(
 			"arrayZip(attribute_names, attribute_values)",
 			"",
