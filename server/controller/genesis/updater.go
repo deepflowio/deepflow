@@ -420,7 +420,7 @@ func (v *GenesisSyncRpcUpdater) ParseProcessInfo(info VIFRPCMessage, vtapID uint
 		for _, tag := range p.GetOsAppTags() {
 			osAppTagSlice = append(osAppTagSlice, tag.GetKey()+":"+tag.GetValue())
 		}
-		osAppTagString := strings.Join(osAppTagSlice, ",")
+		osAppTagString := strings.Join(osAppTagSlice, ", ")
 		startTime := time.Unix(int64(p.GetStartTime()), 0)
 		pID := p.GetPid()
 		processes = append(processes, model.GenesisProcess{
