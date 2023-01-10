@@ -19,6 +19,7 @@ package dbwriter
 import (
 	logging "github.com/op/go-logging"
 
+	basecommon "github.com/deepflowys/deepflow/server/ingester/common"
 	"github.com/deepflowys/deepflow/server/ingester/config"
 	"github.com/deepflowys/deepflow/server/ingester/pkg/ckwriter"
 	"github.com/deepflowys/deepflow/server/ingester/stream/common"
@@ -55,6 +56,7 @@ func newFlowLogTable(id common.FlowLogID, columns []*ckdb.Column, engine ckdb.En
 	}
 
 	return &ckdb.Table{
+		Version:         basecommon.CK_VERSION,
 		ID:              uint8(id),
 		Database:        common.FLOW_LOG_DB,
 		LocalName:       id.String() + "_local",
