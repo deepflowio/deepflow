@@ -746,6 +746,7 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 		var isIntEnum = true
 		tagName := strings.TrimLeft(function, "Enum(")
 		tagName = strings.TrimRight(tagName, ")")
+		tagName = strings.Trim(tagName, "`")
 		tagEnum := strings.TrimSuffix(tagName, "_0")
 		tagEnum = strings.TrimSuffix(tagEnum, "_1")
 		tagDescription, ok := tag.TAG_DESCRIPTIONS[tag.TagDescriptionKey{
