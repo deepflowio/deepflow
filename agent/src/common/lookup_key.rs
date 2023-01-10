@@ -203,7 +203,7 @@ impl fmt::Display for LookupKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{:?} {}:{} > {}:{}, eth_type: {:#06x}, {}.{}.{} > {}.{}.{}, proto: {:?}, tap_type: {}, tunnel_id: {}",
+            "{:?} {}:{} > {}:{}, eth_type: {:#06x}, {}.{}.{} > {}.{}.{}, nat: {:?}.{}, proto: {:?}, tap_type: {}, tunnel_id: {}",
             self.timestamp,
             self.src_mac,
             self.l2_end_0,
@@ -216,6 +216,8 @@ impl fmt::Display for LookupKey {
             self.dst_ip,
             self.dst_port,
             self.l3_end_1,
+            self.nat_client_ip,
+            self.nat_client_port,
             self.proto,
             self.tap_type,
             self.tunnel_id,
