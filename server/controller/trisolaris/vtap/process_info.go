@@ -53,6 +53,16 @@ func generateEPKey(epcId, port, ip uint32) uint64 {
 	return uint64(epcIDPort)<<32 | uint64(ip)
 }
 
+func getEpcIdPortIP(value uint64) (epcId, port, ip uint32) {
+	ip = uint32(value & 0xffffffff)
+	epcIdPort := uint32(value >> 32)
+	port = (epcIdPort & 0xffff)
+	epcId = epcIdPort >> 16
+	return
+}
+
+var serverTypes = [MAX]int{TCPServer, TCPClient, UDPServer, UDPClient}
+
 const (
 	TCPServer = iota
 	TCPClient
@@ -132,8 +142,49 @@ func (d EntryData) getData(protocol trident.ServiceProtocol, role trident.RoleTy
 	return epcIDPortIPMap.getData(epcID, port, ip)
 }
 
-func (e EntryData) getAllData() []*trident.GPIDSyncEntry {
-	return nil
+func (e EntryData) getGPIDGlobalData(p *ProcessInfo) []*trident.GlobalGPIDEntry {
+	vtapIDAndPIDToGPID := p.vtapIDAndPIDToGPID
+	allData := []*trident.GlobalGPIDEntry{}
+	for _, value := range serverTypes {
+		var protocol trident.ServiceProtocol
+		var role trident.RoleType
+		switch value {
+		case TCPServer:
+			protocol = trident.ServiceProtocol_TCP_SERVICE
+			role = trident.RoleType_ROLE_SERVER
+		case TCPClient:
+			protocol = trident.ServiceProtocol_TCP_SERVICE
+			role = trident.RoleType_ROLE_CLIENT
+		case UDPServer:
+			protocol = trident.ServiceProtocol_UDP_SERVICE
+			role = trident.RoleType_ROLE_SERVER
+		case UDPClient:
+			protocol = trident.ServiceProtocol_UDP_SERVICE
+			role = trident.RoleType_ROLE_CLIENT
+
+		}
+		if value >= MAX {
+			break
+		}
+		for epcIdPortIP, data := range e[value] {
+			epcId, port, ip := getEpcIdPortIP(epcIdPortIP)
+			vtapID := data.vtapID
+			pid := data.pid
+			gpid := vtapIDAndPIDToGPID.getData(vtapID, pid)
+			entry := &trident.GlobalGPIDEntry{
+				VtapId:   &vtapID,
+				Pid:      &pid,
+				Gpid:     &gpid,
+				EpcId:    &epcId,
+				Ipv4:     &ip,
+				Port:     &port,
+				Role:     &role,
+				Protocol: &protocol,
+			}
+			allData = append(allData, entry)
+		}
+	}
+	return allData
 }
 
 type CacheReq struct {
@@ -325,8 +376,8 @@ func (p *ProcessInfo) updateGlobalLocalEntries(data EntryData) {
 	p.globalLocalEntries = data
 }
 
-func (p *ProcessInfo) GetGlobalLocalEntries() []*trident.GPIDSyncEntry {
-	return p.globalLocalEntries.getAllData()
+func (p *ProcessInfo) GetGlobalEntries() []*trident.GlobalGPIDEntry {
+	return p.globalLocalEntries.getGPIDGlobalData(p)
 }
 
 func (p *ProcessInfo) generateGlobalLocalEntries() {

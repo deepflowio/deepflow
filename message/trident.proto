@@ -20,8 +20,8 @@ service Synchronizer {
 
 // debug service
 service Debug {
-    rpc DebugGPIDGlobalLocalData (GPIDSyncRequest) returns(GPIDGlobalLocalData) {}
-    rpc DebugGPIDVTapLocalData (GPIDSyncRequest) returns(GPIDSyncRequest) {}
+    rpc DebugGPIDGlobalData (GPIDSyncRequest) returns(GPIDGlobalData) {}
+    rpc DebugGPIDVTapData (GPIDSyncRequest) returns(GPIDSyncRequest) {}
 }
 
 enum State {
@@ -688,6 +688,18 @@ message GPIDSyncResponse {
     repeated GPIDSyncEntry entries = 2;
 }
 
-message GPIDGlobalLocalData {
-    repeated trident.GPIDSyncEntry  entries = 1;
+message GlobalGPIDEntry {
+    optional uint32 vtap_id = 1;
+    optional ServiceProtocol protocol = 2 [default = ANY];
+    optional RoleType role = 3 [default = ROLE_NONE];
+
+    optional uint32 epc_id = 4 [default = 0];
+    optional uint32 ipv4 = 5 [default = 0];
+    optional uint32 port = 6 [default = 0];
+    optional uint32 pid = 7 [default = 0];
+    optional uint32 gpid = 8 [default = 0];
+}
+
+message GPIDGlobalData {
+    repeated GlobalGPIDEntry  entries = 1;
 }
