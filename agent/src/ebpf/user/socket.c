@@ -1689,10 +1689,11 @@ void print_io_event_info(const char *data, int len)
 
 	memcpy(&event, data, sizeof(event));
 
-	printf("bytes_count=[%u]\n", event.bytes_count);
-	printf("operation=[%u]\n", event.operation);
-	printf("latency=[%llu]\n", event.latency);
-	printf("filename=[%s]\n", event.filename);
+	fprintf(datadump_file,
+		"bytes_count=[%u]\noperation=[%u]\nlatency=[%llu]\nfilename=[%s]\n",
+		event.bytes_count, event.operation,
+		event.latency, event.filename);
+
 	fflush(stdout);
 	return;
 }

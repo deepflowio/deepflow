@@ -74,6 +74,8 @@
 #define DATADUMP_FILE_PATH_PREFIX	"/var/log"
 
 // trace map回收的最大比例（指当前数量超过了整个MAP的容量的回收比例才进行回收）
+// Maximum proportion of trace map reclamation (refers to the proportion of
+// reclamation when the current quantity exceeds the capacity of the whole MAP)
 #define RECLAIM_TRACE_MAP_SCALE		0.9
 
 #endif /* DF_EBPF_CONFIG_H */
