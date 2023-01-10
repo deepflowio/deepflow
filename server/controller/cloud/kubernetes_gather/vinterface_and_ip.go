@@ -282,6 +282,10 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 		aggFlag4 := false
 		for i, v4CIDR := range noMaskPodV4CIDRs {
 			intersecFlag4 := false
+			if v4CIDR.Contains(v4ipNet) {
+				aggFlag4 = true
+				break
+			}
 			pSlisce := []ipaddr.Prefix{*v4ipNet, *v4CIDR}
 			v4AggCIDR := ipaddr.Supernet(pSlisce)
 			if v4AggCIDR == nil {
@@ -320,6 +324,10 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 		aggFlag6 := false
 		for i, v6CIDR := range noMaskPodV6CIDRs {
 			intersecFlag6 := false
+			if v6CIDR.Contains(v6ipNet) {
+				aggFlag6 = true
+				break
+			}
 			pSlisce := []ipaddr.Prefix{*v6ipNet, *v6CIDR}
 			v6AggCIDR := ipaddr.Supernet(pSlisce)
 			if v6AggCIDR == nil {
@@ -351,6 +359,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 	}
 	// 添加聚合后的子网
 	noMaskCIDRs := append(noMaskPodV4CIDRs, noMaskPodV6CIDRs...)
+	aggNoMaskNets := append(aggNoMaskV4Nets, aggNoMaskV6Nets...)
 	for _, ipPrefix := range noMaskCIDRs {
 		subnetLcuuid := common.GetUUID(k.podNetworkLcuuidCIDRs.networkLcuuid+"NO_MASK"+ipPrefix.String(), uuid.Nil)
 		subnet := model.Subnet{
@@ -363,21 +372,22 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 		podSubnets = append(podSubnets, subnet)
 		ipNetPrefix, _ := netaddr.ParseIPPrefix(ipPrefix.String())
 		subnetLcuuidToCIDR[subnetLcuuid] = ipNetPrefix
-		aggNoMaskNets := append(aggNoMaskV4Nets, aggNoMaskV6Nets...)
 		// 将ip关联到聚合的子网
 		for _, noMaskIPString := range aggNoMaskNets {
 			noMaskIP, _ := netaddr.ParseIPPrefix(noMaskIPString)
-			if ipNetPrefix.Contains(noMaskIP.IP()) {
-				vinterfaceLcuuid := ipToVinterfaceLcuuid[noMaskIPString]
-				noMaskIPPrefix, _ := netaddr.ParseIPPrefix(noMaskIPString)
-				ipLcuuid := common.GetUUID(vinterfaceLcuuid+noMaskIPPrefix.IP().String(), uuid.Nil)
-				podIPModel, ok := podIPsMap[ipLcuuid]
-				if !ok {
-					log.Warningf("vinterface,ip ip (%s) not relevancy subnet (%s)", noMaskIPPrefix.IP().String(), ipNetPrefix.String())
-					continue
-				}
-				podIPModel.SubnetLcuuid = subnetLcuuid
+			if !ipNetPrefix.Contains(noMaskIP.IP()) {
+				log.Warningf("vinterface,ip ip (%s) not found aggregated subnet", noMaskIPString)
+				continue
 			}
+			vinterfaceLcuuid := ipToVinterfaceLcuuid[noMaskIPString]
+			noMaskIPPrefix, _ := netaddr.ParseIPPrefix(noMaskIPString)
+			ipLcuuid := common.GetUUID(vinterfaceLcuuid+noMaskIPPrefix.IP().String(), uuid.Nil)
+			podIPModel, ok := podIPsMap[ipLcuuid]
+			if !ok {
+				log.Warningf("vinterface,ip ip (%s) not relevancy subnet (%s)", noMaskIPPrefix.IP().String(), ipNetPrefix.String())
+				continue
+			}
+			podIPModel.SubnetLcuuid = subnetLcuuid
 		}
 	}
 	for _, v := range podIPsMap {
