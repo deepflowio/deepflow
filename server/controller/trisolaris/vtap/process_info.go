@@ -113,12 +113,11 @@ func (d EntryData) addData(vtapID uint32, entry *trident.GPIDSyncEntry) {
 	if entry.GetPid_1() > 0 {
 		epcIDPortIPMap := d.getEpcIDPortIPMap(entry.GetProtocol(), trident.RoleType_ROLE_SERVER)
 		if epcIDPortIPMap != nil {
-			epcIDPortIPMap.addData(vtapID, entry.GetEpcId_0(), entry.GetPort_0(), entry.GetPid_0(), entry.GetIpv4_0())
+			epcIDPortIPMap.addData(vtapID, entry.GetEpcId_1(), entry.GetPort_1(), entry.GetPid_1(), entry.GetIpv4_1())
 		}
-		epcIDPortIPMap.addData(vtapID, entry.GetEpcId_1(), entry.GetPort_1(), entry.GetPid_1(), entry.GetIpv4_1())
 	}
 	if entry.GetPidReal() > 0 {
-		epcIDPortIPMap := d.getEpcIDPortIPMap(entry.GetProtocol(), entry.GetRole())
+		epcIDPortIPMap := d.getEpcIDPortIPMap(entry.GetProtocol(), entry.GetRealRole())
 		if epcIDPortIPMap != nil {
 			epcIDPortIPMap.addData(vtapID, entry.GetEpcIdReal(), entry.GetPortReal(), entry.GetPidReal(), entry.GetIpv4Real())
 		}
@@ -324,11 +323,11 @@ func (p *ProcessInfo) GetGPIDResponseByReq(req *trident.GPIDSyncRequest) *triden
 	vtapID := req.GetVtapId()
 	responseEntries := make([]*trident.GPIDSyncEntry, 0, len(entries))
 	for _, entry := range entries {
-		role := entry.GetRole()
+		realRole := entry.GetRealRole()
 		protocol := entry.GetProtocol()
 		responseEntry := &trident.GPIDSyncEntry{
 			Protocol:  &protocol,
-			Role:      &role,
+			RealRole:  &realRole,
 			EpcId_1:   proto.Uint32(entry.GetEpcId_1()),
 			Ipv4_1:    proto.Uint32(entry.GetIpv4_1()),
 			Port_1:    proto.Uint32(entry.GetPort_1()),
@@ -361,7 +360,7 @@ func (p *ProcessInfo) GetGPIDResponseByReq(req *trident.GPIDSyncRequest) *triden
 		}
 
 		if entry.GetPidReal() == 0 {
-			globalReal := p.globalLocalEntries.getData(protocol, role,
+			globalReal := p.globalLocalEntries.getData(protocol, realRole,
 				entry.GetEpcIdReal(), entry.GetPortReal(), entry.GetIpv4Real())
 			if globalReal != nil {
 				gpidReal = p.vtapIDAndPIDToGPID.getData(globalReal.vtapID, globalReal.pid)
