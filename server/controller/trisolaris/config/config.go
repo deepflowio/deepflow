@@ -49,7 +49,7 @@ type Config struct {
 	VTapCacheRefreshInterval       int  `default:"300" yaml:"vtapcache-refresh-interval"`
 	MetaDataRefreshInterval        int  `default:"60" yaml:"metadata-refresh-interval"`
 	NodeRefreshInterval            int  `default:"60" yaml:"node-refresh-interval"`
-	GPIDRefreshInterval            int  `default:"10" yaml:"gpid-refresh-interval"`
+	GPIDRefreshInterval            int  `default:"9" yaml:"gpid-refresh-interval"`
 	VTapAutoRegister               bool `default:"true" yaml:"vtap-auto-register"`
 	DefaultTapMode                 int  `yaml:"default-tap-mode"`
 	BillingMethod                  string
