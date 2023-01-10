@@ -816,7 +816,7 @@ impl FlowMap {
         self.update_endpoint_and_policy_data(&mut node, meta_packet);
 
         node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].gpid = meta_packet.gpid_0;
-        node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].gpid = meta_packet.gpid_1;
+        node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].gpid = meta_packet.gpid_1;
 
         if let Some(endpoints) = &meta_packet.endpoint_data {
             if endpoints.src_info.is_vip || endpoints.dst_info.is_vip {
@@ -942,7 +942,7 @@ impl FlowMap {
         }
         if meta_packet.gpid_1 > 0 {
             flow.flow_metrics_peers[meta_packet.direction.reversed() as usize].gpid =
-                meta_packet.gpid_1
+                meta_packet.gpid_1;
         }
 
         // The ebpf data has no l3 and l4 information, so it can be returned directly
