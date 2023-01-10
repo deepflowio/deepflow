@@ -265,6 +265,15 @@ func formatEntries(entry *trident.GPIDSyncEntry) string {
 	return buffer.String()
 }
 
+func formatGlobalEntry(entry *trident.GlobalGPIDEntry) string {
+	buffer := bytes.Buffer{}
+	format := "{vtap_id: %d, protocol: %d, role: %d, epc_id: %d, ipv4: %s, port: %d, pid: %d, gpid: %d}"
+	buffer.WriteString(fmt.Sprintf(format,
+		entry.GetVtapId(), entry.GetProtocol(), entry.GetRole(), entry.GetEpcId(), utils.IpFromUint32(entry.GetIpv4()).String(),
+		entry.GetPort(), entry.GetPid(), entry.GetGpid()))
+	return buffer.String()
+}
+
 func gpidGlobalTable(cmd *cobra.Command) {
 	conn := getConn(cmd)
 	if conn == nil {
@@ -274,14 +283,14 @@ func gpidGlobalTable(cmd *cobra.Command) {
 	fmt.Printf("request trisolaris(%s), params(%+v)\n", conn.Target(), paramData)
 	c := trident.NewDebugClient(conn)
 	reqData := &trident.GPIDSyncRequest{}
-	response, err := c.DebugGPIDGlobalLocalData(context.Background(), reqData)
+	response, err := c.DebugGPIDGlobalData(context.Background(), reqData)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 	fmt.Println("GPIDGlobalLocalData:")
 	for index, entry := range response.GetEntries() {
-		JsonFormat(index+1, entry)
+		JsonFormat(index+1, formatGlobalEntry(entry))
 	}
 }
 
@@ -297,7 +306,7 @@ func gpidAgentRequest(cmd *cobra.Command) {
 		CtrlIp:  &paramData.CtrlIP,
 		CtrlMac: &paramData.CtrlMac,
 	}
-	response, err := c.DebugGPIDVTapLocalData(context.Background(), reqData)
+	response, err := c.DebugGPIDVTapData(context.Background(), reqData)
 	if err != nil {
 		fmt.Println(err)
 		return
