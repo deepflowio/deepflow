@@ -32,6 +32,8 @@ const (
 	NEQ
 	LIKE
 	NLIKE
+	REGEXP
+	NREGEXP
 )
 
 type Operator struct {
@@ -59,6 +61,10 @@ func (n *Operator) ToString() string {
 		return " LIKE "
 	case NLIKE:
 		return " NOT LIKE "
+	case REGEXP:
+		return " MATCH "
+	case NREGEXP:
+		return " NOT MATCH "
 	}
 	return ""
 }
@@ -90,6 +96,10 @@ func GetOperator(op string) (*Operator, int) {
 		opType = LIKE
 	case "not like":
 		opType = NLIKE
+	case "regexp":
+		opType = REGEXP
+	case "not regexp":
+		opType = NREGEXP
 	}
 	return &Operator{Type: opType}, opType
 }

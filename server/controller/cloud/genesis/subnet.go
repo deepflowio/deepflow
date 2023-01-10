@@ -48,7 +48,7 @@ func (g *Genesis) getSubnets() ([]model.Subnet, error) {
 			Lcuuid:        s.Lcuuid,
 			Name:          subnetName,
 			CIDR:          s.CIDR,
-			VPCLcuuid:     s.VPCLcuuid,
+			VPCLcuuid:     vpcLcuuid,
 			NetworkLcuuid: s.NetworkLcuuid,
 		}
 		subnets = append(subnets, subnet)

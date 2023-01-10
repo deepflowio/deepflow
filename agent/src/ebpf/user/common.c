@@ -31,9 +31,11 @@
 #include <linux/unistd.h>
 #include <unistd.h>
 #include <time.h>
+#include <sys/time.h>
 #include <string.h>
 #include <inttypes.h>
 #include <sys/utsname.h>
+#include "config.h"
 #include "list.h"
 #include "common.h"
 #include "log.h"
@@ -437,6 +439,22 @@ unsigned int fetch_kernel_version_code(void)
 		return 0;
 	}
 
+	/*
+	 * Calculate LINUX_VERSION_CODE based on kernel
+	 * version(linux major.minor.patch), use macros
+	 * `KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c)).`
+	 * If the patch number is greater than 255, there will
+	 * be a deviation. For example, Linux 4.14.275
+	 * calculates 265983 with KERNEL_VERSION(4,14,275),
+	 * and the backderived kernel version is 4.15.19,
+	 * which is obviously wrong.
+	 * The solution is to determine the value of patch
+	 * and set it to 255 if it exceeds 255.
+	 */
+	if (patch > 255) {
+		patch = 255;
+	}
+
 	return KERNEL_VERSION(major, minor, patch);
 }
 
@@ -470,4 +488,40 @@ bool is_process(int pid)
 		return true;
 
 	return false;
+}
+
+static char *gen_datetime_str(const char *fmt)
+{
+	const int strlen = DATADUMP_FILE_PATH_SIZE;
+	time_t timep;
+	char *str;
+	struct tm *p;
+	str = malloc(strlen);
+	if (str == NULL) {
+		ebpf_warning("malloc() failed.\n");
+		return NULL;
+	}
+
+	time(&timep);
+	p = localtime(&timep);
+	struct timeval msectime;
+	gettimeofday(&msectime, NULL);
+	long msec = 0;
+	msec = msectime.tv_usec / 1000;
+	snprintf(str, strlen, fmt,
+		 (1900 + p->tm_year), (1 + p->tm_mon),
+		 p->tm_mday, p->tm_hour, p->tm_min,
+		 p->tm_sec, msec);
+
+	return str;
+}
+
+char *gen_file_name_by_datetime(void)
+{
+	return gen_datetime_str("%d_%02d_%02d_%02d_%02d_%02d_%ld");
+}
+
+char *gen_timestamp_prefix(void)
+{
+	return gen_datetime_str("%d-%02d-%02d %02d:%02d:%02d.%ld");
 }

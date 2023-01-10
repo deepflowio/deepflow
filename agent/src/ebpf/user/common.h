@@ -264,5 +264,7 @@ int get_num_possible_cpus(void);
 // Check if task is the main thread based on pid.
 // Ignore threads other than the main thread in uprobe to avoid repeating hooks
 bool is_process(int pid);
+char *gen_file_name_by_datetime(void);
+char *gen_timestamp_prefix(void);
 
 #endif /* DF_COMMON_H */

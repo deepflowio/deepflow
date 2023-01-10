@@ -16,15 +16,11 @@
 
 #ifndef DF_USER_SOCKET_H
 #define DF_USER_SOCKET_H
+#include "config.h"
 
 #ifndef CACHE_LINE_SIZE
 #define CACHE_LINE_SIZE 64
 #endif
-
-#define SK_TRACER_NAME  "socket-trace"
-
-// trace map回收的最大比例（指当前数量超过了整个MAP的容量的回收比例才进行回收）
-#define RECLAIM_TRACE_MAP_SCALE  0.9
 
 #define CACHE_LINE_ROUNDUP(size) \
   (CACHE_LINE_SIZE * ((size + CACHE_LINE_SIZE - 1) / CACHE_LINE_SIZE))
@@ -148,6 +144,11 @@ struct bpf_socktrace_params {
 	uint32_t kern_socket_map_used;
 	uint32_t kern_trace_map_max;
 	uint32_t kern_trace_map_used;
+	bool datadump_enable;
+	int datadump_pid;
+	uint8_t datadump_proto;
+	char datadump_file_path[DATADUMP_FILE_PATH_SIZE];
+	char datadump_comm[16];
 	struct bpf_offset_param_array offset_array;
 };
 
@@ -159,6 +160,40 @@ struct extra_event {
 	uint32_t type;
 	void (*h)(void *);
 };
+
+static inline char *get_proto_name(uint16_t proto_id)
+{
+	switch (proto_id) {
+	case PROTO_HTTP1:
+		return "HTTP1";
+	case PROTO_HTTP2:
+		return "HTTP2";
+	case PROTO_TLS_HTTP1:
+		return "TLS_HTTP1";
+	case PROTO_TLS_HTTP2:
+		return "TLS_HTTP2";
+	case PROTO_MYSQL:
+		return "MySQL";
+	case PROTO_DNS:
+		return "DNS";
+	case PROTO_REDIS:
+		return "Redis";
+	case PROTO_KAFKA:
+		return "Kafka";
+	case PROTO_MQTT:
+		return "MQTT";
+	case PROTO_DUBBO:
+		return "Dubbo";
+	case PROTO_SOFARPC:
+		return "SofaRPC";
+	case PROTO_POSTGRESQL:
+		return "PgSQL";
+	default:
+		return "Unknown";
+	}
+
+	return "Unknown";
+}
 
 int set_data_limit_max(int limit_size);
 int set_go_tracing_timeout(int timeout);

@@ -961,7 +961,7 @@ impl TryFrom<&trident::GpidSyncEntry> for GpidEntry {
             port_real: (value.port_real() & 0xffff) as u16,
             pid_real: (value.pid_real() & 0xffffffff) as u32,
             protocol,
-            role: value.role(),
+            role: value.role_real(),
         })
     }
 }
