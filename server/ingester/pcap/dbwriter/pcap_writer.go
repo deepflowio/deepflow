@@ -33,7 +33,7 @@ const (
 )
 
 type PcapWriter struct {
-	ckdbAddr          string
+	ckdbAddrs         []string
 	ckdbUsername      string
 	ckdbPassword      string
 	ckdbCluster       string
@@ -51,7 +51,7 @@ func (w *PcapWriter) Write(m interface{}) {
 
 func NewPcapWriter(config *config.Config) (*PcapWriter, error) {
 	w := &PcapWriter{
-		ckdbAddr:          config.Base.CKDB.ActualAddr,
+		ckdbAddrs:         config.Base.CKDB.ActualAddrs,
 		ckdbUsername:      config.Base.CKDBAuth.Username,
 		ckdbPassword:      config.Base.CKDBAuth.Password,
 		ckdbCluster:       config.Base.CKDB.ClusterName,
@@ -62,8 +62,8 @@ func NewPcapWriter(config *config.Config) (*PcapWriter, error) {
 	}
 	table := GenPcapCKTable(w.ckdbCluster, w.ckdbStoragePolicy, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, PCAP_DB, PCAP_TABLE))
 
-	ckwriter, err := ckwriter.NewCKWriter(w.ckdbAddr, "", w.ckdbUsername, w.ckdbPassword,
-		PCAP_TABLE, table, false, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
+	ckwriter, err := ckwriter.NewCKWriter(w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
+		PCAP_TABLE, table, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
 	if err != nil {
 		return nil, err
 	}

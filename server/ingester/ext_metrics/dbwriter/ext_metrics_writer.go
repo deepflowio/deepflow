@@ -17,7 +17,6 @@
 package dbwriter
 
 import (
-	"database/sql"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -61,7 +60,7 @@ type tableInfo struct {
 
 type ExtMetricsWriter struct {
 	msgType           datatype.MessageType
-	ckdbAddr          string
+	ckdbAddrs         []string
 	ckdbUsername      string
 	ckdbPassword      string
 	ckdbCluster       string
@@ -71,7 +70,7 @@ type ExtMetricsWriter struct {
 	writerConfig      baseconfig.CKWriterConfig
 	ckdbWatcher       *baseconfig.Watcher
 
-	ckdbConn *sql.DB
+	ckdbConn common.DBs
 
 	createTable        sync.Mutex
 	tablesLock         sync.RWMutex
@@ -85,7 +84,7 @@ type ExtMetricsWriter struct {
 
 func (w *ExtMetricsWriter) InitDatabase() error {
 	if w.ckdbConn == nil {
-		conn, err := common.NewCKConnection(w.ckdbAddr, w.ckdbUsername, w.ckdbPassword)
+		conn, err := common.NewCKConnections(w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword)
 		if err != nil {
 			return err
 		}
@@ -121,7 +120,7 @@ func (w *ExtMetricsWriter) getOrCreateCkwriter(s *ExtMetrics) (*ckwriter.CKWrite
 	}
 
 	if w.ckdbConn == nil {
-		conn, err := common.NewCKConnection(w.ckdbAddr, w.ckdbUsername, w.ckdbPassword)
+		conn, err := common.NewCKConnections(w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword)
 		if err != nil {
 			return nil, err
 		}
@@ -131,8 +130,8 @@ func (w *ExtMetricsWriter) getOrCreateCkwriter(s *ExtMetrics) (*ckwriter.CKWrite
 	// 将要创建的表信息
 	table := s.GenCKTable(w.ckdbCluster, w.ckdbStoragePolicy, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, s.Database, s.TableName))
 
-	ckwriter, err := ckwriter.NewCKWriter(w.ckdbAddr, "", w.ckdbUsername, w.ckdbPassword,
-		w.msgType.String()+"-"+s.TableName, table, false, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
+	ckwriter, err := ckwriter.NewCKWriter(w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
+		w.msgType.String()+"-"+s.TableName, table, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -241,7 +240,7 @@ func NewExtMetricsWriter(
 	}
 	writer := &ExtMetricsWriter{
 		msgType:           msgType,
-		ckdbAddr:          config.Base.CKDB.ActualAddr,
+		ckdbAddrs:         config.Base.CKDB.ActualAddrs,
 		ckdbUsername:      config.Base.CKDBAuth.Username,
 		ckdbPassword:      config.Base.CKDBAuth.Password,
 		ckdbCluster:       config.Base.CKDB.ClusterName,

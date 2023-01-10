@@ -40,10 +40,9 @@ type Issu struct {
 	columnRenames      []*ColumnRename
 	columnMods         []*ColumnMod
 	columnAdds         []*ColumnAdd
-	primaryConnection  *sql.DB
-	primaryAddr        string
+	Connections        common.DBs
+	Addrs              []string
 	username, password string
-	oldVersion         string
 	exit               bool
 }
 
@@ -800,10 +799,10 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo, isEdgeTab
 
 func NewCKIssu(cfg *config.Config) (*Issu, error) {
 	i := &Issu{
-		cfg:         cfg,
-		primaryAddr: cfg.CKDB.ActualAddr,
-		username:    cfg.CKDBAuth.Username,
-		password:    cfg.CKDBAuth.Password,
+		cfg:      cfg,
+		Addrs:    cfg.CKDB.ActualAddrs,
+		username: cfg.CKDBAuth.Username,
+		password: cfg.CKDBAuth.Password,
 	}
 
 	allVersionAdds := [][]*ColumnAdds{ColumnAdd610, ColumnAdd611, ColumnAdd612, ColumnAdd613, ColumnAdd615, ColumnAdd618, ColumnAdd620}
@@ -822,34 +821,32 @@ func NewCKIssu(cfg *config.Config) (*Issu, error) {
 	}
 
 	var err error
-	i.primaryConnection, err = common.NewCKConnection(i.primaryAddr, i.username, i.password)
+	i.Connections, err = common.NewCKConnections(i.Addrs, i.username, i.password)
 	if err != nil {
 		return nil, err
 	}
-
-	flowLogVersion, err := i.getTableVersion(i.primaryConnection, "flow_log", "l4_flow_log_local")
-	if err != nil {
-		return nil, err
-	}
-	i.oldVersion = flowLogVersion
 
 	return i, nil
 }
 
 func (i *Issu) RunRenameTable(ds *datasource.DatasourceManager) error {
-	if strings.Compare(i.oldVersion, "v6.1.1") >= 0 || i.oldVersion == "" {
-		return nil
-	}
-
 	i.tableRenames = TableRenames611
-	for _, tableRename := range i.tableRenames {
-		if err := i.renameTable(i.primaryConnection, tableRename); err != nil {
+	for _, connection := range i.Connections {
+		oldVersion, err := i.getTableVersion(connection, "flow_log", "l4_flow_log_local")
+		if err != nil {
 			return err
 		}
-	}
-
-	if err := i.renameUserDefineDatasource(i.primaryConnection, ds); err != nil {
-		log.Warning(err)
+		if strings.Compare(oldVersion, "v6.1.1") >= 0 || oldVersion == "" {
+			continue
+		}
+		for _, tableRename := range i.tableRenames {
+			if err := i.renameTable(connection, tableRename); err != nil {
+				return err
+			}
+		}
+		if err := i.renameUserDefineDatasource(connection, ds); err != nil {
+			log.Warning(err)
+		}
 	}
 
 	return nil
@@ -1091,47 +1088,49 @@ func (i *Issu) addColumns(connect *sql.DB) ([]*ColumnAdd, error) {
 }
 
 func (i *Issu) Start() error {
-	connect := i.primaryConnection
-	if connect == nil {
-		return fmt.Errorf("primary connection is nil")
+	connects := i.Connections
+	if len(connects) == 0 {
+		return fmt.Errorf("connections is nil")
 	}
-	renames, errRenames := i.renameColumns(connect)
-	if errRenames != nil {
-		return errRenames
-	}
-	mods, errMods := i.modColumns(connect)
-	if errMods != nil {
-		return errMods
-	}
-
-	adds, errAdds := i.addColumns(connect)
-	if errAdds != nil {
-		return errAdds
-	}
-
-	for _, cr := range renames {
-		if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
-			return err
+	for _, connect := range connects {
+		renames, errRenames := i.renameColumns(connect)
+		if errRenames != nil {
+			return errRenames
 		}
-	}
-	for _, cr := range mods {
-		if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
-			return err
+		mods, errMods := i.modColumns(connect)
+		if errMods != nil {
+			return errMods
 		}
-	}
-	for _, cr := range adds {
-		if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
-			return err
+
+		adds, errAdds := i.addColumns(connect)
+		if errAdds != nil {
+			return errAdds
+		}
+
+		for _, cr := range renames {
+			if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
+				return err
+			}
+		}
+		for _, cr := range mods {
+			if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
+				return err
+			}
+		}
+		for _, cr := range adds {
+			if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
 func (i *Issu) Close() error {
-	if i.primaryConnection == nil {
+	if len(i.Connections) == 0 {
 		return nil
 	}
-	return i.primaryConnection.Close()
+	return i.Connections.Close()
 }
 
 func (i *Issu) renameUserDefineDatasource(connect *sql.DB, ds *datasource.DatasourceManager) error {

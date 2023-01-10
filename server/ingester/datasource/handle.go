@@ -22,11 +22,8 @@ import (
 
 	basecommon "github.com/deepflowys/deepflow/server/ingester/common"
 	"github.com/deepflowys/deepflow/server/ingester/flow_log/common"
-	"github.com/deepflowys/deepflow/server/ingester/pkg/ckwriter"
 	"github.com/deepflowys/deepflow/server/libs/ckdb"
 	"github.com/deepflowys/deepflow/server/libs/zerodoc"
-
-	clickhouse "github.com/ClickHouse/clickhouse-go/v2"
 )
 
 const (
@@ -381,7 +378,7 @@ func (m *DatasourceManager) getMetricsTable(id zerodoc.MetricsTableID) *ckdb.Tab
 	return zerodoc.GetMetricsTables(ckdb.MergeTree, basecommon.CK_VERSION, m.ckdbCluster, m.ckdbStoragePolicy, 7, 1, 7, 1, m.ckdbColdStorages)[id]
 }
 
-func (m *DatasourceManager) createTableMV(ck clickhouse.Conn, tableId zerodoc.MetricsTableID, baseTable, dstTable, aggrSummable, aggrUnsummable string, aggInterval IntervalEnum, duration int) error {
+func (m *DatasourceManager) createTableMV(cks basecommon.DBs, tableId zerodoc.MetricsTableID, baseTable, dstTable, aggrSummable, aggrUnsummable string, aggInterval IntervalEnum, duration int) error {
 	table := m.getMetricsTable(tableId)
 	if baseTable != ORIGIN_TABLE_1M && baseTable != ORIGIN_TABLE_1S {
 		return fmt.Errorf("Only support base datasource 1s,1m")
@@ -402,14 +399,14 @@ func (m *DatasourceManager) createTableMV(ck clickhouse.Conn, tableId zerodoc.Me
 	}
 	for _, cmd := range commands {
 		log.Info(cmd)
-		if err := ckwriter.ExecSQL(ck, cmd); err != nil {
+		if _, err := cks.Exec(cmd); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (m *DatasourceManager) modTableMV(ck clickhouse.Conn, tableId zerodoc.MetricsTableID, dstTable string, duration int) error {
+func (m *DatasourceManager) modTableMV(cks basecommon.DBs, tableId zerodoc.MetricsTableID, dstTable string, duration int) error {
 	table := m.getMetricsTable(tableId)
 	tableMod := ""
 	if dstTable == ORIGIN_TABLE_1M || dstTable == ORIGIN_TABLE_1S {
@@ -420,18 +417,20 @@ func (m *DatasourceManager) modTableMV(ck clickhouse.Conn, tableId zerodoc.Metri
 	modTable := fmt.Sprintf("ALTER TABLE %s MODIFY TTL %s",
 		tableMod, m.makeTTLString(table.TimeKey, ckdb.METRICS_DB, table.GlobalName, duration))
 
-	return ckwriter.ExecSQL(ck, modTable)
+	_, err := cks.Exec(modTable)
+	return err
 }
 
-func (m *DatasourceManager) modFlowLogLocalTable(ck clickhouse.Conn, tableID common.FlowLogID, duration int) error {
+func (m *DatasourceManager) modFlowLogLocalTable(cks basecommon.DBs, tableID common.FlowLogID, duration int) error {
 	timeKey := tableID.TimeKey()
 	tableLocal := fmt.Sprintf("%s.%s_%s", common.FLOW_LOG_DB, tableID.String(), LOCAL)
 	modTable := fmt.Sprintf("ALTER TABLE %s MODIFY TTL %s",
 		tableLocal, m.makeTTLString(timeKey, common.FLOW_LOG_DB, tableID.String(), duration))
-	return ckwriter.ExecSQL(ck, modTable)
+	_, err := cks.Exec(modTable)
+	return err
 }
 
-func delTableMV(ck clickhouse.Conn, dbId zerodoc.MetricsTableID, table string) error {
+func delTableMV(cks basecommon.DBs, dbId zerodoc.MetricsTableID, table string) error {
 	dropTables := []string{
 		getMetricsTableName(uint8(dbId), table, GLOBAL),
 		getMetricsTableName(uint8(dbId), table, LOCAL),
@@ -439,7 +438,7 @@ func delTableMV(ck clickhouse.Conn, dbId zerodoc.MetricsTableID, table string) e
 		getMetricsTableName(uint8(dbId), table, AGG),
 	}
 	for _, name := range dropTables {
-		if err := ckwriter.ExecSQL(ck, "DROP TABLE IF EXISTS "+name); err != nil {
+		if _, err := cks.Exec("DROP TABLE IF EXISTS " + name); err != nil {
 			return err
 		}
 	}
@@ -448,18 +447,11 @@ func delTableMV(ck clickhouse.Conn, dbId zerodoc.MetricsTableID, table string) e
 }
 
 func (m *DatasourceManager) Handle(dbGroup, action, baseTable, dstTable, aggrSummable, aggrUnsummable string, interval, duration int) error {
-	if len(m.ckAddr) == 0 {
-		return fmt.Errorf("ck addr is empty")
+	if len(m.ckAddrs) == 0 {
+		return fmt.Errorf("ck addrs is empty")
 	}
-	ck, err := clickhouse.Open(&clickhouse.Options{
-		Addr: []string{m.ckAddr},
-		Auth: clickhouse.Auth{
-			Database: "default",
-			Username: m.user,
-			Password: m.password,
-		},
-	})
 
+	cks, err := basecommon.NewCKConnections(m.ckAddrs, m.user, m.password)
 	if err != nil {
 		return err
 	}
@@ -472,7 +464,7 @@ func (m *DatasourceManager) Handle(dbGroup, action, baseTable, dstTable, aggrSum
 		if dbGroup == FLOW_LOG_L7 {
 			flowLogID = common.L7_FLOW_ID
 		}
-		if err := m.modFlowLogLocalTable(ck, flowLogID, duration); err != nil {
+		if err := m.modFlowLogLocalTable(cks, flowLogID, duration); err != nil {
 			return err
 		}
 		return nil
@@ -520,15 +512,15 @@ func (m *DatasourceManager) Handle(dbGroup, action, baseTable, dstTable, aggrSum
 			if interval == 1440 {
 				aggInterval = IntervalDay
 			}
-			if err := m.createTableMV(ck, tableId, baseTable, dstTable, aggrSummable, aggrUnsummable, aggInterval, duration); err != nil {
+			if err := m.createTableMV(cks, tableId, baseTable, dstTable, aggrSummable, aggrUnsummable, aggInterval, duration); err != nil {
 				return err
 			}
 		case MOD:
-			if err := m.modTableMV(ck, tableId, dstTable, duration); err != nil {
+			if err := m.modTableMV(cks, tableId, dstTable, duration); err != nil {
 				return err
 			}
 		case DEL:
-			if err := delTableMV(ck, tableId, dstTable); err != nil {
+			if err := delTableMV(cks, tableId, dstTable); err != nil {
 				return err
 			}
 		default:
