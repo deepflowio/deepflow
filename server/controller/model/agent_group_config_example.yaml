@@ -984,12 +984,18 @@ vtap_group_id: g-xxxxxx
   #os-app-tag-exec-user: deepflow
 
   ## the regular expression use for match process and replace the process name
-  ## Note: will traverse over the entire array, so the previous ones will be matched first
+  ## Note: will traverse over the entire array, so the previous ones will be matched first.
+  ##   rewrite-name can replace by regexp capture group and windows style environment variable, for example:
+  ##   `$1-py-script-%HOSTNAME%` will replace regexp capture group 1 and HOSTNAME env var
+  ##
   ## Example:
   ##   os-proc-regex:
   ##     - match-regex: python3 (.*)\.py
   ##       match-type: cmdline
   ##       rewrite-name: $1-py-script
+  ##     - match-regex: (?P<PROC_NAME>nginx)
+  ##       match-type: process_name
+  ##       rewrite-name: ${PROC_NAME}-%HOSTNAME%
   ##     - match-regex: .*
   #os-proc-regex:
 
