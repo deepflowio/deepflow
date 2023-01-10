@@ -76,6 +76,30 @@ func (e *EventManagerBase) enqueue(resourceLcuuid string, event *eventapi.Resour
 	}
 }
 
+func (e *EventManagerBase) createProcessAndEnqueue(
+	resourceLcuuid, eventType, gprocessName string, gprocessID int, options ...eventapi.TagFieldOption) {
+	event := eventapi.AcquireResourceEvent()
+	e.fillProcessEvent(event, eventType, gprocessName, gprocessID, options...)
+
+	log.Infof("put process event (lcuuid: %s): %+v into shared queue", resourceLcuuid, event)
+	err := e.Queue.Put(event)
+	if err != nil {
+		log.Error(putEventIntoQueueFailed("process", err))
+	}
+}
+
+func (e EventManagerBase) fillProcessEvent(
+	event *eventapi.ResourceEvent, eventType, gprocessName string, gprocessID int, options ...eventapi.TagFieldOption) {
+	event.Time = time.Now().Unix()
+	event.TimeMilli = time.Now().UnixMilli()
+	event.Type = eventType
+	event.GProcessID = uint32(gprocessID)
+	event.GProcessName = gprocessName
+	for _, option := range options {
+		option(event)
+	}
+}
+
 // Due to the fixed sequence of resource learning, some data required by resource change events can only be obtained after the completion of subsequent resource learning.
 // Therefore, we need to store the change event temporarily until all resources are learned and the required data is filled before the queue is added
 // Such change events include:
