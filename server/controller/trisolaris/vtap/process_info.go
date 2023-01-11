@@ -149,6 +149,9 @@ func NewCacheReq(req *trident.GPIDSyncRequest) *CacheReq {
 }
 
 func (c *CacheReq) getReq() *trident.GPIDSyncRequest {
+	if c == nil {
+		return nil
+	}
 	return c.req
 }
 
@@ -185,6 +188,9 @@ func (r *VTapIDToReq) getSetIntKeys() mapset.Set {
 }
 
 func (r *VTapIDToReq) updateReq(req *trident.GPIDSyncRequest) {
+	if req == nil {
+		return
+	}
 	r.Lock()
 	r.idToReq[req.GetVtapId()] = NewCacheReq(req)
 	r.Unlock()
