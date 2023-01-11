@@ -70,3 +70,10 @@ func (s *service) DebugGPIDVTapData(ctx context.Context, in *api.GPIDSyncRequest
 
 	return req, nil
 }
+
+func (s *service) DebugRealGlobalData(ctx context.Context, in *api.GPIDSyncRequest) (*api.RealGlobalData, error) {
+	processInfo := trisolaris.GetGVTapInfo().GetProcessInfo()
+	return &api.RealGlobalData{
+		Entries: processInfo.GetRealGlobalData(),
+	}, nil
+}
