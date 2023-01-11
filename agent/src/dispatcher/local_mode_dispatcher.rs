@@ -254,11 +254,7 @@ impl LocalModeDispatcher {
             }
 
             meta_packet.tap_port = TapPort::from_local_mac(
-                if meta_packet.lookup_key.nat_client_ip.is_some() {
-                    TapPort::NAT_SOURCE_TOA
-                } else {
-                    TapPort::NAT_SOURCE_NONE
-                },
+                meta_packet.lookup_key.get_nat_source(),
                 base.tunnel_info.tunnel_type,
                 u64::from(pipeline.vm_mac) as u32,
             );

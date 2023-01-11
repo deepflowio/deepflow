@@ -99,11 +99,11 @@ impl MetaAppProto {
             gpid_1: flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].gpid,
             mac_src: MacAddr::ZERO,
             mac_dst: MacAddr::ZERO,
-            ip_src: meta_packet.lookup_key.src_ip,
-            ip_dst: meta_packet.lookup_key.dst_ip,
+            ip_src: flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].nat_real_ip,
+            ip_dst: flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].nat_real_ip,
             is_ipv6: meta_packet.lookup_key.eth_type == EthernetType::Ipv6,
-            port_src: meta_packet.lookup_key.src_port,
-            port_dst: meta_packet.lookup_key.dst_port,
+            port_src: flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].nat_real_port,
+            port_dst: flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].nat_real_port,
             l3_epc_id_src: 0,
             l3_epc_id_dst: 0,
             req_tcp_seq: 0,
@@ -156,7 +156,7 @@ impl MetaAppProto {
             }
         }
 
-        if meta_packet.direction == PacketDirection::ClientToServer {
+        if meta_packet.lookup_key.direction == PacketDirection::ClientToServer {
             base_info.l3_epc_id_src = flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].l3_epc_id;
             base_info.l3_epc_id_dst = flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].l3_epc_id;
             base_info.req_tcp_seq = meta_packet.tcp_data.seq;
@@ -182,7 +182,7 @@ impl MetaAppProto {
 
         Some(Self {
             base_info,
-            direction: meta_packet.direction,
+            direction: meta_packet.lookup_key.direction,
             l7_info,
         })
     }

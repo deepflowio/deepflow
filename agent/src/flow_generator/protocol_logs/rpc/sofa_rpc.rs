@@ -620,8 +620,8 @@ mod test {
         let pcap_file = Path::new("resources/test/flow_generator/sofarpc/sofa-old.pcap");
         let capture = Capture::load_pcap(pcap_file, None);
         let mut p = capture.as_meta_packets();
-        p[0].direction = PacketDirection::ClientToServer;
-        p[1].direction = PacketDirection::ServerToClient;
+        p[0].lookup_key.direction = PacketDirection::ClientToServer;
+        p[1].lookup_key.direction = PacketDirection::ServerToClient;
         let mut parser = SofaRpcLog::new();
 
         let req_param = &mut ParseParam::from(&p[0]);
@@ -674,8 +674,8 @@ mod test {
         let pcap_file = Path::new("resources/test/flow_generator/sofarpc/sofa-new.pcap");
         let capture = Capture::load_pcap(pcap_file, None);
         let mut p = capture.as_meta_packets();
-        p[0].direction = PacketDirection::ClientToServer;
-        p[1].direction = PacketDirection::ServerToClient;
+        p[0].lookup_key.direction = PacketDirection::ClientToServer;
+        p[1].lookup_key.direction = PacketDirection::ServerToClient;
         let mut parser = SofaRpcLog::new();
 
         let req_param = &mut ParseParam::from(&p[0]);

@@ -29,9 +29,9 @@ fn main() {
     let first_dst_port = packets[0].lookup_key.dst_port;
     for packet in packets.iter_mut().take(2) {
         if packet.lookup_key.dst_port == first_dst_port {
-            packet.direction = PacketDirection::ClientToServer;
+            packet.lookup_key.direction = PacketDirection::ClientToServer;
         } else {
-            packet.direction = PacketDirection::ServerToClient;
+            packet.lookup_key.direction = PacketDirection::ServerToClient;
         }
     }
 

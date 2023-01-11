@@ -83,17 +83,19 @@ impl L7FlowPerf for RedisPerfData {
 
         // 通过Redis请求判断是否为Redis协议
         if self.l7_proto == L7Protocol::Unknown
-            && packet.direction == PacketDirection::ServerToClient
+            && packet.lookup_key.direction == PacketDirection::ServerToClient
         {
             return Err(Error::RedisPerfParseFailed);
         }
         // Redis协议通过Redis请求来识别，对于请求报文格式严格检查，回应有分段的情况不会严格检查
-        let (context, _, is_error_resp) =
-            decode(payload, packet.direction == PacketDirection::ClientToServer)
-                .ok_or(Error::RedisPerfParseFailed)?;
+        let (context, _, is_error_resp) = decode(
+            payload,
+            packet.lookup_key.direction == PacketDirection::ClientToServer,
+        )
+        .ok_or(Error::RedisPerfParseFailed)?;
         self.l7_proto = L7Protocol::Redis;
         self.has_log_data = true;
-        if packet.direction == PacketDirection::ClientToServer {
+        if packet.lookup_key.direction == PacketDirection::ClientToServer {
             self.calc_request(packet.lookup_key.timestamp, flow_id);
         } else if self.calc_response(
             packet.lookup_key.timestamp,
@@ -262,9 +264,9 @@ mod tests {
         let first_dst_port = packets[0].lookup_key.dst_port;
         for packet in packets.iter_mut() {
             if packet.lookup_key.dst_port == first_dst_port {
-                packet.direction = PacketDirection::ClientToServer;
+                packet.lookup_key.direction = PacketDirection::ClientToServer;
             } else {
-                packet.direction = PacketDirection::ServerToClient;
+                packet.lookup_key.direction = PacketDirection::ServerToClient;
             }
             let _ = redis_perf_data.parse(packet, 0x1f3c01010);
         }

@@ -15,7 +15,7 @@
  */
 
 use std::{
-    fmt,
+    fmt::{self, Display},
     mem::swap,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     process,
@@ -566,12 +566,6 @@ impl From<L7PerfStats> for flow_log::L7PerfStats {
 
 #[derive(Debug, Clone, Copy)]
 pub struct FlowMetricsPeer {
-    // This field is valid for the following two scenarios:
-    // VIP: Mac query acquisition
-    // TOA: Parsing tcp options
-    pub nat_real_ip: IpAddr,
-    pub nat_real_port: u16,
-
     pub byte_count: u64,         // 每个流统计周期（目前是自然秒）清零
     pub l3_byte_count: u64,      // 每个流统计周期的L3载荷量
     pub l4_byte_count: u64,      // 每个流统计周期的L4载荷量
@@ -592,7 +586,13 @@ pub struct FlowMetricsPeer {
     pub is_local_mac: bool,     // 同EndpointInfo中的IsLocalMac, 流日志中不需要存储
     pub is_local_ip: bool,      // 同EndpointInfo中的IsLocalIp, 流日志中不需要存储
 
+    // This field is valid for the following two scenarios:
+    // VIP: Mac query acquisition
+    // TOA: Parsing tcp options
+    pub nat_source: u8,
+    pub nat_real_port: u16,
     pub gpid: u32,
+    pub nat_real_ip: IpAddr,
 }
 
 pub fn serialize_flow_metrics<S>(v: &[FlowMetricsPeer; 2], serializer: S) -> Result<S::Ok, S::Error>
@@ -682,6 +682,7 @@ where
 impl Default for FlowMetricsPeer {
     fn default() -> Self {
         FlowMetricsPeer {
+            nat_source: TapPort::NAT_SOURCE_NONE,
             nat_real_ip: Ipv4Addr::UNSPECIFIED.into(),
             nat_real_port: 0,
             byte_count: 0,
@@ -795,6 +796,15 @@ impl Default for PacketDirection {
     }
 }
 
+impl Display for PacketDirection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ClientToServer => write!(f, "c2s"),
+            Self::ServerToClient => write!(f, "s2c"),
+        }
+    }
+}
+
 #[cfg(target_os = "linux")]
 impl From<u8> for PacketDirection {
     fn from(msg_type: u8) -> Self {
@@ -862,6 +872,16 @@ fn tunnel_is_none(t: &TunnelField) -> bool {
 }
 
 impl Flow {
+    fn swap_flow_ip_and_real_ip(&mut self) {
+        let metric = &mut self.flow_metrics_peers[PacketDirection::ClientToServer as usize];
+        swap(&mut self.flow_key.port_src, &mut metric.nat_real_port);
+        swap(&mut self.flow_key.ip_src, &mut metric.nat_real_ip);
+
+        let metric = &mut self.flow_metrics_peers[PacketDirection::ServerToClient as usize];
+        swap(&mut self.flow_key.port_dst, &mut metric.nat_real_port);
+        swap(&mut self.flow_key.ip_dst, &mut metric.nat_real_ip);
+    }
+
     pub fn sequential_merge(&mut self, other: &Flow) {
         self.flow_metrics_peers[0].sequential_merge(&other.flow_metrics_peers[0]);
         self.flow_metrics_peers[1].sequential_merge(&other.flow_metrics_peers[1]);
@@ -978,7 +998,7 @@ impl Flow {
             return;
         }
         // 链路追踪统计位置
-        let (src_tap_side, dst_tap_side, _) =
+        let [src_tap_side, dst_tap_side] =
             get_direction(&*self, trident_type, cloud_gateway_traffic);
 
         if src_tap_side != Direction::None && dst_tap_side == Direction::None {
@@ -1012,7 +1032,10 @@ impl fmt::Display for Flow {
 }
 
 impl From<Flow> for flow_log::Flow {
-    fn from(f: Flow) -> Self {
+    // When sending l4_flow_log, exchange the IP/Port in the traffic with the real IP/Port before and after NAT.
+    // That is, the client and server in Flow are stored as the real (farthest) client and server first
+    fn from(mut f: Flow) -> Self {
+        f.swap_flow_ip_and_real_ip();
         flow_log::Flow {
             flow_key: Some(f.flow_key.into()),
             metrics_peer_src: Some(f.flow_metrics_peers[0].into()),
@@ -1057,7 +1080,7 @@ pub fn get_direction(
     flow: &Flow,
     trident_type: TridentType,
     cloud_gateway_traffic: bool, // 从static config 获取
-) -> (Direction, Direction, bool) {
+) -> [Direction; 2] {
     let src_ep = &flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC];
     let dst_ep = &flow.flow_metrics_peers[FLOW_METRICS_PEER_DST];
     // For eBPF data, the direction can be calculated directly through l2_end,
@@ -1072,13 +1095,13 @@ pub fn get_direction(
         } else if dst_ep.is_l2_end {
             src_direct = Direction::None
         }
-        return (src_direct, dst_direct, false);
+        return [src_direct, dst_direct];
     } else if flow.signal_source == SignalSource::XFlow {
-        return (Direction::None, Direction::None, false);
+        return [Direction::None, Direction::None];
     } else if flow.flow_key.mac_src == flow.flow_key.mac_dst
         && (is_tt_pod(trident_type) || is_tt_workload(trident_type))
     {
-        return (Direction::LocalToLocal, Direction::None, false);
+        return [Direction::LocalToLocal, Direction::None];
     }
 
     // 返回值分别为统计点对应的zerodoc.DirectionEnum以及及是否添加追踪数据的开关，在微软
@@ -1095,22 +1118,16 @@ pub fn get_direction(
         l3_epc_id: i32,
         cloud_gateway_traffic: bool, // 从static config 获取
         trident_type: TridentType,
-        nat_source: u8,
-    ) -> (Direction, Direction, bool) {
+    ) -> (Direction, Direction) {
         let is_ep = l2_end && l3_end;
         let tunnel_tier = tunnel.tier;
-        let mut add_tracing_doc = nat_source == TapPort::NAT_SOURCE_TOA;
 
         match trident_type {
             TridentType::TtDedicatedPhysicalMachine => {
                 //  接入网络
                 if tap_type != TapType::Cloud {
                     if l3_epc_id != EPC_FROM_INTERNET {
-                        return (
-                            Direction::ClientToServer,
-                            Direction::ServerToClient,
-                            add_tracing_doc,
-                        );
+                        return (Direction::ClientToServer, Direction::ServerToClient);
                     }
                 } else {
                     // 虚拟网络
@@ -1139,14 +1156,9 @@ pub fn get_direction(
                             return (
                                 Direction::ServerGatewayToClient,
                                 Direction::ClientGatewayToServer,
-                                add_tracing_doc,
                             );
                         } else {
-                            return (
-                                Direction::ClientToServer,
-                                Direction::ServerToClient,
-                                add_tracing_doc,
-                            );
+                            return (Direction::ClientToServer, Direction::ServerToClient);
                         }
                     }
                 }
@@ -1156,11 +1168,9 @@ pub fn get_direction(
                 if l2_end {
                     // SNAT、LB Backend
                     // IP地址为VIP: 将双端(若不是vip_iface)的VIP替换为其MAC对对应的RIP,生成另一份doc
-                    add_tracing_doc = nat_source == TapPort::NAT_SOURCE_VIP || add_tracing_doc;
                     return (
                         Direction::ClientHypervisorToServer,
                         Direction::ServerHypervisorToClient,
-                        add_tracing_doc,
                     );
                 }
             }
@@ -1170,50 +1180,31 @@ pub fn get_direction(
                     return (
                         Direction::ClientHypervisorToServer,
                         Direction::ServerHypervisorToClient,
-                        add_tracing_doc,
                     );
                 }
 
                 if l2_end && is_unicast {
-                    if nat_source != TapPort::NAT_SOURCE_VIP {
-                        // Router
-                        // windows hyper-v场景采集到的流量ttl还未减1，这里需要屏蔽ttl避免l3end为true
-                        // 注意c/s方向与0/1相反
-                        return (
-                            Direction::ServerGatewayHypervisorToClient,
-                            Direction::ClientGatewayHypervisorToServer,
-                            add_tracing_doc,
-                        );
-                    } else {
-                        //MUX
-                        add_tracing_doc = tunnel_tier > 0 || add_tracing_doc;
-                        return (
-                            Direction::ServerGatewayHypervisorToClient,
-                            Direction::ClientGatewayHypervisorToServer,
-                            add_tracing_doc,
-                        );
-                    }
+                    // Router&MUX
+                    // windows hyper-v场景采集到的流量ttl还未减1，这里需要屏蔽ttl避免l3end为true
+                    // 注意c/s方向与0/1相反
+                    return (
+                        Direction::ServerGatewayHypervisorToClient,
+                        Direction::ClientGatewayHypervisorToServer,
+                    );
                 }
             }
             TridentType::TtPublicCloud | TridentType::TtPhysicalMachine => {
-                // 该采集器类型中统计位置为客户端网关/服务端网关或存在VIP时，需要增加追踪数据
+                // 该采集器类型中统计位置为客户端网关/服务端网关或存在VIP时，会使用VIP创建Doc和Log.
                 // VIP：
                 //     微软ACS云内SLB通信场景，在VM内采集的流量无隧道IP地址使用VIP,
-                //     将对端的VIP替换为其mac对应的RIP，生成另一份doc
-                add_tracing_doc = nat_source == TapPort::NAT_SOURCE_VIP || add_tracing_doc;
                 if is_ep {
-                    return (
-                        Direction::ClientToServer,
-                        Direction::ServerToClient,
-                        add_tracing_doc,
-                    );
+                    return (Direction::ClientToServer, Direction::ServerToClient);
                 } else if l2_end {
                     if is_unicast {
                         // 注意c/s方向与0/1相反
                         return (
                             Direction::ServerGatewayToClient,
                             Direction::ClientGatewayToServer,
-                            add_tracing_doc,
                         );
                     }
                 }
@@ -1221,36 +1212,20 @@ pub fn get_direction(
             TridentType::TtHostPod | TridentType::TtVmPod => {
                 if is_ep {
                     if tunnel_tier == 0 {
-                        return (
-                            Direction::ClientToServer,
-                            Direction::ServerToClient,
-                            add_tracing_doc,
-                        );
+                        return (Direction::ClientToServer, Direction::ServerToClient);
                     } else {
                         // tunnelTier > 0：容器节点的出口做隧道封装
-                        return (
-                            Direction::ClientNodeToServer,
-                            Direction::ServerNodeToClient,
-                            add_tracing_doc,
-                        );
+                        return (Direction::ClientNodeToServer, Direction::ServerNodeToClient);
                     }
                 } else if l2_end {
                     if is_local_ip {
                         // 本机IP：容器节点的出口做路由转发
-                        return (
-                            Direction::ClientNodeToServer,
-                            Direction::ServerNodeToClient,
-                            add_tracing_doc,
-                        );
+                        return (Direction::ClientNodeToServer, Direction::ServerNodeToClient);
                     } else if tunnel_tier > 0 {
                         // tunnelTier > 0：容器节点的出口做隧道封装
                         // 例如：两个容器节点之间打隧道，隧道内层IP为tunl0接口的/32隧道专用IP
                         // 但由于tunl0接口有时候没有MAC，不会被控制器记录，因此不会匹配isLocalIp的条件
-                        return (
-                            Direction::ClientNodeToServer,
-                            Direction::ServerNodeToClient,
-                            add_tracing_doc,
-                        );
+                        return (Direction::ClientNodeToServer, Direction::ServerNodeToClient);
                     }
                     // 其他情况
                     // 举例：在tun0接收到的、本地POD发送到容器节点外部的流量
@@ -1261,26 +1236,14 @@ pub fn get_direction(
                         // 平安Serverless容器集群中，容器POD访问的流量特征为：
                         //   POD -> 外部：源MAC=Node MAC（Node路由转发）
                         //   POD <- 外部：目MAC=POD MAC（Node交换转发）
-                        return (
-                            Direction::ClientNodeToServer,
-                            Direction::ServerNodeToClient,
-                            add_tracing_doc,
-                        );
+                        return (Direction::ClientNodeToServer, Direction::ServerNodeToClient);
                     }
                 } else {
                     if is_local_mac {
                         if is_local_ip {
-                            return (
-                                Direction::ClientNodeToServer,
-                                Direction::ServerNodeToClient,
-                                add_tracing_doc,
-                            );
+                            return (Direction::ClientNodeToServer, Direction::ServerNodeToClient);
                         } else if tunnel_tier > 0 {
-                            return (
-                                Direction::ClientNodeToServer,
-                                Direction::ServerNodeToClient,
-                                add_tracing_doc,
-                            );
+                            return (Direction::ClientNodeToServer, Direction::ServerNodeToClient);
                         } else {
                             //其他情况: BUM流量
                         }
@@ -1292,11 +1255,7 @@ pub fn get_direction(
             TridentType::TtProcess => {
                 if is_ep {
                     if tunnel_tier == 0 {
-                        return (
-                            Direction::ClientToServer,
-                            Direction::ServerToClient,
-                            add_tracing_doc,
-                        );
+                        return (Direction::ClientToServer, Direction::ServerToClient);
                     } else {
                         // 宿主机隧道转发
                         if is_local_ip {
@@ -1304,7 +1263,6 @@ pub fn get_direction(
                             return (
                                 Direction::ClientHypervisorToServer,
                                 Direction::ServerHypervisorToClient,
-                                add_tracing_doc,
                             );
                         }
                         // 其他情况
@@ -1317,7 +1275,6 @@ pub fn get_direction(
                             return (
                                 Direction::ClientHypervisorToServer,
                                 Direction::ServerHypervisorToClient,
-                                add_tracing_doc,
                             );
                         } else {
                             // 虚拟机或容器作为路由器时，在虚接口上抓到路由转发流量
@@ -1325,7 +1282,6 @@ pub fn get_direction(
                             return (
                                 Direction::ServerGatewayToClient,
                                 Direction::ClientGatewayToServer,
-                                add_tracing_doc,
                             );
                         }
                     } else if is_local_mac {
@@ -1338,13 +1294,11 @@ pub fn get_direction(
                                 return (
                                     Direction::ClientHypervisorToServer,
                                     Direction::ServerHypervisorToClient,
-                                    add_tracing_doc,
                                 );
                             } else {
                                 return (
                                     Direction::ServerGatewayHypervisorToClient,
                                     Direction::ClientGatewayHypervisorToServer,
-                                    add_tracing_doc,
                                 );
                             }
                         } else {
@@ -1354,7 +1308,6 @@ pub fn get_direction(
                                 return (
                                     Direction::ClientHypervisorToServer,
                                     Direction::ServerHypervisorToClient,
-                                    add_tracing_doc,
                                 );
                             }
                             //其他情况:  由隧道封装的BUM包
@@ -1365,7 +1318,6 @@ pub fn get_direction(
                             return (
                                 Direction::ClientHypervisorToServer,
                                 Direction::ServerHypervisorToClient,
-                                add_tracing_doc,
                             );
                         }
                         //其他情况: BUM流量
@@ -1379,7 +1331,6 @@ pub fn get_direction(
                                 return (
                                     Direction::ClientHypervisorToServer,
                                     Direction::ServerHypervisorToClient,
-                                    add_tracing_doc,
                                 );
                             } else if tunnel_tier > 0 {
                                 // 腾讯TCE的Underlay母机使用IPIP封装，外层IP为本机Underlay CVM的IP和MAC，内层IP为CLB的VIP
@@ -1387,13 +1338,11 @@ pub fn get_direction(
                                 return (
                                     Direction::ClientHypervisorToServer,
                                     Direction::ServerHypervisorToClient,
-                                    add_tracing_doc,
                                 );
                             } else {
                                 return (
                                     Direction::ServerGatewayHypervisorToClient,
                                     Direction::ClientGatewayHypervisorToServer,
-                                    add_tracing_doc,
                                 );
                             }
                         }
@@ -1403,11 +1352,7 @@ pub fn get_direction(
             }
             TridentType::TtVm => {
                 if tunnel_tier == 0 && is_ep {
-                    return (
-                        Direction::ClientToServer,
-                        Direction::ServerToClient,
-                        add_tracing_doc,
-                    );
+                    return (Direction::ClientToServer, Direction::ServerToClient);
                 }
             }
             _ => {
@@ -1416,7 +1361,7 @@ pub fn get_direction(
                 process::exit(1)
             }
         }
-        (Direction::None, Direction::None, false)
+        (Direction::None, Direction::None)
     }
 
     const FLOW_METRICS_PEER_SRC: usize = 0;
@@ -1431,7 +1376,7 @@ pub fn get_direction(
             | TridentType::TtPhysicalMachine
             | TridentType::TtHostPod
             | TridentType::TtVmPod => {
-                return (Direction::LocalToLocal, Direction::None, false);
+                return [Direction::LocalToLocal, Direction::None];
             }
             _ => (),
         }
@@ -1439,8 +1384,7 @@ pub fn get_direction(
 
     // 全景图统计
     let tunnel = &flow.tunnel;
-    let nat_source = flow.flow_key.tap_port.get_nat_source();
-    let (mut src_direct, _, is_extra_tracing_doc0) = inner(
+    let (mut src_direct, _) = inner(
         flow_key.tap_type,
         tunnel,
         src_ep.is_l2_end,
@@ -1451,9 +1395,8 @@ pub fn get_direction(
         src_ep.l3_epc_id,
         cloud_gateway_traffic,
         trident_type,
-        nat_source,
     );
-    let (_, mut dst_direct, is_extra_tracing_doc1) = inner(
+    let (_, mut dst_direct) = inner(
         flow_key.tap_type,
         tunnel,
         dst_ep.is_l2_end,
@@ -1464,7 +1407,6 @@ pub fn get_direction(
         dst_ep.l3_epc_id,
         cloud_gateway_traffic,
         trident_type,
-        nat_source,
     );
     // 双方向都有统计位置优先级为：client/server侧 > L2End侧 > IsLocalMac侧 > 其他
     if src_direct != Direction::None && dst_direct != Direction::None {
@@ -1473,7 +1415,7 @@ pub fn get_direction(
             // the Direction is set to None and Doc data to count a Rest record.
             // ======================================================================================================
             // 当专属采集器采集的 IDC 流量无法区分 Direction 时，Direction设置为None Doc数据中统计一份 Rest 记录。
-            return (Direction::None, Direction::None, false);
+            return [Direction::None, Direction::None];
         } else if (src_direct == Direction::ClientToServer || src_ep.is_l2_end)
             && dst_direct != Direction::ServerToClient
         {
@@ -1489,11 +1431,7 @@ pub fn get_direction(
         }
     }
 
-    (
-        src_direct,
-        dst_direct,
-        is_extra_tracing_doc0 || is_extra_tracing_doc1,
-    )
+    [src_direct, dst_direct]
 }
 
 // 生成32位flowID,确保在1分钟内1个thread的flowID不重复

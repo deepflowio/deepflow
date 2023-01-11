@@ -112,7 +112,12 @@ impl L7FlowPerf for HttpPerfData {
         }
 
         if self
-            .parse_http_v1(payload, meta.lookup_key.timestamp, meta.direction, flow_id)
+            .parse_http_v1(
+                payload,
+                meta.lookup_key.timestamp,
+                meta.lookup_key.direction,
+                flow_id,
+            )
             .is_ok()
         {
             self.session_data.has_log_data = true;
@@ -120,7 +125,12 @@ impl L7FlowPerf for HttpPerfData {
             return Ok(());
         }
         if self
-            .parse_http_v2(payload, meta.lookup_key.timestamp, meta.direction, flow_id)
+            .parse_http_v2(
+                payload,
+                meta.lookup_key.timestamp,
+                meta.lookup_key.direction,
+                flow_id,
+            )
             .is_ok()
         {
             self.session_data.has_log_data = true;
@@ -527,9 +537,9 @@ mod tests {
         let first_dst_port = packets[0].lookup_key.dst_port;
         for packet in packets.iter_mut() {
             if packet.lookup_key.dst_port == first_dst_port {
-                packet.direction = PacketDirection::ClientToServer;
+                packet.lookup_key.direction = PacketDirection::ClientToServer;
             } else {
-                packet.direction = PacketDirection::ServerToClient;
+                packet.lookup_key.direction = PacketDirection::ServerToClient;
             }
             let _ = http_perf_data.parse(packet, 0x1f3c01010);
         }

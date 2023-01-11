@@ -452,7 +452,7 @@ impl FlowMap {
 
         let mini_meta_packet = packet_sequence_block::MiniMetaPacket::new(
             node.tagged_flow.flow.flow_id,
-            meta_packet.direction as u8,
+            meta_packet.lookup_key.direction as u8,
             meta_packet.lookup_key.timestamp,
             meta_packet.payload_len,
             meta_packet.tcp_data.seq,
@@ -482,13 +482,13 @@ impl FlowMap {
         let timestamp = meta_packet.lookup_key.timestamp;
         let flow_closed = self.update_tcp_flow(config, meta_packet, &mut node);
         if config.collector_enabled {
-            let direction = meta_packet.direction == PacketDirection::ClientToServer;
+            let direction = meta_packet.lookup_key.direction == PacketDirection::ClientToServer;
             self.collect_metric(config, &mut node, meta_packet, direction, false);
         }
 
         // After collect_metric() is called for eBPF MetaPacket, its direction is determined.
         if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
-            if meta_packet.direction == PacketDirection::ClientToServer {
+            if meta_packet.lookup_key.direction == PacketDirection::ClientToServer {
                 node.residual_request += 1;
             } else {
                 node.residual_request -= 1;
@@ -537,13 +537,13 @@ impl FlowMap {
                 config,
                 &mut node,
                 meta_packet,
-                meta_packet.direction == PacketDirection::ClientToServer,
+                meta_packet.lookup_key.direction == PacketDirection::ClientToServer,
                 false,
             );
         }
 
         if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
-            self.update_udp_is_active(&mut node, meta_packet.direction);
+            self.update_udp_is_active(&mut node, meta_packet.lookup_key.direction);
         }
 
         slot_nodes.push(node);
@@ -580,7 +580,7 @@ impl FlowMap {
         meta_packet: &mut MetaPacket,
         node: &mut FlowNode,
     ) -> bool {
-        let direction = meta_packet.direction;
+        let direction = meta_packet.lookup_key.direction;
         let pkt_tcp_flags = meta_packet.tcp_data.flags;
         node.tagged_flow.flow.flow_metrics_peers[direction as usize].tcp_flags |= pkt_tcp_flags;
         self.update_flow(node, meta_packet);
@@ -621,7 +621,7 @@ impl FlowMap {
         let (next_tcp_seq0, next_tcp_seq1) = (node.next_tcp_seq0, node.next_tcp_seq1);
 
         // 记录下一次TCP Seq
-        match meta_packet.direction {
+        match meta_packet.lookup_key.direction {
             PacketDirection::ClientToServer => node.next_tcp_seq1 = meta_packet.tcp_data.ack,
             PacketDirection::ServerToClient => node.next_tcp_seq0 = meta_packet.tcp_data.ack,
         }
@@ -638,9 +638,9 @@ impl FlowMap {
 
         let (seq, ack) = (meta_packet.tcp_data.seq, meta_packet.tcp_data.ack);
 
-        if meta_packet.direction == PacketDirection::ClientToServer
+        if meta_packet.lookup_key.direction == PacketDirection::ClientToServer
             && seq.wrapping_add(1) == next_tcp_seq0
-            || meta_packet.direction == PacketDirection::ServerToClient
+            || meta_packet.lookup_key.direction == PacketDirection::ServerToClient
                 && seq.wrapping_add(1) == next_tcp_seq1
         {
             let flow = &mut node.tagged_flow.flow;
@@ -721,24 +721,28 @@ impl FlowMap {
     }
 
     fn init_nat_info(flow: &mut Flow, meta_packet: &MetaPacket) {
-        if meta_packet.lookup_key.nat_client_port > 0 {
-            flow.flow_metrics_peers[0].nat_real_ip = meta_packet
-                .lookup_key
-                .nat_client_ip
-                .as_ref()
-                .unwrap()
-                .clone();
-            flow.flow_metrics_peers[0].nat_real_port = meta_packet.lookup_key.nat_client_port;
+        if meta_packet.lookup_key.src_nat_source != TapPort::NAT_SOURCE_NONE {
+            flow.flow_metrics_peers[0].nat_source = meta_packet.lookup_key.src_nat_source;
+            flow.flow_metrics_peers[0].nat_real_ip = meta_packet.lookup_key.src_nat_ip;
+            flow.flow_metrics_peers[0].nat_real_port = meta_packet.lookup_key.src_nat_port;
         } else {
+            flow.flow_metrics_peers[0].nat_source = TapPort::NAT_SOURCE_NONE;
             flow.flow_metrics_peers[0].nat_real_ip = flow.flow_key.ip_src;
             flow.flow_metrics_peers[0].nat_real_port = flow.flow_key.port_src;
         }
-        flow.flow_metrics_peers[1].nat_real_ip = flow.flow_key.ip_dst;
-        flow.flow_metrics_peers[1].nat_real_port = flow.flow_key.port_dst;
+        if meta_packet.lookup_key.dst_nat_source != TapPort::NAT_SOURCE_NONE {
+            flow.flow_metrics_peers[1].nat_source = meta_packet.lookup_key.dst_nat_source;
+            flow.flow_metrics_peers[1].nat_real_ip = meta_packet.lookup_key.dst_nat_ip;
+            flow.flow_metrics_peers[1].nat_real_port = meta_packet.lookup_key.dst_nat_port;
+        } else {
+            flow.flow_metrics_peers[1].nat_source = TapPort::NAT_SOURCE_NONE;
+            flow.flow_metrics_peers[1].nat_real_ip = flow.flow_key.ip_dst;
+            flow.flow_metrics_peers[1].nat_real_port = flow.flow_key.port_dst;
+        }
     }
 
     fn init_flow(&mut self, config: &FlowConfig, meta_packet: &mut MetaPacket) -> FlowNode {
-        meta_packet.direction = PacketDirection::ClientToServer;
+        meta_packet.lookup_key.direction = PacketDirection::ClientToServer;
 
         let mut tagged_flow = TaggedFlow::default();
         let lookup_key = &meta_packet.lookup_key;
@@ -750,7 +754,7 @@ impl FlowMap {
         } else {
             false
         };
-        let mut flow = Flow {
+        let flow = Flow {
             flow_key: FlowKey {
                 vtap_id: config.vtap_id,
                 mac_src: lookup_key.src_mac,
@@ -808,12 +812,11 @@ impl FlowMap {
             is_active_service,
             ..Default::default()
         };
-        Self::init_nat_info(&mut flow, meta_packet);
         tagged_flow.flow = flow;
 
         // FlowMap信息
         let mut policy_in_tick = [false; 2];
-        policy_in_tick[meta_packet.direction as usize] = true;
+        policy_in_tick[meta_packet.lookup_key.direction as usize] = true;
 
         let mut node = FlowNode {
             timestamp_key: lookup_key.timestamp.as_secs(),
@@ -846,19 +849,18 @@ impl FlowMap {
         (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
         self.update_endpoint_and_policy_data(&mut node, meta_packet);
 
+        Self::init_nat_info(&mut node.tagged_flow.flow, meta_packet);
+
         node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].gpid = meta_packet.gpid_0;
         node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].gpid = meta_packet.gpid_1;
 
-        if let Some(endpoints) = &meta_packet.endpoint_data {
-            if endpoints.src_info.is_vip || endpoints.dst_info.is_vip {
-                meta_packet.tap_port.set_nat_source(TapPort::NAT_SOURCE_VIP);
-                node.tagged_flow
-                    .flow
-                    .flow_key
-                    .tap_port
-                    .set_nat_source(TapPort::NAT_SOURCE_VIP);
-            }
-        }
+        let nat_source = meta_packet.lookup_key.get_nat_source();
+        meta_packet.tap_port.set_nat_source(nat_source);
+        node.tagged_flow
+            .flow
+            .flow_key
+            .tap_port
+            .set_nat_source(nat_source);
 
         let l7_proto_enum = match meta_packet.signal_source {
             SignalSource::EBPF => {
@@ -910,16 +912,8 @@ impl FlowMap {
             );
         }
 
-        if meta_packet.lookup_key.nat_client_ip.is_some() {
-            node.tagged_flow
-                .flow
-                .flow_key
-                .tap_port
-                .set_nat_source(TapPort::NAT_SOURCE_TOA);
-        }
-
-        if !node.policy_in_tick[meta_packet.direction as usize] {
-            node.policy_in_tick[meta_packet.direction as usize] = true;
+        if !node.policy_in_tick[meta_packet.lookup_key.direction as usize] {
+            node.policy_in_tick[meta_packet.lookup_key.direction as usize] = true;
             #[cfg(target_os = "linux")]
             let local_epc_id = if self.ebpf_config.is_some() {
                 self.ebpf_config.as_ref().unwrap().load().epc_id as i32
@@ -929,33 +923,23 @@ impl FlowMap {
             #[cfg(target_os = "windows")]
             let local_epc_id = 0;
             if node.tagged_flow.flow.flow_key.tap_port.get_nat_source() == TapPort::NAT_SOURCE_TOA
-                && meta_packet.direction == PacketDirection::ClientToServer
-                && meta_packet.lookup_key.nat_client_port == 0
+                && meta_packet.lookup_key.direction == PacketDirection::ClientToServer
+                && meta_packet.lookup_key.src_nat_port == 0
             {
                 let metric = &node.tagged_flow.flow.flow_metrics_peers
                     [PacketDirection::ClientToServer as usize];
-                meta_packet.lookup_key.nat_client_ip = Some(metric.nat_real_ip.clone());
-                meta_packet.lookup_key.nat_client_port = metric.nat_real_port;
+                meta_packet.lookup_key.src_nat_ip = metric.nat_real_ip;
+                meta_packet.lookup_key.src_nat_port = metric.nat_real_port;
+                meta_packet.lookup_key.src_nat_source = TapPort::NAT_SOURCE_TOA;
             }
             (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
             self.update_endpoint_and_policy_data(node, meta_packet);
-
-            if let Some(endpoints) = &meta_packet.endpoint_data {
-                if endpoints.src_info.is_vip || endpoints.dst_info.is_vip {
-                    meta_packet.tap_port.set_nat_source(TapPort::NAT_SOURCE_VIP);
-                    node.tagged_flow
-                        .flow
-                        .flow_key
-                        .tap_port
-                        .set_nat_source(TapPort::NAT_SOURCE_VIP);
-                }
-            }
         } else {
             // copy endpoint and policy data
             meta_packet.policy_data.replace(Arc::new(
-                node.policy_data_cache[meta_packet.direction as usize].clone(),
+                node.policy_data_cache[meta_packet.lookup_key.direction as usize].clone(),
             ));
-            match meta_packet.direction {
+            match meta_packet.lookup_key.direction {
                 PacketDirection::ClientToServer => {
                     meta_packet
                         .endpoint_data
@@ -976,19 +960,48 @@ impl FlowMap {
         let flow = &mut node.tagged_flow.flow;
 
         if meta_packet.gpid_0 > 0 {
-            flow.flow_metrics_peers[meta_packet.direction as usize].gpid = meta_packet.gpid_0;
+            flow.flow_metrics_peers[meta_packet.lookup_key.direction as usize].gpid =
+                meta_packet.gpid_0;
         }
         if meta_packet.gpid_1 > 0 {
-            flow.flow_metrics_peers[meta_packet.direction.reversed() as usize].gpid =
+            flow.flow_metrics_peers[meta_packet.lookup_key.direction.reversed() as usize].gpid =
                 meta_packet.gpid_1;
         }
+        if meta_packet.lookup_key.src_nat_source != TapPort::NAT_SOURCE_NONE
+            && meta_packet.lookup_key.src_nat_source
+                >= flow.flow_metrics_peers[meta_packet.lookup_key.direction as usize].nat_source
+        {
+            flow.flow_metrics_peers[meta_packet.lookup_key.direction as usize].nat_source =
+                meta_packet.lookup_key.src_nat_source;
+            flow.flow_metrics_peers[meta_packet.lookup_key.direction as usize].nat_real_ip =
+                meta_packet.lookup_key.src_nat_ip;
+            flow.flow_metrics_peers[meta_packet.lookup_key.direction as usize].nat_real_port =
+                meta_packet.lookup_key.src_nat_port;
+        }
+        if meta_packet.lookup_key.dst_nat_source != TapPort::NAT_SOURCE_NONE
+            && meta_packet.lookup_key.dst_nat_source
+                >= flow.flow_metrics_peers[meta_packet.lookup_key.direction.reversed() as usize]
+                    .nat_source
+        {
+            flow.flow_metrics_peers[meta_packet.lookup_key.direction.reversed() as usize]
+                .nat_source = meta_packet.lookup_key.dst_nat_source;
+            flow.flow_metrics_peers[meta_packet.lookup_key.direction.reversed() as usize]
+                .nat_real_ip = meta_packet.lookup_key.dst_nat_ip;
+            flow.flow_metrics_peers[meta_packet.lookup_key.direction.reversed() as usize]
+                .nat_real_port = meta_packet.lookup_key.dst_nat_port;
+        }
+
+        let nat_source = meta_packet.lookup_key.get_nat_source();
+        meta_packet.tap_port.set_nat_source(nat_source);
+        flow.flow_key.tap_port.set_nat_source(nat_source);
 
         // The ebpf data has no l3 and l4 information, so it can be returned directly
         if flow.signal_source == SignalSource::EBPF {
             return;
         }
 
-        let flow_metrics_peer = &mut flow.flow_metrics_peers[meta_packet.direction as usize];
+        let flow_metrics_peer =
+            &mut flow.flow_metrics_peers[meta_packet.lookup_key.direction as usize];
         flow_metrics_peer.packet_count += 1;
         flow_metrics_peer.total_packet_count += 1;
         flow_metrics_peer.byte_count += meta_packet.packet_len as u64;
@@ -999,21 +1012,12 @@ impl FlowMap {
         if flow_metrics_peer.first.is_zero() {
             flow_metrics_peer.first = pkt_timestamp;
         }
-        if meta_packet.lookup_key.nat_client_port > 0 {
-            flow_metrics_peer.nat_real_ip = meta_packet
-                .lookup_key
-                .nat_client_ip
-                .as_ref()
-                .unwrap()
-                .clone();
-            flow_metrics_peer.nat_real_port = meta_packet.lookup_key.nat_client_port;
-        }
 
         if meta_packet.vlan > 0 {
             flow.vlan = meta_packet.vlan;
         }
         if let Some(tunnel) = meta_packet.tunnel {
-            match meta_packet.direction {
+            match meta_packet.lookup_key.direction {
                 PacketDirection::ClientToServer => {
                     flow.tunnel.tx_ip0 = tunnel.src;
                     flow.tunnel.tx_ip1 = tunnel.dst;
@@ -1124,7 +1128,12 @@ impl FlowMap {
                 node.timeout = config.flow_timeout.exception;
                 node.flow_state = FlowState::Exception;
             }
-            self.update_flow_state_machine(config, &mut node, pkt_tcp_flags, meta_packet.direction);
+            self.update_flow_state_machine(
+                config,
+                &mut node,
+                pkt_tcp_flags,
+                meta_packet.lookup_key.direction,
+            );
             self.update_syn_or_syn_ack_seq(&mut node, meta_packet);
         }
 
@@ -1134,7 +1143,7 @@ impl FlowMap {
 
         // After collect_metric() is called for eBPF MetaPacket, its direction is determined.
         if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
-            if meta_packet.direction == PacketDirection::ClientToServer {
+            if meta_packet.lookup_key.direction == PacketDirection::ClientToServer {
                 node.residual_request += 1;
             } else {
                 node.residual_request -= 1;
@@ -1396,7 +1405,8 @@ impl FlowMap {
                 let flags = meta_packet.tcp_data.flags;
                 self.service_table.get_tcp_score(
                     is_first_packet,
-                    meta_packet.tap_port.get_nat_source() == TapPort::NAT_SOURCE_TOA,
+                    node.tagged_flow.flow.flow_metrics_peers[0].nat_source
+                        == TapPort::NAT_SOURCE_TOA,
                     flags,
                     src_key,
                     dst_key,
@@ -1408,7 +1418,7 @@ impl FlowMap {
             _ => unimplemented!(),
         };
 
-        if PacketDirection::ServerToClient == meta_packet.direction {
+        if PacketDirection::ServerToClient == meta_packet.lookup_key.direction {
             mem::swap(&mut src_score, &mut dst_score);
         }
 
@@ -1417,7 +1427,7 @@ impl FlowMap {
             mem::swap(&mut src_score, &mut dst_score);
 
             Self::reverse_flow(node, is_first_packet);
-            meta_packet.direction = meta_packet.direction.reversed();
+            meta_packet.lookup_key.direction = meta_packet.lookup_key.direction.reversed();
             reverse = true;
         }
 
@@ -1475,7 +1485,7 @@ impl FlowMap {
             mem::swap(&mut src_score, &mut dst_score);
             Self::reverse_flow(node, false);
             if let Some(pkt) = meta_packet {
-                pkt.direction = pkt.direction.reversed();
+                pkt.lookup_key.direction = pkt.lookup_key.direction.reversed();
             }
         }
 
@@ -1510,13 +1520,13 @@ impl FlowMap {
         {
             // If flow_key.ip_src and flow_key.port_src of node.tagged_flow.flow are the same as
             // that of meta_packet, but the direction of meta_packet is S2C, reverse flow
-            if meta_packet.direction == PacketDirection::ServerToClient {
+            if meta_packet.lookup_key.direction == PacketDirection::ServerToClient {
                 Self::reverse_flow(node, is_first_packet);
             }
         } else {
             // If flow_key.ip_src or flow_key.port_src of node.tagged_flow.flow is different
             // from that of meta_packet, and the direction of meta_packet is C2S, reverse flow
-            if meta_packet.direction == PacketDirection::ClientToServer {
+            if meta_packet.lookup_key.direction == PacketDirection::ClientToServer {
                 Self::reverse_flow(node, is_first_packet);
             }
         }
@@ -1529,7 +1539,7 @@ impl FlowMap {
     ) {
         // update endpoint
         if let Some(data) = meta_packet.endpoint_data.as_ref() {
-            match meta_packet.direction {
+            match meta_packet.lookup_key.direction {
                 PacketDirection::ClientToServer => {
                     node.endpoint_data_cache[0] = data.clone();
                     node.endpoint_data_cache[1] = Arc::new(data.reversed());
@@ -1550,11 +1560,14 @@ impl FlowMap {
             peer_src.is_l3_end = src_info.l3_end;
             peer_src.l3_epc_id = src_info.l3_epc_id;
             peer_src.is_vip = src_info.is_vip;
-            if !src_info.real_ip.is_unspecified() {
-                peer_src.nat_real_ip = src_info.real_ip;
-            }
             peer_src.is_local_mac = src_info.is_local_mac;
             peer_src.is_local_ip = src_info.is_local_ip;
+            if !src_info.real_ip.is_unspecified()
+                && TapPort::NAT_SOURCE_VIP > meta_packet.lookup_key.dst_nat_source
+            {
+                meta_packet.lookup_key.src_nat_ip = src_info.real_ip;
+                meta_packet.lookup_key.src_nat_source = TapPort::NAT_SOURCE_VIP;
+            }
         }
         {
             let dst_info = node.endpoint_data_cache[0].dst_info;
@@ -1565,16 +1578,19 @@ impl FlowMap {
             peer_dst.is_l3_end = dst_info.l3_end;
             peer_dst.l3_epc_id = dst_info.l3_epc_id;
             peer_dst.is_vip = dst_info.is_vip;
-            if !dst_info.real_ip.is_unspecified() {
-                peer_dst.nat_real_ip = dst_info.real_ip;
-            }
             peer_dst.is_local_mac = dst_info.is_local_mac;
             peer_dst.is_local_ip = dst_info.is_local_ip;
+            if !dst_info.real_ip.is_unspecified()
+                && TapPort::NAT_SOURCE_VIP > meta_packet.lookup_key.dst_nat_source
+            {
+                meta_packet.lookup_key.dst_nat_ip = dst_info.real_ip;
+                meta_packet.lookup_key.dst_nat_source = TapPort::NAT_SOURCE_VIP;
+            }
         }
 
         // update policy data
         if meta_packet.policy_data.is_some() {
-            node.policy_data_cache[meta_packet.direction as usize] = PolicyData {
+            node.policy_data_cache[meta_packet.lookup_key.direction as usize] = PolicyData {
                 acl_id: meta_packet.policy_data.as_ref().unwrap().acl_id,
                 npb_actions: meta_packet
                     .policy_data
@@ -1954,7 +1970,7 @@ mod tests {
         let mut packet1 = _new_meta_packet();
         packet1.tcp_data.flags = TcpFlags::SYN_ACK;
         _reverse_meta_packet(&mut packet1);
-        packet1.direction = PacketDirection::ServerToClient;
+        packet1.lookup_key.direction = PacketDirection::ServerToClient;
         packet1.policy_data.replace(Arc::new(policy_data1));
 
         let config = (&RuntimeConfig::default()).into();
@@ -2207,7 +2223,7 @@ mod tests {
             .unwrap();
         for mut packet in packets {
             packet.lookup_key.timestamp = timestamp;
-            packet.direction = if packet.lookup_key.dst_mac == dst_mac {
+            packet.lookup_key.direction = if packet.lookup_key.dst_mac == dst_mac {
                 PacketDirection::ClientToServer
             } else {
                 PacketDirection::ServerToClient
@@ -2243,7 +2259,7 @@ mod tests {
             .duration_since(time::UNIX_EPOCH)
             .unwrap();
         for mut packet in packets {
-            packet.direction = if packet.lookup_key.dst_mac == dst_mac {
+            packet.lookup_key.direction = if packet.lookup_key.dst_mac == dst_mac {
                 PacketDirection::ClientToServer
             } else {
                 PacketDirection::ServerToClient

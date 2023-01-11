@@ -539,8 +539,8 @@ mod test {
         let pcap_file = Path::new(FILE_DIR).join(file_name);
         let capture = Capture::load_pcap(pcap_file, None);
         let mut p = capture.as_meta_packets();
-        p[0].direction = PacketDirection::ClientToServer;
-        p[1].direction = PacketDirection::ServerToClient;
+        p[0].lookup_key.direction = PacketDirection::ClientToServer;
+        p[1].lookup_key.direction = PacketDirection::ServerToClient;
 
         let mut parser = PostgresqlLog::new();
         let req_param = &mut ParseParam::from(&p[0]);

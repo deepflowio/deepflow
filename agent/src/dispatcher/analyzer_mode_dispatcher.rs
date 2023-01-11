@@ -328,9 +328,6 @@ impl AnalyzerModeDispatcher {
                 debug!("meta_packet update failed: {:?}", e);
                 continue;
             }
-            if meta_packet.lookup_key.nat_client_ip.is_some() {
-                meta_packet.tap_port.set_nat_source(TapPort::NAT_SOURCE_TOA);
-            }
 
             if base.tunnel_info.tunnel_type != TunnelType::None {
                 meta_packet.tunnel = Some(&base.tunnel_info);

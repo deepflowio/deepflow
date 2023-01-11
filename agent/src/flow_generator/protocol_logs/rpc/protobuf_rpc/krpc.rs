@@ -360,8 +360,8 @@ mod test {
         let pcap_file = Path::new("resources/test/flow_generator/krpc/krpc.pcap");
         let capture = Capture::load_pcap(pcap_file, None);
         let mut p = capture.as_meta_packets();
-        p[3].direction = PacketDirection::ClientToServer;
-        p[5].direction = PacketDirection::ServerToClient;
+        p[3].lookup_key.direction = PacketDirection::ClientToServer;
+        p[5].lookup_key.direction = PacketDirection::ServerToClient;
 
         let mut parser = KrpcLog::new();
 

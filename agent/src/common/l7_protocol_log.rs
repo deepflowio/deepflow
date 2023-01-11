@@ -452,7 +452,7 @@ impl From<&MetaPacket<'_>> for ParseParam {
             port_src: packet.lookup_key.src_port,
             port_dst: packet.lookup_key.dst_port,
 
-            direction: packet.direction,
+            direction: packet.lookup_key.direction,
             ebpf_type: packet.ebpf_type,
             ebpf_param: None,
             time: packet.lookup_key.timestamp.as_micros() as u64,

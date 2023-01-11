@@ -190,7 +190,7 @@ impl FlowNode {
                 && flow_key.ip_src == meta_lookup_key.src_ip
                 && flow_key.ip_dst == meta_lookup_key.dst_ip
             {
-                meta_packet.direction = PacketDirection::ClientToServer;
+                meta_packet.lookup_key.direction = PacketDirection::ClientToServer;
                 return true;
             }
             // direction = ServerToClient
@@ -199,7 +199,7 @@ impl FlowNode {
                 && flow_key.ip_src == meta_lookup_key.dst_ip
                 && flow_key.ip_dst == meta_lookup_key.src_ip
             {
-                meta_packet.direction = PacketDirection::ServerToClient;
+                meta_packet.lookup_key.direction = PacketDirection::ServerToClient;
                 return true;
             }
 
@@ -231,7 +231,7 @@ impl FlowNode {
             && flow_key.port_src == meta_lookup_key.src_port
             && flow_key.port_dst == meta_lookup_key.dst_port
         {
-            meta_packet.direction = PacketDirection::ClientToServer;
+            meta_packet.lookup_key.direction = PacketDirection::ClientToServer;
             Self::endpoint_match_with_direction(
                 &flow.flow_metrics_peers,
                 meta_packet,
@@ -248,7 +248,7 @@ impl FlowNode {
             && flow_key.port_src == meta_lookup_key.dst_port
             && flow_key.port_dst == meta_lookup_key.src_port
         {
-            meta_packet.direction = PacketDirection::ServerToClient;
+            meta_packet.lookup_key.direction = PacketDirection::ServerToClient;
             Self::endpoint_match_with_direction(
                 &flow.flow_metrics_peers,
                 meta_packet,

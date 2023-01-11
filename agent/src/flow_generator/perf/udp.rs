@@ -48,11 +48,11 @@ impl L4FlowPerf for UdpPerf {
         }
 
         let pkt_timestamp = header.lookup_key.timestamp;
-        if header.direction == PacketDirection::ClientToServer {
+        if header.lookup_key.direction == PacketDirection::ClientToServer {
             self.req_timestamp = pkt_timestamp;
         } else if self.req_timestamp != Duration::ZERO
             && self.req_timestamp <= pkt_timestamp
-            && header.direction != self.last_pkt_direction
+            && header.lookup_key.direction != self.last_pkt_direction
         {
             let art = pkt_timestamp - self.req_timestamp;
             if art <= ART_MAX {
@@ -63,7 +63,7 @@ impl L4FlowPerf for UdpPerf {
             }
         }
 
-        self.last_pkt_direction = header.direction;
+        self.last_pkt_direction = header.lookup_key.direction;
 
         Ok(())
     }
@@ -103,13 +103,13 @@ mod tests {
         let first_pkt_src_ip = packets[0].lookup_key.src_ip;
         for (i, mut pkt) in packets.into_iter().enumerate() {
             if first_pkt_src_ip == pkt.lookup_key.src_ip {
-                pkt.direction = PacketDirection::ClientToServer;
+                pkt.lookup_key.direction = PacketDirection::ClientToServer;
             } else {
-                pkt.direction = PacketDirection::ServerToClient;
+                pkt.lookup_key.direction = PacketDirection::ServerToClient;
             }
 
             if reverse_pkt {
-                pkt.direction = pkt.direction.reversed();
+                pkt.lookup_key.direction = pkt.lookup_key.direction.reversed();
             }
 
             flow_perf.parse(&pkt, false).unwrap();

@@ -87,7 +87,7 @@ impl L7FlowPerf for DubboPerfData {
 
         self.session_data.dubbo_header = DubboHeader::default();
         self.session_data.dubbo_header.parse_headers(payload)?;
-        if packet.direction == PacketDirection::ClientToServer {
+        if packet.lookup_key.direction == PacketDirection::ClientToServer {
             self.calc_request(packet.lookup_key.timestamp, flow_id);
         } else if self.calc_response(packet.lookup_key.timestamp, flow_id) {
             return Err(Error::L7ReqNotFound(1));
@@ -260,9 +260,9 @@ mod tests {
         let first_dst_port = packets[0].lookup_key.dst_port;
         for packet in packets.iter_mut() {
             if packet.lookup_key.dst_port == first_dst_port {
-                packet.direction = PacketDirection::ClientToServer;
+                packet.lookup_key.direction = PacketDirection::ClientToServer;
             } else {
-                packet.direction = PacketDirection::ServerToClient;
+                packet.lookup_key.direction = PacketDirection::ServerToClient;
             }
             let _ = dubbo_perf_data.parse(packet, 0x1f3c01010);
         }

@@ -19,9 +19,11 @@ use std::mem::swap;
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
 
+use super::TapPort;
 use super::{
     endpoint::FeatureFlags,
     enums::{EthernetType, IpProtocol, TapType},
+    flow::PacketDirection,
     matched_field::{MatchedField, MatchedFieldv4, MatchedFieldv6, MatchedFlag},
 };
 
@@ -54,8 +56,13 @@ pub struct LookupKey {
     pub fast_index: usize,
     pub tunnel_id: u32,
     /********** For NAT (currently only TOA) ***********/
-    pub nat_client_ip: Option<IpAddr>,
-    pub nat_client_port: u16,
+    pub dst_nat_port: u16,
+    pub src_nat_port: u16,
+    pub src_nat_ip: IpAddr,
+    pub dst_nat_ip: IpAddr,
+    pub dst_nat_source: u8,
+    pub src_nat_source: u8,
+    pub direction: PacketDirection,
 }
 
 impl DedupOperator for LookupKey {
@@ -98,13 +105,22 @@ impl Default for LookupKey {
             backward_matched: None,
             fast_index: 0,
             tunnel_id: 0,
-            nat_client_ip: None,
-            nat_client_port: 0,
+            src_nat_source: TapPort::NAT_SOURCE_NONE,
+            src_nat_ip: Ipv4Addr::UNSPECIFIED.into(),
+            src_nat_port: 0,
+            dst_nat_source: TapPort::NAT_SOURCE_NONE,
+            dst_nat_ip: Ipv4Addr::UNSPECIFIED.into(),
+            dst_nat_port: 0,
+            direction: PacketDirection::ClientToServer,
         }
     }
 }
 
 impl LookupKey {
+    pub fn get_nat_source(&self) -> u8 {
+        self.src_nat_source.max(self.dst_nat_source)
+    }
+
     fn set_matched_field(
         f: &mut MatchedField,
         tap_type: TapType,
@@ -203,21 +219,26 @@ impl fmt::Display for LookupKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{:?} {}:{} > {}:{}, eth_type: {:#06x}, {}.{}.{} > {}.{}.{}, nat: {:?}.{}, proto: {:?}, tap_type: {}, tunnel_id: {}",
+            "{:?} {}:{} > {}:{}, eth_type: {:#06x}, {} {}.{}.{} > {}.{}.{}, nat: {}.{:?}.{} > {}.{:?}.{}, proto: {:?}, tap_type: {}, tunnel_id: {}",
             self.timestamp,
             self.src_mac,
             self.l2_end_0,
             self.dst_mac,
             self.l2_end_1,
             u16::from(self.eth_type),
+            self.direction,
             self.src_ip,
             self.src_port,
             self.l3_end_0,
             self.dst_ip,
             self.dst_port,
             self.l3_end_1,
-            self.nat_client_ip,
-            self.nat_client_port,
+            self.src_nat_source,
+            self.src_nat_ip,
+            self.src_nat_port,
+            self.dst_nat_source,
+            self.dst_nat_ip,
+            self.dst_nat_port,
             self.proto,
             self.tap_type,
             self.tunnel_id,
