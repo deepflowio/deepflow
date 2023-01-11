@@ -229,7 +229,7 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 #define HTTPV2_STATIC_TABLE_POST_IDX    0x3
 #define HTTPV2_STATIC_TABLE_PATH_1_IDX  0x4
 #define HTTPV2_STATIC_TABLE_PATH_2_IDX  0x5
-#define HTTPV2_LOOP_MAX 10
+#define HTTPV2_LOOP_MAX 9
 /*
  *  HTTPV2_FRAME_READ_SZ取值考虑以下3部分：
  *  (1) fixed 9-octet header
@@ -1253,14 +1253,14 @@ static __inline bool drop_msg_by_comm(void)
 	if (bpf_get_current_comm(&comm, sizeof(comm)))
 		return false;
 
-	if (is_same_command("sshd", comm))
-		return true;
-
-	if (is_same_command("ssh", comm))
-		return true;
-
-	if (is_same_command("scp", comm))
-		return true;
+	// filter 'ssh', 'scp', 'sshd'
+	if (comm[0] == 's') {
+		if ((comm[1] == 's' && comm[2] == 'h' && comm[3] == '\0') ||
+		    (comm[1] == 'c' && comm[2] == 'p' && comm[3] == '\0') ||
+		    (comm[1] == 's' && comm[2] == 'h' && comm[3] == 'd' &&
+		     comm[4] == '\0'))
+			return true;
+	}
 
 	return false;
 }
