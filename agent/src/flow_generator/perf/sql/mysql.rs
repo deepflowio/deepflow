@@ -101,7 +101,7 @@ impl L7FlowPerf for MysqlPerfData {
         }
         let offset = offset as usize;
         let msg_type = header
-            .check(packet.direction, offset, payload, self.l7_proto)
+            .check(packet.lookup_key.direction, offset, payload, self.l7_proto)
             .ok_or(Error::MysqlPerfParseFailed)?;
 
         match msg_type {
@@ -311,9 +311,9 @@ mod test {
         let first_src_mac = packets[0].lookup_key.src_mac;
         for packet in packets.iter_mut() {
             if packet.lookup_key.src_mac == first_src_mac {
-                packet.direction = PacketDirection::ClientToServer;
+                packet.lookup_key.direction = PacketDirection::ClientToServer;
             } else {
-                packet.direction = PacketDirection::ServerToClient;
+                packet.lookup_key.direction = PacketDirection::ServerToClient;
             }
             let _ = perf_data.parse(packet, 0x1f3c01010);
         }

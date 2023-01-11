@@ -92,7 +92,6 @@ pub struct MetaPacket<'a> {
     pub signal_source: SignalSource,
     pub payload_len: u16,
     pub vlan: u16,
-    pub direction: PacketDirection,
     pub is_active_service: bool,
     pub queue_hash: u8,
 
@@ -252,11 +251,13 @@ impl<'a> MetaPacket<'a> {
                 }
                 TcpOptionNumber(TCP_OPT_ADDRESS_HUAWEI) | TcpOptionNumber(TCP_OPT_ADDRESS_IPVS) => {
                     if assume_length == TCP_TOA_LEN {
-                        self.lookup_key.nat_client_port =
+                        self.lookup_key.src_nat_source = TapPort::NAT_SOURCE_TOA;
+                        self.lookup_key.src_nat_port =
                             read_u16_be(&packet[offset + TCP_TOA_PORT_OFFSET..]);
-                        self.lookup_key.nat_client_ip = Some(IpAddr::from(Ipv4Addr::from(
-                            read_u32_be(&packet[offset + TCP_TOA_IP_OFFSET..]),
+                        self.lookup_key.src_nat_ip = IpAddr::from(Ipv4Addr::from(read_u32_be(
+                            &packet[offset + TCP_TOA_IP_OFFSET..],
                         )));
+                        self.tap_port.set_nat_source(TapPort::NAT_SOURCE_TOA);
                     }
                     offset += assume_length;
                 }
@@ -836,7 +837,7 @@ impl<'a> MetaPacket<'a> {
             if data.l7_protocol_hint == SOCK_DATA_HTTP2
                 || data.l7_protocol_hint == SOCK_DATA_TLS_HTTP2
             {
-                packet.direction = PacketDirection::from(data.msg_type);
+                packet.lookup_key.direction = PacketDirection::from(data.msg_type);
                 match data.msg_type {
                     MSG_REQUEST_END => packet.is_request_end = true,
                     MSG_RESPONSE_END => packet.is_response_end = true,
@@ -884,8 +885,8 @@ impl<'a> MetaPacket<'a> {
 impl<'a> fmt::Display for MetaPacket<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "\t\t{}\n", self.lookup_key)?;
-        write!(f, "\t\tsource_ip: {}, packet_count: {}, packet_bytes: {}, tap_port: {}, packet_len: {}, payload_len: {}, vlan: {}, direction: {:?}\n",
-            Ipv4Addr::from(self.source_ip), self.packet_count, self.packet_bytes, self.tap_port, self.packet_len, self.payload_len, self.vlan, self.direction
+        write!(f, "\t\tsource_ip: {}, packet_count: {}, packet_bytes: {}, tap_port: {}, packet_len: {}, payload_len: {}, vlan: {}, direction: {}\n",
+            Ipv4Addr::from(self.source_ip), self.packet_count, self.packet_bytes, self.tap_port, self.packet_len, self.payload_len, self.vlan, self.lookup_key.direction
             )?;
         if let Some(t) = &self.tunnel {
             write!(f, "\t\ttunnel: {}\n", t)?;

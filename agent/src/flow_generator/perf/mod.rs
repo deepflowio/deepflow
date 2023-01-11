@@ -383,7 +383,7 @@ impl FlowPerf {
             let param = ParseParam::from(&*packet);
             for protocol in checker.possible_protocols(
                 packet.lookup_key.proto.into(),
-                match packet.direction {
+                match packet.lookup_key.direction {
                     PacketDirection::ClientToServer => packet.lookup_key.dst_port,
                     PacketDirection::ServerToClient => packet.lookup_key.src_port,
                 },
@@ -395,7 +395,7 @@ impl FlowPerf {
                 if parser.check_payload(payload, &param) {
                     self.l7_protocol_enum = parser.l7_protocl_enum();
                     self.server_port = packet.lookup_key.dst_port;
-                    packet.direction = PacketDirection::ClientToServer;
+                    packet.lookup_key.direction = PacketDirection::ClientToServer;
 
                     let mut rrt = 0;
                     if is_parse_perf {
@@ -450,7 +450,7 @@ impl FlowPerf {
             // if the packet from eBPF and it's server_port is not equal to 0, We can get the packet's
             // direction by comparing self.server_port with packet.lookup_key.dst_port When check_payload()
             // fails, the server_port value is still 0, and the flow direction cannot be corrected.
-            packet.direction = if self.server_port == packet.lookup_key.dst_port {
+            packet.lookup_key.direction = if self.server_port == packet.lookup_key.dst_port {
                 PacketDirection::ClientToServer
             } else {
                 PacketDirection::ServerToClient
