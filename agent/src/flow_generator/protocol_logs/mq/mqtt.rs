@@ -106,10 +106,6 @@ impl L7ProtocolInfoInterface for MqttInfo {
     fn is_tls(&self) -> bool {
         false
     }
-
-    fn skip_send(&self) -> bool {
-        false
-    }
 }
 
 pub fn topics_format<S>(t: &Option<Vec<MqttTopic>>, serializer: S) -> Result<S::Ok, S::Error>

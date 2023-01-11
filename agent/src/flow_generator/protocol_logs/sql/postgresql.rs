@@ -133,11 +133,6 @@ impl L7ProtocolInfoInterface for PostgreInfo {
     fn is_tls(&self) -> bool {
         self.is_tls
     }
-
-    fn skip_send(&self) -> bool {
-        // if sql check fail and have no error response, very likely is protocol miscalculate.
-        self.status == L7ResponseStatus::default() && !is_postgresql(&self.context)
-    }
 }
 
 impl From<PostgreInfo> for L7ProtocolSendLog {
@@ -259,17 +254,19 @@ impl L7FlowPerf for PostgresqlLog {
         return self.perf_stats.is_some();
     }
 
-    fn copy_and_reset_data(&mut self, _l7_timeout_count: u32) -> FlowPerfStats {
+    fn copy_and_reset_data(&mut self, l7_timeout_count: u32) -> FlowPerfStats {
         FlowPerfStats {
             l7_protocol: L7Protocol::PostgreSQL,
             l7: if let Some(perf) = self.perf_stats.take() {
                 L7PerfStats {
                     request_count: perf.req_count,
                     response_count: perf.resp_count,
+                    err_client_count: perf.req_err_count,
+                    err_server_count: perf.resp_err_count,
+                    err_timeout: l7_timeout_count,
                     rrt_count: perf.rrt_count,
                     rrt_sum: perf.rrt_sum.as_micros() as u64,
                     rrt_max: perf.rrt_max.as_micros() as u32,
-                    ..Default::default()
                 }
             } else {
                 L7PerfStats::default()

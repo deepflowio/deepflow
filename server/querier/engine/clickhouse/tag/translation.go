@@ -292,7 +292,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 					"if("+autoTypeSuffix+" in (0,255),if(is_ipv4=1, IPv4NumToString("+ip4Suffix+"), IPv6NumToString("+ip6Suffix+")),dictGet(flow_tag.device_map, 'name', (toUInt64("+autoTypeSuffix+"),toUInt64("+autoIDSuffix+"))))",
 					"",
 					"if("+autoTypeSuffix+" in (0,255),if(is_ipv4=1, IPv4NumToString("+ip4Suffix+"), IPv6NumToString("+ip6Suffix+")) %s %s,(toUInt64("+autoIDSuffix+"),toUInt64("+autoTypeSuffix+")) IN (SELECT deviceid,devicetype FROM flow_tag.device_map WHERE name %s %s AND "+deviceTypeFilter+"))",
-					"if("+autoTypeSuffix+" in (0,255),if(is_ipv4=1, IPv4NumToString("+ip4Suffix+"), IPv6NumToString("+ip6Suffix+")) %s %s,(toUInt64("+autoIDSuffix+"),toUInt64("+autoTypeSuffix+")) IN (SELECT deviceid,devicetype FROM flow_tag.device_map WHERE %s(name,%s) AND "+deviceTypeFilter+"))",
+					"if("+autoTypeSuffix+" in (0,255),%s(if(is_ipv4=1, IPv4NumToString("+ip4Suffix+"), IPv6NumToString("+ip6Suffix+")),%s),(toUInt64("+autoIDSuffix+"),toUInt64("+autoTypeSuffix+")) IN (SELECT deviceid,devicetype FROM flow_tag.device_map WHERE %s(name,%s) AND "+deviceTypeFilter+"))",
 				),
 				"node_type": NewTag(
 					nodeTypeStrSuffix,
@@ -792,6 +792,14 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"notEmpty(acl_gids)",
 			"",
 			"notEmpty(acl_gids) %s %s",
+			"",
+		)}
+
+	tagResourceMap["pcap_batch"] = map[string]*Tag{
+		"default": NewTag(
+			"TO_BASE64(pcap_batch)",
+			"",
+			"",
 			"",
 		)}
 	return tagResourceMap

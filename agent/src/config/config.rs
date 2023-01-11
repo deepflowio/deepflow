@@ -512,6 +512,7 @@ impl YamlConfig {
                 parse_u16_range_list_to_bitmap(port_range, false).unwrap(),
             ));
         }
+        port_bitmap.sort_unstable_by_key(|p| p.0.clone());
         port_bitmap
     }
 }
@@ -574,7 +575,7 @@ impl Default for YamlConfig {
                 let mut protos = vec![];
                 for i in get_all_protocol() {
                     if i.parse_default() {
-                        protos.push(i.as_string());
+                        protos.push(i.as_str().to_owned());
                     }
                 }
                 protos

@@ -101,7 +101,8 @@ pub struct FlowMap {
 
     output_queue: DebugSender<Box<TaggedFlow>>,
     out_log_queue: DebugSender<Box<MetaAppProto>>,
-    output_buffer: Vec<TaggedFlow>,
+    output_buffer: Vec<Box<TaggedFlow>>,
+    protolog_buffer: Vec<Box<MetaAppProto>>,
     last_queue_flush: Duration,
     config: FlowAccess,
     parse_config: LogParserAccess,
@@ -181,7 +182,8 @@ impl FlowMap {
             total_flow: 0,
             output_queue,
             out_log_queue: app_proto_log_queue,
-            output_buffer: vec![],
+            output_buffer: Vec::with_capacity(QUEUE_BATCH_SIZE),
+            protolog_buffer: Vec::with_capacity(QUEUE_BATCH_SIZE),
             last_queue_flush: Duration::ZERO,
             config,
             parse_config,
@@ -288,6 +290,8 @@ impl FlowMap {
 
         self.start_time_in_unit = next_start_time_in_unit;
         self.flush_queue(&config, timestamp);
+
+        self.flush_app_protolog();
 
         true
     }
@@ -1078,15 +1082,11 @@ impl FlowMap {
     fn flush_queue(&mut self, config: &FlowConfig, now: Duration) {
         if now - self.last_queue_flush > config.flush_interval {
             if self.output_buffer.len() > 0 {
-                let flows = self
-                    .output_buffer
-                    .drain(..)
-                    .map(Box::new)
-                    .collect::<Vec<_>>();
-                if let Err(_) = self.output_queue.send_all(flows) {
+                if let Err(_) = self.output_queue.send_all(&mut self.output_buffer) {
                     warn!(
                         "flow-map push tagged flows to queue failed because queue have terminated"
                     );
+                    self.output_buffer.clear();
                 }
             }
             self.last_queue_flush = now;
@@ -1123,15 +1123,11 @@ impl FlowMap {
                 stats.l7_protocol = L7Protocol::Other;
             }
         }
-        self.output_buffer.push(tagged_flow);
+        self.output_buffer.push(Box::new(tagged_flow));
         if self.output_buffer.len() >= QUEUE_BATCH_SIZE {
-            let flows = self
-                .output_buffer
-                .drain(..)
-                .map(Box::new)
-                .collect::<Vec<_>>();
-            if let Err(_) = self.output_queue.send_all(flows) {
+            if let Err(_) = self.output_queue.send_all(&mut self.output_buffer) {
                 warn!("flow-map push tagged flows to queue failed because queue have terminated");
+                self.output_buffer.clear();
             }
         }
     }
@@ -1251,6 +1247,9 @@ impl FlowMap {
         l7_info: L7ProtocolInfo,
         rrt: u64,
     ) {
+        if self.protolog_buffer.len() >= QUEUE_BATCH_SIZE {
+            self.flush_app_protolog();
+        }
         // 考虑性能，最好是l7 perf解析后，满足需要的包生成log
         if let Some(mut head) = l7_info.app_proto_head() {
             head.rrt = rrt;
@@ -1261,11 +1260,16 @@ impl FlowMap {
             if let Some(app_proto) =
                 MetaAppProto::new(&node.tagged_flow, meta_packet, l7_info, head)
             {
-                if let Err(_) = self.out_log_queue.send(Box::new(app_proto)) {
-                    warn!(
-                        "flow-map push MetaAppProto to queue failed because queue have terminated"
-                    );
-                }
+                self.protolog_buffer.push(Box::new(app_proto));
+            }
+        }
+    }
+
+    fn flush_app_protolog(&mut self) {
+        if self.protolog_buffer.len() > 0 {
+            if let Err(_) = self.out_log_queue.send_all(&mut self.protolog_buffer) {
+                warn!("flow-map push MetaAppProto to queue failed because queue have terminated");
+                self.protolog_buffer.clear();
             }
         }
     }

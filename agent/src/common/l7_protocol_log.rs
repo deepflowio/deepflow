@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+use std::fmt::Debug;
 use std::net::IpAddr;
 
 use enum_dispatch::enum_dispatch;
@@ -230,20 +231,19 @@ macro_rules! all_protocol {
             )+
         }
 
-        impl L7ProtocolParser{
-            pub fn as_string(&self) -> String{
+        impl L7ProtocolParser {
+            pub fn as_str(&self) -> &'static str {
                 match self {
                     L7ProtocolParser::HttpParser(http) => {
-                        match http.protocol(){
-                            L7Protocol::Http1 => return String::from("HTTP"),
-                            L7Protocol::Http2 => return String::from("HTTP2"),
-                            _=> unreachable!()
+                        match http.protocol() {
+                            L7Protocol::Http1 => return "HTTP",
+                            L7Protocol::Http2 => return "HTTP2",
+                            _ => unreachable!()
                         }
                     },
                     $(
-                        L7ProtocolParser::$parser(_) => String::from(stringify!($l7_proto)),
+                        L7ProtocolParser::$parser(_) => stringify!($l7_proto),
                     )+
-
                 }
             }
         }
@@ -258,7 +258,7 @@ macro_rules! all_protocol {
                     $(
                         stringify!($l7_proto) => Ok(L7ProtocolParser::$parser($log::$new_func())),
                     )+
-                    _=> Err(String::from(format!("unknown protocol {}",value))),
+                    _ => Err(String::from(format!("unknown protocol {}",value))),
                 }
             }
         }
@@ -273,7 +273,7 @@ macro_rules! all_protocol {
                     $(
                         L7Protocol::$l7_proto => Some(L7ProtocolParser::$parser($log::$new_func())),
                     )+
-                    _=>None,
+                    _ => None,
                 },
 
                 L7ProtocolEnum::ProtobufRpc(p) => Some(get_protobuf_rpc_parser(p)),
@@ -356,7 +356,7 @@ impl L7ProtocolParser {
         port: u16,
     ) -> bool {
         for (p, bitmap) in port_bitmap.iter() {
-            if self.as_string().eq(p) {
+            if self.as_str() == p.as_str() {
                 if let Ok(b) = bitmap.get(port as usize) {
                     return !b;
                 }
@@ -538,7 +538,7 @@ pub fn get_parse_bitmap(protocol: IpProtocol, l7_enabled: L7ProtocolBitmap) -> L
     when bit set 0 should skip the protocol check.
     so the protocol number can not exceed 127.
 */
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct L7ProtocolBitmap(u128);
 
 impl L7ProtocolBitmap {
@@ -560,13 +560,25 @@ impl L7ProtocolBitmap {
 }
 
 impl From<&Vec<String>> for L7ProtocolBitmap {
-    fn from(v: &Vec<String>) -> Self {
+    fn from(vs: &Vec<String>) -> Self {
         let mut bitmap = L7ProtocolBitmap(0);
-        for i in v.iter() {
-            if let Ok(p) = L7ProtocolParser::try_from(i.as_str()) {
+        for v in vs.iter() {
+            if let Ok(p) = L7ProtocolParser::try_from(v.as_str()) {
                 bitmap.set_enabled(p.protocol());
             }
         }
         bitmap
+    }
+}
+
+impl Debug for L7ProtocolBitmap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut p = vec![];
+        for i in get_all_protocol() {
+            if self.is_enabled(i.protocol()) {
+                p.push(i.protocol());
+            }
+        }
+        f.write_str(format!("{:#?}", p).as_str())
     }
 }

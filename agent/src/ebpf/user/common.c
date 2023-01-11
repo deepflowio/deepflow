@@ -437,6 +437,22 @@ unsigned int fetch_kernel_version_code(void)
 		return 0;
 	}
 
+	/*
+	 * Calculate LINUX_VERSION_CODE based on kernel
+	 * version(linux major.minor.patch), use macros
+	 * `KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c)).`
+	 * If the patch number is greater than 255, there will
+	 * be a deviation. For example, Linux 4.14.275
+	 * calculates 265983 with KERNEL_VERSION(4,14,275),
+	 * and the backderived kernel version is 4.15.19,
+	 * which is obviously wrong.
+	 * The solution is to determine the value of patch
+	 * and set it to 255 if it exceeds 255.
+	 */
+	if (patch > 255) {
+		patch = 255;
+	}
+
 	return KERNEL_VERSION(major, minor, patch);
 }
 

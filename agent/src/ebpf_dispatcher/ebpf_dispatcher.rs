@@ -195,14 +195,6 @@ struct EbpfDispatcher {
 impl EbpfDispatcher {
     const FLOW_MAP_SIZE: usize = 1 << 14;
 
-    fn on_config_change(&mut self, config: &EbpfConfig) {
-        info!(
-            "ebpf collector config change from {:#?} to {:#?}.",
-            *self.config.load(),
-            config
-        );
-    }
-
     fn run(&mut self, sync_counter: SyncEbpfCounter) {
         let mut flow_map = FlowMap::new(
             self.dispatcher_id as u32,
@@ -490,13 +482,16 @@ impl EbpfCollector {
 
     pub fn on_config_change(&mut self, config: &EbpfConfig) {
         if config.l7_log_enabled() {
+            unsafe {
+                if SWITCH {
+                    self.stop();
+                }
+            }
             self.start();
+            Self::ebpf_on_config_change(config.l7_log_packet_size);
         } else {
             self.stop();
         }
-
-        Self::ebpf_on_config_change(config.l7_log_packet_size);
-        self.thread_dispatcher.on_config_change(config);
     }
 
     pub fn start(&mut self) {
