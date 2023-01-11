@@ -104,7 +104,7 @@ impl L7FlowPerf for KafkaPerfData {
 
         let payload = packet.get_l4_payload().ok_or(Error::ZeroPayloadLen)?;
 
-        match packet.direction {
+        match packet.lookup_key.direction {
             PacketDirection::ClientToServer => {
                 self.parse_request_header(payload, packet.payload_len)?;
                 self.calc_request(packet.lookup_key.timestamp, flow_id);
@@ -356,9 +356,9 @@ mod tests {
         let first_dst_port = packets[0].lookup_key.dst_port;
         for packet in packets.iter_mut() {
             if packet.lookup_key.dst_port == first_dst_port {
-                packet.direction = PacketDirection::ClientToServer;
+                packet.lookup_key.direction = PacketDirection::ClientToServer;
             } else {
-                packet.direction = PacketDirection::ServerToClient;
+                packet.lookup_key.direction = PacketDirection::ServerToClient;
             }
             let _ = kafka_perf_data.parse(packet, 1608373855724393643);
         }
