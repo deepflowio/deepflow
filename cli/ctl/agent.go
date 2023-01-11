@@ -380,6 +380,9 @@ func upgadeAgent(cmd *cobra.Command, args []string) {
 		return
 	}
 	vtapName := args[0]
+	if strings.HasSuffix(upgradePackage, ".exe") {
+		upgradePackage = strings.TrimSuffix(upgradePackage, ".exe")
+	}
 	command := upgradePackage + " -v"
 	output, err := executeCommand(command)
 	if err != nil {
