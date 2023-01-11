@@ -1556,22 +1556,12 @@ impl ConfigHandler {
             if static_config.agent_mode == RunningMode::Managed {
                 fn platform_callback(handler: &ConfigHandler, components: &mut Components) {
                     let conf = &handler.candidate_config.platform;
-                    #[cfg(target_os = "windows")]
-                    if handler.candidate_config.enabled
-                        && handler.candidate_config.tap_mode == TapMode::Local
-                    {
-                        components.platform_synchronizer.start();
-                    } else {
-                        components.platform_synchronizer.stop();
-                        info!("PlatformSynchronizer is not enabled");
-                    }
 
                     #[cfg(target_os = "linux")]
                     if handler.candidate_config.enabled
                         && (handler.candidate_config.tap_mode == TapMode::Local
                             || is_tt_pod(conf.trident_type))
                     {
-                        components.platform_synchronizer.start();
                         if is_tt_pod(conf.trident_type) {
                             components.platform_synchronizer.start_kubernetes_poller();
                         } else {
@@ -1582,9 +1572,6 @@ impl ConfigHandler {
                         } else {
                             components.api_watcher.stop();
                         }
-                    } else {
-                        components.platform_synchronizer.stop();
-                        info!("PlatformSynchronizer is not enabled");
                     }
                     #[cfg(target_os = "linux")]
                     if conf.kubernetes_api_enabled {
