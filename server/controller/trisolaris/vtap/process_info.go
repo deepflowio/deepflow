@@ -300,27 +300,64 @@ func (p IDToGPID) addData(process *models.Process) {
 	p[generateVPKey(uint32(process.VTapID), uint32(process.PID))] = uint32(process.ID)
 }
 
+type RealClientToRealServer map[uint64]uint64
+
+func (r RealClientToRealServer) addData(entry *trident.GPIDSyncEntry) {
+	if entry.GetIpv4Real() != 0 && entry.GetRoleReal() == trident.RoleType_ROLE_CLIENT &&
+		entry.GetIpv4_1() != 0 {
+		key := generateEPKey(entry.GetEpcIdReal(), entry.GetPortReal(), entry.GetIpv4Real())
+		value := generateEPKey(entry.GetEpcId_1(), entry.GetPort_1(), entry.GetIpv4_1())
+		r[key] = value
+	}
+}
+
+func (r RealClientToRealServer) getData(entry *trident.GPIDSyncEntry) (epcId, port, ip uint32) {
+	key := generateEPKey(entry.GetEpcId_0(), entry.GetPort_0(), entry.GetIpv4_0())
+	epcId, port, ip = getEpcIdPortIP(r[key])
+	return
+}
+
+func (r RealClientToRealServer) getGlobalRealData() []*trident.RealClientToRealServer {
+	data := make([]*trident.RealClientToRealServer, 0, len(r))
+	for key, value := range r {
+		epcIdR, portR, ipR := getEpcIdPortIP(key)
+		epcIdC, portC, ipC := getEpcIdPortIP(value)
+		data = append(data, &trident.RealClientToRealServer{
+			EpcId_1:   &epcIdC,
+			Ipv4_1:    &ipC,
+			Port_1:    &portC,
+			EpcIdReal: &epcIdR,
+			Ipv4Real:  &ipR,
+			PortReal:  &portR,
+		})
+	}
+
+	return data
+}
+
 type ProcessInfo struct {
-	sendGPIDReq          *VTapIDToReq
-	vtapIDToLocalGPIDReq *VTapIDToReq
-	vtapIDToShareGPIDReq *VTapIDToReq
-	vtapIDAndPIDToGPID   IDToGPID
-	globalLocalEntries   EntryData
-	grpcConns            map[string]*grpc.ClientConn
-	db                   *gorm.DB
-	config               *config.Config
+	sendGPIDReq            *VTapIDToReq
+	vtapIDToLocalGPIDReq   *VTapIDToReq
+	vtapIDToShareGPIDReq   *VTapIDToReq
+	vtapIDAndPIDToGPID     IDToGPID
+	globalLocalEntries     EntryData
+	realClientToRealServer RealClientToRealServer
+	grpcConns              map[string]*grpc.ClientConn
+	db                     *gorm.DB
+	config                 *config.Config
 }
 
 func NewProcessInfo(db *gorm.DB, cfg *config.Config) *ProcessInfo {
 	return &ProcessInfo{
-		sendGPIDReq:          NewVTapIDToReq(),
-		vtapIDToLocalGPIDReq: NewVTapIDToReq(),
-		vtapIDToShareGPIDReq: NewVTapIDToReq(),
-		vtapIDAndPIDToGPID:   make(IDToGPID),
-		globalLocalEntries:   NewEntryData(),
-		grpcConns:            make(map[string]*grpc.ClientConn),
-		db:                   db,
-		config:               cfg,
+		sendGPIDReq:            NewVTapIDToReq(),
+		vtapIDToLocalGPIDReq:   NewVTapIDToReq(),
+		vtapIDToShareGPIDReq:   NewVTapIDToReq(),
+		vtapIDAndPIDToGPID:     make(IDToGPID),
+		globalLocalEntries:     NewEntryData(),
+		realClientToRealServer: make(RealClientToRealServer),
+		grpcConns:              make(map[string]*grpc.ClientConn),
+		db:                     db,
+		config:                 cfg,
 	}
 }
 
@@ -376,12 +413,21 @@ func (p *ProcessInfo) updateGlobalLocalEntries(data EntryData) {
 	p.globalLocalEntries = data
 }
 
+func (p *ProcessInfo) updateRealClientToRealServer(data RealClientToRealServer) {
+	p.realClientToRealServer = data
+}
+
 func (p *ProcessInfo) GetGlobalEntries() []*trident.GlobalGPIDEntry {
 	return p.globalLocalEntries.getGPIDGlobalData(p)
 }
 
+func (p *ProcessInfo) GetRealGlobalData() []*trident.RealClientToRealServer {
+	return p.realClientToRealServer.getGlobalRealData()
+}
+
 func (p *ProcessInfo) generateGlobalLocalEntries() {
 	globalLocalEntries := NewEntryData()
+	realClientToRealServer := make(RealClientToRealServer)
 	vtapIDs := p.vtapIDToLocalGPIDReq.getKeys()
 	shareFilter := mapset.NewSet()
 	for _, vtapID := range vtapIDs {
@@ -404,6 +450,7 @@ func (p *ProcessInfo) generateGlobalLocalEntries() {
 		}
 		for _, entry := range req.GetEntries() {
 			globalLocalEntries.addData(vtapID, entry)
+			realClientToRealServer.addData(entry)
 		}
 	}
 
@@ -421,10 +468,12 @@ func (p *ProcessInfo) generateGlobalLocalEntries() {
 		}
 		for _, entry := range req.GetEntries() {
 			globalLocalEntries.addData(vtapID, entry)
+			realClientToRealServer.addData(entry)
 		}
 	}
 
 	p.updateGlobalLocalEntries(globalLocalEntries)
+	p.updateRealClientToRealServer(realClientToRealServer)
 }
 
 func (p *ProcessInfo) getGPIDInfoFromDB() {
@@ -491,7 +540,7 @@ func (p *ProcessInfo) GetGPIDResponseByReq(req *trident.GPIDSyncRequest) *triden
 			gpid1 = p.vtapIDAndPIDToGPID.getData(vtapID, entry.GetPid_1())
 		}
 
-		if entry.GetPidReal() == 0 {
+		if entry.GetPidReal() == 0 && entry.GetIpv4Real() > 0 {
 			globalReal := p.globalLocalEntries.getData(protocol, roleReal,
 				entry.GetEpcIdReal(), entry.GetPortReal(), entry.GetIpv4Real())
 			if globalReal != nil {
@@ -499,6 +548,17 @@ func (p *ProcessInfo) GetGPIDResponseByReq(req *trident.GPIDSyncRequest) *triden
 			}
 		} else {
 			gpidReal = p.vtapIDAndPIDToGPID.getData(vtapID, entry.GetPidReal())
+		}
+
+		if entry.GetIpv4Real() == 0 {
+			epcIdReal, portReal, ipv4Real := p.realClientToRealServer.getData(entry)
+			if ipv4Real > 0 {
+				role := trident.RoleType_ROLE_SERVER
+				responseEntry.EpcIdReal = &epcIdReal
+				responseEntry.Ipv4Real = &ipv4Real
+				responseEntry.PortReal = &portReal
+				responseEntry.RoleReal = &role
+			}
 		}
 		responseEntry.Pid_0 = &gpid0
 		responseEntry.Pid_1 = &gpid1

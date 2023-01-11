@@ -138,6 +138,13 @@ func regiterCommand() []*cobra.Command {
 			gpidAgentRequest(cmd)
 		},
 	}
+	realGlobalCmd := &cobra.Command{
+		Use:   "realclient-to-realserver",
+		Short: "get realclient-to-realserver from deepflow-server",
+		Run: func(cmd *cobra.Command, args []string) {
+			realGlobal(cmd)
+		},
+	}
 
 	allCmd := &cobra.Command{
 		Use:   "all",
@@ -150,7 +157,7 @@ func regiterCommand() []*cobra.Command {
 
 	commands := []*cobra.Command{platformDataCmd, ipGroupsCmd, flowAclsCmd,
 		tapTypesCmd, configCmd, segmentsCmd, vpcIPCmd, skipInterfaceCmd,
-		localServersCmd, gpidAgentResponseCmd, gpidGlobalTableCmd, gpidAgentRequestCmd, allCmd}
+		localServersCmd, gpidAgentResponseCmd, gpidGlobalTableCmd, gpidAgentRequestCmd, realGlobalCmd, allCmd}
 	return commands
 }
 
@@ -315,6 +322,39 @@ func gpidAgentRequest(cmd *cobra.Command) {
 	fmt.Println("Entries:")
 	for index, entry := range response.Entries {
 		JsonFormat(index+1, formatEntries(entry))
+	}
+}
+
+func formatRealEntry(entry *trident.RealClientToRealServer) string {
+	buffer := bytes.Buffer{}
+	format := "{epc_id_1: %d, ipv4_1: %s, port_1: %d, " +
+		"epc_id_real: %d, ipv4_real: %s, port_real: %d}"
+	buffer.WriteString(fmt.Sprintf(format,
+		entry.GetEpcId_1(), utils.IpFromUint32(entry.GetIpv4_1()).String(), entry.GetPort_1(),
+		entry.GetEpcIdReal(), utils.IpFromUint32(entry.GetIpv4Real()).String(), entry.GetPortReal()))
+	return buffer.String()
+}
+
+func realGlobal(cmd *cobra.Command) {
+	conn := getConn(cmd)
+	if conn == nil {
+		return
+	}
+	defer conn.Close()
+	fmt.Printf("request trisolaris(%s), params(%+v)\n", conn.Target(), paramData)
+	c := trident.NewDebugClient(conn)
+	reqData := &trident.GPIDSyncRequest{
+		CtrlIp:  &paramData.CtrlIP,
+		CtrlMac: &paramData.CtrlMac,
+	}
+	response, err := c.DebugRealGlobalData(context.Background(), reqData)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println("Entries:")
+	for index, entry := range response.Entries {
+		JsonFormat(index+1, formatRealEntry(entry))
 	}
 }
 

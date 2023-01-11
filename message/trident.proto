@@ -22,6 +22,7 @@ service Synchronizer {
 service Debug {
     rpc DebugGPIDGlobalData (GPIDSyncRequest) returns(GPIDGlobalData) {}
     rpc DebugGPIDVTapData (GPIDSyncRequest) returns(GPIDSyncRequest) {}
+    rpc DebugRealGlobalData (GPIDSyncRequest) returns(RealGlobalData) {}
 }
 
 enum State {
@@ -702,4 +703,18 @@ message GlobalGPIDEntry {
 
 message GPIDGlobalData {
     repeated GlobalGPIDEntry  entries = 1;
+}
+
+message RealClientToRealServer {
+    optional uint32 epc_id_1 = 1 [default = 0];
+    optional uint32 ipv4_1 = 2 [default = 0];
+    optional uint32 port_1 = 3 [default = 0];
+
+    optional uint32 epc_id_real = 4 [default = 0];
+    optional uint32 ipv4_real = 5 [default = 0];
+    optional uint32 port_real = 6 [default = 0];
+}
+
+message RealGlobalData {
+    repeated RealClientToRealServer entries = 1;
 }
