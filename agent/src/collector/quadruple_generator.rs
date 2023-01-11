@@ -24,11 +24,10 @@ use std::thread;
 use std::time::Duration;
 
 use arc_swap::access::Access;
+use log::{debug, info, warn};
 use thread::JoinHandle;
 
-use log::{debug, info, warn};
-
-use super::acc_flow::{AccumulatedFlow, U16Set};
+use super::acc_flow::AccumulatedFlow;
 use super::consts::*;
 use super::MetricsType;
 
@@ -488,8 +487,7 @@ impl SubQuadGen {
         tagged_flow: Arc<TaggedFlow>,
         flow_meter: &FlowMeter,
         app_meter: &AppMeter,
-        policy_ids: &[U16Set; 2],
-        tunnel_ip_ids: &[U16Set; 2],
+        id_maps: &[HashMap<u16, u16>; 2],
         time_in_second: Duration,
         key: &mut QgKey,
     ) {
@@ -515,14 +513,7 @@ impl SubQuadGen {
             QgKey::V4(k) => stash.v4_flows.get_mut(k),
         };
         if let Some(acc_flow) = value {
-            acc_flow.merge(
-                time_in_second,
-                flow_meter,
-                app_meter,
-                policy_ids,
-                tunnel_ip_ids,
-                &tagged_flow,
-            );
+            acc_flow.merge(time_in_second, flow_meter, app_meter, id_maps, &tagged_flow);
         } else {
             let nat_real_ip0 = tagged_flow.flow.flow_metrics_peers[0].nat_real_ip;
             let nat_real_ip1 = tagged_flow.flow.flow_metrics_peers[1].nat_real_ip;
@@ -536,8 +527,7 @@ impl SubQuadGen {
                 l7_protocol,
                 is_active_host0: true,
                 is_active_host1: true,
-                policy_ids: policy_ids.clone(),
-                tunnel_ip_ids: tunnel_ip_ids.clone(),
+                id_maps: id_maps.clone(),
                 flow_meter: *flow_meter,
                 time_in_second,
                 nat_src_ip: nat_real_ip0,
@@ -706,8 +696,7 @@ pub struct QuadrupleGenerator {
     possible_host: PossibleHost,
 
     key: QgKey,
-    policy_ids: [U16Set; 2],
-    tunnel_ip_ids: [U16Set; 2],
+    id_maps: [HashMap<u16, u16>; 2],
     output_flow: Option<DebugSender<Arc<TaggedFlow>>>, // Send TaggedFlows to FlowAggr, equal to None when processing eBPF data.
 
     l7_metrics_enabled: Arc<AtomicBool>,
@@ -835,8 +824,7 @@ impl QuadrupleGenerator {
             possible_host: PossibleHost::new(possible_host_size),
 
             key: QgKey::V6([0; IPV6_LRU_KEY_SIZE]),
-            policy_ids: [U16Set::new(), U16Set::new()],
-            tunnel_ip_ids: [U16Set::new(), U16Set::new()],
+            id_maps: [HashMap::new(), HashMap::new()],
             output_flow: flow_output,
 
             l7_metrics_enabled,
@@ -889,10 +877,8 @@ impl QuadrupleGenerator {
 
         let key = Self::get_key(&tagged_flow);
         self.key = key;
-        self.policy_ids[0].clear();
-        self.policy_ids[1].clear();
-        self.tunnel_ip_ids[0].clear();
-        self.tunnel_ip_ids[1].clear();
+        self.id_maps[0].clear();
+        self.id_maps[1].clear();
 
         let (flow_meter, app_meter) =
             Self::generate_meter(&tagged_flow, self.l7_metrics_enabled.clone());
@@ -902,8 +888,7 @@ impl QuadrupleGenerator {
                 tagged_flow.clone(),
                 &flow_meter,
                 &app_meter,
-                &self.policy_ids,
-                &self.tunnel_ip_ids,
+                &self.id_maps,
                 time_in_second,
                 &mut self.key,
             );
@@ -913,11 +898,8 @@ impl QuadrupleGenerator {
             for i in 0..2 {
                 // policy_ids are only used for the calculation of vtap_acl metrics
                 for action in tagged_flow.tag.policy_data[i].npb_actions.iter() {
-                    for gid in action.acl_gids().iter() {
-                        self.policy_ids[i].add(*gid);
-                    }
-                    for ip_id in action.tunnel_ip_ids().iter() {
-                        self.tunnel_ip_ids[i].add(*ip_id);
+                    for (&gid, &ip_id) in action.acl_gids().iter().zip(action.tunnel_ip_ids()) {
+                        self.id_maps[i].insert(gid, ip_id);
                     }
                 }
             }
@@ -925,8 +907,7 @@ impl QuadrupleGenerator {
                 tagged_flow,
                 &flow_meter,
                 &app_meter,
-                &self.policy_ids,
-                &self.tunnel_ip_ids,
+                &self.id_maps,
                 time_in_second,
                 &mut self.key,
             );
@@ -1179,8 +1160,7 @@ mod test {
             l7_protocol: L7Protocol::Unknown,
             is_active_host0: true,
             is_active_host1: true,
-            policy_ids: [U16Set::new(), U16Set::new()],
-            tunnel_ip_ids: [U16Set::new(), U16Set::new()],
+            id_maps: [HashMap::new(), HashMap::new()],
             flow_meter: FlowMeter::default(),
             app_meter: AppMeter::default(),
             key: QuadrupleGenerator::get_key(&tagged_flow),
@@ -1225,15 +1205,13 @@ mod test {
         let tagged_flow_arc = Arc::new(tagged_flow);
         let flow_meter = FlowMeter::default();
         let app_meter = AppMeter::default();
-        let policy_ids = [U16Set::new(), U16Set::new()];
-        let tunnel_ip_ids = [U16Set::new(), U16Set::new()];
+        let id_maps = [HashMap::new(), HashMap::new()];
         let mut key = QuadrupleGenerator::get_key(&tagged_flow_arc);
         quad_gen.inject_flow(
             tagged_flow_arc.clone(),
             &flow_meter,
             &app_meter,
-            &policy_ids,
-            &tunnel_ip_ids,
+            &id_maps,
             window_start + Duration::from_secs(10),
             &mut key,
         );
@@ -1246,8 +1224,7 @@ mod test {
             tagged_flow_arc.clone(),
             &flow_meter,
             &app_meter,
-            &policy_ids,
-            &tunnel_ip_ids,
+            &id_maps,
             window_start + Duration::from_secs(15),
             &mut key,
         );
