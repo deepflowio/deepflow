@@ -20,6 +20,7 @@ pod_service           , K8s Service                  ,
 pod_group             , K8s Workload                 ,
 pod                   , K8s POD                      ,
 service               , Service                      ,
+gprocess              , Process                      ,
 
 k8s.label             , K8s Label                    ,
 cloud.tag             , Cloud Tag                    ,

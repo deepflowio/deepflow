@@ -20,6 +20,7 @@ pod_service                , K8s 容器服务               ,
 pod_group                  , K8s 工作负载               ,
 pod                        , K8s 容器 POD               ,
 service                    , 服务                       ,
+gprocess                   , 进程                       ,
 
 k8s.label                  , K8s Label                  ,
 cloud.tag                  , Cloud Tag                  ,

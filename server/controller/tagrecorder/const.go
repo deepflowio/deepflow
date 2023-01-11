@@ -480,6 +480,7 @@ var DBNodeTypeToResourceType = map[string]string{
 	"pod":         RESOURCE_TYPE_POD,
 	"ip":          RESOURCE_TYPE_IP,
 	"internet":    RESOURCE_TYPE_INTERNET,
+	"gprocess":    RESOURCE_TYPE_GPROCESS,
 }
 
 // icon名称不会重复
