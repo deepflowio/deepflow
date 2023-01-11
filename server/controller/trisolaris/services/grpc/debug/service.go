@@ -43,17 +43,17 @@ func (s *service) Register(gs *grpc.Server) error {
 	return nil
 }
 
-func (s *service) DebugGPIDGlobalLocalData(ctx context.Context, in *api.GPIDSyncRequest) (*api.GPIDGlobalLocalData, error) {
+func (s *service) DebugGPIDGlobalData(ctx context.Context, in *api.GPIDSyncRequest) (*api.GPIDGlobalData, error) {
 	log.Infof("receive DebugGPIDGlobalLocalData about vtap(ctrl_ip: %s, ctrl_mac: %s)",
 		in.GetCtrlIp(), in.GetCtrlMac())
 
 	processInfo := trisolaris.GetGVTapInfo().GetProcessInfo()
-	return &api.GPIDGlobalLocalData{
-		Entries: processInfo.GetGlobalLocalEntries(),
+	return &api.GPIDGlobalData{
+		Entries: processInfo.GetGlobalEntries(),
 	}, nil
 }
 
-func (s *service) DebugGPIDVTapLocalData(ctx context.Context, in *api.GPIDSyncRequest) (*api.GPIDSyncRequest, error) {
+func (s *service) DebugGPIDVTapData(ctx context.Context, in *api.GPIDSyncRequest) (*api.GPIDSyncRequest, error) {
 	vtapCacheKey := in.GetCtrlIp() + "-" + in.GetCtrlMac()
 	vtapCache := trisolaris.GetGVTapInfo().GetVTapCache(vtapCacheKey)
 	if vtapCache == nil {

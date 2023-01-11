@@ -115,8 +115,8 @@ func (i *LANIP) addCache(dbItems []*mysql.LANIP) {
 	i.cache.AddLANIPs(dbItems)
 }
 
-// 保留接口
 func (i *LANIP) updateCache(cloudItem *cloudmodel.IP, diffBase *cache.LANIP) {
+	diffBase.Update(cloudItem)
 }
 
 func (i *LANIP) deleteCache(lcuuids []string) {
