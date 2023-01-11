@@ -1476,12 +1476,14 @@ func (c *Cache) refreshPods() {
 func (c *Cache) AddProcesses(items []*mysql.Process) {
 	for _, item := range items {
 		c.DiffBaseDataSet.addProcess(item, c.Sequence)
+		c.ToolDataSet.addProcess(item)
 	}
 }
 
 func (c *Cache) DeleteProcesses(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
 		c.DiffBaseDataSet.deleteProcess(lcuuid)
+		c.ToolDataSet.deleteProcess(lcuuid)
 	}
 }
 
