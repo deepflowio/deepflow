@@ -40,7 +40,8 @@ type ThrottlingQueue struct {
 	periodCount     int
 	periodEmitCount int
 
-	sampleItems []interface{}
+	sampleItems      []interface{}
+	pcapFlowLogCache []interface{}
 }
 
 func NewThrottlingQueue(throttle int, flowLogWriter *dbwriter.FlowLogWriter, index int) *ThrottlingQueue {
@@ -50,6 +51,7 @@ func NewThrottlingQueue(throttle int, flowLogWriter *dbwriter.FlowLogWriter, ind
 		index:         index,
 	}
 	thq.sampleItems = make([]interface{}, thq.Throttle)
+	thq.pcapFlowLogCache = make([]interface{}, 0, thq.Throttle)
 	return thq
 }
 
@@ -100,5 +102,17 @@ func (thq *ThrottlingQueue) SendWithoutThrottling(flow interface{}) bool {
 		thq.flowLogWriter.Put(thq.index, thq.sampleItems[:thq.periodEmitCount]...)
 		thq.periodEmitCount = 0
 	}
+	return true
+}
+
+func (thq *ThrottlingQueue) SendPcapFlowLog(flow interface{}) bool {
+	if flow == nil || len(thq.pcapFlowLogCache) > thq.Throttle {
+		if len(thq.pcapFlowLogCache) > 0 {
+			thq.flowLogWriter.PutPcapFlowLog(thq.pcapFlowLogCache...)
+			thq.pcapFlowLogCache = thq.pcapFlowLogCache[:0]
+		}
+		return true
+	}
+	thq.pcapFlowLogCache = append(thq.pcapFlowLogCache, flow)
 	return true
 }

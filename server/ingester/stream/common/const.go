@@ -26,14 +26,16 @@ const (
 	L4_FLOW_ID FlowLogID = iota
 	L7_FLOW_ID
 	L4_PACKET_ID
+	L4_PCAP_FLOW_ID // The flow log with PCAP flag is also written to 'l4_flow_log' table, but it needs to be written and monitored separately
 
 	FLOWLOG_ID_MAX
 )
 
 var flowLogNames = []string{
-	L4_FLOW_ID:   "l4_flow_log",
-	L7_FLOW_ID:   "l7_flow_log",
-	L4_PACKET_ID: "l4_packet",
+	L4_FLOW_ID:      "l4_flow_log",
+	L7_FLOW_ID:      "l7_flow_log",
+	L4_PACKET_ID:    "l4_packet",
+	L4_PCAP_FLOW_ID: "l4_flow_log",
 }
 
 func (l FlowLogID) String() string {
@@ -42,14 +44,4 @@ func (l FlowLogID) String() string {
 
 func (l FlowLogID) TimeKey() string {
 	return "time"
-}
-
-func FlowLogNameToID(name string) FlowLogID {
-	for i, n := range flowLogNames {
-		if name == n {
-			return FlowLogID(i)
-		}
-	}
-
-	return FLOWLOG_ID_MAX
 }

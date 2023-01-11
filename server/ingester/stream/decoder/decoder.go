@@ -271,8 +271,12 @@ func (d *Decoder) sendFlow(flow *pb.TaggedFlow) {
 	}
 	d.counter.Count++
 	l := jsonify.TaggedFlowToL4FlowLog(flow, d.platformData)
-	if !d.throttler.Send(l) {
-		d.counter.DropCount++
+	if l.HasPcap() {
+		d.throttler.SendWithoutThrottling(l)
+	} else {
+		if !d.throttler.Send(l) {
+			d.counter.DropCount++
+		}
 	}
 }
 
@@ -322,5 +326,6 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 func (d *Decoder) flush() {
 	if d.throttler != nil {
 		d.throttler.Send(nil)
+		d.throttler.SendPcapFlowLog(nil)
 	}
 }

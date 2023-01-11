@@ -47,7 +47,7 @@ func newFlowLogTable(id common.FlowLogID, columns []*ckdb.Column, engine ckdb.En
 	case common.L7_FLOW_ID:
 		orderKeys = []string{"l7_protocol"}
 		orderKeys = append(orderKeys, flowKeys...)
-	case common.L4_FLOW_ID:
+	case common.L4_FLOW_ID, common.L4_PCAP_FLOW_ID:
 		orderKeys = flowKeys
 	case common.L4_PACKET_ID:
 		orderKeys = []string{"flow_id", "vtap_id"}
@@ -79,6 +79,7 @@ func GetFlowLogTables(engine ckdb.EngineType, cluster, storagePolicy string, l4L
 		newFlowLogTable(common.L4_FLOW_ID, jsonify.L4FlowLogColumns(), engine, cluster, storagePolicy, l4LogTtl, ckdb.GetColdStorage(coldStorages, common.FLOW_LOG_DB, common.L4_FLOW_ID.String())),
 		newFlowLogTable(common.L7_FLOW_ID, jsonify.L7FlowLogColumns(), engine, cluster, storagePolicy, l7LogTtl, ckdb.GetColdStorage(coldStorages, common.FLOW_LOG_DB, common.L7_FLOW_ID.String())),
 		newFlowLogTable(common.L4_PACKET_ID, jsonify.L4PacketColumns(), engine, cluster, storagePolicy, l4PacketTtl, ckdb.GetColdStorage(coldStorages, common.FLOW_LOG_DB, common.L4_PACKET_ID.String())),
+		newFlowLogTable(common.L4_PCAP_FLOW_ID, jsonify.L4FlowLogColumns(), engine, cluster, storagePolicy, l4LogTtl, ckdb.GetColdStorage(coldStorages, common.FLOW_LOG_DB, common.L4_FLOW_ID.String())),
 	}
 }
 
@@ -110,4 +111,8 @@ func (w *FlowLogWriter) Close() {
 	for _, ckwriter := range w.ckwriters {
 		ckwriter.Close()
 	}
+}
+
+func (w *FlowLogWriter) PutPcapFlowLog(items ...interface{}) {
+	w.ckwriters[common.L4_PCAP_FLOW_ID].Put(items...)
 }
