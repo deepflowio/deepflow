@@ -409,15 +409,11 @@ impl Stash {
 
         // PCAP和分发策略统计
         if self.context.metric_type == MetricsType::MINUTE {
-            let policy_ids = acc_flow.policy_ids[0].list();
-            let tunnel_ip_ids = acc_flow.tunnel_ip_ids[0].list();
-            for i in 0..policy_ids.len() {
-                let id = policy_ids[i];
-                let ip_id = tunnel_ip_ids[i];
-
+            let id_map = &acc_flow.id_maps[0];
+            for (&acl_gid, &ip_id) in id_map.iter() {
                 let tagger = Tagger {
                     code: Code::ACL_GID | Code::TAG_TYPE | Code::TAG_VALUE | Code::VTAP_ID,
-                    acl_gid: id,
+                    acl_gid,
                     tag_value: ip_id,
                     tag_type: TagType::TunnelIpId,
                     ..Default::default()
@@ -433,15 +429,11 @@ impl Stash {
                 let key = StashKey::new(&tagger, Ipv4Addr::UNSPECIFIED.into(), None);
                 self.add(key, tagger, Meter::Usage(usage_meter));
             }
-            let policy_ids = acc_flow.policy_ids[1].list();
-            let tunnel_ip_ids = acc_flow.tunnel_ip_ids[1].list();
-            for i in 0..policy_ids.len() {
-                let id = policy_ids[i];
-                let ip_id = tunnel_ip_ids[i];
-
+            let id_map = &acc_flow.id_maps[1];
+            for (&acl_gid, &ip_id) in id_map.iter() {
                 let tagger = Tagger {
                     code: Code::ACL_GID | Code::TAG_TYPE | Code::TAG_VALUE | Code::VTAP_ID,
-                    acl_gid: id,
+                    acl_gid,
                     tag_value: ip_id,
                     tag_type: TagType::TunnelIpId,
                     ..Default::default()
