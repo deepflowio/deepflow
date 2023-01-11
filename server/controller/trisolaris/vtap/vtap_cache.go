@@ -340,6 +340,10 @@ func (c *VTapCache) GetVTapID() uint32 {
 	return uint32(c.id)
 }
 
+func (c *VTapCache) updateVTapID(vtapID int) {
+	c.id = vtapID
+}
+
 func (c *VTapCache) GetFunctions() mapset.Set {
 	return c.licenseFunctionSet
 }
@@ -800,6 +804,7 @@ func (c *VTapCache) updateVTapCacheFromDB(vtap *models.VTap, v *VTapInfo) {
 	if c.GetVTapHost() != vtap.Name {
 		c.updateVTapHost(vtap.Name)
 	}
+	c.updateVTapID(vtap.ID)
 	if c.GetControllerIP() != vtap.ControllerIP {
 		c.updateControllerIP(vtap.ControllerIP)
 	}
