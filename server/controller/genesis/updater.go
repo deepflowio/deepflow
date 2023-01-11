@@ -519,7 +519,7 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info *trident.GenesisPlatfo
 		tIPLastSeen := tIP.GetLastSeen()
 		ip.LastSeen = time.Unix(int64(tIPLastSeen), 0).Local()
 		ip.VtapID = vtapID
-		macStr := strings.ToUpper(genesiscommon.Uint64ToMac(tIP.GetMac()).String())
+		macStr := genesiscommon.Uint64ToMac(tIP.GetMac()).String()
 		macToIPs[macStr] = append(macToIPs[macStr], ip)
 		cFlag := true
 		for _, l := range v.localIPRanges {
@@ -568,7 +568,7 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info *trident.GenesisPlatfo
 		for _, xmlIf := range xmlVM.Interfaces {
 			port := model.GenesisPort{}
 			network := model.GenesisNetwork{}
-			mac := xmlIf.Mac
+			mac := strings.ToLower(xmlIf.Mac)
 			ifName := xmlIf.Target
 			if ovsMode {
 				portMap := map[string]string{}
