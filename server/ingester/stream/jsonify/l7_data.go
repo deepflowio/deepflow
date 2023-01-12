@@ -312,7 +312,7 @@ func L7FlowLogColumns() []*ckdb.Column {
 		ckdb.NewColumn("request_id", ckdb.UInt64Nullable).SetComment("请求ID, HTTP请求ID、RPC请求ID、MQ请求ID、DNS请求ID"),
 
 		ckdb.NewColumn("response_status", ckdb.UInt8).SetComment("响应状态 0:正常, 1:异常 ,2:不存在，3:服务端异常, 4:客户端异常"),
-		ckdb.NewColumn("response_code", ckdb.Int16Nullable).SetComment("响应码, HTTP响应码、RPC响应码、SQL响应码、MQ响应码、DNS响应码"),
+		ckdb.NewColumn("response_code", ckdb.Int32Nullable).SetComment("响应码, HTTP响应码、RPC响应码、SQL响应码、MQ响应码、DNS响应码"),
 		ckdb.NewColumn("response_exception", ckdb.String).SetComment("响应异常"),
 		ckdb.NewColumn("response_result", ckdb.String).SetComment("响应结果, DNS解析地址"),
 
