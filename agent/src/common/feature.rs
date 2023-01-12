@@ -25,15 +25,8 @@ bitflags! {
 
 impl From<&Vec<String>> for FeatureFlags {
     fn from(flags: &Vec<String>) -> Self {
-        let mut features = FeatureFlags::NONE;
-        for flag in flags {
-            match flag.to_lowercase().as_str() {
-                "core" => features.set(FeatureFlags::CORE, true),
-                _ => {}
-            }
-        }
-
-        features
+        // disable core temporarily
+        FeatureFlags::NONE
     }
 }
 
