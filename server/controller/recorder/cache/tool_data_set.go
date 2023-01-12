@@ -297,8 +297,10 @@ func (t *ToolDataSet) updateVM(cloudItem *cloudmodel.VM) {
 	if vpcID, ok := t.vpcLcuuidToID[cloudItem.Lcuuid]; ok {
 		info.VPCID = vpcID
 	}
-	if hostID, ok := t.GetHostIDByIP(cloudItem.LaunchServer); ok {
-		info.HostID = hostID
+	if cloudItem.LaunchServer != "" {
+		if hostID, ok := t.GetHostIDByIP(cloudItem.LaunchServer); ok {
+			info.HostID = hostID
+		}
 	}
 }
 
@@ -348,10 +350,13 @@ func (t *ToolDataSet) deleteNetwork(lcuuid string) {
 
 func (t *ToolDataSet) addSubnet(item *mysql.Subnet) {
 	t.subnetLcuuidToID[item.Lcuuid] = item.ID
+	t.subnetIDToLcuuid[item.ID] = item.Lcuuid
 	log.Info(addToToolMap(RESOURCE_TYPE_SUBNET_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteSubnet(lcuuid string) {
+	id, _ := t.GetSubnetIDByLcuuid(lcuuid)
+	delete(t.subnetIDToLcuuid, id)
 	delete(t.subnetLcuuidToID, lcuuid)
 	log.Info(deleteFromToolMap(RESOURCE_TYPE_SUBNET_EN, lcuuid))
 }
