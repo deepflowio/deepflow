@@ -24,7 +24,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.63.1
 	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancing v1.14.18
 	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.18.20
-	github.com/baidubce/bce-sdk-go v0.9.123
+	github.com/baidubce/bce-sdk-go v0.9.141
 	github.com/bitly/go-simplejson v0.5.0
 	github.com/bxcodec/faker/v3 v3.8.0
 	github.com/cactus/go-statsd-client/v5 v5.0.0

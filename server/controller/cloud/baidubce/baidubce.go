@@ -23,6 +23,7 @@ import (
 	"github.com/baidubce/bce-sdk-go/services/bcc/api"
 	"github.com/baidubce/bce-sdk-go/services/blb"
 	"github.com/baidubce/bce-sdk-go/services/cce"
+	"github.com/baidubce/bce-sdk-go/services/csn"
 	"github.com/baidubce/bce-sdk-go/services/eni"
 	"github.com/baidubce/bce-sdk-go/services/rds"
 	"github.com/baidubce/bce-sdk-go/services/vpc"
@@ -190,6 +191,14 @@ func (b *BaiduBce) GetCloudData() (model.Resource, error) {
 		return resource, err
 	}
 
+	// CSN
+	cens, err := b.getCENs()
+	if err != nil {
+		resource.ErrorState = common.RESOURCE_STATE_CODE_WARNING
+		resource.ErrorMessage = err.Error()
+		log.Warning(err)
+	}
+
 	// RDS
 	rdsInstances, tmpVInterfaces, tmpIPs, err := b.getRDSInstances(
 		region, vpcIdToLcuuid, networkIdToLcuuid, zoneNameToAZLcuuid,
@@ -223,6 +232,7 @@ func (b *BaiduBce) GetCloudData() (model.Resource, error) {
 	resource.NATGateways = natGateways
 	resource.LBs = lbs
 	resource.PeerConnections = peerConnections
+	resource.CENs = cens
 	resource.RDSInstances = rdsInstances
 	resource.SubDomains = subDomains
 	b.debugger.Refresh()
@@ -232,7 +242,7 @@ func (b *BaiduBce) GetCloudData() (model.Resource, error) {
 type BCEResultStruct interface {
 	api.ZoneModel | *blb.DescribeLoadBalancersResult | *vpc.ListNatGatewayResult | *vpc.ListSubnetResult |
 		*vpc.ListPeerConnsResult | *rds.ListRdsResult | *vpc.GetRouteTableResult | *api.ListSecurityGroupResult |
-		*cce.ListClusterResult | *api.ListInstanceResult | *eni.ListEniResult | *vpc.ListVPCResult |
+		*cce.ListClusterResult | *api.ListInstanceResult | *eni.ListEniResult | *vpc.ListVPCResult | csn.Csn | csn.Instance |
 		*appblb.DescribeLoadBalancersResult
 }
 
