@@ -839,6 +839,19 @@ impl Flow {
         if other.last_keepalive_ack != 0 {
             self.last_keepalive_ack = other.last_keepalive_ack;
         }
+
+        for new_acl_gid in other.acl_gids.iter() {
+            let mut has = false;
+            for old_acl_gid in self.acl_gids.iter() {
+                if *new_acl_gid == *old_acl_gid {
+                    has = true;
+                    break;
+                }
+            }
+            if !has {
+                self.acl_gids.push(*new_acl_gid);
+            }
+        }
     }
 
     // FIXME 注意：由于FlowGenerator中TcpPerfStats在Flow方向调整之后才获取到，
