@@ -27,6 +27,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use chrono::{DateTime, Local};
 use flexi_logger::{writers::LogWriter, DeferredNow, Level, Record};
 use hostname;
+use log::info;
 
 use super::stats;
 
@@ -56,6 +57,7 @@ impl RemoteLogConfig {
             .iter()
             .map(|addr| SocketAddr::new(addr.as_ref().parse().unwrap(), port))
             .collect();
+        info!("set remotes addrs remotes {:?}", remotes);
         *self.remotes.write().unwrap() = remotes;
     }
 }
@@ -96,6 +98,7 @@ impl RemoteLogWriter {
                 .map(|addr| SocketAddr::new(addr.as_ref().parse().unwrap(), port))
                 .collect(),
         ));
+        info!("new remotes writer addrs  remotes {:?}", remotes.read());
         (
             Self {
                 remotes: remotes.clone(),
@@ -179,6 +182,7 @@ impl RemoteLogWriter {
         let mut result = Ok(());
         let remotes = self.remotes.read().unwrap();
         for remote in remotes.iter() {
+            info!("write remote message remote {:?}", remote);
             match self.socket.send_to(buffer.as_slice(), remote) {
                 Err(e) => result = Err(e),
                 _ => (),
