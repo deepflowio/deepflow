@@ -41,6 +41,8 @@ mod platform_consts {
     pub const COREFILE_FORMAT: &'static str = "core";
     pub const DEFAULT_COREFILE_PATH: &'static str = "/tmp";
     pub const DEFAULT_LIBVIRT_XML_PATH: &'static str = "/etc/libvirt/qemu";
+    pub const CGROUP_PROCS_PATH: &'static str = "/sys/fs/cgroup/cpu/deepflow-agent/cgroup.procs";
+    pub const CGROUP_TASKS_PATH: &'static str = "/sys/fs/cgroup/cpu/deepflow-agent/tasks";
 }
 
 #[cfg(target_os = "windows")]
