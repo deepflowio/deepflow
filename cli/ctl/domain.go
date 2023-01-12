@@ -88,7 +88,7 @@ func RegisterDomainCommand() *cobra.Command {
 		Use:     "example domain_type",
 		Short:   "example domain create yaml",
 		Long:    "supported types: " + strings.Trim(fmt.Sprint(common.DomainTypes), "[]"),
-		Example: "deepflow-ctl domain example agent_sync",
+		Example: "deepflow-ctl domain example agent_sync \nsupport example type: aliyun | aws | baidu_bce | filereader | agent_sync | \nhuawei | kubernetes | qingcloud | tencent ",
 		Run: func(cmd *cobra.Command, args []string) {
 			exampleDomainConfig(cmd, args)
 		},
