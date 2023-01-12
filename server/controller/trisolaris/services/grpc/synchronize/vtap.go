@@ -360,7 +360,7 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 		vtapCache.UpdatePushVersionGroups(versionGroups)
 	}
 	if in.GetVersionAcls() != 0 {
-		vtapCache.UpdatePushVersionPolicy(in.GetVersionGroups())
+		vtapCache.UpdatePushVersionPolicy(in.GetVersionAcls())
 	} else {
 		vtapCache.UpdatePushVersionPolicy(versionPolicy)
 	}
