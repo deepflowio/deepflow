@@ -1229,7 +1229,7 @@ impl ConfigHandler {
                 && candidate_config.dispatcher.tap_interface_regex
                     != new_config.dispatcher.tap_interface_regex
             {
-                fn switch_recv_engine(handler: &ConfigHandler, comp: &mut Components) {
+                fn switch_recv_engine(handler: &ConfigHandler, comp: &mut AgentComponents) {
                     let pcap_interfaces = match links_by_name_regex(
                         &handler.candidate_config.dispatcher.tap_interface_regex,
                     ) {
