@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+use std::io::Read;
 use std::path::Path;
 use std::{
     fs::{self, File},
@@ -35,14 +36,20 @@ use super::process::{
     get_current_sys_free_memory_percentage, get_file_and_size_sum, get_thread_num, FileAndSizeSum,
 };
 use crate::common::NORMAL_EXIT_WITH_RESTART;
+#[cfg(target_os = "linux")]
+use crate::common::{CGROUP_PROCS_PATH, CGROUP_TASKS_PATH};
 use crate::config::handler::EnvironmentAccess;
 use crate::exception::ExceptionHandler;
-use public::proto::trident::Exception;
+#[cfg(target_os = "linux")]
+use crate::utils::environment::running_in_container;
+
+use public::proto::trident::{Exception, TapMode};
 
 pub struct Guard {
     config: EnvironmentAccess,
     log_dir: String,
     interval: Duration,
+    tap_mode: TapMode,
     thread: Mutex<Option<JoinHandle<()>>>,
     running: Arc<(Mutex<bool>, Condvar)>,
     exception_handler: ExceptionHandler,
@@ -53,12 +60,14 @@ impl Guard {
         config: EnvironmentAccess,
         log_dir: String,
         interval: Duration,
+        tap_mode: TapMode,
         exception_handler: ExceptionHandler,
     ) -> Self {
         Self {
             config,
             log_dir,
             interval,
+            tap_mode,
             thread: Mutex::new(None),
             running: Arc::new((Mutex::new(false), Condvar::new())),
             exception_handler,
@@ -122,11 +131,39 @@ impl Guard {
         let exception_handler = self.exception_handler.clone();
         let log_dir = self.log_dir.clone();
         let interval = self.interval;
+        let tap_mode = self.tap_mode;
         #[cfg(target_os = "windows")]
         let mut over_memory_limit = false; // Higher than the limit does not meet expectations, just for Windows, Linux will use cgroup to limit memory
         let mut under_sys_free_memory_limit = false; // Below the limit, it does not meet expectations
         let thread = thread::Builder::new().name("guard".to_owned()).spawn(move || {
             loop {
+                #[cfg(target_os = "linux")]
+                {
+                    fn check_cgroup(path: &str, tap_mode: TapMode) {
+                        if running_in_container() || tap_mode == TapMode::Analyzer {
+                            return;
+                        }
+                        match File::open(path) {
+                            Ok(mut file) => {
+                                let mut buf: Vec<u8> = Vec::new();
+                                file.read_to_end(&mut buf).unwrap_or_default();
+                                if buf.len() == 0 {
+                                    error!("check cgroup file failed: {} is empty", path);
+                                    thread::sleep(Duration::from_secs(1));
+                                    exit(-1);
+                                }
+                                debug!("check cgroup files ok");
+                            }
+                            Err(e) => {
+                                error!("check cgroup file failed, cannot open file: {}, {}", path, e);
+                                thread::sleep(Duration::from_secs(1));
+                                exit(-1);
+                            }
+                        }
+                    }
+                    check_cgroup(CGROUP_PROCS_PATH, tap_mode);
+                    check_cgroup(CGROUP_TASKS_PATH, tap_mode);
+                }
                 #[cfg(target_os = "windows")]
                 {
                     let memory_limit = limit.load().max_memory;
