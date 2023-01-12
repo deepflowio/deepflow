@@ -257,10 +257,14 @@ impl Status {
                 }
 
                 self.update_platform_data(version, interfaces, peers, cidrs);
-                return true;
+            } else {
+                error!("Invalid platform data.");
+                self.update_platform_data(version, vec![], vec![], vec![]);
             }
+        } else {
+            self.update_platform_data(version, vec![], vec![], vec![]);
         }
-        return false;
+        return true;
     }
 
     fn modify_platform(&mut self, macs: &Vec<MacAddr>, config: &RuntimeConfig) {
@@ -326,10 +330,14 @@ impl Status {
                     })
                     .collect::<Vec<Acl>>();
                 self.update_flow_acl(version, flow_acls);
-                return true;
+            } else {
+                error!("Invalid acls.");
+                self.update_flow_acl(version, vec![]);
             }
+        } else {
+            self.update_flow_acl(version, vec![]);
         }
-        return false;
+        return true;
     }
 
     pub fn get_ip_groups(&mut self, resp: &tp::SyncResponse) -> bool {
@@ -361,10 +369,14 @@ impl Status {
                     }
                 }
                 self.update_ip_groups(version, ip_groups);
-                return true;
+            } else {
+                error!("Invalid ip groups.");
+                self.update_ip_groups(version, vec![]);
             }
+        } else {
+            self.update_ip_groups(version, vec![]);
         }
-        return false;
+        return true;
     }
 
     pub fn get_blacklist(&mut self, resp: &tp::SyncResponse) -> Vec<u64> {
