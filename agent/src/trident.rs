@@ -405,6 +405,7 @@ impl Trident {
             config_handler.environment(),
             log_dir.to_string(),
             config_handler.candidate_config.yaml_config.guard_interval,
+            config_handler.candidate_config.tap_mode,
             exception_handler.clone(),
         );
         guard.start();
