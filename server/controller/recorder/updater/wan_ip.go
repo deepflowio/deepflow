@@ -20,9 +20,10 @@ import (
 	"strings"
 
 	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
+	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowys/deepflow/server/controller/recorder/common"
+	. "github.com/deepflowys/deepflow/server/controller/recorder/common"
 	"github.com/deepflowys/deepflow/server/controller/recorder/db"
 )
 
@@ -56,16 +57,16 @@ func (i *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.WANIP, boo
 	vinterfaceID, exists := i.cache.GetVInterfaceIDByLcuuid(cloudItem.VInterfaceLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.VInterfaceLcuuid,
-			common.RESOURCE_TYPE_WAN_IP_EN, cloudItem.Lcuuid,
+			RESOURCE_TYPE_VINTERFACE_EN, cloudItem.VInterfaceLcuuid,
+			RESOURCE_TYPE_WAN_IP_EN, cloudItem.Lcuuid,
 		))
 		return nil, false
 	}
 	subnetID, _ := i.cache.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
-	ip := common.FormatIP(cloudItem.IP)
+	ip := FormatIP(cloudItem.IP)
 	if ip == "" {
 		log.Error(ipIsInvalid(
-			common.RESOURCE_TYPE_WAN_IP_EN, cloudItem.Lcuuid, cloudItem.IP,
+			RESOURCE_TYPE_WAN_IP_EN, cloudItem.Lcuuid, cloudItem.IP,
 		))
 		return nil, false
 	}
@@ -76,15 +77,15 @@ func (i *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.WANIP, boo
 		VInterfaceID: vinterfaceID,
 		SubnetID:     subnetID,
 		Region:       cloudItem.RegionLcuuid,
-		ISP:          common.WAN_IP_ISP,
+		ISP:          WAN_IP_ISP,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	if strings.Contains(cloudItem.IP, ":") {
-		dbItem.Netmask = common.IPV6_DEFAULT_NETMASK
-		dbItem.Gateway = common.IPV6_DEFAULT_GATEWAY
+		dbItem.Netmask = IPV6_DEFAULT_NETMASK
+		dbItem.Gateway = IPV6_DEFAULT_GATEWAY
 	} else {
-		dbItem.Netmask = common.IPV4_DEFAULT_NETMASK
-		dbItem.Gateway = common.IPV4_DEFAULT_GATEWAY
+		dbItem.Netmask = IPV4_DEFAULT_NETMASK
+		dbItem.Gateway = IPV4_DEFAULT_GATEWAY
 	}
 	return dbItem, true
 }
@@ -95,14 +96,15 @@ func (i *WANIP) generateUpdateInfo(diffBase *cache.WANIP, cloudItem *cloudmodel.
 		updateInfo["region"] = cloudItem.RegionLcuuid
 	}
 	if diffBase.SubnetLcuuid != cloudItem.SubnetLcuuid {
-		if cloudItem.SubnetLcuuid == "" {
+		subnetLcuuidsRepresentingNone := []string{"", "ffffffff-ffff-ffff-ffff-ffffffffffff", "94f0ca77-cb52-5869-98fb-2773ca4fb83f"}
+		if common.Contains(subnetLcuuidsRepresentingNone, cloudItem.SubnetLcuuid) {
 			updateInfo["vl2_net_id"] = 0
 		} else {
 			subnetID, exists := i.cache.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
 			if !exists {
 				log.Error(resourceAForResourceBNotFound(
-					common.RESOURCE_TYPE_SUBNET_EN, cloudItem.SubnetLcuuid,
-					common.RESOURCE_TYPE_WAN_IP_EN, cloudItem.Lcuuid,
+					RESOURCE_TYPE_SUBNET_EN, cloudItem.SubnetLcuuid,
+					RESOURCE_TYPE_WAN_IP_EN, cloudItem.Lcuuid,
 				))
 				return nil, false
 			}
