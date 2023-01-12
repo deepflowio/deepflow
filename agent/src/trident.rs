@@ -1424,7 +1424,6 @@ impl Components {
                 .mirror_traffic_pcp(yaml_config.mirror_traffic_pcp)
                 .tap_typer(tap_typer.clone())
                 .analyzer_dedup_disabled(yaml_config.analyzer_dedup_disabled)
-                .libvirt_xml_extractor(libvirt_xml_extractor.clone())
                 .flow_output_queue(flow_sender.clone())
                 .log_output_queue(log_sender.clone())
                 .packet_sequence_output_queue(packet_sequence_sender) // Enterprise Edition Feature: packet-sequence
@@ -1440,6 +1439,7 @@ impl Components {
 
             #[cfg(target_os = "linux")]
             let dispatcher = dispatcher_builder
+                .libvirt_xml_extractor(libvirt_xml_extractor.clone())
                 .platform_poller(platform_synchronizer.clone_poller())
                 .build()
                 .unwrap();
