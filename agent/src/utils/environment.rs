@@ -26,6 +26,8 @@ use std::{
     process, thread,
     time::Duration,
 };
+#[cfg(target_os = "windows")]
+use std::{ffi::OsString, os::windows::ffi::OsStringExt, ptr};
 
 use bytesize::ByteSize;
 #[cfg(target_os = "linux")]
@@ -34,6 +36,20 @@ use log::{error, info, warn};
 #[cfg(target_os = "linux")]
 use nom::AsBytes;
 use sysinfo::{DiskExt, System, SystemExt};
+#[cfg(target_os = "windows")]
+use winapi::{
+    shared::{
+        minwindef::{DWORD, MAX_PATH},
+        winerror::ERROR_INSUFFICIENT_BUFFER,
+    },
+    um::{
+        errhandlingapi::GetLastError,
+        libloaderapi::{
+            GetModuleFileNameW, GetModuleHandleExW, GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+            GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+        },
+    },
+};
 
 use crate::common::PROCESS_NAME;
 use crate::error::{Error, Result};
@@ -426,6 +442,7 @@ pub fn running_in_container() -> bool {
     env::var_os("IN_CONTAINER").is_some()
 }
 
+#[cfg(target_os = "linux")]
 pub fn get_executable_path() -> Result<PathBuf, io::Error> {
     let possible_paths = vec![
         "/proc/self/exe".to_owned(),
@@ -442,6 +459,24 @@ pub fn get_executable_path() -> Result<PathBuf, io::Error> {
         io::ErrorKind::NotFound,
         "executable path not found",
     ))
+}
+
+#[cfg(target_os = "windows")]
+pub fn get_executable_path() -> Result<PathBuf, io::Error> {
+    let mut buf = Vec::with_capacity(MAX_PATH);
+    unsafe {
+        let ret = GetModuleFileNameW(ptr::null_mut(), buf.as_mut_ptr(), MAX_PATH as DWORD) as usize;
+        if ret > 0 && ret < MAX_PATH {
+            buf.set_len(ret);
+            let s = OsString::from_wide(&buf);
+            Ok(s.into())
+        } else {
+            Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                "executable path not found",
+            ))
+        }
+    }
 }
 
 pub fn get_mac_by_name(src_interface: String) -> u32 {

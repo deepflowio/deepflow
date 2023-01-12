@@ -828,10 +828,15 @@ impl DispatcherBuilder {
         );
         let mut dispatcher = match tap_mode {
             TapMode::Local => {
+                #[cfg(target_os = "linux")]
                 let extractor = self
                     .libvirt_xml_extractor
                     .ok_or(Error::ConfigIncomplete("no libvirt xml extractor".into()))?;
-                DispatcherFlavor::Local(LocalModeDispatcher { base, extractor })
+                DispatcherFlavor::Local(LocalModeDispatcher {
+                    base,
+                    #[cfg(target_os = "linux")]
+                    extractor,
+                })
             }
             TapMode::Mirror => DispatcherFlavor::Mirror(MirrorModeDispatcher {
                 base,
