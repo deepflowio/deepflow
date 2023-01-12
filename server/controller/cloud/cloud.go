@@ -142,7 +142,9 @@ func (c *Cloud) getCloudData() {
 				c.resource.ErrorState = common.RESOURCE_STATE_CODE_EXCEPTION
 			}
 		} else {
-			c.resource.ErrorState = common.RESOURCE_STATE_CODE_SUCCESS
+			if c.resource.ErrorState == 0 {
+				c.resource.ErrorState = common.RESOURCE_STATE_CODE_SUCCESS
+			}
 		}
 	} else {
 		c.getKubernetesData()
