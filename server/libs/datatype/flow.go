@@ -515,6 +515,20 @@ func (f *Flow) SequentialMerge(rhs *Flow) {
 	if rhs.LastKeepaliveAck != 0 {
 		f.LastKeepaliveAck = rhs.LastKeepaliveAck
 	}
+
+	// merge AclGids
+	for _, newAclGid := range rhs.AclGids {
+		has := false
+		for _, oldAclGid := range f.AclGids {
+			if newAclGid == oldAclGid {
+				has = true
+				break
+			}
+		}
+		if !has {
+			f.AclGids = append(f.AclGids, newAclGid)
+		}
+	}
 }
 
 func (f *Flow) WriteToPB(p *pb.Flow) {
