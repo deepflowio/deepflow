@@ -97,9 +97,7 @@ func (i *WANIP) generateUpdateInfo(diffBase *cache.WANIP, cloudItem *cloudmodel.
 	}
 	if diffBase.SubnetLcuuid != cloudItem.SubnetLcuuid {
 		subnetLcuuidsRepresentingNone := []string{"", "ffffffff-ffff-ffff-ffff-ffffffffffff", "94f0ca77-cb52-5869-98fb-2773ca4fb83f"}
-		if common.Contains(subnetLcuuidsRepresentingNone, cloudItem.SubnetLcuuid) {
-			updateInfo["vl2_net_id"] = 0
-		} else {
+		if !common.Contains(subnetLcuuidsRepresentingNone, cloudItem.SubnetLcuuid) {
 			subnetID, exists := i.cache.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
 			if !exists {
 				log.Error(resourceAForResourceBNotFound(
@@ -109,6 +107,8 @@ func (i *WANIP) generateUpdateInfo(diffBase *cache.WANIP, cloudItem *cloudmodel.
 				return nil, false
 			}
 			updateInfo["vl2_net_id"] = subnetID
+		} else if !common.Contains(subnetLcuuidsRepresentingNone, diffBase.SubnetLcuuid) {
+			updateInfo["vl2_net_id"] = 0
 		}
 	}
 
