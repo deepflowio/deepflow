@@ -43,24 +43,6 @@ use public::packet::MiniPacket;
 use public::queue::DebugSender;
 use regex::Regex;
 
-use crate::config::PcapConfig;
-#[cfg(target_os = "linux")]
-use crate::ebpf_dispatcher::EbpfCollector;
-use crate::handler::{NpbBuilder, PacketHandlerBuilder};
-use crate::integration_collector::{
-    MetricServer, OpenTelemetry, OpenTelemetryCompressed, PrometheusMetric, TelegrafMetric,
-};
-use crate::metric::document::BoxedDocument;
-#[cfg(target_os = "linux")]
-use crate::platform::ApiWatcher;
-use crate::platform::SocketSynchronizer;
-use crate::sender::get_sender_id;
-#[cfg(target_os = "linux")]
-use crate::utils::cgroups::Cgroups;
-#[cfg(target_os = "linux")]
-use crate::utils::environment::core_file_check;
-use crate::utils::lru::Lru;
-use crate::utils::stats::ArcBatch;
 use crate::{
     collector::Collector,
     collector::{
@@ -74,6 +56,7 @@ use crate::{
         FeatureFlags, DEFAULT_CONF_FILE, DEFAULT_INGESTER_PORT, DEFAULT_LOG_RETENTION,
         FREE_SPACE_REQUIREMENT, NORMAL_EXIT_WITH_RESTART,
     },
+    config::PcapConfig,
     config::{
         handler::{ConfigHandler, DispatcherConfig, ModuleConfig, PortAccess},
         Config, ConfigError, RuntimeConfig, YamlConfig,
@@ -86,11 +69,16 @@ use crate::{
     flow_generator::{
         protocol_logs::BoxAppProtoLogsData, AppProtoLogsParser, PacketSequenceParser,
     },
+    handler::{NpbBuilder, PacketHandlerBuilder},
+    integration_collector::{
+        MetricServer, OpenTelemetry, OpenTelemetryCompressed, PrometheusMetric, TelegrafMetric,
+    },
+    metric::document::BoxedDocument,
     monitor::Monitor,
-    platform::{LibvirtXmlExtractor, PlatformSynchronizer},
+    platform::{LibvirtXmlExtractor, PlatformSynchronizer, SocketSynchronizer},
     policy::{Policy, PolicySetter},
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
-    sender::{npb_sender::NpbArpTable, uniform_sender::UniformSenderThread},
+    sender::{get_sender_id, npb_sender::NpbArpTable, uniform_sender::UniformSenderThread},
     utils::{
         environment::{
             check, controller_ip_check, free_memory_check, free_space_checker, get_ctrl_ip_and_mac,
@@ -99,10 +87,21 @@ use crate::{
         },
         guard::Guard,
         logger::{LogLevelWriter, LogWriterAdapter, RemoteLogConfig, RemoteLogWriter},
+        lru::Lru,
         npb_bandwidth_watcher::NpbBandwidthWatcher,
-        stats::{self, Countable, RefCountable, StatsOption},
+        stats::{self, ArcBatch, Countable, RefCountable, StatsOption},
     },
 };
+#[cfg(target_os = "linux")]
+use crate::{
+    ebpf_dispatcher::EbpfCollector,
+    platform::ApiWatcher,
+    utils::{
+        cgroups::Cgroups,
+        environment::{core_file_check, is_tt_pod},
+    },
+};
+
 #[cfg(target_os = "linux")]
 use public::netns::{links_by_name_regex_in_netns, NetNs};
 #[cfg(target_os = "windows")]
@@ -413,6 +412,36 @@ impl Trident {
         let monitor = Monitor::new(stats_collector.clone(), log_dir.to_string())?;
         monitor.start();
 
+        #[cfg(target_os = "linux")]
+        let (libvirt_xml_extractor, platform_synchronizer) = {
+            let ext = Arc::new(LibvirtXmlExtractor::new());
+            let syn = Arc::new(PlatformSynchronizer::new(
+                config_handler.platform(),
+                session.clone(),
+                ext.clone(),
+                exception_handler.clone(),
+                config_handler
+                    .candidate_config
+                    .dispatcher
+                    .extra_netns_regex
+                    .clone(),
+            ));
+            ext.start();
+            (ext, syn)
+        };
+        #[cfg(target_os = "windows")]
+        let platform_synchronizer = Arc::new(PlatformSynchronizer::new(
+            config_handler.platform(),
+            session.clone(),
+            exception_handler.clone(),
+        ));
+        if matches!(
+            config_handler.static_config.agent_mode,
+            RunningMode::Managed
+        ) {
+            platform_synchronizer.start();
+        }
+
         let (state, cond) = &*state;
         let mut state_guard = state.lock().unwrap();
         let mut components: Option<Components> = None;
@@ -429,10 +458,15 @@ impl Trident {
                         c.stop();
                         guard.stop();
                         monitor.stop();
+                        platform_synchronizer.stop();
+
                         #[cfg(target_os = "linux")]
-                        if let Some(cg_controller) = cgroups_controller {
-                            if let Err(e) = cg_controller.stop() {
-                                warn!("stop cgroup controller failed, {:?}", e);
+                        {
+                            libvirt_xml_extractor.stop();
+                            if let Some(cg_controller) = cgroups_controller {
+                                if let Err(e) = cg_controller.stop() {
+                                    warn!("stop cgroup controller failed, {:?}", e);
+                                }
                             }
                         }
                     }
@@ -482,6 +516,9 @@ impl Trident {
                         &synchronizer,
                         exception_handler.clone(),
                         remote_log_config.clone(),
+                        #[cfg(target_os = "linux")]
+                        libvirt_xml_extractor.clone(),
+                        platform_synchronizer.clone(),
                         vm_mac_addrs,
                         config_handler.static_config.agent_mode,
                     )?;
@@ -792,7 +829,7 @@ pub enum Components {
 pub struct WatcherComponents {
     pub api_watcher: Arc<ApiWatcher>,
     pub libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
-    pub platform_synchronizer: PlatformSynchronizer,
+    pub platform_synchronizer: Arc<PlatformSynchronizer>,
     pub domain_name_listener: DomainNameListener,
     pub running: AtomicBool,
     tap_mode: TapMode,
@@ -808,17 +845,11 @@ impl WatcherComponents {
         synchronizer: &Arc<Synchronizer>,
         exception_handler: ExceptionHandler,
         remote_log_config: RemoteLogConfig,
+        libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
+        platform_synchronizer: Arc<PlatformSynchronizer>,
         agent_mode: RunningMode,
     ) -> Result<Self> {
-        let libvirt_xml_extractor = Arc::new(LibvirtXmlExtractor::new());
         let candidate_config = &config_handler.candidate_config;
-        let platform_synchronizer = PlatformSynchronizer::new(
-            config_handler.platform(),
-            session.clone(),
-            libvirt_xml_extractor.clone(),
-            exception_handler.clone(),
-            candidate_config.dispatcher.extra_netns_regex.clone(),
-        );
         let api_watcher = Arc::new(ApiWatcher::new(
             config_handler.platform(),
             session.clone(),
@@ -852,10 +883,8 @@ impl WatcherComponents {
         }
         info!("Staring watcher components.");
         if matches!(self.agent_mode, RunningMode::Managed) {
-            self.platform_synchronizer.start();
             self.api_watcher.start();
         }
-        self.libvirt_xml_extractor.start();
         self.platform_synchronizer.start_kubernetes_poller();
         self.domain_name_listener.start();
         info!("Started watcher components.");
@@ -865,8 +894,6 @@ impl WatcherComponents {
         if !self.running.swap(false, Ordering::Relaxed) {
             return;
         }
-        self.libvirt_xml_extractor.stop();
-        self.platform_synchronizer.stop();
         self.api_watcher.stop();
         self.domain_name_listener.stop();
         info!("Stopped watcher components.")
@@ -877,7 +904,6 @@ pub struct AgentComponents {
     pub config: ModuleConfig,
     pub rx_leaky_bucket: Arc<LeakyBucket>,
     pub l7_log_rate: Arc<LeakyBucket>,
-    pub libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
     pub tap_typer: Arc<TapTyper>,
     pub cur_tap_types: Vec<trident::TapType>,
     pub dispatchers: Vec<Dispatcher>,
@@ -888,7 +914,7 @@ pub struct AgentComponents {
     pub metrics_uniform_sender: UniformSenderThread<BoxedDocument>,
     pub l7_flow_uniform_sender: UniformSenderThread<BoxAppProtoLogsData>,
     pub stats_sender: UniformSenderThread<ArcBatch>,
-    pub platform_synchronizer: PlatformSynchronizer,
+    pub platform_synchronizer: Arc<PlatformSynchronizer>,
     #[cfg(target_os = "linux")]
     pub socket_synchronizer: SocketSynchronizer,
     #[cfg(target_os = "linux")]
@@ -1073,6 +1099,8 @@ impl AgentComponents {
         synchronizer: &Arc<Synchronizer>,
         exception_handler: ExceptionHandler,
         remote_log_config: RemoteLogConfig,
+        #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
+        platform_synchronizer: Arc<PlatformSynchronizer>,
         vm_mac_addrs: Vec<MacAddr>,
         agent_mode: RunningMode,
     ) -> Result<Self> {
@@ -1141,22 +1169,6 @@ impl AgentComponents {
 
         // TODO: collector enabled
         // TODO: packet handler builders
-
-        let libvirt_xml_extractor = Arc::new(LibvirtXmlExtractor::new());
-        #[cfg(target_os = "linux")]
-        let platform_synchronizer = PlatformSynchronizer::new(
-            config_handler.platform(),
-            session.clone(),
-            libvirt_xml_extractor.clone(),
-            exception_handler.clone(),
-            candidate_config.dispatcher.extra_netns_regex.clone(),
-        );
-        #[cfg(target_os = "windows")]
-        let platform_synchronizer = PlatformSynchronizer::new(
-            config_handler.platform(),
-            session.clone(),
-            exception_handler.clone(),
-        );
 
         #[cfg(target_os = "linux")]
         let api_watcher = Arc::new(ApiWatcher::new(
@@ -1608,7 +1620,6 @@ impl AgentComponents {
                 .mirror_traffic_pcp(yaml_config.mirror_traffic_pcp)
                 .tap_typer(tap_typer.clone())
                 .analyzer_dedup_disabled(yaml_config.analyzer_dedup_disabled)
-                .libvirt_xml_extractor(libvirt_xml_extractor.clone())
                 .flow_output_queue(flow_sender.clone())
                 .log_output_queue(log_sender.clone())
                 .packet_sequence_output_queue(packet_sequence_sender) // Enterprise Edition Feature: packet-sequence
@@ -1624,6 +1635,7 @@ impl AgentComponents {
 
             #[cfg(target_os = "linux")]
             let dispatcher = dispatcher_builder
+                .libvirt_xml_extractor(libvirt_xml_extractor.clone())
                 .platform_poller(platform_synchronizer.clone_poller())
                 .build()
                 .unwrap();
@@ -1903,7 +1915,6 @@ impl AgentComponents {
             config: candidate_config.clone(),
             rx_leaky_bucket,
             l7_log_rate,
-            libvirt_xml_extractor,
             tap_typer,
             cur_tap_types: vec![],
             dispatchers,
@@ -1951,18 +1962,16 @@ impl AgentComponents {
             return;
         }
         info!("Staring agent components.");
-        self.libvirt_xml_extractor.start();
-        if matches!(self.agent_mode, RunningMode::Managed) {
-            self.platform_synchronizer.start();
-            #[cfg(target_os = "linux")]
-            if running_in_container() {
+        #[cfg(target_os = "linux")]
+        {
+            if is_tt_pod(self.config.trident_type) {
+                self.platform_synchronizer.start_kubernetes_poller();
+            }
+            if matches!(self.agent_mode, RunningMode::Managed) && running_in_container() {
                 self.api_watcher.start();
             }
+            self.socket_synchronizer.start();
         }
-        #[cfg(target_os = "linux")]
-        self.platform_synchronizer.start_kubernetes_poller();
-        #[cfg(target_os = "linux")]
-        self.socket_synchronizer.start();
         self.debugger.start();
         self.metrics_uniform_sender.start();
         self.l7_flow_uniform_sender.start();
@@ -2037,13 +2046,13 @@ impl AgentComponents {
         for d in self.dispatchers.iter_mut() {
             d.stop();
         }
-        self.platform_synchronizer.stop();
 
         #[cfg(target_os = "linux")]
-        self.socket_synchronizer.stop();
-
-        #[cfg(target_os = "linux")]
-        self.api_watcher.stop();
+        {
+            self.platform_synchronizer.stop_kubernetes_poller();
+            self.socket_synchronizer.stop();
+            self.api_watcher.stop();
+        }
 
         for q in self.collectors.iter_mut() {
             q.stop();
@@ -2057,7 +2066,6 @@ impl AgentComponents {
         self.metrics_uniform_sender.stop();
         self.l7_flow_uniform_sender.stop();
 
-        self.libvirt_xml_extractor.stop();
         self.debugger.stop();
         #[cfg(target_os = "linux")]
         if let Some(ebpf_collector) = self.ebpf_collector.as_mut() {
@@ -2102,6 +2110,8 @@ impl Components {
         synchronizer: &Arc<Synchronizer>,
         exception_handler: ExceptionHandler,
         remote_log_config: RemoteLogConfig,
+        libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
+        platform_synchronizer: Arc<PlatformSynchronizer>,
         vm_mac_addrs: Vec<MacAddr>,
         agent_mode: RunningMode,
     ) -> Result<Self> {
@@ -2114,6 +2124,8 @@ impl Components {
                 synchronizer,
                 exception_handler,
                 remote_log_config,
+                libvirt_xml_extractor,
+                platform_synchronizer,
                 agent_mode,
             )?;
             return Ok(Components::Watcher(components));
@@ -2126,6 +2138,9 @@ impl Components {
             synchronizer,
             exception_handler,
             remote_log_config,
+            #[cfg(target_os = "linux")]
+            libvirt_xml_extractor,
+            platform_synchronizer,
             vm_mac_addrs,
             agent_mode,
         )?;

@@ -359,19 +359,13 @@ static __inline void init_conn_info(__u32 tgid, __u32 fd,
 	bpf_probe_read(&inet_sport, sizeof(inet_sport), sk + STRUCT_SOCK_SPORT_OFFSET);
 	conn_info->tuple.dport = __bpf_ntohs(inet_dport);
 	conn_info->tuple.num = inet_sport;
-	conn_info->prev_count = 0;
-	conn_info->direction = 0;
-	*((__u32 *) conn_info->prev_buf) = 0;
-	conn_info->need_reconfirm = false;
 	conn_info->correlation_id = -1; // 当前用于kafka协议推断
 	conn_info->fd = fd;
-	conn_info->role = ROLE_UNKNOWN;
 
 	conn_info->sk = sk;
 	__u64 conn_key = gen_conn_key_id((__u64)tgid, (__u64)conn_info->fd);
 	conn_info->socket_info_ptr =
 			socket_info_map__lookup(&conn_key);
-	conn_info->keep_data_seq = false;
 }
 
 static __inline bool get_socket_info(struct __socket_data *v,
@@ -657,8 +651,6 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 	 * -----------------------------
 	 *                   socket-m
 	 *                      | -> ①
-	 *                      | -> ②
-	 *                      | -> ③
 	 *                        ......
 	 * 采用的策略是：沿用上次trace_info保存的traceID。
 	 */
@@ -717,7 +709,6 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 			if (trace_info_ptr->is_trace_id_zero &&
 			    conn_info->message_type == MSG_RESPONSE &&
 			    conn_info->infer_reliable) {
-				*thread_trace_id = 0;
 				trace_map__delete(trace_key);
 				trace_stats->trace_map_count--;
 				return;
@@ -734,7 +725,6 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 			    socket_info_ptr->peer_fd != 0)
 				trace_info.peer_fd = socket_info_ptr->peer_fd;
 		}
-		trace_info.is_trace_id_zero = false;
 		trace_info.update_time = time_stamp / NS_PER_SEC;
 		trace_info.socket_id = socket_id;
 		trace_map__update(trace_key, &trace_info);
@@ -752,7 +742,6 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 			 * 	(client-socket) request [traceID : 0] ->
 			 */
 			if (trace_info_ptr->is_trace_id_zero) {
-				*thread_trace_id = 0;
 				return;
 			}
 			/*
@@ -760,8 +749,6 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 			 */
 			if (socket_id != trace_info_ptr->socket_id) {
 				*thread_trace_id = trace_info_ptr->thread_trace_id;
-			} else {
-				*thread_trace_id = 0;
 			}
 
 			trace_map__delete(trace_key);
@@ -773,15 +760,12 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 			 * (client-socket) request [traceID : 0] ->
 			 */
 			if (conn_info->message_type == MSG_REQUEST) {
-				*thread_trace_id = 0;
 				struct trace_info_t trace_info = { 0 };
 				trace_info.is_trace_id_zero = true;
 				trace_info.update_time = time_stamp / NS_PER_SEC;
 				trace_map__update(trace_key, &trace_info);
 				trace_stats->trace_map_count++;
-			} else {
-				*thread_trace_id = 0;
-			}	
+			}
 		}
 	}
 }
@@ -1076,8 +1060,6 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 				 ssize_t bytes_count,
 				 const struct process_data_extra *extra)
 {
-	__u32 tgid = id >> 32;
-
 	if (!extra)
 		return -1;
 
@@ -1101,7 +1083,7 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 		return -1;
 	
 	void *sk = get_socket_from_fd(args->fd, offset);
-	struct conn_info_t *conn_info, __conn_info = {};
+	struct conn_info_t *conn_info, __conn_info = { 0 };
 	conn_info = &__conn_info;
 	__u8 sock_state;
 	if (!(sk != NULL &&
@@ -1110,7 +1092,7 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 		return -1;
 	}
 
-	init_conn_info(tgid, args->fd, &__conn_info, sk);
+	init_conn_info(id >> 32, args->fd, &__conn_info, sk);
 
 	conn_info->direction = direction;
 

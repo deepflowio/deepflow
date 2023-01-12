@@ -25,7 +25,9 @@ pub mod tcp;
 mod udp;
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
+use std::slice;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -41,11 +43,10 @@ use super::protocol_logs::{AppProtoHead, PostgresqlLog, ProtobufRpcWrapLog, Sofa
 use crate::common::flow::{PacketDirection, SignalSource};
 use crate::common::l7_protocol_info::L7ProtocolInfo;
 use crate::common::l7_protocol_log::{
-    get_all_protocol, get_parse_bitmap, L7ProtocolBitmap, L7ProtocolParser,
-    L7ProtocolParserInterface, ParseParam,
+    get_all_protocol, get_parser, L7ProtocolBitmap, L7ProtocolParser, L7ProtocolParserInterface,
+    ParseParam,
 };
 use crate::common::{
-    enums::IpProtocol,
     flow::{FlowPerfStats, L4Protocol, L7Protocol},
     meta_packet::MetaPacket,
 };
@@ -117,6 +118,73 @@ impl L7FlowPerfTable {
     }
 }
 
+pub type L7ProtocolTuple = (L7Protocol, Option<Bitmap>);
+
+// None in Vec means all ports
+pub struct L7ProtocolChecker {
+    tcp: Vec<L7ProtocolTuple>,
+    udp: Vec<L7ProtocolTuple>,
+}
+
+impl L7ProtocolChecker {
+    pub fn new(
+        protocol_bitmap: &L7ProtocolBitmap,
+        port_bitmap: &HashMap<L7Protocol, Bitmap>,
+    ) -> Self {
+        let mut tcp = vec![];
+        let mut udp = vec![];
+        for parser in get_all_protocol() {
+            let protocol = parser.protocol();
+            if !protocol_bitmap.is_enabled(protocol) {
+                continue;
+            }
+            if parser.parsable_on_tcp() {
+                tcp.push((protocol, port_bitmap.get(&protocol).map(|m| m.clone())));
+            }
+            if parser.parsable_on_udp() {
+                udp.push((protocol, port_bitmap.get(&protocol).map(|m| m.clone())));
+            }
+        }
+
+        L7ProtocolChecker { tcp, udp }
+    }
+
+    pub fn possible_protocols(
+        &self,
+        l4_protocol: L4Protocol,
+        port: u16,
+    ) -> L7ProtocolCheckerIterator {
+        L7ProtocolCheckerIterator {
+            iter: match l4_protocol {
+                L4Protocol::Tcp => self.tcp.iter(),
+                L4Protocol::Udp => self.udp.iter(),
+                L4Protocol::Unknown => [].iter(),
+            },
+            port,
+        }
+    }
+}
+
+pub struct L7ProtocolCheckerIterator<'a> {
+    iter: slice::Iter<'a, L7ProtocolTuple>,
+    port: u16,
+}
+
+impl<'a> Iterator for L7ProtocolCheckerIterator<'a> {
+    type Item = &'a L7Protocol;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some((proto, bitmap)) = self.iter.next() {
+            match bitmap {
+                // if bitmap is not None and does not has port in it, check next protocol
+                Some(b) if !b.get(self.port as usize).unwrap_or_default() => continue,
+                _ => return Some(proto),
+            }
+        }
+        None
+    }
+}
+
 pub struct FlowPerf {
     l4: L4FlowPerfTable,
     l7: Option<L7FlowPerfTable>,
@@ -126,7 +194,6 @@ pub struct FlowPerf {
 
     rrt_cache: Rc<RefCell<L7RrtCache>>,
 
-    protocol_bitmap: L7ProtocolBitmap,
     l7_protocol_enum: L7ProtocolEnum,
 
     // Only for eBPF data, the server_port will be set in l7_check() method, it checks the first
@@ -140,9 +207,6 @@ pub struct FlowPerf {
 
     parse_config: LogParserAccess,
     flow_config: FlowAccess,
-
-    // port bitmap max = 65535, indicate the l7 protocol in this port whether to parse
-    l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
 }
 
 impl FlowPerf {
@@ -166,13 +230,6 @@ impl FlowPerf {
             | L7Protocol::Grpc => Some(L7FlowPerfTable::from(HttpPerfData::new(rrt_cache.clone()))),
             _ => None,
         }
-    }
-
-    fn is_skip_l7_protocol_parse(&self, proto: &L7ProtocolParser, port: u16) -> bool {
-        if self.protocol_bitmap.is_disabled(proto.protocol()) {
-            return true;
-        }
-        proto.is_skip_parse_by_port_bitmap(&self.l7_protocol_parse_port_bitmap, port)
     }
 
     // return rrt
@@ -316,6 +373,7 @@ impl FlowPerf {
         is_parse_log: bool,
         local_epc: i32,
         remote_epc: i32,
+        checker: &L7ProtocolChecker,
     ) -> Result<(Vec<L7ProtocolInfo>, u64)> {
         if self.is_skip {
             return Err(Error::L7ProtocolCheckLimit);
@@ -323,26 +381,26 @@ impl FlowPerf {
 
         if let Some(payload) = packet.get_l4_payload() {
             let param = ParseParam::from(&*packet);
-            for mut i in get_all_protocol() {
-                if self.is_skip_l7_protocol_parse(
-                    &i,
-                    match packet.direction {
-                        PacketDirection::ClientToServer => packet.lookup_key.dst_port,
-                        PacketDirection::ServerToClient => packet.lookup_key.src_port,
-                    },
-                ) {
+            for protocol in checker.possible_protocols(
+                packet.lookup_key.proto.into(),
+                match packet.direction {
+                    PacketDirection::ClientToServer => packet.lookup_key.dst_port,
+                    PacketDirection::ServerToClient => packet.lookup_key.src_port,
+                },
+            ) {
+                let Some(mut parser) = get_parser(L7ProtocolEnum::L7Protocol(*protocol)) else {
                     continue;
-                }
-                i.set_parse_config(&self.parse_config);
-                if i.check_payload(payload, &param) {
-                    self.l7_protocol_enum = i.l7_protocl_enum();
+                };
+                parser.set_parse_config(&self.parse_config);
+                if parser.check_payload(payload, &param) {
+                    self.l7_protocol_enum = parser.l7_protocl_enum();
                     self.server_port = packet.lookup_key.dst_port;
                     packet.direction = PacketDirection::ClientToServer;
 
                     let mut rrt = 0;
                     if is_parse_perf {
                         // perf 没有抽象出来,这里可能返回None，对于返回None即不解析perf，只解析log
-                        self.l7 = Self::l7_new(i.protocol(), self.rrt_cache.clone());
+                        self.l7 = Self::l7_new(*protocol, self.rrt_cache.clone());
                         if self.l7.is_some() {
                             rrt = self
                                 .l7_parse_perf(packet, flow_id, app_table, local_epc, remote_epc)?;
@@ -350,7 +408,7 @@ impl FlowPerf {
                     }
 
                     if is_parse_log {
-                        self.l7_protocol_log_parser = Some(i);
+                        self.l7_protocol_log_parser = Some(parser);
                         let ret =
                             self.l7_parse_log(packet, app_table, &param, local_epc, remote_epc)?;
                         return Ok((ret, rrt));
@@ -386,6 +444,7 @@ impl FlowPerf {
         is_parse_log: bool,
         local_epc: i32,
         remote_epc: i32,
+        checker: &L7ProtocolChecker,
     ) -> Result<(Vec<L7ProtocolInfo>, u64)> {
         if packet.signal_source == SignalSource::EBPF && self.server_port != 0 {
             // if the packet from eBPF and it's server_port is not equal to 0, We can get the packet's
@@ -433,6 +492,7 @@ impl FlowPerf {
             is_parse_log,
             local_epc,
             remote_epc,
+            checker,
         )
     }
 
@@ -442,10 +502,8 @@ impl FlowPerf {
         l7_proto: Option<L7ProtocolEnum>,
         l7_parser: Option<L7ProtocolParser>,
         counter: Arc<FlowPerfCounter>,
-        l7_prorocol_enable_bitmap: L7ProtocolBitmap,
         parse_config: LogParserAccess,
         flow_config: FlowAccess,
-        l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
     ) -> Option<Self> {
         let l4 = match l4_proto {
             L4Protocol::Tcp => L4FlowPerfTable::from(TcpPerf::new(counter)),
@@ -460,12 +518,6 @@ impl FlowPerf {
         Some(Self {
             l4,
             l7: Self::l7_new(l7_protocol_enum.get_l7_protocol(), rrt_cache.clone()),
-            protocol_bitmap: {
-                match l4_proto {
-                    L4Protocol::Tcp => get_parse_bitmap(IpProtocol::Tcp, l7_prorocol_enable_bitmap),
-                    _ => get_parse_bitmap(IpProtocol::Udp, l7_prorocol_enable_bitmap),
-                }
-            },
             l7_protocol_log_parser: l7_parser,
             rrt_cache,
             l7_protocol_enum,
@@ -474,7 +526,6 @@ impl FlowPerf {
             is_skip: false,
             parse_config,
             flow_config,
-            l7_protocol_parse_port_bitmap,
             server_port: 0,
         })
     }
@@ -498,6 +549,7 @@ impl FlowPerf {
         app_table: &mut AppTable,
         local_epc: i32,
         remote_epc: i32,
+        checker: &L7ProtocolChecker,
     ) -> Result<(Vec<L7ProtocolInfo>, u64)> {
         if l4_performance_enabled {
             self.l4.parse(packet, is_first_packet_direction)?;
@@ -513,6 +565,7 @@ impl FlowPerf {
                 l7_log_parse_enabled,
                 local_epc,
                 remote_epc,
+                checker,
             );
         }
         Ok((vec![], 0))
