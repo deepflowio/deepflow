@@ -615,6 +615,7 @@ dependencies = [
  "tonic",
  "tonic-build",
  "uluru",
+ "winapi",
  "windows",
  "windows_recv_engine",
 ]
