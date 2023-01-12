@@ -75,7 +75,7 @@ use crate::{
     },
     metric::document::BoxedDocument,
     monitor::Monitor,
-    platform::{LibvirtXmlExtractor, PlatformSynchronizer, SocketSynchronizer},
+    platform::{LibvirtXmlExtractor, PlatformSynchronizer},
     policy::{Policy, PolicySetter},
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
     sender::{get_sender_id, npb_sender::NpbArpTable, uniform_sender::UniformSenderThread},
@@ -95,7 +95,7 @@ use crate::{
 #[cfg(target_os = "linux")]
 use crate::{
     ebpf_dispatcher::EbpfCollector,
-    platform::ApiWatcher,
+    platform::{ApiWatcher, SocketSynchronizer},
     utils::{
         cgroups::Cgroups,
         environment::{core_file_check, is_tt_pod},
@@ -2110,7 +2110,7 @@ impl Components {
         synchronizer: &Arc<Synchronizer>,
         exception_handler: ExceptionHandler,
         remote_log_config: RemoteLogConfig,
-        libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
+        #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
         platform_synchronizer: Arc<PlatformSynchronizer>,
         vm_mac_addrs: Vec<MacAddr>,
         agent_mode: RunningMode,

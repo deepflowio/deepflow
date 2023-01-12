@@ -52,6 +52,7 @@ use public::{
 
 pub(super) struct LocalModeDispatcher {
     pub(super) base: BaseDispatcher,
+    #[cfg(target_os = "linux")]
     pub(super) extractor: Arc<LibvirtXmlExtractor>,
 }
 
@@ -295,7 +296,11 @@ impl LocalModeDispatcher {
     }
 
     pub(super) fn listener(&self) -> LocalModeDispatcherListener {
-        LocalModeDispatcherListener::new(self.base.listener(), self.extractor.clone())
+        #[cfg(target_os = "linux")]
+        return LocalModeDispatcherListener::new(self.base.listener(), self.extractor.clone());
+
+        #[cfg(target_os = "windows")]
+        return LocalModeDispatcherListener::new(self.base.listener());
     }
 }
 
@@ -310,14 +315,19 @@ impl LocalModeDispatcher {
 #[derive(Clone)]
 pub struct LocalModeDispatcherListener {
     base: BaseDispatcherListener,
+    #[cfg(target_os = "linux")]
     extractor: Arc<LibvirtXmlExtractor>,
     rewriter: MacRewriter,
 }
 
 impl LocalModeDispatcherListener {
-    pub(super) fn new(base: BaseDispatcherListener, extractor: Arc<LibvirtXmlExtractor>) -> Self {
+    pub(super) fn new(
+        base: BaseDispatcherListener,
+        #[cfg(target_os = "linux")] extractor: Arc<LibvirtXmlExtractor>,
+    ) -> Self {
         Self {
             base,
+            #[cfg(target_os = "linux")]
             extractor,
             rewriter: MacRewriter::new(),
         }
@@ -401,6 +411,7 @@ impl LocalModeDispatcherListener {
         #[cfg(target_os = "linux")]
         let index_to_mac_map =
             Self::get_if_index_to_inner_mac_map(&self.base.platform_poller, &self.base.netns);
+        #[cfg(target_os = "linux")]
         let name_to_mac_map = self.get_if_name_to_mac_map(tap_mac_script);
 
         for iface in interfaces.iter() {
@@ -431,14 +442,17 @@ impl LocalModeDispatcherListener {
                     }
                     new_mac
                 }
+                #[cfg(target_os = "linux")]
                 IfMacSource::IfLibvirtXml => {
                     *name_to_mac_map.get(&iface.name).unwrap_or(&iface.mac_addr)
                 }
+                #[cfg(target_os = "windows")]
+                IfMacSource::IfLibvirtXml => MacAddr::ZERO,
             });
         }
         macs
     }
-
+    #[cfg(target_os = "linux")]
     fn get_if_name_to_mac_map(&self, tap_mac_script: &str) -> HashMap<String, MacAddr> {
         let mut result = HashMap::new();
         if let Some(entries) = self.extractor.get_entries() {

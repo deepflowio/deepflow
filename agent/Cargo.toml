@@ -87,6 +87,7 @@ kube = { git = "https://github.com/deepflowys/kube", tag = "0.74.1" }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 pcap = "0.10.1"
+winapi = { version = "0.3.9", features = ["errhandlingapi", "libloaderapi", "minwindef", "winerror" ] }
 windows = { version = "0.30", features = [
     "Win32_Foundation",
     "Win32_System_Diagnostics_ToolHelp",
