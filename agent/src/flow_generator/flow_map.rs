@@ -39,7 +39,7 @@ use super::{
     app_table::AppTable,
     error::Error,
     flow_state::{StateMachine, StateValue},
-    perf::{FlowPerf, FlowPerfCounter, L7RrtCache},
+    perf::{FlowPerf, FlowPerfCounter, L7ProtocolChecker, L7RrtCache},
     protocol_logs::MetaAppProto,
     service_table::{ServiceKey, ServiceTable},
     FlowMapKey, FlowNode, FlowState, COUNTER_FLOW_ID_MASK, FLOW_METRICS_PEER_DST,
@@ -59,7 +59,7 @@ use crate::{
             SignalSource, TunnelField,
         },
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{get_parser, L7ProtocolParserInterface},
+        l7_protocol_log::{get_parser, L7ProtocolParser, L7ProtocolParserInterface},
         lookup_key::LookupKey,
         meta_packet::{MetaPacket, MetaPacketTcpHeader},
         tagged_flow::TaggedFlow,
@@ -75,7 +75,6 @@ use crate::{
 };
 use npb_pcap_policy::PolicyData;
 use public::{
-    bitmap::Bitmap,
     counter::{Counter, CounterType, CounterValue, RefCountable},
     debug::QueueDebugger,
     proto::common::TridentType,
@@ -113,8 +112,9 @@ pub struct FlowMap {
     ntp_diff: Arc<AtomicI64>,
     packet_sequence_queue: Option<DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>>, // Enterprise Edition Feature: packet-sequence
     packet_sequence_enabled: bool,
-    l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
     stats_counter: Arc<FlowMapCounter>,
+
+    l7_protocol_checker: L7ProtocolChecker,
 }
 
 impl FlowMap {
@@ -134,7 +134,6 @@ impl FlowMap {
         let flow_perf_counter = Arc::new(FlowPerfCounter::default());
         let stats_counter = Arc::new(FlowMapCounter::default());
         let config_guard = config.load();
-        let l7_protocol_parse_port_bitmap = config_guard.l7_protocol_parse_port_bitmap.clone();
         let packet_sequence_enabled = config_guard.packet_sequence_flag > 0 && !from_ebpf;
         let time_window_size = {
             let max_timeout = config_guard.flow_timeout.max;
@@ -194,8 +193,19 @@ impl FlowMap {
             ntp_diff,
             packet_sequence_queue, // Enterprise Edition Feature: packet-sequence
             packet_sequence_enabled,
-            l7_protocol_parse_port_bitmap,
             stats_counter,
+            l7_protocol_checker: L7ProtocolChecker::new(
+                &config_guard.l7_protocol_enabled_bitmap,
+                &config_guard
+                    .l7_protocol_parse_port_bitmap
+                    .iter()
+                    .filter_map(|(name, bitmap)| {
+                        L7ProtocolParser::try_from(name.as_ref())
+                            .ok()
+                            .map(|p| (p.protocol(), bitmap.clone()))
+                    })
+                    .collect(),
+            ),
         }
     }
 
@@ -854,10 +864,8 @@ impl FlowMap {
                     None
                 },
                 self.flow_perf_counter.clone(),
-                config.l7_protocol_enabled_bitmap,
                 self.parse_config.clone(),
                 self.config.clone(),
-                self.l7_protocol_parse_port_bitmap.clone(),
             )
         }
         node
@@ -1054,6 +1062,7 @@ impl FlowMap {
                 &mut self.app_table,
                 local_epc,
                 remote_epc,
+                &self.l7_protocol_checker,
             ) {
                 Ok(i) => {
                     info = Some(i);
