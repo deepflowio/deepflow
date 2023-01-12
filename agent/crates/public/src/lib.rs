@@ -28,6 +28,8 @@ pub mod packet;
 pub mod proto;
 pub mod queue;
 pub mod sender;
+#[cfg(target_os = "linux")]
+pub mod signal;
 pub mod utils;
 
 pub use leaky_bucket::LeakyBucket;
