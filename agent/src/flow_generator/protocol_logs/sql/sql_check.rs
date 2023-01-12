@@ -111,11 +111,13 @@ pub(super) fn is_postgresql(sql: &String) -> bool {
     LOAD
     FETCH
     IMPORT
+    DESC
 */
 
 // not all of sql start first keyword. only log some necessary sql.
-const MYSQL_START: [&'static str; 10] = [
-    "XA", "FLUSH", "SHOW", "USE", "LOCK", "UNLOCK", "STOP", "START", "LOAD", "ANALYZE",
+const MYSQL_START: [&'static str; 14] = [
+    "XA", "FLUSH", "SHOW", "USE", "LOCK", "UNLOCK", "STOP", "START", "LOAD", "ANALYZE", "BEGIN",
+    "COMMIT", "ROLLBACK", "DESC",
 ];
 
 pub(super) fn is_mysql(sql: &String) -> bool {
@@ -164,6 +166,9 @@ fn trim_head_comment_and_first_upper(mut sql: &str, first_word_max_len: usize) -
             let (sub_sql, _) = sql.split_at(idx);
             return Some(sub_sql.to_ascii_uppercase());
         }
+    } else if sql.len() <= first_word_max_len {
+        // if not have word boundary, assume as single word
+        return Some(sql.to_ascii_uppercase());
     }
     None
 }
@@ -209,7 +214,7 @@ mod test_sql_check {
         );
         assert_eq!(
             trim_head_comment_and_first_upper(r"/* unable to parse */SelecT", 6),
-            None
+            Some(String::from("SELECT"))
         );
         assert_eq!(
             trim_head_comment_and_first_upper(r"/* able to parse */SelecT ", 6),
