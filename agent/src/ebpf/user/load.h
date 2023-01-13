@@ -17,6 +17,10 @@
 #ifndef DF_BPF_LOAD_H
 #define DF_BPF_LOAD_H
 
+#ifndef BPF_MAXINSNS
+#define BPF_MAXINSNS 4096
+#endif
+
 #define OBJ_NAME_SZ 128
 #define MAP_NAME_SZ 128
 

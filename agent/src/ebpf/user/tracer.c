@@ -226,11 +226,30 @@ int tracer_bpf_load(struct bpf_tracer *tracer)
 
 	ret = ebpf_obj_load(obj);
 	if (ret != 0) {
-		ebpf_warning("bpf load \"%s\" failed, error:%s (%d)."
-			     "Try the following method to see if it "
-			     "can be solved?\nCheck the selinux status "
-			     "and ensure that selinux is disabled.\n",
+		ebpf_warning("bpf load \"%s\" failed, error:%s (%d).\n",
 			     tracer->bpf_load_name, strerror(errno), errno);
+		if (errno == EACCES) {
+			ebpf_warning("Check the selinux status, if found SELinux"
+				     " 'status: enabled' and 'Current mode:"
+				     "enforcing', please try the following way "
+				     "to solve:\n"
+				     "1 Create file 'deepflow-agent.te',"
+				     "contents:\n\n"
+				     "module deepflow-agent 1.0;\n"
+				     "require {\n"
+				     "  type container_runtime_t;\n"
+				     "  class bpf { map_create map_read "
+				     "map_write prog_load prog_run };\n"
+				     "}\nallow container_runtime_t self:"
+				     "bpf { map_create map_read map_write "
+				     "prog_load prog_run };\n\n"
+				     "2 checkmodule -M -m -o deepflow-agent.mod"
+				     " deepflow-agent.te\n"
+				     "3 semodule_package -o deepflow-agent.pp "
+				     "-m deepflow-agent.mod\n"
+				     "4 semodule -i deepflow-agent.pp\n");
+		}
+
 		return ret;
 	}
 
