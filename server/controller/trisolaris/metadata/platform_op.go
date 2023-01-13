@@ -497,11 +497,11 @@ func (p *PlatformDataOP) generatePodIPS() {
 		if ok == false {
 			continue
 		}
-		for vif := range vifs.Iter() {
+		vifs.Each(func(vif interface{}) bool {
 			podVif := vif.(*models.VInterface)
 			ips, ok := rawData.vInterfaceIDToIP[podVif.ID]
 			if ok == false || len(ips) == 0 {
-				continue
+				return false
 			}
 			data := &trident.PodIp{
 				PodId:        proto.Uint32(uint32(pod.ID)),
@@ -511,8 +511,8 @@ func (p *PlatformDataOP) generatePodIPS() {
 				PodClusterId: proto.Uint32(uint32(pod.PodClusterID)),
 			}
 			podIPs = append(podIPs, data)
-			break
-		}
+			return true
+		})
 	}
 	p.updatePodIPs(podIPs)
 }
