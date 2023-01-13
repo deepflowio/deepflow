@@ -1021,6 +1021,8 @@ pub fn get_direction(
             src_direct = Direction::None
         }
         return (src_direct, dst_direct, false);
+    } else if flow.signal_source == SignalSource::XFlow {
+        return (Direction::None, Direction::None, false);
     }
 
     // 返回值分别为统计点对应的zerodoc.DirectionEnum以及及是否添加追踪数据的开关，在微软
@@ -1410,7 +1412,13 @@ pub fn get_direction(
     );
     // 双方向都有统计位置优先级为：client/server侧 > L2End侧 > IsLocalMac侧 > 其他
     if src_direct != Direction::None && dst_direct != Direction::None {
-        if (src_direct == Direction::ClientToServer || src_ep.is_l2_end)
+        if let TapType::Idc(_) = flow_key.tap_type {
+            // When the IDC traffic collected by the dedicated deepflow-agent cannot distinguish between Directions,
+            // the Direction is set to None and Doc data to count a Rest record.
+            // ======================================================================================================
+            // 当专属采集器采集的 IDC 流量无法区分 Direction 时，Direction设置为None Doc数据中统计一份 Rest 记录。
+            return (Direction::None, Direction::None, false);
+        } else if (src_direct == Direction::ClientToServer || src_ep.is_l2_end)
             && dst_direct != Direction::ServerToClient
         {
             dst_direct = Direction::None;
