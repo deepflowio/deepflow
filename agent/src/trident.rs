@@ -137,7 +137,7 @@ pub enum State {
     Running,
     ConfigChanged(ChangedConfig),
     Terminated,
-    Disabled, // 禁用状态
+    Disabled(Option<RuntimeConfig>), // Requires runtime config to update platform config
 }
 
 impl State {
@@ -448,7 +448,7 @@ impl Trident {
         let mut yaml_conf: Option<YamlConfig> = None;
 
         loop {
-            match &*state_guard {
+            match &mut *state_guard {
                 State::Running => {
                     state_guard = cond.wait(state_guard).unwrap();
                     continue;
@@ -472,9 +472,12 @@ impl Trident {
                     }
                     return Ok(());
                 }
-                State::Disabled => {
+                State::Disabled(config) => {
                     if let Some(ref mut c) = components {
                         c.stop();
+                    }
+                    if let Some(c) = config.take() {
+                        config_handler.on_config(c, &exception_handler, None);
                     }
                     state_guard = cond.wait(state_guard).unwrap();
                     continue;

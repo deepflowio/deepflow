@@ -737,7 +737,7 @@ impl Synchronizer {
 
         let (trident_state, cvar) = &**trident_state;
         if !runtime_config.enabled {
-            *trident_state.lock().unwrap() = trident::State::Disabled;
+            *trident_state.lock().unwrap() = trident::State::Disabled(Some(runtime_config));
         } else {
             *trident_state.lock().unwrap() = trident::State::ConfigChanged(ChangedConfig {
                 runtime_config,
@@ -859,7 +859,7 @@ impl Synchronizer {
                     Ok(None) => return,
                     Err(_) => {
                         let (ts, cvar) = &*trident_state;
-                        *ts.lock().unwrap() = trident::State::Disabled;
+                        *ts.lock().unwrap() = trident::State::Disabled(None);
                         cvar.notify_one();
                         warn!("deepflow-agent restart, as max escape time expired");
                         // 与控制器失联的时间超过设置的逃逸时间，这里直接重启主要有两个原因：
@@ -1140,7 +1140,7 @@ impl Synchronizer {
                 let new_sync_interval = Duration::from_secs(runtime_config.sync_interval);
                 let (trident_state, cvar) = &*trident_state;
                 if !runtime_config.enabled {
-                    *trident_state.lock().unwrap() = trident::State::Disabled;
+                    *trident_state.lock().unwrap() = trident::State::Disabled(Some(runtime_config));
                 } else {
                     *trident_state.lock().unwrap() = trident::State::ConfigChanged(ChangedConfig {
                         runtime_config,
