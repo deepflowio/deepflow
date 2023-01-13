@@ -36,7 +36,7 @@ use super::{
 };
 use crate::{
     common::{
-        enums::{EthernetType, IpProtocol, TapType},
+        enums::{EthernetType, IpProtocol},
         flow::{get_direction, Flow, L7Protocol, SignalSource},
     },
     config::handler::CollectorAccess,
@@ -52,7 +52,6 @@ use crate::{
     },
 };
 use public::{
-    proto::common::TridentType,
     queue::{DebugSender, Error, Receiver},
     utils::net::MacAddr,
 };
@@ -340,26 +339,6 @@ impl Stash {
         }
     }
 
-    fn get_directions(
-        &self,
-        flow: &Flow,
-        trident_type: TridentType,
-        cloud_gateway_traffic: bool,
-    ) -> ([Direction; 2], bool) {
-        let (src, dst, is_extra_tracing_doc) =
-            get_direction(flow, trident_type, cloud_gateway_traffic);
-        match flow.flow_key.tap_type {
-            TapType::Idc(_) if src != Direction::None && dst != Direction::None => {
-                // When the IDC traffic collected by the dedicated deepflow-agent cannot distinguish between Directions,
-                // the Direction is set to None and Doc data to count a Rest record.
-                // ======================================================================================================
-                // 当专属采集器采集的 IDC 流量无法区分 Direction 时，Direction设置为None Doc数据中统计一份 Rest 记录。
-                ([Direction::None, Direction::None], is_extra_tracing_doc)
-            }
-            _ => ([src, dst], is_extra_tracing_doc),
-        }
-    }
-
     fn collect(&mut self, acc_flow: Option<AccumulatedFlow>, mut time_in_second: u64) {
         if time_in_second < self.start_time.as_secs() {
             self.counter
@@ -468,11 +447,12 @@ impl Stash {
         }
 
         // 全景图统计
-        let (directions, is_extra_tracing_doc) = self.get_directions(
+        let (direction_0, direction_1, is_extra_tracing_doc) = get_direction(
             flow,
             self.context.config.load().trident_type,
             self.context.config.load().cloud_gateway_traffic,
         );
+        let directions = [direction_0, direction_1];
 
         self.fill_stats(&acc_flow, directions, false, inactive_ip_enabled);
         self.fill_tracing_stats(
