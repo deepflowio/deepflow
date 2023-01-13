@@ -43,6 +43,8 @@ mod platform_consts {
     pub const DEFAULT_LIBVIRT_XML_PATH: &'static str = "/etc/libvirt/qemu";
     pub const CGROUP_PROCS_PATH: &'static str = "/sys/fs/cgroup/cpu/deepflow-agent/cgroup.procs";
     pub const CGROUP_TASKS_PATH: &'static str = "/sys/fs/cgroup/cpu/deepflow-agent/tasks";
+    pub const CGROUP_V2_PROCS_PATH: &'static str = "/sys/fs/cgroup/deepflow-agent/cgroup.procs";
+    pub const CGROUP_V2_THREADS_PATH: &'static str = "/sys/fs/cgroup/deepflow-agent/cgroup.threads";
 }
 
 #[cfg(target_os = "windows")]
