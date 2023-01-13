@@ -37,7 +37,9 @@ use super::process::{
 };
 use crate::common::NORMAL_EXIT_WITH_RESTART;
 #[cfg(target_os = "linux")]
-use crate::common::{CGROUP_PROCS_PATH, CGROUP_TASKS_PATH};
+use crate::common::{
+    CGROUP_PROCS_PATH, CGROUP_TASKS_PATH, CGROUP_V2_PROCS_PATH, CGROUP_V2_THREADS_PATH,
+};
 use crate::config::handler::EnvironmentAccess;
 use crate::exception::ExceptionHandler;
 #[cfg(target_os = "linux")]
@@ -139,30 +141,33 @@ impl Guard {
             loop {
                 #[cfg(target_os = "linux")]
                 {
-                    fn check_cgroup(path: &str, tap_mode: TapMode) {
-                        if running_in_container() || tap_mode == TapMode::Analyzer {
-                            return;
-                        }
+                    fn check_cgroup(path: &str) -> bool {
                         match File::open(path) {
                             Ok(mut file) => {
                                 let mut buf: Vec<u8> = Vec::new();
                                 file.read_to_end(&mut buf).unwrap_or_default();
                                 if buf.len() == 0 {
-                                    error!("check cgroup file failed: {} is empty", path);
-                                    thread::sleep(Duration::from_secs(1));
-                                    exit(-1);
+                                    warn!("check cgroup file failed: {} is empty", path);
+                                    return false;
                                 }
-                                debug!("check cgroup files ok");
+                                return true;
                             }
                             Err(e) => {
-                                error!("check cgroup file failed, cannot open file: {}, {}", path, e);
-                                thread::sleep(Duration::from_secs(1));
-                                exit(-1);
+                                warn!("check cgroup file failed, cannot open file: {}, {}", path, e);
+                                return false;
                             }
                         }
                     }
-                    check_cgroup(CGROUP_PROCS_PATH, tap_mode);
-                    check_cgroup(CGROUP_TASKS_PATH, tap_mode);
+                    // If it is in a container or tap_mode is Analyzer, there is no need to limit resource, so there is no need to check cgroup
+                    if !running_in_container() && tap_mode != TapMode::Analyzer {
+                        if (!check_cgroup(CGROUP_PROCS_PATH) || !check_cgroup(CGROUP_TASKS_PATH)) &&
+                            (!check_cgroup(CGROUP_V2_PROCS_PATH) || !check_cgroup(CGROUP_V2_THREADS_PATH)){
+                            error!("check cgroup file failed, deepflow-agent restart...");
+                            thread::sleep(Duration::from_secs(1));
+                            exit(-1);
+                        }
+
+                    }
                 }
                 #[cfg(target_os = "windows")]
                 {
