@@ -423,8 +423,15 @@ add_program:
 				  0 /*EBPF_LOG_LEVEL, log_buf, LOG_BUF_SZ */ );
 
 		if (new_prog->prog_fd < 0) {
-			ebpf_debug("bcc_prog_load() failed.\n");
-			return ETR_NOMEM;
+			ebpf_warning("bcc_prog_load() failed. name: %s, errno: %d\n",
+				     new_prog->name, errno);
+			if (new_prog->insns_cnt > BPF_MAXINSNS) {
+				ebpf_warning("The number of EBPF instructions (%d) "
+					     "exceeded the maximum limit (%d).\n",
+					     new_prog->insns_cnt, BPF_MAXINSNS);
+			}
+
+			return ETR_INVAL;
 		}
 
 		ebpf_debug
