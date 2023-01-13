@@ -29,6 +29,7 @@ import (
 	. "github.com/deepflowys/deepflow/server/controller/common"
 	models "github.com/deepflowys/deepflow/server/controller/db/mysql"
 	. "github.com/deepflowys/deepflow/server/controller/trisolaris/common"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/utils"
 	. "github.com/deepflowys/deepflow/server/controller/trisolaris/utils"
 )
 
@@ -224,6 +225,26 @@ func (p *PlatformDataOP) generatePeerConnections() {
 			RemoteEpcId: proto.Uint32(uint32(pc.RemoteVPCID)),
 		}
 		dpcData.addData(pc.Domain, data)
+	}
+
+	// Add CEN(Cloud Enterprise Network) data to peer connection.
+	// Associate cen.vpc_ids in pairs in one direction.
+	for _, cen := range dbDataCache.GetCENs() {
+		epcIDs, err := utils.ConvertStrToU32List(cen.VPCIDs)
+		if err != nil {
+			log.Error(err)
+			continue
+		}
+		for i := 0; i < len(epcIDs); i++ {
+			for j := i + 1; j < len(epcIDs); j++ {
+				data := &trident.PeerConnection{
+					Id:          proto.Uint32(0),
+					LocalEpcId:  proto.Uint32(uint32(epcIDs[i])),
+					RemoteEpcId: proto.Uint32(uint32(epcIDs[j])),
+				}
+				dpcData.addData(cen.Domain, data)
+			}
+		}
 	}
 
 	p.updateDomainPeerConnProto(dpcData)

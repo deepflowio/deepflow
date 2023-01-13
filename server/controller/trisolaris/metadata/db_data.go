@@ -67,6 +67,7 @@ type DBDataCache struct {
 	npbTunnels              []*models.NpbTunnel
 	npbPolicies             []*models.NpbPolicy
 	pcapPolicies            []*models.PcapPolicy
+	cens                    []*models.CEN
 }
 
 func newDBDataCache() *DBDataCache {
@@ -240,6 +241,10 @@ func (d *DBDataCache) GetNpbPolicies() []*models.NpbPolicy {
 
 func (d *DBDataCache) GetPcapPolicies() []*models.PcapPolicy {
 	return d.pcapPolicies
+}
+
+func (d *DBDataCache) GetCENs() []*models.CEN {
+	return d.cens
 }
 
 func GetTapTypesFromDB(db *gorm.DB) []*models.TapType {
@@ -538,6 +543,13 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 	pcapPolicies, err := dbmgr.DBMgr[models.PcapPolicy](db).GetBatchFromState(ACL_STATE_ENABLE)
 	if err == nil {
 		d.pcapPolicies = pcapPolicies
+	} else {
+		log.Error(err)
+	}
+
+	cens, err := dbmgr.DBMgr[models.CEN](db).Gets()
+	if err == nil {
+		d.cens = cens
 	} else {
 		log.Error(err)
 	}
