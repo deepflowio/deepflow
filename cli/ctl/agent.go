@@ -31,6 +31,7 @@ import (
 
 	"github.com/deepflowys/deepflow/cli/ctl/common"
 	"github.com/deepflowys/deepflow/cli/ctl/common/jsonparser"
+	"github.com/deepflowys/deepflow/cli/ctl/common/printutil"
 	"github.com/deepflowys/deepflow/cli/ctl/example"
 	agentpb "github.com/deepflowys/deepflow/message/trident"
 )
@@ -380,11 +381,20 @@ func upgadeAgent(cmd *cobra.Command, args []string) {
 		return
 	}
 	vtapName := args[0]
-	var command string
+
+	// Purpose: Support remote upgrade of windows on linux.
+	// Because the .exe file cannot be run on linux, the version number cannot be obtained.
+	// Solution: Place the executable file of the linux version in the same directory.
+	command := upgradePackage + " -v"
 	if strings.HasSuffix(upgradePackage, ".exe") {
-		command = strings.TrimSuffix(upgradePackage, ".exe") + " -v"
-	} else {
-		command = upgradePackage + " -v"
+		execFile := strings.TrimSuffix(upgradePackage, ".exe")
+		command = execFile + " -v"
+		if _, err := os.Stat(execFile); errors.Is(err, os.ErrNotExist) {
+			printutil.ErrorfWithColor("make sure %s exist, and the version must be consistent with %s",
+				execFile, upgradePackage)
+			return
+		}
+		printutil.WarnWithColor("deepflow-agent.exe and deepflow-agent version must match")
 	}
 	output, err := executeCommand(command)
 	if err != nil {
