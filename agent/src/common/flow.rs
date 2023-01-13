@@ -38,6 +38,7 @@ use crate::{
     flow_generator::protocol_logs::{duration_to_micros, to_string_format},
     flow_generator::FlowState,
     metric::document::TapSide,
+    utils::environment::{is_tt_pod, is_tt_workload},
 };
 use public::proto::{common::TridentType, flow_log};
 use public::utils::net::MacAddr;
@@ -1023,6 +1024,10 @@ pub fn get_direction(
         return (src_direct, dst_direct, false);
     } else if flow.signal_source == SignalSource::XFlow {
         return (Direction::None, Direction::None, false);
+    } else if flow.flow_key.mac_src == flow.flow_key.mac_dst
+        && (is_tt_pod(trident_type) || is_tt_workload(trident_type))
+    {
+        return (Direction::LocalToLocal, Direction::None, false);
     }
 
     // 返回值分别为统计点对应的zerodoc.DirectionEnum以及及是否添加追踪数据的开关，在微软
