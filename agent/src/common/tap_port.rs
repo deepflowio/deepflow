@@ -23,7 +23,7 @@ use super::decapsulate::TunnelType;
 
 // 64     60         40           36         32                                    0
 // +------+----------+------------+----------+-------------------------------------+
-// | from | RESERVED | NAT SOURCE | TUN_TYPE |              ip/id/mac              |
+// | from | RESERVED | NAT SOURCE | TUN_TYPE |   ip/mac/dispatcher_id/process_id   |
 // +------+----------+------------+----------+-------------------------------------+
 // 注意ip/id/mac不能超过32bit，否则数据存储、四元组聚合都会有歧义
 #[derive(Serialize, Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
