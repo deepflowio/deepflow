@@ -245,12 +245,17 @@ impl FlowMap {
             let time_hashset = &mut time_set[time_in_unit as usize & (self.time_window_size - 1)];
             for flow_key in time_hashset.drain() {
                 let nodes = node_map.get_mut(&flow_key).unwrap();
-                loop {
-                    let Some(index) = nodes
+                self.stats_counter
+                    .total_scan
+                    .fetch_add(nodes.len() as u64, Ordering::Relaxed);
+                let mut skip = 0 as usize;
+                while skip < nodes.len() {
+                    let Some(index) = nodes[skip..]
                         .iter()
                         .position(|node| node.timestamp_key <= time_in_unit) else {
                             break;
                     };
+                    skip = index;
                     let mut node = nodes.swap_remove(index);
 
                     let timeout = node.recent_time + node.timeout;
@@ -356,10 +361,16 @@ impl FlowMap {
                         node_map.len() as u64,
                         1 + max_depth as u64,
                     );
+                    self.stats_counter
+                        .total_scan
+                        .fetch_add(max_depth as u64, Ordering::Relaxed);
                     self.node_map.replace(node_map);
                     self.time_set.replace(time_set);
                     return;
                 }
+                self.stats_counter
+                    .total_scan
+                    .fetch_add(1 + index.unwrap() as u64, Ordering::Relaxed);
 
                 let mut node = nodes.swap_remove(index.unwrap());
                 // 1. 输出上一个统计周期的统计信息
@@ -388,6 +399,16 @@ impl FlowMap {
             // 未找到匹配的 FlowNode，需要插入新的节点
             None => {
                 let node = Box::new(self.new_flow_node(&config, meta_packet));
+                // For ebpf data, if server_port is 0, it means that parsed data
+                // failed, the info in node maybe wrong, we should drop this node.
+                if meta_packet.signal_source == SignalSource::EBPF
+                    && node.meta_flow_perf.is_some()
+                    && node.meta_flow_perf.as_ref().unwrap().server_port == 0
+                {
+                    self.node_map.replace(node_map);
+                    self.time_set.replace(time_set);
+                    return;
+                }
 
                 time_set[pkt_timestamp.as_secs() as usize & (self.time_window_size - 1)]
                     .insert(pkt_key);
@@ -1149,15 +1170,6 @@ impl FlowMap {
         timeout: Duration,
         meta_packet: Option<&mut MetaPacket>,
     ) {
-        // For ebpf data, if server_port is 0, it means that parsed data failed,
-        // the node's info maybe wrong which should not be reported.
-        if meta_packet.is_some()
-            && meta_packet.as_ref().unwrap().signal_source == SignalSource::EBPF
-            && node.meta_flow_perf.is_some()
-            && node.meta_flow_perf.as_ref().unwrap().server_port == 0
-        {
-            return;
-        }
         // 统计数据输出前矫正流方向
         self.update_flow_direction(&mut node, meta_packet);
 
@@ -1506,14 +1518,14 @@ pub struct FlowMapCounter {
     drop_by_window: AtomicU64, // times of flush wihich drop by window
     concurrent: AtomicU64,     // current the number of FlowNode
     slots: AtomicU64,          //  current the length of HashMap
-    slot_max_depth: AtomicU64, //  the max length of  Vec<FlowNode>
+    slot_max_depth: AtomicU64, //  the max length of Vec<FlowNode>
+    total_scan: AtomicU64,     //  the total number of iteration to scan over Vec<FlowNode>
 }
 
 impl RefCountable for FlowMapCounter {
     fn get_counters(&self) -> Vec<Counter> {
         let concurrent = self.concurrent.load(Ordering::Relaxed);
         let slots = self.slots.swap(0, Ordering::Relaxed);
-        let slots_avg_depth = concurrent.checked_div(slots).unwrap_or_default();
 
         vec![
             (
@@ -1542,9 +1554,9 @@ impl RefCountable for FlowMapCounter {
                 CounterValue::Unsigned(self.slot_max_depth.swap(0, Ordering::Relaxed)),
             ),
             (
-                "slots_avg_depth",
+                "total_scan",
                 CounterType::Gauged,
-                CounterValue::Unsigned(slots_avg_depth),
+                CounterValue::Unsigned(self.total_scan.swap(0, Ordering::Relaxed)),
             ),
             ("slots", CounterType::Gauged, CounterValue::Unsigned(slots)),
         ]

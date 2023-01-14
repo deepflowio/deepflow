@@ -17,7 +17,6 @@
 use std::{net::IpAddr, sync::Arc, time::Duration};
 
 use super::{perf::FlowPerf, FlowState, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC};
-use crate::common::flow::SignalSource;
 use crate::common::{
     decapsulate::TunnelType,
     endpoint::EndpointData,
@@ -167,14 +166,6 @@ impl FlowNode {
         ignore_tor_mac: bool,
         trident_type: TridentType,
     ) -> bool {
-        // For ebpf data, if server_port is 0, it means that parsed data
-        // failed, it should new a flow node, old node's info maybe wrong.
-        if meta_packet.signal_source == SignalSource::EBPF
-            && self.meta_flow_perf.is_some()
-            && self.meta_flow_perf.as_ref().unwrap().server_port == 0
-        {
-            return false;
-        }
         let flow = &self.tagged_flow.flow;
         let flow_key = &flow.flow_key;
         let meta_lookup_key = &meta_packet.lookup_key;
