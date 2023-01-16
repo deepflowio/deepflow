@@ -95,6 +95,7 @@ type PlatformRawData struct {
 	regionUUIDs                   mapset.Set
 	azUUIDs                       mapset.Set
 	peerConnIDs                   mapset.Set
+	cenIDs                        mapset.Set
 	podServiceIDs                 mapset.Set
 	redisInstanceIDs              mapset.Set
 	rdsInstanceIDs                mapset.Set
@@ -159,6 +160,7 @@ func NewPlatformRawData() *PlatformRawData {
 		regionUUIDs:                   mapset.NewSet(),
 		azUUIDs:                       mapset.NewSet(),
 		peerConnIDs:                   mapset.NewSet(),
+		cenIDs:                        mapset.NewSet(),
 		podServiceIDs:                 mapset.NewSet(),
 		redisInstanceIDs:              mapset.NewSet(),
 		rdsInstanceIDs:                mapset.NewSet(),
@@ -664,6 +666,16 @@ func (r *PlatformRawData) ConvertDBPeerConnection(dbDataCache *DBDataCache) {
 	}
 }
 
+func (r *PlatformRawData) ConvertDBCEN(dbDataCache *DBDataCache) {
+	cens := dbDataCache.GetCENs()
+	if cens == nil {
+		return
+	}
+	for _, cen := range cens {
+		r.cenIDs.Add(cen.ID)
+	}
+}
+
 func (r *PlatformRawData) ConvertDBPodService(dbDataCache *DBDataCache) {
 	podServices := dbDataCache.GetPodServices()
 	if podServices == nil {
@@ -1023,6 +1035,7 @@ func (r *PlatformRawData) ConvertDBCache(dbDataCache *DBDataCache) {
 	r.ConvertDBRegion(dbDataCache)
 	r.ConvertDBAZ(dbDataCache)
 	r.ConvertDBPeerConnection(dbDataCache)
+	r.ConvertDBCEN(dbDataCache)
 	r.ConvertDBPodService(dbDataCache)
 	r.ConvertDBPodServicePort(dbDataCache)
 	r.ConvertDBRedisInstance(dbDataCache)
@@ -1326,6 +1339,11 @@ func (r *PlatformRawData) equal(o *PlatformRawData) bool {
 
 	if !r.peerConnIDs.Equal(o.peerConnIDs) {
 		log.Info("platform peer_connections changed")
+		return false
+	}
+
+	if !r.cenIDs.Equal(o.cenIDs) {
+		log.Info("platform cens changed")
 		return false
 	}
 
