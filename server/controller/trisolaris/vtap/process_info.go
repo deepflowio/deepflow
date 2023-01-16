@@ -553,6 +553,11 @@ func (p *ProcessInfo) GetGPIDResponseByReq(req *trident.GPIDSyncRequest) *triden
 		if entry.GetIpv4Real() == 0 {
 			epcIdReal, portReal, ipv4Real := p.realClientToRealServer.getData(entry)
 			if ipv4Real > 0 {
+				globalReal := p.globalLocalEntries.getData(protocol, trident.RoleType_ROLE_SERVER,
+					epcIdReal, portReal, ipv4Real)
+				if globalReal != nil {
+					gpidReal = p.vtapIDAndPIDToGPID.getData(globalReal.vtapID, globalReal.pid)
+				}
 				role := trident.RoleType_ROLE_SERVER
 				responseEntry.EpcIdReal = &epcIdReal
 				responseEntry.Ipv4Real = &ipv4Real
