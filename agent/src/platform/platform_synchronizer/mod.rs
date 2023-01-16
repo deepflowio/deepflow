@@ -28,7 +28,10 @@ mod windows_process;
 
 #[cfg(target_os = "linux")]
 use std::os::linux::fs::MetadataExt;
-use std::{fs::symlink_metadata, path::PathBuf};
+use std::{
+    fs::{metadata, symlink_metadata},
+    path::PathBuf,
+};
 
 #[cfg(target_os = "windows")]
 pub use self::windows::*;
@@ -54,6 +57,12 @@ pub(super) fn sym_uptime(now_sec: u64, path: &PathBuf) -> Result<u64, &'static s
     } else {
         Err("sym up time after current")
     }
+}
+
+#[cfg(target_os = "linux")]
+pub fn dir_inode(path: &str) -> std::io::Result<u64> {
+    let m = metadata(path)?;
+    Ok(m.st_ino())
 }
 
 // whether need to scan the process info
