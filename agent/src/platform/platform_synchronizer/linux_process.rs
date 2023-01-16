@@ -14,29 +14,29 @@
  * limitations under the License.
  */
 
-use std::ffi::{CStr, CString};
+use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::{collections::HashMap, os::unix::process::CommandExt, process::Command};
 
 use envmnt::{ExpandOptions, ExpansionType};
-use libc::{getpwnam, getpwuid, passwd, uid_t};
-use log::{error, warn};
+
+use log::error;
 use nom::AsBytes;
 use procfs::{process::Process, ProcError, ProcResult};
 use public::bytes::write_u64_be;
 use public::proto::trident::{ProcessInfo, Tag};
+use public::pwd::PasswordInfo;
 use regex::Regex;
 use ring::digest;
 use serde::Deserialize;
 
 use super::proc_scan_hook::proc_scan_hook;
-use super::SHA1_DIGEST_LEN;
+use super::{dir_inode, SHA1_DIGEST_LEN};
 
 use crate::config::handler::OsProcScanConfig;
 use crate::config::{
     OsProcRegexp, OS_PROC_REGEXP_MATCH_TYPE_CMD, OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME,
 };
-
 #[derive(Debug, Clone)]
 pub struct ProcessData {
     pub name: String, // the replaced name
@@ -72,6 +72,19 @@ impl ProcessData {
             Ok(base_time - start_time_sec)
         }
     }
+
+    // get the inode of /proc/pid/root
+    pub(super) fn get_root_inode(&mut self, proc_root: &str) -> std::io::Result<u64> {
+        // /proc/{pid}/root
+        let p = PathBuf::from_iter([proc_root, self.pid.to_string().as_str(), "root"]);
+        dir_inode(p.to_str().unwrap())
+    }
+
+    pub(super) fn set_username(&mut self, pwd: &PasswordInfo) {
+        if let Some(u) = pwd.get_username_by_uid(self.user_id) {
+            self.user = u;
+        }
+    }
 }
 
 // need sort by pid before calc the hash
@@ -89,7 +102,7 @@ pub fn calc_process_datas_sha1(data: &Vec<ProcessData>) -> [u8; SHA1_DIGEST_LEN]
 
 impl TryFrom<&Process> for ProcessData {
     type Error = ProcError;
-
+    // will not set the username
     fn try_from(proc: &Process) -> Result<Self, Self::Error> {
         let (exe, cmd, uid) = (proc.exe()?, proc.cmdline()?, proc.uid()?);
         let Some(proc_name) = exe.file_name() else {
@@ -102,7 +115,7 @@ impl TryFrom<&Process> for ProcessData {
             process_name: proc_name.to_string_lossy().to_string(),
             cmd,
             user_id: uid,
-            user: get_username_by_uid(uid).unwrap_or_default(),
+            user: "".to_string(),
             start_time: {
                 if let Ok(stat) = proc.stat() {
                     let z = stat.starttime().unwrap_or_default();
@@ -228,6 +241,8 @@ struct OsAppTag {
 }
 
 pub(super) fn get_all_process(conf: &OsProcScanConfig) -> Vec<ProcessData> {
+    // Hashmap<root_inode, PasswordInfo>
+    let mut pwd_info = HashMap::new();
     let (user, cmd, proc_root, proc_regexp, now_sec) = (
         conf.os_app_tag_exec_user.as_str(),
         conf.os_app_tag_exec.as_slice(),
@@ -273,6 +288,28 @@ pub(super) fn get_all_process(conf: &OsProcScanConfig) -> Vec<ProcessData> {
 
             for i in proc_regexp.iter() {
                 if i.match_and_rewrite_proc(&mut proc_data, false) {
+                    // get pwd info from hashmap or parse pwd file from /proc/pid/root/etc/passwd and insert to hashmap
+                    // and get the username from pwd info
+                    match proc_data.get_root_inode(proc_root) {
+                        Err(e) => error!("pid {} get root inode fail: {}", proc_data.pid, e),
+                        Ok(inode) => {
+                            if let Some(pwd) = pwd_info.get(&inode) {
+                                proc_data.set_username(&pwd);
+                            } else {
+                                // not in hashmap, parse from /proc/pid/root/etc/passwd
+                                let p = PathBuf::from_iter([
+                                    proc_root,
+                                    proc_data.pid.to_string().as_str(),
+                                    "root/etc/passwd",
+                                ]);
+                                if let Ok(pwd) = PasswordInfo::new(p) {
+                                    proc_data.set_username(&pwd);
+                                    pwd_info.insert(inode, pwd);
+                                }
+                            }
+                        }
+                    }
+
                     // fill tags
                     if let Some(tags) = tags_map.remove(&proc_data.pid) {
                         proc_data.os_app_tags = tags.tags
@@ -290,7 +327,12 @@ pub(super) fn get_all_process(conf: &OsProcScanConfig) -> Vec<ProcessData> {
 
 pub(super) fn get_self_proc() -> ProcResult<ProcessData> {
     let proc = procfs::process::Process::myself()?;
-    ProcessData::try_from(&proc)
+    let mut path = proc.root()?;
+    path.push("etc/passwd");
+    let pwd = PasswordInfo::new(path).map_err(|e| ProcError::Other(e.to_string()))?;
+    let mut proc_data = ProcessData::try_from(&proc)?;
+    proc_data.set_username(&pwd);
+    Ok(proc_data)
 }
 
 // return Hashmap<pid, OsAppTag>
@@ -302,7 +344,8 @@ fn get_os_app_tag_by_exec(
         return Ok(HashMap::new());
     }
 
-    let Some(uid) = get_uid_by_username(username) else {
+    let pwd_info = PasswordInfo::new("/etc/passwd").map_err(|e| e.to_string())?;
+    let Some(uid) = pwd_info.get_uid_by_username(username) else {
         return Err(format!("get userid by username {} fail", username).to_string());
     };
 
@@ -327,40 +370,5 @@ fn get_os_app_tag_by_exec(
     match serde_yaml::from_str::<Vec<OsAppTag>>(stdout.as_str()) {
         Ok(tags) => Ok(HashMap::from_iter(tags.into_iter().map(|t| (t.pid, t)))),
         Err(e) => Err(format!("unmarshal to yaml fail: {}\nstdout: {}", e, stdout).to_string()),
-    }
-}
-
-fn get_username_by_uid(uid: uid_t) -> Option<String> {
-    unsafe {
-        let pwd = getpwuid(uid);
-        if pwd.is_null() {
-            return None;
-        }
-
-        if let Ok(username) = CStr::from_ptr((*pwd).pw_name).to_str() {
-            Some(username.to_string())
-        } else {
-            None
-        }
-    }
-}
-
-fn get_uid_by_username(username: &str) -> Option<u32> {
-    let username_c_str = match CString::new(username) {
-        Ok(u) => u,
-        Err(err) => {
-            warn!("convert username: {} to c_char fail: {}", username, err);
-            return None;
-        }
-    };
-    // Call getpwnam to get a pointer to a passwd struct for the user
-    unsafe {
-        let pwd_ptr: *const passwd = getpwnam(username_c_str.as_c_str().as_ptr());
-
-        if !pwd_ptr.is_null() {
-            Some((*pwd_ptr).pw_uid)
-        } else {
-            None
-        }
     }
 }

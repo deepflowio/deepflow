@@ -26,7 +26,7 @@ pub fn proc_scan_hook(_: &mut Vec<ProcessData>) {
             return
         };
 
-        info!("self proc: {#?}",self_proc);
+        info!("self proc: {:#?}",self_proc);
 
         for i in _.iter_mut() {
             // handle every process
