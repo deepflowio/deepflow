@@ -31,6 +31,8 @@ use log::{debug, error, info, warn};
 use public::sender::{SendMessageType, Sendable};
 use thread::JoinHandle;
 
+use super::QUEUE_BATCH_SIZE;
+
 use crate::config::handler::SenderAccess;
 use crate::exception::ExceptionHandler;
 use crate::utils::stats::{
@@ -436,33 +438,36 @@ impl<T: Sendable> UniformSender<T> {
 
     pub fn process(&mut self) {
         let mut kv_string = String::with_capacity(2048);
+        let mut batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
         while self.running.load(Ordering::Relaxed) {
             let socket_type = self.config.load().collector_socket_type;
-            match self
-                .input
-                .recv(Some(Duration::from_secs(Self::QUEUE_READ_TIMEOUT)))
-            {
-                Ok(send_item) => {
-                    let message_type = send_item.message_type();
-                    self.counter.rx.fetch_add(1, Ordering::Relaxed);
-                    debug!(
-                        "{} sender send item {}: {:?}",
-                        self.name, message_type, send_item
-                    );
-                    let result = match socket_type {
-                        SocketType::File => self.handle_target_file(send_item, &mut kv_string),
-                        _ => self.handle_target_server(send_item),
-                    };
-                    if let Err(e) = result {
-                        if self.counter.dropped.load(Ordering::Relaxed) == 0 {
-                            warn!(
-                                "{} sender send item {} failed {}",
-                                self.name, message_type, e
-                            );
-                            // reopen write file and overwritten
-                            let _ = self.buf_writer.take();
+            match self.input.recv_all(
+                &mut batch,
+                Some(Duration::from_secs(Self::QUEUE_READ_TIMEOUT)),
+            ) {
+                Ok(_) => {
+                    for send_item in batch.drain(..) {
+                        let message_type = send_item.message_type();
+                        self.counter.rx.fetch_add(1, Ordering::Relaxed);
+                        debug!(
+                            "{} sender send item {}: {:?}",
+                            self.name, message_type, send_item
+                        );
+                        let result = match socket_type {
+                            SocketType::File => self.handle_target_file(send_item, &mut kv_string),
+                            _ => self.handle_target_server(send_item),
+                        };
+                        if let Err(e) = result {
+                            if self.counter.dropped.load(Ordering::Relaxed) == 0 {
+                                warn!(
+                                    "{} sender send item {} failed {}",
+                                    self.name, message_type, e
+                                );
+                                // reopen write file and overwritten
+                                let _ = self.buf_writer.take();
+                            }
+                            self.counter.dropped.fetch_add(1, Ordering::Relaxed);
                         }
-                        self.counter.dropped.fetch_add(1, Ordering::Relaxed);
                     }
                 }
                 Err(Error::Timeout) => match socket_type {

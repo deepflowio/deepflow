@@ -31,8 +31,9 @@ use arc_swap::access::Access;
 use log::{debug, info, warn};
 
 use super::{
-    acc_flow::AccumulatedFlow, MetricsType, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC,
-    QUEUE_BATCH_SIZE, RCV_TIMEOUT,
+    acc_flow::AccumulatedFlow,
+    consts::{QUEUE_BATCH_SIZE, RCV_TIMEOUT},
+    MetricsType, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC,
 };
 use crate::{
     common::{
@@ -886,10 +887,11 @@ impl Collector {
             .name("collector".to_owned())
             .spawn(move || {
                 let mut stash = Stash::new(ctx, sender, counter);
+                let mut batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
                 while running.load(Ordering::Relaxed) {
-                    match receiver.recv_n(QUEUE_BATCH_SIZE, Some(RCV_TIMEOUT)) {
-                        Ok(acc_flows) => {
-                            for flow in acc_flows {
+                    match receiver.recv_all(&mut batch, Some(RCV_TIMEOUT)) {
+                        Ok(_) => {
+                            for flow in batch.drain(..) {
                                 let time_in_second = flow.tagged_flow.flow.flow_stat_time.as_secs();
                                 stash.collect(Some(*flow), time_in_second);
                             }

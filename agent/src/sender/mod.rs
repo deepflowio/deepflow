@@ -27,3 +27,5 @@ static ID_COUNTER: AtomicU8 = AtomicU8::new(0);
 pub fn get_sender_id() -> u8 {
     ID_COUNTER.fetch_add(1, Ordering::SeqCst)
 }
+
+pub(crate) const QUEUE_BATCH_SIZE: usize = 1024;

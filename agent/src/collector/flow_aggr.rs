@@ -275,14 +275,18 @@ impl FlowAggr {
     }
 
     fn run(&mut self) {
+        let mut batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
         while self.running.load(Ordering::Relaxed) {
-            match self.input.recv(Some(QUEUE_READ_TIMEOUT)) {
-                Ok(tagged_flow) => {
-                    if self.config.load().l4_log_store_tap_types[u16::from(TapType::Any) as usize]
-                        || self.config.load().l4_log_store_tap_types
-                            [u16::from(tagged_flow.flow.flow_key.tap_type) as usize]
-                    {
-                        self.minute_merge(tagged_flow);
+            match self.input.recv_all(&mut batch, Some(QUEUE_READ_TIMEOUT)) {
+                Ok(_) => {
+                    for tagged_flow in batch.drain(..) {
+                        if self.config.load().l4_log_store_tap_types
+                            [u16::from(TapType::Any) as usize]
+                            || self.config.load().l4_log_store_tap_types
+                                [u16::from(tagged_flow.flow.flow_key.tap_type) as usize]
+                        {
+                            self.minute_merge(tagged_flow);
+                        }
                     }
                 }
                 Err(Error::Timeout) => {

@@ -414,6 +414,25 @@ impl<T> Receiver<T> {
             }
         }
     }
+
+    // Clears anything in msgs, and receive at most msgs.capacity() messages
+    pub fn recv_all(&self, msgs: &mut Vec<T>, timeout: Option<Duration>) -> Result<(), Error<T>> {
+        msgs.clear();
+        unsafe {
+            let max_recv = msgs.capacity();
+            match self
+                .counter()
+                .queue
+                .raw_recv_timeout(timeout, msgs.as_mut_ptr(), max_recv)
+            {
+                Ok(count) => {
+                    msgs.set_len(count);
+                    Ok(())
+                }
+                Err(e) => Err(e),
+            }
+        }
+    }
 }
 
 impl<T> Drop for Receiver<T> {
@@ -603,6 +622,66 @@ mod tests {
     }
 
     #[test]
+    fn batch_sender() {
+        let c = Arc::new(AtomicUsize::new(0));
+
+        {
+            let (s, r, _) = bounded(1024);
+            for i in 0..10 {
+                let sender = s.clone();
+                thread::spawn(move || {
+                    if i % 2 == 0 {
+                        for j in 1..=10 {
+                            sender.send(j).unwrap();
+                        }
+                    } else {
+                        sender
+                            .send_in_batch(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 3)
+                            .unwrap();
+                    }
+                });
+            }
+            mem::drop(s);
+
+            let mut sum = 0;
+            for c in r {
+                sum += c;
+            }
+            assert_eq!(sum, 550, "expected: 550, result: {}", sum);
+        }
+
+        let c = c.load(Ordering::Acquire);
+        assert_eq!(c, 0, "new/drop count mismatch: new - drop = {}", c);
+    }
+
+    #[test]
+    fn batch_overwrite() {
+        let c = Arc::new(AtomicUsize::new(0));
+
+        {
+            let (s, r, _) = bounded(3);
+
+            s.send_in_batch(
+                vec![
+                    CountedU64::new(42, c.clone()),
+                    CountedU64::new(43, c.clone()),
+                    CountedU64::new(44, c.clone()),
+                    CountedU64::new(45, c.clone()),
+                ],
+                2,
+            )
+            .unwrap();
+            let mut vs = Vec::with_capacity(3);
+            r.recv_all(&mut vs, None).unwrap();
+            let co = r.recv(None).unwrap();
+            assert_eq!(co, 45, "expected: 45, result: {}", co);
+        }
+
+        let c = c.load(Ordering::Acquire);
+        assert_eq!(c, 0, "new/drop count mismatch: new - drop = {}", c);
+    }
+
+    #[test]
     fn simple_overwrite() {
         let c = Arc::new(AtomicUsize::new(0));
 
@@ -645,7 +724,8 @@ mod tests {
             ])
             .unwrap();
 
-            r.recv_n(3, None).unwrap();
+            let mut vs = Vec::with_capacity(3);
+            r.recv_all(&mut vs, None).unwrap();
             let co = r.recv(None).unwrap();
             assert_eq!(co, 55, "expected: 55, result: {}", co);
         }
@@ -668,7 +748,8 @@ mod tests {
             .unwrap();
             s.send(CountedU64::new(44, c.clone())).unwrap();
 
-            let co = r.recv_n(2, None).unwrap();
+            let mut co = Vec::with_capacity(2);
+            r.recv_all(&mut co, None).unwrap();
             assert_eq!(co, vec![43, 44], "expected: [43, 44], result: {:?}", co);
 
             s.send_all(&mut vec![
@@ -709,7 +790,9 @@ mod tests {
 
                 phase.store(1, Ordering::Release);
 
-                let co: Vec<CountedU64> = r.recv_n(100, Some(Duration::from_millis(100))).unwrap();
+                let mut co = Vec::with_capacity(100);
+                r.recv_all(&mut co, Some(Duration::from_millis(100)))
+                    .unwrap();
                 assert_eq!(co, vec![42, 43], "expected: [42, 43], result: {:?}", co);
 
                 let e: Error<CountedU64> = r.recv(Some(Duration::from_millis(10))).err().unwrap();
