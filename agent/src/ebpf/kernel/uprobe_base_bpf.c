@@ -398,7 +398,8 @@ int runtime_casgstatus(struct pt_regs *ctx)
 // coroutine numbers are in the parameters and return values ​​respectively.
 // Pass the function parameters through pid_tgid_callerid_map
 //
-// func newproc1(fn *funcval, callergp *g, callerpc uintptr) *g
+// go 1.15 ~ 1.17: func newproc1(fn *funcval, argp unsafe.Pointer, narg int32, callergp *g, callerpc uintptr) *g
+// go1.18+ :func newproc1(fn *funcval, callergp *g, callerpc uintptr) *g
 SEC("uprobe/enter_runtime.newproc1")
 int enter_runtime_newproc1(struct pt_regs *ctx)
 {
@@ -411,6 +412,12 @@ int enter_runtime_newproc1(struct pt_regs *ctx)
 		return 0;
 	}
 
+	// go less than 1.15 cannot get parent-child coroutine relationship
+	// ~ go1.14: func newproc1(fn *funcval, argp unsafe.Pointer, narg int32, callergp *g, callerpc uintptr)
+	if (info->version < GO_VERSION(1, 15, 0)) {
+		return 0;
+	}
+
 	int offset_g_goid = info->offsets[OFFSET_IDX_GOID_RUNTIME_G];
 	if (offset_g_goid < 0) {
 		return 0;
@@ -418,10 +425,20 @@ int enter_runtime_newproc1(struct pt_regs *ctx)
 
 	void *g_ptr;
 	if (is_register_based_call(info)) {
-		g_ptr = (void *)PT_GO_REGS_PARM2(ctx);
+		// https://github.com/golang/go/commit/8e5304f7298a0eef48e4796017c51b4d9aeb52b5
+		if (info->version >= GO_VERSION(1, 18, 0)) {
+			g_ptr = (void *)PT_GO_REGS_PARM2(ctx);
+		} else {
+			g_ptr = (void *)PT_GO_REGS_PARM4(ctx);
+		}
 	} else {
-		bpf_probe_read(&g_ptr, sizeof(g_ptr),
-			       (void *)(PT_REGS_SP(ctx) + 16));
+		if (info->version >= GO_VERSION(1, 18, 0)) {
+			bpf_probe_read(&g_ptr, sizeof(g_ptr),
+				       (void *)(PT_REGS_SP(ctx) + 16));
+		} else {
+			bpf_probe_read(&g_ptr, sizeof(g_ptr),
+				       (void *)(PT_REGS_SP(ctx) + 32));
+		}
 	}
 
 	__s64 goid = 0;
@@ -441,7 +458,8 @@ int enter_runtime_newproc1(struct pt_regs *ctx)
 
 // The mapping relationship between parent and child coroutines is stored in go_ancerstor_map
 //
-// func newproc1(fn *funcval, callergp *g, callerpc uintptr) *g
+// go 1.15 ~ 1.17: func newproc1(fn *funcval, argp unsafe.Pointer, narg int32, callergp *g, callerpc uintptr) *g
+// go1.18+ :func newproc1(fn *funcval, callergp *g, callerpc uintptr) *g
 SEC("uprobe/exit_runtime.newproc1")
 int exit_runtime_newproc1(struct pt_regs *ctx)
 {
@@ -451,6 +469,10 @@ int exit_runtime_newproc1(struct pt_regs *ctx)
 	struct ebpf_proc_info *info =
 		bpf_map_lookup_elem(&proc_info_map, &tgid);
 	if (!info) {
+		return 0;
+	}
+
+	if(info->version < GO_VERSION(1, 15, 0)){
 		return 0;
 	}
 
@@ -469,7 +491,11 @@ int exit_runtime_newproc1(struct pt_regs *ctx)
 	if (is_register_based_call(info)) {
 		g_ptr = (void *)PT_GO_REGS_PARM1(ctx);
 	} else {
-		bpf_probe_read(&g_ptr, sizeof(g_ptr), caller->sp + 32);
+		if (info->version >= GO_VERSION(1, 18, 0)) {
+			bpf_probe_read(&g_ptr, sizeof(g_ptr), caller->sp + 32);
+		} else {
+			bpf_probe_read(&g_ptr, sizeof(g_ptr), caller->sp + 48);
+		}
 	}
 
 	__s64 goid = 0;
