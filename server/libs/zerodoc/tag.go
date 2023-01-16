@@ -450,6 +450,8 @@ const (
 	VTAP_FLOW_EDGE_PORT = BasePathCode | BasePortCode | TAPPort
 	VTAP_APP_PORT       = BaseCode | BasePortCode | Direction | L7Protocol
 	VTAP_APP_EDGE_PORT  = BasePathCode | BasePortCode | TAPPort | L7Protocol
+
+	VTAP_ACL = ACLGID | TagType | TagValue | VTAPID
 )
 
 var metricsTableCodes = []Code{
@@ -459,7 +461,7 @@ var metricsTableCodes = []Code{
 	VTAP_APP_PORT_1M:      VTAP_APP_PORT,
 	VTAP_APP_EDGE_PORT_1M: VTAP_APP_EDGE_PORT,
 
-	VTAP_ACL_1M: ACLGID | TagType | TagValue | VTAPID,
+	VTAP_ACL_1M: VTAP_ACL,
 
 	VTAP_FLOW_PORT_1S:      VTAP_FLOW_PORT,
 	VTAP_FLOW_EDGE_PORT_1S: VTAP_FLOW_EDGE_PORT,
@@ -1348,9 +1350,10 @@ func (t *Tag) ReadFromPB(p *pb.MiniTag) {
 	t.TAPPort = datatype.TapPort(p.Field.TapPort)
 	t.TAPType = TAPTypeEnum(p.Field.TapType)
 	t.L7Protocol = datatype.L7Protocol(p.Field.L7Protocol)
+	// In order to be compatible with the old version of Agent data, GPID needs to be set
 	if t.Code&IPPath != 0 {
 		t.Code |= GPIDPath
-	} else {
+	} else if t.Code != VTAP_ACL {
 		t.Code |= GPID
 	}
 	t.GPID = p.Field.Gpid
