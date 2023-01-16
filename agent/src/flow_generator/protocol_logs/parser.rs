@@ -650,15 +650,17 @@ impl AppProtoLogsParser {
                     SessionQueue::new(counter, output_queue, config.clone(), log_rate);
                 let mut app_logs = AppLogs::new(&config);
 
+                let mut batch_buffer = Vec::with_capacity(QUEUE_BATCH_SIZE);
+
                 while running.load(Ordering::Relaxed) {
-                    match input_queue.recv_n(QUEUE_BATCH_SIZE, Some(RCV_TIMEOUT)) {
-                        Ok(app_protos) => {
+                    match input_queue.recv_all(&mut batch_buffer, Some(RCV_TIMEOUT)) {
+                        Ok(_) => {
                             Self::update_l7_log_dynamic_config(
                                 l7_log_dynamic_is_updated.clone(),
                                 &config,
                                 &mut app_logs,
                             );
-                            for app_proto in app_protos {
+                            for app_proto in batch_buffer.drain(..) {
                                 session_queue.aggregate_session_and_send(AppProtoLogsData {
                                     base_info: (*app_proto).base_info.clone(),
                                     special_info: (*app_proto).l7_info,
