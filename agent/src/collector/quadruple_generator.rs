@@ -27,9 +27,7 @@ use arc_swap::access::Access;
 use log::{debug, error, info, warn};
 use thread::JoinHandle;
 
-use super::acc_flow::AccumulatedFlow;
-use super::consts::*;
-use super::MetricsType;
+use super::{acc_flow::AccumulatedFlow, consts::*, MetricsType};
 
 use crate::common::{
     endpoint::EPC_FROM_INTERNET,
@@ -1136,28 +1134,38 @@ impl QuadrupleGenerator {
     }
 
     fn handler_routine(&mut self) {
+        let mut recv_batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
+        let mut send_batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
         while self.running.load(Ordering::Relaxed) {
-            match self.input.recv(Some(Duration::from_secs(3))) {
-                Ok(tagged_flow) => {
-                    let tagged_flow = Arc::new(*tagged_flow);
-                    if self.output_flow.is_some() {
-                        if let Err(_) = self.output_flow.as_mut().unwrap().send(tagged_flow.clone())
-                        {
-                            debug!("qg push TaggedFlow to l4_flow queue failed, maybe queue have terminated");
+            match self.input.recv_all(&mut recv_batch, Some(RCV_TIMEOUT)) {
+                Ok(_) => {
+                    for tagged_flow in recv_batch.drain(..) {
+                        let tagged_flow = Arc::from(tagged_flow);
+                        if self.output_flow.is_some() {
+                            send_batch.push(Arc::clone(&tagged_flow));
                         }
-                    }
+                        if self.collector_enabled.load(Ordering::Relaxed) {
+                            self.handle(
+                                Some(Arc::clone(&tagged_flow)),
+                                tagged_flow.flow.flow_stat_time,
+                            );
+                        }
 
-                    #[cfg(target_os = "linux")]
-                    if let Some(toa) = tagged_flow.get_toa_info() {
-                        if self.proc_sync_enable {
-                            if let Err(_) = self.toa_info_output.send(Box::new(toa)) {
-                                error!("send toa info fail");
+                        #[cfg(target_os = "linux")]
+                        if let Some(toa) = tagged_flow.get_toa_info() {
+                            if self.proc_sync_enable {
+                                if let Err(_) = self.toa_info_output.send(Box::new(toa)) {
+                                    error!("send toa info fail");
+                                }
                             }
                         }
                     }
-
-                    if self.collector_enabled.load(Ordering::Relaxed) {
-                        self.handle(Some(tagged_flow.clone()), tagged_flow.flow.flow_stat_time);
+                    if send_batch.len() > 0 {
+                        if let Err(_) = self.output_flow.as_mut().unwrap().send_all(&mut send_batch)
+                        {
+                            debug!("qg push TaggedFlow to l4_flow queue failed, maybe queue have terminated");
+                            send_batch.clear();
+                        }
                     }
                 }
                 Err(Error::Timeout) => {

@@ -26,7 +26,8 @@ use log::{info, warn};
 use packet_sequence_block::BoxedPacketSequenceBlock;
 
 // Enterprise Edition Feature: packet-sequence
-use crate::flow_generator::packet_sequence::consts;
+use super::consts;
+
 use public::queue::{DebugSender, Error, Receiver};
 
 pub struct PacketSequenceParser {
@@ -64,12 +65,13 @@ impl PacketSequenceParser {
         let thread = thread::Builder::new()
             .name("packet-sequence-parser".to_owned())
             .spawn(move || {
+                let mut blocks = Vec::with_capacity(consts::QUEUE_BATCH_SIZE);
                 let mut batch = Vec::new();
                 while running.load(Ordering::Relaxed) {
-                    match input_queue.recv_n(consts::QUEUE_BATCH_SIZE, Some(consts::RCV_TIMEOUT)) {
-                        Ok(blocks) => {
+                    match input_queue.recv_all(&mut blocks, Some(consts::RCV_TIMEOUT)) {
+                        Ok(_) => {
                             batch.reserve(blocks.len());
-                            batch.extend(blocks.into_iter().map(|f| BoxedPacketSequenceBlock(f)));
+                            batch.extend(blocks.drain(..).map(|f| BoxedPacketSequenceBlock(f)));
                             if let Err(_) = output_queue.send_all(&mut batch) {
                                 warn!(
                                     "packet sequence block to queue failed maybe queue have terminated"

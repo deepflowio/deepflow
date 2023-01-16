@@ -211,18 +211,24 @@ impl EbpfDispatcher {
             true, // from_ebpf
         );
         let ebpf_config = self.config.load();
+        const QUEUE_BATCH_SIZE: usize = 1024;
+        let mut batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
         while unsafe { SWITCH } {
-            let mut packet = self.receiver.recv(Some(Duration::from_millis(1)));
-            if packet.is_err() {
+            if self
+                .receiver
+                .recv_all(&mut batch, Some(Duration::from_secs(1)))
+                .is_err()
+            {
                 continue;
             }
 
-            sync_counter.counter().rx += 1;
+            for mut packet in batch.drain(..) {
+                sync_counter.counter().rx += 1;
 
-            let packet = packet.as_mut().unwrap();
-            packet.timestamp_adjust(self.time_diff.load(Ordering::Relaxed));
-            packet.set_loopback_mac(ebpf_config.ctrl_mac);
-            flow_map.inject_meta_packet(&mut *packet);
+                packet.timestamp_adjust(self.time_diff.load(Ordering::Relaxed));
+                packet.set_loopback_mac(ebpf_config.ctrl_mac);
+                flow_map.inject_meta_packet(&mut packet);
+            }
         }
     }
 }
