@@ -26,6 +26,7 @@ pub mod leaky_bucket;
 pub mod netns;
 pub mod packet;
 pub mod proto;
+pub mod pwd;
 pub mod queue;
 pub mod sender;
 pub mod utils;
