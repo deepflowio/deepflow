@@ -29,6 +29,8 @@ use std::{
 
 use log::{info, warn};
 
+use super::QUEUE_BATCH_SIZE;
+
 use crate::utils::{
     bytes::write_u64_be,
     stats::{Counter, CounterType, CounterValue, RefCountable},
@@ -120,35 +122,41 @@ impl TcpPacketSender {
                 let mut sequence = 0;
                 let mut last_err_time = Duration::ZERO;
                 let mut socket = None;
+                let mut batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
                 while running.load(Ordering::Relaxed) {
-                    match receiver.recv(Some(RCV_TIMEOUT)) {
-                        Ok(mut pkt) => {
-                            if (socket.is_none() || reconnect.load(Ordering::Relaxed))
-                                && !Self::connect(
-                                    &reconnect,
-                                    &mut socket,
-                                    *dst_ip.lock().unwrap(),
-                                    dst_port.load(Ordering::Relaxed),
-                                )
-                            {
-                                continue;
-                            }
-
-                            sequence += 1;
-                            write_u64_be(&mut pkt[SEQUENCE_OFFSET..SEQUENCE_OFFSET + 8], sequence);
-                            match socket.as_mut().unwrap().write(&pkt) {
-                                Ok(n) => {
-                                    counter.tx_bytes.fetch_add(n as u64, Ordering::Relaxed);
-                                    counter.tx.fetch_add(1, Ordering::Relaxed);
+                    match receiver.recv_all(&mut batch, Some(RCV_TIMEOUT)) {
+                        Ok(_) => {
+                            for mut pkt in batch.drain(..) {
+                                if (socket.is_none() || reconnect.load(Ordering::Relaxed))
+                                    && !Self::connect(
+                                        &reconnect,
+                                        &mut socket,
+                                        *dst_ip.lock().unwrap(),
+                                        dst_port.load(Ordering::Relaxed),
+                                    )
+                                {
+                                    continue;
                                 }
-                                Err(e) => {
-                                    let now = SystemTime::now()
-                                        .duration_since(SystemTime::UNIX_EPOCH)
-                                        .unwrap();
-                                    if now > last_err_time + ERR_INTERVAL {
-                                        warn!("send tcp packet failed: {}", e);
-                                        last_err_time = now;
-                                        socket.take();
+
+                                sequence += 1;
+                                write_u64_be(
+                                    &mut pkt[SEQUENCE_OFFSET..SEQUENCE_OFFSET + 8],
+                                    sequence,
+                                );
+                                match socket.as_mut().unwrap().write(&pkt) {
+                                    Ok(n) => {
+                                        counter.tx_bytes.fetch_add(n as u64, Ordering::Relaxed);
+                                        counter.tx.fetch_add(1, Ordering::Relaxed);
+                                    }
+                                    Err(e) => {
+                                        let now = SystemTime::now()
+                                            .duration_since(SystemTime::UNIX_EPOCH)
+                                            .unwrap();
+                                        if now > last_err_time + ERR_INTERVAL {
+                                            warn!("send tcp packet failed: {}", e);
+                                            last_err_time = now;
+                                            socket.take();
+                                        }
                                     }
                                 }
                             }

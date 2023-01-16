@@ -39,6 +39,7 @@ pub const IPV4_LRU_KEY_SIZE: usize = OFFSET_IP + IPV4_PATH_SIZE; // 192b, 24B
 pub const IPV6_LRU_KEY_SIZE: usize = OFFSET_IP + IPV6_PATH_SIZE; // 384b, 48B
 
 pub const QUEUE_BATCH_SIZE: usize = 1024;
+pub const RCV_TIMEOUT: Duration = Duration::from_secs(1);
 
 pub const SECONDS_IN_MINUTE: u64 = 60;
 pub const NANOS_IN_SECOND: u64 = 1_000_000_000;
