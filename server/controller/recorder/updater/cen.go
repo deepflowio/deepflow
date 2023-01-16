@@ -88,7 +88,7 @@ func (c *CEN) generateUpdateInfo(diffBase *cache.CEN, cloudItem *cloudmodel.CEN)
 			}
 			vpcIDs = append(vpcIDs, vpcID)
 		}
-		updateInfo["epc_ids"] = vpcIDs
+		updateInfo["epc_ids"] = common.IntArrayToString(vpcIDs)
 	}
 
 	if len(updateInfo) > 0 {
