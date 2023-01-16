@@ -247,7 +247,8 @@ int tracer_bpf_load(struct bpf_tracer *tracer)
 				     " deepflow-agent.te\n"
 				     "3 semodule_package -o deepflow-agent.pp "
 				     "-m deepflow-agent.mod\n"
-				     "4 semodule -i deepflow-agent.pp\n");
+				     "4 semodule -i deepflow-agent.pp\n"
+				     "5 restart pods\n");
 		}
 
 		return ret;
