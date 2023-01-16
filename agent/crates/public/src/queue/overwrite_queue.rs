@@ -426,6 +426,25 @@ impl<T> Receiver<T> {
             }
         }
     }
+
+    // Clears anything in msgs, and receive at most msgs.capacity() messages
+    pub fn recv_all(&self, msgs: &mut Vec<T>, timeout: Option<Duration>) -> Result<(), Error<T>> {
+        msgs.clear();
+        unsafe {
+            let max_recv = msgs.capacity();
+            match self
+                .counter()
+                .queue
+                .raw_recv_timeout(timeout, msgs.as_mut_ptr(), max_recv)
+            {
+                Ok(count) => {
+                    msgs.set_len(count);
+                    Ok(())
+                }
+                Err(e) => Err(e),
+            }
+        }
+    }
 }
 
 impl<T> Drop for Receiver<T> {
@@ -664,7 +683,8 @@ mod tests {
                 2,
             )
             .unwrap();
-            r.recv_n(3, None).unwrap();
+            let mut vs = Vec::with_capacity(3);
+            r.recv_all(&mut vs, None).unwrap();
             let co = r.recv(None).unwrap();
             assert_eq!(co, 45, "expected: 45, result: {}", co);
         }
@@ -716,7 +736,8 @@ mod tests {
             ])
             .unwrap();
 
-            r.recv_n(3, None).unwrap();
+            let mut vs = Vec::with_capacity(3);
+            r.recv_all(&mut vs, None).unwrap();
             let co = r.recv(None).unwrap();
             assert_eq!(co, 55, "expected: 55, result: {}", co);
         }
@@ -739,7 +760,8 @@ mod tests {
             .unwrap();
             s.send(CountedU64::new(44, c.clone())).unwrap();
 
-            let co = r.recv_n(2, None).unwrap();
+            let mut co = Vec::with_capacity(2);
+            r.recv_all(&mut co, None).unwrap();
             assert_eq!(co, vec![43, 44], "expected: [43, 44], result: {:?}", co);
 
             s.send_all(&mut vec![
@@ -780,7 +802,9 @@ mod tests {
 
                 phase.store(1, Ordering::Release);
 
-                let co: Vec<CountedU64> = r.recv_n(100, Some(Duration::from_millis(100))).unwrap();
+                let mut co = Vec::with_capacity(100);
+                r.recv_all(&mut co, Some(Duration::from_millis(100)))
+                    .unwrap();
                 assert_eq!(co, vec![42, 43], "expected: [42, 43], result: {:?}", co);
 
                 let e: Error<CountedU64> = r.recv(Some(Duration::from_millis(10))).err().unwrap();

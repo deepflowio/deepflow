@@ -36,6 +36,8 @@ use socket2::{SockAddr, Socket};
 #[cfg(windows)]
 use windows::Win32::Networking::WinSock::socket;
 
+use super::QUEUE_BATCH_SIZE;
+
 use crate::common::{
     enums::IpProtocol, erspan, vxlan, IPV4_ADDR_LEN, IPV4_DST_OFFSET, IPV4_PACKET_SIZE,
     IPV4_PROTO_OFFSET, IPV6_ADDR_LEN, IPV6_DST_OFFSET, IPV6_PACKET_SIZE, IPV6_PROTO_OFFSET,
@@ -768,20 +770,26 @@ impl NpbPacketSender {
 
     pub fn run(&self) {
         let mut last_timestamp = 0;
+        let mut batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
         while !self.disable.load(Ordering::Relaxed) {
-            let packet = self.receiver.recv(Some(Duration::from_secs(1)));
-            if packet.is_err() {
+            if self
+                .receiver
+                .recv_all(&mut batch, Some(Duration::from_secs(1)))
+                .is_err()
+            {
                 continue;
             }
-            let (timestamp, underlay_l2_opt_size, packet) = packet.unwrap();
-            let ret =
-                self.connections
-                    .lock()
-                    .unwrap()
-                    .send(timestamp, underlay_l2_opt_size, packet);
-            if ret.is_err() && last_timestamp + Self::LOG_INTERVAL < timestamp {
-                last_timestamp = timestamp;
-                info!("Npb packet sender error: {:?}.", ret);
+            for packet in batch.drain(..) {
+                let (timestamp, underlay_l2_opt_size, packet) = packet;
+                let ret =
+                    self.connections
+                        .lock()
+                        .unwrap()
+                        .send(timestamp, underlay_l2_opt_size, packet);
+                if ret.is_err() && last_timestamp + Self::LOG_INTERVAL < timestamp {
+                    last_timestamp = timestamp;
+                    info!("Npb packet sender error: {:?}.", ret);
+                }
             }
         }
     }
