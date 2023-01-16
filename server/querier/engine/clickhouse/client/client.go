@@ -63,9 +63,7 @@ func (c *Client) init(query_uuid string) error {
 		}
 	}
 	url := fmt.Sprintf("clickhouse://%s:%s@%s:%d/%s?&query_id=%s", c.UserName, c.Password, c.Host, c.Port, c.DB, query_uuid)
-	conn, err := splunksqlx.Open(
-		"clickhouse", url,
-	)
+	conn, err := splunksqlx.Open("clickhouse", url)
 	if err != nil {
 		log.Errorf("connect clickhouse failed: %s, url: %s, query_uuid: %s", err, url, query_uuid)
 		return err
