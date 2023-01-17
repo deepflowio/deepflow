@@ -45,7 +45,10 @@ use crate::{
     exception::ExceptionHandler,
     platform::kubernetes::resource_watcher::ResourceWatcherFactory,
     rpc::Session,
-    utils::stats,
+    utils::{
+        environment::{running_in_container, running_in_only_watch_k8s_mode},
+        stats,
+    },
 };
 use public::proto::{
     common::KubernetesApiInfo,
@@ -197,7 +200,9 @@ impl ApiWatcher {
             return;
         }
 
-        if !self.context.config.load().kubernetes_api_enabled {
+        if (!self.context.config.load().kubernetes_api_enabled && !running_in_only_watch_k8s_mode())
+            || !running_in_container()
+        {
             return;
         }
 
