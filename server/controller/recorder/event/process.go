@@ -21,6 +21,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
+	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowys/deepflow/server/libs/eventapi"
@@ -29,6 +30,7 @@ import (
 
 type Process struct {
 	EventManagerBase
+	deviceType int
 }
 
 func NewProcess(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *Process {
@@ -38,6 +40,7 @@ func NewProcess(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *Process {
 			ToolDataSet:  toolDS,
 			Queue:        eq,
 		},
+		common.PROCESS_INSTANCE_TYPE,
 	}
 	return mng
 }
@@ -67,6 +70,7 @@ func (p *Process) ProduceByAdd(items []*mysql.Process) {
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
+			p.deviceType,
 			item.ID,
 			opt,
 		)
@@ -92,6 +96,7 @@ func (p *Process) ProduceByDelete(lcuuids []string) {
 			lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_DELETE,
 			name,
+			p.deviceType,
 			id,
 		)
 	}

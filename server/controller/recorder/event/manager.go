@@ -45,6 +45,17 @@ func (e *EventManagerBase) createAndEnqueue(
 	e.enqueue(resourceLcuuid, event)
 }
 
+func (e *EventManagerBase) createProcessAndEnqueue(
+	resourceLcuuid, eventType, instanceName string, instanceType, instanceID int, options ...eventapi.TagFieldOption) {
+	// use interface in eventapi to create ResourceEvent instance which will be enqueued, because we need to manually free instance memory
+	event := eventapi.AcquireResourceEvent()
+	e.fillEvent(event, eventType, instanceName, instanceType, instanceID, options...)
+	// add process info
+	event.GProcessID = uint32(instanceID)
+	event.GProcessName = instanceName
+	e.enqueue(resourceLcuuid, event)
+}
+
 func (e EventManagerBase) fillEvent(
 	event *eventapi.ResourceEvent,
 	eventType, instanceName string, instanceType, instanceID int, options ...eventapi.TagFieldOption,
@@ -73,30 +84,6 @@ func (e *EventManagerBase) enqueue(resourceLcuuid string, event *eventapi.Resour
 	err := e.Queue.Put(event)
 	if err != nil {
 		log.Error(putEventIntoQueueFailed(rt, err))
-	}
-}
-
-func (e *EventManagerBase) createProcessAndEnqueue(
-	resourceLcuuid, eventType, gprocessName string, gprocessID int, options ...eventapi.TagFieldOption) {
-	event := eventapi.AcquireResourceEvent()
-	e.fillProcessEvent(event, eventType, gprocessName, gprocessID, options...)
-
-	log.Infof("put process event (lcuuid: %s): %+v into shared queue", resourceLcuuid, event)
-	err := e.Queue.Put(event)
-	if err != nil {
-		log.Error(putEventIntoQueueFailed("process", err))
-	}
-}
-
-func (e EventManagerBase) fillProcessEvent(
-	event *eventapi.ResourceEvent, eventType, gprocessName string, gprocessID int, options ...eventapi.TagFieldOption) {
-	event.Time = time.Now().Unix()
-	event.TimeMilli = time.Now().UnixMilli()
-	event.Type = eventType
-	event.GProcessID = uint32(gprocessID)
-	event.GProcessName = gprocessName
-	for _, option := range options {
-		option(event)
 	}
 }
 
