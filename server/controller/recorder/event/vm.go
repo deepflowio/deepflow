@@ -100,6 +100,9 @@ func (v *VM) ProduceByUpdate(cloudItem *cloudmodel.VM, diffBase *cache.VM) {
 		description = fmt.Sprintf(DESCStateChangeFormat, cloudItem.Name,
 			VMStateToString[diffBase.State], VMStateToString[cloudItem.State])
 	}
+	if eType == "" {
+		return
+	}
 
 	nIDs, ips := v.getIPNetworksByID(id)
 	v.createAndEnqueue(
