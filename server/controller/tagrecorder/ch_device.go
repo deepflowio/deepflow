@@ -88,6 +88,10 @@ func (d *ChDevice) generateNewData() (map[DeviceKey]mysql.ChDevice, bool) {
 	if !ok {
 		return nil, false
 	}
+	ok = d.generateProcessData(keyToItem)
+	if !ok {
+		return nil, false
+	}
 	d.generateIPData(keyToItem)
 	d.generateInternetData(keyToItem)
 	return keyToItem, true
@@ -562,4 +566,35 @@ func (d *ChDevice) generateInternetData(keyToItem map[DeviceKey]mysql.ChDevice) 
 		Name:       "Internet",
 		IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_INTERNET}],
 	}
+}
+
+func (d *ChDevice) generateProcessData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
+	var processes []mysql.Process
+	err := mysql.Db.Unscoped().Find(&processes).Error
+	if err != nil {
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
+		return false
+	}
+	for _, process := range processes {
+		key := DeviceKey{
+			DeviceType: CH_DEVICE_TYPE_GPROCESS,
+			DeviceID:   process.ID,
+		}
+		if process.DeletedAt.Valid {
+			keyToItem[key] = mysql.ChDevice{
+				DeviceType: CH_DEVICE_TYPE_GPROCESS,
+				DeviceID:   process.ID,
+				Name:       process.Name + " (deleted)",
+				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
+			}
+		} else {
+			keyToItem[key] = mysql.ChDevice{
+				DeviceType: CH_DEVICE_TYPE_GPROCESS,
+				DeviceID:   process.ID,
+				Name:       process.Name,
+				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
+			}
+		}
+	}
+	return true
 }
