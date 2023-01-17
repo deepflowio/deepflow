@@ -60,6 +60,7 @@ func (q *QingCloud) GetFloatingIPs() ([]model.VInterface, []model.IP, []model.Fl
 					IP:            ip,
 					VMLcuuid:      common.GenerateUUID(resourceId),
 					NetworkLcuuid: common.NETWORK_ISP_LCUUID,
+					VPCLcuuid:     vpcLcuuid,
 					RegionLcuuid:  regionLcuuid,
 				})
 
