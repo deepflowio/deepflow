@@ -49,6 +49,19 @@ static uint32_t conf_max_socket_entries;
 static uint32_t conf_max_trace_entries;
 
 /*
+ * The datadump related Settings
+ */
+static bool datadump_enable;
+static int datadump_pid; // If the value is 0, process-ID/thread-ID filtering is not performed.
+static uint32_t datadump_start_time;
+static uint32_t datadump_timeout;
+static char datadump_comm[16]; // If null, process or thread name filtering is not performed.
+static uint8_t datadump_proto;
+static char datadump_file_path[DATADUMP_FILE_PATH_SIZE];
+static FILE *datadump_file;
+static pthread_mutex_t datadump_mutex;
+
+/*
  * The maximum amount of data passed to the agent by eBPF programe.
  * Set by set_data_limit_max()
  */
@@ -71,6 +84,7 @@ static int socket_tracer_stop(void);
 static int socket_tracer_start(void);
 static int update_offsets_table(struct bpf_tracer *t,
 				struct bpf_offset_param *offset);
+static void datadump_process(void *data);
 
 static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 {
@@ -305,6 +319,16 @@ static int socktrace_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
 	params->kern_trace_map_max = conf_max_trace_entries;
 	params->tracer_state = t->state;
 
+	pthread_mutex_lock(&datadump_mutex);
+	params->datadump_enable = datadump_enable;
+	params->datadump_pid = datadump_pid;
+	params->datadump_proto = datadump_proto;
+	safe_buf_copy(params->datadump_file_path,
+		      sizeof(params->datadump_file_path),
+		      (void *)datadump_file_path, sizeof(datadump_file_path));
+	memcpy(params->datadump_comm, datadump_comm, sizeof(datadump_comm));
+	pthread_mutex_unlock(&datadump_mutex);
+
 	struct trace_stats stats_total;
 
 	if (bpf_stats_map_collect(t, &stats_total)) {
@@ -331,6 +355,82 @@ static struct tracer_sockopts socktrace_sockopts = {
 	.get_opt_min = SOCKOPT_GET_SOCKTRACE_SHOW,
 	.get_opt_max = SOCKOPT_GET_SOCKTRACE_SHOW,
 	.get = socktrace_sockopt_get,
+};
+
+static int datadump_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
+{
+	struct datadump_msg *msg = (struct datadump_msg *)conf;
+	pthread_mutex_lock(&datadump_mutex);
+	if (msg->is_params) {
+		datadump_pid = msg->pid;
+		datadump_proto = msg->proto;
+		safe_buf_copy(datadump_comm, sizeof(datadump_comm),
+			      (void *)msg->comm, sizeof(msg->comm));
+		ebpf_info("Set datadump pid %d comm %s\n", datadump_pid, datadump_comm);
+	} else {
+		if (datadump_enable && !msg->enable) {
+			// close output file
+			if (datadump_file != stdout)
+				fclose(datadump_file);
+		}
+
+		if (!datadump_enable && msg->enable) {
+			// create a new output file
+			if (datadump_file == stdout && !msg->only_stdout) {
+				char *file = gen_file_name_by_datetime();
+				if (file != NULL) {
+					snprintf(datadump_file_path,
+						 sizeof(datadump_file_path),
+						 "%s/datadump-%s.log",
+						 DATADUMP_FILE_PATH_PREFIX,
+						 file);
+					free(file);
+					datadump_file = fopen(datadump_file_path, "a+");
+					if (datadump_file == NULL) {
+						memcpy(datadump_file_path, "stdout", 7);
+						datadump_file = stdout;
+					}
+					ebpf_info("create datadump file %s\n",
+						  datadump_file_path);
+				}
+			}
+		}
+
+		if (msg->enable) {
+			datadump_start_time = get_sys_uptime();
+			datadump_timeout = msg->timeout;
+		}
+
+		datadump_enable = msg->enable;
+		if (!datadump_enable) {
+			datadump_start_time = 0;
+			datadump_timeout = 0;
+			datadump_pid = 0;
+			datadump_comm[0] = '\0';
+			datadump_proto = 0;
+			memcpy(datadump_file_path, "stdout", 7);
+			datadump_file = stdout;
+		}
+		ebpf_info("datadump %s\n", datadump_enable ? "enable" : "disable");
+	}
+	pthread_mutex_unlock(&datadump_mutex);
+	return 0;
+}
+
+static int datadump_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
+				void **out, size_t * outsize)
+{
+	return 0;
+}
+
+static struct tracer_sockopts datadump_sockopts = {
+	.version = SOCKOPT_VERSION,
+	.set_opt_min = SOCKOPT_SET_DATADUMP_ADD,
+	.set_opt_max = SOCKOPT_SET_DATADUMP_OFF,
+	.set = datadump_sockopt_set,
+	.get_opt_min = SOCKOPT_GET_DATADUMP_SHOW,
+	.get_opt_max = SOCKOPT_GET_DATADUMP_SHOW,
+	.get = datadump_sockopt_get,
 };
 
 // TODO : 标记上层是否需要重新确认协议准确性
@@ -1000,6 +1100,14 @@ int running_socket_tracer(l7_handle_fn handle,
 		buffer_sz = sizeof(socket_trace_common_ebpf_data);
 	}
 
+	/*
+	 * Initialize datadump
+	 */
+	pthread_mutex_init(&datadump_mutex, NULL);
+	datadump_enable = false;
+	memcpy(datadump_file_path, "stdout", 7);
+	datadump_file = stdout;
+
 	// Initialize events_list
 	if (events_list.next == events_list.prev &&
 		events_list.next == NULL) {
@@ -1033,6 +1141,7 @@ int running_socket_tracer(l7_handle_fn handle,
 
 	tracer->stop_handle = socket_tracer_stop;
 	tracer->start_handle = socket_tracer_start;
+	tracer->datadump = datadump_process;
 
 	if ((ret =
 	     maps_config(tracer, MAP_SOCKET_INFO_NAME, max_socket_entries)))
@@ -1131,6 +1240,9 @@ int running_socket_tracer(l7_handle_fn handle,
 		return ret;
 
 	if ((ret = sockopt_register(&socktrace_sockopts)) != ETR_OK)
+		return ret;
+
+	if ((ret = sockopt_register(&datadump_sockopts)) != ETR_OK)
 		return ret;
 
 	ret =
@@ -1512,8 +1624,8 @@ void print_uprobe_http2_info(const char *data, int len)
 	char key[1024] = { 0 };
 	char value[1024] = { 0 };
 	memcpy(&header, data, sizeof(header));
-	printf("fd=[%d]\n", header.fd);
-	printf("stream_id=[%d]\n", header.stream_id);
+	fprintf(datadump_file, "fd=[%d]\n", header.fd);
+	fprintf(datadump_file, "stream_id=[%d]\n", header.stream_id);
 
 	const int value_start = sizeof(header) + header.header_len;
 
@@ -1523,8 +1635,8 @@ void print_uprobe_http2_info(const char *data, int len)
 	memcpy(&key, data + sizeof(header), header.header_len);
 	memcpy(&value, data + value_start, header.value_len);
 
-	printf("header=[%s:%s]\n", key, value);
-	fflush(stdout);
+	fprintf(datadump_file,"header=[%s:%s]\n", key, value);
+	fflush(datadump_file);
 	return;
 }
 
@@ -1536,10 +1648,10 @@ void print_dns_info(const char *data, int len)
 	char dns_ips[10][256];
 	char dns_name[10][1024];
 	if (header->qr == 0) {
-		printf("Query datalen %d, qcount:%d\n", len,
-		       ntohs(header->q_count));
+		fprintf(datadump_file, "Query datalen %d, qcount:%d\n", len,
+			ntohs(header->q_count));
 	} else {
-		printf("Response datalen %d\n", len);
+		fprintf(datadump_file, "Response datalen %d\n", len);
 	}
 	int q, i, j;
 	char p;
@@ -1560,10 +1672,10 @@ void print_dns_info(const char *data, int len)
 		}
 		dns_name[q][i - 1] = '\0';	//remove the last dot
 		question = (struct QUESTION *)&qname[i + 1];
-		printf("Name %s, QTYPE %s, QCLASS 0x%04x(%s)\n", dns_name[q],
-		       question->qtype == 0x0100 ? "A (IPv4)" : "AAAA (IPv6)",
-		       question->qclass,
-		       question->qclass == 0x0100 ? "IN" : "unknown");
+		fprintf(datadump_file, "Name %s, QTYPE %s, QCLASS 0x%04x(%s)\n", dns_name[q],
+			question->qtype == 0x0100 ? "A (IPv4)" : "AAAA (IPv6)",
+			question->qclass,
+			question->qclass == 0x0100 ? "IN" : "unknown");
 		qname = (unsigned char *)(question + 1);
 	}
 
@@ -1577,13 +1689,13 @@ void print_dns_info(const char *data, int len)
 		int stop = 0;
 		unsigned char *reader = qname;
 
-		printf("\nThe response contains : ");
-		printf("\n - %d Questions.", ntohs(dns->q_count));
-		printf("\n - %d Answers.", ntohs(dns->ans_count));
-		printf("\n - %d Authoritative Servers.",
-		       ntohs(dns->auth_count));
-		printf("\n - %d Additional records.\n\n",
-		       ntohs(dns->add_count));
+		fprintf(datadump_file, "\nThe response contains : ");
+		fprintf(datadump_file, "\n - %d Questions.", ntohs(dns->q_count));
+		fprintf(datadump_file, "\n - %d Answers.", ntohs(dns->ans_count));
+		fprintf(datadump_file, "\n - %d Authoritative Servers.",
+			ntohs(dns->auth_count));
+		fprintf(datadump_file, "\n - %d Additional records.\n\n",
+			ntohs(dns->add_count));
 
 		//reading answers
 		stop = 0;
@@ -1625,26 +1737,26 @@ void print_dns_info(const char *data, int len)
 
 		}
 
-		printf("Answer :\n");
+		fprintf(datadump_file, "Answer :\n");
 		for (i = 0; i < ntohs(dns->ans_count); i++) {
-			printf("  - Name : %s ", answers[i].name);
+			fprintf(datadump_file, "  - Name : %s ", answers[i].name);
 			if (ntohs(answers[i].resource->type) == 1)	//IPv4 address
 			{
 				long *p;
 				p = (long *)answers[i].rdata;
 				a.sin_addr.s_addr = (*p);	//working without ntohl
-				printf("has IPv4 address : %s",
-				       inet_ntoa(a.sin_addr));
+				fprintf(datadump_file, "has IPv4 address : %s",
+					inet_ntoa(a.sin_addr));
 			}
 			if (ntohs(answers[i].resource->type) == 5)	//Canonical name for an alias
 			{
-				printf("has alias name : %s", answers[i].rdata);
+				fprintf(datadump_file, "has alias name : %s", answers[i].rdata);
 			}
-			printf("\n");
+			fprintf(datadump_file, "\n");
 		}
 	}
 
-	fflush(stdout);
+	fflush(datadump_file);
 }
 
 // ------- print mysql --------
@@ -1691,4 +1803,195 @@ void print_dubbo_info(const char *data, uint32_t len, uint8_t dir)
 	printf("\n");
 
 	fflush(stdout);
+}
+
+static char *flow_info(struct socket_bpf_data *sd)
+{
+#define BUF_SIZE 128
+
+	char *buf = malloc(BUF_SIZE);
+	if (buf == NULL)
+		return NULL;
+	memset(buf, 0, 128);
+	char sbuf[64], dbuf[64];
+	char *tag;
+	if (sd->tuple.addr_len == 16) {
+		inet_ntop(AF_INET6, sd->tuple.rcv_saddr, sbuf, sizeof(sbuf));
+		inet_ntop(AF_INET6, sd->tuple.daddr, dbuf, sizeof(dbuf));
+	} else {
+		struct in_addr addr;
+		addr.s_addr = *((in_addr_t *) sd->tuple.rcv_saddr);
+		snprintf(sbuf, sizeof(sbuf), "%s", inet_ntoa(addr));
+		addr.s_addr = *((in_addr_t *) sd->tuple.daddr);
+		snprintf(dbuf, sizeof(dbuf), "%s", inet_ntoa(addr));
+	}
+
+	if (sd->tuple.l4_protocol == 6) {
+		tag = "TCP";
+	} else if (sd->tuple.l4_protocol == 17) {
+		tag = "UDP";
+	} else {
+		tag = "Unknow";
+	}
+
+	if (sd->direction == T_EGRESS) {
+		snprintf(buf, BUF_SIZE, "%s %s.%d > %s.%d",
+			 tag, sbuf, sd->tuple.num, dbuf, sd->tuple.dport);
+	} else {
+		snprintf(buf, BUF_SIZE, "%s %s.%d > %s.%d",
+			 tag, dbuf, sd->tuple.dport, sbuf, sd->tuple.num);
+	}
+
+	return buf;
+}
+
+static void print_socket_data(struct socket_bpf_data *sd)
+{
+#define OUTPUT_DATA_SIZE 128
+
+	bool output = false;
+	uint32_t passed_sec = get_sys_uptime() - datadump_start_time;
+	if (passed_sec > datadump_timeout) {
+		datadump_start_time = 0;
+		datadump_enable = false;
+		datadump_timeout = 0;
+		datadump_pid = 0;
+		datadump_comm[0] = '\0';
+		datadump_proto = 0;
+		memcpy(datadump_file_path, "stdout", 7);
+		datadump_file = stdout;
+		return;
+	}
+
+	if (datadump_pid == 0 && (strlen(datadump_comm) > 0)
+	    && (datadump_proto == 0)) {
+		if (strcmp((char *)sd->process_kname, (char *)datadump_comm) ==
+		    0) {
+			output = true;
+		}
+
+	} else if (datadump_pid == 0 && (strlen(datadump_comm) == 0)
+		   && (datadump_proto == 0)) {
+		output = true;
+
+	} else if (datadump_pid > 0 && (strlen(datadump_comm) == 0)
+		   && (datadump_proto == 0)) {
+		if (sd->process_id == datadump_pid
+		    || sd->thread_id == datadump_pid)
+			output = true;
+
+	} else if (datadump_pid > 0 && (strlen(datadump_comm) > 0)
+		   && (datadump_proto == 0)) {
+		if ((sd->process_id == datadump_pid
+		     || sd->thread_id == datadump_pid)
+		    && (strcmp((char *)sd->process_kname, (char *)datadump_comm)
+			== 0))
+			output = true;
+	} else if (datadump_pid == 0 && (strlen(datadump_comm) > 0)
+		   && (datadump_proto > 0)) {
+		if (strcmp((char *)sd->process_kname, (char *)datadump_comm) ==
+		    0 && sd->l7_protocal_hint == datadump_proto)
+			output = true;
+
+	} else if (datadump_pid == 0 && (strlen(datadump_comm) == 0)
+		   && (datadump_proto > 0)) {
+		if (sd->l7_protocal_hint == datadump_proto)
+			output = true;
+
+	} else if (datadump_pid > 0 && (strlen(datadump_comm) == 0)
+		   && (datadump_proto > 0)) {
+		if ((sd->process_id == datadump_pid
+		     || sd->thread_id == datadump_pid)
+		    && sd->l7_protocal_hint == datadump_proto)
+			output = true;
+
+	} else if (datadump_pid > 0 && (strlen(datadump_comm) > 0)
+		   && (datadump_proto > 0)) {
+		if ((sd->process_id == datadump_pid
+		     || sd->thread_id == datadump_pid)
+		    && (strcmp((char *)sd->process_kname, (char *)datadump_comm)
+			== 0) && sd->l7_protocal_hint == datadump_proto)
+			output = true;
+	}
+
+	if (!output)
+		return;
+
+	char *timestamp = gen_timestamp_prefix();
+	if (timestamp == NULL)
+		return;
+
+	char *proto_tag = get_proto_name(sd->l7_protocal_hint);
+	char *type;
+	char *flow_str = flow_info(sd);
+	if (flow_str == NULL)
+		return;
+
+	if (sd->msg_type == MSG_REQUEST)
+		type = "req";
+	else if (sd->msg_type == MSG_RESPONSE)
+		type = "res";
+	else
+		type = "unknow";
+
+	if (sd->l7_protocal_hint == PROTO_HTTP1) {
+		fprintf(datadump_file, "\n+-----------------------------+\n"
+			"%s <%s> DIR %s TYPE %s(%d) PID %u THREAD_ID %u "
+			"COROUTINE_ID %" PRIu64 " SOURCE %d COMM %s "
+			"%s LEN %d SYSCALL_LEN %" PRIu64 " SOCKET_ID %" PRIu64 " "
+			"TRACE_ID %" PRIu64 " TCP_SEQ %" PRIu64 " DATA_SEQ %" PRIu64 " "
+			"TimeStamp %" PRIu64 "\n%s",
+			timestamp, proto_tag, sd->direction == T_EGRESS ? "out" : "in",
+			type, sd->msg_type, sd->process_id, sd->thread_id,
+			sd->coroutine_id, sd->source, sd->process_kname,
+			flow_str, sd->cap_len, sd->syscall_len,
+			sd->socket_id, sd->syscall_trace_id_call,
+			sd->tcp_seq, sd->cap_seq, sd->timestamp,
+			sd->cap_data);
+	} else {
+		fprintf(datadump_file, "\n+-----------------------------+\n"
+			"%s <%s> DIR %s TYPE %s(%d) PID %u THREAD_ID %u "
+			"COROUTINE_ID %" PRIu64 " SOURCE %d COMM %s "
+			"%s LEN %d SYSCALL_LEN %" PRIu64 " SOCKET_ID %" PRIu64 " "
+			"TRACE_ID %" PRIu64 " TCP_SEQ %" PRIu64 " DATA_SEQ %" PRIu64 " "
+			"TimeStamp %" PRIu64 "\n",
+			timestamp, proto_tag, sd->direction == T_EGRESS ? "out" : "in",
+			type, sd->msg_type, sd->process_id, sd->thread_id,
+			sd->coroutine_id, sd->source, sd->process_kname,
+			flow_str, sd->cap_len, sd->syscall_len,
+			sd->socket_id, sd->syscall_trace_id_call,
+			sd->tcp_seq, sd->cap_seq, sd->timestamp);
+
+		if (sd->l7_protocal_hint == PROTO_DNS) {
+			print_dns_info(sd->cap_data, sd->cap_len);
+		} else if (sd->source == 2) {
+			print_uprobe_http2_info(sd->cap_data, sd->cap_len);
+		} else {
+			int i, len = 0, __len;
+			char output_buf[OUTPUT_DATA_SIZE];
+			for (i = 0; i < sd->cap_len; i++) {
+				__len = snprintf(output_buf + len,
+						 sizeof(output_buf) - len,
+						 "%02X ", (uint8_t)sd->cap_data[i]);
+				len += __len;
+				if (__len <= 0 || len >= OUTPUT_DATA_SIZE)
+					break;
+			}
+
+			fprintf(datadump_file, "%s\n", output_buf);
+		}
+	}
+
+	fflush(datadump_file);
+	free(timestamp);
+	free(flow_str);
+}
+
+static void datadump_process(void *data)
+{
+	struct socket_bpf_data *sd = data;
+	pthread_mutex_lock(&datadump_mutex);
+	if (unlikely(datadump_enable))
+		print_socket_data(sd);
+	pthread_mutex_unlock(&datadump_mutex);
 }
