@@ -22,8 +22,9 @@ use super::FlowTimeout;
 
 use crate::common::enums::TcpFlags;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum FlowState {
+    #[default]
     Raw,
     Opening1,
     Opening2,
