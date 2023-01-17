@@ -409,7 +409,7 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 		}
 		entries := ret.GetEntries()
 		if len(entries) == 0 {
-			log.Warningf("genesis sharing k8s node (%s) entries length is 0", serverIP)
+			log.Debugf("genesis sharing k8s node (%s) entries length is 0", serverIP)
 			continue
 		}
 		epochStr := ret.GetEpoch()

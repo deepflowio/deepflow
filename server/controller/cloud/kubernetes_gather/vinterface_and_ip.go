@@ -376,7 +376,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 		for _, noMaskIPString := range aggNoMaskNets {
 			noMaskIP, _ := netaddr.ParseIPPrefix(noMaskIPString)
 			if !ipNetPrefix.Contains(noMaskIP.IP()) {
-				log.Warningf("vinterface,ip ip (%s) not found aggregated subnet", noMaskIPString)
+				log.Debugf("vinterface,ip ip (%s) not found aggregated subnet", noMaskIPString)
 				continue
 			}
 			vinterfaceLcuuid := ipToVinterfaceLcuuid[noMaskIPString]
@@ -384,7 +384,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 			ipLcuuid := common.GetUUID(vinterfaceLcuuid+noMaskIPPrefix.IP().String(), uuid.Nil)
 			podIPModel, ok := podIPsMap[ipLcuuid]
 			if !ok {
-				log.Warningf("vinterface,ip ip (%s) not relevancy subnet (%s)", noMaskIPPrefix.IP().String(), ipNetPrefix.String())
+				log.Debugf("vinterface,ip ip (%s) not relevancy subnet (%s)", noMaskIPPrefix.IP().String(), ipNetPrefix.String())
 				continue
 			}
 			podIPModel.SubnetLcuuid = subnetLcuuid
