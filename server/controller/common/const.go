@@ -515,3 +515,7 @@ const (
 	BILLING_METHOD_LICENSE = "license"
 	BILLING_METHOD_VOUCHER = "voucher"
 )
+
+const (
+	PROCESS_INSTANCE_TYPE = 62999 // used in process event
+)
