@@ -156,8 +156,10 @@ impl AppTable {
     }
 
     pub fn get_protocol(&mut self, packet: &MetaPacket) -> Option<L7ProtocolEnum> {
-        let (ip, epc, port) =
-            Self::get_ip_epc_port(packet, packet.direction == PacketDirection::ClientToServer);
+        let (ip, epc, port) = Self::get_ip_epc_port(
+            packet,
+            packet.lookup_key.direction == PacketDirection::ClientToServer,
+        );
         let time_in_sec = packet.lookup_key.timestamp.as_secs();
         match ip {
             IpAddr::V4(i) => self.get_ipv4_protocol(time_in_sec, i, epc, port),
@@ -284,8 +286,10 @@ impl AppTable {
     }
 
     pub fn set_protocol(&mut self, packet: &MetaPacket, protocol: L7ProtocolEnum) -> bool {
-        let (ip, epc, port) =
-            Self::get_ip_epc_port(packet, packet.direction == PacketDirection::ClientToServer);
+        let (ip, epc, port) = Self::get_ip_epc_port(
+            packet,
+            packet.lookup_key.direction == PacketDirection::ClientToServer,
+        );
         let time_in_sec = packet.lookup_key.timestamp.as_secs();
         match ip {
             IpAddr::V4(i) => self.set_ipv4_protocol(time_in_sec, i, epc, port, protocol),
@@ -300,7 +304,7 @@ impl AppTable {
         local_epc: i32,
         remote_epc: i32,
     ) -> bool {
-        let is_c2s = packet.direction == PacketDirection::ClientToServer;
+        let is_c2s = packet.lookup_key.direction == PacketDirection::ClientToServer;
         let (ip, _, port) = Self::get_ip_epc_port(packet, is_c2s);
         // 在容器环境中相同回环地址和端口可能对应不同的应用，这里不做记录
         // ====================================================================================
