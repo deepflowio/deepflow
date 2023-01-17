@@ -184,20 +184,23 @@ enum {
 	SOCKOPT_SET_TRACER_DEL,
 	SOCKOPT_SET_TRACER_SET,
 	SOCKOPT_SET_TRACER_FLUSH,
-
 	/* get */
 	SOCKOPT_GET_TRACER_SHOW,
-};
 
-enum {
 	/* set */
 	SOCKOPT_SET_SOCKTRACE_ADD = 500,
 	SOCKOPT_SET_SOCKTRACE_DEL,
 	SOCKOPT_SET_SOCKTRACE_SET,
 	SOCKOPT_SET_SOCKTRACE_FLUSH,
-
 	/* get */
 	SOCKOPT_GET_SOCKTRACE_SHOW,
+
+	/* set */
+	SOCKOPT_SET_DATADUMP_ADD = 600,
+	SOCKOPT_SET_DATADUMP_ON,
+	SOCKOPT_SET_DATADUMP_OFF,
+	/* get */
+	SOCKOPT_GET_DATADUMP_SHOW
 };
 
 struct mem_block_head {
@@ -303,6 +306,7 @@ struct bpf_tracer {
 	int dispatch_workers_nr;		// 分发线程数量
 	struct queue queues[MAX_CPU_NR];	// 分发队列，每个分发线程都有其对应的队列。
 	void *process_fn;			// 回调应用传递过来的接口, 进行数据处理
+	void (*datadump) (void *data);		// eBPF data dump handle
 
 	/*
 	 * perf ring-buffer from kernel to user.
@@ -445,6 +449,8 @@ prefetch_and_process_datas(struct bpf_tracer *t, int nb_rx, void **datas_burst)
 		if (block_head->fn != NULL) {
 			block_head->fn(sd);
 		} else {
+			if (t->datadump)
+				t->datadump((void *)sd);
 			callback(sd);
 		}
 
