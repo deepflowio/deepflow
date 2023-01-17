@@ -447,27 +447,20 @@ impl Stash {
         }
 
         // 全景图统计
-        let (direction_0, direction_1, is_extra_tracing_doc) = get_direction(
+        let directions = get_direction(
             flow,
             self.context.config.load().trident_type,
             self.context.config.load().cloud_gateway_traffic,
         );
-        let directions = [direction_0, direction_1];
-
-        self.fill_stats(&acc_flow, directions, false, inactive_ip_enabled);
-        self.fill_tracing_stats(
-            &acc_flow,
-            directions,
-            is_extra_tracing_doc,
-            inactive_ip_enabled,
-        );
+        self.fill_stats(&acc_flow, directions, inactive_ip_enabled);
     }
 
+    // When generating doc data, use flow.flow_metrics_peers[x].nat_real_ip/port,
+    // The tag is to use the real client before NAT and the real server after NAT
     fn fill_stats(
         &mut self,
         acc_flow: &AccumulatedFlow,
         directions: [Direction; 2],
-        is_extra_tracing_doc: bool,
         inactive_ip_enabled: bool,
     ) {
         for ep in 0..2 {
@@ -480,8 +473,8 @@ impl Stash {
             } else {
                 acc_flow.is_active_host1
             };
-            // 单端统计量：不统计非活跃的一端（Internet/不回包的内网IP）；不统计链路追踪额外增加的doc
-            if (inactive_ip_enabled || is_active_host) && !is_extra_tracing_doc {
+            // 单端统计量：不统计非活跃的一端（Internet/不回包的内网IP）
+            if inactive_ip_enabled || is_active_host {
                 if ep == FLOW_METRICS_PEER_DST {
                     let reversed_meter = acc_flow.flow_meter.to_reversed();
                     self.fill_single_stats(
@@ -502,21 +495,11 @@ impl Stash {
                 }
             }
             // 双端统计量：若某端direction已知，则以该direction（对应的tap-side）记录统计数据，最多记录两次
-            self.fill_edge_stats(
-                acc_flow,
-                directions[ep],
-                is_extra_tracing_doc,
-                inactive_ip_enabled,
-            );
+            self.fill_edge_stats(acc_flow, directions[ep], inactive_ip_enabled);
         }
         // 双端统计量：若双端direction都未知，则以direction=0（对应tap-side=rest）记录一次统计数据
         if directions[0] == Direction::None && directions[1] == Direction::None {
-            self.fill_edge_stats(
-                acc_flow,
-                Direction::None,
-                is_extra_tracing_doc,
-                inactive_ip_enabled,
-            );
+            self.fill_edge_stats(acc_flow, Direction::None, inactive_ip_enabled);
         }
     }
 
@@ -559,7 +542,7 @@ impl Stash {
             }
         } else if ep == FLOW_METRICS_PEER_SRC {
             if flow.flow_metrics_peers[0].l3_epc_id > 0 {
-                flow_key.ip_src
+                flow.flow_metrics_peers[0].nat_real_ip
             } else {
                 if is_ipv6 {
                     Ipv6Addr::UNSPECIFIED.into()
@@ -569,7 +552,7 @@ impl Stash {
             }
         } else {
             if flow.flow_metrics_peers[1].l3_epc_id > 0 {
-                flow_key.ip_dst
+                flow.flow_metrics_peers[1].nat_real_ip
             } else {
                 if is_ipv6 {
                     Ipv6Addr::UNSPECIFIED.into()
@@ -604,7 +587,7 @@ impl Stash {
                 ) {
                 0
             } else {
-                flow_key.port_dst
+                flow.flow_metrics_peers[1].nat_real_port
             },
             is_ipv6,
             code: {
@@ -655,7 +638,6 @@ impl Stash {
         &mut self,
         acc_flow: &AccumulatedFlow,
         direction: Direction,
-        is_extra_tracing_doc: bool,
         inactive_ip_enabled: bool,
     ) {
         let flow = &acc_flow.tagged_flow.flow;
@@ -666,16 +648,7 @@ impl Stash {
         let is_ipv6 = flow.eth_type == EthernetType::Ipv6;
 
         let (src_ip, dst_ip) = {
-            let (mut src_ip, mut dst_ip) = (flow.flow_key.ip_src, flow.flow_key.ip_dst);
-            if is_extra_tracing_doc {
-                if src_ip != acc_flow.nat_real_ip_0 {
-                    src_ip = acc_flow.nat_real_ip_0;
-                }
-                if dst_ip != acc_flow.nat_real_ip_1 {
-                    dst_ip = acc_flow.nat_real_ip_1;
-                }
-            }
-
+            let (mut src_ip, mut dst_ip) = (acc_flow.nat_real_ip_0, acc_flow.nat_real_ip_1);
             if !inactive_ip_enabled {
                 if !acc_flow.is_active_host0 {
                     src_ip = if is_ipv6 {
@@ -717,17 +690,16 @@ impl Stash {
 
         let (src_mac, dst_mac) = {
             let (mut src_mac, mut dst_mac) = (flow.flow_key.mac_src, flow.flow_key.mac_dst);
-            // 不是追踪数据，仅VIPInterface设备发送MAC地址
-            if !is_extra_tracing_doc {
-                if direction != Direction::LocalToLocal {
-                    if !src_ep.is_vip_interface {
-                        src_mac = MacAddr::ZERO;
-                    }
-                    if !dst_ep.is_vip_interface {
-                        dst_mac = MacAddr::ZERO;
-                    }
+            // 仅VIPInterface设备发送MAC地址
+            if direction != Direction::LocalToLocal {
+                if !src_ep.is_vip_interface {
+                    src_mac = MacAddr::ZERO;
+                }
+                if !dst_ep.is_vip_interface {
+                    dst_mac = MacAddr::ZERO;
                 }
             }
+
             (src_mac, dst_mac)
         };
 
@@ -753,7 +725,7 @@ impl Stash {
             ) {
                 0
             } else {
-                flow_key.port_dst
+                dst_ep.nat_real_port
             },
             code: {
                 let mut code = Code::IP_PATH
@@ -795,26 +767,6 @@ impl Stash {
             let key = StashKey::new(&tagger, src_ip, Some(dst_ip));
             self.add(key, tagger, Meter::App(acc_flow.app_meter.clone()));
         }
-    }
-
-    fn fill_tracing_stats(
-        &mut self,
-        acc_flow: &AccumulatedFlow,
-        directions: [Direction; 2],
-        is_extra_tracing_doc: bool,
-        inactive_ip_enabled: bool,
-    ) {
-        // 目前有两种场景需要增加追踪数据：
-        // VIP场景：
-        //     需要有RIP即natSrcIp和natDstIp
-        // 其他场景直接返回
-        if !is_extra_tracing_doc
-            || (acc_flow.nat_real_ip_0 == acc_flow.tagged_flow.flow.flow_key.ip_src
-                && acc_flow.nat_real_ip_1 == acc_flow.tagged_flow.flow.flow_key.ip_dst)
-        {
-            return;
-        }
-        self.fill_stats(acc_flow, directions, true, inactive_ip_enabled)
     }
 
     fn add(&mut self, key: StashKey, tagger: Tagger, meter: Meter) {

@@ -525,7 +525,7 @@ mod tests {
         let mut output: String = String::new();
         let first_dst_port = packets[0].lookup_key.dst_port;
         for packet in packets.iter_mut() {
-            packet.direction = if packet.lookup_key.dst_port == first_dst_port {
+            packet.lookup_key.direction = if packet.lookup_key.dst_port == first_dst_port {
                 PacketDirection::ClientToServer
             } else {
                 PacketDirection::ServerToClient
@@ -537,7 +537,7 @@ mod tests {
             let _ = mysql.parse(
                 payload,
                 packet.lookup_key.proto,
-                packet.direction,
+                packet.lookup_key.direction,
                 None,
                 None,
             );
