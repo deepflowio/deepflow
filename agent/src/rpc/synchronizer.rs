@@ -53,7 +53,9 @@ use crate::exception::ExceptionHandler;
 use crate::rpc::session::Session;
 use crate::trident::{self, ChangedConfig, RunningMode, TridentState, VersionInfo};
 use crate::utils::{
-    environment::{get_executable_path, is_tt_pod, running_in_container},
+    environment::{
+        get_executable_path, is_tt_pod, running_in_container, running_in_only_watch_k8s_mode,
+    },
     stats,
 };
 use public::proto::common::TridentType;
@@ -569,6 +571,7 @@ impl Synchronizer {
             vtap_group_id_request: Some(static_config.vtap_group_id_request.clone()),
             kubernetes_cluster_id: Some(static_config.kubernetes_cluster_id.clone()),
             kubernetes_cluster_name: static_config.kubernetes_cluster_name.clone(),
+            kubernetes_force_watch: Some(running_in_only_watch_k8s_mode()),
 
             ..Default::default()
         }

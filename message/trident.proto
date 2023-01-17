@@ -86,6 +86,7 @@ message SyncRequest {
     repeated string host_ips = 23; // 仅作为注册使用
     optional string ctrl_mac = 25;
     optional string vtap_group_id_request = 26; // 支持采集器自动加入组
+    optional bool kubernetes_force_watch = 27 [default = false];
 
     repeated CommunicationVtap communication_vtaps = 31; // 仅对数据节点有意义
 

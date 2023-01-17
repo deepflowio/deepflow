@@ -832,7 +832,7 @@ pub enum Components {
 #[cfg(target_os = "linux")]
 pub struct WatcherComponents {
     pub api_watcher: Arc<ApiWatcher>,
-    pub libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
+    pub libvirt_xml_extractor: Arc<LibvirtXmlExtractor>, // FIXME: Delete this component
     pub platform_synchronizer: Arc<PlatformSynchronizer>,
     pub domain_name_listener: DomainNameListener,
     pub running: AtomicBool,
