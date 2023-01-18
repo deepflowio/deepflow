@@ -25,6 +25,7 @@ import (
 	"net"
 	"sort"
 	"strconv"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/spf13/cobra"
@@ -318,9 +319,11 @@ func gpidAgentRequest(cmd *cobra.Command) {
 		fmt.Println(err)
 		return
 	}
-	fmt.Printf("response(ctrl_ip: %s ctrl_mac: %s vtap_id: %d)\n", response.GetCtrlIp(), response.GetCtrlMac(), response.GetVtapId())
+	req := response.GetSyncRequest()
+	tm := time.Unix(int64(response.GetUpdateTime()), 0)
+	fmt.Printf("response(ctrl_ip: %s ctrl_mac: %s vtap_id: %d update_time: %s)\n", req.GetCtrlIp(), req.GetCtrlMac(), req.GetVtapId(), tm.Format("2006-01-02 15:04:05"))
 	fmt.Println("Entries:")
-	for index, entry := range response.Entries {
+	for index, entry := range req.Entries {
 		JsonFormat(index+1, formatEntries(entry))
 	}
 }

@@ -21,7 +21,7 @@ service Synchronizer {
 // debug service
 service Debug {
     rpc DebugGPIDGlobalData (GPIDSyncRequest) returns(GPIDGlobalData) {}
-    rpc DebugGPIDVTapData (GPIDSyncRequest) returns(GPIDSyncRequest) {}
+    rpc DebugGPIDVTapData (GPIDSyncRequest) returns(GPIDVTapData) {}
     rpc DebugRealGlobalData (GPIDSyncRequest) returns(RealGlobalData) {}
 }
 
@@ -718,4 +718,9 @@ message RealClientToRealServer {
 
 message RealGlobalData {
     repeated RealClientToRealServer entries = 1;
+}
+
+message GPIDVTapData {
+    optional uint32  update_time = 1 [default = 0];
+    optional GPIDSyncRequest  sync_request = 2;    
 }
