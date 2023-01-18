@@ -25,6 +25,7 @@ use crate::{
         flow::{FlowPerfStats, L7PerfStats, L7Protocol, PacketDirection},
         meta_packet::MetaPacket,
     },
+    config::handler::LogParserConfig,
     flow_generator::{
         error::{Error, Result},
         perf::l7_rrt::L7RrtCache,
@@ -75,7 +76,12 @@ impl fmt::Debug for RedisPerfData {
 }
 
 impl L7FlowPerf for RedisPerfData {
-    fn parse(&mut self, packet: &MetaPacket, flow_id: u64) -> Result<()> {
+    fn parse(
+        &mut self,
+        _: Option<&LogParserConfig>,
+        packet: &MetaPacket,
+        flow_id: u64,
+    ) -> Result<()> {
         if packet.lookup_key.proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
         }
@@ -268,7 +274,7 @@ mod tests {
             } else {
                 packet.lookup_key.direction = PacketDirection::ServerToClient;
             }
-            let _ = redis_perf_data.parse(packet, 0x1f3c01010);
+            let _ = redis_perf_data.parse(None, packet, 0x1f3c01010);
         }
         redis_perf_data
     }

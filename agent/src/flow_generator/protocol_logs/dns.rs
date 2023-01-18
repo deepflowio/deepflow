@@ -25,6 +25,7 @@ use crate::{
         l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
         IPV4_ADDR_LEN, IPV6_ADDR_LEN,
     },
+    config::handler::LogParserConfig,
     flow_generator::error::{Error, Result},
     log_info_merge, parse_common,
     utils::bytes::read_u16_be,
@@ -153,7 +154,12 @@ pub struct DnsLog {
 
 //解析器接口实现
 impl L7ProtocolParserInterface for DnsLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(
+        &mut self,
+        _: Option<&LogParserConfig>,
+        payload: &[u8],
+        param: &ParseParam,
+    ) -> bool {
         if !param.ebpf_type.is_raw_protocol() {
             return false;
         }
@@ -161,7 +167,12 @@ impl L7ProtocolParserInterface for DnsLog {
         self.dns_check_protocol(payload, param)
     }
 
-    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+    fn parse_payload(
+        &mut self,
+        _: Option<&LogParserConfig>,
+        payload: &[u8],
+        param: &ParseParam,
+    ) -> Result<Vec<L7ProtocolInfo>> {
         if self.parsed {
             return Ok(vec![L7ProtocolInfo::DnsInfo(self.info.clone())]);
         }

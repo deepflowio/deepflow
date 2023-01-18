@@ -15,24 +15,25 @@
  */
 use serde::Serialize;
 
-use super::super::{
-    consts::KAFKA_REQ_HEADER_LEN, value_is_default, value_is_negative, AppProtoHead,
-    L7ResponseStatus, LogMessageType,
-};
-
-use crate::common::flow::L7Protocol;
-use crate::common::l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface};
-use crate::common::l7_protocol_log::{L7ProtocolParserInterface, ParseParam};
-use crate::flow_generator::protocol_logs::pb_adapter::{
-    ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response,
-};
 use crate::{
-    common::enums::IpProtocol,
-    common::flow::PacketDirection,
-    flow_generator::error::{Error, Result},
+    common::{
+        enums::IpProtocol,
+        flow::{L7Protocol, PacketDirection},
+        l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
+        l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
+    },
+    config::handler::LogParserConfig,
+    flow_generator::{
+        error::{Error, Result},
+        protocol_logs::{
+            consts::KAFKA_REQ_HEADER_LEN,
+            pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response},
+            value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus, LogMessageType,
+        },
+    },
+    log_info_merge, parse_common,
     utils::bytes::{read_i16_be, read_u16_be, read_u32_be},
 };
-use crate::{log_info_merge, parse_common};
 
 const KAFKA_FETCH: u16 = 1;
 
@@ -249,14 +250,24 @@ pub struct KafkaLog {
 }
 
 impl L7ProtocolParserInterface for KafkaLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(
+        &mut self,
+        _: Option<&LogParserConfig>,
+        payload: &[u8],
+        param: &ParseParam,
+    ) -> bool {
         if !param.ebpf_type.is_raw_protocol() {
             return false;
         }
         Self::kafka_check_protocol(payload, param)
     }
 
-    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+    fn parse_payload(
+        &mut self,
+        _: Option<&LogParserConfig>,
+        payload: &[u8],
+        param: &ParseParam,
+    ) -> Result<Vec<L7ProtocolInfo>> {
         parse_common!(self, param);
         Self::parse(
             self,

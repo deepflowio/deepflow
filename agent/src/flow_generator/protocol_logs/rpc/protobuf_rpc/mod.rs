@@ -30,7 +30,7 @@ use crate::{
         l7_protocol_log::{L7ProtocolParser, L7ProtocolParserInterface, ParseParam},
         MetaPacket,
     },
-    config::handler::LogParserAccess,
+    config::handler::LogParserConfig,
     flow_generator::{
         perf::L7FlowPerf, protocol_logs::pb_adapter::L7ProtocolSendLog, AppProtoHead, Result,
     },

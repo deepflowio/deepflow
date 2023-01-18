@@ -69,6 +69,8 @@ pub enum Error {
     L7ProtocolCanNotMerge(L7ProtocolInfo),
     #[error("l7 log can not merge")]
     L7LogCanNotMerge(AppProtoLogsData),
+    #[error("parse config not provided")]
+    NoParseConfig,
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

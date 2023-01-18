@@ -28,6 +28,7 @@ use crate::{
         flow::{FlowPerfStats, L7PerfStats, L7Protocol},
         meta_packet::MetaPacket,
     },
+    config::handler::LogParserConfig,
     flow_generator::{
         error::{Error, Result},
         perf::l7_rrt::L7RrtCache,
@@ -89,7 +90,12 @@ impl fmt::Debug for MqttPerfData {
 }
 
 impl L7FlowPerf for MqttPerfData {
-    fn parse(&mut self, packet: &MetaPacket, flow_id: u64) -> Result<()> {
+    fn parse(
+        &mut self,
+        _: Option<&LogParserConfig>,
+        packet: &MetaPacket,
+        flow_id: u64,
+    ) -> Result<()> {
         if packet.lookup_key.proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
         }
@@ -318,7 +324,7 @@ mod tests {
             } else {
                 packet.lookup_key.direction = PacketDirection::ServerToClient;
             }
-            let _ = mqtt_perf_data.parse(packet, 1608373855724393643);
+            let _ = mqtt_perf_data.parse(None, packet, 1608373855724393643);
         }
         mqtt_perf_data.stats.unwrap_or_default()
     }
