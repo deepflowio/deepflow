@@ -36,7 +36,7 @@ fn main() {
     }
 
     for _ in 0..iters {
-        let _ = parser.parse(&packets[0], 0x1f3c01010);
-        let _ = parser.parse(&packets[1], 0x1f3c01010);
+        let _ = parser.parse(None, &packets[0], 0x1f3c01010);
+        let _ = parser.parse(None, &packets[1], 0x1f3c01010);
     }
 }

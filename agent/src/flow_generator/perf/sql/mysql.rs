@@ -25,6 +25,7 @@ use crate::{
         flow::{FlowPerfStats, L7PerfStats, L7Protocol},
         meta_packet::MetaPacket,
     },
+    config::handler::LogParserConfig,
     flow_generator::{
         error::{Error, Result},
         perf::l7_rrt::L7RrtCache,
@@ -87,7 +88,12 @@ const CLIENT_ERROR_MIN: u16 = 2000;
 const CLIENT_ERROR_MAX: u16 = 2999;
 
 impl L7FlowPerf for MysqlPerfData {
-    fn parse(&mut self, packet: &MetaPacket, flow_id: u64) -> Result<()> {
+    fn parse(
+        &mut self,
+        _: Option<&LogParserConfig>,
+        packet: &MetaPacket,
+        flow_id: u64,
+    ) -> Result<()> {
         if packet.lookup_key.proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
         }
@@ -315,7 +321,7 @@ mod test {
             } else {
                 packet.lookup_key.direction = PacketDirection::ServerToClient;
             }
-            let _ = perf_data.parse(packet, 0x1f3c01010);
+            let _ = perf_data.parse(None, packet, 0x1f3c01010);
         }
         perf_data
     }

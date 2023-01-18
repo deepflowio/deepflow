@@ -20,16 +20,21 @@ use std::{fmt, str};
 
 use super::super::{value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
 
-use crate::common::enums::IpProtocol;
-use crate::common::flow::L7Protocol;
-use crate::common::flow::PacketDirection;
-use crate::common::l7_protocol_info::L7ProtocolInfo;
-use crate::common::l7_protocol_info::L7ProtocolInfoInterface;
-use crate::common::l7_protocol_log::L7ProtocolParserInterface;
-use crate::common::l7_protocol_log::ParseParam;
-use crate::flow_generator::error::{Error, Result};
-use crate::flow_generator::protocol_logs::pb_adapter::{L7ProtocolSendLog, L7Request, L7Response};
-use crate::parse_common;
+use crate::{
+    common::{
+        enums::IpProtocol,
+        flow::L7Protocol,
+        flow::PacketDirection,
+        l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
+        l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
+    },
+    config::handler::LogParserConfig,
+    flow_generator::{
+        error::{Error, Result},
+        protocol_logs::pb_adapter::{L7ProtocolSendLog, L7Request, L7Response},
+    },
+    parse_common,
+};
 
 const SEPARATOR_SIZE: usize = 2;
 
@@ -196,7 +201,12 @@ pub struct RedisLog {
 }
 
 impl L7ProtocolParserInterface for RedisLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(
+        &mut self,
+        _: Option<&LogParserConfig>,
+        payload: &[u8],
+        param: &ParseParam,
+    ) -> bool {
         if !param.ebpf_type.is_raw_protocol() {
             return false;
         }
@@ -205,7 +215,12 @@ impl L7ProtocolParserInterface for RedisLog {
         Self::redis_check_protocol(payload, param)
     }
 
-    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+    fn parse_payload(
+        &mut self,
+        _: Option<&LogParserConfig>,
+        payload: &[u8],
+        param: &ParseParam,
+    ) -> Result<Vec<L7ProtocolInfo>> {
         parse_common!(self, param);
         self.info.is_tls = param.is_tls();
         self.info.set_packet_seq(param);

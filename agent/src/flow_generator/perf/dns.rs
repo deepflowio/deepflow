@@ -28,6 +28,7 @@ use crate::{
         flow::{FlowPerfStats, L7PerfStats, L7Protocol},
         meta_packet::MetaPacket,
     },
+    config::handler::LogParserConfig,
     flow_generator::error::{Error, Result},
     utils::bytes::{read_u16_be, read_u16_le},
 };
@@ -78,7 +79,12 @@ impl fmt::Debug for DnsPerfData {
 }
 
 impl L7FlowPerf for DnsPerfData {
-    fn parse(&mut self, packet: &MetaPacket, flow_id: u64) -> Result<()> {
+    fn parse(
+        &mut self,
+        _: Option<&LogParserConfig>,
+        packet: &MetaPacket,
+        flow_id: u64,
+    ) -> Result<()> {
         let payload = packet.get_l4_payload().ok_or(Error::ZeroPayloadLen)?;
 
         match packet.lookup_key.proto {
@@ -284,7 +290,7 @@ mod tests {
             } else {
                 packet.lookup_key.direction = PacketDirection::ServerToClient;
             }
-            let _ = dns_perf_data.parse(packet, 0x1f3c01010);
+            let _ = dns_perf_data.parse(None, packet, 0x1f3c01010);
         }
         dns_perf_data
     }
