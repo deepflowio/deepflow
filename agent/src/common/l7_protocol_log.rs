@@ -24,7 +24,7 @@ use super::flow::PacketDirection;
 use super::l7_protocol_info::L7ProtocolInfo;
 use super::MetaPacket;
 
-use crate::config::handler::LogParserAccess;
+use crate::config::handler::LogParserConfig;
 use crate::flow_generator::protocol_logs::{
     get_protobuf_rpc_parser, DnsLog, DubboLog, HttpLog, KafkaLog, MqttLog, MysqlLog, PostgresqlLog,
     ProtobufRpcWrapLog, RedisLog, SofaRpcLog,
@@ -96,7 +96,7 @@ macro_rules! parse_common {
     impl L7ProtocolParserInterface for xxxLog {
         // ... other fn
 
-         fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+         fn parse_payload(&mut self, config: Option<&L7LogParserConfig>, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
             // set the info time
             self.info.start_time = param.time;
             self.info.end_time = param.time;
@@ -350,9 +350,19 @@ all_protocol!(
 
 #[enum_dispatch(L7ProtocolParser)]
 pub trait L7ProtocolParserInterface {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool;
+    fn check_payload(
+        &mut self,
+        config: Option<&LogParserConfig>,
+        payload: &[u8],
+        param: &ParseParam,
+    ) -> bool;
     // 协议解析
-    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>>;
+    fn parse_payload(
+        &mut self,
+        config: Option<&LogParserConfig>,
+        payload: &[u8],
+        param: &ParseParam,
+    ) -> Result<Vec<L7ProtocolInfo>>;
     // 返回协议号和协议名称，由于的bitmap使用u128，所以协议号不能超过128.
     // 其中 crates/public/src/l7_protocol.rs 里面的 pub const L7_PROTOCOL_xxx 是已实现的协议号.
     // ===========================================================================================
@@ -373,10 +383,6 @@ pub trait L7ProtocolParserInterface {
             _ => L7ProtocolEnum::L7Protocol(proto),
         }
     }
-    // 仅http和dubbo协议会有log_parser_config，其他协议可以忽略。
-    // ================================================================
-    // only http and dubbo use config. other protocol should do nothing.
-    fn set_parse_config(&mut self, _log_parser_config: &LogParserAccess) {}
     // l4是tcp时是否解析，用于快速过滤协议
     // ==============================
     // whether l4 is parsed when tcp, use for quickly protocol filter
