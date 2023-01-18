@@ -278,9 +278,9 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 		}, nil
 	}
 	if vtapCache == nil {
-		log.Warningf("vtap (ctrl_ip: %s, ctrl_mac: %s, host_ips: %s, kubernetes_cluster_id: %s, group_id: %s) not found in cache. "+
+		log.Warningf("vtap (ctrl_ip: %s, ctrl_mac: %s, host_ips: %s, kubernetes_cluster_id: %s, kubernetes_force_watch: %t, group_id: %s) not found in cache. "+
 			"NAME:%s  REVISION:%s  BOOT_TIME:%d",
-			ctrlIP, ctrlMac, in.GetHostIps(), in.GetKubernetesClusterId(),
+			ctrlIP, ctrlMac, in.GetHostIps(), in.GetKubernetesClusterId(), in.GetKubernetesForceWatch(),
 			in.GetVtapGroupIdRequest(), in.GetProcessName(), in.GetRevision(), in.GetBootTime())
 
 		gVTapInfo.Register(
@@ -386,11 +386,11 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 	configInfo := e.generateConfigInfo(vtapCache, in.GetKubernetesClusterId())
 	// 携带信息有cluster_id时选择一个采集器开启云平台同步开关
 	if in.GetKubernetesClusterId() != "" && isOpenK8sSyn(vtapCache.GetVTapType()) == true {
-		value := gVTapInfo.GetKubernetesClusterID(in.GetKubernetesClusterId(), vtapCacheKey)
+		value := gVTapInfo.GetKubernetesClusterID(in.GetKubernetesClusterId(), vtapCacheKey, in.GetKubernetesForceWatch())
 		if value == vtapCacheKey {
 			log.Infof(
-				"open cluster(%s) kubernetes_api_enabled VTap(ctrl_ip: %s, ctrl_mac: %s)",
-				in.GetKubernetesClusterId(), ctrlIP, ctrlMac)
+				"open cluster(%s) kubernetes_api_enabled VTap(ctrl_ip: %s, ctrl_mac: %s, kubernetes_force_watch: %t)",
+				in.GetKubernetesClusterId(), ctrlIP, ctrlMac, in.GetKubernetesForceWatch())
 			configInfo.KubernetesApiEnabled = proto.Bool(true)
 		}
 	}
@@ -532,12 +532,12 @@ func (e *VTapEvent) noVTapResponse(in *api.SyncRequest) *api.SyncResponse {
 		}
 		configInfo.TridentType = &tridentType
 		configInfo.Enabled = proto.Bool(true)
-		value := gVTapInfo.GetKubernetesClusterID(in.GetKubernetesClusterId(), vtapCacheKey)
+		value := gVTapInfo.GetKubernetesClusterID(in.GetKubernetesClusterId(), vtapCacheKey, in.GetKubernetesForceWatch())
 		if value == vtapCacheKey {
 			configInfo.KubernetesApiEnabled = proto.Bool(true)
 			log.Infof(
-				"open cluster(%s) kubernetes_api_enabled VTap(ctrl_ip: %s, ctrl_mac: %s)",
-				in.GetKubernetesClusterId(), ctrlIP, ctrlMac)
+				"open cluster(%s) kubernetes_api_enabled VTap(ctrl_ip: %s, ctrl_mac: %s, kubernetes_force_watch: %t)",
+				in.GetKubernetesClusterId(), ctrlIP, ctrlMac, in.GetKubernetesForceWatch())
 		}
 		return &api.SyncResponse{
 			Status: &STATUS_SUCCESS,
@@ -663,11 +663,11 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 	configInfo := e.generateConfigInfo(vtapCache, in.GetKubernetesClusterId())
 	// 携带信息有cluster_id时选择一个采集器开启云平台同步开关
 	if in.GetKubernetesClusterId() != "" && isOpenK8sSyn(vtapCache.GetVTapType()) == true {
-		value := gVTapInfo.GetKubernetesClusterID(in.GetKubernetesClusterId(), vtapCacheKey)
+		value := gVTapInfo.GetKubernetesClusterID(in.GetKubernetesClusterId(), vtapCacheKey, in.GetKubernetesForceWatch())
 		if value == vtapCacheKey {
 			log.Infof(
-				"open cluster(%s) kubernetes_api_enabled VTap(ctrl_ip: %s, ctrl_mac: %s)",
-				in.GetKubernetesClusterId(), ctrlIP, ctrlMac)
+				"open cluster(%s) kubernetes_api_enabled VTap(ctrl_ip: %s, ctrl_mac: %s, kubernetes_force_watch: %t)",
+				in.GetKubernetesClusterId(), ctrlIP, ctrlMac, in.GetKubernetesForceWatch())
 			configInfo.KubernetesApiEnabled = proto.Bool(true)
 		}
 	}
