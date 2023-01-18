@@ -31,7 +31,6 @@ use std::slice;
 use std::sync::Arc;
 use std::time::Duration;
 
-use arc_swap::access::Access;
 use enum_dispatch::enum_dispatch;
 use public::bitmap::Bitmap;
 use public::l7_protocol::L7ProtocolEnum;
@@ -40,18 +39,18 @@ use super::app_table::AppTable;
 use super::error::{Error, Result};
 use super::protocol_logs::{AppProtoHead, PostgresqlLog, ProtobufRpcWrapLog, SofaRpcLog};
 
-use crate::common::flow::{PacketDirection, SignalSource};
-use crate::common::l7_protocol_info::L7ProtocolInfo;
-use crate::common::l7_protocol_log::{
-    get_all_protocol, get_parser, L7ProtocolBitmap, L7ProtocolParser, L7ProtocolParserInterface,
-    ParseParam,
+use crate::{
+    common::{
+        flow::{FlowPerfStats, L4Protocol, L7Protocol, PacketDirection, SignalSource},
+        l7_protocol_info::L7ProtocolInfo,
+        l7_protocol_log::{
+            get_all_protocol, get_parser, L7ProtocolBitmap, L7ProtocolParser,
+            L7ProtocolParserInterface, ParseParam,
+        },
+        meta_packet::MetaPacket,
+    },
+    config::{handler::LogParserConfig, FlowConfig},
 };
-use crate::common::{
-    flow::{FlowPerfStats, L4Protocol, L7Protocol},
-    meta_packet::MetaPacket,
-};
-use crate::config::handler::LogParserAccess;
-use crate::config::FlowAccess;
 
 use {
     self::http::HttpPerfData,
@@ -80,7 +79,12 @@ pub trait L4FlowPerf {
 
 #[enum_dispatch(L7FlowPerfTable)]
 pub trait L7FlowPerf {
-    fn parse(&mut self, packet: &MetaPacket, flow_id: u64) -> Result<()>;
+    fn parse(
+        &mut self,
+        config: Option<&LogParserConfig>,
+        packet: &MetaPacket,
+        flow_id: u64,
+    ) -> Result<()>;
     fn data_updated(&self) -> bool;
     fn copy_and_reset_data(&mut self, l7_timeout_count: u32) -> FlowPerfStats;
     fn app_proto_head(&mut self) -> Option<(AppProtoHead, u16)>;
@@ -204,9 +208,6 @@ pub struct FlowPerf {
     is_from_app: bool,
     is_success: bool,
     is_skip: bool,
-
-    parse_config: LogParserAccess,
-    flow_config: FlowAccess,
 }
 
 impl FlowPerf {
@@ -235,6 +236,7 @@ impl FlowPerf {
     // return rrt
     fn l7_parse_perf(
         &mut self,
+        log_parser_config: &LogParserConfig,
         packet: &MetaPacket,
         flow_id: u64,
         app_table: &mut AppTable,
@@ -248,7 +250,7 @@ impl FlowPerf {
             return Err(Error::ZeroPayloadLen);
         }
         let perf_parser = self.l7.as_mut().unwrap();
-        let ret = perf_parser.parse(packet, flow_id);
+        let ret = perf_parser.parse(Some(log_parser_config), packet, flow_id);
 
         // TODO 目前rrt由perf计算， 用于聚合时计算slot，后面perf 抽象出来后，将去掉perf，rrt由log parser计算
         // =======================================================================================
@@ -303,6 +305,8 @@ impl FlowPerf {
 
     fn l7_parse_log(
         &mut self,
+        flow_config: &FlowConfig,
+        log_parser_config: &LogParserConfig,
         packet: &mut MetaPacket,
         app_table: &mut AppTable,
         parse_param: &ParseParam,
@@ -315,11 +319,11 @@ impl FlowPerf {
 
         if let Some(payload) = packet.get_l4_payload() {
             let parser = self.l7_protocol_log_parser.as_mut().unwrap();
-            parser.set_parse_config(&self.parse_config);
 
             let ret = parser.parse_payload(
+                Some(log_parser_config),
                 {
-                    let pkt_size = self.flow_config.load().l7_log_packet_size as usize;
+                    let pkt_size = flow_config.l7_log_packet_size as usize;
                     if pkt_size > payload.len() {
                         payload
                     } else {
@@ -366,6 +370,8 @@ impl FlowPerf {
 
     fn l7_check(
         &mut self,
+        flow_config: &FlowConfig,
+        log_parser_config: &LogParserConfig,
         packet: &mut MetaPacket,
         flow_id: u64,
         app_table: &mut AppTable,
@@ -391,8 +397,7 @@ impl FlowPerf {
                 let Some(mut parser) = get_parser(L7ProtocolEnum::L7Protocol(*protocol)) else {
                     continue;
                 };
-                parser.set_parse_config(&self.parse_config);
-                if parser.check_payload(payload, &param) {
+                if parser.check_payload(Some(log_parser_config), payload, &param) {
                     self.l7_protocol_enum = parser.l7_protocl_enum();
                     self.server_port = packet.lookup_key.dst_port;
                     packet.direction = PacketDirection::ClientToServer;
@@ -402,15 +407,28 @@ impl FlowPerf {
                         // perf 没有抽象出来,这里可能返回None，对于返回None即不解析perf，只解析log
                         self.l7 = Self::l7_new(*protocol, self.rrt_cache.clone());
                         if self.l7.is_some() {
-                            rrt = self
-                                .l7_parse_perf(packet, flow_id, app_table, local_epc, remote_epc)?;
+                            rrt = self.l7_parse_perf(
+                                log_parser_config,
+                                packet,
+                                flow_id,
+                                app_table,
+                                local_epc,
+                                remote_epc,
+                            )?;
                         }
                     }
 
                     if is_parse_log {
                         self.l7_protocol_log_parser = Some(parser);
-                        let ret =
-                            self.l7_parse_log(packet, app_table, &param, local_epc, remote_epc)?;
+                        let ret = self.l7_parse_log(
+                            flow_config,
+                            log_parser_config,
+                            packet,
+                            app_table,
+                            &param,
+                            local_epc,
+                            remote_epc,
+                        )?;
                         return Ok((ret, rrt));
                     }
                     return Ok((vec![], 0));
@@ -437,6 +455,8 @@ impl FlowPerf {
     // when log parse implement perf parse, rrt will calculate from log parse.
     fn l7_parse(
         &mut self,
+        flow_config: &FlowConfig,
+        log_parser_config: &LogParserConfig,
         packet: &mut MetaPacket,
         flow_id: u64,
         app_table: &mut AppTable,
@@ -459,7 +479,14 @@ impl FlowPerf {
 
         let mut rrt = 0;
         if self.l7.is_some() && is_parse_perf {
-            rrt = self.l7_parse_perf(packet, flow_id, app_table, local_epc, remote_epc)?;
+            rrt = self.l7_parse_perf(
+                log_parser_config,
+                packet,
+                flow_id,
+                app_table,
+                local_epc,
+                remote_epc,
+            )?;
             if !is_parse_log {
                 return Ok((vec![], rrt));
             }
@@ -467,6 +494,8 @@ impl FlowPerf {
 
         if self.l7_protocol_log_parser.is_some() && is_parse_log {
             let ret = self.l7_parse_log(
+                flow_config,
+                log_parser_config,
                 packet,
                 app_table,
                 &ParseParam::from(&*packet),
@@ -485,6 +514,8 @@ impl FlowPerf {
         }
 
         self.l7_check(
+            flow_config,
+            log_parser_config,
             packet,
             flow_id,
             app_table,
@@ -502,8 +533,6 @@ impl FlowPerf {
         l7_proto: Option<L7ProtocolEnum>,
         l7_parser: Option<L7ProtocolParser>,
         counter: Arc<FlowPerfCounter>,
-        parse_config: LogParserAccess,
-        flow_config: FlowAccess,
     ) -> Option<Self> {
         let l4 = match l4_proto {
             L4Protocol::Tcp => L4FlowPerfTable::from(TcpPerf::new(counter)),
@@ -524,8 +553,6 @@ impl FlowPerf {
             is_from_app: l7_proto.is_some(),
             is_success: false,
             is_skip: false,
-            parse_config,
-            flow_config,
             server_port: 0,
         })
     }
@@ -540,6 +567,8 @@ impl FlowPerf {
 
     pub fn parse(
         &mut self,
+        flow_config: &FlowConfig,
+        log_parser_config: &LogParserConfig,
         packet: &mut MetaPacket,
         is_first_packet_direction: bool,
         flow_id: u64,
@@ -558,6 +587,8 @@ impl FlowPerf {
         if l7_performance_enabled || l7_log_parse_enabled {
             // 抛出错误由flowMap.FlowPerfCounter处理
             return self.l7_parse(
+                flow_config,
+                log_parser_config,
                 packet,
                 flow_id,
                 app_table,
