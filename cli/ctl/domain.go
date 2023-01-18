@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/ghodss/yaml"
@@ -135,7 +134,7 @@ func listDomain(cmd *cobra.Command, args []string, output string) {
 				nameMaxSize = nameSize
 			}
 		}
-		format := "%-*s %-14s %-37s %-17s %-15s %-22s %-22s %-8s %-8s %s\n"
+		format := "%-*s %-14s %-37s %-17s %-15s %-22s %-22s %-8s %-10s %s\n"
 		header := fmt.Sprintf(
 			format, nameMaxSize, "NAME", "ID", "LCUUID", "TYPE", "CONTROLLER_IP",
 			"CREATED_AT", "SYNCED_AT", "ENABLED", "STATE", "AGENT_WATCH_K8S", // TODO translate state to readable word
@@ -154,7 +153,7 @@ func listDomain(cmd *cobra.Command, args []string, output string) {
 				format, nameMaxSize-nameChineseCount, name, d.Get("CLUSTER_ID").MustString(), d.Get("LCUUID").MustString(),
 				common.DomainType(d.Get("TYPE").MustInt()), d.Get("CONTROLLER_IP").MustString(),
 				d.Get("CREATED_AT").MustString(), d.Get("SYNCED_AT").MustString(),
-				strconv.Itoa(d.Get("ENABLED").MustInt()), strconv.Itoa(d.Get("STATE").MustInt()),
+				common.DomainEnabled(d.Get("ENABLED").MustInt()), common.DomainState(d.Get("STATE").MustInt()),
 				d.Get("VTAP_NAME").MustString(),
 			)
 		}
