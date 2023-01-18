@@ -2106,7 +2106,7 @@ CREATE TABLE IF NOT EXISTS consumer_bill (
     vtap_ctrl_mac           CHAR(64) DEFAULT NULL,
     monitor_type            INTEGER DEFAULT NULL,
     transaction_time        datetime(6) DEFAULT NULL,
-    consumption_price       float(5,2) DEFAULT NULL,
+    consumption_price       float(10,2) DEFAULT NULL,
     consumption_service     INTEGER DEFAULT NULL,
     consumption_period      VARCHAR(256) DEFAULT NULL,
     remaining_sum           double(10,2) DEFAULT NULL,
