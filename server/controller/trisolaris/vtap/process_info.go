@@ -206,6 +206,13 @@ func (c *CacheReq) getReq() *trident.GPIDSyncRequest {
 	return c.req
 }
 
+func (c *CacheReq) getUpdateTime() int {
+	if c == nil {
+		return 0
+	}
+	return int(c.updateTime.Unix())
+}
+
 func (c *CacheReq) After(r *CacheReq) bool {
 	if c == nil || r == nil {
 		return false
@@ -365,28 +372,27 @@ func (p *ProcessInfo) UpdateVTapGPIDReq(req *trident.GPIDSyncRequest) {
 	p.sendGPIDReq.updateReq(req)
 }
 
-func (p *ProcessInfo) GetVTapGPIDReq(vtapID uint32) *trident.GPIDSyncRequest {
-	var req *trident.GPIDSyncRequest
-	req = p.sendGPIDReq.getReq(vtapID)
-	if req == nil {
+func (p *ProcessInfo) GetVTapGPIDReq(vtapID uint32) (*trident.GPIDSyncRequest, uint32) {
+	cacheReq := p.sendGPIDReq.getCacheReq(vtapID)
+	if cacheReq == nil {
 		localReq := p.vtapIDToLocalGPIDReq.getCacheReq(vtapID)
 		shareReq := p.vtapIDToShareGPIDReq.getCacheReq(vtapID)
 		if localReq != nil && shareReq != nil {
 			if localReq.After(shareReq) {
-				req = localReq.getReq()
+				cacheReq = localReq
 			} else {
-				req = shareReq.getReq()
+				cacheReq = shareReq
 			}
 		} else {
 			if localReq == nil {
-				req = shareReq.getReq()
+				cacheReq = shareReq
 			} else {
-				req = localReq.getReq()
+				cacheReq = localReq
 			}
 		}
 	}
 
-	return req
+	return cacheReq.getReq(), uint32(cacheReq.getUpdateTime())
 }
 
 func (p *ProcessInfo) UpdateGPIDReqFromShare(shareReq *trident.ShareGPIDSyncRequests) {
@@ -490,7 +496,8 @@ func (p *ProcessInfo) getGPIDInfoFromDB() {
 }
 
 func (p *ProcessInfo) GetGPIDResponseByVtapID(vtapID uint32) *trident.GPIDSyncResponse {
-	return p.GetGPIDResponseByReq(p.GetVTapGPIDReq(vtapID))
+	req, _ := p.GetVTapGPIDReq(vtapID)
+	return p.GetGPIDResponseByReq(req)
 }
 
 func (p *ProcessInfo) GetGPIDResponseByReq(req *trident.GPIDSyncRequest) *trident.GPIDSyncResponse {
