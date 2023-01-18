@@ -88,6 +88,26 @@ func GetDomainTypeByName(domainTypeName string) DomainType {
 	return DOMAIN_TYPE_UNKNOWN
 }
 
+//go:generate stringer -type=DomainEnabled -trimprefix=DOMAIN_ENABLED_ -linecomment
+type DomainEnabled int
+
+const (
+	// attention: following line comments are used by `stringer`
+	DOMAIN_ENABLED_ENABLE DomainEnabled = iota
+	DOMAIN_ENABLED_DISABLE
+)
+
+//go:generate stringer -type=DomainState -trimprefix=DOMAIN_STATE_ -linecomment
+type DomainState int
+
+const (
+	// attention: following line comments are used by `stringer`
+	DOMAIN_STATE_NORMAL DomainState = iota + 1
+	_                               // 2
+	DOMAIN_STATE_EXCEPTION
+	DOMAIN_STATE_WARN
+)
+
 //go:generate stringer -type=VtapState -trimprefix=VTAP_STATE_ -linecomment
 type VtapState int
 
