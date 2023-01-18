@@ -53,22 +53,21 @@ func (s *service) DebugGPIDGlobalData(ctx context.Context, in *api.GPIDSyncReque
 	}, nil
 }
 
-func (s *service) DebugGPIDVTapData(ctx context.Context, in *api.GPIDSyncRequest) (*api.GPIDSyncRequest, error) {
+func (s *service) DebugGPIDVTapData(ctx context.Context, in *api.GPIDSyncRequest) (*api.GPIDVTapData, error) {
 	vtapCacheKey := in.GetCtrlIp() + "-" + in.GetCtrlMac()
 	vtapCache := trisolaris.GetGVTapInfo().GetVTapCache(vtapCacheKey)
 	if vtapCache == nil {
 		log.Info("not found vtap(ctrl_ip: %s, ctrl_mac: %s) cache", in.GetCtrlIp(), in.GetCtrlMac())
-		return &api.GPIDSyncRequest{}, nil
+		return &api.GPIDVTapData{}, nil
 	}
 	log.Infof("receive DebugGPIDVTapLocalData about vtap(ctrl_ip: %s, ctrl_mac: %s, id: %d)",
 		in.GetCtrlIp(), in.GetCtrlMac(), vtapCache.GetVTapID())
 	processInfo := trisolaris.GetGVTapInfo().GetProcessInfo()
-	req := processInfo.GetVTapGPIDReq(uint32(vtapCache.GetVTapID()))
-	if req == nil {
-		req = &api.GPIDSyncRequest{}
-	}
-
-	return req, nil
+	req, updateTime := processInfo.GetVTapGPIDReq(uint32(vtapCache.GetVTapID()))
+	return &api.GPIDVTapData{
+		UpdateTime:  &updateTime,
+		SyncRequest: req,
+	}, nil
 }
 
 func (s *service) DebugRealGlobalData(ctx context.Context, in *api.GPIDSyncRequest) (*api.RealGlobalData, error) {
