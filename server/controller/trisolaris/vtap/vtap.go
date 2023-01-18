@@ -877,8 +877,8 @@ func (v *VTapInfo) getVTapPodDomains(c *VTapCache) []string {
 	return result
 }
 
-func (v *VTapInfo) GetKubernetesClusterID(clusterID string, value string) string {
-	return v.kcData.getClusterID(clusterID, value)
+func (v *VTapInfo) GetKubernetesClusterID(clusterID string, value string, force bool) string {
+	return v.kcData.getClusterID(clusterID, value, force)
 }
 
 func (v *VTapInfo) putChVTapChangedForPD() {
