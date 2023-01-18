@@ -1720,12 +1720,6 @@ impl ConfigHandler {
                     candidate_config.log_parser.l7_log_dynamic,
                     new_config.log_parser.l7_log_dynamic
                 );
-                fn l7_log_dynamic_callback(_: &ConfigHandler, components: &mut AgentComponents) {
-                    for log_parser in components.log_parsers.iter().as_ref() {
-                        log_parser.l7_log_dynamic_config_updated();
-                    }
-                }
-                callbacks.push(l7_log_dynamic_callback);
             }
             if candidate_config.log_parser.l7_log_collect_nps_threshold
                 != new_config.log_parser.l7_log_collect_nps_threshold

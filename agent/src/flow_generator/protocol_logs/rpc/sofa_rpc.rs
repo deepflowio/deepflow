@@ -29,6 +29,7 @@ use crate::{
         l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
         MetaPacket,
     },
+    config::handler::LogParserConfig,
     flow_generator::{
         perf::{L7FlowPerf, PerfStats},
         protocol_logs::{
@@ -261,14 +262,24 @@ impl Default for SofaRpcLog {
 perf_impl!(SofaRpcLog);
 
 impl L7ProtocolParserInterface for SofaRpcLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(
+        &mut self,
+        _: Option<&LogParserConfig>,
+        payload: &[u8],
+        param: &ParseParam,
+    ) -> bool {
         self.parsed = self.parse_with_strict(payload, param, true).is_ok()
             && self.info.msg_type == LogMessageType::Request
             && self.info.cmd_code != CMD_CODE_HEARTBEAT;
         self.parsed
     }
 
-    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+    fn parse_payload(
+        &mut self,
+        _: Option<&LogParserConfig>,
+        payload: &[u8],
+        param: &ParseParam,
+    ) -> Result<Vec<L7ProtocolInfo>> {
         self.parse_with_strict(payload, param, false)
     }
 
@@ -404,9 +415,14 @@ impl SofaRpcLog {
 }
 
 impl L7FlowPerf for SofaRpcLog {
-    fn parse(&mut self, packet: &MetaPacket, _: u64) -> Result<()> {
+    fn parse(
+        &mut self,
+        config: Option<&LogParserConfig>,
+        packet: &MetaPacket,
+        _: u64,
+    ) -> Result<()> {
         if let Some(payload) = packet.get_l4_payload() {
-            self.parse_payload(payload, &ParseParam::from(packet))?;
+            self.parse_payload(config, payload, &ParseParam::from(packet))?;
             return Ok(());
         }
         Err(Error::L7ProtocolUnknown)
@@ -626,9 +642,9 @@ mod test {
 
         let req_param = &mut ParseParam::from(&p[0]);
         let req_payload = p[0].get_l4_payload().unwrap();
-        assert_eq!(parser.check_payload(req_payload, req_param), true);
+        assert_eq!(parser.check_payload(None, req_payload, req_param), true);
         let req_info = parser
-            .parse_payload(req_payload, req_param)
+            .parse_payload(None, req_payload, req_param)
             .unwrap()
             .remove(0);
 
@@ -653,7 +669,7 @@ mod test {
         let resp_payload = p[1].get_l4_payload().unwrap();
 
         let resp_info = parser
-            .parse_payload(resp_payload, resp_param)
+            .parse_payload(None, resp_payload, resp_param)
             .unwrap()
             .remove(0);
 
@@ -680,9 +696,9 @@ mod test {
 
         let req_param = &mut ParseParam::from(&p[0]);
         let req_payload = p[0].get_l4_payload().unwrap();
-        assert_eq!(parser.check_payload(req_payload, req_param), true);
+        assert_eq!(parser.check_payload(None, req_payload, req_param), true);
         let req_info = parser
-            .parse_payload(req_payload, req_param)
+            .parse_payload(None, req_payload, req_param)
             .unwrap()
             .remove(0);
 
@@ -707,7 +723,7 @@ mod test {
         let resp_payload = p[1].get_l4_payload().unwrap();
 
         let resp_info = parser
-            .parse_payload(resp_payload, resp_param)
+            .parse_payload(None, resp_payload, resp_param)
             .unwrap()
             .remove(0);
 
