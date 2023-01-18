@@ -993,7 +993,9 @@ impl FlowMap {
 
         let nat_source = meta_packet.lookup_key.get_nat_source();
         meta_packet.tap_port.set_nat_source(nat_source);
-        flow.flow_key.tap_port.set_nat_source(nat_source);
+        if nat_source > flow.flow_key.tap_port.get_nat_source() {
+            flow.flow_key.tap_port.set_nat_source(nat_source);
+        }
 
         // The ebpf data has no l3 and l4 information, so it can be returned directly
         if flow.signal_source == SignalSource::EBPF {
