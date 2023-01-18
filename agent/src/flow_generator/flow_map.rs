@@ -276,6 +276,7 @@ impl FlowMap {
             ((timestamp - config.packet_delay).as_nanos() / TIME_UNIT.as_nanos()) as u64;
         self.start_time =
             Duration::from_nanos(next_start_time_in_unit * TIME_UNIT.as_nanos() as u64);
+        timestamp = self.start_time - 1;
 
         let (mut node_map, mut time_set) = match self.node_map.take().zip(self.time_set.take()) {
             Some(pair) => pair,
@@ -295,6 +296,9 @@ impl FlowMap {
                 self.stats_counter
                     .total_scan
                     .fetch_add(nodes.len() as u64, Ordering::Relaxed);
+                self.stats_counter
+                    .slot_max_depth
+                    .fetch_max(nodes.len() as u64, Ordering::Relaxed);
 
                 // nodes are partitioned by timed out or not
                 // nodes not in this time_set or not timed out are moved to front
@@ -317,8 +321,7 @@ impl FlowMap {
                         continue;
                     }
                     // 未超时Flow的统计信息发送到队列下游
-                    let timeout = node.recent_time + node.timeout;
-                    self.node_updated_aftercare(&config, node, timeout, None);
+                    self.node_updated_aftercare(&config, node, timestamp, None);
                     // Enterprise Edition Feature: packet-sequence
                     if self.packet_sequence_enabled && node.packet_sequence_block.is_some() {
                         // flush the packet_sequence_block at the regular time
@@ -335,13 +338,13 @@ impl FlowMap {
                     }
 
                     // 若流统计信息已输出，将节点移动至最终超时的时间
-                    let updated_time = timeout.min(timestamp + config.flow_timeout.min);
-                    node.timestamp_key = updated_time.as_secs();
-                    moved_key.push((updated_time, flow_key));
+                    let timeout = node.recent_time + node.timeout;
+                    node.timestamp_key = timeout.as_secs();
+                    moved_key.push((node.timestamp_key, flow_key));
                 }
             }
             for key in moved_key.drain(..) {
-                time_set[key.0.as_secs() as usize & (self.time_window_size - 1)].insert(key.1);
+                time_set[key.0 as usize & (self.time_window_size - 1)].insert(key.1);
             }
         }
         Self::update_stats_counter(&self.stats_counter, node_map.len() as u64, 0);
@@ -385,7 +388,7 @@ impl FlowMap {
         };
 
         let pkt_timestamp = meta_packet.lookup_key.timestamp;
-        let max_depth;
+        let mut max_depth = 1;
         match node_map.get_mut(&pkt_key) {
             // 找到一组可能的 FlowNode
             Some(nodes) => {
@@ -399,8 +402,15 @@ impl FlowMap {
                 let Some(index) = index else {
                     // 没有找到严格匹配的 FlowNode，插入新 Node
                     let node = Box::new(self.new_flow_node(&flow_config, &log_parser_config, meta_packet));
-                    time_set[node.timestamp_key as usize & (self.time_window_size - 1)].insert(pkt_key);
-                    nodes.push(node);
+                    if meta_packet.signal_source == SignalSource::EBPF
+                        && node.meta_flow_perf.is_some()
+                        && node.meta_flow_perf.as_ref().unwrap().server_port == 0 {
+                        // For ebpf data, if server_port is 0, it means that parsed data
+                        // failed, the info in node maybe wrong, we should drop this node.
+                    } else {
+                        time_set[node.timestamp_key as usize & (self.time_window_size - 1)].insert(pkt_key);
+                        nodes.push(node);
+                    }
                     Self::update_stats_counter(
                         &self.stats_counter,
                         node_map.len() as u64,
@@ -434,11 +444,6 @@ impl FlowMap {
                     _ => self.update_other_node(&flow_config, node, meta_packet),
                 };
 
-                // remove pkt_key from old time slot
-                // add it to new slot if flow not closed
-                let ts = &mut time_set[node.timestamp_key as usize & (self.time_window_size - 1)];
-                ts.remove(&pkt_key);
-
                 if flow_closed {
                     let node = *nodes.swap_remove(index);
                     self.node_removed_aftercare(
@@ -452,35 +457,33 @@ impl FlowMap {
                         node_map.remove(&pkt_key);
                     }
                 } else {
-                    // node timestamp_key is updated after update_node to preserve old value for
-                    // removing node from time_set
-                    // timestamp_key is updated here and insert to new time_set slot
-                    node.timestamp_key = pkt_timestamp.as_secs();
-                    let ts =
-                        &mut time_set[node.timestamp_key as usize & (self.time_window_size - 1)];
-                    ts.insert(pkt_key);
+                    if node.timestamp_key < pkt_timestamp.as_secs() {
+                        // Because pkt_key is shared by multiple nodes, we have no low-cost way to
+                        // delete it from time_set. In fact, we can invalidate the flow_key in the
+                        // old slot in time_set by updating node.timestamp_key.
+                        //
+                        // Therefore, it is only necessary to insert the node into the new slot of
+                        // time_set, so that the statistical data can be output in time. However,
+                        // the following operations are only required when the slot needs to be
+                        // changed.
+                        node.timestamp_key = pkt_timestamp.as_secs();
+                        time_set[node.timestamp_key as usize & (self.time_window_size - 1)].insert(pkt_key);
+                    }
                 }
             }
             // 未找到匹配的 FlowNode，需要插入新的节点
             None => {
                 let node =
                     Box::new(self.new_flow_node(&flow_config, &log_parser_config, meta_packet));
-                // For ebpf data, if server_port is 0, it means that parsed data
-                // failed, the info in node maybe wrong, we should drop this node.
                 if meta_packet.signal_source == SignalSource::EBPF
                     && node.meta_flow_perf.is_some()
-                    && node.meta_flow_perf.as_ref().unwrap().server_port == 0
-                {
-                    self.node_map.replace(node_map);
-                    self.time_set.replace(time_set);
-                    return;
+                    && node.meta_flow_perf.as_ref().unwrap().server_port == 0 {
+                    // For ebpf data, if server_port is 0, it means that parsed data
+                    // failed, the info in node maybe wrong, we should drop this node.
+                } else {
+                    time_set[node.timestamp_key as usize & (self.time_window_size - 1)].insert(pkt_key);
+                    node_map.insert(pkt_key, vec![node]);
                 }
-
-                time_set[node.timestamp_key as usize & (self.time_window_size - 1)].insert(pkt_key);
-
-                node_map.insert(pkt_key, vec![node]);
-
-                max_depth = 1;
             }
         }
         Self::update_stats_counter(&self.stats_counter, node_map.len() as u64, max_depth as u64);
@@ -1142,7 +1145,7 @@ impl FlowMap {
                 meta_packet,
                 is_first_packet_direction,
                 flow_id,
-                node.tagged_flow.flow.signal_source != SignalSource::EBPF
+                node.tagged_flow.flow.signal_source == SignalSource::Packet
                     && Self::l4_metrics_enabled(flow_config),
                 Self::l7_metrics_enabled(flow_config),
                 Self::l7_log_parse_enabled(flow_config, &meta_packet.lookup_key),
@@ -1376,7 +1379,7 @@ impl FlowMap {
                 perf.copy_and_reset_perf_data(
                     flow.reversed,
                     l7_timeout_count as u32,
-                    flow.signal_source != SignalSource::EBPF && Self::l4_metrics_enabled(config),
+                    flow.signal_source == SignalSource::Packet && Self::l4_metrics_enabled(config),
                     Self::l7_metrics_enabled(config),
                 )
             });
@@ -1410,13 +1413,13 @@ impl FlowMap {
         &mut self,
         config: &FlowConfig,
         node: &mut FlowNode,
-        timeout: Duration,
+        timestamp: Duration,
         meta_packet: Option<&mut MetaPacket>,
     ) {
         let flow = &node.tagged_flow.flow;
         if node.packet_in_tick
-            && (timeout >= flow.flow_stat_time + STATISTICAL_INTERVAL
-                || timeout < flow.flow_stat_time)
+            && (timestamp >= flow.flow_stat_time + STATISTICAL_INTERVAL
+                || timestamp < flow.flow_stat_time)
         {
             self.update_flow_direction(node, meta_packet); // 每个流统计数据输出前矫正流方向
             node.tagged_flow.flow.close_type = CloseType::ForcedReport;
@@ -1429,7 +1432,7 @@ impl FlowMap {
                     perf.copy_and_reset_perf_data(
                         flow.reversed,
                         0,
-                        flow.signal_source != SignalSource::EBPF
+                        flow.signal_source == SignalSource::Packet
                             && Self::l4_metrics_enabled(config),
                         Self::l7_metrics_enabled(config),
                     )
