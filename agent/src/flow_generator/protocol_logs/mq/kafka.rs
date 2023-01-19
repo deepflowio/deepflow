@@ -22,7 +22,6 @@ use crate::{
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
     },
-    config::handler::LogParserConfig,
     flow_generator::{
         error::{Error, Result},
         protocol_logs::{
@@ -250,24 +249,14 @@ pub struct KafkaLog {
 }
 
 impl L7ProtocolParserInterface for KafkaLog {
-    fn check_payload(
-        &mut self,
-        _: Option<&LogParserConfig>,
-        payload: &[u8],
-        param: &ParseParam,
-    ) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
         if !param.ebpf_type.is_raw_protocol() {
             return false;
         }
         Self::kafka_check_protocol(payload, param)
     }
 
-    fn parse_payload(
-        &mut self,
-        _: Option<&LogParserConfig>,
-        payload: &[u8],
-        param: &ParseParam,
-    ) -> Result<Vec<L7ProtocolInfo>> {
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
         parse_common!(self, param);
         Self::parse(
             self,

@@ -96,7 +96,7 @@ macro_rules! parse_common {
     impl L7ProtocolParserInterface for xxxLog {
         // ... other fn
 
-         fn parse_payload(&mut self, config: Option<&L7LogParserConfig>, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+         fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
             // set the info time
             self.info.start_time = param.time;
             self.info.end_time = param.time;
@@ -350,19 +350,9 @@ all_protocol!(
 
 #[enum_dispatch(L7ProtocolParser)]
 pub trait L7ProtocolParserInterface {
-    fn check_payload(
-        &mut self,
-        config: Option<&LogParserConfig>,
-        payload: &[u8],
-        param: &ParseParam,
-    ) -> bool;
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool;
     // 协议解析
-    fn parse_payload(
-        &mut self,
-        config: Option<&LogParserConfig>,
-        payload: &[u8],
-        param: &ParseParam,
-    ) -> Result<Vec<L7ProtocolInfo>>;
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>>;
     // 返回协议号和协议名称，由于的bitmap使用u128，所以协议号不能超过128.
     // 其中 crates/public/src/l7_protocol.rs 里面的 pub const L7_PROTOCOL_xxx 是已实现的协议号.
     // ===========================================================================================
@@ -432,7 +422,7 @@ pub struct EbpfParam {
 }
 
 #[derive(Clone, Copy)]
-pub struct ParseParam {
+pub struct ParseParam<'a> {
     // l3/l4 info
     pub l4_protocol: IpProtocol,
     pub ip_src: IpAddr,
@@ -447,9 +437,11 @@ pub struct ParseParam {
     // not None when payload from ebpf
     pub ebpf_param: Option<EbpfParam>,
     pub time: u64,
+
+    pub parse_config: Option<&'a LogParserConfig>,
 }
 
-impl From<&MetaPacket<'_>> for ParseParam {
+impl From<&MetaPacket<'_>> for ParseParam<'_> {
     fn from(packet: &MetaPacket<'_>) -> Self {
         let mut param = Self {
             l4_protocol: packet.lookup_key.proto,
@@ -462,6 +454,7 @@ impl From<&MetaPacket<'_>> for ParseParam {
             ebpf_type: packet.ebpf_type,
             ebpf_param: None,
             time: packet.lookup_key.timestamp.as_micros() as u64,
+            parse_config: None,
         };
         if packet.ebpf_type != EbpfType::None {
             let is_tls = match packet.ebpf_type {
@@ -483,7 +476,15 @@ impl From<&MetaPacket<'_>> for ParseParam {
     }
 }
 
-impl ParseParam {
+impl<'a> From<(&MetaPacket<'_>, &'a LogParserConfig)> for ParseParam<'a> {
+    fn from(f: (&MetaPacket<'_>, &'a LogParserConfig)) -> Self {
+        let mut p = Self::from(f.0);
+        p.parse_config = Some(f.1);
+        p
+    }
+}
+
+impl ParseParam<'_> {
     pub fn is_tls(&self) -> bool {
         if let Some(ebpf_param) = self.ebpf_param {
             return ebpf_param.is_tls;

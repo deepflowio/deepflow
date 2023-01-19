@@ -271,12 +271,7 @@ impl KrpcLog {
 }
 
 impl L7ProtocolParserInterface for KrpcLog {
-    fn check_payload(
-        &mut self,
-        _: Option<&LogParserConfig>,
-        payload: &[u8],
-        param: &ParseParam,
-    ) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
         if !param.ebpf_type.is_raw_protocol() {
             return false;
         }
@@ -286,12 +281,7 @@ impl L7ProtocolParserInterface for KrpcLog {
         self.parsed && self.info.msg_type == LogMessageType::Request
     }
 
-    fn parse_payload(
-        &mut self,
-        _: Option<&LogParserConfig>,
-        payload: &[u8],
-        param: &ParseParam,
-    ) -> Result<Vec<L7ProtocolInfo>> {
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
         self.parse(payload, param, false)
     }
 
@@ -383,9 +373,9 @@ mod test {
 
         let req_param = &mut ParseParam::from(&p[3]);
         let req_payload = p[3].get_l4_payload().unwrap();
-        assert_eq!(parser.check_payload(None, req_payload, req_param), true);
+        assert_eq!(parser.check_payload(req_payload, req_param), true);
         let mut req_info = parser
-            .parse_payload(None, req_payload, req_param)
+            .parse_payload(req_payload, req_param)
             .unwrap()
             .remove(0);
 
@@ -412,7 +402,7 @@ mod test {
         let resp_payload = p[5].get_l4_payload().unwrap();
 
         let resp_info = parser
-            .parse_payload(None, resp_payload, resp_param)
+            .parse_payload(resp_payload, resp_param)
             .unwrap()
             .remove(0);
 

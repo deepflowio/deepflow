@@ -28,7 +28,6 @@ use crate::{
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
     },
-    config::handler::LogParserConfig,
     flow_generator::{
         error::{Error, Result},
         protocol_logs::pb_adapter::{L7ProtocolSendLog, L7Request, L7Response},
@@ -201,12 +200,7 @@ pub struct RedisLog {
 }
 
 impl L7ProtocolParserInterface for RedisLog {
-    fn check_payload(
-        &mut self,
-        _: Option<&LogParserConfig>,
-        payload: &[u8],
-        param: &ParseParam,
-    ) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
         if !param.ebpf_type.is_raw_protocol() {
             return false;
         }
@@ -215,12 +209,7 @@ impl L7ProtocolParserInterface for RedisLog {
         Self::redis_check_protocol(payload, param)
     }
 
-    fn parse_payload(
-        &mut self,
-        _: Option<&LogParserConfig>,
-        payload: &[u8],
-        param: &ParseParam,
-    ) -> Result<Vec<L7ProtocolInfo>> {
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
         parse_common!(self, param);
         self.info.is_tls = param.is_tls();
         self.info.set_packet_seq(param);

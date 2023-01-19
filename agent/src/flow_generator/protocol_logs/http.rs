@@ -32,7 +32,7 @@ use crate::{
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
     },
-    config::handler::{L7LogDynamicConfig, LogParserConfig, TraceType},
+    config::handler::{L7LogDynamicConfig, TraceType},
     flow_generator::error::{Error, Result},
     flow_generator::protocol_logs::{decode_base64_to_string, L7ProtoRawDataType},
     parse_common,
@@ -367,12 +367,7 @@ pub struct HttpLog {
 }
 
 impl L7ProtocolParserInterface for HttpLog {
-    fn check_payload(
-        &mut self,
-        config: Option<&LogParserConfig>,
-        payload: &[u8],
-        param: &ParseParam,
-    ) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
         parse_common!(self, param);
         self.info.is_tls = param.is_tls();
         self.info.set_packet_seq(param);
@@ -380,7 +375,7 @@ impl L7ProtocolParserInterface for HttpLog {
         match self.proto {
             L7Protocol::Http1 => self.http1_check_protocol(payload, param),
             L7Protocol::Http2 | L7Protocol::Grpc => {
-                let Some(config) = config else {
+                let Some(config) = param.parse_config else {
                     return false;
                 };
                 match param.ebpf_type {
@@ -407,16 +402,11 @@ impl L7ProtocolParserInterface for HttpLog {
         }
     }
 
-    fn parse_payload(
-        &mut self,
-        config: Option<&LogParserConfig>,
-        payload: &[u8],
-        param: &ParseParam,
-    ) -> Result<Vec<L7ProtocolInfo>> {
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
         if self.parsed {
             return Ok(vec![L7ProtocolInfo::HttpInfo(self.info.clone())]);
         }
-        let Some(config) = config else {
+        let Some(config) = param.parse_config else {
             return Err(Error::NoParseConfig);
         };
         parse_common!(self, param);

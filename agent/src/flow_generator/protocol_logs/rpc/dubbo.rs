@@ -25,7 +25,7 @@ use crate::{
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
     },
-    config::handler::{L7LogDynamicConfig, LogParserConfig, TraceType},
+    config::handler::{L7LogDynamicConfig, TraceType},
     flow_generator::{
         error::{Error, Result},
         protocol_logs::{
@@ -160,25 +160,15 @@ pub struct DubboLog {
 }
 
 impl L7ProtocolParserInterface for DubboLog {
-    fn check_payload(
-        &mut self,
-        _: Option<&LogParserConfig>,
-        payload: &[u8],
-        param: &ParseParam,
-    ) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
         if !param.ebpf_type.is_raw_protocol() {
             return false;
         }
         Self::dubbo_check_protocol(payload, param)
     }
 
-    fn parse_payload(
-        &mut self,
-        config: Option<&LogParserConfig>,
-        payload: &[u8],
-        param: &ParseParam,
-    ) -> Result<Vec<L7ProtocolInfo>> {
-        let Some(config) = config else {
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+        let Some(config) = param.parse_config else {
             return Err(Error::NoParseConfig);
         };
         parse_common!(self, param);
