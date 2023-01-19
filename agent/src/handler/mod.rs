@@ -53,18 +53,18 @@ pub struct MiniPacket<'a> {
     timestamp: u64,
     packet: &'a [u8],
     npb_mode: NpbMode,
-    l2_opt_size: usize,
-    l3_opt_size: usize,
-    l4_opt_size: usize,
-    packet_size: usize,
+    l2_opt_size: u8,
+    l3_opt_size: u16,
+    l4_opt_size: u32,
+    packet_size: u32,
     // IPV6
-    ipv6_last_option_offset: usize,
-    ipv6_fragment_option_offset: usize,
+    ipv6_last_option_offset: u16,
+    ipv6_fragment_option_offset: u16,
     // RawPcap
     flow_id: u64,
     header_type: HeaderType,
-    l2_l3_opt_size: usize,
-    packet_len: usize,
+    l2_l3_opt_size: u16,
+    packet_len: u32,
 }
 
 impl<'a> MiniPacket<'a> {
@@ -75,12 +75,12 @@ impl<'a> MiniPacket<'a> {
             timestamp: meta_packet.lookup_key.timestamp.as_nanos() as u64,
             npb_mode: meta_packet.npb_mode(),
             l2_opt_size: meta_packet.vlan_tag_size,
-            l3_opt_size: meta_packet.l2_l3_opt_size - meta_packet.vlan_tag_size,
+            l3_opt_size: meta_packet.l2_l3_opt_size - meta_packet.vlan_tag_size as u16,
             l4_opt_size: meta_packet.l4_opt_size,
-            packet_size: if meta_packet.packet_len > overlay_packet.len() {
-                overlay_packet.len()
+            packet_size: if meta_packet.packet_len as usize > overlay_packet.len() {
+                overlay_packet.len() as u32
             } else {
-                meta_packet.packet_len
+                meta_packet.packet_len as u32
             },
             ipv6_last_option_offset: meta_packet.offset_ipv6_last_option,
             ipv6_fragment_option_offset: meta_packet.offset_ipv6_fragment_option,
@@ -109,8 +109,8 @@ impl PacketHandler {
                     return;
                 }
                 let payload_offset = packet.header_type.min_header_size()
-                    + packet.l2_l3_opt_size
-                    + packet.l4_opt_size;
+                    + packet.l2_l3_opt_size as usize
+                    + packet.l4_opt_size as usize;
                 let policy = packet.policy.as_ref().unwrap();
                 let mut max_raw_len = 0;
                 // find longest payload
@@ -118,13 +118,13 @@ impl PacketHandler {
                     if action.tunnel_type() != NpbTunnelType::Pcap {
                         continue;
                     }
-                    let mut raw_len = payload_offset + action.payload_slice() as usize;
+                    let mut raw_len = payload_offset + action.payload_slice();
                     if raw_len > packet.packet.len() {
                         raw_len = packet.packet.len();
                     }
-                    if raw_len > packet.packet_len {
+                    if raw_len > packet.packet_len as usize {
                         // only get packet_size in padding situation
-                        raw_len = packet.packet_len;
+                        raw_len = packet.packet_len as usize;
                     }
                     if raw_len > max_raw_len {
                         max_raw_len = raw_len;
@@ -148,12 +148,12 @@ impl PacketHandler {
                 &packet.npb_mode,
                 packet.timestamp,
                 packet.packet,
-                packet.packet_size,
-                packet.l2_opt_size,
-                packet.l3_opt_size,
-                packet.l4_opt_size,
-                packet.ipv6_last_option_offset,
-                packet.ipv6_fragment_option_offset,
+                packet.packet_size as usize,
+                packet.l2_opt_size as usize,
+                packet.l3_opt_size as usize,
+                packet.l4_opt_size as usize,
+                packet.ipv6_last_option_offset as usize,
+                packet.ipv6_fragment_option_offset as usize,
             ),
         }
     }
