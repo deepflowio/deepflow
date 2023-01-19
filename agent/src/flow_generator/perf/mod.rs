@@ -306,7 +306,6 @@ impl FlowPerf {
     fn l7_parse_log(
         &mut self,
         flow_config: &FlowConfig,
-        log_parser_config: &LogParserConfig,
         packet: &mut MetaPacket,
         app_table: &mut AppTable,
         parse_param: &ParseParam,
@@ -321,7 +320,6 @@ impl FlowPerf {
             let parser = self.l7_protocol_log_parser.as_mut().unwrap();
 
             let ret = parser.parse_payload(
-                Some(log_parser_config),
                 {
                     let pkt_size = flow_config.l7_log_packet_size as usize;
                     if pkt_size > payload.len() {
@@ -386,7 +384,7 @@ impl FlowPerf {
         }
 
         if let Some(payload) = packet.get_l4_payload() {
-            let param = ParseParam::from(&*packet);
+            let param = ParseParam::from((&*packet, log_parser_config));
             for protocol in checker.possible_protocols(
                 packet.lookup_key.proto.into(),
                 match packet.lookup_key.direction {
@@ -397,7 +395,7 @@ impl FlowPerf {
                 let Some(mut parser) = get_parser(L7ProtocolEnum::L7Protocol(*protocol)) else {
                     continue;
                 };
-                if parser.check_payload(Some(log_parser_config), payload, &param) {
+                if parser.check_payload(payload, &param) {
                     self.l7_protocol_enum = parser.l7_protocl_enum();
                     self.server_port = packet.lookup_key.dst_port;
                     packet.lookup_key.direction = PacketDirection::ClientToServer;
@@ -422,7 +420,6 @@ impl FlowPerf {
                         self.l7_protocol_log_parser = Some(parser);
                         let ret = self.l7_parse_log(
                             flow_config,
-                            log_parser_config,
                             packet,
                             app_table,
                             &param,
@@ -495,10 +492,9 @@ impl FlowPerf {
         if self.l7_protocol_log_parser.is_some() && is_parse_log {
             let ret = self.l7_parse_log(
                 flow_config,
-                log_parser_config,
                 packet,
                 app_table,
-                &ParseParam::from(&*packet),
+                &ParseParam::from((&*packet, log_parser_config)),
                 local_epc,
                 remote_epc,
             )?;
