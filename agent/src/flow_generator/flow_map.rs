@@ -279,7 +279,7 @@ impl FlowMap {
             ((timestamp - config.packet_delay).as_nanos() / TIME_UNIT.as_nanos()) as u64;
         self.start_time =
             Duration::from_nanos(next_start_time_in_unit * TIME_UNIT.as_nanos() as u64);
-        timestamp = self.start_time - TIME_UNIT;
+        timestamp = self.start_time - Duration::from_nanos(1);
 
         let (mut node_map, mut time_set) = match self.node_map.take().zip(self.time_set.take()) {
             Some(pair) => pair,
@@ -346,8 +346,10 @@ impl FlowMap {
 
                     // 若流统计信息已输出，将节点移动至最终超时的时间
                     let timeout = node.recent_time + node.timeout;
-                    node.timestamp_key = timeout.as_secs();
-                    moved_key.push((node.timestamp_key, flow_key));
+                    if node.timestamp_key != timeout.as_secs() {
+                        node.timestamp_key = timeout.as_secs();
+                        moved_key.push((node.timestamp_key, flow_key));
+                    }
                 }
             }
             for key in moved_key.drain(..) {
