@@ -510,7 +510,7 @@ impl FlowMap {
     fn append_to_block(&self, node: &mut FlowNode, meta_packet: &MetaPacket) {
         const MINUTE: u64 = 60;
         if node.packet_sequence_block.is_some() {
-            if !node.packet_sequence_block.as_ref().unwrap().check(
+            if !node.packet_sequence_block.as_ref().unwrap().is_available(
                 self.config.load().packet_sequence_block_size,
                 (meta_packet.lookup_key.timestamp.as_secs() / MINUTE) as u32,
             ) {
