@@ -61,23 +61,23 @@ pub struct MetaPacket<'a> {
     pub lookup_key: LookupKey,
 
     pub raw: Option<&'a [u8]>,
-    pub packet_len: usize,
-    pub vlan_tag_size: usize,
+    pub packet_len: u32,
+    pub vlan_tag_size: u8,
     pub ttl: u8,
     pub reset_ttl: bool,
     pub endpoint_data: Option<Arc<EndpointData>>,
     pub policy_data: Option<Arc<PolicyData>>,
 
-    pub offset_ipv6_last_option: usize,
-    pub offset_ipv6_fragment_option: usize,
+    pub offset_ipv6_last_option: u16,
+    pub offset_ipv6_fragment_option: u16,
 
     pub header_type: HeaderType,
     // 读取时不要直接用这个字段，用MetaPacket.GetPktSize()
     // 注意：不含镜像外层VLAN的四个字节
-    pub l2_l3_opt_size: usize, // 802.1Q + IPv4 optional fields
-    pub l4_opt_size: usize,    // ICMP payload / TCP optional fields
-    l3_payload_len: usize,
-    l4_payload_len: usize,
+    pub l2_l3_opt_size: u16, // 802.1Q + IPv4 optional fields
+    pub l4_opt_size: u32,    // ICMP payload / TCP optional fields
+    l3_payload_len: u16,
+    l4_payload_len: u16,
     pub npb_ignore_l4: bool, // 对于IP分片或IP Options不全的情况，分发时不对l4进行解析
     nd_reply_or_arp_request: bool, // NDP request or ARP request
 
@@ -96,11 +96,12 @@ pub struct MetaPacket<'a> {
     pub queue_hash: u8,
 
     /********** for xFlow (NetFlow/sFlow/NetStream) **********/
-    pub packet_count: u64,
-    pub packet_bytes: u64,
-    pub start_time: Duration,
-    pub end_time: Duration,
-    pub source_ip: u32,
+    // TODO support xFlow
+    // pub packet_count: u64,
+    // pub packet_bytes: u64,
+    // pub start_time: Duration,
+    // pub end_time: Duration,
+    // pub source_ip: u32,
 
     /********** for eBPF (tracepoint/kprobe/uprobe) **********/
     pub ebpf_type: EbpfType,
@@ -197,8 +198,8 @@ impl<'a> MetaPacket<'a> {
 
     fn update_tcp_opt(&mut self) {
         let packet = self.raw.as_ref().unwrap();
-        let mut offset = self.header_type.min_packet_size() + self.l2_l3_opt_size;
-        let payload_offset = (offset + self.l4_opt_size).min(packet.len());
+        let mut offset = self.header_type.min_packet_size() + self.l2_l3_opt_size as usize;
+        let payload_offset = (offset + self.l4_opt_size as usize).min(packet.len());
 
         while offset + 1 < payload_offset {
             // 如果不足2B，EOL和NOP都可以忽略
@@ -280,7 +281,7 @@ impl<'a> MetaPacket<'a> {
                         if size_checker < 2 {
                             break;
                         }
-                        self.offset_ipv6_last_option = option_offset;
+                        self.offset_ipv6_last_option = option_offset as u16;
                         next_header = packet[option_offset];
                         let length = (packet[option_offset + 1] as usize + 2) * 4;
                         option_offset += length;
@@ -297,7 +298,7 @@ impl<'a> MetaPacket<'a> {
                         if size_checker < 0 {
                             break;
                         }
-                        self.offset_ipv6_last_option = option_offset;
+                        self.offset_ipv6_last_option = option_offset as u16;
                         next_header = packet[option_offset];
                         let length = packet[option_offset + 1] as usize;
                         option_offset += length * 8 + 8;
@@ -312,8 +313,8 @@ impl<'a> MetaPacket<'a> {
                         if size_checker < 0 {
                             break;
                         }
-                        self.offset_ipv6_last_option = option_offset;
-                        self.offset_ipv6_fragment_option = option_offset;
+                        self.offset_ipv6_last_option = option_offset as u16;
+                        self.offset_ipv6_fragment_option = option_offset as u16;
                         next_header = packet[option_offset];
                         option_offset += 8;
                         continue;
@@ -322,7 +323,7 @@ impl<'a> MetaPacket<'a> {
                         return (next_header, option_offset - original_offset);
                     }
                     IpProtocol::Esp => {
-                        self.offset_ipv6_last_option = option_offset;
+                        self.offset_ipv6_last_option = option_offset as u16;
                         option_offset += size_checker as usize;
                         return (next_header, option_offset - original_offset);
                     }
@@ -338,7 +339,7 @@ impl<'a> MetaPacket<'a> {
     }
 
     pub fn get_pkt_size(&self) -> u16 {
-        if self.packet_len < u16::MAX as usize {
+        if self.packet_len < u16::MAX as u32 {
             self.packet_len as u16
         } else {
             u16::MAX
@@ -347,16 +348,16 @@ impl<'a> MetaPacket<'a> {
 
     pub fn get_restored_packet_size(&self) -> u16 {
         // 压缩包头仅支持发送最内层的VLAN，所以QINQ场景下长度不能计算外层的VLAN
-        let mut skip_vlan_header_size = 0;
-        if self.vlan_tag_size > VLAN_HEADER_SIZE {
+        let mut skip_vlan_header_size = 0u16;
+        if self.vlan_tag_size as usize > VLAN_HEADER_SIZE {
             // QinQ
-            skip_vlan_header_size = self.vlan_tag_size - VLAN_HEADER_SIZE;
+            skip_vlan_header_size = (self.vlan_tag_size as usize - VLAN_HEADER_SIZE) as u16;
         }
         let packet_size = self.get_pkt_size();
         if packet_size == 0 {
             packet_size
         } else {
-            packet_size - skip_vlan_header_size as u16
+            packet_size - skip_vlan_header_size
         }
     }
 
@@ -369,8 +370,9 @@ impl<'a> MetaPacket<'a> {
             return Some(&self.raw_from_ebpf);
         }
 
-        let packet_header_size =
-            self.header_type.min_packet_size() + self.l2_l3_opt_size + self.l4_opt_size;
+        let packet_header_size = self.header_type.min_packet_size()
+            + self.l2_l3_opt_size as usize
+            + self.l4_opt_size as usize;
         if let Some(raw) = self.raw.as_ref() {
             if raw.len() > packet_header_size {
                 return Some(&raw[packet_header_size..]);
@@ -400,7 +402,7 @@ impl<'a> MetaPacket<'a> {
         let packet = self.raw.as_ref().unwrap();
         self.lookup_key.l2_end_0 = src_endpoint;
         self.lookup_key.l2_end_1 = dst_endpoint;
-        self.packet_len = packet.len();
+        self.packet_len = packet.len() as u32;
         let mut size_checker = packet.len() as isize;
 
         // eth
@@ -448,7 +450,7 @@ impl<'a> MetaPacket<'a> {
             MacAddr::try_from(&packet[FIELD_OFFSET_DA..FIELD_OFFSET_DA + MAC_ADDR_LEN]).unwrap();
 
         self.header_type = HeaderType::Eth;
-        self.vlan_tag_size = vlan_tag_size;
+        self.vlan_tag_size = vlan_tag_size as u8;
         let mut is_ipv6 = false;
         let ip_protocol;
         let mut offset_port_0 = FIELD_OFFSET_SPORT;
@@ -469,7 +471,7 @@ impl<'a> MetaPacket<'a> {
                     *<&[u8; 4]>::try_from(&packet[tpa_offset..tpa_offset + IPV4_ADDR_LEN]).unwrap(),
                 );
                 self.nd_reply_or_arp_request =
-                    read_u16_be(&packet[self.vlan_tag_size + ARP_OP_OFFSET..]) == arp::OP_REQUEST;
+                    read_u16_be(&packet[vlan_tag_size + ARP_OP_OFFSET..]) == arp::OP_REQUEST;
                 return Ok(());
             }
             EthernetType::Ipv6 => {
@@ -492,7 +494,7 @@ impl<'a> MetaPacket<'a> {
                         .unwrap(),
                 );
                 self.ttl = packet[IPV6_HOP_LIMIT_OFFSET + vlan_tag_size];
-                self.l2_l3_opt_size = vlan_tag_size;
+                self.l2_l3_opt_size = vlan_tag_size as u16;
                 let mut payload = read_u16_be(&packet[FIELD_OFFSET_PAYLOAD_LEN + vlan_tag_size..]);
                 // e1000网卡驱动，在开启TSO功能时，IPv6的payload可能为0
                 // e1000网卡驱动：https://elixir.bootlin.com/linux/v3.0/source/drivers/net/e1000e/netdev.c#L4423
@@ -502,11 +504,11 @@ impl<'a> MetaPacket<'a> {
                 let r = self.update_ip6_opt(vlan_tag_size);
                 ip_protocol = IpProtocol::from(r.0);
                 let options_length = r.1;
-                self.l2_l3_opt_size += options_length;
-                self.packet_len = payload as usize
-                    + HeaderType::Ipv6.min_packet_size()
-                    + vlan_tag_size
-                    + IPV6_HEADER_ADJUST;
+                self.l2_l3_opt_size += options_length as u16;
+                self.packet_len = payload as u32
+                    + HeaderType::Ipv6.min_packet_size() as u32
+                    + vlan_tag_size as u32
+                    + IPV6_HEADER_ADJUST as u32;
                 self.lookup_key.proto = ip_protocol;
 
                 size_checker -= options_length as isize;
@@ -514,7 +516,7 @@ impl<'a> MetaPacket<'a> {
                     self.npb_ignore_l4 = true;
                     return Ok(());
                 }
-                self.l3_payload_len = size_checker as usize;
+                self.l3_payload_len = size_checker as u16;
             }
             EthernetType::Ipv4 => {
                 size_checker -= HeaderType::Ipv4.min_header_size() as isize;
@@ -542,11 +544,12 @@ impl<'a> MetaPacket<'a> {
                 if total_length == 0 {
                     total_length = size_checker as usize + HeaderType::Ipv4.min_header_size();
                 }
-                self.packet_len = total_length + HeaderType::Eth.min_packet_size() + vlan_tag_size;
+                self.packet_len =
+                    (total_length + HeaderType::Eth.min_packet_size() + vlan_tag_size) as u32;
                 // 错包时取最小包长
                 self.packet_len = self
                     .packet_len
-                    .max(HeaderType::Ipv4.min_packet_size() + vlan_tag_size);
+                    .max(HeaderType::Ipv4.min_packet_size() as u32 + vlan_tag_size as u32);
 
                 let mut l3_opt_size = ihl as isize * 4 - 20;
                 // wrong ihl
@@ -558,8 +561,9 @@ impl<'a> MetaPacket<'a> {
                     self.npb_ignore_l4 = true;
                     return Ok(());
                 }
-                self.l2_l3_opt_size = vlan_tag_size + l3_opt_size as usize;
-                self.l3_payload_len = self.packet_len - (packet.len() - size_checker as usize);
+                self.l2_l3_opt_size = vlan_tag_size as u16 + l3_opt_size as u16;
+                self.l3_payload_len =
+                    (self.packet_len - (packet.len() - size_checker as usize) as u32) as u16;
 
                 ip_protocol = IpProtocol::from(packet[IPV4_PROTO_OFFSET + vlan_tag_size]);
                 self.lookup_key.proto = ip_protocol;
@@ -580,19 +584,21 @@ impl<'a> MetaPacket<'a> {
         match ip_protocol {
             IpProtocol::Icmpv4 => {
                 // 错包时取最小包长
-                self.packet_len = self
-                    .packet_len
-                    .max(HeaderType::Ipv4Icmp.min_packet_size() + self.l2_l3_opt_size);
+                self.packet_len = self.packet_len.max(
+                    HeaderType::Ipv4Icmp.min_packet_size() as u32 + self.l2_l3_opt_size as u32,
+                );
                 size_checker -= HeaderType::Ipv4Icmp.min_header_size() as isize;
                 if size_checker < 0 {
                     return Ok(());
                 }
-                match IcmpType::new(packet[FIELD_OFFSET_ICMP_TYPE_CODE + self.l2_l3_opt_size]) {
+                match IcmpType::new(
+                    packet[FIELD_OFFSET_ICMP_TYPE_CODE + self.l2_l3_opt_size as usize],
+                ) {
                     IcmpTypes::DestinationUnreachable
                     | IcmpTypes::SourceQuench
                     | IcmpTypes::RedirectMessage
                     | IcmpTypes::ParameterProblem => {
-                        self.l4_opt_size = FIELD_LEN_ICMP_REST;
+                        self.l4_opt_size = FIELD_LEN_ICMP_REST as u32;
                         size_checker -= self.l4_opt_size as isize;
                         if size_checker < 0 {
                             self.l4_opt_size = 0;
@@ -602,21 +608,23 @@ impl<'a> MetaPacket<'a> {
                     _ => (),
                 }
                 self.payload_len =
-                    (self.packet_len - (packet.len() - size_checker as usize)) as u16;
+                    (self.packet_len as usize - (packet.len() - size_checker as usize)) as u16;
                 self.header_type = HeaderType::Ipv4Icmp;
                 return Ok(());
             }
             IpProtocol::Udp => {
                 match eth_type {
                     EthernetType::Ipv4 => {
-                        self.packet_len = self
-                            .packet_len
-                            .max(HeaderType::Ipv4Udp.min_packet_size() + self.l2_l3_opt_size)
+                        self.packet_len = self.packet_len.max(
+                            HeaderType::Ipv4Udp.min_packet_size() as u32
+                                + self.l2_l3_opt_size as u32,
+                        )
                     }
                     EthernetType::Ipv6 => {
-                        self.packet_len = self
-                            .packet_len
-                            .max(HeaderType::Ipv6Udp.min_packet_size() + self.l2_l3_opt_size)
+                        self.packet_len = self.packet_len.max(
+                            HeaderType::Ipv6Udp.min_packet_size() as u32
+                                + self.l2_l3_opt_size as u32,
+                        )
                     }
                     _ => unreachable!(),
                 }
@@ -629,7 +637,8 @@ impl<'a> MetaPacket<'a> {
                 if size_checker < 0 {
                     return Ok(());
                 }
-                self.l4_payload_len = self.packet_len - (packet.len() - size_checker as usize);
+                self.l4_payload_len =
+                    (self.packet_len as usize - (packet.len() - size_checker as usize)) as u16;
                 self.payload_len = self.l4_payload_len as u16;
                 self.header_type = header_type;
             }
@@ -654,14 +663,16 @@ impl<'a> MetaPacket<'a> {
 
                 match eth_type {
                     EthernetType::Ipv4 => {
-                        self.packet_len = self
-                            .packet_len
-                            .max(HeaderType::Ipv4Tcp.min_packet_size() + self.l2_l3_opt_size)
+                        self.packet_len = self.packet_len.max(
+                            HeaderType::Ipv4Tcp.min_packet_size() as u32
+                                + self.l2_l3_opt_size as u32,
+                        )
                     }
                     EthernetType::Ipv6 => {
-                        self.packet_len = self
-                            .packet_len
-                            .max(HeaderType::Ipv6Tcp.min_packet_size() + self.l2_l3_opt_size)
+                        self.packet_len = self.packet_len.max(
+                            HeaderType::Ipv6Tcp.min_packet_size() as u32
+                                + self.l2_l3_opt_size as u32,
+                        )
                     }
                     _ => unreachable!(),
                 }
@@ -676,27 +687,29 @@ impl<'a> MetaPacket<'a> {
                     return Ok(());
                 }
 
-                let data_offset = packet[data_off + self.l2_l3_opt_size] >> 4;
+                let data_offset = packet[data_off + self.l2_l3_opt_size as usize] >> 4;
                 let mut l4_opt_size = data_offset as isize * 4 - 20;
                 if l4_opt_size < 0 {
                     // dataOffset可能为一个错误的值
                     l4_opt_size = 0;
                 }
-                self.l4_opt_size = l4_opt_size as usize;
+                self.l4_opt_size = l4_opt_size as u32;
                 size_checker -= l4_opt_size;
                 if size_checker < 0 {
                     self.npb_ignore_l4 = true;
                     return Ok(());
                 }
-                self.l4_payload_len = self.packet_len - (packet.len() - size_checker as usize);
+                self.l4_payload_len =
+                    (self.packet_len - (packet.len() - size_checker as usize) as u32) as u16;
                 self.payload_len = self.l4_payload_len as u16;
                 self.header_type = header_type;
                 self.tcp_data.data_offset = data_offset;
-                self.tcp_data.win_size = read_u16_be(&packet[win_off + self.l2_l3_opt_size..]);
+                self.tcp_data.win_size =
+                    read_u16_be(&packet[win_off + self.l2_l3_opt_size as usize..]);
                 self.tcp_data.flags =
-                    TcpFlags::from_bits_truncate(packet[flag_off + self.l2_l3_opt_size]);
-                self.tcp_data.seq = read_u32_be(&packet[seq_off + self.l2_l3_opt_size..]);
-                self.tcp_data.ack = read_u32_be(&packet[ack_off + self.l2_l3_opt_size..]);
+                    TcpFlags::from_bits_truncate(packet[flag_off + self.l2_l3_opt_size as usize]);
+                self.tcp_data.seq = read_u32_be(&packet[seq_off + self.l2_l3_opt_size as usize..]);
+                self.tcp_data.ack = read_u32_be(&packet[ack_off + self.l2_l3_opt_size as usize..]);
                 if data_offset > 5 {
                     self.update_tcp_opt();
                 }
@@ -705,7 +718,8 @@ impl<'a> MetaPacket<'a> {
                 if size_checker > 0 {
                     // ICMPV6_TYPE_OFFSET使用ipv6的头长，实际ipv6比ipv4多的已经加在l3optSize中，这里再去掉
                     self.nd_reply_or_arp_request = Icmpv6Type::new(
-                        packet[ICMPV6_TYPE_OFFSET + self.l2_l3_opt_size - IPV6_HEADER_ADJUST],
+                        packet[ICMPV6_TYPE_OFFSET + self.l2_l3_opt_size as usize
+                            - IPV6_HEADER_ADJUST],
                     ) == Icmpv6Types::NeighborAdvert;
                     // 忽略link-local address并只考虑ND reply, i.e. neighbour advertisement
                     if let IpAddr::V6(ip) = self.lookup_key.src_ip {
@@ -714,40 +728,42 @@ impl<'a> MetaPacket<'a> {
                     }
                 }
                 self.payload_len =
-                    (self.packet_len - (packet.len() - size_checker as usize)) as u16;
+                    (self.packet_len - (packet.len() - size_checker as usize) as u32) as u16;
                 return Ok(());
             }
             _ => {
                 self.payload_len =
-                    (self.packet_len - (packet.len() - size_checker as usize)) as u16;
+                    (self.packet_len - (packet.len() - size_checker as usize) as u32) as u16;
                 return Ok(());
             }
         }
         let packet = self.raw.as_ref().unwrap();
         if self.header_type >= HeaderType::Ipv4 {
-            self.lookup_key.src_port = read_u16_be(&packet[offset_port_0 + self.l2_l3_opt_size..]);
-            self.lookup_key.dst_port = read_u16_be(&packet[offset_port_1 + self.l2_l3_opt_size..]);
+            self.lookup_key.src_port =
+                read_u16_be(&packet[offset_port_0 + self.l2_l3_opt_size as usize..]);
+            self.lookup_key.dst_port =
+                read_u16_be(&packet[offset_port_1 + self.l2_l3_opt_size as usize..]);
         }
         const PACKET_MAX_PADDING: usize = 16;
-        if self.packet_len + PACKET_MAX_PADDING < original_length {
+        if self.packet_len as usize + PACKET_MAX_PADDING < original_length {
             // 因为采集包是有padding的, 正常场景PacketLen根据ip.total_len计算出准确的值
             // 在有些场景采集包会被截断，或者由于tso等功能多个报文会合并为一个，但是采集
             // 到的ip.total_len远远小于实际包长，考虑到其中的tcp.seq和tcp.ack可能未改变
             // 的，m.PacketLen在最后使用originalLength校准，但不会修改PayloadLen，不影响
             // RTT计算。
-            self.packet_len = original_length;
+            self.packet_len = original_length as u32;
         }
         Ok(())
     }
 
     /// Get the meta packet's l3 payload len.
     pub fn l3_payload_len(&self) -> usize {
-        self.l3_payload_len
+        self.l3_payload_len as usize
     }
 
     /// Get the meta packet's l4 payload len.
     pub fn l4_payload_len(&self) -> usize {
-        self.l4_payload_len
+        self.l4_payload_len as usize
     }
 
     #[cfg(target_os = "linux")]
@@ -806,9 +822,9 @@ impl<'a> MetaPacket<'a> {
         #[cfg(target_arch = "x86_64")]
         data.cap_data
             .copy_to_nonoverlapping(packet.raw_from_ebpf.as_mut_ptr() as *mut i8, cap_len);
-        packet.packet_len = data.syscall_len as usize + 54; // 目前仅支持TCP
+        packet.packet_len = data.syscall_len as u32 + 54; // 目前仅支持TCP
         packet.payload_len = data.cap_len as u16;
-        packet.l4_payload_len = data.cap_len as usize;
+        packet.l4_payload_len = data.cap_len as u16;
         packet.tap_port = TapPort::from_ebpf(data.process_id);
         packet.signal_source = SignalSource::EBPF;
         packet.cap_seq = data.cap_seq;
@@ -885,9 +901,9 @@ impl<'a> MetaPacket<'a> {
 impl<'a> fmt::Display for MetaPacket<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "\t\t{}\n", self.lookup_key)?;
-        write!(f, "\t\tsource_ip: {}, packet_count: {}, packet_bytes: {}, tap_port: {}, packet_len: {}, payload_len: {}, vlan: {}, direction: {}\n",
-            Ipv4Addr::from(self.source_ip), self.packet_count, self.packet_bytes, self.tap_port, self.packet_len, self.payload_len, self.vlan, self.lookup_key.direction
-            )?;
+        // write!(f, "\t\tsource_ip: {}, packet_count: {}, packet_bytes: {}, tap_port: {}, packet_len: {}, payload_len: {}, vlan: {}, direction: {}\n",
+        //     Ipv4Addr::from(self.source_ip), self.packet_count, self.packet_bytes, self.tap_port, self.packet_len, self.payload_len, self.vlan, self.lookup_key.direction
+        //     )?;
         if let Some(t) = &self.tunnel {
             write!(f, "\t\ttunnel: {}\n", t)?;
         }

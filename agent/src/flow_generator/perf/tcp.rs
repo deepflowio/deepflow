@@ -1089,7 +1089,7 @@ struct MiniMetaPacket {
     ack: u32,
     timestamp: u64,
     payload_len: u16,
-    packet_len: usize,
+    packet_len: u32,
 }
 
 impl<'a> From<MiniMetaPacket> for MetaPacket<'_> {
