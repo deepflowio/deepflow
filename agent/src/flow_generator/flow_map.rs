@@ -466,7 +466,7 @@ impl FlowMap {
                         node_map.remove(&pkt_key);
                     }
                 } else {
-                    if node.timestamp_key < pkt_timestamp.as_secs() {
+                    if node.timestamp_key != pkt_timestamp.as_secs() {
                         // Because pkt_key is shared by multiple nodes, we have no low-cost way to
                         // delete it from time_set. In fact, we can invalidate the flow_key in the
                         // old slot in time_set by updating node.timestamp_key.
