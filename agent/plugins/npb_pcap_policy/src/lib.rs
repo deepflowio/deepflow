@@ -124,7 +124,7 @@ impl NpbAction {
         100
     }
 
-    pub const fn payload_slice(&self) -> u16 {
+    pub const fn payload_slice(&self) -> usize {
         65535
     }
 

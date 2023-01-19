@@ -110,29 +110,27 @@ impl FlowMapKey {
 
 #[derive(Default)]
 pub struct FlowNode {
+    pub tagged_flow: TaggedFlow,
+    pub min_arrived_time: Duration,
+    // 最近一个Packet的时间戳
+    pub recent_time: Duration,
+    // 相对超时时间
+    pub timeout: Duration,
     // 用作time_set比对的标识，等于FlowTimeKey的timestamp_key, 只有创建FlowNode和刷新更新流节点的超时才会更新
     pub timestamp_key: u64,
 
-    pub tagged_flow: TaggedFlow,
-    pub min_arrived_time: Duration,
-    pub recent_time: Duration,
-    // 最近一个Packet的时间戳
-    pub timeout: Duration,
-    // 相对超时时间
-    pub flow_state: FlowState,
     pub meta_flow_perf: Option<FlowPerf>,
-
     pub policy_data_cache: [PolicyData; 2],
     pub endpoint_data_cache: [Arc<EndpointData>; 2],
 
     // Only for eBPF TCP Flow, used to help confirm whether the Flow can be timed out.
     pub residual_request: i32,
-
     pub next_tcp_seq0: u32,
     pub next_tcp_seq1: u32,
-    pub policy_in_tick: [bool; 2],
     // 当前统计周期（目前是自然秒）是否更新策略
+    pub policy_in_tick: [bool; 2],
     pub packet_in_tick: bool, // 当前统计周期（目前是自然秒）是否有包
+    pub flow_state: FlowState,
 
     // Enterprise Edition Feature: packet-sequence
     pub packet_sequence_block: Option<packet_sequence_block::PacketSequenceBlock>,
