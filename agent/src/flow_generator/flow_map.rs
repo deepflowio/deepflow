@@ -115,6 +115,8 @@ pub struct FlowMap {
     stats_counter: Arc<FlowMapCounter>,
 
     l7_protocol_checker: L7ProtocolChecker,
+
+    time_key_buffer: Option<Vec<(u64, FlowMapKey)>>,
 }
 
 impl FlowMap {
@@ -206,6 +208,7 @@ impl FlowMap {
                     })
                     .collect(),
             ),
+            time_key_buffer: None,
         }
     }
 
@@ -276,7 +279,7 @@ impl FlowMap {
             ((timestamp - config.packet_delay).as_nanos() / TIME_UNIT.as_nanos()) as u64;
         self.start_time =
             Duration::from_nanos(next_start_time_in_unit * TIME_UNIT.as_nanos() as u64);
-        timestamp = self.start_time - 1;
+        timestamp = self.start_time - TIME_UNIT;
 
         let (mut node_map, mut time_set) = match self.node_map.take().zip(self.time_set.take()) {
             Some(pair) => pair,
@@ -286,7 +289,11 @@ impl FlowMap {
             }
         };
 
-        let mut moved_key = Vec::with_capacity(self.hash_slots / self.time_window_size);
+        let mut moved_key = self
+            .time_key_buffer
+            .take()
+            .unwrap_or(Vec::with_capacity(self.hash_slots / self.time_window_size));
+        moved_key.clear();
         for time_in_unit in self.start_time_in_unit..next_start_time_in_unit {
             let time_hashset = &mut time_set[time_in_unit as usize & (self.time_window_size - 1)];
             for flow_key in time_hashset.drain() {
@@ -349,6 +356,7 @@ impl FlowMap {
         }
         Self::update_stats_counter(&self.stats_counter, node_map.len() as u64, 0);
 
+        self.time_key_buffer.replace(moved_key);
         self.node_map.replace(node_map);
         self.time_set.replace(time_set);
 
@@ -468,7 +476,8 @@ impl FlowMap {
                         // the following operations are only required when the slot needs to be
                         // changed.
                         node.timestamp_key = pkt_timestamp.as_secs();
-                        time_set[node.timestamp_key as usize & (self.time_window_size - 1)].insert(pkt_key);
+                        time_set[node.timestamp_key as usize & (self.time_window_size - 1)]
+                            .insert(pkt_key);
                     }
                 }
             }
@@ -478,11 +487,13 @@ impl FlowMap {
                     Box::new(self.new_flow_node(&flow_config, &log_parser_config, meta_packet));
                 if meta_packet.signal_source == SignalSource::EBPF
                     && node.meta_flow_perf.is_some()
-                    && node.meta_flow_perf.as_ref().unwrap().server_port == 0 {
+                    && node.meta_flow_perf.as_ref().unwrap().server_port == 0
+                {
                     // For ebpf data, if server_port is 0, it means that parsed data
                     // failed, the info in node maybe wrong, we should drop this node.
                 } else {
-                    time_set[node.timestamp_key as usize & (self.time_window_size - 1)].insert(pkt_key);
+                    time_set[node.timestamp_key as usize & (self.time_window_size - 1)]
+                        .insert(pkt_key);
                     node_map.insert(pkt_key, vec![node]);
                 }
             }
