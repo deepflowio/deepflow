@@ -93,8 +93,8 @@ type DomainEnabled int
 
 const (
 	// attention: following line comments are used by `stringer`
-	DOMAIN_ENABLED_ENABLE DomainEnabled = iota
-	DOMAIN_ENABLED_DISABLE
+	DOMAIN_ENABLED_DISABLE DomainEnabled = iota
+	DOMAIN_ENABLED_ENABLE
 )
 
 //go:generate stringer -type=DomainState -trimprefix=DOMAIN_STATE_ -linecomment
