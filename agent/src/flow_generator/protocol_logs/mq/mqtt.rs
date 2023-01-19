@@ -33,7 +33,6 @@ use crate::{
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
     },
-    config::handler::LogParserConfig,
     flow_generator::{
         error::{Error, Result},
         protocol_logs::{
@@ -222,24 +221,14 @@ pub struct MqttLog {
 }
 
 impl L7ProtocolParserInterface for MqttLog {
-    fn check_payload(
-        &mut self,
-        _: Option<&LogParserConfig>,
-        payload: &[u8],
-        param: &ParseParam,
-    ) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
         if !param.ebpf_type.is_raw_protocol() {
             return false;
         }
         Self::mqtt_check_protocol(payload, param)
     }
 
-    fn parse_payload(
-        &mut self,
-        _: Option<&LogParserConfig>,
-        payload: &[u8],
-        param: &ParseParam,
-    ) -> Result<Vec<L7ProtocolInfo>> {
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
         self.parse(payload, param.l4_protocol, param.direction, None, None)?;
         let mut v = vec![];
         for i in self.info.iter() {

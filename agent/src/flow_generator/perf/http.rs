@@ -109,12 +109,13 @@ impl L7FlowPerf for HttpPerfData {
         if meta.lookup_key.proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
         }
-
+        let Some(config) = config else {
+            return Err(Error::NoParseConfig);
+        };
         let payload = meta.get_l4_payload().ok_or(Error::ZeroPayloadLen)?;
 
-        let param = ParseParam::from(meta);
         if ParseParam::from(meta).ebpf_type == EbpfType::GoHttp2Uprobe {
-            return self.parse_go_http2_uprobe(config, payload, &param);
+            return self.parse_go_http2_uprobe(payload, &ParseParam::from((meta, config)));
         }
 
         if self
@@ -491,17 +492,10 @@ impl HttpPerfData {
         Ok(())
     }
 
-    fn parse_go_http2_uprobe(
-        &mut self,
-        config: Option<&LogParserConfig>,
-        payload: &[u8],
-        param: &ParseParam,
-    ) -> Result<()> {
+    fn parse_go_http2_uprobe(&mut self, payload: &[u8], param: &ParseParam) -> Result<()> {
         let mut log = L7ProtocolParser::HttpParser(HttpLog::new_v2(false));
         let perf_stats = self.perf_stats.get_or_insert(PerfStats::default());
-        if let L7ProtocolInfo::HttpInfo(h) =
-            log.parse_payload(config, payload, param)?.get(0).unwrap()
-        {
+        if let L7ProtocolInfo::HttpInfo(h) = log.parse_payload(payload, param)?.get(0).unwrap() {
             self.session_data.httpv2_headers.stream_id = h.stream_id.unwrap_or_default();
             self.session_data.l7_proto = h.get_l7_protocol_with_tls();
             if let Some(code) = h.status_code {
@@ -533,7 +527,7 @@ mod tests {
 
     use super::*;
 
-    use crate::utils::test::Capture;
+    use crate::{config::handler::L7LogDynamicConfig, utils::test::Capture};
 
     const FILE_DIR: &str = "resources/test/flow_generator/http";
 
@@ -554,7 +548,15 @@ mod tests {
             } else {
                 packet.lookup_key.direction = PacketDirection::ServerToClient;
             }
-            let _ = http_perf_data.parse(None, packet, 0x1f3c01010);
+            let _ = http_perf_data.parse(
+                Some(&LogParserConfig {
+                    l7_log_collect_nps_threshold: 0,
+                    l7_log_session_aggr_timeout: Duration::new(0, 0),
+                    l7_log_dynamic: L7LogDynamicConfig::default(),
+                }),
+                packet,
+                0x1f3c01010,
+            );
         }
         http_perf_data
     }

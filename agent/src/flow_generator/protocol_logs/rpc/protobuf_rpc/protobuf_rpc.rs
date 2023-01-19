@@ -47,14 +47,9 @@ impl ProtobufRpcWrapLog {
 }
 
 impl L7ProtocolParserInterface for ProtobufRpcWrapLog {
-    fn check_payload(
-        &mut self,
-        config: Option<&LogParserConfig>,
-        payload: &[u8],
-        param: &ParseParam,
-    ) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
         for mut p in all_protobuf_rpc_parser().into_iter() {
-            if p.check_payload(config, payload, param) {
+            if p.check_payload(payload, param) {
                 self.parser = Some(p);
                 return true;
             }
@@ -62,16 +57,8 @@ impl L7ProtocolParserInterface for ProtobufRpcWrapLog {
         false
     }
 
-    fn parse_payload(
-        &mut self,
-        config: Option<&LogParserConfig>,
-        payload: &[u8],
-        param: &ParseParam,
-    ) -> Result<Vec<L7ProtocolInfo>> {
-        self.parser
-            .as_mut()
-            .unwrap()
-            .parse_payload(config, payload, param)
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+        self.parser.as_mut().unwrap().parse_payload(payload, param)
     }
 
     fn protocol(&self) -> L7Protocol {
@@ -104,23 +91,25 @@ impl L7FlowPerf for ProtobufRpcWrapLog {
         packet: &MetaPacket,
         _: u64,
     ) -> Result<()> {
+        let Some(config) = config else {
+            return Err(Error::NoParseConfig);
+        };
+        let param = ParseParam::from((packet, config));
+
         if let Some(payload) = packet.get_l4_payload() {
             if self.parser.is_none() {
                 for mut p in all_protobuf_rpc_parser().into_iter() {
-                    if p.parse_payload(config, payload, &ParseParam::from(packet))
-                        .is_ok()
-                    {
+                    if p.parse_payload(payload, &param).is_ok() {
                         self.parser = Some(p);
                         return Ok(());
                     }
                 }
                 return Err(Error::L7ProtocolUnknown);
             } else {
-                self.parser.as_mut().unwrap().parse_payload(
-                    config,
-                    payload,
-                    &ParseParam::from(packet),
-                )?;
+                self.parser
+                    .as_mut()
+                    .unwrap()
+                    .parse_payload(payload, &param)?;
                 return Ok(());
             }
         } else {
