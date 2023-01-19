@@ -30,7 +30,7 @@ impl PacketSequenceBlock {
         unimplemented!();
     }
 
-    pub fn check(&self, _: usize, _: u32) -> bool {
+    pub fn is_available(&self, _: usize, _: u32) -> bool {
         unimplemented!();
     }
 
