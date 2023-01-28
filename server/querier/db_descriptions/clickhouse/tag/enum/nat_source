@@ -1,4 +1,5 @@
 # Value , DisplayName  , Description
 0       , NONE         ,
-1       , VIP          ,
-2       , TOA          ,
+2       , VIP          ,
+4       , CONTROLLER   ,
+6       , TOA          ,
