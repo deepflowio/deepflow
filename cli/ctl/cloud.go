@@ -114,7 +114,7 @@ func getInfo(cmd *cobra.Command, domainLcuuid, domainName, resource string) {
 			subDomainResources := data.Get("SubDomainResources").MustMap()
 			for _, subDomainData := range subDomainResources {
 				rscData, ok := subDomainData.(map[string]interface{})[r]
-				if !ok {
+				if !ok || rscData == nil {
 					continue
 				}
 				for _, d := range rscData.([]interface{}) {
