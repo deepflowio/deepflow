@@ -99,13 +99,15 @@ func (c *TagRecorder) UpdateChDictionary() {
 						}
 						// 删除deepflow数据库
 						// Drop database deepflow
-						log.Info("drop database deepflow")
-						sql := "DROP DATABASE IF EXISTS deepflow"
-						_, err = connect.Exec(sql)
-						if err != nil {
-							log.Error(err)
-							connect.Close()
-							continue
+						if err := connect.Select(&databases, "USE deepflow"); err == nil {
+							log.Info("drop database deepflow")
+							sql := "DROP DATABASE deepflow"
+							_, err = connect.Exec(sql)
+							if err != nil {
+								log.Error(err)
+								connect.Close()
+								continue
+							}
 						}
 
 						sort.Strings(databases)
