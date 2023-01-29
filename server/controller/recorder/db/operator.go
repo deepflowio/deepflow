@@ -122,7 +122,7 @@ func (o OperatorBase[MT]) dedupInSelf(items []*MT) ([]*MT, []string, map[string]
 	for _, item := range items {
 		lcuuid := (*item).GetLcuuid()
 		if common.Contains(lcuuids, lcuuid) {
-			log.Errorf("%s data is duplicated in cloud data (lcuuid: %s)", o.resourceTypeName, lcuuid)
+			log.Infof("%s data is duplicated in cloud data (lcuuid: %s)", o.resourceTypeName, lcuuid)
 		} else {
 			dedupItems = append(dedupItems, item)
 			lcuuids = append(lcuuids, lcuuid)
