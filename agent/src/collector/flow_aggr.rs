@@ -240,10 +240,14 @@ impl FlowAggr {
                 (f.flow.flow_stat_time + Duration::from_secs(SECONDS_IN_MINUTE)).round_to_minute();
         }
         self.metrics.out.fetch_add(1, Ordering::Relaxed);
-        if !self.output.send(f) {
-            self.metrics
-                .drop_in_throttle
-                .fetch_add(1, Ordering::Relaxed);
+        if f.flow.hit_pcap_policy() {
+            self.output.send_without_throttling(f);
+        } else {
+            if !self.output.send_with_throttling(f) {
+                self.metrics
+                    .drop_in_throttle
+                    .fetch_add(1, Ordering::Relaxed);
+            }
         }
     }
 
@@ -330,11 +334,13 @@ struct ThrottlingQueue {
 
     small_rng: SmallRng,
 
-    last_flush_time: Duration,
+    last_flush_cache_with_throttling_time: Duration,
+    last_flush_cache_without_throttling_time: Duration,
     period_count: usize,
     output: DebugSender<BoxedTaggedFlow>,
 
-    stashs: Vec<BoxedTaggedFlow>,
+    cache_with_throttling: Vec<BoxedTaggedFlow>,
+    cache_without_throttling: Vec<BoxedTaggedFlow>,
 }
 
 impl ThrottlingQueue {
@@ -342,6 +348,7 @@ impl ThrottlingQueue {
     const THROTTLE_BUCKET: u64 = 1 << Self::THROTTLE_BUCKET_BITS; // 2^N。由于发送方是有突发的，需要累积一定时间做采样
     const MIN_L4_LOG_COLLECT_NPS_THRESHOLD: u64 = 100;
     const MAX_L4_LOG_COLLECT_NPS_THRESHOLD: u64 = 1000000;
+    const CACHE_WITHOUT_THROTTLING_SIZE: usize = 1024;
 
     pub fn new(output: DebugSender<BoxedTaggedFlow>, config: CollectorAccess) -> Self {
         let t: u64 = config.load().l4_log_collect_nps_threshold * Self::THROTTLE_BUCKET;
@@ -351,44 +358,68 @@ impl ThrottlingQueue {
 
             small_rng: SmallRng::from_entropy(),
 
-            last_flush_time: Duration::ZERO,
+            last_flush_cache_with_throttling_time: Duration::ZERO,
+            last_flush_cache_without_throttling_time: Duration::ZERO,
             period_count: 0,
 
             output,
-            stashs: Vec::with_capacity(t as usize),
+            cache_with_throttling: Vec::with_capacity(t as usize),
+            cache_without_throttling: Vec::with_capacity(Self::CACHE_WITHOUT_THROTTLING_SIZE),
         }
     }
 
-    fn flush(&mut self) {
-        if let Err(_) = self.output.send_all(&mut self.stashs) {
+    fn flush_cache_with_throttling(&mut self) {
+        if let Err(_) = self.output.send_all(&mut self.cache_with_throttling) {
             debug!("l4 flow throttle push aggred flow to sender queue failed, maybe queue have terminated");
-            self.stashs.clear();
+            self.cache_with_throttling.clear();
         }
     }
 
-    pub fn send(&mut self, f: TaggedFlow) -> bool {
+    pub fn send_with_throttling(&mut self, f: TaggedFlow) -> bool {
         let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
 
         if now.as_secs() >> Self::THROTTLE_BUCKET_BITS
-            != self.last_flush_time.as_secs() >> Self::THROTTLE_BUCKET_BITS
+            != self.last_flush_cache_with_throttling_time.as_secs() >> Self::THROTTLE_BUCKET_BITS
         {
             self.update_throttle();
-            self.flush();
-            self.last_flush_time = now;
+            self.flush_cache_with_throttling();
+            self.last_flush_cache_with_throttling_time = now;
             self.period_count = 0;
         }
 
         self.period_count += 1;
-        if self.stashs.len() < self.throttle as usize {
-            self.stashs.push(BoxedTaggedFlow(Box::new(f)));
+        if self.cache_with_throttling.len() < self.throttle as usize {
+            self.cache_with_throttling
+                .push(BoxedTaggedFlow(Box::new(f)));
             true
         } else {
             let r = self.small_rng.gen_range(0..self.period_count);
             if r < self.throttle as usize {
-                self.stashs[r] = BoxedTaggedFlow(Box::new(f));
+                self.cache_with_throttling[r] = BoxedTaggedFlow(Box::new(f));
             }
             false
         }
+    }
+
+    fn flush_cache_without_throttling(&mut self) {
+        if let Err(_) = self.output.send_all(&mut self.cache_without_throttling) {
+            debug!("l4 flow push aggred flow to sender queue failed, maybe queue have terminated");
+            self.cache_without_throttling.clear();
+        }
+    }
+
+    pub fn send_without_throttling(&mut self, f: TaggedFlow) {
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+        if self.cache_without_throttling.len() >= Self::CACHE_WITHOUT_THROTTLING_SIZE
+            || now.as_secs() >> Self::THROTTLE_BUCKET_BITS
+                != self.last_flush_cache_without_throttling_time.as_secs()
+                    >> Self::THROTTLE_BUCKET_BITS
+        {
+            self.flush_cache_without_throttling();
+            self.last_flush_cache_without_throttling_time = now;
+        }
+        self.cache_without_throttling
+            .push(BoxedTaggedFlow(Box::new(f)));
     }
 
     pub fn update_throttle(&mut self) {
@@ -414,6 +445,6 @@ impl ThrottlingQueue {
             new
         );
         self.throttle = new * Self::THROTTLE_BUCKET;
-        self.stashs.truncate(self.throttle as usize);
+        self.cache_with_throttling.truncate(self.throttle as usize);
     }
 }
