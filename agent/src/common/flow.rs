@@ -938,6 +938,11 @@ impl Flow {
             self.tap_side = dst_tap_side.into();
         }
     }
+
+    // Currently acl_gids only saves the policy ID of pcap, but does not save the policy ID of NPB
+    pub fn hit_pcap_policy(&self) -> bool {
+        self.acl_gids.len() > 0
+    }
 }
 
 impl fmt::Display for Flow {
