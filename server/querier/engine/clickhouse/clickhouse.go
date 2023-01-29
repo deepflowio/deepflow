@@ -253,26 +253,13 @@ func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
 			colName, ok := item.Expr.(*sqlparser.ColName)
 			if ok {
 				// pod_ingress/lb_listener is not supported by select
-				// is_internet/resource_glx does not support as
 				if strings.HasPrefix(sqlparser.String(colName), "pod_ingress") || strings.HasPrefix(sqlparser.String(colName), "lb_listener") {
 					errStr := fmt.Sprintf("%s is not supported by select", sqlparser.String(colName))
 					return errors.New(errStr)
-				} else if strings.HasPrefix(sqlparser.String(colName), "is_internet") || sqlparser.String(colName) == "tags" || sqlparser.String(colName) == "metrics" || sqlparser.String(colName) == "attributes" || sqlparser.String(colName) == "packet_batch" {
+				} else if sqlparser.String(colName) == "tags" || sqlparser.String(colName) == "metrics" || sqlparser.String(colName) == "attributes" || sqlparser.String(colName) == "packet_batch" {
 					if as != "" {
 						errStr := fmt.Sprintf("%s does not support as", sqlparser.String(colName))
 						return errors.New(errStr)
-					}
-				} else {
-					for _, suffix := range []string{"", "_0", "_1"} {
-						for _, resourceName := range []string{"resource_gl0", "resource_gl1", "resource_gl2"} {
-							resourceNameSuffix := resourceName + suffix
-							if sqlparser.String(colName) == resourceNameSuffix {
-								if as != "" {
-									errStr := fmt.Sprintf("%s does not support as", sqlparser.String(colName))
-									return errors.New(errStr)
-								}
-							}
-						}
 					}
 				}
 				if as != "" {
