@@ -33,12 +33,12 @@ func GetGroup(name string, asTagMap map[string]string, db, table string) (Statem
 	tag, ok := tag.GetTag(name, db, table, "default")
 	if ok {
 		if tag.TagTranslator != "" {
-			stmt = &GroupTag{Value: tag.TagTranslator, Alias: name}
+			stmt = &GroupTag{Value: tag.TagTranslator, Alias: name, AsTagMap: asTagMap}
 		} else {
-			stmt = &GroupTag{Value: name}
+			stmt = &GroupTag{Value: name, AsTagMap: asTagMap}
 		}
 	} else {
-		stmt = &GroupTag{Value: name}
+		stmt = &GroupTag{Value: name, AsTagMap: asTagMap}
 	}
 	return stmt, nil
 }
@@ -120,9 +120,10 @@ func FormatInnerTime(m *view.Model) {
 }
 
 type GroupTag struct {
-	Value string
-	Alias string
-	Withs []view.Node
+	Value    string
+	Alias    string
+	Withs    []view.Node
+	AsTagMap map[string]string
 }
 
 func (g *GroupTag) Format(m *view.Model) {
@@ -131,10 +132,17 @@ func (g *GroupTag) Format(m *view.Model) {
 	} else {
 		m.AddGroup(&view.Group{Value: g.Value, Withs: g.Withs})
 	}
+	preAsTag, preAsOK := g.AsTagMap[g.Value]
 	for _, suffix := range []string{"", "_0", "_1"} {
 		for _, resourceName := range []string{"resource_gl0", "resource_gl1", "resource_gl2"} {
 			resourceTypeSuffix := resourceName + "_type" + suffix
-			if g.Alias == resourceName+suffix {
+			preAsTag, preAsOK = g.AsTagMap[g.Value]
+			if preAsOK {
+				if preAsTag == resourceName+suffix {
+					m.AddTag(&view.Tag{Value: resourceTypeSuffix})
+					m.AddGroup(&view.Group{Value: resourceTypeSuffix})
+				}
+			} else if g.Alias == resourceName+suffix {
 				m.AddTag(&view.Tag{Value: resourceTypeSuffix})
 				m.AddGroup(&view.Group{Value: resourceTypeSuffix})
 			}
@@ -142,7 +150,11 @@ func (g *GroupTag) Format(m *view.Model) {
 		// internet增加epc分组
 		internetSuffix := "is_internet" + suffix
 		epcSuffix := "l3_epc_id" + suffix
-		if g.Alias == internetSuffix {
+		if preAsOK {
+			if preAsTag == internetSuffix {
+				m.AddGroup(&view.Group{Value: epcSuffix})
+			}
+		} else if g.Alias == internetSuffix {
 			m.AddGroup(&view.Group{Value: epcSuffix})
 		}
 	}
