@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/bitly/go-simplejson"
 	"github.com/deepflowys/deepflow/cli/ctl/common"
@@ -285,22 +286,29 @@ func tableIp(response *simplejson.Json, table *tablewriter.Table) {
 }
 
 func tableVinterface(response *simplejson.Json, table *tablewriter.Table) {
-	table.SetHeader([]string{"MAC", "NAME", "TAP_MAC", "TAP_NAME", "DEVICE_TYPE", "DEVICE_NAME", "HOST_IP", "VTAP_ID", "IPS"})
+	table.SetHeader([]string{"MAC", "NAME", "TAP_MAC", "TAP_NAME", "DEVICE_TYPE", "DEVICE_NAME", "HOST_IP", "VTAP_ID", "CLUSTER_ID", "IP"})
 
 	tableItems := [][]string{}
 	for i := range response.Get("DATA").MustArray() {
 		data := response.Get("DATA").GetIndex(i)
-		tableItem := []string{}
-		tableItem = append(tableItem, data.Get("MAC").MustString())
-		tableItem = append(tableItem, data.Get("NAME").MustString())
-		tableItem = append(tableItem, data.Get("TAP_MAC").MustString())
-		tableItem = append(tableItem, data.Get("TAP_NAME").MustString())
-		tableItem = append(tableItem, data.Get("DEVICE_TYPE").MustString())
-		tableItem = append(tableItem, data.Get("DEVICE_NAME").MustString())
-		tableItem = append(tableItem, data.Get("HOST_IP").MustString())
-		tableItem = append(tableItem, strconv.Itoa(data.Get("VTAP_ID").MustInt()))
-		tableItem = append(tableItem, data.Get("IPS").MustString())
-		tableItems = append(tableItems, tableItem)
+		ipsString := data.Get("IPS").MustString()
+		for _, ip := range strings.Split(ipsString, ",") {
+			if ip == "" {
+				continue
+			}
+			tableItem := []string{}
+			tableItem = append(tableItem, data.Get("MAC").MustString())
+			tableItem = append(tableItem, data.Get("NAME").MustString())
+			tableItem = append(tableItem, data.Get("TAP_MAC").MustString())
+			tableItem = append(tableItem, data.Get("TAP_NAME").MustString())
+			tableItem = append(tableItem, data.Get("DEVICE_TYPE").MustString())
+			tableItem = append(tableItem, data.Get("DEVICE_NAME").MustString())
+			tableItem = append(tableItem, data.Get("HOST_IP").MustString())
+			tableItem = append(tableItem, strconv.Itoa(data.Get("VTAP_ID").MustInt()))
+			tableItem = append(tableItem, data.Get("KUBERNETES_CLUSTER_ID").MustString())
+			tableItem = append(tableItem, ip)
+			tableItems = append(tableItems, tableItem)
+		}
 	}
 
 	table.AppendBulk(tableItems)
