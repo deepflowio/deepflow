@@ -25,7 +25,7 @@ use std::{
     time::Duration,
 };
 
-use log::{debug, info, log_enabled, warn, Level};
+use log::{debug, info, log_enabled, trace, warn, Level};
 use regex::Regex;
 
 use super::Poller;
@@ -33,6 +33,8 @@ use public::{
     consts::NORMAL_EXIT_WITH_RESTART,
     netns::{InterfaceInfo, NetNs, NsFile},
 };
+
+const ENTRY_EXPIRE_COUNT: u8 = 3;
 
 #[derive(Debug, Default)]
 pub struct ActivePoller {
@@ -95,6 +97,12 @@ impl ActivePoller {
         let new_entries = Self::query(&nss);
         *entries.lock().unwrap() = new_entries;
         version.store(1, Ordering::SeqCst);
+        info!("kubernetes poller updated to version (1)");
+
+        // counter for entries in interface_info
+        // if a namespace or a piece of interface info is missing in ENTRY_EXPIRE_COUNT consecutive queries
+        // it will be removed from interface_info
+        let mut absent_count = HashMap::new();
 
         loop {
             let guard = running.lock().unwrap();
@@ -122,6 +130,8 @@ impl ActivePoller {
             // compare two lists
             let mut old_interface_info = entries.lock().unwrap();
             if old_interface_info.eq(&new_interface_info) {
+                // everything refreshed, clear absent map
+                absent_count.clear();
                 continue;
             }
 
@@ -129,17 +139,65 @@ impl ActivePoller {
             for (k, old_vs) in old_interface_info.iter() {
                 match new_interface_info.entry(k.clone()) {
                     Entry::Vacant(v) => {
-                        v.insert(old_vs.to_vec());
+                        let retain = match absent_count.entry(k.clone()) {
+                            Entry::Vacant(v) => {
+                                v.insert((1, HashMap::new()));
+                                trace!("interfaces in {:?} expire count is 1", k);
+                                true
+                            }
+                            Entry::Occupied(o) => {
+                                let r = o.into_mut();
+                                r.0 += 1;
+                                trace!("interfaces in {:?} expire count is {}", k, r.0);
+                                r.0 < ENTRY_EXPIRE_COUNT
+                            }
+                        };
+                        if retain {
+                            v.insert(old_vs.to_vec());
+                        } else {
+                            debug!("interfaces in {:?} expired", k);
+                        }
                     }
                     Entry::Occupied(o) => {
                         let new_vs = o.into_mut();
+
+                        let mut absent =
+                            absent_count.entry(k.clone()).or_insert((0, HashMap::new()));
+                        absent.0 = 0;
+                        // reset new interface absent count
+                        for vs in new_vs.iter() {
+                            absent.1.remove(&vs.tap_idx);
+                        }
+
                         let mut to_insert = vec![];
                         for toi in old_vs.into_iter() {
                             let contains = new_vs
                                 .binary_search_by_key(&toi.tap_idx, |v| v.tap_idx)
                                 .is_ok();
                             if !contains {
-                                to_insert.push(toi.clone());
+                                let retain = match absent.1.entry(toi.tap_idx) {
+                                    Entry::Vacant(v) => {
+                                        v.insert(1);
+                                        trace!("interfaces {:?} in {:?} expire count is 1", toi, k);
+                                        true
+                                    }
+                                    Entry::Occupied(o) => {
+                                        let r = o.into_mut();
+                                        *r += 1;
+                                        trace!(
+                                            "interfaces {:?} in {:?} expire count is {}",
+                                            toi,
+                                            k,
+                                            r
+                                        );
+                                        *r < ENTRY_EXPIRE_COUNT
+                                    }
+                                };
+                                if retain {
+                                    to_insert.push(toi.clone());
+                                } else {
+                                    debug!("interfaces {:?} in {:?} expired", toi, k);
+                                }
                             }
                         }
                         new_vs.extend(to_insert);
@@ -148,12 +206,15 @@ impl ActivePoller {
                 }
             }
 
-            *old_interface_info = new_interface_info;
-            version.fetch_add(1, Ordering::SeqCst);
-            info!(
-                "kubernetes poller updated to version ({})",
-                version.load(Ordering::SeqCst)
-            );
+            // may be equal if merged
+            if !old_interface_info.eq(&new_interface_info) {
+                *old_interface_info = new_interface_info;
+                version.fetch_add(1, Ordering::SeqCst);
+                info!(
+                    "kubernetes poller updated to version ({})",
+                    version.load(Ordering::SeqCst)
+                );
+            }
             if log_enabled!(Level::Debug) {
                 for ns in old_interface_info.values() {
                     for entry in ns {
