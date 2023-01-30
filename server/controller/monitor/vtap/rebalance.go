@@ -22,8 +22,8 @@ import (
 	"time"
 
 	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/http/service"
 	"github.com/deepflowys/deepflow/server/controller/monitor/config"
-	"github.com/deepflowys/deepflow/server/controller/service"
 )
 
 type RebalanceCheck struct {
