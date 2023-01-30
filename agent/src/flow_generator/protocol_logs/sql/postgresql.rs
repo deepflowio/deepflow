@@ -28,6 +28,7 @@ use crate::{
         l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
         MetaPacket,
     },
+    config::handler::LogParserConfig,
     flow_generator::{
         perf::{L7FlowPerf, PerfStats},
         protocol_logs::{
@@ -184,7 +185,12 @@ impl Default for PostgresqlLog {
 perf_impl!(PostgresqlLog);
 
 impl L7ProtocolParserInterface for PostgresqlLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(
+        &mut self,
+        _: Option<&LogParserConfig>,
+        payload: &[u8],
+        param: &ParseParam,
+    ) -> bool {
         self.set_msg_type(param.direction);
         self.info.is_tls = param.is_tls();
         if self.check_is_ssl_req(payload) {
@@ -199,7 +205,12 @@ impl L7ProtocolParserInterface for PostgresqlLog {
         }
     }
 
-    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+    fn parse_payload(
+        &mut self,
+        _: Option<&LogParserConfig>,
+        payload: &[u8],
+        param: &ParseParam,
+    ) -> Result<Vec<L7ProtocolInfo>> {
         if self.parsed {
             let r = if self.info.ignore {
                 vec![]
@@ -243,9 +254,14 @@ impl L7ProtocolParserInterface for PostgresqlLog {
 }
 
 impl L7FlowPerf for PostgresqlLog {
-    fn parse(&mut self, packet: &MetaPacket, _flow_id: u64) -> Result<()> {
+    fn parse(
+        &mut self,
+        config: Option<&LogParserConfig>,
+        packet: &MetaPacket,
+        _flow_id: u64,
+    ) -> Result<()> {
         if let Some(payload) = packet.get_l4_payload() {
-            self.parse_payload(payload, &ParseParam::from(packet))?;
+            self.parse_payload(config, payload, &ParseParam::from(packet))?;
         }
         Ok(())
     }
@@ -545,17 +561,25 @@ mod test {
         let mut parser = PostgresqlLog::new();
         let req_param = &mut ParseParam::from(&p[0]);
         let req_payload = p[0].get_l4_payload().unwrap();
-        assert_eq!((&mut parser).check_payload(req_payload, req_param), true);
-        let mut info = (&mut parser).parse_payload(req_payload, req_param).unwrap();
+        assert_eq!(
+            (&mut parser).check_payload(None, req_payload, req_param),
+            true
+        );
+        let mut info = (&mut parser)
+            .parse_payload(None, req_payload, req_param)
+            .unwrap();
         let mut req = info.swap_remove(0);
 
         (&mut parser).reset();
 
         let resp_param = &ParseParam::from(&p[1]);
         let resp_payload = p[1].get_l4_payload().unwrap();
-        assert_eq!((&mut parser).check_payload(resp_payload, resp_param), true);
+        assert_eq!(
+            (&mut parser).check_payload(None, resp_payload, resp_param),
+            true
+        );
         let resp = (&mut parser)
-            .parse_payload(resp_payload, resp_param)
+            .parse_payload(None, resp_payload, resp_param)
             .unwrap()
             .swap_remove(0);
 

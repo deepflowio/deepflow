@@ -559,19 +559,6 @@ struct AppLogs {
     mqtt: MqttLog,
 }
 
-impl AppLogs {
-    pub fn new(config: &LogParserAccess) -> Self {
-        let mut dubbo = DubboLog::new();
-        dubbo.update_config(config);
-
-        Self {
-            http: HttpLog::new(config),
-            dubbo: dubbo,
-            ..Default::default()
-        }
-    }
-}
-
 pub struct AppProtoLogsParser {
     input_queue: Arc<Receiver<Box<MetaAppProto>>>,
     output_queue: DebugSender<BoxAppProtoLogsData>,
@@ -579,7 +566,6 @@ pub struct AppProtoLogsParser {
     running: Arc<AtomicBool>,
     thread: Mutex<Option<JoinHandle<()>>>,
     counter: Arc<SessionAggrCounter>,
-    l7_log_dynamic_is_updated: Arc<AtomicBool>,
     config: LogParserAccess,
 
     log_rate: Arc<LeakyBucket>,
@@ -602,28 +588,11 @@ impl AppProtoLogsParser {
                 running: Default::default(),
                 thread: Mutex::new(None),
                 counter: counter.clone(),
-                l7_log_dynamic_is_updated: Arc::new(AtomicBool::new(true)),
                 config,
                 log_rate,
             },
             counter,
         )
-    }
-
-    pub fn l7_log_dynamic_config_updated(&self) {
-        self.l7_log_dynamic_is_updated
-            .store(true, Ordering::Relaxed);
-    }
-
-    fn update_l7_log_dynamic_config(
-        l7_log_dynamic_is_updated: Arc<AtomicBool>,
-        config: &LogParserAccess,
-        app_logs: &mut AppLogs,
-    ) {
-        if l7_log_dynamic_is_updated.swap(false, Ordering::Relaxed) {
-            app_logs.http.update_config(config);
-            app_logs.dubbo.update_config(config);
-        }
     }
 
     pub fn start(&self) {
@@ -637,7 +606,6 @@ impl AppProtoLogsParser {
         let output_queue = self.output_queue.clone();
 
         let config = self.config.clone();
-        let l7_log_dynamic_is_updated = self.l7_log_dynamic_is_updated.clone();
         let log_rate = self.log_rate.clone();
 
         let thread = thread::Builder::new()
@@ -645,17 +613,13 @@ impl AppProtoLogsParser {
             .spawn(move || {
                 let mut session_queue =
                     SessionQueue::new(counter, output_queue, config.clone(), log_rate);
-                let mut app_logs = AppLogs::new(&config);
+
+                let mut batch_buffer = Vec::with_capacity(QUEUE_BATCH_SIZE);
 
                 while running.load(Ordering::Relaxed) {
-                    match input_queue.recv_n(QUEUE_BATCH_SIZE, Some(RCV_TIMEOUT)) {
-                        Ok(app_protos) => {
-                            Self::update_l7_log_dynamic_config(
-                                l7_log_dynamic_is_updated.clone(),
-                                &config,
-                                &mut app_logs,
-                            );
-                            for app_proto in app_protos {
+                    match input_queue.recv_all(&mut batch_buffer, Some(RCV_TIMEOUT)) {
+                        Ok(_) => {
+                            for app_proto in batch_buffer.drain(..) {
                                 session_queue.aggregate_session_and_send(AppProtoLogsData {
                                     base_info: (*app_proto).base_info.clone(),
                                     special_info: (*app_proto).l7_info,

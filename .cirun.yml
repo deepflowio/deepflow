@@ -29,7 +29,7 @@ runners:
       - "c6i.8xlarge"
       - "c6id.8xlarge"
       - "cc2.8xlarge"
-    machine_image: 
+    machine_image:
       - "ami-080f95b5d948cd7bb"
       - "ami-080f95b5d948cd7bb"
       - "ami-080f95b5d948cd7bb"
@@ -90,7 +90,7 @@ runners:
       - "cirun-aws-amd64-32c"
   - name: "aws-arm64-32c"
     cloud: "aws"
-    instance_type: 
+    instance_type:
       - "c6g.8xlarge"
       - "c6gd.8xlarge"
       - "c6gn.8xlarge"
@@ -110,7 +110,7 @@ runners:
       - "c6gd.8xlarge"
       - "c6gn.8xlarge"
       - "c7g.8xlarge"
-    machine_image: 
+    machine_image:
       - "ami-0f03f0478052da1c5"
       - "ami-0f03f0478052da1c5"
       - "ami-0f03f0478052da1c5"
@@ -196,7 +196,7 @@ runners:
       - "c5d.4xlarge"
       - "c6a.4xlarge"
       - "c6id.4xlarge"
-    machine_image: 
+    machine_image:
       - "ami-080f95b5d948cd7bb"
       - "ami-080f95b5d948cd7bb"
       - "ami-080f95b5d948cd7bb"
@@ -276,6 +276,6 @@ runners:
       - "en-west-1"
       - "en-west-1"
       - "en-west-1"
-    preemptible: true
+    preemptible: false
     labels:
       - "cirun-aws-amd64-16c"

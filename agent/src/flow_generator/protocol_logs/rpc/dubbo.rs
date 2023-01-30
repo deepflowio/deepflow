@@ -16,30 +16,28 @@
 
 use std::borrow::Cow;
 
-use arc_swap::access::Access;
-use log::debug;
 use serde::Serialize;
 
-use super::super::{
-    consts::*, value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus, LogMessageType,
+use crate::{
+    common::{
+        enums::IpProtocol,
+        flow::{L7Protocol, PacketDirection},
+        l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
+        l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
+    },
+    config::handler::{L7LogDynamicConfig, LogParserConfig, TraceType},
+    flow_generator::{
+        error::{Error, Result},
+        protocol_logs::{
+            consts::*,
+            decode_base64_to_string,
+            pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
+            value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus, LogMessageType,
+        },
+    },
+    log_info_merge, parse_common,
+    utils::bytes::{read_u32_be, read_u64_be},
 };
-
-use crate::common::enums::IpProtocol;
-use crate::common::flow::L7Protocol;
-use crate::common::flow::PacketDirection;
-use crate::common::l7_protocol_info::L7ProtocolInfo;
-use crate::common::l7_protocol_info::L7ProtocolInfoInterface;
-use crate::common::l7_protocol_log::L7ProtocolParserInterface;
-use crate::common::l7_protocol_log::ParseParam;
-use crate::config::handler::{L7LogDynamicConfig, LogParserAccess, TraceType};
-use crate::flow_generator::error::{Error, Result};
-use crate::flow_generator::protocol_logs::{
-    decode_base64_to_string,
-    pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
-};
-use crate::log_info_merge;
-use crate::parse_common;
-use crate::utils::bytes::{read_u32_be, read_u64_be};
 
 const TRACE_ID_MAX_LEN: usize = 1024;
 
@@ -159,25 +157,39 @@ impl From<DubboInfo> for L7ProtocolSendLog {
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct DubboLog {
     info: DubboInfo,
-    #[serde(skip)]
-    l7_log_dynamic_config: L7LogDynamicConfig,
 }
 
 impl L7ProtocolParserInterface for DubboLog {
-    fn set_parse_config(&mut self, log_parser_config: &LogParserAccess) {
-        self.update_config(log_parser_config);
-    }
-
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(
+        &mut self,
+        _: Option<&LogParserConfig>,
+        payload: &[u8],
+        param: &ParseParam,
+    ) -> bool {
         if !param.ebpf_type.is_raw_protocol() {
             return false;
         }
         Self::dubbo_check_protocol(payload, param)
     }
 
-    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+    fn parse_payload(
+        &mut self,
+        config: Option<&LogParserConfig>,
+        payload: &[u8],
+        param: &ParseParam,
+    ) -> Result<Vec<L7ProtocolInfo>> {
+        let Some(config) = config else {
+            return Err(Error::NoParseConfig);
+        };
         parse_common!(self, param);
-        self.parse(payload, param.l4_protocol, param.direction, None, None)?;
+        self.parse(
+            &config.l7_log_dynamic,
+            payload,
+            param.l4_protocol,
+            param.direction,
+            None,
+            None,
+        )?;
         Ok(vec![L7ProtocolInfo::DubboInfo((&self.info).clone())])
     }
 
@@ -190,27 +202,11 @@ impl L7ProtocolParserInterface for DubboLog {
     }
 
     fn reset(&mut self) {
-        let mut log = Self::default();
-        log.l7_log_dynamic_config = self.l7_log_dynamic_config.clone();
-        *self = log;
+        *self = Self::default();
     }
 }
 
 impl DubboLog {
-    pub fn new() -> Self {
-        Self {
-            ..Default::default()
-        }
-    }
-
-    pub fn update_config(&mut self, config: &LogParserAccess) {
-        self.l7_log_dynamic_config = config.load().l7_log_dynamic.clone();
-        debug!(
-            "dubbo log update l7 log dynamic config to {:#?}",
-            self.l7_log_dynamic_config
-        );
-    }
-
     fn reset_logs(&mut self) {
         self.info.serial_id = 0;
         self.info.data_type = 0;
@@ -389,7 +385,7 @@ impl DubboLog {
     }
 
     // 尽力而为的去解析Dubbo请求中Body各参数
-    fn get_req_body_info(&mut self, payload: &[u8]) {
+    fn get_req_body_info(&mut self, config: &L7LogDynamicConfig, payload: &[u8]) {
         let mut n = BODY_PARAM_MIN;
         let mut para_index = 0;
         let payload_len = payload.len();
@@ -432,12 +428,12 @@ impl DubboLog {
             n += 1;
         }
 
-        if self.l7_log_dynamic_config.trace_types.is_empty() || para_index >= payload.len() {
+        if config.trace_types.is_empty() || para_index >= payload.len() {
             return;
         }
 
         let payload_str = String::from_utf8_lossy(&payload[para_index..]);
-        for trace_type in self.l7_log_dynamic_config.trace_types.iter() {
+        for trace_type in config.trace_types.iter() {
             if trace_type.to_string().len() > u8::MAX as usize {
                 continue;
             }
@@ -447,7 +443,7 @@ impl DubboLog {
                 break;
             }
         }
-        for span_type in self.l7_log_dynamic_config.span_types.iter() {
+        for span_type in config.span_types.iter() {
             if span_type.to_string().len() > u8::MAX as usize {
                 continue;
             }
@@ -459,7 +455,7 @@ impl DubboLog {
         }
     }
 
-    fn request(&mut self, payload: &[u8], dubbo_header: &DubboHeader) {
+    fn request(&mut self, config: &L7LogDynamicConfig, payload: &[u8], dubbo_header: &DubboHeader) {
         self.info.msg_type = LogMessageType::Request;
 
         self.info.data_type = dubbo_header.data_type;
@@ -467,7 +463,7 @@ impl DubboLog {
         self.info.serial_id = dubbo_header.serial_id;
         self.info.request_id = dubbo_header.request_id;
 
-        self.get_req_body_info(&payload[DUBBO_HEADER_LEN..]);
+        self.get_req_body_info(config, &payload[DUBBO_HEADER_LEN..]);
     }
 
     fn set_status(&mut self, status_code: u8) {
@@ -514,6 +510,7 @@ impl DubboLog {
 
     fn parse(
         &mut self,
+        config: &L7LogDynamicConfig,
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
@@ -530,7 +527,7 @@ impl DubboLog {
 
         match direction {
             PacketDirection::ClientToServer => {
-                self.request(payload, &dubbo_header);
+                self.request(&config, payload, &dubbo_header);
             }
             PacketDirection::ServerToClient => {
                 self.response(&dubbo_header);
@@ -639,16 +636,21 @@ mod tests {
                 None => continue,
             };
 
+            let config = L7LogDynamicConfig::new(
+                "".to_owned(),
+                "".to_owned(),
+                vec![
+                    TraceType::Customize("EagleEye-TraceID".to_string()),
+                    TraceType::Sw8,
+                ],
+                vec![
+                    TraceType::Customize("EagleEye-SpanID".to_string()),
+                    TraceType::Sw8,
+                ],
+            );
             let mut dubbo = DubboLog::default();
-            dubbo.l7_log_dynamic_config.trace_types = vec![
-                TraceType::Customize("EagleEye-TraceID".to_string()),
-                TraceType::Sw8,
-            ];
-            dubbo.l7_log_dynamic_config.span_types = vec![
-                TraceType::Customize("EagleEye-SpanID".to_string()),
-                TraceType::Sw8,
-            ];
             let _ = dubbo.parse(
+                &config,
                 payload,
                 packet.lookup_key.proto,
                 packet.direction,

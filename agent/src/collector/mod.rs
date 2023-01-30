@@ -89,7 +89,5 @@ impl CollectorThread {
     }
 }
 
-const RCV_TIMEOUT: Duration = Duration::from_secs(1);
-const QUEUE_BATCH_SIZE: usize = 1024;
 const FLOW_METRICS_PEER_SRC: usize = 0;
 const FLOW_METRICS_PEER_DST: usize = 1;

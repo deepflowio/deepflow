@@ -108,6 +108,7 @@ impl FlowMapKey {
     }
 }
 
+#[derive(Default)]
 pub struct FlowNode {
     // 用作time_set比对的标识，等于FlowTimeKey的timestamp_key, 只有创建FlowNode和刷新更新流节点的超时才会更新
     pub timestamp_key: u64,
