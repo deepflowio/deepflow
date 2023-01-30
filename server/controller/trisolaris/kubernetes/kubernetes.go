@@ -28,8 +28,8 @@ import (
 	. "github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	models "github.com/deepflowys/deepflow/server/controller/db/mysql"
+	resourceservice "github.com/deepflowys/deepflow/server/controller/http/service/resource"
 	"github.com/deepflowys/deepflow/server/controller/model"
-	"github.com/deepflowys/deepflow/server/controller/service"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris/config"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris/dbmgr"
 )
@@ -185,7 +185,7 @@ func (k *KubernetesInfo) createDomain(clusterID, clusterName string) (domainLcuu
 		ControllerIP:        k.cfg.NodeIP,
 		Config:              domainConf,
 	}
-	domain, err := service.CreateDomain(domainCreate, nil)
+	domain, err := resourceservice.CreateDomain(domainCreate, nil)
 	if err != nil {
 		log.Errorf("create domain failed: %s", err.Error())
 		return "", err

@@ -31,7 +31,7 @@ import (
 	"github.com/deepflowys/deepflow/message/trident"
 	. "github.com/deepflowys/deepflow/server/controller/common"
 	models "github.com/deepflowys/deepflow/server/controller/db/mysql"
-	"github.com/deepflowys/deepflow/server/controller/service"
+	"github.com/deepflowys/deepflow/server/controller/http/service"
 	. "github.com/deepflowys/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris/config"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris/dbmgr"
