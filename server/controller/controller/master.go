@@ -25,12 +25,12 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/config"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql/migrator"
 	"github.com/deepflowys/deepflow/server/controller/election"
+	resoureservice "github.com/deepflowys/deepflow/server/controller/http/service/resource"
 	"github.com/deepflowys/deepflow/server/controller/monitor"
 	"github.com/deepflowys/deepflow/server/controller/monitor/license"
 	"github.com/deepflowys/deepflow/server/controller/monitor/vtap"
 	"github.com/deepflowys/deepflow/server/controller/recorder"
 	recorderdb "github.com/deepflowys/deepflow/server/controller/recorder/db"
-	"github.com/deepflowys/deepflow/server/controller/service"
 	"github.com/deepflowys/deepflow/server/controller/tagrecorder"
 )
 
@@ -92,7 +92,7 @@ func checkAndStartMasterFunctions(
 	vtapRebalanceCheck := vtap.NewRebalanceCheck(cfg.MonitorCfg, ctx)
 	vtapLicenseAllocation := license.NewVTapLicenseAllocation(cfg.MonitorCfg, ctx)
 	resourceCleaner := recorder.NewResourceCleaner(&cfg.ManagerCfg.TaskCfg.RecorderCfg, ctx)
-	domainChecker := service.NewDomainCheck(ctx)
+	domainChecker := resoureservice.NewDomainCheck(ctx)
 
 	masterController := ""
 	thisIsMasterController := false

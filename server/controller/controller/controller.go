@@ -36,12 +36,13 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/election"
 	"github.com/deepflowys/deepflow/server/controller/genesis"
 	"github.com/deepflowys/deepflow/server/controller/grpc"
+	"github.com/deepflowys/deepflow/server/controller/http/router"
+	"github.com/deepflowys/deepflow/server/controller/http/router/configuration"
+	resourcerouter "github.com/deepflowys/deepflow/server/controller/http/router/resource"
 	"github.com/deepflowys/deepflow/server/controller/manager"
 	"github.com/deepflowys/deepflow/server/controller/monitor"
 	recorderdb "github.com/deepflowys/deepflow/server/controller/recorder/db"
 	"github.com/deepflowys/deepflow/server/controller/report"
-	"github.com/deepflowys/deepflow/server/controller/router"
-	"github.com/deepflowys/deepflow/server/controller/router/configuration"
 	"github.com/deepflowys/deepflow/server/controller/statsd"
 	"github.com/deepflowys/deepflow/server/controller/tagrecorder"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris"
@@ -167,19 +168,23 @@ func Start(ctx context.Context, configPath string, shared *servercommon.Controll
 	router.VtapRouter(r)
 	router.VtapGroupRouter(r, cfg)
 	router.DataSourceRouter(r, cfg)
-	router.DomainRouter(r, cfg)
 	router.VTapGroupConfigRouter(r)
 	router.VTapInterface(r, cfg)
-	router.VPCRouter(r)
 	trouter.RegistRouter(r)
 	configuration.ConfigurationRouter(r)
-	router.ProcessRouter(r)
+	registerResourceRouters(r, cfg)
 
 	grpcStart(ctx, cfg)
 
 	if !cfg.ReportingDisabled {
 		go report.NewReportServer(mysql.Db).StartReporting()
 	}
+}
+
+func registerResourceRouters(r *gin.Engine, cfg *config.ControllerConfig) {
+	resourcerouter.DomainRouter(r, cfg)
+	resourcerouter.VPCRouter(r)
+	resourcerouter.ProcessRouter(r)
 }
 
 func grpcStart(ctx context.Context, cfg *config.ControllerConfig) {
