@@ -522,7 +522,7 @@ var ColumnAdd620 = []*ColumnAdds{
 	&ColumnAdds{
 		Dbs:         []string{"flow_log"},
 		Tables:      []string{"l4_flow_log", "l4_flow_log_local"},
-		ColumnNames: []string{"nat_real_ip_0", "nat_real_ip_1"},
+		ColumnNames: []string{"nat_real_ip4_0", "nat_real_ip4_1"},
 		ColumnType:  ckdb.IPv4,
 	},
 	&ColumnAdds{

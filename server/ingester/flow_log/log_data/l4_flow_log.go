@@ -412,8 +412,8 @@ var FlowInfoColumns = []*ckdb.Column{
 	ckdb.NewColumn("acl_gids", ckdb.ArrayUInt16),
 	ckdb.NewColumn("gprocess_id_0", ckdb.UInt32),
 	ckdb.NewColumn("gprocess_id_1", ckdb.UInt32),
-	ckdb.NewColumn("nat_real_ip_0", ckdb.IPv4),
-	ckdb.NewColumn("nat_real_ip_1", ckdb.IPv4),
+	ckdb.NewColumn("nat_real_ip4_0", ckdb.IPv4),
+	ckdb.NewColumn("nat_real_ip4_1", ckdb.IPv4),
 	ckdb.NewColumn("nat_real_port_0", ckdb.UInt16),
 	ckdb.NewColumn("nat_real_port_1", ckdb.UInt16),
 }

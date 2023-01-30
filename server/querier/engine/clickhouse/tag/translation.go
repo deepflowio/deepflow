@@ -759,11 +759,12 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	// Nat Real IP
 	for _, suffix := range []string{"", "_0", "_1"} {
 		NatRealIPSuffix := "nat_real_ip" + suffix
+		NatRealIP4Suffix := "nat_real_ip4" + suffix
 		tagResourceMap[NatRealIPSuffix] = map[string]*Tag{
 			"default": NewTag(
-				"IPv4NumToString("+NatRealIPSuffix+")",
+				"IPv4NumToString("+NatRealIP4Suffix+")",
 				"",
-				"hex("+NatRealIPSuffix+") %s %s",
+				"hex("+NatRealIP4Suffix+") %s %s",
 				"",
 			)}
 	}
