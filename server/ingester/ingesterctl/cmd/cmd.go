@@ -49,7 +49,7 @@ func RegisterIngesterCommand(root *cobra.Command) {
 		Short: "Droplet debug commands",
 	}
 	flowMetricsCmd := &cobra.Command{
-		Use:   "metircs",
+		Use:   "metrics",
 		Short: "FlowMetrics debug commands",
 	}
 	flowLogCmd := &cobra.Command{
