@@ -19,6 +19,7 @@ use std::path::Path;
 use std::{
     fs::{self, File},
     process::exit,
+    string::String,
     sync::{Arc, Condvar, Mutex},
     thread::{self, JoinHandle},
     time::{Duration, UNIX_EPOCH},
@@ -35,15 +36,13 @@ use super::process::get_memory_rss;
 use super::process::{
     get_current_sys_free_memory_percentage, get_file_and_size_sum, get_thread_num, FileAndSizeSum,
 };
-use crate::common::NORMAL_EXIT_WITH_RESTART;
-#[cfg(target_os = "linux")]
 use crate::common::{
     CGROUP_PROCS_PATH, CGROUP_TASKS_PATH, CGROUP_V2_PROCS_PATH, CGROUP_V2_THREADS_PATH,
+    NORMAL_EXIT_WITH_RESTART,
 };
 use crate::config::handler::EnvironmentAccess;
 use crate::exception::ExceptionHandler;
-#[cfg(target_os = "linux")]
-use crate::utils::environment::running_in_container;
+use crate::utils::{cgroups::is_kernel_available_for_cgroup, environment::running_in_container};
 
 use public::proto::trident::{Exception, TapMode};
 
@@ -55,6 +54,8 @@ pub struct Guard {
     thread: Mutex<Option<JoinHandle<()>>>,
     running: Arc<(Mutex<bool>, Condvar)>,
     exception_handler: ExceptionHandler,
+    cgroup_mount_path: String,
+    is_cgroup_v2: bool,
 }
 
 impl Guard {
@@ -64,6 +65,8 @@ impl Guard {
         interval: Duration,
         tap_mode: TapMode,
         exception_handler: ExceptionHandler,
+        cgroup_mount_path: String,
+        is_cgroup_v2: bool,
     ) -> Self {
         Self {
             config,
@@ -73,6 +76,8 @@ impl Guard {
             thread: Mutex::new(None),
             running: Arc::new((Mutex::new(false), Condvar::new())),
             exception_handler,
+            cgroup_mount_path,
+            is_cgroup_v2,
         }
     }
 
@@ -118,6 +123,45 @@ impl Guard {
         }
     }
 
+    fn check_cgroup<P: AsRef<Path>>(cgroup_mount_path: P, is_cgroup_v2: bool) {
+        fn check_file(path: &str) -> bool {
+            match File::open(path) {
+                Ok(mut file) => {
+                    let mut buf: Vec<u8> = Vec::new();
+                    // Because the cgroup file system is vfs, it is necessary to determine
+                    // whether the file is empty by reading the contents of the file
+                    file.read_to_end(&mut buf).unwrap_or_default();
+                    if buf.len() == 0 {
+                        warn!("check cgroup file failed: {} is empty", path);
+                        return false;
+                    }
+                    return true;
+                }
+                Err(e) => {
+                    warn!(
+                        "check cgroup file failed, cannot open file: {}, {}",
+                        path, e
+                    );
+                    return false;
+                }
+            }
+        }
+        let (proc_path, task_path) = if is_cgroup_v2 {
+            (CGROUP_V2_PROCS_PATH, CGROUP_V2_THREADS_PATH)
+        } else {
+            (CGROUP_PROCS_PATH, CGROUP_TASKS_PATH)
+        };
+        let cgroup_proc_path = cgroup_mount_path.as_ref().join(proc_path).to_owned();
+        let cgroup_task_path = cgroup_mount_path.as_ref().join(task_path).to_owned();
+        if !check_file(cgroup_proc_path.to_str().unwrap())
+            || !check_file(cgroup_task_path.to_str().unwrap())
+        {
+            error!("check cgroup file failed, deepflow-agent restart...");
+            thread::sleep(Duration::from_secs(1));
+            exit(-1);
+        }
+    }
+
     pub fn start(&self) {
         {
             let (started, _) = &*self.running;
@@ -137,37 +181,13 @@ impl Guard {
         #[cfg(target_os = "windows")]
         let mut over_memory_limit = false; // Higher than the limit does not meet expectations, just for Windows, Linux will use cgroup to limit memory
         let mut under_sys_free_memory_limit = false; // Below the limit, it does not meet expectations
+        let cgroup_mount_path = self.cgroup_mount_path.clone();
+        let is_cgroup_v2 = self.is_cgroup_v2;
         let thread = thread::Builder::new().name("guard".to_owned()).spawn(move || {
             loop {
-                #[cfg(target_os = "linux")]
-                {
-                    fn check_cgroup(path: &str) -> bool {
-                        match File::open(path) {
-                            Ok(mut file) => {
-                                let mut buf: Vec<u8> = Vec::new();
-                                file.read_to_end(&mut buf).unwrap_or_default();
-                                if buf.len() == 0 {
-                                    warn!("check cgroup file failed: {} is empty", path);
-                                    return false;
-                                }
-                                return true;
-                            }
-                            Err(e) => {
-                                warn!("check cgroup file failed, cannot open file: {}, {}", path, e);
-                                return false;
-                            }
-                        }
-                    }
-                    // If it is in a container or tap_mode is Analyzer, there is no need to limit resource, so there is no need to check cgroup
-                    if !running_in_container() && tap_mode != TapMode::Analyzer {
-                        if (!check_cgroup(CGROUP_PROCS_PATH) || !check_cgroup(CGROUP_TASKS_PATH)) &&
-                            (!check_cgroup(CGROUP_V2_PROCS_PATH) || !check_cgroup(CGROUP_V2_THREADS_PATH)){
-                            error!("check cgroup file failed, deepflow-agent restart...");
-                            thread::sleep(Duration::from_secs(1));
-                            exit(-1);
-                        }
-
-                    }
+                // If it is in a container or tap_mode is Analyzer, there is no need to limit resource, so there is no need to check cgroup
+                if !running_in_container() && tap_mode != TapMode::Analyzer && is_kernel_available_for_cgroup() {
+                    Self::check_cgroup(cgroup_mount_path.clone(), is_cgroup_v2);
                 }
                 #[cfg(target_os = "windows")]
                 {
