@@ -19,34 +19,23 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 use std::{fs, process, thread};
 
+use super::Error;
 use crate::config::handler::EnvironmentAccess;
 
 use arc_swap::access::Access;
 use cgroups_rs::cgroup_builder::*;
 use cgroups_rs::*;
-use log::{error, info, warn};
+use log::{info, warn};
+use nix::sys::utsname::uname;
 use public::consts::{DEFAULT_CPU_CFS_PERIOD_US, PROCESS_NAME};
-use thiserror::Error;
-
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("cgroup is not supported: {0}")]
-    CgroupNotSupported(String),
-    #[error("set cpu controller failed: {0}")]
-    CpuControllerSetFailed(String),
-    #[error("set mem controller failed: {0}")]
-    MemControllerSetFailed(String),
-    #[error("apply resources failed: {0}")]
-    ApplyResourcesFailed(String),
-    #[error("delete cgroup failed: {0}")]
-    DeleteCgroupFailed(String),
-}
 
 pub struct Cgroups {
     config: EnvironmentAccess,
     thread: Mutex<Option<JoinHandle<()>>>,
     running: Arc<(Mutex<bool>, Condvar)>,
     cgroup: Cgroup,
+    mount_path: String,
+    is_v2: bool,
 }
 
 const CHECK_INTERVAL: Duration = Duration::from_secs(1);
@@ -74,21 +63,52 @@ impl Cgroups {
             )));
         }
         let hier = hierarchies::auto();
+        let mount_path = hier.root().to_str().unwrap().to_string();
+        let is_v2 = hier.v2();
         let cg: Cgroup = CgroupBuilder::new(PROCESS_NAME).build(hier);
         let cpus: &cpu::CpuController = cg.controller_of().unwrap();
-        if let Err(e) = cpus.add_task_by_tgid(&CgroupPid::from(pid)) {
-            return Err(Error::CpuControllerSetFailed(e.to_string()));
+
+        if !is_kernel_available_for_cgroup() {
+            // The cgroup.procs file can only be written after Linux 3.0. Refer to:
+            // https://github.com/torvalds/linux/commit/74a1166dfe1135dcc168d35fa5261aa7e087011b
+            // So in kernel versions before Linux 3.0, we use add_task method, write thread id to the tasks file
+            if let Err(e) = cpus.add_task(&CgroupPid::from(pid)) {
+                // fixme:All thread IDs belonging to this process need to be recorded to this file
+                return Err(Error::CpuControllerSetFailed(e.to_string()));
+            }
+            let mem: &memory::MemController = cg.controller_of().unwrap();
+            if let Err(e) = mem.add_task(&CgroupPid::from(pid)) {
+                return Err(Error::MemControllerSetFailed(e.to_string()));
+            }
+        } else {
+            // In versions after Linux 3.0, we call the add_task_by_tgid method, which will
+            // write the pid to the cgroup.procs file, so cgroup will automatically synchronize
+            // the tasks file. Refer to: https://wudaijun.com/2018/10/linux-cgroup/
+            if let Err(e) = cpus.add_task_by_tgid(&CgroupPid::from(pid)) {
+                return Err(Error::CpuControllerSetFailed(e.to_string()));
+            }
+            let mem: &memory::MemController = cg.controller_of().unwrap();
+            if let Err(e) = mem.add_task_by_tgid(&CgroupPid::from(pid)) {
+                return Err(Error::MemControllerSetFailed(e.to_string()));
+            }
         }
-        let mem: &memory::MemController = cg.controller_of().unwrap();
-        if let Err(e) = mem.add_task_by_tgid(&CgroupPid::from(pid)) {
-            return Err(Error::MemControllerSetFailed(e.to_string()));
-        }
+
         Ok(Cgroups {
             config,
             thread: Mutex::new(None),
             running: Arc::new((Mutex::new(false), Condvar::new())),
             cgroup: cg,
+            mount_path,
+            is_v2,
         })
+    }
+
+    pub fn get_mount_path(&self) -> String {
+        self.mount_path.clone()
+    }
+
+    pub fn is_v2(&self) -> bool {
+        self.is_v2
     }
 
     pub fn start(&self) {
@@ -184,4 +204,16 @@ impl Cgroups {
         info!("cgroup controller stopped");
         Ok(())
     }
+}
+
+pub fn is_kernel_available_for_cgroup() -> bool {
+    const MIN_KERNEL_VERSION: &str = "3";
+    let sys_uname = uname(); // kernel_version is in the format of 5.4.0-13
+    sys_uname
+        .release()
+        .trim()
+        .split_once('-')
+        .unwrap_or_default()
+        .0
+        .ge(MIN_KERNEL_VERSION)
 }
