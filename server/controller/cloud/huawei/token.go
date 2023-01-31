@@ -83,7 +83,9 @@ func (h *HuaWei) createToken(projectName, projectID string) (*Token, error) {
 			},
 		},
 	}
-	resp, err := cloudcommon.RequestPost(fmt.Sprintf("https://iam.%s.%s/v3/auth/tokens", projectName, h.config.URLDomain), time.Duration(h.httpTimeout), authBody)
+	resp, err := cloudcommon.RequestPost(
+		fmt.Sprintf("https://%s.%s.%s/v3/auth/tokens", h.config.IAMHostPrefix, projectName, h.config.Domain), time.Duration(h.httpTimeout), authBody,
+	)
 	if err != nil {
 		log.Errorf("request failed: %+v", err)
 		return nil, err
@@ -101,7 +103,7 @@ func (h *HuaWei) refreshTokenMap() (err error) {
 	h.toolDataSet.configProjectToken = token.token
 
 	projectIDs := []string{}
-	jProjects, err := h.getRawData(fmt.Sprintf("https://iam.%s/v3/auth/projects", h.config.URLDomain), token.token, "projects")
+	jProjects, err := h.getRawData(fmt.Sprintf("https://%s/v3/auth/projects", h.config.IAMHost), token.token, "projects")
 	if err != nil {
 		log.Errorf("request failed: %v", err)
 		return
@@ -138,7 +140,7 @@ func (h *HuaWei) refreshTokenMap() (err error) {
 			continue
 		}
 		jvpcs, err := h.getRawData(
-			fmt.Sprintf("https://vpc.%s.%s/v1/%s/vpcs", p.name, h.config.URLDomain, p.id), t.token, "vpcs",
+			fmt.Sprintf("https://vpc.%s.%s/v1/%s/vpcs", p.name, h.config.Domain, p.id), t.token, "vpcs",
 		)
 		if err != nil {
 			log.Errorf("request failed: %v", err)
