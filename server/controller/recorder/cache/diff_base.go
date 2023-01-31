@@ -1000,6 +1000,12 @@ func (a *AZ) Update(cloudItem *cloudmodel.AZ) {
 
 type SubDomain struct {
 	DiffBase
+	Name string `json:"name"`
+}
+
+func (s *SubDomain) Update(cloudItem *cloudmodel.SubDomain) {
+	s.Name = cloudItem.Name
+	log.Info(updateDiffBase(RESOURCE_TYPE_SUB_DOMAIN_EN, s))
 }
 
 type Host struct {
