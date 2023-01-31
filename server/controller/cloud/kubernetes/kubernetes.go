@@ -24,6 +24,7 @@ import (
 
 	k8sGather "github.com/deepflowys/deepflow/server/controller/cloud/kubernetes_gather"
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
+	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 )
 
@@ -59,12 +60,12 @@ func NewKubernetes(domain mysql.Domain) (*Kubernetes, error) {
 
 	podNetIPv4CIDRMaxMask, err := configJson.Get("pod_net_ipv4_cidr_max_mask").Int()
 	if err != nil {
-		podNetIPv4CIDRMaxMask = k8sGather.K8S_POD_IPV4_NETMASK
+		podNetIPv4CIDRMaxMask = common.K8S_POD_IPV4_NETMASK
 	}
 
 	podNetIPv6CIDRMaxMask, err := configJson.Get("pod_net_ipv6_cidr_max_mask").Int()
 	if err != nil {
-		podNetIPv6CIDRMaxMask = k8sGather.K8S_POD_IPV6_NETMASK
+		podNetIPv6CIDRMaxMask = common.K8S_POD_IPV6_NETMASK
 	}
 
 	return &Kubernetes{

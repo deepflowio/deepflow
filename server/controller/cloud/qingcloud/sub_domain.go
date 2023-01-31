@@ -60,13 +60,15 @@ func (q *QingCloud) GetSubDomains() ([]model.SubDomain, error) {
 					vpcLcuuid = common.GenerateUUID(vpcRouterId)
 				}
 
-				config := map[string]string{
-					"vpc_uuid":        vpcLcuuid,
-					"cluster_id":      clusterId,
-					"port_name_regex": common.DEFAULT_PORT_NAME_REGEX,
-					"vtap_id":         "",
-					"controller_ip":   "",
-					"region_uuid":     regionLcuuid,
+				config := map[string]interface{}{
+					"vpc_uuid":                   vpcLcuuid,
+					"cluster_id":                 clusterId,
+					"port_name_regex":            common.DEFAULT_PORT_NAME_REGEX,
+					"vtap_id":                    "",
+					"controller_ip":              "",
+					"region_uuid":                regionLcuuid,
+					"pod_net_ipv4_cidr_max_mask": common.K8S_POD_IPV4_NETMASK,
+					"pod_net_ipv6_cidr_max_mask": common.K8S_POD_IPV6_NETMASK,
 				}
 				configJson, _ := json.Marshal(config)
 				retSubDomains = append(retSubDomains, model.SubDomain{
