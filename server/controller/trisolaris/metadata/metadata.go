@@ -17,12 +17,12 @@
 package metadata
 
 import (
-	"gorm.io/gorm"
 	"sync/atomic"
 	"time"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/op/go-logging"
+	"gorm.io/gorm"
 
 	"github.com/deepflowys/deepflow/message/trident"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris/config"

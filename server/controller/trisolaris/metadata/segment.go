@@ -21,6 +21,7 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/deepflowys/deepflow/message/trident"
+	"github.com/deepflowys/deepflow/server/controller/common"
 	models "github.com/deepflowys/deepflow/server/controller/db/mysql"
 )
 
@@ -46,9 +47,16 @@ func newNetworkMacs() NetworkMacs {
 	return make(NetworkMacs)
 }
 
+func isMacNullOrDefault(mac string) bool {
+	if mac == "" || mac == common.VIF_DEFAULT_MAC {
+		return true
+	}
+	return false
+}
+
 func (n NetworkMacs) add(data interface{}) {
 	vif := data.(*models.VInterface)
-	if vif.Mac == "" {
+	if isMacNullOrDefault(vif.Mac) {
 		return
 	}
 	macID := newMacID(vif)
@@ -326,8 +334,10 @@ func (s *Segment) generateGatewayHostSegments() {
 			macs := make([]string, 0, len(macIDs))
 			vifIDs := make([]uint32, 0, len(macIDs))
 			for _, macID := range macIDs {
-				macs = append(macs, macID.Mac)
-				vifIDs = append(vifIDs, uint32(macID.ID))
+				if !isMacNullOrDefault(macID.Mac) {
+					macs = append(macs, macID.Mac)
+					vifIDs = append(vifIDs, uint32(macID.ID))
+				}
 			}
 			segment := &trident.Segment{
 				Id:          proto.Uint32(uint32(1)),
@@ -346,8 +356,10 @@ func (s *Segment) GenerateNoVTapUsedSegments(rawData *PlatformRawData) {
 	segments := make([]*trident.Segment, 0, 1)
 	for _, vif := range rawData.deviceVifs {
 		if !s.vtapUsedVInterfaceIDs.Contains(vif.ID) {
-			macs = append(macs, vif.Mac)
-			vifIDs = append(vifIDs, uint32(vif.ID))
+			if !isMacNullOrDefault(vif.Mac) {
+				macs = append(macs, vif.Mac)
+				vifIDs = append(vifIDs, uint32(vif.ID))
+			}
 		}
 	}
 
