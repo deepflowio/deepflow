@@ -66,10 +66,10 @@ func (i *ChIPRelation) generateKey(dbItem mysql.ChIPRelation) IPRelationKey {
 func (i *ChIPRelation) generateUpdateInfo(oldItem, newItem mysql.ChIPRelation) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.NATGWID != newItem.NATGWID {
-		updateInfo["nat_gateway_id"] = newItem.NATGWID
+		updateInfo["natgw_id"] = newItem.NATGWID
 	}
 	if oldItem.NATGWName != newItem.NATGWName {
-		updateInfo["nat_gateway_name"] = newItem.NATGWName
+		updateInfo["natgw_name"] = newItem.NATGWName
 	}
 	if oldItem.LBID != newItem.LBID {
 		updateInfo["lb_id"] = newItem.LBID
