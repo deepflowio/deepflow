@@ -46,6 +46,7 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/tagrecorder"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris"
 	trouter "github.com/deepflowys/deepflow/server/controller/trisolaris/server/http"
+	"github.com/deepflowys/deepflow/server/libs/logger"
 
 	_ "github.com/deepflowys/deepflow/server/controller/grpc/controller"
 	_ "github.com/deepflowys/deepflow/server/controller/trisolaris/services/grpc/debug"
@@ -71,7 +72,8 @@ func Start(ctx context.Context, configPath string, shared *servercommon.Controll
 	setGlobalConfig(cfg)
 
 	// register router
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.LoggerWithFormatter(logger.GinLogFormat))
 	router.HealthRouter(r)
 	go func() {
 		if err := r.Run(fmt.Sprintf(":%d", cfg.ListenPort)); err != nil {
