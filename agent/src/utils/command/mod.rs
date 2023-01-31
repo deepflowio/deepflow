@@ -15,6 +15,7 @@
  */
 
 use std::{
+    env,
     io::{Error, ErrorKind, Result},
     process::Command,
 };
@@ -41,13 +42,9 @@ fn exec_command(program: &str, args: &[&str]) -> Result<String> {
 }
 
 pub fn get_hostname() -> Result<String> {
-    match hostname::get() {
-        Ok(hostname) => {
-            return match hostname.into_string() {
-                Ok(s) => Ok(s),
-                Err(_) => Err(Error::new(ErrorKind::Other, "get hostname failed")),
-            };
-        }
-        Err(e) => Err(Error::new(ErrorKind::Other, e.to_string())),
-    }
+    env::var("HOSTNAME").or_else(|_| {
+        hostname::get()?
+            .into_string()
+            .map_err(|_| Error::new(ErrorKind::Other, "get hostname failed"))
+    })
 }

@@ -29,12 +29,14 @@ use cadence::{
 };
 use log::{debug, info, warn};
 use prost::Message;
-pub use public::counter::*;
-use public::sender::{SendMessageType, Sendable};
 
-use crate::common::DEFAULT_INGESTER_PORT;
-use public::proto::stats;
-use public::queue::{bounded, Receiver, Sender};
+use crate::{common::DEFAULT_INGESTER_PORT, utils::command::get_hostname};
+pub use public::counter::*;
+use public::{
+    proto::stats,
+    queue::{bounded, Receiver, Sender},
+    sender::{SendMessageType, Sendable},
+};
 
 const STATS_PREFIX: &'static str = "deepflow_agent";
 const TICK_CYCLE: Duration = Duration::from_secs(60);
@@ -171,12 +173,7 @@ impl Collector {
             .filter_map(|x| x.parse::<IpAddr>().ok())
             .collect();
         let s = Self {
-            hostname: Arc::new(Mutex::new(
-                hostname::get()
-                    .ok()
-                    .and_then(|s| s.into_string().ok())
-                    .unwrap_or_default(),
-            )),
+            hostname: Arc::new(Mutex::new(get_hostname().unwrap_or_default())),
             remotes: Arc::new(Mutex::new(Some(remotes))),
             sources: Arc::new(Mutex::new(vec![])),
             pre_hooks: Arc::new(Mutex::new(vec![])),
