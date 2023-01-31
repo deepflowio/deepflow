@@ -67,10 +67,10 @@ DeepFlow Community Edition consists of two components, Agent and Server. An Agen
 
 Here is our [future feature plan](https://deepflow.yunshan.net/docs/about/milestone/?from=github). Issues and Pull Requests are welcome.
 
-# Join DeepFlow WeChat Group
+# Contact Us
 
-Join the WeChat group，you can communicate with other users (in Chinese):
-
+- Discord：Click [here](https://discord.gg/QJ7Dyj4wWM) to join our discussion.
+- WeChat Group：
 <img src=./docs/wechat-group-keeper.png width=30% />
 
 # Acknowledgments
