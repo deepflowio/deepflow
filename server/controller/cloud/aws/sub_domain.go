@@ -71,11 +71,13 @@ func (a *Aws) getSubDomains(region awsRegion) ([]model.SubDomain, error) {
 			log.Debugf("cluster (%s) vpc (%s) not found", name, vpcID)
 			continue
 		}
-		config := map[string]string{
-			"cluster_id":      name,
-			"region_uuid":     a.getRegionLcuuid(region.lcuuid),
-			"vpc_uuid":        vpcLcuuid,
-			"port_name_regex": common.DEFAULT_PORT_NAME_REGEX,
+		config := map[string]interface{}{
+			"cluster_id":                 name,
+			"region_uuid":                a.getRegionLcuuid(region.lcuuid),
+			"vpc_uuid":                   vpcLcuuid,
+			"port_name_regex":            common.DEFAULT_PORT_NAME_REGEX,
+			"pod_net_ipv4_cidr_max_mask": common.K8S_POD_IPV4_NETMASK,
+			"pod_net_ipv6_cidr_max_mask": common.K8S_POD_IPV6_NETMASK,
 		}
 		configJson, _ := json.Marshal(config)
 		retSubDomains = append(retSubDomains, model.SubDomain{
