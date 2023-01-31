@@ -78,6 +78,7 @@ make && make install && make clean
 ln -s /usr/local/lib/libelf.a /usr/lib/libelf.a
 
 # libGoReSym
+# 安装/升级golang版本到go1.18
 wget https://github.com/deepflowys/libGoReSym/archive/refs/tags/v0.0.1-2.tar.gz
 tar -xzf v0.0.1-2.tar.gz
 cd libGoReSym-0.0.1-2
