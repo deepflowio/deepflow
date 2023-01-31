@@ -289,6 +289,13 @@ func (q *QingCloud) getLBListenerAndTargetServers(
 						vmLcuuid := ""
 						address := net.ParseIP(resourceId)
 						if address == nil {
+							if _, ok := q.vmIdToVPCLcuuid[resourceId]; !ok {
+								log.Debugf(
+									"lb (%s) listener (%s) target_server (%s) not found",
+									lbId, listenerId, resourceId,
+								)
+								continue
+							}
 							serverType = common.LB_SERVER_TYPE_VM
 							vmLcuuid = common.GenerateUUID(resourceId)
 							ip = server.Get("private_ip").MustString()
