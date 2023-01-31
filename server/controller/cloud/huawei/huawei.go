@@ -51,7 +51,6 @@ func NewHuaWei(domain mysql.Domain, globalCloudCfg config.CloudConfig) (*HuaWei,
 	if err != nil {
 		return nil, err
 	}
-	conf.URLDomain = globalCloudCfg.HuaweiDomainName
 	return &HuaWei{
 		lcuuid: domain.Lcuuid,
 		// TODO: display_name后期需要修改为uuid_generate

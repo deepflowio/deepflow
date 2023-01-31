@@ -22,7 +22,6 @@ type CloudConfig struct {
 	CloudGatherInterval      uint32 `default:"30" yaml:"cloud_gather_interval"`
 	KubernetesGatherInterval uint32 `default:"30" yaml:"kubernetes_gather_interval"`
 	AliyunRegionName         string `default:"cn-beijing" yaml:"aliyun_region_name"`
-	HuaweiDomainName         string `default:"myhuaweicloud.com" yaml:"huawei_domain_name"`
 	GenesisDefaultVpcName    string `default:"default_vpc" yaml:"genesis_default_vpc"`
 	HostnameToIPFile         string `default:"/etc/hostname_to_ip.csv" yaml:"hostname_to_ip_file"`
 	DNSEnable                bool   `default:"false" yaml:"dns_enable"`

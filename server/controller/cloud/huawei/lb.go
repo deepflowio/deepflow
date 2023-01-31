@@ -31,7 +31,7 @@ func (h *HuaWei) getLBs() (
 	requiredAttrs := []string{"id", "name", "vip_port_id", "vip_subnet_id", "vip_address"}
 	for project, token := range h.projectTokenMap {
 		jLBs, err := h.getRawData(
-			fmt.Sprintf("https://vpc.%s.%s/v2.0/lbaas/loadbalancers", project.name, h.config.URLDomain), token.token, "loadbalancers",
+			fmt.Sprintf("https://vpc.%s.%s/v2.0/lbaas/loadbalancers", project.name, h.config.Domain), token.token, "loadbalancers",
 		)
 		if err != nil {
 			log.Errorf("request failed: %v", err)
@@ -84,6 +84,7 @@ func (h *HuaWei) getLBs() (
 				model.VInterface{
 					Lcuuid:        vifLcuuid,
 					Type:          vifType,
+					Mac:           common.VIF_DEFAULT_MAC,
 					DeviceType:    common.VIF_DEVICE_TYPE_LB,
 					DeviceLcuuid:  id,
 					NetworkLcuuid: networkLcuuid,
@@ -118,7 +119,7 @@ func (h *HuaWei) getLBs() (
 
 func (h *HuaWei) formatListenersAndTargetServers(projectName, token string) (lbListeners []model.LBListener, lbTargetSevers []model.LBTargetServer, err error) {
 	jLs, err := h.getRawData(
-		fmt.Sprintf("https://vpc.%s.%s/v2.0/lbaas/listeners", projectName, h.config.URLDomain), token, "listeners",
+		fmt.Sprintf("https://vpc.%s.%s/v2.0/lbaas/listeners", projectName, h.config.Domain), token, "listeners",
 	)
 	if err != nil {
 		log.Errorf("request failed: %v", err)
@@ -172,7 +173,7 @@ func (h *HuaWei) formatListenersAndTargetServers(projectName, token string) (lbL
 		poolID, ok := jL.CheckGet("default_pool_id")
 		if ok && poolID.MustString() != "" {
 			jTSs, err := h.getRawData(
-				fmt.Sprintf("https://vpc.%s.%s/v2.0/lbaas/pools/%s/members", projectName, h.config.URLDomain, poolID.MustString()), token, "members",
+				fmt.Sprintf("https://vpc.%s.%s/v2.0/lbaas/pools/%s/members", projectName, h.config.Domain, poolID.MustString()), token, "members",
 			)
 			if err != nil {
 				log.Errorf("request failed: %v", err)

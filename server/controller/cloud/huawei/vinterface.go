@@ -45,7 +45,7 @@ func (h *HuaWei) getVInterfaces() ([]model.DHCPPort, []model.VInterface, []model
 	vifRequiredAttrs := []string{"id", "mac_address", "network_id", "device_id", "device_owner"}
 	for project, token := range h.projectTokenMap {
 		jPorts, err := h.getRawData(
-			fmt.Sprintf("https://vpc.%s.%s/v1/%s/ports", project.name, h.config.URLDomain, project.id), token.token, "ports",
+			fmt.Sprintf("https://vpc.%s.%s/v1/%s/ports", project.name, h.config.Domain, project.id), token.token, "ports",
 		)
 		if err != nil {
 			log.Errorf("request failed: %v", err)
@@ -197,7 +197,7 @@ func (h *HuaWei) formatIPsAndNATRules(jPort *simplejson.Json, vif model.VInterfa
 
 func (h *HuaWei) formatPublicIPs(project Project, token string) error {
 	jIPs, err := h.getRawData(
-		fmt.Sprintf("https://vpc.%s.%s/v1/%s/publicips", project.name, h.config.URLDomain, project.id), token, "publicips",
+		fmt.Sprintf("https://vpc.%s.%s/v1/%s/publicips", project.name, h.config.Domain, project.id), token, "publicips",
 	)
 	if err != nil {
 		log.Errorf("request failed: %v", err)

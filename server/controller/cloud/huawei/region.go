@@ -25,7 +25,7 @@ import (
 )
 
 func (h *HuaWei) getRegions() ([]model.Region, error) {
-	jRegions, err := h.getRawData(fmt.Sprintf("https://iam.%s/v3/regions", h.config.URLDomain), h.toolDataSet.configProjectToken, "regions")
+	jRegions, err := h.getRawData(fmt.Sprintf("https://%s/v3/regions", h.config.IAMHost), h.toolDataSet.configProjectToken, "regions")
 	if err != nil {
 		log.Errorf("request failed: %v", err)
 		return nil, err

@@ -38,7 +38,7 @@ func (h *HuaWei) getVMs() ([]model.VM, []model.VMSecurityGroup, []model.VInterfa
 	var ips []model.IP
 	for project, token := range h.projectTokenMap {
 		jVMs, err := h.getRawData(
-			fmt.Sprintf("https://ecs.%s.%s/v2.1/%s/servers/detail", project.name, h.config.URLDomain, project.id), token.token, "servers",
+			fmt.Sprintf("https://ecs.%s.%s/v2.1/%s/servers/detail", project.name, h.config.Domain, project.id), token.token, "servers",
 		)
 		if err != nil {
 			log.Errorf("request failed: %v", err)
