@@ -323,6 +323,9 @@ func gpidAgentRequest(cmd *cobra.Command) {
 	tm := time.Unix(int64(response.GetUpdateTime()), 0)
 	fmt.Printf("response(ctrl_ip: %s ctrl_mac: %s vtap_id: %d update_time: %s)\n", req.GetCtrlIp(), req.GetCtrlMac(), req.GetVtapId(), tm.Format("2006-01-02 15:04:05"))
 	fmt.Println("Entries:")
+	if req.Entries == nil {
+		return
+	}
 	for index, entry := range req.Entries {
 		JsonFormat(index+1, formatEntries(entry))
 	}

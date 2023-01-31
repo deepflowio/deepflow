@@ -254,6 +254,16 @@ func (r *VTapIDToReq) updateReq(req *trident.GPIDSyncRequest) {
 	r.Unlock()
 }
 
+func (r *VTapIDToReq) updateCacheReq(cacheReq *CacheReq) {
+	if cacheReq == nil || cacheReq.req == nil {
+		return
+	}
+
+	r.Lock()
+	r.idToReq[cacheReq.req.GetVtapId()] = cacheReq
+	r.Unlock()
+}
+
 func (r *VTapIDToReq) getCacheReq(vtapID uint32) *CacheReq {
 	r.RLock()
 	cacheReq := r.idToReq[vtapID]
@@ -408,11 +418,15 @@ func (p *ProcessInfo) GetGPIDShareReqs() *trident.ShareGPIDSyncRequests {
 		p.vtapIDToLocalGPIDReq.updateReq(req.getReq())
 		shareSyncReqs = append(shareSyncReqs, req.getReq())
 	}
-	shareReqs := &trident.ShareGPIDSyncRequests{
-		ServerIp:     proto.String(p.config.NodeIP),
-		SyncRequests: shareSyncReqs,
+	if len(shareSyncReqs) > 0 {
+		shareReqs := &trident.ShareGPIDSyncRequests{
+			ServerIp:     proto.String(p.config.NodeIP),
+			SyncRequests: shareSyncReqs,
+		}
+
+		return shareReqs
 	}
-	return shareReqs
+	return nil
 }
 
 func (p *ProcessInfo) updateGlobalLocalEntries(data EntryData) {
@@ -655,31 +669,35 @@ func (p *ProcessInfo) getLocalControllersConns() map[string]*grpc.ClientConn {
 func (p *ProcessInfo) sendLocalShareEntryData() {
 	grpcConns := p.getLocalControllersConns()
 	if len(grpcConns) == 0 {
-		for _, req := range p.sendGPIDReq.getAllReqAndClear() {
-			p.vtapIDToLocalGPIDReq.updateReq(req.getReq())
+		for _, cacheReq := range p.sendGPIDReq.getAllReqAndClear() {
+			p.vtapIDToLocalGPIDReq.updateCacheReq(cacheReq)
 		}
 
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 	shareReqs := p.GetGPIDShareReqs()
-	responses := make([]*trident.ShareGPIDSyncRequests, 0, len(grpcConns))
-	for _, conn := range grpcConns {
-		client := trident.NewSynchronizerClient(conn)
-		response, err := client.ShareGPIDLocalData(ctx, shareReqs)
-		if err != nil {
-			log.Error(err)
-			continue
-		}
-		responses = append(responses, response)
+	if shareReqs == nil {
+		return
 	}
-
-	for _, response := range responses {
-		log.Infof("receive gpid sync data from server(%s)", response.GetServerIp())
-		for _, req := range response.GetSyncRequests() {
-			p.vtapIDToShareGPIDReq.updateReq(req)
-		}
+	for _, conn := range grpcConns {
+		go func(conn *grpc.ClientConn) {
+			log.Infof("server(%s) send local share req data to server(%s)", p.config.NodeIP, conn.Target())
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			client := trident.NewSynchronizerClient(conn)
+			response, err := client.ShareGPIDLocalData(ctx, shareReqs)
+			if err != nil {
+				log.Error(err)
+				return
+			}
+			if len(response.GetSyncRequests()) == 0 {
+				return
+			}
+			log.Infof("receive gpid sync data from server(%s)", response.GetServerIp())
+			for _, req := range response.GetSyncRequests() {
+				p.vtapIDToShareGPIDReq.updateReq(req)
+			}
+		}(conn)
 	}
 }
 
