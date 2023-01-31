@@ -31,7 +31,7 @@ func (h *HuaWei) getVPCs() ([]model.VPC, []model.VRouter, []model.RoutingTable, 
 	var routingTables []model.RoutingTable
 	for project, token := range h.projectTokenMap {
 		jvpcs, err := h.getRawData(
-			fmt.Sprintf("https://vpc.%s.%s/v1/%s/vpcs", project.name, h.config.URLDomain, project.id), token.token, "vpcs",
+			fmt.Sprintf("https://vpc.%s.%s/v1/%s/vpcs", project.name, h.config.Domain, project.id), token.token, "vpcs",
 		)
 		if err != nil {
 			log.Errorf("request failed: %v", err)
@@ -119,7 +119,7 @@ func (h *HuaWei) formatRoutingTables(jVPC *simplejson.Json, vpcLcuuid, vrouterLc
 
 func (h *HuaWei) getPartialRoutingTables(projectName, token string) (routingTables []model.RoutingTable, err error) {
 	jRoutes, err := h.getRawData(
-		fmt.Sprintf("https://vpc.%s.%s/v2.0/vpc/routes", projectName, h.config.URLDomain), token, "routes",
+		fmt.Sprintf("https://vpc.%s.%s/v2.0/vpc/routes", projectName, h.config.Domain), token, "routes",
 	)
 	if err != nil {
 		log.Errorf("request failed: %v", err)

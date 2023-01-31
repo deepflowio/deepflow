@@ -32,7 +32,7 @@ func (h *HuaWei) getNetworks() ([]model.Network, []model.Subnet, []model.VInterf
 	requiredAttrs := []string{"id", "name", "cidr", "vpc_id", "availability_zone"}
 	for project, token := range h.projectTokenMap {
 		jNetworks, err := h.getRawData(
-			fmt.Sprintf("https://vpc.%s.%s/v1/%s/subnets", project.name, h.config.URLDomain, project.id), token.token, "subnets",
+			fmt.Sprintf("https://vpc.%s.%s/v1/%s/subnets", project.name, h.config.Domain, project.id), token.token, "subnets",
 		)
 		if err != nil {
 			log.Errorf("request failed: %v", err)

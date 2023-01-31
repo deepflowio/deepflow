@@ -24,24 +24,38 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 )
 
+var DEFAULT_DOMAIN = "myhuaweicloud.com"
+var DEFAULT_IAM_HOST_PREFIX = "iam"
+var DEFAULT_IAM_HOST = strings.Join([]string{DEFAULT_IAM_HOST_PREFIX, DEFAULT_DOMAIN}, ".")
+
 type Config struct {
 	RegionLcuuid   string
 	AccountName    string
-	ProjectID      string
-	ProjectName    string
 	IAMName        string
 	Password       string
+	IAMHost        string
+	IAMHostPrefix  string
+	ProjectID      string
+	ProjectName    string
+	Domain         string // 用于构造访问华为云的endpoint，需与DeepFlow自身domain做区分
 	ExcludeRegions []string
 	IncludeRegions []string
-
-	// 用于API访问，需与DeepFlow自身domain做区分
-	URLDomain string
 }
 
 func (c *Config) LoadFromString(sConf string) (err error) {
 	jConf, err := simplejson.NewJson([]byte(sConf))
 	if err != nil {
 		log.Error("convert config string: %s to json failed: %v", sConf, err)
+		return
+	}
+	c.AccountName, err = jConf.Get("account_name").String()
+	if err != nil {
+		log.Error("account_name must be specified")
+		return
+	}
+	c.IAMName, err = jConf.Get("iam_name").String()
+	if err != nil {
+		log.Error("iam_name must be specified")
 		return
 	}
 	pswd, err := jConf.Get("password").String()
@@ -55,16 +69,12 @@ func (c *Config) LoadFromString(sConf string) (err error) {
 		return
 	}
 	c.Password = dpswd
-	c.AccountName, err = jConf.Get("account_name").String()
-	if err != nil {
-		log.Error("account_name must be specified")
-		return
+
+	c.IAMHost = jConf.Get("iam_host").MustString()
+	if c.IAMHost == "" {
+		c.IAMHost = DEFAULT_IAM_HOST
 	}
-	c.IAMName, err = jConf.Get("iam_name").String()
-	if err != nil {
-		log.Error("iam_name must be specified")
-		return
-	}
+	c.IAMHostPrefix = strings.Split(c.IAMHost, ".")[0]
 	c.ProjectID, err = jConf.Get("project_id").String()
 	if err != nil {
 		log.Error("project_id must be specified")
@@ -74,6 +84,10 @@ func (c *Config) LoadFromString(sConf string) (err error) {
 	if err != nil {
 		log.Error("region_name must be specified")
 		return
+	}
+	c.Domain = jConf.Get("domain").MustString()
+	if c.Domain == "" {
+		c.Domain = DEFAULT_DOMAIN
 	}
 	c.RegionLcuuid, err = jConf.Get("region_uuid").String()
 	if err != nil {
