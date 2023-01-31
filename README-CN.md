@@ -67,10 +67,10 @@ DeepFlow Community 版本主要由 Agent 和 Server 两个进程组成。每个 
 
 这里有我们[未来的 Feature 规划](https://deepflow.yunshan.net/docs/zh/about/milestone/?from=github)。欢迎 Issue 和 Pull Request。
 
-# 加入技术交流群
+# 联系我们
 
-DeepFlow 官方社群对外开放，欢迎加入讨论：
-
+- Discord：点击 [此链接](https://discord.gg/QJ7Dyj4wWM) 加入 Discord 频道.
+- 微信群：
 <img src=./docs/wechat-group-keeper.png width=30% />
 
 # 致谢
