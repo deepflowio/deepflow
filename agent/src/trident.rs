@@ -81,6 +81,7 @@ use crate::{
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
     sender::{get_sender_id, npb_sender::NpbArpTable, uniform_sender::UniformSenderThread},
     utils::{
+        cgroups::{is_kernel_available_for_cgroup, Cgroups},
         environment::{
             check, controller_ip_check, free_memory_check, free_space_checker, get_ctrl_ip_and_mac,
             kernel_check, running_in_container, tap_interface_check, trident_process_check,
@@ -95,10 +96,7 @@ use crate::{
 use crate::{
     ebpf_dispatcher::EbpfCollector,
     platform::ApiWatcher,
-    utils::{
-        cgroups::Cgroups,
-        environment::{core_file_check, is_tt_pod},
-    },
+    utils::environment::{core_file_check, is_tt_pod},
 };
 
 #[cfg(target_os = "linux")]
@@ -377,14 +375,22 @@ impl Trident {
         );
         synchronizer.start();
 
-        #[cfg(target_os = "linux")]
+        let mut cgroup_mount_path = "".to_string();
+        let mut is_cgroup_v2 = false;
         let mut cgroups_controller = None;
-        #[cfg(target_os = "linux")]
-        if config_handler.candidate_config.tap_mode != TapMode::Analyzer && !running_in_container()
-        {
+        if config_handler.candidate_config.tap_mode == TapMode::Analyzer {
+            warn!("don't initialize cgroup controller, because agent in Analyzer mode.");
+        } else if running_in_container() {
+            warn!("don't initialize cgroup controller, because agent is running in container");
+        } else if !is_kernel_available_for_cgroup() {
+            // fixme: Linux after kernel version 2.6.24 can use cgroup
+            warn!("don't initialize cgroup controller, because kernel version < 3 or agent is in Windows");
+        } else {
             match Cgroups::new(process::id() as u64, config_handler.environment()) {
                 Ok(cg_controller) => {
                     cg_controller.start();
+                    cgroup_mount_path = cg_controller.get_mount_path();
+                    is_cgroup_v2 = cg_controller.is_v2();
                     cgroups_controller = Some(cg_controller);
                 }
                 Err(e) => {
@@ -395,7 +401,7 @@ impl Trident {
                     thread::sleep(Duration::from_secs(1));
                     process::exit(1);
                 }
-            };
+            }
         }
 
         let log_dir = Path::new(config_handler.static_config.log_file.as_str());
@@ -406,6 +412,8 @@ impl Trident {
             config_handler.candidate_config.yaml_config.guard_interval,
             config_handler.candidate_config.tap_mode,
             exception_handler.clone(),
+            cgroup_mount_path,
+            is_cgroup_v2,
         );
         guard.start();
 
@@ -461,12 +469,10 @@ impl Trident {
                         platform_synchronizer.stop();
 
                         #[cfg(target_os = "linux")]
-                        {
-                            libvirt_xml_extractor.stop();
-                            if let Some(cg_controller) = cgroups_controller {
-                                if let Err(e) = cg_controller.stop() {
-                                    warn!("stop cgroup controller failed, {:?}", e);
-                                }
+                        libvirt_xml_extractor.stop();
+                        if let Some(cg_controller) = cgroups_controller {
+                            if let Err(e) = cg_controller.stop() {
+                                warn!("stop cgroup controller failed, {:?}", e);
                             }
                         }
                     }
@@ -876,8 +882,11 @@ impl Components {
             packet_sequence_parser.start();
         }
 
+        // When tap_mode is Analyzer mode and agent is not running in container and agent
+        // in the environment where cgroup is not supported, we need to check free memory
         if self.tap_mode != TapMode::Analyzer
-            && self.config.platform.kubernetes_cluster_id.is_empty()
+            && !running_in_container()
+            && !is_kernel_available_for_cgroup()
         {
             match free_memory_check(self.max_memory, &self.exception_handler) {
                 Ok(()) => {

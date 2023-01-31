@@ -56,7 +56,9 @@ use crate::error::{Error, Result};
 use crate::exception::ExceptionHandler;
 use public::proto::{common::TridentType, trident::Exception};
 
-use super::process::{get_memory_rss, get_process_num_by_name};
+#[cfg(target_os = "windows")]
+use super::process::get_memory_rss;
+use super::process::get_process_num_by_name;
 #[cfg(target_os = "linux")]
 use public::utils::net::get_link_enabled_features;
 use public::utils::net::{get_mac_by_ip, get_route_src_ip_and_mac, link_by_name, MacAddr};
@@ -139,6 +141,12 @@ pub fn tap_interface_check(tap_interfaces: &[String]) {
     }
 }
 
+#[cfg(target_os = "linux")]
+pub fn free_memory_check(_required: u64, _exception_handler: &ExceptionHandler) -> Result<()> {
+    return Ok(()); // fixme: The way to obtain free memory is different in earlier versions of Linux, which requires adaptation
+}
+
+#[cfg(target_os = "windows")]
 pub fn free_memory_check(required: u64, exception_handler: &ExceptionHandler) -> Result<()> {
     get_memory_rss()
         .map_err(|e| Error::Environment(e.to_string()))

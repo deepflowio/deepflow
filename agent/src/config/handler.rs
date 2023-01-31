@@ -38,6 +38,7 @@ use super::{
 };
 use crate::common::l7_protocol_log::L7ProtocolBitmap;
 use crate::flow_generator::protocol_logs::SOFA_NEW_RPC_TRACE_CTX_KEY;
+use crate::utils::environment::free_memory_check;
 use crate::{
     common::{decapsulate::TunnelTypeBitmap, enums::TapType},
     dispatcher::recv_engine,
@@ -46,7 +47,8 @@ use crate::{
     handler::PacketHandlerBuilder,
     trident::{Components, RunningMode},
     utils::{
-        environment::{free_memory_check, get_ctrl_ip_and_mac, running_in_container},
+        cgroups::is_kernel_available_for_cgroup,
+        environment::{get_ctrl_ip_and_mac, running_in_container},
         logger::RemoteLogConfig,
     },
 };
@@ -1120,7 +1122,11 @@ impl ConfigHandler {
             candidate_config.tap_mode = new_config.tap_mode;
         }
 
-        if candidate_config.tap_mode != TapMode::Analyzer && !running_in_container() {
+        if candidate_config.tap_mode != TapMode::Analyzer
+            && !running_in_container()
+            && !is_kernel_available_for_cgroup()
+        // In the environment where cgroup is not supported, we need to check free memory
+        {
             // Check and send out exceptions in time
             if let Err(e) = free_memory_check(new_config.environment.max_memory, exception_handler)
             {
@@ -1233,8 +1239,10 @@ impl ConfigHandler {
                                 }
                             }
                             _ => {
-                                if !running_in_container() {
+                                if !running_in_container() && !is_kernel_available_for_cgroup() {
+                                    // In the environment where cgroup is not supported, we need to check free memory
                                     match free_memory_check(
+                                        // fixme: It can skip this check because it has been checked before
                                         handler.candidate_config.environment.max_memory,
                                         &components.exception_handler,
                                     ) {
@@ -1820,9 +1828,13 @@ impl ConfigHandler {
                 for dispatcher in components.dispatchers.iter() {
                     dispatcher.stop();
                 }
-                if handler.candidate_config.tap_mode != TapMode::Analyzer && !running_in_container()
+                if handler.candidate_config.tap_mode != TapMode::Analyzer
+                    && !running_in_container()
+                    && !is_kernel_available_for_cgroup()
+                // In the environment where cgroup is not supported, we need to check free memory
                 {
                     match free_memory_check(
+                        // fixme: It can skip this check because it has been checked before
                         handler.candidate_config.environment.max_memory,
                         &components.exception_handler,
                     ) {
