@@ -26,6 +26,7 @@ import (
 	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"
 
+	"github.com/deepflowys/deepflow/server/libs/logger"
 	"github.com/deepflowys/deepflow/server/querier/common"
 	"github.com/deepflowys/deepflow/server/querier/config"
 	"github.com/deepflowys/deepflow/server/querier/router"
@@ -61,9 +62,9 @@ func Start(configPath string) {
 	}
 
 	// 注册router
-	r := gin.Default()
+	r := gin.New()
 	r.Use(otelgin.Middleware("gin-web-server"))
-	r.Use(LoggerHandle)
+	r.Use(gin.LoggerWithFormatter(logger.GinLogFormat))
 	r.Use(ErrHandle())
 	router.QueryRouter(r)
 	// TODO: 增加router
@@ -107,21 +108,4 @@ func ErrHandle() gin.HandlerFunc {
 		}()
 		c.Next()
 	}
-}
-
-func LoggerHandle(c *gin.Context) {
-	ip := c.ClientIP()          //请求ip
-	method := c.Request.Method  // Method
-	url := c.Request.RequestURI // url
-	startTime := time.Now()
-	// 处理请求
-	c.Next()
-	endTime := time.Now()
-	log.Infof("| %3d | %13v | %15s | %s | %s |",
-		c.Writer.Status(),      // 状态码
-		endTime.Sub(startTime), //执行时间
-		ip,
-		method,
-		url,
-	)
 }
