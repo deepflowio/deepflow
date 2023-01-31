@@ -259,6 +259,9 @@ func (q *QingCloud) GetVMNics() ([]model.VInterface, []model.IP, error) {
 				if index < len(q.defaultVxnetIDs) && q.defaultVxnetIDs[index] == vxnetId {
 					networkLcuuid = common.GenerateUUID(q.defaultVxnetName + regionLcuuid)
 					netType = common.VIF_TYPE_WAN
+				} else if _, ok := q.vxnetIdToVPCLcuuid[vxnetId]; !ok {
+					networkLcuuid = common.NETWORK_ISP_LCUUID
+					netType = common.VIF_TYPE_WAN
 				}
 
 				vinterfaceLcuuid := common.GenerateUUID(nicId + instanceId)
