@@ -924,6 +924,10 @@ impl Flow {
                 self.acl_gids.push(*new_acl_gid);
             }
         }
+        let nat_source = other.flow_key.tap_port.get_nat_source();
+        if nat_source > self.flow_key.tap_port.get_nat_source() {
+            self.flow_key.tap_port.set_nat_source(nat_source);
+        }
     }
 
     // FIXME 注意：由于FlowGenerator中TcpPerfStats在Flow方向调整之后才获取到，
