@@ -152,5 +152,6 @@ type EbpfConfig struct {
 type OsProcRegex struct {
 	MatchRegex  *string `yaml:"match-regex,omitempty"`
 	MatchType   *string `yaml:"match-type,omitempty"`
+	Action      *string `yaml:"action,omitempty"`
 	RewriteName *string `yaml:"rewrite-name,omitempty"`
 }

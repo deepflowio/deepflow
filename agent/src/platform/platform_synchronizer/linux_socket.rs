@@ -35,7 +35,7 @@ use public::{
     proto::trident::{GpidSyncEntry, RoleType, ServiceProtocol},
 };
 
-use super::{sym_uptime, ProcessData};
+use super::{sym_uptime, ProcessData, RegExpAction};
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum Role {
@@ -204,6 +204,10 @@ pub(super) fn get_all_socket(
 
         for i in conf.os_proc_regex.as_slice() {
             if i.match_and_rewrite_proc(&mut proc_data, true) {
+                if i.action() == RegExpAction::Drop {
+                    break;
+                }
+
                 // when match proc, will record the inode and (pid, fd) map, use for get the connection pid and fd in later.
                 for fd in fds {
                     let Ok(f) = fd else {

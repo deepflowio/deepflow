@@ -237,6 +237,9 @@ impl Default for UprobeProcRegExp {
 
 pub const OS_PROC_REGEXP_MATCH_TYPE_CMD: &'static str = "cmdline";
 pub const OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME: &'static str = "process_name";
+
+pub const OS_PROC_REGEXP_MATCH_ACTION_ACCEPT: &'static str = "accept";
+pub const OS_PROC_REGEXP_MATCH_ACTION_DROP: &'static str = "drop";
 // use for proc scan match and replace
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Default)]
 #[serde(default, rename_all = "kebab-case")]
@@ -244,6 +247,7 @@ pub struct OsProcRegexp {
     pub match_regex: String,
     pub match_type: String, // one of cmdline or process_name
     pub rewrite_name: String,
+    pub action: String, // one of accept or drop
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Default)]
@@ -626,6 +630,7 @@ impl Default for YamlConfig {
                 match_regex: ".*".into(),
                 match_type: OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME.into(),
                 rewrite_name: "".into(),
+                action: OS_PROC_REGEXP_MATCH_ACTION_ACCEPT.into(),
             }],
             os_app_tag_exec_user: "deepflow".to_string(),
             os_app_tag_exec: vec![],
