@@ -30,7 +30,10 @@ use ring::digest;
 use tokio::runtime::{Builder, Runtime};
 
 use crate::{
-    config::handler::PlatformAccess, exception::ExceptionHandler, rpc::Session, utils::command::*,
+    config::handler::PlatformAccess,
+    exception::ExceptionHandler,
+    rpc::Session,
+    utils::command::{get_hostname, get_ip_address},
 };
 use public::proto::trident::{self, Exception, GenesisSyncRequest, GenesisSyncResponse};
 
