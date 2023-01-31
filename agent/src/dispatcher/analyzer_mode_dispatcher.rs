@@ -73,6 +73,19 @@ impl AnalyzerModeDispatcherListener {
             return;
         }
         old_vm_mac_addrs.clear();
+        if vm_mac_addrs.len() >= 100 {
+            info!(
+                "Update {} remote VMs: {:?}",
+                vm_mac_addrs.len(),
+                &vm_mac_addrs
+            );
+        } else {
+            info!(
+                "Update {} remote VMs: {:?} ...",
+                vm_mac_addrs.len(),
+                &vm_mac_addrs[..100]
+            );
+        }
         vm_mac_addrs.iter().for_each(|addr| {
             old_vm_mac_addrs.insert(addr.to_lower_32b(), *addr);
         });

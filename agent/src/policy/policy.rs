@@ -193,9 +193,9 @@ impl Policy {
                         RoleType::RoleServer => {
                             packet.gpid_0 = socket_extra_info_0.gpid;
                             packet.gpid_1 = socket_extra_info_0.gpid_real;
-                            // NAT_SOURCE_CONTROLLER高于或等于当前优先级会更新数据
-                            if TapPort::NAT_SOURCE_CONTROLLER >= packet.lookup_key.dst_nat_source {
-                                packet.lookup_key.dst_nat_source = TapPort::NAT_SOURCE_CONTROLLER;
+                            // NAT_SOURCE_RTOA高于或等于当前优先级会更新数据
+                            if TapPort::NAT_SOURCE_RTOA >= packet.lookup_key.dst_nat_source {
+                                packet.lookup_key.dst_nat_source = TapPort::NAT_SOURCE_RTOA;
                                 packet.lookup_key.dst_nat_port = socket_extra_info_0.port_real;
                                 packet.lookup_key.dst_nat_ip =
                                     IpAddr::V4(Ipv4Addr::from(socket_extra_info_0.ip_real));
@@ -203,9 +203,9 @@ impl Policy {
                         }
                         RoleType::RoleClient => {
                             packet.gpid_0 = socket_extra_info_0.gpid_real;
-                            // NAT_SOURCE_CONTROLLER高于或等于当前优先级会更新数据
-                            if TapPort::NAT_SOURCE_CONTROLLER >= packet.lookup_key.src_nat_source {
-                                packet.lookup_key.src_nat_source = TapPort::NAT_SOURCE_CONTROLLER;
+                            // NAT_SOURCE_RTOA高于或等于当前优先级会更新数据
+                            if TapPort::NAT_SOURCE_RTOA >= packet.lookup_key.src_nat_source {
+                                packet.lookup_key.src_nat_source = TapPort::NAT_SOURCE_RTOA;
                                 packet.lookup_key.src_nat_port = socket_extra_info_0.port_real;
                                 packet.lookup_key.src_nat_ip =
                                     IpAddr::V4(Ipv4Addr::from(socket_extra_info_0.ip_real));
@@ -228,9 +228,9 @@ impl Policy {
                     match socket_extra_info_1.role_real {
                         RoleType::RoleServer => {
                             packet.gpid_0 = socket_extra_info_1.gpid_real;
-                            // NAT_SOURCE_CONTROLLER高于或等于当前优先级会更新数据
-                            if TapPort::NAT_SOURCE_CONTROLLER >= packet.lookup_key.src_nat_source {
-                                packet.lookup_key.src_nat_source = TapPort::NAT_SOURCE_CONTROLLER;
+                            // NNAT_SOURCE_RTOA高于或等于当前优先级会更新数据
+                            if TapPort::NAT_SOURCE_RTOA >= packet.lookup_key.src_nat_source {
+                                packet.lookup_key.src_nat_source = TapPort::NAT_SOURCE_RTOA;
                                 packet.lookup_key.src_nat_port = socket_extra_info_1.port_real;
                                 packet.lookup_key.src_nat_ip =
                                     IpAddr::V4(Ipv4Addr::from(socket_extra_info_1.ip_real));
@@ -240,9 +240,9 @@ impl Policy {
                         RoleType::RoleClient => {
                             packet.gpid_0 = socket_extra_info_0.gpid;
                             packet.gpid_1 = socket_extra_info_1.gpid_real;
-                            // NAT_SOURCE_CONTROLLER高于或等于当前优先级会更新数据
-                            if TapPort::NAT_SOURCE_CONTROLLER >= packet.lookup_key.dst_nat_source {
-                                packet.lookup_key.dst_nat_source = TapPort::NAT_SOURCE_CONTROLLER;
+                            // NAT_SOURCE_RTOA高于或等于当前优先级会更新数据
+                            if TapPort::NAT_SOURCE_RTOA >= packet.lookup_key.dst_nat_source {
+                                packet.lookup_key.dst_nat_source = TapPort::NAT_SOURCE_RTOA;
                                 packet.lookup_key.dst_nat_port = socket_extra_info_1.port_real;
                                 packet.lookup_key.dst_nat_ip =
                                     IpAddr::V4(Ipv4Addr::from(socket_extra_info_1.ip_real));
