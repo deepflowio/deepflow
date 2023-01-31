@@ -960,7 +960,7 @@ vtap_group_id: g-xxxxxx
   ## Note: Note that the value unit is second.
   #os-proc-socket-sync-interval: 10
 
-  ## Socket uptime threshold
+  ## Socket and Process uptime threshold
   ## Default: 3
   ## Note: Note that the value unit is second.
   #os-proc-socket-min-lifetime: 3
@@ -1005,8 +1005,13 @@ vtap_group_id: g-xxxxxx
 
     #  # Regexp match field
     #  # Default: process_name
-    #  # Note: one of process_name, cmdline.
+    #  # Note: Options: process_name, cmdline.
     #  match-type:
+    #
+    #  # Action when RegExp match
+    #  # Default: accept
+    #  # Note: Options: accept, drop.
+    #  action:
     #
     #  # The name will replace the process name or cmd use regexp replace
     #  # Default: ""
