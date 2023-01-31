@@ -58,17 +58,20 @@ func (d *SubDomain) generateDBItemToAdd(cloudItem *cloudmodel.SubDomain) (*mysql
 	return dbItem, true
 }
 
-// 保留接口
 func (d *SubDomain) generateUpdateInfo(diffBase *cache.SubDomain, cloudItem *cloudmodel.SubDomain) (map[string]interface{}, bool) {
-	return nil, false
+	updateInfo := make(map[string]interface{})
+	if diffBase.Name != cloudItem.Name {
+		updateInfo["name"] = cloudItem.Name
+	}
+	return updateInfo, len(updateInfo) > 0
 }
 
 func (d *SubDomain) addCache(dbItems []*mysql.SubDomain) {
 	d.cache.AddSubDomains(dbItems)
 }
 
-// 保留接口
 func (d *SubDomain) updateCache(cloudItem *cloudmodel.SubDomain, diffBase *cache.SubDomain) {
+	diffBase.Update(cloudItem)
 }
 
 func (d *SubDomain) deleteCache(lcuuids []string) {
