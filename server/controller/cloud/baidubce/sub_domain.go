@@ -58,13 +58,15 @@ func (b *BaiduBce) getSubDomains(region model.Region, vpcIdToLcuuid map[string]s
 				continue
 			}
 
-			config := map[string]string{
-				"vpc_uuid":        vpcLcuuid,
-				"cluster_id":      cluster.ClusterUuid,
-				"port_name_regex": common.DEFAULT_PORT_NAME_REGEX,
-				"vtap_id":         "",
-				"controller_ip":   "",
-				"region_uuid":     region.Lcuuid,
+			config := map[string]interface{}{
+				"vpc_uuid":                   vpcLcuuid,
+				"cluster_id":                 cluster.ClusterUuid,
+				"port_name_regex":            common.DEFAULT_PORT_NAME_REGEX,
+				"vtap_id":                    "",
+				"controller_ip":              "",
+				"region_uuid":                region.Lcuuid,
+				"pod_net_ipv4_cidr_max_mask": common.K8S_POD_IPV4_NETMASK,
+				"pod_net_ipv6_cidr_max_mask": common.K8S_POD_IPV6_NETMASK,
 			}
 			configJson, _ := json.Marshal(config)
 			retSubDomains = append(retSubDomains, model.SubDomain{
