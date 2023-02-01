@@ -46,6 +46,7 @@ use crate::{
     policy::PolicySetter,
     rpc::{RunningConfig, Session, StaticConfig, Status},
     trident::RunningMode,
+    utils::command::get_hostname,
 };
 use public::debug::{send_to, Error, QueueDebugger, QueueMessage, Result, MAX_BUF_SIZE};
 
@@ -121,14 +122,8 @@ impl Debugger {
                     .spawn(move || {
                         while running_clone.load(Ordering::Relaxed) {
                             thread::sleep(BEACON_INTERVAL);
-                            let hostname = match hostname::get() {
-                                Ok(hostname) => match hostname.into_string() {
-                                    Ok(s) => s,
-                                    Err(e) => {
-                                        warn!("get hostname failed: {:?}", e);
-                                        continue;
-                                    }
-                                },
+                            let hostname = match get_hostname() {
+                                Ok(hostname) => hostname,
                                 Err(e) => {
                                     warn!("get hostname failed: {}", e);
                                     continue;
@@ -251,14 +246,8 @@ impl Debugger {
                     .spawn(move || {
                         while running_clone.load(Ordering::Relaxed) {
                             thread::sleep(BEACON_INTERVAL);
-                            let hostname = match hostname::get() {
-                                Ok(hostname) => match hostname.into_string() {
-                                    Ok(s) => s,
-                                    Err(e) => {
-                                        warn!("get hostname failed: {:?}", e);
-                                        continue;
-                                    }
-                                },
+                            let hostname = match get_hostname() {
+                                Ok(hostname) => hostname,
                                 Err(e) => {
                                     warn!("get hostname failed: {}", e);
                                     continue;
