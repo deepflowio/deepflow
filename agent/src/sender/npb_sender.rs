@@ -754,8 +754,8 @@ impl NpbConnectionPool {
                 Ok(NpbSender::RawSender(AfpacketSender::new(remote)))
             }
             _ => Err(format!(
-                "NPB not support socket type: {:?} in protocol {}.",
-                self.socket_type, protocol
+                "NPB socket type {:?} not support tunnel ip {} and protocol {}.",
+                self.socket_type, remote, protocol
             )),
         }
     }
@@ -880,7 +880,7 @@ impl NpbPacketSender {
                         .send(timestamp, underlay_l2_opt_size, packet);
                 if ret.is_err() && last_timestamp + Self::LOG_INTERVAL < timestamp {
                     last_timestamp = timestamp;
-                    info!("Npb packet sender error: {:?}.", ret);
+                    warn!("Npb packet sender error: {:?}.", ret);
                 }
             }
         }
