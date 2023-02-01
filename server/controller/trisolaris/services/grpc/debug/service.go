@@ -48,8 +48,10 @@ func (s *service) DebugGPIDGlobalData(ctx context.Context, in *api.GPIDSyncReque
 		in.GetCtrlIp(), in.GetCtrlMac())
 
 	processInfo := trisolaris.GetGVTapInfo().GetProcessInfo()
+	entries, loopbackEntries := processInfo.GetGlobalEntries()
 	return &api.GPIDGlobalData{
-		Entries: processInfo.GetGlobalEntries(),
+		Entries:         entries,
+		LoopbackEntries: loopbackEntries,
 	}, nil
 }
 

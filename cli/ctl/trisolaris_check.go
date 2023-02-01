@@ -264,11 +264,11 @@ func formatEntries(entry *trident.GPIDSyncEntry) string {
 	buffer := bytes.Buffer{}
 	format := "{protocol: %d, epc_id_1: %d, ipv4_1: %s, port_1: %d, pid_1: %d, " +
 		"epc_id_0: %d, ipv4_0: %s, port_0: %d, pid_0: %d, epc_id_real: %d, " +
-		"ipv4_real: %s, port_real: %d, pid_real: %d, role: %d}"
+		"ipv4_real: %s, port_real: %d, pid_real: %d, role_real: %d, netns_idx: %d}"
 	buffer.WriteString(fmt.Sprintf(format,
 		entry.GetProtocol(), entry.GetEpcId_1(), utils.IpFromUint32(entry.GetIpv4_1()).String(), entry.GetPort_1(), entry.GetPid_1(),
 		entry.GetEpcId_0(), utils.IpFromUint32(entry.GetIpv4_0()).String(), entry.GetPort_0(), entry.GetPid_0(), entry.GetEpcIdReal(),
-		utils.IpFromUint32(entry.GetIpv4Real()).String(), entry.GetPortReal(), entry.GetPidReal(), entry.GetRoleReal()),
+		utils.IpFromUint32(entry.GetIpv4Real()).String(), entry.GetPortReal(), entry.GetPidReal(), entry.GetRoleReal(), entry.GetNetnsIdx()),
 	)
 	return buffer.String()
 }
@@ -296,9 +296,13 @@ func gpidGlobalTable(cmd *cobra.Command) {
 		fmt.Println(err)
 		return
 	}
-	fmt.Println("GPIDGlobalLocalData:")
+	fmt.Println("GPIDGlobalData:")
 	for index, entry := range response.GetEntries() {
 		JsonFormat(index+1, formatGlobalEntry(entry))
+	}
+	fmt.Println("GPIDGlobalLoopbackData:")
+	for index, entry := range response.GetLoopbackEntries() {
+		JsonFormat(index+1, entry)
 	}
 }
 
@@ -323,10 +327,10 @@ func gpidAgentRequest(cmd *cobra.Command) {
 	tm := time.Unix(int64(response.GetUpdateTime()), 0)
 	fmt.Printf("response(ctrl_ip: %s ctrl_mac: %s vtap_id: %d update_time: %s)\n", req.GetCtrlIp(), req.GetCtrlMac(), req.GetVtapId(), tm.Format("2006-01-02 15:04:05"))
 	fmt.Println("Entries:")
-	if req.Entries == nil {
+	if req == nil {
 		return
 	}
-	for index, entry := range req.Entries {
+	for index, entry := range req.GetEntries() {
 		JsonFormat(index+1, formatEntries(entry))
 	}
 }
@@ -359,7 +363,7 @@ func realGlobal(cmd *cobra.Command) {
 		return
 	}
 	fmt.Println("Entries:")
-	for index, entry := range response.Entries {
+	for index, entry := range response.GetEntries() {
 		JsonFormat(index+1, formatRealEntry(entry))
 	}
 }

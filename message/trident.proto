@@ -705,8 +705,20 @@ message GlobalGPIDEntry {
     optional uint32 gpid = 8 [default = 0];
 }
 
+message GlobalLoopbackGPIDEntry {
+    optional uint32 vtap_id = 1;
+    optional ServiceProtocol protocol = 2 [default = ANY];
+    optional RoleType role = 3 [default = ROLE_NONE];
+
+    optional uint32 netns_idx = 4 [default = 0];
+    optional uint32 port = 5 [default = 0];
+    optional uint32 pid = 6 [default = 0];
+    optional uint32 gpid = 7 [default = 0];
+}
+
 message GPIDGlobalData {
     repeated GlobalGPIDEntry  entries = 1;
+    repeated GlobalLoopbackGPIDEntry loopback_entries = 2;
 }
 
 message RealClientToRealServer {
