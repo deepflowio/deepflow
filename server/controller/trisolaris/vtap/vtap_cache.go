@@ -795,7 +795,9 @@ func (c *VTapCache) updateVTapCacheFromDB(vtap *models.VTap, v *VTapInfo) {
 	c.updateCtrlMacFromDB(vtap.CtrlMac)
 	c.state = vtap.State
 	c.enable = vtap.Enable
-	c.updateLicenseFunctions(vtap.LicenseFunctions)
+	if v.config.BillingMethod == BILLING_METHOD_LICENSE {
+		c.updateLicenseFunctions(vtap.LicenseFunctions)
+	}
 	c.updateTapMode(vtap.TapMode)
 	if c.vTapType != vtap.Type {
 		c.vTapType = vtap.Type
