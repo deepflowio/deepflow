@@ -3,23 +3,36 @@ package prometheus
 import (
 	"context"
 	"fmt"
+	//"strings"
+	//"strconv"
+	//"time"
+
 	"github.com/deepflowys/deepflow/server/querier/common"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse"
 	"github.com/google/uuid"
+	//"github.com/k0kubun/pp"
+	logging "github.com/op/go-logging"
 	"github.com/prometheus/prometheus/prompb"
 )
 
+var log = logging.MustGetLogger("promethues")
+
 func PromReaderExecute(req *prompb.ReadRequest, ctx context.Context) (resp *prompb.ReadResponse, err error) {
 	// promrequest trans to sql
-	sql, err := PromReaderTransToSQL(req)
+	//pp.Println(req)
+	sql, db, datasource, err := PromReaderTransToSQL(req)
+	//fmt.Println(sql, db)
 	if err != nil {
 		return nil, err
 	}
+	if db == "" {
+		db = "ext_metrics"
+	}
 	query_uuid := uuid.New()
 	args := common.QuerierParams{
-		DB:         "ext_metrics",
+		DB:         db,
 		Sql:        sql,
-		DataSource: "",
+		DataSource: datasource,
 		Debug:      "false",
 		QueryUUID:  query_uuid.String(),
 		Context:    ctx,
@@ -35,7 +48,9 @@ func PromReaderExecute(req *prompb.ReadRequest, ctx context.Context) (resp *prom
 	// response trans to prom resp
 	resp, err = RespTransToProm(result)
 	if err != nil {
+		log.Error(err)
 		return nil, err
 	}
+	//pp.Println(resp)
 	return resp, nil
 }
