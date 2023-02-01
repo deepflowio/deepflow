@@ -447,8 +447,8 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 						return &view.Expr{Value: filter}, nil
 					}
 				} else if strings.HasPrefix(t.Tag, "Enum(") {
-					t.Tag = strings.TrimLeft(t.Tag, "Enum(")
-					t.Tag = strings.TrimRight(t.Tag, ")")
+					t.Tag = strings.TrimPrefix(t.Tag, "Enum(")
+					t.Tag = strings.TrimSuffix(t.Tag, ")")
 					tagItem, ok = tag.GetTag(t.Tag, db, table, "enum")
 					if ok {
 						switch strings.ToLower(op) {
@@ -744,8 +744,8 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 	function := strings.Trim(f.Function.ToString(), "`")
 	if strings.HasPrefix(function, "Enum(") {
 		var isIntEnum = true
-		tagName := strings.TrimLeft(function, "Enum(")
-		tagName = strings.TrimRight(tagName, ")")
+		tagName := strings.TrimPrefix(function, "Enum(")
+		tagName = strings.TrimSuffix(tagName, ")")
 		tagName = strings.Trim(tagName, "`")
 		tagEnum := strings.TrimSuffix(tagName, "_0")
 		tagEnum = strings.TrimSuffix(tagEnum, "_1")
