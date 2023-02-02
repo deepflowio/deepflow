@@ -98,6 +98,9 @@ func (q *QingCloud) GetNATGateways() (
 							if instanceId == "" {
 								continue
 							}
+							if _, ok := q.vmIdToVPCLcuuid[instanceId]; !ok {
+								continue
+							}
 							retNATVMConns = append(retNATVMConns, model.NATVMConnection{
 								Lcuuid:           common.GenerateUUID(natLcuuid + instanceId),
 								NATGatewayLcuuid: natLcuuid,

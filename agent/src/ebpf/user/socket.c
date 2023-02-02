@@ -34,6 +34,7 @@
 
 #include "socket_trace_bpf_common.c"
 #include "socket_trace_bpf_5_2_plus.c"
+#include "socket_trace_bpf_kylin.c"
 
 static uint64_t socket_map_reclaim_count;	// socket map回收数量统计
 static uint64_t trace_map_reclaim_count;	// trace map回收数量统计
@@ -1132,7 +1133,18 @@ int running_socket_tracer(l7_handle_fn handle,
 		return -EINVAL;
 	}
 
-	if (major > 5 || (major == 5 && minor >= 2)) {
+	char sys_type[16];
+	memset(sys_type, 0, sizeof(sys_type));
+	if (fetch_system_type(sys_type, sizeof(sys_type) - 1) != ETR_OK) {
+		ebpf_warning("Fetch system type faild.\n");
+	}
+
+	if (strcmp(sys_type, "ky10") == 0) {
+		snprintf(bpf_load_buffer_name, NAME_LEN,
+			 "socket-trace-bpf-linux-kylin");
+		bpf_bin_buffer = (void *)socket_trace_kylin_ebpf_data;
+		buffer_sz = sizeof(socket_trace_kylin_ebpf_data);
+	} else if (major > 5 || (major == 5 && minor >= 2)) {
 		snprintf(bpf_load_buffer_name, NAME_LEN,
 			 "socket-trace-bpf-linux-5.2_plus");
 		bpf_bin_buffer = (void *)socket_trace_5_2_plus_ebpf_data;

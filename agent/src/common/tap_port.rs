@@ -45,7 +45,7 @@ impl TapPort {
     // NAT_SOURCE_TOA is obtained through TCP Options Address.
     pub const NAT_SOURCE_NONE: u8 = 0;
     pub const NAT_SOURCE_VIP: u8 = 2;
-    pub const NAT_SOURCE_CONTROLLER: u8 = 4;
+    pub const NAT_SOURCE_RTOA: u8 = 4;
     pub const NAT_SOURCE_TOA: u8 = 6;
 
     const TUNNEL_TYPE_OFFSET: u64 = 32;
