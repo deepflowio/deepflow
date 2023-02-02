@@ -33,6 +33,10 @@ pub const DEFAULT_CPU_CFS_PERIOD_US: u32 = 100000; // cfs_period_us默认值
 
 pub const DEFAULT_LOG_RETENTION: u32 = 365;
 pub const DEFAULT_LOG_FILE_SIZE_LIMIT: u32 = 10000; // 单位：M
+pub const CGROUP_PROCS_PATH: &'static str = "cpu/deepflow-agent/cgroup.procs";
+pub const CGROUP_TASKS_PATH: &'static str = "cpu/deepflow-agent/tasks";
+pub const CGROUP_V2_PROCS_PATH: &'static str = "deepflow-agent/cgroup.procs";
+pub const CGROUP_V2_THREADS_PATH: &'static str = "deepflow-agent/cgroup.threads";
 
 #[cfg(target_os = "linux")]
 mod platform_consts {
@@ -41,10 +45,6 @@ mod platform_consts {
     pub const COREFILE_FORMAT: &'static str = "core";
     pub const DEFAULT_COREFILE_PATH: &'static str = "/tmp";
     pub const DEFAULT_LIBVIRT_XML_PATH: &'static str = "/etc/libvirt/qemu";
-    pub const CGROUP_PROCS_PATH: &'static str = "/sys/fs/cgroup/cpu/deepflow-agent/cgroup.procs";
-    pub const CGROUP_TASKS_PATH: &'static str = "/sys/fs/cgroup/cpu/deepflow-agent/tasks";
-    pub const CGROUP_V2_PROCS_PATH: &'static str = "/sys/fs/cgroup/deepflow-agent/cgroup.procs";
-    pub const CGROUP_V2_THREADS_PATH: &'static str = "/sys/fs/cgroup/deepflow-agent/cgroup.threads";
 }
 
 #[cfg(target_os = "windows")]

@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#[cfg(target_os = "linux")]
 pub(crate) mod cgroups;
 pub(crate) mod command;
 pub(crate) mod environment;
