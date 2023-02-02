@@ -68,10 +68,8 @@ impl Cgroups {
         let cg: Cgroup = CgroupBuilder::new(PROCESS_NAME).build(hier);
         let cpus: &cpu::CpuController = cg.controller_of().unwrap();
 
-        if !is_kernel_available_for_cgroup() {
-            // The cgroup.procs file can only be written after Linux 3.0. Refer to:
-            // https://github.com/torvalds/linux/commit/74a1166dfe1135dcc168d35fa5261aa7e087011b
-            // So in kernel versions before Linux 3.0, we use add_task method, write thread id to the tasks file
+        if !is_cgroup_procs_writable() {
+            // In kernel versions before Linux 3.0, we use add_task method, write thread id to the tasks file
             if let Err(e) = cpus.add_task(&CgroupPid::from(pid)) {
                 // fixme:All thread IDs belonging to this process need to be recorded to this file
                 return Err(Error::CpuControllerSetFailed(e.to_string()));
@@ -207,7 +205,7 @@ impl Cgroups {
 }
 
 pub fn is_kernel_available_for_cgroup() -> bool {
-    const MIN_KERNEL_VERSION: &str = "3";
+    const MIN_KERNEL_VERSION_SUPPORT_CGROUP: &str = "2.6.24"; // Support cgroups from Linux 2.6.24
     let sys_uname = uname(); // kernel_version is in the format of 5.4.0-13
     sys_uname
         .release()
@@ -215,5 +213,18 @@ pub fn is_kernel_available_for_cgroup() -> bool {
         .split_once('-')
         .unwrap_or_default()
         .0
-        .ge(MIN_KERNEL_VERSION)
+        .ge(MIN_KERNEL_VERSION_SUPPORT_CGROUP)
+}
+pub fn is_cgroup_procs_writable() -> bool {
+    // The cgroup.procs file can only be written after Linux 3.0. Refer to:
+    // https://github.com/torvalds/linux/commit/74a1166dfe1135dcc168d35fa5261aa7e087011b
+    const MIN_KERNEL_VERSION_CGROUP_PROCS: &str = "3";
+    let sys_uname = uname(); // kernel_version is in the format of 5.4.0-13
+    sys_uname
+        .release()
+        .trim()
+        .split_once('-')
+        .unwrap_or_default()
+        .0
+        .ge(MIN_KERNEL_VERSION_CGROUP_PROCS)
 }
