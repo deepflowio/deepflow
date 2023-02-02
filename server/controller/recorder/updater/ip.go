@@ -30,12 +30,12 @@ type IP struct {
 	lanIPUpdater *LANIP
 }
 
-func NewIP(cache *cache.Cache, cloudData []cloudmodel.IP) *IP {
+func NewIP(cache *cache.Cache, cloudData []cloudmodel.IP, domainToolDataSet *cache.ToolDataSet) *IP {
 	return &IP{
 		cache:        cache,
 		cloudData:    cloudData,
-		wanIPUpdater: NewWANIP(cache),
-		lanIPUpdater: NewLANIP(cache),
+		wanIPUpdater: NewWANIP(cache, domainToolDataSet),
+		lanIPUpdater: NewLANIP(cache, domainToolDataSet),
 	}
 }
 
