@@ -857,8 +857,10 @@ static void process_events_handle_main(__unused void *arg)
 				fprintf(datadump_file,
 					"\n\nDump data is finished, use time: %us.\n\n",
 					datadump_timeout);
-				ebpf_info("close datadump file %s\n", datadump_file_path);
-				fclose(datadump_file);
+				if (datadump_file != stdout) {
+					ebpf_info("close datadump file %s\n", datadump_file_path);
+					fclose(datadump_file);
+				}
 				memcpy(datadump_file_path, "stdout", 7);
 				datadump_file = stdout;
 				datadump_timeout = 0;
