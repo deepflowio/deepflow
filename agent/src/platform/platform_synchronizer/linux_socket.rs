@@ -334,15 +334,14 @@ fn record_tcp_listening_ip_port(
     let mut handle_entry = |enties: Vec<TcpNetEntry>| {
         for t in enties {
             if t.state == TcpState::Listen {
-                // now only support ipv4
-                let Some(local_address) = convert_addr_to_v4(t.local_address) else {
-                    continue;
-                };
-
                 // when listening in zero addr, indicate listen in all interface
-                if is_zero_addr(&local_address) {
-                    all_iface_listen_sock.insert((local_address.port(), Protocol::Tcp, netns));
+                if is_zero_addr(&t.local_address) {
+                    all_iface_listen_sock.insert((t.local_address.port(), Protocol::Tcp, netns));
                 } else {
+                    // now only support ipv4
+                    let Some(local_address) = convert_addr_to_v4(t.local_address) else {
+                        continue;
+                    };
                     spec_addr_listen_sock.insert(local_address);
                 }
             } else {
