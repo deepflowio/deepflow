@@ -50,7 +50,7 @@ chosts:
 
 cloud_tags:
 - resource_type: xxxx # required. options: chost, pod_ns 
-  resource_name: xxxx # required
+  resource_name: xxxx # required. (If there is a duplicate name, one will be chosen at random.)
   domain_uuid: xxxx   # required
   tags:               # required
   - key: xxxx         # required
