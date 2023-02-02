@@ -73,7 +73,6 @@ use crate::{
     rpc::get_timestamp,
     utils::stats::{self, Countable, StatsOption},
 };
-use npb_pcap_policy::PolicyData;
 use public::{
     counter::{Counter, CounterType, CounterValue, RefCountable},
     debug::QueueDebugger,
@@ -81,6 +80,9 @@ use public::{
     queue::{self, DebugSender, Receiver},
     utils::net::MacAddr,
 };
+
+use npb_pcap_policy::PolicyData;
+use packet_sequence_block::PacketSequenceBlock;
 
 // not thread-safe
 pub struct FlowMap {
@@ -110,7 +112,7 @@ pub struct FlowMap {
     rrt_cache: Rc<RefCell<L7RrtCache>>,
     flow_perf_counter: Arc<FlowPerfCounter>,
     ntp_diff: Arc<AtomicI64>,
-    packet_sequence_queue: Option<DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>>, // Enterprise Edition Feature: packet-sequence
+    packet_sequence_queue: Option<DebugSender<Box<PacketSequenceBlock>>>, // Enterprise Edition Feature: packet-sequence
     packet_sequence_enabled: bool,
     stats_counter: Arc<FlowMapCounter>,
 
@@ -129,7 +131,7 @@ impl FlowMap {
         config: FlowAccess,
         parse_config: LogParserAccess,
         #[cfg(target_os = "linux")] ebpf_config: Option<EbpfAccess>,
-        packet_sequence_queue: Option<DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>>, // Enterprise Edition Feature: packet-sequence
+        packet_sequence_queue: Option<DebugSender<Box<PacketSequenceBlock>>>, // Enterprise Edition Feature: packet-sequence
         stats_collector: &stats::Collector,
         from_ebpf: bool,
     ) -> Self {
@@ -333,17 +335,15 @@ impl FlowMap {
                     // 未超时Flow的统计信息发送到队列下游
                     self.node_updated_aftercare(&config, node, timestamp, None);
                     // Enterprise Edition Feature: packet-sequence
-                    if self.packet_sequence_enabled && node.packet_sequence_block.is_some() {
-                        // flush the packet_sequence_block at the regular time
-                        if let Err(_) = self
-                            .packet_sequence_queue
-                            .as_ref()
-                            .unwrap()
-                            .send(Box::new(node.packet_sequence_block.take().unwrap()))
-                        {
-                            warn!(
-                                "packet sequence block to queue failed maybe queue have terminated"
-                            );
+                    if self.packet_sequence_enabled {
+                        if let Some(block) = node.packet_sequence_block.take() {
+                            // flush the packet_sequence_block at the regular time
+                            if let Err(_) = self.packet_sequence_queue.as_ref().unwrap().send(block)
+                            {
+                                warn!(
+                                    "packet sequence block to queue failed maybe queue have terminated"
+                                );
+                            }
                         }
                     }
 
@@ -522,18 +522,18 @@ impl FlowMap {
                     .packet_sequence_queue
                     .as_ref()
                     .unwrap()
-                    .send(Box::new(node.packet_sequence_block.take().unwrap()))
+                    .send(node.packet_sequence_block.take().unwrap())
                 {
                     warn!("packet sequence block to queue failed maybe queue have terminated");
                 }
-                node.packet_sequence_block = Some(packet_sequence_block::PacketSequenceBlock::new(
+                node.packet_sequence_block = Some(Box::new(PacketSequenceBlock::new(
                     (meta_packet.lookup_key.timestamp.as_secs() / MINUTE) as u32,
-                ));
+                )));
             }
         } else {
-            node.packet_sequence_block = Some(packet_sequence_block::PacketSequenceBlock::new(
+            node.packet_sequence_block = Some(Box::new(PacketSequenceBlock::new(
                 (meta_packet.lookup_key.timestamp.as_secs() / MINUTE) as u32,
-            ));
+            )));
         }
 
         let mini_meta_packet = packet_sequence_block::MiniMetaPacket::new(
@@ -933,6 +933,7 @@ impl FlowMap {
                 get_parser(l7_proto_enum.unwrap_or_default()),
                 self.flow_perf_counter.clone(),
             )
+            .map(|o| Box::new(o));
         }
         node
     }
@@ -1319,17 +1320,11 @@ impl FlowMap {
         }
 
         // Enterprise Edition Feature: packet-sequence
-        if self.packet_sequence_enabled
-            && node.packet_sequence_block.is_some()
-            && flow.flow_key.proto == IpProtocol::Tcp
-        {
-            if let Err(_) = self
-                .packet_sequence_queue
-                .as_ref()
-                .unwrap()
-                .send(Box::new(node.packet_sequence_block.take().unwrap()))
-            {
-                warn!("packet sequence block to queue failed maybe queue have terminated");
+        if self.packet_sequence_enabled && flow.flow_key.proto == IpProtocol::Tcp {
+            if let Some(block) = node.packet_sequence_block.take() {
+                if let Err(_) = self.packet_sequence_queue.as_ref().unwrap().send(block) {
+                    warn!("packet sequence block to queue failed maybe queue have terminated");
+                }
             }
         }
 
