@@ -733,7 +733,7 @@ mod tests {
 
     #[test]
     fn state_machine() {
-        let (mut flow_map, _) = _new_flow_map_and_receiver(TridentType::TtProcess);
+        let (mut flow_map, _) = _new_flow_map_and_receiver(TridentType::TtProcess, None);
         let mut flow_node = FlowNode {
             timestamp_key: get_timestamp(0).as_nanos() as u64,
 
@@ -809,7 +809,7 @@ mod tests {
 
     fn state_machine_helper<P: AsRef<Path>>(pcap_file: P, expect_close_type: CloseType) {
         let (mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess);
+            _new_flow_map_and_receiver(TridentType::TtProcess, None);
 
         let capture = Capture::load_pcap(pcap_file, None);
         let packets = capture.as_meta_packets();
