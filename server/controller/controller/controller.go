@@ -190,7 +190,7 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 func registerResourceRouters(r *gin.Engine, cfg *config.ControllerConfig) {
 	resourcerouter.DomainRouter(r, cfg)
 	resourcerouter.VPCRouter(r)
-	resourcerouter.ProcessRouter(r)
+	resourcerouter.ProcessRouter(r, &cfg.RedisCfg)
 }
 
 func grpcStart(ctx context.Context, cfg *config.ControllerConfig) {

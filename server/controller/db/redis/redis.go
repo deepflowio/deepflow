@@ -26,9 +26,11 @@ import (
 )
 
 var log = logging.MustGetLogger("db.redis")
-var RedisDB redis.UniversalClient
+var RedisDB *RedisClient
 
 type RedisConfig struct {
+	ResourceAPIDatabase       int      `default:"1" yaml:"resource_api_database"`
+	ResourceAPIExpireInterval int      `default:"3600" yaml:"resource_api_expire_interval"`
 	DimensionResourceDatabase int      `default:"2" yaml:"dimension_resource_database"`
 	Host                      []string `default:"" yaml:"host"` // TODO add default value
 	Port                      uint32   `default:"6379" yaml:"port"`
@@ -36,6 +38,11 @@ type RedisConfig struct {
 	TimeOut                   uint32   `default:"30" yaml:"timeout"`
 	Enabled                   bool     `default:"false" yaml:"enabled"`
 	ClusterEnabled            bool     `default:"false" yaml:"cluster_enabled"`
+}
+
+type RedisClient struct {
+	ResourceAPI       redis.UniversalClient
+	DimensionResource redis.UniversalClient
 }
 
 func generateAddrs(cfg RedisConfig) []string {
@@ -50,13 +57,13 @@ func generateSimpleAddr(cfg RedisConfig) string {
 	return generateAddrs(cfg)[0]
 }
 
-func createSimpleClient(cfg RedisConfig) redis.UniversalClient {
+func createSimpleClient(cfg RedisConfig, database int) redis.UniversalClient {
 	addr := generateSimpleAddr(cfg)
 	log.Infof("redis addr: %v", addr)
 	return redis.NewClient(&redis.Options{
 		Addr:        addr,
 		Password:    cfg.Password,
-		DB:          cfg.DimensionResourceDatabase,
+		DB:          database,
 		DialTimeout: time.Duration(cfg.TimeOut) * time.Second,
 	})
 }
@@ -75,16 +82,23 @@ func createClusterClient(cfg RedisConfig) redis.UniversalClient {
 	})
 }
 
-func createUniversalRedisClient(cfg RedisConfig) redis.UniversalClient {
+func createUniversalRedisClient(cfg RedisConfig, database int) redis.UniversalClient {
 	if cfg.ClusterEnabled {
 		return createClusterClient(cfg)
 	} else {
-		return createSimpleClient(cfg)
+		return createSimpleClient(cfg, database)
 	}
 }
 
 func InitRedis(cfg RedisConfig, ctx context.Context) (err error) {
-	RedisDB = createUniversalRedisClient(cfg)
-	_, err = RedisDB.Ping(ctx).Result()
+	RedisDB = &RedisClient{
+		ResourceAPI:       createUniversalRedisClient(cfg, cfg.ResourceAPIDatabase), // TODO ClusterClient sync once
+		DimensionResource: createUniversalRedisClient(cfg, cfg.DimensionResourceDatabase),
+	}
+	_, err = RedisDB.ResourceAPI.Ping(ctx).Result()
+	if err != nil {
+		return
+	}
+	_, err = RedisDB.DimensionResource.Ping(ctx).Result()
 	return
 }
