@@ -34,7 +34,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
+	servicecommon "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 )
@@ -214,23 +214,23 @@ func CreateDomain(domainCreate model.DomainCreate, cfg *config.ControllerConfig)
 
 	mysql.Db.Model(&mysql.Domain{}).Where("name = ?", domainCreate.Name).Count(&count)
 	if count > 0 {
-		return nil, NewError(common.RESOURCE_ALREADY_EXIST, fmt.Sprintf("domain (%s) already exist", domainCreate.Name))
+		return nil, servicecommon.NewError(common.RESOURCE_ALREADY_EXIST, fmt.Sprintf("domain (%s) already exist", domainCreate.Name))
 	}
 
 	mysql.Db.Model(&mysql.SubDomain{}).Where("name = ?", domainCreate.Name).Count(&count)
 	if count > 0 {
-		return nil, NewError(common.RESOURCE_ALREADY_EXIST, fmt.Sprintf("sub_domain (%s) already exist", domainCreate.Name))
+		return nil, servicecommon.NewError(common.RESOURCE_ALREADY_EXIST, fmt.Sprintf("sub_domain (%s) already exist", domainCreate.Name))
 	}
 
 	if domainCreate.KubernetesClusterID != "" {
 		mysql.Db.Model(&mysql.Domain{}).Where("cluster_id = ?", domainCreate.KubernetesClusterID).Count(&count)
 		if count > 0 {
-			return nil, NewError(common.RESOURCE_ALREADY_EXIST, fmt.Sprintf("domain cluster_id (%s) already exist", domainCreate.KubernetesClusterID))
+			return nil, servicecommon.NewError(common.RESOURCE_ALREADY_EXIST, fmt.Sprintf("domain cluster_id (%s) already exist", domainCreate.KubernetesClusterID))
 		}
 
 		mysql.Db.Model(&mysql.SubDomain{}).Where("cluster_id = ?", domainCreate.KubernetesClusterID).Count(&count)
 		if count > 0 {
-			return nil, NewError(common.RESOURCE_ALREADY_EXIST, fmt.Sprintf("sub_domain cluster_id (%s) already exist", domainCreate.KubernetesClusterID))
+			return nil, servicecommon.NewError(common.RESOURCE_ALREADY_EXIST, fmt.Sprintf("sub_domain cluster_id (%s) already exist", domainCreate.KubernetesClusterID))
 		}
 	}
 
@@ -260,7 +260,7 @@ func CreateDomain(domainCreate model.DomainCreate, cfg *config.ControllerConfig)
 		var region mysql.Region
 		res := mysql.Db.Find(&region)
 		if res.RowsAffected != int64(1) {
-			return nil, NewError(common.INVALID_PARAMETERS, fmt.Sprintf("can not find region, please specify or create one"))
+			return nil, servicecommon.NewError(common.INVALID_PARAMETERS, fmt.Sprintf("can not find region, please specify or create one"))
 		}
 		domainCreate.Config["region_uuid"] = region.Lcuuid
 		regionLcuuid = region.Lcuuid
@@ -274,7 +274,7 @@ func CreateDomain(domainCreate model.DomainCreate, cfg *config.ControllerConfig)
 		var azConn mysql.AZControllerConnection
 		res := mysql.Db.Where("region = ?", regionLcuuid).First(&azConn)
 		if res.RowsAffected != int64(1) {
-			return nil, NewError(common.INVALID_PARAMETERS, fmt.Sprintf("can not find controller ip, please specify or create one"))
+			return nil, servicecommon.NewError(common.INVALID_PARAMETERS, fmt.Sprintf("can not find controller ip, please specify or create one"))
 		}
 		domainCreate.Config["controller_ip"] = azConn.ControllerIP
 		controllerIP = azConn.ControllerIP
@@ -292,7 +292,7 @@ func CreateDomain(domainCreate model.DomainCreate, cfg *config.ControllerConfig)
 			)
 			if err != nil {
 				log.Error("get encrypt key failed (%s)", err.Error())
-				return nil, NewError(common.SERVER_ERROR, err.Error())
+				return nil, servicecommon.NewError(common.SERVER_ERROR, err.Error())
 			}
 
 			domainCreate.Config[key] = encryptKey
@@ -354,7 +354,7 @@ func UpdateDomain(
 	var dbUpdateMap = make(map[string]interface{})
 
 	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&domain); ret.Error != nil {
-		return nil, NewError(
+		return nil, servicecommon.NewError(
 			common.RESOURCE_NOT_FOUND, fmt.Sprintf("domain (%s) not found", lcuuid),
 		)
 	}
@@ -418,7 +418,7 @@ func UpdateDomain(
 					)
 					if err != nil {
 						log.Error(err)
-						return nil, NewError(common.SERVER_ERROR, err.Error())
+						return nil, servicecommon.NewError(common.SERVER_ERROR, err.Error())
 					}
 					configUpdate[key] = encryptKey
 					log.Debugf(
@@ -472,7 +472,7 @@ func DeleteDomain(lcuuid string) (map[string]string, error) { // TODO whether re
 	var domain mysql.Domain
 
 	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&domain); ret.Error != nil {
-		return nil, NewError(
+		return nil, servicecommon.NewError(
 			common.RESOURCE_NOT_FOUND, fmt.Sprintf("domain (%s) not found", lcuuid),
 		)
 	}
@@ -642,13 +642,13 @@ func CreateSubDomain(subDomainCreate model.SubDomainCreate) (*model.SubDomain, e
 		return nil, err
 	}
 	if domainCount == 0 {
-		return nil, NewError(common.RESOURCE_NOT_FOUND, fmt.Sprintf("domain lcuuid (%s) does not exit", subDomainCreate.Domain))
+		return nil, servicecommon.NewError(common.RESOURCE_NOT_FOUND, fmt.Sprintf("domain lcuuid (%s) does not exit", subDomainCreate.Domain))
 	}
 
 	var count int64
 	mysql.Db.Model(&mysql.SubDomain{}).Where("name = ?", subDomainCreate.Name).Count(&count)
 	if count > 0 {
-		return nil, NewError(common.RESOURCE_ALREADY_EXIST, fmt.Sprintf("sub_domain (%s) already exist", subDomainCreate.Name))
+		return nil, servicecommon.NewError(common.RESOURCE_ALREADY_EXIST, fmt.Sprintf("sub_domain (%s) already exist", subDomainCreate.Name))
 	}
 
 	log.Infof("create sub_domain (%v)", subDomainCreate)
@@ -681,7 +681,7 @@ func UpdateSubDomain(lcuuid string, subDomainUpdate map[string]interface{}) (*mo
 	var dbUpdateMap = make(map[string]interface{})
 
 	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&subDomain); ret.Error != nil {
-		return nil, NewError(
+		return nil, servicecommon.NewError(
 			common.RESOURCE_NOT_FOUND, fmt.Sprintf("sub_domain (%s) not found", lcuuid),
 		)
 	}
@@ -705,7 +705,7 @@ func DeleteSubDomain(lcuuid string) (map[string]string, error) {
 	var subDomain mysql.SubDomain
 
 	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&subDomain); ret.Error != nil {
-		return nil, NewError(
+		return nil, servicecommon.NewError(
 			common.RESOURCE_NOT_FOUND, fmt.Sprintf("sub_domain (%s) not found", lcuuid),
 		)
 	}
