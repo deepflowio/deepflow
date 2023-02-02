@@ -51,6 +51,8 @@ controller:
   redis:
     enabled: true
     cluster_enabled: false
+    resource_api_database: 1
+    resource_api_expire_interval: 3600
     dimension_resource_database: 2
     password: deepflow
     host:
