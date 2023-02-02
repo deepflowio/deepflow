@@ -53,6 +53,7 @@ use crate::exception::ExceptionHandler;
 use crate::rpc::session::Session;
 use crate::trident::{self, ChangedConfig, RunningMode, TridentState, VersionInfo};
 use crate::utils::{
+    command::get_hostname,
     environment::{
         get_executable_path, is_tt_pod, running_in_container, running_in_only_watch_k8s_mode,
     },
@@ -1175,14 +1176,12 @@ impl Synchronizer {
         let ntp_diff = self.ntp_diff.clone();
         self.threads.lock().push(self.rt.spawn(async move {
             while running.load(Ordering::SeqCst) {
-                match hostname::get() {
-                    Ok(hostname) => {
-                        if let Ok(s) = hostname.into_string() {
-                            let r = status.upgradable_read();
-                            if s.ne(&r.hostname) {
-                                info!("hostname changed from \"{}\" to \"{}\"", r.hostname, s);
-                                RwLockUpgradableReadGuard::upgrade(r).hostname = s;
-                            }
+                match get_hostname() {
+                    Ok(s) => {
+                        let r = status.upgradable_read();
+                        if s.ne(&r.hostname) {
+                            info!("hostname changed from \"{}\" to \"{}\"", r.hostname, s);
+                            RwLockUpgradableReadGuard::upgrade(r).hostname = s;
                         }
                     }
                     Err(e) => warn!("refresh hostname failed: {}", e),
