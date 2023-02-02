@@ -706,6 +706,8 @@ mod tests {
     use crate::utils::test::Capture;
     use public::proto::common::TridentType;
 
+    use packet_sequence_block::PacketSequenceBlock;
+
     const FILE_DIR: &'static str = "resources/test/flow_generator";
 
     #[test]
@@ -778,7 +780,7 @@ mod tests {
             next_tcp_seq1: 0,
             packet_in_tick: false,
             policy_in_tick: [false; 2],
-            packet_sequence_block: Some(packet_sequence_block::PacketSequenceBlock::default()), // Enterprise Edition Feature: packet-sequence
+            packet_sequence_block: Some(Box::new(PacketSequenceBlock::default())), // Enterprise Edition Feature: packet-sequence
         };
 
         let peers = &mut flow_node.tagged_flow.flow.flow_metrics_peers;
