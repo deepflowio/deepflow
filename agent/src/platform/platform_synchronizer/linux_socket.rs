@@ -22,7 +22,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use log::error;
+use log::{error, warn};
 use procfs::{
     net::{TcpNetEntry, TcpState, UdpNetEntry},
     process::{FDTarget, Process},
@@ -65,6 +65,7 @@ pub(super) struct SockEntry {
     pub(super) local: SockAddrData,
     pub(super) remote: SockAddrData,
     pub(super) real_client: Option<SockAddrData>,
+    pub(super) netns_idx: u16,
 }
 
 impl TryFrom<SockEntry> for GpidSyncEntry {
@@ -125,6 +126,7 @@ impl TryFrom<SockEntry> for GpidSyncEntry {
             ipv4_0: ip_0,
             port_0: port_0,
             pid_0: pid_0,
+            netns_idx: Some(s.netns_idx as u32),
             ..Default::default()
         };
 
@@ -155,8 +157,8 @@ pub(super) fn get_all_socket(
     // Hashmap<inode, (pid,fd)>
     let mut inode_pid_fd_map = HashMap::new();
 
-    // all netns, use for skip the netns which info had been fetched
-    let mut netns_set = HashSet::new();
+    // Hashmap<netns_id, netns_idx>, use for map the netns id to u16 and skip the netns which info had been fetched
+    let mut netns_id_idx_map = HashMap::new();
 
     // HashSet<(port, proto, NetnsInode)>, the listenning port when socket listening in `0.0.0.0` or `::`
     let mut all_iface_listen_sock = HashSet::new();
@@ -174,6 +176,9 @@ pub(super) fn get_all_socket(
         vec![],
         vec![],
     );
+
+    // netns idx increase every time get the new netns id
+    let mut netns_idx = 0u16;
 
     // get all process, and record the open fd and fetch listining socket info
     // note that the /proc/pid/net/{tcp,tcp6,udp,udp6} include all the connection in the proc netns, not the process created connection.
@@ -219,9 +224,19 @@ pub(super) fn get_all_socket(
                 }
 
                 // break if the netns had been fetched
-                if !netns_set.insert(netns) {
+                if netns_id_idx_map.contains_key(&netns) {
                     break;
-                }
+                };
+
+                netns_id_idx_map.insert(netns, {
+                    if netns_idx == u16::MAX {
+                        warn!("netns_idx reach u16::Max, set to 0");
+                        0
+                    } else {
+                        netns_idx += 1;
+                        netns_idx
+                    }
+                });
 
                 // also recoed the listining socket info, use for determine client or server connection.
                 // note that proc.{tcp(), tcp6(), udp(), udp6()} include all connection in the proc netns
@@ -236,14 +251,17 @@ pub(super) fn get_all_socket(
                 }
 
                 // record the tcp and udp connection in current netns
-                // only support ipv4 now
-                match (proc.tcp(), proc.udp()) {
-                    (Ok(tcp), Ok(udp)) => {
+                // only support ipv4 now, ipv6 dual stack will extra ipv4 addr
+                match (proc.tcp(), proc.udp(), proc.tcp6(), proc.udp6()) {
+                    (Ok(tcp), Ok(udp), Ok(tcp6), Ok(udp6)) => {
                         tcp_entries.push((tcp, netns));
-                        udp_entries.push(udp);
+                        udp_entries.push((udp, netns));
+                        tcp_entries.push((tcp6, netns));
+                        udp_entries.push((udp6, netns));
                     }
                     _ => error!("pid {} get connection info fail", pid),
                 }
+
                 break;
             }
         }
@@ -257,6 +275,7 @@ pub(super) fn get_all_socket(
         &all_iface_listen_sock,
         &spec_addr_listen_sock,
         &inode_pid_fd_map,
+        &netns_id_idx_map,
         tcp_entries,
         &mut sock_entries,
     );
@@ -266,6 +285,7 @@ pub(super) fn get_all_socket(
         policy_getter,
         min_sock_lifetime,
         &inode_pid_fd_map,
+        &netns_id_idx_map,
         udp_entries,
         &mut sock_entries,
     );
@@ -318,7 +338,11 @@ fn record_tcp_listening_ip_port(
                 if is_zero_addr(&t.local_address) {
                     all_iface_listen_sock.insert((t.local_address.port(), Protocol::Tcp, netns));
                 } else {
-                    spec_addr_listen_sock.insert(t.local_address);
+                    // now only support ipv4
+                    let Some(local_address) = convert_addr_to_v4(t.local_address) else {
+                        continue;
+                    };
+                    spec_addr_listen_sock.insert(local_address);
                 }
             } else {
                 // the listen socket info in /proc/pid/net/tcp always in the top
@@ -396,6 +420,8 @@ fn divide_tcp_entry(
     spec_addr_listen_sock: &HashSet<SocketAddr>,
     // Hashmap<inode, (pid,fd)>
     inode_pid_fd_map: &HashMap<u64, (i32, i32)>,
+    // Hashmap<netns_id, netnss_idx>
+    netns_idx_map: &HashMap<u64, u16>,
     // Vec< Vec<tcp_entrys>, netns >
     tcp_entry: Vec<(Vec<TcpNetEntry>, u64)>,
     sock_entries: &mut Vec<SockEntry>,
@@ -427,14 +453,21 @@ fn divide_tcp_entry(
                 continue;
             }
 
+            // now only support ipv4
+            let (Some(local_address),Some(remote_address)) = (
+                convert_addr_to_v4(t.local_address),convert_addr_to_v4(t.remote_address)
+            ) else {
+                continue;
+            };
+
             sock_entries.push(SockEntry {
                 pid: *pid as u32,
                 proto: Protocol::Tcp,
                 role: if all_iface_listen_sock.contains(&(
-                    t.local_address.port(),
+                    local_address.port(),
                     Protocol::Tcp,
                     netns,
-                )) || spec_addr_listen_sock.contains(&t.local_address)
+                )) || spec_addr_listen_sock.contains(&local_address)
                 {
                     // sport in all_iface_listen_sock or SocketAddr in spec_addr_listen_sock, assume is server connection
                     Role::Server
@@ -444,18 +477,19 @@ fn divide_tcp_entry(
 
                 local: SockAddrData {
                     epc_id: local_epc_id,
-                    ip: t.local_address.ip(),
-                    port: t.local_address.port(),
+                    ip: local_address.ip(),
+                    port: local_address.port(),
                 },
                 remote: SockAddrData {
                     epc_id: convert_i32_epc_id(policy_getter.lookup_epc_by_epc(
-                        t.local_address.ip(),
-                        t.remote_address.ip(),
+                        local_address.ip(),
+                        remote_address.ip(),
                         local_epc_id as i32,
                     )),
-                    ip: t.remote_address.ip(),
-                    port: t.remote_address.port(),
+                    ip: remote_address.ip(),
+                    port: remote_address.port(),
                 },
+                netns_idx: *netns_idx_map.get(&netns).unwrap(),
                 real_client: None,
             });
         }
@@ -470,14 +504,16 @@ fn divide_udp_entry(
     sock_min_lifetime_sec: u64,
     // Hashmap<inode, (pid,fd)>
     inode_pid_fd_map: &HashMap<u64, (i32, i32)>,
-    udp_entry: Vec<Vec<UdpNetEntry>>,
+    // Hashmap<netns_id, netnss_idx>
+    netns_idx_map: &HashMap<u64, u16>,
+    udp_entry: Vec<(Vec<UdpNetEntry>, u64)>,
     sock_entries: &mut Vec<SockEntry>,
 ) {
     let now_sec = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_secs();
-    for udp_entries in udp_entry {
+    for (udp_entries, net_ns) in udp_entry {
         for u in udp_entries {
             let Some((pid, fd)) = inode_pid_fd_map.get(&u.inode) else {
                 continue;
@@ -500,6 +536,14 @@ fn divide_udp_entry(
                 // foreign addr is zero, indicate the udp socker create use bind(), no idea to determine the local and remote, ignore
                 continue;
             }
+
+            // now only support ipv4
+            let (Some(local_address),Some(remote_address)) = (
+                convert_addr_to_v4(u.local_address),convert_addr_to_v4(u.remote_address)
+            ) else {
+                continue;
+            };
+
             // foreign addr is not zero, indicate the udp socker create use connect()
             sock_entries.push(SockEntry {
                 pid: *pid as u32,
@@ -507,19 +551,19 @@ fn divide_udp_entry(
                 role: Role::Client,
                 local: SockAddrData {
                     epc_id: local_epc_id,
-                    ip: u.local_address.ip(),
-                    port: u.local_address.port(),
+                    ip: local_address.ip(),
+                    port: local_address.port(),
                 },
                 remote: SockAddrData {
                     epc_id: convert_i32_epc_id(policy_getter.lookup_epc_by_epc(
-                        u.local_address.ip(),
-                        u.remote_address.ip(),
+                        local_address.ip(),
+                        remote_address.ip(),
                         local_epc_id as i32,
                     )),
-                    ip: u.remote_address.ip(),
-                    port: u.remote_address.port(),
+                    ip: remote_address.ip(),
+                    port: remote_address.port(),
                 },
-                // FIXME get real client from toa
+                netns_idx: *netns_idx_map.get(&net_ns).unwrap(),
                 real_client: None,
             });
         }
@@ -531,5 +575,28 @@ fn convert_i32_epc_id(epc_id: i32) -> u32 {
         epc_id as u16 as u32
     } else {
         epc_id as u32
+    }
+}
+
+/*
+    if sockaddr is ipv4, return self
+    if sockaddr is ipv6 and have prefix ::ffff:?:? or ::?:? (such as `::ffff:127.0.0.1`), is dual stack ip addr, convert to ipv4
+*/
+fn convert_addr_to_v4(addr: SocketAddr) -> Option<SocketAddr> {
+    const IPV6_V4_PREFIX: [u8; 12] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 255];
+    match &addr {
+        SocketAddr::V4(_) => Some(addr),
+        SocketAddr::V6(v6) => {
+            if &v6.ip().octets()[..12] != &IPV6_V4_PREFIX {
+                // not ipv6 dual stack addr
+                None
+            } else {
+                // extra latest 4 byte as ipv4 addr
+                Some(SocketAddr::new(
+                    IpAddr::V4(v6.ip().to_ipv4().unwrap()),
+                    v6.port(),
+                ))
+            }
+        }
     }
 }

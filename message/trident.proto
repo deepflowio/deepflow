@@ -656,6 +656,9 @@ message GPIDSyncEntry {
     optional uint32 port_real = 12 [default = 0];   // u16
     optional uint32 pid_real = 13 [default = 0];    // pid or gpid
     optional RoleType role_real = 14 [default = ROLE_NONE]; // role of real ip, ROLE_NONE means compressed
+
+    // the net nsmaspace index,  neither netns id nor netns inode 
+    optional uint32 netns_idx = 15 [default = 0];  // u16
 }
 
 enum GPIDSyncCompressAlgorithm {
