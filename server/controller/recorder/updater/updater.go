@@ -58,11 +58,12 @@ type Callbacks[CT constraint.CloudModel, MT constraint.MySQLModel, BT constraint
 }
 
 type UpdaterBase[CT constraint.CloudModel, MT constraint.MySQLModel, BT constraint.DiffBase[MT]] struct {
-	cache         *cache.Cache
-	dbOperator    db.Operator[MT]           // 数据库操作对象
-	diffBaseData  map[string]BT             // 用于比对的旧资源数据
-	cloudData     []CT                      // 定时获取的新资源数据
-	dataGenerator DataGenerator[CT, MT, BT] // 提供各类数据生成的方法
+	cache             *cache.Cache              // 基于 Domain 或者 SubDomain 范围构造
+	domainToolDataSet *cache.ToolDataSet        // TODO ugly 基于 Domain 构造，仅当 Updater 资源属于 SubDomain 时使用
+	dbOperator        db.Operator[MT]           // 数据库操作对象
+	diffBaseData      map[string]BT             // 用于比对的旧资源数据
+	cloudData         []CT                      // 定时获取的新资源数据
+	dataGenerator     DataGenerator[CT, MT, BT] // 提供各类数据生成的方法
 	// TODO 移出updater
 	cacheHandler CacheHandler[CT, MT, BT] // 提供处理cache中特定资源的方法
 	callbacks    Callbacks[CT, MT, BT]
