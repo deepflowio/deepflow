@@ -252,14 +252,21 @@ pub(super) fn get_all_socket(
 
                 // record the tcp and udp connection in current netns
                 // only support ipv4 now, ipv6 dual stack will extra ipv4 addr
-                match (proc.tcp(), proc.udp(), proc.tcp6(), proc.udp6()) {
-                    (Ok(tcp), Ok(udp), Ok(tcp6), Ok(udp6)) => {
+                match (proc.tcp(), proc.udp()) {
+                    (Ok(tcp), Ok(udp)) => {
                         tcp_entries.push((tcp, netns));
                         udp_entries.push((udp, netns));
+                    }
+                    _ => error!("pid {} get connection info fail", pid),
+                }
+
+                // old kernel have no tcp6/udp6
+                match (proc.tcp6(), proc.udp6()) {
+                    (Ok(tcp6), Ok(udp6)) => {
                         tcp_entries.push((tcp6, netns));
                         udp_entries.push((udp6, netns));
                     }
-                    _ => error!("pid {} get connection info fail", pid),
+                    _ => {}
                 }
 
                 break;
