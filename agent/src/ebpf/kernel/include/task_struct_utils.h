@@ -119,7 +119,7 @@ static __inline void *infer_and_get_socket_from_fd(int fd_num,
 					       offset->task__files_offset);
 	}
 
-	if (file == NULL) {
+	if (file == NULL || !offset->task__files_offset) {
 		//bpf_debug("file == NULL\n");
 		return NULL;
 	}
