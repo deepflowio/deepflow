@@ -191,10 +191,10 @@ impl<'a> Iterator for L7ProtocolCheckerIterator<'a> {
 
 pub struct FlowPerf {
     l4: L4FlowPerfTable,
-    l7: Option<L7FlowPerfTable>,
+    l7: Option<Box<L7FlowPerfTable>>,
 
     // perf 目前还没有抽象出来,自定义协议需要添加字段区分,以后抽出来后 l7可以去掉.
-    l7_protocol_log_parser: Option<L7ProtocolParser>,
+    l7_protocol_log_parser: Option<Box<L7ProtocolParser>>,
 
     rrt_cache: Rc<RefCell<L7RrtCache>>,
 
@@ -403,7 +403,8 @@ impl FlowPerf {
                     let mut rrt = 0;
                     if is_parse_perf {
                         // perf 没有抽象出来,这里可能返回None，对于返回None即不解析perf，只解析log
-                        self.l7 = Self::l7_new(*protocol, self.rrt_cache.clone());
+                        self.l7 =
+                            Self::l7_new(*protocol, self.rrt_cache.clone()).map(|o| Box::new(o));
                         if self.l7.is_some() {
                             rrt = self.l7_parse_perf(
                                 log_parser_config,
@@ -417,7 +418,7 @@ impl FlowPerf {
                     }
 
                     if is_parse_log {
-                        self.l7_protocol_log_parser = Some(parser);
+                        self.l7_protocol_log_parser = Some(Box::new(parser));
                         let ret = self.l7_parse_log(
                             flow_config,
                             packet,
@@ -542,8 +543,9 @@ impl FlowPerf {
 
         Some(Self {
             l4,
-            l7: Self::l7_new(l7_protocol_enum.get_l7_protocol(), rrt_cache.clone()),
-            l7_protocol_log_parser: l7_parser,
+            l7: Self::l7_new(l7_protocol_enum.get_l7_protocol(), rrt_cache.clone())
+                .map(|o| Box::new(o)),
+            l7_protocol_log_parser: l7_parser.map(|o| Box::new(o)),
             rrt_cache,
             l7_protocol_enum,
             is_from_app: l7_proto.is_some(),
@@ -558,7 +560,7 @@ impl FlowPerf {
         self.is_from_app = l7_proto.is_some();
         self.is_skip = false;
         self.is_success = false;
-        self.l7 = Self::l7_new(l7_protocol, self.rrt_cache.clone());
+        self.l7 = Self::l7_new(l7_protocol, self.rrt_cache.clone()).map(|o| Box::new(o));
     }
 
     pub fn parse(
