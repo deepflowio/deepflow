@@ -992,10 +992,14 @@ vtap_group_id: g-xxxxxx
   ##   os-proc-regex:
   ##     - match-regex: python3 (.*)\.py
   ##       match-type: cmdline
+  ##       action: accept
   ##       rewrite-name: $1-py-script
   ##     - match-regex: (?P<PROC_NAME>nginx)
   ##       match-type: process_name
   ##       rewrite-name: ${PROC_NAME}-%HOSTNAME%
+  ##     - match-regex: .*sleep.*
+  ##       match-type: process_name
+  ##       action: drop
   ##     - match-regex: .*
   #os-proc-regex:
 
