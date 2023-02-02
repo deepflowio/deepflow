@@ -283,13 +283,17 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 			ctrlIP, ctrlMac, in.GetHostIps(), in.GetKubernetesClusterId(), in.GetKubernetesForceWatch(),
 			in.GetVtapGroupIdRequest(), in.GetProcessName(), in.GetRevision(), in.GetBootTime())
 
-		gVTapInfo.Register(
-			int(in.GetTapMode()),
-			in.GetCtrlIp(),
-			in.GetCtrlMac(),
-			in.GetHostIps(),
-			in.GetHost(),
-			in.GetVtapGroupIdRequest())
+		// If the kubernetes_force_watch field is true, the ctrl_ip and ctrl_mac of the vtap will not change,
+		// resulting in unsuccessful registration and a large number of error logs.
+		if !in.GetKubernetesForceWatch() {
+			gVTapInfo.Register(
+				int(in.GetTapMode()),
+				in.GetCtrlIp(),
+				in.GetCtrlMac(),
+				in.GetHostIps(),
+				in.GetHost(),
+				in.GetVtapGroupIdRequest())
+		}
 		return e.noVTapResponse(in), nil
 	}
 
@@ -691,6 +695,13 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 }
 
 func (e *VTapEvent) Push(r *api.SyncRequest, in api.Synchronizer_PushServer) error {
+	// If the kubernetes_force_watch field is true, the ctrl_ip and ctrl_mac of the vtap will not change,
+	// resulting in unsuccessful registration and a large number of error logs.
+	if r.GetKubernetesForceWatch() {
+		response := &api.SyncResponse{Status: &STATUS_FAILED}
+		return in.Send(response)
+	}
+
 	var err error
 	for {
 		response, err := e.pushResponse(r)
