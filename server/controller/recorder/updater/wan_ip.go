@@ -31,12 +31,13 @@ type WANIP struct {
 	UpdaterBase[cloudmodel.IP, mysql.WANIP, *cache.WANIP]
 }
 
-func NewWANIP(wholeCache *cache.Cache) *WANIP {
+func NewWANIP(wholeCache *cache.Cache, domainToolDataSet *cache.ToolDataSet) *WANIP {
 	updater := &WANIP{
 		UpdaterBase[cloudmodel.IP, mysql.WANIP, *cache.WANIP]{
-			cache:        wholeCache,
-			dbOperator:   db.NewWANIP(),
-			diffBaseData: wholeCache.WANIPs,
+			cache:             wholeCache,
+			domainToolDataSet: domainToolDataSet,
+			dbOperator:        db.NewWANIP(),
+			diffBaseData:      wholeCache.WANIPs,
 		},
 	}
 	updater.dataGenerator = updater
@@ -62,7 +63,12 @@ func (i *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.WANIP, boo
 		))
 		return nil, false
 	}
-	subnetID, _ := i.cache.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
+	subnetID, exists := i.cache.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
+	if !exists {
+		if i.domainToolDataSet != nil {
+			subnetID, _ = i.domainToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
+		}
+	}
 	ip := FormatIP(cloudItem.IP)
 	if ip == "" {
 		log.Error(ipIsInvalid(
@@ -102,11 +108,16 @@ func (i *WANIP) generateUpdateInfo(diffBase *cache.WANIP, cloudItem *cloudmodel.
 		} else {
 			subnetID, exists := i.cache.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
 			if !exists {
-				log.Error(resourceAForResourceBNotFound(
-					RESOURCE_TYPE_SUBNET_EN, cloudItem.SubnetLcuuid,
-					RESOURCE_TYPE_WAN_IP_EN, cloudItem.Lcuuid,
-				))
-				return nil, false
+				if i.domainToolDataSet != nil {
+					subnetID, exists = i.domainToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
+				}
+				if !exists {
+					log.Error(resourceAForResourceBNotFound(
+						RESOURCE_TYPE_SUBNET_EN, cloudItem.SubnetLcuuid,
+						RESOURCE_TYPE_WAN_IP_EN, cloudItem.Lcuuid,
+					))
+					return nil, false
+				}
 			}
 			updateInfo["vl2_net_id"] = subnetID
 		}
