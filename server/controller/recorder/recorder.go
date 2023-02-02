@@ -185,7 +185,7 @@ func (r *Recorder) getDomainUpdatersInOrder(cloudData cloudmodel.Resource) []upd
 	podService.RegisterCallbacks(
 		podServiceListener.OnUpdaterAdded, podServiceListener.OnUpdaterUpdated, podServiceListener.OnUpdaterDeleted)
 
-	ip := updater.NewIP(r.cacheMng.DomainCache, cloudData.IPs)
+	ip := updater.NewIP(r.cacheMng.DomainCache, cloudData.IPs, nil)
 	lanIPListener := listener.NewLANIP(r.cacheMng.DomainCache, r.eventQueue)
 	ip.GetLANIP().RegisterCallbacks(
 		lanIPListener.OnUpdaterAdded, lanIPListener.OnUpdaterUpdated, lanIPListener.OnUpdaterDeleted)
@@ -269,7 +269,7 @@ func (r *Recorder) getDomainUpdatersInOrder(cloudData cloudmodel.Resource) []upd
 		redisInstance,
 		updater.NewPeerConnection(r.cacheMng.DomainCache, cloudData.PeerConnections),
 		updater.NewCEN(r.cacheMng.DomainCache, cloudData.CENs),
-		updater.NewVInterface(r.cacheMng.DomainCache, cloudData.VInterfaces),
+		updater.NewVInterface(r.cacheMng.DomainCache, cloudData.VInterfaces, nil),
 		updater.NewFloatingIP(r.cacheMng.DomainCache, cloudData.FloatingIPs),
 		ip,
 		updater.NewVMPodNodeConnection(r.cacheMng.DomainCache, cloudData.VMPodNodeConnections), // VMPodNodeConnection需放在最后
@@ -304,7 +304,7 @@ func (r *Recorder) refreshSubDomains(cloudSubDomainResourceMap map[string]cloudm
 		r.updateSubDomainSyncedAt(subDomainLcuuid)
 
 		listener := listener.NewSubDomain(r.domainLcuuid, subDomainLcuuid, r.cacheMng.DomainCache, r.eventQueue)
-		subDomainUpdatersInUpdateOrder := r.getSubDomainUpdatersInOrder(subDomainLcuuid, subDomainResource, nil)
+		subDomainUpdatersInUpdateOrder := r.getSubDomainUpdatersInOrder(subDomainLcuuid, subDomainResource, nil, nil)
 		r.executeUpdators(subDomainUpdatersInUpdateOrder)
 		listener.OnUpdatersCompeleted()
 
@@ -316,7 +316,7 @@ func (r *Recorder) refreshSubDomains(cloudSubDomainResourceMap map[string]cloudm
 		_, ok := cloudSubDomainResourceMap[subDomainLcuuid]
 		if !ok {
 			log.Infof("sub_domain (lcuuid: %s) clean refresh started", subDomainLcuuid)
-			subDomainUpdatersInUpdateOrder := r.getSubDomainUpdatersInOrder(subDomainLcuuid, cloudmodel.SubDomainResource{}, subDomainCache)
+			subDomainUpdatersInUpdateOrder := r.getSubDomainUpdatersInOrder(subDomainLcuuid, cloudmodel.SubDomainResource{}, subDomainCache, &r.cacheMng.DomainCache.ToolDataSet)
 			r.executeUpdators(subDomainUpdatersInUpdateOrder)
 			log.Infof("sub_domain (lcuuid: %s) clean refresh completed", subDomainLcuuid)
 		}
@@ -324,7 +324,7 @@ func (r *Recorder) refreshSubDomains(cloudSubDomainResourceMap map[string]cloudm
 }
 
 func (r *Recorder) getSubDomainUpdatersInOrder(subDomainLcuuid string, cloudData cloudmodel.SubDomainResource,
-	subDomainCache *cache.Cache) []updater.ResourceUpdater {
+	subDomainCache *cache.Cache, domainToolDataSet *cache.ToolDataSet) []updater.ResourceUpdater {
 	if subDomainCache == nil {
 		subDomainCache = r.cacheMng.CreateSubDomainCacheIfNotExists(subDomainLcuuid)
 	}
@@ -343,7 +343,7 @@ func (r *Recorder) getSubDomainUpdatersInOrder(subDomainLcuuid string, cloudData
 	podService.RegisterCallbacks(
 		podServiceListener.OnUpdaterAdded, podServiceListener.OnUpdaterUpdated, podServiceListener.OnUpdaterDeleted)
 
-	ip := updater.NewIP(subDomainCache, cloudData.IPs)
+	ip := updater.NewIP(subDomainCache, cloudData.IPs, domainToolDataSet)
 	lanIPListener := listener.NewLANIP(subDomainCache, r.eventQueue)
 	ip.GetLANIP().RegisterCallbacks(
 		lanIPListener.OnUpdaterAdded, lanIPListener.OnUpdaterUpdated, lanIPListener.OnUpdaterDeleted)
@@ -366,7 +366,7 @@ func (r *Recorder) getSubDomainUpdatersInOrder(subDomainLcuuid string, cloudData
 		pod,
 		updater.NewNetwork(subDomainCache, cloudData.Networks),
 		updater.NewSubnet(subDomainCache, cloudData.Subnets),
-		updater.NewVInterface(subDomainCache, cloudData.VInterfaces),
+		updater.NewVInterface(subDomainCache, cloudData.VInterfaces, domainToolDataSet),
 		ip,
 		updater.NewVMPodNodeConnection(subDomainCache, cloudData.VMPodNodeConnections), // VMPodNodeConnection需放在最后
 	}

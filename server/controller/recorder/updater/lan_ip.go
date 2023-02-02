@@ -28,12 +28,13 @@ type LANIP struct {
 	UpdaterBase[cloudmodel.IP, mysql.LANIP, *cache.LANIP]
 }
 
-func NewLANIP(wholeCache *cache.Cache) *LANIP {
+func NewLANIP(wholeCache *cache.Cache, domainToolDataSet *cache.ToolDataSet) *LANIP {
 	updater := &LANIP{
 		UpdaterBase[cloudmodel.IP, mysql.LANIP, *cache.LANIP]{
-			cache:        wholeCache,
-			dbOperator:   db.NewLANIP(),
-			diffBaseData: wholeCache.LANIPs,
+			cache:             wholeCache,
+			domainToolDataSet: domainToolDataSet,
+			dbOperator:        db.NewLANIP(),
+			diffBaseData:      wholeCache.LANIPs,
 		},
 	}
 	updater.dataGenerator = updater
@@ -61,19 +62,29 @@ func (i *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.LANIP, boo
 	}
 	networkID, exists := i.cache.GetNetworkIDByVInterfaceLcuuid(cloudItem.VInterfaceLcuuid)
 	if !exists {
-		log.Error(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.VInterfaceLcuuid,
-			common.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid,
-		))
-		return nil, false
+		if i.domainToolDataSet != nil {
+			networkID, exists = i.domainToolDataSet.GetNetworkIDByVInterfaceLcuuid(cloudItem.VInterfaceLcuuid)
+		}
+		if !exists {
+			log.Error(resourceAForResourceBNotFound(
+				common.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.VInterfaceLcuuid,
+				common.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid,
+			))
+			return nil, false
+		}
 	}
 	subnetID, exists := i.cache.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
 	if !exists {
-		log.Error(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_SUBNET_EN, cloudItem.SubnetLcuuid,
-			common.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid,
-		))
-		return nil, false
+		if i.domainToolDataSet != nil {
+			subnetID, exists = i.domainToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
+		}
+		if !exists {
+			log.Error(resourceAForResourceBNotFound(
+				common.RESOURCE_TYPE_SUBNET_EN, cloudItem.SubnetLcuuid,
+				common.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid,
+			))
+			return nil, false
+		}
 	}
 	ip := common.FormatIP(cloudItem.IP)
 	if ip == "" {
@@ -99,11 +110,16 @@ func (i *LANIP) generateUpdateInfo(diffBase *cache.LANIP, cloudItem *cloudmodel.
 	if diffBase.SubnetLcuuid != cloudItem.SubnetLcuuid {
 		subnetID, exists := i.cache.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
 		if !exists {
-			log.Error(resourceAForResourceBNotFound(
-				common.RESOURCE_TYPE_SUBNET_EN, cloudItem.SubnetLcuuid,
-				common.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid,
-			))
-			return nil, false
+			if i.domainToolDataSet != nil {
+				subnetID, exists = i.domainToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
+			}
+			if !exists {
+				log.Error(resourceAForResourceBNotFound(
+					common.RESOURCE_TYPE_SUBNET_EN, cloudItem.SubnetLcuuid,
+					common.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid,
+				))
+				return nil, false
+			}
 		}
 		updateInfo["vl2_net_id"] = subnetID
 	}
