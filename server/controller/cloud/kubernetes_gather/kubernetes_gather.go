@@ -31,8 +31,6 @@ import (
 )
 
 const (
-	K8S_POD_IPV4_NETMASK      = 16
-	K8S_POD_IPV6_NETMASK      = 64
 	K8S_VINTERFACE_NAME_REGEX = "^(cni|flannel|cali|vxlan.calico|tunl|en[ospx])"
 	K8S_VPC_NAME              = "kubernetes_vpc"
 	K8S_VERSION_PREFIX        = "Kubernetes"
@@ -115,12 +113,12 @@ func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, isSub
 
 	podNetIPv4CIDRMaxMask, err := configJson.Get("pod_net_ipv4_cidr_max_mask").Int()
 	if err != nil {
-		podNetIPv4CIDRMaxMask = K8S_POD_IPV4_NETMASK
+		podNetIPv4CIDRMaxMask = common.K8S_POD_IPV4_NETMASK
 	}
 
 	podNetIPv6CIDRMaxMask, err := configJson.Get("pod_net_ipv6_cidr_max_mask").Int()
 	if err != nil {
-		podNetIPv6CIDRMaxMask = K8S_POD_IPV6_NETMASK
+		podNetIPv6CIDRMaxMask = common.K8S_POD_IPV6_NETMASK
 	}
 
 	return &KubernetesGather{

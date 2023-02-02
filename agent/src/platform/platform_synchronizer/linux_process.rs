@@ -35,7 +35,8 @@ use super::{dir_inode, SHA1_DIGEST_LEN};
 
 use crate::config::handler::OsProcScanConfig;
 use crate::config::{
-    OsProcRegexp, OS_PROC_REGEXP_MATCH_TYPE_CMD, OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME,
+    OsProcRegexp, OS_PROC_REGEXP_MATCH_ACTION_ACCEPT, OS_PROC_REGEXP_MATCH_ACTION_DROP,
+    OS_PROC_REGEXP_MATCH_TYPE_CMD, OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME,
 };
 #[derive(Debug, Clone)]
 pub struct ProcessData {
@@ -153,19 +154,42 @@ impl From<&ProcessData> for ProcessInfo {
     }
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+pub enum RegExpAction {
+    Accept,
+    Drop,
+}
+
+impl Default for RegExpAction {
+    fn default() -> Self {
+        Self::Accept
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum ProcRegRewrite {
-    // (match reg, rewrite string)
-    Cmd(Regex, String),
-    ProcessName(Regex, String),
+    // (match reg, action, rewrite string)
+    Cmd(Regex, RegExpAction, String),
+    ProcessName(Regex, RegExpAction, String),
+}
+
+impl ProcRegRewrite {
+    pub fn action(&self) -> RegExpAction {
+        match self {
+            ProcRegRewrite::Cmd(_, act, _) => *act,
+            ProcRegRewrite::ProcessName(_, act, _) => *act,
+        }
+    }
 }
 
 impl PartialEq for ProcRegRewrite {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Cmd(lr, ls), Self::Cmd(rr, rs)) => lr.as_str() == rr.as_str() && ls == rs,
-            (Self::ProcessName(lr, ls), Self::ProcessName(rr, rs)) => {
-                lr.as_str() == rr.as_str() && ls == rs
+            (Self::Cmd(lr, lact, ls), Self::Cmd(rr, ract, rs)) => {
+                lr.as_str() == rr.as_str() && lact == ract && ls == rs
+            }
+            (Self::ProcessName(lr, lact, ls), Self::ProcessName(rr, ract, rs)) => {
+                lr.as_str() == rr.as_str() && lact == ract && ls == rs
             }
             _ => false,
         }
@@ -179,7 +203,11 @@ impl TryFrom<&OsProcRegexp> for ProcRegRewrite {
 
     fn try_from(value: &OsProcRegexp) -> Result<Self, Self::Error> {
         let re = Regex::new(value.match_regex.as_str())?;
-
+        let action = match value.action.as_str() {
+            "" | OS_PROC_REGEXP_MATCH_ACTION_ACCEPT => RegExpAction::Accept,
+            OS_PROC_REGEXP_MATCH_ACTION_DROP => RegExpAction::Drop,
+            _ => return Err(regex::Error::Syntax("action must accept or drop".into())),
+        };
         let env_rewrite = |r: String| {
             envmnt::expand(
                 r.as_str(),
@@ -191,11 +219,14 @@ impl TryFrom<&OsProcRegexp> for ProcRegRewrite {
         };
 
         match value.match_type.as_str() {
-            OS_PROC_REGEXP_MATCH_TYPE_CMD => {
-                Ok(Self::Cmd(re, env_rewrite(value.rewrite_name.clone())))
-            }
+            OS_PROC_REGEXP_MATCH_TYPE_CMD => Ok(Self::Cmd(
+                re,
+                action,
+                env_rewrite(value.rewrite_name.clone()),
+            )),
             "" | OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME => Ok(Self::ProcessName(
                 re,
+                action,
                 env_rewrite(value.rewrite_name.clone()),
             )),
             _ => Err(regex::Error::__Nonexhaustive),
@@ -205,23 +236,24 @@ impl TryFrom<&OsProcRegexp> for ProcRegRewrite {
 
 impl ProcRegRewrite {
     pub(super) fn match_and_rewrite_proc(&self, proc: &mut ProcessData, match_only: bool) -> bool {
-        let mut match_replace_fn = |reg: &Regex, s: &String, replace: &String| {
-            if reg.is_match(s.as_str()) {
-                if !replace.is_empty() && !match_only {
-                    proc.name = reg.replace_all(s.as_str(), replace).to_string();
+        let mut match_replace_fn =
+            |reg: &Regex, act: &RegExpAction, s: &String, replace: &String| {
+                if reg.is_match(s.as_str()) {
+                    if act == &RegExpAction::Accept && !replace.is_empty() && !match_only {
+                        proc.name = reg.replace_all(s.as_str(), replace).to_string();
+                    }
+                    true
+                } else {
+                    false
                 }
-                true
-            } else {
-                false
-            }
-        };
+            };
 
         match self {
-            ProcRegRewrite::Cmd(reg, replace) => {
-                match_replace_fn(reg, &proc.cmd.join(" "), replace)
+            ProcRegRewrite::Cmd(reg, act, replace) => {
+                match_replace_fn(reg, act, &proc.cmd.join(" "), replace)
             }
-            ProcRegRewrite::ProcessName(reg, replace) => {
-                match_replace_fn(reg, &proc.process_name, replace)
+            ProcRegRewrite::ProcessName(reg, act, replace) => {
+                match_replace_fn(reg, act, &proc.process_name, replace)
             }
         }
     }
@@ -288,6 +320,10 @@ pub(super) fn get_all_process(conf: &OsProcScanConfig) -> Vec<ProcessData> {
 
             for i in proc_regexp.iter() {
                 if i.match_and_rewrite_proc(&mut proc_data, false) {
+                    if i.action() == RegExpAction::Drop {
+                        break;
+                    }
+
                     // get pwd info from hashmap or parse pwd file from /proc/pid/root/etc/passwd and insert to hashmap
                     // and get the username from pwd info
                     match proc_data.get_root_inode(proc_root) {

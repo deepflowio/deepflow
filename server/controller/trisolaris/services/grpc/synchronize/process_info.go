@@ -65,5 +65,9 @@ func (e *ProcessInfoEvent) ShareGPIDLocalData(ctx context.Context, in *api.Share
 	processInfo := trisolaris.GetGVTapInfo().GetProcessInfo()
 	log.Infof("receive gpid sync data from server(%s)", in.GetServerIp())
 	processInfo.UpdateGPIDReqFromShare(in)
-	return processInfo.GetGPIDShareReqs(), nil
+	shareData := processInfo.GetGPIDShareReqs()
+	if shareData == nil {
+		shareData = &api.ShareGPIDSyncRequests{}
+	}
+	return shareData, nil
 }

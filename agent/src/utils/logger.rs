@@ -26,9 +26,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use chrono::{DateTime, Local};
 use flexi_logger::{writers::LogWriter, DeferredNow, Level, Record};
-use hostname;
 
 use super::stats;
+
+use crate::utils::command::get_hostname;
 
 #[derive(Clone)]
 pub struct RemoteLogConfig {
@@ -84,12 +85,7 @@ impl RemoteLogWriter {
     ) -> (Self, RemoteLogConfig) {
         let enabled: Arc<AtomicBool> = Default::default();
         let threshold: Arc<AtomicU32> = Default::default();
-        let hostname = Arc::new(Mutex::new(
-            hostname::get()
-                .ok()
-                .and_then(|c| c.into_string().ok())
-                .unwrap_or_default(),
-        ));
+        let hostname = Arc::new(Mutex::new(get_hostname().unwrap_or_default()));
         let remotes = Arc::new(RwLock::new(
             addrs
                 .iter()

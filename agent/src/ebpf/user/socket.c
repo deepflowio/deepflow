@@ -369,7 +369,10 @@ static int datadump_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
 		datadump_proto = msg->proto;
 		safe_buf_copy(datadump_comm, sizeof(datadump_comm),
 			      (void *)msg->comm, sizeof(msg->comm));
-		ebpf_info("Set datadump pid %d comm %s\n", datadump_pid, datadump_comm);
+		ebpf_info("Set datadump pid %d comm %s proto %d\n",
+			  datadump_pid,
+			  datadump_comm,
+			  datadump_proto);
 	} else {
 		if (datadump_enable && !msg->enable) {
 			// close output file
@@ -406,13 +409,15 @@ static int datadump_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
 
 		datadump_enable = msg->enable;
 		if (!datadump_enable) {
-			datadump_start_time = 0;
 			datadump_timeout = 0;
 			datadump_pid = 0;
 			datadump_comm[0] = '\0';
 			datadump_proto = 0;
 			memcpy(datadump_file_path, "stdout", 7);
 			datadump_file = stdout;
+			fprintf(datadump_file, "\nDump data is finished, use time: %us.\n",
+				get_sys_uptime() - datadump_start_time);
+			datadump_start_time = 0;
 		}
 		ebpf_info("datadump %s\n", datadump_enable ? "enable" : "disable");
 	}
@@ -1918,6 +1923,8 @@ static void print_socket_data(struct socket_bpf_data *sd)
 		datadump_proto = 0;
 		memcpy(datadump_file_path, "stdout", 7);
 		datadump_file = stdout;
+		fprintf(datadump_file, "\nDump data is finished, use time: %us.\n",
+			datadump_timeout);
 		return;
 	}
 
