@@ -66,7 +66,7 @@ func (b *Block) WriteDateTime(v uint32) {
 }
 
 func (b *Block) WriteIPv4(v uint32) {
-	b.items = append(b.items, utils.IpFromUint32(v))
+	b.items = append(b.items, v)
 }
 
 func (b *Block) WriteIPv6(v net.IP) {
