@@ -429,6 +429,34 @@ int fetch_kernel_version(int *major, int *minor, int *patch)
 	return ETR_OK;
 }
 
+int fetch_system_type(char *sys_type, int type_len)
+{
+	int len, i, count = 0;
+	char *p = NULL;
+	struct utsname sys_info;
+	uname(&sys_info);
+	len = strlen(sys_info.release);
+	for (i = len - 1; i >= 0; i--) {
+		if (sys_info.release[i] == '.') {
+			if (count == 0) {
+				sys_info.release[i] = '\0';
+			} else if (count == 1) {
+				p = &sys_info.release[i + 1];
+				break;
+			}
+			count++;
+		}
+	}
+
+	if (p == NULL)
+		return ETR_INVAL;
+
+	len = strlen(p) + 1 > type_len ? type_len : strlen(p) + 1;
+	memcpy(sys_type, p, len);
+
+	return ETR_OK;
+}
+
 unsigned int fetch_kernel_version_code(void)
 {
 	int ret;
