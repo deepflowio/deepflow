@@ -367,14 +367,11 @@ static int datadump_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
 		datadump_proto = msg->proto;
 		safe_buf_copy(datadump_comm, sizeof(datadump_comm),
 			      (void *)msg->comm, sizeof(msg->comm));
-		ebpf_info("Set datadump pid %d comm %s\n", datadump_pid, datadump_comm);
+		ebpf_info("Set datadump pid %d comm %s proto %d\n",
+			  datadump_pid,
+			  datadump_comm,
+			  datadump_proto);
 	} else {
-		if (datadump_enable && !msg->enable) {
-			// close output file
-			if (datadump_file != stdout)
-				fclose(datadump_file);
-		}
-
 		if (!datadump_enable && msg->enable) {
 			// create a new output file
 			if (datadump_file == stdout && !msg->only_stdout) {
@@ -402,16 +399,23 @@ static int datadump_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
 			datadump_timeout = msg->timeout;
 		}
 
-		datadump_enable = msg->enable;
-		if (!datadump_enable) {
-			datadump_start_time = 0;
+		if (datadump_enable && !msg->enable) {
 			datadump_timeout = 0;
 			datadump_pid = 0;
 			datadump_comm[0] = '\0';
 			datadump_proto = 0;
+			fprintf(datadump_file, "\n\nDump data is finished, use time: %us.\n\n",
+				get_sys_uptime() - datadump_start_time);
+			if (datadump_file != stdout) {
+				fclose(datadump_file);
+				ebpf_info("close datadump file %s\n", datadump_file_path);
+			}
 			memcpy(datadump_file_path, "stdout", 7);
 			datadump_file = stdout;
+			datadump_start_time = 0;
 		}
+
+		datadump_enable = msg->enable;
 		ebpf_info("datadump %s\n", datadump_enable ? "enable" : "disable");
 	}
 	pthread_mutex_unlock(&datadump_mutex);
@@ -837,9 +841,31 @@ static int check_kern_adapt_and_state_update(void)
 static void process_events_handle_main(__unused void *arg)
 {
 	prctl(PR_SET_NAME, "proc-events");
+	uint32_t passed_sec;
 	for(;;) {
 		go_process_events_handle();
 		ssl_events_handle();
+		pthread_mutex_lock(&datadump_mutex);
+		if (datadump_enable) {
+			passed_sec = get_sys_uptime() - datadump_start_time;
+			if (passed_sec > datadump_timeout) {
+				datadump_start_time = 0;
+				datadump_enable = false;
+				datadump_pid = 0;
+				datadump_comm[0] = '\0';
+				datadump_proto = 0;
+				fprintf(datadump_file,
+					"\n\nDump data is finished, use time: %us.\n\n",
+					datadump_timeout);
+				ebpf_info("close datadump file %s\n", datadump_file_path);
+				fclose(datadump_file);
+				memcpy(datadump_file_path, "stdout", 7);
+				datadump_file = stdout;
+				datadump_timeout = 0;
+				ebpf_info("datadump disable\n");
+			}
+		}
+		pthread_mutex_unlock(&datadump_mutex);
 		usleep(LOOP_DELAY_US);
 	}
 }
@@ -1863,19 +1889,6 @@ static void print_socket_data(struct socket_bpf_data *sd)
 #define OUTPUT_DATA_SIZE 128
 
 	bool output = false;
-	uint32_t passed_sec = get_sys_uptime() - datadump_start_time;
-	if (passed_sec > datadump_timeout) {
-		datadump_start_time = 0;
-		datadump_enable = false;
-		datadump_timeout = 0;
-		datadump_pid = 0;
-		datadump_comm[0] = '\0';
-		datadump_proto = 0;
-		memcpy(datadump_file_path, "stdout", 7);
-		datadump_file = stdout;
-		return;
-	}
-
 	if (datadump_pid == 0 && (strlen(datadump_comm) > 0)
 	    && (datadump_proto == 0)) {
 		if (strcmp((char *)sd->process_kname, (char *)datadump_comm) ==
