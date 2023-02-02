@@ -42,7 +42,7 @@ use super::{
     perf::{FlowPerf, FlowPerfCounter, L7ProtocolChecker, L7RrtCache},
     protocol_logs::MetaAppProto,
     service_table::{ServiceKey, ServiceTable},
-    FlowMapKey, FlowNode, FlowState, COUNTER_FLOW_ID_MASK, FLOW_METRICS_PEER_DST,
+    FlowMapKey, FlowNode, FlowState, FlowTimeout, COUNTER_FLOW_ID_MASK, FLOW_METRICS_PEER_DST,
     FLOW_METRICS_PEER_SRC, L7_PROTOCOL_UNKNOWN_LIMIT, L7_RRT_CACHE_CAPACITY, QUEUE_BATCH_SIZE,
     SERVICE_TABLE_IPV4_CAPACITY, SERVICE_TABLE_IPV6_CAPACITY, STATISTICAL_INTERVAL,
     THREAD_FLOW_ID_MASK, TIMER_FLOW_ID_MASK, TIME_UNIT,
@@ -294,7 +294,10 @@ impl FlowMap {
             .take()
             .unwrap_or(Vec::with_capacity(self.hash_slots / self.time_window_size));
         moved_key.clear();
-        for time_in_unit in self.start_time_in_unit..next_start_time_in_unit {
+        // at most self.time_windows_size slots in time_set
+        for time_in_unit in self.start_time_in_unit
+            ..next_start_time_in_unit.min(self.start_time_in_unit + self.time_window_size as u64)
+        {
             let time_hashset = &mut time_set[time_in_unit as usize & (self.time_window_size - 1)];
             for flow_key in time_hashset.drain() {
                 let Some(nodes) = node_map.get_mut(&flow_key) else {
@@ -1789,6 +1792,7 @@ pub fn _reverse_meta_packet(packet: &mut MetaPacket) {
 
 pub fn _new_flow_map_and_receiver(
     trident_type: TridentType,
+    flow_timeout: Option<FlowTimeout>,
 ) -> (FlowMap, Receiver<Box<TaggedFlow>>) {
     let (_, mut policy_getter) = Policy::new(1, 0, 1 << 10, false);
     policy_getter.disable();
@@ -1804,6 +1808,7 @@ pub fn _new_flow_map_and_receiver(
             l4_performance_enabled: true,
             l7_metrics_enabled: true,
             app_proto_log_enabled: true,
+            flow_timeout: flow_timeout.unwrap_or(super::TcpTimeout::default().into()),
             ..(&RuntimeConfig::default()).into()
         },
         log_parser: LogParserConfig {
@@ -1930,10 +1935,17 @@ mod tests {
 
     const DEFAULT_DURATION: Duration = Duration::from_millis(10);
 
+    impl FlowMap {
+        fn reset_start_time(&mut self, d: Duration) {
+            self.start_time = d;
+            self.start_time_in_unit = (d.as_nanos() / TIME_UNIT.as_nanos()) as u64;
+        }
+    }
+
     #[test]
     fn syn_rst() {
         let (mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess);
+            _new_flow_map_and_receiver(TridentType::TtProcess, None);
         let mut packet0 = _new_meta_packet();
         flow_map.inject_meta_packet(&mut packet0);
         let mut packet1 = _new_meta_packet();
@@ -1962,7 +1974,7 @@ mod tests {
     #[test]
     fn syn_fin() {
         let (mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess);
+            _new_flow_map_and_receiver(TridentType::TtProcess, None);
         let mut packet0 = _new_meta_packet();
         flow_map.inject_meta_packet(&mut packet0);
 
@@ -1995,7 +2007,7 @@ mod tests {
     #[test]
     fn platform_data() {
         let (mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess);
+            _new_flow_map_and_receiver(TridentType::TtProcess, None);
         let mut packet1 = _new_meta_packet();
         packet1.tcp_data.seq = 1111;
         packet1.tcp_data.ack = 112;
@@ -2018,7 +2030,7 @@ mod tests {
     #[test]
     fn handshake_perf() {
         let (mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess);
+            _new_flow_map_and_receiver(TridentType::TtProcess, None);
         let mut packet0 = _new_meta_packet();
         packet0.tcp_data.flags = TcpFlags::SYN;
         packet0.tcp_data.seq = 111;
@@ -2051,7 +2063,7 @@ mod tests {
 
     #[test]
     fn reverse_new_cycle() {
-        let (mut flow_map, _) = _new_flow_map_and_receiver(TridentType::TtProcess);
+        let (mut flow_map, _) = _new_flow_map_and_receiver(TridentType::TtProcess, None);
         let npb_action = NpbAction::new(
             0,
             10,
@@ -2097,7 +2109,7 @@ mod tests {
     #[test]
     fn force_report() {
         let (mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess);
+            _new_flow_map_and_receiver(TridentType::TtProcess, None);
         let mut packet0 = _new_meta_packet();
         flow_map.inject_meta_packet(&mut packet0);
 
@@ -2130,7 +2142,7 @@ mod tests {
     #[test]
     fn udp_arp_short_flow() {
         let (mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess);
+            _new_flow_map_and_receiver(TridentType::TtProcess, None);
         let mut packet0 = _new_meta_packet();
         packet0.lookup_key.proto = IpProtocol::Udp;
         let flush_timestamp = packet0.lookup_key.timestamp;
@@ -2159,7 +2171,7 @@ mod tests {
     #[test]
     fn port_equal_tor() {
         let (mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtHyperVCompute);
+            _new_flow_map_and_receiver(TridentType::TtHyperVCompute, None);
         let mut packet0 = _new_meta_packet();
         packet0.lookup_key.tap_type = TapType::Cloud;
         flow_map.inject_meta_packet(&mut packet0);
@@ -2212,7 +2224,7 @@ mod tests {
 
     #[test]
     fn flow_state_machine() {
-        let (mut flow_map, _) = _new_flow_map_and_receiver(TridentType::TtProcess);
+        let (mut flow_map, _) = _new_flow_map_and_receiver(TridentType::TtProcess, None);
 
         let config = (&RuntimeConfig::default()).into();
 
@@ -2275,7 +2287,7 @@ mod tests {
     #[test]
     fn double_fin_from_server() {
         let (mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess);
+            _new_flow_map_and_receiver(TridentType::TtProcess, None);
         // SYN
         let mut packet0 = _new_meta_packet();
         packet0.lookup_key.timestamp = Duration::from_nanos(
@@ -2321,8 +2333,20 @@ mod tests {
 
     #[test]
     fn l3_l4_payload() {
-        let (mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess);
+        let (mut flow_map, output_queue_receiver) = _new_flow_map_and_receiver(
+            TridentType::TtProcess,
+            Some(FlowTimeout {
+                opening: Duration::ZERO,
+                established: Duration::from_secs(300),
+                closing: Duration::ZERO,
+                established_rst: Duration::from_secs(30),
+                exception: Duration::from_secs(5),
+                closed_fin: Duration::ZERO,
+                single_direction: Duration::from_millis(10),
+                max: Duration::from_secs(300),
+                min: Duration::ZERO,
+            }),
+        );
 
         let capture = Capture::load_pcap("resources/test/flow_generator/ip-fragment.pcap", None);
         let packets = capture.as_meta_packets();
@@ -2359,11 +2383,12 @@ mod tests {
     #[test]
     fn tcp_perf() {
         let (mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess);
+            _new_flow_map_and_receiver(TridentType::TtProcess, None);
 
         let capture = Capture::load_pcap("resources/test/flow_generator/http.pcap", None);
         let packets = capture.as_meta_packets();
 
+        flow_map.reset_start_time(packets[0].lookup_key.timestamp);
         let dst_mac = packets[0].lookup_key.dst_mac;
         let timestamp = time::SystemTime::now()
             .duration_since(time::UNIX_EPOCH)
@@ -2389,7 +2414,7 @@ mod tests {
     #[test]
     fn tcp_syn_ack_zerowin() {
         let (mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess);
+            _new_flow_map_and_receiver(TridentType::TtProcess, None);
 
         let capture = Capture::load_pcap(
             "resources/test/flow_generator/tcp-syn-ack-zerowin.pcap",
@@ -2397,6 +2422,7 @@ mod tests {
         );
         let packets = capture.as_meta_packets();
 
+        flow_map.reset_start_time(packets[0].lookup_key.timestamp);
         let timestamp = time::SystemTime::now()
             .duration_since(time::UNIX_EPOCH)
             .unwrap();
