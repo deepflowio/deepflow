@@ -18,8 +18,8 @@ mod app_table;
 mod error;
 mod flow_config;
 pub mod flow_map;
-mod flow_node;
-mod flow_state;
+pub(crate) mod flow_node;
+pub(crate) mod flow_state;
 mod packet_sequence; // Enterprise Edition Feature: packet-sequence
 pub mod perf;
 pub mod protocol_logs;

@@ -487,7 +487,7 @@ impl HttpPerfData {
         payload: &[u8],
         param: &ParseParam,
     ) -> Result<()> {
-        let mut log = L7ProtocolParser::HttpParser(HttpLog::new_v2(false));
+        let mut log = L7ProtocolParser::Http(Box::new(HttpLog::new_v2(false)));
         let perf_stats = self.perf_stats.get_or_insert(PerfStats::default());
         if let L7ProtocolInfo::HttpInfo(h) =
             log.parse_payload(config, payload, param)?.get(0).unwrap()

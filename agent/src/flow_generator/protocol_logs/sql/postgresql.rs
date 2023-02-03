@@ -173,12 +173,14 @@ pub struct PostgresqlLog {
 
 impl Default for PostgresqlLog {
     fn default() -> Self {
-        Self {
+        let mut log = Self {
             previous_log_info: LruCache::new(1),
             info: PostgreInfo::default(),
             perf_stats: None,
             parsed: false,
-        }
+        };
+        log.info.ignore = true;
+        log
     }
 }
 
@@ -300,12 +302,6 @@ impl L7FlowPerf for PostgresqlLog {
 }
 
 impl PostgresqlLog {
-    pub fn new() -> Self {
-        let mut s = Self::default();
-        s.info.ignore = true;
-        s
-    }
-
     fn set_msg_type(&mut self, direction: PacketDirection) {
         match direction {
             PacketDirection::ClientToServer => self.info.msg_type = LogMessageType::Request,
@@ -558,7 +554,7 @@ mod test {
         p[0].direction = PacketDirection::ClientToServer;
         p[1].direction = PacketDirection::ServerToClient;
 
-        let mut parser = PostgresqlLog::new();
+        let mut parser = PostgresqlLog::default();
         let req_param = &mut ParseParam::from(&p[0]);
         let req_payload = p[0].get_l4_payload().unwrap();
         assert_eq!(

@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-mod dns;
+pub(crate) mod dns;
 pub mod http;
 pub mod l7_rrt;
-mod mq;
-mod rpc;
-mod sql;
+pub(crate) mod mq;
+pub(crate) mod rpc;
+pub(crate) mod sql;
 mod stats;
 pub mod tcp;
-mod udp;
+pub(crate) mod udp;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -70,14 +70,13 @@ pub use dns::DNS_PORT;
 
 const ART_MAX: Duration = Duration::from_secs(30);
 
-#[enum_dispatch(L4FlowPerfTable)]
 pub trait L4FlowPerf {
     fn parse(&mut self, packet: &MetaPacket, direction: bool) -> Result<()>;
     fn data_updated(&self) -> bool;
     fn copy_and_reset_data(&mut self, flow_reversed: bool) -> FlowPerfStats;
 }
 
-#[enum_dispatch(L7FlowPerfTable)]
+#[enum_dispatch]
 pub trait L7FlowPerf {
     fn parse(
         &mut self,
@@ -90,33 +89,96 @@ pub trait L7FlowPerf {
     fn app_proto_head(&mut self) -> Option<(AppProtoHead, u16)>;
 }
 
-#[enum_dispatch]
 pub enum L4FlowPerfTable {
-    TcpPerf,
-    UdpPerf,
+    Tcp(Box<TcpPerf>),
+    Udp(UdpPerf),
 }
 
-#[enum_dispatch]
-pub enum L7FlowPerfTable {
-    DnsPerfData,
-    KafkaPerfData,
-    MqttPerfData,
-    RedisPerfData,
-    DubboPerfData,
-    MysqlPerfData,
-    HttpPerfData,
-    PostgresqlLog,
-    ProtobufRpcWrapLog,
-    SofaRpcLog,
+impl L4FlowPerf for L4FlowPerfTable {
+    fn parse(&mut self, packet: &MetaPacket, direction: bool) -> Result<()> {
+        match self {
+            Self::Tcp(p) => p.parse(packet, direction),
+            Self::Udp(p) => p.parse(packet, direction),
+        }
+    }
+
+    fn data_updated(&self) -> bool {
+        match self {
+            Self::Tcp(p) => p.data_updated(),
+            Self::Udp(p) => p.data_updated(),
+        }
+    }
+
+    fn copy_and_reset_data(&mut self, flow_reversed: bool) -> FlowPerfStats {
+        match self {
+            Self::Tcp(p) => p.copy_and_reset_data(flow_reversed),
+            Self::Udp(p) => p.copy_and_reset_data(flow_reversed),
+        }
+    }
+}
+
+macro_rules! impl_l7_flow_perf {
+    (pub enum $name:ident { $($enum_name:ident($enum_type:ty)),* $(,)? }) => {
+        pub enum $name {
+            $($enum_name($enum_type)),*
+        }
+
+        impl L7FlowPerf for $name {
+            fn parse(
+                &mut self,
+                config: Option<&LogParserConfig>,
+                packet: &MetaPacket,
+                flow_id: u64,
+            ) -> Result<()> {
+                match self {
+                    $(Self::$enum_name(p) => p.parse(config, packet, flow_id)),*
+                }
+            }
+
+            fn data_updated(&self) -> bool {
+                match self {
+                    $(Self::$enum_name(p) => p.data_updated()),*
+                }
+            }
+
+            fn copy_and_reset_data(&mut self, l7_timeout_count: u32) -> FlowPerfStats {
+                match self {
+                    $(Self::$enum_name(p) => p.copy_and_reset_data(l7_timeout_count)),*
+                }
+            }
+
+            fn app_proto_head(&mut self) -> Option<(AppProtoHead, u16)> {
+                match self {
+                    $(Self::$enum_name(p) => p.app_proto_head()),*
+                }
+            }
+        }
+    };
+}
+
+// impl L7FlowPerf for L7FlowPerfTable
+impl_l7_flow_perf! {
+    pub enum L7FlowPerfTable {
+        Dns(DnsPerfData),
+        Kafka(KafkaPerfData),
+        Mqtt(MqttPerfData),
+        Redis(RedisPerfData),
+        Dubbo(DubboPerfData),
+        Mysql(MysqlPerfData),
+        Http(HttpPerfData),
+        Postgresql(Box<PostgresqlLog>),
+        ProtobufRpc(Box<ProtobufRpcWrapLog>),
+        SofaRpc(Box<SofaRpcLog>),
+    }
 }
 
 impl L7FlowPerfTable {
     // TODO will remove when perf abstruct to log parse
     pub fn reset(&mut self) {
         match self {
-            L7FlowPerfTable::ProtobufRpcWrapLog(p) => p.reset(),
-            L7FlowPerfTable::PostgresqlLog(p) => p.reset(),
-            L7FlowPerfTable::SofaRpcLog(p) => p.reset(),
+            L7FlowPerfTable::ProtobufRpc(p) => p.reset(),
+            L7FlowPerfTable::Postgresql(p) => p.reset(),
+            L7FlowPerfTable::SofaRpc(p) => p.reset(),
             _ => {}
         }
     }
@@ -215,20 +277,28 @@ impl FlowPerf {
 
     fn l7_new(protocol: L7Protocol, rrt_cache: Rc<RefCell<L7RrtCache>>) -> Option<L7FlowPerfTable> {
         match protocol {
-            L7Protocol::DNS => Some(L7FlowPerfTable::from(DnsPerfData::new(rrt_cache.clone()))),
-            L7Protocol::ProtobufRPC => Some(L7FlowPerfTable::from(ProtobufRpcWrapLog::new())),
-            L7Protocol::SofaRPC => Some(L7FlowPerfTable::from(SofaRpcLog::new())),
-            L7Protocol::Dubbo => Some(L7FlowPerfTable::from(DubboPerfData::new(rrt_cache.clone()))),
-            L7Protocol::Kafka => Some(L7FlowPerfTable::from(KafkaPerfData::new(rrt_cache.clone()))),
-            L7Protocol::MQTT => Some(L7FlowPerfTable::from(MqttPerfData::new(rrt_cache.clone()))),
-            L7Protocol::MySQL => Some(L7FlowPerfTable::from(MysqlPerfData::new(rrt_cache.clone()))),
-            L7Protocol::PostgreSQL => Some(L7FlowPerfTable::from(PostgresqlLog::new())),
-            L7Protocol::Redis => Some(L7FlowPerfTable::from(RedisPerfData::new(rrt_cache.clone()))),
+            L7Protocol::DNS => Some(L7FlowPerfTable::Dns(DnsPerfData::new(rrt_cache.clone()))),
+            L7Protocol::ProtobufRPC => Some(L7FlowPerfTable::ProtobufRpc(Default::default())),
+            L7Protocol::SofaRPC => Some(L7FlowPerfTable::SofaRpc(Default::default())),
+            L7Protocol::Dubbo => Some(L7FlowPerfTable::Dubbo(DubboPerfData::new(
+                rrt_cache.clone(),
+            ))),
+            L7Protocol::Kafka => Some(L7FlowPerfTable::Kafka(KafkaPerfData::new(
+                rrt_cache.clone(),
+            ))),
+            L7Protocol::MQTT => Some(L7FlowPerfTable::Mqtt(MqttPerfData::new(rrt_cache.clone()))),
+            L7Protocol::MySQL => Some(L7FlowPerfTable::Mysql(MysqlPerfData::new(
+                rrt_cache.clone(),
+            ))),
+            L7Protocol::PostgreSQL => Some(L7FlowPerfTable::Postgresql(Default::default())),
+            L7Protocol::Redis => Some(L7FlowPerfTable::Redis(RedisPerfData::new(
+                rrt_cache.clone(),
+            ))),
             L7Protocol::Http1
             | L7Protocol::Http1TLS
             | L7Protocol::Http2
             | L7Protocol::Http2TLS
-            | L7Protocol::Grpc => Some(L7FlowPerfTable::from(HttpPerfData::new(rrt_cache.clone()))),
+            | L7Protocol::Grpc => Some(L7FlowPerfTable::Http(HttpPerfData::new(rrt_cache.clone()))),
             _ => None,
         }
     }
@@ -536,8 +606,8 @@ impl FlowPerf {
         counter: Arc<FlowPerfCounter>,
     ) -> Option<Self> {
         let l4 = match l4_proto {
-            L4Protocol::Tcp => L4FlowPerfTable::from(TcpPerf::new(counter)),
-            L4Protocol::Udp => L4FlowPerfTable::from(UdpPerf::new()),
+            L4Protocol::Tcp => L4FlowPerfTable::Tcp(Box::new(TcpPerf::new(counter))),
+            L4Protocol::Udp => L4FlowPerfTable::Udp(UdpPerf::new()),
             _ => {
                 return None;
             }
