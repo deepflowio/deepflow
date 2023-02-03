@@ -59,7 +59,7 @@ use crate::{
             SignalSource, TunnelField,
         },
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{get_parser, L7ProtocolParser, L7ProtocolParserInterface},
+        l7_protocol_log::{L7ProtocolParser, L7ProtocolParserInterface},
         lookup_key::LookupKey,
         meta_packet::{MetaPacket, MetaPacketTcpHeader},
         tagged_flow::TaggedFlow,
@@ -77,6 +77,7 @@ use crate::{
 use public::{
     counter::{Counter, CounterType, CounterValue, RefCountable},
     debug::QueueDebugger,
+    l7_protocol::L7ProtocolEnum,
     proto::common::TridentType,
     queue::{self, DebugSender, Receiver},
     utils::net::MacAddr,
@@ -947,17 +948,26 @@ impl FlowMap {
             .tap_port
             .set_nat_source(nat_source);
 
-        let l7_proto_enum = match meta_packet.signal_source {
-            SignalSource::EBPF => {
-                let (local_epc, remote_epc) = if meta_packet.lookup_key.l2_end_0 {
-                    (local_epc_id, 0)
-                } else {
-                    (0, local_epc_id)
-                };
-                self.app_table
-                    .get_protocol_from_ebpf(meta_packet, local_epc, remote_epc)
-            }
-            _ => self.app_table.get_protocol(meta_packet),
+        /*
+            ebpf will pass the server port to FlowPerf use for adjuest packet direction.
+            non ebpf not need this field, FlowPerf::server_port always 0.
+        */
+        let (l7_proto_enum, port, from_app_tab) = if let Some((proto, port)) =
+            match meta_packet.signal_source {
+                SignalSource::EBPF => {
+                    let (local_epc, remote_epc) = if meta_packet.lookup_key.l2_end_0 {
+                        (local_epc_id, 0)
+                    } else {
+                        (0, local_epc_id)
+                    };
+                    self.app_table
+                        .get_protocol_from_ebpf(meta_packet, local_epc, remote_epc)
+                }
+                _ => self.app_table.get_protocol(meta_packet).map(|p| (p, 0u16)),
+            } {
+            (proto, port, true)
+        } else {
+            (L7ProtocolEnum::default(), 0, false)
         };
 
         if config.collector_enabled {
@@ -965,8 +975,9 @@ impl FlowMap {
                 self.rrt_cache.clone(),
                 L4Protocol::from(meta_packet.lookup_key.proto),
                 l7_proto_enum,
-                get_parser(l7_proto_enum.unwrap_or_default()),
+                from_app_tab,
                 self.flow_perf_counter.clone(),
+                port,
             )
             .map(|o| Box::new(o));
         }
