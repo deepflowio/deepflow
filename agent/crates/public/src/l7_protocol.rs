@@ -60,7 +60,7 @@ pub enum ProtobufRpcProtocol {
     Krpc = 1,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum L7ProtocolEnum {
     L7Protocol(L7Protocol),
     ProtobufRpc(ProtobufRpcProtocol),
