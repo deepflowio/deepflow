@@ -1277,6 +1277,11 @@ func (f *L4FlowLog) String() string {
 	return fmt.Sprintf("flow: %+v\n", *f)
 }
 
+func (f *L4FlowLog) HitPcapPolicy() bool {
+	// AclGids currently only records the policy ID of PCAP, but does not record the policy ID of NPB
+	return len(f.AclGids) > 0
+}
+
 var poolL4FlowLog = pool.NewLockFreePool(func() interface{} {
 	l := new(L4FlowLog)
 	return l
