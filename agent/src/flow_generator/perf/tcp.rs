@@ -80,7 +80,7 @@ struct SeqSegment {
 const SEQ_LIST_MAX_LEN: usize = 16;
 
 #[derive(Default)]
-struct SessionPeer {
+pub(crate) struct SessionPeer {
     seq_list: [SeqSegment; SEQ_LIST_MAX_LEN],
     seq_list_len: isize,
 
@@ -364,7 +364,7 @@ struct PacketVariance {
 }
 
 #[derive(Default)]
-struct PerfControl(SessionPeer, SessionPeer);
+pub(crate) struct PerfControl(SessionPeer, SessionPeer);
 
 #[derive(Default, Debug, PartialEq, Eq)]
 struct TimeStats {
@@ -389,7 +389,7 @@ impl TimeStats {
 // 现有3个连续包PSH/ACK--ACK--PSH/ACK,其中第一个包是client端的请求包，
 // 后2个包是server端的应答包，art表示后2个包之间的时间间隔
 #[derive(Default, Debug, PartialEq, Eq)]
-struct PerfData {
+pub(crate) struct PerfData {
     rtt_0: TimeStats,
     rtt_1: TimeStats,
     art_0: TimeStats,

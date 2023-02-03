@@ -243,7 +243,7 @@ impl From<KafkaInfo> for L7ProtocolSendLog {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Clone, Serialize)]
 pub struct KafkaLog {
     info: KafkaInfo,
 }
@@ -278,18 +278,23 @@ impl L7ProtocolParserInterface for KafkaLog {
     }
 
     fn reset(&mut self) {
-        *self = Self::default();
+        self.info = KafkaInfo::default();
         self.info.status = L7ResponseStatus::NotExist;
     }
 }
-impl KafkaLog {
-    const MSG_LEN_SIZE: usize = 4;
 
-    pub fn new() -> KafkaLog {
-        let mut log = KafkaLog::default();
+impl Default for KafkaLog {
+    fn default() -> Self {
+        let mut log = KafkaLog {
+            info: KafkaInfo::default(),
+        };
         log.reset();
         log
     }
+}
+
+impl KafkaLog {
+    const MSG_LEN_SIZE: usize = 4;
 
     fn reset_logs(&mut self) {
         self.info.correlation_id = 0;
@@ -359,7 +364,7 @@ impl KafkaLog {
         if payload.len() < KAFKA_REQ_HEADER_LEN {
             return false;
         }
-        let mut kafka = KafkaLog::default();
+        let mut kafka = KafkaLog { info: KafkaInfo::default() };
 
         let ret = kafka.request(payload, true);
         if ret.is_err() {
@@ -424,7 +429,7 @@ mod tests {
                 None => continue,
             };
 
-            let mut kafka = KafkaLog::default();
+            let mut kafka = KafkaLog { info: KafkaInfo::default() };
             let _ = kafka.parse(
                 payload,
                 packet.lookup_key.proto,
