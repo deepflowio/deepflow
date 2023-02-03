@@ -40,7 +40,8 @@ type ThrottlingQueue struct {
 	periodCount     int
 	periodEmitCount int
 
-	sampleItems []interface{}
+	sampleItems    []interface{}
+	nonSampleItems []interface{}
 }
 
 func NewThrottlingQueue(throttle int, flowLogWriter *dbwriter.FlowLogWriter, index int) *ThrottlingQueue {
@@ -50,6 +51,7 @@ func NewThrottlingQueue(throttle int, flowLogWriter *dbwriter.FlowLogWriter, ind
 		index:         index,
 	}
 	thq.sampleItems = make([]interface{}, thq.Throttle)
+	thq.nonSampleItems = make([]interface{}, 0, thq.Throttle)
 	return thq
 }
 
@@ -59,7 +61,7 @@ func (thq *ThrottlingQueue) flush() {
 	}
 }
 
-func (thq *ThrottlingQueue) Send(flow interface{}) bool {
+func (thq *ThrottlingQueue) SendWithThrottling(flow interface{}) bool {
 	now := time.Now().Unix()
 	if now/THROTTLE_BUCKET != thq.lastFlush/THROTTLE_BUCKET {
 		thq.flush()
@@ -93,12 +95,14 @@ func (thq *ThrottlingQueue) Send(flow interface{}) bool {
 	}
 }
 
-func (thq *ThrottlingQueue) SendWithoutThrottling(flow interface{}) bool {
-	thq.sampleItems[thq.periodEmitCount] = flow
-	thq.periodEmitCount++
-	if thq.periodEmitCount == thq.Throttle || flow == nil {
-		thq.flowLogWriter.Put(thq.index, thq.sampleItems[:thq.periodEmitCount]...)
-		thq.periodEmitCount = 0
+func (thq *ThrottlingQueue) SendWithoutThrottling(flow interface{}) {
+	if flow == nil || len(thq.nonSampleItems) >= thq.Throttle {
+		if len(thq.nonSampleItems) > 0 {
+			thq.flowLogWriter.Put(thq.index, thq.nonSampleItems...)
+			thq.nonSampleItems = thq.nonSampleItems[:0]
+		}
 	}
-	return true
+	if flow != nil {
+		thq.nonSampleItems = append(thq.nonSampleItems, flow)
+	}
 }
