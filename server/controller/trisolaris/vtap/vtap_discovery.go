@@ -132,12 +132,26 @@ var reg = regexp.MustCompile(` |:`)
 
 func (r *VTapRegister) insertToDB(dbVTap *models.VTap, db *gorm.DB) bool {
 	vTapName := reg.ReplaceAllString(dbVTap.Name, "-")
-	_, err := dbmgr.DBMgr[models.VTap](db).GetFromName(vTapName)
+	oldVTap, err := dbmgr.DBMgr[models.VTap](db).GetFromName(vTapName)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		dbVTap.Name = vTapName
 	} else {
 		if err == nil {
 			log.Errorf("agent(%s) already exist", vTapName)
+			if oldVTap.State == VTAP_STATE_NOT_CONNECTED {
+				log.Warningf("vtap(%s) info (ctrl_ip: %s, ctr_mac: %s) change to (ctrl_ip: %s, ctr_mac: %s)", vTapName,
+					oldVTap.CtrlIP, oldVTap.CtrlMac, dbVTap.CtrlIP, dbVTap.CtrlMac)
+				oldVTap.CtrlMac = dbVTap.CtrlMac
+				oldVTap.CtrlIP = dbVTap.CtrlIP
+				oldVTap.LaunchServer = dbVTap.LaunchServer
+				err := dbmgr.DBMgr[models.VTap](db).Save(oldVTap)
+				if err != nil {
+					log.Error(err)
+					return false
+				}
+				*dbVTap = *oldVTap
+				return true
+			}
 		} else {
 			log.Errorf("query agent(%s) from DB table vtap failed, err: %s", vTapName, err)
 		}
@@ -625,11 +639,11 @@ func (r *VTapRegister) registerLocalVTapByIP(db *gorm.DB) (*models.VTap, bool) {
 	return dbVTap, result
 }
 
-func (r *VTapRegister) registerVTapAnalyzerTapMode(db *gorm.DB) *models.VTap {
+func (r *VTapRegister) registerVTapAnalyzerTapMode(db *gorm.DB) (*models.VTap, bool) {
 	az, err := dbmgr.DBMgr[models.AZ](db).GetFromRegion(r.region)
 	if err != nil {
 		log.Errorf("failed to register agent(%s), because no az in region %s", r.getKey(), r.region)
-		return nil
+		return nil, false
 	}
 
 	dbVTap := &models.VTap{
@@ -647,9 +661,9 @@ func (r *VTapRegister) registerVTapAnalyzerTapMode(db *gorm.DB) *models.VTap {
 	}
 	result := r.insertToDB(dbVTap, db)
 	if result == false {
-		return nil
+		return nil, false
 	}
-	return dbVTap
+	return dbVTap, true
 }
 
 func (r *VTapRegister) registerVTap(v *VTapInfo, done func()) {
@@ -702,7 +716,7 @@ func (r *VTapRegister) registerVTap(v *VTapInfo, done func()) {
 			}
 			vtap, ok = r.registerMirrorVTapByIP(v.db)
 		case TAPMODE_ANALYZER:
-			vtap = r.registerVTapAnalyzerTapMode(v.db)
+			vtap, ok = r.registerVTapAnalyzerTapMode(v.db)
 
 		default:
 			log.Errorf("unkown tap_mode(%d) from agent(%s)", r.tapMode, r.getKey())
@@ -710,7 +724,7 @@ func (r *VTapRegister) registerVTap(v *VTapInfo, done func()) {
 		break
 	}
 
-	if vtap != nil {
+	if vtap != nil && ok == true {
 		v.AddVTapCache(vtap)
 		v.putChRegisterFisnish()
 	}
