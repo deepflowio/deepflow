@@ -235,7 +235,7 @@ func (d *Decoder) sendOpenMetetry(vtapID uint16, tracesData *v1.TracesData) {
 	ls := log_data.OTelTracesDataToL7FlowLogs(vtapID, tracesData, d.platformData)
 	for _, l := range ls {
 		l.AddReferenceCount()
-		if !d.throttler.Send(l) {
+		if !d.throttler.SendWithThrottling(l) {
 			d.counter.DropCount++
 		} else {
 			d.fieldsBuf, d.fieldValuesBuf = d.fieldsBuf[:0], d.fieldValuesBuf[:0]
@@ -271,8 +271,13 @@ func (d *Decoder) sendFlow(flow *pb.TaggedFlow) {
 	}
 	d.counter.Count++
 	l := log_data.TaggedFlowToL4FlowLog(flow, d.platformData)
-	if !d.throttler.Send(l) {
-		d.counter.DropCount++
+
+	if l.HitPcapPolicy() {
+		d.throttler.SendWithoutThrottling(l)
+	} else {
+		if !d.throttler.SendWithThrottling(l) {
+			d.counter.DropCount++
+		}
 	}
 }
 
@@ -285,7 +290,7 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 	drop := int64(0)
 	l := log_data.ProtoLogToL7FlowLog(proto, d.platformData)
 	l.AddReferenceCount()
-	if !d.throttler.Send(l) {
+	if !d.throttler.SendWithThrottling(l) {
 		d.counter.DropCount++
 		drop = 1
 	} else {
@@ -321,6 +326,7 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 
 func (d *Decoder) flush() {
 	if d.throttler != nil {
-		d.throttler.Send(nil)
+		d.throttler.SendWithThrottling(nil)
+		d.throttler.SendWithoutThrottling(nil)
 	}
 }
