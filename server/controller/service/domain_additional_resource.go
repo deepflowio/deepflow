@@ -18,6 +18,7 @@ package service
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 
@@ -341,7 +342,10 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 					common.INVALID_POST_DATA,
 					fmt.Sprintf("cloud tag (resource name: %s) domain (uuid: %s) not found", cloudTag.ResourceName, cloudTag.DomainUUID))
 			}
-			chost.CloudTags = convertTagsToString(cloudTag.Tags)
+			chost.CloudTags, err = convertTagsToString(cloudTag.Tags)
+			if err != nil {
+				return nil, err
+			}
 			toolDS.cloudTagCHosts = append(toolDS.cloudTagCHosts, chost)
 		} else if cloudTag.ResourceType == CLOUD_TAGS_RESOURCE_TYPE_POD_NS {
 			podNSNameToInfo, ok := domainUUIDToPodNSNameToInfo[cloudTag.DomainUUID]
@@ -356,7 +360,10 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 					common.INVALID_POST_DATA,
 					fmt.Sprintf("cloud tag (resource name: %s) domain (uuid: %s) not found", cloudTag.ResourceName, cloudTag.DomainUUID))
 			}
-			podNS.CloudTags = convertTagsToString(cloudTag.Tags)
+			podNS.CloudTags, err = convertTagsToString(cloudTag.Tags)
+			if err != nil {
+				return nil, err
+			}
 			toolDS.cloudTagPodNamespaces = append(toolDS.cloudTagPodNamespaces, podNS)
 		} else {
 			return nil, NewError(
@@ -793,14 +800,22 @@ func getPodNamespaceFromDB(domainUUIDs []string) (map[string]map[string]mysql.Po
 	return domainUUIDToPodNSNameToInfo, nil
 }
 
-func convertTagsToString(tags []model.AdditionalResourceTag) string {
+func convertTagsToString(tags []model.AdditionalResourceTag) (string, error) {
+	// If tag is not set then return null value as delete.
+	if len(tags) == 0 {
+		return "", nil
+	}
+
 	var str string
 	for i, tag := range tags {
+		if tag.Key == "" && tag.Value == "" {
+			return "", errors.New("the key and value of tags do not support null values")
+		}
 		if i == 0 {
 			str = fmt.Sprintf("%s:%s", tag.Key, tag.Value)
 			continue
 		}
 		str = fmt.Sprintf("%s, %s:%s", str, tag.Key, tag.Value)
 	}
-	return str
+	return str, nil
 }
