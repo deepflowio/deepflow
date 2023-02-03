@@ -156,10 +156,6 @@ impl LookupKey {
         );
     }
 
-    pub fn is_loopback_packet(&self) -> bool {
-        self.src_ip.is_loopback() || self.dst_ip.is_loopback()
-    }
-
     pub fn reverse(&mut self) {
         swap(&mut self.src_mac, &mut self.dst_mac);
         swap(&mut self.src_ip, &mut self.dst_ip);
