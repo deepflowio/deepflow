@@ -30,7 +30,13 @@ import (
 
 func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, err error) {
 	log.Debug("get pods starting")
-	podTypes := [5]string{"StatefulSet", "ReplicaSet", "ReplicationController", "Deployment", "DaemonSet"}
+	podTypesMap := map[string]bool{
+		"DaemonSet":             false,
+		"Deployment":            false,
+		"ReplicaSet":            false,
+		"StatefulSet":           false,
+		"ReplicationController": false,
+	}
 	abstractNodes := map[string]int{}
 	for _, p := range k.k8sInfo["*v1.Pod"] {
 		pData, pErr := simplejson.NewJson([]byte(p))
@@ -93,15 +99,8 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, e
 			continue
 		}
 		kind := podGroups.GetIndex(0).Get("kind").MustString()
-		inPodTypesFlag := false
-		for _, t := range podTypes {
-			if t == kind {
-				inPodTypesFlag = true
-				break
-			}
-		}
-		if !inPodTypesFlag {
-			log.Infof("pod group (%s) type not support", name)
+		if _, ok := podTypesMap[kind]; !ok {
+			log.Infof("pod group (%s) type (%s) not support", name, kind)
 			continue
 		}
 		hostIP := pData.Get("status").Get("hostIP").MustString()
