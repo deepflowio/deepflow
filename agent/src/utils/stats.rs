@@ -18,7 +18,7 @@ use std::fmt;
 use std::io;
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs, UdpSocket};
 use std::sync::{
-    atomic::{AtomicU32, AtomicU64, Ordering},
+    atomic::{AtomicU16, AtomicU32, AtomicU64, Ordering},
     Arc, Condvar, Mutex,
 };
 use std::thread::{self, JoinHandle};
@@ -30,7 +30,7 @@ use cadence::{
 use log::{debug, info, warn};
 use prost::Message;
 
-use crate::{common::DEFAULT_INGESTER_PORT, utils::command::get_hostname};
+use crate::utils::command::get_hostname;
 pub use public::counter::*;
 use public::{
     proto::stats,
@@ -141,6 +141,7 @@ pub struct Collector {
     hostname: Arc<Mutex<String>>,
 
     remotes: Arc<Mutex<Option<Vec<IpAddr>>>>,
+    remote_port: Arc<AtomicU16>,
     sources: Arc<Mutex<Vec<Source>>>,
     pre_hooks: Arc<Mutex<Vec<Box<dyn FnMut() + Send>>>>,
 
@@ -154,11 +155,11 @@ pub struct Collector {
 }
 
 impl Collector {
-    pub fn new(remotes: &Vec<String>) -> Self {
-        Self::with_min_interval(remotes, TICK_CYCLE)
+    pub fn new(remotes: &Vec<String>, port: u16) -> Self {
+        Self::with_min_interval(remotes, port, TICK_CYCLE)
     }
 
-    pub fn with_min_interval(remotes: &Vec<String>, interval: Duration) -> Self {
+    pub fn with_min_interval(remotes: &Vec<String>, port: u16, interval: Duration) -> Self {
         let (stats_queue_sender, stats_queue_receiver, counter) = bounded(1000);
         let min_interval = if interval <= TICK_CYCLE {
             TICK_CYCLE
@@ -175,6 +176,7 @@ impl Collector {
         let s = Self {
             hostname: Arc::new(Mutex::new(get_hostname().unwrap_or_default())),
             remotes: Arc::new(Mutex::new(Some(remotes))),
+            remote_port: Arc::new(AtomicU16::new(port)),
             sources: Arc::new(Mutex::new(vec![])),
             pre_hooks: Arc::new(Mutex::new(vec![])),
             min_interval: Arc::new(AtomicU64::new(min_interval.as_secs())),
@@ -255,8 +257,9 @@ impl Collector {
         self.pre_hooks.lock().unwrap().push(hook);
     }
 
-    pub fn set_remotes(&self, remotes: Vec<IpAddr>) {
+    pub fn set_remotes(&self, remotes: Vec<IpAddr>, port: u16) {
         self.remotes.lock().unwrap().replace(remotes);
+        self.remote_port.store(port, Ordering::Relaxed);
     }
 
     pub fn set_hostname(&self, hostname: String) {
@@ -303,6 +306,7 @@ impl Collector {
         }
 
         let remotes = self.remotes.clone();
+        let remote_port = self.remote_port.clone();
         let running = self.running.clone();
         let sources = self.sources.clone();
         let pre_hooks = self.pre_hooks.clone();
@@ -361,19 +365,17 @@ impl Collector {
                                 break;
                             }
 
+                            let port = remote_port.load(Ordering::Relaxed);
                             match remotes.lock().unwrap().take() {
                                 Some(remotes) => {
                                     statsd_clients.clear();
                                     for remote in remotes.iter() {
-                                        match Self::new_statsd_client((
-                                            *remote,
-                                            DEFAULT_INGESTER_PORT,
-                                        )) {
+                                        match Self::new_statsd_client((*remote, port)) {
                                             Ok(client) => statsd_clients.push(Some(client)),
                                             Err(e) => {
                                                 warn!(
-                                                    "create client to remote {} failed: {}",
-                                                    remote, e
+                                                    "create client to remote {}:{} failed: {}",
+                                                    remote, port, e
                                                 );
                                             }
                                         }
@@ -385,16 +387,13 @@ impl Collector {
                                         if client.is_some() {
                                             continue;
                                         }
-                                        match Self::new_statsd_client((
-                                            old_remotes[i],
-                                            DEFAULT_INGESTER_PORT,
-                                        )) {
+                                        match Self::new_statsd_client((old_remotes[i], port)) {
                                             Ok(s) => {
                                                 client.replace(s);
                                             }
                                             Err(e) => warn!(
-                                                "create client to remote {} failed: {}",
-                                                old_remotes[i], e
+                                                "create client to remote {}:{} failed: {}",
+                                                old_remotes[i], port, e
                                             ),
                                         }
                                     }
