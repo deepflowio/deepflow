@@ -11,6 +11,6 @@
 9       , Transfer - Client RST              ,
 2       , Transfer - Server RST              ,
 17      , Transfer - Server Queue Overflow   ,
-3       , Transfer - Flow Timeout            ,
+3       , Transfer - Timeout                 ,
 11      , Close - Client Half Close          ,
 8       , Close - Server Half Close          ,
