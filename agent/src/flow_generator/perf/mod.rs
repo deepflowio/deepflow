@@ -601,9 +601,10 @@ impl FlowPerf {
     pub fn new(
         rrt_cache: Rc<RefCell<L7RrtCache>>,
         l4_proto: L4Protocol,
-        l7_proto: Option<L7ProtocolEnum>,
-        l7_parser: Option<L7ProtocolParser>,
+        l7_protocol_enum: L7ProtocolEnum,
+        is_from_app_tab: bool,
         counter: Arc<FlowPerfCounter>,
+        server_port: u16,
     ) -> Option<Self> {
         let l4 = match l4_proto {
             L4Protocol::Tcp => L4FlowPerfTable::Tcp(Box::new(TcpPerf::new(counter))),
@@ -613,19 +614,17 @@ impl FlowPerf {
             }
         };
 
-        let l7_protocol_enum = l7_proto.unwrap_or(L7ProtocolEnum::default());
-
         Some(Self {
             l4,
             l7: Self::l7_new(l7_protocol_enum.get_l7_protocol(), rrt_cache.clone())
                 .map(|o| Box::new(o)),
-            l7_protocol_log_parser: l7_parser.map(|o| Box::new(o)),
+            l7_protocol_log_parser: get_parser(l7_protocol_enum).map(|o| Box::new(o)),
             rrt_cache,
             l7_protocol_enum,
-            is_from_app: l7_proto.is_some(),
+            is_from_app: is_from_app_tab,
             is_success: false,
             is_skip: false,
-            server_port: 0,
+            server_port: server_port,
         })
     }
 
