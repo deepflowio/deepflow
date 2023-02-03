@@ -439,6 +439,7 @@ pub struct DiagnoseConfig {
 pub struct StatsConfig {
     pub interval: Duration,
     pub host: String,
+    pub analyzer_port: u16,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -787,6 +788,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
             stats: StatsConfig {
                 interval: Duration::from_secs(conf.stats_interval),
                 host: conf.host.clone(),
+                analyzer_port: conf.analyzer_port,
             },
             dispatcher: DispatcherConfig {
                 global_pps_threshold: conf.global_pps_threshold,
@@ -1430,6 +1432,15 @@ impl ConfigHandler {
                 let c = &components.stats_collector;
                 c.set_hostname(handler.candidate_config.stats.host.clone());
                 c.set_min_interval(handler.candidate_config.stats.interval);
+                let mut remotes = vec![];
+                for e in &handler.static_config.controller_ips {
+                    let ip = e.parse::<IpAddr>();
+                    if ip.is_err() {
+                        continue;
+                    }
+                    remotes.push(ip.unwrap());
+                }
+                c.set_remotes(remotes, handler.candidate_config.stats.analyzer_port);
             }
             callbacks.push(stats_callback);
         }
