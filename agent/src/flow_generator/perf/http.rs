@@ -493,7 +493,7 @@ impl HttpPerfData {
     }
 
     fn parse_go_http2_uprobe(&mut self, payload: &[u8], param: &ParseParam) -> Result<()> {
-        let mut log = L7ProtocolParser::HttpParser(HttpLog::new_v2(false));
+        let mut log = L7ProtocolParser::Http(Box::new(HttpLog::new_v2(false)));
         let perf_stats = self.perf_stats.get_or_insert(PerfStats::default());
         if let L7ProtocolInfo::HttpInfo(h) = log.parse_payload(payload, param)?.get(0).unwrap() {
             self.session_data.httpv2_headers.stream_id = h.stream_id.unwrap_or_default();
