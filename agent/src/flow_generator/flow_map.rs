@@ -1511,49 +1511,57 @@ impl FlowMap {
         is_first_packet: bool,
     ) -> bool {
         let lookup_key = &meta_packet.lookup_key;
-        let src_key = ServiceKey::new(
+        let flow_src_key = ServiceKey::new(
             lookup_key.src_ip,
             node.endpoint_data_cache[0].src_info.l3_epc_id as i16,
             lookup_key.src_port,
         );
-        let dst_key = ServiceKey::new(
+        let flow_dst_key = ServiceKey::new(
             lookup_key.dst_ip,
             node.endpoint_data_cache[0].dst_info.l3_epc_id as i16,
             lookup_key.dst_port,
         );
-        let (mut src_score, mut dst_score) = match lookup_key.proto {
+        let (mut flow_src_score, mut flow_dst_score) = match lookup_key.proto {
             // TCP/UDP
             IpProtocol::Tcp => {
                 let flags = meta_packet.tcp_data.flags;
+                let toa_sent_by_src = node.tagged_flow.flow.flow_metrics_peers[0].nat_source
+                    == TapPort::NAT_SOURCE_TOA;
+                let toa_sent_by_dst = node.tagged_flow.flow.flow_metrics_peers[1].nat_source
+                    == TapPort::NAT_SOURCE_TOA;
                 self.service_table.get_tcp_score(
                     is_first_packet,
-                    node.tagged_flow.flow.flow_metrics_peers[0].nat_source
-                        == TapPort::NAT_SOURCE_TOA,
+                    meta_packet.need_reverse_flow,
                     flags,
-                    src_key,
-                    dst_key,
+                    toa_sent_by_src,
+                    toa_sent_by_dst,
+                    flow_src_key,
+                    flow_dst_key,
                 )
             }
-            IpProtocol::Udp => self
-                .service_table
-                .get_udp_score(is_first_packet, src_key, dst_key),
+            IpProtocol::Udp => self.service_table.get_udp_score(
+                is_first_packet,
+                meta_packet.need_reverse_flow,
+                flow_src_key,
+                flow_dst_key,
+            ),
             _ => unimplemented!(),
         };
 
         if PacketDirection::ServerToClient == meta_packet.lookup_key.direction {
-            mem::swap(&mut src_score, &mut dst_score);
+            mem::swap(&mut flow_src_score, &mut flow_dst_score);
         }
 
         let mut reverse = false;
-        if !ServiceTable::is_client_to_server(src_score, dst_score) {
-            mem::swap(&mut src_score, &mut dst_score);
+        if !ServiceTable::is_client_to_server(flow_src_score, flow_dst_score) {
+            mem::swap(&mut flow_src_score, &mut flow_dst_score);
 
             Self::reverse_flow(node, is_first_packet);
             meta_packet.lookup_key.direction = meta_packet.lookup_key.direction.reversed();
             reverse = true;
         }
 
-        node.tagged_flow.flow.is_active_service = ServiceTable::is_active_service(dst_score);
+        node.tagged_flow.flow.is_active_service = ServiceTable::is_active_service(flow_dst_score);
         return reverse;
     }
 
@@ -1591,27 +1599,47 @@ impl FlowMap {
         let flow_key = &node.tagged_flow.flow.flow_key;
         let src_epc_id = node.tagged_flow.flow.flow_metrics_peers[0].l3_epc_id as i16;
         let dst_epc_id = node.tagged_flow.flow.flow_metrics_peers[1].l3_epc_id as i16;
+        let need_reverse_flow = meta_packet
+            .as_ref()
+            .map(|p| p.need_reverse_flow)
+            .unwrap_or_default();
 
-        let src_key = ServiceKey::new(flow_key.ip_src, src_epc_id, flow_key.port_src);
-        let dst_key = ServiceKey::new(flow_key.ip_dst, dst_epc_id, flow_key.port_dst);
-        let (mut src_score, mut dst_score) = match flow_key.proto {
+        let flow_src_key = ServiceKey::new(flow_key.ip_src, src_epc_id, flow_key.port_src);
+        let flow_dst_key = ServiceKey::new(flow_key.ip_dst, dst_epc_id, flow_key.port_dst);
+        let (mut flow_src_score, mut flow_dst_score) = match flow_key.proto {
             IpProtocol::Tcp => {
-                self.service_table
-                    .get_tcp_score(false, false, TcpFlags::empty(), src_key, dst_key)
+                let toa_sent_by_src = node.tagged_flow.flow.flow_metrics_peers[0].nat_source
+                    == TapPort::NAT_SOURCE_TOA;
+                let toa_sent_by_dst = node.tagged_flow.flow.flow_metrics_peers[1].nat_source
+                    == TapPort::NAT_SOURCE_TOA;
+                self.service_table.get_tcp_score(
+                    false,
+                    need_reverse_flow,
+                    TcpFlags::empty(),
+                    toa_sent_by_src,
+                    toa_sent_by_dst,
+                    flow_src_key,
+                    flow_dst_key,
+                )
             }
-            IpProtocol::Udp => self.service_table.get_udp_score(false, src_key, dst_key),
+            IpProtocol::Udp => self.service_table.get_udp_score(
+                false,
+                need_reverse_flow,
+                flow_src_key,
+                flow_dst_key,
+            ),
             _ => return,
         };
 
-        if !ServiceTable::is_client_to_server(src_score, dst_score) {
-            mem::swap(&mut src_score, &mut dst_score);
+        if !ServiceTable::is_client_to_server(flow_src_score, flow_dst_score) {
+            mem::swap(&mut flow_src_score, &mut flow_dst_score);
             Self::reverse_flow(node, false);
             if let Some(pkt) = meta_packet {
                 pkt.lookup_key.direction = pkt.lookup_key.direction.reversed();
             }
         }
 
-        node.tagged_flow.flow.is_active_service = ServiceTable::is_active_service(dst_score);
+        node.tagged_flow.flow.is_active_service = ServiceTable::is_active_service(flow_dst_score);
     }
 
     fn reverse_flow(node: &mut FlowNode, is_first_packet: bool) {
@@ -2374,7 +2402,7 @@ mod tests {
             flow_map.inject_meta_packet(&mut packet);
         }
 
-        flow_map.inject_flush_ticker(timestamp.add(Duration::from_secs(2)));
+        flow_map.inject_flush_ticker(timestamp.add(Duration::from_secs(3)));
         let flow_1 = output_queue_receiver.recv(Some(TIME_UNIT)).unwrap();
 
         flow_map.inject_flush_ticker(timestamp.add(Duration::from_secs(10)));
@@ -2403,6 +2431,10 @@ mod tests {
             .duration_since(time::UNIX_EPOCH)
             .unwrap();
         for mut packet in packets {
+            packet.lookup_key.timestamp = Duration::new(
+                timestamp.as_secs(),
+                packet.lookup_key.timestamp.subsec_nanos(),
+            );
             packet.lookup_key.direction = if packet.lookup_key.dst_mac == dst_mac {
                 PacketDirection::ClientToServer
             } else {
@@ -2436,6 +2468,7 @@ mod tests {
             .duration_since(time::UNIX_EPOCH)
             .unwrap();
         for mut packet in packets {
+            packet.lookup_key.timestamp = timestamp;
             flow_map.inject_meta_packet(&mut packet);
         }
 

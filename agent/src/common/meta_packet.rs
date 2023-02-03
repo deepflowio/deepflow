@@ -59,6 +59,7 @@ use public::utils::net::{is_unicast_link_local, MacAddr};
 pub struct MetaPacket<'a> {
     // 主机序, 不因L2End1而颠倒, 端口会在查询策略时被修改
     pub lookup_key: LookupKey,
+    pub need_reverse_flow: bool, // Use socket_info to correct flow direction
 
     pub raw: Option<&'a [u8]>,
     pub packet_len: u32,

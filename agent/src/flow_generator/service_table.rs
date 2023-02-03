@@ -100,83 +100,90 @@ impl ServiceTable {
     pub fn get_tcp_score(
         &mut self,
         is_first_packet: bool,
-        has_toa: bool,
+        need_reverse_flow: bool,
         tcp_flags: TcpFlags,
-        src_key: ServiceKey,
-        dst_key: ServiceKey,
+        toa_sent_by_flow_src: bool,
+        toa_sent_by_flow_dst: bool,
+        flow_src_key: ServiceKey,
+        flow_dst_key: ServiceKey,
     ) -> (u8, u8) {
-        let (mut src_score, mut dst_score) = (Self::MIN_SCORE, Self::MIN_SCORE);
+        let (mut flow_src_score, mut flow_dst_score) = (Self::MIN_SCORE, Self::MIN_SCORE);
 
-        if tcp_flags.contains(TcpFlags::SYN_ACK) {
+        if tcp_flags.contains(TcpFlags::SYN_ACK) || toa_sent_by_flow_dst || need_reverse_flow {
             // 一旦发送SYN|ACK，即被认为是服务端，其对侧被认为不可能是服务端
-            src_score = Self::MAX_SCORE;
-            dst_score = Self::MIN_SCORE;
-            match (src_key, dst_key) {
-                (ServiceKey::V4(src_key), ServiceKey::V4(dst_key)) => {
-                    self.ipv4.put(src_key, src_score);
-                    self.ipv4.pop(&dst_key);
+            flow_src_score = Self::MAX_SCORE;
+            flow_dst_score = Self::MIN_SCORE;
+            match (flow_src_key, flow_dst_key) {
+                (ServiceKey::V4(flow_src_key), ServiceKey::V4(flow_dst_key)) => {
+                    self.ipv4.put(flow_src_key, flow_src_score);
+                    self.ipv4.pop(&flow_dst_key);
                 }
-                (ServiceKey::V6(src_key), ServiceKey::V6(dst_key)) => {
-                    self.ipv6.put(src_key, src_score);
-                    self.ipv6.pop(&dst_key);
+                (ServiceKey::V6(flow_src_key), ServiceKey::V6(flow_dst_key)) => {
+                    self.ipv6.put(flow_src_key, flow_src_score);
+                    self.ipv6.pop(&flow_dst_key);
                 }
                 _ => unimplemented!(),
             }
-            (src_score, dst_score)
-        } else if tcp_flags.contains(TcpFlags::SYN) || has_toa {
+            (flow_src_score, flow_dst_score)
+        } else if tcp_flags.contains(TcpFlags::SYN) || toa_sent_by_flow_src {
             // It must be the client when packet has SYN or TOA.
-            src_score = Self::MIN_SCORE;
+            flow_src_score = Self::MIN_SCORE;
 
-            match (src_key, dst_key) {
-                (ServiceKey::V4(src_key), ServiceKey::V4(dst_key)) => {
-                    self.ipv4.pop(&src_key);
+            match (flow_src_key, flow_dst_key) {
+                (ServiceKey::V4(flow_src_key), ServiceKey::V4(flow_dst_key)) => {
+                    self.ipv4.pop(&flow_src_key);
 
-                    if let Some(score) = self.ipv4.get(&dst_key) {
-                        dst_score = *score;
+                    if let Some(score) = self.ipv4.get(&flow_dst_key) {
+                        flow_dst_score = *score;
                     }
-                    if is_first_packet && dst_score < Self::MAX_SCORE - 1 {
-                        dst_score += 1;
-                        self.ipv4.put(dst_key, dst_score);
+                    if is_first_packet && flow_dst_score < Self::MAX_SCORE - 1 {
+                        flow_dst_score += 1;
+                        self.ipv4.put(flow_dst_key, flow_dst_score);
                     }
                 }
-                (ServiceKey::V6(src_key), ServiceKey::V6(dst_key)) => {
-                    self.ipv6.pop(&src_key);
+                (ServiceKey::V6(flow_src_key), ServiceKey::V6(flow_dst_key)) => {
+                    self.ipv6.pop(&flow_src_key);
 
-                    if let Some(score) = self.ipv6.get(&dst_key) {
-                        dst_score = *score;
+                    if let Some(score) = self.ipv6.get(&flow_dst_key) {
+                        flow_dst_score = *score;
                     }
-                    if is_first_packet && dst_score < Self::MAX_SCORE - 1 {
-                        dst_score += 1;
-                        self.ipv6.put(dst_key, dst_score);
+                    if is_first_packet && flow_dst_score < Self::MAX_SCORE - 1 {
+                        flow_dst_score += 1;
+                        self.ipv6.put(flow_dst_key, flow_dst_score);
                     }
                 }
                 _ => unimplemented!(),
             }
 
-            (src_score, dst_score)
+            (flow_src_score, flow_dst_score)
         } else if is_first_packet {
-            self.get_first_packet_score(src_key, dst_key)
+            self.get_first_packet_score(flow_src_key, flow_dst_key)
         } else {
-            match (src_key, dst_key) {
-                (ServiceKey::V4(src_key), ServiceKey::V4(dst_key)) => {
-                    if let Some(score) = self.ipv4.get(&src_key) {
-                        src_score = *score;
+            match (flow_src_key, flow_dst_key) {
+                (ServiceKey::V4(flow_src_key), ServiceKey::V4(flow_dst_key)) => {
+                    if let Some(score) = self.ipv4.get(&flow_src_key) {
+                        flow_src_score = *score;
                     }
-                    if let Some(score) = self.ipv4.get(&dst_key) {
-                        dst_score = *score;
+                    if let Some(score) = self.ipv4.get(&flow_dst_key) {
+                        flow_dst_score = *score;
                     }
 
-                    self.adjust_score(src_key.port, dst_key.port, src_score, dst_score)
+                    self.adjust_score(
+                        flow_src_key.port,
+                        flow_dst_key.port,
+                        flow_src_score,
+                        flow_dst_score,
+                    )
                 }
-                (ServiceKey::V6(src_key), ServiceKey::V6(dst_key)) => {
-                    if let Some(score) = self.ipv6.get(&src_key) {
-                        src_score = *score;
+                (ServiceKey::V6(flow_src_key), ServiceKey::V6(flow_dst_key)) => {
+                    if let Some(score) = self.ipv6.get(&flow_src_key) {
+                        flow_src_score = *score;
                     }
-                    if let Some(score) = self.ipv6.get(&dst_key) {
-                        dst_score = *score;
+                    if let Some(score) = self.ipv6.get(&flow_dst_key) {
+                        flow_dst_score = *score;
                     }
 
-                    (src_score, dst_score)
+                    (flow_src_score, flow_dst_score)
                 }
                 _ => unimplemented!(),
             }
@@ -186,143 +193,164 @@ impl ServiceTable {
     pub fn get_udp_score(
         &mut self,
         is_first_packet: bool,
-        src_key: ServiceKey,
-        dst_key: ServiceKey,
+        need_reverse_flow: bool,
+        flow_src_key: ServiceKey,
+        flow_dst_key: ServiceKey,
     ) -> (u8, u8) {
         if is_first_packet {
-            return self.get_first_packet_score(src_key, dst_key);
+            return self.get_first_packet_score(flow_src_key, flow_dst_key);
         }
 
-        let (mut src_score, mut dst_score) = (Self::MIN_SCORE, Self::MIN_SCORE);
-        match (src_key, dst_key) {
-            (ServiceKey::V4(src_key), ServiceKey::V4(dst_key)) => {
-                if let Some(score) = self.ipv4.get(&src_key) {
-                    src_score = *score;
+        let (mut flow_src_score, mut flow_dst_score) = (Self::MIN_SCORE, Self::MIN_SCORE);
+        match (flow_src_key, flow_dst_key) {
+            (ServiceKey::V4(flow_src_key), ServiceKey::V4(flow_dst_key)) => {
+                if need_reverse_flow {
+                    flow_src_score = Self::MAX_SCORE;
+                    self.ipv4.put(flow_src_key, flow_src_score);
+                } else if let Some(score) = self.ipv4.get(&flow_src_key) {
+                    flow_src_score = *score;
                 }
-                if let Some(score) = self.ipv4.get(&dst_key) {
-                    dst_score = *score;
+                if let Some(score) = self.ipv4.get(&flow_dst_key) {
+                    flow_dst_score = *score;
                 }
 
-                self.adjust_score(src_key.port, dst_key.port, src_score, dst_score)
+                self.adjust_score(
+                    flow_src_key.port,
+                    flow_dst_key.port,
+                    flow_src_score,
+                    flow_dst_score,
+                )
             }
-            (ServiceKey::V6(src_key), ServiceKey::V6(dst_key)) => {
-                if let Some(score) = self.ipv6.get(&src_key) {
-                    src_score = *score;
+            (ServiceKey::V6(flow_src_key), ServiceKey::V6(flow_dst_key)) => {
+                if need_reverse_flow {
+                    flow_src_score = Self::MAX_SCORE;
+                    self.ipv6.put(flow_src_key, flow_src_score);
+                } else if let Some(score) = self.ipv6.get(&flow_src_key) {
+                    flow_src_score = *score;
                 }
-                if let Some(score) = self.ipv6.get(&dst_key) {
-                    dst_score = *score;
+                if let Some(score) = self.ipv6.get(&flow_dst_key) {
+                    flow_dst_score = *score;
                 }
 
-                (src_score, dst_score)
+                (flow_src_score, flow_dst_score)
             }
             _ => unimplemented!(),
         }
     }
 
-    pub fn is_client_to_server(src_score: u8, dst_score: u8) -> bool {
-        src_score <= dst_score // 分数相等也认为是C2S，避免reverse Flow
+    pub fn is_client_to_server(flow_src_score: u8, flow_dst_score: u8) -> bool {
+        flow_src_score <= flow_dst_score // 分数相等也认为是C2S，避免reverse Flow
     }
 
-    pub fn is_active_service(dst_score: u8) -> bool {
-        dst_score == Self::MAX_SCORE
+    pub fn is_active_service(flow_dst_score: u8) -> bool {
+        flow_dst_score == Self::MAX_SCORE
     }
 
     pub fn is_ebpf_active_udp_service(
         &mut self,
-        src_key: ServiceKey,
-        dst_key: ServiceKey,
+        flow_src_key: ServiceKey,
+        flow_dst_key: ServiceKey,
         direction: PacketDirection,
     ) -> bool {
         if direction == PacketDirection::ClientToServer {
             // if direction is ClientToServer, use dst_key which contains server ip and server port
-            return match dst_key {
-                ServiceKey::V4(dst_key) => {
-                    let mut dst_score = 0;
-                    if let Some(score) = self.ipv4.get(&dst_key) {
-                        dst_score = *score;
+            return match flow_dst_key {
+                ServiceKey::V4(flow_dst_key) => {
+                    let mut flow_dst_score = 0;
+                    if let Some(score) = self.ipv4.get(&flow_dst_key) {
+                        flow_dst_score = *score;
                     }
-                    dst_score > 0
+                    flow_dst_score > 0
                 }
-                ServiceKey::V6(dst_key) => {
-                    let mut dst_score = 0;
-                    if let Some(score) = self.ipv6.get(&dst_key) {
-                        dst_score = *score;
+                ServiceKey::V6(flow_dst_key) => {
+                    let mut flow_dst_score = 0;
+                    if let Some(score) = self.ipv6.get(&flow_dst_key) {
+                        flow_dst_score = *score;
                     }
-                    dst_score > 0
+                    flow_dst_score > 0
                 }
             };
         } else {
-            match src_key {
-                ServiceKey::V4(src_key) => {
-                    self.ipv4.put(src_key, 1);
+            match flow_src_key {
+                ServiceKey::V4(flow_src_key) => {
+                    self.ipv4.put(flow_src_key, 1);
                 }
-                ServiceKey::V6(src_key) => {
-                    self.ipv6.put(src_key, 1);
+                ServiceKey::V6(flow_src_key) => {
+                    self.ipv6.put(flow_src_key, 1);
                 }
             }
             return true;
         }
     }
 
-    fn get_first_packet_score(&mut self, src_key: ServiceKey, dst_key: ServiceKey) -> (u8, u8) {
-        let (mut src_score, mut dst_score) = (Self::MIN_SCORE, Self::MIN_SCORE);
+    fn get_first_packet_score(
+        &mut self,
+        flow_src_key: ServiceKey,
+        flow_dst_key: ServiceKey,
+    ) -> (u8, u8) {
+        let (mut flow_src_score, mut flow_dst_score) = (Self::MIN_SCORE, Self::MIN_SCORE);
 
-        match (src_key, dst_key) {
-            (ServiceKey::V4(src_key), ServiceKey::V4(dst_key)) => {
-                if let Some(score) = self.ipv4.get(&src_key) {
-                    src_score = *score;
+        match (flow_src_key, flow_dst_key) {
+            (ServiceKey::V4(flow_src_key), ServiceKey::V4(flow_dst_key)) => {
+                if let Some(score) = self.ipv4.get(&flow_src_key) {
+                    flow_src_score = *score;
                 }
-                if let Some(score) = self.ipv4.get(&dst_key) {
-                    dst_score = *score;
+                if let Some(score) = self.ipv4.get(&flow_dst_key) {
+                    flow_dst_score = *score;
                 }
-                if src_score == Self::MAX_SCORE || dst_score == Self::MAX_SCORE {
+                if flow_src_score == Self::MAX_SCORE || flow_dst_score == Self::MAX_SCORE {
                     // 一旦有一侧发送过SYN|ACK，无需更新
-                    return (src_score, dst_score);
+                    return (flow_src_score, flow_dst_score);
                 }
 
-                if src_score > Self::MIN_SCORE {
-                    src_score -= 1;
-                    if src_score > Self::MIN_SCORE {
-                        self.ipv4.put(src_key, src_score);
+                if flow_src_score > Self::MIN_SCORE {
+                    flow_src_score -= 1;
+                    if flow_src_score > Self::MIN_SCORE {
+                        self.ipv4.put(flow_src_key, flow_src_score);
                     } else {
-                        self.ipv4.pop(&src_key);
+                        self.ipv4.pop(&flow_src_key);
                     }
                 }
 
-                if dst_score < Self::MAX_SCORE - 1 {
-                    dst_score += 1;
-                    self.ipv4.put(dst_key, dst_score);
+                if flow_dst_score < Self::MAX_SCORE - 1 {
+                    flow_dst_score += 1;
+                    self.ipv4.put(flow_dst_key, flow_dst_score);
                 }
 
-                self.adjust_score(src_key.port, dst_key.port, src_score, dst_score)
+                self.adjust_score(
+                    flow_src_key.port,
+                    flow_dst_key.port,
+                    flow_src_score,
+                    flow_dst_score,
+                )
             }
-            (ServiceKey::V6(src_key), ServiceKey::V6(dst_key)) => {
-                if let Some(score) = self.ipv6.get(&src_key) {
-                    src_score = *score;
+            (ServiceKey::V6(flow_src_key), ServiceKey::V6(flow_dst_key)) => {
+                if let Some(score) = self.ipv6.get(&flow_src_key) {
+                    flow_src_score = *score;
                 }
-                if let Some(score) = self.ipv6.get(&dst_key) {
-                    dst_score = *score;
+                if let Some(score) = self.ipv6.get(&flow_dst_key) {
+                    flow_dst_score = *score;
                 }
-                if src_score == Self::MAX_SCORE || dst_score == Self::MAX_SCORE {
+                if flow_src_score == Self::MAX_SCORE || flow_dst_score == Self::MAX_SCORE {
                     // 一旦有一侧发送过SYN|ACK，无需更新
-                    return (src_score, dst_score);
+                    return (flow_src_score, flow_dst_score);
                 }
 
-                if src_score > Self::MIN_SCORE {
-                    src_score -= 1;
-                    if src_score > Self::MIN_SCORE {
-                        self.ipv6.put(src_key, src_score);
+                if flow_src_score > Self::MIN_SCORE {
+                    flow_src_score -= 1;
+                    if flow_src_score > Self::MIN_SCORE {
+                        self.ipv6.put(flow_src_key, flow_src_score);
                     } else {
-                        self.ipv6.pop(&src_key);
+                        self.ipv6.pop(&flow_src_key);
                     }
                 }
 
-                if dst_score < Self::MAX_SCORE - 1 {
-                    dst_score += 1;
-                    self.ipv6.put(dst_key, dst_score);
+                if flow_dst_score < Self::MAX_SCORE - 1 {
+                    flow_dst_score += 1;
+                    self.ipv6.put(flow_dst_key, flow_dst_score);
                 }
 
-                (src_score, dst_score)
+                (flow_src_score, flow_dst_score)
             }
             _ => unimplemented!(),
         }
@@ -330,22 +358,22 @@ impl ServiceTable {
 
     fn adjust_score(
         &mut self,
-        src_port: u16,
-        dst_port: u16,
-        src_score: u8,
-        dst_score: u8,
+        flow_src_port: u16,
+        flow_dst_port: u16,
+        flow_src_score: u8,
+        flow_dst_score: u8,
     ) -> (u8, u8) {
-        let diff_value = if src_score > dst_score {
-            src_score - dst_score
+        let diff_value = if flow_src_score > flow_dst_score {
+            flow_src_score - flow_dst_score
         } else {
-            dst_score - src_score
+            flow_dst_score - flow_src_score
         };
 
         if diff_value < Self::SCORE_DIFF_THRESHOLD {
             // 两个端口一个小于32768，一个大于等于32768时进行校正
             // 参考：Many Linux kernels use the port range 32768–60999：https://en.wikipedia.org/wiki/Ephemeral_port
-            if (src_port ^ dst_port) & Self::PORT_MSB != 0 {
-                if src_port & Self::PORT_MSB > 0 {
+            if (flow_src_port ^ flow_dst_port) & Self::PORT_MSB != 0 {
+                if flow_src_port & Self::PORT_MSB > 0 {
                     return (0, 1);
                 } else {
                     return (1, 0);
@@ -353,7 +381,7 @@ impl ServiceTable {
             }
         }
 
-        (src_score, dst_score)
+        (flow_src_score, flow_dst_score)
     }
 }
 
@@ -424,55 +452,97 @@ mod tests {
 
         let mut table = ServiceTable::new(10, 10);
         for (src_key, dst_key) in key_pairs {
-            let (src_score, dst_score) =
-                table.get_tcp_score(true, false, TcpFlags::SYN_ACK, src_key, dst_key);
+            let (src_score, dst_score) = table.get_tcp_score(
+                true,
+                false,
+                TcpFlags::SYN_ACK,
+                false,
+                false,
+                src_key,
+                dst_key,
+            );
             assert!(
                 src_score == ServiceTable::MAX_SCORE && dst_score == ServiceTable::MIN_SCORE,
                 "对SYN|ACK判断不正确"
             );
-            let (src_score, dst_score) =
-                table.get_tcp_score(false, false, TcpFlags::SYN_ACK, src_key, dst_key);
+            let (src_score, dst_score) = table.get_tcp_score(
+                false,
+                false,
+                TcpFlags::SYN_ACK,
+                false,
+                false,
+                src_key,
+                dst_key,
+            );
             assert!(
                 src_score == ServiceTable::MAX_SCORE && dst_score == ServiceTable::MIN_SCORE,
                 "对SYN|ACK判断不正确"
             );
 
-            let (src_score, dst_score) =
-                table.get_tcp_score(true, false, TcpFlags::empty(), src_key, dst_key);
+            let (src_score, dst_score) = table.get_tcp_score(
+                true,
+                false,
+                TcpFlags::empty(),
+                false,
+                false,
+                src_key,
+                dst_key,
+            );
             assert!(
                 src_score == ServiceTable::MAX_SCORE && dst_score == ServiceTable::MIN_SCORE,
                 "其它Flag首包预期不能改变SYN|ACK的Score"
             );
 
-            let (src_score, dst_score) =
-                table.get_tcp_score(false, false, TcpFlags::empty(), src_key, dst_key);
+            let (src_score, dst_score) = table.get_tcp_score(
+                false,
+                false,
+                TcpFlags::empty(),
+                false,
+                false,
+                src_key,
+                dst_key,
+            );
             assert!(
                 src_score == ServiceTable::MAX_SCORE && dst_score == ServiceTable::MIN_SCORE,
                 "其它Flag非首包预期不能改变SYN|ACK的Score"
             );
 
             let (src_score, dst_score) =
-                table.get_tcp_score(true, false, TcpFlags::SYN, src_key, dst_key);
+                table.get_tcp_score(true, false, TcpFlags::SYN, false, false, src_key, dst_key);
             assert!(
                 src_score == ServiceTable::MIN_SCORE && dst_score == ServiceTable::MIN_SCORE + 1,
                 "对SYN判断不正确"
             );
 
             let (src_score, dst_score) =
-                table.get_tcp_score(false, false, TcpFlags::SYN, src_key, dst_key);
+                table.get_tcp_score(false, false, TcpFlags::SYN, false, false, src_key, dst_key);
             assert!(
                 src_score == ServiceTable::MIN_SCORE && dst_score == ServiceTable::MIN_SCORE + 1,
                 "对SYN判断不正确"
             );
-            let (src_score, dst_score) =
-                table.get_tcp_score(true, false, TcpFlags::empty(), src_key, dst_key);
+            let (src_score, dst_score) = table.get_tcp_score(
+                true,
+                false,
+                TcpFlags::empty(),
+                false,
+                false,
+                src_key,
+                dst_key,
+            );
             assert!(
                 src_score == ServiceTable::MIN_SCORE && dst_score == ServiceTable::MIN_SCORE + 2,
                 "对其它Flag首包的判断不正确"
             );
 
-            let (src_score, dst_score) =
-                table.get_tcp_score(false, false, TcpFlags::empty(), src_key, dst_key);
+            let (src_score, dst_score) = table.get_tcp_score(
+                false,
+                false,
+                TcpFlags::empty(),
+                false,
+                false,
+                src_key,
+                dst_key,
+            );
             assert!(
                 src_score == ServiceTable::MIN_SCORE && dst_score == ServiceTable::MIN_SCORE + 2,
                 "对其它Flag非首包的判断不正确"
@@ -515,17 +585,17 @@ mod tests {
 
         let mut table = ServiceTable::new(10, 10);
         for (src_key, dst_key) in key_pairs {
-            let (src_score, dst_score) = table.get_udp_score(true, src_key, dst_key);
+            let (src_score, dst_score) = table.get_udp_score(true, false, src_key, dst_key);
             assert!(
                 src_score == ServiceTable::MIN_SCORE && dst_score == ServiceTable::MIN_SCORE + 1,
                 "对UDP首包的判断不正确"
             );
-            let (src_score, dst_score) = table.get_udp_score(false, src_key, dst_key);
+            let (src_score, dst_score) = table.get_udp_score(false, false, src_key, dst_key);
             assert!(
                 src_score == ServiceTable::MIN_SCORE && dst_score == ServiceTable::MIN_SCORE + 1,
                 "对UDP非首包的判断不正确"
             );
-            let (src_score, dst_score) = table.get_udp_score(true, src_key, dst_key);
+            let (src_score, dst_score) = table.get_udp_score(true, false, src_key, dst_key);
             assert!(
                 src_score == ServiceTable::MIN_SCORE && dst_score == ServiceTable::MIN_SCORE + 2,
                 "对UDP非首包累加的判断不正确"
