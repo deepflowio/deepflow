@@ -15,13 +15,13 @@
  */
 
 pub mod consts;
-mod dns;
-mod http;
-mod mq;
+pub(crate) mod dns;
+pub(crate) mod http;
+pub(crate) mod mq;
 mod parser;
 pub mod pb_adapter;
-mod rpc;
-mod sql;
+pub(crate) mod rpc;
+pub(crate) mod sql;
 pub use self::http::{
     check_http_method, get_http_request_info, get_http_request_version, get_http_resp_info,
     is_http_v1_payload, parse_v1_headers, HttpInfo, HttpLog, Httpv2Headers,

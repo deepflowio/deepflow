@@ -73,3 +73,62 @@ pub use {
     policy::first_path::FirstPath as _FirstPath,
     policy::labeler::Labeler as _Labeler,
 };
+
+#[cfg(test)]
+mod tests {
+    macro_rules! print_size_of {
+        ($(($spaces: expr, $t: ty)),*) => {
+            $({
+                println!(concat!($spaces, stringify!($t), ": {}"), std::mem::size_of::<$t>());
+            })*
+        };
+    }
+
+    #[test]
+    fn struct_sizes() {
+        #[rustfmt::skip]
+        print_size_of![
+            ("", crate::flow_generator::flow_node::FlowNode),
+            ("    ", crate::common::TaggedFlow),
+            ("        ", crate::common::flow::Flow),
+            ("            ", crate::common::flow::FlowKey),
+            ("         2x ", crate::common::flow::FlowMetricsPeer),
+            ("            ", crate::common::flow::TunnelField),
+            ("            ", crate::common::flow::FlowPerfStats),
+            ("        ", crate::common::tag::Tag),
+            ("    ", crate::flow_generator::flow_state::FlowState),
+            (" -> ", crate::flow_generator::perf::FlowPerf),
+            ("        ", crate::flow_generator::perf::L4FlowPerfTable),
+            ("         +> ", crate::flow_generator::perf::tcp::TcpPerf),
+            ("         |      ", crate::flow_generator::perf::tcp::PerfControl),
+            ("         |       2x ", crate::flow_generator::perf::tcp::SessionPeer),
+            ("         |      ", crate::flow_generator::perf::tcp::PerfData),
+            ("         -- ", crate::flow_generator::perf::udp::UdpPerf),
+            ("     -> ", crate::flow_generator::perf::L7FlowPerfTable),
+            ("         +- ", crate::flow_generator::perf::dns::DnsPerfData),
+            ("         +- ", crate::flow_generator::perf::mq::KafkaPerfData),
+            ("         +- ", crate::flow_generator::perf::mq::MqttPerfData),
+            ("         +- ", crate::flow_generator::perf::sql::RedisPerfData),
+            ("         +- ", crate::flow_generator::perf::rpc::DubboPerfData),
+            ("         +- ", crate::flow_generator::perf::sql::MysqlPerfData),
+            ("         +- ", crate::flow_generator::perf::http::HttpPerfData),
+            ("         +> ", crate::flow_generator::protocol_logs::sql::PostgresqlLog),
+            ("         +> ", crate::flow_generator::protocol_logs::rpc::ProtobufRpcWrapLog),
+            ("         +> ", crate::flow_generator::protocol_logs::rpc::SofaRpcLog),
+            ("     -> ", crate::common::l7_protocol_log::L7ProtocolParser),
+            ("         +- ", crate::flow_generator::protocol_logs::http::HttpLog),
+            ("         +- ", crate::flow_generator::protocol_logs::dns::DnsLog),
+            ("         +- ", crate::flow_generator::protocol_logs::rpc::ProtobufRpcWrapLog),
+            ("         +- ", crate::flow_generator::protocol_logs::rpc::SofaRpcLog),
+            ("         +- ", crate::flow_generator::protocol_logs::sql::MysqlLog),
+            ("         +- ", crate::flow_generator::protocol_logs::mq::KafkaLog),
+            ("         +- ", crate::flow_generator::protocol_logs::sql::RedisLog),
+            ("         +- ", crate::flow_generator::protocol_logs::sql::PostgresqlLog),
+            ("         +- ", crate::flow_generator::protocol_logs::rpc::DubboLog),
+            ("         +- ", crate::flow_generator::protocol_logs::mq::MqttLog),
+            (" 2x ", npb_pcap_policy::PolicyData),
+            (" 2x ", crate::common::endpoint::EndpointData),
+            (" -> ", packet_sequence_block::PacketSequenceBlock)
+        ];
+    }
+}

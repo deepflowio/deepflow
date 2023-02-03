@@ -58,7 +58,7 @@ pub fn get_protobuf_rpc_parser(proto: ProtobufRpcProtocol) -> L7ProtocolParser {
     match proto {
         ProtobufRpcProtocol::Krpc => p.set_rpc_parser(ProtobufRpcLog::KrpcLog(KrpcLog::default())),
     }
-    L7ProtocolParser::ProtobufRpcParser(p)
+    L7ProtocolParser::ProtobufRPC(Box::new(p))
 }
 
 // all protobuf rpc parser

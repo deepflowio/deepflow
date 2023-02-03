@@ -37,10 +37,6 @@ pub struct ProtobufRpcWrapLog {
 }
 
 impl ProtobufRpcWrapLog {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     pub(crate) fn set_rpc_parser(&mut self, parser: ProtobufRpcLog) {
         self.parser = Some(parser);
     }
