@@ -27,9 +27,10 @@ func Test_convertTagsToString(t *testing.T) {
 		tags []model.AdditionalResourceTag
 	}
 	tests := []struct {
-		name string
-		args args
-		want string
+		name    string
+		args    args
+		want    string
+		wantErr bool
 	}{
 		{
 			name: "one tag",
@@ -38,7 +39,8 @@ func Test_convertTagsToString(t *testing.T) {
 					{Key: "key-1", Value: "value-1"},
 				},
 			},
-			want: "key-1:value-1",
+			want:    "key-1:value-1",
+			wantErr: false,
 		},
 		{
 			name: "more than one tags",
@@ -48,12 +50,45 @@ func Test_convertTagsToString(t *testing.T) {
 					{Key: "key-2", Value: "value-2"},
 				},
 			},
-			want: "key-1:value-1, key-2:value-2",
+			want:    "key-1:value-1, key-2:value-2",
+			wantErr: false,
+		},
+		{
+			name: "one of tags with null",
+			args: args{
+				tags: []model.AdditionalResourceTag{
+					{Key: "", Value: ""},
+					{Key: "key", Value: "value"},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "one tag with null",
+			args: args{
+				tags: []model.AdditionalResourceTag{
+					{Key: "", Value: ""},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "without tags",
+			args: args{
+				tags: []model.AdditionalResourceTag{},
+			},
+			want:    "",
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := convertTagsToString(tt.args.tags); got != tt.want {
+			got, err := convertTagsToString(tt.args.tags)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("convertTagsToString() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
 				t.Errorf("convertTagsToString() = %v, want %v", got, tt.want)
 			}
 		})
