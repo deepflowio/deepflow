@@ -268,7 +268,10 @@ impl Trident {
         };
         let logger_handle = logger.start()?;
 
-        let stats_collector = Arc::new(stats::Collector::new(&config.controller_ips));
+        let stats_collector = Arc::new(stats::Collector::new(
+            &config.controller_ips,
+            DEFAULT_INGESTER_PORT,
+        ));
         if matches!(config.agent_mode, RunningMode::Managed) {
             stats_collector.start();
         }
@@ -818,6 +821,7 @@ impl DomainNameListener {
                                 ips.iter()
                                     .map(|item| item.parse::<IpAddr>().unwrap())
                                     .collect(),
+                                port_config.load().analyzer_port,
                             );
 
                             remote_log_config.set_remotes(&ips, port_config.load().analyzer_port);
