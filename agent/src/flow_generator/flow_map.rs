@@ -1513,11 +1513,19 @@ impl FlowMap {
             // TCP/UDP
             IpProtocol::Tcp => {
                 let flags = meta_packet.tcp_data.flags;
+                let has_src_toa = node.tagged_flow.flow.flow_metrics_peers[0].nat_source
+                    == TapPort::NAT_SOURCE_TOA
+                    || node.tagged_flow.flow.flow_metrics_peers[0].nat_source
+                        == TapPort::NAT_SOURCE_RTOA;
+                let has_dst_toa = node.tagged_flow.flow.flow_metrics_peers[1].nat_source
+                    == TapPort::NAT_SOURCE_TOA
+                    || node.tagged_flow.flow.flow_metrics_peers[1].nat_source
+                        == TapPort::NAT_SOURCE_RTOA;
                 self.service_table.get_tcp_score(
                     is_first_packet,
-                    node.tagged_flow.flow.flow_metrics_peers[0].nat_source
-                        == TapPort::NAT_SOURCE_TOA,
                     flags,
+                    has_src_toa,
+                    has_dst_toa,
                     src_key,
                     dst_key,
                 )
@@ -1583,10 +1591,14 @@ impl FlowMap {
         let src_key = ServiceKey::new(flow_key.ip_src, src_epc_id, flow_key.port_src);
         let dst_key = ServiceKey::new(flow_key.ip_dst, dst_epc_id, flow_key.port_dst);
         let (mut src_score, mut dst_score) = match flow_key.proto {
-            IpProtocol::Tcp => {
-                self.service_table
-                    .get_tcp_score(false, false, TcpFlags::empty(), src_key, dst_key)
-            }
+            IpProtocol::Tcp => self.service_table.get_tcp_score(
+                false,
+                TcpFlags::empty(),
+                false,
+                false,
+                src_key,
+                dst_key,
+            ),
             IpProtocol::Udp => self.service_table.get_udp_score(false, src_key, dst_key),
             _ => return,
         };

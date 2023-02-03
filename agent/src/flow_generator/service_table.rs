@@ -100,14 +100,15 @@ impl ServiceTable {
     pub fn get_tcp_score(
         &mut self,
         is_first_packet: bool,
-        has_toa: bool,
         tcp_flags: TcpFlags,
+        has_src_toa: bool,
+        has_dst_toa: bool,
         src_key: ServiceKey,
         dst_key: ServiceKey,
     ) -> (u8, u8) {
         let (mut src_score, mut dst_score) = (Self::MIN_SCORE, Self::MIN_SCORE);
 
-        if tcp_flags.contains(TcpFlags::SYN_ACK) {
+        if tcp_flags.contains(TcpFlags::SYN_ACK) || has_dst_toa {
             // 一旦发送SYN|ACK，即被认为是服务端，其对侧被认为不可能是服务端
             src_score = Self::MAX_SCORE;
             dst_score = Self::MIN_SCORE;
@@ -123,7 +124,7 @@ impl ServiceTable {
                 _ => unimplemented!(),
             }
             (src_score, dst_score)
-        } else if tcp_flags.contains(TcpFlags::SYN) || has_toa {
+        } else if tcp_flags.contains(TcpFlags::SYN) || has_src_toa {
             // It must be the client when packet has SYN or TOA.
             src_score = Self::MIN_SCORE;
 
