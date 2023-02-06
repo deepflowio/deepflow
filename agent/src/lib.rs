@@ -94,7 +94,7 @@ mod tests {
             ("            ", crate::common::flow::FlowKey),
             ("         2x ", crate::common::flow::FlowMetricsPeer),
             ("            ", crate::common::flow::TunnelField),
-            ("            ", crate::common::flow::FlowPerfStats),
+            ("         -> ", crate::common::flow::FlowPerfStats),
             ("        ", crate::common::tag::Tag),
             ("    ", crate::flow_generator::flow_state::FlowState),
             (" -> ", crate::flow_generator::perf::FlowPerf),

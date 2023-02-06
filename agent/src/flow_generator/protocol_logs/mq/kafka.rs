@@ -364,7 +364,9 @@ impl KafkaLog {
         if payload.len() < KAFKA_REQ_HEADER_LEN {
             return false;
         }
-        let mut kafka = KafkaLog { info: KafkaInfo::default() };
+        let mut kafka = KafkaLog {
+            info: KafkaInfo::default(),
+        };
 
         let ret = kafka.request(payload, true);
         if ret.is_err() {
@@ -429,7 +431,9 @@ mod tests {
                 None => continue,
             };
 
-            let mut kafka = KafkaLog { info: KafkaInfo::default() };
+            let mut kafka = KafkaLog {
+                info: KafkaInfo::default(),
+            };
             let _ = kafka.parse(
                 payload,
                 packet.lookup_key.proto,
