@@ -143,6 +143,7 @@ func (r *VTapRegister) insertToDB(dbVTap *models.VTap, db *gorm.DB) bool {
 					oldVTap.CtrlIP, oldVTap.CtrlMac, dbVTap.CtrlIP, dbVTap.CtrlMac)
 				oldVTap.CtrlMac = dbVTap.CtrlMac
 				oldVTap.CtrlIP = dbVTap.CtrlIP
+				oldVTap.LaunchServer = dbVTap.LaunchServer
 				err := dbmgr.DBMgr[models.VTap](db).Save(oldVTap)
 				if err != nil {
 					log.Error(err)
