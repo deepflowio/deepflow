@@ -18,6 +18,7 @@ package common
 
 import (
 	"bufio"
+	"encoding/binary"
 	"encoding/csv"
 	"errors"
 	"fmt"
@@ -603,6 +604,18 @@ func EliminateEmptyAZs(azs []model.AZ, azLcuuidToResourceNum map[string]int) []m
 // 根据主机名获取主机IP
 // 不同方式优先级：DNS > file > Hash
 func GetHostIPByName(name string) (string, error) {
+	ip, err := getHostIPFromDNS(name)
+	if ip != "" || err != nil {
+		return ip, err
+	}
+	ip, err = getHostIPFromFile(name)
+	if ip != "" || err != nil {
+		return ip, err
+	}
+	return createHostIPFromHash(name), nil
+}
+
+func getHostIPFromDNS(name string) (string, error) {
 	if config.CONF.DNSEnable {
 		ips, err := net.LookupIP(name) // TODO 是否需要自定义err
 		if err == nil {
@@ -611,7 +624,10 @@ func GetHostIPByName(name string) (string, error) {
 			log.Errorf("lookup for hostname: %s failed: %v", name, err)
 		}
 	}
+	return "", nil
+}
 
+func getHostIPFromFile(name string) (string, error) {
 	// TODO 将此文件内容持久化，避免每次都重新读取
 	f, err := os.Open(config.CONF.HostnameToIPFile)
 	if err == nil {
@@ -634,9 +650,26 @@ func GetHostIPByName(name string) (string, error) {
 	} else {
 		log.Errorf("open file: %s failed: %v", config.CONF.HostnameToIPFile, err)
 	}
-
-	// TODO hash实现
 	return "", nil
+}
+
+func createHostIPFromHash(name string) string {
+	return InetNToA(BKDRHash(name))
+}
+
+func BKDRHash(str string) uint32 {
+	var h uint32
+	seed := uint32(131)
+	for _, c := range str {
+		h = h*seed + uint32(c)
+	}
+	return h
+}
+
+func InetNToA(ip uint32) string {
+	data := make([]byte, 4)
+	binary.BigEndian.PutUint32(data, ip)
+	return fmt.Sprintf("%d.%d.%d.%d", data[3], data[2], data[1], data[0])
 }
 
 func GetAZLcuuidFromUUIDGenerate(uuidGenerate string) string {
