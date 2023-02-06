@@ -15,11 +15,11 @@
  */
 
 use std::cmp::max;
-use std::time::Duration;
 
 use crate::common::{
     flow::{FlowPerfStats, L4Protocol, PacketDirection},
     meta_packet::MetaPacket,
+    Timestamp,
 };
 use crate::flow_generator::error::{Error, Result};
 
@@ -27,9 +27,9 @@ use super::{L4FlowPerf, ART_MAX};
 
 #[derive(Debug, Default)]
 pub struct UdpPerf {
-    req_timestamp: Duration,
-    art_max: Duration,
-    art_sum: Duration,
+    req_timestamp: Timestamp,
+    art_max: Timestamp,
+    art_sum: Timestamp,
     art_count: u32,
     last_pkt_direction: PacketDirection,
     data_update_flag: bool,
@@ -49,12 +49,12 @@ impl L4FlowPerf for UdpPerf {
 
         let pkt_timestamp = header.lookup_key.timestamp;
         if header.lookup_key.direction == PacketDirection::ClientToServer {
-            self.req_timestamp = pkt_timestamp;
-        } else if self.req_timestamp != Duration::ZERO
+            self.req_timestamp = pkt_timestamp.into();
+        } else if self.req_timestamp != Timestamp::ZERO
             && self.req_timestamp <= pkt_timestamp
             && header.lookup_key.direction != self.last_pkt_direction
         {
-            let art = pkt_timestamp - self.req_timestamp;
+            let art = Timestamp::from(pkt_timestamp - self.req_timestamp);
             if art <= ART_MAX {
                 self.art_max = max(self.art_max, art);
                 self.art_sum += art;
@@ -75,8 +75,8 @@ impl L4FlowPerf for UdpPerf {
     fn copy_and_reset_data(&mut self, _: bool) -> FlowPerfStats {
         let mut stats = FlowPerfStats::default();
         stats.l4_protocol = L4Protocol::Udp;
-        stats.tcp.art_max = (self.art_max.as_nanos() / Duration::from_micros(1).as_nanos()) as u32;
-        stats.tcp.art_sum = (self.art_sum.as_nanos() / Duration::from_micros(1).as_nanos()) as u32;
+        stats.tcp.art_max = (self.art_max.as_nanos() / Timestamp::from_micros(1).as_nanos()) as u32;
+        stats.tcp.art_sum = (self.art_sum.as_nanos() / Timestamp::from_micros(1).as_nanos()) as u32;
         stats.tcp.art_count = self.art_count;
 
         stats
@@ -143,7 +143,7 @@ mod tests {
     }
 
     #[test]
-    fn upd_single_packet() {
+    fn udp_single_packet() {
         udp_perf_helper(
             Path::new(FILE_DIR).join("udp_1_packet.pcap"),
             Path::new(FILE_DIR).join("udp_1_packet.result"),

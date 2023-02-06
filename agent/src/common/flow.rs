@@ -19,7 +19,6 @@ use std::{
     mem::swap,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     process,
-    time::Duration,
 };
 
 use log::{error, warn};
@@ -33,9 +32,12 @@ use super::{
     tap_port::TapPort,
 };
 
-use crate::{common::endpoint::EPC_FROM_INTERNET, metric::document::Direction};
 use crate::{
-    flow_generator::protocol_logs::{duration_to_micros, to_string_format},
+    common::{endpoint::EPC_FROM_INTERNET, timestamp_to_micros, Timestamp},
+    metric::document::Direction,
+};
+use crate::{
+    flow_generator::protocol_logs::to_string_format,
     flow_generator::FlowState,
     metric::document::TapSide,
     utils::environment::{is_tt_pod, is_tt_workload},
@@ -572,8 +574,8 @@ pub struct FlowMetricsPeer {
     pub packet_count: u64,       // 每个流统计周期（目前是自然秒）清零
     pub total_byte_count: u64,   // 整个Flow生命周期的统计量
     pub total_packet_count: u64, // 整个Flow生命周期的统计量
-    pub first: Duration,         // 整个Flow生命周期首包的时间戳
-    pub last: Duration,          // 整个Flow生命周期尾包的时间戳
+    pub first: Timestamp,        // 整个Flow生命周期首包的时间戳
+    pub last: Timestamp,         // 整个Flow生命周期尾包的时间戳
 
     pub l3_epc_id: i32,
     pub is_l2_end: bool,
@@ -691,8 +693,8 @@ impl Default for FlowMetricsPeer {
             packet_count: 0,
             total_byte_count: 0,
             total_packet_count: 0,
-            first: Duration::default(),
-            last: Duration::default(),
+            first: Default::default(),
+            last: Default::default(),
 
             l3_epc_id: 0,
             is_l2_end: false,
@@ -756,8 +758,8 @@ impl From<FlowMetricsPeer> for flow_log::FlowMetricsPeer {
             packet_count: m.packet_count,
             total_byte_count: m.total_byte_count,
             total_packet_count: m.total_packet_count,
-            first: m.first.as_nanos() as u64,
-            last: m.last.as_nanos() as u64,
+            first: m.first.as_nanos(),
+            last: m.last.as_nanos(),
 
             l3_epc_id: m.l3_epc_id,
             is_l2_end: m.is_l2_end as u32,
@@ -835,15 +837,15 @@ pub struct Flow {
     pub last_keepalive_seq: u32,
     pub last_keepalive_ack: u32,
 
-    #[serde(serialize_with = "duration_to_micros")]
-    pub start_time: Duration,
-    #[serde(serialize_with = "duration_to_micros")]
-    pub end_time: Duration,
-    #[serde(serialize_with = "duration_to_micros")]
-    pub duration: Duration,
+    #[serde(serialize_with = "timestamp_to_micros")]
+    pub start_time: Timestamp,
+    #[serde(serialize_with = "timestamp_to_micros")]
+    pub end_time: Timestamp,
+    #[serde(serialize_with = "timestamp_to_micros")]
+    pub duration: Timestamp,
 
     #[serde(skip)]
-    pub flow_stat_time: Duration,
+    pub flow_stat_time: Timestamp,
 
     /* L2 */
     pub vlan: u16,
@@ -851,7 +853,7 @@ pub struct Flow {
 
     /* TCP Perf Data*/
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
-    pub flow_perf_stats: Option<FlowPerfStats>,
+    pub flow_perf_stats: Option<Box<FlowPerfStats>>,
 
     pub close_type: CloseType,
     pub signal_source: SignalSource,
@@ -1058,13 +1060,7 @@ impl From<Flow> for flow_log::Flow {
             eth_type: u16::from(f.eth_type) as u32,
             vlan: f.vlan as u32,
             has_perf_stats: f.flow_perf_stats.is_some() as u32,
-            perf_stats: {
-                if f.flow_perf_stats.is_none() {
-                    None
-                } else {
-                    Some(f.flow_perf_stats.unwrap().into())
-                }
-            },
+            perf_stats: f.flow_perf_stats.map(|stats| (*stats).into()),
             close_type: f.close_type as u32,
             signal_source: f.signal_source as u32,
             is_active_service: f.is_active_service as u32,
