@@ -810,6 +810,7 @@ impl Synchronizer {
                                 session.get_current_server(),
                                 tp::Status::Failed
                             );
+                            time::sleep(RPC_RETRY_INTERVAL).await;
                             continue;
                         }
                         tp::Status::Heartbeat => {
