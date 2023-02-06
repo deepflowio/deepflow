@@ -1126,7 +1126,7 @@ impl QuadrupleGenerator {
                         if self.collector_enabled.load(Ordering::Relaxed) {
                             self.handle(
                                 Some(Arc::clone(&tagged_flow)),
-                                tagged_flow.flow.flow_stat_time,
+                                tagged_flow.flow.flow_stat_time.into(),
                             );
                         }
                     }

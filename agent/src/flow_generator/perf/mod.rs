@@ -29,7 +29,6 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::slice;
 use std::sync::Arc;
-use std::time::Duration;
 
 use enum_dispatch::enum_dispatch;
 use public::bitmap::Bitmap;
@@ -48,6 +47,7 @@ use crate::{
             L7ProtocolParserInterface, ParseParam,
         },
         meta_packet::MetaPacket,
+        Timestamp,
     },
     config::{handler::LogParserConfig, FlowConfig},
 };
@@ -68,7 +68,7 @@ pub use stats::PerfStats;
 
 pub use dns::DNS_PORT;
 
-const ART_MAX: Duration = Duration::from_secs(30);
+const ART_MAX: Timestamp = Timestamp::from_secs(30);
 
 pub trait L4FlowPerf {
     fn parse(&mut self, packet: &MetaPacket, direction: bool) -> Result<()>;

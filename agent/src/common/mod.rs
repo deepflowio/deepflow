@@ -33,6 +33,7 @@ pub(crate) mod tag;
 pub mod tagged_flow;
 pub mod tap_port;
 pub mod tap_types;
+pub mod timestamp;
 
 pub use consts::*;
 pub use feature::FeatureFlags;
@@ -42,6 +43,7 @@ pub use public::enums;
 pub use tagged_flow::TaggedFlow;
 pub use tap_port::TapPort;
 pub use tap_types::TapTyper;
+pub use timestamp::{timestamp_to_micros, Timestamp};
 
 use std::{
     fmt,
