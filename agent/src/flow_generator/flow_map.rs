@@ -64,6 +64,7 @@ use crate::{
         meta_packet::{MetaPacket, MetaPacketTcpHeader},
         tagged_flow::TaggedFlow,
         tap_port::TapPort,
+        Timestamp,
     },
     config::{
         handler::{L7LogDynamicConfig, LogParserAccess, LogParserConfig},
@@ -867,8 +868,8 @@ impl FlowMap {
                 TunnelField::default()
             },
             flow_id: self.generate_flow_id(lookup_key.timestamp, self.id),
-            start_time: lookup_key.timestamp,
-            flow_stat_time: Duration::from_nanos(
+            start_time: lookup_key.timestamp.into(),
+            flow_stat_time: Timestamp::from_nanos(
                 (lookup_key.timestamp.as_nanos() / TIME_UNIT.as_nanos() * TIME_UNIT.as_nanos())
                     as u64,
             ),
@@ -885,8 +886,8 @@ impl FlowMap {
                     byte_count: meta_packet.packet_len as u64,
                     l3_byte_count: meta_packet.l3_payload_len() as u64,
                     l4_byte_count: meta_packet.l4_payload_len() as u64,
-                    first: lookup_key.timestamp,
-                    last: lookup_key.timestamp,
+                    first: lookup_key.timestamp.into(),
+                    last: lookup_key.timestamp.into(),
                     tcp_flags: meta_packet.tcp_data.flags,
                     ..Default::default()
                 },
@@ -977,14 +978,14 @@ impl FlowMap {
         let flow = &mut node.tagged_flow.flow;
         if pkt_timestamp > node.recent_time {
             node.recent_time = pkt_timestamp;
-            flow.duration = node.recent_time - node.min_arrived_time
+            flow.duration = (node.recent_time - node.min_arrived_time).into();
             // Duration仅使用包的时间计算，不包括超时时间
         }
 
         if !node.packet_in_tick {
             // FlowStatTime取整至统计时间的开始，只需要赋值一次，且使用包的时间戳
             node.packet_in_tick = true;
-            flow.flow_stat_time = Duration::from_nanos(
+            flow.flow_stat_time = Timestamp::from_nanos(
                 (pkt_timestamp.as_nanos() / STATISTICAL_INTERVAL.as_nanos()
                     * STATISTICAL_INTERVAL.as_nanos()) as u64,
             );
@@ -1088,9 +1089,9 @@ impl FlowMap {
         flow_metrics_peer.l3_byte_count += meta_packet.l3_payload_len() as u64;
         flow_metrics_peer.l4_byte_count += meta_packet.l4_payload_len() as u64;
         flow_metrics_peer.total_byte_count += meta_packet.packet_len as u64;
-        flow_metrics_peer.last = pkt_timestamp;
+        flow_metrics_peer.last = pkt_timestamp.into();
         if flow_metrics_peer.first.is_zero() {
-            flow_metrics_peer.first = pkt_timestamp;
+            flow_metrics_peer.first = pkt_timestamp.into();
         }
 
         if meta_packet.vlan > 0 {
@@ -1379,8 +1380,8 @@ impl FlowMap {
         } else {
             flow.update_close_type(node.flow_state);
         }
-        flow.end_time = timeout;
-        flow.flow_stat_time = Duration::from_nanos(
+        flow.end_time = timeout.into();
+        flow.flow_stat_time = Timestamp::from_nanos(
             (timeout.as_nanos() / STATISTICAL_INTERVAL.as_nanos() * STATISTICAL_INTERVAL.as_nanos())
                 as u64,
         );
@@ -1400,6 +1401,7 @@ impl FlowMap {
                     flow.signal_source == SignalSource::Packet && Self::l4_metrics_enabled(config),
                     Self::l7_metrics_enabled(config),
                 )
+                .map(|o| Box::new(o))
             });
         }
 
@@ -1448,6 +1450,7 @@ impl FlowMap {
                             && Self::l4_metrics_enabled(config),
                         Self::l7_metrics_enabled(config),
                     )
+                    .map(|o| Box::new(o))
                 });
             }
             self.push_to_flow_stats_queue(config, node.tagged_flow.clone());
