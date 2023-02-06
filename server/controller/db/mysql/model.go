@@ -1277,3 +1277,20 @@ type DialTestTask struct {
 func (DialTestTask) TableName() string {
 	return "dial_test_task"
 }
+
+type RepoVTap struct {
+	ID          int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Arch        string    `gorm:"column:arch;type:varchar(256);default:''" json:"ARCH"`
+	OS          string    `gorm:"column:os;type:varchar(256);default:''" json:"OS"`
+	Branch      string    `gorm:"column:branch;type:varchar(256);default:''" json:"BRANCH"`
+	RevCount    string    `gorm:"column:rev_count;type:varchar(256);default:''" json:"REV_COUNT"`
+	GitHash     string    `gorm:"column:git_hash;type:varchar(256);default:''" json:"GIT_HASH"`
+	ProcessName string    `gorm:"column:process_name;type:varchar(256);not null" json:"PROCESS_NAME"`
+	Image       []byte    `gorm:"column:image;type:logblob;not null" json:"IMAGE"`
+	CreatedAt   time.Time `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
+	UpdatedAt   time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
+}
+
+func (RepoVTap) TableName() string {
+	return "repo_vtap"
+}
