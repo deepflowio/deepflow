@@ -60,6 +60,14 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	sql := args.Sql
 	query_uuid := args.QueryUUID
 	log.Debugf("query_uuid: %s | raw sql: %s", query_uuid, sql)
+	// Parse slimitSql
+	slimitResult, slimitDebug, err := e.ParseSlimitSql(sql, args)
+	if err != nil {
+		return nil, nil, err
+	}
+	if slimitResult != nil {
+		return slimitResult, slimitDebug, err
+	}
 	// Parse showSql
 	result, sqlList, isShow, err := e.ParseShowSql(sql)
 	if isShow {
@@ -214,6 +222,213 @@ func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, err
 		return GetDatabases(), []string{}, true, nil
 	}
 	return nil, []string{}, true, errors.New(fmt.Sprintf("parse show sql error, sql: '%s' not support", sql))
+}
+
+func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*common.Result, map[string]interface{}, error) {
+	if !strings.Contains(sql, "SLIMIT") && !strings.Contains(sql, "slimit") {
+		return nil, nil, nil
+	}
+	newSql := strings.ReplaceAll(sql, " SLIMIT ", " slimit ")
+	newSql = strings.ReplaceAll(newSql, " WHERE ", " where ")
+	newSql = strings.ReplaceAll(newSql, " GROUP BY ", " group by ")
+	newSql = strings.ReplaceAll(newSql, " slimit ", " limit ")
+	newSqlSlice := []string{}
+	if !strings.Contains(newSql, " where ") {
+		if strings.Contains(newSql, " group by ") {
+			groupSlice := strings.Split(newSql, " group by ")
+			newSqlSlice = append(newSqlSlice, groupSlice[0])
+			newSqlSlice = append(newSqlSlice, " where 1=1 group by ")
+			newSqlSlice = append(newSqlSlice, groupSlice[1])
+			newSql = strings.Join(newSqlSlice, "")
+		}
+	}
+	stmt, err := sqlparser.Parse(newSql)
+	if err != nil {
+		log.Error(err)
+		return nil, nil, err
+	}
+	innerSelectSlice := []string{}
+	outerWhereLeftSlice := []string{}
+	outerWhereLeftAppendSlice := []string{}
+
+	innerGroupBySlice := []string{}
+	innerSql := ""
+	pStmt := stmt.(*sqlparser.Select)
+	table := ""
+	// From解析
+	if pStmt.From != nil {
+		for _, from := range pStmt.From {
+			switch from := from.(type) {
+			case *sqlparser.AliasedTableExpr:
+				// 解析Table类型
+				table = strings.Trim(sqlparser.String(from), "`")
+			}
+		}
+	}
+
+	showTagsSql := "show tags from " + table
+	tags, _, _, err := e.ParseShowSql(showTagsSql)
+	tagsSlice := []string{}
+	for _, col := range tags.Values {
+		colSlice := col.([]interface{})
+		tagsSlice = append(tagsSlice, colSlice[0].(string))
+		tagsSlice = append(tagsSlice, colSlice[1].(string))
+		tagsSlice = append(tagsSlice, colSlice[2].(string))
+	}
+	// Select解析
+	if pStmt.SelectExprs != nil {
+		for _, tag := range pStmt.SelectExprs {
+			item, ok := tag.(*sqlparser.AliasedExpr)
+			if ok {
+				colName, ok := item.Expr.(*sqlparser.ColName)
+				if ok && (common.IsValueInSliceString(sqlparser.String(colName), tagsSlice) || strings.Contains(sqlparser.String(colName), "_id")) {
+					innerSelectSlice = append(innerSelectSlice, sqlparser.String(colName))
+					outerWhereLeftSlice = append(outerWhereLeftSlice, sqlparser.String(colName))
+					for _, suffix := range []string{"", "_0", "_1"} {
+						for _, resourceName := range []string{"resource_gl0", "resource_gl1", "resource_gl2"} {
+							resourceTypeSuffix := resourceName + "_type" + suffix
+							if sqlparser.String(colName) == resourceName+suffix {
+								outerWhereLeftAppendSlice = append(outerWhereLeftAppendSlice, resourceTypeSuffix)
+							}
+						}
+						// internet增加epc分组
+						internetSuffix := "is_internet" + suffix
+						epcSuffix := "l3_epc_id" + suffix
+						if sqlparser.String(colName) == internetSuffix {
+							outerWhereLeftAppendSlice = append(outerWhereLeftAppendSlice, epcSuffix)
+						}
+					}
+				}
+				funcName, ok := item.Expr.(*sqlparser.FuncExpr)
+				if ok && strings.HasPrefix(sqlparser.String(funcName), "enum") {
+					innerSelectSlice = append(innerSelectSlice, strings.ReplaceAll(sqlparser.String(funcName), "enum", "Enum"))
+					outerWhereLeftSlice = append(outerWhereLeftSlice, "`"+strings.ReplaceAll(sqlparser.String(funcName), "enum", "Enum")+"`")
+				}
+			}
+		}
+	}
+	// GroupBy解析
+	if pStmt.GroupBy != nil {
+		for _, group := range pStmt.GroupBy {
+			colName, ok := group.(*sqlparser.ColName)
+			if ok {
+				if sqlparser.String(colName) == "toi" || sqlparser.String(colName) == "time" {
+					continue
+				} else if strings.Contains(sqlparser.String(colName), "node_type") || strings.Contains(sqlparser.String(colName), "icon_id") {
+					continue
+				}
+				groupTag := sqlparser.String(colName)
+				innerGroupBySlice = append(innerGroupBySlice, groupTag)
+			}
+			funcName, ok := group.(*sqlparser.FuncExpr)
+			if ok {
+				if strings.HasPrefix(sqlparser.String(funcName), "time") {
+					continue
+				}
+				groupTag := sqlparser.String(funcName)
+				innerGroupBySlice = append(innerGroupBySlice, groupTag)
+			}
+		}
+	}
+
+	innerSelectSql := strings.Join(innerSelectSlice, ",")
+	innerGroupBySql := strings.Join(innerGroupBySlice, ",")
+	lowerSql := strings.ReplaceAll(sql, " WHERE ", " where ")
+	lowerSql = strings.ReplaceAll(lowerSql, " GROUP BY ", " group by ")
+	lowerSql = strings.ReplaceAll(lowerSql, " SLIMIT ", " slimit ")
+	lowerSql = strings.ReplaceAll(lowerSql, " FROM ", " from ")
+	if strings.Contains(lowerSql, " where ") {
+		sqlSlice := strings.Split(lowerSql, " where ")
+		if strings.Contains(lowerSql, " group by ") {
+			whereSlice := strings.Split(sqlSlice[1], " group by ")
+			whereSql := whereSlice[0]
+			limitSlice := strings.Split(whereSlice[1], " slimit ")
+			limitSql := limitSlice[1]
+			innerSql = "SELECT " + innerSelectSql + " FROM " + table + " WHERE " + whereSql + " GROUP BY " + innerGroupBySql + " LIMIT " + limitSql
+		}
+	} else {
+		if strings.Contains(lowerSql, " group by ") {
+			groupSlice := strings.Split(lowerSql, " group by ")
+			limitSlice := strings.Split(groupSlice[1], " slimit ")
+			limitSql := limitSlice[1]
+			innerSql = "SELECT " + innerSelectSql + " FROM " + table + " GROUP BY " + innerGroupBySql + " LIMIT " + limitSql
+		}
+	}
+	innerEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context}
+	innerEngine.Init()
+	innerParser := parse.Parser{Engine: innerEngine}
+	err = innerParser.ParseSQL(innerSql)
+	if err != nil {
+		log.Error(err)
+		return nil, nil, err
+	}
+	for _, stmt := range innerEngine.Statements {
+		stmt.Format(innerEngine.Model)
+	}
+	FormatModel(innerEngine.Model)
+	// 使用Model生成View
+	innerEngine.View = view.NewView(innerEngine.Model)
+	innerTransSql := innerEngine.ToSQLString()
+	outerEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context}
+	outerEngine.Init()
+	outerParser := parse.Parser{Engine: outerEngine}
+	err = outerParser.ParseSQL(newSql)
+	if err != nil {
+		log.Error(err)
+		return nil, nil, err
+	}
+	for _, stmt := range outerEngine.Statements {
+		stmt.Format(outerEngine.Model)
+	}
+	FormatModel(outerEngine.Model)
+	// 使用Model生成View
+	outerEngine.View = view.NewView(outerEngine.Model)
+	outerTransSql := outerEngine.ToSQLString()
+	outerSlice := []string{}
+	outerWhereLeftSlice = append(outerWhereLeftSlice, outerWhereLeftAppendSlice...)
+	outerWhereLeftSql := strings.Join(outerWhereLeftSlice, ",")
+	if strings.Contains(outerTransSql, " PREWHERE ") {
+		oldWhereSlice := strings.Split(outerTransSql, " PREWHERE ")
+		outerSlice = append(outerSlice, oldWhereSlice[0])
+		outerSlice = append(outerSlice, " PREWHERE ("+outerWhereLeftSql+") IN ("+innerTransSql+") AND ")
+		slimitSlice := strings.Split(oldWhereSlice[1], " LIMIT ")
+		outerSlice = append(outerSlice, slimitSlice[0])
+		outerSlice = append(outerSlice, " LIMIT 10000")
+	}
+	outerSql := strings.Join(outerSlice, "")
+
+	query_uuid := args.QueryUUID
+	debug := &client.Debug{
+		IP:        config.Cfg.Clickhouse.Host,
+		QueryUUID: query_uuid,
+	}
+	outerSql = strings.Replace(outerSql, " IN ", " GLOBAL IN ", 1)
+	callbacks := outerEngine.View.GetCallbacks()
+	debug.Sql = outerSql
+	chClient := client.Client{
+		Host:     config.Cfg.Clickhouse.Host,
+		Port:     config.Cfg.Clickhouse.Port,
+		UserName: config.Cfg.Clickhouse.User,
+		Password: config.Cfg.Clickhouse.Password,
+		DB:       outerEngine.DB,
+		Debug:    debug,
+		Context:  outerEngine.Context,
+	}
+	ColumnSchemaMap := make(map[string]*common.ColumnSchema)
+	for _, ColumnSchema := range outerEngine.ColumnSchemas {
+		ColumnSchemaMap[ColumnSchema.Name] = ColumnSchema
+	}
+	params := &client.QueryParams{
+		Sql:             outerSql,
+		Callbacks:       callbacks,
+		QueryUUID:       query_uuid,
+		ColumnSchemaMap: ColumnSchemaMap,
+	}
+	rst, err := chClient.DoQuery(params)
+	if err != nil {
+		return nil, debug.Get(), err
+	}
+	return rst, debug.Get(), err
 }
 
 func (e *CHEngine) Init() {
