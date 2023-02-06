@@ -143,7 +143,7 @@ impl FlowNode {
         self.policy_in_tick = [false; 2];
         self.packet_in_tick = false;
         let flow = &mut self.tagged_flow.flow;
-        flow.flow_stat_time = Duration::ZERO;
+        flow.flow_stat_time = Default::default();
         flow.is_new_flow = false;
         let flow_metrics_peer_src = &mut flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC];
         flow_metrics_peer_src.packet_count = 0;
