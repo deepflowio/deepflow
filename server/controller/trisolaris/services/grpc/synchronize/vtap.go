@@ -695,13 +695,6 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 }
 
 func (e *VTapEvent) Push(r *api.SyncRequest, in api.Synchronizer_PushServer) error {
-	// If the kubernetes_force_watch field is true, the ctrl_ip and ctrl_mac of the vtap will not change,
-	// resulting in unsuccessful registration and a large number of error logs.
-	if r.GetKubernetesForceWatch() {
-		response := &api.SyncResponse{Status: &STATUS_FAILED}
-		return in.Send(response)
-	}
-
 	var err error
 	for {
 		response, err := e.pushResponse(r)
