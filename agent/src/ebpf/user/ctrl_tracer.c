@@ -121,8 +121,7 @@ static void tracer_dump(struct bpf_tracer_param *param)
 	printf("%-18s %d\n", "Perf-Pages-Count", btp->perf_pg_cnt);
 	printf("%-18s %" PRIu64 "\n", "Events Lost", btp->lost);
 	printf("%-18s %d\n", "Probes Count", btp->probes_count);
-	printf("%-18s %d [ 0 (TRACER_INIT), 1 (TRACER_RUNNING), "
-	       "2 (TRACER_STOP) ]\n", "State", btp->state);
+	printf("%-18s %s\n", "State", get_tracer_state_name(btp->state));
 	printf("%-18s %d\n", "Adapt", btp->adapt_success);
 	printf("%-18s %d\n", "data_limit_max", btp->data_limit_max);
 	printf("\n-------------------- Queue ---------------------------\n");
@@ -458,9 +457,8 @@ static int socktrace_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 		printf("datadump_file_path:\t%s\n\n",
 		       sk_trace_params->datadump_file_path);
 
-		printf
-		    ("tracer_state:\t%u [ 0 (TRACER_INIT), 1 (TRACER_RUNNING), "
-		     "2 (TRACER_STOP) ]\n\n", sk_trace_params->tracer_state);
+		printf("tracer_state:\t%s\n\n",
+		       get_tracer_state_name(sk_trace_params->tracer_state));
 
 		for (i = 0; i < array->count; i++) {
 			if (array->offsets[i].ready != 1)
