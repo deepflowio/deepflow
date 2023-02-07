@@ -33,6 +33,7 @@
 #include <libgen.h>
 
 int major, minor;		// Linux kernel主版本，次版本
+char linux_release[128];	// Record the contents of 'uname -r'
 
 volatile uint64_t sys_boot_time_ns;	// 当前系统启动时间，单位：纳秒
 volatile uint64_t prev_sys_boot_time_ns;	// 上一次更新的系统启动时间，单位：纳秒
@@ -1284,8 +1285,13 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 
 	max_rlim_open_files_set(OPEN_FILES_MAX);
 	sys_cpus_count = get_cpus_count(&cpu_online);
-	if (sys_cpus_count <= 0)
+	if (sys_cpus_count <= 0 || sys_cpus_count > MAX_CPU_NR) {
+		ebpf_warning
+		    ("The number of CPUs is required to be in the range of 1 to %d, and "
+		     "the current number of CPUs is %d, which makes eBPF-tracer unable to run.\n",
+		     MAX_CPU_NR, sys_cpus_count);
 		return ETR_INVAL;
+	}
 
 	uint64_t real_time, monotonic_time;
 	real_time = gettime(CLOCK_REALTIME, TIME_TYPE_NAN);
