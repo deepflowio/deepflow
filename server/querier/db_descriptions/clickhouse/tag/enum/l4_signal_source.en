@@ -1,0 +1,3 @@
+# Value , DisplayName   , Description
+0      , Packet         , Packet data from AF_PACKET/Winpcap
+1      , xFlow          , Flow data from NetFlow/sFlow/NetStream
