@@ -557,9 +557,9 @@ tag 的取值参考 src/flow_generator/protocol_logs/sql/postgresql.rs
 
 */
 static __inline enum message_type infer_postgre_message(const char *buf,
-						      size_t count,
-						      struct conn_info_t
-						      *conn_info)
+							size_t count,
+							struct conn_info_t
+							*conn_info)
 {
 	if (!is_protocol_enabled(PROTO_POSTGRESQL)) {
 		return MSG_UNKNOWN;
@@ -640,9 +640,9 @@ static __inline enum message_type infer_postgre_message(const char *buf,
 */
 
 static __inline enum message_type infer_sofarpc_message(const char *buf,
-						      size_t count,
-						      struct conn_info_t
-						      *conn_info)
+							size_t count,
+							struct conn_info_t
+							*conn_info)
 {
 	char const PROTO_BOLT_V1 = 1;
 	char const TYPE_REQ = 1;
@@ -1361,6 +1361,7 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 
 	__u32 pid = (__u32) bpf_get_current_pid_tgid();
 	__u32 cache_key = pid >> 16;
+	__u8 skip_proto = PROTO_UNKNOWN;
 	if (cache_key < PROTO_INFER_CACHE_SIZE) {
 		struct proto_infer_cache_t *p;
 		p = proto_infer_cache_map__lookup(&cache_key);
@@ -1462,7 +1463,18 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 		default:
 			break;
 		}
+
+		/*
+		 * Going here means that no hit is going to be counted in the
+		 * slow path. We want the slow path to skip this protocol inference
+		 * to avoid duplicate matches.
+		 */
+		skip_proto = p->protocols[idx];
 	}
+
+	/*
+	 * Enter the slow matching path.
+	 */
 #endif
 
 	/*
@@ -1478,24 +1490,43 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 	 *     ... ...
 	 *   进行快速判断。
 	 */
-
+#ifdef LINUX_VER_5_2_PLUS
+	if (skip_proto != PROTO_HTTP1 && (inferred_message.type =
+#else
 	if ((inferred_message.type =
+#endif
 	     infer_http_message(infer_buf, count, conn_info)) != MSG_UNKNOWN) {
 		conn_info->infer_reliable = 1;
 		inferred_message.protocol = PROTO_HTTP1;
+#ifdef LINUX_VER_5_2_PLUS
+	} else if (skip_proto != PROTO_REDIS && (inferred_message.type =
+#else
 	} else if ((inferred_message.type =
+#endif
 		    infer_redis_message(infer_buf, count,
 					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_REDIS;
+#ifdef LINUX_VER_5_2_PLUS
+	} else if (skip_proto != PROTO_MQTT && (inferred_message.type =
+#else
 	} else if ((inferred_message.type =
+#endif
 		    infer_mqtt_message(infer_buf, count,
 				       conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_MQTT;
+#ifdef LINUX_VER_5_2_PLUS
+	} else if (skip_proto != PROTO_DUBBO && (inferred_message.type =
+#else
 	} else if ((inferred_message.type =
+#endif
 		    infer_dubbo_message(infer_buf, count,
 					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_DUBBO;
+#ifdef LINUX_VER_5_2_PLUS
+	} else if (skip_proto != PROTO_DNS && (inferred_message.type =
+#else
 	} else if ((inferred_message.type =
+#endif
 		    infer_dns_message(infer_buf, count,
 				      conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_DNS;
@@ -1510,23 +1541,43 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 		return inferred_message;
 	}
 
+#ifdef LINUX_VER_5_2_PLUS
+	if (skip_proto != PROTO_MYSQL && (inferred_message.type =
+#else
 	if ((inferred_message.type =
+#endif
 		    infer_mysql_message(infer_buf, count,
 					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_MYSQL;
+#ifdef LINUX_VER_5_2_PLUS
+	} else if (skip_proto != PROTO_KAFKA && (inferred_message.type =
+#else
 	} else if ((inferred_message.type =
+#endif
 		    infer_kafka_message(infer_buf, count,
 					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_KAFKA;
+#ifdef LINUX_VER_5_2_PLUS
+	} else if (skip_proto != PROTO_SOFARPC && (inferred_message.type =
+#else
 	} else if ((inferred_message.type =
+#endif
 		    infer_sofarpc_message(infer_buf, count,
 					conn_info)) != MSG_UNKNOWN){
 		inferred_message.protocol = PROTO_SOFARPC;
+#ifdef LINUX_VER_5_2_PLUS
+	} else if (skip_proto != PROTO_HTTP2 && (inferred_message.type =
+#else
 	} else if ((inferred_message.type =
+#endif
 	    	infer_http2_message(buf, count, 
 					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_HTTP2;
-	}   else if ((inferred_message.type =
+#ifdef LINUX_VER_5_2_PLUS
+	} else if (skip_proto != PROTO_POSTGRESQL && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
 			infer_postgre_message(infer_buf, count,
 					conn_info)) != MSG_UNKNOWN){
 		inferred_message.protocol = PROTO_POSTGRESQL;
