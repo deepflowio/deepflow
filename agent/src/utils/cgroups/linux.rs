@@ -66,7 +66,22 @@ impl Cgroups {
         let mount_path = hier.root().to_str().unwrap().to_string();
         let is_v2 = hier.v2();
         let cg: Cgroup = CgroupBuilder::new(PROCESS_NAME).build(hier);
-        let cpus: &cpu::CpuController = cg.controller_of().unwrap();
+        let cpus: &cpu::CpuController = match cg.controller_of() {
+            Some(controller) => controller,
+            None => {
+                return Err(Error::CpuControllerSetFailed(format!(
+                    "maybe cgroup is not installed"
+                )));
+            }
+        };
+        let mem: &memory::MemController = match cg.controller_of() {
+            Some(controller) => controller,
+            None => {
+                return Err(Error::MemControllerSetFailed(format!(
+                    "maybe cgroup is not installed"
+                )));
+            }
+        };
 
         if !is_cgroup_procs_writable() {
             // In kernel versions before Linux 3.0, we use add_task method, write thread id to the tasks file
@@ -74,7 +89,6 @@ impl Cgroups {
                 // fixme:All thread IDs belonging to this process need to be recorded to this file
                 return Err(Error::CpuControllerSetFailed(e.to_string()));
             }
-            let mem: &memory::MemController = cg.controller_of().unwrap();
             if let Err(e) = mem.add_task(&CgroupPid::from(pid)) {
                 return Err(Error::MemControllerSetFailed(e.to_string()));
             }
@@ -85,7 +99,6 @@ impl Cgroups {
             if let Err(e) = cpus.add_task_by_tgid(&CgroupPid::from(pid)) {
                 return Err(Error::CpuControllerSetFailed(e.to_string()));
             }
-            let mem: &memory::MemController = cg.controller_of().unwrap();
             if let Err(e) = mem.add_task_by_tgid(&CgroupPid::from(pid)) {
                 return Err(Error::MemControllerSetFailed(e.to_string()));
             }
