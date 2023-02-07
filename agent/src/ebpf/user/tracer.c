@@ -1289,8 +1289,8 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 	if (sys_cpus_count <= 0 || sys_cpus_count > MAX_CPU_NR) {
 		ebpf_warning
 		    ("The number of CPUs is required to be in the range of 1 to %d, and "
-		     "the current number of CPUs is 100, which makes eBPF unable to run.\n",
-		     MAX_CPU_NR);
+		     "the current number of CPUs is %d, which makes eBPF-tracer unable to run.\n",
+		     MAX_CPU_NR, sys_cpus_count);
 		return ETR_INVAL;
 	}
 
