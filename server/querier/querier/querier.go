@@ -18,6 +18,7 @@ package querier
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"runtime"
 	"time"
@@ -36,7 +37,7 @@ import (
 
 var log = logging.MustGetLogger("querier")
 
-func Start(configPath string) {
+func Start(configPath, serverLogFile string) {
 	ServerCfg := config.DefaultConfig()
 	ServerCfg.Load(configPath)
 	config.Cfg = &ServerCfg.QuerierConfig
@@ -61,8 +62,12 @@ func Start(configPath string) {
 		initTraceProvider(cfg.OtelEndpoint)
 	}
 
+	ginLogFile, _ := os.OpenFile(serverLogFile, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
+	gin.DefaultWriter = io.MultiWriter(ginLogFile, os.Stdout)
+
 	// 注册router
 	r := gin.New()
+	r.Use(gin.Recovery())
 	r.Use(otelgin.Middleware("gin-web-server"))
 	r.Use(gin.LoggerWithFormatter(logger.GinLogFormat))
 	r.Use(ErrHandle())
