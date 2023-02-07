@@ -87,6 +87,14 @@ pub const TRACER_INIT: u8 = 0;
 pub const TRACER_RUNNING: u8 = 1;
 #[allow(dead_code)]
 pub const TRACER_STOP: u8 = 2;
+#[allow(dead_code)]
+pub const TRACER_WAIT_START: u8 = 3;
+#[allow(dead_code)]
+pub const TRACER_START_ERR: u8 = 4;
+#[allow(dead_code)]
+pub const TRACER_WAIT_STOP: u8 = 5;
+#[allow(dead_code)]
+pub const TRACER_STOP_ERR: u8 = 6;
 
 // 消息类型
 // 目前除了 source=EBPF_TYPE_GO_HTTP2_UPROBE 以外,都不能保证这个方向的正确性.
@@ -301,7 +309,8 @@ pub struct SK_TRACE_STATS {
      * tracer 当前状态
      */
     pub is_adapt_success: bool, // 适配状态：内核适配成功为true，否则为false
-    pub tracer_state: u8,       // 追踪器当前状态。值：TRACER_INIT, TRACER_STOP，TRACER_RUNNING
+    pub tracer_state: u8,       // 追踪器当前状态。值：TRACER_INIT, TRACER_STOP，TRACER_RUNNING,
+    // TRACER_WAIT_START, TRACER_START_ERR, TRACER_WAIT_STOP, TRACER_STOP_ERR
 
     /*
      * 纳秒级系统启动时间每分钟进行一次更新，
