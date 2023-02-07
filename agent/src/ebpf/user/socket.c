@@ -40,8 +40,20 @@ static uint64_t socket_map_reclaim_count;	// socket map回收数量统计
 static uint64_t trace_map_reclaim_count;	// trace map回收数量统计
 
 static struct list_head events_list;	// Use for extra register events
-
 static pthread_t proc_events_pthread;	// Process exec/exit thread
+
+/*
+ * tracer_hooks_detach() and tracer_hooks_attach() will become terrible
+ * when the number of probes is very large. Because we have to spend a
+ * long time waiting for it to complete, this is not a good way, we hope
+ * that calling socket_tracer_stop() or socket_tracer_start() will not
+ * block the execution of subsequent tasks.
+ *
+ * In order to solve this problem, we use a global variable(`probes_act`)
+ * to hold the latest attach/detach behavior, it be executed later by
+ * another thread, so that the current thread will not be blocked.
+ */
+static volatile uint64_t probes_act;
 
 extern int sys_cpus_count;
 extern bool *cpu_online;
@@ -75,6 +87,7 @@ static uint32_t go_tracing_timeout = GO_TRACING_TIMEOUT_DEFAULT;
 static uint32_t conf_socket_map_max_reclaim;
 
 extern int major, minor;
+extern char linux_release[128];
 
 extern uint64_t sys_boot_time_ns;
 extern uint64_t prev_sys_boot_time_ns;
@@ -375,12 +388,6 @@ static int datadump_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
 			  datadump_comm,
 			  datadump_proto);
 	} else {
-		if (datadump_enable && !msg->enable) {
-			// close output file
-			if (datadump_file != stdout)
-				fclose(datadump_file);
-		}
-
 		if (!datadump_enable && msg->enable) {
 			// create a new output file
 			if (datadump_file == stdout && !msg->only_stdout) {
@@ -408,18 +415,23 @@ static int datadump_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
 			datadump_timeout = msg->timeout;
 		}
 
-		datadump_enable = msg->enable;
-		if (!datadump_enable) {
+		if (datadump_enable && !msg->enable) {
 			datadump_timeout = 0;
 			datadump_pid = 0;
 			datadump_comm[0] = '\0';
 			datadump_proto = 0;
+			fprintf(datadump_file, "\n\nDump data is finished, use time: %us.\n\n",
+				get_sys_uptime() - datadump_start_time);
+			if (datadump_file != stdout) {
+				fclose(datadump_file);
+				ebpf_info("close datadump file %s\n", datadump_file_path);
+			}
 			memcpy(datadump_file_path, "stdout", 7);
 			datadump_file = stdout;
-			fprintf(datadump_file, "\nDump data is finished, use time: %us.\n",
-				get_sys_uptime() - datadump_start_time);
 			datadump_start_time = 0;
 		}
+
+		datadump_enable = msg->enable;
 		ebpf_info("datadump %s\n", datadump_enable ? "enable" : "disable");
 	}
 	pthread_mutex_unlock(&datadump_mutex);
@@ -822,6 +834,11 @@ static int check_map_exceeded(void)
 	return 0;
 }
 
+static inline void add_probes_act(enum probes_act_type type)
+{
+	probes_act = type;	
+}
+
 static int check_kern_adapt_and_state_update(void)
 {
 	struct bpf_tracer *t = find_bpf_tracer(SK_TRACER_NAME);
@@ -829,11 +846,10 @@ static int check_kern_adapt_and_state_update(void)
 		return -1;
 
 	if (is_adapt_success(t)) {
-		ebpf_info("Linux %d.%d adapt success.\n", major, minor);
-		if (tracer_hooks_detach(t) == 0) {
-			t->state = TRACER_STOP;
-			ebpf_info("Set current state: TRACER_STOP.\n");
-		}
+		ebpf_info("Linux %s adapt success. Set the status to TRACER_RUNNING\n",
+			  linux_release);
+		t->state = TRACER_RUNNING;
+		add_probes_act(ACT_DETACH);
 		set_period_event_invalid("check-kern-adapt");
 		t->adapt_success = true;
 	}
@@ -841,13 +857,104 @@ static int check_kern_adapt_and_state_update(void)
 	return 0;
 }
 
+static void process_probes_act(struct bpf_tracer *t)
+{
+	if (probes_act == ACT_NONE)
+		return;
+	enum probes_act_type type = probes_act;
+
+        /*
+         * Probes attach/detach in multithreading, e.g.:
+         * 1. Snoop go process execute/exit events, then process events(add/remove probes).
+         * 2. Start/stop tracer need process probes.
+         * The above scenario is handled in different threads, so use thread locks for protection.
+         */
+	pthread_mutex_lock(&t->mutex_probes_lock);
+	// If there is an unfinished attach/detach, return directly.
+	if (t->state == TRACER_WAIT_STOP || t->state == TRACER_WAIT_START) {
+		ebpf_warning("Current state: %s. There are unfinished tasks.\n",
+			     get_tracer_state_name(t->state));
+		pthread_mutex_unlock(&t->mutex_probes_lock);
+		return;
+	}
+
+	if (type == ACT_DETACH && t->state == TRACER_RUNNING) {
+		t->state = TRACER_WAIT_STOP;
+		ebpf_info("Set current state: TRACER_WAIT_STOP.\n");
+		if (tracer_hooks_detach(t) == 0) {
+			t->state = TRACER_STOP;
+			ebpf_info("Set current state: TRACER_STOP.\n");
+		} else {
+			t->state = TRACER_STOP_ERR;
+			ebpf_warning("Set current state: TRACER_STOP_ERR.\n");
+		}
+		// clean socket map
+		reclaim_socket_map(t, 0);
+	} else if (type == ACT_ATTACH && t->state == TRACER_STOP) {
+		t->state = TRACER_WAIT_START;
+		ebpf_info("Set current state: TRACER_WAIT_START.\n");
+		if (tracer_hooks_attach(t) == 0) {
+			t->state = TRACER_RUNNING;
+			ebpf_info("Set current state: TRACER_RUNNING.\n");
+		} else {
+			t->state = TRACER_START_ERR;
+			ebpf_warning("Set current state: TRACER_START_ERR.\n");
+		}
+	}
+	pthread_mutex_unlock(&t->mutex_probes_lock);
+}
+
+static void check_datadump_timeout(void)
+{
+	uint32_t passed_sec;
+	pthread_mutex_lock(&datadump_mutex);
+	if (datadump_enable) {
+		passed_sec = get_sys_uptime() - datadump_start_time;
+		if (passed_sec > datadump_timeout) {
+			datadump_start_time = 0;
+			datadump_enable = false;
+			datadump_pid = 0;
+			datadump_comm[0] = '\0';
+			datadump_proto = 0;
+			fprintf(datadump_file,
+				"\n\nDump data is finished, use time: %us.\n\n",
+				datadump_timeout);
+			if (datadump_file != stdout) {
+				ebpf_info("close datadump file %s\n", datadump_file_path);
+				fclose(datadump_file);
+			}
+			memcpy(datadump_file_path, "stdout", 7);
+			datadump_file = stdout;
+			datadump_timeout = 0;
+			ebpf_info("datadump disable\n");
+		}
+	}
+	pthread_mutex_unlock(&datadump_mutex);	
+}
+
 // Manage process start or exit events.
 static void process_events_handle_main(__unused void *arg)
 {
 	prctl(PR_SET_NAME, "proc-events");
+	struct bpf_tracer *t = arg;
 	for(;;) {
+		/*
+		 * Will attach/detach all probes in the following cases:
+		 *
+		 * 1 The socket tracer startup phase will transition from TRACER_INIT to TRACER_STOP.
+		 * 2 states from TRACER_STOP to TRACER_RUNNIN.
+		 * 3 state from TRACER_RUNNING to TRACER_STOP.
+		 *
+		 * The behavior of attach/detach will take a lot of time, we will store it into
+		 * `probes_act` for asynchronous processing.
+		 *
+		 * Here, handle attach/detach behavior.
+		 */
+		process_probes_act(t);
+
 		go_process_events_handle();
 		ssl_events_handle();
+		check_datadump_timeout();
 		usleep(LOOP_DELAY_US);
 	}
 }
@@ -1187,6 +1294,7 @@ int running_socket_tracer(l7_handle_fn handle,
 		return -EINVAL;
 
 	tracer->state = TRACER_INIT;
+	probes_act = ACT_NONE;
 	tracer->adapt_success = false;
 
 	/*
@@ -1303,7 +1411,7 @@ int running_socket_tracer(l7_handle_fn handle,
 		return ret;
 	ret =
 	    pthread_create(&proc_events_pthread, NULL,
-			   (void *)&process_events_handle_main, NULL);
+			   (void *)&process_events_handle_main, (void *)tracer);
 	if (ret) {
 		ebpf_info
 		    ("<%s> proc_events_pthread, pthread_create is error:%s\n",
@@ -1320,35 +1428,23 @@ static int socket_tracer_stop(void)
 	struct bpf_tracer *t = find_bpf_tracer(SK_TRACER_NAME);
 	if (t == NULL)
 		return ret;
-
 	if (t->state == TRACER_INIT) {
 		ebpf_warning
-		    ("socket_tracer state is TRACER_INIT, not permit stop.\n");
+		    ("Adapting the linux kernel(%s) is in progress, please try "
+		     "the stop operation again later.\n", linux_release);
 		return -1;
 	}
 
-	if (t->state == TRACER_STOP) {
+	if (probes_act == ACT_DETACH) {
 		ebpf_warning
-		    ("socket_tracer state is already TRACER_STOP, without operating.\n");
+		    ("The latest probes_act is already ACT_DETACH, without operating.\n");
+			
 		return 0;
 	}
 
-	/*
-	 * Probes attach/detach in multithreading, e.g.:
-	 * 1. Snoop go process execute/exit events, then process events(add/remove probes).
-	 * 2. Start/stop tracer need process probes. 
-	 * The above scenario is handled in different threads, so use thread locks for protection.
-	 */
-	pthread_mutex_lock(&t->mutex_probes_lock);
-	if ((ret = tracer_hooks_detach(t)) == 0) {
-		t->state = TRACER_STOP;
-		ebpf_info("Tracer stop success, current state: TRACER_STOP\n");
-	}
-	//清空 ebpf map
-	reclaim_socket_map(t, 0);
-	pthread_mutex_unlock(&t->mutex_probes_lock);
-
-	return ret;
+	ebpf_info("Call socket_tracer_stop()\n");
+	add_probes_act(ACT_DETACH);
+	return 0;
 }
 
 static int socket_tracer_start(void)
@@ -1359,26 +1455,22 @@ static int socket_tracer_start(void)
 		return ret;
 
 	if (t->state == TRACER_INIT) {
-		ebpf_info
-		    ("socket_tracer state is TRACER_INIT, not permit start.\n");
+		ebpf_warning
+		    ("Adapting the linux kernel(%s) is in progress, please try "
+		     "the start operation again later.\n", linux_release);
 		return -1;
 	}
 
-	if (t->state == TRACER_RUNNING) {
+	if (probes_act == ACT_ATTACH) {
 		ebpf_warning
-		    ("socket_tracer state is already TRACER_RUNNING, without operating.\n");
+		    ("The latest probes_act already ACT_ATTACH, without operating.\n");
 		return 0;
 	}
-	// Protect the probes operation in multiple threads, similar to socket_tracer_stop()
-	pthread_mutex_lock(&t->mutex_probes_lock);
-	if ((ret = tracer_hooks_attach(t)) == 0) {
-		t->state = TRACER_RUNNING;
-		ebpf_info
-		    ("Tracer start success, current state: TRACER_RUNNING\n");
-	}
-	pthread_mutex_unlock(&t->mutex_probes_lock);
 
-	return ret;
+	ebpf_info("Call socket_tracer_start()\n");
+	add_probes_act(ACT_ATTACH);
+
+	return 0;
 }
 
 static bool bpf_stats_map_collect(struct bpf_tracer *tracer,
@@ -1925,21 +2017,6 @@ static void print_socket_data(struct socket_bpf_data *sd)
 #define OUTPUT_DATA_SIZE 128
 
 	bool output = false;
-	uint32_t passed_sec = get_sys_uptime() - datadump_start_time;
-	if (passed_sec > datadump_timeout) {
-		datadump_start_time = 0;
-		datadump_enable = false;
-		datadump_timeout = 0;
-		datadump_pid = 0;
-		datadump_comm[0] = '\0';
-		datadump_proto = 0;
-		memcpy(datadump_file_path, "stdout", 7);
-		datadump_file = stdout;
-		fprintf(datadump_file, "\nDump data is finished, use time: %us.\n",
-			datadump_timeout);
-		return;
-	}
-
 	if (datadump_pid == 0 && (strlen(datadump_comm) > 0)
 	    && (datadump_proto == 0)) {
 		if (strcmp((char *)sd->process_kname, (char *)datadump_comm) ==

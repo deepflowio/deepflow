@@ -1852,7 +1852,7 @@ pub fn _new_flow_map_and_receiver(
             &config.log_parser
         }),
         Some(packet_sequence_queue), // Enterprise Edition Feature: packet-sequence
-        &stats::Collector::new(&vec!["127.0.0.1".to_string()]),
+        &stats::Collector::new(&vec!["127.0.0.1".to_string()], 30033),
         false,
     );
 
