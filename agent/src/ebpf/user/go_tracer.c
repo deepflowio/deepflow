@@ -978,7 +978,12 @@ void go_process_events_handle(void)
 			pthread_mutex_unlock(&mutex_proc_events_lock);
 
 			if (pe->type == EVENT_TYPE_PROC_EXEC) {
-				if (access(pe->path, F_OK) == 0) {
+				/*
+				 * Threads and processes share the code section,
+				 * here only processes are concerned.
+				 */
+				if (is_process(pe->pid)
+				    && access(pe->path, F_OK) == 0) {
 					process_execute_handle(pe->pid,
 							       pe->tracer);
 				}

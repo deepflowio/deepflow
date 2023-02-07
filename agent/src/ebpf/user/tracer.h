@@ -82,7 +82,11 @@ enum tracer_hook_type {
 enum tracer_state {
 	TRACER_INIT,
 	TRACER_RUNNING,
-	TRACER_STOP
+	TRACER_STOP,
+	TRACER_WAIT_START,
+	TRACER_START_ERR,
+	TRACER_WAIT_STOP,
+	TRACER_STOP_ERR
 };
 
 enum probe_type {
@@ -334,9 +338,9 @@ struct bpf_tracer {
 	 */
 	tracer_ctl_fun_t stop_handle;
 	tracer_ctl_fun_t start_handle;
-	enum tracer_state state;	// 追踪器状态
-	bool adapt_success;	// 是否成功适配内核, true 成功适配，false 适配失败
-	uint32_t data_limit_max;     // The maximum amount of data returned to the user-reader
+	volatile enum tracer_state state;	// 追踪器状态（Tracker status）
+	bool adapt_success;			// 是否成功适配内核, true 成功适配，false 适配失败
+	uint32_t data_limit_max;		// The maximum amount of data returned to the user-reader
 };
 
 #define EXTRA_TYPE_SERVER 0

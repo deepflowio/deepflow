@@ -25,6 +25,12 @@
 #define CACHE_LINE_ROUNDUP(size) \
   (CACHE_LINE_SIZE * ((size + CACHE_LINE_SIZE - 1) / CACHE_LINE_SIZE))
 
+enum probes_act_type {
+	ACT_NONE,
+	ACT_ATTACH,
+	ACT_DETACH
+};
+
 struct socket_bpf_data {
 	/* session info */
 	uint32_t process_id;	   // tgid in kernel struct task_struct
@@ -193,6 +199,20 @@ static inline char *get_proto_name(uint16_t proto_id)
 	}
 
 	return "Unknown";
+}
+
+static inline const char *get_tracer_state_name(enum tracer_state s)
+{
+	switch(s) {
+	case TRACER_INIT: return "TRACER_INIT";
+	case TRACER_RUNNING: return "TRACER_RUNNING";
+	case TRACER_STOP: return "TRACER_STOP";
+	case TRACER_WAIT_START: return "TRACER_WAIT_START";
+	case TRACER_START_ERR: return "TRACER_START_ERR";
+	case TRACER_WAIT_STOP: return "TRACER_WAIT_STOP";
+	case TRACER_STOP_ERR: return "TRACER_STOP_ERR";
+	default: return "TRACER_UNKNOWN";
+	}
 }
 
 int set_data_limit_max(int limit_size);

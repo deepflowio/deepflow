@@ -429,7 +429,7 @@ int fetch_kernel_version(int *major, int *minor, int *patch)
 	return ETR_OK;
 }
 
-int fetch_system_type(char *sys_type, int type_len)
+int fetch_system_type(const char *sys_type, int type_len)
 {
 	int len, i, count = 0;
 	char *p = NULL;
@@ -452,9 +452,19 @@ int fetch_system_type(char *sys_type, int type_len)
 		return ETR_INVAL;
 
 	len = strlen(p) + 1 > type_len ? type_len : strlen(p) + 1;
-	memcpy(sys_type, p, len);
+	memcpy((void *)sys_type, p, len);
 
 	return ETR_OK;
+}
+
+void fetch_linux_release(const char *buf, int buf_len)
+{
+	struct utsname sys_info;
+	uname(&sys_info);
+	int len =
+	    strlen(sys_info.release) + 1 >
+	    buf_len ? buf_len : strlen(sys_info.release) + 1;
+	memcpy((void *)buf, sys_info.release, len);
 }
 
 unsigned int fetch_kernel_version_code(void)

@@ -266,5 +266,6 @@ int get_num_possible_cpus(void);
 bool is_process(int pid);
 char *gen_file_name_by_datetime(void);
 char *gen_timestamp_prefix(void);
-int fetch_system_type(char *sys_type, int type_len);
+int fetch_system_type(const char *sys_type, int type_len);
+void fetch_linux_release(const char *buf, int buf_len);
 #endif /* DF_COMMON_H */
