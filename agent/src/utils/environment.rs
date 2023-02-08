@@ -14,12 +14,9 @@
  * limitations under the License.
  */
 
-#[cfg(target_os = "linux")]
-use std::os::unix::fs::MetadataExt;
 use std::{
     env::{self, VarError},
-    fs,
-    io::{self, Read},
+    io,
     iter::Iterator,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     path::{Path, PathBuf},
@@ -28,27 +25,22 @@ use std::{
 };
 #[cfg(target_os = "windows")]
 use std::{ffi::OsString, os::windows::ffi::OsStringExt, ptr};
+#[cfg(target_os = "linux")]
+use std::{fs, io::Read, os::unix::fs::MetadataExt};
 
 use bytesize::ByteSize;
 #[cfg(target_os = "linux")]
 use elf::{file::FileHeader, gabi::ET_CORE};
-use log::{error, info, warn};
+#[cfg(target_os = "linux")]
+use log::info;
+use log::{error, warn};
 #[cfg(target_os = "linux")]
 use nom::AsBytes;
 use sysinfo::{DiskExt, System, SystemExt};
 #[cfg(target_os = "windows")]
 use winapi::{
-    shared::{
-        minwindef::{DWORD, MAX_PATH},
-        winerror::ERROR_INSUFFICIENT_BUFFER,
-    },
-    um::{
-        errhandlingapi::GetLastError,
-        libloaderapi::{
-            GetModuleFileNameW, GetModuleHandleExW, GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
-            GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-        },
-    },
+    shared::minwindef::{DWORD, MAX_PATH},
+    um::libloaderapi::GetModuleFileNameW,
 };
 
 use crate::common::PROCESS_NAME;

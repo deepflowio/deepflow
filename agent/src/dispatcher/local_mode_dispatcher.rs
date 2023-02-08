@@ -17,7 +17,9 @@
 use std::collections::{HashMap, HashSet};
 use std::process::Command;
 use std::str;
-use std::sync::{atomic::Ordering, Arc};
+use std::sync::atomic::Ordering;
+#[cfg(target_os = "linux")]
+use std::sync::Arc;
 use std::time::Duration;
 
 use log::{debug, info, log_enabled, warn};
@@ -28,7 +30,7 @@ use super::base_dispatcher::{BaseDispatcher, BaseDispatcherListener};
 use super::error::Result;
 
 #[cfg(target_os = "linux")]
-use crate::platform::{GenericPoller, Poller};
+use crate::platform::{GenericPoller, LibvirtXmlExtractor, Poller};
 use crate::{
     common::{
         decapsulate::TunnelType,
@@ -38,7 +40,6 @@ use crate::{
     config::DispatcherConfig,
     flow_generator::FlowMap,
     handler::MiniPacket,
-    platform::LibvirtXmlExtractor,
     rpc::get_timestamp,
     utils::bytes::read_u16_be,
 };
@@ -398,7 +399,8 @@ impl LocalModeDispatcherListener {
         interfaces: &Vec<Link>,
         if_mac_source: IfMacSource,
         trident_type: TridentType,
-        tap_mac_script: &str,
+        #[cfg(target_os = "linux")] tap_mac_script: &str,
+        #[cfg(target_os = "windows")] _: &str,
     ) -> Vec<MacAddr> {
         let mut macs = vec![];
 

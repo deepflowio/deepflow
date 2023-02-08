@@ -15,7 +15,9 @@
  */
 
 use std::cmp::{max, min};
-use std::collections::{HashMap, HashSet};
+#[cfg(target_os = "linux")]
+use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fmt;
 use std::net::IpAddr;
 use std::path::PathBuf;
@@ -37,6 +39,7 @@ use super::{
 };
 use crate::common::l7_protocol_log::L7ProtocolBitmap;
 use crate::flow_generator::protocol_logs::SOFA_NEW_RPC_TRACE_CTX_KEY;
+#[cfg(target_os = "linux")]
 use crate::platform::ProcRegRewrite;
 use crate::utils::environment::free_memory_check;
 use crate::{
@@ -761,8 +764,6 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
             static_config.controller_ips[0].clone()
         };
 
-        let l7_protocol_parse_port_bitmap =
-            Arc::new((&conf.yaml_config).get_protocol_port_parse_bitmap());
         let config = ModuleConfig {
             enabled: conf.enabled,
             yaml_config: conf.yaml_config.clone(),
@@ -985,7 +986,9 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 l7_protocol_enabled_bitmap: L7ProtocolBitmap::from(
                     &conf.yaml_config.l7_protocol_enabled,
                 ),
-                l7_protocol_parse_port_bitmap,
+                l7_protocol_parse_port_bitmap: Arc::new(
+                    (&conf.yaml_config).get_protocol_port_parse_bitmap(),
+                ),
                 l7_protocol_ports: conf.yaml_config.l7_protocol_ports.clone(),
                 ebpf: conf.yaml_config.ebpf.clone(),
             },
@@ -1613,11 +1616,11 @@ impl ConfigHandler {
             );
             candidate_config.platform = new_config.platform;
 
+            #[cfg(target_os = "linux")]
             if static_config.agent_mode == RunningMode::Managed {
                 fn platform_callback(handler: &ConfigHandler, components: &mut AgentComponents) {
                     let conf = &handler.candidate_config.platform;
 
-                    #[cfg(target_os = "linux")]
                     if handler.candidate_config.enabled
                         && (handler.candidate_config.tap_mode == TapMode::Local
                             || is_tt_pod(conf.trident_type))
@@ -1633,7 +1636,6 @@ impl ConfigHandler {
                             components.api_watcher.stop();
                         }
                     }
-                    #[cfg(target_os = "linux")]
                     if conf.kubernetes_api_enabled {
                         components.api_watcher.start();
                     } else {

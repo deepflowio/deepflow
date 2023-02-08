@@ -60,6 +60,7 @@ pub use recv_engine::{
     DEFAULT_BLOCK_SIZE, FRAME_SIZE_MAX, FRAME_SIZE_MIN, POLL_TIMEOUT,
 };
 
+#[cfg(target_os = "linux")]
 use self::base_dispatcher::TapInterfaceWhitelist;
 #[cfg(target_os = "linux")]
 use crate::platform::GenericPoller;

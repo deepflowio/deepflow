@@ -14,15 +14,10 @@
  * limitations under the License.
  */
 
-use std::time::Duration;
-use std::{process, thread};
-
 use super::Error;
 use crate::config::handler::EnvironmentAccess;
 
-use log::{info, warn};
-
-pub struct Cgroups {}
+pub struct Cgroups;
 
 impl Cgroups {
     pub fn new(_pid: u64, _config: EnvironmentAccess) -> Result<Self, Error> {

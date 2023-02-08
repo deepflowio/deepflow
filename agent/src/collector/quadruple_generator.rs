@@ -24,7 +24,9 @@ use std::thread;
 use std::time::Duration;
 
 use arc_swap::access::Access;
-use log::{debug, error, info, warn};
+#[cfg(target_os = "linux")]
+use log::error;
+use log::{debug, info, warn};
 use thread::JoinHandle;
 
 use super::{acc_flow::AccumulatedFlow, consts::*, MetricsType};
