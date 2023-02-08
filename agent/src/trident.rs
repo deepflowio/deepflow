@@ -81,6 +81,7 @@ use crate::{
     sender::{get_sender_id, npb_sender::NpbArpTable, uniform_sender::UniformSenderThread},
     utils::{
         cgroups::{is_kernel_available_for_cgroup, Cgroups},
+        command::get_hostname,
         environment::{
             check, controller_ip_check, free_memory_check, free_space_checker, get_ctrl_ip_and_mac,
             kernel_check, running_in_container, running_in_only_watch_k8s_mode,
@@ -228,6 +229,11 @@ impl Trident {
             }
         };
 
+        let hostname = match config.override_os_hostname.as_ref() {
+            Some(name) => name.to_owned(),
+            None => get_hostname().unwrap_or_default(),
+        };
+
         let base_name = Path::new(&env::args().next().unwrap())
             .file_name()
             .unwrap()
@@ -235,6 +241,7 @@ impl Trident {
             .unwrap()
             .to_owned();
         let (remote_log_writer, remote_log_config) = RemoteLogWriter::new(
+            &hostname,
             &config.controller_ips,
             DEFAULT_INGESTER_PORT,
             base_name,
@@ -269,6 +276,7 @@ impl Trident {
         let logger_handle = logger.start()?;
 
         let stats_collector = Arc::new(stats::Collector::new(
+            &hostname,
             &config.controller_ips,
             DEFAULT_INGESTER_PORT,
         ));
@@ -368,6 +376,7 @@ impl Trident {
             config_handler.static_config.vtap_group_id_request.clone(),
             config_handler.static_config.kubernetes_cluster_id.clone(),
             config_handler.static_config.kubernetes_cluster_name.clone(),
+            config_handler.static_config.override_os_hostname.clone(),
             exception_handler.clone(),
             config_handler.static_config.agent_mode,
             config_path,
@@ -437,6 +446,7 @@ impl Trident {
                     .dispatcher
                     .extra_netns_regex
                     .clone(),
+                config_handler.static_config.override_os_hostname.clone(),
             ));
             ext.start();
             (ext, syn)
@@ -446,6 +456,7 @@ impl Trident {
             config_handler.platform(),
             session.clone(),
             exception_handler.clone(),
+            config_handler.static_config.override_os_hostname.clone(),
         ));
         if matches!(
             config_handler.static_config.agent_mode,

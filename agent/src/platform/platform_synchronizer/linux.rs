@@ -90,6 +90,7 @@ pub(super) struct ProcessArgs {
     pub(super) kubernetes_poller: Arc<GenericPoller>,
     pub(super) exception_handler: ExceptionHandler,
     pub(super) extra_netns_regex: Arc<Mutex<Option<Regex>>>,
+    pub(super) override_os_hostname: Arc<Option<String>>,
 }
 
 #[derive(Default)]
@@ -127,6 +128,7 @@ pub struct PlatformSynchronizer {
     sniffer: Arc<sniffer_builder::Sniffer>,
     exception_handler: ExceptionHandler,
     extra_netns_regex: Arc<Mutex<Option<Regex>>>,
+    override_os_hostname: Arc<Option<String>>,
 }
 
 impl PlatformSynchronizer {
@@ -136,6 +138,7 @@ impl PlatformSynchronizer {
         xml_extractor: Arc<LibvirtXmlExtractor>,
         exception_handler: ExceptionHandler,
         extra_netns_regex: String,
+        override_os_hostname: Option<String>,
     ) -> Self {
         let (can_set_ns, can_read_link_ns) = (check_set_ns(), check_read_link_ns());
 
@@ -199,6 +202,7 @@ impl PlatformSynchronizer {
             sniffer,
             exception_handler,
             extra_netns_regex: Arc::new(Mutex::new(extra_netns_regex)),
+            override_os_hostname: Arc::new(override_os_hostname),
         }
     }
 
@@ -278,6 +282,7 @@ impl PlatformSynchronizer {
             sniffer: self.sniffer.clone(),
             exception_handler: self.exception_handler.clone(),
             extra_netns_regex: self.extra_netns_regex.clone(),
+            override_os_hostname: self.override_os_hostname.clone(),
         };
 
         let handle = thread::Builder::new()
@@ -311,9 +316,17 @@ impl PlatformSynchronizer {
 
         let mut hash_handle = digest::Context::new(&digest::SHA1_FOR_LEGACY_USE_ONLY);
 
-        let raw_hostname = get_hostname()
-            .map_err(|err| debug!("get_hostname error:{}", err))
-            .ok();
+        let raw_hostname = process_args
+            .override_os_hostname
+            .as_ref()
+            .clone()
+            .or_else(|| match get_hostname() {
+                Ok(name) => Some(name),
+                Err(e) => {
+                    debug!("get_hostname error: {}", e);
+                    None
+                }
+            });
         if let Some(hostname) = raw_hostname.as_ref() {
             hash_handle.update(hostname.as_bytes());
         }
