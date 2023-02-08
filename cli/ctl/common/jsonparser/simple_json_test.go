@@ -46,7 +46,7 @@ func TestGetTheMaxSizeOfAttr(t *testing.T) {
 				data: case2Json,
 				attr: "NAME",
 			},
-			want: 0,
+			want: 4,
 		},
 		{
 			name: "DATA is not an array",

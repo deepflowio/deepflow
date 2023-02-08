@@ -1,0 +1,74 @@
+/*
+ * Copyright (c) 2023 Yunshan Networks
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package router
+
+import (
+	"bytes"
+	"io"
+
+	"github.com/gin-gonic/gin"
+
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	. "github.com/deepflowys/deepflow/server/controller/http/router/common"
+	"github.com/deepflowys/deepflow/server/controller/http/service"
+)
+
+func VtapRepoRouter(e *gin.Engine) {
+	e.GET("/v1/vtap-repo/", getVtapRepo)
+	e.POST("/v1/vtap-repo/", createVtapRepo)
+	e.DELETE("/v1/vtap-repo/:name/", deleteVtapRepo)
+}
+
+func getVtapRepo(c *gin.Context) {
+	data, err := service.GetVtapRepo()
+	JsonResponse(c, data, err)
+}
+
+func createVtapRepo(c *gin.Context) {
+	vtapRepo := &mysql.VTapRepo{
+		Name:     c.PostForm("NAME"),
+		Arch:     c.PostForm("ARCH"),
+		Branch:   c.PostForm("BRANCH"),
+		RevCount: c.PostForm("REV_COUNT"),
+		CommitID: c.PostForm("COMMIT_ID"),
+		OS:       c.PostForm("OS"),
+	}
+
+	// get file
+	file, _, err := c.Request.FormFile("IMAGE")
+	if err != nil {
+		JsonResponse(c, nil, err)
+		return
+	}
+	defer file.Close()
+
+	buf := bytes.NewBuffer(nil)
+	_, err = io.Copy(buf, file)
+	if err != nil {
+		JsonResponse(c, nil, err)
+		return
+	}
+	vtapRepo.Image = buf.Bytes()
+
+	err = service.CreateVtapRepo(vtapRepo)
+	JsonResponse(c, nil, err)
+}
+
+func deleteVtapRepo(c *gin.Context) {
+	name := c.Param("name")
+	JsonResponse(c, nil, service.DeleteVtapRepo(name))
+}
