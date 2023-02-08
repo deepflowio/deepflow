@@ -174,6 +174,17 @@ type VtapUpdateTapMode struct {
 	TapMode     int      `json:"TAP_MODE"`
 }
 
+type VtapRepo struct {
+	Name      string `json:"NAME"`
+	Arch      string `json:"ARCH" binding:"required"`
+	OS        string `json:"OS"`
+	Branch    string `json:"BRANCH"`
+	RevCount  string `json:"REV_COUNT"`
+	CommitID  string `json:"COMMIT_ID"`
+	Image     []byte `json:"IMAGE" binding:"required"`
+	UpdatedAt string `json:"UPDATED_AT"`
+}
+
 type HostVTapRebalanceResult struct {
 	IP            string `json:"IP"`
 	AZ            string `json:"AZ"`

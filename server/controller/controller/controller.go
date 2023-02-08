@@ -178,6 +178,7 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 	trouter.RegistRouter(r)
 	configuration.ConfigurationRouter(r)
 	registerResourceRouters(r, cfg)
+	router.VtapRepoRouter(r)
 
 	grpcStart(ctx, cfg)
 

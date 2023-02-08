@@ -60,6 +60,7 @@ func Execute(version string) {
 	root.AddCommand(RegisterTrisolarisCommand())
 	root.AddCommand(RegisterVPCCommend())
 	root.AddCommand(RegisterServerCommand())
+	root.AddCommand(RegisterRepoCommand())
 
 	cmd.RegisterIngesterCommand(root)
 
