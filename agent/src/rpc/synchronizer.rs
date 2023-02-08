@@ -79,6 +79,8 @@ pub struct StaticConfig {
     pub env: RuntimeEnvironment,
     pub kubernetes_cluster_id: String,
     pub kubernetes_cluster_name: Option<String>,
+
+    pub override_os_hostname: Option<String>,
 }
 
 const EMPTY_VERSION_INFO: &'static trident::VersionInfo = &trident::VersionInfo {
@@ -102,6 +104,7 @@ impl Default for StaticConfig {
             env: Default::default(),
             kubernetes_cluster_id: Default::default(),
             kubernetes_cluster_name: Default::default(),
+            override_os_hostname: None,
         }
     }
 }
@@ -437,6 +440,7 @@ impl Synchronizer {
         vtap_group_id_request: String,
         kubernetes_cluster_id: String,
         kubernetes_cluster_name: Option<String>,
+        override_os_hostname: Option<String>,
         exception_handler: ExceptionHandler,
         agent_mode: RunningMode,
         standalone_runtime_config: Option<PathBuf>,
@@ -451,6 +455,7 @@ impl Synchronizer {
                 env: RuntimeEnvironment::new(),
                 kubernetes_cluster_id,
                 kubernetes_cluster_name,
+                override_os_hostname,
             }),
             running_config: Arc::new(RwLock::new(RunningConfig { ctrl_mac, ctrl_ip })),
             trident_state,
@@ -1177,16 +1182,23 @@ impl Synchronizer {
         let ntp_diff = self.ntp_diff.clone();
         self.threads.lock().push(self.rt.spawn(async move {
             while running.load(Ordering::SeqCst) {
-                match get_hostname() {
-                    Ok(s) => {
-                        let r = status.upgradable_read();
-                        if s.ne(&r.hostname) {
-                            info!("hostname changed from \"{}\" to \"{}\"", r.hostname, s);
-                            RwLockUpgradableReadGuard::upgrade(r).hostname = s;
-                        }
+                let upgrade_hostname = |s: &str| {
+                    let r = status.upgradable_read();
+                    if s.ne(&r.hostname) {
+                        info!("hostname changed from \"{}\" to \"{}\"", r.hostname, s);
+                        RwLockUpgradableReadGuard::upgrade(r).hostname = s.to_owned();
                     }
-                    Err(e) => warn!("refresh hostname failed: {}", e),
-                }
+                };
+                if let Some(name) = static_config.override_os_hostname.as_ref() {
+                    upgrade_hostname(name);
+                } else {
+                    match get_hostname() {
+                        Ok(name) => {
+                            upgrade_hostname(&name);
+                        }
+                        Err(e) => warn!("refresh hostname failed: {}", e),
+                    }
+                };
                 if session.get_request_failed() {
                     let running_config = running_config.read();
                     let status = status.read();
