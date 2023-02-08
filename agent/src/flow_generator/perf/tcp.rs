@@ -29,17 +29,18 @@ use crate::{
         flow::{FlowPerfStats, L4Protocol},
         lookup_key::LookupKey,
         meta_packet::{MetaPacket, MetaPacketTcpHeader},
+        Timestamp,
     },
     flow_generator::error::{Error, Result},
 };
 
-const SRT_MAX: Duration = Duration::from_secs(10);
-const RTT_FULL_MAX: Duration = Duration::from_secs(30);
-const RTT_MAX: Duration = Duration::from_secs(30);
+const SRT_MAX: Timestamp = Timestamp::from_secs(10);
+const RTT_FULL_MAX: Timestamp = Timestamp::from_secs(30);
+const RTT_MAX: Timestamp = Timestamp::from_secs(30);
 
-fn adjust_rtt(d: Duration, max: Duration) -> Duration {
+fn adjust_rtt(d: Timestamp, max: Timestamp) -> Timestamp {
     if d > max {
-        Duration::ZERO
+        Timestamp::ZERO
     } else {
         d
     }
@@ -80,12 +81,12 @@ struct SeqSegment {
 const SEQ_LIST_MAX_LEN: usize = 16;
 
 #[derive(Default)]
-struct SessionPeer {
+pub(crate) struct SessionPeer {
     seq_list: [SeqSegment; SEQ_LIST_MAX_LEN],
     seq_list_len: isize,
 
-    timestamp: Duration,
-    first_syn_timestamp: Duration,
+    timestamp: Timestamp,
+    first_syn_timestamp: Timestamp,
 
     seq_threshold: u32, // fast syn_retrans check
     seq: u32,
@@ -337,7 +338,7 @@ impl SessionPeer {
     // 在TCP_STATE_ESTABLISHED阶段更新数据
     fn update_data(&mut self, p: &MetaPacket) {
         let header = &p.tcp_data;
-        self.timestamp = p.lookup_key.timestamp;
+        self.timestamp = p.lookup_key.timestamp.into();
         self.payload_len = p.payload_len as u32;
         if header.flags.contains(TcpFlags::SYN) {
             self.payload_len = 1;
@@ -355,27 +356,19 @@ impl fmt::Display for SessionPeer {
     }
 }
 
-struct PacketVariance {
-    interval_avg: f64,
-    interval_variance: f64,
-    size_avg: f64,
-    size_variance: f64,
-    last_timestamp: Duration,
-}
-
 #[derive(Default)]
-struct PerfControl(SessionPeer, SessionPeer);
+pub(crate) struct PerfControl(SessionPeer, SessionPeer);
 
 #[derive(Default, Debug, PartialEq, Eq)]
 struct TimeStats {
     pub count: u32,
-    pub sum: Duration,
-    pub max: Duration,
+    pub sum: Timestamp,
+    pub max: Timestamp,
     pub updated: bool,
 }
 
 impl TimeStats {
-    fn update(&mut self, d: Duration) {
+    fn update(&mut self, d: Timestamp) {
         self.count += 1;
         self.sum += d;
         if self.max < d {
@@ -389,7 +382,7 @@ impl TimeStats {
 // 现有3个连续包PSH/ACK--ACK--PSH/ACK,其中第一个包是client端的请求包，
 // 后2个包是server端的应答包，art表示后2个包之间的时间间隔
 #[derive(Default, Debug, PartialEq, Eq)]
-struct PerfData {
+pub(crate) struct PerfData {
     rtt_0: TimeStats,
     rtt_1: TimeStats,
     art_0: TimeStats,
@@ -400,7 +393,7 @@ struct PerfData {
 
     // flow数据
     retrans_sum: u32,
-    rtt_full: Duration,
+    rtt_full: Timestamp,
 
     // 包括syn重传
     retrans_0: u32,
@@ -431,7 +424,7 @@ impl PerfData {
 
     // FIXME: art,rtt均值计算方法，需要增加影响因子
     // 计算art值
-    fn calc_art(&mut self, d: Duration, fpd: bool) {
+    fn calc_art(&mut self, d: Timestamp, fpd: bool) {
         if fpd {
             self.art_0.update(d);
         } else {
@@ -441,7 +434,7 @@ impl PerfData {
     }
 
     // 计算srt值
-    fn calc_srt(&mut self, d: Duration, fpd: bool) {
+    fn calc_srt(&mut self, d: Timestamp, fpd: bool) {
         if fpd {
             self.srt_0.update(d);
         } else {
@@ -450,12 +443,12 @@ impl PerfData {
         self.updated = true;
     }
 
-    fn calc_rtt_full(&mut self, d: Duration) {
+    fn calc_rtt_full(&mut self, d: Timestamp) {
         self.rtt_full = d;
         self.updated = true;
     }
 
-    fn calc_rtt(&mut self, d: Duration, fpd: bool) {
+    fn calc_rtt(&mut self, d: Timestamp, fpd: bool) {
         if fpd {
             self.rtt_0.update(d);
         } else {
@@ -522,7 +515,7 @@ impl PerfData {
         self.updated = true;
     }
 
-    fn calc_cit(&mut self, d: Duration) {
+    fn calc_cit(&mut self, d: Timestamp) {
         self.cit.update(d);
         self.updated = true;
     }
@@ -620,7 +613,7 @@ impl TcpPerf {
             if same_dir.seq_threshold == 0 {
                 // first SYN
                 same_dir.seq_threshold = p.tcp_data.seq + 1;
-                same_dir.first_syn_timestamp = p.lookup_key.timestamp;
+                same_dir.first_syn_timestamp = p.lookup_key.timestamp.into();
                 self.handshaking = true;
             } else if same_dir.syn_transmitted {
                 self.perf_data.calc_retrans_syn(fpd);
@@ -724,7 +717,10 @@ impl TcpPerf {
             if (Self::is_handshake_ack_packet(same_dir, oppo_dir, p) || p.is_syn_ack())
                 && oppo_dir.is_reply_packet(p)
             {
-                let rtt = adjust_rtt(p.lookup_key.timestamp - oppo_dir.timestamp, RTT_MAX);
+                let rtt = adjust_rtt(
+                    (p.lookup_key.timestamp - oppo_dir.timestamp).into(),
+                    RTT_MAX,
+                );
                 if !rtt.is_zero() {
                     self.perf_data.calc_rtt(rtt, fpd);
                 }
@@ -734,7 +730,7 @@ impl TcpPerf {
         if same_dir.rtt_full_calculable {
             if oppo_dir.is_sync_ack_ack_packet(p) {
                 let rtt_full = adjust_rtt(
-                    p.lookup_key.timestamp - same_dir.first_syn_timestamp,
+                    (p.lookup_key.timestamp - same_dir.first_syn_timestamp).into(),
                     RTT_FULL_MAX,
                 );
                 if !rtt_full.is_zero() {
@@ -786,7 +782,10 @@ impl TcpPerf {
         // srt--用连续的PSH/ACK(payload_len>0)和反向ACK(payload_len==0)计算srt值
         if same_dir.srt_calculable {
             if p.is_ack() && oppo_dir.is_reply_packet(p) {
-                let srt = adjust_rtt(p.lookup_key.timestamp - oppo_dir.timestamp, SRT_MAX);
+                let srt = adjust_rtt(
+                    (p.lookup_key.timestamp - oppo_dir.timestamp).into(),
+                    SRT_MAX,
+                );
                 if !srt.is_zero() {
                     self.perf_data.calc_srt(srt, fpd);
                 }
@@ -796,7 +795,10 @@ impl TcpPerf {
         // art--用连续的PSH/ACK(payload_len>0)和ACK(payload_len==0)[可选]、PSH/ACK(payload_len>0)计算art值
         if same_dir.art_calculable {
             if p.has_valid_payload() && same_dir.is_next_packet(p) {
-                let art = adjust_rtt(p.lookup_key.timestamp - oppo_dir.timestamp, ART_MAX);
+                let art = adjust_rtt(
+                    (p.lookup_key.timestamp - oppo_dir.timestamp).into(),
+                    ART_MAX,
+                );
                 if !art.is_zero() {
                     self.perf_data.calc_art(art, fpd);
                 }
@@ -852,12 +854,12 @@ impl TcpPerf {
             if same_dir.is_handshake_ack_packet {
                 same_dir.is_handshake_ack_packet = false;
                 let d = p.lookup_key.timestamp - same_dir.timestamp.max(oppo_dir.timestamp);
-                self.perf_data.calc_cit(d);
+                self.perf_data.calc_cit(d.into());
             } else if oppo_dir.payload_len > 1
                 && (same_dir.payload_len <= 1 || oppo_dir.timestamp > same_dir.timestamp)
             {
                 let d = p.lookup_key.timestamp - oppo_dir.timestamp;
-                self.perf_data.calc_cit(d);
+                self.perf_data.calc_cit(d.into());
             }
         }
     }
@@ -995,19 +997,19 @@ impl fmt::Debug for TcpPerf {
 #[doc(hidden)]
 pub fn _benchmark_report(perf: &mut TcpPerf) {
     let pd = &mut perf.perf_data;
-    pd.art_0.max = Duration::from_nanos(100);
-    pd.art_0.sum = Duration::from_nanos(100);
+    pd.art_0.max = Timestamp::from_nanos(100);
+    pd.art_0.sum = Timestamp::from_nanos(100);
     pd.art_0.count = 1;
-    pd.art_1.max = Duration::from_nanos(300);
-    pd.art_1.sum = Duration::from_nanos(300);
+    pd.art_1.max = Timestamp::from_nanos(300);
+    pd.art_1.sum = Timestamp::from_nanos(300);
     pd.art_1.count = 1;
     let _ = perf.copy_and_reset_data(false);
     let pd = &mut perf.perf_data;
-    pd.art_0.max = Duration::from_nanos(200);
-    pd.art_0.sum = Duration::from_nanos(200);
+    pd.art_0.max = Timestamp::from_nanos(200);
+    pd.art_0.sum = Timestamp::from_nanos(200);
     pd.art_0.count = 1;
-    pd.srt_0.max = Duration::from_nanos(1000);
-    pd.srt_0.sum = Duration::from_nanos(1000);
+    pd.srt_0.max = Timestamp::from_nanos(1000);
+    pd.srt_0.sum = Timestamp::from_nanos(1000);
     pd.srt_0.count = 1;
     let _ = perf.copy_and_reset_data(false);
 }
@@ -1266,13 +1268,13 @@ mod tests {
     fn adjust() {
         assert_eq!(adjust_rtt(SRT_MAX, SRT_MAX), SRT_MAX);
         assert_eq!(
-            adjust_rtt(SRT_MAX + Duration::from_secs(1), SRT_MAX),
-            Duration::ZERO
+            adjust_rtt(SRT_MAX + Timestamp::from_secs(1), SRT_MAX),
+            Timestamp::ZERO
         );
         assert_eq!(adjust_rtt(ART_MAX, ART_MAX), ART_MAX);
         assert_eq!(
-            adjust_rtt(ART_MAX + Duration::from_secs(1), ART_MAX),
-            Duration::ZERO
+            adjust_rtt(ART_MAX + Timestamp::from_secs(1), ART_MAX),
+            Timestamp::ZERO
         );
     }
 
@@ -1785,27 +1787,27 @@ mod tests {
 
         let perf_data = PerfData {
             rtt_0: TimeStats {
-                sum: Duration::from_nanos(10),
-                max: Duration::from_nanos(2),
+                sum: Timestamp::from_nanos(10),
+                max: Timestamp::from_nanos(2),
                 updated: true,
                 ..Default::default()
             },
             rtt_1: TimeStats {
-                sum: Duration::from_nanos(1),
-                max: Duration::from_nanos(1),
+                sum: Timestamp::from_nanos(1),
+                max: Timestamp::from_nanos(1),
                 updated: true,
                 ..Default::default()
             },
             art_0: TimeStats {
-                sum: Duration::from_nanos(70),
-                max: Duration::from_nanos(70),
+                sum: Timestamp::from_nanos(70),
+                max: Timestamp::from_nanos(70),
                 count: 1,
                 updated: true,
                 ..Default::default()
             },
             srt_0: TimeStats {
-                sum: Duration::from_nanos(16),
-                max: Duration::from_nanos(16),
+                sum: Timestamp::from_nanos(16),
+                max: Timestamp::from_nanos(16),
                 count: 2,
                 updated: true,
                 ..Default::default()

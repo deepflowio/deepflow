@@ -434,8 +434,7 @@ impl EbpfCollector {
                 if retry_count >= RETRY_MAX {
                     error!(
                         "The tracer_start() error. Kernel offset adapt failed. \
-                            Use the command 'uname -r' to obtain detailed kernel version \
-                            information, and provide the operating system name and the \
+                            Provide the operating system name and the \
                             'kernel-devel' package for developers to adapt."
                     );
                 }

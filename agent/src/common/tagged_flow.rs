@@ -113,13 +113,13 @@ impl Sendable for BoxedTaggedFlow {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
     use prost::Message;
 
     use super::*;
 
-    use crate::common::{decapsulate::TunnelType, flow::FlowPerfStats, flow::L4Protocol};
+    use crate::common::{
+        decapsulate::TunnelType, flow::FlowPerfStats, flow::L4Protocol, Timestamp,
+    };
 
     // test run: cargo test --package trident --lib -- common::tagged_flow::tests::sequential_merge --exact --nocapture
     #[test]
@@ -134,7 +134,7 @@ mod tests {
         f1.flow.flow_metrics_peers[0].byte_count = 20;
         f.flow.flow_metrics_peers[1].l3_byte_count = 30;
         f1.flow.flow_metrics_peers[1].l3_byte_count = 40;
-        f1.flow.flow_perf_stats = Some(FlowPerfStats::default());
+        f1.flow.flow_perf_stats = Some(Default::default());
         f1.flow.flow_perf_stats.as_mut().unwrap().tcp.rtt_client_max = 100;
 
         f.sequential_merge(&f1);
@@ -167,11 +167,11 @@ mod tests {
         tflow.flow.flow_metrics_peers[1].byte_count = 6;
         tflow.flow.tunnel.tunnel_type = TunnelType::Vxlan;
         tflow.flow.flow_id = 8;
-        tflow.flow.start_time = Duration::from_nanos(100_000_000_001);
+        tflow.flow.start_time = Timestamp::from_nanos(100_000_000_001);
         let mut flow_perf_stats = FlowPerfStats::default();
         flow_perf_stats.l4_protocol = L4Protocol::Tcp;
         flow_perf_stats.tcp.rtt = 10;
-        tflow.flow.flow_perf_stats = Some(flow_perf_stats);
+        tflow.flow.flow_perf_stats = Some(Box::new(flow_perf_stats));
         tflow.flow.is_active_service = true;
 
         let mut buf: Vec<u8> = vec![];

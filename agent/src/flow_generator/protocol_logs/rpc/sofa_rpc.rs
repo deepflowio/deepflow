@@ -290,10 +290,6 @@ impl L7ProtocolParserInterface for SofaRpcLog {
 }
 
 impl SofaRpcLog {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     fn parse_with_strict(
         &mut self,
         mut payload: &[u8],
@@ -623,7 +619,7 @@ mod test {
         let mut p = capture.as_meta_packets();
         p[0].lookup_key.direction = PacketDirection::ClientToServer;
         p[1].lookup_key.direction = PacketDirection::ServerToClient;
-        let mut parser = SofaRpcLog::new();
+        let mut parser = SofaRpcLog::default();
 
         let req_param = &mut ParseParam::from(&p[0]);
         let req_payload = p[0].get_l4_payload().unwrap();
@@ -677,7 +673,7 @@ mod test {
         let mut p = capture.as_meta_packets();
         p[0].lookup_key.direction = PacketDirection::ClientToServer;
         p[1].lookup_key.direction = PacketDirection::ServerToClient;
-        let mut parser = SofaRpcLog::new();
+        let mut parser = SofaRpcLog::default();
 
         let req_param = &mut ParseParam::from(&p[0]);
         let req_payload = p[0].get_l4_payload().unwrap();

@@ -29,7 +29,6 @@ use npb_pcap_policy::NpbTunnelType;
 use rand::prelude::{Rng, SeedableRng, SmallRng};
 
 use super::consts::*;
-use super::round_to_minute;
 
 use crate::collector::acc_flow::U16Set;
 use crate::common::{
@@ -233,12 +232,12 @@ impl FlowAggr {
         f.flow.acl_gids = Vec::from(acl_gids.list());
 
         if !f.flow.is_new_flow {
-            f.flow.start_time = round_to_minute(f.flow.flow_stat_time);
+            f.flow.start_time = f.flow.flow_stat_time.round_to_minute();
         }
 
         if f.flow.close_type == CloseType::ForcedReport {
             f.flow.end_time =
-                round_to_minute(f.flow.flow_stat_time + Duration::from_secs(SECONDS_IN_MINUTE));
+                (f.flow.flow_stat_time + Duration::from_secs(SECONDS_IN_MINUTE)).round_to_minute();
         }
         self.metrics.out.fetch_add(1, Ordering::Relaxed);
         if !self.output.send(f) {

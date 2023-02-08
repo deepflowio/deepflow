@@ -27,9 +27,11 @@ use crate::common::{
     tagged_flow::TaggedFlow,
     TapPort,
 };
-use npb_pcap_policy::PolicyData;
 use public::proto::common::TridentType;
 use public::utils::net::MacAddr;
+
+use npb_pcap_policy::PolicyData;
+use packet_sequence_block::PacketSequenceBlock;
 
 #[repr(u8)]
 enum MatchMac {
@@ -124,7 +126,7 @@ pub struct FlowNode {
     // 用作time_set比对的标识，等于FlowTimeKey的timestamp_key, 只有创建FlowNode和刷新更新流节点的超时才会更新
     pub timestamp_key: u64,
 
-    pub meta_flow_perf: Option<FlowPerf>,
+    pub meta_flow_perf: Option<Box<FlowPerf>>,
     pub policy_data_cache: [PolicyData; 2],
     pub endpoint_data_cache: [Arc<EndpointData>; 2],
 
@@ -138,7 +140,7 @@ pub struct FlowNode {
     pub flow_state: FlowState,
 
     // Enterprise Edition Feature: packet-sequence
-    pub packet_sequence_block: Option<packet_sequence_block::PacketSequenceBlock>,
+    pub packet_sequence_block: Option<Box<PacketSequenceBlock>>,
 }
 
 impl FlowNode {
@@ -146,7 +148,7 @@ impl FlowNode {
         self.policy_in_tick = [false; 2];
         self.packet_in_tick = false;
         let flow = &mut self.tagged_flow.flow;
-        flow.flow_stat_time = Duration::ZERO;
+        flow.flow_stat_time = Default::default();
         flow.is_new_flow = false;
         let flow_metrics_peer_src = &mut flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC];
         flow_metrics_peer_src.packet_count = 0;
