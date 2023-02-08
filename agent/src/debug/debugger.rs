@@ -387,7 +387,8 @@ impl Debugger {
         mut payload: &[u8],
         debuggers: &ModuleDebuggers,
         serialize_conf: Configuration,
-        agent_mode: RunningMode,
+        #[cfg(target_os = "linux")] agent_mode: RunningMode,
+        #[cfg(target_os = "windows")] _: RunningMode,
     ) -> Result<()> {
         let m = *payload.first().unwrap();
         let module = Module::try_from(m).unwrap_or_default();
