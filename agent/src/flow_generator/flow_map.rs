@@ -417,20 +417,17 @@ impl FlowMap {
                 });
                 let Some(index) = index else {
                     // 没有找到严格匹配的 FlowNode，插入新 Node
-                    let node = Box::new(self.new_flow_node(&flow_config, &log_parser_config, meta_packet));
-                    if meta_packet.signal_source == SignalSource::EBPF
-                        && node.meta_flow_perf.is_some()
-                        && node.meta_flow_perf.as_ref().unwrap().server_port == 0 {
-                        // For ebpf data, if server_port is 0, it means that parsed data
-                        // failed, the info in node maybe wrong, we should drop this node.
-                    } else {
+                    let node = self.new_flow_node(&flow_config, &log_parser_config, meta_packet);
+                    if node.is_some() {
+                        let node = Box::new(node.unwrap());
                         time_set[node.timestamp_key as usize & (self.time_window_size - 1)].insert(pkt_key);
                         nodes.push(node);
+                        max_depth += 1;
                     }
                     Self::update_stats_counter(
                         &self.stats_counter,
                         node_map.len() as u64,
-                        1 + max_depth as u64,
+                        max_depth as u64,
                     );
                     self.stats_counter
                         .total_scan
@@ -490,15 +487,9 @@ impl FlowMap {
             }
             // 未找到匹配的 FlowNode，需要插入新的节点
             None => {
-                let node =
-                    Box::new(self.new_flow_node(&flow_config, &log_parser_config, meta_packet));
-                if meta_packet.signal_source == SignalSource::EBPF
-                    && node.meta_flow_perf.is_some()
-                    && node.meta_flow_perf.as_ref().unwrap().server_port == 0
-                {
-                    // For ebpf data, if server_port is 0, it means that parsed data
-                    // failed, the info in node maybe wrong, we should drop this node.
-                } else {
+                let node = self.new_flow_node(&flow_config, &log_parser_config, meta_packet);
+                if node.is_some() {
+                    let node = Box::new(node.unwrap());
                     time_set[node.timestamp_key as usize & (self.time_window_size - 1)]
                         .insert(pkt_key);
                     node_map.insert(pkt_key, vec![node]);
@@ -1163,7 +1154,7 @@ impl FlowMap {
                 0
             };
             #[cfg(target_os = "windows")]
-            let local_epc_id = 0;
+            let local_epc_id = 0; // just for ebpf, Windows does not need this value
             let (local_epc, remote_epc) = if meta_packet.lookup_key.l2_end_0 {
                 (local_epc_id, 0)
             } else {
@@ -1306,7 +1297,7 @@ impl FlowMap {
         flow_config: &FlowConfig,
         log_parser_config: &LogParserConfig,
         meta_packet: &mut MetaPacket,
-    ) -> FlowNode {
+    ) -> Option<FlowNode> {
         self.stats_counter.new.fetch_add(1, Ordering::Relaxed);
         let node = match meta_packet.lookup_key.proto {
             IpProtocol::Tcp => self.new_tcp_node(flow_config, log_parser_config, meta_packet),
@@ -1314,10 +1305,19 @@ impl FlowMap {
             _ => self.new_other_node(flow_config, meta_packet),
         };
         meta_packet.flow_id = node.tagged_flow.flow.flow_id;
-        self.stats_counter
-            .concurrent
-            .fetch_add(1, Ordering::Relaxed);
-        node
+        if meta_packet.signal_source == SignalSource::EBPF
+            && node.meta_flow_perf.is_some()
+            && node.meta_flow_perf.as_ref().unwrap().server_port == 0
+        {
+            // For ebpf data, if server_port is 0, it means that parsed data failed,
+            // the info in node maybe wrong, we should not create this node.
+            None
+        } else {
+            self.stats_counter
+                .concurrent
+                .fetch_add(1, Ordering::Relaxed);
+            Some(node)
+        }
     }
 
     fn flush_queue(&mut self, config: &FlowConfig, now: Duration) {
