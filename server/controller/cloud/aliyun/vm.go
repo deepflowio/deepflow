@@ -211,8 +211,8 @@ func (a *Aliyun) getVMPorts(region model.Region) ([]model.VInterface, []model.IP
 				// 内网IP
 				ip := port.Get("PrivateIpSets").Get("PrivateIpSet").GetIndex(i)
 
-				// 阿里公有云过滤直接用于POD的辅助网卡
-				if !ip.Get("Primary").MustBool() && port.Get("Description").MustString() == "created by Container Service" {
+				// 阿里公有云过滤直接用于POD的网卡(Primary && Secondary)
+				if port.Get("Description").MustString() == "created by Container Service" {
 					continue
 				}
 				privateIP := ip.Get("PrivateIpAddress").MustString()
