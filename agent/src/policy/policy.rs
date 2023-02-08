@@ -98,6 +98,7 @@ impl PolicyMonitor {
 pub struct SocketExtraInfo {
     // GPID (Global ProcessID) associated with the socket endpoint
     gpid: u32,
+    role: RoleType,
     gpid_real: u32,
     // Real client address information before NAT, or real server address information after NAT
     ip_real: u32,
@@ -184,8 +185,26 @@ impl Policy {
         socket_extra_infos: &(SocketExtraInfo, SocketExtraInfo),
     ) {
         let (socket_extra_info_0, socket_extra_info_1) = socket_extra_infos;
+        let mut direction = packet.lookup_key.direction;
 
-        match packet.lookup_key.direction {
+        // We consider the direction (role) in socket_extra_info to be the ground truth because
+        // it is taken from the socket information of the OS. Both meta_packet and flow need to
+        // correct their direction based on this.
+        packet.need_reverse_flow = match direction {
+            PacketDirection::ClientToServer => {
+                socket_extra_info_0.role == RoleType::RoleServer
+                    || socket_extra_info_1.role == RoleType::RoleClient
+            }
+            PacketDirection::ServerToClient => {
+                socket_extra_info_0.role == RoleType::RoleClient
+                    || socket_extra_info_1.role == RoleType::RoleServer
+            }
+        };
+        if packet.need_reverse_flow {
+            direction = direction.reversed()
+        };
+
+        match direction {
             PacketDirection::ClientToServer => {
                 if socket_extra_info_0.port_real > 0 {
                     // 用于客户端处采集的流量，流量服务端IP为NAT IP，需要通过客户端信息查询流量真实的服务端IP
@@ -193,8 +212,8 @@ impl Policy {
                         RoleType::RoleServer => {
                             packet.gpid_0 = socket_extra_info_0.gpid;
                             packet.gpid_1 = socket_extra_info_0.gpid_real;
-                            // NAT_SOURCE_RTOA高于或等于当前优先级会更新数据
-                            if TapPort::NAT_SOURCE_RTOA >= packet.lookup_key.dst_nat_source {
+                            // NAT_SOURCE_RTOA高于当前优先级会更新数据
+                            if TapPort::NAT_SOURCE_RTOA > packet.lookup_key.dst_nat_source {
                                 packet.lookup_key.dst_nat_source = TapPort::NAT_SOURCE_RTOA;
                                 packet.lookup_key.dst_nat_port = socket_extra_info_0.port_real;
                                 packet.lookup_key.dst_nat_ip =
@@ -203,9 +222,9 @@ impl Policy {
                         }
                         RoleType::RoleClient => {
                             packet.gpid_0 = socket_extra_info_0.gpid_real;
-                            // NAT_SOURCE_RTOA高于或等于当前优先级会更新数据
-                            if TapPort::NAT_SOURCE_RTOA >= packet.lookup_key.src_nat_source {
-                                packet.lookup_key.src_nat_source = TapPort::NAT_SOURCE_RTOA;
+                            // NAT_SOURCE_TOA高于当前优先级会更新数据
+                            if TapPort::NAT_SOURCE_TOA > packet.lookup_key.src_nat_source {
+                                packet.lookup_key.src_nat_source = TapPort::NAT_SOURCE_TOA;
                                 packet.lookup_key.src_nat_port = socket_extra_info_0.port_real;
                                 packet.lookup_key.src_nat_ip =
                                     IpAddr::V4(Ipv4Addr::from(socket_extra_info_0.ip_real));
@@ -228,8 +247,8 @@ impl Policy {
                     match socket_extra_info_1.role_real {
                         RoleType::RoleServer => {
                             packet.gpid_0 = socket_extra_info_1.gpid_real;
-                            // NNAT_SOURCE_RTOA高于或等于当前优先级会更新数据
-                            if TapPort::NAT_SOURCE_RTOA >= packet.lookup_key.src_nat_source {
+                            // NNAT_SOURCE_RTOA高于当前优先级会更新数据
+                            if TapPort::NAT_SOURCE_RTOA > packet.lookup_key.src_nat_source {
                                 packet.lookup_key.src_nat_source = TapPort::NAT_SOURCE_RTOA;
                                 packet.lookup_key.src_nat_port = socket_extra_info_1.port_real;
                                 packet.lookup_key.src_nat_ip =
@@ -240,9 +259,9 @@ impl Policy {
                         RoleType::RoleClient => {
                             packet.gpid_0 = socket_extra_info_0.gpid;
                             packet.gpid_1 = socket_extra_info_1.gpid_real;
-                            // NAT_SOURCE_RTOA高于或等于当前优先级会更新数据
-                            if TapPort::NAT_SOURCE_RTOA >= packet.lookup_key.dst_nat_source {
-                                packet.lookup_key.dst_nat_source = TapPort::NAT_SOURCE_RTOA;
+                            // NAT_SOURCE_RTOA高于当前优先级会更新数据
+                            if TapPort::NAT_SOURCE_TOA > packet.lookup_key.dst_nat_source {
+                                packet.lookup_key.dst_nat_source = TapPort::NAT_SOURCE_TOA;
                                 packet.lookup_key.dst_nat_port = socket_extra_info_1.port_real;
                                 packet.lookup_key.dst_nat_ip =
                                     IpAddr::V4(Ipv4Addr::from(socket_extra_info_1.ip_real));
@@ -503,6 +522,7 @@ impl Policy {
                             ip_real: entry.ip_real,
                             port_real: entry.port_real,
                             role_real: entry.role,
+                            role: RoleType::RoleClient,
                         },
                     );
                 }
@@ -511,6 +531,7 @@ impl Policy {
                         entry.client_keys(),
                         SocketExtraInfo {
                             gpid: entry.pid_0,
+                            role: RoleType::RoleClient,
                             ..Default::default()
                         },
                     );
@@ -521,6 +542,7 @@ impl Policy {
                 entry.server_keys(),
                 SocketExtraInfo {
                     gpid: entry.pid_1,
+                    role: RoleType::RoleServer,
                     ..Default::default()
                 },
             );
@@ -529,6 +551,7 @@ impl Policy {
                 entry.real_keys(),
                 SocketExtraInfo {
                     gpid: entry.pid_real,
+                    role: entry.role,
                     ..Default::default()
                 },
             );
