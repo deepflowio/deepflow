@@ -39,11 +39,6 @@ type Filter map[string]interface{}
 
 // 功能：调用其他模块API并获取返回结果
 func CURLPerform(method string, url string, body map[string]interface{}, strBody string) (*simplejson.Json, error) {
-	errResponse, _ := simplejson.NewJson([]byte("{}"))
-
-	// TODO: 通过配置文件获取API超时时间
-	client := &http.Client{Timeout: time.Second * 30}
-
 	var err error
 	var contentType string
 	req := &http.Request{}
@@ -59,39 +54,59 @@ func CURLPerform(method string, url string, body map[string]interface{}, strBody
 	}
 
 	if err != nil {
-		return errResponse, err
+		return nil, err
 	}
 	req.Header.Set("Content-Type", contentType)
 	req.Header.Set("Accept", "application/json, text/plain")
 	req.Header.Set("X-User-Id", "1")
 	req.Header.Set("X-User-Type", "1")
 
+	return parseResponse(req)
+}
+
+func parseResponse(req *http.Request) (*simplejson.Json, error) {
+	errResponse, _ := simplejson.NewJson([]byte("{}"))
+	// TODO: 通过配置文件获取API超时时间
+	client := &http.Client{Timeout: time.Second * 30}
 	resp, err := client.Do(req)
 	if err != nil {
-		return errResponse, errors.New(fmt.Sprintf("curl (%s) failed, (%v)", url, err))
+		return errResponse, errors.New(fmt.Sprintf("curl (%s) failed, (%v)", req.URL, err))
 	}
 
 	defer resp.Body.Close()
 	respBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return errResponse, errors.New(fmt.Sprintf("read (%s) body failed, (%v)", url, err))
+		return errResponse, errors.New(fmt.Sprintf("read (%s) body failed, (%v)", req.URL, err))
 	}
 	if resp.StatusCode != http.StatusOK {
-		return errResponse, errors.New(fmt.Sprintf("curl (%s) failed, (%v)", url, string(respBytes)))
+		return errResponse, errors.New(fmt.Sprintf("curl (%s) failed, (%v)", req.URL, string(respBytes)))
 	}
 
 	response, err := simplejson.NewJson(respBytes)
 	if err != nil {
-		return errResponse, errors.New(fmt.Sprintf("parse (%s) body failed, (%v)", url, err))
+		return errResponse, errors.New(fmt.Sprintf("parse (%s) body failed, (%v)", req.URL, err))
 	}
 
 	optStatus := response.Get("OPT_STATUS").MustString()
 	if optStatus != "" && optStatus != SUCCESS {
 		description := response.Get("DESCRIPTION").MustString()
-		return response, errors.New(fmt.Sprintf("curl (%s) failed, (%v)", url, description))
+		return response, errors.New(fmt.Sprintf("curl (%s) failed, (%v)", req.URL, description))
 	}
-
 	return response, nil
+}
+
+func CURLPostFormData(url, contentType string, body *bytes.Buffer) (*simplejson.Json, error) {
+	req, err := http.NewRequest("POST", url, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", contentType)
+	req.Header.Set("Accept", "application/json, text/plain")
+	req.Header.Set("X-User-Id", "1")
+	req.Header.Set("X-User-Type", "1")
+	req.Close = true
+
+	return parseResponse(req)
 }
 
 func CURLResponseRawJson(method string, url string) (*simplejson.Json, error) {

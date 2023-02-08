@@ -17,6 +17,12 @@
 package mysql
 
 import (
+	"bytes"
+	"compress/zlib"
+	"database/sql/driver"
+	"errors"
+	"fmt"
+	"io"
 	"time"
 
 	"gorm.io/gorm"
@@ -1276,4 +1282,57 @@ type DialTestTask struct {
 
 func (DialTestTask) TableName() string {
 	return "dial_test_task"
+}
+
+type VTapRepo struct {
+	ID        int             `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name      string          `gorm:"column:name;type:char(64);not null" json:"NAME"`
+	Arch      string          `gorm:"column:arch;type:varchar(256);default:''" json:"ARCH"`
+	OS        string          `gorm:"column:os;type:varchar(256);default:''" json:"OS"`
+	Branch    string          `gorm:"column:branch;type:varchar(256);default:''" json:"BRANCH"`
+	RevCount  string          `gorm:"column:rev_count;type:varchar(256);default:''" json:"REV_COUNT"`
+	CommitID  string          `gorm:"column:commit_id;type:varchar(256);default:''" json:"COMMIT_ID"`
+	Image     compressedImage `gorm:"column:image;type:logblob;not null" json:"IMAGE"`
+	CreatedAt time.Time       `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
+	UpdatedAt time.Time       `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
+}
+
+type compressedImage []byte
+
+// Scan scan decompress value into compressedImage, implements sql.Scanner interface
+func (c *compressedImage) Scan(value interface{}) error {
+	// decompress
+	compressedData, ok := value.([]byte)
+	if !ok {
+		return errors.New(fmt.Sprint("Failed to decompress compressedImage value:", value))
+	}
+
+	var b bytes.Buffer
+	b.Write(compressedData)
+	r, err := zlib.NewReader(&b)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	originData, err := io.ReadAll(r)
+	if err != nil {
+		return err
+	}
+	*c = originData
+	return nil
+}
+
+// Value return compress value, implement driver.Valuer interface
+func (c compressedImage) Value() (driver.Value, error) {
+	// compress
+	var b bytes.Buffer
+	w := zlib.NewWriter(&b)
+	w.Write(c)
+	w.Close()
+	return b.String(), nil
+}
+
+func (VTapRepo) TableName() string {
+	return "vtap_repo"
 }
