@@ -29,8 +29,6 @@ use flexi_logger::{writers::LogWriter, DeferredNow, Level, Record};
 
 use super::stats;
 
-use crate::utils::command::get_hostname;
-
 #[derive(Clone)]
 pub struct RemoteLogConfig {
     enabled: Arc<AtomicBool>,
@@ -77,15 +75,16 @@ pub struct RemoteLogWriter {
 }
 
 impl RemoteLogWriter {
-    pub fn new<S: AsRef<str>>(
-        addrs: &[S],
+    pub fn new<S1: AsRef<str>, S2: AsRef<str>>(
+        hostname: S1,
+        addrs: &[S2],
         port: u16,
         tag: String,
         header: Vec<u8>,
     ) -> (Self, RemoteLogConfig) {
         let enabled: Arc<AtomicBool> = Default::default();
         let threshold: Arc<AtomicU32> = Default::default();
-        let hostname = Arc::new(Mutex::new(get_hostname().unwrap_or_default()));
+        let hostname = Arc::new(Mutex::new(hostname.as_ref().to_owned()));
         let remotes = Arc::new(RwLock::new(
             addrs
                 .iter()

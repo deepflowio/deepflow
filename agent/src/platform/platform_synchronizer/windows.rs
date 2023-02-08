@@ -46,6 +46,7 @@ struct ProcessArgs {
     session: Arc<Session>,
     timer: Arc<Condvar>,
     exception_handler: ExceptionHandler,
+    override_os_hostname: Arc<Option<String>>,
 }
 
 #[derive(Default)]
@@ -67,6 +68,7 @@ pub struct PlatformSynchronizer {
     thread: Mutex<Option<JoinHandle<()>>>,
     session: Arc<Session>,
     exception_handler: ExceptionHandler,
+    override_os_hostname: Arc<Option<String>>,
 }
 
 impl PlatformSynchronizer {
@@ -74,6 +76,7 @@ impl PlatformSynchronizer {
         config: PlatformAccess,
         session: Arc<Session>,
         exception_handler: ExceptionHandler,
+        override_os_hostname: Option<String>,
     ) -> Self {
         Self {
             config,
@@ -88,6 +91,7 @@ impl PlatformSynchronizer {
             thread: Mutex::new(None),
             session,
             exception_handler,
+            override_os_hostname: Arc::new(override_os_hostname),
         }
     }
 
@@ -138,6 +142,7 @@ impl PlatformSynchronizer {
             timer: self.timer.clone(),
             session: self.session.clone(),
             exception_handler: self.exception_handler.clone(),
+            override_os_hostname: self.override_os_hostname.clone(),
         };
 
         let handle = thread::Builder::new()
@@ -158,9 +163,17 @@ impl PlatformSynchronizer {
 
         let mut hash_handle = digest::Context::new(&digest::SHA1_FOR_LEGACY_USE_ONLY);
 
-        let raw_hostname = get_hostname()
-            .map_err(|err| debug!("get_hostname error:{}", err))
-            .ok();
+        let raw_hostname = process_args
+            .override_os_hostname
+            .as_ref()
+            .clone()
+            .or_else(|| match get_hostname() {
+                Ok(name) => Some(name),
+                Err(e) => {
+                    debug!("get_hostname error: {}", e);
+                    None
+                }
+            });
         if let Some(hostname) = raw_hostname.as_ref() {
             hash_handle.update(hostname.as_bytes());
         }
