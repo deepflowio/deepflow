@@ -23,10 +23,13 @@ use std::{
     time::Duration,
 };
 
-use log::{debug, info, warn};
+#[cfg(target_os = "linux")]
+use log::debug;
+use log::{info, warn};
 
 #[cfg(windows)]
 use super::TapTypeHandler;
+
 #[cfg(windows)]
 use crate::common::decapsulate::TunnelTypeBitmap;
 #[cfg(target_os = "linux")]
@@ -435,27 +438,25 @@ impl MirrorModeDispatcher {
                 .rx_bytes
                 .fetch_add(packet.capture_length as u64, Ordering::Relaxed);
 
-            #[cfg(windows)]
-            let mut decap_length = 0;
-            #[cfg(unix)]
+            #[cfg(target_os = "linux")]
             let decap_length = 0;
-
             #[cfg(target_os = "windows")]
-            {
+            let decap_length = {
                 // Mirror Mode运行于Windows环境下时目前只有Hyper-V一个场景，由于Hyper-V加了VXLAN隧道，
                 // 这里需要decap并将tunnel信息保存在flow中，目前仅保存最外层的tunnel
-                decap_length = Self::decap_tunnel(
+                let len = Self::decap_tunnel(
                     &mut packet,
                     &self.base.tap_type_handler,
                     &mut self.base.tunnel_info,
                     &self.base.tunnel_type_bitmap,
                     &self.base.counter,
                 ) as usize;
-                if decap_length > packet.capture_length as usize {
+                if len > packet.capture_length as usize {
                     warn!("Decap tunnel error.");
                     continue;
                 }
-            }
+                len
+            };
 
             let original_length = packet.data.len() - decap_length;
             let overlay_packet = &mut packet.data[decap_length..decap_length + original_length];

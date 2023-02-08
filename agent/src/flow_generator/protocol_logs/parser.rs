@@ -79,7 +79,6 @@ impl MetaAppProto {
         l7_info: L7ProtocolInfo,
         head: AppProtoHead,
     ) -> Option<Self> {
-        let is_src = meta_packet.lookup_key.l2_end_0;
         let mut base_info = AppProtoLogsBaseInfo {
             start_time: meta_packet.lookup_key.timestamp,
             end_time: meta_packet.lookup_key.timestamp,
@@ -123,6 +122,7 @@ impl MetaAppProto {
 
         #[cfg(target_os = "linux")]
         if meta_packet.signal_source == SignalSource::EBPF {
+            let is_src = meta_packet.lookup_key.l2_end_0;
             let mut end_index = meta_packet.process_kname.len();
             for (i, char) in meta_packet.process_kname.iter().enumerate() {
                 if *char == b'\0' {

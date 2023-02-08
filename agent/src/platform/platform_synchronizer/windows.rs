@@ -35,7 +35,7 @@ use crate::{
     rpc::Session,
     utils::command::{get_hostname, get_ip_address},
 };
-use public::proto::trident::{self, Exception, GenesisSyncRequest, GenesisSyncResponse};
+use public::proto::trident::{self, Exception};
 
 const SHA1_DIGEST_LEN: usize = 20;
 
