@@ -458,7 +458,7 @@ impl PlatformSynchronizer {
             }
         }
 
-        if process_info_enabled {
+        if process_info_enabled && proc_scan_conf.os_proc_sync_enabled {
             *process_info = get_all_process(proc_scan_conf);
             process_info.sort_by_key(|p| p.pid);
             let proc_sha1 = calc_process_datas_sha1(&*process_info);
@@ -947,6 +947,14 @@ impl SocketSynchronizer {
                 sync_interval = Duration::from_secs(
                     conf_guard.os_proc_scan_conf.os_proc_socket_sync_interval as u64,
                 );
+
+                // wait for config from server
+                if !conf_guard.os_proc_scan_conf.os_proc_sync_enabled {
+                    if !Self::wait_timeout(running_guard, stop_notify.clone(), sync_interval) {
+                        return;
+                    }
+                    continue;
+                }
 
                 let ctl_mac = running_config.read().ctrl_mac.clone();
                 let mut policy_getter = policy_getter.lock().unwrap();
