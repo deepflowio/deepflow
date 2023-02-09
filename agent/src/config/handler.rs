@@ -1428,6 +1428,8 @@ impl ConfigHandler {
                 "stats config change from {:#?} to {:#?}",
                 candidate_config.stats, new_config.stats
             );
+            candidate_config.stats = new_config.stats;
+
             fn stats_callback(handler: &ConfigHandler, components: &mut AgentComponents) {
                 let c = &components.stats_collector;
                 c.set_hostname(handler.candidate_config.stats.host.clone());
@@ -1791,14 +1793,6 @@ impl ConfigHandler {
                 }
             }
             callbacks.push(ebpf_callback);
-        }
-
-        if candidate_config.stats != new_config.stats {
-            info!(
-                "stats config change from {:#?} to {:#?}",
-                candidate_config.stats, new_config.stats
-            );
-            candidate_config.stats = new_config.stats;
         }
 
         if candidate_config.trident_type != new_config.trident_type {
