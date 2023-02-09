@@ -17,11 +17,16 @@
 package common
 
 const PERMISSION_TYPE_NUM = 3
+const DB_NAME_FLOW_LOG = "flow_log"
+const DB_NAME_FLOW_METRICS = "flow_metrics"
+const DB_NAME_EXT_METRICS = "ext_metrics"
+const DB_NAME_DEEPFLOW_SYSTEM = "deepflow_system"
+const DB_NAME_EVENT = "event"
 
 var DB_TABLE_MAP = map[string][]string{
-	"flow_log":        []string{"l4_flow_log", "l7_flow_log", "l4_packet", "l7_packet"},
-	"flow_metrics":    []string{"vtap_flow_port", "vtap_flow_edge_port", "vtap_app_port", "vtap_app_edge_port", "vtap_acl"},
-	"ext_metrics":     []string{"ext_common"},
-	"deepflow_system": []string{"deepflow_system_common"},
-	"event":           []string{"event"},
+	DB_NAME_FLOW_LOG:        []string{"l4_flow_log", "l7_flow_log", "l4_packet", "l7_packet"},
+	DB_NAME_FLOW_METRICS:    []string{"vtap_flow_port", "vtap_flow_edge_port", "vtap_app_port", "vtap_app_edge_port", "vtap_acl"},
+	DB_NAME_EXT_METRICS:     []string{"ext_common"},
+	DB_NAME_DEEPFLOW_SYSTEM: []string{"deepflow_system_common"},
+	DB_NAME_EVENT:           []string{"event"},
 }
