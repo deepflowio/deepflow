@@ -308,14 +308,14 @@ fn is_zero_addr(addr: &SocketAddr) -> bool {
 }
 
 fn get_proc_netns(proc: &Process) -> Result<u64, ProcError> {
-    if let Some(netns) = proc.namespaces()?.get(&OsString::from("net")) {
-        Ok(netns.identifier)
-    } else {
-        Err(ProcError::Other(format!(
-            "pid {} get net ns fail",
-            proc.pid
-        )))
-    }
+    // works with linux 3.0+ kernel only
+    // refer to this [commit](https://github.com/torvalds/linux/commit/6b4e306aa3dc94a0545eb9279475b1ab6209a31f)
+    // use 0 as default ns for old kernel
+    proc.namespaces()
+        .map_or(Ok(0), |m| match m.get(&OsString::from("net")) {
+            Some(netns) => Ok(netns.identifier),
+            _ => Ok(0),
+        })
 }
 
 /*
