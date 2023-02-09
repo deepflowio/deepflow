@@ -37,10 +37,7 @@ use flexi_logger::{
     colored_opt_format, Age, Cleanup, Criterion, FileSpec, Logger, LoggerHandle, Naming,
 };
 use log::{info, warn};
-use packet_sequence_block::BoxedPacketSequenceBlock;
-use pcap_assembler::{BoxedPcapBatch, PcapAssembler};
-use public::packet::MiniPacket;
-use public::queue::DebugSender;
+#[cfg(target_os = "linux")]
 use regex::Regex;
 
 use crate::{
@@ -75,20 +72,19 @@ use crate::{
     },
     metric::document::BoxedDocument,
     monitor::Monitor,
-    platform::{LibvirtXmlExtractor, PlatformSynchronizer},
+    platform::PlatformSynchronizer,
     policy::{Policy, PolicySetter},
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
     sender::{get_sender_id, npb_sender::NpbArpTable, uniform_sender::UniformSenderThread},
     utils::{
         cgroups::{is_kernel_available_for_cgroup, Cgroups},
+        command::get_hostname,
         environment::{
             check, controller_ip_check, free_memory_check, free_space_checker, get_ctrl_ip_and_mac,
-            kernel_check, running_in_container, running_in_only_watch_k8s_mode,
-            tap_interface_check, trident_process_check,
+            kernel_check, running_in_container, tap_interface_check, trident_process_check,
         },
         guard::Guard,
         logger::{LogLevelWriter, LogWriterAdapter, RemoteLogConfig, RemoteLogWriter},
-        lru::Lru,
         npb_bandwidth_watcher::NpbBandwidthWatcher,
         stats::{self, ArcBatch, Countable, RefCountable, StatsOption},
     },
@@ -96,9 +92,15 @@ use crate::{
 #[cfg(target_os = "linux")]
 use crate::{
     ebpf_dispatcher::EbpfCollector,
-    platform::{ApiWatcher, SocketSynchronizer},
-    utils::environment::{core_file_check, is_tt_pod},
+    platform::{ApiWatcher, LibvirtXmlExtractor, SocketSynchronizer},
+    utils::{
+        environment::{core_file_check, is_tt_pod, running_in_only_watch_k8s_mode},
+        lru::Lru,
+    },
 };
+
+use packet_sequence_block::BoxedPacketSequenceBlock;
+use pcap_assembler::{BoxedPcapBatch, PcapAssembler};
 
 #[cfg(target_os = "linux")]
 use public::netns::{links_by_name_regex_in_netns, NetNs};
@@ -107,8 +109,9 @@ use public::utils::net::link_by_name;
 use public::{
     debug::QueueDebugger,
     netns::NsFile,
+    packet::MiniPacket,
     proto::trident::{self, IfMacSource, SocketType, TapMode},
-    queue,
+    queue::{self, DebugSender},
     sender::SendMessageType,
     utils::net::{get_route_src_ip, links_by_name_regex, MacAddr},
     LeakyBucket,
@@ -228,6 +231,11 @@ impl Trident {
             }
         };
 
+        let hostname = match config.override_os_hostname.as_ref() {
+            Some(name) => name.to_owned(),
+            None => get_hostname().unwrap_or_default(),
+        };
+
         let base_name = Path::new(&env::args().next().unwrap())
             .file_name()
             .unwrap()
@@ -235,6 +243,7 @@ impl Trident {
             .unwrap()
             .to_owned();
         let (remote_log_writer, remote_log_config) = RemoteLogWriter::new(
+            &hostname,
             &config.controller_ips,
             DEFAULT_INGESTER_PORT,
             base_name,
@@ -269,6 +278,7 @@ impl Trident {
         let logger_handle = logger.start()?;
 
         let stats_collector = Arc::new(stats::Collector::new(
+            &hostname,
             &config.controller_ips,
             DEFAULT_INGESTER_PORT,
         ));
@@ -368,6 +378,7 @@ impl Trident {
             config_handler.static_config.vtap_group_id_request.clone(),
             config_handler.static_config.kubernetes_cluster_id.clone(),
             config_handler.static_config.kubernetes_cluster_name.clone(),
+            config_handler.static_config.override_os_hostname.clone(),
             exception_handler.clone(),
             config_handler.static_config.agent_mode,
             config_path,
@@ -437,6 +448,7 @@ impl Trident {
                     .dispatcher
                     .extra_netns_regex
                     .clone(),
+                config_handler.static_config.override_os_hostname.clone(),
             ));
             ext.start();
             (ext, syn)
@@ -446,6 +458,7 @@ impl Trident {
             config_handler.platform(),
             session.clone(),
             exception_handler.clone(),
+            config_handler.static_config.override_os_hostname.clone(),
         ));
         if matches!(
             config_handler.static_config.agent_mode,
@@ -498,12 +511,20 @@ impl Trident {
             mem::swap(&mut new_state, &mut *state_guard);
             mem::drop(state_guard);
 
+            #[cfg(target_os = "linux")]
             let ChangedConfig {
                 runtime_config,
                 blacklist,
                 vm_mac_addrs,
                 tap_types,
             } = new_state.unwrap_config();
+            #[cfg(target_os = "windows")]
+            let ChangedConfig {
+                runtime_config,
+                vm_mac_addrs,
+                ..
+            } = new_state.unwrap_config();
+
             if let Some(old_yaml) = yaml_conf {
                 if old_yaml != runtime_config.yaml_config {
                     if let Some(mut c) = components.take() {
@@ -519,6 +540,7 @@ impl Trident {
             yaml_conf = Some(runtime_config.yaml_config.clone());
             match components.as_mut() {
                 None => {
+                    #[cfg(target_os = "linux")]
                     let callbacks =
                         config_handler.on_config(runtime_config, &exception_handler, None);
                     let mut comp = Components::new(
@@ -537,6 +559,7 @@ impl Trident {
                     )?;
                     comp.start();
 
+                    #[cfg(target_os = "linux")]
                     if let Components::Agent(components) = &mut comp {
                         if config_handler.candidate_config.dispatcher.tap_mode == TapMode::Analyzer
                         {
@@ -550,6 +573,7 @@ impl Trident {
 
                     components.replace(comp);
                 }
+                #[cfg(target_os = "linux")]
                 Some(components) => {
                     if let Components::Agent(components) = components {
                         let callbacks = config_handler.on_config(
@@ -576,6 +600,8 @@ impl Trident {
                         }
                     }
                 }
+                #[cfg(target_os = "windows")]
+                _ => (),
             }
             state_guard = state.lock().unwrap();
         }
@@ -965,8 +991,8 @@ impl AgentComponents {
         stats_collector: Arc<stats::Collector>,
         flow_receiver: queue::Receiver<Box<TaggedFlow>>,
         toa_info_sender: DebugSender<Box<(SocketAddr, SocketAddr)>>,
-        l4_flow_aggr_sender: Option<queue::DebugSender<BoxedTaggedFlow>>,
-        metrics_sender: queue::DebugSender<BoxedDocument>,
+        l4_flow_aggr_sender: Option<DebugSender<BoxedTaggedFlow>>,
+        metrics_sender: DebugSender<BoxedDocument>,
         metrics_type: MetricsType,
         config_handler: &ConfigHandler,
         queue_debugger: &QueueDebugger,
@@ -1207,7 +1233,14 @@ impl AgentComponents {
         let debugger = Debugger::new(context);
         let queue_debugger = debugger.clone_queue();
 
+        #[cfg(target_os = "linux")]
         let (toa_sender, toa_recv, _) = queue::bounded_with_debug(
+            yaml_config.toa_sender_queue_size,
+            "socket-sync-toa-info-queue",
+            &queue_debugger,
+        );
+        #[cfg(target_os = "windows")]
+        let (toa_sender, _, _) = queue::bounded_with_debug(
             yaml_config.toa_sender_queue_size,
             "socket-sync-toa-info-queue",
             &queue_debugger,

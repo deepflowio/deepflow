@@ -27,9 +27,9 @@ mod windows;
 mod windows_process;
 
 #[cfg(target_os = "linux")]
-use std::os::linux::fs::MetadataExt;
 use std::{
     fs::{metadata, symlink_metadata},
+    os::linux::fs::MetadataExt,
     path::PathBuf,
 };
 
