@@ -30,7 +30,6 @@ use cadence::{
 use log::{debug, info, warn};
 use prost::Message;
 
-use crate::utils::command::get_hostname;
 pub use public::counter::*;
 use public::{
     proto::stats,
@@ -155,11 +154,16 @@ pub struct Collector {
 }
 
 impl Collector {
-    pub fn new(remotes: &Vec<String>, port: u16) -> Self {
-        Self::with_min_interval(remotes, port, TICK_CYCLE)
+    pub fn new<S: AsRef<str>>(hostname: S, remotes: &Vec<String>, port: u16) -> Self {
+        Self::with_min_interval(hostname, remotes, port, TICK_CYCLE)
     }
 
-    pub fn with_min_interval(remotes: &Vec<String>, port: u16, interval: Duration) -> Self {
+    pub fn with_min_interval<S: AsRef<str>>(
+        hostname: S,
+        remotes: &Vec<String>,
+        port: u16,
+        interval: Duration,
+    ) -> Self {
         let (stats_queue_sender, stats_queue_receiver, counter) = bounded(1000);
         let min_interval = if interval <= TICK_CYCLE {
             TICK_CYCLE
@@ -174,7 +178,7 @@ impl Collector {
             .filter_map(|x| x.parse::<IpAddr>().ok())
             .collect();
         let s = Self {
-            hostname: Arc::new(Mutex::new(get_hostname().unwrap_or_default())),
+            hostname: Arc::new(Mutex::new(hostname.as_ref().to_owned())),
             remotes: Arc::new(Mutex::new(Some(remotes))),
             remote_port: Arc::new(AtomicU16::new(port)),
             sources: Arc::new(Mutex::new(vec![])),
@@ -271,7 +275,11 @@ impl Collector {
             .store(interval.as_secs(), Ordering::Relaxed);
     }
 
-    fn new_statsd_client<A: ToSocketAddrs>(addr: A) -> MetricResult<StatsdClient> {
+    fn new_statsd_client<A: ToSocketAddrs + std::fmt::Debug>(
+        addr: A,
+    ) -> MetricResult<StatsdClient> {
+        info!("stats client connect to {:?}", &addr);
+
         let socket = UdpSocket::bind("0.0.0.0:0")?;
         let sink = DropletSink::from(addr, socket)?;
         Ok(StatsdClient::from_sink(STATS_PREFIX, sink))

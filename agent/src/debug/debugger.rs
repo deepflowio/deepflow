@@ -63,6 +63,7 @@ pub struct Debugger {
     running: Arc<AtomicBool>,
     debuggers: Arc<ModuleDebuggers>,
     config: DebugAccess,
+    override_os_hostname: Arc<Option<String>>,
 }
 
 pub struct ConstructDebugCtx {
@@ -87,6 +88,7 @@ impl Debugger {
         let running = self.running.clone();
         let debuggers = self.debuggers.clone();
         let conf = self.config.clone();
+        let override_os_hostname = self.override_os_hostname.clone();
 
         #[cfg(target_os = "linux")]
         let thread = thread::Builder::new()
@@ -122,12 +124,16 @@ impl Debugger {
                     .spawn(move || {
                         while running_clone.load(Ordering::Relaxed) {
                             thread::sleep(BEACON_INTERVAL);
-                            let hostname = match get_hostname() {
-                                Ok(hostname) => hostname,
-                                Err(e) => {
-                                    warn!("get hostname failed: {}", e);
-                                    continue;
+                            let Some(hostname) = override_os_hostname.as_ref().clone().or_else(|| {
+                                match get_hostname() {
+                                    Ok(hostname) => Some(hostname),
+                                    Err(e) => {
+                                        warn!("get hostname failed: {}", e);
+                                        None
+                                    }
                                 }
+                            }) else {
+                                continue;
                             };
 
                             let beacon = Beacon {
@@ -246,12 +252,16 @@ impl Debugger {
                     .spawn(move || {
                         while running_clone.load(Ordering::Relaxed) {
                             thread::sleep(BEACON_INTERVAL);
-                            let hostname = match get_hostname() {
-                                Ok(hostname) => hostname,
-                                Err(e) => {
-                                    warn!("get hostname failed: {}", e);
-                                    continue;
+                            let Some(hostname) = override_os_hostname.as_ref().clone().or_else(|| {
+                                match get_hostname() {
+                                    Ok(hostname) => Some(hostname),
+                                    Err(e) => {
+                                        warn!("get hostname failed: {}", e);
+                                        None
+                                    }
                                 }
+                            }) else {
+                                continue;
                             };
 
                             let beacon = Beacon {
@@ -377,7 +387,8 @@ impl Debugger {
         mut payload: &[u8],
         debuggers: &ModuleDebuggers,
         serialize_conf: Configuration,
-        agent_mode: RunningMode,
+        #[cfg(target_os = "linux")] agent_mode: RunningMode,
+        #[cfg(target_os = "windows")] _: RunningMode,
     ) -> Result<()> {
         let m = *payload.first().unwrap();
         let module = Module::try_from(m).unwrap_or_default();
@@ -475,6 +486,7 @@ impl Debugger {
 impl Debugger {
     /// 传入构造上下文
     pub fn new(context: ConstructDebugCtx) -> Self {
+        let override_os_hostname = Arc::new(context.static_config.override_os_hostname.clone());
         let debuggers = ModuleDebuggers {
             #[cfg(target_os = "linux")]
             platform: PlatformDebugger::new(context.api_watcher, context.poller),
@@ -493,6 +505,7 @@ impl Debugger {
             running: Arc::new(AtomicBool::new(false)),
             debuggers: Arc::new(debuggers),
             config: context.config,
+            override_os_hostname,
         }
     }
 
