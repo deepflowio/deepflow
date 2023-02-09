@@ -37,6 +37,9 @@ use super::{
     config::{Config, PcapConfig, PortConfig, YamlConfig},
     ConfigError, IngressFlavour, KubernetesPollerType, RuntimeConfig,
 };
+use super::{
+    OsProcRegexp, OS_PROC_REGEXP_MATCH_ACTION_ACCEPT, OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME,
+};
 use crate::common::l7_protocol_log::L7ProtocolBitmap;
 use crate::flow_generator::protocol_logs::SOFA_NEW_RPC_TRACE_CTX_KEY;
 #[cfg(target_os = "linux")]
@@ -226,6 +229,9 @@ pub struct OsProcScanConfig {
     pub os_proc_regex: Vec<ProcRegRewrite>,
     pub os_app_tag_exec_user: String,
     pub os_app_tag_exec: Vec<String>,
+    // whether to sync os socket and proc info
+    // only make sense when process_info_enabled() == true
+    pub os_proc_sync_enabled: bool,
 }
 #[cfg(target_os = "windows")]
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -912,10 +918,22 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                                 v.push(r);
                             }
                         }
+
+                        // append the .* at the end for accept the proc whic not match any regexp
+                        v.push(
+                            ProcRegRewrite::try_from(&OsProcRegexp {
+                                match_regex: ".*".into(),
+                                match_type: OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME.into(),
+                                rewrite_name: "".into(),
+                                action: OS_PROC_REGEXP_MATCH_ACTION_ACCEPT.into(),
+                            })
+                            .unwrap(),
+                        );
                         v
                     },
                     os_app_tag_exec_user: conf.yaml_config.os_app_tag_exec_user.clone(),
                     os_app_tag_exec: conf.yaml_config.os_app_tag_exec.clone(),
+                    os_proc_sync_enabled: conf.yaml_config.os_proc_sync_enabled,
                 },
                 #[cfg(target_os = "windows")]
                 os_proc_scan_conf: OsProcScanConfig {},
