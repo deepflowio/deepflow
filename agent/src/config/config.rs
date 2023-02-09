@@ -370,6 +370,9 @@ pub struct YamlConfig {
     pub os_proc_regex: Vec<OsProcRegexp>,
     pub os_app_tag_exec_user: String,
     pub os_app_tag_exec: Vec<String>,
+    // whether to sync os socket and proc info.
+    // only make sense when process_info_enabled() == true
+    pub os_proc_sync_enabled: bool,
     #[serde(with = "humantime_serde")]
     pub guard_interval: Duration,
 }
@@ -636,6 +639,7 @@ impl Default for YamlConfig {
             }],
             os_app_tag_exec_user: "deepflow".to_string(),
             os_app_tag_exec: vec![],
+            os_proc_sync_enabled: false,
             guard_interval: Duration::from_secs(60),
         }
     }
