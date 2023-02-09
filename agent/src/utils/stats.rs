@@ -275,7 +275,11 @@ impl Collector {
             .store(interval.as_secs(), Ordering::Relaxed);
     }
 
-    fn new_statsd_client<A: ToSocketAddrs>(addr: A) -> MetricResult<StatsdClient> {
+    fn new_statsd_client<A: ToSocketAddrs + std::fmt::Debug>(
+        addr: A,
+    ) -> MetricResult<StatsdClient> {
+        info!("stats client connect to {:?}", &addr);
+
         let socket = UdpSocket::bind("0.0.0.0:0")?;
         let sink = DropletSink::from(addr, socket)?;
         Ok(StatsdClient::from_sink(STATS_PREFIX, sink))
