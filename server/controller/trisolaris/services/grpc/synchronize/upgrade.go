@@ -19,13 +19,14 @@ package synchronize
 import (
 	"crypto/md5"
 	"fmt"
-	"io/ioutil"
 	"math"
 
 	"github.com/golang/protobuf/proto"
 
 	api "github.com/deepflowys/deepflow/message/trident"
+	models "github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/dbmgr"
 )
 
 type UpgradeEvent struct{}
@@ -53,14 +54,20 @@ func sendFailed(in api.Synchronizer_UpgradeServer) error {
 	return err
 }
 
-func (e *UpgradeEvent) GetUpgradeFile(upgradePackage string) (*UpgradeData, error) {
+func (e *UpgradeEvent) GetUpgradeFile(upgradePackage string, expectedRevision string) (*UpgradeData, error) {
 	if upgradePackage == "" {
-		return nil, fmt.Errorf("upgradePackage(%s) file does not exist", upgradePackage)
+		return nil, fmt.Errorf("image(%s) file does not exist", upgradePackage)
 	}
-	content, err := ioutil.ReadFile(upgradePackage)
+	vtapRrepo, err := dbmgr.DBMgr[models.VTapRepo](trisolaris.GetDB()).GetFromName(upgradePackage)
 	if err != nil {
-		return nil, fmt.Errorf("trident(%s) file does not exist, err: %s", upgradePackage, err)
+		return nil, fmt.Errorf("get vtapRepo(name=%s) failed, %s", upgradePackage, err)
 	}
+	dbRevision := vtapRrepo.RevCount + "-" + vtapRrepo.CommitID
+	if dbRevision != expectedRevision {
+		return nil, fmt.Errorf("get vtapRepo(name=%s) failed, dbRevision(%s) != expectedRevision(%s)",
+			upgradePackage, dbRevision, expectedRevision)
+	}
+	content := vtapRrepo.Image
 	totalLen := uint64(len(content))
 	step := uint64(1024 * 1024)
 	pktCount := uint32(math.Ceil(float64(totalLen) / float64(step)))
@@ -84,7 +91,7 @@ func (e *UpgradeEvent) Upgrade(r *api.UpgradeRequest, in api.Synchronizer_Upgrad
 		log.Errorf("vtap(%s) cache not found", vtapCacheKey)
 		return sendFailed(in)
 	}
-	upgradeData, err := e.GetUpgradeFile(vtapCache.GetUpgradePackage())
+	upgradeData, err := e.GetUpgradeFile(vtapCache.GetUpgradePackage(), vtapCache.GetExpectedRevision())
 	if err != nil {
 		log.Error(err)
 		return sendFailed(in)

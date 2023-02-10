@@ -42,8 +42,7 @@ func NewUpgradeService() *UpgradeService {
 }
 
 type UpgradeInfo struct {
-	ExpectedRevision string `json:"expected_revision" binding:"required"`
-	UpgradePackage   string `json:"upgrade_package" binding:"required"`
+	ImageName string `json:"image_name" binding:"required"`
 }
 
 func Upgrade(c *gin.Context) {
@@ -59,6 +58,26 @@ func Upgrade(c *gin.Context) {
 		common.Response(c, nil, common.NewReponse("FAILED", "", nil, fmt.Sprintf("%s", err)))
 		return
 	}
+
+	vtapRrepo, err := dbmgr.DBMgr[models.VTapRepo](trisolaris.GetDB()).GetFieldsFromName(
+		[]string{"rev_count", "commit_id"}, upgradeInfo.ImageName)
+	if err != nil {
+		log.Error(err)
+		common.Response(c, nil, common.NewReponse("FAILED", "", nil, fmt.Sprintf("%s", err)))
+		return
+	}
+	var expectedRevision string
+	if vtapRrepo.RevCount != "" && vtapRrepo.CommitID != "" {
+		expectedRevision = vtapRrepo.RevCount + "-" + vtapRrepo.CommitID
+	}
+	if len(expectedRevision) == 0 {
+		errLog := fmt.Sprintf("get vtapRepo(%s) failed RevCount=%s CommitID=%s",
+			upgradeInfo.ImageName, vtapRrepo.RevCount, vtapRrepo.CommitID)
+		log.Error(errLog)
+		common.Response(c, nil, common.NewReponse("FAILED", "", nil, errLog))
+		return
+	}
+
 	vtap, err := dbmgr.DBMgr[models.VTap](trisolaris.GetDB()).GetFromLcuuid(lcuuid)
 	if err != nil {
 		log.Error(err)
@@ -71,8 +90,8 @@ func Upgrade(c *gin.Context) {
 		common.Response(c, nil, common.NewReponse("FAILED", "", nil, "not found vtap cache"))
 		return
 	}
-	vTapCache.UpdateUpgradeInfo(upgradeInfo.ExpectedRevision, upgradeInfo.UpgradePackage)
-	log.Infof("vtap(%s, %s) upgrade:%+v", vtap.Name, key, upgradeInfo)
+	vTapCache.UpdateUpgradeInfo(expectedRevision, upgradeInfo.ImageName)
+	log.Infof("vtap(%s, %s) upgrade:(%s, %s)", vtap.Name, key, expectedRevision, upgradeInfo.ImageName)
 	common.Response(c, nil, common.NewReponse("SUCCESS", "", nil, ""))
 }
 
