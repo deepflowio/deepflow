@@ -1283,6 +1283,7 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 		    ("\"/proc/sys/net/core/bpf_jit_enable value is invalid\n");
 	}
 
+	fetch_linux_release(linux_release, sizeof(linux_release) - 1);
 	max_rlim_open_files_set(OPEN_FILES_MAX);
 	sys_cpus_count = get_cpus_count(&cpu_online);
 	if (sys_cpus_count <= 0 || sys_cpus_count > MAX_CPU_NR) {
