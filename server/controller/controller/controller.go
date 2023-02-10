@@ -20,6 +20,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"time"
@@ -61,7 +62,7 @@ var log = logging.MustGetLogger("controller")
 
 type Controller struct{}
 
-func Start(ctx context.Context, configPath string, shared *servercommon.ControllerIngesterShared) {
+func Start(ctx context.Context, configPath, serverLogFile string, shared *servercommon.ControllerIngesterShared) {
 	flag.Parse()
 
 	serverCfg := config.DefaultConfig()
@@ -72,8 +73,12 @@ func Start(ctx context.Context, configPath string, shared *servercommon.Controll
 	log.Infof("controller config:\n%s", string(bytes))
 	setGlobalConfig(cfg)
 
+	ginLogFile, _ := os.OpenFile(serverLogFile, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
+	gin.DefaultWriter = io.MultiWriter(ginLogFile, os.Stdout)
+
 	// register router
 	r := gin.New()
+	r.Use(gin.Recovery())
 	r.Use(gin.LoggerWithFormatter(logger.GinLogFormat))
 	router.HealthRouter(r)
 	go func() {
@@ -173,6 +178,7 @@ func Start(ctx context.Context, configPath string, shared *servercommon.Controll
 	trouter.RegistRouter(r)
 	configuration.ConfigurationRouter(r)
 	registerResourceRouters(r, cfg)
+	router.VtapRepoRouter(r)
 
 	grpcStart(ctx, cfg)
 

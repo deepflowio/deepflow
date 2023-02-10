@@ -39,7 +39,6 @@ func Register(r interface{}) {
 }
 
 func RegistRouter(mux *gin.Engine) {
-	mux.Use(RequestLoggerMiddleware)
 	for _, registered := range register.r {
 		registered.Register(mux)
 	}

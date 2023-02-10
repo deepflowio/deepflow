@@ -951,6 +951,11 @@ vtap_group_id: g-xxxxxx
   #####################
   ## Proc Monitoring ##
   #####################
+  ## whether to sync os socket and proc info
+  ## Default: false
+  ## Note: only make sense when trident type is one of CHOST_VM, CHOST_BM, K8S_VM, K8S_BM
+  #os-proc-sync-enabled: false
+
   ## The proc fs mount path
   ## Default: /proc
   #os-proc-root: /proc
@@ -986,7 +991,8 @@ vtap_group_id: g-xxxxxx
   ## the regular expression use for match process and replace the process name
   ## Note: will traverse over the entire array, so the previous ones will be matched first.
   ##   rewrite-name can replace by regexp capture group and windows style environment variable, for example:
-  ##   `$1-py-script-%HOSTNAME%` will replace regexp capture group 1 and HOSTNAME env var
+  ##   `$1-py-script-%HOSTNAME%` will replace regexp capture group 1 and HOSTNAME env var.
+  ##   if proc not match any regexp will be accepted (essentially will auto append '- match-regex: .*' at the end).
   ##
   ## Example:
   ##   os-proc-regex:
@@ -1000,7 +1006,6 @@ vtap_group_id: g-xxxxxx
   ##     - match-regex: .*sleep.*
   ##       match-type: process_name
   ##       action: drop
-  ##     - match-regex: .*
   #os-proc-regex:
 
     ## The regexp use for match the process
