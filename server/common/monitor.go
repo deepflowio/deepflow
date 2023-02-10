@@ -6,6 +6,8 @@ import (
 
 	"github.com/deepflowys/deepflow/server/libs/stats"
 	"github.com/deepflowys/deepflow/server/libs/utils"
+	"github.com/shirou/gopsutil/load"
+	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/net"
 	"github.com/shirou/gopsutil/v3/process"
 )
@@ -44,6 +46,21 @@ func (m *Monitor) GetDiskIO() (uint64, uint64) {
 	return 0, 0
 }
 
+func (m *Monitor) GetLoad1() float64 {
+	if loadInfo, err := load.Avg(); err == nil {
+		return loadInfo.Load1
+	}
+	return 0
+}
+
+func (m *Monitor) GetCpuNum() uint64 {
+	cpuNum, err := cpu.Counts(true)
+	if err != nil {
+		cpuNum = runtime.NumCPU()
+	}
+	return uint64(cpuNum)
+}
+
 type Monitor struct {
 	process             *process.Process
 	lastRecv, lastSend  uint64
@@ -60,6 +77,8 @@ type Counter struct {
 	BytesRecv  uint64  `statsd:"bytes-recv"`
 	BytesRead  uint64  `statsd:"bytes-read"`
 	BytesWrite uint64  `statsd:"bytes-write"`
+	Load1      float64 `statsd:"load1"`
+	CPUNum     uint64  `statsd:"cpu-num"`
 }
 
 func NewMonitor() (*Monitor, error) {
@@ -86,6 +105,8 @@ func (m *Monitor) GetCounter() interface{} {
 		BytesRecv:  bytesRecv - m.lastRecv,
 		BytesRead:  bytesRead - m.lastRead,
 		BytesWrite: bytesWrite - m.lastWrite,
+		Load1:      m.GetLoad1(),
+		CPUNum:     m.GetCpuNum(),
 	}
 	m.lastSend, m.lastRecv = bytesSend, bytesRecv
 	m.lastRead, m.lastWrite = bytesRead, bytesWrite
