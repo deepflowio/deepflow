@@ -30,3 +30,6 @@ controller-ips:
 
 ## 支持采集器自动加入组
 #vtap-group-id-request: ""
+
+## If specified, use this name for hostname
+#override-os-hostname:

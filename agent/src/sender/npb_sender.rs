@@ -391,7 +391,8 @@ enum NpbSender {
 impl NpbSender {
     fn send(
         &mut self,
-        timestamp: u64,
+        #[cfg(unix)] timestamp: u64,
+        #[cfg(not(unix))] _: u64,
         underlay_l2_opt_size: usize,
         packet: Vec<u8>,
         arp: &Arc<NpbArpTable>,

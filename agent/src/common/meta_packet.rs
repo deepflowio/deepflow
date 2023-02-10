@@ -16,11 +16,10 @@
 
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr};
-use std::ptr;
 use std::sync::Arc;
 use std::time::Duration;
 #[cfg(target_os = "linux")]
-use std::{error::Error, net::Ipv6Addr};
+use std::{error::Error, net::Ipv6Addr, ptr};
 
 use pnet::packet::{
     icmp::{IcmpType, IcmpTypes},
@@ -29,17 +28,17 @@ use pnet::packet::{
 };
 
 use super::ebpf::EbpfType;
-#[cfg(target_os = "linux")]
-use super::enums::TapType;
 use super::{
     consts::*,
     decapsulate::TunnelInfo,
     endpoint::EndpointData,
     enums::{EthernetType, HeaderType, IpProtocol, TcpFlags},
-    flow::{L7Protocol, PacketDirection, SignalSource},
+    flow::{L7Protocol, SignalSource},
     lookup_key::LookupKey,
     tap_port::TapPort,
 };
+#[cfg(target_os = "linux")]
+use super::{enums::TapType, flow::PacketDirection};
 
 use crate::error;
 use crate::utils::bytes::{read_u16_be, read_u32_be};

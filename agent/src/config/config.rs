@@ -77,6 +77,7 @@ pub struct Config {
     pub controller_domain_name: Vec<String>,
     #[serde(skip)]
     pub agent_mode: RunningMode,
+    pub override_os_hostname: Option<String>,
 }
 
 impl Config {
@@ -213,6 +214,7 @@ impl Default for Config {
             vtap_group_id_request: "".into(),
             controller_domain_name: vec![],
             agent_mode: Default::default(),
+            override_os_hostname: None,
         }
     }
 }
