@@ -31,7 +31,6 @@ import (
 
 	"github.com/deepflowys/deepflow/cli/ctl/common"
 	"github.com/deepflowys/deepflow/cli/ctl/common/jsonparser"
-	"github.com/deepflowys/deepflow/cli/ctl/common/printutil"
 	"github.com/deepflowys/deepflow/cli/ctl/example"
 	agentpb "github.com/deepflowys/deepflow/message/trident"
 )
@@ -128,12 +127,12 @@ func RegisterAgentUpgradeCommand() *cobra.Command {
 		Use:   "agent-upgrade",
 		Short: "agent upgrade operation commands",
 		Example: "deepflow-ctl agent-upgrade list\n" +
-			"deepflow-ctl agent-upgrade vtap-name --package=/usr/sbin/deepflow-agent\n",
+			"deepflow-ctl agent-upgrade vtap-name --image-name=deepflow-agent\n",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) == 1 {
 				if args[0] == "list" {
 					listAgentUpgrade(cmd, args)
-				} else if upgradePackage != "" {
+				} else if imageName != "" {
 					upgadeAgent(cmd, args)
 				} else {
 					fmt.Println(cmd.Example)
@@ -144,7 +143,7 @@ func RegisterAgentUpgradeCommand() *cobra.Command {
 			}
 		},
 	}
-	agentUpgrade.Flags().StringVarP(&upgradePackage, "package", "c", "", "")
+	agentUpgrade.Flags().StringVarP(&imageName, "image-name", "I", "", "")
 
 	return agentUpgrade
 }
@@ -373,7 +372,7 @@ func executeCommand(command string) (string, error) {
 	return string(output), err
 }
 
-var upgradePackage string
+var imageName string
 
 func upgadeAgent(cmd *cobra.Command, args []string) {
 	if len(args) == 0 {
@@ -381,41 +380,6 @@ func upgadeAgent(cmd *cobra.Command, args []string) {
 		return
 	}
 	vtapName := args[0]
-
-	// Purpose: Support remote upgrade of windows on linux.
-	// Because the .exe file cannot be run on linux, the version number cannot be obtained.
-	// Solution: Place the executable file of the linux version in the same directory.
-	command := upgradePackage + " -v"
-	if strings.HasSuffix(upgradePackage, ".exe") {
-		execFile := strings.TrimSuffix(upgradePackage, ".exe")
-		command = execFile + " -v"
-		if _, err := os.Stat(execFile); errors.Is(err, os.ErrNotExist) {
-			printutil.ErrorfWithColor("make sure %s exist, and the version must be consistent with %s",
-				execFile, upgradePackage)
-			return
-		}
-		printutil.WarnWithColor("deepflow-agent.exe and deepflow-agent version must match")
-	}
-	output, err := executeCommand(command)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	var expectedVersion string
-	splitStr := strings.Split(output, "\n")
-	if len(splitStr) < 5 {
-		splitStr = strings.Split(splitStr[0], " ")
-		if len(splitStr) == 2 {
-			expectedVersion = splitStr[0]
-		}
-	} else {
-		expectedVersion = splitStr[0]
-	}
-	if expectedVersion == "" {
-		fmt.Printf("get expectedVersion faild, exec: %s, output: %s", command, output)
-		return
-	}
 
 	server := common.GetServerInfo(cmd)
 	serverURL := fmt.Sprintf("http://%s:%d/v1/controllers/", server.IP, server.Port)
@@ -467,8 +431,7 @@ func upgadeAgent(cmd *cobra.Command, args []string) {
 	hosts[vtapController] = struct{}{}
 	url_format := "http://%s:%d/v1/upgrade/vtap/%s/"
 	body := map[string]interface{}{
-		"expected_revision": expectedVersion,
-		"upgrade_package":   upgradePackage,
+		"image_name": imageName,
 	}
 	sendHosts := make([]string, 0, len(hosts))
 	for host, _ := range hosts {
@@ -482,7 +445,7 @@ func upgadeAgent(cmd *cobra.Command, args []string) {
 		}
 	}
 	fmt.Printf("send upgrade data to server:%v\n", sendHosts)
-	fmt.Printf("set agent %s revision(%s) success\n", vtapName, expectedVersion)
+	fmt.Printf("set agent %s upgrate image(%s) success\n", vtapName, imageName)
 }
 
 func rebalance(cmd *cobra.Command, rebalanceType RebalanceType, typeVal string) error {
