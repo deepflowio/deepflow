@@ -139,6 +139,20 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 					k.nsLabelToGroupLcuuids[nsLabel] = nsGroupIDsSet
 				}
 			}
+			labels := metaData.Get("labels").MustMap()
+			for key, v := range labels {
+				nsL := namespace + key + "_" + v.(string)
+				_, ok := k.nsLabelToGroupLcuuids[nsL]
+				if ok {
+					k.nsLabelToGroupLcuuids[nsL].Add(uID)
+				} else {
+					nsGIDsSet := mapset.NewSet()
+					nsGIDsSet.Add(uID)
+					k.nsLabelToGroupLcuuids[nsL] = nsGIDsSet
+				}
+			}
+			labelSlice := cloudcommon.StringInterfaceMapKVs(labels, ":")
+			labelString := strings.Join(labelSlice, ", ")
 			containers := cData.Get("spec").Get("template").Get("spec").Get("containers")
 			for i := range containers.MustArray() {
 				container := containers.GetIndex(i)
@@ -155,9 +169,6 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 					podTargetPorts[cPortName] = cPort.Get("containerPort").MustInt()
 				}
 			}
-			labels := metaData.Get("labels").MustMap()
-			labelSlice := cloudcommon.StringInterfaceMapKVs(labels, ":")
-			labelString := strings.Join(labelSlice, ", ")
 			podGroup := model.PodGroup{
 				Lcuuid:             uID,
 				Name:               name,
