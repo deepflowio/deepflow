@@ -34,7 +34,7 @@ func VtapRepoRouter(e *gin.Engine) {
 }
 
 func getVtapRepo(c *gin.Context) {
-	data, err := service.GetVtapRepo()
+	data, err := service.GetVtapRepo(nil)
 	JsonResponse(c, data, err)
 }
 
@@ -64,8 +64,8 @@ func createVtapRepo(c *gin.Context) {
 	}
 	vtapRepo.Image = buf.Bytes()
 
-	err = service.CreateVtapRepo(vtapRepo)
-	JsonResponse(c, nil, err)
+	data, err := service.CreateVtapRepo(vtapRepo)
+	JsonResponse(c, data, err)
 }
 
 func deleteVtapRepo(c *gin.Context) {

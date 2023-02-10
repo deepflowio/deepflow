@@ -181,7 +181,7 @@ type VtapRepo struct {
 	Branch    string `json:"BRANCH"`
 	RevCount  string `json:"REV_COUNT"`
 	CommitID  string `json:"COMMIT_ID"`
-	Image     []byte `json:"IMAGE" binding:"required"`
+	Image     []byte `json:"IMAGE,omitempty" binding:"required"`
 	UpdatedAt string `json:"UPDATED_AT"`
 }
 
