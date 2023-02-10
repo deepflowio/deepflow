@@ -63,7 +63,7 @@ func registerAgentCommand() *cobra.Command {
 		},
 	}
 
-	var arch, image, Image string
+	var arch, image, versionImage string
 	create := &cobra.Command{
 		Use:     "create",
 		Short:   "create repo agent",
@@ -71,20 +71,27 @@ func registerAgentCommand() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			if _, err := os.Stat(image); errors.Is(err, os.ErrNotExist) {
 				fmt.Printf("file %s not found\n", image)
+				return
 			}
-			if Image != "" {
-				if _, err := os.Stat(Image); errors.Is(err, os.ErrNotExist) {
-					fmt.Printf("file %s not found\n", Image)
+			if strings.HasSuffix(image, ".exe") {
+				if versionImage == "" {
+					printutil.ErrorWithColor("version-image must be set when uploading a window image")
+					return
 				}
+				if _, err := os.Stat(versionImage); errors.Is(err, os.ErrNotExist) {
+					fmt.Printf("file %s not found\n", versionImage)
+					return
+				}
+				printutil.WarnfWithColor("make sure %s and %s have the same version", image, versionImage)
 			}
-			if err := createRepoAgent(cmd, arch, image, Image); err != nil {
+			if err := createRepoAgent(cmd, arch, image, versionImage); err != nil {
 				fmt.Println(err)
 			}
 		},
 	}
 	create.Flags().StringVarP(&arch, "arch", "", "", "arch of deepflow-agent")
 	create.Flags().StringVarP(&image, "image", "", "", "deepflow-agent image to upload")
-	create.Flags().StringVarP(&Image, "Image", "", "", "deepflow-agent Image to get branch, rev_count and commit_id")
+	create.Flags().StringVarP(&versionImage, "version-image", "", "", "deepflow-agent Image to get branch, rev_count and commit_id")
 	create.MarkFlagsRequiredTogether("arch", "image")
 
 	list := &cobra.Command{
@@ -113,10 +120,10 @@ func registerAgentCommand() *cobra.Command {
 	return agent
 }
 
-func createRepoAgent(cmd *cobra.Command, arch, image, Image string) error {
+func createRepoAgent(cmd *cobra.Command, arch, image, versionImage string) error {
 	execImage := image
-	if Image != "" {
-		execImage = Image
+	if versionImage != "" {
+		execImage = versionImage
 	}
 	agentOutput, err := getAgentOutput(execImage)
 	if err != nil {
@@ -134,7 +141,6 @@ func createRepoAgent(cmd *cobra.Command, arch, image, Image string) error {
 	osStr := "Linux"
 	if strings.HasSuffix(image, ".exe") {
 		osStr = "Windows"
-		printutil.ErrorfWithColor("make sure %s and %s have the same version", image, Image)
 	}
 	bodyWriter.WriteField("OS", osStr)
 
@@ -152,10 +158,14 @@ func createRepoAgent(cmd *cobra.Command, arch, image, Image string) error {
 
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v1/vtap-repo/", server.IP, server.Port)
-	_, err = common.CURLPostFormData(url, contentType, bodyBuf)
+	resp, err := common.CURLPostFormData(url, contentType, bodyBuf)
 	if err != nil {
 		return err
 	}
+	data := resp.Get("DATA")
+	data.Get("")
+	fmt.Printf("created successfully, os: %s, branch: %s, rev_count: %s, commit_id: %s\n", data.Get("OS").MustString(),
+		data.Get("BRANCH").MustString(), data.Get("REV_COUNT").MustString(), data.Get("COMMIT_ID").MustString())
 	return nil
 }
 
