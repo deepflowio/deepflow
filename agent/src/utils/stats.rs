@@ -16,7 +16,7 @@
 
 use std::fmt;
 use std::io;
-use std::net::{IpAddr, SocketAddr, ToSocketAddrs, UdpSocket};
+use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
 use std::sync::{
     atomic::{AtomicU16, AtomicU32, AtomicU64, Ordering},
     Arc, Condvar, Mutex,
@@ -140,7 +140,7 @@ impl Sendable for ArcBatch {
 pub struct Collector {
     hostname: Arc<Mutex<String>>,
 
-    remotes: Arc<Mutex<Option<Vec<IpAddr>>>>,
+    remote: Arc<Mutex<Option<String>>>,
     remote_port: Arc<AtomicU16>,
     sources: Arc<Mutex<Vec<Source>>>,
     pre_hooks: Arc<Mutex<Vec<Box<dyn FnMut() + Send>>>>,
@@ -155,11 +155,11 @@ pub struct Collector {
 }
 
 impl Collector {
-    pub fn new(remotes: &Vec<String>, port: u16) -> Self {
-        Self::with_min_interval(remotes, port, TICK_CYCLE)
+    pub fn new(remote: String, port: u16) -> Self {
+        Self::with_min_interval(remote, port, TICK_CYCLE)
     }
 
-    pub fn with_min_interval(remotes: &Vec<String>, port: u16, interval: Duration) -> Self {
+    pub fn with_min_interval(remote: String, port: u16, interval: Duration) -> Self {
         let (stats_queue_sender, stats_queue_receiver, counter) = bounded(1000);
         let min_interval = if interval <= TICK_CYCLE {
             TICK_CYCLE
@@ -169,13 +169,9 @@ impl Collector {
                     * TICK_CYCLE.as_secs(),
             )
         };
-        let remotes = remotes
-            .iter()
-            .filter_map(|x| x.parse::<IpAddr>().ok())
-            .collect();
         let s = Self {
             hostname: Arc::new(Mutex::new(get_hostname().unwrap_or_default())),
-            remotes: Arc::new(Mutex::new(Some(remotes))),
+            remote: Arc::new(Mutex::new(Some(remote))),
             remote_port: Arc::new(AtomicU16::new(port)),
             sources: Arc::new(Mutex::new(vec![])),
             pre_hooks: Arc::new(Mutex::new(vec![])),
@@ -257,8 +253,8 @@ impl Collector {
         self.pre_hooks.lock().unwrap().push(hook);
     }
 
-    pub fn set_remotes(&self, remotes: Vec<IpAddr>, port: u16) {
-        self.remotes.lock().unwrap().replace(remotes);
+    pub fn set_remote(&self, remote: String, port: u16) {
+        self.remote.lock().unwrap().replace(remote);
         self.remote_port.store(port, Ordering::Relaxed);
     }
 
@@ -309,7 +305,7 @@ impl Collector {
             *started = true;
         }
 
-        let remotes = self.remotes.clone();
+        let remote = self.remote.clone();
         let remote_port = self.remote_port.clone();
         let running = self.running.clone();
         let sources = self.sources.clone();
@@ -321,8 +317,8 @@ impl Collector {
             thread::Builder::new()
                 .name("stats-collector".to_owned())
                 .spawn(move || {
-                    let mut statsd_clients = vec![];
-                    let mut old_remotes = vec![];
+                    let mut statsd_client: Option<StatsdClient> = None;
+                    let mut old_remote = String::new();
                     loop {
                         let host = hostname.lock().unwrap().clone();
                         // for early exit
@@ -370,49 +366,43 @@ impl Collector {
                             }
 
                             let port = remote_port.load(Ordering::Relaxed);
-                            match remotes.lock().unwrap().take() {
-                                Some(remotes) => {
-                                    statsd_clients.clear();
-                                    for remote in remotes.iter() {
-                                        match Self::new_statsd_client((*remote, port)) {
-                                            Ok(client) => statsd_clients.push(Some(client)),
-                                            Err(e) => {
-                                                warn!(
-                                                    "create client to remote {}:{} failed: {}",
-                                                    remote, port, e
-                                                );
-                                            }
+                            match remote.lock().unwrap().take() {
+                                Some(remote) => {
+                                    statsd_client = None;
+                                    match Self::new_statsd_client((remote.clone(), port)) {
+                                        Ok(client) => statsd_client = Some(client),
+                                        Err(e) => {
+                                            warn!(
+                                                "create client to remote {}:{} failed: {}",
+                                                &remote, port, e
+                                            );
                                         }
                                     }
-                                    old_remotes = remotes;
+                                    old_remote = remote;
                                 }
                                 None => {
-                                    for (i, client) in statsd_clients.iter_mut().enumerate() {
-                                        if client.is_some() {
-                                            continue;
-                                        }
-                                        match Self::new_statsd_client((old_remotes[i], port)) {
+                                    if statsd_client.is_none() {
+                                        match Self::new_statsd_client((old_remote.clone(), port)) {
                                             Ok(s) => {
-                                                client.replace(s);
+                                                statsd_client.replace(s);
                                             }
                                             Err(e) => warn!(
                                                 "create client to remote {}:{} failed: {}",
-                                                old_remotes[i], port, e
+                                                &old_remote, port, e
                                             ),
                                         }
                                     }
                                 }
                             }
 
-                            if statsd_clients.len() == 0 {
+                            if statsd_client.is_none() {
                                 info!("no statsd remote available");
                                 break;
                             }
 
                             debug!("collected: {:?}", batches);
-                            for (i, batch) in batches.into_iter().enumerate() {
-                                let client =
-                                    statsd_clients[i % statsd_clients.len()].as_ref().unwrap();
+                            let client = statsd_client.as_ref().unwrap();
+                            for batch in batches.into_iter() {
                                 for point in batch.points.iter() {
                                     let metric_name =
                                         format!("{}_{}", batch.module, point.0).replace("-", "_");
