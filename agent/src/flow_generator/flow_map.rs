@@ -101,6 +101,7 @@ pub struct FlowMap {
     hash_slots: usize,
     time_window_size: usize,
     total_flow: usize,
+    time_set_slot_size: usize,
 
     output_queue: DebugSender<Box<TaggedFlow>>,
     out_log_queue: DebugSender<Box<MetaAppProto>>,
@@ -160,12 +161,11 @@ impl FlowMap {
         let start_time = get_timestamp(ntp_diff.load(Ordering::Relaxed))
             - config_guard.packet_delay
             - Duration::from_secs(1);
+        let time_set_slot_size = config_guard.hash_slots as usize / time_window_size;
         Self {
             node_map: Some(HashMap::with_capacity(config_guard.hash_slots as usize)),
             time_set: Some(vec![
-                HashSet::with_capacity(
-                    config_guard.hash_slots as usize / time_window_size
-                );
+                HashSet::with_capacity(time_set_slot_size);
                 time_window_size
             ]),
             id,
@@ -185,6 +185,7 @@ impl FlowMap {
             hash_slots: config_guard.hash_slots as usize,
             time_window_size,
             total_flow: 0,
+            time_set_slot_size,
             output_queue,
             out_log_queue: app_proto_log_queue,
             output_buffer: Vec::with_capacity(QUEUE_BATCH_SIZE),
@@ -356,6 +357,12 @@ impl FlowMap {
                         moved_key.push((node.timestamp_key, flow_key));
                     }
                 }
+            }
+            if time_hashset.capacity() > 2 * self.time_set_slot_size {
+                self.stats_counter
+                    .time_set_shrinks
+                    .fetch_add(1, Ordering::Relaxed);
+                time_hashset.shrink_to(self.time_set_slot_size);
             }
             for key in moved_key.drain(..) {
                 time_set[key.0 as usize & (self.time_window_size - 1)].insert(key.1);
@@ -1762,13 +1769,14 @@ impl FlowMap {
 
 #[derive(Default)]
 pub struct FlowMapCounter {
-    new: AtomicU64,            // the number of  created flow
-    closed: AtomicU64,         // the number of closed flow
-    drop_by_window: AtomicU64, // times of flush wihich drop by window
-    concurrent: AtomicU64,     // current the number of FlowNode
-    slots: AtomicU64,          //  current the length of HashMap
-    slot_max_depth: AtomicU64, //  the max length of Vec<FlowNode>
-    total_scan: AtomicU64,     //  the total number of iteration to scan over Vec<FlowNode>
+    new: AtomicU64,              // the number of  created flow
+    closed: AtomicU64,           // the number of closed flow
+    drop_by_window: AtomicU64,   // times of flush wihich drop by window
+    concurrent: AtomicU64,       // current the number of FlowNode
+    slots: AtomicU64,            // current the length of HashMap
+    slot_max_depth: AtomicU64,   // the max length of Vec<FlowNode>
+    total_scan: AtomicU64,       // the total number of iteration to scan over Vec<FlowNode>
+    time_set_shrinks: AtomicU64, // the total number of time_set HashSet shrinks
 }
 
 impl RefCountable for FlowMapCounter {
@@ -1808,6 +1816,11 @@ impl RefCountable for FlowMapCounter {
                 CounterValue::Unsigned(self.total_scan.swap(0, Ordering::Relaxed)),
             ),
             ("slots", CounterType::Gauged, CounterValue::Unsigned(slots)),
+            (
+                "time_set_shrinks",
+                CounterType::Gauged,
+                CounterValue::Unsigned(self.time_set_shrinks.swap(0, Ordering::Relaxed)),
+            ),
         ]
     }
 }
