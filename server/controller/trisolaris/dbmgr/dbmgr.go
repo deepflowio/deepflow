@@ -161,6 +161,12 @@ func (obj *_DBMgr[M]) GetFromName(name string) (result *M, err error) {
 	return
 }
 
+func (obj *_DBMgr[M]) GetFieldsFromName(fields []string, name string) (result *M, err error) {
+	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Select(fields).Where("`name` = ?", name).First(&result).Error
+
+	return
+}
+
 // GetFromRegion 通过region获取内容
 func (obj *_DBMgr[M]) GetFromRegion(region string) (result *M, err error) {
 	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`region` = ?", region).First(&result).Error
