@@ -28,22 +28,45 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/model"
 )
 
-func CreateVtapRepo(vtapRepoCreate *mysql.VTapRepo) error {
+const (
+	IMAGE_MAX_COUNT = 20
+)
+
+func CreateVtapRepo(vtapRepoCreate *mysql.VTapRepo) (*model.VtapRepo, error) {
 	var vtapRepoFirst mysql.VTapRepo
 	if err := mysql.Db.Where("name = ?", vtapRepoCreate.Name).First(&vtapRepoFirst).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return mysql.Db.Create(&vtapRepoCreate).Error
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, NewError(common.SERVER_ERROR,
+				fmt.Sprintf("fail to query vtap_repo by name(%s), error: %s", vtapRepoCreate.Name, err))
 		}
-		return NewError(common.SERVER_ERROR,
-			fmt.Sprintf("fail to query vtap_repo by name(%s), error: %s", vtapRepoCreate.Name, err))
+
+		var count int64
+		mysql.Db.Model(&mysql.VTapRepo{}).Count(&count)
+		if count >= IMAGE_MAX_COUNT {
+			return nil, fmt.Errorf("the number of image can not exceed %d", IMAGE_MAX_COUNT)
+		}
+		if err = mysql.Db.Create(&vtapRepoCreate).Error; err != nil {
+			return nil, err
+		}
+		vtapRepoes, _ := GetVtapRepo(map[string]interface{}{"name": vtapRepoCreate.Name})
+		return &vtapRepoes[0], nil
 	}
 
 	// update by name
-	return mysql.Db.Model(&mysql.VTapRepo{}).Where("name = ?", vtapRepoCreate.Name).Updates(vtapRepoCreate).Error
+	if err := mysql.Db.Model(&mysql.VTapRepo{}).Where("name = ?", vtapRepoCreate.Name).
+		Updates(vtapRepoCreate).Error; err != nil {
+		return nil, err
+	}
+	vtapRepoes, _ := GetVtapRepo(map[string]interface{}{"name": vtapRepoCreate.Name})
+	return &vtapRepoes[0], nil
 }
 
-func GetVtapRepo() ([]model.VtapRepo, error) {
+func GetVtapRepo(filter map[string]interface{}) ([]model.VtapRepo, error) {
 	var vtapRepoes []mysql.VTapRepo
+	db := mysql.Db
+	if _, ok := filter["name"]; ok {
+		db = db.Where("name = ?", filter["name"])
+	}
 	mysql.Db.Order("updated_at DESC").Find(&vtapRepoes)
 
 	var resp []model.VtapRepo
