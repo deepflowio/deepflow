@@ -137,7 +137,7 @@ func (r *VTapRegister) insertToDB(dbVTap *models.VTap, db *gorm.DB) bool {
 		dbVTap.Name = vTapName
 	} else {
 		if err == nil {
-			log.Errorf("agent(%s) already exist", vTapName)
+			log.Errorf("agent(%s) name=%s already exist", r, vTapName)
 			if oldVTap.State == VTAP_STATE_NOT_CONNECTED {
 				log.Warningf("vtap(%s) info (ctrl_ip: %s, ctr_mac: %s) change to (ctrl_ip: %s, ctr_mac: %s)", vTapName,
 					oldVTap.CtrlIP, oldVTap.CtrlMac, dbVTap.CtrlIP, dbVTap.CtrlMac)
