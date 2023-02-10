@@ -17,7 +17,7 @@
 use std::env;
 use std::fmt;
 use std::mem;
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::Ipv4Addr;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process;
@@ -267,8 +267,9 @@ impl Trident {
         };
         let logger_handle = logger.start()?;
 
+        // Use controller ip to replace analyzer ip before obtaining configuration
         let stats_collector = Arc::new(stats::Collector::new(
-            &config.controller_ips,
+            config.controller_ips[0].clone(),
             DEFAULT_INGESTER_PORT,
         ));
         if matches!(config.agent_mode, RunningMode::Managed) {
@@ -750,7 +751,6 @@ impl DomainNameListener {
         if self.domain_names.len() == 0 {
             return;
         }
-        let stats_collector = self.stats_collector.clone();
         let synchronizer = self.synchronizer.clone();
 
         let mut ips = self.ips.clone();
@@ -800,12 +800,6 @@ impl DomainNameListener {
                                 ips.clone(),
                                 ctrl_ip.to_string(),
                                 ctrl_mac.to_string(),
-                            );
-                            stats_collector.set_remotes(
-                                ips.iter()
-                                    .map(|item| item.parse::<IpAddr>().unwrap())
-                                    .collect(),
-                                port_config.load().analyzer_port,
                             );
 
                             remote_log_config.set_remotes(&ips, port_config.load().analyzer_port);
