@@ -429,12 +429,12 @@ func GetTagValues(db, table, sql string) (*common.Result, []string, error) {
 	// 获取tagEnumFile
 	sqlSplit := strings.Split(sql, " ")
 	tag := sqlSplit[2]
-	if strings.Contains(tag, "'") {
-		return nil, sqlList, errors.New(fmt.Sprintf("Tags containing single quotes (') or space are not supported: %s ", tag))
-	}
 	if strings.HasPrefix(tag, "`") && strings.HasSuffix(tag, "`") {
 		tag = strings.TrimPrefix(tag, "`")
 		tag = strings.TrimSuffix(tag, "`")
+	}
+	if strings.Contains(tag, "'") || strings.Contains(tag, "`") {
+		return nil, sqlList, errors.New(fmt.Sprintf("Tags containing single quotes (') or backquote (`) or space are not supported: %s ", tag))
 	}
 	var rgx = regexp.MustCompile(`(?i)show|SHOW +tag +\S+ +values +from|FROM +\S+( +(where|WHERE \S+ like|LIKE \S+))?`)
 	sqlOk := rgx.MatchString(sql)
