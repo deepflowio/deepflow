@@ -423,13 +423,19 @@ func GetEnumTagValues(db, table, sql string) (map[string][]interface{}, error) {
 }
 
 func GetTagValues(db, table, sql string) (*common.Result, []string, error) {
+	var sqlList []string
 	// 把`1m`的反引号去掉
 	table = strings.Trim(table, "`")
 	// 获取tagEnumFile
 	sqlSplit := strings.Split(sql, " ")
 	tag := sqlSplit[2]
-	tag = strings.Trim(tag, "'")
-	var sqlList []string
+	if strings.Contains(tag, "'") {
+		return nil, sqlList, errors.New(fmt.Sprintf("Tags containing single quotes (') or space are not supported: %s ", tag))
+	}
+	if strings.HasPrefix(tag, "`") && strings.HasSuffix(tag, "`") {
+		tag = strings.TrimPrefix(tag, "`")
+		tag = strings.TrimSuffix(tag, "`")
+	}
 	var rgx = regexp.MustCompile(`(?i)show|SHOW +tag +\S+ +values +from|FROM +\S+( +(where|WHERE \S+ like|LIKE \S+))?`)
 	sqlOk := rgx.MatchString(sql)
 	if !sqlOk {
@@ -529,6 +535,10 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 	sqlSplit := strings.Split(rawSql, " ")
 	tag := sqlSplit[2]
 	tag = strings.Trim(tag, "'")
+	if strings.HasPrefix(tag, "`") && strings.HasSuffix(tag, "`") {
+		tag = strings.TrimPrefix(tag, "`")
+		tag = strings.TrimSuffix(tag, "`")
+	}
 	var sqlList []string
 	var sql string
 	var whereSql string
@@ -784,6 +794,10 @@ func GetExternalTagValues(db, table, rawSql string) (*common.Result, []string, e
 	sqlSplit := strings.Split(rawSql, " ")
 	tag := sqlSplit[2]
 	tag = strings.Trim(tag, "'")
+	if strings.HasPrefix(tag, "`") && strings.HasSuffix(tag, "`") {
+		tag = strings.TrimPrefix(tag, "`")
+		tag = strings.TrimSuffix(tag, "`")
+	}
 	tag = strings.TrimPrefix(tag, "tag.")
 	tag = strings.TrimPrefix(tag, "attribute.")
 	var sqlList []string
