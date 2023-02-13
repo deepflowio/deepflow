@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{IpAddr, Ipv6Addr, SocketAddr, TcpStream};
 use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering};
@@ -22,7 +23,7 @@ use std::thread::sleep;
 use std::time::Duration;
 
 use flate2::{read::GzDecoder, write::ZlibEncoder, Compression};
-use http::header::CONTENT_ENCODING;
+use http::header::{CONTENT_ENCODING, CONTENT_TYPE};
 use http::HeaderMap;
 use hyper::{
     body::{aggregate, Buf},
@@ -48,7 +49,7 @@ use public::proto::integration::opentelemetry::proto::{
     common::v1::{AnyValue, KeyValue},
     trace::v1::TracesData,
 };
-use public::proto::trident::Exception;
+use public::proto::{metric, trident::Exception};
 use public::queue::{DebugSender, Error};
 
 type GenericError = Box<dyn std::error::Error + Send + Sync>;
@@ -138,6 +139,20 @@ impl Sendable for TelegrafMetric {
 
     fn version(&self) -> u32 {
         TELEGRAF
+    }
+}
+
+/// java profile xxxx
+#[derive(Debug, PartialEq)]
+pub struct Profile(metric::Profile);
+
+impl Sendable for Profile {
+    fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
+        self.0.encode(buf).map(|_| self.0.encoded_len())
+    }
+
+    fn message_type(&self) -> SendMessageType {
+        SendMessageType::Profile
     }
 }
 
@@ -242,6 +257,7 @@ async fn handler(
     compressed_otel_sender: DebugSender<OpenTelemetryCompressed>,
     prometheus_sender: DebugSender<PrometheusMetric>,
     telegraf_sender: DebugSender<TelegrafMetric>,
+    profile_sender: DebugSender<Profile>,
     exception_handler: ExceptionHandler,
     compressed: bool,
     counter: Arc<CompressedMetric>,
@@ -326,12 +342,74 @@ async fn handler(
             }
             Ok(Response::builder().body(Body::empty()).unwrap())
         }
+        // profile integration
+        (&Method::POST, "/api/v1/profile/ingest") => {
+            let mut profile = metric::Profile::default();
+            if let Some(query) = req.uri().query() {
+                parse_profile_query(query, &mut profile);
+            }
+            let (part, body) = req.into_parts();
+            let whole_body = match aggregate_with_catch_exception(body, &exception_handler).await {
+                Ok(b) => b,
+                Err(e) => {
+                    return Ok(e);
+                }
+            };
+            profile.data = decode_metric(whole_body, &part.headers)?;
+            profile.ip = match peer_addr.ip() {
+                IpAddr::V4(ip4) => ip4.octets().to_vec(),
+                IpAddr::V6(ip6) => ip6.octets().to_vec(),
+            };
+            if let Some(content_type) = part.headers.get(CONTENT_TYPE) {
+                profile.content_type = content_type.as_bytes().to_vec();
+            }
+
+            if let Err(Error::Terminated(..)) = profile_sender.send(Profile(profile)) {
+                warn!("profile sender queue has terminated");
+            }
+
+            Ok(Response::builder().body(Body::empty()).unwrap())
+        }
         // Return the 404 Not Found for other routes.
         _ => Ok(Response::builder()
             .status(StatusCode::NOT_FOUND)
             .body(NOT_FOUND.into())
             .unwrap()),
     }
+}
+
+fn parse_profile_query(query: &str, profile: &mut metric::Profile) {
+    let query_hash: HashMap<String, String> = query
+        .split('&')
+        .filter_map(|s| {
+            s.split_once('=')
+                .and_then(|t| Some((t.0.to_owned(), t.1.to_owned())))
+        })
+        .collect();
+    if let Some(name) = query_hash.get("name") {
+        profile.name = name.to_string();
+    }
+    if let Some(units) = query_hash.get("units") {
+        profile.units = units.to_string();
+    };
+    if let Some(aggregation_type) = query_hash.get("aggregrationType") {
+        profile.aggregation_type = aggregation_type.to_string();
+    };
+    if let Some(sample_rate) = query_hash.get("sampleRate") {
+        profile.sample_rate = sample_rate.parse::<u32>().unwrap_or_default();
+    };
+    if let Some(from) = query_hash.get("from") {
+        profile.from = from.parse::<u32>().unwrap_or_default();
+    };
+    if let Some(until) = query_hash.get("until") {
+        profile.until = until.parse::<u32>().unwrap_or_default();
+    };
+    if let Some(spy_name) = query_hash.get("spyName") {
+        profile.spy_name = spy_name.to_string();
+    }
+    if let Some(format) = query_hash.get("format") {
+        profile.format = format.to_string();
+    };
 }
 
 #[derive(Default)]
@@ -389,6 +467,7 @@ pub struct MetricServer {
     compressed_otel_sender: DebugSender<OpenTelemetryCompressed>,
     prometheus_sender: DebugSender<PrometheusMetric>,
     telegraf_sender: DebugSender<TelegrafMetric>,
+    profile_sender: DebugSender<Profile>,
     port: Arc<AtomicU16>,
     exception_handler: ExceptionHandler,
     server_shutdown_tx: Mutex<Option<mpsc::Sender<()>>>,
@@ -402,6 +481,7 @@ impl MetricServer {
         compressed_otel_sender: DebugSender<OpenTelemetryCompressed>,
         prometheus_sender: DebugSender<PrometheusMetric>,
         telegraf_sender: DebugSender<TelegrafMetric>,
+        profile_sender: DebugSender<Profile>,
         port: u16,
         exception_handler: ExceptionHandler,
         compressed: bool,
@@ -422,6 +502,7 @@ impl MetricServer {
                 compressed_otel_sender,
                 prometheus_sender,
                 telegraf_sender,
+                profile_sender,
                 port: Arc::new(AtomicU16::new(port)),
                 exception_handler,
                 server_shutdown_tx: Default::default(),
@@ -454,6 +535,7 @@ impl MetricServer {
         let compressed_otel_sender = self.compressed_otel_sender.clone();
         let prometheus_sender = self.prometheus_sender.clone();
         let telegraf_sender = self.telegraf_sender.clone();
+        let profile_sender = self.profile_sender.clone();
         let port = self.port.clone();
         let monitor_port = Arc::new(AtomicU16::new(port.load(Ordering::Acquire)));
         let (mon_tx, mon_rx) = oneshot::channel();
@@ -509,6 +591,7 @@ impl MetricServer {
                     let compressed_otel_sender = compressed_otel_sender.clone();
                     let prometheus_sender = prometheus_sender.clone();
                     let telegraf_sender = telegraf_sender.clone();
+                    let profile_sender = profile_sender.clone();
                     let exception_handler_inner = exception_handler.clone();
                     let counter = counter.clone();
                     let compressed = compressed.clone();
@@ -517,6 +600,7 @@ impl MetricServer {
                         let compressed_otel_sender = compressed_otel_sender.clone();
                         let prometheus_sender = prometheus_sender.clone();
                         let telegraf_sender = telegraf_sender.clone();
+                        let profile_sender = profile_sender.clone();
                         let exception_handler = exception_handler_inner.clone();
                         let peer_addr = conn.remote_addr();
                         let counter = counter.clone();
@@ -530,6 +614,7 @@ impl MetricServer {
                                     compressed_otel_sender.clone(),
                                     prometheus_sender.clone(),
                                     telegraf_sender.clone(),
+                                    profile_sender.clone(),
                                     exception_handler.clone(),
                                     compressed.load(Ordering::Relaxed),
                                     counter.clone(),
