@@ -511,7 +511,11 @@ func GetTagValues(db, table, sql string) (*common.Result, []string, error) {
 	}
 	if len(likeList) > 1 {
 		if strings.Trim(likeList[1], " ") != "" {
-			whereSql = " AND (" + strings.ReplaceAll(likeList[1], "*", "%") + ")"
+			if strings.Contains(likeList[1], " like ") || strings.Contains(likeList[1], " LIKE ") {
+				whereSql = " AND (" + strings.ReplaceAll(likeList[1], "*", "%") + ")"
+			} else {
+				whereSql = " AND (" + likeList[1] + ")"
+			}
 		}
 	}
 	if strings.Contains(strings.ToLower(sql), "like") || strings.Contains(strings.ToLower(sql), "regexp") {
@@ -566,7 +570,11 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 		}
 
 		if strings.Trim(whereLimitList[0], " ") != "" {
-			whereSql = " WHERE (" + strings.ReplaceAll(whereLimitList[0], "*", "%") + ")"
+			if strings.Contains(whereLimitList[0], " like ") || strings.Contains(whereLimitList[0], " LIKE ") {
+				whereSql = " WHERE (" + strings.ReplaceAll(whereLimitList[0], "*", "%") + ")"
+			} else {
+				whereSql = " WHERE (" + whereLimitList[0] + ")"
+			}
 		}
 	}
 
@@ -818,7 +826,11 @@ func GetExternalTagValues(db, table, rawSql string) (*common.Result, []string, e
 			whereLimitList = strings.Split(whereSql, "limit")
 		}
 		if strings.Trim(whereLimitList[0], " ") != "" {
-			whereSql = fmt.Sprintf(" AND (%s)", strings.ReplaceAll(whereLimitList[0], "*", "%"))
+			if strings.Contains(whereLimitList[0], " like ") || strings.Contains(whereLimitList[0], " LIKE ") {
+				whereSql = " AND (" + strings.ReplaceAll(whereLimitList[0], "*", "%") + ")"
+			} else {
+				whereSql = " AND (" + whereLimitList[0] + ")"
+			}
 		}
 	}
 	limitList := strings.Split(rawSql, "LIMIT")
