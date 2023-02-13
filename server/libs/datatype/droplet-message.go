@@ -47,6 +47,7 @@ const (
 	MESSAGE_TYPE_DFSTATS
 	MESSAGE_TYPE_OPENTELEMETRY_COMPRESSED
 	MESSAGE_TYPE_RAW_PCAP
+	MESSAGE_TYPE_PROFILE
 	MESSAGE_TYPE_MAX
 )
 
@@ -66,6 +67,7 @@ var MessageTypeString = [MESSAGE_TYPE_MAX]string{
 	MESSAGE_TYPE_DFSTATS:                  "deepflow_stats",
 	MESSAGE_TYPE_OPENTELEMETRY_COMPRESSED: "open_telemetry_compressed",
 	MESSAGE_TYPE_RAW_PCAP:                 "raw_pcap",
+	MESSAGE_TYPE_PROFILE:                  "profile",
 }
 
 func (m MessageType) String() string {
@@ -103,6 +105,7 @@ var MessageHeaderTypes = [MESSAGE_TYPE_MAX]MessageHeaderType{
 	MESSAGE_TYPE_DFSTATS:                  HEADER_TYPE_LT_VTAP,
 	MESSAGE_TYPE_OPENTELEMETRY_COMPRESSED: HEADER_TYPE_LT_VTAP,
 	MESSAGE_TYPE_RAW_PCAP:                 HEADER_TYPE_LT_VTAP,
+	MESSAGE_TYPE_PROFILE:                  HEADER_TYPE_LT_VTAP,
 }
 
 func (m MessageType) HeaderType() MessageHeaderType {

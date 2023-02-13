@@ -31,7 +31,7 @@ use log::{debug, error, info, warn};
 use public::sender::{SendMessageType, Sendable};
 use thread::JoinHandle;
 
-use super::QUEUE_BATCH_SIZE;
+use super::{get_sender_id, QUEUE_BATCH_SIZE};
 
 use crate::config::handler::SenderAccess;
 use crate::exception::ExceptionHandler;
@@ -189,7 +189,6 @@ pub struct UniformSenderThread<T> {
 
 impl<T: Sendable> UniformSenderThread<T> {
     pub fn new(
-        id: usize,
         name: &'static str,
         input: Arc<Receiver<T>>,
         config: SenderAccess,
@@ -199,7 +198,7 @@ impl<T: Sendable> UniformSenderThread<T> {
     ) -> Self {
         let running = Arc::new(AtomicBool::new(false));
         Self {
-            id,
+            id: get_sender_id() as usize,
             name,
             input,
             config,

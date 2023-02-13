@@ -185,3 +185,17 @@ message AppAnomaly {
     uint32 timeout = 3;
 }
 
+message Profile {
+    bytes ip = 1;
+    string name = 2;
+    string units = 3;
+    string aggregation_type = 4;
+    uint32 sample_rate = 5;
+    uint32 from = 6;
+    uint32 until = 7;
+    string spy_name = 8;
+    string format = 9;
+    bytes content_type = 10;
+    bytes data = 11;
+}
+
