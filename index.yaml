@@ -2,6 +2,43 @@ apiVersion: v1
 entries:
   deepflow:
   - apiVersion: v2
+    appVersion: 6.2.2
+    created: "2023-02-13T08:05:06.773319939Z"
+    dependencies:
+    - condition: clickhouse.enabled
+      name: clickhouse
+      repository: ""
+      version: '*.*.*'
+    - condition: mysql.enabled
+      name: mysql
+      repository: ""
+      version: '*.*.*'
+    - condition: deepflow-agent.enabled
+      name: deepflow-agent
+      repository: ""
+      version: '*.*.*'
+    - condition: grafana.enabled
+      name: grafana
+      repository: https://grafana.github.io/helm-charts
+      version: 6.*.*
+    description: An automated observability platform for cloud-native developers.
+    digest: 71589d2923d3479bfbc3e1321073bf4e0e8ca412a454523b7f1928e7a88ce92a
+    home: https://github.com/deepflowys/deepflow
+    icon: https://raw.githubusercontent.com/deepflowys/deepflow-charts/main/deepflow.svg
+    keywords:
+    - deepflow
+    kubeVersion: '>=1.16.0-0'
+    maintainers:
+    - name: deepflow
+      url: https://github.com/deepflowys/deepflow
+    name: deepflow
+    sources:
+    - https://github.com/deepflowys/deepflow
+    type: application
+    urls:
+    - https://github.com/deepflowys/deepflow-charts/releases/download/deepflow-6.2.201/deepflow-6.2.201.tgz
+    version: 6.2.201
+  - apiVersion: v2
     appVersion: 6.2.1
     created: "2023-01-19T02:34:00.044568372Z"
     dependencies:
@@ -262,7 +299,7 @@ entries:
     version: 6.1.801
   - apiVersion: v2
     appVersion: 6.1.8
-    created: "2023-01-19T03:36:45.487775648Z"
+    created: "2022-12-13T08:32:47.225533695Z"
     dependencies:
     - condition: clickhouse.enabled
       name: clickhouse
@@ -281,7 +318,7 @@ entries:
       repository: https://grafana.github.io/helm-charts
       version: 6.*.*
     description: An automated observability platform for cloud-native developers.
-    digest: bea54b0cf226d9a26bab16366505377e3e0100fb03676e88890cf6fcb5a6ec6c
+    digest: 401962ab10acfb58cfb2f11a2a5b108942274ea0651fff5cdfa1071919765d3e
     home: https://github.com/deepflowys/deepflow
     icon: https://raw.githubusercontent.com/deepflowys/deepflow-charts/main/deepflow.svg
     keywords:
@@ -2586,6 +2623,26 @@ entries:
     version: 0.1.030
   deepflow-agent:
   - apiVersion: v2
+    appVersion: 6.2.2
+    created: "2023-02-13T08:05:06.940681351Z"
+    description: An automated observability platform for cloud-native developers.
+    digest: f9e93634c68640e06170f122bc2a3246010284a8222efd0993baa1a886e9add9
+    home: https://github.com/deepflowys/deepflow
+    icon: https://raw.githubusercontent.com/deepflowys/deepflow-charts/main/deepflow.svg
+    keywords:
+    - deepflow
+    kubeVersion: '>=1.16.0-0'
+    maintainers:
+    - name: deepflow
+      url: https://github.com/deepflowys/deepflow
+    name: deepflow-agent
+    sources:
+    - https://github.com/deepflowys/deepflow
+    type: application
+    urls:
+    - https://github.com/deepflowys/deepflow-charts/releases/download/deepflow-agent-6.2.201/deepflow-agent-6.2.201.tgz
+    version: 6.2.201
+  - apiVersion: v2
     appVersion: 6.2.1
     created: "2023-01-19T02:34:00.553877779Z"
     description: An automated observability platform for cloud-native developers.
@@ -2727,9 +2784,9 @@ entries:
     version: 6.1.801
   - apiVersion: v2
     appVersion: 6.1.8
-    created: "2023-01-19T03:36:45.578647518Z"
+    created: "2022-12-13T08:32:47.364486593Z"
     description: An automated observability platform for cloud-native developers.
-    digest: 434de095fb43ae3b9a92ec16c6eac0101d300cd7701a45c3b00503183793ec4c
+    digest: fab181443523e60265b93a9c3c2d2500ee5da70f4d4ade70dd79fb8ddae34aeb
     home: https://github.com/deepflowys/deepflow
     icon: https://raw.githubusercontent.com/deepflowys/deepflow-charts/main/deepflow.svg
     keywords:
@@ -3962,4 +4019,4 @@ entries:
     urls:
     - https://github.com/deepflowys/deepflow-charts/releases/download/deepflow-agent-0.1.030/deepflow-agent-0.1.030.tgz
     version: 0.1.030
-generated: "2023-01-19T03:36:45.577159388Z"
+generated: "2023-02-13T08:05:06.94203477Z"
