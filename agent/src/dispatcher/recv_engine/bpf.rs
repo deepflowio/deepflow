@@ -28,6 +28,8 @@ use crate::common::{
     VLAN_HEADER_SIZE, VXLAN6_FLAGS_OFFSET, VXLAN_FLAGS_OFFSET,
 };
 use crate::common::{enums::IpProtocol, erspan::GRE_PROTO_ERSPAN_III};
+#[cfg(target_os = "linux")]
+use public::enums::LinuxSllPacketType::Outgoing;
 
 #[cfg(target_os = "linux")]
 type JumpModifier = fn(jumpIf: JumpIf, index: usize, total: usize) -> JumpIf;
@@ -635,6 +637,36 @@ impl Builder {
         return syntax;
     }
 
+    fn skip_lo_tx(&self) -> Vec<BpfSyntax> {
+        let mut lo_tx_builder = BpfBuilder::default();
+
+        lo_tx_builder
+            .append(BpfSyntax::LoadExtension(LoadExtension {
+                num: Extension::ExtInterfaceIndex,
+            }))
+            .branch(
+                JumpIf {
+                    cond: JumpTest::JumpNotEqual,
+                    val: 1, // lo网卡的ifIndex一定是1
+                    ..Default::default()
+                },
+                Self::bypass_modifier,
+            )
+            .append(BpfSyntax::LoadExtension(LoadExtension {
+                num: Extension::ExtType,
+            }))
+            .branch(
+                JumpIf {
+                    cond: JumpTest::JumpEqual,
+                    val: Outgoing as u32,
+                    ..Default::default()
+                },
+                Self::drop_modifier,
+            )
+            .append(BpfSyntax::RetConstant(RetConstant { val: 0 }));
+        return lo_tx_builder.build();
+    }
+
     fn build_ipv4_syntax(self, bpf_builder: &mut BpfBuilder) -> Vec<BpfSyntax> {
         // 不采集和控制器通信的流量
         bpf_builder.appends(&mut self.skip_controller());
@@ -659,11 +691,14 @@ impl Builder {
 
     pub fn build_pcap_syntax(self) -> Vec<BpfSyntax> {
         let mut bpf_builder = self.skip_ethernet();
+        // 不采集器lo TX方向流量
+        let mut lo_bpf = self.skip_lo_tx();
         if self.is_ipv6 {
-            return self.build_ipv6_syntax(&mut bpf_builder);
+            lo_bpf.append(&mut self.build_ipv6_syntax(&mut bpf_builder));
         } else {
-            return self.build_ipv4_syntax(&mut bpf_builder);
+            lo_bpf.append(&mut self.build_ipv4_syntax(&mut bpf_builder));
         }
+        return lo_bpf;
     }
 }
 
@@ -740,6 +775,11 @@ mod tests {
             .collect::<Vec<String>>();
 
         let except = [
+            "ld #ifidx",
+            "jneq #1,3",
+            "ld #type",
+            "jneq #4,1",
+            "ret #0",
             "ldh [12]",
             "jneq #33024,2",
             "ldx #4",
@@ -821,6 +861,11 @@ mod tests {
         output.iter().for_each(|x| println!("\"{}\",", x));
 
         let except = [
+            "ld #ifidx",
+            "jneq #1,3",
+            "ld #type",
+            "jneq #4,1",
+            "ret #0",
             "ldh [12]",
             "jneq #33024,2",
             "ldx #4",
