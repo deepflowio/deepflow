@@ -433,19 +433,17 @@ func upgadeAgent(cmd *cobra.Command, args []string) {
 	body := map[string]interface{}{
 		"image_name": imageName,
 	}
-	sendHosts := make([]string, 0, len(hosts))
 	for host, _ := range hosts {
-		sendHosts = append(sendHosts, host)
 		url := fmt.Sprintf(url_format, host, server.Port, vtapLcuuid)
-		_, err := common.CURLPerform("PATCH", url, body, "")
+		response, err := common.CURLPerform("PATCH", url, body, "")
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
-			fmt.Printf("upgrade agent %s server %s failed\n", vtapName, host)
+			fmt.Printf("upgrade agent %s server %s failed, response: %s\n", vtapName, host, response)
 			continue
+		} else {
+			fmt.Printf("set agent %s upgrate image(%s) to server(%s) success\n", vtapName, imageName, host)
 		}
 	}
-	fmt.Printf("send upgrade data to server:%v\n", sendHosts)
-	fmt.Printf("set agent %s upgrate image(%s) success\n", vtapName, imageName)
 }
 
 func rebalance(cmd *cobra.Command, rebalanceType RebalanceType, typeVal string) error {
