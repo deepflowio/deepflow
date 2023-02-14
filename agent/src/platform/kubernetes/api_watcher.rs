@@ -38,7 +38,7 @@ use tokio::{
     task::JoinHandle,
 };
 
-use super::resource_watcher::{GenericResourceWatcher, Watcher};
+use super::resource_watcher::{GenericResourceWatcher, Watcher, WatcherConfig};
 use crate::{
     config::{handler::PlatformAccess, IngressFlavour},
     error::{Error, Result},
@@ -245,6 +245,7 @@ impl ApiWatcher {
         err_msgs: &Arc<Mutex<Vec<String>>>,
         namespace: Option<&str>,
         stats_collector: &stats::Collector,
+        watcher_config: &WatcherConfig,
     ) -> Result<(HashMap<String, GenericResourceWatcher>, Vec<JoinHandle<()>>)> {
         let mut config = Config::infer().await.map_err(|e| {
             Error::KubernetesApiWatcher(format!("failed to infer kubernetes config: {}", e))
@@ -300,6 +301,7 @@ impl ApiWatcher {
                         PB_RESOURCES[index],
                         namespace,
                         stats_collector,
+                        watcher_config,
                     ) {
                         watchers.insert(resource_name, watcher);
                     }
@@ -361,6 +363,7 @@ impl ApiWatcher {
                                 PB_RESOURCES[index],
                                 namespace,
                                 stats_collector,
+                                watcher_config,
                             ) {
                                 watchers.insert(resource_name, watcher);
                             }
@@ -370,7 +373,13 @@ impl ApiWatcher {
                     }
                 }
                 let ingress_watcher = if is_openshift_route {
-                    watcher_factory.new_watcher("routes", PB_INGRESS, namespace, stats_collector)
+                    watcher_factory.new_watcher(
+                        "routes",
+                        PB_INGRESS,
+                        namespace,
+                        stats_collector,
+                        watcher_config,
+                    )
                 } else if ingress_groups
                     .iter()
                     .any(|g| g.as_str() == "networking.k8s.io/v1")
@@ -380,6 +389,7 @@ impl ApiWatcher {
                         PB_INGRESS,
                         namespace,
                         stats_collector,
+                        watcher_config,
                     )
                 } else if ingress_groups
                     .iter()
@@ -390,6 +400,7 @@ impl ApiWatcher {
                         PB_INGRESS,
                         namespace,
                         stats_collector,
+                        watcher_config,
                     )
                 } else if ingress_groups
                     .iter()
@@ -400,6 +411,7 @@ impl ApiWatcher {
                         PB_INGRESS,
                         namespace,
                         stats_collector,
+                        watcher_config,
                     )
                 } else {
                     None
@@ -455,6 +467,7 @@ impl ApiWatcher {
                         PB_RESOURCES[index],
                         namespace,
                         stats_collector,
+                        watcher_config,
                     ) {
                         if let Some(handle) = watcher.start() {
                             task_handles.push(handle);
@@ -464,13 +477,20 @@ impl ApiWatcher {
                 }
 
                 let ingress_watcher = if is_openshift_route {
-                    watcher_factory.new_watcher("routes", PB_INGRESS, namespace, stats_collector)
+                    watcher_factory.new_watcher(
+                        "routes",
+                        PB_INGRESS,
+                        namespace,
+                        stats_collector,
+                        watcher_config,
+                    )
                 } else {
                     watcher_factory.new_watcher(
                         "v1ingresses",
                         PB_INGRESS,
                         namespace,
                         stats_collector,
+                        watcher_config,
                     )
                 };
 
@@ -666,8 +686,13 @@ impl ApiWatcher {
     ) {
         info!("kubernetes api watcher starting");
 
-        let namespace = context.config.load().namespace.clone();
+        let config = context.config.load();
+
+        let namespace = config.namespace.clone();
         let ns = namespace.as_ref().map(|ns| ns.as_str());
+        let watcher_config = WatcherConfig {
+            list_limit: config.kubernetes_api_list_limit,
+        };
 
         let (resource_watchers, task_handles) = loop {
             match context.runtime.block_on(Self::set_up(
@@ -677,6 +702,7 @@ impl ApiWatcher {
                 &err_msgs,
                 ns,
                 &stats_collector,
+                &watcher_config,
             )) {
                 Ok(r) => break r,
                 Err(e) => {
