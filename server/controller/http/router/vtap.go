@@ -17,8 +17,14 @@
 package router
 
 import (
+	"bytes"
+	"encoding/csv"
 	"fmt"
+	"io"
+	"net/url"
+	"reflect"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -44,6 +50,8 @@ func VtapRouter(e *gin.Engine) {
 	e.PATCH("/v1/vtaps-license-type/:lcuuid/", updateVtapLicenseType)
 	e.PATCH("/v1/vtaps-license-type/", batchUpdateVtapLicenseType)
 	e.PATCH("/v1/vtaps-tap-mode/", batchUpdateVtapTapMode)
+
+	e.POST("/v1/vtaps-csv/", getVtapCSV)
 }
 
 func getVtap(c *gin.Context) {
@@ -242,4 +250,88 @@ func batchUpdateVtapTapMode(c *gin.Context) {
 	}
 	data, err := service.BatchUpdateVtapTapMode(&vtapUpdateTapMode)
 	JsonResponse(c, data, err)
+}
+
+func getVtapCSV(c *gin.Context) {
+	var vtapCSV model.CSV
+	if err := c.ShouldBindBodyWith(&vtapCSV, binding.JSON); err != nil {
+		BadRequestResponse(c, common.INVALID_PARAMETERS, err.Error())
+		return
+	}
+	vtaps, err := service.GetVtaps(nil)
+	if err != nil {
+		BadRequestResponse(c, common.SERVER_ERROR, "get vtaps failed")
+		return
+	}
+
+	buf := new(bytes.Buffer)
+	buf.WriteString("\xEF\xBB\xBF")
+	w := csv.NewWriter(buf)
+	// write header
+	var headers []string
+	for _, header := range vtapCSV.Headers {
+		headers = append(headers, header.DisplayName)
+	}
+	w.Write(headers)
+	// write data
+	for _, vtap := range vtaps {
+		data := vtapToCSVData(vtapCSV.Headers, &vtap)
+		w.Write(data)
+	}
+	w.Flush()
+	c.Writer.Header().Add("Content-type", "application/octet-stream")
+	fileName := fmt.Sprintf("DeepFlow-采集器列表-%s.csv", time.Now().Format("2006-01-02"))
+	fileName = url.QueryEscape(fileName)
+	c.Writer.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename*=utf-8''%s", fileName))
+	_, err = io.Copy(c.Writer, buf)
+}
+
+func vtapToCSVData(headers []model.CSVHeader, vtap *model.Vtap) []string {
+	headerMap := make(map[string]int)
+	for i, header := range headers {
+		headerMap[header.FieldName] = i
+	}
+
+	resp := make([]string, len(headers))
+	elem := reflect.ValueOf(vtap).Elem()
+	for i := 0; i < elem.NumField(); i++ {
+		tag := elem.Type().Field(i).Tag
+		jsonTag := tag.Get("json")
+		if jsonTag == "" {
+			log.Warning("json tag not found")
+			continue
+		}
+
+		index, ok := headerMap[jsonTag]
+		if !ok {
+			continue
+		}
+		value := fmt.Sprintf("%v", elem.Field(i))
+		if jsonTag == "TYPE" {
+			value = common.VTapTypeChinese[vtap.Type]
+		} else if jsonTag == "TAP_MODE" {
+			value = common.VtapTapModeName[vtap.TapMode]
+		} else if jsonTag == "STATE" {
+			value = common.VTapStateToChinese[vtap.State]
+		} else if jsonTag == "BOOT_TIME" {
+			if elem.Field(i).Int() == 0 {
+				value = ""
+			} else {
+				value = time.Unix(int64(vtap.BootTime), 0).Format(common.GO_BIRTHDAY)
+			}
+		} else if jsonTag == "EXCEPTIONS" {
+			var exceptions string
+			for i, e := range vtap.Exceptions {
+				if i == 0 {
+					exceptions = common.VTapExceptionChinese[e]
+					continue
+				}
+				exceptions += fmt.Sprintf("、%s", common.VTapExceptionChinese[e])
+			}
+			value = exceptions
+		}
+		resp[index] = value
+	}
+
+	return resp
 }
