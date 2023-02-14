@@ -107,6 +107,15 @@ const (
 	VTAP_STATE_PENDING
 )
 
+var (
+	VTapStateToChinese = map[int]string{
+		VTAP_STATE_NOT_CONNECTED: "失联",
+		VTAP_STATE_NORMAL:        "运行",
+		VTAP_STATE_DISABLE:       "禁用",
+		VTAP_STATE_PENDING:       "未注册",
+	}
+)
+
 const (
 	VTAP_STATE_NOT_CONNECTED_STR = "LOST"
 	VTAP_STATE_NORMAL_STR        = "RUNNING"
@@ -139,12 +148,48 @@ var VTapTypeName = map[int]string{
 	VTAP_TYPE_HYPER_V:              "HYPER_V",
 }
 
+var VTapTypeChinese = map[int]string{
+	VTAP_TYPE_KVM:                  "KVM",
+	VTAP_TYPE_ESXI:                 "ESXI",
+	VTAP_TYPE_WORKLOAD_V:           "云服务器-V",
+	VTAP_TYPE_WORKLOAD_P:           "云服务器-P",
+	VTAP_TYPE_DEDICATED:            "专属服务器",
+	VTAP_TYPE_POD_HOST:             "容器-P",
+	VTAP_TYPE_POD_VM:               "容器-V",
+	VTAP_TYPE_TUNNEL_DECAPSULATION: "隧道解封装",
+	VTAP_TYPE_HYPER_V:              "Hyper-V",
+}
+
 // need synchronized update with the cli
 const (
 	VTAP_EXCEPTION_LICENSE_NOT_ENGOUTH     = 0x10000000
 	VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED   = 0x40000000
 	VTAP_EXCEPTION_ALLOC_CONTROLLER_FAILED = 0x80000000
 )
+
+var VTapExceptionChinese = map[int64]string{
+	2 << 0:                                 "自检失败：日志所在磁盘剩余空间不足100MB",
+	2 << 1:                                 "自检失败：可用内存不足",
+	2 << 2:                                 "自检失败：Coredump文件过多",
+	2 << 3:                                 "分发熔断",
+	2 << 4:                                 "分发流量达到限速",
+	2 << 5:                                 "到分发点的网关ARP无法找到",
+	2 << 6:                                 "采集包速率达到限速",
+	2 << 7:                                 "到数据节点的网关ARP无法找到",
+	2 << 8:                                 "控制器下发的配置信息校验不通过",
+	2 << 9:                                 "采集器线程数超限",
+	2 << 10:                                "采集器进程数超限",
+	2 << 11:                                "采集器编译生成的分发和PCAP策略数量超限",
+	2 << 12:                                "空闲内存超限",
+	2 << 13:                                "日志文件大小超限",
+	2 << 14:                                "控制SOCKET错误",
+	2 << 15:                                "数据SOCKET错误",
+	2 << 16:                                "分发SOCKET错误",
+	2 << 17:                                "集成SOCKET错误",
+	VTAP_EXCEPTION_LICENSE_NOT_ENGOUTH:     "采集器授权个数不足",
+	VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED:   "分配数据节点失败",
+	VTAP_EXCEPTION_ALLOC_CONTROLLER_FAILED: "分配控制器失败",
+}
 
 const VTAP_LICENSE_CHECK_INTERVAL = time.Minute
 
@@ -493,6 +538,13 @@ const (
 	TAPMODE_ANALYZER = 2
 	TAPMODE_DECAP    = 3
 )
+
+var VtapTapModeName = map[int]string{
+	TAPMODE_LOCAL:    "本地",
+	TAPMODE_MIRROR:   "镜像",
+	TAPMODE_ANALYZER: "专属",
+	TAPMODE_DECAP:    "隧道解封装",
+}
 
 var VTapToChangeTapModes = map[int][]int{
 	VTAP_TYPE_KVM:                  []int{TAPMODE_LOCAL, TAPMODE_MIRROR},

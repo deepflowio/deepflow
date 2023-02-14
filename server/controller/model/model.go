@@ -764,3 +764,12 @@ type Process struct {
 	StartTime    string `json:"START_TIME"`
 	UpdateAt     string `json:"UPDATE_AT"`
 }
+
+type CSV struct {
+	Headers []CSVHeader `json:"CSV_HEADERS"`
+}
+
+type CSVHeader struct {
+	DisplayName string `json:"DISPLAY_NAME"`
+	FieldName   string `json:"FIELD_NAME"`
+}
