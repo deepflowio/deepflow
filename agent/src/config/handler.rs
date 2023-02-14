@@ -235,7 +235,7 @@ pub struct OsProcScanConfig {
 }
 #[cfg(target_os = "windows")]
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct OsProcScanConfig {}
+pub struct OsProcScanConfig;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct PlatformConfig {
@@ -250,6 +250,7 @@ pub struct PlatformConfig {
     pub source_ip: IpAddr,
     pub epc_id: u32,
     pub kubernetes_api_enabled: bool,
+    pub kubernetes_api_list_limit: u32,
     pub namespace: Option<String>,
     pub thread_threshold: u32,
     pub tap_mode: TapMode,
@@ -901,6 +902,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 source_ip: ctrl_ip,
                 epc_id: conf.epc_id,
                 kubernetes_api_enabled: conf.kubernetes_api_enabled,
+                kubernetes_api_list_limit: conf.yaml_config.kubernetes_api_list_limit,
                 namespace: if conf.yaml_config.kubernetes_namespace.is_empty() {
                     None
                 } else {
@@ -1619,14 +1621,30 @@ impl ConfigHandler {
             if candidate_config.platform.enabled != new_config.platform.enabled {
                 info!("Platform enabled set to {}", new_config.platform.enabled);
             }
+            let mut restart_api_watcher = false;
+            if candidate_config.platform.kubernetes_api_list_limit
+                != new_config.platform.kubernetes_api_list_limit
+            {
+                restart_api_watcher = true;
+                info!(
+                    "Kubernetes API list limit set to {}",
+                    new_config.platform.kubernetes_api_list_limit
+                );
+            }
             if candidate_config.platform.kubernetes_api_enabled
                 != new_config.platform.kubernetes_api_enabled
             {
+                // if enabled changed no need to restart
+                restart_api_watcher = false;
                 info!(
                     "Kubernetes API enabled set to {}",
                     new_config.platform.kubernetes_api_enabled
                 );
+            } else if !new_config.platform.kubernetes_api_enabled {
+                // if disabled no need to restart
+                restart_api_watcher = false;
             }
+
             info!(
                 "platform config change from {:#?} to {:#?}",
                 candidate_config.platform, new_config.platform
@@ -1660,6 +1678,12 @@ impl ConfigHandler {
                     }
                 }
                 callbacks.push(platform_callback);
+                if restart_api_watcher {
+                    callbacks.push(|_, components| {
+                        components.api_watcher.stop();
+                        components.api_watcher.start();
+                    })
+                }
             }
         }
 
