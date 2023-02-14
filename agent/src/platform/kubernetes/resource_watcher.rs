@@ -48,7 +48,7 @@ use kube::{
     runtime::{self, watcher::Event},
     Api, Client, Resource,
 };
-use log::{debug, info, warn};
+use log::{debug, info, trace, warn};
 use openshift_openapi::api::route::v1::Route;
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
@@ -149,6 +149,11 @@ impl RefCountable for WatcherCounter {
     }
 }
 
+#[derive(Clone)]
+pub struct WatcherConfig {
+    pub list_limit: u32,
+}
+
 // 发生错误，需要重新构造实例
 #[derive(Clone)]
 pub struct ResourceWatcher<K> {
@@ -160,9 +165,10 @@ pub struct ResourceWatcher<K> {
     runtime: Handle,
     ready: Arc<AtomicBool>,
     stats_counter: Arc<WatcherCounter>,
+    config: WatcherConfig,
 }
 
-struct ProcessArg<K> {
+struct Context<K> {
     entries: Arc<Mutex<HashMap<String, Vec<u8>>>>,
     version: Arc<AtomicU64>,
     api: Api<K>,
@@ -170,6 +176,8 @@ struct ProcessArg<K> {
     err_msg: Arc<Mutex<Option<String>>>,
     ready: Arc<AtomicBool>,
     stats_counter: Arc<WatcherCounter>,
+    config: WatcherConfig,
+    resource_version: Option<String>,
 }
 
 impl<K> Watcher for ResourceWatcher<K>
@@ -178,7 +186,7 @@ where
     K: Metadata<Ty = ObjectMeta>,
 {
     fn start(&self) -> Option<JoinHandle<()>> {
-        let args = ProcessArg {
+        let ctx = Context {
             entries: self.entries.clone(),
             version: self.version.clone(),
             kind: self.kind,
@@ -186,9 +194,11 @@ where
             ready: self.ready.clone(),
             api: self.api.clone(),
             stats_counter: self.stats_counter.clone(),
+            config: self.config.clone(),
+            resource_version: None,
         };
 
-        let handle = self.runtime.spawn(Self::process(args));
+        let handle = self.runtime.spawn(Self::process(ctx));
         info!("{} watcher started", self.kind);
         Some(handle)
     }
@@ -223,7 +233,7 @@ where
     K: Clone + Debug + DeserializeOwned + Resource + Serialize + Trimmable,
     K: Metadata<Ty = ObjectMeta>,
 {
-    pub fn new(api: Api<K>, kind: &'static str, runtime: Handle) -> Self {
+    pub fn new(api: Api<K>, kind: &'static str, runtime: Handle, config: &WatcherConfig) -> Self {
         Self {
             api,
             entries: Arc::new(Mutex::new(HashMap::new())),
@@ -233,148 +243,149 @@ where
             runtime,
             ready: Default::default(),
             stats_counter: Default::default(),
+            config: config.clone(),
         }
     }
 
-    async fn process(args: ProcessArg<K>) {
+    async fn process(mut ctx: Context<K>) {
         let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
-        Self::get_list_entry(&args, &mut encoder).await;
-        args.ready.store(true, Ordering::Relaxed);
-        info!("{} watcher ready", args.kind);
+        Self::get_list_entry(&mut ctx, &mut encoder).await;
+        ctx.ready.store(true, Ordering::Relaxed);
+        info!("{} watcher ready", ctx.kind);
 
         let mut last_update = SystemTime::now();
-        let mut stream = runtime::watcher(args.api.clone(), ListParams::default()).boxed();
+        let mut stream = runtime::watcher(ctx.api.clone(), ListParams::default()).boxed();
 
         // If the watch is successful, keep updating the entry with the watch. If the watch is not successful,
         // update the entry with the full amount every 10 minutes.
         loop {
             while let Ok(Some(event)) = stream.try_next().await {
-                Self::resolve_event(&args, &mut encoder, event).await;
+                Self::resolve_event(&ctx, &mut encoder, event).await;
             }
             if last_update.elapsed().unwrap() >= LIST_INTERVAL {
-                Self::full_sync(&args, &mut encoder).await;
+                Self::full_sync(&mut ctx, &mut encoder).await;
                 last_update = SystemTime::now();
             }
             time::sleep(SLEEP_INTERVAL).await;
         }
     }
 
-    async fn full_sync(args: &ProcessArg<K>, encoder: &mut ZlibEncoder<Vec<u8>>) {
+    async fn full_sync(ctx: &mut Context<K>, encoder: &mut ZlibEncoder<Vec<u8>>) {
         let now = Instant::now();
-        Self::get_list_entry(args, encoder).await;
-        args.stats_counter
+        Self::get_list_entry(ctx, encoder).await;
+        ctx.stats_counter
             .list_cost_time_sum
             .fetch_add(now.elapsed().as_nanos() as u64, Ordering::Relaxed);
-        args.stats_counter
-            .list_count
-            .fetch_add(1, Ordering::Relaxed);
+        ctx.stats_counter.list_count.fetch_add(1, Ordering::Relaxed);
     }
 
-    async fn get_list_entry(args: &ProcessArg<K>, encoder: &mut ZlibEncoder<Vec<u8>>) {
-        match args.api.list(&ListParams::default()).await {
-            Ok(object_list) => {
-                args.stats_counter
-                    .list_length
-                    .fetch_add(object_list.items.len() as u32, Ordering::Relaxed);
-                info!(
-                    "k8s {} watcher list entry.len={}",
-                    args.kind,
-                    object_list.items.len()
-                );
-                // 检查内存和List API查询结果是否一致
-                {
-                    let entries_lock = args.entries.lock().await;
-                    if object_list.items.len() == entries_lock.len() {
-                        let mut identical = true;
-                        for object in object_list.items.iter() {
-                            match object.meta().uid.as_ref() {
-                                Some(uid) if entries_lock.contains_key(uid) => (),
-                                _ => {
-                                    identical = false;
-                                    break;
-                                }
-                            }
-                        }
-                        if identical {
-                            return;
-                        }
+    async fn get_list_entry(ctx: &mut Context<K>, encoder: &mut ZlibEncoder<Vec<u8>>) {
+        info!(
+            "list {} entries with limit {}",
+            ctx.kind, ctx.config.list_limit
+        );
+        let mut all_entries = HashMap::new();
+        let mut total_count = 0;
+        let mut params = ListParams::default().limit(ctx.config.list_limit);
+        loop {
+            trace!("{} list with {:?}", ctx.kind, params);
+            match ctx.api.list(&params).await {
+                Ok(mut object_list) => {
+                    total_count += object_list.items.len();
+                    if ctx.resource_version.is_some()
+                        && ctx.resource_version == object_list.metadata.resource_version
+                    {
+                        debug!("skip {} list with same resource version", ctx.kind);
+                        ctx.stats_counter
+                            .list_length
+                            .fetch_add(total_count as u32, Ordering::Relaxed);
+                        return;
                     }
-                }
+                    debug!(
+                        "{} list returns {} entries, {} remaining",
+                        ctx.kind,
+                        object_list.items.len(),
+                        object_list
+                            .metadata
+                            .remaining_item_count
+                            .unwrap_or_default()
+                    );
 
-                debug!("reload {} data", args.kind);
-
-                let mut new_entries = HashMap::new();
-
-                for object in object_list {
-                    if object.meta().uid.as_ref().is_none() {
-                        continue;
-                    }
-                    let mut trim_object = object.trim();
-                    match serde_json::to_vec(&trim_object) {
-                        Ok(serialized_object) => {
-                            let compressed_object =
-                                match Self::compress_entry(encoder, serialized_object.as_slice()) {
+                    for object in object_list.items {
+                        if object.meta().uid.as_ref().is_none() {
+                            continue;
+                        }
+                        let mut trim_object = object.trim();
+                        match serde_json::to_vec(&trim_object) {
+                            Ok(serialized_object) => {
+                                let compressed_object = match Self::compress_entry(
+                                    encoder,
+                                    serialized_object.as_slice(),
+                                ) {
                                     Ok(c) => c,
                                     Err(e) => {
                                         warn!(
-                                        "failed to compress {} resource with UID({}) error: {} ",
-                                        args.kind,
-                                        trim_object.meta().uid.as_ref().unwrap(),
-                                        e
-                                    );
+                                            "failed to compress {} resource with UID({}) error: {} ",
+                                            ctx.kind,
+                                            trim_object.meta().uid.as_ref().unwrap(),
+                                            e
+                                        );
                                         continue;
                                     }
                                 };
-                            new_entries.insert(
-                                trim_object.meta_mut().uid.take().unwrap(),
-                                compressed_object,
-                            );
+                                all_entries.insert(
+                                    trim_object.meta_mut().uid.take().unwrap(),
+                                    compressed_object,
+                                );
+                            }
+                            Err(e) => warn!(
+                                "failed serialized resource {} UID({}) to json Err: {}",
+                                ctx.kind,
+                                trim_object.meta().uid.as_ref().unwrap(),
+                                e
+                            ),
                         }
-                        Err(e) => warn!(
-                            "failed serialized resource {} UID({}) to json Err: {}",
-                            args.kind,
-                            trim_object.meta().uid.as_ref().unwrap(),
-                            e
-                        ),
                     }
-                }
 
-                if !new_entries.is_empty() {
-                    *args.entries.lock().await = new_entries;
-                    args.version.fetch_add(1, Ordering::SeqCst);
+                    if object_list.metadata.continue_.is_none() {
+                        info!("list {} returned {} entries", ctx.kind, total_count);
+                        if !all_entries.is_empty() {
+                            *ctx.entries.lock().await = all_entries;
+                            ctx.version.fetch_add(1, Ordering::SeqCst);
+                        }
+                        ctx.resource_version = object_list.metadata.resource_version.take();
+                        ctx.stats_counter
+                            .list_length
+                            .fetch_add(total_count as u32, Ordering::Relaxed);
+                        return;
+                    }
+                    params.continue_token = object_list.metadata.continue_.take();
                 }
-            }
-            Err(err) => {
-                args.stats_counter
-                    .list_error
-                    .fetch_add(1, Ordering::Relaxed);
-                let msg = format!("{} watcher list failed: {}", args.kind, err);
-                warn!("{}", msg);
-                args.err_msg.lock().await.replace(msg);
+                Err(err) => {
+                    ctx.stats_counter.list_error.fetch_add(1, Ordering::Relaxed);
+                    let msg = format!("{} watcher list failed: {}", ctx.kind, err);
+                    warn!("{}", msg);
+                    ctx.err_msg.lock().await.replace(msg);
+                }
             }
         }
     }
 
-    async fn resolve_event(
-        args: &ProcessArg<K>,
-        encoder: &mut ZlibEncoder<Vec<u8>>,
-        event: Event<K>,
-    ) {
+    async fn resolve_event(ctx: &Context<K>, encoder: &mut ZlibEncoder<Vec<u8>>, event: Event<K>) {
         match event {
             Event::Applied(object) => {
-                Self::insert_object(encoder, object, &args.entries, &args.version, &args.kind)
-                    .await;
-                args.stats_counter
+                Self::insert_object(encoder, object, &ctx.entries, &ctx.version, &ctx.kind).await;
+                ctx.stats_counter
                     .watch_applied
                     .fetch_add(1, Ordering::Relaxed);
             }
             Event::Deleted(mut object) => {
                 if let Some(uid) = object.meta_mut().uid.take() {
                     // 只有删除时检查是否需要更新版本号，其余消息直接更新map内容
-                    if args.entries.lock().await.remove(&uid).is_some() {
-                        args.version.fetch_add(1, Ordering::SeqCst);
+                    if ctx.entries.lock().await.remove(&uid).is_some() {
+                        ctx.version.fetch_add(1, Ordering::SeqCst);
                     }
-                    args.stats_counter
+                    ctx.stats_counter
                         .watch_deleted
                         .fetch_add(1, Ordering::Relaxed);
                 }
@@ -383,9 +394,9 @@ where
                 // 按照语义重启后应该拿改key对应最新的state，所以只取restart的最后一个
                 // restarted 存储的是某个key对应的object在重启过程中不同状态
                 if let Some(object) = objects.pop() {
-                    Self::insert_object(encoder, object, &args.entries, &args.version, &args.kind)
+                    Self::insert_object(encoder, object, &ctx.entries, &ctx.version, &ctx.kind)
                         .await;
-                    args.stats_counter
+                    ctx.stats_counter
                         .watch_restarted
                         .fetch_add(1, Ordering::Relaxed);
                 }
@@ -710,6 +721,7 @@ impl ResourceWatcherFactory {
         kind: &'static str,
         stats_collector: &stats::Collector,
         namespace: Option<&str>,
+        config: &WatcherConfig,
     ) -> ResourceWatcher<K>
     where
         K: Clone + Debug + DeserializeOwned + Resource + Serialize + Trimmable,
@@ -723,6 +735,7 @@ impl ResourceWatcherFactory {
             },
             kind,
             self.runtime.clone(),
+            config,
         );
         stats_collector.register_countable(
             "resource_watcher",
@@ -738,70 +751,82 @@ impl ResourceWatcherFactory {
         kind: &'static str,
         namespace: Option<&str>,
         stats_collector: &stats::Collector,
+        config: &WatcherConfig,
     ) -> Option<GenericResourceWatcher> {
-        let watcher = match resource {
-            // 特定namespace不支持Node/Namespace资源
-            "nodes" => {
-                GenericResourceWatcher::Node(self.new_watcher_inner(kind, stats_collector, None))
-            }
-            "namespaces" => GenericResourceWatcher::Namespace(self.new_watcher_inner(
-                kind,
-                stats_collector,
-                None,
-            )),
-            "services" => GenericResourceWatcher::Service(self.new_watcher_inner(
-                kind,
-                stats_collector,
-                namespace,
-            )),
-            "deployments" => GenericResourceWatcher::Deployment(self.new_watcher_inner(
-                kind,
-                stats_collector,
-                namespace,
-            )),
-            "pods" => GenericResourceWatcher::Pod(self.new_watcher_inner(
-                kind,
-                stats_collector,
-                namespace,
-            )),
-            "statefulsets" => GenericResourceWatcher::StatefulSet(self.new_watcher_inner(
-                kind,
-                stats_collector,
-                namespace,
-            )),
-            "daemonsets" => GenericResourceWatcher::DaemonSet(self.new_watcher_inner(
-                kind,
-                stats_collector,
-                namespace,
-            )),
-            "replicationcontrollers" => GenericResourceWatcher::ReplicationController(
-                self.new_watcher_inner(kind, stats_collector, namespace),
-            ),
-            "replicasets" => GenericResourceWatcher::ReplicaSet(self.new_watcher_inner(
-                kind,
-                stats_collector,
-                namespace,
-            )),
-            "v1ingresses" => GenericResourceWatcher::V1Ingress(self.new_watcher_inner(
-                kind,
-                stats_collector,
-                namespace,
-            )),
-            "v1beta1ingresses" => GenericResourceWatcher::V1beta1Ingress(self.new_watcher_inner(
-                kind,
-                stats_collector,
-                namespace,
-            )),
-            "extv1beta1ingresses" => GenericResourceWatcher::ExtV1beta1Ingress(
-                self.new_watcher_inner(kind, stats_collector, namespace),
-            ),
-            "routes" => GenericResourceWatcher::Route(self.new_watcher_inner(
-                kind,
-                stats_collector,
-                namespace,
-            )),
-            _ => return None,
-        };
+        let watcher =
+            match resource {
+                // 特定namespace不支持Node/Namespace资源
+                "nodes" => GenericResourceWatcher::Node(self.new_watcher_inner(
+                    kind,
+                    stats_collector,
+                    None,
+                    config,
+                )),
+                "namespaces" => GenericResourceWatcher::Namespace(self.new_watcher_inner(
+                    kind,
+                    stats_collector,
+                    None,
+                    config,
+                )),
+                "services" => GenericResourceWatcher::Service(self.new_watcher_inner(
+                    kind,
+                    stats_collector,
+                    namespace,
+                    config,
+                )),
+                "deployments" => GenericResourceWatcher::Deployment(self.new_watcher_inner(
+                    kind,
+                    stats_collector,
+                    namespace,
+                    config,
+                )),
+                "pods" => GenericResourceWatcher::Pod(self.new_watcher_inner(
+                    kind,
+                    stats_collector,
+                    namespace,
+                    config,
+                )),
+                "statefulsets" => GenericResourceWatcher::StatefulSet(self.new_watcher_inner(
+                    kind,
+                    stats_collector,
+                    namespace,
+                    config,
+                )),
+                "daemonsets" => GenericResourceWatcher::DaemonSet(self.new_watcher_inner(
+                    kind,
+                    stats_collector,
+                    namespace,
+                    config,
+                )),
+                "replicationcontrollers" => GenericResourceWatcher::ReplicationController(
+                    self.new_watcher_inner(kind, stats_collector, namespace, config),
+                ),
+                "replicasets" => GenericResourceWatcher::ReplicaSet(self.new_watcher_inner(
+                    kind,
+                    stats_collector,
+                    namespace,
+                    config,
+                )),
+                "v1ingresses" => GenericResourceWatcher::V1Ingress(self.new_watcher_inner(
+                    kind,
+                    stats_collector,
+                    namespace,
+                    config,
+                )),
+                "v1beta1ingresses" => GenericResourceWatcher::V1beta1Ingress(
+                    self.new_watcher_inner(kind, stats_collector, namespace, config),
+                ),
+                "extv1beta1ingresses" => GenericResourceWatcher::ExtV1beta1Ingress(
+                    self.new_watcher_inner(kind, stats_collector, namespace, config),
+                ),
+                "routes" => GenericResourceWatcher::Route(self.new_watcher_inner(
+                    kind,
+                    stats_collector,
+                    namespace,
+                    config,
+                )),
+                _ => return None,
+            };
 
         Some(watcher)
     }
