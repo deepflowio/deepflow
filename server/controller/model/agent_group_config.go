@@ -60,6 +60,7 @@ type StaticConfig struct {
 	AnalyzerIp                       *string               `yaml:"analyzer-ip,omitempty"`
 	AnalyzerPort                     *uint16               `yaml:"analyzer-port,omitempty"`
 	KubernetesNamespace              *string               `yaml:"kubernetes-namespace,omitempty"`
+	KubernetesAPIListLimit           *uint32               `yaml:"kubernetes-api-list-limit,omitempty"`
 	IngressFlavour                   *string               `yaml:"ingress-flavour,omitempty"`
 	GrpcBufferSize                   *int                  `yaml:"grpc-buffer-size,omitempty"`            // 单位：M
 	L7LogSessionAggrTimeout          *string               `yaml:"l7-log-session-aggr-timeout,omitempty"` // 单位: s
