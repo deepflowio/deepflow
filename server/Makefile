@@ -72,7 +72,6 @@ libs/geo/ip_info.go: libs/geo/ip_info_mini.json libs/geo/ip_info.py
 
 vendor:
 	go mod tidy && go mod download && go mod vendor
-	patch vendor/github.com/signalfx/splunk-otel-go/instrumentation/database/sql/splunksql/sql.go querier/patch/otel_sql.diff
 	find vendor -type d -exec chmod +w {} \;
 
 .PHONY: test

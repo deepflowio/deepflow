@@ -768,21 +768,24 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 			return nil
 		}
 		if e.DB == chCommon.DB_NAME_EXT_METRICS || e.DB == chCommon.DB_NAME_DEEPFLOW_SYSTEM {
-			if as == "" {
-				as = strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", "")
-			}
-			args := []Function{}
-			for _, arg := range expr.Exprs {
-				arg, err := e.parseSelectBinaryExpr(arg.(*sqlparser.AliasedExpr).Expr)
-				if err != nil {
-					return err
+			funcName := strings.Trim(sqlparser.String(expr.Name), "`")
+			if _, ok := metrics.METRICS_FUNCTIONS_MAP[funcName]; ok {
+				if as == "" {
+					as = strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", "")
 				}
-				args = append(args, arg)
+				args := []Function{}
+				for _, arg := range expr.Exprs {
+					arg, err := e.parseSelectBinaryExpr(arg.(*sqlparser.AliasedExpr).Expr)
+					if err != nil {
+						return err
+					}
+					args = append(args, arg)
+				}
+				binFunction, _ := GetBinaryFunc(funcName, args)
+				binFunction.SetAlias(as)
+				e.Statements = append(e.Statements, binFunction)
+				return nil
 			}
-			binFunction, _ := GetBinaryFunc(sqlparser.String(expr.Name), args)
-			binFunction.SetAlias(as)
-			e.Statements = append(e.Statements, binFunction)
-			return nil
 		}
 		name, args, err := e.parseFunction(expr)
 		if err != nil {
