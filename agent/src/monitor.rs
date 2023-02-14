@@ -23,11 +23,13 @@ use std::{
     time::Duration,
 };
 
+use arc_swap::access::Access;
 use log::{debug, info, warn};
 use sysinfo::{
     get_current_pid, NetworkExt, Pid, ProcessExt, ProcessRefreshKind, System, SystemExt,
 };
 
+use crate::config::handler::EnvironmentAccess;
 use crate::{
     error::{Error, Result},
     utils::{
@@ -159,10 +161,15 @@ struct SysStatusBroker {
     pid: Pid,
     create_time: Duration,
     log_dir: String,
+    config: EnvironmentAccess,
 }
 
 impl SysStatusBroker {
-    pub fn new(system: Arc<Mutex<System>>, log_dir: String) -> Result<Self> {
+    pub fn new(
+        system: Arc<Mutex<System>>,
+        log_dir: String,
+        config: EnvironmentAccess,
+    ) -> Result<Self> {
         let pid = get_current_pid().map_err(|e| Error::SysMonitor(String::from(e)))?;
 
         let create_time = {
@@ -186,6 +193,7 @@ impl SysStatusBroker {
             pid,
             create_time,
             log_dir,
+            config,
         })
     }
 }
@@ -205,6 +213,22 @@ impl RefCountable for SysStatusBroker {
             "sys_free_memory",
             CounterType::Gauged,
             CounterValue::Unsigned(current_sys_free_memory_percentage as u64),
+        ));
+
+        metrics.push((
+            "max_memory",
+            CounterType::Gauged,
+            CounterValue::Unsigned(self.config.load().max_memory as u64),
+        ));
+        metrics.push((
+            "max_cpus",
+            CounterType::Gauged,
+            CounterValue::Unsigned(self.config.load().max_cpus as u64),
+        ));
+        metrics.push((
+            "system_free_memory_limit",
+            CounterType::Gauged,
+            CounterValue::Unsigned(self.config.load().sys_free_memory_limit as u64),
         ));
 
         match get_file_and_size_sum(self.log_dir.clone()) {
@@ -277,7 +301,7 @@ pub struct Monitor {
 }
 
 impl Monitor {
-    pub fn new(stats: Arc<Collector>, log_dir: String) -> Result<Self> {
+    pub fn new(stats: Arc<Collector>, log_dir: String, config: EnvironmentAccess) -> Result<Self> {
         let mut system = System::new();
         system.refresh_cpu();
         let system = Arc::new(Mutex::new(system));
@@ -285,7 +309,11 @@ impl Monitor {
         Ok(Self {
             stats,
             running: AtomicBool::new(false),
-            sys_monitor: Arc::new(SysStatusBroker::new(system.clone(), log_dir)?),
+            sys_monitor: Arc::new(SysStatusBroker::new(
+                system.clone(),
+                log_dir,
+                config.clone(),
+            )?),
             sys_load: Arc::new(SysLoad(system.clone())),
             link_map: Arc::new(Mutex::new(HashMap::new())),
             system,

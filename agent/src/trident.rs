@@ -433,7 +433,11 @@ impl Trident {
         );
         guard.start();
 
-        let monitor = Monitor::new(stats_collector.clone(), log_dir.to_string())?;
+        let monitor = Monitor::new(
+            stats_collector.clone(),
+            log_dir.to_string(),
+            config_handler.environment(),
+        )?;
         monitor.start();
 
         #[cfg(target_os = "linux")]
