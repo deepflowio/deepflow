@@ -1617,6 +1617,7 @@ impl ConfigHandler {
                     }
                 }
                 callbacks.push(platform_callback);
+                #[cfg(target_os = "linux")]
                 if restart_api_watcher {
                     callbacks.push(|_, components| {
                         components.api_watcher.stop();
