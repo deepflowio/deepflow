@@ -19,7 +19,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/deepflowys/deepflow/cli/ctl"
+	"github.com/deepflowio/deepflow/cli/ctl"
 )
 
 var RevCount, Revision, CommitDate, goVersion, Branch, CompileTime string

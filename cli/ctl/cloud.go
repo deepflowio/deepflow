@@ -24,7 +24,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/deepflowys/deepflow/cli/ctl/common"
+	"github.com/deepflowio/deepflow/cli/ctl/common"
 )
 
 func RegisterCloudCommand() *cobra.Command {
