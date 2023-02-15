@@ -17,7 +17,7 @@
 use criterion::*;
 
 mod flow_map;
-mod perf;
+mod l7_log;
 
-criterion_group!(benches, flow_map::bench, perf::bench);
+criterion_group!(benches, flow_map::bench, l7_log::bench);
 criterion_main!(benches);

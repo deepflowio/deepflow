@@ -549,6 +549,46 @@ impl L7PerfStats {
             self.rrt_max = other.rrt_max
         }
     }
+
+    pub fn merge_perf(
+        &mut self,
+        req_count: u32,
+        resp_count: u32,
+        req_err: u32,
+        resp_err: u32,
+        rrt: u64,
+    ) {
+        self.request_count += req_count;
+        self.response_count += resp_count;
+        self.err_client_count += req_err;
+        self.err_server_count += resp_err;
+
+        if rrt != 0 {
+            self.rrt_max = self.rrt_max.max(rrt as u32);
+            self.rrt_sum += rrt;
+            self.rrt_count += 1;
+        }
+    }
+
+    pub fn inc_req(&mut self) {
+        self.merge_perf(1, 0, 0, 0, 0);
+    }
+
+    pub fn inc_resp(&mut self) {
+        self.merge_perf(0, 1, 0, 0, 0);
+    }
+
+    pub fn inc_req_err(&mut self) {
+        self.merge_perf(0, 0, 1, 0, 0);
+    }
+
+    pub fn inc_resp_err(&mut self) {
+        self.merge_perf(0, 0, 0, 1, 0);
+    }
+
+    pub fn update_rrt(&mut self, rrt: u64) {
+        self.merge_perf(0, 0, 0, 0, rrt);
+    }
 }
 
 impl From<L7PerfStats> for flow_log::L7PerfStats {

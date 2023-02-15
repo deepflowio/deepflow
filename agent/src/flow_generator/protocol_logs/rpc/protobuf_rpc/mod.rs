@@ -25,15 +25,11 @@ use serde::Serialize;
 
 use crate::{
     common::{
-        flow::FlowPerfStats,
+        flow::L7PerfStats,
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ProtocolParser, L7ProtocolParserInterface, ParseParam},
-        MetaPacket,
     },
-    config::handler::LogParserConfig,
-    flow_generator::{
-        perf::L7FlowPerf, protocol_logs::pb_adapter::L7ProtocolSendLog, AppProtoHead, Result,
-    },
+    flow_generator::{protocol_logs::pb_adapter::L7ProtocolSendLog, AppProtoHead, Result},
 };
 
 use self::krpc::{KrpcInfo, KrpcLog};
@@ -63,7 +59,7 @@ pub fn get_protobuf_rpc_parser(proto: ProtobufRpcProtocol) -> L7ProtocolParser {
 
 // all protobuf rpc parser
 #[derive(Debug, Serialize)]
-#[enum_dispatch(L7ProtocolParserInterface, L7FlowPerf)]
+#[enum_dispatch(L7ProtocolParserInterface)]
 pub enum ProtobufRpcLog {
     KrpcLog(KrpcLog),
 }
