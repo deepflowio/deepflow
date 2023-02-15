@@ -32,9 +32,9 @@ import (
 	_ "golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	"github.com/deepflowys/deepflow/cli/ctl/common"
-	"github.com/deepflowys/deepflow/message/trident"
-	"github.com/deepflowys/deepflow/server/libs/utils"
+	"github.com/deepflowio/deepflow/cli/ctl/common"
+	"github.com/deepflowio/deepflow/message/trident"
+	"github.com/deepflowio/deepflow/server/libs/utils"
 )
 
 type ParamData struct {
