@@ -671,6 +671,8 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 			default:
 				whereFilter = fmt.Sprintf(tagItem.WhereTranslator, "hasAny", t.Value)
 			}
+		case "acl_gid":
+			whereFilter = fmt.Sprintf(tagItem.WhereTranslator, t.Value)
 		default:
 			switch strings.ToLower(op) {
 			case "regexp":
