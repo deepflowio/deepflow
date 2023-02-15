@@ -1,9 +1,10 @@
-module github.com/deepflowys/deepflow/cli
+module github.com/deepflowio/deepflow/cli
 
 go 1.18
 
 require (
 	github.com/bitly/go-simplejson v0.5.0
+	github.com/deepflowys/deepflow/cli v0.0.0-20230215034050-9ccc96af813e
 	github.com/deepflowys/deepflow/message v0.0.0-20230108090919-8d32a4683317
 	github.com/deepflowys/deepflow/server v0.0.0-20230130073556-05c72bcfbcfc
 	github.com/ghodss/yaml v1.0.0
@@ -63,7 +64,6 @@ require (
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/kr/pretty v0.3.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
@@ -71,6 +71,7 @@ require (
 	github.com/openshift/api v0.0.0-20210422150128-d8a48168c81c // indirect
 	github.com/openshift/client-go v0.0.0-20210422153130-25c8450d1535 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
+	github.com/rogpeppe/go-internal v1.6.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	golang.org/x/oauth2 v0.0.0-20220622183110-fd043fe589d2 // indirect
 	golang.org/x/term v0.3.0 // indirect

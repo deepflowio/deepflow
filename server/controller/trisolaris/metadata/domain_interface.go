@@ -17,9 +17,9 @@
 package metadata
 
 import (
-	"github.com/deepflowys/deepflow/message/trident"
-	. "github.com/deepflowys/deepflow/server/controller/common"
-	models "github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/message/trident"
+	. "github.com/deepflowio/deepflow/server/controller/common"
+	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
 type TInterfaces []*trident.Interface

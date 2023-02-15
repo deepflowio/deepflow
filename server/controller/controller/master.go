@@ -21,17 +21,17 @@ import (
 	"os"
 	"time"
 
-	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/config"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql/migrator"
-	"github.com/deepflowys/deepflow/server/controller/election"
-	resoureservice "github.com/deepflowys/deepflow/server/controller/http/service/resource"
-	"github.com/deepflowys/deepflow/server/controller/monitor"
-	"github.com/deepflowys/deepflow/server/controller/monitor/license"
-	"github.com/deepflowys/deepflow/server/controller/monitor/vtap"
-	"github.com/deepflowys/deepflow/server/controller/recorder"
-	recorderdb "github.com/deepflowys/deepflow/server/controller/recorder/db"
-	"github.com/deepflowys/deepflow/server/controller/tagrecorder"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/config"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator"
+	"github.com/deepflowio/deepflow/server/controller/election"
+	resoureservice "github.com/deepflowio/deepflow/server/controller/http/service/resource"
+	"github.com/deepflowio/deepflow/server/controller/monitor"
+	"github.com/deepflowio/deepflow/server/controller/monitor/license"
+	"github.com/deepflowio/deepflow/server/controller/monitor/vtap"
+	"github.com/deepflowio/deepflow/server/controller/recorder"
+	recorderdb "github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 func IsMasterRegion(cfg *config.ControllerConfig) bool {

@@ -23,8 +23,8 @@ import (
 
 	. "github.com/google/gopacket/layers"
 
-	pb "github.com/deepflowys/deepflow/message/trident"
-	. "github.com/deepflowys/deepflow/server/libs/utils"
+	pb "github.com/deepflowio/deepflow/message/trident"
+	. "github.com/deepflowio/deepflow/server/libs/utils"
 )
 
 type TunnelType uint8

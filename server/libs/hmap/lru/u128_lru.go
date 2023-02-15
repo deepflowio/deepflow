@@ -21,10 +21,10 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/deepflowys/deepflow/server/libs/hmap"
-	"github.com/deepflowys/deepflow/server/libs/hmap/keyhash"
-	"github.com/deepflowys/deepflow/server/libs/stats"
-	"github.com/deepflowys/deepflow/server/libs/utils"
+	"github.com/deepflowio/deepflow/server/libs/hmap"
+	"github.com/deepflowio/deepflow/server/libs/hmap/keyhash"
+	"github.com/deepflowio/deepflow/server/libs/stats"
+	"github.com/deepflowio/deepflow/server/libs/utils"
 )
 
 type u128LRUNode struct {

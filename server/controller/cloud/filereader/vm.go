@@ -20,8 +20,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/deepflowys/deepflow/server/controller/cloud/model"
-	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/common"
 )
 
 func (f *FileReader) getVMs(fileInfo *FileInfo) ([]model.VM, []model.VInterface, []model.IP, error) {

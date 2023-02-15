@@ -19,13 +19,13 @@ package dbwriter
 import (
 	logging "github.com/op/go-logging"
 
-	basecommon "github.com/deepflowys/deepflow/server/ingester/common"
-	"github.com/deepflowys/deepflow/server/ingester/config"
-	"github.com/deepflowys/deepflow/server/ingester/flow_log/common"
-	flowlogconfig "github.com/deepflowys/deepflow/server/ingester/flow_log/config"
-	logdata "github.com/deepflowys/deepflow/server/ingester/flow_log/log_data"
-	"github.com/deepflowys/deepflow/server/ingester/pkg/ckwriter"
-	"github.com/deepflowys/deepflow/server/libs/ckdb"
+	basecommon "github.com/deepflowio/deepflow/server/ingester/common"
+	"github.com/deepflowio/deepflow/server/ingester/config"
+	"github.com/deepflowio/deepflow/server/ingester/flow_log/common"
+	flowlogconfig "github.com/deepflowio/deepflow/server/ingester/flow_log/config"
+	logdata "github.com/deepflowio/deepflow/server/ingester/flow_log/log_data"
+	"github.com/deepflowio/deepflow/server/ingester/pkg/ckwriter"
+	"github.com/deepflowio/deepflow/server/libs/ckdb"
 )
 
 var log = logging.MustGetLogger("flow_log.dbwriter")

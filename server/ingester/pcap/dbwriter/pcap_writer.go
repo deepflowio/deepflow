@@ -19,10 +19,10 @@ package dbwriter
 import (
 	logging "github.com/op/go-logging"
 
-	baseconfig "github.com/deepflowys/deepflow/server/ingester/config"
-	"github.com/deepflowys/deepflow/server/ingester/pcap/config"
-	"github.com/deepflowys/deepflow/server/ingester/pkg/ckwriter"
-	"github.com/deepflowys/deepflow/server/libs/ckdb"
+	baseconfig "github.com/deepflowio/deepflow/server/ingester/config"
+	"github.com/deepflowio/deepflow/server/ingester/pcap/config"
+	"github.com/deepflowio/deepflow/server/ingester/pkg/ckwriter"
+	"github.com/deepflowio/deepflow/server/libs/ckdb"
 )
 
 var log = logging.MustGetLogger("pcap.dbwriter")

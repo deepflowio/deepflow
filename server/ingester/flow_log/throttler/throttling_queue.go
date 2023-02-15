@@ -20,7 +20,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/deepflowys/deepflow/server/ingester/flow_log/dbwriter"
+	"github.com/deepflowio/deepflow/server/ingester/flow_log/dbwriter"
 )
 
 const (

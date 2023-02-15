@@ -1,14 +1,14 @@
-module github.com/deepflowys/deepflow/server
+module github.com/deepflowio/deepflow/server
 
 go 1.18
 
 replace (
 	cloud.google.com/go => cloud.google.com/go v0.103.0
-	github.com/deepflowys/deepflow/server/controller/cloud/platform => ./controller/cloud/platform
-	github.com/deepflowys/deepflow/server/controller/db/mysql/migrator => ./controller/db/mysql/migrator
-	github.com/deepflowys/deepflow/server/controller/http/service/configuration => ./controller/http/service/configuration
-	github.com/deepflowys/deepflow/server/controller/monitor/license => ./controller/monitor/license
-	github.com/deepflowys/deepflow/server/querier/engine/clickhouse/packet_batch => ./querier/engine/clickhouse/packet_batch
+	github.com/deepflowio/deepflow/server/controller/cloud/platform => ./controller/cloud/platform
+	github.com/deepflowio/deepflow/server/controller/db/mysql/migrator => ./controller/db/mysql/migrator
+	github.com/deepflowio/deepflow/server/controller/http/service/configuration => ./controller/http/service/configuration
+	github.com/deepflowio/deepflow/server/controller/monitor/license => ./controller/monitor/license
+	github.com/deepflowio/deepflow/server/querier/engine/clickhouse/packet_batch => ./querier/engine/clickhouse/packet_batch
 	github.com/ionos-cloud/sdk-go/v6 => github.com/ionos-cloud/sdk-go/v6 v6.1.0
 )
 
@@ -30,13 +30,13 @@ require (
 	github.com/cactus/go-statsd-client/v5 v5.0.0
 	github.com/deckarep/golang-set v1.8.0
 	github.com/deckarep/golang-set/v2 v2.1.0
-	github.com/deepflowys/deepflow/message v0.0.0-20230108035551-d7d77f3f1785
-	github.com/deepflowys/deepflow/server/controller/cloud/platform v0.0.0-00010101000000-000000000000
-	github.com/deepflowys/deepflow/server/controller/db/mysql/migrator v0.0.0-00010101000000-000000000000
-	github.com/deepflowys/deepflow/server/controller/http/service/configuration v0.0.0-00010101000000-000000000000
-	github.com/deepflowys/deepflow/server/controller/monitor/license v0.0.0-00010101000000-000000000000
-	github.com/deepflowys/deepflow/server/querier/engine/clickhouse/packet_batch v0.0.0-00010101000000-000000000000
-	github.com/deepflowys/tempopb v0.0.0-20221209022705-ef5ed506f43c
+	github.com/deepflowio/deepflow/message v0.0.0-20230108035551-d7d77f3f1785
+	github.com/deepflowio/deepflow/server/controller/cloud/platform v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/controller/db/mysql/migrator v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/controller/http/service/configuration v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/controller/monitor/license v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/querier/engine/clickhouse/packet_batch v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/tempopb v0.0.0-20221209022705-ef5ed506f43c
 	github.com/docker/go-units v0.4.0
 	github.com/gin-gonic/gin v1.8.1
 	github.com/gogo/protobuf v1.3.2

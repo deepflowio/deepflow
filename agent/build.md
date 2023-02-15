@@ -8,7 +8,7 @@ The easiest way is to use our docker image:
 ```bash
 docker run --privileged --rm -it -v \
     $(pwd):/deepflow hub.deepflow.yunshan.net/public/rust-build bash -c \
-    "source /opt/rh/devtoolset-8/enable && git clone --recursive https://github.com/deepflowys/deepflow.git /deepflow && cd /deepflow/agent && cargo build"
+    "source /opt/rh/devtoolset-8/enable && git clone --recursive https://github.com/deepflowio/deepflow.git /deepflow && cd /deepflow/agent && cargo build"
 
 # binary file directory: ./deepflow/agent/target/debug/deepflow-agent
 ```
@@ -80,7 +80,7 @@ ln -s /usr/local/lib/libelf.a /usr/lib/libelf.a
 
 # libGoReSym
 # Install or upgrade golang version to 1.18
-wget https://github.com/deepflowys/libGoReSym/archive/refs/tags/v0.0.1-2.tar.gz
+wget https://github.com/deepflowio/libGoReSym/archive/refs/tags/v0.0.1-2.tar.gz
 tar -xzf v0.0.1-2.tar.gz
 cd libGoReSym-0.0.1-2
 make && make install && make clean
@@ -88,7 +88,7 @@ make && make install && make clean
 
 Compile agent：
 ```bash
-git clone --recursive https://github.com/deepflowys/deepflow.git
+git clone --recursive https://github.com/deepflowio/deepflow.git
 cd deepflow/agent
 cargo build
 ```

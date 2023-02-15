@@ -144,10 +144,10 @@ github.com/deckarep/golang-set v1.8.0 h1:sk9/l/KqpunDwP7pSjUg0keiOOLEnOBHzykLrsP
 github.com/deckarep/golang-set v1.8.0/go.mod h1:5nI87KwE7wgsBU1F4GKAw2Qod7p5kyS383rP6+o6qqo=
 github.com/deckarep/golang-set/v2 v2.1.0 h1:g47V4Or+DUdzbs8FxCCmgb6VYd+ptPAngjM6dtGktsI=
 github.com/deckarep/golang-set/v2 v2.1.0/go.mod h1:VAky9rY/yGXJOLEDv3OMci+7wtDpOF4IN+y82NBOac4=
-github.com/deepflowys/deepflow/message v0.0.0-20230108035551-d7d77f3f1785 h1:fCFxosn7UO0TULZ/oty1NBTaoGuMB3S50jKlBCCVV+o=
-github.com/deepflowys/deepflow/message v0.0.0-20230108035551-d7d77f3f1785/go.mod h1:mSlcdrl/mmrjBdG+xcqhGXC0BTK26G98ekXxNDgOyQ4=
-github.com/deepflowys/tempopb v0.0.0-20221209022705-ef5ed506f43c h1:Wfh8QZ7dcr4EZWmCdYtJ0Sq459tqT+unbMyUGgq893w=
-github.com/deepflowys/tempopb v0.0.0-20221209022705-ef5ed506f43c/go.mod h1:UKggKRo8JFcrnJ8+qFnalWFgsCl7z+ur9QRBzuy3Tic=
+github.com/deepflowio/deepflow/message v0.0.0-20230108035551-d7d77f3f1785 h1:fCFxosn7UO0TULZ/oty1NBTaoGuMB3S50jKlBCCVV+o=
+github.com/deepflowio/deepflow/message v0.0.0-20230108035551-d7d77f3f1785/go.mod h1:mSlcdrl/mmrjBdG+xcqhGXC0BTK26G98ekXxNDgOyQ4=
+github.com/deepflowio/tempopb v0.0.0-20221209022705-ef5ed506f43c h1:Wfh8QZ7dcr4EZWmCdYtJ0Sq459tqT+unbMyUGgq893w=
+github.com/deepflowio/tempopb v0.0.0-20221209022705-ef5ed506f43c/go.mod h1:UKggKRo8JFcrnJ8+qFnalWFgsCl7z+ur9QRBzuy3Tic=
 github.com/dennwc/varint v1.0.0 h1:kGNFFSSw8ToIy3obO/kKr8U9GZYUAxQEVuix4zfDWzE=
 github.com/dennwc/varint v1.0.0/go.mod h1:hnItb35rvZvJrbTALZtY/iQfDs48JKRG1RPpgziApxA=
 github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f h1:lO4WD4F/rVNCu3HqELle0jiPLLBs70cWOduZpkS1E78=

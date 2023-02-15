@@ -22,9 +22,9 @@ import (
 	"github.com/op/go-logging"
 	"gorm.io/gorm"
 
-	. "github.com/deepflowys/deepflow/server/controller/db/mysql/common"
-	. "github.com/deepflowys/deepflow/server/controller/db/mysql/config"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql/migration"
+	. "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
+	. "github.com/deepflowio/deepflow/server/controller/db/mysql/config"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/migration"
 )
 
 var log = logging.MustGetLogger("db.migrator.mysql")

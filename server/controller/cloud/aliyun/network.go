@@ -18,8 +18,8 @@ package aliyun
 
 import (
 	vpc "github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
-	"github.com/deepflowys/deepflow/server/controller/cloud/model"
-	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/common"
 )
 
 func (a *Aliyun) getNetworks(region model.Region) ([]model.Network, []model.Subnet, error) {
