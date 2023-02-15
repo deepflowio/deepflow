@@ -28,10 +28,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/bitly/go-simplejson"
-	cloudconfig "github.com/deepflowys/deepflow/server/controller/cloud/config"
-	"github.com/deepflowys/deepflow/server/controller/cloud/model"
-	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	cloudconfig "github.com/deepflowio/deepflow/server/controller/cloud/config"
+	"github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/op/go-logging"
 )
 

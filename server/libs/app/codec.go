@@ -20,9 +20,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/deepflowys/deepflow/server/libs/codec"
-	"github.com/deepflowys/deepflow/server/libs/zerodoc"
-	"github.com/deepflowys/deepflow/server/libs/zerodoc/pb"
+	"github.com/deepflowio/deepflow/server/libs/codec"
+	"github.com/deepflowio/deepflow/server/libs/zerodoc"
+	"github.com/deepflowio/deepflow/server/libs/zerodoc/pb"
 )
 
 func DecodePB(decoder *codec.SimpleDecoder, pbDoc *pb.Document) (*Document, error) {

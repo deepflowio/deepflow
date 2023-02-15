@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/deepflowys/deepflow/server/ingester/droplet/queue"
+	"github.com/deepflowio/deepflow/server/ingester/droplet/queue"
 )
 
 func TestTridentAdapter(t *testing.T) {

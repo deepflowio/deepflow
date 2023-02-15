@@ -17,8 +17,8 @@
 package zerodoc
 
 import (
-	"github.com/deepflowys/deepflow/server/libs/codec"
-	"github.com/deepflowys/deepflow/server/libs/zerodoc/pb"
+	"github.com/deepflowio/deepflow/server/libs/codec"
+	"github.com/deepflowio/deepflow/server/libs/zerodoc/pb"
 
 	"testing"
 )

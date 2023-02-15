@@ -23,9 +23,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/op/go-logging"
 
-	"github.com/deepflowys/deepflow/server/controller/common"
-	. "github.com/deepflowys/deepflow/server/controller/http/router/common"
-	servicecommon "github.com/deepflowys/deepflow/server/controller/http/service/common"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
+	servicecommon "github.com/deepflowio/deepflow/server/controller/http/service/common"
 )
 
 var log = logging.MustGetLogger("router.health")

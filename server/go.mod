@@ -1,14 +1,14 @@
-module github.com/deepflowys/deepflow/server
+module github.com/deepflowio/deepflow/server
 
 go 1.18
 
 replace (
 	cloud.google.com/go => cloud.google.com/go v0.103.0
-	github.com/deepflowys/deepflow/server/controller/cloud/platform => ./controller/cloud/platform
-	github.com/deepflowys/deepflow/server/controller/db/mysql/migrator => ./controller/db/mysql/migrator
-	github.com/deepflowys/deepflow/server/controller/http/service/configuration => ./controller/http/service/configuration
-	github.com/deepflowys/deepflow/server/controller/monitor/license => ./controller/monitor/license
-	github.com/deepflowys/deepflow/server/querier/engine/clickhouse/packet_batch => ./querier/engine/clickhouse/packet_batch
+	github.com/deepflowio/deepflow/server/controller/cloud/platform => ./controller/cloud/platform
+	github.com/deepflowio/deepflow/server/controller/db/mysql/migrator => ./controller/db/mysql/migrator
+	github.com/deepflowio/deepflow/server/controller/http/service/configuration => ./controller/http/service/configuration
+	github.com/deepflowio/deepflow/server/controller/monitor/license => ./controller/monitor/license
+	github.com/deepflowio/deepflow/server/querier/engine/clickhouse/packet_batch => ./querier/engine/clickhouse/packet_batch
 	github.com/ionos-cloud/sdk-go/v6 => github.com/ionos-cloud/sdk-go/v6 v6.1.0
 )
 
@@ -30,13 +30,13 @@ require (
 	github.com/cactus/go-statsd-client/v5 v5.0.0
 	github.com/deckarep/golang-set v1.8.0
 	github.com/deckarep/golang-set/v2 v2.1.0
-	github.com/deepflowys/deepflow/message v0.0.0-20230108035551-d7d77f3f1785
-	github.com/deepflowys/deepflow/server/controller/cloud/platform v0.0.0-00010101000000-000000000000
-	github.com/deepflowys/deepflow/server/controller/db/mysql/migrator v0.0.0-00010101000000-000000000000
-	github.com/deepflowys/deepflow/server/controller/http/service/configuration v0.0.0-00010101000000-000000000000
-	github.com/deepflowys/deepflow/server/controller/monitor/license v0.0.0-00010101000000-000000000000
-	github.com/deepflowys/deepflow/server/querier/engine/clickhouse/packet_batch v0.0.0-00010101000000-000000000000
-	github.com/deepflowys/tempopb v0.0.0-20221209022705-ef5ed506f43c
+	github.com/deepflowio/deepflow/message v0.0.0-20230215103233-9634a1a0bf6f
+	github.com/deepflowio/deepflow/server/controller/cloud/platform v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/controller/db/mysql/migrator v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/controller/http/service/configuration v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/controller/monitor/license v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/querier/engine/clickhouse/packet_batch v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/tempopb v0.0.0-20230215110519-15853baf3a79
 	github.com/docker/go-units v0.4.0
 	github.com/gin-gonic/gin v1.8.1
 	github.com/gogo/protobuf v1.3.2
@@ -72,9 +72,9 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.7.0
 	go.opentelemetry.io/otel/sdk v1.13.0
 	go.opentelemetry.io/proto/otlp v0.19.0
-	golang.org/x/net v0.4.0
-	golang.org/x/sys v0.3.0
-	google.golang.org/grpc v1.52.3
+	golang.org/x/net v0.7.0
+	golang.org/x/sys v0.5.0
+	google.golang.org/grpc v1.53.0
 	gopkg.in/alexcesaro/statsd.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0
 	gorm.io/driver/mysql v1.3.4
@@ -122,7 +122,7 @@ require (
 	github.com/aws/smithy-go v1.13.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect
-	github.com/cespare/xxhash/v2 v2.1.2 // indirect
+	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dennwc/varint v1.0.0 // indirect
 	github.com/emicklei/go-restful v2.9.5+incompatible // indirect
@@ -193,13 +193,13 @@ require (
 	go4.org/intern v0.0.0-20211027215823-ae77deb06f29 // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20211027215541-db492cf91b37 // indirect
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292 // indirect
-	golang.org/x/oauth2 v0.0.0-20221014153046-6fdb5e3db783 // indirect
+	golang.org/x/oauth2 v0.4.0 // indirect
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
-	golang.org/x/term v0.3.0 // indirect
-	golang.org/x/text v0.5.0 // indirect
+	golang.org/x/term v0.5.0 // indirect
+	golang.org/x/text v0.7.0 // indirect
 	golang.org/x/time v0.0.0-20220224211638-0e9765cccd65 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/genproto v0.0.0-20221118155620-16455021b5e6 // indirect
+	google.golang.org/genproto v0.0.0-20230209215440-0dfe4f8abfcc // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.66.2 // indirect

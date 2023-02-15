@@ -25,7 +25,7 @@ import (
 
 	"github.com/influxdata/influxdb/client/v2"
 
-	"github.com/deepflowys/deepflow/server/libs/zerodoc"
+	"github.com/deepflowio/deepflow/server/libs/zerodoc"
 )
 
 const (

@@ -17,10 +17,10 @@
 package dbwriter
 
 import (
-	"github.com/deepflowys/deepflow/server/ingester/flow_tag"
-	"github.com/deepflowys/deepflow/server/libs/ckdb"
-	"github.com/deepflowys/deepflow/server/libs/pool"
-	"github.com/deepflowys/deepflow/server/libs/zerodoc"
+	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
+	"github.com/deepflowio/deepflow/server/libs/ckdb"
+	"github.com/deepflowio/deepflow/server/libs/pool"
+	"github.com/deepflowio/deepflow/server/libs/zerodoc"
 )
 
 const (

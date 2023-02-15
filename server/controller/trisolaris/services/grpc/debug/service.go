@@ -17,13 +17,13 @@
 package synchronize
 
 import (
-	api "github.com/deepflowys/deepflow/message/trident"
+	api "github.com/deepflowio/deepflow/message/trident"
 	"github.com/op/go-logging"
 	context "golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	grpcserver "github.com/deepflowys/deepflow/server/controller/grpc"
-	"github.com/deepflowys/deepflow/server/controller/trisolaris"
+	grpcserver "github.com/deepflowio/deepflow/server/controller/grpc"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 )
 
 var log = logging.MustGetLogger("trisolaris/debug")

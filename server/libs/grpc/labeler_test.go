@@ -25,9 +25,9 @@ import (
 
 	"github.com/google/gopacket/layers"
 
-	"github.com/deepflowys/deepflow/server/libs/logger"
-	"github.com/deepflowys/deepflow/server/libs/policy"
-	api "github.com/deepflowys/deepflow/server/libs/reciter-api"
+	"github.com/deepflowio/deepflow/server/libs/logger"
+	"github.com/deepflowio/deepflow/server/libs/policy"
+	api "github.com/deepflowio/deepflow/server/libs/reciter-api"
 )
 
 func TestDedup(t *testing.T) {

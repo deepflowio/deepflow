@@ -22,19 +22,19 @@ import (
 
 	logging "github.com/op/go-logging"
 
-	"github.com/deepflowys/deepflow/server/controller/cloud/aliyun"
-	"github.com/deepflowys/deepflow/server/controller/cloud/aws"
-	"github.com/deepflowys/deepflow/server/controller/cloud/baidubce"
-	"github.com/deepflowys/deepflow/server/controller/cloud/config"
-	"github.com/deepflowys/deepflow/server/controller/cloud/filereader"
-	"github.com/deepflowys/deepflow/server/controller/cloud/genesis"
-	"github.com/deepflowys/deepflow/server/controller/cloud/huawei"
-	"github.com/deepflowys/deepflow/server/controller/cloud/kubernetes"
-	"github.com/deepflowys/deepflow/server/controller/cloud/model"
-	"github.com/deepflowys/deepflow/server/controller/cloud/qingcloud"
-	"github.com/deepflowys/deepflow/server/controller/cloud/tencent"
-	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/cloud/aliyun"
+	"github.com/deepflowio/deepflow/server/controller/cloud/aws"
+	"github.com/deepflowio/deepflow/server/controller/cloud/baidubce"
+	"github.com/deepflowio/deepflow/server/controller/cloud/config"
+	"github.com/deepflowio/deepflow/server/controller/cloud/filereader"
+	"github.com/deepflowio/deepflow/server/controller/cloud/genesis"
+	"github.com/deepflowio/deepflow/server/controller/cloud/huawei"
+	"github.com/deepflowio/deepflow/server/controller/cloud/kubernetes"
+	"github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/cloud/qingcloud"
+	"github.com/deepflowio/deepflow/server/controller/cloud/tencent"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
 var log = logging.MustGetLogger("cloud.platform")
