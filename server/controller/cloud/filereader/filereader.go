@@ -25,8 +25,8 @@ import (
 	simplejson "github.com/bitly/go-simplejson"
 	logging "github.com/op/go-logging"
 
-	"github.com/deepflowys/deepflow/server/controller/cloud/model"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
 var log = logging.MustGetLogger("cloud.filereader")

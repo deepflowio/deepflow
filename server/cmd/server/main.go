@@ -28,13 +28,13 @@ import (
 
 	"io/ioutil"
 
-	"github.com/deepflowys/deepflow/server/common"
-	"github.com/deepflowys/deepflow/server/controller/controller"
-	"github.com/deepflowys/deepflow/server/controller/report"
-	"github.com/deepflowys/deepflow/server/controller/trisolaris/utils"
-	"github.com/deepflowys/deepflow/server/ingester/ingester"
-	"github.com/deepflowys/deepflow/server/libs/logger"
-	"github.com/deepflowys/deepflow/server/querier/querier"
+	"github.com/deepflowio/deepflow/server/common"
+	"github.com/deepflowio/deepflow/server/controller/controller"
+	"github.com/deepflowio/deepflow/server/controller/report"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
+	"github.com/deepflowio/deepflow/server/ingester/ingester"
+	"github.com/deepflowio/deepflow/server/libs/logger"
+	"github.com/deepflowio/deepflow/server/querier/querier"
 
 	yaml "gopkg.in/yaml.v2"
 

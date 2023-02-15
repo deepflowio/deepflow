@@ -22,8 +22,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/deepflowys/deepflow/server/libs/queue"
-	"github.com/deepflowys/deepflow/server/libs/receiver"
+	"github.com/deepflowio/deepflow/server/libs/queue"
+	"github.com/deepflowio/deepflow/server/libs/receiver"
 )
 
 const (

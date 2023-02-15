@@ -19,12 +19,12 @@ package service
 import (
 	"fmt"
 
-	kubernetes_gather_model "github.com/deepflowys/deepflow/server/controller/cloud/kubernetes_gather/model"
-	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
-	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/genesis"
-	"github.com/deepflowys/deepflow/server/controller/manager"
-	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
+	kubernetes_gather_model "github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
+	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/genesis"
+	"github.com/deepflowio/deepflow/server/controller/manager"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 )
 
 func GetCloudBasicInfos(filter map[string]string, m *manager.Manager) (resp []cloudmodel.BasicInfo, err error) {

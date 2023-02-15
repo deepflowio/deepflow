@@ -17,7 +17,7 @@
 package utils
 
 import (
-	"github.com/deepflowys/deepflow/server/libs/pool"
+	"github.com/deepflowio/deepflow/server/libs/pool"
 )
 
 type ByteBuffer struct {

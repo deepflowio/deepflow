@@ -17,10 +17,10 @@
 package updater
 
 import (
-	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
-	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
-	rcommon "github.com/deepflowys/deepflow/server/controller/recorder/common"
+	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type IP struct {

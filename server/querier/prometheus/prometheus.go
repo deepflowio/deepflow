@@ -3,8 +3,8 @@ package prometheus
 import (
 	"context"
 	"fmt"
-	"github.com/deepflowys/deepflow/server/querier/common"
-	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse"
+	"github.com/deepflowio/deepflow/server/querier/common"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse"
 	"github.com/google/uuid"
 	"github.com/prometheus/prometheus/prompb"
 )

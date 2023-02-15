@@ -3,8 +3,8 @@ package common
 import (
 	"time"
 
-	"github.com/deepflowys/deepflow/server/libs/eventapi"
-	"github.com/deepflowys/deepflow/server/libs/queue"
+	"github.com/deepflowio/deepflow/server/libs/eventapi"
+	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 const QUEUE_SIZE = 1 << 16

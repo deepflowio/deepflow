@@ -22,7 +22,7 @@ import (
 
 	logging "github.com/op/go-logging"
 
-	"github.com/deepflowys/deepflow/server/controller/config"
+	"github.com/deepflowio/deepflow/server/controller/config"
 )
 
 var log = logging.MustGetLogger("tagrecorder")

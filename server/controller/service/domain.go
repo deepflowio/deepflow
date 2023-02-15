@@ -29,13 +29,13 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"gorm.io/gorm/clause"
 
-	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
-	k8s "github.com/deepflowys/deepflow/server/controller/cloud/kubernetes_gather"
-	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/config"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
-	"github.com/deepflowys/deepflow/server/controller/model"
-	"github.com/deepflowys/deepflow/server/controller/recorder/constraint"
+	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
+	k8s "github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/config"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 )
 
 var DOMAIN_PASSWORD_KEYS = []string{

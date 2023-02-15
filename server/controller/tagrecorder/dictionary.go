@@ -30,8 +30,8 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/db/clickhouse"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/db/clickhouse"
 )
 
 func (c *TagRecorder) UpdateChDictionary() {

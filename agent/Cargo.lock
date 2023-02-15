@@ -1218,7 +1218,7 @@ dependencies = [
 [[package]]
 name = "kube"
 version = "0.74.0"
-source = "git+https://github.com/deepflowys/kube?tag=0.74.1#02c3f208e1c2acf19bdb7a1a14ab4d6a4d1cd22f"
+source = "git+https://github.com/deepflowio/kube?tag=0.74.1#02c3f208e1c2acf19bdb7a1a14ab4d6a4d1cd22f"
 dependencies = [
  "k8s-openapi",
  "kube-client",
@@ -1230,7 +1230,7 @@ dependencies = [
 [[package]]
 name = "kube-client"
 version = "0.74.0"
-source = "git+https://github.com/deepflowys/kube?tag=0.74.1#02c3f208e1c2acf19bdb7a1a14ab4d6a4d1cd22f"
+source = "git+https://github.com/deepflowio/kube?tag=0.74.1#02c3f208e1c2acf19bdb7a1a14ab4d6a4d1cd22f"
 dependencies = [
  "base64 0.13.0",
  "bytes 1.2.1",
@@ -1265,7 +1265,7 @@ dependencies = [
 [[package]]
 name = "kube-core"
 version = "0.74.0"
-source = "git+https://github.com/deepflowys/kube?tag=0.74.1#02c3f208e1c2acf19bdb7a1a14ab4d6a4d1cd22f"
+source = "git+https://github.com/deepflowio/kube?tag=0.74.1#02c3f208e1c2acf19bdb7a1a14ab4d6a4d1cd22f"
 dependencies = [
  "chrono",
  "form_urlencoded",
@@ -1282,7 +1282,7 @@ dependencies = [
 [[package]]
 name = "kube-derive"
 version = "0.74.0"
-source = "git+https://github.com/deepflowys/kube?tag=0.74.1#02c3f208e1c2acf19bdb7a1a14ab4d6a4d1cd22f"
+source = "git+https://github.com/deepflowio/kube?tag=0.74.1#02c3f208e1c2acf19bdb7a1a14ab4d6a4d1cd22f"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -1294,7 +1294,7 @@ dependencies = [
 [[package]]
 name = "kube-runtime"
 version = "0.74.0"
-source = "git+https://github.com/deepflowys/kube?tag=0.74.1#02c3f208e1c2acf19bdb7a1a14ab4d6a4d1cd22f"
+source = "git+https://github.com/deepflowio/kube?tag=0.74.1#02c3f208e1c2acf19bdb7a1a14ab4d6a4d1cd22f"
 dependencies = [
  "ahash",
  "backoff",
@@ -1619,7 +1619,7 @@ checksum = "0ab1bc2a289d34bd04a330323ac98a1b4bc82c9d9fcb1e66b63caa84da26b575"
 [[package]]
 name = "openshift-openapi"
 version = "0.3.1"
-source = "git+https://github.com/deepflowys/openshift-openapi.git#6498131f5f5ef80411a0aee2e7e9ba632bfdb406"
+source = "git+https://github.com/deepflowio/openshift-openapi.git#6498131f5f5ef80411a0aee2e7e9ba632bfdb406"
 dependencies = [
  "base64 0.12.3",
  "bytes 0.5.6",

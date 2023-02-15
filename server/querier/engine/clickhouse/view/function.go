@@ -19,7 +19,7 @@ package view
 import (
 	"bytes"
 	"fmt"
-	"github.com/deepflowys/deepflow/server/querier/common"
+	"github.com/deepflowio/deepflow/server/querier/common"
 	"strconv"
 	"strings"
 )

@@ -26,9 +26,9 @@ import (
 	"time"
 
 	"github.com/bitly/go-simplejson"
-	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
-	"github.com/deepflowys/deepflow/server/controller/model"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
 type ChVTapPort struct {

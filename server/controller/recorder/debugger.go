@@ -20,7 +20,7 @@ package recorder
 import (
 	"reflect"
 
-	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 )
 
 func (r *Recorder) GetCache(domainLcuuid, subDomainLcuuid string) cache.Cache {

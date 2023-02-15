@@ -22,7 +22,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/common"
 )
 
 // 功能：判断当前控制器是否为masterController

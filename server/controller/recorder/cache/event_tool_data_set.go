@@ -17,7 +17,7 @@
 package cache
 
 import (
-	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/common"
 )
 
 type EventToolDataSet struct {
