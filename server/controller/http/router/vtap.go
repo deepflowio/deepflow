@@ -19,6 +19,7 @@ package router
 import (
 	"bytes"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/url"
@@ -253,11 +254,17 @@ func batchUpdateVtapTapMode(c *gin.Context) {
 }
 
 func getVtapCSV(c *gin.Context) {
-	var vtapCSV model.CSV
-	if err := c.ShouldBindBodyWith(&vtapCSV, binding.JSON); err != nil {
-		BadRequestResponse(c, common.INVALID_PARAMETERS, err.Error())
+	value, ok := c.GetPostForm("CSV_HEADERS")
+	if !ok {
+		BadRequestResponse(c, common.INVALID_PARAMETERS, "can not not get form data(CSV_HEADERS)")
 		return
 	}
+	var headers []model.CSVHeader
+	if err := json.Unmarshal([]byte(value), &headers); err != nil {
+		BadRequestResponse(c, common.INVALID_PARAMETERS, "parse form data(CSV_HEADERS) failed")
+		return
+	}
+
 	vtaps, err := service.GetVtaps(nil)
 	if err != nil {
 		BadRequestResponse(c, common.SERVER_ERROR, "get vtaps failed")
@@ -268,14 +275,16 @@ func getVtapCSV(c *gin.Context) {
 	buf.WriteString("\xEF\xBB\xBF")
 	w := csv.NewWriter(buf)
 	// write header
-	var headers []string
-	for _, header := range vtapCSV.Headers {
-		headers = append(headers, header.DisplayName)
+	var writeHeaders []string
+	headerMap := make(map[string]int)
+	for i, header := range headers {
+		writeHeaders = append(writeHeaders, header.DisplayName)
+		headerMap[header.FieldName] = i
 	}
-	w.Write(headers)
+	w.Write(writeHeaders)
 	// write data
 	for _, vtap := range vtaps {
-		data := vtapToCSVData(vtapCSV.Headers, &vtap)
+		data := getVtapCSVData(headerMap, &vtap)
 		w.Write(data)
 	}
 	w.Flush()
@@ -286,13 +295,8 @@ func getVtapCSV(c *gin.Context) {
 	_, err = io.Copy(c.Writer, buf)
 }
 
-func vtapToCSVData(headers []model.CSVHeader, vtap *model.Vtap) []string {
-	headerMap := make(map[string]int)
-	for i, header := range headers {
-		headerMap[header.FieldName] = i
-	}
-
-	resp := make([]string, len(headers))
+func getVtapCSVData(headerMap map[string]int, vtap *model.Vtap) []string {
+	resp := make([]string, len(headerMap))
 	elem := reflect.ValueOf(vtap).Elem()
 	for i := 0; i < elem.NumField(); i++ {
 		tag := elem.Type().Field(i).Tag
