@@ -21,7 +21,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        <img src="https://github.com/deepflowys/deepflow/blob/main/docs/deepflow-logo.png?raw=true" alt="DeepFlow logo" height="90px" align="right" />
+        <img src="https://github.com/deepflowio/deepflow/blob/main/docs/deepflow-logo.png?raw=true" alt="DeepFlow logo" height="90px" align="right" />
 
         Thank you for finding the time to propose new feature!
 
@@ -31,11 +31,11 @@ body:
     attributes:
       label: Search before asking
       description: >
-        Please make sure to search in the [issues](https://github.com/deepflowys/deepflow/issues?q=is%3Aissue) first to see
+        Please make sure to search in the [issues](https://github.com/deepflowio/deepflow/issues?q=is%3Aissue) first to see
         whether the same feature was requested already.
       options:
         - label: >
-            I had searched in the [issues](https://github.com/deepflowys/deepflow/issues?q=is%3Aissue) and found no similar
+            I had searched in the [issues](https://github.com/deepflowio/deepflow/issues?q=is%3Aissue) and found no similar
             feature requirement.
           required: true
 
@@ -74,7 +74,7 @@ body:
         that everyone agrees to it.
       options:
         - label: |
-            I agree to follow this project's [Code of Conduct](https://github.com/deepflowys/deepflow/blob/main/CODE_OF_CONDUCT.md)
+            I agree to follow this project's [Code of Conduct](https://github.com/deepflowio/deepflow/blob/main/CODE_OF_CONDUCT.md)
           required: true
 
   - type: markdown

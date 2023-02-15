@@ -1,7 +1,7 @@
 syntax = "proto2";
 
 package common;
-option go_package = "github.com/deepflowys/deepflow/message/common";
+option go_package = "github.com/deepflowio/deepflow/message/common";
 
 enum TridentType {
     TT_UNKNOWN = 0;

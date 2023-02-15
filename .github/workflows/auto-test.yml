@@ -365,7 +365,7 @@ jobs:
 
 #       - name: add deepflow helm repo
 #         run: |
-#           helm repo add deepflow https://deepflowys.github.io/deepflow-charts
+#           helm repo add deepflow https://deepflowio.github.io/deepflow-charts
 #           helm repo update deepflow 
 
 #       - name: install and upgrade deepflow server 
@@ -378,7 +378,7 @@ jobs:
 #               --set global.nodePort.clickhouse="" \
 #               --set global.nodePort.deepflowServerIngester="" \
 #               --set global.nodePort.deepflowServerhealthCheck="" \
-#               --set global.image.repository="ghcr.io/deepflowys/deepflow-ce" \
+#               --set global.image.repository="ghcr.io/deepflowio/deepflow-ce" \
 #               --set-string image.server.tag=${{ github.run_id }}
 
 #       - name: install and upgrade deepflow agent 
@@ -391,7 +391,7 @@ jobs:
 #               --set global.nodePort.clickhouse="" \
 #               --set global.nodePort.deepflowServerIngester="" \
 #               --set global.nodePort.deepflowServerhealthCheck="" \
-#               --set global.image.repository="ghcr.io/deepflowys/deepflow-ce" \
+#               --set global.image.repository="ghcr.io/deepflowio/deepflow-ce" \
 #               --set-string deepflow-agent.image.tag=${{ github.run_id }} \
 #               --reuse-values
      
@@ -514,7 +514,7 @@ jobs:
 
 #       - name: install deepflow
 #         run: |
-#           helm repo add deepflow https://deepflowys.github.io/deepflow-charts
+#           helm repo add deepflow https://deepflowio.github.io/deepflow-charts
 #           helm repo update deepflow 
 #           helm upgrade --install deepflow -n deepflow deepflow/deepflow --create-namespace \
 #               --set global.allInOneLocalStorage=true \
@@ -523,7 +523,7 @@ jobs:
 #               --set global.nodePort.clickhouse="" \
 #               --set global.nodePort.deepflowServerIngester="" \
 #               --set global.nodePort.deepflowServerhealthCheck="" \
-#               --set global.image.repository="ghcr.io/deepflowys/deepflow-ce"  \
+#               --set global.image.repository="ghcr.io/deepflowio/deepflow-ce"  \
 #               --set-string image.server.tag="latest-6081"
 #           sudo curl -o /usr/bin/deepflow-ctl https://deepflow-ce.oss-accelerate.aliyuncs.com/bin/ctl/latest/linux/amd64/deepflow-ctl
 #           sudo chmod a+x /usr/bin/deepflow-ctl
@@ -555,7 +555,7 @@ jobs:
 #               --set global.nodePort.clickhouse="" \
 #               --set global.nodePort.deepflowServerIngester="" \
 #               --set global.nodePort.deepflowServerhealthCheck="" \
-#               --set global.image.repository="ghcr.io/deepflowys/deepflow-ce" \
+#               --set global.image.repository="ghcr.io/deepflowio/deepflow-ce" \
 #               --set-string image.server.tag=${{ github.run_id }}
 
 #       - name: upgrade deepflow agent
@@ -568,7 +568,7 @@ jobs:
 #               --set global.nodePort.clickhouse="" \
 #               --set global.nodePort.deepflowServerIngester="" \
 #               --set global.nodePort.deepflowServerhealthCheck="" \
-#               --set global.image.repository="ghcr.io/deepflowys/deepflow-ce" \
+#               --set global.image.repository="ghcr.io/deepflowio/deepflow-ce" \
 #               --set-string deepflow-agent.image.tag=${{ github.run_id }} \
 #               --reuse-values
 
@@ -635,21 +635,21 @@ jobs:
 #           set +e
 #           gh api \
 #           -H "Accept: application/vnd.github+json"  \
-#           /orgs/deepflowys/packages/container/deepflow-ce%2Fdeepflow-server/versions \
+#           /orgs/deepflowio/packages/container/deepflow-ce%2Fdeepflow-server/versions \
 #           | jq '.[]|select (.metadata.container.tags[] == "${{ github.run_id }}")|.id'
 #           PACKAGE_VERSION_ID=$(gh api \
 #           -H "Accept: application/vnd.github+json"  \
-#           /orgs/deepflowys/packages/container/deepflow-ce%2Fdeepflow-server/versions \
+#           /orgs/deepflowio/packages/container/deepflow-ce%2Fdeepflow-server/versions \
 #           | jq '.[]|select (.metadata.container.tags[] == "${{ github.run_id }}")|.id')
-#           curl -i -X DELETE -H "Accept: application/vnd.github+json" -H "Authorization: token ${{ secrets.DELETE_PACKAGES_TOKEN }}" https://api.github.com/orgs/deepflowys/packages/container/deepflow-ce%2Fdeepflow-server/versions/$PACKAGE_VERSION_ID
+#           curl -i -X DELETE -H "Accept: application/vnd.github+json" -H "Authorization: token ${{ secrets.DELETE_PACKAGES_TOKEN }}" https://api.github.com/orgs/deepflowio/packages/container/deepflow-ce%2Fdeepflow-server/versions/$PACKAGE_VERSION_ID
 #            gh api \
 #            -H "Accept: application/vnd.github+json"  \
-#            /orgs/deepflowys/packages/container/deepflow-ce%2Fdeepflow-agent/versions \
+#            /orgs/deepflowio/packages/container/deepflow-ce%2Fdeepflow-agent/versions \
 #            | jq '.[]|select (.metadata.container.tags[] == "${{ github.run_id }}")|.id'
 #            PACKAGE_VERSION_ID=$(gh api \
 #            -H "Accept: application/vnd.github+json"  \
-#            /orgs/deepflowys/packages/container/deepflow-ce%2Fdeepflow-agent/versions \
+#            /orgs/deepflowio/packages/container/deepflow-ce%2Fdeepflow-agent/versions \
 #            | jq '.[]|select (.metadata.container.tags[] == "${{ github.run_id }}")|.id')
-#            curl -i -X DELETE -H "Accept: application/vnd.github+json" -H "Authorization: token ${{ secrets.DELETE_PACKAGES_TOKEN }}" https://api.github.com/orgs/deepflowys/packages/container/deepflow-ce%2Fdeepflow-agent/versions/$PACKAGE_VERSION_ID
+#            curl -i -X DELETE -H "Accept: application/vnd.github+json" -H "Authorization: token ${{ secrets.DELETE_PACKAGES_TOKEN }}" https://api.github.com/orgs/deepflowio/packages/container/deepflow-ce%2Fdeepflow-agent/versions/$PACKAGE_VERSION_ID
 #         env:
 #           GITHUB_TOKEN: ${{ secrets.DELETE_PACKAGES_TOKEN }}

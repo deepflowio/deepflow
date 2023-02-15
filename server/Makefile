@@ -26,6 +26,7 @@ vendor/${MESSAGE}/common/common.pb.go: vendor/${MESSAGE}/common.proto
 
 vendor/${MESSAGE}/common.proto: vendor
 	cp -r ../message/common.proto vendor/${MESSAGE}/
+	sed -i "s/deepflowio/deepflowys/g" vendor/${MESSAGE}/common.proto
 	cp -r ../message/common vendor/${MESSAGE}/
 
 vendor/${MESSAGE}/trident/trident.pb.go: vendor/${MESSAGE}/trident.proto
