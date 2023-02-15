@@ -23,10 +23,10 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
-func Test_vtapToCSVData(t *testing.T) {
+func Test_getVtapCSVData(t *testing.T) {
 	type args struct {
-		headers []model.CSVHeader
-		vtap    *model.Vtap
+		headerMap map[string]int
+		vtap      *model.Vtap
 	}
 	tests := []struct {
 		name string
@@ -36,9 +36,9 @@ func Test_vtapToCSVData(t *testing.T) {
 		{
 			name: "two headers",
 			args: args{
-				headers: []model.CSVHeader{
-					{DisplayName: "名称", FieldName: "NAME"},
-					{DisplayName: "区域", FieldName: "REGION_NAME"},
+				headerMap: map[string]int{
+					"NAME":        0,
+					"REGION_NAME": 1,
 				},
 				vtap: &model.Vtap{Name: "name", RegionName: "region name"},
 			},
@@ -47,12 +47,12 @@ func Test_vtapToCSVData(t *testing.T) {
 		{
 			name: "special headers",
 			args: args{
-				headers: []model.CSVHeader{
-					{DisplayName: "类型", FieldName: "TYPE"},
-					{DisplayName: "采集模式", FieldName: "TAP_MODE"},
-					{DisplayName: "状态", FieldName: "STATE"},
-					{DisplayName: "启动时间", FieldName: "BOOT_TIME"},
-					{DisplayName: "异常", FieldName: "EXCEPTIONS"},
+				headerMap: map[string]int{
+					"TYPE":       0,
+					"TAP_MODE":   1,
+					"STATE":      2,
+					"BOOT_TIME":  3,
+					"EXCEPTIONS": 4,
 				},
 				vtap: &model.Vtap{
 					Type:       1,
@@ -67,9 +67,9 @@ func Test_vtapToCSVData(t *testing.T) {
 		{
 			name: "boot time header",
 			args: args{
-				headers: []model.CSVHeader{
-					{DisplayName: "启动时间", FieldName: "BOOT_TIME"},
-					{DisplayName: "异常", FieldName: "EXCEPTIONS"},
+				headerMap: map[string]int{
+					"BOOT_TIME":  0,
+					"EXCEPTIONS": 0,
 				},
 				vtap: &model.Vtap{BootTime: 0, Exceptions: []int64{}},
 			},
@@ -78,8 +78,8 @@ func Test_vtapToCSVData(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := vtapToCSVData(tt.args.headers, tt.args.vtap); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("vtapToCSVData() = %v, want %v", got, tt.want)
+			if got := getVtapCSVData(tt.args.headerMap, tt.args.vtap); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("getVtapCSVData() = %v, want %v", got, tt.want)
 			}
 		})
 	}
