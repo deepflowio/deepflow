@@ -23,11 +23,11 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 
-	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/config"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
-	mconfig "github.com/deepflowys/deepflow/server/controller/monitor/config"
-	"github.com/deepflowys/deepflow/server/controller/trisolaris/refresh"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/config"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mconfig "github.com/deepflowio/deepflow/server/controller/monitor/config"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 )
 
 type AnalyzerCheck struct {

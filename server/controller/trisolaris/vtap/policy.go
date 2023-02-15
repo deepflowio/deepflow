@@ -18,7 +18,7 @@ package vtap
 
 import (
 	mapset "github.com/deckarep/golang-set"
-	"github.com/deepflowys/deepflow/server/controller/trisolaris/metadata"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/metadata"
 )
 
 type VTapPolicyData struct {

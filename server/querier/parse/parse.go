@@ -19,7 +19,7 @@ package parse
 import (
 	"github.com/xwb1989/sqlparser"
 
-	"github.com/deepflowys/deepflow/server/querier/engine"
+	"github.com/deepflowio/deepflow/server/querier/engine"
 )
 
 type Parser struct {

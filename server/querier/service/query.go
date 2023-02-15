@@ -18,10 +18,10 @@ package service
 
 import (
 	"context"
-	"github.com/deepflowys/deepflow/server/querier/common"
-	"github.com/deepflowys/deepflow/server/querier/engine"
-	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse"
-	"github.com/deepflowys/deepflow/server/querier/prometheus"
+	"github.com/deepflowio/deepflow/server/querier/common"
+	"github.com/deepflowio/deepflow/server/querier/engine"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse"
+	"github.com/deepflowio/deepflow/server/querier/prometheus"
 	"github.com/prometheus/prometheus/prompb"
 )
 

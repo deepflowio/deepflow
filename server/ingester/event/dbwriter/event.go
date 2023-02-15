@@ -17,9 +17,9 @@
 package dbwriter
 
 import (
-	"github.com/deepflowys/deepflow/server/ingester/event/common"
-	"github.com/deepflowys/deepflow/server/libs/ckdb"
-	"github.com/deepflowys/deepflow/server/libs/pool"
+	"github.com/deepflowio/deepflow/server/ingester/event/common"
+	"github.com/deepflowio/deepflow/server/libs/ckdb"
+	"github.com/deepflowio/deepflow/server/libs/pool"
 )
 
 const (

@@ -25,10 +25,10 @@ import (
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v2"
 
-	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
-	"github.com/deepflowys/deepflow/server/controller/model"
-	"github.com/deepflowys/deepflow/server/controller/trisolaris/refresh"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/model"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 )
 
 func convertStrToIntList(convertStr string) ([]int, error) {

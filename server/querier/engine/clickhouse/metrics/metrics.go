@@ -22,9 +22,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/deepflowys/deepflow/server/querier/common"
-	"github.com/deepflowys/deepflow/server/querier/config"
-	ckcommon "github.com/deepflowys/deepflow/server/querier/engine/clickhouse/common"
+	"github.com/deepflowio/deepflow/server/querier/common"
+	"github.com/deepflowio/deepflow/server/querier/config"
+	ckcommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 
 	logging "github.com/op/go-logging"
 )

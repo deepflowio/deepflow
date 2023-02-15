@@ -38,12 +38,12 @@ import (
 	logging "github.com/op/go-logging"
 	uuid "github.com/satori/go.uuid"
 
-	"github.com/deepflowys/deepflow/server/controller/cloud/config"
-	"github.com/deepflowys/deepflow/server/controller/cloud/model"
-	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
-	"github.com/deepflowys/deepflow/server/controller/genesis"
-	controllermodel "github.com/deepflowys/deepflow/server/controller/model"
+	"github.com/deepflowio/deepflow/server/controller/cloud/config"
+	"github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/genesis"
+	controllermodel "github.com/deepflowio/deepflow/server/controller/model"
 )
 
 var log = logging.MustGetLogger("cloud.common")

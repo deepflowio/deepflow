@@ -20,8 +20,8 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/deepflowys/deepflow/server/ingester/common"
-	"github.com/deepflowys/deepflow/server/ingester/config"
+	"github.com/deepflowio/deepflow/server/ingester/common"
+	"github.com/deepflowio/deepflow/server/ingester/config"
 
 	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"

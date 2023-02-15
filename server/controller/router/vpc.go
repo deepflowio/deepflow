@@ -3,7 +3,7 @@ package router
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/deepflowys/deepflow/server/controller/service"
+	"github.com/deepflowio/deepflow/server/controller/service"
 )
 
 func VPCRouter(e *gin.Engine) {

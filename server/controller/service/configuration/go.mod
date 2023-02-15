@@ -1,3 +1,3 @@
-module github.com/deepflowys/deepflow/server/controller/service/configuration
+module github.com/deepflowio/deepflow/server/controller/service/configuration
 
 go 1.18

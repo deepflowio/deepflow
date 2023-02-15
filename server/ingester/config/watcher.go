@@ -26,7 +26,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
-	libs "github.com/deepflowys/deepflow/server/libs/kubernetes"
+	libs "github.com/deepflowio/deepflow/server/libs/kubernetes"
 	corev1 "k8s.io/api/core/v1"
 )
 

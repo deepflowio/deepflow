@@ -18,8 +18,8 @@ package aliyun
 
 import (
 	vpc "github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
-	"github.com/deepflowys/deepflow/server/controller/cloud/model"
-	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/common"
 )
 
 func (a *Aliyun) getRouterAndTables(region model.Region) ([]model.VRouter, []model.RoutingTable, error) {

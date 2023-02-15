@@ -26,11 +26,11 @@ import (
 
 	"github.com/google/uuid"
 
-	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
-	rcommon "github.com/deepflowys/deepflow/server/controller/recorder/common"
-	"github.com/deepflowys/deepflow/server/controller/recorder/config"
-	"github.com/deepflowys/deepflow/server/controller/recorder/test"
+	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
+	"github.com/deepflowio/deepflow/server/controller/recorder/config"
+	"github.com/deepflowio/deepflow/server/controller/recorder/test"
 )
 
 // const (

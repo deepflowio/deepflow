@@ -28,9 +28,9 @@ import (
 	"strings"
 	"time"
 
-	. "github.com/deepflowys/deepflow/server/libs/logger"
-	. "github.com/deepflowys/deepflow/server/libs/xdppacket"
-	. "github.com/deepflowys/deepflow/server/libs/xdppacket/cmd/common"
+	. "github.com/deepflowio/deepflow/server/libs/logger"
+	. "github.com/deepflowio/deepflow/server/libs/xdppacket"
+	. "github.com/deepflowio/deepflow/server/libs/xdppacket/cmd/common"
 	logging "github.com/op/go-logging"
 )
 

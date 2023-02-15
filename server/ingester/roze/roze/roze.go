@@ -23,16 +23,16 @@ import (
 
 	logging "github.com/op/go-logging"
 
-	"github.com/deepflowys/deepflow/server/ingester/droplet/queue"
-	"github.com/deepflowys/deepflow/server/ingester/ingesterctl"
-	"github.com/deepflowys/deepflow/server/ingester/roze/config"
-	"github.com/deepflowys/deepflow/server/ingester/roze/dbwriter"
-	"github.com/deepflowys/deepflow/server/ingester/roze/unmarshaller"
-	"github.com/deepflowys/deepflow/server/libs/datatype"
-	"github.com/deepflowys/deepflow/server/libs/debug"
-	"github.com/deepflowys/deepflow/server/libs/grpc"
-	libqueue "github.com/deepflowys/deepflow/server/libs/queue"
-	"github.com/deepflowys/deepflow/server/libs/receiver"
+	"github.com/deepflowio/deepflow/server/ingester/droplet/queue"
+	"github.com/deepflowio/deepflow/server/ingester/ingesterctl"
+	"github.com/deepflowio/deepflow/server/ingester/roze/config"
+	"github.com/deepflowio/deepflow/server/ingester/roze/dbwriter"
+	"github.com/deepflowio/deepflow/server/ingester/roze/unmarshaller"
+	"github.com/deepflowio/deepflow/server/libs/datatype"
+	"github.com/deepflowio/deepflow/server/libs/debug"
+	"github.com/deepflowio/deepflow/server/libs/grpc"
+	libqueue "github.com/deepflowio/deepflow/server/libs/queue"
+	"github.com/deepflowio/deepflow/server/libs/receiver"
 )
 
 const (

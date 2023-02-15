@@ -26,14 +26,14 @@ import (
 	logging "github.com/op/go-logging"
 	"github.com/xwb1989/sqlparser"
 
-	"github.com/deepflowys/deepflow/server/querier/common"
-	"github.com/deepflowys/deepflow/server/querier/config"
-	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/client"
-	chCommon "github.com/deepflowys/deepflow/server/querier/engine/clickhouse/common"
-	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/metrics"
-	tagdescription "github.com/deepflowys/deepflow/server/querier/engine/clickhouse/tag"
-	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/view"
-	"github.com/deepflowys/deepflow/server/querier/parse"
+	"github.com/deepflowio/deepflow/server/querier/common"
+	"github.com/deepflowio/deepflow/server/querier/config"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
+	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/metrics"
+	tagdescription "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
+	"github.com/deepflowio/deepflow/server/querier/parse"
 )
 
 var log = logging.MustGetLogger("clickhouse")

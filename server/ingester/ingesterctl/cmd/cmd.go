@@ -24,16 +24,16 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/deepflowys/deepflow/server/ingester/droplet/adapter"
-	"github.com/deepflowys/deepflow/server/ingester/droplet/labeler"
-	"github.com/deepflowys/deepflow/server/ingester/droplet/profiler"
-	"github.com/deepflowys/deepflow/server/ingester/droplet/queue"
-	"github.com/deepflowys/deepflow/server/ingester/ingesterctl"
-	"github.com/deepflowys/deepflow/server/ingester/ingesterctl/rpc"
-	"github.com/deepflowys/deepflow/server/ingester/roze/roze"
-	"github.com/deepflowys/deepflow/server/ingester/stream/stream"
-	"github.com/deepflowys/deepflow/server/libs/debug"
-	"github.com/deepflowys/deepflow/server/libs/receiver"
+	"github.com/deepflowio/deepflow/server/ingester/droplet/adapter"
+	"github.com/deepflowio/deepflow/server/ingester/droplet/labeler"
+	"github.com/deepflowio/deepflow/server/ingester/droplet/profiler"
+	"github.com/deepflowio/deepflow/server/ingester/droplet/queue"
+	"github.com/deepflowio/deepflow/server/ingester/ingesterctl"
+	"github.com/deepflowio/deepflow/server/ingester/ingesterctl/rpc"
+	"github.com/deepflowio/deepflow/server/ingester/roze/roze"
+	"github.com/deepflowio/deepflow/server/ingester/stream/stream"
+	"github.com/deepflowio/deepflow/server/libs/debug"
+	"github.com/deepflowio/deepflow/server/libs/receiver"
 )
 
 func RegisterIngesterCommand(root *cobra.Command) {

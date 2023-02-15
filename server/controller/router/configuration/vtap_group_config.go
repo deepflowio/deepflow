@@ -1,7 +1,7 @@
 package configuration
 
 import (
-	"github.com/deepflowys/deepflow/server/controller/service/configuration"
+	"github.com/deepflowio/deepflow/server/controller/service/configuration"
 	"github.com/gin-gonic/gin"
 )
 
