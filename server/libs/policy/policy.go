@@ -22,8 +22,8 @@ import (
 
 	logging "github.com/op/go-logging"
 
-	. "github.com/deepflowys/deepflow/server/libs/datatype"
-	. "github.com/deepflowys/deepflow/server/libs/utils"
+	. "github.com/deepflowio/deepflow/server/libs/datatype"
+	. "github.com/deepflowio/deepflow/server/libs/utils"
 )
 
 type SortedAcls []*Acl

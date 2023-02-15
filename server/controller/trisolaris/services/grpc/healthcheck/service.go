@@ -21,7 +21,7 @@ import (
 	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 
-	grpcserver "github.com/deepflowys/deepflow/server/controller/grpc"
+	grpcserver "github.com/deepflowio/deepflow/server/controller/grpc"
 )
 
 type service struct {

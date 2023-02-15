@@ -25,7 +25,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/deepflowys/deepflow/server/libs/debug"
+	"github.com/deepflowio/deepflow/server/libs/debug"
 )
 
 const (

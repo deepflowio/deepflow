@@ -21,9 +21,9 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/http/service"
-	"github.com/deepflowys/deepflow/server/controller/monitor/config"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/http/service"
+	"github.com/deepflowio/deepflow/server/controller/monitor/config"
 )
 
 type RebalanceCheck struct {

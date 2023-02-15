@@ -14,7 +14,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/deepflowys/deepflow/message/controller"
+	"github.com/deepflowio/deepflow/message/controller"
 )
 
 var CAMD5 string

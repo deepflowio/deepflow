@@ -6,9 +6,9 @@ import (
 
 	//logging "github.com/op/go-logging"
 	//"fmt"
-	"github.com/deepflowys/deepflow/server/querier/common"
-	"github.com/deepflowys/deepflow/server/querier/prometheus"
-	"github.com/deepflowys/deepflow/server/querier/service"
+	"github.com/deepflowio/deepflow/server/querier/common"
+	"github.com/deepflowio/deepflow/server/querier/prometheus"
+	"github.com/deepflowio/deepflow/server/querier/service"
 	"github.com/golang/snappy"
 	//"github.com/k0kubun/pp"
 	"github.com/prometheus/prometheus/prompb"

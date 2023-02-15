@@ -24,9 +24,9 @@ import (
 	"github.com/op/go-logging"
 	"google.golang.org/grpc"
 
-	"github.com/deepflowys/deepflow/server/controller/config"
-	"github.com/deepflowys/deepflow/server/controller/trisolaris/services/grpc/statsd"
-	"github.com/deepflowys/deepflow/server/controller/trisolaris/utils"
+	"github.com/deepflowio/deepflow/server/controller/config"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/services/grpc/statsd"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
 
 var log = logging.MustGetLogger("grpc/server")

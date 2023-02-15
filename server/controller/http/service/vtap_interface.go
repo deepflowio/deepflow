@@ -17,8 +17,8 @@
 package service
 
 import (
-	"github.com/deepflowys/deepflow/server/controller/model"
-	"github.com/deepflowys/deepflow/server/controller/tagrecorder"
+	"github.com/deepflowio/deepflow/server/controller/model"
+	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 func GetVTapInterfaces(filter map[string]interface{}) (resp []model.VTapInterface, err error) {

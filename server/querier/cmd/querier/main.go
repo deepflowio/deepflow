@@ -23,8 +23,8 @@ import (
 
 	logging "github.com/op/go-logging"
 
-	"github.com/deepflowys/deepflow/server/libs/logger"
-	"github.com/deepflowys/deepflow/server/querier/querier"
+	"github.com/deepflowio/deepflow/server/libs/logger"
+	"github.com/deepflowio/deepflow/server/querier/querier"
 )
 
 var configPath = flag.String("f", "/etc/server.yaml", "Specify config file location")

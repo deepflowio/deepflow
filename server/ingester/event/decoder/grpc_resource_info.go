@@ -23,9 +23,9 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"golang.org/x/net/context"
 
-	"github.com/deepflowys/deepflow/message/trident"
-	"github.com/deepflowys/deepflow/server/libs/datatype"
-	"github.com/deepflowys/deepflow/server/libs/grpc"
+	"github.com/deepflowio/deepflow/message/trident"
+	"github.com/deepflowio/deepflow/server/libs/datatype"
+	"github.com/deepflowio/deepflow/server/libs/grpc"
 )
 
 func (p *ResourceInfoTable) QueryResourceInfo(resourceType uint32, resourceID uint32) *ResourceInfo {

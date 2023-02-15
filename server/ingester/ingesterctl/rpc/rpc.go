@@ -35,11 +35,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/deepflowys/deepflow/message/trident"
-	"github.com/deepflowys/deepflow/server/ingester/config"
-	dropletcfg "github.com/deepflowys/deepflow/server/ingester/droplet/config"
-	"github.com/deepflowys/deepflow/server/ingester/ingesterctl"
-	"github.com/deepflowys/deepflow/server/libs/utils"
+	"github.com/deepflowio/deepflow/message/trident"
+	"github.com/deepflowio/deepflow/server/ingester/config"
+	dropletcfg "github.com/deepflowio/deepflow/server/ingester/droplet/config"
+	"github.com/deepflowio/deepflow/server/ingester/ingesterctl"
+	"github.com/deepflowio/deepflow/server/libs/utils"
 )
 
 type CmdExecute func(response *trident.SyncResponse)

@@ -4,9 +4,9 @@
   <p align="center">DeepFlow is an automated observability platform for cloud-native developers.</p>
 </p>
 <p align="center">
-    <img alt="GitHub Release" src="https://img.shields.io/github/v/release/deepflowys/deepflow"> </a>
+    <img alt="GitHub Release" src="https://img.shields.io/github/v/release/deepflowio/deepflow"> </a>
     <img alt="docker pulls" src="https://img.shields.io/docker/pulls/deepflowce/deepflow-agent?color=green?label=docker pulls"> </a>
-    <img alt="License" src="https://img.shields.io/github/license/deepflowys/deepflow?color=purple"> </a>
+    <img alt="License" src="https://img.shields.io/github/license/deepflowio/deepflow?color=purple"> </a>
 </p>
 
 -------------

@@ -21,7 +21,7 @@ import (
 	"net"
 	"reflect"
 
-	"github.com/deepflowys/deepflow/server/libs/pool"
+	"github.com/deepflowio/deepflow/server/libs/pool"
 )
 
 const (

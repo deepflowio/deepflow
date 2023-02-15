@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/deepflowys/deepflow/server/querier/common"
+	"github.com/deepflowio/deepflow/server/querier/common"
 	//"github.com/k0kubun/pp"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/model/labels"

@@ -17,7 +17,7 @@
 package config
 
 import (
-	"github.com/deepflowys/deepflow/message/trident"
+	"github.com/deepflowio/deepflow/message/trident"
 )
 
 type Handler func(*trident.SyncResponse, *RpcInfoVersions)

@@ -19,7 +19,7 @@ package tagrecorder
 import (
 	"strings"
 
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
 type ChChostCloudTag struct {

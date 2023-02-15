@@ -26,9 +26,9 @@ import (
 
 	"github.com/google/gopacket/layers"
 
-	"github.com/deepflowys/deepflow/server/libs/codec"
-	"github.com/deepflowys/deepflow/server/libs/datatype"
-	"github.com/deepflowys/deepflow/server/libs/zerodoc/pb"
+	"github.com/deepflowio/deepflow/server/libs/codec"
+	"github.com/deepflowio/deepflow/server/libs/datatype"
+	"github.com/deepflowio/deepflow/server/libs/zerodoc/pb"
 )
 
 func TestHasEdgeTagField(t *testing.T) {

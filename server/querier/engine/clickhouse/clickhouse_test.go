@@ -18,13 +18,13 @@ package clickhouse
 
 import (
 	//"github.com/k0kubun/pp"
-	"github.com/deepflowys/deepflow/server/querier/common"
-	"github.com/deepflowys/deepflow/server/querier/parse"
+	"github.com/deepflowio/deepflow/server/querier/common"
+	"github.com/deepflowio/deepflow/server/querier/parse"
 
-	//"github.com/deepflowys/deepflow/server/querier/querier"
+	//"github.com/deepflowio/deepflow/server/querier/querier"
 	"testing"
 
-	"github.com/deepflowys/deepflow/server/querier/config"
+	"github.com/deepflowio/deepflow/server/querier/config"
 )
 
 /* var (
