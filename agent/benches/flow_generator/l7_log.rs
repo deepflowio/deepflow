@@ -14,20 +14,21 @@
  * limitations under the License.
  */
 
-use std::cell::RefCell;
 use std::path::Path;
-use std::rc::Rc;
-use std::sync::Arc;
 use std::time::Instant;
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use criterion::*;
 
 use deepflow_agent::{
-    _FlowPerfCounter as FlowPerfCounter, _HttpPerfData as HttpPerfData, _L7FlowPerf as L7FlowPerf,
-    _L7RrtCache as L7RrtCache, _PacketDirection as PacketDirection, _TcpPerf as TcpPerf,
+    _FlowPerfCounter as FlowPerfCounter, _L7PerfCache as L7PerfCache,
+    _PacketDirection as PacketDirection, _TcpPerf as TcpPerf,
     _benchmark_report as benchmark_report,
     _benchmark_session_peer_seq_no_assert as benchmark_session_peer_seq_no_assert,
-    _meta_flow_perf_update as meta_flow_perf_update, utils::test::Capture,
+    _meta_flow_perf_update as meta_flow_perf_update,
+    common::l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
+    utils::test::Capture,
+    HttpLog,
 };
 
 pub(super) fn bench(c: &mut Criterion) {
@@ -61,7 +62,7 @@ pub(super) fn bench(c: &mut Criterion) {
             benchmark_session_peer_seq_no_assert(false);
         })
     });
-    c.bench_function("perf_parse_http_v1", |b| {
+    c.bench_function("parse_http_v1_log", |b| {
         b.iter_custom(|iters| {
             let capture = Capture::load_pcap(
                 Path::new("./resources/test/flow_generator/http/httpv1.pcap"),
@@ -72,8 +73,10 @@ pub(super) fn bench(c: &mut Criterion) {
                 panic!("unable to load pcap file");
             }
 
-            let rrt_cache = L7RrtCache::new(8);
-            let mut parser = HttpPerfData::new(Rc::new(RefCell::new(rrt_cache)));
+            let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(8)));
+            let req_param = ParseParam::from((&packets[0], rrt_cache.clone(), false));
+            let resp_param = ParseParam::from((&packets[1], rrt_cache.clone(), false));
+            let mut parser = HttpLog::new_v1();
 
             let first_dst_port = packets[0].lookup_key.dst_port;
             for packet in packets.iter_mut().take(2) {
@@ -86,8 +89,8 @@ pub(super) fn bench(c: &mut Criterion) {
 
             let start = Instant::now();
             for _ in 0..iters {
-                let _ = parser.parse(None, &packets[0], 0x1f3c01010);
-                let _ = parser.parse(None, &packets[1], 0x1f3c01010);
+                let _ = parser.parse_payload(packets[0].get_l4_payload().unwrap(), &req_param);
+                let _ = parser.parse_payload(packets[1].get_l4_payload().unwrap(), &resp_param);
             }
             start.elapsed()
         })

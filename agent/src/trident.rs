@@ -41,6 +41,7 @@ use log::{info, warn};
 use regex::Regex;
 use tokio::runtime::{Builder, Runtime};
 
+use crate::flow_generator::protocol_logs::SessionAggregator;
 use crate::{
     collector::Collector,
     collector::{
@@ -64,9 +65,7 @@ use crate::{
         self, recv_engine::bpf, BpfOptions, Dispatcher, DispatcherBuilder, DispatcherListener,
     },
     exception::ExceptionHandler,
-    flow_generator::{
-        protocol_logs::BoxAppProtoLogsData, AppProtoLogsParser, PacketSequenceParser,
-    },
+    flow_generator::{protocol_logs::BoxAppProtoLogsData, PacketSequenceParser},
     handler::{NpbBuilder, PacketHandlerBuilder},
     integration_collector::{
         MetricServer, OpenTelemetry, OpenTelemetryCompressed, Profile, PrometheusMetric,
@@ -941,7 +940,7 @@ pub struct AgentComponents {
     pub cur_tap_types: Vec<trident::TapType>,
     pub dispatchers: Vec<Dispatcher>,
     pub dispatcher_listeners: Vec<DispatcherListener>,
-    pub log_parsers: Vec<AppProtoLogsParser>,
+    pub session_aggrs: Vec<SessionAggregator>,
     pub collectors: Vec<CollectorThread>,
     pub l4_flow_uniform_sender: UniformSenderThread<BoxedTaggedFlow>,
     pub metrics_uniform_sender: UniformSenderThread<BoxedDocument>,
@@ -1307,7 +1306,7 @@ impl AgentComponents {
         let mut dispatchers = vec![];
         let mut dispatcher_listeners = vec![];
         let mut collectors = vec![];
-        let mut log_parsers = vec![];
+        let mut session_aggrs = vec![];
         let mut packet_sequence_parsers = vec![]; // Enterprise Edition Feature: packet-sequence
 
         // Sender/Collector
@@ -1536,7 +1535,7 @@ impl AgentComponents {
                 ],
             );
 
-            let (app_proto_log_parser, counter) = AppProtoLogsParser::new(
+            let (session_aggr, counter) = SessionAggregator::new(
                 log_receiver,
                 proto_log_sender.clone(),
                 i as u32,
@@ -1548,7 +1547,7 @@ impl AgentComponents {
                 Countable::Ref(Arc::downgrade(&counter) as Weak<dyn RefCountable>),
                 vec![StatsOption::Tag("index", i.to_string())],
             );
-            log_parsers.push(app_proto_log_parser);
+            session_aggrs.push(session_aggr);
 
             // Enterprise Edition Feature: packet-sequence
             // create and start packet sequence
@@ -1773,7 +1772,7 @@ impl AgentComponents {
                     StatsOption::Tag("index", ebpf_dispatcher_id.to_string()),
                 ],
             );
-            let (app_proto_log_parser, counter) = AppProtoLogsParser::new(
+            let (session_aggr, counter) = SessionAggregator::new(
                 log_receiver,
                 proto_log_sender.clone(),
                 ebpf_dispatcher_id as u32,
@@ -1785,7 +1784,7 @@ impl AgentComponents {
                 Countable::Ref(Arc::downgrade(&counter) as Weak<dyn RefCountable>),
                 vec![StatsOption::Tag("index", ebpf_dispatcher_id.to_string())],
             );
-            log_parsers.push(app_proto_log_parser);
+            session_aggrs.push(session_aggr);
             collectors.push(collector);
             ebpf_collector = EbpfCollector::new(
                 ebpf_dispatcher_id,
@@ -2013,7 +2012,7 @@ impl AgentComponents {
             #[cfg(target_os = "linux")]
             api_watcher,
             debugger,
-            log_parsers,
+            session_aggrs,
             #[cfg(target_os = "linux")]
             ebpf_collector,
             stats_collector,
@@ -2091,8 +2090,8 @@ impl AgentComponents {
             }
         }
 
-        for log_parser in self.log_parsers.iter() {
-            log_parser.start();
+        for sess_aggr in self.session_aggrs.iter() {
+            sess_aggr.start();
         }
 
         for collector in self.collectors.iter_mut() {
@@ -2148,7 +2147,7 @@ impl AgentComponents {
             q.stop();
         }
 
-        for p in self.log_parsers.iter() {
+        for p in self.session_aggrs.iter() {
             p.stop();
         }
 

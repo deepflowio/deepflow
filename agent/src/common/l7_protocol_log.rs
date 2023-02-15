@@ -14,13 +14,17 @@
  * limitations under the License.
  */
 
+use std::cell::RefCell;
 use std::fmt::Debug;
 use std::net::IpAddr;
+use std::rc::Rc;
 
 use enum_dispatch::enum_dispatch;
 
+use lru::LruCache;
+
 use super::ebpf::EbpfType;
-use super::flow::PacketDirection;
+use super::flow::{L7PerfStats, PacketDirection};
 use super::l7_protocol_info::L7ProtocolInfo;
 use super::MetaPacket;
 
@@ -29,7 +33,7 @@ use crate::flow_generator::protocol_logs::{
     get_protobuf_rpc_parser, DnsLog, DubboLog, HttpLog, KafkaLog, MqttLog, MysqlLog, PostgresqlLog,
     ProtobufRpcWrapLog, RedisLog, SofaRpcLog,
 };
-use crate::flow_generator::Result;
+use crate::flow_generator::{LogMessageType, Result};
 
 use public::enums::IpProtocol;
 use public::l7_protocol::{L7Protocol, L7ProtocolEnum, ProtobufRpcProtocol};
@@ -53,171 +57,6 @@ use public::l7_protocol::{L7Protocol, L7ProtocolEnum, ProtobufRpcProtocol};
                          |                   |
                          |_____next packet___|
 */
-
-#[macro_export]
-macro_rules! parse_common {
-    ($self:ident,$parse_param:ident) => {
-        $self.info.start_time = $parse_param.time;
-        $self.info.end_time = $parse_param.time;
-        if let Some(param) = $parse_param.ebpf_param {
-            $self.info.is_tls = param.is_tls;
-        }
-    };
-}
-
-/*
-    common log perf update macro. if must define the log and info struct like:
-
-    struct xxxInfo{
-        // .. some field
-
-        // the current msg type
-        msg_type: LogMessageType,
-
-        // the msg time
-        start_time: u64,
-        end_time: u64,
-
-    }
-
-    struct xxxLog{
-        // ... some field
-
-        // the log info
-        info: xxxInfo,
-
-        // (log_type, timestamp), record the previous log info,
-        previous_log_info: LruCache<u32, (LogMessageType, u64)>,
-        perf_stats: Option<PerfStats>,
-    }
-
-    also need to add the code like:
-
-    impl L7ProtocolParserInterface for xxxLog {
-        // ... other fn
-
-         fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
-            // set the info time
-            self.info.start_time = param.time;
-            self.info.end_time = param.time;
-
-            // ...parse payload
-
-            // revert the info time before return Ok().
-            self.revert_info_time(param.direction, param.time);
-            Ok(...)
-
-         }
-
-        fn reset(&mut self) {
-            // save the current log info before reset log
-            self.save_info_rrt();
-
-            // ... reset log
-        }
-    }
-*/
-#[macro_export]
-macro_rules! perf_impl {
-    ($log_struct:ident) => {
-        impl $log_struct {
-            fn save_info_time(&mut self){
-                let time = match self.info.msg_type{
-                    LogMessageType::Response =>self.info.end_time,
-                    LogMessageType::Request =>self.info.start_time,
-                    _=>return,
-                };
-
-                self.previous_log_info.put(
-                    self.info.session_id().unwrap_or_default(),
-                    (self.info.msg_type, time),
-                );
-            }
-
-            // revert the rrt from previous_log_info
-            fn revert_info_time(&mut self, direction: PacketDirection, cur_time: u64) {
-                let Some((ref prev_typ,ref prev_time)) = self.previous_log_info.get(&self.info.session_id().unwrap_or_default()) else{
-                    return ;
-                };
-                match direction {
-                    // current is req and previous is resp and previous time gt current time,
-                    // likely ebpf disorder, revert the info end time
-                    PacketDirection::ClientToServer
-                        if *prev_typ == LogMessageType::Response && *prev_time > cur_time =>
-                    {
-                        self.info.end_time = *prev_time;
-                    }
-
-                    // current is resp and previous is req and current info time gt previous info time, revert the info start.
-                    PacketDirection::ServerToClient
-                        if *prev_typ == LogMessageType::Request && cur_time > *prev_time =>
-                    {
-                        self.info.start_time = *prev_time;
-                    }
-                    _ => {}
-                }
-            }
-
-            fn update_perf(
-                &mut self,
-                req_count: u32,
-                resp_count: u32,
-                req_err: u32,
-                resp_err: u32,
-                time: u64,
-            ) {
-                if self.perf_stats.is_none() {
-                    self.perf_stats = Some(PerfStats::default());
-                }
-                let perf = self.perf_stats.as_mut().unwrap();
-                perf.update_perf(req_count, resp_count, req_err, resp_err, {
-                    let previous_log_info = self
-                        .previous_log_info
-                        .get(&self.info.session_id().unwrap_or_default());
-
-                    if time != 0 && previous_log_info.is_some() {
-                        let previous_log_info = previous_log_info.unwrap();
-                        // if previous is req and current is resp, calculate the round trip time.
-                        if previous_log_info.0 == LogMessageType::Request
-                            && self.info.msg_type == LogMessageType::Response
-                            && time > previous_log_info.1
-                        {
-                            time - previous_log_info.1
-
-                        // if previous is resp and current is req and previous time gt current time, likely ebpf disorder,
-                        // calculate the round trip time.
-                        } else if previous_log_info.0 == LogMessageType::Response
-                            && self.info.msg_type == LogMessageType::Request
-                            && previous_log_info.1 > time
-                        {
-                            previous_log_info.1 - time
-                        } else {
-                            0
-                        }
-                    } else {
-                        0
-                    }
-                });
-            }
-
-            fn perf_inc_req(&mut self, time: u64) {
-                self.update_perf(1, 0, 0, 0, time);
-            }
-
-            fn perf_inc_resp(&mut self, time: u64) {
-                self.update_perf(0, 1, 0, 0, time);
-            }
-
-            fn perf_inc_req_err(&mut self) {
-                self.update_perf(0, 0, 1, 0, 0);
-            }
-
-            fn perf_inc_resp_err(&mut self) {
-                self.update_perf(0, 0, 0, 1, 0);
-            }
-        }
-    };
-}
 
 macro_rules! impl_protocol_parser {
     (pub enum $name:ident { $($proto:ident($log_type:ty)),* $(,)? }) => {
@@ -287,6 +126,13 @@ macro_rules! impl_protocol_parser {
                 match self {
                     Self::Http(p) => p.reset(),
                     $(Self::$proto(p) => p.reset()),*
+                }
+            }
+
+            fn perf_stats(&mut self) -> Option<L7PerfStats> {
+                match self {
+                    Self::Http(p) => p.perf_stats(),
+                    $(Self::$proto(p) => p.perf_stats()),*
                 }
             }
         }
@@ -452,7 +298,13 @@ pub trait L7ProtocolParserInterface {
         true
     }
 
-    fn reset(&mut self);
+    fn reset(&mut self) {}
+
+    // return perf data
+    // TODO will remove default implement after finish perf remake
+    fn perf_stats(&mut self) -> Option<L7PerfStats> {
+        unimplemented!()
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -482,7 +334,26 @@ pub struct EbpfParam {
     pub cap_seq: u64,
 }
 
-#[derive(Clone, Copy)]
+pub struct L7PerfCache {
+    // lru cache previous rrt
+    pub rrt_cache: LruCache<u128, (LogMessageType, u64)>,
+    // LruCache<flow_id, count>
+    pub timeout_cache: LruCache<u64, usize>,
+}
+
+impl L7PerfCache {
+    pub fn new(cap: usize) -> Self {
+        L7PerfCache {
+            rrt_cache: LruCache::new(cap.try_into().unwrap()),
+            timeout_cache: LruCache::new(cap.try_into().unwrap()),
+        }
+    }
+
+    pub fn get_timeout_count(&mut self, flow_id: &u64) -> usize {
+        *(self.timeout_cache.get(flow_id).unwrap_or(&0))
+    }
+}
+
 pub struct ParseParam<'a> {
     // l3/l4 info
     pub l4_protocol: IpProtocol,
@@ -490,32 +361,47 @@ pub struct ParseParam<'a> {
     pub ip_dst: IpAddr,
     pub port_src: u16,
     pub port_dst: u16,
+    pub flow_id: u64,
 
+    // parse info
     pub direction: PacketDirection,
     pub ebpf_type: EbpfType,
     // ebpf_type 不为 EBPF_TYPE_NONE 会有值
     // ===================================
     // not None when payload from ebpf
     pub ebpf_param: Option<EbpfParam>,
+    // calculate from cap_seq, req and correspond resp may have same packet seq, non ebpf always 0
+    pub packet_seq: u64,
     pub time: u64,
+    pub perf_only: bool,
 
     pub parse_config: Option<&'a LogParserConfig>,
+
+    pub l7_perf_cache: Rc<RefCell<L7PerfCache>>,
 }
 
-impl From<&MetaPacket<'_>> for ParseParam<'_> {
-    fn from(packet: &MetaPacket<'_>) -> Self {
+// from packet, previous_log_info_cache, perf_only
+impl From<(&MetaPacket<'_>, Rc<RefCell<L7PerfCache>>, bool)> for ParseParam<'_> {
+    fn from(f: (&MetaPacket<'_>, Rc<RefCell<L7PerfCache>>, bool)) -> Self {
+        let (packet, cache, perf_only) = f;
+
         let mut param = Self {
             l4_protocol: packet.lookup_key.proto,
             ip_src: packet.lookup_key.src_ip,
             ip_dst: packet.lookup_key.dst_ip,
             port_src: packet.lookup_key.src_port,
             port_dst: packet.lookup_key.dst_port,
+            flow_id: packet.flow_id,
 
             direction: packet.lookup_key.direction,
             ebpf_type: packet.ebpf_type,
+            packet_seq: packet.cap_seq,
             ebpf_param: None,
             time: packet.lookup_key.timestamp.as_micros() as u64,
+            perf_only,
             parse_config: None,
+
+            l7_perf_cache: cache,
         };
         if packet.ebpf_type != EbpfType::None {
             let is_tls = match packet.ebpf_type {
@@ -537,10 +423,25 @@ impl From<&MetaPacket<'_>> for ParseParam<'_> {
     }
 }
 
-impl<'a> From<(&MetaPacket<'_>, &'a LogParserConfig)> for ParseParam<'a> {
-    fn from(f: (&MetaPacket<'_>, &'a LogParserConfig)) -> Self {
-        let mut p = Self::from(f.0);
-        p.parse_config = Some(f.1);
+// from packet, previous_log_info_cache, parse_config
+impl<'a>
+    From<(
+        &MetaPacket<'_>,
+        Rc<RefCell<L7PerfCache>>,
+        bool,
+        &'a LogParserConfig,
+    )> for ParseParam<'a>
+{
+    fn from(
+        f: (
+            &MetaPacket<'_>,
+            Rc<RefCell<L7PerfCache>>,
+            bool,
+            &'a LogParserConfig,
+        ),
+    ) -> Self {
+        let mut p = Self::from((f.0, f.1, f.2));
+        p.parse_config = Some(f.3);
         p
     }
 }

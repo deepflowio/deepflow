@@ -24,6 +24,7 @@ use super::value_is_default;
 use super::{consts::*, AppProtoHead, L7ResponseStatus};
 use super::{decode_new_rpc_trace_context_with_type, LogMessageType};
 
+use crate::common::flow::L7PerfStats;
 use crate::{
     common::{
         ebpf::EbpfType,
@@ -36,7 +37,6 @@ use crate::{
     config::handler::{L7LogDynamicConfig, TraceType},
     flow_generator::error::{Error, Result},
     flow_generator::protocol_logs::{decode_base64_to_string, L7ProtoRawDataType},
-    parse_common,
     utils::bytes::{read_u32_be, read_u32_le},
 };
 use public::utils::net::h2pack;
@@ -48,15 +48,11 @@ pub struct HttpInfo {
     is_req_end: bool,
     #[serde(skip)]
     is_resp_end: bool,
-    // from MetaPacket::cap_seq
-    cap_seq: Option<u64>,
+    #[serde(skip)]
+    rrt: u64,
 
     #[serde(skip)]
     pub proto: L7Protocol,
-    #[serde(skip)]
-    start_time: u64,
-    #[serde(skip)]
-    end_time: u64,
     #[serde(skip)]
     is_tls: bool,
     msg_type: LogMessageType,
@@ -106,12 +102,6 @@ impl L7ProtocolInfoInterface for HttpInfo {
 
     fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
         if let L7ProtocolInfo::HttpInfo(other) = other {
-            if other.start_time < self.start_time {
-                self.start_time = other.start_time;
-            }
-            if other.end_time > self.end_time {
-                self.end_time = other.end_time;
-            }
             return self.merge(other);
         }
         Ok(())
@@ -121,7 +111,7 @@ impl L7ProtocolInfoInterface for HttpInfo {
         Some(AppProtoHead {
             proto: self.get_l7_protocol_with_tls(),
             msg_type: self.msg_type,
-            rrt: self.end_time - self.start_time,
+            rrt: self.rrt,
         })
     }
 
@@ -153,11 +143,6 @@ impl HttpInfo {
         match other.msg_type {
             // merge with request
             LogMessageType::Request => {
-                if !other.can_merge(self) {
-                    return Err(Error::L7ProtocolCanNotMerge(L7ProtocolInfo::HttpInfo(
-                        other,
-                    )));
-                }
                 if self.path.is_empty() {
                     self.path = other.path;
                 }
@@ -185,11 +170,6 @@ impl HttpInfo {
             }
             // merge with response
             LogMessageType::Response => {
-                if !self.can_merge(&other) {
-                    return Err(Error::L7ProtocolCanNotMerge(L7ProtocolInfo::HttpInfo(
-                        other,
-                    )));
-                }
                 if other.status != L7ResponseStatus::default() {
                     self.status = other.status;
                 }
@@ -223,31 +203,13 @@ impl HttpInfo {
         Ok(())
     }
 
-    pub fn set_packet_seq(&mut self, param: &ParseParam) {
-        if let Some(p) = param.ebpf_param {
-            self.cap_seq = Some(p.cap_seq);
-        }
-    }
-
-    /*
-        if http1 with long live tcp connection, ebpf maybe disorder.
-        need to check the packet sequence when from ebpf and protocol is http1
-        self must req and other must resp.
-    */
-    pub fn can_merge(&self, resp: &Self) -> bool {
-        if self.proto == L7Protocol::Http1 || self.proto == L7Protocol::Http1TLS {
-            if let (Some(req_seq), Some(resp_seq)) = (self.cap_seq, resp.cap_seq) {
-                return resp_seq > req_seq && resp_seq - req_seq == 1;
-            }
-        }
-        true
-    }
-
     pub fn is_empty(&self) -> bool {
-        return self.host.is_empty() && self.method.is_empty() && self.path.is_empty();
+        return self.host.is_empty()
+            && self.method.is_empty()
+            && self.path.is_empty()
+            && self.status_code == None;
     }
 
-    // return (is_req_end, is_resp_end)
     pub fn is_req_resp_end(&self) -> (bool, bool) {
         (self.is_req_end, self.is_resp_end)
     }
@@ -365,13 +327,16 @@ pub struct HttpLog {
     // check 是否已经解析过，已经解析过parse会跳过
     parsed: bool,
     proto: L7Protocol,
+
+    perf_stats: Option<L7PerfStats>,
 }
 
 impl L7ProtocolParserInterface for HttpLog {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
-        parse_common!(self, param);
         self.info.is_tls = param.is_tls();
-        self.info.set_packet_seq(param);
+        if self.perf_stats.is_none() {
+            self.perf_stats = Some(L7PerfStats::default())
+        };
         // http2 有两个版本, 现在可以直接通过proto区分解析哪个版本的协议.
         match self.proto {
             L7Protocol::Http1 => self.http1_check_protocol(payload, param),
@@ -396,7 +361,7 @@ impl L7ProtocolParserInterface for HttpLog {
                             false
                         }
                     }
-                    _ => self.http2_check_protocol(&config.l7_log_dynamic, payload, param),
+                    _ => self.http2_check_protocol(payload, param),
                 }
             }
             _ => unreachable!(),
@@ -410,37 +375,45 @@ impl L7ProtocolParserInterface for HttpLog {
         let Some(config) = param.parse_config else {
             return Err(Error::NoParseConfig);
         };
-        parse_common!(self, param);
         self.info.is_tls = param.is_tls();
-        self.info.set_packet_seq(param);
-        match param.ebpf_type {
-            EbpfType::GoHttp2Uprobe => {
-                if let Some(p) = &param.ebpf_param {
-                    self.parse_http2_go_uprobe(
-                        &config.l7_log_dynamic,
-                        payload,
-                        param.direction,
-                        Some(p.is_req_end),
-                        Some(p.is_resp_end),
-                    )?;
-                    return Ok(vec![L7ProtocolInfo::HttpInfo(self.info.clone())]);
-                } else {
-                    return Err(Error::L7ProtocolUnknown);
-                };
-            }
-            _ => {
-                match self.proto {
-                    L7Protocol::Http1 => {
-                        self.parse_http_v1(&config.l7_log_dynamic, payload, param.direction)?
-                    }
-                    L7Protocol::Http2 | L7Protocol::Grpc => {
-                        self.parse_http_v2(&config.l7_log_dynamic, payload, param.direction)?
-                    }
-                    _ => unreachable!(),
+
+        if self.perf_stats.is_none() {
+            self.perf_stats = Some(L7PerfStats::default())
+        };
+
+        match self.proto {
+            L7Protocol::Http1 => self.parse_http_v1(payload, param)?,
+            L7Protocol::Http2 | L7Protocol::Grpc => match param.ebpf_type {
+                EbpfType::GoHttp2Uprobe => {
+                    if let Some(p) = &param.ebpf_param {
+                        self.parse_http2_go_uprobe(
+                            &config.l7_log_dynamic,
+                            payload,
+                            param.direction,
+                            Some(p.is_req_end),
+                            Some(p.is_resp_end),
+                        )?;
+                        if self.info.is_req_end || self.info.is_resp_end {
+                            self.info.cal_rrt(param).map(|rrt| {
+                                self.info.rrt = rrt;
+                                self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+                            });
+                        }
+                        return Ok(vec![L7ProtocolInfo::HttpInfo(self.info.clone())]);
+                    } else {
+                        return Err(Error::L7ProtocolUnknown);
+                    };
                 }
-                Ok(vec![L7ProtocolInfo::HttpInfo(self.info.clone())])
-            }
+                _ => self.parse_http_v2(payload, param)?,
+            },
+            _ => unreachable!(),
         }
+
+        self.info.cal_rrt(param).map(|rrt| {
+            self.info.rrt = rrt;
+            self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+        });
+        Ok(vec![L7ProtocolInfo::HttpInfo(self.info.clone())])
     }
 
     fn protocol(&self) -> L7Protocol {
@@ -472,13 +445,18 @@ impl L7ProtocolParserInterface for HttpLog {
 
     fn reset(&mut self) {
         self.info = HttpInfo::default();
-        let new_log = match self.proto {
+        let mut new_log = match self.proto {
             L7Protocol::Http1 => Self::new_v1(),
             L7Protocol::Http2 => Self::new_v2(false),
             L7Protocol::Grpc => Self::new_v2(true),
             _ => unreachable!(),
         };
+        new_log.perf_stats = self.perf_stats.take();
         *self = new_log
+    }
+
+    fn perf_stats(&mut self) -> Option<L7PerfStats> {
+        self.perf_stats.take()
     }
 }
 
@@ -527,24 +505,12 @@ impl HttpLog {
         is_http_req_line(first_line)
     }
 
-    pub fn http2_check_protocol(
-        &mut self,
-        config: &L7LogDynamicConfig,
-        payload: &[u8],
-        param: &ParseParam,
-    ) -> bool {
+    pub fn http2_check_protocol(&mut self, payload: &[u8], param: &ParseParam) -> bool {
         if param.l4_protocol != IpProtocol::Tcp {
             return false;
         }
-        self.parsed = self
-            .parse_http_v2(config, payload, PacketDirection::ClientToServer)
-            .is_ok();
+        self.parsed = self.parse_http_v2(payload, param).is_ok();
         self.parsed
-    }
-
-    fn reset_logs(&mut self) {
-        self.info.status_code = None;
-        self.info = HttpInfo::default();
     }
 
     fn set_status(&mut self, status_code: u16) {
@@ -552,11 +518,13 @@ impl HttpLog {
             && status_code <= HTTP_STATUS_CLIENT_ERROR_MAX
         {
             // http客户端请求存在错误
+            self.perf_stats.as_mut().unwrap().inc_req_err();
             self.info.status = L7ResponseStatus::ClientError;
         } else if status_code >= HTTP_STATUS_SERVER_ERROR_MIN
             && status_code <= HTTP_STATUS_SERVER_ERROR_MAX
         {
             // http服务端响应存在错误
+            self.perf_stats.as_mut().unwrap().inc_resp_err();
             self.info.status = L7ResponseStatus::ServerError;
         } else {
             self.info.status = L7ResponseStatus::Ok;
@@ -618,18 +586,23 @@ impl HttpLog {
         }
 
         self.info.is_req_end = is_req_end.unwrap_or_default();
+        if self.info.is_req_end {
+            self.perf_stats.as_mut().unwrap().inc_req();
+        }
         self.info.is_resp_end = is_resp_end.unwrap_or_default();
+        if self.info.is_req_end {
+            self.perf_stats.as_mut().unwrap().inc_resp();
+        }
         self.info.version = String::from("2");
         self.info.stream_id = Some(stream_id);
         return Ok(());
     }
 
-    fn parse_http_v1(
-        &mut self,
-        config: &L7LogDynamicConfig,
-        payload: &[u8],
-        direction: PacketDirection,
-    ) -> Result<()> {
+    pub fn parse_http_v1(&mut self, payload: &[u8], param: &ParseParam) -> Result<()> {
+        let (direction, config) = (
+            param.direction,
+            &param.parse_config.as_ref().unwrap().l7_log_dynamic,
+        );
         if !is_http_v1_payload(payload) {
             return Err(Error::HttpHeaderParseFailed);
         }
@@ -648,6 +621,7 @@ impl HttpLog {
 
             self.info.msg_type = LogMessageType::Response;
 
+            self.perf_stats.as_mut().unwrap().inc_resp();
             self.set_status(status_code);
         } else {
             // HTTP请求行：GET /background.png HTTP/1.0
@@ -660,8 +634,11 @@ impl HttpLog {
             self.info.version = get_http_request_version(version)?.to_owned();
 
             self.info.msg_type = LogMessageType::Request;
+            self.perf_stats.as_mut().unwrap().inc_req();
         }
-
+        if param.perf_only {
+            return Ok(());
+        }
         let mut content_length: Option<u32> = None;
         for body_line in headers {
             let col_index = body_line.find(':');
@@ -704,12 +681,11 @@ impl HttpLog {
         &payload[..HTTPV2_MAGIC_PREFIX.len()] == HTTPV2_MAGIC_PREFIX.as_bytes()
     }
 
-    fn parse_http_v2(
-        &mut self,
-        config: &L7LogDynamicConfig,
-        payload: &[u8],
-        direction: PacketDirection,
-    ) -> Result<()> {
+    fn parse_http_v2(&mut self, payload: &[u8], param: &ParseParam) -> Result<()> {
+        let (direction, config) = (
+            param.direction,
+            &param.parse_config.as_ref().unwrap().l7_log_dynamic,
+        );
         let mut content_length: Option<u32> = None;
         let mut header_frame_parsed = false;
         let mut is_httpv2 = false;
@@ -824,6 +800,7 @@ impl HttpLog {
                 if check_http_method(&self.info.method).is_err() {
                     return Err(Error::HttpHeaderParseFailed);
                 }
+                self.perf_stats.as_mut().unwrap().inc_req();
                 self.info.req_content_length = content_length;
             } else {
                 if let Some(code) = self.info.status_code {
@@ -834,7 +811,7 @@ impl HttpLog {
                 } else {
                     return Err(Error::HttpHeaderParseFailed);
                 }
-
+                self.perf_stats.as_mut().unwrap().inc_resp();
                 self.info.resp_content_length = content_length;
             }
             self.info.version = String::from("2");
@@ -984,32 +961,6 @@ impl HttpLog {
                 decode_new_rpc_trace_context_with_type(payload.as_bytes(), id_type)
             }
         }
-    }
-
-    fn parse(
-        &mut self,
-        config: &L7LogDynamicConfig,
-        payload: &[u8],
-        proto: IpProtocol,
-        direction: PacketDirection,
-        is_req_end: Option<bool>,
-        is_resp_end: Option<bool>,
-    ) -> Result<()> {
-        if proto != IpProtocol::Tcp {
-            return Err(Error::InvalidIpProtocol);
-        }
-        self.reset_logs();
-
-        match self.info.raw_data_type {
-            L7ProtoRawDataType::GoHttp2Uprobe => {
-                self.parse_http2_go_uprobe(&config, payload, direction, is_req_end, is_resp_end)?;
-            }
-            _ => {
-                self.parse_http_v1(&config, payload, direction)
-                    .or(self.parse_http_v2(&config, payload, direction))?;
-            }
-        }
-        Ok(())
     }
 }
 
@@ -1209,14 +1160,20 @@ pub fn parse_v1_headers(payload: &[u8]) -> V1HeaderIterator<'_> {
 
 #[cfg(test)]
 mod tests {
+    use crate::common::l7_protocol_log::L7PerfCache;
     use crate::common::MetaPacket;
+    use crate::config::handler::LogParserConfig;
+    use crate::flow_generator::L7_RRT_CACHE_CAPACITY;
     use crate::utils::test::Capture;
 
+    use std::cell::RefCell;
     use std::collections::HashSet;
     use std::fs;
     use std::mem::size_of;
     use std::path::Path;
+    use std::rc::Rc;
     use std::slice::from_raw_parts;
+    use std::time::Duration;
 
     use super::*;
 
@@ -1224,6 +1181,7 @@ mod tests {
 
     fn run(name: &str) -> String {
         let capture = Capture::load_pcap(Path::new(FILE_DIR).join(name), Some(1500));
+        let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
         let mut packets = capture.as_meta_packets();
         if packets.is_empty() {
             return "".to_string();
@@ -1237,6 +1195,11 @@ mod tests {
             vec![TraceType::Sw8],
             vec![TraceType::Sw8],
         );
+        let parse_config = &LogParserConfig {
+            l7_log_collect_nps_threshold: 10,
+            l7_log_session_aggr_timeout: Duration::from_secs(10),
+            l7_log_dynamic: config,
+        };
         for packet in packets.iter_mut() {
             packet.lookup_key.direction = if packet.lookup_key.dst_port == first_dst_port {
                 PacketDirection::ClientToServer
@@ -1252,20 +1215,23 @@ mod tests {
             trace_set.insert(TraceType::Sw8.to_checker_string());
             let mut span_set = HashSet::new();
             span_set.insert(TraceType::Sw8.to_checker_string());
-            let mut http = HttpLog::default();
-            let _ = http.parse(
-                &config,
-                payload,
-                packet.lookup_key.proto,
-                packet.lookup_key.direction,
-                None,
-                None,
-            );
-            let param = &ParseParam::from(packet as &MetaPacket);
-            let mut is_http = http.http1_check_protocol(payload, param);
-            is_http |= http.http2_check_protocol(&config, payload, param);
-
-            output.push_str(&format!("{:?} is_http: {}\n", http.info, is_http));
+            let mut http1 = HttpLog::new_v1();
+            let mut http2 = HttpLog::new_v2(false);
+            let param = &ParseParam::from((
+                packet as &MetaPacket,
+                log_cache.clone(),
+                false,
+                parse_config,
+            ));
+            if http1.parse_payload(payload, param).is_ok() {
+                http1.info.rrt = 0;
+                output.push_str(&format!("{:?} is_http: {}\n", http1.info, true));
+            } else if http2.parse_payload(payload, param).is_ok() {
+                http2.info.rrt = 0;
+                output.push_str(&format!("{:?} is_http: {}\n", http2.info, true));
+            } else {
+                output.push_str(&format!("{:?} is_http: {}\n", http1.info, false));
+            }
         }
         output
     }

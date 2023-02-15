@@ -16,12 +16,12 @@
 
 use std::{net::IpAddr, sync::Arc, time::Duration};
 
-use super::{perf::FlowPerf, FlowState, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC};
+use super::{perf::FlowLog, FlowState, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC};
 use crate::common::{
     decapsulate::TunnelType,
     endpoint::EndpointData,
     enums::{EthernetType, TapType, TcpFlags},
-    flow::{FlowMetricsPeer, PacketDirection},
+    flow::{FlowMetricsPeer, PacketDirection, SignalSource},
     lookup_key::LookupKey,
     meta_packet::MetaPacket,
     tagged_flow::TaggedFlow,
@@ -126,7 +126,7 @@ pub struct FlowNode {
     // 用作time_set比对的标识，等于FlowTimeKey的timestamp_key, 只有创建FlowNode和刷新更新流节点的超时才会更新
     pub timestamp_key: u64,
 
-    pub meta_flow_perf: Option<Box<FlowPerf>>,
+    pub meta_flow_log: Option<Box<FlowLog>>,
     pub policy_data_cache: [Arc<PolicyData>; 2],
     pub endpoint_data_cache: [Arc<EndpointData>; 2],
 
@@ -172,6 +172,10 @@ impl FlowNode {
         ignore_tor_mac: bool,
         trident_type: TridentType,
     ) -> bool {
+        if meta_packet.signal_source == SignalSource::EBPF {
+            return self.tagged_flow.flow.flow_id == meta_packet.socket_id;
+        }
+
         let flow = &self.tagged_flow.flow;
         let flow_key = &flow.flow_key;
         let meta_lookup_key = &meta_packet.lookup_key;

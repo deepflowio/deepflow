@@ -744,7 +744,7 @@ mod tests {
             recent_time: Duration::ZERO,
             timeout: Duration::ZERO,
             flow_state: FlowState::Raw,
-            meta_flow_perf: None,
+            meta_flow_log: None,
             policy_data_cache: Default::default(),
             endpoint_data_cache: {
                 let data = EndpointData {

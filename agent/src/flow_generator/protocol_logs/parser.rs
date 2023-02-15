@@ -31,8 +31,7 @@ use arc_swap::access::Access;
 use log::{info, warn};
 
 use super::{
-    AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, BoxAppProtoLogsData, DnsLog, DubboLog,
-    KafkaLog, LogMessageType, MqttLog, MysqlLog, RedisLog,
+    AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, BoxAppProtoLogsData, LogMessageType,
 };
 
 use crate::{
@@ -43,10 +42,7 @@ use crate::{
         MetaPacket, TaggedFlow,
     },
     config::handler::LogParserAccess,
-    flow_generator::{
-        protocol_logs::HttpLog, Error::L7LogCanNotMerge, FLOW_METRICS_PEER_DST,
-        FLOW_METRICS_PEER_SRC,
-    },
+    flow_generator::{Error::L7LogCanNotMerge, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC},
     metric::document::TapSide,
     utils::stats::{Counter, CounterType, CounterValue, RefCountable},
 };
@@ -454,7 +450,6 @@ impl SessionQueue {
                     self.send(request);
                 } else {
                     // if can not merge, send req and resp directly.
-                    // generally use for ebpf disorder.
                     if let Err(L7LogCanNotMerge(item)) = request.session_merge(item) {
                         self.send(item);
                     }
@@ -560,18 +555,7 @@ impl SessionQueue {
     }
 }
 
-#[derive(Default)]
-struct AppLogs {
-    dns: DnsLog,
-    http: HttpLog,
-    mysql: MysqlLog,
-    redis: RedisLog,
-    dubbo: DubboLog,
-    kafka: KafkaLog,
-    mqtt: MqttLog,
-}
-
-pub struct AppProtoLogsParser {
+pub struct SessionAggregator {
     input_queue: Arc<Receiver<Box<MetaAppProto>>>,
     output_queue: DebugSender<BoxAppProtoLogsData>,
     id: u32,
@@ -583,7 +567,7 @@ pub struct AppProtoLogsParser {
     log_rate: Arc<LeakyBucket>,
 }
 
-impl AppProtoLogsParser {
+impl SessionAggregator {
     pub fn new(
         input_queue: Receiver<Box<MetaAppProto>>,
         output_queue: DebugSender<BoxAppProtoLogsData>,

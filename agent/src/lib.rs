@@ -50,6 +50,7 @@ pub use {
         enums::TcpFlags as _TcpFlags,
         feature as _feature,
         flow::PacketDirection as _PacketDirection,
+        l7_protocol_log::L7PerfCache as _L7PerfCache,
         lookup_key::LookupKey as _LookupKey,
         platform_data::{IpSubnet as _IpSubnet, PlatformData as _PlatformData},
         policy::{Acl as _Acl, Cidr as _Cidr, IpGroupData as _IpGroupData},
@@ -59,7 +60,6 @@ pub use {
         _new_flow_map_and_receiver, _new_meta_packet, _reverse_meta_packet,
     },
     flow_generator::perf::{
-        http::HttpPerfData as _HttpPerfData,
         l7_rrt::L7RrtCache as _L7RrtCache,
         tcp::{
             TcpPerf as _TcpPerf, _benchmark_report, _benchmark_session_peer_seq_no_assert,
@@ -67,6 +67,7 @@ pub use {
         },
         FlowPerfCounter as _FlowPerfCounter, L7FlowPerf as _L7FlowPerf,
     },
+    flow_generator::HttpLog,
     npb_pcap_policy::{
         NpbAction as _NpbAction, NpbTunnelType as _NpbTunnelType, TapSide as _TapSide,
     },
@@ -97,7 +98,7 @@ mod tests {
             ("         -> ", crate::common::flow::FlowPerfStats),
             ("        ", crate::common::tag::Tag),
             ("    ", crate::flow_generator::flow_state::FlowState),
-            (" -> ", crate::flow_generator::perf::FlowPerf),
+            (" -> ", crate::flow_generator::perf::FlowLog),
             ("        ", crate::flow_generator::perf::L4FlowPerfTable),
             ("         +> ", crate::flow_generator::perf::tcp::TcpPerf),
             ("         |      ", crate::flow_generator::perf::tcp::PerfControl),
@@ -111,7 +112,6 @@ mod tests {
             ("         +- ", crate::flow_generator::perf::sql::RedisPerfData),
             ("         +- ", crate::flow_generator::perf::rpc::DubboPerfData),
             ("         +- ", crate::flow_generator::perf::sql::MysqlPerfData),
-            ("         +- ", crate::flow_generator::perf::http::HttpPerfData),
             ("         +> ", crate::flow_generator::protocol_logs::sql::PostgresqlLog),
             ("         +> ", crate::flow_generator::protocol_logs::rpc::ProtobufRpcWrapLog),
             ("         +> ", crate::flow_generator::protocol_logs::rpc::SofaRpcLog),

@@ -35,7 +35,7 @@ use crate::{
             value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus, LogMessageType,
         },
     },
-    log_info_merge, parse_common,
+    log_info_merge,
     utils::bytes::{read_u32_be, read_u64_be},
 };
 
@@ -171,7 +171,6 @@ impl L7ProtocolParserInterface for DubboLog {
         let Some(config) = param.parse_config else {
             return Err(Error::NoParseConfig);
         };
-        parse_common!(self, param);
         self.parse(
             &config.l7_log_dynamic,
             payload,
@@ -594,11 +593,14 @@ pub fn get_req_param_len(payload: &[u8]) -> (usize, usize) {
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
+    use std::cell::RefCell;
     use std::path::Path;
+    use std::{fs, rc::Rc};
 
     use super::*;
 
+    use crate::common::l7_protocol_log::L7PerfCache;
+    use crate::flow_generator::L7_RRT_CACHE_CAPACITY;
     use crate::{
         common::{flow::PacketDirection, MetaPacket},
         utils::test::Capture,
@@ -608,6 +610,7 @@ mod tests {
 
     fn run(name: &str) -> String {
         let capture = Capture::load_pcap(Path::new(FILE_DIR).join(name), Some(1024));
+        let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
         let mut packets = capture.as_meta_packets();
         if packets.is_empty() {
             return "".to_string();
@@ -647,8 +650,10 @@ mod tests {
                 None,
                 None,
             );
-            let is_dubbo =
-                DubboLog::dubbo_check_protocol(payload, &ParseParam::from(packet as &MetaPacket));
+            let is_dubbo = DubboLog::dubbo_check_protocol(
+                payload,
+                &ParseParam::from((packet as &MetaPacket, log_cache.clone(), false)),
+            );
             output.push_str(&format!("{:?} is_dubbo: {}\r\n", dubbo.info, is_dubbo));
         }
         output

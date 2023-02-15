@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-use lru::LruCache;
 use nom::InputTakeAtPosition;
 use public::{
     bytes::{read_u16_be, read_u32_be},
@@ -24,21 +23,17 @@ use serde::Serialize;
 
 use crate::{
     common::{
-        flow::{FlowPerfStats, L7PerfStats, PacketDirection},
+        flow::L7PerfStats,
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
-        MetaPacket,
     },
-    config::handler::LogParserConfig,
     flow_generator::{
-        perf::{L7FlowPerf, PerfStats},
         protocol_logs::{
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
             L7ResponseStatus,
         },
         AppProtoHead, Error, HttpLog, LogMessageType, Result,
     },
-    perf_impl,
 };
 
 const REQ_HDR_LEN: usize = 22;
@@ -159,11 +154,7 @@ pub struct SofaRpcInfo {
     proto: u8,
     req_id: u32,
     msg_type: LogMessageType,
-
-    #[serde(skip)]
-    start_time: u64,
-    #[serde(skip)]
-    end_time: u64,
+    rrt: u64,
 
     target_serv: String,
     method: String,
@@ -197,7 +188,7 @@ impl L7ProtocolInfoInterface for SofaRpcInfo {
         Some(AppProtoHead {
             proto: L7Protocol::SofaRPC,
             msg_type: self.msg_type,
-            rrt: self.end_time - self.start_time,
+            rrt: self.rrt,
         })
     }
 
@@ -241,25 +232,20 @@ impl From<SofaRpcInfo> for L7ProtocolSendLog {
 #[derive(Debug, Serialize)]
 pub struct SofaRpcLog {
     info: SofaRpcInfo,
-    perf_stats: Option<PerfStats>,
     parsed: bool,
-    // <session_id,(type,time)>, use for calculate perf
     #[serde(skip)]
-    previous_log_info: LruCache<u32, (LogMessageType, u64)>,
+    perf_stats: Option<L7PerfStats>,
 }
 
 impl Default for SofaRpcLog {
     fn default() -> Self {
         Self {
-            previous_log_info: LruCache::new(100.try_into().unwrap()),
             info: SofaRpcInfo::default(),
             perf_stats: None,
             parsed: false,
         }
     }
 }
-
-perf_impl!(SofaRpcLog);
 
 impl L7ProtocolParserInterface for SofaRpcLog {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
@@ -279,13 +265,15 @@ impl L7ProtocolParserInterface for SofaRpcLog {
 
     fn reset(&mut self) {
         self.parsed = false;
-        self.save_info_time();
-
         self.info = SofaRpcInfo::default();
     }
 
     fn parsable_on_udp(&self) -> bool {
         false
+    }
+
+    fn perf_stats(&mut self) -> Option<L7PerfStats> {
+        self.perf_stats.take()
     }
 }
 
@@ -299,11 +287,11 @@ impl SofaRpcLog {
         if self.parsed {
             return Ok(vec![L7ProtocolInfo::SofaRpcInfo(self.info.clone())]);
         }
-        self.info.start_time = param.time;
-        self.info.end_time = param.time;
+        if self.perf_stats.is_none() {
+            self.perf_stats = Some(L7PerfStats::default())
+        };
 
         let hdr = Hdr::try_from(payload)?;
-
         self.info.proto = hdr.proto;
         // now only support bolt v1
         if self.info.proto != PROTO_BOLT_V1 {
@@ -332,10 +320,10 @@ impl SofaRpcLog {
                 self.info.resp_len =
                     hdr.content_len + (hdr.hdr_len as u32) + (hdr.class_len as u32);
                 if self.info.resp_code == 8 {
-                    self.perf_inc_req_err();
+                    self.perf_stats.as_mut().unwrap().inc_req_err();
                     self.info.status = L7ResponseStatus::ClientError;
                 } else if self.info.resp_code != 0 {
-                    self.perf_inc_resp_err();
+                    self.perf_stats.as_mut().unwrap().inc_resp_err();
                     self.info.status = L7ResponseStatus::ServerError;
                 }
                 LogMessageType::Response
@@ -343,8 +331,8 @@ impl SofaRpcLog {
             _ => return Err(Error::L7ProtocolUnknown),
         };
         match self.info.msg_type {
-            LogMessageType::Request => self.perf_inc_req(param.time),
-            LogMessageType::Response => self.perf_inc_resp(param.time),
+            LogMessageType::Request => self.perf_stats.as_mut().unwrap().inc_req(),
+            LogMessageType::Response => self.perf_stats.as_mut().unwrap().inc_resp(),
             _ => {}
         }
 
@@ -382,7 +370,10 @@ impl SofaRpcLog {
                 self.fill_with_trace_ctx(sofa_hdr.new_rpc_trace_context);
             }
         }
-        self.revert_info_time(param.direction, param.time);
+        self.info.cal_rrt(param).map(|rrt| {
+            self.info.rrt = rrt;
+            self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+        });
         Ok(vec![L7ProtocolInfo::SofaRpcInfo(self.info.clone())])
     }
 
@@ -397,48 +388,6 @@ impl SofaRpcLog {
         if !ctx.parent_span_id.is_empty() {
             self.info.parent_span_id = ctx.parent_span_id;
         }
-    }
-}
-
-impl L7FlowPerf for SofaRpcLog {
-    fn parse(&mut self, _: Option<&LogParserConfig>, packet: &MetaPacket, _: u64) -> Result<()> {
-        if let Some(payload) = packet.get_l4_payload() {
-            self.parse_payload(payload, &ParseParam::from(packet))?;
-            return Ok(());
-        }
-        Err(Error::L7ProtocolUnknown)
-    }
-
-    fn data_updated(&self) -> bool {
-        self.perf_stats.is_some()
-    }
-
-    fn copy_and_reset_data(&mut self, timeout_count: u32) -> crate::common::flow::FlowPerfStats {
-        FlowPerfStats {
-            l7_protocol: L7Protocol::SofaRPC,
-            l7: if let Some(perf) = self.perf_stats.take() {
-                L7PerfStats {
-                    request_count: perf.req_count,
-                    response_count: perf.resp_count,
-                    err_client_count: perf.req_err_count,
-                    err_server_count: perf.resp_err_count,
-                    err_timeout: timeout_count,
-                    rrt_count: perf.rrt_count,
-                    rrt_sum: perf.rrt_sum.as_micros() as u64,
-                    rrt_max: perf.rrt_max.as_micros() as u32,
-                }
-            } else {
-                L7PerfStats::default()
-            },
-            ..Default::default()
-        }
-    }
-
-    fn app_proto_head(&mut self) -> Option<(AppProtoHead, u16)> {
-        if let Some(h) = L7ProtocolInfoInterface::app_proto_head(&self.info) {
-            return Some((h, 0));
-        }
-        None
     }
 }
 
@@ -568,17 +517,17 @@ fn read_url_param_kv<'a>(payload: &mut &'a [u8]) -> Option<(&'a [u8], &'a [u8])>
 
 #[cfg(test)]
 mod test {
-    use std::path::Path;
+    use std::{cell::RefCell, path::Path, rc::Rc};
 
     use crate::{
         common::{
             flow::PacketDirection,
             l7_protocol_info::L7ProtocolInfo,
-            l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
+            l7_protocol_log::{L7PerfCache, L7ProtocolParserInterface, ParseParam},
         },
         flow_generator::{
             protocol_logs::rpc::sofa_rpc::{CMD_CODE_REQ, CMD_CODE_RESP, PROTO_BOLT_V1},
-            LogMessageType,
+            LogMessageType, L7_RRT_CACHE_CAPACITY,
         },
         utils::test::Capture,
     };
@@ -615,13 +564,14 @@ mod test {
     #[test]
     fn test_sofarpc_old() {
         let pcap_file = Path::new("resources/test/flow_generator/sofarpc/sofa-old.pcap");
+        let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
         let capture = Capture::load_pcap(pcap_file, None);
         let mut p = capture.as_meta_packets();
         p[0].lookup_key.direction = PacketDirection::ClientToServer;
         p[1].lookup_key.direction = PacketDirection::ServerToClient;
         let mut parser = SofaRpcLog::default();
 
-        let req_param = &mut ParseParam::from(&p[0]);
+        let req_param = &mut ParseParam::from((&p[0], log_cache.clone(), false));
         let req_payload = p[0].get_l4_payload().unwrap();
         assert_eq!(parser.check_payload(req_payload, req_param), true);
         let req_info = parser
@@ -646,7 +596,7 @@ mod test {
 
         parser.reset();
 
-        let resp_param = &mut ParseParam::from(&p[1]);
+        let resp_param = &mut ParseParam::from((&p[1], log_cache.clone(), false));
         let resp_payload = p[1].get_l4_payload().unwrap();
 
         let resp_info = parser
@@ -669,13 +619,14 @@ mod test {
     #[test]
     fn test_sofarpc_new() {
         let pcap_file = Path::new("resources/test/flow_generator/sofarpc/sofa-new.pcap");
+        let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
         let capture = Capture::load_pcap(pcap_file, None);
         let mut p = capture.as_meta_packets();
         p[0].lookup_key.direction = PacketDirection::ClientToServer;
         p[1].lookup_key.direction = PacketDirection::ServerToClient;
         let mut parser = SofaRpcLog::default();
 
-        let req_param = &mut ParseParam::from(&p[0]);
+        let req_param = &mut ParseParam::from((&p[0], log_cache.clone(), false));
         let req_payload = p[0].get_l4_payload().unwrap();
         assert_eq!(parser.check_payload(req_payload, req_param), true);
         let req_info = parser
@@ -700,7 +651,7 @@ mod test {
 
         parser.reset();
 
-        let resp_param = &mut ParseParam::from(&p[1]);
+        let resp_param = &mut ParseParam::from((&p[1], log_cache.clone(), false));
         let resp_payload = p[1].get_l4_payload().unwrap();
 
         let resp_info = parser

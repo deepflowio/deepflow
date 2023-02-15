@@ -29,7 +29,7 @@ pub use self::http::{
 use self::pb_adapter::L7ProtocolSendLog;
 pub use dns::{DnsInfo, DnsLog};
 pub use mq::{mqtt, KafkaInfo, KafkaLog, MqttInfo, MqttLog};
-pub use parser::{AppProtoLogsParser, MetaAppProto};
+pub use parser::{MetaAppProto, SessionAggregator};
 pub use rpc::{
     decode_new_rpc_trace_context, decode_new_rpc_trace_context_with_type, get_protobuf_rpc_parser,
     DubboHeader, DubboInfo, DubboLog, ProtobufRpcInfo, ProtobufRpcWrapLog, SofaRpcInfo, SofaRpcLog,

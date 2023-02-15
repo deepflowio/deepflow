@@ -225,7 +225,7 @@ impl L7ProtocolParserInterface for MqttLog {
         if !param.ebpf_type.is_raw_protocol() {
             return false;
         }
-        Self::mqtt_check_protocol(payload, param)
+        Self::check_protocol(payload, param)
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
@@ -398,7 +398,7 @@ impl MqttLog {
     /// pest effort parsing to determine whether it is an mqtt packet, because "judging protocol implementation
     /// independent of protocol port" requires the first request packet to return true, the others are false,
     /// so only judge whether it is a legitimate "Connect" packet
-    pub fn mqtt_check_protocol(payload: &[u8], param: &ParseParam) -> bool {
+    pub fn check_protocol(payload: &[u8], param: &ParseParam) -> bool {
         if param.l4_protocol != IpProtocol::Tcp {
             return false;
         }
@@ -776,11 +776,14 @@ fn mqtt_unsubscription_requests(input: &[u8]) -> IResult<&[u8], Vec<&str>> {
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
+    use std::cell::RefCell;
     use std::path::Path;
+    use std::{fs, rc::Rc};
 
     use super::*;
 
+    use crate::common::l7_protocol_log::L7PerfCache;
+    use crate::flow_generator::L7_RRT_CACHE_CAPACITY;
     use crate::{
         common::{flow::PacketDirection, MetaPacket},
         utils::test::Capture,
@@ -790,6 +793,7 @@ mod tests {
 
     fn run(name: &str) -> String {
         let capture = Capture::load_pcap(Path::new(FILE_DIR).join(name), Some(1024));
+        let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
         let mut packets = capture.as_meta_packets();
         if packets.is_empty() {
             return "".to_string();
@@ -815,8 +819,10 @@ mod tests {
                 None,
                 None,
             );
-            let is_mqtt =
-                MqttLog::mqtt_check_protocol(payload, &ParseParam::from(packet as &MetaPacket));
+            let is_mqtt = MqttLog::check_protocol(
+                payload,
+                &ParseParam::from((packet as &MetaPacket, log_cache.clone(), false)),
+            );
             for i in mqtt.info.iter() {
                 output.push_str(&format!("{:?} is_mqtt: {}\r\n", i, is_mqtt));
             }

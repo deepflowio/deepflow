@@ -26,7 +26,7 @@ use crate::{
         IPV4_ADDR_LEN, IPV6_ADDR_LEN,
     },
     flow_generator::error::{Error, Result},
-    log_info_merge, parse_common,
+    log_info_merge,
     utils::bytes::read_u16_be,
 };
 use public::{l7_protocol::L7Protocol, utils::net::parse_ip_slice};
@@ -157,7 +157,6 @@ impl L7ProtocolParserInterface for DnsLog {
         if !param.ebpf_type.is_raw_protocol() {
             return false;
         }
-        parse_common!(self, param);
         self.dns_check_protocol(payload, param)
     }
 
@@ -165,7 +164,6 @@ impl L7ProtocolParserInterface for DnsLog {
         if self.parsed {
             return Ok(vec![L7ProtocolInfo::DnsInfo(self.info.clone())]);
         }
-        parse_common!(self, param);
         self.parse(payload, param.l4_protocol, param.direction, None, None)?;
         Ok(vec![L7ProtocolInfo::DnsInfo(self.info.clone())])
     }
@@ -450,6 +448,7 @@ impl DnsLog {
                     let err_msg = format!("dns payload length error:{}", payload.len());
                     return Err(Error::DNSLogParseFailed(err_msg));
                 }
+                // TODO fix size determine when payload from ebpf
                 let size = read_u16_be(payload);
                 if (size as usize) < payload[DNS_TCP_PAYLOAD_OFFSET..].len() {
                     let err_msg = format!("dns payload length error:{}", size);
@@ -467,13 +466,15 @@ impl DnsLog {
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
     use std::path::Path;
+    use std::rc::Rc;
+    use std::{cell::RefCell, fs};
 
     use super::*;
 
     use crate::{
-        common::{flow::PacketDirection, MetaPacket},
+        common::{flow::PacketDirection, l7_protocol_log::L7PerfCache, MetaPacket},
+        flow_generator::L7_RRT_CACHE_CAPACITY,
         utils::test::Capture,
     };
 
@@ -481,6 +482,7 @@ mod tests {
 
     fn run(name: &str) -> String {
         let capture = Capture::load_pcap(Path::new(FILE_DIR).join(name), None);
+        let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
         let mut packets = capture.as_meta_packets();
         if packets.is_empty() {
             return "".to_string();
@@ -507,7 +509,10 @@ mod tests {
                 None,
                 None,
             );
-            let is_dns = dns.dns_check_protocol(payload, &ParseParam::from(packet as &MetaPacket));
+            let is_dns = dns.dns_check_protocol(
+                payload,
+                &ParseParam::from((packet as &MetaPacket, log_cache.clone(), false)),
+            );
             output.push_str(&format!("{:?} is_dns: {}\r\n", dns.info, is_dns));
         }
         output
