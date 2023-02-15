@@ -24,9 +24,9 @@ import (
 	"github.com/op/go-logging"
 	"gorm.io/gorm"
 
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/pushmanager"
 	"github.com/deepflowys/deepflow/message/trident"
-	"github.com/deepflowys/deepflow/server/controller/trisolaris/config"
-	"github.com/deepflowys/deepflow/server/controller/trisolaris/pushmanager"
 )
 
 var log = logging.MustGetLogger("trisolaris/metadata")

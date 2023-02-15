@@ -24,13 +24,13 @@ import (
 	"github.com/golang/protobuf/proto"
 	context "golang.org/x/net/context"
 
+	. "github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris"
+	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/pushmanager"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/vtap"
 	"github.com/deepflowys/deepflow/message/common"
 	api "github.com/deepflowys/deepflow/message/trident"
-	. "github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/trisolaris"
-	. "github.com/deepflowys/deepflow/server/controller/trisolaris/common"
-	"github.com/deepflowys/deepflow/server/controller/trisolaris/pushmanager"
-	"github.com/deepflowys/deepflow/server/controller/trisolaris/vtap"
 )
 
 var (

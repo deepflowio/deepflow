@@ -21,7 +21,7 @@ import (
 	"encoding/binary"
 	"testing"
 
-	"github.com/deepflowys/deepflow/server/libs/hmap"
+	"github.com/deepflowio/deepflow/server/libs/hmap"
 )
 
 func TestU128IDMapAddOrGet(t *testing.T) {

@@ -24,14 +24,14 @@ import (
 
 	"github.com/op/go-logging"
 
-	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
-	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
-	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowys/deepflow/server/controller/recorder/config"
-	"github.com/deepflowys/deepflow/server/controller/recorder/listener"
-	"github.com/deepflowys/deepflow/server/controller/recorder/updater"
-	"github.com/deepflowys/deepflow/server/libs/queue"
+	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/config"
+	"github.com/deepflowio/deepflow/server/controller/recorder/listener"
+	"github.com/deepflowio/deepflow/server/controller/recorder/updater"
+	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 var log = logging.MustGetLogger("recorder")

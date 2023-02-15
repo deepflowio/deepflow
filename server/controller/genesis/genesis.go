@@ -30,14 +30,14 @@ import (
 	"github.com/op/go-logging"
 	"google.golang.org/grpc"
 
+	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/config"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	gconfig "github.com/deepflowio/deepflow/server/controller/genesis/config"
+	"github.com/deepflowio/deepflow/server/controller/model"
+	"github.com/deepflowio/deepflow/server/controller/statsd"
+	"github.com/deepflowio/deepflow/server/libs/queue"
 	api "github.com/deepflowys/deepflow/message/controller"
-	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/config"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
-	gconfig "github.com/deepflowys/deepflow/server/controller/genesis/config"
-	"github.com/deepflowys/deepflow/server/controller/model"
-	"github.com/deepflowys/deepflow/server/controller/statsd"
-	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
 var log = logging.MustGetLogger("genesis")

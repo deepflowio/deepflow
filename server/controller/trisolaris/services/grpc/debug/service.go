@@ -22,8 +22,8 @@ import (
 	context "golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	grpcserver "github.com/deepflowys/deepflow/server/controller/grpc"
-	"github.com/deepflowys/deepflow/server/controller/trisolaris"
+	grpcserver "github.com/deepflowio/deepflow/server/controller/grpc"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 )
 
 var log = logging.MustGetLogger("trisolaris/debug")

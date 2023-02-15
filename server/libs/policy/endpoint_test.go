@@ -22,8 +22,8 @@ import (
 
 	. "github.com/google/gopacket/layers"
 
-	. "github.com/deepflowys/deepflow/server/libs/datatype"
-	. "github.com/deepflowys/deepflow/server/libs/utils"
+	. "github.com/deepflowio/deepflow/server/libs/datatype"
+	. "github.com/deepflowio/deepflow/server/libs/utils"
 )
 
 // 平台信息有关测试
@@ -97,7 +97,7 @@ func TestGetGroupData(t *testing.T) {
 	t.Log(time.Now().Sub(now))
 }
 
-//测试全局Pass策略匹配direction==3
+// 测试全局Pass策略匹配direction==3
 func TestAllPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(1, 2, 1024, false)
 	generatePlatformData(policy)
@@ -114,7 +114,7 @@ func TestAllPassPolicy(t *testing.T) {
 	}
 }
 
-//测试资源组forward策略匹配 direction==1
+// 测试资源组forward策略匹配 direction==1
 func TestGroupForwardPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(1, 2, 1024, false)
 	generatePlatformData(policy)
@@ -132,7 +132,7 @@ func TestGroupForwardPassPolicy(t *testing.T) {
 	}
 }
 
-//测试资源组backward策略匹配 direction==2
+// 测试资源组backward策略匹配 direction==2
 func TestGroupBackwardPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(1, 2, 1024, false)
 	generatePlatformData(policy)
@@ -150,7 +150,7 @@ func TestGroupBackwardPassPolicy(t *testing.T) {
 	}
 }
 
-//测试Port策略匹配 acl配置port=0，查询SrcPort=30，DstPort=30，查询到ACl
+// 测试Port策略匹配 acl配置port=0，查询SrcPort=30，DstPort=30，查询到ACl
 func TestAllPortPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(1, 2, 1024, false)
 	generatePlatformData(policy)
@@ -168,7 +168,7 @@ func TestAllPortPassPolicy(t *testing.T) {
 	}
 }
 
-//测试Port策略匹配 acl配置port=30，查询Srcport=30，查到acl的direction=2
+// 测试Port策略匹配 acl配置port=30，查询Srcport=30，查到acl的direction=2
 func TestSrcPortPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(1, 2, 1024, false)
 	generatePlatformData(policy)
@@ -188,7 +188,7 @@ func TestSrcPortPassPolicy(t *testing.T) {
 	}
 }
 
-//测试Port策略匹配 acl配置port=30，查询Dstport=30，查到acl的direction=1
+// 测试Port策略匹配 acl配置port=30，查询Dstport=30，查到acl的direction=1
 func TestDstPortPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(1, 2, 1024, false)
 	generatePlatformData(policy)
@@ -208,7 +208,7 @@ func TestDstPortPassPolicy(t *testing.T) {
 	}
 }
 
-//测试Port策略匹配 acl配置port=30，查询SrcPort=30, Dstport=30，查到acl的direction=3
+// 测试Port策略匹配 acl配置port=30，查询SrcPort=30, Dstport=30，查到acl的direction=3
 func TestSrcDstPortPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(1, 2, 1024, false)
 	generatePlatformData(policy)
@@ -228,7 +228,7 @@ func TestSrcDstPortPassPolicy(t *testing.T) {
 	}
 }
 
-//测试两条acl proto为6和17 查询proto=6的acl,proto为6的匹配成功
+// 测试两条acl proto为6和17 查询proto=6的acl,proto为6的匹配成功
 func TestAclsPassPolicy(t *testing.T) {
 	policy := NewPolicyTable(1, 2, 1024, false)
 	generatePlatformData(policy)

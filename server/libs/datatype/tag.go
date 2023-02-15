@@ -17,7 +17,7 @@
 package datatype
 
 import (
-	"github.com/deepflowys/deepflow/server/libs/codec"
+	"github.com/deepflowio/deepflow/server/libs/codec"
 )
 
 type Tag struct {

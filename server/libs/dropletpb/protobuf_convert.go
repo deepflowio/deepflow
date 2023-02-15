@@ -23,9 +23,9 @@ import (
 	"github.com/deepflowys/deepflow/message/trident"
 	logging "github.com/op/go-logging"
 
-	"github.com/deepflowys/deepflow/server/libs/datatype"
-	"github.com/deepflowys/deepflow/server/libs/policy"
-	. "github.com/deepflowys/deepflow/server/libs/utils"
+	"github.com/deepflowio/deepflow/server/libs/datatype"
+	"github.com/deepflowio/deepflow/server/libs/policy"
+	. "github.com/deepflowio/deepflow/server/libs/utils"
 )
 
 var log = logging.MustGetLogger("dropletpb")

@@ -22,18 +22,21 @@ import (
 	"github.com/op/go-logging"
 	"gorm.io/gorm"
 
-	. "github.com/deepflowys/deepflow/server/controller/db/mysql/common"
-	. "github.com/deepflowys/deepflow/server/controller/db/mysql/config"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql/migration"
+	. "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
+	. "github.com/deepflowio/deepflow/server/controller/db/mysql/config"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/migration"
 )
 
 var log = logging.MustGetLogger("db.migrator.mysql")
 
 // if configured database does not exist, it is considered a new dployment, will create database and init tables;
 // if configured database exsits, but db_version table does not exist, it is also considered a new deployment,
-// 		maybe we do not have permission to create database or other reasons, then will init all tables.
+//
+//	maybe we do not have permission to create database or other reasons, then will init all tables.
+//
 // if configured database exsits, and db_version table exists, check wheather db_version is the latest version
-// 		and upgrade based the result.
+//
+//	and upgrade based the result.
 func MigrateMySQL(cfg MySqlConfig) bool {
 	db := GetConnectionWithoudDatabase(cfg)
 	if db == nil {

@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	. "github.com/deepflowys/deepflow/server/libs/datatype"
+	. "github.com/deepflowio/deepflow/server/libs/datatype"
 )
 
 func TestPortSegmentSimple(t *testing.T) {

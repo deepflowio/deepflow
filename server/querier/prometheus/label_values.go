@@ -2,9 +2,9 @@ package prometheus
 
 import (
 	"fmt"
-	"github.com/deepflowys/deepflow/server/querier/common"
-	chCommon "github.com/deepflowys/deepflow/server/querier/engine/clickhouse/common"
-	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/metrics"
+	"github.com/deepflowio/deepflow/server/querier/common"
+	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/metrics"
 	"strings"
 )
 

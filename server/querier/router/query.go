@@ -23,8 +23,8 @@ import (
 
 	//logging "github.com/op/go-logging"
 	//"fmt"
-	"github.com/deepflowys/deepflow/server/querier/common"
-	"github.com/deepflowys/deepflow/server/querier/service"
+	"github.com/deepflowio/deepflow/server/querier/common"
+	"github.com/deepflowio/deepflow/server/querier/service"
 	//"github.com/k0kubun/pp"
 )
 

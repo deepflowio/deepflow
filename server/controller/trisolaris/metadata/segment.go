@@ -20,9 +20,9 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	"github.com/golang/protobuf/proto"
 
+	"github.com/deepflowio/deepflow/server/controller/common"
+	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/message/trident"
-	"github.com/deepflowys/deepflow/server/controller/common"
-	models "github.com/deepflowys/deepflow/server/controller/db/mysql"
 )
 
 type MacID struct {
