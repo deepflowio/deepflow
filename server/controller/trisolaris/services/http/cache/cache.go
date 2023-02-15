@@ -20,10 +20,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/op/go-logging"
 
-	. "github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/trisolaris"
-	"github.com/deepflowys/deepflow/server/controller/trisolaris/server/http"
-	"github.com/deepflowys/deepflow/server/controller/trisolaris/server/http/common"
+	. "github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/server/http"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/server/http/common"
 )
 
 var log = logging.MustGetLogger("trisolaris/cache")

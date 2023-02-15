@@ -17,9 +17,9 @@
 package listener
 
 import (
-	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowys/deepflow/server/controller/recorder/event"
-	"github.com/deepflowys/deepflow/server/libs/queue"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/event"
+	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 type SubDomain struct {

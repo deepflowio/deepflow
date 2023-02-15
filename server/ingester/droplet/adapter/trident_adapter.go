@@ -23,13 +23,13 @@ import (
 
 	logging "github.com/op/go-logging"
 
-	"github.com/deepflowys/deepflow/server/ingester/common"
-	"github.com/deepflowys/deepflow/server/ingester/ingesterctl"
-	"github.com/deepflowys/deepflow/server/libs/debug"
-	"github.com/deepflowys/deepflow/server/libs/pool"
-	"github.com/deepflowys/deepflow/server/libs/queue"
-	"github.com/deepflowys/deepflow/server/libs/receiver"
-	"github.com/deepflowys/deepflow/server/libs/utils"
+	"github.com/deepflowio/deepflow/server/ingester/common"
+	"github.com/deepflowio/deepflow/server/ingester/ingesterctl"
+	"github.com/deepflowio/deepflow/server/libs/debug"
+	"github.com/deepflowio/deepflow/server/libs/pool"
+	"github.com/deepflowio/deepflow/server/libs/queue"
+	"github.com/deepflowio/deepflow/server/libs/receiver"
+	"github.com/deepflowio/deepflow/server/libs/utils"
 )
 
 const (

@@ -23,8 +23,8 @@ import (
 
 	"github.com/cactus/go-statsd-client/v5/statsd"
 
-	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/statsd/config"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/statsd/config"
 )
 
 var MetaStatsd *StatsdMonitor

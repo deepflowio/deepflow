@@ -21,8 +21,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/deepflowys/deepflow/server/controller/common"
-	servicecommon "github.com/deepflowys/deepflow/server/controller/http/service/common"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	servicecommon "github.com/deepflowio/deepflow/server/controller/http/service/common"
 )
 
 type Response struct {

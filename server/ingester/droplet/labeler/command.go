@@ -30,13 +30,13 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/spf13/cobra"
 
-	"github.com/deepflowys/deepflow/server/libs/datatype"
-	"github.com/deepflowys/deepflow/server/libs/debug"
-	"github.com/deepflowys/deepflow/server/libs/policy"
-	. "github.com/deepflowys/deepflow/server/libs/utils"
+	"github.com/deepflowio/deepflow/server/libs/datatype"
+	"github.com/deepflowio/deepflow/server/libs/debug"
+	"github.com/deepflowio/deepflow/server/libs/policy"
+	. "github.com/deepflowio/deepflow/server/libs/utils"
 
-	"github.com/deepflowys/deepflow/server/ingester/ingesterctl"
-	"github.com/deepflowys/deepflow/server/ingester/ingesterctl/rpc"
+	"github.com/deepflowio/deepflow/server/ingester/ingesterctl"
+	"github.com/deepflowio/deepflow/server/ingester/ingesterctl/rpc"
 )
 
 type command struct {

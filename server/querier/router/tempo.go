@@ -7,11 +7,11 @@ import (
 
 	//logging "github.com/op/go-logging"
 	//"fmt"
-	"github.com/deepflowys/deepflow/server/querier/common"
+	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/golang/protobuf/jsonpb"
 	//"github.com/golang/protobuf/proto"
 	//"github.com/grafana/tempo/pkg/tempopb"
-	"github.com/deepflowys/deepflow/server/querier/tempo"
+	"github.com/deepflowio/deepflow/server/querier/tempo"
 	"github.com/golang/protobuf/proto"
 	//"github.com/k0kubun/pp"
 )

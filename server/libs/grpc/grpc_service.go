@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/deepflowys/deepflow/message/trident"
-	"github.com/deepflowys/deepflow/server/libs/utils"
+	"github.com/deepflowio/deepflow/message/trident"
+	"github.com/deepflowio/deepflow/server/libs/utils"
 	"github.com/google/gopacket/layers"
 )
 

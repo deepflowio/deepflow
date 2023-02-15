@@ -1,6 +1,6 @@
 # DeepFlow Helm Charts
 
-DeepFlow helm chart repo: https://github.com/deepflowys/deepflow-charts
+DeepFlow helm chart repo: https://github.com/deepflowio/deepflow-charts
 
 An automated observability platform for cloud-native developers.
 
@@ -14,7 +14,7 @@ Please refer to Helm's [documentation](https://helm.sh/docs/) to get started.
 Once Helm is set up properly, add the repo as follows:
 
 ```console
-helm repo add deepflow https://deepflowys.github.io/deepflow
+helm repo add deepflow https://deepflowio.github.io/deepflow
 helm repo update deepflow
 ```
 

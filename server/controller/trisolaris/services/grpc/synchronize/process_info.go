@@ -19,9 +19,9 @@ package synchronize
 import (
 	context "golang.org/x/net/context"
 
-	api "github.com/deepflowys/deepflow/message/trident"
-	"github.com/deepflowys/deepflow/server/controller/trisolaris"
-	"github.com/deepflowys/deepflow/server/controller/trisolaris/services/grpc/statsd"
+	api "github.com/deepflowio/deepflow/message/trident"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/services/grpc/statsd"
 )
 
 var EmptyGPIDResponse = &api.GPIDSyncResponse{}

@@ -19,9 +19,9 @@ package metadata
 import (
 	"gorm.io/gorm"
 
-	. "github.com/deepflowys/deepflow/server/controller/common"
-	models "github.com/deepflowys/deepflow/server/controller/db/mysql"
-	dbmgr "github.com/deepflowys/deepflow/server/controller/trisolaris/dbmgr"
+	. "github.com/deepflowio/deepflow/server/controller/common"
+	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
+	dbmgr "github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
 )
 
 type DBDataCache struct {

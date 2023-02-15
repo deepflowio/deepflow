@@ -21,11 +21,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/deepflowys/deepflow/server/querier/common"
-	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/metrics"
-	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/packet_batch"
-	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/tag"
-	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/view"
+	"github.com/deepflowio/deepflow/server/querier/common"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/metrics"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/packet_batch"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
 )
 
 func GetTagTranslator(name, alias, db, table string) (Statement, error) {

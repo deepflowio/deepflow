@@ -19,8 +19,8 @@ package huawei
 import (
 	"fmt"
 
-	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
-	"github.com/deepflowys/deepflow/server/controller/cloud/model"
+	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
+	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 )
 
 func (h *HuaWei) getPeerConnections() ([]model.PeerConnection, error) {

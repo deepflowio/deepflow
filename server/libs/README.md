@@ -58,13 +58,13 @@ graph TD;
 ```
 goos: linux
 goarch: amd64
-pkg: github.com/deepflowys/deepflow/server/libs/pool
+pkg: github.com/deepflowio/deepflow/server/libs/pool
 BenchmarkPoolGet-20             50000000                29.8 ns/op             4 B/op          0 allocs/op
 BenchmarkPoolPut-20             30000000                62.1 ns/op             6 B/op          0 allocs/op
 BenchmarkPoolHungryGet-20       50000000                28.6 ns/op             0 B/op          0 allocs/op
 BenchmarkPoolOverPut-20         50000000                24.9 ns/op             0 B/op          0 allocs/op
 PASS
-ok      github.com/deepflowys/deepflow/server/libs/pool  12.126s
+ok      github.com/deepflowio/deepflow/server/libs/pool  12.126s
 ```
 由于设计上pool就是无锁pool，因此不论是否遇到多线程互斥，pool的性能都会是这个数字，
 如果profiler上看到pool的开销过大，那么说明的是对象构造函数开销过大而非pool本身的开销过大。

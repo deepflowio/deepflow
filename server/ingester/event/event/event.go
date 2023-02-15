@@ -20,11 +20,11 @@ import (
 	_ "golang.org/x/net/context"
 	_ "google.golang.org/grpc"
 
-	"github.com/deepflowys/deepflow/server/ingester/event/common"
-	"github.com/deepflowys/deepflow/server/ingester/event/config"
-	"github.com/deepflowys/deepflow/server/ingester/event/dbwriter"
-	"github.com/deepflowys/deepflow/server/ingester/event/decoder"
-	"github.com/deepflowys/deepflow/server/libs/queue"
+	"github.com/deepflowio/deepflow/server/ingester/event/common"
+	"github.com/deepflowio/deepflow/server/ingester/event/config"
+	"github.com/deepflowio/deepflow/server/ingester/event/dbwriter"
+	"github.com/deepflowio/deepflow/server/ingester/event/decoder"
+	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 type Event struct {

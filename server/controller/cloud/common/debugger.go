@@ -23,7 +23,7 @@ import (
 
 	"github.com/bitly/go-simplejson"
 
-	. "github.com/deepflowys/deepflow/server/controller/cloud/config"
+	. "github.com/deepflowio/deepflow/server/controller/cloud/config"
 )
 
 type Debugger struct {

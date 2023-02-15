@@ -19,7 +19,7 @@ package resource
 import (
 	"testing"
 
-	"github.com/deepflowys/deepflow/server/controller/model"
+	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
 func Test_convertTagsToString(t *testing.T) {

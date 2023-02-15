@@ -25,14 +25,14 @@ import (
 	"github.com/satori/go.uuid"
 
 	"github.com/deckarep/golang-set"
-	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
-	"github.com/deepflowys/deepflow/server/controller/cloud/config"
-	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
-	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
-	"github.com/deepflowys/deepflow/server/controller/genesis"
-	"github.com/deepflowys/deepflow/server/controller/model"
-	"github.com/deepflowys/deepflow/server/controller/statsd"
+	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
+	"github.com/deepflowio/deepflow/server/controller/cloud/config"
+	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/genesis"
+	"github.com/deepflowio/deepflow/server/controller/model"
+	"github.com/deepflowio/deepflow/server/controller/statsd"
 )
 
 var log = logging.MustGetLogger("cloud.genesis")

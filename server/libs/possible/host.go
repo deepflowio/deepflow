@@ -20,8 +20,8 @@ import (
 	"net"
 	"sync"
 
-	"github.com/deepflowys/deepflow/server/libs/hmap/lru"
-	"github.com/deepflowys/deepflow/server/libs/utils"
+	"github.com/deepflowio/deepflow/server/libs/hmap/lru"
+	"github.com/deepflowio/deepflow/server/libs/utils"
 )
 
 type PossibleHost struct {

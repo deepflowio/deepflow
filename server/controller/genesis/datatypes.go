@@ -22,11 +22,11 @@ import (
 	"sync"
 	"time"
 
-	messagecommon "github.com/deepflowys/deepflow/message/common"
-	"github.com/deepflowys/deepflow/message/trident"
-	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
-	"github.com/deepflowys/deepflow/server/controller/model"
+	messagecommon "github.com/deepflowio/deepflow/message/common"
+	"github.com/deepflowio/deepflow/message/trident"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
 type VIFRPCMessage struct {

@@ -25,12 +25,12 @@ import (
 	"strings"
 	"time"
 
-	tridentcommon "github.com/deepflowys/deepflow/message/common"
-	"github.com/deepflowys/deepflow/server/controller/common"
-	genesiscommon "github.com/deepflowys/deepflow/server/controller/genesis/common"
-	"github.com/deepflowys/deepflow/server/controller/genesis/config"
-	"github.com/deepflowys/deepflow/server/controller/model"
-	"github.com/deepflowys/deepflow/server/libs/queue"
+	tridentcommon "github.com/deepflowio/deepflow/message/common"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	genesiscommon "github.com/deepflowio/deepflow/server/controller/genesis/common"
+	"github.com/deepflowio/deepflow/server/controller/genesis/config"
+	"github.com/deepflowio/deepflow/server/controller/model"
+	"github.com/deepflowio/deepflow/server/libs/queue"
 	uuid "github.com/satori/go.uuid"
 )
 

@@ -20,9 +20,9 @@ import (
 	"github.com/op/go-logging"
 	"gorm.io/gorm/clause"
 
-	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
-	"github.com/deepflowys/deepflow/server/controller/recorder/constraint"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 )
 
 var log = logging.MustGetLogger("recorder.db")

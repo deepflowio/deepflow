@@ -24,11 +24,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/deepflowys/deepflow/server/libs/ckdb"
-	"github.com/deepflowys/deepflow/server/libs/datatype"
-	"github.com/deepflowys/deepflow/server/libs/pool"
-	"github.com/deepflowys/deepflow/server/libs/utils"
-	"github.com/deepflowys/deepflow/server/libs/zerodoc/pb"
+	"github.com/deepflowio/deepflow/server/libs/ckdb"
+	"github.com/deepflowio/deepflow/server/libs/datatype"
+	"github.com/deepflowio/deepflow/server/libs/pool"
+	"github.com/deepflowio/deepflow/server/libs/utils"
+	"github.com/deepflowio/deepflow/server/libs/zerodoc/pb"
 
 	"github.com/google/gopacket/layers"
 )

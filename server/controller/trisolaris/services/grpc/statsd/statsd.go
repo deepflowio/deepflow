@@ -19,7 +19,7 @@ package statsd
 import (
 	"sync/atomic"
 
-	"github.com/deepflowys/deepflow/server/libs/stats"
+	"github.com/deepflowio/deepflow/server/libs/stats"
 	"github.com/op/go-logging"
 )
 

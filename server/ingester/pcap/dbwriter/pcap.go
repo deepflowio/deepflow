@@ -19,10 +19,10 @@ package dbwriter
 import (
 	"fmt"
 
-	"github.com/deepflowys/deepflow/server/ingester/common"
-	"github.com/deepflowys/deepflow/server/libs/ckdb"
-	"github.com/deepflowys/deepflow/server/libs/pool"
-	"github.com/deepflowys/deepflow/server/libs/utils"
+	"github.com/deepflowio/deepflow/server/ingester/common"
+	"github.com/deepflowio/deepflow/server/libs/ckdb"
+	"github.com/deepflowio/deepflow/server/libs/pool"
+	"github.com/deepflowio/deepflow/server/libs/utils"
 )
 
 const (

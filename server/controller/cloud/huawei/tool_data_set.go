@@ -17,7 +17,7 @@
 package huawei
 
 import (
-	"github.com/deepflowys/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 )
 
 type ToolDataSet struct {

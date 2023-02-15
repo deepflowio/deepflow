@@ -21,11 +21,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowys/deepflow/server/controller/recorder/common"
-	. "github.com/deepflowys/deepflow/server/controller/recorder/config"
-	"github.com/deepflowys/deepflow/server/controller/recorder/constraint"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
+	. "github.com/deepflowio/deepflow/server/controller/recorder/config"
+	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"gorm.io/gorm/clause"
 )
 

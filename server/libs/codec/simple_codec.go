@@ -22,7 +22,7 @@ import (
 	"net"
 	"unsafe"
 
-	"github.com/deepflowys/deepflow/server/libs/pool"
+	"github.com/deepflowio/deepflow/server/libs/pool"
 )
 
 // buffered encoder

@@ -27,9 +27,9 @@ import (
 
 	logging "github.com/op/go-logging"
 
-	"github.com/deepflowys/deepflow/server/libs/queue"
-	"github.com/deepflowys/deepflow/server/libs/receiver"
-	"github.com/deepflowys/deepflow/server/libs/utils"
+	"github.com/deepflowio/deepflow/server/libs/queue"
+	"github.com/deepflowio/deepflow/server/libs/receiver"
+	"github.com/deepflowio/deepflow/server/libs/utils"
 )
 
 var log = logging.MustGetLogger("droplet.syslog")

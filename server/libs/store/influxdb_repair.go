@@ -24,8 +24,8 @@ import (
 
 	"github.com/influxdata/influxdb/client/v2"
 
-	"github.com/deepflowys/deepflow/server/libs/stats"
-	"github.com/deepflowys/deepflow/server/libs/utils"
+	"github.com/deepflowio/deepflow/server/libs/stats"
+	"github.com/deepflowio/deepflow/server/libs/utils"
 )
 
 const (

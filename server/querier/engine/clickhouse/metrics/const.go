@@ -18,7 +18,7 @@ package metrics
 
 import (
 	"encoding/json"
-	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/view"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
 )
 
 // 指标量类型

@@ -24,11 +24,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/deepflowys/deepflow/server/querier/common"
-	"github.com/deepflowys/deepflow/server/querier/config"
-	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/metrics"
-	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/tag"
-	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/view"
+	"github.com/deepflowio/deepflow/server/querier/common"
+	"github.com/deepflowio/deepflow/server/querier/config"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/metrics"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
 )
 
 const (

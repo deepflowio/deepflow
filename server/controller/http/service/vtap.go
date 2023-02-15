@@ -26,13 +26,13 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowys/deepflow/server/controller/http/service/common"
-	"github.com/deepflowys/deepflow/server/controller/model"
-	"github.com/deepflowys/deepflow/server/controller/monitor/license"
-	"github.com/deepflowys/deepflow/server/controller/trisolaris/utils"
-	vtapop "github.com/deepflowys/deepflow/server/controller/trisolaris/vtap"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
+	"github.com/deepflowio/deepflow/server/controller/model"
+	"github.com/deepflowio/deepflow/server/controller/monitor/license"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
+	vtapop "github.com/deepflowio/deepflow/server/controller/trisolaris/vtap"
 )
 
 const (

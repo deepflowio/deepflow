@@ -25,8 +25,8 @@ import (
 	simplejson "github.com/bitly/go-simplejson"
 	"github.com/mikioh/ipaddr"
 
-	"github.com/deepflowys/deepflow/server/controller/cloud/model"
-	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/common"
 )
 
 func (q *QingCloud) GetVMs() ([]model.VM, []model.VMSecurityGroup, []model.Subnet, error) {

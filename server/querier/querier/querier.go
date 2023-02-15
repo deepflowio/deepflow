@@ -27,11 +27,11 @@ import (
 	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"
 
-	"github.com/deepflowys/deepflow/server/libs/logger"
-	"github.com/deepflowys/deepflow/server/querier/common"
-	"github.com/deepflowys/deepflow/server/querier/config"
-	"github.com/deepflowys/deepflow/server/querier/router"
-	"github.com/deepflowys/deepflow/server/querier/statsd"
+	"github.com/deepflowio/deepflow/server/libs/logger"
+	"github.com/deepflowio/deepflow/server/querier/common"
+	"github.com/deepflowio/deepflow/server/querier/config"
+	"github.com/deepflowio/deepflow/server/querier/router"
+	"github.com/deepflowio/deepflow/server/querier/statsd"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 

@@ -21,10 +21,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/deepflowys/deepflow/server/controller/genesis"
-	. "github.com/deepflowys/deepflow/server/controller/http/router/common"
-	"github.com/deepflowys/deepflow/server/controller/http/service"
-	"github.com/deepflowys/deepflow/server/controller/manager"
+	"github.com/deepflowio/deepflow/server/controller/genesis"
+	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
+	"github.com/deepflowio/deepflow/server/controller/http/service"
+	"github.com/deepflowio/deepflow/server/controller/manager"
 )
 
 func DebugRouter(e *gin.Engine, m *manager.Manager, g *genesis.Genesis) {

@@ -17,8 +17,8 @@
 package zerodoc
 
 import (
-	"github.com/deepflowys/deepflow/server/libs/ckdb"
-	"github.com/deepflowys/deepflow/server/libs/zerodoc/pb"
+	"github.com/deepflowio/deepflow/server/libs/ckdb"
+	"github.com/deepflowio/deepflow/server/libs/zerodoc/pb"
 )
 
 type AppMeter struct {

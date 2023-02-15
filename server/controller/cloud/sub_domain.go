@@ -19,9 +19,9 @@ package cloud
 import (
 	"inet.af/netaddr"
 
-	kubernetes_model "github.com/deepflowys/deepflow/server/controller/cloud/kubernetes_gather/model"
-	"github.com/deepflowys/deepflow/server/controller/cloud/model"
-	"github.com/deepflowys/deepflow/server/controller/common"
+	kubernetes_model "github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
+	"github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/common"
 )
 
 // 合并附属容器集群的资源到云平台资源中

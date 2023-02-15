@@ -21,13 +21,13 @@ import (
 	"sync"
 	"time"
 
-	tridentcommon "github.com/deepflowys/deepflow/message/common"
-	"github.com/deepflowys/deepflow/message/controller"
-	"github.com/deepflowys/deepflow/message/trident"
-	controllercommon "github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/genesis/common"
-	"github.com/deepflowys/deepflow/server/controller/genesis/config"
-	"github.com/deepflowys/deepflow/server/libs/queue"
+	tridentcommon "github.com/deepflowio/deepflow/message/common"
+	"github.com/deepflowio/deepflow/message/controller"
+	"github.com/deepflowio/deepflow/message/trident"
+	controllercommon "github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/genesis/common"
+	"github.com/deepflowio/deepflow/server/controller/genesis/config"
+	"github.com/deepflowio/deepflow/server/libs/queue"
 	"google.golang.org/grpc/peer"
 )
 

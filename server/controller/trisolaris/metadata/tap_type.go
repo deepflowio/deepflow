@@ -21,7 +21,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	"github.com/deepflowys/deepflow/message/trident"
+	"github.com/deepflowio/deepflow/message/trident"
 )
 
 type TapType struct {

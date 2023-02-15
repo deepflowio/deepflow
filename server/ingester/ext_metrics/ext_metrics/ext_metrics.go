@@ -23,17 +23,17 @@ import (
 	_ "golang.org/x/net/context"
 	_ "google.golang.org/grpc"
 
-	dropletqueue "github.com/deepflowys/deepflow/server/ingester/droplet/queue"
-	"github.com/deepflowys/deepflow/server/ingester/ext_metrics/config"
-	"github.com/deepflowys/deepflow/server/ingester/ext_metrics/dbwriter"
-	"github.com/deepflowys/deepflow/server/ingester/ext_metrics/decoder"
-	"github.com/deepflowys/deepflow/server/ingester/ingesterctl"
-	"github.com/deepflowys/deepflow/server/libs/datatype"
-	"github.com/deepflowys/deepflow/server/libs/debug"
-	"github.com/deepflowys/deepflow/server/libs/grpc"
-	"github.com/deepflowys/deepflow/server/libs/queue"
-	libqueue "github.com/deepflowys/deepflow/server/libs/queue"
-	"github.com/deepflowys/deepflow/server/libs/receiver"
+	dropletqueue "github.com/deepflowio/deepflow/server/ingester/droplet/queue"
+	"github.com/deepflowio/deepflow/server/ingester/ext_metrics/config"
+	"github.com/deepflowio/deepflow/server/ingester/ext_metrics/dbwriter"
+	"github.com/deepflowio/deepflow/server/ingester/ext_metrics/decoder"
+	"github.com/deepflowio/deepflow/server/ingester/ingesterctl"
+	"github.com/deepflowio/deepflow/server/libs/datatype"
+	"github.com/deepflowio/deepflow/server/libs/debug"
+	"github.com/deepflowio/deepflow/server/libs/grpc"
+	"github.com/deepflowio/deepflow/server/libs/queue"
+	libqueue "github.com/deepflowio/deepflow/server/libs/queue"
+	"github.com/deepflowio/deepflow/server/libs/receiver"
 )
 
 const (

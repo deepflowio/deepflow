@@ -22,8 +22,8 @@ import (
 
 	"github.com/deckarep/golang-set"
 
-	"github.com/deepflowys/deepflow/server/controller/cloud/model"
-	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/common"
 )
 
 func (q *QingCloud) getRegionAndAZs() ([]model.Region, []model.AZ, error) {

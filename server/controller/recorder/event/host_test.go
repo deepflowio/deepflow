@@ -19,9 +19,9 @@ package event
 import (
 	"testing"
 
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
-	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowys/deepflow/server/libs/eventapi"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/stretchr/testify/assert"
 )
 

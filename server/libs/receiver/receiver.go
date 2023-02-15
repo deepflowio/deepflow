@@ -31,14 +31,14 @@ import (
 
 	logging "github.com/op/go-logging"
 
-	"github.com/deepflowys/deepflow/server/libs/app"
-	"github.com/deepflowys/deepflow/server/libs/cache"
-	"github.com/deepflowys/deepflow/server/libs/datatype"
-	"github.com/deepflowys/deepflow/server/libs/debug"
-	"github.com/deepflowys/deepflow/server/libs/pool"
-	"github.com/deepflowys/deepflow/server/libs/queue"
-	"github.com/deepflowys/deepflow/server/libs/stats"
-	. "github.com/deepflowys/deepflow/server/libs/utils"
+	"github.com/deepflowio/deepflow/server/libs/app"
+	"github.com/deepflowio/deepflow/server/libs/cache"
+	"github.com/deepflowio/deepflow/server/libs/datatype"
+	"github.com/deepflowio/deepflow/server/libs/debug"
+	"github.com/deepflowio/deepflow/server/libs/pool"
+	"github.com/deepflowio/deepflow/server/libs/queue"
+	"github.com/deepflowio/deepflow/server/libs/stats"
+	. "github.com/deepflowio/deepflow/server/libs/utils"
 )
 
 const (

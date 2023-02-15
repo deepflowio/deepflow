@@ -31,8 +31,8 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
 
-	. "github.com/deepflowys/deepflow/server/controller/db/mysql/config"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql/migration"
+	. "github.com/deepflowio/deepflow/server/controller/db/mysql/config"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/migration"
 )
 
 var log = logging.MustGetLogger("db.mysql.common")

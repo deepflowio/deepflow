@@ -19,8 +19,8 @@ package flow_tag
 import (
 	"fmt"
 
-	"github.com/deepflowys/deepflow/server/libs/ckdb"
-	"github.com/deepflowys/deepflow/server/libs/pool"
+	"github.com/deepflowio/deepflow/server/libs/ckdb"
+	"github.com/deepflowio/deepflow/server/libs/pool"
 )
 
 const (

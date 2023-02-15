@@ -20,11 +20,11 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
-	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
-	. "github.com/deepflowys/deepflow/server/controller/recorder/common"
-	"github.com/deepflowys/deepflow/server/libs/eventapi"
-	"github.com/deepflowys/deepflow/server/libs/queue"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
+	"github.com/deepflowio/deepflow/server/libs/eventapi"
+	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 type EventManagerBase struct {

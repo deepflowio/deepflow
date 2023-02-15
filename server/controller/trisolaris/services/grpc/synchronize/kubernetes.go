@@ -17,11 +17,11 @@
 package synchronize
 
 import (
-	api "github.com/deepflowys/deepflow/message/trident"
+	api "github.com/deepflowio/deepflow/message/trident"
 	context "golang.org/x/net/context"
 
-	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/trisolaris"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 )
 
 type KubernetesClusterIDEvent struct {

@@ -20,8 +20,8 @@ import (
 	"math"
 	"net"
 
-	. "github.com/deepflowys/deepflow/server/libs/datatype"
-	"github.com/deepflowys/deepflow/server/libs/utils"
+	. "github.com/deepflowio/deepflow/server/libs/datatype"
+	"github.com/deepflowio/deepflow/server/libs/utils"
 )
 
 const (

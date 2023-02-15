@@ -20,12 +20,12 @@ import (
 	"github.com/op/go-logging"
 	"gorm.io/gorm"
 
-	"github.com/deepflowys/deepflow/server/controller/trisolaris/config"
-	"github.com/deepflowys/deepflow/server/controller/trisolaris/kubernetes"
-	"github.com/deepflowys/deepflow/server/controller/trisolaris/metadata"
-	"github.com/deepflowys/deepflow/server/controller/trisolaris/node"
-	"github.com/deepflowys/deepflow/server/controller/trisolaris/refresh"
-	"github.com/deepflowys/deepflow/server/controller/trisolaris/vtap"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/kubernetes"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/metadata"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/node"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/vtap"
 )
 
 var log = logging.MustGetLogger("trisolaris")

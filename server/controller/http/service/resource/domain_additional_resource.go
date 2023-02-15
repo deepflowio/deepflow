@@ -25,11 +25,11 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"gorm.io/gorm"
 
-	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
-	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowys/deepflow/server/controller/http/service/common"
-	"github.com/deepflowys/deepflow/server/controller/model"
+	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
+	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
 const (

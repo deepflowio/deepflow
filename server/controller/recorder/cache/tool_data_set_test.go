@@ -21,8 +21,8 @@ import (
 	"time"
 
 	"github.com/bxcodec/faker/v3"
-	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )

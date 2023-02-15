@@ -22,10 +22,10 @@ import (
 
 	"gorm.io/gorm"
 
-	models "github.com/deepflowys/deepflow/server/controller/db/mysql"
-	"github.com/deepflowys/deepflow/server/controller/trisolaris/dbmgr"
-	. "github.com/deepflowys/deepflow/server/controller/trisolaris/utils"
-	"github.com/deepflowys/deepflow/server/controller/trisolaris/utils/atomicbool"
+	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
+	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils/atomicbool"
 )
 
 type CacheKC struct {

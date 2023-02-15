@@ -16,7 +16,7 @@
 
 package ingesterctl
 
-import "github.com/deepflowys/deepflow/server/libs/debug"
+import "github.com/deepflowio/deepflow/server/libs/debug"
 
 const (
 	DEBUG_LISTEN_IP   = "0.0.0.0"

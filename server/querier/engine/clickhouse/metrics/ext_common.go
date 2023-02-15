@@ -20,8 +20,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/deepflowys/deepflow/server/querier/config"
-	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/client"
+	"github.com/deepflowio/deepflow/server/querier/config"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
 )
 
 var EXT_METRICS = map[string]*Metrics{}

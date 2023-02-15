@@ -21,10 +21,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/deepflowys/deepflow/server/ingester/flow_log/geo"
-	"github.com/deepflowys/deepflow/server/libs/datatype"
-	"github.com/deepflowys/deepflow/server/libs/datatype/pb"
-	"github.com/deepflowys/deepflow/server/libs/grpc"
+	"github.com/deepflowio/deepflow/server/ingester/flow_log/geo"
+	"github.com/deepflowio/deepflow/server/libs/datatype"
+	"github.com/deepflowio/deepflow/server/libs/datatype/pb"
+	"github.com/deepflowio/deepflow/server/libs/grpc"
 )
 
 func TestJsonify(t *testing.T) {

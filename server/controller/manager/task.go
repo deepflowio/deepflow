@@ -20,11 +20,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/deepflowys/deepflow/server/controller/cloud"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
-	"github.com/deepflowys/deepflow/server/controller/manager/config"
-	"github.com/deepflowys/deepflow/server/controller/recorder"
-	"github.com/deepflowys/deepflow/server/libs/queue"
+	"github.com/deepflowio/deepflow/server/controller/cloud"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/manager/config"
+	"github.com/deepflowio/deepflow/server/controller/recorder"
+	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 type Task struct {

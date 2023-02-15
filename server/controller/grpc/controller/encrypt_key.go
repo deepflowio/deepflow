@@ -17,10 +17,10 @@
 package controller
 
 import (
-	api "github.com/deepflowys/deepflow/message/controller"
+	api "github.com/deepflowio/deepflow/message/controller"
 	context "golang.org/x/net/context"
 
-	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/common"
 )
 
 type EncryptKeyEvent struct{}

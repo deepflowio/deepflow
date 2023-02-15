@@ -23,8 +23,8 @@ import (
 	"github.com/baidubce/bce-sdk-go/services/bcc"
 	bcc_api "github.com/baidubce/bce-sdk-go/services/bcc/api"
 
-	"github.com/deepflowys/deepflow/server/controller/cloud/model"
-	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/common"
 )
 
 func (b *BaiduBce) getSecurityGroups(region model.Region, vpcIdToLcuuid map[string]string) (

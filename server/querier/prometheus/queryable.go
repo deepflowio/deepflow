@@ -2,7 +2,7 @@ package prometheus
 
 import (
 	"context"
-	"github.com/deepflowys/deepflow/server/querier/common"
+	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/prompb"
 	//"github.com/prometheus/prometheus/promql/parser"

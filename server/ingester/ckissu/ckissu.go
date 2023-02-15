@@ -25,11 +25,11 @@ import (
 
 	"database/sql"
 
-	"github.com/deepflowys/deepflow/server/ingester/common"
-	"github.com/deepflowys/deepflow/server/ingester/config"
-	"github.com/deepflowys/deepflow/server/ingester/datasource"
-	"github.com/deepflowys/deepflow/server/libs/ckdb"
-	"github.com/deepflowys/deepflow/server/libs/zerodoc"
+	"github.com/deepflowio/deepflow/server/ingester/common"
+	"github.com/deepflowio/deepflow/server/ingester/config"
+	"github.com/deepflowio/deepflow/server/ingester/datasource"
+	"github.com/deepflowio/deepflow/server/libs/ckdb"
+	"github.com/deepflowio/deepflow/server/libs/zerodoc"
 )
 
 var log = logging.MustGetLogger("issu")

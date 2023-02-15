@@ -17,7 +17,7 @@
 package main
 
 import (
-	"github.com/deepflowys/deepflow/server/controller/controller"
+	"github.com/deepflowio/deepflow/server/controller/controller"
 )
 
 func main() {

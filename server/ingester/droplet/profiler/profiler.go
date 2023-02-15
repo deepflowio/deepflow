@@ -28,8 +28,8 @@ import (
 	logging "github.com/op/go-logging"
 	"github.com/spf13/cobra"
 
-	"github.com/deepflowys/deepflow/server/ingester/ingesterctl"
-	"github.com/deepflowys/deepflow/server/libs/debug"
+	"github.com/deepflowio/deepflow/server/ingester/ingesterctl"
+	"github.com/deepflowio/deepflow/server/libs/debug"
 )
 
 type ProfilerServer struct {

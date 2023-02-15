@@ -21,9 +21,9 @@ import (
 	"time"
 
 	"github.com/bitly/go-simplejson"
-	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
-	"github.com/deepflowys/deepflow/server/controller/cloud/model"
-	"github.com/deepflowys/deepflow/server/controller/common"
+	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
+	"github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/common"
 )
 
 var STATE_CONVERTION = map[string]int{

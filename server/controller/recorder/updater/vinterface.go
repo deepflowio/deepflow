@@ -19,11 +19,11 @@ package updater
 import (
 	"strings"
 
-	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
-	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
-	"github.com/deepflowys/deepflow/server/controller/recorder/common"
-	"github.com/deepflowys/deepflow/server/controller/recorder/db"
+	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/recorder/common"
+	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 )
 
 type VInterface struct {

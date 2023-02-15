@@ -24,8 +24,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/deepflowys/deepflow/server/ingester/config"
-	"github.com/deepflowys/deepflow/server/libs/ckdb"
+	"github.com/deepflowio/deepflow/server/ingester/config"
+	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/gorilla/mux"
 	logging "github.com/op/go-logging"
 )

@@ -19,12 +19,12 @@ package event
 import (
 	"fmt"
 
-	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
-	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
-	. "github.com/deepflowys/deepflow/server/controller/recorder/common"
-	"github.com/deepflowys/deepflow/server/controller/recorder/constraint"
-	"github.com/deepflowys/deepflow/server/libs/eventapi"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
+	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
+	"github.com/deepflowio/deepflow/server/libs/eventapi"
 )
 
 var (

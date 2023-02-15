@@ -20,10 +20,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/deepflowys/deepflow/server/controller/cloud/kubernetes_gather"
-	kubernetes_gather_model "github.com/deepflowys/deepflow/server/controller/cloud/kubernetes_gather/model"
-	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather"
+	kubernetes_gather_model "github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
 type KubernetesGatherTask struct {

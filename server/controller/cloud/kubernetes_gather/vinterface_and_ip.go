@@ -24,10 +24,10 @@ import (
 	"strings"
 
 	mapset "github.com/deckarep/golang-set"
-	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
-	"github.com/deepflowys/deepflow/server/controller/cloud/model"
-	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/genesis"
+	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
+	"github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/genesis"
 	"github.com/mikioh/ipaddr"
 	uuid "github.com/satori/go.uuid"
 )

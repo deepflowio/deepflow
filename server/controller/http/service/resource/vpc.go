@@ -16,7 +16,7 @@
 
 package resource
 
-import "github.com/deepflowys/deepflow/server/controller/db/mysql"
+import "github.com/deepflowio/deepflow/server/controller/db/mysql"
 
 func GetVPCs(filter map[string]interface{}) ([]*mysql.VPC, error) {
 	db := mysql.Db

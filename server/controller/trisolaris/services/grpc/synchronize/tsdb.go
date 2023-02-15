@@ -24,10 +24,10 @@ import (
 	"github.com/op/go-logging"
 	context "golang.org/x/net/context"
 
-	api "github.com/deepflowys/deepflow/message/trident"
-	"github.com/deepflowys/deepflow/server/controller/trisolaris"
-	. "github.com/deepflowys/deepflow/server/controller/trisolaris/common"
-	"github.com/deepflowys/deepflow/server/controller/trisolaris/pushmanager"
+	api "github.com/deepflowio/deepflow/message/trident"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris"
+	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/pushmanager"
 )
 
 var log = logging.MustGetLogger("trisolaris/synchronize")
