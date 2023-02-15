@@ -70,6 +70,7 @@ DeepFlow Community 版本主要由 Agent 和 Server 两个进程组成。每个 
 # 联系我们
 
 - Discord：点击 [此链接](https://discord.gg/QJ7Dyj4wWM) 加入 Discord 频道.
+- Twitter：[DeepFlow](https://twitter.com/deepflowio)
 - 微信群：
 <img src=./docs/wechat-group-keeper.png width=30% />
 

@@ -70,6 +70,7 @@ Here is our [future feature plan](https://deepflow.yunshan.net/docs/about/milest
 # Contact Us
 
 - Discord：Click [here](https://discord.gg/QJ7Dyj4wWM) to join our discussion.
+- Twitter：[DeepFlow](https://twitter.com/deepflowio)
 - WeChat Group：
 <img src=./docs/wechat-group-keeper.png width=30% />
 
