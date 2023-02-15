@@ -41,5 +41,5 @@ func main() {
 		logger.EnableStdoutLog()
 	}
 
-	querier.Start(*configPath)
+	querier.Start(*configPath, "")
 }

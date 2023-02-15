@@ -229,18 +229,31 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 		return nil, nil, nil
 	}
 	newSql := strings.ReplaceAll(sql, " SLIMIT ", " slimit ")
+	newSql = strings.ReplaceAll(newSql, " LIMIT ", " limit ")
 	newSql = strings.ReplaceAll(newSql, " WHERE ", " where ")
 	newSql = strings.ReplaceAll(newSql, " GROUP BY ", " group by ")
-	newSql = strings.ReplaceAll(newSql, " slimit ", " limit ")
 	newSqlSlice := []string{}
 	if !strings.Contains(newSql, " where ") {
 		if strings.Contains(newSql, " group by ") {
 			groupSlice := strings.Split(newSql, " group by ")
 			newSqlSlice = append(newSqlSlice, groupSlice[0])
 			newSqlSlice = append(newSqlSlice, " where 1=1 group by ")
-			newSqlSlice = append(newSqlSlice, groupSlice[1])
+			newSqlSlimitSlice := strings.Split(groupSlice[1], " slimit ")
+			newSqlSlice = append(newSqlSlice, groupSlice[0])
+			if strings.Contains(newSqlSlimitSlice[1], " limit ") {
+				newSqlLimitSlice := strings.Split(newSqlSlimitSlice[1], " limit ")
+				newSqlSlice = append(newSqlSlice, fmt.Sprintf(" limit %s", newSqlLimitSlice[1]))
+			}
 			newSql = strings.Join(newSqlSlice, "")
 		}
+	} else {
+		newSqlSlimitSlice := strings.Split(newSql, " slimit ")
+		newSqlSlice = append(newSqlSlice, newSqlSlimitSlice[0])
+		if strings.Contains(newSqlSlimitSlice[1], " limit ") {
+			newSqlLimitSlice := strings.Split(newSqlSlimitSlice[1], " limit ")
+			newSqlSlice = append(newSqlSlice, fmt.Sprintf(" limit %s", newSqlLimitSlice[1]))
+		}
+		newSql = strings.Join(newSqlSlice, "")
 	}
 	stmt, err := sqlparser.Parse(newSql)
 	if err != nil {
@@ -312,7 +325,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 		for _, group := range pStmt.GroupBy {
 			colName, ok := group.(*sqlparser.ColName)
 			if ok {
-				if sqlparser.String(colName) == "toi" || sqlparser.String(colName) == "time" {
+				if sqlparser.String(colName) == "toi" || strings.Contains(sqlparser.String(colName), "time") {
 					continue
 				} else if strings.Contains(sqlparser.String(colName), "node_type") || strings.Contains(sqlparser.String(colName), "icon_id") {
 					continue
@@ -336,7 +349,12 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 	lowerSql := strings.ReplaceAll(sql, " WHERE ", " where ")
 	lowerSql = strings.ReplaceAll(lowerSql, " GROUP BY ", " group by ")
 	lowerSql = strings.ReplaceAll(lowerSql, " SLIMIT ", " slimit ")
+	lowerSql = strings.ReplaceAll(lowerSql, " LIMIT ", " limit ")
 	lowerSql = strings.ReplaceAll(lowerSql, " FROM ", " from ")
+	if strings.Contains(lowerSql, " limit ") {
+		lowerSqlLimitSlice := strings.Split(lowerSql, " limit ")
+		lowerSql = lowerSqlLimitSlice[0]
+	}
 	if strings.Contains(lowerSql, " where ") {
 		sqlSlice := strings.Split(lowerSql, " where ")
 		if strings.Contains(lowerSql, " group by ") {
@@ -391,9 +409,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 		oldWhereSlice := strings.Split(outerTransSql, " PREWHERE ")
 		outerSlice = append(outerSlice, oldWhereSlice[0])
 		outerSlice = append(outerSlice, " PREWHERE ("+outerWhereLeftSql+") IN ("+innerTransSql+") AND ")
-		slimitSlice := strings.Split(oldWhereSlice[1], " LIMIT ")
-		outerSlice = append(outerSlice, slimitSlice[0])
-		outerSlice = append(outerSlice, " LIMIT 10000")
+		outerSlice = append(outerSlice, oldWhereSlice[1])
 	}
 	outerSql := strings.Join(outerSlice, "")
 
@@ -402,7 +418,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 		IP:        config.Cfg.Clickhouse.Host,
 		QueryUUID: query_uuid,
 	}
-	outerSql = strings.Replace(outerSql, " IN ", " GLOBAL IN ", 1)
+	outerSql = strings.Replace(outerSql, ") IN (", ") GLOBAL IN (", 1)
 	callbacks := outerEngine.View.GetCallbacks()
 	debug.Sql = outerSql
 	chClient := client.Client{
