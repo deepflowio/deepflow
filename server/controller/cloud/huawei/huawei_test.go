@@ -21,8 +21,8 @@ import (
 
 	. "github.com/smartystreets/goconvey/convey"
 
-	"github.com/deepflowys/deepflow/server/controller/cloud/config"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/cloud/config"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
 func TestHuaWei(t *testing.T) {

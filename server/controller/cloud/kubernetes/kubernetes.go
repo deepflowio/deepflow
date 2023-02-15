@@ -22,9 +22,9 @@ import (
 	simplejson "github.com/bitly/go-simplejson"
 	logging "github.com/op/go-logging"
 
-	k8sGather "github.com/deepflowys/deepflow/server/controller/cloud/kubernetes_gather"
-	"github.com/deepflowys/deepflow/server/controller/cloud/model"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	k8sGather "github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather"
+	"github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
 var log = logging.MustGetLogger("cloud.kubernetes")

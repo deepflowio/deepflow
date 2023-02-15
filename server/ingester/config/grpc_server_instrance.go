@@ -24,8 +24,8 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"golang.org/x/net/context"
 
+	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowys/deepflow/message/trident"
-	"github.com/deepflowys/deepflow/server/libs/grpc"
 )
 
 func (p *ServerInstanceInfo) Close() {

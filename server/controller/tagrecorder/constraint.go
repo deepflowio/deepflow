@@ -18,7 +18,7 @@
 package tagrecorder
 
 import (
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
 // 资源的MySQL orm对象

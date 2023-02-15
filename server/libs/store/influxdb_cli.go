@@ -25,7 +25,7 @@ import (
 
 	"github.com/influxdata/influxdb/client/v2"
 
-	"github.com/deepflowys/deepflow/server/libs/zerodoc"
+	"github.com/deepflowio/deepflow/server/libs/zerodoc"
 )
 
 const (
@@ -267,12 +267,14 @@ func GetCQParams(cqInfos []CQInfo, db, rp string) *CQHandler {
 	}
 }
 
-/* 提供给droplet-ctl调用, 实现更新CQ:
-   1, 查询vtap_flow, vtap_packet, vtap_wan数据库的RP和CQ信息，提取CQ的参数
-     - 包括原RP，目的RP，聚合时长，可累加聚合信息（以packet_rx为准），不可累加聚合(以rtt的处理为准)
-   2，对所有的数据库根据获取的CQ参数和当前的field信息再次下发CQ，
-     - 若有新增field，则会对新增的field增加CQ命令
-     - 若无新增field，则对已有的CQ重复下发，若和原来的CQ参数不一致，则报错。
+/*
+提供给droplet-ctl调用, 实现更新CQ:
+
+	1, 查询vtap_flow, vtap_packet, vtap_wan数据库的RP和CQ信息，提取CQ的参数
+	  - 包括原RP，目的RP，聚合时长，可累加聚合信息（以packet_rx为准），不可累加聚合(以rtt的处理为准)
+	2，对所有的数据库根据获取的CQ参数和当前的field信息再次下发CQ，
+	  - 若有新增field，则会对新增的field增加CQ命令
+	  - 若无新增field，则对已有的CQ重复下发，若和原来的CQ参数不一致，则报错。
 */
 func UpdateCQs(httpAddr, user, password string) error {
 	httpClient, err := initHttpClient(httpAddr, user, password)

@@ -19,9 +19,9 @@ package vtap
 import (
 	"github.com/deepflowys/deepflow/message/trident"
 
-	. "github.com/deepflowys/deepflow/server/controller/common"
-	. "github.com/deepflowys/deepflow/server/controller/trisolaris/common"
-	. "github.com/deepflowys/deepflow/server/controller/trisolaris/utils"
+	. "github.com/deepflowio/deepflow/server/controller/common"
+	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
+	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
 
 /*

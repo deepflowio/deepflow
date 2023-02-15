@@ -18,8 +18,8 @@ package aliyun
 
 import (
 	ecs "github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
-	"github.com/deepflowys/deepflow/server/controller/cloud/model"
-	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/common"
 	"strconv"
 	"strings"
 )

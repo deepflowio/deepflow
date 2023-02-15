@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/election"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/election"
 )
 
 func GetLeaderInfo() (resp map[string]string, err error) {

@@ -3,7 +3,7 @@ package prometheus
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/deepflowys/deepflow/server/querier/common"
+	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/prometheus/prometheus/prompb"
 	"strings"
 )

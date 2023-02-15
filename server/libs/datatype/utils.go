@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/deepflowys/deepflow/server/libs/utils"
+	"github.com/deepflowio/deepflow/server/libs/utils"
 )
 
 var (

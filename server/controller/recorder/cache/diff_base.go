@@ -19,9 +19,9 @@ package cache
 import (
 	"time"
 
-	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowys/deepflow/server/controller/recorder/common"
+	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 // 所有资源的主要信息，用于与cloud数据比较差异，根据差异更新资源

@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"strings"
 
-	basecommon "github.com/deepflowys/deepflow/server/ingester/common"
-	"github.com/deepflowys/deepflow/server/ingester/pkg/ckwriter"
-	"github.com/deepflowys/deepflow/server/ingester/stream/common"
-	"github.com/deepflowys/deepflow/server/libs/ckdb"
-	"github.com/deepflowys/deepflow/server/libs/zerodoc"
+	basecommon "github.com/deepflowio/deepflow/server/ingester/common"
+	"github.com/deepflowio/deepflow/server/ingester/pkg/ckwriter"
+	"github.com/deepflowio/deepflow/server/ingester/stream/common"
+	"github.com/deepflowio/deepflow/server/libs/ckdb"
+	"github.com/deepflowio/deepflow/server/libs/zerodoc"
 
 	clickhouse "github.com/ClickHouse/clickhouse-go/v2"
 )

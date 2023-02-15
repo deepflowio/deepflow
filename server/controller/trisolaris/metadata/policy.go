@@ -26,12 +26,12 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set"
+	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/message/trident"
-	models "github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/golang/protobuf/proto"
 
-	. "github.com/deepflowys/deepflow/server/controller/common"
-	. "github.com/deepflowys/deepflow/server/controller/trisolaris/common"
+	. "github.com/deepflowio/deepflow/server/controller/common"
+	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 )
 
 type PolicyRawData struct {

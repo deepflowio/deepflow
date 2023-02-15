@@ -24,20 +24,20 @@ import (
 
 	logging "github.com/op/go-logging"
 
-	"github.com/deepflowys/deepflow/server/libs/datatype"
-	libpcap "github.com/deepflowys/deepflow/server/libs/pcap"
-	libqueue "github.com/deepflowys/deepflow/server/libs/queue"
-	"github.com/deepflowys/deepflow/server/libs/receiver"
+	"github.com/deepflowio/deepflow/server/libs/datatype"
+	libpcap "github.com/deepflowio/deepflow/server/libs/pcap"
+	libqueue "github.com/deepflowio/deepflow/server/libs/queue"
+	"github.com/deepflowio/deepflow/server/libs/receiver"
 
+	"github.com/deepflowio/deepflow/server/ingester/droplet/adapter"
+	"github.com/deepflowio/deepflow/server/ingester/droplet/config"
+	"github.com/deepflowio/deepflow/server/ingester/droplet/labeler"
+	"github.com/deepflowio/deepflow/server/ingester/droplet/pcap"
+	"github.com/deepflowio/deepflow/server/ingester/droplet/queue"
+	"github.com/deepflowio/deepflow/server/ingester/droplet/statsd"
+	"github.com/deepflowio/deepflow/server/ingester/droplet/syslog"
+	"github.com/deepflowio/deepflow/server/ingester/ingesterctl"
 	"github.com/deepflowys/deepflow/message/trident"
-	"github.com/deepflowys/deepflow/server/ingester/droplet/adapter"
-	"github.com/deepflowys/deepflow/server/ingester/droplet/config"
-	"github.com/deepflowys/deepflow/server/ingester/droplet/labeler"
-	"github.com/deepflowys/deepflow/server/ingester/droplet/pcap"
-	"github.com/deepflowys/deepflow/server/ingester/droplet/queue"
-	"github.com/deepflowys/deepflow/server/ingester/droplet/statsd"
-	"github.com/deepflowys/deepflow/server/ingester/droplet/syslog"
-	"github.com/deepflowys/deepflow/server/ingester/ingesterctl"
 )
 
 var log = logging.MustGetLogger("droplet")

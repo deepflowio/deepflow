@@ -26,12 +26,12 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	logging "github.com/op/go-logging"
 
-	"github.com/deepflowys/deepflow/server/controller/cloud/config"
-	"github.com/deepflowys/deepflow/server/controller/cloud/model"
-	"github.com/deepflowys/deepflow/server/controller/cloud/platform"
-	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
-	"github.com/deepflowys/deepflow/server/controller/statsd"
+	"github.com/deepflowio/deepflow/server/controller/cloud/config"
+	"github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/cloud/platform"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/statsd"
 )
 
 var log = logging.MustGetLogger("cloud")

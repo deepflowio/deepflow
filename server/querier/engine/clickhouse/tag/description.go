@@ -26,10 +26,10 @@ import (
 
 	logging "github.com/op/go-logging"
 
-	"github.com/deepflowys/deepflow/server/querier/common"
-	"github.com/deepflowys/deepflow/server/querier/config"
-	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/client"
-	ckcommon "github.com/deepflowys/deepflow/server/querier/engine/clickhouse/common"
+	"github.com/deepflowio/deepflow/server/querier/common"
+	"github.com/deepflowio/deepflow/server/querier/config"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
+	ckcommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 )
 
 var log = logging.MustGetLogger("clickhouse.tag")

@@ -24,11 +24,11 @@ import (
 	"strings"
 
 	"github.com/Knetic/govaluate"
-	"github.com/deepflowys/deepflow/server/libs/utils"
-	"github.com/deepflowys/deepflow/server/querier/config"
-	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/common"
-	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/tag"
-	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/view"
+	"github.com/deepflowio/deepflow/server/libs/utils"
+	"github.com/deepflowio/deepflow/server/querier/config"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
 	"github.com/xwb1989/sqlparser"
 	"inet.af/netaddr"
 )
