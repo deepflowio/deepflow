@@ -345,6 +345,7 @@ pub struct YamlConfig {
     pub tap_mac_script: String,
     pub cloud_gateway_traffic: bool,
     pub kubernetes_namespace: String,
+    pub kubernetes_api_list_limit: u32,
     pub external_metrics_sender_queue_size: usize,
     pub l7_protocol_inference_max_fail_count: usize,
     pub l7_protocol_inference_ttl: usize,
@@ -520,6 +521,10 @@ impl YamlConfig {
             c.guard_interval = Duration::from_secs(60);
         }
 
+        if c.kubernetes_api_list_limit < 10 {
+            c.kubernetes_api_list_limit = 10;
+        }
+
         if let Err(e) = c.validate() {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string()));
         }
@@ -598,6 +603,7 @@ impl Default for YamlConfig {
             tap_mac_script: "".into(),
             cloud_gateway_traffic: false,
             kubernetes_namespace: "".into(),
+            kubernetes_api_list_limit: 1000,
             external_metrics_sender_queue_size: 1 << 12,
             l7_protocol_inference_max_fail_count: L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT,
             l7_protocol_inference_ttl: L7_PROTOCOL_INFERENCE_TTL,

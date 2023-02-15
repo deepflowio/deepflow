@@ -864,6 +864,13 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"notEmpty(acl_gids) %s %s",
 			"",
 		)}
+	tagResourceMap["acl_gid"] = map[string]*Tag{
+		"default": NewTag(
+			"",
+			"",
+			"has(acl_gids, %s)",
+			"",
+		)}
 
 	tagResourceMap["pcap_batch"] = map[string]*Tag{
 		"default": NewTag(
