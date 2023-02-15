@@ -304,12 +304,6 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 								outerWhereLeftAppendSlice = append(outerWhereLeftAppendSlice, resourceTypeSuffix)
 							}
 						}
-						// internet增加epc分组
-						internetSuffix := "is_internet" + suffix
-						epcSuffix := "l3_epc_id" + suffix
-						if sqlparser.String(colName) == internetSuffix {
-							outerWhereLeftAppendSlice = append(outerWhereLeftAppendSlice, epcSuffix)
-						}
 					}
 				}
 				funcName, ok := item.Expr.(*sqlparser.FuncExpr)
@@ -328,6 +322,9 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 				if sqlparser.String(colName) == "toi" || strings.Contains(sqlparser.String(colName), "time") {
 					continue
 				} else if strings.Contains(sqlparser.String(colName), "node_type") || strings.Contains(sqlparser.String(colName), "icon_id") {
+					continue
+					// Inner sql remove star grouping
+				} else if common.IsValueInSliceString(sqlparser.String(colName), []string{"_", "_0", "_1"}) {
 					continue
 				}
 				groupTag := sqlparser.String(colName)
