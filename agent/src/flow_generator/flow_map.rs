@@ -39,7 +39,7 @@ use super::{
     app_table::AppTable,
     error::Error,
     flow_state::{StateMachine, StateValue},
-    perf::{FlowPerf, FlowPerfCounter, L7ProtocolChecker, L7RrtCache},
+    perf::{FlowLog, FlowPerfCounter, L7ProtocolChecker, L7RrtCache},
     protocol_logs::MetaAppProto,
     service_table::{ServiceKey, ServiceTable},
     FlowMapKey, FlowNode, FlowState, FlowTimeout, COUNTER_FLOW_ID_MASK, FLOW_METRICS_PEER_DST,
@@ -59,7 +59,7 @@ use crate::{
             SignalSource, TunnelField,
         },
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ProtocolParser, L7ProtocolParserInterface},
+        l7_protocol_log::{L7PerfCache, L7ProtocolParser, L7ProtocolParserInterface},
         lookup_key::LookupKey,
         meta_packet::{MetaPacket, MetaPacketTcpHeader},
         tagged_flow::TaggedFlow,
@@ -111,7 +111,9 @@ pub struct FlowMap {
     parse_config: LogParserAccess,
     #[cfg(target_os = "linux")]
     ebpf_config: Option<EbpfAccess>, // TODO: We only need its epc_id，epc_id is not only useful for ebpf, consider moving it to FlowConfig
+    // TODO will remove after perf remake
     rrt_cache: Rc<RefCell<L7RrtCache>>,
+    perf_cache: Rc<RefCell<L7PerfCache>>,
     flow_perf_counter: Arc<FlowPerfCounter>,
     ntp_diff: Arc<AtomicI64>,
     packet_sequence_queue: Option<DebugSender<Box<PacketSequenceBlock>>>, // Enterprise Edition Feature: packet-sequence
@@ -194,7 +196,9 @@ impl FlowMap {
             parse_config,
             #[cfg(target_os = "linux")]
             ebpf_config,
+            // TODO wille remove after perf remake
             rrt_cache: Rc::new(RefCell::new(L7RrtCache::new(L7_RRT_CACHE_CAPACITY))),
+            perf_cache: Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY))),
             flow_perf_counter,
             ntp_diff,
             packet_sequence_queue, // Enterprise Edition Feature: packet-sequence
@@ -869,7 +873,11 @@ impl FlowMap {
             } else {
                 TunnelField::default()
             },
-            flow_id: self.generate_flow_id(lookup_key.timestamp, self.id),
+            flow_id: if meta_packet.signal_source == SignalSource::EBPF {
+                meta_packet.socket_id
+            } else {
+                self.generate_flow_id(lookup_key.timestamp, self.id)
+            },
             start_time: lookup_key.timestamp.into(),
             flow_stat_time: Timestamp::from_nanos(
                 (lookup_key.timestamp.as_nanos() / TIME_UNIT.as_nanos() * TIME_UNIT.as_nanos())
@@ -915,7 +923,7 @@ impl FlowMap {
             packet_in_tick: true,
             policy_in_tick,
             flow_state: FlowState::Raw,
-            meta_flow_perf: None,
+            meta_flow_log: None,
             next_tcp_seq0: 0,
             next_tcp_seq1: 0,
             policy_data_cache: Default::default(),
@@ -972,8 +980,9 @@ impl FlowMap {
         };
 
         if config.collector_enabled {
-            node.meta_flow_perf = FlowPerf::new(
+            node.meta_flow_log = FlowLog::new(
                 self.rrt_cache.clone(),
+                self.perf_cache.clone(),
                 L4Protocol::from(meta_packet.lookup_key.proto),
                 l7_proto_enum,
                 from_app_tab,
@@ -1155,7 +1164,7 @@ impl FlowMap {
         is_first_packet: bool,
     ) {
         let mut info = None;
-        if let Some(perf) = node.meta_flow_perf.as_mut() {
+        if let Some(log) = node.meta_flow_log.as_mut() {
             let flow_id = node.tagged_flow.flow.flow_id;
             #[cfg(target_os = "linux")]
             let local_epc_id = if self.ebpf_config.is_some() {
@@ -1170,7 +1179,7 @@ impl FlowMap {
             } else {
                 (0, local_epc_id)
             };
-            match perf.parse(
+            match log.parse(
                 flow_config,
                 log_parser_config,
                 meta_packet,
@@ -1215,6 +1224,7 @@ impl FlowMap {
         meta_packet: &mut MetaPacket,
     ) -> FlowNode {
         let mut node = self.init_flow(flow_config, meta_packet);
+        meta_packet.flow_id = node.tagged_flow.flow.flow_id;
         meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
         let mut reverse = false;
         if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
@@ -1272,6 +1282,7 @@ impl FlowMap {
         meta_packet: &mut MetaPacket,
     ) -> FlowNode {
         let mut node = self.init_flow(flow_config, meta_packet);
+        meta_packet.flow_id = node.tagged_flow.flow.flow_id;
         meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
         node.flow_state = FlowState::Established;
         // For eBPF UDP Flow, there is no special treatment for timeout.
@@ -1296,6 +1307,7 @@ impl FlowMap {
 
     fn new_other_node(&mut self, config: &FlowConfig, meta_packet: &mut MetaPacket) -> FlowNode {
         let mut node = self.init_flow(config, meta_packet);
+        meta_packet.flow_id = node.tagged_flow.flow.flow_id;
         node.flow_state = FlowState::Established;
         // opening timeout
         node.timeout = config.flow_timeout.opening;
@@ -1314,10 +1326,9 @@ impl FlowMap {
             IpProtocol::Udp => self.new_udp_node(flow_config, log_parser_config, meta_packet),
             _ => self.new_other_node(flow_config, meta_packet),
         };
-        meta_packet.flow_id = node.tagged_flow.flow.flow_id;
         if meta_packet.signal_source == SignalSource::EBPF
-            && node.meta_flow_perf.is_some()
-            && node.meta_flow_perf.as_ref().unwrap().server_port == 0
+            && node.meta_flow_log.is_some()
+            && node.meta_flow_log.as_ref().unwrap().server_port == 0
         {
             // For ebpf data, if server_port is 0, it means that parsed data failed,
             // the info in node maybe wrong, we should not create this node.
@@ -1410,12 +1421,22 @@ impl FlowMap {
         if config.collector_enabled
             && (flow.flow_key.proto == IpProtocol::Tcp || flow.flow_key.proto == IpProtocol::Udp)
         {
-            let l7_timeout_count = self
-                .rrt_cache
-                .borrow_mut()
-                .get_and_remove_l7_req_timeout(flow.flow_id);
+            let l7_timeout_count = if node
+                .meta_flow_log
+                .as_mut()
+                .map_or(false, |x| !x.l7_perf_remake())
+            {
+                self.rrt_cache
+                    .borrow_mut()
+                    .get_and_remove_l7_req_timeout(flow.flow_id)
+            } else {
+                self.perf_cache
+                    .borrow_mut()
+                    .get_timeout_count(&flow.flow_id)
+            };
+
             // 如果返回None，就清空掉flow_perf_stats
-            flow.flow_perf_stats = node.meta_flow_perf.as_mut().and_then(|perf| {
+            flow.flow_perf_stats = node.meta_flow_log.as_mut().and_then(|perf| {
                 perf.copy_and_reset_perf_data(
                     flow.reversed,
                     l7_timeout_count as u32,
@@ -1463,7 +1484,7 @@ impl FlowMap {
                 return;
             }
             if flow.flow_key.proto == IpProtocol::Tcp || flow.flow_key.proto == IpProtocol::Udp {
-                flow.flow_perf_stats = node.meta_flow_perf.as_mut().and_then(|perf| {
+                flow.flow_perf_stats = node.meta_flow_log.as_mut().and_then(|perf| {
                     perf.copy_and_reset_perf_data(
                         flow.reversed,
                         0,
@@ -1492,7 +1513,8 @@ impl FlowMap {
         }
         // 考虑性能，最好是l7 perf解析后，满足需要的包生成log
         if let Some(mut head) = l7_info.app_proto_head() {
-            head.rrt = rrt;
+            // TODO 已重构的协议，rrt直接在 l7log 获取，未重构的从perf获取，重构完成后rrt不再作为参数传入
+            head.rrt = head.rrt.max(rrt);
             node.tagged_flow
                 .flow
                 .set_tap_side(config.trident_type, config.cloud_gateway_traffic);
@@ -1653,9 +1675,6 @@ impl FlowMap {
         node.endpoint_data_cache.swap(0, 1);
         node.tagged_flow.flow.reverse(is_first_packet);
         node.tagged_flow.tag.reverse();
-        if let Some(meta_flow_perf) = node.meta_flow_perf.as_mut() {
-            meta_flow_perf.reverse(None);
-        }
         // Enterprise Edition Feature: packet-sequence
         if node.packet_sequence_block.is_some() {
             node.packet_sequence_block

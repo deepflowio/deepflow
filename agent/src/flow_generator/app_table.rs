@@ -329,7 +329,14 @@ impl AppTable {
         remote_epc: i32,
     ) -> bool {
         let is_c2s = packet.lookup_key.direction == PacketDirection::ClientToServer;
-        let (ip, _, port) = Self::get_ip_epc_port(packet, is_c2s);
+
+        let (ip, port);
+        // redis can not determine dirction by RESP protocol when pakcet is from ebpf, special treatment
+        if protocol.get_l7_protocol() == L7Protocol::Redis {
+            (ip, port) = packet.get_redis_server_addr();
+        } else {
+            (ip, _, port) = Self::get_ip_epc_port(packet, is_c2s);
+        }
         // due to loopback may be in different protocol in container, add pid as key
         // FIXME: istio (or the similar proxy use DNAT on loopback addr and port to hijack traffic) will have different protocol in same port,
         // save the protocol to apptable use loopback addr and port will lead to get incorrect protocol in those envrioment
