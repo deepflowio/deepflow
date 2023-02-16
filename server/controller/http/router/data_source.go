@@ -27,12 +27,20 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
-func DataSourceRouter(e *gin.Engine, cfg *config.ControllerConfig) {
+type DataSource struct {
+	cfg *config.ControllerConfig
+}
+
+func NewDataSource(cfg *config.ControllerConfig) *DataSource {
+	return &DataSource{cfg: cfg}
+}
+
+func (ds *DataSource) RegisterTo(e *gin.Engine) {
 	e.GET("/v1/data-sources/:lcuuid/", getDataSource)
 	e.GET("/v1/data-sources/", getDataSources)
-	e.POST("/v1/data-sources/", createDataSource(cfg))
-	e.PATCH("/v1/data-sources/:lcuuid/", updateDataSource(cfg))
-	e.DELETE("/v1/data-sources/:lcuuid/", deleteDataSource(cfg))
+	e.POST("/v1/data-sources/", createDataSource(ds.cfg))
+	e.PATCH("/v1/data-sources/:lcuuid/", updateDataSource(ds.cfg))
+	e.DELETE("/v1/data-sources/:lcuuid/", deleteDataSource(ds.cfg))
 }
 
 func getDataSource(c *gin.Context) {

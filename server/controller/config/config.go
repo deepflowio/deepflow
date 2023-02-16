@@ -28,6 +28,7 @@ import (
 	mysql "github.com/deepflowio/deepflow/server/controller/db/mysql/config"
 	"github.com/deepflowio/deepflow/server/controller/db/redis"
 	genesis "github.com/deepflowio/deepflow/server/controller/genesis/config"
+	http "github.com/deepflowio/deepflow/server/controller/http/config"
 	manager "github.com/deepflowio/deepflow/server/controller/manager/config"
 	monitor "github.com/deepflowio/deepflow/server/controller/monitor/config"
 	prometheus "github.com/deepflowio/deepflow/server/controller/prometheus/config"
@@ -54,7 +55,14 @@ type Specification struct {
 type DFWebService struct {
 	Enabled bool   `default:"false" yaml:"enabled"`
 	Host    string `default:"df-web" yaml:"host"`
-	Port    int    `default:"20106" yaml:"port"`
+	Port    int    `default:"20825" yaml:"port"`
+	Timeout int    `default:"30" yaml:"timeout"`
+}
+
+type FPermit struct {
+	Enabled bool   `default:"false" yaml:"enabled"`
+	Host    string `default:"fpermit" yaml:"host"`
+	Port    int    `default:"20823" yaml:"port"`
 	Timeout int    `default:"30" yaml:"timeout"`
 }
 
@@ -75,6 +83,7 @@ type ControllerConfig struct {
 	PodClusterInternalIPToIngester int    `default:"0" yaml:"pod-cluster-internal-ip-to-ingester"`
 
 	DFWebService DFWebService `yaml:"df-web-service"`
+	FPermit      FPermit      `yaml:"fpermit"`
 
 	MySqlCfg      mysql.MySqlConfig           `yaml:"mysql"`
 	RedisCfg      redis.RedisConfig           `yaml:"redis"`
@@ -90,6 +99,7 @@ type ControllerConfig struct {
 	TrisolarisCfg  trisolaris.Config             `yaml:"trisolaris"`
 	TagRecorderCfg tagrecorder.TagRecorderConfig `yaml:"tagrecorder"`
 	PrometheusCfg  prometheus.Config             `yaml:"prometheus"`
+	HTTPCfg        http.HTTPConfig               `yaml:"http"`
 }
 
 type Config struct {

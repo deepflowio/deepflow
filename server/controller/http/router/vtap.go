@@ -36,7 +36,13 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
-func VtapRouter(e *gin.Engine) {
+type Vtap struct{}
+
+func NewVtap() *Vtap {
+	return new(Vtap)
+}
+
+func (v *Vtap) RegisterTo(e *gin.Engine) {
 	e.GET("/v1/vtaps/:lcuuid/", getVtap)
 	e.GET("/v1/vtaps/", getVtaps)
 	e.POST("/v1/vtaps/", createVtap)

@@ -14,4 +14,9 @@
  * limitations under the License.
  */
 
-package service
+package common
+
+var (
+	VM_GET_URL_PATH  = "/v2/vms"
+	POD_GET_URL_PATH = "/v2/pods"
+)

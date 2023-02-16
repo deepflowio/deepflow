@@ -809,7 +809,7 @@ type Pod struct {
 	PodNamespaceID  int    `gorm:"column:pod_namespace_id;type:int;default:null" json:"POD_NAMESPACE_ID"`
 	PodNodeID       int    `gorm:"column:pod_node_id;type:int;default:null" json:"POD_NODE_ID"`
 	PodClusterID    int    `gorm:"column:pod_cluster_id;type:int;default:null" json:"POD_CLUSTER_ID"`
-	VPCID           int    `gorm:"column:epc_id;type:int;default:null" json:"VPC_ID"`
+	VPCID           int    `gorm:"column:epc_id;type:int;default:null" json:"EPC_ID"`
 	AZ              string `gorm:"column:az;type:char(64);default:''" json:"AZ"`
 	Region          string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
 	SubDomain       string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`

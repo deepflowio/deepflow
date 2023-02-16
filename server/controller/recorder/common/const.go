@@ -20,7 +20,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 )
 
-const (
+const ( // TODO DELETE use const in controller/common
 	RESOURCE_TYPE_REGION_EN                   = "region"
 	RESOURCE_TYPE_AZ_EN                       = "az"
 	RESOURCE_TYPE_SUB_DOMAIN_EN               = "sub_domain"

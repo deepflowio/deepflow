@@ -30,12 +30,20 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
-func DomainRouter(e *gin.Engine, cfg *config.ControllerConfig) {
-	// TODO: 后续统一为v2
+type Domain struct {
+	cfg *config.ControllerConfig
+}
+
+func NewDomain(cfg *config.ControllerConfig) *Domain {
+	return &Domain{cfg: cfg}
+}
+
+func (d *Domain) RegisterTo(e *gin.Engine) {
+	// TODO(ZhengYa): 后续统一为v2
 	e.GET("/v2/domains/:lcuuid/", getDomain)
 	e.GET("/v2/domains/", getDomains)
-	e.POST("/v1/domains/", createDomain(cfg))
-	e.PATCH("/v1/domains/:lcuuid/", updateDomain(cfg))
+	e.POST("/v1/domains/", createDomain(d.cfg))
+	e.PATCH("/v1/domains/:lcuuid/", updateDomain(d.cfg))
 	e.DELETE("/v1/domains/:lcuuid/", deleteDomain)
 
 	e.GET("/v2/sub-domains/:lcuuid/", getSubDomain)

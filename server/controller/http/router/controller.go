@@ -29,11 +29,20 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/monitor"
 )
 
-func ControllerRouter(e *gin.Engine, m *monitor.ControllerCheck, cfg *config.ControllerConfig) {
+type Controller struct {
+	cfg *config.ControllerConfig
+	m   *monitor.ControllerCheck
+}
+
+func NewController(cfg *config.ControllerConfig, m *monitor.ControllerCheck) *Controller {
+	return &Controller{cfg: cfg, m: m}
+}
+
+func (c *Controller) RegisterTo(e *gin.Engine) {
 	e.GET("/v1/controllers/:lcuuid/", getController)
 	e.GET("/v1/controllers/", getControllers)
-	e.PATCH("/v1/controllers/:lcuuid/", updateController(m, cfg))
-	e.DELETE("/v1/controllers/:lcuuid/", deleteController(m, cfg))
+	e.PATCH("/v1/controllers/:lcuuid/", updateController(c.m, c.cfg))
+	e.DELETE("/v1/controllers/:lcuuid/", deleteController(c.m, c.cfg))
 }
 
 func getController(c *gin.Context) {

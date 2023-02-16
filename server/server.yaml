@@ -40,11 +40,24 @@ controller:
   # 2 (K8s Cluster in local AZs)
   pod-cluster-internal-ip-to-ingester: 0
 
+  http:
+    # resource api memory cache refresh interval, unit:s
+    memory_refresh_interval: 300
+    # resource api redis cache refresh interval, unit:s
+    redis_refresh_interval: 3600
+
   # deepflow web service config
   df-web-service:
     enabled: false
     host: df-web
     port: 20825
+    timeout: 30
+
+  # deepflow fpermit service config
+  fpermit:
+    enabled: false
+    host: fpermit
+    port: 20823
     timeout: 30
 
   # mysql相关配置

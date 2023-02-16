@@ -23,7 +23,13 @@ import (
 	. "github.com/deepflowio/deepflow/server/controller/http/service/resource"
 )
 
-func VPCRouter(e *gin.Engine) {
+type VPC struct{}
+
+func NewVPC() *VPC {
+	return new(VPC)
+}
+
+func (v *VPC) RegisterTo(e *gin.Engine) {
 	e.GET("/v2/vpcs/", getVPCs)
 }
 

@@ -19,6 +19,7 @@ package redis
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/go-redis/redis/v9"
@@ -26,7 +27,10 @@ import (
 )
 
 var log = logging.MustGetLogger("db.redis")
-var RedisDB *RedisClient
+var (
+	redisClientOnce sync.Once
+	RedisDB         *RedisClient
+)
 
 type RedisConfig struct {
 	ResourceAPIDatabase       int      `default:"1" yaml:"resource_api_database"`
@@ -40,9 +44,14 @@ type RedisConfig struct {
 	ClusterEnabled            bool     `default:"false" yaml:"cluster_enabled"`
 }
 
+func GetClient() *RedisClient {
+	return RedisDB
+}
+
 type RedisClient struct {
 	ResourceAPI       redis.UniversalClient
 	DimensionResource redis.UniversalClient
+	Config            *RedisConfig
 }
 
 func generateAddrs(cfg RedisConfig) []string {
@@ -90,15 +99,18 @@ func createUniversalRedisClient(cfg RedisConfig, database int) redis.UniversalCl
 	}
 }
 
-func InitRedis(cfg RedisConfig, ctx context.Context) (err error) {
-	RedisDB = &RedisClient{
-		ResourceAPI:       createUniversalRedisClient(cfg, cfg.ResourceAPIDatabase), // TODO ClusterClient sync once
-		DimensionResource: createUniversalRedisClient(cfg, cfg.DimensionResourceDatabase),
-	}
-	_, err = RedisDB.ResourceAPI.Ping(ctx).Result()
-	if err != nil {
+func InitRedis(cfg RedisConfig, ctx context.Context) (err error) { // TODO ctx as first param
+	redisClientOnce.Do(func() {
+		RedisDB = &RedisClient{
+			ResourceAPI:       createUniversalRedisClient(cfg, cfg.ResourceAPIDatabase),
+			DimensionResource: createUniversalRedisClient(cfg, cfg.DimensionResourceDatabase),
+		}
+		_, err = RedisDB.ResourceAPI.Ping(ctx).Result()
+		if err != nil {
+			return
+		}
+		_, err = RedisDB.DimensionResource.Ping(ctx).Result()
 		return
-	}
-	_, err = RedisDB.DimensionResource.Ping(ctx).Result()
+	})
 	return
 }

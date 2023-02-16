@@ -29,11 +29,20 @@ import (
 	"github.com/gin-gonic/gin/binding"
 )
 
-func AnalyzerRouter(e *gin.Engine, m *monitor.AnalyzerCheck, cfg *config.ControllerConfig) {
+type Analyzer struct {
+	cfg *config.ControllerConfig
+	a   *monitor.AnalyzerCheck
+}
+
+func NewAnalyzer(cfg *config.ControllerConfig, a *monitor.AnalyzerCheck) *Analyzer {
+	return &Analyzer{cfg: cfg, a: a}
+}
+
+func (a *Analyzer) RegisterTo(e *gin.Engine) {
 	e.GET("/v1/analyzers/:lcuuid/", getAnalyzer)
 	e.GET("/v1/analyzers/", getAnalyzers)
-	e.PATCH("/v1/analyzers/:lcuuid/", updateAnalyzer(m, cfg))
-	e.DELETE("/v1/analyzers/:lcuuid/", deleteAnalyzer(m, cfg))
+	e.PATCH("/v1/analyzers/:lcuuid/", updateAnalyzer(a.a, a.cfg))
+	e.DELETE("/v1/analyzers/:lcuuid/", deleteAnalyzer(a.a, a.cfg))
 }
 
 func getAnalyzer(c *gin.Context) {

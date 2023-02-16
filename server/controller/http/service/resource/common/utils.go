@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+// TODO delete this file
 package common
 
 import (
@@ -22,19 +22,19 @@ import (
 	"strconv"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	servicecommon "github.com/deepflowio/deepflow/server/controller/http/service/common"
+	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
 )
 
 func GetUserInfoFromHTTPHeader(header http.Header) (userType, userID int, err error) {
 	userTypes, _ := header[HEADER_KEY_X_USER_TYPE]
 	if len(userTypes) == 0 {
-		err = servicecommon.NewError(common.INVALID_PARAMETERS, fmt.Sprintf("No %s in request header", HEADER_KEY_X_USER_TYPE))
+		err = NewError(common.INVALID_PARAMETERS, fmt.Sprintf("No %s in request header", HEADER_KEY_X_USER_TYPE))
 	} else {
 		userType, err = strconv.Atoi(userTypes[0])
 	}
 	userIDs, _ := header[HEADER_KEY_X_USER_ID]
 	if len(userIDs) == 0 {
-		err = servicecommon.NewError(common.INVALID_PARAMETERS, fmt.Sprintf("No %s in request header", HEADER_KEY_X_USER_ID))
+		err = NewError(common.INVALID_PARAMETERS, fmt.Sprintf("No %s in request header", HEADER_KEY_X_USER_ID))
 	} else {
 		userID, err = strconv.Atoi(userIDs[0])
 	}

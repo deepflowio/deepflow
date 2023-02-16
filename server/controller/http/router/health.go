@@ -35,6 +35,16 @@ const OK = "ok"
 var curStage string
 var curStageStartedAt time.Time
 
+type Health struct{}
+
+func NewHealth() *Health {
+	return new(Health)
+}
+
+func (s *Health) RegisterTo(e *gin.Engine) {
+	HealthRouter(e) // TODO
+}
+
 func HealthRouter(e *gin.Engine) {
 	e.GET("/v1/health/", func(c *gin.Context) {
 		if curStage == OK {
