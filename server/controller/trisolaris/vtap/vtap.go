@@ -1137,7 +1137,7 @@ func (v *VTapInfo) TimedRefreshVTapCache() {
 		case <-tickerVTapCache:
 			log.Info("start generate vtap cache data from timed")
 			v.GenerateVTapCache()
-			v.processInfo.DeleteVTapExpiredData(v.dbVTapIDs)
+			v.processInfo.DeleteAgentExpiredData(v.dbVTapIDs)
 			log.Info("end generate vtap cache data from timed")
 		case <-v.chVTapCacheRefresh:
 			log.Info("start generate vtap cache data from rpc")
