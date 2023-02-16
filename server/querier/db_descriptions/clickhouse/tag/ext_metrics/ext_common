@@ -28,6 +28,10 @@ resource_gl1_type          , resource_gl1_type         , resource_gl1_type      
 resource_gl1               , resource_gl1              , resource_gl1              , resource      ,                       , Universal Tag   , 111
 resource_gl2_type          , resource_gl2_type         , resource_gl2_type         , int_enum      , resource_gl2_type     , Universal Tag   , 111
 resource_gl2               , resource_gl2              , resource_gl2              , resource      ,                       , Universal Tag   , 111
+auto_instance_type         , auto_instance_type_0      , auto_instance_type_1      , int_enum      , auto_instance_type    , Universal Tag   , 111
+auto_instance              , auto_instance_0           , auto_instance_1           , resource      ,                       , Universal Tag   , 111
+auto_service_type          , auto_service_type_0       , auto_service_type_1       , int_enum      , auto_service_type     , Universal Tag   , 111
+auto_service               , auto_service_0            , auto_service_1            , resource      ,                       , Universal Tag   , 111
 
 k8s.label                  , k8s.label                 , k8s.label                 , map           ,                       , Custom Tag      , 111
 cloud.tag                  , cloud.tag                 , cloud.tag                 , map           ,                       , Custom Tag      , 111

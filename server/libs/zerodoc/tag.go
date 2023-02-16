@@ -90,6 +90,7 @@ const (
 	TAPPort
 	IsKeyService
 	L7Protocol
+	SignalSource
 )
 
 const (
@@ -124,6 +125,7 @@ const (
 	GatewayHypervisorSide
 	GatewaySide
 	ProcessSide
+	AppSide
 )
 
 type DirectionEnum uint8
@@ -149,6 +151,8 @@ const (
 	ServerGatewayToClient           = ServerToClient | DirectionEnum(GatewaySide)           // 服务端网关（特指VIP机制的SLB，例如微软云MUX等）, Mac地址对应的接口为vip设备
 	ClientProcessToServer           = ClientToServer | DirectionEnum(ProcessSide)           // 客户端进程
 	ServerProcessToClient           = ServerToClient | DirectionEnum(ProcessSide)           // 服务端进程
+	ClientAppToServer               = ClientToServer | DirectionEnum(AppSide)               // 客户端应用
+	ServerAppToClient               = ServerToClient | DirectionEnum(AppSide)               // 服务端应用
 )
 
 func (d DirectionEnum) IsClientToServer() bool {
@@ -179,6 +183,8 @@ const (
 	ServerGateway           = Server | TAPSideEnum(GatewaySide)
 	ClientProcess           = Client | TAPSideEnum(ProcessSide)
 	ServerProcess           = Server | TAPSideEnum(ProcessSide)
+	ClientApp               = Client | TAPSideEnum(AppSide)
+	ServerApp               = Server | TAPSideEnum(AppSide)
 	Rest                    = 0
 )
 
@@ -197,6 +203,8 @@ var TAPSideEnumsString = []string{
 	ServerGateway:           "s-gw",
 	ClientProcess:           "c-p",
 	ServerProcess:           "s-p",
+	ClientApp:               "c-app",
+	ServerApp:               "s-app",
 }
 
 func (s TAPSideEnum) String() string {
@@ -241,53 +249,49 @@ type Field struct {
 	//   - roze写入influxdb，作用类似_id，序列化为_tid
 	GlobalThreadID uint8
 
-	IP6             net.IP // FIXME: 合并IP6和IP
-	MAC             uint64
-	IP              uint32
-	L3EpcID         int32 // (8B)
-	L3DeviceID      uint32
-	L3DeviceType    DeviceType
-	RegionID        uint16
-	SubnetID        uint16
-	HostID          uint16
-	PodNodeID       uint32
-	AZID            uint16
-	PodGroupID      uint32
-	PodNSID         uint16
-	PodID           uint32
-	PodClusterID    uint16
-	ServiceID       uint32
-	ResourceGl0ID   uint32
-	ResourceGl0Type uint8
-	ResourceGl1ID   uint32
-	ResourceGl1Type uint8
-	ResourceGl2ID   uint32
-	ResourceGl2Type uint8
-	GPID            uint32
+	IP6              net.IP // FIXME: 合并IP6和IP
+	MAC              uint64
+	IP               uint32
+	L3EpcID          int32 // (8B)
+	L3DeviceID       uint32
+	L3DeviceType     DeviceType
+	RegionID         uint16
+	SubnetID         uint16
+	HostID           uint16
+	PodNodeID        uint32
+	AZID             uint16
+	PodGroupID       uint32
+	PodNSID          uint16
+	PodID            uint32
+	PodClusterID     uint16
+	ServiceID        uint32
+	AutoInstanceID   uint32
+	AutoInstanceType uint8
+	AutoServiceID    uint32
+	AutoServiceType  uint8
+	GPID             uint32
 
-	MAC1             uint64
-	IP61             net.IP // FIXME: 合并IP61和IP1
-	IP1              uint32
-	L3EpcID1         int32 // (8B)
-	L3DeviceID1      uint32
-	L3DeviceType1    DeviceType // (+1B=8B)
-	RegionID1        uint16
-	SubnetID1        uint16 // (8B)
-	HostID1          uint16
-	PodNodeID1       uint32
-	AZID1            uint16
-	PodGroupID1      uint32
-	PodNSID1         uint16
-	PodID1           uint32
-	PodClusterID1    uint16
-	ServiceID1       uint32
-	ResourceGl0ID1   uint32
-	ResourceGl0Type1 uint8
-	ResourceGl1ID1   uint32
-	ResourceGl1Type1 uint8
-	ResourceGl2ID1   uint32
-	ResourceGl2Type1 uint8
-	GPID1            uint32
+	MAC1              uint64
+	IP61              net.IP // FIXME: 合并IP61和IP1
+	IP1               uint32
+	L3EpcID1          int32 // (8B)
+	L3DeviceID1       uint32
+	L3DeviceType1     DeviceType // (+1B=8B)
+	RegionID1         uint16
+	SubnetID1         uint16 // (8B)
+	HostID1           uint16
+	PodNodeID1        uint32
+	AZID1             uint16
+	PodGroupID1       uint32
+	PodNSID1          uint16
+	PodID1            uint32
+	PodClusterID1     uint16
+	ServiceID1        uint32
+	AutoInstanceID1   uint32
+	AutoInstanceType1 uint8
+	AutoServiceID1    uint32
+	AutoServiceType1  uint8
+	GPID1             uint32
 
 	ACLGID       uint16
 	Direction    DirectionEnum
@@ -300,6 +304,9 @@ type Field struct {
 	IsIPv6       uint8 // (8B) 与IP/IP6是共生字段
 	IsKeyService uint8
 	L7Protocol   datatype.L7Protocol
+	AppService   string
+	AppInstance  string
+	SignalSource uint16
 
 	TagType  uint8
 	TagValue uint16
@@ -442,8 +449,8 @@ func MetricsTableNameToID(name string) MetricsTableID {
 }
 
 const (
-	BaseCode     = AZID | HostID | IP | L3Device | L3EpcID | PodClusterID | PodGroupID | PodID | PodNodeID | PodNSID | RegionID | SubnetID | TAPType | VTAPID | ServiceID | Resource | GPID
-	BasePathCode = AZIDPath | HostIDPath | IPPath | L3DevicePath | L3EpcIDPath | PodClusterIDPath | PodGroupIDPath | PodIDPath | PodNodeIDPath | PodNSIDPath | RegionIDPath | SubnetIDPath | TAPSide | TAPType | VTAPID | ServiceIDPath | ResourcePath | GPIDPath
+	BaseCode     = AZID | HostID | IP | L3Device | L3EpcID | PodClusterID | PodGroupID | PodID | PodNodeID | PodNSID | RegionID | SubnetID | TAPType | VTAPID | ServiceID | Resource | GPID | SignalSource
+	BasePathCode = AZIDPath | HostIDPath | IPPath | L3DevicePath | L3EpcIDPath | PodClusterIDPath | PodGroupIDPath | PodIDPath | PodNodeIDPath | PodNSIDPath | RegionIDPath | SubnetIDPath | TAPSide | TAPType | VTAPID | ServiceIDPath | ResourcePath | GPIDPath | SignalSource
 	BasePortCode = Protocol | ServerPort | IsKeyService
 
 	VTAP_FLOW_PORT      = BaseCode | BasePortCode | Direction
@@ -656,6 +663,8 @@ func (t *Tag) MarshalTo(b []byte) int {
 	if t.Code&L7Protocol != 0 {
 		offset += copy(b[offset:], ",l7_protocol=")
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.L7Protocol), 10))
+		offset += copy(b[offset:], ",app_service="+t.AppService)
+		offset += copy(b[offset:], ",app_instance="+t.AppInstance)
 	}
 	if t.Code&MAC != 0 {
 		// 不存入tsdb中
@@ -747,49 +756,38 @@ func (t *Tag) MarshalTo(b []byte) int {
 	}
 
 	if t.Code&Resource != 0 {
-		offset += copy(b[offset:], ",resource_gl0_id=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl0ID), 10))
-		offset += copy(b[offset:], ",resource_gl0_type=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl0Type), 10))
-		offset += copy(b[offset:], ",resource_gl1_id=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl1ID), 10))
-		offset += copy(b[offset:], ",resource_gl1_type=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl1Type), 10))
-		offset += copy(b[offset:], ",resource_gl2_id=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl2ID), 10))
-		offset += copy(b[offset:], ",resource_gl2_type=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl2Type), 10))
+		offset += copy(b[offset:], ",auto_instance_id=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.AutoInstanceID), 10))
+		offset += copy(b[offset:], ",auto_instance_type=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.AutoInstanceType), 10))
+		offset += copy(b[offset:], ",auto_service_id=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.AutoServiceID), 10))
+		offset += copy(b[offset:], ",auto_service_type=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.AutoServiceType), 10))
 	}
 	if t.Code&ResourcePath != 0 {
-		offset += copy(b[offset:], ",resource_gl0_id_0=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl0ID), 10))
-		offset += copy(b[offset:], ",resource_gl0_id_1=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl0ID1), 10))
+		offset += copy(b[offset:], ",auto_instance_id_0=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.AutoInstanceID), 10))
+		offset += copy(b[offset:], ",auto_instance_type_0=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.AutoInstanceType), 10))
+		offset += copy(b[offset:], ",auto_service_id_0=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.AutoServiceID), 10))
+		offset += copy(b[offset:], ",auto_service_type_0=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.AutoServiceType), 10))
 
-		offset += copy(b[offset:], ",resource_gl0_type_0=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl0Type), 10))
-		offset += copy(b[offset:], ",resource_gl0_type_1=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl0Type1), 10))
+		offset += copy(b[offset:], ",auto_instance_id_1=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.AutoInstanceID1), 10))
+		offset += copy(b[offset:], ",auto_instance_type_1=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.AutoInstanceType1), 10))
+		offset += copy(b[offset:], ",auto_service_id_1=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.AutoServiceID1), 10))
+		offset += copy(b[offset:], ",auto_service_type_1=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.AutoServiceType1), 10))
+	}
 
-		offset += copy(b[offset:], ",resource_gl1_id_0=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl1ID), 10))
-		offset += copy(b[offset:], ",resource_gl1_id_1=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl1ID1), 10))
-
-		offset += copy(b[offset:], ",resource_gl1_type_0=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl1Type), 10))
-		offset += copy(b[offset:], ",resource_gl1_type_1=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl1Type1), 10))
-
-		offset += copy(b[offset:], ",resource_gl2_id_0=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl2ID), 10))
-		offset += copy(b[offset:], ",resource_gl2_id_1=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl2ID1), 10))
-
-		offset += copy(b[offset:], ",resource_gl2_type_0=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl2Type), 10))
-		offset += copy(b[offset:], ",resource_gl2_type_1=")
-		offset += copy(b[offset:], strconv.FormatUint(uint64(t.ResourceGl2Type1), 10))
+	if t.Code&SignalSource != 0 {
+		offset += copy(b[offset:], ",signal_source=")
+		offset += copy(b[offset:], strconv.FormatUint(uint64(t.SignalSource), 10))
 	}
 
 	if t.Code&ServerPort != 0 {
@@ -955,6 +953,8 @@ func GenTagColumns(code Code) []*ckdb.Column {
 	}
 	if code&L7Protocol != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("l7_protocol", ckdb.UInt8).SetComment("应用协议0: unknown, 1: http, 2: dns, 3: mysql, 4: redis, 5: dubbo, 6: kafka"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("app_service", ckdb.LowCardinalityString))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("app_instance", ckdb.String))
 	}
 
 	if code&MAC != 0 {
@@ -1025,30 +1025,26 @@ func GenTagColumns(code Code) []*ckdb.Column {
 	}
 
 	if code&Resource != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl0_id", ckdb.UInt32).SetComment("ip对应的容器pod优先的资源ID, 取值优先级为pod_id -> pod_node_id -> l3_device_id"))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl0_type", ckdb.UInt8).SetComment("资源类型, 0:IP地址(无法对应资源), 0-100:deviceType(其中10:pod, 14:podNode), 101-200:DeepFlow抽象出的资源(其中101:podGroup, 102:service), 201-255:其他"))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl1_id", ckdb.UInt32).SetComment("ip对应的工作负载优先的资源ID, 取值优先级为pod_group_id -> pod_node_id -> l3_device_id"))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl1_type", ckdb.UInt8).SetComment("资源类型, 0:IP地址(无法对应资源), 0-100:deviceType(其中10:pod, 14:podNode), 101-200:DeepFlow抽象出的资源(其中101:podGroup, 102:service), 201-255:其他"))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl2_id", ckdb.UInt32).SetComment("ip对应的服务优先的资源ID, 取值优先级为service_id  -> pod_node_id -> l3_device_id"))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl2_type", ckdb.UInt8).SetComment("资源类型, 0:IP地址(无法对应资源), 0-100:deviceType(其中10:pod, 14:podNode), 101-200:DeepFlow抽象出的资源(其中101:podGroup, 102:service), 201-255:其他"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("auto_instance_id", ckdb.UInt32).SetComment("ip对应的容器pod优先的资源ID, 取值优先级为pod_id -> pod_node_id -> l3_device_id"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("auto_instance_type", ckdb.UInt8).SetComment("资源类型, 0:IP地址(无法对应资源), 0-100:deviceType(其中10:pod, 14:podNode), 101-200:DeepFlow抽象出的资源(其中101:podGroup, 102:service), 201-255:其他"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("auto_service_id", ckdb.UInt32).SetComment("ip对应的服务优先的资源ID, 取值优先级为service_id  -> pod_node_id -> l3_device_id"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("auto_service_type", ckdb.UInt8).SetComment("资源类型, 0:IP地址(无法对应资源), 0-100:deviceType(其中10:pod, 14:podNode), 101-200:DeepFlow抽象出的资源(其中101:podGroup, 102:service), 201-255:其他"))
 	}
 	if code&ResourcePath != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl0_id_0", ckdb.UInt32).SetComment("ip0对应的容器pod优先的资源ID, 取值优先级为pod_id -> pod_node_id -> l3_device_id"))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl0_type_0", ckdb.UInt8).SetComment("资源类型, 0:IP地址(无法对应资源), 0-100:deviceType(其中10:pod, 14:podNode), 101-200:DeepFlow抽象出的资源(其中101:podGroup, 102:service), 201-255:其他"))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl1_id_0", ckdb.UInt32).SetComment("ip0对应的工作负载优先的资源ID, 取值优先级为pod_group_id -> pod_node_id -> l3_device_id"))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl1_type_0", ckdb.UInt8).SetComment("资源类型, 0:IP地址(无法对应资源), 0-100:deviceType(其中10:pod, 14:podNode), 101-200:DeepFlow抽象出的资源(其中101:podGroup, 102:service), 201-255:其他"))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl2_id_0", ckdb.UInt32).SetComment("ip0对应的服务优先的资源ID, 取值优先级为service_id  -> pod_node_id -> l3_device_id"))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl2_type_0", ckdb.UInt8).SetComment("资源类型, 0:IP地址(无法对应资源), 0-100:deviceType(其中10:pod, 14:podNode), 101-200:DeepFlow抽象出的资源(其中101:podGroup, 102:service), 201-255:其他"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("auto_instance_id_0", ckdb.UInt32).SetComment("ip0对应的容器pod优先的资源ID, 取值优先级为pod_id -> pod_node_id -> l3_device_id"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("auto_instance_type_0", ckdb.UInt8).SetComment("资源类型, 0:IP地址(无法对应资源), 0-100:deviceType(其中10:pod, 14:podNode), 101-200:DeepFlow抽象出的资源(其中101:podGroup, 102:service), 201-255:其他"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("auto_service_id_0", ckdb.UInt32).SetComment("ip0对应的服务优先的资源ID, 取值优先级为service_id  -> pod_node_id -> l3_device_id"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("auto_service_type_0", ckdb.UInt8).SetComment("资源类型, 0:IP地址(无法对应资源), 0-100:deviceType(其中10:pod, 14:podNode), 101-200:DeepFlow抽象出的资源(其中101:podGroup, 102:service), 201-255:其他"))
 
-		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl0_id_1", ckdb.UInt32).SetComment("ip1对应的容器pod优先的资源ID, 取值优先级为pod_id -> pod_node_id -> l3_device_id"))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl0_type_1", ckdb.UInt8).SetComment("资源类型, 0:IP地址(无法对应资源), 0-100:deviceType(其中10:pod, 14:podNode), 101-200:DeepFlow抽象出的资源(其中101:podGroup, 102:service), 201-255:其他"))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl1_id_1", ckdb.UInt32).SetComment("ip1对应的工作负载优先的资源ID, 取值优先级为pod_group_id -> pod_node_id -> l3_device_id"))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl1_type_1", ckdb.UInt8).SetComment("资源类型, 0:IP地址(无法对应资源), 0-100:deviceType(其中10:pod, 14:podNode), 101-200:DeepFlow抽象出的资源(其中101:podGroup, 102:service), 201-255:其他"))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl2_id_1", ckdb.UInt32).SetComment("ip1对应的服务优先的资源ID, 取值优先级为service_id  -> pod_node_id -> l3_device_id"))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("resource_gl2_type_1", ckdb.UInt8).SetComment("资源类型, 0:IP地址(无法对应资源), 0-100:deviceType(其中10:pod, 14:podNode), 101-200:DeepFlow抽象出的资源(其中101:podGroup, 102:service), 201-255:其他"))
-
+		columns = append(columns, ckdb.NewColumnWithGroupBy("auto_instance_id_1", ckdb.UInt32).SetComment("ip1对应的容器pod优先的资源ID, 取值优先级为pod_id -> pod_node_id -> l3_device_id"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("auto_instance_type_1", ckdb.UInt8).SetComment("资源类型, 0:IP地址(无法对应资源), 0-100:deviceType(其中10:pod, 14:podNode), 101-200:DeepFlow抽象出的资源(其中101:podGroup, 102:service), 201-255:其他"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("auto_service_id_1", ckdb.UInt32).SetComment("ip1对应的服务优先的资源ID, 取值优先级为service_id  -> pod_node_id -> l3_device_id"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("auto_service_type_1", ckdb.UInt8).SetComment("资源类型, 0:IP地址(无法对应资源), 0-100:deviceType(其中10:pod, 14:podNode), 101-200:DeepFlow抽象出的资源(其中101:podGroup, 102:service), 201-255:其他"))
 	}
 
+	if code&SignalSource != 0 {
+		columns = append(columns, ckdb.NewColumnWithGroupBy("signal_source", ckdb.UInt16).SetComment("信号源"))
+	}
 	if code&ServiceID != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("service_id", ckdb.UInt32).SetComment("ip对应的服务ID"))
 	}
@@ -1162,6 +1158,8 @@ func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) {
 
 	if code&L7Protocol != 0 {
 		block.Write(uint8(t.L7Protocol))
+		block.Write(t.AppService)
+		block.Write(t.AppInstance)
 	}
 
 	if code&MAC != 0 {
@@ -1224,24 +1222,24 @@ func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) {
 
 	if code&Resource != 0 || code&ResourcePath != 0 {
 		block.Write(
-			t.ResourceGl0ID,
-			t.ResourceGl0Type,
-			t.ResourceGl1ID,
-			t.ResourceGl1Type,
-			t.ResourceGl2ID,
-			t.ResourceGl2Type,
+			t.AutoInstanceID,
+			t.AutoInstanceType,
+			t.AutoServiceID,
+			t.AutoServiceType,
 		)
 	}
 
 	if code&ResourcePath != 0 {
 		block.Write(
-			t.ResourceGl0ID1,
-			t.ResourceGl0Type1,
-			t.ResourceGl1ID1,
-			t.ResourceGl1Type1,
-			t.ResourceGl2ID1,
-			t.ResourceGl2Type1,
+			t.AutoInstanceID1,
+			t.AutoInstanceType1,
+			t.AutoServiceID1,
+			t.AutoServiceType1,
 		)
+	}
+
+	if code&SignalSource != 0 {
+		block.Write(t.SignalSource)
 	}
 
 	if code&ServiceID != 0 {
@@ -1350,14 +1348,19 @@ func (t *Tag) ReadFromPB(p *pb.MiniTag) {
 	t.TAPPort = datatype.TapPort(p.Field.TapPort)
 	t.TAPType = TAPTypeEnum(p.Field.TapType)
 	t.L7Protocol = datatype.L7Protocol(p.Field.L7Protocol)
+	t.AppService = p.Field.AppService
+	t.AppInstance = p.Field.AppInstance
 	// In order to be compatible with the old version of Agent data, GPID needs to be set
 	if t.Code&IPPath != 0 {
 		t.Code |= GPIDPath
+		t.Code |= SignalSource
 	} else if t.Code != VTAP_ACL {
 		t.Code |= GPID
+		t.Code |= SignalSource
 	}
 	t.GPID = p.Field.Gpid
 	t.GPID1 = p.Field.Gpid1
+	t.SignalSource = uint16(p.Field.SignalSource)
 	t.TagType = uint8(p.Field.TagType)
 	t.TagValue = uint16(p.Field.TagValue)
 }

@@ -22,12 +22,16 @@ pod_service                , K8s 容器服务               ,
 pod_group                  , K8s 工作负载               , 例如 Deployment、StatefulSet、Daemonset 等。
 pod                        , K8s 容器 POD               ,
 service                    , 服务                       ,
-resource_gl0_type          , 类型-容器 POD 优先         ,
-resource_gl0               , 资源-容器 POD 优先         ,
-resource_gl1_type          , 类型-工作负载优先          ,
-resource_gl1               , 资源-工作负载优先          ,
-resource_gl2_type          , 类型-服务优先              ,
-resource_gl2               , 资源-服务优先              ,
+resource_gl0_type          , 类型-容器 POD 优先         , 已废弃，请使用 auto_instance_type。
+resource_gl0               , 资源-容器 POD 优先         , 已废弃，请使用 auto_instance。
+resource_gl1_type          , 类型-工作负载优先          , 已废弃，请使用 auto_service_type。
+resource_gl1               , 资源-工作负载优先          , 已废弃，请使用 auto_service。
+resource_gl2_type          , 类型-服务优先              , 已废弃，请使用 auto_service_type。
+resource_gl2               , 资源-服务优先              , 已废弃，请使用 auto_service。
+auto_instance_type         , 类型-容器 POD 优先         , `auto_intance`实例对应的类型。
+auto_instance              , 资源-容器 POD 优先         , IP 对应的实例。
+auto_service_type          , 类型-服务优先              , `auto_service`实例对应的类型。
+auto_service               , 资源-服务优先              , 在`auto_instance`基础上，将容器服务的 ClusterIP 与工作负载聚合为服务。
 gprocess                   , 进程                       ,
 
 k8s.label                  , K8s Label                  ,
@@ -50,3 +54,4 @@ tap_port                   , 采集位置标识               , 当采集位置�
 tap_port_name              , 采集位置名称               , 当采集位置类型为本地网卡时，此值表示采集网卡的名称。
 tap_port_type              , 采集位置类型               , 表示流量采集位置的类型，包括本地网卡（云内流量）、云网关网卡（云网关流量）、分光镜像（传统 IDC 流量）等。
 tap_side                   , 路径统计位置               , 采集位置在流量路径中所处的逻辑位置，例如客户端网卡、客户端容器节点、服务端容器节点、服务端网卡等。
+signal_source                 , 信号源                     ,
