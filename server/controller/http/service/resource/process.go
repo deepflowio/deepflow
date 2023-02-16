@@ -26,8 +26,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/db/redis"
+	. "github.com/deepflowio/deepflow/server/controller/http/service/resource/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
-	servicecommon "github.com/deepflowys/deepflow/server/controller/http/service/resource/common"
 	"github.com/gin-gonic/gin"
 )
 
