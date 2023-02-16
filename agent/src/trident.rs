@@ -59,7 +59,7 @@ use crate::{
     },
     config::PcapConfig,
     config::{
-        handler::{ConfigHandler, DispatcherConfig, ModuleConfig, PortAccess},
+        handler::{ConfigHandler, DispatcherConfig, ModuleConfig},
         Config, ConfigError, RuntimeConfig, YamlConfig,
     },
     debug::{ConstructDebugCtx, Debugger},
@@ -694,11 +694,9 @@ fn parse_tap_type(components: &mut Components, tap_types: Vec<trident::TapType>)
 pub struct DomainNameListener {
     stats_collector: Arc<stats::Collector>,
     synchronizer: Arc<Synchronizer>,
-    remote_log_config: RemoteLogConfig,
 
     ips: Vec<String>,
     domain_names: Vec<String>,
-    port_config: PortAccess,
 
     thread_handler: Option<JoinHandle<()>>,
     stopped: Arc<AtomicBool>,
@@ -710,19 +708,15 @@ impl DomainNameListener {
     fn new(
         stats_collector: Arc<stats::Collector>,
         synchronizer: Arc<Synchronizer>,
-        remote_log_config: RemoteLogConfig,
         domain_names: Vec<String>,
         ips: Vec<String>,
-        port_config: PortAccess,
     ) -> DomainNameListener {
         Self {
             stats_collector: stats_collector.clone(),
             synchronizer: synchronizer.clone(),
-            remote_log_config,
 
             domain_names: domain_names.clone(),
             ips: ips.clone(),
-            port_config,
 
             thread_handler: None,
             stopped: Arc::new(AtomicBool::new(false)),
@@ -756,8 +750,6 @@ impl DomainNameListener {
         let mut ips = self.ips.clone();
         let domain_names = self.domain_names.clone();
         let stopped = self.stopped.clone();
-        let remote_log_config = self.remote_log_config.clone();
-        let port_config = self.port_config.clone();
 
         info!(
             "Resolve controller domain name {} {}",
@@ -801,8 +793,6 @@ impl DomainNameListener {
                                 ctrl_ip.to_string(),
                                 ctrl_mac.to_string(),
                             );
-
-                            remote_log_config.set_remotes(&ips, port_config.load().analyzer_port);
                         }
                     }
                 })
@@ -849,6 +839,7 @@ pub struct Components {
     pub pcap_batch_uniform_sender: UniformSenderThread<BoxedPcapBatch>,
     pub policy_setter: PolicySetter,
     pub npb_bandwidth_watcher: Box<Arc<NpbBandwidthWatcher>>,
+    pub remote_log_config: RemoteLogConfig,
     max_memory: u64,
     tap_mode: TapMode,
     agent_mode: RunningMode,
@@ -1234,6 +1225,7 @@ impl Components {
         let mut handler_builders = Vec::new();
         let npb_arp_table = Arc::new(NpbArpTable::new(
             config_handler.candidate_config.npb.socket_type == SocketType::RawUdp,
+            exception_handler.clone(),
         ));
 
         let mut src_interfaces_and_namespaces = vec![];
@@ -1702,10 +1694,8 @@ impl Components {
         let domain_name_listener = DomainNameListener::new(
             stats_collector.clone(),
             synchronizer.clone(),
-            remote_log_config,
             config_handler.static_config.controller_domain_name.clone(),
             config_handler.static_config.controller_ips.clone(),
-            config_handler.port(),
         );
 
         let sender_config = config_handler.sender().load();
@@ -1764,6 +1754,7 @@ impl Components {
             policy_setter,
             npb_bandwidth_watcher,
             npb_arp_table,
+            remote_log_config,
         })
     }
 
