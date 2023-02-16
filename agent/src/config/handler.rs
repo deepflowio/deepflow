@@ -277,6 +277,8 @@ pub struct LogConfig {
     pub log_retention: u32,
     pub rsyslog_enabled: bool,
     pub host: String,
+    pub analyzer_ip: String,
+    pub analyzer_port: u16,
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -919,6 +921,8 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 log_retention: conf.log_retention,
                 rsyslog_enabled: conf.rsyslog_enabled,
                 host: conf.host.clone(),
+                analyzer_ip: dest_ip.to_string(),
+                analyzer_port: conf.analyzer_port,
             },
             #[cfg(target_os = "linux")]
             ebpf: EbpfConfig {
@@ -1382,6 +1386,18 @@ impl ConfigHandler {
                         warn!("failed to set log_retention: {}", e);
                     }
                 }
+            }
+            if candidate_config.log.analyzer_ip != new_config.log.analyzer_ip
+                || candidate_config.log.analyzer_port != new_config.log.analyzer_port
+            {
+                info!(
+                    "Rsyslog client connect to {} {}",
+                    &new_config.log.analyzer_ip, new_config.log.analyzer_port
+                );
+                self.remote_log_config.set_remotes(
+                    &vec![new_config.log.analyzer_ip.clone()],
+                    new_config.log.analyzer_port,
+                );
             }
             candidate_config.log = new_config.log;
         }

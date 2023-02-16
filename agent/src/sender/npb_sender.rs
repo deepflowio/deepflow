@@ -48,10 +48,11 @@ use crate::common::{IPV4_SRC_OFFSET, IPV6_SRC_OFFSET};
 use crate::config::NpbConfig;
 #[cfg(unix)]
 use crate::dispatcher::af_packet::{Options, Tpacket};
+use crate::exception::ExceptionHandler;
 use crate::utils::stats::{self, StatsOption};
 use npb_handler::NOT_SUPPORT;
 use public::counter::{Countable, CounterType, CounterValue, OwnedCountable};
-use public::proto::trident::SocketType;
+use public::proto::trident::{Exception, SocketType};
 use public::queue::Receiver;
 #[cfg(unix)]
 use public::utils::net::MAC_ADDR_LEN;
@@ -150,7 +151,7 @@ impl AfpacketSender {
         let entry = arp.lookup(&self.remote);
         if entry.is_none() {
             return Err(IOError::new(
-                ErrorKind::Other,
+                ErrorKind::NotFound,
                 format!("Arp not found: {}", self.remote),
             ));
         }
@@ -458,17 +459,19 @@ pub struct NpbArpTable {
     table: Arc<RwLock<HashMap<IpAddr, ArpEntry>>>,
     is_running: Arc<AtomicBool>,
     need_resolve_mac: Arc<AtomicBool>,
+    exception_handler: ExceptionHandler,
 
     thread_handler: Mutex<Option<JoinHandle<()>>>,
 }
 
 impl NpbArpTable {
-    pub fn new(need_resolve_mac: bool) -> Self {
+    pub fn new(need_resolve_mac: bool, exception_handler: ExceptionHandler) -> Self {
         NpbArpTable {
             table: Arc::new(RwLock::new(HashMap::new())),
             thread_handler: Mutex::new(None),
             is_running: Arc::new(AtomicBool::new(false)),
             need_resolve_mac: Arc::new(AtomicBool::new(need_resolve_mac)),
+            exception_handler,
         }
     }
 
@@ -521,6 +524,7 @@ impl NpbArpTable {
         table: Arc<RwLock<HashMap<IpAddr, ArpEntry>>>,
         is_running: Arc<AtomicBool>,
         need_resolve_mac: Arc<AtomicBool>,
+        exception_handler: ExceptionHandler,
     ) {
         let mut lookup_ips = vec![];
         let mut timeout_ips = vec![];
@@ -554,8 +558,11 @@ impl NpbArpTable {
                 if entry.is_ok() {
                     let entry = entry.unwrap();
                     table.write().unwrap().get_mut(key).unwrap().update(entry);
-                } else if *last_lookup {
-                    warn!("Arp lookup {} error: {:?}.", key, entry.unwrap_err());
+                } else {
+                    exception_handler.set(Exception::NpbNoGwArp);
+                    if *last_lookup {
+                        warn!("Arp lookup {} error: {:?}.", key, entry.unwrap_err());
+                    }
                 }
             }
 
@@ -573,11 +580,12 @@ impl NpbArpTable {
         let table = self.table.clone();
         let is_running = self.is_running.clone();
         let need_resolve_mac = self.need_resolve_mac.clone();
+        let exception_handler = self.exception_handler.clone();
         self.thread_handler.lock().unwrap().replace(
             thread::Builder::new()
                 .name("npb-sender".to_owned())
                 .spawn(move || {
-                    Self::run(table, is_running, need_resolve_mac);
+                    Self::run(table, is_running, need_resolve_mac, exception_handler);
                 })
                 .unwrap(),
         );
