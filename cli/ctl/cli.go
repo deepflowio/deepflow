@@ -22,8 +22,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/deepflowys/deepflow/cli/ctl/common"
-	"github.com/deepflowys/deepflow/server/ingester/ingesterctl/cmd"
+	"github.com/deepflowio/deepflow/cli/ctl/common"
+	"github.com/deepflowio/deepflow/server/ingester/ingesterctl/cmd"
 )
 
 type Ctl struct{}

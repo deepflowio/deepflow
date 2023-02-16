@@ -29,11 +29,11 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 
-	"github.com/deepflowys/deepflow/cli/ctl/common"
-	"github.com/deepflowys/deepflow/cli/ctl/common/jsonparser"
-	"github.com/deepflowys/deepflow/cli/ctl/common/printutil"
-	"github.com/deepflowys/deepflow/cli/ctl/example"
-	agentpb "github.com/deepflowys/deepflow/message/trident"
+	"github.com/deepflowio/deepflow/cli/ctl/common"
+	"github.com/deepflowio/deepflow/cli/ctl/common/jsonparser"
+	"github.com/deepflowio/deepflow/cli/ctl/common/printutil"
+	"github.com/deepflowio/deepflow/cli/ctl/example"
+	agentpb "github.com/deepflowio/deepflow/message/trident"
 )
 
 type RebalanceType string
