@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse"
+
 	/* "github.com/grafana/tempo/pkg/tempopb"
 	v1 "github.com/grafana/tempo/pkg/tempopb/common/v1"
 	resourceProto "github.com/grafana/tempo/pkg/tempopb/resource/v1"
@@ -17,27 +19,29 @@ import (
 	resourceProto "github.com/deepflowio/tempopb/resource/v1"
 	traceProto "github.com/deepflowio/tempopb/trace/v1"
 	"github.com/google/uuid"
+
 	//"github.com/k0kubun/pp"
-	logging "github.com/op/go-logging"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	logging "github.com/op/go-logging"
 )
 
 var log = logging.MustGetLogger("querier.tempo")
 var L7_TRACING_SERVICE_UID = "service_uid"
 var L7_TRACING_SERVICE_UNAME = "service_uname"
-var L7_FLOW_LOG_SERVICE_NAME = "service_name"
+var L7_FLOW_LOG_SERVICE_NAME = "app_service"
 var L7_TRACING_ENDPOINT = "endpoint"
 var L7_TRACING_OTEL_SDK_NAME = "telemetry.sdk.name"
 var L7_TRACING_OTEL_SDK_VERSION = "telemetry.sdk.version"
 var TABLE_NAME_L7_FLOW_LOG = "l7_flow_log"
 
 var SEARCH_FIELDS = []string{
-	"trace_id as traceID", "service_name as rootServiceName", "endpoint as rootTraceName", "toUnixTimestamp64Micro(start_time) as startTimeUnixNano", "response_duration/1000 as durationMs",
+	"trace_id as traceID", "app_service as rootServiceName", "endpoint as rootTraceName", "toUnixTimestamp64Micro(start_time) as startTimeUnixNano", "response_duration/1000 as durationMs",
 }
 
 var SPAN_ATTRS_MAP = map[string]string{

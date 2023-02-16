@@ -130,9 +130,8 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 				}
 			}
 		}
-		t.ResourceGl0ID1, t.ResourceGl0Type1 = common.GetResourceGl0(t.PodID1, t.PodNodeID1, t.L3DeviceID1, uint8(t.L3DeviceType1), t.L3EpcID1)
-		t.ResourceGl1ID1, t.ResourceGl1Type1 = common.GetResourceGl1(t.PodGroupID1, t.PodNodeID1, t.L3DeviceID1, uint8(t.L3DeviceType1), t.L3EpcID1)
-		t.ResourceGl2ID1, t.ResourceGl2Type1 = common.GetResourceGl2(t.ServiceID1, t.PodGroupID1, t.PodNodeID1, t.L3DeviceID1, uint8(t.L3DeviceType1), t.L3EpcID1)
+		t.AutoInstanceID1, t.AutoInstanceType1 = common.GetAutoInstance(t.PodID1, t.PodNodeID1, t.L3DeviceID1, uint8(t.L3DeviceType1), t.L3EpcID1)
+		t.AutoServiceID1, t.AutoServiceType1 = common.GetAutoService(t.ServiceID1, t.PodGroupID1, t.PodNodeID1, t.L3DeviceID1, uint8(t.L3DeviceType1), t.L3EpcID1)
 	} else {
 		t.Code |= MainAddCode
 		if t.L3EpcID == datatype.EPC_FROM_INTERNET {
@@ -200,9 +199,8 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 				}
 			}
 		}
-		t.ResourceGl0ID, t.ResourceGl0Type = common.GetResourceGl0(t.PodID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
-		t.ResourceGl1ID, t.ResourceGl1Type = common.GetResourceGl1(t.PodGroupID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
-		t.ResourceGl2ID, t.ResourceGl2Type = common.GetResourceGl2(t.ServiceID, t.PodGroupID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
+		t.AutoInstanceID, t.AutoInstanceType = common.GetAutoInstance(t.PodID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
+		t.AutoServiceID, t.AutoServiceType = common.GetAutoService(t.ServiceID, t.PodGroupID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
 	}
 
 	return nil

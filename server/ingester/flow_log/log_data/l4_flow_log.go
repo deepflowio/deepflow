@@ -252,19 +252,15 @@ type KnowledgeGraph struct {
 	ServiceID0    uint32 `json:"service_id_0"`
 	ServiceID1    uint32 `json:"service_id_1"`
 
-	ResourceGl0ID0   uint32
-	ResourceGl0Type0 uint8
-	ResourceGl1ID0   uint32
-	ResourceGl1Type0 uint8
-	ResourceGl2ID0   uint32
-	ResourceGl2Type0 uint8
+	AutoInstanceID0   uint32
+	AutoInstanceType0 uint8
+	AutoServiceID0    uint32
+	AutoServiceType0  uint8
 
-	ResourceGl0ID1   uint32
-	ResourceGl0Type1 uint8
-	ResourceGl1ID1   uint32
-	ResourceGl1Type1 uint8
-	ResourceGl2ID1   uint32
-	ResourceGl2Type1 uint8
+	AutoInstanceID1   uint32
+	AutoInstanceType1 uint8
+	AutoServiceID1    uint32
+	AutoServiceType1  uint8
 }
 
 var KnowledgeGraphColumns = []*ckdb.Column{
@@ -298,19 +294,15 @@ var KnowledgeGraphColumns = []*ckdb.Column{
 	ckdb.NewColumn("service_id_0", ckdb.UInt32),
 	ckdb.NewColumn("service_id_1", ckdb.UInt32),
 
-	ckdb.NewColumn("resource_gl0_id_0", ckdb.UInt32),
-	ckdb.NewColumn("resource_gl0_type_0", ckdb.UInt8),
-	ckdb.NewColumn("resource_gl1_id_0", ckdb.UInt32),
-	ckdb.NewColumn("resource_gl1_type_0", ckdb.UInt8),
-	ckdb.NewColumn("resource_gl2_id_0", ckdb.UInt32),
-	ckdb.NewColumn("resource_gl2_type_0", ckdb.UInt8),
+	ckdb.NewColumn("auto_instance_id_0", ckdb.UInt32),
+	ckdb.NewColumn("auto_instance_type_0", ckdb.UInt8),
+	ckdb.NewColumn("auto_service_id_0", ckdb.UInt32),
+	ckdb.NewColumn("auto_service_type_0", ckdb.UInt8),
 
-	ckdb.NewColumn("resource_gl0_id_1", ckdb.UInt32),
-	ckdb.NewColumn("resource_gl0_type_1", ckdb.UInt8),
-	ckdb.NewColumn("resource_gl1_id_1", ckdb.UInt32),
-	ckdb.NewColumn("resource_gl1_type_1", ckdb.UInt8),
-	ckdb.NewColumn("resource_gl2_id_1", ckdb.UInt32),
-	ckdb.NewColumn("resource_gl2_type_1", ckdb.UInt8),
+	ckdb.NewColumn("auto_instance_id_1", ckdb.UInt32),
+	ckdb.NewColumn("auto_instance_type_1", ckdb.UInt8),
+	ckdb.NewColumn("auto_service_id_1", ckdb.UInt32),
+	ckdb.NewColumn("auto_service_type_1", ckdb.UInt8),
 }
 
 func (k *KnowledgeGraph) WriteBlock(block *ckdb.Block) {
@@ -344,19 +336,16 @@ func (k *KnowledgeGraph) WriteBlock(block *ckdb.Block) {
 		k.ServiceID0,
 		k.ServiceID1,
 
-		k.ResourceGl0ID0,
-		k.ResourceGl0Type0,
-		k.ResourceGl1ID0,
-		k.ResourceGl1Type0,
-		k.ResourceGl2ID0,
-		k.ResourceGl2Type0,
+		k.AutoInstanceID0,
+		k.AutoInstanceType0,
+		k.AutoServiceID0,
+		k.AutoServiceType0,
 
-		k.ResourceGl0ID1,
-		k.ResourceGl0Type1,
-		k.ResourceGl1ID1,
-		k.ResourceGl1Type1,
-		k.ResourceGl2ID1,
-		k.ResourceGl2Type1)
+		k.AutoInstanceID1,
+		k.AutoInstanceType1,
+		k.AutoServiceID1,
+		k.AutoServiceType1,
+	)
 }
 
 type FlowInfo struct {
@@ -799,13 +788,11 @@ func (k *KnowledgeGraph) fill(
 		k.ServiceID1 = platformData.QueryService(k.PodID1, k.PodNodeID1, uint32(k.PodClusterID1), k.PodGroupID1, l3EpcID1, isIPv6, ip41, ip61, protocol, port)
 	}
 
-	k.ResourceGl0ID0, k.ResourceGl0Type0 = common.GetResourceGl0(k.PodID0, k.PodNodeID0, k.L3DeviceID0, k.L3DeviceType0, k.L3EpcID0)
-	k.ResourceGl1ID0, k.ResourceGl1Type0 = common.GetResourceGl1(k.PodGroupID0, k.PodNodeID0, k.L3DeviceID0, k.L3DeviceType0, k.L3EpcID0)
-	k.ResourceGl2ID0, k.ResourceGl2Type0 = common.GetResourceGl2(k.ServiceID0, k.PodGroupID0, k.PodNodeID0, k.L3DeviceID0, k.L3DeviceType0, k.L3EpcID0)
+	k.AutoInstanceID0, k.AutoInstanceType0 = common.GetAutoInstance(k.PodID0, k.PodNodeID0, k.L3DeviceID0, k.L3DeviceType0, k.L3EpcID0)
+	k.AutoServiceID0, k.AutoServiceType0 = common.GetAutoService(k.ServiceID0, k.PodGroupID0, k.PodNodeID0, k.L3DeviceID0, k.L3DeviceType0, k.L3EpcID0)
 
-	k.ResourceGl0ID1, k.ResourceGl0Type1 = common.GetResourceGl0(k.PodID1, k.PodNodeID1, k.L3DeviceID1, k.L3DeviceType1, k.L3EpcID1)
-	k.ResourceGl1ID1, k.ResourceGl1Type1 = common.GetResourceGl1(k.PodGroupID1, k.PodNodeID1, k.L3DeviceID1, k.L3DeviceType1, k.L3EpcID1)
-	k.ResourceGl2ID1, k.ResourceGl2Type1 = common.GetResourceGl2(k.ServiceID1, k.PodGroupID1, k.PodNodeID1, k.L3DeviceID1, k.L3DeviceType1, k.L3EpcID1)
+	k.AutoInstanceID1, k.AutoInstanceType1 = common.GetAutoInstance(k.PodID1, k.PodNodeID1, k.L3DeviceID1, k.L3DeviceType1, k.L3EpcID1)
+	k.AutoServiceID1, k.AutoServiceType1 = common.GetAutoService(k.ServiceID1, k.PodGroupID1, k.PodNodeID1, k.L3DeviceID1, k.L3DeviceType1, k.L3EpcID1)
 }
 
 func (k *KnowledgeGraph) FillL4(f *pb.Flow, isIPv6 bool, platformData *grpc.PlatformInfoTable) {

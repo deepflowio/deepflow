@@ -157,9 +157,9 @@ func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue
 		if i >= len(spanAttributes) {
 			switch key {
 			case "service.name":
-				h.ServiceName = getValueString(value)
+				h.AppService = getValueString(value)
 			case "service.instance.id":
-				h.ServiceInstanceId = getValueString(value)
+				h.AppInstance = getValueString(value)
 			// 通过一个[k8sattributesprocessor插件](https://pkg.go.dev/github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor#section-readme)
 			// 获取当前应用(otel-agent)对应上一级（即Span的来源）的IP地址，例如：Span为POD产生，则获取POD的IP；Span为部署在虚拟机上的进程产生，则获取虚拟机的IP
 			//   - 限制：因为获取的为当前应用的上一级IP，因此如果Span所在的应用发送数据给otel-agent是通过LB过来，则获取的为LB的IP
