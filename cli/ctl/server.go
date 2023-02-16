@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/deepflowys/deepflow/cli/ctl/common"
-	"github.com/deepflowys/deepflow/cli/ctl/common/table"
+	"github.com/deepflowio/deepflow/cli/ctl/common"
+	"github.com/deepflowio/deepflow/cli/ctl/common/table"
 
 	"github.com/spf13/cobra"
 )

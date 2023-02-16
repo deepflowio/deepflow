@@ -25,7 +25,7 @@ import (
 	"strings"
 
 	"github.com/bitly/go-simplejson"
-	"github.com/deepflowys/deepflow/cli/ctl/common"
+	"github.com/deepflowio/deepflow/cli/ctl/common"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
