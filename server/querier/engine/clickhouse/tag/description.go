@@ -587,7 +587,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 	}
 	if !isAdminFlag {
 		switch tag {
-		case "resource_gl0", "resource_gl1", "resource_gl2":
+		case "resource_gl0", "resource_gl1", "resource_gl2", "auto_instance", "auto_service":
 			results := &common.Result{}
 			for resourceKey, resourceType := range AutoMap {
 				// 增加资源ID
@@ -604,9 +604,11 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 				results.Values = append(results.Values, rst.Values...)
 			}
 			autoMap := map[string]map[string]int{
-				"resource_gl0": AutoPodMap,
-				"resource_gl1": AutoPodGroupMap,
-				"resource_gl2": AutoServiceMap,
+				"resource_gl0":  AutoPodMap,
+				"auto_instance": AutoPodMap,
+				"resource_gl1":  AutoPodGroupMap,
+				"resource_gl2":  AutoServiceMap,
+				"auto_service":  AutoServiceMap,
 			}
 			for resourceKey, resourceType := range autoMap[tag] {
 				resourceId := resourceKey + "_id"
@@ -723,9 +725,11 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 				autoDeviceTypes = append(autoDeviceTypes, strconv.Itoa(deviceType))
 			}
 			autoMap := map[string]map[string]int{
-				"resource_gl0": AutoPodMap,
-				"resource_gl1": AutoPodGroupMap,
-				"resource_gl2": AutoServiceMap,
+				"resource_gl0":  AutoPodMap,
+				"auto_instance": AutoPodMap,
+				"resource_gl1":  AutoPodGroupMap,
+				"resource_gl2":  AutoServiceMap,
+				"auto_service":  AutoServiceMap,
 			}
 			for _, deviceType := range autoMap[tag] {
 				autoDeviceTypes = append(autoDeviceTypes, strconv.Itoa(deviceType))
