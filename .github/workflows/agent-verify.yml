@@ -86,3 +86,18 @@ jobs:
           RUSTFLAGS='-D warnings' cargo check && \
           cargo fmt --all -- --check"
 
+  verify_agent_windows:
+    name: verify agent windows
+    runs-on: "cirun-aws-amd64-16c-windows--${{ github.run_id }}"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: verify agent
+        run: |
+          RUSTFLAGS='-D warnings' cargo check && \
+          cargo fmt --all -- --check"
+
