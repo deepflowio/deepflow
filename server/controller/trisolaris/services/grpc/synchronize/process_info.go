@@ -53,7 +53,7 @@ func (e *ProcessInfoEvent) GPIDSync(ctx context.Context, in *api.GPIDSyncRequest
 
 	log.Infof("receive gpid sync data from vtap(ctrl_ip: %s, ctrl_mac: %s, vtap_id: %d) data_len: %d",
 		in.GetCtrlIp(), in.GetCtrlMac(), in.GetVtapId(), len(in.GetEntries()))
-	processInfo.UpdateVTapGPIDReq(in)
+	processInfo.UpdateAgentGPIDReq(in)
 	resp := processInfo.GetGPIDResponseByReq(in)
 	log.Infof("send gpid response data(len=%d) to vtap(ctrl_ip: %s, ctrl_mac: %s, vtap_id: %d)",
 		len(resp.GetEntries()), in.GetCtrlIp(), in.GetCtrlMac(), in.GetVtapId())

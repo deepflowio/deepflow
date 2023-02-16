@@ -23,6 +23,7 @@ service Debug {
     rpc DebugGPIDGlobalData (GPIDSyncRequest) returns(GPIDGlobalData) {}
     rpc DebugGPIDVTapData (GPIDSyncRequest) returns(GPIDVTapData) {}
     rpc DebugRealGlobalData (GPIDSyncRequest) returns(RealGlobalData) {}
+    rpc DebugRIPToVIP (GPIDSyncRequest) returns(RVData) {}
 }
 
 enum State {
@@ -694,45 +695,60 @@ message GPIDSyncResponse {
 }
 
 message GlobalGPIDEntry {
-    optional uint32 vtap_id = 1;
-    optional ServiceProtocol protocol = 2 [default = ANY];
-    optional RoleType role = 3 [default = ROLE_NONE];
+    optional ServiceProtocol protocol = 1 [default = ANY]; // ANY means compressed
+    // server side
+    optional uint32 agent_id_1 = 2 [default = 0];
+    optional uint32 epc_id_1 = 3 [default = 0];
+    optional uint32 ipv4_1 = 4 [default = 0];
+    optional uint32 port_1 = 5 [default = 0];
+    optional uint32 pid_1 = 6 [default = 0];
+    optional uint32 gpid_1 = 7 [default = 0];
+    // client side
+    optional uint32 agent_id_0 = 8 [default = 0];
+    optional uint32 epc_id_0 = 9 [default = 0];
+    optional uint32 ipv4_0 = 10 [default = 0];
+    optional uint32 port_0 = 11 [default = 0];
+    optional uint32 pid_0 = 12 [default = 0];
+    optional uint32 gpid_0 = 13 [default = 0];
 
-    optional uint32 epc_id = 4 [default = 0];
-    optional uint32 ipv4 = 5 [default = 0];
-    optional uint32 port = 6 [default = 0];
-    optional uint32 pid = 7 [default = 0];
-    optional uint32 gpid = 8 [default = 0];
-}
-
-message GlobalLoopbackGPIDEntry {
-    optional uint32 vtap_id = 1;
-    optional ServiceProtocol protocol = 2 [default = ANY];
-    optional RoleType role = 3 [default = ROLE_NONE];
-
-    optional uint32 netns_idx = 4 [default = 0];
-    optional uint32 port = 5 [default = 0];
-    optional uint32 pid = 6 [default = 0];
-    optional uint32 gpid = 7 [default = 0];
+    optional uint32 netns_idx = 14 [default = 0];
 }
 
 message GPIDGlobalData {
     repeated GlobalGPIDEntry  entries = 1;
-    repeated GlobalLoopbackGPIDEntry loopback_entries = 2;
 }
 
 message RealClientToRealServer {
-    optional uint32 epc_id_1 = 1 [default = 0];
-    optional uint32 ipv4_1 = 2 [default = 0];
-    optional uint32 port_1 = 3 [default = 0];
+    optional uint32 epc_id_0 = 1 [default = 0];
+    optional uint32 ipv4_0 = 2 [default = 0];
+    optional uint32 port_0 = 3 [default = 0];
 
-    optional uint32 epc_id_real = 4 [default = 0];
-    optional uint32 ipv4_real = 5 [default = 0];
-    optional uint32 port_real = 6 [default = 0];
+    optional uint32 epc_id_1 = 4 [default = 0];
+    optional uint32 ipv4_1 = 5 [default = 0];
+    optional uint32 port_1 = 6 [default = 0];
+
+    optional uint32 epc_id_real = 7 [default = 0];
+    optional uint32 ipv4_real = 8 [default = 0];
+    optional uint32 port_real = 9 [default = 0];
+    optional uint32 pid_real = 10 [default = 0];
+    optional uint32 agent_id_real = 11 [default = 0];
 }
 
 message RealGlobalData {
     repeated RealClientToRealServer entries = 1;
+}
+
+message RipToVip {
+    optional ServiceProtocol protocol = 1 [default = ANY]; // ANY means compressed
+    optional uint32 epc_id = 2 [default = 0];
+    optional uint32 r_ipv4 = 3[default = 0];
+    optional uint32 r_port = 4 [default = 0];
+    optional uint32 v_ipv4 = 5 [default = 0];
+    optional uint32 v_port = 6 [default = 0];
+}
+
+message RVData {
+    repeated RipToVip  entries = 1;
 }
 
 message GPIDVTapData {

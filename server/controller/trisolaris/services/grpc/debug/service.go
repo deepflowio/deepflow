@@ -48,10 +48,9 @@ func (s *service) DebugGPIDGlobalData(ctx context.Context, in *api.GPIDSyncReque
 		in.GetCtrlIp(), in.GetCtrlMac())
 
 	processInfo := trisolaris.GetGVTapInfo().GetProcessInfo()
-	entries, loopbackEntries := processInfo.GetGlobalEntries()
+	entries := processInfo.GetGlobalEntries()
 	return &api.GPIDGlobalData{
-		Entries:         entries,
-		LoopbackEntries: loopbackEntries,
+		Entries: entries,
 	}, nil
 }
 
@@ -65,7 +64,7 @@ func (s *service) DebugGPIDVTapData(ctx context.Context, in *api.GPIDSyncRequest
 	log.Infof("receive DebugGPIDVTapLocalData about vtap(ctrl_ip: %s, ctrl_mac: %s, id: %d)",
 		in.GetCtrlIp(), in.GetCtrlMac(), vtapCache.GetVTapID())
 	processInfo := trisolaris.GetGVTapInfo().GetProcessInfo()
-	req, updateTime := processInfo.GetVTapGPIDReq(uint32(vtapCache.GetVTapID()))
+	req, updateTime := processInfo.GetAgentGPIDReq(uint32(vtapCache.GetVTapID()))
 	return &api.GPIDVTapData{
 		UpdateTime:  &updateTime,
 		SyncRequest: req,
@@ -76,5 +75,12 @@ func (s *service) DebugRealGlobalData(ctx context.Context, in *api.GPIDSyncReque
 	processInfo := trisolaris.GetGVTapInfo().GetProcessInfo()
 	return &api.RealGlobalData{
 		Entries: processInfo.GetRealGlobalData(),
+	}, nil
+}
+
+func (s *service) DebugRIPToVIP(ctx context.Context, in *api.GPIDSyncRequest) (*api.RVData, error) {
+	processInfo := trisolaris.GetGVTapInfo().GetProcessInfo()
+	return &api.RVData{
+		Entries: processInfo.GetRVData(),
 	}, nil
 }
