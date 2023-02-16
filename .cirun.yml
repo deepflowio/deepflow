@@ -279,3 +279,14 @@ runners:
     preemptible: false
     labels:
       - "cirun-aws-amd64-16c"
+  - name: "aws-amd64-16c-windows"
+    cloud: "aws"
+    instance_type:
+      - "c4.4xlarge"
+    machine_image: 
+      - ami-00dbe5b4169998950
+    region:
+      - "us-east-2"
+    preemptible: false
+    labels:
+      - "cirun-aws-amd64-16c-windows"
