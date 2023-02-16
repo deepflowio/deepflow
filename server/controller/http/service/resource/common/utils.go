@@ -21,8 +21,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/deepflowys/deepflow/server/controller/common"
-	servicecommon "github.com/deepflowys/deepflow/server/controller/http/service/common"
+	"github.com/deepflowio/deepflow/server/controller/common"
+	servicecommon "github.com/deepflowio/deepflow/server/controller/http/service/common"
 )
 
 func GetUserInfoFromHTTPHeader(header http.Header) (userType, userID int, err error) {

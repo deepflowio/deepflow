@@ -19,9 +19,9 @@ package resource
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/deepflowys/deepflow/server/controller/db/redis"
-	. "github.com/deepflowys/deepflow/server/controller/http/router/common"
-	. "github.com/deepflowys/deepflow/server/controller/http/service/resource"
+	"github.com/deepflowio/deepflow/server/controller/db/redis"
+	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
+	. "github.com/deepflowio/deepflow/server/controller/http/service/resource"
 )
 
 func ProcessRouter(e *gin.Engine, redisConfig *redis.RedisConfig) {
