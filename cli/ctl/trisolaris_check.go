@@ -147,6 +147,14 @@ func regiterCommand() []*cobra.Command {
 		},
 	}
 
+	ripToVipCmd := &cobra.Command{
+		Use:   "rip-to-vip",
+		Short: "get rip-to-vip from deepflow-server",
+		Run: func(cmd *cobra.Command, args []string) {
+			ripToVip(cmd)
+		},
+	}
+
 	allCmd := &cobra.Command{
 		Use:   "all",
 		Short: "get all data from deepflow-server",
@@ -158,7 +166,8 @@ func regiterCommand() []*cobra.Command {
 
 	commands := []*cobra.Command{platformDataCmd, ipGroupsCmd, flowAclsCmd,
 		tapTypesCmd, configCmd, segmentsCmd, vpcIPCmd, skipInterfaceCmd,
-		localServersCmd, gpidAgentResponseCmd, gpidGlobalTableCmd, gpidAgentRequestCmd, realGlobalCmd, allCmd}
+		localServersCmd, gpidAgentResponseCmd, gpidGlobalTableCmd, gpidAgentRequestCmd,
+		realGlobalCmd, ripToVipCmd, allCmd}
 	return commands
 }
 
@@ -275,10 +284,14 @@ func formatEntries(entry *trident.GPIDSyncEntry) string {
 
 func formatGlobalEntry(entry *trident.GlobalGPIDEntry) string {
 	buffer := bytes.Buffer{}
-	format := "{vtap_id: %d, protocol: %d, role: %d, epc_id: %d, ipv4: %s, port: %d, pid: %d, gpid: %d}"
+	format := "{ protocol: %d, agent_id_1: %d, epc_id_1: %d, ipv4_1: %s, port_1: %d, pid_1: %d, gpid_1: %d " +
+		"agent_id_0: %d, epc_id_0: %d, ipv4_0: %s, port_0: %d, pid_0: %d, gpid_0: %d, netns_idx: %d}"
 	buffer.WriteString(fmt.Sprintf(format,
-		entry.GetVtapId(), entry.GetProtocol(), entry.GetRole(), entry.GetEpcId(), utils.IpFromUint32(entry.GetIpv4()).String(),
-		entry.GetPort(), entry.GetPid(), entry.GetGpid()))
+		entry.GetProtocol(),
+		entry.GetAgentId_1(), entry.GetEpcId_1(), utils.IpFromUint32(entry.GetIpv4_1()).String(), entry.GetPort_1(), entry.GetPid_1(), entry.GetGpid_1(),
+		entry.GetAgentId_0(), entry.GetEpcId_0(), utils.IpFromUint32(entry.GetIpv4_0()).String(), entry.GetPort_0(), entry.GetPid_0(), entry.GetGpid_0(),
+		entry.GetNetnsIdx()))
+
 	return buffer.String()
 }
 
@@ -299,10 +312,6 @@ func gpidGlobalTable(cmd *cobra.Command) {
 	fmt.Println("GPIDGlobalData:")
 	for index, entry := range response.GetEntries() {
 		JsonFormat(index+1, formatGlobalEntry(entry))
-	}
-	fmt.Println("GPIDGlobalLoopbackData:")
-	for index, entry := range response.GetLoopbackEntries() {
-		JsonFormat(index+1, entry)
 	}
 }
 
@@ -325,7 +334,7 @@ func gpidAgentRequest(cmd *cobra.Command) {
 	}
 	req := response.GetSyncRequest()
 	tm := time.Unix(int64(response.GetUpdateTime()), 0)
-	fmt.Printf("response(ctrl_ip: %s ctrl_mac: %s vtap_id: %d update_time: %s)\n", req.GetCtrlIp(), req.GetCtrlMac(), req.GetVtapId(), tm.Format("2006-01-02 15:04:05"))
+	fmt.Printf("response(ctrl_ip: %s ctrl_mac: %s agent_id: %d update_time: %s)\n", req.GetCtrlIp(), req.GetCtrlMac(), req.GetVtapId(), tm.Format("2006-01-02 15:04:05"))
 	fmt.Println("Entries:")
 	if req == nil {
 		return
@@ -338,10 +347,13 @@ func gpidAgentRequest(cmd *cobra.Command) {
 func formatRealEntry(entry *trident.RealClientToRealServer) string {
 	buffer := bytes.Buffer{}
 	format := "{epc_id_1: %d, ipv4_1: %s, port_1: %d, " +
-		"epc_id_real: %d, ipv4_real: %s, port_real: %d}"
+		"epc_id_0: %d, ipv4_0: %s, port_0: %d, " +
+		"epc_id_real: %d, ipv4_real: %s, port_real: %d, pid_real: %d, agent_id_real: %d}"
 	buffer.WriteString(fmt.Sprintf(format,
 		entry.GetEpcId_1(), utils.IpFromUint32(entry.GetIpv4_1()).String(), entry.GetPort_1(),
-		entry.GetEpcIdReal(), utils.IpFromUint32(entry.GetIpv4Real()).String(), entry.GetPortReal()))
+		entry.GetEpcId_0(), utils.IpFromUint32(entry.GetIpv4_0()).String(), entry.GetPort_0(),
+		entry.GetEpcIdReal(), utils.IpFromUint32(entry.GetIpv4Real()).String(),
+		entry.GetPortReal(), entry.GetPidReal(), entry.GetAgentIdReal()))
 	return buffer.String()
 }
 
@@ -365,6 +377,41 @@ func realGlobal(cmd *cobra.Command) {
 	fmt.Println("Entries:")
 	for index, entry := range response.GetEntries() {
 		JsonFormat(index+1, formatRealEntry(entry))
+	}
+}
+
+func formatRVEntry(entry *trident.RipToVip) string {
+	buffer := bytes.Buffer{}
+	format := "{protocol: %d, epc_id: %d, r_ipv4: %s, r_port: %d, " +
+		" v_ipv4: %s, v_port: %d, }"
+	buffer.WriteString(fmt.Sprintf(format,
+		entry.GetProtocol(), entry.GetEpcId(),
+		utils.IpFromUint32(entry.GetRIpv4()).String(), entry.GetRPort(),
+		utils.IpFromUint32(entry.GetVIpv4()).String(), entry.GetVPort(),
+	))
+	return buffer.String()
+}
+
+func ripToVip(cmd *cobra.Command) {
+	conn := getConn(cmd)
+	if conn == nil {
+		return
+	}
+	defer conn.Close()
+	fmt.Printf("request trisolaris(%s), params(%+v)\n", conn.Target(), paramData)
+	c := trident.NewDebugClient(conn)
+	reqData := &trident.GPIDSyncRequest{
+		CtrlIp:  &paramData.CtrlIP,
+		CtrlMac: &paramData.CtrlMac,
+	}
+	response, err := c.DebugRIPToVIP(context.Background(), reqData)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println("Entries:")
+	for index, entry := range response.GetEntries() {
+		JsonFormat(index+1, formatRVEntry(entry))
 	}
 }
 
