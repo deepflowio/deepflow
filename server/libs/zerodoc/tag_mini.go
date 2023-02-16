@@ -61,6 +61,9 @@ type MiniField struct {
 
 	TagType  uint8 // (8B)
 	TagValue uint16
+
+	AppService  string
+	AppInstance string
 }
 
 func (f *MiniField) IP() net.IP {

@@ -30,6 +30,10 @@ resource_gl1_type         , resource_gl1_type_0       , resource_gl1_type_1     
 resource_gl1              , resource_gl1_0            , resource_gl1_1             , resource       ,                       , Universal Tag     , 111
 resource_gl2_type         , resource_gl2_type_0       , resource_gl2_type_1        , int_enum       , resource_gl2_type     , Universal Tag     , 111
 resource_gl2              , resource_gl2_0            , resource_gl2_1             , resource       ,                       , Universal Tag     , 111
+auto_instance_type        , auto_instance_type_0      , auto_instance_type_1       , int_enum       , auto_instance_type    , Universal Tag     , 111
+auto_instance             , auto_instance_0           , auto_instance_1            , resource       ,                       , Universal Tag     , 111
+auto_service_type         , auto_service_type_0       , auto_service_type_1        , int_enum       , auto_service_type     , Universal Tag     , 111
+auto_service              , auto_service_0            , auto_service_1             , resource       ,                       , Universal Tag     , 111
 gprocess                  , gprocess_0                , gprocess_1                 , resource       ,                       , Universal Tag     , 111
 
 k8s.label                 , k8s.label_0               , k8s.label_1                , map            ,                       , Custom Tag        , 111
@@ -62,8 +66,8 @@ response_code             , response_code             , response_code           
 response_exception        , response_exception        , response_exception         , string         ,                       , Application Layer , 111
 response_result           , response_result           , response_result            , string         ,                       , Application Layer , 111
 
-service_name              , service_name              , service_name               , string         ,                       , Service Info      , 111
-service_instance_id       , service_instance_id       , service_instance_id        , string         ,                       , Service Info      , 111
+app_service               , app_service               , app_service                , string         ,                       , Service Info      , 111
+app_instance              , app_instance              , app_instance               , string         ,                       , Service Info      , 111
 endpoint                  , endpoint                  , endpoint                   , string         ,                       , Service Info      , 111
 process_id                , process_id_0              , process_id_1               , int            ,                       , Service Info      , 111
 process_kname             , process_kname_0           , process_kname_1            , string         ,                       , Service Info      , 111

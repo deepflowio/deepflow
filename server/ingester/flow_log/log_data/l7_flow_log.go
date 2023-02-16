@@ -201,15 +201,15 @@ type L7FlowLog struct {
 	ResponseException string
 	ResponseResult    string
 
-	HttpProxyClient   string
-	XRequestId        string
-	TraceId           string
-	SpanId            string
-	ParentSpanId      string
-	SpanKind          uint8
-	spanKind          *uint8
-	ServiceName       string
-	ServiceInstanceId string
+	HttpProxyClient string
+	XRequestId      string
+	TraceId         string
+	SpanId          string
+	ParentSpanId    string
+	SpanKind        uint8
+	spanKind        *uint8
+	AppService      string
+	AppInstance     string
 
 	ResponseDuration uint64
 	RequestLength    *int64
@@ -253,8 +253,8 @@ func L7FlowLogColumns() []*ckdb.Column {
 		ckdb.NewColumn("span_id", ckdb.String).SetComment("SpanID"),
 		ckdb.NewColumn("parent_span_id", ckdb.String).SetComment("ParentSpanID"),
 		ckdb.NewColumn("span_kind", ckdb.UInt8Nullable).SetComment("SpanKind"),
-		ckdb.NewColumn("service_name", ckdb.LowCardinalityString).SetComment("service name"),
-		ckdb.NewColumn("service_instance_id", ckdb.String).SetComment("service instance id"),
+		ckdb.NewColumn("app_service", ckdb.LowCardinalityString).SetComment("app service"),
+		ckdb.NewColumn("app_instance", ckdb.String).SetComment("app instance"),
 
 		ckdb.NewColumn("response_duration", ckdb.UInt64),
 		ckdb.NewColumn("request_length", ckdb.Int64Nullable).SetComment("请求长度"),
@@ -294,8 +294,8 @@ func (h *L7FlowLog) WriteBlock(block *ckdb.Block) {
 		h.SpanId,
 		h.ParentSpanId,
 		h.spanKind,
-		h.ServiceName,
-		h.ServiceInstanceId,
+		h.AppService,
+		h.AppInstance,
 		h.ResponseDuration,
 		h.RequestLength,
 		h.ResponseLength,
@@ -371,7 +371,7 @@ func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData) {
 		if h.requestId != 0 {
 			h.RequestId = &h.requestId
 		}
-		h.ServiceName = l.ExtInfo.ServiceName
+		h.AppService = l.ExtInfo.ServiceName
 		h.XRequestId = l.ExtInfo.XRequestId
 		h.HttpProxyClient = l.ExtInfo.ClientIp
 		if l.ExtInfo.HttpUserAgent != "" {
@@ -561,8 +561,8 @@ func L7FlowLogToFlowTagInterfaces(l *L7FlowLog, fields, fieldValues *[]interface
 	time := uint32(l.L7Base.EndTime / US_TO_S_DEVISOR)
 	db, table := common.FLOW_LOG_DB, common.L7_FLOW_ID.String()
 
-	extraFieldNames := []string{"service_name", "endpoint", "service_instance_id"}
-	extraFieldValues := []string{l.ServiceName, l.Endpoint, l.ServiceInstanceId}
+	extraFieldNames := []string{"app_service", "endpoint", "app_instance"}
+	extraFieldValues := []string{l.AppService, l.Endpoint, l.AppInstance}
 
 	L3EpcIDs := []int32{l.L3EpcID0, l.L3EpcID1}
 	PodNSIDs := []uint16{l.PodNSID0, l.PodNSID1}

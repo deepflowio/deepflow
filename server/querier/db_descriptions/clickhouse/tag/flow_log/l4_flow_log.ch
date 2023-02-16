@@ -24,12 +24,16 @@ pod_service           , K8s 容器服务                 ,
 pod_group             , K8s 工作负载                 , 例如 Deployment、StatefulSet、Daemonset 等。
 pod                   , K8s 容器 POD                 ,
 service               , 服务                         ,
-resource_gl0_type     , 类型-容器 POD 优先           ,
-resource_gl0          , 资源-容器 POD 优先           ,
-resource_gl1_type     , 类型-工作负载优先            ,
-resource_gl1          , 资源-工作负载优先            ,
-resource_gl2_type     , 类型-服务优先                ,
-resource_gl2          , 资源-服务优先                ,
+resource_gl0_type     , 类型-容器 POD 优先           , 已废弃，请使用 auto_instance_type。
+resource_gl0          , 资源-容器 POD 优先           , 已废弃，请使用 auto_instance。
+resource_gl1_type     , 类型-工作负载优先            , 已废弃，请使用 auto_service_type。
+resource_gl1          , 资源-工作负载优先            , 已废弃，请使用 auto_service。
+resource_gl2_type     , 类型-服务优先                , 已废弃，请使用 auto_service_type。
+resource_gl2          , 资源-服务优先                , 已废弃，请使用 auto_service。
+auto_instance_type    , 类型-容器 POD 优先           , `auto_intance`实例对应的类型。
+auto_instance         , 资源-容器 POD 优先           , IP 对应的实例。
+auto_service_type     , 类型-服务优先                , `auto_service`实例对应的类型。
+auto_service          , 资源-服务优先                , 在`auto_instance`基础上，将容器服务的 ClusterIP 与工作负载聚合为服务。
 gprocess              , 进程                         ,
 
 k8s.label             , K8s Label                    ,

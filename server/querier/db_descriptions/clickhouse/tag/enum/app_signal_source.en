@@ -1,0 +1,5 @@
+# Value , DisplayName   , Description
+0      , Packet         , Packet data from AF_PACKET/Winpcap
+1      , xFlow          , Flow data from NetFlow/sFlow/NetStream
+3      , eBPF           , Function call data from eBPF
+4      , OTel           , Tracing data received using the OTLP protocol, such as otel-collector data

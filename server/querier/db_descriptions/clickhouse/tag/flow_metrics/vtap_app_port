@@ -28,6 +28,10 @@ resource_gl1_type          , resource_gl1_type         , resource_gl1_type      
 resource_gl1               , resource_gl1              , resource_gl1              , resource      ,                      , Universal Tag     , 111
 resource_gl2_type          , resource_gl2_type         , resource_gl2_type         , int_enum      , resource_gl2_type    , Universal Tag     , 111
 resource_gl2               , resource_gl2              , resource_gl2              , resource      ,                      , Universal Tag     , 111
+auto_instance_type         , auto_instance_type_0      , auto_instance_type_1      , int_enum      , auto_instance_type   , Universal Tag     , 111
+auto_instance              , auto_instance_0           , auto_instance_1           , resource      ,                      , Universal Tag     , 111
+auto_service_type          , auto_service_type_0       , auto_service_type_1       , int_enum      , auto_service_type    , Universal Tag     , 111
+auto_service               , auto_service_0            , auto_service_1            , resource      ,                      , Universal Tag     , 111
 gprocess                   , gprocess                  , gprocess                  , resource      ,                      , Universal Tag     , 111
 
 k8s.label                  , k8s.label                 , k8s.label                 , map           ,                      , Custom Tag        , 111
@@ -41,6 +45,9 @@ protocol                   , protocol                  , protocol               
 server_port                , server_port               , server_port               , int_enum      , server_port          , Transport Layer   , 111
 
 l7_protocol                , l7_protocol               , l7_protocol               , int_enum      , l7_protocol          , Application Layer , 111
+app_service                , app_service               , app_service               , string        ,                      , Application Layer , 111
+app_instance               , app_instance              , app_instance              , string        ,                      , Application Layer , 111
 
 tap                        , tap                       , tap                       , resource      ,                      , Capture Info      , 111
 vtap                       , vtap                      , vtap                      , resource      ,                      , Capture Info      , 111
+signal_source              , signal_source             , signal_source             , int_enum      , app_signal_source    , Capture Info      , 111
