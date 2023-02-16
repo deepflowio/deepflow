@@ -17,13 +17,13 @@
 package kubernetes_gather
 
 import (
-	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
-	"github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/common"
 	"strings"
 
 	"github.com/bitly/go-simplejson"
 	mapset "github.com/deckarep/golang-set"
+	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
+	"github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/common"
 	uuid "github.com/satori/go.uuid"
 )
 
@@ -88,35 +88,46 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 				label = "daemonset" + namespace + ":" + name
 			case 3:
 				replicas = 0
-				providerType := metaData.Get("labels").Get("virtual-kubelet.io/provider-cluster-type").MustString()
-				if providerType != "serverless" && providerType != "proprietary" {
-					log.Debugf("sci pod (%s) type (%s) not support", name, providerType)
-					continue
-				}
-				abstractPGType := metaData.Get("labels").Get("virtual-kubelet.io/provider-workload-type").MustString()
-				if abstractPGType == "" {
-					if _, ok := metaData.Get("labels").CheckGet("statefulset.kubernetes.io/pod-name"); ok {
-						abstractPGType = "StatefulSet"
-					} else {
-						abstractPGType = "Deployment"
+				if metaData.Get("ownerReferences").GetIndex(0).Get("kind").MustString() == "InPlaceSet" {
+					uID = metaData.Get("ownerReferences").GetIndex(0).Get("uid").MustString()
+					name = metaData.Get("ownerReferences").GetIndex(0).Get("name").MustString()
+					if k.podGroupLcuuids.Contains(uID) {
+						log.Debugf("inplaceset pod (%s) abstract workload already existed", name)
+						continue
 					}
+					serviceType = 1
+					label = "inplaceset" + ":" + namespace + ":" + name
+				} else {
+					providerType := metaData.Get("labels").Get("virtual-kubelet.io/provider-cluster-type").MustString()
+					if providerType != "serverless" && providerType != "proprietary" {
+						log.Debugf("sci pod (%s) type (%s) not support", name, providerType)
+						continue
+					}
+					abstractPGType := metaData.Get("labels").Get("virtual-kubelet.io/provider-workload-type").MustString()
+					if abstractPGType == "" {
+						if _, ok := metaData.Get("labels").CheckGet("statefulset.kubernetes.io/pod-name"); ok {
+							abstractPGType = "StatefulSet"
+						} else {
+							abstractPGType = "Deployment"
+						}
+					}
+					resourceName := metaData.Get("labels").Get("virtual-kubelet.io/provider-resource-name").MustString()
+					if resourceName == "" {
+						log.Debugf("sci pod (%s) abstract pod group not found provider resource name", name)
+						continue
+					}
+					targetIndex := strings.LastIndex(resourceName, "-")
+					abstractPGName := resourceName[:targetIndex]
+					uID = common.GetUUID(namespace+abstractPGName, uuid.Nil)
+					if k.podGroupLcuuids.Contains(uID) {
+						log.Debugf("sci pod (%s) abstract workload already existed", name)
+						continue
+					}
+					typeName := strings.ToLower(abstractPGType)
+					serviceType = pgNameToTypeID[typeName]
+					label = typeName + ":" + namespace + ":" + abstractPGName
+					name = abstractPGName
 				}
-				resourceName := metaData.Get("labels").Get("virtual-kubelet.io/provider-resource-name").MustString()
-				if resourceName == "" {
-					log.Debugf("sci pod (%s) abstract pod group not found provider resource name", name)
-					continue
-				}
-				targetIndex := strings.LastIndex(resourceName, "-")
-				abstractPGName := resourceName[:targetIndex]
-				uID = common.GetUUID(namespace+abstractPGName, uuid.Nil)
-				if k.podGroupLcuuids.Contains(uID) {
-					log.Debugf("sci pod (%s) abstract workload already existed", name)
-					continue
-				}
-				typeName := strings.ToLower(abstractPGType)
-				serviceType = pgNameToTypeID[typeName]
-				label = typeName + ":" + namespace + ":" + abstractPGName
-				name = abstractPGName
 			}
 
 			_, ok = k.nsLabelToGroupLcuuids[namespace+label]
