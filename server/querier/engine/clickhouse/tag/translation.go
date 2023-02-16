@@ -280,7 +280,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			autoIconDictGet := fmt.Sprintf("dictGet(flow_tag.device_map, 'icon_id', (toUInt64(%s),toUInt64(%s)))", autoTypeSuffix, autoIDSuffix)
 			iconIDStrSuffix := fmt.Sprintf("multiIf(%s=%d,%s,%s=%d,%s,%s)", autoTypeSuffix, VIF_DEVICE_TYPE_INTERNET, internetIconDictGet, autoTypeSuffix, VIF_DEVICE_TYPE_IP, ipIconDictGet, autoIconDictGet)
 			deviceTypeFilter := ""
-			if strings.HasPrefix(autoNameSuffix, "resource_gl0") {
+			if strings.HasPrefix(autoNameSuffix, "resource_gl0") || strings.HasPrefix(autoNameSuffix, "auto_instance") {
 				deviceTypeFilter = "devicetype not in (101,102)"
 			} else if strings.HasPrefix(autoNameSuffix, "resource_gl1") {
 				deviceTypeFilter = "devicetype not in (10,102)"
@@ -824,7 +824,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			),
 		}
 	}
-	for _, enumName := range []string{"resource_gl0_type", "resource_gl1_type", "resource_gl2_type", "tcp_flags_bit"} {
+	for _, enumName := range []string{"resource_gl0_type", "resource_gl1_type", "resource_gl2_type", "tcp_flags_bit", "auto_instance_type", "auto_service_type"} {
 		for _, suffix := range []string{"", "_0", "_1"} {
 			enumNameSuffix := enumName + suffix
 			tagResourceMap[enumNameSuffix] = map[string]*Tag{
