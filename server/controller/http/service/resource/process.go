@@ -86,7 +86,7 @@ func getProcesses() ([]model.Process, error) {
 
 	// get processes
 	var processes []mysql.Process
-	if err := mysql.Db.Unscoped().Find(&processes).Error; err != nil {
+	if err := mysql.Db.Unscoped().Order("created_at DESC").Find(&processes).Error; err != nil {
 		return nil, err
 	}
 	var resp []model.Process
