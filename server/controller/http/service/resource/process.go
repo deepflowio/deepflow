@@ -32,15 +32,7 @@ import (
 )
 
 func GetProcesses(c *gin.Context, redisConfig *redis.RedisConfig) (responseData []model.Process, err error) {
-	responseData, _ = getCache(c)
-	if len(responseData) != 0 {
-		return
-	}
 	responseData, err = getProcesses()
-	if err != nil {
-		return
-	}
-	setCache(c, redisConfig, responseData)
 	return
 }
 
@@ -86,7 +78,7 @@ func getProcesses() ([]model.Process, error) {
 
 	// get processes
 	var processes []mysql.Process
-	if err := mysql.Db.Find(&processes).Error; err != nil {
+	if err := mysql.Db.Unscoped().Order("created_at DESC").Find(&processes).Error; err != nil {
 		return nil, err
 	}
 	var resp []model.Process
@@ -114,6 +106,7 @@ func getProcesses() ([]model.Process, error) {
 			ResourceID:   vtapIDToInfo[process.VTapID].LaunchServerID,
 			StartTime:    process.StartTime.Format(common.GO_BIRTHDAY),
 			UpdateAt:     process.UpdatedAt.Format(common.GO_BIRTHDAY),
+			DeletedAt:    process.DeletedAt.Time.Format(common.GO_BIRTHDAY),
 		}
 		resp = append(resp, processResp)
 	}

@@ -38,6 +38,10 @@ message MiniField {
 
     uint32 gpid = 20;
     uint32 gpid1 = 21;
+
+    uint32 signal_source = 22;
+    string app_service = 23;
+    string app_instance = 24;
 }
 
 message MiniTag {
