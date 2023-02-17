@@ -17,6 +17,7 @@
 use std::collections::HashMap;
 use std::fmt;
 use std::net::IpAddr;
+use std::num::NonZeroUsize;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
@@ -117,7 +118,9 @@ pub struct Forward {
 }
 
 impl Forward {
-    const TABLE_SIZE: usize = 1 << 14;
+    // safe because parameter to new_unchecked is not zero
+    const TABLE_SIZE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(1 << 14) };
+
     pub fn new(queue_count: usize) -> Self {
         assert!(queue_count < super::MAX_QUEUE_COUNT && queue_count > 0);
         Self {

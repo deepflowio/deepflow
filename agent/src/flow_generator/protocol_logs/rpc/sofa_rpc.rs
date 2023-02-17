@@ -251,7 +251,7 @@ pub struct SofaRpcLog {
 impl Default for SofaRpcLog {
     fn default() -> Self {
         Self {
-            previous_log_info: LruCache::new(100),
+            previous_log_info: LruCache::new(100.try_into().unwrap()),
             info: SofaRpcInfo::default(),
             perf_stats: None,
             parsed: false,

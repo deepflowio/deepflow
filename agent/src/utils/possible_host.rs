@@ -21,7 +21,7 @@ pub struct PossibleHost(LruCache<u64, bool>);
 
 impl PossibleHost {
     pub fn new(capacity: usize) -> Self {
-        PossibleHost(LruCache::new(capacity))
+        PossibleHost(LruCache::new(capacity.try_into().unwrap()))
     }
 
     fn get_ip6_hash(ip6: &Ipv6Addr) -> u32 {
