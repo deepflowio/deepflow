@@ -17,12 +17,26 @@
 package resource
 
 import (
+	"encoding/json"
+	"errors"
+	"time"
+
+	goredis "github.com/go-redis/redis/v9"
+
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/redis"
+	. "github.com/deepflowio/deepflow/server/controller/http/service/resource/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
+	"github.com/gin-gonic/gin"
 )
 
-func GetProcesses() ([]model.Process, error) {
+func GetProcesses(c *gin.Context, redisConfig *redis.RedisConfig) (responseData []model.Process, err error) {
+	responseData, err = getProcesses()
+	return
+}
+
+func getProcesses() ([]model.Process, error) {
 	// store vtap info
 	var vtaps []mysql.VTap
 	if err := mysql.Db.Find(&vtaps).Error; err != nil {
@@ -64,7 +78,7 @@ func GetProcesses() ([]model.Process, error) {
 
 	// get processes
 	var processes []mysql.Process
-	if err := mysql.Db.Find(&processes).Error; err != nil {
+	if err := mysql.Db.Unscoped().Order("created_at DESC").Find(&processes).Error; err != nil {
 		return nil, err
 	}
 	var resp []model.Process
@@ -92,9 +106,52 @@ func GetProcesses() ([]model.Process, error) {
 			ResourceID:   vtapIDToInfo[process.VTapID].LaunchServerID,
 			StartTime:    process.StartTime.Format(common.GO_BIRTHDAY),
 			UpdateAt:     process.UpdatedAt.Format(common.GO_BIRTHDAY),
+			DeletedAt:    process.DeletedAt.Time.Format(common.GO_BIRTHDAY),
 		}
 		resp = append(resp, processResp)
 	}
 
 	return resp, nil
+}
+
+func getCache(c *gin.Context) ([]model.Process, error) {
+	var responseData []model.Process
+	key, err := GenerateRedisKey(c.Request.Header, c.Request.URL)
+	if err != nil {
+		log.Error(err)
+		return responseData, err
+	}
+	strCache, err := redis.RedisDB.ResourceAPI.Get(c, key).Result()
+	if errors.Is(err, goredis.Nil) {
+		return responseData, nil
+	}
+	if err != nil {
+		log.Error(err)
+		return responseData, err
+	}
+	err = json.Unmarshal([]byte(strCache), &responseData)
+	if err != nil {
+		log.Error(err)
+		return responseData, err
+	}
+	return responseData, nil
+}
+
+func setCache(c *gin.Context, redisConfig *redis.RedisConfig, data []model.Process) error {
+	key, err := GenerateRedisKey(c.Request.Header, c.Request.URL)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	strCache, err := json.Marshal(data)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	_, err = redis.RedisDB.ResourceAPI.Set(c, key, strCache, time.Duration(redisConfig.ResourceAPIExpireInterval)*time.Second).Result()
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	return nil
 }

@@ -298,7 +298,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 					innerSelectSlice = append(innerSelectSlice, sqlparser.String(colName))
 					outerWhereLeftSlice = append(outerWhereLeftSlice, sqlparser.String(colName))
 					for _, suffix := range []string{"", "_0", "_1"} {
-						for _, resourceName := range []string{"resource_gl0", "resource_gl1", "resource_gl2"} {
+						for _, resourceName := range []string{"resource_gl0", "auto_instance", "resource_gl1", "resource_gl2", "auto_service"} {
 							resourceTypeSuffix := resourceName + "_type" + suffix
 							if sqlparser.String(colName) == resourceName+suffix {
 								outerWhereLeftAppendSlice = append(outerWhereLeftAppendSlice, resourceTypeSuffix)
@@ -340,50 +340,54 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 			}
 		}
 	}
+	innerTransSql := ""
+	// No internal sql required when only star grouping
+	if len(innerSelectSlice) > 0 {
+		innerSelectSql := strings.Join(innerSelectSlice, ",")
+		innerGroupBySql := strings.Join(innerGroupBySlice, ",")
+		lowerSql := strings.ReplaceAll(sql, " WHERE ", " where ")
+		lowerSql = strings.ReplaceAll(lowerSql, " GROUP BY ", " group by ")
+		lowerSql = strings.ReplaceAll(lowerSql, " SLIMIT ", " slimit ")
+		lowerSql = strings.ReplaceAll(lowerSql, " LIMIT ", " limit ")
+		lowerSql = strings.ReplaceAll(lowerSql, " FROM ", " from ")
+		if strings.Contains(lowerSql, " limit ") {
+			lowerSqlLimitSlice := strings.Split(lowerSql, " limit ")
+			lowerSql = lowerSqlLimitSlice[0]
+		}
+		if strings.Contains(lowerSql, " where ") {
+			sqlSlice := strings.Split(lowerSql, " where ")
+			if strings.Contains(lowerSql, " group by ") {
+				whereSlice := strings.Split(sqlSlice[1], " group by ")
+				whereSql := whereSlice[0]
+				limitSlice := strings.Split(whereSlice[1], " slimit ")
+				limitSql := limitSlice[1]
+				innerSql = "SELECT " + innerSelectSql + " FROM " + table + " WHERE " + whereSql + " GROUP BY " + innerGroupBySql + " LIMIT " + limitSql
+			}
+		} else {
+			if strings.Contains(lowerSql, " group by ") {
+				groupSlice := strings.Split(lowerSql, " group by ")
+				limitSlice := strings.Split(groupSlice[1], " slimit ")
+				limitSql := limitSlice[1]
+				innerSql = "SELECT " + innerSelectSql + " FROM " + table + " GROUP BY " + innerGroupBySql + " LIMIT " + limitSql
+			}
+		}
+		innerEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context}
+		innerEngine.Init()
+		innerParser := parse.Parser{Engine: innerEngine}
+		err = innerParser.ParseSQL(innerSql)
+		if err != nil {
+			log.Error(err)
+			return nil, nil, err
+		}
+		for _, stmt := range innerEngine.Statements {
+			stmt.Format(innerEngine.Model)
+		}
+		FormatModel(innerEngine.Model)
+		// 使用Model生成View
+		innerEngine.View = view.NewView(innerEngine.Model)
+		innerTransSql = innerEngine.ToSQLString()
+	}
 
-	innerSelectSql := strings.Join(innerSelectSlice, ",")
-	innerGroupBySql := strings.Join(innerGroupBySlice, ",")
-	lowerSql := strings.ReplaceAll(sql, " WHERE ", " where ")
-	lowerSql = strings.ReplaceAll(lowerSql, " GROUP BY ", " group by ")
-	lowerSql = strings.ReplaceAll(lowerSql, " SLIMIT ", " slimit ")
-	lowerSql = strings.ReplaceAll(lowerSql, " LIMIT ", " limit ")
-	lowerSql = strings.ReplaceAll(lowerSql, " FROM ", " from ")
-	if strings.Contains(lowerSql, " limit ") {
-		lowerSqlLimitSlice := strings.Split(lowerSql, " limit ")
-		lowerSql = lowerSqlLimitSlice[0]
-	}
-	if strings.Contains(lowerSql, " where ") {
-		sqlSlice := strings.Split(lowerSql, " where ")
-		if strings.Contains(lowerSql, " group by ") {
-			whereSlice := strings.Split(sqlSlice[1], " group by ")
-			whereSql := whereSlice[0]
-			limitSlice := strings.Split(whereSlice[1], " slimit ")
-			limitSql := limitSlice[1]
-			innerSql = "SELECT " + innerSelectSql + " FROM " + table + " WHERE " + whereSql + " GROUP BY " + innerGroupBySql + " LIMIT " + limitSql
-		}
-	} else {
-		if strings.Contains(lowerSql, " group by ") {
-			groupSlice := strings.Split(lowerSql, " group by ")
-			limitSlice := strings.Split(groupSlice[1], " slimit ")
-			limitSql := limitSlice[1]
-			innerSql = "SELECT " + innerSelectSql + " FROM " + table + " GROUP BY " + innerGroupBySql + " LIMIT " + limitSql
-		}
-	}
-	innerEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context}
-	innerEngine.Init()
-	innerParser := parse.Parser{Engine: innerEngine}
-	err = innerParser.ParseSQL(innerSql)
-	if err != nil {
-		log.Error(err)
-		return nil, nil, err
-	}
-	for _, stmt := range innerEngine.Statements {
-		stmt.Format(innerEngine.Model)
-	}
-	FormatModel(innerEngine.Model)
-	// 使用Model生成View
-	innerEngine.View = view.NewView(innerEngine.Model)
-	innerTransSql := innerEngine.ToSQLString()
 	outerEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context}
 	outerEngine.Init()
 	outerParser := parse.Parser{Engine: outerEngine}
@@ -402,14 +406,19 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 	outerSlice := []string{}
 	outerWhereLeftSlice = append(outerWhereLeftSlice, outerWhereLeftAppendSlice...)
 	outerWhereLeftSql := strings.Join(outerWhereLeftSlice, ",")
-	if strings.Contains(outerTransSql, " PREWHERE ") {
-		oldWhereSlice := strings.Split(outerTransSql, " PREWHERE ")
-		outerSlice = append(outerSlice, oldWhereSlice[0])
-		outerSlice = append(outerSlice, " PREWHERE ("+outerWhereLeftSql+") IN ("+innerTransSql+") AND ")
-		outerSlice = append(outerSlice, oldWhereSlice[1])
+	outerSql := ""
+	// No internal sql required when only star grouping
+	if len(innerSelectSlice) > 0 {
+		if strings.Contains(outerTransSql, " PREWHERE ") {
+			oldWhereSlice := strings.Split(outerTransSql, " PREWHERE ")
+			outerSlice = append(outerSlice, oldWhereSlice[0])
+			outerSlice = append(outerSlice, " PREWHERE ("+outerWhereLeftSql+") IN ("+innerTransSql+") AND ")
+			outerSlice = append(outerSlice, oldWhereSlice[1])
+			outerSql = strings.Join(outerSlice, "")
+		}
+	} else {
+		outerSql = outerTransSql
 	}
-	outerSql := strings.Join(outerSlice, "")
-
 	query_uuid := args.QueryUUID
 	debug := &client.Debug{
 		IP:        config.Cfg.Clickhouse.Host,
@@ -797,6 +806,7 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 				binFunction, _ := GetBinaryFunc(funcName, args)
 				binFunction.SetAlias(as)
 				e.Statements = append(e.Statements, binFunction)
+				e.ColumnSchemas[len(e.ColumnSchemas)-1].Type = common.COLUMN_SCHEMA_TYPE_METRICS
 				return nil
 			}
 		}

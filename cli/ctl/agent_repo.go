@@ -67,7 +67,7 @@ func registerAgentCommand() *cobra.Command {
 	create := &cobra.Command{
 		Use:     "create",
 		Short:   "create repo agent",
-		Example: "deepflow-ctl repo agent create -a x86 -image deepflow-agent",
+		Example: "deepflow-ctl repo agent create --arch x86 -image deepflow-agent",
 		Run: func(cmd *cobra.Command, args []string) {
 			if _, err := os.Stat(image); errors.Is(err, os.ErrNotExist) {
 				fmt.Printf("file %s not found\n", image)

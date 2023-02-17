@@ -14,23 +14,11 @@
  * limitations under the License.
  */
 
-package resource
+package common
 
-import (
-	"github.com/gin-gonic/gin"
+var HEADER_KEY_X_USER_TYPE = "X-User-Type"
+var HEADER_KEY_X_USER_ID = "X-User-Id"
 
-	"github.com/deepflowio/deepflow/server/controller/db/redis"
-	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
-	. "github.com/deepflowio/deepflow/server/controller/http/service/resource"
-)
-
-func ProcessRouter(e *gin.Engine, redisConfig *redis.RedisConfig) {
-	e.GET("/v1/processes/", getProcesses(redisConfig))
-}
-
-func getProcesses(redisConfig *redis.RedisConfig) gin.HandlerFunc {
-	return gin.HandlerFunc(func(c *gin.Context) {
-		data, err := GetProcesses(c, redisConfig)
-		JsonResponse(c, data, err)
-	})
-}
+var REDIS_KEY_PREFIX_DEEPFLOW = "deepflow_"
+var REDIS_KEY_PREFIX_RESOURECE_API = "resource_api_"
+var REDIS_KEY_PREFIX_DIMENSION_RESOURCE = "dimension_resource_"
