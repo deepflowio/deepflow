@@ -806,6 +806,7 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 				binFunction, _ := GetBinaryFunc(funcName, args)
 				binFunction.SetAlias(as)
 				e.Statements = append(e.Statements, binFunction)
+				e.ColumnSchemas[len(e.ColumnSchemas)-1].Type = common.COLUMN_SCHEMA_TYPE_METRICS
 				return nil
 			}
 		}
