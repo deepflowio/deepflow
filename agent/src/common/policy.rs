@@ -884,9 +884,8 @@ impl TryFrom<IpProtocol> for GpidProtocol {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GpidEntry {
-    pub role: trident::RoleType,
     pub protocol: GpidProtocol,
     // Server side
     pub epc_id_1: i32,
@@ -899,10 +898,32 @@ pub struct GpidEntry {
     pub port_0: u16,
     pub pid_0: u32, // PID or GPID
     // Real ip
+    pub role_real: trident::RoleType,
     pub epc_id_real: i32,
     pub ip_real: u32, // Only support IPV4.
     pub port_real: u16,
     pub pid_real: u32, // PID or GPID
+}
+
+impl Default for GpidEntry {
+    fn default() -> Self {
+        Self {
+            role_real: trident::RoleType::RoleNone,
+            protocol: GpidProtocol::Udp,
+            epc_id_1: 0,
+            ip_1: 0,
+            port_1: 0,
+            pid_1: 0,
+            epc_id_0: 0,
+            ip_0: 0,
+            port_0: 0,
+            pid_0: 0,
+            epc_id_real: 0,
+            ip_real: 0,
+            port_real: 0,
+            pid_real: 0,
+        }
+    }
 }
 
 pub fn gpid_key(ip: u32, epc_id: i32, port: u16) -> u64 {
@@ -911,15 +932,15 @@ pub fn gpid_key(ip: u32, epc_id: i32, port: u16) -> u64 {
 }
 
 impl GpidEntry {
-    pub fn client_keys(&self) -> u64 {
+    pub fn client_key(&self) -> u64 {
         return gpid_key(self.ip_0, self.epc_id_0, self.port_0);
     }
 
-    pub fn server_keys(&self) -> u64 {
+    pub fn server_key(&self) -> u64 {
         return gpid_key(self.ip_1, self.epc_id_1, self.port_1);
     }
 
-    pub fn real_keys(&self) -> u64 {
+    pub fn real_key(&self) -> u64 {
         return gpid_key(self.ip_real, self.epc_id_real, self.port_real);
     }
 }
@@ -961,7 +982,7 @@ impl TryFrom<&trident::GpidSyncEntry> for GpidEntry {
             port_real: (value.port_real() & 0xffff) as u16,
             pid_real: (value.pid_real() & 0xffffffff) as u32,
             protocol,
-            role: value.role_real(),
+            role_real: value.role_real(),
         })
     }
 }

@@ -21,7 +21,7 @@ use std::sync::{
     Arc, RwLock,
 };
 
-use log::debug;
+use log::{debug, warn};
 use pnet::datalink;
 use public::enums::IpProtocol;
 
@@ -58,12 +58,12 @@ impl PolicyMonitor {
         key: &LookupKey,
         policy: &Arc<PolicyData>,
         endpoints: &Arc<EndpointData>,
-        socket_extra_infos: &(SocketExtraInfo, SocketExtraInfo),
+        gpid_entries: &GpidEntry,
     ) {
         if self.enabled.load(Ordering::Relaxed) {
             let _ = self.sender.send(format!(
-                "{}\n\t{:?}\n\t{:?}\n\tSOCKET: {:?} > {:?}",
-                key, endpoints, policy, &socket_extra_infos.0, &socket_extra_infos.1,
+                "{}\n\t{:?}\n\t{:?}\n\tSOCKET: {:?}",
+                key, endpoints, policy, gpid_entries,
             ));
         }
     }
@@ -76,36 +76,15 @@ impl PolicyMonitor {
         dst_port: u16,
         src_epc: i32,
         dst_epc: i32,
-        socket_extra_infos: &(SocketExtraInfo, SocketExtraInfo),
+        gpid_entries: &GpidEntry,
     ) {
         if self.enabled.load(Ordering::Relaxed) {
             let _ = self.sender.send(format!(
-                "EBPF: IP {} > {} PORT {} > {} L3EPC {} > {} SOCKET: {:?} > {:?}",
-                src_ip,
-                dst_ip,
-                src_port,
-                dst_port,
-                src_epc,
-                dst_epc,
-                &socket_extra_infos.0,
-                &socket_extra_infos.1,
+                "EBPF: IP {} > {} PORT {} > {} L3EPC {} > {} SOCKET: {:?} ",
+                src_ip, dst_ip, src_port, dst_port, src_epc, dst_epc, gpid_entries,
             ));
         }
     }
-}
-
-#[derive(Clone, Copy, Debug, Default)]
-pub struct SocketExtraInfo {
-    // GPID (Global ProcessID) associated with the socket endpoint
-    gpid: u32,
-    role: RoleType,
-    gpid_real: u32,
-    // Real client address information before NAT, or real server address information after NAT
-    ip_real: u32,
-    // The epc_id here will not be the Internet
-    epc_id_real: u16,
-    port_real: u16,
-    role_real: RoleType,
 }
 
 pub struct Policy {
@@ -113,7 +92,7 @@ pub struct Policy {
     table: FirstPath,
     forward: Forward,
 
-    nat: RwLock<Vec<HashMap<u64, SocketExtraInfo>>>,
+    nat: RwLock<Vec<HashMap<u128, GpidEntry>>>,
 
     queue_count: usize,
     first_hit: usize,
@@ -179,102 +158,97 @@ impl Policy {
         // TODO: 根据TTL添加forward表
     }
 
-    fn fill_socket_extra_info(
-        &mut self,
-        packet: &mut MetaPacket,
-        socket_extra_infos: &(SocketExtraInfo, SocketExtraInfo),
-    ) {
-        let (socket_extra_info_0, socket_extra_info_1) = socket_extra_infos;
+    fn fill_gpid_entry(packet: &mut MetaPacket, gpid_entry: &GpidEntry) {
         let mut direction = packet.lookup_key.direction;
 
-        // We consider the direction (role) in socket_extra_info to be the ground truth because
+        // We consider the direction (role) in GpidEntry to be the ground truth because
         // it is taken from the socket information of the OS. Both meta_packet and flow need to
         // correct their direction based on this.
         packet.need_reverse_flow = match direction {
-            PacketDirection::ClientToServer => {
-                socket_extra_info_0.role == RoleType::RoleServer
-                    || socket_extra_info_1.role == RoleType::RoleClient
-            }
             PacketDirection::ServerToClient => {
-                socket_extra_info_0.role == RoleType::RoleClient
-                    || socket_extra_info_1.role == RoleType::RoleServer
+                gpid_entry.port_1 != packet.lookup_key.src_port
+                    || IpAddr::from(Ipv4Addr::from(gpid_entry.ip_1)) != packet.lookup_key.src_ip
+            }
+            PacketDirection::ClientToServer => {
+                gpid_entry.port_1 != packet.lookup_key.dst_port
+                    || IpAddr::from(Ipv4Addr::from(gpid_entry.ip_1)) != packet.lookup_key.dst_ip
             }
         };
         if packet.need_reverse_flow {
             direction = direction.reversed()
-        };
+        }
 
         match direction {
             PacketDirection::ClientToServer => {
-                if socket_extra_info_0.port_real > 0 {
+                if gpid_entry.port_real > 0 {
                     // 用于客户端处采集的流量，流量服务端IP为NAT IP，需要通过客户端信息查询流量真实的服务端IP
-                    match socket_extra_info_0.role_real {
+                    match gpid_entry.role_real {
                         RoleType::RoleServer => {
-                            packet.gpid_0 = socket_extra_info_0.gpid;
-                            packet.gpid_1 = socket_extra_info_0.gpid_real;
+                            packet.gpid_0 = gpid_entry.pid_0;
+                            packet.gpid_1 = gpid_entry.pid_real;
                             // NAT_SOURCE_RTOA高于当前优先级会更新数据
                             if TapPort::NAT_SOURCE_RTOA > packet.lookup_key.dst_nat_source {
                                 packet.lookup_key.dst_nat_source = TapPort::NAT_SOURCE_RTOA;
-                                packet.lookup_key.dst_nat_port = socket_extra_info_0.port_real;
+                                packet.lookup_key.dst_nat_port = gpid_entry.port_real;
                                 packet.lookup_key.dst_nat_ip =
-                                    IpAddr::V4(Ipv4Addr::from(socket_extra_info_0.ip_real));
+                                    IpAddr::V4(Ipv4Addr::from(gpid_entry.ip_real));
                             }
                         }
                         RoleType::RoleClient => {
-                            packet.gpid_0 = socket_extra_info_0.gpid_real;
+                            packet.gpid_0 = gpid_entry.pid_real;
                             // NAT_SOURCE_TOA高于当前优先级会更新数据
                             if TapPort::NAT_SOURCE_TOA > packet.lookup_key.src_nat_source {
                                 packet.lookup_key.src_nat_source = TapPort::NAT_SOURCE_TOA;
-                                packet.lookup_key.src_nat_port = socket_extra_info_0.port_real;
+                                packet.lookup_key.src_nat_port = gpid_entry.port_real;
                                 packet.lookup_key.src_nat_ip =
-                                    IpAddr::V4(Ipv4Addr::from(socket_extra_info_0.ip_real));
+                                    IpAddr::V4(Ipv4Addr::from(gpid_entry.ip_real));
                             }
-                            packet.gpid_1 = socket_extra_info_1.gpid;
+                            packet.gpid_1 = gpid_entry.pid_1;
                         }
                         RoleType::RoleNone => {
-                            packet.gpid_0 = socket_extra_info_0.gpid;
-                            packet.gpid_1 = socket_extra_info_1.gpid;
+                            packet.gpid_0 = gpid_entry.pid_0;
+                            packet.gpid_1 = gpid_entry.pid_1;
                         }
                     }
                 } else {
-                    packet.gpid_0 = socket_extra_info_0.gpid;
-                    packet.gpid_1 = socket_extra_info_1.gpid;
+                    packet.gpid_0 = gpid_entry.pid_0;
+                    packet.gpid_1 = gpid_entry.pid_1;
                 }
             }
             PacketDirection::ServerToClient => {
-                if socket_extra_info_1.port_real > 0 {
+                if gpid_entry.port_real > 0 {
                     // 用于客户端处采集的流量，流量服务端IP为NAT IP，需要通过客户端信息查询流量真实的服务端IP
-                    match socket_extra_info_1.role_real {
+                    match gpid_entry.role_real {
                         RoleType::RoleServer => {
-                            packet.gpid_0 = socket_extra_info_1.gpid_real;
+                            packet.gpid_0 = gpid_entry.pid_real;
                             // NNAT_SOURCE_RTOA高于当前优先级会更新数据
                             if TapPort::NAT_SOURCE_RTOA > packet.lookup_key.src_nat_source {
                                 packet.lookup_key.src_nat_source = TapPort::NAT_SOURCE_RTOA;
-                                packet.lookup_key.src_nat_port = socket_extra_info_1.port_real;
+                                packet.lookup_key.src_nat_port = gpid_entry.port_real;
                                 packet.lookup_key.src_nat_ip =
-                                    IpAddr::V4(Ipv4Addr::from(socket_extra_info_1.ip_real));
+                                    IpAddr::V4(Ipv4Addr::from(gpid_entry.ip_real));
                             }
-                            packet.gpid_1 = socket_extra_info_1.gpid;
+                            packet.gpid_1 = gpid_entry.pid_0;
                         }
                         RoleType::RoleClient => {
-                            packet.gpid_0 = socket_extra_info_0.gpid;
-                            packet.gpid_1 = socket_extra_info_1.gpid_real;
+                            packet.gpid_0 = gpid_entry.pid_1;
+                            packet.gpid_1 = gpid_entry.pid_real;
                             // NAT_SOURCE_RTOA高于当前优先级会更新数据
                             if TapPort::NAT_SOURCE_TOA > packet.lookup_key.dst_nat_source {
                                 packet.lookup_key.dst_nat_source = TapPort::NAT_SOURCE_TOA;
-                                packet.lookup_key.dst_nat_port = socket_extra_info_1.port_real;
+                                packet.lookup_key.dst_nat_port = gpid_entry.port_real;
                                 packet.lookup_key.dst_nat_ip =
-                                    IpAddr::V4(Ipv4Addr::from(socket_extra_info_1.ip_real));
+                                    IpAddr::V4(Ipv4Addr::from(gpid_entry.ip_real));
                             }
                         }
                         RoleType::RoleNone => {
-                            packet.gpid_0 = socket_extra_info_0.gpid;
-                            packet.gpid_1 = socket_extra_info_1.gpid;
+                            packet.gpid_0 = gpid_entry.pid_1;
+                            packet.gpid_1 = gpid_entry.pid_0;
                         }
                     }
                 } else {
-                    packet.gpid_0 = socket_extra_info_0.gpid;
-                    packet.gpid_1 = socket_extra_info_1.gpid;
+                    packet.gpid_0 = gpid_entry.pid_1;
+                    packet.gpid_1 = gpid_entry.pid_0;
                 }
             }
         }
@@ -287,18 +261,18 @@ impl Policy {
         let key = &mut packet.lookup_key;
 
         if packet.signal_source == SignalSource::EBPF {
-            let (endpoints, socket_extra_infos) = self.lookup_all_by_epc(key, local_epc_id);
+            let (endpoints, gpid_entries) = self.lookup_all_by_epc(key, local_epc_id);
             packet.endpoint_data = Some(Arc::new(endpoints));
             packet.policy_data = Some(Arc::new(PolicyData::default())); // Only endpoint is required for ebpf data
-            self.fill_socket_extra_info(packet, &socket_extra_infos);
+            Self::fill_gpid_entry(packet, &gpid_entries);
             return;
         }
 
         // 策略查序会改变端口，为不影响后续业务， 这里保存
-        if let Some((policy, endpoints, socket_extra_infos)) = self.lookup_all_by_key(key) {
+        if let Some((policy, endpoints, gpid_entries)) = self.lookup_all_by_key(key) {
             packet.policy_data = Some(policy);
             packet.endpoint_data = Some(endpoints);
-            self.fill_socket_extra_info(packet, &socket_extra_infos);
+            Self::fill_gpid_entry(packet, &gpid_entries);
         }
     }
 
@@ -307,13 +281,13 @@ impl Policy {
         key: &LookupKey,
         policy: &Arc<PolicyData>,
         endpoints: &Arc<EndpointData>,
-        socket_extra_infos: &(SocketExtraInfo, SocketExtraInfo),
+        gpid_entry: &GpidEntry,
     ) {
         if self.monitor.is_some() {
             self.monitor
                 .as_ref()
                 .unwrap()
-                .send(key, policy, endpoints, socket_extra_infos);
+                .send(key, policy, endpoints, gpid_entry);
         }
     }
 
@@ -325,17 +299,11 @@ impl Policy {
         dst_port: u16,
         src_epc: i32,
         dst_epc: i32,
-        socket_extra_infos: &(SocketExtraInfo, SocketExtraInfo),
+        gpid_entry: &GpidEntry,
     ) {
         if self.monitor.is_some() {
             self.monitor.as_ref().unwrap().send_ebpf(
-                src_ip,
-                dst_ip,
-                src_port,
-                dst_port,
-                src_epc,
-                dst_epc,
-                socket_extra_infos,
+                src_ip, dst_ip, src_port, dst_port, src_epc, dst_epc, gpid_entry,
             );
         }
     }
@@ -343,29 +311,25 @@ impl Policy {
     pub fn lookup_all_by_key(
         &mut self,
         key: &mut LookupKey,
-    ) -> Option<(
-        Arc<PolicyData>,
-        Arc<EndpointData>,
-        (SocketExtraInfo, SocketExtraInfo),
-    )> {
+    ) -> Option<(Arc<PolicyData>, Arc<EndpointData>, GpidEntry)> {
         let src_port = key.src_port;
         let dst_port = key.dst_port;
         if let Some(x) = self.table.fast_get(key) {
             key.src_port = src_port;
             key.dst_port = dst_port;
-            let socket_extra_infos = self.lookup_soceket_extra_info(key, &x.1);
             self.fast_hit += 1;
-            self.send(key, &x.0, &x.1, &socket_extra_infos);
-            return Some((x.0, x.1, socket_extra_infos));
+            let entry = self.lookup_gpid_entry(key, &x.1);
+            self.send(key, &x.0, &x.1, &entry);
+            return Some((x.0, x.1, entry));
         }
         self.first_hit += 1;
         let endpoints = self.labeler.get_endpoint_data(key);
         let x = self.table.first_get(key, endpoints).unwrap();
         key.src_port = src_port;
         key.dst_port = dst_port;
-        let socket_extra_infos = self.lookup_soceket_extra_info(key, &x.1);
-        self.send(key, &x.0, &x.1, &socket_extra_infos);
-        return Some((x.0, x.1, socket_extra_infos));
+        let entry = self.lookup_gpid_entry(key, &x.1);
+        self.send(key, &x.0, &x.1, &entry);
+        return Some((x.0, x.1, entry));
     }
 
     fn lookup_epc_by_epc(&mut self, src: IpAddr, dst: IpAddr, l3_epc_id_src: i32) -> i32 {
@@ -380,17 +344,17 @@ impl Policy {
             0,
             endpoints.src_info.l3_epc_id,
             endpoints.dst_info.l3_epc_id,
-            &(SocketExtraInfo::default(), SocketExtraInfo::default()),
+            &GpidEntry::default(),
         );
 
         endpoints.dst_info.l3_epc_id
     }
 
     fn lookup_all_by_epc(
-        &mut self,
+        &self,
         key: &mut LookupKey,
         local_epc_id: i32,
-    ) -> (EndpointData, (SocketExtraInfo, SocketExtraInfo)) {
+    ) -> (EndpointData, GpidEntry) {
         // TODO：可能也需要走fast提升性能
         let (l3_epc_id_0, l3_epc_id_1) = if key.l2_end_0 {
             (local_epc_id, 0)
@@ -400,7 +364,7 @@ impl Policy {
         let endpoints =
             self.labeler
                 .get_endpoint_data_by_epc(key.src_ip, key.dst_ip, l3_epc_id_0, l3_epc_id_1);
-        let socket_extra_infos = self.lookup_soceket_extra_info(key, &endpoints);
+        let entry = self.lookup_gpid_entry(key, &endpoints);
         self.send_ebpf(
             key.src_ip,
             key.dst_ip,
@@ -408,10 +372,10 @@ impl Policy {
             key.dst_port,
             endpoints.src_info.l3_epc_id,
             endpoints.dst_info.l3_epc_id,
-            &socket_extra_infos,
+            &entry,
         );
 
-        (endpoints, socket_extra_infos)
+        (endpoints, entry)
     }
 
     pub fn update_interfaces(
@@ -451,13 +415,9 @@ impl Policy {
         Ok(())
     }
 
-    fn lookup_soceket_extra_info(
-        &self,
-        key: &mut LookupKey,
-        _endpoints: &EndpointData,
-    ) -> (SocketExtraInfo, SocketExtraInfo) {
+    fn lookup_gpid_entry(&self, key: &mut LookupKey, _endpoints: &EndpointData) -> GpidEntry {
         if !key.is_ipv4() || (key.proto != IpProtocol::Udp && key.proto != IpProtocol::Tcp) {
-            return (SocketExtraInfo::default(), SocketExtraInfo::default());
+            return GpidEntry::default();
         }
         let protocol = u8::from(GpidProtocol::try_from(key.proto).unwrap()) as usize;
         // FIXME: Support epc id
@@ -489,72 +449,32 @@ impl Policy {
 
         let key_0 = gpid_key(ip_0, epc_id_0, port_0);
         let key_1 = gpid_key(ip_1, epc_id_1, port_1);
-        let socket_extra_info_0 = *self.nat.read().unwrap()[protocol]
-            .get(&key_0)
-            .unwrap_or(&SocketExtraInfo::default());
-        let socket_extra_info_1 = *self.nat.read().unwrap()[protocol]
-            .get(&key_1)
-            .unwrap_or(&SocketExtraInfo::default());
-        (socket_extra_info_0, socket_extra_info_1)
+        let key = (key_0 as u128) << 64 | key_1 as u128;
+        *self.nat.read().unwrap()[protocol]
+            .get(&key)
+            .unwrap_or(&GpidEntry::default())
     }
 
-    pub fn update_gpids(&mut self, entrys: &Vec<GpidEntry>) {
-        let mut table = vec![HashMap::new(), HashMap::new()];
-        for entry in entrys.iter() {
-            let protocol = u8::from(entry.protocol) as usize;
-
-            debug!(
-                "0x{:x} 0x{:x} 0x{:x}: {:?}",
-                entry.client_keys(),
-                entry.server_keys(),
-                entry.real_keys(),
-                &entry
-            );
-
-            match entry.role {
-                RoleType::RoleClient | RoleType::RoleServer => {
-                    table[protocol].insert(
-                        entry.client_keys(),
-                        SocketExtraInfo {
-                            gpid: entry.pid_0,
-                            gpid_real: entry.pid_real,
-                            epc_id_real: entry.epc_id_real as u16,
-                            ip_real: entry.ip_real,
-                            port_real: entry.port_real,
-                            role_real: entry.role,
-                            role: RoleType::RoleClient,
-                        },
-                    );
-                }
-                _ => {
-                    table[protocol].insert(
-                        entry.client_keys(),
-                        SocketExtraInfo {
-                            gpid: entry.pid_0,
-                            role: RoleType::RoleClient,
-                            ..Default::default()
-                        },
-                    );
-                }
+    pub fn update_gpids(&mut self, gpid_entries: &Vec<GpidEntry>) {
+        let mut table = vec![
+            HashMap::with_capacity(gpid_entries.len()),
+            HashMap::with_capacity(gpid_entries.len() >> 2),
+        ];
+        for gpid_entry in gpid_entries.iter() {
+            let protocol = u8::from(gpid_entry.protocol) as usize;
+            if protocol >= table.len() {
+                warn!("Invalid protocol {:?} in {:?}", protocol, &gpid_entry);
+                continue;
             }
 
-            table[protocol].insert(
-                entry.server_keys(),
-                SocketExtraInfo {
-                    gpid: entry.pid_1,
-                    role: RoleType::RoleServer,
-                    ..Default::default()
-                },
-            );
+            let (key_0, key_1) = (gpid_entry.client_key(), gpid_entry.server_key());
+            debug!("key: 0x{:x} 0x{:x} value: {:?}", key_0, key_1, &gpid_entry);
 
-            table[protocol].insert(
-                entry.real_keys(),
-                SocketExtraInfo {
-                    gpid: entry.pid_real,
-                    role: entry.role,
-                    ..Default::default()
-                },
-            );
+            // Data in both directions will be stored for quick query
+            let key = (key_0 as u128) << 64 | key_1 as u128;
+            table[protocol].insert(key, gpid_entry.clone());
+            let key = (key_1 as u128) << 64 | key_0 as u128;
+            table[protocol].insert(key, gpid_entry.clone());
         }
         *self.nat.write().unwrap() = table;
     }
@@ -608,11 +528,7 @@ impl PolicyGetter {
     pub fn lookup_all_by_key(
         &mut self,
         key: &mut LookupKey,
-    ) -> Option<(
-        Arc<PolicyData>,
-        Arc<EndpointData>,
-        (SocketExtraInfo, SocketExtraInfo),
-    )> {
+    ) -> Option<(Arc<PolicyData>, Arc<EndpointData>, GpidEntry)> {
         self.policy().lookup_all_by_key(key)
     }
 
