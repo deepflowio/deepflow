@@ -371,6 +371,9 @@ impl From<Tagger> for metric::MiniTag {
                 tag_value: t.tag_value as u32,
                 gpid: t.gpid,
                 gpid1: t.gpid_1,
+                signal_source: 0, // FIX ME
+                app_service: "FIX ME".to_string(),
+                app_instance: "FIX ME".to_string(),
             }),
         }
     }
