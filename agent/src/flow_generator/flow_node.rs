@@ -122,7 +122,7 @@ pub struct FlowNode {
     pub timestamp_key: u64,
 
     pub meta_flow_perf: Option<Box<FlowPerf>>,
-    pub policy_data_cache: [PolicyData; 2],
+    pub policy_data_cache: [Arc<PolicyData>; 2],
     pub endpoint_data_cache: [Arc<EndpointData>; 2],
 
     // Only for eBPF TCP Flow, used to help confirm whether the Flow can be timed out.
@@ -175,11 +175,13 @@ impl FlowNode {
         {
             return false;
         }
+
+        if flow.eth_type != meta_lookup_key.eth_type {
+            return false;
+        }
+
         // other ethernet type
         if flow.eth_type != EthernetType::Ipv4 && meta_lookup_key.eth_type != EthernetType::Ipv6 {
-            if meta_lookup_key.eth_type != flow.eth_type {
-                return false;
-            }
             // direction = ClientToServer
             if flow_key.mac_src == meta_lookup_key.src_mac
                 && flow_key.mac_dst == meta_lookup_key.dst_mac
@@ -199,10 +201,6 @@ impl FlowNode {
                 return true;
             }
 
-            return false;
-        }
-
-        if flow.eth_type != meta_lookup_key.eth_type {
             return false;
         }
 

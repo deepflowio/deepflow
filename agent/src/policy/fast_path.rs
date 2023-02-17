@@ -273,7 +273,7 @@ impl FastPath {
 
         if self.policy_table[start_index + u16::from(key.tap_type) as usize].is_none() {
             self.policy_table[start_index + u16::from(key.tap_type) as usize] =
-                Some(LruCache::new(self.map_size));
+                Some(LruCache::new(self.map_size.try_into().unwrap()));
             return true;
         }
         false

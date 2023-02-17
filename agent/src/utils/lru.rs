@@ -16,7 +16,7 @@ impl<K: Hash + Eq, V> Lru<K, V> {
         let init_cap = init_cap.next_power_of_two();
         let max_cap = max_cap.next_power_of_two().max(init_cap);
         Self {
-            cache: LruCache::new(init_cap),
+            cache: LruCache::new(init_cap.try_into().unwrap()),
             init_cap,
             max_cap,
             cap: init_cap,
@@ -32,7 +32,7 @@ impl<K: Hash + Eq, V> Lru<K, V> {
         if r.is_none() && self.cache.len() >= self.cap && self.cap < self.max_cap {
             // new entry, check capacity
             self.cap <<= 1;
-            self.cache.resize(self.cap);
+            self.cache.resize(self.cap.try_into().unwrap());
         }
         r
     }
@@ -46,7 +46,7 @@ impl<K: Hash + Eq, V> Lru<K, V> {
     }
 
     pub fn clear(&mut self) {
-        self.cache.resize(self.init_cap);
+        self.cache.resize(self.init_cap.try_into().unwrap());
         self.cap = self.init_cap;
         self.cache.clear();
     }
