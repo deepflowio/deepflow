@@ -92,8 +92,8 @@ impl ServiceTable {
 
     pub fn new(ipv4_capacity: usize, ipv6_capacity: usize) -> Self {
         Self {
-            ipv4: LruCache::new(ipv4_capacity),
-            ipv6: LruCache::new(ipv6_capacity),
+            ipv4: LruCache::new(ipv4_capacity.try_into().unwrap()),
+            ipv6: LruCache::new(ipv6_capacity.try_into().unwrap()),
         }
     }
 

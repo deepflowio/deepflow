@@ -14,7 +14,10 @@
  * limitations under the License.
  */
 
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::{
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
+    num::NonZeroUsize,
+};
 
 use lru::LruCache;
 use public::l7_protocol::{L7Protocol, L7ProtocolEnum};
@@ -70,7 +73,8 @@ impl Default for AppTable {
 }
 
 impl AppTable {
-    const APP_LRU_SIZE: usize = 1 << 12;
+    // safe because parameter to new_unchecked is not zero
+    const APP_LRU_SIZE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(1 << 12) };
 
     pub fn new(
         l7_protocol_inference_max_fail_count: usize,

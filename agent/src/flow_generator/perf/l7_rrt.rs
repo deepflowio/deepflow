@@ -28,6 +28,7 @@ pub struct L7RrtCache {
 
 impl L7RrtCache {
     pub fn new(cap: usize) -> L7RrtCache {
+        let cap = cap.try_into().unwrap();
         L7RrtCache {
             double_key_cache: LruCache::new(cap),
             single_key_cache: LruCache::new(cap),

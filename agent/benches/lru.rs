@@ -111,7 +111,7 @@ fn lru_64b(c: &mut Criterion) {
                     ip: Ipv4Addr::new(i as u8, (i >> 8) as u8, (i >> 16) as u8, (i >> 24) as u8),
                 });
             }
-            let mut cache = LruCache::new(1000);
+            let mut cache = LruCache::new(1000.try_into().unwrap());
             let start = Instant::now();
             for item in seeds {
                 cache.put(item.id, item.ip);
@@ -132,7 +132,7 @@ fn lru_64b(c: &mut Criterion) {
                 });
                 indexes.push(rng.gen_range(0..iters as usize));
             }
-            let mut cache = LruCache::new(1000);
+            let mut cache = LruCache::new(1000.try_into().unwrap());
             for item in seeds.iter() {
                 cache.put(item.id, item.ip);
             }
@@ -153,7 +153,7 @@ fn lru_64b(c: &mut Criterion) {
                     ip: Ipv4Addr::new(i as u8, (i >> 8) as u8, (i >> 16) as u8, (i >> 24) as u8),
                 });
             }
-            let mut cache = LruCache::new(1000);
+            let mut cache = LruCache::new(1000.try_into().unwrap());
             for item in seeds.iter() {
                 cache.put(item.id, item.ip);
             }
@@ -239,7 +239,7 @@ fn lru_192b(c: &mut Criterion) {
                     ip: Ipv6Addr::from(i as u128 * 1024),
                 });
             }
-            let mut cache = LruCache::new(1000);
+            let mut cache = LruCache::new(1000.try_into().unwrap());
             let start = Instant::now();
             for item in seeds {
                 cache.put(item, item.id);
@@ -260,7 +260,7 @@ fn lru_192b(c: &mut Criterion) {
                 });
                 indexes.push(rng.gen_range(0..iters as usize));
             }
-            let mut cache = LruCache::new(1000);
+            let mut cache = LruCache::new(1000.try_into().unwrap());
             for item in seeds.iter() {
                 cache.put(*item, item.id);
             }
@@ -281,7 +281,7 @@ fn lru_192b(c: &mut Criterion) {
                     ip: Ipv6Addr::from(i as u128 * 1024),
                 });
             }
-            let mut cache = LruCache::new(1000);
+            let mut cache = LruCache::new(1000.try_into().unwrap());
             for item in seeds.iter() {
                 cache.put(*item, item.id);
             }
@@ -355,7 +355,7 @@ fn lru_128b(c: &mut Criterion) {
             for i in 0..iters {
                 seeds.push(Ipv6Addr::from(i as u128 * 1024));
             }
-            let mut cache = LruCache::new(1000);
+            let mut cache = LruCache::new(1000.try_into().unwrap());
             let start = Instant::now();
             for item in seeds {
                 cache.put(item, item);
@@ -373,7 +373,7 @@ fn lru_128b(c: &mut Criterion) {
                 seeds.push(Ipv6Addr::from(i as u128 * 1024));
                 indexes.push(rng.gen_range(0..iters as usize));
             }
-            let mut cache = LruCache::new(1000);
+            let mut cache = LruCache::new(1000.try_into().unwrap());
             for item in seeds.iter() {
                 cache.put(*item, *item);
             }
@@ -391,7 +391,7 @@ fn lru_128b(c: &mut Criterion) {
             for i in 0..iters {
                 seeds.push(Ipv6Addr::from(i as u128));
             }
-            let mut cache = LruCache::new(1000);
+            let mut cache = LruCache::new(1000.try_into().unwrap());
             for item in seeds.iter() {
                 cache.put(*item, *item);
             }
