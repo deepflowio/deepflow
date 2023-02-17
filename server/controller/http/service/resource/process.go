@@ -86,7 +86,7 @@ func getProcesses() ([]model.Process, error) {
 
 	// get processes
 	var processes []mysql.Process
-	if err := mysql.Db.Find(&processes).Error; err != nil {
+	if err := mysql.Db.Unscoped().Find(&processes).Error; err != nil {
 		return nil, err
 	}
 	var resp []model.Process
@@ -114,6 +114,7 @@ func getProcesses() ([]model.Process, error) {
 			ResourceID:   vtapIDToInfo[process.VTapID].LaunchServerID,
 			StartTime:    process.StartTime.Format(common.GO_BIRTHDAY),
 			UpdateAt:     process.UpdatedAt.Format(common.GO_BIRTHDAY),
+			DeletedAt:    process.DeletedAt.Time.Format(common.GO_BIRTHDAY),
 		}
 		resp = append(resp, processResp)
 	}
