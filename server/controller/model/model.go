@@ -763,6 +763,7 @@ type Process struct {
 	ResourceID   int    `json:"RESOURCE_ID"`
 	StartTime    string `json:"START_TIME"`
 	UpdateAt     string `json:"UPDATE_AT"`
+	DeletedAt    string `json:"DELETED_AT"`
 }
 
 type CSV struct {
