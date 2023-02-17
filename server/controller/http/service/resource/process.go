@@ -32,15 +32,7 @@ import (
 )
 
 func GetProcesses(c *gin.Context, redisConfig *redis.RedisConfig) (responseData []model.Process, err error) {
-	responseData, _ = getCache(c)
-	if len(responseData) != 0 {
-		return
-	}
 	responseData, err = getProcesses()
-	if err != nil {
-		return
-	}
-	setCache(c, redisConfig, responseData)
 	return
 }
 
