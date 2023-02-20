@@ -21,5 +21,5 @@ import (
 )
 
 func main() {
-	controller.Start("")
+	controller.Start(nil, "", "", nil)
 }

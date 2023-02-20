@@ -17,48 +17,37 @@
 package statsd
 
 import (
-	"net"
+	"fmt"
+	"math"
+	"os"
 	"sort"
 	"time"
 
-	"github.com/cactus/go-statsd-client/v5/statsd"
-
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/statsd/config"
+	"github.com/deepflowio/deepflow/server/libs/codec"
+	"github.com/deepflowio/deepflow/server/libs/stats"
+	"github.com/deepflowio/deepflow/server/libs/stats/pb"
+	"github.com/op/go-logging"
 )
 
+var log = logging.MustGetLogger("statsd")
 var MetaStatsd *StatsdMonitor
+var dfstatsdClient *stats.UDPClient
 
 type StatsdMonitor struct {
 	enable bool
-	client statsd.Statter
+	host   string
+	port   int
 }
 
-func NewStatsdMonitor(cfg config.StatsdConfig) error {
-	if !cfg.Enabled {
-		MetaStatsd = &StatsdMonitor{
-			enable: cfg.Enabled,
-		}
-		return nil
-	}
-
-	statsdServer := net.JoinHostPort(cfg.Host, cfg.Port)
-	config := &statsd.ClientConfig{
-		Address:       statsdServer,
-		Prefix:        common.DEEPFLOW_STATSD_PREFIX,
-		UseBuffered:   true,
-		FlushInterval: time.Duration(cfg.FlushInterval),
-		TagFormat:     statsd.InfixComma,
-	}
-	client, err := statsd.NewClientWithConfig(config)
-	if err != nil {
-		return err
-	}
+func NewStatsdMonitor(cfg config.StatsdConfig) {
 	MetaStatsd = &StatsdMonitor{
 		enable: cfg.Enabled,
-		client: client,
+		host:   cfg.Host,
+		port:   cfg.Port,
 	}
-	return nil
+	return
 }
 
 func (s *StatsdMonitor) RegisterStatsdTable(statter Statsdtable) {
@@ -66,36 +55,71 @@ func (s *StatsdMonitor) RegisterStatsdTable(statter Statsdtable) {
 		return
 	}
 
-	gTags := []statsd.Tag{}
+	if dfstatsdClient == nil {
+		var err error
+		dfstatsdClient, err = stats.NewUDPClient(stats.UDPConfig{fmt.Sprintf("%s:%d", s.host, s.port), 1400})
+		if err != nil {
+			log.Warningf("connect (%s:%d) stats udp server failed: %s", s.host, s.port, err.Error())
+			return
+		}
+	}
+
+	encoder := new(codec.SimpleEncoder)
+
 	keys := []string{}
 	for key := range statter.GetStatter().GlobalTags {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-	for _, k := range keys {
-		gTags = append(gTags, statsd.Tag{k, statter.GetStatter().GlobalTags[k]})
-	}
+
 	// collect
+	timeStamp := time.Now().Unix()
 	for _, e := range statter.GetStatter().Element {
-		rate := e.Rate
-		if rate == 0 {
-			rate = 1.0
-		}
-		for tagValue, values := range e.PrivateTagValueToCount {
-			tags := []statsd.Tag{{e.PrivateTagKey, tagValue}}
+		for mfName, mfValues := range e.MetricsFloatNameToValues {
+			name := common.DEEPFLOW_STATSD_PREFIX + "_" + e.VirtualTableName
+			hostName := os.Getenv(common.NODE_NAME_KEY)
+			tagNames := []string{e.PrivateTagKey, "host"}
+			tagValues := []string{mfName, hostName}
+
 			if e.UseGlobalTag {
-				tags = append(tags, gTags...)
+				tagNames = append(tagNames, keys...)
+				for _, k := range keys {
+					tagValues = append(tagValues, statter.GetStatter().GlobalTags[k])
+				}
+			}
+
+			metricsFloatNames := []string{}
+			metricsFloatValues := []float64{}
+			var vSum int
+			for _, v := range mfValues {
+				vSum += v
 			}
 			switch e.MetricType {
 			case "Inc":
-				for _, value := range values {
-					s.client.Inc(e.MetricName, int64(value), rate, tags...)
-				}
+				metricsFloatNames = []string{"count"}
+				metricsFloatValues = []float64{float64(vSum)}
 			case "Timing":
-				for _, value := range values {
-					s.client.Timing(e.MetricName, int64(value), rate, tags...)
+				vLen := len(mfValues)
+				vAVG := math.Ceil(float64(vSum / vLen))
+				metricsFloatNames = []string{"avg", "len"}
+				if vLen == 1 && vAVG == 0 {
+					vLen = 0
 				}
+				metricsFloatValues = []float64{vAVG, float64(vLen)}
+			default:
+				continue
 			}
+
+			dfStats := pb.AcquireDFStats()
+			dfStats.Timestamp = uint64(timeStamp)
+			dfStats.Name = name
+			dfStats.TagNames = tagNames
+			dfStats.TagValues = tagValues
+			dfStats.MetricsFloatNames = metricsFloatNames
+			dfStats.MetricsFloatValues = metricsFloatValues
+			dfStats.Encode(encoder)
+			dfstatsdClient.Write(encoder.Bytes())
+			encoder.Reset()
 		}
 	}
 }

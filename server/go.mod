@@ -27,7 +27,6 @@ require (
 	github.com/baidubce/bce-sdk-go v0.9.141
 	github.com/bitly/go-simplejson v0.5.0
 	github.com/bxcodec/faker/v3 v3.8.0
-	github.com/cactus/go-statsd-client/v5 v5.0.0
 	github.com/deckarep/golang-set v1.8.0
 	github.com/deckarep/golang-set/v2 v2.1.0
 	github.com/deepflowio/deepflow/message v0.0.0-20230217063215-4569e47dc5b0
