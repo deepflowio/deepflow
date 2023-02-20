@@ -382,13 +382,11 @@ impl Trident {
         let mut cgroup_mount_path = "".to_string();
         let mut is_cgroup_v2 = false;
         let mut cgroups_controller = None;
-        if config_handler.candidate_config.tap_mode == TapMode::Analyzer {
-            warn!("don't initialize cgroup controller, because agent in Analyzer mode.");
-        } else if running_in_container() {
-            warn!("don't initialize cgroup controller, because agent is running in container");
+        if running_in_container() {
+            info!("don't initialize cgroup controller, because agent is running in container");
         } else if !is_kernel_available_for_cgroup() {
             // fixme: Linux after kernel version 2.6.24 can use cgroup
-            warn!("don't initialize cgroup controller, because kernel version < 3 or agent is in Windows");
+            info!("don't initialize cgroup controller, because kernel version < 3 or agent is in Windows");
         } else {
             match Cgroups::new(process::id() as u64, config_handler.environment()) {
                 Ok(cg_controller) => {

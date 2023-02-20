@@ -1469,17 +1469,22 @@ impl ConfigHandler {
                 info!("cpu limit set to {}", new_config.environment.max_cpus);
                 candidate_config.environment.max_cpus = new_config.environment.max_cpus;
             }
-        } else if (candidate_config.tap_mode == TapMode::Analyzer || running_in_container())
-            && candidate_config.environment.max_memory != 0
-        {
+        } else if candidate_config.tap_mode == TapMode::Analyzer || running_in_container() {
             let mut system = sysinfo::System::new();
-            info!("memory set ulimit when tap_mode=analyzer or running in a K8s pod");
             system.refresh_memory();
-            candidate_config.environment.max_memory = system.total_memory();
-
-            info!("cpu set ulimit when tap_mode=analyzer or running in a K8s pod");
+            let max_memory = system.total_memory();
             system.refresh_cpu();
-            candidate_config.environment.max_cpus = 1.max(system.cpus().len()) as u32;
+            let max_cpus = 1.max(system.cpus().len()) as u32;
+
+            if candidate_config.environment.max_memory != max_memory {
+                info!("memory set ulimit when tap_mode=analyzer or running in a K8s pod");
+                candidate_config.environment.max_memory = max_memory;
+            }
+
+            if candidate_config.environment.max_cpus != max_cpus {
+                info!("cpu set ulimit when tap_mode=analyzer or running in a K8s pod");
+                candidate_config.environment.max_cpus = max_cpus;
+            }
         }
 
         if candidate_config.environment.sys_free_memory_limit
