@@ -261,17 +261,18 @@ impl FastPath {
     }
 
     fn table_flush_check(&mut self, key: &LookupKey) -> bool {
+        let start_index = key.fast_index * MAX_TAP_TYPE;
         if self.policy_table_flush_flags[key.fast_index] {
             for i in 0..MAX_TAP_TYPE {
-                if let Some(t) = &mut self.policy_table[key.fast_index * i] {
+                if let Some(t) = &mut self.policy_table[start_index + i] {
                     t.clear();
                 }
             }
             self.policy_table_flush_flags[key.fast_index] = false
         }
 
-        if self.policy_table[key.fast_index * u16::from(key.tap_type) as usize].is_none() {
-            self.policy_table[key.fast_index * u16::from(key.tap_type) as usize] =
+        if self.policy_table[start_index + u16::from(key.tap_type) as usize].is_none() {
+            self.policy_table[start_index + u16::from(key.tap_type) as usize] =
                 Some(LruCache::new(self.map_size));
             return true;
         }
@@ -287,11 +288,12 @@ impl FastPath {
         self.table_flush_check(packet);
         self.interest_table_map(packet);
 
+        let start_index = packet.fast_index * MAX_TAP_TYPE;
         let acl_id = policy.acl_id;
         let (key_0, key_1) = self.generate_map_key(packet);
         let proto = u8::from(packet.proto) as usize;
         let key = (key_0 as u128) << 64 | key_1 as u128;
-        let table = self.policy_table[packet.fast_index * u16::from(packet.tap_type) as usize]
+        let table = self.policy_table[start_index + u16::from(packet.tap_type) as usize]
             .as_mut()
             .unwrap();
 
@@ -354,9 +356,10 @@ impl FastPath {
         }
         self.interest_table_map(packet);
 
+        let start_index = packet.fast_index * MAX_TAP_TYPE;
         let (key_0, key_1) = self.generate_map_key(packet);
         let key = (key_0 as u128) << 64 | key_1 as u128;
-        let table = self.policy_table[packet.fast_index * u16::from(packet.tap_type) as usize]
+        let table = self.policy_table[start_index + u16::from(packet.tap_type) as usize]
             .as_mut()
             .unwrap();
         if let Some(item) = table.get(&key) {
