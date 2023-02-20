@@ -53,5 +53,5 @@ cloud_tags:
   resource_name: xxxx # required. (If there is a duplicate name, one will be chosen at random.)
   domain_uuid: xxxx   # required
   tags:               # required
-  - key: xxxx         # required. (Limited to 255 characters and does not support spaces, single quotes, back quotes.)
-    value: xxxx       # required. (Limited to 255 characters.)
+  - key: xxxx         # required. (Limited to 255 characters and does not support spaces, colon, single quotes, back quotes.)
+    value: xxxx       # required. (Limited to 255 characters and does not support spaces, colon.)

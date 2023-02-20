@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"gorm.io/gorm"
@@ -809,9 +810,13 @@ func convertTagsToString(tags []model.AdditionalResourceTag) (string, error) {
 
 	var str string
 	for i, tag := range tags {
-		if tag.Key == "" && tag.Value == "" {
-			return "", errors.New("the key and value of tags do not support null values")
+		if err := isTagValid(tag.Key, true); err != nil {
+			return "", err
 		}
+		if err := isTagValid(tag.Value, false); err != nil {
+			return "", err
+		}
+
 		if i == 0 {
 			str = fmt.Sprintf("%s:%s", tag.Key, tag.Value)
 			continue
@@ -819,4 +824,26 @@ func convertTagsToString(tags []model.AdditionalResourceTag) (string, error) {
 		str = fmt.Sprintf("%s, %s:%s", str, tag.Key, tag.Value)
 	}
 	return str, nil
+}
+
+func isTagValid(str string, isKey bool) error {
+	if str == "" {
+		return errors.New("the key and value of tags do not support null values")
+	}
+	if strings.Contains(str, " ") {
+		return fmt.Errorf("%s can not support spaces", str)
+	}
+	if strings.Contains(str, ":") {
+		return fmt.Errorf("%s can not support colon", str)
+	}
+
+	if isKey {
+		if strings.Contains(str, "'") {
+			return fmt.Errorf("%s can not support single quotes", str)
+		}
+		if strings.Contains(str, "`") {
+			return fmt.Errorf("%s can not support back quotes", str)
+		}
+	}
+	return nil
 }
