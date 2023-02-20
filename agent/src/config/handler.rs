@@ -1534,11 +1534,12 @@ impl ConfigHandler {
         } else if (candidate_config.tap_mode == TapMode::Analyzer || running_in_container())
             && candidate_config.environment.max_memory != 0
         {
+            let mut system = sysinfo::System::new();
             info!("memory set ulimit when tap_mode=analyzer or running in a K8s pod");
-            candidate_config.environment.max_memory = 0;
+            system.refresh_memory();
+            candidate_config.environment.max_memory = system.total_memory();
 
             info!("cpu set ulimit when tap_mode=analyzer or running in a K8s pod");
-            let mut system = sysinfo::System::new();
             system.refresh_cpu();
             candidate_config.environment.max_cpus = 1.max(system.cpus().len()) as u32;
         }
