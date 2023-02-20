@@ -38,7 +38,7 @@ type TableLruCache = LruCache<u128, PolicyTableItem>;
 #[derive(Clone, Debug)]
 struct PolicyTableItem {
     store: EndpointStore,
-    protocol_table: [Option<Arc<PolicyData>>; MAX_ACL_PROTOCOL + 1],
+    protocol_table: Vec<Option<Arc<PolicyData>>>,
 }
 
 pub struct FastPath {
@@ -306,7 +306,7 @@ impl FastPath {
         } else {
             let mut item = PolicyTableItem {
                 store: EndpointStore::from(endpoints),
-                protocol_table: unsafe { std::mem::zeroed() },
+                protocol_table: vec![None; MAX_ACL_PROTOCOL + 1],
             };
             item.protocol_table[proto] = Some(Arc::new(forward.clone()));
             table.put(key, item);
@@ -335,7 +335,7 @@ impl FastPath {
             };
             let mut item = PolicyTableItem {
                 store: EndpointStore::from(endpoints),
-                protocol_table: unsafe { std::mem::zeroed() },
+                protocol_table: vec![None; MAX_ACL_PROTOCOL + 1],
             };
 
             item.protocol_table[proto] = Some(Arc::new(backward.clone()));
