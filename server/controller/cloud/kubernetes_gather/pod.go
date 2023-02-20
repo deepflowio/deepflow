@@ -33,6 +33,7 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, e
 	podTypesMap := map[string]bool{
 		"DaemonSet":             false,
 		"Deployment":            false,
+		"InPlaceSet":            false,
 		"ReplicaSet":            false,
 		"StatefulSet":           false,
 		"ReplicationController": false,
