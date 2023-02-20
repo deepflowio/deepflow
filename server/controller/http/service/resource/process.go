@@ -91,6 +91,11 @@ func getProcesses() ([]model.Process, error) {
 			resourceName = podNodeIDToName[vtapIDToInfo[process.VTapID].LaunchServerID]
 		}
 
+		var deletedAt string
+		if process.DeletedAt.Valid {
+			deletedAt = process.DeletedAt.Time.Format(common.GO_BIRTHDAY)
+		}
+
 		processResp := model.Process{
 			ResourceType: deviceType,
 			ResourceName: resourceName,
@@ -106,7 +111,7 @@ func getProcesses() ([]model.Process, error) {
 			ResourceID:   vtapIDToInfo[process.VTapID].LaunchServerID,
 			StartTime:    process.StartTime.Format(common.GO_BIRTHDAY),
 			UpdateAt:     process.UpdatedAt.Format(common.GO_BIRTHDAY),
-			DeletedAt:    process.DeletedAt.Time.Format(common.GO_BIRTHDAY),
+			DeletedAt:    deletedAt,
 		}
 		resp = append(resp, processResp)
 	}
