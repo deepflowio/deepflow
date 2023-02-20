@@ -17,8 +17,7 @@
 package config
 
 type StatsdConfig struct {
-	Enabled       bool   `default:"false" yaml:"enabled"`
-	Host          string `default:"telegraf" yaml:"host"`
-	Port          string `default:"20040" yaml:"port"`
-	FlushInterval int    `default:"30" yaml:"flush_interval"`
+	Enabled bool   `default:"true" yaml:"enabled"`
+	Host    string `default:"127.0.0.1" yaml:"host"`
+	Port    int    `default:"20033" yaml:"port"`
 }

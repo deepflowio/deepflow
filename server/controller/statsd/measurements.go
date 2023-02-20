@@ -41,19 +41,14 @@ type StatsdStatter struct {
 type StatsdElement struct {
 	// metric type (specified by a constant)
 	MetricType string
-	// influxdb measurement name (if there is a configuration prefix, the prefix must be added)
-	MetricName string
-	// the default value is 1.0, usually no modification is required
-	Rate float32
+	// clickhouse metrics field (if there is a configuration prefix, the prefix must be added)
+	VirtualTableName string
 	// use global tags
 	UseGlobalTag bool
 	// private tag key
 	PrivateTagKey string
-	// private tag value to count
-	// when the type is Timing，unit is: ms
-	// since this is a map, concurrent writing is not supported and locks can be used if required.
-	// future: it might be useful sync.Map
-	PrivateTagValueToCount map[string][]int
+	// metrics float name to values
+	MetricsFloatNameToValues map[string][]int
 }
 
 type CloudStatsd struct {
@@ -94,29 +89,29 @@ func (c *CloudStatsd) RefreshResCount(resource model.Resource) {
 func GetCloudStatsd(cloud CloudStatsd) []StatsdElement {
 	// init metric type Inc
 	apiCount := StatsdElement{
-		MetricType:             MetricInc,
-		MetricName:             common.CLOUD_METRIC_NAME_API_COUNT,
-		UseGlobalTag:           true,
-		PrivateTagKey:          "type",
-		PrivateTagValueToCount: cloud.APICount,
+		MetricType:               MetricInc,
+		VirtualTableName:         common.CLOUD_METRIC_NAME_API_COUNT,
+		UseGlobalTag:             true,
+		PrivateTagKey:            "type",
+		MetricsFloatNameToValues: cloud.APICount,
 	}
 
 	// init metric type Timing
 	apiCost := StatsdElement{
-		MetricType:             MetricTiming,
-		MetricName:             common.CLOUD_METRIC_NAME_API_COST,
-		UseGlobalTag:           true,
-		PrivateTagKey:          "type",
-		PrivateTagValueToCount: cloud.APICost,
+		MetricType:               MetricTiming,
+		VirtualTableName:         common.CLOUD_METRIC_NAME_API_COST,
+		UseGlobalTag:             true,
+		PrivateTagKey:            "type",
+		MetricsFloatNameToValues: cloud.APICost,
 	}
 
 	// init metric type Inc
 	resCount := StatsdElement{
-		MetricType:             MetricInc,
-		MetricName:             common.CLOUD_METRIC_NAME_INFO_COUNT,
-		UseGlobalTag:           true,
-		PrivateTagKey:          "type",
-		PrivateTagValueToCount: cloud.ResCount,
+		MetricType:               MetricInc,
+		VirtualTableName:         common.CLOUD_METRIC_NAME_INFO_COUNT,
+		UseGlobalTag:             true,
+		PrivateTagKey:            "type",
+		MetricsFloatNameToValues: cloud.ResCount,
 	}
 
 	return []StatsdElement{apiCount, apiCost, resCount}
@@ -129,11 +124,11 @@ type CloudTaskStatsd struct {
 func GetCloudTaskStatsd(cloud CloudTaskStatsd) []StatsdElement {
 	// init metric type Timing
 	taskCost := StatsdElement{
-		MetricType:             MetricTiming,
-		MetricName:             common.CLOUD_METRIC_NAME_TASK_COST,
-		UseGlobalTag:           false,
-		PrivateTagKey:          "domain",
-		PrivateTagValueToCount: cloud.TaskCost,
+		MetricType:               MetricTiming,
+		VirtualTableName:         common.CLOUD_METRIC_NAME_TASK_COST,
+		UseGlobalTag:             false,
+		PrivateTagKey:            "domain",
+		MetricsFloatNameToValues: cloud.TaskCost,
 	}
 
 	return []StatsdElement{taskCost}
@@ -168,11 +163,11 @@ type GenesisStatsd struct {
 
 func GetGenesisStatsd(genesis GenesisStatsd) []StatsdElement {
 	k8sInfoDelay := StatsdElement{
-		MetricType:             MetricTiming,
-		MetricName:             common.GENESIS_METRIC_NAME_K8SINFO_DELAY,
-		UseGlobalTag:           false,
-		PrivateTagKey:          "cluster_id",
-		PrivateTagValueToCount: genesis.K8SInfoDelay,
+		MetricType:               MetricTiming,
+		VirtualTableName:         common.GENESIS_METRIC_NAME_K8SINFO_DELAY,
+		UseGlobalTag:             false,
+		PrivateTagKey:            "cluster_id",
+		MetricsFloatNameToValues: genesis.K8SInfoDelay,
 	}
 	return []StatsdElement{k8sInfoDelay}
 }

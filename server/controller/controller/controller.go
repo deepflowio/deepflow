@@ -134,12 +134,7 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 
 	router.SetInitStageForHealthChecker("Statsd init")
 	// start statsd
-	err = statsd.NewStatsdMonitor(cfg.StatsdCfg)
-	if err != nil {
-		log.Errorf("cloud statsd connect telegraf failed: %s", err.Error())
-		time.Sleep(time.Second)
-		os.Exit(0)
-	}
+	statsd.NewStatsdMonitor(cfg.StatsdCfg)
 
 	router.SetInitStageForHealthChecker("Genesis init")
 	// 启动genesis
