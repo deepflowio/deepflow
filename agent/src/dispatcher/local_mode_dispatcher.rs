@@ -148,35 +148,13 @@ impl LocalModeDispatcher {
             pipeline.timestamp = timestamp;
 
             // compare 4 low bytes
-            #[cfg(target_os = "linux")]
-            let (src_local, dst_local) = if pipeline.vm_mac.octets()[2..]
-                == packet.data[MAC_ADDR_LEN + 2..MAC_ADDR_LEN + MAC_ADDR_LEN]
-            {
-                // src mac
-                (true, false)
-            } else if pipeline.vm_mac.octets()[2..] == packet.data[2..MAC_ADDR_LEN]
-                || MacAddr::is_multicast(packet.data)
-            {
-                // dst mac
-                (false, true)
-            } else {
-                (false, false)
-            };
-
-            #[cfg(target_os = "windows")]
-            let (src_local, dst_local) = if pipeline.vm_mac.octets()[2..]
-                == packet.data[MAC_ADDR_LEN + 2..MAC_ADDR_LEN + MAC_ADDR_LEN]
-            {
-                // src mac
-                (true, false)
-            } else if pipeline.vm_mac.octets()[2..] == packet.data[2..MAC_ADDR_LEN]
-                || MacAddr::is_multicast(&packet.data)
-            {
-                // dst mac
-                (false, true)
-            } else {
-                (false, false)
-            };
+            let mac_low = &pipeline.vm_mac.octets()[2..];
+            // src mac
+            let src_local = mac_low == &packet.data[MAC_ADDR_LEN + 2..MAC_ADDR_LEN + MAC_ADDR_LEN];
+            // dst mac
+            let dst_local = !src_local
+                && (mac_low == &packet.data[2..MAC_ADDR_LEN]
+                    || MacAddr::is_multicast(&packet.data));
 
             // LOCAL模式L2END使用underlay网络的MAC地址，实际流量解析使用overlay
 
@@ -411,7 +389,7 @@ impl LocalModeDispatcherListener {
                 IfMacSource::IfMac => {
                     let mut mac = iface.mac_addr;
                     if trident_type == TridentType::TtProcess {
-                        let mut octets = mac.octets();
+                        let mut octets = mac.octets().to_owned();
                         octets[0] = 0;
                         mac = octets.into();
                     }

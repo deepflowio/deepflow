@@ -318,7 +318,7 @@ impl BaseDispatcher {
     }
 
     pub(super) fn decap_tunnel_with_erspan(
-        packet: &mut Vec<u8>,
+        packet: &mut [u8],
         tap_type_handler: &TapTypeHandler,
         tunnel_info: &mut TunnelInfo,
         bitmap: &TunnelTypeBitmap,
@@ -352,7 +352,7 @@ impl BaseDispatcher {
     }
 
     pub(super) fn decap_tunnel(
-        packet: &mut Vec<u8>,
+        packet: &mut [u8],
         tap_type_handler: &TapTypeHandler,
         tunnel_info: &mut TunnelInfo,
         bitmap: TunnelTypeBitmap,

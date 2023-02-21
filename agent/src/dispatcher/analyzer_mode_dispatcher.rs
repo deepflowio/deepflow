@@ -179,21 +179,6 @@ impl AnalyzerModeDispatcher {
             };
 
             let tunnel_type_bitmap = base.tunnel_type_bitmap.lock().unwrap().clone();
-            #[cfg(target_os = "windows")]
-            let (decap_length, tap_type) = match Self::decap_tunnel(
-                packet.data[..raw_length].as_mut(),
-                &base.tap_type_handler,
-                &mut base.tunnel_info,
-                tunnel_type_bitmap,
-            ) {
-                Ok(d) => d,
-                Err(e) => {
-                    base.counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
-                    warn!("decap_tunnel failed: {:?}", e);
-                    continue;
-                }
-            };
-            #[cfg(target_os = "linux")]
             let (decap_length, tap_type) = match Self::decap_tunnel(
                 &mut packet.data[..raw_length],
                 &base.tap_type_handler,
@@ -250,7 +235,7 @@ impl AnalyzerModeDispatcher {
             );
             let mut tap_port = TapPort::from_id(base.tunnel_info.tunnel_type, base.id as u32);
             let is_unicast =
-                base.tunnel_info.tier > 0 || MacAddr::is_multicast(&overlay_packet[..].to_vec()); // Consider unicast when there is a tunnel
+                base.tunnel_info.tier > 0 || MacAddr::is_multicast(&overlay_packet[..]); // Consider unicast when there is a tunnel
             let (src_local, dst_local) = if src_remote && dst_remote && is_unicast {
                 (true, true)
             } else if src_remote {
@@ -352,12 +337,13 @@ impl AnalyzerModeDispatcher {
         info!("Stopped dispatcher {}", base.log_id);
     }
 
-    pub(super) fn decap_tunnel(
-        packet: &mut [u8],
+    pub(super) fn decap_tunnel<T: AsMut<[u8]>>(
+        mut packet: T,
         tap_type_handler: &TapTypeHandler,
         tunnel_info: &mut TunnelInfo,
         bitmap: TunnelTypeBitmap,
     ) -> Result<(usize, TapType)> {
+        let packet = packet.as_mut();
         if packet[BILD_FLAGS_OFFSET] == BILD_FLAGS as u8 {
             // bild will mark ERSPAN traffic and reduce the Trident process
             // XXX: In the current implementation mode, when using bild to mark the ERSPAN offset, it does not support the scenario that there are other tunnel encapsulation in the inner layer
@@ -372,7 +358,7 @@ impl AnalyzerModeDispatcher {
             return Ok((overlay_offset, tap_type));
         }
 
-        BaseDispatcher::decap_tunnel(&mut packet.to_vec(), tap_type_handler, tunnel_info, bitmap)
+        BaseDispatcher::decap_tunnel(packet, tap_type_handler, tunnel_info, bitmap)
     }
 
     pub(super) fn prepare_flow(
