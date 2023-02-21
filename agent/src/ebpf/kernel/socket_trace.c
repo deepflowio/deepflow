@@ -1181,15 +1181,20 @@ TPPROG(sys_exit_sendto) (struct syscall_comm_exit_ctx *ctx) {
 	struct data_args_t* write_args = active_write_args_map__lookup(&id);
 	if (write_args != NULL) {
 		process_syscall_data((struct pt_regs*)ctx, id, T_EGRESS, write_args, bytes_count);
+		active_write_args_map__delete(&id);
 	}
 
-	active_write_args_map__delete(&id);
 	return 0;
 }
 
 // ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
 //		  struct sockaddr *src_addr, socklen_t *addrlen);
 TPPROG(sys_enter_recvfrom) (struct syscall_comm_enter_ctx *ctx) {
+	// If flags contains MSG_PEEK, it is returned directly.
+	// ref : https://linux.die.net/man/2/recvfrom
+	if (ctx->flags & MSG_PEEK)
+		return 0;
+
 	__u64 id = bpf_get_current_pid_tgid();
 	int sockfd = (int)ctx->fd;
 	char *buf = (char *)ctx->buf;
@@ -1213,8 +1218,9 @@ TPPROG(sys_exit_recvfrom) (struct syscall_comm_exit_ctx *ctx) {
 	struct data_args_t* read_args = active_read_args_map__lookup(&id);
 	if (read_args != NULL) {
 		process_syscall_data((struct pt_regs *)ctx, id, T_INGRESS, read_args, bytes_count);
+		active_read_args_map__delete(&id);
 	}
-	active_read_args_map__delete(&id);
+
 	return 0;
 }
 
@@ -1250,9 +1256,9 @@ TPPROG(sys_exit_sendmsg) (struct syscall_comm_exit_ctx *ctx) {
 	struct data_args_t* write_args = active_write_args_map__lookup(&id);
 	if (write_args != NULL) {
 		process_syscall_data_vecs((struct pt_regs *)ctx, id, T_EGRESS, write_args, bytes_count);
+		active_write_args_map__delete(&id);
 	}
 
-	active_write_args_map__delete(&id);
 	return 0;
 }
 
@@ -1303,6 +1309,10 @@ TPPROG(sys_exit_sendmmsg) (struct syscall_comm_exit_ctx *ctx) {
 //		   bool forbid_cmsg_compat)
 // ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags);
 KPROG(__sys_recvmsg) (struct pt_regs* ctx) {
+	int flags = (int) PT_REGS_PARM3(ctx);
+	if (flags & MSG_PEEK)
+		return 0;
+
 	__u64 id = bpf_get_current_pid_tgid();
 	struct user_msghdr __msg, *msghdr = (struct user_msghdr *)PT_REGS_PARM2(ctx);
 	int sockfd = (int) PT_REGS_PARM1(ctx);
@@ -1331,15 +1341,19 @@ TPPROG(sys_exit_recvmsg) (struct syscall_comm_exit_ctx *ctx) {
 	struct data_args_t* read_args = active_read_args_map__lookup(&id);
 	if (read_args != NULL) {
 		process_syscall_data_vecs((struct pt_regs *)ctx, id, T_INGRESS, read_args, bytes_count);
+		active_read_args_map__delete(&id);
 	}
 
-	active_read_args_map__delete(&id);
 	return 0;
 }
 
 // int __sys_recvmmsg(int fd, struct mmsghdr __user *mmsg, unsigned int vlen,
 //		   unsigned int flags, struct timespec *timeout)
 KPROG(__sys_recvmmsg) (struct pt_regs* ctx) {
+	int flags = (int) PT_REGS_PARM4(ctx);
+	if (flags & MSG_PEEK)
+		return 0;
+
 	__u64 id = bpf_get_current_pid_tgid();
 	int sockfd = (int)PT_REGS_PARM1(ctx);
 	struct mmsghdr *msgvec = (struct mmsghdr *)PT_REGS_PARM2(ctx);
