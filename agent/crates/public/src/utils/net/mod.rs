@@ -155,24 +155,17 @@ impl MacAddr {
 
     const BROADCAST: u64 = 0xffffffffffff;
     const MULTICAST: u64 = 0x010000000000;
-    pub fn octets(&self) -> [u8; 6] {
-        self.0
+    pub fn octets(&self) -> &[u8; 6] {
+        &self.0
     }
 
     pub fn to_lower_32b(&self) -> u32 {
         u32::from_be_bytes(self.0[2..6].try_into().unwrap()) as u32
     }
 
-    #[cfg(target_os = "linux")]
-    pub fn is_multicast(octets: &[u8]) -> bool {
-        assert!(octets.len() > MAC_ADDR_LEN);
-        octets[0] & 0x1 == 1
-    }
-
-    #[cfg(target_os = "windows")]
-    pub fn is_multicast(octets: &Vec<u8>) -> bool {
-        assert!(octets.len() > MAC_ADDR_LEN);
-        octets[0] & 0x1 == 1
+    pub fn is_multicast<T: AsRef<[u8]>>(octets: T) -> bool {
+        assert!(octets.as_ref().len() > MAC_ADDR_LEN);
+        octets.as_ref()[0] & 0x1 == 1
     }
 
     pub fn is_unicast(mac: MacAddr) -> bool {
