@@ -36,7 +36,7 @@ ipnet = "2.4.0"
 ipnetwork = "0.18.0"
 libc = "0.2.103"
 log = "0.4"
-lru = "0.7.5"
+lru = "0.9.0"
 md-5 = "0.10.1"
 nom = "7.1.1"
 npb_handler = { path = "plugins/npb_handler" }
@@ -101,7 +101,7 @@ windows_recv_engine = { path = "plugins/windows_recv_engine" }
 
 [dev-dependencies]
 criterion = "0.3.5"
-lru = "0.7.5"
+lru = "0.9.0"
 tempfile = "3.2.0"
 uluru = "3.0.0"
 
@@ -111,6 +111,10 @@ dunce = "0.1.1"
 tonic-build = "0.8.0"
 
 [features]
+
+[[bench]]
+name = "common"
+harness = false
 
 [[bench]]
 name = "flow_generator"

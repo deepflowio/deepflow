@@ -174,7 +174,7 @@ pub struct PostgresqlLog {
 impl Default for PostgresqlLog {
     fn default() -> Self {
         let mut log = Self {
-            previous_log_info: LruCache::new(1),
+            previous_log_info: LruCache::new(1.try_into().unwrap()),
             info: PostgreInfo::default(),
             perf_stats: None,
             parsed: false,
