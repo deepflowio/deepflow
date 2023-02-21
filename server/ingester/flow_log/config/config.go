@@ -31,8 +31,8 @@ var log = logging.MustGetLogger("flow_log.config")
 const (
 	DefaultThrottle          = 50000
 	DefaultDecoderQueueCount = 2
-	DefaultDecoderQueueSize  = 10000
-	DefaultBrokerQueueSize   = 10000
+	DefaultDecoderQueueSize  = 1 << 14
+	DefaultBrokerQueueSize   = 1 << 14
 	DefaultFlowLogTTL        = 3
 )
 

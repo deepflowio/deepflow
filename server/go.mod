@@ -29,7 +29,7 @@ require (
 	github.com/bxcodec/faker/v3 v3.8.0
 	github.com/deckarep/golang-set v1.8.0
 	github.com/deckarep/golang-set/v2 v2.1.0
-	github.com/deepflowio/deepflow/message v0.0.0-20230217063215-4569e47dc5b0
+	github.com/deepflowio/deepflow/message v0.0.0-20230228083932-0a8eb83be667
 	github.com/deepflowio/deepflow/server/controller/cloud/platform v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/db/mysql/migrator v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/http/service/configuration v0.0.0-00010101000000-000000000000
@@ -88,27 +88,41 @@ require (
 require (
 	github.com/aws/aws-sdk-go-v2/service/eks v1.26.0
 	github.com/go-redis/redis/v9 v9.0.0-rc.2
+	github.com/pyroscope-io/pyroscope v0.37.1
 )
 
 require (
+	github.com/DataDog/zstd v1.4.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.0 // indirect
+	github.com/cespare/xxhash v1.1.0 // indirect
+	github.com/dgraph-io/badger/v2 v2.2007.2 // indirect
+	github.com/dgraph-io/ristretto v0.1.0 // indirect
+	github.com/dgryski/go-farm v0.0.0-20190423205320-6a90982ecee2 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
+	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/edsrzf/mmap-go v1.1.0 // indirect
 	github.com/fortytw2/leaktest v1.3.0 // indirect
+	github.com/golang/glog v1.0.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.10.2 // indirect
+	github.com/hashicorp/errwrap v1.0.0 // indirect
+	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/ionos-cloud/sdk-go/v6 v6.1.0 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
+	github.com/pyroscope-io/jfr-parser v0.5.2 // indirect
 	github.com/signalfx/splunk-otel-go v1.3.1 // indirect
 	github.com/signalfx/splunk-otel-go/instrumentation/database/sql/splunksql v1.3.1 // indirect
 	github.com/signalfx/splunk-otel-go/instrumentation/internal v1.3.1 // indirect
+	github.com/sirupsen/logrus v1.8.1 // indirect
+	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.13.0 // indirect
+	golang.org/x/exp v0.0.0-20230129154200-a960b3787bd2 // indirect
 )
 
 require (
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
-	github.com/aws/aws-sdk-go v1.44.20 // indirect
+	github.com/aws/aws-sdk-go v1.44.37 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.17.3
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.12.17 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.1.27 // indirect
@@ -124,7 +138,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dennwc/varint v1.0.0 // indirect
-	github.com/emicklei/go-restful v2.9.5+incompatible // indirect
+	github.com/emicklei/go-restful v2.14.2+incompatible // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/go-kit/log v0.2.1 // indirect
@@ -191,7 +205,7 @@ require (
 	go.uber.org/goleak v1.1.12 // indirect
 	go4.org/intern v0.0.0-20211027215823-ae77deb06f29 // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20211027215541-db492cf91b37 // indirect
-	golang.org/x/crypto v0.0.0-20220214200702-86341886e292 // indirect
+	golang.org/x/crypto v0.1.0 // indirect
 	golang.org/x/oauth2 v0.4.0 // indirect
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
 	golang.org/x/term v0.5.0 // indirect
