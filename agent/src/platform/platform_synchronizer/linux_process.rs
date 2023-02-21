@@ -19,7 +19,6 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::{collections::HashMap, os::unix::process::CommandExt, process::Command};
 
 use envmnt::{ExpandOptions, ExpansionType};
-
 use log::error;
 use nom::AsBytes;
 use procfs::{process::Process, ProcError, ProcResult};
@@ -42,6 +41,7 @@ use crate::config::{
 pub struct ProcessData {
     pub name: String, // the replaced name
     pub pid: u64,
+    pub ppid: u64,
     pub process_name: String, // raw process name
     pub cmd: Vec<String>,
     pub user_id: u32,
@@ -113,6 +113,12 @@ impl TryFrom<&Process> for ProcessData {
         Ok(ProcessData {
             name: proc_name.to_string_lossy().to_string(),
             pid: proc.pid as u64,
+            ppid: if let Ok(stat) = proc.stat().as_ref() {
+                stat.ppid as u64
+            } else {
+                error!("pid {} get stat fail", proc.pid);
+                0
+            },
             process_name: proc_name.to_string_lossy().to_string(),
             cmd,
             user_id: uid,
@@ -356,6 +362,7 @@ pub(super) fn get_all_process(conf: &OsProcScanConfig) -> Vec<ProcessData> {
                 }
             }
         }
+        fill_child_proc_tag_by_parent(ret.as_mut());
         proc_scan_hook(&mut ret);
     }
     return ret;
@@ -406,5 +413,51 @@ fn get_os_app_tag_by_exec(
     match serde_yaml::from_str::<Vec<OsAppTag>>(stdout.as_str()) {
         Ok(tags) => Ok(HashMap::from_iter(tags.into_iter().map(|t| (t.pid, t)))),
         Err(e) => Err(format!("unmarshal to yaml fail: {}\nstdout: {}", e, stdout).to_string()),
+    }
+}
+
+fn fill_child_proc_tag_by_parent(procs: &mut Vec<ProcessData>) {
+    let merge_tag = |child_tag: &mut Vec<OsAppTagKV>, parent_tag: &[OsAppTagKV]| {
+        'l: for pt in parent_tag {
+            // ignore key is in exist in child
+            for ct in child_tag.iter() {
+                if ct.key == pt.key {
+                    continue 'l;
+                }
+            }
+            child_tag.push(pt.clone());
+        }
+    };
+
+    // Hashmap<pid, proc_idx> use for fill child proc tag from parent tag
+    let mut pid_map = HashMap::new();
+    for (i, p) in procs.iter().enumerate() {
+        pid_map.insert(p.pid, i);
+    }
+
+    for child_idx in 0..procs.len() {
+        let child_ppid = procs.get(child_idx).unwrap().ppid;
+        let Some(parent_idx) = pid_map.get(&child_ppid) else {
+            continue;
+        };
+
+        if child_idx == *parent_idx {
+            error!("pid: {} child pid equal to parent pid", child_ppid);
+            continue;
+        }
+
+        let (child, parent) = if child_idx > *parent_idx {
+            let (left, right) = procs.split_at_mut(child_idx);
+            let child = right.get_mut(0).unwrap();
+            let parent: &ProcessData = left.get(*parent_idx).unwrap();
+            (child, parent)
+        } else {
+            let (left, right) = procs.split_at_mut(*parent_idx);
+            let child = left.get_mut(child_idx).unwrap();
+            let parent: &ProcessData = right.get(0).unwrap();
+            (child, parent)
+        };
+
+        merge_tag(&mut child.os_app_tags, &parent.os_app_tags);
     }
 }
