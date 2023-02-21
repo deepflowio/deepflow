@@ -31,7 +31,7 @@ use std::{
     collections::HashMap,
     sync::{
         atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
-        Arc, Mutex, Weak,
+        Arc, Mutex, RwLock, Weak,
     },
 };
 
@@ -43,6 +43,7 @@ use packet_dedup::*;
 use pcap_sys::bpf_insn;
 #[cfg(target_os = "linux")]
 use pcap_sys::{bpf_program, pcap_compile_nopcap};
+use public::debug::QueueDebugger;
 #[cfg(target_os = "linux")]
 use public::enums::LinuxSllPacketType::Outgoing;
 #[cfg(target_os = "windows")]
@@ -563,6 +564,7 @@ pub struct DispatcherBuilder {
     pcap_interfaces: Option<Vec<Link>>,
     netns: Option<NsFile>,
     trident_type: Option<TridentType>,
+    queue_debugger: Option<Arc<QueueDebugger>>,
 }
 
 impl DispatcherBuilder {
@@ -686,6 +688,11 @@ impl DispatcherBuilder {
 
     pub fn trident_type(mut self, v: TridentType) -> Self {
         self.trident_type = Some(v);
+        self
+    }
+
+    pub fn queue_debugger(mut self, v: Arc<QueueDebugger>) -> Self {
+        self.queue_debugger = Some(v);
         self
     }
 
@@ -888,10 +895,13 @@ impl DispatcherBuilder {
 
                 DispatcherFlavor::Analyzer(AnalyzerModeDispatcher {
                     base,
-                    vm_mac_addrs: Arc::new(Mutex::new(Default::default())),
-                    dedup: PacketDedupMap::new(),
-                    tap_pipelines: Default::default(),
+                    vm_mac_addrs: Arc::new(RwLock::new(Default::default())),
                     pool_raw_size: snap_len,
+                    parser_thread_handler: None,
+                    flow_thread_handler: None,
+                    pipeline_thread_handler: None,
+                    stats_collector: collector.clone(),
+                    queue_debugger: self.queue_debugger.as_ref().unwrap().clone(),
                 })
             }
             _ => {

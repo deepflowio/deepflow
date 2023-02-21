@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+use std::borrow::Cow;
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr};
 use std::ptr;
@@ -59,7 +60,7 @@ pub struct MetaPacket<'a> {
     // 主机序, 不因L2End1而颠倒, 端口会在查询策略时被修改
     pub lookup_key: LookupKey,
 
-    pub raw: Option<&'a [u8]>,
+    pub raw: Option<Cow<'a, [u8]>>,
     pub packet_len: u32,
     pub vlan_tag_size: u8,
     pub ttl: u8,
@@ -80,7 +81,7 @@ pub struct MetaPacket<'a> {
     pub npb_ignore_l4: bool, // 对于IP分片或IP Options不全的情况，分发时不对l4进行解析
     nd_reply_or_arp_request: bool, // NDP request or ARP request
 
-    pub tunnel: Option<&'a TunnelInfo>,
+    pub tunnel: Option<TunnelInfo>,
 
     next_header: u8, // ipv6 header中的nextHeader字段，用于包头压缩等
 
@@ -365,9 +366,32 @@ impl<'a> MetaPacket<'a> {
         None
     }
 
-    pub fn update(
+    pub fn update_with_copy(
+        &mut self,
+        packet: Vec<u8>,
+        src_endpoint: bool,
+        dst_endpoint: bool,
+        timestamp: Duration,
+        original_length: usize,
+    ) -> error::Result<()> {
+        self.raw = Some(Cow::from(packet));
+        self.update(src_endpoint, dst_endpoint, timestamp, original_length)
+    }
+
+    pub fn update_without_copy(
         &mut self,
         packet: &'a [u8],
+        src_endpoint: bool,
+        dst_endpoint: bool,
+        timestamp: Duration,
+        original_length: usize,
+    ) -> error::Result<()> {
+        self.raw = Some(Cow::from(packet));
+        self.update(src_endpoint, dst_endpoint, timestamp, original_length)
+    }
+
+    fn update(
+        &mut self,
         src_endpoint: bool,
         dst_endpoint: bool,
         timestamp: Duration,
@@ -382,7 +406,6 @@ impl<'a> MetaPacket<'a> {
             u32::from_be_bytes(*<&[u8; 4]>::try_from(&bs[..4]).unwrap())
         }
         self.lookup_key.timestamp = timestamp;
-        self.raw = Some(packet);
         let packet = self.raw.as_ref().unwrap();
         self.lookup_key.l2_end_0 = src_endpoint;
         self.lookup_key.l2_end_1 = dst_endpoint;

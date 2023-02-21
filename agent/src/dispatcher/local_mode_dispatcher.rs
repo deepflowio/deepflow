@@ -192,7 +192,7 @@ impl LocalModeDispatcher {
             let overlay_packet = &packet.data[decap_length..];
             let mut meta_packet = MetaPacket::empty();
             let offset = Duration::ZERO;
-            if let Err(e) = meta_packet.update(
+            if let Err(e) = meta_packet.update_without_copy(
                 overlay_packet,
                 src_local,
                 dst_local,
@@ -210,7 +210,7 @@ impl LocalModeDispatcher {
                 .fetch_add(packet.data.len() as u64, Ordering::Relaxed);
 
             if base.tunnel_info.tunnel_type != TunnelType::None {
-                meta_packet.tunnel = Some(&base.tunnel_info);
+                meta_packet.tunnel = Some(base.tunnel_info);
                 if base.tunnel_info.tunnel_type == TunnelType::TencentGre
                     || base.tunnel_info.tunnel_type == TunnelType::Vxlan
                 {

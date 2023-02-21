@@ -286,7 +286,7 @@ impl MirrorModeDispatcher {
     ) -> Result<MetaPacket<'a>> {
         let mut meta_packet = MetaPacket::empty();
         let offset = Duration::ZERO;
-        if let Err(e) = meta_packet.update(
+        if let Err(e) = meta_packet.update_without_copy(
             &overlay_packet,
             src_local,
             dst_local,
@@ -298,7 +298,7 @@ impl MirrorModeDispatcher {
         }
 
         if tunnel_info.tunnel_type != TunnelType::None {
-            meta_packet.tunnel = Some(tunnel_info);
+            meta_packet.tunnel = Some(*tunnel_info);
         }
 
         Ok(meta_packet)

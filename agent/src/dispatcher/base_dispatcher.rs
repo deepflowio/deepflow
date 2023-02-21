@@ -519,7 +519,7 @@ impl BaseDispatcher {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub(super) struct TapTypeHandler {
     pub(super) tap_typer: Arc<TapTyper>,
     pub(super) default_tap_type: TapType,

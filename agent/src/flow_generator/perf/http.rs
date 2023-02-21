@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use std::{cell::RefCell, fmt, rc::Rc, str, time::Duration};
+use std::{cell::RefCell, fmt, rc::Rc, time::Duration};
 
 use crate::{
     common::{
@@ -373,11 +373,12 @@ impl HttpPerfData {
         if payload.len() < HTTPV2_MAGIC_LENGTH {
             return false;
         }
-        if let Ok(payload_str) = str::from_utf8(&payload[..HTTPV2_MAGIC_PREFIX.len()]) {
-            payload_str.starts_with(HTTPV2_MAGIC_PREFIX)
-        } else {
-            false
+        for (i, &b) in HTTPV2_MAGIC_PREFIX.iter().enumerate() {
+            if payload[i] != b {
+                return false;
+            }
         }
+        return true;
     }
 
     fn parse_frame(&mut self, payload: &[u8]) -> Result<u16> {
