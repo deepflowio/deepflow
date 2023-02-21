@@ -1286,7 +1286,12 @@ impl ConfigHandler {
             if candidate_config.dispatcher.capture_packet_size
                 != new_config.dispatcher.capture_packet_size
             {
-                if candidate_config.tap_mode == TapMode::Analyzer || cfg!(target_os = "windows") {
+                if components.is_none() {
+                    candidate_config.dispatcher.capture_packet_size =
+                        new_config.dispatcher.capture_packet_size;
+                } else if candidate_config.tap_mode == TapMode::Analyzer
+                    || cfg!(target_os = "windows")
+                {
                     todo!()
                 }
             }
