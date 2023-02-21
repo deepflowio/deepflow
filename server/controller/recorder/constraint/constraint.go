@@ -81,5 +81,6 @@ type MySQLSoftDeleteModel interface {
 		mysql.VRouter | mysql.DHCPPort | mysql.SecurityGroup | mysql.NATGateway |
 		mysql.LB | mysql.LBListener | mysql.CEN | mysql.PeerConnection | mysql.RDSInstance |
 		mysql.RedisInstance | mysql.PodCluster | mysql.PodNode | mysql.PodNamespace |
-		mysql.PodIngress | mysql.PodService | mysql.PodGroup | mysql.PodReplicaSet | mysql.Pod
+		mysql.PodIngress | mysql.PodService | mysql.PodGroup | mysql.PodReplicaSet | mysql.Pod |
+		mysql.Process
 }

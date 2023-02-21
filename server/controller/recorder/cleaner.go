@@ -102,6 +102,7 @@ func (c *ResourceCleaner) cleanDeletedData(retentionInterval int) {
 	forceDelete[mysql.PodGroup](expiredAt)
 	forceDelete[mysql.PodReplicaSet](expiredAt)
 	forceDelete[mysql.Pod](expiredAt)
+	forceDelete[mysql.Process](expiredAt)
 	log.Info("clean soft deleted resources completed")
 }
 
