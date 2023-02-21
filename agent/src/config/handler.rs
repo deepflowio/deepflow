@@ -368,6 +368,7 @@ impl fmt::Debug for FlowConfig {
         f.debug_struct("FlowConfig")
             .field("vtap_id", &self.vtap_id)
             .field("trident_type", &self.trident_type)
+            .field("cloud_gateway_traffic", &self.cloud_gateway_traffic)
             .field("collector_enabled", &self.collector_enabled)
             .field(
                 "l7_log_tap_types",
@@ -378,6 +379,7 @@ impl fmt::Debug for FlowConfig {
                     .filter(|&(_, b)| *b)
                     .collect::<Vec<_>>(),
             )
+            .field("hash_slots", &self.hash_slots)
             .field("packet_delay", &self.packet_delay)
             .field("flush_interval", &self.flush_interval)
             .field("flow_timeout", &self.flow_timeout)
@@ -397,6 +399,12 @@ impl fmt::Debug for FlowConfig {
                 "packet_sequence_block_size",
                 &self.packet_sequence_block_size,
             )
+            .field(
+                "l7_protocol_enabled_bitmap",
+                &self.l7_protocol_enabled_bitmap,
+            )
+            // FIXME: this field is too long to log
+            // .field("l7_protocol_parse_port_bitmap", &self.l7_protocol_parse_port_bitmap)
             .finish()
     }
 }

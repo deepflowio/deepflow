@@ -83,7 +83,6 @@ use public::{
     utils::net::MacAddr,
 };
 
-use npb_pcap_policy::PolicyData;
 use packet_sequence_block::PacketSequenceBlock;
 
 // not thread-safe
@@ -1622,17 +1621,8 @@ impl FlowMap {
         }
 
         // update policy data
-        if meta_packet.policy_data.is_some() {
-            node.policy_data_cache[meta_packet.direction as usize] = Arc::new(PolicyData {
-                acl_id: meta_packet.policy_data.as_ref().unwrap().acl_id,
-                npb_actions: meta_packet
-                    .policy_data
-                    .as_ref()
-                    .unwrap()
-                    .npb_actions
-                    .clone(),
-                action_flags: meta_packet.policy_data.as_ref().unwrap().action_flags,
-            });
+        if let Some(policy_data) = meta_packet.policy_data.as_ref() {
+            node.policy_data_cache[meta_packet.direction as usize] = policy_data.clone();
         }
         node.tagged_flow.tag.policy_data = node.policy_data_cache.clone();
     }
@@ -1856,7 +1846,7 @@ mod tests {
         common::{enums::EthernetType, flow::CloseType, tap_port::TapPort},
         utils::test::Capture,
     };
-    use npb_pcap_policy::{NpbAction, NpbTunnelType, TapSide};
+    use npb_pcap_policy::{NpbAction, NpbTunnelType, PolicyData, TapSide};
     use public::utils::net::MacAddr;
 
     const DEFAULT_DURATION: Duration = Duration::from_millis(10);
