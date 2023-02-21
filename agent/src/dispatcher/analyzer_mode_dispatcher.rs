@@ -17,7 +17,8 @@
 use std::{
     collections::HashMap,
     ops::Add,
-    sync::{atomic::Ordering, Arc, Mutex},
+    sync::{atomic::Ordering, Arc, RwLock},
+    thread::{self, JoinHandle},
     time::Duration,
 };
 
@@ -40,9 +41,14 @@ use crate::{
     flow_generator::FlowMap,
     handler::{MiniPacket, PacketHandler},
     rpc::get_timestamp,
+    utils::{
+        bytes::read_u32_be,
+        stats::{self, Countable, StatsOption},
+    },
 };
-use public::proto::trident::IfMacSource;
+use public::queue::{self, bounded_with_debug, DebugSender, Receiver};
 use public::utils::net::{Link, MacAddr};
+use public::{debug::QueueDebugger, proto::trident::IfMacSource};
 
 // BILD to reduce the processing flow of Trident tunnel traffic, the tunnel traffic will be marked
 // Use the first byte of the source MAC to mark the ERSPAN traffic, which is 0xff
@@ -53,7 +59,7 @@ const BILD_OVERLAY_OFFSET: usize = 7;
 
 #[derive(Clone)]
 pub struct AnalyzerModeDispatcherListener {
-    vm_mac_addrs: Arc<Mutex<HashMap<u32, MacAddr>>>,
+    vm_mac_addrs: Arc<RwLock<HashMap<u32, MacAddr>>>,
     base: BaseDispatcherListener,
 }
 
@@ -64,16 +70,18 @@ impl AnalyzerModeDispatcherListener {
     }
 
     pub fn on_vm_change(&self, vm_mac_addrs: &[MacAddr]) {
-        let mut old_vm_mac_addrs = self.vm_mac_addrs.lock().unwrap();
-        if old_vm_mac_addrs.len() <= vm_mac_addrs.len()
-            && vm_mac_addrs
-                .iter()
-                .all(|addr| old_vm_mac_addrs.contains_key(&addr.to_lower_32b()))
         {
-            return;
+            let old_vm_mac_addrs = self.vm_mac_addrs.read().unwrap();
+            if old_vm_mac_addrs.len() <= vm_mac_addrs.len()
+                && vm_mac_addrs
+                    .iter()
+                    .all(|addr| old_vm_mac_addrs.contains_key(&addr.to_lower_32b()))
+            {
+                return;
+            }
         }
-        old_vm_mac_addrs.clear();
-        if vm_mac_addrs.len() >= 100 {
+
+        if vm_mac_addrs.len() <= 100 {
             info!(
                 "Update {} remote VMs: {:?}",
                 vm_mac_addrs.len(),
@@ -86,9 +94,11 @@ impl AnalyzerModeDispatcherListener {
                 &vm_mac_addrs[..100]
             );
         }
+        let mut new_vm_mac_addrs = HashMap::new();
         vm_mac_addrs.iter().for_each(|addr| {
-            old_vm_mac_addrs.insert(addr.to_lower_32b(), *addr);
+            new_vm_mac_addrs.insert(addr.to_lower_32b(), *addr);
         });
+        *self.vm_mac_addrs.write().unwrap() = new_vm_mac_addrs;
     }
 
     pub(super) fn on_config_change(&mut self, config: &DispatcherConfig) {
@@ -110,12 +120,24 @@ pub(super) struct AnalyzerPipeline {
     timestamp: Duration,
 }
 
+#[derive(Debug)]
+struct PakcketInfo {
+    timestamp: Duration,
+    raw: Vec<u8>,
+    original_length: u32,
+    raw_length: u32,
+    tap_type: TapType,
+}
+
 pub(super) struct AnalyzerModeDispatcher {
     pub(super) base: BaseDispatcher,
-    pub(super) vm_mac_addrs: Arc<Mutex<HashMap<u32, MacAddr>>>,
-    pub(super) dedup: PacketDedupMap,
-    pub(super) tap_pipelines: HashMap<TapType, Arc<Mutex<AnalyzerPipeline>>>,
+    pub(super) vm_mac_addrs: Arc<RwLock<HashMap<u32, MacAddr>>>,
     pub(super) pool_raw_size: usize,
+    pub(super) parser_thread_handler: Option<JoinHandle<()>>,
+    pub(super) flow_thread_handler: Option<JoinHandle<()>>,
+    pub(super) pipeline_thread_handler: Option<JoinHandle<()>>,
+    pub(super) queue_debugger: Arc<QueueDebugger>,
+    pub(super) stats_collector: Arc<stats::Collector>,
 }
 
 impl AnalyzerModeDispatcher {
@@ -126,12 +148,219 @@ impl AnalyzerModeDispatcher {
         }
     }
 
-    pub(super) fn run(&mut self) {
-        let base = &mut self.base;
-        info!("Start analyzer dispatcher {}", base.log_id);
-        let time_diff = base.ntp_diff.load(Ordering::Relaxed);
-        let mut prev_timestamp = get_timestamp(time_diff);
+    fn adjust_timestmap(
+        timestamp_map: &mut HashMap<TapType, Duration>,
+        tap_type: TapType,
+        mut timestamp: Duration,
+    ) -> (Duration, bool) {
+        let last_timestamp = match timestamp_map.get_mut(&tap_type) {
+            None => {
+                timestamp_map.insert(tap_type, Duration::ZERO);
+                timestamp_map.get_mut(&tap_type).unwrap()
+            }
+            Some(last_timestamp) => last_timestamp,
+        };
 
+        if timestamp.add(Duration::from_millis(1)).lt(last_timestamp) {
+            return (Duration::ZERO, false);
+        } else if timestamp.lt(last_timestamp) {
+            timestamp = *last_timestamp;
+        }
+
+        *last_timestamp = timestamp;
+        return (timestamp, true);
+    }
+
+    fn lookup_l2end(
+        id: usize,
+        vm_mac_addrs: &Arc<RwLock<HashMap<u32, MacAddr>>>,
+        tunnel_info: &TunnelInfo,
+        overlay_packet: &[u8],
+        cloud_gateway_traffic: bool,
+    ) -> (TapPort, bool, bool) {
+        let (da_key, sa_key) =
+            if tunnel_info.tier == 0 && overlay_packet.len() >= super::L2_MAC_ADDR_OFFSET {
+                (
+                    read_u32_be(&overlay_packet[2..6]),
+                    read_u32_be(&overlay_packet[8..12]),
+                )
+            } else {
+                (tunnel_info.mac_dst, tunnel_info.mac_src)
+            };
+        let vm_mac_addrs = vm_mac_addrs.read().unwrap();
+        let (dst_remote, src_remote) = (
+            vm_mac_addrs.contains_key(&da_key),
+            vm_mac_addrs.contains_key(&sa_key),
+        );
+        let mut tap_port = TapPort::from_id(tunnel_info.tunnel_type, id as u32);
+        let is_unicast =
+            tunnel_info.tier > 0 || MacAddr::is_multicast(&overlay_packet[..].to_vec()); // Consider unicast when there is a tunnel
+
+        if src_remote && dst_remote && is_unicast {
+            (tap_port, true, true)
+        } else if src_remote {
+            if cloud_gateway_traffic {
+                tap_port = TapPort::from_gateway_mac(tunnel_info.tunnel_type, sa_key);
+            }
+            (tap_port, true, false)
+        } else if dst_remote && is_unicast {
+            if cloud_gateway_traffic {
+                tap_port = TapPort::from_gateway_mac(tunnel_info.tunnel_type, da_key);
+            }
+            (tap_port, false, true)
+        } else {
+            (tap_port, false, false)
+        }
+    }
+
+    fn run_parser(
+        &mut self,
+        receiver: Receiver<PakcketInfo>,
+        sender: DebugSender<(TapType, MetaPacket<'static>)>,
+    ) {
+        let terminated = self.base.terminated.clone();
+        let tunnel_type_bitmap = self.base.tunnel_type_bitmap.clone();
+        let tap_type_handler = self.base.tap_type_handler.clone();
+        let counter = self.base.counter.clone();
+        let analyzer_dedup_disabled = self.base.analyzer_dedup_disabled;
+        let flow_map_config = self.base.flow_map_config.clone();
+        let vm_mac_addrs = self.vm_mac_addrs.clone();
+        let mut dedup = PacketDedupMap::new();
+        let id = self.base.id;
+        let pool_raw_size = self.pool_raw_size;
+
+        self.parser_thread_handler.replace(
+            thread::Builder::new()
+                .name("dispatcher-parser".to_owned())
+                .spawn(move || {
+                    let mut timestamp_map: HashMap<TapType, Duration> = HashMap::new();
+
+                    while !terminated.load(Ordering::Relaxed) {
+                        let mut batch = Vec::with_capacity(1024);
+
+                        match receiver.recv_all(&mut batch, Some(Duration::from_secs(1))) {
+                            Ok(_) => {}
+                            Err(queue::Error::Timeout) => continue,
+                            Err(queue::Error::Terminated(..)) => break,
+                        }
+
+                        for mut packet in batch.drain(..) {
+                            let raw_length = (packet.raw_length as usize)
+                                .min(packet.raw.len())
+                                .min(pool_raw_size);
+                            let tunnel_type_bitmap = tunnel_type_bitmap.lock().unwrap().clone();
+                            let mut tunnel_info = TunnelInfo::default();
+
+                            #[cfg(target_os = "windows")]
+                            let (decap_length, tap_type) = match Self::decap_tunnel(
+                                packet.data[..raw_length].as_mut(),
+                                &base.tap_type_handler,
+                                &mut base.tunnel_info,
+                                tunnel_type_bitmap,
+                            ) {
+                                Ok(d) => d,
+                                Err(e) => {
+                                    base.counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
+                                    warn!("decap_tunnel failed: {:?}", e);
+                                    continue;
+                                }
+                            };
+                            #[cfg(target_os = "linux")]
+                            let (decap_length, tap_type) = match Self::decap_tunnel(
+                                &mut packet.data[..raw_length],
+                                &base.tap_type_handler,
+                                &mut base.tunnel_info,
+                                tunnel_type_bitmap,
+                            ) {
+                                Ok(d) => d,
+                                Err(e) => {
+                                    base.counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
+                                    warn!("decap_tunnel failed: {:?}", e);
+                                    continue;
+                                }
+                            };
+
+                            if decap_length >= raw_length {
+                                counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
+                                warn!(
+                                    "decap_tunnel wrong, decap_length: {}, raw_length: {}",
+                                    decap_length, raw_length
+                                );
+                                continue;
+                            }
+
+                            let original_length = packet.raw.len() - decap_length;
+                            let timestamp = packet.timestamp; // FIXME
+
+                            let overlay_packet = &mut packet.raw[decap_length..raw_length];
+                            // Only cloud traffic goes to de-duplication
+                            if tap_type == TapType::Cloud
+                                && !analyzer_dedup_disabled
+                                && dedup.duplicate(overlay_packet, timestamp)
+                            {
+                                debug!("packet is duplicate");
+                                continue;
+                            }
+
+                            let (tap_port, src_local, dst_local) = Self::lookup_l2end(
+                                id,
+                                &vm_mac_addrs,
+                                &tunnel_info,
+                                overlay_packet,
+                                flow_map_config.load().cloud_gateway_traffic,
+                            );
+                            let (timestamp, ok) =
+                                Self::adjust_timestmap(&mut timestamp_map, tap_type, timestamp);
+                            if !ok {
+                                // FIXME: just in case
+                                counter.retired.fetch_add(1, Ordering::Relaxed);
+                                continue;
+                            }
+
+                            let mut meta_packet = MetaPacket::empty();
+                            meta_packet.tap_port = tap_port;
+                            let offset = Duration::ZERO;
+                            if let Err(e) = meta_packet.update_with_copy(
+                                overlay_packet.to_vec(),
+                                src_local,
+                                dst_local,
+                                timestamp + offset,
+                                original_length,
+                            ) {
+                                counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
+                                debug!("meta_packet update failed: {:?}", e);
+                                continue;
+                            }
+
+                            if tunnel_info.tunnel_type != TunnelType::None {
+                                meta_packet.tunnel = Some(tunnel_info);
+                                if tunnel_info.tunnel_type == TunnelType::TencentGre
+                                    || tunnel_info.tunnel_type == TunnelType::Vxlan
+                                {
+                                    // Tencent TCE and Qingyun Private Cloud need to query cloud platform information through TunnelID
+                                    // Only the case of single-layer tunnel encapsulation needs to be considered here
+                                    // In the double-layer encapsulation scenario, consider that the inner MAC exists and is valid (VXLAN-VXLAN) or needs to be judged by IP (VXLAN-IPIP)
+                                    meta_packet.lookup_key.tunnel_id = tunnel_info.id;
+                                }
+                            }
+
+                            let _ = sender.send((packet.tap_type, meta_packet));
+                        }
+                    }
+                })
+                .unwrap(),
+        );
+    }
+
+    fn run_flow(
+        &mut self,
+        receiver: Receiver<(TapType, MetaPacket<'static>)>,
+        sender: DebugSender<(TapType, MetaPacket<'static>)>,
+    ) {
+        let base = &self.base;
+        let terminated = base.terminated.clone();
+        let npb_dedup_enabled = base.npb_dedup_enabled.clone();
+        let id = base.id;
         #[cfg(target_os = "linux")]
         let mut flow_map = FlowMap::new(
             base.id as u32,
@@ -160,6 +389,148 @@ impl AnalyzerModeDispatcher {
             false, // !from_ebpf
         );
 
+        self.flow_thread_handler.replace(
+            thread::Builder::new()
+                .name("dispatcher-flow".to_owned())
+                .spawn(move || {
+                    while !terminated.load(Ordering::Relaxed) {
+                        let mut batch = Vec::with_capacity(1024);
+                        match receiver.recv_all(&mut batch, Some(Duration::from_secs(1))) {
+                            Ok(_) => {}
+                            Err(queue::Error::Timeout) => {
+                                flow_map.inject_flush_ticker(Duration::ZERO);
+                                continue;
+                            }
+                            Err(queue::Error::Terminated(..)) => break,
+                        }
+
+                        for (tap_type, mut meta_packet) in batch.drain(..) {
+                            Self::prepare_flow(
+                                &mut meta_packet,
+                                tap_type,
+                                id as u8,
+                                npb_dedup_enabled.load(Ordering::Relaxed),
+                            );
+                            flow_map.inject_meta_packet(&mut meta_packet);
+                            let _ = sender.send((tap_type, meta_packet));
+                        }
+                    }
+                })
+                .unwrap(),
+        );
+    }
+
+    fn run_pipeline(&mut self, receiver: Receiver<(TapType, MetaPacket<'static>)>) {
+        let base = &self.base;
+        let terminated = base.terminated.clone();
+        let handler_builder = self.base.handler_builder.clone();
+        let id = base.id;
+
+        self.pipeline_thread_handler.replace(
+            thread::Builder::new()
+                .name("dispatcher-pipeline".to_owned())
+                .spawn(move || {
+                    let mut tap_pipelines: HashMap<TapType, AnalyzerPipeline> = HashMap::new();
+                    while !terminated.load(Ordering::Relaxed) {
+                        let mut batch = Vec::with_capacity(1024);
+                        match receiver.recv_all(&mut batch, Some(Duration::from_secs(1))) {
+                            Ok(_) => {}
+                            Err(queue::Error::Timeout) => continue,
+                            Err(queue::Error::Terminated(..)) => break,
+                        }
+
+                        for (tap_type, meta_packet) in batch.drain(..) {
+                            let pipeline = match tap_pipelines.get_mut(&tap_type) {
+                                None => {
+                                    // ff : ff : ff : ff : DispatcherID : TapType(1-255)
+                                    let mac = ((0xffffffff as u64) << 16)
+                                        | ((id as u64) << 8)
+                                        | (u16::from(tap_type) as u64);
+                                    let handlers = handler_builder
+                                        .lock()
+                                        .unwrap()
+                                        .iter()
+                                        .map(|b| {
+                                            b.build_with(id, 0, MacAddr::try_from(mac).unwrap())
+                                        })
+                                        .collect();
+                                    let pipeline = AnalyzerPipeline {
+                                        tap_type,
+                                        handlers,
+                                        timestamp: Duration::ZERO,
+                                    };
+                                    tap_pipelines.insert(tap_type, pipeline);
+                                    tap_pipelines.get_mut(&tap_type).unwrap()
+                                }
+                                Some(p) => p,
+                            };
+
+                            let mini_packet = MiniPacket::new(
+                                meta_packet.raw.as_ref().unwrap().as_ref(),
+                                &meta_packet,
+                            );
+                            for i in pipeline.handlers.iter_mut() {
+                                i.handle(&mini_packet);
+                            }
+                        }
+                    }
+                    tap_pipelines.clear();
+                })
+                .unwrap(),
+        );
+    }
+
+    fn prepare_run(&mut self) -> DebugSender<PakcketInfo> {
+        let id = self.base.id.to_string();
+        let name = "0.1-bytes-to-parse";
+        let (sender_to_parser, receiver_from_dispatcher, counter) =
+            bounded_with_debug(65536, name, &self.queue_debugger);
+        self.stats_collector.register_countable(
+            "queue",
+            Countable::Owned(Box::new(counter)),
+            vec![
+                StatsOption::Tag("module", name.to_string()),
+                StatsOption::Tag("index", id.clone()),
+            ],
+        );
+
+        let name = "0.2-packet-to-flowgenerator";
+        let (sender_to_flow, receiver_from_parser, counter) =
+            bounded_with_debug(65536, name, &self.queue_debugger);
+        self.stats_collector.register_countable(
+            "queue",
+            Countable::Owned(Box::new(counter)),
+            vec![
+                StatsOption::Tag("module", name.to_string()),
+                StatsOption::Tag("index", id.clone()),
+            ],
+        );
+
+        let name = "0.3-packet-to-pipeline";
+        let (sender_to_pipeline, receiver_from_flow, counter) =
+            bounded_with_debug(65536, "0.3-packet-to-pipeline", &self.queue_debugger);
+        self.stats_collector.register_countable(
+            "queue",
+            Countable::Owned(Box::new(counter)),
+            vec![
+                StatsOption::Tag("module", name.to_string()),
+                StatsOption::Tag("index", id),
+            ],
+        );
+
+        self.run_parser(receiver_from_dispatcher, sender_to_flow);
+        self.run_flow(receiver_from_parser, sender_to_pipeline);
+        self.run_pipeline(receiver_from_flow);
+        return sender_to_parser;
+    }
+
+    pub(super) fn run(&mut self) {
+        let sender_to_parser = self.prepare_run();
+        let base = &mut self.base;
+        info!("Start analyzer dispatcher {}", base.log_id);
+        let time_diff = base.ntp_diff.load(Ordering::Relaxed);
+        let mut prev_timestamp = get_timestamp(time_diff);
+
         while !base.terminated.load(Ordering::Relaxed) {
             if base.reset_whitelist.swap(false, Ordering::Relaxed) {
                 base.tap_interface_whitelist.reset();
@@ -173,7 +544,6 @@ impl AnalyzerModeDispatcher {
                 &base.ntp_diff,
             );
             if recved.is_none() {
-                flow_map.inject_flush_ticker(Duration::ZERO);
                 if base.tap_interface_whitelist.next_sync(Duration::ZERO) {
                     base.need_update_bpf.store(true, Ordering::Relaxed);
                 }
@@ -182,9 +552,9 @@ impl AnalyzerModeDispatcher {
             }
 
             #[cfg(target_os = "linux")]
-            let (packet, mut timestamp) = recved.unwrap();
+            let (packet, timestamp) = recved.unwrap();
             #[cfg(target_os = "windows")]
-            let (mut packet, mut timestamp) = recved.unwrap();
+            let (mut packet, timestamp) = recved.unwrap();
 
             // From here on, ANALYZER mode is different from LOCAL mode
             base.counter.rx.fetch_add(1, Ordering::Relaxed);
@@ -192,183 +562,25 @@ impl AnalyzerModeDispatcher {
                 .rx_bytes
                 .fetch_add(packet.capture_length as u64, Ordering::Relaxed);
 
-            // parseProcesser
-            let raw_length = if packet.capture_length as usize > self.pool_raw_size {
-                self.pool_raw_size
-            } else {
-                packet.data.len()
+            let info = PakcketInfo {
+                timestamp,
+                raw: packet.data.to_vec(),
+                original_length: packet.capture_length as u32,
+                raw_length: packet.data.len() as u32,
+                tap_type: TapType::Cloud,
             };
-
-            let tunnel_type_bitmap = base.tunnel_type_bitmap.lock().unwrap().clone();
-            #[cfg(target_os = "windows")]
-            let (decap_length, tap_type) = match Self::decap_tunnel(
-                packet.data[..raw_length].as_mut(),
-                &base.tap_type_handler,
-                &mut base.tunnel_info,
-                tunnel_type_bitmap,
-            ) {
-                Ok(d) => d,
-                Err(e) => {
-                    base.counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
-                    warn!("decap_tunnel failed: {:?}", e);
-                    continue;
-                }
-            };
-            #[cfg(target_os = "linux")]
-            let (decap_length, tap_type) = match Self::decap_tunnel(
-                &mut packet.data[..raw_length],
-                &base.tap_type_handler,
-                &mut base.tunnel_info,
-                tunnel_type_bitmap,
-            ) {
-                Ok(d) => d,
-                Err(e) => {
-                    base.counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
-                    warn!("decap_tunnel failed: {:?}", e);
-                    continue;
-                }
-            };
-
-            if decap_length >= raw_length {
-                base.counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
-                warn!(
-                    "decap_tunnel wrong, decap_length: {}, raw_length: {}",
-                    decap_length, raw_length
-                );
-                continue;
-            }
-
-            let original_length = packet.data.len() - decap_length;
-
-            let overlay_packet = &mut packet.data[decap_length..raw_length];
-            // Only cloud traffic goes to de-duplication
-            if tap_type == TapType::Cloud
-                && !base.analyzer_dedup_disabled
-                && self.dedup.duplicate(overlay_packet, timestamp)
-            {
-                debug!("packet is duplicate");
-                continue;
-            }
-
-            let (da_key, sa_key) = if base.tunnel_info.tier == 0
-                && overlay_packet.len() >= super::L2_MAC_ADDR_OFFSET
-            {
-                let mut da_mac: [u8; 6] = [0; 6];
-                let mut sa_mac: [u8; 6] = [0; 6];
-                da_mac.copy_from_slice(&overlay_packet[..6]);
-                sa_mac.copy_from_slice(&overlay_packet[6..12]);
-                (
-                    MacAddr::from(da_mac).to_lower_32b(),
-                    MacAddr::from(sa_mac).to_lower_32b(),
-                )
-            } else {
-                (base.tunnel_info.mac_dst, base.tunnel_info.mac_src)
-            };
-            let vm_mac_addrs = self.vm_mac_addrs.lock().unwrap().clone();
-            let (dst_remote, src_remote) = (
-                vm_mac_addrs.contains_key(&da_key),
-                vm_mac_addrs.contains_key(&sa_key),
-            );
-            let mut tap_port = TapPort::from_id(base.tunnel_info.tunnel_type, base.id as u32);
-            let is_unicast =
-                base.tunnel_info.tier > 0 || MacAddr::is_multicast(&overlay_packet[..].to_vec()); // Consider unicast when there is a tunnel
-            let (src_local, dst_local) = if src_remote && dst_remote && is_unicast {
-                (true, true)
-            } else if src_remote {
-                if base.flow_map_config.load().cloud_gateway_traffic {
-                    tap_port = TapPort::from_gateway_mac(base.tunnel_info.tunnel_type, sa_key);
-                }
-                (true, false)
-            } else if dst_remote && is_unicast {
-                if base.flow_map_config.load().cloud_gateway_traffic {
-                    tap_port = TapPort::from_gateway_mac(base.tunnel_info.tunnel_type, da_key);
-                }
-                (false, true)
-            } else {
-                (false, false)
-            };
-
-            // pipelineProcesser
-            let mut pipeline = match self.tap_pipelines.get(&tap_type) {
-                None => {
-                    // ff : ff : ff : ff : DispatcherID : TapType(1-255)
-                    let mac = ((0xffffffff as u64) << 16)
-                        | ((base.id as u64) << 8)
-                        | (u16::from(tap_type) as u64);
-                    let handlers = base
-                        .handler_builder
-                        .lock()
-                        .unwrap()
-                        .iter()
-                        .map(|b| b.build_with(base.id, 0, MacAddr::try_from(mac).unwrap()))
-                        .collect();
-                    let pipeline = AnalyzerPipeline {
-                        tap_type,
-                        handlers,
-                        timestamp: Duration::ZERO,
-                    };
-                    self.tap_pipelines
-                        .insert(tap_type, Arc::new(Mutex::new(pipeline)));
-                    self.tap_pipelines.get(&tap_type).unwrap().lock().unwrap()
-                }
-                Some(p) => p.lock().unwrap(),
-            };
-
-            if timestamp
-                .add(Duration::from_millis(1))
-                .lt(&pipeline.timestamp)
-            {
-                // FIXME: just in case
-                base.counter.retired.fetch_add(1, Ordering::Relaxed);
-                continue;
-            } else if timestamp.lt(&pipeline.timestamp) {
-                timestamp = pipeline.timestamp;
-            }
-
-            pipeline.timestamp = timestamp;
-
-            let mut meta_packet = MetaPacket::empty();
-            meta_packet.tap_port = tap_port;
-            let offset = Duration::ZERO;
-            if let Err(e) = meta_packet.update(
-                &overlay_packet,
-                src_local,
-                dst_local,
-                timestamp + offset,
-                original_length,
-            ) {
-                base.counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
-                debug!("meta_packet update failed: {:?}", e);
-                continue;
-            }
-
-            if base.tunnel_info.tunnel_type != TunnelType::None {
-                meta_packet.tunnel = Some(&base.tunnel_info);
-                if base.tunnel_info.tunnel_type == TunnelType::TencentGre
-                    || base.tunnel_info.tunnel_type == TunnelType::Vxlan
-                {
-                    // Tencent TCE and Qingyun Private Cloud need to query cloud platform information through TunnelID
-                    // Only the case of single-layer tunnel encapsulation needs to be considered here
-                    // In the double-layer encapsulation scenario, consider that the inner MAC exists and is valid (VXLAN-VXLAN) or needs to be judged by IP (VXLAN-IPIP)
-                    meta_packet.lookup_key.tunnel_id = base.tunnel_info.id;
-                }
-            }
-
-            Self::prepare_flow(
-                &mut meta_packet,
-                tap_type,
-                base.id as u8,
-                base.npb_dedup_enabled.load(Ordering::Relaxed),
-            );
-            // flowProcesser
-            flow_map.inject_meta_packet(&mut meta_packet);
-            let mini_packet = MiniPacket::new(overlay_packet, &meta_packet);
-            for i in pipeline.handlers.iter_mut() {
-                i.handle(&mini_packet);
-            }
+            let _ = sender_to_parser.send(info);
+        }
+        if let Some(handler) = self.parser_thread_handler.take() {
+            let _ = handler.join();
+        }
+        if let Some(handler) = self.flow_thread_handler.take() {
+            let _ = handler.join();
+        }
+        if let Some(handler) = self.pipeline_thread_handler.take() {
+            let _ = handler.join();
         }
 
-        self.tap_pipelines.clear();
         base.terminate_handler();
         info!("Stopped dispatcher {}", base.log_id);
     }
