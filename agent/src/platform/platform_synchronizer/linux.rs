@@ -751,6 +751,9 @@ impl PlatformSynchronizer {
             }
 
             if last_version == cur_version {
+                let process_data = GenesisProcessData {
+                    process_entries: process_data.iter().map(|p| ProcessInfo::from(p)).collect(),
+                };
                 let msg = trident::GenesisSyncRequest {
                     version: Some(cur_version),
                     trident_type: Some(trident_type as i32),
@@ -758,7 +761,7 @@ impl PlatformSynchronizer {
                     vtap_id: Some(cur_vtap_id as u32),
                     kubernetes_cluster_id: Some(kubernetes_cluster_id.clone()),
                     platform_data: None,
-                    process_data: None,
+                    process_data: Some(process_data),
                     nat_ip: None,
                 };
 
