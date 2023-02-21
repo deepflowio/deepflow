@@ -710,11 +710,12 @@ impl HttpLog {
         if payload.len() < HTTPV2_MAGIC_LENGTH {
             return false;
         }
-        if let Ok(payload_str) = str::from_utf8(&payload[..HTTPV2_MAGIC_PREFIX.len()]) {
-            payload_str.starts_with(HTTPV2_MAGIC_PREFIX)
-        } else {
-            false
+        for (i, &b) in HTTPV2_MAGIC_PREFIX.iter().enumerate() {
+            if payload[i] != b {
+                return false;
+            }
         }
+        return true;
     }
 
     fn parse_http_v2(
@@ -1051,15 +1052,14 @@ impl Httpv2Headers {
             return Err(Error::HttpHeaderParseFailed);
         }
 
-        let stream_id = read_u32_be(&payload[5..]);
-        if stream_id & 0x80000000 != 0 {
+        if payload[5] & 0x80 != 0 {
             return Err(Error::HttpHeaderParseFailed);
         }
 
         self.frame_length = read_u32_be(&payload) >> 8;
         self.frame_type = frame_type;
         self.flags = payload[4];
-        self.stream_id = stream_id;
+        self.stream_id = read_u32_be(&payload[5..]);
 
         Ok(())
     }
