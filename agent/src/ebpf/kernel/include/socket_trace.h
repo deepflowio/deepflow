@@ -212,6 +212,7 @@ struct syscall_comm_enter_ctx {
 		};
 	};
 	size_t count;		/*    32     8 */
+	unsigned int flags;
 };
 
 struct sched_comm_exit_ctx {
