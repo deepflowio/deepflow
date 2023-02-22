@@ -268,8 +268,14 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	for _, autoStr := range TAG_RESOURCE_TYPE_AUTO {
 		// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
 		for _, suffix := range []string{"", "_0", "_1"} {
-			autoIDSuffix := autoStr + "_id" + suffix
-			autoTypeSuffix := autoStr + "_type" + suffix
+			tagAutoIDSuffix := autoStr + "_id" + suffix
+			tagAutoTypeSuffix := autoStr + "_type" + suffix
+			autoIDSuffix := "auto_service_id" + suffix
+			autoTypeSuffix := "auto_service_type" + suffix
+			if common.IsValueInSliceString(autoStr, []string{"resource_gl0", "auto_instance"}) {
+				autoTypeSuffix = "auto_instance_type" + suffix
+				autoIDSuffix = "auto_instance_id" + suffix
+			}
 			autoNameSuffix := autoStr + suffix
 			ip4Suffix := "ip4" + suffix
 			ip6Suffix := "ip6" + suffix
@@ -282,8 +288,6 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			deviceTypeFilter := ""
 			if strings.HasPrefix(autoNameSuffix, "resource_gl0") || strings.HasPrefix(autoNameSuffix, "auto_instance") {
 				deviceTypeFilter = "devicetype not in (101,102)"
-			} else if strings.HasPrefix(autoNameSuffix, "resource_gl1") {
-				deviceTypeFilter = "devicetype not in (10,102)"
 			} else {
 				deviceTypeFilter = "devicetype not in (10)"
 			}
@@ -307,11 +311,22 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 					"",
 				),
 			}
-			tagResourceMap[autoIDSuffix] = map[string]*Tag{
+			tagResourceMap[tagAutoIDSuffix] = map[string]*Tag{
 				"default": NewTag(
 					"if("+autoTypeSuffix+" in (0,255),"+subnetIDSuffix+","+autoIDSuffix+")",
 					"",
 					"if("+autoTypeSuffix+" in (0,255),"+subnetIDSuffix+" %s %s,"+autoIDSuffix+" %s %s)",
+					"",
+				),
+			}
+			if strings.HasPrefix(tagAutoTypeSuffix, "auto") {
+				continue
+			}
+			tagResourceMap[tagAutoTypeSuffix] = map[string]*Tag{
+				"default": NewTag(
+					autoTypeSuffix,
+					"",
+					autoTypeSuffix+" %s %s",
 					"",
 				),
 			}
@@ -814,7 +829,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"",
 		)}
 	// enum_tag
-	for _, enumName := range []string{"close_type", "eth_type", "signal_source", "is_ipv4", "l7_ip_protocol", "type", "l7_protocol", "protocol", "response_status", "server_port", "status", "tap_port_type", "tcp_flags_bit", "tunnel_tier", "tunnel_type", "instance_type", "nat_source"} {
+	for _, enumName := range []string{"close_type", "eth_type", "signal_source", "is_ipv4", "l7_ip_protocol", "type", "l7_protocol", "protocol", "response_status", "server_port", "status", "tap_port_type", "tunnel_tier", "tunnel_type", "instance_type", "nat_source"} {
 		tagResourceMap[enumName] = map[string]*Tag{
 			"enum": NewTag(
 				"dictGetOrDefault(flow_tag.int_enum_map, 'name', ('%s',toUInt64("+enumName+")), "+enumName+")",
@@ -826,14 +841,30 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	}
 	for _, enumName := range []string{"resource_gl0_type", "resource_gl1_type", "resource_gl2_type", "tcp_flags_bit", "auto_instance_type", "auto_service_type"} {
 		for _, suffix := range []string{"", "_0", "_1"} {
+			tagEnumNameSuffix := enumName + suffix
 			enumNameSuffix := enumName + suffix
-			tagResourceMap[enumNameSuffix] = map[string]*Tag{
-				"enum": NewTag(
+			if common.IsValueInSliceString(enumName, []string{"resource_gl0_type", "auto_instance_type"}) {
+				enumNameSuffix = "auto_instance_type" + suffix
+			} else if common.IsValueInSliceString(enumName, []string{"resource_gl1_type", "resource_gl2_type", "auto_service_type"}) {
+				enumNameSuffix = "auto_service_type" + suffix
+			}
+			_, ok := tagResourceMap[tagEnumNameSuffix]
+			if ok {
+				tagResourceMap[tagEnumNameSuffix]["enum"] = NewTag(
 					"dictGetOrDefault(flow_tag.int_enum_map, 'name', ('%s',toUInt64("+enumNameSuffix+")), "+enumNameSuffix+")",
 					"",
 					"toUInt64("+enumNameSuffix+") IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
 					"toUInt64("+enumNameSuffix+") IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
-				),
+				)
+			} else {
+				tagResourceMap[tagEnumNameSuffix] = map[string]*Tag{
+					"enum": NewTag(
+						"dictGetOrDefault(flow_tag.int_enum_map, 'name', ('%s',toUInt64("+enumNameSuffix+")), "+enumNameSuffix+")",
+						"",
+						"toUInt64("+enumNameSuffix+") IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
+						"toUInt64("+enumNameSuffix+") IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
+					),
+				}
 			}
 		}
 	}

@@ -306,7 +306,10 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 					}
 					for _, suffix := range []string{"", "_0", "_1"} {
 						for _, resourceName := range []string{"resource_gl0", "auto_instance", "resource_gl1", "resource_gl2", "auto_service"} {
-							resourceTypeSuffix := resourceName + "_type" + suffix
+							resourceTypeSuffix := "auto_service_type" + suffix
+							if common.IsValueInSliceString(resourceName, []string{"resource_gl0", "auto_instance"}) {
+								resourceTypeSuffix = "auto_instance_type" + suffix
+							}
 							if sqlparser.String(colName) == resourceName+suffix {
 								outerWhereLeftAppendSlice = append(outerWhereLeftAppendSlice, resourceTypeSuffix)
 							}
