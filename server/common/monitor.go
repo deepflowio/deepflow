@@ -12,6 +12,8 @@ import (
 	"github.com/shirou/gopsutil/v3/process"
 )
 
+const ENV_K8S_NODE_IP = "K8S_NODE_IP_FOR_DEEPFLOW"
+
 func (m *Monitor) GetCpuPercent() float64 {
 	if percent, err := m.process.Percent(0); err == nil {
 		return percent
@@ -89,8 +91,8 @@ func NewMonitor() (*Monitor, error) {
 	m := &Monitor{
 		process: p,
 	}
-
-	stats.RegisterCountable("monitor", m)
+	myNodeIP, _ := os.LookupEnv(ENV_K8S_NODE_IP)
+	stats.RegisterCountable("monitor", m, stats.OptionStatTags{"host_ip": myNodeIP})
 	return m, nil
 }
 
