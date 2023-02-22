@@ -577,7 +577,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		tagResourceMap[k8sLabelSuffix] = map[string]*Tag{
 			"default": NewTag(
 				"dictGet(flow_tag.k8s_label_map, 'value', (toUInt64("+podIDSuffix+"),'%s'))",
-				podIDSuffix+"!=0",
+				"toUInt64("+podIDSuffix+") IN (SELECT pod_id FROM flow_tag.k8s_label_map WHERE key='%s')",
 				"toUInt64("+podIDSuffix+") IN (SELECT pod_id FROM flow_tag.k8s_label_map WHERE value %s %s and key='%s')",
 				"toUInt64("+podIDSuffix+") IN (SELECT pod_id FROM flow_tag.k8s_label_map WHERE %s(value,%s) and key='%s')",
 			),
@@ -606,7 +606,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		tagResourceMap[cloudTagSuffix] = map[string]*Tag{
 			"default": NewTag(
 				"if(if("+deviceTypeIDSuffix+"=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64("+deviceIDSuffix+"),'%s')), '')!='',if("+deviceTypeIDSuffix+"=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64("+deviceIDSuffix+"),'%s')), ''), dictGet(flow_tag.pod_ns_cloud_tag_map, 'value', (toUInt64("+podNSIDSuffix+"),'%s')) )",
-				"(("+deviceIDSuffix+"!=0 AND "+deviceTypeIDSuffix+"=1) OR "+podNSIDSuffix+"!=0)",
+				"((toUInt64("+deviceIDSuffix+") IN (SELECT id FROM flow_tag.chost_cloud_tag_map WHERE key='%s') AND "+deviceTypeIDSuffix+"=1) OR (toUInt64("+podNSIDSuffix+") IN (SELECT id FROM flow_tag.pod_ns_cloud_tag_map WHERE key='%s')))",
 				"((toUInt64("+deviceIDSuffix+") IN (SELECT id FROM flow_tag.chost_cloud_tag_map WHERE value %s %s and key='%s') AND "+deviceTypeIDSuffix+"=1) OR (toUInt64("+podNSIDSuffix+") IN (SELECT id FROM flow_tag.pod_ns_cloud_tag_map WHERE value %s %s and key='%s'))) ",
 				"((toUInt64("+deviceIDSuffix+") IN (SELECT id FROM flow_tag.chost_cloud_tag_map WHERE %s(value,%s) and key='%s') AND "+deviceTypeIDSuffix+"=1) OR (toUInt64("+podNSIDSuffix+") IN (SELECT id FROM flow_tag.pod_ns_cloud_tag_map WHERE %s(value,%s) and key='%s'))) ",
 			),
@@ -635,7 +635,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		tagResourceMap[osAPPSuffix] = map[string]*Tag{
 			"default": NewTag(
 				"dictGet(flow_tag.os_app_tag_map, 'value', (toUInt64("+processIDSuffix+"),'%s'))",
-				processIDSuffix+"!=0",
+				"toUInt64("+processIDSuffix+") IN (SELECT pid FROM flow_tag.os_app_tag_map WHERE key='%s')",
 				"toUInt64("+processIDSuffix+") IN (SELECT pid FROM flow_tag.os_app_tag_map WHERE value %s %s and key='%s')",
 				"toUInt64("+processIDSuffix+") IN (SELECT pid FROM flow_tag.os_app_tag_map WHERE %s(value,%s) and key='%s')",
 			),
