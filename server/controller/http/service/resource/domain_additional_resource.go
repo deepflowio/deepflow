@@ -836,13 +836,16 @@ func isTagValid(str string, isKey bool) error {
 	if strings.Contains(str, ":") {
 		return fmt.Errorf("%s can not support colon", str)
 	}
+	if strings.Contains(str, "`") {
+		return fmt.Errorf("%s can not support back quotes", str)
+	}
+	if strings.Contains(str, "\\") {
+		return fmt.Errorf("%s can not support backslash", str)
+	}
 
 	if isKey {
 		if strings.Contains(str, "'") {
 			return fmt.Errorf("%s can not support single quotes", str)
-		}
-		if strings.Contains(str, "`") {
-			return fmt.Errorf("%s can not support back quotes", str)
 		}
 	}
 	return nil
