@@ -193,7 +193,10 @@ func (g *GroupTag) Format(m *view.Model) {
 	preAsTag, preAsOK := g.AsTagMap[g.Value]
 	for _, suffix := range []string{"", "_0", "_1"} {
 		for _, resourceName := range []string{"resource_gl0", "auto_instance", "resource_gl1", "resource_gl2", "auto_service"} {
-			resourceTypeSuffix := resourceName + "_type" + suffix
+			resourceTypeSuffix := "auto_service_type" + suffix
+			if common.IsValueInSliceString(resourceName, []string{"resource_gl0", "auto_instance"}) {
+				resourceTypeSuffix = "auto_instance_type" + suffix
+			}
 			preAsTag, preAsOK = g.AsTagMap[g.Value]
 			if preAsOK {
 				if preAsTag == resourceName+suffix {

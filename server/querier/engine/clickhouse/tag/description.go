@@ -606,7 +606,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 			autoMap := map[string]map[string]int{
 				"resource_gl0":  AutoPodMap,
 				"auto_instance": AutoPodMap,
-				"resource_gl1":  AutoPodGroupMap,
+				"resource_gl1":  AutoServiceMap,
 				"resource_gl2":  AutoServiceMap,
 				"auto_service":  AutoServiceMap,
 			}
@@ -727,7 +727,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 			autoMap := map[string]map[string]int{
 				"resource_gl0":  AutoPodMap,
 				"auto_instance": AutoPodMap,
-				"resource_gl1":  AutoPodGroupMap,
+				"resource_gl1":  AutoServiceMap,
 				"resource_gl2":  AutoServiceMap,
 				"auto_service":  AutoServiceMap,
 			}
