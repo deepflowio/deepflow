@@ -560,6 +560,9 @@ type AdditionalResource struct {
 	IPs                   []IP
 	CHostCloudTags        UUIDToCloudTags
 	PodNamespaceCloudTags UUIDToCloudTags
+	LB                    []LB
+	LBListeners           []LBListener
+	LBTargetServers       []LBTargetServer
 }
 
 type UUIDToCloudTags map[string]string
