@@ -28,6 +28,7 @@ import (
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	controllercommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	servicecommon "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
@@ -54,6 +55,7 @@ type addtionalResourceToolDataSet struct {
 	podClusterIDToUUID     map[int]string
 	cloudTagCHosts         []mysql.VM
 	cloudTagPodNamespaces  []mysql.PodNamespace
+	additionalLBs          []model.AdditionalResourceLB
 }
 
 func newAddtionalResourceToolDataSet(regionUUID string) *addtionalResourceToolDataSet {
@@ -305,6 +307,37 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 		}
 	}
 
+	for _, lb := range additionalRsc.LB {
+		toolDS, ok := domainUUIDToToolDataSet[lb.DomainUUID]
+		if !ok {
+			return nil, servicecommon.NewError(
+				common.RESOURCE_NOT_FOUND,
+				fmt.Sprintf("lb (name: %s) domain (uuid: %s) not found", lb.Name, lb.DomainUUID),
+			)
+		}
+		if toolDS.regionUUID != lb.RegionUUID {
+			return nil, servicecommon.NewError(
+				common.RESOURCE_NOT_FOUND,
+				fmt.Sprintf("lb (name: %s) domain (uuid: %s) region(: %s) not found", lb.Name, lb.DomainUUID, lb.RegionUUID),
+			)
+		}
+		if !common.Contains(toolDS.vpcUUIDs, lb.VPCUUID) {
+			return nil, servicecommon.NewError(
+				common.RESOURCE_NOT_FOUND,
+				fmt.Sprintf("chost (name: %s) vpc (uuid: %s) not found", lb.Name, lb.VPCUUID),
+			)
+		}
+		for _, vif := range lb.VInterfaces {
+			if _, ok := toolDS.subnetUUIDToType[vif.SubnetUUID]; !ok {
+				return nil, servicecommon.NewError(
+					common.RESOURCE_NOT_FOUND,
+					fmt.Sprintf("lb (name: %s) vinterface (mac: %s) subnet (uuid: %s) not found", lb.Name, vif.Mac, vif.SubnetUUID),
+				)
+			}
+		}
+		toolDS.additionalLBs = append(toolDS.additionalLBs, lb)
+	}
+
 	// store podClusterIDToUUID
 	domainUUIDToPodClusterIDToUUID, err := getPodClusterDataFromDB(domainUUIDs)
 	if err != nil {
@@ -397,6 +430,9 @@ func getDomainUUIDsUsedByAdditionalResource(additionalRsc model.AdditionalResour
 	}
 	for _, cloudTag := range additionalRsc.CloudTags {
 		domainUUIDs.Add(cloudTag.DomainUUID)
+	}
+	for _, lb := range additionalRsc.LB {
+		domainUUIDs.Add(lb.DomainUUID)
 	}
 	return domainUUIDs.ToSlice()
 }
@@ -581,6 +617,101 @@ func generateCloudModelData(domainUUIDToToolDataSet map[string]*addtionalResourc
 			}
 			cloudMD.PodNamespaceCloudTags[podNamespace.Lcuuid] = podNamespace.CloudTags
 		}
+
+		for _, lb := range toolDS.additionalLBs {
+			lbUUID := common.GenerateUUID(lb.Name + lb.VPCUUID)
+			modelLB := cloudmodel.LB{
+				Lcuuid:       lbUUID,
+				Name:         lb.Name,
+				Model:        lb.Model,
+				VPCLcuuid:    lb.VPCUUID,
+				RegionLcuuid: lb.RegionUUID,
+			}
+
+			// add vinterface
+			for _, vif := range lb.VInterfaces {
+				vifUUID := common.GenerateUUID(vif.SubnetUUID + vif.Mac)
+				cloudMD.VInterfaces = append(
+					cloudMD.VInterfaces,
+					cloudmodel.VInterface{
+						Lcuuid:        vifUUID,
+						Mac:           vif.Mac,
+						Type:          toolDS.subnetUUIDToType[vif.SubnetUUID],
+						DeviceType:    common.VIF_DEVICE_TYPE_LB,
+						DeviceLcuuid:  lbUUID,
+						NetworkLcuuid: vif.SubnetUUID,
+						RegionLcuuid:  toolDS.regionUUID,
+					},
+				)
+				for _, ip := range vif.IPs {
+					var subnetCIDRUUID string
+					for cidr, uuid := range toolDS.subnetToCIDRToCIDRUUID[vif.SubnetUUID] {
+						if isIPInCIDR(cidr, ip) {
+							subnetCIDRUUID = uuid
+							break
+						}
+					}
+					if subnetCIDRUUID == "" {
+						return nil, servicecommon.NewError(
+							common.RESOURCE_NOT_FOUND,
+							fmt.Sprintf("lb (name: %s) vinterface (mac: %s) ip: %s is not in any cidr", lb.Name, vif.Mac, ip),
+						)
+					}
+					cloudMD.IPs = append(
+						cloudMD.IPs,
+						cloudmodel.IP{
+							Lcuuid:           common.GenerateUUID(vifUUID + ip),
+							IP:               ip,
+							VInterfaceLcuuid: vifUUID,
+							SubnetLcuuid:     subnetCIDRUUID,
+							RegionLcuuid:     toolDS.regionUUID,
+						},
+					)
+				}
+			}
+
+			// add load balance if exists
+			var vip string
+			for i, lbListener := range lb.LBListeners {
+				if i == 0 {
+					vip = lbListener.IP
+				} else {
+					vip += "," + lbListener.IP
+				}
+				lbListenerUUID := common.GenerateUUID(lbUUID + lbListener.IP)
+				lbListenerName := lbListener.Name
+				if lbListener.Name == "" {
+					lbListenerName = fmt.Sprintf("%s-%d", lbListener.IP, lbListener.Port)
+				}
+				modelLBListener := cloudmodel.LBListener{
+					Lcuuid:   lbListenerUUID,
+					LBLcuuid: lbUUID,
+					Name:     lbListenerName,
+					IPs:      lbListener.IP,
+					Port:     lbListener.Port,
+					Protocol: lbListener.Protocol,
+				}
+				cloudMD.LBListeners = append(cloudMD.LBListeners, modelLBListener)
+
+				// add load balance target server if exists
+				for _, lbTargetServer := range lbListener.LBTargetServers {
+					modelLBTargetServer := cloudmodel.LBTargetServer{
+						Lcuuid:           common.GenerateUUID(lbListenerUUID + lbTargetServer.IP),
+						LBLcuuid:         lbUUID,
+						LBListenerLcuuid: lbListenerUUID,
+						Type:             controllercommon.LB_SERVER_TYPE_IP,
+						IP:               lbTargetServer.IP,
+						Port:             lbTargetServer.Port,
+						Protocol:         lbListener.Protocol,
+						VPCLcuuid:        lb.VPCUUID,
+					}
+					cloudMD.LBTargetServers = append(cloudMD.LBTargetServers, modelLBTargetServer)
+				}
+			}
+			modelLB.VIP = vip
+			cloudMD.LB = append(cloudMD.LB, modelLB)
+		}
+
 		domainUUIDToCloudModelData[domainUUID] = cloudMD
 		log.Debugf("domain (uuid: %s) cloud data: %#v", cloudMD)
 	}
