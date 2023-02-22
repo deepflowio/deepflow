@@ -330,6 +330,9 @@ func (c *Cloud) appendAddtionalResourcesData() {
 	c.resource.VInterfaces = append(c.resource.VInterfaces, additionalResource.VInterfaces...)
 	c.resource.IPs = append(c.resource.IPs, additionalResource.IPs...)
 	c.appendCloudTags(additionalResource.CHostCloudTags, additionalResource.PodNamespaceCloudTags)
+	c.resource.LBs = append(c.resource.LBs, additionalResource.LB...)
+	c.resource.LBListeners = append(c.resource.LBListeners, additionalResource.LBListeners...)
+	c.resource.LBTargetServers = append(c.resource.LBTargetServers, additionalResource.LBTargetServers...)
 }
 
 func (c *Cloud) appendCloudTags(chostCloudTags model.UUIDToCloudTags, podNamespaceCloudTags model.UUIDToCloudTags) {

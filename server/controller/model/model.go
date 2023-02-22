@@ -411,6 +411,29 @@ type AdditionalResourceTag struct {
 	Value string `json:"value" yaml:"value" binding:"required"`
 }
 
+type AdditionalResourceLB struct {
+	Name        string                         `json:"name" yaml:"name" binding:"required"`
+	Model       int                            `json:"model" yaml:"model" binding:"required"`
+	VPCUUID     string                         `json:"vpc_uuid" yaml:"vpc_uuid" binding:"required"`
+	RegionUUID  string                         `json:"region_uuid" yaml:"region_uuid" binding:"required"`
+	DomainUUID  string                         `json:"domain_uuid" yaml:"domain_uuid" binding:"required"`
+	VInterfaces []AdditionalResourceVInterface `json:"vinterfaces" yaml:"vinterfaces"`
+	LBListeners []AdditionalResourceLBListener `json:"lb_listeners" yaml:"lb_listeners"`
+}
+
+type AdditionalResourceLBListener struct {
+	Name            string                             `json:"name" yaml:"name"`
+	Protocol        string                             `json:"protocol" yaml:"protocol" binding:"required"`
+	IP              string                             `json:"ip" yaml:"ip" binding:"required"`
+	Port            int                                `json:"port" yaml:"port" binding:"required"`
+	LBTargetServers []AdditionalResourceLBTargetServer `json:"lb_target_servers" yaml:"lb_target_servers"`
+}
+
+type AdditionalResourceLBTargetServer struct {
+	IP   string `json:"ip" yaml:"ip" binding:"required"`
+	Port int    `json:"port" yaml:"port" binding:"required"`
+}
+
 type AdditionalResource struct {
 	AZs       []AdditionalResourceAZ       `json:"azs" yaml:"azs"`
 	VPCs      []AdditionalResourceVPC      `json:"vpcs" yaml:"vpcs"`
@@ -418,6 +441,7 @@ type AdditionalResource struct {
 	Hosts     []AdditionalResourceHost     `json:"hosts" yaml:"hosts"`
 	CHosts    []AdditionalResourceChost    `json:"chosts" yaml:"chosts"`
 	CloudTags []AdditionalResourceCloudTag `json:"cloud_tags" yaml:"cloud_tags"`
+	LB        []AdditionalResourceLB       `json:"lbs" yaml:"lbs"`
 }
 
 type VTapGroupConfiguration struct {

@@ -55,3 +55,23 @@ cloud_tags:
   tags:               # required
   - key: xxxx         # required. (Limited to 255 characters and does not support spaces, colon, back quotes, backslash, single quotes.)
     value: xxxx       # required. (Limited to 255 characters and does not support spaces, colon, back quotes, backslash.)
+
+# lb, load balance
+lbs:
+- name: xxx                # required
+  model: 2                 # default: 2. options: 1 (internal), 2 (external)
+  vpc_uuid: xxxx           # required
+  domain_uuid: xxxx        # required
+  region_uuid: xxxx        # required
+  vinterfaces:             # optional. lb interfaces
+  - mac: xx:xx:xx:xx:xx:xx # required
+    subnet_uuid: xxxx      # required
+    ips: ["x.x.x.x"]       # required
+  lb_listeners:            # optional, lb listeners
+  - name: xxx              # optional
+    protocol: TCP/UDP      # required
+    ip: x.x.x.x            # required
+    port: xx               # required
+    lb_target_servers:     # optional, lb target servers
+    - ip: x.x.x.x          # required
+      port: xx             # required
