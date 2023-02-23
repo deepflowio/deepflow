@@ -72,6 +72,7 @@ func InitIDManager(cfg *RecorderConfig, ctx context.Context) (err error) {
 			RESOURCE_TYPE_POD_INGRESS_EN:     &IDPool[mysql.PodIngress]{resourceType: RESOURCE_TYPE_POD_INGRESS_EN, max: cfg.ResourceMaxID1},
 			RESOURCE_TYPE_POD_GROUP_EN:       &IDPool[mysql.PodGroup]{resourceType: RESOURCE_TYPE_POD_GROUP_EN, max: cfg.ResourceMaxID1},
 			RESOURCE_TYPE_POD_REPLICA_SET_EN: &IDPool[mysql.PodReplicaSet]{resourceType: RESOURCE_TYPE_POD_REPLICA_SET_EN, max: cfg.ResourceMaxID1},
+			RESOURCE_TYPE_PROCESS_EN:         &IDPool[mysql.Process]{resourceType: RESOURCE_TYPE_PROCESS_EN, max: cfg.ResourceMaxID1},
 		},
 	}
 	return
