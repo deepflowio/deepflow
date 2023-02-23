@@ -335,6 +335,11 @@ func (r *Recorder) getSubDomainUpdatersInOrder(subDomainLcuuid string, cloudData
 	pod := updater.NewPod(subDomainCache, cloudData.Pods)
 	pod.RegisterCallbacks(podListener.OnUpdaterAdded, podListener.OnUpdaterUpdated, podListener.OnUpdaterDeleted)
 
+	processListener := listener.NewProcess(subDomainCache, r.eventQueue)
+	process := updater.NewProcess(subDomainCache, cloudData.Processes)
+	process.RegisterCallbacks(
+		processListener.OnUpdaterAdded, processListener.OnUpdaterUpdated, processListener.OnUpdaterDeleted)
+
 	podNodeListener := listener.NewPodNode(subDomainCache, r.eventQueue)
 	podNode := updater.NewPodNode(subDomainCache, cloudData.PodNodes)
 	podNode.RegisterCallbacks(
@@ -366,6 +371,7 @@ func (r *Recorder) getSubDomainUpdatersInOrder(subDomainLcuuid string, cloudData
 		updater.NewPodGroupPort(subDomainCache, cloudData.PodGroupPorts),
 		updater.NewPodReplicaSet(subDomainCache, cloudData.PodReplicaSets),
 		pod,
+		process,
 		updater.NewNetwork(subDomainCache, cloudData.Networks),
 		updater.NewSubnet(subDomainCache, cloudData.Subnets),
 		updater.NewVInterface(subDomainCache, cloudData.VInterfaces, domainToolDataSet),
