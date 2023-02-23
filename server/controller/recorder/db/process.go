@@ -30,7 +30,7 @@ func NewProcess() *Process {
 		OperatorBase[mysql.Process]{
 			resourceTypeName: common.RESOURCE_TYPE_PROCESS_EN,
 			softDelete:       true,
-			allocateID:       false,
+			allocateID:       true,
 		},
 	}
 	operator.setter = operator
