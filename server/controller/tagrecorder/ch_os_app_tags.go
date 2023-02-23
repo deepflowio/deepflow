@@ -55,17 +55,19 @@ func (o *ChOSAppTags) generateNewData() (map[OSAPPTagsKey]mysql.ChOSAppTags, boo
 				osAppTagsMap[strings.Trim(splitSingleTag[0], " ")] = strings.Trim(splitSingleTag[1], " ")
 			}
 		}
-		osAppTagsStr, err := json.Marshal(osAppTagsMap)
-		if err != nil {
-			log.Error(err)
-			return nil, false
-		}
-		key := OSAPPTagsKey{
-			PID: process.ID,
-		}
-		keyToItem[key] = mysql.ChOSAppTags{
-			PID:       process.ID,
-			OSAPPTags: string(osAppTagsStr),
+		if len(osAppTagsMap) > 0 {
+			osAppTagsStr, err := json.Marshal(osAppTagsMap)
+			if err != nil {
+				log.Error(err)
+				return nil, false
+			}
+			key := OSAPPTagsKey{
+				PID: process.ID,
+			}
+			keyToItem[key] = mysql.ChOSAppTags{
+				PID:       process.ID,
+				OSAPPTags: string(osAppTagsStr),
+			}
 		}
 	}
 	return keyToItem, true
