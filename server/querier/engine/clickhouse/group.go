@@ -59,7 +59,10 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 					} else {
 						tagItem, ok = tag.GetTag("k8s_label", db, table, "default")
 					}
-					filter := fmt.Sprintf(tagItem.NotNullFilter, strings.TrimPrefix(preAsTag, "k8s.label."))
+					filterName := strings.TrimPrefix(preAsTag, "k8s.label.")
+					filterName = strings.TrimSuffix(filterName, "_0")
+					filterName = strings.TrimSuffix(filterName, "_1")
+					filter := fmt.Sprintf(tagItem.NotNullFilter, filterName)
 					return &view.Expr{Value: "(" + filter + ")"}, true
 				} else if strings.HasPrefix(preAsTag, "cloud.tag.") {
 					if strings.HasSuffix(preAsTag, "_0") {
@@ -69,7 +72,10 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 					} else {
 						tagItem, ok = tag.GetTag("cloud_tag", db, table, "default")
 					}
-					filter := fmt.Sprintf(tagItem.NotNullFilter, strings.TrimPrefix(preAsTag, "cloud.tag."), strings.TrimPrefix(preAsTag, "cloud.tag."))
+					filterName := strings.TrimPrefix(preAsTag, "cloud.tag.")
+					filterName = strings.TrimSuffix(filterName, "_0")
+					filterName = strings.TrimSuffix(filterName, "_1")
+					filter := fmt.Sprintf(tagItem.NotNullFilter, filterName, filterName)
 					return &view.Expr{Value: "(" + filter + ")"}, true
 				} else if strings.HasPrefix(preAsTag, "os.app.") {
 					if strings.HasSuffix(preAsTag, "_0") {
@@ -79,7 +85,10 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 					} else {
 						tagItem, ok = tag.GetTag("os_app", db, table, "default")
 					}
-					filter := fmt.Sprintf(tagItem.NotNullFilter, strings.TrimPrefix(preAsTag, "os.app."))
+					filterName := strings.TrimPrefix(preAsTag, "os.app.")
+					filterName = strings.TrimSuffix(filterName, "_0")
+					filterName = strings.TrimSuffix(filterName, "_1")
+					filter := fmt.Sprintf(tagItem.NotNullFilter, filterName)
 					return &view.Expr{Value: "(" + filter + ")"}, true
 				} else if strings.HasPrefix(preAsTag, "tag.") || strings.HasPrefix(preAsTag, "attribute.") {
 					tagItem, ok = tag.GetTag("tag.", db, table, "default")
@@ -106,7 +115,10 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 				} else {
 					tagItem, ok = tag.GetTag("k8s_label", db, table, "default")
 				}
-				filter := fmt.Sprintf(tagItem.NotNullFilter, strings.TrimPrefix(name, "k8s.label."))
+				filterName := strings.TrimPrefix(name, "k8s.label.")
+				filterName = strings.TrimSuffix(filterName, "_0")
+				filterName = strings.TrimSuffix(filterName, "_1")
+				filter := fmt.Sprintf(tagItem.NotNullFilter, filterName)
 				return &view.Expr{Value: "(" + filter + ")"}, true
 			} else if strings.HasPrefix(name, "cloud.tag.") {
 				if strings.HasSuffix(name, "_0") {
@@ -116,7 +128,10 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 				} else {
 					tagItem, ok = tag.GetTag("cloud_tag", db, table, "default")
 				}
-				filter := fmt.Sprintf(tagItem.NotNullFilter, strings.TrimPrefix(name, "cloud.tag."), strings.TrimPrefix(name, "cloud.tag."))
+				filterName := strings.TrimPrefix(name, "cloud.tag.")
+				filterName = strings.TrimSuffix(filterName, "_0")
+				filterName = strings.TrimSuffix(filterName, "_1")
+				filter := fmt.Sprintf(tagItem.NotNullFilter, filterName, filterName)
 				return &view.Expr{Value: "(" + filter + ")"}, true
 			} else if strings.HasPrefix(name, "os.app.") {
 				if strings.HasSuffix(name, "_0") {
@@ -126,7 +141,10 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 				} else {
 					tagItem, ok = tag.GetTag("os_app", db, table, "default")
 				}
-				filter := fmt.Sprintf(tagItem.NotNullFilter, strings.TrimPrefix(name, "os.app."))
+				filterName := strings.TrimPrefix(name, "os.app.")
+				filterName = strings.TrimSuffix(filterName, "_0")
+				filterName = strings.TrimSuffix(filterName, "_1")
+				filter := fmt.Sprintf(tagItem.NotNullFilter, filterName)
 				return &view.Expr{Value: "(" + filter + ")"}, true
 			} else if strings.HasPrefix(name, "tag.") || strings.HasPrefix(name, "attribute.") {
 				tagItem, ok = tag.GetTag("tag.", db, table, "default")
