@@ -293,10 +293,17 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 		for _, tag := range pStmt.SelectExprs {
 			item, ok := tag.(*sqlparser.AliasedExpr)
 			if ok {
+				as := sqlparser.String(item.As)
 				colName, ok := item.Expr.(*sqlparser.ColName)
 				if ok && (common.IsValueInSliceString(sqlparser.String(colName), tagsSlice) || strings.Contains(sqlparser.String(colName), "_id")) {
-					innerSelectSlice = append(innerSelectSlice, sqlparser.String(colName))
-					outerWhereLeftSlice = append(outerWhereLeftSlice, sqlparser.String(colName))
+					if as != "" {
+						selectTag := sqlparser.String(colName) + " AS " + as
+						innerSelectSlice = append(innerSelectSlice, selectTag)
+						outerWhereLeftSlice = append(outerWhereLeftSlice, as)
+					} else {
+						innerSelectSlice = append(innerSelectSlice, sqlparser.String(colName))
+						outerWhereLeftSlice = append(outerWhereLeftSlice, sqlparser.String(colName))
+					}
 					for _, suffix := range []string{"", "_0", "_1"} {
 						for _, resourceName := range []string{"resource_gl0", "auto_instance", "resource_gl1", "resource_gl2", "auto_service"} {
 							resourceTypeSuffix := resourceName + "_type" + suffix
