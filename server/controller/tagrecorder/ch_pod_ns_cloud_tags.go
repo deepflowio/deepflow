@@ -55,17 +55,19 @@ func (p *ChPodNSCloudTags) generateNewData() (map[CloudTagsKey]mysql.ChPodNSClou
 				cloudTagsMap[splitSingleLabel[0]] = splitSingleLabel[1]
 			}
 		}
-		cloudTagsStr, err := json.Marshal(cloudTagsMap)
-		if err != nil {
-			log.Error(err)
-			return nil, false
-		}
-		key := CloudTagsKey{
-			ID: podNamespace.ID,
-		}
-		keyToItem[key] = mysql.ChPodNSCloudTags{
-			ID:        podNamespace.ID,
-			CloudTags: string(cloudTagsStr),
+		if len(cloudTagsMap) > 0 {
+			cloudTagsStr, err := json.Marshal(cloudTagsMap)
+			if err != nil {
+				log.Error(err)
+				return nil, false
+			}
+			key := CloudTagsKey{
+				ID: podNamespace.ID,
+			}
+			keyToItem[key] = mysql.ChPodNSCloudTags{
+				ID:        podNamespace.ID,
+				CloudTags: string(cloudTagsStr),
+			}
 		}
 	}
 	return keyToItem, true

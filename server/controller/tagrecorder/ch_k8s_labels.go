@@ -55,19 +55,21 @@ func (k *ChK8sLabels) generateNewData() (map[K8sLabelsKey]mysql.ChK8sLabels, boo
 				labelsMap[splitSingleLabel[0]] = splitSingleLabel[1]
 			}
 		}
-		labelsStr, err := json.Marshal(labelsMap)
-		if err != nil {
-			log.Error(err)
-			return nil, false
-		}
-		key := K8sLabelsKey{
-			PodID: pod.ID,
-		}
-		keyToItem[key] = mysql.ChK8sLabels{
-			PodID:   pod.ID,
-			Labels:  string(labelsStr),
-			L3EPCID: pod.VPCID,
-			PodNsID: pod.PodNamespaceID,
+		if len(labelsMap) > 0 {
+			labelsStr, err := json.Marshal(labelsMap)
+			if err != nil {
+				log.Error(err)
+				return nil, false
+			}
+			key := K8sLabelsKey{
+				PodID: pod.ID,
+			}
+			keyToItem[key] = mysql.ChK8sLabels{
+				PodID:   pod.ID,
+				Labels:  string(labelsStr),
+				L3EPCID: pod.VPCID,
+				PodNsID: pod.PodNamespaceID,
+			}
 		}
 	}
 	return keyToItem, true
