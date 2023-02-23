@@ -55,17 +55,19 @@ func (c *ChChostCloudTags) generateNewData() (map[CloudTagsKey]mysql.ChChostClou
 				cloudTagsMap[splitSingleLabel[0]] = splitSingleLabel[1]
 			}
 		}
-		cloudTagsStr, err := json.Marshal(cloudTagsMap)
-		if err != nil {
-			log.Error(err)
-			return nil, false
-		}
-		key := CloudTagsKey{
-			ID: vm.ID,
-		}
-		keyToItem[key] = mysql.ChChostCloudTags{
-			ID:        vm.ID,
-			CloudTags: string(cloudTagsStr),
+		if len(cloudTagsMap) > 0 {
+			cloudTagsStr, err := json.Marshal(cloudTagsMap)
+			if err != nil {
+				log.Error(err)
+				return nil, false
+			}
+			key := CloudTagsKey{
+				ID: vm.ID,
+			}
+			keyToItem[key] = mysql.ChChostCloudTags{
+				ID:        vm.ID,
+				CloudTags: string(cloudTagsStr),
+			}
 		}
 	}
 	return keyToItem, true
