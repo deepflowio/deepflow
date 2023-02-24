@@ -1201,6 +1201,8 @@ func (i *Issu) renameColumn(connect *sql.DB, cr *ColumnRename) error {
 				log.Infof("db: %s, table: %s error: %s", cr.Db, cr.Table, err)
 			} else if strings.Contains(err.Error(), "'DROP_INDEX' is not supported by storage Distributed") {
 				log.Infof("db: %s, table: %s info: %s", cr.Db, cr.Table, err)
+			} else if strings.Contains(err.Error(), "doesn't exist") {
+				log.Infof("db: %s, table: %s info: %s", cr.Db, cr.Table, err)
 			} else {
 				log.Errorf("sql: %s, error: %s", sql, err)
 				return err
@@ -1238,6 +1240,9 @@ func (i *Issu) renameColumn(connect *sql.DB, cr *ColumnRename) error {
 		if strings.Contains(err.Error(), "Cannot find column") ||
 			strings.Contains(err.Error(), "column with this name already exists") {
 			log.Infof("db: %s, table: %s error: %s", cr.Db, cr.Table, err)
+			return nil
+		} else if strings.Contains(err.Error(), "doesn't exist") {
+			log.Infof("db: %s, table: %s info: %s", cr.Db, cr.Table, err)
 			return nil
 		}
 		log.Error(err)
