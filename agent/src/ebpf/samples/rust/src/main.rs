@@ -322,8 +322,8 @@ fn main() {
         set_data_limit_max(10000);
 
         // test go traceing timeout,
-        // Defaults to 120 seconds if the function is not called
-        //set_go_tracing_timeout(120);
+        // Defaults to 0 seconds if the function is not called
+        //set_go_tracing_timeout(0);
 
         bpf_tracer_finish();
 

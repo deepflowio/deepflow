@@ -916,9 +916,10 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	}
 
 	if (conn_info->message_type != MSG_PRESTORE &&
-	    conn_info->message_type != MSG_RECONFIRM)
+	    conn_info->message_type != MSG_RECONFIRM &&
+	    !(trace_key.goid != 0 && timeout == 0))
 		trace_process(socket_info_ptr, conn_info, socket_id, pid_tgid,
-			      trace_info_ptr, trace_conf , trace_stats,
+			      trace_info_ptr, trace_conf, trace_stats,
 			      &thread_trace_id, time_stamp, &trace_key);
 
 	if (!is_socket_info_valid(socket_info_ptr)) {
