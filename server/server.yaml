@@ -134,6 +134,10 @@ controller:
         # 资源ID限制：所有设备ID（除宿主机外）、容器节点、Ingress、工作负载、ReplicaSet、POD
         resource_max_id_1: 499999
 
+  tagrecorder:
+    # size of data in batch operation for MySQL
+    mysql_batch_size: 5000
+
   trisolaris:
     tsdb_ip:
     chrony:
