@@ -343,10 +343,14 @@ http2_fill_common_socket_2(struct http2_header_data *data,
 		.message_type = send_buffer->msg_type,
 	};
 
-	trace_process(socket_info_ptr, &conn_info, send_buffer->socket_id, id,
-		      trace_info_ptr, trace_conf, trace_stats,
-		      &send_buffer->thread_trace_id, send_buffer->timestamp,
-		      &trace_key);
+	if (timeout != 0) {
+		trace_process(socket_info_ptr, &conn_info,
+			      send_buffer->socket_id, id, trace_info_ptr,
+			      trace_conf, trace_stats,
+			      &send_buffer->thread_trace_id,
+			      send_buffer->timestamp, &trace_key);
+	}
+
 	send_buffer->pid = (__u32)id;
 	return true;
 }
