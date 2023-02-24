@@ -354,6 +354,7 @@ const (
 	VIF_DEVICE_TYPE_INTERNET  = 0
 	VIF_DEVICE_TYPE_POD_GROUP = 101
 	VIF_DEVICE_TYPE_SERVICE   = 102
+	VIF_DEVICE_TYPE_GPROCESS  = 120
 	VIF_DEVICE_TYPE_IP        = 255
 )
 
@@ -574,5 +575,5 @@ const (
 )
 
 const (
-	PROCESS_INSTANCE_TYPE = 62999 // used in process event
+	PROCESS_INSTANCE_TYPE = 120 // used in process event
 )
