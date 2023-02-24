@@ -655,8 +655,8 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 		case "tap":
 			sql = fmt.Sprintf("SELECT value, name AS display_name FROM tap_type_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 
-		case "vtap":
-			sql = fmt.Sprintf("SELECT id AS value, name AS display_name FROM vtap_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+		case "vtap", "gprocess":
+			sql = fmt.Sprintf("SELECT id AS value, name AS display_name FROM %s_map %s GROUP BY value, display_name ORDER BY %s ASC %s", tag, whereSql, orderBy, limitSql)
 
 		default:
 			if strings.HasPrefix(tag, "k8s.label.") {
