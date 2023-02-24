@@ -110,6 +110,7 @@ func (c *TagRecorder) refresh(domainLcuuidToIconID map[string]int, resourceTypeT
 		updaters = append(updaters, NewChIPResource(c.tCtx))
 	}
 	for _, updater := range updaters {
+		updater.SetConfig(c.cfg.TagRecorderCfg)
 		updater.Refresh()
 	}
 }
