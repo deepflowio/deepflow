@@ -354,6 +354,7 @@ func (k *KnowledgeGraph) FillOTel(l *L7FlowLog, platformData *grpc.PlatformInfoT
 		l.IP40, l.IP41,
 		l.IP60, l.IP61,
 		0, 0,
+		l.GPID0, l.GPID1,
 		uint16(l.ServerPort),
 		zerodoc.Rest,
 		layers.IPProtocol(l.Protocol),

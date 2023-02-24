@@ -521,6 +521,7 @@ func (k *KnowledgeGraph) FillL7(l *pb.AppProtoLogsBaseInfo, platformData *grpc.P
 		l.IpSrc, l.IpDst,
 		l.Ip6Src, l.Ip6Dst,
 		l.MacSrc, l.MacDst,
+		l.Gpid_0, l.Gpid_1,
 		uint16(l.PortDst),
 		l.TapSide,
 		protocol,

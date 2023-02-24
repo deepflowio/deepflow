@@ -130,8 +130,8 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 				}
 			}
 		}
-		t.AutoInstanceID1, t.AutoInstanceType1 = common.GetAutoInstance(t.PodID1, t.PodNodeID1, t.L3DeviceID1, uint8(t.L3DeviceType1), t.L3EpcID1)
-		t.AutoServiceID1, t.AutoServiceType1 = common.GetAutoService(t.ServiceID1, t.PodGroupID1, t.PodNodeID1, t.L3DeviceID1, uint8(t.L3DeviceType1), t.L3EpcID1)
+		t.AutoInstanceID1, t.AutoInstanceType1 = common.GetAutoInstance(t.PodID1, t.GPID1, t.PodNodeID1, t.L3DeviceID1, uint8(t.L3DeviceType1), t.L3EpcID1)
+		t.AutoServiceID1, t.AutoServiceType1 = common.GetAutoService(t.ServiceID1, t.PodGroupID1, t.GPID, t.PodNodeID1, t.L3DeviceID1, uint8(t.L3DeviceType1), t.L3EpcID1)
 	} else {
 		t.Code |= MainAddCode
 		if t.L3EpcID == datatype.EPC_FROM_INTERNET {
@@ -199,8 +199,8 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 				}
 			}
 		}
-		t.AutoInstanceID, t.AutoInstanceType = common.GetAutoInstance(t.PodID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
-		t.AutoServiceID, t.AutoServiceType = common.GetAutoService(t.ServiceID, t.PodGroupID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
+		t.AutoInstanceID, t.AutoInstanceType = common.GetAutoInstance(t.PodID, t.GPID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
+		t.AutoServiceID, t.AutoServiceType = common.GetAutoService(t.ServiceID, t.PodGroupID, t.GPID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
 	}
 
 	return nil
