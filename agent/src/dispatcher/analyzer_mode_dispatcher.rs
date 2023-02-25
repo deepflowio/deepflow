@@ -361,38 +361,33 @@ impl AnalyzerModeDispatcher {
         let terminated = base.terminated.clone();
         let npb_dedup_enabled = base.npb_dedup_enabled.clone();
         let id = base.id;
-        #[cfg(target_os = "linux")]
-        let mut flow_map = FlowMap::new(
-            base.id as u32,
-            base.flow_output_queue.clone(),
-            base.policy_getter,
-            base.log_output_queue.clone(),
-            base.ntp_diff.clone(),
-            base.flow_map_config.clone(),
-            base.log_parse_config.clone(),
-            None,
-            Some(base.packet_sequence_output_queue.clone()), // Enterprise Edition Feature: packet-sequence
-            &base.stats,
-            false, // !from_ebpf
-        );
-        #[cfg(target_os = "windows")]
-        let mut flow_map = FlowMap::new(
-            base.id as u32,
-            base.flow_output_queue.clone(),
-            base.policy_getter,
-            base.log_output_queue.clone(),
-            base.ntp_diff.clone(),
-            base.flow_map_config.clone(),
-            base.log_parse_config.clone(),
-            Some(base.packet_sequence_output_queue.clone()), // Enterprise Edition Feature: packet-sequence
-            &base.stats,
-            false, // !from_ebpf
-        );
+        let flow_output_queue = base.flow_output_queue.clone();
+        let policy_getter = base.policy_getter;
+        let log_output_queue = base.log_output_queue.clone();
+        let ntp_diff = base.ntp_diff.clone();
+        let flow_map_config = base.flow_map_config.clone();
+        let log_parse_config = base.log_parse_config.clone();
+        let packet_sequence_output_queue = base.packet_sequence_output_queue.clone(); // Enterprise Edition Feature: packet-sequence
+        let stats = base.stats.clone();
 
         self.flow_thread_handler.replace(
             thread::Builder::new()
                 .name("dispatcher-flow".to_owned())
                 .spawn(move || {
+                    let mut flow_map = FlowMap::new(
+                        id as u32,
+                        flow_output_queue,
+                        policy_getter,
+                        log_output_queue,
+                        ntp_diff,
+                        flow_map_config,
+                        log_parse_config,
+                        #[cfg(target_os = "linux")]
+                        None,
+                        Some(packet_sequence_output_queue), // Enterprise Edition Feature: packet-sequence
+                        &stats,
+                        false, // !from_ebpf
+                    );
                     while !terminated.load(Ordering::Relaxed) {
                         let mut batch = Vec::with_capacity(1024);
                         match receiver.recv_all(&mut batch, Some(Duration::from_secs(1))) {
