@@ -17,17 +17,23 @@
 package cloud
 
 import (
+	"fmt"
+
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/satori/go.uuid"
 )
 
 // Kubernetes平台直接使用对应kubernetesgather的resource作为cloud的resource
-func (c *Cloud) getKubernetesData() {
+func (c *Cloud) getKubernetesData() model.Resource {
 	k8sGatherTask, ok := c.kubernetesGatherTaskMap[c.basicInfo.Lcuuid]
 	if !ok {
-		log.Infof("domain (%s) no related kubernetes_gather_task", c.basicInfo.Name)
-		return
+		errMSG := fmt.Sprintf("domain (%s) no related kubernetes_gather_task", c.basicInfo.Name)
+		log.Error(errMSG)
+		return model.Resource{
+			ErrorMessage: errMSG,
+			ErrorState:   common.RESOURCE_STATE_CODE_EXCEPTION,
+		}
 	}
 	kubernetesGatherResource := k8sGatherTask.GetResource()
 
@@ -35,11 +41,10 @@ func (c *Cloud) getKubernetesData() {
 	if kubernetesGatherResource.AZ.Lcuuid == "" {
 		log.Infof("domain (%s) kubernetes_gather_task resource is null", c.basicInfo.Name)
 		// return k8s gather error info
-		c.resource = model.Resource{
+		return model.Resource{
 			ErrorState:   kubernetesGatherResource.ErrorState,
 			ErrorMessage: kubernetesGatherResource.ErrorMessage,
 		}
-		return
 	}
 
 	// 合并网络
@@ -101,8 +106,8 @@ func (c *Cloud) getKubernetesData() {
 		})
 	}
 
-	// 更新resource资源
-	c.resource = model.Resource{
+	return model.Resource{
+		Verified:               true,
 		AZs:                    []model.AZ{kubernetesGatherResource.AZ},
 		VPCs:                   []model.VPC{kubernetesGatherResource.VPC},
 		PodClusters:            []model.PodCluster{kubernetesGatherResource.PodCluster},

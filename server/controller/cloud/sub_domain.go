@@ -26,14 +26,14 @@ import (
 
 // 合并附属容器集群的资源到云平台资源中
 // 遍历Cloud下所有KubernetesGather的数据，更新部分属性信息，并合并到Cloud的resource中
-func (c *Cloud) getSubDomainData() {
+func (c *Cloud) getSubDomainData(cResource model.Resource) map[string]model.SubDomainResource {
 
 	subDomainResources := make(map[string]model.SubDomainResource)
 	for lcuuid, kubernetesGatherTask := range c.kubernetesGatherTaskMap {
 		kubernetesGatherResource := kubernetesGatherTask.GetResource()
 
 		// 容器节点及与虚拟机关联关系
-		podNodes, vmPodNodeConnections := c.getSubDomainPodNodes(lcuuid, &kubernetesGatherResource)
+		podNodes, vmPodNodeConnections := c.getSubDomainPodNodes(lcuuid, cResource, &kubernetesGatherResource)
 		// 如果当前KubernetesGather数据中没有容器节点，则跳过该集群
 		if len(podNodes) == 0 {
 			log.Info("cloud merge subdomain data: k8s gather resource not found pod node")
@@ -73,7 +73,7 @@ func (c *Cloud) getSubDomainData() {
 
 		// IP
 		ips, reservedPodSubnetLcuuidToIPNum, updatedVInterfaceLcuuidToNetworkLcuuid :=
-			c.getSubDomainIPs(lcuuid, &kubernetesGatherResource)
+			c.getSubDomainIPs(lcuuid, cResource, &kubernetesGatherResource)
 
 		// vinterfaces
 		vinterfaces := c.getSubDomainVInterfaces(
@@ -113,31 +113,31 @@ func (c *Cloud) getSubDomainData() {
 		}
 		subDomainResources[lcuuid] = subDomainResource
 	}
-	// 附属到cloud资源中
-	c.resource.SubDomainResources = subDomainResources
+
+	return subDomainResources
 }
 
 // - 根据IP查询对应的虚拟机，生成与虚拟机的关联关系
 // - 根据虚拟机的az属性，确定容器节点的az信息
-func (c *Cloud) getSubDomainPodNodes(subDomainLcuuid string, resource *kubernetes_model.KubernetesGatherResource) ([]model.PodNode, []model.VMPodNodeConnection) {
+func (c *Cloud) getSubDomainPodNodes(subDomainLcuuid string, cResource model.Resource, kResource *kubernetes_model.KubernetesGatherResource) ([]model.PodNode, []model.VMPodNodeConnection) {
 	var retPodNodes []model.PodNode
 	var retVMPodNodeConnections []model.VMPodNodeConnection
 
-	if len(resource.PodNodes) == 0 {
+	if len(kResource.PodNodes) == 0 {
 		return retPodNodes, retVMPodNodeConnections
 	}
-	vpcLcuuid := resource.PodNodes[0].VPCLcuuid
+	vpcLcuuid := kResource.PodNodes[0].VPCLcuuid
 
 	lcuuidToVM := make(map[string]*model.VM)
-	for index, vm := range c.resource.VMs {
+	for index, vm := range cResource.VMs {
 		if vm.VPCLcuuid != vpcLcuuid {
 			continue
 		}
-		lcuuidToVM[vm.Lcuuid] = &c.resource.VMs[index]
+		lcuuidToVM[vm.Lcuuid] = &cResource.VMs[index]
 	}
 
 	vinterfaceLcuuidToVMLcuuid := make(map[string]string)
-	for _, vinterface := range c.resource.VInterfaces {
+	for _, vinterface := range cResource.VInterfaces {
 		if vinterface.VPCLcuuid != vpcLcuuid || vinterface.DeviceType != common.VIF_DEVICE_TYPE_VM {
 			continue
 		}
@@ -145,7 +145,7 @@ func (c *Cloud) getSubDomainPodNodes(subDomainLcuuid string, resource *kubernete
 	}
 
 	ipToVM := make(map[string]*model.VM)
-	for _, ip := range c.resource.IPs {
+	for _, ip := range cResource.IPs {
 		vmLcuuid, ok := vinterfaceLcuuidToVMLcuuid[ip.VInterfaceLcuuid]
 		if !ok {
 			continue
@@ -157,7 +157,7 @@ func (c *Cloud) getSubDomainPodNodes(subDomainLcuuid string, resource *kubernete
 		ipToVM[ip.IP] = vm
 	}
 
-	for _, podNode := range resource.PodNodes {
+	for _, podNode := range kResource.PodNodes {
 		vm, ok := ipToVM[podNode.IP]
 		if !ok {
 			continue
@@ -394,14 +394,14 @@ func (c *Cloud) getSubDomainPods(
 }
 
 func (c *Cloud) getSubDomainIPs(
-	subDomainLcuuid string, resource *kubernetes_model.KubernetesGatherResource,
+	subDomainLcuuid string, cResource model.Resource, kResource *kubernetes_model.KubernetesGatherResource,
 ) ([]model.IP, map[string]int, map[string]string) {
 	var retIPs []model.IP
 	var reservedPodSubnetLcuuidToIPNum map[string]int
 	var updatedVInterfaceLcuuidToNetworkLcuuid map[string]string
 
 	// POD/Service IP无需处理子网信息，直接补充subDomainLcuuid
-	for _, ips := range [][]model.IP{resource.PodIPs, resource.PodServiceIPs} {
+	for _, ips := range [][]model.IP{kResource.PodIPs, kResource.PodServiceIPs} {
 		for _, ip := range ips {
 			retIPs = append(retIPs, model.IP{
 				Lcuuid:           ip.Lcuuid,
@@ -420,13 +420,13 @@ func (c *Cloud) getSubDomainIPs(
 	subnets := []model.Subnet{}
 	reservedPodSubnetLcuuidToIPNum = make(map[string]int)
 	updatedVInterfaceLcuuidToNetworkLcuuid = make(map[string]string)
-	for _, subnet := range c.resource.Subnets {
-		if subnet.VPCLcuuid != resource.VPC.Lcuuid {
+	for _, subnet := range cResource.Subnets {
+		if subnet.VPCLcuuid != kResource.VPC.Lcuuid {
 			continue
 		}
 		subnets = append(subnets, subnet)
 	}
-	for _, ip := range resource.PodNodeIPs {
+	for _, ip := range kResource.PodNodeIPs {
 		ipAddr, _ := netaddr.ParseIP(ip.IP)
 		subnetLcuuid := ""
 		for _, subnet := range subnets {
