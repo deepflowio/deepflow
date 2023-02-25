@@ -57,6 +57,8 @@ const BILD_FLAGS: usize = 0xff;
 const BILD_FLAGS_OFFSET: usize = 6;
 const BILD_OVERLAY_OFFSET: usize = 7;
 
+const HANDLER_BATCH_SIZE: usize = 64;
+
 #[derive(Clone)]
 pub struct AnalyzerModeDispatcherListener {
     vm_mac_addrs: Arc<RwLock<HashMap<u32, MacAddr>>>,
@@ -234,10 +236,10 @@ impl AnalyzerModeDispatcher {
                 .name("dispatcher-parser".to_owned())
                 .spawn(move || {
                     let mut timestamp_map: HashMap<TapType, Duration> = HashMap::new();
+                    let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
+                    let mut output_batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
 
                     while !terminated.load(Ordering::Relaxed) {
-                        let mut batch = Vec::with_capacity(1024);
-
                         match receiver.recv_all(&mut batch, Some(Duration::from_secs(1))) {
                             Ok(_) => {}
                             Err(queue::Error::Timeout) => continue,
@@ -344,7 +346,11 @@ impl AnalyzerModeDispatcher {
                                 }
                             }
 
-                            let _ = sender.send((packet.tap_type, meta_packet));
+                            output_batch.push((packet.tap_type, meta_packet));
+                        }
+                        if let Err(e) = sender.send_all(&mut output_batch) {
+                            warn!("dispatcher-parser sender failed: {:?}", e);
+                            output_batch.clear();
                         }
                     }
                 })
@@ -388,8 +394,8 @@ impl AnalyzerModeDispatcher {
                         &stats,
                         false, // !from_ebpf
                     );
+                    let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
                     while !terminated.load(Ordering::Relaxed) {
-                        let mut batch = Vec::with_capacity(1024);
                         match receiver.recv_all(&mut batch, Some(Duration::from_secs(1))) {
                             Ok(_) => {}
                             Err(queue::Error::Timeout) => {
@@ -399,15 +405,18 @@ impl AnalyzerModeDispatcher {
                             Err(queue::Error::Terminated(..)) => break,
                         }
 
-                        for (tap_type, mut meta_packet) in batch.drain(..) {
+                        for (tap_type, meta_packet) in batch.iter_mut() {
                             Self::prepare_flow(
-                                &mut meta_packet,
-                                tap_type,
+                                meta_packet,
+                                *tap_type,
                                 id as u8,
                                 npb_dedup_enabled.load(Ordering::Relaxed),
                             );
-                            flow_map.inject_meta_packet(&mut meta_packet);
-                            let _ = sender.send((tap_type, meta_packet));
+                            flow_map.inject_meta_packet(meta_packet);
+                        }
+                        if let Err(e) = sender.send_all(&mut batch) {
+                            warn!("dispatcher-flow sender failed: {:?}", e);
+                            batch.clear();
                         }
                     }
                 })
@@ -426,8 +435,8 @@ impl AnalyzerModeDispatcher {
                 .name("dispatcher-pipeline".to_owned())
                 .spawn(move || {
                     let mut tap_pipelines: HashMap<TapType, AnalyzerPipeline> = HashMap::new();
+                    let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
                     while !terminated.load(Ordering::Relaxed) {
-                        let mut batch = Vec::with_capacity(1024);
                         match receiver.recv_all(&mut batch, Some(Duration::from_secs(1))) {
                             Ok(_) => {}
                             Err(queue::Error::Timeout) => continue,
@@ -525,6 +534,7 @@ impl AnalyzerModeDispatcher {
         info!("Start analyzer dispatcher {}", base.log_id);
         let time_diff = base.ntp_diff.load(Ordering::Relaxed);
         let mut prev_timestamp = get_timestamp(time_diff);
+        let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
 
         while !base.terminated.load(Ordering::Relaxed) {
             if base.reset_whitelist.swap(false, Ordering::Relaxed) {
@@ -538,6 +548,12 @@ impl AnalyzerModeDispatcher {
                 &base.counter,
                 &base.ntp_diff,
             );
+            if recved.is_none() || batch.len() >= HANDLER_BATCH_SIZE {
+                if let Err(e) = sender_to_parser.send_all(&mut batch) {
+                    warn!("dispatcher sender_to_parser failed: {:?}", e);
+                    batch.clear();
+                }
+            }
             if recved.is_none() {
                 if base.tap_interface_whitelist.next_sync(Duration::ZERO) {
                     base.need_update_bpf.store(true, Ordering::Relaxed);
@@ -564,7 +580,7 @@ impl AnalyzerModeDispatcher {
                 raw_length: packet.data.len() as u32,
                 tap_type: TapType::Cloud,
             };
-            let _ = sender_to_parser.send(info);
+            batch.push(info);
         }
         if let Some(handler) = self.parser_thread_handler.take() {
             let _ = handler.join();
