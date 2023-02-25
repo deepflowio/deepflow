@@ -124,8 +124,6 @@ pub struct FlowMap {
     time_key_buffer: Option<Vec<(u64, FlowMapKey)>>,
 }
 
-unsafe impl Send for FlowMap {}
-
 impl FlowMap {
     pub fn new(
         id: u32,

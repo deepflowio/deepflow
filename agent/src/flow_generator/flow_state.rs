@@ -80,8 +80,6 @@ const N_STATES: usize = FlowState::Max as usize;
 
 pub struct StateMachine([[StateEntry; N_FLAGS]; N_STATES]);
 
-unsafe impl Send for StateMachine {}
-
 impl Default for StateMachine {
     fn default() -> Self {
         // Initializing with unsafe because:
