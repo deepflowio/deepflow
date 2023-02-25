@@ -510,11 +510,11 @@ impl FlowMap {
         // rust 版本用了std的hashmap自动处理扩容，所以无需执行policy_gettelr
     }
 
-    fn append_to_block(&self, node: &mut FlowNode, meta_packet: &MetaPacket) {
+    fn append_to_block(&self, config: &FlowConfig, node: &mut FlowNode, meta_packet: &MetaPacket) {
         const MINUTE: u64 = 60;
         if node.packet_sequence_block.is_some() {
             if !node.packet_sequence_block.as_ref().unwrap().is_available(
-                self.config.load().packet_sequence_block_size,
+                config.packet_sequence_block_size,
                 (meta_packet.lookup_key.timestamp.as_secs() / MINUTE) as u32,
             ) {
                 // if the packet_sequence_block is no enough to push one more packet, then send it to the queue
@@ -553,7 +553,7 @@ impl FlowMap {
         node.packet_sequence_block
             .as_mut()
             .unwrap()
-            .append_packet(mini_meta_packet, self.config.load().packet_sequence_flag);
+            .append_packet(mini_meta_packet, config.packet_sequence_flag);
     }
 
     fn update_tcp_node(
@@ -594,7 +594,7 @@ impl FlowMap {
 
         // Enterprise Edition Feature: packet-sequence
         if self.packet_sequence_enabled {
-            self.append_to_block(node, meta_packet);
+            self.append_to_block(flow_config, node, meta_packet);
         }
 
         flow_closed
@@ -1257,7 +1257,7 @@ impl FlowMap {
 
         // Enterprise Edition Feature: packet-sequence
         if self.packet_sequence_enabled {
-            self.append_to_block(&mut node, meta_packet);
+            self.append_to_block(flow_config, &mut node, meta_packet);
         }
         node
     }
