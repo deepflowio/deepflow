@@ -366,7 +366,7 @@ impl<'a> MetaPacket<'a> {
         None
     }
 
-    pub fn update_with_copy(
+    pub fn update_with_raw_copy(
         &mut self,
         packet: Vec<u8>,
         src_endpoint: bool,
@@ -375,10 +375,10 @@ impl<'a> MetaPacket<'a> {
         original_length: usize,
     ) -> error::Result<()> {
         self.raw = Some(Cow::from(packet));
-        self.update(src_endpoint, dst_endpoint, timestamp, original_length)
+        self.update_fields_except_raw(src_endpoint, dst_endpoint, timestamp, original_length)
     }
 
-    pub fn update_without_copy(
+    pub fn update_without_raw_copy(
         &mut self,
         packet: &'a [u8],
         src_endpoint: bool,
@@ -387,10 +387,10 @@ impl<'a> MetaPacket<'a> {
         original_length: usize,
     ) -> error::Result<()> {
         self.raw = Some(Cow::from(packet));
-        self.update(src_endpoint, dst_endpoint, timestamp, original_length)
+        self.update_fields_except_raw(src_endpoint, dst_endpoint, timestamp, original_length)
     }
 
-    fn update(
+    fn update_fields_except_raw(
         &mut self,
         src_endpoint: bool,
         dst_endpoint: bool,

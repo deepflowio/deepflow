@@ -58,6 +58,7 @@ const BILD_FLAGS_OFFSET: usize = 6;
 const BILD_OVERLAY_OFFSET: usize = 7;
 
 const HANDLER_BATCH_SIZE: usize = 64;
+const INNER_QUEUE_SIZE: usize = 65536;
 
 #[derive(Clone)]
 pub struct AnalyzerModeDispatcherListener {
@@ -72,17 +73,17 @@ impl AnalyzerModeDispatcherListener {
     }
 
     pub fn on_vm_change(&self, vm_mac_addrs: &[MacAddr]) {
+        let old_vm_mac_addrs = self.vm_mac_addrs.read().unwrap();
+        if old_vm_mac_addrs.len() <= vm_mac_addrs.len()
+            && vm_mac_addrs
+                .iter()
+                .all(|addr| old_vm_mac_addrs.contains_key(&addr.to_lower_32b()))
         {
-            let old_vm_mac_addrs = self.vm_mac_addrs.read().unwrap();
-            if old_vm_mac_addrs.len() <= vm_mac_addrs.len()
-                && vm_mac_addrs
-                    .iter()
-                    .all(|addr| old_vm_mac_addrs.contains_key(&addr.to_lower_32b()))
-            {
-                return;
-            }
+            return;
         }
-        let mut new_vm_mac_addrs = HashMap::new();
+        drop(old_vm_mac_addrs);
+
+        let mut new_vm_mac_addrs = HashMap::with_capacity(vm_mac_addrs.len());
         vm_mac_addrs.iter().for_each(|addr| {
             new_vm_mac_addrs.insert(addr.to_lower_32b(), *addr);
         });
@@ -100,8 +101,8 @@ pub(super) struct AnalyzerPipeline {
     timestamp: Duration,
 }
 
-#[derive(Debug)]
-struct PakcketInfo {
+#[derive(Clone, Debug)]
+struct Packet {
     timestamp: Duration,
     raw: Vec<u8>,
     original_length: u32,
@@ -128,18 +129,12 @@ impl AnalyzerModeDispatcher {
         }
     }
 
-    fn adjust_timestmap(
+    fn timestamp(
         timestamp_map: &mut HashMap<TapType, Duration>,
         tap_type: TapType,
         mut timestamp: Duration,
     ) -> (Duration, bool) {
-        let last_timestamp = match timestamp_map.get_mut(&tap_type) {
-            None => {
-                timestamp_map.insert(tap_type, Duration::ZERO);
-                timestamp_map.get_mut(&tap_type).unwrap()
-            }
-            Some(last_timestamp) => last_timestamp,
-        };
+        let last_timestamp = timestamp_map.entry(tap_type).or_insert(Duration::ZERO);
 
         if timestamp.add(Duration::from_millis(1)).lt(last_timestamp) {
             return (Duration::ZERO, false);
@@ -193,9 +188,13 @@ impl AnalyzerModeDispatcher {
         }
     }
 
-    fn run_parser(
+    // This thread implements the following functions:
+    // 1. Decap tunnel
+    // 2. Lookup l2end
+    // 3. Generate MetaPacket
+    fn run_meta_packet_generator(
         &mut self,
-        receiver: Receiver<PakcketInfo>,
+        receiver: Receiver<Packet>,
         sender: DebugSender<(TapType, MetaPacket<'static>)>,
     ) {
         let terminated = self.base.terminated.clone();
@@ -211,7 +210,7 @@ impl AnalyzerModeDispatcher {
 
         self.parser_thread_handler.replace(
             thread::Builder::new()
-                .name("dispatcher-parser".to_owned())
+                .name("dispatcher-meta-packet-generator".to_owned())
                 .spawn(move || {
                     let mut timestamp_map: HashMap<TapType, Duration> = HashMap::new();
                     let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
@@ -225,6 +224,7 @@ impl AnalyzerModeDispatcher {
                         }
 
                         for mut packet in batch.drain(..) {
+                            // Truncate package according to configuration
                             let raw_length = (packet.raw_length as usize)
                                 .min(packet.raw.len())
                                 .min(pool_raw_size);
@@ -255,7 +255,7 @@ impl AnalyzerModeDispatcher {
                             }
 
                             let original_length = packet.raw.len() - decap_length;
-                            let timestamp = packet.timestamp; // FIXME
+                            let timestamp = packet.timestamp;
 
                             let overlay_packet = &mut packet.raw[decap_length..raw_length];
                             // Only cloud traffic goes to de-duplication
@@ -275,7 +275,7 @@ impl AnalyzerModeDispatcher {
                                 flow_map_config.load().cloud_gateway_traffic,
                             );
                             let (timestamp, ok) =
-                                Self::adjust_timestmap(&mut timestamp_map, tap_type, timestamp);
+                                Self::timestamp(&mut timestamp_map, tap_type, timestamp);
                             if !ok {
                                 // FIXME: just in case
                                 counter.retired.fetch_add(1, Ordering::Relaxed);
@@ -285,7 +285,7 @@ impl AnalyzerModeDispatcher {
                             let mut meta_packet = MetaPacket::empty();
                             meta_packet.tap_port = tap_port;
                             let offset = Duration::ZERO;
-                            if let Err(e) = meta_packet.update_with_copy(
+                            if let Err(e) = meta_packet.update_with_raw_copy(
                                 overlay_packet.to_vec(),
                                 src_local,
                                 dst_local,
@@ -312,7 +312,10 @@ impl AnalyzerModeDispatcher {
                             output_batch.push((packet.tap_type, meta_packet));
                         }
                         if let Err(e) = sender.send_all(&mut output_batch) {
-                            warn!("dispatcher-parser sender failed: {:?}", e);
+                            debug!(
+                                "dispatcher-meta-packet-generator {} sender failed: {:?}",
+                                id, e
+                            );
                             output_batch.clear();
                         }
                     }
@@ -321,7 +324,9 @@ impl AnalyzerModeDispatcher {
         );
     }
 
-    fn run_flow(
+    // This thread implements the following functions:
+    // 1. Generate tagged flow
+    fn run_tagged_flow_generator(
         &mut self,
         receiver: Receiver<(TapType, MetaPacket<'static>)>,
         sender: DebugSender<(TapType, MetaPacket<'static>)>,
@@ -341,7 +346,7 @@ impl AnalyzerModeDispatcher {
 
         self.flow_thread_handler.replace(
             thread::Builder::new()
-                .name("dispatcher-flow".to_owned())
+                .name("dispatcher-tagged-flow-generator".to_owned())
                 .spawn(move || {
                     let mut flow_map = FlowMap::new(
                         id as u32,
@@ -378,7 +383,10 @@ impl AnalyzerModeDispatcher {
                             flow_map.inject_meta_packet(meta_packet);
                         }
                         if let Err(e) = sender.send_all(&mut batch) {
-                            warn!("dispatcher-flow sender failed: {:?}", e);
+                            debug!(
+                                "dispatcher-tagged-flow-generator {} sender failed: {:?}",
+                                id, e
+                            );
                             batch.clear();
                         }
                     }
@@ -387,7 +395,13 @@ impl AnalyzerModeDispatcher {
         );
     }
 
-    fn run_pipeline(&mut self, receiver: Receiver<(TapType, MetaPacket<'static>)>) {
+    // This thread implements the following functions:
+    // 1. Lookup pipeline
+    // 2. NPB/PCAP/...
+    fn run_additional_packet_pipeline(
+        &mut self,
+        receiver: Receiver<(TapType, MetaPacket<'static>)>,
+    ) {
         let base = &self.base;
         let terminated = base.terminated.clone();
         let handler_builder = self.base.handler_builder.clone();
@@ -395,7 +409,7 @@ impl AnalyzerModeDispatcher {
 
         self.pipeline_thread_handler.replace(
             thread::Builder::new()
-                .name("dispatcher-pipeline".to_owned())
+                .name("dispatcher-additional-packet-pipeline".to_owned())
                 .spawn(move || {
                     let mut tap_pipelines: HashMap<TapType, AnalyzerPipeline> = HashMap::new();
                     let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
@@ -447,11 +461,11 @@ impl AnalyzerModeDispatcher {
         );
     }
 
-    fn prepare_run(&mut self) -> DebugSender<PakcketInfo> {
+    fn setup_inner_thread_and_queue(&mut self) -> DebugSender<Packet> {
         let id = self.base.id.to_string();
-        let name = "0.1-bytes-to-parse";
+        let name = "0.1-bytes-to-meta-packet-generator";
         let (sender_to_parser, receiver_from_dispatcher, counter) =
-            bounded_with_debug(65536, name, &self.queue_debugger);
+            bounded_with_debug(INNER_QUEUE_SIZE, name, &self.queue_debugger);
         self.stats_collector.register_countable(
             "queue",
             Countable::Owned(Box::new(counter)),
@@ -461,9 +475,9 @@ impl AnalyzerModeDispatcher {
             ],
         );
 
-        let name = "0.2-packet-to-flowgenerator";
+        let name = "0.2-packet-to-tagged-flow-generator";
         let (sender_to_flow, receiver_from_parser, counter) =
-            bounded_with_debug(65536, name, &self.queue_debugger);
+            bounded_with_debug(INNER_QUEUE_SIZE, name, &self.queue_debugger);
         self.stats_collector.register_countable(
             "queue",
             Countable::Owned(Box::new(counter)),
@@ -473,9 +487,9 @@ impl AnalyzerModeDispatcher {
             ],
         );
 
-        let name = "0.3-packet-to-pipeline";
+        let name = "0.3-packet-to-additional-pipeline";
         let (sender_to_pipeline, receiver_from_flow, counter) =
-            bounded_with_debug(65536, "0.3-packet-to-pipeline", &self.queue_debugger);
+            bounded_with_debug(INNER_QUEUE_SIZE, name, &self.queue_debugger);
         self.stats_collector.register_countable(
             "queue",
             Countable::Owned(Box::new(counter)),
@@ -485,18 +499,19 @@ impl AnalyzerModeDispatcher {
             ],
         );
 
-        self.run_parser(receiver_from_dispatcher, sender_to_flow);
-        self.run_flow(receiver_from_parser, sender_to_pipeline);
-        self.run_pipeline(receiver_from_flow);
+        self.run_meta_packet_generator(receiver_from_dispatcher, sender_to_flow);
+        self.run_tagged_flow_generator(receiver_from_parser, sender_to_pipeline);
+        self.run_additional_packet_pipeline(receiver_from_flow);
         return sender_to_parser;
     }
 
     pub(super) fn run(&mut self) {
-        let sender_to_parser = self.prepare_run();
+        let sender_to_parser = self.setup_inner_thread_and_queue();
         let base = &mut self.base;
         info!("Start analyzer dispatcher {}", base.log_id);
         let time_diff = base.ntp_diff.load(Ordering::Relaxed);
         let mut prev_timestamp = get_timestamp(time_diff);
+        let id = base.id;
         let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
 
         while !base.terminated.load(Ordering::Relaxed) {
@@ -513,7 +528,7 @@ impl AnalyzerModeDispatcher {
             );
             if recved.is_none() || batch.len() >= HANDLER_BATCH_SIZE {
                 if let Err(e) = sender_to_parser.send_all(&mut batch) {
-                    warn!("dispatcher sender_to_parser failed: {:?}", e);
+                    debug!("dispatcher {} sender failed: {:?}", id, e);
                     batch.clear();
                 }
             }
@@ -535,7 +550,7 @@ impl AnalyzerModeDispatcher {
             base.counter
                 .rx_bytes
                 .fetch_add(packet.capture_length as u64, Ordering::Relaxed);
-            let info = PakcketInfo {
+            let info = Packet {
                 timestamp,
                 raw: packet.data.to_vec(),
                 original_length: packet.capture_length as u32,
