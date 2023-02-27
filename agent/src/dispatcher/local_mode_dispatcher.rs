@@ -215,7 +215,7 @@ impl LocalModeDispatcher {
             let overlay_packet = &packet.data[decap_length..];
             let mut meta_packet = MetaPacket::empty();
             let offset = Duration::ZERO;
-            if let Err(e) = meta_packet.update_without_copy(
+            if let Err(e) = meta_packet.update_without_raw_copy(
                 overlay_packet,
                 src_local,
                 dst_local,
