@@ -21,7 +21,9 @@ use std::collections::HashSet;
 use std::fmt;
 use std::net::IpAddr;
 use std::path::PathBuf;
+use std::process;
 use std::sync::Arc;
+use std::thread;
 use std::time::Duration;
 
 use arc_swap::{access::Map, ArcSwap};
@@ -1286,13 +1288,12 @@ impl ConfigHandler {
             if candidate_config.dispatcher.capture_packet_size
                 != new_config.dispatcher.capture_packet_size
             {
-                if components.is_none() {
-                    candidate_config.dispatcher.capture_packet_size =
-                        new_config.dispatcher.capture_packet_size;
-                } else if candidate_config.tap_mode == TapMode::Analyzer
-                    || cfg!(target_os = "windows")
-                {
-                    todo!()
+                candidate_config.dispatcher.capture_packet_size =
+                    new_config.dispatcher.capture_packet_size;
+                if !components.is_none() {
+                    info!("Capture packet size update, deepflow-agent restart...");
+                    thread::sleep(Duration::from_secs(1));
+                    process::exit(1);
                 }
             }
 
