@@ -49,16 +49,22 @@ type NATSource uint8
 
 const (
 	NAT_SOURCE_NONE NATSource = iota
+	_
 	NAT_SOURCE_VIP
+	_
+	NAT_SOURCE_RTOA
+	_
 	NAT_SOURCE_TOA
 )
 
 func (n NATSource) String() string {
 	switch n {
 	case NAT_SOURCE_NONE:
-		return "none"
+		return "NONE"
 	case NAT_SOURCE_VIP:
 		return "VIP"
+	case NAT_SOURCE_RTOA:
+		return "RTOA"
 	case NAT_SOURCE_TOA:
 		return "TOA"
 	default:

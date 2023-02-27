@@ -316,10 +316,10 @@ func (h *L7FlowLog) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platform
 	h.Endpoint = l.Name
 	h.SpanKind = uint8(l.Kind)
 	h.spanKind = &h.SpanKind
-	h.StartTime = int64(l.StartTimeUnixNano) / int64(time.Microsecond)
+	h.L7Base.StartTime = int64(l.StartTimeUnixNano) / int64(time.Microsecond)
 	h.L7Base.EndTime = int64(l.EndTimeUnixNano) / int64(time.Microsecond)
-	if h.L7Base.EndTime > h.StartTime {
-		h.ResponseDuration = uint64(h.L7Base.EndTime - h.StartTime)
+	if h.L7Base.EndTime > h.L7Base.StartTime {
+		h.ResponseDuration = uint64(h.L7Base.EndTime - h.L7Base.StartTime)
 	}
 
 	h.fillAttributes(l.GetAttributes(), resAttributes, l.GetLinks())
