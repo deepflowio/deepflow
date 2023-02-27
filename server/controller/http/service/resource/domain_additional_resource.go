@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -678,7 +679,7 @@ func generateCloudModelData(domainUUIDToToolDataSet map[string]*addtionalResourc
 				} else {
 					vip += "," + lbListener.IP
 				}
-				lbListenerUUID := common.GenerateUUID(lbUUID + lbListener.IP)
+				lbListenerUUID := common.GenerateUUID(lbUUID + lbListener.IP + strconv.Itoa(lbListener.Port))
 				lbListenerName := lbListener.Name
 				if lbListener.Name == "" {
 					lbListenerName = fmt.Sprintf("%s-%d", lbListener.IP, lbListener.Port)
@@ -696,7 +697,7 @@ func generateCloudModelData(domainUUIDToToolDataSet map[string]*addtionalResourc
 				// add load balance target server if exists
 				for _, lbTargetServer := range lbListener.LBTargetServers {
 					modelLBTargetServer := cloudmodel.LBTargetServer{
-						Lcuuid:           common.GenerateUUID(lbListenerUUID + lbTargetServer.IP),
+						Lcuuid:           common.GenerateUUID(lbListenerUUID + lbTargetServer.IP + strconv.Itoa(lbListener.Port)),
 						LBLcuuid:         lbUUID,
 						LBListenerLcuuid: lbListenerUUID,
 						Type:             controllercommon.LB_SERVER_TYPE_IP,
