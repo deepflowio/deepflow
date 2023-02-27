@@ -16,6 +16,7 @@
 
 use std::str;
 
+use nom::AsBytes;
 use serde::Serialize;
 
 use super::pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo};
@@ -710,12 +711,7 @@ impl HttpLog {
         if payload.len() < HTTPV2_MAGIC_LENGTH {
             return false;
         }
-        for (i, &b) in HTTPV2_MAGIC_PREFIX.iter().enumerate() {
-            if payload[i] != b {
-                return false;
-            }
-        }
-        return true;
+        &payload[..HTTPV2_MAGIC_PREFIX.len()] == HTTPV2_MAGIC_PREFIX.as_bytes()
     }
 
     fn parse_http_v2(
