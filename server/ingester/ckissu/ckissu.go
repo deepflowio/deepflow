@@ -915,7 +915,7 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo, isEdgeTab
 	}
 
 	if isAppTable {
-		columnAddss623 = append(columnAddss620, []*ColumnAdds{
+		columnAddss623 = append(columnAddss623, []*ColumnAdds{
 			&ColumnAdds{
 				Dbs:         []string{d.db},
 				Tables:      []string{d.name, d.name + "_agg"},
@@ -940,7 +940,7 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo, isEdgeTab
 				ColumnType:  ckdb.UInt32,
 			},
 		}...)
-		columnAddss623 = append(columnAddss620, []*ColumnAdds{
+		columnAddss623 = append(columnAddss623, []*ColumnAdds{
 			&ColumnAdds{
 				Dbs:         []string{d.db},
 				Tables:      []string{d.name, d.name + "_agg"},
@@ -963,7 +963,7 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo, isEdgeTab
 				ColumnType:  ckdb.UInt32,
 			},
 		}...)
-		columnAddss623 = append(columnAddss620, []*ColumnAdds{
+		columnAddss623 = append(columnAddss623, []*ColumnAdds{
 			&ColumnAdds{
 				Dbs:         []string{d.db},
 				Tables:      []string{d.name, d.name + "_agg"},
