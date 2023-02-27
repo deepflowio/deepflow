@@ -958,7 +958,7 @@ vtap_group_id: g-xxxxxx
   #####################
   ## whether to sync os socket and proc info
   ## Default: false
-  ## Note: only make sense when trident type is one of CHOST_VM, CHOST_BM, K8S_VM, K8S_BM
+  ## Note: only make sense when agent type is one of CHOST_VM, CHOST_BM, K8S_VM, K8S_BM
   #os-proc-sync-enabled: false
 
   ## The proc fs mount path
