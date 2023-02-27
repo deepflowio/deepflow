@@ -20,6 +20,7 @@ bitflags! {
     pub struct FeatureFlags: u64 {
         const NONE = 0;
         const CORE = 1<<2;
+        const OTEL_METRICS = 1<<3;
    }
 }
 
@@ -29,6 +30,7 @@ impl From<&Vec<String>> for FeatureFlags {
         for flag in flags {
             match flag.to_lowercase().as_str() {
                 "core" => features.set(FeatureFlags::CORE, true),
+                "otel_metrics" => features.set(FeatureFlags::OTEL_METRICS, true),
                 _ => {}
             }
         }
@@ -43,8 +45,9 @@ mod test {
 
     #[test]
     fn test_feature_flags() {
-        let flags = vec!["CoRe".to_string()];
+        let flags = vec!["CoRe".to_string(), "otel_metrics".to_string()];
         let feature = FeatureFlags::from(&flags);
         assert_eq!(feature.contains(FeatureFlags::CORE), true);
+        assert_eq!(feature.contains(FeatureFlags::OTEL_METRICS), true);
     }
 }

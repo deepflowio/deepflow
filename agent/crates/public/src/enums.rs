@@ -225,6 +225,21 @@ impl From<IpProtocol> for L4Protocol {
     }
 }
 
+// Translate the string value of otel l4_protocol into a L4Protocol enumeration value
+// According to https://opentelemetry.io/docs/reference/specification/trace/semantic_conventions/span-general/#network-transport-attributes
+impl From<String> for L4Protocol {
+    fn from(l4_protocol_str: String) -> Self {
+        let l4_protocol_str = l4_protocol_str.to_lowercase();
+        if l4_protocol_str.eq("ip_tcp") {
+            Self::Tcp
+        } else if l4_protocol_str.eq("ip_udp") {
+            Self::Udp
+        } else {
+            Self::Unknown
+        }
+    }
+}
+
 impl Default for L4Protocol {
     fn default() -> Self {
         L4Protocol::Unknown
