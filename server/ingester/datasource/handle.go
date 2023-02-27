@@ -17,16 +17,14 @@
 package datasource
 
 import (
+	"database/sql"
 	"fmt"
 	"strings"
 
 	basecommon "github.com/deepflowio/deepflow/server/ingester/common"
-	"github.com/deepflowio/deepflow/server/ingester/pkg/ckwriter"
 	"github.com/deepflowio/deepflow/server/ingester/stream/common"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/zerodoc"
-
-	clickhouse "github.com/ClickHouse/clickhouse-go/v2"
 )
 
 const (
@@ -34,6 +32,10 @@ const (
 	ORIGIN_TABLE_1S = "1s"
 	FLOW_LOG_L4     = "flow_log.l4"
 	FLOW_LOG_L7     = "flow_log.l7"
+	FLOW_METRICS    = "vtap_flow"
+	APP_METRICS     = "vtap_app"
+
+	ERR_IS_MODIFYING = "Modifying the retention time (%s), please try again later"
 )
 
 // VATP_ACL数据库, 不进行数据源修改
@@ -46,13 +48,13 @@ var metricsGroupTableIDs = [][]zerodoc.MetricsTableID{
 
 func getMetricsSubTableIDs(tableGroup, baseTable string) ([]zerodoc.MetricsTableID, error) {
 	switch tableGroup {
-	case "vtap_flow":
+	case FLOW_METRICS:
 		if baseTable == ORIGIN_TABLE_1S {
 			return metricsGroupTableIDs[zerodoc.VTAP_FLOW_PORT_1S], nil
 		} else {
 			return metricsGroupTableIDs[zerodoc.VTAP_FLOW_PORT_1M], nil
 		}
-	case "vtap_app":
+	case APP_METRICS:
 		if baseTable == ORIGIN_TABLE_1S {
 			return metricsGroupTableIDs[zerodoc.VTAP_APP_PORT_1S], nil
 		} else {
@@ -381,7 +383,7 @@ func (m *DatasourceManager) getMetricsTable(id zerodoc.MetricsTableID) *ckdb.Tab
 	return zerodoc.GetMetricsTables(ckdb.MergeTree, basecommon.CK_VERSION, m.ckdbCluster, m.ckdbStoragePolicy, 7, 1, 7, 1, m.ckdbColdStorages)[id]
 }
 
-func (m *DatasourceManager) createTableMV(ck clickhouse.Conn, tableId zerodoc.MetricsTableID, baseTable, dstTable, aggrSummable, aggrUnsummable string, aggInterval IntervalEnum, duration int) error {
+func (m *DatasourceManager) createTableMV(ck *sql.DB, tableId zerodoc.MetricsTableID, baseTable, dstTable, aggrSummable, aggrUnsummable string, aggInterval IntervalEnum, duration int) error {
 	table := m.getMetricsTable(tableId)
 	if baseTable != ORIGIN_TABLE_1M && baseTable != ORIGIN_TABLE_1S {
 		return fmt.Errorf("Only support base datasource 1s,1m")
@@ -402,14 +404,14 @@ func (m *DatasourceManager) createTableMV(ck clickhouse.Conn, tableId zerodoc.Me
 	}
 	for _, cmd := range commands {
 		log.Info(cmd)
-		if err := ckwriter.ExecSQL(ck, cmd); err != nil {
+		if _, err := ck.Exec(cmd); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (m *DatasourceManager) modTableMV(ck clickhouse.Conn, tableId zerodoc.MetricsTableID, dstTable string, duration int) error {
+func (m *DatasourceManager) modTableMV(ck *sql.DB, tableId zerodoc.MetricsTableID, dstTable string, duration int) error {
 	table := m.getMetricsTable(tableId)
 	tableMod := ""
 	if dstTable == ORIGIN_TABLE_1M || dstTable == ORIGIN_TABLE_1S {
@@ -420,18 +422,20 @@ func (m *DatasourceManager) modTableMV(ck clickhouse.Conn, tableId zerodoc.Metri
 	modTable := fmt.Sprintf("ALTER TABLE %s MODIFY TTL %s",
 		tableMod, m.makeTTLString(table.TimeKey, ckdb.METRICS_DB, table.GlobalName, duration))
 
-	return ckwriter.ExecSQL(ck, modTable)
+	_, err := ck.Exec(modTable)
+	return err
 }
 
-func (m *DatasourceManager) modFlowLogLocalTable(ck clickhouse.Conn, tableID common.FlowLogID, duration int) error {
+func (m *DatasourceManager) modFlowLogLocalTable(ck *sql.DB, tableID common.FlowLogID, duration int) error {
 	timeKey := tableID.TimeKey()
 	tableLocal := fmt.Sprintf("%s.%s_%s", common.FLOW_LOG_DB, tableID.String(), LOCAL)
 	modTable := fmt.Sprintf("ALTER TABLE %s MODIFY TTL %s",
 		tableLocal, m.makeTTLString(timeKey, common.FLOW_LOG_DB, tableID.String(), duration))
-	return ckwriter.ExecSQL(ck, modTable)
+	_, err := ck.Exec(modTable)
+	return err
 }
 
-func delTableMV(ck clickhouse.Conn, dbId zerodoc.MetricsTableID, table string) error {
+func delTableMV(ck *sql.DB, dbId zerodoc.MetricsTableID, table string) error {
 	dropTables := []string{
 		getMetricsTableName(uint8(dbId), table, GLOBAL),
 		getMetricsTableName(uint8(dbId), table, LOCAL),
@@ -439,7 +443,7 @@ func delTableMV(ck clickhouse.Conn, dbId zerodoc.MetricsTableID, table string) e
 		getMetricsTableName(uint8(dbId), table, AGG),
 	}
 	for _, name := range dropTables {
-		if err := ckwriter.ExecSQL(ck, "DROP TABLE IF EXISTS "+name); err != nil {
+		if _, err := ck.Exec("DROP TABLE IF EXISTS " + name); err != nil {
 			return err
 		}
 	}
@@ -451,34 +455,65 @@ func (m *DatasourceManager) Handle(dbGroup, action, baseTable, dstTable, aggrSum
 	if len(m.ckAddr) == 0 {
 		return fmt.Errorf("ck addr is empty")
 	}
-	ck, err := clickhouse.Open(&clickhouse.Options{
-		Addr: []string{m.ckAddr},
-		Auth: clickhouse.Auth{
-			Database: "default",
-			Username: m.user,
-			Password: m.password,
-		},
-	})
+	ck, err := basecommon.NewCKConnection(m.ckAddr, m.user, m.password)
 
 	if err != nil {
 		return err
 	}
+	defer ck.Close()
 
 	duration = duration / 24 // 切换为天
 
 	// flow_log.l4和flow_log.l7只支持mod
 	if (dbGroup == FLOW_LOG_L4 || dbGroup == FLOW_LOG_L7) && action == actionStrings[MOD] {
-		flowLogID := common.L4_FLOW_ID
 		if dbGroup == FLOW_LOG_L7 {
-			flowLogID = common.L7_FLOW_ID
+			tableID := common.L7_FLOW_ID + common.FlowLogID(zerodoc.VTAP_TABLE_ID_MAX)
+			if m.isModifyingFlags[tableID] {
+				return fmt.Errorf(ERR_IS_MODIFYING, common.L7_FLOW_ID)
+			}
+			go func() {
+				cks, err := basecommon.NewCKConnection(m.ckAddr, m.user, m.password)
+				if err != nil {
+					log.Error(err)
+					return
+				}
+				defer cks.Close()
+				m.isModifyingFlags[tableID] = true
+				if err := m.modFlowLogLocalTable(ck, common.L7_FLOW_ID, duration); err != nil {
+					log.Info(err)
+				}
+				m.isModifyingFlags[tableID] = false
+			}()
+		} else {
+			for _, id := range []common.FlowLogID{common.L4_FLOW_ID, common.L4_PACKET_ID, common.L7_PACKET_ID} {
+				tableID := id + common.FlowLogID(zerodoc.VTAP_TABLE_ID_MAX)
+				if m.isModifyingFlags[tableID] {
+					return fmt.Errorf(ERR_IS_MODIFYING, tableID)
+				}
+				go func(id common.FlowLogID) {
+					ck, err := basecommon.NewCKConnection(m.ckAddr, m.user, m.password)
+					if err != nil {
+						log.Error(err)
+						return
+					}
+					defer ck.Close()
+					m.isModifyingFlags[id] = true
+					if err := m.modFlowLogLocalTable(ck, id-common.FlowLogID(zerodoc.VTAP_TABLE_ID_MAX), duration); err != nil {
+						log.Warning(err)
+					}
+					m.isModifyingFlags[id] = false
+				}(tableID)
+			}
 		}
-		if err := m.modFlowLogLocalTable(ck, flowLogID, duration); err != nil {
-			return err
-		}
+
 		return nil
 	}
 
-	subTableIDs, err := getMetricsSubTableIDs(dbGroup, baseTable)
+	table := baseTable
+	if table == "" {
+		table = dstTable
+	}
+	subTableIDs, err := getMetricsSubTableIDs(dbGroup, table)
 	if err != nil {
 		return err
 	}
@@ -524,9 +559,23 @@ func (m *DatasourceManager) Handle(dbGroup, action, baseTable, dstTable, aggrSum
 				return err
 			}
 		case MOD:
-			if err := m.modTableMV(ck, tableId, dstTable, duration); err != nil {
-				return err
+			if m.isModifyingFlags[tableId] {
+				return fmt.Errorf(ERR_IS_MODIFYING, tableId.TableName())
 			}
+			log.Infof("mod rp tableId %d %s, dstTable %s", tableId, tableId.TableName(), dstTable)
+			go func(id zerodoc.MetricsTableID) {
+				ck, err := basecommon.NewCKConnection(m.ckAddr, m.user, m.password)
+				if err != nil {
+					log.Error(err)
+					return
+				}
+				defer ck.Close()
+				m.isModifyingFlags[id] = true
+				if err := m.modTableMV(ck, id, dstTable, duration); err != nil {
+					log.Warning(err)
+				}
+				m.isModifyingFlags[id] = false
+			}(tableId)
 		case DEL:
 			if err := delTableMV(ck, tableId, dstTable); err != nil {
 				return err
