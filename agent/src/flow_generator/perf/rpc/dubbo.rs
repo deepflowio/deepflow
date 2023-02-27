@@ -22,13 +22,13 @@ use std::time::Duration;
 use crate::{
     common::{
         enums::IpProtocol,
-        flow::{FlowPerfStats, L7PerfStats, L7Protocol, PacketDirection},
+        flow::{FlowPerfStats, L7PerfStats, L7Protocol, PacketDirection, SignalSource},
         meta_packet::MetaPacket,
     },
     config::handler::LogParserConfig,
     flow_generator::{
         error::{Error, Result},
-        perf::l7_rrt::L7RrtCache,
+        perf::l7_rrt::RrtCache,
         perf::stats::PerfStats,
         perf::L7FlowPerf,
         protocol_logs::{consts::*, AppProtoHead, DubboHeader, L7ResponseStatus, LogMessageType},
@@ -44,7 +44,7 @@ struct DubboSessionData {
 
     pub l7_proto: L7Protocol,
     pub msg_type: LogMessageType,
-    rrt_cache: Rc<RefCell<L7RrtCache>>,
+    rrt_cache: Rc<RefCell<RrtCache>>,
 }
 
 pub struct DubboPerfData {
@@ -94,8 +94,20 @@ impl L7FlowPerf for DubboPerfData {
         self.session_data.dubbo_header = DubboHeader::default();
         self.session_data.dubbo_header.parse_headers(payload)?;
         if packet.direction == PacketDirection::ClientToServer {
-            self.calc_request(packet.lookup_key.timestamp, flow_id);
-        } else if self.calc_response(packet.lookup_key.timestamp, flow_id) {
+            self.calc_request(
+                packet.lookup_key.timestamp,
+                flow_id,
+                packet.cap_seq,
+                packet.direction,
+                packet.signal_source == SignalSource::EBPF,
+            );
+        } else if self.calc_response(
+            packet.lookup_key.timestamp,
+            flow_id,
+            packet.cap_seq,
+            packet.direction,
+            packet.signal_source == SignalSource::EBPF,
+        ) {
             return Err(Error::L7ReqNotFound(1));
         }
 
@@ -161,7 +173,7 @@ impl L7FlowPerf for DubboPerfData {
 }
 
 impl DubboPerfData {
-    pub fn new(rrt_cache: Rc<RefCell<L7RrtCache>>) -> Self {
+    pub fn new(rrt_cache: Rc<RefCell<RrtCache>>) -> Self {
         let session_data = DubboSessionData {
             dubbo_header: DubboHeader::default(),
             status: L7ResponseStatus::default(),
@@ -176,20 +188,46 @@ impl DubboPerfData {
         }
     }
 
-    fn calc_request(&mut self, timestamp: Duration, flow_id: u64) {
+    fn calc_request(
+        &mut self,
+        timestamp: Duration,
+        flow_id: u64,
+        cap_seq: u64,
+        direction: PacketDirection,
+        from_ebpf: bool,
+    ) {
         self.session_data.msg_type = LogMessageType::Request;
 
         let perf_stats = self.perf_stats.get_or_insert(PerfStats::default());
         perf_stats.req_count += 1;
         perf_stats.rrt_last = Duration::ZERO;
-        self.session_data
-            .rrt_cache
-            .borrow_mut()
-            .add_req_time(flow_id, None, timestamp);
+        let rrt = self.session_data.rrt_cache.borrow_mut().cal_rrt(
+            flow_id,
+            Some(self.session_data.dubbo_header.request_id as u32),
+            direction,
+            timestamp,
+            cap_seq,
+            from_ebpf,
+        );
+        if !rrt.is_zero() {
+            if rrt > perf_stats.rrt_max {
+                perf_stats.rrt_max = rrt;
+            }
+            perf_stats.rrt_last = rrt;
+            perf_stats.rrt_sum += rrt;
+            perf_stats.rrt_count += 1;
+        }
     }
 
     // 返回是否无法匹配到request
-    fn calc_response(&mut self, timestamp: Duration, flow_id: u64) -> bool {
+    fn calc_response(
+        &mut self,
+        timestamp: Duration,
+        flow_id: u64,
+        cap_seq: u64,
+        direction: PacketDirection,
+        from_ebpf: bool,
+    ) -> bool {
         self.session_data.msg_type = LogMessageType::Response;
 
         let perf_stats = self.perf_stats.get_or_insert(PerfStats::default());
@@ -209,27 +247,22 @@ impl DubboPerfData {
 
         perf_stats.rrt_last = Duration::ZERO;
 
-        let req_timestamp = match self
-            .session_data
-            .rrt_cache
-            .borrow_mut()
-            .get_and_remove_l7_req_time(flow_id, None)
-        {
-            Some(t) => t,
-            None => return true,
-        };
-
-        if timestamp < req_timestamp {
-            return false;
+        let rrt = self.session_data.rrt_cache.borrow_mut().cal_rrt(
+            flow_id,
+            Some(self.session_data.dubbo_header.request_id as u32),
+            direction,
+            timestamp,
+            cap_seq,
+            from_ebpf,
+        );
+        if !rrt.is_zero() {
+            if rrt > perf_stats.rrt_max {
+                perf_stats.rrt_max = rrt;
+            }
+            perf_stats.rrt_last = rrt;
+            perf_stats.rrt_sum += rrt;
+            perf_stats.rrt_count += 1;
         }
-
-        let rrt = timestamp - req_timestamp;
-        if rrt > perf_stats.rrt_max {
-            perf_stats.rrt_max = rrt;
-        }
-        perf_stats.rrt_last = rrt;
-        perf_stats.rrt_sum += rrt;
-        perf_stats.rrt_count += 1;
         false
     }
 
@@ -254,7 +287,7 @@ mod tests {
     const FILE_DIR: &str = "resources/test/flow_generator/dubbo";
 
     fn run(pcap: &str) -> DubboPerfData {
-        let rrt_cache = Rc::new(RefCell::new(L7RrtCache::new(100)));
+        let rrt_cache = Rc::new(RefCell::new(RrtCache::new(100)));
         let mut dubbo_perf_data = DubboPerfData::new(rrt_cache);
 
         let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap), None);
@@ -295,7 +328,7 @@ mod tests {
                     status: L7ResponseStatus::Ok,
                     has_log_data: true,
                     msg_type: LogMessageType::Response,
-                    rrt_cache: Rc::new(RefCell::new(L7RrtCache::new(100))),
+                    rrt_cache: Rc::new(RefCell::new(RrtCache::new(100))),
                     dubbo_header: DubboHeader::default(),
                 },
             },

@@ -3,8 +3,8 @@ use std::path::Path;
 use std::rc::Rc;
 
 use deepflow_agent::{
-    _HttpPerfData as HttpPerfData, _L7FlowPerf as L7FlowPerf, _L7RrtCache as L7RrtCache,
-    _PacketDirection as PacketDirection, utils::test::Capture,
+    _HttpPerfData as HttpPerfData, _L7FlowPerf as L7FlowPerf, _PacketDirection as PacketDirection,
+    _RrtCache as RrtCache, utils::test::Capture,
 };
 
 fn main() {
@@ -23,7 +23,7 @@ fn main() {
         panic!("unable to load pcap file");
     }
 
-    let rrt_cache = L7RrtCache::new(8);
+    let rrt_cache = RrtCache::new(8);
     let mut parser = HttpPerfData::new(Rc::new(RefCell::new(rrt_cache)));
 
     let first_dst_port = packets[0].lookup_key.dst_port;

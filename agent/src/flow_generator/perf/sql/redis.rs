@@ -22,15 +22,14 @@ use std::time::Duration;
 use crate::{
     common::{
         enums::IpProtocol,
-        flow::{FlowPerfStats, L7PerfStats, L7Protocol, PacketDirection},
+        flow::{FlowPerfStats, L7PerfStats, L7Protocol, PacketDirection, SignalSource},
         meta_packet::MetaPacket,
     },
     config::handler::LogParserConfig,
     flow_generator::{
         error::{Error, Result},
-        perf::l7_rrt::L7RrtCache,
-        perf::stats::PerfStats,
         perf::L7FlowPerf,
+        perf::{l7_rrt::RrtCache, stats::PerfStats},
         protocol_logs::{decode, AppProtoHead, L7ResponseStatus, LogMessageType},
     },
 };
@@ -44,7 +43,7 @@ pub struct RedisPerfData {
     active: u32,
     status: L7ResponseStatus,
     has_log_data: bool,
-    rrt_cache: Rc<RefCell<L7RrtCache>>,
+    rrt_cache: Rc<RefCell<RrtCache>>,
 }
 
 impl PartialEq for RedisPerfData {
@@ -100,12 +99,21 @@ impl L7FlowPerf for RedisPerfData {
         self.l7_proto = L7Protocol::Redis;
         self.has_log_data = true;
         if packet.direction == PacketDirection::ClientToServer {
-            self.calc_request(packet.lookup_key.timestamp, flow_id);
+            self.calc_request(
+                packet.lookup_key.timestamp,
+                flow_id,
+                packet.cap_seq,
+                packet.direction,
+                packet.signal_source == SignalSource::EBPF,
+            );
         } else if self.calc_response(
             packet.lookup_key.timestamp,
             &context,
             flow_id,
             is_error_resp,
+            packet.cap_seq,
+            packet.direction,
+            packet.signal_source == SignalSource::EBPF,
         ) {
             return Err(Error::L7ReqNotFound(1));
         }
@@ -167,7 +175,7 @@ impl L7FlowPerf for RedisPerfData {
 }
 
 impl RedisPerfData {
-    pub fn new(rrt_cache: Rc<RefCell<L7RrtCache>>) -> Self {
+    pub fn new(rrt_cache: Rc<RefCell<RrtCache>>) -> Self {
         Self {
             stats: None,
             l7_proto: L7Protocol::default(),
@@ -179,15 +187,32 @@ impl RedisPerfData {
         }
     }
 
-    fn calc_request(&mut self, timestamp: Duration, flow_id: u64) {
+    fn calc_request(
+        &mut self,
+        timestamp: Duration,
+        flow_id: u64,
+        cap_seq: u64,
+        direction: PacketDirection,
+        from_ebpf: bool,
+    ) {
         let stats = self.stats.get_or_insert(PerfStats::default());
         stats.rrt_last = Duration::ZERO;
         stats.req_count += 1;
         self.active += 1;
         self.msg_type = LogMessageType::Request;
-        self.rrt_cache
+
+        let rrt = self
+            .rrt_cache
             .borrow_mut()
-            .add_req_time(flow_id, None, timestamp);
+            .cal_rrt(flow_id, None, direction, timestamp, cap_seq, from_ebpf);
+        if !rrt.is_zero() {
+            if rrt > stats.rrt_max {
+                stats.rrt_max = rrt;
+            }
+            stats.rrt_last = rrt;
+            stats.rrt_sum += rrt;
+            stats.rrt_count += 1;
+        }
     }
 
     // 返回是否无法匹配到request
@@ -197,6 +222,9 @@ impl RedisPerfData {
         context: &Vec<u8>,
         flow_id: u64,
         is_error_resp: bool,
+        cap_seq: u64,
+        direction: PacketDirection,
+        from_ebpf: bool,
     ) -> bool {
         let stats = self.stats.get_or_insert(PerfStats::default());
         stats.resp_count += 1;
@@ -212,26 +240,21 @@ impl RedisPerfData {
         if self.active <= 0 {
             return true;
         }
-        let req_timestamp = match self
-            .rrt_cache
-            .borrow_mut()
-            .get_and_remove_l7_req_time(flow_id, None)
-        {
-            Some(t) => t,
-            None => return true,
-        };
 
         self.active -= 1;
-        if timestamp < req_timestamp {
-            return false;
+
+        let rrt = self
+            .rrt_cache
+            .borrow_mut()
+            .cal_rrt(flow_id, None, direction, timestamp, cap_seq, from_ebpf);
+        if !rrt.is_zero() {
+            if rrt > stats.rrt_max {
+                stats.rrt_max = rrt;
+            }
+            stats.rrt_last = rrt;
+            stats.rrt_sum += rrt;
+            stats.rrt_count += 1;
         }
-        let rrt = timestamp - req_timestamp;
-        if rrt > stats.rrt_max {
-            stats.rrt_max = rrt;
-        }
-        stats.rrt_last = rrt;
-        stats.rrt_sum += rrt;
-        stats.rrt_count += 1;
         false
     }
 
@@ -256,7 +279,7 @@ mod tests {
     const FILE_DIR: &str = "resources/test/flow_generator/redis";
 
     fn run(pcap: &str) -> RedisPerfData {
-        let rrt_cache = Rc::new(RefCell::new(L7RrtCache::new(100)));
+        let rrt_cache = Rc::new(RefCell::new(RrtCache::new(100)));
         let mut redis_perf_data = RedisPerfData::new(rrt_cache);
 
         let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap), None);
@@ -298,7 +321,7 @@ mod tests {
                     active: 0,
                     has_log_data: true,
                     msg_type: LogMessageType::Response,
-                    rrt_cache: Rc::new(RefCell::new(L7RrtCache::new(100))),
+                    rrt_cache: Rc::new(RefCell::new(RrtCache::new(100))),
                 },
             ),
             (
@@ -319,7 +342,7 @@ mod tests {
                     status: L7ResponseStatus::ServerError,
                     has_log_data: true,
                     msg_type: LogMessageType::Response,
-                    rrt_cache: Rc::new(RefCell::new(L7RrtCache::new(100))),
+                    rrt_cache: Rc::new(RefCell::new(RrtCache::new(100))),
                 },
             ),
             (
@@ -340,7 +363,7 @@ mod tests {
                     status: L7ResponseStatus::Ok,
                     has_log_data: true,
                     msg_type: LogMessageType::Response,
-                    rrt_cache: Rc::new(RefCell::new(L7RrtCache::new(100))),
+                    rrt_cache: Rc::new(RefCell::new(RrtCache::new(100))),
                 },
             ),
         ];

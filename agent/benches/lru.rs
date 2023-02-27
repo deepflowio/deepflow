@@ -20,11 +20,10 @@ use std::time::Duration;
 use std::{net::Ipv4Addr, time::Instant};
 
 use criterion::*;
+use deepflow_agent::{_PacketDirection as PacketDirection, _RrtCache as RrtCache};
 use lru::LruCache;
 use rand::prelude::*;
 use uluru::LRUCache;
-
-use deepflow_agent::_L7RrtCache as L7RrtCache;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct SmallStruct {
@@ -425,10 +424,17 @@ fn rrt_lru(c: &mut Criterion) {
                     duration: Duration::new(i as u64, i as u32),
                 });
             }
-            let mut cache = L7RrtCache::new(1000);
+            let mut cache = RrtCache::new(1000);
             let start = Instant::now();
             for item in seeds {
-                cache.add_req_time(item.flow_id, item.stream_id, item.duration);
+                cache.set(
+                    item.flow_id,
+                    item.stream_id,
+                    PacketDirection::ClientToServer,
+                    0,
+                    false,
+                    item.duration,
+                );
             }
             start.elapsed()
         })
@@ -445,13 +451,26 @@ fn rrt_lru(c: &mut Criterion) {
                     duration: Duration::new(i as u64, i as u32),
                 });
             }
-            let mut cache = L7RrtCache::new(1000);
+            let mut cache = RrtCache::new(1000);
             for item in &seeds {
-                cache.add_req_time(item.flow_id, item.stream_id, item.duration);
+                cache.set(
+                    item.flow_id,
+                    item.stream_id,
+                    PacketDirection::ClientToServer,
+                    0,
+                    false,
+                    item.duration,
+                );
             }
             let start = Instant::now();
             for item in &seeds {
-                cache.get_and_remove_l7_req_time(item.flow_id, item.stream_id);
+                cache.get(
+                    item.flow_id,
+                    item.stream_id,
+                    PacketDirection::ClientToServer,
+                    0,
+                    false,
+                );
             }
             start.elapsed()
         })
@@ -468,13 +487,26 @@ fn rrt_lru(c: &mut Criterion) {
                     duration: Duration::new(i as u64, i as u32),
                 });
             }
-            let mut cache = L7RrtCache::new(1000);
+            let mut cache = RrtCache::new(1000);
             for item in &seeds {
-                cache.add_req_time(item.flow_id, item.stream_id, item.duration);
+                cache.set(
+                    item.flow_id,
+                    None,
+                    PacketDirection::ClientToServer,
+                    0,
+                    false,
+                    item.duration,
+                );
             }
             let start = Instant::now();
             for item in &seeds {
-                cache.get_and_remove_l7_req_timeout(item.flow_id);
+                cache.get(
+                    item.flow_id,
+                    item.stream_id,
+                    PacketDirection::ClientToServer,
+                    0,
+                    false,
+                );
             }
             start.elapsed()
         })

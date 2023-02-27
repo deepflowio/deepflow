@@ -60,7 +60,7 @@ pub use {
     },
     flow_generator::perf::{
         http::HttpPerfData as _HttpPerfData,
-        l7_rrt::L7RrtCache as _L7RrtCache,
+        l7_rrt::RrtCache as _RrtCache,
         tcp::{
             TcpPerf as _TcpPerf, _benchmark_report, _benchmark_session_peer_seq_no_assert,
             _meta_flow_perf_update,

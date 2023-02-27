@@ -22,15 +22,14 @@ use std::time::Duration;
 use crate::{
     common::{
         enums::IpProtocol,
-        flow::{FlowPerfStats, L7PerfStats, L7Protocol},
+        flow::{FlowPerfStats, L7PerfStats, L7Protocol, PacketDirection, SignalSource},
         meta_packet::MetaPacket,
     },
     config::handler::LogParserConfig,
     flow_generator::{
         error::{Error, Result},
-        perf::l7_rrt::L7RrtCache,
-        perf::stats::PerfStats,
         perf::L7FlowPerf,
+        perf::{l7_rrt::RrtCache, stats::PerfStats},
         protocol_logs::{consts::*, AppProtoHead, L7ResponseStatus, LogMessageType, MysqlHeader},
     },
     utils::bytes,
@@ -49,7 +48,7 @@ pub struct MysqlPerfData {
     has_log_data: bool,
     decode_response: bool,
     has_response: bool,
-    rrt_cache: Rc<RefCell<L7RrtCache>>,
+    rrt_cache: Rc<RefCell<RrtCache>>,
 }
 
 impl PartialEq for MysqlPerfData {
@@ -112,7 +111,7 @@ impl L7FlowPerf for MysqlPerfData {
 
         match msg_type {
             LogMessageType::Request => {
-                self.parse_request(packet.lookup_key.timestamp, flow_id);
+                self.parse_request(flow_id, packet);
                 self.l7_proto = L7Protocol::MySQL;
                 self.decode_response = true;
                 self.has_response = false;
@@ -124,7 +123,7 @@ impl L7FlowPerf for MysqlPerfData {
                     && self.l7_proto == L7Protocol::MySQL =>
             {
                 self.has_response = true;
-                if self.parse_response(packet.lookup_key.timestamp, flow_id, &payload[offset..]) {
+                if self.parse_response(flow_id, &payload[offset..], packet) {
                     Err(Error::L7ReqNotFound(1))
                 } else {
                     Ok(())
@@ -206,7 +205,7 @@ impl L7FlowPerf for MysqlPerfData {
 }
 
 impl MysqlPerfData {
-    pub fn new(rrt_cache: Rc<RefCell<L7RrtCache>>) -> Self {
+    pub fn new(rrt_cache: Rc<RefCell<RrtCache>>) -> Self {
         Self {
             stats: None,
             l7_proto: L7Protocol::default(),
@@ -220,17 +219,42 @@ impl MysqlPerfData {
         }
     }
 
-    fn calc_request(&mut self, timestamp: Duration, flow_id: u64) {
+    fn calc_request(
+        &mut self,
+        timestamp: Duration,
+        flow_id: u64,
+        cap_seq: u64,
+        direction: PacketDirection,
+        from_ebpf: bool,
+    ) {
         let stats = self.stats.get_or_insert(PerfStats::default());
         stats.req_count += 1;
         self.active += 1;
         stats.rrt_last = Duration::ZERO;
-        self.rrt_cache
+
+        let rrt = self
+            .rrt_cache
             .borrow_mut()
-            .add_req_time(flow_id, None, timestamp);
+            .cal_rrt(flow_id, None, direction, timestamp, cap_seq, from_ebpf);
+        if !rrt.is_zero() {
+            if rrt > stats.rrt_max {
+                stats.rrt_max = rrt;
+            }
+            stats.rrt_last = rrt;
+            stats.rrt_sum += rrt;
+            stats.rrt_count += 1;
+        }
     }
 
-    fn calc_response(&mut self, timestamp: Duration, flow_id: u64, error_code: u16) -> bool {
+    fn calc_response(
+        &mut self,
+        timestamp: Duration,
+        flow_id: u64,
+        error_code: u16,
+        cap_seq: u64,
+        direction: PacketDirection,
+        from_ebpf: bool,
+    ) -> bool {
         let stats = self.stats.get_or_insert(PerfStats::default());
         stats.resp_count += 1;
 
@@ -252,38 +276,37 @@ impl MysqlPerfData {
             return true;
         }
 
-        let req_timestamp = match self
-            .rrt_cache
-            .borrow_mut()
-            .get_and_remove_l7_req_time(flow_id, None)
-        {
-            Some(t) => t,
-            None => return true,
-        };
         self.active -= 1;
 
-        if timestamp < req_timestamp {
-            return false;
+        let rrt = self
+            .rrt_cache
+            .borrow_mut()
+            .cal_rrt(flow_id, None, direction, timestamp, cap_seq, from_ebpf);
+        if !rrt.is_zero() {
+            if rrt > stats.rrt_max {
+                stats.rrt_max = rrt;
+            }
+            stats.rrt_last = rrt;
+            stats.rrt_sum += rrt;
+            stats.rrt_count += 1;
         }
-
-        let rrt = timestamp - req_timestamp;
-        if rrt > stats.rrt_max {
-            stats.rrt_max = rrt;
-        }
-        stats.rrt_last = rrt;
-        stats.rrt_sum += rrt;
-        stats.rrt_count += 1;
         false
     }
 
-    fn parse_request(&mut self, timestamp: Duration, flow_id: u64) {
+    fn parse_request(&mut self, flow_id: u64, packet: &MetaPacket) {
         self.msg_type = LogMessageType::Request;
         self.has_log_data = true;
-        self.calc_request(timestamp, flow_id);
+        self.calc_request(
+            packet.lookup_key.timestamp,
+            flow_id,
+            packet.cap_seq,
+            packet.direction,
+            packet.signal_source == SignalSource::EBPF,
+        );
     }
 
     // MySQL通过Greeting报文判断该流是否为MySQL
-    fn parse_response(&mut self, timestamp: Duration, flow_id: u64, payload: &[u8]) -> bool {
+    fn parse_response(&mut self, flow_id: u64, payload: &[u8], packet: &MetaPacket) -> bool {
         self.msg_type = LogMessageType::Response;
         self.has_log_data = true;
         let error_code: u16 = if payload[RESPONSE_CODE_OFFSET] == MYSQL_RESPONSE_CODE_ERR
@@ -293,7 +316,14 @@ impl MysqlPerfData {
         } else {
             0
         };
-        self.calc_response(timestamp, flow_id, error_code)
+        self.calc_response(
+            packet.lookup_key.timestamp,
+            flow_id,
+            error_code,
+            packet.cap_seq,
+            packet.direction,
+            packet.signal_source == SignalSource::EBPF,
+        )
     }
 }
 
@@ -308,7 +338,7 @@ mod test {
     const FILE_DIR: &str = "resources/test/flow_generator/mysql";
 
     fn run(pcap: &str) -> MysqlPerfData {
-        let rrt_cache = Rc::new(RefCell::new(L7RrtCache::new(100)));
+        let rrt_cache = Rc::new(RefCell::new(RrtCache::new(100)));
         let mut perf_data = MysqlPerfData::new(rrt_cache);
 
         let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap), Some(1400));
@@ -349,7 +379,7 @@ mod test {
                     has_log_data: true,
                     decode_response: true,
                     has_response: true,
-                    rrt_cache: Rc::new(RefCell::new(L7RrtCache::new(100))),
+                    rrt_cache: Rc::new(RefCell::new(RrtCache::new(100))),
                 },
             ),
             (
@@ -372,7 +402,7 @@ mod test {
                     has_log_data: true,
                     decode_response: true,
                     has_response: true,
-                    rrt_cache: Rc::new(RefCell::new(L7RrtCache::new(100))),
+                    rrt_cache: Rc::new(RefCell::new(RrtCache::new(100))),
                 },
             ),
             (
@@ -395,7 +425,7 @@ mod test {
                     has_log_data: true,
                     decode_response: true,
                     has_response: false,
-                    rrt_cache: Rc::new(RefCell::new(L7RrtCache::new(100))),
+                    rrt_cache: Rc::new(RefCell::new(RrtCache::new(100))),
                 },
             ),
         ];

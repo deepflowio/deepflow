@@ -25,13 +25,13 @@ use nom::{bytes::complete::take, Parser};
 use crate::{
     common::{
         enums::IpProtocol,
-        flow::{FlowPerfStats, L7PerfStats, L7Protocol},
+        flow::{FlowPerfStats, L7PerfStats, L7Protocol, PacketDirection, SignalSource},
         meta_packet::MetaPacket,
     },
     config::handler::LogParserConfig,
     flow_generator::{
         error::{Error, Result},
-        perf::l7_rrt::L7RrtCache,
+        perf::l7_rrt::RrtCache,
         perf::stats::PerfStats,
         perf::L7FlowPerf,
         protocol_logs::{
@@ -58,7 +58,7 @@ pub struct MqttPerfData {
     l7_proto: L7Protocol,
     msg_type: LogMessageType,
 
-    rrt_cache: Rc<RefCell<L7RrtCache>>,
+    rrt_cache: Rc<RefCell<RrtCache>>,
 }
 
 impl PartialEq for MqttPerfData {
@@ -101,7 +101,7 @@ impl L7FlowPerf for MqttPerfData {
         }
 
         let payload = packet.get_l4_payload().ok_or(Error::ZeroPayloadLen)?;
-        self.parse_mqtt(payload, packet.lookup_key.timestamp, flow_id)?;
+        self.parse_mqtt(payload, packet, flow_id)?;
 
         Ok(())
     }
@@ -162,7 +162,7 @@ impl L7FlowPerf for MqttPerfData {
 }
 
 impl MqttPerfData {
-    pub fn new(rrt_cache: Rc<RefCell<L7RrtCache>>) -> Self {
+    pub fn new(rrt_cache: Rc<RefCell<RrtCache>>) -> Self {
         Self {
             stats: None,
             status_code: 0,
@@ -175,8 +175,9 @@ impl MqttPerfData {
         }
     }
 
-    fn parse_mqtt(&mut self, mut payload: &[u8], timestamp: Duration, flow_id: u64) -> Result<()> {
+    fn parse_mqtt(&mut self, mut payload: &[u8], packet: &MetaPacket, flow_id: u64) -> Result<()> {
         // 现在只支持 MQTT 3.1.1解析
+        let timestamp = packet.lookup_key.timestamp;
         if self.proto_version != 0 && self.proto_version != 4 {
             warn!("cannot parse packet, perf parser only support to parse MQTT V3.1.1 packet");
             return Err(Error::MqttPerfParseFailed);
@@ -194,7 +195,13 @@ impl MqttPerfData {
                         .map_err(|_| Error::MqttPerfParseFailed)?;
                     self.proto_version = version;
                     self.msg_type = LogMessageType::Request;
-                    self.calc_request(timestamp, flow_id);
+                    self.calc_request(
+                        timestamp,
+                        flow_id,
+                        packet.cap_seq,
+                        packet.direction,
+                        packet.signal_source == SignalSource::EBPF,
+                    );
                 }
                 PacketKind::Connack => {
                     let (_, return_code) =
@@ -202,7 +209,13 @@ impl MqttPerfData {
                     self.status_code = return_code;
                     self.msg_type = LogMessageType::Response;
                     self.status = parse_status_code(return_code);
-                    self.calc_response(timestamp, flow_id);
+                    self.calc_response(
+                        timestamp,
+                        flow_id,
+                        packet.cap_seq,
+                        packet.direction,
+                        packet.signal_source == SignalSource::EBPF,
+                    );
                 }
                 PacketKind::Publish { dup, qos, .. } => {
                     if dup && qos == QualityOfService::AtMostOnce {
@@ -214,11 +227,23 @@ impl MqttPerfData {
                     match qos {
                         QualityOfService::AtLeastOnce | QualityOfService::ExactlyOnce => {
                             self.msg_type = LogMessageType::Request;
-                            self.calc_request(timestamp, flow_id);
+                            self.calc_request(
+                                timestamp,
+                                flow_id,
+                                packet.cap_seq,
+                                packet.direction,
+                                packet.signal_source == SignalSource::EBPF,
+                            );
                         }
                         QualityOfService::AtMostOnce => {
                             self.msg_type = LogMessageType::Response;
-                            self.calc_response(timestamp, flow_id);
+                            self.calc_response(
+                                timestamp,
+                                flow_id,
+                                packet.cap_seq,
+                                packet.direction,
+                                packet.signal_source == SignalSource::EBPF,
+                            );
                         }
                     }
                 }
@@ -229,18 +254,36 @@ impl MqttPerfData {
                 | PacketKind::Puback
                 | PacketKind::Unsuback => {
                     self.msg_type = LogMessageType::Response;
-                    self.calc_response(timestamp, flow_id);
+                    self.calc_response(
+                        timestamp,
+                        flow_id,
+                        packet.cap_seq,
+                        packet.direction,
+                        packet.signal_source == SignalSource::EBPF,
+                    );
                 }
                 PacketKind::Subscribe
                 | PacketKind::Unsubscribe
                 | PacketKind::Pingreq
                 | PacketKind::Pubrel => {
                     self.msg_type = LogMessageType::Request;
-                    self.calc_request(timestamp, flow_id);
+                    self.calc_request(
+                        timestamp,
+                        flow_id,
+                        packet.cap_seq,
+                        packet.direction,
+                        packet.signal_source == SignalSource::EBPF,
+                    );
                 }
                 PacketKind::Disconnect => {
                     self.msg_type = LogMessageType::Session;
-                    self.calc_request(timestamp, flow_id);
+                    self.calc_request(
+                        timestamp,
+                        flow_id,
+                        packet.cap_seq,
+                        packet.direction,
+                        packet.signal_source == SignalSource::EBPF,
+                    );
                 }
             }
             if input.len() <= header.remaining_length as usize {
@@ -256,34 +299,50 @@ impl MqttPerfData {
         Ok(())
     }
 
-    fn calc_request(&mut self, timestamp: Duration, flow_id: u64) {
+    fn calc_request(
+        &mut self,
+        timestamp: Duration,
+        flow_id: u64,
+        cap_seq: u64,
+        direction: PacketDirection,
+        from_ebpf: bool,
+    ) {
         let stats = self.stats.get_or_insert(PerfStats::default());
         stats.req_count += 1;
         stats.rrt_last = Duration::ZERO;
-        self.rrt_cache
-            .borrow_mut()
-            .add_req_time(flow_id, None, timestamp);
-    }
-
-    fn calc_response(&mut self, timestamp: Duration, flow_id: u64) {
-        let stats = self.stats.get_or_insert(PerfStats::default());
-        stats.resp_count += 1;
-
-        let req_timestamp = match self
+        let rrt = self
             .rrt_cache
             .borrow_mut()
-            .get_and_remove_l7_req_time(flow_id, None)
-            .filter(|t| *t <= timestamp)
-        {
-            Some(t) => t,
-            None => return,
-        };
+            .cal_rrt(flow_id, None, direction, timestamp, cap_seq, from_ebpf);
+        if !rrt.is_zero() {
+            stats.rrt_max = stats.rrt_max.max(rrt);
+            stats.rrt_last = rrt;
+            stats.rrt_sum += rrt;
+            stats.rrt_count += 1;
+        }
+    }
 
-        let rrt = timestamp - req_timestamp;
-        stats.rrt_max = stats.rrt_max.max(rrt);
-        stats.rrt_last = rrt;
-        stats.rrt_sum += rrt;
-        stats.rrt_count += 1;
+    fn calc_response(
+        &mut self,
+        timestamp: Duration,
+        flow_id: u64,
+        cap_seq: u64,
+        direction: PacketDirection,
+        from_ebpf: bool,
+    ) {
+        let stats = self.stats.get_or_insert(PerfStats::default());
+        stats.rrt_last = Duration::ZERO;
+        stats.resp_count += 1;
+        let rrt = self
+            .rrt_cache
+            .borrow_mut()
+            .cal_rrt(flow_id, None, direction, timestamp, cap_seq, from_ebpf);
+        if !rrt.is_zero() {
+            stats.rrt_max = stats.rrt_max.max(rrt);
+            stats.rrt_last = rrt;
+            stats.rrt_sum += rrt;
+            stats.rrt_count += 1;
+        }
     }
 
     fn reset(&mut self) {
@@ -308,7 +367,7 @@ mod tests {
     const FILE_DIR: &str = "resources/test/flow_generator/mqtt";
 
     fn run(pcap: &str) -> PerfStats {
-        let rrt_cache = Rc::new(RefCell::new(L7RrtCache::new(100)));
+        let rrt_cache = Rc::new(RefCell::new(RrtCache::new(100)));
         let mut mqtt_perf_data = MqttPerfData::new(rrt_cache);
 
         let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap), None);

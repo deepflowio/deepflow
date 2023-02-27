@@ -22,7 +22,7 @@ use crate::{
     common::{
         ebpf::EbpfType,
         enums::IpProtocol,
-        flow::{FlowPerfStats, L7PerfStats, L7Protocol, PacketDirection},
+        flow::{FlowPerfStats, L7PerfStats, L7Protocol, PacketDirection, SignalSource},
         l7_protocol_info::L7ProtocolInfo,
         l7_protocol_log::{L7ProtocolParser, L7ProtocolParserInterface, ParseParam},
         meta_packet::MetaPacket,
@@ -30,7 +30,6 @@ use crate::{
     config::handler::LogParserConfig,
     flow_generator::{
         error::{Error, Result},
-        perf::l7_rrt::L7RrtCache,
         perf::stats::PerfStats,
         perf::L7FlowPerf,
         protocol_logs::{
@@ -43,6 +42,8 @@ use crate::{
 };
 use public::utils::net::h2pack;
 
+use super::l7_rrt::RrtCache;
+
 struct HttpSessionData {
     // HTTPv2 Header
     httpv2_headers: Httpv2Headers,
@@ -52,7 +53,7 @@ struct HttpSessionData {
     pub has_log_data: bool,
     pub l7_proto: L7Protocol,
     pub msg_type: LogMessageType,
-    rrt_cache: Rc<RefCell<L7RrtCache>>,
+    rrt_cache: Rc<RefCell<RrtCache>>,
 }
 
 impl HttpSessionData {
@@ -116,23 +117,57 @@ impl L7FlowPerf for HttpPerfData {
 
         let param = ParseParam::from(meta);
         if ParseParam::from(meta).ebpf_type == EbpfType::GoHttp2Uprobe {
-            return self.parse_go_http2_uprobe(config, payload, &param);
+            return self.parse_go_http2_uprobe(config, payload, &param, flow_id);
         }
 
-        if self
-            .parse_http_v1(payload, meta.lookup_key.timestamp, meta.direction, flow_id)
-            .is_ok()
-        {
+        if self.parse_http_v1(payload, meta.direction).is_ok() {
+            let perf_stats = self.perf_stats.as_mut().unwrap();
+            // reset the rrt
+            perf_stats.rrt_last = Duration::ZERO;
+            let rrt = self.session_data.rrt_cache.borrow_mut().cal_rrt(
+                flow_id,
+                None,
+                meta.direction,
+                meta.lookup_key.timestamp,
+                meta.cap_seq,
+                meta.signal_source == SignalSource::EBPF,
+            );
+            if !rrt.is_zero() {
+                if rrt > perf_stats.rrt_max {
+                    perf_stats.rrt_max = rrt;
+                }
+                perf_stats.rrt_last = rrt;
+                perf_stats.rrt_sum += rrt;
+                perf_stats.rrt_count += 1;
+            }
+
             self.session_data.has_log_data = true;
             self.session_data.set_http_protocol(L7Protocol::Http1);
             return Ok(());
         }
-        if self
-            .parse_http_v2(payload, meta.lookup_key.timestamp, meta.direction, flow_id)
-            .is_ok()
-        {
+        if self.parse_http_v2(payload, meta.direction).is_ok() {
             self.session_data.has_log_data = true;
             self.session_data.set_http_protocol(L7Protocol::Http2);
+
+            let perf_stats = self.perf_stats.as_mut().unwrap();
+            // reset the rrt
+            perf_stats.rrt_last = Duration::ZERO;
+            let rrt = self.session_data.rrt_cache.borrow_mut().cal_rrt(
+                flow_id,
+                Some(self.session_data.httpv2_headers.stream_id),
+                meta.direction,
+                meta.lookup_key.timestamp,
+                meta.cap_seq,
+                meta.signal_source == SignalSource::EBPF,
+            );
+            if !rrt.is_zero() {
+                if rrt > perf_stats.rrt_max {
+                    perf_stats.rrt_max = rrt;
+                }
+                perf_stats.rrt_last = rrt;
+                perf_stats.rrt_sum += rrt;
+                perf_stats.rrt_count += 1;
+            }
             return Ok(());
         }
 
@@ -199,7 +234,7 @@ impl L7FlowPerf for HttpPerfData {
 }
 
 impl HttpPerfData {
-    pub fn new(rrt_cache: Rc<RefCell<L7RrtCache>>) -> Self {
+    pub fn new(rrt_cache: Rc<RefCell<RrtCache>>) -> Self {
         let session_data = HttpSessionData {
             httpv2_headers: Httpv2Headers::default(),
             status_code: 0,
@@ -216,13 +251,7 @@ impl HttpPerfData {
         }
     }
 
-    fn parse_http_v1(
-        &mut self,
-        payload: &[u8],
-        timestamp: Duration,
-        direction: PacketDirection,
-        flow_id: u64,
-    ) -> Result<()> {
+    fn parse_http_v1(&mut self, payload: &[u8], direction: PacketDirection) -> Result<()> {
         if !is_http_v1_payload(payload) {
             return Err(Error::HttpHeaderParseFailed);
         }
@@ -254,29 +283,6 @@ impl HttpPerfData {
             }
 
             perf_stats.resp_count += 1;
-            perf_stats.rrt_last = Duration::ZERO;
-
-            let req_timestamp = match self
-                .session_data
-                .rrt_cache
-                .borrow_mut()
-                .get_and_remove_l7_req_time(flow_id, None)
-            {
-                Some(t) => t,
-                None => return Ok(()),
-            };
-
-            if timestamp < req_timestamp {
-                return Ok(());
-            }
-
-            let rrt = timestamp - req_timestamp;
-            if rrt > perf_stats.rrt_max {
-                perf_stats.rrt_max = rrt;
-            }
-            perf_stats.rrt_last = rrt;
-            perf_stats.rrt_sum += rrt;
-            perf_stats.rrt_count += 1;
         } else {
             // HTTP请求行：GET /background.png HTTP/1.0
             let Ok((method, _, version)) = get_http_request_info(first_line) else {
@@ -289,11 +295,6 @@ impl HttpPerfData {
 
             let perf_stats = self.perf_stats.get_or_insert(PerfStats::default());
             perf_stats.req_count += 1;
-            perf_stats.rrt_last = Duration::ZERO;
-            self.session_data
-                .rrt_cache
-                .borrow_mut()
-                .add_req_time(flow_id, None, timestamp);
         }
         Ok(())
     }
@@ -413,13 +414,7 @@ impl HttpPerfData {
     }
 
     // HTTPv2协议参考:https://tools.ietf.org/html/rfc7540
-    fn parse_http_v2(
-        &mut self,
-        payload: &[u8],
-        timestamp: Duration,
-        direction: PacketDirection,
-        flow_id: u64,
-    ) -> Result<()> {
+    fn parse_http_v2(&mut self, payload: &[u8], direction: PacketDirection) -> Result<()> {
         let status_code = self.parse_frame(payload)?;
         if direction == PacketDirection::ServerToClient {
             self.session_data.msg_type = LogMessageType::Response;
@@ -439,42 +434,11 @@ impl HttpPerfData {
                     self.session_data.status = L7ResponseStatus::Ok;
                 }
             }
-            perf_stats.rrt_last = Duration::ZERO;
-
-            let req_timestamp = match self
-                .session_data
-                .rrt_cache
-                .borrow_mut()
-                .get_and_remove_l7_req_time(
-                    flow_id,
-                    Some(self.session_data.httpv2_headers.stream_id),
-                ) {
-                Some(t) => t,
-                None => return Ok(()),
-            };
-
-            if timestamp < req_timestamp {
-                return Ok(());
-            }
-
-            let rrt = timestamp - req_timestamp;
-            if rrt > perf_stats.rrt_max {
-                perf_stats.rrt_max = rrt;
-            }
-            perf_stats.rrt_last = rrt;
-            perf_stats.rrt_sum += rrt;
-            perf_stats.rrt_count += 1;
             perf_stats.resp_count += 1;
         } else {
             self.session_data.msg_type = LogMessageType::Request;
             let perf_stats = self.perf_stats.get_or_insert(PerfStats::default());
             perf_stats.req_count += 1;
-            perf_stats.rrt_last = Duration::ZERO;
-            self.session_data.rrt_cache.borrow_mut().add_req_time(
-                flow_id,
-                Some(self.session_data.httpv2_headers.stream_id),
-                timestamp,
-            );
         }
         Ok(())
     }
@@ -484,12 +448,17 @@ impl HttpPerfData {
         config: Option<&LogParserConfig>,
         payload: &[u8],
         param: &ParseParam,
+        flow_id: u64,
     ) -> Result<()> {
         let mut log = L7ProtocolParser::Http(Box::new(HttpLog::new_v2(false)));
         let perf_stats = self.perf_stats.get_or_insert(PerfStats::default());
+
         if let L7ProtocolInfo::HttpInfo(h) =
             log.parse_payload(config, payload, param)?.get(0).unwrap()
         {
+            //reset rrt
+            perf_stats.rrt_last = Duration::ZERO;
+
             self.session_data.httpv2_headers.stream_id = h.stream_id.unwrap_or_default();
             self.session_data.l7_proto = h.get_l7_protocol_with_tls();
             if let Some(code) = h.status_code {
@@ -510,6 +479,40 @@ impl HttpPerfData {
             } else if ebpf_param.is_resp_end {
                 perf_stats.resp_count += 1;
             }
+
+            let cur_time = Duration::from_micros(param.time);
+            let mut rrt_cache = self.session_data.rrt_cache.borrow_mut();
+            let Some((_, prev_rrt)) = rrt_cache.get(
+                flow_id,
+                Some(self.session_data.httpv2_headers.stream_id),
+                param.direction,
+                0,
+                true,
+            ) else {
+                rrt_cache.set(
+                    flow_id,
+                    Some(self.session_data.httpv2_headers.stream_id),
+                    param.direction,
+                    0,
+                    true,
+                    cur_time
+                );
+
+                return Ok(());
+            };
+
+            let rrt = if *prev_rrt > cur_time {
+                *prev_rrt - cur_time
+            } else {
+                cur_time - *prev_rrt
+            };
+
+            if !rrt.is_zero() {
+                perf_stats.rrt_max = perf_stats.rrt_max.max(rrt);
+                perf_stats.rrt_last = rrt;
+                perf_stats.rrt_sum += rrt;
+                perf_stats.rrt_count += 1;
+            }
         }
         Ok(())
     }
@@ -526,7 +529,7 @@ mod tests {
     const FILE_DIR: &str = "resources/test/flow_generator/http";
 
     fn run(pcap: &str) -> HttpPerfData {
-        let rrt_cache = Rc::new(RefCell::new(L7RrtCache::new(100)));
+        let rrt_cache = Rc::new(RefCell::new(RrtCache::new(100)));
         let mut http_perf_data = HttpPerfData::new(rrt_cache);
 
         let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap), Some(512));
@@ -569,7 +572,7 @@ mod tests {
                         status: L7ResponseStatus::Ok,
                         has_log_data: true,
                         msg_type: LogMessageType::Response,
-                        rrt_cache: Rc::new(RefCell::new(L7RrtCache::new(100))),
+                        rrt_cache: Rc::new(RefCell::new(RrtCache::new(100))),
                         httpv2_headers: Httpv2Headers::default(),
                     },
                 },
@@ -593,7 +596,7 @@ mod tests {
                         status: L7ResponseStatus::Ok,
                         has_log_data: true,
                         msg_type: LogMessageType::Response,
-                        rrt_cache: Rc::new(RefCell::new(L7RrtCache::new(100))),
+                        rrt_cache: Rc::new(RefCell::new(RrtCache::new(100))),
                         httpv2_headers: Httpv2Headers::default(),
                     },
                 },

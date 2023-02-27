@@ -24,7 +24,7 @@ use criterion::*;
 
 use deepflow_agent::{
     _FlowPerfCounter as FlowPerfCounter, _HttpPerfData as HttpPerfData, _L7FlowPerf as L7FlowPerf,
-    _L7RrtCache as L7RrtCache, _PacketDirection as PacketDirection, _TcpPerf as TcpPerf,
+    _PacketDirection as PacketDirection, _RrtCache as RrtCache, _TcpPerf as TcpPerf,
     _benchmark_report as benchmark_report,
     _benchmark_session_peer_seq_no_assert as benchmark_session_peer_seq_no_assert,
     _meta_flow_perf_update as meta_flow_perf_update, utils::test::Capture,
@@ -72,7 +72,7 @@ pub(super) fn bench(c: &mut Criterion) {
                 panic!("unable to load pcap file");
             }
 
-            let rrt_cache = L7RrtCache::new(8);
+            let rrt_cache = RrtCache::new(8);
             let mut parser = HttpPerfData::new(Rc::new(RefCell::new(rrt_cache)));
 
             let first_dst_port = packets[0].lookup_key.dst_port;
