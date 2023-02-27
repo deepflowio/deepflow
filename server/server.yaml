@@ -470,6 +470,15 @@ ingester:
   ## unit: s
   #flow-tag-cache-flush-timeout: 600
 
+  ## export to OTLP collector, now only support protocol 'grpc'
+  #otlp-exporter:
+  #  enabled: false
+  #  addr: 127.0.0.1:4317 # grpc protobuf addr
+  #  queue-count: 2       # parallelism of sender
+  #  queue-size: 1000000  # size of each exporter queue
+  #  l7-enabled: true
+  #  otel-enabled: false  # unsurport now
+
 profile:
   # profile http listenport
   listen-port: 20419

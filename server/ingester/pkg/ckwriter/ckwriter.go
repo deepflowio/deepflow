@@ -187,6 +187,14 @@ func (i *Counter) GetCounter() interface{} {
 }
 
 func (w *CKWriter) Put(items ...interface{}) {
+	if w.queueSize == 0 {
+		for _, item := range items {
+			if ck, ok := item.(CKItem); ok {
+				ck.Release()
+			}
+		}
+		return
+	}
 	w.putCounter++
 	w.dataQueues.Put(queue.HashKey(w.putCounter%w.queueCount), items...)
 }
