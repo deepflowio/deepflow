@@ -1336,6 +1336,10 @@ func (i *Issu) renameColumns(connect *sql.DB) ([]*ColumnRename, error) {
 	for _, renameColumn := range i.columnRenames {
 		version, err := i.getTableVersion(connect, renameColumn.Db, renameColumn.Table)
 		if err != nil {
+			if strings.Contains(err.Error(), "doesn't exist") {
+				log.Infof("db: %s, table: %s info: %s", renameColumn.Db, renameColumn.Table, err)
+				continue
+			}
 			return dones, err
 		}
 		if version == common.CK_VERSION {
