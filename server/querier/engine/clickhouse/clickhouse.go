@@ -295,7 +295,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 			if ok {
 				as := sqlparser.String(item.As)
 				colName, ok := item.Expr.(*sqlparser.ColName)
-				if ok && (common.IsValueInSliceString(sqlparser.String(colName), tagsSlice) || strings.Contains(sqlparser.String(colName), "_id")) {
+				if ok && (common.IsValueInSliceString(strings.Trim(strings.Trim(sqlparser.String(colName), "'"), "`"), tagsSlice) || strings.Contains(sqlparser.String(colName), "_id")) {
 					if as != "" {
 						selectTag := sqlparser.String(colName) + " AS " + as
 						innerSelectSlice = append(innerSelectSlice, selectTag)

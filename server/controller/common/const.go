@@ -354,6 +354,7 @@ const (
 	VIF_DEVICE_TYPE_INTERNET  = 0
 	VIF_DEVICE_TYPE_POD_GROUP = 101
 	VIF_DEVICE_TYPE_SERVICE   = 102
+	VIF_DEVICE_TYPE_GPROCESS  = 120
 	VIF_DEVICE_TYPE_IP        = 255
 )
 
@@ -500,12 +501,12 @@ const (
 )
 
 const (
-	DEEPFLOW_STATSD_PREFIX            = "deepflow.server.controller"
-	CLOUD_METRIC_NAME_TASK_COST       = "cloud.task.cost"
-	CLOUD_METRIC_NAME_INFO_COUNT      = "cloud.info.count"
-	CLOUD_METRIC_NAME_API_COUNT       = "cloud.api.count"
-	CLOUD_METRIC_NAME_API_COST        = "cloud.api.cost"
-	GENESIS_METRIC_NAME_K8SINFO_DELAY = "genesis.k8sinfo.delay"
+	DEEPFLOW_STATSD_PREFIX            = "deepflow_server_controller"
+	CLOUD_METRIC_NAME_TASK_COST       = "cloud_task_cost"
+	CLOUD_METRIC_NAME_INFO_COUNT      = "cloud_info_count"
+	CLOUD_METRIC_NAME_API_COUNT       = "cloud_api_count"
+	CLOUD_METRIC_NAME_API_COST        = "cloud_api_cost"
+	GENESIS_METRIC_NAME_K8SINFO_DELAY = "genesis_k8sinfo_delay"
 )
 
 var (
@@ -574,5 +575,5 @@ const (
 )
 
 const (
-	PROCESS_INSTANCE_TYPE = 62999 // used in process event
+	PROCESS_INSTANCE_TYPE = 120 // used in process event
 )

@@ -31,6 +31,7 @@ const (
 	VIF_DEVICE_TYPE_NAT_GATEWAY    = 16
 	VIF_DEVICE_TYPE_POD_GROUP      = 101
 	VIF_DEVICE_TYPE_SERVICE        = 102
+	VIF_DEVICE_TYPE_GPROCESS       = 120
 	VIF_DEVICE_TYPE_IP             = 255
 )
 
@@ -57,6 +58,7 @@ var AutoMap = map[string]int{
 	"pod_node":    VIF_DEVICE_TYPE_POD_NODE,
 	"lb":          VIF_DEVICE_TYPE_LB,
 	"natgw":       VIF_DEVICE_TYPE_NAT_GATEWAY,
+	"gprocess":    VIF_DEVICE_TYPE_GPROCESS,
 }
 
 var AutoPodMap = map[string]int{
