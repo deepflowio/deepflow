@@ -31,6 +31,10 @@ const (
 	ORIGIN_TABLE_1S = "1s"
 	FLOW_LOG_L4     = "flow_log.l4"
 	FLOW_LOG_L7     = "flow_log.l7"
+	FLOW_METRICS    = "vtap_flow"
+	APP_METRICS     = "vtap_app"
+
+	ERR_IS_MODIFYING = "Modifying the retention time (%s), please try again later"
 )
 
 // VATP_ACL数据库, 不进行数据源修改
@@ -43,13 +47,13 @@ var metricsGroupTableIDs = [][]zerodoc.MetricsTableID{
 
 func getMetricsSubTableIDs(tableGroup, baseTable string) ([]zerodoc.MetricsTableID, error) {
 	switch tableGroup {
-	case "vtap_flow":
+	case FLOW_METRICS:
 		if baseTable == ORIGIN_TABLE_1S {
 			return metricsGroupTableIDs[zerodoc.VTAP_FLOW_PORT_1S], nil
 		} else {
 			return metricsGroupTableIDs[zerodoc.VTAP_FLOW_PORT_1M], nil
 		}
-	case "vtap_app":
+	case APP_METRICS:
 		if baseTable == ORIGIN_TABLE_1S {
 			return metricsGroupTableIDs[zerodoc.VTAP_APP_PORT_1S], nil
 		} else {
@@ -417,7 +421,7 @@ func (m *DatasourceManager) modTableMV(cks basecommon.DBs, tableId zerodoc.Metri
 	modTable := fmt.Sprintf("ALTER TABLE %s MODIFY TTL %s",
 		tableMod, m.makeTTLString(table.TimeKey, ckdb.METRICS_DB, table.GlobalName, duration))
 
-	_, err := cks.Exec(modTable)
+	_, err := cks.ExecParallel(modTable)
 	return err
 }
 
@@ -426,7 +430,7 @@ func (m *DatasourceManager) modFlowLogLocalTable(cks basecommon.DBs, tableID com
 	tableLocal := fmt.Sprintf("%s.%s_%s", common.FLOW_LOG_DB, tableID.String(), LOCAL)
 	modTable := fmt.Sprintf("ALTER TABLE %s MODIFY TTL %s",
 		tableLocal, m.makeTTLString(timeKey, common.FLOW_LOG_DB, tableID.String(), duration))
-	_, err := cks.Exec(modTable)
+	_, err := cks.ExecParallel(modTable)
 	return err
 }
 
@@ -455,22 +459,60 @@ func (m *DatasourceManager) Handle(dbGroup, action, baseTable, dstTable, aggrSum
 	if err != nil {
 		return err
 	}
+	defer cks.Close()
 
 	duration = duration / 24 // 切换为天
 
 	// flow_log.l4和flow_log.l7只支持mod
 	if (dbGroup == FLOW_LOG_L4 || dbGroup == FLOW_LOG_L7) && action == actionStrings[MOD] {
-		flowLogID := common.L4_FLOW_ID
 		if dbGroup == FLOW_LOG_L7 {
-			flowLogID = common.L7_FLOW_ID
+			tableID := common.L7_FLOW_ID + common.FlowLogID(zerodoc.VTAP_TABLE_ID_MAX)
+			if m.isModifyingFlags[tableID] {
+				return fmt.Errorf(ERR_IS_MODIFYING, common.L7_FLOW_ID)
+			}
+			go func() {
+				cks, err := basecommon.NewCKConnections(m.ckAddrs, m.user, m.password)
+				if err != nil {
+					log.Error(err)
+					return
+				}
+				defer cks.Close()
+				m.isModifyingFlags[tableID] = true
+				if err := m.modFlowLogLocalTable(cks, common.L7_FLOW_ID, duration); err != nil {
+					log.Info(err)
+				}
+				m.isModifyingFlags[tableID] = false
+			}()
+		} else {
+			for _, id := range []common.FlowLogID{common.L4_FLOW_ID, common.L4_PACKET_ID, common.L7_PACKET_ID} {
+				tableID := id + common.FlowLogID(zerodoc.VTAP_TABLE_ID_MAX)
+				if m.isModifyingFlags[tableID] {
+					return fmt.Errorf(ERR_IS_MODIFYING, tableID)
+				}
+				go func(id common.FlowLogID) {
+					cks, err := basecommon.NewCKConnections(m.ckAddrs, m.user, m.password)
+					if err != nil {
+						log.Error(err)
+						return
+					}
+					defer cks.Close()
+					m.isModifyingFlags[id] = true
+					if err := m.modFlowLogLocalTable(cks, id-common.FlowLogID(zerodoc.VTAP_TABLE_ID_MAX), duration); err != nil {
+						log.Warning(err)
+					}
+					m.isModifyingFlags[id] = false
+				}(tableID)
+			}
 		}
-		if err := m.modFlowLogLocalTable(cks, flowLogID, duration); err != nil {
-			return err
-		}
+
 		return nil
 	}
 
-	subTableIDs, err := getMetricsSubTableIDs(dbGroup, baseTable)
+	table := baseTable
+	if table == "" {
+		table = dstTable
+	}
+	subTableIDs, err := getMetricsSubTableIDs(dbGroup, table)
 	if err != nil {
 		return err
 	}
@@ -516,9 +558,23 @@ func (m *DatasourceManager) Handle(dbGroup, action, baseTable, dstTable, aggrSum
 				return err
 			}
 		case MOD:
-			if err := m.modTableMV(cks, tableId, dstTable, duration); err != nil {
-				return err
+			if m.isModifyingFlags[tableId] {
+				return fmt.Errorf(ERR_IS_MODIFYING, tableId.TableName())
 			}
+			log.Infof("mod rp tableId %d %s, dstTable %s", tableId, tableId.TableName(), dstTable)
+			go func(id zerodoc.MetricsTableID) {
+				cks, err := basecommon.NewCKConnections(m.ckAddrs, m.user, m.password)
+				if err != nil {
+					log.Error(err)
+					return
+				}
+				defer cks.Close()
+				m.isModifyingFlags[id] = true
+				if err := m.modTableMV(cks, id, dstTable, duration); err != nil {
+					log.Warning(err)
+				}
+				m.isModifyingFlags[id] = false
+			}(tableId)
 		case DEL:
 			if err := delTableMV(cks, tableId, dstTable); err != nil {
 				return err
