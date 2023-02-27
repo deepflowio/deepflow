@@ -16,6 +16,8 @@
 
 use std::{cell::RefCell, fmt, rc::Rc, time::Duration};
 
+use nom::AsBytes;
+
 use crate::{
     common::{
         ebpf::EbpfType,
@@ -384,12 +386,7 @@ impl HttpPerfData {
         if payload.len() < HTTPV2_MAGIC_LENGTH {
             return false;
         }
-        for (i, &b) in HTTPV2_MAGIC_PREFIX.iter().enumerate() {
-            if payload[i] != b {
-                return false;
-            }
-        }
-        return true;
+        &payload[..HTTPV2_MAGIC_PREFIX.len()] == HTTPV2_MAGIC_PREFIX.as_bytes()
     }
 
     fn parse_frame(&mut self, payload: &[u8]) -> Result<u16> {
