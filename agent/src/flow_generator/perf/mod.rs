@@ -34,6 +34,8 @@ use enum_dispatch::enum_dispatch;
 use public::bitmap::Bitmap;
 use public::l7_protocol::L7ProtocolEnum;
 
+use self::l7_rrt::RrtCache;
+
 use super::app_table::AppTable;
 use super::error::{Error, Result};
 use super::protocol_logs::{AppProtoHead, PostgresqlLog, ProtobufRpcWrapLog, SofaRpcLog};
@@ -62,7 +64,6 @@ use {
     udp::UdpPerf,
 };
 
-pub use l7_rrt::L7RrtCache;
 pub use stats::FlowPerfCounter;
 pub use stats::PerfStats;
 
@@ -258,7 +259,7 @@ pub struct FlowPerf {
     // perf 目前还没有抽象出来,自定义协议需要添加字段区分,以后抽出来后 l7可以去掉.
     l7_protocol_log_parser: Option<Box<L7ProtocolParser>>,
 
-    rrt_cache: Rc<RefCell<L7RrtCache>>,
+    rrt_cache: Rc<RefCell<RrtCache>>,
 
     l7_protocol_enum: L7ProtocolEnum,
 
@@ -275,7 +276,7 @@ pub struct FlowPerf {
 impl FlowPerf {
     const PROTOCOL_CHECK_LIMIT: usize = 5;
 
-    fn l7_new(protocol: L7Protocol, rrt_cache: Rc<RefCell<L7RrtCache>>) -> Option<L7FlowPerfTable> {
+    fn l7_new(protocol: L7Protocol, rrt_cache: Rc<RefCell<RrtCache>>) -> Option<L7FlowPerfTable> {
         match protocol {
             L7Protocol::DNS => Some(L7FlowPerfTable::Dns(DnsPerfData::new(rrt_cache.clone()))),
             L7Protocol::ProtobufRPC => Some(L7FlowPerfTable::ProtobufRpc(Default::default())),
@@ -599,7 +600,7 @@ impl FlowPerf {
     }
 
     pub fn new(
-        rrt_cache: Rc<RefCell<L7RrtCache>>,
+        rrt_cache: Rc<RefCell<RrtCache>>,
         l4_proto: L4Protocol,
         l7_protocol_enum: L7ProtocolEnum,
         is_from_app_tab: bool,
@@ -626,14 +627,6 @@ impl FlowPerf {
             is_skip: false,
             server_port: server_port,
         })
-    }
-
-    pub fn reverse(&mut self, l7_proto: Option<L7Protocol>) {
-        let l7_protocol = l7_proto.unwrap_or(L7Protocol::Unknown);
-        self.is_from_app = l7_proto.is_some();
-        self.is_skip = false;
-        self.is_success = false;
-        self.l7 = Self::l7_new(l7_protocol, self.rrt_cache.clone()).map(|o| Box::new(o));
     }
 
     pub fn parse(

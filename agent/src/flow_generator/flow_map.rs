@@ -39,7 +39,7 @@ use super::{
     app_table::AppTable,
     error::Error,
     flow_state::{StateMachine, StateValue},
-    perf::{FlowPerf, FlowPerfCounter, L7ProtocolChecker, L7RrtCache},
+    perf::{l7_rrt::RrtCache, FlowPerf, FlowPerfCounter, L7ProtocolChecker},
     protocol_logs::MetaAppProto,
     service_table::{ServiceKey, ServiceTable},
     FlowMapKey, FlowNode, FlowState, FlowTimeout, COUNTER_FLOW_ID_MASK, FLOW_METRICS_PEER_DST,
@@ -111,7 +111,7 @@ pub struct FlowMap {
     parse_config: LogParserAccess,
     #[cfg(target_os = "linux")]
     ebpf_config: Option<EbpfAccess>, // TODO: We only need its epc_id，epc_id is not only useful for ebpf, consider moving it to FlowConfig
-    rrt_cache: Rc<RefCell<L7RrtCache>>,
+    rrt_cache: Rc<RefCell<RrtCache>>,
     flow_perf_counter: Arc<FlowPerfCounter>,
     ntp_diff: Arc<AtomicI64>,
     packet_sequence_queue: Option<DebugSender<Box<PacketSequenceBlock>>>, // Enterprise Edition Feature: packet-sequence
@@ -194,7 +194,7 @@ impl FlowMap {
             parse_config,
             #[cfg(target_os = "linux")]
             ebpf_config,
-            rrt_cache: Rc::new(RefCell::new(L7RrtCache::new(L7_RRT_CACHE_CAPACITY))),
+            rrt_cache: Rc::new(RefCell::new(RrtCache::new(L7_RRT_CACHE_CAPACITY))),
             flow_perf_counter,
             ntp_diff,
             packet_sequence_queue, // Enterprise Edition Feature: packet-sequence
@@ -844,7 +844,11 @@ impl FlowMap {
             } else {
                 TunnelField::default()
             },
-            flow_id: self.generate_flow_id(lookup_key.timestamp, self.id),
+            flow_id: if meta_packet.signal_source == SignalSource::EBPF {
+                meta_packet.socket_id
+            } else {
+                self.generate_flow_id(lookup_key.timestamp, self.id)
+            },
             start_time: lookup_key.timestamp.into(),
             flow_stat_time: Timestamp::from_nanos(
                 (lookup_key.timestamp.as_nanos() / TIME_UNIT.as_nanos() * TIME_UNIT.as_nanos())
@@ -1322,10 +1326,7 @@ impl FlowMap {
         if config.collector_enabled
             && (flow.flow_key.proto == IpProtocol::Tcp || flow.flow_key.proto == IpProtocol::Udp)
         {
-            let l7_timeout_count = self
-                .rrt_cache
-                .borrow_mut()
-                .get_and_remove_l7_req_timeout(flow.flow_id);
+            let l7_timeout_count = self.rrt_cache.borrow_mut().get_timeout_count(flow.flow_id);
             // 如果返回None，就清空掉flow_perf_stats
             flow.flow_perf_stats = node.meta_flow_perf.as_mut().and_then(|perf| {
                 perf.copy_and_reset_perf_data(
@@ -1536,9 +1537,7 @@ impl FlowMap {
         node.endpoint_data_cache.swap(0, 1);
         node.tagged_flow.flow.reverse(is_first_packet);
         node.tagged_flow.tag.reverse();
-        if let Some(meta_flow_perf) = node.meta_flow_perf.as_mut() {
-            meta_flow_perf.reverse(None);
-        }
+
         // Enterprise Edition Feature: packet-sequence
         if node.packet_sequence_block.is_some() {
             node.packet_sequence_block

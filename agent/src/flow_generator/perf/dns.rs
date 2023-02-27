@@ -20,8 +20,11 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use super::super::protocol_logs::{consts::*, AppProtoHead, L7ResponseStatus, LogMessageType};
-use super::{stats::PerfStats, L7FlowPerf, L7RrtCache};
+use super::l7_rrt::RrtCache;
+use super::{stats::PerfStats, L7FlowPerf};
 
+use crate::common::flow::PacketDirection;
+use crate::common::flow::SignalSource;
 use crate::{
     common::{
         enums::IpProtocol,
@@ -44,7 +47,7 @@ struct DnsSessionData {
 
     pub l7_proto: L7Protocol,
     pub msg_type: LogMessageType,
-    rrt_cache: Rc<RefCell<L7RrtCache>>,
+    rrt_cache: Rc<RefCell<RrtCache>>,
 }
 
 pub struct DnsPerfData {
@@ -89,7 +92,14 @@ impl L7FlowPerf for DnsPerfData {
 
         match packet.lookup_key.proto {
             IpProtocol::Udp => {
-                self.decode_payload(payload, packet.lookup_key.timestamp, flow_id)?;
+                self.decode_payload(
+                    payload,
+                    packet.lookup_key.timestamp,
+                    flow_id,
+                    packet.direction,
+                    packet.cap_seq,
+                    packet.signal_source == SignalSource::EBPF,
+                )?;
             }
             IpProtocol::Tcp => {
                 if payload.len() <= DNS_TCP_PAYLOAD_OFFSET {
@@ -104,6 +114,9 @@ impl L7FlowPerf for DnsPerfData {
                     &payload[DNS_TCP_PAYLOAD_OFFSET..],
                     packet.lookup_key.timestamp,
                     flow_id,
+                    packet.direction,
+                    packet.cap_seq,
+                    packet.signal_source == SignalSource::EBPF,
                 )?;
             }
             _ => return Err(Error::DNSPerfParseFailed("dns translation type error")),
@@ -170,7 +183,7 @@ impl L7FlowPerf for DnsPerfData {
 }
 
 impl DnsPerfData {
-    pub fn new(rrt_cache: Rc<RefCell<L7RrtCache>>) -> Self {
+    pub fn new(rrt_cache: Rc<RefCell<RrtCache>>) -> Self {
         let session_data = DnsSessionData {
             id: 0,
             status_code: 0,
@@ -194,7 +207,15 @@ impl DnsPerfData {
         self.session_data.has_log_data = false;
     }
 
-    fn decode_payload(&mut self, payload: &[u8], timestamp: Duration, flow_id: u64) -> Result<()> {
+    fn decode_payload(
+        &mut self,
+        payload: &[u8],
+        timestamp: Duration,
+        flow_id: u64,
+        direction: PacketDirection,
+        cap_seq: u64,
+        from_ebpf: bool,
+    ) -> Result<()> {
         if payload.len() < DNS_HEADER_SIZE {
             return Err(Error::DNSPerfParseFailed("protocol mismatch"));
         }
@@ -209,18 +230,31 @@ impl DnsPerfData {
 
             let perf_stats = self.perf_stats.get_or_insert(PerfStats::default());
             perf_stats.req_count += 1;
+
             perf_stats.rrt_last = Duration::ZERO;
-            self.session_data.rrt_cache.borrow_mut().add_req_time(
+            let rrt = self.session_data.rrt_cache.borrow_mut().cal_rrt(
                 flow_id,
                 Some(self.session_data.id as u32),
+                direction,
                 timestamp,
+                cap_seq,
+                from_ebpf,
             );
+            if !rrt.is_zero() {
+                if rrt > perf_stats.rrt_max {
+                    perf_stats.rrt_max = rrt;
+                }
+                perf_stats.rrt_last = rrt;
+                perf_stats.rrt_sum += rrt;
+                perf_stats.rrt_count += 1;
+            }
             return Ok(());
         } else if qr == DNS_OPCODE_RESPONSE {
             self.session_data.msg_type = LogMessageType::Response;
 
             let perf_stats = self.perf_stats.get_or_insert(PerfStats::default());
             perf_stats.resp_count += 1;
+            perf_stats.rrt_last = Duration::ZERO;
 
             match self.session_data.status_code {
                 DNS_RESPCODE_SUCCESS => {
@@ -236,26 +270,22 @@ impl DnsPerfData {
                 }
             }
 
-            perf_stats.rrt_last = Duration::ZERO;
-
-            let req_timestamp = self
-                .session_data
-                .rrt_cache
-                .borrow_mut()
-                .get_and_remove_l7_req_time(flow_id, Some(self.session_data.id as u32))
-                .ok_or(Error::L7ReqNotFound(1))?;
-
-            if timestamp < req_timestamp {
-                return Ok(());
+            let rrt = self.session_data.rrt_cache.borrow_mut().cal_rrt(
+                flow_id,
+                Some(self.session_data.id as u32),
+                direction,
+                timestamp,
+                cap_seq,
+                from_ebpf,
+            );
+            if !rrt.is_zero() {
+                if rrt > perf_stats.rrt_max {
+                    perf_stats.rrt_max = rrt;
+                }
+                perf_stats.rrt_last = rrt;
+                perf_stats.rrt_sum += rrt;
+                perf_stats.rrt_count += 1;
             }
-
-            let rrt = timestamp - req_timestamp;
-            if rrt > perf_stats.rrt_max {
-                perf_stats.rrt_max = rrt;
-            }
-            perf_stats.rrt_last = rrt;
-            perf_stats.rrt_sum += rrt;
-            perf_stats.rrt_count += 1;
             return Ok(());
         }
 
@@ -275,7 +305,7 @@ mod tests {
     const FILE_DIR: &str = "resources/test/flow_generator/dns";
 
     fn run(pcap: &str) -> DnsPerfData {
-        let rrt_cache = Rc::new(RefCell::new(L7RrtCache::new(100)));
+        let rrt_cache = Rc::new(RefCell::new(RrtCache::new(100)));
         let mut dns_perf_data = DnsPerfData::new(rrt_cache);
 
         let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap), None);
@@ -317,7 +347,7 @@ mod tests {
                     has_log_data: true,
                     l7_proto: L7Protocol::DNS,
                     msg_type: LogMessageType::Response,
-                    rrt_cache: Rc::new(RefCell::new(L7RrtCache::new(100))),
+                    rrt_cache: Rc::new(RefCell::new(RrtCache::new(100))),
                 },
             },
         )];

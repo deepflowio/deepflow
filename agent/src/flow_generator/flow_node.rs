@@ -21,7 +21,7 @@ use crate::common::{
     decapsulate::TunnelType,
     endpoint::EndpointData,
     enums::{EthernetType, TapType, TcpFlags},
-    flow::{FlowMetricsPeer, PacketDirection},
+    flow::{FlowMetricsPeer, PacketDirection, SignalSource},
     lookup_key::LookupKey,
     meta_packet::MetaPacket,
     tagged_flow::TaggedFlow,
@@ -167,6 +167,10 @@ impl FlowNode {
         ignore_tor_mac: bool,
         trident_type: TridentType,
     ) -> bool {
+        if meta_packet.signal_source == SignalSource::EBPF {
+            return self.tagged_flow.flow.flow_id == meta_packet.socket_id;
+        }
+
         let flow = &self.tagged_flow.flow;
         let flow_key = &flow.flow_key;
         let meta_lookup_key = &meta_packet.lookup_key;

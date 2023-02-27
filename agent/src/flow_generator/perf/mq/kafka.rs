@@ -22,13 +22,13 @@ use std::time::Duration;
 use crate::{
     common::{
         enums::IpProtocol,
-        flow::{FlowPerfStats, L7PerfStats, L7Protocol, PacketDirection},
+        flow::{FlowPerfStats, L7PerfStats, L7Protocol, PacketDirection, SignalSource},
         meta_packet::MetaPacket,
     },
     config::handler::LogParserConfig,
     flow_generator::{
         error::{Error, Result},
-        perf::l7_rrt::L7RrtCache,
+        perf::l7_rrt::RrtCache,
         perf::stats::PerfStats,
         perf::L7FlowPerf,
         protocol_logs::{AppProtoHead, L7ResponseStatus, LogMessageType},
@@ -61,7 +61,7 @@ pub struct KafkaPerfData {
     l7_proto: L7Protocol,
     msg_type: LogMessageType,
 
-    rrt_cache: Rc<RefCell<L7RrtCache>>,
+    rrt_cache: Rc<RefCell<RrtCache>>,
 }
 
 impl PartialEq for KafkaPerfData {
@@ -113,7 +113,13 @@ impl L7FlowPerf for KafkaPerfData {
         match packet.direction {
             PacketDirection::ClientToServer => {
                 self.parse_request_header(payload, packet.payload_len)?;
-                self.calc_request(packet.lookup_key.timestamp, flow_id);
+                self.calc_request(
+                    packet.lookup_key.timestamp,
+                    flow_id,
+                    packet.cap_seq,
+                    packet.direction,
+                    packet.signal_source == SignalSource::EBPF,
+                );
                 self.l7_proto = L7Protocol::Kafka;
                 self.has_log_data = true;
                 Ok(())
@@ -122,7 +128,14 @@ impl L7FlowPerf for KafkaPerfData {
                 self.parse_response_header(payload, packet.payload_len)?;
                 self.l7_proto = L7Protocol::Kafka;
                 self.has_log_data = true;
-                if self.calc_response(payload, packet.lookup_key.timestamp, flow_id) {
+                if self.calc_response(
+                    payload,
+                    packet.lookup_key.timestamp,
+                    flow_id,
+                    packet.cap_seq,
+                    packet.direction,
+                    packet.signal_source == SignalSource::EBPF,
+                ) {
                     Err(Error::L7ReqNotFound(1))
                 } else {
                     Ok(())
@@ -187,7 +200,7 @@ impl L7FlowPerf for KafkaPerfData {
 }
 
 impl KafkaPerfData {
-    pub fn new(rrt_cache: Rc<RefCell<L7RrtCache>>) -> Self {
+    pub fn new(rrt_cache: Rc<RefCell<RrtCache>>) -> Self {
         Self {
             stats: None,
             correlation_id: 0,
@@ -255,7 +268,14 @@ impl KafkaPerfData {
         Ok(())
     }
 
-    fn calc_request(&mut self, timestamp: Duration, flow_id: u64) {
+    fn calc_request(
+        &mut self,
+        timestamp: Duration,
+        flow_id: u64,
+        cap_seq: u64,
+        direction: PacketDirection,
+        from_ebpf: bool,
+    ) {
         let stats = self.stats.get_or_insert(PerfStats::default());
         stats.rrt_last = Duration::ZERO;
         stats.req_count += 1;
@@ -269,30 +289,49 @@ impl KafkaPerfData {
         let timestamp_nanos = (timestamp.as_nanos() as u64 & KAFKA_REQ_TIMESTAMP_MASK_VALUE)
             | (api_key & KAFKA_API_KEY_MASK_VALUE);
 
-        self.rrt_cache.borrow_mut().add_req_time(
+        self.rrt_cache.borrow_mut().set(
             flow_id,
             Some(self.correlation_id),
+            direction,
+            cap_seq,
+            from_ebpf,
             Duration::from_nanos(timestamp_nanos),
         );
     }
 
-    fn calc_response(&mut self, payload: &[u8], timestamp: Duration, flow_id: u64) -> bool {
+    fn calc_response(
+        &mut self,
+        payload: &[u8],
+        timestamp: Duration,
+        flow_id: u64,
+        cap_seq: u64,
+        direction: PacketDirection,
+        from_ebpf: bool,
+    ) -> bool {
         self.msg_type = LogMessageType::Response;
 
         let stats = self.stats.get_or_insert(PerfStats::default());
+        stats.rrt_last = Duration::ZERO;
         stats.resp_count += 1;
         self.has_log_data = true;
 
-        let req_timestmp_nanos = match self
-            .rrt_cache
-            .borrow_mut()
-            .get_and_remove_l7_req_time(flow_id, Some(self.correlation_id))
-        {
-            Some(t) => t.as_nanos() as u64,
-            None => return true,
+        let mut rrt_cache = self.rrt_cache.borrow_mut();
+        let Some((log_type, req_time_api_key)) = rrt_cache.get(
+            flow_id,Some(self.correlation_id),direction,cap_seq,from_ebpf) else {
+            return true;
         };
+        if *log_type != LogMessageType::Request {
+            return true;
+        }
 
-        let api_key = (req_timestmp_nanos & KAFKA_API_KEY_MASK_VALUE) >> KAFKA_API_KEY_OFFSET;
+        let req_time = req_time_api_key.as_nanos() as u64 & KAFKA_REQ_TIMESTAMP_MASK_VALUE;
+        let resp_time = timestamp.as_nanos() as u64 & KAFKA_REQ_TIMESTAMP_MASK_VALUE;
+        if req_time > resp_time {
+            return true;
+        }
+
+        let api_key =
+            (req_time_api_key.as_nanos() as u64 & KAFKA_API_KEY_MASK_VALUE) >> KAFKA_API_KEY_OFFSET;
         // 只支持对fetch命令解析返回码
         if api_key as i16 == KAFKA_FETCH && payload.len() > KAFKA_FETCH_STATUS_CODE_OFFSET {
             self.status_code = bytes::read_u16_be(&payload[12..]);
@@ -307,20 +346,8 @@ impl KafkaPerfData {
             self.status = L7ResponseStatus::NotExist;
         }
 
-        if (timestamp.as_nanos() as u64 & KAFKA_REQ_TIMESTAMP_MASK_VALUE)
-            < (req_timestmp_nanos & KAFKA_REQ_TIMESTAMP_MASK_VALUE)
-        {
-            stats.rrt_last = Duration::ZERO;
-            return true;
-        }
-
-        let rrt = (timestamp.as_nanos() as u64 & KAFKA_REQ_TIMESTAMP_MASK_VALUE)
-            - (req_timestmp_nanos & KAFKA_REQ_TIMESTAMP_MASK_VALUE);
-
-        let rrt = Duration::from_nanos(rrt);
-        if rrt > stats.rrt_max {
-            stats.rrt_max = rrt;
-        }
+        let rrt = Duration::from_nanos(resp_time - req_time);
+        stats.rrt_max = stats.rrt_max.max(rrt);
         stats.rrt_last = rrt;
         stats.rrt_sum += rrt;
         stats.rrt_count += 1;
@@ -350,7 +377,7 @@ mod tests {
     const FILE_DIR: &str = "resources/test/flow_generator/kafka";
 
     fn run(pcap: &str) -> PerfStats {
-        let rrt_cache = Rc::new(RefCell::new(L7RrtCache::new(100)));
+        let rrt_cache = Rc::new(RefCell::new(RrtCache::new(100)));
         let mut kafka_perf_data = KafkaPerfData::new(rrt_cache);
 
         let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap), None);
