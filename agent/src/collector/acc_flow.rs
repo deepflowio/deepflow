@@ -22,7 +22,7 @@ use std::time::Duration;
 
 use super::quadruple_generator::QgKey;
 
-use crate::common::flow::L7Protocol;
+use crate::common::flow::{L7Protocol, SignalSource};
 use crate::common::tagged_flow::TaggedFlow;
 use crate::metric::meter::{AppMeter, FlowMeter};
 
@@ -69,10 +69,15 @@ impl AccumulatedFlow {
         tagged_flow: &Arc<TaggedFlow>,
     ) {
         self.time_in_second = time_in_second;
-        self.flow_meter.sequential_merge(flow_meter);
-        for i in 0..2 {
-            for (k, v) in id_maps[i].iter() {
-                self.id_maps[i].insert(*k, *v);
+        // Only flow whose signal_source is Packet or XFlow has flow_meter
+        if tagged_flow.flow.signal_source == SignalSource::Packet
+            || tagged_flow.flow.signal_source == SignalSource::XFlow
+        {
+            self.flow_meter.sequential_merge(flow_meter);
+            for i in 0..2 {
+                for (k, v) in id_maps[i].iter() {
+                    self.id_maps[i].insert(*k, *v);
+                }
             }
         }
         // 相同服务端端口不同客户端端口的流L7Protocol可能不一致

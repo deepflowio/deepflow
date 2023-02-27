@@ -488,9 +488,10 @@ impl SubQuadGen {
         let stash = &mut self.stashs[slot];
         let connection = &mut self.connections[slot];
 
-        // 仅统计TCP和UDP的并发连接数
-        if tagged_flow.flow.flow_key.proto == IpProtocol::Tcp
-            || tagged_flow.flow.flow_key.proto == IpProtocol::Udp
+        // Only count the number of concurrent connections between TCP and UDP with the signal_source of packet
+        if (tagged_flow.flow.flow_key.proto == IpProtocol::Tcp
+            || tagged_flow.flow.flow_key.proto == IpProtocol::Udp)
+            && tagged_flow.flow.signal_source == SignalSource::Packet
         {
             if tagged_flow.flow.is_new_flow
                 && tagged_flow.flow.close_type == CloseType::ForcedReport
@@ -937,93 +938,103 @@ impl QuadrupleGenerator {
         let dst = &tagged_flow.flow.flow_metrics_peers[1];
 
         let perf_stats = tagged_flow.flow.flow_perf_stats.as_ref();
-        flow_meter.traffic = Traffic {
-            packet_tx: src.packet_count,
-            packet_rx: dst.packet_count,
-            byte_tx: src.byte_count,
-            byte_rx: dst.byte_count,
-            l3_byte_tx: src.l3_byte_count,
-            l3_byte_rx: dst.l3_byte_count,
-            l4_byte_tx: src.l4_byte_count,
-            l4_byte_rx: dst.l4_byte_count,
-            new_flow: tagged_flow.flow.is_new_flow as u64,
-            closed_flow: (tagged_flow.flow.close_type != CloseType::ForcedReport) as u64,
-            l7_request: 0,
-            l7_response: 0,
-            syn: perf_stats.map(|s| s.tcp.syn_count).unwrap_or_default(),
-            synack: perf_stats.map(|s| s.tcp.synack_count).unwrap_or_default(),
-        };
-        if tagged_flow.flow.flow_key.proto == IpProtocol::Tcp {
-            match tagged_flow.flow.close_type {
-                CloseType::TcpServerRst => flow_meter.anomaly.server_rst_flow = 1,
-                CloseType::Timeout => flow_meter.anomaly.tcp_timeout = 1,
-                CloseType::ClientSynRepeat => flow_meter.anomaly.client_syn_repeat = 1,
-                CloseType::ServerHalfClose => flow_meter.anomaly.server_half_close_flow = 1,
-                CloseType::TcpClientRst => flow_meter.anomaly.client_rst_flow = 1,
-                CloseType::ServerSynAckRepeat => flow_meter.anomaly.server_synack_repeat = 1,
-                CloseType::ClientHalfClose => flow_meter.anomaly.client_half_close_flow = 1,
-                CloseType::ClientSourcePortReuse => flow_meter.anomaly.client_source_port_reuse = 1,
-                CloseType::ServerReset => flow_meter.anomaly.server_reset = 1,
-                CloseType::ServerQueueLack => flow_meter.anomaly.server_queue_lack = 1,
-                CloseType::ClientEstablishReset => flow_meter.anomaly.client_establish_reset = 1,
-                CloseType::ServerEstablishReset => flow_meter.anomaly.server_establish_reset = 1,
-                CloseType::ForcedReport
-                | CloseType::TcpFin
-                | CloseType::Unknown
-                | CloseType::Max => (),
-            }
-        }
-
         let stats = match tagged_flow.flow.flow_perf_stats.as_ref() {
             Some(s) => s,
             None => return (flow_meter, app_meter),
         };
-
-        if tagged_flow.flow.flow_key.proto == IpProtocol::Tcp {
-            flow_meter.latency = Latency {
-                rtt_max: stats.tcp.rtt,
-                rtt_client_max: stats.tcp.rtt_client_max,
-                rtt_server_max: stats.tcp.rtt_server_max,
-                srt_max: stats.tcp.srt_max,
-                art_max: stats.tcp.art_max,
-                rrt_max: 0,
-                cit_max: stats.tcp.cit_max,
-
-                rtt_sum: stats.tcp.rtt as u64,
-                rtt_client_sum: stats.tcp.rtt_client_sum as u64,
-                rtt_server_sum: stats.tcp.rtt_server_sum as u64,
-                srt_sum: stats.tcp.srt_sum as u64,
-                art_sum: stats.tcp.art_sum as u64,
-                rrt_sum: 0,
-                cit_sum: stats.tcp.cit_sum as u64,
-
-                rtt_count: (stats.tcp.rtt > 0) as u32,
-                rtt_client_count: stats.tcp.rtt_client_count,
-                rtt_server_count: stats.tcp.rtt_server_count,
-                srt_count: stats.tcp.srt_count,
-                art_count: stats.tcp.art_count,
-                rrt_count: 0,
-                cit_count: stats.tcp.cit_count,
+        // Only count the flow_meter whose signal_source of flow is SignalSource::Packet or SignalSource::XFlow
+        if tagged_flow.flow.signal_source == SignalSource::Packet
+            || tagged_flow.flow.signal_source == SignalSource::XFlow
+        {
+            flow_meter.traffic = Traffic {
+                packet_tx: src.packet_count,
+                packet_rx: dst.packet_count,
+                byte_tx: src.byte_count,
+                byte_rx: dst.byte_count,
+                l3_byte_tx: src.l3_byte_count,
+                l3_byte_rx: dst.l3_byte_count,
+                l4_byte_tx: src.l4_byte_count,
+                l4_byte_rx: dst.l4_byte_count,
+                new_flow: tagged_flow.flow.is_new_flow as u64,
+                closed_flow: (tagged_flow.flow.close_type != CloseType::ForcedReport) as u64,
+                l7_request: 0,
+                l7_response: 0,
+                syn: perf_stats.map(|s| s.tcp.syn_count).unwrap_or_default(),
+                synack: perf_stats.map(|s| s.tcp.synack_count).unwrap_or_default(),
             };
+            if tagged_flow.flow.flow_key.proto == IpProtocol::Tcp {
+                match tagged_flow.flow.close_type {
+                    CloseType::TcpServerRst => flow_meter.anomaly.server_rst_flow = 1,
+                    CloseType::Timeout => flow_meter.anomaly.tcp_timeout = 1,
+                    CloseType::ClientSynRepeat => flow_meter.anomaly.client_syn_repeat = 1,
+                    CloseType::ServerHalfClose => flow_meter.anomaly.server_half_close_flow = 1,
+                    CloseType::TcpClientRst => flow_meter.anomaly.client_rst_flow = 1,
+                    CloseType::ServerSynAckRepeat => flow_meter.anomaly.server_synack_repeat = 1,
+                    CloseType::ClientHalfClose => flow_meter.anomaly.client_half_close_flow = 1,
+                    CloseType::ClientSourcePortReuse => {
+                        flow_meter.anomaly.client_source_port_reuse = 1
+                    }
+                    CloseType::ServerReset => flow_meter.anomaly.server_reset = 1,
+                    CloseType::ServerQueueLack => flow_meter.anomaly.server_queue_lack = 1,
+                    CloseType::ClientEstablishReset => {
+                        flow_meter.anomaly.client_establish_reset = 1
+                    }
+                    CloseType::ServerEstablishReset => {
+                        flow_meter.anomaly.server_establish_reset = 1
+                    }
+                    CloseType::ForcedReport
+                    | CloseType::TcpFin
+                    | CloseType::Unknown
+                    | CloseType::Max => (),
+                }
+            }
 
-            let src_perf = &stats.tcp.counts_peers[0];
-            let dst_perf = &stats.tcp.counts_peers[1];
-            flow_meter.performance = Performance {
-                retrans_tx: src_perf.retrans_count as u64,
-                retrans_rx: dst_perf.retrans_count as u64,
-                zero_win_tx: src_perf.zero_win_count as u64,
-                zero_win_rx: dst_perf.zero_win_count as u64,
-                retrans_syn: stats.tcp.retrans_syn_count,
-                retrans_synack: stats.tcp.retrans_synack_count,
-            };
-        } else {
-            flow_meter.latency.art_max = stats.tcp.art_max;
-            flow_meter.latency.art_sum = stats.tcp.art_sum as u64;
-            flow_meter.latency.art_count = stats.tcp.art_max;
-        }
+            if tagged_flow.flow.flow_key.proto == IpProtocol::Tcp {
+                flow_meter.latency = Latency {
+                    rtt_max: stats.tcp.rtt,
+                    rtt_client_max: stats.tcp.rtt_client_max,
+                    rtt_server_max: stats.tcp.rtt_server_max,
+                    srt_max: stats.tcp.srt_max,
+                    art_max: stats.tcp.art_max,
+                    rrt_max: 0,
+                    cit_max: stats.tcp.cit_max,
 
-        if !l7_metrics_enabled.load(Ordering::Relaxed) {
-            return (flow_meter, app_meter);
+                    rtt_sum: stats.tcp.rtt as u64,
+                    rtt_client_sum: stats.tcp.rtt_client_sum as u64,
+                    rtt_server_sum: stats.tcp.rtt_server_sum as u64,
+                    srt_sum: stats.tcp.srt_sum as u64,
+                    art_sum: stats.tcp.art_sum as u64,
+                    rrt_sum: 0,
+                    cit_sum: stats.tcp.cit_sum as u64,
+
+                    rtt_count: (stats.tcp.rtt > 0) as u32,
+                    rtt_client_count: stats.tcp.rtt_client_count,
+                    rtt_server_count: stats.tcp.rtt_server_count,
+                    srt_count: stats.tcp.srt_count,
+                    art_count: stats.tcp.art_count,
+                    rrt_count: 0,
+                    cit_count: stats.tcp.cit_count,
+                };
+
+                let src_perf = &stats.tcp.counts_peers[0];
+                let dst_perf = &stats.tcp.counts_peers[1];
+                flow_meter.performance = Performance {
+                    retrans_tx: src_perf.retrans_count as u64,
+                    retrans_rx: dst_perf.retrans_count as u64,
+                    zero_win_tx: src_perf.zero_win_count as u64,
+                    zero_win_rx: dst_perf.zero_win_count as u64,
+                    retrans_syn: stats.tcp.retrans_syn_count,
+                    retrans_synack: stats.tcp.retrans_synack_count,
+                };
+            } else {
+                flow_meter.latency.art_max = stats.tcp.art_max;
+                flow_meter.latency.art_sum = stats.tcp.art_sum as u64;
+                flow_meter.latency.art_count = stats.tcp.art_max;
+            }
+
+            if !l7_metrics_enabled.load(Ordering::Relaxed) {
+                return (flow_meter, app_meter);
+            }
         }
 
         match stats.l7_protocol {

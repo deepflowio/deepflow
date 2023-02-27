@@ -350,7 +350,7 @@ impl Policy {
         endpoints.dst_info.l3_epc_id
     }
 
-    fn lookup_all_by_epc(
+    pub fn lookup_all_by_epc(
         &self,
         key: &mut LookupKey,
         local_epc_id: i32,
@@ -510,7 +510,7 @@ unsafe impl Send for PolicyGetter {}
 unsafe impl Sync for PolicyGetter {}
 
 impl PolicyGetter {
-    fn policy(&self) -> &mut Policy {
+    pub fn policy(&self) -> &mut Policy {
         unsafe { &mut *self.policy }
     }
 
