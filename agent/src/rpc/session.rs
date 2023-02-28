@@ -14,26 +14,22 @@
  * limitations under the License.
  */
 
-use std::net::IpAddr;
 use std::sync::{
-    atomic::{AtomicBool, AtomicU64, Ordering},
+    atomic::{AtomicU64, Ordering},
     Arc, Weak,
 };
 use std::time::{Duration, Instant};
 
-use dns_lookup::lookup_host;
 use log::{debug, error, info};
 use parking_lot::RwLock;
-use rand::Rng;
 use tokio::sync::Semaphore;
 use tonic::transport::{Channel, Endpoint};
 
 use crate::common::{DEFAULT_CONTROLLER_PORT, DEFAULT_CONTROLLER_TLS_PORT};
 use crate::exception::ExceptionHandler;
 use crate::utils::stats::{self, AtomicTimeStats, StatsOption};
-use public::proto::trident::{self, Exception};
-
 use public::counter::{Countable, Counter, CounterType, CounterValue, RefCountable};
+use public::proto::trident::{self, Exception};
 
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 // Sessions in use occasionally timeout for 60 seconds, The
@@ -63,8 +59,10 @@ const GET_KUBERNETES_CLUSTER_ID_ENDPOINT: usize = 6;
 const GPID_SYNC_ENDPOINT: usize = 7;
 
 struct Config {
+    ips: Vec<String>,
     port: u16,
     tls_port: u16,
+    proxy_ip: Option<String>,
     proxy_port: u16,
     timeout: Duration,
     controller_cert_file_prefix: String,
@@ -73,6 +71,8 @@ struct Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
+            ips: vec![],
+            proxy_ip: None,
             port: DEFAULT_CONTROLLER_PORT,
             tls_port: DEFAULT_CONTROLLER_TLS_PORT,
             proxy_port: DEFAULT_CONTROLLER_PORT,
@@ -103,11 +103,10 @@ impl Config {
 }
 
 pub struct Session {
-    config: RwLock<Config>,
+    config: Arc<RwLock<Config>>,
 
-    server_ip: RwLock<ServerIp>,
+    server_dispatcher: RwLock<ServerDispatcher>,
 
-    reset_session: AtomicBool,
     version: AtomicU64,
     client: RwLock<Option<Channel>>,
     exception_handler: ExceptionHandler,
@@ -171,22 +170,19 @@ impl Session {
             );
         }
 
+        let config = Arc::new(RwLock::new(Config {
+            ips: controller_ips,
+            port,
+            tls_port,
+            timeout,
+            controller_cert_file_prefix,
+            ..Default::default()
+        }));
+
         Session {
-            config: RwLock::new(Config {
-                port,
-                tls_port,
-                timeout,
-                controller_cert_file_prefix,
-                ..Default::default()
-            }),
-            server_ip: RwLock::new(ServerIp::new(
-                controller_ips
-                    .into_iter()
-                    .map(|x| x.parse().unwrap())
-                    .collect(),
-            )),
+            config: config.clone(),
+            server_dispatcher: RwLock::new(ServerDispatcher::new(config)),
             version: AtomicU64::new(0),
-            reset_session: Default::default(),
             client: RwLock::new(None),
             exception_handler,
             counters,
@@ -196,25 +192,17 @@ impl Session {
     }
 
     pub fn reset_server_ip(&self, controller_ips: Vec<String>) {
-        self.server_ip.write().update_controller_ips(
-            controller_ips
-                .into_iter()
-                .map(|x| x.parse().unwrap())
-                .collect(),
-        );
-
-        self.reset_session.store(true, Ordering::Relaxed);
+        self.server_dispatcher
+            .write()
+            .update_controller_ips(controller_ips);
     }
 
     pub fn reset(&self) {
         *self.client.write() = None;
-        self.reset_session.store(true, Ordering::Relaxed);
-        self.server_ip.write().reset();
+        self.server_dispatcher.write().reset();
     }
 
-    async fn dial(&self, remote: &IpAddr) {
-        let is_proxy = self.server_ip.read().is_proxy_ip();
-        let remote_port = self.config.read().get_port(is_proxy);
+    async fn dial(&self, remote: &String, remote_port: u16) {
         // TODO: 错误处理和tls
         match Endpoint::from_shared(format!("http://{}:{}", remote, remote_port))
             .unwrap()
@@ -226,6 +214,7 @@ impl Session {
             Ok(channel) => *self.client.write() = Some(channel),
             Err(e) => {
                 self.exception_handler.set(Exception::ControllerSocketError);
+                self.set_request_failed(true);
                 error!("dial server({}) failed {}", remote, e);
             }
         }
@@ -235,15 +224,15 @@ impl Session {
         self.client.read().clone()
     }
 
-    pub fn get_current_server(&self) -> IpAddr {
-        self.server_ip.read().get_current_ip()
+    pub fn get_current_server(&self) -> (String, u16) {
+        self.server_dispatcher.read().get_current_ip()
     }
 
     async fn update_current_server(&self) -> bool {
-        let changed = self.server_ip.write().update_current_ip();
+        let changed = self.server_dispatcher.write().update_current_ip();
         if changed {
-            let ip = self.server_ip.read().get_current_ip();
-            self.dial(&ip).await;
+            let (ip, port) = self.server_dispatcher.read().get_current_ip();
+            self.dial(&ip, port).await;
             self.version.fetch_add(1, Ordering::SeqCst);
         }
         changed
@@ -258,25 +247,23 @@ impl Session {
     }
 
     pub fn get_request_failed(&self) -> bool {
-        self.server_ip.read().get_request_failed()
+        self.server_dispatcher.read().get_request_failed()
     }
 
     pub fn set_request_failed(&self, failed: bool) {
-        self.server_ip.write().set_request_failed(failed);
+        self.server_dispatcher.write().set_request_failed(failed);
     }
 
     pub fn get_proxy_server(&self) -> (Option<String>, u16) {
         (
-            self.server_ip.read().get_proxy_ip(),
+            self.server_dispatcher.read().get_proxy_ip(),
             self.config.read().get_proxy_port(),
         )
     }
 
     pub fn set_proxy_server(&self, ip: Option<String>, port: u16) {
-        self.server_ip.write().set_proxy_ip(ip);
+        self.server_dispatcher.write().set_proxy_ip(ip);
         self.config.write().set_proxy_port(port);
-
-        self.reset_session.store(true, Ordering::Relaxed);
     }
 
     pub async fn grpc_push_with_statsd(
@@ -384,73 +371,58 @@ impl Session {
     }
 }
 
-struct ServerIp {
-    controller_ips: Vec<IpAddr>,
-    this_controller: usize,
+struct ServerDispatcher {
+    config: Arc<RwLock<Config>>,
 
-    current_ip: IpAddr,
-    proxy_ip: Option<String>,
+    current_ip: String,
+    current_port: u16,
+    current_ip_index: usize,
+
     proxied: bool,
     request_failed: bool,
-
-    initialized: bool,
 }
 
-impl ServerIp {
-    fn new(controller_ips: Vec<IpAddr>) -> ServerIp {
-        if controller_ips.is_empty() {
-            panic!("no controller IP set");
-        }
+impl ServerDispatcher {
+    fn new(config: Arc<RwLock<Config>>) -> ServerDispatcher {
+        ServerDispatcher {
+            config,
 
-        // Prevent multiple agents from reporting data to the same server and cause avalanches
-        let mut rng = rand::thread_rng();
-        let this_controller = rng.gen_range(0..controller_ips.len());
-        ServerIp {
-            current_ip: controller_ips[this_controller],
+            current_ip_index: 0,
+            current_ip: String::new(),
+            current_port: 0,
 
-            controller_ips,
-            this_controller,
-
-            proxy_ip: None,
             proxied: false,
             request_failed: false,
-
-            initialized: false,
         }
     }
 
     fn reset(&mut self) {
-        self.this_controller = 0;
-        self.current_ip = self.controller_ips[self.this_controller];
+        self.current_ip_index = 0;
+        self.current_ip = String::new();
+        self.current_port = 0;
         self.proxied = false;
-        self.initialized = false;
-        self.proxy_ip = None;
         self.request_failed = false;
     }
 
-    fn update_controller_ips(&mut self, controller_ips: Vec<IpAddr>) {
-        self.proxied = false;
-        self.this_controller = 0;
-        self.controller_ips = controller_ips;
-        self.current_ip = self.controller_ips[self.this_controller];
-        self.initialized = false;
-        self.request_failed = false;
+    fn update_controller_ips(&mut self, controller_ips: Vec<String>) {
+        self.reset();
+        self.config.write().ips = controller_ips;
     }
 
-    fn get_current_ip(&self) -> IpAddr {
-        self.current_ip
+    fn get_current_ip(&self) -> (String, u16) {
+        (self.current_ip.clone(), self.current_port)
     }
 
-    fn set_current_ip(&mut self, ip: IpAddr) {
+    fn set_current_ip(&mut self, ip: String) {
         self.current_ip = ip;
     }
 
     fn get_proxy_ip(&self) -> Option<String> {
-        self.proxy_ip.clone()
+        self.config.read().proxy_ip.clone()
     }
 
     fn set_proxy_ip(&mut self, ip: Option<String>) {
-        self.proxy_ip = ip;
+        self.config.write().proxy_ip = ip;
     }
 
     fn is_proxy_ip(&self) -> bool {
@@ -465,119 +437,94 @@ impl ServerIp {
         self.request_failed = failed;
     }
 
-    fn get_current_controller_ip(&self) -> IpAddr {
+    fn get_current_controller_ip(&self) -> String {
         // controller_ips一定不为空
-        self.controller_ips[self.this_controller]
+        self.config.read().ips[self.current_ip_index].clone()
     }
 
     fn next_controller_ip(&mut self) {
-        self.this_controller += 1;
-        if self.this_controller >= self.controller_ips.len() {
-            self.this_controller = 0;
+        self.current_ip_index += 1;
+        if self.current_ip_index >= self.config.read().ips.len() {
+            self.current_ip_index = 0;
         }
     }
 
     fn update_current_ip(&mut self) -> bool {
-        if !self.initialized {
+        if self.current_ip.len() == 0 {
+            self.current_ip = self.get_current_controller_ip();
+            self.current_port = self.config.read().get_port(false);
             // 第一次访问，直接返回
-            self.initialized = true;
             return true;
         }
-        if self.request_failed {
-            // 上一次rpc请求失败
-            if self.proxied {
+
+        match (self.proxied, self.request_failed) {
+            // 访问代理控制器失败，重连控制器
+            (true, true) => {
                 let new_ip = self.get_current_controller_ip();
                 info!(
                     "rpc IP changed to controller {} from unavailable proxy {}",
                     new_ip, self.current_ip
                 );
-                self.current_ip = new_ip.into();
+                self.current_ip = new_ip;
+                self.current_port = self.config.read().get_port(false);
                 self.proxied = false;
-            } else {
-                self.next_controller_ip();
-                let new_ip = self.get_current_controller_ip();
-                info!(
-                    "rpc IP changed to controller {} from unavailable controller {}",
-                    new_ip, self.current_ip
-                );
-                self.current_ip = new_ip.into();
+                true
             }
-            return true;
-        }
-        if !self.proxied {
-            // 请求controller成功，改为请求proxy
-            if let Some(new_ip) = self.get_proxy_ip() {
-                let ip = if new_ip.parse::<IpAddr>().is_ok() {
-                    new_ip.parse().unwrap()
-                } else {
-                    let ips = lookup_host(&new_ip);
-                    if ips.is_err() {
-                        info!("Dns lookup {} error: {:?}", &new_ip, ips);
-                        return false;
-                    }
-                    let ips = ips.unwrap();
-                    let mut index = 0;
-                    for (i, ip) in ips.iter().enumerate() {
-                        if *ip == self.current_ip {
-                            index = i;
-                            break;
-                        }
-                    }
-
-                    ips[index]
-                };
-
-                if ip == self.current_ip {
+            // 成功访问代理控制器
+            (true, false) => {
+                let proxy_port = self.config.read().get_proxy_port();
+                let proxy_ip = self.config.read().proxy_ip.as_ref().unwrap().clone();
+                if proxy_port != self.current_port || self.current_ip != proxy_ip {
                     info!(
-                        "proxy {} same as controller {}, nothing to do",
-                        ip, self.current_ip
+                        "rpc Proxy changed to proxy {} {} from proxy {} {}",
+                        proxy_ip, proxy_port, self.current_ip, self.current_port
                     );
-                    self.proxied = true;
-                    return false;
+                    // 配置变更需要更新
+                    self.current_port = proxy_port;
+                    self.current_ip = proxy_ip;
+                    true
+                } else {
+                    false
                 }
-                info!(
-                    "rpc IP changed to proxy {} from controller {}",
-                    ip, self.current_ip
-                );
-                self.current_ip = ip.into();
-                self.proxied = true;
-                true
-            } else {
-                info!("rpc IP not changed, no valid proxy IP provided");
-                false
             }
-        } else {
-            // 这里proxy_ip一定有
-            let new_ip = self.get_proxy_ip().unwrap();
-            let ip = if new_ip.parse::<IpAddr>().is_ok() {
-                new_ip.parse().unwrap()
-            } else {
-                let ips = lookup_host(&new_ip);
-                if ips.is_err() {
-                    info!("Dns lookup {} error: {:?}", &new_ip, ips);
+            // 访问控制器失败，更新控制器IP地址
+            (false, true) => {
+                self.next_controller_ip();
+                let port = self.config.read().get_port(false);
+                let ip = self.get_current_controller_ip();
+                info!(
+                    "rpc IP changed to controller {} {} from unavailable controller {} {}",
+                    ip, port, self.current_ip, self.current_port
+                );
+                self.current_port = port;
+                self.current_ip = ip;
+
+                true
+            }
+            // 访问控制器成功，切换为代理控制器
+            (false, false) => {
+                if self.config.read().proxy_ip.is_none() {
                     return false;
                 }
-                let ips = ips.unwrap();
-                let mut index = 0;
-                for (i, ip) in ips.iter().enumerate() {
-                    if *ip == self.current_ip {
-                        index = i;
-                        break;
-                    }
-                }
+                let proxy_port = self.config.read().get_proxy_port();
+                let proxy_ip = self.config.read().proxy_ip.as_ref().unwrap().clone();
+                self.proxied = true;
 
-                ips[index]
-            };
-            if ip.ne(&self.current_ip) {
-                // proxy改变
-                info!(
-                    "rpc IP changed to proxy {} from proxy {}",
-                    ip, self.current_ip
-                );
-                self.current_ip = ip.into();
-                true
-            } else {
-                false
+                if self.current_port != proxy_port || self.current_ip != proxy_ip {
+                    info!(
+                        "rpc IP changed to proxy {} {} from controller {} {}",
+                        proxy_ip, proxy_port, self.current_ip, self.current_port
+                    );
+                    self.current_port = proxy_port;
+                    self.current_ip = proxy_ip;
+                    true
+                } else {
+                    info!(
+                        "rpc proxy {} {} and controller {} {} are the same, not updated",
+                        proxy_ip, proxy_port, proxy_ip, proxy_port
+                    );
+                    false
+                }
             }
         }
     }
