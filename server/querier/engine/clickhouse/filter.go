@@ -86,6 +86,12 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 		} else {
 			op = "not ilike"
 		}
+	} else if strings.ToLower(op) == "regexp" || strings.ToLower(op) == "not regexp" {
+		if strings.ToLower(op) == "regexp" {
+			op = "match"
+		} else {
+			op = "not match"
+		}
 	}
 	if !ok {
 		preAsTag, ok := asTagMap[t.Tag]
@@ -166,20 +172,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 							nameNoSuffix := strings.TrimSuffix(preAsTag, "_0")
 							nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
 							nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.label.")
-							switch strings.ToLower(op) {
-							case "regexp":
-								filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value, nameNoPreffix)
-							case "not regexp":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value, nameNoPreffix) + ")"
-							case "not ilike":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", t.Value, nameNoPreffix) + ")"
-							case "not in":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", t.Value, nameNoPreffix) + ")"
-							case "!=":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value, nameNoPreffix) + ")"
-							default:
-								filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, nameNoPreffix)
-							}
+							filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, nameNoPreffix)
 							return &view.Expr{Value: filter}, nil
 						}
 					} else if strings.HasPrefix(preAsTag, "cloud.tag.") {
@@ -194,20 +187,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 							nameNoSuffix := strings.TrimSuffix(preAsTag, "_0")
 							nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
 							nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "cloud.tag.")
-							switch strings.ToLower(op) {
-							case "regexp":
-								filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value, nameNoPreffix, "match", t.Value, nameNoPreffix)
-							case "not regexp":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value, nameNoPreffix, "match", t.Value, nameNoPreffix) + ")"
-							case "not ilike":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", t.Value, nameNoPreffix, "ilike", t.Value, nameNoPreffix) + ")"
-							case "not in":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", t.Value, nameNoPreffix, "in", t.Value, nameNoPreffix) + ")"
-							case "!=":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value, nameNoPreffix, "=", t.Value, nameNoPreffix) + ")"
-							default:
-								filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, nameNoPreffix, op, t.Value, nameNoPreffix)
-							}
+							filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, nameNoPreffix, op, t.Value, nameNoPreffix)
 							return &view.Expr{Value: filter}, nil
 						}
 					} else if strings.HasPrefix(preAsTag, "os.app.") {
@@ -222,20 +202,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 							nameNoSuffix := strings.TrimSuffix(preAsTag, "_0")
 							nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
 							nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "os.app.")
-							switch strings.ToLower(op) {
-							case "regexp":
-								filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value, nameNoPreffix)
-							case "not regexp":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value, nameNoPreffix) + ")"
-							case "not ilike":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", t.Value, nameNoPreffix) + ")"
-							case "not in":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", t.Value, nameNoPreffix) + ")"
-							case "!=":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value, nameNoPreffix) + ")"
-							default:
-								filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, nameNoPreffix)
-							}
+							filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, nameNoPreffix)
 							return &view.Expr{Value: filter}, nil
 						}
 					} else if strings.HasPrefix(preAsTag, "tag.") || strings.HasPrefix(preAsTag, "attribute.") {
@@ -247,29 +214,13 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 						if ok {
 							nameNoPreffix := strings.TrimPrefix(preAsTag, "tag.")
 							nameNoPreffix = strings.TrimPrefix(nameNoPreffix, "attribute.")
-							switch strings.ToLower(op) {
-							case "regexp":
-								filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", nameNoPreffix, t.Value)
-							case "not regexp":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", nameNoPreffix, t.Value) + ")"
-							case "not ilike":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, nameNoPreffix, "ilike", t.Value) + ")"
-							case "not in":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, nameNoPreffix, "in", t.Value) + ")"
-							case "!=":
-								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, nameNoPreffix, "=", t.Value) + ")"
-							default:
-								filter = fmt.Sprintf(tagItem.WhereTranslator, nameNoPreffix, op, t.Value)
-							}
+							filter = fmt.Sprintf(tagItem.WhereTranslator, nameNoPreffix, op, t.Value)
 							return &view.Expr{Value: filter}, nil
 						}
 					}
-					switch strings.ToLower(op) {
-					case "regexp":
-						filter = fmt.Sprintf("match(%s,%s)", t.Tag, t.Value)
-					case "not regexp":
-						filter = fmt.Sprintf("NOT match(%s,%s)", t.Tag, t.Value)
-					default:
+					if strings.Contains(op, "match") {
+						filter = fmt.Sprintf("%s(%s,%s)", op, t.Tag, t.Value)
+					} else {
 						filter = fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
 					}
 				}
@@ -349,20 +300,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 						nameNoSuffix := strings.TrimSuffix(t.Tag, "_0")
 						nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
 						nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.label.")
-						switch strings.ToLower(op) {
-						case "regexp":
-							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value, nameNoPreffix)
-						case "not regexp":
-							filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value, nameNoPreffix) + ")"
-						case "not ilike":
-							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", t.Value, nameNoPreffix) + ")"
-						case "not in":
-							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", t.Value, nameNoPreffix) + ")"
-						case "!=":
-							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value, nameNoPreffix) + ")"
-						default:
-							filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, nameNoPreffix)
-						}
+						filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, nameNoPreffix)
 						return &view.Expr{Value: filter}, nil
 					}
 				} else if strings.HasPrefix(t.Tag, "cloud.tag.") {
@@ -377,20 +315,8 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 						nameNoSuffix := strings.TrimSuffix(t.Tag, "_0")
 						nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
 						nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "cloud.tag.")
-						switch strings.ToLower(op) {
-						case "regexp":
-							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value, nameNoPreffix, "match", t.Value, nameNoPreffix)
-						case "not regexp":
-							filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value, nameNoPreffix, "match", t.Value, nameNoPreffix) + ")"
-						case "not ilike":
-							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", t.Value, nameNoPreffix, "ilike", t.Value, nameNoPreffix) + ")"
-						case "not in":
-							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", t.Value, nameNoPreffix, "in", t.Value, nameNoPreffix) + ")"
-						case "!=":
-							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value, nameNoPreffix, "=", t.Value, nameNoPreffix) + ")"
-						default:
-							filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, nameNoPreffix, op, t.Value, nameNoPreffix)
-						}
+						filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, nameNoPreffix, op, t.Value, nameNoPreffix)
+
 						return &view.Expr{Value: filter}, nil
 					}
 				} else if strings.HasPrefix(t.Tag, "os.app.") {
@@ -405,20 +331,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 						nameNoSuffix := strings.TrimSuffix(t.Tag, "_0")
 						nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
 						nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "os.app.")
-						switch strings.ToLower(op) {
-						case "regexp":
-							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value, nameNoPreffix)
-						case "not regexp":
-							filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value, nameNoPreffix) + ")"
-						case "not ilike":
-							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", t.Value, nameNoPreffix) + ")"
-						case "not in":
-							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", t.Value, nameNoPreffix) + ")"
-						case "!=":
-							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value, nameNoPreffix) + ")"
-						default:
-							filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, nameNoPreffix)
-						}
+						filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, nameNoPreffix)
 						return &view.Expr{Value: filter}, nil
 					}
 				} else if strings.HasPrefix(t.Tag, "tag.") || strings.HasPrefix(t.Tag, "attribute.") {
@@ -430,20 +343,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 					if ok {
 						nameNoPreffix := strings.TrimPrefix(t.Tag, "tag.")
 						nameNoPreffix = strings.TrimPrefix(nameNoPreffix, "attribute.")
-						switch strings.ToLower(op) {
-						case "regexp":
-							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", nameNoPreffix, t.Value)
-						case "not regexp":
-							filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", nameNoPreffix, t.Value) + ")"
-						case "not ilike":
-							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, nameNoPreffix, "ilike", t.Value) + ")"
-						case "not in":
-							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, nameNoPreffix, "in", t.Value) + ")"
-						case "!=":
-							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, nameNoPreffix, "=", t.Value) + ")"
-						default:
-							filter = fmt.Sprintf(tagItem.WhereTranslator, nameNoPreffix, op, t.Value)
-						}
+						filter = fmt.Sprintf(tagItem.WhereTranslator, nameNoPreffix, op, t.Value)
 						return &view.Expr{Value: filter}, nil
 					}
 				} else if strings.HasPrefix(t.Tag, "Enum(") {
@@ -451,29 +351,13 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 					t.Tag = strings.TrimSuffix(t.Tag, ")")
 					tagItem, ok = tag.GetTag(t.Tag, db, table, "enum")
 					if ok {
-						switch strings.ToLower(op) {
-						case "regexp":
-							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value)
-						case "not regexp":
-							filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value) + ")"
-						case "not ilike":
-							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", t.Value) + ")"
-						case "not in":
-							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", t.Value) + ")"
-						case "!=":
-							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value) + ")"
-						default:
-							filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value)
-						}
+						filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value)
 						return &view.Expr{Value: filter}, nil
 					}
 				}
-				switch strings.ToLower(op) {
-				case "regexp":
-					filter = fmt.Sprintf("match(%s,%s)", t.Tag, t.Value)
-				case "not regexp":
-					filter = fmt.Sprintf("NOT match(%s,%s)", t.Tag, t.Value)
-				default:
+				if strings.Contains(op, "match") {
+					filter = fmt.Sprintf("%s(%s,%s)", op, t.Tag, t.Value)
+				} else {
 					filter = fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
 				}
 			}
@@ -633,8 +517,11 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 			default:
 				whereFilter = equalFilter
 			}
-		case "pod_service_id", "pod_service_id_0", "pod_service_id_1":
+		case "pod_service_id", "pod_service_id_0", "pod_service_id_1", "natgw_id", "natgw_id_0", "natgw_id_1", "natgw", "natgw_0", "natgw_1",
+			"lb_id", "lb_id_0", "lb_id_1", "lb", "lb_0", "lb_1", "lb_listener_id", "lb_listener_id_0", "lb_listener_id_1", "lb_listener", "lb_listener_0", "lb_listener_1":
 			switch strings.ToLower(op) {
+			case "not match":
+				whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "match", t.Value) + ")"
 			case "not ilike":
 				whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", t.Value) + ")"
 			case "not in":
@@ -644,17 +531,10 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 			default:
 				whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value)
 			}
-
 		case "pod_ingress_id", "pod_ingress_id_0", "pod_ingress_id_1", "pod_ingress", "pod_ingress_0", "pod_ingress_1",
-			"pod_service", "pod_service_0", "pod_service_1", "resource_gl0", "resource_gl0_0", "resource_gl0_1", "resource_gl1",
-			"resource_gl1_0", "resource_gl1_1", "resource_gl2", "resource_gl2_0", "resource_gl2_1", "resource_gl0_id", "resource_gl0_id_0",
-			"resource_gl0_id_1", "resource_gl1_id", "resource_gl1_id_0", "resource_gl1_id_1", "resource_gl2_id", "resource_gl2_id_0", "resource_gl2_id_1",
-			"auto_instance", "auto_instance_0", "auto_instance_1", "auto_instance_id", "auto_instance_id_0", "auto_instance_id_1",
-			"auto_service", "auto_service_0", "auto_service_1", "auto_service_id", "auto_service_id_0", "auto_service_id_1":
+			"pod_service", "pod_service_0", "pod_service_1":
 			switch strings.ToLower(op) {
-			case "regexp":
-				whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value, "match", t.Value)
-			case "not regexp":
+			case "not match":
 				whereFilter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value, "match", t.Value) + ")"
 			case "not ilike":
 				whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", t.Value, "ilike", t.Value) + ")"
@@ -665,6 +545,12 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 			default:
 				whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, op, t.Value)
 			}
+		case "resource_gl0", "resource_gl0_0", "resource_gl0_1", "resource_gl1", "resource_gl1_0", "resource_gl1_1",
+			"resource_gl2", "resource_gl2_0", "resource_gl2_1", "resource_gl0_id", "resource_gl0_id_0", "resource_gl0_id_1",
+			"resource_gl1_id", "resource_gl1_id_0", "resource_gl1_id_1", "resource_gl2_id", "resource_gl2_id_0", "resource_gl2_id_1",
+			"auto_instance", "auto_instance_0", "auto_instance_1", "auto_instance_id", "auto_instance_id_0", "auto_instance_id_1",
+			"auto_service", "auto_service_0", "auto_service_1", "auto_service_id", "auto_service_id_0", "auto_service_id_1":
+			whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, op, t.Value)
 		case "ips", "subnets_id", "subnets":
 			t.Value = strings.TrimPrefix(t.Value, "(")
 			t.Value = strings.TrimSuffix(t.Value, ")")
@@ -679,29 +565,13 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 		case "acl_gids":
 			whereFilter = fmt.Sprintf(tagItem.WhereTranslator, t.Value)
 		default:
-			switch strings.ToLower(op) {
-			case "regexp":
-				whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value)
-			case "not regexp":
-				whereFilter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value) + ")"
-			case "not ilike":
-				whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", t.Value) + ")"
-			case "not in":
-				whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", t.Value) + ")"
-			case "!=":
-				whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value) + ")"
-			default:
-				whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value)
-			}
+			whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value)
 		}
 	} else {
 		filter := ""
-		switch strings.ToLower(op) {
-		case "regexp":
-			filter = fmt.Sprintf("match(%s,%s)", t.Tag, t.Value)
-		case "not regexp":
-			filter = fmt.Sprintf("NOT match(%s,%s)", t.Tag, t.Value)
-		default:
+		if strings.Contains(op, "match") {
+			filter = fmt.Sprintf("%s(%s,%s)", op, t.Tag, t.Value)
+		} else {
 			filter = fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
 		}
 		return &view.Expr{Value: filter}, nil
@@ -778,15 +648,15 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 				} else {
 					opName = "not ilike"
 				}
+			} else if strings.ToLower(opName) == "regexp" || strings.ToLower(opName) == "not regexp" {
+				if strings.ToLower(opName) == "regexp" {
+					opName = "match"
+				} else {
+					opName = "not match"
+				}
 			}
 			enumFileName := strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)
 			switch strings.ToLower(expr.(*sqlparser.ComparisonExpr).Operator) {
-			case "regexp":
-				whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", f.Value, enumFileName)
-			case "not regexp":
-				whereFilter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", f.Value, enumFileName) + ")"
-			case "not in":
-				whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", f.Value, enumFileName) + ")"
 			case "=":
 				//when enum function operator is '=' , add 'or tag = xxx'
 				if isIntEnum {
@@ -806,12 +676,12 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 					intValue, err := strconv.Atoi(strings.Trim(f.Value, "'"))
 					if err == nil {
 						// when value type is int, add toUInt64() function
-						whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + ") AND " + tagName + " != " + "toUInt64(" + strconv.Itoa(intValue) + ")"
+						whereFilter = fmt.Sprintf(tagItem.WhereTranslator, opName, f.Value, enumFileName) + " AND " + tagName + " != " + "toUInt64(" + strconv.Itoa(intValue) + ")"
 					} else {
-						whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + ")"
+						whereFilter = fmt.Sprintf(tagItem.WhereTranslator, opName, f.Value, enumFileName)
 					}
 				} else {
-					whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + ") AND " + tagName + " != " + f.Value
+					whereFilter = fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + " AND " + tagName + " != " + f.Value
 				}
 			default:
 				whereFilter = fmt.Sprintf(tagItem.WhereTranslator, opName, f.Value, enumFileName)
