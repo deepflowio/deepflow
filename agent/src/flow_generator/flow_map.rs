@@ -83,7 +83,6 @@ use public::{
     utils::net::MacAddr,
 };
 
-use npb_pcap_policy::PolicyData;
 use packet_sequence_block::PacketSequenceBlock;
 
 // not thread-safe
@@ -510,11 +509,11 @@ impl FlowMap {
         // rust 版本用了std的hashmap自动处理扩容，所以无需执行policy_gettelr
     }
 
-    fn append_to_block(&self, node: &mut FlowNode, meta_packet: &MetaPacket) {
+    fn append_to_block(&self, config: &FlowConfig, node: &mut FlowNode, meta_packet: &MetaPacket) {
         const MINUTE: u64 = 60;
         if node.packet_sequence_block.is_some() {
             if !node.packet_sequence_block.as_ref().unwrap().is_available(
-                self.config.load().packet_sequence_block_size,
+                config.packet_sequence_block_size,
                 (meta_packet.lookup_key.timestamp.as_secs() / MINUTE) as u32,
             ) {
                 // if the packet_sequence_block is no enough to push one more packet, then send it to the queue
@@ -553,7 +552,7 @@ impl FlowMap {
         node.packet_sequence_block
             .as_mut()
             .unwrap()
-            .append_packet(mini_meta_packet, self.config.load().packet_sequence_flag);
+            .append_packet(mini_meta_packet, config.packet_sequence_flag);
     }
 
     fn update_tcp_node(
@@ -594,7 +593,7 @@ impl FlowMap {
 
         // Enterprise Edition Feature: packet-sequence
         if self.packet_sequence_enabled {
-            self.append_to_block(node, meta_packet);
+            self.append_to_block(flow_config, node, meta_packet);
         }
 
         flow_closed
@@ -1257,7 +1256,7 @@ impl FlowMap {
 
         // Enterprise Edition Feature: packet-sequence
         if self.packet_sequence_enabled {
-            self.append_to_block(&mut node, meta_packet);
+            self.append_to_block(flow_config, &mut node, meta_packet);
         }
         node
     }
@@ -1746,18 +1745,8 @@ impl FlowMap {
         }
 
         // update policy data
-        if meta_packet.policy_data.is_some() {
-            node.policy_data_cache[meta_packet.lookup_key.direction as usize] =
-                Arc::new(PolicyData {
-                    acl_id: meta_packet.policy_data.as_ref().unwrap().acl_id,
-                    npb_actions: meta_packet
-                        .policy_data
-                        .as_ref()
-                        .unwrap()
-                        .npb_actions
-                        .clone(),
-                    action_flags: meta_packet.policy_data.as_ref().unwrap().action_flags,
-                });
+        if let Some(policy_data) = meta_packet.policy_data.as_ref() {
+            node.policy_data_cache[meta_packet.lookup_key.direction as usize] = policy_data.clone();
         }
         node.tagged_flow.tag.policy_data = node.policy_data_cache.clone();
     }
@@ -1981,7 +1970,7 @@ mod tests {
         common::{enums::EthernetType, flow::CloseType, tap_port::TapPort},
         utils::test::Capture,
     };
-    use npb_pcap_policy::{NpbAction, NpbTunnelType, TapSide};
+    use npb_pcap_policy::{NpbAction, NpbTunnelType, PolicyData, TapSide};
     use public::utils::net::MacAddr;
 
     const DEFAULT_DURATION: Duration = Duration::from_millis(10);

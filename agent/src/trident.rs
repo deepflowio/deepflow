@@ -1649,7 +1649,8 @@ impl AgentComponents {
                 .ntp_diff(synchronizer.ntp_diff())
                 .src_interface(src_interface.clone())
                 .netns(netns)
-                .trident_type(candidate_config.dispatcher.trident_type);
+                .trident_type(candidate_config.dispatcher.trident_type)
+                .queue_debugger(queue_debugger.clone());
 
             #[cfg(target_os = "linux")]
             let dispatcher = dispatcher_builder

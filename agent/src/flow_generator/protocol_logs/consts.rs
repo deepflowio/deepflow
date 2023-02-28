@@ -41,7 +41,8 @@ pub const HTTPV2_CUSTOM_DATA_MIN_LENGTH: usize = 16;
 
 pub const HTTPV2_FRAME_HEADER_LENGTH: usize = 9;
 pub const HTTPV2_MAGIC_LENGTH: usize = 24;
-pub const HTTPV2_MAGIC_PREFIX: &str = "PRI * HTTP";
+pub const HTTPV2_MAGIC_PREFIX: [u8; 10] =
+    [b'P', b'R', b'I', b' ', b'*', b' ', b'H', b'T', b'T', b'P'];
 
 pub const HTTPV2_FRAME_DATA_TYPE: u8 = 0x00;
 pub const HTTPV2_FRAME_HEADERS_TYPE: u8 = 0x01;

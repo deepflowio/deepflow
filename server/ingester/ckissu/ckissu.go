@@ -915,7 +915,7 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo, isEdgeTab
 	}
 
 	if isAppTable {
-		columnAddss623 = append(columnAddss620, []*ColumnAdds{
+		columnAddss623 = append(columnAddss623, []*ColumnAdds{
 			&ColumnAdds{
 				Dbs:         []string{d.db},
 				Tables:      []string{d.name, d.name + "_agg"},
@@ -940,7 +940,7 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo, isEdgeTab
 				ColumnType:  ckdb.UInt32,
 			},
 		}...)
-		columnAddss623 = append(columnAddss620, []*ColumnAdds{
+		columnAddss623 = append(columnAddss623, []*ColumnAdds{
 			&ColumnAdds{
 				Dbs:         []string{d.db},
 				Tables:      []string{d.name, d.name + "_agg"},
@@ -963,7 +963,7 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo, isEdgeTab
 				ColumnType:  ckdb.UInt32,
 			},
 		}...)
-		columnAddss623 = append(columnAddss620, []*ColumnAdds{
+		columnAddss623 = append(columnAddss623, []*ColumnAdds{
 			&ColumnAdds{
 				Dbs:         []string{d.db},
 				Tables:      []string{d.name, d.name + "_agg"},
@@ -1307,6 +1307,12 @@ func (i *Issu) setTableVersion(connect *sql.DB, db, table string) error {
 	sql := fmt.Sprintf("ALTER TABLE %s.`%s` COMMENT COLUMN time '%s'",
 		db, table, common.CK_VERSION)
 	_, err := connect.Exec(sql)
+	if err != nil {
+		if strings.Contains(err.Error(), "doesn't exist") {
+			log.Infof("db: %s, table: %s info: %s", db, table, err)
+			return nil
+		}
+	}
 	return err
 }
 
@@ -1336,6 +1342,10 @@ func (i *Issu) renameColumns(connect *sql.DB) ([]*ColumnRename, error) {
 	for _, renameColumn := range i.columnRenames {
 		version, err := i.getTableVersion(connect, renameColumn.Db, renameColumn.Table)
 		if err != nil {
+			if strings.Contains(err.Error(), "doesn't exist") {
+				log.Infof("db: %s, table: %s info: %s", renameColumn.Db, renameColumn.Table, err)
+				continue
+			}
 			return dones, err
 		}
 		if version == common.CK_VERSION {

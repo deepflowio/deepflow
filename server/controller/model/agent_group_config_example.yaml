@@ -927,10 +927,10 @@ vtap_group_id: g-xxxxxx
     #max-trace-entries: 524288
 
     ## eBPF go trace timeout
-    ## Default: 120 second[s]. Range: [0, +]
+    ## Default: 0 second[s]. Range: [0, +]
     ## Note: The expected maximum time interval between the server receiving the request and returning the response,
     ##   If the value is 0, this feature is disabled. Tracing only considers the thread number.
-    #go-tracing-timeout: 120
+    #go-tracing-timeout: 0
 
   ######################################
   ## Agent Running in Standalone Mode ##
@@ -958,7 +958,7 @@ vtap_group_id: g-xxxxxx
   #####################
   ## whether to sync os socket and proc info
   ## Default: false
-  ## Note: only make sense when trident type is one of CHOST_VM, CHOST_BM, K8S_VM, K8S_BM
+  ## Note: only make sense when agent type is one of CHOST_VM, CHOST_BM, K8S_VM, K8S_BM
   #os-proc-sync-enabled: false
 
   ## The proc fs mount path

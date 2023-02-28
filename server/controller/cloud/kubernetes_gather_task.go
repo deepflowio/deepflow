@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather"
-	kubernetes_gather_model "github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
+	kmodel "github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
@@ -31,8 +31,8 @@ type KubernetesGatherTask struct {
 	kCancel          context.CancelFunc
 	interval         uint32
 	kubernetesGather *kubernetes_gather.KubernetesGather
-	resource         kubernetes_gather_model.KubernetesGatherResource
-	basicInfo        kubernetes_gather_model.KubernetesGatherBasicInfo
+	resource         kmodel.KubernetesGatherResource
+	basicInfo        kmodel.KubernetesGatherBasicInfo
 	SubDomainConfig  string // 附属容器集群配置字段config
 }
 
@@ -50,7 +50,7 @@ func NewKubernetesGatherTask(
 
 	kCtx, kCancel := context.WithCancel(ctx)
 	return &KubernetesGatherTask{
-		basicInfo: kubernetes_gather_model.KubernetesGatherBasicInfo{
+		basicInfo: kmodel.KubernetesGatherBasicInfo{
 			Name:                  kubernetesGather.Name,
 			Lcuuid:                kubernetesGather.Lcuuid,
 			ClusterID:             kubernetesGather.ClusterID,
@@ -58,7 +58,7 @@ func NewKubernetesGatherTask(
 			PodNetIPv4CIDRMaxMask: kubernetesGather.PodNetIPv4CIDRMaxMask,
 			PodNetIPv6CIDRMaxMask: kubernetesGather.PodNetIPv6CIDRMaxMask,
 		},
-		resource: kubernetes_gather_model.KubernetesGatherResource{
+		resource: kmodel.KubernetesGatherResource{
 			ErrorState: common.RESOURCE_STATE_CODE_SUCCESS,
 		},
 		kCtx:             kCtx,
@@ -69,11 +69,11 @@ func NewKubernetesGatherTask(
 	}
 }
 
-func (k *KubernetesGatherTask) GetBasicInfo() kubernetes_gather_model.KubernetesGatherBasicInfo {
+func (k *KubernetesGatherTask) GetBasicInfo() kmodel.KubernetesGatherBasicInfo {
 	return k.basicInfo
 }
 
-func (k *KubernetesGatherTask) GetResource() kubernetes_gather_model.KubernetesGatherResource {
+func (k *KubernetesGatherTask) GetResource() kmodel.KubernetesGatherResource {
 	return k.resource
 }
 
@@ -95,17 +95,17 @@ func (k *KubernetesGatherTask) Start() {
 
 func (k *KubernetesGatherTask) run() {
 	log.Infof("kubernetes gather (%s) assemble data starting", k.kubernetesGather.Name)
-	var err error
-	k.resource, err = k.kubernetesGather.GetKubernetesGatherData()
+	kResource, err := k.kubernetesGather.GetKubernetesGatherData()
 	// 这里因为任务内部没有对成功的状态赋值状态码，在这里统一处理了
 	if err != nil {
-		k.resource.ErrorMessage = err.Error()
-		if k.resource.ErrorState == 0 {
-			k.resource.ErrorState = common.RESOURCE_STATE_CODE_EXCEPTION
+		kResource.ErrorMessage = err.Error()
+		if kResource.ErrorState == 0 {
+			kResource.ErrorState = common.RESOURCE_STATE_CODE_EXCEPTION
 		}
 	} else {
-		k.resource.ErrorState = common.RESOURCE_STATE_CODE_SUCCESS
+		kResource.ErrorState = common.RESOURCE_STATE_CODE_SUCCESS
 	}
+	k.resource = kResource
 	log.Infof("kubernetes gather (%s) assemble data complete", k.kubernetesGather.Name)
 }
 

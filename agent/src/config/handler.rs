@@ -21,7 +21,9 @@ use std::collections::HashSet;
 use std::fmt;
 use std::net::IpAddr;
 use std::path::PathBuf;
+use std::process;
 use std::sync::Arc;
+use std::thread;
 use std::time::Duration;
 
 use arc_swap::{access::Map, ArcSwap};
@@ -32,28 +34,23 @@ use log::{info, warn, Level};
 use sysinfo::SystemExt;
 
 #[cfg(target_os = "linux")]
-use super::config::EbpfYamlConfig;
+use super::{
+    config::EbpfYamlConfig, OsProcRegexp, OS_PROC_REGEXP_MATCH_ACTION_ACCEPT,
+    OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME,
+};
 use super::{
     config::{Config, PcapConfig, PortConfig, YamlConfig},
     ConfigError, IngressFlavour, KubernetesPollerType, RuntimeConfig,
 };
-use super::{
-    OsProcRegexp, OS_PROC_REGEXP_MATCH_ACTION_ACCEPT, OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME,
-};
-use crate::common::l7_protocol_log::L7ProtocolBitmap;
-use crate::flow_generator::protocol_logs::SOFA_NEW_RPC_TRACE_CTX_KEY;
-#[cfg(target_os = "linux")]
-use crate::platform::ProcRegRewrite;
-use crate::utils::environment::free_memory_check;
 use crate::{
-    common::{decapsulate::TunnelTypeBitmap, enums::TapType},
+    common::{decapsulate::TunnelTypeBitmap, enums::TapType, l7_protocol_log::L7ProtocolBitmap},
     dispatcher::recv_engine,
     exception::ExceptionHandler,
-    flow_generator::{FlowTimeout, TcpTimeout},
+    flow_generator::{protocol_logs::SOFA_NEW_RPC_TRACE_CTX_KEY, FlowTimeout, TcpTimeout},
     handler::PacketHandlerBuilder,
     trident::{AgentComponents, RunningMode},
     utils::{
-        environment::{get_ctrl_ip_and_mac, running_in_container},
+        environment::{free_memory_check, get_ctrl_ip_and_mac, running_in_container},
         logger::RemoteLogConfig,
     },
 };
@@ -61,6 +58,7 @@ use crate::{
 use crate::{
     dispatcher::recv_engine::af_packet::OptTpacketVersion,
     ebpf::CAP_LEN_MAX,
+    platform::ProcRegRewrite,
     utils::{environment::is_tt_pod, environment::is_tt_workload},
 };
 
@@ -392,6 +390,7 @@ impl fmt::Debug for FlowConfig {
         f.debug_struct("FlowConfig")
             .field("vtap_id", &self.vtap_id)
             .field("trident_type", &self.trident_type)
+            .field("cloud_gateway_traffic", &self.cloud_gateway_traffic)
             .field("collector_enabled", &self.collector_enabled)
             .field(
                 "l7_log_tap_types",
@@ -402,6 +401,7 @@ impl fmt::Debug for FlowConfig {
                     .filter(|&(_, b)| *b)
                     .collect::<Vec<_>>(),
             )
+            .field("hash_slots", &self.hash_slots)
             .field("packet_delay", &self.packet_delay)
             .field("flush_interval", &self.flush_interval)
             .field("flow_timeout", &self.flow_timeout)
@@ -421,6 +421,12 @@ impl fmt::Debug for FlowConfig {
                 "packet_sequence_block_size",
                 &self.packet_sequence_block_size,
             )
+            .field(
+                "l7_protocol_enabled_bitmap",
+                &self.l7_protocol_enabled_bitmap,
+            )
+            // FIXME: this field is too long to log
+            // .field("l7_protocol_parse_port_bitmap", &self.l7_protocol_parse_port_bitmap)
             .finish()
     }
 }
@@ -1286,8 +1292,12 @@ impl ConfigHandler {
             if candidate_config.dispatcher.capture_packet_size
                 != new_config.dispatcher.capture_packet_size
             {
-                if candidate_config.tap_mode == TapMode::Analyzer || cfg!(target_os = "windows") {
-                    todo!()
+                candidate_config.dispatcher.capture_packet_size =
+                    new_config.dispatcher.capture_packet_size;
+                if !components.is_none() {
+                    info!("Capture packet size update, deepflow-agent restart...");
+                    thread::sleep(Duration::from_secs(1));
+                    process::exit(1);
                 }
             }
 
