@@ -31,10 +31,10 @@ use flate2::write::ZlibDecoder;
 #[cfg(target_os = "linux")]
 use deepflow_agent::debug::PlatformMessage;
 use deepflow_agent::debug::{
-    Beacon, Client, Message, Module, PolicyMessage, RpcMessage, BEACON_PORT,
-    DEBUG_QUEUE_IDLE_TIMEOUT, DEEPFLOW_AGENT_BEACON,
+    Beacon, Client, Message, Module, PolicyMessage, RpcMessage, DEBUG_QUEUE_IDLE_TIMEOUT,
+    DEEPFLOW_AGENT_BEACON,
 };
-use public::debug::QueueMessage;
+use public::{consts::DEFAULT_CONTROLLER_PORT, debug::QueueMessage};
 
 const ERR_PORT_MSG: &str = "error: The following required arguments were not provided:
     \t--port <PORT> required arguments were not provided";
@@ -270,12 +270,18 @@ impl Controller {
     1              ubuntu                       ::ffff:127.0.0.1                              42700
     */
     fn list(&self) -> Result<()> {
-        let server = UdpSocket::bind((Ipv6Addr::UNSPECIFIED, BEACON_PORT))?;
+        let beacon_port = if let Some(port) = self.port {
+            port
+        } else {
+            DEFAULT_CONTROLLER_PORT
+        };
+
+        let server = UdpSocket::bind((Ipv6Addr::UNSPECIFIED, beacon_port))?;
         let mut vtap_map = HashSet::new();
 
         println!(
             "deepflow-agent-ctl listening udp port {} to find deepflow-agent\n",
-            BEACON_PORT
+            beacon_port
         );
         println!("{:-<100}", "");
         println!(
