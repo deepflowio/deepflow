@@ -697,6 +697,7 @@ impl ApiWatcher {
         let ns = namespace.as_ref().map(|ns| ns.as_str());
         let watcher_config = WatcherConfig {
             list_limit: config.kubernetes_api_list_limit,
+            list_interval: config.kubernetes_api_list_interval,
         };
 
         let (resource_watchers, task_handles) = loop {

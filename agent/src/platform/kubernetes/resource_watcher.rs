@@ -58,7 +58,6 @@ use crate::utils::stats::{
     self, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption,
 };
 
-const LIST_INTERVAL: Duration = Duration::from_secs(600);
 const REFRESH_INTERVAL: Duration = Duration::from_secs(3600);
 const SLEEP_INTERVAL: Duration = Duration::from_secs(5);
 
@@ -152,6 +151,7 @@ impl RefCountable for WatcherCounter {
 #[derive(Clone)]
 pub struct WatcherConfig {
     pub list_limit: u32,
+    pub list_interval: Duration,
 }
 
 // 发生错误，需要重新构造实例
@@ -262,7 +262,7 @@ where
             while let Ok(Some(event)) = stream.try_next().await {
                 Self::resolve_event(&ctx, &mut encoder, event).await;
             }
-            if last_update.elapsed().unwrap() >= LIST_INTERVAL {
+            if last_update.elapsed().unwrap() >= ctx.config.list_interval {
                 Self::full_sync(&mut ctx, &mut encoder).await;
                 last_update = SystemTime::now();
             }
