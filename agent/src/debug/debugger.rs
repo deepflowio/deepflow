@@ -37,7 +37,7 @@ use super::platform::{PlatformDebugger, PlatformMessage};
 use super::{
     policy::{PolicyDebugger, PolicyMessage},
     rpc::{RpcDebugger, RpcMessage},
-    Beacon, Message, Module, BEACON_INTERVAL, BEACON_PORT, DEEPFLOW_AGENT_BEACON,
+    Beacon, Message, Module, BEACON_INTERVAL, DEEPFLOW_AGENT_BEACON,
 };
 #[cfg(target_os = "linux")]
 use crate::platform::{ApiWatcher, GenericPoller};
@@ -119,6 +119,7 @@ impl Debugger {
                 let running_clone = running.clone();
                 let serialize_conf = config::standard();
                 let agent_mode = conf.load().agent_mode;
+                let beacon_port = conf.load().controller_port;
                 thread::Builder::new()
                     .name("debugger-beacon".to_owned())
                     .spawn(move || {
@@ -153,7 +154,7 @@ impl Debugger {
                                     ]
                                     .concat()
                                     .as_slice(),
-                                    (ip, BEACON_PORT),
+                                    (ip, beacon_port),
                                 ) {
                                     warn!("write beacon to client error: {}", e);
                                 }
@@ -247,6 +248,7 @@ impl Debugger {
                 let running_clone = running.clone();
                 let serialize_conf = config::standard();
                 let agent_mode = conf.load().agent_mode;
+                let beacon_port = conf.load().controller_port;
                 thread::Builder::new()
                     .name("debugger-beacon".to_owned())
                     .spawn(move || {
@@ -282,7 +284,7 @@ impl Debugger {
                                         ]
                                         .concat()
                                         .as_slice(),
-                                        (ip, BEACON_PORT),
+                                        (ip, beacon_port),
                                     ) {
                                         warn!("write beacon to client error: {}", e);
                                     }
@@ -294,7 +296,7 @@ impl Debugger {
                                         ]
                                         .concat()
                                         .as_slice(),
-                                        (ip, BEACON_PORT),
+                                        (ip, beacon_port),
                                     ) {
                                         warn!("write beacon to client error: {}", e);
                                     }
