@@ -249,6 +249,7 @@ pub struct PlatformConfig {
     pub epc_id: u32,
     pub kubernetes_api_enabled: bool,
     pub kubernetes_api_list_limit: u32,
+    pub kubernetes_api_list_interval: Duration,
     pub namespace: Option<String>,
     pub thread_threshold: u32,
     pub tap_mode: TapMode,
@@ -911,6 +912,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 epc_id: conf.epc_id,
                 kubernetes_api_enabled: conf.kubernetes_api_enabled,
                 kubernetes_api_list_limit: conf.yaml_config.kubernetes_api_list_limit,
+                kubernetes_api_list_interval: conf.yaml_config.kubernetes_api_list_interval,
                 namespace: if conf.yaml_config.kubernetes_namespace.is_empty() {
                     None
                 } else {
@@ -1650,32 +1652,38 @@ impl ConfigHandler {
         }
 
         if candidate_config.platform != new_config.platform {
-            if candidate_config.platform.enabled != new_config.platform.enabled {
-                info!("Platform enabled set to {}", new_config.platform.enabled);
+            let old_cfg = &candidate_config.platform;
+            let new_cfg = &new_config.platform;
+
+            if old_cfg.enabled != new_cfg.enabled {
+                info!("Platform enabled set to {}", new_cfg.enabled);
             }
-            let mut restart_api_watcher = false;
-            if candidate_config.platform.kubernetes_api_list_limit
-                != new_config.platform.kubernetes_api_list_limit
-            {
-                restart_api_watcher = true;
+            if old_cfg.kubernetes_api_list_limit != new_cfg.kubernetes_api_list_limit {
                 info!(
                     "Kubernetes API list limit set to {}",
-                    new_config.platform.kubernetes_api_list_limit
+                    new_cfg.kubernetes_api_list_limit
                 );
             }
-            if candidate_config.platform.kubernetes_api_enabled
-                != new_config.platform.kubernetes_api_enabled
-            {
-                // if enabled changed no need to restart
-                restart_api_watcher = false;
+            if old_cfg.kubernetes_api_list_interval != new_cfg.kubernetes_api_list_interval {
+                info!(
+                    "Kubernetes API list interval set to {:?}",
+                    new_cfg.kubernetes_api_list_interval
+                );
+            }
+            if old_cfg.kubernetes_api_enabled != new_cfg.kubernetes_api_enabled {
                 info!(
                     "Kubernetes API enabled set to {}",
-                    new_config.platform.kubernetes_api_enabled
+                    new_cfg.kubernetes_api_enabled
                 );
-            } else if !new_config.platform.kubernetes_api_enabled {
-                // if disabled no need to restart
-                restart_api_watcher = false;
             }
+
+            // restart api watcher if it keeps running and config changes
+            #[cfg(target_os = "linux")]
+            let restart_api_watcher = old_cfg.kubernetes_api_enabled
+                && new_cfg.kubernetes_api_enabled
+                && (old_cfg.kubernetes_api_list_limit != new_cfg.kubernetes_api_list_limit
+                    || old_cfg.kubernetes_api_list_interval
+                        != new_cfg.kubernetes_api_list_interval);
 
             info!(
                 "platform config change from {:#?} to {:#?}",
