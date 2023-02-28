@@ -1307,6 +1307,12 @@ func (i *Issu) setTableVersion(connect *sql.DB, db, table string) error {
 	sql := fmt.Sprintf("ALTER TABLE %s.`%s` COMMENT COLUMN time '%s'",
 		db, table, common.CK_VERSION)
 	_, err := connect.Exec(sql)
+	if err != nil {
+		if strings.Contains(err.Error(), "doesn't exist") {
+			log.Infof("db: %s, table: %s info: %s", db, table, err)
+			return nil
+		}
+	}
 	return err
 }
 
