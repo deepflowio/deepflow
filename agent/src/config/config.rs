@@ -527,6 +527,10 @@ impl YamlConfig {
             c.kubernetes_api_list_limit = 10;
         }
 
+        if c.kubernetes_api_list_interval < Duration::from_secs(600) {
+            c.kubernetes_api_list_interval = Duration::from_secs(600);
+        }
+
         if let Err(e) = c.validate() {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string()));
         }
