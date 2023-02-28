@@ -346,6 +346,8 @@ pub struct YamlConfig {
     pub cloud_gateway_traffic: bool,
     pub kubernetes_namespace: String,
     pub kubernetes_api_list_limit: u32,
+    #[serde(with = "humantime_serde")]
+    pub kubernetes_api_list_interval: Duration,
     pub external_metrics_sender_queue_size: usize,
     pub l7_protocol_inference_max_fail_count: usize,
     pub l7_protocol_inference_ttl: usize,
@@ -604,6 +606,7 @@ impl Default for YamlConfig {
             cloud_gateway_traffic: false,
             kubernetes_namespace: "".into(),
             kubernetes_api_list_limit: 1000,
+            kubernetes_api_list_interval: Duration::from_secs(600),
             external_metrics_sender_queue_size: 1 << 12,
             l7_protocol_inference_max_fail_count: L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT,
             l7_protocol_inference_ttl: L7_PROTOCOL_INFERENCE_TTL,

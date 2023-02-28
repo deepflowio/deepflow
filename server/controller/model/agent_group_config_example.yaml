@@ -409,11 +409,16 @@ vtap_group_id: g-xxxxxx
   ## K8s Namespace
   ## Note: Used when deepflow-agent has only one k8s namespace query permission.
   #kubernetes-namespace:
-  #
+
   ## K8s api list limit
   ## Default: 1000. Options: [10, 4294967296)
   ## Note: Used when limit k8s api list entry size.
   #kubernetes-api-list-limit:
+
+  ## K8s api list interval
+  ## Default: 10m
+  ## Note: Interval of listing resource when watcher idles
+  #kubernetes-api-list-interval:
 
   ## Type of Ingress
   ## Default: kubernetes. Options: kubernetes, openshift
