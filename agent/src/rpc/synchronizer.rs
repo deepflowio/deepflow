@@ -646,7 +646,7 @@ impl Synchronizer {
     }
 
     fn on_response(
-        remote: &IpAddr,
+        remote: (String, u16),
         mut resp: tp::SyncResponse,
         trident_state: &TridentState,
         static_config: &Arc<StaticConfig>,
@@ -660,7 +660,7 @@ impl Synchronizer {
 
         match resp.status() {
             tp::Status::Failed => warn!(
-                "server (ip: {}) responded with {:?}",
+                "server ({:?}) responded with {:?}",
                 remote,
                 tp::Status::Failed
             ),
@@ -670,13 +670,13 @@ impl Synchronizer {
 
         let config = resp.config.take();
         if config.is_none() {
-            warn!("invalid response from {} without config", remote);
+            warn!("invalid response from {:?} without config", remote);
             return;
         }
         let runtime_config = RuntimeConfig::try_from(config.unwrap());
         if let Err(e) = runtime_config {
             warn!(
-                "invalid response from {} with invalid config: {}",
+                "invalid response from {:?} with invalid config: {}",
                 remote, e
             );
             exception_handler.set(Exception::InvalidConfiguration);
@@ -784,10 +784,12 @@ impl Synchronizer {
 
                 if let Err(m) = response {
                     exception_handler.set(Exception::ControllerSocketError);
+                    session.set_request_failed(true);
                     error!("rpc error {:?}", m);
                     time::sleep(RPC_RETRY_INTERVAL).await;
                     continue;
                 }
+                session.set_request_failed(false);
 
                 let mut stream = response.unwrap().into_inner();
                 while running.load(Ordering::SeqCst) {
@@ -810,9 +812,11 @@ impl Synchronizer {
                     match message.status() {
                         tp::Status::Failed => {
                             exception_handler.set(Exception::ControllerSocketError);
+                            let (ip, port) = session.get_current_server();
                             warn!(
-                                "server (ip: {}) responded with {:?}",
-                                session.get_current_server(),
+                                "server (ip: {} port: {}) responded with {:?}",
+                                ip,
+                                port,
                                 tp::Status::Failed
                             );
                             time::sleep(RPC_RETRY_INTERVAL).await;
@@ -840,7 +844,7 @@ impl Synchronizer {
                     }
 
                     Self::on_response(
-                        &session.get_current_server(),
+                        session.get_current_server(),
                         message,
                         &trident_state,
                         &static_config,
@@ -1223,9 +1227,11 @@ impl Synchronizer {
                 let response = session.grpc_sync_with_statsd(request).await;
                 if let Err(m) = response {
                     exception_handler.set(Exception::ControllerSocketError);
+                    let (ip, port) = session.get_current_server();
                     error!(
-                        "grpc sync error, server {} unavailable, status-code {}, message: \"{}\"",
-                        session.get_current_server(),
+                        "grpc sync error, server {} {} unavailable, status-code {}, message: \"{}\"",
+                        ip,
+                        port,
                         m.code(),
                         m.message()
                     );
@@ -1236,7 +1242,7 @@ impl Synchronizer {
                 session.set_request_failed(false);
 
                 Self::on_response(
-                    &session.get_current_server(),
+                    session.get_current_server(),
                     response.unwrap().into_inner(),
                     &trident_state,
                     &static_config,
