@@ -1056,6 +1056,13 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	} else
 		v->extra_data_count = 0;
 
+	if (conn_info->tuple.l4_protocol == IPPROTO_TCP &&
+	    conn_info->protocol == PROTO_DNS &&
+	    conn_info->direction == T_INGRESS &&
+	    conn_info->message_type == MSG_REQUEST) {
+		v->tcp_seq -= 2;
+	}
+
 	v->coroutine_id = trace_key.goid;
 	v->source = extra->source;
 
@@ -1148,7 +1155,25 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 			}
 			bpf_probe_read(&iov_cpy, sizeof(struct iovec),
 				       &args->iov[i]);
-			if (buf == NULL) {
+
+			// FIXME: The length of the TCP message of coredns is
+			// placed in the first iovec, and the other parts are
+			// placed in the second iovec. At present, we only pass
+			// one pointer backward. If the data length part is
+			// passed backward, the data part will be lost. Here we
+			// use A dirty method to skip the part with a length of
+			// two. Currently, when interpreting other protocols,
+			// packets with a length less than 4 are skipped,
+			// without affecting other parts, and can fix the
+			// coredns problem at the same time.
+			//
+			// Current fixes will surely create new problems in the
+			// future. There are two final solutions:
+			// 1. Pass the original pointer backwards and get it
+			// directly wherever the data is needed
+			// 2. Concatenate the various parts in iovec into a
+			// large buffer, and pass this buffer backward.
+			if (buf == NULL && iov_cpy.iov_len != 2) {
 				buf = iov_cpy.iov_base;
 			}
 			length += iov_cpy.iov_len;
