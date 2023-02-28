@@ -423,6 +423,7 @@ pub struct DebugConfig {
     pub vtap_id: u16,
     pub enabled: bool,
     pub controller_ips: Vec<IpAddr>,
+    pub controller_port: u16,
     pub listen_port: u16,
     pub agent_mode: RunningMode,
 }
@@ -923,6 +924,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     .map(|c| c.parse::<IpAddr>().unwrap())
                     .collect(),
                 listen_port: conf.yaml_config.debug_listen_port,
+                controller_port: static_config.controller_port,
                 agent_mode: static_config.agent_mode,
             },
             log: LogConfig {
