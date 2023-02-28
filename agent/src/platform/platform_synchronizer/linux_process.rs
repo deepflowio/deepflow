@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::{collections::HashMap, os::unix::process::CommandExt, process::Command};
@@ -416,35 +417,46 @@ fn get_os_app_tag_by_exec(
     }
 }
 
-fn fill_child_proc_tag_by_parent(procs: &mut Vec<ProcessData>) {
-    let merge_tag = |child_tag: &mut Vec<OsAppTagKV>, parent_tag: &[OsAppTagKV]| {
-        'l: for pt in parent_tag {
-            // ignore key is in exist in child
-            for ct in child_tag.iter() {
-                if ct.key == pt.key {
-                    continue 'l;
-                }
-            }
-            child_tag.push(pt.clone());
-        }
-    };
+/*
+    Fill proc tag from parent tag. preserve child key and val when parent and child key conflict.
+    It will recursive to tag parent before merge the child and parent tag. Therefore, the parent
+    tag can spread to child only if parent process not filter by os-regexp.
 
+*/
+fn fill_child_proc_tag_by_parent(procs: &mut Vec<ProcessData>) {
     // Hashmap<pid, proc_idx> use for fill child proc tag from parent tag
     let mut pid_map = HashMap::new();
     for (i, p) in procs.iter().enumerate() {
         pid_map.insert(p.pid, i);
     }
 
+    let mut tagged_pid = HashSet::new();
     for child_idx in 0..procs.len() {
-        let child_ppid = procs.get(child_idx).unwrap().ppid;
-        let Some(parent_idx) = pid_map.get(&child_ppid) else {
-            continue;
-        };
+        tag_child_along_parent(child_idx, procs, &pid_map, &mut tagged_pid);
+    }
+}
 
+fn tag_child_along_parent(
+    child_idx: usize,
+    procs: &mut Vec<ProcessData>,
+    pid_map: &HashMap<u64, usize>,
+    tagged_pid: &mut HashSet<u64>,
+) {
+    let proc = procs.get(child_idx).unwrap();
+    let pid = proc.pid;
+    let ppid = proc.ppid;
+    if ppid == 0 || tagged_pid.contains(&proc.pid) {
+        return;
+    }
+
+    if let Some(parent_idx) = pid_map.get(&ppid) {
         if child_idx == *parent_idx {
-            error!("pid: {} child pid equal to parent pid", child_ppid);
-            continue;
+            error!("pid: {} child pid equal to parent pid", ppid);
+            return;
         }
+
+        // recursive to tag parent
+        tag_child_along_parent(*parent_idx, procs, pid_map, tagged_pid);
 
         let (child, parent) = if child_idx > *parent_idx {
             let (left, right) = procs.split_at_mut(child_idx);
@@ -459,5 +471,125 @@ fn fill_child_proc_tag_by_parent(procs: &mut Vec<ProcessData>) {
         };
 
         merge_tag(&mut child.os_app_tags, &parent.os_app_tags);
+        tagged_pid.insert(pid);
+    }
+}
+
+fn merge_tag(child_tag: &mut Vec<OsAppTagKV>, parent_tag: &[OsAppTagKV]) {
+    'l: for pt in parent_tag {
+        // ignore key is in exist in child
+        for ct in child_tag.iter() {
+            if ct.key == pt.key {
+                continue 'l;
+            }
+        }
+        child_tag.push(pt.clone());
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::time::Duration;
+
+    use rand::{seq::SliceRandom, thread_rng};
+
+    use crate::platform::platform_synchronizer::linux_process::fill_child_proc_tag_by_parent;
+
+    use super::{OsAppTagKV, ProcessData};
+
+    #[test]
+    fn test_tag_spread() {
+        for _ in 0..20 {
+            let mut procs = vec![
+                ProcessData {
+                    name: "root".into(),
+                    pid: 999,
+                    ppid: 0,
+                    process_name: "root".into(),
+                    cmd: vec!["root".into()],
+                    user_id: 0,
+                    user: "u".into(),
+                    start_time: Duration::ZERO,
+                    os_app_tags: vec![OsAppTagKV {
+                        key: "root_key".into(),
+                        value: "root_val".into(),
+                    }],
+                },
+                ProcessData {
+                    name: "parent".into(),
+                    pid: 99,
+                    ppid: 999,
+                    process_name: "parent".into(),
+                    cmd: vec!["parent".into()],
+                    user_id: 0,
+                    user: "u".into(),
+                    start_time: Duration::ZERO,
+                    os_app_tags: vec![OsAppTagKV {
+                        key: "parent_key".into(),
+                        value: "parent_val".into(),
+                    }],
+                },
+                ProcessData {
+                    name: "child".into(),
+                    pid: 9999,
+                    ppid: 99,
+                    process_name: "child".into(),
+                    cmd: vec!["child".into()],
+                    user_id: 0,
+                    user: "u".into(),
+                    start_time: Duration::ZERO,
+                    os_app_tags: vec![OsAppTagKV {
+                        key: "child_key".into(),
+                        value: "child_val".into(),
+                    }],
+                },
+                ProcessData {
+                    name: "other".into(),
+                    pid: 777,
+                    ppid: 98,
+                    process_name: "other".into(),
+                    cmd: vec!["other".into()],
+                    user_id: 0,
+                    user: "u".into(),
+                    start_time: Duration::ZERO,
+                    os_app_tags: vec![OsAppTagKV {
+                        key: "other_key".into(),
+                        value: "other_val".into(),
+                    }],
+                },
+            ];
+
+            procs.shuffle(&mut thread_rng());
+            fill_child_proc_tag_by_parent(&mut procs);
+
+            procs.sort_by_key(|x| x.pid);
+
+            let parent = procs.get(0).unwrap();
+            let other = procs.get(1).unwrap();
+            let root = procs.get(2).unwrap();
+            let child = procs.get(3).unwrap();
+
+            assert_eq!(other.os_app_tags.len(), 1);
+            assert_eq!(other.os_app_tags[0].key.to_string(), "other_key");
+            assert_eq!(other.os_app_tags[0].value.to_string(), "other_val");
+
+            assert_eq!(root.os_app_tags.len(), 1);
+            assert_eq!(root.os_app_tags[0].key.to_string(), "root_key");
+            assert_eq!(root.os_app_tags[0].value.to_string(), "root_val");
+
+            assert_eq!(parent.os_app_tags.len(), 2);
+            assert_eq!(parent.os_app_tags[0].key.to_string(), "parent_key");
+            assert_eq!(parent.os_app_tags[0].value.to_string(), "parent_val");
+            assert_eq!(parent.os_app_tags[1].key.to_string(), "root_key");
+            assert_eq!(parent.os_app_tags[1].value.to_string(), "root_val");
+
+            assert_eq!(child.os_app_tags.len(), 3);
+            assert_eq!(child.os_app_tags[0].key.to_string(), "child_key");
+            assert_eq!(child.os_app_tags[0].value.to_string(), "child_val");
+            assert_eq!(child.os_app_tags[1].key.to_string(), "parent_key");
+            assert_eq!(child.os_app_tags[1].value.to_string(), "parent_val");
+            assert_eq!(child.os_app_tags[2].key.to_string(), "root_key");
+            assert_eq!(child.os_app_tags[2].value.to_string(), "root_val");
+        }
     }
 }
