@@ -207,19 +207,7 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 	if pcapDataRetention != 0 {
 		configure.PcapDataRetention = proto.Uint32(pcapDataRetention)
 	}
-	localConfig := gVTapInfo.GetVTapLocalConfig(c.GetVTapGroupLcuuid())
-	configure.LocalConfig = &localConfig
-
-	if trisolaris.GetBillingMethod() == BILLING_METHOD_LICENSE {
-		if c.EnabledApplicationMonitoring() == false {
-			configure.L7MetricsEnabled = proto.Bool(false)
-			configure.L7LogStoreTapTypes = nil
-		}
-		if c.EnabledNetworkMonitoring() == false {
-			configure.L4PerformanceEnabled = proto.Bool(false)
-			configure.L4LogTapTypes = nil
-		}
-	}
+	configure.LocalConfig = proto.String(c.GetLocalConfig())
 
 	return configure
 }
