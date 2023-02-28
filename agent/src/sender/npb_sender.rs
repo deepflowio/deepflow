@@ -123,9 +123,9 @@ impl AfpacketSender {
     }
 
     fn serialize_underlay(&self, underlay_l2_opt_size: usize, packet: &mut Vec<u8>) {
-        packet[..MAC_ADDR_LEN].copy_from_slice(&self.underlay_dst_mac.octets());
+        packet[..MAC_ADDR_LEN].copy_from_slice(&self.underlay_dst_mac.octets()[..]);
         packet[MAC_ADDR_LEN..MAC_ADDR_LEN + MAC_ADDR_LEN]
-            .copy_from_slice(&self.underlay_src_mac.octets());
+            .copy_from_slice(&self.underlay_src_mac.octets()[..]);
 
         match self.underlay_src_ip {
             IpAddr::V4(addr) => {

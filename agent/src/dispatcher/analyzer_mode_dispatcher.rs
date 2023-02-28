@@ -252,21 +252,6 @@ impl AnalyzerModeDispatcher {
                             let tunnel_type_bitmap = tunnel_type_bitmap.lock().unwrap().clone();
                             let mut tunnel_info = TunnelInfo::default();
 
-                            #[cfg(target_os = "windows")]
-                            let (decap_length, tap_type) = match Self::decap_tunnel(
-                                packet.raw[..raw_length].as_mut(),
-                                &base.tap_type_handler,
-                                &mut tunnel_info,
-                                tunnel_type_bitmap,
-                            ) {
-                                Ok(d) => d,
-                                Err(e) => {
-                                    base.counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
-                                    warn!("decap_tunnel failed: {:?}", e);
-                                    continue;
-                                }
-                            };
-                            #[cfg(target_os = "linux")]
                             let (decap_length, tap_type) = match Self::decap_tunnel(
                                 &mut packet.raw[..raw_length],
                                 &tap_type_handler,
@@ -576,10 +561,7 @@ impl AnalyzerModeDispatcher {
                 continue;
             }
 
-            #[cfg(target_os = "linux")]
             let (packet, timestamp) = recved.unwrap();
-            #[cfg(target_os = "windows")]
-            let (mut packet, timestamp) = recved.unwrap();
 
             // From here on, ANALYZER mode is different from LOCAL mode
             base.counter.rx.fetch_add(1, Ordering::Relaxed);
@@ -610,12 +592,13 @@ impl AnalyzerModeDispatcher {
         info!("Stopped dispatcher {}", base.log_id);
     }
 
-    pub(super) fn decap_tunnel(
-        packet: &mut [u8],
+    pub(super) fn decap_tunnel<T: AsMut<[u8]>>(
+        mut packet: T,
         tap_type_handler: &TapTypeHandler,
         tunnel_info: &mut TunnelInfo,
         bitmap: TunnelTypeBitmap,
     ) -> Result<(usize, TapType)> {
+        let packet = packet.as_mut();
         if packet[BILD_FLAGS_OFFSET] == BILD_FLAGS as u8 {
             // bild will mark ERSPAN traffic and reduce the Trident process
             // XXX: In the current implementation mode, when using bild to mark the ERSPAN offset, it does not support the scenario that there are other tunnel encapsulation in the inner layer
@@ -630,7 +613,7 @@ impl AnalyzerModeDispatcher {
             return Ok((overlay_offset, tap_type));
         }
 
-        BaseDispatcher::decap_tunnel(&mut packet.to_vec(), tap_type_handler, tunnel_info, bitmap)
+        BaseDispatcher::decap_tunnel(packet, tap_type_handler, tunnel_info, bitmap)
     }
 
     pub(super) fn prepare_flow(
