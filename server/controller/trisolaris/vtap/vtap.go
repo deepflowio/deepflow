@@ -468,9 +468,6 @@ func (v *VTapInfo) convertConfig(configs []*models.VTapGroupConfiguration) {
 		tv := reflect.ValueOf(config).Elem()
 		for i := 0; i < tv.NumField(); i++ {
 			field := tt.Field(i)
-			if field.Name == "YamlConfig" {
-				continue
-			}
 			if JudgeField(field.Name) == true {
 				typeOfVTapConfiguration.Field(i).Set(tv.Field(i))
 				continue

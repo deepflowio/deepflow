@@ -26,10 +26,12 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/golang/protobuf/proto"
+	"gopkg.in/yaml.v2"
 
 	"github.com/deepflowio/deepflow/message/trident"
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
+	cmodel "github.com/deepflowio/deepflow/server/controller/model"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/metadata"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
@@ -273,6 +275,69 @@ func (c *VTapCache) convertLicenseFunctions() {
 	if Find[int](licenseFunctionsInt, VTAP_LICENSE_FUNCTION_TRAFFIC_DISTRIBUTION) {
 		c.enabledTrafficDistribution.Set()
 	}
+}
+
+func (c *VTapCache) GetLocalConfig() string {
+	configure := c.GetVTapConfig()
+	if configure == nil {
+		return ""
+	}
+
+	return configure.YamlConfig
+}
+
+var NetWorkL7ProtocolEnabled = []string{"HTTP", "DNS"}
+
+func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
+	if configure == nil {
+		return
+	}
+	if c.EnabledApplicationMonitoring() == false &&
+		c.EnabledNetworkMonitoring() == false {
+		configure.L7MetricsEnabled = DISABLED
+		configure.ConvertedL7LogStoreTapTypes = nil
+	}
+
+	if c.EnabledNetworkMonitoring() == false {
+		configure.L4PerformanceEnabled = DISABLED
+		configure.ConvertedL4LogTapTypes = nil
+	}
+
+	// modify static config
+	if configure.YamlConfig == "" {
+		return
+	}
+	yamlConfig := &cmodel.StaticConfig{}
+	err := yaml.Unmarshal([]byte(configure.YamlConfig), yamlConfig)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
+	if c.EnabledNetworkMonitoring() == true &&
+		c.EnabledApplicationMonitoring() == false {
+		filter7ProtocolEnabled := []string{}
+		for _, protocol := range yamlConfig.L7ProtocolEnabled {
+			if Find[string](NetWorkL7ProtocolEnabled, protocol) {
+				filter7ProtocolEnabled = append(filter7ProtocolEnabled, protocol)
+			}
+		}
+		yamlConfig.L7ProtocolEnabled = filter7ProtocolEnabled
+	} else if c.EnabledNetworkMonitoring() == false &&
+		c.EnabledApplicationMonitoring() == false {
+		yamlConfig.L7ProtocolEnabled = nil
+	}
+
+	if c.EnabledApplicationMonitoring() == false {
+		yamlConfig.BpfDisabled = proto.Bool(true)
+	}
+
+	b, err := yaml.Marshal(yamlConfig)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	configure.YamlConfig = string(b)
 }
 
 func (c *VTapCache) EnabledApplicationMonitoring() bool {
@@ -759,6 +824,9 @@ func (c *VTapCache) initVTapConfig(v *VTapInfo) {
 			realConfig = *v.realDefaultConfig
 		}
 	}
+	if v.config.BillingMethod == BILLING_METHOD_LICENSE {
+		c.modifyVTapConfigByLicense(&realConfig)
+	}
 	c.updateVTapConfig(&realConfig)
 }
 
@@ -780,6 +848,9 @@ func (c *VTapCache) updateVTapConfigFromDB(v *VTapInfo) {
 		}
 	}
 
+	if v.config.BillingMethod == BILLING_METHOD_LICENSE {
+		c.modifyVTapConfigByLicense(&newConfig)
+	}
 	c.updateVTapConfig(&newConfig)
 }
 
