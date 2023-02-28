@@ -50,7 +50,7 @@ impl Capture {
             .iter()
             .map(|(h, p)| {
                 let mut meta = MetaPacket::empty();
-                meta.update(
+                meta.update_without_raw_copy(
                     &p,
                     true,
                     true,

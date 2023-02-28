@@ -99,17 +99,6 @@ func (c *Cloud) GetBasicInfo() model.BasicInfo {
 }
 
 func (c *Cloud) GetResource() model.Resource {
-	if c.basicInfo.Type != common.KUBERNETES {
-		if c.resource.ErrorState != 1 || len(c.resource.VMs) == 0 {
-			return model.Resource{
-				ErrorState:   c.resource.ErrorState,
-				ErrorMessage: c.resource.ErrorMessage,
-			}
-		}
-		c.getSubDomainData()
-	}
-	c.appendResourceProcess()
-	c.resource.Verified = true
 	return c.resource
 }
 
@@ -134,24 +123,43 @@ func (c *Cloud) getCloudGatherInterval() int {
 }
 
 func (c *Cloud) getCloudData() {
+	var cResource model.Resource
 	if c.basicInfo.Type != common.KUBERNETES {
 		var err error
-		c.resource, err = c.platform.GetCloudData()
+		cResource, err = c.platform.GetCloudData()
 		// 这里因为任务内部没有对成功的状态赋值状态码，在这里统一处理了
-		if err != nil {
-			c.resource.ErrorMessage = err.Error()
-			if c.resource.ErrorState == 0 {
-				c.resource.ErrorState = common.RESOURCE_STATE_CODE_EXCEPTION
+		if err == nil {
+			if cResource.ErrorState == 0 {
+				cResource.Verified = true
+				cResource.ErrorState = common.RESOURCE_STATE_CODE_SUCCESS
 			}
+			cResource.SubDomainResources = c.getSubDomainData(cResource)
 		} else {
-			if c.resource.ErrorState == 0 {
-				c.resource.ErrorState = common.RESOURCE_STATE_CODE_SUCCESS
+			if cResource.ErrorState == 0 {
+				cResource.ErrorState = common.RESOURCE_STATE_CODE_EXCEPTION
+			}
+			cResource = model.Resource{
+				ErrorMessage: err.Error(),
+				ErrorState:   cResource.ErrorState,
 			}
 		}
 	} else {
-		c.getKubernetesData()
+		cResource = c.getKubernetesData()
 	}
-	c.appendAddtionalResourcesData()
+
+	if len(cResource.VMs) == 0 {
+		cResource = model.Resource{
+			ErrorState:   cResource.ErrorState,
+			ErrorMessage: cResource.ErrorMessage,
+		}
+	}
+
+	if cResource.Verified {
+		cResource = c.appendAddtionalResourcesData(cResource)
+		cResource = c.appendResourceProcess(cResource)
+	}
+
+	c.resource = cResource
 }
 
 func (c *Cloud) run() {
@@ -305,66 +313,68 @@ func (c *Cloud) runKubernetesGatherTask() {
 	}
 }
 
-func (c *Cloud) appendAddtionalResourcesData() {
+func (c *Cloud) appendAddtionalResourcesData(resource model.Resource) model.Resource {
 	var dbItem mysql.DomainAdditionalResource
 	result := mysql.Db.Where("domain = ?", c.basicInfo.Lcuuid).Find(&dbItem)
 	if result.Error != nil {
 		log.Errorf("domain (lcuuid: %s) db query additional resources failed: %s", c.basicInfo.Lcuuid, result.Error.Error())
-		return
+		return resource
 	} else if result.RowsAffected == 0 {
 		log.Debugf("domain (lcuuid: %s) has no additional resources to append", c.basicInfo.Lcuuid)
-		return
+		return resource
 	}
 	var additionalResource model.AdditionalResource
 	err := json.Unmarshal([]byte(dbItem.Content), &additionalResource)
 	if err != nil {
 		log.Errorf("domain (lcuuid: %s) json unmarshal content failed: %s", err.Error())
-		return
+		return resource
 	}
-	c.resource.AZs = append(c.resource.AZs, additionalResource.AZs...)
-	c.resource.VPCs = append(c.resource.VPCs, additionalResource.VPCs...)
-	c.resource.Networks = append(c.resource.Networks, additionalResource.Subnets...)
-	c.resource.Subnets = append(c.resource.Subnets, additionalResource.SubnetCIDRs...)
-	c.resource.Hosts = append(c.resource.Hosts, additionalResource.Hosts...)
-	c.resource.VMs = append(c.resource.VMs, additionalResource.CHosts...)
-	c.resource.VInterfaces = append(c.resource.VInterfaces, additionalResource.VInterfaces...)
-	c.resource.IPs = append(c.resource.IPs, additionalResource.IPs...)
-	c.appendCloudTags(additionalResource.CHostCloudTags, additionalResource.PodNamespaceCloudTags)
-	c.resource.LBs = append(c.resource.LBs, additionalResource.LB...)
-	c.resource.LBListeners = append(c.resource.LBListeners, additionalResource.LBListeners...)
-	c.resource.LBTargetServers = append(c.resource.LBTargetServers, additionalResource.LBTargetServers...)
+	resource.AZs = append(resource.AZs, additionalResource.AZs...)
+	resource.VPCs = append(resource.VPCs, additionalResource.VPCs...)
+	resource.Networks = append(resource.Networks, additionalResource.Subnets...)
+	resource.Subnets = append(resource.Subnets, additionalResource.SubnetCIDRs...)
+	resource.Hosts = append(resource.Hosts, additionalResource.Hosts...)
+	resource.VMs = append(resource.VMs, additionalResource.CHosts...)
+	resource.VInterfaces = append(resource.VInterfaces, additionalResource.VInterfaces...)
+	resource.IPs = append(resource.IPs, additionalResource.IPs...)
+	resource = c.appendCloudTags(resource, additionalResource.CHostCloudTags, additionalResource.PodNamespaceCloudTags)
+	resource.LBs = append(resource.LBs, additionalResource.LB...)
+	resource.LBListeners = append(resource.LBListeners, additionalResource.LBListeners...)
+	resource.LBTargetServers = append(resource.LBTargetServers, additionalResource.LBTargetServers...)
+	return resource
 }
 
-func (c *Cloud) appendCloudTags(chostCloudTags model.UUIDToCloudTags, podNamespaceCloudTags model.UUIDToCloudTags) {
-	for i, chost := range c.resource.VMs {
+func (c *Cloud) appendCloudTags(resource model.Resource, chostCloudTags model.UUIDToCloudTags, podNamespaceCloudTags model.UUIDToCloudTags) model.Resource {
+	for i, chost := range resource.VMs {
 		if value, ok := chostCloudTags[chost.Lcuuid]; ok {
-			c.resource.VMs[i].CloudTags = value
+			resource.VMs[i].CloudTags = value
 		}
 	}
-	for i, podNamespace := range c.resource.PodNamespaces {
+	for i, podNamespace := range resource.PodNamespaces {
 		if value, ok := podNamespaceCloudTags[podNamespace.Lcuuid]; ok {
-			c.resource.PodNamespaces[i].CloudTags = value
+			resource.PodNamespaces[i].CloudTags = value
 		}
 	}
+	return resource
 }
 
-func (c *Cloud) appendResourceProcess() {
+func (c *Cloud) appendResourceProcess(resource model.Resource) model.Resource {
 
 	if genesis.GenesisService == nil {
 		log.Error("genesis service is nil")
-		return
+		return resource
 	}
 
 	genesisSyncData, err := genesis.GenesisService.GetGenesisSyncResponse()
 	if err != nil {
 		log.Errorf("get genesis sync data failed: %s", err.Error())
-		return
+		return resource
 	}
 
 	vtapIDToLcuuid, err := common.GetVTapSubDomainMappingByDomain(c.basicInfo.Lcuuid)
 	if err != nil {
 		log.Errorf("domain (%s) add process failed: %s", c.basicInfo.Name, err.Error())
-		return
+		return resource
 	}
 
 	for _, sProcess := range genesisSyncData.Processes {
@@ -384,15 +394,16 @@ func (c *Cloud) appendResourceProcess() {
 			OSAPPTags:   sProcess.OSAPPTags,
 		}
 		if lcuuid == "" {
-			c.resource.Processes = append(c.resource.Processes, process)
+			resource.Processes = append(resource.Processes, process)
 			continue
 		}
-		subDomainResource, ok := c.resource.SubDomainResources[lcuuid]
-		if !ok {
+		subDomainResource, ok := resource.SubDomainResources[lcuuid]
+		if !ok || !subDomainResource.Verified {
 			continue
 		}
-		process.SubDomainLcuuid = subDomainResource.PodNodes[0].SubDomainLcuuid
+		process.SubDomainLcuuid = lcuuid
 		subDomainResource.Processes = append(subDomainResource.Processes, process)
-		c.resource.SubDomainResources[lcuuid] = subDomainResource
+		resource.SubDomainResources[lcuuid] = subDomainResource
 	}
+	return resource
 }
