@@ -229,7 +229,10 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 #define HTTPV2_STATIC_TABLE_POST_IDX    0x3
 #define HTTPV2_STATIC_TABLE_PATH_1_IDX  0x4
 #define HTTPV2_STATIC_TABLE_PATH_2_IDX  0x5
-#define HTTPV2_LOOP_MAX 9
+// In some cases, the compiled binary instructions exceed the limit, the
+// specific reason is unknown, reduce the number of cycles of http2, which
+// may cause http2 packet loss
+#define HTTPV2_LOOP_MAX 8
 /*
  *  HTTPV2_FRAME_READ_SZ取值考虑以下3部分：
  *  (1) fixed 9-octet header
