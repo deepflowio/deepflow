@@ -871,6 +871,8 @@ pub struct Flow {
     pub otel_service: Option<String>,
     #[serde(skip)]
     pub otel_instance: Option<String>,
+    #[serde(skip)]
+    pub endpoint: Option<String>,
 }
 
 fn tunnel_is_none(t: &TunnelField) -> bool {

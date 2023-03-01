@@ -42,6 +42,7 @@ message MiniField {
     uint32 signal_source = 22;
     string app_service = 23;
     string app_instance = 24;
+    string endpoint = 25;
 }
 
 message MiniTag {
