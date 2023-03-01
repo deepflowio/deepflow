@@ -107,7 +107,6 @@ struct Packet {
     raw: Vec<u8>,
     original_length: u32,
     raw_length: u32,
-    tap_type: TapType,
 }
 
 pub(super) struct AnalyzerModeDispatcher {
@@ -309,7 +308,7 @@ impl AnalyzerModeDispatcher {
                                 }
                             }
 
-                            output_batch.push((packet.tap_type, meta_packet));
+                            output_batch.push((tap_type, meta_packet));
                         }
                         if let Err(e) = sender.send_all(&mut output_batch) {
                             debug!(
@@ -555,7 +554,6 @@ impl AnalyzerModeDispatcher {
                 raw: packet.data.to_vec(),
                 original_length: packet.capture_length as u32,
                 raw_length: packet.data.len() as u32,
-                tap_type: TapType::Cloud,
             };
             batch.push(info);
         }
