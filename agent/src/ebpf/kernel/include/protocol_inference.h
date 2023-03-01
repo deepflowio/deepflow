@@ -423,6 +423,43 @@ static __inline enum message_type infer_http_message(const char *buf,
 	return MSG_UNKNOWN;
 }
 
+static __inline void save_prev_data(const char *buf,
+				    struct conn_info_t *conn_info)
+{
+	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+		*(__u32 *) conn_info->socket_info_ptr->prev_data =
+		    *(__u32 *) buf;
+		conn_info->socket_info_ptr->prev_data_len = 4;
+		conn_info->socket_info_ptr->direction = conn_info->direction;
+	} else {
+		*(__u32 *) conn_info->prev_buf = *(__u32 *) buf;
+		conn_info->prev_count = 4;
+	}
+}
+
+// MySQL、Kafka推断需要之前的4字节数据
+// MySQL and Kafka need the previous 4 bytes of data for inference
+static __inline void check_and_fetch_prev_data(struct conn_info_t *conn_info)
+{
+	if (conn_info->socket_info_ptr != NULL &&
+	    conn_info->socket_info_ptr->prev_data_len != 0) {
+		/*
+		 * For adjacent read/write in the same direction.
+		 */
+		if (conn_info->direction ==
+		    conn_info->socket_info_ptr->direction) {
+			*(__u32 *) conn_info->prev_buf =
+			    *(__u32 *) conn_info->socket_info_ptr->prev_data;
+			conn_info->prev_count = 4;
+		}
+
+		/*
+		 * Clean up previously stored data.
+		 */
+		conn_info->socket_info_ptr->prev_data_len = 0;
+	}
+}
+
 // MySQL packet:
 //      0         8        16        24        32
 //      +---------+---------+---------+---------+
@@ -441,6 +478,11 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 {
 	if (!is_protocol_enabled(PROTO_MYSQL)) {
 		return MSG_UNKNOWN;
+	}
+
+	if (count == 4) {
+		save_prev_data(buf, conn_info);
+		return MSG_PRESTORE;
 	}
 
 	static const __u8 kComQuery = 0x03;
@@ -1173,6 +1215,11 @@ static __inline enum message_type infer_kafka_message(const char *buf,
 		return MSG_UNKNOWN;
 	}
 
+	if (count == 4) {
+		save_prev_data(buf, conn_info);
+		return MSG_PRESTORE;
+	}
+
 	bool is_first = true, use_prev_buf;
 	if (!kafka_data_check_len(count, buf, conn_info, &use_prev_buf))
 		return MSG_UNKNOWN;
@@ -1353,45 +1400,19 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 	if (inferred_message.protocol != MSG_UNKNOWN)
 		return inferred_message;
 
-	if (count == 4) {
-		if (is_socket_info_valid(conn_info->socket_info_ptr)) {
-			*(__u32 *) conn_info->socket_info_ptr->prev_data =
-			    *(__u32 *) infer_buf;
-			conn_info->socket_info_ptr->prev_data_len = 4;
-			conn_info->socket_info_ptr->direction =
-			    conn_info->direction;
-		} else {
-			*(__u32 *) conn_info->prev_buf = *(__u32 *) infer_buf;
-			conn_info->prev_count = 4;
-		}
-
-		inferred_message.type = MSG_PRESTORE;
-		return inferred_message;
-	}
-	// MySQL、Kafka推断需要之前的4字节数据
-	if (conn_info->socket_info_ptr != NULL && 
-	    conn_info->socket_info_ptr->prev_data_len != 0) {
-		if (conn_info->direction !=
-		    conn_info->socket_info_ptr->direction)
-			return inferred_message;
-
-		*(__u32 *) conn_info->prev_buf =
-		    *(__u32 *) conn_info->socket_info_ptr->prev_data;
-		conn_info->prev_count = 4;
-
-		/*
-		 * 上次存储的数据清忽略掉
-		 */
-		conn_info->socket_info_ptr->prev_data_len = 0;
-	}
+	check_and_fetch_prev_data(conn_info);
 
 	if ((inferred_message.type =
 		    infer_mysql_message(infer_buf, count,
 					conn_info)) != MSG_UNKNOWN) {
+		if (inferred_message.type == MSG_PRESTORE)
+			return inferred_message;
 		inferred_message.protocol = PROTO_MYSQL;
 	} else if ((inferred_message.type =
 		    infer_kafka_message(infer_buf, count,
 					conn_info)) != MSG_UNKNOWN) {
+		if (inferred_message.type == MSG_PRESTORE)
+			return inferred_message;
 		inferred_message.protocol = PROTO_KAFKA;
 	} else if ((inferred_message.type =
 		    infer_sofarpc_message(infer_buf, count,
