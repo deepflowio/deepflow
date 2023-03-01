@@ -309,6 +309,7 @@ pub struct Tagger {
     pub tag_value: u16,
     pub otel_service: Option<String>,
     pub otel_instance: Option<String>,
+    pub endpoint: Option<String>,
     pub signal_source: SignalSource,
 }
 
@@ -342,6 +343,7 @@ impl Default for Tagger {
             tag_value: 0,
             otel_service: None,
             otel_instance: None,
+            endpoint: None,
             signal_source: SignalSource::default(),
         }
     }
@@ -398,6 +400,7 @@ impl From<Tagger> for metric::MiniTag {
                 signal_source: t.signal_source as u32,
                 app_service: t.otel_service.unwrap_or_default(),
                 app_instance: t.otel_instance.unwrap_or_default(),
+                endpoint: t.endpoint.unwrap_or_default(),
             }),
         }
     }

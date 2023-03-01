@@ -346,6 +346,7 @@ fn fill_tagged_flow(
     tagged_flow.flow.signal_source = SignalSource::OTel;
     tagged_flow.flow.otel_service = otel_service;
     tagged_flow.flow.otel_instance = otel_instance;
+    tagged_flow.flow.endpoint = Some(span.name.clone());
     tagged_flow.flow.eth_type = eth_type;
     tagged_flow.flow.tap_side = TapSide::from(SpanKind::from_i32(span.kind).unwrap());
     if tagged_flow.flow.tap_side == TapSide::Rest {
