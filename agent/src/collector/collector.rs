@@ -614,6 +614,7 @@ impl Stash {
             signal_source: flow.signal_source,
             otel_service: flow.otel_service.clone(),
             otel_instance: flow.otel_instance.clone(),
+            endpoint: flow.endpoint.clone(),
             ..Default::default()
         };
         let l7_metrics_enabled = self.context.config.load().l7_metrics_enabled;
@@ -757,6 +758,7 @@ impl Stash {
             signal_source: flow.signal_source,
             otel_service: flow.otel_service.clone(),
             otel_instance: flow.otel_instance.clone(),
+            endpoint: flow.endpoint.clone(),
             ..Default::default()
         };
 
