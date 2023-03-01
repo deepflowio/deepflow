@@ -1490,7 +1490,7 @@ func (c *Cache) DeleteProcesses(lcuuids []string) {
 func (c *Cache) refreshProcesses() {
 	log.Infof(refreshResource(RESOURCE_TYPE_PROCESS_EN))
 	var processes []*mysql.Process
-	if err := mysql.Db.Where(c.getConditionDomain()).Find(&processes).Error; err != nil {
+	if err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid).Find(&processes).Error; err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_PROCESS_EN, err))
 		return
 	}
