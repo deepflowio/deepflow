@@ -60,7 +60,7 @@ func ParseAlias(node sqlparser.SQLNode) string {
 		return fmt.Sprintf("`%s`", alias)
 	}
 	// K8s Labels字带上``
-	if strings.HasPrefix(alias, "k8s.label") {
+	if strings.HasPrefix(alias, "k8s.label") || strings.HasPrefix(alias, "os.app") || strings.HasPrefix(alias, "cloud.tag") {
 		return fmt.Sprintf("`%s`", alias)
 	}
 	// 外部字段带上``
