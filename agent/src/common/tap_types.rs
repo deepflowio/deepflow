@@ -19,10 +19,7 @@ use std::{
     fmt,
     net::Ipv4Addr,
     str::FromStr,
-    sync::{
-        atomic::{AtomicU16, Ordering},
-        Mutex,
-    },
+    sync::RwLock,
 };
 
 use log::warn;
@@ -34,19 +31,19 @@ use super::{enums::TapType, XflowKey};
 const VLAN_MAX: u16 = 4096;
 
 pub struct TapTyper {
-    packet: [AtomicU16; (VLAN_MAX + 1) as usize],
-    xflow: Mutex<HashMap<XflowKey, TapType>>,
+    packet: RwLock<[u16; (VLAN_MAX + 1) as usize]>,
+    xflow: RwLock<HashMap<XflowKey, TapType>>,
     //xflowmissed 没有删除操作，只有插入操作，这是业务要求(仅打印一次)，问过苑超说key不会一直增长，应该不会有内存泄漏问题
-    _xflow_missed: Mutex<HashSet<XflowKey>>,
+    _xflow_missed: RwLock<HashSet<XflowKey>>,
 }
 
 impl TapTyper {
-    const TAP_TYPE_ANY: AtomicU16 = AtomicU16::new(0);
+    const TAP_TYPE_ANY: u16 = 0;
     pub fn new() -> Self {
         Self {
-            packet: [Self::TAP_TYPE_ANY; (VLAN_MAX + 1) as usize],
-            xflow: Mutex::new(HashMap::new()),
-            _xflow_missed: Mutex::new(HashSet::new()),
+            packet: RwLock::new([Self::TAP_TYPE_ANY; (VLAN_MAX + 1) as usize]),
+            xflow: RwLock::new(HashMap::new()),
+            _xflow_missed: RwLock::new(HashSet::new()),
         }
     }
 
@@ -55,37 +52,35 @@ impl TapTyper {
             return None;
         }
 
-        let p = &self.packet[vlan as usize];
-        let tt = p.load(Ordering::Relaxed).try_into().unwrap();
-        if tt == TapType::Any {
+        let p = self.packet.read().unwrap()[vlan as usize];
+        if p == Self::TAP_TYPE_ANY {
             warn!("vlan {}'s tap_type is unknown", vlan);
-            p.store(TapType::Unknown.into(), Ordering::Relaxed);
+            self.packet.write().unwrap()[vlan as usize] = TapType::Unknown.into();
             None
         } else {
-            Some(tt)
+            Some(p.try_into().unwrap())
         }
     }
 
     pub fn get_tap_type_by_xflow_key(&self, xflow_key: &XflowKey) -> Option<TapType> {
-        let xflow_guard = self.xflow.lock().unwrap();
+        let xflow_guard = self.xflow.read().unwrap();
         if xflow_guard.contains_key(xflow_key) {
             return xflow_guard.get(xflow_key).map(|t| *t);
         }
         drop(xflow_guard);
 
-        let mut xflow_missed_guard = self._xflow_missed.lock().unwrap();
+        let xflow_missed_guard = self._xflow_missed.read().unwrap();
         if !xflow_missed_guard.contains(xflow_key) {
-            xflow_missed_guard.insert(*xflow_key);
+            drop(xflow_missed_guard);
+            self._xflow_missed.write().unwrap().insert(*xflow_key);
             warn!("xflowKey {}'s tap_type is unknown", xflow_key);
         }
         None
     }
 
     pub fn on_tap_types_change(&self, tap_types: Vec<trident::TapType>) {
-        for tap in self.packet.iter() {
-            tap.store(0, Ordering::Relaxed);
-        }
         let mut xflow = HashMap::new();
+        let mut packet = [0u16; (VLAN_MAX + 1) as usize];
         for tap_type in tap_types {
             match tap_type.packet_type() {
                 trident::PacketType::Packet => {
@@ -99,7 +94,7 @@ impl TapTyper {
                     if let Err(e) = TapType::try_from(tap) {
                         warn!("parse tap_type from protocol buffer TapType error: {}", e);
                     } else {
-                        self.packet[vlan as usize].store(tap, Ordering::Relaxed);
+                        packet[vlan as usize] = tap;
                     }
                 }
                 _ => {
@@ -131,7 +126,8 @@ impl TapTyper {
             }
         }
 
-        *self.xflow.lock().unwrap() = xflow;
+        *self.packet.write().unwrap() = packet;
+        *self.xflow.write().unwrap() = xflow;
     }
 }
 
@@ -145,10 +141,12 @@ impl fmt::Display for TapTyper {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let packet: Vec<(u16, TapType)> = self
             .packet
+            .read()
+            .unwrap()
             .iter()
             .enumerate()
             .filter_map(|(vlan, tap_type)| {
-                let tap_type = TapType::try_from(tap_type.load(Ordering::Relaxed)).unwrap();
+                let tap_type = TapType::try_from(*tap_type).unwrap();
                 if tap_type != TapType::Any {
                     Some((vlan as u16, tap_type))
                 } else {
@@ -157,7 +155,7 @@ impl fmt::Display for TapTyper {
             })
             .collect();
 
-        let xflow_str = self.xflow.lock().unwrap().iter().fold(
+        let xflow_str = self.xflow.read().unwrap().iter().fold(
             "".to_string(),
             |mut result, (key, tap_type)| {
                 result.push_str(format!("[{},{}]", *key, *tap_type).as_str());
