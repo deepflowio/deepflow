@@ -54,7 +54,7 @@ use crate::{
         enums::TapType,
         tagged_flow::{BoxedTaggedFlow, TaggedFlow},
         tap_types::TapTyper,
-        FeatureFlags, DEFAULT_CONF_FILE, DEFAULT_INGESTER_PORT, DEFAULT_LOG_RETENTION,
+        FeatureFlags, DEFAULT_INGESTER_PORT, DEFAULT_LOG_RETENTION, DEFAULT_TRIDENT_CONF_FILE,
         FREE_SPACE_REQUIREMENT, NORMAL_EXIT_WITH_RESTART,
     },
     config::PcapConfig,
@@ -205,7 +205,7 @@ impl Trident {
                     Err(e) => {
                         if let ConfigError::YamlConfigInvalid(_) = e {
                             // try to load config file from trident.yaml to support upgrading from trident
-                            if let Ok(conf) = Config::load_from_file(DEFAULT_CONF_FILE) {
+                            if let Ok(conf) = Config::load_from_file(DEFAULT_TRIDENT_CONF_FILE) {
                                 conf
                             } else {
                                 // return the original error instead of loading trident conf
