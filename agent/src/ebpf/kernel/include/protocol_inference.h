@@ -1557,6 +1557,8 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 #endif
 		    infer_mysql_message(infer_buf, count,
 					conn_info)) != MSG_UNKNOWN) {
+		if (inferred_message.type == MSG_PRESTORE)
+			return inferred_message;
 		inferred_message.protocol = PROTO_MYSQL;
 #ifdef LINUX_VER_5_2_PLUS
 	} else if (skip_proto != PROTO_KAFKA && (inferred_message.type =
@@ -1565,6 +1567,8 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 #endif
 		    infer_kafka_message(infer_buf, count,
 					conn_info)) != MSG_UNKNOWN) {
+		if (inferred_message.type == MSG_PRESTORE)
+			return inferred_message;
 		inferred_message.protocol = PROTO_KAFKA;
 #ifdef LINUX_VER_5_2_PLUS
 	} else if (skip_proto != PROTO_SOFARPC && (inferred_message.type =
