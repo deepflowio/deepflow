@@ -1113,6 +1113,12 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	v->thread_trace_id = thread_trace_id;
 	bpf_get_current_comm(v->comm, sizeof(v->comm));
 
+	if (conn_info->tuple.l4_protocol == IPPROTO_TCP &&
+	    conn_info->protocol == PROTO_DNS && conn_info->prev_count == 2) {
+		v->tcp_seq -= 2;
+		conn_info->prev_count = 0;
+	}
+
 	if (conn_info->prev_count > 0) {
 		// 注意这里没有调整v->syscall_len和v->len我们会在用户层做。
 		v->extra_data = *(__u32 *)conn_info->prev_buf;
