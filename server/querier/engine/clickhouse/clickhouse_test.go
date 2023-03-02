@@ -196,6 +196,9 @@ var (
 	}, {
 		input:  "select Sum(session_length) from l7_flow_log",
 		output: "SELECT SUM(if(request_length>0,request_length,0)+if(response_length>0,response_length,0)) AS `Sum(session_length)` FROM flow_log.`l7_flow_log` LIMIT 10000",
+	}, {
+		input:  "select region_0 from l7_flow_log where region regexp '系统*'",
+		output: "SELECT dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0` FROM flow_log.`l7_flow_log` PREWHERE (toUInt64(region_id) IN (SELECT id FROM flow_tag.region_map WHERE match(name,'系统*'))) LIMIT 10000",
 	},
 	}
 )
