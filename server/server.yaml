@@ -486,3 +486,12 @@ ingester:
 
   ## unit: s
   #flow-tag-cache-flush-timeout: 600
+
+profile:
+  # profile http listenport
+  listen-port: 20419
+
+  # querier相关配置
+  querier:
+    host: querier
+    port: 20416
