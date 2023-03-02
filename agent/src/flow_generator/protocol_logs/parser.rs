@@ -46,6 +46,8 @@ use crate::{
     metric::document::TapSide,
     utils::stats::{Counter, CounterType, CounterValue, RefCountable},
 };
+#[cfg(target_os = "linux")]
+use public::utils::string::get_string_from_chars;
 use public::{
     queue::{DebugSender, Error, Receiver},
     utils::net::MacAddr,
@@ -119,18 +121,7 @@ impl MetaAppProto {
         #[cfg(target_os = "linux")]
         if meta_packet.signal_source == SignalSource::EBPF {
             let is_src = meta_packet.lookup_key.l2_end_0;
-            let mut end_index = meta_packet.process_kname.len();
-            for (i, char) in meta_packet.process_kname.iter().enumerate() {
-                if *char == b'\0' {
-                    end_index = i;
-                    break;
-                }
-            }
-            let process_name = meta_packet.process_kname[..end_index]
-                .iter()
-                .map(|x| if x.is_ascii_graphic() { *x } else { b'.' })
-                .collect::<Vec<u8>>();
-            let process_name = String::from_utf8(process_name).unwrap();
+            let process_name = get_string_from_chars(&meta_packet.process_kname);
             if is_src {
                 base_info.process_id_0 = meta_packet.process_id;
                 base_info.process_kname_0 = process_name;

@@ -21,15 +21,15 @@ use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 use arc_swap::access::Access;
-use libc::c_int;
+use libc::{c_int, c_ulonglong};
 use log::{debug, error, info, warn};
 
 use super::{Error, Result};
-use crate::common::ebpf::EbpfType;
 use crate::common::l7_protocol_log::{
     get_all_protocol, L7ProtocolBitmap, L7ProtocolParserInterface,
 };
 use crate::common::meta_packet::MetaPacket;
+use crate::common::proc_event::{BoxedProcEvents, EventType, ProcEvent};
 use crate::common::TaggedFlow;
 use crate::config::handler::{EbpfAccess, EbpfConfig, LogParserAccess};
 use crate::config::FlowAccess;
@@ -255,11 +255,26 @@ pub struct EbpfCollector {
 
 static mut SWITCH: bool = false;
 static mut SENDER: Option<DebugSender<Box<MetaPacket>>> = None;
+static mut PROC_EVENT_SENDER: Option<DebugSender<BoxedProcEvents>> = None;
 
 impl EbpfCollector {
     extern "C" fn ebpf_callback(sd: *mut ebpf::SK_BPF_DATA) {
         unsafe {
             if !SWITCH || SENDER.is_none() {
+                return;
+            }
+            let event_type = EventType::from((*sd).source);
+            if event_type != EventType::OtherEvent {
+                // EbpfType like TracePoint, TlsUprobe, GoHttp2Uprobe belong to other events
+                let event = ProcEvent::from_ebpf(sd, event_type);
+                if event.is_err() {
+                    warn!("proc event parse from ebpf error: {}", event.unwrap_err());
+                    return;
+                }
+                let event = event.unwrap();
+                if let Err(e) = PROC_EVENT_SENDER.as_mut().unwrap().send(event) {
+                    warn!("event send ebpf error: {:?}", e);
+                }
                 return;
             }
             let packet = MetaPacket::from_ebpf(sd);
@@ -268,10 +283,6 @@ impl EbpfCollector {
                 return;
             }
             let packet = packet.unwrap();
-            if packet.ebpf_type == EbpfType::IOEvent {
-                // FIXME: Remove this code when the feature is stable
-                return;
-            }
             if let Err(e) = SENDER.as_mut().unwrap().send(Box::new(packet)) {
                 warn!("meta packet send ebpf error: {:?}", e);
             }
@@ -281,6 +292,7 @@ impl EbpfCollector {
     fn ebpf_init(
         config: &EbpfConfig,
         sender: DebugSender<Box<MetaPacket<'static>>>,
+        proc_event_sender: DebugSender<BoxedProcEvents>,
         l7_protocol_enabled_bitmap: L7ProtocolBitmap,
     ) -> Result<()> {
         // ebpf内核模块初始化
@@ -377,6 +389,25 @@ impl EbpfCollector {
                 return Err(Error::EbpfInitError);
             }
 
+            if ebpf::set_io_event_collect_mode(config.ebpf.io_event_collect_mode as c_int) != 0 {
+                info!(
+                    "ebpf set_io_event_collect_mode error: {}",
+                    config.ebpf.io_event_collect_mode
+                );
+                return Err(Error::EbpfInitError);
+            }
+
+            if ebpf::set_io_event_minimal_duration(
+                config.ebpf.io_event_minimal_duration.as_nanos() as c_ulonglong
+            ) != 0
+            {
+                info!(
+                    "ebpf set_io_event_minimal_duration error: {:?}",
+                    config.ebpf.io_event_minimal_duration
+                );
+                return Err(Error::EbpfInitError);
+            }
+
             if ebpf::running_socket_tracer(
                 Self::ebpf_callback,                       /* 回调接口 rust -> C */
                 config.ebpf.thread_num as i32, /* 工作线程数，是指用户态有多少线程参与数据处理 */
@@ -395,6 +426,7 @@ impl EbpfCollector {
         unsafe {
             SWITCH = false;
             SENDER = Some(sender);
+            PROC_EVENT_SENDER = Some(proc_event_sender);
         }
 
         Ok(())
@@ -458,6 +490,7 @@ impl EbpfCollector {
         policy_getter: PolicyGetter,
         output: DebugSender<Box<MetaAppProto>>,
         flow_output: DebugSender<Box<TaggedFlow>>,
+        proc_event_output: DebugSender<BoxedProcEvents>,
         queue_debugger: &QueueDebugger,
         stats_collector: Arc<stats::Collector>,
     ) -> Result<Box<Self>> {
@@ -470,7 +503,12 @@ impl EbpfCollector {
         let (sender, receiver, _) =
             bounded_with_debug(4096, "0-ebpf-packet-to-ebpf-dispatcher", queue_debugger);
 
-        Self::ebpf_init(&ebpf_config, sender, ebpf_config.l7_protocol_enabled_bitmap)?;
+        Self::ebpf_init(
+            &ebpf_config,
+            sender,
+            proc_event_output,
+            ebpf_config.l7_protocol_enabled_bitmap,
+        )?;
         Self::ebpf_on_config_change(ebpf::CAP_LEN_MAX);
 
         info!("ebpf collector initialized.");

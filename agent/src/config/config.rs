@@ -275,6 +275,9 @@ pub struct EbpfYamlConfig {
     pub max_trace_entries: usize,
     pub socket_map_max_reclaim: usize,
     pub go_tracing_timeout: usize,
+    pub io_event_collect_mode: usize,
+    #[serde(with = "humantime_serde")]
+    pub io_event_minimal_duration: Duration,
 }
 
 impl Default for EbpfYamlConfig {
@@ -291,6 +294,8 @@ impl Default for EbpfYamlConfig {
             kprobe_whitelist: EbpfKprobeWhitelist::default(),
             uprobe_proc_regexp: UprobeProcRegExp::default(),
             go_tracing_timeout: 0,
+            io_event_collect_mode: 1,
+            io_event_minimal_duration: Duration::from_millis(1),
         }
     }
 }
