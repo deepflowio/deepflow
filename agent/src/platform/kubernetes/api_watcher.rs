@@ -351,30 +351,35 @@ impl ApiWatcher {
 
                     for api_resource in api_resources.unwrap().resources {
                         let resource_name = api_resource.name;
-                        if !RESOURCES.iter().any(|&r| r == resource_name) {
+                        if watchers.contains_key(&resource_name) {
+                            debug!(
+                                "found another {} api in group {}, skipped",
+                                resource_name.as_str(),
+                                version.group_version.as_str()
+                            );
                             continue;
                         }
 
+                        let Some(index) = RESOURCES.iter().position(|&r| r == resource_name) else {
+                            continue;
+                        };
                         info!(
                             "found {} api in group {}",
                             resource_name.as_str(),
                             version.group_version.as_str()
                         );
 
-                        if resource_name != RESOURCES[RESOURCES.len() - 1] {
-                            let index = RESOURCES.iter().position(|&r| r == resource_name).unwrap();
-                            if let Some(watcher) = watcher_factory.new_watcher(
-                                RESOURCES[index],
-                                PB_RESOURCES[index],
-                                namespace,
-                                stats_collector,
-                                watcher_config,
-                            ) {
-                                watchers.insert(resource_name, watcher);
-                            }
-                            continue;
+                        if resource_name == "ingresses" {
+                            ingress_groups.push(version.group_version.clone());
+                        } else if let Some(watcher) = watcher_factory.new_watcher(
+                            RESOURCES[index],
+                            PB_RESOURCES[index],
+                            namespace,
+                            stats_collector,
+                            watcher_config,
+                        ) {
+                            watchers.insert(resource_name, watcher);
                         }
-                        ingress_groups.push(version.group_version.clone());
                     }
                 }
                 let ingress_watcher = if is_openshift_route {
