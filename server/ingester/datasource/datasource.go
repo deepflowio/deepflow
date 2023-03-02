@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/deepflowio/deepflow/server/ingester/config"
@@ -90,6 +91,15 @@ func respFailed(w http.ResponseWriter, desc string) {
 	log.Warningf("resp failed: %s", desc)
 }
 
+func respPending(w http.ResponseWriter, desc string) {
+	resp, _ := json.Marshal(JsonResp{
+		OptStatus:   "PENDING",
+		Description: desc,
+	})
+	w.Write(resp)
+	log.Infof("resp pending: %s", desc)
+}
+
 type AddBody struct {
 	BaseRP       string `json:"base-rp"`
 	DB           string `json:"db"`
@@ -151,7 +161,11 @@ func (m *DatasourceManager) rpMod(w http.ResponseWriter, r *http.Request) {
 
 	err = m.Handle(b.DB, "mod", "", b.Name, "", "", 0, b.Duration)
 	if err != nil {
-		respFailed(w, err.Error())
+		if strings.Contains(err.Error(), "try again") {
+			respPending(w, err.Error())
+		} else {
+			respFailed(w, err.Error())
+		}
 		return
 	}
 
