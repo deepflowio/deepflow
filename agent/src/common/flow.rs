@@ -867,6 +867,12 @@ pub struct Flow {
     pub tap_side: TapSide,
     #[serde(skip)]
     pub acl_gids: Vec<u16>,
+    #[serde(skip)]
+    pub otel_service: Option<String>,
+    #[serde(skip)]
+    pub otel_instance: Option<String>,
+    #[serde(skip)]
+    pub endpoint: Option<String>,
 }
 
 fn tunnel_is_none(t: &TunnelField) -> bool {
@@ -1027,14 +1033,14 @@ impl fmt::Display for Flow {
             "flow_id:{} signal_source:{:?} tunnel:{} close_type:{:?} is_active_service:{} is_new_flow:{} queue_hash:{} \
         syn_seq:{} synack_seq:{} last_keepalive_seq:{} last_keepalive_ack:{} flow_stat_time:{:?} \
         \t start_time:{:?} end_time:{:?} duration:{:?} \
-        \t vlan:{} eth_type:{:?} reversed:{} flow_key:{} \
+        \t vlan:{} eth_type:{:?} reversed:{} otel_service:{:?} otel_instance:{:?} flow_key:{} \
         \n\t flow_metrics_peers_src:{:?} \
         \n\t flow_metrics_peers_dst:{:?} \
         \n\t flow_perf_stats:{:?}",
             self.flow_id, self.signal_source, self.tunnel, self.close_type, self.is_active_service, self.is_new_flow, self.queue_hash,
             self.syn_seq, self.synack_seq, self.last_keepalive_seq, self.last_keepalive_ack, self.flow_stat_time,
             self.start_time, self.end_time, self.duration,
-            self.vlan, self.eth_type, self.reversed, self.flow_key,
+            self.vlan, self.eth_type, self.reversed, self.otel_service, self.otel_instance, self.flow_key,
             self.flow_metrics_peers[0],
             self.flow_metrics_peers[1],
             self.flow_perf_stats
@@ -1095,6 +1101,15 @@ pub fn get_direction(
             Direction::ClientProcessToServer,
             Direction::ServerProcessToClient,
         );
+        if src_ep.is_l2_end {
+            dst_direct = Direction::None
+        } else if dst_ep.is_l2_end {
+            src_direct = Direction::None
+        }
+        return [src_direct, dst_direct];
+    } else if flow.signal_source == SignalSource::OTel {
+        let (mut src_direct, mut dst_direct) =
+            (Direction::ClientAppToServer, Direction::ServerAppToClient);
         if src_ep.is_l2_end {
             dst_direct = Direction::None
         } else if dst_ep.is_l2_end {

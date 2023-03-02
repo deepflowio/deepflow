@@ -50,7 +50,7 @@ use crate::{
         enums::TapType,
         tagged_flow::{BoxedTaggedFlow, TaggedFlow},
         tap_types::TapTyper,
-        FeatureFlags, DEFAULT_CONF_FILE, DEFAULT_INGESTER_PORT, DEFAULT_LOG_RETENTION,
+        FeatureFlags, DEFAULT_INGESTER_PORT, DEFAULT_LOG_RETENTION, DEFAULT_TRIDENT_CONF_FILE,
         FREE_SPACE_REQUIREMENT, NORMAL_EXIT_WITH_RESTART,
     },
     config::PcapConfig,
@@ -210,7 +210,7 @@ impl Trident {
                     Err(e) => {
                         if let ConfigError::YamlConfigInvalid(_) = e {
                             // try to load config file from trident.yaml to support upgrading from trident
-                            if let Ok(conf) = Config::load_from_file(DEFAULT_CONF_FILE) {
+                            if let Ok(conf) = Config::load_from_file(DEFAULT_TRIDENT_CONF_FILE) {
                                 conf
                             } else {
                                 // return the original error instead of loading trident conf
@@ -1706,12 +1706,12 @@ impl AgentComponents {
             collectors.push(collector);
         }
 
+        let ebpf_dispatcher_id = dispatchers.len();
         #[cfg(target_os = "linux")]
         #[allow(unused)]
         let mut ebpf_collector = None;
         #[cfg(target_os = "linux")]
         if candidate_config.tap_mode != TapMode::Analyzer {
-            let ebpf_dispatcher_id = dispatchers.len();
             let (flow_sender, flow_receiver, counter) = queue::bounded_with_debug(
                 yaml_config.flow_queue_size,
                 "1-tagged-flow-to-quadruple-generator",
@@ -1806,6 +1806,38 @@ impl AgentComponents {
             true,
         );
 
+        let mut otel_metrics_collect_sender = None;
+        if feature_flags.contains(FeatureFlags::OTEL_METRICS) {
+            let otel_dispatcher_id = ebpf_dispatcher_id + 1;
+            let (otel_metrics_sender, otel_metrics_receiver, counter) = queue::bounded_with_debug(
+                yaml_config.flow_queue_size,
+                "1-tagged-flow-to-quadruple-generator",
+                &queue_debugger,
+            );
+            otel_metrics_collect_sender = Some(otel_metrics_sender);
+            stats_collector.register_countable(
+                "queue",
+                Countable::Owned(Box::new(counter)),
+                vec![
+                    StatsOption::Tag("module", "1-otel-metrics-to-collector".to_string()),
+                    StatsOption::Tag("index", otel_dispatcher_id.to_string()),
+                ],
+            );
+            let collector = Self::new_collector(
+                otel_dispatcher_id,
+                stats_collector.clone(),
+                otel_metrics_receiver,
+                toa_sender.clone(),
+                None,
+                metrics_sender.clone(),
+                MetricsType::SECOND | MetricsType::MINUTE,
+                config_handler,
+                &queue_debugger,
+                &synchronizer,
+            );
+            collectors.push(collector);
+        }
+
         let prometheus_queue_name = "1-prometheus-to-sender";
         let (prometheus_sender, prometheus_receiver, counter) = queue::bounded_with_debug(
             yaml_config.external_metrics_sender_queue_size,
@@ -1895,12 +1927,15 @@ impl AgentComponents {
         let (external_metrics_server, external_metrics_counter) = MetricServer::new(
             otel_sender,
             compressed_otel_sender,
+            otel_metrics_collect_sender,
             prometheus_sender,
             telegraf_sender,
             profile_sender,
             candidate_config.metric_server.port,
             exception_handler.clone(),
             candidate_config.metric_server.compressed,
+            candidate_config.platform.epc_id,
+            policy_getter,
         );
 
         stats_collector.register_countable(

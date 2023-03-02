@@ -38,10 +38,9 @@ var log = logging.MustGetLogger("common")
 
 func ParseAlias(node sqlparser.SQLNode) string {
 	alias := sqlparser.String(node)
-	// 判断字符串首尾是否为单引号或者反引号
-	if (strings.HasPrefix(alias, "'") && strings.HasSuffix(alias, "'")) ||
-		(strings.HasPrefix(alias, "`") && strings.HasSuffix(alias, "`")) {
-		alias = strings.Trim(strings.Trim(alias, "'"), "`")
+	// 判断字符串首尾是否为反引号
+	if strings.HasPrefix(alias, "`") && strings.HasSuffix(alias, "`") {
+		alias = strings.Trim(alias, "`")
 	} else {
 		return alias
 	}
@@ -61,7 +60,7 @@ func ParseAlias(node sqlparser.SQLNode) string {
 		return fmt.Sprintf("`%s`", alias)
 	}
 	// K8s Labels字带上``
-	if strings.HasPrefix(alias, "k8s.label") {
+	if strings.HasPrefix(alias, "k8s.label") || strings.HasPrefix(alias, "os.app") || strings.HasPrefix(alias, "cloud.tag") {
 		return fmt.Sprintf("`%s`", alias)
 	}
 	// 外部字段带上``

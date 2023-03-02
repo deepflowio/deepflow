@@ -16,7 +16,7 @@
 
 use std::collections::HashMap;
 use std::io::{Read, Write};
-use std::net::{IpAddr, Ipv6Addr, SocketAddr, TcpStream};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, TcpStream};
 use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
@@ -42,12 +42,22 @@ use tokio::{
     time,
 };
 
+use crate::common::flow::{FlowPerfStats, L7PerfStats, SignalSource};
+use crate::common::lookup_key::LookupKey;
+use crate::common::{TaggedFlow, Timestamp};
 use crate::exception::ExceptionHandler;
+use crate::flow_generator::protocol_logs::L7ResponseStatus;
+use crate::metric::document::TapSide;
+use crate::policy::PolicyGetter;
+
 use public::counter::{Counter, CounterType, CounterValue, OwnedCountable};
+use public::enums::{EthernetType, L4Protocol};
+use public::l7_protocol::L7Protocol;
+use public::proto::integration::opentelemetry::proto::common::v1::any_value::Value::IntValue;
+use public::proto::integration::opentelemetry::proto::trace::v1::Span;
 use public::proto::integration::opentelemetry::proto::{
-    common::v1::any_value::Value,
-    common::v1::{AnyValue, KeyValue},
-    trace::v1::TracesData,
+    common::v1::{any_value::Value::StringValue, AnyValue, KeyValue},
+    trace::v1::{span::SpanKind, TracesData},
 };
 use public::proto::{metric, trident::Exception};
 use public::queue::{DebugSender, Error};
@@ -196,7 +206,14 @@ async fn aggregate_with_catch_exception(
     })
 }
 
-fn decode_otel_trace_data(peer_addr: SocketAddr, data: Vec<u8>) -> Result<Vec<u8>, GenericError> {
+fn decode_otel_trace_data(
+    peer_addr: SocketAddr,
+    data: Vec<u8>,
+    local_epc_id: u32,
+    policy_getter: Arc<PolicyGetter>,
+    is_collect: bool,
+) -> Result<(Vec<u8>, Vec<Box<TaggedFlow>>), GenericError> {
+    let mut tagged_flow: Vec<Box<TaggedFlow>> = vec![];
     let mut d = TracesData::decode(data.as_slice())?;
     // 因为collector传过来traceData的全部resource都有"app.host.ip"的属性，所以只检查第一个resource有没有“app.host.ip”即可，
     // sdk传过来的traceData因没有该属性则要补上(key: “app.host.ip”, value: 对端IP)属性值
@@ -204,43 +221,295 @@ fn decode_otel_trace_data(peer_addr: SocketAddr, data: Vec<u8>) -> Result<Vec<u8
     // Because all the resources of the traceData passed by the collector have the attribute "app.host.ip",
     // only check whether the first resource has "app.host.ip". The traceData passed by the sdk does not have this attribute.
     //  Fill in the (key: "app.host.ip", value: peer IP) attribute value
-    let mut skip_verify_ip = false;
+    let mut skip_verify_ip = true;
+
+    let mut ip: IpAddr;
     let host_ip = KeyValue {
         key: "app.host.ip".into(),
         value: Some(AnyValue {
             value: {
                 let ip_str = match peer_addr.ip() {
-                    IpAddr::V4(s) => s.to_string(),
+                    IpAddr::V4(s) => {
+                        ip = IpAddr::V4(s);
+                        s.to_string()
+                    }
                     IpAddr::V6(s) => match s.to_ipv4() {
-                        Some(v4) => v4.to_string(),
-                        None => s.to_string(),
+                        // Some values are like: "::ffff:0.0.0.0"it is either an IPv4-compatible address
+                        Some(v4) => {
+                            ip = IpAddr::V4(v4);
+                            v4.to_string()
+                        }
+                        None => {
+                            ip = IpAddr::V6(s);
+                            s.to_string()
+                        }
                     },
                 };
-                Some(Value::StringValue(ip_str))
+                Some(StringValue(ip_str))
             },
         }),
     };
+
     for resource_span in d.resource_spans.iter_mut() {
+        let mut otel_service = None;
+        let mut otel_instance = None;
         if let Some(resource) = resource_span.resource.as_mut() {
+            for attr in resource.attributes.iter() {
+                match attr.key.as_str() {
+                    "app.host.ip" => {
+                        skip_verify_ip = false;
+                        // the format such as: ResourceSpans { resource: Some(Resource {attributes:[KeyValue { key: "app.host.ip", value: Some(AnyValue { value: Some(StringValue("0.0.0.0")) }) }]
+                        if let Some(value) = attr.value.clone() {
+                            if let Some(StringValue(val)) = value.value {
+                                if let Ok(ip_addr) = val.parse::<IpAddr>() {
+                                    ip = ip_addr;
+                                }
+                            }
+                        }
+                    }
+                    "service.name" => {
+                        // the format such as: ResourceSpans { resource: Some(Resource {attributes:[KeyValue { key: "service.name", value: Some(AnyValue { value: Some(StringValue("someservice")) }) }]
+                        if let Some(value) = attr.value.clone() {
+                            if let Some(StringValue(val)) = value.value {
+                                otel_service = Some(val);
+                            }
+                        }
+                    }
+                    "service.instance.id" => {
+                        // the format such as: ResourceSpans { resource: Some(Resource {attributes:[KeyValue { key: "service.instance.id", value: Some(AnyValue { value: Some(StringValue("someserviceinstabceid")) }) }]
+                        if let Some(value) = attr.value.clone() {
+                            if let Some(StringValue(val)) = value.value {
+                                otel_instance = Some(val);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
             if skip_verify_ip {
+                // if resource.attributes doesn't have the "app.host.ip" attribute, add this attribute.
                 resource.attributes.push(host_ip.clone());
-            } else if resource
-                .attributes
-                .iter()
-                .find(|attr| attr.key.as_str() == "app.host.ip")
-                .is_some()
-            {
-                debug!("send otel collector traces_data to sender: {:?}", d);
-                return Ok(data);
-            } else {
-                skip_verify_ip = true;
-                resource.attributes.push(host_ip.clone());
+            }
+        }
+        // collect otel metrics
+        if is_collect {
+            for scope_spans in resource_span.scope_spans.iter() {
+                for span in scope_spans.spans.iter() {
+                    match fill_tagged_flow(
+                        span,
+                        ip,
+                        policy_getter.clone(),
+                        local_epc_id,
+                        otel_service.clone(),
+                        otel_instance.clone(),
+                    ) {
+                        Some(f) => {
+                            tagged_flow.push(Box::new(f));
+                        }
+                        None => continue,
+                    }
+                }
             }
         }
     }
     let sdk_data = d.encode_to_vec();
     debug!("send otel sdk traces_data to sender: {:?}", d);
-    return Ok(sdk_data);
+    return Ok((sdk_data, tagged_flow));
+}
+
+fn fill_tagged_flow(
+    span: &Span,
+    ip: IpAddr,
+    policy_getter: Arc<PolicyGetter>,
+    local_epc_id: u32,
+    otel_service: Option<String>,
+    otel_instance: Option<String>,
+) -> Option<TaggedFlow> {
+    let (mut ip0, mut ip1, eth_type) = if ip.is_ipv4() {
+        (
+            IpAddr::from(Ipv4Addr::UNSPECIFIED),
+            IpAddr::from(Ipv4Addr::UNSPECIFIED),
+            EthernetType::Ipv4,
+        )
+    } else {
+        (
+            IpAddr::from(Ipv6Addr::UNSPECIFIED),
+            IpAddr::from(Ipv6Addr::UNSPECIFIED),
+            EthernetType::Ipv6,
+        )
+    };
+    let mut l4_protocol = L4Protocol::Tcp;
+    let mut l7_protocol = L7Protocol::Unknown;
+    let mut status = L7ResponseStatus::NotExist;
+
+    let mut tagged_flow = TaggedFlow::default();
+    tagged_flow.flow.signal_source = SignalSource::OTel;
+    tagged_flow.flow.otel_service = otel_service;
+    tagged_flow.flow.otel_instance = otel_instance;
+    tagged_flow.flow.endpoint = Some(span.name.clone());
+    tagged_flow.flow.eth_type = eth_type;
+    tagged_flow.flow.tap_side = TapSide::from(SpanKind::from_i32(span.kind).unwrap());
+    if tagged_flow.flow.tap_side == TapSide::Rest {
+        // if tap_side is neither ClientApp nor ServerApp, which means that this span is not the span of calling between services
+        return None;
+    }
+    if tagged_flow.flow.tap_side == TapSide::ClientApp {
+        ip0 = ip;
+    } else {
+        ip1 = ip;
+    }
+    for attr in &span.attributes {
+        match attr.key.as_str() {
+            // According to https://opentelemetry.io/docs/reference/specification/trace/semantic_conventions/
+            // the format such as:
+            // {
+            //     "scope_spans": [
+            //         {
+            //             "spans": [
+            //                 {
+            //                     "attributes": [
+            //                         {
+            //                             "key": "rpc.system",
+            //                             "value": "grpc"
+            //                         }
+            //                     ]
+            //                 }
+            //             ]
+            //         }
+            //     ]
+            // }
+            "http.scheme" | "db.system" | "rpc.system" | "messaging.system"
+            | "messaging.protocol" => {
+                if let Some(value) = attr.value.clone() {
+                    if let Some(StringValue(val)) = value.value {
+                        l7_protocol = L7Protocol::from(val);
+                    }
+                }
+            }
+            // Format as above, "net.peer.ip": "0.0.0.0"
+            "net.peer.ip" => {
+                if let Some(value) = attr.value.clone() {
+                    if let Some(StringValue(val)) = value.value {
+                        if let Ok(ip_addr) = val.parse::<IpAddr>() {
+                            if tagged_flow.flow.tap_side == TapSide::ClientApp {
+                                ip1 = ip_addr;
+                            } else {
+                                ip0 = ip_addr;
+                            }
+                        }
+                    }
+                }
+            }
+            // Format as above, "net.transport": "ip_tcp"
+            "net.transport" => {
+                if let Some(value) = attr.value.clone() {
+                    if let Some(StringValue(val)) = value.value {
+                        l4_protocol = L4Protocol::from(val);
+                    }
+                }
+            }
+            // Format as above, "http.status_code": 200
+            "http.status_code" => {
+                if let Some(value) = attr.value.clone() {
+                    if let Some(IntValue(val)) = value.value {
+                        status = http_code_to_response_status(val);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    (
+        tagged_flow.flow.flow_key.ip_src,
+        tagged_flow.flow.flow_key.ip_dst,
+    ) = (ip0, ip1);
+
+    // According to https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/api.md#set-status
+    // Unset = 0, Ok = 1, Error = 2
+    if status == L7ResponseStatus::NotExist && span.status.is_some() {
+        status = match span.status.as_ref().unwrap().code {
+            1 => L7ResponseStatus::Ok,
+            2 => L7ResponseStatus::ServerError,
+            _ => L7ResponseStatus::NotExist,
+        }
+    }
+
+    let start_time = span.start_time_unix_nano;
+    let end_time = span.end_time_unix_nano;
+    tagged_flow.flow.flow_stat_time = Timestamp::from_nanos(start_time);
+    let rrt = if end_time > start_time {
+        (end_time - start_time) / 1000 // unit: μs
+    } else {
+        0
+    };
+    let flow_perf_stats = FlowPerfStats {
+        tcp: Default::default(),
+        l7: L7PerfStats {
+            request_count: 1, // Because both TapSide::ClientApp and TapSide::ServerApp will have request, and the request_count is always 1
+            response_count: if tagged_flow.flow.tap_side == TapSide::ServerApp {
+                1
+            } else {
+                0
+            },
+            err_client_count: if status == L7ResponseStatus::ClientError {
+                1
+            } else {
+                0
+            },
+            err_server_count: if status == L7ResponseStatus::ServerError {
+                1
+            } else {
+                0
+            },
+            err_timeout: 0,
+            rrt_count: if rrt > 0 { 1 } else { 0 },
+            rrt_sum: if rrt > 0 { rrt } else { 0 },
+            rrt_max: if rrt > 0 { rrt as u32 } else { 0 },
+        },
+        l4_protocol,
+        l7_protocol,
+    };
+    tagged_flow.flow.flow_perf_stats = Some(Box::new(flow_perf_stats));
+    let mut lookup_key = LookupKey {
+        src_ip: tagged_flow.flow.flow_key.ip_src,
+        dst_ip: tagged_flow.flow.flow_key.ip_dst,
+        ..Default::default()
+    };
+    let (endpoint, _) = policy_getter
+        .policy()
+        .lookup_all_by_epc(&mut lookup_key, local_epc_id as i32);
+    let (src_info, dst_info) = (endpoint.src_info, endpoint.dst_info);
+    let peer_src = &mut tagged_flow.flow.flow_metrics_peers[0];
+    peer_src.is_device = src_info.is_device;
+    peer_src.is_vip_interface = src_info.is_vip_interface;
+    peer_src.is_l2_end = src_info.l2_end;
+    peer_src.is_l3_end = src_info.l3_end;
+    peer_src.l3_epc_id = src_info.l3_epc_id;
+    peer_src.is_vip = src_info.is_vip;
+    peer_src.is_local_mac = src_info.is_local_mac;
+    peer_src.is_local_ip = src_info.is_local_ip;
+    peer_src.nat_real_ip = tagged_flow.flow.flow_key.ip_src;
+    let peer_dst = &mut tagged_flow.flow.flow_metrics_peers[1];
+    peer_dst.is_device = dst_info.is_device;
+    peer_dst.is_vip_interface = dst_info.is_vip_interface;
+    peer_dst.is_l2_end = dst_info.l2_end;
+    peer_dst.is_l3_end = dst_info.l3_end;
+    peer_dst.l3_epc_id = dst_info.l3_epc_id;
+    peer_dst.is_vip = dst_info.is_vip;
+    peer_dst.is_local_mac = dst_info.is_local_mac;
+    peer_dst.is_local_ip = dst_info.is_local_ip;
+    peer_dst.nat_real_ip = tagged_flow.flow.flow_key.ip_dst;
+    Some(tagged_flow)
+}
+
+fn http_code_to_response_status(status_code: i64) -> L7ResponseStatus {
+    if status_code >= 400 && status_code <= 499 {
+        L7ResponseStatus::ClientError
+    } else if status_code >= 500 && status_code <= 600 {
+        L7ResponseStatus::ServerError
+    } else {
+        L7ResponseStatus::Ok
+    }
 }
 
 fn compress_data(input: Vec<u8>) -> std::io::Result<Vec<u8>> {
@@ -255,12 +524,15 @@ async fn handler(
     req: Request<Body>,
     otel_sender: DebugSender<OpenTelemetry>,
     compressed_otel_sender: DebugSender<OpenTelemetryCompressed>,
+    otel_metrics_collect_sender: Option<DebugSender<Box<TaggedFlow>>>,
     prometheus_sender: DebugSender<PrometheusMetric>,
     telegraf_sender: DebugSender<TelegrafMetric>,
     profile_sender: DebugSender<Profile>,
     exception_handler: ExceptionHandler,
     compressed: bool,
     counter: Arc<CompressedMetric>,
+    local_epc_id: u32,
+    policy_getter: Arc<PolicyGetter>,
 ) -> Result<Response<Body>, GenericError> {
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/") => {
@@ -280,15 +552,29 @@ async fn handler(
                 }
             };
             let tracing_data = decode_metric(whole_body, &part.headers)?;
-            let decode_data = decode_otel_trace_data(peer_addr, tracing_data).map_err(|e| {
+            let mut decode_data = decode_otel_trace_data(
+                peer_addr,
+                tracing_data,
+                local_epc_id,
+                policy_getter,
+                otel_metrics_collect_sender.is_some(),
+            )
+            .map_err(|e| {
                 debug!("decode otel trace data error: {}", e);
                 e
             })?;
+            if let Some(sender) = otel_metrics_collect_sender {
+                if !decode_data.1.is_empty() {
+                    if let Err(Error::Terminated(..)) = sender.send_all(&mut decode_data.1) {
+                        warn!("sender queue has terminated");
+                    }
+                }
+            }
             if compressed {
                 counter
                     .uncompressed
-                    .fetch_add(decode_data.len() as u64, Ordering::Relaxed);
-                let compressed_data = compress_data(decode_data)?;
+                    .fetch_add(decode_data.0.len() as u64, Ordering::Relaxed);
+                let compressed_data = compress_data(decode_data.0)?;
                 counter
                     .compressed
                     .fetch_add(compressed_data.len() as u64, Ordering::Relaxed);
@@ -298,7 +584,7 @@ async fn handler(
                     warn!("sender queue has terminated");
                 }
             } else {
-                if let Err(Error::Terminated(..)) = otel_sender.send(OpenTelemetry(decode_data)) {
+                if let Err(Error::Terminated(..)) = otel_sender.send(OpenTelemetry(decode_data.0)) {
                     warn!("sender queue has terminated");
                 }
             }
@@ -465,6 +751,7 @@ pub struct MetricServer {
     thread: Arc<Mutex<Option<JoinHandle<()>>>>,
     otel_sender: DebugSender<OpenTelemetry>,
     compressed_otel_sender: DebugSender<OpenTelemetryCompressed>,
+    otel_metrics_collect_sender: Option<DebugSender<Box<TaggedFlow>>>,
     prometheus_sender: DebugSender<PrometheusMetric>,
     telegraf_sender: DebugSender<TelegrafMetric>,
     profile_sender: DebugSender<Profile>,
@@ -473,18 +760,23 @@ pub struct MetricServer {
     server_shutdown_tx: Mutex<Option<mpsc::Sender<()>>>,
     counter: Arc<CompressedMetric>,
     compressed: Arc<AtomicBool>,
+    local_epc_id: u32,
+    policy_getter: Arc<PolicyGetter>,
 }
 
 impl MetricServer {
     pub fn new(
         otel_sender: DebugSender<OpenTelemetry>,
         compressed_otel_sender: DebugSender<OpenTelemetryCompressed>,
+        otel_metrics_collect_sender: Option<DebugSender<Box<TaggedFlow>>>,
         prometheus_sender: DebugSender<PrometheusMetric>,
         telegraf_sender: DebugSender<TelegrafMetric>,
         profile_sender: DebugSender<Profile>,
         port: u16,
         exception_handler: ExceptionHandler,
         compressed: bool,
+        local_epc_id: u32,
+        policy_getter: PolicyGetter,
     ) -> (Self, IntegrationCounter) {
         let counter = IntegrationCounter::default();
         (
@@ -500,6 +792,7 @@ impl MetricServer {
                 compressed: Arc::new(AtomicBool::new(compressed)),
                 otel_sender,
                 compressed_otel_sender,
+                otel_metrics_collect_sender,
                 prometheus_sender,
                 telegraf_sender,
                 profile_sender,
@@ -507,6 +800,8 @@ impl MetricServer {
                 exception_handler,
                 server_shutdown_tx: Default::default(),
                 counter: counter.metrics.clone(),
+                local_epc_id,
+                policy_getter: Arc::new(policy_getter),
             },
             counter,
         )
@@ -533,6 +828,7 @@ impl MetricServer {
 
         let otel_sender = self.otel_sender.clone();
         let compressed_otel_sender = self.compressed_otel_sender.clone();
+        let otel_metrics_collect_sender = self.otel_metrics_collect_sender.clone();
         let prometheus_sender = self.prometheus_sender.clone();
         let telegraf_sender = self.telegraf_sender.clone();
         let profile_sender = self.profile_sender.clone();
@@ -543,6 +839,8 @@ impl MetricServer {
         let running = self.running.clone();
         let counter = self.counter.clone();
         let compressed = self.compressed.clone();
+        let local_epc_id = self.local_epc_id.clone();
+        let policy_getter = self.policy_getter.clone();
         let (tx, mut rx) = mpsc::channel(8);
         self.rt
             .spawn(Self::alive_check(monitor_port.clone(), tx.clone(), mon_rx));
@@ -589,15 +887,19 @@ impl MetricServer {
 
                     let otel_sender = otel_sender.clone();
                     let compressed_otel_sender = compressed_otel_sender.clone();
+                    let otel_metrics_collect_sender = otel_metrics_collect_sender.clone();
                     let prometheus_sender = prometheus_sender.clone();
                     let telegraf_sender = telegraf_sender.clone();
                     let profile_sender = profile_sender.clone();
                     let exception_handler_inner = exception_handler.clone();
                     let counter = counter.clone();
                     let compressed = compressed.clone();
+                    let local_epc_id = local_epc_id.clone();
+                    let policy_getter = policy_getter.clone();
                     let service = make_service_fn(move |conn: &AddrStream| {
                         let otel_sender = otel_sender.clone();
                         let compressed_otel_sender = compressed_otel_sender.clone();
+                        let otel_metrics_collect_sender = otel_metrics_collect_sender.clone();
                         let prometheus_sender = prometheus_sender.clone();
                         let telegraf_sender = telegraf_sender.clone();
                         let profile_sender = profile_sender.clone();
@@ -605,6 +907,8 @@ impl MetricServer {
                         let peer_addr = conn.remote_addr();
                         let counter = counter.clone();
                         let compressed = compressed.clone();
+                        let local_epc_id = local_epc_id.clone();
+                        let policy_getter = policy_getter.clone();
                         async move {
                             Ok::<_, GenericError>(service_fn(move |req| {
                                 handler(
@@ -612,12 +916,15 @@ impl MetricServer {
                                     req,
                                     otel_sender.clone(),
                                     compressed_otel_sender.clone(),
+                                    otel_metrics_collect_sender.clone(),
                                     prometheus_sender.clone(),
                                     telegraf_sender.clone(),
                                     profile_sender.clone(),
                                     exception_handler.clone(),
                                     compressed.load(Ordering::Relaxed),
                                     counter.clone(),
+                                    local_epc_id,
+                                    policy_getter.clone(),
                                 )
                             }))
                         }

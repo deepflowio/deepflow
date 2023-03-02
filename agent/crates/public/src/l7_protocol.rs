@@ -53,6 +53,28 @@ pub enum L7Protocol {
     Max = 255,
 }
 
+// Translate the string value of l7_protocol into a L7Protocol enumeration value
+impl From<String> for L7Protocol {
+    fn from(l7_protocol_str: String) -> Self {
+        let l7_protocol_str = l7_protocol_str.to_lowercase();
+        match l7_protocol_str.as_str() {
+            "http" => Self::Http1,
+            "http2" => Self::Http2,
+            "dubbo" => Self::Dubbo,
+            "grpc" => Self::Grpc,
+            "protobufrpc" => Self::ProtobufRPC,
+            "sofarpc" => Self::SofaRPC,
+            "mysql" => Self::MySQL,
+            "postgresql" => Self::PostgreSQL,
+            "redis" => Self::Redis,
+            "kafka" => Self::Kafka,
+            "mqtt" => Self::MQTT,
+            "dns" => Self::DNS,
+            _ => Self::Other,
+        }
+    }
+}
+
 // the actually rpc protocol when l7 protocol is ProtobufRPC
 #[derive(Serialize, Debug, Clone, Copy, PartialEq, Hash, Eq)]
 #[repr(u64)]

@@ -48,8 +48,9 @@ func execName() string {
 
 var log = logging.MustGetLogger(execName())
 
-var configPath = flag.String("f", "/etc/server.yaml", "Specify config file location")
-var version = flag.Bool("v", false, "Display the version")
+var flagSet = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+var configPath = flagSet.String("f", "/etc/server.yaml", "Specify config file location")
+var version = flagSet.Bool("v", false, "Display the version")
 
 var Branch, RevCount, Revision, CommitDate, goVersion, CompileTime string
 
@@ -74,7 +75,7 @@ func loadConfig(path string) *Config {
 }
 
 func main() {
-	flag.Parse()
+	flagSet.Parse(os.Args[1:])
 	if *version {
 		fmt.Printf(
 			"%s\n%s\n%s\n%s\n%s\n%s\n",

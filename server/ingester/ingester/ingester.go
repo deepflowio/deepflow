@@ -55,6 +55,8 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/ingesterctl"
 	pcapcfg "github.com/deepflowio/deepflow/server/ingester/pcap/config"
 	"github.com/deepflowio/deepflow/server/ingester/pcap/pcap"
+	profilecfg "github.com/deepflowio/deepflow/server/ingester/profile/config"
+	"github.com/deepflowio/deepflow/server/ingester/profile/profile"
 )
 
 var log = logging.MustGetLogger("ingester")
@@ -139,6 +141,10 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 		bytes, _ = yaml.Marshal(pcapConfig)
 		log.Infof("pcap config:\n%s", string(bytes))
 
+		profileConfig := profilecfg.Load(cfg, configPath)
+		bytes, _ = yaml.Marshal(profileConfig)
+		log.Infof("profile config:\n%s", string(bytes))
+
 		// 创建、修改、删除数据源及其存储时长
 		ds := datasource.NewDatasourceManager(cfg, flowMetricsConfig.CKReadTimeout)
 		ds.Start()
@@ -196,6 +202,12 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 		checkError(err)
 		pcaper.Start()
 		closers = append(closers, pcaper)
+
+		// write profile data
+		profile, err := profile.NewProfile(profileConfig, receiver, platformDataManager)
+		checkError(err)
+		profile.Start()
+		closers = append(closers, profile)
 
 		// 检查clickhouse的磁盘空间占用，达到阈值时，自动删除老数据
 		cm, err := ckmonitor.NewCKMonitor(cfg)

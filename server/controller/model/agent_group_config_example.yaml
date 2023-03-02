@@ -416,7 +416,7 @@ vtap_group_id: g-xxxxxx
   #kubernetes-api-list-limit:
 
   ## K8s api list interval
-  ## Default: 10m
+  ## Default: 10m. Must be larger than or equal to 10m.
   ## Note: Interval of listing resource when watcher idles
   #kubernetes-api-list-interval:
 

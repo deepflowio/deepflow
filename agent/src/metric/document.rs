@@ -24,11 +24,11 @@ use super::meter::Meter;
 
 use crate::common::{
     enums::{IpProtocol, TapType},
-    flow::L7Protocol,
+    flow::{L7Protocol, SignalSource},
     tap_port::TapPort,
 };
-use public::proto::metric;
 use public::{
+    proto::{integration::opentelemetry::proto::trace::v1::span::SpanKind, metric},
     sender::{SendMessageType, Sendable},
     utils::net::MacAddr,
 };
@@ -157,17 +157,19 @@ pub enum Direction {
     ServerToClient = 1 << 1,
     LocalToLocal = 1 << 2,
 
-    // 以下类型为转换TapSide而增加
-    ClientNodeToServer = Direction::ClientToServer as u8 | SIDE_NODE, // 客户端容器节点，路由、SNAT、隧道
-    ServerNodeToClient = Direction::ServerToClient as u8 | SIDE_NODE, // 服务端容器节点，路由、SNAT、隧道
-    ClientHypervisorToServer = Direction::ClientToServer as u8 | SIDE_HYPERVISOR, // 客户端宿主机，隧道
-    ServerHypervisorToClient = Direction::ServerToClient as u8 | SIDE_HYPERVISOR, // 服务端宿主机，隧道
-    ClientGatewayHypervisorToServer = Direction::ClientToServer as u8 | SIDE_GATEWAY_HYPERVISOR, // 客户端网关宿主机
-    ServerGatewayHypervisorToClient = Direction::ServerToClient as u8 | SIDE_GATEWAY_HYPERVISOR, // 服务端网关宿主机
-    ClientGatewayToServer = Direction::ClientToServer as u8 | SIDE_GATEWAY, // 客户端网关（特指VIP机制的SLB，例如微软云MUX等）, Mac地址对应的接口为vip设备
-    ServerGatewayToClient = Direction::ServerToClient as u8 | SIDE_GATEWAY, // 服务端网关（特指VIP机制的SLB，例如微软云MUX等）, Mac地址对应的接口为vip设备
-    ClientProcessToServer = Direction::ClientToServer as u8 | SIDE_PROCESS, // 客户端进程
-    ServerProcessToClient = Direction::ServerToClient as u8 | SIDE_PROCESS, // 服务端进程
+    // The following types are added for converting TapSide
+    ClientNodeToServer = Direction::ClientToServer as u8 | SIDE_NODE, // client container node, route、SNAT、tunnel
+    ServerNodeToClient = Direction::ServerToClient as u8 | SIDE_NODE, // server container node, route、SNAT、tunnel
+    ClientHypervisorToServer = Direction::ClientToServer as u8 | SIDE_HYPERVISOR, // client hypervisor, tunnel
+    ServerHypervisorToClient = Direction::ServerToClient as u8 | SIDE_HYPERVISOR, // server hypervisor, tunnel
+    ClientGatewayHypervisorToServer = Direction::ClientToServer as u8 | SIDE_GATEWAY_HYPERVISOR, // client gateway hypervisor
+    ServerGatewayHypervisorToClient = Direction::ServerToClient as u8 | SIDE_GATEWAY_HYPERVISOR, // server gateway hypervisor
+    ClientGatewayToServer = Direction::ClientToServer as u8 | SIDE_GATEWAY, // client gateway(In particular, SLB of VIP mechanism, such as Microsoft Cloud MUX, etc.), the interface corresponding to Mac address is vip device
+    ServerGatewayToClient = Direction::ServerToClient as u8 | SIDE_GATEWAY, // server gateway(In particular, SLB of VIP mechanism, such as Microsoft Cloud MUX, etc.), the interface corresponding to Mac address is vip device
+    ClientProcessToServer = Direction::ClientToServer as u8 | SIDE_PROCESS, // client process
+    ServerProcessToClient = Direction::ServerToClient as u8 | SIDE_PROCESS, // server process
+    ClientAppToServer = Direction::ClientToServer as u8 | SIDE_APP,         // client app(for otel)
+    ServerAppToClient = Direction::ServerToClient as u8 | SIDE_APP,         // server app(for otel)
 }
 
 impl Default for Direction {
@@ -181,6 +183,7 @@ const SIDE_HYPERVISOR: u8 = 2 << 3;
 const SIDE_GATEWAY_HYPERVISOR: u8 = 3 << 3;
 const SIDE_GATEWAY: u8 = 4 << 3;
 const SIDE_PROCESS: u8 = 5 << 3;
+const SIDE_APP: u8 = 6 << 3;
 
 const MASK_CLIENT_SERVER: u8 = 0x7;
 const MASK_SIDE: u8 = 0xf8;
@@ -216,6 +219,8 @@ pub enum TapSide {
     ServerGateway = TapSide::Server as u8 | SIDE_GATEWAY,
     ClientProcess = TapSide::Client as u8 | SIDE_PROCESS,
     ServerProcess = TapSide::Server as u8 | SIDE_PROCESS,
+    ClientApp = TapSide::Client as u8 | SIDE_APP,
+    ServerApp = TapSide::Server as u8 | SIDE_APP,
 }
 
 impl Default for TapSide {
@@ -240,7 +245,20 @@ impl From<Direction> for TapSide {
             Direction::ServerGatewayToClient => TapSide::ServerGateway,
             Direction::ClientProcessToServer => TapSide::ClientProcess,
             Direction::ServerProcessToClient => TapSide::ServerProcess,
+            Direction::ClientAppToServer => TapSide::ClientApp,
+            Direction::ServerAppToClient => TapSide::ServerApp,
             Direction::None => TapSide::Rest,
+        }
+    }
+}
+
+// According to https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/trace/v1/trace.proto#L121
+impl From<SpanKind> for TapSide {
+    fn from(span_kind: SpanKind) -> Self {
+        match span_kind {
+            SpanKind::Client | SpanKind::Producer => TapSide::ClientApp,
+            SpanKind::Server | SpanKind::Consumer => TapSide::ServerApp,
+            _ => TapSide::Rest,
         }
     }
 }
@@ -289,6 +307,10 @@ pub struct Tagger {
 
     pub tag_type: TagType,
     pub tag_value: u16,
+    pub otel_service: Option<String>,
+    pub otel_instance: Option<String>,
+    pub endpoint: Option<String>,
+    pub signal_source: SignalSource,
 }
 
 impl Default for Tagger {
@@ -319,6 +341,10 @@ impl Default for Tagger {
 
             tag_type: TagType::default(),
             tag_value: 0,
+            otel_service: None,
+            otel_instance: None,
+            endpoint: None,
+            signal_source: SignalSource::default(),
         }
     }
 }
@@ -371,9 +397,10 @@ impl From<Tagger> for metric::MiniTag {
                 tag_value: t.tag_value as u32,
                 gpid: t.gpid,
                 gpid1: t.gpid_1,
-                signal_source: 0, // FIX ME
-                app_service: "FIX ME".to_string(),
-                app_instance: "FIX ME".to_string(),
+                signal_source: t.signal_source as u32,
+                app_service: t.otel_service.unwrap_or_default(),
+                app_instance: t.otel_instance.unwrap_or_default(),
+                endpoint: t.endpoint.unwrap_or_default(),
             }),
         }
     }

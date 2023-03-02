@@ -394,9 +394,12 @@ impl Stash {
             Some(f) => f,
             None => return,
         };
+        let flow = &acc_flow.tagged_flow.flow;
 
         // PCAP和分发策略统计
-        if self.context.metric_type == MetricsType::MINUTE {
+        if self.context.metric_type == MetricsType::MINUTE
+            && flow.signal_source == SignalSource::Packet
+        {
             let id_map = &acc_flow.id_maps[0];
             for (&acl_gid, &ip_id) in id_map.iter() {
                 let tagger = Tagger {
@@ -404,6 +407,7 @@ impl Stash {
                     acl_gid,
                     tag_value: ip_id,
                     tag_type: TagType::TunnelIpId,
+                    signal_source: flow.signal_source,
                     ..Default::default()
                 };
                 let meter = &acc_flow.flow_meter;
@@ -424,6 +428,7 @@ impl Stash {
                     acl_gid,
                     tag_value: ip_id,
                     tag_type: TagType::TunnelIpId,
+                    signal_source: flow.signal_source,
                     ..Default::default()
                 };
 
@@ -439,7 +444,6 @@ impl Stash {
                 self.add(key, tagger, Meter::Usage(usage_meter));
             }
         }
-        let flow = &acc_flow.tagged_flow.flow;
 
         let inactive_ip_enabled = self.context.config.load().inactive_ip_enabled;
         if !acc_flow.is_active_host0 && !acc_flow.is_active_host1 && !inactive_ip_enabled {
@@ -607,31 +611,36 @@ impl Stash {
                 code
             },
             l7_protocol: acc_flow.l7_protocol,
+            signal_source: flow.signal_source,
+            otel_service: flow.otel_service.clone(),
+            otel_instance: flow.otel_instance.clone(),
+            endpoint: flow.endpoint.clone(),
             ..Default::default()
         };
         let l7_metrics_enabled = self.context.config.load().l7_metrics_enabled;
+        let key = StashKey::new(&tagger, ip, None);
+        // We collect the single-ended metrics data from Packet, XFlow, EBPF, Otel to the table (vtap_app_port).
+        // In the case of signal_source grouping, the single_stats data is not duplicate.
+        // Only data whose direction is c|s|local has flow_meter.
         if tagger.direction == Direction::ServerToClient
             || tagger.direction == Direction::ClientToServer
+            || tagger.direction == Direction::LocalToLocal
         {
-            let key = StashKey::new(&tagger, ip, None);
             self.add(key, tagger.clone(), Meter::Flow(flow_meter));
-            if tagger.l7_protocol != L7Protocol::Unknown && l7_metrics_enabled {
+        }
+
+        if tagger.l7_protocol != L7Protocol::Unknown && l7_metrics_enabled {
+            // Only data whose direction is c|s|local|c-p|s-p|c-app|s-app has app_meter.
+            // The data of XFlow itself will not be duplicated.
+            if tagger.direction == Direction::ClientToServer
+                || tagger.direction == Direction::ServerToClient
+                || tagger.direction == Direction::LocalToLocal
+                || tagger.signal_source != SignalSource::Packet
+            {
                 tagger.code |= Code::L7_PROTOCOL;
                 let key = StashKey::new(&tagger, ip, None);
                 self.add(key, tagger, Meter::App(acc_flow.app_meter.clone()));
             }
-        } else if (tagger.direction == Direction::ClientProcessToServer
-            || tagger.direction == Direction::ServerProcessToClient)
-            && (tagger.l7_protocol == L7Protocol::Http1TLS
-                || tagger.l7_protocol == L7Protocol::Http2TLS)
-            && l7_metrics_enabled
-        {
-            // We don’t want duplicate records in the single-ended metrics table (vtap_app_port).
-            // We have already collected metrics data of almost all types of protocols from Packet,
-            // so we only need to supplement the metrics of XX_TLS through eBPF data.
-            tagger.code |= Code::L7_PROTOCOL;
-            let key = StashKey::new(&tagger, ip, None);
-            self.add(key, tagger, Meter::App(acc_flow.app_meter.clone()));
         }
     }
 
@@ -746,12 +755,16 @@ impl Stash {
             },
             l7_protocol: acc_flow.l7_protocol,
             is_ipv6,
+            signal_source: flow.signal_source,
+            otel_service: flow.otel_service.clone(),
+            otel_instance: flow.otel_instance.clone(),
+            endpoint: flow.endpoint.clone(),
             ..Default::default()
         };
 
         // network metrics (vtap_flow_edge_port)
-        // eBPF data has no L4 info
-        if flow.signal_source != SignalSource::EBPF {
+        // Packet data and XFlow data have L4 info
+        if flow.signal_source == SignalSource::Packet || flow.signal_source == SignalSource::XFlow {
             let key = StashKey::new(&tagger, src_ip, Some(dst_ip));
             self.add(
                 key,

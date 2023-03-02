@@ -18,6 +18,7 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/tagrecorder/config"
 )
 
 type ChResourceUpdater interface {
@@ -27,6 +28,7 @@ type ChResourceUpdater interface {
 	// 遍历新的ch数据，若key不在旧的ch数据中，则新增；否则检查是否有更新，若有更新，则更新
 	// 遍历旧的ch数据，若key不在新的ch数据中，则删除
 	Refresh()
+	SetConfig(cfg config.TagRecorderConfig)
 }
 
 type DataGenerator[MT MySQLChModel, KT ChModelKey] interface {
@@ -39,18 +41,28 @@ type DataGenerator[MT MySQLChModel, KT ChModelKey] interface {
 }
 
 type UpdaterBase[MT MySQLChModel, KT ChModelKey] struct {
+	cfg              config.TagRecorderConfig
 	resourceTypeName string
 	dataGenerator    DataGenerator[MT, KT]
+}
+
+func (b *UpdaterBase[MT, KT]) SetConfig(cfg config.TagRecorderConfig) {
+	b.cfg = cfg
 }
 
 func (b *UpdaterBase[MT, KT]) Refresh() {
 	newKeyToDBItem, newOK := b.dataGenerator.generateNewData()
 	oldKeyToDBItem, oldOK := b.generateOldData()
+	keysToAdd := []KT{}
+	itemsToAdd := []MT{}
+	keysToDelete := []KT{}
+	itemsToDelete := []MT{}
 	if newOK && oldOK {
 		for key, newDBItem := range newKeyToDBItem {
 			oldDBItem, exists := oldKeyToDBItem[key]
 			if !exists {
-				b.add(newDBItem, key)
+				keysToAdd = append(keysToAdd, key)
+				itemsToAdd = append(itemsToAdd, newDBItem)
 			} else {
 				updateInfo, ok := b.dataGenerator.generateUpdateInfo(oldDBItem, newDBItem)
 				if ok {
@@ -58,11 +70,19 @@ func (b *UpdaterBase[MT, KT]) Refresh() {
 				}
 			}
 		}
+		if len(itemsToAdd) > 0 {
+			b.operateBatch(keysToAdd, itemsToAdd, b.add)
+		}
+
 		for key, oldDBItem := range oldKeyToDBItem {
 			_, exists := newKeyToDBItem[key]
 			if !exists {
-				b.delete(oldDBItem, key)
+				keysToDelete = append(keysToDelete, key)
+				itemsToDelete = append(itemsToDelete, oldDBItem)
 			}
+		}
+		if len(itemsToDelete) > 0 {
+			b.operateBatch(keysToDelete, itemsToDelete, b.delete)
 		}
 	}
 }
@@ -81,30 +101,56 @@ func (b *UpdaterBase[MT, KT]) generateOldData() (map[KT]MT, bool) {
 	return idToItem, true
 }
 
-// TODO 是否需要批量处理
-func (b *UpdaterBase[MT, KT]) add(dbItem MT, key KT) {
-	err := mysql.Db.Create(&dbItem).Error
+func (b *UpdaterBase[MT, KT]) operateBatch(keys []KT, items []MT, operateFunc func([]KT, []MT)) {
+	count := len(items)
+	offset := b.cfg.MySQLBatchSize
+	var pages int
+	if count%offset == 0 {
+		pages = count / offset
+	} else {
+		pages = count/offset + 1
+	}
+	for i := 0; i < pages; i++ {
+		start := i * offset
+		end := (i + 1) * offset
+		if end > count {
+			end = count
+		}
+		operateFunc(keys[start:end], items[start:end])
+	}
+}
+
+func (b *UpdaterBase[MT, KT]) add(keys []KT, dbItems []MT) {
+	err := mysql.Db.Create(&dbItems).Error
 	if err != nil {
-		log.Errorf("add %s %v (%+v) failed: %s", b.resourceTypeName, key, dbItem, err)
+		for i := range keys {
+			log.Errorf("add %s (key: %+v value: %+v) failed: %s", b.resourceTypeName, keys[i], dbItems[i], err.Error())
+		}
 		return
 	}
-	log.Infof("add %s %v (%+v) success", b.resourceTypeName, key, dbItem)
+	for i := range keys {
+		log.Infof("add %s (key: %+v value: %+v) success", b.resourceTypeName, keys[i], dbItems[i])
+	}
 }
 
 func (b *UpdaterBase[MT, KT]) update(oldDBItem MT, updateInfo map[string]interface{}, key KT) {
 	err := mysql.Db.Model(&oldDBItem).Updates(updateInfo).Error
 	if err != nil {
-		log.Errorf("update %s %v (%+v) failed: %s", b.resourceTypeName, key, oldDBItem, err)
+		log.Errorf("update %s (key: %+v value: %+v) failed: %s", b.resourceTypeName, key, oldDBItem, err.Error())
 		return
 	}
-	log.Infof("update %s %v (%+v, %v) success", b.resourceTypeName, key, oldDBItem, updateInfo)
+	log.Infof("update %s (key: %+v value: %+v, update info: %v) success", b.resourceTypeName, key, oldDBItem, updateInfo)
 }
 
-func (b *UpdaterBase[MT, KT]) delete(dbItem MT, key KT) {
-	err := mysql.Db.Delete(&dbItem).Error
+func (b *UpdaterBase[MT, KT]) delete(keys []KT, dbItems []MT) {
+	err := mysql.Db.Delete(&dbItems).Error
 	if err != nil {
-		log.Errorf("delete %s %v (%+v) failed: %s", b.resourceTypeName, key, dbItem, err)
+		for i := range keys {
+			log.Errorf("delete %s (key: %+v value: %+v) failed: %s", b.resourceTypeName, keys[i], dbItems[i], err.Error())
+		}
 		return
 	}
-	log.Infof("delete %s %v (%+v) success", b.resourceTypeName, key, dbItem)
+	for i := range keys {
+		log.Infof("delete %s (key: %+v value: %+v) success", b.resourceTypeName, keys[i], dbItems[i])
+	}
 }

@@ -134,6 +134,10 @@ controller:
         # 资源ID限制：所有设备ID（除宿主机外）、容器节点、Ingress、工作负载、ReplicaSet、POD
         resource_max_id_1: 499999
 
+  tagrecorder:
+    # size of data in batch operation for MySQL
+    mysql_batch_size: 5000
+
   trisolaris:
     tsdb_ip:
     chrony:
@@ -330,6 +334,16 @@ ingester:
   ## pcap decoder queue count/size
   #pcap-queue-count: 2
   #pcap-queue-size: 10000
+
+  ## profile process data write config
+  #profile-ck-writer:
+  #  queue-count: 1      # parallelism of table writing
+  #  queue-size: 100000  # size of writing queue
+  #  batch-size: 51200   # size of batch writing
+  #  flush-timeout: 5    # timeout of table writing
+
+  ## profile process database data retention time(unit: day)
+  #profile-ttl: 3
 
   ## 默认读超时，修改数据保留时长时使用
   #ck-read-timeout: 300

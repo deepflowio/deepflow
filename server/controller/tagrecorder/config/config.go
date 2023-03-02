@@ -17,5 +17,6 @@
 package config
 
 type TagRecorderConfig struct {
-	Interval int `default:"60" yaml:"timeout"`
+	Interval       int `default:"60" yaml:"timeout"`
+	MySQLBatchSize int `default:"5000" yaml:"mysql_batch_size"`
 }

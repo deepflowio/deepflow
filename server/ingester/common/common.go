@@ -20,6 +20,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net"
+	"sync"
 
 	"github.com/deepflowio/deepflow/message/trident"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
@@ -45,12 +46,35 @@ func (s DBs) Exec(query string, args ...any) (sql.Result, error) {
 	var result sql.Result
 	var err error
 	for _, conn := range s {
+		log.Infof("Begin exec SQL: %s", query)
 		result, err = conn.Exec(query, args...)
+		log.Infof("End exec SQL: %s, err: %v", query, err)
 		if err != nil {
 			return result, err
 		}
 	}
 	return result, nil
+}
+
+func (s DBs) ExecParallel(query string, args ...any) (sql.Result, error) {
+	var result sql.Result
+	var err error
+	wg := sync.WaitGroup{}
+	for _, conn := range s {
+		wg.Add(1)
+		go func() {
+			log.Infof("Begin exec parallel SQL: %s", query)
+			r, e := conn.Exec(query, args...)
+			log.Infof("End exec parallel SQL: %s, err:%v", query, err)
+			if err == nil {
+				result = r
+				err = e
+			}
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+	return result, err
 }
 
 func (s DBs) Query(query string, args ...any) (*sql.Rows, error) {

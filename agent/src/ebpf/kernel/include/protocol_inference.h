@@ -426,6 +426,44 @@ static __inline enum message_type infer_http_message(const char *buf,
 	return MSG_UNKNOWN;
 }
 
+static __inline void save_prev_data(const char *buf,
+				    struct conn_info_t *conn_info)
+{
+	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+		*(__u32 *) conn_info->socket_info_ptr->prev_data =
+		    *(__u32 *) buf;
+		conn_info->socket_info_ptr->prev_data_len = 4;
+		conn_info->socket_info_ptr->direction = conn_info->direction;
+	} else {
+		*(__u32 *) conn_info->prev_buf = *(__u32 *) buf;
+		conn_info->prev_count = 4;
+	}
+}
+
+// MySQL、Kafka推断需要之前的4字节数据
+// MySQL and Kafka need the previous 4 bytes of data for inference
+static __inline void check_and_fetch_prev_data(struct conn_info_t *conn_info)
+{
+	if (conn_info->socket_info_ptr != NULL &&
+	    conn_info->socket_info_ptr->prev_data_len != 0) {
+		/*
+		 * For adjacent read/write in the same direction.
+		 */
+		if (conn_info->direction ==
+		    conn_info->socket_info_ptr->direction) {
+			*(__u32 *) conn_info->prev_buf =
+			    *(__u32 *) conn_info->socket_info_ptr->prev_data;
+			conn_info->prev_count = 4;
+		}
+
+		/*
+		 * Clean up previously stored data.
+		 */
+		conn_info->socket_info_ptr->prev_data_len = 0;
+	}
+
+}
+
 // MySQL packet:
 //      0         8        16        24        32
 //      +---------+---------+---------+---------+
@@ -444,6 +482,11 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 {
 	if (!is_protocol_enabled(PROTO_MYSQL)) {
 		return MSG_UNKNOWN;
+	}
+
+	if (count == 4) {
+		save_prev_data(buf, conn_info);
+		return MSG_PRESTORE;
 	}
 
 	static const __u8 kComQuery = 0x03;
@@ -1174,6 +1217,11 @@ static __inline enum message_type infer_kafka_message(const char *buf,
 		return MSG_UNKNOWN;
 	}
 
+	if (count == 4) {
+		save_prev_data(buf, conn_info);
+		return MSG_PRESTORE;
+	}
+
 	bool is_first = true, use_prev_buf;
 	if (!kafka_data_check_len(count, buf, conn_info, &use_prev_buf))
 		return MSG_UNKNOWN;
@@ -1268,20 +1316,6 @@ static __inline bool drop_msg_by_comm(void)
 	return false;
 }
 
-static __inline void save_prev_data(const char *buf,
-				    struct conn_info_t *conn_info)
-{
-	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
-		*(__u32 *) conn_info->socket_info_ptr->prev_data =
-		    *(__u32 *) buf;
-		conn_info->socket_info_ptr->prev_data_len = 4;
-		conn_info->socket_info_ptr->direction = conn_info->direction;
-	} else {
-		*(__u32 *) conn_info->prev_buf = *(__u32 *) buf;
-		conn_info->prev_count = 4;
-	}
-}
-
 static __inline struct protocol_message_t infer_protocol(const char *buf,
 							 size_t count,
 							 struct conn_info_t
@@ -1330,23 +1364,7 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 	char infer_buf[DATA_BUF_MAX];
 	bpf_probe_read(&infer_buf, sizeof(infer_buf), buf);
 
-	// MySQL、Kafka推断需要之前的4字节数据
-	// MySQL and Kafka need the previous 4 bytes of data for inference
-	if (conn_info->socket_info_ptr != NULL &&
-	    conn_info->socket_info_ptr->prev_data_len != 0) {
-		if (conn_info->direction !=
-		    conn_info->socket_info_ptr->direction)
-			return inferred_message;
-
-		*(__u32 *) conn_info->prev_buf =
-		    *(__u32 *) conn_info->socket_info_ptr->prev_data;
-		conn_info->prev_count = 4;
-
-		/*
-		 * Clean up previously stored data.
-		 */
-		conn_info->socket_info_ptr->prev_data_len = 0;
-	}
+	check_and_fetch_prev_data(conn_info);
 
 #ifdef LINUX_VER_5_2_PLUS
 	/*
@@ -1414,27 +1432,21 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 			}
 			break;
 		case PROTO_MYSQL:
-			if (count == 4) {
-				save_prev_data(infer_buf, conn_info);
-				inferred_message.type = MSG_PRESTORE;
-				return inferred_message;
-			}
 			if ((inferred_message.type =
 			     infer_mysql_message(infer_buf, count,
 						 conn_info)) != MSG_UNKNOWN) {
+				if (inferred_message.type == MSG_PRESTORE)
+					return inferred_message;
 				inferred_message.protocol = PROTO_MYSQL;
 				return inferred_message;
 			}
 			break;
 		case PROTO_KAFKA:
-			if (count == 4) {
-				save_prev_data(infer_buf, conn_info);
-				inferred_message.type = MSG_PRESTORE;
-				return inferred_message;
-			}
 			if ((inferred_message.type =
 			     infer_kafka_message(infer_buf, count,
 						 conn_info)) != MSG_UNKNOWN) {
+				if (inferred_message.type == MSG_PRESTORE)
+					return inferred_message;
 				inferred_message.protocol = PROTO_KAFKA;
 				return inferred_message;
 			}
@@ -1538,12 +1550,6 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 	if (inferred_message.protocol != MSG_UNKNOWN)
 		return inferred_message;
 
-	if (count == 4) {
-		save_prev_data(infer_buf, conn_info);
-		inferred_message.type = MSG_PRESTORE;
-		return inferred_message;
-	}
-
 #ifdef LINUX_VER_5_2_PLUS
 	if (skip_proto != PROTO_MYSQL && (inferred_message.type =
 #else
@@ -1551,6 +1557,8 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 #endif
 		    infer_mysql_message(infer_buf, count,
 					conn_info)) != MSG_UNKNOWN) {
+		if (inferred_message.type == MSG_PRESTORE)
+			return inferred_message;
 		inferred_message.protocol = PROTO_MYSQL;
 #ifdef LINUX_VER_5_2_PLUS
 	} else if (skip_proto != PROTO_KAFKA && (inferred_message.type =
@@ -1559,6 +1567,8 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 #endif
 		    infer_kafka_message(infer_buf, count,
 					conn_info)) != MSG_UNKNOWN) {
+		if (inferred_message.type == MSG_PRESTORE)
+			return inferred_message;
 		inferred_message.protocol = PROTO_KAFKA;
 #ifdef LINUX_VER_5_2_PLUS
 	} else if (skip_proto != PROTO_SOFARPC && (inferred_message.type =
@@ -1566,14 +1576,14 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 	} else if ((inferred_message.type =
 #endif
 		    infer_sofarpc_message(infer_buf, count,
-					conn_info)) != MSG_UNKNOWN){
+					  conn_info)) != MSG_UNKNOWN){
 		inferred_message.protocol = PROTO_SOFARPC;
 #ifdef LINUX_VER_5_2_PLUS
 	} else if (skip_proto != PROTO_HTTP2 && (inferred_message.type =
 #else
 	} else if ((inferred_message.type =
 #endif
-	    	infer_http2_message(buf, count, 
+		    infer_http2_message(buf, count, 
 					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_HTTP2;
 #ifdef LINUX_VER_5_2_PLUS
@@ -1581,7 +1591,7 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 #else
 	} else if ((inferred_message.type =
 #endif
-			infer_postgre_message(infer_buf, count,
+		    infer_postgre_message(infer_buf, count,
 					conn_info)) != MSG_UNKNOWN){
 		inferred_message.protocol = PROTO_POSTGRESQL;
 	}
