@@ -29,13 +29,17 @@ import (
 var log = logging.MustGetLogger("event.config")
 
 const (
-	DefaultEventTTL = 720 // hour
+	DefaultDecoderQueueCount = 2
+	DefaultDecoderQueueSize  = 1 << 17
+	DefaultEventTTL          = 720 // hour
 )
 
 type Config struct {
-	Base           *config.Config
-	CKWriterConfig config.CKWriterConfig `yaml:"event-ck-writer"`
-	TTL            int                   `yaml:"event-ttl-hour"`
+	Base              *config.Config
+	CKWriterConfig    config.CKWriterConfig `yaml:"event-ck-writer"`
+	DecoderQueueCount int                   `yaml:"event-decoder-queue-count"`
+	DecoderQueueSize  int                   `yaml:"event-decoder-queue-size"`
+	TTL               int                   `yaml:"event-ttl"`
 }
 
 type EventConfig struct {
@@ -43,6 +47,12 @@ type EventConfig struct {
 }
 
 func (c *Config) Validate() error {
+	if c.DecoderQueueCount == 0 {
+		c.DecoderQueueCount = DefaultDecoderQueueCount
+	}
+	if c.DecoderQueueSize == 0 {
+		c.DecoderQueueSize = DefaultDecoderQueueSize
+	}
 	if c.TTL <= 0 {
 		c.TTL = DefaultEventTTL
 	}
@@ -53,9 +63,11 @@ func (c *Config) Validate() error {
 func Load(base *config.Config, path string) *Config {
 	config := &EventConfig{
 		Event: Config{
-			Base:           base,
-			CKWriterConfig: config.CKWriterConfig{QueueCount: 1, QueueSize: 50000, BatchSize: 25600, FlushTimeout: 5},
-			TTL:            DefaultEventTTL,
+			Base:              base,
+			CKWriterConfig:    config.CKWriterConfig{QueueCount: 1, QueueSize: 50000, BatchSize: 25600, FlushTimeout: 5},
+			DecoderQueueCount: DefaultDecoderQueueCount,
+			DecoderQueueSize:  DefaultDecoderQueueSize,
+			TTL:               DefaultEventTTL,
 		},
 	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {
