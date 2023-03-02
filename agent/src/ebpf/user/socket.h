@@ -217,6 +217,8 @@ static inline const char *get_tracer_state_name(enum tracer_state s)
 
 int set_data_limit_max(int limit_size);
 int set_go_tracing_timeout(int timeout);
+int set_io_event_collect_mode(uint32_t mode);
+int set_io_event_minimal_duration(uint64_t duration);
 struct socket_trace_stats socket_tracer_stats(void);
 int running_socket_tracer(l7_handle_fn handle,
 			  int thread_nr,

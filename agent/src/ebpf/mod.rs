@@ -20,6 +20,7 @@ pub use libc::c_char;
 pub use libc::c_int;
 pub use libc::c_uchar; // u8
 pub use libc::c_uint; // u32
+pub use libc::c_ulonglong;
 pub use std::ffi::{CStr, CString};
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
@@ -335,6 +336,8 @@ extern "C" {
      */
     pub fn set_data_limit_max(limit_size: c_int) -> c_int;
     pub fn set_go_tracing_timeout(timeout: c_int) -> c_int;
+    pub fn set_io_event_collect_mode(mode: c_int) -> c_int;
+    pub fn set_io_event_minimal_duration(duration: c_ulonglong) -> c_int;
     pub fn set_allow_port_bitmap(bitmap: *const c_uchar) -> c_int;
     pub fn enable_ebpf_protocol(protocol: c_int) -> c_int;
     pub fn set_feature_regex(idx: c_int, pattern: *const c_char) -> c_int;
