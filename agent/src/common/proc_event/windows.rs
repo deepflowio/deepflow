@@ -13,21 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+use public::sender::{SendMessageType, Sendable};
+use std::fmt::{Debug, Formatter};
 
-use thiserror::Error;
+pub struct BoxedProcEvents();
 
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("{0}")]
-    ParseCidr(String),
-    #[error("{0}")]
-    ParseIpGroupData(String),
-    #[error("{0}")]
-    ParsePlatformData(String),
-    #[error("{0}")]
-    ParseGpid(String),
-    #[error("{0}")]
-    ParseEventData(String),
-    #[error("{0}")]
-    InvalidProtocol(String),
+impl Debug for BoxedProcEvents {
+    fn fmt(&self, _: &mut Formatter<'_>) -> std::fmt::Result {
+        Ok(())
+    }
+}
+
+impl Sendable for BoxedProcEvents {
+    fn encode(self, _: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
+        Ok(0)
+    }
+
+    fn message_type(&self) -> SendMessageType {
+        SendMessageType::ProcEvents
+    }
 }
