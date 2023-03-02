@@ -184,6 +184,8 @@ func (k *KubernetesInfo) createDomain(clusterID, clusterName string) (domainLcuu
 		KubernetesClusterID: clusterID,
 		ControllerIP:        k.cfg.NodeIP,
 		Config:              domainConf,
+		// icon id value only for enterprise edition
+		IconID: DomainTypeToIconID[KUBERNETES],
 	}
 	domain, err := resourceservice.CreateDomain(domainCreate, nil)
 	if err != nil {

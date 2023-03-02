@@ -312,6 +312,10 @@ const (
 	BAIDU_BCE_CH        = "百度云"
 )
 
+var DomainTypeToIconID = map[int]int{
+	KUBERNETES: 14,
+}
+
 const (
 	NETWORK_ISP_LCUUID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 	NETWORK_TYPE_WAN   = 3
