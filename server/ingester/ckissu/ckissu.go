@@ -771,6 +771,15 @@ var ColumnAdd626 = []*ColumnAdds{
 	},
 }
 
+var TableRenames626 = []*TableRename{
+	&TableRename{
+		OldDb:     "event",
+		OldTables: []string{"event", "event_local"},
+		NewDb:     "event",
+		NewTables: []string{"event_v624", "event_local_v624"},
+	},
+}
+
 func getTables(connect *sql.DB, db, tableName string) ([]string, error) {
 	sql := fmt.Sprintf("SHOW TABLES IN %s", db)
 	rows, err := connect.Query(sql)
@@ -1151,7 +1160,21 @@ func (i *Issu) RunRenameTable(ds *datasource.DatasourceManager) error {
 			log.Warning(err)
 		}
 	}
-
+	i.tableRenames = TableRenames626
+	for _, connection := range i.Connections {
+		oldVersion, err := i.getTableVersion(connection, "event", "event_local")
+		if err != nil {
+			return err
+		}
+		if strings.Compare(oldVersion, "v6.2.5.2") >= 0 || oldVersion == "" {
+			continue
+		}
+		for _, tableRename := range i.tableRenames {
+			if err := i.renameTable(connection, tableRename); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 

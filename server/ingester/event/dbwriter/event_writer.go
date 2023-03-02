@@ -20,8 +20,8 @@ import (
 	logging "github.com/op/go-logging"
 
 	baseconfig "github.com/deepflowio/deepflow/server/ingester/config"
-	"github.com/deepflowio/deepflow/server/ingester/event/common"
 	"github.com/deepflowio/deepflow/server/ingester/event/config"
+	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowio/deepflow/server/ingester/pkg/ckwriter"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
@@ -30,7 +30,8 @@ import (
 var log = logging.MustGetLogger("event.dbwriter")
 
 const (
-	EVENT_DB = "event"
+	EVENT_DB    = "event"
+	EVENT_TABLE = "event"
 )
 
 type ClusterNode struct {
@@ -54,14 +55,16 @@ type EventWriter struct {
 	ttl               int
 	writerConfig      baseconfig.CKWriterConfig
 
-	ckWriter *ckwriter.CKWriter
+	ckWriter      *ckwriter.CKWriter
+	flowTagWriter *flow_tag.FlowTagWriter
 }
 
-func (w *EventWriter) Write(m interface{}) {
-	w.ckWriter.Put(m)
+func (w *EventWriter) Write(e *EventStore) {
+	w.ckWriter.Put(e)
+	w.flowTagWriter.WriteFieldsAndFieldValues(e.ToFlowTags())
 }
 
-func NewEventWriter(eventType common.EventType, config *config.Config) (*EventWriter, error) {
+func NewEventWriter(config *config.Config) (*EventWriter, error) {
 	w := &EventWriter{
 		ckdbAddrs:         config.Base.CKDB.ActualAddrs,
 		ckdbUsername:      config.Base.CKDBAuth.Username,
@@ -72,10 +75,16 @@ func NewEventWriter(eventType common.EventType, config *config.Config) (*EventWr
 		ttl:               config.TTL,
 		writerConfig:      config.CKWriterConfig,
 	}
-	table := GenEventCKTable(eventType, w.ckdbCluster, w.ckdbStoragePolicy, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, EVENT_DB, eventType.TableName()))
+	flowTagWriter, err := flow_tag.NewFlowTagWriter(EVENT_DB, EVENT_DB, config.TTL, DefaultPartition, config.Base, &config.CKWriterConfig)
+	if err != nil {
+		return nil, err
+	}
+	w.flowTagWriter = flowTagWriter
+
+	table := GenEventCKTable(w.ckdbCluster, w.ckdbStoragePolicy, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, EVENT_DB, EVENT_TABLE))
 
 	ckwriter, err := ckwriter.NewCKWriter(w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
-		eventType.TableName(), table, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
+		EVENT_TABLE, table, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
 	if err != nil {
 		return nil, err
 	}
