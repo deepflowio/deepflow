@@ -59,6 +59,14 @@ MAP_PROG_ARRAY(progs_jmp_tp_map, __u32, __u32, 2)
 MAP_PERARRAY(data_buf, __u32, struct __socket_data_buffer, 1)
 
 /*
+ * For protocol infer buffer
+ */
+struct infer_data_s {
+	__u32 len;
+	char data[64];
+};
+MAP_PERARRAY(infer_buf, __u32, struct infer_data_s, 1)
+/*
  * 结构体成员偏移
  */
 MAP_PERARRAY(members_offset, __u32, struct member_fields_offset, 1)
@@ -168,6 +176,114 @@ static __u32 __inline get_tcp_read_seq_from_fd(int fd)
 	bpf_probe_read(&tcp_seq, sizeof(tcp_seq),
 		       sock + offset->tcp_sock__copied_seq_offset);
 	return tcp_seq;
+}
+
+/*
+ * B ; buffer
+ * O : buffer offset, e.g: infer_buf->len
+ * I : &args->iov[i]
+ * L_T : total_size
+ * L_C : bytes_copy
+ * F : first_iov
+ * F_S : first_iov_size
+ */
+#define COPY_IOV(B, O, I, L_T, L_C, F, F_S) do {				\
+	struct iovec iov_cpy;							\
+	bpf_probe_read(&iov_cpy, sizeof(struct iovec), (I));			\
+	if (iov_cpy.iov_base == NULL) continue;					\
+	if (!(F)) {								\
+		F = iov_cpy.iov_base;						\
+		F_S = iov_cpy.iov_len;						\
+	}									\
+	const int bytes_remaining = (L_T) - (L_C);				\
+        __u32 iov_size =							\
+            iov_cpy.iov_len <							\
+            bytes_remaining ? iov_cpy.iov_len : bytes_remaining;		\
+        __u32 len = (O) + (L_C);						\
+        struct copy_data_s *cp = (struct copy_data_s *)((B) + len);		\
+	if (len > (sizeof((B)) - sizeof(*cp)))					\
+		return (L_C);							\
+	if (iov_size >= sizeof(cp->data)) {					\
+		bpf_probe_read(cp->data, sizeof(cp->data), iov_cpy.iov_base);	\
+		iov_size = sizeof(cp->data);					\
+	} else {								\
+		iov_size = iov_size & (sizeof(cp->data) - 1);			\
+		bpf_probe_read(cp->data, iov_size + 1, iov_cpy.iov_base);	\
+	}									\
+	L_C = (L_C) + iov_size;							\
+} while (0)
+
+static __inline int iovecs_copy(struct __socket_data *v,
+				struct __socket_data_buffer *v_buff,
+				const struct data_args_t* args,
+				size_t syscall_len,
+				__u32 send_len)
+{
+#define LOOP_LIMIT 12
+
+	struct copy_data_s {
+		char data[CAP_DATA_SIZE];
+	};
+
+	int bytes_copy = 0;
+	__u32 total_size = 0;
+
+	if (syscall_len >= sizeof(v->data))
+		total_size = sizeof(v->data);
+	else
+		total_size = send_len;
+	char *first_iov = NULL;
+	__u32 first_iov_size = 0;
+
+#pragma unroll
+	for (unsigned int i = 0;
+	     i < LOOP_LIMIT && i < args->iovlen && bytes_copy < total_size;
+	     ++i) {
+		COPY_IOV(v_buff->data,
+			 v_buff->len + offsetof(typeof(struct __socket_data),
+						data), &args->iov[i],
+			 total_size, bytes_copy, first_iov, first_iov_size);
+	}
+
+	return bytes_copy;
+}
+
+static __inline int infer_iovecs_copy(struct infer_data_s *infer_buf,
+				      const struct data_args_t *args,
+				      size_t syscall_len,
+				      __u32 copy_len,
+				      char **f_iov,
+				      __u32 *f_iov_len)
+{
+#define INFER_COPY_SZ	 32
+#define INFER_LOOP_LIMIT 3
+	struct copy_data_s {
+		char data[INFER_COPY_SZ];
+	};
+
+	int bytes_copy = 0;
+	__u32 total_size = 0;
+	infer_buf->len = 0;
+
+	if (syscall_len >= sizeof(infer_buf->data))
+		total_size = sizeof(infer_buf->data);
+	else
+		total_size = copy_len;
+	char *first_iov = NULL;
+	__u32 first_iov_size = 0;
+
+#pragma unroll
+	for (unsigned int i = 0;
+	     i < INFER_LOOP_LIMIT && i < args->iovlen && bytes_copy < total_size;
+	     i++) {
+		COPY_IOV(infer_buf->data, infer_buf->len, &args->iov[i],
+			 total_size, bytes_copy, first_iov, first_iov_size);
+	}
+
+	*f_iov = first_iov;
+	*f_iov_len = first_iov_size;
+
+	return bytes_copy;
 }
 
 #include "uprobe_base_bpf.c"
@@ -425,7 +541,7 @@ static __inline void connect_submit(struct pt_regs *ctx, struct conn_info_t *v, 
 #endif
 
 static __inline void infer_l7_class(struct conn_info_t* conn_info,
-				    enum traffic_direction direction, const char* buf,
+				    enum traffic_direction direction, const struct data_args_t *args,
 				    size_t count, __u8 sk_type,
 				    const struct process_data_extra *extra) {
 	if (conn_info == NULL) {
@@ -434,7 +550,7 @@ static __inline void infer_l7_class(struct conn_info_t* conn_info,
 
 	// 推断应用协议
 	struct protocol_message_t inferred_protocol =
-		infer_protocol(buf, count, conn_info, sk_type, extra);
+		infer_protocol(args, count, conn_info, sk_type, extra);
 	if (inferred_protocol.protocol == PROTO_UNKNOWN &&
 	    inferred_protocol.type == MSG_UNKNOWN) {
 		conn_info->protocol = PROTO_UNKNOWN;
@@ -794,57 +910,6 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 	}
 }
 
-static __inline int iovecs_copy(struct __socket_data *v,
-				struct __socket_data_buffer *v_buff,
-				const struct data_args_t* args,
-				size_t syscall_len,
-				__u32 send_len)
-{
-#define LOOP_LIMIT 12
-
-	struct copy_data_s {
-		char data[CAP_DATA_SIZE];
-	};
-
-	__u32 len;
-	struct copy_data_s *cp;
-	int bytes_sent = 0;
-	__u32 iov_size;
-	__u32 total_size = 0;
-
-	if (syscall_len >= sizeof(v->data))
-		total_size = sizeof(v->data);
-	else
-		total_size = send_len;
-
-#pragma unroll
-	for (unsigned int i = 0; i < LOOP_LIMIT && i < args->iovlen && bytes_sent < total_size; ++i) {
-		struct iovec iov_cpy;
-		bpf_probe_read(&iov_cpy, sizeof(struct iovec), &args->iov[i]);
-
-		const int bytes_remaining = total_size - bytes_sent;
-		iov_size = iov_cpy.iov_len < bytes_remaining ? iov_cpy.iov_len : bytes_remaining;
-
-		len = v_buff->len + offsetof(typeof(struct __socket_data), data) + bytes_sent;
-		cp = (struct copy_data_s *)(v_buff->data + len);
-		if (len > (sizeof(v_buff->data) - sizeof(*cp)))
-			return bytes_sent;
-
-		if (iov_size >= sizeof(cp->data)) {
-			bpf_probe_read(cp->data, sizeof(cp->data), iov_cpy.iov_base);
-			iov_size = sizeof(cp->data);
-		} else {
-			iov_size = iov_size & (sizeof(cp->data) - 1);
-			// 使用'iov_size + 1'代替'iov_size'，来适应inux 4.14.x
-			bpf_probe_read(cp->data, iov_size + 1, iov_cpy.iov_base);
-		}
-
-		bytes_sent += iov_size;
-	}
-
-	return bytes_sent;
-}
-
 static __inline int
 data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	    const struct data_args_t *args, const bool vecs, __u32 syscall_len,
@@ -1132,30 +1197,8 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 	if (data_submit_dircet) {
 		conn_info->protocol = PROTO_ORTHER;
 		conn_info->message_type = MSG_REQUEST;
-	} else if (!extra->vecs) {
-		infer_l7_class(conn_info, direction, args->buf, bytes_count, sock_state, extra);
 	} else {
-		struct iovec iov_cpy = {};
-		int i;
-		ssize_t length = 0;
-		void *buf = NULL;
-#pragma unroll
-		// length = sum(iov[i].iov_len),
-		// and now the loop is limited to 5 times
-		for (i = 0; i < 5; i++) {
-			if (i >= args->iovlen) {
-				break;
-			}
-			bpf_probe_read(&iov_cpy, sizeof(struct iovec),
-				       &args->iov[i]);
-			if (buf == NULL) {
-				buf = iov_cpy.iov_base;
-			}
-			length += iov_cpy.iov_len;
-		}
-		// Ensure we are not reading beyond the available data.
-		const size_t buf_size = length < bytes_count ? length : bytes_count;
-		infer_l7_class(conn_info, direction, buf, buf_size, sock_state, extra);
+		infer_l7_class(conn_info, direction, args, bytes_count, sock_state, extra);
 	}
 
 	// When at least one of protocol or message_type is valid, 
