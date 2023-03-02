@@ -14,20 +14,20 @@
  * limitations under the License.
  */
 
-use thiserror::Error;
-
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("{0}")]
-    ParseCidr(String),
-    #[error("{0}")]
-    ParseIpGroupData(String),
-    #[error("{0}")]
-    ParsePlatformData(String),
-    #[error("{0}")]
-    ParseGpid(String),
-    #[error("{0}")]
-    ParseEventData(String),
-    #[error("{0}")]
-    InvalidProtocol(String),
+pub fn get_string_from_chars(chars: &[u8]) -> String {
+    let mut end_index = chars.len();
+    for (i, char) in chars.iter().enumerate() {
+        if *char == b'\0' {
+            end_index = i;
+            break;
+        }
+    }
+    let result = chars[..end_index]
+        .iter()
+        .map(|x| if x.is_ascii_graphic() { *x } else { b'.' }) // Check each character, instead of ascii characters, use dots instead
+        .collect::<Vec<u8>>();
+    unsafe {
+        // safe because it has been checked that every character is ascii
+        String::from_utf8_unchecked(result)
+    }
 }

@@ -103,6 +103,7 @@ use crate::{
 use packet_sequence_block::BoxedPacketSequenceBlock;
 use pcap_assembler::{BoxedPcapBatch, PcapAssembler};
 
+use crate::common::proc_event::BoxedProcEvents;
 #[cfg(target_os = "linux")]
 use public::netns::{links_by_name_regex_in_netns, NetNs};
 #[cfg(target_os = "windows")]
@@ -971,6 +972,7 @@ pub struct AgentComponents {
     pub profile_uniform_sender: UniformSenderThread<Profile>,
     pub packet_sequence_parsers: Vec<PacketSequenceParser>, // Enterprise Edition Feature: packet-sequence
     pub packet_sequence_uniform_sender: UniformSenderThread<BoxedPacketSequenceBlock>, // Enterprise Edition Feature: packet-sequence
+    pub proc_event_uniform_sender: UniformSenderThread<BoxedProcEvents>,
     pub exception_handler: ExceptionHandler,
     pub domain_name_listener: DomainNameListener,
     pub npb_bps_limit: Arc<LeakyBucket>,
@@ -1735,6 +1737,29 @@ impl AgentComponents {
             );
             collectors.push(collector);
         }
+        let proc_event_queue_name = "1-proc-event-to-sender";
+        #[allow(unused)]
+        let (proc_event_sender, proc_event_receiver, counter) = queue::bounded_with_debug(
+            yaml_config.external_metrics_sender_queue_size,
+            proc_event_queue_name,
+            &queue_debugger,
+        );
+        stats_collector.register_countable(
+            "queue",
+            Countable::Owned(Box::new(counter)),
+            vec![StatsOption::Tag(
+                "module",
+                proc_event_queue_name.to_string(),
+            )],
+        );
+        let proc_event_uniform_sender = UniformSenderThread::new(
+            proc_event_queue_name,
+            Arc::new(proc_event_receiver),
+            config_handler.sender(),
+            stats_collector.clone(),
+            exception_handler.clone(),
+            true,
+        );
 
         let ebpf_dispatcher_id = dispatchers.len();
         #[cfg(target_os = "linux")]
@@ -1803,6 +1828,7 @@ impl AgentComponents {
                 policy_getter,
                 log_sender,
                 flow_sender,
+                proc_event_sender,
                 &queue_debugger,
                 stats_collector.clone(),
             )
@@ -2033,6 +2059,7 @@ impl AgentComponents {
             prometheus_uniform_sender,
             telegraf_uniform_sender,
             profile_uniform_sender,
+            proc_event_uniform_sender,
             tap_mode: candidate_config.tap_mode,
             packet_sequence_uniform_sender, // Enterprise Edition Feature: packet-sequence
             packet_sequence_parsers,        // Enterprise Edition Feature: packet-sequence
@@ -2196,6 +2223,9 @@ impl AgentComponents {
             join_handles.push(h);
         }
         if let Some(h) = self.profile_uniform_sender.notify_stop() {
+            join_handles.push(h);
+        }
+        if let Some(h) = self.proc_event_uniform_sender.notify_stop() {
             join_handles.push(h);
         }
         // Enterprise Edition Feature: packet-sequence

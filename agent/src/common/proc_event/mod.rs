@@ -14,20 +14,11 @@
  * limitations under the License.
  */
 
-use thiserror::Error;
-
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("{0}")]
-    ParseCidr(String),
-    #[error("{0}")]
-    ParseIpGroupData(String),
-    #[error("{0}")]
-    ParsePlatformData(String),
-    #[error("{0}")]
-    ParseGpid(String),
-    #[error("{0}")]
-    ParseEventData(String),
-    #[error("{0}")]
-    InvalidProtocol(String),
-}
+#[cfg(target_os = "linux")]
+mod linux;
+#[cfg(target_os = "linux")]
+pub use linux::*;
+#[cfg(target_os = "windows")]
+mod windows;
+#[cfg(target_os = "windows")]
+pub use self::windows::*;

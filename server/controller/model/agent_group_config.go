@@ -151,6 +151,8 @@ type EbpfConfig struct {
 	MaxTraceEntries         *int                               `yaml:"max-trace-entries,omitempty"`
 	SocketMapMaxReclaim     *int                               `yaml:"socket-map-max-reclaim,omitempty"`
 	GoTracingTimeout        *int                               `yaml:"go-tracing-timeout,omitempty"`
+	IOEventCollectMode      *int                               `yaml:"io-event-collect-mode,omitempty"`
+	IOEventMinimalDuration  *string                            `yaml:"io-event-minimal-duration,omitempty"`
 }
 
 type OsProcRegex struct {

@@ -54,6 +54,7 @@ pub enum SendMessageType {
     OpenTelemetryCompressed = 11,
     RawPcap = 12, // Enterprise Edition Feature: pcap
     Profile = 13,
+    ProcEvents = 14,
 }
 
 impl fmt::Display for SendMessageType {
@@ -73,6 +74,7 @@ impl fmt::Display for SendMessageType {
             Self::OpenTelemetryCompressed => write!(f, "open_telemetry compressed"),
             Self::RawPcap => write!(f, "raw_pcap"), // Enterprise Edition Feature: pcap
             Self::Profile => write!(f, "profile"),
+            Self::ProcEvents => write!(f, "proc_events"),
         }
     }
 }

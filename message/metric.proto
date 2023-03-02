@@ -202,3 +202,29 @@ message Profile {
     bytes data = 11;
 }
 
+enum IoOperation {
+    Read = 0;
+    Write = 1;
+}
+
+message IoEventData {
+    uint32 bytes_count = 1;
+    IoOperation operation = 2;
+    uint64 latency = 3;
+    bytes filename = 4;
+}
+
+enum EventType {
+    IoEvent = 0;
+}
+
+message ProcEvent {
+    uint32 pid = 1;
+    uint32 thread_id = 2;
+    uint32 coroutine_id = 3;
+    uint64 start_time = 4;
+    uint64 end_time = 5;
+    EventType event_type = 6;
+    IoEventData io_event_data = 7;
+}
+

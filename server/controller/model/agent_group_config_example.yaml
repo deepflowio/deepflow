@@ -937,6 +937,19 @@ vtap_group_id: g-xxxxxx
     ##   If the value is 0, this feature is disabled. Tracing only considers the thread number.
     #go-tracing-timeout: 0
 
+    ## eBPF IO event collect mode
+    ## Default: 1 . Range: [0, 1, 2]
+    ## Note:
+    ##   0: Indicates that no IO events are collected.
+    ##   1: Indicates that only IO events within the request life cycle are collected.
+    ##   2: Indicates that all IO events are collected.
+    #io-event-collect-mode: 1
+
+    ## eBPF IO event minimal duration
+    ## Default: 1ms. Range: [1ns, 1s]
+    ## Note: Only collect IO events with delay exceeding this threshold, the default value is 1ms.
+    #io-event-minimal-duration: 1ms
+
   ######################################
   ## Agent Running in Standalone Mode ##
   ######################################
