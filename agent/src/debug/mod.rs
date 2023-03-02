@@ -34,7 +34,6 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 pub const QUEUE_LEN: usize = 1024;
 pub const BEACON_INTERVAL: Duration = Duration::from_secs(60);
-pub const BEACON_PORT: u16 = 30035;
 pub const DEBUG_QUEUE_IDLE_TIMEOUT: Duration = Duration::from_secs(30);
 pub const DEEPFLOW_AGENT_BEACON: &str = "deepflow-agent";
 
