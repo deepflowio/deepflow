@@ -281,6 +281,15 @@ fn main() {
             CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
         );
 
+        set_io_event_collect_mode(1);
+
+        // Normal operating systems rarely have file io exceeding 1ms.
+        // Adjust the time to 1000 nanoseconds during the test
+        set_io_event_minimal_duration(1000);
+
+        // enable go auto traceing,
+        set_go_tracing_timeout(1);
+
         /*
             let allow_port = 443;
             let mut allow_port_bitmap: [u8; 65536 / 8] = [0; 65536 / 8];
@@ -320,10 +329,6 @@ fn main() {
 
         // test data limit max
         set_data_limit_max(10000);
-
-        // test go traceing timeout,
-        // Defaults to 0 seconds if the function is not called
-        //set_go_tracing_timeout(0);
 
         bpf_tracer_finish();
 
