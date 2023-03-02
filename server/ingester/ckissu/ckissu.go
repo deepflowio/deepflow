@@ -657,7 +657,7 @@ var ColumnAdd623 = []*ColumnAdds{
 	&ColumnAdds{
 		Dbs:         []string{"flow_metrics"},
 		Tables:      vtapAppTables,
-		ColumnNames: []string{"app_instance"},
+		ColumnNames: []string{"app_instance", "endpoint"},
 		ColumnType:  ckdb.String,
 	},
 }
@@ -925,7 +925,7 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo, isEdgeTab
 			&ColumnAdds{
 				Dbs:         []string{d.db},
 				Tables:      []string{d.name, d.name + "_agg"},
-				ColumnNames: []string{"app_instance"},
+				ColumnNames: []string{"app_instance", "endpoint"},
 				ColumnType:  ckdb.String,
 			},
 		}...)

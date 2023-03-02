@@ -306,6 +306,7 @@ type Field struct {
 	L7Protocol   datatype.L7Protocol
 	AppService   string
 	AppInstance  string
+	Endpoint     string
 	SignalSource uint16
 
 	TagType  uint8
@@ -665,6 +666,7 @@ func (t *Tag) MarshalTo(b []byte) int {
 		offset += copy(b[offset:], strconv.FormatUint(uint64(t.L7Protocol), 10))
 		offset += copy(b[offset:], ",app_service="+t.AppService)
 		offset += copy(b[offset:], ",app_instance="+t.AppInstance)
+		offset += copy(b[offset:], ",endpoint="+t.Endpoint)
 	}
 	if t.Code&MAC != 0 {
 		// 不存入tsdb中
@@ -955,6 +957,7 @@ func GenTagColumns(code Code) []*ckdb.Column {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("l7_protocol", ckdb.UInt8).SetComment("应用协议0: unknown, 1: http, 2: dns, 3: mysql, 4: redis, 5: dubbo, 6: kafka"))
 		columns = append(columns, ckdb.NewColumnWithGroupBy("app_service", ckdb.LowCardinalityString))
 		columns = append(columns, ckdb.NewColumnWithGroupBy("app_instance", ckdb.String))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("endpoint", ckdb.String))
 	}
 
 	if code&MAC != 0 {
@@ -1160,6 +1163,7 @@ func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) {
 		block.Write(uint8(t.L7Protocol))
 		block.Write(t.AppService)
 		block.Write(t.AppInstance)
+		block.Write(t.Endpoint)
 	}
 
 	if code&MAC != 0 {
@@ -1350,6 +1354,7 @@ func (t *Tag) ReadFromPB(p *pb.MiniTag) {
 	t.L7Protocol = datatype.L7Protocol(p.Field.L7Protocol)
 	t.AppService = p.Field.AppService
 	t.AppInstance = p.Field.AppInstance
+	t.Endpoint = p.Field.Endpoint
 	// In order to be compatible with the old version of Agent data, GPID needs to be set
 	if t.Code&IPPath != 0 {
 		t.Code |= GPIDPath
