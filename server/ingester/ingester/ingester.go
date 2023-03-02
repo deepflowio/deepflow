@@ -192,7 +192,7 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 		closers = append(closers, extMetrics)
 
 		// write event data
-		event, err := event.NewEvent(eventConfig, shared.ResourceEventQueue)
+		event, err := event.NewEvent(eventConfig, shared.ResourceEventQueue, receiver, platformDataManager)
 		checkError(err)
 		event.Start()
 		closers = append(closers, event)

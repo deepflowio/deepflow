@@ -18,29 +18,32 @@ package dbwriter
 
 import (
 	basecommon "github.com/deepflowio/deepflow/server/ingester/common"
-	"github.com/deepflowio/deepflow/server/ingester/event/common"
+	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/pool"
 )
 
 const (
-	DefaultPartition = ckdb.TimeFuncTwelveHour
+	DefaultPartition    = ckdb.TimeFuncTwelveHour
+	EVENT_TYPE_RESOURCE = "Resource"
+	EVENT_TYPE_IO       = "IO"
+	IO_EVENT_TYPE_READ  = "read"
+	IO_EVENT_TYPE_WRITE = "write"
 )
 
 type EventStore struct {
-	Time   uint32 // s
-	Source string
+	Time uint32 // s
+
+	StartTime int64
+	EndTime   int64
+
 	Tagged uint8
 
-	InstanceType uint32 // l3_device_type
-	InstanceID   uint32
-	InstanceName string
-
-	EventType        string
+	EventType        string // Resource / File IO
+	EventSubType     string
 	EventDescription string
-	SubnetIDs        []uint32
-	IPs              []string
-	GProcessID       uint32
+
+	GProcessID uint32
 
 	RegionID     uint16
 	AZID         uint16
@@ -54,20 +57,38 @@ type EventStore struct {
 	L3DeviceType uint8
 	L3DeviceID   uint32
 	ServiceID    uint32
+	VTAPID       uint16
+
+	AutoInstanceID   uint32
+	AutoInstanceType uint8
+	AutoServiceID    uint32
+	AutoServiceType  uint8
+
+	AppInstance string
+
+	AttributeNames  []string
+	AttributeValues []string
+
+	Bytes    uint32
+	Duration uint64
+
+	fields, fieldValues []interface{}
 }
 
 func (e *EventStore) WriteBlock(block *ckdb.Block) {
 	block.WriteDateTime(e.Time)
-	block.Write(e.Source,
+	block.Write(
+		e.StartTime,
+		e.EndTime,
+
 		e.Tagged,
-		e.InstanceType,
-		e.InstanceID,
-		e.InstanceName,
+
 		e.EventType,
+		e.EventSubType,
 		e.EventDescription,
-		e.SubnetIDs,
-		e.IPs,
+
 		e.GProcessID,
+
 		e.RegionID,
 		e.AZID,
 		e.L3EpcID,
@@ -79,7 +100,21 @@ func (e *EventStore) WriteBlock(block *ckdb.Block) {
 		e.PodGroupID,
 		e.L3DeviceType,
 		e.L3DeviceID,
-		e.ServiceID)
+		e.ServiceID,
+		e.VTAPID,
+
+		e.AutoInstanceID,
+		e.AutoInstanceType,
+		e.AutoServiceID,
+		e.AutoServiceType,
+		e.AppInstance,
+
+		e.AttributeNames,
+		e.AttributeValues,
+
+		e.Bytes,
+		e.Duration,
+	)
 }
 
 func (e *EventStore) Release() {
@@ -89,15 +124,15 @@ func (e *EventStore) Release() {
 func EventColumns() []*ckdb.Column {
 	return []*ckdb.Column{
 		ckdb.NewColumn("time", ckdb.DateTime),
-		ckdb.NewColumn("source", ckdb.LowCardinalityString).SetComment("事件来源"),
-		ckdb.NewColumn("tagged", ckdb.UInt8).SetComment("标签是否为填充"),
-		ckdb.NewColumn("instance_type", ckdb.UInt32).SetComment("资源类型"),
-		ckdb.NewColumn("instance_id", ckdb.UInt32).SetComment("资源ID"),
-		ckdb.NewColumn("instance_name", ckdb.LowCardinalityString).SetComment("资源名称"),
+		ckdb.NewColumn("start_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
+		ckdb.NewColumn("end_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
+
+		ckdb.NewColumn("tagged", ckdb.UInt8).SetComment("标签是否为填充, 用于调试"),
+
 		ckdb.NewColumn("event_type", ckdb.LowCardinalityString).SetComment("事件类型"),
+		ckdb.NewColumn("event_subtype", ckdb.LowCardinalityString).SetComment("事件子类型"), // resource, read, write
 		ckdb.NewColumn("event_desc", ckdb.String).SetComment("事件信息"),
-		ckdb.NewColumn("subnet_ids", ckdb.ArrayUInt32).SetComment("子网IDs"),
-		ckdb.NewColumn("ips", ckdb.ArrayString).SetComment("IPs"),
+
 		ckdb.NewColumn("gprocess_id", ckdb.UInt32).SetComment("全局进程ID"),
 
 		ckdb.NewColumn("region_id", ckdb.UInt16).SetComment("云平台区域ID"),
@@ -113,28 +148,33 @@ func EventColumns() []*ckdb.Column {
 		ckdb.NewColumn("l3_device_type", ckdb.UInt8).SetComment("资源类型"),
 		ckdb.NewColumn("l3_device_id", ckdb.UInt32).SetComment("资源ID"),
 		ckdb.NewColumn("service_id", ckdb.UInt32).SetComment("服务ID"),
+		ckdb.NewColumn("vtap_id", ckdb.UInt16).SetComment("采集器ID"),
+
+		ckdb.NewColumn("auto_instance_id", ckdb.UInt32),
+		ckdb.NewColumn("auto_instance_type", ckdb.UInt8),
+		ckdb.NewColumn("auto_service_id", ckdb.UInt32),
+		ckdb.NewColumn("auto_service_type", ckdb.UInt8),
+		ckdb.NewColumn("app_instance", ckdb.String).SetComment("app instance"),
+
+		ckdb.NewColumn("attribute_names", ckdb.ArrayString).SetComment("额外的属性"),
+		ckdb.NewColumn("attribute_values", ckdb.ArrayString).SetComment("额外的属性对应的值"),
+
+		ckdb.NewColumn("bytes", ckdb.UInt32),
+		ckdb.NewColumn("duration", ckdb.UInt64).SetComment("精度: 微秒"),
 	}
 }
 
-func GenEventCKTable(eventType common.EventType, cluster, storagePolicy string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
+func GenEventCKTable(cluster, storagePolicy string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
 	timeKey := "time"
 	engine := ckdb.MergeTree
-	orderKeys := []string{"l3_device_type", "l3_device_id", timeKey}
-
-	var columns []*ckdb.Column
-	switch eventType {
-	case common.RESOURCE_EVENT:
-		columns = EventColumns()
-	default:
-		return nil
-	}
+	orderKeys := []string{"event_type", "event_subtype", "l3_epc_id", "l3_device_type", "l3_device_id"}
 
 	return &ckdb.Table{
 		Version:         basecommon.CK_VERSION,
 		Database:        EVENT_DB,
-		LocalName:       eventType.TableName() + ckdb.LOCAL_SUBFFIX,
-		GlobalName:      eventType.TableName(),
-		Columns:         columns,
+		LocalName:       EVENT_TABLE + ckdb.LOCAL_SUBFFIX,
+		GlobalName:      EVENT_TABLE,
+		Columns:         EventColumns(),
 		TimeKey:         timeKey,
 		TTL:             ttl,
 		PartitionFunc:   DefaultPartition,
@@ -147,10 +187,27 @@ func GenEventCKTable(eventType common.EventType, cluster, storagePolicy string, 
 	}
 }
 
+func (e *EventStore) ToFlowTags() ([]interface{}, []interface{}) {
+	if cap(e.fields) < len(e.AttributeNames) {
+		e.fields = make([]interface{}, 0, len(e.AttributeNames))
+	}
+	if cap(e.fieldValues) < len(e.AttributeNames) {
+		e.fieldValues = make([]interface{}, 0, len(e.AttributeNames))
+	}
+	e.fields, e.fieldValues = e.fields[:0], e.fieldValues[:0]
+	for i, name := range e.AttributeNames {
+		e.fields = append(e.fields, flow_tag.NewTagField(e.Time, EVENT_DB, EVENT_TABLE, int32(e.L3EpcID), e.PodNSID, flow_tag.FieldTag, name))
+		e.fieldValues = append(e.fieldValues, flow_tag.NewTagFieldValue(e.Time, EVENT_DB, EVENT_TABLE, int32(e.L3EpcID), e.PodNSID, flow_tag.FieldTag, name, e.AttributeValues[i]))
+	}
+	return e.fields, e.fieldValues
+}
+
 var eventPool = pool.NewLockFreePool(func() interface{} {
 	return &EventStore{
-		SubnetIDs: []uint32{},
-		IPs:       []string{},
+		AttributeNames:  []string{},
+		AttributeValues: []string{},
+		fields:          []interface{}{},
+		fieldValues:     []interface{}{},
 	}
 })
 
@@ -162,10 +219,15 @@ func ReleaseEventStore(e *EventStore) {
 	if e == nil {
 		return
 	}
-	subnetIDs := e.SubnetIDs[:0]
-	ips := e.IPs[:0]
+	attributeNames := e.AttributeNames[:0]
+	attributeValues := e.AttributeValues[:0]
+	fields := e.fields[:0]
+	fieldValues := e.fieldValues[:0]
 	*e = EventStore{}
-	e.SubnetIDs = subnetIDs
-	e.IPs = ips
+	e.AttributeNames = attributeNames
+	e.AttributeValues = attributeValues
+	e.fields = fields
+	e.fieldValues = fieldValues
+
 	eventPool.Put(e)
 }

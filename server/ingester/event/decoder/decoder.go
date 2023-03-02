@@ -17,7 +17,11 @@
 package decoder
 
 import (
+	"fmt"
 	"net"
+	"strconv"
+	"strings"
+	"time"
 
 	logging "github.com/op/go-logging"
 
@@ -26,16 +30,21 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/event/common"
 	"github.com/deepflowio/deepflow/server/ingester/event/config"
 	"github.com/deepflowio/deepflow/server/ingester/event/dbwriter"
+	"github.com/deepflowio/deepflow/server/libs/codec"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
+	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/queue"
+	"github.com/deepflowio/deepflow/server/libs/receiver"
 	"github.com/deepflowio/deepflow/server/libs/stats"
 	"github.com/deepflowio/deepflow/server/libs/utils"
+	"github.com/deepflowio/deepflow/server/libs/zerodoc/pb"
 )
 
 var log = logging.MustGetLogger("event.decoder")
 
 const (
 	BUFFER_SIZE = 1024
+	SEPARATOR   = ", "
 )
 
 type Counter struct {
@@ -47,6 +56,7 @@ type Counter struct {
 type Decoder struct {
 	eventType         common.EventType
 	resourceInfoTable *ResourceInfoTable
+	platformData      *grpc.PlatformInfoTable
 	inQueue           queue.QueueReader
 	eventWriter       *dbwriter.EventWriter
 	debugEnabled      bool
@@ -60,6 +70,7 @@ func NewDecoder(
 	eventType common.EventType,
 	inQueue queue.QueueReader,
 	eventWriter *dbwriter.EventWriter,
+	platformData *grpc.PlatformInfoTable,
 	config *config.Config,
 ) *Decoder {
 	controllers := make([]net.IP, len(config.Base.ControllerIPs))
@@ -69,10 +80,14 @@ func NewDecoder(
 			controllers[i] = controllers[i].To4()
 		}
 	}
-	resourceInfoTable := NewResourceInfoTable(controllers, int(config.Base.ControllerPort), config.Base.GrpcBufferSize)
+	var resourceInfoTable *ResourceInfoTable
+	if eventType == common.RESOURCE_EVENT {
+		resourceInfoTable = NewResourceInfoTable(controllers, int(config.Base.ControllerPort), config.Base.GrpcBufferSize)
+	}
 	return &Decoder{
 		eventType:         eventType,
 		resourceInfoTable: resourceInfoTable,
+		platformData:      platformData,
 		inQueue:           inQueue,
 		debugEnabled:      log.IsEnabledFor(logging.DEBUG),
 		eventWriter:       eventWriter,
@@ -89,10 +104,13 @@ func (d *Decoder) GetCounter() interface{} {
 
 func (d *Decoder) Run() {
 	log.Infof("event(%s) decoder run", d.eventType)
-	d.resourceInfoTable.Start()
+	if d.resourceInfoTable != nil {
+		d.resourceInfoTable.Start()
+	}
 	ingestercommon.RegisterCountableForIngester("decoder", d, stats.OptionStatTags{
 		"event_type": d.eventType.String()})
 	buffer := make([]interface{}, BUFFER_SIZE)
+	decoder := &codec.SimpleDecoder{}
 	for {
 		n := d.inQueue.Gets(buffer)
 		for i := 0; i < n; i++ {
@@ -105,31 +123,124 @@ func (d *Decoder) Run() {
 				event, ok := buffer[i].(*eventapi.ResourceEvent)
 				if !ok {
 					log.Warning("get decode queue data type wrong")
-				} else {
-					d.handleResourceEvent(event)
-					event.Release()
+					continue
 				}
-			default:
-				log.Warningf("unknown event type %d", d.eventType)
+				d.handleResourceEvent(event)
+				event.Release()
+			case common.PROC_EVENT:
+				if buffer[i] == nil {
+					continue
+				}
+				d.counter.InCount++
+				recvBytes, ok := buffer[i].(*receiver.RecvBuffer)
+				if !ok {
+					log.Warning("get decode queue data type wrong")
+					continue
+				}
+				decoder.Init(recvBytes.Buffer[recvBytes.Begin:recvBytes.End])
+				d.handleProcEvent(recvBytes.VtapID, decoder)
+				receiver.ReleaseRecvBuffer(recvBytes)
 			}
 		}
 	}
 }
 
+func (d *Decoder) WriteProcEvent(vtapId uint16, e *pb.ProcEvent) {
+	eventStore := dbwriter.AcquireEventStore()
+	eventStore.Time = uint32(time.Duration(e.StartTime) / time.Second)
+	eventStore.StartTime = int64(time.Duration(e.StartTime) / time.Microsecond)
+	eventStore.EndTime = int64(time.Duration(e.EndTime) / time.Microsecond)
+	eventStore.Duration = uint64(e.EndTime - e.StartTime)
+
+	if e.EventType == pb.EventType_IoEvent {
+		eventStore.EventType = dbwriter.EVENT_TYPE_IO
+	} else {
+		eventStore.EventType = e.EventType.String()
+	}
+
+	if e.IoEventData != nil {
+		ioData := e.IoEventData
+		eventStore.EventSubType = strings.ToLower(ioData.Operation.String())
+		eventStore.EventDescription = fmt.Sprintf("process %s (%d) %s %d bytes and took %dms", string(e.ProcessKname), e.Pid, eventStore.EventSubType, ioData.BytesCount, ioData.Latency/uint64(time.Millisecond))
+		eventStore.AttributeNames = append(eventStore.AttributeNames, "file_name", "thread_id", "coroutine_id")
+		eventStore.AttributeValues = append(eventStore.AttributeValues, string(ioData.Filename), strconv.Itoa(int(e.ThreadId)), strconv.Itoa(int(e.CoroutineId)))
+		eventStore.Bytes = ioData.BytesCount
+		eventStore.Duration = uint64(eventStore.EndTime - eventStore.StartTime)
+	}
+	eventStore.VTAPID = vtapId
+	eventStore.L3EpcID = d.platformData.QueryVtapEpc0(uint32(vtapId))
+	if baseInfo := d.platformData.QueryEpcIDBaseInfo(eventStore.L3EpcID); baseInfo != nil {
+		eventStore.RegionID = uint16(baseInfo.RegionID)
+	}
+	eventStore.AppInstance = strconv.Itoa(int(e.Pid))
+
+	d.eventWriter.Write(eventStore)
+}
+
+func (d *Decoder) handleProcEvent(vtapId uint16, decoder *codec.SimpleDecoder) {
+	for !decoder.IsEnd() {
+		bytes := decoder.ReadBytes()
+		if decoder.Failed() {
+			if d.counter.ErrorCount == 0 {
+				log.Errorf("proc event decode failed, offset=%d len=%d", decoder.Offset(), len(decoder.Bytes()))
+			}
+			d.counter.ErrorCount++
+			return
+		}
+		pbProcEvent := &pb.ProcEvent{}
+		if err := pbProcEvent.Unmarshal(bytes); err != nil {
+			if d.counter.ErrorCount == 0 {
+				log.Errorf("proc event unmarshal failed, err: %s", err)
+			}
+			d.counter.ErrorCount++
+			continue
+		}
+		d.WriteProcEvent(vtapId, pbProcEvent)
+	}
+}
+
+func uint32ArrayToStr(u32s []uint32) string {
+	sb := &strings.Builder{}
+	for i, u32 := range u32s {
+		sb.WriteString(strconv.Itoa(int(u32)))
+		if i < len(u32s)-1 {
+			sb.WriteString(SEPARATOR)
+		}
+	}
+	return sb.String()
+}
+
+func getAutoInstance(instanceID, instanceType, GProcessID uint32) (uint32, uint8) {
+	if GProcessID == 0 || instanceType == ingestercommon.PodType {
+		return instanceID, uint8(instanceType)
+	}
+	return GProcessID, ingestercommon.ProcessType
+}
+
 func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 	eventStore := dbwriter.AcquireEventStore()
 	eventStore.Time = uint32(event.Time)
+	eventStore.StartTime = event.TimeMilli * 1000 // convert to microsecond
+	eventStore.EndTime = eventStore.StartTime
 
-	eventStore.InstanceType = event.InstanceType
-	eventStore.InstanceID = event.InstanceID
-	eventStore.InstanceName = event.InstanceName
-
-	eventStore.EventType = event.SubType
+	eventStore.EventType = dbwriter.EVENT_TYPE_RESOURCE
+	eventStore.EventSubType = event.SubType
 	eventStore.EventDescription = event.Description
 
-	eventStore.SubnetIDs = append(eventStore.SubnetIDs, event.AttributeSubnetIDs...)
-	eventStore.IPs = append(eventStore.IPs, event.AttributeIPs...)
 	eventStore.GProcessID = event.GProcessID
+
+	if len(event.AttributeSubnetIDs) > 0 {
+		eventStore.AttributeNames = append(eventStore.AttributeNames, "subnet_ids")
+		eventStore.AttributeValues = append(eventStore.AttributeValues,
+			uint32ArrayToStr(event.AttributeSubnetIDs))
+	}
+	if len(event.AttributeIPs) > 0 {
+		eventStore.AttributeNames = append(eventStore.AttributeNames, "ips")
+		eventStore.AttributeValues = append(eventStore.AttributeValues,
+			strings.Join(event.AttributeIPs, SEPARATOR))
+
+	}
+	eventStore.AutoInstanceID, eventStore.AutoInstanceType = getAutoInstance(event.InstanceID, event.InstanceType, event.GProcessID)
 
 	if event.IfNeedTagged {
 		eventStore.Tagged = 1
