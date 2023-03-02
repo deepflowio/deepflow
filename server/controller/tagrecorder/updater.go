@@ -82,7 +82,7 @@ func (b *UpdaterBase[MT, KT]) Refresh() {
 			}
 		}
 		if len(itemsToDelete) > 0 {
-			b.operateBatch(keysToAdd, itemsToAdd, b.delete)
+			b.operateBatch(keysToDelete, itemsToDelete, b.delete)
 		}
 	}
 }
