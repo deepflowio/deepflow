@@ -50,10 +50,13 @@ mod platform_consts {
 
 #[cfg(target_os = "windows")]
 mod platform_consts {
-    pub const DEFAULT_LOG_FILE: &'static str = "C:\\DeepFlow\\deepflow-agent\\log\\deepflow-agent.log";
+    pub const DEFAULT_LOG_FILE: &'static str =
+        "C:\\DeepFlow\\deepflow-agent\\log\\deepflow-agent.log";
     // NOTE yaml must be full path, otherwise service wouldn't start as you wish.
-    pub const DEFAULT_CONF_FILE: &'static str = "C:\\DeepFlow\\deepflow-agent\\deepflow-agent-windows.yaml";
-    pub const DEFAULT_TRIDENT_CONF_FILE: &'static str = "C:\\DeepFlow\\trident\\trident-windows.yaml";
+    pub const DEFAULT_CONF_FILE: &'static str =
+        "C:\\DeepFlow\\deepflow-agent\\deepflow-agent-windows.yaml";
+    pub const DEFAULT_TRIDENT_CONF_FILE: &'static str =
+        "C:\\DeepFlow\\trident\\trident-windows.yaml";
     pub const DEFAULT_COREFILE_PATH: &'static str = "C:\\DeepFlow\\deepflow-agent";
     pub const COREFILE_FORMAT: &'static str = "dump";
 }

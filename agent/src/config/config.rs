@@ -378,6 +378,7 @@ pub struct YamlConfig {
     pub os_proc_sync_enabled: bool,
     #[serde(with = "humantime_serde")]
     pub guard_interval: Duration,
+    pub check_core_file_disabled: bool,
 }
 
 impl YamlConfig {
@@ -654,6 +655,7 @@ impl Default for YamlConfig {
             os_app_tag_exec: vec![],
             os_proc_sync_enabled: false,
             guard_interval: Duration::from_secs(60),
+            check_core_file_disabled: false,
         }
     }
 }
