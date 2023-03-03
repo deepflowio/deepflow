@@ -359,4 +359,10 @@ func (k *KnowledgeGraph) FillOTel(l *L7FlowLog, platformData *grpc.PlatformInfoT
 		zerodoc.Rest,
 		layers.IPProtocol(l.Protocol),
 	)
+	if k.L3EpcID0 == datatype.EPC_FROM_INTERNET {
+		k.L3EpcID0 = datatype.EPC_UNKNOWN
+	}
+	if k.L3EpcID1 == datatype.EPC_FROM_INTERNET {
+		k.L3EpcID1 = datatype.EPC_UNKNOWN
+	}
 }

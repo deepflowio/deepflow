@@ -27,6 +27,7 @@ import (
 const (
 	EPC_FROM_DEEPFLOW = -1
 	EPC_FROM_INTERNET = -2 // 当流量在所有平台数据建立的map中都无法查询到对应的epcId时，epc为-2, 在函数ModifyInternetEpcId中修改
+	EPC_UNKNOWN       = 0
 	GROUP_INTERNET    = -2 // Trisolaris下发使用固定值，策略匹配不做特殊处理
 )
 
