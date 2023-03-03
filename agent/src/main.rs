@@ -19,8 +19,6 @@ use std::path::Path;
 use anyhow::Result;
 use clap::{ArgAction, Parser};
 #[cfg(target_os = "linux")]
-use public::signal::disable_coredump_by_hook_signal;
-#[cfg(target_os = "linux")]
 use signal_hook::{consts::TERM_SIGNALS, iterator::Signals};
 
 use ::deepflow_agent::*;
@@ -89,8 +87,6 @@ const VERSION_INFO: &'static trident::VersionInfo = &trident::VersionInfo {
 };
 
 fn main() -> Result<()> {
-    #[cfg(target_os = "linux")]
-    disable_coredump_by_hook_signal();
     let opts = Opts::parse();
     if opts.version {
         println!("{}", VERSION_INFO);

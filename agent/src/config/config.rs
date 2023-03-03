@@ -344,6 +344,7 @@ pub struct YamlConfig {
     pub l7_protocol_ports: HashMap<String, String>,
     #[serde(with = "humantime_serde")]
     pub guard_interval: Duration,
+    pub check_core_file_disabled: bool,
 }
 
 impl YamlConfig {
@@ -599,6 +600,7 @@ impl Default for YamlConfig {
             l7_protocol_ports: HashMap::from([(String::from("DNS"), String::from("53"))]),
             ebpf: EbpfYamlConfig::default(),
             guard_interval: Duration::from_secs(60),
+            check_core_file_disabled: false,
         }
     }
 }

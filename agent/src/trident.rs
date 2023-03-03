@@ -963,12 +963,16 @@ impl Components {
         );
         stats_sender.start();
 
+        info!("Start check number of processes...");
         trident_process_check(process_threshold);
-        if feature_flags.contains(FeatureFlags::CORE) {
-            #[cfg(target_os = "linux")]
+        #[cfg(target_os = "linux")]
+        if !yaml_config.check_core_file_disabled {
+            info!("Start check core file...");
             core_file_check();
         }
+        info!("Start check controller ip...");
         controller_ip_check(&static_config.controller_ips);
+        info!("Start check free space...");
         check(free_space_checker(
             &static_config.log_file,
             FREE_SPACE_REQUIREMENT,
@@ -977,13 +981,16 @@ impl Components {
 
         match candidate_config.tap_mode {
             TapMode::Analyzer => {
+                info!("Start check kernel...");
                 kernel_check();
+                info!("Start check tap interface...");
                 tap_interface_check(&yaml_config.src_interfaces);
             }
             _ => {
                 // NPF服务检查
                 // TODO: npf (only on windows)
                 if candidate_config.tap_mode == TapMode::Mirror {
+                    info!("Start check kernel...");
                     kernel_check();
                 }
             }
