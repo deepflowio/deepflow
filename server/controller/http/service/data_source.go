@@ -17,11 +17,15 @@
 package service
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
@@ -214,45 +218,85 @@ func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cf
 			common.RESOURCE_NOT_FOUND, fmt.Sprintf("data_source (%s) not found", lcuuid),
 		)
 	}
-
 	if dataSourceUpdate.RetentionTime > cfg.Spec.DataSourceRetentionTimeMax {
 		return model.DataSource{}, NewError(
 			common.INVALID_POST_DATA,
-			fmt.Sprintf("data_source retention_time should le %d", cfg.Spec.DataSourceRetentionTimeMax),
+			fmt.Sprintf("data_source retention_time should be %d", cfg.Spec.DataSourceRetentionTimeMax),
 		)
 	}
-	dataSource.RetentionTime = dataSourceUpdate.RetentionTime
-	mysql.Db.Save(&dataSource)
-
-	log.Infof("update data_source (%s)", dataSource.Name)
-
-	// 调用roze API配置clickhouse
-	var analyzers []mysql.Analyzer
-	mysql.Db.Find(&analyzers)
-
-	for _, analyzer := range analyzers {
-		if CallRozeAPIModRP(analyzer.IP, dataSource, cfg.Roze.Port) != nil {
-			errMsg := fmt.Sprintf(
-				"config analyzer (%s) mod data_source (%s) failed", analyzer.IP, dataSource.Name,
-			)
-			log.Error(errMsg)
-			err = NewError(common.SERVER_ERROR, errMsg)
-			break
-		}
-		log.Infof(
-			"config analyzer (%s) mod data_source (%s) complete",
-			analyzer.IP, dataSource.Name,
+	if dataSource.State == common.DATA_SOURCE_STATE_PENDING {
+		return model.DataSource{}, NewError(
+			common.PENDING, fmt.Sprintf("pending, unable to edit"),
 		)
 	}
 
+	err = callRPMod(cfg.Roze.Port, dataSource, dataSourceUpdate.RetentionTime)
 	if err != nil {
-		mysql.Db.Model(&dataSource).Updates(
-			map[string]interface{}{"state": common.DATA_SOURCE_STATE_EXCEPTION},
-		)
+		callModPRRegularly(cfg.Roze.Port, dataSource, dataSourceUpdate.RetentionTime)
 	}
 
 	response, _ := GetDataSources(map[string]interface{}{"lcuuid": lcuuid})
 	return response[0], err
+}
+
+func callRPMod(rozePort int, dataSource mysql.DataSource, updateRetentionTime int) error {
+	// 调用roze API配置clickhouse
+	var analyzers []mysql.Analyzer
+	mysql.Db.Find(&analyzers)
+
+	errs, ctx := errgroup.WithContext(context.Background())
+	for _, analyzer := range analyzers {
+		errs.Go(func() error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+				if err := CallRozeAPIModRP(analyzer.IP, dataSource, rozePort); err != nil {
+					errMsg := fmt.Sprintf("config analyzer (%s) mod data_source (%s) failed", analyzer.IP, dataSource.Name)
+					log.Errorf("%s, err: %v", errMsg, err)
+					return NewError(common.SERVER_ERROR, errMsg)
+				}
+				log.Infof("config analyzer (%s) mod data_source (%s) complete", analyzer.IP, dataSource.Name)
+				return nil
+			}
+		})
+	}
+
+	err := errs.Wait()
+	if err != nil {
+		if errors.Is(err, common.ErrorFail) {
+			mysql.Db.Model(&dataSource).Updates(map[string]interface{}{"state": common.DATA_SOURCE_STATE_EXCEPTION})
+		} else if errors.Is(err, common.ErrorPending) {
+			mysql.Db.Model(&dataSource).Updates(map[string]interface{}{"state": common.DATA_SOURCE_STATE_PENDING})
+		}
+		return err
+	} else {
+		var oldRetentionTime = dataSource.RetentionTime
+		dataSource.RetentionTime = updateRetentionTime
+		mysql.Db.Save(&dataSource)
+		log.Infof("update data_source (%s), retention time change: %d ->  %d",
+			dataSource.Name, oldRetentionTime, updateRetentionTime)
+	}
+	return nil
+}
+
+func callModPRRegularly(rozePort int, dataSource mysql.DataSource, updateRetentionTime int) {
+	log.Info("callModPR regularly, update retention time: %v", updateRetentionTime)
+	ctx, cancel := context.WithTimeout(context.TODO(), time.Hour)
+	defer cancel()
+	go func() {
+		ticker := time.NewTicker(time.Minute)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := callRPMod(rozePort, dataSource, updateRetentionTime); err == nil {
+					return
+				}
+			}
+		}
+	}()
 }
 
 func DeleteDataSource(lcuuid string, cfg *config.ControllerConfig) (map[string]string, error) {

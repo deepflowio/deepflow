@@ -2059,7 +2059,7 @@ CREATE TABLE IF NOT EXISTS data_source (
     id                          INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     name                        CHAR(64),
     tsdb_type                   CHAR(64),
-    state                       INTEGER DEFAULT 1 COMMENT '0: Exception 1: Normal',
+    state                       INTEGER DEFAULT 1 COMMENT '0: Exception 1: Normal 2: Pending',
     base_data_source_id         INTEGER,
     `interval`                  INTEGER NOT NULL COMMENT 'uint: s',
     retention_time              INTEGER NOT NULL COMMENT 'uint: day',
