@@ -71,7 +71,7 @@ func JsonResponse(c *gin.Context, data interface{}, err error) {
 				common.SELECTED_RESOURCES_NUM_EXCEEDED, common.RESOURCE_ALREADY_EXIST,
 				common.PARAMETER_ILLEGAL, common.INVALID_PARAMETERS:
 				BadRequestResponse(c, t.Status, t.Message)
-			case common.SERVER_ERROR:
+			case common.SERVER_ERROR, common.CONFIG_PENDING:
 				InternalErrorResponse(c, data, t.Status, t.Message)
 			case common.SERVICE_UNAVAILABLE:
 				ServiceUnavailableResponse(c, data, t.Status, t.Message)

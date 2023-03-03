@@ -17,6 +17,7 @@
 package common
 
 import (
+	"errors"
 	"time"
 )
 
@@ -38,6 +39,7 @@ const (
 const (
 	SUCCESS                         = "SUCCESS"
 	FAIL                            = "FAIL"
+	CONFIG_PENDING                  = "CONFIG_PENDING"
 	INVALID_PARAMETERS              = "INVALID_PARAMETERS"
 	RESOURCE_NOT_FOUND              = "RESOURCE_NOT_FOUND"
 	RESOURCE_ALREADY_EXIST          = "RESOURCE_ALREADY_EXIST"
@@ -47,6 +49,11 @@ const (
 	RESOURCE_NUM_EXCEEDED           = "RESOURCE_NUM_EXCEEDED"
 	SELECTED_RESOURCES_NUM_EXCEEDED = "SELECTED_RESOURCES_NUM_EXCEEDED"
 	SERVICE_UNAVAILABLE             = "SERVICE_UNAVAILABLE"
+)
+
+var (
+	ErrorFail    = errors.New("FAIL")
+	ErrorPending = errors.New("PENDING")
 )
 
 const (

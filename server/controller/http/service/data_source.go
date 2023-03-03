@@ -17,6 +17,7 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -207,7 +208,6 @@ func CreateDataSource(dataSourceCreate model.DataSourceCreate, cfg *config.Contr
 
 func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cfg *config.ControllerConfig) (model.DataSource, error) {
 	var dataSource mysql.DataSource
-	var err error
 
 	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&dataSource); ret.Error != nil {
 		return model.DataSource{}, NewError(
@@ -221,34 +221,43 @@ func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cf
 			fmt.Sprintf("data_source retention_time should le %d", cfg.Spec.DataSourceRetentionTimeMax),
 		)
 	}
+	oldRetentionTime := dataSource.RetentionTime
 	dataSource.RetentionTime = dataSourceUpdate.RetentionTime
-	mysql.Db.Save(&dataSource)
-
-	log.Infof("update data_source (%s)", dataSource.Name)
 
 	// 调用roze API配置clickhouse
 	var analyzers []mysql.Analyzer
 	mysql.Db.Find(&analyzers)
 
+	var err error
+	var errAnalyzerIP string
 	for _, analyzer := range analyzers {
-		if CallRozeAPIModRP(analyzer.IP, dataSource, cfg.Roze.Port) != nil {
-			errMsg := fmt.Sprintf(
-				"config analyzer (%s) mod data_source (%s) failed", analyzer.IP, dataSource.Name,
-			)
-			log.Error(errMsg)
-			err = NewError(common.SERVER_ERROR, errMsg)
+		err = CallRozeAPIModRP(analyzer.IP, dataSource, cfg.Roze.Port)
+		if err != nil {
+			errAnalyzerIP = analyzer.IP
 			break
 		}
-		log.Infof(
-			"config analyzer (%s) mod data_source (%s) complete",
-			analyzer.IP, dataSource.Name,
-		)
+		log.Infof("config analyzer (%s) mod data_source (%s) complete, retention time change: %ds -> %ds",
+			analyzer.IP, dataSource.Name, oldRetentionTime, dataSource.RetentionTime)
 	}
 
-	if err != nil {
+	if err == nil {
+		dataSource.State = common.DATA_SOURCE_STATE_NORMAL
+		mysql.Db.Save(&dataSource)
+		log.Infof("update data_source (%s), retention time change: %ds -> %ds",
+			dataSource.Name, oldRetentionTime, dataSource.RetentionTime)
+	}
+	if errors.Is(err, common.ErrorFail) {
 		mysql.Db.Model(&dataSource).Updates(
 			map[string]interface{}{"state": common.DATA_SOURCE_STATE_EXCEPTION},
 		)
+		errMsg := fmt.Sprintf("config analyzer (%s) mod data_source (%s) failed", errAnalyzerIP, dataSource.Name)
+		log.Error(errMsg)
+		err = NewError(common.SERVER_ERROR, errMsg)
+	}
+	if errors.Is(err, common.ErrorPending) {
+		warnMsg := fmt.Sprintf("config analyzer (%s) mod data_source (%s) is pending", errAnalyzerIP, dataSource.Name)
+		log.Warning(NewError(common.CONFIG_PENDING, warnMsg))
+		err = NewError(common.CONFIG_PENDING, warnMsg)
 	}
 
 	response, _ := GetDataSources(map[string]interface{}{"lcuuid": lcuuid})
