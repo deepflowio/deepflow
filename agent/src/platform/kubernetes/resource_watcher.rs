@@ -60,6 +60,7 @@ use crate::utils::stats::{
 
 const REFRESH_INTERVAL: Duration = Duration::from_secs(3600);
 const SLEEP_INTERVAL: Duration = Duration::from_secs(5);
+const SPIN_INTERVAL: Duration = Duration::from_millis(100);
 
 #[enum_dispatch]
 pub trait Watcher {
@@ -166,6 +167,8 @@ pub struct ResourceWatcher<K> {
     ready: Arc<AtomicBool>,
     stats_counter: Arc<WatcherCounter>,
     config: WatcherConfig,
+
+    listing: Arc<AtomicBool>,
 }
 
 struct Context<K> {
@@ -178,6 +181,8 @@ struct Context<K> {
     stats_counter: Arc<WatcherCounter>,
     config: WatcherConfig,
     resource_version: Option<String>,
+
+    listing: Arc<AtomicBool>,
 }
 
 impl<K> Watcher for ResourceWatcher<K>
@@ -196,6 +201,7 @@ where
             stats_counter: self.stats_counter.clone(),
             config: self.config.clone(),
             resource_version: None,
+            listing: self.listing.clone(),
         };
 
         let handle = self.runtime.spawn(Self::process(ctx));
@@ -233,7 +239,13 @@ where
     K: Clone + Debug + DeserializeOwned + Resource + Serialize + Trimmable,
     K: Metadata<Ty = ObjectMeta>,
 {
-    pub fn new(api: Api<K>, kind: &'static str, runtime: Handle, config: &WatcherConfig) -> Self {
+    pub fn new(
+        api: Api<K>,
+        kind: &'static str,
+        runtime: Handle,
+        config: &WatcherConfig,
+        listing: Arc<AtomicBool>,
+    ) -> Self {
         Self {
             api,
             entries: Arc::new(Mutex::new(HashMap::new())),
@@ -244,12 +256,13 @@ where
             ready: Default::default(),
             stats_counter: Default::default(),
             config: config.clone(),
+            listing,
         }
     }
 
     async fn process(mut ctx: Context<K>) {
         let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
-        Self::get_list_entry(&mut ctx, &mut encoder).await;
+        Self::serialized_get_list_entry(&mut ctx, &mut encoder).await;
         ctx.ready.store(true, Ordering::Relaxed);
         info!("{} watcher ready", ctx.kind);
 
@@ -272,13 +285,26 @@ where
 
     async fn full_sync(ctx: &mut Context<K>, encoder: &mut ZlibEncoder<Vec<u8>>) {
         let now = Instant::now();
-        Self::get_list_entry(ctx, encoder).await;
+        Self::serialized_get_list_entry(ctx, encoder).await;
         ctx.stats_counter
             .list_cost_time_sum
             .fetch_add(now.elapsed().as_nanos() as u64, Ordering::Relaxed);
         ctx.stats_counter.list_count.fetch_add(1, Ordering::Relaxed);
     }
 
+    async fn serialized_get_list_entry(ctx: &mut Context<K>, encoder: &mut ZlibEncoder<Vec<u8>>) {
+        while let Err(_) =
+            ctx.listing
+                .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        {
+            time::sleep(SPIN_INTERVAL).await;
+        }
+        Self::get_list_entry(ctx, encoder).await;
+        ctx.listing.store(false, Ordering::SeqCst);
+    }
+
+    // calling list on multiple resources simultaneously may consume a lot of memory
+    // use serialized_get_list_entry to avoid oom
     async fn get_list_entry(ctx: &mut Context<K>, encoder: &mut ZlibEncoder<Vec<u8>>) {
         info!(
             "list {} entries with limit {}",
@@ -366,6 +392,7 @@ where
                     let msg = format!("{} watcher list failed: {}", ctx.kind, err);
                     warn!("{}", msg);
                     ctx.err_msg.lock().await.replace(msg);
+                    return;
                 }
             }
         }
@@ -709,11 +736,18 @@ impl Trimmable for Namespace {
 pub struct ResourceWatcherFactory {
     client: Client,
     runtime: Handle,
+
+    // serialize list operation
+    listing: Arc<AtomicBool>,
 }
 
 impl ResourceWatcherFactory {
     pub fn new(client: Client, runtime: Handle) -> Self {
-        Self { client, runtime }
+        Self {
+            client,
+            runtime,
+            listing: Default::default(),
+        }
     }
 
     fn new_watcher_inner<K>(
@@ -736,6 +770,7 @@ impl ResourceWatcherFactory {
             kind,
             self.runtime.clone(),
             config,
+            self.listing.clone(),
         );
         stats_collector.register_countable(
             "resource_watcher",

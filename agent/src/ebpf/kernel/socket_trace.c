@@ -1853,16 +1853,18 @@ static __inline void trace_io_event_common(void *ctx,
 		return;
 	}
 
-	__u32 timeout = trace_conf->go_tracing_timeout;
-	struct trace_key_t trace_key = get_trace_key(timeout);
-	struct trace_info_t *trace_info_ptr = trace_map__lookup(&trace_key);
-	if (!trace_info_ptr) {
+	if (trace_conf->io_event_collect_mode == 0) {
 		return;
 	}
 
-	trace_id = trace_info_ptr->thread_trace_id;
+	__u32 timeout = trace_conf->go_tracing_timeout;
+	struct trace_key_t trace_key = get_trace_key(timeout);
+	struct trace_info_t *trace_info_ptr = trace_map__lookup(&trace_key);
+	if (trace_info_ptr) {
+		trace_id = trace_info_ptr->thread_trace_id;
+	}
 
-	if (trace_id == 0) {
+	if (trace_id == 0 && trace_conf->io_event_collect_mode == 1) {
 		return;
 	}
 
@@ -1873,6 +1875,10 @@ static __inline void trace_io_event_common(void *ctx,
 	}
 
 	latency = bpf_ktime_get_ns() - data_args->enter_ts;
+	if (latency < trace_conf->io_event_minimal_duration) {
+		return;
+	}
+
 	char *name = fd_to_name(data_args->fd);
 
 	struct __io_event_buffer *buffer = io_event_buffer__lookup(&k0);
