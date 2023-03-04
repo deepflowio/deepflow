@@ -25,7 +25,18 @@ func GetTagValues(args *common.PromMetaParams) (result *common.PromQueryResponse
 }
 
 func getMetrics(args *common.PromMetaParams) (resp []string) {
-	where := fmt.Sprintf("time>=%s and time<=%s", args.StartTime, args.EndTime)
+	// We speed up the return of the metrics list by querying the aggregation information in
+	// `flow_tag.ext_metrics_custom_field_value`. Since we do not query the original time series
+	// data, filtering metrics by time is currently not supported.
+	where := ""
+	//if args.StartTime != "" && args.EndTime != "" {
+	//	where = fmt.Sprintf("time>=%s AND time<=%s", args.StartTime, args.EndTime)
+	//} else if args.StartTime != "" {
+	//	where = fmt.Sprintf("time>=%s", args.StartTime)
+	//} else if args.EndTime != "" {
+	//	where = fmt.Sprintf("time<=%s", args.EndTime)
+	//}
+
 	resp = []string{}
 	for db, tables := range chCommon.DB_TABLE_MAP {
 		if db == DB_NAME_EXT_METRICS {
@@ -40,10 +51,10 @@ func getMetrics(args *common.PromMetaParams) (resp []string) {
 					if v.Category == METRICS_CATEGORY_CARDINALITY {
 						continue
 					}
-					if db == DB_NAME_EXT_METRICS || db == DB_NAME_DEEPFLOW_SYSTEM || (table == TABLE_NAME_L7_FLOW_LOG && strings.Contains(field, "metrics.")) {
+					if db == DB_NAME_DEEPFLOW_SYSTEM || (table == TABLE_NAME_L7_FLOW_LOG && strings.Contains(field, "metrics.")) {
 						field = v.DisplayName
 					} else {
-						field = strings.TrimPrefix(field, "metrics.")
+						field = strings.TrimPrefix(field, "metrics.") // why??
 					}
 					metricsName := ""
 					if db == DB_NAME_FLOW_METRICS {

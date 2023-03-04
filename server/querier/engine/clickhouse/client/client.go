@@ -104,8 +104,8 @@ func (c *Client) DoQuery(params *QueryParams) (result *common.Result, err error)
 		c.Debug.Error = fmt.Sprintf("%s", err)
 		return nil, err
 	}
-	var columnNames []interface{}
-	var columnTypes []string
+	columnNames := make([]interface{}, 0, len(columns))
+	columnTypes := make([]string, 0, len(columns))
 	var columnSchemas common.ColumnSchemas
 	// 获取列名和列类型
 	for _, column := range columns {
@@ -127,7 +127,7 @@ func (c *Client) DoQuery(params *QueryParams) (result *common.Result, err error)
 			c.Debug.Error = fmt.Sprintf("%s", err)
 			return nil, err
 		}
-		var record []interface{}
+		record := make([]interface{}, 0, len(row))
 		for i, rawValue := range row {
 			value, valueType, err := TransType(columnTypes[i], rawValue)
 			if err != nil {

@@ -30,7 +30,7 @@ func GetExtMetrics(db, table, where string, ctx context.Context) (map[string]*Me
 	loadMetrics := make(map[string]*Metrics)
 	var err error
 	if db == "ext_metrics" || db == "deepflow_system" || (db == "flow_log" && table == "l7_flow_log") {
-		// 避免ut报错
+		// Avoid UT failures
 		if config.Cfg == nil {
 			return nil, nil
 		}
@@ -45,12 +45,12 @@ func GetExtMetrics(db, table, where string, ctx context.Context) (map[string]*Me
 		var externalMetricSql string
 		var tableFilter string
 		var whereSql string
-		externalMetricSql = "SELECT field_name,table FROM %s_custom_field WHERE %sfield_type='metrics'%s GROUP BY field_name,table ORDER BY table, field_name ASC"
+		externalMetricSql = "SELECT field_name, table FROM %s_custom_field WHERE %s field_type='metrics' %s GROUP BY field_name, table ORDER BY table, field_name ASC"
 		if table != "" {
-			tableFilter = fmt.Sprintf("table='%s' AND ", table)
+			tableFilter = fmt.Sprintf("table='%s' AND", table)
 		}
 		if where != "" {
-			whereSql = fmt.Sprintf(" AND (%s)", where)
+			whereSql = fmt.Sprintf("AND (%s)", where)
 		}
 		externalMetricSql = fmt.Sprintf(externalMetricSql, db, tableFilter, whereSql)
 
@@ -64,8 +64,8 @@ func GetExtMetrics(db, table, where string, ctx context.Context) (map[string]*Me
 			tableName := value.([]interface{})[1].(string)
 			externalTag := tagName.(string)
 			metrics_names_field, metrics_values_field := METRICS_ARRAY_NAME_MAP[db][0], METRICS_ARRAY_NAME_MAP[db][1]
-			dbField := fmt.Sprintf("if(indexOf(%s, '%s')=0,null,%s[indexOf(%s, '%s')])", metrics_names_field, externalTag, metrics_values_field, metrics_names_field, externalTag)
-			metricName := fmt.Sprintf("%s.%s", "metrics", externalTag)
+			dbField := fmt.Sprintf("if(indexOf(%s, '%s')=0, null, %s[indexOf(%s, '%s')])", metrics_names_field, externalTag, metrics_values_field, metrics_names_field, externalTag)
+			metricName := fmt.Sprintf("metrics.%s", externalTag)
 			lm := NewMetrics(
 				i, dbField, metricName, "", METRICS_TYPE_COUNTER,
 				"metrics", []bool{true, true, true}, "", tableName, "",

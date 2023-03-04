@@ -122,7 +122,6 @@ func parseMatchersParam(matchers []string) ([][]*labels.Matcher, error) {
 	for _, s := range matchers {
 		matchers, err := parser.ParseMetricSelector(s)
 		if err != nil {
-			log.Error(err)
 			return nil, err
 		}
 		matcherSets = append(matcherSets, matchers)
@@ -135,6 +134,9 @@ OUTER:
 				continue OUTER
 			}
 		}
+		return nil, errors.New("match[] must contain at least one non-empty matcher")
+	}
+	if len(matcherSets) == 0 {
 		return nil, errors.New("match[] must contain at least one non-empty matcher")
 	}
 	return matcherSets, nil
@@ -153,9 +155,18 @@ func parseTime(s string) (time.Time, error) {
 	return time.Time{}, errors.New(fmt.Sprintf("cannot parse %q to a valid timestamp", s))
 }
 
+// API Spec: https://prometheus.io/docs/prometheus/latest/querying/api/#finding-series-by-label-matchers
 func Series(args *common.PromQueryParams) (result *common.PromQueryResponse, err error) {
-	start, _ := parseTime(args.StartTime)
-	end, _ := parseTime(args.EndTime)
+	start, err := parseTime(args.StartTime)
+	if err != nil {
+		log.Error("Parse StartTime failed: %v", err)
+		return nil, err
+	}
+	end, err := parseTime(args.EndTime)
+	if err != nil {
+		log.Error("Parse EndTime failed: %v", err)
+		return nil, err
+	}
 
 	matcherSets, err := parseMatchersParam(args.Matchers)
 	//pp.Println(args.Matchers)

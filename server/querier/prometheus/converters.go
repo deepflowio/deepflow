@@ -2,16 +2,18 @@ package prometheus
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/prometheus/prometheus/prompb"
+
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
 	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	tagdescription "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
-	//"github.com/k0kubun/pp"
-	"github.com/prometheus/prometheus/prompb"
-	"strconv"
-	"strings"
-	"time"
 )
 
 const (
@@ -28,7 +30,7 @@ func PromReaderTransToSQL(req *prompb.ReadRequest) (sql string, db string, datas
 	queriers := req.Queries
 	if len(queriers) < 1 {
 		// TODO
-		return "", "", "", nil
+		return "", "", "", errors.New("len(req.Queries) == 0, this feature is not yet implemented!")
 	}
 	q := queriers[0]
 	//pp.Println(q)
@@ -43,17 +45,20 @@ func PromReaderTransToSQL(req *prompb.ReadRequest) (sql string, db string, datas
 	metrics := []string{fmt.Sprintf("toUnixTimestamp(time) AS %s", extMetricsTimeAlias)}
 	metricsName := ""
 	table := ""
-	// filter
+
+	// metrics_name
 	for _, matcher := range q.Matchers {
-		// __name__为metrics
 		if matcher.Name == prometheusMetricsName {
 			metricsName = matcher.Value
 			if strings.Contains(metricsName, "__") {
+				// DeepFlow native metrics: ${db}__${table}__${metricsName}
+				// Prometheus/InfluxDB integrated metrics: ext_metrics__ext_common__${metricsName}
 				metricsSplit := strings.Split(metricsName, "__")
 				if _, ok := chCommon.DB_TABLE_MAP[metricsSplit[0]]; ok {
 					db = metricsSplit[0]
 					table = metricsSplit[1]
 					metricsName = metricsSplit[2]
+					// To identify which columns belong to metrics, we prefix all metrics names with `metrics.`
 					metrics = append(metrics, fmt.Sprintf("%s as `metrics.%s`", metricsName, metricsName))
 					if len(metricsSplit) > 3 {
 						datasource = metricsSplit[3]
@@ -62,10 +67,19 @@ func PromReaderTransToSQL(req *prompb.ReadRequest) (sql string, db string, datas
 					return "", "", "", fmt.Errorf("unknown metrics %v", metricsName)
 				}
 			} else {
+				// Prometheus integrated metrics: ${metricsName}
 				metrics = append(metrics, fmt.Sprintf("metrics.%s", metricsName))
 			}
+			break
+		}
+	}
+
+	// filter
+	for _, matcher := range q.Matchers {
+		if matcher.Name == prometheusMetricsName {
 			continue
 		}
+
 		op := ""
 		switch matcher.Type {
 		case prompb.LabelMatcher_EQ:
@@ -79,17 +93,19 @@ func PromReaderTransToSQL(req *prompb.ReadRequest) (sql string, db string, datas
 		default:
 			return "", "", "", fmt.Errorf("unknown match type %v", matcher.Type)
 		}
-		if db != "" || db != "deepflow_system" {
-			filters = append(filters, fmt.Sprintf("%s%s'%s'", matcher.Name, op, matcher.Value))
-		} else {
-			filters = append(filters, fmt.Sprintf("`tag.%s`%s'%s'", matcher.Name, op, matcher.Value))
-		}
 
+		if db != "" && db != chCommon.DB_NAME_EXT_METRICS && db != chCommon.DB_NAME_DEEPFLOW_SYSTEM {
+			filters = append(filters, fmt.Sprintf("%s %s '%s'", matcher.Name, op, matcher.Value))
+		} else {
+			filters = append(filters, fmt.Sprintf("`tag.%s` %s '%s'", matcher.Name, op, matcher.Value))
+		}
 	}
+
 	if len(metrics) == 1 {
 		return "", "", "", fmt.Errorf("not support find metrics with labels")
 	}
-	if db == "" || db == "deepflow_system" {
+
+	if db == "" || db == chCommon.DB_NAME_EXT_METRICS || db == chCommon.DB_NAME_DEEPFLOW_SYSTEM {
 		metrics = append(metrics, extMetricsTagsName)
 	} else {
 		showSql := fmt.Sprintf("SHOW tags FROM %s WHERE time >= %d AND time <= %d", table, startTime, endTime)
@@ -97,7 +113,7 @@ func PromReaderTransToSQL(req *prompb.ReadRequest) (sql string, db string, datas
 		for _, value := range data.Values {
 			values := value.([]interface{})
 			tagName := values[0].(string)
-			if tagName == "lb_listener" || tagName == "pod_ingress" {
+			if tagName == "lb_listener" || tagName == "pod_ingress" { // TODO: why? comment
 				continue
 			}
 			clientTagName := values[1].(string)
@@ -108,13 +124,15 @@ func PromReaderTransToSQL(req *prompb.ReadRequest) (sql string, db string, datas
 			} else {
 				metrics = append(metrics, fmt.Sprintf("`%s`", tagName))
 			}
-
 		}
 	}
+
 	if db != "" {
-		sql = fmt.Sprintf("SELECT %s FROM %s WHERE %s ORDER BY time desc LIMIT %s", strings.Join(metrics, ","), table, strings.Join(filters, " AND "), config.Cfg.Limit)
+		sql = fmt.Sprintf("SELECT %s FROM %s WHERE %s ORDER BY time desc LIMIT %s",
+			strings.Join(metrics, ","), table, strings.Join(filters, " AND "), config.Cfg.Limit)
 	} else {
-		sql = fmt.Sprintf("SELECT %s FROM prometheus.%s WHERE %s LIMIT %s", strings.Join(metrics, ","), metricsName, strings.Join(filters, " AND "), config.Cfg.Limit)
+		sql = fmt.Sprintf("SELECT %s FROM prometheus.%s WHERE %s LIMIT %s",
+			strings.Join(metrics, ","), metricsName, strings.Join(filters, " AND "), config.Cfg.Limit)
 	}
 
 	return sql, db, datasource, nil
