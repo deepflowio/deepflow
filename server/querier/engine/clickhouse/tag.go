@@ -157,9 +157,7 @@ func (t *SelectTag) Format(m *view.Model) {
 		}
 		m.AddCallback(t.Value, MacTranslate([]interface{}{t.Value, alias}))
 	}
-	if t.Alias == "tag" || t.Alias == "attribute" || t.Alias == "metrics" {
-		m.AddCallback(t.Alias, ExternalTagsFormat([]interface{}{t.Alias}))
-	} else if t.Value == "packet_batch" {
+	if t.Value == "packet_batch" {
 		m.AddCallback(t.Value, packet_batch.PacketBatchFormat([]interface{}{}))
 	}
 }
