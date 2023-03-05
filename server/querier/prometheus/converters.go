@@ -140,15 +140,12 @@ func PromReaderTransToSQL(req *prompb.ReadRequest) (sql string, db string, datas
 
 func RespTransToProm(result *common.Result) (resp *prompb.ReadResponse, err error) {
 	// querier result trans to Prom Response
-	resp = &prompb.ReadResponse{
-		Results: []*prompb.QueryResult{{}},
-	}
-	tags := result.Columns
 	tagIndex := -1
 	metricsIndex := -1
 	timeIndex := -1
+	otherTagCount := 0
 	metricsName := ""
-	for i, tag := range tags {
+	for i, tag := range result.Columns {
 		if tag == extMetricsTagsName {
 			tagIndex = i
 		} else if strings.HasPrefix(tag.(string), "metrics.") {
@@ -156,6 +153,8 @@ func RespTransToProm(result *common.Result) (resp *prompb.ReadResponse, err erro
 			metricsName = strings.TrimPrefix(tag.(string), "metrics.")
 		} else if tag == extMetricsTimeAlias {
 			timeIndex = i
+		} else {
+			otherTagCount++
 		}
 	}
 	if metricsIndex < 0 || timeIndex < 0 {
@@ -164,7 +163,7 @@ func RespTransToProm(result *common.Result) (resp *prompb.ReadResponse, err erro
 	// series group by tag
 	tagSeriesMap := map[string]*prompb.TimeSeries{}
 	// ext_metrics & deepflow_system dont have other tags, flow_metrics & flow_log dont have `tag`
-	allTagIndexs := []int{}
+	allTagIndexs := make([]int, 0, otherTagCount)
 	for i := range result.Columns {
 		if i == tagIndex || i == metricsIndex || i == timeIndex {
 			continue
@@ -194,10 +193,11 @@ func RespTransToProm(result *common.Result) (resp *prompb.ReadResponse, err erro
 				continue
 			}
 			// __name__:metricsName
-			pairs := []prompb.Label{prompb.Label{
+			pairs := make([]prompb.Label, 1, 1+len(allTagIndexs))
+			pairs[0] = prompb.Label{
 				Name:  prometheusMetricsName,
 				Value: metricsName,
-			}}
+			}
 			// tag label pair
 			if tagIndex > -1 {
 				pairs = append(pairs, TagsToLabelPairs(tagsJsonStr)...)
@@ -212,7 +212,6 @@ func RespTransToProm(result *common.Result) (resp *prompb.ReadResponse, err erro
 						Value: FormatString(values[i]),
 					})
 				}
-
 			}
 			series := &prompb.TimeSeries{
 				Labels: pairs,
@@ -228,17 +227,23 @@ func RespTransToProm(result *common.Result) (resp *prompb.ReadResponse, err erro
 			metricsValue = *values[metricsIndex].(*float64)
 		}
 		// group by tags
-		tagSeriesMap[tagsJsonStr].Samples = append(
-			tagSeriesMap[tagsJsonStr].Samples, prompb.Sample{
+		series := tagSeriesMap[tagsJsonStr]
+		series.Samples = append(
+			series.Samples, prompb.Sample{
 				Timestamp: int64(values[timeIndex].(int)) * 1000,
 				Value:     metricsValue,
 			},
 		)
 	}
+
+	// assemble the final prometheus response
+	resp = &prompb.ReadResponse{
+		Results: []*prompb.QueryResult{{}},
+	}
+	resp.Results[0].Timeseries = make([]*prompb.TimeSeries, 0, len(tagSeriesMap))
 	for _, series := range tagSeriesMap {
 		resp.Results[0].Timeseries = append(resp.Results[0].Timeseries, series)
 	}
-	fmt.Println(len(tagSeriesMap))
 	return resp, nil
 }
 
