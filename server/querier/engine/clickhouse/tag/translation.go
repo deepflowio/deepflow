@@ -690,7 +690,9 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	// 外部字段map
 	tagResourceMap["tag"] = map[string]*Tag{
 		"default": NewTag(
-			"arrayZip(tag_names, tag_values)",
+			// TODO: We can use MAP_FROM_ARRAYS after upgrade ClickHouse,
+			// https://clickhouse.com/docs/en/sql-reference/functions/tuple-map-functions/#mapfromarrays
+			"toJSONString(CAST((tag_names, tag_values), 'Map(String, String)'))",
 			"",
 			"",
 			"",
@@ -698,7 +700,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	}
 	tagResourceMap["attribute"] = map[string]*Tag{
 		"default": NewTag(
-			"arrayZip(attribute_names, attribute_values)",
+			"toJSONString(CAST((attribute_names, attribute_values), 'Map(String, String)'))",
 			"",
 			"",
 			"",
@@ -716,7 +718,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	}
 	tagResourceMap["metrics"] = map[string]*Tag{
 		"default": NewTag(
-			"arrayZip(%s, %s)",
+			"toJSONString(CAST((%s, %s), 'Map(String, Float64)'))",
 			"",
 			"",
 			"",
