@@ -25,6 +25,7 @@ type RemoteReadQuerier struct {
 	Ctx  context.Context
 }
 
+// For PromQL instant query
 func (q *RemoteReadQuerier) Select(sortSeries bool, hints *storage.SelectHints, matchers ...*labels.Matcher) storage.SeriesSet {
 	startTimeS, err := (strconv.ParseFloat(q.Args.StartTime, 64))
 	if err != nil {
@@ -81,6 +82,7 @@ type RemoteReadRangeQuerier struct {
 	Ctx  context.Context
 }
 
+// For PromQL range query
 func (q *RemoteReadRangeQuerier) Select(sortSeries bool, hints *storage.SelectHints, matchers ...*labels.Matcher) storage.SeriesSet {
 	startS, err := (strconv.ParseFloat(q.Args.StartTime, 64))
 	if err != nil {

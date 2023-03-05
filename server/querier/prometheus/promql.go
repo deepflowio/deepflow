@@ -18,6 +18,7 @@ import (
 	"github.com/prometheus/prometheus/storage"
 )
 
+// API Spec: https://prometheus.io/docs/prometheus/latest/querying/api/#instant-queries
 func PromQueryExecute(args *common.PromQueryParams, ctx context.Context) (result *common.PromQueryResponse, err error) {
 	timeS, err := (strconv.ParseFloat(args.StartTime, 64))
 	if err != nil {

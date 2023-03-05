@@ -138,8 +138,8 @@ func PromReaderTransToSQL(req *prompb.ReadRequest) (sql string, db string, datas
 	return sql, db, datasource, nil
 }
 
+// querier result trans to Prom Response
 func RespTransToProm(result *common.Result) (resp *prompb.ReadResponse, err error) {
-	// querier result trans to Prom Response
 	tagIndex := -1
 	metricsIndex := -1
 	timeIndex := -1
@@ -160,8 +160,11 @@ func RespTransToProm(result *common.Result) (resp *prompb.ReadResponse, err erro
 	if metricsIndex < 0 || timeIndex < 0 {
 		return nil, fmt.Errorf("metricsIndex(%d), timeIndex(%d) get failed", metricsIndex, timeIndex)
 	}
+	metricsType := result.Schemas[metricsIndex].ValueType
+
 	// series group by tag
 	tagSeriesMap := map[string]*prompb.TimeSeries{}
+
 	// ext_metrics & deepflow_system dont have other tags, flow_metrics & flow_log dont have `tag`
 	allTagIndexs := make([]int, 0, otherTagCount)
 	for i := range result.Columns {
@@ -170,9 +173,12 @@ func RespTransToProm(result *common.Result) (resp *prompb.ReadResponse, err erro
 		}
 		allTagIndexs = append(allTagIndexs, i)
 	}
-	metricsType := result.Schemas[metricsIndex].ValueType
+
+	// scan all rows
 	for _, v := range result.Values {
 		values := v.([]interface{})
+
+		// merge and serialize all tags as map key
 		tagsJsonStr := ""
 		if tagIndex > -1 {
 			tagsJsonStr = values[tagIndex].(string)
@@ -188,10 +194,13 @@ func RespTransToProm(result *common.Result) (resp *prompb.ReadResponse, err erro
 			}
 			tagsJsonStr = strings.Join(tagsStrList, "-")
 		}
+
+		// check and create propb.TimeSeries
 		if _, ok := tagSeriesMap[tagsJsonStr]; !ok {
 			if len(tagSeriesMap) >= config.Cfg.Prometheus.SeriesLimit {
 				continue
 			}
+
 			// __name__:metricsName
 			pairs := make([]prompb.Label, 1, 1+len(allTagIndexs))
 			pairs[0] = prompb.Label{
@@ -218,6 +227,8 @@ func RespTransToProm(result *common.Result) (resp *prompb.ReadResponse, err erro
 			}
 			tagSeriesMap[tagsJsonStr] = series
 		}
+
+		// get metrics
 		var metricsValue float64
 		if metricsType == "Int" {
 			metricsValue = float64(values[metricsIndex].(int))
@@ -226,7 +237,8 @@ func RespTransToProm(result *common.Result) (resp *prompb.ReadResponse, err erro
 		} else {
 			metricsValue = *values[metricsIndex].(*float64)
 		}
-		// group by tags
+
+		// add a sample for the TimeSeries
 		series := tagSeriesMap[tagsJsonStr]
 		series.Samples = append(
 			series.Samples, prompb.Sample{

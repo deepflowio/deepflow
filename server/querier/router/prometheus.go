@@ -1,11 +1,14 @@
 package router
 
 import (
-	"github.com/gin-gonic/gin"
+	"fmt"
 	"io/ioutil"
+	"strconv"
+	"time"
+
+	"github.com/gin-gonic/gin"
 
 	//logging "github.com/op/go-logging"
-	//"fmt"
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/prometheus"
 	"github.com/deepflowio/deepflow/server/querier/service"
@@ -16,13 +19,21 @@ import (
 
 var STATUS_FIAL = "fail"
 
+// PromQL Query API
 func promQuery() gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		args := common.PromQueryParams{}
 		args.Context = c.Request.Context()
 		args.Promql = c.Request.FormValue("query")
-		args.StartTime = c.Request.FormValue("time")
-		args.EndTime = c.Request.FormValue("time")
+		endTime, err := strconv.ParseInt(c.Request.FormValue("time"), 10, 64)
+		if err != nil {
+			endTime = time.Now().Unix()
+			args.EndTime = fmt.Sprintf("%d", endTime)
+		} else {
+			args.EndTime = c.Request.FormValue("time")
+		}
+		// FIXME: At present, we roughly query the data of the last 5 minutes
+		args.StartTime = fmt.Sprintf("%d", endTime-300)
 		result, err := service.PromQueryExecute(&args, c.Request.Context())
 		if err != nil {
 			c.JSON(500, &common.PromQueryResponse{Error: err.Error(), Status: STATUS_FIAL})
@@ -31,6 +42,7 @@ func promQuery() gin.HandlerFunc {
 	})
 }
 
+// PromQL Range Query API
 func promQueryRange() gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		args := common.PromQueryParams{}
@@ -51,6 +63,7 @@ func promQueryRange() gin.HandlerFunc {
 	})
 }
 
+// RemoteRead API
 func promReader() gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		compressed, _ := ioutil.ReadAll(c.Request.Body)
