@@ -2,7 +2,6 @@ package prometheus
 
 import (
 	"context"
-	"fmt"
 	//"strings"
 	//"strconv"
 	//"time"
@@ -42,7 +41,7 @@ func PromReaderExecute(req *prompb.ReadRequest, ctx context.Context) (resp *prom
 	result, debug, err := ckEngine.ExecuteQuery(&args)
 	if err != nil {
 		// TODO
-		fmt.Printf("%v %v", debug, err)
+		log.Errorf("ExecuteQuery failed, debug info = %v, err info = %v", debug, err)
 		return nil, err
 	}
 	// response trans to prom resp
