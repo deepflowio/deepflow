@@ -72,10 +72,6 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 	if ok == false {
 		collectorSocketType = UDP_SOCKET
 	}
-	compressorSocketType, ok := SOCKET_TYPE_TO_MESSAGE[vtapConfig.CompressorSocketType]
-	if ok == false {
-		compressorSocketType = RAW_UDP_SOCKET
-	}
 	npbSocketType, ok := SOCKET_TYPE_TO_MESSAGE[vtapConfig.NpbSocketType]
 	if ok == false {
 		npbSocketType = RAW_UDP_SOCKET
@@ -95,7 +91,6 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 	configure := &api.Config{
 		CollectorEnabled:              proto.Bool(Int2Bool(vtapConfig.CollectorEnabled)),
 		CollectorSocketType:           &collectorSocketType,
-		CompressorSocketType:          &compressorSocketType,
 		PlatformEnabled:               proto.Bool(Int2Bool(vtapConfig.PlatformEnabled)),
 		MaxCpus:                       proto.Uint32(uint32(vtapConfig.MaxCPUs)),
 		MaxMemory:                     proto.Uint32(uint32(vtapConfig.MaxMemory)),
@@ -417,10 +412,6 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string) *api.Config {
 	if ok == false {
 		collectorSocketType = UDP_SOCKET
 	}
-	compressorSocketType, ok := SOCKET_TYPE_TO_MESSAGE[vtapConfig.CompressorSocketType]
-	if ok == false {
-		compressorSocketType = RAW_UDP_SOCKET
-	}
 	npbSocketType, ok := SOCKET_TYPE_TO_MESSAGE[vtapConfig.NpbSocketType]
 	if ok == false {
 		npbSocketType = RAW_UDP_SOCKET
@@ -436,7 +427,6 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string) *api.Config {
 	configure := &api.Config{
 		CollectorEnabled:              proto.Bool(Int2Bool(vtapConfig.CollectorEnabled)),
 		CollectorSocketType:           &collectorSocketType,
-		CompressorSocketType:          &compressorSocketType,
 		PlatformEnabled:               proto.Bool(Int2Bool(vtapConfig.PlatformEnabled)),
 		MaxCpus:                       proto.Uint32(uint32(vtapConfig.MaxCPUs)),
 		MaxMemory:                     proto.Uint32(uint32(vtapConfig.MaxMemory)),
