@@ -25,6 +25,7 @@ type ToolDataSet struct {
 
 	projectNameToRegionLcuuid     map[string]string
 	azNameToAZLcuuid              map[string]string
+	vpcLcuuids                    []string
 	vpcLcuuidToVRouterLcuuid      map[string]string
 	networkLcuuidToCIDR           map[string]string
 	networkLcuuidToAZName         map[string]string
