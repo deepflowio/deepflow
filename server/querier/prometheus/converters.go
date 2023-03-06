@@ -35,8 +35,10 @@ func PromReaderTransToSQL(req *prompb.ReadRequest) (sql string, db string, datas
 	q := queriers[0]
 	//pp.Println(q)
 
-	startTime := q.StartTimestampMs / 1000
-	endTime := q.EndTimestampMs / 1000
+	// q.StartTimestampMs/EndTimestampMs is not available when doing instant query
+	// use q.Hints.StartMs/EndMs instead, it covers range query & instant query
+	startTime := q.Hints.StartMs / 1000
+	endTime := q.Hints.EndMs / 1000
 	if q.EndTimestampMs%1000 > 0 {
 		endTime += 1
 	}

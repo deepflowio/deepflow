@@ -48,8 +48,14 @@ func PromQueryExecute(args *common.PromQueryParams, ctx context.Context) (result
 	//pp.Println(res)
 	//pp.Println(res.Value.(promql.Vector))
 	stats := "success"
+	var resultType parser.ValueType
+	if res.Value == nil {
+		resultType = parser.ValueTypeNone
+	} else {
+		resultType = res.Value.Type()
+	}
 	return &common.PromQueryResponse{Data: &common.PromQueryData{
-		ResultType: res.Value.Type(),
+		ResultType: resultType,
 		Result:     res.Value,
 	}, Status: stats}, err
 }
@@ -98,8 +104,14 @@ func PromQueryRangeExecute(args *common.PromQueryParams, ctx context.Context) (r
 	//pp.Println(res.Err)
 	//pp.Println(res)
 	stats := "success"
+	var resultType parser.ValueType
+	if res.Value == nil {
+		resultType = parser.ValueTypeNone
+	} else {
+		resultType = res.Value.Type()
+	}
 	return &common.PromQueryResponse{Data: &common.PromQueryData{
-		ResultType: res.Value.Type(),
+		ResultType: resultType,
 		Result:     res.Value,
 	}, Status: stats}, err
 }

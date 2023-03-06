@@ -83,11 +83,11 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 	debug.NewLogLevelControl()
 
 	profiler := profiler.NewProfiler(PROFILER_PORT)
-	//if cfg.Profiler {
-	runtime.SetMutexProfileFraction(1)
-	runtime.SetBlockProfileRate(1)
-	profiler.Start()
-	//}
+	if cfg.Profiler {
+		runtime.SetMutexProfileFraction(1)
+		runtime.SetBlockProfileRate(1)
+		profiler.Start()
+	}
 
 	if cfg.MaxCPUs > 0 {
 		runtime.GOMAXPROCS(cfg.MaxCPUs)
