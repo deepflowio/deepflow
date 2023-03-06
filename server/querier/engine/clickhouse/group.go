@@ -194,18 +194,23 @@ func (g *GroupTag) Format(m *view.Model) {
 	for _, suffix := range []string{"", "_0", "_1"} {
 		for _, resourceName := range []string{"resource_gl0", "auto_instance", "resource_gl1", "resource_gl2", "auto_service"} {
 			resourceTypeSuffix := "auto_service_type" + suffix
+			oldResourceTypeSuffix := resourceName + "_type" + suffix
 			if common.IsValueInSliceString(resourceName, []string{"resource_gl0", "auto_instance"}) {
 				resourceTypeSuffix = "auto_instance_type" + suffix
 			}
 			preAsTag, preAsOK = g.AsTagMap[g.Value]
 			if preAsOK {
 				if preAsTag == resourceName+suffix {
-					m.AddTag(&view.Tag{Value: resourceTypeSuffix})
-					m.AddGroup(&view.Group{Value: resourceTypeSuffix})
+					m.AddTag(&view.Tag{Value: resourceTypeSuffix, Alias: oldResourceTypeSuffix})
+					m.AddGroup(&view.Group{Value: oldResourceTypeSuffix})
 				}
 			} else if g.Alias == resourceName+suffix {
-				m.AddTag(&view.Tag{Value: resourceTypeSuffix})
-				m.AddGroup(&view.Group{Value: resourceTypeSuffix})
+				if resourceTypeSuffix != oldResourceTypeSuffix {
+					m.AddTag(&view.Tag{Value: resourceTypeSuffix, Alias: oldResourceTypeSuffix})
+				} else {
+					m.AddTag(&view.Tag{Value: resourceTypeSuffix})
+				}
+				m.AddGroup(&view.Group{Value: oldResourceTypeSuffix})
 			}
 		}
 		// internet增加epc分组
