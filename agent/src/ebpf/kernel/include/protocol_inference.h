@@ -224,15 +224,10 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 {
 #define HTTPV2_FRAME_PROTO_SZ           0x9
 #define HTTPV2_FRAME_TYPE_HEADERS       0x1
-#define HTTPV2_STATIC_TABLE_AUTH_IDX    0x1
-#define HTTPV2_STATIC_TABLE_GET_IDX     0x2
-#define HTTPV2_STATIC_TABLE_POST_IDX    0x3
-#define HTTPV2_STATIC_TABLE_PATH_1_IDX  0x4
-#define HTTPV2_STATIC_TABLE_PATH_2_IDX  0x5
 // In some cases, the compiled binary instructions exceed the limit, the
 // specific reason is unknown, reduce the number of cycles of http2, which
 // may cause http2 packet loss
-#define HTTPV2_LOOP_MAX 8
+#define HTTPV2_LOOP_MAX 6
 /*
  *  HTTPV2_FRAME_READ_SZ取值考虑以下3部分：
  *  (1) fixed 9-octet header
@@ -318,29 +313,9 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 		    static_table_idx == 0)
 			continue;
 
-		// HTTPV2 REQUEST
-		if (static_table_idx == HTTPV2_STATIC_TABLE_AUTH_IDX ||
-		    static_table_idx == HTTPV2_STATIC_TABLE_GET_IDX ||
-	    	    static_table_idx == HTTPV2_STATIC_TABLE_POST_IDX ||
-		    static_table_idx == HTTPV2_STATIC_TABLE_PATH_1_IDX ||
-		    static_table_idx == HTTPV2_STATIC_TABLE_PATH_2_IDX) {
-			msg_type = MSG_REQUEST;
-			conn_info->role =	
-			    (conn_info->direction == T_INGRESS) ? ROLE_SERVER : ROLE_CLIENT;
-
-		} else {
-
-			/*
-			 * 如果初次判断时HTTPV2的数据类型是RESPONSE直接放弃推断，
-			 * 因为第一次获取的数据是RESPONSE可认为是无效的数据他无
-			 * 法找到REQUEST进行聚合，并且对RESPONSE的判断比较粗略容
-			 * 易产生误判。
-			 */
-			if (is_first)
-				return MSG_UNKNOWN;
-
-			msg_type = MSG_RESPONSE;
-		}
+		msg_type = MSG_REQUEST;
+		conn_info->role =	
+			(conn_info->direction == T_INGRESS) ? ROLE_SERVER : ROLE_CLIENT;
 
 		break;
 	}
@@ -781,6 +756,13 @@ static __inline enum message_type infer_dns_message(const char *buf,
 	}
 
 	struct dns_header *dns = (struct dns_header *)buf;
+	if (conn_info->tuple.l4_protocol == IPPROTO_TCP) {
+		if (__bpf_ntohs(dns->id) + 2 == count) {
+			dns = (void *)dns + 2;
+		} else {
+			conn_info->prev_count = 2;
+		}
+	}
 
 	__u16 num_questions = __bpf_ntohs(dns->q_count);
 	__u16 num_answers = __bpf_ntohs(dns->ans_count);
@@ -865,20 +847,7 @@ static __inline enum message_type infer_redis_message(const char *buf,
 	if (first_byte == '-' && ((buf[1] != 'E' && buf[1] != 'W') || buf[2] != 'R'))
 		return MSG_UNKNOWN;
 
-	// 此时开始认为一定是 Redis 协议,开始判定请求响应.
-	// 请求的第一个字符一定是 '*',否则是响应
-	if (first_byte != '*') {
-		return MSG_RESPONSE;
-	}
-	// 由于 Redis 的 "多条批量回复" 类型的响应与请求类型格式一模一样,用协议无法区分请求响应
-	// 此时根据进程名和流量方向进行区分,当进程名为 "redis-server" 时入站为请求出站为响应,
-	// 非 "redis-server" 处理方式相反.
-	if (is_current_comm("redis-server")) 
-		return conn_info->direction == T_INGRESS ? MSG_REQUEST : MSG_RESPONSE;
-	else 
-		return conn_info->direction == T_INGRESS ? MSG_RESPONSE : MSG_REQUEST;
-
-	return MSG_UNKNOWN;
+	return MSG_REQUEST;
 }
 
 // 伪代码参考自
@@ -1234,14 +1203,7 @@ static __inline enum message_type infer_kafka_message(const char *buf,
 		    conn_info->socket_info_ptr->need_reconfirm;
 
 		if (!conn_info->need_reconfirm) {
-			if ((conn_info->role == ROLE_CLIENT
-			     && conn_info->direction == T_EGRESS)
-			    || (conn_info->role == ROLE_SERVER
-				&& conn_info->direction == T_INGRESS)) {
-				return MSG_REQUEST;
-			}
-
-			return MSG_RESPONSE;
+			return MSG_REQUEST;
 		}
 
 		conn_info->correlation_id =
@@ -1316,7 +1278,7 @@ static __inline bool drop_msg_by_comm(void)
 	return false;
 }
 
-static __inline struct protocol_message_t infer_protocol(const char *buf,
+static __inline struct protocol_message_t infer_protocol(const struct data_args_t *args,
 							 size_t count,
 							 struct conn_info_t
 							 *conn_info,
@@ -1361,8 +1323,27 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 			return inferred_message;
 	}
 
-	char infer_buf[DATA_BUF_MAX];
-	bpf_probe_read(&infer_buf, sizeof(infer_buf), buf);
+	const char *buf = args->buf;
+
+	__u32 k0 = 0;
+	struct infer_data_s *buf_map = bpf_map_lookup_elem(&NAME(infer_buf), &k0);
+	if (!buf_map)
+		return inferred_message;
+
+	char *http2_infer_buf = NULL;
+	__u32 http2_infer_len = 0;
+	if (extra->vecs) {
+		buf_map->len = infer_iovecs_copy(buf_map, args,
+						 count, DATA_BUF_MAX,
+						 &http2_infer_buf,
+						 &http2_infer_len);
+	} else {
+		bpf_probe_read(buf_map->data, sizeof(buf_map->data), buf);
+		http2_infer_buf = (char *)buf;
+		http2_infer_len = count;
+	}
+
+	char *infer_buf = buf_map->data;
 
 	check_and_fetch_prev_data(conn_info);
 
@@ -1461,7 +1442,7 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 			break;
 		case PROTO_HTTP2:
 			if ((inferred_message.type =
-			     infer_http2_message(buf, count,
+			     infer_http2_message(http2_infer_buf, http2_infer_len,
 						 conn_info)) != MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_HTTP2;
 				return inferred_message;
@@ -1583,7 +1564,7 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 #else
 	} else if ((inferred_message.type =
 #endif
-		    infer_http2_message(buf, count, 
+		    infer_http2_message(http2_infer_buf, http2_infer_len, 
 					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_HTTP2;
 #ifdef LINUX_VER_5_2_PLUS
