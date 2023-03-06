@@ -30,10 +30,8 @@ use std::time::Duration;
 use dns_lookup::lookup_host;
 use log::{error, info, warn};
 
-#[cfg(target_os = "windows")]
-use super::error::Error;
 use super::{
-    error::Result,
+    error::{Error, Result},
     recv_engine::{self, bpf, RecvEngine},
     BpfOptions, Options, PacketCounter, Pipeline,
 };
@@ -305,7 +303,9 @@ impl BaseDispatcher {
         bitmap: &TunnelTypeBitmap,
     ) -> Result<(usize, TapType)> {
         if packet.len() < ETH_HEADER_SIZE {
-            return Err("Invalid packet.");
+            return Err(Error::PacketInvalid(
+                "packet.len() < ETH_HEADER_SIZE".to_string(),
+            ));
         }
 
         let (tap_type, eth_type, l2_len) = tap_type_handler.get_l2_info(packet)?;
@@ -465,6 +465,12 @@ impl BaseDispatcher {
         tunnel_info: &mut TunnelInfo,
         bitmap: &TunnelTypeBitmap,
     ) -> Result<(usize, TapType)> {
+        if packet.len() < ETH_HEADER_SIZE {
+            return Err(Error::PacketInvalid(
+                "packet.len() < ETH_HEADER_SIZE".to_string(),
+            ));
+        }
+
         let (tap_type, eth_type, l2_len) = tap_type_handler.get_l2_info(packet)?;
         let offset = match eth_type {
             // 最外层隧道封装，可能是ERSPAN或VXLAN
