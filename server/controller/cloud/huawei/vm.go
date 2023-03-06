@@ -53,17 +53,19 @@ func (h *HuaWei) getVMs() ([]model.VM, []model.VMSecurityGroup, []model.VInterfa
 			}
 			id := jVM.Get("id").MustString()
 			addrs := jVM.Get("addresses").MustMap()
-			if len(addrs) == 0 {
+			var vpcLcuuid string
+			for key := range addrs {
+				if common.Contains(h.toolDataSet.vpcLcuuids, key) {
+					vpcLcuuid = key
+					break
+				}
+			}
+			if vpcLcuuid == "" {
 				log.Infof("exclude vm: %s, missing vpc info", id) // vpc info is in addresses
 				continue
 			}
 			name := jVM.Get("name").MustString()
 			azLcuuid := h.toolDataSet.azNameToAZLcuuid[jVM.Get("OS-EXT-AZ:availability_zone").MustString()]
-			var vpcLcuuid string
-			for key := range addrs {
-				vpcLcuuid = key
-				break
-			}
 			vm := model.VM{
 				Lcuuid:       id,
 				Name:         name,
