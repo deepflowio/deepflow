@@ -1155,6 +1155,7 @@ impl AgentComponents {
 
         info!("Start check process...");
         trident_process_check(process_threshold);
+        #[cfg(target_os = "linux")]
         if !yaml_config.check_core_file_disabled {
             info!("Start check core file...");
             core_file_check();
