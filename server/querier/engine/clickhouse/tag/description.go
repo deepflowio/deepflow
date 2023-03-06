@@ -847,9 +847,9 @@ func GetExternalTagValues(db, table, rawSql string) (*common.Result, []string, e
 
 	var sql string
 	if whereSql != "" {
-		sql = fmt.Sprintf("SELECT field_value AS value, value AS display_name FROM %s_custom_field_value WHERE 'table'='%s' AND field_type='tag' AND field_name='%s' %s GROUP BY value, display_name ORDER BY %s %s", db, table, tag, whereSql, orderBy, limitSql)
+		sql = fmt.Sprintf("SELECT field_value AS value, value AS display_name FROM %s_custom_field_value WHERE `table`='%s' AND field_type='tag' AND field_name='%s' %s GROUP BY value, display_name ORDER BY %s %s", db, table, tag, whereSql, orderBy, limitSql)
 	} else {
-		sql = fmt.Sprintf("SELECT field_value AS value, value AS display_name FROM %s_custom_field_value WHERE 'table'='%s' AND field_type='tag' AND field_name='%s' GROUP BY value, display_name ORDER BY %s %s", db, table, tag, orderBy, limitSql)
+		sql = fmt.Sprintf("SELECT field_value AS value, value AS display_name FROM %s_custom_field_value WHERE `table`='%s' AND field_type='tag' AND field_name='%s' GROUP BY value, display_name ORDER BY %s %s", db, table, tag, orderBy, limitSql)
 	}
 	log.Debug(sql)
 	sqlList = append(sqlList, sql)
