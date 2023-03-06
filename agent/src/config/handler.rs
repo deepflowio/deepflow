@@ -182,7 +182,6 @@ pub struct SenderConfig {
     pub npb_dedup_enabled: bool,
     pub npb_bps_threshold: u64,
     pub npb_socket_type: trident::SocketType,
-    pub compressor_socket_type: trident::SocketType,
     pub collector_socket_type: trident::SocketType,
     pub standalone_data_file_size: u32,
     pub standalone_data_file_dir: String,
@@ -258,7 +257,6 @@ pub struct PlatformConfig {
 
 #[derive(Clone, PartialEq, Debug, Eq)]
 pub struct HandlerConfig {
-    pub compressor_socket_type: SocketType,
     pub npb_dedup_enabled: bool,
     pub trident_type: TridentType,
 }
@@ -275,7 +273,6 @@ pub struct DispatcherConfig {
     #[cfg(target_os = "linux")]
     pub extra_netns_regex: String,
     pub tap_interface_regex: String,
-    pub packet_header_enabled: bool,
     pub if_mac_source: IfMacSource,
     pub analyzer_ip: String,
     pub analyzer_port: u16,
@@ -821,7 +818,6 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 #[cfg(target_os = "linux")]
                 extra_netns_regex: conf.extra_netns_regex.to_string(),
                 tap_interface_regex: conf.tap_interface_regex.to_string(),
-                packet_header_enabled: conf.packet_header_enabled,
                 if_mac_source: conf.if_mac_source,
                 analyzer_ip: dest_ip.clone(),
                 analyzer_port: conf.analyzer_port,
@@ -853,7 +849,6 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 npb_dedup_enabled: conf.npb_dedup_enabled,
                 npb_bps_threshold: conf.npb_bps_threshold,
                 npb_socket_type: conf.npb_socket_type,
-                compressor_socket_type: conf.compressor_socket_type,
                 server_tx_bandwidth_threshold: conf.server_tx_bandwidth_threshold,
                 bandwidth_probe_interval: conf.bandwidth_probe_interval,
                 collector_socket_type: conf.collector_socket_type,
@@ -895,7 +890,6 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 cloud_gateway_traffic: conf.yaml_config.cloud_gateway_traffic,
             },
             handler: HandlerConfig {
-                compressor_socket_type: conf.compressor_socket_type,
                 npb_dedup_enabled: conf.npb_dedup_enabled,
                 trident_type: conf.trident_type,
             },
@@ -1734,13 +1728,6 @@ impl ConfigHandler {
                 != new_config.sender.collector_socket_type
             {
                 if candidate_config.sender.enabled != new_config.sender.enabled {
-                    restart_dispatcher = true;
-                }
-            }
-            if candidate_config.sender.compressor_socket_type
-                != new_config.sender.compressor_socket_type
-            {
-                if candidate_config.dispatcher.packet_header_enabled {
                     restart_dispatcher = true;
                 }
             }
