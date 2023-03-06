@@ -220,7 +220,10 @@ func (h *HuaWei) getRawData(url, token, resultKey string) (jsonList []*simplejso
 				}
 			}
 			statsdAPIDataCount += curCount
-			if curCount < limit {
+			// response data is not incomplete when getting ports by page,
+			// for example: ports total count is 128, set limit to 50 may get only 38 items.
+			// so checking response count is 0 is used as break sign.
+			if curCount == 0 {
 				break
 			}
 		}
