@@ -577,7 +577,7 @@ impl Stash {
                 flow_key.mac_dst
             },
             ip,
-            l3_epc_id: side.l3_epc_id as i16,
+            l3_epc_id: get_l3_epc_id(side.l3_epc_id, flow.signal_source),
             gpid: side.gpid,
             protocol: flow_key.proto,
             direction,
@@ -630,7 +630,7 @@ impl Stash {
         }
 
         if tagger.l7_protocol != L7Protocol::Unknown && l7_metrics_enabled {
-            // Only data whose direction is c|s|local|c-p|s-p|c-app|s-app has app_meter.
+            // Only data whose direction is c|s|local|c-p|s-p|c-app|s-app|app has app_meter.
             // The data of XFlow itself will not be duplicated.
             if tagger.direction == Direction::ClientToServer
                 || tagger.direction == Direction::ServerToClient
@@ -720,8 +720,8 @@ impl Stash {
             mac1: dst_mac,
             ip: src_ip,
             ip1: dst_ip,
-            l3_epc_id: src_ep.l3_epc_id as i16,
-            l3_epc_id1: dst_ep.l3_epc_id as i16,
+            l3_epc_id: get_l3_epc_id(src_ep.l3_epc_id, flow.signal_source),
+            l3_epc_id1: get_l3_epc_id(dst_ep.l3_epc_id, flow.signal_source),
             gpid: src_ep.gpid,
             gpid_1: dst_ep.gpid,
             protocol: flow_key.proto,
@@ -811,6 +811,14 @@ impl Stash {
                 warn!("{} queue terminated", self.context.name);
             }
         }
+    }
+}
+
+fn get_l3_epc_id(l3_epc_id: i32, signal_source: SignalSource) -> i16 {
+    if l3_epc_id < 0 && signal_source == SignalSource::OTel {
+        0 // OTel data l3_epc_id always not from internet
+    } else {
+        l3_epc_id as i16
     }
 }
 

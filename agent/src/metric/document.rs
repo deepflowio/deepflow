@@ -170,6 +170,7 @@ pub enum Direction {
     ServerProcessToClient = Direction::ServerToClient as u8 | SIDE_PROCESS, // server process
     ClientAppToServer = Direction::ClientToServer as u8 | SIDE_APP,         // client app(for otel)
     ServerAppToClient = Direction::ServerToClient as u8 | SIDE_APP,         // server app(for otel)
+    App = SIDE_APP,                                                         // app(for otel)
 }
 
 impl Default for Direction {
@@ -221,6 +222,7 @@ pub enum TapSide {
     ServerProcess = TapSide::Server as u8 | SIDE_PROCESS,
     ClientApp = TapSide::Client as u8 | SIDE_APP,
     ServerApp = TapSide::Server as u8 | SIDE_APP,
+    App = SIDE_APP,
 }
 
 impl Default for TapSide {
@@ -247,6 +249,7 @@ impl From<Direction> for TapSide {
             Direction::ServerProcessToClient => TapSide::ServerProcess,
             Direction::ClientAppToServer => TapSide::ClientApp,
             Direction::ServerAppToClient => TapSide::ServerApp,
+            Direction::App => TapSide::App,
             Direction::None => TapSide::Rest,
         }
     }
@@ -258,7 +261,7 @@ impl From<SpanKind> for TapSide {
         match span_kind {
             SpanKind::Client | SpanKind::Producer => TapSide::ClientApp,
             SpanKind::Server | SpanKind::Consumer => TapSide::ServerApp,
-            _ => TapSide::Rest,
+            _ => TapSide::App,
         }
     }
 }

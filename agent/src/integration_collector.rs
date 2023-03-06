@@ -349,10 +349,6 @@ fn fill_tagged_flow(
     tagged_flow.flow.endpoint = Some(span.name.clone());
     tagged_flow.flow.eth_type = eth_type;
     tagged_flow.flow.tap_side = TapSide::from(SpanKind::from_i32(span.kind).unwrap());
-    if tagged_flow.flow.tap_side == TapSide::Rest {
-        // if tap_side is neither ClientApp nor ServerApp, which means that this span is not the span of calling between services
-        return None;
-    }
     if tagged_flow.flow.tap_side == TapSide::ClientApp {
         ip0 = ip;
     } else {
