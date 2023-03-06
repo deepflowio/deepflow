@@ -69,7 +69,7 @@ lbs:
     ips: ["x.x.x.x"]       # required
   lb_listeners:            # optional, lb listeners
   - name: xxx              # optional
-    protocol: TCP/UDP      # required
+    protocol: TCP/UDP      # required, options: TCP, UDP
     ip: x.x.x.x            # required
     port: xx               # required
     lb_target_servers:     # optional, lb target servers
