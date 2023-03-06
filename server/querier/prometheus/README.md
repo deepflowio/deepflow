@@ -1,3 +1,30 @@
+Prometheus Promql 文档
+====
+
+查询流程：
+---------
+  - api输入 -> 1.instant查询： promql.go(PromQueryExecute)  2.range查询：    promql.go(PromQueryRangeExecute)
+  - -> promql.go(NewInstantQuery)将promql传入，由prometheus代码解析并在queryable.go(Select)中获得语法树
+    - promql语法树为queryable.go(Select)中的`hints *storage.SelectHints, matchers ...*labels.Matcher`参数
+  - -> queryable.go(remote.ToQuery)生成remote_read请求结构, queryable.go(Select)执行remote_read.go(PromReaderExecute)进行查询
+  - -> remote_read.go(PromReaderTransToSQL) 将remote_read请求结构翻译成querier_sql
+    - 请求结构参考Prometheus RemoteRead API 文档
+  - -> clickhouse.go(ExecuteQuery)执行查询
+  - -> remote_read.go(RespTransToProm) 将querier返回结果转换为remote_read返回结构
+    - 返回结构参考Prometheus RemoteRead API 文档
+  - -> 剩余返回结果的聚合和过滤等操作由prometheus代码完成
+
+metrics解析逻辑(metricsName为querier的GetMetrics函数所返回的指标量名称):
+  - db：`flow_log`, `event`, `deepflow_system` 
+    - metrics: `{db}__{table}__{metricsName}`
+  - db: `flow_metrics`
+    - metrics: `{db}__{table}__{metricsName}__{datasource}`
+  - db: `ext_metrics`, prometheus写入的指标量, 因为需要支持prometheus页面的remote_read, 所以直接使用指标量名称裸查, 并且去掉由ext_common中getExtMetrics所增加的`metrics.`前缀
+    - metrics: `strings.TrimPrefix(metricsName, 'metrics.')`
+    - querier针对ext_metrics查询的逻辑与其他db不同，查询时需要将table设置为`prometheus.{metricsName}`, 查询的metricsName需携带`metrics.`前缀
+  - db: `ext_metrics`, influxdb写入的指标量 TODO
+    - metrics: `ext_metrics__ext_common__influxdb.{metricsName}`
+
 Prometheus RemoteRead API 文档
 ====
 
