@@ -57,6 +57,7 @@ func (h *HuaWei) getVPCs() ([]model.VPC, []model.VRouter, []model.RoutingTable, 
 				vpc.CIDR = cidr.MustString()
 			}
 			vpcs = append(vpcs, vpc)
+			h.toolDataSet.vpcLcuuids = append(h.toolDataSet.vpcLcuuids, id)
 			h.toolDataSet.regionLcuuidToResourceNum[regionLcuuid]++
 
 			vrouterLcuuid := common.GenerateUUID(vpc.Lcuuid)
