@@ -314,6 +314,12 @@ impl DnsLog {
     }
 
     fn decode_rdata(&mut self, payload: &[u8], g_offset: usize, data_length: usize) -> Result<()> {
+        if payload.len() < g_offset + data_length {
+            return Err(Error::DNSLogParseFailed(
+                "invalid data: payload.len() < g_offset + data_length".to_string(),
+            ));
+        }
+
         let answer_name_len = self.info.answers.len();
         if answer_name_len > 0
             && self.info.answers[answer_name_len - 1..] != DOMAIN_NAME_SPLIT.to_string()
