@@ -2,10 +2,11 @@ package prometheus
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/deepflowio/deepflow/server/querier/common"
 	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/metrics"
-	"strings"
 )
 
 var LABEL_NAME_METRICS = "__name__"
@@ -53,8 +54,6 @@ func getMetrics(args *common.PromMetaParams) (resp []string) {
 					}
 					if db == DB_NAME_DEEPFLOW_SYSTEM || (table == TABLE_NAME_L7_FLOW_LOG && strings.Contains(field, "metrics.")) {
 						field = v.DisplayName
-					} else {
-						field = strings.TrimPrefix(field, "metrics.") // why??
 					}
 					metricsName := ""
 					if db == DB_NAME_FLOW_METRICS {
