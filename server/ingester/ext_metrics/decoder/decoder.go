@@ -17,18 +17,18 @@
 package decoder
 
 import (
-	"bytes"
 	"fmt"
 	"math"
 	"net"
 	"strconv"
 	"strings"
 
+	"github.com/gogo/protobuf/proto"
+	"github.com/golang/snappy"
 	"github.com/influxdata/influxdb/models"
 	logging "github.com/op/go-logging"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/prompb"
-	"github.com/prometheus/prometheus/storage/remote"
 
 	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/ext_metrics/config"
@@ -133,6 +133,20 @@ func (d *Decoder) Run() {
 	}
 }
 
+func DecodeWriteRequest(compressed []byte) (*prompb.WriteRequest, error) {
+	reqBuf, err := snappy.Decode(nil, compressed)
+	if err != nil {
+		return nil, err
+	}
+
+	var req prompb.WriteRequest
+	if err := proto.Unmarshal(reqBuf, &req); err != nil {
+		return nil, err
+	}
+
+	return &req, nil
+}
+
 func (d *Decoder) handlePrometheus(vtapID uint16, decoder *codec.SimpleDecoder) {
 	for !decoder.IsEnd() {
 		data := decoder.ReadBytes()
@@ -143,7 +157,7 @@ func (d *Decoder) handlePrometheus(vtapID uint16, decoder *codec.SimpleDecoder) 
 			d.counter.ErrorCount++
 			return
 		}
-		req, err := remote.DecodeWriteRequest(bytes.NewReader(data))
+		req, err := DecodeWriteRequest(data)
 		if err != nil {
 			if d.counter.ErrorCount == 0 {
 				log.Warningf("prometheus parse failed, err msg:%s", err)
