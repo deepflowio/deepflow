@@ -91,7 +91,7 @@ type StaticConfig struct {
 	OsProcRegex                      []*OsProcRegex        `yaml:"os-proc-regex,omitempty"`
 	OsProcSyncEnabled                *bool                 `yaml:"os-proc-sync-enabled,omitempty"`
 	GuardInterval                    *string               `yaml:"guard-interval,omitempty"`
-	CheckCoreFileDisabled            *bool                 `yaml:"check-core-file-disabled"`
+	CheckCoreFileDisabled            *bool                 `yaml:"check-core-file-disabled,omitempty"`
 }
 
 type XflowCollectorConfig struct {
