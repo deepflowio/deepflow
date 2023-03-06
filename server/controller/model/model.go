@@ -413,20 +413,20 @@ type AdditionalResourceTag struct {
 
 type AdditionalResourceLB struct {
 	Name        string                         `json:"name" yaml:"name" binding:"required"`
-	Model       int                            `json:"model" yaml:"model" binding:"required"`
+	Model       int                            `json:"model" yaml:"model" binding:"required,oneof=1 2"`
 	VPCUUID     string                         `json:"vpc_uuid" yaml:"vpc_uuid" binding:"required"`
 	RegionUUID  string                         `json:"region_uuid" yaml:"region_uuid" binding:"required"`
 	DomainUUID  string                         `json:"domain_uuid" yaml:"domain_uuid" binding:"required"`
-	VInterfaces []AdditionalResourceVInterface `json:"vinterfaces" yaml:"vinterfaces"`
-	LBListeners []AdditionalResourceLBListener `json:"lb_listeners" yaml:"lb_listeners"`
+	VInterfaces []AdditionalResourceVInterface `json:"vinterfaces" yaml:"vinterfaces" binding:"omitempty,dive"`
+	LBListeners []AdditionalResourceLBListener `json:"lb_listeners" yaml:"lb_listeners" binding:"omitempty,dive"`
 }
 
 type AdditionalResourceLBListener struct {
 	Name            string                             `json:"name" yaml:"name"`
-	Protocol        string                             `json:"protocol" yaml:"protocol" binding:"required"`
+	Protocol        string                             `json:"protocol" yaml:"protocol" binding:"required,oneof=TCP UDP"`
 	IP              string                             `json:"ip" yaml:"ip" binding:"required"`
 	Port            int                                `json:"port" yaml:"port" binding:"required"`
-	LBTargetServers []AdditionalResourceLBTargetServer `json:"lb_target_servers" yaml:"lb_target_servers"`
+	LBTargetServers []AdditionalResourceLBTargetServer `json:"lb_target_servers" yaml:"lb_target_servers" binding:"omitempty,dive"`
 }
 
 type AdditionalResourceLBTargetServer struct {
@@ -441,7 +441,7 @@ type AdditionalResource struct {
 	Hosts     []AdditionalResourceHost     `json:"hosts" yaml:"hosts"`
 	CHosts    []AdditionalResourceChost    `json:"chosts" yaml:"chosts"`
 	CloudTags []AdditionalResourceCloudTag `json:"cloud_tags" yaml:"cloud_tags"`
-	LB        []AdditionalResourceLB       `json:"lbs" yaml:"lbs"`
+	LB        []AdditionalResourceLB       `json:"lbs" yaml:"lbs" binding:"omitempty,dive"`
 }
 
 type VTapGroupConfiguration struct {
