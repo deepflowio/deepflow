@@ -31,7 +31,7 @@ use crate::{
     common::{
         decapsulate::{TunnelInfo, TunnelType, TunnelTypeBitmap},
         enums::TapType,
-        MetaPacket, TapPort,
+        MetaPacket, TapPort, ETH_HEADER_SIZE, VLAN_HEADER_SIZE,
     },
     config::DispatcherConfig,
     dispatcher::{
@@ -253,6 +253,14 @@ impl AnalyzerModeDispatcher {
                                 continue;
                             }
 
+                            let decap_length = if packet.raw.len() - decap_length
+                                > ETH_HEADER_SIZE + VLAN_HEADER_SIZE
+                            {
+                                decap_length
+                            } else {
+                                tunnel_info = TunnelInfo::default();
+                                0
+                            };
                             let original_length = packet.raw.len() - decap_length;
                             let timestamp = packet.timestamp;
 
@@ -578,7 +586,7 @@ impl AnalyzerModeDispatcher {
         bitmap: TunnelTypeBitmap,
     ) -> Result<(usize, TapType)> {
         let packet = packet.as_mut();
-        if packet[BILD_FLAGS_OFFSET] == BILD_FLAGS as u8 {
+        if packet[BILD_FLAGS_OFFSET] == BILD_FLAGS as u8 && packet.len() > ETH_HEADER_SIZE {
             // bild will mark ERSPAN traffic and reduce the Trident process
             // XXX: In the current implementation mode, when using bild to mark the ERSPAN offset, it does not support the scenario that there are other tunnel encapsulation in the inner layer
             let overlay_offset = packet[BILD_OVERLAY_OFFSET] as usize;

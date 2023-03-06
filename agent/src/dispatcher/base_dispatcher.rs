@@ -303,6 +303,10 @@ impl BaseDispatcher {
         tunnel_info: &mut TunnelInfo,
         bitmap: &TunnelTypeBitmap,
     ) -> Result<(usize, TapType)> {
+        if packet.len() < ETH_HEADER_SIZE {
+            return Err("Invalid packet.");
+        }
+
         let (tap_type, eth_type, l2_len) = tap_type_handler.get_l2_info(packet)?;
         let offset = match eth_type {
             // 最外层隧道封装，可能是ERSPAN或VXLAN
