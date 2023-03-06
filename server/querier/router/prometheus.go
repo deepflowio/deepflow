@@ -1,10 +1,7 @@
 package router
 
 import (
-	"fmt"
 	"io/ioutil"
-	"strconv"
-	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -13,6 +10,7 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/prometheus"
 	"github.com/deepflowio/deepflow/server/querier/service"
 	"github.com/golang/snappy"
+
 	//"github.com/k0kubun/pp"
 	"github.com/prometheus/prometheus/prompb"
 )
@@ -25,15 +23,11 @@ func promQuery() gin.HandlerFunc {
 		args := common.PromQueryParams{}
 		args.Context = c.Request.Context()
 		args.Promql = c.Request.FormValue("query")
-		endTime, err := strconv.ParseInt(c.Request.FormValue("time"), 10, 64)
-		if err != nil {
-			endTime = time.Now().Unix()
-			args.EndTime = fmt.Sprintf("%d", endTime)
-		} else {
-			args.EndTime = c.Request.FormValue("time")
-		}
-		// FIXME: At present, we roughly query the data of the last 5 minutes
-		args.StartTime = fmt.Sprintf("%d", endTime-300)
+
+		// query time range will be fixed after promQL parsed, use ReadHints instead
+		// ref: https://github.com/prometheus/prometheus/blob/main/prompb/types.proto#L157
+		args.StartTime = c.Request.FormValue("time")
+		args.EndTime = c.Request.FormValue("time")
 		result, err := service.PromQueryExecute(&args, c.Request.Context())
 		if err != nil {
 			c.JSON(500, &common.PromQueryResponse{Error: err.Error(), Status: STATUS_FIAL})
