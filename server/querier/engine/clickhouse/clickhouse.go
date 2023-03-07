@@ -274,7 +274,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 			switch from := from.(type) {
 			case *sqlparser.AliasedTableExpr:
 				// 解析Table类型
-				table = strings.Trim(sqlparser.String(from), "`")
+				table = sqlparser.String(from)
 			}
 		}
 	}
