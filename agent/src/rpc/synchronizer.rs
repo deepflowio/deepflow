@@ -37,7 +37,7 @@ use parking_lot::{Mutex, RwLock, RwLockUpgradableReadGuard};
 use prost::Message;
 use rand::RngCore;
 use sysinfo::{System, SystemExt};
-use tokio::runtime::{Builder, Runtime};
+use tokio::runtime::Runtime;
 use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio::task::JoinHandle;
 use tokio::time;
@@ -420,7 +420,7 @@ pub struct Synchronizer {
     running: Arc<AtomicBool>,
 
     // threads
-    rt: Runtime,
+    runtime: Arc<Runtime>,
     threads: Mutex<Vec<JoinHandle<()>>>,
 
     max_memory: Arc<AtomicU64>,
@@ -431,6 +431,7 @@ pub struct Synchronizer {
 
 impl Synchronizer {
     pub fn new(
+        runtime: Arc<Runtime>,
         session: Arc<Session>,
         trident_state: TridentState,
         version_info: &'static VersionInfo,
@@ -462,11 +463,7 @@ impl Synchronizer {
             status: Default::default(),
             session,
             running: Arc::new(AtomicBool::new(false)),
-            rt: Builder::new_multi_thread()
-                .worker_threads(1)
-                .enable_all()
-                .build()
-                .unwrap(),
+            runtime,
             threads: Default::default(),
             flow_acl_listener: Arc::new(sync::Mutex::new(vec![])),
             exception_handler,
@@ -769,7 +766,7 @@ impl Synchronizer {
         let flow_acl_listener = self.flow_acl_listener.clone();
         let exception_handler = self.exception_handler.clone();
         let ntp_diff = self.ntp_diff.clone();
-        self.threads.lock().push(self.rt.spawn(async move {
+        self.threads.lock().push(self.runtime.spawn(async move {
             while running.load(Ordering::SeqCst) {
                 let response = session
                     .grpc_push_with_statsd(Synchronizer::generate_sync_request(
@@ -863,7 +860,7 @@ impl Synchronizer {
         let (tx, mut rx) = mpsc::unbounded_channel();
         let trident_state = self.trident_state.clone();
         let running = self.running.clone();
-        self.rt.spawn(async move {
+        self.runtime.spawn(async move {
             // default escape time is 1h
             let mut escape_time = Duration::from_secs(3600);
             while running.load(Ordering::SeqCst) {
@@ -901,7 +898,7 @@ impl Synchronizer {
         let status = self.status.clone();
         let running = self.running.clone();
         let ntp_diff = self.ntp_diff.clone();
-        self.rt.spawn(async move {
+        self.runtime.spawn(async move {
             while running.load(Ordering::SeqCst) {
                 let (enabled, sync_interval) = {
                     let reader = status.read();
@@ -923,7 +920,7 @@ impl Synchronizer {
 
                 let ctrl_ip = running_config.read().ctrl_ip.clone();
                 let response = session
-                    .grpc_query_with_statsd(tp::NtpRequest {
+                    .grpc_ntp_with_statsd(tp::NtpRequest {
                         ctrl_ip: Some(ctrl_ip),
                         request: Some(ntp_msg.to_vec()),
                     })
@@ -1134,7 +1131,7 @@ impl Synchronizer {
         let max_memory = self.max_memory.clone();
         let mut sync_interval = DEFAULT_SYNC_INTERVAL;
         let standalone_runtime_config = self.standalone_runtime_config.as_ref().unwrap().clone();
-        self.threads.lock().push(self.rt.spawn(async move {
+        self.threads.lock().push(self.runtime.spawn(async move {
             while running.load(Ordering::SeqCst) {
                 let runtime_config =
                     match RuntimeConfig::load_from_file(standalone_runtime_config.as_path()) {
@@ -1184,7 +1181,7 @@ impl Synchronizer {
         let max_memory = self.max_memory.clone();
         let exception_handler = self.exception_handler.clone();
         let ntp_diff = self.ntp_diff.clone();
-        self.threads.lock().push(self.rt.spawn(async move {
+        self.threads.lock().push(self.runtime.spawn(async move {
             while running.load(Ordering::SeqCst) {
                 let upgrade_hostname = |s: &str| {
                     let r = status.upgradable_read();
@@ -1319,7 +1316,7 @@ impl Synchronizer {
         if !self.running.swap(false, Ordering::SeqCst) {
             return;
         }
-        self.rt.block_on(async move {
+        self.runtime.block_on(async move {
             for t in self.threads.lock().drain(..) {
                 let _ = t.await;
             }
