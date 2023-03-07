@@ -517,12 +517,7 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 	}
 
 out:
-	if (is_current_comm("mysqld")) 
-		return conn_info->direction == T_INGRESS ? MSG_REQUEST : MSG_RESPONSE;
-	else 
-		return conn_info->direction == T_INGRESS ? MSG_RESPONSE : MSG_REQUEST;
-
-	return MSG_UNKNOWN;
+	return MSG_REQUEST;
 
 	/*
 	   e.g:
@@ -934,15 +929,7 @@ static __inline enum message_type infer_mqtt_message(const char *buf,
 	if ((mqtt_type == 12 || mqtt_type == 13 || mqtt_type == 14) && length != 0)
 		return MSG_UNKNOWN;
 
-	// AUTH 类型的数据部分长度很灵活,不能通过上述过滤其他类型的方式进行过滤,
-	// 默认所有 AUTH 类型都是有效的
-
-	const volatile int __mqtt_type = mqtt_type;
-	if (__mqtt_type == 1 || __mqtt_type == 3 || __mqtt_type == 8 ||
-	    __mqtt_type == 10 || __mqtt_type == 12 || __mqtt_type == 14 ||
-	    __mqtt_type == 15)
-		return MSG_REQUEST;
-	return MSG_RESPONSE;
+	return MSG_REQUEST;
 }
 
 /*
