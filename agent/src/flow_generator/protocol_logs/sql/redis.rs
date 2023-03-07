@@ -119,11 +119,6 @@ where
 
 impl RedisInfo {
     pub fn merge(&mut self, other: Self) -> Result<()> {
-        if !self.can_merge(&other) {
-            return Err(Error::L7ProtocolCanNotMerge(L7ProtocolInfo::RedisInfo(
-                other,
-            )));
-        }
         self.response = other.response;
         self.status = other.status;
         self.error = other.error;
@@ -135,13 +130,6 @@ impl RedisInfo {
         if let Some(p) = param.ebpf_param {
             self.cap_seq = Some(p.cap_seq);
         }
-    }
-
-    pub fn can_merge(&self, resp: &Self) -> bool {
-        if let (Some(req_seq), Some(resp_seq)) = (self.cap_seq, resp.cap_seq) {
-            return resp_seq > req_seq && resp_seq - req_seq == 1;
-        }
-        true
     }
 }
 

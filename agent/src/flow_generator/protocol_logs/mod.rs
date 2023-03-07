@@ -414,11 +414,7 @@ impl AppProtoLogsData {
 
     pub fn session_merge(&mut self, log: Self) -> Result<()> {
         if let Err(err) = self.protocol_merge(log.special_info) {
-            /*
-                if can not merge, return log which can not merge to self.
-                the follow circumstance can not merge:
-                    when ebpf disorder, http1 can not match req/resp.
-            */
+            // if can not merge, return log which can not merge to self.
             if let Error::L7ProtocolCanNotMerge(special_info) = err {
                 return Err(Error::L7LogCanNotMerge(Self {
                     special_info,

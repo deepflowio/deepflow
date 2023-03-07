@@ -153,11 +153,6 @@ impl HttpInfo {
         match other.msg_type {
             // merge with request
             LogMessageType::Request => {
-                if !other.can_merge(self) {
-                    return Err(Error::L7ProtocolCanNotMerge(L7ProtocolInfo::HttpInfo(
-                        other,
-                    )));
-                }
                 if self.path.is_empty() {
                     self.path = other.path;
                 }
@@ -185,11 +180,6 @@ impl HttpInfo {
             }
             // merge with response
             LogMessageType::Response => {
-                if !self.can_merge(&other) {
-                    return Err(Error::L7ProtocolCanNotMerge(L7ProtocolInfo::HttpInfo(
-                        other,
-                    )));
-                }
                 if other.status != L7ResponseStatus::default() {
                     self.status = other.status;
                 }
@@ -227,20 +217,6 @@ impl HttpInfo {
         if let Some(p) = param.ebpf_param {
             self.cap_seq = Some(p.cap_seq);
         }
-    }
-
-    /*
-        if http1 with long live tcp connection, ebpf maybe disorder.
-        need to check the packet sequence when from ebpf and protocol is http1
-        self must req and other must resp.
-    */
-    pub fn can_merge(&self, resp: &Self) -> bool {
-        if self.proto == L7Protocol::Http1 || self.proto == L7Protocol::Http1TLS {
-            if let (Some(req_seq), Some(resp_seq)) = (self.cap_seq, resp.cap_seq) {
-                return resp_seq > req_seq && resp_seq - req_seq == 1;
-            }
-        }
-        true
     }
 
     pub fn is_empty(&self) -> bool {
