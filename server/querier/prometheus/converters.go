@@ -35,8 +35,6 @@ func PromReaderTransToSQL(req *prompb.ReadRequest) (sql string, db string, datas
 	q := queriers[0]
 	//pp.Println(q)
 
-	// q.StartTimestampMs/EndTimestampMs is not available when doing instant query
-	// use q.Hints.StartMs/EndMs instead, it covers range query & instant query
 	startTime := q.Hints.StartMs / 1000
 	endTime := q.Hints.EndMs / 1000
 	if q.EndTimestampMs%1000 > 0 {
@@ -129,14 +127,14 @@ func PromReaderTransToSQL(req *prompb.ReadRequest) (sql string, db string, datas
 		}
 	}
 
+	// order by DESC for get data completely, then scan data reversely for data combine(see func.RespTransToProm)
 	if db != "" {
 		sql = fmt.Sprintf("SELECT %s FROM %s WHERE %s ORDER BY time desc LIMIT %s",
 			strings.Join(metrics, ","), table, strings.Join(filters, " AND "), config.Cfg.Limit)
 	} else {
-		sql = fmt.Sprintf("SELECT %s FROM prometheus.%s WHERE %s LIMIT %s",
+		sql = fmt.Sprintf("SELECT %s FROM prometheus.%s WHERE %s ORDER BY time desc LIMIT %s",
 			strings.Join(metrics, ","), metricsName, strings.Join(filters, " AND "), config.Cfg.Limit)
 	}
-
 	return sql, db, datasource, nil
 }
 
@@ -177,8 +175,9 @@ func RespTransToProm(result *common.Result) (resp *prompb.ReadResponse, err erro
 	}
 
 	// scan all rows
-	for _, v := range result.Values {
-		values := v.([]interface{})
+	// reverse scan, make data order by time asc for prometheus filter handling (happens in prometheus promql engine)
+	for i := len(result.Values) - 1; i >= 0; i-- {
+		values := result.Values[i].([]interface{})
 
 		// merge and serialize all tags as map key
 		tagsJsonStr := ""
@@ -186,13 +185,13 @@ func RespTransToProm(result *common.Result) (resp *prompb.ReadResponse, err erro
 			tagsJsonStr = values[tagIndex].(string)
 		} else {
 			tagsStrList := make([]string, 0, len(allTagIndexs))
-			for _, i := range allTagIndexs {
+			for _, idx := range allTagIndexs {
 				// remove nil tag
-				if ValueIsNil(values[i]) {
+				if ValueIsNil(values[idx]) {
 					continue
 				}
-				tagsStrList = append(tagsStrList, strconv.Itoa(i))
-				tagsStrList = append(tagsStrList, FormatString(values[i]))
+				tagsStrList = append(tagsStrList, strconv.Itoa(idx))
+				tagsStrList = append(tagsStrList, FormatString(values[idx]))
 			}
 			tagsJsonStr = strings.Join(tagsStrList, "-")
 		}
@@ -213,14 +212,14 @@ func RespTransToProm(result *common.Result) (resp *prompb.ReadResponse, err erro
 			if tagIndex > -1 {
 				pairs = append(pairs, TagsToLabelPairs(tagsJsonStr)...)
 			} else {
-				for _, i := range allTagIndexs {
+				for _, idx := range allTagIndexs {
 					// remove nil tag
-					if ValueIsNil(values[i]) {
+					if ValueIsNil(values[idx]) {
 						continue
 					}
 					pairs = append(pairs, prompb.Label{
-						Name:  FromatTagName(result.Columns[i].(string)),
-						Value: FormatString(values[i]),
+						Name:  FromatTagName(result.Columns[idx].(string)),
+						Value: FormatString(values[idx]),
 					})
 				}
 			}
