@@ -235,6 +235,15 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 		toolDS.hostIPToUUID[host.IP] = host.UUID
 		toolDS.additionalHosts = append(toolDS.additionalHosts, host)
 		for _, vif := range host.VInterfaces {
+			if vif.SubnetUUID == "" {
+				if len(vif.IPs) != 0 {
+					return nil, NewError(
+						common.RESOURCE_NOT_FOUND,
+						fmt.Sprintf("host (name: %s) vinterface (mac: %s) subnet (uuid: %s) not found", host.Name, vif.Mac, vif.SubnetUUID),
+					)
+				}
+				continue
+			}
 			if _, ok := toolDS.subnetUUIDToType[vif.SubnetUUID]; !ok {
 				return nil, NewError(
 					common.RESOURCE_NOT_FOUND,
