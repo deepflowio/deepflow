@@ -23,7 +23,6 @@ use std::time::{Duration, Instant};
 
 use log::{debug, error, info};
 use parking_lot::RwLock;
-use tokio::sync::Semaphore;
 use tonic::transport::{Channel, Endpoint};
 
 use crate::common::{DEFAULT_CONTROLLER_PORT, DEFAULT_CONTROLLER_TLS_PORT};
@@ -41,7 +40,7 @@ pub const SESSION_TIMEOUT: Duration = Duration::from_secs(120);
 
 const GRPC_CALL_ENDPOINTS: [&str; 7] = [
     "push",
-    "query",
+    "ntp",
     "upgrade",
     "sync",
     "genesis_sync",
@@ -50,7 +49,7 @@ const GRPC_CALL_ENDPOINTS: [&str; 7] = [
 ];
 
 const PUSH_ENDPOINT: usize = 0;
-const QUERY_ENDPOINT: usize = 1;
+const NTP_ENDPOINT: usize = 1;
 const UPGRADE_ENDPOINT: usize = 2;
 const SYNC_ENDPOINT: usize = 3;
 const GENESIS_SYNC_ENDPOINT: usize = 4;
@@ -110,11 +109,6 @@ pub struct Session {
     client: RwLock<Option<Channel>>,
     exception_handler: ExceptionHandler,
     counters: Vec<Arc<GrpcCallCounter>>,
-
-    // sharing tonic grpc channel sometimes suffers from high latency
-    // using semaphore to force serialized grpc calls to
-    // reduce the probability
-    in_use: Semaphore,
 }
 
 impl Session {
@@ -159,8 +153,6 @@ impl Session {
             client: RwLock::new(None),
             exception_handler,
             counters,
-
-            in_use: Semaphore::new(1),
         }
     }
 
@@ -244,7 +236,6 @@ impl Session {
         request: trident::SyncRequest,
     ) -> Result<tonic::Response<tonic::codec::Streaming<trident::SyncResponse>>, tonic::Status>
     {
-        let _lock = self.in_use.acquire().await.unwrap();
         self.update_current_server().await;
         let client = match self.get_client() {
             Some(c) => c,
@@ -268,7 +259,6 @@ impl Session {
         request: trident::SyncRequest,
         with_statsd: bool,
     ) -> Result<tonic::Response<trident::SyncResponse>, tonic::Status> {
-        let _lock = self.in_use.acquire().await.unwrap();
         self.update_current_server().await;
         let client = match self.get_client() {
             Some(c) => c,
@@ -279,8 +269,9 @@ impl Session {
         };
         let mut client = trident::synchronizer_client::SynchronizerClient::new(client);
 
-        if with_statsd {
-            client.sync(request).await
+        if !with_statsd {
+            let response = client.sync(request).await;
+            response
         } else {
             let now = Instant::now();
             let response = client.sync(request).await;
@@ -311,7 +302,6 @@ impl Session {
         request: trident::UpgradeRequest,
     ) -> Result<tonic::Response<tonic::codec::Streaming<trident::UpgradeResponse>>, tonic::Status>
     {
-        let _lock = self.in_use.acquire().await.unwrap();
         self.update_current_server().await;
         let client = match self.get_client() {
             Some(c) => c,
@@ -330,11 +320,10 @@ impl Session {
         response
     }
 
-    pub async fn grpc_query_with_statsd(
+    pub async fn grpc_ntp_with_statsd(
         &self,
         request: trident::NtpRequest,
     ) -> Result<tonic::Response<trident::NtpResponse>, tonic::Status> {
-        let _lock = self.in_use.acquire().await.unwrap();
         self.update_current_server().await;
         let client = match self.get_client() {
             Some(c) => c,
@@ -348,8 +337,9 @@ impl Session {
         let now = Instant::now();
         let response = client.query(request).await;
         let now_elapsed = now.elapsed();
-        self.counters[QUERY_ENDPOINT].delay.update(now_elapsed);
-        debug!("grpc query latency {:?}ms", now_elapsed.as_millis());
+        self.counters[NTP_ENDPOINT].delay.update(now_elapsed);
+        // Ntp rpc name is `query`
+        debug!("grpc ntp latency {:?}ms", now_elapsed.as_millis());
         response
     }
 
@@ -357,7 +347,6 @@ impl Session {
         &self,
         request: trident::GenesisSyncRequest,
     ) -> Result<tonic::Response<trident::GenesisSyncResponse>, tonic::Status> {
-        let _lock = self.in_use.acquire().await.unwrap();
         self.update_current_server().await;
         let client = match self.get_client() {
             Some(c) => c,
@@ -382,7 +371,6 @@ impl Session {
         &self,
         request: trident::KubernetesApiSyncRequest,
     ) -> Result<tonic::Response<trident::KubernetesApiSyncResponse>, tonic::Status> {
-        let _lock = self.in_use.acquire().await.unwrap();
         self.update_current_server().await;
         let client = match self.get_client() {
             Some(c) => c,
@@ -410,7 +398,6 @@ impl Session {
         &self,
         request: trident::KubernetesClusterIdRequest,
     ) -> Result<tonic::Response<trident::KubernetesClusterIdResponse>, tonic::Status> {
-        let _lock = self.in_use.acquire().await.unwrap();
         self.update_current_server().await;
         let client = match self.get_client() {
             Some(c) => c,

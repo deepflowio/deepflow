@@ -30,7 +30,7 @@ use arc_swap::access::Access;
 use log::{debug, error, info, warn};
 use regex::Regex;
 use ring::digest;
-use tokio::runtime::{Builder, Runtime};
+use tokio::runtime::Runtime;
 
 use crate::{
     config::{handler::PlatformAccess, KubernetesPollerType},
@@ -61,6 +61,7 @@ use public::{
 const SHA1_DIGEST_LEN: usize = 20;
 
 struct ProcessArgs {
+    runtime: Arc<Runtime>,
     config: PlatformAccess,
     running: Arc<Mutex<bool>>,
     version: Arc<AtomicU64>,
@@ -96,6 +97,7 @@ struct HashArgs {
 }
 
 pub struct PlatformSynchronizer {
+    runtime: Arc<Runtime>,
     config: PlatformAccess,
     version: Arc<AtomicU64>,
     running: Arc<Mutex<bool>>,
@@ -111,6 +113,7 @@ pub struct PlatformSynchronizer {
 
 impl PlatformSynchronizer {
     pub fn new(
+        runtime: Arc<Runtime>,
         config: PlatformAccess,
         session: Arc<Session>,
         xml_extractor: Arc<LibvirtXmlExtractor>,
@@ -163,6 +166,7 @@ impl PlatformSynchronizer {
         let sniffer = Arc::new(sniffer_builder::Sniffer);
 
         Self {
+            runtime,
             config,
             version: Arc::new(AtomicU64::new(
                 SystemTime::now()
@@ -248,6 +252,7 @@ impl PlatformSynchronizer {
         drop(running_guard);
 
         let process_args = ProcessArgs {
+            runtime: self.runtime.clone(),
             config: self.config.clone(),
             running: self.running.clone(),
             version: self.version.clone(),
@@ -516,7 +521,6 @@ impl PlatformSynchronizer {
         self_xml_interfaces: &Vec<InterfaceEntry>,
         vtap_id: u16,
         version: u64,
-        rt: &Runtime,
     ) -> Result<u64, tonic::Status> {
         let config_guard = process_args.config.load();
         let trident_type = config_guard.trident_type;
@@ -624,13 +628,13 @@ impl PlatformSynchronizer {
             nat_ip: None,
         };
 
-        rt.block_on(process_args.session.grpc_genesis_sync_with_statsd(msg))
+        process_args
+            .runtime
+            .block_on(process_args.session.grpc_genesis_sync_with_statsd(msg))
             .map(|r| r.into_inner().version())
     }
 
     fn process(args: ProcessArgs) {
-        let rt = Builder::new_current_thread().enable_all().build().unwrap();
-
         let mut last_version = 0;
         let mut kubernetes_version = 0;
         let mut last_ip_update_timestamp = Duration::default();
@@ -701,7 +705,10 @@ impl PlatformSynchronizer {
                     nat_ip: None,
                 };
 
-                match rt.block_on(args.session.grpc_genesis_sync_with_statsd(msg)) {
+                match args
+                    .runtime
+                    .block_on(args.session.grpc_genesis_sync_with_statsd(msg))
+                {
                     Ok(res) => {
                         let res = res.into_inner();
                         let remote_version = res.version();
@@ -739,7 +746,6 @@ impl PlatformSynchronizer {
                 &xml_interfaces,
                 cur_vtap_id,
                 cur_version,
-                &rt,
             ) {
                 Ok(version) => last_version = version,
                 Err(e) => {
