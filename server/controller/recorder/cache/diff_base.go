@@ -338,7 +338,10 @@ func (b *DiffBaseDataSet) deleteDHCPPort(lcuuid string) {
 }
 
 func (b *DiffBaseDataSet) addVInterface(dbItem *mysql.VInterface, seq int, toolDataSet *ToolDataSet) {
-	networkLcuuid, _ := toolDataSet.GetNetworkLcuuidByID(dbItem.NetworkID)
+	var networkLcuuid string
+	if dbItem.NetworkID != 0 {
+		networkLcuuid, _ = toolDataSet.GetNetworkLcuuidByID(dbItem.NetworkID)
+	}
 	b.VInterfaces[dbItem.Lcuuid] = &VInterface{
 		DiffBase: DiffBase{
 			Sequence: seq,
