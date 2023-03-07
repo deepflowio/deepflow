@@ -15,6 +15,10 @@ type ClickhouseCounter struct {
 	ResponseSize uint64 `statsd:"response_size"`
 	RowCount     uint64 `statsd:"row_count"`
 	ColumnCount  uint64 `statsd:"column_count"`
+	QueryTime    uint64
+	QueryTimeSum uint64
+	QueryTimeAvg uint64 `statsd:"query_time_avg"`
+	QueryTimeMax uint64 `statsd:"query_time_max"`
 }
 
 type Counter struct {
@@ -31,6 +35,12 @@ func (c *Counter) WriteCk(qc *ClickhouseCounter) {
 		c.ck.RowCount += qc.RowCount
 		c.ck.ColumnCount += qc.ColumnCount
 		c.ck.QueryCount++
+
+		c.ck.QueryTimeSum += qc.QueryTime
+		c.ck.QueryTimeAvg = c.ck.QueryTimeSum / c.ck.QueryCount
+		if qc.QueryTime > c.ck.QueryTimeMax {
+			c.ck.QueryTimeMax = qc.QueryTime
+		}
 	}()
 }
 
