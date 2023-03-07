@@ -18,9 +18,9 @@ import (
 var log = logging.MustGetLogger("flow_tag.dbwriter")
 
 const (
-	FLOW_TAG_CACHE_FLUSH_TIMEOUT = 10 * 60 // s
-	FLOW_TAG_CACHE_INIT_SIZE     = 1 << 14
-	FLOW_TAG_CACHE_MAX_SIZE      = 1 << 18
+	FLOW_TAG_CACHE_INIT_SIZE = 1 << 14
+	MIN_FLUSH_CACHE_TIMEOUT  = 60
+	CACHE_FLUSH_WRITE_COUNT  = 100 << 10 // 100k
 )
 
 type Counter struct {
@@ -53,14 +53,18 @@ type FlowTagCache struct {
 	fieldLock, fieldValueLock   sync.Mutex
 
 	lastFieldFlushTime, lastFieldValueFlushTime int64
+	cacheFlushTimeout                           int64
+	cacheMaxSize                                int
 }
 
-func NewFlowTagCache() *FlowTagCache {
+func NewFlowTagCache(cacheFlushTimeout, cacheMaxSize uint32) *FlowTagCache {
 	return &FlowTagCache{
 		fieldCache:              make(map[FlowTagInfo]*FlowTag, FLOW_TAG_CACHE_INIT_SIZE),
 		fieldValueCache:         make(map[FlowTagInfo]*FlowTag, FLOW_TAG_CACHE_INIT_SIZE),
 		lastFieldFlushTime:      time.Now().Unix(),
 		lastFieldValueFlushTime: time.Now().Unix(),
+		cacheFlushTimeout:       int64(cacheFlushTimeout),
+		cacheMaxSize:            int(cacheMaxSize),
 	}
 }
 
@@ -104,8 +108,10 @@ func (c *FlowTagCache) CacheOrDropFieldValues(values []interface{}) []interface{
 }
 
 func (c *FlowTagCache) CheckOrFlushFields() []interface{} {
-	if time.Now().Unix()-c.lastFieldFlushTime < FLOW_TAG_CACHE_FLUSH_TIMEOUT &&
-		len(c.fieldCache) < FLOW_TAG_CACHE_MAX_SIZE {
+	timeDiff := time.Now().Unix() - c.lastFieldFlushTime
+	if (timeDiff < c.cacheFlushTimeout &&
+		len(c.fieldCache) < c.cacheMaxSize) ||
+		timeDiff < MIN_FLUSH_CACHE_TIMEOUT {
 		return nil
 	}
 	c.fieldLock.Lock()
@@ -121,8 +127,10 @@ func (c *FlowTagCache) CheckOrFlushFields() []interface{} {
 }
 
 func (c *FlowTagCache) CheckOrFlushFieldValues() []interface{} {
-	if time.Now().Unix()-c.lastFieldValueFlushTime < FLOW_TAG_CACHE_FLUSH_TIMEOUT &&
-		len(c.fieldValueCache) < FLOW_TAG_CACHE_MAX_SIZE {
+	timeDiff := time.Now().Unix() - c.lastFieldValueFlushTime
+	if (timeDiff < c.cacheFlushTimeout &&
+		len(c.fieldValueCache) < c.cacheMaxSize) ||
+		timeDiff < MIN_FLUSH_CACHE_TIMEOUT {
 		return nil
 	}
 	c.fieldValueLock.Lock()
@@ -151,19 +159,19 @@ func NewFlowTagWriter(
 		ckdbPassword: config.CKDBAuth.Password,
 		writerConfig: writerConfig,
 
-		cache:   NewFlowTagCache(),
+		cache:   NewFlowTagCache(config.FlowTagCacheFlushTimeout, config.FlowTagCacheMaxSize),
 		counter: &Counter{},
 	}
 	t := FlowTag{}
 	var err error
 	for _, tagType := range []TagType{TagField, TagFieldValue} {
-		t.TableName = fmt.Sprintf("%s_%s", srcDB, tagType.String())
+		tableName := fmt.Sprintf("%s_%s", srcDB, tagType.String())
 		t.hasFieldValue = false
 		if tagType == TagFieldValue {
 			t.hasFieldValue = true
 		}
 		w.ckwriters[tagType], err = ckwriter.NewCKWriter(w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
-			fmt.Sprintf("%s_%s", name, t.TableName), t.GenCKTable(config.CKDB.ClusterName, config.CKDB.StoragePolicy, ttl, partition), w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
+			fmt.Sprintf("%s_%s", name, tableName), t.GenCKTable(config.CKDB.ClusterName, config.CKDB.StoragePolicy, tableName, ttl, partition), w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
 		if err != nil {
 			return nil, err
 		}
@@ -178,6 +186,17 @@ func (w *FlowTagWriter) Write(t TagType, values ...interface{}) {
 	w.ckwriters[t].Put(values...)
 }
 
+func (w *FlowTagWriter) WriteSmoothly(t TagType, values []interface{}) {
+	for i := 0; i < len(values); i += CACHE_FLUSH_WRITE_COUNT {
+		endIndex := i + CACHE_FLUSH_WRITE_COUNT
+		if i+CACHE_FLUSH_WRITE_COUNT > len(values) {
+			endIndex = len(values)
+		}
+		w.ckwriters[t].Put(values[i:endIndex]...)
+		time.Sleep(10 * time.Second)
+	}
+}
+
 func (w *FlowTagWriter) WriteFieldsAndFieldValues(fields, fieldValues []interface{}) {
 	fieldsCount, fieldValuesCount := len(fields), len(fieldValues)
 	fields = w.cache.CacheOrDropFields(fields)
@@ -187,7 +206,7 @@ func (w *FlowTagWriter) WriteFieldsAndFieldValues(fields, fieldValues []interfac
 	} else {
 		flushValues := w.cache.CheckOrFlushFields()
 		if len(flushValues) > 0 {
-			w.ckwriters[TagField].Put(flushValues...)
+			go w.WriteSmoothly(TagField, flushValues)
 		}
 		w.counter.FieldCount += int64(len(flushValues))
 	}
@@ -199,7 +218,7 @@ func (w *FlowTagWriter) WriteFieldsAndFieldValues(fields, fieldValues []interfac
 	} else {
 		flushValues := w.cache.CheckOrFlushFieldValues()
 		if len(flushValues) > 0 {
-			w.ckwriters[TagFieldValue].Put(flushValues...)
+			go w.WriteSmoothly(TagFieldValue, flushValues)
 		}
 		w.counter.FieldValueCount += int64(len(flushValues))
 	}
