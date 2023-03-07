@@ -144,7 +144,7 @@ type VInterface struct {
 	TapMac          string `json:"tap_mac"`
 	DeviceLcuuid    string `json:"device_lcuuid" binding:"required"`
 	DeviceType      int    `json:"device_type" binding:"required"`
-	NetworkLcuuid   string `json:"network_lcuuid" binding:"required"`
+	NetworkLcuuid   string `json:"network_lcuuid"`
 	VPCLcuuid       string `json:"vpc_lcuuid"` // TODO not used
 	RegionLcuuid    string `json:"region_lcuuid" binding:"required"`
 	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
