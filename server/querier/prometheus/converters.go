@@ -162,9 +162,6 @@ func RespTransToProm(result *common.Result) (resp *prompb.ReadResponse, err erro
 	}
 	metricsType := result.Schemas[metricsIndex].ValueType
 
-	// series group by tag
-	tagSeriesMap := map[string]*prompb.TimeSeries{}
-
 	// ext_metrics & deepflow_system dont have other tags, flow_metrics & flow_log dont have `tag`
 	allTagIndexs := make([]int, 0, otherTagCount)
 	for i := range result.Columns {
@@ -174,10 +171,19 @@ func RespTransToProm(result *common.Result) (resp *prompb.ReadResponse, err erro
 		allTagIndexs = append(allTagIndexs, i)
 	}
 
-	// scan all rows
-	// reverse scan, make data order by time asc for prometheus filter handling (happens in prometheus promql engine)
-	for i := len(result.Values) - 1; i >= 0; i-- {
-		values := result.Values[i].([]interface{})
+	// Scan all the results, determine the seriesID of each sample and the number of samples in each series,
+	// so that the size of the sample array in each series can be determined in advance.
+	maxPossibleSeries := len(result.Values)
+	if maxPossibleSeries > config.Cfg.Prometheus.SeriesLimit {
+		maxPossibleSeries = config.Cfg.Prometheus.SeriesLimit
+	}
+	seriesIndexMap := map[string]int32{} // the index in seriesArray, for each `tagsJsonStr`
+	seriesArray := make([]*prompb.TimeSeries, 0, maxPossibleSeries)
+	sampleSeriesIndex := make([]int32, len(result.Values)) // the index in seriesArray, for each sample
+	seriesSampleCount := make([]int32, maxPossibleSeries)  // number of samples of each series
+	initialSeriesIndex := int32(0)
+	for i, v := range result.Values {
+		values := v.([]interface{})
 
 		// merge and serialize all tags as map key
 		tagsJsonStr := ""
@@ -196,22 +202,32 @@ func RespTransToProm(result *common.Result) (resp *prompb.ReadResponse, err erro
 			tagsJsonStr = strings.Join(tagsStrList, "-")
 		}
 
-		// check and create propb.TimeSeries
-		if _, ok := tagSeriesMap[tagsJsonStr]; !ok {
-			if len(tagSeriesMap) >= config.Cfg.Prometheus.SeriesLimit {
+		// check and assign seriesIndex
+		var series *prompb.TimeSeries
+		index, exist := seriesIndexMap[tagsJsonStr]
+		if exist {
+			sampleSeriesIndex[i] = index
+			seriesSampleCount[index]++
+		} else {
+			if len(seriesIndexMap) >= config.Cfg.Prometheus.SeriesLimit {
+				sampleSeriesIndex[i] = -1
 				continue
 			}
 
-			// __name__:metricsName
-			pairs := make([]prompb.Label, 1, 1+len(allTagIndexs))
-			pairs[0] = prompb.Label{
-				Name:  prometheusMetricsName,
-				Value: metricsName,
-			}
 			// tag label pair
+			var pairs []prompb.Label
 			if tagIndex > -1 {
-				pairs = append(pairs, TagsToLabelPairs(tagsJsonStr)...)
+				tagMap := make(map[string]string)
+				json.Unmarshal([]byte(tagsJsonStr), &tagMap)
+				pairs = make([]prompb.Label, 0, 1+len(tagMap))
+				for k, v := range tagMap {
+					pairs = append(pairs, prompb.Label{
+						Name:  k,
+						Value: v,
+					})
+				}
 			} else {
+				pairs = make([]prompb.Label, 0, 1+len(allTagIndexs))
 				for _, idx := range allTagIndexs {
 					// remove nil tag
 					if ValueIsNil(values[idx]) {
@@ -223,13 +239,32 @@ func RespTransToProm(result *common.Result) (resp *prompb.ReadResponse, err erro
 					})
 				}
 			}
-			series := &prompb.TimeSeries{
+			// append the special tag: "__name__": "$metricsName"
+			pairs = append(pairs, prompb.Label{
+				Name:  prometheusMetricsName,
+				Value: metricsName,
+			})
+
+			series = &prompb.TimeSeries{
 				Labels: pairs,
 			}
-			tagSeriesMap[tagsJsonStr] = series
+
+			seriesIndexMap[tagsJsonStr] = initialSeriesIndex
+			seriesArray = append(seriesArray, series)
+			sampleSeriesIndex[i] = index
+			seriesSampleCount[index] = 1
+			initialSeriesIndex++
+		}
+	}
+
+	// reverse scan, make data order by time asc for prometheus filter handling (happens in prometheus promql engine)
+	for i := len(result.Values) - 1; i >= 0; i-- {
+		if sampleSeriesIndex[i] == -1 {
+			continue // SLIMIT overflow
 		}
 
 		// get metrics
+		values := result.Values[i].([]interface{})
 		var metricsValue float64
 		if metricsType == "Int" {
 			metricsValue = float64(values[metricsIndex].(int))
@@ -240,7 +275,11 @@ func RespTransToProm(result *common.Result) (resp *prompb.ReadResponse, err erro
 		}
 
 		// add a sample for the TimeSeries
-		series := tagSeriesMap[tagsJsonStr]
+		seriesIndex := sampleSeriesIndex[i]
+		series := seriesArray[seriesIndex]
+		if cap(series.Samples) == 0 {
+			series.Samples = make([]prompb.Sample, 0, seriesSampleCount[seriesIndex])
+		}
 		series.Samples = append(
 			series.Samples, prompb.Sample{
 				Timestamp: int64(values[timeIndex].(int)) * 1000,
@@ -253,24 +292,11 @@ func RespTransToProm(result *common.Result) (resp *prompb.ReadResponse, err erro
 	resp = &prompb.ReadResponse{
 		Results: []*prompb.QueryResult{{}},
 	}
-	resp.Results[0].Timeseries = make([]*prompb.TimeSeries, 0, len(tagSeriesMap))
-	for _, series := range tagSeriesMap {
+	resp.Results[0].Timeseries = make([]*prompb.TimeSeries, 0, len(seriesArray))
+	for _, series := range seriesArray {
 		resp.Results[0].Timeseries = append(resp.Results[0].Timeseries, series)
 	}
 	return resp, nil
-}
-
-func TagsToLabelPairs(tagsJsonStr string) []prompb.Label {
-	pairs := []prompb.Label{}
-	m := make(map[string]string)
-	json.Unmarshal([]byte(tagsJsonStr), &m)
-	for k, v := range m {
-		pairs = append(pairs, prompb.Label{
-			Name:  string(k),
-			Value: v,
-		})
-	}
-	return pairs
 }
 
 func FormatString(a interface{}) string {
