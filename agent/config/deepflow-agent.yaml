@@ -30,3 +30,6 @@ controller-ips:
 
 ## 支持采集器自动加入组
 #vtap-group-id-request: ""
+
+## Number of worker threads of tokio, range [1, 32768), defaults to 16
+#tokio-worker-thread-number: 16
