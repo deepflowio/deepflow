@@ -204,6 +204,9 @@ querier:
   limit: 10000
   time-fill-limit: 20
 
+  prometheus:
+    series-limit: 10000
+
 ingester:
   #ckdb:
   #  # use internal or external ckdb
