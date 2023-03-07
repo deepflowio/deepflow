@@ -17,8 +17,6 @@
 package flow_tag
 
 import (
-	"fmt"
-
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/pool"
 )
@@ -80,7 +78,6 @@ type FlowTag struct {
 	pool.ReferenceCount
 
 	Timestamp uint32 // s
-	TableName string
 	FlowTagInfo
 	fieldValueCount uint64
 }
@@ -88,7 +85,6 @@ type FlowTag struct {
 func NewTagField(time uint32, db, table string, epcId int32, podNsId uint16, fieldType FieldType, fieldName string) *FlowTag {
 	t := AcquireFlowTag()
 	t.Timestamp = time
-	t.TableName = fmt.Sprintf("%s_%s", db, TagField.String())
 	t.table = table
 	t.fieldType = fieldType
 	t.vpcId = epcId
@@ -105,7 +101,6 @@ func NewTagField(time uint32, db, table string, epcId int32, podNsId uint16, fie
 func NewTagFieldValue(time uint32, db, table string, epcId int32, podNsId uint16, fieldType FieldType, fieldName string, fieldValue string) *FlowTag {
 	t := AcquireFlowTag()
 	t.Timestamp = time
-	t.TableName = fmt.Sprintf("%s_%s", db, TagFieldValue.String())
 	t.table = table
 	t.fieldType = fieldType
 	t.vpcId = epcId
@@ -151,7 +146,7 @@ func (t *FlowTag) Columns() []*ckdb.Column {
 	return columns
 }
 
-func (t *FlowTag) GenCKTable(cluster, storagePolicy string, ttl int, partition ckdb.TimeFuncType) *ckdb.Table {
+func (t *FlowTag) GenCKTable(cluster, storagePolicy, tableName string, ttl int, partition ckdb.TimeFuncType) *ckdb.Table {
 	timeKey := "time"
 	engine := ckdb.ReplacingMergeTree
 
@@ -165,8 +160,8 @@ func (t *FlowTag) GenCKTable(cluster, storagePolicy string, ttl int, partition c
 
 	return &ckdb.Table{
 		Database:        FLOW_TAG_DB,
-		LocalName:       t.TableName + ckdb.LOCAL_SUBFFIX,
-		GlobalName:      t.TableName,
+		LocalName:       tableName + ckdb.LOCAL_SUBFFIX,
+		GlobalName:      tableName,
 		Columns:         t.Columns(),
 		TimeKey:         timeKey,
 		SummingKey:      "count",

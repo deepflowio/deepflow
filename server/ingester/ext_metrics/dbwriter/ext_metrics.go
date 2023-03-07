@@ -41,6 +41,9 @@ type ExtMetrics struct {
 
 	MetricsFloatNames  []string
 	MetricsFloatValues []float64
+
+	fields      []interface{}
+	fieldValues []interface{}
 }
 
 func (m *ExtMetrics) WriteBlock(block *ckdb.Block) {
@@ -109,20 +112,25 @@ func (m *ExtMetrics) GenCKTable(cluster, storagePolicy string, ttl int, coldStor
 }
 
 func (m *ExtMetrics) ToFlowTags() ([]interface{}, []interface{}) {
-	fields := make([]interface{}, 0, len(m.TagNames)+len(m.MetricsFloatNames))
-	fieldValues := make([]interface{}, 0, len(m.TagNames))
+	if cap(m.fields) < len(m.TagNames)+len(m.MetricsFloatNames) {
+		m.fields = make([]interface{}, 0, len(m.TagNames)+len(m.MetricsFloatNames))
+	}
+	if cap(m.fieldValues) < len(m.TagNames) {
+		m.fieldValues = make([]interface{}, 0, len(m.TagNames))
+	}
+	m.fields, m.fieldValues = m.fields[:0], m.fieldValues[:0]
 	tableName := m.TableName
 	if m.VirtualTableName != "" {
 		tableName = m.VirtualTableName
 	}
 	for i, name := range m.TagNames {
-		fields = append(fields, flow_tag.NewTagField(m.Timestamp, m.Database, tableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldTag, name))
-		fieldValues = append(fieldValues, flow_tag.NewTagFieldValue(m.Timestamp, m.Database, tableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldTag, name, m.TagValues[i]))
+		m.fields = append(m.fields, flow_tag.NewTagField(m.Timestamp, m.Database, tableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldTag, name))
+		m.fieldValues = append(m.fieldValues, flow_tag.NewTagFieldValue(m.Timestamp, m.Database, tableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldTag, name, m.TagValues[i]))
 	}
 	for _, name := range m.MetricsFloatNames {
-		fields = append(fields, flow_tag.NewTagField(m.Timestamp, m.Database, tableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldMetrics, name))
+		m.fields = append(m.fields, flow_tag.NewTagField(m.Timestamp, m.Database, tableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldMetrics, name))
 	}
-	return fields, fieldValues
+	return m.fields, m.fieldValues
 }
 
 var extMetricsPool = pool.NewLockFreePool(func() interface{} {
@@ -134,6 +142,8 @@ var extMetricsPool = pool.NewLockFreePool(func() interface{} {
 		TagValues:          make([]string, 0, 4),
 		MetricsFloatNames:  make([]string, 0, 4),
 		MetricsFloatValues: make([]float64, 0, 4),
+		fields:             make([]interface{}, 0, 4),
+		fieldValues:        make([]interface{}, 0, 4),
 	}
 })
 
@@ -148,5 +158,7 @@ func ReleaseExtMetrics(m *ExtMetrics) {
 	m.TagValues = m.TagValues[:0]
 	m.MetricsFloatNames = m.MetricsFloatNames[:0]
 	m.MetricsFloatValues = m.MetricsFloatValues[:0]
+	m.fields = m.fields[:0]
+	m.fieldValues = m.fieldValues[:0]
 	extMetricsPool.Put(m)
 }
