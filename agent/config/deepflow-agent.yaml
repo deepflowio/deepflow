@@ -33,3 +33,6 @@ controller-ips:
 
 ## If specified, use this name for hostname
 #override-os-hostname:
+
+## Number of worker threads of tokio, range [1, 32768), defaults to 16
+#tokio-worker-thread-number: 16

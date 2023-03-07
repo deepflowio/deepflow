@@ -32,7 +32,7 @@ use log::{debug, error, info, warn};
 use parking_lot::RwLock;
 use regex::Regex;
 use ring::digest;
-use tokio::runtime::{Builder, Runtime};
+use tokio::runtime::Runtime;
 
 use crate::{
     common::policy::GpidEntry,
@@ -80,6 +80,7 @@ use super::{
 pub const SHA1_DIGEST_LEN: usize = 20;
 
 pub(super) struct ProcessArgs {
+    pub(super) runtime: Arc<Runtime>,
     pub(super) config: PlatformAccess,
     pub(super) running: Arc<Mutex<bool>>,
     pub(super) version: Arc<AtomicU64>,
@@ -117,6 +118,7 @@ struct HashArgs {
 }
 
 pub struct PlatformSynchronizer {
+    runtime: Arc<Runtime>,
     config: PlatformAccess,
     version: Arc<AtomicU64>,
     running: Arc<Mutex<bool>>,
@@ -133,6 +135,7 @@ pub struct PlatformSynchronizer {
 
 impl PlatformSynchronizer {
     pub fn new(
+        runtime: Arc<Runtime>,
         config: PlatformAccess,
         session: Arc<Session>,
         xml_extractor: Arc<LibvirtXmlExtractor>,
@@ -186,6 +189,7 @@ impl PlatformSynchronizer {
         let sniffer = Arc::new(sniffer_builder::Sniffer);
 
         Self {
+            runtime,
             config,
             version: Arc::new(AtomicU64::new(
                 SystemTime::now()
@@ -272,6 +276,7 @@ impl PlatformSynchronizer {
         drop(running_guard);
 
         let process_args = ProcessArgs {
+            runtime: self.runtime.clone(),
             config: self.config.clone(),
             running: self.running.clone(),
             version: self.version.clone(),
@@ -565,7 +570,6 @@ impl PlatformSynchronizer {
         proc_data: &Vec<ProcessData>,
         vtap_id: u16,
         version: u64,
-        rt: &Runtime,
         ctrl_ip: IpAddr,
         trident_type: TridentType,
         platform_enabled: bool,
@@ -674,13 +678,13 @@ impl PlatformSynchronizer {
             nat_ip: None,
         };
 
-        rt.block_on(process_args.session.grpc_genesis_sync_with_statsd(msg))
+        process_args
+            .runtime
+            .block_on(process_args.session.grpc_genesis_sync_with_statsd(msg))
             .map(|r| r.into_inner().version())
     }
 
     fn process(args: ProcessArgs) {
-        let rt = Builder::new_current_thread().enable_all().build().unwrap();
-
         let mut last_version = 0;
         let mut kubernetes_version = 0;
         let mut last_ip_update_timestamp = Duration::default();
@@ -765,7 +769,10 @@ impl PlatformSynchronizer {
                     nat_ip: None,
                 };
 
-                match rt.block_on(args.session.grpc_genesis_sync_with_statsd(msg)) {
+                match args
+                    .runtime
+                    .block_on(args.session.grpc_genesis_sync_with_statsd(msg))
+                {
                     Ok(res) => {
                         let res = res.into_inner();
                         let remote_version = res.version();
@@ -804,7 +811,6 @@ impl PlatformSynchronizer {
                 &process_data,
                 cur_vtap_id,
                 cur_version,
-                &rt,
                 ctrl_ip,
                 trident_type,
                 platform_enabled,
@@ -844,6 +850,7 @@ impl PlatformSynchronizer {
 }
 
 pub struct SocketSynchronizer {
+    runtime: Arc<Runtime>,
     config: PlatformAccess,
     running_config: Arc<RwLock<RunningConfig>>,
     stop_notify: Arc<Condvar>,
@@ -856,6 +863,7 @@ pub struct SocketSynchronizer {
 
 impl SocketSynchronizer {
     pub fn new(
+        runtime: Arc<Runtime>,
         config: PlatformAccess,
         running_config: Arc<RwLock<RunningConfig>>,
         policy_getter: Arc<Mutex<PolicyGetter>>,
@@ -878,6 +886,7 @@ impl SocketSynchronizer {
         }
 
         Self {
+            runtime,
             config,
             running_config,
             policy_getter,
@@ -902,6 +911,7 @@ impl SocketSynchronizer {
         }
 
         let (
+            runtime,
             running,
             config,
             running_config,
@@ -911,6 +921,7 @@ impl SocketSynchronizer {
             stop_notify,
             lru_toa_info,
         ) = (
+            self.runtime.clone(),
             self.running.clone(),
             self.config.clone(),
             self.running_config.clone(),
@@ -925,6 +936,7 @@ impl SocketSynchronizer {
             .name("socket-synchronizer".to_string())
             .spawn(move || {
                 Self::run(
+                    runtime,
                     running,
                     config,
                     running_config,
@@ -942,6 +954,7 @@ impl SocketSynchronizer {
     }
 
     fn run(
+        runtime: Arc<Runtime>,
         running: Arc<Mutex<bool>>,
         config: PlatformAccess,
         running_config: Arc<RwLock<RunningConfig>>,
@@ -951,7 +964,6 @@ impl SocketSynchronizer {
         stop_notify: Arc<Condvar>,
         lru_toa_info: Arc<Mutex<Lru<SocketAddr, SocketAddr>>>,
     ) {
-        let rt = Builder::new_current_thread().enable_all().build().unwrap();
         let mut last_entries: Vec<GpidEntry> = vec![];
 
         loop {
@@ -1014,7 +1026,7 @@ impl SocketSynchronizer {
                     }
                 };
 
-                match rt.block_on(
+                match runtime.block_on(
                     session.gpid_sync(GpidSyncRequest {
                         ctrl_ip: Some(conf_guard.source_ip.to_string()),
                         ctrl_mac: Some(ctl_mac),

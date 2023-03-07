@@ -35,7 +35,7 @@ use log::{debug, error, info, log_enabled, warn, Level};
 use prost::Message;
 use public::sender::{SendMessageType, Sendable};
 use tokio::{
-    runtime::{Builder, Runtime},
+    runtime::Runtime,
     select,
     sync::{mpsc, oneshot},
     task::JoinHandle,
@@ -743,7 +743,7 @@ impl OwnedCountable for IntegrationCounter {
 /// 监听HTTP端口，接收OpenTelemetry的trace pb数据，然后发送到Sender
 pub struct MetricServer {
     running: Arc<AtomicBool>,
-    rt: Runtime,
+    runtime: Arc<Runtime>,
     thread: Arc<Mutex<Option<JoinHandle<()>>>>,
     otel_sender: DebugSender<OpenTelemetry>,
     compressed_otel_sender: DebugSender<OpenTelemetryCompressed>,
@@ -762,6 +762,7 @@ pub struct MetricServer {
 
 impl MetricServer {
     pub fn new(
+        runtime: Arc<Runtime>,
         otel_sender: DebugSender<OpenTelemetry>,
         compressed_otel_sender: DebugSender<OpenTelemetryCompressed>,
         otel_metrics_collect_sender: Option<DebugSender<Box<TaggedFlow>>>,
@@ -778,12 +779,7 @@ impl MetricServer {
         (
             Self {
                 running: Default::default(),
-                rt: Builder::new_multi_thread()
-                    .worker_threads(2)
-                    .enable_all()
-                    .thread_name("integration collector thread")
-                    .build()
-                    .unwrap(),
+                runtime,
                 thread: Arc::new(Mutex::new(None)),
                 compressed: Arc::new(AtomicBool::new(compressed)),
                 otel_sender,
@@ -812,7 +808,7 @@ impl MetricServer {
             // port changes, resets server
             info!("port changes to {}", port);
             if let Some(tx) = self.server_shutdown_tx.lock().unwrap().as_ref() {
-                let _ = self.rt.block_on(tx.send(()));
+                let _ = self.runtime.block_on(tx.send(()));
             }
         }
     }
@@ -838,14 +834,14 @@ impl MetricServer {
         let local_epc_id = self.local_epc_id.clone();
         let policy_getter = self.policy_getter.clone();
         let (tx, mut rx) = mpsc::channel(8);
-        self.rt
+        self.runtime
             .spawn(Self::alive_check(monitor_port.clone(), tx.clone(), mon_rx));
         self.server_shutdown_tx.lock().unwrap().replace(tx);
 
         self.thread
             .lock()
             .unwrap()
-            .replace(self.rt.spawn(async move {
+            .replace(self.runtime.spawn(async move {
                 info!("integration collector starting");
                 while running.load(Ordering::Relaxed) {
                     let mut max_tries = 0;
@@ -948,7 +944,7 @@ impl MetricServer {
         }
 
         if let Some(tx) = self.server_shutdown_tx.lock().unwrap().take() {
-            let _ = self.rt.block_on(tx.send(()));
+            let _ = self.runtime.block_on(tx.send(()));
         }
 
         if let Some(t) = self.thread.lock().unwrap().take() {

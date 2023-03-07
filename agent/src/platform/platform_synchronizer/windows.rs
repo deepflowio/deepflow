@@ -27,7 +27,7 @@ use std::{
 use arc_swap::access::Access;
 use log::{debug, error, info};
 use ring::digest;
-use tokio::runtime::{Builder, Runtime};
+use tokio::runtime::Runtime;
 
 use crate::{
     config::handler::PlatformAccess,
@@ -40,6 +40,7 @@ use public::proto::trident::{self, Exception};
 const SHA1_DIGEST_LEN: usize = 20;
 
 struct ProcessArgs {
+    runtime: Arc<Runtime>,
     config: PlatformAccess,
     running: Arc<Mutex<bool>>,
     version: Arc<AtomicU64>,
@@ -61,6 +62,7 @@ struct HashArgs {
 }
 
 pub struct PlatformSynchronizer {
+    runtime: Arc<Runtime>,
     config: PlatformAccess,
     version: Arc<AtomicU64>,
     running: Arc<Mutex<bool>>,
@@ -73,12 +75,14 @@ pub struct PlatformSynchronizer {
 
 impl PlatformSynchronizer {
     pub fn new(
+        runtime: Arc<Runtime>,
         config: PlatformAccess,
         session: Arc<Session>,
         exception_handler: ExceptionHandler,
         override_os_hostname: Option<String>,
     ) -> Self {
         Self {
+            runtime,
             config,
             version: Arc::new(AtomicU64::new(
                 SystemTime::now()
@@ -136,6 +140,7 @@ impl PlatformSynchronizer {
         drop(running_guard);
 
         let process_args = ProcessArgs {
+            runtime: self.runtime.clone(),
             config: self.config.clone(),
             running: self.running.clone(),
             version: self.version.clone(),
@@ -218,7 +223,6 @@ impl PlatformSynchronizer {
         process_args: &ProcessArgs,
         vtap_id: u16,
         version: u64,
-        rt: &Runtime,
     ) -> Result<u64, tonic::Status> {
         let config_guard = process_args.config.load();
         let trident_type = config_guard.trident_type;
@@ -245,13 +249,13 @@ impl PlatformSynchronizer {
             ..Default::default()
         };
 
-        rt.block_on(process_args.session.grpc_genesis_sync_with_statsd(msg))
+        process_args
+            .runtime
+            .block_on(process_args.session.grpc_genesis_sync_with_statsd(msg))
             .map(|r| r.into_inner().version())
     }
 
     fn process(args: ProcessArgs) {
-        let rt = Builder::new_current_thread().enable_all().build().unwrap();
-
         let mut last_version = 0;
         let init_version = args.version.load(Ordering::Relaxed);
 
@@ -292,7 +296,10 @@ impl PlatformSynchronizer {
                     ..Default::default()
                 };
 
-                match rt.block_on(args.session.grpc_genesis_sync_with_statsd(msg)) {
+                match args
+                    .runtime
+                    .block_on(args.session.grpc_genesis_sync_with_statsd(msg))
+                {
                     Ok(res) => {
                         let res = res.into_inner();
                         let remote_version = res.version();
@@ -323,8 +330,7 @@ impl PlatformSynchronizer {
                 info!("local version changed to {}", cur_version);
             }
 
-            match Self::push_platform_message(&platform_args, &args, cur_vtap_id, cur_version, &rt)
-            {
+            match Self::push_platform_message(&platform_args, &args, cur_vtap_id, cur_version) {
                 Ok(version) => last_version = version,
                 Err(e) => {
                     args.exception_handler.set(Exception::ControllerSocketError);

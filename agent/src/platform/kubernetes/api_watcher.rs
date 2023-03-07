@@ -32,11 +32,7 @@ use flate2::{write::ZlibEncoder, Compression};
 use k8s_openapi::apimachinery::pkg::version::Info;
 use kube::{Client, Config};
 use log::{debug, error, info, log_enabled, warn, Level};
-use sysinfo::{System, SystemExt};
-use tokio::{
-    runtime::{Builder, Runtime},
-    task::JoinHandle,
-};
+use tokio::{runtime::Runtime, task::JoinHandle};
 
 use super::resource_watcher::{GenericResourceWatcher, Watcher, WatcherConfig};
 use crate::{
@@ -99,7 +95,7 @@ const PB_VERSION_INFO: &str = "*version.Info";
 
 struct Context {
     config: PlatformAccess,
-    runtime: Runtime,
+    runtime: Arc<Runtime>,
     version: AtomicU64,
 }
 
@@ -118,19 +114,12 @@ pub struct ApiWatcher {
 
 impl ApiWatcher {
     pub fn new(
+        runtime: Arc<Runtime>,
         config: PlatformAccess,
         session: Arc<Session>,
         exception_handler: ExceptionHandler,
         stats_collector: Arc<stats::Collector>,
     ) -> Self {
-        // worker_threads = min(min(3 * CPU_CORE + 0, THREAD_THRESHOLD), RESOURCES.len())
-        let mut sys = System::new();
-        sys.refresh_cpu();
-        let worker_threads = 1
-            .max(sys.cpus().len() * 3)
-            .min(config.load().thread_threshold as usize)
-            .min(RESOURCES.len());
-
         Self {
             context: Arc::new(Context {
                 config,
@@ -140,11 +129,7 @@ impl ApiWatcher {
                         .unwrap()
                         .as_secs(),
                 ),
-                runtime: Builder::new_multi_thread()
-                    .worker_threads(worker_threads)
-                    .enable_all()
-                    .build()
-                    .unwrap(),
+                runtime,
             }),
             thread: Mutex::new(None),
             session,
