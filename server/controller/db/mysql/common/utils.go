@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"io/fs"
 	"io/ioutil"
+	l "log"
+	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -29,6 +31,7 @@ import (
 	"github.com/op/go-logging"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 	"gorm.io/gorm/schema"
 
 	. "github.com/deepflowio/deepflow/server/controller/db/mysql/config"
@@ -76,6 +79,14 @@ func GetGormDB(dsn string) *gorm.DB {
 		SkipInitializeWithVersion: false, // 根据当前 MySQL 版本自动配置
 	}), &gorm.Config{
 		NamingStrategy: schema.NamingStrategy{SingularTable: true}, // 设置全局表名禁用复数
+		Logger: logger.New(
+			l.New(os.Stdout, "\r\n", l.LstdFlags), // io writer
+			logger.Config{
+				SlowThreshold:             0,            // 慢SQL阈值,为0时不打印
+				LogLevel:                  logger.Error, // Log level
+				IgnoreRecordNotFoundError: false,        // 忽略ErrRecordNotFound（记录未找到）错误
+				Colorful:                  true,         // 是否彩色打印
+			}), // 配置log
 	})
 	if err != nil {
 		log.Errorf("Mysql Connection failed with error: %v", err.Error())
