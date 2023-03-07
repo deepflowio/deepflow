@@ -903,6 +903,43 @@ impl<'a> MetaPacket<'a> {
             }
         }
     }
+
+    /*
+        redis can not determine dirction by RESP protocol when pakcet is from ebpf.
+        if the process name is `redis-server`, the local addr assume is server addr
+        if one side port is 6379, this side assume is server addr
+        otherwise use addr according to direction which may be wrong
+    */
+    pub fn get_redis_server_addr(&self) -> (IpAddr, u16) {
+        if self.signal_source != SignalSource::EBPF {
+            unreachable!()
+        }
+
+        let (src, dst) = (
+            (self.lookup_key.src_ip, self.lookup_key.src_port),
+            (self.lookup_key.dst_ip, self.lookup_key.dst_port),
+        );
+        if (self.process_kname[..12]).eq(b"redis-server") {
+            if self.lookup_key.l2_end_1 {
+                // if server side recv, dst addr is server addr
+                dst
+            } else {
+                // if server send, src addr is server addr
+                src
+            }
+        } else if self.lookup_key.dst_port == 6379 {
+            dst
+        } else if self.lookup_key.src_port == 6379 {
+            src
+        } else {
+            //FIXME: can not determine redis server addr, use addr according to direction which may be wrong.
+            if self.direction == PacketDirection::ClientToServer {
+                dst
+            } else {
+                src
+            }
+        }
+    }
 }
 
 impl<'a> fmt::Display for MetaPacket<'a> {
