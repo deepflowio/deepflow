@@ -234,7 +234,7 @@ func (c *AnalyzerCheck) vtapAnalyzerAlloc(excludeIP string) {
 	// 获取数据节点的剩余采集器个数
 	analyzerIPToAvailableVTapNum := make(map[string]int)
 	for _, analyzer := range analyzers {
-		analyzerIPToAvailableVTapNum[analyzer.IP] -= analyzer.VTapMax
+		analyzerIPToAvailableVTapNum[analyzer.IP] = analyzer.VTapMax
 		if usedVTapNum, ok := analyzerIPToUsedVTapNum[analyzer.IP]; ok {
 			analyzerIPToAvailableVTapNum[analyzer.IP] = analyzer.VTapMax - usedVTapNum
 		}
@@ -293,9 +293,12 @@ func (c *AnalyzerCheck) vtapAnalyzerAlloc(excludeIP string) {
 			// Search for controllers that have capacity. If none has capacity, the collector limit is allowed.
 			index := 0
 			for i, availableVTap := range analyzerAvailableVTapNum {
+				// If the analyzerIPToAvailableVTapNum has been allocated during the current vtap for loop,
+				// then look for the next analyzerIPToAvailableVTapNum with capacity.
 				if availableVTap.Value == 0 || analyzerIPToAvailableVTapNum[availableVTap.Key] == 0 {
 					continue
 				}
+				// Find the first one that meets the conditions and exit.
 				index = i
 			}
 			analyzerAvailableVTapNum[index].Value -= 1
