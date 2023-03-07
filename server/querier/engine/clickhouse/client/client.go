@@ -147,6 +147,7 @@ func (c *Client) DoQuery(params *QueryParams) (result *common.Result, err error)
 			ResponseSize: uint64(resSize),
 			RowCount:     uint64(resRows),
 			ColumnCount:  uint64(resColumns),
+			QueryTime:    uint64(queryTime),
 		},
 	)
 	c.Debug.QueryTime = int64(queryTime)
