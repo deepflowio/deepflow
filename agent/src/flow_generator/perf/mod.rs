@@ -470,7 +470,16 @@ impl FlowPerf {
                 };
                 if parser.check_payload(Some(log_parser_config), payload, &param) {
                     self.l7_protocol_enum = parser.l7_protocl_enum();
-                    self.server_port = packet.lookup_key.dst_port;
+
+                    // redis can not determine dirction by RESP protocol when pakcet is from ebpf, special treatment
+                    if self.l7_protocol_enum.get_l7_protocol() == L7Protocol::Redis
+                        && packet.signal_source == SignalSource::EBPF
+                    {
+                        (_, self.server_port) = packet.get_redis_server_addr();
+                    } else {
+                        self.server_port = packet.lookup_key.dst_port;
+                    }
+
                     packet.direction = PacketDirection::ClientToServer;
 
                     let mut rrt = 0;
