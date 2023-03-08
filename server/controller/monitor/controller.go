@@ -308,23 +308,18 @@ func (c *ControllerCheck) vtapControllerAlloc(excludeIP string) {
 				return controllerAvailableVTapNum[i].Value > controllerAvailableVTapNum[j].Value
 			})
 			// Search for controllers that have capacity. If none has capacity, the collector limit is allowed.
-			index := 0
-			for i, availableVTap := range controllerAvailableVTapNum {
-				// If the controllerIPToAvailableVTapNum has been allocated during the current vtap for loop,
-				// then look for the next controllerIPToAvailableVTapNum with capacity.
-				if availableVTap.Value == 0 || controllerIPToAvailableVTapNum[availableVTap.Key] == 0 {
-					continue
-				}
-				// Find the first one that meets the conditions and exit.
-				index = i
-				break
-			}
-			controllerAvailableVTapNum[index].Value -= 1
-			controllerIPToAvailableVTapNum[controllerAvailableVTapNum[index].Key] -= 1
+			// There are five types of Value in controllerAvailableVTapNum:
+			// 1. All positive numbers
+			// 2. Positive numbers and 0
+			// 3. All are 0
+			// 4, 0 and negative numbers
+			// 5. All negative numbers
+			controllerAvailableVTapNum[0].Value -= 1
+			controllerIPToAvailableVTapNum[controllerAvailableVTapNum[0].Key] -= 1
 
 			// 分配控制器成功，更新控制器IP + 清空控制器分配失败的错误码
-			log.Infof("alloc controller (%s) for vtap (%s)", controllerAvailableVTapNum[index].Key, vtap.Name)
-			mysql.Db.Model(&vtap).Update("controller_ip", controllerAvailableVTapNum[index].Key)
+			log.Infof("alloc controller (%s) for vtap (%s)", controllerAvailableVTapNum[0].Key, vtap.Name)
+			mysql.Db.Model(&vtap).Update("controller_ip", controllerAvailableVTapNum[0].Key)
 			if vtap.Exceptions&common.VTAP_EXCEPTION_ALLOC_CONTROLLER_FAILED != 0 {
 				exceptions := vtap.Exceptions ^ common.VTAP_EXCEPTION_ALLOC_CONTROLLER_FAILED
 				mysql.Db.Model(&vtap).Update("exceptions", exceptions)
