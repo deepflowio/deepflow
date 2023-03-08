@@ -310,10 +310,14 @@ func (c *ControllerCheck) vtapControllerAlloc(excludeIP string) {
 			// Search for controllers that have capacity. If none has capacity, the collector limit is allowed.
 			index := 0
 			for i, availableVTap := range controllerAvailableVTapNum {
+				// If the controllerIPToAvailableVTapNum has been allocated during the current vtap for loop,
+				// then look for the next controllerIPToAvailableVTapNum with capacity.
 				if availableVTap.Value == 0 || controllerIPToAvailableVTapNum[availableVTap.Key] == 0 {
 					continue
 				}
+				// Find the first one that meets the conditions and exit.
 				index = i
+				break
 			}
 			controllerAvailableVTapNum[index].Value -= 1
 			controllerIPToAvailableVTapNum[controllerAvailableVTapNum[index].Key] -= 1

@@ -51,17 +51,21 @@ func (i *VInterface) getDiffBaseByCloudItem(cloudItem *cloudmodel.VInterface) (d
 }
 
 func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*mysql.VInterface, bool) {
-	networkID, exists := i.cache.ToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
-	if !exists {
-		if i.domainToolDataSet != nil {
-			networkID, exists = i.domainToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
-		}
+	var networkID int
+	if cloudItem.NetworkLcuuid != "" {
+		var exists bool
+		networkID, exists = i.cache.ToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
 		if !exists {
-			log.Errorf(resourceAForResourceBNotFound(
-				common.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
-				common.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
-			))
-			return nil, false
+			if i.domainToolDataSet != nil {
+				networkID, exists = i.domainToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
+			}
+			if !exists {
+				log.Errorf(resourceAForResourceBNotFound(
+					common.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
+					common.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
+				))
+				return nil, false
+			}
 		}
 	}
 	deviceID, exists := i.cache.ToolDataSet.GetDeviceIDByDeviceLcuuid(cloudItem.DeviceType, cloudItem.DeviceLcuuid)
@@ -95,20 +99,24 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*mys
 func (i *VInterface) generateUpdateInfo(diffBase *cache.VInterface, cloudItem *cloudmodel.VInterface) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.NetworkLcuuid != cloudItem.NetworkLcuuid {
-		networkID, exists := i.cache.ToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
-		if !exists {
-			if i.domainToolDataSet != nil {
-				networkID, exists = i.domainToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
-			}
+		if cloudItem.NetworkLcuuid == "" {
+			updateInfo["subnetid"] = 0
+		} else {
+			networkID, exists := i.cache.ToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
 			if !exists {
-				log.Errorf(resourceAForResourceBNotFound(
-					common.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
-					common.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
-				))
-				return nil, false
+				if i.domainToolDataSet != nil {
+					networkID, exists = i.domainToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
+				}
+				if !exists {
+					log.Errorf(resourceAForResourceBNotFound(
+						common.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
+						common.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
+					))
+					return nil, false
+				}
 			}
+			updateInfo["subnetid"] = networkID
 		}
-		updateInfo["subnetid"] = networkID
 	}
 	if diffBase.Name != cloudItem.Name {
 		updateInfo["name"] = cloudItem.Name
