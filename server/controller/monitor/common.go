@@ -21,6 +21,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	logging "github.com/op/go-logging"
 )
 
@@ -51,4 +53,27 @@ func isActive(urlPrefix string, ip string, port int) bool {
 		response.Body.Close()
 	}
 	return err == nil && response.StatusCode == http.StatusOK
+}
+
+func getIPMap(hostType string) (map[string]bool, error) {
+	var res map[string]bool
+	switch hostType {
+	case common.HOST_TYPE_CONTROLLER:
+		var controllers []mysql.Controller
+		mysql.Db.Where("state = ?", common.HOST_STATE_COMPLETE).Find(&controllers)
+		res := make(map[string]bool, len(controllers))
+		for _, controller := range controllers {
+			res[controller.IP] = true
+		}
+	case common.HOST_TYPE_ANALYZER:
+		var analyzers []mysql.Analyzer
+		mysql.Db.Where("state = ?", common.HOST_STATE_COMPLETE).Find(&analyzers)
+		res := make(map[string]bool, len(analyzers))
+		for _, analyzer := range analyzers {
+			res[analyzer.IP] = true
+		}
+	default:
+		return nil, fmt.Errorf("does not support type: %s", hostType)
+	}
+	return res, nil
 }

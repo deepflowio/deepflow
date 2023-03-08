@@ -480,3 +480,9 @@ ingester:
 
   #decoder-queue-count: 2
   #decoder-queue-size: 10000
+  
+  ## unit: byte
+  #flow-tag-cache-max-size: 262144
+
+  ## unit: s
+  #flow-tag-cache-flush-timeout: 600
