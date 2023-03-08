@@ -207,8 +207,19 @@ func (c *ControllerCheck) vtapControllerCheck() {
 
 	log.Info("vtap controller check start")
 
+	ipMap, err := getIPMap(common.HOST_TYPE_CONTROLLER)
+	if err != nil {
+		log.Error(err)
+	}
+
 	mysql.Db.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&vtaps)
 	for _, vtap := range vtaps {
+		// check vtap.analyzer_ip is not in controller.ip, set to empty if not exist
+		if _, ok := ipMap[vtap.ControllerIP]; !ok {
+			vtap.ControllerIP = ""
+			mysql.Db.Model(&mysql.VTap{}).Where("lcuuid = ?", vtap.Lcuuid).Update("controller_ip", "")
+		}
+
 		if vtap.ControllerIP == "" {
 			noControllerVtapCount += 1
 		} else if vtap.Exceptions&common.VTAP_EXCEPTION_ALLOC_CONTROLLER_FAILED != 0 {

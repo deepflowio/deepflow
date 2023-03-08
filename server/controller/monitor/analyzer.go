@@ -190,8 +190,19 @@ func (c *AnalyzerCheck) vtapAnalyzerCheck() {
 
 	log.Info("vtap analyzer check start")
 
+	ipMap, err := getIPMap(common.HOST_TYPE_ANALYZER)
+	if err != nil {
+		log.Error(err)
+	}
+
 	mysql.Db.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&vtaps)
 	for _, vtap := range vtaps {
+		// check vtap.analyzer_ip is not in controller.ip, set to empty if not exist
+		if _, ok := ipMap[vtap.AnalyzerIP]; !ok {
+			vtap.AnalyzerIP = ""
+			mysql.Db.Model(&mysql.VTap{}).Where("lcuuid = ?", vtap.Lcuuid).Update("analyzer_ip", "")
+		}
+
 		if vtap.AnalyzerIP == "" {
 			noAnalyzerVtapCount += 1
 		} else if vtap.Exceptions&common.VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED != 0 {

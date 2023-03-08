@@ -75,6 +75,11 @@ const (
 )
 
 const (
+	HOST_TYPE_CONTROLLER = "controller"
+	HOST_TYPE_ANALYZER   = "analyzer"
+)
+
+const (
 	CONTROLLER_NODE_TYPE_MASTER = 1
 	CONTROLLER_NODE_TYPE_SLAVE  = 2
 
