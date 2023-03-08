@@ -165,6 +165,10 @@ var (
 		output: "SELECT if(indexOf(metrics_float_names, 'xxx')=0,null,metrics_float_values[indexOf(metrics_float_names, 'xxx')]) AS `xxx` FROM ext_metrics.`metrics` PREWHERE (virtual_table_name='cpu') LIMIT 10000",
 		db:     "ext_metrics",
 	}, {
+		input:  "select Percentile(`metrics.xxx`, 0.9) as xxx from cpu",
+		output: "SELECT quantile(0.9)(if(indexOf(metrics_float_names, 'xxx')=0,null,metrics_float_values[indexOf(metrics_float_names, 'xxx')])) AS `xxx` FROM ext_metrics.`metrics` PREWHERE (virtual_table_name='cpu') LIMIT 10000",
+		db:     "ext_metrics",
+	}, {
 		input:  "select Sum(packet_count) as count from l4_packet",
 		output: "SELECT SUM(packet_count) AS `count` FROM flow_log.`l4_packet` LIMIT 10000",
 	}, {

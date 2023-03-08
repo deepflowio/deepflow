@@ -156,6 +156,14 @@ func (f *BinaryFunction) Trans(m *view.Model) view.Node {
 		histogram.SetFlag(view.METRICS_FLAG_TOP)
 		histogram.Init()
 		return histogram
+	} else if f.Name == view.FUNCTION_PCTL || f.Name == view.FUNCTION_PCTL_EXACT {
+		function := view.GetFunc(f.Name)
+		function.SetFields(fields[:1])                   // metrics
+		function.SetArgs([]string{fields[1].ToString()}) // quantile percentage
+		function.SetFlag(view.METRICS_FLAG_OUTER)
+		function.SetTime(m.Time)
+		function.Init()
+		return function
 	}
 	function := view.GetFunc(f.Name)
 	function.SetFields(fields)
