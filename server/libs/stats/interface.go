@@ -33,7 +33,7 @@ const (
 )
 
 const (
-	TICK_CYCLE = 60 * time.Second
+	TICK_CYCLE = 10 * time.Second
 )
 
 type Option = interface{}
