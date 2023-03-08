@@ -57,6 +57,8 @@ func NewCloud(domain mysql.Domain, cfg config.CloudConfig, ctx context.Context) 
 		return nil
 	}
 
+	log.Infof("cloud task (%s) init success", domain.Name)
+
 	cCtx, cCancel := context.WithCancel(ctx)
 	return &Cloud{
 		basicInfo: model.BasicInfo{
@@ -215,6 +217,13 @@ func (c *Cloud) startKubernetesGatherTask() {
 }
 
 func (c *Cloud) runKubernetesGatherTask() {
+	var domain mysql.Domain
+	err := mysql.Db.Where("lcuuid = ?", c.basicInfo.Lcuuid).First(&domain).Error
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
 	if c.basicInfo.Type == common.KUBERNETES {
 		// Kubernetes平台，只会有一个KubernetesGatherTask
 		// - 如果已存在KubernetesGatherTask，则无需启动新的Task
@@ -222,12 +231,6 @@ func (c *Cloud) runKubernetesGatherTask() {
 		if len(c.kubernetesGatherTaskMap) != 0 {
 			return
 		}
-		var domains []mysql.Domain
-		mysql.Db.Where("lcuuid = ?", c.basicInfo.Lcuuid).Find(&domains)
-		if len(domains) == 0 {
-			return
-		}
-		domain := domains[0]
 		kubernetesGatherTask := NewKubernetesGatherTask(
 			&domain, nil, c.cCtx, false, c.cfg.KubernetesGatherInterval,
 		)
@@ -274,7 +277,7 @@ func (c *Cloud) runKubernetesGatherTask() {
 		for _, subDomain := range addSubDomains.ToSlice() {
 			lcuuid := subDomain.(string)
 			kubernetesGatherTask := NewKubernetesGatherTask(
-				nil, lcuuidToSubDomain[lcuuid], c.cCtx, true, c.cfg.KubernetesGatherInterval,
+				&domain, lcuuidToSubDomain[lcuuid], c.cCtx, true, c.cfg.KubernetesGatherInterval,
 			)
 			if kubernetesGatherTask == nil {
 				continue
@@ -297,7 +300,7 @@ func (c *Cloud) runKubernetesGatherTask() {
 				log.Infof("newSubDomainConfig: %s", newSubDomain.Config)
 				c.kubernetesGatherTaskMap[lcuuid].Stop()
 				kubernetesGatherTask := NewKubernetesGatherTask(
-					nil, lcuuidToSubDomain[lcuuid], c.cCtx, true, c.cfg.KubernetesGatherInterval,
+					&domain, lcuuidToSubDomain[lcuuid], c.cCtx, true, c.cfg.KubernetesGatherInterval,
 				)
 				if kubernetesGatherTask == nil {
 					continue

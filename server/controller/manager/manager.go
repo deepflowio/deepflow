@@ -179,7 +179,7 @@ func (m *Manager) run(ctx context.Context) {
 	for _, domain := range addDomains.ToSlice() {
 		lcuuid := domain.(string)
 		task := NewTask(lcuuidToDomain[lcuuid], m.cfg.TaskCfg, ctx, m.resourceEventQueue)
-		if task == nil {
+		if task == nil || task.Cloud == nil {
 			log.Errorf("domain (%s) init failed", lcuuidToDomain[lcuuid].Name)
 			continue
 		}
@@ -202,7 +202,7 @@ func (m *Manager) run(ctx context.Context) {
 			log.Infof("newDomainConfig: %s", newDomainConfig)
 			m.taskMap[lcuuid].Stop()
 			task := NewTask(lcuuidToDomain[lcuuid], m.cfg.TaskCfg, ctx, m.resourceEventQueue)
-			if task == nil {
+			if task == nil || task.Cloud == nil {
 				log.Errorf("domain (%s) init failed", lcuuidToDomain[lcuuid].Name)
 				continue
 			}
@@ -219,7 +219,7 @@ func (m *Manager) run(ctx context.Context) {
 				if m.taskMap[lcuuid].Cloud.GetBasicInfo().Type == common.KUBERNETES {
 					m.taskMap[lcuuid].Stop()
 					task := NewTask(lcuuidToDomain[lcuuid], m.cfg.TaskCfg, ctx, m.resourceEventQueue)
-					if task == nil {
+					if task == nil || task.Cloud == nil {
 						log.Errorf("domain (%s) init failed", lcuuidToDomain[lcuuid].Name)
 						continue
 					}
