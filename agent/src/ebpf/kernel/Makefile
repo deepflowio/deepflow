@@ -40,7 +40,7 @@ ifeq ($(LINUX_VER_KYLIN),1)
 	EXTRA_EBPF_CLAGS = -DLINUX_VER_KYLIN
 endif
 
-FINAL_TARGET = -emit-llvm -D__TARGET_ARCH_$(ARCH) -o ${@:.elf=.ll} -c $^ && $(LLC) -march=bpf -filetype=obj -mcpu=probe -o $@ ${@:.elf=.ll}
+FINAL_TARGET = -emit-llvm -D__TARGET_ARCH_$(ARCH) -o ${@:.elf=.ll} -c $^ && $(LLC) -march=bpf -filetype=obj -o $@ ${@:.elf=.ll}
 
 all: $(TAEGET_KERN_ELF)
 
