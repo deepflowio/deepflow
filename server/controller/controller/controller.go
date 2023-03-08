@@ -90,6 +90,7 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 	}()
 	defer router.SetInitStageForHealthChecker(router.OK)
 
+	router.SetInitStageForHealthChecker("Election init")
 	// start election
 	go election.Start(ctx, cfg)
 
@@ -156,6 +157,7 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 	tr := tagrecorder.NewTagRecorder(*cfg, ctx)
 	go checkAndStartAllRegionMasterFunctions(tr)
 
+	router.SetInitStageForHealthChecker("Master function init")
 	controllerCheck := monitor.NewControllerCheck(cfg, ctx)
 	analyzerCheck := monitor.NewAnalyzerCheck(cfg, ctx)
 	go checkAndStartMasterFunctions(cfg, ctx, tr, controllerCheck, analyzerCheck)
