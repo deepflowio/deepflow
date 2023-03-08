@@ -22,7 +22,6 @@ use std::time::{Duration, Instant};
 
 use log::{debug, error, info};
 use parking_lot::RwLock;
-use tokio::sync::Semaphore;
 use tonic::transport::{Channel, Endpoint};
 
 use crate::common::{DEFAULT_CONTROLLER_PORT, DEFAULT_CONTROLLER_TLS_PORT};
@@ -40,7 +39,7 @@ pub const SESSION_TIMEOUT: Duration = Duration::from_secs(120);
 
 const GRPC_CALL_ENDPOINTS: [&str; 8] = [
     "push",
-    "query",
+    "ntp",
     "upgrade",
     "sync",
     "genesis_sync",
@@ -50,7 +49,7 @@ const GRPC_CALL_ENDPOINTS: [&str; 8] = [
 ];
 
 const PUSH_ENDPOINT: usize = 0;
-const QUERY_ENDPOINT: usize = 1;
+const NTP_ENDPOINT: usize = 1;
 const UPGRADE_ENDPOINT: usize = 2;
 const SYNC_ENDPOINT: usize = 3;
 const GENESIS_SYNC_ENDPOINT: usize = 4;
@@ -111,16 +110,33 @@ pub struct Session {
     client: RwLock<Option<Channel>>,
     exception_handler: ExceptionHandler,
     counters: Vec<Arc<GrpcCallCounter>>,
+}
 
-    // sharing tonic grpc channel sometimes suffers from high latency
-    // using semaphore to force serialized grpc calls to
-    // reduce the probability
-    in_use: Semaphore,
+macro_rules! response_size {
+    (push, $($_:ident),*) => {
+        "is stream"
+    };
+    (upgrade, $($_:ident),*) => {
+        "is stream"
+    };
+    ($_:ident,  $response:ident) => {
+        format!(
+            "{}B",
+            $response
+                .as_ref()
+                .map(|r| r.get_ref().encoded_len())
+                .unwrap_or_default(),
+        )
+    };
 }
 
 macro_rules! sync_grpc_call {
     ($self:ident, $func:ident, $request:ident, $enpoint:ident) => {{
-        let _lock = $self.in_use.acquire().await.unwrap();
+        use prost::Message;
+
+        let prefix = std::concat!("grpc ", stringify!($func));
+
+        log::trace!("{} prepare client", prefix);
         $self.update_current_server().await;
         let client = match $self.get_client() {
             Some(c) => c,
@@ -131,15 +147,22 @@ macro_rules! sync_grpc_call {
         };
         let mut client = trident::synchronizer_client::SynchronizerClient::new(client);
 
+        let request_len = $request.encoded_len();
         let now = Instant::now();
+        log::trace!("{} send request", prefix);
         let response = client.$func($request).await;
+        log::trace!("{} receive response", prefix);
         let now_elapsed = now.elapsed();
         $self.counters[$enpoint].delay.update(now_elapsed);
-        debug!(
-            "grpc {:?} latency {:?}ms",
-            stringify!($func),
-            now_elapsed.as_millis(),
-        );
+        if log::log_enabled!(log::Level::Debug) {
+            debug!(
+                "{} latency {:?}ms request {}B response {}",
+                prefix,
+                now_elapsed.as_millis(),
+                request_len,
+                response_size!($func, response),
+            );
+        }
         response
     }};
 }
@@ -186,8 +209,6 @@ impl Session {
             client: RwLock::new(None),
             exception_handler,
             counters,
-
-            in_use: Semaphore::new(1),
         }
     }
 
@@ -279,7 +300,7 @@ impl Session {
         request: trident::SyncRequest,
         with_statsd: bool,
     ) -> Result<tonic::Response<trident::SyncResponse>, tonic::Status> {
-        let _lock = self.in_use.acquire().await.unwrap();
+        log::trace!("grpc sync prepare client");
         self.update_current_server().await;
         let client = match self.get_client() {
             Some(c) => c,
@@ -290,11 +311,16 @@ impl Session {
         };
         let mut client = trident::synchronizer_client::SynchronizerClient::new(client);
 
-        if with_statsd {
-            client.sync(request).await
+        if !with_statsd {
+            log::trace!("grpc sync send request");
+            let response = client.sync(request).await;
+            log::trace!("grpc sync receive response");
+            response
         } else {
             let now = Instant::now();
+            log::trace!("grpc sync send request");
             let response = client.sync(request).await;
+            log::trace!("grpc sync receive response");
             let now_elapsed = now.elapsed();
             self.counters[SYNC_ENDPOINT].delay.update(now_elapsed);
             debug!("grpc sync latency {:?}ms", now_elapsed.as_millis());
@@ -325,11 +351,12 @@ impl Session {
         sync_grpc_call!(self, upgrade, request, UPGRADE_ENDPOINT)
     }
 
-    pub async fn grpc_query_with_statsd(
+    pub async fn grpc_ntp_with_statsd(
         &self,
         request: trident::NtpRequest,
     ) -> Result<tonic::Response<trident::NtpResponse>, tonic::Status> {
-        sync_grpc_call!(self, query, request, QUERY_ENDPOINT)
+        // Ntp rpc name is `query`
+        sync_grpc_call!(self, query, request, NTP_ENDPOINT)
     }
 
     pub async fn grpc_genesis_sync_with_statsd(

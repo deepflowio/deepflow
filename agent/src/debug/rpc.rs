@@ -18,7 +18,7 @@ use std::sync::Arc;
 
 use bincode::{Decode, Encode};
 use parking_lot::RwLock;
-use tokio::runtime::{Builder, Runtime};
+use tokio::runtime::Runtime;
 
 use crate::config::RuntimeConfig;
 use crate::exception::ExceptionHandler;
@@ -31,7 +31,7 @@ pub struct RpcDebugger {
     status: Arc<RwLock<Status>>,
     config: Arc<StaticConfig>,
     running_config: Arc<RwLock<RunningConfig>>,
-    rt: Runtime,
+    runtime: Arc<Runtime>,
 }
 
 #[derive(PartialEq, Debug)]
@@ -61,17 +61,18 @@ pub enum RpcMessage {
 
 impl RpcDebugger {
     pub(super) fn new(
+        runtime: Arc<Runtime>,
         session: Arc<Session>,
         config: Arc<StaticConfig>,
         running_config: Arc<RwLock<RunningConfig>>,
         status: Arc<RwLock<Status>>,
     ) -> Self {
         Self {
+            runtime,
             session,
             status,
             config,
             running_config,
-            rt: Builder::new_current_thread().enable_all().build().unwrap(),
         }
     }
 
@@ -90,7 +91,7 @@ impl RpcDebugger {
 
     pub(super) fn basic_config(&self) -> Result<Vec<RpcMessage>> {
         let mut resp = self
-            .rt
+            .runtime
             .block_on(self.get_rpc_response())
             .map_err(|e| Error::Tonic(e))?
             .into_inner();
@@ -119,7 +120,7 @@ impl RpcDebugger {
 
     pub(super) fn tap_types(&self) -> Result<Vec<RpcMessage>> {
         let resp = self
-            .rt
+            .runtime
             .block_on(self.get_rpc_response())
             .map_err(|e| Error::Tonic(e))?
             .into_inner();
@@ -142,7 +143,7 @@ impl RpcDebugger {
 
     pub(super) fn cidrs(&self) -> Result<Vec<RpcMessage>> {
         let resp = self
-            .rt
+            .runtime
             .block_on(self.get_rpc_response())
             .map_err(|e| Error::Tonic(e))?
             .into_inner();
@@ -166,7 +167,7 @@ impl RpcDebugger {
 
     pub(super) fn platform_data(&self) -> Result<Vec<RpcMessage>> {
         let resp = self
-            .rt
+            .runtime
             .block_on(self.get_rpc_response())
             .map_err(|e| Error::Tonic(e))?
             .into_inner();
@@ -199,7 +200,7 @@ impl RpcDebugger {
 
     pub(super) fn ip_groups(&self) -> Result<Vec<RpcMessage>> {
         let resp = self
-            .rt
+            .runtime
             .block_on(self.get_rpc_response())
             .map_err(|e| Error::Tonic(e))?
             .into_inner();
@@ -225,7 +226,7 @@ impl RpcDebugger {
 
     pub(super) fn flow_acls(&self) -> Result<Vec<RpcMessage>> {
         let resp = self
-            .rt
+            .runtime
             .block_on(self.get_rpc_response())
             .map_err(|e| Error::Tonic(e))?
             .into_inner();
@@ -251,7 +252,7 @@ impl RpcDebugger {
 
     pub(super) fn local_segments(&self) -> Result<Vec<RpcMessage>> {
         let resp = self
-            .rt
+            .runtime
             .block_on(self.get_rpc_response())
             .map_err(|e| Error::Tonic(e))?
             .into_inner();

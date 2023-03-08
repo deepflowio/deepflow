@@ -72,10 +72,6 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 	if ok == false {
 		collectorSocketType = UDP_SOCKET
 	}
-	compressorSocketType, ok := SOCKET_TYPE_TO_MESSAGE[vtapConfig.CompressorSocketType]
-	if ok == false {
-		compressorSocketType = RAW_UDP_SOCKET
-	}
 	npbSocketType, ok := SOCKET_TYPE_TO_MESSAGE[vtapConfig.NpbSocketType]
 	if ok == false {
 		npbSocketType = RAW_UDP_SOCKET
@@ -95,7 +91,6 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 	configure := &api.Config{
 		CollectorEnabled:              proto.Bool(Int2Bool(vtapConfig.CollectorEnabled)),
 		CollectorSocketType:           &collectorSocketType,
-		CompressorSocketType:          &compressorSocketType,
 		PlatformEnabled:               proto.Bool(Int2Bool(vtapConfig.PlatformEnabled)),
 		MaxCpus:                       proto.Uint32(uint32(vtapConfig.MaxCPUs)),
 		MaxMemory:                     proto.Uint32(uint32(vtapConfig.MaxMemory)),
@@ -207,19 +202,7 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 	if pcapDataRetention != 0 {
 		configure.PcapDataRetention = proto.Uint32(pcapDataRetention)
 	}
-	localConfig := gVTapInfo.GetVTapLocalConfig(c.GetVTapGroupLcuuid())
-	configure.LocalConfig = &localConfig
-
-	if trisolaris.GetBillingMethod() == BILLING_METHOD_LICENSE {
-		if c.EnabledApplicationMonitoring() == false {
-			configure.L7MetricsEnabled = proto.Bool(false)
-			configure.L7LogStoreTapTypes = nil
-		}
-		if c.EnabledNetworkMonitoring() == false {
-			configure.L4PerformanceEnabled = proto.Bool(false)
-			configure.L4LogTapTypes = nil
-		}
-	}
+	configure.LocalConfig = proto.String(c.GetLocalConfig())
 
 	return configure
 }
@@ -429,10 +412,6 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string) *api.Config {
 	if ok == false {
 		collectorSocketType = UDP_SOCKET
 	}
-	compressorSocketType, ok := SOCKET_TYPE_TO_MESSAGE[vtapConfig.CompressorSocketType]
-	if ok == false {
-		compressorSocketType = RAW_UDP_SOCKET
-	}
 	npbSocketType, ok := SOCKET_TYPE_TO_MESSAGE[vtapConfig.NpbSocketType]
 	if ok == false {
 		npbSocketType = RAW_UDP_SOCKET
@@ -448,7 +427,6 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string) *api.Config {
 	configure := &api.Config{
 		CollectorEnabled:              proto.Bool(Int2Bool(vtapConfig.CollectorEnabled)),
 		CollectorSocketType:           &collectorSocketType,
-		CompressorSocketType:          &compressorSocketType,
 		PlatformEnabled:               proto.Bool(Int2Bool(vtapConfig.PlatformEnabled)),
 		MaxCpus:                       proto.Uint32(uint32(vtapConfig.MaxCPUs)),
 		MaxMemory:                     proto.Uint32(uint32(vtapConfig.MaxMemory)),
