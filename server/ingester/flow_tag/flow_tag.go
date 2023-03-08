@@ -85,10 +85,34 @@ type FlowTag struct {
 	fieldValueCount uint64
 }
 
+func getTagFieldTableName(db string) string {
+	switch db {
+	case "ext_metrics":
+		return "ext_metrics_custom_field"
+	case "flow_log":
+		return "flow_log_custom_field"
+	case "deepflow_system":
+		return "deepflow_system_custom_field"
+	}
+	return fmt.Sprintf("%s_%s", db, TagField.String())
+}
+
+func getTagFieldValueTableName(db string) string {
+	switch db {
+	case "ext_metrics":
+		return "ext_metrics_custom_field_value"
+	case "flow_log":
+		return "flow_log_custom_field_value"
+	case "deepflow_system":
+		return "deepflow_system_custom_field_value"
+	}
+	return fmt.Sprintf("%s_%s", db, TagFieldValue.String())
+}
+
 func NewTagField(time uint32, db, table string, epcId int32, podNsId uint16, fieldType FieldType, fieldName string) *FlowTag {
 	t := AcquireFlowTag()
 	t.Timestamp = time
-	t.TableName = fmt.Sprintf("%s_%s", db, TagField.String())
+	t.TableName = getTagFieldTableName(db)
 	t.table = table
 	t.fieldType = fieldType
 	t.vpcId = epcId
@@ -105,7 +129,7 @@ func NewTagField(time uint32, db, table string, epcId int32, podNsId uint16, fie
 func NewTagFieldValue(time uint32, db, table string, epcId int32, podNsId uint16, fieldType FieldType, fieldName string, fieldValue string) *FlowTag {
 	t := AcquireFlowTag()
 	t.Timestamp = time
-	t.TableName = fmt.Sprintf("%s_%s", db, TagFieldValue.String())
+	t.TableName = getTagFieldValueTableName(db)
 	t.table = table
 	t.fieldType = fieldType
 	t.vpcId = epcId
