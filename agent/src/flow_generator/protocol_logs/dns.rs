@@ -461,12 +461,13 @@ impl DnsLog {
                     let err_msg = format!("dns payload length error:{}", payload.len());
                     return Err(Error::DNSLogParseFailed(err_msg));
                 }
-                let size = read_u16_be(payload);
-                if (size as usize) < payload[DNS_TCP_PAYLOAD_OFFSET..].len() {
-                    let err_msg = format!("dns payload length error:{}", size);
-                    return Err(Error::DNSLogParseFailed(err_msg));
+                let size = read_u16_be(payload) as usize;
+                if size != payload[DNS_TCP_PAYLOAD_OFFSET..].len() {
+                    self.decode_payload(payload)
+                } else {
+                    self.decode_payload(&payload[DNS_TCP_PAYLOAD_OFFSET..])
+                        .or_else(|_| self.decode_payload(payload))
                 }
-                self.decode_payload(&payload[DNS_TCP_PAYLOAD_OFFSET..])
             }
             _ => {
                 let err_msg = format!("dns payload length error:{}", payload.len());
