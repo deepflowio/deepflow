@@ -356,7 +356,7 @@ impl Trident {
 
         let runtime = Arc::new(
             Builder::new_multi_thread()
-                .worker_threads(config.tokio_worker_thread_number.into())
+                .worker_threads(config.async_worker_thread_number.into())
                 .enable_all()
                 .build()
                 .unwrap(),
