@@ -919,15 +919,19 @@ impl<'a> MetaPacket<'a> {
             (self.lookup_key.src_ip, self.lookup_key.src_port),
             (self.lookup_key.dst_ip, self.lookup_key.dst_port),
         );
+
+        #[cfg(target_os = "linux")]
         if (self.process_kname[..12]).eq(b"redis-server") {
-            if self.lookup_key.l2_end_1 {
+            return if self.lookup_key.l2_end_1 {
                 // if server side recv, dst addr is server addr
                 dst
             } else {
                 // if server send, src addr is server addr
                 src
-            }
-        } else if self.lookup_key.dst_port == 6379 {
+            };
+        }
+
+        if self.lookup_key.dst_port == 6379 {
             dst
         } else if self.lookup_key.src_port == 6379 {
             src
