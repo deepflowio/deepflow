@@ -76,7 +76,7 @@ pub struct Config {
     pub controller_domain_name: Vec<String>,
     #[serde(skip)]
     pub agent_mode: RunningMode,
-    pub tokio_worker_thread_number: u16,
+    pub async_worker_thread_number: u16,
 }
 
 impl Config {
@@ -213,7 +213,7 @@ impl Default for Config {
             vtap_group_id_request: "".into(),
             controller_domain_name: vec![],
             agent_mode: Default::default(),
-            tokio_worker_thread_number: 16,
+            async_worker_thread_number: 16,
         }
     }
 }

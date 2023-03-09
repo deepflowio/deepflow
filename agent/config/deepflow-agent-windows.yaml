@@ -33,5 +33,7 @@ controller-ips:
 ## 支持采集器自动加入组
 #vtap-group-id-request: ""
 
-## Number of worker threads of tokio, range [1, 32768), defaults to 16
-#tokio-worker-thread-number: 16
+## Number of async worker threads, range [1, 32768), defaults to 16
+## async workers are used mainly used for grpc calls, synchronizer and
+## kubernetes api watcher
+#async-worker-thread-number: 16
