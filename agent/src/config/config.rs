@@ -30,7 +30,7 @@ use serde::{
     Deserialize, Deserializer,
 };
 use thiserror::Error;
-use tokio::runtime::Builder;
+use tokio::runtime::Runtime;
 
 use crate::common::decapsulate::TunnelType;
 use crate::common::l7_protocol_log::get_all_protocol;
@@ -76,6 +76,7 @@ pub struct Config {
     pub controller_domain_name: Vec<String>,
     #[serde(skip)]
     pub agent_mode: RunningMode,
+    pub async_worker_thread_number: u16,
 }
 
 impl Config {
@@ -188,10 +189,10 @@ impl Config {
     // ConfigMap is empty, Call GetKubernetesClusterID RPC to get the cluster-id, if the RPC call fails, call it again
     // after 1 minute of sleep until it succeeds
     pub fn get_k8s_cluster_id(
+        runtime: &Runtime,
         session: &Session,
         kubernetes_cluster_name: Option<&String>,
     ) -> String {
-        let runtime = Builder::new_current_thread().enable_all().build().unwrap();
         runtime.block_on(Self::async_get_k8s_cluster_id(
             session,
             kubernetes_cluster_name,
@@ -212,6 +213,7 @@ impl Default for Config {
             vtap_group_id_request: "".into(),
             controller_domain_name: vec![],
             agent_mode: Default::default(),
+            async_worker_thread_number: 16,
         }
     }
 }

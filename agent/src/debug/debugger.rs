@@ -31,6 +31,7 @@ use bincode::{
 };
 use log::{error, info, warn};
 use parking_lot::RwLock;
+use tokio::runtime::Runtime;
 
 #[cfg(target_os = "linux")]
 use super::platform::{PlatformDebugger, PlatformMessage};
@@ -66,6 +67,7 @@ pub struct Debugger {
 }
 
 pub struct ConstructDebugCtx {
+    pub runtime: Arc<Runtime>,
     pub config: DebugAccess,
     #[cfg(target_os = "linux")]
     pub api_watcher: Arc<ApiWatcher>,
@@ -481,6 +483,7 @@ impl Debugger {
             #[cfg(target_os = "linux")]
             platform: PlatformDebugger::new(context.api_watcher, context.poller),
             rpc: RpcDebugger::new(
+                context.runtime.clone(),
                 context.session,
                 context.static_config,
                 context.running_config,

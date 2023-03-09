@@ -32,3 +32,8 @@ controller-ips:
 
 ## 支持采集器自动加入组
 #vtap-group-id-request: ""
+
+## Number of async worker threads, range [1, 32768), defaults to 16
+## async workers are used mainly used for grpc calls, synchronizer and
+## kubernetes api watcher
+#async-worker-thread-number: 16

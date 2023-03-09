@@ -43,6 +43,7 @@ use pcap_assembler::{BoxedPcapBatch, PcapAssembler};
 use public::packet::MiniPacket;
 use public::queue::DebugSender;
 use regex::Regex;
+use tokio::runtime::{Builder, Runtime};
 
 use crate::{
     collector::Collector,
@@ -341,12 +342,23 @@ impl Trident {
             &stats_collector,
         ));
 
+        let runtime = Arc::new(
+            Builder::new_multi_thread()
+                .worker_threads(config.async_worker_thread_number.into())
+                .enable_all()
+                .build()
+                .unwrap(),
+        );
+
         if matches!(config.agent_mode, RunningMode::Managed)
             && running_in_container()
             && config.kubernetes_cluster_id.is_empty()
         {
-            config.kubernetes_cluster_id =
-                Config::get_k8s_cluster_id(&session, config.kubernetes_cluster_name.as_ref());
+            config.kubernetes_cluster_id = Config::get_k8s_cluster_id(
+                &runtime,
+                &session,
+                config.kubernetes_cluster_name.as_ref(),
+            );
             warn!("When running in a K8s pod, the cpu and memory limits notified by deepflow-server will be ignored, please make sure to use K8s for resource limits.");
         }
 
@@ -359,6 +371,7 @@ impl Trident {
         );
 
         let synchronizer = Arc::new(Synchronizer::new(
+            runtime.clone(),
             session.clone(),
             state.clone(),
             version_info,
@@ -426,6 +439,7 @@ impl Trident {
         let (libvirt_xml_extractor, platform_synchronizer) = {
             let ext = Arc::new(LibvirtXmlExtractor::new());
             let syn = Arc::new(PlatformSynchronizer::new(
+                runtime.clone(),
                 config_handler.platform(),
                 session.clone(),
                 ext.clone(),
@@ -441,6 +455,7 @@ impl Trident {
         };
         #[cfg(target_os = "windows")]
         let platform_synchronizer = Arc::new(PlatformSynchronizer::new(
+            runtime.clone(),
             config_handler.platform(),
             session.clone(),
             exception_handler.clone(),
@@ -532,6 +547,7 @@ impl Trident {
                         platform_synchronizer.clone(),
                         vm_mac_addrs,
                         config_handler.static_config.agent_mode,
+                        runtime.clone(),
                     )?;
                     comp.start();
                     if config_handler.candidate_config.dispatcher.tap_mode == TapMode::Analyzer {
@@ -841,6 +857,8 @@ pub struct Components {
     max_memory: u64,
     tap_mode: TapMode,
     agent_mode: RunningMode,
+
+    runtime: Arc<Runtime>,
 }
 
 impl Components {
@@ -939,6 +957,7 @@ impl Components {
         platform_synchronizer: Arc<PlatformSynchronizer>,
         vm_mac_addrs: Vec<MacAddr>,
         agent_mode: RunningMode,
+        runtime: Arc<Runtime>,
     ) -> Result<Self> {
         let static_config = &config_handler.static_config;
         let candidate_config = &config_handler.candidate_config;
@@ -1015,6 +1034,7 @@ impl Components {
 
         #[cfg(target_os = "linux")]
         let api_watcher = Arc::new(ApiWatcher::new(
+            runtime.clone(),
             config_handler.platform(),
             session.clone(),
             exception_handler.clone(),
@@ -1022,6 +1042,7 @@ impl Components {
         ));
 
         let context = ConstructDebugCtx {
+            runtime: runtime.clone(),
             #[cfg(target_os = "linux")]
             api_watcher: api_watcher.clone(),
             #[cfg(target_os = "linux")]
@@ -1678,6 +1699,7 @@ impl Components {
         );
 
         let (external_metrics_server, external_metrics_counter) = MetricServer::new(
+            runtime.clone(),
             otel_sender,
             compressed_otel_sender,
             prometheus_sender,
@@ -1761,6 +1783,7 @@ impl Components {
             npb_bandwidth_watcher,
             npb_arp_table,
             remote_log_config,
+            runtime,
         })
     }
 
