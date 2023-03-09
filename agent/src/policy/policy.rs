@@ -159,6 +159,10 @@ impl Policy {
     }
 
     fn fill_gpid_entry(packet: &mut MetaPacket, gpid_entry: &GpidEntry) {
+        if gpid_entry.port_1 == 0 && gpid_entry.port_0 == 0 {
+            return;
+        }
+
         let mut direction = packet.lookup_key.direction;
 
         // We consider the direction (role) in GpidEntry to be the ground truth because

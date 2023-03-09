@@ -630,6 +630,10 @@ impl FlowMap {
             self.update_udp_is_active(node, meta_packet.lookup_key.direction);
         }
 
+        if meta_packet.need_reverse_flow {
+            self.update_l4_direction(meta_packet, node, false);
+        }
+
         false
     }
 
@@ -674,8 +678,8 @@ impl FlowMap {
             return false;
         }
 
-        // 有特殊包时更新ServiceTable并矫正流方向：SYN+ACK或SYN
-        if pkt_tcp_flags.bits() & TcpFlags::SYN.bits() != 0 {
+        // 有特殊包时更新ServiceTable并矫正流方向：SYN+ACK、SYN或need_reverse_flow为true
+        if pkt_tcp_flags.bits() & TcpFlags::SYN.bits() != 0 || meta_packet.need_reverse_flow {
             self.update_l4_direction(meta_packet, node, false);
             self.update_syn_or_syn_ack_seq(node, meta_packet);
         }
@@ -1531,16 +1535,13 @@ impl FlowMap {
             // TCP/UDP
             IpProtocol::Tcp => {
                 let flags = meta_packet.tcp_data.flags;
-                let toa_sent_by_src = node.tagged_flow.flow.flow_metrics_peers[0].nat_source
-                    == TapPort::NAT_SOURCE_TOA;
-                let toa_sent_by_dst = node.tagged_flow.flow.flow_metrics_peers[1].nat_source
-                    == TapPort::NAT_SOURCE_TOA;
                 self.service_table.get_tcp_score(
                     is_first_packet,
                     meta_packet.need_reverse_flow,
+                    lookup_key.direction,
                     flags,
-                    toa_sent_by_src,
-                    toa_sent_by_dst,
+                    false,
+                    false,
                     flow_src_key,
                     flow_dst_key,
                 )
@@ -1548,6 +1549,7 @@ impl FlowMap {
             IpProtocol::Udp => self.service_table.get_udp_score(
                 is_first_packet,
                 meta_packet.need_reverse_flow,
+                lookup_key.direction,
                 flow_src_key,
                 flow_dst_key,
             ),
@@ -1561,7 +1563,6 @@ impl FlowMap {
         let mut reverse = false;
         if !ServiceTable::is_client_to_server(flow_src_score, flow_dst_score) {
             mem::swap(&mut flow_src_score, &mut flow_dst_score);
-
             Self::reverse_flow(node, is_first_packet);
             meta_packet.lookup_key.direction = meta_packet.lookup_key.direction.reversed();
             reverse = true;
@@ -1605,10 +1606,6 @@ impl FlowMap {
         let flow_key = &node.tagged_flow.flow.flow_key;
         let src_epc_id = node.tagged_flow.flow.flow_metrics_peers[0].l3_epc_id as i16;
         let dst_epc_id = node.tagged_flow.flow.flow_metrics_peers[1].l3_epc_id as i16;
-        let need_reverse_flow = meta_packet
-            .as_ref()
-            .map(|p| p.need_reverse_flow)
-            .unwrap_or_default();
 
         let flow_src_key = ServiceKey::new(flow_key.ip_src, src_epc_id, flow_key.port_src);
         let flow_dst_key = ServiceKey::new(flow_key.ip_dst, dst_epc_id, flow_key.port_dst);
@@ -1620,7 +1617,8 @@ impl FlowMap {
                     == TapPort::NAT_SOURCE_TOA;
                 self.service_table.get_tcp_score(
                     false,
-                    need_reverse_flow,
+                    false,
+                    PacketDirection::ClientToServer,
                     TcpFlags::empty(),
                     toa_sent_by_src,
                     toa_sent_by_dst,
@@ -1630,7 +1628,8 @@ impl FlowMap {
             }
             IpProtocol::Udp => self.service_table.get_udp_score(
                 false,
-                need_reverse_flow,
+                false,
+                PacketDirection::ClientToServer,
                 flow_src_key,
                 flow_dst_key,
             ),
