@@ -32,13 +32,34 @@ func Tracing(args *common.ProfileParams) (jsonData map[string]interface{}, debug
 	url := fmt.Sprintf("http://%s/v1/query/", net.JoinHostPort(config.Cfg.Querier.Host, fmt.Sprintf("%d", config.Cfg.Querier.Port)))
 	body := map[string]interface{}{}
 	body["db"] = args.DB
-	body["sql"] = "select profile_location_str, profile_node_id, profile_parent_node_id from in_process limit 10"
+	body["sql"] = "select profile_location_str, profile_node_id, profile_parent_node_id from in_process group by profile_location_str, profile_node_id, profile_parent_node_id limit 10"
 	resp, err := controllerCommon.CURLPerform("POST", url, body)
 	if err != nil {
 		log.Errorf("call querier failed: %s, %s", err.Error(), url)
 	}
 	if len(resp.Get("result").MustMap()) == 0 {
 		log.Warningf("no data in curl response: %s", url)
+	}
+	for k, v := range resp.Get("result").MustMap() {
+		if k == "columns" {
+			for index, item := range v.([]interface{}) {
+				if item.string
+				formatStr, err := common.JsonFormat(item.(string))
+				if err != nil {
+					fmt.Println("format json str faild: " + err.Error())
+					continue
+				}
+				fmt.Println(formatStr)
+			}
+		}
+		for _, item := range v.([]interface{}) {
+			formatStr, err := common.JsonFormat(item.(string))
+			if err != nil {
+				fmt.Println("format json str faild: " + err.Error())
+				continue
+			}
+			fmt.Println(formatStr)
+		}
 	}
 	log.Debug(url)
 	log.Infof("%#v", resp)
