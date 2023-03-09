@@ -227,7 +227,7 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 // In some cases, the compiled binary instructions exceed the limit, the
 // specific reason is unknown, reduce the number of cycles of http2, which
 // may cause http2 packet loss
-#define HTTPV2_LOOP_MAX 5
+#define HTTPV2_LOOP_MAX 6
 /*
  *  HTTPV2_FRAME_READ_SZ取值考虑以下3部分：
  *  (1) fixed 9-octet header
@@ -1345,8 +1345,6 @@ static __inline struct protocol_message_t infer_protocol(const struct data_args_
 	}
 
 	char *infer_buf = buf_map->data;
-
-	check_and_fetch_prev_data(conn_info);
 
 	/*
 	 * 为了提高协议推断的准确率，做了一下处理：
