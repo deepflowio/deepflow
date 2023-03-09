@@ -97,10 +97,14 @@ impl ServiceTable {
         }
     }
 
+    // At present, the function is called in update_l4_direction and update_flow_direction respectively,
+    // where update_l4_direction uses the tcp flags and need_reverse_flow obtained from the packet to adjust the direction,
+    // and update_flow_direction uses toa obtained from flow to adjust the direction
     pub fn get_tcp_score(
         &mut self,
         is_first_packet: bool,
         need_reverse_flow: bool,
+        direction: PacketDirection,
         tcp_flags: TcpFlags,
         toa_sent_by_flow_src: bool,
         toa_sent_by_flow_dst: bool,
@@ -109,7 +113,7 @@ impl ServiceTable {
     ) -> (u8, u8) {
         let (mut flow_src_score, mut flow_dst_score) = (Self::MIN_SCORE, Self::MIN_SCORE);
 
-        if tcp_flags.contains(TcpFlags::SYN_ACK) || toa_sent_by_flow_dst || need_reverse_flow {
+        if tcp_flags.contains(TcpFlags::SYN_ACK) || toa_sent_by_flow_dst {
             // 一旦发送SYN|ACK，即被认为是服务端，其对侧被认为不可能是服务端
             flow_src_score = Self::MAX_SCORE;
             flow_dst_score = Self::MIN_SCORE;
@@ -158,6 +162,41 @@ impl ServiceTable {
             (flow_src_score, flow_dst_score)
         } else if is_first_packet {
             self.get_first_packet_score(flow_src_key, flow_dst_key)
+        } else if need_reverse_flow {
+            match direction {
+                PacketDirection::ClientToServer => {
+                    flow_src_score = Self::MAX_SCORE;
+                    flow_dst_score = Self::MIN_SCORE;
+                    match (flow_src_key, flow_dst_key) {
+                        (ServiceKey::V4(flow_src_key), ServiceKey::V4(flow_dst_key)) => {
+                            self.ipv4.put(flow_src_key, flow_src_score);
+                            self.ipv4.pop(&flow_dst_key);
+                        }
+                        (ServiceKey::V6(flow_src_key), ServiceKey::V6(flow_dst_key)) => {
+                            self.ipv6.put(flow_src_key, flow_src_score);
+                            self.ipv6.pop(&flow_dst_key);
+                        }
+                        _ => unimplemented!(),
+                    }
+                    (flow_src_score, flow_dst_score)
+                }
+                PacketDirection::ServerToClient => {
+                    flow_src_score = Self::MIN_SCORE;
+                    flow_dst_score = Self::MAX_SCORE;
+                    match (flow_src_key, flow_dst_key) {
+                        (ServiceKey::V4(flow_src_key), ServiceKey::V4(flow_dst_key)) => {
+                            self.ipv4.put(flow_src_key, flow_src_score);
+                            self.ipv4.pop(&flow_dst_key);
+                        }
+                        (ServiceKey::V6(flow_src_key), ServiceKey::V6(flow_dst_key)) => {
+                            self.ipv6.put(flow_src_key, flow_src_score);
+                            self.ipv6.pop(&flow_dst_key);
+                        }
+                        _ => unimplemented!(),
+                    }
+                    (flow_src_score, flow_dst_score)
+                }
+            }
         } else {
             match (flow_src_key, flow_dst_key) {
                 (ServiceKey::V4(flow_src_key), ServiceKey::V4(flow_dst_key)) => {
@@ -194,6 +233,7 @@ impl ServiceTable {
         &mut self,
         is_first_packet: bool,
         need_reverse_flow: bool,
+        direction: PacketDirection,
         flow_src_key: ServiceKey,
         flow_dst_key: ServiceKey,
     ) -> (u8, u8) {
@@ -205,9 +245,20 @@ impl ServiceTable {
         match (flow_src_key, flow_dst_key) {
             (ServiceKey::V4(flow_src_key), ServiceKey::V4(flow_dst_key)) => {
                 if need_reverse_flow {
-                    flow_src_score = Self::MAX_SCORE;
-                    self.ipv4.put(flow_src_key, flow_src_score);
-                } else if let Some(score) = self.ipv4.get(&flow_src_key) {
+                    match direction {
+                        PacketDirection::ClientToServer => {
+                            flow_src_score = Self::MAX_SCORE;
+                            self.ipv4.put(flow_src_key, flow_src_score);
+                        }
+                        PacketDirection::ServerToClient => {
+                            flow_dst_score = Self::MAX_SCORE;
+                            self.ipv4.put(flow_dst_key, flow_dst_score);
+                        }
+                    }
+                    return (flow_src_score, flow_dst_score);
+                }
+
+                if let Some(score) = self.ipv4.get(&flow_src_key) {
                     flow_src_score = *score;
                 }
                 if let Some(score) = self.ipv4.get(&flow_dst_key) {
@@ -223,9 +274,20 @@ impl ServiceTable {
             }
             (ServiceKey::V6(flow_src_key), ServiceKey::V6(flow_dst_key)) => {
                 if need_reverse_flow {
-                    flow_src_score = Self::MAX_SCORE;
-                    self.ipv6.put(flow_src_key, flow_src_score);
-                } else if let Some(score) = self.ipv6.get(&flow_src_key) {
+                    match direction {
+                        PacketDirection::ClientToServer => {
+                            flow_src_score = Self::MAX_SCORE;
+                            self.ipv6.put(flow_src_key, flow_src_score);
+                        }
+                        PacketDirection::ServerToClient => {
+                            flow_dst_score = Self::MAX_SCORE;
+                            self.ipv6.put(flow_dst_key, flow_dst_score);
+                        }
+                    }
+                    return (flow_src_score, flow_dst_score);
+                }
+
+                if let Some(score) = self.ipv6.get(&flow_src_key) {
                     flow_src_score = *score;
                 }
                 if let Some(score) = self.ipv6.get(&flow_dst_key) {
@@ -455,6 +517,7 @@ mod tests {
             let (src_score, dst_score) = table.get_tcp_score(
                 true,
                 false,
+                PacketDirection::ClientToServer,
                 TcpFlags::SYN_ACK,
                 false,
                 false,
@@ -468,6 +531,7 @@ mod tests {
             let (src_score, dst_score) = table.get_tcp_score(
                 false,
                 false,
+                PacketDirection::ClientToServer,
                 TcpFlags::SYN_ACK,
                 false,
                 false,
@@ -482,6 +546,7 @@ mod tests {
             let (src_score, dst_score) = table.get_tcp_score(
                 true,
                 false,
+                PacketDirection::ClientToServer,
                 TcpFlags::empty(),
                 false,
                 false,
@@ -496,6 +561,7 @@ mod tests {
             let (src_score, dst_score) = table.get_tcp_score(
                 false,
                 false,
+                PacketDirection::ClientToServer,
                 TcpFlags::empty(),
                 false,
                 false,
@@ -507,15 +573,31 @@ mod tests {
                 "其它Flag非首包预期不能改变SYN|ACK的Score"
             );
 
-            let (src_score, dst_score) =
-                table.get_tcp_score(true, false, TcpFlags::SYN, false, false, src_key, dst_key);
+            let (src_score, dst_score) = table.get_tcp_score(
+                true,
+                false,
+                PacketDirection::ClientToServer,
+                TcpFlags::SYN,
+                false,
+                false,
+                src_key,
+                dst_key,
+            );
             assert!(
                 src_score == ServiceTable::MIN_SCORE && dst_score == ServiceTable::MIN_SCORE + 1,
                 "对SYN判断不正确"
             );
 
-            let (src_score, dst_score) =
-                table.get_tcp_score(false, false, TcpFlags::SYN, false, false, src_key, dst_key);
+            let (src_score, dst_score) = table.get_tcp_score(
+                false,
+                false,
+                PacketDirection::ClientToServer,
+                TcpFlags::SYN,
+                false,
+                false,
+                src_key,
+                dst_key,
+            );
             assert!(
                 src_score == ServiceTable::MIN_SCORE && dst_score == ServiceTable::MIN_SCORE + 1,
                 "对SYN判断不正确"
@@ -523,6 +605,7 @@ mod tests {
             let (src_score, dst_score) = table.get_tcp_score(
                 true,
                 false,
+                PacketDirection::ClientToServer,
                 TcpFlags::empty(),
                 false,
                 false,
@@ -537,6 +620,7 @@ mod tests {
             let (src_score, dst_score) = table.get_tcp_score(
                 false,
                 false,
+                PacketDirection::ClientToServer,
                 TcpFlags::empty(),
                 false,
                 false,
@@ -585,17 +669,35 @@ mod tests {
 
         let mut table = ServiceTable::new(10, 10);
         for (src_key, dst_key) in key_pairs {
-            let (src_score, dst_score) = table.get_udp_score(true, false, src_key, dst_key);
+            let (src_score, dst_score) = table.get_udp_score(
+                true,
+                false,
+                PacketDirection::ClientToServer,
+                src_key,
+                dst_key,
+            );
             assert!(
                 src_score == ServiceTable::MIN_SCORE && dst_score == ServiceTable::MIN_SCORE + 1,
                 "对UDP首包的判断不正确"
             );
-            let (src_score, dst_score) = table.get_udp_score(false, false, src_key, dst_key);
+            let (src_score, dst_score) = table.get_udp_score(
+                false,
+                false,
+                PacketDirection::ClientToServer,
+                src_key,
+                dst_key,
+            );
             assert!(
                 src_score == ServiceTable::MIN_SCORE && dst_score == ServiceTable::MIN_SCORE + 1,
                 "对UDP非首包的判断不正确"
             );
-            let (src_score, dst_score) = table.get_udp_score(true, false, src_key, dst_key);
+            let (src_score, dst_score) = table.get_udp_score(
+                true,
+                false,
+                PacketDirection::ClientToServer,
+                src_key,
+                dst_key,
+            );
             assert!(
                 src_score == ServiceTable::MIN_SCORE && dst_score == ServiceTable::MIN_SCORE + 2,
                 "对UDP非首包累加的判断不正确"
