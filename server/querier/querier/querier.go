@@ -70,6 +70,7 @@ func Start(configPath, serverLogFile string) {
 	r.Use(gin.Recovery())
 	r.Use(otelgin.Middleware("gin-web-server"))
 	r.Use(gin.LoggerWithFormatter(logger.GinLogFormat))
+	r.Use(StatdHandle())
 	r.Use(ErrHandle())
 	router.QueryRouter(r)
 	// TODO: 增加router
@@ -112,5 +113,17 @@ func ErrHandle() gin.HandlerFunc {
 			}
 		}()
 		c.Next()
+	}
+}
+
+func StatdHandle() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		startTime := time.Now()
+		c.Next()
+		statsd.QuerierCounter.WriteApi(
+			&statsd.ClickhouseCounter{
+				ApiTime: uint64(time.Since(startTime)),
+			},
+		)
 	}
 }
