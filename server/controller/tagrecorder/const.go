@@ -168,7 +168,7 @@ const (
 		"    `icon_id` Int64\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
-		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(FLAT())"
 	CREATE_VPC_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
@@ -179,7 +179,7 @@ const (
 		"    `uid` String\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
-		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(FLAT())"
 	CREATE_TAP_TYPE_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
@@ -188,7 +188,7 @@ const (
 		"    `name` String\n" +
 		")\n" +
 		"PRIMARY KEY value\n" +
-		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(FLAT())"
 	CREATE_VTAP_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
@@ -199,7 +199,7 @@ const (
 		"    `icon_id` Int64\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
-		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(FLAT())"
 	CREATE_DEVICE_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
@@ -211,7 +211,7 @@ const (
 		"    `uid` String\n" +
 		")\n" +
 		"PRIMARY KEY devicetype, deviceid\n" +
-		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(COMPLEX_KEY_HASHED())"
 	CREATE_VTAP_PORT_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
@@ -227,7 +227,7 @@ const (
 		"    `icon_id` Int64\n" +
 		")\n" +
 		"PRIMARY KEY vtap_id, tap_port\n" +
-		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(COMPLEX_KEY_HASHED())"
 	CREATE_PORT_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
@@ -243,7 +243,7 @@ const (
 		"    `port_pod_service_name` String\n" +
 		")\n" +
 		"PRIMARY KEY id, protocol, port\n" +
-		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(COMPLEX_KEY_HASHED())"
 	CREATE_IP_PORT_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
@@ -260,7 +260,7 @@ const (
 		"    `port_pod_service_name` String\n" +
 		")\n" +
 		"PRIMARY KEY ip, subnet_id, protocol, port\n" +
-		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(COMPLEX_KEY_HASHED())"
 	CREATE_DEVICE_PORT_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
@@ -277,7 +277,7 @@ const (
 		"    `port_pod_service_name` String\n" +
 		")\n" +
 		"PRIMARY KEY devicetype, deviceid, protocol, port\n" +
-		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(COMPLEX_KEY_HASHED())"
 	CREATE_SERVER_PORT_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
@@ -286,7 +286,7 @@ const (
 		"    `server_port_name` String\n" +
 		")\n" +
 		"PRIMARY KEY server_port\n" +
-		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(FLAT())"
 	CREATE_IP_RELATION_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
@@ -305,7 +305,7 @@ const (
 		"    `pod_service_name` String\n" +
 		")\n" +
 		"PRIMARY KEY l3_epc_id, ip\n" +
-		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(COMPLEX_KEY_HASHED())"
 	CREATE_ID_NAME_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
@@ -314,7 +314,7 @@ const (
 		"    `name` String\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
-		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(FLAT())"
 	CREATE_K8S_LABEL_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
@@ -326,7 +326,7 @@ const (
 		"    `pod_ns_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY pod_id, key\n" +
-		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(COMPLEX_KEY_HASHED())"
 	CREATE_K8S_LABELS_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
@@ -337,7 +337,7 @@ const (
 		"    `pod_ns_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY pod_id\n" +
-		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(FLAT())"
 	CREATE_IP_RESOURCE_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
@@ -386,7 +386,7 @@ const (
 		"    `uid` String\n" +
 		")\n" +
 		"PRIMARY KEY ip, subnet_id\n" +
-		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(COMPLEX_KEY_HASHED())"
 	CREATE_STRING_ENUM_SQL = "CREATE DICTIONARY %s.%s\n" +
@@ -397,7 +397,7 @@ const (
 		"    `description` String\n" +
 		")\n" +
 		"PRIMARY KEY tag_name, value\n" +
-		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(COMPLEX_KEY_HASHED())"
 	CREATE_INT_ENUM_SQL = "CREATE DICTIONARY %s.%s\n" +
@@ -408,7 +408,7 @@ const (
 		"    `description` String\n" +
 		")\n" +
 		"PRIMARY KEY tag_name, value\n" +
-		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(COMPLEX_KEY_HASHED())"
 	CREATE_NODE_TYPE_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
@@ -417,7 +417,7 @@ const (
 		"    `node_type` String\n" +
 		")\n" +
 		"PRIMARY KEY resource_type\n" +
-		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(FLAT())"
 	CREATE_CLOUD_TAG_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
@@ -427,7 +427,7 @@ const (
 		"    `value` String\n" +
 		")\n" +
 		"PRIMARY KEY id, key\n" +
-		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(COMPLEX_KEY_HASHED())"
 	CREATE_CLOUD_TAGS_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
@@ -436,7 +436,7 @@ const (
 		"    `cloud_tags` String\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
-		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(FLAT())"
 	CREATE_OS_APP_TAG_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
@@ -446,7 +446,7 @@ const (
 		"    `value` String\n" +
 		")\n" +
 		"PRIMARY KEY pid, key\n" +
-		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(COMPLEX_KEY_HASHED())"
 	CREATE_OS_APP_TAGS_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
@@ -455,7 +455,7 @@ const (
 		"    `os_app_tags` String\n" +
 		")\n" +
 		"PRIMARY KEY pid\n" +
-		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(FLAT())"
 )
