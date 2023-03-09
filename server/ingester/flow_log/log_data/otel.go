@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/utils"
@@ -359,10 +360,25 @@ func (k *KnowledgeGraph) FillOTel(l *L7FlowLog, platformData *grpc.PlatformInfoT
 		zerodoc.Rest,
 		layers.IPProtocol(l.Protocol),
 	)
+
+	// OTel data always not from INTERNET
 	if k.L3EpcID0 == datatype.EPC_FROM_INTERNET {
 		k.L3EpcID0 = datatype.EPC_UNKNOWN
 	}
 	if k.L3EpcID1 == datatype.EPC_FROM_INTERNET {
 		k.L3EpcID1 = datatype.EPC_UNKNOWN
 	}
+	if k.AutoServiceType0 == common.InternetIpType {
+		k.AutoServiceType0 = common.IpType
+	}
+	if k.AutoServiceType1 == common.InternetIpType {
+		k.AutoServiceType1 = common.IpType
+	}
+	if k.AutoInstanceType0 == common.InternetIpType {
+		k.AutoInstanceType0 = common.IpType
+	}
+	if k.AutoInstanceType1 == common.InternetIpType {
+		k.AutoInstanceType1 = common.IpType
+	}
+
 }
