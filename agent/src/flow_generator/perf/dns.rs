@@ -107,17 +107,35 @@ impl L7FlowPerf for DnsPerfData {
                 }
 
                 let size = read_u16_be(payload) as usize;
-                if size < payload[DNS_TCP_PAYLOAD_OFFSET..].len() {
-                    return Err(Error::DNSPerfParseFailed("dns payload length error"));
+                if size != payload[DNS_TCP_PAYLOAD_OFFSET..].len() {
+                    self.decode_payload(
+                        payload,
+                        packet.lookup_key.timestamp,
+                        flow_id,
+                        packet.direction,
+                        packet.cap_seq,
+                        packet.signal_source == SignalSource::EBPF,
+                    )?;
+                } else {
+                    self.decode_payload(
+                        &payload[DNS_TCP_PAYLOAD_OFFSET..],
+                        packet.lookup_key.timestamp,
+                        flow_id,
+                        packet.direction,
+                        packet.cap_seq,
+                        packet.signal_source == SignalSource::EBPF,
+                    )
+                    .or_else(|_| {
+                        self.decode_payload(
+                            payload,
+                            packet.lookup_key.timestamp,
+                            flow_id,
+                            packet.direction,
+                            packet.cap_seq,
+                            packet.signal_source == SignalSource::EBPF,
+                        )
+                    })?;
                 }
-                self.decode_payload(
-                    &payload[DNS_TCP_PAYLOAD_OFFSET..],
-                    packet.lookup_key.timestamp,
-                    flow_id,
-                    packet.direction,
-                    packet.cap_seq,
-                    packet.signal_source == SignalSource::EBPF,
-                )?;
             }
             _ => return Err(Error::DNSPerfParseFailed("dns translation type error")),
         }
