@@ -139,7 +139,7 @@ func RegetInfoFromIP(isIPv6 bool, ip6 net.IP, ip4 uint32, epcID int32, platformD
 
 const (
 	IpType         = 255
-	InternatIpType = 0
+	InternetIpType = 0
 
 	PodType     = 10
 	PodNodeType = 14
@@ -160,7 +160,7 @@ func GetAutoInstance(podID, gpID, podNodeID, l3DeviceID uint32, l3DeviceType uin
 	} else if l3DeviceID > 0 {
 		return l3DeviceID, l3DeviceType
 	} else if l3EpcID == datatype.EPC_FROM_INTERNET {
-		return 0, InternatIpType
+		return 0, InternetIpType
 	}
 
 	return 0, IpType
@@ -178,7 +178,7 @@ func GetAutoService(serviceID, podGroupID, gpID, podNodeID, l3DeviceID uint32, l
 	} else if l3DeviceID > 0 {
 		return l3DeviceID, l3DeviceType
 	} else if l3EpcID == datatype.EPC_FROM_INTERNET {
-		return 0, InternatIpType
+		return 0, InternetIpType
 	}
 	return 0, IpType
 }
