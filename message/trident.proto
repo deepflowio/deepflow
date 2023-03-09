@@ -192,7 +192,7 @@ message Config {
     optional uint32  mtu                  = 12 [default = 1500];
     optional uint64  npb_bps_threshold    = 13 [default = 1000000000];
     optional bool    collector_enabled    = 14 [default = false];
-    optional bool    packet_header_enabled = 15 [default = true];
+    // _ = 15; // deprecated
     optional bool    platform_enabled     = 16 [default = false];
     optional bool    kubernetes_api_enabled = 17 [default = false];
     optional uint64  server_tx_bandwidth_threshold = 18 [default = 0]; //bps
@@ -220,7 +220,7 @@ message Config {
     optional common.TridentType trident_type = 41 [default = TT_UNKNOWN];
 
     optional SocketType collector_socket_type = 45 [default = TCP];
-    optional SocketType compressor_socket_type = 46 [default = RAW_UDP];
+    // _ = 46; // deprecated
     optional SocketType npb_socket_type   = 47 [default = RAW_UDP];
 
     optional uint32 pcap_data_retention   = 51 [default = 7]; // uint: day

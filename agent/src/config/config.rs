@@ -31,7 +31,7 @@ use serde::{
     Deserialize, Deserializer,
 };
 use thiserror::Error;
-use tokio::runtime::Builder;
+use tokio::runtime::Runtime;
 
 use crate::common::decapsulate::TunnelType;
 use crate::common::l7_protocol_log::get_all_protocol;
@@ -78,6 +78,7 @@ pub struct Config {
     #[serde(skip)]
     pub agent_mode: RunningMode,
     pub override_os_hostname: Option<String>,
+    pub tokio_worker_thread_number: u16,
 }
 
 impl Config {
@@ -190,10 +191,10 @@ impl Config {
     // ConfigMap is empty, Call GetKubernetesClusterID RPC to get the cluster-id, if the RPC call fails, call it again
     // after 1 minute of sleep until it succeeds
     pub fn get_k8s_cluster_id(
+        runtime: &Runtime,
         session: &Session,
         kubernetes_cluster_name: Option<&String>,
     ) -> String {
-        let runtime = Builder::new_current_thread().enable_all().build().unwrap();
         runtime.block_on(Self::async_get_k8s_cluster_id(
             session,
             kubernetes_cluster_name,
@@ -215,6 +216,7 @@ impl Default for Config {
             controller_domain_name: vec![],
             agent_mode: Default::default(),
             override_os_hostname: None,
+            tokio_worker_thread_number: 16,
         }
     }
 }
@@ -843,8 +845,6 @@ pub struct RuntimeConfig {
     #[serde(skip)]
     pub app_proto_log_enabled: bool,
     pub l7_log_store_tap_types: Vec<u8>,
-    #[serde(skip)]
-    pub packet_header_enabled: bool,
     #[serde(deserialize_with = "bool_from_int")]
     pub platform_enabled: bool,
     #[serde(skip)]
@@ -878,8 +878,6 @@ pub struct RuntimeConfig {
     pub vtap_id: u16,
     #[serde(deserialize_with = "to_socket_type")]
     pub collector_socket_type: trident::SocketType,
-    #[serde(deserialize_with = "to_socket_type")]
-    pub compressor_socket_type: trident::SocketType,
     #[serde(deserialize_with = "to_socket_type")]
     pub npb_socket_type: trident::SocketType,
     #[serde(skip)]
@@ -973,7 +971,6 @@ impl RuntimeConfig {
             npb_bps_threshold: 1000,
             collector_enabled: true,
             l4_log_store_tap_types: vec![0],
-            packet_header_enabled: false,
             platform_enabled: false,
             server_tx_bandwidth_threshold: 1,
             bandwidth_probe_interval: Duration::from_secs(60),
@@ -992,7 +989,6 @@ impl RuntimeConfig {
             epc_id: 3302,
             vtap_id: 3302,
             collector_socket_type: trident::SocketType::File,
-            compressor_socket_type: trident::SocketType::Tcp,
             npb_socket_type: trident::SocketType::RawUdp,
             trident_type: common::TridentType::TtProcess,
             capture_packet_size: 65535,
@@ -1151,7 +1147,6 @@ impl TryFrom<trident::Config> for RuntimeConfig {
                     }
                 })
                 .collect(),
-            packet_header_enabled: conf.packet_header_enabled(),
             platform_enabled: conf.platform_enabled(),
             server_tx_bandwidth_threshold: conf.server_tx_bandwidth_threshold(),
             bandwidth_probe_interval: Duration::from_secs(conf.bandwidth_probe_interval()),
@@ -1177,7 +1172,6 @@ impl TryFrom<trident::Config> for RuntimeConfig {
             epc_id: conf.epc_id(),
             vtap_id: (conf.vtap_id() & 0xFFFFFFFF) as u16,
             collector_socket_type: conf.collector_socket_type(),
-            compressor_socket_type: conf.compressor_socket_type(),
             npb_socket_type: conf.npb_socket_type(),
             trident_type: conf.trident_type(),
             capture_packet_size: conf.capture_packet_size(),

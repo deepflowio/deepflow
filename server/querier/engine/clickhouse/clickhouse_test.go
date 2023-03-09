@@ -165,6 +165,10 @@ var (
 		output: "SELECT if(indexOf(metrics_float_names, 'xxx')=0,null,metrics_float_values[indexOf(metrics_float_names, 'xxx')]) AS `xxx` FROM ext_metrics.`metrics` PREWHERE (virtual_table_name='cpu') LIMIT 10000",
 		db:     "ext_metrics",
 	}, {
+		input:  "select Percentile(`metrics.xxx`, 0.9) as xxx from cpu",
+		output: "SELECT quantile(0.9)(if(indexOf(metrics_float_names, 'xxx')=0,null,metrics_float_values[indexOf(metrics_float_names, 'xxx')])) AS `xxx` FROM ext_metrics.`metrics` PREWHERE (virtual_table_name='cpu') LIMIT 10000",
+		db:     "ext_metrics",
+	}, {
 		input:  "select Sum(packet_count) as count from l4_packet",
 		output: "SELECT SUM(packet_count) AS `count` FROM flow_log.`l4_packet` LIMIT 10000",
 	}, {
@@ -199,6 +203,13 @@ var (
 	}, {
 		input:  "select region_0 from l7_flow_log where region regexp '系统*'",
 		output: "SELECT dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0` FROM flow_log.`l7_flow_log` PREWHERE (toUInt64(region_id) IN (SELECT id FROM flow_tag.region_map WHERE match(name,'系统*'))) LIMIT 10000",
+	}, {
+		input:  "select time(time, 0.2) as toi, PerSecond(Sum(byte)+100) as persecond_max_byte_100 from l4_flow_log group by toi limit 1",
+		output: "WITH toStartOfInterval(time, toIntervalSecond(1)) + toIntervalSecond(arrayJoin([0]) * 1) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, divide(plus(SUM(byte_tx+byte_rx), 100), 1) AS `persecond_max_byte_100` FROM flow_log.`l4_flow_log` GROUP BY `toi` LIMIT 1",
+	}, {
+		input:  "select time(time, 1.2) as toi, Avg(`byte_tx`) AS `Avg(byte_tx)` from vtap_flow_edge_port group by toi limit 1",
+		output: "WITH toStartOfInterval(_time, toIntervalSecond(2)) + toIntervalSecond(arrayJoin([0]) * 2) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, AVG(`_sum_byte_tx`) AS `Avg(byte_tx)` FROM (WITH toStartOfInterval(time, toIntervalSecond(1)) AS `_time` SELECT _time, SUM(byte_tx) AS `_sum_byte_tx` FROM flow_metrics.`vtap_flow_edge_port` GROUP BY `_time`) GROUP BY `toi` LIMIT 1",
+		db:     "flow_metrics",
 	},
 	}
 )

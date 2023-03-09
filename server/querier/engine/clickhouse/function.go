@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"strconv"
 	"strings"
@@ -156,6 +157,14 @@ func (f *BinaryFunction) Trans(m *view.Model) view.Node {
 		histogram.SetFlag(view.METRICS_FLAG_TOP)
 		histogram.Init()
 		return histogram
+	} else if f.Name == view.FUNCTION_PCTL || f.Name == view.FUNCTION_PCTL_EXACT {
+		function := view.GetFunc(f.Name)
+		function.SetFields(fields[:1])                   // metrics
+		function.SetArgs([]string{fields[1].ToString()}) // quantile percentage
+		function.SetFlag(view.METRICS_FLAG_OUTER)
+		function.SetTime(m.Time)
+		function.Init()
+		return function
 	}
 	function := view.GetFunc(f.Name)
 	function.SetFields(fields)
@@ -364,8 +373,9 @@ type Time struct {
 
 func (t *Time) Trans(m *view.Model) error {
 	t.TimeField = strings.ReplaceAll(t.Args[0], "`", "")
-	interval, err := strconv.Atoi(t.Args[1])
-	t.Interval = interval
+	floatInterval, err := strconv.ParseFloat(t.Args[1], 64)
+	intInterval := int(math.Ceil(floatInterval))
+	t.Interval = intInterval
 	if err != nil {
 		return err
 	}

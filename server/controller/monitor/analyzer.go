@@ -190,8 +190,19 @@ func (c *AnalyzerCheck) vtapAnalyzerCheck() {
 
 	log.Info("vtap analyzer check start")
 
+	ipMap, err := getIPMap(common.HOST_TYPE_ANALYZER)
+	if err != nil {
+		log.Error(err)
+	}
+
 	mysql.Db.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&vtaps)
 	for _, vtap := range vtaps {
+		// check vtap.analyzer_ip is not in controller.ip, set to empty if not exist
+		if _, ok := ipMap[vtap.AnalyzerIP]; !ok {
+			vtap.AnalyzerIP = ""
+			mysql.Db.Model(&mysql.VTap{}).Where("lcuuid = ?", vtap.Lcuuid).Update("analyzer_ip", "")
+		}
+
 		if vtap.AnalyzerIP == "" {
 			noAnalyzerVtapCount += 1
 		} else if vtap.Exceptions&common.VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED != 0 {
@@ -234,7 +245,7 @@ func (c *AnalyzerCheck) vtapAnalyzerAlloc(excludeIP string) {
 	// 获取数据节点的剩余采集器个数
 	analyzerIPToAvailableVTapNum := make(map[string]int)
 	for _, analyzer := range analyzers {
-		analyzerIPToAvailableVTapNum[analyzer.IP] -= analyzer.VTapMax
+		analyzerIPToAvailableVTapNum[analyzer.IP] = analyzer.VTapMax
 		if usedVTapNum, ok := analyzerIPToUsedVTapNum[analyzer.IP]; ok {
 			analyzerIPToAvailableVTapNum[analyzer.IP] = analyzer.VTapMax - usedVTapNum
 		}
@@ -291,19 +302,18 @@ func (c *AnalyzerCheck) vtapAnalyzerAlloc(excludeIP string) {
 				return analyzerAvailableVTapNum[i].Value > analyzerAvailableVTapNum[j].Value
 			})
 			// Search for controllers that have capacity. If none has capacity, the collector limit is allowed.
-			index := 0
-			for i, availableVTap := range analyzerAvailableVTapNum {
-				if availableVTap.Value == 0 || analyzerIPToAvailableVTapNum[availableVTap.Key] == 0 {
-					continue
-				}
-				index = i
-			}
-			analyzerAvailableVTapNum[index].Value -= 1
-			analyzerIPToAvailableVTapNum[analyzerAvailableVTapNum[index].Key] -= 1
+			// There are five types of Value in analyzerAvailableVTapNum:
+			// 1. All positive numbers
+			// 2. Positive numbers and 0
+			// 3. All are 0
+			// 4, 0 and negative numbers
+			// 5. All negative numbers
+			analyzerAvailableVTapNum[0].Value -= 1
+			analyzerIPToAvailableVTapNum[analyzerAvailableVTapNum[0].Key] -= 1
 
 			// 分配数据节点成功，更新数据节点IP + 清空数据节点分配失败的错误码
-			log.Infof("alloc analyzer (%s) for vtap (%s)", analyzerAvailableVTapNum[index].Key, vtap.Name)
-			mysql.Db.Model(&vtap).Update("analyzer_ip", analyzerAvailableVTapNum[index].Key)
+			log.Infof("alloc analyzer (%s) for vtap (%s)", analyzerAvailableVTapNum[0].Key, vtap.Name)
+			mysql.Db.Model(&vtap).Update("analyzer_ip", analyzerAvailableVTapNum[0].Key)
 			if vtap.Exceptions&common.VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED != 0 {
 				exceptions := vtap.Exceptions ^ common.VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED
 				mysql.Db.Model(&vtap).Update("exceptions", exceptions)

@@ -264,12 +264,12 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 		labelKey := "k8s.label." + key.(string)
 		if db == "ext_metrics" || db == "event" || table == "vtap_flow_port" || table == "vtap_app_port" {
 			response.Values = append(response.Values, []interface{}{
-				labelKey, labelKey, labelKey, labelKey, "label",
+				labelKey, labelKey, labelKey, labelKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
 			})
 		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
 			response.Values = append(response.Values, []interface{}{
-				labelKey, labelKey + "_0", labelKey + "_1", labelKey, "label",
+				labelKey, labelKey + "_0", labelKey + "_1", labelKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
 			})
 		}
@@ -287,12 +287,12 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 		chostCloudTagKey := "cloud.tag." + key.(string)
 		if db == "ext_metrics" || db == "event" || table == "vtap_flow_port" || table == "vtap_app_port" {
 			response.Values = append(response.Values, []interface{}{
-				chostCloudTagKey, chostCloudTagKey, chostCloudTagKey, chostCloudTagKey, "cloud tag",
+				chostCloudTagKey, chostCloudTagKey, chostCloudTagKey, chostCloudTagKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
 			})
 		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
 			response.Values = append(response.Values, []interface{}{
-				chostCloudTagKey, chostCloudTagKey + "_0", chostCloudTagKey + "_1", chostCloudTagKey, "cloud tag",
+				chostCloudTagKey, chostCloudTagKey + "_0", chostCloudTagKey + "_1", chostCloudTagKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
 			})
 		}
@@ -308,12 +308,12 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 		podNSCloudTagKey := "cloud.tag." + key.(string)
 		if db == "ext_metrics" || db == "event" || table == "vtap_flow_port" || table == "vtap_app_port" {
 			response.Values = append(response.Values, []interface{}{
-				podNSCloudTagKey, podNSCloudTagKey, podNSCloudTagKey, podNSCloudTagKey, "cloud tag",
+				podNSCloudTagKey, podNSCloudTagKey, podNSCloudTagKey, podNSCloudTagKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
 			})
 		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
 			response.Values = append(response.Values, []interface{}{
-				podNSCloudTagKey, podNSCloudTagKey + "_0", podNSCloudTagKey + "_1", podNSCloudTagKey, "cloud tag",
+				podNSCloudTagKey, podNSCloudTagKey + "_0", podNSCloudTagKey + "_1", podNSCloudTagKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
 			})
 		}
@@ -330,12 +330,12 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 		osAPPTagKey := "os.app." + key.(string)
 		if db == "ext_metrics" || db == "event" || table == "vtap_flow_port" || table == "vtap_app_port" {
 			response.Values = append(response.Values, []interface{}{
-				osAPPTagKey, osAPPTagKey, osAPPTagKey, osAPPTagKey, "os app",
+				osAPPTagKey, osAPPTagKey, osAPPTagKey, osAPPTagKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
 			})
 		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
 			response.Values = append(response.Values, []interface{}{
-				osAPPTagKey, osAPPTagKey + "_0", osAPPTagKey + "_1", osAPPTagKey, "os app",
+				osAPPTagKey, osAPPTagKey + "_0", osAPPTagKey + "_1", osAPPTagKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
 			})
 		}
@@ -373,13 +373,13 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 		if db == "ext_metrics" || db == "deepflow_system" {
 			externalTag := "tag." + tagName.(string)
 			response.Values = append(response.Values, []interface{}{
-				externalTag, externalTag, externalTag, externalTag, "tag",
+				externalTag, externalTag, externalTag, externalTag, "map_item",
 				"Native Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "",
 			})
 		} else {
 			externalTag := "attribute." + tagName.(string)
 			response.Values = append(response.Values, []interface{}{
-				externalTag, externalTag, externalTag, externalTag, "attribute",
+				externalTag, externalTag, externalTag, externalTag, "map_item",
 				"Native Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "",
 			})
 		}
