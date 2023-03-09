@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"strconv"
 	"strings"
@@ -372,8 +373,9 @@ type Time struct {
 
 func (t *Time) Trans(m *view.Model) error {
 	t.TimeField = strings.ReplaceAll(t.Args[0], "`", "")
-	interval, err := strconv.Atoi(t.Args[1])
-	t.Interval = interval
+	floatInterval, err := strconv.ParseFloat(t.Args[1], 64)
+	intInterval := int(math.Ceil(floatInterval))
+	t.Interval = intInterval
 	if err != nil {
 		return err
 	}
