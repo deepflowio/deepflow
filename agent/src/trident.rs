@@ -530,18 +530,11 @@ impl Trident {
             mem::swap(&mut new_state, &mut *state_guard);
             mem::drop(state_guard);
 
-            #[cfg(target_os = "linux")]
             let ChangedConfig {
                 runtime_config,
                 blacklist,
                 vm_mac_addrs,
                 tap_types,
-            } = new_state.unwrap_config();
-            #[cfg(target_os = "windows")]
-            let ChangedConfig {
-                runtime_config,
-                vm_mac_addrs,
-                ..
             } = new_state.unwrap_config();
 
             if let Some(old_yaml) = yaml_conf {
@@ -559,7 +552,6 @@ impl Trident {
             yaml_conf = Some(runtime_config.yaml_config.clone());
             match components.as_mut() {
                 None => {
-                    #[cfg(target_os = "linux")]
                     let callbacks =
                         config_handler.on_config(runtime_config, &exception_handler, None);
                     let mut comp = Components::new(
@@ -579,7 +571,6 @@ impl Trident {
                     )?;
                     comp.start();
 
-                    #[cfg(target_os = "linux")]
                     if let Components::Agent(components) = &mut comp {
                         if config_handler.candidate_config.dispatcher.tap_mode == TapMode::Analyzer
                         {
@@ -593,7 +584,6 @@ impl Trident {
 
                     components.replace(comp);
                 }
-                #[cfg(target_os = "linux")]
                 Some(components) => {
                     if let Components::Agent(components) = components {
                         let callbacks = config_handler.on_config(
@@ -620,8 +610,6 @@ impl Trident {
                         }
                     }
                 }
-                #[cfg(target_os = "windows")]
-                _ => (),
             }
             state_guard = state.lock().unwrap();
         }
@@ -866,6 +854,7 @@ pub enum Components {
     Agent(AgentComponents),
     #[cfg(target_os = "linux")]
     Watcher(WatcherComponents),
+    Other,
 }
 
 #[cfg(target_os = "linux")]
@@ -2201,6 +2190,7 @@ impl Components {
             Self::Agent(a) => a.start(),
             #[cfg(target_os = "linux")]
             Self::Watcher(w) => w.start(),
+            _ => {}
         }
     }
 
@@ -2256,6 +2246,7 @@ impl Components {
             Self::Agent(a) => a.stop(),
             #[cfg(target_os = "linux")]
             Self::Watcher(w) => w.stop(),
+            _ => {}
         }
     }
 }
