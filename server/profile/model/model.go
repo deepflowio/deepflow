@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package migration
+package model
 
-const (
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "6.2.1.17"
-)
+type ProfileTracing struct {
+	// TODO
+	AppService string `json:"app_service" binding:"required"`
+}
