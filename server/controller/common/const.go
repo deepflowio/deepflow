@@ -448,8 +448,8 @@ const (
 const (
 	DATA_SOURCE_FLOW   = "flow"
 	DATA_SOURCE_APP    = "app"
-	DATA_SOURCE_L4_LOG = "flow_log.l4"
-	DATA_SOURCE_L7_LOG = "flow_log.l7"
+	DATA_SOURCE_L4_LOG = "flow_log.l4_flow_log"
+	DATA_SOURCE_L7_LOG = "flow_log.l7_flow_log"
 
 	DATA_SOURCE_STATE_EXCEPTION = 0
 	DATA_SOURCE_STATE_NORMAL    = 1
