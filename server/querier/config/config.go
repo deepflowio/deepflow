@@ -22,9 +22,10 @@ import (
 	"reflect"
 	"regexp"
 
+	"strings"
+
 	"github.com/op/go-logging"
 	"gopkg.in/yaml.v2"
-	"strings"
 )
 
 var log = logging.MustGetLogger("clickhouse")
@@ -63,7 +64,8 @@ type Clickhouse struct {
 }
 
 type Prometheus struct {
-	SeriesLimit int `default:"100" yaml:"series-limit"`
+	SeriesLimit       int    `default:"100" yaml:"series-limit"`
+	AutoTaggingPrefix string `default:"df_" yaml:"auto-tagging-prefix"`
 }
 
 func (c *Config) expendEnv() {

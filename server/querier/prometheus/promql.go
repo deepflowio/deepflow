@@ -18,6 +18,33 @@ import (
 	"github.com/prometheus/prometheus/storage"
 )
 
+// The Series API supports returning the following time series (metrics):
+// - Prometheus native metrics: directly return the existing metrics in Prometheus in the format of ${metrics_name}, for example
+//    - demo_cpu_usage_seconds_total
+// - DeepFlow metrics: Return all metrics by ${db_name}__${table_name}__${time_granularity}__${metrics_name}, where you need to replace . in metrics_name with _ to return, for example
+//    - flow_log__l7_flow_log__rrt
+//    - flow_metrics__vtap_flow_port__1m__rtt
+//    - ext_metrics__metrics__prometheus_demo_cpu_usage_seconds_total
+//    - ext_metrics__metrics__influxdb_cpu
+
+// Note that as can be seen from the above description, Prometheus native metrics actually return twice.
+
+// For the above two types of metrics, return the labels they support:
+// - Prometheus native metrics
+//    - Return the tag that has been injected in the Prometheus data, that is, the tag name in the tag_names column in ClickHouse, without the prefix `tag_`, for example: instance, pod
+//    - Return the resource tags automatically injected by DeepFlow, including cloud resources, K8s pod resources, etc., and add `df_` prefix before the original tag name, for example: df_vpc, df_pod
+//    - Return the automatically associated business labels in DeepFlow, including K8s label, etc., and add `df_` prefix before the original label name (and replace . with _), for example: df_k8s_label_env
+// - DeepFlow metrics: use the tag name returned by the show tag API and replace . with _
+//    - Return the injected tags in Prometheus/InfluxDB data, for example: tag_instance, tag_pod
+//    - Returns the resource tags automatically injected by DeepFlow, including cloud resources, K8s pod resources, etc., for example: vpc, pod
+//    - Returns the automatically associated business labels in DeepFlow, including K8s label, etc., for example: k8s_label_env
+
+// Through this design, we mainly hope to achieve the following goals:
+// - The Grafana Dashboard of Prometheus does not need to be modified, and the tags automatically added in DeepFlow can be used in these Dashboards
+// - The Dashboard created by the user can directly use DeepFlow metrics, and there is no need to change the label name automatically added by DeepFlow when switching between different metrics
+
+const _SUCCESS = "success"
+
 // API Spec: https://prometheus.io/docs/prometheus/latest/querying/api/#instant-queries
 func PromQueryExecute(args *common.PromQueryParams, ctx context.Context) (result *common.PromQueryResponse, err error) {
 	timeS, err := (strconv.ParseFloat(args.StartTime, 64))
@@ -47,17 +74,17 @@ func PromQueryExecute(args *common.PromQueryParams, ctx context.Context) (result
 	//pp.Println(res.Err)
 	//pp.Println(res)
 	//pp.Println(res.Value.(promql.Vector))
-	stats := "success"
 	var resultType parser.ValueType
 	if res.Value == nil {
 		resultType = parser.ValueTypeNone
 	} else {
 		resultType = res.Value.Type()
 	}
-	return &common.PromQueryResponse{Data: &common.PromQueryData{
-		ResultType: resultType,
-		Result:     res.Value,
-	}, Status: stats}, err
+	return &common.PromQueryResponse{
+		Data: &common.PromQueryData{
+			ResultType: resultType,
+			Result:     res.Value,
+		}, Status: _SUCCESS}, err
 }
 
 func durationMilliseconds(d time.Duration) int64 {
@@ -103,35 +130,35 @@ func PromQueryRangeExecute(args *common.PromQueryParams, ctx context.Context) (r
 	//pp.Println(res.Value.(promql.Matrix))
 	//pp.Println(res.Err)
 	//pp.Println(res)
-	stats := "success"
 	var resultType parser.ValueType
 	if res.Value == nil {
 		resultType = parser.ValueTypeNone
 	} else {
 		resultType = res.Value.Type()
 	}
-	return &common.PromQueryResponse{Data: &common.PromQueryData{
-		ResultType: resultType,
-		Result:     res.Value,
-	}, Status: stats}, err
+	return &common.PromQueryResponse{
+		Data: &common.PromQueryData{
+			ResultType: resultType,
+			Result:     res.Value,
+		}, Status: _SUCCESS}, err
 }
 
 func parseDuration(s string) (time.Duration, error) {
 	if d, err := strconv.ParseFloat(s, 64); err == nil {
 		ts := d * float64(time.Second)
 		if ts > float64(math.MaxInt64) || ts < float64(math.MinInt64) {
-			return 0, errors.New(fmt.Sprintf("cannot parse %q to a valid duration. It overflows int64", s))
+			return 0, fmt.Errorf("cannot parse %q to a valid duration. It overflows int64", s)
 		}
 		return time.Duration(ts), nil
 	}
 	if d, err := model.ParseDuration(s); err == nil {
 		return time.Duration(d), nil
 	}
-	return 0, errors.New(fmt.Sprintf("cannot parse %q to a valid duration", s))
+	return 0, fmt.Errorf("cannot parse %q to a valid duration", s)
 }
 
 func parseMatchersParam(matchers []string) ([][]*labels.Matcher, error) {
-	var matcherSets [][]*labels.Matcher
+	matcherSets := make([][]*labels.Matcher, 0, len(matchers))
 	for _, s := range matchers {
 		matchers, err := parser.ParseMetricSelector(s)
 		if err != nil {
@@ -165,10 +192,11 @@ func parseTime(s string) (time.Time, error) {
 		return t, nil
 	}
 
-	return time.Time{}, errors.New(fmt.Sprintf("cannot parse %q to a valid timestamp", s))
+	return time.Time{}, fmt.Errorf("cannot parse %q to a valid timestamp", s)
 }
 
 // API Spec: https://prometheus.io/docs/prometheus/latest/querying/api/#finding-series-by-label-matchers
+// TODO: 可以先不要返回 flow_metrics 以外的数据？并检查 deepflow_system 是否支持 promQL
 func Series(args *common.PromQueryParams) (result *common.PromQueryResponse, err error) {
 	start, err := parseTime(args.StartTime)
 	if err != nil {
@@ -181,16 +209,16 @@ func Series(args *common.PromQueryParams) (result *common.PromQueryResponse, err
 		return nil, err
 	}
 
-	matcherSets, err := parseMatchersParam(args.Matchers)
-	//pp.Println(args.Matchers)
-	//pp.Println(matcherSets)
+	labelMatchers, err := parseMatchersParam(args.Matchers)
+	// pp.Println(args.Matchers)
+	// pp.Println(matcherSets)
 	if err != nil {
 		log.Error(err)
 		return nil, err
 	}
-	qable := &RemoteReadQuerierable{Args: args, Ctx: args.Context}
-	q, err := qable.Querier(args.Context, timestamp.FromTime(start), timestamp.FromTime(end))
 
+	querierable := &RemoteReadQuerierable{Args: args, Ctx: args.Context}
+	q, err := querierable.Querier(args.Context, timestamp.FromTime(start), timestamp.FromTime(end))
 	if err != nil {
 		log.Error(err)
 		return nil, err
@@ -201,31 +229,30 @@ func Series(args *common.PromQueryParams) (result *common.PromQueryResponse, err
 		End:   timestamp.FromTime(end),
 		Func:  "series", // There is no series function, this token is used for lookups that don't need samples.
 	}
-	var set storage.SeriesSet
 
-	if len(matcherSets) > 1 {
-		var sets []storage.SeriesSet
-		for _, mset := range matcherSets {
+	var seriesSet storage.SeriesSet
+	if len(labelMatchers) > 1 {
+		var queryResultSets []storage.SeriesSet
+		for _, matcher := range labelMatchers {
 			// We need to sort this select results to merge (deduplicate) the series sets later.
-			s := q.Select(true, hints, mset...)
-			sets = append(sets, s)
+			s := q.Select(true, hints, matcher...)
+			queryResultSets = append(queryResultSets, s)
 		}
-		set = storage.NewMergeSeriesSet(sets, storage.ChainedSeriesMerge)
+		seriesSet = storage.NewMergeSeriesSet(queryResultSets, storage.ChainedSeriesMerge)
 	} else {
 		// At this point at least one match exists.
-		set = q.Select(false, hints, matcherSets[0]...)
+		seriesSet = q.Select(false, hints, labelMatchers[0]...)
 	}
 
 	metrics := []labels.Labels{}
-	for set.Next() {
-		metrics = append(metrics, set.At().Labels())
+	for seriesSet.Next() {
+		metrics = append(metrics, seriesSet.At().Labels())
 	}
 
-	if set.Err() != nil {
-		log.Error(set.Err())
-		return nil, set.Err()
+	if seriesSet.Err() != nil {
+		log.Error(seriesSet.Err())
+		return nil, seriesSet.Err()
 	}
 
-	stats := "success"
-	return &common.PromQueryResponse{Data: metrics, Status: stats}, err
+	return &common.PromQueryResponse{Data: metrics, Status: _SUCCESS}, err
 }

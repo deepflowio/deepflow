@@ -1,6 +1,7 @@
 package router
 
 import (
+	"context"
 	"io/ioutil"
 
 	"github.com/gin-gonic/gin"
@@ -113,6 +114,8 @@ func promSeriesReader() gin.HandlerFunc {
 			Matchers:  c.Request.Form["match[]"],
 			Context:   c.Request.Context(),
 		}
+		// should show tags when get `Series`
+		args.Context = context.WithValue(args.Context, prometheus.CtxKeyShowTag{}, true)
 		result, err := prometheus.Series(&args)
 		if err != nil {
 			c.JSON(500, &common.PromQueryResponse{Error: err.Error(), Status: STATUS_FIAL})
