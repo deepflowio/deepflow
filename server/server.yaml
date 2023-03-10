@@ -485,6 +485,7 @@ ingester:
 profile:
   # profile http listenport
   listen-port: 20419
+  flame_query_limit: 1000000
 
   # querier相关配置
   querier:

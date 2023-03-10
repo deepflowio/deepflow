@@ -35,11 +35,11 @@ type Config struct {
 }
 
 type ProfileConfig struct {
-	LogFile      string  `default:"/var/log/profile.log" yaml:"log-file"`
-	LogLevel     string  `default:"info" yaml:"log-level"`
-	ListenPort   int     `default:"20419" yaml:"listen-port"`
-	Querier      Querier `yaml:"querier"`
-	OtelEndpoint string  `default:"http://${K8S_NODE_IP_FOR_DEEPFLOW}:38086/api/v1/otel/trace" yaml:"otel-endpoint"`
+	LogFile         string  `default:"/var/log/profile.log" yaml:"log-file"`
+	LogLevel        string  `default:"info" yaml:"log-level"`
+	ListenPort      int     `default:"20419" yaml:"listen-port"`
+	FlameQueryLimit int     `default:"1000000" yaml:"flame_query_limit"`
+	Querier         Querier `yaml:"querier"`
 }
 
 type Querier struct {
