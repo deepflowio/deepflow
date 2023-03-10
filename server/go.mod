@@ -89,6 +89,7 @@ require (
 	github.com/go-redis/redis/v9 v9.0.0-rc.2
 	github.com/pyroscope-io/pyroscope v0.37.1
 	go.opentelemetry.io/collector/pdata v0.66.0
+	golang.org/x/exp v0.0.0-20230321023759-10a507213a29
 )
 
 require (
@@ -113,7 +114,6 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.13.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
-	golang.org/x/exp v0.0.0-20230129154200-a960b3787bd2 // indirect
 )
 
 require (
