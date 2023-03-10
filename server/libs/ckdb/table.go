@@ -100,9 +100,9 @@ func (t *Table) MakeLocalTableCreateSQL() string {
 	}
 	ttl := ""
 	if t.TTL > 0 {
-		ttl = fmt.Sprintf("TTL %s +  toIntervalDay(%d)", t.TimeKey, t.TTL)
+		ttl = fmt.Sprintf("TTL %s +  toIntervalHour(%d)", t.TimeKey, t.TTL)
 		if t.ColdStorage.Enabled {
-			ttl += fmt.Sprintf(", %s + toIntervalDay(%d) TO %s '%s'", t.TimeKey, t.ColdStorage.TTLToMove, t.ColdStorage.Type, t.ColdStorage.Name)
+			ttl += fmt.Sprintf(", %s + toIntervalHour(%d) TO %s '%s'", t.TimeKey, t.ColdStorage.TTLToMove, t.ColdStorage.Type, t.ColdStorage.Name)
 		}
 	}
 

@@ -29,13 +29,13 @@ import (
 var log = logging.MustGetLogger("event.config")
 
 const (
-	DefaultEventTTL = 30
+	DefaultEventTTL = 720 // hour
 )
 
 type Config struct {
 	Base           *config.Config
 	CKWriterConfig config.CKWriterConfig `yaml:"event-ck-writer"`
-	TTL            int                   `yaml:"event-ttl"`
+	TTL            int                   `yaml:"event-ttl-hour"`
 }
 
 type EventConfig struct {

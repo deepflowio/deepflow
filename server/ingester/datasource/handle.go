@@ -17,6 +17,7 @@
 package datasource
 
 import (
+	"database/sql"
 	"fmt"
 	"strings"
 
@@ -29,10 +30,9 @@ import (
 const (
 	ORIGIN_TABLE_1M = "1m"
 	ORIGIN_TABLE_1S = "1s"
-	FLOW_LOG_L4     = "flow_log.l4"
-	FLOW_LOG_L7     = "flow_log.l7"
 	FLOW_METRICS    = "vtap_flow"
 	APP_METRICS     = "vtap_app"
+	DEEPFLOW_SYSTEM = "deepflow_system"
 
 	ERR_IS_MODIFYING = "Modifying the retention time (%s), please try again later"
 )
@@ -235,11 +235,11 @@ func stringSliceHas(items []string, item string) bool {
 func (m *DatasourceManager) makeTTLString(timeKey, db, table string, duration int) string {
 	coldStorage := ckdb.GetColdStorage(m.ckdbColdStorages, db, table)
 	if coldStorage.Enabled {
-		return fmt.Sprintf("%s + toIntervalDay(%d), %s +  toIntervalDay(%d) TO %s '%s'",
+		return fmt.Sprintf("%s + toIntervalHour(%d), %s +  toIntervalHour(%d) TO %s '%s'",
 			timeKey, duration,
 			timeKey, coldStorage.TTLToMove, coldStorage.Type, coldStorage.Name)
 	}
-	return fmt.Sprintf("%s + toIntervalDay(%d)", timeKey, duration)
+	return fmt.Sprintf("%s + toIntervalHour(%d)", timeKey, duration)
 }
 
 func (m *DatasourceManager) makeAggTableCreateSQL(t *ckdb.Table, dstTable, aggrSummable, aggrUnsummable string, partitionTime ckdb.TimeFuncType, duration int) string {
@@ -434,6 +434,51 @@ func (m *DatasourceManager) modFlowLogLocalTable(cks basecommon.DBs, tableID com
 	return err
 }
 
+func getDeepflowSystemLocalTables(connect *sql.DB) ([]string, error) {
+	sql := fmt.Sprintf("SHOW TABLES IN deepflow_system")
+	rows, err := connect.Query(sql)
+	if err != nil {
+		return nil, err
+	}
+	tables := []string{}
+	var table string
+	for rows.Next() {
+		err := rows.Scan(&table)
+		if err != nil {
+			return nil, err
+		}
+		if strings.HasSuffix(table, "_local") {
+			tables = append(tables, table)
+		}
+	}
+	return tables, nil
+}
+
+func (m *DatasourceManager) modDeepflowSystemTables(cks basecommon.DBs, duration int) error {
+	var e error
+	for _, ck := range cks {
+		tableNames, err := getDeepflowSystemLocalTables(ck)
+		if err != nil {
+			log.Error("get deepflow system tables failed: %s", err)
+			e = err
+			continue
+		}
+
+		for _, tableName := range tableNames {
+			tableLocal := fmt.Sprintf("%s.`%s`", DEEPFLOW_SYSTEM, tableName)
+			modTable := fmt.Sprintf("ALTER TABLE %s MODIFY TTL %s",
+				tableLocal, m.makeTTLString("time", DEEPFLOW_SYSTEM, tableName, duration))
+			log.Infof("modify deepflow_system table TTL: %s", modTable)
+			_, err := ck.Exec(modTable)
+			if err != nil {
+				e = err
+				log.Errorf("modify deepflow_system table(%s) TTL failed, err: %s", tableName, err)
+			}
+		}
+	}
+	return e
+}
+
 func delTableMV(cks basecommon.DBs, dbId zerodoc.MetricsTableID, table string) error {
 	dropTables := []string{
 		getMetricsTableName(uint8(dbId), table, GLOBAL),
@@ -450,6 +495,24 @@ func delTableMV(cks basecommon.DBs, dbId zerodoc.MetricsTableID, table string) e
 	return nil
 }
 
+func isFlowLogGroup(name string) bool {
+	for id := common.L4_FLOW_ID; id < common.FLOWLOG_ID_MAX; id++ {
+		if name == id.DataourceString() {
+			return true
+		}
+	}
+	return false
+}
+
+func getFlowLogDatasoureID(name string) (common.FlowLogID, uint8) {
+	for id := common.L4_FLOW_ID; id < common.FLOWLOG_ID_MAX; id++ {
+		if name == id.DataourceString() {
+			return id, uint8(id) + uint8(zerodoc.VTAP_TABLE_ID_MAX)
+		}
+	}
+	return common.FLOWLOG_ID_MAX, uint8(common.FLOWLOG_ID_MAX) + uint8(zerodoc.VTAP_TABLE_ID_MAX)
+}
+
 func (m *DatasourceManager) Handle(dbGroup, action, baseTable, dstTable, aggrSummable, aggrUnsummable string, interval, duration int) error {
 	if len(m.ckAddrs) == 0 {
 		return fmt.Errorf("ck addrs is empty")
@@ -461,50 +524,44 @@ func (m *DatasourceManager) Handle(dbGroup, action, baseTable, dstTable, aggrSum
 	}
 	defer cks.Close()
 
-	duration = duration / 24 // 切换为天
-
-	// flow_log.l4和flow_log.l7只支持mod
-	if (dbGroup == FLOW_LOG_L4 || dbGroup == FLOW_LOG_L7) && action == actionStrings[MOD] {
-		if dbGroup == FLOW_LOG_L7 {
-			tableID := common.L7_FLOW_ID + common.FlowLogID(zerodoc.VTAP_TABLE_ID_MAX)
-			if m.isModifyingFlags[tableID] {
-				return fmt.Errorf(ERR_IS_MODIFYING, common.L7_FLOW_ID)
-			}
-			go func() {
-				cks, err := basecommon.NewCKConnections(m.ckAddrs, m.user, m.password)
-				if err != nil {
-					log.Error(err)
-					return
-				}
-				defer cks.Close()
-				m.isModifyingFlags[tableID] = true
-				if err := m.modFlowLogLocalTable(cks, common.L7_FLOW_ID, duration); err != nil {
-					log.Info(err)
-				}
-				m.isModifyingFlags[tableID] = false
-			}()
-		} else {
-			for _, id := range []common.FlowLogID{common.L4_FLOW_ID, common.L4_PACKET_ID, common.L7_PACKET_ID} {
-				tableID := id + common.FlowLogID(zerodoc.VTAP_TABLE_ID_MAX)
-				if m.isModifyingFlags[tableID] {
-					return fmt.Errorf(ERR_IS_MODIFYING, tableID)
-				}
-				go func(id common.FlowLogID) {
-					cks, err := basecommon.NewCKConnections(m.ckAddrs, m.user, m.password)
-					if err != nil {
-						log.Error(err)
-						return
-					}
-					defer cks.Close()
-					m.isModifyingFlags[id] = true
-					if err := m.modFlowLogLocalTable(cks, id-common.FlowLogID(zerodoc.VTAP_TABLE_ID_MAX), duration); err != nil {
-						log.Warning(err)
-					}
-					m.isModifyingFlags[id] = false
-				}(tableID)
-			}
+	// flow_log.x只支持mod
+	if isFlowLogGroup(dbGroup) && action == actionStrings[MOD] {
+		flowLogID, tableID := getFlowLogDatasoureID(dbGroup)
+		if m.isModifyingFlags[tableID] {
+			return fmt.Errorf(ERR_IS_MODIFYING, flowLogID)
 		}
-
+		go func(id common.FlowLogID) {
+			cks, err := basecommon.NewCKConnections(m.ckAddrs, m.user, m.password)
+			if err != nil {
+				log.Error(err)
+				return
+			}
+			defer cks.Close()
+			m.isModifyingFlags[tableID] = true
+			if err := m.modFlowLogLocalTable(cks, id, duration); err != nil {
+				log.Info(err)
+			}
+			m.isModifyingFlags[tableID] = false
+		}(flowLogID)
+		return nil
+	} else if dbGroup == DEEPFLOW_SYSTEM && action == actionStrings[MOD] {
+		deepflowSystemID := uint8(common.FLOWLOG_ID_MAX) + uint8(zerodoc.VTAP_TABLE_ID_MAX) + 1
+		if m.isModifyingFlags[deepflowSystemID] {
+			return fmt.Errorf(ERR_IS_MODIFYING, DEEPFLOW_SYSTEM)
+		}
+		go func(id uint8) {
+			cks, err := basecommon.NewCKConnections(m.ckAddrs, m.user, m.password)
+			if err != nil {
+				log.Error(err)
+				return
+			}
+			defer cks.Close()
+			m.isModifyingFlags[id] = true
+			if err := m.modDeepflowSystemTables(cks, duration); err != nil {
+				log.Error(err)
+			}
+			m.isModifyingFlags[id] = false
+		}(deepflowSystemID)
 		return nil
 	}
 

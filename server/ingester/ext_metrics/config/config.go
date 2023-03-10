@@ -31,7 +31,7 @@ var log = logging.MustGetLogger("ext_metrics.config")
 const (
 	DefaultDecoderQueueCount = 2
 	DefaultDecoderQueueSize  = 1 << 17
-	DefaultExtMetricsTTL     = 7
+	DefaultExtMetricsTTL     = 168 // hour
 )
 
 type Config struct {
@@ -39,7 +39,7 @@ type Config struct {
 	CKWriterConfig    config.CKWriterConfig `yaml:"ext-metrics-ck-writer"`
 	DecoderQueueCount int                   `yaml:"decoder-queue-count"`
 	DecoderQueueSize  int                   `yaml:"decoder-queue-size"`
-	TTL               int                   `yaml:"ext-metrics-ttl"`
+	TTL               int                   `yaml:"ext-metrics-ttl-hour"`
 }
 
 type ExtMetricsConfig struct {

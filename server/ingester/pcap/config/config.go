@@ -29,7 +29,7 @@ import (
 var log = logging.MustGetLogger("pcap.config")
 
 const (
-	DefaultPcapTTL        = 3
+	DefaultPcapTTL        = 72
 	DefaultPcapQueueCount = 2
 	DefaultPcapQueueSize  = 10000
 )
