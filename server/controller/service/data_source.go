@@ -325,8 +325,7 @@ func CallRozeAPIAddRP(ip string, dataSource, baseDataSource mysql.DataSource, ro
 		"interval":              dataSource.Interval / common.INTERVAL_1MINUTE,
 		"retention-time":        dataSource.RetentionTime,
 	}
-	log.Debug(url)
-	log.Debug(body)
+	log.Infof("call add data_source, url: %s, bodby: %v", url, body)
 	_, err := common.CURLPerform("POST", url, body)
 	return err
 }
@@ -342,8 +341,7 @@ func CallRozeAPIModRP(ip string, dataSource mysql.DataSource, rozePort int) erro
 		"db":             db,
 		"retention-time": dataSource.RetentionTime,
 	}
-	log.Debug(url)
-	log.Debug(body)
+	log.Infof("call mod data_source, url: %s, bodby: %v", url, body)
 	_, err := common.CURLPerform("PATCH", url, body)
 	return err
 }
@@ -354,8 +352,7 @@ func CallRozeAPIDelRP(ip string, dataSource mysql.DataSource, rozePort int) erro
 		"name": dataSource.Name,
 		"db":   "vtap_" + dataSource.TsdbType,
 	}
-	log.Debug(url)
-	log.Debug(body)
+	log.Infof("call del data_source, url: %s, bodby: %v", url, body)
 	_, err := common.CURLPerform("DELETE", url, body)
 	return err
 }

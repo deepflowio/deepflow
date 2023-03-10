@@ -223,13 +223,13 @@ ingester:
   #    tables:
   #    - l4_flow_log
   #    - l7_flow_log
-  #    # uint: day, move data to cold disk after 'ttl-to-move' day
-  #    ttl-to-move: 1
+  #    # uint: hour, move data to cold disk after 'ttl-hour-to-move'
+  #    ttl-hour-to-move: 24
   #  - db: flow_metrics
   #    tables:
   #    - vtap_flow_port.1m
   #    - vtap_flow_edge_port.1m
-  #    ttl-to-move: 7
+  #    ttl-hour-to-move: 168
 
   #ckdb-auth:
   #  username: default
@@ -289,21 +289,21 @@ ingester:
   #  batch-size: 51200   # 多少行数据同时写入
   #  flush-timeout: 10   # 超时写入时间
 
-  ## ext metrics数据的保留的时长(单位: 天)
-  #ext-metrics-ttl: 7
+  ## ext metrics数据的保留的时长(单位: 小时)
+  #ext-metrics-ttl-hour: 168
 
-  ## flow_metrics database data retention time(unit: day)
-  #flow-metrics-ttl:
-  #  vtap-flow-1m: 7     # vtap_flow[_edge]_port.1m
-  #  vtap-flow-1s: 1     # vtap_flow[_edge]_port.1s
-  #  vtap-app-1m: 7      # vtap_app[_edge]_port.1m
-  #  vtap-app-1s: 1      # vtap_app[_edge]_port.1s
+  ## flow_metrics database data retention time(unit: hour)
+  #flow-metrics-ttl-hour:
+  #  vtap-flow-1m: 168     # vtap_flow[_edge]_port.1m
+  #  vtap-flow-1s: 24     # vtap_flow[_edge]_port.1s
+  #  vtap-app-1m: 168      # vtap_app[_edge]_port.1m
+  #  vtap-app-1s: 24      # vtap_app[_edge]_port.1s
 
-  ## flow_metrics database data retention time(unit: day)
-  #flow-log-ttl:
-  #  l4-flow-log: 3
-  #  l7-flow-log: 3
-  #  l4-packet: 3
+  ## flow_metrics database data retention time(unit: hour)
+  #flow-log-ttl-hour:
+  #  l4-flow-log: 72
+  #  l7-flow-log: 72
+  #  l4-packet: 72
 
   ## event data write config
   #event-ck-writer:
@@ -312,8 +312,8 @@ ingester:
   #  batch-size: 25600   # 多少行数据同时写入
   #  flush-timeout: 5   # 超时写入时间
 
-  ## event database data retention time(unit: day)
-  #event-ttl: 30
+  ## event database data retention time(unit: hour)
+  #event-ttl-hour: 720
 
   ## pcap data write config
   #pcap-ck-writer:
@@ -322,12 +322,22 @@ ingester:
   #  batch-size: 2048   # 多少行数据同时写入
   #  flush-timeout: 5   # 超时写入时间
 
-  ## pcap database data retention time(unit: day)
-  #pcap-ttl: 3
+  ## pcap database data retention time(unit: hour)
+  #pcap-ttl-hour: 72
 
   ## pcap decoder queue count/size
   #pcap-queue-count: 2
   #pcap-queue-size: 10000
+
+  ## profile process data write config
+  #profile-ck-writer:
+  #  queue-count: 1      # parallelism of table writing
+  #  queue-size: 100000  # size of writing queue
+  #  batch-size: 51200   # size of batch writing
+  #  flush-timeout: 5    # timeout of table writing
+
+  ## profile process database data retention time(unit: hour)
+  #profile-ttl-hour: 72
 
   ## 默认读超时，修改数据保留时长时使用
   #ck-read-timeout: 300

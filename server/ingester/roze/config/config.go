@@ -34,8 +34,8 @@ const (
 	DefaultUnmarshallQueueSize  = 10240
 	DefaultReceiverWindowSize   = 1024
 	DefaultCKReadTimeout        = 300
-	DefaultFlowMetrics1MTTL     = 7
-	DefaultFlowMetrics1STTL     = 1
+	DefaultFlowMetrics1MTTL     = 168 // hour
+	DefaultFlowMetrics1STTL     = 24  // hour
 )
 
 type PCapConfig struct {
@@ -58,7 +58,7 @@ type Config struct {
 	UnmarshallQueueCount int                   `yaml:"unmarshall-queue-count"`
 	UnmarshallQueueSize  int                   `yaml:"unmarshall-queue-size"`
 	ReceiverWindowSize   uint64                `yaml:"receiver-window-size"`
-	FlowMetricsTTL       FlowMetricsTTL        `yaml:"flow-metrics-ttl"`
+	FlowMetricsTTL       FlowMetricsTTL        `yaml:"flow-metrics-ttl-hour"`
 }
 
 type RozeConfig struct {

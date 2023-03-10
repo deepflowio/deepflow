@@ -31,9 +31,9 @@ var log = logging.MustGetLogger("stream.config")
 const (
 	DefaultThrottle          = 50000
 	DefaultDecoderQueueCount = 2
-	DefaultDecoderQueueSize  = 10000
-	DefaultBrokerQueueSize   = 10000
-	DefaultFlowLogTTL        = 3
+	DefaultDecoderQueueSize  = 1 << 14
+	DefaultBrokerQueueSize   = 1 << 14
+	DefaultFlowLogTTL        = 72 // hour
 )
 
 type FlowLogTTL struct {
@@ -48,7 +48,7 @@ type Config struct {
 	Throttle          int                   `yaml:"throttle"`
 	L4Throttle        int                   `yaml:"l4-throttle"`
 	L7Throttle        int                   `yaml:"l7-throttle"`
-	FlowLogTTL        FlowLogTTL            `yaml:"flow-log-ttl"`
+	FlowLogTTL        FlowLogTTL            `yaml:"flow-log-ttl-hour"`
 	DecoderQueueCount int                   `yaml:"decoder-queue-count"`
 	DecoderQueueSize  int                   `yaml:"decoder-queue-size"`
 }

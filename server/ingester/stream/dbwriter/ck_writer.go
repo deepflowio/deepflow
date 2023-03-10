@@ -32,7 +32,6 @@ var log = logging.MustGetLogger("stream.dbwriter")
 
 const (
 	CACHE_SIZE       = 10240
-	DefaultDayForTTL = 3
 	DefaultPartition = ckdb.TimeFuncHour
 )
 
