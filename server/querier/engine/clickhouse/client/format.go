@@ -58,7 +58,7 @@ func TransType(value interface{}, columnName, columnDatabaseTypeName string) (in
 		return v.String(), VALUE_TYPE_STRING, nil
 	case *net.IP:
 		return v.String(), VALUE_TYPE_STRING, nil
-	case **float64: // FIXME: Why does this type exist?
+	case **float64: // Nullable(float64)
 		// NaN, Inf
 		if math.IsNaN(**v) || **v == math.Inf(1) || **v == math.Inf(-1) {
 			return nil, VALUE_TYPE_FLOAT64, nil

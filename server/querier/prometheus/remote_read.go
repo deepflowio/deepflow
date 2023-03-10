@@ -9,6 +9,7 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse"
 	"github.com/google/uuid"
+
 	//"github.com/k0kubun/pp"
 	logging "github.com/op/go-logging"
 	"github.com/prometheus/prometheus/prompb"
@@ -18,9 +19,9 @@ var log = logging.MustGetLogger("promethues")
 
 func PromReaderExecute(req *prompb.ReadRequest, ctx context.Context) (resp *prompb.ReadResponse, err error) {
 	// promrequest trans to sql
-	//pp.Println(req)
-	sql, db, datasource, err := PromReaderTransToSQL(req)
-	//fmt.Println(sql, db)
+	// pp.Println(req)
+	sql, db, datasource, err := PromReaderTransToSQL(req, ctx)
+	// fmt.Println(sql, db)
 	if err != nil {
 		return nil, err
 	}

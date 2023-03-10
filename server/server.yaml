@@ -207,6 +207,7 @@ querier:
 
   prometheus:
     series-limit: 10000
+    auto-tagging-prefix: df_
 
 ingester:
   #ckdb:
