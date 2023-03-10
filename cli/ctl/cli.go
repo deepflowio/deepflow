@@ -38,8 +38,9 @@ func Execute(version string) {
 	var outputVersion bool
 	root.PersistentFlags().BoolVarP(&outputVersion, "version", "v", false, "deepflow-ctl version")
 	root.PersistentFlags().StringP("ip", "i", common.GetDefaultRouteIP(), "deepflow-server service ip")
-	root.PersistentFlags().Uint32P("api-port", "", 30417, "deepflow-server service http port")
+	root.PersistentFlags().Uint32P("api-port", "", 30417, "deepflow-server service node port")
 	root.PersistentFlags().Uint32P("rpc-port", "", 30035, "deepflow-server service grpc port")
+	root.PersistentFlags().Uint32P("svc-port", "", 20417, "deepflow-server service http port")
 	root.ParseFlags(os.Args[1:])
 
 	// support output version
