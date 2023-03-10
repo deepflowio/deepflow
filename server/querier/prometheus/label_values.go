@@ -38,6 +38,7 @@ func getMetrics(args *common.PromMetaParams) (resp []string) {
 	//	where = fmt.Sprintf("time<=%s", args.EndTime)
 	//}
 
+	// FIXME: support deepflow_system & ext_metrics
 	resp = []string{}
 	for db, tables := range chCommon.DB_TABLE_MAP {
 		if db == DB_NAME_EXT_METRICS {
