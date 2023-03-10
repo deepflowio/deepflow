@@ -74,7 +74,7 @@ func (r *VRouter) ProduceByAdd(items []*mysql.VRouter) {
 
 		r.createAndEnqueue(
 			item.Lcuuid,
-			eventapi.RESOURCE_EVENT_TYPE_CREATE,
+			eventapi.RESOURCE_EVENT_SUB_TYPE_CREATE,
 			item.Name,
 			r.deviceType,
 			item.ID,
@@ -101,6 +101,6 @@ func (r *VRouter) ProduceByDelete(lcuuids []string) {
 			}
 		}
 
-		r.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, r.deviceType, id)
+		r.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_SUB_TYPE_DELETE, name, r.deviceType, id)
 	}
 }

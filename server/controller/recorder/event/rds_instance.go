@@ -61,7 +61,7 @@ func (r *RDSInstance) ProduceByAdd(items []*mysql.RDSInstance) {
 
 		r.createAndEnqueue(
 			item.Lcuuid,
-			eventapi.RESOURCE_EVENT_TYPE_CREATE,
+			eventapi.RESOURCE_EVENT_SUB_TYPE_CREATE,
 			item.Name,
 			r.deviceType,
 			item.ID,
@@ -85,6 +85,6 @@ func (r *RDSInstance) ProduceByDelete(lcuuids []string) {
 			log.Error(nameByIDNotFound(r.resourceType, id))
 		}
 
-		r.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, r.deviceType, id)
+		r.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_SUB_TYPE_DELETE, name, r.deviceType, id)
 	}
 }
