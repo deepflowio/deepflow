@@ -174,13 +174,15 @@ type Server struct {
 	IP      string
 	Port    uint32
 	RpcPort uint32
+	SvcPort uint32
 }
 
 func GetServerInfo(cmd *cobra.Command) *Server {
 	ip, _ := cmd.Flags().GetString("ip")
 	port, _ := cmd.Flags().GetUint32("api-port")
 	rpcPort, _ := cmd.Flags().GetUint32("rpc-port")
-	return &Server{ip, port, rpcPort}
+	svcPort, _ := cmd.Flags().GetUint32("svc-port")
+	return &Server{ip, port, rpcPort, svcPort}
 }
 
 func PrettyPrint(data interface{}) {
@@ -229,4 +231,24 @@ func IsChineseChar(str string) bool {
 		}
 	}
 	return false
+}
+
+func ConvertControllerAddrToPodIP(controllerIP string, controllerPort uint32) (string, error) {
+	url := fmt.Sprintf("http://%s:%d/v1/controllers/", controllerIP, controllerPort)
+	resp, err := CURLResponseRawJson("GET", url)
+	if err != nil {
+		return "", err
+	}
+	var podIP string
+	for c := range resp.Get("DATA").MustArray() {
+		controller := resp.Get("DATA").GetIndex(c)
+		if controller.Get("IP").MustString() == controllerIP {
+			podIP = controller.Get("POD_IP").MustString()
+			break
+		}
+	}
+	if podIP == "" {
+		return "", errors.New(fmt.Sprintf("request (%s) get pod ip failed", url))
+	}
+	return podIP, nil
 }

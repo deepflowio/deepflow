@@ -93,8 +93,14 @@ func getInfo(cmd *cobra.Command, domainLcuuid, domainName, resource string) {
 		}
 		lcuuid = resp.Get("DATA").GetIndex(0).Get("LCUUID").MustString()
 	}
-	url := fmt.Sprintf("http://%s:%d/v1/info/%s/", server.IP, server.Port, lcuuid)
 
+	podIP, err := common.ConvertControllerAddrToPodIP(server.IP, server.Port)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	url := fmt.Sprintf("http://%s:%d/v1/info/%s/", podIP, server.SvcPort, lcuuid)
 	resp, err := common.CURLResponseRawJson("GET", url)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
