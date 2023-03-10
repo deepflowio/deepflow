@@ -14,9 +14,32 @@
  * limitations under the License.
  */
 
-package migration
+package main
 
-const (
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "6.2.1.17"
+import (
+	"flag"
+	"os"
+	"strings"
+
+	logging "github.com/op/go-logging"
+
+	"github.com/deepflowio/deepflow/server/libs/logger"
+	"github.com/deepflowio/deepflow/server/profile/profile"
 )
+
+var configPath = flag.String("f", "/etc/server.yaml", "Specify config file location")
+
+func execName() string {
+	splitted := strings.Split(os.Args[0], "/")
+	return splitted[len(splitted)-1]
+}
+
+var log = logging.MustGetLogger(execName())
+
+func main() {
+	if os.Getppid() != 1 {
+		logger.EnableStdoutLog()
+	}
+
+	profile.Start(*configPath, "")
+}

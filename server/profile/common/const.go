@@ -14,9 +14,17 @@
  * limitations under the License.
  */
 
-package migration
+package common
 
 const (
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "6.2.1.17"
+	SUCCESS            = "SUCCESS"
+	FAIL               = "FAIL"
+	INVALID_PARAMETERS = "INVALID_PARAMETERS"
+	INVALID_POST_DATA  = "INVALID_POST_DATA"
+	SERVER_ERROR       = "SERVER_ERROR"
+)
+
+const (
+	DATABASE_PROFILE = "profile"
+	TABLE_PROFILE    = "in_process"
 )
