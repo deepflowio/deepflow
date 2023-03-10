@@ -19,27 +19,27 @@ package eventapi
 import "github.com/deepflowio/deepflow/server/libs/pool"
 
 const (
-	RESOURCE_EVENT_TYPE_CREATE       = "create"
-	RESOURCE_EVENT_TYPE_DELETE       = "delete"
-	RESOURCE_EVENT_TYPE_UPDATE_STATE = "update-state"
-	RESOURCE_EVENT_TYPE_MIGRATE      = "migrate"
-	RESOURCE_EVENT_TYPE_RECREATE     = "recreate"
-	RESOURCE_EVENT_TYPE_ADD_IP       = "add-ip"
-	RESOURCE_EVENT_TYPE_REMOVE_IP    = "remove-ip"
+	RESOURCE_EVENT_SUB_TYPE_CREATE       = "create"
+	RESOURCE_EVENT_SUB_TYPE_DELETE       = "delete"
+	RESOURCE_EVENT_SUB_TYPE_UPDATE_STATE = "update-state"
+	RESOURCE_EVENT_SUB_TYPE_MIGRATE      = "migrate"
+	RESOURCE_EVENT_SUB_TYPE_RECREATE     = "recreate"
+	RESOURCE_EVENT_SUB_TYPE_ADD_IP       = "add-ip"
+	RESOURCE_EVENT_SUB_TYPE_REMOVE_IP    = "remove-ip"
 )
 
 type ResourceEvent struct {
-	Time         int64
-	TimeMilli    int64 // record millisecond time for debug
-	Type         string
-	InstanceType uint32 // the value is the same as l3_device_type
-	InstanceID   uint32
-	InstanceName string
-	SubnetIDs    []uint32
-	IPs          []string
-	Description  string
-	GProcessID   uint32 // if this value is set, InstanceType and InstanceID are empty
-	GProcessName string // if this value is set, InstanceName is empty
+	Time               int64
+	TimeMilli          int64 // record millisecond time for debug
+	SubType            string
+	InstanceType       uint32 // the value is the same as l3_device_type
+	InstanceID         uint32
+	InstanceName       string
+	AttributeSubnetIDs []uint32
+	AttributeIPs       []string
+	Description        string
+	GProcessID         uint32 // if this value is set, InstanceType and InstanceID are empty
+	GProcessName       string // if this value is set, InstanceName is empty
 
 	IfNeedTagged bool // if need ingester set tag
 	RegionID     uint32
@@ -54,19 +54,21 @@ type ResourceEvent struct {
 	PodServiceID uint32
 	PodGroupID   uint32
 	PodID        uint32
+	SubnetID     uint32
+	IP           string
 }
 
 type TagFieldOption func(opts *ResourceEvent)
 
-func TagSubnetIDs(netIDs []uint32) TagFieldOption {
+func TagAttributeSubnetIDs(netIDs []uint32) TagFieldOption {
 	return func(r *ResourceEvent) {
-		r.SubnetIDs = netIDs
+		r.AttributeSubnetIDs = netIDs
 	}
 }
 
-func TagIPs(ips []string) TagFieldOption {
+func TagAttributeIPs(ips []string) TagFieldOption {
 	return func(r *ResourceEvent) {
-		r.IPs = ips
+		r.AttributeIPs = ips
 	}
 }
 
@@ -145,6 +147,18 @@ func TagPodGroupID(id int) TagFieldOption {
 func TagPodID(id int) TagFieldOption {
 	return func(r *ResourceEvent) {
 		r.PodID = uint32(id)
+	}
+}
+
+func TagSubnetID(id int) TagFieldOption {
+	return func(r *ResourceEvent) {
+		r.SubnetID = uint32(id)
+	}
+}
+
+func TagIP(ip string) TagFieldOption {
+	return func(r *ResourceEvent) {
+		r.IP = ip
 	}
 }
 

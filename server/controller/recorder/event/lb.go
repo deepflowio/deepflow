@@ -62,7 +62,7 @@ func (l *LB) ProduceByAdd(items []*mysql.LB) {
 
 		l.createAndEnqueue(
 			item.Lcuuid,
-			eventapi.RESOURCE_EVENT_TYPE_CREATE,
+			eventapi.RESOURCE_EVENT_SUB_TYPE_CREATE,
 			item.Name,
 			l.deviceType,
 			item.ID,
@@ -89,6 +89,6 @@ func (l *LB) ProduceByDelete(lcuuids []string) {
 			log.Error(nameByIDNotFound(l.resourceType, id))
 		}
 
-		l.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, l.deviceType, id)
+		l.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_SUB_TYPE_DELETE, name, l.deviceType, id)
 	}
 }

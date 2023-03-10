@@ -75,7 +75,7 @@ func (v *VM) ProduceByAdd(items []*mysql.VM) {
 
 		v.createAndEnqueue(
 			item.Lcuuid,
-			eventapi.RESOURCE_EVENT_TYPE_CREATE,
+			eventapi.RESOURCE_EVENT_SUB_TYPE_CREATE,
 			item.Name,
 			v.deviceType,
 			item.ID,
@@ -92,11 +92,11 @@ func (v *VM) ProduceByUpdate(cloudItem *cloudmodel.VM, diffBase *cache.VM) {
 	var eType string
 	var description string
 	if diffBase.LaunchServer != cloudItem.LaunchServer {
-		eType = eventapi.RESOURCE_EVENT_TYPE_MIGRATE
+		eType = eventapi.RESOURCE_EVENT_SUB_TYPE_MIGRATE
 		description = fmt.Sprintf(DESCMigrateFormat, cloudItem.Name, diffBase.LaunchServer, cloudItem.LaunchServer)
 	}
 	if diffBase.State != cloudItem.State {
-		eType = eventapi.RESOURCE_EVENT_TYPE_UPDATE_STATE
+		eType = eventapi.RESOURCE_EVENT_SUB_TYPE_UPDATE_STATE
 		description = fmt.Sprintf(DESCStateChangeFormat, cloudItem.Name,
 			VMStateToString[diffBase.State], VMStateToString[cloudItem.State])
 	}
@@ -112,8 +112,8 @@ func (v *VM) ProduceByUpdate(cloudItem *cloudmodel.VM, diffBase *cache.VM) {
 		common.VIF_DEVICE_TYPE_VM,
 		id,
 		eventapi.TagDescription(description),
-		eventapi.TagSubnetIDs(nIDs),
-		eventapi.TagIPs(ips),
+		eventapi.TagAttributeSubnetIDs(nIDs),
+		eventapi.TagAttributeIPs(ips),
 	)
 }
 
@@ -124,7 +124,7 @@ func (v *VM) ProduceByDelete(lcuuids []string) {
 			log.Errorf("%v, %v", idByLcuuidNotFound(v.resourceType, lcuuid), err)
 		}
 
-		v.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, v.deviceType, id)
+		v.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_SUB_TYPE_DELETE, name, v.deviceType, id)
 	}
 }
 

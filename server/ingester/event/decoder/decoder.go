@@ -124,11 +124,11 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 	eventStore.InstanceID = event.InstanceID
 	eventStore.InstanceName = event.InstanceName
 
-	eventStore.EventType = event.Type
+	eventStore.EventType = event.SubType
 	eventStore.EventDescription = event.Description
 
-	eventStore.SubnetIDs = append(eventStore.SubnetIDs, event.SubnetIDs...)
-	eventStore.IPs = append(eventStore.IPs, event.IPs...)
+	eventStore.SubnetIDs = append(eventStore.SubnetIDs, event.AttributeSubnetIDs...)
+	eventStore.IPs = append(eventStore.IPs, event.AttributeIPs...)
 	eventStore.GProcessID = event.GProcessID
 
 	if event.IfNeedTagged {
