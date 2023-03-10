@@ -62,12 +62,12 @@ func (e EventManagerBase) fillEvent(
 ) {
 	event.Time = time.Now().Unix()
 	event.TimeMilli = time.Now().UnixMilli()
-	event.Type = eventType
+	event.SubType = eventType
 	event.InstanceType = uint32(instanceType)
 	event.InstanceID = uint32(instanceID)
 	event.InstanceName = instanceName
 	event.IfNeedTagged = true
-	if eventType == eventapi.RESOURCE_EVENT_TYPE_CREATE || eventType == eventapi.RESOURCE_EVENT_TYPE_ADD_IP {
+	if eventType == eventapi.RESOURCE_EVENT_SUB_TYPE_CREATE || eventType == eventapi.RESOURCE_EVENT_SUB_TYPE_ADD_IP {
 		event.IfNeedTagged = false
 	}
 	for _, option := range options {
@@ -127,12 +127,12 @@ func (e *EventManagerBase) convertToEventBeEnqueued(ev *eventapi.ResourceEvent) 
 	event := eventapi.AcquireResourceEvent()
 	event.Time = ev.Time
 	event.TimeMilli = ev.TimeMilli
-	event.Type = ev.Type
+	event.SubType = ev.SubType
 	event.InstanceType = ev.InstanceType
 	event.InstanceName = ev.InstanceName
 	event.InstanceID = ev.InstanceID
-	event.SubnetIDs = ev.SubnetIDs
-	event.IPs = ev.IPs
+	event.AttributeSubnetIDs = ev.AttributeSubnetIDs
+	event.AttributeIPs = ev.AttributeIPs
 	event.IfNeedTagged = ev.IfNeedTagged
 	event.RegionID = ev.RegionID
 	event.AZID = ev.AZID

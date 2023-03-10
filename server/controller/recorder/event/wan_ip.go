@@ -87,8 +87,8 @@ func (i *WANIP) ProduceByAdd(items []*mysql.WANIP) { // TODO 同 lan ip 合并 c
 		}
 		opts = append(opts, []eventapi.TagFieldOption{
 			eventapi.TagDescription(fmt.Sprintf(DESCAddIPFormat, deviceName, item.IP, networkName)),
-			eventapi.TagSubnetIDs([]uint32{uint32(networkID)}),
-			eventapi.TagIPs([]string{item.IP}),
+			eventapi.TagAttributeSubnetIDs([]uint32{uint32(networkID)}),
+			eventapi.TagAttributeIPs([]string{item.IP}),
 		}...)
 		opts = append(opts, deviceRelatedOpts...)
 
@@ -104,7 +104,7 @@ func (i *WANIP) ProduceByAdd(items []*mysql.WANIP) { // TODO 同 lan ip 合并 c
 					i.enqueueIfInsertIntoMySQLFailed(
 						item.Lcuuid,
 						podNodeInfo.DomainLcuuid,
-						eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
+						eventapi.RESOURCE_EVENT_SUB_TYPE_ADD_IP,
 						deviceName,
 						deviceType,
 						deviceID,
@@ -125,7 +125,7 @@ func (i *WANIP) ProduceByAdd(items []*mysql.WANIP) { // TODO 同 lan ip 合并 c
 					i.enqueueIfInsertIntoMySQLFailed(
 						item.Lcuuid,
 						podInfo.DomainLcuuid,
-						eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
+						eventapi.RESOURCE_EVENT_SUB_TYPE_ADD_IP,
 						deviceName,
 						deviceType,
 						deviceID,
@@ -138,7 +138,7 @@ func (i *WANIP) ProduceByAdd(items []*mysql.WANIP) { // TODO 同 lan ip 合并 c
 
 		i.createAndEnqueue(
 			item.Lcuuid,
-			eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
+			eventapi.RESOURCE_EVENT_SUB_TYPE_ADD_IP,
 			deviceName,
 			deviceType,
 			deviceID,
@@ -200,13 +200,13 @@ func (i *WANIP) ProduceByDelete(lcuuids []string) {
 
 		i.createAndEnqueue(
 			lcuuid,
-			eventapi.RESOURCE_EVENT_TYPE_REMOVE_IP,
+			eventapi.RESOURCE_EVENT_SUB_TYPE_REMOVE_IP,
 			deviceName,
 			deviceType,
 			deviceID,
 			eventapi.TagDescription(fmt.Sprintf(DESCRemoveIPFormat, deviceName, ip, networkName)),
-			eventapi.TagSubnetIDs([]uint32{uint32(networkID)}),
-			eventapi.TagIPs([]string{ip}),
+			eventapi.TagAttributeSubnetIDs([]uint32{uint32(networkID)}),
+			eventapi.TagAttributeIPs([]string{ip}),
 		)
 	}
 }

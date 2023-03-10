@@ -88,8 +88,8 @@ func (i *LANIP) ProduceByAdd(items []*mysql.LANIP) {
 		}
 		opts = append(opts, []eventapi.TagFieldOption{
 			eventapi.TagDescription(fmt.Sprintf(DESCAddIPFormat, deviceName, item.IP, networkName)),
-			eventapi.TagSubnetIDs([]uint32{uint32(networkID)}),
-			eventapi.TagIPs([]string{item.IP}),
+			eventapi.TagAttributeSubnetIDs([]uint32{uint32(networkID)}),
+			eventapi.TagAttributeIPs([]string{item.IP}),
 		}...)
 		opts = append(opts, deviceRelatedOpts...)
 
@@ -105,7 +105,7 @@ func (i *LANIP) ProduceByAdd(items []*mysql.LANIP) {
 					i.enqueueIfInsertIntoMySQLFailed(
 						item.Lcuuid,
 						podNodeInfo.DomainLcuuid,
-						eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
+						eventapi.RESOURCE_EVENT_SUB_TYPE_ADD_IP,
 						deviceName,
 						deviceType,
 						deviceID,
@@ -126,7 +126,7 @@ func (i *LANIP) ProduceByAdd(items []*mysql.LANIP) {
 					i.enqueueIfInsertIntoMySQLFailed(
 						item.Lcuuid,
 						podInfo.DomainLcuuid,
-						eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
+						eventapi.RESOURCE_EVENT_SUB_TYPE_ADD_IP,
 						deviceName,
 						deviceType,
 						deviceID,
@@ -139,7 +139,7 @@ func (i *LANIP) ProduceByAdd(items []*mysql.LANIP) {
 
 		i.createAndEnqueue(
 			item.Lcuuid,
-			eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
+			eventapi.RESOURCE_EVENT_SUB_TYPE_ADD_IP,
 			deviceName,
 			deviceType,
 			deviceID,
@@ -200,13 +200,13 @@ func (i *LANIP) ProduceByDelete(lcuuids []string) {
 
 		i.createAndEnqueue(
 			lcuuid,
-			eventapi.RESOURCE_EVENT_TYPE_REMOVE_IP,
+			eventapi.RESOURCE_EVENT_SUB_TYPE_REMOVE_IP,
 			deviceName,
 			deviceType,
 			deviceID,
 			eventapi.TagDescription(fmt.Sprintf(DESCRemoveIPFormat, deviceName, ip, networkName)),
-			eventapi.TagSubnetIDs([]uint32{uint32(networkID)}),
-			eventapi.TagIPs([]string{ip}),
+			eventapi.TagAttributeSubnetIDs([]uint32{uint32(networkID)}),
+			eventapi.TagAttributeIPs([]string{ip}),
 		)
 	}
 }
