@@ -45,7 +45,7 @@ func GetExtMetrics(db, table, where string, ctx context.Context) (map[string]*Me
 		var externalMetricSql string
 		var tableFilter string
 		var whereSql string
-		externalMetricSql = "SELECT field_name, table FROM %s_custom_field WHERE %s field_type='metrics' %s GROUP BY field_name, table ORDER BY table, field_name ASC"
+		externalMetricSql = "SELECT field_name, table FROM flow_tag.%s_custom_field WHERE %s field_type='metrics' %s GROUP BY field_name, table ORDER BY table, field_name ASC"
 		if table != "" {
 			tableFilter = fmt.Sprintf("table='%s' AND", table)
 		}

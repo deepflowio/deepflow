@@ -3,7 +3,7 @@ package statsd
 import (
 	"sync"
 
-	"github.com/deepflowio/deepflow/server/libs/stats"
+	"github.com/deepflowio/deepflow/server/libs/stats" // FIXME: why not use stats directly
 )
 
 func RegisterCountableForIngester(module string, countable stats.Countable, opts ...stats.Option) error {
