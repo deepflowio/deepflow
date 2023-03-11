@@ -58,7 +58,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	var sqlList []string
 	var err error
 	sql := args.Sql
-	query_uuid := args.QueryUUID
+	query_uuid := args.QueryUUID // FIXME: should be queryUUID
 	log.Debugf("query_uuid: %s | raw sql: %s", query_uuid, sql)
 	// Parse slimitSql
 	slimitResult, slimitDebug, err := e.ParseSlimitSql(sql, args)
