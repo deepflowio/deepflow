@@ -18,16 +18,16 @@ package client
 
 import (
 	"context"
+	"reflect"
 	//"database/sql"
 	"fmt"
-	_ "github.com/ClickHouse/clickhouse-go/v2"
-	"github.com/jmoiron/sqlx"
+
+	clickhouse "github.com/ClickHouse/clickhouse-go/v2"
 	//"github.com/k0kubun/pp"
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/statsd"
 	"github.com/google/uuid"
 	logging "github.com/op/go-logging"
-	"github.com/signalfx/splunk-otel-go/instrumentation/github.com/jmoiron/sqlx/splunksqlx"
 	"time"
 	"unsafe"
 )
@@ -41,12 +41,15 @@ type QueryParams struct {
 	ColumnSchemaMap map[string]*common.ColumnSchema
 }
 
+// All ClickHouse Client share one connection
+var connection clickhouse.Conn
+
 type Client struct {
 	Host       string
 	Port       int
 	UserName   string
 	Password   string
-	connection *sqlx.DB
+	connection clickhouse.Conn
 	DB         string
 	Context    context.Context
 	Debug      *Debug
@@ -62,18 +65,37 @@ func (c *Client) init(query_uuid string) error {
 			IP:        c.Host,
 		}
 	}
-	url := fmt.Sprintf("clickhouse://%s:%s@%s:%d/%s?&query_id=%s", c.UserName, c.Password, c.Host, c.Port, c.DB, query_uuid)
-	conn, err := splunksqlx.Open("clickhouse", url)
-	if err != nil {
-		log.Errorf("connect clickhouse failed: %s, url: %s, query_uuid: %s", err, url, query_uuid)
-		return err
+	if connection == nil { // FIXME: add a RWLock
+		conn, err := clickhouse.Open(&clickhouse.Options{
+			Addr: []string{fmt.Sprintf("%s:%d", c.Host, c.Port)},
+			Auth: clickhouse.Auth{
+				Database: "default",
+				Username: c.UserName,
+				Password: c.Password,
+			},
+			// Default MaxOpenConns = MaxIdleConns + 5
+			//     Ref: https://clickhouse.com/docs/en/integrations/go/clickhouse-go/clickhouse-api#connection-settings
+			// In ClickHouse SDK, when returning a connection, if the current number of idle connections is equal to
+			// `MaxIdleConns`, the connection to be returned will be closed directly. Therefore, when `MaxOpenConns`
+			// is greater than `MaxIdleConns`, it is very easy for the connection to be actively closed, and it is
+			// easy to cause a lot of short connections during high-concurrency queries, so set the two to the same
+			// value here.
+			//     Ref: https://github.com/ClickHouse/clickhouse-go/blob/main/clickhouse.go#L296
+			MaxOpenConns: 20, // FIXME: add in server.yaml
+			MaxIdleConns: 20,
+		})
+		if err != nil {
+			log.Errorf("connect clickhouse failed: %s, url: %s:%s@%s:%d", err, c.UserName, c.Password, c.Host, c.Port)
+			return err
+		}
+		connection = conn
 	}
-	c.connection = conn
+	c.connection = connection
 	return nil
 }
 
 func (c *Client) Close() error {
-	return c.connection.Close()
+	return nil
 }
 
 func (c *Client) DoQuery(params *QueryParams) (result *common.Result, err error) {
@@ -83,13 +105,13 @@ func (c *Client) DoQuery(params *QueryParams) (result *common.Result, err error)
 		return nil, err
 	}
 	defer c.Close()
+
 	start := time.Now()
-	var rows *sqlx.Rows
-	if c.Context != nil {
-		rows, err = c.connection.QueryxContext(c.Context, sqlstr)
-	} else {
-		rows, err = c.connection.Queryx(sqlstr)
+	ctx := c.Context
+	if c.Context == nil {
+		ctx = context.Background()
 	}
+	rows, err := c.connection.Query(ctx, sqlstr)
 
 	c.Debug.Sql = sqlstr
 	if err != nil {
@@ -98,19 +120,17 @@ func (c *Client) DoQuery(params *QueryParams) (result *common.Result, err error)
 		return nil, err
 	}
 	defer rows.Close()
-	columns, err := rows.ColumnTypes()
+	columns := rows.ColumnTypes()
 	resColumns := len(columns)
 	if err != nil {
 		c.Debug.Error = fmt.Sprintf("%s", err)
 		return nil, err
 	}
 	columnNames := make([]interface{}, 0, len(columns))
-	columnTypes := make([]string, 0, len(columns))
-	var columnSchemas common.ColumnSchemas
+	var columnSchemas common.ColumnSchemas // FIXME: Slice growth should be avoided.
 	// 获取列名和列类型
 	for _, column := range columns {
 		columnNames = append(columnNames, column.Name())
-		columnTypes = append(columnTypes, column.DatabaseTypeName())
 		if schema, ok := columnSchemaMap[column.Name()]; ok {
 			columnSchemas = append(columnSchemas, schema)
 		} else {
@@ -118,18 +138,19 @@ func (c *Client) DoQuery(params *QueryParams) (result *common.Result, err error)
 		}
 	}
 	var values []interface{}
+	columnValues := make([]interface{}, len(columns))
+	for i := range columns {
+		columnValues[i] = reflect.New(columns[i].ScanType()).Interface()
+	}
 	resSize := 0
 	for rows.Next() {
-		// row, err := rows.SliceScan()
-		var row []interface{}
-		row, err = sqlx.SliceScan(rows)
-		if err != nil {
+		if err := rows.Scan(columnValues...); err != nil {
 			c.Debug.Error = fmt.Sprintf("%s", err)
 			return nil, err
 		}
-		record := make([]interface{}, 0, len(row))
-		for i, rawValue := range row {
-			value, valueType, err := TransType(columnTypes[i], rawValue)
+		record := make([]interface{}, 0, len(columns))
+		for i, rawValue := range columnValues {
+			value, valueType, err := TransType(rawValue, columns[i].Name(), columns[i].DatabaseTypeName())
 			if err != nil {
 				c.Debug.Error = fmt.Sprintf("%s", err)
 				return nil, err
