@@ -134,7 +134,7 @@ func NewCKWriter(addrs []string, user, password, counterName string, table *ckdb
 				Username: user,
 				Password: password,
 			},
-			ConnMaxLifetime: time.Hour * 24 * 30,
+			ConnMaxLifetime: time.Hour * 24,
 		}); err != nil {
 			return nil, err
 		}
