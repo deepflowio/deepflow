@@ -49,6 +49,7 @@ type GenesisSyncRpcUpdater struct {
 	localIPRanges         []netaddr.IPPrefix
 	excludeIPRanges       []netaddr.IPPrefix
 	multiNSMode           bool
+	singleVPCMode         bool
 	genesisSyncDataByPeer map[uint32]GenesisSyncDataOperation
 }
 
@@ -106,6 +107,7 @@ func NewGenesisSyncRpcUpdater(storage *SyncStorage, queue queue.QueueReader, cfg
 		localIPRanges:         localIPRanges,
 		excludeIPRanges:       excludeIPRanges,
 		multiNSMode:           cfg.MultiNSMode,
+		singleVPCMode:         cfg.SingleVPCMode,
 		genesisSyncDataByPeer: map[uint32]GenesisSyncDataOperation{},
 	}
 }
@@ -286,7 +288,7 @@ func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(info VIFRPCMessage, pe
 		Lcuuid: common.GetUUID("default-public-cloud-vpc", uuid.Nil),
 		VtapID: vtapID,
 	}
-	if behindNat {
+	if behindNat && !v.singleVPCMode {
 		vpc = model.GenesisVpc{
 			Name:   "VPC-" + peer,
 			Lcuuid: common.GetUUID("VPC-"+peer, uuid.Nil),
