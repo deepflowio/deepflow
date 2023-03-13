@@ -145,6 +145,7 @@ enum process_data_extra_source {
 
 struct process_data_extra {
 	bool vecs : 1;
+	bool is_go_process : 1;
 	enum process_data_extra_source source;
 	enum traffic_protocol protocol;
 	__u64 coroutine_id;
