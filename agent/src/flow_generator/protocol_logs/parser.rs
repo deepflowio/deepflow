@@ -164,8 +164,17 @@ impl MetaAppProto {
             base_info.syscall_trace_id_thread_0 = meta_packet.thread_id;
             base_info.syscall_cap_seq_0 = meta_packet.cap_seq;
         } else {
+            swap(&mut base_info.mac_src, &mut base_info.mac_dst);
             swap(&mut base_info.ip_src, &mut base_info.ip_dst);
             swap(&mut base_info.port_src, &mut base_info.port_dst);
+            #[cfg(target_os = "linux")]
+            if meta_packet.signal_source == SignalSource::EBPF {
+                swap(&mut base_info.process_id_0, &mut base_info.process_id_1);
+                swap(
+                    &mut base_info.process_kname_0,
+                    &mut base_info.process_kname_1,
+                );
+            }
 
             base_info.l3_epc_id_src = flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].l3_epc_id;
             base_info.l3_epc_id_dst = flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].l3_epc_id;
