@@ -83,7 +83,8 @@ int uprobe_openssl_write_exit(struct pt_regs *ctx)
         active_write_args_map__update(&id, &write_args);
 	if (!process_data((struct pt_regs *)ctx, id, T_EGRESS, &write_args,
 			  size, &extra)) {
-		bpf_tail_call(ctx, &NAME(progs_jmp_kp_map), 0);
+		bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
+			      PROG_DATA_SUBMIT_KP_IDX);
 	}
 	active_write_args_map__delete(&id);
 	return 0;
@@ -138,7 +139,8 @@ int uprobe_openssl_read_exit(struct pt_regs *ctx)
         active_read_args_map__update(&id, &read_args);
 	if (!process_data((struct pt_regs *)ctx, id, T_INGRESS, &read_args,
 			  size, &extra)) {
-		bpf_tail_call(ctx, &NAME(progs_jmp_kp_map), 0);
+		bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
+			      PROG_DATA_SUBMIT_KP_IDX);
 	}
 	active_read_args_map__delete(&id);
 	return 0;
