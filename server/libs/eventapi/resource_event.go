@@ -37,6 +37,8 @@ type ResourceEvent struct {
 	InstanceName       string
 	AttributeSubnetIDs []uint32
 	AttributeIPs       []string
+	SubnetIDs          uint32
+	IPs                string
 	Description        string
 	GProcessID         uint32 // if this value is set, InstanceType and InstanceID are empty
 	GProcessName       string // if this value is set, InstanceName is empty
@@ -150,7 +152,7 @@ func TagPodID(id int) TagFieldOption {
 	}
 }
 
-func TagSubnetID(id int) TagFieldOption {
+func TagSubnetID(id uint32) TagFieldOption {
 	return func(r *ResourceEvent) {
 		r.SubnetID = uint32(id)
 	}

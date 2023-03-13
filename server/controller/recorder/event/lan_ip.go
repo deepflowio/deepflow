@@ -90,6 +90,8 @@ func (i *LANIP) ProduceByAdd(items []*mysql.LANIP) {
 			eventapi.TagDescription(fmt.Sprintf(DESCAddIPFormat, deviceName, item.IP, networkName)),
 			eventapi.TagAttributeSubnetIDs([]uint32{uint32(networkID)}),
 			eventapi.TagAttributeIPs([]string{item.IP}),
+			eventapi.TagSubnetID(uint32(networkID)),
+			eventapi.TagIP(item.IP),
 		}...)
 		opts = append(opts, deviceRelatedOpts...)
 
@@ -207,6 +209,8 @@ func (i *LANIP) ProduceByDelete(lcuuids []string) {
 			eventapi.TagDescription(fmt.Sprintf(DESCRemoveIPFormat, deviceName, ip, networkName)),
 			eventapi.TagAttributeSubnetIDs([]uint32{uint32(networkID)}),
 			eventapi.TagAttributeIPs([]string{ip}),
+			eventapi.TagSubnetID(uint32(networkID)),
+			eventapi.TagIP(ip),
 		)
 	}
 }

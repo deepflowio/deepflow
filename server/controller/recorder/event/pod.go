@@ -140,6 +140,17 @@ func (p *Pod) ProduceByUpdate(cloudItem *cloudmodel.Pod, diffBase *cache.Pod) {
 		} else {
 			domainLcuuid = info.DomainLcuuid
 		}
+		opts := []eventapi.TagFieldOption{
+			eventapi.TagDescription(fmt.Sprintf(DESCRecreateFormat, cloudItem.Name, oldPodNodeName, newPodNodeName)),
+			eventapi.TagAttributeSubnetIDs(nIDs),
+			eventapi.TagAttributeIPs(ips),
+		}
+		if len(nIDs) > 0 {
+			opts = append(opts, eventapi.TagSubnetID(nIDs[0]))
+		}
+		if len(ips) > 0 {
+			opts = append(opts, eventapi.TagIP(ips[0]))
+		}
 		p.enqueueIfInsertIntoMySQLFailed(
 			cloudItem.Lcuuid,
 			domainLcuuid,
@@ -147,9 +158,7 @@ func (p *Pod) ProduceByUpdate(cloudItem *cloudmodel.Pod, diffBase *cache.Pod) {
 			name,
 			p.deviceType,
 			id,
-			eventapi.TagDescription(fmt.Sprintf(DESCRecreateFormat, cloudItem.Name, oldPodNodeName, newPodNodeName)),
-			eventapi.TagAttributeSubnetIDs(nIDs),
-			eventapi.TagAttributeIPs(ips),
+			opts...,
 		)
 	}
 }

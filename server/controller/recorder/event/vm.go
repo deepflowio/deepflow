@@ -105,15 +105,24 @@ func (v *VM) ProduceByUpdate(cloudItem *cloudmodel.VM, diffBase *cache.VM) {
 	}
 
 	nIDs, ips := v.getIPNetworksByID(id)
+	opts := []eventapi.TagFieldOption{
+		eventapi.TagDescription(description),
+		eventapi.TagAttributeSubnetIDs(nIDs),
+		eventapi.TagAttributeIPs(ips),
+	}
+	if len(nIDs) > 0 {
+		opts = append(opts, eventapi.TagSubnetID(nIDs[0]))
+	}
+	if len(ips) > 0 {
+		opts = append(opts, eventapi.TagIP(ips[0]))
+	}
 	v.createAndEnqueue(
 		cloudItem.Lcuuid,
 		eType,
 		name,
 		common.VIF_DEVICE_TYPE_VM,
 		id,
-		eventapi.TagDescription(description),
-		eventapi.TagAttributeSubnetIDs(nIDs),
-		eventapi.TagAttributeIPs(ips),
+		opts...,
 	)
 }
 
