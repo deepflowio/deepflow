@@ -59,7 +59,7 @@ func (h *Host) ProduceByAdd(items []*mysql.Host) {
 
 		h.createAndEnqueue(
 			item.Lcuuid,
-			eventapi.RESOURCE_EVENT_TYPE_CREATE,
+			eventapi.RESOURCE_EVENT_SUB_TYPE_CREATE,
 			item.Name,
 			h.deviceType,
 			item.ID,
@@ -85,6 +85,6 @@ func (h *Host) ProduceByDelete(lcuuids []string) {
 			}
 		}
 
-		h.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, h.deviceType, id)
+		h.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_SUB_TYPE_DELETE, name, h.deviceType, id)
 	}
 }

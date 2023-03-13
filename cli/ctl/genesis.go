@@ -341,7 +341,13 @@ func agentInfo(cmd *cobra.Command, args []string) {
 	}
 
 	server := common.GetServerInfo(cmd)
-	url := fmt.Sprintf("http://%s:%d/v1/agent-stats/%s/", server.IP, server.Port, args[0])
+	podIP, err := common.ConvertControllerAddrToPodIP(server.IP, server.Port)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	url := fmt.Sprintf("http://%s:%d/v1/agent-stats/%s/", podIP, server.SvcPort, args[0])
 	response, err := common.CURLPerform("GET", url, nil, "")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

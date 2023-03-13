@@ -323,11 +323,7 @@ clickhouse指标量及算子特殊处理：
 
 - 以下Tag字段在使用时需要携带`反引号`
   - `AS`后的中文字符
-  - `label`类型的tag
-  - `tag`类型的tag
-  - `attribute`类型的tag
-  - `cloud tag`类型的tag
-  - `os app`类型的tag
+  - `map_item`类型的tag
   - `k8s.label`, `cloud.tag`, `os.app`
   - 所有指标量
 - 字符串类型的value需要携带`单引号`
