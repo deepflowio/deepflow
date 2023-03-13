@@ -31,8 +31,9 @@ hosts:
   domain_uuid: xxxx        # required
   vinterfaces:             # optional. network interfaces
   - mac: xx:xx:xx:xx:xx:xx # required
-    subnet_uuid: xxxx      # optional
-    ips: ["x.x.x.x"]       # optional
+    name: xxxx             # optional. Set when host type is 6 (Gateway).
+    subnet_uuid: xxxx      # optional. Do not set when host type is 6 (Gateway), otherwise set this field.
+    ips: ["x.x.x.x"]       # optional. Do not set when host type is 6 (Gateway), otherwise set this field.
 
 # chost, cloud/legacy host, including vm (virtual mechine) and bm (bare metal)
 chosts:

@@ -394,7 +394,8 @@ type AdditionalResourceChost struct {
 }
 
 type AdditionalResourceVInterface struct {
-	SubnetUUID string   `json:"subnet_uuid" yaml:"subnet_uuid" binding:"required"`
+	SubnetUUID string   `json:"subnet_uuid" yaml:"subnet_uuid"`
+	Name       string   `json:"name" yaml:"name"`
 	Mac        string   `json:"mac" yaml:"mac" binding:"required"`
 	IPs        []string `json:"ips" yaml:"ips"`
 }
