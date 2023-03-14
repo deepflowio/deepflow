@@ -19,6 +19,7 @@ pub use npb::NpbBuilder;
 
 use std::net::IpAddr;
 use std::sync::Arc;
+use std::thread::JoinHandle;
 use std::time::Duration;
 
 use log::debug;
@@ -169,6 +170,13 @@ impl PacketHandlerBuilder {
         match self {
             PacketHandlerBuilder::Pcap(s) => PacketHandler::Pcap(s.clone()),
             PacketHandlerBuilder::Npb(b) => PacketHandler::Npb(b.build_with(id, if_index, mac)),
+        }
+    }
+
+    pub fn notify_stop(&mut self) -> Option<JoinHandle<()>> {
+        match self {
+            PacketHandlerBuilder::Pcap(_) => None,
+            PacketHandlerBuilder::Npb(b) => b.notify_stop(),
         }
     }
 

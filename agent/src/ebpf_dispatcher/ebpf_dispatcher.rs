@@ -541,6 +541,20 @@ impl EbpfCollector {
         info!("ebpf collector started");
     }
 
+    pub fn notify_stop(&mut self) -> Option<JoinHandle<()>> {
+        unsafe {
+            if !SWITCH {
+                info!("ebpf collector stopped.");
+                return None;
+            }
+            SWITCH = false;
+        }
+        Self::ebpf_stop();
+
+        info!("notified ebpf collector stopping thread.");
+        self.thread_handle.take()
+    }
+
     pub fn stop(&mut self) {
         unsafe {
             if !SWITCH {

@@ -312,6 +312,18 @@ impl NpbBuilder {
         );
     }
 
+    pub fn notify_stop(&self) -> Option<JoinHandle<()>> {
+        if self.npb_packet_sender.is_none()
+            || !self.npb_packet_sender.as_ref().unwrap().is_running()
+        {
+            return None;
+        }
+        self.npb_packet_sender.as_ref().unwrap().stop();
+
+        info!("Notified stop npb packet sender {}.", self.id);
+        self.thread_handle.lock().unwrap().take()
+    }
+
     pub fn stop(&self) {
         if self.npb_packet_sender.is_none()
             || !self.npb_packet_sender.as_ref().unwrap().is_running()
