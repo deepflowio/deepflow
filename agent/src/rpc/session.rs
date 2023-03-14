@@ -31,11 +31,7 @@ use public::counter::{Countable, Counter, CounterType, CounterValue, RefCountabl
 use public::proto::trident::{self, Exception};
 
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
-// Sessions in use occasionally timeout for 60 seconds, The
-// timeout should be adjusted to be greater than 60 seconds.
-// ==========================================================
-// 使用中会话偶尔会超时60秒，这里调整超时时间需要大于60秒
-pub const SESSION_TIMEOUT: Duration = Duration::from_secs(120);
+pub const SESSION_TIMEOUT: Duration = Duration::from_secs(30);
 
 const GRPC_CALL_ENDPOINTS: [&str; 8] = [
     "push",

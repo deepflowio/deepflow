@@ -932,6 +932,17 @@ impl Collector {
         info!("{} id=({}) started", self.context.name, self.context.id);
     }
 
+    pub fn notify_stop(&self) -> Option<JoinHandle<()>> {
+        if !self.running.swap(false, Ordering::Relaxed) {
+            return None;
+        }
+        info!(
+            "{} id=({}) notified stop",
+            self.context.name, self.context.id
+        );
+        self.thread.lock().unwrap().take()
+    }
+
     pub fn stop(&self) {
         if !self.running.swap(false, Ordering::Relaxed) {
             return;
