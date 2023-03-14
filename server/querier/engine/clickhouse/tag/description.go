@@ -521,7 +521,8 @@ func GetTagValues(db, table, sql string) (*common.Result, []string, error) {
 	if strings.Contains(strings.ToLower(sql), "like") || strings.Contains(strings.ToLower(sql), "regexp") {
 		orderBy = "length(display_name)"
 	}
-	sql = fmt.Sprintf("SELECT value,name AS display_name, description FROM flow_tag.%s WHERE tag_name='%s' %s GROUP BY value, display_name, description ORDER BY %s ASC %s", table, tag, whereSql, orderBy, limitSql)
+	// querier will be called later, so there is no need to display the declaration db
+	sql = fmt.Sprintf("SELECT value,name AS display_name, description FROM %s WHERE tag_name='%s' %s GROUP BY value, display_name, description ORDER BY %s ASC %s", table, tag, whereSql, orderBy, limitSql)
 	log.Debug(sql)
 	sqlList = append(sqlList, sql)
 	return nil, sqlList, nil
@@ -709,6 +710,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 		}
 		return rst, sqlList, nil
 	} else {
+		// querier will be called later, so there is no need to display the declaration db
 		deviceType, ok := TAG_RESOURCE_TYPE_DEVICE_MAP[tag]
 		if ok {
 			if whereSql != "" {
@@ -716,9 +718,9 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 			} else {
 				whereSql = fmt.Sprintf("WHERE devicetype=%d", deviceType)
 			}
-			sql = fmt.Sprintf("SELECT deviceid AS value,name AS display_name,uid FROM flow_tag.device_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+			sql = fmt.Sprintf("SELECT deviceid AS value,name AS display_name,uid FROM device_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		} else if common.IsValueInSliceString(tag, TAG_RESOURCE_TYPE_DEFAULT) {
-			sql = fmt.Sprintf("SELECT id as value,name AS display_name FROM flow_tag.%s %s GROUP BY value, display_name ORDER BY %s ASC %s", tag+"_map", whereSql, orderBy, limitSql)
+			sql = fmt.Sprintf("SELECT id as value,name AS display_name FROM %s %s GROUP BY value, display_name ORDER BY %s ASC %s", tag+"_map", whereSql, orderBy, limitSql)
 		} else if common.IsValueInSliceString(tag, TAG_RESOURCE_TYPE_AUTO) {
 			var autoDeviceTypes []string
 			for _, deviceType := range AutoMap {
@@ -740,21 +742,21 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 				whereSql = fmt.Sprintf("WHERE devicetype in (%s)", strings.Join(autoDeviceTypes, ","))
 			}
 			sql = fmt.Sprintf(
-				"SELECT deviceid AS value,name AS display_name,devicetype AS device_type,uid FROM flow_tag.device_map %s GROUP BY value, display_name, device_type, uid ORDER BY %s ASC %s",
+				"SELECT deviceid AS value,name AS display_name,devicetype AS device_type,uid FROM device_map %s GROUP BY value, display_name, device_type, uid ORDER BY %s ASC %s",
 				whereSql, orderBy, limitSql,
 			)
 		} else if tag == "vpc" || tag == "l2_vpc" {
-			sql = fmt.Sprintf("SELECT id as value,name AS display_name,uid FROM flow_tag.l3_epc_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+			sql = fmt.Sprintf("SELECT id as value,name AS display_name,uid FROM l3_epc_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		} else if tag == "ip" {
-			sql = fmt.Sprintf("SELECT ip as value,ip AS display_name FROM flow_tag.ip_relation_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+			sql = fmt.Sprintf("SELECT ip as value,ip AS display_name FROM ip_relation_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		} else if tag == "tap" {
-			sql = fmt.Sprintf("SELECT value, name AS display_name FROM flow_tag.tap_type_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+			sql = fmt.Sprintf("SELECT value, name AS display_name FROM tap_type_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		} else if tag == "vtap" {
-			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM flow_tag.vtap_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM vtap_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		} else if tag == "lb_listener" {
-			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM flow_tag.lb_listener_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM lb_listener_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		} else if tag == "pod_ingress" {
-			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM flow_tag.pod_ingress_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM pod_ingress_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		} else if strings.HasPrefix(tag, "k8s.label.") {
 			labelTag := strings.TrimPrefix(tag, "k8s.label.")
 			if whereSql != "" {
@@ -762,7 +764,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 			} else {
 				whereSql = fmt.Sprintf("WHERE `key`='%s'", labelTag)
 			}
-			sql = fmt.Sprintf("SELECT value, value AS display_name FROM flow_tag.k8s_label_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+			sql = fmt.Sprintf("SELECT value, value AS display_name FROM k8s_label_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		} else if strings.HasPrefix(tag, "cloud.tag.") {
 			cloudTag := strings.TrimPrefix(tag, "cloud.tag.")
 			if whereSql != "" {
@@ -791,7 +793,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 			} else {
 				whereSql = fmt.Sprintf("WHERE `key`='%s'", osAPPTag)
 			}
-			sql = fmt.Sprintf("SELECT value, value AS display_name FROM flow_tag.os_app_tag_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+			sql = fmt.Sprintf("SELECT value, value AS display_name FROM os_app_tag_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		}
 		if sql == "" {
 			return GetExternalTagValues(db, table, rawSql)
@@ -847,9 +849,9 @@ func GetExternalTagValues(db, table, rawSql string) (*common.Result, []string, e
 
 	var sql string
 	if whereSql != "" {
-		sql = fmt.Sprintf("SELECT field_value AS value, value AS display_name FROM flow_tag.%s_custom_field_value WHERE `table`='%s' AND field_type='tag' AND field_name='%s' %s GROUP BY value, display_name ORDER BY %s %s", db, table, tag, whereSql, orderBy, limitSql)
+		sql = fmt.Sprintf("SELECT field_value AS value, value AS display_name FROM %s_custom_field_value WHERE `table`='%s' AND field_type='tag' AND field_name='%s' %s GROUP BY value, display_name ORDER BY %s %s", db, table, tag, whereSql, orderBy, limitSql)
 	} else {
-		sql = fmt.Sprintf("SELECT field_value AS value, value AS display_name FROM flow_tag.%s_custom_field_value WHERE `table`='%s' AND field_type='tag' AND field_name='%s' GROUP BY value, display_name ORDER BY %s %s", db, table, tag, orderBy, limitSql)
+		sql = fmt.Sprintf("SELECT field_value AS value, value AS display_name FROM %s_custom_field_value WHERE `table`='%s' AND field_type='tag' AND field_name='%s' GROUP BY value, display_name ORDER BY %s %s", db, table, tag, orderBy, limitSql)
 	}
 	log.Debug(sql)
 	sqlList = append(sqlList, sql)

@@ -193,6 +193,7 @@ querier:
     host: clickhouse
     port: 9000
     timeout: 60
+    max-connection: 20
     # user-password:
   
   # deepflow-app相关配置

@@ -584,14 +584,6 @@ github.com/shirou/gopsutil/v3 v3.22.5/go.mod h1:so9G9VzeHt/hsd0YwqprnjHnfARAUkta
 github.com/shirou/w32 v0.0.0-20160930032740-bb4de0191aa4/go.mod h1:qsXQc7+bwAM3Q1u/4XEfrquwF8Lw7D7y5cD8CuHnfIc=
 github.com/shopspring/decimal v1.3.1 h1:2Usl1nmF/WZucqkFZhnfFYxxxu8LG21F6nPQBE5gKV8=
 github.com/shopspring/decimal v1.3.1/go.mod h1:DKyhrW/HYNuLGql+MJL6WCR6knT2jwCFRcu2hWCYk4o=
-github.com/signalfx/splunk-otel-go v1.3.1 h1:hvFPCaaO95J+SxPQjANqDzaJXbxrTiQc4BUUzlV5mFo=
-github.com/signalfx/splunk-otel-go v1.3.1/go.mod h1:7J9XWI7AZwqfThpI2skUA2MLDxgI0ciEKR3tZH+ee1A=
-github.com/signalfx/splunk-otel-go/instrumentation/database/sql/splunksql v1.3.1 h1:D9VJYELWlO67q9naFJC1pDL+lTo9fm4VbGrMGrTpaQ8=
-github.com/signalfx/splunk-otel-go/instrumentation/database/sql/splunksql v1.3.1/go.mod h1:BUnIzfQfIihREYaIXwn/KjiQxyHYNFw9PUZ2I+79mbw=
-github.com/signalfx/splunk-otel-go/instrumentation/github.com/jmoiron/sqlx/splunksqlx v1.3.1 h1:/7UZp73z96TB2IIMXL5R2tH0QeUmx3quSvU+8lkx6xM=
-github.com/signalfx/splunk-otel-go/instrumentation/github.com/jmoiron/sqlx/splunksqlx v1.3.1/go.mod h1:zt60X9W5/pxckfp55x9WSDSvdDl09GAKa9ohV7Z9q8g=
-github.com/signalfx/splunk-otel-go/instrumentation/internal v1.3.1 h1:UGo5B32Rzc94+5O684tW4feAIANvbwwbl3dxjo7Dggo=
-github.com/signalfx/splunk-otel-go/instrumentation/internal v1.3.1/go.mod h1:LKZ+6v7mGoFFVP1RpmnvQOOrja/lAEme/QAIab5yWao=
 github.com/sirupsen/logrus v1.2.0/go.mod h1:LxeOpSwHxABJmUn/MG1IvRgCAasNZTLOkJPxbbu5VWo=
 github.com/sirupsen/logrus v1.4.2/go.mod h1:tLMulIdttU9McNUspp0xgXVQah82FyeX6MwdIuYE2rE=
 github.com/sirupsen/logrus v1.6.0/go.mod h1:7uNnSEd1DgxDLC74fIahvMZmmYsHGZGEOFrfsX/uA88=

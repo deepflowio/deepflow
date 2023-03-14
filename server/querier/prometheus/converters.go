@@ -108,7 +108,8 @@ func PromReaderTransToSQL(req *prompb.ReadRequest) (sql string, db string, datas
 	if db == "" || db == chCommon.DB_NAME_EXT_METRICS || db == chCommon.DB_NAME_DEEPFLOW_SYSTEM {
 		metrics = append(metrics, extMetricsTagsName)
 	} else {
-		showSql := fmt.Sprintf("SHOW tags FROM %s.%s WHERE time >= %d AND time <= %d", db, table, startTime, endTime)
+		// querier will be called later, so there is no need to display the declaration db
+		showSql := fmt.Sprintf("SHOW tags FROM %s WHERE time >= %d AND time <= %d", table, startTime, endTime)
 		data, _ := tagdescription.GetTagDescriptions(db, table, showSql, nil)
 		for _, value := range data.Values {
 			values := value.([]interface{})
@@ -128,9 +129,10 @@ func PromReaderTransToSQL(req *prompb.ReadRequest) (sql string, db string, datas
 	}
 
 	// order by DESC for get data completely, then scan data reversely for data combine(see func.RespTransToProm)
+	// querier will be called later, so there is no need to display the declaration db
 	if db != "" {
-		sql = fmt.Sprintf("SELECT %s FROM %s.%s WHERE %s ORDER BY time desc LIMIT %s",
-			strings.Join(metrics, ","), db, table, strings.Join(filters, " AND "), config.Cfg.Limit)
+		sql = fmt.Sprintf("SELECT %s FROM %s WHERE %s ORDER BY time desc LIMIT %s",
+			strings.Join(metrics, ","), table, strings.Join(filters, " AND "), config.Cfg.Limit)
 	} else {
 		sql = fmt.Sprintf("SELECT %s FROM prometheus.%s WHERE %s ORDER BY time desc LIMIT %s",
 			strings.Join(metrics, ","), metricsName, strings.Join(filters, " AND "), config.Cfg.Limit)
