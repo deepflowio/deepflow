@@ -58,7 +58,6 @@ require (
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/shirou/gopsutil/v3 v3.22.5
-	github.com/signalfx/splunk-otel-go/instrumentation/github.com/jmoiron/sqlx/splunksqlx v1.3.1
 	github.com/smartystreets/goconvey v1.7.2
 	github.com/spf13/cobra v1.4.0
 	github.com/stretchr/testify v1.8.1
@@ -109,9 +108,6 @@ require (
 	github.com/ionos-cloud/sdk-go/v6 v6.1.0 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/pyroscope-io/jfr-parser v0.5.2 // indirect
-	github.com/signalfx/splunk-otel-go v1.3.1 // indirect
-	github.com/signalfx/splunk-otel-go/instrumentation/database/sql/splunksql v1.3.1 // indirect
-	github.com/signalfx/splunk-otel-go/instrumentation/internal v1.3.1 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.13.0 // indirect

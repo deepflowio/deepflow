@@ -59,6 +59,7 @@ type Clickhouse struct {
 	Port           int    `default:"9000" yaml:"port"`
 	Timeout        int    `default:"60" yaml:"timeout"`
 	ConnectTimeout int    `default:"2" yaml:"connect-timeout"`
+	MaxConnection  int    `default:"20" yaml:"max-connection"`
 }
 
 type Prometheus struct {
