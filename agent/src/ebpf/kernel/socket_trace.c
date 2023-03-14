@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "config.h"
 #include "include/socket_trace.h"
 #include "include/task_struct_utils.h"
 
@@ -22,6 +23,10 @@
 
 #define NS_PER_US		1000ULL
 #define NS_PER_SEC		1000000000ULL
+
+#define SUBMIT_OK		(0)
+#define SUBMIT_INVALID		(-1)
+#define SUBMIT_ABORT		(-2)
 
 /***********************************************************
  * map definitions
@@ -48,8 +53,8 @@ MAP_PERF_EVENT(socket_data, int, __u32, MAX_CPU)
  * 'progs_jmp_kp_map' for kprobe/uprobe (`A -> B`, both A and B are [k/u]probe program)
  * 'progs_jmp_tp_map' for tracepoint (`A -> B`, both A and B are tracepoint program)
  */
-MAP_PROG_ARRAY(progs_jmp_kp_map, __u32, __u32, 1)
-MAP_PROG_ARRAY(progs_jmp_tp_map, __u32, __u32, 1)
+MAP_PROG_ARRAY(progs_jmp_kp_map, __u32, __u32, PROG_KP_NUM)
+MAP_PROG_ARRAY(progs_jmp_tp_map, __u32, __u32, PROG_TP_NUM)
 
 /*
  * 因为ebpf栈只有512字节无法存放http数据，这里使用map做为buffer。
@@ -57,13 +62,20 @@ MAP_PROG_ARRAY(progs_jmp_tp_map, __u32, __u32, 1)
 MAP_PERARRAY(data_buf, __u32, struct __socket_data_buffer, 1)
 
 /*
- * For protocol infer buffer
+ * For protocol infer buffer and tail calls context
  */
-struct infer_data_s {
-	__u32 len;
-	char data[64];
+struct ctx_info_s {
+	union {
+		struct infer_data_s {
+			__u32 len;
+			char data[64];
+		} infer_buf;
+
+		struct tail_calls_context tail_call;
+	};
 };
-MAP_PERARRAY(infer_buf, __u32, struct infer_data_s, 1)
+MAP_PERARRAY(ctx_info, __u32, struct ctx_info_s, 1)
+
 /*
  * 结构体成员偏移
  */
@@ -164,8 +176,8 @@ static __u32 __inline get_tcp_read_seq_from_fd(int fd)
 }
 
 /*
- * B ; buffer
- * O : buffer offset, e.g: infer_buf->len
+ * B : buffer
+ * O : buffer offset, e.g.: infer_buf->len
  * I : &args->iov[i]
  * L_T : total_size
  * L_C : bytes_copy
@@ -516,17 +528,21 @@ static __inline void connect_submit(struct pt_regs *ctx, struct conn_info_t *v, 
 }
 #endif
 
-static __inline void infer_l7_class(struct conn_info_t* conn_info,
-				    enum traffic_direction direction, const struct data_args_t *args,
-				    size_t count, __u8 sk_type,
-				    const struct process_data_extra *extra) {
+static __inline void 
+infer_l7_class(struct ctx_info_s *ctx,
+	       struct conn_info_t* conn_info,
+	       enum traffic_direction direction,
+	       const struct data_args_t *args,
+	       size_t count, __u8 sk_type,
+	       const struct process_data_extra *extra)
+{
 	if (conn_info == NULL) {
 		return;
 	}
 
 	// 推断应用协议
 	struct protocol_message_t inferred_protocol =
-		infer_protocol(args, count, conn_info, sk_type, extra);
+		infer_protocol(ctx, args, count, conn_info, sk_type, extra);
 	if (inferred_protocol.protocol == PROTO_UNKNOWN &&
 	    inferred_protocol.type == MSG_UNKNOWN) {
 		conn_info->protocol = PROTO_UNKNOWN;
@@ -815,29 +831,29 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 }
 
 static __inline int
-data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
-	    const struct data_args_t *args, const bool vecs, __u32 syscall_len,
-	    struct member_fields_offset *offset, __u64 time_stamp,
-	    const struct process_data_extra *extra)
+__data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
+	      const struct data_args_t *args, const bool vecs, __u32 syscall_len,
+	      struct member_fields_offset *offset, __u64 time_stamp,
+	      const struct process_data_extra *extra)
 {
 	if (conn_info == NULL) {
-		return -1;
+		return SUBMIT_INVALID;
 	}
 
 	// ignore non-http protocols that are go tls
 	if (extra->source == DATA_SOURCE_GO_TLS_UPROBE) {
 		if (conn_info->protocol != PROTO_HTTP1)
-			return -1;
+			return SUBMIT_INVALID;
 	}
 
 	if (extra->source == DATA_SOURCE_OPENSSL_UPROBE) {
 		if (conn_info->protocol != PROTO_HTTP1 &&
 		    conn_info->protocol != PROTO_HTTP2)
-			return -1;
+			return SUBMIT_INVALID;
 	}
 
 	if (conn_info->sk == NULL || conn_info->message_type == MSG_UNKNOWN) {
-		return -1;
+		return SUBMIT_INVALID;
 	}
 
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
@@ -848,7 +864,7 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 
 	if (conn_info->message_type == MSG_CLEAR) {
 		delete_socket_info(conn_key, conn_info->socket_info_ptr);
-		return -1;
+		return SUBMIT_INVALID;
 	}
 
 	__u32 tcp_seq = args->tcp_seq;
@@ -857,7 +873,7 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	struct socket_info_t sk_info = { 0 };
 	struct trace_conf_t *trace_conf = trace_conf_map__lookup(&k0);
 	if (trace_conf == NULL)
-		return -1;
+		return SUBMIT_INVALID;
 
 	/*
 	 * It is possible that these values were modified during ebpf running,
@@ -867,7 +883,7 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 
 	struct trace_stats *trace_stats = trace_stats_map__lookup(&k0);
 	if (trace_stats == NULL)
-		return -1;
+		return SUBMIT_INVALID;
 
 	struct trace_info_t *trace_info_ptr =
 				trace_map__lookup(&pid_tgid);
@@ -925,7 +941,7 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	 */
 	if (conn_info->message_type == MSG_PRESTORE ||
 	    conn_info->message_type == MSG_RECONFIRM)
-		return -1;
+		return SUBMIT_INVALID;
 
 	if (is_socket_info_valid(socket_info_ptr)) {
 		sk_info.uid = socket_info_ptr->uid;
@@ -959,16 +975,16 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 
 	struct __socket_data_buffer *v_buff = bpf_map_lookup_elem(&NAME(data_buf), &k0);
 	if (!v_buff)
-		return -1;
+		return SUBMIT_INVALID;
 
 	struct __socket_data *v = (struct __socket_data *)&v_buff->data[0];
 
 	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*v)))
-		return -1;
+		return SUBMIT_INVALID;
 
 	v = (struct __socket_data *)(v_buff->data + v_buff->len);
 	if (get_socket_info(v, conn_info->sk, conn_info) == false)
-		return -1;
+		return SUBMIT_INVALID;
 
 	v->tuple.l4_protocol = conn_info->tuple.l4_protocol;
 	v->tuple.dport = conn_info->tuple.dport;
@@ -1037,7 +1053,7 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	context->vecs = (bool) vecs;
 	context->dir = conn_info->direction;
 
-	return 0;
+	return SUBMIT_OK;
 }
 
 static __inline int process_data(struct pt_regs *ctx, __u64 id,
@@ -1084,6 +1100,10 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 
 	conn_info->direction = direction;
 
+	struct ctx_info_s *ctx_map = bpf_map_lookup_elem(&NAME(ctx_info), &k0);
+	if (!ctx_map)
+		return -1;
+
 	bool data_submit_dircet = false;
 	struct allow_port_bitmap *bp = allow_port_bitmap__lookup(&k0);
 	if (bp) {
@@ -1096,15 +1116,23 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 		conn_info->protocol = PROTO_ORTHER;
 		conn_info->message_type = MSG_REQUEST;
 	} else {
-		infer_l7_class(conn_info, direction, args, bytes_count, sock_state, extra);
+		infer_l7_class(ctx_map, conn_info, direction, args,
+			       bytes_count, sock_state, extra);
 	}
 
 	// When at least one of protocol or message_type is valid, 
 	// data_submit can be performed, otherwise MySQL data may be lost
 	if (conn_info->protocol != PROTO_UNKNOWN ||
 	    conn_info->message_type != MSG_UNKNOWN) {
-		return data_submit(ctx, conn_info, args, extra->vecs,
-				   (__u32)bytes_count, offset, args->enter_ts, extra);
+		/*
+		 * Fill in tail call context information.
+		 */
+		ctx_map->tail_call.conn_info = __conn_info;
+		ctx_map->tail_call.extra = *extra;
+		ctx_map->tail_call.bytes_count = bytes_count;
+		ctx_map->tail_call.offset = offset;
+
+		return 0;
 	}
 
 	return -1;
@@ -1119,7 +1147,8 @@ static __inline void process_syscall_data(struct pt_regs* ctx, __u64 id,
 	};
 
 	if (!process_data(ctx, id, direction, args, bytes_count, &extra))
-		bpf_tail_call(ctx, &NAME(progs_jmp_tp_map), 0);
+		bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
+			      PROG_DATA_SUBMIT_TP_IDX);
 }
 
 static __inline void process_syscall_data_vecs(struct pt_regs* ctx, __u64 id,
@@ -1132,7 +1161,8 @@ static __inline void process_syscall_data_vecs(struct pt_regs* ctx, __u64 id,
 	};
 
 	if (!process_data(ctx, id, direction, args, bytes_count, &extra))
-		bpf_tail_call(ctx, &NAME(progs_jmp_tp_map), 0);
+		bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
+			      PROG_DATA_SUBMIT_TP_IDX);
 }
 
 /***********************************************************
@@ -1606,7 +1636,7 @@ TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx *ctx) {
  * This eBPF program is specially used to transmit data to the agent. The purpose
  * of this is to solve the problem that the number of instructions exceeds the limit.
  */
-PROG(output_data) (void *ctx) {
+static __inline int output_data_common(void *ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	enum traffic_direction dir;
 	bool vecs = false;
@@ -1710,6 +1740,89 @@ clear_args_map_1:
 clear_args_map_2:
 	active_read_args_map__delete(&id);
 	active_write_args_map__delete(&id);
+	return 0;
+}
+
+PROGTP(output_data) (void *ctx)
+{
+	return output_data_common(ctx);
+}
+
+PROGKP(output_data) (void *ctx)
+{
+	return output_data_common(ctx);
+}
+
+static __inline int data_submit(void *ctx)
+{
+	int ret = 0;
+	__u32 k0 = 0;
+	struct ctx_info_s *ctx_map =
+			bpf_map_lookup_elem(&NAME(ctx_info), &k0);
+	if (!ctx_map)
+		return SUBMIT_ABORT;
+
+	__u64 id = bpf_get_current_pid_tgid();
+	struct conn_info_t *conn_info;
+	struct conn_info_t __conn_info = ctx_map->tail_call.conn_info;
+	conn_info = &__conn_info;
+	__u64 conn_key = gen_conn_key_id(id >> 32, (__u64)conn_info->fd);
+	conn_info->socket_info_ptr = socket_info_map__lookup(&conn_key);
+
+	struct data_args_t *args;
+	if (conn_info->direction == T_INGRESS)
+		args = active_read_args_map__lookup(&id);
+	else
+		args = active_write_args_map__lookup(&id);
+
+	if (args == NULL)
+		return SUBMIT_ABORT;
+
+	const bool vecs = ctx_map->tail_call.extra.vecs;
+	__u32 bytes_count = ctx_map->tail_call.bytes_count;
+	struct member_fields_offset *offset = ctx_map->tail_call.offset;
+	__u64 enter_ts = args->enter_ts;
+	const struct process_data_extra extra = ctx_map->tail_call.extra;
+
+	ret = __data_submit(ctx, conn_info, args, vecs, bytes_count,
+			    offset, enter_ts, &extra);
+
+	return ret;
+}
+
+PROGTP(data_submit) (void *ctx)
+{
+	int ret;
+	ret = data_submit(ctx);
+	if (ret == SUBMIT_OK) {
+		bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
+			      PROG_OUTPUT_DATA_TP_IDX);
+	} else if (ret == SUBMIT_ABORT) {
+		return 0;
+	} else {
+		__u64 id = bpf_get_current_pid_tgid();	
+		active_read_args_map__delete(&id);
+		active_write_args_map__delete(&id);
+	}
+
+	return 0;
+}
+
+PROGKP(data_submit) (void *ctx)
+{
+	int ret;
+	ret = data_submit(ctx);
+	if (ret == SUBMIT_OK) {
+		bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
+			      PROG_OUTPUT_DATA_KP_IDX);
+	} else if (ret == SUBMIT_ABORT) {
+		return 0;
+	} else {
+		__u64 id = bpf_get_current_pid_tgid();	
+		active_read_args_map__delete(&id);
+		active_write_args_map__delete(&id);
+	}
+
 	return 0;
 }
 

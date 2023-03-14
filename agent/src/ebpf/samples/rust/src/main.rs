@@ -276,10 +276,10 @@ fn main() {
             CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
         );
 
-        let allow_port = 443;
-        let mut allow_port_bitmap:[u8;65536/8] = [0;65536/8];
-        allow_port_bitmap[allow_port/8] |= 1<<(allow_port%8);
-        set_allow_port_bitmap(allow_port_bitmap.as_ptr());
+        //let allow_port = 443;
+        //let mut allow_port_bitmap:[u8;65536/8] = [0;65536/8];
+        //allow_port_bitmap[allow_port/8] |= 1<<(allow_port%8);
+        //set_allow_port_bitmap(allow_port_bitmap.as_ptr());
 
         // The first parameter passed by a null pointer can be
         // filled with std::ptr::null()

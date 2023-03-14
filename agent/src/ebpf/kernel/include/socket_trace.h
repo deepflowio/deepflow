@@ -149,6 +149,19 @@ struct process_data_extra {
 	enum message_type message_type;
 } __attribute__ ((packed));
 
+/*
+ * BPF Tail Calls context
+ */
+struct tail_calls_context {
+	int max_size_limit;             // The maximum size of the socket data that can be transferred.
+	enum traffic_direction dir;     // Data flow direction.
+	bool vecs;                      // Whether a memory vector is used ? (for specific syscall)
+	struct conn_info_t conn_info;
+	struct process_data_extra extra;
+	__u32 bytes_count;
+	struct member_fields_offset *offset;
+};
+
 enum syscall_src_func {
 	SYSCALL_FUNC_UNKNOWN,
 	SYSCALL_FUNC_WRITE,
@@ -164,15 +177,6 @@ enum syscall_src_func {
 	SYSCALL_FUNC_WRITEV,
 	SYSCALL_FUNC_READV,
 	SYSCALL_FUNC_SENDFILE
-};
-
-/*
- * BPF Tail Calls context
- */
-struct tail_calls_context {
-	int max_size_limit;             // The maximum size of the socket data that can be transferred.
-	enum traffic_direction dir;     // Data flow direction.
-	bool vecs;                      // Whether a memory vector is used ? (for specific syscall)
 };
 
 struct data_args_t {
