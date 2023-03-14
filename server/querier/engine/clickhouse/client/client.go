@@ -25,6 +25,7 @@ import (
 	clickhouse "github.com/ClickHouse/clickhouse-go/v2"
 	//"github.com/k0kubun/pp"
 	"github.com/deepflowio/deepflow/server/querier/common"
+	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/statsd"
 	"github.com/google/uuid"
 	logging "github.com/op/go-logging"
@@ -81,8 +82,8 @@ func (c *Client) init(query_uuid string) error {
 			// easy to cause a lot of short connections during high-concurrency queries, so set the two to the same
 			// value here.
 			//     Ref: https://github.com/ClickHouse/clickhouse-go/blob/main/clickhouse.go#L296
-			MaxOpenConns: 20, // FIXME: add in server.yaml
-			MaxIdleConns: 20,
+			MaxOpenConns: config.Cfg.Clickhouse.MaxConnection,
+			MaxIdleConns: config.Cfg.Clickhouse.MaxConnection,
 		})
 		if err != nil {
 			log.Errorf("connect clickhouse failed: %s, url: %s:%s@%s:%d", err, c.UserName, c.Password, c.Host, c.Port)
