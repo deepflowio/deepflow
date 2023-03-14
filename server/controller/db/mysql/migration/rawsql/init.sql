@@ -2141,7 +2141,7 @@ CREATE TABLE IF NOT EXISTS data_source (
     state                       INTEGER DEFAULT 1 COMMENT '0: Exception 1: Normal',
     base_data_source_id         INTEGER,
     `interval`                  INTEGER NOT NULL COMMENT 'uint: s',
-    retention_time              INTEGER NOT NULL COMMENT 'uint: day',
+    retention_time              INTEGER NOT NULL COMMENT 'uint: hour',
     summable_metrics_operator   CHAR(64),
     unsummable_metrics_operator CHAR(64),
     updated_at              DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -2150,17 +2150,23 @@ CREATE TABLE IF NOT EXISTS data_source (
 TRUNCATE TABLE data_source;
 
 set @lcuuid = (select uuid());
-INSERT INTO data_source (id, name, tsdb_type, `interval`, retention_time, lcuuid) VALUES (1, '1s', 'flow', 1, 1, @lcuuid);
+INSERT INTO data_source (id, name, tsdb_type, `interval`, retention_time, lcuuid) VALUES (1, '1s', 'flow', 1, 1*24, @lcuuid);
 set @lcuuid = (select uuid());
-INSERT INTO data_source (id, name, tsdb_type, base_data_source_id, `interval`, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid) VALUES (3, '1m', 'flow', 1, 60, 7, 'Sum', 'Avg', @lcuuid);
+INSERT INTO data_source (id, name, tsdb_type, base_data_source_id, `interval`, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid) VALUES (3, '1m', 'flow', 1, 60, 7*24, 'Sum', 'Avg', @lcuuid);
 set @lcuuid = (select uuid());
-INSERT INTO data_source (id, name, tsdb_type, `interval`, retention_time, lcuuid) VALUES (6, 'flow_log.l4', 'flow_log.l4', 0, 3, @lcuuid);
+INSERT INTO data_source (id, name, tsdb_type, `interval`, retention_time, lcuuid) VALUES (6, 'flow_log.l4_flow_log', 'flow_log.l4_flow_log', 0, 3*24, @lcuuid);
 set @lcuuid = (select uuid());
-INSERT INTO data_source (id, name, tsdb_type, `interval`, retention_time, lcuuid) VALUES (7, '1s', 'app', 1, 1, @lcuuid);
+INSERT INTO data_source (id, name, tsdb_type, `interval`, retention_time, lcuuid) VALUES (7, '1s', 'app', 1, 1*24, @lcuuid);
 set @lcuuid = (select uuid());
-INSERT INTO data_source (id, name, tsdb_type, base_data_source_id, `interval`, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid) VALUES (8, '1m', 'app', 7, 60, 7, 'Sum', 'Avg', @lcuuid);
+INSERT INTO data_source (id, name, tsdb_type, base_data_source_id, `interval`, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid) VALUES (8, '1m', 'app', 7, 60, 7*24, 'Sum', 'Avg', @lcuuid);
 set @lcuuid = (select uuid());
-INSERT INTO data_source (id, name, tsdb_type, `interval`, retention_time, lcuuid) VALUES (9, 'flow_log.l7', 'flow_log.l7', 0, 3, @lcuuid);
+INSERT INTO data_source (id, name, tsdb_type, `interval`, retention_time, lcuuid) VALUES (9, 'flow_log.l7_flow_log', 'flow_log.l7_flow_log', 0, 3*24, @lcuuid);
+set @lcuuid = (select uuid());
+INSERT INTO data_source (id, name, tsdb_type, `interval`, retention_time, lcuuid) VALUES (10, 'flow_log.l4_packet', 'flow_log.l4_packet', 0, 3*24, @lcuuid);
+set @lcuuid = (select uuid());
+INSERT INTO data_source (id, name, tsdb_type, `interval`, retention_time, lcuuid) VALUES (11, 'flow_log.l7_packet', 'flow_log.l7_packet', 0, 3*24, @lcuuid);
+set @lcuuid = (select uuid());
+INSERT INTO data_source (id, name, tsdb_type, `interval`, retention_time, lcuuid) VALUES (12, 'deepflow_system', 'deepflow_system', 0, 7*24, @lcuuid);
 
 CREATE TABLE IF NOT EXISTS license (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
