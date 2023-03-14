@@ -684,6 +684,7 @@ impl StateMachine {
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
     use std::convert::AsRef;
     use std::fmt;
     use std::net::Ipv4Addr;
@@ -736,7 +737,7 @@ mod tests {
     #[test]
     fn state_machine() {
         let (mut flow_map, _) = _new_flow_map_and_receiver(TridentType::TtProcess, None);
-        let mut flow_node = FlowNode {
+        let flow_node = Rc::new(RefCell::new(FlowNode {
             timestamp_key: get_timestamp(0).as_nanos() as u64,
 
             tagged_flow: TaggedFlow::default(),
@@ -781,8 +782,10 @@ mod tests {
             packet_in_tick: false,
             policy_in_tick: [false; 2],
             packet_sequence_block: Some(Box::new(PacketSequenceBlock::default())), // Enterprise Edition Feature: packet-sequence
-        };
+            pool_index: RefCell::new(0),
+        }));
 
+        let mut flow_node = flow_node.borrow_mut();
         let peers = &mut flow_node.tagged_flow.flow.flow_metrics_peers;
         peers[FLOW_METRICS_PEER_SRC].total_packet_count = 1;
         peers[FLOW_METRICS_PEER_DST].total_packet_count = 1;

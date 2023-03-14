@@ -25,6 +25,7 @@ pub mod l7_protocol;
 pub mod leaky_bucket;
 pub mod netns;
 pub mod packet;
+pub mod pool;
 pub mod proto;
 pub mod queue;
 pub mod sender;

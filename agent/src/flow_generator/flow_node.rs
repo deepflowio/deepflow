@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use std::{net::IpAddr, sync::Arc, time::Duration};
+use std::{cell::RefCell, net::IpAddr, sync::Arc, time::Duration};
 
 use super::{perf::FlowPerf, FlowState, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC};
 use crate::common::{
@@ -27,6 +27,7 @@ use crate::common::{
     tagged_flow::TaggedFlow,
     TapPort,
 };
+use public::pool::Poolable;
 use public::proto::common::TridentType;
 use public::utils::net::MacAddr;
 
@@ -133,6 +134,8 @@ pub struct FlowNode {
     pub policy_in_tick: [bool; 2],
     pub packet_in_tick: bool, // 当前统计周期（目前是自然秒）是否有包
     pub flow_state: FlowState,
+
+    pub pool_index: RefCell<usize>,
 
     // Enterprise Edition Feature: packet-sequence
     pub packet_sequence_block: Option<Box<PacketSequenceBlock>>,
@@ -354,5 +357,15 @@ impl FlowNode {
                     && lookup_key.l2_end_1 == peers[0].is_l2_end
             }
         }
+    }
+}
+
+impl Poolable for FlowNode {
+    fn set_pool_index(&self, index: usize) {
+        *self.pool_index.borrow_mut() = index;
+    }
+
+    fn get_pool_index(&self) -> usize {
+        *self.pool_index.borrow()
     }
 }

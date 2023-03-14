@@ -16,9 +16,10 @@
 
 use std::{
     boxed::Box,
-    cell::RefCell,
+    cell::{RefCell, RefMut},
     collections::{HashMap, HashSet},
     mem,
+    mem::drop,
     net::Ipv4Addr,
     rc::Rc,
     str::FromStr,
@@ -78,6 +79,7 @@ use public::{
     counter::{Counter, CounterType, CounterValue, RefCountable},
     debug::QueueDebugger,
     l7_protocol::L7ProtocolEnum,
+    pool::ObjectsPool,
     proto::common::TridentType,
     queue::{self, DebugSender, Receiver},
     utils::net::MacAddr,
@@ -87,7 +89,8 @@ use packet_sequence_block::PacketSequenceBlock;
 
 // not thread-safe
 pub struct FlowMap {
-    node_map: Option<HashMap<FlowMapKey, Vec<Box<FlowNode>>>>,
+    node_pool: ObjectsPool<FlowNode>,
+    node_map: Option<HashMap<FlowMapKey, Vec<Rc<RefCell<FlowNode>>>>>,
     time_set: Option<Vec<HashSet<FlowMapKey>>>,
     id: u32,
     state_machine_master: StateMachine,
@@ -162,6 +165,7 @@ impl FlowMap {
             - Duration::from_secs(1);
         let time_set_slot_size = config_guard.hash_slots as usize / time_window_size;
         Self {
+            node_pool: ObjectsPool::with_capacity(0, || FlowNode::default()),
             node_map: Some(HashMap::with_capacity(config_guard.hash_slots as usize)),
             time_set: Some(vec![
                 HashSet::with_capacity(time_set_slot_size);
@@ -223,7 +227,7 @@ impl FlowMap {
     //     B refers to nodes timed out
     // returned index will be the first timed out node in nodes
     fn sort_nodes_by_timeout(
-        nodes: &mut Vec<Box<FlowNode>>,
+        nodes: &mut Vec<Rc<RefCell<FlowNode>>>,
         timestamp: Duration,
         time_in_unit: u64,
     ) -> usize {
@@ -231,7 +235,7 @@ impl FlowMap {
         let mut right = nodes.len() as isize - 1;
 
         while left <= right {
-            let node = &nodes[left as usize];
+            let node = nodes[left as usize].as_ref().borrow();
 
             // find first timeout node from left
             let timeout = node.recent_time + node.timeout;
@@ -243,7 +247,7 @@ impl FlowMap {
 
             // find first not timeout node from right
             while left <= right {
-                let node = &nodes[right as usize];
+                let node = nodes[right as usize].as_ref().borrow();
                 let timeout = node.recent_time + node.timeout;
                 if node.timestamp_key > time_in_unit || timestamp < timeout {
                     break;
@@ -251,6 +255,7 @@ impl FlowMap {
                 right -= 1;
             }
 
+            drop(node);
             // swap nodes
             if left < right {
                 nodes.swap(left as usize, right as usize);
@@ -321,8 +326,10 @@ impl FlowMap {
                 let index = Self::sort_nodes_by_timeout(nodes, timestamp, time_in_unit);
                 // handle and remove timeout nodes
                 for node in nodes.drain(index..) {
-                    let timeout = node.recent_time + node.timeout;
-                    self.node_removed_aftercare(&config, *node, timeout, None);
+                    let node_ref = node.as_ref().borrow();
+                    let timeout = node_ref.recent_time + node_ref.timeout;
+                    drop(node_ref);
+                    self.node_removed_aftercare(&config, node, timeout, None);
                 }
                 if nodes.is_empty() {
                     node_map.remove(&flow_key);
@@ -331,11 +338,12 @@ impl FlowMap {
 
                 // handle rest nodes
                 for node in nodes.iter_mut() {
+                    let mut node = node.borrow_mut();
                     if node.timestamp_key > time_in_unit {
                         continue;
                     }
                     // 未超时Flow的统计信息发送到队列下游
-                    self.node_updated_aftercare(&config, node, timestamp, None);
+                    self.node_updated_aftercare(&config, &mut node, timestamp, None);
                     // Enterprise Edition Feature: packet-sequence
                     if self.packet_sequence_enabled {
                         if let Some(block) = node.packet_sequence_block.take() {
@@ -419,14 +427,19 @@ impl FlowMap {
                 let ignore_tor_mac = flow_config.ignore_tor_mac;
                 let trident_type = flow_config.trident_type;
                 let index = nodes.iter().position(|node| {
-                    node.match_node(meta_packet, ignore_l2_end, ignore_tor_mac, trident_type)
+                    node.as_ref().borrow().match_node(
+                        meta_packet,
+                        ignore_l2_end,
+                        ignore_tor_mac,
+                        trident_type,
+                    )
                 });
                 let Some(index) = index else {
                     // 没有找到严格匹配的 FlowNode，插入新 Node
                     let node = self.new_flow_node(&flow_config, &log_parser_config, meta_packet);
                     if node.is_some() {
-                        let node = Box::new(node.unwrap());
-                        time_set[node.timestamp_key as usize & (self.time_window_size - 1)].insert(pkt_key);
+                        let node = node.unwrap();
+                        time_set[node.as_ref().borrow().timestamp_key as usize & (self.time_window_size - 1)].insert(pkt_key);
                         nodes.push(node);
                         max_depth += 1;
                     }
@@ -446,25 +459,37 @@ impl FlowMap {
                     .total_scan
                     .fetch_add(1 + index as u64, Ordering::Relaxed);
 
-                let node = &mut nodes[index];
+                let mut node = nodes[index].borrow_mut();
                 // 1. 输出上一个统计周期的统计信息
-                self.node_updated_aftercare(&flow_config, node, pkt_timestamp, Some(meta_packet));
+                self.node_updated_aftercare(
+                    &flow_config,
+                    &mut node,
+                    pkt_timestamp,
+                    Some(meta_packet),
+                );
 
                 // 2. 更新Flow状态，判断是否已结束
                 // 设置timestamp_key为流的相同，time_set根据key来删除
                 meta_packet.flow_id = node.tagged_flow.flow.flow_id;
                 let flow_closed = match meta_packet.lookup_key.proto {
-                    IpProtocol::Tcp => {
-                        self.update_tcp_node(&flow_config, &log_parser_config, node, meta_packet)
-                    }
-                    IpProtocol::Udp => {
-                        self.update_udp_node(&flow_config, &log_parser_config, node, meta_packet)
-                    }
-                    _ => self.update_other_node(&flow_config, node, meta_packet),
+                    IpProtocol::Tcp => self.update_tcp_node(
+                        &flow_config,
+                        &log_parser_config,
+                        &mut node,
+                        meta_packet,
+                    ),
+                    IpProtocol::Udp => self.update_udp_node(
+                        &flow_config,
+                        &log_parser_config,
+                        &mut node,
+                        meta_packet,
+                    ),
+                    _ => self.update_other_node(&flow_config, &mut node, meta_packet),
                 };
 
+                drop(node);
                 if flow_closed {
-                    let node = *nodes.swap_remove(index);
+                    let node = nodes.swap_remove(index);
                     self.node_removed_aftercare(
                         &flow_config,
                         node,
@@ -476,6 +501,7 @@ impl FlowMap {
                         node_map.remove(&pkt_key);
                     }
                 } else {
+                    let mut node = nodes[index].borrow_mut();
                     if node.timestamp_key != pkt_timestamp.as_secs() {
                         // Because pkt_key is shared by multiple nodes, we have no low-cost way to
                         // delete it from time_set. In fact, we can invalidate the flow_key in the
@@ -495,8 +521,9 @@ impl FlowMap {
             None => {
                 let node = self.new_flow_node(&flow_config, &log_parser_config, meta_packet);
                 if node.is_some() {
-                    let node = Box::new(node.unwrap());
-                    time_set[node.timestamp_key as usize & (self.time_window_size - 1)]
+                    let node = node.unwrap();
+                    time_set[node.as_ref().borrow().timestamp_key as usize
+                        & (self.time_window_size - 1)]
                         .insert(pkt_key);
                     node_map.insert(pkt_key, vec![node]);
                 }
@@ -509,7 +536,12 @@ impl FlowMap {
         // rust 版本用了std的hashmap自动处理扩容，所以无需执行policy_gettelr
     }
 
-    fn append_to_block(&self, config: &FlowConfig, node: &mut FlowNode, meta_packet: &MetaPacket) {
+    fn append_to_block(
+        &self,
+        config: &FlowConfig,
+        node: &mut RefMut<FlowNode>,
+        meta_packet: &MetaPacket,
+    ) {
         const MINUTE: u64 = 60;
         if node.packet_sequence_block.is_some() {
             if !node.packet_sequence_block.as_ref().unwrap().is_available(
@@ -559,7 +591,7 @@ impl FlowMap {
         &mut self,
         flow_config: &FlowConfig,
         log_parser_config: &LogParserConfig,
-        node: &mut FlowNode,
+        node: &mut RefMut<FlowNode>,
         meta_packet: &mut MetaPacket,
     ) -> bool {
         let flow_closed = self.update_tcp_flow(flow_config, meta_packet, node);
@@ -603,7 +635,7 @@ impl FlowMap {
         &mut self,
         flow_config: &FlowConfig,
         log_parser_config: &LogParserConfig,
-        node: &mut FlowNode,
+        node: &mut RefMut<FlowNode>,
         meta_packet: &mut MetaPacket,
     ) -> bool {
         self.update_flow(node, meta_packet);
@@ -636,7 +668,7 @@ impl FlowMap {
     fn update_other_node(
         &mut self,
         config: &FlowConfig,
-        node: &mut FlowNode,
+        node: &mut RefMut<FlowNode>,
         meta_packet: &mut MetaPacket,
     ) -> bool {
         self.update_flow(node, meta_packet);
@@ -661,7 +693,7 @@ impl FlowMap {
         &mut self,
         config: &FlowConfig,
         meta_packet: &mut MetaPacket,
-        node: &mut FlowNode,
+        node: &mut RefMut<FlowNode>,
     ) -> bool {
         let direction = meta_packet.direction;
         let pkt_tcp_flags = meta_packet.tcp_data.flags;
@@ -698,7 +730,7 @@ impl FlowMap {
     //		1.payloadLen为0/1
     //		2.非FIN、SYN、RST
     //		3.TCP保活探测报文序列号(Seq)为前一个TCP报文序列号(Seq)减一
-    fn update_tcp_keepalive_seq(&mut self, node: &mut FlowNode, meta_packet: &MetaPacket) {
+    fn update_tcp_keepalive_seq(&mut self, node: &mut RefMut<FlowNode>, meta_packet: &MetaPacket) {
         // 保存TCP Seq用于TCP Keepalive报文判断
 
         let (next_tcp_seq0, next_tcp_seq1) = (node.next_tcp_seq0, node.next_tcp_seq1);
@@ -732,7 +764,11 @@ impl FlowMap {
         }
     }
 
-    fn update_syn_or_syn_ack_seq(&mut self, node: &mut FlowNode, meta_packet: &mut MetaPacket) {
+    fn update_syn_or_syn_ack_seq(
+        &mut self,
+        node: &mut RefMut<FlowNode>,
+        meta_packet: &mut MetaPacket,
+    ) {
         let tcp_flag = meta_packet.tcp_data.flags;
         let flow = &mut node.tagged_flow.flow;
         if tcp_flag == TcpFlags::SYN {
@@ -746,7 +782,7 @@ impl FlowMap {
     pub(super) fn update_flow_state_machine(
         &mut self,
         config: &FlowConfig,
-        node: &mut FlowNode,
+        node: &mut RefMut<FlowNode>,
         flags: TcpFlags,
         direction: PacketDirection,
     ) -> bool {
@@ -803,10 +839,14 @@ impl FlowMap {
         config.l4_performance_enabled
     }
 
-    fn init_flow(&mut self, config: &FlowConfig, meta_packet: &mut MetaPacket) -> FlowNode {
+    fn init_flow(
+        &mut self,
+        config: &FlowConfig,
+        meta_packet: &mut MetaPacket,
+    ) -> Rc<RefCell<FlowNode>> {
         meta_packet.direction = PacketDirection::ClientToServer;
 
-        let mut tagged_flow = TaggedFlow::default();
+        let node = self.node_pool.get();
         let lookup_key = &meta_packet.lookup_key;
         let is_active_service = if meta_packet.signal_source == SignalSource::EBPF {
             match lookup_key.proto {
@@ -816,78 +856,77 @@ impl FlowMap {
         } else {
             false
         };
-        let flow = Flow {
-            flow_key: FlowKey {
-                vtap_id: config.vtap_id,
-                mac_src: lookup_key.src_mac,
-                mac_dst: lookup_key.dst_mac,
-                ip_src: lookup_key.src_ip,
-                ip_dst: lookup_key.dst_ip,
-                port_src: lookup_key.src_port,
-                port_dst: lookup_key.dst_port,
-                proto: lookup_key.proto,
-                tap_type: lookup_key.tap_type,
-                tap_port: meta_packet.tap_port,
-            },
-            tunnel: if let Some(tunnel) = meta_packet.tunnel {
-                TunnelField {
-                    tx_ip0: tunnel.src,
-                    tx_ip1: tunnel.dst,
-                    tx_mac0: tunnel.mac_src,
-                    tx_mac1: tunnel.mac_dst,
-                    tx_id: tunnel.id,
-                    tier: tunnel.tier,
-                    tunnel_type: tunnel.tunnel_type,
-                    is_ipv6: tunnel.is_ipv6,
-                    ..Default::default()
-                }
-            } else {
-                TunnelField::default()
-            },
-            flow_id: if meta_packet.signal_source == SignalSource::EBPF {
-                meta_packet.socket_id
-            } else {
-                self.generate_flow_id(lookup_key.timestamp, self.id)
-            },
-            start_time: lookup_key.timestamp.into(),
-            flow_stat_time: Timestamp::from_nanos(
-                (lookup_key.timestamp.as_nanos() / TIME_UNIT.as_nanos() * TIME_UNIT.as_nanos())
-                    as u64,
-            ),
-            vlan: meta_packet.vlan,
-            eth_type: lookup_key.eth_type,
-            queue_hash: meta_packet.queue_hash,
-            is_new_flow: true,
-            // 统计量
-            flow_metrics_peers: [
-                FlowMetricsPeer {
-                    total_packet_count: 1,
-                    packet_count: 1,
-                    total_byte_count: meta_packet.packet_len as u64,
-                    byte_count: meta_packet.packet_len as u64,
-                    l3_byte_count: meta_packet.l3_payload_len() as u64,
-                    l4_byte_count: meta_packet.l4_payload_len() as u64,
-                    first: lookup_key.timestamp.into(),
-                    last: lookup_key.timestamp.into(),
-                    tcp_flags: meta_packet.tcp_data.flags,
-                    ..Default::default()
-                },
-                FlowMetricsPeer::default(),
-            ],
-            signal_source: meta_packet.signal_source,
-            is_active_service,
-            ..Default::default()
-        };
-        tagged_flow.flow = flow;
-
-        // FlowMap信息
         let mut policy_in_tick = [false; 2];
         policy_in_tick[meta_packet.direction as usize] = true;
+        let mut node_mut = node.borrow_mut();
 
-        let mut node = FlowNode {
+        *node_mut = FlowNode {
             timestamp_key: lookup_key.timestamp.as_secs(),
-
-            tagged_flow,
+            tagged_flow: TaggedFlow {
+                flow: Flow {
+                    flow_key: FlowKey {
+                        vtap_id: config.vtap_id,
+                        mac_src: lookup_key.src_mac,
+                        mac_dst: lookup_key.dst_mac,
+                        ip_src: lookup_key.src_ip,
+                        ip_dst: lookup_key.dst_ip,
+                        port_src: lookup_key.src_port,
+                        port_dst: lookup_key.dst_port,
+                        proto: lookup_key.proto,
+                        tap_type: lookup_key.tap_type,
+                        tap_port: meta_packet.tap_port,
+                    },
+                    tunnel: if let Some(tunnel) = meta_packet.tunnel {
+                        TunnelField {
+                            tx_ip0: tunnel.src,
+                            tx_ip1: tunnel.dst,
+                            tx_mac0: tunnel.mac_src,
+                            tx_mac1: tunnel.mac_dst,
+                            tx_id: tunnel.id,
+                            tier: tunnel.tier,
+                            tunnel_type: tunnel.tunnel_type,
+                            is_ipv6: tunnel.is_ipv6,
+                            ..Default::default()
+                        }
+                    } else {
+                        TunnelField::default()
+                    },
+                    flow_id: if meta_packet.signal_source == SignalSource::EBPF {
+                        meta_packet.socket_id
+                    } else {
+                        self.generate_flow_id(lookup_key.timestamp, self.id)
+                    },
+                    start_time: lookup_key.timestamp.into(),
+                    flow_stat_time: Timestamp::from_nanos(
+                        (lookup_key.timestamp.as_nanos() / TIME_UNIT.as_nanos()
+                            * TIME_UNIT.as_nanos()) as u64,
+                    ),
+                    vlan: meta_packet.vlan,
+                    eth_type: lookup_key.eth_type,
+                    queue_hash: meta_packet.queue_hash,
+                    is_new_flow: true,
+                    // 统计量
+                    flow_metrics_peers: [
+                        FlowMetricsPeer {
+                            total_packet_count: 1,
+                            packet_count: 1,
+                            total_byte_count: meta_packet.packet_len as u64,
+                            byte_count: meta_packet.packet_len as u64,
+                            l3_byte_count: meta_packet.l3_payload_len() as u64,
+                            l4_byte_count: meta_packet.l4_payload_len() as u64,
+                            first: lookup_key.timestamp.into(),
+                            last: lookup_key.timestamp.into(),
+                            tcp_flags: meta_packet.tcp_data.flags,
+                            ..Default::default()
+                        },
+                        FlowMetricsPeer::default(),
+                    ],
+                    signal_source: meta_packet.signal_source,
+                    is_active_service,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
             min_arrived_time: lookup_key.timestamp,
             recent_time: lookup_key.timestamp,
             timeout: Duration::ZERO,
@@ -901,7 +940,9 @@ impl FlowMap {
             endpoint_data_cache: Default::default(),
             packet_sequence_block: None, // Enterprise Edition Feature: packet-sequence
             residual_request: 0,
+            ..Default::default()
         };
+
         #[cfg(target_os = "linux")]
         let local_epc_id = if self.ebpf_config.is_some() {
             self.ebpf_config.as_ref().unwrap().load().epc_id as i32
@@ -913,7 +954,7 @@ impl FlowMap {
 
         // 标签
         (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
-        self.update_endpoint_and_policy_data(&mut node, meta_packet);
+        self.update_endpoint_and_policy_data(&mut node_mut, meta_packet);
 
         /*
             ebpf will pass the server port to FlowPerf use for adjuest packet direction.
@@ -938,7 +979,7 @@ impl FlowMap {
         };
 
         if config.collector_enabled {
-            node.meta_flow_perf = FlowPerf::new(
+            node_mut.meta_flow_perf = FlowPerf::new(
                 self.rrt_cache.clone(),
                 L4Protocol::from(meta_packet.lookup_key.proto),
                 l7_proto_enum,
@@ -948,22 +989,22 @@ impl FlowMap {
             )
             .map(|o| Box::new(o));
         }
+        drop(node_mut);
         node
     }
 
-    fn update_flow(&mut self, node: &mut FlowNode, meta_packet: &mut MetaPacket) {
+    fn update_flow(&mut self, node: &mut RefMut<FlowNode>, meta_packet: &mut MetaPacket) {
         let pkt_timestamp = meta_packet.lookup_key.timestamp;
-        let flow = &mut node.tagged_flow.flow;
         if pkt_timestamp > node.recent_time {
             node.recent_time = pkt_timestamp;
-            flow.duration = (node.recent_time - node.min_arrived_time).into();
+            node.tagged_flow.flow.duration = (node.recent_time - node.min_arrived_time).into();
             // Duration仅使用包的时间计算，不包括超时时间
         }
 
         if !node.packet_in_tick {
             // FlowStatTime取整至统计时间的开始，只需要赋值一次，且使用包的时间戳
             node.packet_in_tick = true;
-            flow.flow_stat_time = Timestamp::from_nanos(
+            node.tagged_flow.flow.flow_stat_time = Timestamp::from_nanos(
                 (pkt_timestamp.as_nanos() / STATISTICAL_INTERVAL.as_nanos()
                     * STATISTICAL_INTERVAL.as_nanos()) as u64,
             );
@@ -1065,14 +1106,15 @@ impl FlowMap {
         &mut self,
         flow_config: &FlowConfig,
         log_parser_config: &LogParserConfig,
-        node: &mut FlowNode,
+        node: &mut RefMut<FlowNode>,
         meta_packet: &mut MetaPacket,
         is_first_packet_direction: bool,
         is_first_packet: bool,
     ) {
         let mut info = None;
+        let flow_id = node.tagged_flow.flow.flow_id;
+        let signal_source = node.tagged_flow.flow.signal_source;
         if let Some(perf) = node.meta_flow_perf.as_mut() {
-            let flow_id = node.tagged_flow.flow.flow_id;
             #[cfg(target_os = "linux")]
             let local_epc_id = if self.ebpf_config.is_some() {
                 self.ebpf_config.as_ref().unwrap().load().epc_id as i32
@@ -1092,8 +1134,7 @@ impl FlowMap {
                 meta_packet,
                 is_first_packet_direction,
                 flow_id,
-                node.tagged_flow.flow.signal_source == SignalSource::Packet
-                    && Self::l4_metrics_enabled(flow_config),
+                signal_source == SignalSource::Packet && Self::l4_metrics_enabled(flow_config),
                 Self::l7_metrics_enabled(flow_config),
                 Self::l7_log_parse_enabled(flow_config, &meta_packet.lookup_key),
                 &mut self.app_table,
@@ -1129,36 +1170,37 @@ impl FlowMap {
         flow_config: &FlowConfig,
         log_parser_config: &LogParserConfig,
         meta_packet: &mut MetaPacket,
-    ) -> FlowNode {
-        let mut node = self.init_flow(flow_config, meta_packet);
-        meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
+    ) -> Rc<RefCell<FlowNode>> {
+        let node = self.init_flow(flow_config, meta_packet);
+        let mut node_mut = node.borrow_mut();
+        meta_packet.is_active_service = node_mut.tagged_flow.flow.is_active_service;
         let mut reverse = false;
-        if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
+        if node_mut.tagged_flow.flow.signal_source == SignalSource::EBPF {
             // Initialize a timeout long enough for eBPF Flow to enable successful session aggregation.
-            node.timeout = log_parser_config.l7_log_session_aggr_timeout;
+            node_mut.timeout = log_parser_config.l7_log_session_aggr_timeout;
         } else {
-            reverse = self.update_l4_direction(meta_packet, &mut node, true);
+            reverse = self.update_l4_direction(meta_packet, &mut node_mut, true);
 
             let pkt_tcp_flags = meta_packet.tcp_data.flags;
             if pkt_tcp_flags.is_invalid() {
                 // exception timeout
-                node.timeout = flow_config.flow_timeout.exception;
-                node.flow_state = FlowState::Exception;
+                node_mut.timeout = flow_config.flow_timeout.exception;
+                node_mut.flow_state = FlowState::Exception;
             }
             self.update_flow_state_machine(
                 flow_config,
-                &mut node,
+                &mut node_mut,
                 pkt_tcp_flags,
                 meta_packet.direction,
             );
-            self.update_syn_or_syn_ack_seq(&mut node, meta_packet);
+            self.update_syn_or_syn_ack_seq(&mut node_mut, meta_packet);
         }
 
         if flow_config.collector_enabled {
             self.collect_metric(
                 flow_config,
                 log_parser_config,
-                &mut node,
+                &mut node_mut,
                 meta_packet,
                 !reverse,
                 true,
@@ -1166,18 +1208,19 @@ impl FlowMap {
         }
 
         // After collect_metric() is called for eBPF MetaPacket, its direction is determined.
-        if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
+        if node_mut.tagged_flow.flow.signal_source == SignalSource::EBPF {
             if meta_packet.direction == PacketDirection::ClientToServer {
-                node.residual_request += 1;
+                node_mut.residual_request += 1;
             } else {
-                node.residual_request -= 1;
+                node_mut.residual_request -= 1;
             }
         }
 
         // Enterprise Edition Feature: packet-sequence
         if self.packet_sequence_enabled {
-            self.append_to_block(flow_config, &mut node, meta_packet);
+            self.append_to_block(flow_config, &mut node_mut, meta_packet);
         }
+        drop(node_mut);
         node
     }
 
@@ -1186,35 +1229,43 @@ impl FlowMap {
         flow_config: &FlowConfig,
         log_parser_config: &LogParserConfig,
         meta_packet: &mut MetaPacket,
-    ) -> FlowNode {
-        let mut node = self.init_flow(flow_config, meta_packet);
-        meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
-        node.flow_state = FlowState::Established;
+    ) -> Rc<RefCell<FlowNode>> {
+        let node = self.init_flow(flow_config, meta_packet);
+        let mut node_mut = node.borrow_mut();
+        meta_packet.is_active_service = node_mut.tagged_flow.flow.is_active_service;
+        node_mut.flow_state = FlowState::Established;
         // For eBPF UDP Flow, there is no special treatment for timeout.
-        node.timeout = flow_config.flow_timeout.opening; // use opening timeout
+        node_mut.timeout = flow_config.flow_timeout.opening; // use opening timeout
         let mut reverse = false;
-        if node.tagged_flow.flow.signal_source != SignalSource::EBPF {
+        if node_mut.tagged_flow.flow.signal_source != SignalSource::EBPF {
             // eBPF Flow only use server_port to correct the direction.
-            reverse = self.update_l4_direction(meta_packet, &mut node, true);
+            reverse = self.update_l4_direction(meta_packet, &mut node_mut, true);
         }
         if flow_config.collector_enabled {
             self.collect_metric(
                 flow_config,
                 log_parser_config,
-                &mut node,
+                &mut node_mut,
                 meta_packet,
                 !reverse,
                 true,
             );
         }
+        drop(node_mut);
         node
     }
 
-    fn new_other_node(&mut self, config: &FlowConfig, meta_packet: &mut MetaPacket) -> FlowNode {
-        let mut node = self.init_flow(config, meta_packet);
-        node.flow_state = FlowState::Established;
+    fn new_other_node(
+        &mut self,
+        config: &FlowConfig,
+        meta_packet: &mut MetaPacket,
+    ) -> Rc<RefCell<FlowNode>> {
+        let node = self.init_flow(config, meta_packet);
+        let mut node_mut = node.borrow_mut();
+        node_mut.flow_state = FlowState::Established;
         // opening timeout
-        node.timeout = config.flow_timeout.opening;
+        node_mut.timeout = config.flow_timeout.opening;
+        drop(node_mut);
         node
     }
 
@@ -1223,17 +1274,18 @@ impl FlowMap {
         flow_config: &FlowConfig,
         log_parser_config: &LogParserConfig,
         meta_packet: &mut MetaPacket,
-    ) -> Option<FlowNode> {
+    ) -> Option<Rc<RefCell<FlowNode>>> {
         self.stats_counter.new.fetch_add(1, Ordering::Relaxed);
         let node = match meta_packet.lookup_key.proto {
             IpProtocol::Tcp => self.new_tcp_node(flow_config, log_parser_config, meta_packet),
             IpProtocol::Udp => self.new_udp_node(flow_config, log_parser_config, meta_packet),
             _ => self.new_other_node(flow_config, meta_packet),
         };
-        meta_packet.flow_id = node.tagged_flow.flow.flow_id;
+        let node_ref = node.as_ref().borrow();
+        meta_packet.flow_id = node_ref.tagged_flow.flow.flow_id;
         if meta_packet.signal_source == SignalSource::EBPF
-            && node.meta_flow_perf.is_some()
-            && node.meta_flow_perf.as_ref().unwrap().server_port == 0
+            && node_ref.meta_flow_perf.is_some()
+            && node_ref.meta_flow_perf.as_ref().unwrap().server_port == 0
         {
             // For ebpf data, if server_port is 0, it means that parsed data failed,
             // the info in node maybe wrong, we should not create this node.
@@ -1242,6 +1294,7 @@ impl FlowMap {
             self.stats_counter
                 .concurrent
                 .fetch_add(1, Ordering::Relaxed);
+            drop(node_ref);
             Some(node)
         }
     }
@@ -1303,45 +1356,55 @@ impl FlowMap {
     fn node_removed_aftercare(
         &mut self,
         config: &FlowConfig,
-        mut node: FlowNode,
+        node: Rc<RefCell<FlowNode>>,
         timeout: Duration,
         meta_packet: Option<&mut MetaPacket>,
     ) {
+        let mut node_mut = node.borrow_mut();
         // 统计数据输出前矫正流方向
-        self.update_flow_direction(&mut node, meta_packet);
+        self.update_flow_direction(&mut node_mut, meta_packet);
 
-        let flow = &mut node.tagged_flow.flow;
-        if flow.signal_source == SignalSource::EBPF {
+        let flow_state = node_mut.flow_state;
+        if node_mut.tagged_flow.flow.signal_source == SignalSource::EBPF {
             // the flow which from eBPF, it's close_type always be CloseType::Timeout
-            flow.close_type = CloseType::Timeout;
+            node_mut.tagged_flow.flow.close_type = CloseType::Timeout;
         } else {
-            flow.update_close_type(node.flow_state);
+            node_mut.tagged_flow.flow.update_close_type(flow_state);
         }
-        flow.end_time = timeout.into();
-        flow.flow_stat_time = Timestamp::from_nanos(
+        node_mut.tagged_flow.flow.end_time = timeout.into();
+        node_mut.tagged_flow.flow.flow_stat_time = Timestamp::from_nanos(
             (timeout.as_nanos() / STATISTICAL_INTERVAL.as_nanos() * STATISTICAL_INTERVAL.as_nanos())
                 as u64,
         );
 
         if config.collector_enabled
-            && (flow.flow_key.proto == IpProtocol::Tcp || flow.flow_key.proto == IpProtocol::Udp)
+            && (node_mut.tagged_flow.flow.flow_key.proto == IpProtocol::Tcp
+                || node_mut.tagged_flow.flow.flow_key.proto == IpProtocol::Udp)
         {
-            let l7_timeout_count = self.rrt_cache.borrow_mut().get_timeout_count(flow.flow_id);
+            let signal_source = node_mut.tagged_flow.flow.signal_source;
+            let reversed = node_mut.tagged_flow.flow.reversed;
+            let l7_timeout_count = self
+                .rrt_cache
+                .borrow_mut()
+                .get_timeout_count(node_mut.tagged_flow.flow.flow_id);
             // 如果返回None，就清空掉flow_perf_stats
-            flow.flow_perf_stats = node.meta_flow_perf.as_mut().and_then(|perf| {
-                perf.copy_and_reset_perf_data(
-                    flow.reversed,
-                    l7_timeout_count as u32,
-                    flow.signal_source == SignalSource::Packet && Self::l4_metrics_enabled(config),
-                    Self::l7_metrics_enabled(config),
-                )
-                .map(|o| Box::new(o))
-            });
+            node_mut.tagged_flow.flow.flow_perf_stats =
+                node_mut.meta_flow_perf.as_mut().and_then(|perf| {
+                    perf.copy_and_reset_perf_data(
+                        reversed,
+                        l7_timeout_count as u32,
+                        signal_source == SignalSource::Packet && Self::l4_metrics_enabled(config),
+                        Self::l7_metrics_enabled(config),
+                    )
+                    .map(|o| Box::new(o))
+                });
         }
 
         // Enterprise Edition Feature: packet-sequence
-        if self.packet_sequence_enabled && flow.flow_key.proto == IpProtocol::Tcp {
-            if let Some(block) = node.packet_sequence_block.take() {
+        if self.packet_sequence_enabled
+            && node_mut.tagged_flow.flow.flow_key.proto == IpProtocol::Tcp
+        {
+            if let Some(block) = node_mut.packet_sequence_block.take() {
                 if let Err(_) = self.packet_sequence_queue.as_ref().unwrap().send(block) {
                     warn!("packet sequence block to queue failed maybe queue have terminated");
                 }
@@ -1353,14 +1416,16 @@ impl FlowMap {
             .fetch_sub(1, Ordering::Relaxed);
         self.stats_counter.closed.fetch_add(1, Ordering::Relaxed);
 
-        self.push_to_flow_stats_queue(config, node.tagged_flow);
+        self.push_to_flow_stats_queue(config, node_mut.tagged_flow.clone());
+        drop(node_mut);
+        self.node_pool.put(node);
     }
 
     // go 版本的copyAndOutput
     fn node_updated_aftercare(
         &mut self,
         config: &FlowConfig,
-        node: &mut FlowNode,
+        node: &mut RefMut<FlowNode>,
         timestamp: Duration,
         meta_packet: Option<&mut MetaPacket>,
     ) {
@@ -1371,21 +1436,25 @@ impl FlowMap {
         {
             self.update_flow_direction(node, meta_packet); // 每个流统计数据输出前矫正流方向
             node.tagged_flow.flow.close_type = CloseType::ForcedReport;
-            let flow = &mut node.tagged_flow.flow;
             if !config.collector_enabled {
                 return;
             }
-            if flow.flow_key.proto == IpProtocol::Tcp || flow.flow_key.proto == IpProtocol::Udp {
-                flow.flow_perf_stats = node.meta_flow_perf.as_mut().and_then(|perf| {
-                    perf.copy_and_reset_perf_data(
-                        flow.reversed,
-                        0,
-                        flow.signal_source == SignalSource::Packet
-                            && Self::l4_metrics_enabled(config),
-                        Self::l7_metrics_enabled(config),
-                    )
-                    .map(|o| Box::new(o))
-                });
+            if node.tagged_flow.flow.flow_key.proto == IpProtocol::Tcp
+                || node.tagged_flow.flow.flow_key.proto == IpProtocol::Udp
+            {
+                let reversed = node.tagged_flow.flow.reversed;
+                let signal_source = node.tagged_flow.flow.signal_source;
+                node.tagged_flow.flow.flow_perf_stats =
+                    node.meta_flow_perf.as_mut().and_then(|perf| {
+                        perf.copy_and_reset_perf_data(
+                            reversed,
+                            0,
+                            signal_source == SignalSource::Packet
+                                && Self::l4_metrics_enabled(config),
+                            Self::l7_metrics_enabled(config),
+                        )
+                        .map(|o| Box::new(o))
+                    });
             }
             self.push_to_flow_stats_queue(config, node.tagged_flow.clone());
             node.reset_flow_stat_info();
@@ -1395,7 +1464,7 @@ impl FlowMap {
     fn write_to_app_proto_log(
         &mut self,
         config: &FlowConfig,
-        node: &mut FlowNode,
+        node: &mut RefMut<FlowNode>,
         meta_packet: &MetaPacket,
         l7_info: L7ProtocolInfo,
         rrt: u64,
@@ -1430,7 +1499,7 @@ impl FlowMap {
     fn update_l4_direction(
         &mut self,
         meta_packet: &mut MetaPacket,
-        node: &mut FlowNode,
+        node: &mut RefMut<FlowNode>,
         is_first_packet: bool,
     ) -> bool {
         let lookup_key = &meta_packet.lookup_key;
@@ -1476,7 +1545,7 @@ impl FlowMap {
 
     // just for ebpf, tcp flow.is_active_service is always true,
     // but udp flow.is_active_service still needs to continue to judge.
-    fn update_udp_is_active(&mut self, node: &mut FlowNode, direction: PacketDirection) {
+    fn update_udp_is_active(&mut self, node: &mut RefMut<FlowNode>, direction: PacketDirection) {
         // If it is already an active service, we do not need to continue to query.
         if !node.tagged_flow.flow.is_active_service {
             let flow_key = &node.tagged_flow.flow.flow_key;
@@ -1499,7 +1568,11 @@ impl FlowMap {
         }
     }
 
-    fn update_flow_direction(&mut self, node: &mut FlowNode, meta_packet: Option<&mut MetaPacket>) {
+    fn update_flow_direction(
+        &mut self,
+        node: &mut RefMut<FlowNode>,
+        meta_packet: Option<&mut MetaPacket>,
+    ) {
         if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
             // The direction of eBPF Flow is determined when FlowPerf::l7_parse is called for the
             // first time, and no further correction is required.
@@ -1531,7 +1604,7 @@ impl FlowMap {
         node.tagged_flow.flow.is_active_service = ServiceTable::is_active_service(dst_score);
     }
 
-    fn reverse_flow(node: &mut FlowNode, is_first_packet: bool) {
+    fn reverse_flow(node: &mut RefMut<FlowNode>, is_first_packet: bool) {
         node.policy_in_tick.swap(0, 1);
         node.policy_data_cache.swap(0, 1);
         node.endpoint_data_cache.swap(0, 1);
@@ -1548,7 +1621,7 @@ impl FlowMap {
     }
 
     fn rectify_ebpf_flow_direction(
-        node: &mut FlowNode,
+        node: &mut RefMut<FlowNode>,
         meta_packet: &mut MetaPacket,
         is_first_packet: bool,
     ) {
@@ -1571,7 +1644,7 @@ impl FlowMap {
 
     fn update_endpoint_and_policy_data(
         &mut self,
-        node: &mut FlowNode,
+        node: &mut RefMut<FlowNode>,
         meta_packet: &mut MetaPacket,
     ) {
         // update endpoint
@@ -2011,7 +2084,8 @@ mod tests {
         packet1.policy_data.replace(Arc::new(policy_data1));
 
         let config = (&RuntimeConfig::default()).into();
-        let mut node = flow_map.init_flow(&config, &mut packet0);
+        let binding = flow_map.init_flow(&config, &mut packet0);
+        let mut node = binding.borrow_mut();
         node.policy_in_tick.fill(false);
         flow_map.update_flow(&mut node, &mut packet1);
 
@@ -2145,7 +2219,8 @@ mod tests {
 
         let mut packet0 = _new_meta_packet();
         // test handshake
-        let mut node = flow_map.init_flow(&config, &mut packet0);
+        let binding = flow_map.init_flow(&config, &mut packet0);
+        let mut node = binding.borrow_mut();
         let peer_src = &mut node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC];
         peer_src.tcp_flags = TcpFlags::SYN;
         flow_map.update_flow_state_machine(
@@ -2321,9 +2396,12 @@ mod tests {
 
         let tagged_flow = output_queue_receiver.recv(Some(TIME_UNIT)).unwrap();
         let perf_stats = &tagged_flow.flow.flow_perf_stats.unwrap().tcp;
+        let (all, in_use) = flow_map.node_pool.counter();
         assert_eq!(perf_stats.rtt_client_max, 114);
         assert_eq!(perf_stats.rtt_server_max, 44);
         assert_eq!(perf_stats.srt_max, 12);
+        assert_eq!(all, 12);
+        assert_eq!(in_use, 12);
     }
 
     #[test]
@@ -2356,48 +2434,48 @@ mod tests {
     #[test]
     fn sort_nodes_by_timeout() {
         let mut nodes = vec![
-            Box::new(FlowNode {
+            Rc::new(RefCell::new(FlowNode {
                 timestamp_key: 120,
                 ..Default::default()
-            }),
-            Box::new(FlowNode {
+            })),
+            Rc::new(RefCell::new(FlowNode {
                 timestamp_key: 60,
                 recent_time: Duration::from_secs(40),
                 ..Default::default()
-            }),
-            Box::new(FlowNode {
+            })),
+            Rc::new(RefCell::new(FlowNode {
                 timestamp_key: 60,
                 recent_time: Duration::from_secs(10),
                 ..Default::default()
-            }),
-            Box::new(FlowNode {
+            })),
+            Rc::new(RefCell::new(FlowNode {
                 timestamp_key: 60,
                 recent_time: Duration::from_secs(60),
                 ..Default::default()
-            }),
-            Box::new(FlowNode {
+            })),
+            Rc::new(RefCell::new(FlowNode {
                 timestamp_key: 180,
                 ..Default::default()
-            }),
-            Box::new(FlowNode {
+            })),
+            Rc::new(RefCell::new(FlowNode {
                 timestamp_key: 60,
                 recent_time: Duration::from_secs(60),
                 ..Default::default()
-            }),
-            Box::new(FlowNode {
+            })),
+            Rc::new(RefCell::new(FlowNode {
                 timestamp_key: 120,
                 ..Default::default()
-            }),
-            Box::new(FlowNode {
+            })),
+            Rc::new(RefCell::new(FlowNode {
                 timestamp_key: 60,
                 recent_time: Duration::from_secs(20),
                 ..Default::default()
-            }),
-            Box::new(FlowNode {
+            })),
+            Rc::new(RefCell::new(FlowNode {
                 timestamp_key: 60,
                 recent_time: Duration::from_secs(60),
                 ..Default::default()
-            }),
+            })),
         ];
         let index = FlowMap::sort_nodes_by_timeout(&mut nodes, Duration::from_secs(50), 70);
         assert_eq!(
@@ -2407,7 +2485,10 @@ mod tests {
             index,
             nodes
                 .iter()
-                .map(|n| (n.timestamp_key, n.recent_time))
+                .map(|n| (
+                    n.as_ref().borrow().timestamp_key,
+                    n.as_ref().borrow().recent_time
+                ))
                 .collect::<Vec<_>>()
         );
     }
