@@ -33,6 +33,8 @@ const (
 	MainAddCode = zerodoc.RegionID | zerodoc.HostID | zerodoc.L3Device | zerodoc.SubnetID | zerodoc.PodNodeID | zerodoc.AZID | zerodoc.PodGroupID | zerodoc.PodNSID | zerodoc.PodID | zerodoc.PodClusterID | zerodoc.ServiceID | zerodoc.Resource
 	EdgeAddCode = zerodoc.RegionIDPath | zerodoc.HostIDPath | zerodoc.L3DevicePath | zerodoc.SubnetIDPath | zerodoc.PodNodeIDPath | zerodoc.AZIDPath | zerodoc.PodGroupIDPath | zerodoc.PodNSIDPath | zerodoc.PodIDPath | zerodoc.PodClusterIDPath | zerodoc.ServiceIDPath | zerodoc.ResourcePath
 	PortAddCode = zerodoc.IsKeyService
+
+	SIGNAL_SOURCE_OTEL = 4
 )
 
 func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) error {
@@ -201,6 +203,28 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 		}
 		t.AutoInstanceID, t.AutoInstanceType = common.GetAutoInstance(t.PodID, t.GPID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
 		t.AutoServiceID, t.AutoServiceType = common.GetAutoService(t.ServiceID, t.PodGroupID, t.GPID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
+	}
+
+	// OTel data always not from INTERNET
+	if t.SignalSource == SIGNAL_SOURCE_OTEL {
+		if t.L3EpcID == datatype.EPC_FROM_INTERNET {
+			t.L3EpcID = datatype.EPC_UNKNOWN
+		}
+		if t.L3EpcID1 == datatype.EPC_FROM_INTERNET {
+			t.L3EpcID1 = datatype.EPC_UNKNOWN
+		}
+		if t.AutoServiceType == common.InternetIpType {
+			t.AutoServiceType = common.IpType
+		}
+		if t.AutoServiceType1 == common.InternetIpType {
+			t.AutoServiceType1 = common.IpType
+		}
+		if t.AutoInstanceType == common.InternetIpType {
+			t.AutoInstanceType = common.IpType
+		}
+		if t.AutoInstanceType1 == common.InternetIpType {
+			t.AutoInstanceType1 = common.IpType
+		}
 	}
 
 	return nil
