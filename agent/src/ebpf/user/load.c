@@ -324,7 +324,6 @@ static int load_obj__progs(struct ebpf_object *obj)
 	struct bpf_insn *insns;
 	GElf_Sym sym;
 	struct ebpf_prog *new_prog;
-	bool is_tail_call = false;
 
 	scn_syms = elf_getscn(obj->elf_info.elf, obj->elf_info.syms_sec->shndx);
 	if (scn_syms == NULL) {
@@ -333,7 +332,6 @@ static int load_obj__progs(struct ebpf_object *obj)
 	}
 
 	for (i = 0; i < progs_cnt; i++) {
-		is_tail_call = false;
 		desc = &prog_descs[i];
 		insns = (struct bpf_insn *)desc->d_buf;	// SHT_PROGBITS & SHF_EXECINSTR data buffer
 		scn_rel = elf_getscn(obj->elf_info.elf, desc->shndx_rel);
@@ -356,13 +354,14 @@ static int load_obj__progs(struct ebpf_object *obj)
 
 		enum bpf_prog_type prog_type = get_prog_type(desc);
 		if (prog_type == BPF_PROG_TYPE_UNSPEC) {
-			if (memcmp(desc->name, "prog/", 5)) {
-				ebpf_warning("Prog %s type %d invalid\n", desc->name,
-					     prog_type);
-				return ETR_INVAL;
-			} else {
-				is_tail_call = true;
+			if (!memcmp(desc->name, "prog/tp/", 8)) {
 				prog_type = BPF_PROG_TYPE_TRACEPOINT;
+			} else if (!memcmp(desc->name, "prog/kp/", 8)) {
+				prog_type = BPF_PROG_TYPE_KPROBE;
+			} else {
+				ebpf_warning("Prog %s type %d invalid\n",
+					     desc->name, prog_type);
+				return ETR_INVAL;
 			}
 		}
 
@@ -379,7 +378,6 @@ static int load_obj__progs(struct ebpf_object *obj)
 					    obj->elf_info.syms_sec->strtabidx,
 					    sym.st_name);
 
-add_program:
 		new_prog = NULL;
 		add_new_prog(obj->progs, obj->progs_cnt, new_prog);
 		if (new_prog == NULL) {
@@ -394,21 +392,6 @@ add_program:
 		if (new_prog->name == NULL) {
 			ebpf_debug("strdup() failed.\n");
 			return ETR_NOMEM;
-		}
-
-		if (is_tail_call) {
-			free(new_prog->name);
-			char *suffix = "_kp";
-			if (prog_type == BPF_PROG_TYPE_TRACEPOINT)
-				suffix = "_tp";
-			new_prog->name = calloc(1, strlen(sym_name) + strlen(suffix) + 1);
-			if (new_prog->name == NULL) {
-				ebpf_debug("calloc() failed.\n");
-				return ETR_NOMEM;
-			}
-
-			memcpy(new_prog->name, sym_name, strlen(sym_name));
-			memcpy(new_prog->name + strlen(sym_name), suffix, strlen(suffix));
 		}
 
 		new_prog->insns = insns;
@@ -440,15 +423,6 @@ add_program:
 		     new_prog->sec_name, new_prog->name, new_prog->insns_cnt,
 		     new_prog->type, new_prog->prog_fd, obj->license,
 		     obj->kern_version);
-
-		/*
-		 * For tail call program, need to add the BPF_PROG_TYPE_KPROBE and
-		 * BPF_PROG_TYPE_TRACEPOINT types to the kernel.
-		 */
-		if (is_tail_call && prog_type != BPF_PROG_TYPE_KPROBE) {
-			prog_type = BPF_PROG_TYPE_KPROBE;
-			goto add_program;
-		}
 	}
 
 	return ETR_OK;
