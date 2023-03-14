@@ -343,10 +343,9 @@ func CallRozeAPIAddRP(ip string, dataSource, baseDataSource mysql.DataSource, ro
 
 func CallRozeAPIModRP(ip string, dataSource mysql.DataSource, rozePort int) error {
 	url := fmt.Sprintf("http://%s:%d/v1/rpmod/", common.GetCURLIP(ip), rozePort)
-	db := "vtap_" + dataSource.TsdbType
-	switch dataSource.TsdbType {
-	case common.DATA_SOURCE_L4_LOG, common.DATA_SOURCE_L7_LOG:
-		db = dataSource.TsdbType
+	db := dataSource.TsdbType
+	if dataSource.TsdbType == common.DATA_SOURCE_APP || dataSource.TsdbType == common.DATA_SOURCE_FLOW {
+		db = "vtap_" + dataSource.TsdbType
 	}
 	body := map[string]interface{}{
 		"name":           dataSource.Name,
