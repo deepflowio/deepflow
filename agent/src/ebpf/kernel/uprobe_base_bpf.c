@@ -265,6 +265,18 @@ static __inline __u64 get_rw_goid(__u64 timeout)
 	return goid;
 }
 
+static __inline bool is_current_go_process(void)
+{
+	__u32 tgid = (__u32)(bpf_get_current_pid_tgid() >> 32);
+	struct ebpf_proc_info *info =
+		bpf_map_lookup_elem(&proc_info_map, &tgid);
+	if (info && info->version) {
+		return true;
+	} else {
+		return false;
+	}
+}
+
 static __inline bool is_tcp_conn_interface(void *conn,
 					   struct ebpf_proc_info *info)
 {
