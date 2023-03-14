@@ -1265,14 +1265,13 @@ static __inline bool drop_msg_by_comm(void)
 	return false;
 }
 
-static __inline struct protocol_message_t infer_protocol(const struct data_args_t *args,
-							 size_t count,
-							 struct conn_info_t
-							 *conn_info,
-							 __u8 sk_state,
-							 const struct
-							 process_data_extra
-							 *extra)
+static __inline struct protocol_message_t
+infer_protocol(struct ctx_info_s *ctx,
+	       const struct data_args_t *args,
+	       size_t count,
+	       struct conn_info_t *conn_info,
+	       __u8 sk_state,
+	       const struct process_data_extra *extra)
 {
 #define DATA_BUF_MAX  32
 
@@ -1311,26 +1310,21 @@ static __inline struct protocol_message_t infer_protocol(const struct data_args_
 	}
 
 	const char *buf = args->buf;
-
-	__u32 k0 = 0;
-	struct infer_data_s *buf_map = bpf_map_lookup_elem(&NAME(infer_buf), &k0);
-	if (!buf_map)
-		return inferred_message;
-
+	struct infer_data_s *__infer_buf = &ctx->infer_buf;
 	char *http2_infer_buf = NULL;
 	__u32 http2_infer_len = 0;
 	if (extra->vecs) {
-		buf_map->len = infer_iovecs_copy(buf_map, args,
-						 count, DATA_BUF_MAX,
-						 &http2_infer_buf,
-						 &http2_infer_len);
+		__infer_buf->len = infer_iovecs_copy(__infer_buf, args,
+						     count, DATA_BUF_MAX,
+						     &http2_infer_buf,
+						     &http2_infer_len);
 	} else {
-		bpf_probe_read(buf_map->data, sizeof(buf_map->data), buf);
+		bpf_probe_read(__infer_buf->data, sizeof(__infer_buf->data), buf);
 		http2_infer_buf = (char *)buf;
 		http2_infer_len = count;
 	}
 
-	char *infer_buf = buf_map->data;
+	char *infer_buf = __infer_buf->data;
 
 	check_and_fetch_prev_data(conn_info);
 
