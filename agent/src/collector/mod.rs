@@ -20,10 +20,12 @@ mod consts;
 pub(crate) mod flow_aggr;
 pub(crate) mod quadruple_generator;
 
+use std::thread::JoinHandle;
+use std::time::Duration;
+
 pub use collector::Collector;
 
 use bitflags::bitflags;
-use std::time::Duration;
 
 use self::{flow_aggr::FlowAggrThread, quadruple_generator::QuadrupleGeneratorThread};
 
@@ -73,6 +75,23 @@ impl CollectorThread {
         if let Some(minute_collector) = self.minute_collector.as_mut() {
             minute_collector.start();
         }
+    }
+
+    pub fn notify_stop(&mut self) -> Vec<JoinHandle<()>> {
+        let mut handles = vec![];
+        if let Some(h) = self.quadruple_generator.notify_stop() {
+            handles.push(h);
+        }
+        if let Some(h) = self.l4_flow_aggr.as_mut().and_then(|t| t.notify_stop()) {
+            handles.push(h);
+        }
+        if let Some(h) = self.second_collector.as_mut().and_then(|t| t.notify_stop()) {
+            handles.push(h);
+        }
+        if let Some(h) = self.minute_collector.as_mut().and_then(|t| t.notify_stop()) {
+            handles.push(h);
+        }
+        handles
     }
 
     pub fn stop(&mut self) {

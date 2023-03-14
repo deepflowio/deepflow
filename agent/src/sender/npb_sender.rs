@@ -685,6 +685,15 @@ impl NpbArpTable {
         );
     }
 
+    pub fn notify_stop(&self) -> Option<JoinHandle<()>> {
+        if !self.is_running.load(Ordering::Relaxed) || NOT_SUPPORT {
+            return None;
+        }
+        info!("Arp table stopping...");
+        self.is_running.store(false, Ordering::Relaxed);
+        self.thread_handler.lock().unwrap().take()
+    }
+
     pub fn stop(&self) {
         if !self.is_running.load(Ordering::Relaxed) || NOT_SUPPORT {
             return;

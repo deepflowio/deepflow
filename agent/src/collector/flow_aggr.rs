@@ -115,12 +115,21 @@ impl FlowAggrThread {
         info!("l4 flow aggr id: {} started", self.id);
     }
 
+    pub fn notify_stop(&mut self) -> Option<JoinHandle<()>> {
+        if !self.running.swap(false, Ordering::Relaxed) {
+            warn!("l4 flow aggr id: {} already stopped, do nothing.", self.id);
+            return None;
+        }
+        info!("notify stopping l4 flow aggr: {}", self.id);
+        self.thread_handle.take()
+    }
+
     pub fn stop(&mut self) {
         if !self.running.swap(false, Ordering::Relaxed) {
             warn!("l4 flow aggr id: {} already stopped, do nothing.", self.id);
             return;
         }
-        info!("stoping l4 flow aggr: {}", self.id);
+        info!("stopping l4 flow aggr: {}", self.id);
         let _ = self.thread_handle.take().unwrap().join();
         info!("stopped l4 flow aggr: {}", self.id);
     }
