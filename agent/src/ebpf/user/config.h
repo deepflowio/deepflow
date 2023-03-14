@@ -37,9 +37,24 @@
 #define MAP_PROGS_JMP_TP_NAME		"__progs_jmp_tp_map"
 
 // This prog is designed to handle data transfer
+#define PROG_DATA_SUBMIT_NAME_FOR_KP   "bpf_prog_kp__data_submit"
+#define PROG_DATA_SUBMIT_NAME_FOR_TP   "bpf_prog_tp__data_submit"
 #define PROG_OUTPUT_DATA_NAME_FOR_KP	"bpf_prog_kp__output_data"
 #define PROG_OUTPUT_DATA_NAME_FOR_TP	"bpf_prog_tp__output_data"
 #define PROG_IO_EVENT_NAME_FOR_TP	"bpf_prog_tp__io_event"
+
+enum {
+	PROG_DATA_SUBMIT_TP_IDX,
+	PROG_OUTPUT_DATA_TP_IDX,
+	PROG_IO_EVENT_TP_IDX,
+	PROG_TP_NUM
+};
+
+enum {
+	PROG_DATA_SUBMIT_KP_IDX,
+	PROG_OUTPUT_DATA_KP_IDX,
+	PROG_KP_NUM
+};
 
 /*
  * When the socket map is recycled, each socket message is recycled without sending
