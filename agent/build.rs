@@ -123,6 +123,7 @@ fn set_linkage() -> Result<(), Box<dyn Error>> {
 
     println!("cargo:rustc-link-lib=static=dwarf");
     println!("cargo:rustc-link-lib=static=bcc_bpf");
+    println!("cargo:rustc-link-lib=static=pcap");
 
     match target_env.as_str() {
         "gnu" => {
@@ -134,7 +135,6 @@ fn set_linkage() -> Result<(), Box<dyn Error>> {
         "musl" => {
             println!("cargo:rustc-link-lib=static=c");
             println!("cargo:rustc-link-lib=static=elf");
-            println!("cargo:rustc-link-lib=static=pcap");
             println!("cargo:rustc-link-lib=static=m");
             println!("cargo:rustc-link-lib=static=z");
             println!("cargo:rustc-link-lib=static=pthread");

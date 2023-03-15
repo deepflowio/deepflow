@@ -5,8 +5,8 @@ import (
 	"os"
 
 	"github.com/deepflowio/deepflow/server/ingester/config"
-	"github.com/op/go-logging"
-	"gopkg.in/yaml.v2"
+	logging "github.com/op/go-logging"
+	yaml "gopkg.in/yaml.v2"
 )
 
 var log = logging.MustGetLogger("profile.config")
@@ -14,7 +14,7 @@ var log = logging.MustGetLogger("profile.config")
 type Config struct {
 	Base              *config.Config
 	CKWriterConfig    config.CKWriterConfig `yaml:"profile-ck-writer"`
-	ProfileTTL        int                   `yaml:"profile-ttl"`
+	ProfileTTL        int                   `yaml:"profile-ttl-hour"`
 	DecoderQueueCount int                   `yaml:"decoder-queue-count"`
 	DecoderQueueSize  int                   `yaml:"decoder-queue-size"`
 }
@@ -24,7 +24,7 @@ type ProfileConfig struct {
 }
 
 const (
-	DefaultProfileTTL        = 3 // day
+	DefaultProfileTTL        = 72 // hour
 	DefaultDecoderQueueCount = 2
 	DefaultDecoderQueueSize  = 1 << 14
 )

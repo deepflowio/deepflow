@@ -42,6 +42,10 @@ func (l FlowLogID) String() string {
 	return flowLogNames[l]
 }
 
+func (l FlowLogID) DataourceString() string {
+	return FLOW_LOG_DB + "." + flowLogNames[l]
+}
+
 func (l FlowLogID) TimeKey() string {
 	return "time"
 }
