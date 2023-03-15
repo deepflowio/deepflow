@@ -731,6 +731,28 @@ var ColumnRename623 = []*ColumnRenames{
 	},
 }
 
+var u8ColumnNameAdd625 = []string{"direction_score"}
+var ColumnAdd625 = []*ColumnAdds{
+	&ColumnAdds{
+		Dbs:         []string{"flow_metrics"},
+		Tables:      flowMetricsTables,
+		ColumnNames: u8ColumnNameAdd625,
+		ColumnType:  ckdb.UInt8,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_metrics"},
+		Tables:      flowMetricsEdgeTables,
+		ColumnNames: u8ColumnNameAdd625,
+		ColumnType:  ckdb.UInt8,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      flowLogTables,
+		ColumnNames: u8ColumnNameAdd625,
+		ColumnType:  ckdb.UInt8,
+	},
+}
+
 func getTables(connect *sql.DB, db, tableName string) ([]string, error) {
 	sql := fmt.Sprintf("SHOW TABLES IN %s", db)
 	rows, err := connect.Query(sql)
@@ -979,7 +1001,16 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo, isEdgeTab
 		}...)
 	}
 
-	for _, version := range [][]*ColumnAdds{columnAddss612, columnAddss620, columnAddss623} {
+	var columnAddss625 = []*ColumnAdds{
+		&ColumnAdds{
+			Dbs:         []string{d.db},
+			Tables:      []string{d.name, d.name + "_agg"},
+			ColumnNames: u8ColumnNameAdd625,
+			ColumnType:  ckdb.UInt8,
+		},
+	}
+
+	for _, version := range [][]*ColumnAdds{columnAddss612, columnAddss620, columnAddss623, columnAddss625} {
 		for _, addrs := range version {
 			columnAdds = append(columnAdds, getColumnAdds(addrs)...)
 		}
@@ -1058,7 +1089,7 @@ func NewCKIssu(cfg *config.Config) (*Issu, error) {
 		datasourceInfo: make(map[string]*DatasourceInfo),
 	}
 
-	allVersionAdds := [][]*ColumnAdds{ColumnAdd610, ColumnAdd611, ColumnAdd612, ColumnAdd613, ColumnAdd615, ColumnAdd618, ColumnAdd620, ColumnAdd623}
+	allVersionAdds := [][]*ColumnAdds{ColumnAdd610, ColumnAdd611, ColumnAdd612, ColumnAdd613, ColumnAdd615, ColumnAdd618, ColumnAdd620, ColumnAdd623, ColumnAdd625}
 	i.columnAdds = []*ColumnAdd{}
 	for _, versionAdd := range allVersionAdds {
 		for _, adds := range versionAdd {

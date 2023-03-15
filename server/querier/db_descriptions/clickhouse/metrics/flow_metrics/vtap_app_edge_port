@@ -1,6 +1,7 @@
 # Field                     , DBField              , Type       , Category    , Permission
 request                     , request              , counter    , Throuthput   , 111
 response                    , response             , counter    , Throuthput   , 111
+direction_score             , direction_score      , gauge      , Throughput   , 111
 
 rrt                         ,                      , delay      , Delay        , 111
 rrt_max                     , rrt_max              , delay      , Delay        , 111

@@ -218,6 +218,7 @@ type L7FlowLog struct {
 	responseLength   int64
 	SqlAffectedRows  *uint64
 	sqlAffectedRows  uint64
+	DirectionScore   uint8
 
 	AttributeNames  []string
 	AttributeValues []string
@@ -260,6 +261,8 @@ func L7FlowLogColumns() []*ckdb.Column {
 		ckdb.NewColumn("request_length", ckdb.Int64Nullable).SetComment("请求长度"),
 		ckdb.NewColumn("response_length", ckdb.Int64Nullable).SetComment("响应长度"),
 		ckdb.NewColumn("sql_affected_rows", ckdb.UInt64Nullable).SetComment("sql影响行数"),
+		ckdb.NewColumn("direction_score", ckdb.UInt8),
+
 		ckdb.NewColumn("attribute_names", ckdb.ArrayString).SetComment("额外的属性"),
 		ckdb.NewColumn("attribute_values", ckdb.ArrayString).SetComment("额外的属性对应的值"),
 		ckdb.NewColumn("metrics_names", ckdb.ArrayString).SetComment("额外的指标"),
@@ -300,6 +303,7 @@ func (h *L7FlowLog) WriteBlock(block *ckdb.Block) {
 		h.RequestLength,
 		h.ResponseLength,
 		h.SqlAffectedRows,
+		h.DirectionScore,
 
 		h.AttributeNames,
 		h.AttributeValues,
@@ -341,6 +345,7 @@ func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData) {
 	if h.sqlAffectedRows != 0 {
 		h.SqlAffectedRows = &h.sqlAffectedRows
 	}
+	h.DirectionScore = uint8(l.DirectionScore)
 
 	if l.Req != nil {
 		h.RequestDomain = l.Req.Domain

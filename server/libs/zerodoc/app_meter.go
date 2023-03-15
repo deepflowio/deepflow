@@ -132,8 +132,9 @@ func (m *AppMeter) WriteBlock(block *ckdb.Block) {
 }
 
 type AppTraffic struct {
-	Request  uint32 `db:"request"`
-	Response uint32 `db:"response"`
+	Request        uint32 `db:"request"`
+	Response       uint32 `db:"response"`
+	DirectionScore uint8  `db:"direction_score"`
 }
 
 func (_ *AppTraffic) Reverse() {
@@ -143,16 +144,21 @@ func (_ *AppTraffic) Reverse() {
 func (t *AppTraffic) WriteToPB(p *pb.AppTraffic) {
 	p.Request = t.Request
 	p.Response = t.Response
+	p.DirectionScore = uint32(t.DirectionScore)
 }
 
 func (t *AppTraffic) ReadFromPB(p *pb.AppTraffic) {
 	t.Request = p.Request
 	t.Response = p.Response
+	t.DirectionScore = uint8(p.DirectionScore)
 }
 
 func (t *AppTraffic) ConcurrentMerge(other *AppTraffic) {
 	t.Request += other.Request
 	t.Response += other.Response
+	if t.DirectionScore < other.DirectionScore {
+		t.DirectionScore = other.DirectionScore
+	}
 }
 
 func (t *AppTraffic) SequentialMerge(other *AppTraffic) {
@@ -160,8 +166,8 @@ func (t *AppTraffic) SequentialMerge(other *AppTraffic) {
 }
 
 func (t *AppTraffic) MarshalTo(b []byte) int {
-	fields := []string{"request=", "response="}
-	values := []uint64{uint64(t.Request), uint64(t.Response)}
+	fields := []string{"request=", "response=", "direction_score"}
+	values := []uint64{uint64(t.Request), uint64(t.Response), uint64(t.DirectionScore)}
 	return marshalKeyValues(b, fields, values)
 }
 
@@ -176,12 +182,13 @@ func AppTrafficColumns() []*ckdb.Column {
 	columns := []*ckdb.Column{}
 	columns = append(columns, ckdb.NewColumn("request", ckdb.UInt32).SetComment("累计请求次数").SetIndex(ckdb.IndexNone))
 	columns = append(columns, ckdb.NewColumn("response", ckdb.UInt32).SetComment("累计响应次数").SetIndex(ckdb.IndexNone))
+	columns = append(columns, ckdb.NewColumn("direction_score", ckdb.UInt8).SetComment("for correcting direction").SetIndex(ckdb.IndexNone))
 	return columns
 }
 
 // WriteBlock和LatencyColumns的列需要按顺序一一对应
 func (t *AppTraffic) WriteBlock(block *ckdb.Block) {
-	block.Write(t.Request, t.Response)
+	block.Write(t.Request, t.Response, t.DirectionScore)
 }
 
 type AppLatency struct {
