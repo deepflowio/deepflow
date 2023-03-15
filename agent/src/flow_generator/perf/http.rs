@@ -34,22 +34,20 @@ use crate::{
         perf::L7FlowPerf,
         protocol_logs::{
             check_http_method, consts::*, get_http_request_info, get_http_request_version,
-            get_http_resp_info, is_http_v1_payload, parse_v1_headers, AppProtoHead, Httpv2Headers,
+            get_http_resp_info, is_http_v1_payload, parse_v1_headers, AppProtoHead,
             L7ResponseStatus, LogMessageType,
         },
         HttpLog,
     },
 };
-use public::utils::net::h2pack;
 
 use super::l7_rrt::RrtCache;
 
 struct HttpSessionData {
-    // HTTPv2 Header
-    httpv2_headers: Httpv2Headers,
-
+    pub stream_id: Option<u32>,
     pub status: L7ResponseStatus,
     pub status_code: u16,
+
     pub has_log_data: bool,
     pub l7_proto: L7Protocol,
     pub msg_type: LogMessageType,
@@ -145,16 +143,18 @@ impl L7FlowPerf for HttpPerfData {
             self.session_data.set_http_protocol(L7Protocol::Http1);
             return Ok(());
         }
-        if self.parse_http_v2(payload, meta.direction).is_ok() {
+        if self
+            .parse_http_v2(payload, &ParseParam::from(meta), config)
+            .is_ok()
+        {
             self.session_data.has_log_data = true;
-            self.session_data.set_http_protocol(L7Protocol::Http2);
 
             let perf_stats = self.perf_stats.as_mut().unwrap();
             // reset the rrt
             perf_stats.rrt_last = Duration::ZERO;
             let rrt = self.session_data.rrt_cache.borrow_mut().cal_rrt(
                 flow_id,
-                Some(self.session_data.httpv2_headers.stream_id),
+                self.session_data.stream_id,
                 meta.direction,
                 meta.lookup_key.timestamp,
                 meta.cap_seq,
@@ -236,7 +236,7 @@ impl L7FlowPerf for HttpPerfData {
 impl HttpPerfData {
     pub fn new(rrt_cache: Rc<RefCell<RrtCache>>) -> Self {
         let session_data = HttpSessionData {
-            httpv2_headers: Httpv2Headers::default(),
+            stream_id: None,
             status_code: 0,
             status: L7ResponseStatus::default(),
             has_log_data: false,
@@ -299,79 +299,6 @@ impl HttpPerfData {
         Ok(())
     }
 
-    // HTTPv2-HEADERS-FramePayload类型格式:https://tools.ietf.org/html/rfc7540#section-6.2
-    // +---------------+
-    // |Pad Length? (8)|
-    // +-+-------------+-----------------------------------------------+
-    // |E|                 Stream Dependency? (31)                     |
-    // +-+-------------+-----------------------------------------------+
-    // |  Weight? (8)  |
-    // +-+-------------+-----------------------------------------------+
-    // |                   Header Block Fragment (*)                 ...
-    // +---------------------------------------------------------------+
-    // |                           Padding (*)                       ...
-    // +---------------------------------------------------------------+
-    fn parse_headers_frame_payload(&mut self, payload: &[u8]) -> Result<u16> {
-        let mut l_offset = 0;
-        let mut end_index = 0;
-
-        if self.session_data.httpv2_headers.flags & FLAG_HEADERS_PADDED != 0 {
-            if u32::from(payload[0]) > self.session_data.httpv2_headers.frame_length {
-                return Err(Error::HttpHeaderParseFailed);
-            }
-            l_offset += 1;
-            end_index = payload[0] as usize;
-        }
-
-        if self.session_data.httpv2_headers.flags & FLAG_HEADERS_PRIORITY != 0 {
-            l_offset += 5;
-        }
-
-        if payload.len() <= l_offset {
-            return Err(Error::HttpHeaderParseFailed);
-        }
-
-        end_index = self.session_data.httpv2_headers.frame_length as usize - end_index;
-
-        if end_index > payload.len() || end_index < l_offset {
-            return Err(Error::HttpHeaderParseFailed);
-        }
-
-        let frame_payload = &payload[l_offset..end_index];
-
-        let mut parser = h2pack::parser::Parser::new();
-
-        let parse_rst = parser.parse(frame_payload);
-
-        if let Err(_) = parse_rst {
-            return Err(Error::HttpHeaderParseFailed);
-        }
-
-        let header_list = parse_rst.unwrap();
-        let mut ret = Err(Error::HttpHeaderParseFailed);
-        for header in header_list.iter() {
-            match header.0.as_slice() {
-                b":method" => {
-                    ret = Ok(0);
-                }
-                b":status" => {
-                    ret = Ok(std::str::from_utf8(header.1.as_slice())
-                        .unwrap_or_default()
-                        .parse::<u16>()
-                        .unwrap_or_default())
-                }
-                b"content-type" => {
-                    if header.1.starts_with(b"application/grpc") {
-                        // change to grpc protocol
-                        self.session_data.set_http_protocol(L7Protocol::Grpc);
-                    }
-                }
-                _ => {}
-            }
-        }
-        ret
-    }
-
     fn has_magic(payload: &[u8]) -> bool {
         if payload.len() < HTTPV2_MAGIC_LENGTH {
             return false;
@@ -379,49 +306,30 @@ impl HttpPerfData {
         &payload[..HTTPV2_MAGIC_PREFIX.len()] == HTTPV2_MAGIC_PREFIX.as_bytes()
     }
 
-    fn parse_frame(&mut self, payload: &[u8]) -> Result<u16> {
-        let mut frame_payload = payload;
-        while frame_payload.len() > H2C_HEADER_SIZE {
-            if Self::has_magic(frame_payload) {
-                frame_payload = &frame_payload[HTTPV2_MAGIC_LENGTH..];
-                continue;
-            }
-            self.session_data
-                .httpv2_headers
-                .parse_headers_frame(frame_payload)?;
-
-            // 值得注意的是，关于H2存在发送端主动通过Settings帧发起WindowUpdate请求时或发送方测量最小往返时间（PING）时，
-            // 接收端如果支持配置会在其发送第一个请求时携带上述帧，可能会影响H2-HEADERS帧的位置，将HEADERS帧前的其它帧跳过。
-            // 参考：https://tools.ietf.org/html/rfc7540#section-6.5
-            if self.session_data.httpv2_headers.frame_type == FRAME_HEADERS {
-                if self.session_data.httpv2_headers.stream_id == 0 {
-                    return Err(Error::HttpHeaderParseFailed);
-                }
-
-                // TODO 调用第三库解析有时会导致panic, 先默认返回成功
-                // return Ok(200);
-                frame_payload = &frame_payload[H2C_HEADER_SIZE..];
-                return self.parse_headers_frame_payload(frame_payload);
-            }
-            let offset = self.session_data.httpv2_headers.frame_length as usize + H2C_HEADER_SIZE;
-
-            if frame_payload.len() <= offset {
-                return Err(Error::HttpHeaderParseFailed);
-            }
-            frame_payload = &frame_payload[offset..];
-        }
-        Err(Error::HttpHeaderParseFailed)
-    }
-
     // HTTPv2协议参考:https://tools.ietf.org/html/rfc7540
-    fn parse_http_v2(&mut self, payload: &[u8], direction: PacketDirection) -> Result<()> {
-        let status_code = self.parse_frame(payload)?;
+    fn parse_http_v2(
+        &mut self,
+        payload: &[u8],
+        param: &ParseParam,
+        config: Option<&LogParserConfig>,
+    ) -> Result<()> {
+        let mut parser = HttpLog::new_v2(false);
+        let info = parser.parse_payload(config, payload, param)?;
+
+        let direction = param.direction;
+        if let L7ProtocolInfo::HttpInfo(info) = info.get(0).unwrap() {
+            self.session_data.stream_id = info.stream_id;
+            self.session_data.status_code = info.status_code.unwrap_or_default() as u16;
+            self.session_data.set_http_protocol(parser.protocol());
+        } else {
+            unreachable!()
+        }
+
         if direction == PacketDirection::ServerToClient {
             self.session_data.msg_type = LogMessageType::Response;
 
             let perf_stats = self.perf_stats.get_or_insert(PerfStats::default());
-            self.session_data.status_code = status_code as u16;
-            match status_code {
+            match self.session_data.status_code {
                 HTTP_STATUS_CLIENT_ERROR_MIN..=HTTP_STATUS_CLIENT_ERROR_MAX => {
                     perf_stats.req_err_count += 1;
                     self.session_data.status = L7ResponseStatus::ClientError;
@@ -459,7 +367,7 @@ impl HttpPerfData {
             //reset rrt
             perf_stats.rrt_last = Duration::ZERO;
 
-            self.session_data.httpv2_headers.stream_id = h.stream_id.unwrap_or_default();
+            self.session_data.stream_id = h.stream_id;
             self.session_data.l7_proto = h.get_l7_protocol_with_tls();
             if let Some(code) = h.status_code {
                 match code as u16 {
@@ -484,14 +392,14 @@ impl HttpPerfData {
             let mut rrt_cache = self.session_data.rrt_cache.borrow_mut();
             let Some((_, prev_rrt)) = rrt_cache.get(
                 flow_id,
-                Some(self.session_data.httpv2_headers.stream_id),
+                self.session_data.stream_id,
                 param.direction,
                 0,
                 true,
             ) else {
                 rrt_cache.set(
                     flow_id,
-                    Some(self.session_data.httpv2_headers.stream_id),
+                    self.session_data.stream_id,
                     param.direction,
                     0,
                     true,
@@ -524,7 +432,7 @@ mod tests {
 
     use super::*;
 
-    use crate::utils::test::Capture;
+    use crate::{config::handler::L7LogDynamicConfig, utils::test::Capture};
 
     const FILE_DIR: &str = "resources/test/flow_generator/http";
 
@@ -545,7 +453,15 @@ mod tests {
             } else {
                 packet.direction = PacketDirection::ServerToClient;
             }
-            let _ = http_perf_data.parse(None, packet, 0x1f3c01010);
+            let _ = http_perf_data.parse(
+                Some(&LogParserConfig {
+                    l7_log_collect_nps_threshold: 0,
+                    l7_log_session_aggr_timeout: Duration::ZERO,
+                    l7_log_dynamic: L7LogDynamicConfig::default(),
+                }),
+                packet,
+                0x1f3c01010,
+            );
         }
         http_perf_data
     }
@@ -567,13 +483,13 @@ mod tests {
                         rrt_sum: Duration::from_nanos(84051000),
                     }),
                     session_data: HttpSessionData {
+                        stream_id: None,
                         l7_proto: L7Protocol::Http1,
                         status_code: 200,
                         status: L7ResponseStatus::Ok,
                         has_log_data: true,
                         msg_type: LogMessageType::Response,
                         rrt_cache: Rc::new(RefCell::new(RrtCache::new(100))),
-                        httpv2_headers: Httpv2Headers::default(),
                     },
                 },
             ),
@@ -591,13 +507,13 @@ mod tests {
                         rrt_sum: Duration::from_nanos(2023000),
                     }),
                     session_data: HttpSessionData {
+                        stream_id: None,
                         l7_proto: L7Protocol::Grpc,
                         status_code: 200,
                         status: L7ResponseStatus::Ok,
                         has_log_data: true,
                         msg_type: LogMessageType::Response,
                         rrt_cache: Rc::new(RefCell::new(RrtCache::new(100))),
-                        httpv2_headers: Httpv2Headers::default(),
                     },
                 },
             ),

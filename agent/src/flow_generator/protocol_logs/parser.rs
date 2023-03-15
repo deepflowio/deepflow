@@ -391,9 +391,8 @@ impl SessionQueue {
             } else {
                 // 若乱序，已存在响应，则可以匹配为会话，则聚合响应发送
                 // If the order is out of order and there is a response, it can be matched as a session, and the aggregated response is sent
-                if p.is_response() {
+                if p.is_response() && p.base_info.start_time > item.base_info.start_time {
                     // if can not merge, send req and resp directly.
-                    // generally use for ebpf disorder.
                     if let Err(L7LogCanNotMerge(p)) = item.session_merge(p) {
                         self.send(p);
                     }
@@ -401,9 +400,14 @@ impl SessionQueue {
                     self.counter.merge.fetch_add(1, Ordering::Relaxed);
                     self.send(item);
                 } else {
-                    // 对于HTTPV1, requestID总为0, 连续出现多个request时，response匹配最后一个request为session
-                    self.send(p);
-                    map.insert(key, item);
+                    // If p is req or resp time lt req time, p is not item corresponding response, send the earlier log and save the later log
+                    if p.base_info.start_time > item.base_info.start_time {
+                        self.send(item);
+                        map.insert(key, p);
+                    } else {
+                        self.send(p);
+                        map.insert(key, item);
+                    }
                 }
             }
         } else {
@@ -433,31 +437,34 @@ impl SessionQueue {
         key: u64,
     ) {
         // response, 需要找到request并merge
-        if let Some(mut request) = map.remove(&key) {
+        if let Some(mut p) = map.remove(&key) {
             if item.need_protocol_merge() {
-                let _ = request.session_merge(item);
+                let _ = p.session_merge(item);
 
-                if request.special_info.is_session_end() {
+                if p.special_info.is_session_end() {
                     self.counter.cached.fetch_sub(1, Ordering::Relaxed);
-                    self.send(request);
+                    self.send(p);
                 } else {
-                    map.insert(key, request);
+                    map.insert(key, p);
                 }
             } else {
-                // 若乱序导致map中的也是响应, 则发送响应,继续缓存新的响应
-                // If the out-of-order causes the response in the map, the response is sent and the new response continues to be cached
-                if request.is_response() {
-                    map.insert(key, item);
-                    self.send(request);
-                } else {
+                if p.is_request() && item.base_info.start_time > p.base_info.start_time {
                     // if can not merge, send req and resp directly.
-                    // generally use for ebpf disorder.
-                    if let Err(L7LogCanNotMerge(item)) = request.session_merge(item) {
+                    if let Err(L7LogCanNotMerge(item)) = p.session_merge(item) {
                         self.send(item);
                     }
                     self.counter.cached.fetch_sub(1, Ordering::Relaxed);
                     self.counter.merge.fetch_add(1, Ordering::Relaxed);
-                    self.send(request);
+                    self.send(p);
+                } else {
+                    // If p is resp or resp time lt req time, p is not the item corresponding req, send the earlier log and save the later log
+                    if p.base_info.start_time < item.base_info.start_time {
+                        self.send(p);
+                        map.insert(key, item);
+                    } else {
+                        self.send(item);
+                        map.insert(key, p);
+                    }
                 }
             }
         } else {
