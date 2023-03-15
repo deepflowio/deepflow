@@ -31,7 +31,7 @@ var log = logging.MustGetLogger("dedup")
 
 func (m *PacketDedupMap) hashPacket(packet []byte) {
 	m.lookupNode = blankPacketDedupMapNodeForInit
-	m.lookupNode.keySize = 64
+	m.lookupNode.keySize = PACKET_ID_SIZE_V4
 	packetId := m.lookupNode.key[:]
 
 	if len(packet) < 18 { // ensure safety
@@ -55,7 +55,7 @@ func (m *PacketDedupMap) hashPacket(packet []byte) {
 	}
 
 	if ethType == EthernetTypeIPv6 {
-		m.lookupNode.keySize = 96
+		m.lookupNode.keySize = PACKET_ID_SIZE_V6
 		copy(packetId[12:], packet[12:])
 
 		if m.ignoreTTL {
@@ -64,13 +64,13 @@ func (m *PacketDedupMap) hashPacket(packet []byte) {
 		m.lookupNode.id = uint64(BigEndian.Uint32(packetId[16:20])) | (uint64(packetId[20]) << 32) // Flow Label, Payload Length, Next header
 		nextHeader := IPProtocol(packetId[20])
 		offset := uint32(0)
-		for nextHeader != IPProtocolTCP && nextHeader != IPProtocolUDP && 54+offset+8 <= PACKET_ID_SIZE {
+		for nextHeader != IPProtocolTCP && nextHeader != IPProtocolUDP && 54+offset+8 <= PACKET_ID_SIZE_V6 {
 			nextHeader = IPProtocol(packetId[54+offset])
 			offset += uint32(packetId[54+offset+1]) + 8 // 注意：假定这个字节均表示Header Ext Length
 		}
-		if nextHeader == IPProtocolUDP && 54+offset+8 <= PACKET_ID_SIZE {
+		if nextHeader == IPProtocolUDP && 54+offset+8 <= PACKET_ID_SIZE_V6 {
 			BigEndian.PutUint16(packetId[54+offset+6:], 0) // ignore L4 checksum
-		} else if nextHeader == IPProtocolTCP && 54+offset+20 <= PACKET_ID_SIZE {
+		} else if nextHeader == IPProtocolTCP && 54+offset+20 <= PACKET_ID_SIZE_V6 {
 			BigEndian.PutUint16(packetId[54+offset+16:], 0) // ignore L4 checksum
 		}
 	} else if ethType == EthernetTypeIPv4 {
@@ -85,9 +85,9 @@ func (m *PacketDedupMap) hashPacket(packet []byte) {
 			(uint64(BigEndian.Uint16(packetId[16:18])) << 48) // IP total length
 		ihl := int(packetId[14]&0xF) * 4
 		ipProtocol := IPProtocol(packetId[23])
-		if ipProtocol == IPProtocolUDP && 14+ihl+8 <= PACKET_ID_SIZE {
+		if ipProtocol == IPProtocolUDP && 14+ihl+8 <= PACKET_ID_SIZE_V4 {
 			BigEndian.PutUint16(packetId[14+ihl+6:], 0) // ignore L4 checksum
-		} else if ipProtocol == IPProtocolTCP && 14+ihl+20 <= PACKET_ID_SIZE {
+		} else if ipProtocol == IPProtocolTCP && 14+ihl+20 <= PACKET_ID_SIZE_V4 {
 			BigEndian.PutUint16(packetId[14+ihl+16:], 0) // ignore L4 checksum
 		}
 	} else {

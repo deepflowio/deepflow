@@ -33,7 +33,8 @@ const (
 
 	ELEMENTS_LIMIT = HASH_TABLE_SIZE * 4
 
-	PACKET_ID_SIZE = 96
+	PACKET_ID_SIZE_V6 = 96
+	PACKET_ID_SIZE_V4 = 64
 )
 
 const (
@@ -51,7 +52,7 @@ type packetDedupMapNode struct {
 	next int32 // 表示节点所在冲突链的下一个节点的 buffer 数组下标
 	slot int32 // 记录 node 对应的哈希 slot ，置为 -1 表示 node 已标记为删除，占用的空间将会随 deleteTimeout 释放
 
-	key [PACKET_ID_SIZE]byte // 原始包头
+	key [PACKET_ID_SIZE_V6]byte // 原始包头
 }
 
 func (n *packetDedupMapNode) equal(v *packetDedupMapNode) bool {

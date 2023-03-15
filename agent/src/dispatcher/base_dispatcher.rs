@@ -351,6 +351,9 @@ impl BaseDispatcher {
                 // erspan-vxlan-erspan；隧道信息为空
                 *tunnel_info = Default::default();
             }
+            if decap_len + offset > packet.len() {
+                break;
+            }
             decap_len += offset;
         }
         Ok((decap_len, tap_type))
