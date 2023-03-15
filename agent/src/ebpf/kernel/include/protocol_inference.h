@@ -1468,14 +1468,6 @@ infer_protocol(struct ctx_info_s *ctx,
 				return inferred_message;
 			}
 			break;
-		case PROTO_HTTP2:
-			if ((inferred_message.type =
-			     infer_http2_message(http2_infer_buf, http2_infer_len,
-						 conn_info)) != MSG_UNKNOWN) {
-				inferred_message.protocol = PROTO_HTTP2;
-				return inferred_message;
-			}
-			break;
 		case PROTO_POSTGRESQL:
 			if ((inferred_message.type =
 			     infer_postgre_message(infer_buf, count,
@@ -1587,11 +1579,7 @@ infer_protocol(struct ctx_info_s *ctx,
 		    infer_sofarpc_message(infer_buf, count,
 					  conn_info)) != MSG_UNKNOWN){
 		inferred_message.protocol = PROTO_SOFARPC;
-#ifdef LINUX_VER_5_2_PLUS
-	} else if (skip_proto != PROTO_HTTP2 && (inferred_message.type =
-#else
 	} else if ((inferred_message.type =
-#endif
 		    infer_http2_message(http2_infer_buf, http2_infer_len, 
 					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_HTTP2;
