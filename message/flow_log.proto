@@ -49,6 +49,8 @@ message Flow {
     uint32 last_keepalive_ack = 23;
 
     repeated uint32 acl_gids = 24;
+
+    uint32 direction_score = 25;
 }
 
 message FlowKey {
@@ -208,6 +210,7 @@ message AppProtoLogsData {
     ExtendedInfo ext_info = 15;
 
     uint32 row_effect = 16;
+    uint32 direction_score = 17;
 }
 
 message AppProtoLogsBaseInfo {

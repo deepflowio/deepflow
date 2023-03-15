@@ -141,6 +141,7 @@ pub struct Traffic {
     pub l7_response: u32,
     pub syn: u32,
     pub synack: u32,
+    pub direction_score: u8,
 }
 
 impl Traffic {
@@ -159,6 +160,7 @@ impl Traffic {
         self.l7_response += other.l7_response;
         self.syn += other.syn;
         self.synack += other.synack;
+        self.direction_score = self.direction_score.max(other.direction_score);
     }
 
     pub fn reverse(&mut self) {
@@ -167,6 +169,7 @@ impl Traffic {
         swap(&mut self.l3_byte_tx, &mut self.l3_byte_rx);
         swap(&mut self.l4_byte_tx, &mut self.l4_byte_rx);
 
+        self.direction_score = 0
         // flow, L7等其他统计,以客户端、服务端为视角，无需Reverse
     }
 }
@@ -188,6 +191,7 @@ impl From<Traffic> for metric::Traffic {
             l7_response: m.l7_response,
             syn: m.syn,
             synack: m.synack,
+            direction_score: m.direction_score as u32,
         }
     }
 }
@@ -447,15 +451,18 @@ impl From<AppMeter> for metric::AppMeter {
 pub struct AppTraffic {
     pub request: u32,
     pub response: u32,
+    pub direction_score: u8,
 }
 
 impl AppTraffic {
     pub fn sequential_merge(&mut self, other: &AppTraffic) {
         self.request += other.request;
         self.response += other.response;
+        self.direction_score = self.direction_score.max(other.direction_score)
     }
     pub fn reverse(&mut self) {
         swap(&mut self.request, &mut self.response);
+        self.direction_score = 0;
     }
 }
 
@@ -464,6 +471,7 @@ impl From<AppTraffic> for metric::AppTraffic {
         metric::AppTraffic {
             request: m.request,
             response: m.response,
+            direction_score: m.direction_score as u32,
         }
     }
 }
@@ -542,6 +550,7 @@ impl UsageMeter {
         self.l4_byte_rx += other.l4_byte_rx;
         self.l4_byte_tx += other.l4_byte_tx;
     }
+
     pub fn reverse(&mut self) {
         swap(&mut self.packet_tx, &mut self.packet_rx);
         swap(&mut self.byte_tx, &mut self.byte_rx);

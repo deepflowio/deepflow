@@ -1590,6 +1590,7 @@ impl FlowMap {
             reverse = true;
         }
 
+        node.tagged_flow.flow.direction_score = flow_dst_score;
         node.tagged_flow.flow.is_active_service = ServiceTable::is_active_service(flow_dst_score);
         return reverse;
     }
@@ -1666,6 +1667,7 @@ impl FlowMap {
             }
         }
 
+        node.tagged_flow.flow.direction_score = flow_dst_score;
         node.tagged_flow.flow.is_active_service = ServiceTable::is_active_service(flow_dst_score);
     }
 

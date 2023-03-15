@@ -88,6 +88,7 @@ message Traffic {
     uint32 l7_response = 12;
     uint32 syn = 13;
     uint32 synack = 14;
+    uint32 direction_score = 15;
 }
 
 // current max id = 21
@@ -172,6 +173,7 @@ message AppMeter {
 message AppTraffic {
     uint32 request = 1;
     uint32 response= 2;
+    uint32 direction_score = 3;
 }
 
 message AppLatency {

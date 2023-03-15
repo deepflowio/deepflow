@@ -913,6 +913,7 @@ pub struct Flow {
     pub otel_instance: Option<String>,
     #[serde(skip)]
     pub endpoint: Option<String>,
+    pub direction_score: u8,
 }
 
 fn tunnel_is_none(t: &TunnelField) -> bool {
@@ -1123,6 +1124,7 @@ impl From<Flow> for flow_log::Flow {
             last_keepalive_seq: f.last_keepalive_seq,
             last_keepalive_ack: f.last_keepalive_ack,
             acl_gids: f.acl_gids.into_iter().map(|g| g as u32).collect(),
+            direction_score: f.direction_score as u32,
         }
     }
 }
