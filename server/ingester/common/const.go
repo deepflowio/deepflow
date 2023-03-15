@@ -17,6 +17,6 @@
 package common
 
 const (
-	CK_VERSION             = "v6.2.4.1" // 用于表示clickhouse的表版本号
+	CK_VERSION             = "v6.2.5.1" // 用于表示clickhouse的表版本号
 	DEFAULT_PCAP_DATA_PATH = "/var/lib/pcap"
 )
