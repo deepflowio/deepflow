@@ -887,12 +887,6 @@ impl<'a> MetaPacket<'a> {
         return Ok(packet);
     }
 
-    pub fn ebpf_flow_id(&self) -> u128 {
-        let protocol = self.l7_protocol_from_ebpf as u128;
-
-        (self.socket_id as u128) | protocol << u64::BITS
-    }
-
     pub fn set_loopback_mac(&mut self, mac: MacAddr) {
         if self.lookup_key.src_ip.is_loopback() {
             self.lookup_key.src_mac = mac;
@@ -916,6 +910,47 @@ impl<'a> MetaPacket<'a> {
                 NpbMode::IPv4
             } else {
                 NpbMode::IPv6
+            }
+        }
+    }
+
+    /*
+        redis can not determine dirction by RESP protocol when pakcet is from ebpf.
+        if the process name is `redis-server`, the local addr assume is server addr
+        if one side port is 6379, this side assume is server addr
+        otherwise use addr according to direction which may be wrong
+    */
+    pub fn get_redis_server_addr(&self) -> (IpAddr, u16) {
+        if self.signal_source != SignalSource::EBPF {
+            unreachable!()
+        }
+
+        let (src, dst) = (
+            (self.lookup_key.src_ip, self.lookup_key.src_port),
+            (self.lookup_key.dst_ip, self.lookup_key.dst_port),
+        );
+
+        #[cfg(target_os = "linux")]
+        if (self.process_kname[..12]).eq(b"redis-server") {
+            return if self.lookup_key.l2_end_1 {
+                // if server side recv, dst addr is server addr
+                dst
+            } else {
+                // if server send, src addr is server addr
+                src
+            };
+        }
+
+        if self.lookup_key.dst_port == 6379 {
+            dst
+        } else if self.lookup_key.src_port == 6379 {
+            src
+        } else {
+            //FIXME: can not determine redis server addr, use addr according to direction which may be wrong.
+            if self.lookup_key.direction == PacketDirection::ClientToServer {
+                dst
+            } else {
+                src
             }
         }
     }

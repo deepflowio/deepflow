@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "config.h"
 #include "include/socket_trace.h"
 #include "include/task_struct_utils.h"
 
@@ -50,8 +51,8 @@ MAP_PERF_EVENT(socket_data, int, __u32, MAX_CPU)
  * 'progs_jmp_kp_map' for kprobe/uprobe (`A -> B`, both A and B are [k/u]probe program)
  * 'progs_jmp_tp_map' for tracepoint (`A -> B`, both A and B are tracepoint program)
  */
-MAP_PROG_ARRAY(progs_jmp_kp_map, __u32, __u32, 1)
-MAP_PROG_ARRAY(progs_jmp_tp_map, __u32, __u32, 2)
+MAP_PROG_ARRAY(progs_jmp_kp_map, __u32, __u32, PROG_KP_NUM)
+MAP_PROG_ARRAY(progs_jmp_tp_map, __u32, __u32, PROG_TP_NUM)
 
 /*
  * 因为ebpf栈只有512字节无法存放http数据，这里使用map做为buffer。
@@ -61,11 +62,17 @@ MAP_PERARRAY(data_buf, __u32, struct __socket_data_buffer, 1)
 /*
  * For protocol infer buffer
  */
-struct infer_data_s {
-	__u32 len;
-	char data[64];
+struct ctx_info_s {
+	union {
+		struct infer_data_s {
+			__u32 len;
+			char data[64];
+		} infer_buf;
+
+		struct tail_calls_context tail_call;
+	};
 };
-MAP_PERARRAY(infer_buf, __u32, struct infer_data_s, 1)
+MAP_PERARRAY(ctx_info, __u32, struct ctx_info_s, 1)
 /*
  * 结构体成员偏移
  */
@@ -180,7 +187,7 @@ static __u32 __inline get_tcp_read_seq_from_fd(int fd)
 
 /*
  * B ; buffer
- * O : buffer offset, e.g: infer_buf->len
+ * O : buffer offset, e.g.: infer_buf->len
  * I : &args->iov[i]
  * L_T : total_size
  * L_C : bytes_copy
@@ -540,17 +547,21 @@ static __inline void connect_submit(struct pt_regs *ctx, struct conn_info_t *v, 
 }
 #endif
 
-static __inline void infer_l7_class(struct conn_info_t* conn_info,
-				    enum traffic_direction direction, const struct data_args_t *args,
-				    size_t count, __u8 sk_type,
-				    const struct process_data_extra *extra) {
+static __inline void 
+infer_l7_class(struct ctx_info_s *ctx,
+	       struct conn_info_t* conn_info,
+	       enum traffic_direction direction,
+	       const struct data_args_t *args,
+	       size_t count, __u8 sk_type,
+	       const struct process_data_extra *extra)
+{
 	if (conn_info == NULL) {
 		return;
 	}
 
 	// 推断应用协议
 	struct protocol_message_t inferred_protocol =
-		infer_protocol(args, count, conn_info, sk_type, extra);
+		infer_protocol(ctx, args, count, conn_info, sk_type, extra);
 	if (inferred_protocol.protocol == PROTO_UNKNOWN &&
 	    inferred_protocol.type == MSG_UNKNOWN) {
 		conn_info->protocol = PROTO_UNKNOWN;
@@ -911,10 +922,10 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 }
 
 static __inline int
-data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
-	    const struct data_args_t *args, const bool vecs, __u32 syscall_len,
-	    struct member_fields_offset *offset, __u64 time_stamp,
-	    const struct process_data_extra *extra)
+__data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
+	      const struct data_args_t *args, const bool vecs, __u32 syscall_len,
+	      struct member_fields_offset *offset, __u64 time_stamp,
+	      const struct process_data_extra *extra)
 {
 	if (conn_info == NULL) {
 		return -1;
@@ -1119,7 +1130,7 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 		conn_info->prev_count = 0;
 	}
 
-	if (conn_info->prev_count > 0) {
+	if (conn_info->prev_count == 4) {
 		// 注意这里没有调整v->syscall_len和v->len我们会在用户层做。
 		v->extra_data = *(__u32 *)conn_info->prev_buf;
 		v->extra_data_count = conn_info->prev_count;
@@ -1192,6 +1203,10 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 
 	conn_info->direction = direction;
 
+	struct ctx_info_s *ctx_map = bpf_map_lookup_elem(&NAME(ctx_info), &k0);
+	if (!ctx_map)
+		return -1;
+
 	bool data_submit_dircet = false;
 	struct allow_port_bitmap *bp = allow_port_bitmap__lookup(&k0);
 	if (bp) {
@@ -1204,15 +1219,23 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 		conn_info->protocol = PROTO_ORTHER;
 		conn_info->message_type = MSG_REQUEST;
 	} else {
-		infer_l7_class(conn_info, direction, args, bytes_count, sock_state, extra);
+		infer_l7_class(ctx_map, conn_info, direction, args,
+			       bytes_count, sock_state, extra);
 	}
 
 	// When at least one of protocol or message_type is valid, 
 	// data_submit can be performed, otherwise MySQL data may be lost
 	if (conn_info->protocol != PROTO_UNKNOWN ||
 	    conn_info->message_type != MSG_UNKNOWN) {
-		return data_submit(ctx, conn_info, args, extra->vecs,
-				   (__u32)bytes_count, offset, args->enter_ts, extra);
+		/*
+		 * Fill in tail call context information.
+		 */
+		ctx_map->tail_call.conn_info = __conn_info;
+		ctx_map->tail_call.extra = *extra;
+		ctx_map->tail_call.bytes_count = bytes_count;
+		ctx_map->tail_call.offset = offset;
+
+		return 0;
 	}
 
 	return -1;
@@ -1228,9 +1251,11 @@ static __inline void process_syscall_data(struct pt_regs* ctx, __u64 id,
 	};
 
 	if (!process_data(ctx, id, direction, args, bytes_count, &extra)) {
-		bpf_tail_call(ctx, &NAME(progs_jmp_tp_map), 0);
+		bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
+			      PROG_DATA_SUBMIT_TP_IDX);
 	} else {
-		bpf_tail_call(ctx, &NAME(progs_jmp_tp_map), 1);
+		bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
+			      PROG_IO_EVENT_TP_IDX);
 	}
 }
 
@@ -1245,9 +1270,11 @@ static __inline void process_syscall_data_vecs(struct pt_regs* ctx, __u64 id,
 	};
 
 	if (!process_data(ctx, id, direction, args, bytes_count, &extra)) {
-		bpf_tail_call(ctx, &NAME(progs_jmp_tp_map), 0);
+		bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
+			      PROG_DATA_SUBMIT_TP_IDX);
 	} else {
-		bpf_tail_call(ctx, &NAME(progs_jmp_tp_map), 1);
+		bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
+			      PROG_IO_EVENT_TP_IDX);
 	}
 }
 
@@ -1868,6 +1895,73 @@ PROGKP(output_data) (void *ctx)
 	return output_data_common(ctx);
 }
 
+static __inline int data_submit(void *ctx)
+{
+	int ret = 0;
+	__u32 k0 = 0;
+	struct ctx_info_s *ctx_map =
+			bpf_map_lookup_elem(&NAME(ctx_info), &k0);
+	if (!ctx_map)
+		return 0;
+
+	__u64 id = bpf_get_current_pid_tgid();
+	struct conn_info_t *conn_info;
+	struct conn_info_t __conn_info = ctx_map->tail_call.conn_info;
+	conn_info = &__conn_info;
+	__u64 conn_key = gen_conn_key_id(id >> 32, (__u64)conn_info->fd);
+	conn_info->socket_info_ptr = socket_info_map__lookup(&conn_key);
+
+	struct data_args_t *args;
+	if (conn_info->direction == T_INGRESS)
+		args = active_read_args_map__lookup(&id);
+	else
+		args = active_write_args_map__lookup(&id);
+
+	if (args == NULL)
+		return 0;
+
+	const bool vecs = ctx_map->tail_call.extra.vecs;
+	__u32 bytes_count = ctx_map->tail_call.bytes_count;
+	struct member_fields_offset *offset = ctx_map->tail_call.offset;
+	__u64 enter_ts = args->enter_ts;
+	const struct process_data_extra extra = ctx_map->tail_call.extra;
+
+	ret = __data_submit(ctx, conn_info, args, vecs, bytes_count,
+			    offset, enter_ts, &extra);
+
+	return ret;
+}
+
+PROGTP(data_submit) (void *ctx)
+{	int ret;
+	ret = data_submit(ctx);
+	if (ret == 0) {
+		bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
+			      PROG_OUTPUT_DATA_TP_IDX);
+	} else {
+		bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
+			      PROG_IO_EVENT_TP_IDX);
+	}
+
+	return 0;
+}
+
+PROGKP(data_submit) (void *ctx)
+{
+	int ret;
+	ret = data_submit(ctx);
+	if (ret == 0) {
+		bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
+			      PROG_OUTPUT_DATA_KP_IDX);
+	} else {
+		__u64 id = bpf_get_current_pid_tgid();	
+		active_read_args_map__delete(&id);
+		active_write_args_map__delete(&id);
+	}
+
+	return 0;
+}
+
 static __inline bool is_regular_file(int fd)
 {
 	__u32 k0 = 0;
@@ -1973,7 +2067,8 @@ static __inline void trace_io_event_common(void *ctx,
 	context->vecs = false;
 	context->dir = direction;
 
-	bpf_tail_call(ctx, &NAME(progs_jmp_tp_map), 0);
+	bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
+		      PROG_OUTPUT_DATA_TP_IDX);
 	return;
 }
 

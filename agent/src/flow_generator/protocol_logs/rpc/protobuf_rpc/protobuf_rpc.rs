@@ -19,13 +19,11 @@ use serde::Serialize;
 
 use crate::{
     common::{
-        flow::FlowPerfStats,
+        flow::L7PerfStats,
         l7_protocol_info::L7ProtocolInfo,
         l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
-        MetaPacket,
     },
-    config::handler::LogParserConfig,
-    flow_generator::{perf::L7FlowPerf, AppProtoHead, Error, Result},
+    flow_generator::Result,
 };
 
 use super::{all_protobuf_rpc_parser, ProtobufRpcLog};
@@ -78,53 +76,8 @@ impl L7ProtocolParserInterface for ProtobufRpcWrapLog {
     fn parse_default(&self) -> bool {
         false
     }
-}
 
-impl L7FlowPerf for ProtobufRpcWrapLog {
-    fn parse(
-        &mut self,
-        config: Option<&LogParserConfig>,
-        packet: &MetaPacket,
-        _: u64,
-    ) -> Result<()> {
-        let Some(config) = config else {
-            return Err(Error::NoParseConfig);
-        };
-        let param = ParseParam::from((packet, config));
-
-        if let Some(payload) = packet.get_l4_payload() {
-            if self.parser.is_none() {
-                for mut p in all_protobuf_rpc_parser().into_iter() {
-                    if p.parse_payload(payload, &param).is_ok() {
-                        self.parser = Some(p);
-                        return Ok(());
-                    }
-                }
-                return Err(Error::L7ProtocolUnknown);
-            } else {
-                self.parser
-                    .as_mut()
-                    .unwrap()
-                    .parse_payload(payload, &param)?;
-                return Ok(());
-            }
-        } else {
-            return Err(Error::ZeroPayloadLen);
-        }
-    }
-
-    fn data_updated(&self) -> bool {
-        return self.parser.is_some() && self.parser.as_ref().unwrap().data_updated();
-    }
-
-    fn copy_and_reset_data(&mut self, l7_timeout_count: u32) -> FlowPerfStats {
-        self.parser
-            .as_mut()
-            .unwrap()
-            .copy_and_reset_data(l7_timeout_count)
-    }
-
-    fn app_proto_head(&mut self) -> Option<(AppProtoHead, u16)> {
-        self.parser.as_mut().unwrap().app_proto_head()
+    fn perf_stats(&mut self) -> Option<L7PerfStats> {
+        self.parser.as_mut().and_then(|p| p.perf_stats())
     }
 }

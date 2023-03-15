@@ -25,4 +25,5 @@ type GenesisConfig struct {
 	QueueLengths            int      `default:"60" yaml:"queue_length"`
 	DataPersistenceInterval int      `default:"60" yaml:"data_persistence_interval"`
 	MultiNSMode             bool     `default:"false" yaml:"multi_ns_mode"`
+	SingleVPCMode           bool     `default:"false" yaml:"single_vpc_mode"`
 }

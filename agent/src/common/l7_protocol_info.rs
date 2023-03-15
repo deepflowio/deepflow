@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
+use super::flow::PacketDirection;
 use enum_dispatch::enum_dispatch;
+use log::{error, warn};
 use serde::Serialize;
 
 use crate::flow_generator::{
@@ -22,8 +24,10 @@ use crate::flow_generator::{
         pb_adapter::L7ProtocolSendLog, DnsInfo, DubboInfo, HttpInfo, KafkaInfo, MqttInfo,
         MysqlInfo, PostgreInfo, ProtobufRpcInfo, RedisInfo, SofaRpcInfo,
     },
-    AppProtoHead, Result,
+    AppProtoHead, LogMessageType, Result,
 };
+
+use super::{ebpf::EbpfType, l7_protocol_log::ParseParam};
 
 #[macro_export]
 macro_rules! log_info_merge {
@@ -112,6 +116,94 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
     // when need merge more than once, use to determine if the stream has ended.
     fn is_req_resp_end(&self) -> (bool, bool) {
         (false, false)
+    }
+
+    fn cal_cache_key(&self, param: &ParseParam) -> u128 {
+        /*
+            if session id is some: flow id 64bit | 0 32bit | session id 32bit
+            if session id is none: flow id 64bit | packet_seq 64bit
+        */
+        match self.session_id() {
+            Some(sid) => ((param.flow_id as u128) << 64) | sid as u128,
+            None => {
+                ((param.flow_id as u128) << 64)
+                    | (if param.ebpf_type != EbpfType::None {
+                        if param.direction == PacketDirection::ClientToServer {
+                            param.packet_seq + 1
+                        } else {
+                            param.packet_seq
+                        }
+                    } else {
+                        0
+                    }) as u128
+            }
+        }
+    }
+
+    /*
+        calculate rrt
+        if have previous log cache:
+            if previous is req and current is resp and current time > previous time
+                rrt = current time - previous time
+            if previous is resp and current is req and current time < previous time, likely ebfp disorder
+                rrt =  previous time - current time
+
+            otherwise can not calculate rrt, cache current log rrt
+
+        if have no previous log cache, cache the current log rrt
+    */
+    fn cal_rrt(&mut self, param: &ParseParam) -> Option<u64> {
+        let mut perf_cache = param.l7_perf_cache.borrow_mut();
+        let cache_key = self.cal_cache_key(param);
+        let previous_log_info = perf_cache.rrt_cache.pop(&cache_key);
+
+        let time = param.time;
+        let msg_type: LogMessageType = param.direction.into();
+
+        if time != 0 {
+            let Some(previous_log_info) = previous_log_info else {
+                perf_cache.rrt_cache.put(cache_key, (param.direction.into(), param.time));
+                let timeout_count = perf_cache.timeout_cache.get_or_insert_mut(param.flow_id, ||0);
+                *timeout_count += 1;
+                return None;
+            };
+
+            let timeout_count = perf_cache.timeout_cache.get_mut(&param.flow_id);
+
+            // if previous is req and current is resp, calculate the round trip time.
+            if previous_log_info.0 == LogMessageType::Request
+                && msg_type == LogMessageType::Response
+                && time > previous_log_info.1
+            {
+                let rrt = time - previous_log_info.1;
+                timeout_count.map(|x| *x -= 1);
+                Some(rrt)
+
+            // if previous is resp and current is req and previous time gt current time, likely ebpf disorder,
+            // calculate the round trip time.
+            } else if previous_log_info.0 == LogMessageType::Response
+                && msg_type == LogMessageType::Request
+                && previous_log_info.1 > time
+            {
+                let rrt = previous_log_info.1 - time;
+                timeout_count.map(|x| *x -= 1);
+                Some(rrt)
+            } else {
+                warn!(
+                    "can not calculate rrt, flow_id: {}, previous log type:{:?}, previous time: {}, current log type: {:?}, current time: {}",
+                    param.flow_id, previous_log_info.0, previous_log_info.1, msg_type, param.time,
+                );
+                timeout_count.map(|x| *x += 1);
+                perf_cache.rrt_cache.put(
+                    self.cal_cache_key(param),
+                    (param.direction.into(), param.time),
+                );
+                None
+            }
+        } else {
+            error!("flow_id: {}, packet time 0", param.flow_id);
+            None
+        }
     }
 }
 

@@ -35,8 +35,8 @@ pub use packet_sequence::PacketSequenceParser; // Enterprise Edition Feature: pa
 pub use perf::L7RrtCache;
 pub use protocol_logs::L7ProtoRawDataType;
 pub use protocol_logs::{
-    AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsParser, DnsLog, DubboLog,
-    HttpLog, KafkaLog, LogMessageType, MetaAppProto, MqttLog, MysqlLog, RedisLog,
+    AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, DnsLog, DubboLog, HttpLog, KafkaLog,
+    LogMessageType, MetaAppProto, MqttLog, MysqlLog, RedisLog,
 };
 
 use std::time::Duration;
@@ -54,5 +54,5 @@ const COUNTER_FLOW_ID_MASK: u64 = 0xFFFFFF;
 const SERVICE_TABLE_IPV4_CAPACITY: usize = 2048;
 // 暂定的Ipv6 ServiceTable LRU cache 容量
 const SERVICE_TABLE_IPV6_CAPACITY: usize = 256;
-const L7_RRT_CACHE_CAPACITY: usize = 4096;
+const L7_RRT_CACHE_CAPACITY: usize = 8192;
 const L7_PROTOCOL_UNKNOWN_LIMIT: Duration = Duration::from_secs(60);

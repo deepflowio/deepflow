@@ -30,7 +30,7 @@ use crate::{
             value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus, LogMessageType,
         },
     },
-    log_info_merge, parse_common,
+    log_info_merge,
     utils::bytes::{read_i16_be, read_u16_be, read_u32_be},
 };
 
@@ -253,11 +253,10 @@ impl L7ProtocolParserInterface for KafkaLog {
         if !param.ebpf_type.is_raw_protocol() {
             return false;
         }
-        Self::kafka_check_protocol(payload, param)
+        Self::check_protocol(payload, param)
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
-        parse_common!(self, param);
         Self::parse(
             self,
             payload,
@@ -356,7 +355,7 @@ impl KafkaLog {
         })
     }
 
-    pub fn kafka_check_protocol(payload: &[u8], param: &ParseParam) -> bool {
+    pub fn check_protocol(payload: &[u8], param: &ParseParam) -> bool {
         if param.l4_protocol != IpProtocol::Tcp {
             return false;
         }
@@ -399,13 +398,15 @@ impl KafkaLog {
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
     use std::path::Path;
+    use std::rc::Rc;
+    use std::{cell::RefCell, fs};
 
     use super::*;
 
     use crate::{
-        common::{flow::PacketDirection, MetaPacket},
+        common::{flow::PacketDirection, l7_protocol_log::L7PerfCache, MetaPacket},
+        flow_generator::L7_RRT_CACHE_CAPACITY,
         utils::test::Capture,
     };
 
@@ -413,6 +414,7 @@ mod tests {
 
     fn run(name: &str) -> String {
         let capture = Capture::load_pcap(Path::new(FILE_DIR).join(name), None);
+        let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
         let mut packets = capture.as_meta_packets();
         if packets.is_empty() {
             return "".to_string();
@@ -441,8 +443,10 @@ mod tests {
                 None,
                 None,
             );
-            let is_kafka =
-                KafkaLog::kafka_check_protocol(payload, &ParseParam::from(packet as &MetaPacket));
+            let is_kafka = KafkaLog::check_protocol(
+                payload,
+                &ParseParam::from((packet as &MetaPacket, log_cache.clone(), false)),
+            );
             output.push_str(&format!("{:?} is_kafka: {}\r\n", kafka.info, is_kafka));
         }
         output
