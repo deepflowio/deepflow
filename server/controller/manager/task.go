@@ -40,18 +40,12 @@ type Task struct {
 func NewTask(domain mysql.Domain, cfg config.TaskConfig, ctx context.Context, resourceEventQueue *queue.OverwriteQueue) *Task {
 
 	tCtx, tCancel := context.WithCancel(ctx)
-	cloud := cloud.NewCloud(domain, cfg.CloudCfg, tCtx)
-	if cloud == nil {
-		return nil
-	}
-
-	log.Infof("task (%s) init success", domain.Name)
 
 	return &Task{
 		tCtx:         tCtx,
 		tCancel:      tCancel,
 		cfg:          cfg,
-		Cloud:        cloud,
+		Cloud:        cloud.NewCloud(domain, cfg.CloudCfg, tCtx),
 		Recorder:     recorder.NewRecorder(domain.Lcuuid, cfg.RecorderCfg, tCtx, resourceEventQueue),
 		DomainName:   domain.Name,
 		DomainConfig: domain.Config,
