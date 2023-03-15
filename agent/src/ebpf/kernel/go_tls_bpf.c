@@ -118,7 +118,6 @@ int uprobe_go_tls_write_exit(struct pt_regs *ctx)
 		.vecs = false,
 		.source = DATA_SOURCE_GO_TLS_UPROBE,
 		.coroutine_id = key.goid,
-		.is_go_process = true,
 	};
 
 	bpf_map_delete_elem(&tls_conn_map, &key);
@@ -235,7 +234,6 @@ int uprobe_go_tls_read_exit(struct pt_regs *ctx)
 		.vecs = false,
 		.source = DATA_SOURCE_GO_TLS_UPROBE,
 		.coroutine_id = key.goid,
-		.is_go_process = true,
 	};
 
 	bpf_map_delete_elem(&tls_conn_map, &key);
