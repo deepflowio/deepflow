@@ -360,7 +360,7 @@ impl From<HttpInfo> for L7ProtocolSendLog {
 
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct HttpLog {
-    info: HttpInfo,
+    pub info: HttpInfo,
 
     // check 是否已经解析过，已经解析过parse会跳过
     parsed: bool,

@@ -127,7 +127,7 @@ impl MysqlInfo {
 
     pub fn get_command_str(&self) -> &'static str {
         let command = [
-            "COM_SLEEP",
+            "", // command 0 is resp, ignore
             "COM_QUIT",
             "COM_INIT_DB",
             "COM_QUERY",
@@ -225,7 +225,10 @@ impl L7ProtocolParserInterface for MysqlLog {
     ) -> Result<Vec<L7ProtocolInfo>> {
         parse_common!(self, param);
         self.info.is_tls = param.is_tls();
-        self.parse(payload, param.l4_protocol, param.direction, None, None)?;
+        if self.parse(payload, param.l4_protocol, param.direction, None, None)? {
+            // ignore greeting
+            return Ok(vec![]);
+        }
         Ok(vec![L7ProtocolInfo::MysqlInfo(self.info.clone())])
     }
 
@@ -241,7 +244,11 @@ impl L7ProtocolParserInterface for MysqlLog {
         *self = Self {
             l7_proto: self.l7_proto,
             command: self.command,
-            ..Default::default()
+            info: MysqlInfo {
+                protocol_version: self.info.protocol_version,
+                status: L7ResponseStatus::Ok,
+                ..Default::default()
+            },
         };
     }
 }
@@ -259,12 +266,6 @@ fn mysql_string(payload: &[u8]) -> String {
 impl MysqlLog {
     fn request_string(&mut self, payload: &[u8]) {
         self.info.context = mysql_string(payload);
-    }
-
-    fn reset_logs(&mut self) {
-        self.info = MysqlInfo::default();
-        self.info.status = L7ResponseStatus::Ok;
-        self.info.error_code = None;
     }
 
     fn greeting(&mut self, payload: &[u8]) -> Result<()> {
@@ -411,6 +412,7 @@ impl MysqlLog {
         false
     }
 
+    // return is_greeting?
     fn parse(
         &mut self,
         payload: &[u8],
@@ -418,11 +420,10 @@ impl MysqlLog {
         direction: PacketDirection,
         _is_req_end: Option<bool>,
         _is_resp_end: Option<bool>,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
         }
-        self.reset_logs();
 
         let mut header = MysqlHeader::default();
         let offset = header.decode(payload);
@@ -437,12 +438,15 @@ impl MysqlLog {
         match msg_type {
             LogMessageType::Request => self.request(&payload[offset..])?,
             LogMessageType::Response => self.response(&payload[offset..])?,
-            LogMessageType::Other => self.greeting(&payload[offset..])?,
+            LogMessageType::Other => {
+                self.greeting(&payload[offset..])?;
+                return Ok(true);
+            }
             _ => return Err(Error::MysqlLogParseFailed),
         };
         self.info.msg_type = msg_type;
 
-        Ok(())
+        Ok(false)
     }
 }
 
@@ -557,6 +561,7 @@ mod tests {
             let is_mysql =
                 MysqlLog::mysql_check_protocol(payload, &ParseParam::from(packet as &MetaPacket));
             output.push_str(&format!("{:?} is_mysql: {}\r\n", mysql.info, is_mysql));
+            mysql.reset();
         }
         output
     }
