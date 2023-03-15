@@ -1034,6 +1034,7 @@ CREATE TABLE IF NOT EXISTS `resource_group` (
   `vl2_ids`                 TEXT COMMENT 'vl2 ids separated by ,',
   `epc_id`                  INTEGER,
   `pod_cluster_id`          INTEGER,
+  `pod_namespace_id`        INTEGER,
   `extra_info_ids`          TEXT COMMENT 'resource group extra info ids separated by ,',
   `lb_id`                   INTEGER,
   `lb_listener_id`          INTEGER,
