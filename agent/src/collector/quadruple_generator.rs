@@ -961,6 +961,7 @@ impl QuadrupleGenerator {
                 l7_response: 0,
                 syn: perf_stats.map(|s| s.tcp.syn_count).unwrap_or_default(),
                 synack: perf_stats.map(|s| s.tcp.synack_count).unwrap_or_default(),
+                direction_score: tagged_flow.flow.direction_score,
             };
             if tagged_flow.flow.flow_key.proto == IpProtocol::Tcp {
                 match tagged_flow.flow.close_type {
@@ -1043,6 +1044,7 @@ impl QuadrupleGenerator {
                     traffic: AppTraffic {
                         request: (tagged_flow.flow.close_type != CloseType::ForcedReport) as u32,
                         response: (tagged_flow.flow.close_type != CloseType::ForcedReport) as u32,
+                        direction_score: tagged_flow.flow.direction_score,
                     },
                     ..Default::default()
                 }
@@ -1052,6 +1054,7 @@ impl QuadrupleGenerator {
                     traffic: AppTraffic {
                         request: stats.l7.request_count,
                         response: stats.l7.response_count,
+                        direction_score: tagged_flow.flow.direction_score,
                     },
                     latency: AppLatency {
                         rrt_max: stats.l7.rrt_max,
