@@ -76,6 +76,7 @@ int uprobe_openssl_write_exit(struct pt_regs *ctx)
 	struct process_data_extra extra = {
 		.vecs = false,
 		.source = DATA_SOURCE_OPENSSL_UPROBE,
+		.is_go_process = false,
 	};
 
 	ssl_ctx_map__delete(&id);
@@ -131,6 +132,7 @@ int uprobe_openssl_read_exit(struct pt_regs *ctx)
 	struct process_data_extra extra = {
 		.vecs = false,
 		.source = DATA_SOURCE_OPENSSL_UPROBE,
+		.is_go_process = false,
 	};
 
 	ssl_ctx_map__delete(&id);

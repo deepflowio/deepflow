@@ -993,7 +993,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 
 	if (conn_info->message_type != MSG_PRESTORE &&
 	    conn_info->message_type != MSG_RECONFIRM &&
-	    !(trace_key.goid != 0 && timeout == 0))
+	    (timeout != 0 || extra->is_go_process == false))
 		trace_process(socket_info_ptr, conn_info, socket_id, pid_tgid,
 			      trace_info_ptr, trace_conf, trace_stats,
 			      &thread_trace_id, time_stamp, &trace_key);
@@ -1247,6 +1247,7 @@ static __inline void process_syscall_data(struct pt_regs* ctx, __u64 id,
 	struct process_data_extra extra = {
 		.vecs = false,
 		.source = DATA_SOURCE_SYSCALL,
+		.is_go_process = is_current_go_process(),
 	};
 
 	if (!process_data(ctx, id, direction, args, bytes_count, &extra)) {
@@ -1265,6 +1266,7 @@ static __inline void process_syscall_data_vecs(struct pt_regs* ctx, __u64 id,
 	struct process_data_extra extra = {
 		.vecs = true,
 		.source = DATA_SOURCE_SYSCALL,
+		.is_go_process = is_current_go_process(),
 	};
 
 	if (!process_data(ctx, id, direction, args, bytes_count, &extra)) {
