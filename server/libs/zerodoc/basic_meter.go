@@ -39,6 +39,8 @@ type Traffic struct {
 	L7Response  uint32 `db:"l7_response"`
 	SynCount    uint32 `db:"syn_count"`
 	SynackCount uint32 `db:"synack_count"`
+
+	DirectionScore uint8 `db:"direction_score"`
 }
 
 func (t *Traffic) Reverse() {
@@ -66,6 +68,8 @@ func (t *Traffic) WriteToPB(p *pb.Traffic) {
 	p.L7Response = t.L7Response
 	p.Syn = t.SynCount
 	p.Synack = t.SynackCount
+
+	p.DirectionScore = uint32(t.DirectionScore)
 }
 
 func (t *Traffic) ReadFromPB(p *pb.Traffic) {
@@ -84,6 +88,7 @@ func (t *Traffic) ReadFromPB(p *pb.Traffic) {
 	t.L7Response = p.L7Response
 	t.SynCount = p.Syn
 	t.SynackCount = p.Synack
+	t.DirectionScore = uint8(p.DirectionScore)
 }
 
 func (t *Traffic) ConcurrentMerge(other *Traffic) {
@@ -102,6 +107,9 @@ func (t *Traffic) ConcurrentMerge(other *Traffic) {
 	t.L7Response += other.L7Response
 	t.SynCount += other.SynCount
 	t.SynackCount += other.SynackCount
+	if t.DirectionScore < other.DirectionScore {
+		t.DirectionScore = other.DirectionScore
+	}
 }
 
 func (t *Traffic) SequentialMerge(other *Traffic) {
@@ -117,11 +125,11 @@ func (t *Traffic) MarshalTo(b []byte) int {
 
 	fields := []string{
 		"packet_tx=", "packet_rx=", "byte_tx=", "byte_rx=", "byte=", "l3_byte_tx=", "l3_byte_rx=", "l4_byte_tx=", "l4_byte_rx=", "new_flow=", "closed_flow=",
-		"l7_request=", "l7_response=", "syn_count=", "synack_count=",
+		"l7_request=", "l7_response=", "syn_count=", "synack_count=", "direction_score=",
 	}
 	values := []uint64{
 		t.PacketTx, t.PacketRx, t.ByteTx, t.ByteRx, t.ByteTx + t.ByteRx, t.L3ByteTx, t.L3ByteRx, t.L4ByteTx, t.L4ByteRx, t.NewFlow, t.ClosedFlow,
-		uint64(t.L7Request), uint64(t.L7Response), uint64(t.SynCount), uint64(t.SynackCount),
+		uint64(t.L7Request), uint64(t.L7Response), uint64(t.SynCount), uint64(t.SynackCount), uint64(t.DirectionScore),
 	}
 	n := marshalKeyValues(b[offset:], fields, values)
 	if n == 0 {
@@ -156,7 +164,7 @@ const (
 
 // Columns列和WriteBlock的列需要按顺序一一对应
 func TrafficColumns() []*ckdb.Column {
-	return ckdb.NewColumnsWithComment(
+	columns := ckdb.NewColumnsWithComment(
 		[][2]string{
 			TRAFFIC_PACKET_TX: {"packet_tx", "累计发送总包数"},
 			TRAFFIC_PACKET_RX: {"packet_rx", "累计接收总包数"},
@@ -181,6 +189,8 @@ func TrafficColumns() []*ckdb.Column {
 			TRAFFIC_SYNACK_COUNT: {"synack_count", "Total SYNACK packet count"},
 		},
 		ckdb.UInt64)
+	columns = append(columns, ckdb.NewColumn("direction_score", ckdb.UInt8).SetIndex(ckdb.IndexNone))
+	return columns
 }
 
 // WriteBlock的列需和Columns 按顺序一一对应
@@ -206,6 +216,7 @@ func (t *Traffic) WriteBlock(block *ckdb.Block) {
 
 		uint64(t.SynCount),
 		uint64(t.SynackCount),
+		t.DirectionScore,
 	)
 }
 
