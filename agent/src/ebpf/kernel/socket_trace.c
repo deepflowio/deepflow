@@ -26,6 +26,10 @@
 
 #define PROTO_INFER_CACHE_SIZE  80
 
+#define SUBMIT_OK		(0)
+#define SUBMIT_INVALID		(-1)
+#define SUBMIT_ABORT		(-2)
+
 /***********************************************************
  * map definitions
  ***********************************************************/
@@ -928,23 +932,23 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	      const struct process_data_extra *extra)
 {
 	if (conn_info == NULL) {
-		return -1;
+		return SUBMIT_INVALID;
 	}
 
 	// ignore non-http protocols that are go tls
 	if (extra->source == DATA_SOURCE_GO_TLS_UPROBE) {
 		if (conn_info->protocol != PROTO_HTTP1)
-			return -1;
+			return SUBMIT_INVALID;
 	}
 
 	if (extra->source == DATA_SOURCE_OPENSSL_UPROBE) {
 		if (conn_info->protocol != PROTO_HTTP1 &&
 		    conn_info->protocol != PROTO_HTTP2)
-			return -1;
+			return SUBMIT_INVALID;
 	}
 
 	if (conn_info->sk == NULL || conn_info->message_type == MSG_UNKNOWN) {
-		return -1;
+		return SUBMIT_INVALID;
 	}
 
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
@@ -955,7 +959,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 
 	if (conn_info->message_type == MSG_CLEAR) {
 		delete_socket_info(conn_key, conn_info->socket_info_ptr);
-		return -1;
+		return SUBMIT_INVALID;
 	}
 
 	__u32 tcp_seq = args->tcp_seq;
@@ -964,7 +968,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	struct socket_info_t sk_info = { 0 };
 	struct trace_conf_t *trace_conf = trace_conf_map__lookup(&k0);
 	if (trace_conf == NULL)
-		return -1;
+		return SUBMIT_INVALID;
 
 	/*
 	 * It is possible that these values were modified during ebpf running,
@@ -974,7 +978,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 
 	struct trace_stats *trace_stats = trace_stats_map__lookup(&k0);
 	if (trace_stats == NULL)
-		return -1;
+		return SUBMIT_INVALID;
 
 	__u32 timeout = trace_conf->go_tracing_timeout;
 	struct trace_key_t trace_key = get_trace_key(timeout);
@@ -1034,7 +1038,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	 */
 	if (conn_info->message_type == MSG_PRESTORE ||
 	    conn_info->message_type == MSG_RECONFIRM)
-		return -1;
+		return SUBMIT_INVALID;
 
 	if (is_socket_info_valid(socket_info_ptr)) {
 		sk_info.uid = socket_info_ptr->uid;
@@ -1068,16 +1072,16 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 
 	struct __socket_data_buffer *v_buff = bpf_map_lookup_elem(&NAME(data_buf), &k0);
 	if (!v_buff)
-		return -1;
+		return SUBMIT_INVALID;
 
 	struct __socket_data *v = (struct __socket_data *)&v_buff->data[0];
 
 	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*v)))
-		return -1;
+		return SUBMIT_INVALID;
 
 	v = (struct __socket_data *)(v_buff->data + v_buff->len);
 	if (get_socket_info(v, conn_info->sk, conn_info) == false)
-		return -1;
+		return SUBMIT_INVALID;
 
 	v->tuple.l4_protocol = conn_info->tuple.l4_protocol;
 	v->tuple.dport = conn_info->tuple.dport;
@@ -1158,7 +1162,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	context->vecs = (bool) vecs;
 	context->dir = conn_info->direction;
 
-	return 0;
+	return SUBMIT_OK;
 }
 
 static __inline int process_data(struct pt_regs *ctx, __u64 id,
@@ -1902,7 +1906,7 @@ static __inline int data_submit(void *ctx)
 	struct ctx_info_s *ctx_map =
 			bpf_map_lookup_elem(&NAME(ctx_info), &k0);
 	if (!ctx_map)
-		return 0;
+		return SUBMIT_ABORT;
 
 	__u64 id = bpf_get_current_pid_tgid();
 	struct conn_info_t *conn_info;
@@ -1918,7 +1922,7 @@ static __inline int data_submit(void *ctx)
 		args = active_write_args_map__lookup(&id);
 
 	if (args == NULL)
-		return 0;
+		return SUBMIT_ABORT;
 
 	const bool vecs = ctx_map->tail_call.extra.vecs;
 	__u32 bytes_count = ctx_map->tail_call.bytes_count;
@@ -1935,9 +1939,11 @@ static __inline int data_submit(void *ctx)
 PROGTP(data_submit) (void *ctx)
 {	int ret;
 	ret = data_submit(ctx);
-	if (ret == 0) {
+	if (ret == SUBMIT_OK) {
 		bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
 			      PROG_OUTPUT_DATA_TP_IDX);
+	} else if (ret == SUBMIT_ABORT) {
+		return 0;
 	} else {
 		bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
 			      PROG_IO_EVENT_TP_IDX);
@@ -1950,9 +1956,11 @@ PROGKP(data_submit) (void *ctx)
 {
 	int ret;
 	ret = data_submit(ctx);
-	if (ret == 0) {
+	if (ret == SUBMIT_OK) {
 		bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
 			      PROG_OUTPUT_DATA_KP_IDX);
+	} else if (ret == SUBMIT_ABORT) {
+		return 0;
 	} else {
 		__u64 id = bpf_get_current_pid_tgid();	
 		active_read_args_map__delete(&id);
