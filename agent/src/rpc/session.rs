@@ -195,7 +195,7 @@ impl Session {
 
     async fn update_current_server(&self) -> bool {
         let changed = self.server_dispatcher.write().update_current_ip();
-        if changed {
+        if changed || self.get_client().is_none() {
             let (ip, port) = self.server_dispatcher.read().get_current_ip();
             self.dial(&ip, port).await;
             self.version.fetch_add(1, Ordering::SeqCst);
