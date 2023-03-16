@@ -108,7 +108,7 @@ func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, isSub
 		return nil
 	}
 
-	portNameRegex := domainConfigJson.Get("port_name_regex").MustString()
+	portNameRegex := domainConfigJson.Get("subdomain_port_name_regex").MustString()
 	if portNameRegex == "" {
 		portNameRegex = K8S_VINTERFACE_NAME_REGEX
 	}
