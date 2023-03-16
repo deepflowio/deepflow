@@ -35,7 +35,11 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 		"NodePort":  common.POD_SERVICE_TYPE_NODEPORT,
 		"ClusterIP": common.POD_SERVICE_TYPE_CLUSTERIP,
 	}
-	for _, s := range k.k8sInfo["*v1.Service"] {
+	servicesArray := k.k8sInfo["*v1.Service"]
+	if serviceRules, ok := k.k8sInfo["*v1.ServiceRule"]; ok {
+		servicesArray = append(servicesArray, serviceRules...)
+	}
+	for _, s := range servicesArray {
 		sData, sErr := simplejson.NewJson([]byte(s))
 		if sErr != nil {
 			err = sErr
@@ -80,9 +84,13 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 		if clusterIP == "None" {
 			clusterIP = ""
 		}
+		labels := metaData.Get("labels").MustMap()
+		labelSlice := cloudcommon.StringInterfaceMapKVs(labels, ":")
+		labelString := strings.Join(labelSlice, ", ")
 		service := model.PodService{
 			Lcuuid:             uID,
 			Name:               name,
+			Label:              labelString,
 			Type:               specType,
 			Selector:           selectorStrings,
 			ServiceClusterIP:   clusterIP,

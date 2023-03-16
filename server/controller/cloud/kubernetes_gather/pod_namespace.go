@@ -49,6 +49,10 @@ func (k *KubernetesGather) getPodNamespaces() ([]model.PodNamespace, error) {
 			continue
 		}
 		k.namespaceToLcuuid[name] = uID
+		clusterNativeName := metaData.GetPath("labels", "virtual-kubelet.io/provider-cluster-native-name").MustString()
+		if clusterNativeName != "" {
+			k.namespaceToExLabels[name] = map[string]interface{}{"virtual-kubelet.io/provider-cluster-native-name": clusterNativeName}
+		}
 		podNamespace := model.PodNamespace{
 			Lcuuid:           uID,
 			Name:             name,
