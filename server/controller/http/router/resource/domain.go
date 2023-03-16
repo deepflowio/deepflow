@@ -17,6 +17,9 @@
 package resource
 
 import (
+	"encoding/json"
+	"io"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 
@@ -171,11 +174,20 @@ func updateSubDomain(c *gin.Context) {
 }
 
 func applyDomainAddtionalResource(c *gin.Context) {
-	var err error
-	var data model.AdditionalResource
+	b, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		BadRequestResponse(c, common.SERVER_ERROR, err.Error())
+		return
+	}
+	err = CheckJSONParam(string(b), model.AdditionalResource{})
+	if err != nil {
+		BadRequestResponse(c, common.PARAMETER_ILLEGAL, err.Error())
+		return
+	}
 
+	var data model.AdditionalResource
+	err = json.Unmarshal(b, &data)
 	// invalidate request body
-	err = c.ShouldBindBodyWith(&data, binding.JSON)
 	if err != nil {
 		BadRequestResponse(c, common.INVALID_PARAMETERS, err.Error())
 		return
