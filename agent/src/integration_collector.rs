@@ -17,7 +17,7 @@
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, TcpStream};
-use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU16, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
@@ -51,7 +51,7 @@ use crate::metric::document::TapSide;
 use crate::policy::PolicyGetter;
 
 use public::counter::{Counter, CounterType, CounterValue, OwnedCountable};
-use public::enums::{EthernetType, L4Protocol};
+use public::enums::{EthernetType, L4Protocol, TapType};
 use public::l7_protocol::L7Protocol;
 use public::proto::integration::opentelemetry::proto::common::v1::any_value::Value::IntValue;
 use public::proto::integration::opentelemetry::proto::trace::v1::Span;
@@ -211,6 +211,7 @@ fn decode_otel_trace_data(
     data: Vec<u8>,
     local_epc_id: u32,
     policy_getter: Arc<PolicyGetter>,
+    time_diff: i64,
     is_collect: bool,
 ) -> Result<(Vec<u8>, Vec<Box<TaggedFlow>>), GenericError> {
     let mut tagged_flow: Vec<Box<TaggedFlow>> = vec![];
@@ -223,30 +224,11 @@ fn decode_otel_trace_data(
     //  Fill in the (key: "app.host.ip", value: peer IP) attribute value
     let mut skip_verify_ip = true;
 
-    let mut ip: IpAddr;
+    let mut ip = get_ip(peer_addr.ip());
     let host_ip = KeyValue {
         key: "app.host.ip".into(),
         value: Some(AnyValue {
-            value: {
-                let ip_str = match peer_addr.ip() {
-                    IpAddr::V4(s) => {
-                        ip = IpAddr::V4(s);
-                        s.to_string()
-                    }
-                    IpAddr::V6(s) => match s.to_ipv4() {
-                        // Some values are like: "::ffff:0.0.0.0"it is either an IPv4-compatible address
-                        Some(v4) => {
-                            ip = IpAddr::V4(v4);
-                            v4.to_string()
-                        }
-                        None => {
-                            ip = IpAddr::V6(s);
-                            s.to_string()
-                        }
-                    },
-                };
-                Some(StringValue(ip_str))
-            },
+            value: { Some(StringValue(ip.to_string())) },
         }),
     };
 
@@ -302,6 +284,7 @@ fn decode_otel_trace_data(
                         local_epc_id,
                         otel_service.clone(),
                         otel_instance.clone(),
+                        time_diff,
                     ) {
                         Some(f) => {
                             tagged_flow.push(Box::new(f));
@@ -324,6 +307,7 @@ fn fill_tagged_flow(
     local_epc_id: u32,
     otel_service: Option<String>,
     otel_instance: Option<String>,
+    time_diff: i64,
 ) -> Option<TaggedFlow> {
     let (mut ip0, mut ip1, eth_type) = if ip.is_ipv4() {
         (
@@ -387,6 +371,7 @@ fn fill_tagged_flow(
                 if let Some(value) = attr.value.clone() {
                     if let Some(StringValue(val)) = value.value {
                         if let Ok(ip_addr) = val.parse::<IpAddr>() {
+                            let ip_addr = get_ip(ip_addr);
                             if tagged_flow.flow.tap_side == TapSide::ClientApp {
                                 ip1 = ip_addr;
                             } else {
@@ -432,7 +417,11 @@ fn fill_tagged_flow(
 
     let start_time = span.start_time_unix_nano;
     let end_time = span.end_time_unix_nano;
-    tagged_flow.flow.flow_stat_time = Timestamp::from_nanos(start_time);
+    if time_diff >= 0 {
+        tagged_flow.flow.flow_stat_time = Timestamp::from_nanos(start_time + time_diff as u64);
+    } else {
+        tagged_flow.flow.flow_stat_time = Timestamp::from_nanos(start_time - -time_diff as u64);
+    }
     let rrt = if end_time > start_time {
         (end_time - start_time) / 1000 // unit: μs
     } else {
@@ -495,7 +484,19 @@ fn fill_tagged_flow(
     peer_dst.is_local_mac = dst_info.is_local_mac;
     peer_dst.is_local_ip = dst_info.is_local_ip;
     peer_dst.nat_real_ip = tagged_flow.flow.flow_key.ip_dst;
+    tagged_flow.flow.flow_key.tap_type = TapType::Cloud;
     Some(tagged_flow)
+}
+
+fn get_ip(ip_addr: IpAddr) -> IpAddr {
+    match ip_addr {
+        IpAddr::V4(s) => IpAddr::V4(s),
+        IpAddr::V6(s) => match s.to_ipv4() {
+            // Some values are like: "::ffff:0.0.0.0"it is either an IPv4-compatible address
+            Some(v4) => IpAddr::V4(v4),
+            None => IpAddr::V6(s),
+        },
+    }
 }
 
 fn http_code_to_response_status(status_code: i64) -> L7ResponseStatus {
@@ -529,6 +530,7 @@ async fn handler(
     counter: Arc<CompressedMetric>,
     local_epc_id: u32,
     policy_getter: Arc<PolicyGetter>,
+    time_diff: Arc<AtomicI64>,
 ) -> Result<Response<Body>, GenericError> {
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/") => {
@@ -548,11 +550,13 @@ async fn handler(
                 }
             };
             let tracing_data = decode_metric(whole_body, &part.headers)?;
+            let time_diff = time_diff.load(Ordering::Relaxed);
             let mut decode_data = decode_otel_trace_data(
                 peer_addr,
                 tracing_data,
                 local_epc_id,
                 policy_getter,
+                time_diff,
                 otel_metrics_collect_sender.is_some(),
             )
             .map_err(|e| {
@@ -758,6 +762,7 @@ pub struct MetricServer {
     compressed: Arc<AtomicBool>,
     local_epc_id: u32,
     policy_getter: Arc<PolicyGetter>,
+    time_diff: Arc<AtomicI64>,
 }
 
 impl MetricServer {
@@ -774,6 +779,7 @@ impl MetricServer {
         compressed: bool,
         local_epc_id: u32,
         policy_getter: PolicyGetter,
+        time_diff: Arc<AtomicI64>,
     ) -> (Self, IntegrationCounter) {
         let counter = IntegrationCounter::default();
         (
@@ -794,6 +800,7 @@ impl MetricServer {
                 counter: counter.metrics.clone(),
                 local_epc_id,
                 policy_getter: Arc::new(policy_getter),
+                time_diff,
             },
             counter,
         )
@@ -833,6 +840,7 @@ impl MetricServer {
         let compressed = self.compressed.clone();
         let local_epc_id = self.local_epc_id.clone();
         let policy_getter = self.policy_getter.clone();
+        let time_diff = self.time_diff.clone();
         let (tx, mut rx) = mpsc::channel(8);
         self.runtime
             .spawn(Self::alive_check(monitor_port.clone(), tx.clone(), mon_rx));
@@ -888,6 +896,7 @@ impl MetricServer {
                     let compressed = compressed.clone();
                     let local_epc_id = local_epc_id.clone();
                     let policy_getter = policy_getter.clone();
+                    let time_diff = time_diff.clone();
                     let service = make_service_fn(move |conn: &AddrStream| {
                         let otel_sender = otel_sender.clone();
                         let compressed_otel_sender = compressed_otel_sender.clone();
@@ -901,6 +910,7 @@ impl MetricServer {
                         let compressed = compressed.clone();
                         let local_epc_id = local_epc_id.clone();
                         let policy_getter = policy_getter.clone();
+                        let time_diff = time_diff.clone();
                         async move {
                             Ok::<_, GenericError>(service_fn(move |req| {
                                 handler(
@@ -917,6 +927,7 @@ impl MetricServer {
                                     counter.clone(),
                                     local_epc_id,
                                     policy_getter.clone(),
+                                    time_diff.clone(),
                                 )
                             }))
                         }
