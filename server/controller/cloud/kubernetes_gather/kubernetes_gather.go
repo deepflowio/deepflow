@@ -63,6 +63,7 @@ type KubernetesGather struct {
 	k8sInfo                      map[string][]string
 	nsLabelToGroupLcuuids        map[string]mapset.Set
 	pgLcuuidTopodTargetPorts     map[string]map[string]int
+	namespaceToExLabels          map[string]map[string]interface{}
 	nsServiceNameToService       map[string]map[string]map[string]int
 	cloudStatsd                  statsd.CloudStatsd
 }
@@ -149,6 +150,7 @@ func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, isSub
 		k8sInfo:                      map[string][]string{},
 		nsLabelToGroupLcuuids:        map[string]mapset.Set{},
 		pgLcuuidTopodTargetPorts:     map[string]map[string]int{},
+		namespaceToExLabels:          map[string]map[string]interface{}{},
 		nsServiceNameToService:       map[string]map[string]map[string]int{},
 		cloudStatsd: statsd.CloudStatsd{
 			APICount: make(map[string][]int),

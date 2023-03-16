@@ -163,6 +163,11 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, e
 			}
 		}
 		labels := metaData.Get("labels").MustMap()
+		if exLabels, ok := k.namespaceToExLabels[namespace]; ok {
+			for exK, exV := range exLabels {
+				labels[exK] = exV
+			}
+		}
 		labelSlice := cloudcommon.StringInterfaceMapKVs(labels, ":")
 		labelString := strings.Join(labelSlice, ", ")
 		pod := model.Pod{
