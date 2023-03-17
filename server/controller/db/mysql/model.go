@@ -703,6 +703,7 @@ type PodService struct {
 	Base             `gorm:"embedded"`
 	SoftDeleteBase   `gorm:"embedded"`
 	Name             string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
+	Label            string `gorm:"column:label;type:text;default:''" json:"LABEL"` // separated by ,
 	Alias            string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS"`
 	Type             int    `gorm:"column:type;type:int;default:null" json:"TYPE"`        // 1: ClusterIP 2: NodePort
 	Selector         string `gorm:"column:selector;type:text;default:''" json:"SELECTOR"` // separated by ,
