@@ -795,6 +795,7 @@ TRUNCATE TABLE pod_namespace;
 CREATE TABLE IF NOT EXISTS pod_service (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '',
+    label               TEXT COMMENT 'separated by ,',
     alias               CHAR(64) DEFAULT '',
     type                INTEGER DEFAULT NULL COMMENT '1: ClusterIP 2: NodePort',
     selector            TEXT COMMENT 'separated by ,',
