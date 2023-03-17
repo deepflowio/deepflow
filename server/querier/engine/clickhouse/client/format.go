@@ -47,22 +47,22 @@ func TransType(value interface{}, columnName, columnDatabaseTypeName string) (in
 	case *int64:
 		return int(*v), VALUE_TYPE_INT, nil
 	case **int8: // for nullable
-		if v == nil {
+		if *v == nil {
 			return nil, VALUE_TYPE_INT, nil
 		}
 		return int(**v), VALUE_TYPE_INT, nil
 	case **int16: // for nullable
-		if v == nil {
+		if *v == nil {
 			return nil, VALUE_TYPE_INT, nil
 		}
 		return int(**v), VALUE_TYPE_INT, nil
 	case **int32: // for nullable
-		if v == nil {
+		if *v == nil {
 			return nil, VALUE_TYPE_INT, nil
 		}
 		return int(**v), VALUE_TYPE_INT, nil
 	case **int64: // for nullable
-		if v == nil {
+		if *v == nil {
 			return nil, VALUE_TYPE_INT, nil
 		}
 		return int(**v), VALUE_TYPE_INT, nil
@@ -75,22 +75,22 @@ func TransType(value interface{}, columnName, columnDatabaseTypeName string) (in
 	case *uint64:
 		return int(*v), VALUE_TYPE_INT, nil
 	case **uint8: // for nullable
-		if v == nil {
+		if *v == nil {
 			return nil, VALUE_TYPE_INT, nil
 		}
 		return int(**v), VALUE_TYPE_INT, nil
 	case **uint16: // for nullable
-		if v == nil {
+		if *v == nil {
 			return nil, VALUE_TYPE_INT, nil
 		}
 		return int(**v), VALUE_TYPE_INT, nil
 	case **uint32: // for nullable
-		if v == nil {
+		if *v == nil {
 			return nil, VALUE_TYPE_INT, nil
 		}
 		return int(**v), VALUE_TYPE_INT, nil
 	case **uint64: // for nullable
-		if v == nil {
+		if *v == nil {
 			return nil, VALUE_TYPE_INT, nil
 		}
 		return int(**v), VALUE_TYPE_INT, nil
@@ -100,7 +100,7 @@ func TransType(value interface{}, columnName, columnDatabaseTypeName string) (in
 		return v.String(), VALUE_TYPE_STRING, nil
 	case **float64: // Nullable(float64)
 		// NaN, Inf
-		if v == nil || math.IsNaN(**v) || **v == math.Inf(1) || **v == math.Inf(-1) {
+		if *v == nil || math.IsNaN(**v) || **v == math.Inf(1) || **v == math.Inf(-1) {
 			return nil, VALUE_TYPE_FLOAT64, nil
 		}
 		return **v, VALUE_TYPE_FLOAT64, nil
