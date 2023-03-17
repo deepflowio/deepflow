@@ -320,7 +320,13 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 	}
 
 	if c.EnabledApplicationMonitoring() == false {
-		yamlConfig.BpfDisabled = proto.Bool(true)
+		if yamlConfig.Ebpf == nil {
+			yamlConfig.Ebpf = &cmodel.EbpfConfig{
+				Disabled: proto.Bool(true),
+			}
+		} else {
+			yamlConfig.Ebpf.Disabled = proto.Bool(true)
+		}
 	}
 
 	b, err := yaml.Marshal(yamlConfig)
