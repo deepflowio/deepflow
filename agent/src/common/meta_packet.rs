@@ -29,17 +29,17 @@ use pnet::packet::{
 };
 
 use super::ebpf::EbpfType;
+#[cfg(target_os = "linux")]
+use super::enums::TapType;
 use super::{
     consts::*,
     decapsulate::TunnelInfo,
     endpoint::EndpointData,
     enums::{EthernetType, HeaderType, IpProtocol, TcpFlags},
-    flow::{L7Protocol, SignalSource},
+    flow::{L7Protocol, PacketDirection, SignalSource},
     lookup_key::LookupKey,
     tap_port::TapPort,
 };
-#[cfg(target_os = "linux")]
-use super::{enums::TapType, flow::PacketDirection};
 
 use crate::error;
 use crate::utils::bytes::{read_u16_be, read_u32_be};

@@ -254,7 +254,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 		DB:       "flow_tag",
 		Context:  ctx,
 	}
-	sql := "SELECT key FROM k8s_label_map GROUP BY key"
+	sql := "SELECT key FROM flow_tag.k8s_label_map GROUP BY key"
 	rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
 	if err != nil {
 		return nil, err
@@ -277,7 +277,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 	}
 
 	// 查询cloud.tag
-	chostCloudTagSql := "SELECT key FROM chost_cloud_tag_map GROUP BY key"
+	chostCloudTagSql := "SELECT key FROM flow_tag.chost_cloud_tag_map GROUP BY key"
 	chostCloudTagRst, err := chClient.DoQuery(&client.QueryParams{Sql: chostCloudTagSql})
 	if err != nil {
 		return nil, err
@@ -298,7 +298,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 		}
 	}
 
-	podNSCloudTagSql := "SELECT key FROM pod_ns_cloud_tag_map GROUP BY key"
+	podNSCloudTagSql := "SELECT key FROM flow_tag.pod_ns_cloud_tag_map GROUP BY key"
 	podNSCloudTagRst, err := chClient.DoQuery(&client.QueryParams{Sql: podNSCloudTagSql})
 	if err != nil {
 		return nil, err
@@ -320,7 +320,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 	}
 
 	// 查询 os.app
-	osAPPTagSql := "SELECT key FROM os_app_tag_map GROUP BY key"
+	osAPPTagSql := "SELECT key FROM flow_tag.os_app_tag_map GROUP BY key"
 	osAPPTagRst, err := chClient.DoQuery(&client.QueryParams{Sql: osAPPTagSql})
 	if err != nil {
 		return nil, err
@@ -360,9 +360,9 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 	}
 	externalSql := ""
 	if whereSql != "" {
-		externalSql = fmt.Sprintf("SELECT field_name AS tag_name FROM %s_custom_field WHERE table='%s' AND field_type='tag' AND (%s) GROUP BY tag_name ORDER BY tag_name ASC", db, table, whereSql)
+		externalSql = fmt.Sprintf("SELECT field_name AS tag_name FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type='tag' AND (%s) GROUP BY tag_name ORDER BY tag_name ASC", db, table, whereSql)
 	} else {
-		externalSql = fmt.Sprintf("SELECT field_name AS tag_name FROM %s_custom_field WHERE table='%s' AND field_type='tag' GROUP BY tag_name ORDER BY tag_name ASC", db, table)
+		externalSql = fmt.Sprintf("SELECT field_name AS tag_name FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type='tag' GROUP BY tag_name ORDER BY tag_name ASC", db, table)
 	}
 	externalRst, err := externalChClient.DoQuery(&client.QueryParams{Sql: externalSql})
 	if err != nil {
@@ -521,6 +521,7 @@ func GetTagValues(db, table, sql string) (*common.Result, []string, error) {
 	if strings.Contains(strings.ToLower(sql), "like") || strings.Contains(strings.ToLower(sql), "regexp") {
 		orderBy = "length(display_name)"
 	}
+	// querier will be called later, so there is no need to display the declaration db
 	sql = fmt.Sprintf("SELECT value,name AS display_name, description FROM %s WHERE tag_name='%s' %s GROUP BY value, display_name, description ORDER BY %s ASC %s", table, tag, whereSql, orderBy, limitSql)
 	log.Debug(sql)
 	sqlList = append(sqlList, sql)
@@ -593,7 +594,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 				// 增加资源ID
 				resourceId := resourceKey + "_id"
 				resourceName := resourceKey + "_name"
-				sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type, uid FROM ip_resource_map %s GROUP BY value, display_name, device_type, uid ORDER BY %s ASC %s", resourceId, resourceName, strconv.Itoa(resourceType), whereSql, orderBy, limitSql)
+				sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type, uid FROM flow_tag.ip_resource_map %s GROUP BY value, display_name, device_type, uid ORDER BY %s ASC %s", resourceId, resourceName, strconv.Itoa(resourceType), whereSql, orderBy, limitSql)
 				sql = strings.ReplaceAll(sql, " like ", " ilike ")
 				sql = strings.ReplaceAll(sql, " LIKE ", " ILIKE ")
 				log.Debug(sql)
@@ -617,7 +618,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 					resourceId = "pod_service_id"
 					resourceName = "pod_service_name"
 				}
-				sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type, uid FROM ip_resource_map %s GROUP BY value, display_name, device_type, uid ORDER BY %s ASC %s", resourceId, resourceName, strconv.Itoa(resourceType), whereSql, orderBy, limitSql)
+				sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type, uid FROM flow_tag.ip_resource_map %s GROUP BY value, display_name, device_type, uid ORDER BY %s ASC %s", resourceId, resourceName, strconv.Itoa(resourceType), whereSql, orderBy, limitSql)
 				sql = strings.ReplaceAll(sql, " like ", " ilike ")
 				sql = strings.ReplaceAll(sql, " LIKE ", " ILIKE ")
 				log.Debug(sql)
@@ -635,10 +636,10 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 		case "chost", "rds", "redis", "lb", "natgw":
 			resourceId := tag + "_id"
 			resourceName := tag + "_name"
-			sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, uid FROM ip_resource_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", resourceId, resourceName, whereSql, orderBy, limitSql)
+			sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, uid FROM flow_tag.ip_resource_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", resourceId, resourceName, whereSql, orderBy, limitSql)
 
 		case "vpc", "l2_vpc":
-			sql = fmt.Sprintf("SELECT vpc_id AS value, vpc_name AS display_name, uid FROM ip_resource_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+			sql = fmt.Sprintf("SELECT vpc_id AS value, vpc_name AS display_name, uid FROM flow_tag.ip_resource_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 
 		case "service", "router", "host", "dhcpgw", "pod_service", "ip", "lb_listener", "pod_ingress", "az", "region", "pod_cluster", "pod_ns", "pod_node", "pod_group", "pod", "subnet":
 			resourceId := tag + "_id"
@@ -650,13 +651,13 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 				resourceId = "pod_service_id"
 				resourceName = "pod_service_name"
 			}
-			sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name FROM ip_resource_map %s GROUP BY value, display_name ORDER BY %s ASC %s", resourceId, resourceName, whereSql, orderBy, limitSql)
+			sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name FROM flow_tag.ip_resource_map %s GROUP BY value, display_name ORDER BY %s ASC %s", resourceId, resourceName, whereSql, orderBy, limitSql)
 
 		case "tap":
-			sql = fmt.Sprintf("SELECT value, name AS display_name FROM tap_type_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+			sql = fmt.Sprintf("SELECT value, name AS display_name FROM flow_tag.tap_type_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 
 		case "vtap", "gprocess":
-			sql = fmt.Sprintf("SELECT id AS value, name AS display_name FROM %s_map %s GROUP BY value, display_name ORDER BY %s ASC %s", tag, whereSql, orderBy, limitSql)
+			sql = fmt.Sprintf("SELECT id AS value, name AS display_name FROM flow_tag.%s_map %s GROUP BY value, display_name ORDER BY %s ASC %s", tag, whereSql, orderBy, limitSql)
 
 		default:
 			if strings.HasPrefix(tag, "k8s.label.") {
@@ -666,7 +667,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 				} else {
 					whereSql = fmt.Sprintf("WHERE `key`='%s'", labelTag)
 				}
-				sql = fmt.Sprintf("SELECT value, value AS display_name FROM k8s_label_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+				sql = fmt.Sprintf("SELECT value, value AS display_name FROM flow_tag.k8s_label_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 			} else if strings.HasPrefix(tag, "cloud.tag.") {
 				cloudTag := strings.TrimPrefix(tag, "cloud.tag.")
 				if whereSql != "" {
@@ -676,7 +677,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 				}
 				results := &common.Result{}
 				for _, table := range []string{"chost_cloud_tag_map", "pod_ns_cloud_tag_map"} {
-					sql = fmt.Sprintf("SELECT value, value AS display_name FROM %s %s GROUP BY value, display_name ORDER BY %s ASC %s", table, whereSql, orderBy, limitSql)
+					sql = fmt.Sprintf("SELECT value, value AS display_name FROM flow_tag.%s %s GROUP BY value, display_name ORDER BY %s ASC %s", table, whereSql, orderBy, limitSql)
 					sql = strings.ReplaceAll(sql, " like ", " ilike ")
 					sql = strings.ReplaceAll(sql, " LIKE ", " ILIKE ")
 					log.Debug(sql)
@@ -695,7 +696,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 				} else {
 					whereSql = fmt.Sprintf("WHERE `key`='%s'", osAPPTag)
 				}
-				sql = fmt.Sprintf("SELECT value, value AS display_name FROM os_app_tag_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+				sql = fmt.Sprintf("SELECT value, value AS display_name FROM flow_tag.os_app_tag_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 			} else {
 				return GetExternalTagValues(db, table, rawSql)
 			}
@@ -709,6 +710,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 		}
 		return rst, sqlList, nil
 	} else {
+		// querier will be called later, so there is no need to display the declaration db
 		deviceType, ok := TAG_RESOURCE_TYPE_DEVICE_MAP[tag]
 		if ok {
 			if whereSql != "" {
@@ -772,7 +774,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 			}
 			results := &common.Result{}
 			for _, table := range []string{"chost_cloud_tag_map", "pod_ns_cloud_tag_map"} {
-				sql = fmt.Sprintf("SELECT value, value AS display_name FROM %s %s GROUP BY value, display_name ORDER BY %s ASC %s", table, whereSql, orderBy, limitSql)
+				sql = fmt.Sprintf("SELECT value, value AS display_name FROM flow_tag.%s %s GROUP BY value, display_name ORDER BY %s ASC %s", table, whereSql, orderBy, limitSql)
 				sql = strings.ReplaceAll(sql, " like ", " ilike ")
 				sql = strings.ReplaceAll(sql, " LIKE ", " ILIKE ")
 				log.Debug(sql)

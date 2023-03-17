@@ -77,34 +77,46 @@ func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, isSub
 	var clusterID string
 	var lcuuid string
 	var configJson *simplejson.Json
+	var domainConfigJson *simplejson.Json
 	var err error
 
+	domainConfigJson, err = simplejson.NewJson([]byte(domain.Config))
 	// 如果是K8s云平台，转换domain表的config
-	if domain != nil {
-		name = domain.Name
-		lcuuid = domain.Lcuuid
-		displayName = domain.DisplayName
-		clusterID = domain.ClusterID
-		configJson, err = simplejson.NewJson([]byte(domain.Config))
-	} else if subDomain != nil {
+	if isSubDomain {
+		if subDomain == nil {
+			log.Error("subdomain model is nil")
+			return nil
+		}
 		name = subDomain.Name
 		lcuuid = subDomain.Lcuuid
 		displayName = subDomain.DisplayName
 		clusterID = subDomain.ClusterID
 		configJson, err = simplejson.NewJson([]byte(subDomain.Config))
 	} else {
-		log.Error("domain and sub_domain are nil")
-		return nil
+		if domain == nil {
+			log.Error("domain model is nil")
+			return nil
+		}
+		name = domain.Name
+		lcuuid = domain.Lcuuid
+		displayName = domain.DisplayName
+		clusterID = domain.ClusterID
+		configJson = domainConfigJson
 	}
 	if err != nil {
 		log.Error(err)
 		return nil
 	}
 
-	portNameRegex := configJson.Get("port_name_regex").MustString()
+	portNameRegex := domainConfigJson.Get("subdomain_port_name_regex").MustString()
 	if portNameRegex == "" {
 		portNameRegex = K8S_VINTERFACE_NAME_REGEX
 	}
+	sPortNameRegex := configJson.Get("port_name_regex").MustString()
+	if sPortNameRegex != "" {
+		portNameRegex = sPortNameRegex
+	}
+
 	_, regxErr := regexp.Compile(portNameRegex)
 	if regxErr != nil {
 		log.Errorf("newkubernetesgather portnameregex (%s) compile error: (%s)", portNameRegex, regxErr.Error())

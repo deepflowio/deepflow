@@ -779,6 +779,14 @@ impl DomainNameListener {
         self.run();
     }
 
+    fn notify_stop(&mut self) -> Option<JoinHandle<()>> {
+        if self.thread_handler.is_none() {
+            return None;
+        }
+        self.stopped.store(true, Ordering::Relaxed);
+        self.thread_handler.take()
+    }
+
     fn stop(&mut self) {
         if self.thread_handler.is_none() {
             return;
@@ -2132,6 +2140,8 @@ impl AgentComponents {
             return;
         }
 
+        let mut join_handles = vec![];
+
         for d in self.dispatchers.iter_mut() {
             d.stop();
         }
@@ -2140,45 +2150,89 @@ impl AgentComponents {
         {
             self.platform_synchronizer.stop_kubernetes_poller();
             self.socket_synchronizer.stop();
-            self.api_watcher.stop();
+            if let Some(h) = self.api_watcher.notify_stop() {
+                join_handles.push(h);
+            }
         }
 
         for q in self.collectors.iter_mut() {
-            q.stop();
+            join_handles.append(&mut q.notify_stop());
         }
 
         for p in self.session_aggrs.iter() {
-            p.stop();
+            if let Some(h) = p.notify_stop() {
+                join_handles.push(h);
+            }
         }
 
-        self.l4_flow_uniform_sender.stop();
-        self.metrics_uniform_sender.stop();
-        self.l7_flow_uniform_sender.stop();
+        if let Some(h) = self.l4_flow_uniform_sender.notify_stop() {
+            join_handles.push(h);
+        }
+        if let Some(h) = self.metrics_uniform_sender.notify_stop() {
+            join_handles.push(h);
+        }
+        if let Some(h) = self.l7_flow_uniform_sender.notify_stop() {
+            join_handles.push(h);
+        }
 
         self.debugger.stop();
         #[cfg(target_os = "linux")]
-        if let Some(ebpf_collector) = self.ebpf_collector.as_mut() {
-            ebpf_collector.stop();
+        if let Some(h) = self.ebpf_collector.as_mut().and_then(|t| t.notify_stop()) {
+            join_handles.push(h);
         }
 
         self.external_metrics_server.stop();
-        self.otel_uniform_sender.stop();
-        self.compressed_otel_uniform_sender.stop();
-        self.prometheus_uniform_sender.stop();
-        self.telegraf_uniform_sender.stop();
-        self.profile_uniform_sender.stop();
-        self.packet_sequence_uniform_sender.stop(); // Enterprise Edition Feature: packet-sequence
-        self.domain_name_listener.stop();
+        if let Some(h) = self.otel_uniform_sender.notify_stop() {
+            join_handles.push(h);
+        }
+        if let Some(h) = self.compressed_otel_uniform_sender.notify_stop() {
+            join_handles.push(h);
+        }
+        if let Some(h) = self.prometheus_uniform_sender.notify_stop() {
+            join_handles.push(h);
+        }
+        if let Some(h) = self.telegraf_uniform_sender.notify_stop() {
+            join_handles.push(h);
+        }
+        if let Some(h) = self.profile_uniform_sender.notify_stop() {
+            join_handles.push(h);
+        }
+        // Enterprise Edition Feature: packet-sequence
+        if let Some(h) = self.packet_sequence_uniform_sender.notify_stop() {
+            join_handles.push(h);
+        }
+        if let Some(h) = self.domain_name_listener.notify_stop() {
+            join_handles.push(h);
+        }
         self.handler_builders.iter().for_each(|x| {
             x.lock().unwrap().iter_mut().for_each(|y| {
-                y.stop();
+                if let Some(h) = y.notify_stop() {
+                    join_handles.push(h);
+                }
             })
         });
-        self.npb_bandwidth_watcher.stop();
-        for p in self.pcap_assemblers.iter() {
-            p.stop();
+        if let Some(h) = self.npb_bandwidth_watcher.notify_stop() {
+            join_handles.push(h);
         }
-        self.npb_arp_table.stop();
+        for p in self.pcap_assemblers.iter() {
+            if let Some(h) = p.notify_stop() {
+                join_handles.push(h);
+            }
+        }
+        if let Some(h) = self.npb_arp_table.notify_stop() {
+            join_handles.push(h);
+        }
+
+        for handle in join_handles {
+            if !handle.is_finished() {
+                info!(
+                    "wait for {} to fully stop",
+                    handle.thread().name().unwrap_or("unnamed thread")
+                );
+            }
+            let _ = handle.join();
+        }
+
         info!("Stopped agent components.")
     }
 }

@@ -675,6 +675,18 @@ impl QuadrupleGeneratorThread {
         info!("quadruple generator id: {} started", self.id);
     }
 
+    pub fn notify_stop(&mut self) -> Option<JoinHandle<()>> {
+        if !self.running.swap(false, Ordering::Relaxed) {
+            warn!(
+                "quadruple generator id: {} already stopped, do nothing.",
+                self.id
+            );
+            return None;
+        }
+        info!("notified stopping quadruple generator: {}", self.id);
+        self.thread_handle.take()
+    }
+
     pub fn stop(&mut self) {
         if !self.running.swap(false, Ordering::Relaxed) {
             warn!(
@@ -683,7 +695,7 @@ impl QuadrupleGeneratorThread {
             );
             return;
         }
-        info!("stoping quadruple generator: {}", self.id);
+        info!("stopping quadruple generator: {}", self.id);
         let _ = self.thread_handle.take().unwrap().join();
         info!("stopped quadruple generator: {}", self.id);
     }

@@ -636,6 +636,14 @@ impl SessionAggregator {
         info!("app protocol logs parser (id={}) started", self.id);
     }
 
+    pub fn notify_stop(&self) -> Option<JoinHandle<()>> {
+        if !self.running.swap(false, Ordering::SeqCst) {
+            return None;
+        }
+        info!("notified app protocol logs parser (id={}) to stop", self.id);
+        self.thread.lock().unwrap().take()
+    }
+
     pub fn stop(&self) {
         if !self.running.swap(false, Ordering::SeqCst) {
             return;
