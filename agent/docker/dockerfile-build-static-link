@@ -1,0 +1,9 @@
+FROM ghcr.io/deepflowio/rust-build:1.17 as builder
+COPY .  /deepflow/
+WORKDIR /deepflow/agent
+ARG GITHUB_REF_NAME
+RUN cp docker/rust-proxy-config /usr/local/cargo/config && RUSTFLAGS="-D warnings" && cargo build --release --target=x86_64-unknown-linux-musl && \
+    cargo build --release --bin deepflow-agent-ctl --target=x86_64-unknown-linux-musl && \
+    ls -alh target/x86_64-unknown-linux-musl/release
+FROM scratch
+COPY --from=builder /deepflow/agent/ /

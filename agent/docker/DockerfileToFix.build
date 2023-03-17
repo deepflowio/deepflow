@@ -51,7 +51,9 @@ RUN yum -y install https://forensics.cert.org/cert-forensics-tools-release-el7.r
     ln -s /usr/include/libGoReSym.h libGoReSym.h  && \
     ln -s /usr/include/linux linux  && \
     ln -s /usr/include/sys/queue.h sys/queue.h && \
-    ln -s /usr/include/zlib.h zlib.h
+    ln -s /usr/include/zlib.h zlib.h && \
+    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/libpcap.a --silent -o /usr/lib64/libpcap.a && \
+    chmod 755 /usr/lib64/libpcap.a
 
 RUN rustup target add x86_64-unknown-linux-musl
 ## 使用依赖缓存

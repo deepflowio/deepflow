@@ -1,4 +1,4 @@
-FROM docker.io/alpine
+FROM ubuntu:22.04
 
 ARG TZ='Asia/Harbin'
 ENV DEFAULT_TZ ${TZ}
@@ -6,22 +6,29 @@ ENV IN_CONTAINER yes
 ENV RUST_BACKTRACE 1
 ARG TARGETARCH
 RUN --mount=target=/tmp-mount \
-    apk upgrade --update \
-    && apk add -U tzdata \
-    && cp /usr/share/zoneinfo/${DEFAULT_TZ} /etc/localtime \
-    && apk del tzdata \
-    && rm -rf /var/cache/apk/*  && \
     chmod 600 /etc/passwd; \
     echo "deepflow:x:1000:1000::/home/deepflow:/bin/bash" >> /etc/passwd; \
     echo "root:root" | chpasswd; \
     chmod 000 /etc/passwd; \
     mkdir -p /lib64 && \
+    apt-get update && apt-get install \
+    --no-install-suggests  --no-install-recommends -y \
+    tzdata \
+    busybox && \
+    /bin/cp /usr/share/zoneinfo/${DEFAULT_TZ} /etc/localtime && \
     AGENT_BUILD_ARCH=$(echo ${TARGETARCH}|sed 's|amd64|x86_64|'|sed 's|arm64|aarch64|') && \
-    cp -raf /tmp-mount/${AGENT_BUILD_ARCH}/agent/output/target/${AGENT_BUILD_ARCH}-unknown-linux-musl/release/deepflow-agent /bin/  && \
-    cp -raf /tmp-mount/${AGENT_BUILD_ARCH}/agent/output/target/${AGENT_BUILD_ARCH}-unknown-linux-musl/release/deepflow-agent-ctl /bin/  && \
+    cp -raf /tmp-mount/${AGENT_BUILD_ARCH}/agent/output/target/release/deepflow-agent /bin/  && \
+    cp -raf /tmp-mount/${AGENT_BUILD_ARCH}/agent/output/target/release/deepflow-agent-ctl /bin/  && \
     cp -raf /tmp-mount/${AGENT_BUILD_ARCH}/agent/output/src/ebpf/deepflow-ebpfctl /bin/  && \
-    chmod 4755 /bin/busybox 
+    cp -raf /tmp-mount/agent/docker/require/${AGENT_BUILD_ARCH}/libelf.so.1 /usr/lib/${AGENT_BUILD_ARCH}-linux-gnu/ && \
+    chmod 777 /usr/lib/${AGENT_BUILD_ARCH}-linux-gnu/libelf.so.1
 
 USER root
 
 CMD /bin/deepflow-agent -f /etc/deepflow-agent/deepflow-agent.yaml
+
+    # apk upgrade --update \
+    # && apk add -U tzdata \
+    # && cp /usr/share/zoneinfo/${DEFAULT_TZ} /etc/localtime \
+    # && apk del tzdata \
+    # && rm -rf /var/cache/apk/*  && \
