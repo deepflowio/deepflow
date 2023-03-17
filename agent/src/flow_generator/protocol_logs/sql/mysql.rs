@@ -19,7 +19,7 @@ use serde::Serialize;
 use super::super::{consts::*, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
 use super::sql_check::is_mysql;
 
-use crate::log_info_merge;
+use crate::common::flow::L7PerfStats;
 use crate::{
     common::{
         enums::IpProtocol,
@@ -38,10 +38,6 @@ use crate::{
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct MysqlInfo {
     msg_type: LogMessageType,
-    #[serde(skip)]
-    start_time: u64,
-    #[serde(skip)]
-    end_time: u64,
     #[serde(skip)]
     is_tls: bool,
 
@@ -70,6 +66,8 @@ pub struct MysqlInfo {
     pub error_message: String,
     #[serde(rename = "response_status")]
     pub status: L7ResponseStatus,
+
+    rrt: u64,
 }
 
 impl L7ProtocolInfoInterface for MysqlInfo {
@@ -77,8 +75,10 @@ impl L7ProtocolInfoInterface for MysqlInfo {
         None
     }
 
-    fn merge_log(&mut self, other: crate::common::l7_protocol_info::L7ProtocolInfo) -> Result<()> {
-        log_info_merge!(self, MysqlInfo, other);
+    fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
+        if let L7ProtocolInfo::MysqlInfo(other) = other {
+            self.merge(other);
+        }
         Ok(())
     }
 
@@ -86,7 +86,7 @@ impl L7ProtocolInfoInterface for MysqlInfo {
         Some(AppProtoHead {
             proto: L7Protocol::MySQL,
             msg_type: self.msg_type,
-            rrt: self.end_time - self.start_time,
+            rrt: self.rrt,
         })
     }
 
@@ -126,7 +126,7 @@ impl MysqlInfo {
 
     pub fn get_command_str(&self) -> &'static str {
         let command = [
-            "COM_SLEEP",
+            "", // command 0 is resp, ignore
             "COM_QUIT",
             "COM_INIT_DB",
             "COM_QUERY",
@@ -198,8 +198,9 @@ impl From<MysqlInfo> for L7ProtocolSendLog {
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct MysqlLog {
     info: MysqlInfo,
-    l7_proto: L7Protocol,
     command: u8,
+    #[serde(skip)]
+    perf_stats: Option<L7PerfStats>,
 }
 
 impl L7ProtocolParserInterface for MysqlLog {
@@ -208,12 +209,22 @@ impl L7ProtocolParserInterface for MysqlLog {
             return false;
         }
         self.info.is_tls = param.is_tls();
-        Self::mysql_check_protocol(payload, param)
+        Self::check(payload, param)
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
         self.info.is_tls = param.is_tls();
-        self.parse(payload, param.l4_protocol, param.direction, None, None)?;
+        if self.perf_stats.is_none() {
+            self.perf_stats = Some(L7PerfStats::default())
+        };
+        if self.parse(payload, param.l4_protocol, param.direction)? {
+            // ignore greeting
+            return Ok(vec![]);
+        }
+        self.info.cal_rrt(param).map(|rrt| {
+            self.info.rrt = rrt;
+            self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+        });
         Ok(vec![L7ProtocolInfo::MysqlInfo(self.info.clone())])
     }
 
@@ -227,10 +238,19 @@ impl L7ProtocolParserInterface for MysqlLog {
 
     fn reset(&mut self) {
         *self = Self {
-            l7_proto: self.l7_proto,
             command: self.command,
-            ..Default::default()
+            info: MysqlInfo {
+                protocol_version: self.info.protocol_version,
+                status: L7ResponseStatus::Ok,
+                error_code: None,
+                ..Default::default()
+            },
+            perf_stats: self.perf_stats.take(),
         };
+    }
+
+    fn perf_stats(&mut self) -> Option<L7PerfStats> {
+        self.perf_stats.take()
     }
 }
 
@@ -247,12 +267,6 @@ fn mysql_string(payload: &[u8]) -> String {
 impl MysqlLog {
     fn request_string(&mut self, payload: &[u8]) {
         self.info.context = mysql_string(payload);
-    }
-
-    fn reset_logs(&mut self) {
-        self.info = MysqlInfo::default();
-        self.info.status = L7ResponseStatus::Ok;
-        self.info.error_code = None;
     }
 
     fn greeting(&mut self, payload: &[u8]) -> Result<()> {
@@ -279,7 +293,6 @@ impl MysqlLog {
         }
         let thread_id_offset = THREAD_ID_OFFSET_B + server_version_pos + 1;
         self.info.server_thread_id = bytes::read_u32_le(&payload[thread_id_offset..]);
-        self.l7_proto = L7Protocol::MySQL;
         Ok(())
     }
 
@@ -294,9 +307,10 @@ impl MysqlLog {
             COM_INIT_DB | COM_QUERY | COM_STMT_PREPARE => {
                 self.request_string(&payload[COMMAND_OFFSET + COMMAND_LEN..]);
             }
+            COM_PING => {}
             _ => return Err(Error::MysqlLogParseFailed),
         }
-        self.l7_proto = L7Protocol::MySQL;
+        self.perf_stats.as_mut().unwrap().inc_req();
         Ok(())
     }
 
@@ -358,6 +372,7 @@ impl MysqlLog {
                     self.info.error_message =
                         String::from_utf8_lossy(&payload[error_message_offset..]).into_owned();
                 }
+                self.perf_stats.as_mut().unwrap().inc_resp_err();
             }
             MYSQL_RESPONSE_CODE_OK => {
                 self.info.status = L7ResponseStatus::Ok;
@@ -369,10 +384,11 @@ impl MysqlLog {
             _ => (),
         }
         self.command = 0;
+        self.perf_stats.as_mut().unwrap().inc_resp();
         Ok(())
     }
 
-    pub fn mysql_check_protocol(payload: &[u8], param: &ParseParam) -> bool {
+    fn check(payload: &[u8], param: &ParseParam) -> bool {
         if param.l4_protocol != IpProtocol::Tcp {
             return false;
         }
@@ -399,18 +415,16 @@ impl MysqlLog {
         false
     }
 
+    // return is_greeting?
     fn parse(
         &mut self,
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
-        _is_req_end: Option<bool>,
-        _is_resp_end: Option<bool>,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
         }
-        self.reset_logs();
 
         let mut header = MysqlHeader::default();
         let offset = header.decode(payload);
@@ -419,18 +433,21 @@ impl MysqlLog {
         }
         let offset = offset as usize;
         let msg_type = header
-            .check(direction, offset, payload, self.l7_proto)
+            .check(direction, offset, payload)
             .ok_or(Error::MysqlLogParseFailed)?;
 
         match msg_type {
             LogMessageType::Request => self.request(&payload[offset..])?,
             LogMessageType::Response => self.response(&payload[offset..])?,
-            LogMessageType::Other => self.greeting(&payload[offset..])?,
+            LogMessageType::Other => {
+                self.greeting(&payload[offset..])?;
+                return Ok(true);
+            }
             _ => return Err(Error::MysqlLogParseFailed),
         };
         self.info.msg_type = msg_type;
 
-        Ok(())
+        Ok(false)
     }
 }
 
@@ -468,16 +485,13 @@ impl MysqlHeader {
         direction: PacketDirection,
         offset: usize,
         payload: &[u8],
-        l7_proto: L7Protocol,
     ) -> Option<LogMessageType> {
         if offset >= payload.len() || self.length == 0 {
             return None;
         }
-        if self.number != 0 && l7_proto == L7Protocol::Unknown {
-            return None;
-        }
 
         match direction {
+            // greeting
             PacketDirection::ServerToClient if self.number == 0 => {
                 let payload = &payload[offset..];
                 if payload.len() < PROTOCOL_VERSION_LEN {
@@ -500,6 +514,7 @@ impl MysqlHeader {
     }
 }
 
+// test log parse
 #[cfg(test)]
 mod tests {
     use std::path::Path;
@@ -538,18 +553,18 @@ mod tests {
                 Some(p) => p,
                 None => continue,
             };
-            let _ = mysql.parse(
-                payload,
-                packet.lookup_key.proto,
-                packet.lookup_key.direction,
-                None,
-                None,
-            );
-            let is_mysql = MysqlLog::mysql_check_protocol(
+            let is_mysql = mysql.check_payload(
                 payload,
                 &ParseParam::from((packet as &MetaPacket, log_cache.clone(), false)),
             );
+
+            let _ = mysql.parse_payload(
+                payload,
+                &ParseParam::from((&*packet, log_cache.clone(), false)),
+            );
+            mysql.info.rrt = 0;
             output.push_str(&format!("{:?} is_mysql: {}\r\n", mysql.info, is_mysql));
+            mysql.reset();
         }
         output
     }
@@ -587,5 +602,76 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn check_perf() {
+        let expecteds = vec![
+            (
+                "mysql.pcap",
+                L7PerfStats {
+                    request_count: 6,
+                    response_count: 7,
+                    err_client_count: 0,
+                    err_server_count: 0,
+                    err_timeout: 0,
+                    rrt_count: 5,
+                    rrt_sum: 373,
+                    rrt_max: 123,
+                },
+            ),
+            (
+                "mysql-error.pcap",
+                L7PerfStats {
+                    request_count: 4,
+                    response_count: 4,
+                    err_client_count: 0,
+                    err_server_count: 1,
+                    err_timeout: 0,
+                    rrt_count: 3,
+                    rrt_sum: 226,
+                    rrt_max: 146,
+                },
+            ),
+            (
+                "171-mysql.pcap",
+                L7PerfStats {
+                    request_count: 390,
+                    response_count: 390,
+                    err_client_count: 0,
+                    err_server_count: 0,
+                    err_timeout: 0,
+                    rrt_count: 390,
+                    rrt_sum: 127090,
+                    rrt_max: 5355,
+                },
+            ),
+        ];
+
+        for item in expecteds.iter() {
+            assert_eq!(item.1, run_perf(item.0), "pcap {} check failed", item.0);
+        }
+    }
+
+    fn run_perf(pcap: &str) -> L7PerfStats {
+        let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
+        let mut mysql = MysqlLog::default();
+
+        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap), Some(1400));
+        let mut packets = capture.as_meta_packets();
+
+        let first_src_mac = packets[0].lookup_key.src_mac;
+        for packet in packets.iter_mut() {
+            if packet.lookup_key.src_mac == first_src_mac {
+                packet.lookup_key.direction = PacketDirection::ClientToServer;
+            } else {
+                packet.lookup_key.direction = PacketDirection::ServerToClient;
+            }
+            if packet.get_l4_payload().is_some() {
+                let param = &ParseParam::from((&*packet, rrt_cache.clone(), true));
+                let _ = mysql.parse_payload(packet.get_l4_payload().unwrap(), param);
+            }
+        }
+        mysql.perf_stats.unwrap()
     }
 }
