@@ -206,7 +206,7 @@ func GetExtTables(db string, ctx context.Context) (values []interface{}) {
 		sql = "SELECT table FROM flow_tag.ext_metrics_custom_field GROUP BY table"
 		chClient.DB = "flow_tag"
 	} else {
-		sql = "SHOW TABLES"
+		sql = "SHOW TABLES FROM " + db
 	}
 	rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
 	if err != nil {
