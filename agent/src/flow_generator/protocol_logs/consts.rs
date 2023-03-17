@@ -146,6 +146,7 @@ pub const COM_QUIT: u8 = 1;
 pub const COM_INIT_DB: u8 = 2;
 pub const COM_QUERY: u8 = 3;
 pub const COM_FIELD_LIST: u8 = 4;
+pub const COM_PING: u8 = 14;
 pub const COM_STMT_PREPARE: u8 = 22;
 pub const COM_STMT_EXECUTE: u8 = 23;
 pub const COM_STMT_CLOSE: u8 = 25;

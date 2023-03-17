@@ -29,7 +29,7 @@ use serde::{Serialize, Serializer};
 use crate::{
     common::{
         enums::IpProtocol,
-        flow::{L7Protocol, PacketDirection},
+        flow::{L7PerfStats, L7Protocol, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
     },
@@ -45,10 +45,6 @@ use public::proto::flow_log::MqttTopic;
 
 #[derive(Serialize, Clone, Debug)]
 pub struct MqttInfo {
-    #[serde(skip)]
-    start_time: u64,
-    #[serde(skip)]
-    end_time: u64,
     msg_type: LogMessageType,
 
     #[serde(rename = "request_domain", skip_serializing_if = "Option::is_none")]
@@ -72,6 +68,8 @@ pub struct MqttInfo {
     #[serde(rename = "response_code", skip_serializing_if = "Option::is_none")]
     pub code: Option<i32>, // connect_ack packet return code
     pub status: L7ResponseStatus,
+
+    rrt: u64,
 }
 
 impl L7ProtocolInfoInterface for MqttInfo {
@@ -81,12 +79,6 @@ impl L7ProtocolInfoInterface for MqttInfo {
 
     fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
         if let L7ProtocolInfo::MqttInfo(mqtt) = other {
-            if mqtt.start_time < self.start_time {
-                self.start_time = mqtt.start_time;
-            }
-            if mqtt.end_time > self.end_time {
-                self.end_time = mqtt.end_time;
-            }
             self.merge(mqtt);
         }
         Ok(())
@@ -96,7 +88,7 @@ impl L7ProtocolInfoInterface for MqttInfo {
         Some(AppProtoHead {
             proto: L7Protocol::MQTT,
             msg_type: self.msg_type,
-            rrt: self.end_time - self.start_time,
+            rrt: self.rrt,
         })
     }
 
@@ -126,9 +118,8 @@ impl Default for MqttInfo {
             publish_topic: None,
             code: None,
             status: L7ResponseStatus::Ok,
-            start_time: 0,
-            end_time: 0,
             msg_type: LogMessageType::Other,
+            rrt: 0,
         }
     }
 }
@@ -187,7 +178,7 @@ impl From<MqttInfo> for L7ProtocolSendLog {
             }
             _ => {}
         };
-        let log = L7ProtocolSendLog {
+        L7ProtocolSendLog {
             version: version,
             req_len: f.req_msg_size,
             resp_len: f.res_msg_size,
@@ -203,8 +194,7 @@ impl From<MqttInfo> for L7ProtocolSendLog {
                 ..Default::default()
             },
             ..Default::default()
-        };
-        return log;
+        }
     }
 }
 
@@ -216,8 +206,7 @@ pub struct MqttLog {
     version: u8,
     client_map: HashMap<u64, String>,
 
-    start_time: u64,
-    end_time: u64,
+    perf_stats: Option<L7PerfStats>,
 }
 
 impl L7ProtocolParserInterface for MqttLog {
@@ -229,14 +218,28 @@ impl L7ProtocolParserInterface for MqttLog {
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
-        self.parse(payload, param.l4_protocol, param.direction, None, None)?;
+        if self.perf_stats.is_none() {
+            self.perf_stats = Some(L7PerfStats::default())
+        };
+
+        self.parse(payload, param.l4_protocol)?;
         let mut v = vec![];
+
         for i in self.info.iter() {
             let mut info = i.clone();
+
+            // FIXME due to mqtt not parse and handle packet identity correctly, the rrt is incorrect now.
+            info.cal_rrt(param).map(|rrt| {
+                info.rrt = rrt;
+                self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+            });
+
             info.msg_type = self.msg_type;
-            info.start_time = self.start_time;
-            info.end_time = self.end_time;
             v.push(L7ProtocolInfo::MqttInfo(info));
+            match param.direction {
+                PacketDirection::ClientToServer => self.perf_stats.as_mut().unwrap().inc_req(),
+                PacketDirection::ServerToClient => self.perf_stats.as_mut().unwrap().inc_resp(),
+            }
         }
         Ok(v)
     }
@@ -252,7 +255,12 @@ impl L7ProtocolParserInterface for MqttLog {
     fn reset(&mut self) {
         let mut s = Self::default();
         s.version = self.version;
+        s.perf_stats = self.perf_stats.take();
         *self = s;
+    }
+
+    fn perf_stats(&mut self) -> Option<L7PerfStats> {
+        self.perf_stats.take()
     }
 }
 
@@ -265,6 +273,14 @@ impl MqttLog {
             return Err(Error::MqttLogParseFailed);
         }
 
+        /*
+           FIXME
+           according to http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718025
+           The variable header component of many of the Control Packet types includes a 2 byte Packet Identifier field.
+           These Control Packets are PUBLISH (where QoS > 0), PUBACK, PUBREC, PUBREL, PUBCOMP, SUBSCRIBE, SUBACK, UNSUBSCRIBE, UNSUBACK.
+
+           need to parse the packet identifier as session id to make session merge correctly.
+        */
         loop {
             let (input, header) =
                 mqtt_fixed_header(payload).map_err(|_| Error::MqttLogParseFailed)?;
@@ -291,7 +307,7 @@ impl MqttLog {
                     self.msg_type = LogMessageType::Response;
                     info.res_msg_size = Some(header.remaining_length as u32);
                     info.pkt_type = header.kind;
-                    self.status = parse_status_code(return_code);
+                    self.status = self.parse_status_code(return_code);
                 }
                 PacketKind::Publish { dup, qos, .. } => {
                     let (_, topic_name) =
@@ -423,14 +439,7 @@ impl MqttLog {
         false
     }
 
-    fn parse(
-        &mut self,
-        payload: &[u8],
-        proto: IpProtocol,
-        _direction: PacketDirection,
-        _is_req_end: Option<bool>,
-        _is_resp_end: Option<bool>,
-    ) -> Result<()> {
+    fn parse(&mut self, payload: &[u8], proto: IpProtocol) -> Result<()> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
         }
@@ -441,6 +450,29 @@ impl MqttLog {
             self.status = L7ResponseStatus::Error;
             e
         })
+    }
+
+    fn parse_status_code(&mut self, code: u8) -> L7ResponseStatus {
+        match code {
+            /*
+            Accepted = 0x0,
+            ProtocolNotAccepted = 0x1,
+            IdentifierRejected = 0x2,
+            ServerUnavailable = 0x3,
+            BadUsernamePassword = 0x4,
+            NotAuthorized = 0x5,
+            */
+            0 => L7ResponseStatus::Ok,
+            1 | 2 | 4 | 5 => {
+                self.perf_stats.as_mut().unwrap().inc_resp_err();
+                L7ResponseStatus::ClientError
+            }
+            3 => {
+                self.perf_stats.as_mut().unwrap().inc_req_err();
+                L7ResponseStatus::ServerError
+            }
+            _ => L7ResponseStatus::NotExist,
+        }
     }
 }
 
@@ -687,23 +719,6 @@ pub fn parse_connack_packet(input: &[u8]) -> IResult<&[u8], u8> {
     Ok((input, connect_return_code))
 }
 
-pub fn parse_status_code(code: u8) -> L7ResponseStatus {
-    match code {
-        /*
-        Accepted = 0x0,
-        ProtocolNotAccepted = 0x1,
-        IdentifierRejected = 0x2,
-        ServerUnavailable = 0x3,
-        BadUsernamePassword = 0x4,
-        NotAuthorized = 0x5,
-        */
-        0 => L7ResponseStatus::Ok,
-        1 | 2 | 4 | 5 => L7ResponseStatus::ClientError,
-        3 => L7ResponseStatus::ServerError,
-        _ => L7ResponseStatus::NotExist,
-    }
-}
-
 fn mqtt_subscription_requests(input: &[u8]) -> IResult<&[u8], Vec<(&str, QualityOfService)>> {
     fn subscription_request(input: &[u8]) -> IResult<&[u8], (&str, QualityOfService)> {
         let (input, topic) = mqtt_string(input)?;
@@ -812,13 +827,7 @@ mod tests {
                 Some(p) => p,
                 None => continue,
             };
-            let _ = mqtt.parse(
-                payload,
-                packet.lookup_key.proto,
-                packet.lookup_key.direction,
-                None,
-                None,
-            );
+            let _ = mqtt.parse(payload, packet.lookup_key.proto);
             let is_mqtt = MqttLog::check_protocol(
                 payload,
                 &ParseParam::from((packet as &MetaPacket, log_cache.clone(), false)),
@@ -986,5 +995,70 @@ mod tests {
         let s = mqtt_string(&input);
 
         assert_eq!(s, Ok((&[][..], "A\u{2A6D4}")))
+    }
+
+    #[test]
+    fn check_perf() {
+        let expected = vec![
+            (
+                "mqtt_connect.pcap",
+                L7PerfStats {
+                    request_count: 1,
+                    response_count: 1,
+                    err_client_count: 0,
+                    err_server_count: 0,
+                    err_timeout: 0,
+                    rrt_count: 1,
+                    rrt_sum: 256746,
+                    rrt_max: 256746,
+                },
+            ),
+            (
+                "mqtt_sub.pcap",
+                L7PerfStats {
+                    request_count: 1,
+                    response_count: 1,
+                    err_client_count: 0,
+                    err_server_count: 0,
+                    err_timeout: 0,
+                    rrt_count: 1,
+                    rrt_sum: 272795,
+                    rrt_max: 272795,
+                },
+            ),
+        ];
+
+        for item in expected.iter() {
+            assert_eq!(item.1, run_perf(item.0), "parse pcap {} unexcepted", item.0);
+        }
+    }
+
+    fn run_perf(pcap: &str) -> L7PerfStats {
+        let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
+        let mut mqtt = MqttLog::default();
+
+        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap), None);
+        let mut packets = capture.as_meta_packets();
+        if packets.len() < 2 {
+            unreachable!()
+        }
+
+        let first_dst_port = packets[0].lookup_key.dst_port;
+        for packet in packets.iter_mut() {
+            if packet.lookup_key.dst_port == first_dst_port {
+                packet.lookup_key.direction = PacketDirection::ClientToServer;
+            } else {
+                packet.lookup_key.direction = PacketDirection::ServerToClient;
+            }
+
+            if packet.get_l4_payload().is_some() {
+                let _ = mqtt.parse_payload(
+                    packet.get_l4_payload().unwrap(),
+                    &ParseParam::from((&*packet, rrt_cache.clone(), true)),
+                );
+                mqtt.reset();
+            }
+        }
+        mqtt.perf_stats.unwrap()
     }
 }

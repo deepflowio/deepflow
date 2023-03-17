@@ -521,7 +521,7 @@ mod test {
 
     use crate::{
         common::{
-            flow::PacketDirection,
+            flow::{L7PerfStats, PacketDirection},
             l7_protocol_info::L7ProtocolInfo,
             l7_protocol_log::{L7PerfCache, L7ProtocolParserInterface, ParseParam},
         },
@@ -614,6 +614,20 @@ mod test {
         } else {
             unreachable!()
         }
+
+        assert_eq!(
+            parser.perf_stats.unwrap(),
+            L7PerfStats {
+                request_count: 1,
+                response_count: 1,
+                err_client_count: 0,
+                err_server_count: 0,
+                err_timeout: 0,
+                rrt_count: 1,
+                rrt_sum: 127254,
+                rrt_max: 127254,
+            }
+        );
     }
 
     #[test]
@@ -669,5 +683,19 @@ mod test {
         } else {
             unreachable!()
         }
+
+        assert_eq!(
+            parser.perf_stats.unwrap(),
+            L7PerfStats {
+                request_count: 1,
+                response_count: 1,
+                err_client_count: 0,
+                err_server_count: 0,
+                err_timeout: 0,
+                rrt_count: 1,
+                rrt_sum: 3922,
+                rrt_max: 3922,
+            }
+        );
     }
 }
