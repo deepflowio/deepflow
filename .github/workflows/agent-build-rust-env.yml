@@ -51,9 +51,9 @@ jobs:
           file: agent/docker/DockerfileToFix.build
           platforms: linux/amd64
           tags: |
-            "ghcr.io/${{ github.repository_owner }}/rust-build:1.17"
+            "ghcr.io/${{ github.repository_owner }}/rust-build:1.18"
             "ghcr.io/${{ github.repository_owner }}/rust-build:latest"
-            "${{ secrets.REGISTRY_ALIYUN_ADDR }}/public/rust-build:1.17"
+            "${{ secrets.REGISTRY_ALIYUN_ADDR }}/public/rust-build:1.18"
             "${{ secrets.REGISTRY_ALIYUN_ADDR }}/public/rust-build:latest"
 
   build_agent_env_arm64:
