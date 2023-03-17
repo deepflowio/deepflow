@@ -304,9 +304,6 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 	}
 
 	// modify static config
-	if configure.YamlConfig == "" {
-		return
-	}
 	yamlConfig := &cmodel.StaticConfig{}
 	err := yaml.Unmarshal([]byte(configure.YamlConfig), yamlConfig)
 	if err != nil {
@@ -316,13 +313,7 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 
 	if c.EnabledNetworkMonitoring() == true &&
 		c.EnabledApplicationMonitoring() == false {
-		filter7ProtocolEnabled := []string{}
-		for _, protocol := range yamlConfig.L7ProtocolEnabled {
-			if Find[string](NetWorkL7ProtocolEnabled, protocol) {
-				filter7ProtocolEnabled = append(filter7ProtocolEnabled, protocol)
-			}
-		}
-		yamlConfig.L7ProtocolEnabled = filter7ProtocolEnabled
+		yamlConfig.L7ProtocolEnabled = NetWorkL7ProtocolEnabled
 	} else if c.EnabledNetworkMonitoring() == false &&
 		c.EnabledApplicationMonitoring() == false {
 		yamlConfig.L7ProtocolEnabled = nil
