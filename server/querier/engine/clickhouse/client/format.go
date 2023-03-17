@@ -17,8 +17,8 @@
 package client
 
 import (
-	"errors"
-	"fmt"
+	//"errors"
+	//"fmt"
 	"math"
 	"net"
 	"time"
@@ -113,7 +113,9 @@ func TransType(value interface{}, columnName, columnDatabaseTypeName string) (in
 	case *string:
 		return *v, VALUE_TYPE_STRING, nil
 	default:
-		return nil, "", errors.New(fmt.Sprintf("Unknown db field with name %s, golang type %T, clickhouse type %s, value: %v (%v)",
-			columnName, v, columnDatabaseTypeName, value, v))
+		// unkown type field return origin type
+		return value, columnDatabaseTypeName, nil
+		//return nil, "", errors.New(fmt.Sprintf("Unknown db field with name %s, golang type %T, clickhouse type %s, value: %v (%v)",
+		//	columnName, v, columnDatabaseTypeName, value, v))
 	}
 }
