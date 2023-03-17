@@ -355,6 +355,7 @@ type PodNamespace struct {
 type PodService struct {
 	Lcuuid             string `json:"lcuuid" binding:"required"`
 	Name               string `json:"name" binding:"required"`
+	Label              string `json:"label"`
 	Type               int    `json:"type" binding:"required"`
 	Selector           string `json:"selector"`
 	ServiceClusterIP   string `json:"service_cluster_ip"`

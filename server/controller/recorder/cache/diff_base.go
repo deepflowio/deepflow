@@ -799,6 +799,7 @@ func (b *DiffBaseDataSet) addPodService(dbItem *mysql.PodService, seq int, toolD
 			Lcuuid:   dbItem.Lcuuid,
 		},
 		Name:             dbItem.Name,
+		Label:            dbItem.Label,
 		Selector:         dbItem.Selector,
 		ServiceClusterIP: dbItem.ServiceClusterIP,
 		PodIngressLcuuid: podIngressLcuuid,
@@ -1461,6 +1462,7 @@ func (p *PodIngressRuleBackend) Update(cloudItem *cloudmodel.PodIngressRuleBacke
 type PodService struct {
 	DiffBase
 	Name             string `json:"name"`
+	Label            string `json:"label"`
 	Selector         string `json:"selector"`
 	ServiceClusterIP string `json:"service_cluster_ip"`
 	PodIngressLcuuid string `json:"pod_ingress_lcuuid"`
@@ -1471,6 +1473,7 @@ type PodService struct {
 
 func (p *PodService) Update(cloudItem *cloudmodel.PodService) {
 	p.Name = cloudItem.Name
+	p.Label = cloudItem.Label
 	p.Selector = cloudItem.Selector
 	p.ServiceClusterIP = cloudItem.ServiceClusterIP
 	p.PodIngressLcuuid = cloudItem.PodIngressLcuuid
