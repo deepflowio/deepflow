@@ -78,7 +78,7 @@ pub struct Config {
     #[serde(skip)]
     pub agent_mode: RunningMode,
     pub override_os_hostname: Option<String>,
-    pub tokio_worker_thread_number: u16,
+    pub async_worker_thread_number: u16,
 }
 
 impl Config {
@@ -216,7 +216,7 @@ impl Default for Config {
             controller_domain_name: vec![],
             agent_mode: Default::default(),
             override_os_hostname: None,
-            tokio_worker_thread_number: 16,
+            async_worker_thread_number: 16,
         }
     }
 }

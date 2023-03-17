@@ -17,6 +17,7 @@
 package common
 
 import (
+	"errors"
 	"time"
 )
 
@@ -38,6 +39,7 @@ const (
 const (
 	SUCCESS                         = "SUCCESS"
 	FAIL                            = "FAIL"
+	CONFIG_PENDING                  = "CONFIG_PENDING"
 	INVALID_PARAMETERS              = "INVALID_PARAMETERS"
 	RESOURCE_NOT_FOUND              = "RESOURCE_NOT_FOUND"
 	RESOURCE_ALREADY_EXIST          = "RESOURCE_ALREADY_EXIST"
@@ -47,6 +49,11 @@ const (
 	RESOURCE_NUM_EXCEEDED           = "RESOURCE_NUM_EXCEEDED"
 	SELECTED_RESOURCES_NUM_EXCEEDED = "SELECTED_RESOURCES_NUM_EXCEEDED"
 	SERVICE_UNAVAILABLE             = "SERVICE_UNAVAILABLE"
+)
+
+var (
+	ErrorFail    = errors.New("FAIL")
+	ErrorPending = errors.New("PENDING")
 )
 
 const (
@@ -439,10 +446,13 @@ const (
 )
 
 const (
-	DATA_SOURCE_FLOW   = "flow"
-	DATA_SOURCE_APP    = "app"
-	DATA_SOURCE_L4_LOG = "flow_log.l4"
-	DATA_SOURCE_L7_LOG = "flow_log.l7"
+	DATA_SOURCE_FLOW            = "flow"
+	DATA_SOURCE_APP             = "app"
+	DATA_SOURCE_L4_FLOW_LOG     = "flow_log.l4_flow_log"
+	DATA_SOURCE_L7_FLOW_LOG     = "flow_log.l7_flow_log"
+	DATA_SOURCE_L4_PACKAGE      = "flow_log.l4_packet"
+	DATA_SOURCE_L7_PACKAGE      = "flow_log.l7_packet"
+	DATA_SOURCE_DEEPFLOW_SYSTEM = "flow_log.deepflow_system"
 
 	DATA_SOURCE_STATE_EXCEPTION = 0
 	DATA_SOURCE_STATE_NORMAL    = 1

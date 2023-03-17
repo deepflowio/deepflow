@@ -111,10 +111,10 @@ var (
 		output: "SELECT if(auto_instance_type_0 in (0,255),if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)),dictGet(flow_tag.device_map, 'name', (toUInt64(auto_instance_type_0),toUInt64(auto_instance_id_0)))) AS `resource_gl0_0`, if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)) AS `ip_0`, auto_instance_type_0 AS `resource_gl0_type_0` FROM flow_log.`l7_flow_log` GROUP BY if(auto_instance_type_0 in (0,255),if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)),dictGet(flow_tag.device_map, 'name', (toUInt64(auto_instance_type_0),toUInt64(auto_instance_id_0)))) AS `resource_gl0_0`, `resource_gl0_type_0`, if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)) AS `ip_0` LIMIT 10000",
 	}, {
 		input:  "select pod_service_0 from l7_flow_log where pod_service_0 !='xx' group by pod_service_0",
-		output: "SELECT dictGet(flow_tag.device_map, 'name', (toUInt64(11),toUInt64(service_id_0))) AS `pod_service_0` FROM flow_log.`l7_flow_log` PREWHERE (not(((if(is_ipv4=1,IPv4NumToString(ip4_0),IPv6NumToString(ip6_0)),toUInt64(l3_epc_id_0)) IN (SELECT ip,l3_epc_id from flow_tag.ip_relation_map WHERE pod_service_name = 'xx')) OR (toUInt64(service_id_0) IN (SELECT pod_service_id from flow_tag.ip_relation_map WHERE pod_service_name = 'xx')))) AND (service_id_0!=0) GROUP BY dictGet(flow_tag.device_map, 'name', (toUInt64(11),toUInt64(service_id_0))) AS `pod_service_0` LIMIT 10000",
+		output: "SELECT dictGet(flow_tag.device_map, 'name', (toUInt64(11),toUInt64(service_id_0))) AS `pod_service_0` FROM flow_log.`l7_flow_log` PREWHERE (not(((if(is_ipv4=1,IPv4NumToString(ip4_0),IPv6NumToString(ip6_0)),toUInt64(l3_epc_id_0)) IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE pod_service_name = 'xx')) OR (toUInt64(service_id_0) IN (SELECT pod_service_id FROM flow_tag.ip_relation_map WHERE pod_service_name = 'xx')))) AND (service_id_0!=0) GROUP BY dictGet(flow_tag.device_map, 'name', (toUInt64(11),toUInt64(service_id_0))) AS `pod_service_0` LIMIT 10000",
 	}, {
 		input:  "select region_id_0 from l7_flow_log where pod_ingress_0 !='xx' group by region_id_0",
-		output: "SELECT region_id_0 FROM flow_log.`l7_flow_log` PREWHERE (not(((if(is_ipv4=1,IPv4NumToString(ip4_0),IPv6NumToString(ip6_0)),toUInt64(l3_epc_id_0)) IN (SELECT ip,l3_epc_id from flow_tag.ip_relation_map WHERE pod_ingress_name = 'xx')) OR (toUInt64(service_id_0) IN (SELECT pod_service_id from flow_tag.ip_relation_map WHERE pod_ingress_name = 'xx')))) AND (region_id_0!=0) GROUP BY `region_id_0` LIMIT 10000",
+		output: "SELECT region_id_0 FROM flow_log.`l7_flow_log` PREWHERE (not(((if(is_ipv4=1,IPv4NumToString(ip4_0),IPv6NumToString(ip6_0)),toUInt64(l3_epc_id_0)) IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE pod_ingress_name = 'xx')) OR (toUInt64(service_id_0) IN (SELECT pod_service_id FROM flow_tag.ip_relation_map WHERE pod_ingress_name = 'xx')))) AND (region_id_0!=0) GROUP BY `region_id_0` LIMIT 10000",
 	}, {
 		input:  "select node_type(region_0) as `node_type_0`,mask(ip_0,33) as `mask_ip_0` from l7_flow_log group by `mask_ip_0`,`node_type_0`",
 		output: "WITH if(is_ipv4, IPv4NumToString(bitAnd(ip4_0, 4294967295)), IPv6NumToString(bitAnd(ip6_0, toFixedString(unhex('ffffffff800000000000000000000000'), 16)))) AS `mask_ip_0` SELECT 'region' AS `node_type_0`, `mask_ip_0` FROM flow_log.`l7_flow_log` GROUP BY `mask_ip_0`, `node_type_0` LIMIT 10000",
@@ -203,6 +203,13 @@ var (
 	}, {
 		input:  "select region_0 from l7_flow_log where region regexp '系统*'",
 		output: "SELECT dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0` FROM flow_log.`l7_flow_log` PREWHERE (toUInt64(region_id) IN (SELECT id FROM flow_tag.region_map WHERE match(name,'系统*'))) LIMIT 10000",
+	}, {
+		input:  "select time(time, 0.2) as toi, PerSecond(Sum(byte)+100) as persecond_max_byte_100 from l4_flow_log group by toi limit 1",
+		output: "WITH toStartOfInterval(time, toIntervalSecond(1)) + toIntervalSecond(arrayJoin([0]) * 1) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, divide(plus(SUM(byte_tx+byte_rx), 100), 1) AS `persecond_max_byte_100` FROM flow_log.`l4_flow_log` GROUP BY `toi` LIMIT 1",
+	}, {
+		input:  "select time(time, 1.2) as toi, Avg(`byte_tx`) AS `Avg(byte_tx)` from vtap_flow_edge_port group by toi limit 1",
+		output: "WITH toStartOfInterval(_time, toIntervalSecond(2)) + toIntervalSecond(arrayJoin([0]) * 2) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, AVG(`_sum_byte_tx`) AS `Avg(byte_tx)` FROM (WITH toStartOfInterval(time, toIntervalSecond(1)) AS `_time` SELECT _time, SUM(byte_tx) AS `_sum_byte_tx` FROM flow_metrics.`vtap_flow_edge_port` GROUP BY `_time`) GROUP BY `toi` LIMIT 1",
+		db:     "flow_metrics",
 	},
 	}
 )

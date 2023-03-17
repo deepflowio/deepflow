@@ -289,6 +289,15 @@ impl NpbBandwidthWatcher {
         );
     }
 
+    pub fn notify_stop(&self) -> Option<JoinHandle<()>> {
+        if !self.watcher.is_running.load(Relaxed) || NOT_SUPPORT {
+            return None;
+        }
+        self.watcher.is_running.store(false, Relaxed);
+        info!("Notify npb bandwidth watcher stop.");
+        self.thread_handler.lock().unwrap().take()
+    }
+
     pub fn stop(&self) {
         if !self.watcher.is_running.load(Relaxed) || NOT_SUPPORT {
             return;

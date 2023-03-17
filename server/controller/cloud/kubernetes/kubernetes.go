@@ -48,7 +48,7 @@ func NewKubernetes(domain mysql.Domain) (*Kubernetes, error) {
 		return nil, err
 	}
 
-	portNameRegex := configJson.Get("port_name_regex").MustString()
+	portNameRegex := configJson.Get("subdomain_port_name_regex").MustString()
 	if portNameRegex == "" {
 		portNameRegex = k8sGather.K8S_VINTERFACE_NAME_REGEX
 	}

@@ -108,6 +108,7 @@ func PromReaderTransToSQL(req *prompb.ReadRequest) (sql string, db string, datas
 	if db == "" || db == chCommon.DB_NAME_EXT_METRICS || db == chCommon.DB_NAME_DEEPFLOW_SYSTEM {
 		metrics = append(metrics, extMetricsTagsName)
 	} else {
+		// querier will be called later, so there is no need to display the declaration db
 		showSql := fmt.Sprintf("SHOW tags FROM %s WHERE time >= %d AND time <= %d", table, startTime, endTime)
 		data, _ := tagdescription.GetTagDescriptions(db, table, showSql, nil)
 		for _, value := range data.Values {
@@ -128,6 +129,7 @@ func PromReaderTransToSQL(req *prompb.ReadRequest) (sql string, db string, datas
 	}
 
 	// order by DESC for get data completely, then scan data reversely for data combine(see func.RespTransToProm)
+	// querier will be called later, so there is no need to display the declaration db
 	if db != "" {
 		sql = fmt.Sprintf("SELECT %s FROM %s WHERE %s ORDER BY time desc LIMIT %s",
 			strings.Join(metrics, ","), table, strings.Join(filters, " AND "), config.Cfg.Limit)
@@ -271,7 +273,7 @@ func RespTransToProm(result *common.Result) (resp *prompb.ReadResponse, err erro
 		} else if metricsType == "Float64" {
 			metricsValue = values[metricsIndex].(float64)
 		} else {
-			metricsValue = *values[metricsIndex].(*float64)
+			return nil, errors.New(fmt.Sprintf("Unknown metrics type %s, value = %v", metricsType, values[metricsIndex]))
 		}
 
 		// add a sample for the TimeSeries

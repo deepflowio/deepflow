@@ -224,10 +224,15 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 {
 #define HTTPV2_FRAME_PROTO_SZ           0x9
 #define HTTPV2_FRAME_TYPE_HEADERS       0x1
+#define HTTPV2_STATIC_TABLE_AUTH_IDX    0x1
+#define HTTPV2_STATIC_TABLE_GET_IDX     0x2
+#define HTTPV2_STATIC_TABLE_POST_IDX    0x3
+#define HTTPV2_STATIC_TABLE_PATH_1_IDX  0x4
+#define HTTPV2_STATIC_TABLE_PATH_2_IDX  0x5
 // In some cases, the compiled binary instructions exceed the limit, the
 // specific reason is unknown, reduce the number of cycles of http2, which
 // may cause http2 packet loss
-#define HTTPV2_LOOP_MAX 6
+#define HTTPV2_LOOP_MAX 8
 /*
  *  HTTPV2_FRAME_READ_SZ取值考虑以下3部分：
  *  (1) fixed 9-octet header
@@ -313,9 +318,31 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 		    static_table_idx == 0)
 			continue;
 
-		msg_type = MSG_REQUEST;
-		conn_info->role =	
-			(conn_info->direction == T_INGRESS) ? ROLE_SERVER : ROLE_CLIENT;
+		// HTTPV2 REQUEST
+		if (static_table_idx == HTTPV2_STATIC_TABLE_AUTH_IDX ||
+		    static_table_idx == HTTPV2_STATIC_TABLE_GET_IDX ||
+	    	    static_table_idx == HTTPV2_STATIC_TABLE_POST_IDX ||
+		    static_table_idx == HTTPV2_STATIC_TABLE_PATH_1_IDX ||
+		    static_table_idx == HTTPV2_STATIC_TABLE_PATH_2_IDX) {
+			msg_type = MSG_REQUEST;
+			conn_info->role =
+			    (conn_info->direction == T_INGRESS) ? ROLE_SERVER : ROLE_CLIENT;
+
+		} else {
+
+			/*
+			 * If the data type of HTTPV2 is RESPONSE in the initial
+			 * judgment, then the inference will be discarded directly.
+			 * Because the data obtained for the first time is RESPONSE,
+			 * it can be considered as invalid data (the REQUEST cannot
+			 * be found for aggregation, and the judgment of RESPONSE is
+			 * relatively rough and prone to misjudgment).
+			 */
+			if (is_first)
+				return MSG_UNKNOWN;
+
+			msg_type = MSG_RESPONSE;
+		}
 
 		break;
 	}
@@ -420,7 +447,7 @@ static __inline void save_prev_data(const char *buf,
 static __inline void check_and_fetch_prev_data(struct conn_info_t *conn_info)
 {
 	if (conn_info->socket_info_ptr != NULL &&
-	    conn_info->socket_info_ptr->prev_data_len != 0) {
+	    conn_info->socket_info_ptr->prev_data_len == 4) {
 		/*
 		 * For adjacent read/write in the same direction.
 		 */
@@ -517,7 +544,12 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 	}
 
 out:
-	return MSG_REQUEST;
+	if (is_current_comm("mysqld"))
+		return conn_info->direction == T_INGRESS ? MSG_REQUEST : MSG_RESPONSE;
+	else
+		return conn_info->direction == T_INGRESS ? MSG_RESPONSE : MSG_REQUEST;
+
+	return MSG_UNKNOWN;
 
 	/*
 	   e.g:
@@ -929,7 +961,15 @@ static __inline enum message_type infer_mqtt_message(const char *buf,
 	if ((mqtt_type == 12 || mqtt_type == 13 || mqtt_type == 14) && length != 0)
 		return MSG_UNKNOWN;
 
-	return MSG_REQUEST;
+	// AUTH 类型的数据部分长度很灵活,不能通过上述过滤其他类型的方式进行过滤,
+	// 默认所有 AUTH 类型都是有效的
+
+	const volatile int __mqtt_type = mqtt_type;
+	if (__mqtt_type == 1 || __mqtt_type == 3 || __mqtt_type == 8 ||
+	    __mqtt_type == 10 || __mqtt_type == 12 || __mqtt_type == 14 ||
+	    __mqtt_type == 15)
+		return MSG_REQUEST;
+	return MSG_RESPONSE;
 }
 
 /*
@@ -1190,7 +1230,14 @@ static __inline enum message_type infer_kafka_message(const char *buf,
 		    conn_info->socket_info_ptr->need_reconfirm;
 
 		if (!conn_info->need_reconfirm) {
-			return MSG_REQUEST;
+			if ((conn_info->role == ROLE_CLIENT
+			     && conn_info->direction == T_EGRESS)
+			    || (conn_info->role == ROLE_SERVER
+				&& conn_info->direction == T_INGRESS)) {
+				return MSG_REQUEST;
+			}
+
+			return MSG_RESPONSE;
 		}
 
 		conn_info->correlation_id =
@@ -1265,14 +1312,13 @@ static __inline bool drop_msg_by_comm(void)
 	return false;
 }
 
-static __inline struct protocol_message_t infer_protocol(const struct data_args_t *args,
-							 size_t count,
-							 struct conn_info_t
-							 *conn_info,
-							 __u8 sk_state,
-							 const struct
-							 process_data_extra
-							 *extra)
+static __inline struct protocol_message_t
+infer_protocol(struct ctx_info_s *ctx,
+	       const struct data_args_t *args,
+	       size_t count,
+	       struct conn_info_t *conn_info,
+	       __u8 sk_state,
+	       const struct process_data_extra *extra)
 {
 #define DATA_BUF_MAX  32
 
@@ -1311,26 +1357,21 @@ static __inline struct protocol_message_t infer_protocol(const struct data_args_
 	}
 
 	const char *buf = args->buf;
-
-	__u32 k0 = 0;
-	struct infer_data_s *buf_map = bpf_map_lookup_elem(&NAME(infer_buf), &k0);
-	if (!buf_map)
-		return inferred_message;
-
+	struct infer_data_s *__infer_buf = &ctx->infer_buf;
 	char *http2_infer_buf = NULL;
 	__u32 http2_infer_len = 0;
 	if (extra->vecs) {
-		buf_map->len = infer_iovecs_copy(buf_map, args,
-						 count, DATA_BUF_MAX,
-						 &http2_infer_buf,
-						 &http2_infer_len);
+		__infer_buf->len = infer_iovecs_copy(__infer_buf, args,
+						     count, DATA_BUF_MAX,
+						     &http2_infer_buf,
+						     &http2_infer_len);
 	} else {
-		bpf_probe_read(buf_map->data, sizeof(buf_map->data), buf);
+		bpf_probe_read(__infer_buf->data, sizeof(__infer_buf->data), buf);
 		http2_infer_buf = (char *)buf;
 		http2_infer_len = count;
 	}
 
-	char *infer_buf = buf_map->data;
+	char *infer_buf = __infer_buf->data;
 
 	check_and_fetch_prev_data(conn_info);
 
@@ -1424,14 +1465,6 @@ static __inline struct protocol_message_t infer_protocol(const struct data_args_
 			     infer_sofarpc_message(infer_buf, count,
 						   conn_info)) != MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_SOFARPC;
-				return inferred_message;
-			}
-			break;
-		case PROTO_HTTP2:
-			if ((inferred_message.type =
-			     infer_http2_message(http2_infer_buf, http2_infer_len,
-						 conn_info)) != MSG_UNKNOWN) {
-				inferred_message.protocol = PROTO_HTTP2;
 				return inferred_message;
 			}
 			break;
@@ -1546,11 +1579,7 @@ static __inline struct protocol_message_t infer_protocol(const struct data_args_
 		    infer_sofarpc_message(infer_buf, count,
 					  conn_info)) != MSG_UNKNOWN){
 		inferred_message.protocol = PROTO_SOFARPC;
-#ifdef LINUX_VER_5_2_PLUS
-	} else if (skip_proto != PROTO_HTTP2 && (inferred_message.type =
-#else
 	} else if ((inferred_message.type =
-#endif
 		    infer_http2_message(http2_infer_buf, http2_infer_len, 
 					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_HTTP2;

@@ -134,6 +134,7 @@ func NewCKWriter(addrs []string, user, password, counterName string, table *ckdb
 				Username: user,
 				Password: password,
 			},
+			ConnMaxLifetime: time.Hour * 24,
 		}); err != nil {
 			return nil, err
 		}
@@ -173,6 +174,8 @@ func (w *CKWriter) Run() {
 type Counter struct {
 	WriteSuccessCount int64 `statsd:"write-success-count"`
 	WriteFailedCount  int64 `statsd:"write-failed-count"`
+	RetryCount        int64 `statsd:"retry-count"`
+	RetryFailedCount  int64 `statsd:"retry-failed-count"`
 	utils.Closable
 }
 
@@ -255,10 +258,12 @@ func (w *CKWriter) Write(queueID int, items []CKItem) {
 			}
 		}
 
+		w.counters[queueID].RetryCount++
 		// 写失败重连后重试一次, 规避偶尔写失败问题
 		err = w.writeItems(connID, items)
 		if logEnabled {
 			if err != nil {
+				w.counters[queueID].RetryFailedCount++
 				log.Warningf("retry write table(%s.%s) failed, drop(%d) items: %s", w.table.Database, w.table.LocalName, len(items), err)
 			} else {
 				log.Infof("retry write table(%s.%s) success, write(%d) items", w.table.Database, w.table.LocalName, len(items))

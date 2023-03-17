@@ -41,6 +41,7 @@ use log::{info, warn};
 use regex::Regex;
 use tokio::runtime::{Builder, Runtime};
 
+use crate::flow_generator::protocol_logs::SessionAggregator;
 use crate::{
     collector::Collector,
     collector::{
@@ -64,9 +65,7 @@ use crate::{
         self, recv_engine::bpf, BpfOptions, Dispatcher, DispatcherBuilder, DispatcherListener,
     },
     exception::ExceptionHandler,
-    flow_generator::{
-        protocol_logs::BoxAppProtoLogsData, AppProtoLogsParser, PacketSequenceParser,
-    },
+    flow_generator::{protocol_logs::BoxAppProtoLogsData, PacketSequenceParser},
     handler::{NpbBuilder, PacketHandlerBuilder},
     integration_collector::{
         MetricServer, OpenTelemetry, OpenTelemetryCompressed, Profile, PrometheusMetric,
@@ -356,7 +355,7 @@ impl Trident {
 
         let runtime = Arc::new(
             Builder::new_multi_thread()
-                .worker_threads(config.tokio_worker_thread_number.into())
+                .worker_threads(config.async_worker_thread_number.into())
                 .enable_all()
                 .build()
                 .unwrap(),
@@ -530,18 +529,11 @@ impl Trident {
             mem::swap(&mut new_state, &mut *state_guard);
             mem::drop(state_guard);
 
-            #[cfg(target_os = "linux")]
             let ChangedConfig {
                 runtime_config,
                 blacklist,
                 vm_mac_addrs,
                 tap_types,
-            } = new_state.unwrap_config();
-            #[cfg(target_os = "windows")]
-            let ChangedConfig {
-                runtime_config,
-                vm_mac_addrs,
-                ..
             } = new_state.unwrap_config();
 
             if let Some(old_yaml) = yaml_conf {
@@ -559,7 +551,6 @@ impl Trident {
             yaml_conf = Some(runtime_config.yaml_config.clone());
             match components.as_mut() {
                 None => {
-                    #[cfg(target_os = "linux")]
                     let callbacks =
                         config_handler.on_config(runtime_config, &exception_handler, None);
                     let mut comp = Components::new(
@@ -579,7 +570,6 @@ impl Trident {
                     )?;
                     comp.start();
 
-                    #[cfg(target_os = "linux")]
                     if let Components::Agent(components) = &mut comp {
                         if config_handler.candidate_config.dispatcher.tap_mode == TapMode::Analyzer
                         {
@@ -593,7 +583,6 @@ impl Trident {
 
                     components.replace(comp);
                 }
-                #[cfg(target_os = "linux")]
                 Some(components) => {
                     if let Components::Agent(components) = components {
                         let callbacks = config_handler.on_config(
@@ -620,8 +609,6 @@ impl Trident {
                         }
                     }
                 }
-                #[cfg(target_os = "windows")]
-                _ => (),
             }
             state_guard = state.lock().unwrap();
         }
@@ -792,6 +779,14 @@ impl DomainNameListener {
         self.run();
     }
 
+    fn notify_stop(&mut self) -> Option<JoinHandle<()>> {
+        if self.thread_handler.is_none() {
+            return None;
+        }
+        self.stopped.store(true, Ordering::Relaxed);
+        self.thread_handler.take()
+    }
+
     fn stop(&mut self) {
         if self.thread_handler.is_none() {
             return;
@@ -866,6 +861,7 @@ pub enum Components {
     Agent(AgentComponents),
     #[cfg(target_os = "linux")]
     Watcher(WatcherComponents),
+    Other,
 }
 
 #[cfg(target_os = "linux")]
@@ -952,7 +948,7 @@ pub struct AgentComponents {
     pub cur_tap_types: Vec<trident::TapType>,
     pub dispatchers: Vec<Dispatcher>,
     pub dispatcher_listeners: Vec<DispatcherListener>,
-    pub log_parsers: Vec<AppProtoLogsParser>,
+    pub session_aggrs: Vec<SessionAggregator>,
     pub collectors: Vec<CollectorThread>,
     pub l4_flow_uniform_sender: UniformSenderThread<BoxedTaggedFlow>,
     pub metrics_uniform_sender: UniformSenderThread<BoxedDocument>,
@@ -1318,7 +1314,7 @@ impl AgentComponents {
         let mut dispatchers = vec![];
         let mut dispatcher_listeners = vec![];
         let mut collectors = vec![];
-        let mut log_parsers = vec![];
+        let mut session_aggrs = vec![];
         let mut packet_sequence_parsers = vec![]; // Enterprise Edition Feature: packet-sequence
 
         // Sender/Collector
@@ -1547,7 +1543,7 @@ impl AgentComponents {
                 ],
             );
 
-            let (app_proto_log_parser, counter) = AppProtoLogsParser::new(
+            let (session_aggr, counter) = SessionAggregator::new(
                 log_receiver,
                 proto_log_sender.clone(),
                 i as u32,
@@ -1559,7 +1555,7 @@ impl AgentComponents {
                 Countable::Ref(Arc::downgrade(&counter) as Weak<dyn RefCountable>),
                 vec![StatsOption::Tag("index", i.to_string())],
             );
-            log_parsers.push(app_proto_log_parser);
+            session_aggrs.push(session_aggr);
 
             // Enterprise Edition Feature: packet-sequence
             // create and start packet sequence
@@ -1784,7 +1780,7 @@ impl AgentComponents {
                     StatsOption::Tag("index", ebpf_dispatcher_id.to_string()),
                 ],
             );
-            let (app_proto_log_parser, counter) = AppProtoLogsParser::new(
+            let (session_aggr, counter) = SessionAggregator::new(
                 log_receiver,
                 proto_log_sender.clone(),
                 ebpf_dispatcher_id as u32,
@@ -1796,7 +1792,7 @@ impl AgentComponents {
                 Countable::Ref(Arc::downgrade(&counter) as Weak<dyn RefCountable>),
                 vec![StatsOption::Tag("index", ebpf_dispatcher_id.to_string())],
             );
-            log_parsers.push(app_proto_log_parser);
+            session_aggrs.push(session_aggr);
             collectors.push(collector);
             ebpf_collector = EbpfCollector::new(
                 ebpf_dispatcher_id,
@@ -2024,7 +2020,7 @@ impl AgentComponents {
             #[cfg(target_os = "linux")]
             api_watcher,
             debugger,
-            log_parsers,
+            session_aggrs,
             #[cfg(target_os = "linux")]
             ebpf_collector,
             stats_collector,
@@ -2102,8 +2098,8 @@ impl AgentComponents {
             }
         }
 
-        for log_parser in self.log_parsers.iter() {
-            log_parser.start();
+        for sess_aggr in self.session_aggrs.iter() {
+            sess_aggr.start();
         }
 
         for collector in self.collectors.iter_mut() {
@@ -2144,6 +2140,8 @@ impl AgentComponents {
             return;
         }
 
+        let mut join_handles = vec![];
+
         for d in self.dispatchers.iter_mut() {
             d.stop();
         }
@@ -2152,45 +2150,89 @@ impl AgentComponents {
         {
             self.platform_synchronizer.stop_kubernetes_poller();
             self.socket_synchronizer.stop();
-            self.api_watcher.stop();
+            if let Some(h) = self.api_watcher.notify_stop() {
+                join_handles.push(h);
+            }
         }
 
         for q in self.collectors.iter_mut() {
-            q.stop();
+            join_handles.append(&mut q.notify_stop());
         }
 
-        for p in self.log_parsers.iter() {
-            p.stop();
+        for p in self.session_aggrs.iter() {
+            if let Some(h) = p.notify_stop() {
+                join_handles.push(h);
+            }
         }
 
-        self.l4_flow_uniform_sender.stop();
-        self.metrics_uniform_sender.stop();
-        self.l7_flow_uniform_sender.stop();
+        if let Some(h) = self.l4_flow_uniform_sender.notify_stop() {
+            join_handles.push(h);
+        }
+        if let Some(h) = self.metrics_uniform_sender.notify_stop() {
+            join_handles.push(h);
+        }
+        if let Some(h) = self.l7_flow_uniform_sender.notify_stop() {
+            join_handles.push(h);
+        }
 
         self.debugger.stop();
         #[cfg(target_os = "linux")]
-        if let Some(ebpf_collector) = self.ebpf_collector.as_mut() {
-            ebpf_collector.stop();
+        if let Some(h) = self.ebpf_collector.as_mut().and_then(|t| t.notify_stop()) {
+            join_handles.push(h);
         }
 
         self.external_metrics_server.stop();
-        self.otel_uniform_sender.stop();
-        self.compressed_otel_uniform_sender.stop();
-        self.prometheus_uniform_sender.stop();
-        self.telegraf_uniform_sender.stop();
-        self.profile_uniform_sender.stop();
-        self.packet_sequence_uniform_sender.stop(); // Enterprise Edition Feature: packet-sequence
-        self.domain_name_listener.stop();
+        if let Some(h) = self.otel_uniform_sender.notify_stop() {
+            join_handles.push(h);
+        }
+        if let Some(h) = self.compressed_otel_uniform_sender.notify_stop() {
+            join_handles.push(h);
+        }
+        if let Some(h) = self.prometheus_uniform_sender.notify_stop() {
+            join_handles.push(h);
+        }
+        if let Some(h) = self.telegraf_uniform_sender.notify_stop() {
+            join_handles.push(h);
+        }
+        if let Some(h) = self.profile_uniform_sender.notify_stop() {
+            join_handles.push(h);
+        }
+        // Enterprise Edition Feature: packet-sequence
+        if let Some(h) = self.packet_sequence_uniform_sender.notify_stop() {
+            join_handles.push(h);
+        }
+        if let Some(h) = self.domain_name_listener.notify_stop() {
+            join_handles.push(h);
+        }
         self.handler_builders.iter().for_each(|x| {
             x.lock().unwrap().iter_mut().for_each(|y| {
-                y.stop();
+                if let Some(h) = y.notify_stop() {
+                    join_handles.push(h);
+                }
             })
         });
-        self.npb_bandwidth_watcher.stop();
-        for p in self.pcap_assemblers.iter() {
-            p.stop();
+        if let Some(h) = self.npb_bandwidth_watcher.notify_stop() {
+            join_handles.push(h);
         }
-        self.npb_arp_table.stop();
+        for p in self.pcap_assemblers.iter() {
+            if let Some(h) = p.notify_stop() {
+                join_handles.push(h);
+            }
+        }
+        if let Some(h) = self.npb_arp_table.notify_stop() {
+            join_handles.push(h);
+        }
+
+        for handle in join_handles {
+            if !handle.is_finished() {
+                info!(
+                    "wait for {} to fully stop",
+                    handle.thread().name().unwrap_or("unnamed thread")
+                );
+            }
+            let _ = handle.join();
+        }
+
         info!("Stopped agent components.")
     }
 }
@@ -2201,6 +2243,7 @@ impl Components {
             Self::Agent(a) => a.start(),
             #[cfg(target_os = "linux")]
             Self::Watcher(w) => w.start(),
+            _ => {}
         }
     }
 
@@ -2256,6 +2299,7 @@ impl Components {
             Self::Agent(a) => a.stop(),
             #[cfg(target_os = "linux")]
             Self::Watcher(w) => w.stop(),
+            _ => {}
         }
     }
 }

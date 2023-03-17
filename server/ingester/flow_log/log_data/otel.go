@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/utils"
@@ -304,6 +305,7 @@ func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue
 func (h *L7FlowLog) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platformData *grpc.PlatformInfoTable) {
 	// OTel data net protocol always set to TCP
 	h.Protocol = uint8(layers.IPProtocolTCP)
+	h.TapType = uint8(datatype.TAP_CLOUD)
 	h.Type = uint8(datatype.MSG_T_SESSION)
 	h.TapPortType = datatype.TAPPORT_FROM_OTEL
 	h.SignalSource = uint16(datatype.SIGNAL_SOURCE_OTEL)
@@ -345,8 +347,22 @@ func (h *L7FlowLog) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platform
 }
 
 func (k *KnowledgeGraph) FillOTel(l *L7FlowLog, platformData *grpc.PlatformInfoTable) {
-	k.L3EpcID0 = platformData.QueryVtapEpc0(uint32(l.VtapID))
-	k.L3EpcID1 = platformData.QueryVtapEpc1(uint32(l.VtapID), l.IsIPv4, l.IP41, l.IP61)
+	switch l.TapSide {
+	case "c-app":
+		// fill Epc0 with the Epc the Vtap belongs to
+		k.L3EpcID0 = platformData.QueryVtapEpc0(uint32(l.VtapID))
+		// fill in Epc1 with other rules, see function description for details
+		k.L3EpcID1 = platformData.QueryVtapEpc1(uint32(l.VtapID), l.IsIPv4, l.IP41, l.IP61)
+	case "s-app":
+		// fill Epc1 with the Epc the Vtap belongs to
+		k.L3EpcID1 = platformData.QueryVtapEpc0(uint32(l.VtapID))
+		// fill in Epc0 with other rules, see function description for details
+		k.L3EpcID0 = platformData.QueryVtapEpc1(uint32(l.VtapID), l.IsIPv4, l.IP40, l.IP60)
+	default: // "app" or others
+		// fill Epc0 and Epc1 with the Epc the Vtap belongs to
+		k.L3EpcID0 = platformData.QueryVtapEpc0(uint32(l.VtapID))
+		k.L3EpcID1 = k.L3EpcID0
+	}
 	k.fill(
 		platformData,
 		!l.IsIPv4, false, false,
@@ -359,10 +375,25 @@ func (k *KnowledgeGraph) FillOTel(l *L7FlowLog, platformData *grpc.PlatformInfoT
 		zerodoc.Rest,
 		layers.IPProtocol(l.Protocol),
 	)
+
+	// OTel data always not from INTERNET
 	if k.L3EpcID0 == datatype.EPC_FROM_INTERNET {
 		k.L3EpcID0 = datatype.EPC_UNKNOWN
 	}
 	if k.L3EpcID1 == datatype.EPC_FROM_INTERNET {
 		k.L3EpcID1 = datatype.EPC_UNKNOWN
 	}
+	if k.AutoServiceType0 == common.InternetIpType {
+		k.AutoServiceType0 = common.IpType
+	}
+	if k.AutoServiceType1 == common.InternetIpType {
+		k.AutoServiceType1 = common.IpType
+	}
+	if k.AutoInstanceType0 == common.InternetIpType {
+		k.AutoInstanceType0 = common.IpType
+	}
+	if k.AutoInstanceType1 == common.InternetIpType {
+		k.AutoInstanceType1 = common.IpType
+	}
+
 }

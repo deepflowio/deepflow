@@ -17,6 +17,7 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -30,7 +31,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
-var DEFAULT_DATA_SOURCE_NAMES = []string{"1s", "1m", "flow_log.l4", "flow_log.l7"}
+var DEFAULT_DATA_SOURCE_NAMES = []string{"1s", "1m", "flow_log.l4_flow_log", "flow_log.l7_flow_log",
+	"flow_log.l4_packet", "flow_log.l7_packet", "deepflow_system"}
 
 func GetDataSources(filter map[string]interface{}) (resp []model.DataSource, err error) {
 	var response []model.DataSource
@@ -207,7 +209,6 @@ func CreateDataSource(dataSourceCreate model.DataSourceCreate, cfg *config.Contr
 
 func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cfg *config.ControllerConfig) (model.DataSource, error) {
 	var dataSource mysql.DataSource
-	var err error
 
 	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&dataSource); ret.Error != nil {
 		return model.DataSource{}, NewError(
@@ -221,34 +222,43 @@ func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cf
 			fmt.Sprintf("data_source retention_time should le %d", cfg.Spec.DataSourceRetentionTimeMax),
 		)
 	}
+	oldRetentionTime := dataSource.RetentionTime
 	dataSource.RetentionTime = dataSourceUpdate.RetentionTime
-	mysql.Db.Save(&dataSource)
-
-	log.Infof("update data_source (%s)", dataSource.Name)
 
 	// 调用roze API配置clickhouse
 	var analyzers []mysql.Analyzer
 	mysql.Db.Find(&analyzers)
 
+	var err error
+	var errAnalyzerIP string
 	for _, analyzer := range analyzers {
-		if CallRozeAPIModRP(analyzer.IP, dataSource, cfg.Roze.Port) != nil {
-			errMsg := fmt.Sprintf(
-				"config analyzer (%s) mod data_source (%s) failed", analyzer.IP, dataSource.Name,
-			)
-			log.Error(errMsg)
-			err = NewError(common.SERVER_ERROR, errMsg)
+		err = CallRozeAPIModRP(analyzer.IP, dataSource, cfg.Roze.Port)
+		if err != nil {
+			errAnalyzerIP = analyzer.IP
 			break
 		}
-		log.Infof(
-			"config analyzer (%s) mod data_source (%s) complete",
-			analyzer.IP, dataSource.Name,
-		)
+		log.Infof("config analyzer (%s) mod data_source (%s) complete, retention time change: %ds -> %ds",
+			analyzer.IP, dataSource.Name, oldRetentionTime, dataSource.RetentionTime)
 	}
 
-	if err != nil {
+	if err == nil {
+		dataSource.State = common.DATA_SOURCE_STATE_NORMAL
+		mysql.Db.Save(&dataSource)
+		log.Infof("update data_source (%s), retention time change: %ds -> %ds",
+			dataSource.Name, oldRetentionTime, dataSource.RetentionTime)
+	}
+	if errors.Is(err, common.ErrorFail) {
 		mysql.Db.Model(&dataSource).Updates(
 			map[string]interface{}{"state": common.DATA_SOURCE_STATE_EXCEPTION},
 		)
+		errMsg := fmt.Sprintf("config analyzer (%s) mod data_source (%s) failed", errAnalyzerIP, dataSource.Name)
+		log.Error(errMsg)
+		err = NewError(common.SERVER_ERROR, errMsg)
+	}
+	if errors.Is(err, common.ErrorPending) {
+		warnMsg := fmt.Sprintf("config analyzer (%s) mod data_source (%s) is pending", errAnalyzerIP, dataSource.Name)
+		log.Warning(NewError(common.CONFIG_PENDING, warnMsg))
+		err = NewError(common.CONFIG_PENDING, warnMsg)
 	}
 
 	response, _ := GetDataSources(map[string]interface{}{"lcuuid": lcuuid})
@@ -323,28 +333,25 @@ func CallRozeAPIAddRP(ip string, dataSource, baseDataSource mysql.DataSource, ro
 		"summable-metrics-op":   strings.ToLower(dataSource.SummableMetricsOperator),
 		"unsummable-metrics-op": strings.ToLower(dataSource.UnSummableMetricsOperator),
 		"interval":              dataSource.Interval / common.INTERVAL_1MINUTE,
-		"retention-time":        dataSource.RetentionTime * (common.INTERVAL_1DAY / common.INTERVAL_1HOUR),
+		"retention-time":        dataSource.RetentionTime,
 	}
-	log.Debug(url)
-	log.Debug(body)
+	log.Infof("call add data_source, url: %s, bodby: %v", url, body)
 	_, err := common.CURLPerform("POST", url, body)
 	return err
 }
 
 func CallRozeAPIModRP(ip string, dataSource mysql.DataSource, rozePort int) error {
 	url := fmt.Sprintf("http://%s:%d/v1/rpmod/", common.GetCURLIP(ip), rozePort)
-	db := "vtap_" + dataSource.TsdbType
-	switch dataSource.TsdbType {
-	case common.DATA_SOURCE_L4_LOG, common.DATA_SOURCE_L7_LOG:
-		db = dataSource.TsdbType
+	db := dataSource.TsdbType
+	if dataSource.TsdbType == common.DATA_SOURCE_APP || dataSource.TsdbType == common.DATA_SOURCE_FLOW {
+		db = "vtap_" + dataSource.TsdbType
 	}
 	body := map[string]interface{}{
 		"name":           dataSource.Name,
 		"db":             db,
-		"retention-time": dataSource.RetentionTime * (common.INTERVAL_1DAY / common.INTERVAL_1HOUR),
+		"retention-time": dataSource.RetentionTime,
 	}
-	log.Debug(url)
-	log.Debug(body)
+	log.Infof("call mod data_source, url: %s, bodby: %v", url, body)
 	_, err := common.CURLPerform("PATCH", url, body)
 	return err
 }
@@ -355,8 +362,7 @@ func CallRozeAPIDelRP(ip string, dataSource mysql.DataSource, rozePort int) erro
 		"name": dataSource.Name,
 		"db":   "vtap_" + dataSource.TsdbType,
 	}
-	log.Debug(url)
-	log.Debug(body)
+	log.Infof("call del data_source, url: %s, bodby: %v", url, body)
 	_, err := common.CURLPerform("DELETE", url, body)
 	return err
 }

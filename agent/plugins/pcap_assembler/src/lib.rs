@@ -18,6 +18,7 @@
 
 use std::sync::atomic::AtomicI64;
 use std::sync::Arc;
+use std::thread::JoinHandle;
 use std::time::Duration;
 
 use public::counter::{Counter, RefCountable};
@@ -68,6 +69,10 @@ impl PcapAssembler {
     }
 
     pub fn start(&self) {}
+
+    pub fn notify_stop(&self) -> Option<JoinHandle<()>> {
+        None
+    }
 
     pub fn stop(&self) {}
 }

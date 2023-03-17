@@ -238,6 +238,18 @@ impl<T: Sendable> UniformSenderThread<T> {
         info!("{} uniform sender id: {} started", self.name, self.id);
     }
 
+    pub fn notify_stop(&mut self) -> Option<JoinHandle<()>> {
+        if !self.running.swap(false, Ordering::Relaxed) {
+            warn!(
+                "uniform sender id: {} already stopped, do nothing.",
+                self.id
+            );
+            return None;
+        }
+        info!("notified stopping uniform sender id: {}", self.id);
+        self.thread_handle.take()
+    }
+
     pub fn stop(&mut self) {
         if !self.running.swap(false, Ordering::Relaxed) {
             warn!(
@@ -246,7 +258,7 @@ impl<T: Sendable> UniformSenderThread<T> {
             );
             return;
         }
-        info!("stoping uniform sender id: {}", self.id);
+        info!("stopping uniform sender id: {}", self.id);
         let _ = self.thread_handle.take().unwrap().join();
         info!("stopped uniform sender id: {}", self.id);
     }

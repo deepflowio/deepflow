@@ -15,7 +15,6 @@
  */
 
 pub(crate) mod dns;
-pub mod http;
 pub mod l7_rrt;
 pub(crate) mod mq;
 pub(crate) mod rpc;
@@ -36,8 +35,10 @@ use public::l7_protocol::L7ProtocolEnum;
 
 use super::app_table::AppTable;
 use super::error::{Error, Result};
-use super::protocol_logs::{AppProtoHead, PostgresqlLog, ProtobufRpcWrapLog, SofaRpcLog};
+use super::protocol_logs::AppProtoHead;
 
+use crate::common::flow::L7PerfStats;
+use crate::common::l7_protocol_log::L7PerfCache;
 use crate::{
     common::{
         flow::{FlowPerfStats, L4Protocol, L7Protocol, PacketDirection, SignalSource},
@@ -53,7 +54,6 @@ use crate::{
 };
 
 use {
-    self::http::HttpPerfData,
     dns::DnsPerfData,
     mq::{KafkaPerfData, MqttPerfData},
     rpc::DubboPerfData,
@@ -157,6 +157,7 @@ macro_rules! impl_l7_flow_perf {
 }
 
 // impl L7FlowPerf for L7FlowPerfTable
+// TODO will remove after perf remake
 impl_l7_flow_perf! {
     pub enum L7FlowPerfTable {
         Dns(DnsPerfData),
@@ -165,22 +166,6 @@ impl_l7_flow_perf! {
         Redis(RedisPerfData),
         Dubbo(DubboPerfData),
         Mysql(MysqlPerfData),
-        Http(HttpPerfData),
-        Postgresql(Box<PostgresqlLog>),
-        ProtobufRpc(Box<ProtobufRpcWrapLog>),
-        SofaRpc(Box<SofaRpcLog>),
-    }
-}
-
-impl L7FlowPerfTable {
-    // TODO will remove when perf abstruct to log parse
-    pub fn reset(&mut self) {
-        match self {
-            L7FlowPerfTable::ProtobufRpc(p) => p.reset(),
-            L7FlowPerfTable::Postgresql(p) => p.reset(),
-            L7FlowPerfTable::SofaRpc(p) => p.reset(),
-            _ => {}
-        }
     }
 }
 
@@ -251,15 +236,21 @@ impl<'a> Iterator for L7ProtocolCheckerIterator<'a> {
     }
 }
 
-pub struct FlowPerf {
+pub struct FlowLog {
     l4: L4FlowPerfTable,
+
+    // TODO perf 重构完成后会去掉
+    // TODO after finish perf remake  will remove
     l7: Option<Box<L7FlowPerfTable>>,
 
     // perf 目前还没有抽象出来,自定义协议需要添加字段区分,以后抽出来后 l7可以去掉.
     l7_protocol_log_parser: Option<Box<L7ProtocolParser>>,
-
+    // TODO perf 重构完成后会去掉
+    // TODO after finish perf remake  will remove
     rrt_cache: Rc<RefCell<L7RrtCache>>,
 
+    // use for cache previous log info, use for calculate rrt
+    perf_cache: Rc<RefCell<L7PerfCache>>,
     l7_protocol_enum: L7ProtocolEnum,
 
     // Only for eBPF data, the server_port will be set in l7_check() method, it checks the first
@@ -272,14 +263,12 @@ pub struct FlowPerf {
     is_skip: bool,
 }
 
-impl FlowPerf {
+impl FlowLog {
     const PROTOCOL_CHECK_LIMIT: usize = 5;
-
+    // TODO will remove after perf remake
     fn l7_new(protocol: L7Protocol, rrt_cache: Rc<RefCell<L7RrtCache>>) -> Option<L7FlowPerfTable> {
         match protocol {
             L7Protocol::DNS => Some(L7FlowPerfTable::Dns(DnsPerfData::new(rrt_cache.clone()))),
-            L7Protocol::ProtobufRPC => Some(L7FlowPerfTable::ProtobufRpc(Default::default())),
-            L7Protocol::SofaRPC => Some(L7FlowPerfTable::SofaRpc(Default::default())),
             L7Protocol::Dubbo => Some(L7FlowPerfTable::Dubbo(DubboPerfData::new(
                 rrt_cache.clone(),
             ))),
@@ -290,20 +279,15 @@ impl FlowPerf {
             L7Protocol::MySQL => Some(L7FlowPerfTable::Mysql(MysqlPerfData::new(
                 rrt_cache.clone(),
             ))),
-            L7Protocol::PostgreSQL => Some(L7FlowPerfTable::Postgresql(Default::default())),
             L7Protocol::Redis => Some(L7FlowPerfTable::Redis(RedisPerfData::new(
                 rrt_cache.clone(),
             ))),
-            L7Protocol::Http1
-            | L7Protocol::Http1TLS
-            | L7Protocol::Http2
-            | L7Protocol::Http2TLS
-            | L7Protocol::Grpc => Some(L7FlowPerfTable::Http(HttpPerfData::new(rrt_cache.clone()))),
             _ => None,
         }
     }
 
     // return rrt
+    // TODO will remove after perf remake
     fn l7_parse_perf(
         &mut self,
         log_parser_config: &LogParserConfig,
@@ -336,10 +320,6 @@ impl FlowPerf {
         } else {
             0
         };
-
-        if ret.is_ok() {
-            perf_parser.reset();
-        }
 
         if !self.is_success {
             if ret.is_ok() {
@@ -454,7 +434,12 @@ impl FlowPerf {
         }
 
         if let Some(payload) = packet.get_l4_payload() {
-            let param = ParseParam::from((&*packet, log_parser_config));
+            let param = ParseParam::from((
+                &*packet,
+                self.perf_cache.clone(),
+                !is_parse_log,
+                log_parser_config,
+            ));
             for protocol in checker.possible_protocols(
                 packet.lookup_key.proto.into(),
                 match packet.lookup_key.direction {
@@ -467,10 +452,35 @@ impl FlowPerf {
                 };
                 if parser.check_payload(payload, &param) {
                     self.l7_protocol_enum = parser.l7_protocl_enum();
-                    self.server_port = packet.lookup_key.dst_port;
+
+                    // redis can not determine dirction by RESP protocol when pakcet is from ebpf, special treatment
+                    if self.l7_protocol_enum.get_l7_protocol() == L7Protocol::Redis
+                        && packet.signal_source == SignalSource::EBPF
+                    {
+                        (_, self.server_port) = packet.get_redis_server_addr();
+                    } else {
+                        self.server_port = packet.lookup_key.dst_port;
+                    }
+
                     packet.lookup_key.direction = PacketDirection::ClientToServer;
 
+                    // 重构后rrt直接由log获取，对于已完成重构的协议 这里的rrt都是0
                     let mut rrt = 0;
+                    // 完成重构的协议， 只会解析一次
+                    if protocol.remaked() {
+                        self.l7_protocol_log_parser = Some(Box::new(parser));
+                        let ret = self.l7_parse_log(
+                            flow_config,
+                            packet,
+                            app_table,
+                            &param,
+                            local_epc,
+                            remote_epc,
+                        )?;
+                        return Ok((ret, rrt));
+                    }
+
+                    // TODO 没完成重构的协议依然走旧逻辑，完成重构后这部分会去掉
                     if is_parse_perf {
                         // perf 没有抽象出来,这里可能返回None，对于返回None即不解析perf，只解析log
                         self.l7 =
@@ -545,6 +555,28 @@ impl FlowPerf {
             };
         }
 
+        // 已重构完成的协议，只解析一次
+        if self.l7_protocol_enum.get_l7_protocol().remaked()
+            && self.l7_protocol_log_parser.is_some()
+        {
+            let ret = self.l7_parse_log(
+                flow_config,
+                packet,
+                app_table,
+                &ParseParam::from((
+                    &*packet,
+                    self.perf_cache.clone(),
+                    !is_parse_log,
+                    log_parser_config,
+                )),
+                local_epc,
+                remote_epc,
+            )?;
+            // 完成重构的协议，rrt可以直接从log获取，这里兼容旧逻辑先返回0
+            return Ok((ret, 0));
+        }
+
+        // TODO 未完成重构的协议走旧逻辑，所有协议重构后下面两个解析会去掉
         let mut rrt = 0;
         if self.l7.is_some() && is_parse_perf {
             rrt = self.l7_parse_perf(
@@ -565,7 +597,7 @@ impl FlowPerf {
                 flow_config,
                 packet,
                 app_table,
-                &ParseParam::from((&*packet, log_parser_config)),
+                &ParseParam::from((&*packet, self.perf_cache.clone(), false, log_parser_config)),
                 local_epc,
                 remote_epc,
             )?;
@@ -595,7 +627,9 @@ impl FlowPerf {
     }
 
     pub fn new(
+        // TODO rrt cache 重构完成后会去掉
         rrt_cache: Rc<RefCell<L7RrtCache>>,
+        perf_cache: Rc<RefCell<L7PerfCache>>,
         l4_proto: L4Protocol,
         l7_protocol_enum: L7ProtocolEnum,
         is_from_app_tab: bool,
@@ -616,20 +650,13 @@ impl FlowPerf {
                 .map(|o| Box::new(o)),
             l7_protocol_log_parser: get_parser(l7_protocol_enum).map(|o| Box::new(o)),
             rrt_cache,
+            perf_cache,
             l7_protocol_enum,
             is_from_app: is_from_app_tab,
             is_success: false,
             is_skip: false,
             server_port: server_port,
         })
-    }
-
-    pub fn reverse(&mut self, l7_proto: Option<L7Protocol>) {
-        let l7_protocol = l7_proto.unwrap_or(L7Protocol::Unknown);
-        self.is_from_app = l7_proto.is_some();
-        self.is_skip = false;
-        self.is_success = false;
-        self.l7 = Self::l7_new(l7_protocol, self.rrt_cache.clone()).map(|o| Box::new(o));
     }
 
     pub fn parse(
@@ -681,21 +708,56 @@ impl FlowPerf {
             stats.replace(self.l4.copy_and_reset_data(flow_reversed));
         }
 
-        if l7_performance_enabled && self.l7.is_some() {
-            let self_l7 = self.l7.as_mut().unwrap();
-            if self_l7.data_updated() || l7_timeout_count > 0 {
-                if let Some(stats) = stats.as_mut() {
-                    let FlowPerfStats {
-                        l7, l7_protocol, ..
-                    } = self_l7.copy_and_reset_data(l7_timeout_count);
-                    stats.l7 = l7;
-                    stats.l7_protocol = l7_protocol;
-                } else {
-                    stats.replace(self_l7.copy_and_reset_data(l7_timeout_count));
+        if l7_performance_enabled {
+            self.get_l7_perf_stat(l7_timeout_count).map_or(
+                {
+                    if l7_timeout_count > 0 {
+                        stats.replace(FlowPerfStats {
+                            l7_protocol: self.l7_protocol_enum.get_l7_protocol(),
+                            l7: L7PerfStats {
+                                err_timeout: l7_timeout_count,
+                                ..Default::default()
+                            },
+                            ..Default::default()
+                        });
+                    }
+                },
+                |mut perf| {
+                    if let Some(stats) = stats.as_mut() {
+                        perf.err_timeout = l7_timeout_count;
+                        stats.l7 = perf;
+                        stats.l7_protocol = self.l7_protocol_enum.get_l7_protocol();
+                    } else {
+                        stats.replace(FlowPerfStats {
+                            l7: perf,
+                            l7_protocol: self.l7_protocol_enum.get_l7_protocol(),
+                            ..Default::default()
+                        });
+                    }
+                },
+            );
+        }
+        stats
+    }
+
+    // TODO 这个用于根据协议判断从perf/log 获取perf数据， perf重构完成后会去掉
+    fn get_l7_perf_stat(&mut self, l7_timeout_count: u32) -> Option<L7PerfStats> {
+        if self.l7_perf_remake() {
+            self.l7_protocol_log_parser
+                .as_mut()
+                .map_or(None, |l| l.perf_stats())
+        } else {
+            if let Some(p) = self.l7.as_mut() {
+                if p.data_updated() {
+                    return Some(p.copy_and_reset_data(l7_timeout_count).l7);
                 }
             }
+            return None;
         }
+    }
 
-        stats
+    // TODO perf重构完成后会去掉
+    pub fn l7_perf_remake(&self) -> bool {
+        self.l7_protocol_enum.get_l7_protocol().remaked()
     }
 }

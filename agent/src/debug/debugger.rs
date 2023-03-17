@@ -518,6 +518,15 @@ impl Debugger {
         self.debuggers.queue.clone()
     }
 
+    pub fn notify_stop(&self) -> Option<JoinHandle<()>> {
+        if !self.running.swap(false, Ordering::Relaxed) {
+            return None;
+        }
+
+        info!("notified debugger exit");
+        self.thread.lock().unwrap().take()
+    }
+
     pub fn stop(&self) {
         if !self.running.swap(false, Ordering::Relaxed) {
             return;

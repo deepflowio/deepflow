@@ -31,8 +31,7 @@ use arc_swap::access::Access;
 use log::{info, warn};
 
 use super::{
-    AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, BoxAppProtoLogsData, DnsLog, DubboLog,
-    KafkaLog, LogMessageType, MqttLog, MysqlLog, RedisLog,
+    AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, BoxAppProtoLogsData, LogMessageType,
 };
 
 use crate::{
@@ -43,10 +42,7 @@ use crate::{
         MetaPacket, TaggedFlow,
     },
     config::handler::LogParserAccess,
-    flow_generator::{
-        protocol_logs::HttpLog, Error::L7LogCanNotMerge, FLOW_METRICS_PEER_DST,
-        FLOW_METRICS_PEER_SRC,
-    },
+    flow_generator::{Error::L7LogCanNotMerge, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC},
     metric::document::TapSide,
     utils::stats::{Counter, CounterType, CounterValue, RefCountable},
 };
@@ -166,9 +162,18 @@ impl MetaAppProto {
             base_info.syscall_trace_id_thread_0 = meta_packet.thread_id;
             base_info.syscall_cap_seq_0 = meta_packet.cap_seq;
         } else {
+            swap(&mut base_info.mac_src, &mut base_info.mac_dst);
             swap(&mut base_info.ip_src, &mut base_info.ip_dst);
             swap(&mut base_info.port_src, &mut base_info.port_dst);
             swap(&mut base_info.gpid_0, &mut base_info.gpid_1);
+            #[cfg(target_os = "linux")]
+            if meta_packet.signal_source == SignalSource::EBPF {
+                swap(&mut base_info.process_id_0, &mut base_info.process_id_1);
+                swap(
+                    &mut base_info.process_kname_0,
+                    &mut base_info.process_kname_1,
+                );
+            }
 
             base_info.l3_epc_id_src = flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].l3_epc_id;
             base_info.l3_epc_id_dst = flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].l3_epc_id;
@@ -445,7 +450,6 @@ impl SessionQueue {
                     self.send(request);
                 } else {
                     // if can not merge, send req and resp directly.
-                    // generally use for ebpf disorder.
                     if let Err(L7LogCanNotMerge(item)) = request.session_merge(item) {
                         self.send(item);
                     }
@@ -551,18 +555,7 @@ impl SessionQueue {
     }
 }
 
-#[derive(Default)]
-struct AppLogs {
-    dns: DnsLog,
-    http: HttpLog,
-    mysql: MysqlLog,
-    redis: RedisLog,
-    dubbo: DubboLog,
-    kafka: KafkaLog,
-    mqtt: MqttLog,
-}
-
-pub struct AppProtoLogsParser {
+pub struct SessionAggregator {
     input_queue: Arc<Receiver<Box<MetaAppProto>>>,
     output_queue: DebugSender<BoxAppProtoLogsData>,
     id: u32,
@@ -574,7 +567,7 @@ pub struct AppProtoLogsParser {
     log_rate: Arc<LeakyBucket>,
 }
 
-impl AppProtoLogsParser {
+impl SessionAggregator {
     pub fn new(
         input_queue: Receiver<Box<MetaAppProto>>,
         output_queue: DebugSender<BoxAppProtoLogsData>,
@@ -641,6 +634,14 @@ impl AppProtoLogsParser {
             .unwrap();
         self.thread.lock().unwrap().replace(thread);
         info!("app protocol logs parser (id={}) started", self.id);
+    }
+
+    pub fn notify_stop(&self) -> Option<JoinHandle<()>> {
+        if !self.running.swap(false, Ordering::SeqCst) {
+            return None;
+        }
+        info!("notified app protocol logs parser (id={}) to stop", self.id);
+        self.thread.lock().unwrap().take()
     }
 
     pub fn stop(&self) {

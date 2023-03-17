@@ -675,6 +675,18 @@ impl QuadrupleGeneratorThread {
         info!("quadruple generator id: {} started", self.id);
     }
 
+    pub fn notify_stop(&mut self) -> Option<JoinHandle<()>> {
+        if !self.running.swap(false, Ordering::Relaxed) {
+            warn!(
+                "quadruple generator id: {} already stopped, do nothing.",
+                self.id
+            );
+            return None;
+        }
+        info!("notified stopping quadruple generator: {}", self.id);
+        self.thread_handle.take()
+    }
+
     pub fn stop(&mut self) {
         if !self.running.swap(false, Ordering::Relaxed) {
             warn!(
@@ -683,7 +695,7 @@ impl QuadrupleGeneratorThread {
             );
             return;
         }
-        info!("stoping quadruple generator: {}", self.id);
+        info!("stopping quadruple generator: {}", self.id);
         let _ = self.thread_handle.take().unwrap().join();
         info!("stopped quadruple generator: {}", self.id);
     }
@@ -961,6 +973,7 @@ impl QuadrupleGenerator {
                 l7_response: 0,
                 syn: perf_stats.map(|s| s.tcp.syn_count).unwrap_or_default(),
                 synack: perf_stats.map(|s| s.tcp.synack_count).unwrap_or_default(),
+                direction_score: tagged_flow.flow.direction_score,
             };
             if tagged_flow.flow.flow_key.proto == IpProtocol::Tcp {
                 match tagged_flow.flow.close_type {
@@ -1043,6 +1056,7 @@ impl QuadrupleGenerator {
                     traffic: AppTraffic {
                         request: (tagged_flow.flow.close_type != CloseType::ForcedReport) as u32,
                         response: (tagged_flow.flow.close_type != CloseType::ForcedReport) as u32,
+                        direction_score: tagged_flow.flow.direction_score,
                     },
                     ..Default::default()
                 }
@@ -1052,6 +1066,7 @@ impl QuadrupleGenerator {
                     traffic: AppTraffic {
                         request: stats.l7.request_count,
                         response: stats.l7.response_count,
+                        direction_score: tagged_flow.flow.direction_score,
                     },
                     latency: AppLatency {
                         rrt_max: stats.l7.rrt_max,

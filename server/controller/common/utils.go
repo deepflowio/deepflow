@@ -224,7 +224,12 @@ func CURLPerform(method string, url string, body map[string]interface{}) (*simpl
 	if optStatus != "" && optStatus != SUCCESS {
 		description := response.Get("DESCRIPTION").MustString()
 		log.Errorf("curl: %s failed, (%s)", url, description)
-		return errResponse, errors.New(description)
+		e := ErrorFail
+		// PENDING used for api /v1/rpmod/
+		if optStatus == "PENDING" {
+			e = ErrorPending
+		}
+		return errResponse, fmt.Errorf("%w, %s", e, description)
 	}
 
 	return response, nil

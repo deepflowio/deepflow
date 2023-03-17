@@ -32,7 +32,6 @@ use crate::{
         error::{Error, Result},
         protocol_logs::pb_adapter::{L7ProtocolSendLog, L7Request, L7Response},
     },
-    parse_common,
 };
 
 const SEPARATOR_SIZE: usize = 2;
@@ -210,7 +209,6 @@ impl L7ProtocolParserInterface for RedisLog {
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
-        parse_common!(self, param);
         self.info.is_tls = param.is_tls();
         self.info.set_packet_seq(param);
         self.parse(payload, param.l4_protocol, param.direction, None, None)?;
@@ -448,13 +446,15 @@ pub fn decode_error_code(context: &[u8]) -> Option<&[u8]> {
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
     use std::path::Path;
+    use std::rc::Rc;
+    use std::{cell::RefCell, fs};
 
     use super::*;
 
     use crate::{
-        common::{flow::PacketDirection, MetaPacket},
+        common::{flow::PacketDirection, l7_protocol_log::L7PerfCache, MetaPacket},
+        flow_generator::L7_RRT_CACHE_CAPACITY,
         utils::test::Capture,
     };
 
@@ -462,6 +462,7 @@ mod tests {
 
     fn run(name: &str) -> String {
         let pcap_file = Path::new(FILE_DIR).join(name);
+        let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
         let capture = Capture::load_pcap(pcap_file, None);
         let mut packets = capture.as_meta_packets();
         if packets.is_empty() {
@@ -489,8 +490,10 @@ mod tests {
                 None,
                 None,
             );
-            let is_redis =
-                RedisLog::redis_check_protocol(payload, &ParseParam::from(packet as &MetaPacket));
+            let is_redis = RedisLog::redis_check_protocol(
+                payload,
+                &ParseParam::from((packet as &MetaPacket, log_cache.clone(), false)),
+            );
             output.push_str(&format!("{} is_redis: {}\r\n", redis.info, is_redis));
         }
         output

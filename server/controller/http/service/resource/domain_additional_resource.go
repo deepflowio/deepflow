@@ -519,6 +519,7 @@ func generateCloudModelData(domainUUIDToToolDataSet map[string]*addtionalResourc
 					cloudMD.VInterfaces,
 					cloudmodel.VInterface{
 						Lcuuid:        vifUUID,
+						Name:          vif.Name,
 						Mac:           vif.Mac,
 						Type:          toolDS.subnetUUIDToType[vif.SubnetUUID],
 						DeviceType:    common.VIF_DEVICE_TYPE_HOST,

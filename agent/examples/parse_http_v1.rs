@@ -3,8 +3,10 @@ use std::path::Path;
 use std::rc::Rc;
 
 use deepflow_agent::{
-    _HttpPerfData as HttpPerfData, _L7FlowPerf as L7FlowPerf, _L7RrtCache as L7RrtCache,
-    _PacketDirection as PacketDirection, utils::test::Capture,
+    _PacketDirection as PacketDirection,
+    common::l7_protocol_log::{L7PerfCache, L7ProtocolParserInterface, ParseParam},
+    utils::test::Capture,
+    HttpLog,
 };
 
 fn main() {
@@ -18,13 +20,13 @@ fn main() {
         Path::new("./resources/test/flow_generator/http/httpv1.pcap"),
         None,
     );
+    let log_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
     let mut packets = capture.as_meta_packets();
     if packets.len() < 2 {
         panic!("unable to load pcap file");
     }
 
-    let rrt_cache = L7RrtCache::new(8);
-    let mut parser = HttpPerfData::new(Rc::new(RefCell::new(rrt_cache)));
+    let mut parser = HttpLog::new_v1();
 
     let first_dst_port = packets[0].lookup_key.dst_port;
     for packet in packets.iter_mut().take(2) {
@@ -36,7 +38,13 @@ fn main() {
     }
 
     for _ in 0..iters {
-        let _ = parser.parse(None, &packets[0], 0x1f3c01010);
-        let _ = parser.parse(None, &packets[1], 0x1f3c01010);
+        let _ = parser.parse_payload(
+            &packets[0].get_l4_payload().unwrap(),
+            &ParseParam::from((&packets[0], log_cache.clone(), false)),
+        );
+        let _ = parser.parse_payload(
+            &packets[1].get_l4_payload().unwrap(),
+            &ParseParam::from((&packets[1], log_cache.clone(), false)),
+        );
     }
 }

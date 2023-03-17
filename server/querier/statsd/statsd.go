@@ -3,7 +3,7 @@ package statsd
 import (
 	"sync"
 
-	"github.com/deepflowio/deepflow/server/libs/stats"
+	"github.com/deepflowio/deepflow/server/libs/stats" // FIXME: why not use stats directly
 )
 
 func RegisterCountableForIngester(module string, countable stats.Countable, opts ...stats.Option) error {
@@ -19,6 +19,11 @@ type ClickhouseCounter struct {
 	QueryTimeSum uint64
 	QueryTimeAvg uint64 `statsd:"query_time_avg"`
 	QueryTimeMax uint64 `statsd:"query_time_max"`
+	ApiTime      uint64
+	ApiTimeSum   uint64
+	ApiTimeAvg   uint64 `statsd:"api_time_avg"`
+	ApiTimeMax   uint64 `statsd:"api_time_max"`
+	ApiCount     uint64 `statsd:"api_count"`
 }
 
 type Counter struct {
@@ -40,6 +45,20 @@ func (c *Counter) WriteCk(qc *ClickhouseCounter) {
 		c.ck.QueryTimeAvg = c.ck.QueryTimeSum / c.ck.QueryCount
 		if qc.QueryTime > c.ck.QueryTimeMax {
 			c.ck.QueryTimeMax = qc.QueryTime
+		}
+	}()
+}
+
+func (c *Counter) WriteApi(qc *ClickhouseCounter) {
+	go func() {
+		c.writeCkM.Lock()
+		defer c.writeCkM.Unlock()
+		c.ck.ApiCount++
+
+		c.ck.ApiTimeSum += qc.ApiTime
+		c.ck.ApiTimeAvg = c.ck.ApiTimeSum / c.ck.ApiCount
+		if qc.ApiTime > c.ck.ApiTimeMax {
+			c.ck.ApiTimeMax = qc.ApiTime
 		}
 	}()
 }

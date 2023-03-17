@@ -549,6 +549,46 @@ impl L7PerfStats {
             self.rrt_max = other.rrt_max
         }
     }
+
+    pub fn merge_perf(
+        &mut self,
+        req_count: u32,
+        resp_count: u32,
+        req_err: u32,
+        resp_err: u32,
+        rrt: u64,
+    ) {
+        self.request_count += req_count;
+        self.response_count += resp_count;
+        self.err_client_count += req_err;
+        self.err_server_count += resp_err;
+
+        if rrt != 0 {
+            self.rrt_max = self.rrt_max.max(rrt as u32);
+            self.rrt_sum += rrt;
+            self.rrt_count += 1;
+        }
+    }
+
+    pub fn inc_req(&mut self) {
+        self.merge_perf(1, 0, 0, 0, 0);
+    }
+
+    pub fn inc_resp(&mut self) {
+        self.merge_perf(0, 1, 0, 0, 0);
+    }
+
+    pub fn inc_req_err(&mut self) {
+        self.merge_perf(0, 0, 1, 0, 0);
+    }
+
+    pub fn inc_resp_err(&mut self) {
+        self.merge_perf(0, 0, 0, 1, 0);
+    }
+
+    pub fn update_rrt(&mut self, rrt: u64) {
+        self.merge_perf(0, 0, 0, 0, rrt);
+    }
 }
 
 impl From<L7PerfStats> for flow_log::L7PerfStats {
@@ -873,6 +913,7 @@ pub struct Flow {
     pub otel_instance: Option<String>,
     #[serde(skip)]
     pub endpoint: Option<String>,
+    pub direction_score: u8,
 }
 
 fn tunnel_is_none(t: &TunnelField) -> bool {
@@ -1083,6 +1124,7 @@ impl From<Flow> for flow_log::Flow {
             last_keepalive_seq: f.last_keepalive_seq,
             last_keepalive_ack: f.last_keepalive_ack,
             acl_gids: f.acl_gids.into_iter().map(|g| g as u32).collect(),
+            direction_score: f.direction_score as u32,
         }
     }
 }
@@ -1322,52 +1364,59 @@ pub fn get_direction(
                                 );
                             }
                         } else {
-                            if tunnel_tier > 0 && tunnel.tunnel_type == TunnelType::TencentGre {
-                                // 腾讯TCE场景，TCE-GRE隧道解封装后我们伪造了MAC地址（因此不是LocalMac）
-                                // 在JNSGW场景中，Underlay CVM直接封装了GRE协议且内层IP为VIP（因此不是LocalIP）、外层IP为实IP
-                                return (
-                                    Direction::ClientHypervisorToServer,
-                                    Direction::ServerHypervisorToClient,
-                                );
-                            }
-                            //其他情况:  由隧道封装的BUM包
+                            // 虚拟机或容器作为路由器时，在虚接口上抓到路由转发流量
+                            // 额外追踪数据：新增的追踪数据添加MAC地址，后端通过MAC地址获取设备信息
+                            return (
+                                Direction::ServerGatewayToClient,
+                                Direction::ClientGatewayToServer,
+                            );
                         }
-                    } else if l3_end {
-                        if is_local_mac {
-                            // 交换转发：被宿主机的虚拟交换机转发的（和客户端/服务端完全一样）流量，记录为客户端宿主机、服务端宿主机
+                    } else {
+                        if tunnel_tier > 0 && tunnel.tunnel_type == TunnelType::TencentGre {
+                            // 腾讯TCE场景，TCE-GRE隧道解封装后我们伪造了MAC地址（因此不是LocalMac）
+                            // 在JNSGW场景中，Underlay CVM直接封装了GRE协议且内层IP为VIP（因此不是LocalIP）、外层IP为实IP
                             return (
                                 Direction::ClientHypervisorToServer,
                                 Direction::ServerHypervisorToClient,
                             );
                         }
-                        //其他情况: BUM流量
-                    } else {
-                        if is_local_mac {
-                            if is_local_ip {
-                                // 容器节点作为路由器时，路由流量在宿主机出接口上直接做交换转发
-                                // 举例：青云环境中，如果网卡做VXLAN Offload，流量会从vfXXX口经过，此时没有做隧道封装
-                                //       POD与外部通信时在vfXXX口看到的MAC是容器节点的，因此l2End和l3End同时为假
-                                //       此时只能通过isLocalIp来判断统计数据的direction
-                                return (
-                                    Direction::ClientHypervisorToServer,
-                                    Direction::ServerHypervisorToClient,
-                                );
-                            } else if tunnel_tier > 0 {
-                                // 腾讯TCE的Underlay母机使用IPIP封装，外层IP为本机Underlay CVM的IP和MAC，内层IP为CLB的VIP
-                                // 宽泛来讲，如果隧道内层是本机MAC、且L2End=false（即隧道外层不是本机MAC），也认为是到达了端点
-                                return (
-                                    Direction::ClientHypervisorToServer,
-                                    Direction::ServerHypervisorToClient,
-                                );
-                            } else {
-                                return (
-                                    Direction::ServerGatewayHypervisorToClient,
-                                    Direction::ClientGatewayHypervisorToServer,
-                                );
-                            }
-                        }
+                        //其他情况:  由隧道封装的BUM包
+                    }
+                } else if l3_end {
+                    if is_local_mac {
+                        // 交换转发：被宿主机的虚拟交换机转发的（和客户端/服务端完全一样）流量，记录为客户端宿主机、服务端宿主机
+                        return (
+                            Direction::ClientHypervisorToServer,
+                            Direction::ServerHypervisorToClient,
+                        );
                         //其他情况: BUM流量
                     }
+                } else {
+                    if is_local_mac {
+                        if is_local_ip {
+                            // 容器节点作为路由器时，路由流量在宿主机出接口上直接做交换转发
+                            // 举例：青云环境中，如果网卡做VXLAN Offload，流量会从vfXXX口经过，此时没有做隧道封装
+                            //       POD与外部通信时在vfXXX口看到的MAC是容器节点的，因此l2End和l3End同时为假
+                            //       此时只能通过isLocalIp来判断统计数据的direction
+                            return (
+                                Direction::ClientHypervisorToServer,
+                                Direction::ServerHypervisorToClient,
+                            );
+                        } else if tunnel_tier > 0 {
+                            // 腾讯TCE的Underlay母机使用IPIP封装，外层IP为本机Underlay CVM的IP和MAC，内层IP为CLB的VIP
+                            // 宽泛来讲，如果隧道内层是本机MAC、且L2End=false（即隧道外层不是本机MAC），也认为是到达了端点
+                            return (
+                                Direction::ClientHypervisorToServer,
+                                Direction::ServerHypervisorToClient,
+                            );
+                        } else {
+                            return (
+                                Direction::ServerGatewayHypervisorToClient,
+                                Direction::ClientGatewayHypervisorToServer,
+                            );
+                        }
+                    }
+                    //其他情况: BUM流量
                 }
             }
             TridentType::TtVm => {

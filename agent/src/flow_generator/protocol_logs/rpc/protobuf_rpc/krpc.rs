@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-use lru::LruCache;
 use prost::Message;
 use public::{
     bytes::read_u16_be,
@@ -24,21 +23,17 @@ use serde::Serialize;
 
 use crate::{
     common::{
-        flow::{FlowPerfStats, L7PerfStats, PacketDirection},
+        flow::L7PerfStats,
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
-        MetaPacket,
     },
-    config::handler::LogParserConfig,
     flow_generator::{
-        perf::{L7FlowPerf, PerfStats},
         protocol_logs::{
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
             L7ResponseStatus,
         },
         AppProtoHead, Error, LogMessageType, Result,
     },
-    perf_impl,
 };
 
 use super::ProtobufRpcInfo;
@@ -50,11 +45,7 @@ const KRPC_DIR_RESP: i32 = 2;
 
 #[derive(Debug, Default, Clone, Serialize)]
 pub struct KrpcInfo {
-    #[serde(skip)]
-    start_time: u64,
-    #[serde(skip)]
-    end_time: u64,
-
+    rrt: u64,
     msg_type: LogMessageType,
     msg_id: i32,
     serv_id: i32,
@@ -129,7 +120,7 @@ impl L7ProtocolInfoInterface for KrpcInfo {
         Some(AppProtoHead {
             proto: L7Protocol::ProtobufRPC,
             msg_type: self.msg_type,
-            rrt: self.end_time - self.start_time,
+            rrt: self.rrt,
         })
     }
 
@@ -172,27 +163,19 @@ impl From<KrpcInfo> for L7ProtocolSendLog {
 #[derive(Debug, Serialize)]
 pub struct KrpcLog {
     info: KrpcInfo,
-    perf_stats: Option<PerfStats>,
-
+    perf_stats: Option<L7PerfStats>,
     parsed: bool,
-
-    // <session_id,(type,time)>, use for calculate perf
-    #[serde(skip)]
-    previous_log_info: LruCache<u32, (LogMessageType, u64)>,
 }
 
 impl Default for KrpcLog {
     fn default() -> Self {
         Self {
-            previous_log_info: LruCache::new(100.try_into().unwrap()),
             info: KrpcInfo::default(),
             perf_stats: None,
             parsed: false,
         }
     }
 }
-
-perf_impl!(KrpcLog);
 
 impl KrpcLog {
     pub fn new() -> Self {
@@ -221,11 +204,13 @@ impl KrpcLog {
                 )])
             };
         }
-        self.info.start_time = param.time;
-        self.info.end_time = param.time;
         if payload.len() < KRPC_FIX_HDR_LEN || &payload[..2] != b"KR" {
             return Err(Error::L7ProtocolUnknown);
         }
+
+        if self.perf_stats.is_none() {
+            self.perf_stats = Some(L7PerfStats::default())
+        };
 
         let hdr_len = read_u16_be(&payload[2..]) as usize;
 
@@ -253,17 +238,20 @@ impl KrpcLog {
             return Ok(vec![]);
         }
         match self.info.msg_type {
-            LogMessageType::Request => self.perf_inc_req(param.time),
+            LogMessageType::Request => self.perf_stats.as_mut().unwrap().inc_req(),
             LogMessageType::Response => {
-                self.perf_inc_resp(param.time);
+                self.perf_stats.as_mut().unwrap().inc_resp();
                 if self.info.ret_code != 0 {
-                    self.perf_inc_resp_err();
+                    self.perf_stats.as_mut().unwrap().inc_resp_err();
                 }
             }
             _ => unreachable!(),
         }
 
-        self.revert_info_time(param.direction, param.time);
+        self.info.cal_rrt(param).map(|rrt| {
+            self.info.rrt = rrt;
+            self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+        });
         Ok(vec![L7ProtocolInfo::ProtobufRpcInfo(
             ProtobufRpcInfo::KrpcInfo(self.info.clone()),
         )])
@@ -275,8 +263,6 @@ impl L7ProtocolParserInterface for KrpcLog {
         if !param.ebpf_type.is_raw_protocol() {
             return false;
         }
-        self.info.start_time = param.time;
-        self.info.end_time = param.time;
         self.parsed = self.parse(payload, param, true).is_ok();
         self.parsed && self.info.msg_type == LogMessageType::Request
     }
@@ -295,68 +281,30 @@ impl L7ProtocolParserInterface for KrpcLog {
 
     fn reset(&mut self) {
         self.parsed = false;
-        self.save_info_time();
         self.info = KrpcInfo::default();
     }
 
     fn parsable_on_udp(&self) -> bool {
         false
     }
-}
 
-impl L7FlowPerf for KrpcLog {
-    fn parse(
-        &mut self,
-        _: Option<&LogParserConfig>,
-        _packet: &MetaPacket,
-        _flow_id: u64,
-    ) -> Result<()> {
-        unreachable!()
-    }
-
-    fn data_updated(&self) -> bool {
-        return self.perf_stats.is_some();
-    }
-
-    fn copy_and_reset_data(&mut self, l7_timeout_count: u32) -> FlowPerfStats {
-        FlowPerfStats {
-            l7_protocol: L7Protocol::ProtobufRPC,
-            l7: if let Some(perf) = self.perf_stats.take() {
-                L7PerfStats {
-                    request_count: perf.req_count,
-                    response_count: perf.resp_count,
-                    err_client_count: perf.req_err_count,
-                    err_server_count: perf.resp_err_count,
-                    err_timeout: l7_timeout_count,
-                    rrt_count: perf.rrt_count,
-                    rrt_sum: perf.rrt_sum.as_micros() as u64,
-                    rrt_max: perf.rrt_max.as_micros() as u32,
-                }
-            } else {
-                L7PerfStats::default()
-            },
-            ..Default::default()
-        }
-    }
-
-    fn app_proto_head(&mut self) -> Option<(AppProtoHead, u16)> {
-        if let Some(h) = L7ProtocolInfoInterface::app_proto_head(&self.info) {
-            return Some((h, 0));
-        }
-        None
+    fn perf_stats(&mut self) -> Option<L7PerfStats> {
+        self.perf_stats.take()
     }
 }
 
 #[cfg(test)]
 mod test {
+    use std::cell::RefCell;
     use std::path::Path;
+    use std::rc::Rc;
 
     use crate::common::flow::PacketDirection;
     use crate::common::l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface};
-    use crate::common::l7_protocol_log::{L7ProtocolParserInterface, ParseParam};
+    use crate::common::l7_protocol_log::{L7PerfCache, L7ProtocolParserInterface, ParseParam};
 
     use crate::flow_generator::protocol_logs::{L7ResponseStatus, ProtobufRpcInfo};
-    use crate::flow_generator::LogMessageType;
+    use crate::flow_generator::{LogMessageType, L7_RRT_CACHE_CAPACITY};
     use crate::utils::test::Capture;
 
     use super::KrpcLog;
@@ -364,6 +312,7 @@ mod test {
     #[test]
     fn test_krpc() {
         let pcap_file = Path::new("resources/test/flow_generator/krpc/krpc.pcap");
+        let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
         let capture = Capture::load_pcap(pcap_file, None);
         let mut p = capture.as_meta_packets();
         p[3].lookup_key.direction = PacketDirection::ClientToServer;
@@ -371,7 +320,7 @@ mod test {
 
         let mut parser = KrpcLog::new();
 
-        let req_param = &mut ParseParam::from(&p[3]);
+        let req_param = &mut ParseParam::from((&p[3], log_cache.clone(), false));
         let req_payload = p[3].get_l4_payload().unwrap();
         assert_eq!(parser.check_payload(req_payload, req_param), true);
         let mut req_info = parser
@@ -398,7 +347,7 @@ mod test {
 
         parser.reset();
 
-        let resp_param = &mut ParseParam::from(&p[5]);
+        let resp_param = &mut ParseParam::from((&p[5], log_cache.clone(), false));
         let resp_payload = p[5].get_l4_payload().unwrap();
 
         let resp_info = parser

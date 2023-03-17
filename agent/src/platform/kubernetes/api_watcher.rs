@@ -162,6 +162,20 @@ impl ApiWatcher {
         serde_json::to_string(info.deref()).ok()
     }
 
+    pub fn notify_stop(&self) -> Option<thread::JoinHandle<()>> {
+        {
+            let mut running_guard = self.running.lock().unwrap();
+            if !*running_guard {
+                debug!("ApiWatcher has already stopped");
+                return None;
+            }
+            *running_guard = false;
+        }
+        self.timer.notify_one();
+
+        self.thread.lock().unwrap().take()
+    }
+
     // 停止 api watcher, 支持睡眠唤醒
     pub fn stop(&self) {
         {

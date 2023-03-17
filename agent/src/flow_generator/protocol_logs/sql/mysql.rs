@@ -19,6 +19,7 @@ use serde::Serialize;
 use super::super::{consts::*, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
 use super::sql_check::is_mysql;
 
+use crate::log_info_merge;
 use crate::{
     common::{
         enums::IpProtocol,
@@ -33,7 +34,6 @@ use crate::{
     },
     utils::bytes,
 };
-use crate::{log_info_merge, parse_common};
 
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct MysqlInfo {
@@ -212,7 +212,6 @@ impl L7ProtocolParserInterface for MysqlLog {
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
-        parse_common!(self, param);
         self.info.is_tls = param.is_tls();
         self.parse(payload, param.l4_protocol, param.direction, None, None)?;
         Ok(vec![L7ProtocolInfo::MysqlInfo(self.info.clone())])
@@ -503,13 +502,15 @@ impl MysqlHeader {
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
     use std::path::Path;
+    use std::rc::Rc;
+    use std::{cell::RefCell, fs};
 
     use super::*;
 
     use crate::{
-        common::{flow::PacketDirection, MetaPacket},
+        common::{flow::PacketDirection, l7_protocol_log::L7PerfCache, MetaPacket},
+        flow_generator::L7_RRT_CACHE_CAPACITY,
         utils::test::Capture,
     };
 
@@ -518,6 +519,7 @@ mod tests {
     fn run(name: &str) -> String {
         let pcap_file = Path::new(FILE_DIR).join(name);
         let capture = Capture::load_pcap(pcap_file, Some(1400));
+        let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
         let mut packets = capture.as_meta_packets();
         if packets.is_empty() {
             return "".to_string();
@@ -543,8 +545,10 @@ mod tests {
                 None,
                 None,
             );
-            let is_mysql =
-                MysqlLog::mysql_check_protocol(payload, &ParseParam::from(packet as &MetaPacket));
+            let is_mysql = MysqlLog::mysql_check_protocol(
+                payload,
+                &ParseParam::from((packet as &MetaPacket, log_cache.clone(), false)),
+            );
             output.push_str(&format!("{:?} is_mysql: {}\r\n", mysql.info, is_mysql));
         }
         output
