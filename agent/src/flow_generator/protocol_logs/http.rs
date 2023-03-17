@@ -491,7 +491,7 @@ impl HttpLog {
         }
     }
 
-    pub fn http1_check_protocol(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn http1_check_protocol(&mut self, payload: &[u8], param: &ParseParam) -> bool {
         if param.l4_protocol != IpProtocol::Tcp {
             return false;
         }
@@ -505,7 +505,7 @@ impl HttpLog {
         is_http_req_line(first_line)
     }
 
-    pub fn http2_check_protocol(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn http2_check_protocol(&mut self, payload: &[u8], param: &ParseParam) -> bool {
         if param.l4_protocol != IpProtocol::Tcp {
             return false;
         }
@@ -1294,7 +1294,7 @@ mod tests {
                     v_len: val_len,
                 };
                 let payload = hdr.to_bytes(key, val);
-                let mut h = HttpLog::default();
+                let mut h = HttpLog::new_v2(false);
                 h.info.raw_data_type = L7ProtoRawDataType::GoHttp2Uprobe;
                 let res = h.parse_http2_go_uprobe(
                     &L7LogDynamicConfig::default(),
@@ -1329,7 +1329,7 @@ mod tests {
                 v_len: val_len,
             };
             let payload = hdr.to_bytes(key, val);
-            let mut h = HttpLog::default();
+            let mut h = HttpLog::new_v2(false);
             h.info.raw_data_type = L7ProtoRawDataType::GoHttp2Uprobe;
             let res = h.parse_http2_go_uprobe(
                 &L7LogDynamicConfig::default(),
@@ -1367,5 +1367,79 @@ mod tests {
             }
             assert_eq!(None, iter.next());
         }
+    }
+
+    #[test]
+    fn check_perf() {
+        let expected = vec![
+            (
+                "httpv1.pcap",
+                L7PerfStats {
+                    request_count: 1,
+                    response_count: 1,
+                    err_client_count: 0,
+                    err_server_count: 0,
+                    err_timeout: 0,
+                    rrt_count: 1,
+                    rrt_sum: 84051,
+                    rrt_max: 84051,
+                },
+            ),
+            (
+                "h2c_ascii.pcap",
+                L7PerfStats {
+                    request_count: 1,
+                    response_count: 1,
+                    err_client_count: 0,
+                    err_server_count: 0,
+                    err_timeout: 0,
+                    rrt_count: 1,
+                    rrt_sum: 2023,
+                    rrt_max: 2023,
+                },
+            ),
+        ];
+
+        assert_eq!(
+            expected[0].1,
+            run_perf(expected[0].0, HttpLog::new_v1()),
+            "parse pcap {} unexcepted",
+            expected[0].0
+        );
+        assert_eq!(
+            expected[1].1,
+            run_perf(expected[1].0, HttpLog::new_v2(false)),
+            "parse pcap {} unexcepted",
+            expected[1].0
+        );
+    }
+
+    fn run_perf(pcap: &str, mut http: HttpLog) -> L7PerfStats {
+        let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
+
+        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap), Some(512));
+        let mut packets = capture.as_meta_packets();
+
+        let first_dst_port = packets[0].lookup_key.dst_port;
+
+        let config = LogParserConfig {
+            l7_log_collect_nps_threshold: 0,
+            l7_log_session_aggr_timeout: Duration::ZERO,
+            l7_log_dynamic: L7LogDynamicConfig::default(),
+        };
+
+        for packet in packets.iter_mut() {
+            if packet.lookup_key.dst_port == first_dst_port {
+                packet.lookup_key.direction = PacketDirection::ClientToServer;
+            } else {
+                packet.lookup_key.direction = PacketDirection::ServerToClient;
+            }
+            if packet.get_l4_payload().is_some() {
+                let param = &ParseParam::from((&*packet, rrt_cache.clone(), true, &config));
+
+                let _ = http.parse_payload(packet.get_l4_payload().unwrap(), param);
+            }
+        }
+        http.perf_stats.unwrap()
     }
 }

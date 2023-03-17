@@ -301,10 +301,7 @@ pub trait L7ProtocolParserInterface {
     fn reset(&mut self) {}
 
     // return perf data
-    // TODO will remove default implement after finish perf remake
-    fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        unimplemented!()
-    }
+    fn perf_stats(&mut self) -> Option<L7PerfStats>;
 }
 
 #[derive(Clone, Copy)]
@@ -372,7 +369,7 @@ pub struct ParseParam<'a> {
     pub ebpf_param: Option<EbpfParam>,
     // calculate from cap_seq, req and correspond resp may have same packet seq, non ebpf always 0
     pub packet_seq: u64,
-    pub time: u64,
+    pub time: u64, // micro second
     pub perf_only: bool,
 
     pub parse_config: Option<&'a LogParserConfig>,
@@ -423,7 +420,7 @@ impl From<(&MetaPacket<'_>, Rc<RefCell<L7PerfCache>>, bool)> for ParseParam<'_> 
     }
 }
 
-// from packet, previous_log_info_cache, parse_config
+// from packet, previous_log_info_cache, perf_only, parse_config
 impl<'a>
     From<(
         &MetaPacket<'_>,

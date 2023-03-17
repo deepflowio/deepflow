@@ -156,8 +156,8 @@ impl From<PostgreInfo> for L7ProtocolSendLog {
 #[derive(Debug, Serialize)]
 pub struct PostgresqlLog {
     info: PostgreInfo,
+    #[serde(skip)]
     perf_stats: Option<L7PerfStats>,
-    // <session_id,(type,time)>, use for calculate perf
     #[serde(skip)]
     parsed: bool,
 }
@@ -186,7 +186,7 @@ impl L7ProtocolParserInterface for PostgresqlLog {
             self.perf_stats = Some(L7PerfStats::default())
         };
 
-        if self.parse(payload).is_ok() {
+        if self.parse(payload, param).is_ok() {
             self.parsed = true;
             return true;
         } else {
@@ -213,14 +213,10 @@ impl L7ProtocolParserInterface for PostgresqlLog {
         };
 
         self.set_msg_type(param.direction);
-        self.parse(payload)?;
+        self.parse(payload, param)?;
         Ok(if self.info.ignore {
             vec![]
         } else {
-            self.info.cal_rrt(param).map(|rrt| {
-                self.info.rrt = rrt;
-                self.perf_stats.as_mut().unwrap().update_rrt(rrt);
-            });
             vec![L7ProtocolInfo::PostgreInfo(self.info.clone())]
         })
     }
@@ -251,7 +247,7 @@ impl PostgresqlLog {
         }
     }
 
-    fn parse(&mut self, payload: &[u8]) -> Result<()> {
+    fn parse(&mut self, payload: &[u8], param: &ParseParam) -> Result<()> {
         let mut offset = 0;
         // is at lease one validate block in payload, prevent miscalculate to other protocol
         let mut at_lease_one_block = false;
@@ -279,6 +275,12 @@ impl PostgresqlLog {
             }
         }
         if at_lease_one_block {
+            if !self.info.ignore {
+                self.info.cal_rrt(param).map(|rrt| {
+                    self.info.rrt = rrt;
+                    self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+                });
+            }
             return Ok(());
         }
         Err(Error::L7ProtocolUnknown)
@@ -448,7 +450,7 @@ mod test {
 
     use crate::{
         common::{
-            flow::PacketDirection,
+            flow::{L7PerfStats, PacketDirection},
             l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
             l7_protocol_log::ParseParam,
             l7_protocol_log::{L7PerfCache, L7ProtocolParserInterface},
@@ -459,20 +461,33 @@ mod test {
     };
 
     const FILE_DIR: &str = "resources/test/flow_generator/postgre";
+
     #[test]
-    fn test_postgre() {
-        test_simple_query()
-    }
     fn test_simple_query() {
-        let info = check_and_parse("simple_query.pcap");
+        let (info, perf) = check_and_parse("simple_query.pcap");
         assert_eq!(info.affected_rows, 1);
         assert_eq!(info.req_type, 'Q');
         assert_eq!(info.context.as_str(), "delete  from test;");
         assert_eq!(info.resp_type, 'C');
+        assert_eq!(info.resp_type, 'C');
+        assert_eq!(
+            perf,
+            L7PerfStats {
+                request_count: 1,
+                response_count: 1,
+                err_client_count: 0,
+                err_server_count: 0,
+                err_timeout: 0,
+                rrt_count: 1,
+                rrt_sum: 2224,
+                rrt_max: 2224,
+            }
+        );
     }
 
+    #[test]
     fn test_prepare_stmt() {
-        let info = check_and_parse("prepare_stat.pcap");
+        let (info, perf) = check_and_parse("prepare_stat.pcap");
         assert_eq!(info.affected_rows, 0);
         assert_eq!(info.req_type, 'P');
         assert_eq!(
@@ -480,18 +495,47 @@ mod test {
             "delete from test where id=$1 returning id"
         );
         assert_eq!(info.resp_type, 'C');
+
+        assert_eq!(
+            perf,
+            L7PerfStats {
+                request_count: 1,
+                response_count: 1,
+                err_client_count: 0,
+                err_server_count: 0,
+                err_timeout: 0,
+                rrt_count: 1,
+                rrt_sum: 477,
+                rrt_max: 477,
+            }
+        );
     }
 
+    #[test]
     fn test_error() {
-        let info = check_and_parse("error.pcap");
+        let (info, perf) = check_and_parse("error.pcap");
         assert_eq!(info.req_type, 'Q');
         assert_eq!(info.context.as_str(), "asdsdfdsf;");
         assert_eq!(info.resp_type, 'E');
         assert_eq!(info.result.as_str(), "42601");
         assert_eq!(info.error_message.as_str(), "syntax_error",);
+
+        assert_eq!(
+            perf,
+            L7PerfStats {
+                request_count: 1,
+                response_count: 1,
+                err_client_count: 1,
+                err_server_count: 0,
+                err_timeout: 0,
+                rrt_count: 1,
+                rrt_sum: 103,
+                rrt_max: 103,
+            }
+        );
     }
 
-    fn check_and_parse(file_name: &str) -> PostgreInfo {
+    fn check_and_parse(file_name: &str) -> (PostgreInfo, L7PerfStats) {
         let pcap_file = Path::new(FILE_DIR).join(file_name);
         let capture = Capture::load_pcap(pcap_file, None);
         let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
@@ -518,7 +562,7 @@ mod test {
 
         req.merge_log(resp).unwrap();
         if let L7ProtocolInfo::PostgreInfo(info) = req {
-            return info;
+            return (info, parser.perf_stats.unwrap());
         }
         unreachable!()
     }

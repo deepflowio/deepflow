@@ -75,22 +75,6 @@ impl From<String> for L7Protocol {
     }
 }
 
-impl L7Protocol {
-    // TODO 已完成重构的协议， 所有协议重构后就会去掉
-    // TODO will remove after finish perf remake
-    pub fn remaked(&self) -> bool {
-        match self {
-            L7Protocol::Http1
-            | L7Protocol::Http2
-            | L7Protocol::Grpc
-            | L7Protocol::SofaRPC
-            | L7Protocol::PostgreSQL => true,
-            L7Protocol::ProtobufRPC => true,
-            _ => false,
-        }
-    }
-}
-
 // the actually rpc protocol when l7 protocol is ProtobufRPC
 #[derive(Serialize, Debug, Clone, Copy, PartialEq, Hash, Eq)]
 #[repr(u64)]

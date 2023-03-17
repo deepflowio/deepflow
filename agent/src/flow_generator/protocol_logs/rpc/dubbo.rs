@@ -21,7 +21,7 @@ use serde::Serialize;
 use crate::{
     common::{
         enums::IpProtocol,
-        flow::{L7Protocol, PacketDirection},
+        flow::{L7PerfStats, L7Protocol, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
     },
@@ -35,7 +35,6 @@ use crate::{
             value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus, LogMessageType,
         },
     },
-    log_info_merge,
     utils::bytes::{read_u32_be, read_u64_be},
 };
 
@@ -44,9 +43,6 @@ const TRACE_ID_MAX_LEN: usize = 1024;
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct DubboInfo {
     #[serde(skip)]
-    start_time: u64,
-    #[serde(skip)]
-    end_time: u64,
     msg_type: LogMessageType,
     #[serde(skip)]
     is_tls: bool,
@@ -82,6 +78,8 @@ pub struct DubboInfo {
     pub resp_status: L7ResponseStatus,
     #[serde(rename = "response_code", skip_serializing_if = "Option::is_none")]
     pub status_code: Option<i32>,
+
+    rrt: u64,
 }
 
 impl DubboInfo {
@@ -103,8 +101,10 @@ impl L7ProtocolInfoInterface for DubboInfo {
         Some(self.request_id as u32)
     }
 
-    fn merge_log(&mut self, other: crate::common::l7_protocol_info::L7ProtocolInfo) -> Result<()> {
-        log_info_merge!(self, DubboInfo, other);
+    fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
+        if let L7ProtocolInfo::DubboInfo(other) = other {
+            self.merge(other);
+        }
         Ok(())
     }
 
@@ -112,7 +112,7 @@ impl L7ProtocolInfoInterface for DubboInfo {
         Some(AppProtoHead {
             proto: L7Protocol::Dubbo,
             msg_type: self.msg_type,
-            rrt: self.end_time - self.start_time,
+            rrt: self.rrt,
         })
     }
 
@@ -157,6 +157,8 @@ impl From<DubboInfo> for L7ProtocolSendLog {
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct DubboLog {
     info: DubboInfo,
+    #[serde(skip)]
+    perf_stats: Option<L7PerfStats>,
 }
 
 impl L7ProtocolParserInterface for DubboLog {
@@ -164,21 +166,36 @@ impl L7ProtocolParserInterface for DubboLog {
         if !param.ebpf_type.is_raw_protocol() {
             return false;
         }
-        Self::dubbo_check_protocol(payload, param)
+        if param.l4_protocol != IpProtocol::Tcp {
+            return false;
+        }
+
+        let mut header = DubboHeader::default();
+        let ret = header.parse_headers(payload);
+        if ret.is_err() {
+            return false;
+        }
+
+        header.check()
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
         let Some(config) = param.parse_config else {
             return Err(Error::NoParseConfig);
         };
+        if self.perf_stats.is_none() {
+            self.perf_stats = Some(L7PerfStats::default())
+        };
         self.parse(
             &config.l7_log_dynamic,
             payload,
             param.l4_protocol,
             param.direction,
-            None,
-            None,
         )?;
+        self.info.cal_rrt(param).map(|rrt| {
+            self.info.rrt = rrt;
+            self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+        });
         Ok(vec![L7ProtocolInfo::DubboInfo((&self.info).clone())])
     }
 
@@ -191,25 +208,18 @@ impl L7ProtocolParserInterface for DubboLog {
     }
 
     fn reset(&mut self) {
-        *self = Self::default();
+        *self = Self {
+            info: DubboInfo::default(),
+            perf_stats: self.perf_stats.take(),
+        }
+    }
+
+    fn perf_stats(&mut self) -> Option<L7PerfStats> {
+        self.perf_stats.take()
     }
 }
 
 impl DubboLog {
-    fn reset_logs(&mut self) {
-        self.info.serial_id = 0;
-        self.info.data_type = 0;
-        self.info.request_id = 0;
-        self.info.req_msg_size = None;
-        self.info.dubbo_version = String::new();
-        self.info.service_name = String::new();
-        self.info.service_version = String::new();
-        self.info.method_name = String::new();
-        self.info.resp_msg_size = None;
-        self.info.resp_status = L7ResponseStatus::Ok;
-        self.info.status_code = None;
-    }
-
     fn check_char_boundary(payload: &Cow<'_, str>, start: usize, end: usize) -> bool {
         let mut invalid = false;
         for index in start..end {
@@ -458,15 +468,14 @@ impl DubboLog {
     fn set_status(&mut self, status_code: u8) {
         self.info.resp_status = match status_code {
             20 => L7ResponseStatus::Ok,
-            30 => L7ResponseStatus::ClientError,
-            31 => L7ResponseStatus::ServerError,
-            40 => L7ResponseStatus::ClientError,
-            50 => L7ResponseStatus::ServerError,
-            60 => L7ResponseStatus::ServerError,
-            70 => L7ResponseStatus::ServerError,
-            80 => L7ResponseStatus::ServerError,
-            90 => L7ResponseStatus::ClientError,
-            100 => L7ResponseStatus::ServerError,
+            30 | 40 | 90 => {
+                self.perf_stats.as_mut().unwrap().inc_req_err();
+                L7ResponseStatus::ClientError
+            }
+            31 | 50 | 60 | 70 | 80 | 100 => {
+                self.perf_stats.as_mut().unwrap().inc_resp_err();
+                L7ResponseStatus::ServerError
+            }
             _ => L7ResponseStatus::Ok,
         }
     }
@@ -482,44 +491,28 @@ impl DubboLog {
         self.set_status(dubbo_header.status_code);
     }
 
-    pub fn dubbo_check_protocol(payload: &[u8], param: &ParseParam) -> bool {
-        if param.l4_protocol != IpProtocol::Tcp {
-            return false;
-        }
-
-        let mut header = DubboHeader::default();
-        let ret = header.parse_headers(payload);
-        if ret.is_err() {
-            // *bitmap &= !(1 << u8::from(L7Protocol::Dubbo));
-            return false;
-        }
-
-        header.check()
-    }
-
     fn parse(
         &mut self,
         config: &L7LogDynamicConfig,
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
-        _is_req_end: Option<bool>,
-        _is_resp_end: Option<bool>,
     ) -> Result<()> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
         }
 
-        self.reset_logs();
         let mut dubbo_header = DubboHeader::default();
         dubbo_header.parse_headers(payload)?;
 
         match direction {
             PacketDirection::ClientToServer => {
                 self.request(&config, payload, &dubbo_header);
+                self.perf_stats.as_mut().unwrap().inc_req();
             }
             PacketDirection::ServerToClient => {
                 self.response(&dubbo_header);
+                self.perf_stats.as_mut().unwrap().inc_resp();
             }
         }
         Ok(())
@@ -595,11 +588,13 @@ pub fn get_req_param_len(payload: &[u8]) -> (usize, usize) {
 mod tests {
     use std::cell::RefCell;
     use std::path::Path;
+    use std::time::Duration;
     use std::{fs, rc::Rc};
 
     use super::*;
 
     use crate::common::l7_protocol_log::L7PerfCache;
+    use crate::config::handler::LogParserConfig;
     use crate::flow_generator::L7_RRT_CACHE_CAPACITY;
     use crate::{
         common::{flow::PacketDirection, MetaPacket},
@@ -629,31 +624,28 @@ mod tests {
                 None => continue,
             };
 
-            let config = L7LogDynamicConfig::new(
-                "".to_owned(),
-                "".to_owned(),
-                vec![
-                    TraceType::Customize("EagleEye-TraceID".to_string()),
-                    TraceType::Sw8,
-                ],
-                vec![
-                    TraceType::Customize("EagleEye-SpanID".to_string()),
-                    TraceType::Sw8,
-                ],
-            );
+            let config = LogParserConfig {
+                l7_log_collect_nps_threshold: 0,
+                l7_log_session_aggr_timeout: Duration::ZERO,
+                l7_log_dynamic: L7LogDynamicConfig::new(
+                    "".to_owned(),
+                    "".to_owned(),
+                    vec![
+                        TraceType::Customize("EagleEye-TraceID".to_string()),
+                        TraceType::Sw8,
+                    ],
+                    vec![
+                        TraceType::Customize("EagleEye-SpanID".to_string()),
+                        TraceType::Sw8,
+                    ],
+                ),
+            };
             let mut dubbo = DubboLog::default();
-            let _ = dubbo.parse(
-                &config,
-                payload,
-                packet.lookup_key.proto,
-                packet.lookup_key.direction,
-                None,
-                None,
-            );
-            let is_dubbo = DubboLog::dubbo_check_protocol(
-                payload,
-                &ParseParam::from((packet as &MetaPacket, log_cache.clone(), false)),
-            );
+            let param =
+                &ParseParam::from((packet as &MetaPacket, log_cache.clone(), false, &config));
+            let is_dubbo = dubbo.check_payload(payload, param);
+
+            let _ = dubbo.parse_payload(payload, param);
             output.push_str(&format!("{:?} is_dubbo: {}\r\n", dubbo.info, is_dubbo));
         }
         output
@@ -683,5 +675,67 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn check_perf() {
+        let expected = vec![(
+            "dubbo_hessian2.pcap",
+            L7PerfStats {
+                request_count: 1,
+                response_count: 1,
+                err_client_count: 0,
+                err_server_count: 0,
+                err_timeout: 0,
+                rrt_count: 1,
+                rrt_sum: 4332,
+                rrt_max: 4332,
+            },
+        )];
+
+        for item in expected.iter() {
+            assert_eq!(item.1, run_perf(item.0), "parse pcap {} unexcepted", item.0);
+        }
+    }
+
+    fn run_perf(pcap: &str) -> L7PerfStats {
+        let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
+        let mut dubbo = DubboLog::default();
+
+        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap), None);
+        let mut packets = capture.as_meta_packets();
+
+        let config = LogParserConfig {
+            l7_log_collect_nps_threshold: 0,
+            l7_log_session_aggr_timeout: Duration::ZERO,
+            l7_log_dynamic: L7LogDynamicConfig::new(
+                "".to_owned(),
+                "".to_owned(),
+                vec![
+                    TraceType::Customize("EagleEye-TraceID".to_string()),
+                    TraceType::Sw8,
+                ],
+                vec![
+                    TraceType::Customize("EagleEye-SpanID".to_string()),
+                    TraceType::Sw8,
+                ],
+            ),
+        };
+
+        let first_dst_port = packets[0].lookup_key.dst_port;
+        for packet in packets.iter_mut() {
+            if packet.lookup_key.dst_port == first_dst_port {
+                packet.lookup_key.direction = PacketDirection::ClientToServer;
+            } else {
+                packet.lookup_key.direction = PacketDirection::ServerToClient;
+            }
+            if packet.get_l4_payload().is_some() {
+                let _ = dubbo.parse_payload(
+                    packet.get_l4_payload().unwrap(),
+                    &ParseParam::from((&*packet, rrt_cache.clone(), true, &config)),
+                );
+            }
+        }
+        dubbo.perf_stats.unwrap()
     }
 }

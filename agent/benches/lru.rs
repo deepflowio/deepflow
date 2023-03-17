@@ -20,11 +20,10 @@ use std::time::Duration;
 use std::{net::Ipv4Addr, time::Instant};
 
 use criterion::*;
+use deepflow_agent::{_L7PerfCache as L7PerfCache, _LogMessageType as LogMessageType};
 use lru::LruCache;
 use rand::prelude::*;
 use uluru::LRUCache;
-
-use deepflow_agent::_L7RrtCache as L7RrtCache;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct SmallStruct {
@@ -425,10 +424,13 @@ fn rrt_lru(c: &mut Criterion) {
                     duration: Duration::new(i as u64, i as u32),
                 });
             }
-            let mut cache = L7RrtCache::new(1000);
+            let mut cache = L7PerfCache::new(1000);
             let start = Instant::now();
             for item in seeds {
-                cache.add_req_time(item.flow_id, item.stream_id, item.duration);
+                cache.rrt_cache.put(
+                    ((item.flow_id as u128) << 64) | item.stream_id.unwrap_or_default() as u128,
+                    (LogMessageType::Request, item.duration.as_micros() as u64),
+                );
             }
             start.elapsed()
         })
@@ -445,13 +447,18 @@ fn rrt_lru(c: &mut Criterion) {
                     duration: Duration::new(i as u64, i as u32),
                 });
             }
-            let mut cache = L7RrtCache::new(1000);
+            let mut cache = L7PerfCache::new(1000);
             for item in &seeds {
-                cache.add_req_time(item.flow_id, item.stream_id, item.duration);
+                cache.rrt_cache.put(
+                    ((item.flow_id as u128) << 64) | item.stream_id.unwrap_or_default() as u128,
+                    (LogMessageType::Request, item.duration.as_micros() as u64),
+                );
             }
             let start = Instant::now();
             for item in &seeds {
-                cache.get_and_remove_l7_req_time(item.flow_id, item.stream_id);
+                cache.rrt_cache.get(
+                    &(((item.flow_id as u128) << 64) | item.stream_id.unwrap_or_default() as u128),
+                );
             }
             start.elapsed()
         })
@@ -468,13 +475,18 @@ fn rrt_lru(c: &mut Criterion) {
                     duration: Duration::new(i as u64, i as u32),
                 });
             }
-            let mut cache = L7RrtCache::new(1000);
+            let mut cache = L7PerfCache::new(1000);
             for item in &seeds {
-                cache.add_req_time(item.flow_id, item.stream_id, item.duration);
+                cache.rrt_cache.put(
+                    ((item.flow_id as u128) << 64) | item.stream_id.unwrap_or_default() as u128,
+                    (LogMessageType::Request, item.duration.as_micros() as u64),
+                );
             }
             let start = Instant::now();
             for item in &seeds {
-                cache.get_and_remove_l7_req_timeout(item.flow_id);
+                cache.rrt_cache.get(
+                    &(((item.flow_id as u128) << 64) | item.stream_id.unwrap_or_default() as u128),
+                );
             }
             start.elapsed()
         })

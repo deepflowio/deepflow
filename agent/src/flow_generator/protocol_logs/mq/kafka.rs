@@ -18,7 +18,7 @@ use serde::Serialize;
 use crate::{
     common::{
         enums::IpProtocol,
-        flow::{L7Protocol, PacketDirection},
+        flow::{L7PerfStats, L7Protocol, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
     },
@@ -30,7 +30,6 @@ use crate::{
             value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus, LogMessageType,
         },
     },
-    log_info_merge,
     utils::bytes::{read_i16_be, read_u16_be, read_u32_be},
 };
 
@@ -39,10 +38,6 @@ const KAFKA_FETCH: u16 = 1;
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct KafkaInfo {
     msg_type: LogMessageType,
-    #[serde(skip)]
-    start_time: u64,
-    #[serde(skip)]
-    end_time: u64,
     #[serde(skip)]
     is_tls: bool,
 
@@ -71,6 +66,8 @@ pub struct KafkaInfo {
     // only fetch and api version > 7 can get the correct err code
     #[serde(skip)]
     pub resp_data: Option<[u8; 14]>,
+
+    rrt: u64,
 }
 
 impl L7ProtocolInfoInterface for KafkaInfo {
@@ -79,7 +76,9 @@ impl L7ProtocolInfoInterface for KafkaInfo {
     }
 
     fn merge_log(&mut self, other: crate::common::l7_protocol_info::L7ProtocolInfo) -> Result<()> {
-        log_info_merge!(self, KafkaInfo, other);
+        if let L7ProtocolInfo::KafkaInfo(other) = other {
+            self.merge(other);
+        }
         Ok(())
     }
 
@@ -87,7 +86,7 @@ impl L7ProtocolInfoInterface for KafkaInfo {
         Some(AppProtoHead {
             proto: L7Protocol::Kafka,
             msg_type: self.msg_type,
-            rrt: self.end_time - self.start_time,
+            rrt: self.rrt,
         })
     }
 
@@ -243,28 +242,35 @@ impl From<KafkaInfo> for L7ProtocolSendLog {
     }
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Default)]
 pub struct KafkaLog {
     info: KafkaInfo,
+    #[serde(skip)]
+    perf_stats: Option<L7PerfStats>,
 }
 
 impl L7ProtocolParserInterface for KafkaLog {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
-        if !param.ebpf_type.is_raw_protocol() {
+        if !param.ebpf_type.is_raw_protocol()
+            || param.l4_protocol != IpProtocol::Tcp
+            || payload.len() < KAFKA_REQ_HEADER_LEN
+        {
             return false;
         }
-        Self::check_protocol(payload, param)
+        let ok = self.request(payload, true).is_ok() && self.info.check();
+        self.reset();
+        ok
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
-        Self::parse(
-            self,
-            payload,
-            param.l4_protocol,
-            param.direction,
-            None,
-            None,
-        )?;
+        if self.perf_stats.is_none() {
+            self.perf_stats = Some(L7PerfStats::default())
+        };
+        Self::parse(self, payload, param.l4_protocol, param.direction)?;
+        self.info.cal_rrt(param).map(|rrt| {
+            self.info.rrt = rrt;
+            self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+        });
         Ok(vec![L7ProtocolInfo::KafkaInfo(self.info.clone())])
     }
 
@@ -278,39 +284,21 @@ impl L7ProtocolParserInterface for KafkaLog {
 
     fn reset(&mut self) {
         self.info = KafkaInfo::default();
-        self.info.status = L7ResponseStatus::NotExist;
     }
-}
 
-impl Default for KafkaLog {
-    fn default() -> Self {
-        let mut log = KafkaLog {
-            info: KafkaInfo::default(),
-        };
-        log.reset();
-        log
+    fn perf_stats(&mut self) -> Option<L7PerfStats> {
+        self.perf_stats.take()
     }
 }
 
 impl KafkaLog {
     const MSG_LEN_SIZE: usize = 4;
 
-    fn reset_logs(&mut self) {
-        self.info.correlation_id = 0;
-        self.info.req_msg_size = None;
-        self.info.api_version = 0;
-        self.info.api_key = 0;
-        self.info.client_id = String::new();
-        self.info.resp_msg_size = None;
-        self.info.status = L7ResponseStatus::Ok;
-        self.info.status_code = None;
-    }
-
     // 协议识别的时候严格检查避免误识别，日志解析的时候不用严格检查因为可能有长度截断
     // ================================================================================
     // The protocol identification is strictly checked to avoid misidentification.
     // The log analysis is not strictly checked because there may be length truncation
-    fn request(&mut self, payload: &[u8], strict: bool) -> Result<AppProtoHead> {
+    fn request(&mut self, payload: &[u8], strict: bool) -> Result<()> {
         let req_len = read_u32_be(payload);
         self.info.req_msg_size = Some(req_len);
         let client_id_len = read_u16_be(&payload[12..]) as usize;
@@ -332,46 +320,17 @@ impl KafkaLog {
         if !self.info.client_id.is_ascii() {
             return Err(Error::KafkaLogParseFailed);
         }
-
-        Ok(AppProtoHead {
-            proto: L7Protocol::Kafka,
-            msg_type: self.info.msg_type,
-            rrt: 0,
-            ..Default::default()
-        })
+        Ok(())
     }
 
-    fn response(&mut self, payload: &[u8]) -> Result<AppProtoHead> {
+    fn response(&mut self, payload: &[u8]) -> Result<()> {
         self.info.resp_msg_size = Some(read_u32_be(payload));
         self.info.correlation_id = read_u32_be(&payload[4..]);
         self.info.msg_type = LogMessageType::Response;
         if payload.len() >= 14 {
             self.info.resp_data = Some(payload[..14].try_into().unwrap());
         }
-        Ok(AppProtoHead {
-            proto: L7Protocol::Kafka,
-            msg_type: self.info.msg_type,
-            rrt: 0,
-        })
-    }
-
-    pub fn check_protocol(payload: &[u8], param: &ParseParam) -> bool {
-        if param.l4_protocol != IpProtocol::Tcp {
-            return false;
-        }
-
-        if payload.len() < KAFKA_REQ_HEADER_LEN {
-            return false;
-        }
-        let mut kafka = KafkaLog {
-            info: KafkaInfo::default(),
-        };
-
-        let ret = kafka.request(payload, true);
-        if ret.is_err() {
-            return false;
-        }
-        kafka.info.check()
+        Ok(())
     }
 
     fn parse(
@@ -379,8 +338,6 @@ impl KafkaLog {
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
-        _is_req_end: Option<bool>,
-        _is_resp_end: Option<bool>,
     ) -> Result<()> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
@@ -389,9 +346,15 @@ impl KafkaLog {
             return Err(Error::KafkaLogParseFailed);
         }
         match direction {
-            PacketDirection::ClientToServer => self.request(payload, false),
-            PacketDirection::ServerToClient => self.response(payload),
-        }?;
+            PacketDirection::ClientToServer => {
+                self.request(payload, false)?;
+                self.perf_stats.as_mut().unwrap().inc_req();
+            }
+            PacketDirection::ServerToClient => {
+                self.response(payload)?;
+                self.perf_stats.as_mut().unwrap().inc_resp();
+            }
+        }
         Ok(())
     }
 }
@@ -433,20 +396,12 @@ mod tests {
                 None => continue,
             };
 
-            let mut kafka = KafkaLog {
-                info: KafkaInfo::default(),
-            };
-            let _ = kafka.parse(
-                payload,
-                packet.lookup_key.proto,
-                packet.lookup_key.direction,
-                None,
-                None,
-            );
-            let is_kafka = KafkaLog::check_protocol(
-                payload,
-                &ParseParam::from((packet as &MetaPacket, log_cache.clone(), false)),
-            );
+            let mut kafka = KafkaLog::default();
+            let param = &ParseParam::from((packet as &MetaPacket, log_cache.clone(), false));
+
+            let is_kafka = kafka.check_payload(payload, param);
+            let _ = kafka.parse_payload(payload, param);
+
             output.push_str(&format!("{:?} is_kafka: {}\r\n", kafka.info, is_kafka));
         }
         output
@@ -471,5 +426,66 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn check_perf() {
+        let expected = vec![
+            (
+                "kafka.pcap",
+                L7PerfStats {
+                    request_count: 1,
+                    response_count: 1,
+                    err_client_count: 0,
+                    err_server_count: 0,
+                    err_timeout: 0,
+                    rrt_count: 1,
+                    rrt_sum: 4941,
+                    rrt_max: 4941,
+                },
+            ),
+            (
+                "kafka_fetch.pcap",
+                L7PerfStats {
+                    request_count: 1,
+                    response_count: 1,
+                    err_client_count: 0,
+                    err_server_count: 0,
+                    err_timeout: 0,
+                    rrt_count: 1,
+                    rrt_sum: 504829,
+                    rrt_max: 504829,
+                },
+            ),
+        ];
+
+        for item in expected.iter() {
+            assert_eq!(item.1, run_perf(item.0), "parse pcap {} unexcepted", item.0);
+        }
+    }
+
+    fn run_perf(pcap: &str) -> L7PerfStats {
+        let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
+        let mut kafka = KafkaLog::default();
+
+        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap), None);
+        let mut packets = capture.as_meta_packets();
+
+        let first_dst_port = packets[0].lookup_key.dst_port;
+        for packet in packets.iter_mut() {
+            if packet.lookup_key.dst_port == first_dst_port {
+                packet.lookup_key.direction = PacketDirection::ClientToServer;
+            } else {
+                packet.lookup_key.direction = PacketDirection::ServerToClient;
+            }
+
+            if packet.get_l4_payload().is_some() {
+                let _ = kafka.parse_payload(
+                    packet.get_l4_payload().unwrap(),
+                    &ParseParam::from((&*packet, rrt_cache.clone(), true)),
+                );
+            }
+        }
+        kafka.perf_stats.unwrap()
     }
 }

@@ -24,7 +24,7 @@ use crate::{
     common::{
         enums::IpProtocol,
         flow::L7Protocol,
-        flow::PacketDirection,
+        flow::{L7PerfStats, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
     },
@@ -39,10 +39,6 @@ const SEPARATOR_SIZE: usize = 2;
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct RedisInfo {
     msg_type: LogMessageType,
-    #[serde(skip)]
-    start_time: u64,
-    #[serde(skip)]
-    end_time: u64,
     #[serde(skip)]
     is_tls: bool,
 
@@ -74,7 +70,7 @@ pub struct RedisInfo {
     #[serde(rename = "response_status")]
     pub resp_status: L7ResponseStatus,
 
-    cap_seq: Option<u64>,
+    rrt: u64,
 }
 
 impl L7ProtocolInfoInterface for RedisInfo {
@@ -84,12 +80,6 @@ impl L7ProtocolInfoInterface for RedisInfo {
 
     fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
         if let L7ProtocolInfo::RedisInfo(other) = other {
-            if other.start_time < self.start_time {
-                self.start_time = other.start_time;
-            }
-            if other.end_time > self.end_time {
-                self.end_time = other.end_time;
-            }
             return self.merge(other);
         }
         Ok(())
@@ -99,7 +89,7 @@ impl L7ProtocolInfoInterface for RedisInfo {
         Some(AppProtoHead {
             proto: L7Protocol::Redis,
             msg_type: self.msg_type,
-            rrt: self.end_time - self.start_time,
+            rrt: self.rrt,
         })
     }
 
@@ -117,29 +107,11 @@ where
 
 impl RedisInfo {
     pub fn merge(&mut self, other: Self) -> Result<()> {
-        if !self.can_merge(&other) {
-            return Err(Error::L7ProtocolCanNotMerge(L7ProtocolInfo::RedisInfo(
-                other,
-            )));
-        }
         self.response = other.response;
         self.status = other.status;
         self.error = other.error;
         self.resp_status = other.resp_status;
         Ok(())
-    }
-
-    pub fn set_packet_seq(&mut self, param: &ParseParam) {
-        if let Some(p) = param.ebpf_param {
-            self.cap_seq = Some(p.cap_seq);
-        }
-    }
-
-    pub fn can_merge(&self, resp: &Self) -> bool {
-        if let (Some(req_seq), Some(resp_seq)) = (self.cap_seq, resp.cap_seq) {
-            return resp_seq > req_seq && resp_seq - req_seq == 1;
-        }
-        true
     }
 }
 
@@ -196,6 +168,8 @@ impl From<RedisInfo> for L7ProtocolSendLog {
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct RedisLog {
     info: RedisInfo,
+    #[serde(skip)]
+    perf_stats: Option<L7PerfStats>,
 }
 
 impl L7ProtocolParserInterface for RedisLog {
@@ -203,15 +177,26 @@ impl L7ProtocolParserInterface for RedisLog {
         if !param.ebpf_type.is_raw_protocol() {
             return false;
         }
-        self.info.is_tls = param.is_tls();
-        self.info.set_packet_seq(param);
-        Self::redis_check_protocol(payload, param)
+        if param.l4_protocol != IpProtocol::Tcp {
+            return false;
+        }
+
+        if payload[0] != b'*' {
+            return false;
+        }
+        decode_asterisk(payload, true).is_some()
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
         self.info.is_tls = param.is_tls();
-        self.info.set_packet_seq(param);
-        self.parse(payload, param.l4_protocol, param.direction, None, None)?;
+        if self.perf_stats.is_none() {
+            self.perf_stats = Some(L7PerfStats::default())
+        };
+        self.parse(payload, param.l4_protocol, param.direction)?;
+        self.info.cal_rrt(param).map(|rrt| {
+            self.info.rrt = rrt;
+            self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+        });
         Ok(vec![L7ProtocolInfo::RedisInfo(self.info.clone())])
     }
 
@@ -225,6 +210,10 @@ impl L7ProtocolParserInterface for RedisLog {
 
     fn reset(&mut self) {
         *self = Self::default();
+    }
+
+    fn perf_stats(&mut self) -> Option<L7PerfStats> {
+        self.perf_stats.take()
     }
 }
 
@@ -240,10 +229,12 @@ impl RedisLog {
         };
         self.info.msg_type = LogMessageType::Request;
         self.info.request = context;
+        self.perf_stats.as_mut().unwrap().inc_req();
     }
 
     fn fill_response(&mut self, context: Vec<u8>, error_response: bool) {
         self.info.msg_type = LogMessageType::Response;
+        self.perf_stats.as_mut().unwrap().inc_resp();
         if context.is_empty() {
             return;
         }
@@ -254,21 +245,11 @@ impl RedisLog {
             b'-' if error_response => {
                 self.info.error = context;
                 self.info.resp_status = L7ResponseStatus::ServerError;
+                self.perf_stats.as_mut().unwrap().inc_resp_err();
             }
             b'-' if !error_response => self.info.response = context,
             _ => self.info.response = context,
         }
-    }
-
-    pub fn redis_check_protocol(payload: &[u8], param: &ParseParam) -> bool {
-        if param.l4_protocol != IpProtocol::Tcp {
-            return false;
-        }
-
-        if payload[0] != b'*' {
-            return false;
-        }
-        decode_asterisk(payload, true).is_some()
     }
 
     fn parse(
@@ -276,8 +257,6 @@ impl RedisLog {
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
-        _is_req_end: Option<bool>,
-        _is_resp_end: Option<bool>,
     ) -> Result<()> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
@@ -444,6 +423,7 @@ pub fn decode_error_code(context: &[u8]) -> Option<&[u8]> {
     None
 }
 
+// test log parse
 #[cfg(test)]
 mod tests {
     use std::path::Path;
@@ -483,17 +463,12 @@ mod tests {
             };
 
             let mut redis = RedisLog::default();
-            let _ = redis.parse(
-                payload,
-                packet.lookup_key.proto,
-                packet.lookup_key.direction,
-                None,
-                None,
-            );
-            let is_redis = RedisLog::redis_check_protocol(
-                payload,
-                &ParseParam::from((packet as &MetaPacket, log_cache.clone(), false)),
-            );
+            let param = &ParseParam::from((packet as &MetaPacket, log_cache.clone(), false));
+
+            let is_redis = redis.check_payload(payload, param);
+
+            let _ = redis.parse_payload(payload, param);
+            println!("{:?}", redis.info);
             output.push_str(&format!("{} is_redis: {}\r\n", redis.info, is_redis));
         }
         output
@@ -567,5 +542,81 @@ mod tests {
         assert_eq!(context, "-1".as_bytes());
         assert_eq!(n, 2);
         assert_eq!(e, true);
+    }
+
+    #[test]
+    fn check_perf() {
+        let expected = vec![
+            (
+                "redis.pcap",
+                L7PerfStats {
+                    request_count: 10,
+                    response_count: 11,
+                    err_client_count: 0,
+                    err_server_count: 1,
+                    err_timeout: 0,
+                    rrt_count: 10,
+                    rrt_sum: 592,
+                    rrt_max: 96,
+                },
+            ),
+            (
+                "redis-error.pcap",
+                L7PerfStats {
+                    request_count: 1,
+                    response_count: 1,
+                    err_client_count: 0,
+                    err_server_count: 1,
+                    err_timeout: 0,
+                    rrt_count: 1,
+                    rrt_sum: 73,
+                    rrt_max: 73,
+                },
+            ),
+            (
+                "redis-debug.pcap",
+                L7PerfStats {
+                    request_count: 1,
+                    response_count: 1,
+                    err_client_count: 0,
+                    err_server_count: 0,
+                    err_timeout: 0,
+                    rrt_count: 1,
+                    rrt_sum: 1209,
+                    rrt_max: 1209,
+                },
+            ),
+        ];
+
+        for item in expected.iter() {
+            assert_eq!(item.1, run_perf(item.0), "parse pcap {} unexcepted", item.0);
+        }
+    }
+
+    fn run_perf(pcap: &str) -> L7PerfStats {
+        let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
+        let mut redis = RedisLog::default();
+
+        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap), None);
+        let mut packets = capture.as_meta_packets();
+        if packets.len() < 2 {
+            unreachable!();
+        }
+
+        let first_dst_port = packets[0].lookup_key.dst_port;
+        for packet in packets.iter_mut() {
+            if packet.lookup_key.dst_port == first_dst_port {
+                packet.lookup_key.direction = PacketDirection::ClientToServer;
+            } else {
+                packet.lookup_key.direction = PacketDirection::ServerToClient;
+            }
+            if packet.get_l4_payload().is_some() {
+                let _ = redis.parse_payload(
+                    packet.get_l4_payload().unwrap(),
+                    &ParseParam::from((&*packet, rrt_cache.clone(), true)),
+                );
+            }
+        }
+        redis.perf_stats.unwrap()
     }
 }

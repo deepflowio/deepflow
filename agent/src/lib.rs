@@ -60,13 +60,13 @@ pub use {
         _new_flow_map_and_receiver, _new_meta_packet, _reverse_meta_packet,
     },
     flow_generator::perf::{
-        l7_rrt::L7RrtCache as _L7RrtCache,
         tcp::{
             TcpPerf as _TcpPerf, _benchmark_report, _benchmark_session_peer_seq_no_assert,
             _meta_flow_perf_update,
         },
         FlowPerfCounter as _FlowPerfCounter, L7FlowPerf as _L7FlowPerf,
     },
+    flow_generator::protocol_logs::LogMessageType as _LogMessageType,
     flow_generator::HttpLog,
     npb_pcap_policy::{
         NpbAction as _NpbAction, NpbTunnelType as _NpbTunnelType, TapSide as _TapSide,
@@ -105,13 +105,6 @@ mod tests {
             ("         |       2x ", crate::flow_generator::perf::tcp::SessionPeer),
             ("         |      ", crate::flow_generator::perf::tcp::PerfData),
             ("         -- ", crate::flow_generator::perf::udp::UdpPerf),
-            ("     -> ", crate::flow_generator::perf::L7FlowPerfTable),
-            ("         +- ", crate::flow_generator::perf::dns::DnsPerfData),
-            ("         +- ", crate::flow_generator::perf::mq::KafkaPerfData),
-            ("         +- ", crate::flow_generator::perf::mq::MqttPerfData),
-            ("         +- ", crate::flow_generator::perf::sql::RedisPerfData),
-            ("         +- ", crate::flow_generator::perf::rpc::DubboPerfData),
-            ("         +- ", crate::flow_generator::perf::sql::MysqlPerfData),
             ("         +> ", crate::flow_generator::protocol_logs::sql::PostgresqlLog),
             ("         +> ", crate::flow_generator::protocol_logs::rpc::ProtobufRpcWrapLog),
             ("         +> ", crate::flow_generator::protocol_logs::rpc::SofaRpcLog),
