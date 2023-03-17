@@ -47,26 +47,22 @@ func TransType(value interface{}, columnName, columnDatabaseTypeName string) (in
 	case *int64:
 		return int(*v), VALUE_TYPE_INT, nil
 	case **int8: // for nullable
-		// NaN, Inf
-		if v == nil || math.IsNaN(float64(**v)) || float64(**v) == math.Inf(1) || float64(**v) == math.Inf(-1) {
+		if v == nil {
 			return nil, VALUE_TYPE_INT, nil
 		}
 		return int(**v), VALUE_TYPE_INT, nil
 	case **int16: // for nullable
-		// NaN, Inf
-		if v == nil || math.IsNaN(float64(**v)) || float64(**v) == math.Inf(1) || float64(**v) == math.Inf(-1) {
+		if v == nil {
 			return nil, VALUE_TYPE_INT, nil
 		}
 		return int(**v), VALUE_TYPE_INT, nil
 	case **int32: // for nullable
-		// NaN, Inf
-		if v == nil || math.IsNaN(float64(**v)) || float64(**v) == math.Inf(1) || float64(**v) == math.Inf(-1) {
+		if v == nil {
 			return nil, VALUE_TYPE_INT, nil
 		}
 		return int(**v), VALUE_TYPE_INT, nil
 	case **int64: // for nullable
-		// NaN, Inf
-		if v == nil || math.IsNaN(float64(**v)) || float64(**v) == math.Inf(1) || float64(**v) == math.Inf(-1) {
+		if v == nil {
 			return nil, VALUE_TYPE_INT, nil
 		}
 		return int(**v), VALUE_TYPE_INT, nil
@@ -79,26 +75,22 @@ func TransType(value interface{}, columnName, columnDatabaseTypeName string) (in
 	case *uint64:
 		return int(*v), VALUE_TYPE_INT, nil
 	case **uint8: // for nullable
-		// NaN, Inf
-		if v == nil || math.IsNaN(float64(**v)) || float64(**v) == math.Inf(1) || float64(**v) == math.Inf(-1) {
+		if v == nil {
 			return nil, VALUE_TYPE_INT, nil
 		}
 		return int(**v), VALUE_TYPE_INT, nil
 	case **uint16: // for nullable
-		// NaN, Inf
-		if v == nil || math.IsNaN(float64(**v)) || float64(**v) == math.Inf(1) || float64(**v) == math.Inf(-1) {
+		if v == nil {
 			return nil, VALUE_TYPE_INT, nil
 		}
 		return int(**v), VALUE_TYPE_INT, nil
 	case **uint32: // for nullable
-		// NaN, Inf
-		if v == nil || math.IsNaN(float64(**v)) || float64(**v) == math.Inf(1) || float64(**v) == math.Inf(-1) {
+		if v == nil {
 			return nil, VALUE_TYPE_INT, nil
 		}
 		return int(**v), VALUE_TYPE_INT, nil
 	case **uint64: // for nullable
-		// NaN, Inf
-		if v == nil || math.IsNaN(float64(**v)) || float64(**v) == math.Inf(1) || float64(**v) == math.Inf(-1) {
+		if v == nil {
 			return nil, VALUE_TYPE_INT, nil
 		}
 		return int(**v), VALUE_TYPE_INT, nil
