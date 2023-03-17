@@ -67,7 +67,7 @@ jobs:
 
       - name: Package code build results
         run: |
-          tar cvf agent-artifact-amd64.tar agent/output/target/x86_64-unknown-linux-musl/release/deepflow-agent agent/output/target/x86_64-unknown-linux-musl/release/deepflow-agent-ctl agent/output/src/ebpf/deepflow-ebpfctl
+          tar cvf agent-artifact.tar agent/output/target/release/deepflow-agent agent/output/target/release/deepflow-agent-ctl agent/output/src/ebpf/deepflow-ebpfctl
 
       - name: Archive code build results
         uses: actions/upload-artifact@v3
@@ -91,7 +91,7 @@ jobs:
         run: |
           cd agent
           mkdir -p pkg/debian/systemd/usr/sbin/
-          cp -af output/target/x86_64-unknown-linux-musl/release/deepflow-agent pkg/debian/systemd/usr/sbin/
+          cp -af output/target/release/deepflow-agent pkg/debian/systemd/usr/sbin/
           mkdir -p pkg/debian/systemd/etc/
           cp -af config/deepflow-agent.yaml pkg/debian/systemd/etc/
           cp -af config/deepflow-agent.yaml pkg/debian/systemd/etc/deepflow-agent.yaml.sample
@@ -100,7 +100,7 @@ jobs:
           sed -i "s/Version.*/Version: 1.0-${{ env.IMAGE_TAG }}/g" pkg/debian/systemd/DEBIAN/control
           dpkg-deb -Zxz --no-uniform-compression -b pkg/debian/systemd x86_64/deepflow-agent-1.0-${{ env.IMAGE_TAG }}.systemd.deb
           mkdir -p pkg/debian/upstart/usr/sbin/
-          cp -af output/target/x86_64-unknown-linux-musl/release/deepflow-agent pkg/debian/upstart/usr/sbin/
+          cp -af output/target/release/deepflow-agent pkg/debian/upstart/usr/sbin/
           mkdir -p pkg/debian/upstart/etc/
           cp -af config/deepflow-agent.yaml pkg/debian/upstart/etc/
           cp -af config/deepflow-agent.yaml pkg/debian/upstart/etc/deepflow-agent.yaml.sample
@@ -113,7 +113,7 @@ jobs:
       - name: build binary package  
         run: |
           mkdir -p agent/bin-package
-          cp -raf agent/output/target/x86_64-unknown-linux-musl/release/deepflow-agent agent/bin-package/
+          cp -raf agent/output/target/release/deepflow-agent agent/bin-package/
           cd agent/bin-package/
           tar -czvf deepflow-agent.tar.gz *
 
@@ -127,7 +127,7 @@ jobs:
         run: |
           ossutil cp -rf agent/artifacts-rpm.zip oss://deepflow-ce/rpm/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/deepflow-agent-rpm.zip
           ossutil cp -rf agent/artifacts-deb.zip oss://deepflow-ce/deb/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/deepflow-agent-deb.zip
-          ossutil cp -rf agent/output/target/x86_64-unknown-linux-musl/release/deepflow-agent-ctl oss://deepflow-ce/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/deepflow-agent-ctl
+          ossutil cp -rf agent/output/target/release/deepflow-agent-ctl oss://deepflow-ce/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/deepflow-agent-ctl
           ossutil cp -rf agent/bin-package/deepflow-agent.tar.gz  oss://deepflow-ce/bin/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/deepflow-agent.tar.gz
           
       - name: upload agent stable artifacts
@@ -135,7 +135,7 @@ jobs:
         run: |
           ossutil cp -rf agent/artifacts-rpm.zip oss://deepflow-ce/rpm/agent/stable/linux/amd64/deepflow-agent-rpm.zip
           ossutil cp -rf agent/artifacts-deb.zip oss://deepflow-ce/deb/agent/stable/linux/amd64/deepflow-agent-deb.zip
-          ossutil cp -rf agent/output/target/x86_64-unknown-linux-musl/release/deepflow-agent-ctl oss://deepflow-ce/bin/ctl/stable/linux/amd64/deepflow-agent-ctl
+          ossutil cp -rf agent/output/target/release/deepflow-agent-ctl oss://deepflow-ce/bin/ctl/stable/linux/amd64/deepflow-agent-ctl
           ossutil cp -rf agent/bin-package/deepflow-agent.tar.gz  oss://deepflow-ce/bin/agent/stable/linux/amd64/deepflow-agent.tar.gz
 
   build_agent_arm64:
@@ -157,6 +157,9 @@ jobs:
         run: |
           docker version
 
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 

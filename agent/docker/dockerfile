@@ -1,4 +1,4 @@
-FROM docker.io/alpine
+FROM docker.io/ubuntu:2204
 
 ARG TZ='Asia/Harbin'
 ENV DEFAULT_TZ ${TZ}
