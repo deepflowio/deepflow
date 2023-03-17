@@ -1967,6 +1967,7 @@ impl AgentComponents {
             candidate_config.metric_server.compressed,
             candidate_config.platform.epc_id,
             policy_getter,
+            synchronizer.ntp_diff(),
         );
 
         stats_collector.register_countable(
