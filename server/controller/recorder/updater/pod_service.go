@@ -84,6 +84,7 @@ func (s *PodService) generateDBItemToAdd(cloudItem *cloudmodel.PodService) (*mys
 	}
 	dbItem := &mysql.PodService{
 		Name:             cloudItem.Name,
+		Label:            cloudItem.Label,
 		Type:             cloudItem.Type,
 		Selector:         cloudItem.Selector,
 		ServiceClusterIP: cloudItem.ServiceClusterIP,
@@ -119,6 +120,9 @@ func (s *PodService) generateUpdateInfo(diffBase *cache.PodService, cloudItem *c
 	}
 	if diffBase.Name != cloudItem.Name {
 		updateInfo["name"] = cloudItem.Name
+	}
+	if diffBase.Label != cloudItem.Label {
+		updateInfo["label"] = cloudItem.Label
 	}
 	if diffBase.Selector != cloudItem.Selector {
 		updateInfo["selector"] = cloudItem.Selector
