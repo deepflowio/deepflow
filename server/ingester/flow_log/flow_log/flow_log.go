@@ -77,7 +77,7 @@ func NewFlowLog(config *config.Config, recv *receiver.Receiver, platformDataMana
 		return nil, err
 	}
 	l4FlowLogger := NewL4FlowLogger(config, platformDataManager, manager, recv, flowLogWriter)
-	flowTagWriter, err := flow_tag.NewFlowTagWriter(common.FLOW_LOG_DB, common.FLOW_LOG_DB, config.FlowLogTTL.L7FlowLog, dbwriter.DefaultPartition, config.Base, &config.CKWriterConfig)
+	flowTagWriter, err := flow_tag.NewFlowTagWriter(0, common.FLOW_LOG_DB, common.FLOW_LOG_DB, config.FlowLogTTL.L7FlowLog, dbwriter.DefaultPartition, config.Base, &config.CKWriterConfig) // FIXME: 修改为各自使用各自的，因为去掉了 lock
 	if err != nil {
 		return nil, err
 	}

@@ -44,7 +44,7 @@ func (t TagType) String() string {
 	}
 }
 
-type FieldType int
+type FieldType uint8
 
 const (
 	FieldTag FieldType = iota
@@ -62,16 +62,17 @@ func (t FieldType) String() string {
 	}
 }
 
+// This structure will be used as a map key, and it is hoped to be as compact as possible in terms of memory layout.
+// In addition, in order to distinguish as early as possible when comparing two values, put the highly distinguishable fields at the front.
 type FlowTagInfo struct {
-	table          string
-	fieldType      FieldType
-	vpcId          int32
-	podNsId        uint16
-	fieldName      string
-	fieldValueType string
+	table      string // Represents virtual_table_name in ext_metrics
+	fieldName  string
+	fieldValue string
 
+	vpcId         int32 // XXX: can use int16
+	podNsId       uint16
+	fieldType     FieldType
 	hasFieldValue bool
-	fieldValue    string
 }
 
 type FlowTag struct {
@@ -82,6 +83,7 @@ type FlowTag struct {
 	fieldValueCount uint64
 }
 
+// FIXME: why db is not used.
 func NewTagField(time uint32, db, table string, epcId int32, podNsId uint16, fieldType FieldType, fieldName string) *FlowTag {
 	t := AcquireFlowTag()
 	t.Timestamp = time
@@ -90,14 +92,10 @@ func NewTagField(time uint32, db, table string, epcId int32, podNsId uint16, fie
 	t.vpcId = epcId
 	t.podNsId = podNsId
 	t.fieldName = fieldName
-	if fieldType == FieldTag {
-		t.fieldValueType = "string"
-	} else {
-		t.fieldValueType = "float"
-	}
 	return t
 }
 
+// FIXME: why db is not used.
 func NewTagFieldValue(time uint32, db, table string, epcId int32, podNsId uint16, fieldType FieldType, fieldName string, fieldValue string) *FlowTag {
 	t := AcquireFlowTag()
 	t.Timestamp = time
@@ -106,7 +104,6 @@ func NewTagFieldValue(time uint32, db, table string, epcId int32, podNsId uint16
 	t.vpcId = epcId
 	t.podNsId = podNsId
 	t.fieldName = fieldName
-	t.fieldValueType = "string"
 	t.hasFieldValue = true
 	t.fieldValue = fieldValue
 	return t
@@ -114,13 +111,17 @@ func NewTagFieldValue(time uint32, db, table string, epcId int32, podNsId uint16
 
 func (t *FlowTag) WriteBlock(block *ckdb.Block) {
 	block.WriteDateTime(t.Timestamp)
+	fieldValueType := "string"
+	if !t.hasFieldValue && t.fieldType != FieldTag {
+		fieldValueType = "float"
+	}
 	block.Write(
 		t.table,
 		t.vpcId,
 		t.podNsId,
 		t.fieldType.String(),
 		t.fieldName,
-		t.fieldValueType,
+		fieldValueType,
 	)
 	if t.hasFieldValue {
 		block.Write(t.fieldValue, t.fieldValueCount)
