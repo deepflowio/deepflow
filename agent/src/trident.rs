@@ -2144,6 +2144,7 @@ impl AgentComponents {
             self.prometheus_uniform_sender.start();
             self.telegraf_uniform_sender.start();
             self.profile_uniform_sender.start();
+            self.proc_event_uniform_sender.start();
             if self.config.metric_server.enabled {
                 self.external_metrics_server.start();
             }
