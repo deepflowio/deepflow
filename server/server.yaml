@@ -437,31 +437,6 @@ ingester:
   #  ## 值越大策略Firstpath表内存使用越少性能越低，取值范围为[1,16]，其他非法值使用默认值8
   #  level: 0
 
-  #pcap:
-  #  ## 计算TCP/IP checksum，默认不计算
-  #  tcpip-checksum: false
-  #
-  #  ## 单次写入文件的块大小，默认64KB
-  #  block-size-kb: 64
-  #
-  #  ## 同时在写的最大pcap文件数，默认5000
-  #  max-concurrent-files: 5000
-  #
-  #  ## 每个pcap文件的最大大小，默认25MB，但是1秒内即使超过该值也不会切分文件
-  #  max-file-size-mb: 25
-  #
-  #  ## 所有pcap文件的最大总大小，默认100GB
-  #  max-directory-size-gb: 100
-  #
-  #  ## 磁盘剩余空间不足该数值时进行删除，默认10GB
-  #  disk-free-space-margin-gb: 10
-  #
-  #  ## 每个pcap文件的最大时间，默认300秒
-  #  max-file-period-second: 300
-  #
-  #  ## pcap文件存储的文件夹
-  #  file-directory: /var/lib/pcap
-
   ## ########################### flow metrics config #############################################
 
   ## 是否不写入秒级数据: 默认: false(写入)
@@ -480,8 +455,14 @@ ingester:
   #l4-throttle: 0
   #l7-throttle: 0
 
-  #decoder-queue-count: 2
-  #decoder-queue-size: 10000
+  #flow-log-decoder-queue-count: 2
+  #flow-log-decoder-queue-size: 10000
+
+  #ext-metrics-decoder-queue-count: 2
+  #ext-metrics-decoder-queue-size: 10000
+
+  #profile-decoder-queue-count: 2
+  #profile-decoder-queue-size: 10000
   
   ## unit: byte
   #flow-tag-cache-max-size: 262144
