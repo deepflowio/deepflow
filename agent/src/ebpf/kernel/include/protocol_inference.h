@@ -1365,6 +1365,12 @@ infer_protocol(struct ctx_info_s *ctx,
 						     count, DATA_BUF_MAX,
 						     &http2_infer_buf,
 						     &http2_infer_len);
+		/*
+		 * The http2_infer_len(iov_cpy.iov_len) may be larger than
+		 * syscall length, make adjustments here.
+		 */
+		if (http2_infer_len > count)
+			http2_infer_len = count;
 	} else {
 		bpf_probe_read(__infer_buf->data, sizeof(__infer_buf->data), buf);
 		http2_infer_buf = (char *)buf;
