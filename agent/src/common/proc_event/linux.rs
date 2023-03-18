@@ -14,7 +14,10 @@
  * limitations under the License.
  */
 
-use std::fmt::{self, Debug, Formatter};
+use std::{
+    fmt::{self, Debug, Formatter},
+    ptr,
+};
 
 use prost::Message;
 use public::utils::string::get_string_from_chars;
@@ -28,7 +31,7 @@ use crate::common::{
     ebpf::IO_EVENT,
     error::Error::{self, ParseEventData},
 };
-use crate::ebpf::SK_BPF_DATA;
+use crate::ebpf::{PACKET_KNAME_MAX_PADDING, SK_BPF_DATA};
 
 const FILE_NAME_MAX_PADDING: usize = 64;
 const IO_BYTES_COUNT_OFFSET: usize = 4;
@@ -130,8 +133,9 @@ pub struct ProcEvent {
     pid: u32,
     thread_id: u32,
     coroutine_id: u64, // optional
-    start_time: u64,   // unit: μs
-    end_time: u64,     // unit: μs
+    process_kname: [u8; PACKET_KNAME_MAX_PADDING + 1],
+    start_time: u64, // unit: μs
+    end_time: u64,   // unit: μs
     event_type: EventType,
     event_data: EventData,
 }
@@ -162,15 +166,30 @@ impl ProcEvent {
             _ => {}
         }
 
-        Ok(BoxedProcEvents(Box::new(ProcEvent {
+        let mut proc_event = ProcEvent {
             pid: data.process_id,
             thread_id: data.thread_id,
             coroutine_id: data.coroutine_id,
+            process_kname: [0u8; PACKET_KNAME_MAX_PADDING + 1],
             start_time: data.timestamp,
             end_time,
             event_type,
             event_data,
-        })))
+        };
+
+        #[cfg(target_arch = "aarch64")]
+        ptr::copy(
+            data.process_kname.as_ptr() as *const u8,
+            proc_event.process_kname.as_mut_ptr() as *mut u8,
+            PACKET_KNAME_MAX_PADDING,
+        );
+        #[cfg(target_arch = "x86_64")]
+        ptr::copy(
+            data.process_kname.as_ptr() as *const i8,
+            proc_event.process_kname.as_mut_ptr() as *mut i8,
+            PACKET_KNAME_MAX_PADDING,
+        );
+        Ok(BoxedProcEvents(Box::new(proc_event)))
     }
 }
 
@@ -180,8 +199,8 @@ pub struct BoxedProcEvents(pub Box<ProcEvent>);
 impl Debug for ProcEvent {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_fmt(format_args!(
-            "ProcEvent {{ pid: {}, thread_id: {}, coroutine_id: {}, event_type: {}, start_time: {}, end_time: {}, event_data: {:?} }}",
-            self.pid, self.thread_id, self.coroutine_id, self.event_type, self.start_time, self.end_time, self.event_data
+            "ProcEvent {{ pid: {}, thread_id: {}, coroutine_id: {}, process_kname: {}, event_type: {}, start_time: {}, end_time: {}, event_data: {:?} }}",
+            self.pid, self.thread_id, self.coroutine_id, get_string_from_chars(&self.process_kname), self.event_type, self.start_time, self.end_time, self.event_data
         ))
     }
 }
@@ -193,6 +212,7 @@ impl Sendable for BoxedProcEvents {
             thread_id: self.0.thread_id,
             coroutine_id: self.0.coroutine_id as u32,
             start_time: self.0.start_time,
+            process_kname: self.0.process_kname.to_vec(),
             end_time: self.0.end_time,
             event_type: self.0.event_type.into(),
             ..Default::default()
