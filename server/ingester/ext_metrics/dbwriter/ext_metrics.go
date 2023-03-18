@@ -111,25 +111,43 @@ func (m *ExtMetrics) GenCKTable(cluster, storagePolicy string, ttl int, coldStor
 	}
 }
 
-func (m *ExtMetrics) ToFlowTags() ([]interface{}, []interface{}) {
-	if cap(m.fields) < len(m.TagNames)+len(m.MetricsFloatNames) {
-		m.fields = make([]interface{}, 0, len(m.TagNames)+len(m.MetricsFloatNames))
-	}
-	if cap(m.fieldValues) < len(m.TagNames) {
-		m.fieldValues = make([]interface{}, 0, len(m.TagNames))
-	}
-	m.fields, m.fieldValues = m.fields[:0], m.fieldValues[:0]
+// Check if there is a TagName/TagValue/MetricsName not in fieldMap or fieldValueMap, and return the newly appeared item.
+func (m *ExtMetrics) GenerateNewFlowTags(fieldMap, fieldValueMap map[flow_tag.FlowTagInfo]*flow_tag.FlowTag) ([]interface{}, []interface{}) {
 	tableName := m.TableName
 	if m.VirtualTableName != "" {
 		tableName = m.VirtualTableName
 	}
+
 	for i, name := range m.TagNames {
-		m.fields = append(m.fields, flow_tag.NewTagField(m.Timestamp, m.Database, tableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldTag, name))
-		m.fieldValues = append(m.fieldValues, flow_tag.NewTagFieldValue(m.Timestamp, m.Database, tableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldTag, name, m.TagValues[i]))
+		tagFieldValue := flow_tag.NewTagFieldValue(m.Timestamp, m.Database, tableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldTag, name, m.TagValues[i])
+		if _, ok := fieldValueMap[tagFieldValue.FlowTagInfo]; ok {
+			tagFieldValue.Release()
+			// If there is no new fieldValue, of course there will be no new field.
+			// So we can just skip the rest of the process in the loop.
+			continue
+		}
+		fieldValueMap[tagFieldValue.FlowTagInfo] = tagFieldValue
+		m.fieldValues = append(m.fieldValues, tagFieldValue)
+
+		tagField := flow_tag.NewTagField(m.Timestamp, m.Database, tableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldTag, name)
+		if _, ok := fieldMap[tagField.FlowTagInfo]; ok {
+			tagField.Release()
+			continue
+		}
+		fieldMap[tagField.FlowTagInfo] = tagField
+		m.fields = append(m.fields, tagField)
 	}
+
 	for _, name := range m.MetricsFloatNames {
-		m.fields = append(m.fields, flow_tag.NewTagField(m.Timestamp, m.Database, tableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldMetrics, name))
+		tagField := flow_tag.NewTagField(m.Timestamp, m.Database, tableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldMetrics, name)
+		if _, ok := fieldMap[tagField.FlowTagInfo]; ok {
+			tagField.Release()
+			continue
+		}
+		fieldMap[tagField.FlowTagInfo] = tagField
+		m.fields = append(m.fields, tagField)
 	}
+
 	return m.fields, m.fieldValues
 }
 
@@ -138,12 +156,6 @@ var extMetricsPool = pool.NewLockFreePool(func() interface{} {
 		Tag: zerodoc.Tag{
 			Field: &zerodoc.Field{},
 		},
-		TagNames:           make([]string, 0, 4),
-		TagValues:          make([]string, 0, 4),
-		MetricsFloatNames:  make([]string, 0, 4),
-		MetricsFloatValues: make([]float64, 0, 4),
-		fields:             make([]interface{}, 0, 4),
-		fieldValues:        make([]interface{}, 0, 4),
 	}
 })
 

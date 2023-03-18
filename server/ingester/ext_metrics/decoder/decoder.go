@@ -47,7 +47,7 @@ import (
 var log = logging.MustGetLogger("ext_metrics.decoder")
 
 const (
-	BUFFER_SIZE             = 1024
+	BUFFER_SIZE             = 128 // An ext_metrics message is usually very large, so use a smaller value than usual
 	TELEGRAF_POD            = "pod_name"
 	PROMETHEUS_POD          = "pod"
 	PROMETHEUS_INSTANCE     = "instance"
@@ -60,6 +60,7 @@ type Counter struct {
 	OutCount               int64 `statsd:"out-count"`
 	ErrorCount             int64 `statsd:"err-count"`
 	ErrMetrics             int64 `statsd:"err-metrics"`
+	TimeSeries             int64 `statsd:"time-series"` // only for prometheus, count the number of TimeSeries (not Samples)
 	DropUnsupportedMetrics int64 `statsd:"drop-unsupported-metrics"`
 }
 
@@ -71,6 +72,7 @@ type Decoder struct {
 	extMetricsWriter *dbwriter.ExtMetricsWriter
 	debugEnabled     bool
 	config           *config.Config
+	extMetricsBuffer []interface{} // for prometheus, Stores all Samples in a TimeSeries.
 
 	counter *Counter
 	utils.Closable
@@ -175,7 +177,7 @@ func (d *Decoder) sendPrometheus(vtapID uint16, ts *prompb.TimeSeries) {
 	if d.debugEnabled {
 		log.Debugf("decoder %d vtap %d recv promtheus timeseries: %v", d.index, vtapID, ts)
 	}
-	extMetrics, err := d.TimeSeriesToExtMetrics(vtapID, ts)
+	err := d.TimeSeriesToExtMetrics(vtapID, ts)
 	if err != nil {
 		if d.counter.ErrMetrics == 0 {
 			log.Warning(err)
@@ -183,10 +185,9 @@ func (d *Decoder) sendPrometheus(vtapID uint16, ts *prompb.TimeSeries) {
 		d.counter.ErrMetrics++
 		return
 	}
-	for _, m := range extMetrics {
-		d.extMetricsWriter.Write(m)
-		d.counter.OutCount++
-	}
+	d.extMetricsWriter.WriteBatch(d.extMetricsBuffer)
+	d.counter.OutCount += int64(len(d.extMetricsBuffer))
+	d.counter.TimeSeries++
 }
 
 func (d *Decoder) handleTelegraf(vtapID uint16, decoder *codec.SimpleDecoder) {
@@ -270,12 +271,20 @@ func StatsToExtMetrics(vtapID uint16, s *pb.Stats) *dbwriter.ExtMetrics {
 	return m
 }
 
-func (d *Decoder) TimeSeriesToExtMetrics(vtapID uint16, ts *prompb.TimeSeries) ([]*dbwriter.ExtMetrics, error) {
-	ms := make([]*dbwriter.ExtMetrics, 0, len(ts.Samples))
+func (d *Decoder) TimeSeriesToExtMetrics(vtapID uint16, ts *prompb.TimeSeries) error {
+	d.extMetricsBuffer = d.extMetricsBuffer[:0]
+	if len(ts.Samples) == 0 {
+		return nil
+	}
+
+	m := dbwriter.AcquireExtMetrics()
+	if cap(m.TagNames) < len(ts.Labels)-1 {
+		m.TagNames = make([]string, 0, len(ts.Labels)-1)
+		m.TagValues = make([]string, 0, len(ts.Labels)-1)
+		// The length of MetricsFloatNames/MetricsFloatValues will only be 1, so there is no need to pre-allocate space.
+	}
 
 	metricNameLabel, podName, instance := "", "", ""
-	tagNames := make([]string, 0, len(ts.Labels))
-	tagValues := make([]string, 0, len(ts.Labels))
 	for _, l := range ts.Labels {
 		if l.Name == model.MetricNameLabel {
 			metricNameLabel = l.Value
@@ -286,16 +295,25 @@ func (d *Decoder) TimeSeriesToExtMetrics(vtapID uint16, ts *prompb.TimeSeries) (
 		} else if l.Name == PROMETHEUS_INSTANCE {
 			instance = l.Value
 		}
-		tagNames = append(tagNames, l.Name)
-		tagValues = append(tagValues, l.Value)
+		m.TagNames = append(m.TagNames, l.Name)
+		m.TagValues = append(m.TagValues, l.Value)
 	}
 	if metricNameLabel == "" {
-		return nil, fmt.Errorf("prometheum metric name label is null")
+		return fmt.Errorf("prometheum metric name label is null")
 	}
+	m.MetricsFloatNames = append(m.MetricsFloatNames, metricNameLabel) // prometheus only has one metric
 
+	// all samples share the same tag_name/tag_value/metric_name
+	tagNames := m.TagNames
+	tagValues := m.TagValues
+	metricsFloatNames := m.MetricsFloatNames
+
+	var universalTag *zerodoc.Tag
 	virtualTableName := TABLE_PREFIX_PROMETHEUS + metricNameLabel
-	for _, s := range ts.Samples {
-		m := dbwriter.AcquireExtMetrics()
+	for i, s := range ts.Samples {
+		if m == nil {
+			m = dbwriter.AcquireExtMetrics()
+		}
 
 		m.Timestamp = uint32(model.Time(s.Timestamp).Unix())
 		m.Database = dbwriter.EXT_METRICS_DB
@@ -310,13 +328,23 @@ func (d *Decoder) TimeSeriesToExtMetrics(vtapID uint16, ts *prompb.TimeSeries) (
 			dbwriter.ReleaseExtMetrics(m)
 			continue
 		}
-		m.MetricsFloatNames = append(m.MetricsFloatNames, metricNameLabel)
+		m.MetricsFloatNames = metricsFloatNames
 		m.MetricsFloatValues = append(m.MetricsFloatValues, v)
 
-		d.fillExtMetricsBase(m, vtapID, podName, instance, false)
-		ms = append(ms, m)
+		if i == 0 {
+			d.fillExtMetricsBase(m, vtapID, podName, instance, false)
+			universalTag = &m.Tag
+		} else {
+			// all samples share the same Tag
+			// FIXME: write a copy function in zerodoc/tag.go
+			m.Tag.Code = universalTag.Code
+			*m.Tag.Field = *universalTag.Field
+		}
+		d.extMetricsBuffer = append(d.extMetricsBuffer, m)
+
+		m = nil
 	}
-	return ms, nil
+	return nil
 }
 
 func (d *Decoder) fillExtMetricsBase(m *dbwriter.ExtMetrics, vtapID uint16, podName, instance string, fillWithVtapId bool) {
