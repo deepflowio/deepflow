@@ -232,7 +232,7 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 // In some cases, the compiled binary instructions exceed the limit, the
 // specific reason is unknown, reduce the number of cycles of http2, which
 // may cause http2 packet loss
-#define HTTPV2_LOOP_MAX 6
+#define HTTPV2_LOOP_MAX 8
 /*
  *  HTTPV2_FRAME_READ_SZ取值考虑以下3部分：
  *  (1) fixed 9-octet header
@@ -1367,6 +1367,12 @@ infer_protocol(struct ctx_info_s *ctx,
 						     count, DATA_BUF_MAX,
 						     &http2_infer_buf,
 						     &http2_infer_len);
+		/*
+		 * The http2_infer_len(iov_cpy.iov_len) may be larger than
+		 * syscall length, make adjustments here.
+		 */
+		if (http2_infer_len > count)
+			http2_infer_len = count;
 	} else {
 		bpf_probe_read(__infer_buf->data, sizeof(__infer_buf->data), buf);
 		http2_infer_buf = (char *)buf;

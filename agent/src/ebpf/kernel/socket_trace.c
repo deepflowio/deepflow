@@ -187,7 +187,7 @@ static __u32 __inline get_tcp_read_seq_from_fd(int fd)
 #define COPY_IOV(B, O, I, L_T, L_C, F, F_S) do {				\
 	struct iovec iov_cpy;							\
 	bpf_probe_read(&iov_cpy, sizeof(struct iovec), (I));			\
-	if (iov_cpy.iov_base == NULL) continue;					\
+	if (iov_cpy.iov_base == NULL || iov_cpy.iov_len == 0) continue;		\
 	if (!(F)) {								\
 		F = iov_cpy.iov_base;						\
 		F_S = iov_cpy.iov_len;						\
@@ -199,7 +199,7 @@ static __u32 __inline get_tcp_read_seq_from_fd(int fd)
         __u32 len = (O) + (L_C);						\
         struct copy_data_s *cp = (struct copy_data_s *)((B) + len);		\
 	if (len > (sizeof((B)) - sizeof(*cp)))					\
-		return (L_C);							\
+		break;								\
 	if (iov_size >= sizeof(cp->data)) {					\
 		bpf_probe_read(cp->data, sizeof(cp->data), iov_cpy.iov_base);	\
 		iov_size = sizeof(cp->data);					\
@@ -230,6 +230,10 @@ static __inline int iovecs_copy(struct __socket_data *v,
 	else
 		total_size = send_len;
 	char *first_iov = NULL;
+
+	if (total_size > syscall_len)
+		total_size = syscall_len;
+
 	__u32 first_iov_size = 0;
 
 #pragma unroll
@@ -253,7 +257,7 @@ static __inline int infer_iovecs_copy(struct infer_data_s *infer_buf,
 				      __u32 *f_iov_len)
 {
 #define INFER_COPY_SZ	 32
-#define INFER_LOOP_LIMIT 3
+#define INFER_LOOP_LIMIT 4
 	struct copy_data_s {
 		char data[INFER_COPY_SZ];
 	};
@@ -266,6 +270,10 @@ static __inline int infer_iovecs_copy(struct infer_data_s *infer_buf,
 		total_size = sizeof(infer_buf->data);
 	else
 		total_size = copy_len;
+
+	if (total_size > syscall_len)
+		total_size = syscall_len;
+
 	char *first_iov = NULL;
 	__u32 first_iov_size = 0;
 
