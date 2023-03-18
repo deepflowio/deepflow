@@ -89,14 +89,11 @@ func NewMetricsor(msgType datatype.MessageType, db string, config *config.Config
 		libqueue.OptionRelease(func(p interface{}) { receiver.ReleaseRecvBuffer(p.(*receiver.RecvBuffer)) }))
 	recv.RegistHandler(msgType, decodeQueues, queueCount)
 
-	metricsWriter, err := dbwriter.NewExtMetricsWriter(msgType, db, config)
-	if err != nil {
-		return nil, err
-	}
 	decoders := make([]*decoder.Decoder, queueCount)
 	platformDatas := make([]*grpc.PlatformInfoTable, queueCount)
 	for i := 0; i < queueCount; i++ {
 		if platformDataEnabled {
+			var err error
 			platformDatas[i], err = platformDataManager.NewPlatformInfoTable(false, "ext-metrics-"+msgType.String()+"-"+strconv.Itoa(i))
 			if i == 0 {
 				debug.ServerRegisterSimple(CMD_PLATFORMDATA_EXT_METRICS, platformDatas[i])
@@ -104,6 +101,10 @@ func NewMetricsor(msgType datatype.MessageType, db string, config *config.Config
 			if err != nil {
 				return nil, err
 			}
+		}
+		metricsWriter, err := dbwriter.NewExtMetricsWriter(i, msgType, db, config) // FIXME: too many ext_writer?
+		if err != nil {
+			return nil, err
 		}
 		decoders[i] = decoder.NewDecoder(
 			i,
