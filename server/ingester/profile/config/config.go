@@ -15,8 +15,8 @@ type Config struct {
 	Base              *config.Config
 	CKWriterConfig    config.CKWriterConfig `yaml:"profile-ck-writer"`
 	ProfileTTL        int                   `yaml:"profile-ttl-hour"`
-	DecoderQueueCount int                   `yaml:"decoder-queue-count"`
-	DecoderQueueSize  int                   `yaml:"decoder-queue-size"`
+	DecoderQueueCount int                   `yaml:"profile-decoder-queue-count"`
+	DecoderQueueSize  int                   `yaml:"profile-decoder-queue-size"`
 }
 
 type ProfileConfig struct {

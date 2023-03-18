@@ -37,8 +37,8 @@ const (
 type Config struct {
 	Base              *config.Config
 	CKWriterConfig    config.CKWriterConfig `yaml:"ext-metrics-ck-writer"`
-	DecoderQueueCount int                   `yaml:"decoder-queue-count"`
-	DecoderQueueSize  int                   `yaml:"decoder-queue-size"`
+	DecoderQueueCount int                   `yaml:"ext-metrics-decoder-queue-count"`
+	DecoderQueueSize  int                   `yaml:"ext-metrics-decoder-queue-size"`
 	TTL               int                   `yaml:"ext-metrics-ttl-hour"`
 }
 

@@ -49,8 +49,8 @@ type Config struct {
 	L4Throttle        int                   `yaml:"l4-throttle"`
 	L7Throttle        int                   `yaml:"l7-throttle"`
 	FlowLogTTL        FlowLogTTL            `yaml:"flow-log-ttl-hour"`
-	DecoderQueueCount int                   `yaml:"decoder-queue-count"`
-	DecoderQueueSize  int                   `yaml:"decoder-queue-size"`
+	DecoderQueueCount int                   `yaml:"flow-log-decoder-queue-count"`
+	DecoderQueueSize  int                   `yaml:"flow-log-decoder-queue-size"`
 }
 type FlowLogConfig struct {
 	FlowLog Config `yaml:"ingester"`
