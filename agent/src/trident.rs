@@ -1863,7 +1863,7 @@ impl AgentComponents {
         );
 
         let mut otel_metrics_collect_sender = None;
-        if feature_flags.contains(FeatureFlags::OTEL_METRICS) {
+        if config_handler.metric_server().load().enabled {
             let otel_dispatcher_id = ebpf_dispatcher_id + 1;
             let (otel_metrics_sender, otel_metrics_receiver, counter) = queue::bounded_with_debug(
                 yaml_config.flow_queue_size,

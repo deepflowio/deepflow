@@ -19,32 +19,22 @@ use bitflags::bitflags;
 bitflags! {
     pub struct FeatureFlags: u64 {
         const NONE = 0;
-        const OTEL_METRICS = 1<<3;
+        // add a new feature flag like:
+        // const OTEL_METRICS = 1<<1;
    }
 }
 
 impl From<&Vec<String>> for FeatureFlags {
     fn from(flags: &Vec<String>) -> Self {
-        let mut features = FeatureFlags::NONE;
+        let features = FeatureFlags::NONE;
         for flag in flags {
             match flag.to_lowercase().as_str() {
-                "otel_metrics" => features.set(FeatureFlags::OTEL_METRICS, true),
+                // match a new feature flag like:
+                // "otel_metrics" => features.set(FeatureFlags::OTEL_METRICS, true),
                 _ => {}
             }
         }
 
         features
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test_feature_flags() {
-        let flags = vec!["otel_metrics".to_string()];
-        let feature = FeatureFlags::from(&flags);
-        assert_eq!(feature.contains(FeatureFlags::OTEL_METRICS), true);
     }
 }
