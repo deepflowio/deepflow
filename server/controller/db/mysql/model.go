@@ -966,7 +966,7 @@ type DataSource struct {
 	State                     int       `gorm:"column:state;type:int;default:1" json:"STATE"`
 	BaseDataSourceID          int       `gorm:"column:base_data_source_id;type:int" json:"BASE_DATA_SOURCE_ID"`
 	Interval                  int       `gorm:"column:interval;type:int" json:"INTERVAL"`
-	RetentionTime             int       `gorm:"column:retention_time;type:int" json:"RETENTION_TIME"`
+	RetentionTime             int       `gorm:"column:retention_time;type:int" json:"RETENTION_TIME"` // unit: hour
 	SummableMetricsOperator   string    `gorm:"column:summable_metrics_operator;type:char(64)" json:"SUMMABLE_METRICS_OPERATOR"`
 	UnSummableMetricsOperator string    `gorm:"column:unsummable_metrics_operator;type:char(64)" json:"UNSUMMABLE_METRICS_OPERATOR"`
 	UpdatedAt                 time.Time `gorm:"column:updated_at" json:"UPDATED_AT"`

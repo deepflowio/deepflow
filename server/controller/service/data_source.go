@@ -29,7 +29,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
-var DEFAULT_DATA_SOURCE_NAMES = []string{"1s", "1m", "flow_log.l4", "flow_log.l7"}
+var DEFAULT_DATA_SOURCE_NAMES = []string{"1s", "1m", "flow_log.l4_flow_log", "flow_log.l7_flow_log",
+	"flow_log.l4_packet", "flow_log.l7_packet", "deepflow_system"}
 
 func GetDataSources(filter map[string]interface{}) (resp []model.DataSource, err error) {
 	var response []model.DataSource
@@ -322,7 +323,7 @@ func CallRozeAPIAddRP(ip string, dataSource, baseDataSource mysql.DataSource, ro
 		"summable-metrics-op":   strings.ToLower(dataSource.SummableMetricsOperator),
 		"unsummable-metrics-op": strings.ToLower(dataSource.UnSummableMetricsOperator),
 		"interval":              dataSource.Interval / common.INTERVAL_1MINUTE,
-		"retention-time":        dataSource.RetentionTime * (common.INTERVAL_1DAY / common.INTERVAL_1HOUR),
+		"retention-time":        dataSource.RetentionTime,
 	}
 	log.Debug(url)
 	log.Debug(body)
@@ -332,15 +333,14 @@ func CallRozeAPIAddRP(ip string, dataSource, baseDataSource mysql.DataSource, ro
 
 func CallRozeAPIModRP(ip string, dataSource mysql.DataSource, rozePort int) error {
 	url := fmt.Sprintf("http://%s:%d/v1/rpmod/", common.GetCURLIP(ip), rozePort)
-	db := "vtap_" + dataSource.TsdbType
-	switch dataSource.TsdbType {
-	case common.DATA_SOURCE_L4_LOG, common.DATA_SOURCE_L7_LOG:
-		db = dataSource.TsdbType
+	db := dataSource.TsdbType
+	if dataSource.TsdbType == common.DATA_SOURCE_APP || dataSource.TsdbType == common.DATA_SOURCE_FLOW {
+		db = "vtap_" + dataSource.TsdbType
 	}
 	body := map[string]interface{}{
 		"name":           dataSource.Name,
 		"db":             db,
-		"retention-time": dataSource.RetentionTime * (common.INTERVAL_1DAY / common.INTERVAL_1HOUR),
+		"retention-time": dataSource.RetentionTime,
 	}
 	log.Debug(url)
 	log.Debug(body)
