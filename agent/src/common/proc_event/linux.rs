@@ -16,11 +16,10 @@
 
 use std::{
     fmt::{self, Debug, Formatter},
-    ptr,
+    str,
 };
 
 use prost::Message;
-use public::utils::string::get_string_from_chars;
 use public::{
     bytes::{read_u32_le, read_u64_le},
     proto::metric,
@@ -31,17 +30,17 @@ use crate::common::{
     ebpf::IO_EVENT,
     error::Error::{self, ParseEventData},
 };
-use crate::ebpf::{PACKET_KNAME_MAX_PADDING, SK_BPF_DATA};
+use crate::ebpf::SK_BPF_DATA;
 
-const FILE_NAME_MAX_PADDING: usize = 64;
+const FILENAME_MAX_PADDING: usize = 64;
 const IO_BYTES_COUNT_OFFSET: usize = 4;
 const IO_OPERATION_OFFSET: usize = 8;
 const IO_LATENCY_OFFSET: usize = 16;
 struct IoEventData {
-    bytes_count: u32,                      // Number of bytes read and written
-    operation: u32,                        // 0: write 1: read
-    latency: u64,                          // Function call delay, in nanoseconds
-    filename: [u8; FILE_NAME_MAX_PADDING], // String ending with \0
+    bytes_count: u32, // Number of bytes read and written
+    operation: u32,   // 0: write 1: read
+    latency: u64,     // Function call delay, in nanoseconds
+    filename: Vec<u8>,
 }
 
 impl TryFrom<&[u8]> for IoEventData {
@@ -49,21 +48,23 @@ impl TryFrom<&[u8]> for IoEventData {
 
     fn try_from(raw_data: &[u8]) -> Result<Self, self::Error> {
         let length = raw_data.len();
-        if length <= FILE_NAME_MAX_PADDING {
+        if length <= FILENAME_MAX_PADDING {
             return Err(ParseEventData(format!(
                 "parse io event data failed, raw data length: {} < {}",
-                length, FILE_NAME_MAX_PADDING
+                length, FILENAME_MAX_PADDING
             )));
         }
-        let mut io_event_data = Self {
+        let io_event_data = Self {
             bytes_count: read_u32_le(&raw_data),
             operation: read_u32_le(&raw_data[IO_BYTES_COUNT_OFFSET..]),
             latency: read_u64_le(&raw_data[IO_OPERATION_OFFSET..]),
-            filename: [0u8; FILE_NAME_MAX_PADDING],
+            filename: raw_data[IO_LATENCY_OFFSET..]
+                .iter()
+                .position(|&b| b == b'\0') // filename ending with '\0'
+                .map(|index| &raw_data[IO_LATENCY_OFFSET..][..index])
+                .unwrap_or(&[])
+                .to_vec(),
         };
-        io_event_data
-            .filename
-            .copy_from_slice(&raw_data[IO_LATENCY_OFFSET..]);
         Ok(io_event_data)
     }
 }
@@ -74,7 +75,7 @@ impl From<IoEventData> for metric::IoEventData {
             bytes_count: io_event_data.bytes_count,
             operation: io_event_data.operation as i32,
             latency: io_event_data.latency,
-            filename: io_event_data.filename.to_vec(),
+            filename: io_event_data.filename,
         }
     }
 }
@@ -87,13 +88,13 @@ enum EventData {
 impl Debug for EventData {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            EventData::IoEvent(d) => {
-                let filename = get_string_from_chars(&d.filename);
-                f.write_fmt(format_args!(
-                    "IoEventData {{ filename: {:?}, operation: {}, bytes_count: {}, latency: {} }}",
-                    filename, d.operation, d.bytes_count, d.latency
-                ))
-            }
+            EventData::IoEvent(d) => f.write_fmt(format_args!(
+                "IoEventData {{ filename: {}, operation: {}, bytes_count: {}, latency: {} }}",
+                str::from_utf8(&d.filename).unwrap_or(""),
+                d.operation,
+                d.bytes_count,
+                d.latency
+            )),
             _ => f.write_str("other event"),
         }
     }
@@ -133,9 +134,9 @@ pub struct ProcEvent {
     pid: u32,
     thread_id: u32,
     coroutine_id: u64, // optional
-    process_kname: [u8; PACKET_KNAME_MAX_PADDING + 1],
-    start_time: u64, // unit: μs
-    end_time: u64,   // unit: μs
+    process_kname: Vec<u8>,
+    start_time: u64, // unit: ns
+    end_time: u64,   // unit: ns
     event_type: EventType,
     event_data: EventData,
 }
@@ -156,39 +157,34 @@ impl ProcEvent {
             .copy_to_nonoverlapping(raw_data.as_mut_ptr() as *mut i8, cap_len);
 
         let mut event_data: EventData = EventData::OtherEvent;
+        let start_time = data.timestamp * 1000; // The unit of data.timestamp is microsecond, and the unit of start_time is nanosecond
         let mut end_time = 0;
         match event_type {
             EventType::IoEvent => {
                 let io_event_data = IoEventData::try_from(raw_data.as_ref())?; // Try to parse IoEventData from data.cap_data
-                end_time = data.timestamp + io_event_data.latency / 1000; // The unit of timestamp is microsecond, and the unit of latency is nanosecond
+                end_time = start_time + io_event_data.latency;
                 event_data = EventData::IoEvent(io_event_data);
             }
             _ => {}
         }
 
-        let mut proc_event = ProcEvent {
+        let proc_event = ProcEvent {
             pid: data.process_id,
             thread_id: data.thread_id,
             coroutine_id: data.coroutine_id,
-            process_kname: [0u8; PACKET_KNAME_MAX_PADDING + 1],
-            start_time: data.timestamp,
+            process_kname: data
+                .process_kname
+                .iter()
+                .position(|&b| b == b'\0') // data.process_kname ending with '\0'
+                .map(|index| &data.process_kname[..index])
+                .unwrap_or(&[])
+                .to_vec(),
+            start_time,
             end_time,
             event_type,
             event_data,
         };
 
-        #[cfg(target_arch = "aarch64")]
-        ptr::copy(
-            data.process_kname.as_ptr() as *const u8,
-            proc_event.process_kname.as_mut_ptr() as *mut u8,
-            PACKET_KNAME_MAX_PADDING,
-        );
-        #[cfg(target_arch = "x86_64")]
-        ptr::copy(
-            data.process_kname.as_ptr() as *const i8,
-            proc_event.process_kname.as_mut_ptr() as *mut i8,
-            PACKET_KNAME_MAX_PADDING,
-        );
         Ok(BoxedProcEvents(Box::new(proc_event)))
     }
 }
@@ -200,7 +196,7 @@ impl Debug for ProcEvent {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_fmt(format_args!(
             "ProcEvent {{ pid: {}, thread_id: {}, coroutine_id: {}, process_kname: {}, event_type: {}, start_time: {}, end_time: {}, event_data: {:?} }}",
-            self.pid, self.thread_id, self.coroutine_id, get_string_from_chars(&self.process_kname), self.event_type, self.start_time, self.end_time, self.event_data
+            self.pid, self.thread_id, self.coroutine_id, str::from_utf8(&self.process_kname).unwrap_or(""), self.event_type, self.start_time, self.end_time, self.event_data
         ))
     }
 }
@@ -212,7 +208,7 @@ impl Sendable for BoxedProcEvents {
             thread_id: self.0.thread_id,
             coroutine_id: self.0.coroutine_id as u32,
             start_time: self.0.start_time,
-            process_kname: self.0.process_kname.to_vec(),
+            process_kname: self.0.process_kname,
             end_time: self.0.end_time,
             event_type: self.0.event_type.into(),
             ..Default::default()
