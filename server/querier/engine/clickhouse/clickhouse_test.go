@@ -211,6 +211,16 @@ var (
 		output: "WITH toStartOfInterval(_time, toIntervalSecond(2)) + toIntervalSecond(arrayJoin([0]) * 2) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, AVG(`_sum_byte_tx`) AS `Avg(byte_tx)` FROM (WITH toStartOfInterval(time, toIntervalSecond(1)) AS `_time` SELECT _time, SUM(byte_tx) AS `_sum_byte_tx` FROM flow_metrics.`vtap_flow_edge_port` GROUP BY `_time`) GROUP BY `toi` LIMIT 1",
 		db:     "flow_metrics",
 	},
+	{
+		input:  "SELECT time(time,5,1,0) as toi, Avg(`metrics.dropped`) AS `Avg(metrics.dropped)` FROM `deepflow_agent_collect_sender` GROUP BY  toi ORDER BY toi desc",
+		output: "WITH toStartOfInterval(time, toIntervalSecond(60)) + toIntervalSecond(arrayJoin([0]) * 60) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, AVG(if(indexOf(metrics_float_names, 'dropped')=0,null,metrics_float_values[indexOf(metrics_float_names, 'dropped')])) AS `Avg(metrics.dropped)` GROUP BY `toi` ORDER BY `toi` desc LIMIT 10000",
+		db:     "deepflow_system"
+	},
+	{
+		input:  "SELECT time(time,120,1,0) as toi, Avg(`metrics.dropped`) AS `Avg(metrics.dropped)` FROM `deepflow_agent_collect_sender` GROUP BY  toi ORDER BY toi desc ",
+		output: "WITH toStartOfInterval(time, toIntervalSecond(120)) + toIntervalSecond(arrayJoin([0]) * 120) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, AVG(if(indexOf(metrics_float_names, 'dropped')=0,null,metrics_float_values[indexOf(metrics_float_names, 'dropped')])) AS `Avg(metrics.dropped)` GROUP BY `toi` ORDER BY `toi` desc LIMIT 10000",
+		db:     "deepflow_system"
+	},
 	}
 )
 

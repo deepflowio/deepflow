@@ -582,6 +582,9 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 					log.Error(err)
 				}
 				e.Model.Time.DatasourceInterval = interval
+			} else if  e.DB == "deepflow_system" {
+				// when DB is deepflow_system, DatasourceInterval is set to 60
+				e.Model.Time.DatasourceInterval = chCommon.DB_DEEPFLOW_SYSTEM_INTERVAL
 			} else {
 				e.AddTable(fmt.Sprintf("%s.`%s`", e.DB, table))
 			}
