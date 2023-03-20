@@ -22,6 +22,7 @@ const DB_NAME_FLOW_METRICS = "flow_metrics"
 const DB_NAME_EXT_METRICS = "ext_metrics"
 const DB_NAME_DEEPFLOW_SYSTEM = "deepflow_system"
 const DB_NAME_EVENT = "event"
+const DB_NAME_PROFILE = "profile"
 const DB_DEEPFLOW_SYSTEM_INTERVAL = 60
 
 var DB_TABLE_MAP = map[string][]string{
@@ -30,4 +31,5 @@ var DB_TABLE_MAP = map[string][]string{
 	DB_NAME_EXT_METRICS:     []string{"ext_common"},
 	DB_NAME_DEEPFLOW_SYSTEM: []string{"deepflow_system_common"},
 	DB_NAME_EVENT:           []string{"event"},
+	DB_NAME_PROFILE:         []string{"in_process"},
 }

@@ -262,7 +262,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 	for _, _key := range rst.Values {
 		key := _key.([]interface{})[0]
 		labelKey := "k8s.label." + key.(string)
-		if db == "ext_metrics" || db == "event" || table == "vtap_flow_port" || table == "vtap_app_port" {
+		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || table == "vtap_flow_port" || table == "vtap_app_port" {
 			response.Values = append(response.Values, []interface{}{
 				labelKey, labelKey, labelKey, labelKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
@@ -285,7 +285,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 	for _, _key := range chostCloudTagRst.Values {
 		key := _key.([]interface{})[0]
 		chostCloudTagKey := "cloud.tag." + key.(string)
-		if db == "ext_metrics" || db == "event" || table == "vtap_flow_port" || table == "vtap_app_port" {
+		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || table == "vtap_flow_port" || table == "vtap_app_port" {
 			response.Values = append(response.Values, []interface{}{
 				chostCloudTagKey, chostCloudTagKey, chostCloudTagKey, chostCloudTagKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
@@ -306,7 +306,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 	for _, _key := range podNSCloudTagRst.Values {
 		key := _key.([]interface{})[0]
 		podNSCloudTagKey := "cloud.tag." + key.(string)
-		if db == "ext_metrics" || db == "event" || table == "vtap_flow_port" || table == "vtap_app_port" {
+		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || table == "vtap_flow_port" || table == "vtap_app_port" {
 			response.Values = append(response.Values, []interface{}{
 				podNSCloudTagKey, podNSCloudTagKey, podNSCloudTagKey, podNSCloudTagKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
@@ -370,7 +370,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 	}
 	for _, _tagName := range externalRst.Values {
 		tagName := _tagName.([]interface{})[0]
-		if db == "ext_metrics" || db == "deepflow_system" {
+		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_DEEPFLOW_SYSTEM || db == ckcommon.DB_NAME_PROFILE {
 			externalTag := "tag." + tagName.(string)
 			response.Values = append(response.Values, []interface{}{
 				externalTag, externalTag, externalTag, externalTag, "map_item",
@@ -384,7 +384,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 			})
 		}
 	}
-	if db == "ext_metrics" || db == "deepflow_system" {
+	if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_DEEPFLOW_SYSTEM || db == ckcommon.DB_NAME_PROFILE {
 		response.Values = append(response.Values, []interface{}{
 			"tag", "tag", "tag", "tag", "map",
 			"Native Tag", []string{}, []bool{true, true, true}, "tag", "",
