@@ -22,6 +22,7 @@ const DB_NAME_FLOW_METRICS = "flow_metrics"
 const DB_NAME_EXT_METRICS = "ext_metrics"
 const DB_NAME_DEEPFLOW_SYSTEM = "deepflow_system"
 const DB_NAME_EVENT = "event"
+const DB_DEEPFLOW_SYSTEM_INTERVAL = 60
 
 var DB_TABLE_MAP = map[string][]string{
 	DB_NAME_FLOW_LOG:        []string{"l4_flow_log", "l7_flow_log", "l4_packet", "l7_packet"},
