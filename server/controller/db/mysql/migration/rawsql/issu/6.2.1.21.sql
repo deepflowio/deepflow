@@ -2,29 +2,29 @@ START TRANSACTION;
 
 -- modify start, add upgrade sql
 
-UPDATE alarm_policy SET sub_view_url= "/v1/stats/querier/UniversalHistory" WHERE name="控制器负载高";
+UPDATE alarm_policy SET sub_view_url="/v1/stats/querier/UniversalHistory", user_id=1 WHERE name="控制器负载高";
 
-UPDATE alarm_policy SET sub_view_url= "/v1/stats/querier/UniversalHistory" WHERE name="数据节点负载高";
+UPDATE alarm_policy SET sub_view_url="/v1/stats/querier/UniversalHistory", user_id=1 WHERE name="数据节点负载高";
 
-UPDATE alarm_policy SET sub_view_url= "/v1/stats/querier/UniversalHistory" WHERE name="控制器磁盘空间不足";
+UPDATE alarm_policy SET sub_view_url="/v1/stats/querier/UniversalHistory", user_id=1 WHERE name="控制器磁盘空间不足";
 
-UPDATE alarm_policy SET sub_view_url= "/v1/stats/querier/UniversalHistory" WHERE name="数据节点磁盘空间不足";
+UPDATE alarm_policy SET sub_view_url="/v1/stats/querier/UniversalHistory", user_id=1 WHERE name="数据节点磁盘空间不足";
 
-UPDATE alarm_policy SET sub_view_url= "/v1/stats/querier/UniversalHistory" WHERE name="采集器CPU超限";
+UPDATE alarm_policy SET sub_view_url="/v1/stats/querier/UniversalHistory", user_id=1 WHERE name="采集器CPU超限";
 
-UPDATE alarm_policy SET sub_view_url= "/v1/stats/querier/UniversalHistory" WHERE name="采集器内存超限";
+UPDATE alarm_policy SET sub_view_url="/v1/stats/querier/UniversalHistory", user_id=1 WHERE name="采集器内存超限";
 
-UPDATE alarm_policy SET sub_view_url= "/v1/stats/querier/UniversalHistory" WHERE name="数据节点写入失败";
+UPDATE alarm_policy SET sub_view_url="/v1/stats/querier/UniversalHistory", user_id=1 WHERE name="数据节点写入失败";
 
-UPDATE alarm_policy SET sub_view_url= "/v1/stats/querier/UniversalHistory" WHERE name="采集器系统空闲内存比例超限";
+UPDATE alarm_policy SET sub_view_url="/v1/stats/querier/UniversalHistory", user_id=1 WHERE name="采集器系统空闲内存比例超限";
 
-UPDATE alarm_policy SET sub_view_url= "/v1/stats/querier/UniversalHistory" WHERE name="采集器的WARN日志条数超限";
+UPDATE alarm_policy SET sub_view_url="/v1/stats/querier/UniversalHistory", user_id=1 WHERE name="采集器的WARN日志条数超限";
 
-UPDATE alarm_policy SET sub_view_url= "/v1/stats/querier/UniversalHistory" WHERE name="采集器的ERR日志条数超限";
+UPDATE alarm_policy SET sub_view_url="/v1/stats/querier/UniversalHistory", user_id=1 WHERE name="采集器的ERR日志条数超限";
 
-UPDATE alarm_policy SET sub_view_url= "/v1/stats/querier/UniversalHistory" WHERE name="K8s容器信息同步滞后";
+UPDATE alarm_policy SET sub_view_url="/v1/stats/querier/UniversalHistory", user_id=1 WHERE name="K8s容器信息同步滞后";
 
-UPDATE alarm_policy SET sub_view_url= "/v1/stats/querier/UniversalHistory" WHERE name="采集器丢包(dispatcher)";
+UPDATE alarm_policy SET sub_view_url="/v1/stats/querier/UniversalHistory", user_id=1 WHERE name="采集器丢包(dispatcher)";
 
 UPDATE alarm_policy SET sub_view_url= "/v1/stats/querier/UniversalHistory" WHERE name="采集器丢包(queue)";
 
