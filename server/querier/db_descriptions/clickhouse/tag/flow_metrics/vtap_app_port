@@ -50,4 +50,4 @@ app_instance               , app_instance              , app_instance           
 
 tap                        , tap                       , tap                       , resource      ,                      , Capture Info      , 111
 vtap                       , vtap                      , vtap                      , resource      ,                      , Capture Info      , 111
-signal_source              , signal_source             , signal_source             , int_enum      , app_signal_source    , Capture Info      , 111
+signal_source              , signal_source             , signal_source             , int_enum      , l7_signal_source    , Capture Info      , 111
