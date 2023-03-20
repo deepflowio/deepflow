@@ -157,9 +157,9 @@ func GetDatasources(db string, table string) ([]string, error) {
 func GetDatasourceInterval(db string, table string, name string) (int, error) {
 	var tsdbType string
 	switch db {
-	case "flow_log", "event":
+	case DB_NAME_FLOW_LOG, DB_NAME_EVENT, DB_NAME_PROFILE:
 		return 1, nil
-	case "flow_metrics":
+	case DB_NAME_FLOW_METRICS:
 		if table == "vtap_flow_port" || table == "vtap_flow_edge_port" {
 			tsdbType = "flow"
 		} else if table == "vtap_app_port" || table == "vtap_app_edge_port" {

@@ -147,6 +147,11 @@ func GetMetricsByDBTableStatic(db string, table string, where string) (map[strin
 		case "event":
 			return GetResourceEventMetrics(), err
 		}
+	case ckcommon.DB_NAME_PROFILE:
+		switch table {
+		case "in_process":
+			return GetInProcessMetrics(), err
+		}
 	}
 	return nil, err
 }
@@ -202,6 +207,11 @@ func GetMetricsByDBTable(db string, table string, where string, ctx context.Cont
 		switch table {
 		case "event":
 			return GetResourceEventMetrics(), err
+		}
+	case ckcommon.DB_NAME_PROFILE:
+		switch table {
+		case "in_process":
+			return GetInProcessMetrics(), err
 		}
 	case "ext_metrics", "deepflow_system":
 		return GetExtMetrics(db, table, where, ctx)
@@ -355,6 +365,12 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) erro
 		case "event":
 			metrics = RESOURCE_EVENT_METRICS
 			replaceMetrics = RESOURCE_EVENT_METRICS_REPLACE
+		}
+	case ckcommon.DB_NAME_PROFILE:
+		switch table {
+		case "in_process":
+			metrics = IN_PROCESS_METRICS
+			replaceMetrics = IN_PROCESS_METRICS_REPLACE
 		}
 	case "ext_metrics", "deepflow_system":
 		metrics = EXT_METRICS
