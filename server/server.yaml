@@ -76,7 +76,7 @@ controller:
     vtap_group_max: 1000
     vtap_max_per_group: 10000
     az_max_per_server: 10
-    data_source_max: 10
+    data_source_max: 15
     data_source_retention_time_max: 1000
 
   # monitor module config
