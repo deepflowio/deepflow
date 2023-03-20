@@ -351,9 +351,6 @@ fn record_tcp_listening_ip_port(
                     };
                     spec_addr_listen_sock.insert(local_address);
                 }
-            } else {
-                // the listen socket info in /proc/pid/net/tcp always in the top
-                break;
             }
         }
     };
