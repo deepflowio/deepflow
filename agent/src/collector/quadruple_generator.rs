@@ -57,6 +57,9 @@ pub struct QgCounter {
 
     pub no_endpoint: AtomicU64,
     pub drop_before_window: AtomicU64,
+
+    pub stash_total_len: AtomicU64,
+    pub stash_total_capacity: AtomicU64,
 }
 
 struct QuadrupleStash {
@@ -300,6 +303,16 @@ impl RefCountable for QgCounter {
                 CounterType::Counted,
                 CounterValue::Unsigned(self.drop_before_window.swap(0, Ordering::Relaxed)),
             ),
+            (
+                "stash-total-len",
+                CounterType::Counted,
+                CounterValue::Unsigned(self.stash_total_len.load(Ordering::Relaxed)),
+            ),
+            (
+                "stash-total-capacity",
+                CounterType::Counted,
+                CounterValue::Unsigned(self.stash_total_capacity.load(Ordering::Relaxed)),
+            ),
         ]
     }
 }
@@ -470,6 +483,21 @@ impl SubQuadGen {
         } else {
             possible_host.check(ip, flow_metric.l3_epc_id)
         }
+    }
+
+    fn calc_stash_counters(&self) {
+        let mut len = 0;
+        let mut cap = 0;
+        for s in self.stashs.iter() {
+            len += s.v4_flows.len() + s.v6_flows.len();
+            cap += s.v4_flows.capacity() + s.v6_flows.len();
+        }
+        self.counter
+            .stash_total_len
+            .store(len as u64, Ordering::Relaxed);
+        self.counter
+            .stash_total_capacity
+            .store(cap as u64, Ordering::Relaxed);
     }
 
     // TODO 策略统计
@@ -1194,6 +1222,12 @@ impl QuadrupleGenerator {
                             debug!("qg push TaggedFlow to l4_flow queue failed, maybe queue have terminated");
                             send_batch.clear();
                         }
+                    }
+                    if let Some(g) = self.second_quad_gen.as_ref() {
+                        g.calc_stash_counters();
+                    }
+                    if let Some(g) = self.minute_quad_gen.as_mut() {
+                        g.calc_stash_counters();
                     }
                 }
                 Err(Error::Timeout) => {

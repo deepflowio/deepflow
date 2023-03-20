@@ -67,6 +67,8 @@ pub struct CollectorCounter {
     drop_before_window: AtomicU64,
     drop_inactive: AtomicU64,
     no_endpoint: AtomicU64,
+    stash_len: AtomicU64,
+    stash_capacity: AtomicU64,
     running: Arc<AtomicBool>,
 }
 
@@ -102,6 +104,16 @@ impl RefCountable for CollectorCounter {
                 "no-endpoint",
                 CounterType::Counted,
                 CounterValue::Unsigned(self.no_endpoint.swap(0, Ordering::Relaxed)),
+            ),
+            (
+                "stash-len",
+                CounterType::Counted,
+                CounterValue::Unsigned(self.stash_len.load(Ordering::Relaxed)),
+            ),
+            (
+                "stash-capacity",
+                CounterType::Counted,
+                CounterValue::Unsigned(self.stash_capacity.load(Ordering::Relaxed)),
             ),
         ]
     }
@@ -819,6 +831,15 @@ impl Stash {
             }
         }
     }
+
+    fn calc_stash_counters(&self) {
+        self.counter
+            .stash_len
+            .store(self.inner.len() as u64, Ordering::Relaxed);
+        self.counter
+            .stash_capacity
+            .store(self.inner.capacity() as u64, Ordering::Relaxed);
+    }
 }
 
 fn get_l3_epc_id(l3_epc_id: i32, signal_source: SignalSource) -> i16 {
@@ -923,6 +944,7 @@ impl Collector {
                                 let time_in_second = flow.tagged_flow.flow.flow_stat_time.as_secs();
                                 stash.collect(Some(*flow), time_in_second);
                             }
+                            stash.calc_stash_counters();
                         }
                         Err(Error::Timeout) => stash.collect(
                             None,

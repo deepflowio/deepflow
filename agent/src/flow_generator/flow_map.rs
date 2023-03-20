@@ -981,6 +981,10 @@ impl FlowMap {
 
         if config.collector_enabled {
             node.meta_flow_log = FlowLog::new(
+                node.tagged_flow.flow.signal_source == SignalSource::Packet
+                    && Self::l4_metrics_enabled(config),
+                Self::l7_metrics_enabled(config)
+                    || Self::l7_log_parse_enabled(config, &meta_packet.lookup_key),
                 self.rrt_cache.clone(),
                 self.perf_cache.clone(),
                 L4Protocol::from(meta_packet.lookup_key.proto),

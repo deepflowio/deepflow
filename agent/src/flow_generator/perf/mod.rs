@@ -237,7 +237,7 @@ impl<'a> Iterator for L7ProtocolCheckerIterator<'a> {
 }
 
 pub struct FlowLog {
-    l4: L4FlowPerfTable,
+    l4: Option<Box<L4FlowPerfTable>>,
 
     // TODO perf 重构完成后会去掉
     // TODO after finish perf remake  will remove
@@ -627,6 +627,8 @@ impl FlowLog {
     }
 
     pub fn new(
+        l4_enabled: bool,
+        l7_enabled: bool,
         // TODO rrt cache 重构完成后会去掉
         rrt_cache: Rc<RefCell<L7RrtCache>>,
         perf_cache: Rc<RefCell<L7PerfCache>>,
@@ -636,18 +638,27 @@ impl FlowLog {
         counter: Arc<FlowPerfCounter>,
         server_port: u16,
     ) -> Option<Self> {
-        let l4 = match l4_proto {
-            L4Protocol::Tcp => L4FlowPerfTable::Tcp(Box::new(TcpPerf::new(counter))),
-            L4Protocol::Udp => L4FlowPerfTable::Udp(UdpPerf::new()),
-            _ => {
-                return None;
+        let l4 = if l4_enabled {
+            match l4_proto {
+                L4Protocol::Tcp => Some(L4FlowPerfTable::Tcp(Box::new(TcpPerf::new(counter)))),
+                L4Protocol::Udp => Some(L4FlowPerfTable::Udp(UdpPerf::new())),
+                _ => None,
             }
+        } else {
+            None
         };
+        let l7 = if l7_enabled {
+            Self::l7_new(l7_protocol_enum.get_l7_protocol(), rrt_cache.clone())
+        } else {
+            None
+        };
+        if l4.is_none() && l7.is_none() {
+            return None;
+        }
 
         Some(Self {
-            l4,
-            l7: Self::l7_new(l7_protocol_enum.get_l7_protocol(), rrt_cache.clone())
-                .map(|o| Box::new(o)),
+            l4: l4.map(|o| Box::new(o)),
+            l7: l7.map(|o| Box::new(o)),
             l7_protocol_log_parser: get_parser(l7_protocol_enum).map(|o| Box::new(o)),
             rrt_cache,
             perf_cache,
@@ -666,7 +677,7 @@ impl FlowLog {
         packet: &mut MetaPacket,
         is_first_packet_direction: bool,
         flow_id: u64,
-        l4_performance_enabled: bool,
+        _: bool,
         l7_performance_enabled: bool,
         l7_log_parse_enabled: bool,
         app_table: &mut AppTable,
@@ -674,8 +685,8 @@ impl FlowLog {
         remote_epc: i32,
         checker: &L7ProtocolChecker,
     ) -> Result<(Vec<L7ProtocolInfo>, u64)> {
-        if l4_performance_enabled {
-            self.l4.parse(packet, is_first_packet_direction)?;
+        if let Some(l4) = self.l4.as_mut() {
+            l4.parse(packet, is_first_packet_direction)?;
         }
 
         if l7_performance_enabled || l7_log_parse_enabled {
@@ -700,12 +711,14 @@ impl FlowLog {
         &mut self,
         flow_reversed: bool,
         l7_timeout_count: u32,
-        l4_performance_enabled: bool,
+        _: bool,
         l7_performance_enabled: bool,
     ) -> Option<FlowPerfStats> {
         let mut stats = None;
-        if l4_performance_enabled && self.l4.data_updated() {
-            stats.replace(self.l4.copy_and_reset_data(flow_reversed));
+        if let Some(l4) = self.l4.as_mut() {
+            if l4.data_updated() {
+                stats.replace(l4.copy_and_reset_data(flow_reversed));
+            }
         }
 
         if l7_performance_enabled {
