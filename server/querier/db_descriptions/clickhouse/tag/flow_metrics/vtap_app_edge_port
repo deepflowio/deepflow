@@ -58,4 +58,4 @@ tap_port                   , tap_port                  , tap_port               
 tap_port_name              , tap_port_name             , tap_port_name             , string        ,                        , Capture Info    , 111
 tap_port_type              , tap_port_type             , tap_port_type             , int_enum      , tap_port_type          , Capture Info    , 111
 tap_side                   , tap_side                  , tap_side                  , string_enum   , tap_side               , Capture Info    , 111
-signal_source              , signal_source             , signal_source             , int_enum      , app_signal_source      , Capture Info    , 111
+signal_source              , signal_source             , signal_source             , int_enum      , l7_signal_source      , Capture Info    , 111
