@@ -28,6 +28,9 @@ resource_gl1_type          , resource_gl1_type_0       , resource_gl1_type_1    
 resource_gl1               , resource_gl1_0            , resource_gl1_1            , resource      ,                        , Universal Tag   , 111
 resource_gl2_type          , resource_gl2_type_0       , resource_gl2_type_1       , int_enum      , resource_gl2_type      , Universal Tag   , 111
 resource_gl2               , resource_gl2_0            , resource_gl2_1            , resource      ,                        , Universal Tag   , 111
+tap_port_host              , tap_port_host             , tap_port_host             , resource      ,                        , Universal Tag   , 111
+tap_port_chost             , tap_port_chost            , tap_port_chost            , resource      ,                        , Universal Tag   , 111
+tap_port_pod_node          , tap_port_pod_node         , tap_port_pod_node         , resource      ,                        , Universal Tag   , 111
 
 labels                     , labels_0                  , labels_1                  , map           ,                        , K8s Labels      , 111
 

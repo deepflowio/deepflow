@@ -28,6 +28,9 @@ resource_gl1_type          , Type - K8s Workload First     ,
 resource_gl1               , Instance - K8s Workload First ,
 resource_gl2_type          , Type - K8s Service First      ,
 resource_gl2               , Instance - K8s Service First  ,
+tap_port_host              , Tap Port Host                 ,
+tap_port_chost             , Tap Port Cloud Host           ,
+tap_port_pod_node          , Tap Port K8s Node             ,
 
 labels                     , K8s Labels                    ,
 

@@ -30,6 +30,9 @@ resource_gl1_type     , 类型-工作负载优先            ,
 resource_gl1          , 资源-工作负载优先            ,
 resource_gl2_type     , 类型-服务优先                ,
 resource_gl2          , 资源-服务优先                ,
+tap_port_host         , 采集网卡所属宿主机            ,
+tap_port_chost        , 采集网卡所属云服务器           ,
+tap_port_pod_node     , 采集网卡所属容器节点           ,
 
 labels                , K8s Labels                   ,
 
