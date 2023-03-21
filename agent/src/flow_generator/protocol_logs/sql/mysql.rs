@@ -287,7 +287,7 @@ impl MysqlLog {
         )
         .into_owned();
         remain -= server_version_pos as usize;
-        if remain < THREAD_ID_LEN {
+        if remain < THREAD_ID_LEN + 1 {
             return Err(Error::MysqlLogParseFailed);
         }
         let thread_id_offset = THREAD_ID_OFFSET_B + server_version_pos + 1;
