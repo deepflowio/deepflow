@@ -15,6 +15,7 @@ RUN --mount=target=/tmp-mount \
     --no-install-suggests  --no-install-recommends -y \
     tzdata \
     iproute2 \ 
+    bridge-utils \
     busybox && \
     /bin/cp /usr/share/zoneinfo/${DEFAULT_TZ} /etc/localtime && \
     AGENT_BUILD_ARCH=$(echo ${TARGETARCH}|sed 's|amd64|x86_64|'|sed 's|arm64|aarch64|') && \
