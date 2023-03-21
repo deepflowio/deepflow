@@ -546,7 +546,8 @@ impl Stash {
                 Ipv4Addr::UNSPECIFIED.into()
             }
         } else if ep == FLOW_METRICS_PEER_SRC {
-            if flow.flow_metrics_peers[0].l3_epc_id > 0 {
+            if flow.flow_metrics_peers[0].l3_epc_id > 0 || flow.signal_source == SignalSource::OTel
+            {
                 flow.flow_metrics_peers[0].nat_real_ip
             } else {
                 if is_ipv6 {
@@ -556,7 +557,8 @@ impl Stash {
                 }
             }
         } else {
-            if flow.flow_metrics_peers[1].l3_epc_id > 0 {
+            if flow.flow_metrics_peers[1].l3_epc_id > 0 || flow.signal_source == SignalSource::OTel
+            {
                 flow.flow_metrics_peers[1].nat_real_ip
             } else {
                 if is_ipv6 {
@@ -676,17 +678,22 @@ impl Stash {
                 }
             } else {
                 // After enabling the storage of inactive IP addresses,
-                // the Internet IP address also needs to be saved as 0
+                // the Internet IP address also needs to be saved as 0,
+                // except for otel data
                 // =======================================
-                // 开启存储非活跃IP后，Internet IP也需要存0
-                if flow.flow_metrics_peers[0].l3_epc_id <= 0 {
+                // 开启存储非活跃IP后，Internet IP也需要存0, otel数据除外
+                if flow.flow_metrics_peers[0].l3_epc_id <= 0
+                    && flow.signal_source != SignalSource::OTel
+                {
                     src_ip = if is_ipv6 {
                         Ipv6Addr::UNSPECIFIED.into()
                     } else {
                         Ipv4Addr::UNSPECIFIED.into()
                     };
                 }
-                if flow.flow_metrics_peers[1].l3_epc_id <= 0 {
+                if flow.flow_metrics_peers[1].l3_epc_id <= 0
+                    && flow.signal_source != SignalSource::OTel
+                {
                     dst_ip = if is_ipv6 {
                         Ipv6Addr::UNSPECIFIED.into()
                     } else {
