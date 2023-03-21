@@ -805,10 +805,10 @@ vtap_group_id: g-xxxxxx
   ## L4 Packet Sequence ##
   ########################
   ## Block Size
-  ## Default: 64. Unit: Byte.
+  ## Default: 256. Unit: Byte.
   ## Note: When generating TCP header data, each flow uses one block to compress and
   ##   store multiple TCP headers, and the block size can be set here.
-  #packet-sequence-block-size: 64
+  #packet-sequence-block-size: 256
 
   ## Queue Size of PacketSequence Output
   ## Default: 65536. Range: [65536, +oo)
