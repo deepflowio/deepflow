@@ -33,9 +33,6 @@ auto_instance              , 资源-容器 POD 优先         , IP 对应的实�
 auto_service_type          , 类型-服务优先              , `auto_service`实例对应的类型。
 auto_service               , 资源-服务优先              , 在`auto_instance`基础上，将容器服务的 ClusterIP 与工作负载聚合为服务。
 gprocess                   , 进程                       ,
-tap_port_host              , 采集网卡所属宿主机           ,
-tap_port_chost             , 采集网卡所属云服务器         ,
-tap_port_pod_node          , 采集网卡所属容器节点         ,
 
 k8s.label                  , K8s Label                  ,
 cloud.tag                  , Cloud Tag                  ,
