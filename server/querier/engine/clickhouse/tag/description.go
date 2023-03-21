@@ -569,7 +569,13 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 
 		case "vtap":
 			sql = fmt.Sprintf("SELECT id AS value, name AS display_name FROM vtap_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
-
+		case common.TAP_PORT_HOST, common.TAP_PORT_CHOST, common.TAP_PORT_POD_NODE:
+			if whereSql != "" {
+				whereSql += fmt.Sprintf(" AND device_type=%d", TAP_PORT_DEVICE_MAP[tag])
+			} else {
+				whereSql = fmt.Sprintf(" WHERE device_type=%d", TAP_PORT_DEVICE_MAP[tag])
+			}
+			sql = fmt.Sprintf("SELECT device_id AS value, device_name AS display_name FROM vtap_port_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		default:
 			if strings.HasPrefix(tag, "label.") {
 				labelTag := strings.TrimPrefix(tag, "label.")
@@ -634,6 +640,13 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM vtap_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		} else if tag == "lb_listener" {
 			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM lb_listener_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+		} else if tag == common.TAP_PORT_HOST || tag == common.TAP_PORT_CHOST || tag == common.TAP_PORT_POD_NODE {
+			if whereSql != "" {
+				whereSql += fmt.Sprintf(" AND device_type=%d", TAP_PORT_DEVICE_MAP[tag])
+			} else {
+				whereSql = fmt.Sprintf(" WHERE device_type=%d", TAP_PORT_DEVICE_MAP[tag])
+			}
+			sql = fmt.Sprintf("SELECT device_id AS value, device_name AS display_name FROM vtap_port_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		} else if tag == "pod_ingress" {
 			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM pod_ingress_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		} else if strings.HasPrefix(tag, "label.") {
