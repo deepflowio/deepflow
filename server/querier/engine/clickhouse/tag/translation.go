@@ -35,6 +35,11 @@ var DEVICE_MAP = map[string]int{
 	"lb":          VIF_DEVICE_TYPE_LB,
 	"natgw":       VIF_DEVICE_TYPE_NAT_GATEWAY,
 }
+var TAP_PORT_DEVICE_MAP = map[string]int{
+	common.TAP_PORT_HOST:     VIF_DEVICE_TYPE_HOST,
+	common.TAP_PORT_CHOST:    VIF_DEVICE_TYPE_VM,
+	common.TAP_PORT_POD_NODE: VIF_DEVICE_TYPE_POD_NODE,
+}
 
 func GenerateTagResoureMap() map[string]map[string]*Tag {
 	tagResourceMap := make(map[string]map[string]*Tag)
@@ -912,5 +917,23 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"",
 			"",
 		)}
+	for tapPortResource, deviceTypeValue := range TAP_PORT_DEVICE_MAP {
+		tapPortResourceID := tapPortResource + "_id"
+		deviceTypeValueStr := strconv.Itoa(deviceTypeValue)
+		tagResourceMap[tapPortResource] = map[string]*Tag{
+			"default": NewTag(
+				"",
+				"",
+				"(toUInt64(vtap_id),toUInt64(tap_port)) IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type="+deviceTypeValueStr+" AND device_name %s %s)",
+				"(toUInt64(vtap_id),toUInt64(tap_port)) IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type="+deviceTypeValueStr+" AND %s(device_name,%s))",
+			)}
+		tagResourceMap[tapPortResourceID] = map[string]*Tag{
+			"default": NewTag(
+				"",
+				"",
+				"(toUInt64(vtap_id),toUInt64(tap_port)) IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type="+deviceTypeValueStr+" AND device_id %s %s)",
+				"",
+			)}
+	}
 	return tagResourceMap
 }
