@@ -219,7 +219,8 @@ func (w *ExtMetricsWriter) WriteBatch(batch []interface{}) {
 		atomic.AddInt64(&w.counter.WriteErr, 1)
 		return
 	}
-	w.flowTagWriter.WriteFieldsAndFieldValues(extMetrics.GenerateNewFlowTags(w.flowTagWriter.Cache.FieldCache, w.flowTagWriter.Cache.FieldValueCache))
+	w.flowTagWriter.WriteFieldsAndFieldValues(extMetrics.GenerateNewFlowTags(
+		w.flowTagWriter.Cache.FieldCache, w.flowTagWriter.Cache.FieldValueCache, w.flowTagWriter.Cache.CacheFlushTimeout))
 
 	atomic.AddInt64(&w.counter.MetricsCount, int64(len(batch)))
 	ckwriter.Put(batch...)
@@ -235,7 +236,8 @@ func (w *ExtMetricsWriter) Write(m *ExtMetrics) {
 		return
 	}
 	atomic.AddInt64(&w.counter.MetricsCount, 1)
-	w.flowTagWriter.WriteFieldsAndFieldValues(m.GenerateNewFlowTags(w.flowTagWriter.Cache.FieldCache, w.flowTagWriter.Cache.FieldValueCache))
+	w.flowTagWriter.WriteFieldsAndFieldValues(m.GenerateNewFlowTags(
+		w.flowTagWriter.Cache.FieldCache, w.flowTagWriter.Cache.FieldValueCache, w.flowTagWriter.Cache.CacheFlushTimeout))
 	ckwriter.Put(m)
 }
 
@@ -275,6 +277,6 @@ func NewExtMetricsWriter(
 	if err := writer.InitDatabase(); err != nil {
 		return nil, err
 	}
-	common.RegisterCountableForIngester("ext_metrics_writer", writer, stats.OptionStatTags{"msg": msgType.String(), "decoder-index": strconv.Itoa(decoderIndex)})
+	common.RegisterCountableForIngester("ext_metrics_writer", writer, stats.OptionStatTags{"msg": msgType.String(), "decoder_index": strconv.Itoa(decoderIndex)})
 	return writer, nil
 }
