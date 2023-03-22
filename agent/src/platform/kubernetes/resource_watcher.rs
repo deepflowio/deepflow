@@ -705,6 +705,7 @@ impl Trimmable for Service {
             name: self.metadata.name.take(),
             namespace: self.metadata.namespace.take(),
             annotations: self.metadata.annotations.take(),
+            labels: self.metadata.labels.take(),
             ..Default::default()
         };
 
