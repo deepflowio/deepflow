@@ -215,7 +215,8 @@ message IoEventData {
 }
 
 enum EventType {
-    IoEvent = 0;
+    OtherEvent = 0;
+    IoEvent = 1;
 }
 
 message ProcEvent {
