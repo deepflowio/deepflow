@@ -28,3 +28,9 @@ const (
 	RESOURCE_NUM_EXCEEDED           = "RESOURCE_NUM_EXCEEDED"
 	SELECTED_RESOURCES_NUM_EXCEEDED = "SELECTED_RESOURCES_NUM_EXCEEDED"
 )
+
+const (
+	TAP_PORT_HOST     = "tap_port_host"
+	TAP_PORT_CHOST    = "tap_port_chost"
+	TAP_PORT_POD_NODE = "tap_port_pod_node"
+)
