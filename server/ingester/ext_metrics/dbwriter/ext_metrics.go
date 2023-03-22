@@ -19,6 +19,7 @@ package dbwriter
 import (
 	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
+	"github.com/deepflowio/deepflow/server/libs/lru"
 	"github.com/deepflowio/deepflow/server/libs/pool"
 	"github.com/deepflowio/deepflow/server/libs/zerodoc"
 )
@@ -111,8 +112,8 @@ func (m *ExtMetrics) GenCKTable(cluster, storagePolicy string, ttl int, coldStor
 	}
 }
 
-// Check if there is a TagName/TagValue/MetricsName not in fieldMap or fieldValueMap, and return the newly appeared item.
-func (m *ExtMetrics) GenerateNewFlowTags(fieldMap, fieldValueMap map[flow_tag.FlowTagInfo]*flow_tag.FlowTag) ([]interface{}, []interface{}) {
+// Check if there is a TagName/TagValue/MetricsName not in fieldCache or fieldValueCache, and return the newly appeared item.
+func (m *ExtMetrics) GenerateNewFlowTags(fieldCache, fieldValueCache *lru.Cache, cacheFlushTimeout uint32) ([]interface{}, []interface{}) {
 	tableName := m.TableName
 	if m.VirtualTableName != "" {
 		tableName = m.VirtualTableName
@@ -120,31 +121,52 @@ func (m *ExtMetrics) GenerateNewFlowTags(fieldMap, fieldValueMap map[flow_tag.Fl
 
 	for i, name := range m.TagNames {
 		tagFieldValue := flow_tag.NewTagFieldValue(m.Timestamp, m.Database, tableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldTag, name, m.TagValues[i])
-		if _, ok := fieldValueMap[tagFieldValue.FlowTagInfo]; ok {
-			tagFieldValue.Release()
-			// If there is no new fieldValue, of course there will be no new field.
-			// So we can just skip the rest of the process in the loop.
-			continue
+		if ele, ok := fieldValueCache.Get(tagFieldValue.FlowTagInfo); ok {
+			v, _ := ele.(*uint32)
+			if *v+cacheFlushTimeout >= m.Timestamp {
+				tagFieldValue.Release()
+				// If there is no new fieldValue, of course there will be no new field.
+				// So we can just skip the rest of the process in the loop.
+				continue
+			} else {
+				*v = m.Timestamp
+			}
+		} else {
+			v := m.Timestamp
+			fieldValueCache.Add(tagFieldValue.FlowTagInfo, &v)
 		}
-		fieldValueMap[tagFieldValue.FlowTagInfo] = tagFieldValue
 		m.fieldValues = append(m.fieldValues, tagFieldValue)
 
 		tagField := flow_tag.NewTagField(m.Timestamp, m.Database, tableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldTag, name)
-		if _, ok := fieldMap[tagField.FlowTagInfo]; ok {
-			tagField.Release()
-			continue
+		if ele, ok := fieldCache.Get(tagField.FlowTagInfo); ok {
+			v, _ := ele.(*uint32)
+			if *v+cacheFlushTimeout >= m.Timestamp {
+				tagField.Release()
+				continue
+			} else {
+				*v = m.Timestamp
+			}
+		} else {
+			v := m.Timestamp
+			fieldCache.Add(tagField.FlowTagInfo, &v)
 		}
-		fieldMap[tagField.FlowTagInfo] = tagField
 		m.fields = append(m.fields, tagField)
 	}
 
 	for _, name := range m.MetricsFloatNames {
 		tagField := flow_tag.NewTagField(m.Timestamp, m.Database, tableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldMetrics, name)
-		if _, ok := fieldMap[tagField.FlowTagInfo]; ok {
-			tagField.Release()
-			continue
+		if ele, ok := fieldCache.Get(tagField.FlowTagInfo); ok {
+			v, _ := ele.(*uint32)
+			if *v+cacheFlushTimeout >= m.Timestamp {
+				tagField.Release()
+				continue
+			} else {
+				*v = m.Timestamp
+			}
+		} else {
+			v := m.Timestamp
+			fieldCache.Add(tagField.FlowTagInfo, &v)
 		}
-		fieldMap[tagField.FlowTagInfo] = tagField
 		m.fields = append(m.fields, tagField)
 	}
 
