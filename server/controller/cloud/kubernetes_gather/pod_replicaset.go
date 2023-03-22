@@ -85,7 +85,7 @@ func (k *KubernetesGather) getReplicaSetsAndReplicaSetControllers() (podRSs []mo
 				rscLcuuidsSet.Add(uID)
 				k.nsLabelToGroupLcuuids[namespace+label] = rscLcuuidsSet
 			}
-			mLabels := rData.Get("spec").Get("selector").Get("matchLabels").MustMap()
+			mLabels := rData.GetPath("spec", "template", "metadata", "labels").MustMap()
 			for key, v := range mLabels {
 				nsLabel := namespace + key + "_" + v.(string)
 				_, ok := k.nsLabelToGroupLcuuids[nsLabel]
