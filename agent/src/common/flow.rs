@@ -682,8 +682,9 @@ impl FlowMetricsPeer {
         self.l3_byte_count += other.l3_byte_count;
         self.l4_byte_count += other.l4_byte_count;
         self.packet_count += other.packet_count;
-        self.total_byte_count += other.total_byte_count;
-        self.total_packet_count += other.total_packet_count;
+
+        self.total_byte_count = other.total_byte_count;
+        self.total_packet_count = other.total_packet_count;
         self.first = other.first;
         self.last = other.last;
 
