@@ -71,6 +71,10 @@ func L7FlowLogToExportRequest(l7 *log_data.L7FlowLog, universalTagsManager *Univ
 	putIntWithoutZero(spanAttrs, "df.span.syscall_thread_1", int64(l7.SyscallThread1))
 	putIntWithoutZero(spanAttrs, "df.span.syscall_cap_seq_0", int64(l7.SyscallCapSeq0))
 	putIntWithoutZero(spanAttrs, "df.span.syscall_cap_seq_1", int64(l7.SyscallCapSeq1))
+	putIntWithoutZero(spanAttrs, "df.span.req_tcp_seq", int64(l7.ReqTcpSeq))
+	putIntWithoutZero(spanAttrs, "df.span.resp_tcp_seq", int64(l7.RespTcpSeq))
+	msgType := datatype.LogMessageType(l7.Type)
+	putStrWithoutEmpty(spanAttrs, "df.span.type", strings.ToLower(msgType.String()))
 
 	putStrWithoutEmpty(spanAttrs, "df.span.app_service", l7.AppService)
 	putStrWithoutEmpty(spanAttrs, "df.span.app_instance", l7.AppInstance)
@@ -97,6 +101,7 @@ func L7FlowLogToExportRequest(l7 *log_data.L7FlowLog, universalTagsManager *Univ
 	putStrWithoutEmpty(resAttrs, "df.capture_info.tap_port", datatype.TapPort(l7.TapPort).String())
 	putStrWithoutEmpty(resAttrs, "df.capture_info.tap_port_type", tapPortTypeToString(l7.TapPortType))
 	putStrWithoutEmpty(resAttrs, "df.capture_info.tap_side", l7.TapSide)
+	putStrWithoutEmpty(resAttrs, "df.capture_info.vtap", tags0.Vtap)
 
 	resAttrs.PutBool("df.network.is_ipv4", l7.IsIPv4)
 	resAttrs.PutBool("df.network.is_internet_0", l7.L3EpcID0 == datatype.EPC_FROM_INTERNET)
