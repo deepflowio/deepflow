@@ -3,7 +3,6 @@ package flow_tag
 import (
 	"fmt"
 	"strconv"
-	"time"
 
 	logging "github.com/op/go-logging"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/config"
 	"github.com/deepflowio/deepflow/server/ingester/pkg/ckwriter"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
+	"github.com/deepflowio/deepflow/server/libs/lru"
 	"github.com/deepflowio/deepflow/server/libs/stats"
 	"github.com/deepflowio/deepflow/server/libs/utils"
 )
@@ -44,21 +44,15 @@ type FlowTagWriter struct {
 }
 
 type FlowTagCache struct {
-	FieldCache, FieldValueCache map[FlowTagInfo]*FlowTag
-
-	lastFieldFlushTime, lastFieldValueFlushTime int64
-	cacheFlushTimeout                           int64
-	cacheMaxSize                                int
+	FieldCache, FieldValueCache *lru.Cache
+	CacheFlushTimeout           uint32
 }
 
 func NewFlowTagCache(cacheFlushTimeout, cacheMaxSize uint32) *FlowTagCache {
 	return &FlowTagCache{
-		FieldCache:              make(map[FlowTagInfo]*FlowTag, FLOW_TAG_CACHE_INIT_SIZE),
-		FieldValueCache:         make(map[FlowTagInfo]*FlowTag, FLOW_TAG_CACHE_INIT_SIZE),
-		lastFieldFlushTime:      time.Now().Unix(),
-		lastFieldValueFlushTime: time.Now().Unix(),
-		cacheFlushTimeout:       int64(cacheFlushTimeout),
-		cacheMaxSize:            int(cacheMaxSize),
+		FieldCache:        lru.NewCache(int(cacheMaxSize)),
+		FieldValueCache:   lru.NewCache(int(cacheMaxSize)),
+		CacheFlushTimeout: cacheFlushTimeout,
 	}
 }
 
@@ -98,7 +92,7 @@ func NewFlowTagWriter(
 		w.ckwriters[tagType].Run()
 	}
 
-	common.RegisterCountableForIngester("flow_tag_writer", w, stats.OptionStatTags{"type": name, "decoder-index": strconv.Itoa(decoderIndex)})
+	common.RegisterCountableForIngester("flow_tag_writer", w, stats.OptionStatTags{"type": name, "decoder_index": strconv.Itoa(decoderIndex)})
 	return w, nil
 }
 
@@ -122,7 +116,7 @@ func (w *FlowTagWriter) WriteFieldsAndFieldValues(fields, fieldValues []interfac
 func (w *FlowTagWriter) GetCounter() interface{} {
 	var counter *Counter
 	counter, w.counter = w.counter, &Counter{}
-	counter.FieldCacheCount = int64(len(w.Cache.FieldCache))
-	counter.FieldValueCacheCount = int64(len(w.Cache.FieldValueCache))
+	counter.FieldCacheCount = int64(w.Cache.FieldCache.Len())
+	counter.FieldValueCacheCount = int64(w.Cache.FieldValueCache.Len())
 	return counter
 }

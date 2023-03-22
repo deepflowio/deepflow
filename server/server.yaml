@@ -195,7 +195,7 @@ querier:
     timeout: 60
     max-connection: 20
     # user-password:
-  
+
   # deepflow-app相关配置
   deepflow-app:
     host: deepflow-app
@@ -419,12 +419,12 @@ ingester:
 
   #event-decoder-queue-count: 2
   #event-decoder-queue-size: 10000
-  
+
   ## unit: byte
   #flow-tag-cache-max-size: 262144
 
   ## unit: s
-  #flow-tag-cache-flush-timeout: 600
+  #flow-tag-cache-flush-timeout: 1800
 
   ## export to OTLP collector, now only support protocol 'grpc'
   #otlp-exporter:
