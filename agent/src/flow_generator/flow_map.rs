@@ -126,6 +126,8 @@ pub struct FlowMap {
 }
 
 impl FlowMap {
+    const MINUTE: Duration = Duration::from_secs(60);
+
     pub fn new(
         id: u32,
         output_queue: DebugSender<Box<TaggedFlow>>,
@@ -1494,6 +1496,12 @@ impl FlowMap {
                     )
                     .map(|o| Box::new(o))
                 });
+            }
+            let current_minute = Timestamp::from_nanos(
+                (timestamp.as_nanos() / Self::MINUTE.as_nanos() * Self::MINUTE.as_nanos()) as u64,
+            );
+            if flow.flow_stat_time < current_minute {
+                flow.flow_stat_time = current_minute;
             }
             self.push_to_flow_stats_queue(config, node.tagged_flow.clone());
             node.reset_flow_stat_info();
