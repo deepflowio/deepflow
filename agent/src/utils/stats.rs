@@ -18,15 +18,13 @@ use std::fmt;
 use std::io;
 use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
 use std::sync::{
-    atomic::{AtomicU16, AtomicU32, AtomicU64, Ordering},
+    atomic::{AtomicU32, AtomicU64, Ordering},
     Arc, Condvar, Mutex,
 };
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use cadence::{
-    Counted, Metric, MetricBuilder, MetricError, MetricResult, MetricSink, StatsdClient,
-};
+use cadence::{Metric, MetricBuilder, MetricError, MetricResult, MetricSink, StatsdClient};
 use log::{debug, info, warn};
 use prost::Message;
 
@@ -139,8 +137,6 @@ impl Sendable for ArcBatch {
 pub struct Collector {
     hostname: Arc<Mutex<String>>,
 
-    remote: Arc<Mutex<Option<String>>>,
-    remote_port: Arc<AtomicU16>,
     sources: Arc<Mutex<Vec<Source>>>,
     pre_hooks: Arc<Mutex<Vec<Box<dyn FnMut() + Send>>>>,
 
@@ -154,16 +150,11 @@ pub struct Collector {
 }
 
 impl Collector {
-    pub fn new<S: AsRef<str>>(hostname: S, remote: String, port: u16) -> Self {
-        Self::with_min_interval(hostname, remote, port, TICK_CYCLE)
+    pub fn new<S: AsRef<str>>(hostname: S) -> Self {
+        Self::with_min_interval(hostname, TICK_CYCLE)
     }
 
-    pub fn with_min_interval<S: AsRef<str>>(
-        hostname: S,
-        remote: String,
-        port: u16,
-        interval: Duration,
-    ) -> Self {
+    pub fn with_min_interval<S: AsRef<str>>(hostname: S, interval: Duration) -> Self {
         let (stats_queue_sender, stats_queue_receiver, counter) = bounded(1000);
         let min_interval = if interval <= TICK_CYCLE {
             TICK_CYCLE
@@ -175,8 +166,6 @@ impl Collector {
         };
         let s = Self {
             hostname: Arc::new(Mutex::new(hostname.as_ref().to_owned())),
-            remote: Arc::new(Mutex::new(Some(remote))),
-            remote_port: Arc::new(AtomicU16::new(port)),
             sources: Arc::new(Mutex::new(vec![])),
             pre_hooks: Arc::new(Mutex::new(vec![])),
             min_interval: Arc::new(AtomicU64::new(min_interval.as_secs())),
@@ -257,12 +246,6 @@ impl Collector {
         self.pre_hooks.lock().unwrap().push(hook);
     }
 
-    pub fn set_remote(&self, remote: String, port: u16) {
-        info!("stats {} {}", &remote, port);
-        self.remote.lock().unwrap().replace(remote);
-        self.remote_port.store(port, Ordering::Relaxed);
-    }
-
     pub fn set_hostname(&self, hostname: String) {
         *self.hostname.lock().unwrap() = hostname;
     }
@@ -310,8 +293,6 @@ impl Collector {
             *started = true;
         }
 
-        let remote = self.remote.clone();
-        let remote_port = self.remote_port.clone();
         let running = self.running.clone();
         let sources = self.sources.clone();
         let pre_hooks = self.pre_hooks.clone();
@@ -322,103 +303,42 @@ impl Collector {
             thread::Builder::new()
                 .name("stats-collector".to_owned())
                 .spawn(move || {
-                    let mut statsd_client: Option<StatsdClient> = None;
-                    let mut old_remote = String::new();
                     loop {
                         let host = hostname.lock().unwrap().clone();
-                        // for early exit
-                        loop {
-                            {
-                                pre_hooks.lock().unwrap().iter_mut().for_each(|hook| hook());
-                            }
+                        {
+                            pre_hooks.lock().unwrap().iter_mut().for_each(|hook| hook());
+                        }
 
-                            let now = SystemTime::now();
-                            let mut batches = vec![];
-                            {
-                                let mut sources = sources.lock().unwrap();
-                                let min_interval_loaded = min_interval.load(Ordering::Relaxed);
-                                // TODO: use Vec::retain_mut after stablize in rust 1.61.0
-                                sources.retain(|s| !s.countable.closed());
-                                for source in sources.iter_mut() {
-                                    source.skip -= 1;
-                                    if source.skip > 0 {
-                                        continue;
-                                    }
-                                    source.skip =
-                                        (source.interval.as_secs().max(min_interval_loaded)
-                                            / TICK_CYCLE.as_secs())
-                                            as i64;
-                                    let points = source.countable.get_counters();
-                                    if !points.is_empty() {
-                                        let batch = Arc::new(Batch {
-                                            module: source.module,
-                                            hostname: host.clone(),
-                                            tags: source.tags.clone(),
-                                            points,
-                                            timestamp: now,
-                                        });
-                                        if let Err(_) = sender.send(ArcBatch(batch.clone())) {
-                                            debug!(
+                        let now = SystemTime::now();
+                        {
+                            let mut sources = sources.lock().unwrap();
+                            let min_interval_loaded = min_interval.load(Ordering::Relaxed);
+                            // TODO: use Vec::retain_mut after stablize in rust 1.61.0
+                            sources.retain(|s| !s.countable.closed());
+                            for source in sources.iter_mut() {
+                                source.skip -= 1;
+                                if source.skip > 0 {
+                                    continue;
+                                }
+                                source.skip = (source.interval.as_secs().max(min_interval_loaded)
+                                    / TICK_CYCLE.as_secs())
+                                    as i64;
+                                let points = source.countable.get_counters();
+                                if !points.is_empty() {
+                                    let batch = Arc::new(Batch {
+                                        module: source.module,
+                                        hostname: host.clone(),
+                                        tags: source.tags.clone(),
+                                        points,
+                                        timestamp: now,
+                                    });
+                                    if let Err(_) = sender.send(ArcBatch(batch.clone())) {
+                                        debug!(
                                         "stats to send queue failed because queue have terminated"
                                     );
-                                        }
-                                        batches.push(batch);
                                     }
                                 }
                             }
-                            if batches.is_empty() {
-                                break;
-                            }
-
-                            let port = remote_port.load(Ordering::Relaxed);
-                            match remote.lock().unwrap().take() {
-                                Some(remote) => {
-                                    statsd_client = None;
-                                    match Self::new_statsd_client((remote.clone(), port)) {
-                                        Ok(client) => statsd_client = Some(client),
-                                        Err(e) => {
-                                            warn!(
-                                                "create client to remote {}:{} failed: {}",
-                                                &remote, port, e
-                                            );
-                                        }
-                                    }
-                                    old_remote = remote;
-                                }
-                                None => {
-                                    if statsd_client.is_none() {
-                                        match Self::new_statsd_client((old_remote.clone(), port)) {
-                                            Ok(s) => {
-                                                statsd_client.replace(s);
-                                            }
-                                            Err(e) => warn!(
-                                                "create client to remote {}:{} failed: {}",
-                                                &old_remote, port, e
-                                            ),
-                                        }
-                                    }
-                                }
-                            }
-
-                            if statsd_client.is_none() {
-                                info!("no statsd remote available");
-                                break;
-                            }
-
-                            debug!("collected: {:?}", batches);
-                            let client = statsd_client.as_ref().unwrap();
-                            for batch in batches.into_iter() {
-                                for point in batch.points.iter() {
-                                    let metric_name =
-                                        format!("{}_{}", batch.module, point.0).replace("-", "_");
-                                    // use counted for gauged fields for compatibility
-                                    // will cause problem if counted fields in buffer not reset before next point
-                                    let b = client.count_with_tags(&metric_name, point.2);
-                                    Self::send_metrics(b, &host, &batch.tags);
-                                }
-                            }
-
-                            break;
                         }
 
                         let (running, timer) = &*running;

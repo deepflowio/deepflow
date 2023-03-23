@@ -1905,7 +1905,7 @@ pub fn _new_flow_map_and_receiver(
         }),
         None,
         Some(packet_sequence_queue), // Enterprise Edition Feature: packet-sequence
-        &stats::Collector::new("", "127.0.0.1".to_string(), 30033),
+        &stats::Collector::new(""),
         false,
     );
     #[cfg(target_os = "windows")]
