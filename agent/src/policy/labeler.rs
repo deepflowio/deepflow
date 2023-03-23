@@ -16,7 +16,10 @@
 
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
-use std::sync::{Arc, RwLock};
+use std::sync::{
+    atomic::{AtomicI32, Ordering},
+    Arc, RwLock,
+};
 
 use super::bit::count_trailing_zeros32;
 use crate::common::decapsulate::TunnelInfo;
@@ -36,6 +39,7 @@ struct EpcIpKey {
 }
 
 pub struct Labeler {
+    local_epc: AtomicI32,
     // Interface表
     mac_table: RwLock<HashMap<u64, Arc<PlatformData>>>,
     epc_ip_table: RwLock<HashMap<EpcIpKey, Arc<PlatformData>>>,
@@ -52,6 +56,7 @@ pub struct Labeler {
 impl Default for Labeler {
     fn default() -> Self {
         Self {
+            local_epc: AtomicI32::new(EPC_FROM_INTERNET),
             mac_table: RwLock::new(HashMap::new()),
             epc_ip_table: RwLock::new(HashMap::new()),
             ip_netmask_table: RwLock::new(HashMap::new()),
@@ -79,6 +84,10 @@ fn is_unicast_mac(mac: u64) -> bool {
 }
 
 impl Labeler {
+    pub fn update_local_epc(&mut self, local_epc: i32) {
+        self.local_epc.store(local_epc, Ordering::Relaxed);
+    }
+
     fn update_mac_table(&mut self, interfaces: &Vec<Arc<PlatformData>>) {
         let mut mac_table = HashMap::new();
 
@@ -395,6 +404,13 @@ impl Labeler {
             l3_end,
             ..Default::default()
         };
+
+        // The loopback packet epc id is local epc id, and no query is required.
+        if ip.is_loopback() {
+            info.set_loopback(self.local_epc.load(Ordering::Relaxed));
+            return (info, false);
+        }
+
         // 如下场景无法直接查询隧道内层的MAC地址确定EPC：
         // 1. 腾讯TCE：使用GRE做隧道封装，内层没有MAC
         // 2. 使用VXLAN隧道但内层MAC已无法识别
