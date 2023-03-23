@@ -99,7 +99,7 @@ MAP_PERARRAY(trace_conf_map, __u32, struct trace_conf_t, 1)
 /*
  * 对各类map进行统计
  */
-MAP_PERARRAY(trace_stats_map, __u32, struct trace_stats, 1)
+MAP_ARRAY(trace_stats_map, __u32, struct trace_stats, 1)
 
 // key: protocol id, value: is protocol enabled, size: PROTO_NUM
 MAP_ARRAY(protocol_filter, int, int, PROTO_NUM)
@@ -154,8 +154,10 @@ static __inline void delete_socket_info(__u64 conn_key,
 	if (trace_stats == NULL)
 		return;
 
-	socket_info_map__delete(&conn_key);
-	trace_stats->socket_map_count--;
+	if (!socket_info_map__delete(&conn_key)) {
+		__sync_fetch_and_add(&trace_stats->
+				     socket_map_count, -1);
+	}
 }
 
 static __u32 __inline get_tcp_write_seq_from_fd(int fd)
@@ -849,6 +851,7 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 	 */
 
 	__u64 pre_trace_id = 0;
+	int ret;
 	if (is_socket_info_valid(socket_info_ptr) &&
 	    conn_info->direction == socket_info_ptr->direction &&
 	    conn_info->message_type == socket_info_ptr->msg_type) {
@@ -863,7 +866,7 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 			 * The following scenarios do not track:
 			 * ---------------------------------------
 			 *                 [traceID : 0]
-			 * (client-socket) request -> 
+			 * (client-socket) request ->
 			 *       |
 			 *     thread-ID
 			 *       |
@@ -872,15 +875,19 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 			if (trace_info_ptr->is_trace_id_zero &&
 			    conn_info->message_type == MSG_RESPONSE &&
 			    conn_info->infer_reliable) {
-				trace_map__delete(trace_key);
-				trace_stats->trace_map_count--;
+				if (!trace_map__delete(trace_key)) {
+					__sync_fetch_and_add(&trace_stats->
+							     trace_map_count,
+							     -1);
+				}
 				return;
 			}
 		}
 
 		struct trace_info_t trace_info = { 0 };
 		*thread_trace_id = trace_info.thread_trace_id =
-				(pre_trace_id == 0 ? ++trace_conf->thread_trace_id : pre_trace_id);
+		    (pre_trace_id ==
+		     0 ? ++trace_conf->thread_trace_id : pre_trace_id);
 		if (conn_info->message_type == MSG_REQUEST)
 			trace_info.peer_fd = conn_info->fd;
 		else if (conn_info->message_type == MSG_RESPONSE) {
@@ -890,9 +897,13 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 		}
 		trace_info.update_time = time_stamp / NS_PER_SEC;
 		trace_info.socket_id = socket_id;
-		trace_map__update(trace_key, &trace_info);
-		if (!trace_info_ptr)
-			trace_stats->trace_map_count++;
+		ret = trace_map__update(trace_key, &trace_info);
+		if (!trace_info_ptr) {
+			if (ret == 0) {
+				__sync_fetch_and_add(&trace_stats->
+						     trace_map_count, 1);
+			}
+		}
 	} else { /* direction == T_EGRESS */
 		if (trace_info_ptr) {
 			/*
@@ -901,8 +912,8 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 			 * (client-socket) request [traceID : 0] ->
 			 *        |
 			 *      thread-ID
-			 *	  |
-			 * 	(client-socket) request [traceID : 0] ->
+			 *        |
+			 *      (client-socket) request [traceID : 0] ->
 			 */
 			if (trace_info_ptr->is_trace_id_zero) {
 				return;
@@ -911,23 +922,29 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 			 * 追踪在不同socket之间进行，而对于在同一个socket的情况进行忽略。
 			 */
 			if (socket_id != trace_info_ptr->socket_id) {
-				*thread_trace_id = trace_info_ptr->thread_trace_id;
+				*thread_trace_id =
+				    trace_info_ptr->thread_trace_id;
 			}
 
-			trace_map__delete(trace_key);
-			trace_stats->trace_map_count--;
+			if (!trace_map__delete(trace_key)) {
+				__sync_fetch_and_add(&trace_stats->
+						     trace_map_count, -1);
+			}
 		} else {
 			/*
 			 * Record the scene below:
 			 * ------------------------------------------------
 			 * (client-socket) request [traceID : 0] ->
 			 */
-			if (conn_info->message_type == MSG_REQUEST) {
+			if (conn_info->message_type == MSG_REQUEST
+			    && conn_info->infer_reliable) {
 				struct trace_info_t trace_info = { 0 };
 				trace_info.is_trace_id_zero = true;
-				trace_info.update_time = time_stamp / NS_PER_SEC;
+				trace_info.update_time =
+				    time_stamp / NS_PER_SEC;
 				trace_map__update(trace_key, &trace_info);
-				trace_stats->trace_map_count++;
+				__sync_fetch_and_add(&trace_stats->
+						     trace_map_count, 1);
 			}
 		}
 	}
@@ -1035,9 +1052,11 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 			sk_info.uid = 0;
 		}
 
-		socket_info_map__update(&conn_key, &sk_info);
-		if (socket_info_ptr == NULL)
-			trace_stats->socket_map_count++;
+		int ret = socket_info_map__update(&conn_key, &sk_info);
+		if (socket_info_ptr == NULL && ret == 0) {
+			__sync_fetch_and_add(&trace_stats->
+                        	             socket_map_count, 1);
+		}
 	}
 
 	/*
@@ -1762,12 +1781,15 @@ TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx *ctx) {
 		sk_info.peer_fd = trace->peer_fd;
 		sk_info.trace_id = trace->thread_trace_id;	
 		__u64 conn_key = gen_conn_key_id(id >> 32, fd);
-		socket_info_map__update(&conn_key, &sk_info);
+		int ret = socket_info_map__update(&conn_key, &sk_info);
 		__u32 k0 = 0;
 		struct trace_stats *trace_stats = trace_stats_map__lookup(&k0);
 		if (trace_stats == NULL)
 			return 0;
-		trace_stats->socket_map_count++;
+		if (ret == 0) {
+			__sync_fetch_and_add(&trace_stats->
+					     socket_map_count, 1);
+		}
 	}
 
 	return 0;

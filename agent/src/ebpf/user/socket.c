@@ -36,9 +36,6 @@
 #include "socket_trace_bpf_5_2_plus.c"
 #include "socket_trace_bpf_kylin.c"
 
-static uint64_t socket_map_reclaim_count;	// socket map回收数量统计
-static uint64_t trace_map_reclaim_count;	// trace map回收数量统计
-
 static struct list_head events_list;	// Use for extra register events
 static pthread_t proc_events_pthread;	// Process exec/exit thread
 
@@ -106,7 +103,9 @@ static int socket_tracer_start(void);
 static int update_offsets_table(struct bpf_tracer *t,
 				struct bpf_offset_param *offset);
 static void datadump_process(void *data);
-
+static bool bpf_stats_map_update(struct bpf_tracer *tracer,
+				 int socket_num,
+				 int trace_num);
 static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 {
 	int index = 0, curr_idx;
@@ -355,9 +354,6 @@ static int socktrace_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
 	if (bpf_stats_map_collect(t, &stats_total)) {
 		params->kern_socket_map_used = stats_total.socket_map_count;
 		params->kern_trace_map_used = stats_total.trace_map_count;
-		// Calibrate map statistics
-		params->kern_socket_map_used -= socket_map_reclaim_count;
-		params->kern_trace_map_used -= trace_map_reclaim_count;
 	}
 
 	if (!bpf_offset_map_collect(t, array)) {
@@ -729,6 +725,37 @@ static void reader_lost_cb(void *t, uint64_t lost)
 	atomic64_add(&tracer->lost, lost);
 }
 
+static bool inline insert_list(void *elt,
+			       uint32_t len,
+			       struct list_head *h)
+{
+	struct clear_list_elem *cle;
+	cle = calloc(sizeof(*cle) + len, 1);
+	if (cle == NULL) {
+		ebpf_warning("calloc() failed.\n");
+		return false;
+	}
+	memcpy((void *)cle->p, (void *)elt, len);
+	list_add_tail(&cle->list, h);
+	return true;
+}
+
+static int inline __reclaim_map(int map_fd, struct list_head *h)
+{
+	int count = 0;
+	struct list_head *p, *n;
+	struct clear_list_elem *cle;
+	list_for_each_safe(p, n, h) {
+		cle = container_of(p, struct clear_list_elem, list);
+		if (!bpf_delete_elem(map_fd, (void *)cle->p))
+			count++;
+		list_head_del(&cle->list);
+		free(cle);
+	}
+
+	return count;
+}
+
 static void reclaim_trace_map(struct bpf_tracer *tracer, uint32_t timeout)
 {
 	struct ebpf_map *map =
@@ -744,15 +771,20 @@ static void reclaim_trace_map(struct bpf_tracer *tracer, uint32_t timeout)
 	uint32_t reclaim_count = 0;
 	struct trace_info_t value;
 	uint32_t uptime = get_sys_uptime();
+	uint32_t curr_trace_count = 0, limit;
+	limit = conf_max_trace_entries * RECLAIM_TRACE_MAP_SCALE;
+	struct list_head clear_elem_head;
+	init_list_head(&clear_elem_head);
 
 	while (bpf_get_next_key(map_fd, &trace_key, &next_trace_key) == 0) {
 		if (bpf_lookup_elem(map_fd, &next_trace_key, &value) == 0) {
-			if (uptime - value.update_time > timeout) {
-				bpf_delete_elem(map_fd, &next_trace_key);
-				reclaim_count++;
-				if (reclaim_count >= 
-				    (conf_max_trace_entries * RECLAIM_TRACE_MAP_SCALE)) {
-					break;
+			curr_trace_count++;
+			if (uptime - value.update_time > timeout &&
+			    reclaim_count < limit) {
+				if (insert_list(&next_trace_key,
+						sizeof(next_trace_key),
+						&clear_elem_head)) {
+					reclaim_count++;
 				}
 			}
 		}
@@ -760,9 +792,15 @@ static void reclaim_trace_map(struct bpf_tracer *tracer, uint32_t timeout)
 		trace_key = next_trace_key;
 	}
 
-	trace_map_reclaim_count += reclaim_count;
-	ebpf_info("[%s] trace map reclaim_count :%u\n", __func__,
-		  reclaim_count);
+	reclaim_count = __reclaim_map(map_fd, &clear_elem_head);
+	// The trace statistics map needs to be updated to reflect the count.	
+	curr_trace_count -= reclaim_count;
+	if (!bpf_stats_map_update(tracer, -1, curr_trace_count)) {
+		ebpf_warning("Update trace statistics failed.\n");
+	}
+
+	ebpf_info("[%s] curr_trace_count %u trace map reclaim_count :%u\n",
+		  __func__, curr_trace_count, reclaim_count);
 }
 
 static void reclaim_socket_map(struct bpf_tracer *tracer, uint32_t timeout)
@@ -780,24 +818,34 @@ static void reclaim_socket_map(struct bpf_tracer *tracer, uint32_t timeout)
 	struct socket_info_t value;
 	conn_key = 0;
 	uint32_t uptime = get_sys_uptime();
+	uint32_t curr_socket_count = 0;
+	struct list_head clear_elem_head;
+	init_list_head(&clear_elem_head);
 
 	while (bpf_get_next_key(map_fd, &conn_key, &next_conn_key) == 0) {
 		if (bpf_lookup_elem(map_fd, &next_conn_key, &value) == 0) {
-			if (uptime - value.update_time > timeout) {
-				bpf_delete_elem(map_fd, &next_conn_key);
-				sockets_reclaim_count++;
-				if (sockets_reclaim_count >=
-				    conf_socket_map_max_reclaim) {
-					break;
+			curr_socket_count++;
+			if ((uptime - value.update_time > timeout) &&
+			    (sockets_reclaim_count <
+				conf_socket_map_max_reclaim)) {
+				if (insert_list(&next_conn_key,
+						sizeof(next_conn_key),
+						&clear_elem_head)) {
+					sockets_reclaim_count++;
 				}
 			}
 		}
 		conn_key = next_conn_key;
 	}
 
-	socket_map_reclaim_count += sockets_reclaim_count;
-	ebpf_info("[%s] sockets_reclaim_count :%u\n", __func__,
-		  sockets_reclaim_count);
+	sockets_reclaim_count = __reclaim_map(map_fd, &clear_elem_head);
+	curr_socket_count -= sockets_reclaim_count;
+	if (!bpf_stats_map_update(tracer, curr_socket_count, -1)) {
+		ebpf_warning("Update trace statistics failed.\n");
+	}
+
+	ebpf_info("[%s] curr_socket_count %u sockets_reclaim_count :%u\n",
+		  __func__, curr_socket_count, sockets_reclaim_count);
 }
 
 static int check_map_exceeded(void)
@@ -813,9 +861,6 @@ static int check_map_exceeded(void)
 	if (bpf_stats_map_collect(t, &stats_total)) {
 		kern_socket_map_used = stats_total.socket_map_count;
 		kern_trace_map_used = stats_total.trace_map_count;
-		// Calibrate map statistics
-		kern_socket_map_used -= socket_map_reclaim_count;
-		kern_trace_map_used -= trace_map_reclaim_count;
 	}
 
 	if (kern_socket_map_used >= conf_socket_map_max_reclaim) {
@@ -1557,19 +1602,39 @@ static int socket_tracer_start(void)
 static bool bpf_stats_map_collect(struct bpf_tracer *tracer,
 				  struct trace_stats *stats_total)
 {
-	int nr_cpus = get_num_possible_cpus();
-	struct trace_stats values[nr_cpus];
-	memset(values, 0, sizeof(values));
-
-	if (!bpf_table_get_value(tracer, MAP_TRACE_STATS_NAME, 0, values))
+	struct trace_stats value = { 0 };
+	if (!bpf_table_get_value(tracer, MAP_TRACE_STATS_NAME,
+				 0, &value))
 		return false;
 
 	memset(stats_total, 0, sizeof(*stats_total));
+	stats_total->socket_map_count += value.socket_map_count;
+	stats_total->trace_map_count += value.trace_map_count;
 
-	int i;
-	for (i = 0; i < nr_cpus; i++) {
-		stats_total->socket_map_count += values[i].socket_map_count;
-		stats_total->trace_map_count += values[i].trace_map_count;
+	return true;
+}
+
+static bool bpf_stats_map_update(struct bpf_tracer *tracer,
+				 int socket_num,
+				 int trace_num)
+{
+	struct trace_stats value = { 0 };
+	if (!bpf_table_get_value(tracer, MAP_TRACE_STATS_NAME,
+				 0, &value))
+		return false;
+
+	if (socket_num != -1) {
+		value.socket_map_count = socket_num;
+	}
+
+	if (trace_num != -1) {
+		value.trace_map_count = trace_num;
+	}
+
+	if (!bpf_table_set_value(tracer,
+				 MAP_TRACE_STATS_NAME,
+				 0, (void *)&value)) {
+		return false;
 	}
 
 	return true;
@@ -1661,9 +1726,6 @@ struct socket_trace_stats socket_tracer_stats(void)
 	if (bpf_stats_map_collect(t, &stats_total)) {
 		stats.kern_socket_map_used = stats_total.socket_map_count;
 		stats.kern_trace_map_used = stats_total.trace_map_count;
-		// Calibrate map statistics
-		stats.kern_socket_map_used -= socket_map_reclaim_count;
-		stats.kern_trace_map_used -= trace_map_reclaim_count;
 	}
 
 	int i;
