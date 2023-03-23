@@ -327,7 +327,7 @@ clickhouse指标量及算子特殊处理：
   - `k8s.label`, `cloud.tag`, `os.app`
   - 所有指标量
 - 字符串类型的value需要携带`单引号`
-- pod_ingress, lb_listener, tap_port_host, tap_port_chost, tap_port_pod_node只支持where，不支持select和group
+- pod_ingress, lb_listener只支持where，不支持select和group
 - resource类型tag（不包括tap, vtap）+ip支持node_type和icon_id
 - tap_port需和tap_port_type一起select和group
 - metrics, tag, attribute, packet_batch不支持AS

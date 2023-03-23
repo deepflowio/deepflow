@@ -917,20 +917,21 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"",
 			"",
 		)}
+	// TAP Port Resource
 	for tapPortResource, deviceTypeValue := range TAP_PORT_DEVICE_MAP {
 		tapPortResourceID := tapPortResource + "_id"
 		deviceTypeValueStr := strconv.Itoa(deviceTypeValue)
 		tagResourceMap[tapPortResource] = map[string]*Tag{
 			"default": NewTag(
-				"",
-				"",
+				"dictGet(flow_tag.vtap_port_map, 'device_name', (toUInt64(vtap_id),toUInt64(tap_port)))",
+				"(toUInt64(vtap_id),toUInt64(tap_port)) IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type="+deviceTypeValueStr+")",
 				"(toUInt64(vtap_id),toUInt64(tap_port)) IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type="+deviceTypeValueStr+" AND device_name %s %s)",
 				"(toUInt64(vtap_id),toUInt64(tap_port)) IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type="+deviceTypeValueStr+" AND %s(device_name,%s))",
 			)}
 		tagResourceMap[tapPortResourceID] = map[string]*Tag{
 			"default": NewTag(
-				"",
-				"",
+				"dictGet(flow_tag.vtap_port_map, 'device_id', (toUInt64(vtap_id),toUInt64(tap_port)))",
+				"(toUInt64(vtap_id),toUInt64(tap_port)) IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type="+deviceTypeValueStr+")",
 				"(toUInt64(vtap_id),toUInt64(tap_port)) IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type="+deviceTypeValueStr+" AND device_id %s %s)",
 				"",
 			)}
