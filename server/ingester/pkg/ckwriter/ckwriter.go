@@ -163,6 +163,8 @@ func NewCKWriter(primaryAddr, secondaryAddr, user, password, counterName string,
 
 	return &CKWriter{
 		primaryAddr:   primaryAddr,
+		user:          user,
+		password:      password,
 		secondaryAddr: secondaryAddr,
 		table:         table,
 		queueCount:    queueCount,
