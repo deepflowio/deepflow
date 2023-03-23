@@ -329,9 +329,11 @@ http2_fill_common_socket_2(struct http2_header_data *data,
 		struct socket_info_t sk_info = {
 			.uid = send_buffer->socket_id,
 		};
-		socket_info_map__update(&conn_key, &sk_info);
 
-		trace_stats->socket_map_count++;
+		if (!socket_info_map__update(&conn_key, &sk_info)) {
+			__sync_fetch_and_add(&trace_stats->
+					     socket_map_count, 1);
+		}
 	}
 
 	__u32 timeout = trace_conf->go_tracing_timeout;

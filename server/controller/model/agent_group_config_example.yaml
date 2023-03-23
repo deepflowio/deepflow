@@ -905,8 +905,8 @@ vtap_group_id: g-xxxxxx
     #thread-num: 1
 
     ## eBPF perf pages count
-    ## Default: 128. Range: [32, 512]
-    ## Note: The number of page occupied by the shared memory of the kernel. The value is 2^n ( n range [5, 9] ). Used for perf data transfer.
+    ## Default: 128. Range: [32, 8192]
+    ## Note: The number of page occupied by the shared memory of the kernel. The value is 2^n ( n range [5, 13] ). Used for perf data transfer.
     ##   If the value is between 2^n and 2^(n+1), it will be automatically adjusted by the ebpf configurator to the minimum value (2^n).
     #perf-pages-count: 128
 
