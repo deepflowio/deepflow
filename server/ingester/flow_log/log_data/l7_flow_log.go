@@ -448,12 +448,20 @@ func (h *L7FlowLog) Release() {
 	ReleaseL7FlowLog(h)
 }
 
+func (h *L7FlowLog) StartTime() time.Duration {
+	return time.Duration(h.L7Base.StartTime) * time.Microsecond
+}
+
 func (h *L7FlowLog) EndTime() time.Duration {
 	return time.Duration(h.L7Base.EndTime) * time.Microsecond
 }
 
 func (h *L7FlowLog) String() string {
 	return fmt.Sprintf("L7FlowLog: %+v\n", *h)
+}
+
+func (h *L7FlowLog) ID() uint64 {
+	return h._id
 }
 
 func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable) {

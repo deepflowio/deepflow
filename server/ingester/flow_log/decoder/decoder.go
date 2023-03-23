@@ -29,6 +29,7 @@ import (
 	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 
 	"github.com/deepflowio/deepflow/server/ingester/common"
+	"github.com/deepflowio/deepflow/server/ingester/flow_log/exporter"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/log_data"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/throttler"
 	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
@@ -78,6 +79,7 @@ type Decoder struct {
 	inQueue       queue.QueueReader
 	throttler     *throttler.ThrottlingQueue
 	flowTagWriter *flow_tag.FlowTagWriter
+	otlpExporter  *exporter.OtlpExporter
 	debugEnabled  bool
 
 	fieldsBuf      []interface{}
@@ -92,6 +94,7 @@ func NewDecoder(
 	inQueue queue.QueueReader,
 	throttler *throttler.ThrottlingQueue,
 	flowTagWriter *flow_tag.FlowTagWriter,
+	otlpExporter *exporter.OtlpExporter,
 ) *Decoder {
 	return &Decoder{
 		index:          index,
@@ -100,6 +103,7 @@ func NewDecoder(
 		inQueue:        inQueue,
 		throttler:      throttler,
 		flowTagWriter:  flowTagWriter,
+		otlpExporter:   otlpExporter,
 		debugEnabled:   log.IsEnabledFor(logging.DEBUG),
 		fieldsBuf:      make([]interface{}, 0, 64),
 		fieldValuesBuf: make([]interface{}, 0, 64),
@@ -240,6 +244,7 @@ func (d *Decoder) sendOpenMetetry(vtapID uint16, tracesData *v1.TracesData) {
 		} else {
 			d.fieldsBuf, d.fieldValuesBuf = d.fieldsBuf[:0], d.fieldValuesBuf[:0]
 			d.flowTagWriter.WriteFieldsAndFieldValues(log_data.L7FlowLogToFlowTagInterfaces(l, &d.fieldsBuf, &d.fieldValuesBuf))
+			d.otlpExport(l)
 		}
 		l.Release()
 	}
@@ -281,6 +286,13 @@ func (d *Decoder) sendFlow(flow *pb.TaggedFlow) {
 	}
 }
 
+func (d *Decoder) otlpExport(l *log_data.L7FlowLog) {
+	if d.otlpExporter != nil {
+		l.AddReferenceCount()
+		d.otlpExporter.Put(l)
+	}
+}
+
 func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 	if d.debugEnabled {
 		log.Debugf("decoder %d recv proto: %s", d.index, proto)
@@ -296,6 +308,7 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 	} else {
 		d.fieldsBuf, d.fieldValuesBuf = d.fieldsBuf[:0], d.fieldValuesBuf[:0]
 		d.flowTagWriter.WriteFieldsAndFieldValues(log_data.L7FlowLogToFlowTagInterfaces(l, &d.fieldsBuf, &d.fieldValuesBuf))
+		d.otlpExport(l)
 	}
 	l.Release()
 	proto.Release()

@@ -33,6 +33,9 @@ auto_instance              , auto_instance_0           , auto_instance_1        
 auto_service_type          , auto_service_type_0       , auto_service_type_1       , int_enum      , auto_service_type      , Universal Tag   , 111
 auto_service               , auto_service_0            , auto_service_1            , resource      ,                        , Universal Tag   , 111
 gprocess                   , gprocess_0                , gprocess_1                , resource      ,                        , Universal Tag   , 111
+tap_port_host              , tap_port_host             , tap_port_host             , resource      ,                        , Universal Tag   , 111
+tap_port_chost             , tap_port_chost            , tap_port_chost            , resource      ,                        , Universal Tag   , 111
+tap_port_pod_node          , tap_port_pod_node         , tap_port_pod_node         , resource      ,                        , Universal Tag   , 111
 
 k8s.label                  , k8s.label_0               , k8s.label_1               , map           ,                        , Custom Tag      , 111
 cloud.tag                  , cloud.tag_0               , cloud.tag_1               , map           ,                        , Custom Tag      , 111
@@ -58,4 +61,4 @@ tap_port                   , tap_port                  , tap_port               
 tap_port_name              , tap_port_name             , tap_port_name             , string        ,                        , Capture Info    , 111
 tap_port_type              , tap_port_type             , tap_port_type             , int_enum      , tap_port_type          , Capture Info    , 111
 tap_side                   , tap_side                  , tap_side                  , string_enum   , tap_side               , Capture Info    , 111
-signal_source              , signal_source             , signal_source             , int_enum      , app_signal_source      , Capture Info    , 111
+signal_source              , signal_source             , signal_source             , int_enum      , l7_signal_source      , Capture Info    , 111

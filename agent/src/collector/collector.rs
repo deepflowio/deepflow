@@ -67,6 +67,8 @@ pub struct CollectorCounter {
     drop_before_window: AtomicU64,
     drop_inactive: AtomicU64,
     no_endpoint: AtomicU64,
+    stash_len: AtomicU64,
+    stash_capacity: AtomicU64,
     running: Arc<AtomicBool>,
 }
 
@@ -102,6 +104,16 @@ impl RefCountable for CollectorCounter {
                 "no-endpoint",
                 CounterType::Counted,
                 CounterValue::Unsigned(self.no_endpoint.swap(0, Ordering::Relaxed)),
+            ),
+            (
+                "stash-len",
+                CounterType::Counted,
+                CounterValue::Unsigned(self.stash_len.load(Ordering::Relaxed)),
+            ),
+            (
+                "stash-capacity",
+                CounterType::Counted,
+                CounterValue::Unsigned(self.stash_capacity.load(Ordering::Relaxed)),
             ),
         ]
     }
@@ -546,7 +558,8 @@ impl Stash {
                 Ipv4Addr::UNSPECIFIED.into()
             }
         } else if ep == FLOW_METRICS_PEER_SRC {
-            if flow.flow_metrics_peers[0].l3_epc_id > 0 {
+            if flow.flow_metrics_peers[0].l3_epc_id > 0 || flow.signal_source == SignalSource::OTel
+            {
                 flow.flow_metrics_peers[0].nat_real_ip
             } else {
                 if is_ipv6 {
@@ -556,7 +569,8 @@ impl Stash {
                 }
             }
         } else {
-            if flow.flow_metrics_peers[1].l3_epc_id > 0 {
+            if flow.flow_metrics_peers[1].l3_epc_id > 0 || flow.signal_source == SignalSource::OTel
+            {
                 flow.flow_metrics_peers[1].nat_real_ip
             } else {
                 if is_ipv6 {
@@ -676,17 +690,22 @@ impl Stash {
                 }
             } else {
                 // After enabling the storage of inactive IP addresses,
-                // the Internet IP address also needs to be saved as 0
+                // the Internet IP address also needs to be saved as 0,
+                // except for otel data
                 // =======================================
-                // 开启存储非活跃IP后，Internet IP也需要存0
-                if flow.flow_metrics_peers[0].l3_epc_id <= 0 {
+                // 开启存储非活跃IP后，Internet IP也需要存0, otel数据除外
+                if flow.flow_metrics_peers[0].l3_epc_id <= 0
+                    && flow.signal_source != SignalSource::OTel
+                {
                     src_ip = if is_ipv6 {
                         Ipv6Addr::UNSPECIFIED.into()
                     } else {
                         Ipv4Addr::UNSPECIFIED.into()
                     };
                 }
-                if flow.flow_metrics_peers[1].l3_epc_id <= 0 {
+                if flow.flow_metrics_peers[1].l3_epc_id <= 0
+                    && flow.signal_source != SignalSource::OTel
+                {
                     dst_ip = if is_ipv6 {
                         Ipv6Addr::UNSPECIFIED.into()
                     } else {
@@ -812,6 +831,15 @@ impl Stash {
             }
         }
     }
+
+    fn calc_stash_counters(&self) {
+        self.counter
+            .stash_len
+            .store(self.inner.len() as u64, Ordering::Relaxed);
+        self.counter
+            .stash_capacity
+            .store(self.inner.capacity() as u64, Ordering::Relaxed);
+    }
 }
 
 fn get_l3_epc_id(l3_epc_id: i32, signal_source: SignalSource) -> i16 {
@@ -916,6 +944,7 @@ impl Collector {
                                 let time_in_second = flow.tagged_flow.flow.flow_stat_time.as_secs();
                                 stash.collect(Some(*flow), time_in_second);
                             }
+                            stash.calc_stash_counters();
                         }
                         Err(Error::Timeout) => stash.collect(
                             None,

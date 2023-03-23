@@ -51,6 +51,8 @@ pub struct FlowAggrCounter {
     drop_before_window: AtomicU64,
     out: AtomicU64,
     drop_in_throttle: AtomicU64,
+    stash_total_len: AtomicU64,
+    stash_total_capacity: AtomicU64,
 }
 
 pub struct FlowAggrThread {
@@ -286,20 +288,36 @@ impl FlowAggr {
         }
     }
 
+    fn calc_stash_counters(&self) {
+        let mut len = 0;
+        let mut cap = 0;
+        for s in self.stashs.iter() {
+            len += s.len();
+            cap += s.capacity();
+        }
+        self.metrics
+            .stash_total_len
+            .store(len as u64, Ordering::Relaxed);
+        self.metrics
+            .stash_total_capacity
+            .store(cap as u64, Ordering::Relaxed);
+    }
+
     fn run(&mut self) {
         let mut batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
         while self.running.load(Ordering::Relaxed) {
             match self.input.recv_all(&mut batch, Some(QUEUE_READ_TIMEOUT)) {
                 Ok(_) => {
+                    let config = self.config.load();
                     for tagged_flow in batch.drain(..) {
-                        if self.config.load().l4_log_store_tap_types
-                            [u16::from(TapType::Any) as usize]
-                            || self.config.load().l4_log_store_tap_types
+                        if config.l4_log_store_tap_types[u16::from(TapType::Any) as usize]
+                            || config.l4_log_store_tap_types
                                 [u16::from(tagged_flow.flow.flow_key.tap_type) as usize]
                         {
                             self.minute_merge(tagged_flow);
                         }
                     }
+                    self.calc_stash_counters();
                 }
                 Err(Error::Timeout) => {
                     let now = get_timestamp(self.ntp_diff.load(Ordering::Relaxed));
@@ -332,6 +350,16 @@ impl RefCountable for FlowAggrCounter {
                 "drop-in-throttle",
                 CounterType::Counted,
                 CounterValue::Unsigned(self.drop_in_throttle.swap(0, Ordering::Relaxed)),
+            ),
+            (
+                "stash-total-len",
+                CounterType::Counted,
+                CounterValue::Unsigned(self.stash_total_len.load(Ordering::Relaxed)),
+            ),
+            (
+                "stash-total-capacity",
+                CounterType::Counted,
+                CounterValue::Unsigned(self.stash_total_capacity.load(Ordering::Relaxed)),
             ),
         ]
     }
