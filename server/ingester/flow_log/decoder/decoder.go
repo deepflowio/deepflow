@@ -298,22 +298,30 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 		log.Debugf("decoder %d recv proto: %s", d.index, proto)
 	}
 
-	d.counter.Count++
-	drop := int64(0)
+	dropped := false
 	l := log_data.ProtoLogToL7FlowLog(proto, d.platformData)
 	l.AddReferenceCount()
-	if !d.throttler.SendWithThrottling(l) {
-		d.counter.DropCount++
-		drop = 1
-	} else {
+	if d.throttler.SendWithThrottling(l) {
 		d.fieldsBuf, d.fieldValuesBuf = d.fieldsBuf[:0], d.fieldValuesBuf[:0]
 		d.flowTagWriter.WriteFieldsAndFieldValues(log_data.L7FlowLogToFlowTagInterfaces(l, &d.fieldsBuf, &d.fieldValuesBuf))
 		d.otlpExport(l)
+	} else {
+		dropped = true
 	}
+	d.updateCounter(datatype.L7Protocol(proto.Base.Head.Proto), dropped)
 	l.Release()
 	proto.Release()
 
-	switch datatype.L7Protocol(proto.Base.Head.Proto) {
+}
+
+func (d *Decoder) updateCounter(l7Protocol datatype.L7Protocol, dropped bool) {
+	d.counter.Count++
+	drop := int64(0)
+	if dropped {
+		d.counter.DropCount++
+		drop = 1
+	}
+	switch l7Protocol {
 	case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2, datatype.L7_PROTOCOL_HTTP_1_TLS, datatype.L7_PROTOCOL_HTTP_2_TLS:
 		d.counter.L7HTTPCount++
 		d.counter.L7HTTPDropCount += drop
@@ -329,8 +337,6 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 	case datatype.L7_PROTOCOL_DUBBO:
 		d.counter.L7RPCCount++
 		d.counter.L7RPCDropCount += drop
-	case datatype.L7_PROTOCOL_KAFKA:
-		fallthrough
 	case datatype.L7_PROTOCOL_MQTT:
 		d.counter.L7MQCount++
 		d.counter.L7MQDropCount += drop
