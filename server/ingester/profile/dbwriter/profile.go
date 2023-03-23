@@ -55,6 +55,7 @@ type InProcessProfile struct {
 	VtapID       uint16
 	RegionID     uint16
 	AZID         uint16
+	SubnetID     uint16
 	L3EpcID      int32
 	HostID       uint16
 	PodID        uint32
@@ -95,6 +96,7 @@ func ProfileColumns() []*ckdb.Column {
 		ckdb.NewColumn("_id", ckdb.UInt64).SetCodec(ckdb.CodecDoubleDelta),
 		ckdb.NewColumn("ip4", ckdb.IPv4).SetComment("IPv4地址"),
 		ckdb.NewColumn("ip6", ckdb.IPv6).SetComment("IPV6地址"),
+		ckdb.NewColumn("is_ipv4", ckdb.UInt8).SetComment("是否为IPv4地址").SetIndex(ckdb.IndexMinmax),
 
 		ckdb.NewColumn("app_service", ckdb.String).SetComment("应用名称, 用户配置上报"),
 		ckdb.NewColumn("profile_location_str", ckdb.String).SetComment("profile 位置"),
@@ -117,6 +119,7 @@ func ProfileColumns() []*ckdb.Column {
 		ckdb.NewColumn("vtap_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
 		ckdb.NewColumn("region_id", ckdb.UInt16).SetComment("云平台区域ID"),
 		ckdb.NewColumn("az_id", ckdb.UInt16).SetComment("可用区ID"),
+		ckdb.NewColumn("subnet_id", ckdb.UInt16).SetComment("ip对应的子网ID"),
 		ckdb.NewColumn("l3_epc_id", ckdb.Int32).SetComment("ip对应的EPC ID"),
 		ckdb.NewColumn("host_id", ckdb.UInt16).SetComment("宿主机ID"),
 		ckdb.NewColumn("pod_id", ckdb.UInt32).SetComment("容器ID"),
@@ -159,6 +162,7 @@ func (p *InProcessProfile) WriteBlock(block *ckdb.Block) {
 	block.Write(p._id)
 	block.WriteIPv4(p.IP4)
 	block.WriteIPv6(p.IP6)
+	block.WriteBool(p.IsIPv4)
 
 	block.Write(
 		p.AppService,
@@ -181,6 +185,7 @@ func (p *InProcessProfile) WriteBlock(block *ckdb.Block) {
 		p.VtapID,
 		p.RegionID,
 		p.AZID,
+		p.SubnetID,
 		p.L3EpcID,
 		p.HostID,
 		p.PodID,
@@ -272,7 +277,8 @@ func (p *InProcessProfile) fillResource(vtapID uint32, platformData *grpc.Platfo
 	if info != nil {
 		p.RegionID = uint16(info.RegionID)
 		p.AZID = uint16(info.AZID)
-		p.HostID = uint16(info.AZID)
+		p.SubnetID = uint16(info.SubnetID)
+		p.HostID = uint16(info.HostID)
 		p.PodID = info.PodID
 		p.PodNodeID = info.PodNodeID
 		p.PodNSID = uint16(info.PodNSID)

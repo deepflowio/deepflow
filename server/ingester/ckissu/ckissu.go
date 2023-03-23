@@ -753,6 +753,24 @@ var ColumnAdd625 = []*ColumnAdds{
 	},
 }
 
+var u8ColumnProfileNameAdd626 = []string{"is_ipv4"}
+var u16ColumnProfileNameAdd626 = []string{"subnet_id"}
+var profileTables = []string{"in_process", "in_process_local"}
+var ColumnAdd626 = []*ColumnAdds{
+	&ColumnAdds{
+		Dbs:         []string{"profile"},
+		Tables:      profileTables,
+		ColumnNames: u8ColumnProfileNameAdd626,
+		ColumnType:  ckdb.UInt8,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"profile"},
+		Tables:      profileTables,
+		ColumnNames: u16ColumnProfileNameAdd626,
+		ColumnType:  ckdb.UInt16,
+	},
+}
+
 func getTables(connect *sql.DB, db, tableName string) ([]string, error) {
 	sql := fmt.Sprintf("SHOW TABLES IN %s", db)
 	rows, err := connect.Query(sql)
@@ -1089,7 +1107,7 @@ func NewCKIssu(cfg *config.Config) (*Issu, error) {
 		datasourceInfo: make(map[string]*DatasourceInfo),
 	}
 
-	allVersionAdds := [][]*ColumnAdds{ColumnAdd610, ColumnAdd611, ColumnAdd612, ColumnAdd613, ColumnAdd615, ColumnAdd618, ColumnAdd620, ColumnAdd623, ColumnAdd625}
+	allVersionAdds := [][]*ColumnAdds{ColumnAdd610, ColumnAdd611, ColumnAdd612, ColumnAdd613, ColumnAdd615, ColumnAdd618, ColumnAdd620, ColumnAdd623, ColumnAdd625, ColumnAdd626}
 	i.columnAdds = []*ColumnAdd{}
 	for _, versionAdd := range allVersionAdds {
 		for _, adds := range versionAdd {
