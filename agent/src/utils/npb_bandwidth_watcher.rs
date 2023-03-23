@@ -314,6 +314,7 @@ impl FlowAclListener for Arc<NpbBandwidthWatcher> {
     fn flow_acl_change(
         &mut self,
         _trident_type: TridentType,
+        _local_epc: i32,
         _ip_groups: &Vec<Arc<IpGroupData>>,
         _platform_data: &Vec<Arc<PlatformData>>,
         _peers: &Vec<Arc<PeerConnection>>,
