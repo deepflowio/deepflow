@@ -96,6 +96,18 @@ pub const TRACER_WAIT_STOP: u8 = 5;
 #[allow(dead_code)]
 pub const TRACER_STOP_ERR: u8 = 6;
 
+// Identifying data source
+#[allow(dead_code)]
+pub const DATA_SOURCE_SYSCALL: u8 = 0;
+#[allow(dead_code)]
+pub const DATA_SOURCE_GO_TLS_UPROBE: u8 = 1;
+#[allow(dead_code)]
+pub const DATA_SOURCE_GO_HTTP2_UPROBE: u8 = 2;
+#[allow(dead_code)]
+pub const DATA_SOURCE_OPENSSL_UPROBE: u8 = 3;
+#[allow(dead_code)]
+pub const DATA_SOURCE_IO_EVENT: u8 = 4;
+
 // 消息类型
 // 目前除了 source=EBPF_TYPE_GO_HTTP2_UPROBE 以外,都不能保证这个方向的正确性.
 // go http2 uprobe 目前 只用了MSG_RESPONSE_END, 用于判断流结束.
@@ -141,7 +153,7 @@ pub struct SK_BPF_DATA {
     pub process_id: u32,   // tgid in kernel struct task_struct
     pub thread_id: u32,    // pid in kernel struct task_struct, main thread iff pid==tgid
     pub coroutine_id: u64, // CoroutineID, i.e., golang goroutine id
-    pub source: u8,        // SYSCALL,GO_TLS_UPROBE,GO_HTTP2_UPROBE
+    pub source: u8,        // Value is DATA_SOURCE_*
 
     pub process_kname: [u8; PACKET_KNAME_MAX_PADDING + 1], //进程或线程名字，占用16bytes
 

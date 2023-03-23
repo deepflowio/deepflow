@@ -314,11 +314,13 @@ static __inline void http2_fill_common_socket(struct http2_header_data *data,
 		struct socket_info_t sk_info = {
 			.uid = send_buffer->socket_id,
 		};
-		socket_info_map__update(&conn_key, &sk_info);
 		struct trace_stats *trace_stats = trace_stats_map__lookup(&k0);
 		if (trace_stats == NULL)
 			return;
-		trace_stats->socket_map_count++;
+		if (!socket_info_map__update(&conn_key, &sk_info)) {
+			__sync_fetch_and_add(&trace_stats->
+					     socket_map_count, 1);
+		}
 	}
 
 	send_buffer->tgid = tgid;
