@@ -149,6 +149,8 @@ func NewCKWriter(addrs []string, user, password, counterName string, table *ckdb
 
 	return &CKWriter{
 		addrs:        addrs,
+		user:         user,
+		password:     password,
 		table:        table,
 		queueCount:   queueCount,
 		queueSize:    queueSize,
