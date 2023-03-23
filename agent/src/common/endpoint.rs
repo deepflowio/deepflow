@@ -79,6 +79,14 @@ impl EndpointInfo {
         self.is_device = true;
         self.is_local_ip = data.is_local;
     }
+
+    pub fn set_loopback(&mut self, local_epc: i32) {
+        self.l2_epc_id = local_epc;
+        self.l3_epc_id = local_epc;
+        self.is_device = true;
+        self.is_local_mac = true;
+        self.is_local_ip = true;
+    }
 }
 
 impl Default for EndpointInfo {
