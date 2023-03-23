@@ -1477,8 +1477,12 @@ impl FlowMap {
         meta_packet: Option<&mut MetaPacket>,
     ) {
         let flow = &node.tagged_flow.flow;
+        // if this function is called by inject_flush_ticker (no meta_packet),
+        // skip statistical interval check because timestamp will be equal to
+        // flow_stat_time
         if node.packet_in_tick
-            && (timestamp >= flow.flow_stat_time + STATISTICAL_INTERVAL
+            && (meta_packet.is_none()
+                || timestamp >= flow.flow_stat_time + STATISTICAL_INTERVAL
                 || timestamp < flow.flow_stat_time)
         {
             self.update_flow_direction(node, meta_packet); // 每个流统计数据输出前矫正流方向
