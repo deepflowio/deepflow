@@ -9,12 +9,15 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/metrics"
 )
 
-var LABEL_NAME_METRICS = "__name__"
-var DB_NAME_EXT_METRICS = "ext_metrics"
-var DB_NAME_DEEPFLOW_SYSTEM = "deepflow_system"
-var DB_NAME_FLOW_METRICS = "flow_metrics"
-var TABLE_NAME_L7_FLOW_LOG = "l7_flow_log"
-var METRICS_CATEGORY_CARDINALITY = "Cardinality"
+const (
+	LABEL_NAME_METRICS           = "__name__"
+	DB_NAME_EXT_METRICS          = "ext_metrics"
+	DB_NAME_DEEPFLOW_SYSTEM      = "deepflow_system"
+	DB_NAME_FLOW_METRICS         = "flow_metrics"
+	TABLE_NAME_METRICS           = "metrics"
+	TABLE_NAME_L7_FLOW_LOG       = "l7_flow_log"
+	METRICS_CATEGORY_CARDINALITY = "Cardinality"
+)
 
 func GetTagValues(args *common.PromMetaParams) (result *common.PromQueryResponse, err error) {
 	if args.LabelName == LABEL_NAME_METRICS {
@@ -38,13 +41,16 @@ func getMetrics(args *common.PromMetaParams) (resp []string) {
 	//	where = fmt.Sprintf("time<=%s", args.EndTime)
 	//}
 
-	// FIXME: support deepflow_system & ext_metrics
 	resp = []string{}
 	for db, tables := range chCommon.DB_TABLE_MAP {
 		if db == DB_NAME_EXT_METRICS {
 			extMetrics, _ := metrics.GetExtMetrics(DB_NAME_EXT_METRICS, "", where, args.Context)
 			for _, v := range extMetrics {
 				resp = append(resp, strings.TrimPrefix(v.DisplayName, "metrics."))
+				// append ext_metrics__metrics__prometheus_${metrics_name}
+				fieldName := strings.Replace(v.Table, ".", "_", 1) // convert prometheus.xxx to prometheus_xxx
+				metricsName := fmt.Sprintf("%s__%s__%s", db, TABLE_NAME_METRICS, fieldName)
+				resp = append(resp, metricsName)
 			}
 		} else {
 			for _, table := range tables {

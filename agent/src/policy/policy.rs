@@ -568,12 +568,14 @@ impl FlowAclListener for PolicySetter {
     fn flow_acl_change(
         &mut self,
         trident_type: TridentType,
+        local_epc: i32,
         ip_groups: &Vec<Arc<IpGroupData>>,
         platform_data: &Vec<Arc<PlatformData>>,
         peers: &Vec<Arc<PeerConnection>>,
         cidrs: &Vec<Arc<Cidr>>,
         acls: &Vec<Arc<Acl>>,
     ) -> Result<(), String> {
+        self.update_local_epc(local_epc);
         self.update_interfaces(trident_type, platform_data);
         self.update_ip_group(ip_groups);
         self.update_peer_connections(peers);
@@ -599,6 +601,10 @@ impl PolicySetter {
 
     pub fn update_map_size(&mut self, map_size: usize) {
         self.policy().table.update_map_size(map_size);
+    }
+
+    pub fn update_local_epc(&mut self, local_epc: i32) {
+        self.policy().labeler.update_local_epc(local_epc);
     }
 
     pub fn update_interfaces(

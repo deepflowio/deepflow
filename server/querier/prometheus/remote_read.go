@@ -20,7 +20,7 @@ var log = logging.MustGetLogger("promethues")
 func PromReaderExecute(req *prompb.ReadRequest, ctx context.Context) (resp *prompb.ReadResponse, err error) {
 	// promrequest trans to sql
 	// pp.Println(req)
-	sql, db, datasource, err := PromReaderTransToSQL(req, ctx)
+	ctx, sql, db, datasource, err := PromReaderTransToSQL(ctx, req)
 	// fmt.Println(sql, db)
 	if err != nil {
 		return nil, err
@@ -46,11 +46,11 @@ func PromReaderExecute(req *prompb.ReadRequest, ctx context.Context) (resp *prom
 		return nil, err
 	}
 	// response trans to prom resp
-	resp, err = RespTransToProm(result)
+	resp, err = RespTransToProm(ctx, result)
 	if err != nil {
 		log.Error(err)
 		return nil, err
 	}
-	//pp.Println(resp)
+	// pp.Println(resp)
 	return resp, nil
 }
