@@ -1483,10 +1483,6 @@ impl ConfigHandler {
                 let c = &components.stats_collector;
                 c.set_hostname(handler.candidate_config.stats.host.clone());
                 c.set_min_interval(handler.candidate_config.stats.interval);
-                c.set_remote(
-                    handler.candidate_config.stats.analyzer_ip.clone(),
-                    handler.candidate_config.stats.analyzer_port,
-                );
             }
             callbacks.push(stats_callback);
         }

@@ -35,7 +35,6 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/droplet/labeler"
 	"github.com/deepflowio/deepflow/server/ingester/droplet/pcap"
 	"github.com/deepflowio/deepflow/server/ingester/droplet/queue"
-	"github.com/deepflowio/deepflow/server/ingester/droplet/statsd"
 	"github.com/deepflowio/deepflow/server/ingester/droplet/syslog"
 	"github.com/deepflowio/deepflow/server/ingester/ingesterctl"
 )
@@ -59,12 +58,6 @@ func Start(cfg *config.Config, recv *receiver.Receiver) (closers []io.Closer) {
 
 	// L1 - packet source from tridentAdapter
 	manager := queue.NewManager(ingesterctl.INGESTERCTL_QUEUE)
-
-	statsdRecvQueues := manager.NewQueues(
-		"1-receiver-to-statsd", cfg.Queue.StatsdQueueSize, 1, 1,
-		libqueue.OptionFlushIndicator(3*time.Second),
-		libqueue.OptionRelease(func(p interface{}) { receiver.ReleaseRecvBuffer(p.(*receiver.RecvBuffer)) }),
-	)
 	syslogRecvQueues := manager.NewQueues(
 		"1-receiver-to-syslog", cfg.Queue.SyslogQueueSize, 1, 1,
 		libqueue.OptionFlushIndicator(3*time.Second),
@@ -77,11 +70,9 @@ func Start(cfg *config.Config, recv *receiver.Receiver) (closers []io.Closer) {
 	)
 
 	recv.RegistHandler(datatype.MESSAGE_TYPE_SYSLOG, syslogRecvQueues, 1)
-	recv.RegistHandler(datatype.MESSAGE_TYPE_STATSD, statsdRecvQueues, 1)
 	recv.RegistHandler(datatype.MESSAGE_TYPE_COMPRESS, compressedPacketRecvQueues, 1)
 
 	syslog.NewSyslogWriter(syslogRecvQueues.Readers()[0], cfg.AgentLogToFile, cfg.ESSyslog, cfg.SyslogDirectory, cfg.ESHostPorts, cfg.ESAuth.User, cfg.ESAuth.Password)
-	statsd.NewStatsdWriter(statsdRecvQueues.Readers()[0])
 
 	releaseMetaPacketBlock := func(x interface{}) {
 		datatype.ReleaseMetaPacketBlock(x.(*datatype.MetaPacketBlock))

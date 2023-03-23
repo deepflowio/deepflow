@@ -265,14 +265,6 @@ ingester:
   #  user:
   #  password:
 
-  ## whether write stats data to influxdb
-  #influxdb-writer-enabled: false
-
-  ## 存储stats统计数据的influxdb地址
-  #influxdb:
-  #  host: influxdb
-  #  port: 20044
-
   ## stats collect interval(unit: s)
   # stats-interval: 10
 
@@ -397,45 +389,6 @@ ingester:
 
   ## query platformData service, port filter fastmap LRU capacity(unit: count)
   #service-labber-lru-cap: 4194304
-
-  ## ########################## droplet config ##########################################
-  ## Rpc synchronization timeout default 8s
-  #rpc-timeout: 8
-
-  #adapter:
-  #  ## cache size (#) for resuming the order of received trident traffic,
-  #  ## default value is 64,
-  #  ## 64 <= value <= 1024, value is 1024 when value > 1024
-  #  ordering-cache-size: 64
-
-  ## internal queues conf
-  #queue:
-  #  ## ----------- 并行度 -----------
-  #  ## 传输网包的队列数量，也是网包处理（以网包作为输入）模块的并行度，默认为1，最大16
-  #  packet-queue-count: 1
-  #
-  #  ## 传输网包的每个队列的长度，默认为65536
-  #  packet-queue-size: 65536
-  #
-  #  ## syslog 接收队列长度, 默认为65536
-  #  syslog-queue-size: 65536
-  #
-  #  ## statsd 接收队列长度, 默认为65536
-  #  statsd-queue-size: 65536
-  #
-  #  ## 压缩包头接收队列长度, 默认为65536
-  #  compressed-queue-size: 65536
-
-  #labeler:
-  #  ## whether to use first-path processing only
-  #  fast-path-disable: false
-  #
-  #  ## size of policy fast-path map, and
-  #  ## map-size-limit >= filter-queue-count*1024
-  #  ## map-size-limit <= filter-queue-count*1048576
-  #  map-size-limit: 1048576
-  #  ## 值越大策略Firstpath表内存使用越少性能越低，取值范围为[1,16]，其他非法值使用默认值8
-  #  level: 0
 
   ## ########################### flow metrics config #############################################
 
