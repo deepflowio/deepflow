@@ -44,6 +44,7 @@ use tokio::time;
 
 use super::ntp::{NtpMode, NtpPacket, NtpTime};
 
+use crate::common::endpoint::EPC_FROM_INTERNET;
 use crate::common::policy::Acl;
 use crate::common::policy::{Cidr, IpGroupData, PeerConnection};
 use crate::common::NORMAL_EXIT_WITH_RESTART;
@@ -137,6 +138,8 @@ pub struct Status {
     pub ntp_enabled: bool,
 
     // GRPC数据
+    pub local_epc: i32,
+
     pub version_platform_data: u64,
     pub version_acls: u64,
     pub version_groups: u64,
@@ -163,6 +166,7 @@ impl Default for Status {
             sync_interval: DEFAULT_SYNC_INTERVAL,
             ntp_enabled: false,
 
+            local_epc: EPC_FROM_INTERNET,
             version_platform_data: 0,
             version_acls: 0,
             version_groups: 0,
@@ -389,6 +393,14 @@ impl Status {
         return resp.skip_interface.iter().map(|i| i.mac.unwrap()).collect();
     }
 
+    pub fn get_local_epc(&mut self, config: &RuntimeConfig) -> bool {
+        if config.epc_id as i32 != self.local_epc {
+            self.local_epc = config.epc_id as i32;
+            return true;
+        }
+        return false;
+    }
+
     fn trigger_flow_acl(
         &self,
         trident_type: TridentType,
@@ -396,6 +408,7 @@ impl Status {
     ) -> Result<(), String> {
         listener.flow_acl_change(
             trident_type,
+            self.local_epc,
             &self.ip_groups,
             &self.interfaces,
             &self.peers,
@@ -709,6 +722,7 @@ impl Synchronizer {
         }
         let mut updated = status.get_ip_groups(&resp) || updated_platform;
         updated = status.get_flow_acls(&resp) || updated;
+        updated = status.get_local_epc(&runtime_config) || updated;
         if updated {
             // 更新策略相关
             let last = SystemTime::now();

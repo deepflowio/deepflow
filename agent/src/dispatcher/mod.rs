@@ -213,6 +213,7 @@ impl FlowAclListener for DispatcherListener {
     fn flow_acl_change(
         &mut self,
         _: TridentType,
+        _: i32,
         _: &Vec<Arc<crate::_IpGroupData>>,
         _: &Vec<Arc<crate::_PlatformData>>,
         _: &Vec<Arc<crate::common::policy::PeerConnection>>,

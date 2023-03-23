@@ -81,6 +81,7 @@ pub trait FlowAclListener: Send + Sync {
     fn flow_acl_change(
         &mut self,
         trident_type: TridentType,
+        local_epc: i32,
         ip_groups: &Vec<Arc<IpGroupData>>,
         platform_data: &Vec<Arc<PlatformData>>,
         peers: &Vec<Arc<PeerConnection>>,
