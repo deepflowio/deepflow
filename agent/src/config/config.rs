@@ -470,7 +470,7 @@ impl YamlConfig {
         if c.ebpf.thread_num == 0 {
             c.ebpf.thread_num = 1;
         }
-        if c.ebpf.perf_pages_count < 32 || c.ebpf.perf_pages_count > 512 {
+        if c.ebpf.perf_pages_count < 32 || c.ebpf.perf_pages_count > 8192 {
             c.ebpf.perf_pages_count = 128
         }
         if c.ebpf.ring_size < 8192 || c.ebpf.ring_size > 131072 {
