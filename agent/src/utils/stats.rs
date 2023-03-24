@@ -38,7 +38,7 @@ use public::{
 };
 
 const STATS_PREFIX: &'static str = "deepflow_agent";
-const TICK_CYCLE: Duration = Duration::from_secs(60);
+const TICK_CYCLE: Duration = Duration::from_secs(10);
 pub const DFSTATS_SENDER_ID: usize = 100;
 
 pub enum StatsOption {
