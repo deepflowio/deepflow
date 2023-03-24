@@ -47,12 +47,12 @@ import (
 var log = logging.MustGetLogger("ext_metrics.decoder")
 
 const (
-	BUFFER_SIZE             = 128 // An ext_metrics message is usually very large, so use a smaller value than usual
-	TELEGRAF_POD            = "pod_name"
-	PROMETHEUS_POD          = "pod"
-	PROMETHEUS_INSTANCE     = "instance"
-	TABLE_PREFIX_TELEGRAF   = "influxdb."
-	TABLE_PREFIX_PROMETHEUS = "prometheus."
+	BUFFER_SIZE              = 128 // An ext_metrics message is usually very large, so use a smaller value than usual
+	TELEGRAF_POD             = "pod_name"
+	PROMETHEUS_POD           = "pod"
+	PROMETHEUS_INSTANCE      = "instance"
+	VTABLE_PREFIX_TELEGRAF   = "influxdb."
+	VTABLE_PREFIX_PROMETHEUS = "prometheus."
 )
 
 type Counter struct {
@@ -72,7 +72,17 @@ type Decoder struct {
 	extMetricsWriter *dbwriter.ExtMetricsWriter
 	debugEnabled     bool
 	config           *config.Config
-	extMetricsBuffer []interface{} // for prometheus, Stores all Samples in a TimeSeries.
+
+	// for prometheus, temporary buffers
+	extMetricsBuffer []interface{} // store all Samples in a TimeSeries.
+	tagNamesBuffer   []string      // store tag names in a time series
+	tagValuesBuffer  []string      // store tag values in a time series
+
+	// universal tag cache
+	podNameToUniversalTag    map[string]*zerodoc.UniversalTag
+	instanceIPToUniversalTag map[string]*zerodoc.UniversalTag
+	vtapIDToUniversalTag     map[uint16]*zerodoc.UniversalTag
+	platformDataVersion      uint64
 
 	counter *Counter
 	utils.Closable
@@ -260,10 +270,9 @@ func (d *Decoder) handleDeepflowStats(vtapID uint16, decoder *codec.SimpleDecode
 func StatsToExtMetrics(vtapID uint16, s *pb.Stats) *dbwriter.ExtMetrics {
 	m := dbwriter.AcquireExtMetrics()
 	m.Timestamp = uint32(s.Timestamp)
-	m.Tag.GlobalThreadID = uint8(vtapID)
-	m.Database = dbwriter.DEEPFLOW_SYSTEM_DB
-	m.TableName = s.Name
-	m.VirtualTableName = ""
+	m.UniversalTag.VTAPID = vtapID
+	m.MsgType = datatype.MESSAGE_TYPE_DFSTATS
+	m.VTableName = s.Name
 	m.TagNames = s.TagNames
 	m.TagValues = s.TagValues
 	m.MetricsFloatNames = s.MetricsFloatNames
@@ -272,17 +281,12 @@ func StatsToExtMetrics(vtapID uint16, s *pb.Stats) *dbwriter.ExtMetrics {
 }
 
 func (d *Decoder) TimeSeriesToExtMetrics(vtapID uint16, ts *prompb.TimeSeries) error {
-	d.extMetricsBuffer = d.extMetricsBuffer[:0]
 	if len(ts.Samples) == 0 {
 		return nil
 	}
-
-	m := dbwriter.AcquireExtMetrics()
-	if cap(m.TagNames) < len(ts.Labels)-1 {
-		m.TagNames = make([]string, 0, len(ts.Labels)-1)
-		m.TagValues = make([]string, 0, len(ts.Labels)-1)
-		// The length of MetricsFloatNames/MetricsFloatValues will only be 1, so there is no need to pre-allocate space.
-	}
+	d.extMetricsBuffer = d.extMetricsBuffer[:0]
+	d.tagNamesBuffer = d.tagNamesBuffer[:0]
+	d.tagValuesBuffer = d.tagValuesBuffer[:0]
 
 	metricNameLabel, podName, instance := "", "", ""
 	for _, l := range ts.Labels {
@@ -295,63 +299,95 @@ func (d *Decoder) TimeSeriesToExtMetrics(vtapID uint16, ts *prompb.TimeSeries) e
 		} else if l.Name == PROMETHEUS_INSTANCE {
 			instance = l.Value
 		}
-		m.TagNames = append(m.TagNames, l.Name)
-		m.TagValues = append(m.TagValues, l.Value)
+		d.tagNamesBuffer = append(d.tagNamesBuffer, l.Name)
+		d.tagValuesBuffer = append(d.tagValuesBuffer, l.Value)
 	}
 	if metricNameLabel == "" {
 		return fmt.Errorf("prometheum metric name label is null")
 	}
-	m.MetricsFloatNames = append(m.MetricsFloatNames, metricNameLabel) // prometheus only has one metric
 
-	// all samples share the same tag_name/tag_value/metric_name
-	tagNames := m.TagNames
-	tagValues := m.TagValues
-	metricsFloatNames := m.MetricsFloatNames
-
-	var universalTag *zerodoc.Tag
-	virtualTableName := TABLE_PREFIX_PROMETHEUS + metricNameLabel
+	var universalTag *zerodoc.UniversalTag
+	virtualTableName := VTABLE_PREFIX_PROMETHEUS + metricNameLabel
 	for i, s := range ts.Samples {
-		if m == nil {
-			m = dbwriter.AcquireExtMetrics()
-		}
+		m := dbwriter.AcquireExtMetrics()
 
 		m.Timestamp = uint32(model.Time(s.Timestamp).Unix())
-		m.Database = dbwriter.EXT_METRICS_DB
-		m.TableName = dbwriter.EXT_METRICS_TABLE
-		m.VirtualTableName = virtualTableName
+		m.MsgType = datatype.MESSAGE_TYPE_PROMETHEUS
+		m.VTableName = virtualTableName
 
-		m.TagNames = tagNames
-		m.TagValues = tagValues
+		m.TagNames = append(m.TagNames, d.tagNamesBuffer...)
+		m.TagValues = append(m.TagValues, d.tagValuesBuffer...)
 
 		v := float64(s.Value)
 		if math.IsNaN(v) || math.IsInf(v, 0) {
 			dbwriter.ReleaseExtMetrics(m)
 			continue
 		}
-		m.MetricsFloatNames = metricsFloatNames
+		m.MetricsFloatNames = append(m.MetricsFloatNames, metricNameLabel)
 		m.MetricsFloatValues = append(m.MetricsFloatValues, v)
 
 		if i == 0 {
 			d.fillExtMetricsBase(m, vtapID, podName, instance, false)
-			universalTag = &m.Tag
+			universalTag = &m.UniversalTag
 		} else {
-			// all samples share the same Tag
-			// FIXME: write a copy function in zerodoc/tag.go
-			m.Tag.Code = universalTag.Code
-			*m.Tag.Field = *universalTag.Field
+			// all samples share the same universal tag
+			m.UniversalTag = *universalTag
 		}
 		d.extMetricsBuffer = append(d.extMetricsBuffer, m)
-
-		m = nil
 	}
 	return nil
 }
 
 func (d *Decoder) fillExtMetricsBase(m *dbwriter.ExtMetrics, vtapID uint16, podName, instance string, fillWithVtapId bool) {
-	t := &m.Tag
-	t.Code = zerodoc.AZID | zerodoc.HostID | zerodoc.IP | zerodoc.L3Device | zerodoc.L3EpcID | zerodoc.PodClusterID | zerodoc.PodGroupID | zerodoc.PodID | zerodoc.PodNodeID | zerodoc.PodNSID | zerodoc.RegionID | zerodoc.SubnetID | zerodoc.VTAPID | zerodoc.ServiceID | zerodoc.Resource
+	var universalTag *zerodoc.UniversalTag
+	var instanceIP string
+
+	// fast path
+	platformDataVersion := d.platformData.Version()
+	if platformDataVersion != d.platformDataVersion {
+		if d.platformDataVersion != 0 {
+			log.Infof("platform data version in ext-metrics-decoder %s-#%d changed from %d to %d",
+				d.msgType, d.index, d.platformDataVersion, platformDataVersion)
+		}
+		d.platformDataVersion = platformDataVersion
+		d.podNameToUniversalTag = make(map[string]*zerodoc.UniversalTag)
+		d.instanceIPToUniversalTag = make(map[string]*zerodoc.UniversalTag)
+		d.vtapIDToUniversalTag = make(map[uint16]*zerodoc.UniversalTag)
+	} else {
+		if podName != "" {
+			universalTag, _ = d.podNameToUniversalTag[podName]
+		} else if instance != "" {
+			instanceIP = getIPPartFromPrometheusInstanceString(instance)
+			if instanceIP != "" {
+				universalTag, _ = d.instanceIPToUniversalTag[instanceIP]
+			}
+		} else if fillWithVtapId {
+			universalTag, _ = d.vtapIDToUniversalTag[vtapID]
+		}
+		if universalTag != nil {
+			m.UniversalTag = *universalTag
+			return
+		}
+	}
+
+	// slow path
+	d.fillExtMetricsBaseSlow(m, vtapID, podName, instanceIP, fillWithVtapId)
+
+	// update fast path
+	universalTag = &zerodoc.UniversalTag{} // Since the cache dictionary will be cleaned up by GC, no need to use a pool here.
+	*universalTag = m.UniversalTag
+	if podName != "" {
+		d.podNameToUniversalTag[podName] = universalTag
+	} else if instanceIP != "" {
+		d.instanceIPToUniversalTag[instanceIP] = universalTag
+	} else if fillWithVtapId {
+		d.vtapIDToUniversalTag[vtapID] = universalTag
+	}
+}
+
+func (d *Decoder) fillExtMetricsBaseSlow(m *dbwriter.ExtMetrics, vtapID uint16, podName, instanceIP string, fillWithVtapId bool) {
+	t := &m.UniversalTag
 	t.VTAPID = vtapID
-	t.GlobalThreadID = uint8(vtapID)
 	t.L3EpcID = datatype.EPC_FROM_INTERNET
 	var ip net.IP
 	if podName != "" {
@@ -362,9 +398,9 @@ func (d *Decoder) fillExtMetricsBase(m *dbwriter.ExtMetrics, vtapID uint16, podN
 			t.L3EpcID = podInfo.EpcId
 			ip = net.ParseIP(podInfo.Ip)
 		}
-	} else if instance != "" {
+	} else if instanceIP != "" {
 		t.L3EpcID = d.platformData.QueryVtapEpc0(uint32(vtapID))
-		ip = parseIPFromInstance(instance)
+		ip = net.ParseIP(instanceIP)
 	} else if fillWithVtapId {
 		t.L3EpcID = d.platformData.QueryVtapEpc0(uint32(vtapID))
 		vtapInfo := d.platformData.QueryVtapInfo(uint32(vtapID))
@@ -382,7 +418,10 @@ func (d *Decoder) fillExtMetricsBase(m *dbwriter.ExtMetrics, vtapID uint16, podN
 			t.IsIPv6 = 1
 			t.IP6 = ip
 		}
+	} else {
+		return
 	}
+
 	var info *grpc.Info
 	if t.IsIPv6 == 1 {
 		info = d.platformData.QueryIPV6Infos(t.L3EpcID, t.IP6)
@@ -414,29 +453,33 @@ func (d *Decoder) fillExtMetricsBase(m *dbwriter.ExtMetrics, vtapID uint16, podN
 	}
 }
 
-// parse ip from "192.168.0.1:22" or "[2001:db8::68]:22"
-func parseIPFromInstance(instance string) net.IP {
-	var ipPart string
-	index := strings.LastIndex(instance, ":")
-	if index < 0 {
-		ipPart = instance
-	} else {
-		ipPart = instance[:index]
-	}
-	if ipPart[0] == '[' && ipPart[len(ipPart)-1] == ']' {
-		ipPart = ipPart[1 : len(ipPart)-1]
+// get ip part from "192.168.0.1:22" or "[2001:db8::68]:22"
+func getIPPartFromPrometheusInstanceString(instance string) string {
+	if len(instance) == 0 {
+		return instance
 	}
 
-	return net.ParseIP(ipPart)
+	index := strings.LastIndex(instance, ":")
+	if index < 0 {
+		index = len(instance)
+	}
+	if instance[0] == '[' {
+		if instance[index-1] == ']' {
+			return instance[1 : index-1]
+		} else {
+			return ""
+		}
+	} else {
+		return instance[:index]
+	}
 }
 
 func (d *Decoder) PointToExtMetrics(vtapID uint16, point models.Point) (*dbwriter.ExtMetrics, error) {
 	m := dbwriter.AcquireExtMetrics()
 	m.Timestamp = uint32(point.Time().Unix())
-	m.Database = dbwriter.EXT_METRICS_DB
+	m.MsgType = datatype.MESSAGE_TYPE_TELEGRAF
 	tableName := string(point.Name())
-	m.TableName = dbwriter.EXT_METRICS_TABLE
-	m.VirtualTableName = TABLE_PREFIX_TELEGRAF + tableName
+	m.VTableName = VTABLE_PREFIX_TELEGRAF + tableName
 	podName := ""
 	for _, tag := range point.Tags() {
 		tagName := string(tag.Key)
