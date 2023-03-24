@@ -39,6 +39,25 @@ func NewCache(maxEntries int) *Cache {
 	}
 }
 
+// When the key already exists, return its current value in lru,
+// otherwise insert the new key-value and return nil.
+func (c *Cache) AddOrGet(key interface{}, value interface{}) interface{} {
+	if c.cache == nil {
+		c.cache = make(map[interface{}]*list.Element)
+		c.lruList = list.New()
+	}
+	if ee, ok := c.cache[key]; ok {
+		c.lruList.MoveToFront(ee)
+		return ee.Value.(*entry).value
+	}
+	ele := c.lruList.PushFront(&entry{key, value})
+	c.cache[key] = ele
+	if c.lruList.Len() > c.capacity {
+		c.removeOldest()
+	}
+	return nil
+}
+
 func (c *Cache) Add(key interface{}, value interface{}) {
 	if c.cache == nil {
 		c.cache = make(map[interface{}]*list.Element)

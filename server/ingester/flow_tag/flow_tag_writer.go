@@ -46,6 +46,11 @@ type FlowTagWriter struct {
 type FlowTagCache struct {
 	FieldCache, FieldValueCache *lru.Cache
 	CacheFlushTimeout           uint32
+
+	// temporary buffers for generating new flow_tags
+	FlowTagInfoBuffer FlowTagInfo
+	Fields            []interface{}
+	FieldValues       []interface{}
 }
 
 func NewFlowTagCache(cacheFlushTimeout, cacheMaxSize uint32) *FlowTagCache {
@@ -77,9 +82,9 @@ func NewFlowTagWriter(
 	var err error
 	for _, tagType := range []TagType{TagField, TagFieldValue} {
 		tableName := fmt.Sprintf("%s_%s", srcDB, tagType.String())
-		t.hasFieldValue = false
+		t.FieldValue = ""
 		if tagType == TagFieldValue {
-			t.hasFieldValue = true
+			t.FieldValue = "x" // Assign a value to the FieldValue field to correctly identify the type of FlowTag.
 		}
 		w.ckwriters[tagType], err = ckwriter.NewCKWriter(
 			w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
@@ -100,16 +105,14 @@ func (w *FlowTagWriter) Write(t TagType, values ...interface{}) {
 	w.ckwriters[t].Put(values...)
 }
 
-func (w *FlowTagWriter) WriteFieldsAndFieldValues(fields, fieldValues []interface{}) {
-	// FIXME: we need check whether FieldCache/FieldValueCache is too large, if so,
-	// we need to consider rebuilding the cache, and pay attention to controlling the frequency of reconstruction.
-	if len(fields) != 0 {
-		w.ckwriters[TagField].Put(fields...)
-		w.counter.NewFieldCount += int64(len(fields))
+func (w *FlowTagWriter) WriteFieldsAndFieldValuesInCache() {
+	if len(w.Cache.Fields) != 0 {
+		w.ckwriters[TagField].Put(w.Cache.Fields...)
+		w.counter.NewFieldCount += int64(len(w.Cache.Fields))
 	}
-	if len(fieldValues) != 0 {
-		w.ckwriters[TagFieldValue].Put(fieldValues...)
-		w.counter.NewFieldValueCount += int64(len(fieldValues))
+	if len(w.Cache.FieldValues) != 0 {
+		w.ckwriters[TagFieldValue].Put(w.Cache.FieldValues...)
+		w.counter.NewFieldValueCount += int64(len(w.Cache.FieldValues))
 	}
 }
 
