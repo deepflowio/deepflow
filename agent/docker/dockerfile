@@ -27,10 +27,4 @@ RUN --mount=target=/tmp-mount \
 
 USER root
 
-CMD /bin/deepflow-agent -f /etc/deepflow-agent/deepflow-agent.yaml
-
-    # apk upgrade --update \
-    # && apk add -U tzdata \
-    # && cp /usr/share/zoneinfo/${DEFAULT_TZ} /etc/localtime \
-    # && apk del tzdata \
-    # && rm -rf /var/cache/apk/*  && \
+CMD ["/bin/deepflow-agent", "-f", "/etc/deepflow-agent/deepflow-agent.yaml"]
