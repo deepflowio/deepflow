@@ -243,7 +243,7 @@ func (d *Decoder) sendOpenMetetry(vtapID uint16, tracesData *v1.TracesData) {
 			d.counter.DropCount++
 		} else {
 			d.fieldsBuf, d.fieldValuesBuf = d.fieldsBuf[:0], d.fieldValuesBuf[:0]
-			d.flowTagWriter.WriteFieldsAndFieldValues(log_data.L7FlowLogToFlowTagInterfaces(l, &d.fieldsBuf, &d.fieldValuesBuf))
+			//d.flowTagWriter.WriteFieldsAndFieldValues(log_data.L7FlowLogToFlowTagInterfaces(l, &d.fieldsBuf, &d.fieldValuesBuf))
 			d.otlpExport(l)
 		}
 		l.Release()
@@ -303,7 +303,7 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 	l.AddReferenceCount()
 	if d.throttler.SendWithThrottling(l) {
 		d.fieldsBuf, d.fieldValuesBuf = d.fieldsBuf[:0], d.fieldValuesBuf[:0]
-		d.flowTagWriter.WriteFieldsAndFieldValues(log_data.L7FlowLogToFlowTagInterfaces(l, &d.fieldsBuf, &d.fieldValuesBuf))
+		//d.flowTagWriter.WriteFieldsAndFieldValues(log_data.L7FlowLogToFlowTagInterfaces(l, &d.fieldsBuf, &d.fieldValuesBuf))
 		d.otlpExport(l)
 	} else {
 		dropped = true

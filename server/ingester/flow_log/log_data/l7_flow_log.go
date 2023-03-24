@@ -23,8 +23,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/deepflowio/deepflow/server/ingester/flow_log/common"
-	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
+	//"github.com/deepflowio/deepflow/server/ingester/flow_log/common"
+	//"github.com/deepflowio/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/datatype/pb"
@@ -572,38 +572,39 @@ func ProtoLogToL7FlowLog(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfo
 }
 
 func L7FlowLogToFlowTagInterfaces(l *L7FlowLog, fields, fieldValues *[]interface{}) ([]interface{}, []interface{}) {
-	time := uint32(l.L7Base.EndTime / US_TO_S_DEVISOR)
-	db, table := common.FLOW_LOG_DB, common.L7_FLOW_ID.String()
+	// FIXME
+	//time := uint32(l.L7Base.EndTime / US_TO_S_DEVISOR)
+	//db, table := common.FLOW_LOG_DB, common.L7_FLOW_ID.String()
 
-	extraFieldNames := []string{"app_service", "endpoint", "app_instance"}
-	extraFieldValues := []string{l.AppService, l.Endpoint, l.AppInstance}
+	//extraFieldNames := []string{"app_service", "endpoint", "app_instance"}
+	//extraFieldValues := []string{l.AppService, l.Endpoint, l.AppInstance}
 
-	L3EpcIDs := []int32{l.L3EpcID0, l.L3EpcID1}
-	PodNSIDs := []uint16{l.PodNSID0, l.PodNSID1}
-	if l.L3EpcID0 == l.L3EpcID1 && l.PodNSID0 == l.PodNSID1 {
-		L3EpcIDs = L3EpcIDs[:1]
-		PodNSIDs = PodNSIDs[:1]
-	}
+	//L3EpcIDs := []int32{l.L3EpcID0, l.L3EpcID1}
+	//PodNSIDs := []uint16{l.PodNSID0, l.PodNSID1}
+	//if l.L3EpcID0 == l.L3EpcID1 && l.PodNSID0 == l.PodNSID1 {
+	//	L3EpcIDs = L3EpcIDs[:1]
+	//	PodNSIDs = PodNSIDs[:1]
+	//}
 
-	for i, L3EpcID := range L3EpcIDs {
-		PodNSID := PodNSIDs[i]
-		for i, name := range extraFieldNames {
-			if extraFieldValues[i] == "" {
-				continue
-			}
-			*fieldValues = append(*fieldValues, flow_tag.NewTagFieldValue(time, db, table, L3EpcID, PodNSID, flow_tag.FieldTag, name, extraFieldValues[i]))
-		}
+	//for i, L3EpcID := range L3EpcIDs {
+	//	PodNSID := PodNSIDs[i]
+	//	for i, name := range extraFieldNames {
+	//		if extraFieldValues[i] == "" {
+	//			continue
+	//		}
+	//		*fieldValues = append(*fieldValues, flow_tag.NewTagFieldValue(time, db, table, L3EpcID, PodNSID, flow_tag.FieldTag, name, extraFieldValues[i]))
+	//	}
 
-		for i, name := range l.AttributeNames {
-			*fields = append(*fields, flow_tag.NewTagField(time, db, table, L3EpcID, PodNSID, flow_tag.FieldTag, name))
-			if l.AttributeValues[i] != "" {
-				*fieldValues = append(*fieldValues, flow_tag.NewTagFieldValue(time, db, table, L3EpcID, PodNSID, flow_tag.FieldTag, name, l.AttributeValues[i]))
-			}
-		}
-		for _, name := range l.MetricsNames {
-			*fields = append(*fields, flow_tag.NewTagField(time, db, table, L3EpcID, PodNSID, flow_tag.FieldMetrics, name))
-		}
-	}
+	//	for i, name := range l.AttributeNames {
+	//		*fields = append(*fields, flow_tag.NewTagField(time, db, table, L3EpcID, PodNSID, flow_tag.FieldTag, name))
+	//		if l.AttributeValues[i] != "" {
+	//			*fieldValues = append(*fieldValues, flow_tag.NewTagFieldValue(time, db, table, L3EpcID, PodNSID, flow_tag.FieldTag, name, l.AttributeValues[i]))
+	//		}
+	//	}
+	//	for _, name := range l.MetricsNames {
+	//		*fields = append(*fields, flow_tag.NewTagField(time, db, table, L3EpcID, PodNSID, flow_tag.FieldMetrics, name))
+	//	}
+	//}
 
 	return *fields, *fieldValues
 }

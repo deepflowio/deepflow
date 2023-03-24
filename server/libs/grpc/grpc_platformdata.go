@@ -1059,6 +1059,10 @@ func (t *PlatformInfoTable) ReloadMaster() error {
 	return nil
 }
 
+func (t *PlatformInfoTable) Version() uint64 {
+	return t.versionPlatformData
+}
+
 func (t *PlatformInfoTable) getCommunicationVtaps() []*trident.CommunicationVtap {
 	var communicationVtaps []*trident.CommunicationVtap
 	if t.receiver != nil {
