@@ -214,8 +214,9 @@ func (c *ControllerCheck) vtapControllerCheck() {
 
 	mysql.Db.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&vtaps)
 	for _, vtap := range vtaps {
-		// check vtap.analyzer_ip is not in controller.ip, set to empty if not exist
+		// check vtap.controller_ip is not in controller.ip, set to empty if not exist
 		if _, ok := ipMap[vtap.ControllerIP]; !ok {
+			log.Infof("controller ip(%s) in vtap(%s) is invalid", vtap.ControllerIP, vtap.Name)
 			vtap.ControllerIP = ""
 			mysql.Db.Model(&mysql.VTap{}).Where("lcuuid = ?", vtap.Lcuuid).Update("controller_ip", "")
 		}

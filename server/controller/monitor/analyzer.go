@@ -199,6 +199,7 @@ func (c *AnalyzerCheck) vtapAnalyzerCheck() {
 	for _, vtap := range vtaps {
 		// check vtap.analyzer_ip is not in controller.ip, set to empty if not exist
 		if _, ok := ipMap[vtap.AnalyzerIP]; !ok {
+			log.Infof("analyzer ip(%s) in vtap(%s) is invalid", vtap.AnalyzerIP, vtap.Name)
 			vtap.AnalyzerIP = ""
 			mysql.Db.Model(&mysql.VTap{}).Where("lcuuid = ?", vtap.Lcuuid).Update("analyzer_ip", "")
 		}
