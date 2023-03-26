@@ -1151,14 +1151,14 @@ pub fn get_direction(
         }
         return [src_direct, dst_direct];
     } else if flow.signal_source == SignalSource::OTel {
-        let (mut src_direct, mut dst_direct) =
-            (Direction::ClientAppToServer, Direction::ServerAppToClient);
-        if src_ep.is_l2_end {
-            dst_direct = Direction::None
-        } else if dst_ep.is_l2_end {
-            src_direct = Direction::None
-        }
-        return [src_direct, dst_direct];
+        // The direction of otel data is obtained according to flow.tap_side.
+        return if flow.tap_side == TapSide::ClientApp {
+            [Direction::ClientAppToServer, Direction::None]
+        } else if flow.tap_side == TapSide::ServerApp {
+            [Direction::None, Direction::ServerAppToClient]
+        } else {
+            [Direction::None, Direction::None]
+        };
     } else if flow.signal_source == SignalSource::XFlow {
         return [Direction::None, Direction::None];
     } else if flow.flow_key.mac_src == flow.flow_key.mac_dst
