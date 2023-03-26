@@ -638,6 +638,9 @@ impl FlowLog {
         counter: Arc<FlowPerfCounter>,
         server_port: u16,
     ) -> Option<Self> {
+        if !l4_enabled && !l7_enabled {
+            return None;
+        }
         let l4 = if l4_enabled {
             match l4_proto {
                 L4Protocol::Tcp => Some(L4FlowPerfTable::Tcp(Box::new(TcpPerf::new(counter)))),
@@ -647,18 +650,11 @@ impl FlowLog {
         } else {
             None
         };
-        let l7 = if l7_enabled {
-            Self::l7_new(l7_protocol_enum.get_l7_protocol(), rrt_cache.clone())
-        } else {
-            None
-        };
-        if l4.is_none() && l7.is_none() {
-            return None;
-        }
 
         Some(Self {
             l4: l4.map(|o| Box::new(o)),
-            l7: l7.map(|o| Box::new(o)),
+            l7: Self::l7_new(l7_protocol_enum.get_l7_protocol(), rrt_cache.clone())
+                .map(|o| Box::new(o)),
             l7_protocol_log_parser: get_parser(l7_protocol_enum).map(|o| Box::new(o)),
             rrt_cache,
             perf_cache,
