@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/bitly/go-simplejson"
@@ -31,6 +32,7 @@ import (
 
 	"github.com/deepflowio/deepflow/cli/ctl/common"
 	"github.com/deepflowio/deepflow/cli/ctl/common/jsonparser"
+	"github.com/deepflowio/deepflow/cli/ctl/common/printutil"
 	"github.com/deepflowio/deepflow/cli/ctl/example"
 	agentpb "github.com/deepflowio/deepflow/message/trident"
 )
@@ -133,6 +135,14 @@ func RegisterAgentUpgradeCommand() *cobra.Command {
 				if args[0] == "list" {
 					listAgentUpgrade(cmd, args)
 				} else if imageName != "" {
+					if filepath.IsAbs(imageName) {
+						printutil.ErrorfWithColor(
+							"invalid image name(%s), please use command `deepflow-ctl repo agent list` to get image name\n"+
+								"reference doc: https://deepflow.io/docs/zh/install/upgrade/",
+							imageName,
+						)
+						return
+					}
 					upgadeAgent(cmd, args)
 				} else {
 					fmt.Println(cmd.Example)
