@@ -17,6 +17,20 @@
 package model
 
 type ProfileTracing struct {
-	// TODO
-	AppService string `json:"app_service" binding:"required"`
+	AppService       string `json:"app_service" binding:"required"`
+	ProfileEventType string `json:"profile_event_type" binding:"required"`
+	TagFilter        string `json:"tag_filter"`
+	GroupBy          string `json:"group_by"`
+	TimeStart        int    `json:"time_start" binding:"required"`
+	TimeEnd          int    `json:"time_end" binding:"required"`
+}
+
+type ProfileTreeNode struct {
+	ProfileLocationStr   string   `json:"profile_location_str"`
+	NodeID               string   `json:"node_id"`
+	ProfileNodeIDS       []int    `json:"profile_node_ids"`
+	ParentNodeIDS        []string `json:"parent_node_ids"`
+	ProfileParentNodeIDS []int    `json:"profile_parent_node_ids"`
+	SelfValue            int      `json:"self_value"`
+	TotalValue           int      `json:"total_value"`
 }
