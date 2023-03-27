@@ -643,9 +643,13 @@ impl Stash {
             self.add(key, tagger.clone(), Meter::Flow(flow_meter));
         }
 
-        if tagger.l7_protocol != L7Protocol::Unknown && l7_metrics_enabled {
+        // The l7_protocol of otel data may not be available, so report all otel data metrics.
+        if (tagger.l7_protocol != L7Protocol::Unknown || tagger.signal_source == SignalSource::OTel)
+            && l7_metrics_enabled
+        {
             // Only data whose direction is c|s|local|c-p|s-p|c-app|s-app|app has app_meter.
             // The data of XFlow itself will not be duplicated.
+            // The tagger.signal_source != SignalSource::Packet which represents these directions: c-p|s-p|c-app|s-app|app
             if tagger.direction == Direction::ClientToServer
                 || tagger.direction == Direction::ServerToClient
                 || tagger.direction == Direction::LocalToLocal
@@ -792,8 +796,9 @@ impl Stash {
             );
         }
 
+        // The l7_protocol of otel data may not be available, so report all otel data metrics.
         // application metrics (vtap_app_edge_port)
-        if tagger.l7_protocol != L7Protocol::Unknown
+        if (tagger.l7_protocol != L7Protocol::Unknown || tagger.signal_source == SignalSource::OTel)
             && self.context.config.load().l7_metrics_enabled
         {
             tagger.code |= Code::L7_PROTOCOL;

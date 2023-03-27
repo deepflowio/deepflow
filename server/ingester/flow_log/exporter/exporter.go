@@ -144,7 +144,7 @@ func (e *OtlpExporter) newGrpcExporter(i int) error {
 	if err != nil {
 		return fmt.Errorf("grpc dial %s failed, err: %s", config.Addr, err)
 	}
-	log.Infof("new grpc otlp exporter: %s", config.Addr)
+	log.Debugf("new grpc otlp exporter: %s", config.Addr)
 	e.grpcConns[i] = conn
 	e.grpcExporters[i] = ptraceotlp.NewGRPCClient(conn)
 	return nil
