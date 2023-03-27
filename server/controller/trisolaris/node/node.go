@@ -285,7 +285,18 @@ func (n *NodeInfo) generateControllerInfo() {
 	}
 }
 
+func (n *NodeInfo) correctTSDBPodIP() {
+	tsdbMgr := dbmgr.DBMgr[models.Analyzer](n.db)
+	tsdb, err := tsdbMgr.GetByOption(tsdbMgr.WithIP(GetNodeIP()))
+	if err == nil && tsdb.PodIP != GetPodIP() {
+		tsdb.PodIP = GetPodIP()
+		tsdbMgr.Save(tsdb)
+	}
+}
+
 func (n *NodeInfo) initTSDBInfo() {
+	// The pod_ip will change after restarting the server, correct the pod_ip
+	n.correctTSDBPodIP()
 	dbTSDBs, err := dbmgr.DBMgr[models.Analyzer](n.db).Gets()
 	if err != nil {
 		log.Error(err)
