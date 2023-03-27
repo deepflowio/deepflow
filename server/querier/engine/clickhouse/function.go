@@ -48,6 +48,8 @@ const (
 	TAG_FUNCTION_ENUM                       = "enum"
 )
 
+const INTERVAL_1D = 86400
+
 var TAG_FUNCTIONS = []string{
 	TAG_FUNCTION_NODE_TYPE, TAG_FUNCTION_ICON_ID, TAG_FUNCTION_MASK, TAG_FUNCTION_TIME,
 	TAG_FUNCTION_TO_UNIX_TIMESTAMP_64_MICRO, TAG_FUNCTION_TO_STRING, TAG_FUNCTION_IF,
@@ -402,6 +404,17 @@ func (t *Time) Trans(m *view.Model) error {
 
 func (t *Time) Format(m *view.Model) {
 	toIntervalFunction := "toIntervalSecond"
+	interval := m.Time.Interval
+	toDatasourceIntervalFunction := "toIntervalSecond"
+	datasourceInterval := m.Time.DatasourceInterval
+	if interval >= INTERVAL_1D {
+		toIntervalFunction = "toIntervalDay"
+		interval = interval / INTERVAL_1D
+	}
+	if datasourceInterval >= INTERVAL_1D {
+		toDatasourceIntervalFunction = "toIntervalDay"
+		datasourceInterval = datasourceInterval / INTERVAL_1D
+	}
 	var windows string
 	w := make([]string, t.WindowSize)
 	for i := range w {
@@ -412,8 +425,8 @@ func (t *Time) Format(m *view.Model) {
 	if m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_LAYERED {
 		innerTimeField = "_" + t.TimeField
 		withValue := fmt.Sprintf(
-			"toStartOfInterval(%s, toIntervalSecond(%d))",
-			t.TimeField, m.Time.DatasourceInterval,
+			"toStartOfInterval(%s, %s(%d))",
+			t.TimeField, toDatasourceIntervalFunction, datasourceInterval,
 		)
 		withAlias := "_" + t.TimeField
 		withs := []view.Node{&view.With{Value: withValue, Alias: withAlias}}
@@ -424,7 +437,7 @@ func (t *Time) Format(m *view.Model) {
 	}
 	withValue := fmt.Sprintf(
 		"toStartOfInterval(%s, %s(%d)) + %s(arrayJoin([%s]) * %d)",
-		innerTimeField, toIntervalFunction, m.Time.Interval, toIntervalFunction, windows, m.Time.Interval,
+		innerTimeField, toIntervalFunction, interval, toIntervalFunction, windows, interval,
 	)
 	withAlias := "_" + strings.Trim(t.Alias, "`")
 	withs := []view.Node{&view.With{Value: withValue, Alias: withAlias}}
