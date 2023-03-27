@@ -104,6 +104,7 @@ int kernel_struct_field_offset(struct ebpf_object *obj, const char *struct_name,
 
 	btf_id = btf__find_by_name_kind(btf, struct_name, BTF_KIND_STRUCT);
 	if (btf_id < 0) {
+		ebpf_warning("BTF struct %s can not found\n", struct_name);
 		return ETR_NOTEXIST;
 	}
 
@@ -117,6 +118,6 @@ int kernel_struct_field_offset(struct ebpf_object *obj, const char *struct_name,
 					      btf_member->offset) / 8;
 		}
 	}
-
+	ebpf_warning("BTF member %s of struct %s can not found\n",field_name, struct_name);
 	return ETR_NOTEXIST;
 }

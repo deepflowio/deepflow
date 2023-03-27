@@ -1008,6 +1008,34 @@ static void process_events_handle_main(__unused void *arg)
 	}
 }
 
+static int update_offset_map_default(struct bpf_tracer *t)
+{
+	struct bpf_offset_param offset;
+	memset(&offset, 0, sizeof(offset));
+
+	offset.struct_files_struct_fdt_offset = 0x20;
+	offset.struct_files_private_data_offset = 0xc8;
+	offset.struct_file_f_inode_offset = 0x20;
+	offset.struct_inode_i_mode_offset = 0x00;
+	offset.struct_file_dentry_offset = 0x18;
+	offset.struct_dentry_name_offset = 0x28;
+	offset.struct_sock_family_offset = 0x10;
+	offset.struct_sock_saddr_offset = 0x4;
+	offset.struct_sock_daddr_offset = 0x0;
+	offset.struct_sock_ip6saddr_offset = 0x48;
+	offset.struct_sock_ip6daddr_offset = 0x38;
+	offset.struct_sock_dport_offset = 0xc;
+	offset.struct_sock_sport_offset = 0xe;
+	offset.struct_sock_skc_state_offset = 0x12;
+	offset.struct_sock_common_ipv6only_offset = 0x13;
+
+	if (update_offsets_table(t, &offset) != ETR_OK) {
+		ebpf_error("update_offset_map_default failed.\n");
+		return ETR_UPDATE_MAP_FAILD;
+	}
+	return ETR_OK;
+}
+
 static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 {
 	struct ebpf_object *obj = t->obj;
@@ -1018,12 +1046,12 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 
 	int copied_seq_offs, write_seq_offs, files_offs, sk_flags_offs;
 	copied_seq_offs =
-	    kernel_struct_field_offset(obj, "tcp_sock", "copied_seq");
+		kernel_struct_field_offset(obj, "tcp_sock", "copied_seq");
 	write_seq_offs =
-	    kernel_struct_field_offset(obj, "tcp_sock", "write_seq");
+		kernel_struct_field_offset(obj, "tcp_sock", "write_seq");
 	files_offs = kernel_struct_field_offset(obj, "task_struct", "files");
 	sk_flags_offs =
-	    kernel_struct_field_offset(obj, "sock", "__sk_flags_offset");
+		kernel_struct_field_offset(obj, "sock", "__sk_flags_offset");
 
 	/*
 	 * From linux 5.6+, struct sock has changed(without '__sk_flags_offset[0]').
@@ -1047,8 +1075,58 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 		}
 	}
 
-	if (copied_seq_offs < 0 || write_seq_offs < 0 ||
-	    files_offs < 0 || sk_flags_offs < 0) {
+
+
+	int struct_files_struct_fdt_offset =
+		kernel_struct_field_offset(obj, "files_struct", "fdt");
+	int struct_files_private_data_offset =
+		kernel_struct_field_offset(obj, "file", "private_data");
+	int struct_file_f_inode_offset =
+		kernel_struct_field_offset(obj, "file", "f_inode");
+	int struct_inode_i_mode_offset =
+		kernel_struct_field_offset(obj, "inode", "i_mode");
+	int struct_file_dentry_offset_1 =
+		kernel_struct_field_offset(obj, "file", "f_path");
+	int struct_file_dentry_offset_2 =
+		kernel_struct_field_offset(obj, "path", "dentry");
+	if (struct_file_dentry_offset_1 < 0 ||
+	    struct_file_dentry_offset_2 < 0) {
+		return ETR_NOTSUPP;
+	}
+	int struct_file_dentry_offset =
+		struct_file_dentry_offset_1 + struct_file_dentry_offset_2;
+	int struct_dentry_name_offset =
+		kernel_struct_field_offset(obj, "dentry", "d_iname");
+	int struct_sock_family_offset =
+		kernel_struct_field_offset(obj, "sock_common", "skc_family");
+	int struct_sock_saddr_offset =
+		kernel_struct_field_offset(obj, "sock_common", "skc_rcv_saddr");
+	int struct_sock_daddr_offset =
+		kernel_struct_field_offset(obj, "sock_common", "skc_daddr");
+	int struct_sock_ip6saddr_offset =
+		kernel_struct_field_offset(obj, "sock_common", "skc_v6_rcv_saddr");
+	int struct_sock_ip6daddr_offset =
+		kernel_struct_field_offset(obj, "sock_common", "skc_v6_daddr");
+	int struct_sock_dport_offset =
+		kernel_struct_field_offset(obj, "sock_common", "skc_dport");
+	int struct_sock_sport_offset =
+		kernel_struct_field_offset(obj, "sock_common", "skc_num");
+	int struct_sock_skc_state_offset =
+		kernel_struct_field_offset(obj, "sock_common", "skc_state");
+	int struct_sock_common_ipv6only_offset =
+		kernel_struct_field_offset(obj, "sock_common", "skc_flags");
+
+	if (copied_seq_offs < 0 || write_seq_offs < 0 || files_offs < 0 ||
+	    sk_flags_offs < 0 || struct_files_struct_fdt_offset < 0 ||
+	    struct_files_private_data_offset < 0 ||
+	    struct_file_f_inode_offset < 0 || struct_inode_i_mode_offset < 0 ||
+	    struct_inode_i_mode_offset < 0 || struct_file_dentry_offset < 0 ||
+	    struct_dentry_name_offset < 0 || struct_sock_family_offset < 0 ||
+	    struct_sock_saddr_offset < 0 || struct_sock_daddr_offset < 0 ||
+	    struct_sock_ip6saddr_offset < 0 ||
+	    struct_sock_ip6daddr_offset < 0 || struct_sock_dport_offset < 0 ||
+	    struct_sock_sport_offset < 0 || struct_sock_skc_state_offset < 0 ||
+	    struct_sock_common_ipv6only_offset < 0) {
 		return ETR_NOTSUPP;
 	}
 
@@ -1062,9 +1140,23 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	offset.ready = 1;
 	offset.task__files_offset = files_offs;
 	offset.sock__flags_offset = sk_flags_offs;
-	offset.socket__has_wq_ptr = 0;
 	offset.tcp_sock__copied_seq_offset = copied_seq_offs;
 	offset.tcp_sock__write_seq_offset = write_seq_offs;
+	offset.struct_files_struct_fdt_offset = struct_files_struct_fdt_offset;
+	offset.struct_files_private_data_offset = struct_files_private_data_offset;
+	offset.struct_file_f_inode_offset = struct_file_f_inode_offset;
+	offset.struct_inode_i_mode_offset = struct_inode_i_mode_offset;
+	offset.struct_file_dentry_offset = struct_file_dentry_offset;
+	offset.struct_dentry_name_offset = struct_dentry_name_offset;
+	offset.struct_sock_family_offset = struct_sock_family_offset;
+	offset.struct_sock_saddr_offset = struct_sock_saddr_offset;
+	offset.struct_sock_daddr_offset = struct_sock_daddr_offset;
+	offset.struct_sock_ip6saddr_offset = struct_sock_ip6saddr_offset;
+	offset.struct_sock_ip6daddr_offset = struct_sock_ip6daddr_offset;
+	offset.struct_sock_dport_offset = struct_sock_dport_offset;
+	offset.struct_sock_sport_offset = struct_sock_sport_offset;
+	offset.struct_sock_skc_state_offset = struct_sock_skc_state_offset;
+	offset.struct_sock_common_ipv6only_offset = struct_sock_common_ipv6only_offset;
 
 	if (update_offsets_table(t, &offset) != ETR_OK) {
 		ebpf_warning("Update offsets map failed.\n");
@@ -1453,6 +1545,9 @@ int running_socket_tracer(l7_handle_fn handle,
 	// Update kernel offsets map from btf vmlinux file.
 	if (update_offset_map_from_btf_vmlinux(tracer) != ETR_OK) {
 		ebpf_info("Set offsets map from btf_vmlinux, not support.\n");
+		if (update_offset_map_default(tracer) != ETR_OK) {
+			ebpf_error("Fatal error, failed to update default offset\n");
+		}
 	} else {
 		ebpf_info("Set offsets map from btf_vmlinux, success.\n");
 	}

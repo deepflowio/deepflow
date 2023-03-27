@@ -431,10 +431,10 @@ static __inline void get_sock_flags(void *sk,
  * @s sock address
  * @f skc_family
  */
-#define ipv4_mapped_on_ipv6_confirm(s, f)				\
+#define ipv4_mapped_on_ipv6_confirm(s, f, o)				\
 do {									\
 	char __addr[16];						\
-	bpf_probe_read(__addr, 16, (s) + STRUCT_SOCK_IP6SADDR_OFFSET);	\
+	bpf_probe_read(__addr, 16, (s) + o->struct_sock_ip6saddr_offset);\
 	__u32 __feature = *(__u32 *)&__addr[8];				\
 	if (__feature == 0xffff0000)					\
 		f = PF_INET;						\
@@ -453,10 +453,10 @@ static __inline int is_tcp_udp_data(void *sk,
 
 	struct skc_flags_t skc_flags;
 	bpf_probe_read(&skc_flags, sizeof(skc_flags),
-		       sk + STRUCT_SOCK_COMMON_IPV6ONLY_OFFSET);
+		       sk + offset->struct_sock_common_ipv6only_offset);
 	conn_info->skc_ipv6only = skc_flags.skc_ipv6only;
 	bpf_probe_read(&conn_info->skc_family, sizeof(conn_info->skc_family),
-		       sk + STRUCT_SOCK_FAMILY_OFFSET);
+		       sk + offset->struct_sock_family_offset);
 	/*
 	 * Without thinking about PF_UNIX.
 	 */
@@ -465,7 +465,7 @@ static __inline int is_tcp_udp_data(void *sk,
 		break;
 	case PF_INET6:
 		if (conn_info->skc_ipv6only == 0) {
-			ipv4_mapped_on_ipv6_confirm(sk, conn_info->skc_family);
+			ipv4_mapped_on_ipv6_confirm(sk, conn_info->skc_family, offset);
 		}
 		break;
 	default:
@@ -484,7 +484,8 @@ static __inline int is_tcp_udp_data(void *sk,
 	}
 
 	unsigned char skc_state;
-	bpf_probe_read(&skc_state, sizeof(skc_state), (void *)sk + STRUCT_SOCK_SKC_STATE_OFFSET);
+	bpf_probe_read(&skc_state, sizeof(skc_state),
+		       (void *)sk + offset->struct_sock_skc_state_offset);
 
 	/* 如果连接尚未建立好，不处于ESTABLISHED或者CLOSE_WAIT状态，退出 */
 	if ((1 << skc_state) & ~(TCPF_ESTABLISHED | TCPF_CLOSE_WAIT)) {
@@ -496,13 +497,13 @@ static __inline int is_tcp_udp_data(void *sk,
 }
 
 static __inline void init_conn_info(__u32 tgid, __u32 fd,
-				    struct conn_info_t *conn_info,
-				    void *sk)
+				    struct conn_info_t *conn_info, void *sk,
+				    struct member_fields_offset *offset)
 {
 	__be16 inet_dport;
 	__u16 inet_sport;
-	bpf_probe_read(&inet_dport, sizeof(inet_dport), sk + STRUCT_SOCK_DPORT_OFFSET);
-	bpf_probe_read(&inet_sport, sizeof(inet_sport), sk + STRUCT_SOCK_SPORT_OFFSET);
+	bpf_probe_read(&inet_dport, sizeof(inet_dport), sk + offset->struct_sock_dport_offset);
+	bpf_probe_read(&inet_sport, sizeof(inet_sport), sk + offset->struct_sock_sport_offset);
 	conn_info->tuple.dport = __bpf_ntohs(inet_dport);
 	conn_info->tuple.num = inet_sport;
 	conn_info->correlation_id = -1; // 当前用于kafka协议推断
@@ -514,25 +515,38 @@ static __inline void init_conn_info(__u32 tgid, __u32 fd,
 			socket_info_map__lookup(&conn_key);
 }
 
-static __inline bool get_socket_info(struct __socket_data *v,
-				     void *sk,
-				     struct conn_info_t* conn_info)
+static __inline bool get_socket_info(struct __socket_data *v, void *sk,
+				     struct conn_info_t *conn_info)
 {
 	if (v == NULL || sk == NULL)
 		return false;
 
+	unsigned int k0 = 0;
+	struct member_fields_offset *offset = members_offset__lookup(&k0);
+	if (!offset)
+		return false;
 	/*
 	 * Without thinking about PF_UNIX.
 	 */
 	switch (conn_info->skc_family) {
 	case PF_INET:
-		bpf_probe_read(v->tuple.rcv_saddr, 4, sk + STRUCT_SOCK_SADDR_OFFSET);
-		bpf_probe_read(v->tuple.daddr, 4, sk + STRUCT_SOCK_DADDR_OFFSET);
+		bpf_probe_read(v->tuple.rcv_saddr, 4,
+			       sk + offset->struct_sock_saddr_offset);
+		bpf_probe_read(v->tuple.daddr, 4,
+			       sk + offset->struct_sock_daddr_offset);
 		v->tuple.addr_len = 4;
 		break;
 	case PF_INET6:
-		bpf_probe_read(v->tuple.rcv_saddr, 16, sk + STRUCT_SOCK_IP6SADDR_OFFSET);
-		bpf_probe_read(v->tuple.daddr, 16, sk + STRUCT_SOCK_IP6DADDR_OFFSET);
+		if (sk + offset->struct_sock_ip6saddr_offset >= 0) {
+			bpf_probe_read(
+				v->tuple.rcv_saddr, 16,
+				sk + offset->struct_sock_ip6saddr_offset);
+		}
+		if (sk + offset->struct_sock_ip6daddr_offset >= 0) {
+			bpf_probe_read(
+				v->tuple.daddr, 16,
+				sk + offset->struct_sock_ip6daddr_offset);
+		}
 		v->tuple.addr_len = 16;
 		break;
 	default:
@@ -1247,7 +1261,7 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 		return -1;
 	}
 
-	init_conn_info(id >> 32, args->fd, &__conn_info, sk);
+	init_conn_info(id >> 32, args->fd, &__conn_info, sk, offset);
 
 	conn_info->direction = direction;
 
@@ -2022,7 +2036,7 @@ static __inline bool is_regular_file(int fd)
 	__u32 k0 = 0;
 	struct member_fields_offset *offset = members_offset__lookup(&k0);
 	void *file = fd_to_file(fd, offset);
-	__u32 i_mode = file_to_i_mode(file);
+	__u32 i_mode = file_to_i_mode(file, offset);
 	return S_ISREG(i_mode);
 }
 
@@ -2031,7 +2045,7 @@ static __inline char *fd_to_name(int fd)
 	__u32 k0 = 0;
 	struct member_fields_offset *offset = members_offset__lookup(&k0);
 	void *file = fd_to_file(fd, offset);
-	return file_to_name(file);
+	return file_to_name(file, offset);
 }
 
 static __inline void trace_io_event_common(void *ctx,
