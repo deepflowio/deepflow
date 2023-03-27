@@ -89,13 +89,41 @@ int ebpf_obj__load_vmlinux_btf(struct ebpf_object *obj)
 	return ETR_INVAL;
 }
 
+static int kernel_struct_field_offset_helper(struct btf *btf, int btf_id,
+					     const char *field_name)
+{
+	int i;
+	const struct btf_type *btf_type = btf__type_by_id(btf, btf_id);
+	const struct btf_member *btf_member =
+		(struct btf_member *)(btf_type + 1);
+
+	for (i = 0; i < BTF_INFO_VLEN(btf_type->info); i++, btf_member++) {
+		if (!strcmp(btf__name_by_offset(btf, btf_member->name_off),
+			    field_name)) {
+			return BTF_MEM_OFFSET(btf_type->info,
+					      btf_member->offset) /
+			       8;
+		}
+		if (!strcmp(btf__name_by_offset(btf, btf_member->name_off),
+			    "")) {
+			int retval = kernel_struct_field_offset_helper(
+				btf, btf_member->type, field_name);
+			if (retval >= 0) {
+				return (BTF_MEM_OFFSET(btf_type->info,
+						       btf_member->offset) /
+					8) +
+				       retval;
+			}
+		}
+	}
+	return ETR_NOTEXIST;
+}
+
 int kernel_struct_field_offset(struct ebpf_object *obj, const char *struct_name,
 			       const char *field_name)
 {
-	const struct btf_type *btf_type;
-	const struct btf_member *btf_member;
 	struct btf *btf;
-	int i, btf_id;
+	int btf_id;
 	btf = obj->btf_vmlinux;
 
 	if (DF_IS_ERR_OR_NULL(btf)) {
@@ -104,19 +132,16 @@ int kernel_struct_field_offset(struct ebpf_object *obj, const char *struct_name,
 
 	btf_id = btf__find_by_name_kind(btf, struct_name, BTF_KIND_STRUCT);
 	if (btf_id < 0) {
+		ebpf_warning("BTF struct %s can not found\n", struct_name);
 		return ETR_NOTEXIST;
 	}
 
-	btf_type = btf__type_by_id(btf, btf_id);
-	btf_member = (struct btf_member *)(btf_type + 1);
-	for (i = 0; i < BTF_INFO_VLEN(btf_type->info); i++, btf_member++) {
-		if (!strcmp
-		    (btf__name_by_offset(btf, btf_member->name_off),
-		     field_name)) {
-			return BTF_MEM_OFFSET(btf_type->info,
-					      btf_member->offset) / 8;
-		}
+	int retval = kernel_struct_field_offset_helper(btf, btf_id, field_name);
+	if (retval < 0) {
+		ebpf_warning("BTF member %s of struct %s can not be found\n",
+			     field_name, struct_name);
+		return ETR_NOTEXIST;
 	}
 
-	return ETR_NOTEXIST;
+	return retval;
 }
