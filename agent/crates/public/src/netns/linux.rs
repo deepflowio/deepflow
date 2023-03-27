@@ -218,6 +218,13 @@ impl NetNs {
                         continue;
                     }
                 };
+                let current_ns = match NsFile::try_from(path.as_ref()) {
+                    Ok(ns) => ns,
+                    Err(e) => {
+                        debug!("create nsfile from {} failed: {:?}", path.display(), e);
+                        continue;
+                    }
+                };
                 if let Err(_) = Self::setns(&fp, Some(path)) {
                     debug!("setns failed for file {}", path.display());
                     continue;
@@ -285,7 +292,7 @@ impl NetNs {
                             })
                             .collect(),
                         name: link.name,
-                        device_id: format!("{}", NsFile::try_from(path.as_ref()).unwrap()),
+                        device_id: current_ns.to_string(),
                     };
                     trace!("found {:?}", info);
                     result
