@@ -2,6 +2,7 @@ package decoder
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"strconv"
 	"strings"
@@ -18,6 +19,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/stats"
 	"github.com/deepflowio/deepflow/server/libs/utils"
 	"github.com/deepflowio/deepflow/server/libs/zerodoc/pb"
+	"github.com/google/uuid"
 	"github.com/op/go-logging"
 	"github.com/pyroscope-io/pyroscope/pkg/convert/jfr"
 	"github.com/pyroscope-io/pyroscope/pkg/convert/pprof"
@@ -186,10 +188,16 @@ func (d *Decoder) handleProfileData(vtapID uint16, decoder *codec.SimpleDecoder)
 }
 
 func (d *Decoder) buildMetaData(profile *pb.Profile) ingestion.Metadata {
-	profileName, err := url.QueryUnescape(profile.Name)
-	if err != nil {
-		log.Warning("decode profile.name wrong, got %s, will use as profilename", profile.Name)
-		profileName = profile.Name
+	var profileName string
+	var err error
+	if profile.Name == "" {
+		profileName = fmt.Sprintf("%s-%s", "profile-empty-service", generateUUID())
+	} else {
+		profileName, err = url.QueryUnescape(profile.Name)
+		if err != nil {
+			log.Warning("decode profile.name wrong, got %s, will use as profilename", profile.Name)
+			profileName = profile.Name
+		}
 	}
 	labels, err := segment.ParseKey(profileName)
 	if err != nil {
@@ -217,4 +225,9 @@ func (d *Decoder) sendProfileData(profile ingestion.RawProfile, format string, p
 		Metadata: metadata,
 	}
 	return input.Profile.Parse(context.TODO(), parser, parser, metadata)
+}
+
+// generate uuid with length 8
+func generateUUID() string {
+	return uuid.New().String()[:8]
 }
