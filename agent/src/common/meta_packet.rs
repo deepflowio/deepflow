@@ -848,7 +848,7 @@ impl<'a> MetaPacket<'a> {
         packet.packet_len = data.syscall_len as u32 + 54; // 目前仅支持TCP
         packet.payload_len = data.cap_len as u16;
         packet.l4_payload_len = data.cap_len as u16;
-        packet.tap_port = TapPort::from_ebpf(data.process_id);
+        packet.tap_port = TapPort::from_ebpf(data.process_id, data.source);
         packet.signal_source = SignalSource::EBPF;
         packet.cap_seq = data.cap_seq;
         packet.process_id = data.process_id;
