@@ -18,10 +18,11 @@ package kubernetes_gather
 
 import (
 	"errors"
-	"inet.af/netaddr"
 	"regexp"
 	"sort"
 	"strings"
+
+	"inet.af/netaddr"
 
 	mapset "github.com/deckarep/golang-set"
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
@@ -62,7 +63,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 	}
 	genesisData, err := genesis.GenesisService.GetGenesisSyncResponse()
 	if err != nil {
-		log.Error("get genesis vinterface failed")
+		log.Error(err.Error())
 		return
 	}
 	vData := genesisData.Vinterfaces
