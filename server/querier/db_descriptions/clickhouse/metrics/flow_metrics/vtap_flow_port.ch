@@ -20,7 +20,6 @@ synack_count                , SYN-ACK 包数            , 包   , TCP 三次握�
 l4_byte                     , 传输层载荷              , 字节 , 发送与接收字节的总和，包含 TCP/UDP 的 payload 的长度
 l4_byte_tx                  , 发送传输层载荷          , 字节 , 发送字节的总和，包含 TCP/UDP 的 payload 的长度
 l4_byte_rx                  , 接收传输层载荷          , 字节 , 接收字节的总和，包含 TCP/UDP 的 payload 的长度
-direction_score             , 方向得分                ,      , 得分越高时客户端、服务端方向的准确性越高，得分为 255 时方向一定是正确的。
 
 retrans_syn                 , SYN 重传                , 包   , TCP 三次握手阶段 SYN 包的重传次数
 retrans_synack              , SYN-ACK 重传            , 包   , TCP 三次握手阶段 SYN 包的重传次数
