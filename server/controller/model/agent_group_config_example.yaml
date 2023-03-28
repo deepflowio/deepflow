@@ -455,10 +455,11 @@ vtap_group_id: g-xxxxxx
   #afpacket-blocks-enabled: false
 
   ## AF_PACKET Blocks
+  ## Default: 128, Range: [8, +oo)
   ## Note: deepflow-agent will automatically calculate the number of blocks
   ##   used by AF_PACKET according to max_memory, which can also be specified
   ##   using this configuration item. The size of each block is fixed at 1MB.
-  #afpacket-blocks: 0
+  #afpacket-blocks: 128
 
   ###################
   ## Analyzer Mode ##
