@@ -273,7 +273,7 @@ func (g *Genesis) GetCloudData() (cloudmodel.Resource, error) {
 
 	genesisData, err := g.getGenesisData()
 	if err != nil {
-		return cloudmodel.Resource{}, errors.New("get genesis data faild")
+		return cloudmodel.Resource{}, errors.New("get genesis data faild" + err.Error())
 	}
 	g.genesisData = genesisData
 
