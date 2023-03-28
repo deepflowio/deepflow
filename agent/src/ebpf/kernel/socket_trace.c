@@ -1146,6 +1146,9 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	v->tgid = tgid;
 	v->pid = (__u32) pid_tgid;
 	v->timestamp = time_stamp;
+	if (conn_info->direction == T_INGRESS) {
+		v->timestamp = bpf_ktime_get_ns();
+	}
 	v->direction = conn_info->direction;
 	v->syscall_len = syscall_len;
 	v->msg_type = conn_info->message_type;
