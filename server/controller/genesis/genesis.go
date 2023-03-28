@@ -21,6 +21,7 @@ import (
 	"compress/zlib"
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"sync"
@@ -158,16 +159,18 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 		grpcServer := net.JoinHostPort(serverIP, g.grpcPort)
 		conn, err := grpc.Dial(grpcServer, grpc.WithInsecure(), grpc.WithMaxMsgSize(g.grpcMaxMSGLength))
 		if err != nil {
-			log.Error("create grpc connection faild:" + err.Error())
-			continue
+			msg := "create grpc connection faild:" + err.Error()
+			log.Error(msg)
+			return retGenesisSyncData, errors.New(msg)
 		}
 		defer conn.Close()
 
 		client := api.NewControllerClient(conn)
 		ret, err := client.GenesisSharingSync(context.Background(), &api.GenesisSharingSyncRequest{})
 		if err != nil {
-			log.Warningf("get genesis sharing sync faild (%s)", err.Error())
-			continue
+			msg := fmt.Sprintf("get genesis sharing sync faild (%s)", err.Error())
+			log.Warning(msg)
+			return retGenesisSyncData, errors.New(msg)
 		}
 
 		genesisSyncData := ret.GetData()
@@ -393,8 +396,9 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 		grpcServer := net.JoinHostPort(serverIP, g.grpcPort)
 		conn, err := grpc.Dial(grpcServer, grpc.WithInsecure(), grpc.WithMaxMsgSize(g.grpcMaxMSGLength))
 		if err != nil {
-			log.Error("create grpc connection faild:" + err.Error())
-			continue
+			msg := "create grpc connection faild:" + err.Error()
+			log.Error(msg)
+			return k8sResp, errors.New(msg)
 		}
 		defer conn.Close()
 
@@ -404,8 +408,9 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 		}
 		ret, err := client.GenesisSharingK8S(context.Background(), req)
 		if err != nil {
-			log.Errorf("get (%s) genesis sharing k8s failed (%s) ", serverIP, err.Error())
-			continue
+			msg := fmt.Sprintf("get (%s) genesis sharing k8s failed (%s) ", serverIP, err.Error())
+			log.Error(msg)
+			return k8sResp, errors.New(msg)
 		}
 		entries := ret.GetEntries()
 		if len(entries) == 0 {

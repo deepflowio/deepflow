@@ -181,20 +181,33 @@ func (g *GenesisSyncTypeOperation[T]) Save() {
 	var dataType T
 	mysql.Db.Where("node_ip = ?", nodeIP).Delete(&dataType)
 
+	// get effective vtap ids in current controller
+	var storages []model.GenesisStorage
+	nodeIPString := os.Getenv(common.NODE_IP_KEY)
+	mysql.Db.Where("node_ip = ?", nodeIPString).Find(&storages)
+	vtapIDMap := map[uint32]int{0: 0}
+	for _, storage := range storages {
+		vtapIDMap[storage.VtapID] = 0
+	}
+
 	// write current memory data
 	var items []T
 	for _, data := range g.dataDict {
 		tData := reflect.ValueOf(&data).Elem()
-		if tData.Type().String() == "model.GenesisProcess" && tData.FieldByName("VtapID").Uint() == 0 {
+		vtapID := tData.FieldByName("VtapID").Uint()
+		if _, ok := vtapIDMap[uint32(vtapID)]; !ok {
+			continue
+		}
+		if tData.Type().String() == "model.GenesisProcess" && vtapID == 0 {
 			continue
 		}
 		nodeIP := tData.FieldByName("NodeIP")
-		nodeIPString := os.Getenv(common.NODE_IP_KEY)
 		nodeIP.SetString(nodeIPString)
 		items = append(items, data)
 	}
+
 	if len(items) > 0 {
-		mysql.Db.Create(&items)
+		mysql.Db.CreateInBatches(items, 100)
 	}
 }
 

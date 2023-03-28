@@ -370,7 +370,7 @@ func (c *Cloud) appendResourceProcess(resource model.Resource) model.Resource {
 
 	genesisSyncData, err := genesis.GenesisService.GetGenesisSyncResponse()
 	if err != nil {
-		log.Errorf("get genesis sync data failed: %s", err.Error())
+		log.Error(err.Error())
 		return resource
 	}
 
