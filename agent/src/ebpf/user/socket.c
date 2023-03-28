@@ -32,7 +32,7 @@
 #include "config.h"
 
 #include "socket_trace_bpf_common.c"
-#include "socket_trace_bpf_5_2.c"
+#include "socket_trace_bpf_5_2_plus.c"
 #include "socket_trace_bpf_kylin.c"
 
 static struct list_head events_list;	// Use for extra register events
@@ -1264,11 +1264,11 @@ int running_socket_tracer(l7_handle_fn handle,
 		bpf_bin_buffer = (void *)socket_trace_kylin_ebpf_data;
 		buffer_sz = sizeof(socket_trace_kylin_ebpf_data);
 		
-	} else if (major == 5 && minor == 2) {
+	} else if (major > 5 || (major == 5 && minor >= 2)) {
 		snprintf(bpf_load_buffer_name, NAME_LEN,
-			 "socket-trace-bpf-linux-5.2");
-		bpf_bin_buffer = (void *)socket_trace_5_2_ebpf_data;
-		buffer_sz = sizeof(socket_trace_5_2_ebpf_data);
+			 "socket-trace-bpf-linux-5.2_plus");
+		bpf_bin_buffer = (void *)socket_trace_5_2_plus_ebpf_data;
+		buffer_sz = sizeof(socket_trace_5_2_plus_ebpf_data);
 	} else {
 		snprintf(bpf_load_buffer_name, NAME_LEN,
 			 "socket-trace-bpf-linux-common");
