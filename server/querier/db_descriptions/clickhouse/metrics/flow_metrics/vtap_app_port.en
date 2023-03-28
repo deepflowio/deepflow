@@ -1,7 +1,6 @@
 # Field                     , DisplayName          , Unit , Description
 request                     , Request              ,      ,
 response                    , Response             ,      ,
-direction_score             , Direction Score      ,      , The higher the score, the higher the accuracy of the direction of the client and server. When the score is 255, the direction must be correct.
 
 rrt                         , Avg Delay            , us   ,
 rrt_max                     , Max Delay            , us   ,
