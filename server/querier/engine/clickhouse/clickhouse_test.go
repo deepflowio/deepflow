@@ -215,7 +215,7 @@ var (
 		db:     "flow_metrics",
 	}, {
 		input:  "SELECT time(time,5,1,0) as toi, Avg(`metrics.dropped`) AS `Avg(metrics.dropped)` FROM `deepflow_agent_collect_sender` GROUP BY  toi ORDER BY toi desc",
-		output: "WITH toStartOfInterval(time, toIntervalSecond(60)) + toIntervalSecond(arrayJoin([0]) * 60) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, AVG(if(indexOf(metrics_float_names, 'dropped')=0,null,metrics_float_values[indexOf(metrics_float_names, 'dropped')])) AS `Avg(metrics.dropped)` FROM deepflow_system.`deepflow_agent_collect_sender` GROUP BY `toi` ORDER BY `toi` desc LIMIT 10000",
+		output: "WITH toStartOfInterval(time, toIntervalSecond(10)) + toIntervalSecond(arrayJoin([0]) * 10) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, AVG(if(indexOf(metrics_float_names, 'dropped')=0,null,metrics_float_values[indexOf(metrics_float_names, 'dropped')])) AS `Avg(metrics.dropped)` FROM deepflow_system.`deepflow_agent_collect_sender` GROUP BY `toi` ORDER BY `toi` desc LIMIT 10000",
 		db:     "deepflow_system",
 	}, {
 		input:  "SELECT time(time,120,1,0) as toi, Avg(`metrics.dropped`) AS `Avg(metrics.dropped)` FROM `deepflow_agent_collect_sender` GROUP BY  toi ORDER BY toi desc ",
