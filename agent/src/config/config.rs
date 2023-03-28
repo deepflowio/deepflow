@@ -576,7 +576,7 @@ impl Default for YamlConfig {
             log_level: log::Level::Info,
             profiler: false,
             af_packet_blocks_enabled: false,
-            af_packet_blocks: 0,
+            af_packet_blocks: 128,
             enable_debug_stats: false,
             analyzer_dedup_disabled: false,
             default_tap_type: 3,
