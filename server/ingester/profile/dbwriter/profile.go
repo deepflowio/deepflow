@@ -3,6 +3,7 @@ package dbwriter
 import (
 	"fmt"
 	"net"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -35,9 +36,9 @@ type InProcessProfile struct {
 	AppService         string `json:"app_service"`
 	ProfileLocationStr string `json:"profile_location_str"` // package/(class/struct)/function name, e.g.: java/lang/Thread.run
 	ProfileValue       int64  `json:"profile_value"`
-	// profile_event_type 由 app_service 与 event_type 构成，event_type 的取值与 profile_value_unit 对应关系见下
-	// profile_event_type union by app_service and event_type, relations between event_type and profile_value_unit is under the struct definition
-	ProfileEventType       string   `json:"profile_event_type"` // app_service.event_type, e.g.: rideshare.java.push.app.cpu
+	// profile_event_type 的取值与 profile_value_unit 对应关系见下
+	// profile_event_type: relations between profile_event_type and profile_value_unit is under the struct definition
+	ProfileEventType       string   `json:"profile_event_type"` // event_type, e.g.: cpu/itimer...
 	ProfileValueUnit       string   `json:"profile_value_unit"`
 	ProfileCreateTimestamp int64    `json:"profile_create_timestamp"` // 数据上传时间 while data upload to server
 	ProfileInTimestamp     int64    `json:"profile_in_timestamp"`     // 数据写入时间 while data write in storage
@@ -72,9 +73,9 @@ type InProcessProfile struct {
 	ServiceID    uint32
 }
 
-// event_type <-> profile_value_unit relation
+// profile_event_type <-> profile_value_unit relation
 /*
-	| event_type                       | unit    |
+	| profile_event_type               | unit    |
 	|----------------------------------|---------|
 	| cpu                              | samples |
 	| inuse_objects                    | objects |
@@ -238,7 +239,7 @@ func (p *InProcessProfile) FillProfile(input *storage.PutInput, platformData *gr
 	p.VtapID = vtapID
 	p.AppService = profileName
 	p.ProfileLocationStr = location
-	p.ProfileEventType = input.Key.AppName()
+	p.ProfileEventType = strings.TrimPrefix(input.Key.AppName(), fmt.Sprintf("%s.", profileName))
 	p.ProfileValue = self
 	p.ProfileValueUnit = input.Units.String()
 	p.ProfileCreateTimestamp = input.StartTime.UnixMicro()
