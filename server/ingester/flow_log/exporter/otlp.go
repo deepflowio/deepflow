@@ -122,27 +122,27 @@ func L7FlowLogToExportRequest(l7 *log_data.L7FlowLog, universalTagsManager *Univ
 
 	switch datatype.L7Protocol(l7.Protocol) {
 	case datatype.L7_PROTOCOL_DNS:
-		setDNS(span, l7)
+		setDNS(&span, l7)
 	case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2, datatype.L7_PROTOCOL_HTTP_1_TLS, datatype.L7_PROTOCOL_HTTP_2_TLS:
-		setHTTP(span, l7)
+		setHTTP(&span, l7)
 	case datatype.L7_PROTOCOL_DUBBO:
-		setDubbo(span, resAttrs, l7)
+		setDubbo(&span, resAttrs, l7)
 	case datatype.L7_PROTOCOL_GRPC:
-		setGRPC(span, l7)
+		setGRPC(&span, l7)
 	case datatype.L7_PROTOCOL_KAFKA:
-		setKafka(span, l7)
+		setKafka(&span, l7)
 	case datatype.L7_PROTOCOL_MQTT:
-		setMQTT(span, l7)
+		setMQTT(&span, l7)
 	case datatype.L7_PROTOCOL_MYSQL:
-		setMySQL(span, l7)
+		setMySQL(&span, l7)
 	case datatype.L7_PROTOCOL_REDIS:
-		setRedis(span, l7)
+		setRedis(&span, l7)
 	}
 
 	return ptraceotlp.NewExportRequestFromTraces(td)
 }
 
-func setDNS(span ptrace.Span, l7 *log_data.L7FlowLog) {
+func setDNS(span *ptrace.Span, l7 *log_data.L7FlowLog) {
 	spanAttrs := span.Attributes()
 	putStrWithoutEmpty(spanAttrs, "df.dns.request_type", l7.RequestType)
 	putStrWithoutEmpty(spanAttrs, "df.dns.request_resource", l7.RequestResource)
@@ -161,7 +161,7 @@ func setDNS(span ptrace.Span, l7 *log_data.L7FlowLog) {
 	}
 }
 
-func setHTTP(span ptrace.Span, l7 *log_data.L7FlowLog) {
+func setHTTP(span *ptrace.Span, l7 *log_data.L7FlowLog) {
 	spanAttrs := span.Attributes()
 	putStrWithoutEmpty(spanAttrs, "http.flavor", l7.Version)
 	putStrWithoutEmpty(spanAttrs, "http.method", l7.RequestType)
@@ -180,7 +180,7 @@ func setHTTP(span ptrace.Span, l7 *log_data.L7FlowLog) {
 	putStrWithoutEmpty(spanAttrs, "df.http.proxy_client", l7.HttpProxyClient)
 }
 
-func setDubbo(span ptrace.Span, resAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
+func setDubbo(span *ptrace.Span, resAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
 	spanAttrs := span.Attributes()
 	putStrWithoutEmpty(spanAttrs, "df.dubbo.version", l7.Version)
 	putStrWithoutEmpty(spanAttrs, "df.dubbo.request_type", l7.RequestType)
@@ -201,14 +201,14 @@ func setDubbo(span ptrace.Span, resAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
 	}
 }
 
-func setGRPC(span ptrace.Span, l7 *log_data.L7FlowLog) {
+func setGRPC(span *ptrace.Span, l7 *log_data.L7FlowLog) {
 	setHTTP(span, l7)
 	if l7.Endpoint != "" {
 		span.Attributes().PutStr("df.grpc.endpoint", l7.Endpoint)
 	}
 }
 
-func setKafka(span ptrace.Span, l7 *log_data.L7FlowLog) {
+func setKafka(span *ptrace.Span, l7 *log_data.L7FlowLog) {
 	spanAttrs := span.Attributes()
 	putStrWithoutEmpty(spanAttrs, "df.kafka.request_type", l7.RequestType)
 	if l7.RequestId != nil {
@@ -223,7 +223,7 @@ func setKafka(span ptrace.Span, l7 *log_data.L7FlowLog) {
 	}
 }
 
-func setMQTT(span ptrace.Span, l7 *log_data.L7FlowLog) {
+func setMQTT(span *ptrace.Span, l7 *log_data.L7FlowLog) {
 	spanAttrs := span.Attributes()
 	putStrWithoutEmpty(spanAttrs, "df.mqtt.request_type", l7.RequestType)
 	putStrWithoutEmpty(spanAttrs, "df.mqtt.request_resource", l7.RequestResource)
@@ -237,7 +237,7 @@ func setMQTT(span ptrace.Span, l7 *log_data.L7FlowLog) {
 	}
 }
 
-func setMySQL(span ptrace.Span, l7 *log_data.L7FlowLog) {
+func setMySQL(span *ptrace.Span, l7 *log_data.L7FlowLog) {
 	spanAttrs := span.Attributes()
 	putStrWithoutEmpty(spanAttrs, "df.mysql.request_type", l7.RequestType)
 	putStrWithoutEmpty(spanAttrs, "df.mysql.request_resource", l7.RequestResource)
@@ -250,7 +250,7 @@ func setMySQL(span ptrace.Span, l7 *log_data.L7FlowLog) {
 	}
 }
 
-func setPostgreSQL(span ptrace.Span, l7 *log_data.L7FlowLog) {
+func setPostgreSQL(span *ptrace.Span, l7 *log_data.L7FlowLog) {
 	spanAttrs := span.Attributes()
 	putStrWithoutEmpty(spanAttrs, "df.pg.request_type", l7.RequestType)
 	putStrWithoutEmpty(spanAttrs, "df.pg.request_resource", l7.RequestResource)
@@ -263,7 +263,7 @@ func setPostgreSQL(span ptrace.Span, l7 *log_data.L7FlowLog) {
 	}
 }
 
-func setRedis(span ptrace.Span, l7 *log_data.L7FlowLog) {
+func setRedis(span *ptrace.Span, l7 *log_data.L7FlowLog) {
 	spanAttrs := span.Attributes()
 	putStrWithoutEmpty(spanAttrs, "df.redis.request_type", l7.RequestType)
 	putStrWithoutEmpty(spanAttrs, "df.redis.request_resource", l7.RequestResource)
