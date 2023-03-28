@@ -325,6 +325,7 @@ fn fill_tagged_flow(
     let mut l4_protocol = L4Protocol::Tcp;
     let mut l7_protocol = L7Protocol::Unknown;
     let mut status = L7ResponseStatus::NotExist;
+    let mut is_http2 = false;
 
     let mut tagged_flow = TaggedFlow::default();
     tagged_flow.flow.signal_source = SignalSource::OTel;
@@ -397,9 +398,28 @@ fn fill_tagged_flow(
                     }
                 }
             }
+            // Format as above, "http.flavor": "1.1"
+            "http.flavor" => {
+                if let Some(value) = attr.value.clone() {
+                    if let Some(StringValue(val)) = value.value {
+                        if val == "2.0" {
+                            is_http2 = true;
+                        }
+                    }
+                }
+            }
             _ => {}
         }
     }
+
+    if is_http2 {
+        if l7_protocol == L7Protocol::Http1 {
+            l7_protocol = L7Protocol::Http2;
+        } else if l7_protocol == L7Protocol::Http1TLS {
+            l7_protocol = L7Protocol::Http2TLS;
+        }
+    }
+
     (
         tagged_flow.flow.flow_key.ip_src,
         tagged_flow.flow.flow_key.ip_dst,
