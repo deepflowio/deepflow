@@ -73,7 +73,7 @@ func (p *Pod) ProduceByAdd(items []*mysql.Pod) {
 			opts = append(opts, l3DeviceOpts...)
 			p.createAndEnqueue(
 				item.Lcuuid,
-				eventapi.RESOURCE_EVENT_SUB_TYPE_CREATE,
+				eventapi.RESOURCE_EVENT_TYPE_CREATE,
 				item.Name,
 				p.deviceType,
 				item.ID,
@@ -83,7 +83,7 @@ func (p *Pod) ProduceByAdd(items []*mysql.Pod) {
 			p.enqueueIfInsertIntoMySQLFailed(
 				item.Lcuuid,
 				domainLcuuid,
-				eventapi.RESOURCE_EVENT_SUB_TYPE_CREATE,
+				eventapi.RESOURCE_EVENT_TYPE_CREATE,
 				item.Name,
 				p.deviceType,
 				item.ID,
@@ -154,7 +154,7 @@ func (p *Pod) ProduceByUpdate(cloudItem *cloudmodel.Pod, diffBase *cache.Pod) {
 		p.enqueueIfInsertIntoMySQLFailed(
 			cloudItem.Lcuuid,
 			domainLcuuid,
-			eventapi.RESOURCE_EVENT_SUB_TYPE_RECREATE,
+			eventapi.RESOURCE_EVENT_TYPE_RECREATE,
 			name,
 			p.deviceType,
 			id,
@@ -180,7 +180,7 @@ func (p *Pod) ProduceByDelete(lcuuids []string) {
 			log.Error(nameByIDNotFound(p.resourceType, id))
 		}
 
-		p.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_SUB_TYPE_DELETE, name, p.deviceType, id)
+		p.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, p.deviceType, id)
 	}
 }
 
