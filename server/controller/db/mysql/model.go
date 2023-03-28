@@ -501,7 +501,7 @@ type LB struct {
 	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
 	Label          string `gorm:"column:label;type:char(64);default:''" json:"LABEL"`
 	Model          int    `gorm:"column:model;type:int;default:0" json:"MODEL"` // 1.Internal 2.External
-	VIP            string `gorm:"column:vip;type:char(64);default:''" json:"VIP"`
+	VIP            string `gorm:"column:vip;type:text;default:''" json:"VIP"`
 	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID"`
 	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"` // TODO delete in future
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`

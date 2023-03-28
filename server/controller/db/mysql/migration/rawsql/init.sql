@@ -642,7 +642,7 @@ CREATE TABLE IF NOT EXISTS lb (
     name                VARCHAR(256) DEFAULT '',
     label               CHAR(64) DEFAULT '',
     model               INTEGER DEFAULT 0 COMMENT '1.Internal 2.External',
-    vip                 CHAR(64) DEFAULT '',
+    vip                 TEXT COMMENT 'separated by ,',
     epc_id              INTEGER DEFAULT 0,
     az                  CHAR(64) DEFAULT '',
     region              CHAR(64) DEFAULT '',
