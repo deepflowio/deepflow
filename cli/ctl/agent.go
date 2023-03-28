@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/bitly/go-simplejson"
@@ -225,8 +226,8 @@ func listAgent(cmd *cobra.Command, args []string, output string) {
 			}
 		}
 
-		cmdFormat := "%-*s %-10s %-16s %-18s %-8s %-*s %s\n"
-		fmt.Printf(cmdFormat, nameMaxSize, "NAME", "TYPE", "CTRL_IP", "CTRL_MAC", "STATE", groupMaxSize, "GROUP", "EXCEPTIONS")
+		cmdFormat := "%-8s %-*s %-10s %-16s %-18s %-8s %-*s %s\n"
+		fmt.Printf(cmdFormat, "VTAP_ID", nameMaxSize, "NAME", "TYPE", "CTRL_IP", "CTRL_MAC", "STATE", groupMaxSize, "GROUP", "EXCEPTIONS")
 		for i := range response.Get("DATA").MustArray() {
 			vtap := response.Get("DATA").GetIndex(i)
 
@@ -242,12 +243,15 @@ func listAgent(cmd *cobra.Command, args []string, output string) {
 			}
 
 			fmt.Printf(cmdFormat,
-				nameMaxSize, vtap.Get("NAME").MustString(),
+				strconv.Itoa(vtap.Get("ID").MustInt()),
+				nameMaxSize,
+				vtap.Get("NAME").MustString(),
 				common.VtapType(vtap.Get("TYPE").MustInt()),
 				vtap.Get("CTRL_IP").MustString(),
 				vtap.Get("CTRL_MAC").MustString(),
 				common.VtapState(vtap.Get("STATE").MustInt()),
-				groupMaxSize, vtap.Get("VTAP_GROUP_NAME").MustString(),
+				groupMaxSize,
+				vtap.Get("VTAP_GROUP_NAME").MustString(),
 				strings.Join(exceptionStrings, ","),
 			)
 		}
