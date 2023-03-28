@@ -61,9 +61,9 @@ func (r *SubDomain) ProduceFromMySQL() {
 			continue
 		}
 
-		if event.SubType == eventapi.RESOURCE_EVENT_SUB_TYPE_RECREATE {
+		if event.Type == eventapi.RESOURCE_EVENT_TYPE_RECREATE {
 			r.fillRecreatePodEvent(event)
-		} else if common.Contains([]string{eventapi.RESOURCE_EVENT_SUB_TYPE_CREATE, eventapi.RESOURCE_EVENT_SUB_TYPE_ADD_IP}, event.SubType) {
+		} else if common.Contains([]string{eventapi.RESOURCE_EVENT_TYPE_CREATE, eventapi.RESOURCE_EVENT_TYPE_ADD_IP}, event.Type) {
 			r.fillL3DeviceInfo(event)
 		}
 		r.convertAndEnqueue(item.ResourceLcuuid, event)
