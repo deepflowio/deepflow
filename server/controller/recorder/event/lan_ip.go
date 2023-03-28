@@ -107,7 +107,7 @@ func (i *LANIP) ProduceByAdd(items []*mysql.LANIP) {
 					i.enqueueIfInsertIntoMySQLFailed(
 						item.Lcuuid,
 						podNodeInfo.DomainLcuuid,
-						eventapi.RESOURCE_EVENT_SUB_TYPE_ADD_IP,
+						eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
 						deviceName,
 						deviceType,
 						deviceID,
@@ -128,7 +128,7 @@ func (i *LANIP) ProduceByAdd(items []*mysql.LANIP) {
 					i.enqueueIfInsertIntoMySQLFailed(
 						item.Lcuuid,
 						podInfo.DomainLcuuid,
-						eventapi.RESOURCE_EVENT_SUB_TYPE_ADD_IP,
+						eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
 						deviceName,
 						deviceType,
 						deviceID,
@@ -141,7 +141,7 @@ func (i *LANIP) ProduceByAdd(items []*mysql.LANIP) {
 
 		i.createAndEnqueue(
 			item.Lcuuid,
-			eventapi.RESOURCE_EVENT_SUB_TYPE_ADD_IP,
+			eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
 			deviceName,
 			deviceType,
 			deviceID,
@@ -202,7 +202,7 @@ func (i *LANIP) ProduceByDelete(lcuuids []string) {
 
 		i.createAndEnqueue(
 			lcuuid,
-			eventapi.RESOURCE_EVENT_SUB_TYPE_REMOVE_IP,
+			eventapi.RESOURCE_EVENT_TYPE_REMOVE_IP,
 			deviceName,
 			deviceType,
 			deviceID,

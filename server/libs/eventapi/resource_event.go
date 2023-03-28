@@ -19,19 +19,19 @@ package eventapi
 import "github.com/deepflowio/deepflow/server/libs/pool"
 
 const (
-	RESOURCE_EVENT_SUB_TYPE_CREATE       = "create"
-	RESOURCE_EVENT_SUB_TYPE_DELETE       = "delete"
-	RESOURCE_EVENT_SUB_TYPE_UPDATE_STATE = "update-state"
-	RESOURCE_EVENT_SUB_TYPE_MIGRATE      = "migrate"
-	RESOURCE_EVENT_SUB_TYPE_RECREATE     = "recreate"
-	RESOURCE_EVENT_SUB_TYPE_ADD_IP       = "add-ip"
-	RESOURCE_EVENT_SUB_TYPE_REMOVE_IP    = "remove-ip"
+	RESOURCE_EVENT_TYPE_CREATE       = "create"
+	RESOURCE_EVENT_TYPE_DELETE       = "delete"
+	RESOURCE_EVENT_TYPE_UPDATE_STATE = "update-state"
+	RESOURCE_EVENT_TYPE_MIGRATE      = "migrate"
+	RESOURCE_EVENT_TYPE_RECREATE     = "recreate"
+	RESOURCE_EVENT_TYPE_ADD_IP       = "add-ip"
+	RESOURCE_EVENT_TYPE_REMOVE_IP    = "remove-ip"
 )
 
 type ResourceEvent struct {
 	Time               int64
 	TimeMilli          int64 // record millisecond time for debug
-	SubType            string
+	Type               string
 	InstanceType       uint32 // the value is the same as l3_device_type
 	InstanceID         uint32
 	InstanceName       string

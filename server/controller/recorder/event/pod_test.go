@@ -41,7 +41,7 @@ func TestAddPod(t *testing.T) {
 	em.ProduceByAdd([]*mysql.Pod{{Base: mysql.Base{ID: id}, Name: name}})
 	assert.Equal(t, 1, eq.Len())
 	e := eq.Get().(*eventapi.ResourceEvent)
-	assert.Equal(t, eventapi.RESOURCE_EVENT_SUB_TYPE_CREATE, e.Type)
+	assert.Equal(t, eventapi.RESOURCE_EVENT_TYPE_CREATE, e.Type)
 	assert.Equal(t, uint32(common.VIF_DEVICE_TYPE_POD), e.InstanceType)
 	assert.Equal(t, uint32(id), e.InstanceID)
 	assert.Equal(t, name, e.InstanceName)
@@ -81,7 +81,7 @@ func TestUpdatePod(t *testing.T) {
 	em.ProduceByUpdate(&cloudmodel.Pod{CreatedAt: time.Now()}, &cache.Pod{})
 	assert.Equal(t, 1, eq.Len())
 	e := eq.Get().(*eventapi.ResourceEvent)
-	assert.Equal(t, eventapi.RESOURCE_EVENT_SUB_TYPE_RECREATE, e.Type)
+	assert.Equal(t, eventapi.RESOURCE_EVENT_TYPE_RECREATE, e.Type)
 	assert.Equal(t, fmt.Sprintf("%s,%s", podNodeName, podNodeName), e.Description)
 }
 
@@ -104,7 +104,7 @@ func TestDeletePod(t *testing.T) {
 	em.ProduceByDelete([]string{RandLcuuid()})
 	assert.Equal(t, 1, eq.Len())
 	e := eq.Get().(*eventapi.ResourceEvent)
-	assert.Equal(t, eventapi.RESOURCE_EVENT_SUB_TYPE_DELETE, e.Type)
+	assert.Equal(t, eventapi.RESOURCE_EVENT_TYPE_DELETE, e.Type)
 	assert.Equal(t, uint32(id), e.InstanceID)
 	assert.Equal(t, name, e.InstanceName)
 }

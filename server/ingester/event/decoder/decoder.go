@@ -224,7 +224,7 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 	eventStore.EndTime = eventStore.StartTime
 
 	eventStore.EventType = dbwriter.EVENT_TYPE_RESOURCE
-	eventStore.EventSubType = event.SubType
+	eventStore.EventSubType = event.Type
 	eventStore.EventDescription = event.Description
 
 	eventStore.GProcessID = event.GProcessID
