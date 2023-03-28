@@ -978,10 +978,6 @@ impl QuadrupleGenerator {
         let dst = &tagged_flow.flow.flow_metrics_peers[1];
 
         let perf_stats = tagged_flow.flow.flow_perf_stats.as_ref();
-        let stats = match tagged_flow.flow.flow_perf_stats.as_ref() {
-            Some(s) => s,
-            None => return (flow_meter, app_meter),
-        };
         // Only count the flow_meter whose signal_source of flow is SignalSource::Packet or SignalSource::XFlow
         if tagged_flow.flow.signal_source == SignalSource::Packet
             || tagged_flow.flow.signal_source == SignalSource::XFlow
@@ -1002,6 +998,11 @@ impl QuadrupleGenerator {
                 syn: perf_stats.map(|s| s.tcp.syn_count).unwrap_or_default(),
                 synack: perf_stats.map(|s| s.tcp.synack_count).unwrap_or_default(),
                 direction_score: tagged_flow.flow.direction_score,
+            };
+
+            let stats = match tagged_flow.flow.flow_perf_stats.as_ref() {
+                Some(s) => s,
+                None => return (flow_meter, app_meter),
             };
             if tagged_flow.flow.flow_key.proto == IpProtocol::Tcp {
                 match tagged_flow.flow.close_type {
@@ -1078,6 +1079,10 @@ impl QuadrupleGenerator {
             }
         }
 
+        let stats = match tagged_flow.flow.flow_perf_stats.as_ref() {
+            Some(s) => s,
+            None => return (flow_meter, app_meter),
+        };
         match stats.l7_protocol {
             L7Protocol::Unknown | L7Protocol::Other => {
                 app_meter = AppMeter {

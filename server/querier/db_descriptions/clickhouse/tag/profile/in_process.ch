@@ -38,6 +38,7 @@ span_name                  , Span名称                    ,
 vtap                       , 采集器                      ,
 
 profile_location_str       , 全限名称                    ,
+profile_value_unit         , 单位                        ,
 profile_event_type         , 剖析类型                    ,
 profile_create_timestamp   , 聚合时间                    ,
 profile_in_timestamp       , 写入时间                    ,

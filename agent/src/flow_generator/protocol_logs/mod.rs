@@ -349,20 +349,31 @@ pub struct AppProtoLogsData {
     pub base_info: AppProtoLogsBaseInfo,
     #[serde(flatten)]
     pub special_info: L7ProtocolInfo,
+    #[serde(flatten)]
+    pub direction_score: u8,
 }
 
 impl fmt::Display for AppProtoLogsData {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}\n", self.base_info)?;
+        write!(
+            f,
+            "{} direction_score: {}\n",
+            self.base_info, self.direction_score
+        )?;
         write!(f, "\t{:?}", self.special_info)
     }
 }
 
 impl AppProtoLogsData {
-    pub fn new(base_info: AppProtoLogsBaseInfo, special_info: L7ProtocolInfo) -> Self {
+    pub fn new(
+        base_info: AppProtoLogsBaseInfo,
+        special_info: L7ProtocolInfo,
+        direction_score: u8,
+    ) -> Self {
         Self {
             base_info,
             special_info,
+            direction_score,
         }
     }
 
@@ -446,6 +457,7 @@ impl Sendable for BoxAppProtoLogsData {
     fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
         let mut pb_proto_logs_data = flow_log::AppProtoLogsData {
             base: Some(self.0.base_info.into()),
+            direction_score: self.0.direction_score as u32,
             ..Default::default()
         };
 

@@ -416,6 +416,9 @@ ingester:
 
   #profile-decoder-queue-count: 2
   #profile-decoder-queue-size: 10000
+
+  #event-decoder-queue-count: 2
+  #event-decoder-queue-size: 10000
   
   ## unit: byte
   #flow-tag-cache-max-size: 262144
@@ -435,6 +438,7 @@ ingester:
 profile:
   # profile http listenport
   listen-port: 20419
+  flame_query_limit: 1000000
 
   # querier相关配置
   querier:

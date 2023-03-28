@@ -59,7 +59,7 @@ impl From<String> for L7Protocol {
         let l7_protocol_str = l7_protocol_str.to_lowercase();
         match l7_protocol_str.as_str() {
             "http" => Self::Http1,
-            "http2" => Self::Http2,
+            "https" => Self::Http1TLS,
             "dubbo" => Self::Dubbo,
             "grpc" => Self::Grpc,
             "protobufrpc" => Self::ProtobufRPC,

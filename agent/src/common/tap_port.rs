@@ -23,7 +23,7 @@ use super::decapsulate::TunnelType;
 
 // 64     60         40           36         32                                    0
 // +------+----------+------------+----------+-------------------------------------+
-// | from | RESERVED | NAT SOURCE | TUN_TYPE |   ip/mac/dispatcher_id/process_id   |
+// | from | RESERVED | NAT SOURCE | TUN_TYPE |   ip/mac/dispatcher_id/src_and_pid  |
 // +------+----------+------------+----------+-------------------------------------+
 // 注意ip/id/mac不能超过32bit，否则数据存储、四元组聚合都会有歧义
 #[derive(Serialize, Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
@@ -55,6 +55,7 @@ impl TapPort {
     const NAT_SOURCE_MASK: u64 = 0xf;
     const RESERVED_OFFSET: u8 = 40;
     const RESERVED_MASK: u32 = 0xfffff;
+    const DATA_SOURCE_OFFSET: u8 = 24;
 
     pub fn is_from(&self, w: u8) -> bool {
         (self.0 >> Self::FROM_OFFSET) as u8 == w
@@ -118,8 +119,16 @@ impl TapPort {
         )
     }
 
-    pub fn from_ebpf(process_id: u32) -> Self {
-        Self(process_id as u64 | (Self::FROM_EBPF as u64) << Self::FROM_OFFSET)
+    // 64     60         40           36         32             24                0
+    // +------+----------+------------+----------+---------------+----------------+
+    // | from | RESERVED | NAT SOURCE | TUN_TYPE |  DATA_SOURCE  |   process_id   |
+    // +------+----------+------------+----------+---------------+----------------+
+    pub fn from_ebpf(process_id: u32, data_source: u8) -> Self {
+        Self(
+            (Self::FROM_EBPF as u64) << Self::FROM_OFFSET
+                | (data_source as u64) << Self::DATA_SOURCE_OFFSET
+                | process_id as u64,
+        )
     }
 
     pub fn split_fields(&self) -> (u32, u8, TunnelType) {

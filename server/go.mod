@@ -29,7 +29,7 @@ require (
 	github.com/bxcodec/faker/v3 v3.8.0
 	github.com/deckarep/golang-set v1.8.0
 	github.com/deckarep/golang-set/v2 v2.1.0
-	github.com/deepflowio/deepflow/message v0.0.0-20230317030950-a6801c056685
+	github.com/deepflowio/deepflow/message v0.0.0-20230322021634-df4bafaaf14b
 	github.com/deepflowio/deepflow/server/controller/cloud/platform v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/db/mysql/migrator v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/http/service/configuration v0.0.0-00010101000000-000000000000
@@ -89,6 +89,7 @@ require (
 	github.com/go-redis/redis/v9 v9.0.0-rc.2
 	github.com/pyroscope-io/pyroscope v0.37.1
 	go.opentelemetry.io/collector/pdata v0.66.0
+	golang.org/x/exp v0.0.0-20230321023759-10a507213a29
 )
 
 require (
@@ -113,7 +114,6 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.13.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
-	golang.org/x/exp v0.0.0-20230129154200-a960b3787bd2 // indirect
 )
 
 require (

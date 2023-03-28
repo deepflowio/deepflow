@@ -67,6 +67,7 @@ const THROTTLE_BUCKET: usize = 1 << THROTTLE_BUCKET_BITS; // 2^N。由于发送�
 pub struct MetaAppProto {
     base_info: AppProtoLogsBaseInfo,
     direction: PacketDirection,
+    direction_score: u8,
     l7_info: L7ProtocolInfo,
 }
 
@@ -179,6 +180,7 @@ impl MetaAppProto {
         Some(Self {
             base_info,
             direction: meta_packet.lookup_key.direction,
+            direction_score: flow.flow.direction_score,
             l7_info,
         })
     }
@@ -610,6 +612,7 @@ impl SessionAggregator {
                                 session_queue.aggregate_session_and_send(AppProtoLogsData {
                                     base_info: (*app_proto).base_info.clone(),
                                     special_info: (*app_proto).l7_info,
+                                    direction_score: (*app_proto).direction_score,
                                 });
                             }
                         }

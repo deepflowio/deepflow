@@ -325,6 +325,7 @@ fn fill_tagged_flow(
     let mut l4_protocol = L4Protocol::Tcp;
     let mut l7_protocol = L7Protocol::Unknown;
     let mut status = L7ResponseStatus::NotExist;
+    let mut is_http2 = false;
 
     let mut tagged_flow = TaggedFlow::default();
     tagged_flow.flow.signal_source = SignalSource::OTel;
@@ -397,9 +398,28 @@ fn fill_tagged_flow(
                     }
                 }
             }
+            // Format as above, "http.flavor": "1.1"
+            "http.flavor" => {
+                if let Some(value) = attr.value.clone() {
+                    if let Some(StringValue(val)) = value.value {
+                        if val == "2.0" {
+                            is_http2 = true;
+                        }
+                    }
+                }
+            }
             _ => {}
         }
     }
+
+    if is_http2 {
+        if l7_protocol == L7Protocol::Http1 {
+            l7_protocol = L7Protocol::Http2;
+        } else if l7_protocol == L7Protocol::Http1TLS {
+            l7_protocol = L7Protocol::Http2TLS;
+        }
+    }
+
     (
         tagged_flow.flow.flow_key.ip_src,
         tagged_flow.flow.flow_key.ip_dst,
@@ -465,24 +485,10 @@ fn fill_tagged_flow(
         .lookup_all_by_epc(&mut lookup_key, local_epc_id as i32);
     let (src_info, dst_info) = (endpoint.src_info, endpoint.dst_info);
     let peer_src = &mut tagged_flow.flow.flow_metrics_peers[0];
-    peer_src.is_device = src_info.is_device;
-    peer_src.is_vip_interface = src_info.is_vip_interface;
-    peer_src.is_l2_end = src_info.l2_end;
-    peer_src.is_l3_end = src_info.l3_end;
     peer_src.l3_epc_id = src_info.l3_epc_id;
-    peer_src.is_vip = src_info.is_vip;
-    peer_src.is_local_mac = src_info.is_local_mac;
-    peer_src.is_local_ip = src_info.is_local_ip;
     peer_src.nat_real_ip = tagged_flow.flow.flow_key.ip_src;
     let peer_dst = &mut tagged_flow.flow.flow_metrics_peers[1];
-    peer_dst.is_device = dst_info.is_device;
-    peer_dst.is_vip_interface = dst_info.is_vip_interface;
-    peer_dst.is_l2_end = dst_info.l2_end;
-    peer_dst.is_l3_end = dst_info.l3_end;
     peer_dst.l3_epc_id = dst_info.l3_epc_id;
-    peer_dst.is_vip = dst_info.is_vip;
-    peer_dst.is_local_mac = dst_info.is_local_mac;
-    peer_dst.is_local_ip = dst_info.is_local_ip;
     peer_dst.nat_real_ip = tagged_flow.flow.flow_key.ip_dst;
     tagged_flow.flow.flow_key.tap_type = TapType::Cloud;
     Some(tagged_flow)
