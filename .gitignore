@@ -32,3 +32,4 @@ target/
 /agent/src/ebpf/user/socket_trace_bpf_core.c
 /agent/src/ebpf/user/socket_trace_bpf_common.c
 /agent/src/ebpf/user/socket_trace_bpf_kylin.c
+/agent/src/ebpf/user/socket_trace_bpf_5_2_plus.c
