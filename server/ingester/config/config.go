@@ -312,7 +312,7 @@ func (c *Config) ValidateAndSetckdbColdStorages() error {
 			return fmt.Errorf("'ingester.ckdb-cold-storage.settings[%d].db' is empty", i)
 		}
 		if setting.TTLToMove < 1 {
-			return fmt.Errorf("'ingester.ckdb-cold-storage.settings[%d].hour-to-move' is '%d', should > 0", i, setting.TTLToMove)
+			return fmt.Errorf("'ingester.ckdb-cold-storage.settings[%d].ttl-hour-to-move' is '%d', should > 0", i, setting.TTLToMove)
 		}
 		for _, table := range setting.Tables {
 			c.ckdbColdStorages[setting.Db+table] = &ckdb.ColdStorage{
