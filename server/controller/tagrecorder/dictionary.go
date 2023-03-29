@@ -131,8 +131,8 @@ func (c *TagRecorder) UpdateChDictionary() {
 						wantedDicts := mapset.NewSet(
 							CH_DICTIONARY_IP_RESOURCE,
 							CH_DICTIONARY_IP_RELATION,
-							CH_DICTIONARY_K8S_LABEL,
-							CH_DICTIONARY_K8S_LABELS,
+							CH_DICTIONARY_POD_K8S_LABEL,
+							CH_DICTIONARY_POD_K8S_LABELS,
 							CH_DICTIONARY_REGION,
 							CH_DICTIONARY_AZ,
 							CH_DICTIONARY_VPC,
@@ -165,6 +165,8 @@ func (c *TagRecorder) UpdateChDictionary() {
 							CH_DICTIONARY_OS_APP_TAG,
 							CH_DICTIONARY_OS_APP_TAGS,
 							CH_DICTIONARY_GPROCESS,
+							CH_DICTIONARY_POD_SERVICE_K8S_LABEL,
+							CH_DICTIONARY_POD_SERVICE_K8S_LABELS,
 						)
 						chDicts := mapset.NewSet()
 						for _, dictionary := range dictionaries {

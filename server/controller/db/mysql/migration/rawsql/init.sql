@@ -1937,7 +1937,7 @@ CREATE TABLE IF NOT EXISTS ch_vtap (
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_vtap;
 
-CREATE TABLE IF NOT EXISTS ch_k8s_label (
+CREATE TABLE IF NOT EXISTS ch_pod_k8s_label (
     `pod_id`        INTEGER NOT NULL,
     `key`           VARCHAR(256) NOT NULL,
     `value`         VARCHAR(256),
@@ -1946,16 +1946,16 @@ CREATE TABLE IF NOT EXISTS ch_k8s_label (
     `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`pod_id`, `key`)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
-TRUNCATE TABLE ch_k8s_label;
+TRUNCATE TABLE ch_pod_k8s_label;
 
-CREATE TABLE IF NOT EXISTS ch_k8s_labels (
+CREATE TABLE IF NOT EXISTS ch_pod_k8s_labels (
     `pod_id`        INTEGER NOT NULL PRIMARY KEY,
     `labels`        TEXT,
     `l3_epc_id`     INTEGER,
     `pod_ns_id`     INTEGER,
     `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
-TRUNCATE TABLE ch_k8s_labels;
+TRUNCATE TABLE ch_pod_k8s_labels;
 
 CREATE TABLE IF NOT EXISTS ch_pod_node_port (
     id                      INTEGER NOT NULL,
@@ -2319,4 +2319,23 @@ CREATE TABLE IF NOT EXISTS ch_gprocess (
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_gprocess;
 
+CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_label (
+    `pod_id`        INTEGER NOT NULL,
+    `key`           VARCHAR(256) NOT NULL,
+    `value`         VARCHAR(256),
+    `l3_epc_id`     INTEGER,
+    `pod_ns_id`     INTEGER,
+    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`pod_id`, `key`)
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_pod_service_k8s_label;
+
+CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_labels (
+    `pod_id`        INTEGER NOT NULL PRIMARY KEY,
+    `labels`        TEXT,
+    `l3_epc_id`     INTEGER,
+    `pod_ns_id`     INTEGER,
+    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_pod_service_k8s_labels;
 

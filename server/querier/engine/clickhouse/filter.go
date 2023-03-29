@@ -97,7 +97,10 @@ func TransWhereTagFunction(name string, args []string) (filter string) {
 			return
 		} else if strings.HasPrefix(resourceNoSuffix, "k8s.label.") {
 			podIDSuffix := "pod_id" + suffix
+			podServiceIDSuffix := "pod_service_id" + suffix
+			deviceTypeSuffix := "l3_device_type" + suffix
 			tagNoPreffix := strings.TrimPrefix(resourceNoSuffix, "k8s.label.")
+			filter = fmt.Sprintf("((toUInt64(%s) IN (SELECT id FROM flow_tag.pod_service_k8s_label_map WHERE key='%s') AND %s=11) OR (toUInt64(%s) IN (SELECT id FROM flow_tag.pod_k8s_label_map WHERE key='%s')))", podServiceIDSuffix, tagNoPreffix, deviceTypeSuffix, podIDSuffix, tagNoPreffix)
 			filter = fmt.Sprintf("toUInt64(%s) IN (SELECT pod_id FROM flow_tag.k8s_label_map WHERE key='%s')", podIDSuffix, tagNoPreffix)
 		} else if strings.HasPrefix(resourceNoSuffix, "cloud.tag.") {
 			deviceIDSuffix := "l3_device_id" + suffix
@@ -223,9 +226,9 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 							nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
 							nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.label.")
 							if strings.Contains(op, "match") {
-								filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, nameNoPreffix)
+								filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, nameNoPreffix, op, t.Value, nameNoPreffix)
 							} else {
-								filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, nameNoPreffix)
+								filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, nameNoPreffix, op, t.Value, nameNoPreffix)
 							}
 							return &view.Expr{Value: filter}, nil
 						}
@@ -367,9 +370,9 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 						nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
 						nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.label.")
 						if strings.Contains(op, "match") {
-							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, nameNoPreffix)
+							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, nameNoPreffix, op, t.Value, nameNoPreffix)
 						} else {
-							filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, nameNoPreffix)
+							filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, nameNoPreffix, op, t.Value, nameNoPreffix)
 						}
 						return &view.Expr{Value: filter}, nil
 					}

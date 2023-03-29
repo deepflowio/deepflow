@@ -17,80 +17,72 @@
 package tagrecorder
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
-type ChK8sLabel struct {
-	UpdaterBase[mysql.ChK8sLabel, K8sLabelKey]
+type ChPodK8sLabels struct {
+	UpdaterBase[mysql.ChPodK8sLabels, K8sLabelsKey]
 }
 
-func NewChK8sLabel() *ChK8sLabel {
-	updater := &ChK8sLabel{
-		UpdaterBase[mysql.ChK8sLabel, K8sLabelKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_K8S_LABEL,
+func NewChPodK8sLabels() *ChPodK8sLabels {
+	updater := &ChPodK8sLabels{
+		UpdaterBase[mysql.ChPodK8sLabels, K8sLabelsKey]{
+			resourceTypeName: RESOURCE_TYPE_CH_K8S_LABELS,
 		},
 	}
 	updater.dataGenerator = updater
 	return updater
 }
 
-func (k *ChK8sLabel) generateNewData() (map[K8sLabelKey]mysql.ChK8sLabel, bool) {
+func (k *ChPodK8sLabels) generateNewData() (map[K8sLabelsKey]mysql.ChPodK8sLabels, bool) {
 	var pods []mysql.Pod
-	var podGroups []mysql.PodGroup
-	var podClusters []mysql.PodCluster
 	err := mysql.Db.Unscoped().Find(&pods).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
 		return nil, false
 	}
-	err = mysql.Db.Unscoped().Find(&podGroups).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
-		return nil, false
-	}
-	err = mysql.Db.Unscoped().Find(&podClusters).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
-		return nil, false
-	}
 
-	podClusterIDToVPCID := make(map[int]int)
-	for _, podCluster := range podClusters {
-		podClusterIDToVPCID[podCluster.ID] = podCluster.VPCID
-	}
-	keyToItem := make(map[K8sLabelKey]mysql.ChK8sLabel)
+	keyToItem := make(map[K8sLabelsKey]mysql.ChPodK8sLabels)
 	for _, pod := range pods {
+		labelsMap := map[string]string{}
 		splitLabel := strings.Split(pod.Label, ", ")
 		for _, singleLabel := range splitLabel {
 			splitSingleLabel := strings.Split(singleLabel, ":")
 			if len(splitSingleLabel) == 2 {
-				key := K8sLabelKey{
-					PodID: pod.ID,
-					Key:   splitSingleLabel[0],
-				}
-				keyToItem[key] = mysql.ChK8sLabel{
-					PodID:   pod.ID,
-					Key:     splitSingleLabel[0],
-					Value:   splitSingleLabel[1],
-					L3EPCID: pod.VPCID,
-					PodNsID: pod.PodNamespaceID,
-				}
+				labelsMap[splitSingleLabel[0]] = splitSingleLabel[1]
+			}
+		}
+		if len(labelsMap) > 0 {
+			labelsStr, err := json.Marshal(labelsMap)
+			if err != nil {
+				log.Error(err)
+				return nil, false
+			}
+			key := K8sLabelsKey{
+				PodID: pod.ID,
+			}
+			keyToItem[key] = mysql.ChPodK8sLabels{
+				PodID:   pod.ID,
+				Labels:  string(labelsStr),
+				L3EPCID: pod.VPCID,
+				PodNsID: pod.PodNamespaceID,
 			}
 		}
 	}
 	return keyToItem, true
 }
 
-func (k *ChK8sLabel) generateKey(dbItem mysql.ChK8sLabel) K8sLabelKey {
-	return K8sLabelKey{PodID: dbItem.PodID, Key: dbItem.Key}
+func (k *ChPodK8sLabels) generateKey(dbItem mysql.ChPodK8sLabels) K8sLabelsKey {
+	return K8sLabelsKey{PodID: dbItem.PodID}
 }
 
-func (k *ChK8sLabel) generateUpdateInfo(oldItem, newItem mysql.ChK8sLabel) (map[string]interface{}, bool) {
+func (k *ChPodK8sLabels) generateUpdateInfo(oldItem, newItem mysql.ChPodK8sLabels) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
-	if oldItem.Value != newItem.Value {
-		updateInfo["value"] = newItem.Value
+	if oldItem.Labels != newItem.Labels {
+		updateInfo["labels"] = newItem.Labels
 	}
 	if oldItem.L3EPCID != newItem.L3EPCID {
 		updateInfo["l3_epc_id"] = newItem.L3EPCID
