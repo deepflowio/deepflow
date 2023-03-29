@@ -16,7 +16,7 @@
 
 use super::flow::PacketDirection;
 use enum_dispatch::enum_dispatch;
-use log::{error, warn};
+use log::{debug, error};
 use serde::Serialize;
 
 use crate::flow_generator::{
@@ -189,7 +189,7 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
                 timeout_count.map(|x| *x -= 1);
                 Some(rrt)
             } else {
-                warn!(
+                debug!(
                     "can not calculate rrt, flow_id: {}, previous log type:{:?}, previous time: {}, current log type: {:?}, current time: {}",
                     param.flow_id, previous_log_info.0, previous_log_info.1, msg_type, param.time,
                 );
