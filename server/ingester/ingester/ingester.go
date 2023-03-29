@@ -64,7 +64,7 @@ var log = logging.MustGetLogger("ingester")
 const (
 	INFLUXDB_RELAY_PORT          = 20048
 	PROFILER_PORT                = 9526
-	MAX_SLAVE_PLATFORMDATA_COUNT = 32
+	MAX_SLAVE_PLATFORMDATA_COUNT = 64
 )
 
 func Start(configPath string, shared *servercommon.ControllerIngesterShared) []io.Closer {

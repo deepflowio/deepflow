@@ -187,19 +187,56 @@ func GenEventCKTable(cluster, storagePolicy string, ttl int, coldStorage *ckdb.C
 	}
 }
 
-func (e *EventStore) ToFlowTags() ([]interface{}, []interface{}) {
-	if cap(e.fields) < len(e.AttributeNames) {
-		e.fields = make([]interface{}, 0, len(e.AttributeNames))
+func (e *EventStore) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
+	// reset temporary buffers
+	flowTagInfo := &cache.FlowTagInfoBuffer
+	*flowTagInfo = flow_tag.FlowTagInfo{
+		Table:   EVENT_TABLE,
+		VpcId:   e.L3EpcID,
+		PodNsId: e.PodNSID,
 	}
-	if cap(e.fieldValues) < len(e.AttributeNames) {
-		e.fieldValues = make([]interface{}, 0, len(e.AttributeNames))
-	}
-	e.fields, e.fieldValues = e.fields[:0], e.fieldValues[:0]
+	cache.Fields = cache.Fields[:0]
+	cache.FieldValues = cache.FieldValues[:0]
+
+	// tags
+	flowTagInfo.FieldType = flow_tag.FieldTag
 	for i, name := range e.AttributeNames {
-		e.fields = append(e.fields, flow_tag.NewTagField(e.Time, EVENT_DB, EVENT_TABLE, int32(e.L3EpcID), e.PodNSID, flow_tag.FieldTag, name))
-		e.fieldValues = append(e.fieldValues, flow_tag.NewTagFieldValue(e.Time, EVENT_DB, EVENT_TABLE, int32(e.L3EpcID), e.PodNSID, flow_tag.FieldTag, name, e.AttributeValues[i]))
+		flowTagInfo.FieldName = name
+
+		// tag + value
+		flowTagInfo.FieldValue = e.AttributeValues[i]
+		v1 := e.Time
+		if old := cache.FieldValueCache.AddOrGet(*flowTagInfo, &v1); old != nil {
+			oldv, _ := old.(*uint32)
+			if *oldv+cache.CacheFlushTimeout >= e.Time {
+				// If there is no new fieldValue, of course there will be no new field.
+				// So we can just skip the rest of the process in the loop.
+				continue
+			} else {
+				*oldv = e.Time
+			}
+		}
+		tagFieldValue := flow_tag.AcquireFlowTag()
+		tagFieldValue.Timestamp = e.Time
+		tagFieldValue.FlowTagInfo = *flowTagInfo
+		cache.FieldValues = append(cache.FieldValues, tagFieldValue)
+
+		// only tag
+		flowTagInfo.FieldValue = ""
+		v2 := e.Time
+		if old := cache.FieldCache.AddOrGet(*flowTagInfo, &v2); old != nil {
+			oldv, _ := old.(*uint32)
+			if *oldv+cache.CacheFlushTimeout >= e.Time {
+				continue
+			} else {
+				*oldv = e.Time
+			}
+		}
+		tagField := flow_tag.AcquireFlowTag()
+		tagField.Timestamp = e.Time
+		tagField.FlowTagInfo = *flowTagInfo
+		cache.Fields = append(cache.Fields, tagField)
 	}
-	return e.fields, e.fieldValues
 }
 
 var eventPool = pool.NewLockFreePool(func() interface{} {

@@ -23,8 +23,8 @@ import (
 	"net"
 	"time"
 
-	//"github.com/deepflowio/deepflow/server/ingester/flow_log/common"
-	//"github.com/deepflowio/deepflow/server/ingester/flow_tag"
+	"github.com/deepflowio/deepflow/server/ingester/flow_log/common"
+	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/datatype/pb"
@@ -571,40 +571,100 @@ func ProtoLogToL7FlowLog(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfo
 	return h
 }
 
-func L7FlowLogToFlowTagInterfaces(l *L7FlowLog, fields, fieldValues *[]interface{}) ([]interface{}, []interface{}) {
-	// FIXME
-	//time := uint32(l.L7Base.EndTime / US_TO_S_DEVISOR)
-	//db, table := common.FLOW_LOG_DB, common.L7_FLOW_ID.String()
+var extraFieldNamesNeedWriteFlowTag = [3]string{"app_service", "endpoint", "app_instance"}
 
-	//extraFieldNames := []string{"app_service", "endpoint", "app_instance"}
-	//extraFieldValues := []string{l.AppService, l.Endpoint, l.AppInstance}
+func (h *L7FlowLog) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
+	l := 2
+	L3EpcIDs := [2]int32{h.L3EpcID0, h.L3EpcID1}
+	PodNSIDs := [2]uint16{h.PodNSID0, h.PodNSID1}
+	if h.L3EpcID0 == h.L3EpcID1 && h.PodNSID0 == h.PodNSID1 {
+		l = 1
+	}
 
-	//L3EpcIDs := []int32{l.L3EpcID0, l.L3EpcID1}
-	//PodNSIDs := []uint16{l.PodNSID0, l.PodNSID1}
-	//if l.L3EpcID0 == l.L3EpcID1 && l.PodNSID0 == l.PodNSID1 {
-	//	L3EpcIDs = L3EpcIDs[:1]
-	//	PodNSIDs = PodNSIDs[:1]
-	//}
+	time := uint32(h.L7Base.EndTime / US_TO_S_DEVISOR)
 
-	//for i, L3EpcID := range L3EpcIDs {
-	//	PodNSID := PodNSIDs[i]
-	//	for i, name := range extraFieldNames {
-	//		if extraFieldValues[i] == "" {
-	//			continue
-	//		}
-	//		*fieldValues = append(*fieldValues, flow_tag.NewTagFieldValue(time, db, table, L3EpcID, PodNSID, flow_tag.FieldTag, name, extraFieldValues[i]))
-	//	}
+	extraFieldValuesNeedWriteFlowTag := [3]string{h.AppService, h.Endpoint, h.AppInstance}
 
-	//	for i, name := range l.AttributeNames {
-	//		*fields = append(*fields, flow_tag.NewTagField(time, db, table, L3EpcID, PodNSID, flow_tag.FieldTag, name))
-	//		if l.AttributeValues[i] != "" {
-	//			*fieldValues = append(*fieldValues, flow_tag.NewTagFieldValue(time, db, table, L3EpcID, PodNSID, flow_tag.FieldTag, name, l.AttributeValues[i]))
-	//		}
-	//	}
-	//	for _, name := range l.MetricsNames {
-	//		*fields = append(*fields, flow_tag.NewTagField(time, db, table, L3EpcID, PodNSID, flow_tag.FieldMetrics, name))
-	//	}
-	//}
+	attributeNames := append(h.AttributeNames, extraFieldNamesNeedWriteFlowTag[:]...)
+	attributeValues := append(h.AttributeValues, extraFieldValuesNeedWriteFlowTag[:]...)
 
-	return *fields, *fieldValues
+	cache.Fields = cache.Fields[:0]
+	cache.FieldValues = cache.FieldValues[:0]
+
+	for idx := 0; idx < l; idx++ {
+		// reset temporary buffers
+		flowTagInfo := &cache.FlowTagInfoBuffer
+		*flowTagInfo = flow_tag.FlowTagInfo{
+			Table:   common.L7_FLOW_ID.String(),
+			VpcId:   L3EpcIDs[idx],
+			PodNsId: PodNSIDs[idx],
+		}
+
+		for i, name := range attributeNames {
+			if attributeValues[i] == "" {
+				continue
+			}
+			flowTagInfo.FieldName = name
+
+			// tag + value
+			flowTagInfo.FieldValue = attributeValues[i]
+			v1 := time
+
+			if old := cache.FieldValueCache.AddOrGet(*flowTagInfo, &v1); old != nil {
+				oldv, _ := old.(*uint32)
+				if *oldv+cache.CacheFlushTimeout >= time {
+					// If there is no new fieldValue, of course there will be no new field.
+					// So we can just skip the rest of the process in the loop.
+					continue
+				} else {
+					*oldv = time
+				}
+			}
+			tagFieldValue := flow_tag.AcquireFlowTag()
+			tagFieldValue.Timestamp = time
+			tagFieldValue.FlowTagInfo = *flowTagInfo
+			cache.FieldValues = append(cache.FieldValues, tagFieldValue)
+
+			// The tag key in extraFieldNamesNeedWriteFlowTag does not need to be written into flow_tag.
+			if i >= len(h.AttributeNames) {
+				continue
+			}
+			// only tag
+			flowTagInfo.FieldValue = ""
+			v2 := time
+			if old := cache.FieldCache.AddOrGet(*flowTagInfo, &v2); old != nil {
+				oldv, _ := old.(*uint32)
+				if *oldv+cache.CacheFlushTimeout >= time {
+					continue
+				} else {
+					*oldv = time
+				}
+			}
+			tagField := flow_tag.AcquireFlowTag()
+			tagField.Timestamp = time
+			tagField.FlowTagInfo = *flowTagInfo
+			cache.Fields = append(cache.Fields, tagField)
+		}
+
+		// metrics
+		flowTagInfo.FieldType = flow_tag.FieldMetrics
+		flowTagInfo.FieldValue = ""
+		for _, name := range h.MetricsNames {
+			flowTagInfo.FieldName = name
+			v := time
+			if old := cache.FieldCache.AddOrGet(*flowTagInfo, &v); old != nil {
+				oldv, _ := old.(*uint32)
+				if *oldv+cache.CacheFlushTimeout >= time {
+					continue
+				} else {
+					*oldv = time
+				}
+			}
+			tagField := flow_tag.AcquireFlowTag()
+			tagField.Timestamp = time
+			tagField.FlowTagInfo = *flowTagInfo
+			cache.Fields = append(cache.Fields, tagField)
+		}
+
+	}
 }
