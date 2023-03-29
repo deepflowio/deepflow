@@ -20,9 +20,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	//"github.com/k0kubun/pp"
 	"strings"
 
+	//"github.com/k0kubun/pp"
 	logging "github.com/op/go-logging"
 	"github.com/xwb1989/sqlparser"
 
@@ -1090,6 +1090,20 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where, isCheck bool) (view
 			stmt := &WhereFunction{Function: outfunc, Value: sqlparser.String(node.Right)}
 			return stmt.Trans(node, w, e.asTagMap, e.DB, e.Table)
 		}
+	case *sqlparser.FuncExpr:
+		args := []string{}
+		for _, argExpr := range node.Exprs {
+			switch argExpr := argExpr.(*sqlparser.AliasedExpr).Expr.(type) {
+			case *sqlparser.ColName:
+				arg := sqlparser.String(argExpr)
+				args = append(args, arg)
+			}
+		}
+		whereFilter := TransWhereTagFunction(sqlparser.String(node.Name), args)
+		if whereFilter == "" {
+			return nil, nil
+		}
+		return &view.Expr{Value: "(" + whereFilter + ")"}, nil
 
 	}
 	return nil, errors.New(fmt.Sprintf("parse where error: %s(%T)", sqlparser.String(node), node))

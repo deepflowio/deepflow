@@ -23,6 +23,8 @@ import (
 	"strconv"
 	"strings"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/Knetic/govaluate"
 	"github.com/deepflowio/deepflow/server/libs/utils"
 	"github.com/deepflowio/deepflow/server/querier/config"
@@ -64,6 +66,54 @@ func GetWhere(name, value string) WhereStatement {
 	default:
 		return &WhereTag{Tag: name, Value: value}
 	}
+}
+
+func TransWhereTagFunction(name string, args []string) (filter string) {
+	funcName := strings.ToLower(name)
+	switch funcName {
+	case "exist":
+		if len(args) != 1 {
+			errorMessage := fmt.Sprintf("The parameters of function %s are not 1", funcName)
+			log.Error(errorMessage)
+			return
+		}
+		resource := strings.ToLower(strings.Trim(args[0], "`"))
+		suffix := ""
+		if strings.HasSuffix(resource, "_0") {
+			suffix = "_0"
+		} else if strings.HasSuffix(resource, "_1") {
+			suffix = "_1"
+		}
+		resourceNoSuffix := strings.TrimSuffix(resource, "_0")
+		resourceNoSuffix = strings.TrimSuffix(resourceNoSuffix, "_1")
+		deviceTypeValue, ok := tag.DEVICE_MAP[resourceNoSuffix]
+		if ok {
+			relatedOK := slices.Contains[string]([]string{"pod_service"}, resourceNoSuffix)
+			if relatedOK {
+				return
+			}
+			deviceTypeTagSuffix := "l3_device_type" + suffix
+			filter = fmt.Sprintf("%s=%d", deviceTypeTagSuffix, deviceTypeValue)
+			return
+		} else if strings.HasPrefix(resourceNoSuffix, "k8s.label.") {
+			podIDSuffix := "pod_id" + suffix
+			tagNoPreffix := strings.TrimPrefix(resourceNoSuffix, "k8s.label.")
+			filter = fmt.Sprintf("toUInt64(%s) IN (SELECT pod_id FROM flow_tag.k8s_label_map WHERE key='%s')", podIDSuffix, tagNoPreffix)
+		} else if strings.HasPrefix(resourceNoSuffix, "cloud.tag.") {
+			deviceIDSuffix := "l3_device_id" + suffix
+			deviceTypeSuffix := "l3_device_type" + suffix
+			podNSIDSuffix := "pod_ns_id" + suffix
+			tagNoPreffix := strings.TrimPrefix(resourceNoSuffix, "cloud.tag.")
+			filter = fmt.Sprintf("((toUInt64(%s) IN (SELECT id FROM flow_tag.chost_cloud_tag_map WHERE key='%s') AND %s=1) OR (toUInt64(%s) IN (SELECT id FROM flow_tag.pod_ns_cloud_tag_map WHERE key='%s')))", deviceIDSuffix, tagNoPreffix, deviceTypeSuffix, podNSIDSuffix, tagNoPreffix)
+		} else if strings.HasPrefix(resourceNoSuffix, "os.app.") {
+			processIDSuffix := "gprocess_id" + suffix
+			tagNoPreffix := strings.TrimPrefix(resourceNoSuffix, "os.app.")
+			filter = fmt.Sprintf("toUInt64(%s) IN (SELECT pid FROM flow_tag.os_app_tag_map WHERE key='%s')", processIDSuffix, tagNoPreffix)
+		} else if deviceTypeValue, ok = tag.TAP_PORT_DEVICE_MAP[resourceNoSuffix]; ok {
+			filter = fmt.Sprintf("(toUInt64(vtap_id),toUInt64(tap_port)) IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type=%d)", deviceTypeValue)
+		}
+	}
+	return
 }
 
 type WhereStatement interface {
