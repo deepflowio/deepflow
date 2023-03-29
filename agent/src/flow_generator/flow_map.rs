@@ -1890,7 +1890,6 @@ pub fn _new_flow_map_and_receiver(
     config.flow.l7_log_tap_types[0] = true;
     config.flow.trident_type = trident_type;
     let current_config = Arc::new(ArcSwap::from_pointee(config));
-    #[cfg(target_os = "linux")]
     let flow_map = FlowMap::new(
         0,
         output_queue_sender,
@@ -1903,26 +1902,10 @@ pub fn _new_flow_map_and_receiver(
         Map::new(current_config.clone(), |config| -> &LogParserConfig {
             &config.log_parser
         }),
+        #[cfg(target_os = "linux")]
         None,
         Some(packet_sequence_queue), // Enterprise Edition Feature: packet-sequence
         &stats::Collector::new(""),
-        false,
-    );
-    #[cfg(target_os = "windows")]
-    let flow_map = FlowMap::new(
-        0,
-        output_queue_sender,
-        policy_getter,
-        app_proto_log_queue,
-        Arc::new(AtomicI64::new(0)),
-        Map::new(current_config.clone(), |config| -> &FlowConfig {
-            &config.flow
-        }),
-        Map::new(current_config.clone(), |config| -> &LogParserConfig {
-            &config.log_parser
-        }),
-        Some(packet_sequence_queue), // Enterprise Edition Feature: packet-sequence
-        &stats::Collector::new("", "127.0.0.1".to_string(), 30033),
         false,
     );
 
