@@ -504,7 +504,7 @@ impl Trident {
                         libvirt_xml_extractor.stop();
                         if let Some(cg_controller) = cgroups_controller {
                             if let Err(e) = cg_controller.stop() {
-                                warn!("stop cgroup controller failed, {:?}", e);
+                                info!("stop cgroup controller failed, {:?}", e);
                             }
                         }
                     }
