@@ -61,10 +61,11 @@ type EventWriter struct {
 
 func (w *EventWriter) Write(e *EventStore) {
 	w.ckWriter.Put(e)
-	w.flowTagWriter.WriteFieldsAndFieldValues(e.ToFlowTags())
+	e.GenerateNewFlowTags(w.flowTagWriter.Cache)
+	w.flowTagWriter.WriteFieldsAndFieldValuesInCache()
 }
 
-func NewEventWriter(config *config.Config) (*EventWriter, error) {
+func NewEventWriter(decoderIndex int, config *config.Config) (*EventWriter, error) {
 	w := &EventWriter{
 		ckdbAddrs:         config.Base.CKDB.ActualAddrs,
 		ckdbUsername:      config.Base.CKDBAuth.Username,
@@ -75,7 +76,7 @@ func NewEventWriter(config *config.Config) (*EventWriter, error) {
 		ttl:               config.TTL,
 		writerConfig:      config.CKWriterConfig,
 	}
-	flowTagWriter, err := flow_tag.NewFlowTagWriter(EVENT_DB, EVENT_DB, config.TTL, DefaultPartition, config.Base, &config.CKWriterConfig)
+	flowTagWriter, err := flow_tag.NewFlowTagWriter(decoderIndex, EVENT_DB, EVENT_DB, config.TTL, DefaultPartition, config.Base, &config.CKWriterConfig)
 	if err != nil {
 		return nil, err
 	}
