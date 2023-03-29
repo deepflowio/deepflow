@@ -2,13 +2,13 @@ package prometheus
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/goccy/go-json"
 	"github.com/prometheus/prometheus/prompb"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
@@ -413,6 +413,10 @@ func RespTransToProm(ctx context.Context, result *common.Result) (resp *prompb.R
 		// get metrics
 		values := result.Values[i].([]interface{})
 		var metricsValue float64
+		if values[metricsIndex] == nil {
+			metricsValue = 0
+			continue
+		}
 		if metricsType == "Int" {
 			metricsValue = float64(values[metricsIndex].(int))
 		} else if metricsType == "Float64" {
@@ -467,6 +471,8 @@ func getValue(value interface{}) string {
 		return strconv.FormatFloat(val, 'f', -1, 64)
 	case time.Time:
 		return val.String()
+	case nil:
+		return ""
 	default:
 		return val.(string)
 	}
@@ -478,6 +484,8 @@ func isZero(value interface{}) bool {
 		return val == "" || val == "{}"
 	case int:
 		return val == 0
+	case nil:
+		return true
 	default:
 		return false
 	}

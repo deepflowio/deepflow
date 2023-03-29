@@ -19,18 +19,20 @@ package client
 import (
 	"context"
 	"reflect"
+
 	//"database/sql"
 	"fmt"
+	"time"
+	"unsafe"
 
 	clickhouse "github.com/ClickHouse/clickhouse-go/v2"
 	//"github.com/k0kubun/pp"
+
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/statsd"
 	"github.com/google/uuid"
 	logging "github.com/op/go-logging"
-	"time"
-	"unsafe"
 )
 
 var log = logging.MustGetLogger("clickhouse.client")
@@ -185,6 +187,6 @@ func (c *Client) DoQuery(params *QueryParams) (result *common.Result, err error)
 		}
 	}
 	log.Debugf("sql: %s, query_uuid: %s", sqlstr, c.Debug.QueryUUID)
-	log.Infof("res_rows: %v, res_columns: %v, res_size: %v", resRows, resColumns, resSize)
+	log.Infof("query_uuid: %s. query api statistics: %d rows, %d columns, %d bytes, cost %f ms", c.Debug.QueryUUID, resRows, resColumns, resSize, float64(queryTime.Milliseconds()))
 	return result, nil
 }
