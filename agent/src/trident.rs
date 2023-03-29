@@ -280,11 +280,7 @@ impl Trident {
         let logger_handle = logger.start()?;
 
         // Use controller ip to replace analyzer ip before obtaining configuration
-        let stats_collector = Arc::new(stats::Collector::new(
-            &hostname,
-            config.controller_ips[0].clone(),
-            DEFAULT_INGESTER_PORT,
-        ));
+        let stats_collector = Arc::new(stats::Collector::new(&hostname));
         if matches!(config.agent_mode, RunningMode::Managed) {
             stats_collector.start();
         }
