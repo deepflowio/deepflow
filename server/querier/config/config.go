@@ -64,8 +64,9 @@ type Clickhouse struct {
 }
 
 type Prometheus struct {
-	SeriesLimit       int    `default:"100" yaml:"series-limit"`
-	AutoTaggingPrefix string `default:"df_" yaml:"auto-tagging-prefix"`
+	SeriesLimit           int    `default:"100" yaml:"series-limit"`
+	AutoTaggingPrefix     string `default:"df_" yaml:"auto-tagging-prefix"`
+	RequestQueryWithDebug bool   `default:"false" yaml:"request-query-with-debug"`
 }
 
 func (c *Config) expendEnv() {
