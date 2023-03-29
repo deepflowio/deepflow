@@ -884,7 +884,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"toUInt64(span_kind) IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
 			"toUInt64(span_kind) IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
 		)}
-	for _, enumName := range []string{"tap_side", "event_type"} {
+	for _, enumName := range []string{"tap_side", "event_type", "profile_language_type"} {
 		tagResourceMap[enumName] = map[string]*Tag{
 			"enum": NewTag(
 				"dictGetOrDefault(flow_tag.string_enum_map, 'name', ('%s',"+enumName+"), "+enumName+")",
