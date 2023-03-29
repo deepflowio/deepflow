@@ -291,6 +291,16 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 	versionPlatformData := vtapCache.GetSimplePlatformDataVersion()
 	versionGroups := gVTapInfo.GetGroupDataVersion()
 	versionPolicy := gVTapInfo.GetVTapPolicyVersion(vtapID, functions)
+	log.Infof("trisolaris-debug ctrl_ip is %s, ctrl_mac is %s, host_ips is %s,"+
+		"(platform data version  %d -> %d), "+
+		"(acls version %d -> %d), "+
+		"(groups version %d -> %d), "+
+		"NAME:%s  REVISION:%s  BOOT_TIME:%d",
+		ctrlIP, ctrlMac, in.GetHostIps(),
+		versionPlatformData, in.GetVersionPlatformData(),
+		versionPolicy, in.GetVersionAcls(),
+		versionGroups, in.GetVersionGroups(),
+		in.GetProcessName(), in.GetRevision(), in.GetBootTime())
 	if versionPlatformData != in.GetVersionPlatformData() || versionPlatformData == 0 ||
 		versionGroups != in.GetVersionGroups() || versionPolicy != in.GetVersionAcls() {
 		log.Infof("ctrl_ip is %s, ctrl_mac is %s, host_ips is %s, "+
