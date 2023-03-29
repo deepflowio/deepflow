@@ -310,6 +310,7 @@ pub struct FlowConfig {
     pub l7_log_tap_types: [bool; 256],
 
     pub hash_slots: u32,
+    pub capacity: usize,
     pub packet_delay: Duration,
     pub flush_interval: Duration,
     pub flow_timeout: FlowTimeout,
@@ -354,6 +355,7 @@ impl From<&RuntimeConfig> for FlowConfig {
                 tap_types
             },
             hash_slots: flow_config.hash_slots,
+            capacity: conf.get_flow_capacity(),
             packet_delay: conf.yaml_config.packet_delay,
             flush_interval: flow_config.flush_interval,
             flow_timeout: FlowTimeout::from(TcpTimeout {
@@ -1357,11 +1359,7 @@ impl ConfigHandler {
                     || yaml_config.get_fast_path_map_size(new_config.dispatcher.max_memory)
                         != yaml_config
                             .get_fast_path_map_size(candidate_config.dispatcher.max_memory)
-                    || candidate_config.get_channel_size(new_config.dispatcher.max_memory)
-                        != candidate_config.get_channel_size(candidate_config.dispatcher.max_memory)
-                    || candidate_config.get_flow_capacity(new_config.dispatcher.max_memory)
-                        != candidate_config
-                            .get_flow_capacity(candidate_config.dispatcher.max_memory)
+                    || candidate_config.flow.capacity != new_config.flow.capacity
                 {
                     restart_dispatcher = true;
                     info!("max_memory change, restart dispatcher");
@@ -1977,24 +1975,6 @@ impl ConfigHandler {
         exception_handler.clear(Exception::InvalidConfiguration);
 
         callbacks
-    }
-}
-
-impl ModuleConfig {
-    fn get_channel_size(&self, mem_size: u64) -> usize {
-        if self.tap_mode == TapMode::Analyzer {
-            return 1 << 14;
-        }
-
-        min(max((mem_size / MB / 128 * 32000) as usize, 32000), 1 << 14)
-    }
-
-    fn get_flow_capacity(&self, mem_size: u64) -> usize {
-        if self.tap_mode == TapMode::Analyzer {
-            return self.yaml_config.flow.capacity as usize;
-        }
-
-        min((mem_size / MB / 128 * 65536) as usize, 1 << 30)
     }
 }
 

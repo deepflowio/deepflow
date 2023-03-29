@@ -98,6 +98,8 @@ pub struct FlowMap {
     start_time: Duration,    // 时间桶中的最早时间
     start_time_in_unit: u64, // 时间桶中的最早时间，以TIME_SLOT_UNIT为单位
     hash_slots: usize,
+    len: isize,
+    capacity: usize,
     time_window_size: usize,
     total_flow: usize,
     time_set_slot_size: usize,
@@ -184,6 +186,8 @@ impl FlowMap {
             start_time,
             start_time_in_unit: start_time.as_secs(),
             hash_slots: config_guard.hash_slots as usize,
+            len: 0,
+            capacity: config_guard.capacity,
             time_window_size,
             total_flow: 0,
             time_set_slot_size,
@@ -1324,6 +1328,14 @@ impl FlowMap {
         log_parser_config: &LogParserConfig,
         meta_packet: &mut MetaPacket,
     ) -> Option<FlowNode> {
+        if self.len >= self.capacity as isize {
+            debug!("flow map (capacity: {}) is full", self.capacity);
+            self.stats_counter
+                .drop_by_capacity
+                .fetch_add(1, Ordering::Relaxed);
+            return None;
+        }
+
         self.stats_counter.new.fetch_add(1, Ordering::Relaxed);
         let node = match meta_packet.lookup_key.proto {
             IpProtocol::Tcp => self.new_tcp_node(flow_config, log_parser_config, meta_packet),
@@ -1341,6 +1353,7 @@ impl FlowMap {
             self.stats_counter
                 .concurrent
                 .fetch_add(1, Ordering::Relaxed);
+            self.len += 1;
             Some(node)
         }
     }
@@ -1463,6 +1476,7 @@ impl FlowMap {
         self.stats_counter
             .concurrent
             .fetch_sub(1, Ordering::Relaxed);
+        self.len -= 1;
         self.stats_counter.closed.fetch_add(1, Ordering::Relaxed);
 
         self.push_to_flow_stats_queue(config, node.tagged_flow);
@@ -1789,7 +1803,8 @@ impl FlowMap {
 pub struct FlowMapCounter {
     new: AtomicU64,              // the number of  created flow
     closed: AtomicU64,           // the number of closed flow
-    drop_by_window: AtomicU64,   // times of flush wihich drop by window
+    drop_by_window: AtomicU64,   // times of flush which drop by window
+    drop_by_capacity: AtomicU64, // flows dropped due to over capacity
     concurrent: AtomicU64,       // current the number of FlowNode
     slots: AtomicU64,            // current the length of HashMap
     slot_max_depth: AtomicU64,   // the max length of Vec<FlowNode>
@@ -1817,6 +1832,11 @@ impl RefCountable for FlowMapCounter {
                 "drop_by_window",
                 CounterType::Gauged,
                 CounterValue::Unsigned(self.drop_by_window.swap(0, Ordering::Relaxed)),
+            ),
+            (
+                "drop_by_capacity",
+                CounterType::Gauged,
+                CounterValue::Unsigned(self.drop_by_capacity.swap(0, Ordering::Relaxed)),
             ),
             (
                 "concurrent",

@@ -887,14 +887,14 @@ impl Collector {
         ntp_diff: Arc<AtomicI64>,
     ) -> Self {
         let delay_seconds = delay_seconds as u64;
-        let name = match metric_type {
+        let (kind, name) = match metric_type {
             MetricsType::MINUTE => {
                 if delay_seconds < MINUTE || delay_seconds >= MINUTE * 2 {
                     panic!("delay_seconds必须在[60, 120)秒内");
                 }
-                "minute_collector"
+                ("minute", "minute_collector")
             }
-            _ => "second_collector",
+            _ => ("second", "second_collector"),
         };
 
         let running = Arc::new(AtomicBool::new(false));
@@ -904,9 +904,12 @@ impl Collector {
         });
 
         stats.register_countable(
-            name,
+            "collector",
             Countable::Ref(Arc::downgrade(&counter) as Weak<dyn RefCountable>),
-            vec![StatsOption::Tag("index", id.to_string())],
+            vec![
+                StatsOption::Tag("kind", kind.to_owned()),
+                StatsOption::Tag("index", id.to_string()),
+            ],
         );
 
         Self {

@@ -47,6 +47,7 @@ use public::proto::{
     trident::{self, KubernetesClusterIdRequest, TapMode},
 };
 
+const MB: u64 = 1048576;
 const K8S_CA_CRT_PATH: &str = "/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 const MINUTE: Duration = Duration::from_secs(60);
 const DEFAULT_STANDALONE_CONFIG: &str = "/etc/deepflow-agent-standalone.yaml";
@@ -1110,6 +1111,14 @@ impl RuntimeConfig {
         }
 
         Ok(())
+    }
+
+    pub fn get_flow_capacity(&self) -> usize {
+        if self.tap_mode == TapMode::Analyzer {
+            return self.yaml_config.flow.capacity as usize;
+        }
+
+        ((self.max_memory / MB / 128 * 65536) as usize).min(1 << 30)
     }
 }
 
