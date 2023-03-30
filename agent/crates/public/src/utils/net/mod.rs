@@ -24,6 +24,7 @@ use std::{
 use bitflags::bitflags;
 use serde::Serialize;
 
+mod arp;
 pub mod h2pack;
 
 mod error;
