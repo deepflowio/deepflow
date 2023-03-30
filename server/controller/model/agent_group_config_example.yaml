@@ -1014,6 +1014,7 @@ vtap_group_id: g-xxxxxx
 
   ## the regular expression use for match process and replace the process name
   ## Note: will traverse over the entire array, so the previous ones will be matched first.
+  ##   when match-type is parent_process_name, will recursive to match parent proc name, and rewrite-name field will ignore.
   ##   rewrite-name can replace by regexp capture group and windows style environment variable, for example:
   ##   `$1-py-script-%HOSTNAME%` will replace regexp capture group 1 and HOSTNAME env var.
   ##   if proc not match any regexp will be accepted (essentially will auto append '- match-regex: .*' at the end).
@@ -1027,6 +1028,9 @@ vtap_group_id: g-xxxxxx
   ##     - match-regex: (?P<PROC_NAME>nginx)
   ##       match-type: process_name
   ##       rewrite-name: ${PROC_NAME}-%HOSTNAME%
+  ##     - match-regex: "nginx"
+  ##       match-type: parent_process_name
+  ##       action: accept
   ##     - match-regex: .*sleep.*
   ##       match-type: process_name
   ##       action: drop
@@ -1038,7 +1042,7 @@ vtap_group_id: g-xxxxxx
 
     #  # Regexp match field
     #  # Default: process_name
-    #  # Note: Options: process_name, cmdline.
+    #  # Note: Options: process_name, cmdline, parent_process_name.
     #  match-type:
     #
     #  # Action when RegExp match

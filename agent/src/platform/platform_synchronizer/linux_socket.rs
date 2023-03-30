@@ -35,7 +35,7 @@ use public::{
     proto::trident::{GpidSyncEntry, RoleType, ServiceProtocol},
 };
 
-use super::{sym_uptime, ProcessData, RegExpAction};
+use super::{get_all_pid_process_map, sym_uptime, RegExpAction};
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum Role {
@@ -180,6 +180,8 @@ pub(super) fn get_all_socket(
     // netns idx increase every time get the new netns id
     let mut netns_idx = 0u16;
 
+    let mut pid_proc_map = get_all_pid_process_map(conf.os_proc_root.as_str());
+
     // get all process, and record the open fd and fetch listining socket info
     // note that the /proc/pid/net/{tcp,tcp6,udp,udp6} include all the connection in the proc netns, not the process created connection.
     for p in procfs::process::all_processes_with_root(proc_root)? {
@@ -187,12 +189,15 @@ pub(super) fn get_all_socket(
             continue;
         };
 
-        let (fds, netns, mut proc_data, pid) = match (
-            proc.fd(),
-            get_proc_netns(&proc),
-            ProcessData::try_from(&proc),
-        ) {
-            (Ok(fds), Ok(netns), Ok(proc_data)) => (fds, netns, proc_data, proc.pid),
+        let mut proc_data = {
+            let Some(proc_data) = pid_proc_map.get_mut(&(proc.pid as u32)) else {
+                continue;
+            };
+            proc_data.clone()
+        };
+
+        let (fds, netns, pid) = match (proc.fd(), get_proc_netns(&proc)) {
+            (Ok(fds), Ok(netns)) => (fds, netns, proc.pid),
             _ => {
                 continue;
             }
@@ -208,7 +213,7 @@ pub(super) fn get_all_socket(
         }
 
         for i in conf.os_proc_regex.as_slice() {
-            if i.match_and_rewrite_proc(&mut proc_data, true) {
+            if i.match_and_rewrite_proc(&mut proc_data, &pid_proc_map, true) {
                 if i.action() == RegExpAction::Drop {
                     break;
                 }
