@@ -24,6 +24,7 @@ use std::{
 use bitflags::bitflags;
 use serde::Serialize;
 
+#[cfg(target_os = "linux")]
 mod arp;
 pub mod h2pack;
 
