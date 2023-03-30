@@ -36,6 +36,10 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/receiver"
 )
 
+const (
+	RESOURCE_EVENT_TAG_WRITE_INDEX = 100
+)
+
 type Event struct {
 	Config          *config.Config
 	ResourceEventor *Eventor
@@ -46,20 +50,15 @@ type Eventor struct {
 	Config        *config.Config
 	Decoders      []*decoder.Decoder
 	PlatformDatas []*grpc.PlatformInfoTable
-	Writer        *dbwriter.EventWriter
 }
 
 func NewEvent(config *config.Config, resourceEventQueue *queue.OverwriteQueue, recv *receiver.Receiver, platformDataManager *grpc.PlatformDataManager) (*Event, error) {
 	manager := dropletqueue.NewManager(ingesterctl.INGESTERCTL_EVENT_QUEUE)
-	eventWriter, err := dbwriter.NewEventWriter(config)
+	resourceEventor, err := NewResouceEventor(resourceEventQueue, common.RESOURCE_EVENT, config)
 	if err != nil {
 		return nil, err
 	}
-	resourceEventor, err := NewResouceEventor(resourceEventQueue, common.RESOURCE_EVENT, eventWriter, config)
-	if err != nil {
-		return nil, err
-	}
-	procEventor, err := NewEventor(config, recv, manager, platformDataManager, eventWriter)
+	procEventor, err := NewEventor(config, recv, manager, platformDataManager)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +69,11 @@ func NewEvent(config *config.Config, resourceEventQueue *queue.OverwriteQueue, r
 	}, nil
 }
 
-func NewResouceEventor(eventQueue *queue.OverwriteQueue, eventType common.EventType, eventWriter *dbwriter.EventWriter, config *config.Config) (*Eventor, error) {
+func NewResouceEventor(eventQueue *queue.OverwriteQueue, eventType common.EventType, config *config.Config) (*Eventor, error) {
+	eventWriter, err := dbwriter.NewEventWriter(RESOURCE_EVENT_TAG_WRITE_INDEX, config)
+	if err != nil {
+		return nil, err
+	}
 	d := decoder.NewDecoder(
 		eventType,
 		queue.QueueReader(eventQueue),
@@ -81,11 +84,10 @@ func NewResouceEventor(eventQueue *queue.OverwriteQueue, eventType common.EventT
 	return &Eventor{
 		Config:   config,
 		Decoders: []*decoder.Decoder{d},
-		Writer:   eventWriter,
 	}, nil
 }
 
-func NewEventor(config *config.Config, recv *receiver.Receiver, manager *dropletqueue.Manager, platformDataManager *grpc.PlatformDataManager, eventWriter *dbwriter.EventWriter) (*Eventor, error) {
+func NewEventor(config *config.Config, recv *receiver.Receiver, manager *dropletqueue.Manager, platformDataManager *grpc.PlatformDataManager) (*Eventor, error) {
 	eventMsg := datatype.MESSAGE_TYPE_PROC_EVENT
 	queueCount := config.DecoderQueueCount
 	decodeQueues := manager.NewQueues(
@@ -99,8 +101,11 @@ func NewEventor(config *config.Config, recv *receiver.Receiver, manager *droplet
 
 	decoders := make([]*decoder.Decoder, queueCount)
 	platformDatas := make([]*grpc.PlatformInfoTable, queueCount)
-	var err error
 	for i := 0; i < queueCount; i++ {
+		eventWriter, err := dbwriter.NewEventWriter(i, config)
+		if err != nil {
+			return nil, err
+		}
 		platformDatas[i], err = platformDataManager.NewPlatformInfoTable(false, "event-"+eventMsg.String()+"-"+strconv.Itoa(i))
 		if err != nil {
 			return nil, err
@@ -117,7 +122,6 @@ func NewEventor(config *config.Config, recv *receiver.Receiver, manager *droplet
 		Config:        config,
 		Decoders:      decoders,
 		PlatformDatas: platformDatas,
-		Writer:        eventWriter,
 	}, nil
 }
 

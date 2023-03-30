@@ -108,8 +108,8 @@ func InitTable(addr, user, password string, t *ckdb.Table) error {
 }
 
 func NewCKWriter(addrs []string, user, password, counterName string, table *ckdb.Table, queueCount, queueSize, batchSize, flushTimeout int) (*CKWriter, error) {
-	log.Infof("New CK writer: Addrs=%v, user=%s, database=%s, table=%s, queueCount=%d, queueSize=%d, batchSize=%d, flushTimeout=%ds",
-		addrs, user, table.Database, table.LocalName, queueCount, queueSize, batchSize, flushTimeout)
+	log.Infof("New CK writer: Addrs=%v, user=%s, database=%s, table=%s, queueCount=%d, queueSize=%d, batchSize=%d, flushTimeout=%ds, counterName=%s",
+		addrs, user, table.Database, table.LocalName, queueCount, queueSize, batchSize, flushTimeout, counterName)
 
 	if len(addrs) == 0 {
 		return nil, fmt.Errorf("addrs is empty")

@@ -77,10 +77,6 @@ func NewFlowLog(config *config.Config, recv *receiver.Receiver, platformDataMana
 		return nil, err
 	}
 	l4FlowLogger := NewL4FlowLogger(config, platformDataManager, manager, recv, flowLogWriter)
-	flowTagWriter, err := flow_tag.NewFlowTagWriter(common.FLOW_LOG_DB, common.FLOW_LOG_DB, config.FlowLogTTL.L7FlowLog, dbwriter.DefaultPartition, config.Base, &config.CKWriterConfig)
-	if err != nil {
-		return nil, err
-	}
 
 	var l7Exporter, otelExporter *exporter.OtlpExporter
 	exporter := exporter.NewOtlpExporter(config)
@@ -90,10 +86,10 @@ func NewFlowLog(config *config.Config, recv *receiver.Receiver, platformDataMana
 	if config.Exporter.OTelEnabled {
 		otelExporter = exporter
 	}
-	l7FlowLogger := NewL7FlowLogger(config, platformDataManager, manager, recv, flowLogWriter, flowTagWriter, l7Exporter)
-	otelLogger := NewLogger(datatype.MESSAGE_TYPE_OPENTELEMETRY, config, platformDataManager, manager, recv, flowLogWriter, common.L7_FLOW_ID, flowTagWriter, otelExporter)
-	otelCompressedLogger := NewLogger(datatype.MESSAGE_TYPE_OPENTELEMETRY_COMPRESSED, config, platformDataManager, manager, recv, flowLogWriter, common.L7_FLOW_ID, flowTagWriter, otelExporter)
-	l4PacketLogger := NewLogger(datatype.MESSAGE_TYPE_PACKETSEQUENCE, config, nil, manager, recv, flowLogWriter, common.L4_PACKET_ID, nil, nil)
+	l7FlowLogger := NewL7FlowLogger(config, platformDataManager, manager, recv, flowLogWriter, l7Exporter)
+	otelLogger := NewLogger(datatype.MESSAGE_TYPE_OPENTELEMETRY, config, platformDataManager, manager, recv, flowLogWriter, common.L7_FLOW_ID, otelExporter)
+	otelCompressedLogger := NewLogger(datatype.MESSAGE_TYPE_OPENTELEMETRY_COMPRESSED, config, platformDataManager, manager, recv, flowLogWriter, common.L7_FLOW_ID, otelExporter)
+	l4PacketLogger := NewLogger(datatype.MESSAGE_TYPE_PACKETSEQUENCE, config, nil, manager, recv, flowLogWriter, common.L4_PACKET_ID, nil)
 	return &FlowLog{
 		FlowLogConfig:        config,
 		L4FlowLogger:         l4FlowLogger,
@@ -105,7 +101,7 @@ func NewFlowLog(config *config.Config, recv *receiver.Receiver, platformDataMana
 	}, nil
 }
 
-func NewLogger(msgType datatype.MessageType, config *config.Config, platformDataManager *grpc.PlatformDataManager, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter, flowLogId common.FlowLogID, flowTagWriter *flow_tag.FlowTagWriter, otlpExporter *exporter.OtlpExporter) *Logger {
+func NewLogger(msgType datatype.MessageType, config *config.Config, platformDataManager *grpc.PlatformDataManager, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter, flowLogId common.FlowLogID, otlpExporter *exporter.OtlpExporter) *Logger {
 	queueCount := config.DecoderQueueCount
 	decodeQueues := manager.NewQueues(
 		"1-receive-to-decode-"+datatype.MessageTypeString[msgType],
@@ -121,6 +117,10 @@ func NewLogger(msgType datatype.MessageType, config *config.Config, platformData
 	decoders := make([]*decoder.Decoder, queueCount)
 	platformDatas := make([]*grpc.PlatformInfoTable, queueCount)
 	for i := 0; i < queueCount; i++ {
+		flowTagWriter, err := flow_tag.NewFlowTagWriter(i, msgType.String(), common.FLOW_LOG_DB, config.FlowLogTTL.L7FlowLog, dbwriter.DefaultPartition, config.Base, &config.CKWriterConfig)
+		if err != nil {
+			return nil
+		}
 		throttlers[i] = throttler.NewThrottlingQueue(
 			throttle,
 			flowLogWriter,
@@ -201,7 +201,7 @@ func NewL4FlowLogger(config *config.Config, platformDataManager *grpc.PlatformDa
 	}
 }
 
-func NewL7FlowLogger(config *config.Config, platformDataManager *grpc.PlatformDataManager, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter, flowTagWriter *flow_tag.FlowTagWriter, otlpExporter *exporter.OtlpExporter) *Logger {
+func NewL7FlowLogger(config *config.Config, platformDataManager *grpc.PlatformDataManager, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter, otlpExporter *exporter.OtlpExporter) *Logger {
 	queueSuffix := "-l7"
 	queueCount := config.DecoderQueueCount
 	msgType := datatype.MESSAGE_TYPE_PROTOCOLLOG
@@ -226,6 +226,10 @@ func NewL7FlowLogger(config *config.Config, platformDataManager *grpc.PlatformDa
 	platformDatas := make([]*grpc.PlatformInfoTable, queueCount)
 	decoders := make([]*decoder.Decoder, queueCount)
 	for i := 0; i < queueCount; i++ {
+		flowTagWriter, err := flow_tag.NewFlowTagWriter(i, msgType.String(), common.FLOW_LOG_DB, config.FlowLogTTL.L7FlowLog, dbwriter.DefaultPartition, config.Base, &config.CKWriterConfig)
+		if err != nil {
+			return nil
+		}
 		throttlers[i] = throttler.NewThrottlingQueue(
 			throttle,
 			flowLogWriter,

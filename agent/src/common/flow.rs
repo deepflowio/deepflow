@@ -519,7 +519,7 @@ impl From<FlowPerfStats> for flow_log::FlowPerfStats {
     }
 }
 
-#[derive(Serialize, Debug, Default, Clone)]
+#[derive(Serialize, Debug, Default, Clone, PartialEq, Eq)]
 pub struct L7PerfStats {
     #[serde(rename = "l7_request")]
     pub request_count: u32,
