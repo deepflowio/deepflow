@@ -96,7 +96,7 @@ func (t *FlowTag) WriteBlock(block *ckdb.Block) {
 		fieldValueType,
 	)
 	if len(t.FieldValue) != 0 {
-		block.Write(t.FieldValue)
+		block.Write(t.FieldValue, 1) // count is 1
 	}
 }
 
@@ -112,7 +112,9 @@ func (t *FlowTag) Columns() []*ckdb.Column {
 		ckdb.NewColumn("field_value_type", ckdb.LowCardinalityString).SetComment("value: string, float"),
 	)
 	if len(t.FieldValue) != 0 {
-		columns = append(columns, ckdb.NewColumn("field_value", ckdb.String))
+		columns = append(columns,
+			ckdb.NewColumn("field_value", ckdb.String),
+			ckdb.NewColumn("count", ckdb.UInt64))
 	}
 	return columns
 }
