@@ -964,7 +964,7 @@ impl RuntimeConfig {
             max_cpus: 1,
             max_memory: 768,
             sync_interval: 60,
-            stats_interval: 60,
+            stats_interval: 10,
             global_pps_threshold: 200,
             #[cfg(target_os = "linux")]
             extra_netns_regex: Default::default(),
