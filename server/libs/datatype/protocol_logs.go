@@ -55,13 +55,30 @@ func (t *LogMessageType) String() string {
 	return formatted
 }
 
+type LogMessageStatus uint8
+
 const (
-	STATUS_OK uint8 = iota
+	STATUS_OK LogMessageStatus = iota
 	STATUS_ERROR
 	STATUS_NOT_EXIST
 	STATUS_SERVER_ERROR
 	STATUS_CLIENT_ERROR
 )
+
+func (t LogMessageStatus) String() string {
+	switch t {
+	case STATUS_OK:
+		return "Success"
+	case STATUS_ERROR:
+		return "Error"
+	case STATUS_SERVER_ERROR:
+		return "Server Error"
+	case STATUS_CLIENT_ERROR:
+		return "Client Error"
+	default:
+		return "Unknown"
+	}
+}
 
 type AppProtoHead struct {
 	Proto   L7Protocol

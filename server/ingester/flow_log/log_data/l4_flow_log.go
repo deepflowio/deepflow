@@ -813,7 +813,7 @@ func (k *KnowledgeGraph) FillL4(f *pb.Flow, isIPv6 bool, platformData *grpc.Plat
 		layers.IPProtocol(f.FlowKey.Proto))
 }
 
-func getStatus(t datatype.CloseType, p layers.IPProtocol) uint8 {
+func getStatus(t datatype.CloseType, p layers.IPProtocol) datatype.LogMessageStatus {
 	if t == datatype.CloseTypeTCPFin || t == datatype.CloseTypeForcedReport ||
 		(p != layers.IPProtocolTCP && t == datatype.CloseTypeTimeout) {
 		return datatype.STATUS_OK
@@ -846,7 +846,7 @@ func (i *FlowInfo) Fill(f *pb.Flow) {
 	i.EndTime = int64(f.EndTime) / int64(time.Microsecond)
 	i.Duration = f.Duration / uint64(time.Microsecond)
 	i.IsNewFlow = uint8(f.IsNewFlow)
-	i.Status = getStatus(datatype.CloseType(i.CloseType), layers.IPProtocol(f.FlowKey.Proto))
+	i.Status = uint8(getStatus(datatype.CloseType(i.CloseType), layers.IPProtocol(f.FlowKey.Proto)))
 	i.AclGids = []uint16{}
 	for _, v := range f.AclGids {
 		i.AclGids = append(i.AclGids, uint16(v))

@@ -100,7 +100,7 @@ func L7FlowLogToExportRequest(l7 *log_data.L7FlowLog, universalTagsManager *Univ
 	putStrWithoutEmpty(resAttrs, "df.capture_info.nat_source", datatype.NATSource(l7.NatSource).String())
 	putStrWithoutEmpty(resAttrs, "df.capture_info.tap_port", datatype.TapPort(l7.TapPort).String())
 	putStrWithoutEmpty(resAttrs, "df.capture_info.tap_port_type", tapPortTypeToString(l7.TapPortType))
-	putStrWithoutEmpty(resAttrs, "df.capture_info.tap_side", l7.TapSide)
+	putStrWithoutEmpty(resAttrs, "df.capture_info.tap_side", tapSideToName(l7.TapSide))
 	putStrWithoutEmpty(resAttrs, "df.capture_info.vtap", tags0.Vtap)
 
 	resAttrs.PutBool("df.network.is_ipv4", l7.IsIPv4)
@@ -137,6 +137,8 @@ func L7FlowLogToExportRequest(l7 *log_data.L7FlowLog, universalTagsManager *Univ
 		setMySQL(&span, spanAttrs, l7)
 	case datatype.L7_PROTOCOL_REDIS:
 		setRedis(&span, spanAttrs, l7)
+	case datatype.L7_PROTOCOL_POSTGRE:
+		setPostgreSQL(&span, spanAttrs, l7)
 	}
 
 	return ptraceotlp.NewExportRequestFromTraces(td)
@@ -148,7 +150,7 @@ func setDNS(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
 	if l7.RequestId != nil {
 		spanAttrs.PutInt("df.global.request_id", int64(*l7.RequestId))
 	}
-	spanAttrs.PutInt("df.dns.response_status", int64(l7.ResponseStatus))
+	spanAttrs.PutStr("df.dns.response_status", datatype.LogMessageStatus(l7.ResponseStatus).String())
 	if l7.ResponseCode != nil {
 		spanAttrs.PutInt("df.dns.response_code", int64(*l7.ResponseCode))
 	}
@@ -168,7 +170,6 @@ func setHTTP(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
 	if l7.RequestId != nil {
 		spanAttrs.PutInt("df.global.request_id", int64(*l7.RequestId))
 	}
-	// ResponseStatus
 	if l7.ResponseCode != nil {
 		spanAttrs.PutInt("http.status_code", int64(*l7.ResponseCode))
 	}
@@ -185,7 +186,7 @@ func setDubbo(span *ptrace.Span, spanAttrs, resAttrs pcommon.Map, l7 *log_data.L
 	if l7.RequestId != nil {
 		spanAttrs.PutInt("df.global.request_id", int64(*l7.RequestId))
 	}
-	spanAttrs.PutInt("df.dubbo.response_status", int64(l7.ResponseStatus))
+	spanAttrs.PutStr("df.dubbo.response_status", datatype.LogMessageStatus(l7.ResponseStatus).String())
 	if l7.ResponseCode != nil {
 		spanAttrs.PutInt("df.dubbo.response_code", int64(*l7.ResponseCode))
 	}
@@ -210,7 +211,7 @@ func setKafka(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) 
 	if l7.RequestId != nil {
 		spanAttrs.PutInt("df.global.request_id", int64(*l7.RequestId))
 	}
-	spanAttrs.PutInt("df.kafka.response_status", int64(l7.ResponseStatus))
+	spanAttrs.PutStr("df.kafka.response_status", datatype.LogMessageStatus(l7.ResponseStatus).String())
 	if l7.ResponseCode != nil {
 		spanAttrs.PutInt("df.kafka.response_code", int64(*l7.ResponseCode))
 	}
@@ -226,16 +227,16 @@ func setMQTT(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
 	if l7.RequestId != nil {
 		spanAttrs.PutInt("df.global.request_id", int64(*l7.RequestId))
 	}
-	spanAttrs.PutInt("df.mqtt.response_status", int64(l7.ResponseStatus))
+	spanAttrs.PutStr("df.mqtt.response_status", datatype.LogMessageStatus(l7.ResponseStatus).String())
 	if l7.ResponseCode != nil {
-		spanAttrs.PutInt("http.status_code", int64(*l7.ResponseCode))
+		spanAttrs.PutInt("df.mqtt.response_code", int64(*l7.ResponseCode))
 	}
 }
 
 func setMySQL(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
 	putStrWithoutEmpty(spanAttrs, "df.mysql.request_type", l7.RequestType)
 	putStrWithoutEmpty(spanAttrs, "df.mysql.request_resource", l7.RequestResource)
-	spanAttrs.PutInt("df.mysql.response_status", int64(l7.ResponseStatus))
+	spanAttrs.PutStr("df.mysql.response_status", datatype.LogMessageStatus(l7.ResponseStatus).String())
 	if l7.ResponseCode != nil {
 		spanAttrs.PutInt("df.mysql.response_code", int64(*l7.ResponseCode))
 	}
@@ -247,7 +248,7 @@ func setMySQL(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) 
 func setPostgreSQL(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
 	putStrWithoutEmpty(spanAttrs, "df.pg.request_type", l7.RequestType)
 	putStrWithoutEmpty(spanAttrs, "df.pg.request_resource", l7.RequestResource)
-	spanAttrs.PutInt("df.pg.response_status", int64(l7.ResponseStatus))
+	spanAttrs.PutStr("df.pg.response_status", datatype.LogMessageStatus(l7.ResponseStatus).String())
 	if l7.ResponseCode != nil {
 		spanAttrs.PutInt("df.pg.response_code", int64(*l7.ResponseCode))
 	}
@@ -259,14 +260,14 @@ func setPostgreSQL(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7Flow
 func setRedis(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
 	putStrWithoutEmpty(spanAttrs, "df.redis.request_type", l7.RequestType)
 	putStrWithoutEmpty(spanAttrs, "df.redis.request_resource", l7.RequestResource)
-	spanAttrs.PutInt("df.redis.response_status", int64(l7.ResponseStatus))
+	spanAttrs.PutStr("df.redis.response_status", datatype.LogMessageStatus(l7.ResponseStatus).String())
 	if l7.ResponseException != "" {
 		span.Events().AppendEmpty().SetName(l7.ResponseException)
 	}
 }
 
 func responseStatusToSpanStatus(status uint8) ptrace.StatusCode {
-	switch status {
+	switch datatype.LogMessageStatus(status) {
 	case datatype.STATUS_OK:
 		return ptrace.StatusCodeOk
 	case datatype.STATUS_CLIENT_ERROR, datatype.STATUS_SERVER_ERROR, datatype.STATUS_ERROR:
@@ -319,4 +320,45 @@ func tapPortTypeToString(tapPortType uint8) string {
 		return "OTel"
 	}
 	return strconv.Itoa(int(tapPortType))
+}
+
+func tapSideToName(tapSide string) string {
+	switch tapSide {
+	case "c":
+		return "Client NIC"
+	case "c-nd":
+		return "Client K8s Node"
+	case "c-hv":
+		return "Client VM Hypervisor"
+	case "c-gw-hv":
+		return "Client-side Gateway Hypervisor"
+	case "c-gw":
+		return "Client-side Gateway"
+	case "local":
+		return "Local NIC"
+	case "rest":
+		return "Other NIC"
+	case "s-gw":
+		return "Server-side Gateway"
+	case "s-gw-hv":
+		return "Server-side Gateway Hypervisor"
+	case "s-hv":
+		return "Server VM Hypervisor"
+	case "s-nd":
+		return "Server K8s Node"
+	case "s":
+		return "Server NIC"
+	case "c-p":
+		return "Client Process"
+	case "s-p":
+		return "Server Process"
+	case "c-app":
+		return "Client Application"
+	case "s-app":
+		return "Server Application"
+	case "app":
+		return "Application"
+
+	}
+	return tapSide
 }
