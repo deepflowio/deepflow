@@ -304,6 +304,11 @@ func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue
 		}
 	}
 
+	// Unrecognized protocols in OTEL are set to Other protocol
+	if h.L7Protocol == uint8(datatype.L7_PROTOCOL_UNKNOWN) {
+		h.L7Protocol = uint8(datatype.L7_PROTOCOL_OTHER)
+	}
+
 	h.AttributeNames = attributeNames
 	h.AttributeValues = attributeValues
 	h.MetricsNames = metricsNames
