@@ -254,12 +254,12 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 		DB:       "flow_tag",
 		Context:  ctx,
 	}
-	sql := "SELECT key FROM flow_tag.k8s_label_map GROUP BY key"
-	rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
+	podK8sLabelSql := "SELECT key FROM flow_tag.pod_k8s_label_map GROUP BY key"
+	podK8sLabelRst, err := chClient.DoQuery(&client.QueryParams{Sql: podK8sLabelSql})
 	if err != nil {
 		return nil, err
 	}
-	for _, _key := range rst.Values {
+	for _, _key := range podK8sLabelRst.Values {
 		key := _key.([]interface{})[0]
 		labelKey := "k8s.label." + key.(string)
 		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || table == "vtap_flow_port" || table == "vtap_app_port" {
@@ -273,7 +273,27 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
 			})
 		}
+	}
 
+	podServiceK8sLabelSql := "SELECT key FROM flow_tag.pod_service_k8s_label_map GROUP BY key"
+	podServiceK8sLabelRst, err := chClient.DoQuery(&client.QueryParams{Sql: podServiceK8sLabelSql})
+	if err != nil {
+		return nil, err
+	}
+	for _, _key := range podServiceK8sLabelRst.Values {
+		key := _key.([]interface{})[0]
+		labelKey := "k8s.label." + key.(string)
+		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || table == "vtap_flow_port" || table == "vtap_app_port" {
+			response.Values = append(response.Values, []interface{}{
+				labelKey, labelKey, labelKey, labelKey, "map_item",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+			})
+		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
+			response.Values = append(response.Values, []interface{}{
+				labelKey, labelKey + "_0", labelKey + "_1", labelKey, "map_item",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+			})
+		}
 	}
 
 	// 查询cloud.tag
@@ -673,7 +693,20 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 				} else {
 					whereSql = fmt.Sprintf("WHERE `key`='%s'", labelTag)
 				}
-				sql = fmt.Sprintf("SELECT value, value AS display_name FROM flow_tag.k8s_label_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+				results := &common.Result{}
+				for _, table := range []string{"pod_service_k8s_label_map", "pod_k8s_label_map"} {
+					sql = fmt.Sprintf("SELECT value, value AS display_name FROM flow_tag.%s %s GROUP BY value, display_name ORDER BY %s ASC %s", table, whereSql, orderBy, limitSql)
+					sql = strings.ReplaceAll(sql, " like ", " ilike ")
+					sql = strings.ReplaceAll(sql, " LIKE ", " ILIKE ")
+					log.Debug(sql)
+					rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
+					if err != nil {
+						return results, sqlList, err
+					}
+					results.Values = append(results.Values, rst.Values...)
+					results.Columns = rst.Columns
+				}
+				return results, sqlList, nil
 			} else if strings.HasPrefix(tag, "cloud.tag.") {
 				cloudTag := strings.TrimPrefix(tag, "cloud.tag.")
 				if whereSql != "" {
@@ -777,7 +810,20 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 			} else {
 				whereSql = fmt.Sprintf("WHERE `key`='%s'", labelTag)
 			}
-			sql = fmt.Sprintf("SELECT value, value AS display_name FROM k8s_label_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+			results := &common.Result{}
+			for _, table := range []string{"pod_service_k8s_label_map", "pod_k8s_label_map"} {
+				sql = fmt.Sprintf("SELECT value, value AS display_name FROM flow_tag.%s %s GROUP BY value, display_name ORDER BY %s ASC %s", table, whereSql, orderBy, limitSql)
+				sql = strings.ReplaceAll(sql, " like ", " ilike ")
+				sql = strings.ReplaceAll(sql, " LIKE ", " ILIKE ")
+				log.Debug(sql)
+				rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
+				if err != nil {
+					return results, sqlList, err
+				}
+				results.Values = append(results.Values, rst.Values...)
+				results.Columns = rst.Columns
+			}
+			return results, sqlList, nil
 		} else if strings.HasPrefix(tag, "cloud.tag.") {
 			cloudTag := strings.TrimPrefix(tag, "cloud.tag.")
 			if whereSql != "" {
