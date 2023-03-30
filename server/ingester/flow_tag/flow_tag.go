@@ -96,7 +96,7 @@ func (t *FlowTag) WriteBlock(block *ckdb.Block) {
 		fieldValueType,
 	)
 	if len(t.FieldValue) != 0 {
-		block.Write(t.FieldValue, 1) // count is 1
+		block.Write(t.FieldValue, uint64(1)) // count is 1
 	}
 }
 
