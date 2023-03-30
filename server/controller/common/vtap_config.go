@@ -87,7 +87,7 @@ var (
 	DefaultMaxCPUs                       = 1
 	DefaultMaxMemory                     = 768
 	DefaultSyncInterval                  = 60
-	DefaultStatsInterval                 = 60
+	DefaultStatsInterval                 = 10
 	DefaultRsyslogEnabled                = 1
 	DefaultMaxTxBandwidth                = int64(0)
 	DefaultBandwidthProbeInterval        = 10

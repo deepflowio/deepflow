@@ -138,10 +138,10 @@ var (
 		output: "SELECT byte_tx+byte_rx AS `byte` FROM flow_log.`l4_flow_log` PREWHERE (((if(is_ipv4=1, hex(ip4), hex(ip6)) >= hex(toIPv4('1.1.1.255'))) OR (if(is_ipv4=1, hex(ip4), hex(ip6)) >= hex(toIPv4('2.2.2.2'))))) AND (((if(is_ipv4=1, hex(ip4), hex(ip6)) <= hex(toIPv6('::'))))) LIMIT 10000",
 	}, {
 		input:  "select `k8s.label.statefulset.kubernetes.io/pod-name_0` from l4_flow_log where `k8s.label.statefulset.kubernetes.io/pod-name_0`='opensource-loki-0' group by `k8s.label.statefulset.kubernetes.io/pod-name_0`",
-		output: "SELECT dictGet(flow_tag.k8s_label_map, 'value', (toUInt64(pod_id_0),'statefulset.kubernetes.io/pod-name')) AS `k8s.label.statefulset.kubernetes.io/pod-name_0` FROM flow_log.`l4_flow_log` PREWHERE toUInt64(pod_id_0) IN (SELECT pod_id FROM flow_tag.k8s_label_map WHERE value = 'opensource-loki-0' and key='statefulset.kubernetes.io/pod-name') AND (toUInt64(pod_id_0) IN (SELECT pod_id FROM flow_tag.k8s_label_map WHERE key='statefulset.kubernetes.io/pod-name')) GROUP BY `k8s.label.statefulset.kubernetes.io/pod-name_0` LIMIT 10000",
+		output: "SELECT if(if(l3_device_type_0=11, dictGet(flow_tag.pod_service_k8s_label_map, 'value', (toUInt64(pod_service_id_0),'statefulset.kubernetes.io/pod-name')), '')!='',if(l3_device_type_0=11, dictGet(flow_tag.pod_service_k8s_label_map, 'value', (toUInt64(pod_service_id_0),'statefulset.kubernetes.io/pod-name')), ''), dictGet(flow_tag.pod_k8s_label_map, 'value', (toUInt64(pod_id_0),'statefulset.kubernetes.io/pod-name')) ) AS `k8s.label.statefulset.kubernetes.io/pod-name_0` FROM flow_log.`l4_flow_log` PREWHERE ((toUInt64(pod_service_id_0) IN (SELECT id FROM flow_tag.pod_service_k8s_label_map WHERE value = 'opensource-loki-0' and key='statefulset.kubernetes.io/pod-name') AND l3_device_type_0=11) OR (toUInt64(pod_id_0) IN (SELECT id FROM flow_tag.pod_k8s_label_map WHERE value = 'opensource-loki-0' and key='statefulset.kubernetes.io/pod-name'))) AND (((toUInt64(pod_service_id_0) IN (SELECT id FROM flow_tag.pod_service_k8s_label_map WHERE key='statefulset.kubernetes.io/pod-name') AND l3_device_type_0=11) OR (toUInt64(pod_id_0) IN (SELECT id FROM flow_tag.pod_k8s_label_map WHERE key='statefulset.kubernetes.io/pod-name')))) GROUP BY `k8s.label.statefulset.kubernetes.io/pod-name_0` LIMIT 10000",
 	}, {
 		input:  "select `k8s.label.statefulset.kubernetes.io/pod-name_0` as `k8s.label.abc` from l4_flow_log where `k8s.label.abc`='opensource-loki-0' group by `k8s.label.abc`",
-		output: "SELECT dictGet(flow_tag.k8s_label_map, 'value', (toUInt64(pod_id_0),'statefulset.kubernetes.io/pod-name')) AS `k8s.label.abc` FROM flow_log.`l4_flow_log` PREWHERE toUInt64(pod_id_0) IN (SELECT pod_id FROM flow_tag.k8s_label_map WHERE value = 'opensource-loki-0' and key='statefulset.kubernetes.io/pod-name') AND (toUInt64(pod_id_0) IN (SELECT pod_id FROM flow_tag.k8s_label_map WHERE key='statefulset.kubernetes.io/pod-name')) GROUP BY `k8s.label.abc` LIMIT 10000",
+		output: "SELECT if(if(l3_device_type_0=11, dictGet(flow_tag.pod_service_k8s_label_map, 'value', (toUInt64(pod_service_id_0),'statefulset.kubernetes.io/pod-name')), '')!='',if(l3_device_type_0=11, dictGet(flow_tag.pod_service_k8s_label_map, 'value', (toUInt64(pod_service_id_0),'statefulset.kubernetes.io/pod-name')), ''), dictGet(flow_tag.pod_k8s_label_map, 'value', (toUInt64(pod_id_0),'statefulset.kubernetes.io/pod-name')) ) AS `k8s.label.abc` FROM flow_log.`l4_flow_log` PREWHERE ((toUInt64(pod_service_id_0) IN (SELECT id FROM flow_tag.pod_service_k8s_label_map WHERE value = 'opensource-loki-0' and key='statefulset.kubernetes.io/pod-name') AND l3_device_type_0=11) OR (toUInt64(pod_id_0) IN (SELECT id FROM flow_tag.pod_k8s_label_map WHERE value = 'opensource-loki-0' and key='statefulset.kubernetes.io/pod-name'))) AND (((toUInt64(pod_service_id_0) IN (SELECT id FROM flow_tag.pod_service_k8s_label_map WHERE key='statefulset.kubernetes.io/pod-name') AND l3_device_type_0=11) OR (toUInt64(pod_id_0) IN (SELECT id FROM flow_tag.pod_k8s_label_map WHERE key='statefulset.kubernetes.io/pod-name')))) GROUP BY `k8s.label.abc` LIMIT 10000",
 	}, {
 		input:  "select `attribute.cc` as `attribute.abc` from l7_flow_log where `attribute.abc`='opensource-loki-0' group by `attribute.abc`",
 		output: "SELECT attribute_values[indexOf(attribute_names,'cc')] AS `attribute.abc` FROM flow_log.`l7_flow_log` PREWHERE attribute_values[indexOf(attribute_names,'cc')] = 'opensource-loki-0' AND (`attribute.abc` != '') GROUP BY `attribute.abc` LIMIT 10000",
@@ -159,7 +159,7 @@ var (
 		db:     "deepflow_system",
 	}, {
 		input:  "select `k8s.label_0` from l7_flow_log",
-		output: "SELECT dictGetOrDefault(flow_tag.k8s_labels_map, 'labels', toUInt64(pod_id_0),'{}') AS `k8s.label_0` FROM flow_log.`l7_flow_log` LIMIT 10000",
+		output: "SELECT if(if(l3_device_type_0=11, dictGetOrDefault(flow_tag.pod_service_k8s_labels_map, 'k8s_labels', toUInt64(pod_service_id_0),'{}'), '{}')!='{}',if(l3_device_type_0=11, dictGetOrDefault(flow_tag.pod_service_k8s_labels_map, 'k8s_labels', toUInt64(pod_service_id_0),'{}'), '{}'), dictGetOrDefault(flow_tag.pod_k8s_labels_map, 'k8s_labels', toUInt64(pod_id_0),'{}'))  AS `k8s.label_0` FROM flow_log.`l7_flow_log` LIMIT 10000",
 	}, {
 		input:  "select `metrics.xxx.yyy` as xxx from l7_flow_log",
 		output: "SELECT if(indexOf(metrics_names, 'xxx.yyy')=0,null,metrics_values[indexOf(metrics_names, 'xxx.yyy')]) AS `xxx` FROM flow_log.`l7_flow_log` LIMIT 10000",
@@ -218,11 +218,16 @@ var (
 		output: "WITH toStartOfInterval(time, toIntervalSecond(10)) + toIntervalSecond(arrayJoin([0]) * 10) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, AVG(if(indexOf(metrics_float_names, 'dropped')=0,null,metrics_float_values[indexOf(metrics_float_names, 'dropped')])) AS `Avg(metrics.dropped)` FROM deepflow_system.`deepflow_agent_collect_sender` GROUP BY `toi` ORDER BY `toi` desc LIMIT 10000",
 		db:     "deepflow_system",
 	}, {
-		input:  "SELECT time(time,120,1,0) as toi, Avg(`metrics.dropped`) AS `Avg(metrics.dropped)` FROM `deepflow_agent_collect_sender` GROUP BY  toi ORDER BY toi desc ",
+		input:  "SELECT time(time,120,1,0) as toi, Avg(`metrics.dropped`) AS `Avg(metrics.dropped)` FROM `deepflow_agent_collect_sender` GROUP BY  toi ORDER BY toi desc",
 		output: "WITH toStartOfInterval(time, toIntervalSecond(120)) + toIntervalSecond(arrayJoin([0]) * 120) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, AVG(if(indexOf(metrics_float_names, 'dropped')=0,null,metrics_float_values[indexOf(metrics_float_names, 'dropped')])) AS `Avg(metrics.dropped)` FROM deepflow_system.`deepflow_agent_collect_sender` GROUP BY `toi` ORDER BY `toi` desc LIMIT 10000",
 		db:     "deepflow_system",
-	},
-	}
+	}, {
+		input:  "SELECT chost_id_0 from l4_flow_log WHERE NOT exist(chost_0) LIMIT 1",
+		output: "SELECT if(l3_device_type_0=1,l3_device_id_0, 0) AS `chost_id_0` FROM flow_log.`l4_flow_log` PREWHERE NOT (l3_device_type_0=1) LIMIT 1",
+	}, {
+		input:  "SELECT `cloud.tag.xx` from l4_flow_log WHERE NOT exist(`cloud.tag.xx`) LIMIT 1",
+		output: "SELECT if(if(l3_device_type=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64(l3_device_id),'xx')), '')!='',if(l3_device_type=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64(l3_device_id),'xx')), ''), dictGet(flow_tag.pod_ns_cloud_tag_map, 'value', (toUInt64(pod_ns_id),'xx')) ) AS `cloud.tag.xx` FROM flow_log.`l4_flow_log` PREWHERE NOT (((toUInt64(l3_device_id) IN (SELECT id FROM flow_tag.chost_cloud_tag_map WHERE key='xx') AND l3_device_type=1) OR (toUInt64(pod_ns_id) IN (SELECT id FROM flow_tag.pod_ns_cloud_tag_map WHERE key='xx')))) LIMIT 1",
+	}}
 )
 
 func TestGetSql(t *testing.T) {

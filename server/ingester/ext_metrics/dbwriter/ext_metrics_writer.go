@@ -18,7 +18,7 @@ package dbwriter
 
 import (
 	"fmt"
-	"sync"
+	"strconv"
 	"sync/atomic"
 
 	logging "github.com/op/go-logging"
@@ -59,6 +59,7 @@ type tableInfo struct {
 }
 
 type ExtMetricsWriter struct {
+	decoderIndex      int
 	msgType           datatype.MessageType
 	ckdbAddrs         []string
 	ckdbUsername      string
@@ -72,10 +73,8 @@ type ExtMetricsWriter struct {
 
 	ckdbConn common.DBs
 
-	createTable        sync.Mutex
-	tablesLock         sync.RWMutex
 	tables             map[string]*tableInfo
-	metricsWriterCache *ckwriter.CKWriter
+	metricsWriterCache *ckwriter.CKWriter // the writer for ext_metrics.metrics table
 	flowTagWriter      *flow_tag.FlowTagWriter
 
 	counter *Counter
@@ -96,25 +95,15 @@ func (w *ExtMetricsWriter) InitDatabase() error {
 
 func (w *ExtMetricsWriter) getOrCreateCkwriter(s *ExtMetrics) (*ckwriter.CKWriter, error) {
 	// fast find
-	if s.TableName == EXT_METRICS_TABLE && w.metricsWriterCache != nil {
+	if s.MsgType != datatype.MESSAGE_TYPE_DFSTATS && w.metricsWriterCache != nil {
 		return w.metricsWriterCache, nil
 	}
-	w.tablesLock.RLock()
-	if info, ok := w.tables[s.TableName]; ok {
+
+	if info, ok := w.tables[s.TableName()]; ok {
 		if info.ckwriter != nil {
-			w.tablesLock.RUnlock()
-			if s.TableName == EXT_METRICS_TABLE {
+			if s.MsgType != datatype.MESSAGE_TYPE_DFSTATS {
 				w.metricsWriterCache = info.ckwriter
 			}
-			return info.ckwriter, nil
-		}
-	}
-	w.tablesLock.RUnlock()
-
-	w.createTable.Lock()
-	defer w.createTable.Unlock()
-	if info, ok := w.tables[s.TableName]; ok {
-		if info.ckwriter != nil {
 			return info.ckwriter, nil
 		}
 	}
@@ -128,10 +117,12 @@ func (w *ExtMetricsWriter) getOrCreateCkwriter(s *ExtMetrics) (*ckwriter.CKWrite
 	}
 
 	// 将要创建的表信息
-	table := s.GenCKTable(w.ckdbCluster, w.ckdbStoragePolicy, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, s.Database, s.TableName))
+	table := s.GenCKTable(w.ckdbCluster, w.ckdbStoragePolicy, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, s.DatabaseName(), s.TableName()))
 
-	ckwriter, err := ckwriter.NewCKWriter(w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
-		w.msgType.String()+"-"+s.TableName, table, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
+	ckwriter, err := ckwriter.NewCKWriter(
+		w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
+		fmt.Sprintf("%s-%s-%d", w.msgType, s.TableName(), w.decoderIndex),
+		table, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -142,15 +133,13 @@ func (w *ExtMetricsWriter) getOrCreateCkwriter(s *ExtMetrics) (*ckwriter.CKWrite
 
 	ckwriter.Run()
 	if w.ttl != config.DefaultExtMetricsTTL {
-		w.setTTL(s.Database, s.TableName)
+		w.setTTL(s.DatabaseName(), s.TableName())
 	}
 
-	w.tablesLock.Lock()
-	w.tables[s.TableName] = &tableInfo{
-		tableName: s.TableName,
+	w.tables[s.TableName()] = &tableInfo{
+		tableName: s.TableName(),
 		ckwriter:  ckwriter,
 	}
-	w.tablesLock.Unlock()
 
 	return ckwriter, nil
 }
@@ -209,6 +198,29 @@ func (w *ExtMetricsWriter) setTTL(database, tableName string) error {
 	return err
 }
 
+// This function can be called when the FlowTags in the batch are the same (e.g. Prometheus metrics).
+func (w *ExtMetricsWriter) WriteBatch(batch []interface{}) {
+	if len(batch) == 0 {
+		return
+	}
+
+	// Only the FlowTag in the first item needs to be written.
+	extMetrics := batch[0].(*ExtMetrics)
+	ckwriter, err := w.getOrCreateCkwriter(extMetrics)
+	if err != nil {
+		if w.counter.WriteErr == 0 {
+			log.Warningf("get writer failed:", err)
+		}
+		atomic.AddInt64(&w.counter.WriteErr, 1)
+		return
+	}
+	extMetrics.GenerateNewFlowTags(w.flowTagWriter.Cache)
+	w.flowTagWriter.WriteFieldsAndFieldValuesInCache()
+
+	atomic.AddInt64(&w.counter.MetricsCount, int64(len(batch)))
+	ckwriter.Put(batch...)
+}
+
 func (w *ExtMetricsWriter) Write(m *ExtMetrics) {
 	ckwriter, err := w.getOrCreateCkwriter(m)
 	if err != nil {
@@ -218,27 +230,46 @@ func (w *ExtMetricsWriter) Write(m *ExtMetrics) {
 		atomic.AddInt64(&w.counter.WriteErr, 1)
 		return
 	}
+	m.GenerateNewFlowTags(w.flowTagWriter.Cache)
+	w.flowTagWriter.WriteFieldsAndFieldValuesInCache()
+
 	atomic.AddInt64(&w.counter.MetricsCount, 1)
-	w.flowTagWriter.WriteFieldsAndFieldValues(m.ToFlowTags())
 	ckwriter.Put(m)
 }
 
 func NewExtMetricsWriter(
+	decoderIndex int,
 	msgType datatype.MessageType,
 	db string,
 	config *config.Config) (*ExtMetricsWriter, error) {
-	// one row of ext_metrics will generate multiple rows of flow_tag, so the writer queue of flow tag needs to be longer.
-	flowTagWriterConfig := baseconfig.CKWriterConfig{
-		QueueCount:   config.CKWriterConfig.QueueCount,
-		QueueSize:    config.CKWriterConfig.QueueSize * 10,
-		BatchSize:    config.CKWriterConfig.BatchSize * 10,
-		FlushTimeout: config.CKWriterConfig.FlushTimeout,
+
+	// adjust CKWriterConfig
+	ckWriterConfig := config.CKWriterConfig
+	if msgType == datatype.MESSAGE_TYPE_DFSTATS {
+		// FIXME: At present, there are hundreds of tables in the deepflow_system database,
+		// and the amount of data is not large. Adjust the queue size to reduce memory consumption.
+		// In the future, it is necessary to merge the data tables in deepflow_system with
+		// reference to the ext_metrics database.
+		ckWriterConfig.QueueCount = 1
+		ckWriterConfig.QueueSize >>= 3
+		ckWriterConfig.BatchSize >>= 3
 	}
-	flowTagWriter, err := flow_tag.NewFlowTagWriter(msgType.String(), db, config.TTL, DefaultPartition, config.Base, &flowTagWriterConfig)
+
+	// FlowTagWriter
+	flowTagWriterConfig := baseconfig.CKWriterConfig{
+		QueueCount:   1,                        // Allocate one FlowTagWriter for each ExtMetricsWriter.
+		QueueSize:    ckWriterConfig.QueueSize, // Only new FlowTags will be written, so the same QueueSize is used here.
+		BatchSize:    ckWriterConfig.BatchSize,
+		FlushTimeout: ckWriterConfig.FlushTimeout,
+	}
+	flowTagWriter, err := flow_tag.NewFlowTagWriter(decoderIndex, msgType.String(), db, config.TTL, DefaultPartition, config.Base, &flowTagWriterConfig)
 	if err != nil {
 		return nil, err
 	}
+
+	// ExtMetricsWriter
 	writer := &ExtMetricsWriter{
+		decoderIndex:      decoderIndex,
 		msgType:           msgType,
 		ckdbAddrs:         config.Base.CKDB.ActualAddrs,
 		ckdbUsername:      config.Base.CKDBAuth.Username,
@@ -249,7 +280,7 @@ func NewExtMetricsWriter(
 		tables:            make(map[string]*tableInfo),
 		ttl:               config.TTL,
 		ckdbWatcher:       config.Base.CKDB.Watcher,
-		writerConfig:      config.CKWriterConfig,
+		writerConfig:      ckWriterConfig,
 		flowTagWriter:     flowTagWriter,
 
 		counter: &Counter{},
@@ -257,6 +288,6 @@ func NewExtMetricsWriter(
 	if err := writer.InitDatabase(); err != nil {
 		return nil, err
 	}
-	common.RegisterCountableForIngester("ext_metrics_writer", writer, stats.OptionStatTags{"msg": msgType.String()})
+	common.RegisterCountableForIngester("ext_metrics_writer", writer, stats.OptionStatTags{"msg": msgType.String(), "decoder_index": strconv.Itoa(decoderIndex)})
 	return writer, nil
 }

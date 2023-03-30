@@ -90,9 +90,25 @@ struct member_fields_offset {
 	__u8 ready;
 	__u32 task__files_offset;
 	__u32 sock__flags_offset;
-	__u8  socket__has_wq_ptr;
 	__u32 tcp_sock__copied_seq_offset;
 	__u32 tcp_sock__write_seq_offset;
+
+	__u32 struct_files_struct_fdt_offset; // offsetof(struct files_struct, fdt)
+	__u32 struct_files_private_data_offset; // offsetof(struct file, private_data)
+	__u32 struct_file_f_inode_offset; // offsetof(struct file, f_inode)
+	__u32 struct_inode_i_mode_offset; // offsetof(struct inode, i_mode)
+	__u32 struct_file_dentry_offset; // offsetof(struct file, f_path) + offsetof(struct path, dentry)
+	__u32 struct_dentry_name_offset; // offsetof(struct dentry, d_name) + offsetof(struct qstr, name)
+	__u32 struct_sock_family_offset; // offsetof(struct sock_common, skc_family)
+	__u32 struct_sock_saddr_offset; // offsetof(struct sock_common, skc_rcv_saddr)
+	__u32 struct_sock_daddr_offset; // offsetof(struct sock_common, skc_daddr)
+	__u32 struct_sock_ip6saddr_offset; // offsetof(struct sock_common, skc_v6_rcv_saddr)
+	__u32 struct_sock_ip6daddr_offset; // offsetof(struct sock_common, skc_v6_daddr)
+	__u32 struct_sock_dport_offset; // offsetof(struct sock_common, skc_dport)
+	__u32 struct_sock_sport_offset; // offsetof(struct sock_common, skc_num)
+	__u32 struct_sock_skc_state_offset; // offsetof(struct sock_common, skc_state)
+	__u32 struct_sock_common_ipv6only_offset; // offsetof(struct sock_common, skc_flags)
+
 };
 
 /********************************************************/

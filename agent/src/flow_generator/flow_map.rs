@@ -39,7 +39,7 @@ use super::{
     app_table::AppTable,
     error::Error,
     flow_state::{StateMachine, StateValue},
-    perf::{FlowLog, FlowPerfCounter, L7ProtocolChecker, L7RrtCache},
+    perf::{FlowLog, FlowPerfCounter, L7ProtocolChecker},
     protocol_logs::MetaAppProto,
     service_table::{ServiceKey, ServiceTable},
     FlowMapKey, FlowNode, FlowState, FlowTimeout, COUNTER_FLOW_ID_MASK, FLOW_METRICS_PEER_DST,
@@ -113,8 +113,6 @@ pub struct FlowMap {
     parse_config: LogParserAccess,
     #[cfg(target_os = "linux")]
     ebpf_config: Option<EbpfAccess>, // TODO: We only need its epc_id，epc_id is not only useful for ebpf, consider moving it to FlowConfig
-    // TODO will remove after perf remake
-    rrt_cache: Rc<RefCell<L7RrtCache>>,
     perf_cache: Rc<RefCell<L7PerfCache>>,
     flow_perf_counter: Arc<FlowPerfCounter>,
     ntp_diff: Arc<AtomicI64>,
@@ -200,8 +198,6 @@ impl FlowMap {
             parse_config,
             #[cfg(target_os = "linux")]
             ebpf_config,
-            // TODO wille remove after perf remake
-            rrt_cache: Rc::new(RefCell::new(L7RrtCache::new(L7_RRT_CACHE_CAPACITY))),
             perf_cache: Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY))),
             flow_perf_counter,
             ntp_diff,
@@ -989,7 +985,6 @@ impl FlowMap {
                     && Self::l4_metrics_enabled(config),
                 Self::l7_metrics_enabled(config)
                     || Self::l7_log_parse_enabled(config, &meta_packet.lookup_key),
-                self.rrt_cache.clone(),
                 self.perf_cache.clone(),
                 L4Protocol::from(meta_packet.lookup_key.proto),
                 l7_proto_enum,
@@ -1171,9 +1166,7 @@ impl FlowMap {
         is_first_packet_direction: bool,
         is_first_packet: bool,
     ) {
-        let mut info = None;
         if let Some(log) = node.meta_flow_log.as_mut() {
-            let flow_id = node.tagged_flow.flow.flow_id;
             #[cfg(target_os = "linux")]
             let local_epc_id = if self.ebpf_config.is_some() {
                 self.ebpf_config.as_ref().unwrap().load().epc_id as i32
@@ -1192,9 +1185,6 @@ impl FlowMap {
                 log_parser_config,
                 meta_packet,
                 is_first_packet_direction,
-                flow_id,
-                node.tagged_flow.flow.signal_source == SignalSource::Packet
-                    && Self::l4_metrics_enabled(flow_config),
                 Self::l7_metrics_enabled(flow_config),
                 Self::l7_log_parse_enabled(flow_config, &meta_packet.lookup_key),
                 &mut self.app_table,
@@ -1202,8 +1192,15 @@ impl FlowMap {
                 remote_epc,
                 &self.l7_protocol_checker,
             ) {
-                Ok(i) => {
-                    info = Some(i);
+                Ok(info) => {
+                    if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
+                        // For ebpf data, after perf.parse() success, meta_packet's direction
+                        // is determined. Here we determine whether to reverse flow.
+                        Self::rectify_ebpf_flow_direction(node, meta_packet, is_first_packet);
+                    }
+                    for i in info.into_iter() {
+                        self.write_to_app_proto_log(flow_config, node, &meta_packet, i);
+                    }
                 }
                 Err(Error::L7ReqNotFound(c)) => {
                     self.flow_perf_counter
@@ -1211,16 +1208,6 @@ impl FlowMap {
                         .fetch_add(c, Ordering::Relaxed);
                 }
                 Err(e) => debug!("{}", e),
-            }
-        }
-        if let Some((info, rrt)) = info {
-            if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
-                // For ebpf data, after perf.parse() success, meta_packet's direction
-                // is determined. Here we determine whether to reverse flow.
-                Self::rectify_ebpf_flow_direction(node, meta_packet, is_first_packet);
-            }
-            for i in info.into_iter() {
-                self.write_to_app_proto_log(flow_config, node, &meta_packet, i, rrt);
             }
         }
     }
@@ -1438,19 +1425,10 @@ impl FlowMap {
         if config.collector_enabled
             && (flow.flow_key.proto == IpProtocol::Tcp || flow.flow_key.proto == IpProtocol::Udp)
         {
-            let l7_timeout_count = if node
-                .meta_flow_log
-                .as_mut()
-                .map_or(false, |x| !x.l7_perf_remake())
-            {
-                self.rrt_cache
-                    .borrow_mut()
-                    .get_and_remove_l7_req_timeout(flow.flow_id)
-            } else {
-                self.perf_cache
-                    .borrow_mut()
-                    .get_timeout_count(&flow.flow_id)
-            };
+            let l7_timeout_count = self
+                .perf_cache
+                .borrow_mut()
+                .get_timeout_count(&flow.flow_id);
 
             // 如果返回None，就清空掉flow_perf_stats
             flow.flow_perf_stats = node.meta_flow_log.as_mut().and_then(|perf| {
@@ -1528,15 +1506,11 @@ impl FlowMap {
         node: &mut FlowNode,
         meta_packet: &MetaPacket,
         l7_info: L7ProtocolInfo,
-        rrt: u64,
     ) {
         if self.protolog_buffer.len() >= QUEUE_BATCH_SIZE {
             self.flush_app_protolog();
         }
-        // 考虑性能，最好是l7 perf解析后，满足需要的包生成log
-        if let Some(mut head) = l7_info.app_proto_head() {
-            // TODO 已重构的协议，rrt直接在 l7log 获取，未重构的从perf获取，重构完成后rrt不再作为参数传入
-            head.rrt = head.rrt.max(rrt);
+        if let Some(head) = l7_info.app_proto_head() {
             node.tagged_flow
                 .flow
                 .set_tap_side(config.trident_type, config.cloud_gateway_traffic);

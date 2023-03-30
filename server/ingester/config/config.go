@@ -52,7 +52,7 @@ const (
 	DefaultServiceLabelerLruCap     = 1 << 22
 	DefaultCKDBEndpointTCPPortName  = "tcp-port"
 	DefaultStatsInterval            = 10      // s
-	DefaultFlowTagCacheFlushTimeout = 600     // s
+	DefaultFlowTagCacheFlushTimeout = 1800    // s
 	DefaultFlowTagCacheMaxSize      = 1 << 18 // 256k
 )
 

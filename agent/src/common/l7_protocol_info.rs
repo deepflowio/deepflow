@@ -29,21 +29,6 @@ use crate::flow_generator::{
 
 use super::{ebpf::EbpfType, l7_protocol_log::ParseParam};
 
-#[macro_export]
-macro_rules! log_info_merge {
-    ($self:ident,$log_type:ident,$other:ident) => {
-        if let L7ProtocolInfo::$log_type(other) = $other {
-            if other.start_time < $self.start_time {
-                $self.start_time = other.start_time;
-            }
-            if other.end_time > $self.end_time {
-                $self.end_time = other.end_time;
-            }
-            $self.merge(other);
-        }
-    };
-}
-
 macro_rules! all_protocol_info {
     ($($name:ident($info_struct:ident)),+$(,)?) => {
         #[derive(Serialize, Debug, Clone)]
@@ -152,7 +137,7 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
 
         if have no previous log cache, cache the current log rrt
     */
-    fn cal_rrt(&mut self, param: &ParseParam) -> Option<u64> {
+    fn cal_rrt(&self, param: &ParseParam) -> Option<u64> {
         let mut perf_cache = param.l7_perf_cache.borrow_mut();
         let cache_key = self.cal_cache_key(param);
         let previous_log_info = perf_cache.rrt_cache.pop(&cache_key);

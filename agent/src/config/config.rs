@@ -242,6 +242,7 @@ impl Default for UprobeProcRegExp {
 
 pub const OS_PROC_REGEXP_MATCH_TYPE_CMD: &'static str = "cmdline";
 pub const OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME: &'static str = "process_name";
+pub const OS_PROC_REGEXP_MATCH_TYPE_PARENT_PROC_NAME: &'static str = "parent_process_name";
 
 pub const OS_PROC_REGEXP_MATCH_ACTION_ACCEPT: &'static str = "accept";
 pub const OS_PROC_REGEXP_MATCH_ACTION_DROP: &'static str = "drop";
@@ -964,7 +965,7 @@ impl RuntimeConfig {
             max_cpus: 1,
             max_memory: 768,
             sync_interval: 60,
-            stats_interval: 60,
+            stats_interval: 10,
             global_pps_threshold: 200,
             #[cfg(target_os = "linux")]
             extra_netns_regex: Default::default(),

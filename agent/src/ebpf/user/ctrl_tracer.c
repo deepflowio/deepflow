@@ -172,8 +172,6 @@ static void offset_dump(int cpu, struct bpf_offset_param *param)
 	printf("ready: \t%d\n", param->ready);
 	printf("task__files_offset: \t0x%x\n", param->task__files_offset);
 	printf("sock__flags_offset: \t0x%x\n", param->sock__flags_offset);
-	printf("socket__has_wq_ptr: \t0x%x(no use)\n",
-	       param->socket__has_wq_ptr);
 	printf("tcp_sock__copied_seq_offset: \t0x%x\n",
 	       param->tcp_sock__copied_seq_offset);
 	printf("tcp_sock__write_seq_offset: \t0x%x\n\n",

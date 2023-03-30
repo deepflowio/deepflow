@@ -80,6 +80,14 @@ func NewExtMetrics(config *config.Config, recv *receiver.Receiver, platformDataM
 
 func NewMetricsor(msgType datatype.MessageType, db string, config *config.Config, platformDataManager *grpc.PlatformDataManager, manager *dropletqueue.Manager, recv *receiver.Receiver, platformDataEnabled bool) (*Metricsor, error) {
 	queueCount := config.DecoderQueueCount
+	if msgType == datatype.MESSAGE_TYPE_DFSTATS {
+		// FIXME: At present, there are hundreds of tables in the deepflow_system database,
+		// and the amount of data is not large. Adjust the queue size to reduce memory consumption.
+		// In the future, it is necessary to merge the data tables in deepflow_system with
+		// reference to the ext_metrics database.
+		queueCount = 1
+	}
+
 	decodeQueues := manager.NewQueues(
 		"1-receive-to-decode-"+msgType.String(),
 		config.DecoderQueueSize,
@@ -89,14 +97,11 @@ func NewMetricsor(msgType datatype.MessageType, db string, config *config.Config
 		libqueue.OptionRelease(func(p interface{}) { receiver.ReleaseRecvBuffer(p.(*receiver.RecvBuffer)) }))
 	recv.RegistHandler(msgType, decodeQueues, queueCount)
 
-	metricsWriter, err := dbwriter.NewExtMetricsWriter(msgType, db, config)
-	if err != nil {
-		return nil, err
-	}
 	decoders := make([]*decoder.Decoder, queueCount)
 	platformDatas := make([]*grpc.PlatformInfoTable, queueCount)
 	for i := 0; i < queueCount; i++ {
 		if platformDataEnabled {
+			var err error
 			platformDatas[i], err = platformDataManager.NewPlatformInfoTable(false, "ext-metrics-"+msgType.String()+"-"+strconv.Itoa(i))
 			if i == 0 {
 				debug.ServerRegisterSimple(CMD_PLATFORMDATA_EXT_METRICS, platformDatas[i])
@@ -104,6 +109,10 @@ func NewMetricsor(msgType datatype.MessageType, db string, config *config.Config
 			if err != nil {
 				return nil, err
 			}
+		}
+		metricsWriter, err := dbwriter.NewExtMetricsWriter(i, msgType, db, config)
+		if err != nil {
+			return nil, err
 		}
 		decoders[i] = decoder.NewDecoder(
 			i,
