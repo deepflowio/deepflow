@@ -330,7 +330,7 @@ func (h *L7FlowLog) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfo
 	h.L7Protocol = uint8(l.Base.Head.Proto)
 	h.L7ProtocolStr = datatype.L7Protocol(h.L7Protocol).String()
 
-	h.ResponseStatus = datatype.STATUS_NOT_EXIST
+	h.ResponseStatus = uint8(datatype.STATUS_NOT_EXIST)
 	h.ResponseDuration = l.Base.Head.Rrt / uint64(time.Microsecond)
 	// 协议结构统一, 不再为每个协议定义单独结构
 	h.fillL7FlowLog(l)
@@ -405,7 +405,7 @@ func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData) {
 	case datatype.L7_PROTOCOL_KAFKA:
 		if l.Req != nil {
 			if h.responseCode == 0 && l.Req.ReqType != datatype.KafkaCommandString[datatype.Fetch] {
-				h.ResponseStatus = datatype.STATUS_NOT_EXIST
+				h.ResponseStatus = uint8(datatype.STATUS_NOT_EXIST)
 				h.ResponseCode = nil
 			}
 			h.RequestId = &h.requestId
@@ -417,7 +417,7 @@ func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData) {
 }
 
 func (h *L7FlowLog) fillExceptionDesc(l *pb.AppProtoLogsData) {
-	if h.ResponseStatus != datatype.STATUS_SERVER_ERROR && h.ResponseStatus != datatype.STATUS_CLIENT_ERROR {
+	if h.ResponseStatus != uint8(datatype.STATUS_SERVER_ERROR) && h.ResponseStatus != uint8(datatype.STATUS_CLIENT_ERROR) {
 		return
 	}
 	code := l.Resp.Code
