@@ -594,22 +594,26 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	for _, suffix := range []string{"", "_0", "_1"} {
 		k8sLabelSuffix := "k8s_label" + suffix
 		podIDSuffix := "pod_id" + suffix
+		deviceTypeIDSuffix := "l3_device_type" + suffix
+		podServiceIdSuffix := "pod_service_id" + suffix
 		tagResourceMap[k8sLabelSuffix] = map[string]*Tag{
 			"default": NewTag(
-				"dictGet(flow_tag.k8s_label_map, 'value', (toUInt64("+podIDSuffix+"),'%s'))",
-				"toUInt64("+podIDSuffix+") IN (SELECT pod_id FROM flow_tag.k8s_label_map WHERE key='%s')",
-				"toUInt64("+podIDSuffix+") IN (SELECT pod_id FROM flow_tag.k8s_label_map WHERE value %s %s and key='%s')",
-				"toUInt64("+podIDSuffix+") IN (SELECT pod_id FROM flow_tag.k8s_label_map WHERE %s(value,%s) and key='%s')",
+				"if(if("+deviceTypeIDSuffix+"=11, dictGet(flow_tag.pod_service_k8s_label_map, 'value', (toUInt64("+podServiceIdSuffix+"),'%s')), '')!='',if("+deviceTypeIDSuffix+"=11, dictGet(flow_tag.pod_service_k8s_label_map, 'value', (toUInt64("+podServiceIdSuffix+"),'%s')), ''), dictGet(flow_tag.pod_k8s_label_map, 'value', (toUInt64("+podIDSuffix+"),'%s')) )",
+				"((toUInt64("+podServiceIdSuffix+") IN (SELECT id FROM flow_tag.pod_service_k8s_label_map WHERE key='%s') AND "+deviceTypeIDSuffix+"=11) OR (toUInt64("+podIDSuffix+") IN (SELECT id FROM flow_tag.pod_k8s_label_map WHERE key='%s')))",
+				"((toUInt64("+podServiceIdSuffix+") IN (SELECT id FROM flow_tag.pod_service_k8s_label_map WHERE value %s %s and key='%s') AND "+deviceTypeIDSuffix+"=11) OR (toUInt64("+podIDSuffix+") IN (SELECT id FROM flow_tag.pod_k8s_label_map WHERE value %s %s and key='%s')))",
+				"((toUInt64("+podServiceIdSuffix+") IN (SELECT id FROM flow_tag.pod_service_k8s_label_map WHERE %s(value,%s) and key='%s') AND "+deviceTypeIDSuffix+"=11) OR (toUInt64("+podIDSuffix+") IN (SELECT id FROM flow_tag.pod_k8s_label_map WHERE %s(value,%s) and key='%s')))",
 			),
 		}
 	}
 	for _, suffix := range []string{"", "_0", "_1"} {
 		k8sLabelSuffix := "k8s.label" + suffix
 		podIDSuffix := "pod_id" + suffix
+		deviceTypeIDSuffix := "l3_device_type" + suffix
+		podServiceIdSuffix := "pod_service_id" + suffix
 		tagResourceMap[k8sLabelSuffix] = map[string]*Tag{
 			"default": NewTag(
-				"dictGetOrDefault(flow_tag.k8s_labels_map, 'labels', toUInt64("+podIDSuffix+"),'{}')",
-				podIDSuffix+"!=0",
+				"if(if("+deviceTypeIDSuffix+"=11, dictGetOrDefault(flow_tag.pod_service_k8s_labels_map, 'k8s_labels', toUInt64("+podServiceIdSuffix+"),'{}'), '{}')!='{}',if("+deviceTypeIDSuffix+"=11, dictGetOrDefault(flow_tag.pod_service_k8s_labels_map, 'k8s_labels', toUInt64("+podServiceIdSuffix+"),'{}'), '{}'), dictGetOrDefault(flow_tag.pod_k8s_labels_map, 'k8s_labels', toUInt64("+podIDSuffix+"),'{}')) ",
+				"(("+podServiceIdSuffix+"!=0 AND "+deviceTypeIDSuffix+"=11) OR "+podIDSuffix+"!=0)",
 				"",
 				"",
 			),
@@ -884,7 +888,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"toUInt64(span_kind) IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
 			"toUInt64(span_kind) IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
 		)}
-	for _, enumName := range []string{"tap_side", "event_type", "profile_language_type"} {
+	for _, enumName := range []string{"tap_side", "event_type"} {
 		tagResourceMap[enumName] = map[string]*Tag{
 			"enum": NewTag(
 				"dictGetOrDefault(flow_tag.string_enum_map, 'name', ('%s',"+enumName+"), "+enumName+")",

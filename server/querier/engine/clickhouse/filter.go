@@ -223,9 +223,9 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 							nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
 							nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.label.")
 							if strings.Contains(op, "match") {
-								filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, nameNoPreffix)
+								filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, nameNoPreffix, op, t.Value, nameNoPreffix)
 							} else {
-								filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, nameNoPreffix)
+								filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, nameNoPreffix, op, t.Value, nameNoPreffix)
 							}
 							return &view.Expr{Value: filter}, nil
 						}
@@ -367,9 +367,9 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 						nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
 						nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.label.")
 						if strings.Contains(op, "match") {
-							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, nameNoPreffix)
+							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, nameNoPreffix, op, t.Value, nameNoPreffix)
 						} else {
-							filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, nameNoPreffix)
+							filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, nameNoPreffix, op, t.Value, nameNoPreffix)
 						}
 						return &view.Expr{Value: filter}, nil
 					}

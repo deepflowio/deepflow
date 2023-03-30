@@ -254,12 +254,12 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 		DB:       "flow_tag",
 		Context:  ctx,
 	}
-	sql := "SELECT key FROM flow_tag.k8s_label_map GROUP BY key"
-	rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
+	podK8sLabelSql := "SELECT key FROM flow_tag.pod_k8s_label_map GROUP BY key"
+	podK8sLabelRst, err := chClient.DoQuery(&client.QueryParams{Sql: podK8sLabelSql})
 	if err != nil {
 		return nil, err
 	}
-	for _, _key := range rst.Values {
+	for _, _key := range podK8sLabelRst.Values {
 		key := _key.([]interface{})[0]
 		labelKey := "k8s.label." + key.(string)
 		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || table == "vtap_flow_port" || table == "vtap_app_port" {
@@ -273,7 +273,27 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
 			})
 		}
+	}
 
+	podServiceK8sLabelSql := "SELECT key FROM flow_tag.pod_service_k8s_label_map GROUP BY key"
+	podServiceK8sLabelRst, err := chClient.DoQuery(&client.QueryParams{Sql: podServiceK8sLabelSql})
+	if err != nil {
+		return nil, err
+	}
+	for _, _key := range podServiceK8sLabelRst.Values {
+		key := _key.([]interface{})[0]
+		labelKey := "k8s.label." + key.(string)
+		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || table == "vtap_flow_port" || table == "vtap_app_port" {
+			response.Values = append(response.Values, []interface{}{
+				labelKey, labelKey, labelKey, labelKey, "map_item",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+			})
+		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
+			response.Values = append(response.Values, []interface{}{
+				labelKey, labelKey + "_0", labelKey + "_1", labelKey, "map_item",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+			})
+		}
 	}
 
 	// 查询cloud.tag
