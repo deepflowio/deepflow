@@ -18,6 +18,8 @@ subgraph deepflow-agent
   agent.queue.5(["queue"])
   agent.queue.6(["queue"])
   agent.queue.7(["queue"])
+  agent.queue.8(["queue"])
+  agent.queue.9(["queue"])
   UniformSender.1["UniformSender"]
   UniformSender.2["UniformSender"]
   UniformSender.3["UniformSender"]
@@ -25,6 +27,8 @@ subgraph deepflow-agent
   UniformSender.5["UniformSender"]
   UniformSender.6["UniformSender"]
   UniformSender.7["UniformSender"]
+  UniformSender.8["UniformSender"]
+  UniformSender.9["UniformSender"]
 end
 
 subgraph deepflow-server.ingester
@@ -36,12 +40,18 @@ subgraph deepflow-server.ingester
   ext_metrics.decoder.1["ext_metrics.decoder"]
   ext_metrics.decoder.2["ext_metrics.decoder"]
   ext_metrics.decoder.3["ext_metrics.decoder"]
+  event.decoder["event.decoder"]
+  profile.decoder["profile.decoder"]
   ingester.queue.1(["queue"])
   ingester.queue.2(["queue"])
   ingester.queue.3(["queue"])
+  ingester.queue.4(["queue"])
+  ingester.queue.5(["queue"])
   flow_metrics.dbwriter
   flow_log.dbwriter
   ext_metrics.dbwriter
+  event.dbwriter
+  profile.dbwriter
 end
 
 Kernel -->|cBPF/AF_PACKET| Dispatcher
@@ -50,23 +60,30 @@ Dispatcher --> agent.queue.2 -->|L4FlowLog| UniformSender.2 -->|"tcp(pb)"| flow_
 Dispatcher --> agent.queue.3 -->|L7FlowLog| UniformSender.3 -->|"tcp(pb)"| flow_log.decoder.2 -->|L7FlowLog| ingester.queue.2
 
 Kernel -->|eBPF| EbpfCollector
+EbpfCollector --> agent.queue.1
 EbpfCollector --> agent.queue.3
+EbpfCollector --> agent.queue.8 -->|ProcEvent| UniformSender.8 -->|"tcp(pb)"| event.decoder -->|EventStore| ingester.queue.4 --> event.dbwriter
 
 otel-collector -->|OTLP| IntegrationCollector
 otel-javaagent/sdk -->|OTLP| IntegrationCollector
+IntegrationCollector -->|OTLP| agent.queue.1
 IntegrationCollector --> agent.queue.4 -->|"zip(OTLP)"| UniformSender.4 -->|"tcp(zip(OTLP))"| flow_log.decoder.3 -->|L7FlowLog| ingester.queue.2
 IntegrationCollector --> agent.queue.5 -->|OTLP| UniformSender.5 -->|"tcp(OTLP)"| flow_log.decoder.4 -->|L7FlowLog| ingester.queue.2
 
 prometheus-server -->|prom-pb| IntegrationCollector
 telegraf -->|influxdb| IntegrationCollector
+pyroscope-remote-write -->|http| IntegrationCollector
 IntegrationCollector --> agent.queue.6 -->|prom-pb| UniformSender.6 -->|"tcp(prom-pb)"| ext_metrics.decoder.1 -->|ExtMetrics| ingester.queue.3 --> ext_metrics.dbwriter
 IntegrationCollector --> agent.queue.7 -->|influxdb| UniformSender.7 -->|"tcp(influxdb)"| ext_metrics.decoder.2 -->|ExtMetrics| ingester.queue.3
+IntegrationCollector --> agent.queue.9 -->|profile-pb| UniformSender.9 -->|"tcp(pb)"| profile.decoder -->|InProcessProfile| ingester.queue.5 --> profile.dbwriter
 
 XXX -->|XXXCounter| StatsdClient -->|"tcp(pb)"| ext_metrics.decoder.3 -->|ExtMetrics| ingester.queue.3
 
 flow_metrics.dbwriter -->|flow_metrics| ClickHouse
 flow_log.dbwriter -->|flow_log| ClickHouse
 ext_metrics.dbwriter -->|ext_metrics| ClickHouse
+event.dbwriter -->|perf_event| ClickHouse
+profile.dbwriter -->|profile| ClickHouse
 ```
 
 ## 1.2. From Dispatcher/EbpfCollector to UniformSender
