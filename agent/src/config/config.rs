@@ -241,6 +241,7 @@ impl Default for UprobeProcRegExp {
 
 pub const OS_PROC_REGEXP_MATCH_TYPE_CMD: &'static str = "cmdline";
 pub const OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME: &'static str = "process_name";
+pub const OS_PROC_REGEXP_MATCH_TYPE_PARENT_PROC_NAME: &'static str = "parent_process_name";
 
 pub const OS_PROC_REGEXP_MATCH_ACTION_ACCEPT: &'static str = "accept";
 pub const OS_PROC_REGEXP_MATCH_ACTION_DROP: &'static str = "drop";
