@@ -19,6 +19,7 @@ package dbwriter
 import (
 	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
+	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/pool"
 	"github.com/deepflowio/deepflow/server/libs/zerodoc"
 )
@@ -29,39 +30,70 @@ const (
 
 type ExtMetrics struct {
 	Timestamp uint32 // s
+	MsgType   datatype.MessageType
 
-	Tag zerodoc.Tag
+	UniversalTag zerodoc.UniversalTag
 
-	Database         string
-	TableName        string
-	VirtualTableName string
+	// in deepflow_system: table name
+	// in ext_metrids: virtual_table_name
+	VTableName string
 
 	TagNames  []string
 	TagValues []string
 
 	MetricsFloatNames  []string
 	MetricsFloatValues []float64
-
-	fields      []interface{}
-	fieldValues []interface{}
 }
 
-func (m *ExtMetrics) WriteBlock(block *ckdb.Block) {
-	m.Tag.WriteBlock(block, m.Timestamp)
+func (m *ExtMetrics) DatabaseName() string {
+	if m.MsgType == datatype.MESSAGE_TYPE_DFSTATS {
+		return DEEPFLOW_SYSTEM_DB
+	} else {
+		return EXT_METRICS_DB
+	}
+}
 
-	if m.VirtualTableName != "" {
-		block.Write(m.VirtualTableName)
+func (m *ExtMetrics) TableName() string {
+	if m.MsgType == datatype.MESSAGE_TYPE_DFSTATS {
+		return m.VTableName
+	} else {
+		return EXT_METRICS_TABLE
+	}
+}
+
+func (m *ExtMetrics) VirtualTableName() string {
+	if m.MsgType == datatype.MESSAGE_TYPE_DFSTATS {
+		return ""
+	} else {
+		return m.VTableName
+	}
+}
+
+// Note: The order of Write() must be consistent with the order of append() in Columns.
+func (m *ExtMetrics) WriteBlock(block *ckdb.Block) {
+	block.WriteDateTime(m.Timestamp)
+	if m.MsgType != datatype.MESSAGE_TYPE_DFSTATS {
+		m.UniversalTag.WriteBlock(block)
+		block.Write(m.VTableName)
 	}
 	block.Write(
 		m.TagNames,
 		m.TagValues,
 		m.MetricsFloatNames,
-		m.MetricsFloatValues)
+		m.MetricsFloatValues,
+	)
 }
 
+// Note: The order of append() must be consistent with the order of Write() in WriteBlock.
 func (m *ExtMetrics) Columns() []*ckdb.Column {
-	columns := zerodoc.GenTagColumns(m.Tag.Code)
-	if m.VirtualTableName != "" {
+	columns := []*ckdb.Column{}
+
+	columns = append(columns, ckdb.NewColumnWithGroupBy("time", ckdb.DateTime))
+	if m.MsgType != datatype.MESSAGE_TYPE_DFSTATS {
+		columns = zerodoc.GenUniversalTagColumns(columns)
+
+		// FIXME: Currently there is no virtual_table_name column in the deepflow_system database,
+		// but it will be unified in the future.
 		columns = append(columns, ckdb.NewColumn("virtual_table_name", ckdb.LowCardinalityString).SetComment("虚拟表名k"))
 	}
 	columns = append(columns,
@@ -70,6 +102,7 @@ func (m *ExtMetrics) Columns() []*ckdb.Column {
 		ckdb.NewColumn("metrics_float_names", ckdb.ArrayString).SetComment("额外的float类型metrics"),
 		ckdb.NewColumn("metrics_float_values", ckdb.ArrayFloat64).SetComment("额外的float metrics值"),
 	)
+
 	return columns
 }
 
@@ -81,23 +114,24 @@ func (m *ExtMetrics) GenCKTable(cluster, storagePolicy string, ttl int, coldStor
 	timeKey := "time"
 	engine := ckdb.MergeTree
 
+	// order key
 	orderKeys := []string{}
-	if m.VirtualTableName != "" {
+	if m.MsgType != datatype.MESSAGE_TYPE_DFSTATS {
+		// FIXME: Currently there is no virtual_table_name column in the deepflow_system database,
+		// but it will be unified in the future.
 		orderKeys = append(orderKeys, "virtual_table_name")
-	}
-	if m.Tag.Code&zerodoc.L3EpcID != 0 {
+
+		// order key in universal tags
 		orderKeys = append(orderKeys, "l3_epc_id")
-	}
-	if m.Tag.Code&zerodoc.IP != 0 {
 		orderKeys = append(orderKeys, "ip4")
 		orderKeys = append(orderKeys, "ip6")
 	}
 	orderKeys = append(orderKeys, timeKey)
 
 	return &ckdb.Table{
-		Database:        m.Database,
-		LocalName:       m.TableName + ckdb.LOCAL_SUBFFIX,
-		GlobalName:      m.TableName,
+		Database:        m.DatabaseName(),
+		LocalName:       m.TableName() + ckdb.LOCAL_SUBFFIX,
+		GlobalName:      m.TableName(),
 		Columns:         m.Columns(),
 		TimeKey:         timeKey,
 		TTL:             ttl,
@@ -111,54 +145,99 @@ func (m *ExtMetrics) GenCKTable(cluster, storagePolicy string, ttl int, coldStor
 	}
 }
 
-func (m *ExtMetrics) ToFlowTags() ([]interface{}, []interface{}) {
-	if cap(m.fields) < len(m.TagNames)+len(m.MetricsFloatNames) {
-		m.fields = make([]interface{}, 0, len(m.TagNames)+len(m.MetricsFloatNames))
+// Check if there is a TagName/TagValue/MetricsName not in fieldCache or fieldValueCache, and store the newly appeared item in cache.
+func (m *ExtMetrics) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
+	tableName := m.TableName()
+	if m.VirtualTableName() != "" {
+		tableName = m.VirtualTableName()
 	}
-	if cap(m.fieldValues) < len(m.TagNames) {
-		m.fieldValues = make([]interface{}, 0, len(m.TagNames))
+
+	// reset temporary buffers
+	flowTagInfo := &cache.FlowTagInfoBuffer
+	*flowTagInfo = flow_tag.FlowTagInfo{
+		Table:   tableName,
+		VpcId:   m.UniversalTag.L3EpcID,
+		PodNsId: m.UniversalTag.PodNSID,
 	}
-	m.fields, m.fieldValues = m.fields[:0], m.fieldValues[:0]
-	tableName := m.TableName
-	if m.VirtualTableName != "" {
-		tableName = m.VirtualTableName
-	}
+	cache.Fields = cache.Fields[:0]
+	cache.FieldValues = cache.FieldValues[:0]
+
+	// tags
+	flowTagInfo.FieldType = flow_tag.FieldTag
 	for i, name := range m.TagNames {
-		m.fields = append(m.fields, flow_tag.NewTagField(m.Timestamp, m.Database, tableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldTag, name))
-		m.fieldValues = append(m.fieldValues, flow_tag.NewTagFieldValue(m.Timestamp, m.Database, tableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldTag, name, m.TagValues[i]))
+		flowTagInfo.FieldName = name
+
+		// tag + value
+		flowTagInfo.FieldValue = m.TagValues[i]
+		v1 := m.Timestamp
+		if old := cache.FieldValueCache.AddOrGet(*flowTagInfo, &v1); old != nil {
+			oldv, _ := old.(*uint32)
+			if *oldv+cache.CacheFlushTimeout >= m.Timestamp {
+				// If there is no new fieldValue, of course there will be no new field.
+				// So we can just skip the rest of the process in the loop.
+				continue
+			} else {
+				*oldv = m.Timestamp
+			}
+		}
+		tagFieldValue := flow_tag.AcquireFlowTag()
+		tagFieldValue.Timestamp = m.Timestamp
+		tagFieldValue.FlowTagInfo = *flowTagInfo
+		cache.FieldValues = append(cache.FieldValues, tagFieldValue)
+
+		// only tag
+		flowTagInfo.FieldValue = ""
+		v2 := m.Timestamp
+		if old := cache.FieldCache.AddOrGet(*flowTagInfo, &v2); old != nil {
+			oldv, _ := old.(*uint32)
+			if *oldv+cache.CacheFlushTimeout >= m.Timestamp {
+				continue
+			} else {
+				*oldv = m.Timestamp
+			}
+		}
+		tagField := flow_tag.AcquireFlowTag()
+		tagField.Timestamp = m.Timestamp
+		tagField.FlowTagInfo = *flowTagInfo
+		cache.Fields = append(cache.Fields, tagField)
 	}
+
+	// metrics
+	flowTagInfo.FieldType = flow_tag.FieldMetrics
+	flowTagInfo.FieldValue = ""
 	for _, name := range m.MetricsFloatNames {
-		m.fields = append(m.fields, flow_tag.NewTagField(m.Timestamp, m.Database, tableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldMetrics, name))
+		flowTagInfo.FieldName = name
+		v := m.Timestamp
+		if old := cache.FieldCache.AddOrGet(*flowTagInfo, &v); old != nil {
+			oldv, _ := old.(*uint32)
+			if *oldv+cache.CacheFlushTimeout >= m.Timestamp {
+				continue
+			} else {
+				*oldv = m.Timestamp
+			}
+		}
+		tagField := flow_tag.AcquireFlowTag()
+		tagField.Timestamp = m.Timestamp
+		tagField.FlowTagInfo = *flowTagInfo
+		cache.Fields = append(cache.Fields, tagField)
 	}
-	return m.fields, m.fieldValues
 }
 
 var extMetricsPool = pool.NewLockFreePool(func() interface{} {
-	return &ExtMetrics{
-		Tag: zerodoc.Tag{
-			Field: &zerodoc.Field{},
-		},
-		TagNames:           make([]string, 0, 4),
-		TagValues:          make([]string, 0, 4),
-		MetricsFloatNames:  make([]string, 0, 4),
-		MetricsFloatValues: make([]float64, 0, 4),
-		fields:             make([]interface{}, 0, 4),
-		fieldValues:        make([]interface{}, 0, 4),
-	}
+	return &ExtMetrics{}
 })
 
 func AcquireExtMetrics() *ExtMetrics {
 	return extMetricsPool.Get().(*ExtMetrics)
 }
 
+var emptyUniversalTag = zerodoc.UniversalTag{}
+
 func ReleaseExtMetrics(m *ExtMetrics) {
-	*m.Tag.Field = zerodoc.Field{}
-	m.Tag.Code = 0
+	m.UniversalTag = emptyUniversalTag
 	m.TagNames = m.TagNames[:0]
 	m.TagValues = m.TagValues[:0]
 	m.MetricsFloatNames = m.MetricsFloatNames[:0]
 	m.MetricsFloatValues = m.MetricsFloatValues[:0]
-	m.fields = m.fields[:0]
-	m.fieldValues = m.fieldValues[:0]
 	extMetricsPool.Put(m)
 }

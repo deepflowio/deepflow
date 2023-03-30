@@ -163,6 +163,7 @@ impl From<KrpcInfo> for L7ProtocolSendLog {
 #[derive(Debug, Serialize)]
 pub struct KrpcLog {
     info: KrpcInfo,
+    #[serde(skip)]
     perf_stats: Option<L7PerfStats>,
     parsed: bool,
 }
@@ -299,7 +300,7 @@ mod test {
     use std::path::Path;
     use std::rc::Rc;
 
-    use crate::common::flow::PacketDirection;
+    use crate::common::flow::{L7PerfStats, PacketDirection};
     use crate::common::l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface};
     use crate::common::l7_protocol_log::{L7PerfCache, L7ProtocolParserInterface, ParseParam};
 
@@ -390,5 +391,19 @@ mod test {
         } else {
             unreachable!()
         }
+
+        assert_eq!(
+            parser.perf_stats.unwrap(),
+            L7PerfStats {
+                request_count: 1,
+                response_count: 1,
+                err_client_count: 0,
+                err_server_count: 0,
+                err_timeout: 0,
+                rrt_count: 1,
+                rrt_sum: 100296,
+                rrt_max: 100296,
+            }
+        );
     }
 }

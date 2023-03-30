@@ -1403,8 +1403,9 @@ infer_protocol(struct ctx_info_s *ctx,
 		p = proto_infer_cache_map__lookup(&cache_key);
 		if (p == NULL)
 			return inferred_message;
-		__u16 idx = (__u16) pid;
-		switch (p->protocols[idx]) {
+		// https://stackoverflow.com/questions/70750259/bpf-verification-error-when-trying-to-extract-sni-from-tls-packet
+		__u8 this_proto = p->protocols[(__u16) pid];
+		switch (this_proto) {
 		case PROTO_HTTP1:
 			if ((inferred_message.type =
 			     infer_http_message(infer_buf, count,
@@ -1491,7 +1492,7 @@ infer_protocol(struct ctx_info_s *ctx,
 		 * slow path. We want the slow path to skip this protocol inference
 		 * to avoid duplicate matches.
 		 */
-		skip_proto = p->protocols[idx];
+		skip_proto = this_proto;
 	}
 
 	/*
