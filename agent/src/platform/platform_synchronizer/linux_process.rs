@@ -36,11 +36,13 @@ use super::{dir_inode, SHA1_DIGEST_LEN};
 use crate::config::handler::OsProcScanConfig;
 use crate::config::{
     OsProcRegexp, OS_PROC_REGEXP_MATCH_ACTION_ACCEPT, OS_PROC_REGEXP_MATCH_ACTION_DROP,
-    OS_PROC_REGEXP_MATCH_TYPE_CMD, OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME,
+    OS_PROC_REGEXP_MATCH_TYPE_CMD, OS_PROC_REGEXP_MATCH_TYPE_PARENT_PROC_NAME,
+    OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME,
 };
 #[derive(Debug, Clone)]
 pub struct ProcessData {
-    pub name: String, // the replaced name
+    pub name: String,     // the replaced name
+    pub raw_name: String, // the name before replace
     pub pid: u64,
     pub ppid: u64,
     pub process_name: String, // raw process name
@@ -113,6 +115,7 @@ impl TryFrom<&Process> for ProcessData {
 
         Ok(ProcessData {
             name: proc_name.to_string_lossy().to_string(),
+            raw_name: proc_name.to_string_lossy().to_string(),
             pid: proc.pid as u64,
             ppid: if let Ok(stat) = proc.stat().as_ref() {
                 stat.ppid as u64
@@ -178,6 +181,7 @@ pub enum ProcRegRewrite {
     // (match reg, action, rewrite string)
     Cmd(Regex, RegExpAction, String),
     ProcessName(Regex, RegExpAction, String),
+    ParentProcessName(Regex, RegExpAction),
 }
 
 impl ProcRegRewrite {
@@ -185,6 +189,7 @@ impl ProcRegRewrite {
         match self {
             ProcRegRewrite::Cmd(_, act, _) => *act,
             ProcRegRewrite::ProcessName(_, act, _) => *act,
+            ProcRegRewrite::ParentProcessName(_, act) => *act,
         }
     }
 }
@@ -197,6 +202,9 @@ impl PartialEq for ProcRegRewrite {
             }
             (Self::ProcessName(lr, lact, ls), Self::ProcessName(rr, ract, rs)) => {
                 lr.as_str() == rr.as_str() && lact == ract && ls == rs
+            }
+            (Self::ParentProcessName(lr, lact), Self::ParentProcessName(rr, ract)) => {
+                lr.as_str() == rr.as_str() && lact == ract
             }
             _ => false,
         }
@@ -236,13 +244,19 @@ impl TryFrom<&OsProcRegexp> for ProcRegRewrite {
                 action,
                 env_rewrite(value.rewrite_name.clone()),
             )),
+            OS_PROC_REGEXP_MATCH_TYPE_PARENT_PROC_NAME => Ok(Self::ParentProcessName(re, action)),
             _ => Err(regex::Error::__Nonexhaustive),
         }
     }
 }
 
 impl ProcRegRewrite {
-    pub(super) fn match_and_rewrite_proc(&self, proc: &mut ProcessData, match_only: bool) -> bool {
+    pub(super) fn match_and_rewrite_proc(
+        &self,
+        proc: &mut ProcessData,
+        pid_process_map: &PidProcMap,
+        match_only: bool,
+    ) -> bool {
         let mut match_replace_fn =
             |reg: &Regex, act: &RegExpAction, s: &String, replace: &String| {
                 if reg.is_match(s.as_str()) {
@@ -262,6 +276,29 @@ impl ProcRegRewrite {
             ProcRegRewrite::ProcessName(reg, act, replace) => {
                 match_replace_fn(reg, act, &proc.process_name, replace)
             }
+            ProcRegRewrite::ParentProcessName(reg, _) => {
+                fn match_parent(
+                    proc: &ProcessData,
+                    pid_process_map: &PidProcMap,
+                    reg: &Regex,
+                ) -> bool {
+                    if proc.ppid == 0 {
+                        return false;
+                    }
+
+                    let Some(parent_proc) = pid_process_map.get(&(proc.ppid as u32)) else {
+                        error!("pid {} have no parent proc with ppid: {}", proc.pid,proc.ppid);
+                        return false;
+                    };
+                    if reg.is_match(&parent_proc.raw_name.as_str()) {
+                        return true;
+                    }
+                    // recursive match along the parent.
+                    match_parent(parent_proc, pid_process_map, reg)
+                }
+
+                match_parent(&*proc, pid_process_map, reg)
+            }
         }
     }
 }
@@ -277,6 +314,29 @@ struct OsAppTag {
     pid: u64,
     // Vec<key, val>
     tags: Vec<OsAppTagKV>,
+}
+
+pub(super) type PidProcMap = HashMap<u32, ProcessData>;
+
+// get the pid and process map
+// now only use for match parent proc name to filter proc, the proc data in map will not fill the tag and not set username
+pub(super) fn get_all_pid_process_map(proc_root: &str) -> PidProcMap {
+    let mut h = HashMap::new();
+    if let Ok(procs) = procfs::process::all_processes_with_root(proc_root) {
+        for proc in procs {
+            if let Err(err) = proc {
+                error!("get process fail: {}", err);
+                continue;
+            }
+            let proc = proc.unwrap();
+            let Ok(proc_data) = ProcessData::try_from(&proc) else {
+                continue;
+            };
+
+            h.insert(proc.pid as u32, proc_data);
+        }
+    }
+    h
 }
 
 pub(super) fn get_all_process(conf: &OsProcScanConfig) -> Vec<ProcessData> {
@@ -307,14 +367,19 @@ pub(super) fn get_all_process(conf: &OsProcScanConfig) -> Vec<ProcessData> {
     };
 
     let mut ret = vec![];
+    let mut pid_proc_map = get_all_pid_process_map(conf.os_proc_root.as_str());
+
     if let Ok(procs) = procfs::process::all_processes_with_root(proc_root) {
         for proc in procs {
             if let Err(err) = proc {
                 error!("get process fail: {}", err);
                 continue;
             }
-            let Ok(mut proc_data) =  ProcessData::try_from(proc.as_ref().unwrap()) else {
-                continue;
+            let mut proc_data = {
+                let Some(proc_data) = pid_proc_map.get_mut(&(proc.unwrap().pid as u32)) else {
+                    continue;
+                };
+                proc_data.clone()
             };
             let Ok(up_sec) = proc_data.up_sec(now_sec) else {
                 continue;
@@ -326,7 +391,7 @@ pub(super) fn get_all_process(conf: &OsProcScanConfig) -> Vec<ProcessData> {
             }
 
             for i in proc_regexp.iter() {
-                if i.match_and_rewrite_proc(&mut proc_data, false) {
+                if i.match_and_rewrite_proc(&mut proc_data, &pid_proc_map, false) {
                     if i.action() == RegExpAction::Drop {
                         break;
                     }
@@ -503,6 +568,7 @@ mod test {
             let mut procs = vec![
                 ProcessData {
                     name: "root".into(),
+                    raw_name: "root".into(),
                     pid: 999,
                     ppid: 0,
                     process_name: "root".into(),
@@ -517,6 +583,7 @@ mod test {
                 },
                 ProcessData {
                     name: "parent".into(),
+                    raw_name: "parent".into(),
                     pid: 99,
                     ppid: 999,
                     process_name: "parent".into(),
@@ -531,6 +598,7 @@ mod test {
                 },
                 ProcessData {
                     name: "child".into(),
+                    raw_name: "child".into(),
                     pid: 9999,
                     ppid: 99,
                     process_name: "child".into(),
@@ -545,6 +613,7 @@ mod test {
                 },
                 ProcessData {
                     name: "other".into(),
+                    raw_name: "other".into(),
                     pid: 777,
                     ppid: 98,
                     process_name: "other".into(),

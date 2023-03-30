@@ -49,7 +49,7 @@ func GetTagTranslator(name, alias, db, table string) (Statement, error) {
 			nameNoSuffix := strings.TrimSuffix(name, "_0")
 			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
 			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.label.")
-			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
+			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix, nameNoPreffix, nameNoPreffix)
 			stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag}
 		} else if strings.HasPrefix(name, "cloud.tag.") {
 			if strings.HasSuffix(name, "_0") {
