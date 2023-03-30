@@ -16,9 +16,8 @@
 
 use std::{
     ffi::{CStr, CString},
-    io::ErrorKind,
     mem::MaybeUninit,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddrV6},
+    net::{IpAddr, Ipv6Addr, SocketAddrV6},
     time::Duration,
 };
 
@@ -33,27 +32,20 @@ use neli::{
 };
 use nix::libc::IFLA_INFO_KIND;
 use pnet::{
-    datalink::{self, DataLinkReceiver, DataLinkSender, NetworkInterface},
-    packet::{
-        arp::{ArpHardwareTypes, ArpOperations, ArpPacket, MutableArpPacket},
-        ethernet::{EtherTypes, EthernetPacket, MutableEthernetPacket},
-        icmpv6::{
-            ndp::{MutableNeighborSolicitPacket, NdpOption, NdpOptionTypes, NeighborAdvertPacket},
-            Icmpv6Code, Icmpv6Types,
-        },
-        Packet,
+    datalink::{self, NetworkInterface},
+    packet::icmpv6::{
+        ndp::{MutableNeighborSolicitPacket, NdpOption, NdpOptionTypes, NeighborAdvertPacket},
+        Icmpv6Code, Icmpv6Types,
     },
 };
 use regex::Regex;
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 
 use super::parse_ip_slice;
+use super::{arp::lookup as arp_lookup, Error, Result};
 use super::{Addr, Link, LinkFlags, MacAddr, NeighborEntry, Route};
-use super::{Error, Result};
 
 pub const IF_TYPE_IPVLAN: &'static str = "ipvlan";
-
-const RCV_TIMEOUT: Duration = Duration::from_millis(500);
 
 const NETLINK_ERROR_NOADDR: i32 = -19;
 
@@ -213,152 +205,10 @@ fn ndp_lookup(selected_interface: &NetworkInterface, dest_addr: Ipv6Addr) -> Res
         )))
 }
 
-// lo ip，MAC地址返为 MAC_ADDR_ZERO
-// source_ip: 发包IP
-// target_ip： 要查询mac 的IP
-// MacAddr: target_ip 的mac
-// Link: 发包Link
-fn arp_lookup(
-    selected_interface: &NetworkInterface,
-    source_addr: Ipv4Addr,
-    dest_addr: Ipv4Addr,
-) -> Result<MacAddr> {
-    let channel_config = datalink::Config {
-        // 设置接收timeout
-        read_timeout: Some(RCV_TIMEOUT),
-        ..datalink::Config::default()
-    };
-
-    let (mut tx, mut rx) = match datalink::channel(&selected_interface, channel_config) {
-        Ok(datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
-        Ok(_) => {
-            return Err(Error::NeighborLookup(String::from(
-                "not an ethernet datalink channel",
-            )));
-        }
-        Err(error) => {
-            return Err(Error::NeighborLookup(format!(
-                "datalink channel creation failed error: {}",
-                error
-            )));
-        }
-    };
-
-    send_arp_request(&mut tx, selected_interface, source_addr, dest_addr)?;
-    receive_arp_response(&mut rx)
-}
-
 fn to_multi_address(addr: Ipv6Addr) -> SockAddr {
     let suffix = addr.segments();
     let multi = Ipv6Addr::new(0xff02, 0, 0, 0, 0, 1, 0xff00 | suffix[6], suffix[7]);
     SockAddr::from(SocketAddrV6::new(multi, 0, 0, 0))
-}
-
-fn send_arp_request(
-    tx: &mut Box<dyn DataLinkSender>,
-    interface: &NetworkInterface,
-    source_addr: Ipv4Addr,
-    dest_addr: Ipv4Addr,
-) -> Result<()> {
-    const ETHERNET_STD_PACKET_SIZE: usize = 42;
-    const ARP_PACKET_SIZE: usize = 28;
-    const HW_ADDR_LEN: u8 = 6;
-    const IP_ADDR_LEN: u8 = 4;
-
-    let mut ethernet_buffer = [0u8; ETHERNET_STD_PACKET_SIZE];
-
-    let mut ethernet_packet = match MutableEthernetPacket::new(&mut ethernet_buffer) {
-        Some(pkt) => pkt,
-        None => {
-            return Err(Error::NeighborLookup(String::from(
-                "could not create ethernet packet",
-            )));
-        }
-    };
-
-    let src_mac = match interface.mac {
-        Some(mac) => mac,
-        None => {
-            return Err(Error::NeighborLookup(String::from(
-                "interface should have a MAC address",
-            )));
-        }
-    };
-    let target_mac = datalink::MacAddr::broadcast();
-
-    ethernet_packet.set_destination(target_mac);
-    ethernet_packet.set_source(src_mac);
-    ethernet_packet.set_ethertype(EtherTypes::Arp);
-
-    let mut arp_buffer = [0u8; ARP_PACKET_SIZE];
-
-    let mut arp_packet = match MutableArpPacket::new(&mut arp_buffer) {
-        Some(p) => p,
-        None => {
-            return Err(Error::NeighborLookup(String::from(
-                "could not create ARP packet",
-            )));
-        }
-    };
-
-    arp_packet.set_hardware_type(ArpHardwareTypes::Ethernet);
-    arp_packet.set_protocol_type(EtherTypes::Ipv4);
-    arp_packet.set_hw_addr_len(HW_ADDR_LEN);
-    arp_packet.set_proto_addr_len(IP_ADDR_LEN);
-    arp_packet.set_operation(ArpOperations::Request);
-    arp_packet.set_sender_hw_addr(src_mac);
-    arp_packet.set_sender_proto_addr(source_addr);
-    arp_packet.set_target_hw_addr(target_mac);
-    arp_packet.set_target_proto_addr(dest_addr);
-    ethernet_packet.set_payload(arp_packet.packet());
-
-    tx.send_to(ethernet_packet.packet(), Some(interface.clone()));
-
-    Ok(())
-}
-
-fn receive_arp_response(rx: &mut Box<dyn DataLinkReceiver>) -> Result<MacAddr> {
-    match rx.next() {
-        Ok(buffer) => match EthernetPacket::new(buffer) {
-            Some(ethernet_packet) => {
-                let is_arp_type = matches!(ethernet_packet.get_ethertype(), EtherTypes::Arp);
-                if !is_arp_type {
-                    return Err(Error::NeighborLookup(String::from("invalid ARP type")));
-                }
-                let arp_packet =
-                    ArpPacket::new(&buffer[MutableEthernetPacket::minimum_packet_size()..]);
-                match arp_packet {
-                    Some(arp) => {
-                        return Ok(MacAddr(arp.get_sender_hw_addr().octets()));
-                    }
-                    None => {
-                        return Err(Error::NeighborLookup(String::from(
-                            "could not create ARP packet",
-                        )));
-                    }
-                }
-            }
-            None => {
-                return Err(Error::NeighborLookup(String::from(
-                    "could not build ethernet packet",
-                )));
-            }
-        },
-        Err(e) => match e.kind() {
-            // 因为 channel_config 设置了timeout，所以等不到就会报错
-            ErrorKind::TimedOut => {
-                return Err(Error::NeighborLookup(String::from(
-                    "receive ethernet packet timeout",
-                )));
-            }
-            _ => {
-                return Err(Error::NeighborLookup(format!(
-                    "receive ARP request error: {}",
-                    e
-                )));
-            }
-        },
-    }
 }
 
 fn request_link_info(name: Option<&str>) -> Result<Vec<Link>> {
