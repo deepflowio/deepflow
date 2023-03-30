@@ -39,6 +39,7 @@ func Tracing(args model.ProfileTracing) (result []*model.ProfileTreeNode, err er
 	whereSlice = append(whereSlice, fmt.Sprintf(" time>=%d", args.TimeStart))
 	whereSlice = append(whereSlice, fmt.Sprintf(" time<=%d", args.TimeEnd))
 	whereSlice = append(whereSlice, fmt.Sprintf(" app_service='%s'", args.AppService))
+	whereSlice = append(whereSlice, fmt.Sprintf(" profile_language_type='%s'", args.ProfileLanguageType))
 	whereSlice = append(whereSlice, fmt.Sprintf(" profile_event_type='%s'", args.ProfileEventType))
 	if args.TagFilter != "" {
 		whereSlice = append(whereSlice, " "+args.TagFilter)
@@ -132,7 +133,7 @@ func Tracing(args model.ProfileTracing) (result []*model.ProfileTreeNode, err er
 	for _, node := range NodeIDToProfileTree {
 		nodeIDs := []string{node.NodeID}
 		parentNode := &model.ProfileTreeNode{}
-		UpdateNodeTotalValue(nodeIDs, node, parentNode, profileNodeIDToNodeID, NodeIDToProfileTree)
+		UpdateNodeTotalValue(nodeIDs, node, parentNode, NodeIDToProfileTree)
 	}
 	// format root node
 	for _, node := range NodeIDToProfileTree {
@@ -153,13 +154,13 @@ func NewProfileTreeNode(profileLocationStr string, nodeID string, profileNodeID 
 	return node
 }
 
-func UpdateNodeTotalValue(nodeIDs []string, node *model.ProfileTreeNode, parentNode *model.ProfileTreeNode, profileNodeIDToNodeID map[int]string, NodeIDToProfileTree map[string]*model.ProfileTreeNode) {
+func UpdateNodeTotalValue(nodeIDs []string, node *model.ProfileTreeNode, parentNode *model.ProfileTreeNode, NodeIDToProfileTree map[string]*model.ProfileTreeNode) {
 	if parentNode.ProfileLocationStr != "" {
 		ok := slices.Contains[string](nodeIDs, parentNode.NodeID)
 		if len(node.ParentNodeIDS) == 0 || ok {
 			return
 		}
-		parentNode.TotalValue += node.TotalValue
+		parentNode.TotalValue += node.SelfValue
 		nodeIDs = append(nodeIDs, parentNode.NodeID)
 	} else {
 		parentNode = node
@@ -167,7 +168,7 @@ func UpdateNodeTotalValue(nodeIDs []string, node *model.ProfileTreeNode, parentN
 	for _, parentNodeID := range parentNode.ParentNodeIDS {
 		parentNode, ok := NodeIDToProfileTree[parentNodeID]
 		if ok {
-			UpdateNodeTotalValue(nodeIDs, node, parentNode, profileNodeIDToNodeID, NodeIDToProfileTree)
+			UpdateNodeTotalValue(nodeIDs, node, parentNode, NodeIDToProfileTree)
 		}
 	}
 }

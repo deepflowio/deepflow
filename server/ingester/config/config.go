@@ -41,8 +41,6 @@ const (
 	DefaultDiskUsedPercent          = 90
 	DefaultDiskFreeSpace            = 50
 	DefaultDFDiskPrefix             = "path_" // In the config.xml of ClickHouse, the disk name of the storage policy 'df_storage' written by deepflow-server starts with 'path_'
-	DefaultInfluxdbHost             = "influxdb"
-	DefaultInfluxdbPort             = "20044"
 	EnvK8sNodeIP                    = "K8S_NODE_IP_FOR_DEEPFLOW"
 	EnvK8sPodName                   = "K8S_POD_NAME_FOR_DEEPFLOW"
 	EnvK8sNodeName                  = "K8S_NODE_NAME_FOR_DEEPFLOW"
@@ -131,14 +129,12 @@ type Config struct {
 	CKDiskMonitor            CKDiskMonitor   `yaml:"ck-disk-monitor"`
 	ColdStorage              CKDBColdStorage `yaml:"ckdb-cold-storage"`
 	ckdbColdStorages         map[string]*ckdb.ColdStorage
-	InfluxdbWriterEnabled    bool     `yaml:"influxdb-writer-enabled"`
-	Influxdb                 HostPort `yaml:"influxdb"`
-	NodeIP                   string   `yaml:"node-ip"`
-	GrpcBufferSize           int      `yaml:"grpc-buffer-size"`
-	ServiceLabelerLruCap     int      `yaml:"service-labeler-lru-cap"`
-	StatsInterval            int      `yaml:"stats-interval"`
-	FlowTagCacheFlushTimeout uint32   `yaml:"flow-tag-cache-flush-timeout"`
-	FlowTagCacheMaxSize      uint32   `yaml:"flow-tag-cache-max-size"`
+	NodeIP                   string `yaml:"node-ip"`
+	GrpcBufferSize           int    `yaml:"grpc-buffer-size"`
+	ServiceLabelerLruCap     int    `yaml:"service-labeler-lru-cap"`
+	StatsInterval            int    `yaml:"stats-interval"`
+	FlowTagCacheFlushTimeout uint32 `yaml:"flow-tag-cache-flush-timeout"`
+	FlowTagCacheMaxSize      uint32 `yaml:"flow-tag-cache-max-size"`
 	LogFile                  string
 	LogLevel                 string
 	MyNodeName               string
@@ -316,7 +312,7 @@ func (c *Config) ValidateAndSetckdbColdStorages() error {
 			return fmt.Errorf("'ingester.ckdb-cold-storage.settings[%d].db' is empty", i)
 		}
 		if setting.TTLToMove < 1 {
-			return fmt.Errorf("'ingester.ckdb-cold-storage.settings[%d].hour-to-move' is '%d', should > 0", i, setting.TTLToMove)
+			return fmt.Errorf("'ingester.ckdb-cold-storage.settings[%d].ttl-hour-to-move' is '%d', should > 0", i, setting.TTLToMove)
 		}
 		for _, table := range setting.Tables {
 			c.ckdbColdStorages[setting.Db+table] = &ckdb.ColdStorage{
@@ -363,7 +359,6 @@ func Load(path string) *Config {
 				DefaultDFDiskPrefix,
 				[]DatabaseTable{{"flow_log", ""}, {"flow_metrics", "1s_local"}},
 			},
-			Influxdb:                 HostPort{DefaultInfluxdbHost, DefaultInfluxdbPort},
 			ListenPort:               DefaultListenPort,
 			GrpcBufferSize:           DefaultGrpcBufferSize,
 			ServiceLabelerLruCap:     DefaultServiceLabelerLruCap,

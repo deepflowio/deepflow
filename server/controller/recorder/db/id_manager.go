@@ -303,9 +303,9 @@ func ReleaseIDs(resourceType string, ids []int) (err error) {
 		uIDs = append(uIDs, uint32(id))
 	}
 	client := api.NewControllerClient(conn)
-	_, err = client.ReleaseResourceID(context.Background(), &api.ReleaseResourceIDRequest{Ids: uIDs})
+	_, err = client.ReleaseResourceID(context.Background(), &api.ReleaseResourceIDRequest{Ids: uIDs, Type: &resourceType})
 	if err != nil {
-		log.Error("release %s id failed: %s", resourceType, err.Error())
+		log.Errorf("release %s id failed: %s", resourceType, err.Error())
 	}
 	log.Infof("release %s ids: %v (count: %d)", resourceType, ids, len(ids))
 	return

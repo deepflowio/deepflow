@@ -280,11 +280,7 @@ impl Trident {
         let logger_handle = logger.start()?;
 
         // Use controller ip to replace analyzer ip before obtaining configuration
-        let stats_collector = Arc::new(stats::Collector::new(
-            &hostname,
-            config.controller_ips[0].clone(),
-            DEFAULT_INGESTER_PORT,
-        ));
+        let stats_collector = Arc::new(stats::Collector::new(&hostname));
         if matches!(config.agent_mode, RunningMode::Managed) {
             stats_collector.start();
         }
@@ -508,7 +504,7 @@ impl Trident {
                         libvirt_xml_extractor.stop();
                         if let Some(cg_controller) = cgroups_controller {
                             if let Err(e) = cg_controller.stop() {
-                                warn!("stop cgroup controller failed, {:?}", e);
+                                info!("stop cgroup controller failed, {:?}", e);
                             }
                         }
                     }

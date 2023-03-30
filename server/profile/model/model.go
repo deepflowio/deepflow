@@ -17,12 +17,13 @@
 package model
 
 type ProfileTracing struct {
-	AppService       string `json:"app_service" binding:"required"`
-	ProfileEventType string `json:"profile_event_type" binding:"required"`
-	TagFilter        string `json:"tag_filter"`
-	GroupBy          string `json:"group_by"`
-	TimeStart        int    `json:"time_start" binding:"required"`
-	TimeEnd          int    `json:"time_end" binding:"required"`
+	AppService          string `json:"app_service" binding:"required"`
+	ProfileEventType    string `json:"profile_event_type" binding:"required"`
+	ProfileLanguageType string `json:"profile_language_type" binding:"required"`
+	TagFilter           string `json:"tag_filter"`
+	GroupBy             string `json:"group_by"`
+	TimeStart           int    `json:"time_start" binding:"required"`
+	TimeEnd             int    `json:"time_end" binding:"required"`
 }
 
 type ProfileTreeNode struct {

@@ -995,8 +995,6 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	__u32 tgid = (__u32) (pid_tgid >> 32);
-	if (time_stamp == 0)
-		time_stamp = bpf_ktime_get_ns();
 	__u64 conn_key = gen_conn_key_id((__u64)tgid, (__u64)conn_info->fd);
 
 	if (conn_info->message_type == MSG_CLEAR) {
@@ -1145,7 +1143,13 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	v->data_seq = sk_info.seq;
 	v->tgid = tgid;
 	v->pid = (__u32) pid_tgid;
-	v->timestamp = time_stamp;
+
+	// For blocking reads, there is a significant deviation between the
+	// entry time of the system call and the real time of the read
+	// operation. Therefore, the end time of the system call is used for
+	// the read operation.
+	v->timestamp = conn_info->direction == T_INGRESS ? bpf_ktime_get_ns() :
+							   time_stamp;
 	v->direction = conn_info->direction;
 	v->syscall_len = syscall_len;
 	v->msg_type = conn_info->message_type;

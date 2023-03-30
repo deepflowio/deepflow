@@ -18,13 +18,11 @@ package genesis
 
 import (
 	"errors"
+
 	"inet.af/netaddr"
 
 	"github.com/bitly/go-simplejson"
-	"github.com/op/go-logging"
-	"github.com/satori/go.uuid"
-
-	"github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set"
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/config"
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
@@ -33,6 +31,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/statsd"
+	"github.com/op/go-logging"
+	uuid "github.com/satori/go.uuid"
 )
 
 var log = logging.MustGetLogger("cloud.genesis")
@@ -273,7 +273,7 @@ func (g *Genesis) GetCloudData() (cloudmodel.Resource, error) {
 
 	genesisData, err := g.getGenesisData()
 	if err != nil {
-		return cloudmodel.Resource{}, errors.New("get genesis data faild")
+		return cloudmodel.Resource{}, err
 	}
 	g.genesisData = genesisData
 

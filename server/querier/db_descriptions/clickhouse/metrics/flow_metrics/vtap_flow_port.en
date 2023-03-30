@@ -20,7 +20,6 @@ synack_count                , SYN-ACK Packet          , Packet ,
 l4_byte                     , L4 Payload              , Byte   ,
 l4_byte_tx                  , L4 Payload TX           , Byte   ,
 l4_byte_rx                  , L4 Payload RX           , Byte   ,
-direction_score             , Direction Score         ,        , The higher the score, the higher the accuracy of the direction of the client and server. When the score is 255, the direction must be correct.
 
 retrans_syn                 , SYN Retransmission        , Packet ,
 retrans_synack              , SYN-ACK Retransmission    , Packet ,

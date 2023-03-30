@@ -95,6 +95,9 @@ var (
 		input:  "select Max(byte) as max_byte, time(time,120) as time_120 from l4_flow_log group by time_120 having Min(byte)>=0 limit 1",
 		output: "WITH toStartOfInterval(time, toIntervalSecond(120)) + toIntervalSecond(arrayJoin([0]) * 120) AS `_time_120` SELECT toUnixTimestamp(`_time_120`) AS `time_120`, MAX(byte_tx+byte_rx) AS `max_byte` FROM flow_log.`l4_flow_log` GROUP BY `time_120` HAVING MIN(byte_tx+byte_rx) >= 0 LIMIT 1",
 	}, {
+		input:  "select Max(byte) as max_byte, time(time,86400) as time_120 from l4_flow_log group by time_120 having Min(byte)>=0 limit 1",
+		output: "WITH toStartOfInterval(time, toIntervalDay(1)) + toIntervalDay(arrayJoin([0]) * 1) AS `_time_120` SELECT toUnixTimestamp(`_time_120`) AS `time_120`, MAX(byte_tx+byte_rx) AS `max_byte` FROM flow_log.`l4_flow_log` GROUP BY `time_120` HAVING MIN(byte_tx+byte_rx) >= 0 LIMIT 1",
+	}, {
 		input:  "select Max(byte) as 'max_byte',region_0,chost_id_1 from l4_flow_log group by region_0,chost_id_1 limit 1",
 		output: "SELECT dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, if(l3_device_type_1=1,l3_device_id_1, 0) AS `chost_id_1`, MAX(byte_tx+byte_rx) AS `max_byte` FROM flow_log.`l4_flow_log` PREWHERE (region_id_0!=0) AND (l3_device_id_1!=0 AND l3_device_type_1=1) GROUP BY dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, if(l3_device_type_1=1,l3_device_id_1, 0) AS `chost_id_1` LIMIT 1",
 	}, {
@@ -212,7 +215,7 @@ var (
 		db:     "flow_metrics",
 	}, {
 		input:  "SELECT time(time,5,1,0) as toi, Avg(`metrics.dropped`) AS `Avg(metrics.dropped)` FROM `deepflow_agent_collect_sender` GROUP BY  toi ORDER BY toi desc",
-		output: "WITH toStartOfInterval(time, toIntervalSecond(60)) + toIntervalSecond(arrayJoin([0]) * 60) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, AVG(if(indexOf(metrics_float_names, 'dropped')=0,null,metrics_float_values[indexOf(metrics_float_names, 'dropped')])) AS `Avg(metrics.dropped)` FROM deepflow_system.`deepflow_agent_collect_sender` GROUP BY `toi` ORDER BY `toi` desc LIMIT 10000",
+		output: "WITH toStartOfInterval(time, toIntervalSecond(10)) + toIntervalSecond(arrayJoin([0]) * 10) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, AVG(if(indexOf(metrics_float_names, 'dropped')=0,null,metrics_float_values[indexOf(metrics_float_names, 'dropped')])) AS `Avg(metrics.dropped)` FROM deepflow_system.`deepflow_agent_collect_sender` GROUP BY `toi` ORDER BY `toi` desc LIMIT 10000",
 		db:     "deepflow_system",
 	}, {
 		input:  "SELECT time(time,120,1,0) as toi, Avg(`metrics.dropped`) AS `Avg(metrics.dropped)` FROM `deepflow_agent_collect_sender` GROUP BY  toi ORDER BY toi desc ",
