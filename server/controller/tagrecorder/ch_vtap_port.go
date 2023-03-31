@@ -291,12 +291,15 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 					if vTap.Region != "" && vTap.Region == host.Region {
 						key := VtapPortKey{VtapID: vTap.ID, TapPort: tapPort}
 						keyToItem[key] = mysql.ChVTapPort{
-							VTapID:   vTap.ID,
-							TapPort:  tapPort,
-							Name:     vInterface.Name + " " + host.Name,
-							HostID:   host.ID,
-							HostName: host.Name,
-							IconID:   deviceKeyToIconID[DeviceKey{DeviceID: host.ID, DeviceType: common.VIF_DEVICE_TYPE_HOST}],
+							VTapID:     vTap.ID,
+							TapPort:    tapPort,
+							Name:       vInterface.Name + " " + host.Name,
+							DeviceID:   host.ID,
+							DeviceType: common.VIF_DEVICE_TYPE_HOST,
+							DeviceName: host.Name,
+							HostID:     host.ID,
+							HostName:   host.Name,
+							IconID:     deviceKeyToIconID[DeviceKey{DeviceID: host.ID, DeviceType: common.VIF_DEVICE_TYPE_HOST}],
 						}
 						log.Debugf("add new: %+v, %+v", key, keyToItem[key])
 					}
