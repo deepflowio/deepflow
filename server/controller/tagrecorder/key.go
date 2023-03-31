@@ -61,12 +61,12 @@ type IPRelationKey struct {
 }
 
 type K8sLabelKey struct {
-	PodID int
-	Key   string
+	ID  int
+	Key string
 }
 
 type K8sLabelsKey struct {
-	PodID int
+	ID int
 }
 
 type TapTypeKey struct {
