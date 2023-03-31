@@ -60,11 +60,10 @@ all_protocol_info!(
     DubboInfo(DubboInfo),
     KafkaInfo(KafkaInfo),
     MqttInfo(MqttInfo),
-    //
-    // add new protocol info below
     PostgreInfo(PostgreInfo),
     ProtobufRpcInfo(ProtobufRpcInfo),
     SofaRpcInfo(SofaRpcInfo),
+    // add new protocol info below
 );
 
 #[enum_dispatch(L7ProtocolInfo)]
