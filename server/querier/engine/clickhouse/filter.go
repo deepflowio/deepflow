@@ -72,6 +72,8 @@ func TransWhereTagFunction(name string, args []string) (filter string) {
 	funcName := strings.ToLower(name)
 	switch funcName {
 	case "exist":
+		// Unsupported tags, filter is 1 = 1
+		filter = "1=1"
 		if len(args) != 1 {
 			errorMessage := fmt.Sprintf("The parameters of function %s are not 1", funcName)
 			log.Error(errorMessage)
