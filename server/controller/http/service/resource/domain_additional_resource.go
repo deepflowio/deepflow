@@ -87,21 +87,21 @@ func ApplyDomainAddtionalResource(reqData model.AdditionalResource) error {
 }
 
 func fullUpdateDB(dbItems []mysql.DomainAdditionalResource) error {
-	// Full update, delete all data before inserting
-	err := mysql.Db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.DomainAdditionalResource{}).Error
+	err := mysql.Db.Transaction(func(tx *gorm.DB) error {
+		// Full update, delete all data before inserting
+		err := tx.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.DomainAdditionalResource{}).Error
+		if err != nil {
+			return err
+		}
+		return tx.Create(&dbItems).Error
+	})
 	if err != nil {
 		return servicecommon.NewError(
 			common.SERVER_ERROR,
-			fmt.Sprintf("apply domain additional resources failed, delete error: %s", err.Error()),
+			fmt.Sprintf("apply domain additional resources error: %s", err.Error()),
 		)
 	}
-	err = mysql.Db.Create(&dbItems).Error
-	if err != nil {
-		return servicecommon.NewError(
-			common.SERVER_ERROR,
-			fmt.Sprintf("apply domain additional resources failed, insert error: %s", err.Error()),
-		)
-	}
+
 	log.Debugf("apply domain additional resources success: %#v", dbItems)
 	return nil
 }
