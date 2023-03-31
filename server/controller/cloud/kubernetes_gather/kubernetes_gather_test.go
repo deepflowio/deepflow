@@ -38,7 +38,7 @@ func TestKubernetes(t *testing.T) {
 			Name:        "test_k8s",
 			DisplayName: "test_k8s",
 			ClusterID:   "d-01LMvvfQPZ",
-			Config:      fmt.Sprintf(`{"port_name_regex": "","pod_net_ipv4_cidr_max_mask": %v,"pod_net_ipv6_cidr_max_mask": %v,"region_uuid": "%s","vpc_uuid": ""}`, common.K8S_POD_IPV4_NETMASK, common.K8S_POD_IPV6_NETMASK, common.DEFAULT_REGION),
+			Config:      fmt.Sprintf(`{"node_port_name_regex": "","pod_net_ipv4_cidr_max_mask": %v,"pod_net_ipv6_cidr_max_mask": %v,"region_uuid": "%s","vpc_uuid": ""}`, common.K8S_POD_IPV4_NETMASK, common.K8S_POD_IPV6_NETMASK, common.DEFAULT_REGION),
 		}
 
 		k8s := NewKubernetesGather(nil, &k8sConfig, false)
