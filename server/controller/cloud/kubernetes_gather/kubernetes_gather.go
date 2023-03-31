@@ -82,6 +82,11 @@ func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, isSub
 	var err error
 
 	domainConfigJson, err = simplejson.NewJson([]byte(domain.Config))
+	portNameRegex := domainConfigJson.Get("node_port_name_regex").MustString()
+	if portNameRegex == "" {
+		portNameRegex = K8S_VINTERFACE_NAME_REGEX
+	}
+
 	// 如果是K8s云平台，转换domain表的config
 	if isSubDomain {
 		if subDomain == nil {
@@ -93,6 +98,10 @@ func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, isSub
 		displayName = subDomain.DisplayName
 		clusterID = subDomain.ClusterID
 		configJson, err = simplejson.NewJson([]byte(subDomain.Config))
+		sPortNameRegex := configJson.Get("port_name_regex").MustString()
+		if sPortNameRegex != "" {
+			portNameRegex = sPortNameRegex
+		}
 	} else {
 		if domain == nil {
 			log.Error("domain model is nil")
@@ -107,15 +116,6 @@ func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, isSub
 	if err != nil {
 		log.Error(err)
 		return nil
-	}
-
-	portNameRegex := domainConfigJson.Get("subdomain_port_name_regex").MustString()
-	if portNameRegex == "" {
-		portNameRegex = K8S_VINTERFACE_NAME_REGEX
-	}
-	sPortNameRegex := configJson.Get("port_name_regex").MustString()
-	if sPortNameRegex != "" && isSubDomain {
-		portNameRegex = sPortNameRegex
 	}
 
 	_, regxErr := regexp.Compile(portNameRegex)
