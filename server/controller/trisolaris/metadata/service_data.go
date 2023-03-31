@@ -25,11 +25,13 @@ import (
 	"github.com/deepflowio/deepflow/message/trident"
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
+	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
 
 type ServiceRawData struct {
 	podServiceIDToPodServicePorts map[int][]*models.PodServicePort
 	podGroupIDToPodGroupPorts     map[int][]*models.PodGroupPort
+	podGroupIDToPodServiceID      map[int]int
 	lbIDToVPCID                   map[int]int
 }
 
@@ -37,6 +39,7 @@ func newServiceRawData() *ServiceRawData {
 	return &ServiceRawData{
 		podServiceIDToPodServicePorts: make(map[int][]*models.PodServicePort),
 		podGroupIDToPodGroupPorts:     make(map[int][]*models.PodGroupPort),
+		podGroupIDToPodServiceID:      make(map[int]int),
 		lbIDToVPCID:                   make(map[int]int),
 	}
 }
@@ -64,7 +67,7 @@ func (r *ServiceRawData) ConvertDBData(dbDataCache *DBDataCache) {
 			r.podServiceIDToPodServicePorts[psp.PodServiceID] = []*models.PodServicePort{psp}
 		}
 	}
-
+	podGroupIDToPodServiceIDs := make(map[int][]int, len(dbDataCache.GetPodGroupPorts()))
 	for _, pgp := range dbDataCache.GetPodGroupPorts() {
 		if _, ok := r.podGroupIDToPodGroupPorts[pgp.PodGroupID]; ok {
 			r.podGroupIDToPodGroupPorts[pgp.PodGroupID] = append(
@@ -72,11 +75,43 @@ func (r *ServiceRawData) ConvertDBData(dbDataCache *DBDataCache) {
 		} else {
 			r.podGroupIDToPodGroupPorts[pgp.PodGroupID] = []*models.PodGroupPort{pgp}
 		}
+		if ids, ok := podGroupIDToPodServiceIDs[pgp.PodGroupID]; ok {
+			podGroupIDToPodServiceIDs[pgp.PodGroupID] = append(
+				podGroupIDToPodServiceIDs[pgp.PodGroupID], pgp.PodServiceID)
+		} else {
+			if Find[int](ids, pgp.PodServiceID) != true {
+				podGroupIDToPodServiceIDs[pgp.PodGroupID] = []int{pgp.PodServiceID}
+			}
+		}
 	}
 
 	for _, lb := range dbDataCache.GetLBs() {
 		r.lbIDToVPCID[lb.ID] = lb.VPCID
 	}
+
+	podServiceIDToName := make(map[int]string, len(dbDataCache.GetPodServices()))
+	for _, podService := range dbDataCache.GetPodServices() {
+		podServiceIDToName[podService.ID] = podService.Name
+	}
+	podGroupIDToPodServiceID := make(map[int]int, len(podGroupIDToPodServiceIDs))
+	for groupId, podServiceIDs := range podGroupIDToPodServiceIDs {
+		var (
+			minName string
+			minID   int
+		)
+		for _, serviceID := range podServiceIDs {
+			name := podServiceIDToName[serviceID]
+			if len(name) == 0 {
+				continue
+			}
+			if minName == "" || minName > name {
+				minName = name
+				minID = serviceID
+			}
+		}
+		podGroupIDToPodServiceID[groupId] = minID
+	}
+	r.podGroupIDToPodServiceID = podGroupIDToPodServiceID
 }
 
 func (s *ServiceDataOP) updateServiceRawData(serviceRawData *ServiceRawData) {
@@ -171,8 +206,13 @@ func (s *ServiceDataOP) generateService() {
 		if ok == false {
 			continue
 		}
+		groupKeys = groupKeys[:0]
+		podServiceID := rData.podGroupIDToPodServiceID[podGroup.ID]
 		keyToPorts := make(map[GroupKey][]uint32)
 		for _, port := range ports {
+			if port.PodServiceID != podServiceID {
+				continue
+			}
 			key := GroupKey{
 				protocol:     getProtocol(port.Protocol),
 				podServiceID: port.PodServiceID,
