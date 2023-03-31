@@ -62,6 +62,45 @@ func (t FieldType) String() string {
 	}
 }
 
+type FlowTagInfoKey struct {
+	Low, High uint64
+}
+
+func (k *FlowTagInfoKey) Reset() {
+	k.Low = 0
+	k.High = 0
+}
+
+func (k *FlowTagInfoKey) SetTableId(tableId uint32) {
+	k.Low ^= k.Low & 0x7FFFFFFF
+	k.Low |= uint64(tableId)
+}
+
+func (k *FlowTagInfoKey) SetFieldType(fieldType FieldType) {
+	k.Low ^= k.Low & 0x80000000
+	k.Low |= uint64(fieldType&0x1) << 31
+}
+
+func (k *FlowTagInfoKey) SetFieldNameId(fieldNameId uint32) {
+	k.Low ^= k.Low & (uint64(0xFFFFFFFF) << 32)
+	k.Low |= uint64(fieldNameId) << 32
+}
+
+func (k *FlowTagInfoKey) SetVpcId(vpcId int32) {
+	k.High ^= k.High & 0xFFFF
+	k.High |= uint64(uint16(vpcId))
+}
+
+func (k *FlowTagInfoKey) SetPodNsId(podNsId uint16) {
+	k.High ^= k.High & 0xFFFF0000
+	k.High |= uint64(podNsId) << 16
+}
+
+func (k *FlowTagInfoKey) SetFieldValueId(fieldValueId uint32) {
+	k.High ^= k.High & (uint64(0xFFFFFFFF) << 32)
+	k.High |= uint64(fieldValueId) << 32
+}
+
 // This structure will be used as a map key, and it is hoped to be as compact as possible in terms of memory layout.
 // In addition, in order to distinguish as early as possible when comparing two values, put the highly distinguishable fields at the front.
 type FlowTagInfo struct {
@@ -162,12 +201,9 @@ func AcquireFlowTag() *FlowTag {
 	return f
 }
 
-var emptyFlowTag = FlowTag{}
-
 func ReleaseFlowTag(t *FlowTag) {
 	if t == nil || t.SubReferenceCount() {
 		return
 	}
-	*t = emptyFlowTag
 	flowTagPool.Put(t)
 }

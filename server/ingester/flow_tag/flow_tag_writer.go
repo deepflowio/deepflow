@@ -1,6 +1,7 @@
 package flow_tag
 
 import (
+	"bytes"
 	"fmt"
 	"strconv"
 
@@ -10,7 +11,8 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/config"
 	"github.com/deepflowio/deepflow/server/ingester/pkg/ckwriter"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
-	"github.com/deepflowio/deepflow/server/libs/lru"
+	"github.com/deepflowio/deepflow/server/libs/hmap/lru"
+	//slowlru "github.com/deepflowio/deepflow/server/libs/lru"
 	"github.com/deepflowio/deepflow/server/libs/stats"
 	"github.com/deepflowio/deepflow/server/libs/utils"
 )
@@ -27,6 +29,7 @@ type Counter struct {
 	NewFieldValueCount   int64 `statsd:"new-field-value-count"`
 	FieldCacheCount      int64 `statsd:"field-cache-count"`
 	FieldValueCacheCount int64 `statsd:"field-value-cache-count"`
+	SeriesCacheCount     int64 `statsd:"series-cache-count"`
 }
 
 type FlowTagWriter struct {
@@ -43,20 +46,55 @@ type FlowTagWriter struct {
 	utils.Closable
 }
 
-type FlowTagCache struct {
-	FieldCache, FieldValueCache *lru.Cache
-	CacheFlushTimeout           uint32
-
-	// temporary buffers for generating new flow_tags
-	FlowTagInfoBuffer FlowTagInfo
-	Fields            []interface{}
-	FieldValues       []interface{}
+type SeriesCache struct {
+	Cache      map[string]uint32
+	Limit      uint32
+	Buffers    []bytes.Buffer
+	Timestamps []uint32
 }
 
-func NewFlowTagCache(cacheFlushTimeout, cacheMaxSize uint32) *FlowTagCache {
+func NewSeriesCache(limit uint32) *SeriesCache {
+	buffers := []bytes.Buffer{bytes.Buffer{}}
+	buffers[0].Grow(1 << 20)
+
+	return &SeriesCache{
+		Cache:   make(map[string]uint32),
+		Limit:   limit,
+		Buffers: buffers,
+	}
+}
+
+func (c *SeriesCache) GetByteBuffer() *bytes.Buffer {
+	buf := &c.Buffers[len(c.Buffers)-1]
+	if buf.Len() >= 1<<20-2048 {
+		c.Buffers = append(c.Buffers, bytes.Buffer{})
+		buf = &c.Buffers[len(c.Buffers)-1]
+		buf.Grow(1 << 20)
+	}
+	return buf
+}
+
+type FlowTagCache struct {
+	FieldCache        *lru.U128LRU
+	FieldValueCache   *lru.U128LRU
+	CacheFlushTimeout uint32
+
+	SeriesCache *SeriesCache
+
+	// temporary buffers for generating new flow_tags
+	FlowTagInfoBuffer    FlowTagInfo
+	FlowTagInfoKeyBuffer FlowTagInfoKey
+	Fields               []interface{}
+	FieldValues          []interface{}
+}
+
+func NewFlowTagCache(name string, cacheFlushTimeout, cacheMaxSize, seriesCacheMaxSize uint32) *FlowTagCache {
 	return &FlowTagCache{
-		FieldCache:        lru.NewCache(int(cacheMaxSize)),
-		FieldValueCache:   lru.NewCache(int(cacheMaxSize)),
+		FieldCache:      lru.NewU128LRU(name+"-field", int(cacheMaxSize)>>6, int(cacheMaxSize)>>3),
+		FieldValueCache: lru.NewU128LRU(name+"-field_value", int(cacheMaxSize)>>3, int(cacheMaxSize)),
+		// SeriesCache:     slowlru.NewCache(int(seriesCacheMaxSize)),
+		SeriesCache: NewSeriesCache(uint32(seriesCacheMaxSize)),
+
 		CacheFlushTimeout: cacheFlushTimeout,
 	}
 }
@@ -75,7 +113,12 @@ func NewFlowTagWriter(
 		ckdbPassword: config.CKDBAuth.Password,
 		writerConfig: writerConfig,
 
-		Cache:   NewFlowTagCache(config.FlowTagCacheFlushTimeout, config.FlowTagCacheMaxSize),
+		Cache: NewFlowTagCache(
+			fmt.Sprintf("%s-%s-%d", name, srcDB, decoderIndex),
+			config.FlowTagCacheFlushTimeout,
+			config.FlowTagCacheMaxSize,
+			config.ExtMetricsSeriesCacheMaxSize,
+		),
 		counter: &Counter{},
 	}
 	t := FlowTag{}
@@ -120,7 +163,8 @@ func (w *FlowTagWriter) WriteFieldsAndFieldValuesInCache() {
 func (w *FlowTagWriter) GetCounter() interface{} {
 	var counter *Counter
 	counter, w.counter = w.counter, &Counter{}
-	counter.FieldCacheCount = int64(w.Cache.FieldCache.Len())
-	counter.FieldValueCacheCount = int64(w.Cache.FieldValueCache.Len())
+	counter.FieldCacheCount = int64(w.Cache.FieldCache.Size())
+	counter.FieldValueCacheCount = int64(w.Cache.FieldValueCache.Size())
+	counter.SeriesCacheCount = int64(len(w.Cache.SeriesCache.Cache))
 	return counter
 }

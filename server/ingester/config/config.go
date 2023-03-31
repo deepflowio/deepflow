@@ -54,6 +54,8 @@ const (
 	DefaultStatsInterval            = 10      // s
 	DefaultFlowTagCacheFlushTimeout = 1800    // s
 	DefaultFlowTagCacheMaxSize      = 1 << 18 // 256k
+
+	DefaultExtMetricsSeriesCacheMaxSize = 1 << 20 // 1m
 )
 
 type DatabaseTable struct {
@@ -144,6 +146,8 @@ type Config struct {
 	LogFile                  string
 	LogLevel                 string
 	MyNodeName               string
+
+	ExtMetricsSeriesCacheMaxSize uint32 `yaml:"ext-metrics-series-cache-max-size"`
 }
 
 type BaseConfig struct {
@@ -168,6 +172,9 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	if c.ExtMetricsSeriesCacheMaxSize == 0 {
+		c.ExtMetricsSeriesCacheMaxSize = DefaultExtMetricsSeriesCacheMaxSize
+	}
 	if c.FlowTagCacheMaxSize == 0 {
 		c.FlowTagCacheMaxSize = DefaultFlowTagCacheMaxSize
 	}

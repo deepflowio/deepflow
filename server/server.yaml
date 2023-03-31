@@ -462,6 +462,7 @@ ingester:
 
   ## unit: byte
   #flow-tag-cache-max-size: 262144
+  #ext-metrics-series-cache-max-size: 1000000
 
   ## unit: s
   #flow-tag-cache-flush-timeout: 1800
