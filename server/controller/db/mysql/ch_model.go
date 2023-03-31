@@ -274,7 +274,7 @@ type ChPodIngress struct {
 }
 
 type ChPodK8sLabel struct {
-	PodID   int    `gorm:"primaryKey;column:pod_id;type:int;not null" json:"POD_ID"`
+	ID      int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	Key     string `gorm:"primaryKey;column:key;type:varchar(64);default:null" json:"KEY"`
 	Value   string `gorm:"column:value;type:varchar(64);default:null" json:"VALUE"`
 	L3EPCID int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
@@ -282,14 +282,14 @@ type ChPodK8sLabel struct {
 }
 
 type ChPodK8sLabels struct {
-	PodID   int    `gorm:"primaryKey;column:pod_id;type:int;not null" json:"POD_ID"`
+	ID      int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	Labels  string `gorm:"column:labels;type:text;default:null" json:"LABELS"`
 	L3EPCID int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
 	PodNsID int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
 }
 
 type ChPodServiceK8sLabel struct {
-	PodID   int    `gorm:"primaryKey;column:pod_id;type:int;not null" json:"POD_ID"`
+	ID      int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	Key     string `gorm:"primaryKey;column:key;type:varchar(64);default:null" json:"KEY"`
 	Value   string `gorm:"column:value;type:varchar(64);default:null" json:"VALUE"`
 	L3EPCID int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
@@ -297,7 +297,7 @@ type ChPodServiceK8sLabel struct {
 }
 
 type ChPodServiceK8sLabels struct {
-	PodID   int    `gorm:"primaryKey;column:pod_id;type:int;not null" json:"POD_ID"`
+	ID      int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	Labels  string `gorm:"column:labels;type:text;default:null" json:"LABELS"`
 	L3EPCID int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
 	PodNsID int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`

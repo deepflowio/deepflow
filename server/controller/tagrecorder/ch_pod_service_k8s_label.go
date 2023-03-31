@@ -67,11 +67,11 @@ func (k *ChPodServiceK8sLabel) generateNewData() (map[K8sLabelKey]mysql.ChPodSer
 			splitSingleLabel := strings.Split(singleLabel, ":")
 			if len(splitSingleLabel) == 2 {
 				key := K8sLabelKey{
-					PodID: podService.ID,
-					Key:   splitSingleLabel[0],
+					ID:  podService.ID,
+					Key: splitSingleLabel[0],
 				}
 				keyToItem[key] = mysql.ChPodServiceK8sLabel{
-					PodID:   podService.ID,
+					ID:      podService.ID,
 					Key:     splitSingleLabel[0],
 					Value:   splitSingleLabel[1],
 					L3EPCID: podService.VPCID,
@@ -84,7 +84,7 @@ func (k *ChPodServiceK8sLabel) generateNewData() (map[K8sLabelKey]mysql.ChPodSer
 }
 
 func (k *ChPodServiceK8sLabel) generateKey(dbItem mysql.ChPodServiceK8sLabel) K8sLabelKey {
-	return K8sLabelKey{PodID: dbItem.PodID, Key: dbItem.Key}
+	return K8sLabelKey{ID: dbItem.ID, Key: dbItem.Key}
 }
 
 func (k *ChPodServiceK8sLabel) generateUpdateInfo(oldItem, newItem mysql.ChPodServiceK8sLabel) (map[string]interface{}, bool) {
