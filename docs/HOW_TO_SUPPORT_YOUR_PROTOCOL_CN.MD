@@ -14,12 +14,21 @@
 整体流程大概是：
 ```mermaid
 graph TB;
-    id1(["payload: &[u8]"])-->MetaPacket-->流协议被标记-->id5;
-    MetaPacket-->foreach-->id2(["L7ProtocolParser::check_payload()"]);
+    id1(["payload: &[u8]"])-->id13-->id15(流协议被标记);
+
+    id15-->达到统计周期-->id16(["L7ProtocolParser::perf_stats()"])-->输出指标数据;
+
+    id15(流协议被标记)-->id5;
+
+    id13(["MetaPacket"])-->协议未被标记-->id17(["for each protocol parser"])-->id2(["L7ProtocolParser::check_payload()"]);
+
     id2-->false-->id3(["解析失败，丢弃这段数据"])-->如果多次失败这个流会标记成unknown;
-    id2-->true-->标记流协议-->id4("l4/l7 perf parse，用于后续输出性能指标，目前不能拓展")-->id5(["L7ProtocolParser::parse_payload()"])-->L7ProtocolInfo-->id6(["加入到session聚合，等待请求/响应"]);
+
+    id2-->true-->标记流协议-->id5(["L7ProtocolParser::parse_payload()"])-->L7ProtocolInfo-->id6(["加入到session聚合，等待请求/响应"]);
+
     L7ProtocolInfo-->id7(["L7ProtocolParser::reset()"]);
     id6-->id8(["长时间没有收到对应请求/响应"])-->id9(["直接发送到server，丢失对应请求/响应"]);
+
     id6-->id10(["收到对应的请求/响应"])-->id11(["L7ProtocolInfo::merge_log()"])-->id12(["L7ProtocolSendLog::from#60;L7protocolInfo#62;()"])-->L7ProtocolSendLog-->发送到server;
 ```
 
@@ -28,7 +37,7 @@ graph TB;
 在 deepflow-agent 中开发的大致步骤：
 1. 在 [l7_protocol.rs](../agent/crates/public/src/l7_protocol.rs) 添加对应协议名称和协议号。
 2. L7ProtocolParser::parse_payload() 需要返回 L7ProtocolInfo，所以需要先定义一个结构，实现 L7ProtocolInfoInterface 接口并且添加到 [l7_protocol_info.rs](../agent/src/common/l7_protocol_info.rs) L7ProtocolInfo 这个枚举。
-3. 实现 L7ProtocolParserInterface 接口，并添加到 [l7_protocol_log.rs](../agent/src/common/l7_protocol_log.rs) 中的 `all_protocol!` 宏。
+3. 实现 L7ProtocolParserInterface 接口，并添加到 [l7_protocol_log.rs](../agent/src/common/l7_protocol_log.rs) 中的 `impl_protocol_parser!` 宏。
 
 在 deepflow-server 中只需增加一个常量用于搜索提示即可。
 
@@ -54,6 +63,9 @@ pub enum L7Protocol {
 #[derive(Debug, Clone, Serialize)]
 pub struct PostgreInfo {
     // struct field define here
+
+    // 一般需要有一个响应时延的字段
+    rrt: u64
 }
 ```
 
@@ -66,10 +78,11 @@ impl L7ProtocolInfoInterface for PostgreInfo {
     }
 
     fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
+        // 这里的self必定是请求，other必定是响应
         if let L7ProtocolInfo::PostgreInfo(pg) = other {
-            // 请求/响应合并逻辑，目前返回错误没有任何作用
+            // 请求/响应合并逻辑，返回错误不会聚合请求和相应，请求/响应会分别单独上报
         }
-        return Ok(());
+        Ok(())
     }
 
     fn app_proto_head(&self) -> Option<AppProtoHead> {
@@ -78,19 +91,15 @@ impl L7ProtocolInfoInterface for PostgreInfo {
             // 标识 L7 协议类型，直接填上对应的协议类型
             proto: L7Protocol::Postgresql,
             // msg_type 表示请求类型还是响应类型，用于 Session 聚合判断请求/响应
+            // 一般情况下，这个字段根据direction字段(后面会说明)设置即可
             msg_type: LogMessageType::Response, // or LogMessageType::Request
-            // round trip time，不需要记录可以返回 0
+            // request response time，后面会说明如果计算
             rrt: 0,
         });
     }
 
     // 一般返回 false
     fn is_tls(&self) -> bool {
-        false
-    }
-
-    // 在发送到 deepflow-server 之前会调用，用于判断是否跳过发送，可以用于过滤空数据
-    fn skip_send(&self) -> bool {
         false
     }
 }
@@ -150,7 +159,7 @@ pub struct L7ProtocolSendLog {
     pub version: Option<String>,
     // 这个一般填 None
     pub trace_info: Option<TraceInfo>,
-    // 额外的拓展信息
+    // 额外的拓展信息，一般来说只有 request_id 需要设置
     pub ext_info: Option<ExtendedInfo>,
 }
 ```
@@ -160,7 +169,6 @@ pub struct L7ProtocolSendLog {
 all_protocol_info!(
     // ... other info
     PostgreInfo(PostgreInfo),
-    // ... other info
 );
 ```
 
@@ -169,15 +177,23 @@ all_protocol_info!(
 ```rust
 // 定义结构
 pub struct PostgresqlLog {
-    // check_payload 和 parse_payload 都用的同一个结构，如果 check_payload 已经能解析，
-    // 那么 parse_payload 可以直接返回结果，避免重复解析。
+    // 同一个流的解析会沿用同一个结构，如果 check_payload 已经能解析,那么 parse_payload 可以直接返回结果，避免重复解析
+    
+    // info: PostgreInfo,
+    // #[serde(skip)]
+
+    // 用于记录指标数据，后面会说明如何计算
+    // perf_stats: Option<L7PerfStats>,
+    // #[serde(skip)]
+
     // parsed: bool,
     // ...
 }
 
 impl L7ProtocolParserInterface for PostgresqlLog {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
-        // 协议判断，关于 ParseParam：
+        // 协议判断，这里的payload是应用层的数据
+        // 关于 ParseParam：
         /*
         pub struct ParseParam {
             // 网络层和传输层协议信息
@@ -186,6 +202,8 @@ impl L7ProtocolParserInterface for PostgresqlLog {
             pub ip_dst: IpAddr,
             pub port_src: u16,
             pub port_dst: u16,
+            // 流id 用于标识一个4层 tcp/udp 流
+            pub flow_id: u64,
 
             // 包方向，表示客户端请求还是服务端响应
             pub direction: PacketDirection,
@@ -224,6 +242,33 @@ impl L7ProtocolParserInterface for PostgresqlLog {
             // ...
         }
 
+        // 如果 perf_stats 是空，说明上一周期的指标已经输出，需要重新统计
+        if self.perf_stats.is_none() {
+            self.perf_stats = Some(L7PerfStats::default())
+        };
+
+        /*
+            这里需要根据 payload 解析出对应的日志info，一般来说，在return Ok(info)前，需要统计指标，例如：
+
+                match param.direction{
+                    PacketDirection::ClientToServer => self.perf_stats.unwrap().inc_req(),
+                    PacketDirection::ServerToClient => self.perf_stats.unwrap().inc_resp(),
+                }
+        
+            如果判断出是服务端或客户端出现错误，也需要执行:
+                // if client_error:
+                self.perf_stats.unwrap().inc_req_err();
+
+                // if server error
+                self.perf_stats.unwrap().inc_resp_err();
+
+            最后还需要计算对应的响应时延:
+                self.info.cal_rrt(param).map(|rrt| {
+                    self.info.rrt = rrt;
+                    self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+                });
+        */
+
     }
 
     // 返回对应协议
@@ -231,9 +276,10 @@ impl L7ProtocolParserInterface for PostgresqlLog {
         L7Protocol::Postgresql
     }
 
-    // 重置解析器，会在每次 parse_payload 后调用，然后用作下次解析。
+    // 重置解析器，会在每次 parse_payload 后调用。
     fn reset(&mut self) {
-        *self = Self::default();
+        self.info = PostgreInfo::default();
+        self.parsed = false;
     }
 
     // 当网络层协议是 udp 时是否解析，用于快速过滤
@@ -245,27 +291,27 @@ impl L7ProtocolParserInterface for PostgresqlLog {
     fn parsable_on_tcp(&self) -> bool {
         return true;
     }
+
+    // 输出指标信息
+    fn perf_stats(&mut self) -> Option<L7PerfStats> {
+        self.perf_stats.take()
+    }
 }
 ```
 
 ### 3.4. 添加解析器
 
-在 [l7_protocol_log.rs](../agent/src/common/l7_protocol_log.rs) 的 `all_protocol!` 宏添加新增解析器：
+在 [l7_protocol_log.rs](../agent/src/common/l7_protocol_log.rs) 的 `impl_protocol_parser!` 宏添加新增解析器：
 ```rust
-// 这里分为4部分：
-// Postgresql,PostgresParser,PostgresqlLog::default;
-//
-// 第1部分 Postgresql，是第一步 L7Protocol 枚举定义的名称。
-// 第2部分 PostgresParser，枚举名称，这个名称理论上不重复就可以。
-// 第3部分 PostgresqlLog，实现解析器接口的结构名称。
-// 第4部分 default，实现解析器接口的结构的创建函数，宏里面会拼接，例如这个例子会拼接成 PostgresqlLog::default()，不能有参数。
-//
 // 宏的顺序就是协议判断和解析的顺序，由于 HTTP 的普遍性和特殊性（存在 v1/v2 版本并且有 uprobe hook 点），HTTP 协议需要优先解析并且不作为宏参数。
-all_protocol!(
-    // other parser
-    Postgresql,PostgresParser,PostgresqlLog::default;
-    // other parser
-);
+impl_protocol_parser! {
+    pub enum L7ProtocolParser {
+        // other parser
+        // 这里的格式是 $协议名称(Box<$解析器>)
+        PostgreSQL(Box<PostgresqlLog>),
+        // other parser
+    }
+}
 ```
 
 ## 4. deepflow-server 中添加协议常量和名称（可选）
