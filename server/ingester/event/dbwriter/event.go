@@ -17,6 +17,8 @@
 package dbwriter
 
 import (
+	"net"
+
 	basecommon "github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
@@ -25,10 +27,16 @@ import (
 
 const (
 	DefaultPartition    = ckdb.TimeFuncTwelveHour
-	EVENT_TYPE_RESOURCE = "Resource"
-	EVENT_TYPE_IO       = "IO"
 	IO_EVENT_TYPE_READ  = "read"
 	IO_EVENT_TYPE_WRITE = "write"
+)
+
+type SignalSource uint8
+
+const (
+	SIGNAL_SOURCE_UNKNOWN SignalSource = iota
+	SIGNAL_SOURCE_RESOURCE
+	SIGNAL_SOURCE_IO
 )
 
 type EventStore struct {
@@ -39,8 +47,8 @@ type EventStore struct {
 
 	Tagged uint8
 
-	EventType        string // Resource / File IO
-	EventSubType     string
+	SignalSource     uint8 // Resource / File IO
+	EventType        string
 	EventDescription string
 
 	GProcessID uint32
@@ -58,6 +66,10 @@ type EventStore struct {
 	L3DeviceID   uint32
 	ServiceID    uint32
 	VTAPID       uint16
+	SubnetID     uint16
+	IsIPv4       bool
+	IP4          uint32
+	IP6          net.IP
 
 	AutoInstanceID   uint32
 	AutoInstanceType uint8
@@ -69,10 +81,9 @@ type EventStore struct {
 	AttributeNames  []string
 	AttributeValues []string
 
-	Bytes    uint32
-	Duration uint64
-
-	fields, fieldValues []interface{}
+	HasMetrics bool
+	Bytes      uint32
+	Duration   uint64
 }
 
 func (e *EventStore) WriteBlock(block *ckdb.Block) {
@@ -83,8 +94,8 @@ func (e *EventStore) WriteBlock(block *ckdb.Block) {
 
 		e.Tagged,
 
+		e.SignalSource,
 		e.EventType,
-		e.EventSubType,
 		e.EventDescription,
 
 		e.GProcessID,
@@ -102,7 +113,12 @@ func (e *EventStore) WriteBlock(block *ckdb.Block) {
 		e.L3DeviceID,
 		e.ServiceID,
 		e.VTAPID,
+		e.SubnetID)
+	block.WriteBool(e.IsIPv4)
+	block.WriteIPv4(e.IP4)
+	block.WriteIPv6(e.IP6)
 
+	block.Write(
 		e.AutoInstanceID,
 		e.AutoInstanceType,
 		e.AutoServiceID,
@@ -111,26 +127,30 @@ func (e *EventStore) WriteBlock(block *ckdb.Block) {
 
 		e.AttributeNames,
 		e.AttributeValues,
-
-		e.Bytes,
-		e.Duration,
 	)
+
+	if e.HasMetrics {
+		block.Write(
+			e.Bytes,
+			e.Duration,
+		)
+	}
 }
 
 func (e *EventStore) Release() {
 	ReleaseEventStore(e)
 }
 
-func EventColumns() []*ckdb.Column {
-	return []*ckdb.Column{
+func EventColumns(hasMetrics bool) []*ckdb.Column {
+	columns := []*ckdb.Column{
 		ckdb.NewColumn("time", ckdb.DateTime),
 		ckdb.NewColumn("start_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
 		ckdb.NewColumn("end_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
 
 		ckdb.NewColumn("tagged", ckdb.UInt8).SetComment("标签是否为填充, 用于调试"),
 
+		ckdb.NewColumn("signal_source", ckdb.UInt8).SetComment("事件来源"),
 		ckdb.NewColumn("event_type", ckdb.LowCardinalityString).SetComment("事件类型"),
-		ckdb.NewColumn("event_subtype", ckdb.LowCardinalityString).SetComment("事件子类型"), // resource, read, write
 		ckdb.NewColumn("event_desc", ckdb.String).SetComment("事件信息"),
 
 		ckdb.NewColumn("gprocess_id", ckdb.UInt32).SetComment("全局进程ID"),
@@ -149,6 +169,10 @@ func EventColumns() []*ckdb.Column {
 		ckdb.NewColumn("l3_device_id", ckdb.UInt32).SetComment("资源ID"),
 		ckdb.NewColumn("service_id", ckdb.UInt32).SetComment("服务ID"),
 		ckdb.NewColumn("vtap_id", ckdb.UInt16).SetComment("采集器ID"),
+		ckdb.NewColumn("subnet_id", ckdb.UInt16),
+		ckdb.NewColumn("is_ipv4", ckdb.UInt8),
+		ckdb.NewColumn("ip4", ckdb.IPv4),
+		ckdb.NewColumn("ip6", ckdb.IPv6),
 
 		ckdb.NewColumn("auto_instance_id", ckdb.UInt32),
 		ckdb.NewColumn("auto_instance_type", ckdb.UInt8),
@@ -158,23 +182,31 @@ func EventColumns() []*ckdb.Column {
 
 		ckdb.NewColumn("attribute_names", ckdb.ArrayString).SetComment("额外的属性"),
 		ckdb.NewColumn("attribute_values", ckdb.ArrayString).SetComment("额外的属性对应的值"),
-
-		ckdb.NewColumn("bytes", ckdb.UInt32),
-		ckdb.NewColumn("duration", ckdb.UInt64).SetComment("精度: 微秒"),
 	}
+	if hasMetrics {
+		columns = append(columns,
+			ckdb.NewColumn("bytes", ckdb.UInt32),
+			ckdb.NewColumn("duration", ckdb.UInt64).SetComment("精度: 微秒"),
+		)
+	}
+	return columns
 }
 
-func GenEventCKTable(cluster, storagePolicy string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
+func GenEventCKTable(cluster, storagePolicy, table string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
 	timeKey := "time"
 	engine := ckdb.MergeTree
-	orderKeys := []string{"event_type", "event_subtype", "l3_epc_id", "l3_device_type", "l3_device_id"}
+	orderKeys := []string{"signal_source", "event_type", "l3_epc_id", "l3_device_type", "l3_device_id"}
+	hasMetrics := false
+	if table == PERF_EVENT_TABLE {
+		hasMetrics = true
+	}
 
 	return &ckdb.Table{
 		Version:         basecommon.CK_VERSION,
 		Database:        EVENT_DB,
-		LocalName:       EVENT_TABLE + ckdb.LOCAL_SUBFFIX,
-		GlobalName:      EVENT_TABLE,
-		Columns:         EventColumns(),
+		LocalName:       table + ckdb.LOCAL_SUBFFIX,
+		GlobalName:      table,
+		Columns:         EventColumns(hasMetrics),
 		TimeKey:         timeKey,
 		TTL:             ttl,
 		PartitionFunc:   DefaultPartition,
@@ -243,8 +275,6 @@ var eventPool = pool.NewLockFreePool(func() interface{} {
 	return &EventStore{
 		AttributeNames:  []string{},
 		AttributeValues: []string{},
-		fields:          []interface{}{},
-		fieldValues:     []interface{}{},
 	}
 })
 
@@ -258,13 +288,9 @@ func ReleaseEventStore(e *EventStore) {
 	}
 	attributeNames := e.AttributeNames[:0]
 	attributeValues := e.AttributeValues[:0]
-	fields := e.fields[:0]
-	fieldValues := e.fieldValues[:0]
 	*e = EventStore{}
 	e.AttributeNames = attributeNames
 	e.AttributeValues = attributeValues
-	e.fields = fields
-	e.fieldValues = fieldValues
 
 	eventPool.Put(e)
 }

@@ -36,14 +36,10 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/receiver"
 )
 
-const (
-	RESOURCE_EVENT_TAG_WRITE_INDEX = 100
-)
-
 type Event struct {
 	Config          *config.Config
 	ResourceEventor *Eventor
-	ProcEventor     *Eventor
+	PerfEventor     *Eventor
 }
 
 type Eventor struct {
@@ -58,19 +54,20 @@ func NewEvent(config *config.Config, resourceEventQueue *queue.OverwriteQueue, r
 	if err != nil {
 		return nil, err
 	}
-	procEventor, err := NewEventor(config, recv, manager, platformDataManager)
+
+	perfEventor, err := NewEventor(config, recv, manager, platformDataManager)
 	if err != nil {
 		return nil, err
 	}
 	return &Event{
 		Config:          config,
 		ResourceEventor: resourceEventor,
-		ProcEventor:     procEventor,
+		PerfEventor:     perfEventor,
 	}, nil
 }
 
 func NewResouceEventor(eventQueue *queue.OverwriteQueue, eventType common.EventType, config *config.Config) (*Eventor, error) {
-	eventWriter, err := dbwriter.NewEventWriter(RESOURCE_EVENT_TAG_WRITE_INDEX, config)
+	eventWriter, err := dbwriter.NewEventWriter(dbwriter.EVENT_TABLE, 0, config)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +99,7 @@ func NewEventor(config *config.Config, recv *receiver.Receiver, manager *droplet
 	decoders := make([]*decoder.Decoder, queueCount)
 	platformDatas := make([]*grpc.PlatformInfoTable, queueCount)
 	for i := 0; i < queueCount; i++ {
-		eventWriter, err := dbwriter.NewEventWriter(i, config)
+		eventWriter, err := dbwriter.NewEventWriter(dbwriter.PERF_EVENT_TABLE, i, config)
 		if err != nil {
 			return nil, err
 		}
@@ -145,11 +142,11 @@ func (e *Eventor) Close() {
 
 func (e *Event) Start() {
 	e.ResourceEventor.Start()
-	e.ProcEventor.Start()
+	e.PerfEventor.Start()
 }
 
 func (e *Event) Close() error {
 	e.ResourceEventor.Start()
-	e.ProcEventor.Close()
+	e.PerfEventor.Close()
 	return nil
 }
