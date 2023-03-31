@@ -776,7 +776,7 @@ var TableRenames626 = []*TableRename{
 		OldDb:     "event",
 		OldTables: []string{"event", "event_local"},
 		NewDb:     "event",
-		NewTables: []string{"event_v624", "event_local_v624"},
+		NewTables: []string{"event_v625", "event_local_v625"},
 	},
 }
 
@@ -1166,7 +1166,7 @@ func (i *Issu) RunRenameTable(ds *datasource.DatasourceManager) error {
 		if err != nil {
 			return err
 		}
-		if strings.Compare(oldVersion, "v6.2.5.2") >= 0 || oldVersion == "" {
+		if strings.Compare(oldVersion, "v6.2.6.2") >= 0 || oldVersion == "" {
 			continue
 		}
 		for _, tableRename := range i.tableRenames {
