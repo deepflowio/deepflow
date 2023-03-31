@@ -60,6 +60,7 @@ type ToolDataSet struct {
 	vinterfaceLcuuidToNetworkID  map[string]int
 	vinterfaceLcuuidToDeviceType map[string]int
 	vinterfaceLcuuidToDeviceID   map[string]int
+	vinterfaceLcuuidToMac        map[string]string
 
 	hostIDToVinterfaceIndexes          map[int][]int
 	vmIDToVinterfaceIndexes            map[int][]int
@@ -137,6 +138,7 @@ func NewToolDataSet() ToolDataSet {
 		vinterfaceLcuuidToNetworkID:  make(map[string]int),
 		vinterfaceLcuuidToDeviceType: make(map[string]int),
 		vinterfaceLcuuidToDeviceID:   make(map[string]int),
+		vinterfaceLcuuidToMac:        make(map[string]string),
 
 		hostIDToVinterfaceIndexes:          make(map[int][]int),
 		vmIDToVinterfaceIndexes:            make(map[int][]int),
@@ -447,6 +449,7 @@ func (t *ToolDataSet) addVInterface(item *mysql.VInterface) {
 	t.vinterfaceLcuuidToNetworkID[item.Lcuuid] = item.NetworkID
 	t.vinterfaceLcuuidToDeviceType[item.Lcuuid] = item.DeviceType
 	t.vinterfaceLcuuidToDeviceID[item.Lcuuid] = item.DeviceID
+	t.vinterfaceLcuuidToMac[item.Lcuuid] = item.Mac
 	t.vinterfaceLcuuidToIndex[item.Lcuuid] = item.Index
 	t.vinterfaceLcuuidToType[item.Lcuuid] = item.Type
 
@@ -510,6 +513,7 @@ func (t *ToolDataSet) deleteVInterface(lcuuid string) {
 	delete(t.vinterfaceLcuuidToNetworkID, lcuuid)
 	delete(t.vinterfaceLcuuidToDeviceType, lcuuid)
 	delete(t.vinterfaceLcuuidToDeviceID, lcuuid)
+	delete(t.vinterfaceLcuuidToMac, lcuuid)
 	delete(t.vinterfaceLcuuidToIndex, lcuuid)
 	delete(t.vinterfaceLcuuidToType, lcuuid)
 	log.Info(deleteFromToolMap(RESOURCE_TYPE_VINTERFACE_EN, lcuuid))
@@ -521,8 +525,9 @@ func (t *ToolDataSet) addWANIP(item *mysql.WANIP) {
 	vifLcuuid, _ := t.GetVInterfaceLcuuidByID(item.VInterfaceID)
 	deviceType, _ := t.GetDeviceTypeByVInterfaceLcuuid(vifLcuuid)
 	deviceID, _ := t.GetDeviceIDByVInterfaceLcuuid(vifLcuuid)
+	mac, _ := t.GetMacByVInterfaceLcuuid(vifLcuuid)
 	networkID, _ := t.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
-	t.setDeviceToIPNetworkMap(deviceType, deviceID, networkID, IPKey{IP: item.IP, Lcuuid: item.Lcuuid})
+	t.setDeviceToIPNetworkMap(deviceType, deviceID, networkID, IPKey{IP: item.IP, Mac: mac, Lcuuid: item.Lcuuid})
 	log.Info(addToToolMap(RESOURCE_TYPE_WAN_IP_EN, item.Lcuuid))
 }
 
@@ -531,9 +536,10 @@ func (t *ToolDataSet) deleteWANIP(lcuuid string) {
 	vifLcuuid, _ := t.GetVInterfaceLcuuidByID(vifID)
 	deviceType, _ := t.GetDeviceTypeByVInterfaceLcuuid(vifLcuuid)
 	deviceID, _ := t.GetDeviceIDByVInterfaceLcuuid(vifLcuuid)
+	mac, _ := t.GetMacByVInterfaceLcuuid(vifLcuuid)
 	networkID, _ := t.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
 	ip, _ := t.GetWANIPByLcuuid(lcuuid)
-	t.deleteDeviceToIPNetworkMapIP(deviceType, deviceID, networkID, IPKey{IP: ip, Lcuuid: lcuuid})
+	t.deleteDeviceToIPNetworkMapIP(deviceType, deviceID, networkID, IPKey{IP: ip, Mac: mac, Lcuuid: lcuuid})
 	delete(t.wanIPLcuuidToVInterfaceID, lcuuid)
 	delete(t.wanIPLcuuidToIP, lcuuid)
 	log.Info(deleteFromToolMap(RESOURCE_TYPE_WAN_IP_EN, lcuuid))
@@ -544,9 +550,10 @@ func (t *ToolDataSet) addLANIP(item *mysql.LANIP) {
 	t.lanIPLcuuidToIP[item.Lcuuid] = item.IP
 	vifLcuuid, _ := t.GetVInterfaceLcuuidByID(item.VInterfaceID)
 	deviceType, _ := t.GetDeviceTypeByVInterfaceLcuuid(vifLcuuid)
+	mac, _ := t.GetMacByVInterfaceLcuuid(vifLcuuid)
 	deviceID, _ := t.GetDeviceIDByVInterfaceLcuuid(vifLcuuid)
 	networkID, _ := t.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
-	t.setDeviceToIPNetworkMap(deviceType, deviceID, networkID, IPKey{IP: item.IP, Lcuuid: item.Lcuuid})
+	t.setDeviceToIPNetworkMap(deviceType, deviceID, networkID, IPKey{IP: item.IP, Mac: mac, Lcuuid: item.Lcuuid})
 	log.Info(addToToolMap(RESOURCE_TYPE_LAN_IP_EN, item.Lcuuid))
 }
 
@@ -555,9 +562,10 @@ func (t *ToolDataSet) deleteLANIP(lcuuid string) {
 	vifLcuuid, _ := t.GetVInterfaceLcuuidByID(vifID)
 	deviceType, _ := t.GetDeviceTypeByVInterfaceLcuuid(vifLcuuid)
 	deviceID, _ := t.GetDeviceIDByVInterfaceLcuuid(vifLcuuid)
+	mac, _ := t.GetMacByVInterfaceLcuuid(vifLcuuid)
 	networkID, _ := t.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
 	ip, _ := t.GetLANIPByLcuuid(lcuuid)
-	t.deleteDeviceToIPNetworkMapIP(deviceType, deviceID, networkID, IPKey{IP: ip, Lcuuid: lcuuid})
+	t.deleteDeviceToIPNetworkMapIP(deviceType, deviceID, networkID, IPKey{IP: ip, Mac: mac, Lcuuid: lcuuid})
 	delete(t.lanIPLcuuidToVInterfaceID, lcuuid)
 	delete(t.lanIPLcuuidToIP, lcuuid)
 	log.Info(deleteFromToolMap(RESOURCE_TYPE_LAN_IP_EN, lcuuid))
@@ -1203,6 +1211,23 @@ func (t *ToolDataSet) GetDeviceIDByVInterfaceLcuuid(vifLcuuid string) (int, bool
 	} else {
 		log.Error(dbResourceByLcuuidNotFound(RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid))
 		return id, false
+	}
+}
+
+func (t *ToolDataSet) GetMacByVInterfaceLcuuid(vifLcuuid string) (string, bool) {
+	mac, exists := t.vinterfaceLcuuidToMac[vifLcuuid]
+	if exists {
+		return mac, true
+	}
+	log.Warningf("cache mac (%s lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+	var vif mysql.VInterface
+	result := mysql.Db.Where("lcuuid = ?", vifLcuuid).Find(&vif)
+	if result.RowsAffected == 1 {
+		t.addVInterface(&vif)
+		return vif.Mac, true
+	} else {
+		log.Error(dbResourceByLcuuidNotFound(RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid))
+		return "", false
 	}
 }
 

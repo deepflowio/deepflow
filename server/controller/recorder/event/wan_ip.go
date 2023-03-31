@@ -48,6 +48,7 @@ func (i *WANIP) ProduceByAdd(items []*mysql.WANIP) { // TODO 同 lan ip 合并 c
 		var (
 			deviceType        int
 			deviceID          int
+			mac               string
 			deviceName        string
 			networkID         int
 			networkName       string
@@ -65,6 +66,10 @@ func (i *WANIP) ProduceByAdd(items []*mysql.WANIP) { // TODO 同 lan ip 合并 c
 			deviceID, ok = i.ToolDataSet.GetDeviceIDByVInterfaceLcuuid(vifLcuuid)
 			if !ok {
 				log.Errorf("device id for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+			}
+			mac, ok = i.ToolDataSet.GetMacByVInterfaceLcuuid(vifLcuuid)
+			if !ok {
+				log.Errorf("mac for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 			}
 			deviceName, err = i.ToolDataSet.GetDeviceNameByDeviceID(deviceType, deviceID)
 			if err != nil {
@@ -85,8 +90,9 @@ func (i *WANIP) ProduceByAdd(items []*mysql.WANIP) { // TODO 同 lan ip 合并 c
 		} else {
 			log.Errorf("%s lcuuid (id: %d) for %s not found", RESOURCE_TYPE_VINTERFACE_EN, item.VInterfaceID, RESOURCE_TYPE_WAN_IP_EN)
 		}
+
 		opts = append(opts, []eventapi.TagFieldOption{
-			eventapi.TagDescription(fmt.Sprintf(DESCAddIPFormat, deviceName, item.IP, networkName)),
+			eventapi.TagDescription(fmt.Sprintf(DESCAddIPFormat, deviceName, item.IP, mac, networkName)),
 			eventapi.TagAttributeSubnetIDs([]uint32{uint32(networkID)}),
 			eventapi.TagAttributeIPs([]string{item.IP}),
 			eventapi.TagSubnetID(uint32(networkID)),
@@ -157,6 +163,7 @@ func (i *WANIP) ProduceByDelete(lcuuids []string) {
 		var (
 			deviceType  int
 			deviceID    int
+			mac         string
 			deviceName  string
 			networkID   int
 			networkName string
@@ -173,6 +180,10 @@ func (i *WANIP) ProduceByDelete(lcuuids []string) {
 				deviceID, ok = i.ToolDataSet.GetDeviceIDByVInterfaceLcuuid(vifLcuuid)
 				if !ok {
 					log.Errorf("device id for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+				}
+				mac, ok = i.ToolDataSet.GetMacByVInterfaceLcuuid(vifLcuuid)
+				if !ok {
+					log.Errorf("mac for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 				}
 				deviceName, err = i.ToolDataSet.GetDeviceNameByDeviceID(deviceType, deviceID)
 				if err != nil {
@@ -206,7 +217,7 @@ func (i *WANIP) ProduceByDelete(lcuuids []string) {
 			deviceName,
 			deviceType,
 			deviceID,
-			eventapi.TagDescription(fmt.Sprintf(DESCRemoveIPFormat, deviceName, ip, networkName)),
+			eventapi.TagDescription(fmt.Sprintf(DESCRemoveIPFormat, deviceName, ip, mac, networkName)),
 			eventapi.TagAttributeSubnetIDs([]uint32{uint32(networkID)}),
 			eventapi.TagAttributeIPs([]string{ip}),
 			eventapi.TagSubnetID(uint32(networkID)),
