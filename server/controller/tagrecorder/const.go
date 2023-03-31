@@ -323,24 +323,24 @@ const (
 		"LAYOUT(FLAT())"
 	CREATE_K8S_LABEL_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
-		"    `pod_id` UInt64,\n" +
+		"    `id` UInt64,\n" +
 		"    `key` String,\n" +
 		"    `value` String,\n" +
 		"    `l3_epc_id` UInt64,\n" +
 		"    `pod_ns_id` UInt64\n" +
 		")\n" +
-		"PRIMARY KEY pod_id, key\n" +
+		"PRIMARY KEY id, key\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(COMPLEX_KEY_HASHED())"
 	CREATE_K8S_LABELS_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
-		"    `pod_id` UInt64,\n" +
+		"    `id` UInt64,\n" +
 		"    `labels` String,\n" +
 		"    `l3_epc_id` UInt64,\n" +
 		"    `pod_ns_id` UInt64\n" +
 		")\n" +
-		"PRIMARY KEY pod_id\n" +
+		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(FLAT())"
