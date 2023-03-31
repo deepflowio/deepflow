@@ -62,10 +62,10 @@ func (k *ChPodServiceK8sLabels) generateNewData() (map[K8sLabelsKey]mysql.ChPodS
 				return nil, false
 			}
 			key := K8sLabelsKey{
-				PodID: podService.ID,
+				ID: podService.ID,
 			}
 			keyToItem[key] = mysql.ChPodServiceK8sLabels{
-				PodID:   podService.ID,
+				ID:      podService.ID,
 				Labels:  string(labelsStr),
 				L3EPCID: podService.VPCID,
 				PodNsID: podService.PodNamespaceID,
@@ -76,7 +76,7 @@ func (k *ChPodServiceK8sLabels) generateNewData() (map[K8sLabelsKey]mysql.ChPodS
 }
 
 func (k *ChPodServiceK8sLabels) generateKey(dbItem mysql.ChPodServiceK8sLabels) K8sLabelsKey {
-	return K8sLabelsKey{PodID: dbItem.PodID}
+	return K8sLabelsKey{ID: dbItem.ID}
 }
 
 func (k *ChPodServiceK8sLabels) generateUpdateInfo(oldItem, newItem mysql.ChPodServiceK8sLabels) (map[string]interface{}, bool) {
