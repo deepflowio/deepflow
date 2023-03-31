@@ -33,7 +33,7 @@ use arc_swap::{
     access::{Access, Map},
     ArcSwap,
 };
-use log::{debug, warn};
+use log::{debug, error, warn};
 
 use super::{
     app_table::AppTable,
@@ -70,9 +70,11 @@ use crate::{
         handler::{L7LogDynamicConfig, LogParserAccess, LogParserConfig},
         FlowAccess, FlowConfig, ModuleConfig, RuntimeConfig,
     },
+    plugin::wasm::{init_wasmtime, WasmVm},
     policy::{Policy, PolicyGetter},
     rpc::get_timestamp,
     utils::stats::{self, Countable, StatsOption},
+    wasm_error,
 };
 use public::{
     counter::{Counter, CounterType, CounterValue, RefCountable},
@@ -84,7 +86,6 @@ use public::{
 };
 
 use packet_sequence_block::PacketSequenceBlock;
-
 // not thread-safe
 pub struct FlowMap {
     node_map: Option<HashMap<FlowMapKey, Vec<Box<FlowNode>>>>,
@@ -121,6 +122,8 @@ pub struct FlowMap {
     l7_protocol_checker: L7ProtocolChecker,
 
     time_key_buffer: Option<Vec<(u64, FlowMapKey)>>,
+
+    wasm_vm: Option<Rc<RefCell<WasmVm>>>,
 }
 
 impl FlowMap {
@@ -213,6 +216,19 @@ impl FlowMap {
                     .collect(),
             ),
             time_key_buffer: None,
+            wasm_vm: {
+                if config_guard.wasm_plugins.is_empty() {
+                    None
+                } else {
+                    let mut vm = init_wasmtime(vec![]);
+                    for (name, data) in config_guard.wasm_plugins.iter() {
+                        if let Err(err) = vm.append_prog(name.as_str(), data.as_slice()) {
+                            wasm_error!(name, "add wasm prog fail: {}", err);
+                        }
+                    }
+                    Some(Rc::new(RefCell::new(vm)))
+                }
+            },
         }
     }
 
@@ -987,6 +1003,7 @@ impl FlowMap {
                 from_app_tab,
                 self.flow_perf_counter.clone(),
                 port,
+                self.wasm_vm.as_ref().map(|w| w.clone()),
             )
             .map(|o| Box::new(o));
         }

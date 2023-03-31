@@ -19,12 +19,15 @@ use enum_dispatch::enum_dispatch;
 use log::{debug, error};
 use serde::Serialize;
 
-use crate::flow_generator::{
-    protocol_logs::{
-        pb_adapter::L7ProtocolSendLog, DnsInfo, DubboInfo, HttpInfo, KafkaInfo, MqttInfo,
-        MysqlInfo, PostgreInfo, ProtobufRpcInfo, RedisInfo, SofaRpcInfo,
+use crate::{
+    flow_generator::{
+        protocol_logs::{
+            pb_adapter::L7ProtocolSendLog, DnsInfo, DubboInfo, HttpInfo, KafkaInfo, MqttInfo,
+            MysqlInfo, PostgreInfo, ProtobufRpcInfo, RedisInfo, SofaRpcInfo,
+        },
+        AppProtoHead, LogMessageType, Result,
     },
-    AppProtoHead, LogMessageType, Result,
+    plugin::CustomInfo,
 };
 
 use super::{ebpf::EbpfType, l7_protocol_log::ParseParam};
@@ -63,6 +66,7 @@ all_protocol_info!(
     PostgreInfo(PostgreInfo),
     ProtobufRpcInfo(ProtobufRpcInfo),
     SofaRpcInfo(SofaRpcInfo),
+    CustomInfo(CustomInfo),
     // add new protocol info below
 );
 
