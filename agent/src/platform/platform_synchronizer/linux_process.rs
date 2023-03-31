@@ -41,8 +41,7 @@ use crate::config::{
 };
 #[derive(Debug, Clone)]
 pub struct ProcessData {
-    pub name: String,     // the replaced name
-    pub raw_name: String, // the name before replace
+    pub name: String, // the replaced name
     pub pid: u64,
     pub ppid: u64,
     pub process_name: String, // raw process name
@@ -108,14 +107,20 @@ impl TryFrom<&Process> for ProcessData {
     type Error = ProcError;
     // will not set the username
     fn try_from(proc: &Process) -> Result<Self, Self::Error> {
-        let (exe, cmd, uid) = (proc.exe()?, proc.cmdline()?, proc.uid()?);
-        let Some(proc_name) = exe.file_name() else {
-            return Err(ProcError::Other(format!("pid {} get process name fail", proc.pid).to_string()));
+        let (cmd, uid) = (proc.cmdline()?, proc.uid()?);
+        let proc_name = if cmd.len() == 0 {
+            return Err(ProcError::Other(format!("pid {} cmd is nil", proc.pid)));
+        } else {
+            let buf = PathBuf::from(&cmd[0]);
+            if let Some(f) = buf.file_name() {
+                f.to_string_lossy().to_string()
+            } else {
+                return Err(ProcError::Other(format!("pid {} cmd parse fail", proc.pid)));
+            }
         };
 
         Ok(ProcessData {
-            name: proc_name.to_string_lossy().to_string(),
-            raw_name: proc_name.to_string_lossy().to_string(),
+            name: proc_name.clone(),
             pid: proc.pid as u64,
             ppid: if let Ok(stat) = proc.stat().as_ref() {
                 stat.ppid as u64
@@ -123,7 +128,7 @@ impl TryFrom<&Process> for ProcessData {
                 error!("pid {} get stat fail", proc.pid);
                 0
             },
-            process_name: proc_name.to_string_lossy().to_string(),
+            process_name: proc_name,
             cmd,
             user_id: uid,
             user: "".to_string(),
@@ -290,7 +295,7 @@ impl ProcRegRewrite {
                         error!("pid {} have no parent proc with ppid: {}", proc.pid,proc.ppid);
                         return false;
                     };
-                    if reg.is_match(&parent_proc.raw_name.as_str()) {
+                    if reg.is_match(&parent_proc.process_name.as_str()) {
                         return true;
                     }
                     // recursive match along the parent.
@@ -568,7 +573,6 @@ mod test {
             let mut procs = vec![
                 ProcessData {
                     name: "root".into(),
-                    raw_name: "root".into(),
                     pid: 999,
                     ppid: 0,
                     process_name: "root".into(),
@@ -583,7 +587,6 @@ mod test {
                 },
                 ProcessData {
                     name: "parent".into(),
-                    raw_name: "parent".into(),
                     pid: 99,
                     ppid: 999,
                     process_name: "parent".into(),
@@ -598,7 +601,6 @@ mod test {
                 },
                 ProcessData {
                     name: "child".into(),
-                    raw_name: "child".into(),
                     pid: 9999,
                     ppid: 99,
                     process_name: "child".into(),
@@ -613,7 +615,6 @@ mod test {
                 },
                 ProcessData {
                     name: "other".into(),
-                    raw_name: "other".into(),
                     pid: 777,
                     ppid: 98,
                     process_name: "other".into(),
