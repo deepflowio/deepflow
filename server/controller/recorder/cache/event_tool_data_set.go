@@ -63,6 +63,7 @@ type EventToolDataSet struct {
 
 type IPKey struct {
 	IP     string
+	Mac    string
 	Lcuuid string
 }
 
