@@ -259,6 +259,16 @@ func (m *U128LRU) Add(key0, key1 uint64, value interface{}) {
 	m.newNode(key0, key1, value, slot)
 }
 
+func (m *U128LRU) AddOrGet(key0, key1 uint64, value interface{}) *interface{} {
+	node, slot := m.find(key0, key1, true)
+	if node != nil {
+		m.updateNode(node, node.value) // do not change value
+		return &node.value
+	}
+	m.newNode(key0, key1, value, slot)
+	return nil
+}
+
 func (m *U128LRU) Remove(key0, key1 uint64) {
 	for node := m.hashSlotHead[m.compressHash(key0, key1)]; node != nil; node = node.hashListNext {
 		if node.key0 == key0 && node.key1 == key1 {

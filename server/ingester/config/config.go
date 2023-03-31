@@ -35,25 +35,26 @@ import (
 var log = logging.MustGetLogger("config")
 
 const (
-	DefaultContrallerIP             = "127.0.0.1"
-	DefaultControllerPort           = 20035
-	DefaultCheckInterval            = 600 // clickhouse是异步删除
-	DefaultDiskUsedPercent          = 90
-	DefaultDiskFreeSpace            = 50
-	DefaultDFDiskPrefix             = "path_" // In the config.xml of ClickHouse, the disk name of the storage policy 'df_storage' written by deepflow-server starts with 'path_'
-	EnvK8sNodeIP                    = "K8S_NODE_IP_FOR_DEEPFLOW"
-	EnvK8sPodName                   = "K8S_POD_NAME_FOR_DEEPFLOW"
-	EnvK8sNodeName                  = "K8S_NODE_NAME_FOR_DEEPFLOW"
-	EnvK8sNamespace                 = "K8S_NAMESPACE_FOR_DEEPFLOW"
-	DefaultCKDBService              = "deepflow-clickhouse"
-	DefaultCKDBServicePort          = 9000
-	DefaultListenPort               = 20033
-	DefaultGrpcBufferSize           = 41943040
-	DefaultServiceLabelerLruCap     = 1 << 22
-	DefaultCKDBEndpointTCPPortName  = "tcp-port"
-	DefaultStatsInterval            = 10      // s
-	DefaultFlowTagCacheFlushTimeout = 1800    // s
-	DefaultFlowTagCacheMaxSize      = 1 << 18 // 256k
+	DefaultContrallerIP                 = "127.0.0.1"
+	DefaultControllerPort               = 20035
+	DefaultCheckInterval                = 600 // clickhouse是异步删除
+	DefaultDiskUsedPercent              = 90
+	DefaultDiskFreeSpace                = 50
+	DefaultDFDiskPrefix                 = "path_" // In the config.xml of ClickHouse, the disk name of the storage policy 'df_storage' written by deepflow-server starts with 'path_'
+	EnvK8sNodeIP                        = "K8S_NODE_IP_FOR_DEEPFLOW"
+	EnvK8sPodName                       = "K8S_POD_NAME_FOR_DEEPFLOW"
+	EnvK8sNodeName                      = "K8S_NODE_NAME_FOR_DEEPFLOW"
+	EnvK8sNamespace                     = "K8S_NAMESPACE_FOR_DEEPFLOW"
+	DefaultCKDBService                  = "deepflow-clickhouse"
+	DefaultCKDBServicePort              = 9000
+	DefaultListenPort                   = 20033
+	DefaultGrpcBufferSize               = 41943040
+	DefaultServiceLabelerLruCap         = 1 << 22
+	DefaultCKDBEndpointTCPPortName      = "tcp-port"
+	DefaultStatsInterval                = 10      // s
+	DefaultFlowTagCacheFlushTimeout     = 1800    // s
+	DefaultFlowTagCacheMaxSize          = 1 << 18 // 256k
+	DefaultExtMetricsSeriesCacheMaxSize = 1 << 20 // 1m
 )
 
 type DatabaseTable struct {
@@ -115,29 +116,30 @@ type CKDB struct {
 }
 
 type Config struct {
-	ListenPort               uint16          `yaml:"listen-port"`
-	CKDB                     CKDB            `yaml:"ckdb"`
-	ControllerIPs            []string        `yaml:"controller-ips,flow"`
-	ControllerPort           uint16          `yaml:"controller-port"`
-	CKDBAuth                 Auth            `yaml:"ckdb-auth"`
-	IngesterEnabled          bool            `yaml:"ingester-enabled"`
-	UDPReadBuffer            int             `yaml:"udp-read-buffer"`
-	TCPReadBuffer            int             `yaml:"tcp-read-buffer"`
-	TCPReaderBuffer          int             `yaml:"tcp-reader-buffer"`
-	Profiler                 bool            `yaml:"profiler"`
-	MaxCPUs                  int             `yaml:"max-cpus"`
-	CKDiskMonitor            CKDiskMonitor   `yaml:"ck-disk-monitor"`
-	ColdStorage              CKDBColdStorage `yaml:"ckdb-cold-storage"`
-	ckdbColdStorages         map[string]*ckdb.ColdStorage
-	NodeIP                   string `yaml:"node-ip"`
-	GrpcBufferSize           int    `yaml:"grpc-buffer-size"`
-	ServiceLabelerLruCap     int    `yaml:"service-labeler-lru-cap"`
-	StatsInterval            int    `yaml:"stats-interval"`
-	FlowTagCacheFlushTimeout uint32 `yaml:"flow-tag-cache-flush-timeout"`
-	FlowTagCacheMaxSize      uint32 `yaml:"flow-tag-cache-max-size"`
-	LogFile                  string
-	LogLevel                 string
-	MyNodeName               string
+	ListenPort                   uint16          `yaml:"listen-port"`
+	CKDB                         CKDB            `yaml:"ckdb"`
+	ControllerIPs                []string        `yaml:"controller-ips,flow"`
+	ControllerPort               uint16          `yaml:"controller-port"`
+	CKDBAuth                     Auth            `yaml:"ckdb-auth"`
+	IngesterEnabled              bool            `yaml:"ingester-enabled"`
+	UDPReadBuffer                int             `yaml:"udp-read-buffer"`
+	TCPReadBuffer                int             `yaml:"tcp-read-buffer"`
+	TCPReaderBuffer              int             `yaml:"tcp-reader-buffer"`
+	Profiler                     bool            `yaml:"profiler"`
+	MaxCPUs                      int             `yaml:"max-cpus"`
+	CKDiskMonitor                CKDiskMonitor   `yaml:"ck-disk-monitor"`
+	ColdStorage                  CKDBColdStorage `yaml:"ckdb-cold-storage"`
+	ckdbColdStorages             map[string]*ckdb.ColdStorage
+	NodeIP                       string `yaml:"node-ip"`
+	GrpcBufferSize               int    `yaml:"grpc-buffer-size"`
+	ServiceLabelerLruCap         int    `yaml:"service-labeler-lru-cap"`
+	StatsInterval                int    `yaml:"stats-interval"`
+	FlowTagCacheFlushTimeout     uint32 `yaml:"flow-tag-cache-flush-timeout"`
+	FlowTagCacheMaxSize          uint32 `yaml:"flow-tag-cache-max-size"`
+	ExtMetricsSeriesCacheMaxSize uint32 `yaml:"ext-metrics-series-cache-max-size"`
+	LogFile                      string
+	LogLevel                     string
+	MyNodeName                   string
 }
 
 type BaseConfig struct {
@@ -162,6 +164,9 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	if c.ExtMetricsSeriesCacheMaxSize == 0 {
+		c.ExtMetricsSeriesCacheMaxSize = DefaultExtMetricsSeriesCacheMaxSize
+	}
 	if c.FlowTagCacheMaxSize == 0 {
 		c.FlowTagCacheMaxSize = DefaultFlowTagCacheMaxSize
 	}

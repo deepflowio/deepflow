@@ -17,6 +17,7 @@
 package dbwriter
 
 import (
+	"bytes"
 	"fmt"
 	"strconv"
 	"sync/atomic"
@@ -51,11 +52,56 @@ type ClusterNode struct {
 type Counter struct {
 	MetricsCount int64 `statsd:"metrics-count"`
 	WriteErr     int64 `statsd:"write-err"`
+
+	TableNameCount  int64 `statsd:"table-name-count"`
+	FieldNameCount  int64 `statsd:"field-name-count"`
+	FieldValueCount int64 `statsd:"field-value-count"`
 }
 
 type tableInfo struct {
 	tableName string
 	ckwriter  *ckwriter.CKWriter
+}
+
+type ExtMetricsIdCache struct {
+	// lowcard string dictionary
+	TableNameIdMap  map[string]uint32
+	FieldNameIdMap  map[string]uint32
+	FieldValueIdMap map[string]uint32
+
+	// string list
+	TableNames  []string
+	FieldNames  []string
+	FieldValues []string
+
+	// The 32-base expression form of the ID.
+	TableNameUids  []string
+	FieldNameUids  []string
+	FieldValueUids []string
+
+	Buffers []bytes.Buffer
+}
+
+func NewExtMetricsIdCache() *ExtMetricsIdCache {
+	buffers := []bytes.Buffer{bytes.Buffer{}}
+	buffers[0].Grow(1 << 20)
+
+	return &ExtMetricsIdCache{
+		TableNameIdMap:  make(map[string]uint32),
+		FieldNameIdMap:  make(map[string]uint32),
+		FieldValueIdMap: make(map[string]uint32),
+		Buffers:         buffers,
+	}
+}
+
+func (c *ExtMetricsIdCache) GetByteBuffer() *bytes.Buffer {
+	buf := &c.Buffers[len(c.Buffers)-1]
+	if buf.Len() >= 1<<20-2048 {
+		c.Buffers = append(c.Buffers, bytes.Buffer{})
+		buf = &c.Buffers[len(c.Buffers)-1]
+		buf.Grow(1 << 20)
+	}
+	return buf
 }
 
 type ExtMetricsWriter struct {
@@ -76,9 +122,94 @@ type ExtMetricsWriter struct {
 	tables             map[string]*tableInfo
 	metricsWriterCache *ckwriter.CKWriter // the writer for ext_metrics.metrics table
 	flowTagWriter      *flow_tag.FlowTagWriter
+	idCache            *ExtMetricsIdCache
 
 	counter *Counter
 	utils.Closable
+}
+
+func (w *ExtMetricsWriter) LookupTableNameAndId(unsafeTableName string) (string, uint32) {
+	c := w.idCache
+	tableNameId, exist := c.TableNameIdMap[unsafeTableName]
+	if exist {
+		return c.TableNames[tableNameId], tableNameId
+	} else {
+		buf := c.GetByteBuffer()
+
+		// string name
+		start := buf.Len()
+		buf.WriteString(unsafeTableName)
+		tableName := utils.String(buf.Bytes()[start:])
+
+		// int id
+		tableNameId = uint32(len(c.TableNameIdMap))
+
+		// string uid
+		start = buf.Len()
+		buf.WriteString(strconv.FormatUint(uint64(tableNameId), 32) + "z")
+		tableNameUid := utils.String(buf.Bytes()[start:])
+
+		c.TableNameIdMap[tableName] = tableNameId
+		c.TableNames = append(c.TableNames, tableName)
+		c.TableNameUids = append(c.TableNameUids, tableNameUid)
+		return tableName, tableNameId
+	}
+}
+
+func (w *ExtMetricsWriter) LookupFieldNameAndId(unsafeFieldName string) (string, uint32) {
+	c := w.idCache
+	fieldNameId, exist := c.FieldNameIdMap[unsafeFieldName]
+	if exist {
+		return c.FieldNames[fieldNameId], fieldNameId
+	} else {
+		buf := c.GetByteBuffer()
+
+		// string name
+		start := buf.Len()
+		buf.WriteString(unsafeFieldName)
+		fieldName := utils.String(buf.Bytes()[start:])
+
+		// int id
+		fieldNameId = uint32(len(c.FieldNameIdMap))
+
+		// string uid
+		start = buf.Len()
+		buf.WriteString(strconv.FormatUint(uint64(fieldNameId), 32) + "z")
+		fieldNameUid := utils.String(buf.Bytes()[start:])
+
+		c.FieldNameIdMap[fieldName] = fieldNameId
+		c.FieldNames = append(c.FieldNames, fieldName)
+		c.FieldNameUids = append(c.FieldNameUids, fieldNameUid)
+		return fieldName, fieldNameId
+	}
+}
+
+func (w *ExtMetricsWriter) LookupFieldValueAndId(unsafeFieldValue string) (string, uint32) {
+	c := w.idCache
+	fieldValueId, exist := c.FieldValueIdMap[unsafeFieldValue]
+	if exist {
+		return c.FieldValues[fieldValueId], fieldValueId
+	} else {
+		buf := c.GetByteBuffer()
+
+		// string name
+		start := buf.Len()
+		buf.WriteString(unsafeFieldValue)
+		fieldValue := utils.String(buf.Bytes()[start:])
+
+		// int id
+		fieldValueId = uint32(len(c.FieldValueIdMap))
+
+		// string uid
+		start = buf.Len()
+		buf.WriteString(strconv.FormatUint(uint64(fieldValueId), 32) + "z")
+		fieldValueUid := utils.String(buf.Bytes()[start:])
+
+		c.FieldValueIdMap[fieldValue] = fieldValueId
+		c.FieldValues = append(c.FieldValues, fieldValue)
+		c.FieldValueUids = append(c.FieldValueUids, fieldValueUid)
+		return fieldValue, fieldValueId
+	}
 }
 
 func (w *ExtMetricsWriter) InitDatabase() error {
@@ -187,6 +318,9 @@ func (w *ExtMetricsWriter) getClusterNodesWithoutLocal(clusterName string) ([]Cl
 func (w *ExtMetricsWriter) GetCounter() interface{} {
 	var counter *Counter
 	counter, w.counter = w.counter, &Counter{}
+	counter.TableNameCount = int64(len(w.idCache.TableNames))
+	counter.FieldNameCount = int64(len(w.idCache.FieldNames))
+	counter.FieldValueCount = int64(len(w.idCache.FieldValues))
 	return counter
 }
 
@@ -214,7 +348,7 @@ func (w *ExtMetricsWriter) WriteBatch(batch []interface{}) {
 		atomic.AddInt64(&w.counter.WriteErr, 1)
 		return
 	}
-	extMetrics.GenerateNewFlowTags(w.flowTagWriter.Cache)
+	extMetrics.GenerateNewFlowTags(w.flowTagWriter.Cache, w.idCache, true)
 	w.flowTagWriter.WriteFieldsAndFieldValuesInCache()
 
 	atomic.AddInt64(&w.counter.MetricsCount, int64(len(batch)))
@@ -230,7 +364,7 @@ func (w *ExtMetricsWriter) Write(m *ExtMetrics) {
 		atomic.AddInt64(&w.counter.WriteErr, 1)
 		return
 	}
-	m.GenerateNewFlowTags(w.flowTagWriter.Cache)
+	m.GenerateNewFlowTags(w.flowTagWriter.Cache, w.idCache, true)
 	w.flowTagWriter.WriteFieldsAndFieldValuesInCache()
 
 	atomic.AddInt64(&w.counter.MetricsCount, 1)
@@ -282,8 +416,8 @@ func NewExtMetricsWriter(
 		ckdbWatcher:       config.Base.CKDB.Watcher,
 		writerConfig:      ckWriterConfig,
 		flowTagWriter:     flowTagWriter,
-
-		counter: &Counter{},
+		idCache:           NewExtMetricsIdCache(),
+		counter:           &Counter{},
 	}
 	if err := writer.InitDatabase(); err != nil {
 		return nil, err

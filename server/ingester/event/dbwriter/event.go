@@ -205,17 +205,17 @@ func (e *EventStore) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 
 		// tag + value
 		flowTagInfo.FieldValue = e.AttributeValues[i]
-		v1 := e.Time
-		if old := cache.FieldValueCache.AddOrGet(*flowTagInfo, &v1); old != nil {
-			oldv, _ := old.(*uint32)
-			if *oldv+cache.CacheFlushTimeout >= e.Time {
-				// If there is no new fieldValue, of course there will be no new field.
-				// So we can just skip the rest of the process in the loop.
-				continue
-			} else {
-				*oldv = e.Time
-			}
-		}
+		//v1 := e.Time
+		//if old := cache.FieldValueCache.AddOrGet(*flowTagInfo, &v1); old != nil {
+		//	oldv, _ := old.(*uint32)
+		//	if *oldv+cache.CacheFlushTimeout >= e.Time {
+		//		// If there is no new fieldValue, of course there will be no new field.
+		//		// So we can just skip the rest of the process in the loop.
+		//		continue
+		//	} else {
+		//		*oldv = e.Time
+		//	}
+		//}
 		tagFieldValue := flow_tag.AcquireFlowTag()
 		tagFieldValue.Timestamp = e.Time
 		tagFieldValue.FlowTagInfo = *flowTagInfo
@@ -223,15 +223,15 @@ func (e *EventStore) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 
 		// only tag
 		flowTagInfo.FieldValue = ""
-		v2 := e.Time
-		if old := cache.FieldCache.AddOrGet(*flowTagInfo, &v2); old != nil {
-			oldv, _ := old.(*uint32)
-			if *oldv+cache.CacheFlushTimeout >= e.Time {
-				continue
-			} else {
-				*oldv = e.Time
-			}
-		}
+		//v2 := e.Time
+		//if old := cache.FieldCache.AddOrGet(*flowTagInfo, &v2); old != nil {
+		//	oldv, _ := old.(*uint32)
+		//	if *oldv+cache.CacheFlushTimeout >= e.Time {
+		//		continue
+		//	} else {
+		//		*oldv = e.Time
+		//	}
+		//}
 		tagField := flow_tag.AcquireFlowTag()
 		tagField.Timestamp = e.Time
 		tagField.FlowTagInfo = *flowTagInfo

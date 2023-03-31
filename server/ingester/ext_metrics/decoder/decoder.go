@@ -23,18 +23,19 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gogo/protobuf/proto"
+	//"github.com/gogo/protobuf/proto"
 	"github.com/golang/snappy"
 	"github.com/influxdata/influxdb/models"
 	logging "github.com/op/go-logging"
 	"github.com/prometheus/common/model"
-	"github.com/prometheus/prometheus/prompb"
+	//"github.com/prometheus/prometheus/prompb"
 
 	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/ext_metrics/config"
 	"github.com/deepflowio/deepflow/server/ingester/ext_metrics/dbwriter"
 	"github.com/deepflowio/deepflow/server/libs/codec"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
+	"github.com/deepflowio/deepflow/server/libs/datatype/prompb"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 	"github.com/deepflowio/deepflow/server/libs/receiver"
@@ -74,9 +75,11 @@ type Decoder struct {
 	config           *config.Config
 
 	// for prometheus, temporary buffers
-	extMetricsBuffer []interface{} // store all Samples in a TimeSeries.
-	tagNamesBuffer   []string      // store tag names in a time series
-	tagValuesBuffer  []string      // store tag values in a time series
+	extMetricsBuffer  []interface{} // store all Samples in a TimeSeries.
+	tagNamesBuffer    []string      // store tag names in a time series
+	tagValueIdsBuffer []uint32
+	tagValuesBuffer   []string // store tag values in a time series
+	tagNameIdsBuffer  []uint32
 
 	// universal tag cache
 	podNameToUniversalTag    map[string]*zerodoc.UniversalTag
@@ -119,6 +122,8 @@ func (d *Decoder) Run() {
 		"thread":   strconv.Itoa(d.index),
 		"msg_type": d.msgType.String()})
 	buffer := make([]interface{}, BUFFER_SIZE)
+	promWriteRequest := &prompb.WriteRequest{} // only for prometheus
+	decodeBuffer := []byte{}                   // only for prometheus
 	decoder := &codec.SimpleDecoder{}
 	for {
 		n := d.inQueue.Gets(buffer)
@@ -136,7 +141,7 @@ func (d *Decoder) Run() {
 			if d.msgType == datatype.MESSAGE_TYPE_TELEGRAF {
 				d.handleTelegraf(recvBytes.VtapID, decoder)
 			} else if d.msgType == datatype.MESSAGE_TYPE_PROMETHEUS {
-				d.handlePrometheus(recvBytes.VtapID, decoder)
+				d.handlePrometheus(recvBytes.VtapID, decoder, &decodeBuffer, promWriteRequest)
 			} else if d.msgType == datatype.MESSAGE_TYPE_DFSTATS {
 				d.handleDeepflowStats(recvBytes.VtapID, decoder)
 			}
@@ -145,23 +150,25 @@ func (d *Decoder) Run() {
 	}
 }
 
-func DecodeWriteRequest(compressed []byte) (*prompb.WriteRequest, error) {
-	reqBuf, err := snappy.Decode(nil, compressed)
+func DecodeWriteRequest(compressedData []byte, decodeBuffer *[]byte, req *prompb.WriteRequest) error {
+	decodedData, err := snappy.Decode(*decodeBuffer, compressedData)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	var req prompb.WriteRequest
-	if err := proto.Unmarshal(reqBuf, &req); err != nil {
-		return nil, err
+	if err := req.Unmarshal(decodedData); err != nil {
+		return err
 	}
 
-	return &req, nil
+	if len(decodedData) > len(*decodeBuffer) {
+		*decodeBuffer = decodedData
+	}
+	return nil
 }
 
-func (d *Decoder) handlePrometheus(vtapID uint16, decoder *codec.SimpleDecoder) {
+func (d *Decoder) handlePrometheus(vtapID uint16, decoder *codec.SimpleDecoder, decodeBuffer *[]byte, req *prompb.WriteRequest) {
 	for !decoder.IsEnd() {
-		data := decoder.ReadBytes()
+		compressedData := decoder.ReadBytes()
 		if decoder.Failed() {
 			if d.counter.ErrorCount == 0 {
 				log.Errorf("prometheus decode failed, offset=%d len=%d", decoder.Offset(), len(decoder.Bytes()))
@@ -169,17 +176,18 @@ func (d *Decoder) handlePrometheus(vtapID uint16, decoder *codec.SimpleDecoder) 
 			d.counter.ErrorCount++
 			return
 		}
-		req, err := DecodeWriteRequest(data)
+
+		err := DecodeWriteRequest(compressedData, decodeBuffer, req)
 		if err != nil {
 			if d.counter.ErrorCount == 0 {
 				log.Warningf("prometheus parse failed, err msg:%s", err)
 			}
 			d.counter.ErrorCount++
 		}
-
 		for _, ts := range req.Timeseries {
 			d.sendPrometheus(vtapID, &ts)
 		}
+		req.ResetWithBufferReserved() // release memory as soon as possible
 	}
 }
 
@@ -262,20 +270,38 @@ func (d *Decoder) handleDeepflowStats(vtapID uint16, decoder *codec.SimpleDecode
 		if d.debugEnabled {
 			log.Debugf("decoder %d vtap %d recv deepflow stats: %v", d.index, vtapID, pbStats)
 		}
-		d.extMetricsWriter.Write(StatsToExtMetrics(vtapID, pbStats))
+		d.extMetricsWriter.Write(d.StatsToExtMetrics(vtapID, pbStats))
 		d.counter.OutCount++
 	}
 }
 
-func StatsToExtMetrics(vtapID uint16, s *pb.Stats) *dbwriter.ExtMetrics {
+func (d *Decoder) StatsToExtMetrics(vtapID uint16, s *pb.Stats) *dbwriter.ExtMetrics {
 	m := dbwriter.AcquireExtMetrics()
 	m.Timestamp = uint32(s.Timestamp)
 	m.UniversalTag.VTAPID = vtapID
 	m.MsgType = datatype.MESSAGE_TYPE_DFSTATS
+
 	m.VTableName = s.Name
+	_, m.VTableNameId = d.extMetricsWriter.LookupTableNameAndId(s.Name)
+
 	m.TagNames = s.TagNames
+	for _, tagName := range m.TagNames {
+		_, tagNameId := d.extMetricsWriter.LookupFieldNameAndId(tagName)
+		m.TagNameIds = append(m.TagNameIds, tagNameId)
+	}
+
 	m.TagValues = s.TagValues
+	for _, tagValue := range m.TagValues {
+		_, tagValueId := d.extMetricsWriter.LookupFieldValueAndId(tagValue)
+		m.TagValueIds = append(m.TagValueIds, tagValueId)
+	}
+
 	m.MetricsFloatNames = s.MetricsFloatNames
+	for _, metricName := range m.MetricsFloatNames {
+		_, metricNameId := d.extMetricsWriter.LookupFieldNameAndId(metricName)
+		m.MetricsFloatNameIds = append(m.MetricsFloatNameIds, metricNameId)
+	}
+
 	m.MetricsFloatValues = s.MetricsFloatValues
 	return m
 }
@@ -286,21 +312,30 @@ func (d *Decoder) TimeSeriesToExtMetrics(vtapID uint16, ts *prompb.TimeSeries) e
 	}
 	d.extMetricsBuffer = d.extMetricsBuffer[:0]
 	d.tagNamesBuffer = d.tagNamesBuffer[:0]
+	d.tagNameIdsBuffer = d.tagNameIdsBuffer[:0]
 	d.tagValuesBuffer = d.tagValuesBuffer[:0]
+	d.tagValueIdsBuffer = d.tagValueIdsBuffer[:0]
+	metricNameLabelId := uint32(0)
 
 	metricNameLabel, podName, instance := "", "", ""
 	for _, l := range ts.Labels {
+		// CAUTION: l.Name and l.Value are unsafe
 		if l.Name == model.MetricNameLabel {
-			metricNameLabel = l.Value
+			metricNameLabel, metricNameLabelId = d.extMetricsWriter.LookupTableNameAndId(l.Value)
 			continue
 		}
-		if l.Name == PROMETHEUS_POD {
-			podName = l.Value
-		} else if l.Name == PROMETHEUS_INSTANCE {
-			instance = l.Value
+		fieldName, fieldNameId := d.extMetricsWriter.LookupFieldNameAndId(l.Name)
+		fieldValue, fieldValueId := d.extMetricsWriter.LookupFieldValueAndId(l.Value)
+
+		if fieldName == PROMETHEUS_POD {
+			podName = fieldValue
+		} else if fieldName == PROMETHEUS_INSTANCE {
+			instance = fieldValue
 		}
-		d.tagNamesBuffer = append(d.tagNamesBuffer, l.Name)
-		d.tagValuesBuffer = append(d.tagValuesBuffer, l.Value)
+		d.tagNamesBuffer = append(d.tagNamesBuffer, fieldName)
+		d.tagNameIdsBuffer = append(d.tagNameIdsBuffer, fieldNameId)
+		d.tagValuesBuffer = append(d.tagValuesBuffer, fieldValue)
+		d.tagValueIdsBuffer = append(d.tagValueIdsBuffer, fieldValueId)
 	}
 	if metricNameLabel == "" {
 		return fmt.Errorf("prometheum metric name label is null")
@@ -314,9 +349,12 @@ func (d *Decoder) TimeSeriesToExtMetrics(vtapID uint16, ts *prompb.TimeSeries) e
 		m.Timestamp = uint32(model.Time(s.Timestamp).Unix())
 		m.MsgType = datatype.MESSAGE_TYPE_PROMETHEUS
 		m.VTableName = virtualTableName
+		m.VTableNameId = metricNameLabelId
 
 		m.TagNames = append(m.TagNames, d.tagNamesBuffer...)
+		m.TagNameIds = append(m.TagNameIds, d.tagNameIdsBuffer...)
 		m.TagValues = append(m.TagValues, d.tagValuesBuffer...)
+		m.TagValueIds = append(m.TagValueIds, d.tagValueIdsBuffer...)
 
 		v := float64(s.Value)
 		if math.IsNaN(v) || math.IsInf(v, 0) {
@@ -324,6 +362,7 @@ func (d *Decoder) TimeSeriesToExtMetrics(vtapID uint16, ts *prompb.TimeSeries) e
 			continue
 		}
 		m.MetricsFloatNames = append(m.MetricsFloatNames, metricNameLabel)
+		m.MetricsFloatNameIds = append(m.MetricsFloatNameIds, metricNameLabelId)
 		m.MetricsFloatValues = append(m.MetricsFloatValues, v)
 
 		if i == 0 {
@@ -480,12 +519,17 @@ func (d *Decoder) PointToExtMetrics(vtapID uint16, point models.Point) (*dbwrite
 	m.MsgType = datatype.MESSAGE_TYPE_TELEGRAF
 	tableName := string(point.Name())
 	m.VTableName = VTABLE_PREFIX_TELEGRAF + tableName
+	_, m.VTableNameId = d.extMetricsWriter.LookupTableNameAndId(tableName)
 	podName := ""
 	for _, tag := range point.Tags() {
 		tagName := string(tag.Key)
 		tagValue := string(tag.Value)
+		_, tagNameId := d.extMetricsWriter.LookupFieldNameAndId(tagName)
+		_, tagValueId := d.extMetricsWriter.LookupFieldValueAndId(tagValue)
 		m.TagNames = append(m.TagNames, tagName)
+		m.TagNameIds = append(m.TagNameIds, tagNameId)
 		m.TagValues = append(m.TagValues, tagValue)
+		m.TagValueIds = append(m.TagValueIds, tagValueId)
 		if tagName == TELEGRAF_POD {
 			podName = tagValue
 		}
@@ -497,6 +541,7 @@ func (d *Decoder) PointToExtMetrics(vtapID uint16, point models.Point) (*dbwrite
 		if len(iter.FieldKey()) == 0 {
 			continue
 		}
+		valid := false
 		switch iter.Type() {
 		case models.Float:
 			v, err := iter.FloatValue()
@@ -504,7 +549,7 @@ func (d *Decoder) PointToExtMetrics(vtapID uint16, point models.Point) (*dbwrite
 				dbwriter.ReleaseExtMetrics(m)
 				return nil, fmt.Errorf("table %s unable to unmarshal field %s: %s", tableName, string(iter.FieldKey()), err)
 			}
-			m.MetricsFloatNames = append(m.MetricsFloatNames, string(iter.FieldKey()))
+			valid = true
 			m.MetricsFloatValues = append(m.MetricsFloatValues, v)
 		case models.Integer:
 			v, err := iter.IntegerValue()
@@ -512,7 +557,7 @@ func (d *Decoder) PointToExtMetrics(vtapID uint16, point models.Point) (*dbwrite
 				dbwriter.ReleaseExtMetrics(m)
 				return nil, fmt.Errorf("table %s  unable to unmarshal field %s: %s", tableName, string(iter.FieldKey()), err)
 			}
-			m.MetricsFloatNames = append(m.MetricsFloatNames, string(iter.FieldKey()))
+			valid = true
 			m.MetricsFloatValues = append(m.MetricsFloatValues, float64(v))
 		case models.Unsigned:
 			v, err := iter.UnsignedValue()
@@ -520,13 +565,19 @@ func (d *Decoder) PointToExtMetrics(vtapID uint16, point models.Point) (*dbwrite
 				dbwriter.ReleaseExtMetrics(m)
 				return nil, fmt.Errorf("table %s unable to unmarshal field %s: %s", tableName, string(iter.FieldKey()), err)
 			}
-			m.MetricsFloatNames = append(m.MetricsFloatNames, string(iter.FieldKey()))
+			valid = true
 			m.MetricsFloatValues = append(m.MetricsFloatValues, float64(v))
 		case models.String, models.Boolean:
 			if d.counter.DropUnsupportedMetrics&0xff == 0 {
 				log.Warningf("table %s drop unsupported metrics name: %s type: %v. total drop %d", tableName, string(iter.FieldKey()), iter.Type(), d.counter.DropUnsupportedMetrics)
 			}
 			d.counter.DropUnsupportedMetrics++
+		}
+		if valid {
+			metricName := string(iter.FieldKey())
+			_, metricNameId := d.extMetricsWriter.LookupFieldNameAndId(metricName)
+			m.MetricsFloatNames = append(m.MetricsFloatNames, metricName)
+			m.MetricsFloatNameIds = append(m.MetricsFloatNameIds, metricNameId)
 		}
 	}
 
