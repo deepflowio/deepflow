@@ -162,15 +162,38 @@ func (m *ExtMetrics) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 	cache.Fields = cache.Fields[:0]
 	cache.FieldValues = cache.FieldValues[:0]
 
+	var tableExist, fieldNameExist, fieldValueExist bool
+	var tableId, fieldNameId, fieldValueId uint32
+	if tableId, tableExist = cache.TableIdMap[tableName]; !tableExist {
+		tableId = uint32(len(cache.TableIdMap))
+		cache.TableIdMap[tableName] = tableId
+	}
+	flowTagInfoKey := &cache.FlowTagInfoKeyBuffer
+	flowTagInfoKey.Reset()
+	flowTagInfoKey.SetTableId(tableId)
+	flowTagInfoKey.SetVpcId(flowTagInfo.VpcId)
+	flowTagInfoKey.SetPodNsId(flowTagInfo.PodNsId)
+
 	// tags
 	flowTagInfo.FieldType = flow_tag.FieldTag
+	flowTagInfoKey.SetFieldType(flow_tag.FieldTag)
 	for i, name := range m.TagNames {
 		flowTagInfo.FieldName = name
+		if fieldNameId, fieldNameExist = cache.FieldNameIdMap[name]; !fieldNameExist {
+			fieldNameId = uint32(len(cache.FieldNameIdMap))
+			cache.FieldNameIdMap[name] = fieldNameId
+		}
+		flowTagInfoKey.SetFieldNameId(fieldNameId)
 
 		// tag + value
 		flowTagInfo.FieldValue = m.TagValues[i]
+		if fieldValueId, fieldValueExist = cache.FieldValueIdMap[flowTagInfo.FieldValue]; !fieldValueExist {
+			fieldValueId = uint32(len(cache.FieldValueIdMap))
+			cache.FieldValueIdMap[flowTagInfo.FieldValue] = fieldValueId
+		}
+		flowTagInfoKey.SetFieldValueId(fieldValueId)
 		v1 := m.Timestamp
-		if old := cache.FieldValueCache.AddOrGet(*flowTagInfo, &v1); old != nil {
+		if old := cache.FieldValueCache.AddOrGet(flowTagInfoKey.Low, flowTagInfoKey.High, &v1); old != nil {
 			oldv, _ := old.(*uint32)
 			if *oldv+cache.CacheFlushTimeout >= m.Timestamp {
 				// If there is no new fieldValue, of course there will be no new field.
@@ -187,8 +210,9 @@ func (m *ExtMetrics) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 
 		// only tag
 		flowTagInfo.FieldValue = ""
+		flowTagInfoKey.SetFieldValueId(0)
 		v2 := m.Timestamp
-		if old := cache.FieldCache.AddOrGet(*flowTagInfo, &v2); old != nil {
+		if old := cache.FieldCache.AddOrGet(flowTagInfoKey.Low, flowTagInfoKey.High, &v2); old != nil {
 			oldv, _ := old.(*uint32)
 			if *oldv+cache.CacheFlushTimeout >= m.Timestamp {
 				continue
@@ -204,11 +228,19 @@ func (m *ExtMetrics) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 
 	// metrics
 	flowTagInfo.FieldType = flow_tag.FieldMetrics
+	flowTagInfoKey.SetFieldType(flow_tag.FieldMetrics)
 	flowTagInfo.FieldValue = ""
+	flowTagInfoKey.SetFieldValueId(0)
 	for _, name := range m.MetricsFloatNames {
 		flowTagInfo.FieldName = name
+		if fieldNameId, fieldNameExist = cache.FieldNameIdMap[name]; !fieldNameExist {
+			fieldNameId = uint32(len(cache.FieldNameIdMap))
+			cache.FieldNameIdMap[name] = fieldNameId
+		}
+		flowTagInfoKey.SetFieldNameId(fieldNameId)
+
 		v := m.Timestamp
-		if old := cache.FieldCache.AddOrGet(*flowTagInfo, &v); old != nil {
+		if old := cache.FieldCache.AddOrGet(flowTagInfoKey.Low, flowTagInfoKey.High, &v); old != nil {
 			oldv, _ := old.(*uint32)
 			if *oldv+cache.CacheFlushTimeout >= m.Timestamp {
 				continue

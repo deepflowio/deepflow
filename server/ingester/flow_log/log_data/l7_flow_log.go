@@ -608,18 +608,17 @@ func (h *L7FlowLog) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 
 			// tag + value
 			flowTagInfo.FieldValue = attributeValues[i]
-			v1 := time
-
-			if old := cache.FieldValueCache.AddOrGet(*flowTagInfo, &v1); old != nil {
-				oldv, _ := old.(*uint32)
-				if *oldv+cache.CacheFlushTimeout >= time {
-					// If there is no new fieldValue, of course there will be no new field.
-					// So we can just skip the rest of the process in the loop.
-					continue
-				} else {
-					*oldv = time
-				}
-			}
+			//v1 := time
+			//if old := cache.FieldValueCache.AddOrGet(*flowTagInfo, &v1); old != nil {
+			//	oldv, _ := old.(*uint32)
+			//	if *oldv+cache.CacheFlushTimeout >= time {
+			//		// If there is no new fieldValue, of course there will be no new field.
+			//		// So we can just skip the rest of the process in the loop.
+			//		continue
+			//	} else {
+			//		*oldv = time
+			//	}
+			//}
 			tagFieldValue := flow_tag.AcquireFlowTag()
 			tagFieldValue.Timestamp = time
 			tagFieldValue.FlowTagInfo = *flowTagInfo
@@ -631,15 +630,15 @@ func (h *L7FlowLog) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 			}
 			// only tag
 			flowTagInfo.FieldValue = ""
-			v2 := time
-			if old := cache.FieldCache.AddOrGet(*flowTagInfo, &v2); old != nil {
-				oldv, _ := old.(*uint32)
-				if *oldv+cache.CacheFlushTimeout >= time {
-					continue
-				} else {
-					*oldv = time
-				}
-			}
+			//v2 := time
+			//if old := cache.FieldCache.AddOrGet(*flowTagInfo, &v2); old != nil {
+			//	oldv, _ := old.(*uint32)
+			//	if *oldv+cache.CacheFlushTimeout >= time {
+			//		continue
+			//	} else {
+			//		*oldv = time
+			//	}
+			//}
 			tagField := flow_tag.AcquireFlowTag()
 			tagField.Timestamp = time
 			tagField.FlowTagInfo = *flowTagInfo
@@ -651,15 +650,15 @@ func (h *L7FlowLog) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 		flowTagInfo.FieldValue = ""
 		for _, name := range h.MetricsNames {
 			flowTagInfo.FieldName = name
-			v := time
-			if old := cache.FieldCache.AddOrGet(*flowTagInfo, &v); old != nil {
-				oldv, _ := old.(*uint32)
-				if *oldv+cache.CacheFlushTimeout >= time {
-					continue
-				} else {
-					*oldv = time
-				}
-			}
+			//v := time
+			//if old := cache.FieldCache.AddOrGet(*flowTagInfo, &v); old != nil {
+			//	oldv, _ := old.(*uint32)
+			//	if *oldv+cache.CacheFlushTimeout >= time {
+			//		continue
+			//	} else {
+			//		*oldv = time
+			//	}
+			//}
 			tagField := flow_tag.AcquireFlowTag()
 			tagField.Timestamp = time
 			tagField.FlowTagInfo = *flowTagInfo

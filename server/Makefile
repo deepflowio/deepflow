@@ -16,7 +16,7 @@ generated_libs = libs/hmap/idmap/ubig_id_map.go libs/hmap/idmap/ubig_id_map_test
 		 libs/hmap/lru/ubig_lru.go libs/hmap/lru/ubig_lru_test.go \
 		 libs/zerodoc/pooled_meters.go libs/kubernetes/watcher.gen.go
 
-proto = vendor/${MESSAGE}/common/common.pb.go vendor/${MESSAGE}/trident/trident.pb.go vendor/${MESSAGE}/controller/controller.pb.go libs/datatype/pb/flow_log.pb.go libs/zerodoc/pb/metric.pb.go libs/stats/pb/stats.pb.go
+proto = vendor/${MESSAGE}/common/common.pb.go vendor/${MESSAGE}/trident/trident.pb.go vendor/${MESSAGE}/controller/controller.pb.go libs/datatype/pb/flow_log.pb.go libs/zerodoc/pb/metric.pb.go libs/datatype/prompb/prompb.pb.go libs/stats/pb/stats.pb.go
 
 $(generated_libs): $(generate_sources)
 	go generate ./...
@@ -57,6 +57,12 @@ libs/zerodoc/pb/metric.proto: vendor
 
 libs/zerodoc/pb/metric.pb.go: libs/zerodoc/pb/metric.proto
 	cd libs/zerodoc/pb && go generate ./...
+
+libs/datatype/prompb/prompb.proto: vendor
+	cp -r $(shell go list -mod=readonly -e -f '{{.Dir}}' ${MESSAGE})/prompb.proto libs/datatype/prompb/
+
+libs/datatype/prompb/prompb.pb.go: libs/datatype/prompb/prompb.proto
+	cd libs/datatype/prompb && go generate ./...
 
 vendor/${MESSAGE}/stats.proto: vendor
 	cp -r $(shell go list -mod=readonly -e -f '{{.Dir}}' ${MESSAGE})/stats.proto vendor/${MESSAGE}/
@@ -103,5 +109,6 @@ clean:
 	rm -f $(generated_libs)
 	rm -f libs/datatype/pb/flow_log.proto
 	rm -f libs/zerodoc/pb/metric.proto
+	rm -f libs/datatype/prompb/prompb.proto
 	rm -f libs/stats/pb/stats.proto
 	rm -f libs/kubernetes/watcher.gen.go

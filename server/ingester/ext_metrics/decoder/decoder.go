@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gogo/protobuf/proto"
+	//"github.com/gogo/protobuf/proto"
 	"github.com/golang/snappy"
 	"github.com/influxdata/influxdb/models"
 	logging "github.com/op/go-logging"
@@ -35,6 +35,7 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/ext_metrics/dbwriter"
 	"github.com/deepflowio/deepflow/server/libs/codec"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
+	//"github.com/deepflowio/deepflow/server/libs/datatype/prompb"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 	"github.com/deepflowio/deepflow/server/libs/receiver"
@@ -151,12 +152,12 @@ func DecodeWriteRequest(compressed []byte) (*prompb.WriteRequest, error) {
 		return nil, err
 	}
 
-	var req prompb.WriteRequest
-	if err := proto.Unmarshal(reqBuf, &req); err != nil {
+	req := &prompb.WriteRequest{}
+	if err := req.Unmarshal(reqBuf); err != nil {
 		return nil, err
 	}
 
-	return &req, nil
+	return req, nil
 }
 
 func (d *Decoder) handlePrometheus(vtapID uint16, decoder *codec.SimpleDecoder) {

@@ -27,6 +27,7 @@ clean:
 	rm -rf x86_64
 	rm -rf zerodoc/pb/*.pb.go
 	rm -rf datatype/pb/*.pb.go
+	rm -rf datatype/prompb/*.pb.go
 
 .DEFAULT_GOAL := test
 
