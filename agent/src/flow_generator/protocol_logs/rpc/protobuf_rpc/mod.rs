@@ -20,7 +20,7 @@ mod protobuf_rpc;
 pub use protobuf_rpc::*;
 
 use enum_dispatch::enum_dispatch;
-use public::l7_protocol::{L7Protocol, L7ProtocolEnum, ProtobufRpcProtocol};
+use public::l7_protocol::{CustomProtocol, L7Protocol, L7ProtocolEnum, ProtobufRpcProtocol};
 use serde::Serialize;
 
 use crate::{

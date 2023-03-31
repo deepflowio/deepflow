@@ -19,7 +19,9 @@ use std::str;
 use nom::AsBytes;
 use serde::Serialize;
 
-use super::pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo};
+use super::pb_adapter::{
+    ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
+};
 use super::value_is_default;
 use super::{consts::*, AppProtoHead, L7ResponseStatus};
 use super::{decode_new_rpc_trace_context_with_type, LogMessageType};
@@ -93,6 +95,9 @@ pub struct HttpInfo {
     pub status_code: Option<i32>,
     #[serde(rename = "response_status")]
     status: L7ResponseStatus,
+
+    #[serde(skip)]
+    attributes: Vec<KeyVal>,
 }
 
 impl L7ProtocolInfoInterface for HttpInfo {
@@ -200,6 +205,7 @@ impl HttpInfo {
         if self.x_request_id.is_empty() {
             self.x_request_id = other.x_request_id.clone();
         }
+        self.attributes.extend(other.attributes);
         Ok(())
     }
 
@@ -313,6 +319,13 @@ impl From<HttpInfo> for L7ProtocolSendLog {
                 user_agent: f.user_agent,
                 referer: f.referer,
                 rpc_service: service_name,
+                attributes: {
+                    if f.attributes.is_empty() {
+                        None
+                    } else {
+                        Some(f.attributes)
+                    }
+                },
                 ..Default::default()
             }),
             ..Default::default()
@@ -382,7 +395,12 @@ impl L7ProtocolParserInterface for HttpLog {
         };
 
         match self.proto {
-            L7Protocol::Http1 => self.parse_http_v1(payload, param)?,
+            L7Protocol::Http1 => {
+                self.parse_http_v1(payload, param)?;
+                if !param.perf_only {
+                    self.wasm_hook(param, payload);
+                }
+            }
             L7Protocol::Http2 | L7Protocol::Grpc => match param.ebpf_type {
                 EbpfType::GoHttp2Uprobe => {
                     if let Some(p) = &param.ebpf_param {
@@ -961,6 +979,24 @@ impl HttpLog {
                 decode_new_rpc_trace_context_with_type(payload.as_bytes(), id_type)
             }
         }
+    }
+
+    fn wasm_hook(&mut self, param: &ParseParam, payload: &[u8]) {
+        let Some(vm) = param.wasm_vm.as_ref() else {
+            return;
+        };
+        let mut vm = vm.borrow_mut();
+        match param.direction {
+            PacketDirection::ClientToServer => vm.on_http_req(payload, param, &self.info),
+            PacketDirection::ServerToClient => vm.on_http_resp(payload, param, &self.info),
+        }
+        .map(|(trace, kv)| {
+            if let Some(trace) = trace {
+                trace.trace_id.map(|s| self.info.trace_id = s);
+                trace.span_id.map(|s| self.info.span_id = s);
+            }
+            self.info.attributes.extend(kv);
+        });
     }
 }
 

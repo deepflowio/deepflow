@@ -71,6 +71,14 @@ pub enum Error {
     L7LogCanNotMerge(AppProtoLogsData),
     #[error("parse config not provided")]
     NoParseConfig,
+    #[error("wasm parse fail")]
+    WasmParseFail,
+    #[error("{0}")]
+    WasmSerializeFail(String),
+    #[error("{0}")]
+    WasmVmError(String),
+    #[error("{0}")]
+    WasmInitFail(String),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

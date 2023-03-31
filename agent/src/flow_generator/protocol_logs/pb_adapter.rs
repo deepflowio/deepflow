@@ -41,7 +41,7 @@ pub struct TraceInfo {
     pub parent_span_id: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct KeyVal {
     pub key: String,
     pub val: String,

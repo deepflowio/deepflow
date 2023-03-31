@@ -132,7 +132,7 @@ impl AppTable {
             {
                 return None;
             } else {
-                return Some(v.l7_protocol_enum);
+                return Some(v.l7_protocol_enum.clone());
             }
         }
         None
@@ -161,7 +161,7 @@ impl AppTable {
             {
                 return None;
             } else {
-                return Some(v.l7_protocol_enum);
+                return Some(v.l7_protocol_enum.clone());
             }
         }
         None
@@ -204,7 +204,8 @@ impl AppTable {
             IpAddr::V4(i) => self.get_ipv4_protocol(time_in_sec, i, epc, dport, pid),
             IpAddr::V6(i) => self.get_ipv6_protocol(time_in_sec, i, epc, dport, pid),
         };
-        if dst_protocol.is_some() && dst_protocol.unwrap().get_l7_protocol() != L7Protocol::Unknown
+        if dst_protocol.is_some()
+            && dst_protocol.as_ref().unwrap().get_l7_protocol() != L7Protocol::Unknown
         {
             return Some((dst_protocol.unwrap(), dport));
         }
@@ -224,7 +225,8 @@ impl AppTable {
             IpAddr::V4(i) => self.get_ipv4_protocol(time_in_sec, i, epc, sport, pid),
             IpAddr::V6(i) => self.get_ipv6_protocol(time_in_sec, i, epc, sport, pid),
         };
-        if src_protocol.is_some() && src_protocol.unwrap().get_l7_protocol() != L7Protocol::Unknown
+        if src_protocol.is_some()
+            && src_protocol.as_ref().unwrap().get_l7_protocol() != L7Protocol::Unknown
         {
             return Some((src_protocol.unwrap(), sport));
         }
