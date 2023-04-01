@@ -100,10 +100,9 @@ func TransWhereTagFunction(name string, args []string) (filter string) {
 			return
 		} else if strings.HasPrefix(resourceNoSuffix, "k8s.label.") {
 			podIDSuffix := "pod_id" + suffix
-			deviceIDSuffix := "l3_device_id" + suffix
-			deviceTypeSuffix := "l3_device_type" + suffix
+			serviceIDSuffix := "service_id" + suffix
 			tagNoPreffix := strings.TrimPrefix(resourceNoSuffix, "k8s.label.")
-			filter = fmt.Sprintf("((toUInt64(%s) IN (SELECT id FROM flow_tag.pod_service_k8s_label_map WHERE key='%s') AND %s=11) OR (toUInt64(%s) IN (SELECT id FROM flow_tag.pod_k8s_label_map WHERE key='%s')))", deviceIDSuffix, tagNoPreffix, deviceTypeSuffix, podIDSuffix, tagNoPreffix)
+			filter = fmt.Sprintf("((toUInt64(%s) IN (SELECT id FROM flow_tag.pod_service_k8s_label_map WHERE key='%s')) OR (toUInt64(%s) IN (SELECT id FROM flow_tag.pod_k8s_label_map WHERE key='%s')))", serviceIDSuffix, tagNoPreffix, podIDSuffix, tagNoPreffix)
 		} else if strings.HasPrefix(resourceNoSuffix, "cloud.tag.") {
 			deviceIDSuffix := "l3_device_id" + suffix
 			deviceTypeSuffix := "l3_device_type" + suffix
