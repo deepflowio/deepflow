@@ -78,17 +78,10 @@ func NewFlowLog(config *config.Config, recv *receiver.Receiver, platformDataMana
 	}
 	l4FlowLogger := NewL4FlowLogger(config, platformDataManager, manager, recv, flowLogWriter)
 
-	var l7Exporter, otelExporter *exporter.OtlpExporter
-	exporter := exporter.NewOtlpExporter(config)
-	if config.Exporter.L7Enabled {
-		l7Exporter = exporter
-	}
-	if config.Exporter.OTelEnabled {
-		otelExporter = exporter
-	}
-	l7FlowLogger := NewL7FlowLogger(config, platformDataManager, manager, recv, flowLogWriter, l7Exporter)
-	otelLogger := NewLogger(datatype.MESSAGE_TYPE_OPENTELEMETRY, config, platformDataManager, manager, recv, flowLogWriter, common.L7_FLOW_ID, otelExporter)
-	otelCompressedLogger := NewLogger(datatype.MESSAGE_TYPE_OPENTELEMETRY_COMPRESSED, config, platformDataManager, manager, recv, flowLogWriter, common.L7_FLOW_ID, otelExporter)
+	otlpExporter := exporter.NewOtlpExporter(config)
+	l7FlowLogger := NewL7FlowLogger(config, platformDataManager, manager, recv, flowLogWriter, otlpExporter)
+	otelLogger := NewLogger(datatype.MESSAGE_TYPE_OPENTELEMETRY, config, platformDataManager, manager, recv, flowLogWriter, common.L7_FLOW_ID, otlpExporter)
+	otelCompressedLogger := NewLogger(datatype.MESSAGE_TYPE_OPENTELEMETRY_COMPRESSED, config, platformDataManager, manager, recv, flowLogWriter, common.L7_FLOW_ID, otlpExporter)
 	l4PacketLogger := NewLogger(datatype.MESSAGE_TYPE_PACKETSEQUENCE, config, nil, manager, recv, flowLogWriter, common.L4_PACKET_ID, nil)
 	return &FlowLog{
 		FlowLogConfig:        config,
@@ -97,7 +90,7 @@ func NewFlowLog(config *config.Config, recv *receiver.Receiver, platformDataMana
 		OtelLogger:           otelLogger,
 		OtelCompressedLogger: otelCompressedLogger,
 		L4PacketLogger:       l4PacketLogger,
-		OtlpExporter:         exporter,
+		OtlpExporter:         otlpExporter,
 	}, nil
 }
 

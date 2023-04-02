@@ -43,12 +43,12 @@ type FlowLogTTL struct {
 }
 
 type ExporterConfig struct {
-	Enabled     bool   `yaml:"enabled"`
-	Addr        string `yaml:"addr"`
-	QueueCount  int    `yaml:"queue-count"`
-	QueueSize   int    `yaml:"queue-size"`
-	L7Enabled   bool   `yaml:"l7-enabled"`
-	OTelEnabled bool   `yaml:"otel-enabled"`
+	Enabled         bool     `yaml:"enabled"`
+	Addr            string   `yaml:"addr"`
+	QueueCount      int      `yaml:"queue-count"`
+	QueueSize       int      `yaml:"queue-size"`
+	ExportDatas     []string `yaml:"export-datas"`
+	ExportDataTypes []string `yaml:"export-data-types"`
 }
 
 type Config struct {
@@ -95,7 +95,14 @@ func Load(base *config.Config, path string) *Config {
 			DecoderQueueSize:  DefaultDecoderQueueSize,
 			CKWriterConfig:    config.CKWriterConfig{QueueCount: 1, QueueSize: 1000000, BatchSize: 512000, FlushTimeout: 10},
 			FlowLogTTL:        FlowLogTTL{DefaultFlowLogTTL, DefaultFlowLogTTL, DefaultFlowLogTTL},
-			Exporter:          ExporterConfig{false, "127.0.0.1:4317", 2, 1000000, true, false},
+			Exporter: ExporterConfig{
+				false,
+				"127.0.0.1:4317",
+				2,
+				100000,
+				[]string{"cbpf-net-span", "ebpf-sys-span"},
+				[]string{"service_info", "tracing_info", "network_layer", "flow_info", "client_universal_tag", "server_universal_tag", "tunnel_info", "transport_layer", "application_layer", "capture_info", "client_custom_tag", "server_custom_tag", "native_tag", "metrics"},
+			},
 		},
 	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {
