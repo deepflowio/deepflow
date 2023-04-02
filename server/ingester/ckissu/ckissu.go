@@ -769,6 +769,12 @@ var ColumnAdd626 = []*ColumnAdds{
 		ColumnNames: u16ColumnProfileNameAdd626,
 		ColumnType:  ckdb.UInt16,
 	},
+	&ColumnAdds{
+		Dbs:         []string{"ext_metrics"},
+		Tables:      []string{"metrics", "metrics_local"},
+		ColumnNames: []string{"gprocess_id"},
+		ColumnType:  ckdb.UInt32,
+	},
 }
 
 var TableRenames626 = []*TableRename{
