@@ -28,6 +28,17 @@ type UniversalTags struct {
 	Service      string
 	GProcess     string
 	Vtap         string
+
+	CHost      string
+	Router     string
+	DhcpGW     string
+	PodService string
+	Redis      string
+	RDS        string
+	LB         string
+	NatGW      string
+
+	TapPortName string
 }
 
 type Tag uint8
@@ -70,8 +81,22 @@ var TagTableNames = []string{
 }
 
 const (
-	HOST_TYPE    = 6
-	SERVICE_TYPE = 11
+	TYPE_INTERNET       = 0
+	TYPE_VM             = 1
+	TYPE_VROUTER        = 5
+	TYPE_HOST           = 6
+	TYPE_DHCP_PORT      = 9
+	TYPE_POD            = 10
+	TYPE_POD_SERVICE    = 11
+	TYPE_REDIS_INSTANCE = 12
+	TYPE_RDS_INSTANCE   = 13
+	TYPE_POD_NODE       = 14
+	TYPE_LB             = 15
+	TYPE_NAT_GATEWAY    = 16
+	TYPE_POD_GROUP      = 101
+	TYPE_SERVICE        = 102
+	TYPE_GPROCESS       = 120
+	TYPE_IP             = 255
 )
 
 func (t Tag) TableName() string {
@@ -82,10 +107,11 @@ type UniversalTagMaps [MAX_TAG_MAP_ID]map[uint32]string
 
 func (u *UniversalTagsManager) QueryUniversalTags(l7FlowLog *log_data.L7FlowLog) (*UniversalTags, *UniversalTags) {
 	tagMaps := u.universalTagMaps
+	tapPortName := u.tapPortNameMap[uint64(l7FlowLog.VtapID)<<32|uint64(l7FlowLog.TapPort)]
 	return &UniversalTags{
 			Region:       tagMaps[REGION][uint32(l7FlowLog.RegionID0)],
 			AZ:           tagMaps[AZ][uint32(l7FlowLog.AZID0)],
-			Host:         tagMaps[HOST][uint32(HOST_TYPE)<<24|uint32(l7FlowLog.HostID0)],
+			Host:         tagMaps[L3_DEVICE][uint32(TYPE_HOST)<<24|uint32(l7FlowLog.HostID0)],
 			L3DeviceType: tagMaps[L3_DEVICE_TYPE][uint32(l7FlowLog.L3DeviceType0)],
 			L3Device:     tagMaps[L3_DEVICE][uint32(l7FlowLog.L3DeviceID0)],
 			PodNode:      tagMaps[POD_NODE][uint32(l7FlowLog.PodNodeID0)],
@@ -95,13 +121,23 @@ func (u *UniversalTagsManager) QueryUniversalTags(l7FlowLog *log_data.L7FlowLog)
 			PodCluster:   tagMaps[POD_CLUSTER][uint32(l7FlowLog.PodClusterID0)],
 			L3Epc:        tagMaps[L3_EPC][uint32(l7FlowLog.L3EpcID0)],
 			Subnet:       tagMaps[SUBNET][uint32(l7FlowLog.SubnetID0)],
-			Service:      tagMaps[L3_DEVICE][uint32(uint32(SERVICE_TYPE)<<24|l7FlowLog.ServiceID0)],
+			Service:      tagMaps[L3_DEVICE][uint32(uint32(TYPE_SERVICE)<<24|l7FlowLog.ServiceID0)],
 			GProcess:     tagMaps[GPROCESS][uint32(l7FlowLog.GPID0)],
 			Vtap:         tagMaps[VTAP][uint32(l7FlowLog.VtapID)],
+
+			CHost:      tagMaps[L3_DEVICE][uint32(TYPE_VM)<<24|uint32(l7FlowLog.L3DeviceID0)],
+			Router:     tagMaps[L3_DEVICE][uint32(TYPE_VROUTER)<<24|uint32(l7FlowLog.L3DeviceID0)],
+			DhcpGW:     tagMaps[L3_DEVICE][uint32(TYPE_DHCP_PORT)<<24|uint32(l7FlowLog.L3DeviceID0)],
+			PodService: tagMaps[L3_DEVICE][uint32(TYPE_POD_SERVICE)<<24|uint32(l7FlowLog.L3DeviceID0)],
+			Redis:      tagMaps[L3_DEVICE][uint32(TYPE_REDIS_INSTANCE)<<24|uint32(l7FlowLog.L3DeviceID0)],
+			RDS:        tagMaps[L3_DEVICE][uint32(TYPE_RDS_INSTANCE)<<24|uint32(l7FlowLog.L3DeviceID0)],
+			LB:         tagMaps[L3_DEVICE][uint32(TYPE_LB)<<24|uint32(l7FlowLog.L3DeviceID0)],
+
+			TapPortName: tapPortName,
 		}, &UniversalTags{
 			Region:       tagMaps[REGION][uint32(l7FlowLog.RegionID1)],
 			AZ:           tagMaps[AZ][uint32(l7FlowLog.AZID1)],
-			Host:         tagMaps[L3_DEVICE][uint32(HOST_TYPE)<<24|uint32(l7FlowLog.HostID1)],
+			Host:         tagMaps[L3_DEVICE][uint32(TYPE_HOST)<<24|uint32(l7FlowLog.HostID1)],
 			L3DeviceType: tagMaps[L3_DEVICE_TYPE][uint32(l7FlowLog.L3DeviceType1)],
 			L3Device:     tagMaps[L3_DEVICE][uint32(l7FlowLog.L3DeviceID1)],
 			PodNode:      tagMaps[POD_NODE][uint32(l7FlowLog.PodNodeID1)],
@@ -111,16 +147,28 @@ func (u *UniversalTagsManager) QueryUniversalTags(l7FlowLog *log_data.L7FlowLog)
 			PodCluster:   tagMaps[POD_CLUSTER][uint32(l7FlowLog.PodClusterID1)],
 			L3Epc:        tagMaps[L3_EPC][uint32(l7FlowLog.L3EpcID1)],
 			Subnet:       tagMaps[SUBNET][uint32(l7FlowLog.SubnetID1)],
-			Service:      tagMaps[L3_DEVICE][uint32(SERVICE_TYPE<<24)|l7FlowLog.ServiceID1],
+			Service:      tagMaps[L3_DEVICE][uint32(TYPE_SERVICE<<24)|l7FlowLog.ServiceID1],
 			GProcess:     tagMaps[GPROCESS][uint32(l7FlowLog.GPID1)],
 			Vtap:         tagMaps[VTAP][uint32(l7FlowLog.VtapID)],
+
+			CHost:      tagMaps[L3_DEVICE][uint32(TYPE_VM)<<24|uint32(l7FlowLog.L3DeviceID1)],
+			Router:     tagMaps[L3_DEVICE][uint32(TYPE_VROUTER)<<24|uint32(l7FlowLog.L3DeviceID1)],
+			DhcpGW:     tagMaps[L3_DEVICE][uint32(TYPE_DHCP_PORT)<<24|uint32(l7FlowLog.L3DeviceID1)],
+			PodService: tagMaps[L3_DEVICE][uint32(TYPE_POD_SERVICE)<<24|uint32(l7FlowLog.L3DeviceID1)],
+			Redis:      tagMaps[L3_DEVICE][uint32(TYPE_REDIS_INSTANCE)<<24|uint32(l7FlowLog.L3DeviceID1)],
+			RDS:        tagMaps[L3_DEVICE][uint32(TYPE_RDS_INSTANCE)<<24|uint32(l7FlowLog.L3DeviceID1)],
+			LB:         tagMaps[L3_DEVICE][uint32(TYPE_LB)<<24|uint32(l7FlowLog.L3DeviceID1)],
+
+			TapPortName: tapPortName,
 		}
 }
 
 type UniversalTagsManager struct {
 	config           *config.Config
 	universalTagMaps *UniversalTagMaps
-	connection       *sql.DB
+	tapPortNameMap   map[uint64]string
+
+	connection *sql.DB
 }
 
 func NewUniversalTagsManager(config *config.Config) *UniversalTagsManager {
@@ -131,6 +179,7 @@ func NewUniversalTagsManager(config *config.Config) *UniversalTagsManager {
 	return &UniversalTagsManager{
 		config:           config,
 		universalTagMaps: universalTagMaps,
+		tapPortNameMap:   make(map[uint64]string),
 	}
 }
 
@@ -150,6 +199,12 @@ func (u *UniversalTagsManager) Start() {
 			}
 		} else {
 			log.Warningf("update universall tag maps faile: %s", err)
+		}
+
+		if newTapPortMap, err := u.queryTapPortMap(); err == nil {
+			if newTapPortMap != nil {
+				u.tapPortNameMap = newTapPortMap
+			}
 		}
 	}
 }
@@ -247,6 +302,27 @@ func (u *UniversalTagsManager) queryDeviceMap() (map[uint32]string, error) {
 			return nil, err
 		}
 		m[uint32((dtype<<24)|id)] = name
+	}
+	return m, err
+}
+
+func (u *UniversalTagsManager) queryTapPortMap() (map[uint64]string, error) {
+	sql := fmt.Sprintf("SELECT vtap_id,tap_port,name FROM flow_tag.`vtap_port_map`")
+	m := make(map[uint64]string)
+	rows, err := u.connection.Query(sql)
+	if err != nil {
+		log.Warning(err)
+		return nil, err
+	}
+	var vtapId, tapPort uint64
+	var name string
+	for rows.Next() {
+		err := rows.Scan(&vtapId, &tapPort, &name)
+		if err != nil {
+			log.Warning(err)
+			return nil, err
+		}
+		m[vtapId<<32|tapPort] = name
 	}
 	return m, err
 }
