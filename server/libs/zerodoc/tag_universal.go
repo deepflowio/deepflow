@@ -57,7 +57,7 @@ type UniversalTag struct {
 // Currently all fields are sorted lexicographically by name.
 func GenUniversalTagColumns(columns []*ckdb.Column) []*ckdb.Column {
 	columns = append(columns, ckdb.NewColumnWithGroupBy("az_id", ckdb.UInt16).SetComment("可用区ID"))
-	//columns = append(columns, ckdb.NewColumnWithGroupBy("gprocess_id", ckdb.UInt32).SetComment("全局进程ID"))
+	columns = append(columns, ckdb.NewColumnWithGroupBy("gprocess_id", ckdb.UInt32).SetComment("全局进程ID"))
 	columns = append(columns, ckdb.NewColumnWithGroupBy("host_id", ckdb.UInt16).SetComment("宿主机ID"))
 	columns = append(columns, ckdb.NewColumnWithGroupBy("ip4", ckdb.IPv4).SetComment("IPv4地址"))
 	columns = append(columns, ckdb.NewColumnWithGroupBy("ip6", ckdb.IPv6).SetComment("IPV6地址"))
@@ -88,7 +88,7 @@ func GenUniversalTagColumns(columns []*ckdb.Column) []*ckdb.Column {
 func (t *UniversalTag) WriteBlock(block *ckdb.Block) {
 	block.Write(
 		t.AZID,
-		//t.GPID,
+		t.GPID,
 		t.HostID,
 	)
 	block.WriteIPv4(t.IP)
