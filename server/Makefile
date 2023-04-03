@@ -98,7 +98,7 @@ clean:
 	rm -rf vendor
 	rm -rf bin
 	rm -rf .test-coverage.txt
-	find . -name '*.pb.go' -delete
+	find . -name '*.pb.go' | grep -v libs/datatype/prompb/ | xargs -i rm -f {}
 	rm -f libs/geo/ip_info.go
 	rm -f $(generated_libs)
 	rm -f libs/datatype/pb/flow_log.proto
