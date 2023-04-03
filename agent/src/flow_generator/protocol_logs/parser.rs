@@ -102,8 +102,8 @@ impl MetaAppProto {
             is_ipv6: meta_packet.lookup_key.eth_type == EthernetType::Ipv6,
             port_src: meta_packet.lookup_key.src_port,
             port_dst: meta_packet.lookup_key.dst_port,
-            l3_epc_id_src: 0,
-            l3_epc_id_dst: 0,
+            l3_epc_id_src: flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].l3_epc_id,
+            l3_epc_id_dst: flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].l3_epc_id,
             req_tcp_seq: 0,
             resp_tcp_seq: 0,
             process_id_0: 0,
@@ -155,8 +155,6 @@ impl MetaAppProto {
         }
 
         if meta_packet.direction == PacketDirection::ClientToServer {
-            base_info.l3_epc_id_src = flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].l3_epc_id;
-            base_info.l3_epc_id_dst = flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].l3_epc_id;
             base_info.req_tcp_seq = meta_packet.tcp_data.seq;
 
             // ebpf info
@@ -164,7 +162,6 @@ impl MetaAppProto {
             base_info.syscall_trace_id_thread_0 = meta_packet.thread_id;
             base_info.syscall_cap_seq_0 = meta_packet.cap_seq;
         } else {
-            swap(&mut base_info.mac_src, &mut base_info.mac_dst);
             swap(&mut base_info.ip_src, &mut base_info.ip_dst);
             swap(&mut base_info.port_src, &mut base_info.port_dst);
             #[cfg(target_os = "linux")]
@@ -176,8 +173,6 @@ impl MetaAppProto {
                 );
             }
 
-            base_info.l3_epc_id_src = flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].l3_epc_id;
-            base_info.l3_epc_id_dst = flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].l3_epc_id;
             base_info.resp_tcp_seq = meta_packet.tcp_data.seq;
 
             // ebpf info
