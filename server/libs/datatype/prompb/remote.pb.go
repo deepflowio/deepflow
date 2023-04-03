@@ -40,7 +40,7 @@ const (
 	// uint32 for CRC32 Castagnoli checksum.
 	//
 	// Response headers:
-	// Content-Type: "application/x-streamed-protobuf; proto=prometheus.ChunkedReadResponse"
+	// Content-Type: "application/x-streamed-protobuf; proto=prometheus_deepflow.ChunkedReadResponse"
 	// Content-Encoding: ""
 	ReadRequest_STREAMED_XOR_CHUNKS ReadRequest_ResponseType = 1
 )
@@ -126,7 +126,7 @@ type ReadRequest struct {
 	// Response types are taken from the list in the FIFO order. If no response type in `accepted_response_types` is
 	// implemented by server, error is returned.
 	// For request that do not contain `accepted_response_types` field the SAMPLES response type will be used.
-	AcceptedResponseTypes []ReadRequest_ResponseType `protobuf:"varint,2,rep,packed,name=accepted_response_types,json=acceptedResponseTypes,proto3,enum=prometheus.ReadRequest_ResponseType" json:"accepted_response_types,omitempty"`
+	AcceptedResponseTypes []ReadRequest_ResponseType `protobuf:"varint,2,rep,packed,name=accepted_response_types,json=acceptedResponseTypes,proto3,enum=prometheus_deepflow.ReadRequest_ResponseType" json:"accepted_response_types,omitempty"`
 	XXX_NoUnkeyedLiteral  struct{}                   `json:"-"`
 	XXX_unrecognized      []byte                     `json:"-"`
 	XXX_sizecache         int32                      `json:"-"`
@@ -408,13 +408,13 @@ func (m *ChunkedReadResponse) GetQueryIndex() int64 {
 }
 
 func init() {
-	proto.RegisterEnum("prometheus.ReadRequest_ResponseType", ReadRequest_ResponseType_name, ReadRequest_ResponseType_value)
-	proto.RegisterType((*WriteRequest)(nil), "prometheus.WriteRequest")
-	proto.RegisterType((*ReadRequest)(nil), "prometheus.ReadRequest")
-	proto.RegisterType((*ReadResponse)(nil), "prometheus.ReadResponse")
-	proto.RegisterType((*Query)(nil), "prometheus.Query")
-	proto.RegisterType((*QueryResult)(nil), "prometheus.QueryResult")
-	proto.RegisterType((*ChunkedReadResponse)(nil), "prometheus.ChunkedReadResponse")
+	proto.RegisterEnum("prometheus_deepflow.ReadRequest_ResponseType", ReadRequest_ResponseType_name, ReadRequest_ResponseType_value)
+	proto.RegisterType((*WriteRequest)(nil), "prometheus_deepflow.WriteRequest")
+	proto.RegisterType((*ReadRequest)(nil), "prometheus_deepflow.ReadRequest")
+	proto.RegisterType((*ReadResponse)(nil), "prometheus_deepflow.ReadResponse")
+	proto.RegisterType((*Query)(nil), "prometheus_deepflow.Query")
+	proto.RegisterType((*QueryResult)(nil), "prometheus_deepflow.QueryResult")
+	proto.RegisterType((*ChunkedReadResponse)(nil), "prometheus_deepflow.ChunkedReadResponse")
 }
 
 func init() { proto.RegisterFile("remote.proto", fileDescriptor_eefc82927d57d89b) }
