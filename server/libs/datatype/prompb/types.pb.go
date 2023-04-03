@@ -678,7 +678,7 @@ func (*TimeSeries) Descriptor() ([]byte, []int) {
 	return fileDescriptor_d938547f84707355, []int{5}
 }
 func (m *TimeSeries) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
+	return m.Unmarshal(b, nil)
 }
 func (m *TimeSeries) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
@@ -3361,9 +3361,13 @@ func (m *BucketSpan) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *TimeSeries) Unmarshal(dAtA []byte) error {
+func (m *TimeSeries) Unmarshal(dAtA []byte, pLabelBuffer *[]Label) error {
 	l := len(dAtA)
 	iNdEx := 0
+	labelStartIndex := 0
+	if pLabelBuffer != nil {
+		labelStartIndex = len(*pLabelBuffer)
+	}
 	for iNdEx < l {
 		preIndex := iNdEx
 		var wire uint64
@@ -3419,7 +3423,12 @@ func (m *TimeSeries) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Labels = append(m.Labels, Label{})
+			if pLabelBuffer != nil {
+				*pLabelBuffer = append(*pLabelBuffer, Label{})
+				m.Labels = (*pLabelBuffer)[labelStartIndex:]
+			} else {
+				m.Labels = append(m.Labels, Label{})
+			}
 			if err := m.Labels[len(m.Labels)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
@@ -3487,10 +3496,11 @@ func (m *TimeSeries) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Exemplars = append(m.Exemplars, Exemplar{})
-			if err := m.Exemplars[len(m.Exemplars)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
+			// Exemplar is not supporrted yet.
+			//m.Exemplars = append(m.Exemplars, Exemplar{})
+			//if err := m.Exemplars[len(m.Exemplars)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+			//	return err
+			//}
 			iNdEx = postIndex
 		case 4:
 			if wireType != 2 {
@@ -3521,10 +3531,11 @@ func (m *TimeSeries) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Histograms = append(m.Histograms, Histogram{})
-			if err := m.Histograms[len(m.Histograms)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
+			// Histogram is not supporrted yet.
+			//m.Histograms = append(m.Histograms, Histogram{})
+			//if err := m.Histograms[len(m.Histograms)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+			//	return err
+			//}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -3538,7 +3549,8 @@ func (m *TimeSeries) Unmarshal(dAtA []byte) error {
 			if (iNdEx + skippy) > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
+			// Ignore unrecognized
+			//m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
 			iNdEx += skippy
 		}
 	}
@@ -3607,7 +3619,7 @@ func (m *Label) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Name = string(dAtA[iNdEx:postIndex])
+			m.Name = unsafeBytesToString(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
@@ -3639,7 +3651,7 @@ func (m *Label) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Value = string(dAtA[iNdEx:postIndex])
+			m.Value = unsafeBytesToString(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
