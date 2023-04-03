@@ -116,6 +116,7 @@ type TcpTimeoutConfig struct {
 	EstablishedTimeout *string `yaml:"established-timeout,omitempty"`
 	ClosingRstTimeout  *string `yaml:"closing-rst-timeout,omitempty"`
 	OthersTimeout      *string `yaml:"others-timeout,omitempty"`
+	OpeningRstTimeout  *string `yaml:"opening-rst-timeout,omitempty"`
 }
 
 type FlowGeneratorConfig struct {
