@@ -281,6 +281,13 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 
 	showTagsSql := "show tags from " + table
 	tags, _, _, err := e.ParseShowSql(showTagsSql)
+	if err != nil {
+		log.Error(err)
+		return nil, nil, err
+	} else if len(tags.Values) == 0 {
+		err = errors.New("No data in show tags")
+		return nil, nil, err
+	}
 	tagsSlice := []string{}
 	for _, col := range tags.Values {
 		colSlice := col.([]interface{})
