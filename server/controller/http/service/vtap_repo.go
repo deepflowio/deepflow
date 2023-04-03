@@ -67,7 +67,7 @@ func GetVtapRepo(filter map[string]interface{}) ([]model.VtapRepo, error) {
 	if _, ok := filter["name"]; ok {
 		db = db.Where("name = ?", filter["name"])
 	}
-	mysql.Db.Order("updated_at DESC").Find(&vtapRepoes)
+	db.Order("updated_at DESC").Find(&vtapRepoes)
 
 	var resp []model.VtapRepo
 	for _, vtapRepo := range vtapRepoes {

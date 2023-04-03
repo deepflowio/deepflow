@@ -1337,3 +1337,16 @@ func (c compressedImage) Value() (driver.Value, error) {
 func (VTapRepo) TableName() string {
 	return "vtap_repo"
 }
+
+type Plugin struct {
+	ID        int             `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name      string          `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
+	Type      int             `gorm:"column:type;type:int" json:"TYPE"` // 1: wasm
+	Image     compressedImage `gorm:"column:image;type:logblob;not null" json:"IMAGE"`
+	CreatedAt time.Time       `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
+	UpdatedAt time.Time       `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
+}
+
+func (Plugin) TableName() string {
+	return "plugin"
+}
