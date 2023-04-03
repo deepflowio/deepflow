@@ -360,6 +360,7 @@ impl From<&RuntimeConfig> for FlowConfig {
                 established: flow_config.established_timeout,
                 closing_rst: flow_config.closing_rst_timeout,
                 others: flow_config.others_timeout,
+                opening_rst: flow_config.opening_rst_timeout,
             }),
             ignore_tor_mac: flow_config.ignore_tor_mac,
             ignore_l2_end: flow_config.ignore_l2_end,

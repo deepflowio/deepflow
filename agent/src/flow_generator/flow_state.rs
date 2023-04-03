@@ -43,6 +43,7 @@ pub enum FlowState {
     Syn1,
     SynAck1,
     EstablishReset,
+    OpeningRst,
 
     Max,
 }
@@ -168,7 +169,7 @@ impl StateMachine {
         m[FlowState::Opening2 as usize][TcpFlags::FIN_PSH_ACK.bits() as usize] = Some(s);
 
         // 有RST(正)
-        let s = Rc::new(StateValue::new(t.closing, FlowState::EstablishReset, false));
+        let s = Rc::new(StateValue::new(t.opening_rst, FlowState::OpeningRst, false));
         m[FlowState::Opening2 as usize][TcpFlags::RST.bits() as usize] = Some(s.clone());
         m[FlowState::Opening2 as usize][TcpFlags::RST_ACK.bits() as usize] = Some(s.clone());
         m[FlowState::Opening2 as usize][TcpFlags::RST_PSH_ACK.bits() as usize] = Some(s);
@@ -521,6 +522,20 @@ impl StateMachine {
         m[FlowState::EstablishReset as usize][TcpFlags::PSH_ACK.bits() as usize] = Some(s.clone());
         m[FlowState::EstablishReset as usize][TcpFlags::PSH_ACK_URG.bits() as usize] = Some(s);
 
+        // for FlowState::OpeningRst
+        let s = Rc::new(StateValue::new(t.opening_rst, FlowState::OpeningRst, false));
+        m[FlowState::OpeningRst as usize][TcpFlags::SYN.bits() as usize] = Some(s.clone());
+        m[FlowState::OpeningRst as usize][TcpFlags::SYN_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::OpeningRst as usize][TcpFlags::FIN.bits() as usize] = Some(s.clone());
+        m[FlowState::OpeningRst as usize][TcpFlags::FIN_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::OpeningRst as usize][TcpFlags::FIN_PSH_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::OpeningRst as usize][TcpFlags::RST.bits() as usize] = Some(s.clone());
+        m[FlowState::OpeningRst as usize][TcpFlags::RST_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::OpeningRst as usize][TcpFlags::RST_PSH_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::OpeningRst as usize][TcpFlags::ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::OpeningRst as usize][TcpFlags::PSH_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::OpeningRst as usize][TcpFlags::PSH_ACK_URG.bits() as usize] = Some(s);
+
         wrapped
     }
 
@@ -675,6 +690,20 @@ impl StateMachine {
         // for FlowState::ClientL4PortReuse
 
         // for FlowState::ServerCandidateQueueLack
+
+        // for FlowState::OpeningRst
+        let s = Rc::new(StateValue::new(t.opening_rst, FlowState::OpeningRst, false));
+        m[FlowState::OpeningRst as usize][TcpFlags::SYN.bits() as usize] = Some(s.clone());
+        m[FlowState::OpeningRst as usize][TcpFlags::SYN_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::OpeningRst as usize][TcpFlags::FIN.bits() as usize] = Some(s.clone());
+        m[FlowState::OpeningRst as usize][TcpFlags::FIN_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::OpeningRst as usize][TcpFlags::FIN_PSH_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::OpeningRst as usize][TcpFlags::RST.bits() as usize] = Some(s.clone());
+        m[FlowState::OpeningRst as usize][TcpFlags::RST_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::OpeningRst as usize][TcpFlags::RST_PSH_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::OpeningRst as usize][TcpFlags::ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::OpeningRst as usize][TcpFlags::PSH_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::OpeningRst as usize][TcpFlags::PSH_ACK_URG.bits() as usize] = Some(s);
 
         wrapped
     }
@@ -996,11 +1025,15 @@ mod tests {
     }
 
     #[test]
-    fn client_establish_reset() {
+    fn opening_reset() {
         state_machine_helper(
             Path::new(FILE_DIR).join("client-syn-try-lack.pcap"),
-            CloseType::ClientEstablishReset,
+            CloseType::TcpClientRst,
         );
+    }
+
+    #[test]
+    fn client_establish_reset() {
         state_machine_helper(
             Path::new(FILE_DIR).join("server-no-response.pcap"),
             CloseType::ClientEstablishReset,
@@ -1228,8 +1261,8 @@ mod tests {
                 cur_state,
                 tcp_flags,
                 pkt_dir,
-                next_state: FlowState::EstablishReset,
-                timeout: flow_timeout.closing,
+                next_state: FlowState::OpeningRst,
+                timeout: flow_timeout.opening_rst,
                 closed: false,
             });
         }
