@@ -596,3 +596,14 @@ const (
 const (
 	PROCESS_INSTANCE_TYPE = 120 // used in process event
 )
+
+// plugin
+const (
+	PLUGIN_TYPE_WASM = 1
+)
+
+var (
+	PluginTypeName = map[int]string{
+		PLUGIN_TYPE_WASM: "wasm",
+	}
+)

@@ -799,3 +799,10 @@ type CSVHeader struct {
 	DisplayName string `json:"DISPLAY_NAME"`
 	FieldName   string `json:"FIELD_NAME"`
 }
+
+type Plugin struct {
+	Name      string `json:"NAME" binding:"required"`
+	Type      int    `json:"TYPE" binding:"required"`
+	Image     []byte `json:"IMAGE,omitempty" binding:"required"`
+	UpdatedAt string `json:"UPDATED_AT"`
+}

@@ -163,7 +163,6 @@ func createRepoAgent(cmd *cobra.Command, arch, image, versionImage string) error
 		return err
 	}
 	data := resp.Get("DATA")
-	data.Get("")
 	fmt.Printf("created successfully, os: %s, branch: %s, rev_count: %s, commit_id: %s\n", data.Get("OS").MustString(),
 		data.Get("BRANCH").MustString(), data.Get("REV_COUNT").MustString(), data.Get("COMMIT_ID").MustString())
 	return nil
