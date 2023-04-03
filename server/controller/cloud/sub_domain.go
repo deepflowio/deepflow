@@ -324,6 +324,7 @@ func (c *Cloud) getSubDomainPodServices(
 		retPodServices = append(retPodServices, model.PodService{
 			Lcuuid:             podService.Lcuuid,
 			Name:               podService.Name,
+			Label:              podService.Label,
 			Type:               podService.Type,
 			Selector:           podService.Selector,
 			ServiceClusterIP:   podService.ServiceClusterIP,
