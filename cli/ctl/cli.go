@@ -62,6 +62,7 @@ func Execute(version string) {
 	root.AddCommand(RegisterVPCCommend())
 	root.AddCommand(RegisterServerCommand())
 	root.AddCommand(RegisterRepoCommand())
+	root.AddCommand(RegisterPluginCommand())
 
 	cmd.RegisterIngesterCommand(root)
 
