@@ -2365,6 +2365,7 @@ mod tests {
                 established: Duration::from_secs(300),
                 closing: Duration::ZERO,
                 established_rst: Duration::from_secs(30),
+                opening_rst: Duration::from_secs(1),
                 exception: Duration::from_secs(5),
                 closed_fin: Duration::ZERO,
                 single_direction: Duration::from_millis(10),

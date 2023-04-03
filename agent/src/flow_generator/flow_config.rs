@@ -25,11 +25,13 @@ use public::proto::common::TridentType;
 pub const TIMEOUT_OTHERS: Duration = Duration::from_secs(5);
 pub const TIMEOUT_ESTABLISHED: Duration = Duration::from_secs(300);
 pub const TIMEOUT_CLOSING: Duration = Duration::from_secs(35);
+pub const TIMEOUT_OPENING_RST: Duration = Duration::from_secs(1);
 
 pub struct TcpTimeout {
     pub established: Duration,
     pub closing_rst: Duration,
     pub others: Duration,
+    pub opening_rst: Duration,
 }
 
 impl Default for TcpTimeout {
@@ -38,6 +40,7 @@ impl Default for TcpTimeout {
             established: TIMEOUT_ESTABLISHED,
             closing_rst: TIMEOUT_CLOSING,
             others: TIMEOUT_OTHERS,
+            opening_rst: TIMEOUT_OPENING_RST,
         }
     }
 }
@@ -51,6 +54,7 @@ pub struct FlowTimeout {
     pub exception: Duration,
     pub closed_fin: Duration,
     pub single_direction: Duration,
+    pub opening_rst: Duration,
 
     pub min: Duration,
     pub max: Duration, // time window
@@ -66,6 +70,7 @@ impl From<TcpTimeout> for FlowTimeout {
             exception: t.others,
             closed_fin: Duration::from_secs(2),
             single_direction: t.others,
+            opening_rst: t.opening_rst,
             min: Duration::from_secs(0),
             max: Duration::from_secs(0),
         };
@@ -83,7 +88,8 @@ impl FlowTimeout {
             .min(self.established_rst)
             .min(self.exception)
             .min(self.closed_fin)
-            .min(self.single_direction);
+            .min(self.single_direction)
+            .min(self.opening_rst);
         self.max = self
             .opening
             .max(self.established)
@@ -91,7 +97,8 @@ impl FlowTimeout {
             .max(self.established_rst)
             .max(self.exception)
             .max(self.closed_fin)
-            .max(self.single_direction);
+            .max(self.single_direction)
+            .max(self.opening_rst);
     }
 }
 
