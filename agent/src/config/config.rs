@@ -679,6 +679,8 @@ pub struct FlowGeneratorConfig {
     pub closing_rst_timeout: Duration,
     #[serde(with = "humantime_serde")]
     pub others_timeout: Duration,
+    #[serde(with = "humantime_serde")]
+    pub opening_rst_timeout: Duration,
 
     #[serde(rename = "flow-slots-size")]
     pub hash_slots: u32,
@@ -699,6 +701,7 @@ impl Default for FlowGeneratorConfig {
             established_timeout: Duration::from_secs(300),
             closing_rst_timeout: Duration::from_secs(35),
             others_timeout: Duration::from_secs(5),
+            opening_rst_timeout: Duration::from_secs(1),
 
             hash_slots: 131072,
             capacity: 1048576,

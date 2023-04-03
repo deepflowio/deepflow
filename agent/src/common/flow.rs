@@ -901,7 +901,7 @@ impl Flow {
                     CloseType::TcpClientRst
                 }
             }
-            FlowState::EstablishReset => {
+            FlowState::EstablishReset | FlowState::OpeningRst => {
                 if self.flow_metrics_peers[FlowMetricsPeer::DST as usize]
                     .tcp_flags
                     .contains(TcpFlags::RST)

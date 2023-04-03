@@ -665,6 +665,7 @@ vtap_group_id: g-xxxxxx
     #established-timeout: 300s
     #closing-rst-timeout: 35s
     #others-timeout: 5s
+    #opening-rst-timeout: 1s
 
   #####################
   ## DPDK RecvEngine ##
