@@ -165,7 +165,7 @@ func (Chunk_Encoding) EnumDescriptor() ([]byte, []int) {
 type MetricMetadata struct {
 	// Represents the metric type, these match the set from Prometheus.
 	// Refer to model/textparse/interface.go for details.
-	Type                 MetricMetadata_MetricType `protobuf:"varint,1,opt,name=type,proto3,enum=prometheus.MetricMetadata_MetricType" json:"type,omitempty"`
+	Type                 MetricMetadata_MetricType `protobuf:"varint,1,opt,name=type,proto3,enum=prometheus_deepflow.MetricMetadata_MetricType" json:"type,omitempty"`
 	MetricFamilyName     string                    `protobuf:"bytes,2,opt,name=metric_family_name,json=metricFamilyName,proto3" json:"metric_family_name,omitempty"`
 	Help                 string                    `protobuf:"bytes,4,opt,name=help,proto3" json:"help,omitempty"`
 	Unit                 string                    `protobuf:"bytes,5,opt,name=unit,proto3" json:"unit,omitempty"`
@@ -399,7 +399,7 @@ type Histogram struct {
 	// histograms.
 	PositiveDeltas []int64             `protobuf:"zigzag64,12,rep,packed,name=positive_deltas,json=positiveDeltas,proto3" json:"positive_deltas,omitempty"`
 	PositiveCounts []float64           `protobuf:"fixed64,13,rep,packed,name=positive_counts,json=positiveCounts,proto3" json:"positive_counts,omitempty"`
-	ResetHint      Histogram_ResetHint `protobuf:"varint,14,opt,name=reset_hint,json=resetHint,proto3,enum=prometheus.Histogram_ResetHint" json:"reset_hint,omitempty"`
+	ResetHint      Histogram_ResetHint `protobuf:"varint,14,opt,name=reset_hint,json=resetHint,proto3,enum=prometheus_deepflow.Histogram_ResetHint" json:"reset_hint,omitempty"`
 	// timestamp is in ms format, see model/timestamp/timestamp.go for
 	// conversion from time.Time to Prometheus timestamp.
 	Timestamp            int64    `protobuf:"varint,15,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
@@ -836,7 +836,7 @@ func (m *Labels) GetLabels() []Label {
 
 // Matcher specifies a rule, which can match or set of labels or not.
 type LabelMatcher struct {
-	Type                 LabelMatcher_Type `protobuf:"varint,1,opt,name=type,proto3,enum=prometheus.LabelMatcher_Type" json:"type,omitempty"`
+	Type                 LabelMatcher_Type `protobuf:"varint,1,opt,name=type,proto3,enum=prometheus_deepflow.LabelMatcher_Type" json:"type,omitempty"`
 	Name                 string            `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	Value                string            `protobuf:"bytes,3,opt,name=value,proto3" json:"value,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
@@ -998,7 +998,7 @@ func (m *ReadHints) GetRangeMs() int64 {
 type Chunk struct {
 	MinTimeMs            int64          `protobuf:"varint,1,opt,name=min_time_ms,json=minTimeMs,proto3" json:"min_time_ms,omitempty"`
 	MaxTimeMs            int64          `protobuf:"varint,2,opt,name=max_time_ms,json=maxTimeMs,proto3" json:"max_time_ms,omitempty"`
-	Type                 Chunk_Encoding `protobuf:"varint,3,opt,name=type,proto3,enum=prometheus.Chunk_Encoding" json:"type,omitempty"`
+	Type                 Chunk_Encoding `protobuf:"varint,3,opt,name=type,proto3,enum=prometheus_deepflow.Chunk_Encoding" json:"type,omitempty"`
 	Data                 []byte         `protobuf:"bytes,4,opt,name=data,proto3" json:"data,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}       `json:"-"`
 	XXX_unrecognized     []byte         `json:"-"`
@@ -1125,22 +1125,22 @@ func (m *ChunkedSeries) GetChunks() []Chunk {
 }
 
 func init() {
-	proto.RegisterEnum("prometheus.MetricMetadata_MetricType", MetricMetadata_MetricType_name, MetricMetadata_MetricType_value)
-	proto.RegisterEnum("prometheus.Histogram_ResetHint", Histogram_ResetHint_name, Histogram_ResetHint_value)
-	proto.RegisterEnum("prometheus.LabelMatcher_Type", LabelMatcher_Type_name, LabelMatcher_Type_value)
-	proto.RegisterEnum("prometheus.Chunk_Encoding", Chunk_Encoding_name, Chunk_Encoding_value)
-	proto.RegisterType((*MetricMetadata)(nil), "prometheus.MetricMetadata")
-	proto.RegisterType((*Sample)(nil), "prometheus.Sample")
-	proto.RegisterType((*Exemplar)(nil), "prometheus.Exemplar")
-	proto.RegisterType((*Histogram)(nil), "prometheus.Histogram")
-	proto.RegisterType((*BucketSpan)(nil), "prometheus.BucketSpan")
-	proto.RegisterType((*TimeSeries)(nil), "prometheus.TimeSeries")
-	proto.RegisterType((*Label)(nil), "prometheus.Label")
-	proto.RegisterType((*Labels)(nil), "prometheus.Labels")
-	proto.RegisterType((*LabelMatcher)(nil), "prometheus.LabelMatcher")
-	proto.RegisterType((*ReadHints)(nil), "prometheus.ReadHints")
-	proto.RegisterType((*Chunk)(nil), "prometheus.Chunk")
-	proto.RegisterType((*ChunkedSeries)(nil), "prometheus.ChunkedSeries")
+	proto.RegisterEnum("prometheus_deepflow.MetricMetadata_MetricType", MetricMetadata_MetricType_name, MetricMetadata_MetricType_value)
+	proto.RegisterEnum("prometheus_deepflow.Histogram_ResetHint", Histogram_ResetHint_name, Histogram_ResetHint_value)
+	proto.RegisterEnum("prometheus_deepflow.LabelMatcher_Type", LabelMatcher_Type_name, LabelMatcher_Type_value)
+	proto.RegisterEnum("prometheus_deepflow.Chunk_Encoding", Chunk_Encoding_name, Chunk_Encoding_value)
+	proto.RegisterType((*MetricMetadata)(nil), "prometheus_deepflow.MetricMetadata")
+	proto.RegisterType((*Sample)(nil), "prometheus_deepflow.Sample")
+	proto.RegisterType((*Exemplar)(nil), "prometheus_deepflow.Exemplar")
+	proto.RegisterType((*Histogram)(nil), "prometheus_deepflow.Histogram")
+	proto.RegisterType((*BucketSpan)(nil), "prometheus_deepflow.BucketSpan")
+	proto.RegisterType((*TimeSeries)(nil), "prometheus_deepflow.TimeSeries")
+	proto.RegisterType((*Label)(nil), "prometheus_deepflow.Label")
+	proto.RegisterType((*Labels)(nil), "prometheus_deepflow.Labels")
+	proto.RegisterType((*LabelMatcher)(nil), "prometheus_deepflow.LabelMatcher")
+	proto.RegisterType((*ReadHints)(nil), "prometheus_deepflow.ReadHints")
+	proto.RegisterType((*Chunk)(nil), "prometheus_deepflow.Chunk")
+	proto.RegisterType((*ChunkedSeries)(nil), "prometheus_deepflow.ChunkedSeries")
 }
 
 func init() { proto.RegisterFile("types.proto", fileDescriptor_d938547f84707355) }

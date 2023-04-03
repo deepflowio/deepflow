@@ -12,7 +12,7 @@
 // limitations under the License.
 
 syntax = "proto3";
-package prometheus;
+package prometheus_deepflow;
 
 option go_package = "prompb";
 
@@ -20,11 +20,11 @@ import "types.proto";
 import "gogoproto/gogo.proto";
 
 message WriteRequest {
-  repeated prometheus.TimeSeries timeseries = 1 [(gogoproto.nullable) = false];
+  repeated prometheus_deepflow.TimeSeries timeseries = 1 [(gogoproto.nullable) = false];
   // Cortex uses this field to determine the source of the write request.
   // We reserve it to avoid any compatibility issues.
   reserved  2;
-  repeated prometheus.MetricMetadata metadata = 3 [(gogoproto.nullable) = false];
+  repeated prometheus_deepflow.MetricMetadata metadata = 3 [(gogoproto.nullable) = false];
 }
 
 // ReadRequest represents a remote read request.
@@ -45,7 +45,7 @@ message ReadRequest {
     // uint32 for CRC32 Castagnoli checksum.
     //
     // Response headers:
-    // Content-Type: "application/x-streamed-protobuf; proto=prometheus.ChunkedReadResponse"
+    // Content-Type: "application/x-streamed-protobuf; proto=prometheus_deepflow.ChunkedReadResponse"
     // Content-Encoding: ""
     STREAMED_XOR_CHUNKS = 1;
   }
@@ -67,13 +67,13 @@ message ReadResponse {
 message Query {
   int64 start_timestamp_ms = 1;
   int64 end_timestamp_ms = 2;
-  repeated prometheus.LabelMatcher matchers = 3;
-  prometheus.ReadHints hints = 4;
+  repeated prometheus_deepflow.LabelMatcher matchers = 3;
+  prometheus_deepflow.ReadHints hints = 4;
 }
 
 message QueryResult {
   // Samples within a time series must be ordered by time.
-  repeated prometheus.TimeSeries timeseries = 1;
+  repeated prometheus_deepflow.TimeSeries timeseries = 1;
 }
 
 // ChunkedReadResponse is a response when response_type equals STREAMED_XOR_CHUNKS.
@@ -81,7 +81,7 @@ message QueryResult {
 // partition of the single series, but once a new series is started to be streamed it means that no more chunks will
 // be sent for previous one. Series are returned sorted in the same way TSDB block are internally.
 message ChunkedReadResponse {
-  repeated prometheus.ChunkedSeries chunked_series = 1;
+  repeated prometheus_deepflow.ChunkedSeries chunked_series = 1;
 
   // query_index represents an index of the query from ReadRequest.queries these chunks relates to.
   int64 query_index = 2;
