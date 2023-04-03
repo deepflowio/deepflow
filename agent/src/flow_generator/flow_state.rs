@@ -297,6 +297,8 @@ impl StateMachine {
         m[FlowState::ClosingRx2 as usize][TcpFlags::PSH_ACK_URG.bits() as usize] = Some(s);
 
         // for FlowState::Closed
+        let s = Rc::new(StateValue::new(t.closed_fin, FlowState::Closed, false));
+        m[FlowState::Closed as usize][TcpFlags::ACK.bits() as usize] = Some(s);
 
         // for FlowState::Reset
         let s = Rc::new(StateValue::new(t.exception, FlowState::Reset, false));
@@ -607,6 +609,8 @@ impl StateMachine {
         m[FlowState::ClosingRx2 as usize][TcpFlags::ACK.bits() as usize] = Some(s);
 
         // for FlowState::Closed
+        let s = Rc::new(StateValue::new(t.closed_fin, FlowState::Closed, false));
+        m[FlowState::Closed as usize][TcpFlags::ACK.bits() as usize] = Some(s);
 
         // for FlowState::Reset
 
@@ -731,6 +735,86 @@ mod tests {
                 .unwrap(),
             StateValue::new(flow_timeout.exception, FlowState::ClientL4PortReuse, false,)
         );
+    }
+
+    #[test]
+    fn test_closed_ack() {
+        let packets = vec![
+            (TcpFlags::SYN, PacketDirection::ClientToServer),
+            (TcpFlags::SYN_ACK, PacketDirection::ServerToClient),
+            (TcpFlags::ACK, PacketDirection::ClientToServer),
+            (TcpFlags::PSH_ACK, PacketDirection::ClientToServer),
+            (TcpFlags::PSH_ACK, PacketDirection::ServerToClient),
+            (TcpFlags::FIN_ACK, PacketDirection::ServerToClient),
+            (TcpFlags::FIN_ACK, PacketDirection::ClientToServer),
+            (TcpFlags::ACK, PacketDirection::ServerToClient),
+            (TcpFlags::ACK, PacketDirection::ClientToServer),
+        ];
+
+        let (mut flow_map, _) = _new_flow_map_and_receiver(TridentType::TtProcess, None);
+        let mut flow_node = FlowNode {
+            timestamp_key: get_timestamp(0).as_nanos() as u64,
+
+            tagged_flow: TaggedFlow::default(),
+            min_arrived_time: Duration::ZERO,
+            recent_time: Duration::ZERO,
+            timeout: Duration::ZERO,
+            flow_state: FlowState::Raw,
+            meta_flow_log: None,
+            policy_data_cache: Default::default(),
+            endpoint_data_cache: {
+                let data = EndpointData {
+                    src_info: EndpointInfo {
+                        real_ip: Ipv4Addr::UNSPECIFIED.into(),
+                        l2_epc_id: 0,
+                        l3_epc_id: 0,
+                        l2_end: false,
+                        l3_end: false,
+                        is_device: false,
+                        is_vip_interface: false,
+                        is_vip: false,
+                        is_local_mac: false,
+                        is_local_ip: false,
+                    },
+                    dst_info: EndpointInfo {
+                        real_ip: Ipv4Addr::UNSPECIFIED.into(),
+                        l2_epc_id: 0,
+                        l3_epc_id: 0,
+                        l2_end: false,
+                        l3_end: false,
+                        is_device: false,
+                        is_vip_interface: false,
+                        is_vip: false,
+                        is_local_mac: false,
+                        is_local_ip: false,
+                    },
+                };
+                [Arc::new(data), Arc::new(data.reversed())]
+            },
+            residual_request: 0,
+            next_tcp_seq0: 0,
+            next_tcp_seq1: 0,
+            packet_in_tick: false,
+            policy_in_tick: [false; 2],
+            packet_sequence_block: Some(Box::new(PacketSequenceBlock::default())), // Enterprise Edition Feature: packet-sequence
+        };
+
+        let peers = &mut flow_node.tagged_flow.flow.flow_metrics_peers;
+        peers[FLOW_METRICS_PEER_SRC].total_packet_count = 1;
+        peers[FLOW_METRICS_PEER_DST].total_packet_count = 1;
+
+        let config = (&RuntimeConfig::default()).into();
+        for (flags, direction) in packets {
+            let _ = flow_map.update_flow_state_machine(&config, &mut flow_node, flags, direction);
+        }
+        assert_eq!(flow_node.flow_state, FlowState::Closed);
+        let _ = flow_map.update_flow_state_machine(
+            &config,
+            &mut flow_node,
+            TcpFlags::PSH_ACK,
+            PacketDirection::ClientToServer,
+        );
+        assert_eq!(flow_node.flow_state, FlowState::Exception);
     }
 
     #[test]
