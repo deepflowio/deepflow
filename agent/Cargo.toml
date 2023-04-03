@@ -79,15 +79,20 @@ kube = { version = "0.74", default-features = false, features = [
 nix = "0.23"
 openshift-openapi = { version = "0.3.1", features = ["v4_6"] }
 pcap = "0.9.1"
-procfs = {git = "https://github.com/deepflowio/procfs/"}
+procfs = { git = "https://github.com/deepflowio/procfs/" }
 
 [patch.crates-io]
 openshift-openapi = { git = "https://github.com/deepflowio/openshift-openapi.git" }
-kube = { git = "https://github.com/deepflowio/kube", tag = "0.74.1" }
+kube = { git = "https://github.com/deepflowio/kube", tag = "0.74.2" }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 pcap = "0.10.1"
-winapi = { version = "0.3.9", features = ["errhandlingapi", "libloaderapi", "minwindef", "winerror" ] }
+winapi = { version = "0.3.9", features = [
+    "errhandlingapi",
+    "libloaderapi",
+    "minwindef",
+    "winerror",
+] }
 windows = { version = "0.30", features = [
     "Win32_Foundation",
     "Win32_System_Diagnostics_ToolHelp",
