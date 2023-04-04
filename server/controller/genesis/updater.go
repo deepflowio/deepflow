@@ -19,11 +19,13 @@ package genesis
 import (
 	"context"
 	"fmt"
-	"inet.af/netaddr"
 	"net"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"inet.af/netaddr"
 
 	tridentcommon "github.com/deepflowio/deepflow/message/common"
 	"github.com/deepflowio/deepflow/server/controller/common"
@@ -50,6 +52,7 @@ type GenesisSyncRpcUpdater struct {
 	excludeIPRanges       []netaddr.IPPrefix
 	multiNSMode           bool
 	singleVPCMode         bool
+	ignoreNICRegex        *regexp.Regexp
 	genesisSyncDataByPeer map[uint32]GenesisSyncDataOperation
 }
 
@@ -97,6 +100,11 @@ func NewGenesisSyncRpcUpdater(storage *SyncStorage, queue queue.QueueReader, cfg
 		}
 	}
 
+	ignoreNICRegex, err := regexp.Compile(cfg.IgnoreNICRegex)
+	if err != nil {
+		log.Errorf("config ignore NIC regex (%s) complie failed", cfg.IgnoreNICRegex)
+	}
+
 	vCtx, vCancel := context.WithCancel(ctx)
 	return &GenesisSyncRpcUpdater{
 		vCtx:                  vCtx,
@@ -108,6 +116,7 @@ func NewGenesisSyncRpcUpdater(storage *SyncStorage, queue queue.QueueReader, cfg
 		excludeIPRanges:       excludeIPRanges,
 		multiNSMode:           cfg.MultiNSMode,
 		singleVPCMode:         cfg.SingleVPCMode,
+		ignoreNICRegex:        ignoreNICRegex,
 		genesisSyncDataByPeer: map[uint32]GenesisSyncDataOperation{},
 	}
 }
@@ -146,6 +155,9 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info VIFRPCMessage, peer str
 
 		for _, item := range parsedGlobalIPs {
 			if item.Name == "lo" {
+				continue
+			}
+			if v.ignoreNICRegex != nil && v.ignoreNICRegex.MatchString(item.Name) {
 				continue
 			}
 			if item.MAC == "" {
