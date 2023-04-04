@@ -30,8 +30,9 @@ import (
 var log = logging.MustGetLogger("event.dbwriter")
 
 const (
-	EVENT_DB    = "event"
-	EVENT_TABLE = "event"
+	EVENT_DB         = "event"
+	EVENT_TABLE      = "event"
+	PERF_EVENT_TABLE = "perf_event"
 )
 
 type ClusterNode struct {
@@ -65,7 +66,7 @@ func (w *EventWriter) Write(e *EventStore) {
 	w.flowTagWriter.WriteFieldsAndFieldValuesInCache()
 }
 
-func NewEventWriter(decoderIndex int, config *config.Config) (*EventWriter, error) {
+func NewEventWriter(table string, decoderIndex int, config *config.Config) (*EventWriter, error) {
 	w := &EventWriter{
 		ckdbAddrs:         config.Base.CKDB.ActualAddrs,
 		ckdbUsername:      config.Base.CKDBAuth.Username,
@@ -73,19 +74,24 @@ func NewEventWriter(decoderIndex int, config *config.Config) (*EventWriter, erro
 		ckdbCluster:       config.Base.CKDB.ClusterName,
 		ckdbStoragePolicy: config.Base.CKDB.StoragePolicy,
 		ckdbColdStorages:  config.Base.GetCKDBColdStorages(),
-		ttl:               config.TTL,
-		writerConfig:      config.CKWriterConfig,
 	}
-	flowTagWriter, err := flow_tag.NewFlowTagWriter(decoderIndex, EVENT_DB, EVENT_DB, config.TTL, DefaultPartition, config.Base, &config.CKWriterConfig)
+	if table == EVENT_TABLE {
+		w.ttl = config.TTL
+		w.writerConfig = config.CKWriterConfig
+	} else {
+		w.ttl = config.PerfTTL
+		w.writerConfig = config.PerfCKWriterConfig
+	}
+	flowTagWriter, err := flow_tag.NewFlowTagWriter(decoderIndex, table, EVENT_DB, w.ttl, DefaultPartition, config.Base, &w.writerConfig)
 	if err != nil {
 		return nil, err
 	}
 	w.flowTagWriter = flowTagWriter
 
-	table := GenEventCKTable(w.ckdbCluster, w.ckdbStoragePolicy, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, EVENT_DB, EVENT_TABLE))
+	ckTable := GenEventCKTable(w.ckdbCluster, w.ckdbStoragePolicy, table, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, EVENT_DB, table))
 
 	ckwriter, err := ckwriter.NewCKWriter(w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
-		EVENT_TABLE, table, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
+		EVENT_TABLE, ckTable, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
 	if err != nil {
 		return nil, err
 	}

@@ -29,17 +29,24 @@ import (
 var log = logging.MustGetLogger("event.config")
 
 const (
-	DefaultDecoderQueueCount = 2
-	DefaultDecoderQueueSize  = 1 << 17
-	DefaultEventTTL          = 720 // hour
+	DefaultDecoderQueueCount     = 1
+	DefaultDecoderQueueSize      = 10000
+	DefaultPerfDecoderQueueCount = 2
+	DefaultPerfDecoderQueueSize  = 100000
+	DefaultEventTTL              = 720 // hour
+	DefaultPerfEventTTL          = 168 // hour
 )
 
 type Config struct {
-	Base              *config.Config
-	CKWriterConfig    config.CKWriterConfig `yaml:"event-ck-writer"`
-	DecoderQueueCount int                   `yaml:"event-decoder-queue-count"`
-	DecoderQueueSize  int                   `yaml:"event-decoder-queue-size"`
-	TTL               int                   `yaml:"event-ttl"`
+	Base                  *config.Config
+	CKWriterConfig        config.CKWriterConfig `yaml:"event-ck-writer"`
+	DecoderQueueCount     int                   `yaml:"event-decoder-queue-count"`
+	DecoderQueueSize      int                   `yaml:"event-decoder-queue-size"`
+	TTL                   int                   `yaml:"event-ttl"`
+	PerfCKWriterConfig    config.CKWriterConfig `yaml:"perf-event-ck-writer"`
+	PerfDecoderQueueCount int                   `yaml:"perf-event-decoder-queue-count"`
+	PerfDecoderQueueSize  int                   `yaml:"perf-event-decoder-queue-size"`
+	PerfTTL               int                   `yaml:"perf-event-ttl"`
 }
 
 type EventConfig struct {
@@ -56,6 +63,15 @@ func (c *Config) Validate() error {
 	if c.TTL <= 0 {
 		c.TTL = DefaultEventTTL
 	}
+	if c.PerfDecoderQueueCount == 0 {
+		c.PerfDecoderQueueCount = DefaultPerfDecoderQueueCount
+	}
+	if c.PerfDecoderQueueSize == 0 {
+		c.PerfDecoderQueueSize = DefaultPerfDecoderQueueSize
+	}
+	if c.PerfTTL <= 0 {
+		c.TTL = DefaultPerfEventTTL
+	}
 
 	return nil
 }
@@ -68,6 +84,11 @@ func Load(base *config.Config, path string) *Config {
 			DecoderQueueCount: DefaultDecoderQueueCount,
 			DecoderQueueSize:  DefaultDecoderQueueSize,
 			TTL:               DefaultEventTTL,
+
+			PerfCKWriterConfig:    config.CKWriterConfig{QueueCount: 2, QueueSize: 50000, BatchSize: 25600, FlushTimeout: 5},
+			PerfDecoderQueueCount: DefaultPerfDecoderQueueCount,
+			PerfDecoderQueueSize:  DefaultPerfDecoderQueueSize,
+			PerfTTL:               DefaultPerfEventTTL,
 		},
 	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {

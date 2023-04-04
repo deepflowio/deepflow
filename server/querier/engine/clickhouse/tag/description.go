@@ -162,10 +162,6 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 						),
 					)
 				}
-				relatedTag := ""
-				if db == "event" && common.IsValueInSliceString(tag[0].(string), []string{"ips", "subnets"}) {
-					relatedTag = strings.TrimSuffix(tag[0].(string), "s")
-				}
 				key := TagDescriptionKey{DB: db, Table: table, TagName: tag[0].(string)}
 				tagLanguage := dbTagData.(map[string]interface{})[table+"."+config.Cfg.Language].([][]interface{})[i]
 				TAG_DESCRIPTION_KEYS = append(TAG_DESCRIPTION_KEYS, key)
@@ -177,7 +173,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 				des := tagLanguage[2].(string)
 				description := NewTagDescription(
 					tag[0].(string), tag[1].(string), tag[2].(string), displayName,
-					tag[3].(string), enumFile, tag[5].(string), permissions, des, relatedTag,
+					tag[3].(string), enumFile, tag[5].(string), permissions, des, "",
 				)
 				TAG_DESCRIPTIONS[key] = description
 				enumFileToTagType[enumFile] = tag[3].(string)
@@ -363,7 +359,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 	}
 
 	// 查询外部字段
-	if (db != "ext_metrics" && db != "flow_log" && db != "deepflow_system") || (db == "flow_log" && table != "l7_flow_log") {
+	if (db != "ext_metrics" && db != "flow_log" && db != "deepflow_system" && db != "event") || (db == "flow_log" && table != "l7_flow_log") {
 		return response, nil
 	}
 	externalChClient := client.Client{
@@ -492,9 +488,6 @@ func GetTagValues(db, table, sql string) (*common.Result, []string, error) {
 	}]
 	if !ok {
 		return nil, sqlList, errors.New(fmt.Sprintf("no tag %s in %s.%s", tag, db, table))
-	}
-	if db == "event" {
-		sql = strings.ReplaceAll(sql, "subnets", "subnet")
 	}
 	// 根据tagEnumFile获取values
 	_, isEnumOK := TAG_ENUMS[tagDescription.EnumFile]

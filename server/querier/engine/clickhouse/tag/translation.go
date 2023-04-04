@@ -371,33 +371,6 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		}
 	}
 
-	// IP-event
-	tagResourceMap["ips"] = map[string]*Tag{
-		"default": NewTag(
-			"",
-			"",
-			"%s(ips,[%s])",
-			"",
-		),
-	}
-	// SubnetID-event
-	tagResourceMap["subnets_id"] = map[string]*Tag{
-		"default": NewTag(
-			"subnet_ids",
-			"",
-			"%s(subnet_ids,[%s])",
-			"",
-		),
-	}
-	// Subnet-event
-	tagResourceMap["subnets"] = map[string]*Tag{
-		"default": NewTag(
-			"arrayMap(x -> dictGet(flow_tag.subnet_map, 'name', (toUInt64(x))),subnet_ids)",
-			"",
-			"%s(arrayMap(x -> dictGet(flow_tag.subnet_map, 'name', (toUInt64(x))),subnet_ids),[%s])",
-			"",
-		),
-	}
 	// Instance-event
 	tagResourceMap["instance"] = map[string]*Tag{
 		"default": NewTag(

@@ -147,21 +147,22 @@ func (d *Decoder) Run() {
 
 func (d *Decoder) WriteProcEvent(vtapId uint16, e *pb.ProcEvent) {
 	eventStore := dbwriter.AcquireEventStore()
+	eventStore.HasMetrics = true
 	eventStore.Time = uint32(time.Duration(e.StartTime) / time.Second)
 	eventStore.StartTime = int64(time.Duration(e.StartTime) / time.Microsecond)
 	eventStore.EndTime = int64(time.Duration(e.EndTime) / time.Microsecond)
 	eventStore.Duration = uint64(e.EndTime - e.StartTime)
 
 	if e.EventType == pb.EventType_IoEvent {
-		eventStore.EventType = dbwriter.EVENT_TYPE_IO
+		eventStore.SignalSource = uint8(dbwriter.SIGNAL_SOURCE_IO)
 	} else {
-		eventStore.EventType = e.EventType.String()
+		eventStore.SignalSource = uint8(e.EventType)
 	}
 
 	if e.IoEventData != nil {
 		ioData := e.IoEventData
-		eventStore.EventSubType = strings.ToLower(ioData.Operation.String())
-		eventStore.EventDescription = fmt.Sprintf("process %s (%d) %s %d bytes and took %dms", string(e.ProcessKname), e.Pid, eventStore.EventSubType, ioData.BytesCount, ioData.Latency/uint64(time.Millisecond))
+		eventStore.EventType = strings.ToLower(ioData.Operation.String())
+		eventStore.EventDescription = fmt.Sprintf("process %s (%d) %s %d bytes and took %dms", string(e.ProcessKname), e.Pid, eventStore.EventType, ioData.BytesCount, ioData.Latency/uint64(time.Millisecond))
 		eventStore.AttributeNames = append(eventStore.AttributeNames, "file_name", "thread_id", "coroutine_id")
 		eventStore.AttributeValues = append(eventStore.AttributeValues, string(ioData.Filename), strconv.Itoa(int(e.ThreadId)), strconv.Itoa(int(e.CoroutineId)))
 		eventStore.Bytes = ioData.BytesCount
@@ -219,12 +220,13 @@ func getAutoInstance(instanceID, instanceType, GProcessID uint32) (uint32, uint8
 
 func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 	eventStore := dbwriter.AcquireEventStore()
+	eventStore.HasMetrics = false
 	eventStore.Time = uint32(event.Time)
 	eventStore.StartTime = event.TimeMilli * 1000 // convert to microsecond
 	eventStore.EndTime = eventStore.StartTime
 
-	eventStore.EventType = dbwriter.EVENT_TYPE_RESOURCE
-	eventStore.EventSubType = event.Type
+	eventStore.SignalSource = uint8(dbwriter.SIGNAL_SOURCE_RESOURCE)
+	eventStore.EventType = event.Type
 	eventStore.EventDescription = event.Description
 
 	eventStore.GProcessID = event.GProcessID
@@ -277,6 +279,35 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 		eventStore.L3DeviceID = event.L3DeviceID
 
 	}
+	eventStore.SubnetID = uint16(event.SubnetID)
+	if ip := net.ParseIP(event.IP); ip != nil {
+		if ip4 := ip.To4(); ip4 != nil {
+			eventStore.IsIPv4 = true
+			eventStore.IP4 = utils.IpToUint32(ip4)
+		} else {
+			eventStore.IsIPv4 = false
+			eventStore.IP6 = ip
+		}
+	}
+	eventStore.AutoInstanceID, eventStore.AutoInstanceType =
+		ingestercommon.GetAutoInstance(
+			eventStore.PodID,
+			eventStore.GProcessID,
+			eventStore.PodNodeID,
+			eventStore.L3DeviceID,
+			eventStore.L3DeviceType,
+			eventStore.L3EpcID,
+		)
+	eventStore.AutoServiceID, eventStore.AutoServiceType =
+		ingestercommon.GetAutoService(
+			eventStore.ServiceID,
+			eventStore.PodGroupID,
+			eventStore.GProcessID,
+			eventStore.PodNodeID,
+			eventStore.L3DeviceID,
+			eventStore.L3DeviceType,
+			eventStore.L3EpcID,
+		)
 	if event.InstanceType == uint32(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) {
 		eventStore.ServiceID = event.InstanceID
 	}
