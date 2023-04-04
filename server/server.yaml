@@ -188,6 +188,12 @@ controller:
     local_ip_ranges:
     # 排除IP范围
     exclude_ip_ranges:
+    # 多namespace模式开关，默认false
+    multi_ns_mode:
+    # 单独vpc模式开关，默认false
+    single_vpc_mode:
+    # 忽略网卡正则表达式配置，匹配到会忽略该网卡，默认为 ^(kube-ipvs) ，增加其他的网卡名称需要在此基础上新增
+    ignore_nic_regex:
 
 querier:
   # querier http listenport
