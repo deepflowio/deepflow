@@ -17,6 +17,8 @@
 package cache
 
 import (
+	"github.com/op/go-logging"
+
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -66,6 +68,13 @@ func (m *CacheManager) UpdateSequence() {
 	}
 }
 
+func (m *CacheManager) SetLogLevel(logLevel logging.Level) {
+	m.DomainCache.SetLogLevel(logLevel)
+	for _, subDomainCache := range m.SubDomainCacheMap {
+		subDomainCache.SetLogLevel(logLevel)
+	}
+}
+
 func (m *CacheManager) CreateSubDomainCacheIfNotExists(subDomainLcuuid string) *Cache {
 	cache, exists := m.SubDomainCacheMap[subDomainLcuuid]
 	if exists {
@@ -102,6 +111,11 @@ func (c *Cache) SetSequence(sequence int) {
 	c.Sequence = sequence
 }
 
+func (c *Cache) SetLogLevel(level logging.Level) {
+	c.DiffBaseDataSet.LogController.SetLogLevel(level)
+	c.ToolDataSet.LogController.SetLogLevel(level)
+}
+
 func (c *Cache) getConditonDomainCreateMethod() map[string]interface{} {
 	return map[string]interface{}{
 		"domain":        c.DomainLcuuid,
@@ -134,6 +148,7 @@ func (c *Cache) getConditonDomainSubDomainCreateMethod() map[string]interface{} 
 func (c *Cache) Refresh() {
 	c.DiffBaseDataSet = NewDiffBaseDataSet()
 	c.ToolDataSet = NewToolDataSet()
+	c.SetLogLevel(logging.DEBUG)
 
 	// 分类刷新资源的相关缓存
 

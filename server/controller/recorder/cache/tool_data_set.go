@@ -28,6 +28,8 @@ import (
 
 // 各类资源的映射关系，用于刷新资源时，转换所需数据
 type ToolDataSet struct {
+	LogController
+
 	// 仅资源变更事件所需的数据
 	EventToolDataSet
 
@@ -187,7 +189,7 @@ func NewToolDataSet() ToolDataSet {
 
 func (t *ToolDataSet) addAZ(item *mysql.AZ) {
 	t.azLcuuidToID[item.Lcuuid] = item.ID
-	log.Info(addToToolMap(RESOURCE_TYPE_AZ_EN, item.Lcuuid))
+	t.GetLogFunc()(addToToolMap(RESOURCE_TYPE_AZ_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteAZ(lcuuid string) {
@@ -215,7 +217,7 @@ func (t *ToolDataSet) GetAZIDByLcuuid(lcuuid string) (int, bool) {
 func (t *ToolDataSet) addRegion(item *mysql.Region) {
 	t.regionLcuuidToID[item.Lcuuid] = item.ID
 	t.regionIDToLcuuid[item.ID] = item.Lcuuid
-	log.Info(addToToolMap(RESOURCE_TYPE_REGION_EN, item.Lcuuid))
+	t.GetLogFunc()(addToToolMap(RESOURCE_TYPE_REGION_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteRegion(lcuuid string) {
@@ -235,7 +237,7 @@ func (t *ToolDataSet) addHost(item *mysql.Host) {
 	if azID, ok := t.GetAZIDByLcuuid(item.AZ); ok {
 		t.hostIDtoInfo[item.ID].AZID = azID
 	}
-	log.Info(addToToolMap(RESOURCE_TYPE_HOST_EN, item.Lcuuid))
+	t.GetLogFunc()(addToToolMap(RESOURCE_TYPE_HOST_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteHost(lcuuid string) {
@@ -279,7 +281,7 @@ func (t *ToolDataSet) addVM(item *mysql.VM) {
 			t.vmIDToInfo[item.ID].HostID = hostID
 		}
 	}
-	log.Info(addToToolMap(RESOURCE_TYPE_VM_EN, item.Lcuuid))
+	t.GetLogFunc()(addToToolMap(RESOURCE_TYPE_VM_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) updateVM(cloudItem *cloudmodel.VM) {
@@ -317,7 +319,7 @@ func (t *ToolDataSet) deleteVM(lcuuid string) {
 func (t *ToolDataSet) addVPC(item *mysql.VPC) {
 	t.vpcLcuuidToID[item.Lcuuid] = item.ID
 	t.vpcIDToLcuuid[item.ID] = item.Lcuuid
-	log.Info(addToToolMap(RESOURCE_TYPE_VPC_EN, item.Lcuuid))
+	t.GetLogFunc()(addToToolMap(RESOURCE_TYPE_VPC_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteVPC(lcuuid string) {
@@ -331,7 +333,7 @@ func (t *ToolDataSet) addNetwork(item *mysql.Network) {
 	t.networkLcuuidToID[item.Lcuuid] = item.ID
 	t.networkIDToLcuuid[item.ID] = item.Lcuuid
 	t.networkIDToName[item.ID] = item.Name
-	log.Info(addToToolMap(RESOURCE_TYPE_NETWORK_EN, item.Lcuuid))
+	t.GetLogFunc()(addToToolMap(RESOURCE_TYPE_NETWORK_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) updateNetwork(cloudItem *cloudmodel.Network) {
@@ -353,7 +355,7 @@ func (t *ToolDataSet) deleteNetwork(lcuuid string) {
 func (t *ToolDataSet) addSubnet(item *mysql.Subnet) {
 	t.subnetLcuuidToID[item.Lcuuid] = item.ID
 	t.subnetIDToLcuuid[item.ID] = item.Lcuuid
-	log.Info(addToToolMap(RESOURCE_TYPE_SUBNET_EN, item.Lcuuid))
+	t.GetLogFunc()(addToToolMap(RESOURCE_TYPE_SUBNET_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteSubnet(lcuuid string) {
@@ -373,7 +375,7 @@ func (t *ToolDataSet) addVRouter(item *mysql.VRouter) {
 	if regionID, ok := t.GetRegionIDByLcuuid(item.Region); ok {
 		t.vrouterIDToInfo[item.ID].RegionID = regionID
 	}
-	log.Info(addToToolMap(RESOURCE_TYPE_VROUTER_EN, item.Lcuuid))
+	t.GetLogFunc()(addToToolMap(RESOURCE_TYPE_VROUTER_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) updateVRouter(cloudItem *cloudmodel.VRouter) {
@@ -413,7 +415,7 @@ func (t *ToolDataSet) addDHCPPort(item *mysql.DHCPPort) {
 	if azID, ok := t.GetAZIDByLcuuid(item.AZ); ok {
 		t.dhcpPortIDToInfo[item.ID].AZID = azID
 	}
-	log.Info(addToToolMap(RESOURCE_TYPE_DHCP_PORT_EN, item.Lcuuid))
+	t.GetLogFunc()(addToToolMap(RESOURCE_TYPE_DHCP_PORT_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) updateDHCPPort(cloudItem *cloudmodel.DHCPPort) {
@@ -498,7 +500,7 @@ func (t *ToolDataSet) addVInterface(item *mysql.VInterface) {
 			t.podIDToVinterfaceIndexes[item.DeviceID], item.ID,
 		)
 	}
-	log.Info(addToToolMap(RESOURCE_TYPE_VINTERFACE_EN, item.Lcuuid))
+	t.GetLogFunc()(addToToolMap(RESOURCE_TYPE_VINTERFACE_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) updateVInterface(cloudItem *cloudmodel.VInterface) {
@@ -528,7 +530,7 @@ func (t *ToolDataSet) addWANIP(item *mysql.WANIP) {
 	mac, _ := t.GetMacByVInterfaceLcuuid(vifLcuuid)
 	networkID, _ := t.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
 	t.setDeviceToIPNetworkMap(deviceType, deviceID, networkID, IPKey{IP: item.IP, Mac: mac, Lcuuid: item.Lcuuid})
-	log.Info(addToToolMap(RESOURCE_TYPE_WAN_IP_EN, item.Lcuuid))
+	t.GetLogFunc()(addToToolMap(RESOURCE_TYPE_WAN_IP_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteWANIP(lcuuid string) {
@@ -554,7 +556,7 @@ func (t *ToolDataSet) addLANIP(item *mysql.LANIP) {
 	deviceID, _ := t.GetDeviceIDByVInterfaceLcuuid(vifLcuuid)
 	networkID, _ := t.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
 	t.setDeviceToIPNetworkMap(deviceType, deviceID, networkID, IPKey{IP: item.IP, Mac: mac, Lcuuid: item.Lcuuid})
-	log.Info(addToToolMap(RESOURCE_TYPE_LAN_IP_EN, item.Lcuuid))
+	t.GetLogFunc()(addToToolMap(RESOURCE_TYPE_LAN_IP_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteLANIP(lcuuid string) {
@@ -573,7 +575,7 @@ func (t *ToolDataSet) deleteLANIP(lcuuid string) {
 
 func (t *ToolDataSet) addSecurityGroup(item *mysql.SecurityGroup) {
 	t.securityGroupLcuuidToID[item.Lcuuid] = item.ID
-	log.Info(addToToolMap(RESOURCE_TYPE_SECURITY_GROUP_EN, item.Lcuuid))
+	t.GetLogFunc()(addToToolMap(RESOURCE_TYPE_SECURITY_GROUP_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteSecurityGroup(lcuuid string) {
@@ -593,7 +595,7 @@ func (t *ToolDataSet) addNATGateway(item *mysql.NATGateway) {
 	if azID, ok := t.azLcuuidToID[item.AZ]; ok {
 		t.natGatewayIDToInfo[item.ID].AZID = azID
 	}
-	log.Info(addToToolMap(RESOURCE_TYPE_NAT_GATEWAY_EN, item.Lcuuid))
+	t.GetLogFunc()(addToToolMap(RESOURCE_TYPE_NAT_GATEWAY_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) updateNATGateway(cloudItem *cloudmodel.NATGateway) {
@@ -629,7 +631,7 @@ func (t *ToolDataSet) addLB(item *mysql.LB) {
 	if regionID, ok := t.GetRegionIDByLcuuid(item.Region); ok {
 		t.lbIDToInfo[item.ID].RegionID = regionID
 	}
-	log.Info(addToToolMap(RESOURCE_TYPE_LB_EN, item.Lcuuid))
+	t.GetLogFunc()(addToToolMap(RESOURCE_TYPE_LB_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) updateLB(cloudItem *cloudmodel.LB) {
@@ -658,7 +660,7 @@ func (t *ToolDataSet) deleteLB(lcuuid string) {
 
 func (t *ToolDataSet) addLBListener(item *mysql.LBListener) {
 	t.lbListenerLcuuidToID[item.Lcuuid] = item.ID
-	log.Info(addToToolMap(RESOURCE_TYPE_LB_LISTENER_EN, item.Lcuuid))
+	t.GetLogFunc()(addToToolMap(RESOURCE_TYPE_LB_LISTENER_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteLBListener(lcuuid string) {
@@ -678,7 +680,7 @@ func (t *ToolDataSet) addRDSInstance(item *mysql.RDSInstance) {
 	if azID, ok := t.GetAZIDByLcuuid(item.AZ); ok {
 		t.rdsInstanceIDToInfo[item.ID].AZID = azID
 	}
-	log.Info(addToToolMap(RESOURCE_TYPE_RDS_INSTANCE_EN, item.Lcuuid))
+	t.GetLogFunc()(addToToolMap(RESOURCE_TYPE_RDS_INSTANCE_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) updateRDSInstance(cloudItem *cloudmodel.RDSInstance) {
@@ -720,7 +722,7 @@ func (t *ToolDataSet) addRedisInstance(item *mysql.RedisInstance) {
 	if azID, ok := t.GetAZIDByLcuuid(item.AZ); ok {
 		t.redisInstanceIDToInfo[item.ID].AZID = azID
 	}
-	log.Info(addToToolMap(RESOURCE_TYPE_REDIS_INSTANCE_EN, item.Lcuuid))
+	t.GetLogFunc()(addToToolMap(RESOURCE_TYPE_REDIS_INSTANCE_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) updateRedisInstance(cloudItem *cloudmodel.RedisInstance) {
@@ -752,7 +754,7 @@ func (t *ToolDataSet) deleteRedisInstance(lcuuid string) {
 
 func (t *ToolDataSet) addPodCluster(item *mysql.PodCluster) {
 	t.podClusterLcuuidToID[item.Lcuuid] = item.ID
-	log.Info(addToToolMap(RESOURCE_TYPE_POD_CLUSTER_EN, item.Lcuuid))
+	t.GetLogFunc()(addToToolMap(RESOURCE_TYPE_POD_CLUSTER_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deletePodCluster(lcuuid string) {
@@ -775,7 +777,7 @@ func (t *ToolDataSet) addPodNode(item *mysql.PodNode) {
 	if azID, ok := t.GetAZIDByLcuuid(item.AZ); ok {
 		t.podNodeIDToInfo[item.ID].AZID = azID
 	}
-	log.Info(addToToolMap(RESOURCE_TYPE_POD_NODE_EN, item.Lcuuid))
+	t.GetLogFunc()(addToToolMap(RESOURCE_TYPE_POD_NODE_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) updatePodNode(cloudItem *cloudmodel.PodNode) {
@@ -812,7 +814,7 @@ func (t *ToolDataSet) deletePodNode(lcuuid string) {
 func (t *ToolDataSet) addVMPodNodeConnection(item *mysql.VMPodNodeConnection) {
 	t.vmPodNodeConnectionLcuuidToPodNodeID[item.Lcuuid] = item.PodNodeID
 	t.podNodeIDToVMID[item.PodNodeID] = item.VMID
-	log.Info(addToToolMap(RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, item.Lcuuid))
+	t.GetLogFunc()(addToToolMap(RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteVMPodNodeConnection(lcuuid string) {
@@ -824,7 +826,7 @@ func (t *ToolDataSet) deleteVMPodNodeConnection(lcuuid string) {
 
 func (t *ToolDataSet) addPodNamespace(item *mysql.PodNamespace) {
 	t.podNamespaceLcuuidToID[item.Lcuuid] = item.ID
-	log.Info(addToToolMap(RESOURCE_TYPE_POD_NAMESPACE_EN, item.Lcuuid))
+	t.GetLogFunc()(addToToolMap(RESOURCE_TYPE_POD_NAMESPACE_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deletePodNamespace(lcuuid string) {
@@ -835,7 +837,7 @@ func (t *ToolDataSet) deletePodNamespace(lcuuid string) {
 func (t *ToolDataSet) addPodIngress(item *mysql.PodIngress) {
 	t.podIngressLcuuidToID[item.Lcuuid] = item.ID
 	t.podIngressIDToLcuuid[item.ID] = item.Lcuuid
-	log.Info(addToToolMap(RESOURCE_TYPE_POD_INGRESS_EN, item.Lcuuid))
+	t.GetLogFunc()(addToToolMap(RESOURCE_TYPE_POD_INGRESS_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deletePodIngress(lcuuid string) {
@@ -847,7 +849,7 @@ func (t *ToolDataSet) deletePodIngress(lcuuid string) {
 
 func (t *ToolDataSet) addPodIngressRule(item *mysql.PodIngressRule) {
 	t.podIngressRuleLcuuidToID[item.Lcuuid] = item.ID
-	log.Info(addToToolMap(RESOURCE_TYPE_POD_INGRESS_RULE_EN, item.Lcuuid))
+	t.GetLogFunc()(addToToolMap(RESOURCE_TYPE_POD_INGRESS_RULE_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deletePodIngressRule(lcuuid string) {
@@ -869,7 +871,7 @@ func (t *ToolDataSet) addPodService(item *mysql.PodService) {
 	if azID, ok := t.GetAZIDByLcuuid(item.AZ); ok {
 		t.podServiceIDToInfo[item.ID].AZID = azID
 	}
-	log.Info(addToToolMap(RESOURCE_TYPE_POD_SERVICE_EN, item.Lcuuid))
+	t.GetLogFunc()(addToToolMap(RESOURCE_TYPE_POD_SERVICE_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) updatePodService(cloudItem *cloudmodel.PodService) {
@@ -907,7 +909,7 @@ func (t *ToolDataSet) deletePodService(lcuuid string) {
 
 func (t *ToolDataSet) addPodGroup(item *mysql.PodGroup) {
 	t.podGroupLcuuidToID[item.Lcuuid] = item.ID
-	log.Info(addToToolMap(RESOURCE_TYPE_POD_GROUP_EN, item.Lcuuid))
+	t.GetLogFunc()(addToToolMap(RESOURCE_TYPE_POD_GROUP_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deletePodGroup(lcuuid string) {
@@ -915,18 +917,18 @@ func (t *ToolDataSet) deletePodGroup(lcuuid string) {
 	log.Info(deleteFromToolMap(RESOURCE_TYPE_POD_GROUP_EN, lcuuid))
 }
 
-func (f *ToolDataSet) addPodReplicaSet(item *mysql.PodReplicaSet) {
-	f.podReplicaSetLcuuidToID[item.Lcuuid] = item.ID
-	f.podReplicaSetIDToLcuuid[item.ID] = item.Lcuuid
-	log.Info(addToToolMap(RESOURCE_TYPE_POD_REPLICA_SET_EN, item.Lcuuid))
+func (t *ToolDataSet) addPodReplicaSet(item *mysql.PodReplicaSet) {
+	t.podReplicaSetLcuuidToID[item.Lcuuid] = item.ID
+	t.podReplicaSetIDToLcuuid[item.ID] = item.Lcuuid
+	t.GetLogFunc()(addToToolMap(RESOURCE_TYPE_POD_REPLICA_SET_EN, item.Lcuuid))
 }
 
-func (f *ToolDataSet) deletePodReplicaSet(lcuuid string) {
-	id, exists := f.GetPodReplicaSetIDByLcuuid(lcuuid)
+func (t *ToolDataSet) deletePodReplicaSet(lcuuid string) {
+	id, exists := t.GetPodReplicaSetIDByLcuuid(lcuuid)
 	if exists {
-		delete(f.podReplicaSetIDToLcuuid, id)
+		delete(t.podReplicaSetIDToLcuuid, id)
 	}
-	delete(f.podReplicaSetLcuuidToID, lcuuid)
+	delete(t.podReplicaSetLcuuidToID, lcuuid)
 	log.Info(deleteFromToolMap(RESOURCE_TYPE_POD_REPLICA_SET_EN, lcuuid))
 }
 
@@ -947,7 +949,7 @@ func (t *ToolDataSet) addPod(item *mysql.Pod) {
 	if azID, ok := t.GetAZIDByLcuuid(item.AZ); ok {
 		t.podIDToInfo[item.ID].AZID = azID
 	}
-	log.Info(addToToolMap(RESOURCE_TYPE_POD_EN, item.Lcuuid))
+	t.GetLogFunc()(addToToolMap(RESOURCE_TYPE_POD_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) updatePod(cloudItem *cloudmodel.Pod) {
@@ -2082,4 +2084,34 @@ func (t *ToolDataSet) GetPodNodeIDByVMPodNodeConnectionLcuuid(lcuuid string) (in
 		return 0, false
 	}
 
+}
+
+func (t *ToolDataSet) addProcess(item *mysql.Process) {
+	t.processLcuuidToInfo[item.Lcuuid] = &processInfo{
+		ID:   item.ID,
+		Name: item.Name,
+	}
+	t.GetLogFunc()(addToToolMap(RESOURCE_TYPE_PROCESS_EN, item.Lcuuid))
+}
+
+func (t *ToolDataSet) deleteProcess(lcuuid string) {
+	delete(t.processLcuuidToInfo, lcuuid)
+	log.Info(deleteFromToolMap(RESOURCE_TYPE_PROCESS_EN, lcuuid))
+}
+
+func (t *ToolDataSet) GetProcessInfoByLcuuid(lcuuid string) (*processInfo, bool) {
+	processInfo, exists := t.processLcuuidToInfo[lcuuid]
+	if exists {
+		return processInfo, true
+	}
+	log.Warning(cacheIDByLcuuidNotFound(RESOURCE_TYPE_REGION_EN, lcuuid))
+	var process *mysql.Process
+	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&process)
+	if result.RowsAffected == 1 {
+		t.addProcess(process)
+		return t.processLcuuidToInfo[lcuuid], true
+	} else {
+		log.Error(dbResourceByLcuuidNotFound(RESOURCE_TYPE_PROCESS_EN, lcuuid))
+		return nil, false
+	}
 }
