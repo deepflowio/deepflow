@@ -95,3 +95,23 @@ func cacheVPCIDByIDNotFound(resource string, id int) string {
 func cacheLaunchServerByIDNotFound(resource string, id int) string {
 	return fmt.Sprintf("cache %s launch server (id: %d) not found", resource, id)
 }
+
+type LogController struct {
+	// controll log level, set info when triggered by resource change event, set debug when called by timing cache refresh
+	level logging.Level
+}
+
+func (l *LogController) SetLogLevel(level logging.Level) error {
+	if level != logging.DEBUG && level != logging.INFO {
+		return fmt.Errorf("invalid log level %d", level)
+	}
+	l.level = level
+	return nil
+}
+
+func (l *LogController) GetLogFunc() func(args ...interface{}) {
+	if l.level == logging.DEBUG {
+		return log.Debug
+	}
+	return log.Info
+}

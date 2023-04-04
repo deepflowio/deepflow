@@ -102,7 +102,7 @@ func (i *WANIP) generateUpdateInfo(diffBase *cache.WANIP, cloudItem *cloudmodel.
 		updateInfo["region"] = cloudItem.RegionLcuuid
 	}
 	if diffBase.SubnetLcuuid != cloudItem.SubnetLcuuid {
-		subnetLcuuidsRepresentingNone := []string{"", "ffffffff-ffff-ffff-ffff-ffffffffffff", "94f0ca77-cb52-5869-98fb-2773ca4fb83f"}
+		subnetLcuuidsRepresentingNone := []string{"", "ffffffff-ffff-ffff-ffff-ffffffffffff", "94f0ca77-cb52-5869-98fb-2773ca4fb83f"} // TODO remove hard code
 		if common.Contains(subnetLcuuidsRepresentingNone, cloudItem.SubnetLcuuid) {
 			updateInfo["vl2_net_id"] = 0
 		} else {

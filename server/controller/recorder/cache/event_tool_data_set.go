@@ -18,8 +18,6 @@ package cache
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type EventToolDataSet struct {
@@ -240,34 +238,4 @@ func (t *EventToolDataSet) GetPodIPNetworkMapByID(id int) (map[IPKey]int, bool) 
 		return make(map[IPKey]int), false
 	}
 	return m, true
-}
-
-func (t *EventToolDataSet) addProcess(item *mysql.Process) {
-	t.processLcuuidToInfo[item.Lcuuid] = &processInfo{
-		ID:   item.ID,
-		Name: item.Name,
-	}
-	log.Info(addToToolMap(RESOURCE_TYPE_PROCESS_EN, item.Lcuuid))
-}
-
-func (t *ToolDataSet) deleteProcess(lcuuid string) {
-	delete(t.processLcuuidToInfo, lcuuid)
-	log.Info(deleteFromToolMap(RESOURCE_TYPE_PROCESS_EN, lcuuid))
-}
-
-func (t *EventToolDataSet) GetProcessInfoByLcuuid(lcuuid string) (*processInfo, bool) {
-	processInfo, exists := t.processLcuuidToInfo[lcuuid]
-	if exists {
-		return processInfo, true
-	}
-	log.Warning(cacheIDByLcuuidNotFound(RESOURCE_TYPE_REGION_EN, lcuuid))
-	var process *mysql.Process
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&process)
-	if result.RowsAffected == 1 {
-		t.addProcess(process)
-		return t.processLcuuidToInfo[lcuuid], true
-	} else {
-		log.Error(dbResourceByLcuuidNotFound(RESOURCE_TYPE_PROCESS_EN, lcuuid))
-		return nil, false
-	}
 }
