@@ -73,6 +73,8 @@ libs/geo/ip_info.go: libs/geo/ip_info_mini.json libs/geo/ip_info.py
 vendor:
 	go mod tidy && go mod download && go mod vendor
 	find vendor -type d -exec chmod +w {} \;
+	# optimize the write performance of Array(string) data type
+	patch -p1 -d vendor/github.com/ClickHouse/clickhouse-go/v2/ < patch/clickhouse-go/write_improve.patch
 
 .PHONY: test
 test: vendor $(proto) $(generated_libs)
