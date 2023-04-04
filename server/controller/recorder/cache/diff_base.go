@@ -27,6 +27,8 @@ import (
 // 所有资源的主要信息，用于与cloud数据比较差异，根据差异更新资源
 // 应保持字段定义与cloud字段定义一致，用于在比较资源时可以抽象方法
 type DiffBaseDataSet struct {
+	LogController
+
 	Regions                map[string]*Region
 	AZs                    map[string]*AZ
 	SubDomains             map[string]*SubDomain
@@ -129,7 +131,7 @@ func (b *DiffBaseDataSet) addRegion(dbItem *mysql.Region, seq int) {
 		Name:  dbItem.Name,
 		Label: dbItem.Label,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_REGION_EN, b.Regions[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_REGION_EN, b.Regions[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteRegion(lcuuid string) {
@@ -147,7 +149,7 @@ func (b *DiffBaseDataSet) addAZ(dbItem *mysql.AZ, seq int) {
 		Label:        dbItem.Label,
 		RegionLcuuid: dbItem.Region,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_AZ_EN, b.AZs[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_AZ_EN, b.AZs[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteAZ(lcuuid string) {
@@ -162,7 +164,7 @@ func (b *DiffBaseDataSet) addSubDomain(dbItem *mysql.SubDomain, seq int) {
 			Lcuuid:   dbItem.Lcuuid,
 		},
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_SUB_DOMAIN_EN, b.SubDomains[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_SUB_DOMAIN_EN, b.SubDomains[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteSubDomain(lcuuid string) {
@@ -185,7 +187,7 @@ func (b *DiffBaseDataSet) addHost(dbItem *mysql.Host, seq int) {
 		MemTotal:     dbItem.MemTotal,
 		ExtraInfo:    dbItem.ExtraInfo,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_HOST_EN, b.Hosts[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_HOST_EN, b.Hosts[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteHost(lcuuid string) {
@@ -211,7 +213,7 @@ func (b *DiffBaseDataSet) addVM(dbItem *mysql.VM, seq int, toolDataSet *ToolData
 		CloudTags:    dbItem.CloudTags,
 	}
 	b.VMs[dbItem.Lcuuid] = newItem
-	log.Info(addDiffBase(RESOURCE_TYPE_VM_EN, b.VMs[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_VM_EN, b.VMs[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteVM(lcuuid string) {
@@ -231,7 +233,7 @@ func (b *DiffBaseDataSet) addVPC(dbItem *mysql.VPC, seq int) {
 		CIDR:         dbItem.CIDR,
 		RegionLcuuid: dbItem.Region,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_VPC_EN, b.VPCs[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_VPC_EN, b.VPCs[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteVPC(lcuuid string) {
@@ -256,7 +258,7 @@ func (b *DiffBaseDataSet) addNetwork(dbItem *mysql.Network, seq int, toolDataSet
 		AZLcuuid:        dbItem.AZ,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_NETWORK_EN, b.Networks[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_NETWORK_EN, b.Networks[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteNetwork(lcuuid string) {
@@ -274,7 +276,7 @@ func (b *DiffBaseDataSet) addSubnet(dbItem *mysql.Subnet, seq int) {
 		Label:           dbItem.Label,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_SUBNET_EN, b.Subnets[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_SUBNET_EN, b.Subnets[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteSubnet(lcuuid string) {
@@ -294,7 +296,7 @@ func (b *DiffBaseDataSet) addVRouter(dbItem *mysql.VRouter, seq int, toolDataSet
 		VPCLcuuid:    vpcLcuuid,
 		RegionLcuuid: dbItem.Region,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_VROUTER_EN, b.VRouters[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_VROUTER_EN, b.VRouters[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteVRouter(lcuuid string) {
@@ -312,7 +314,7 @@ func (b *DiffBaseDataSet) addRoutingTable(dbItem *mysql.RoutingTable, seq int) {
 		Nexthop:     dbItem.Nexthop,
 		NexthopType: dbItem.NexthopType,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_ROUTING_TABLE_EN, b.RoutingTables[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_ROUTING_TABLE_EN, b.RoutingTables[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteRoutingTable(lcuuid string) {
@@ -332,7 +334,7 @@ func (b *DiffBaseDataSet) addDHCPPort(dbItem *mysql.DHCPPort, seq int, toolDataS
 		AZLcuuid:     dbItem.AZ,
 		VPCLcuuid:    vpcLcuuid,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_DHCP_PORT_EN, b.DHCPPorts[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_DHCP_PORT_EN, b.DHCPPorts[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteDHCPPort(lcuuid string) {
@@ -357,7 +359,7 @@ func (b *DiffBaseDataSet) addVInterface(dbItem *mysql.VInterface, seq int, toolD
 		RegionLcuuid:    dbItem.Region,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_VINTERFACE_EN, b.VInterfaces[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_VINTERFACE_EN, b.VInterfaces[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteVInterface(lcuuid string) {
@@ -379,7 +381,7 @@ func (b *DiffBaseDataSet) addWANIP(dbItem *mysql.WANIP, seq int, toolDataSet *To
 		SubDomainLcuuid: dbItem.SubDomain,
 		SubnetLcuuid:    subnetLcuuid,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_WAN_IP_EN, b.WANIPs[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_WAN_IP_EN, b.WANIPs[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteWANIP(lcuuid string) {
@@ -397,7 +399,7 @@ func (b *DiffBaseDataSet) addLANIP(dbItem *mysql.LANIP, seq int, toolDataSet *To
 		SubDomainLcuuid: dbItem.SubDomain,
 		SubnetLcuuid:    subnetLcuuid,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_LAN_IP_EN, b.LANIPs[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_LAN_IP_EN, b.LANIPs[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteLANIP(lcuuid string) {
@@ -415,7 +417,7 @@ func (b *DiffBaseDataSet) addFloatingIP(dbItem *mysql.FloatingIP, seq int, toolD
 		RegionLcuuid: dbItem.Region,
 		VPCLcuuid:    vpcLcuuid,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_FLOATING_IP_EN, b.FloatingIPs[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_FLOATING_IP_EN, b.FloatingIPs[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteFloatingIP(lcuuid string) {
@@ -433,7 +435,7 @@ func (b *DiffBaseDataSet) addSecurityGroup(dbItem *mysql.SecurityGroup, seq int)
 		Label:        dbItem.Label,
 		RegionLcuuid: dbItem.Region,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_SECURITY_GROUP_EN, b.SecurityGroups[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_SECURITY_GROUP_EN, b.SecurityGroups[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteSecurityGroup(lcuuid string) {
@@ -453,7 +455,7 @@ func (b *DiffBaseDataSet) addSecurityGroupRule(dbItem *mysql.SecurityGroupRule, 
 		Remote:          dbItem.Remote,
 		RemotePortRange: dbItem.RemotePortRange,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_SECURITY_GROUP_RULE_EN, b.SecurityGroupRules[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_SECURITY_GROUP_RULE_EN, b.SecurityGroupRules[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteSecurityGroupRule(lcuuid string) {
@@ -469,7 +471,7 @@ func (b *DiffBaseDataSet) addVMSecurityGroup(dbItem *mysql.VMSecurityGroup, seq 
 		},
 		Priority: dbItem.Priority,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_VM_SECURITY_GROUP_EN, b.VMSecurityGroups[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_VM_SECURITY_GROUP_EN, b.VMSecurityGroups[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteVMSecurityGroup(lcuuid string) {
@@ -487,7 +489,7 @@ func (b *DiffBaseDataSet) addNATGateway(dbItem *mysql.NATGateway, seq int) {
 		FloatingIPs:  dbItem.FloatingIPs,
 		RegionLcuuid: dbItem.Region,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_NAT_GATEWAY_EN, b.NATGateways[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_NAT_GATEWAY_EN, b.NATGateways[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteNATGateway(lcuuid string) {
@@ -502,7 +504,7 @@ func (b *DiffBaseDataSet) addNATVMConnection(dbItem *mysql.NATVMConnection, seq 
 			Lcuuid:   dbItem.Lcuuid,
 		},
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_NAT_VM_CONNECTION_EN, b.NATVMConnections[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_NAT_VM_CONNECTION_EN, b.NATVMConnections[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteNATVMConnection(lcuuid string) {
@@ -517,7 +519,7 @@ func (b *DiffBaseDataSet) addNATRule(dbItem *mysql.NATRule, seq int) {
 			Lcuuid:   dbItem.Lcuuid,
 		},
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_NAT_RULE_EN, b.NATRules[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_NAT_RULE_EN, b.NATRules[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteNATRule(lcuuid string) {
@@ -536,7 +538,7 @@ func (b *DiffBaseDataSet) addLB(dbItem *mysql.LB, seq int) {
 		VIP:          dbItem.VIP,
 		RegionLcuuid: dbItem.Region,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_LB_EN, b.LBs[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_LB_EN, b.LBs[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteLB(lcuuid string) {
@@ -551,7 +553,7 @@ func (b *DiffBaseDataSet) addLBVMConnection(dbItem *mysql.LBVMConnection, seq in
 			Lcuuid:   dbItem.Lcuuid,
 		},
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_LB_VM_CONNECTION_EN, b.LBVMConnections[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_LB_VM_CONNECTION_EN, b.LBVMConnections[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteLBVMConnection(lcuuid string) {
@@ -571,7 +573,7 @@ func (b *DiffBaseDataSet) addLBListener(dbItem *mysql.LBListener, seq int) {
 		Port:     dbItem.Port,
 		Protocol: dbItem.Protocol,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_LB_LISTENER_EN, b.LBListeners[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_LB_LISTENER_EN, b.LBListeners[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteLBListener(lcuuid string) {
@@ -589,7 +591,7 @@ func (b *DiffBaseDataSet) addLBTargetServer(dbItem *mysql.LBTargetServer, seq in
 		Port:     dbItem.Port,
 		Protocol: dbItem.Protocol,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_LB_TARGET_SERVER_EN, b.LBTargetServers[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_LB_TARGET_SERVER_EN, b.LBTargetServers[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteLBTargetServer(lcuuid string) {
@@ -609,7 +611,7 @@ func (b *DiffBaseDataSet) addPeerConnection(dbItem *mysql.PeerConnection, seq in
 		RemoteRegionLcuuid: remoteRegionLcuuid,
 		LocalRegionLcuuid:  localRegionLcuuid,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_PEER_CONNECTION_EN, b.PeerConnections[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_PEER_CONNECTION_EN, b.PeerConnections[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePeerConnection(lcuuid string) {
@@ -633,7 +635,7 @@ func (b *DiffBaseDataSet) addCEN(dbItem *mysql.CEN, seq int, toolDataSet *ToolDa
 		Name:       dbItem.Name,
 		VPCLcuuids: vpcLcuuids,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_CEN_EN, b.CENs[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_CEN_EN, b.CENs[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteCEN(lcuuid string) {
@@ -654,7 +656,7 @@ func (b *DiffBaseDataSet) addRDSInstance(dbItem *mysql.RDSInstance, seq int) {
 		RegionLcuuid: dbItem.Region,
 		AZLcuuid:     dbItem.AZ,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_RDS_INSTANCE_EN, b.RDSInstances[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_RDS_INSTANCE_EN, b.RDSInstances[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteRDSInstance(lcuuid string) {
@@ -673,7 +675,7 @@ func (b *DiffBaseDataSet) addRedisInstance(dbItem *mysql.RedisInstance, seq int)
 		PublicHost:   dbItem.PublicHost,
 		RegionLcuuid: dbItem.Region,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_REDIS_INSTANCE_EN, b.RedisInstances[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_REDIS_INSTANCE_EN, b.RedisInstances[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteRedisInstance(lcuuid string) {
@@ -693,7 +695,7 @@ func (b *DiffBaseDataSet) addPodCluster(dbItem *mysql.PodCluster, seq int) {
 		AZLcuuid:        dbItem.AZ,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_POD_CLUSTER_EN, b.PodClusters[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_POD_CLUSTER_EN, b.PodClusters[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePodCluster(lcuuid string) {
@@ -714,7 +716,7 @@ func (b *DiffBaseDataSet) addPodNode(dbItem *mysql.PodNode, seq int) {
 		AZLcuuid:        dbItem.AZ,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_POD_NODE_EN, b.PodNodes[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_POD_NODE_EN, b.PodNodes[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePodNode(lcuuid string) {
@@ -733,7 +735,7 @@ func (b *DiffBaseDataSet) addPodNamespace(dbItem *mysql.PodNamespace, seq int) {
 		SubDomainLcuuid: dbItem.SubDomain,
 		CloudTags:       dbItem.CloudTags,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_POD_NAMESPACE_EN, b.PodNamespaces[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_POD_NAMESPACE_EN, b.PodNamespaces[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePodNamespace(lcuuid string) {
@@ -752,7 +754,7 @@ func (b *DiffBaseDataSet) addPodIngress(dbItem *mysql.PodIngress, seq int) {
 		AZLcuuid:        dbItem.AZ,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_POD_INGRESS_EN, b.PodIngresses[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_POD_INGRESS_EN, b.PodIngresses[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePodIngress(lcuuid string) {
@@ -768,7 +770,7 @@ func (b *DiffBaseDataSet) addPodIngressRule(dbItem *mysql.PodIngressRule, seq in
 		},
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_POD_INGRESS_RULE_EN, b.PodIngressRules[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_POD_INGRESS_RULE_EN, b.PodIngressRules[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePodIngressRule(lcuuid string) {
@@ -784,7 +786,7 @@ func (b *DiffBaseDataSet) addPodIngressRuleBackend(dbItem *mysql.PodIngressRuleB
 		},
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, b.PodIngressRuleBackends[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, b.PodIngressRuleBackends[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePodIngressRuleBackend(lcuuid string) {
@@ -811,7 +813,7 @@ func (b *DiffBaseDataSet) addPodService(dbItem *mysql.PodService, seq int, toolD
 		AZLcuuid:         dbItem.AZ,
 		SubDomainLcuuid:  dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_POD_SERVICE_EN, b.PodServices[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_POD_SERVICE_EN, b.PodServices[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePodService(lcuuid string) {
@@ -828,7 +830,7 @@ func (b *DiffBaseDataSet) addPodServicePort(dbItem *mysql.PodServicePort, seq in
 		Name:            dbItem.Name,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_POD_SERVICE_PORT_EN, b.PodServicePorts[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_POD_SERVICE_PORT_EN, b.PodServicePorts[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePodServicePort(lcuuid string) {
@@ -850,7 +852,7 @@ func (b *DiffBaseDataSet) addPodGroup(dbItem *mysql.PodGroup, seq int) {
 		AZLcuuid:        dbItem.AZ,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_POD_GROUP_EN, b.PodGroups[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_POD_GROUP_EN, b.PodGroups[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePodGroup(lcuuid string) {
@@ -867,7 +869,7 @@ func (b *DiffBaseDataSet) addPodGroupPort(dbItem *mysql.PodGroupPort, seq int) {
 		Name:            dbItem.Name,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_POD_GROUP_PORT_EN, b.PodGroupPorts[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_POD_GROUP_PORT_EN, b.PodGroupPorts[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePodGroupPort(lcuuid string) {
@@ -887,7 +889,7 @@ func (b *DiffBaseDataSet) addPodReplicaSet(dbItem *mysql.PodReplicaSet, seq int)
 		AZLcuuid:        dbItem.AZ,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_POD_REPLICA_SET_EN, b.PodReplicaSets[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_POD_REPLICA_SET_EN, b.PodReplicaSets[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePodReplicaSet(lcuuid string) {
@@ -918,7 +920,7 @@ func (b *DiffBaseDataSet) addPod(dbItem *mysql.Pod, seq int, toolDataSet *ToolDa
 		AZLcuuid:            dbItem.AZ,
 		SubDomainLcuuid:     dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_POD_EN, b.Pods[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_POD_EN, b.Pods[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePod(lcuuid string) {
@@ -934,7 +936,7 @@ func (b *DiffBaseDataSet) addVMPodNodeConnection(dbItem *mysql.VMPodNodeConnecti
 		},
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, b.VMPodNodeConnections[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, b.VMPodNodeConnections[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteVMPodNodeConnection(lcuuid string) {
@@ -951,7 +953,7 @@ func (b *DiffBaseDataSet) addProcess(dbItem *mysql.Process, seq int) {
 		Name:      dbItem.Name,
 		OSAPPTags: dbItem.OSAPPTags,
 	}
-	log.Info(addDiffBase(RESOURCE_TYPE_PROCESS_EN, b.Process[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_PROCESS_EN, b.Process[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteProcess(lcuuid string) {

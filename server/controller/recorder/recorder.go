@@ -149,6 +149,7 @@ func (r *Recorder) runNewRefreshWhole(cloudData cloudmodel.Resource) {
 		log.Infof("recorder (domain lcuuid: %s, name: %s) sync refresh started", r.domainLcuuid, r.domainName)
 
 		r.cacheMng.UpdateSequence()
+		r.cacheMng.SetLogLevel(logging.INFO)
 
 		r.refreshDomain(cloudData)
 		r.refreshSubDomains(cloudData.SubDomainResources)

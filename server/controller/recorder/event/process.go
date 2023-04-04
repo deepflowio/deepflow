@@ -84,7 +84,7 @@ func (p *Process) ProduceByDelete(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
 		var id int
 		var name string
-		processInfo, exists := p.ToolDataSet.EventToolDataSet.GetProcessInfoByLcuuid(lcuuid)
+		processInfo, exists := p.ToolDataSet.GetProcessInfoByLcuuid(lcuuid)
 		if !exists {
 			log.Errorf("process info not fount, lcuuid: %s", lcuuid)
 		} else {
