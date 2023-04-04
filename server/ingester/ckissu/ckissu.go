@@ -769,6 +769,12 @@ var ColumnAdd626 = []*ColumnAdds{
 		ColumnNames: u16ColumnProfileNameAdd626,
 		ColumnType:  ckdb.UInt16,
 	},
+	&ColumnAdds{
+		Dbs:         []string{"ext_metrics"},
+		Tables:      []string{"metrics", "metrics_local"},
+		ColumnNames: []string{"gprocess_id"},
+		ColumnType:  ckdb.UInt32,
+	},
 }
 
 var TableRenames626 = []*TableRename{
@@ -1219,6 +1225,10 @@ func (i *Issu) addColumn(connect *sql.DB, c *ColumnAdd) error {
 	if err != nil {
 		// 如果已经增加，需要跳过该错误
 		if strings.Contains(err.Error(), "column with this name already exists") {
+			log.Infof("db: %s, table: %s error: %s", c.Db, c.Table, err)
+			return nil
+			// The 'metrics/metrics_local' table is created after receiving the ext_metric data. If the table field is modified just after the system starts, it will cause an error. Ignore it
+		} else if strings.Contains(err.Error(), "Table ext_metrics.metrics doesn't exist") || strings.Contains(err.Error(), "Table ext_metrics.metrics_local doesn't exist") {
 			log.Infof("db: %s, table: %s error: %s", c.Db, c.Table, err)
 			return nil
 		}

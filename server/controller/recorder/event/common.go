@@ -31,8 +31,8 @@ var (
 	DESCMigrateFormat     = "%s migrate from %s to %s."
 	DESCStateChangeFormat = "%s state changes from %s to %s."
 	DESCRecreateFormat    = "%s recreate from %s to %s."
-	DESCAddIPFormat       = "%s add ip %s in subnet %s."
-	DESCRemoveIPFormat    = "%s remove ip %s in subnet %s."
+	DESCAddIPFormat       = "%s add ip %s(mac: %s) in subnet %s."
+	DESCRemoveIPFormat    = "%s remove ip %s(mac: %s) in subnet %s."
 )
 
 func GetDeviceOptionsByDeviceID(t *cache.ToolDataSet, deviceType, deviceID int) ([]eventapi.TagFieldOption, error) {

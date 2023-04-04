@@ -75,19 +75,26 @@ type InProcessProfile struct {
 
 // profile_event_type <-> profile_value_unit relation
 /*
-	| profile_event_type               | unit    |
-	|----------------------------------|---------|
-	| cpu                              | samples |
-	| inuse_objects                    | objects |
-	| alloc_objects                    | objects |
-	| inuse_space                      | bytes   |
-	| alloc_space                      | bytes   |
-	| itimer(java)                     | samples |
-	| wall(java)                       | samples |
-	| alloc_in_new_tlab_objects(java)  | objects |
-	| alloc_in_new_tlab_bytes(java)    | bytes   |
-	| alloc_outside_tlab_objects(java) | objects |
-	| alloc_in_new_tlab_bytes(java)    | bytes   |
+| profile_event_type               | unit             | desc                                                     |
+|----------------------------------|------------------|----------------------------------------------------------|
+| cpu                              | samples          | cpu time, count by profile interval, e.g.: 1 sample/10ms |
+| inuse_objects                    | objects          | count                                                    |
+| alloc_objects                    | objects          | count                                                    |
+| inuse_space                      | bytes            | byte(b)                                                  |
+| alloc_space                      | bytes            | byte                                                     |
+| goroutines                       | goroutines       | count                                                    |
+| mutex_duration                   | lock_nanoseconds | ns                                                       |
+| mutex_count                      | lock_samples     | count                                                    |
+| block_duration                   | lock_nanoseconds | ns                                                       |
+| block_count                      | lock_samples     | count                                                    |
+| itimer(java)                     | samples          | cpu time                                                 |
+| wall(java)                       | samples          | cpu time                                                 |
+| alloc_in_new_tlab_objects(java)  | objects          | count                                                    |
+| alloc_in_new_tlab_bytes(java)    | bytes            | byte                                                     |
+| alloc_outside_tlab_objects(java) | objects          | count                                                    |
+| alloc_outside_tlab_bytes(java)   | bytes            | byte                                                     |
+| lock_count(java)                 | lock_samples     | count                                                    |
+| lock_duration(java)              | lock_nanoseconds | ns                                                       |
 */
 
 func ProfileColumns() []*ckdb.Column {
