@@ -32,6 +32,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/utils"
 
 	clickhouse "github.com/ClickHouse/clickhouse-go/v2"
+	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	logging "github.com/op/go-logging"
 )
 
@@ -56,6 +57,7 @@ type CKWriter struct {
 	name         string // 数据库名-表名 用作 queue名字和counter名字
 	prepare      string // 写入数据时，先执行prepare
 	conns        []clickhouse.Conn
+	batchs       []driver.Batch
 	connCount    uint64
 	dataQueues   queue.FixedMultiQueue
 	counters     []Counter
@@ -126,6 +128,7 @@ func NewCKWriter(addrs []string, user, password, counterName string, table *ckdb
 
 	addrCount := len(addrs)
 	conns := make([]clickhouse.Conn, addrCount)
+	batchs := make([]driver.Batch, addrCount)
 	for i := 0; i < addrCount; i++ {
 		if conns[i], err = clickhouse.Open(&clickhouse.Options{
 			Addr: []string{addrs[i]},
@@ -161,6 +164,7 @@ func NewCKWriter(addrs []string, user, password, counterName string, table *ckdb
 		name:       name,
 		prepare:    table.MakePrepareTableInsertSQL(),
 		conns:      conns,
+		batchs:     batchs,
 		connCount:  uint64(len(conns)),
 		dataQueues: dataQueues,
 		counters:   make([]Counter, queueCount),
@@ -316,10 +320,19 @@ func (w *CKWriter) writeItems(connID int, items []CKItem) error {
 		}
 		ck = w.conns[connID]
 	}
-
-	batch, err := ck.PrepareBatch(context.Background(), w.prepare)
-	if err != nil {
-		return err
+	var err error
+	batch := w.batchs[connID]
+	if IsNil(batch) {
+		w.batchs[connID], err = ck.PrepareBatch(context.Background(), w.prepare)
+		if err != nil {
+			return err
+		}
+		batch = w.batchs[connID]
+	} else {
+		batch, err = ck.PrepareReuseBatch(context.Background(), w.prepare, batch)
+		if err != nil {
+			return err
+		}
 	}
 
 	ckdbBlock := ckdb.NewBlock(batch)

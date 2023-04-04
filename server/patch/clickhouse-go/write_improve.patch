@@ -1,0 +1,419 @@
+diff --git a/clickhouse.go b/clickhouse.go
+index 351cc6c..aca1ad0 100644
+--- a/clickhouse.go
++++ b/clickhouse.go
+@@ -151,6 +151,18 @@ func (ch *clickhouse) PrepareBatch(ctx context.Context, query string) (driver.Ba
+ 	return batch, nil
+ }
+ 
++func (ch *clickhouse) PrepareReuseBatch(ctx context.Context, query string, b driver.Batch) (driver.Batch, error) {
++	conn, err := ch.acquire(ctx)
++	if err != nil {
++		return nil, err
++	}
++	batch, err := conn.prepareReuseBatch(ctx, query, ch.release, b.(*batch))
++	if err != nil {
++		return nil, err
++	}
++	return batch, nil
++}
++
+ func (ch *clickhouse) AsyncInsert(ctx context.Context, query string, wait bool) error {
+ 	conn, err := ch.acquire(ctx)
+ 	if err != nil {
+diff --git a/conn_batch.go b/conn_batch.go
+index c2af620..6b74203 100644
+--- a/conn_batch.go
++++ b/conn_batch.go
+@@ -65,6 +65,40 @@ func (c *connect) prepareBatch(ctx context.Context, query string, release func(*
+ 	}, nil
+ }
+ 
++func (c *connect) prepareReuseBatch(ctx context.Context, query string, release func(*connect, error), b *batch) (*batch, error) {
++	query = splitInsertRe.Split(query, -1)[0]
++	if !strings.HasSuffix(strings.TrimSpace(strings.ToUpper(query)), "VALUES") {
++		query += " VALUES"
++	}
++	options := queryOptions(ctx)
++	if deadline, ok := ctx.Deadline(); ok {
++		c.conn.SetDeadline(deadline)
++		defer c.conn.SetDeadline(time.Time{})
++	}
++	if err := c.sendQuery(query, &options); err != nil {
++		release(c, err)
++		return nil, err
++	}
++	var (
++		onProcess  = options.onProcess()
++		block, err = c.firstBlock(ctx, onProcess)
++	)
++	if err != nil {
++		release(c, err)
++		return nil, err
++	}
++	b.block.Reset()
++	b.sent = false
++	b.ctx = ctx
++	b.conn = c
++	b.block.Packet = block.Packet
++	b.release = func(err error) {
++		release(c, err)
++	}
++	b.onProcess = onProcess
++	return b, nil
++}
++
+ type batch struct {
+ 	err       error
+ 	ctx       context.Context
+@@ -75,6 +109,11 @@ type batch struct {
+ 	onProcess *onProcess
+ }
+ 
++func (b *batch) Reset() {
++	b.block.Reset()
++	b.sent = false
++}
++
+ func (b *batch) Abort() error {
+ 	defer func() {
+ 		b.sent = true
+diff --git a/lib/column/array.go b/lib/column/array.go
+index 5358d96..f4a0892 100644
+--- a/lib/column/array.go
++++ b/lib/column/array.go
+@@ -138,6 +138,36 @@ func (col *Array) Append(v interface{}) (nulls []uint8, err error) {
+ }
+ 
+ func (col *Array) AppendRow(v interface{}) error {
++	// avoid reflect to improve performance, but not support col.depth>1
++	if col.depth == 1 {
++		switch tv := v.(type) {
++		case []string:
++			offset := uint64(len(tv))
++			if ln := len(col.offsets[0].values.data); ln != 0 {
++				offset += col.offsets[0].values.data[ln-1]
++			}
++			col.offsets[0].values.data = append(col.offsets[0].values.data, offset)
++			for i := 0; i < len(tv); i++ {
++				if err := col.values.AppendStringRow(tv[i]); err != nil {
++					return err
++				}
++			}
++			return nil
++		case []float64:
++			offset := uint64(len(tv))
++			if ln := len(col.offsets[0].values.data); ln != 0 {
++				offset += col.offsets[0].values.data[ln-1]
++			}
++			col.offsets[0].values.data = append(col.offsets[0].values.data, offset)
++			for i := 0; i < len(tv); i++ {
++				if err := col.values.AppendRow(tv[i]); err != nil {
++					return err
++				}
++			}
++			return nil
++		}
++	}
++
+ 	var elem reflect.Value
+ 	switch v := v.(type) {
+ 	case reflect.Value:
+diff --git a/lib/column/column.go b/lib/column/column.go
+index 6994106..2f1e375 100644
+--- a/lib/column/column.go
++++ b/lib/column/column.go
+@@ -75,12 +75,257 @@ type Interface interface {
+ 	ScanRow(dest interface{}, row int) error
+ 	Append(v interface{}) (nulls []uint8, err error)
+ 	AppendRow(v interface{}) error
++	AppendStringRow(v string) error
+ 	Decode(decoder *binary.Decoder, rows int) error
+ 	Encode(*binary.Encoder) error
+ 	ScanType() reflect.Type
++	Reset()
+ }
+ 
+ type CustomSerialization interface {
+ 	ReadStatePrefix(*binary.Decoder) error
+ 	WriteStatePrefix(*binary.Encoder) error
+ }
++
++func (col *String) AppendStringRow(v string) error {
++	col.data = append(col.data, v)
++	return nil
++}
++
++func (col *DateTime64) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *UUID) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *Ring) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *Map) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *DateTime) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *Decimal) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *Point) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *Array) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *LowCardinality) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *Tuple) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *IPv4) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *IPv6) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *BigInt) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *Polygon) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *FixedString) AppendStringRow(v string) (err error) {
++	return fmt.Errorf("unsupport")
++}
++func (col *Bool) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *Nullable) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *Date) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (jCol *JSONObject) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *SimpleAggregateFunction) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *Date32) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *MultiPolygon) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *Float32) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *Float64) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *Int8) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *Int16) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *Int32) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *Int64) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *UInt8) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *UInt16) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *UInt32) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *UInt64) AppendStringRow(v string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *Enum16) AppendStringRow(elem string) error {
++	return fmt.Errorf("unsupport")
++}
++func (col *Enum8) AppendStringRow(elem string) error {
++	return fmt.Errorf("unsupport")
++}
++func (Nothing) AppendStringRow(string) error {
++	return fmt.Errorf("unsupport")
++}
++func (Interval) AppendStringRow(string) error {
++	return fmt.Errorf("unsupport")
++}
++
++func (col *String) Reset() {
++	col.data = col.data[:0]
++}
++
++func (col *DateTime64) Reset() {
++	col.values.data = col.values.data[:0]
++}
++func (col *UUID) Reset() {
++	col.data = col.data[:0]
++}
++func (col *Ring) Reset() {
++	col.set.Reset()
++}
++func (col *Map) Reset() {
++	col.keys.Reset()
++	col.values.Reset()
++}
++func (col *DateTime) Reset() {
++	col.values.data = col.values.data[:0]
++}
++func (col *Decimal) Reset() {
++	col.values = col.values[:0]
++}
++func (col *Point) Reset() {
++	col.lon.data = col.lon.data[:0]
++	col.lat.data = col.lat.data[:0]
++}
++func (col *Array) Reset() {
++	col.values.Reset()
++	for i := range col.offsets {
++		col.offsets[i].values.Reset()
++	}
++}
++func (col *LowCardinality) Reset() {
++	col.index.Reset()
++	col.rows = 0
++	col.keys8.data = col.keys8.data[:0]
++	col.keys16.data = col.keys16.data[:0]
++	col.keys32.data = col.keys32.data[:0]
++	col.keys64.data = col.keys64.data[:0]
++	col.append.keys = col.append.keys[:0]
++	col.append.index = make(map[interface{}]int)
++}
++func (col *Tuple) Reset() {
++	col.columns = col.columns[:0]
++}
++func (col *IPv4) Reset() {
++	col.data = col.data[:0]
++}
++func (col *IPv6) Reset() {
++	col.data = col.data[:0]
++}
++func (col *BigInt) Reset() {
++	col.data = col.data[:0]
++}
++func (col *Polygon) Reset() {
++	col.set.Reset()
++}
++func (col *FixedString) Reset() {
++	col.data = col.data[:0]
++}
++func (col *Bool) Reset() {
++	col.values.data = col.values.data[:0]
++}
++func (col *Nullable) Reset() {
++	col.base.Reset()
++	col.nulls.data = col.nulls.data[:0]
++}
++func (col *Date) Reset() {
++	col.values.data = col.values.data[:0]
++}
++func (jCol *JSONObject) Reset() {
++	jCol.columns = jCol.columns[:0]
++}
++func (col *SimpleAggregateFunction) Reset() {
++	col.base.Reset()
++}
++func (col *Date32) Reset() {
++	col.values.data = col.values.data[:0]
++}
++func (col *MultiPolygon) Reset() {
++	col.set.Reset()
++}
++func (col *Float32) Reset() {
++	col.data = col.data[:0]
++}
++func (col *Float64) Reset() {
++	col.data = col.data[:0]
++}
++func (col *Int8) Reset() {
++	col.data = col.data[:0]
++}
++func (col *Int16) Reset() {
++	col.data = col.data[:0]
++}
++func (col *Int32) Reset() {
++	col.data = col.data[:0]
++}
++func (col *Int64) Reset() {
++	col.data = col.data[:0]
++}
++func (col *UInt8) Reset() {
++	col.data = col.data[:0]
++}
++func (col *UInt16) Reset() {
++	col.data = col.data[:0]
++}
++func (col *UInt32) Reset() {
++	col.data = col.data[:0]
++}
++func (col *UInt64) Reset() {
++	col.data = col.data[:0]
++}
++func (col *Enum16) Reset() {
++	col.values.data = col.values.data[:0]
++	col.iv = make(map[string]uint16)
++	col.vi = make(map[uint16]string)
++}
++func (col *Enum8) Reset() {
++	col.values.data = col.values.data[:0]
++	col.iv = make(map[string]uint8)
++	col.vi = make(map[uint8]string)
++}
++func (Nothing) Reset() {
++}
++func (col *Interval) Reset() {
++	col.values.data = col.values.data[:0]
++}
+diff --git a/lib/driver/driver.go b/lib/driver/driver.go
+index 629512b..9deb4f2 100644
+--- a/lib/driver/driver.go
++++ b/lib/driver/driver.go
+@@ -47,6 +47,7 @@ type (
+ 		Query(ctx context.Context, query string, args ...interface{}) (Rows, error)
+ 		QueryRow(ctx context.Context, query string, args ...interface{}) Row
+ 		PrepareBatch(ctx context.Context, query string) (Batch, error)
++		PrepareReuseBatch(ctx context.Context, query string, batch Batch) (Batch, error)
+ 		Exec(ctx context.Context, query string, args ...interface{}) error
+ 		AsyncInsert(ctx context.Context, query string, wait bool) error
+ 		Ping(context.Context) error
+@@ -74,6 +75,7 @@ type (
+ 		AppendStruct(v interface{}) error
+ 		Column(int) BatchColumn
+ 		Send() error
++		Reset()
+ 	}
+ 	BatchColumn interface {
+ 		Append(interface{}) error
+diff --git a/lib/proto/block.go b/lib/proto/block.go
+index ca25f89..8db8b26 100644
+--- a/lib/proto/block.go
++++ b/lib/proto/block.go
+@@ -31,6 +31,11 @@ type Block struct {
+ 	Columns []column.Interface
+ }
+ 
++func (b *Block) Reset() {
++	for i := range b.Columns {
++		b.Columns[i].Reset()
++	}
++}
+ func (b *Block) Rows() int {
+ 	if len(b.Columns) == 0 {
+ 		return 0
