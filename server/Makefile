@@ -75,6 +75,8 @@ vendor:
 	find vendor -type d -exec chmod +w {} \;
 	# optimize the write performance of Array(string) data type
 	patch -p1 -d vendor/github.com/ClickHouse/clickhouse-go/v2/ < patch/clickhouse-go/write_improve.patch
+	# reset the pointer to the nullable field
+	patch -p1 -d vendor/github.com/ClickHouse/clickhouse-go/v2/ < patch/clickhouse-go/nullable.patch
 
 .PHONY: test
 test: vendor $(proto) $(generated_libs)
