@@ -327,6 +327,16 @@ ingester:
   ## event database data retention time(unit: hour)
   #event-ttl-hour: 720
 
+  ## perf event data write config
+  #perf-event-ck-writer:
+  #  queue-count: 2      # 每个表并行写数量
+  #  queue-size: 50000  # 数据队列长度
+  #  batch-size: 25600   # 多少行数据同时写入
+  #  flush-timeout: 5    # 超时写入时间
+
+  ## perf event database data retention time(unit: hour)
+  #perf-event-ttl-hour: 168
+
   ## pcap data write config
   #pcap-ck-writer:
   #  queue-count: 1     # 每个表并行写数量
@@ -426,8 +436,11 @@ ingester:
   #profile-decoder-queue-count: 2
   #profile-decoder-queue-size: 10000
 
-  #event-decoder-queue-count: 2
+  #event-decoder-queue-count: 1
   #event-decoder-queue-size: 10000
+
+  #perf-event-decoder-queue-count: 2
+  #perf-event-decoder-queue-size: 100000
 
   ## unit: byte
   #flow-tag-cache-max-size: 262144
