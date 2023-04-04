@@ -323,7 +323,7 @@ fn fill_tagged_flow(
         )
     };
     let mut l4_protocol = L4Protocol::Tcp;
-    let mut l7_protocol = L7Protocol::Unknown;
+    let mut l7_protocol = L7Protocol::Other;
     let mut status = L7ResponseStatus::NotExist;
     let mut is_http2 = false;
 
