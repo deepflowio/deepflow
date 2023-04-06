@@ -185,6 +185,7 @@ const (
 	ServerProcess           = Server | TAPSideEnum(ProcessSide)
 	ClientApp               = Client | TAPSideEnum(AppSide)
 	ServerApp               = Server | TAPSideEnum(AppSide)
+	App                     = TAPSideEnum(AppSide)
 	Rest                    = 0
 )
 
@@ -205,6 +206,7 @@ var TAPSideEnumsString = []string{
 	ServerProcess:           "s-p",
 	ClientApp:               "c-app",
 	ServerApp:               "s-app",
+	App:                     "app",
 }
 
 func (s TAPSideEnum) String() string {
