@@ -381,6 +381,10 @@ impl<T: Sendable> UniformSender<T> {
                     self.tcp_stream.take();
                     return;
                 }
+                info!(
+                    "{} sender tcp connection to {}:{} succeed.",
+                    self.name, self.dst_ip, self.dst_port
+                );
                 self.reconnect = false;
             } else {
                 if self.counter.dropped.load(Ordering::Relaxed) == 0 {

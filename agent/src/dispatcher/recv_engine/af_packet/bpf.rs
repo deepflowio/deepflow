@@ -187,7 +187,7 @@ impl fmt::Display for LoadAbsolute {
                 }
                 write!(f, "ld [{}]", self.off)
             }
-            _ => panic!("invalid size."),
+            _ => panic!("Invalid size."),
         }
     }
 }

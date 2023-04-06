@@ -362,7 +362,7 @@ impl From<Tagger> for metric::MiniTag {
                 (IpAddr::V6(ip6), IpAddr::V6(ip61)) => {
                     (ip6.octets().to_vec(), ip61.octets().to_vec())
                 }
-                _ => panic!("ip, ip1 type mismatch"),
+                _ => panic!("{:?} ip, ip1 type mismatch", &t),
             }
         } else {
             match t.ip {

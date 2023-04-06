@@ -264,7 +264,7 @@ impl Tpacket {
                 return Box::from(header::V3Wrapper::from(position));
             }
             _ => {
-                panic!("Unknown af_packet version.");
+                panic!("Unknown af_packet version {:?}.", &self.tp_version);
             }
         }
     }
