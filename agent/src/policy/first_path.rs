@@ -672,7 +672,7 @@ impl FirstPath {
                 self.get_policy_from_table6(forward, DirectionType::Forward, policy);
                 self.get_policy_from_table6(backward, DirectionType::Backward, policy);
             }
-            _ => panic!("LookupKey MatchedField version error."),
+            _ => panic!("LookupKey({:?}) MatchedField version error.", key),
         }
     }
 

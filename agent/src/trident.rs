@@ -122,7 +122,7 @@ use public::{
 const MINUTE: Duration = Duration::from_secs(60);
 const COMMON_DELAY: u32 = 5;
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct ChangedConfig {
     pub runtime_config: RuntimeConfig,
     pub blacklist: Vec<u64>,
@@ -137,6 +137,7 @@ pub enum RunningMode {
     Standalone,
 }
 
+#[derive(Debug)]
 pub enum State {
     Running,
     ConfigChanged(ChangedConfig),
@@ -148,7 +149,7 @@ impl State {
     fn unwrap_config(self) -> ChangedConfig {
         match self {
             Self::ConfigChanged(c) => c,
-            _ => panic!("not config type"),
+            _ => panic!("{:?} not config type", &self),
         }
     }
 }
@@ -180,7 +181,7 @@ CompileTime: {}",
             match self.name {
                 "deepflow-agent-ce" => "deepflow-agent community edition",
                 "deepflow-agent-ee" => "deepflow-agent enterprise edition",
-                _ => panic!("unknown deepflow-agent edition"),
+                _ => panic!("{:?} unknown deepflow-agent edition", &self.name),
             },
             self.branch,
             self.commit_id,
@@ -1249,13 +1250,13 @@ impl AgentComponents {
         #[cfg(target_os = "linux")]
         let (toa_sender, toa_recv, _) = queue::bounded_with_debug(
             yaml_config.toa_sender_queue_size,
-            "socket-sync-toa-info-queue",
+            "1-socket-sync-toa-info-queue",
             &queue_debugger,
         );
         #[cfg(target_os = "windows")]
         let (toa_sender, _, _) = queue::bounded_with_debug(
             yaml_config.toa_sender_queue_size,
-            "socket-sync-toa-info-queue",
+            "1-socket-sync-toa-info-queue",
             &queue_debugger,
         );
         #[cfg(target_os = "linux")]
