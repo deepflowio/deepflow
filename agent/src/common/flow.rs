@@ -171,7 +171,7 @@ impl From<FlowKey> for flow_log::FlowKey {
             (IpAddr::V6(ip6), IpAddr::V6(ip6_1)) => {
                 (Ipv4Addr::UNSPECIFIED, Ipv4Addr::UNSPECIFIED, ip6, ip6_1)
             }
-            _ => panic!("ip_src,ip_dst type mismatch"),
+            _ => panic!("FlowKey({:?}) ip_src,ip_dst type mismatch", &f),
         };
         flow_log::FlowKey {
             vtap_id: f.vtap_id as u32,

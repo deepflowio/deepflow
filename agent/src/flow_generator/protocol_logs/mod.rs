@@ -259,7 +259,7 @@ impl From<AppProtoLogsBaseInfo> for flow_log::AppProtoLogsBaseInfo {
             (IpAddr::V6(ip6), IpAddr::V6(ip6_1)) => {
                 (Ipv4Addr::UNSPECIFIED, Ipv4Addr::UNSPECIFIED, ip6, ip6_1)
             }
-            _ => panic!("ip_src,ip_dst type mismatch"),
+            _ => panic!("{:?} ip_src,ip_dst type mismatch", &f),
         };
         flow_log::AppProtoLogsBaseInfo {
             start_time: f.start_time.as_nanos() as u64,

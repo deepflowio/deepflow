@@ -435,7 +435,7 @@ impl Builder {
         let mut src_bpf_builder = BpfBuilder::default();
 
         let ip_int = match self.analyzer_source_ip {
-            IpAddr::V4(_) => panic!("analyzer ip type error."),
+            IpAddr::V4(_) => panic!("analyzer ip {:?} type error.", &self.analyzer_source_ip),
             IpAddr::V6(i) => u128::from_be_bytes(i.octets()),
         };
 
@@ -569,7 +569,7 @@ impl Builder {
 
         let ip_int = match self.analyzer_source_ip {
             IpAddr::V4(i) => u32::from(i),
-            IpAddr::V6(_) => panic!("analyzer ip type error."),
+            IpAddr::V6(_) => panic!("analyzer ip {:?} type error.", &self.analyzer_source_ip),
         };
 
         src_bpf_builder

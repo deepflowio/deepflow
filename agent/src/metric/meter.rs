@@ -45,7 +45,7 @@ impl Meter {
             (Meter::Flow(m), Meter::Flow(n)) => m.sequential_merge(n),
             (Meter::App(m), Meter::App(n)) => m.sequential_merge(n),
             (Meter::Usage(m), Meter::Usage(n)) => m.sequential_merge(n),
-            _ => panic!("Meter merge mismatch type."),
+            (m, n) => panic!("Meter merge {:?} and {:?} mismatch type.", m, n),
         }
     }
     pub fn reverse(&mut self) {

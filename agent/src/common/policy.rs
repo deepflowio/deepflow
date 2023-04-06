@@ -303,7 +303,7 @@ impl From<&IpNet> for IpSegment {
                 ..Default::default()
             },
             _ => {
-                panic!("Cidr network and netmask mismatched")
+                panic!("Cidr({:?}) network and netmask mismatched", cidr)
             }
         }
     }

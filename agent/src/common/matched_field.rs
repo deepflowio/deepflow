@@ -68,7 +68,10 @@ impl MatchedField {
         match (self, value) {
             (Self::V4(f), IpAddr::V4(addr)) => f.set_ip(flag, addr),
             (Self::V6(f), IpAddr::V6(addr)) => f.set_ip(flag, addr),
-            _ => panic!("The version of MatchedField and IpAddr conflict."),
+            (f, addr) => panic!(
+                "The version of MatchedField({:?}) and IpAddr({:?}) conflict.",
+                f, addr
+            ),
         }
     }
 
@@ -101,7 +104,10 @@ impl MatchedField {
             (Self::V6(f), Self::V6(mv), Self::V6(m)) => {
                 f.get_all_table_index(mv, m, min, max, vector_bits)
             }
-            _ => panic!("type mismatch"),
+            _ => panic!(
+                "{:?}, {:?} and {:?} type mismatch.",
+                self, mask_vector, mask
+            ),
         }
     }
 
@@ -109,7 +115,7 @@ impl MatchedField {
         match (self, mask_vector) {
             (Self::V4(f), Self::V4(mv)) => f.get_table_index(mv, min, max),
             (Self::V6(f), Self::V6(mv)) => f.get_table_index(mv, min, max),
-            _ => panic!("type mismatch"),
+            _ => panic!("{:?} and {:?} type mismatch.", self, mask_vector),
         }
     }
 }
@@ -223,7 +229,7 @@ impl<const N: usize> MatchedFieldN<N> {
                 let b = b - 8 * 2 * N;
                 self.others[b >> 3] = 1 << (b & 7);
             } else {
-                panic!("bits out of bounds")
+                panic!("bits({:?}) out of bounds", bits)
             }
         }
     }
@@ -284,7 +290,7 @@ impl<const N: usize> MatchedFieldN<N> {
             let offset = offset - 8 * 2 * N;
             self.others[offset >> 3] & (1 << (offset & 7)) == 0
         } else {
-            panic!("bits out of bounds")
+            panic!("offset({}) out of bounds.", offset)
         }
     }
 }
