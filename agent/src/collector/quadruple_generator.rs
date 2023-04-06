@@ -1083,8 +1083,12 @@ impl QuadrupleGenerator {
             Some(s) => s,
             None => return (flow_meter, app_meter),
         };
-        match stats.l7_protocol {
-            L7Protocol::Unknown | L7Protocol::Other => {
+        match (stats.l7_protocol, tagged_flow.flow.signal_source) {
+            (
+                L7Protocol::Unknown | L7Protocol::Other,
+                SignalSource::Packet | SignalSource::EBPF | SignalSource::XFlow,
+            ) => {
+                // only L7Protocol is Unknown or Other and SignalSource != Otel will execute the following logic
                 app_meter = AppMeter {
                     traffic: AppTraffic {
                         request: (tagged_flow.flow.close_type != CloseType::ForcedReport) as u32,
@@ -1094,7 +1098,7 @@ impl QuadrupleGenerator {
                     ..Default::default()
                 }
             }
-            _ => {
+            (_, _) => {
                 app_meter = AppMeter {
                     traffic: AppTraffic {
                         request: stats.l7.request_count,
@@ -1159,6 +1163,17 @@ impl QuadrupleGenerator {
         {
             key[OFFSET_PORT] = (tagged_flow.flow.flow_key.port_dst >> 8) as u8;
             key[OFFSET_PORT + 1] = tagged_flow.flow.flow_key.port_dst as u8;
+        } else if tagged_flow.flow.signal_source == SignalSource::OTel {
+            // Because l7_protocol cannot be parsed in the span received from otel_sdk, the
+            // l7_protocol of some otel data is other, and it is impossible to determine whether
+            // the data is the same stream as other data that can normally parse the protocol.
+            // Therefore, l7_protocol should be used to distinguish otel indicator data
+            key[OFFSET_L7_PROTOCOL] = (tagged_flow
+                .flow
+                .flow_perf_stats
+                .as_ref()
+                .map(|s| s.l7_protocol)
+                .unwrap_or(L7Protocol::Other)) as u8;
         }
     }
 
