@@ -144,7 +144,7 @@ controller:
 
   tagrecorder:
     # size of data in batch operation for MySQL
-    mysql_batch_size: 5000
+    mysql_batch_size: 1000
 
   trisolaris:
     tsdb_ip:

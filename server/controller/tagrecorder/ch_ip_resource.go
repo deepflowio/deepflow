@@ -18,12 +18,12 @@ package tagrecorder
 
 import (
 	"context"
-	"encoding/json"
 	"strconv"
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/db/redis"
+	json "github.com/goccy/go-json"
 )
 
 type ChIPResource struct {
