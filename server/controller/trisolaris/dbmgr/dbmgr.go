@@ -232,6 +232,10 @@ func (obj *_DBMgr[M]) WithName(name string) Option {
 	return optionFunc(func(o *options) { o.query["name"] = name })
 }
 
+func (obj *_DBMgr[M]) WithType(dType int) Option {
+	return optionFunc(func(o *options) { o.query["type"] = dType })
+}
+
 func (obj *_DBMgr[M]) WithCtrlIP(ctrlIP string) Option {
 	return optionFunc(func(o *options) { o.query["ctrl_ip"] = ctrlIP })
 }

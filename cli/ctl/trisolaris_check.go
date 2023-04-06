@@ -21,7 +21,10 @@ import (
 	"context"
 	. "encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net"
 	"sort"
 	"strconv"
@@ -38,13 +41,15 @@ import (
 )
 
 type ParamData struct {
-	CtrlIP    string
-	CtrlMac   string
-	GroupID   string
-	ClusterID string
-	RpcIP     string
-	RpcPort   string
-	Type      string
+	CtrlIP     string
+	CtrlMac    string
+	GroupID    string
+	ClusterID  string
+	RpcIP      string
+	RpcPort    string
+	Type       string
+	PluginType string
+	PluginName string
 }
 
 type SortedAcls []*trident.FlowAcl
@@ -155,6 +160,14 @@ func regiterCommand() []*cobra.Command {
 		},
 	}
 
+	pluginCmd := &cobra.Command{
+		Use:   "plugin",
+		Short: "get plugin from deepflow-server",
+		Run: func(cmd *cobra.Command, args []string) {
+			plugin(cmd)
+		},
+	}
+
 	allCmd := &cobra.Command{
 		Use:   "all",
 		Short: "get all data from deepflow-server",
@@ -167,7 +180,7 @@ func regiterCommand() []*cobra.Command {
 	commands := []*cobra.Command{platformDataCmd, ipGroupsCmd, flowAclsCmd,
 		tapTypesCmd, configCmd, segmentsCmd, vpcIPCmd, skipInterfaceCmd,
 		localServersCmd, gpidAgentResponseCmd, gpidGlobalTableCmd, gpidAgentRequestCmd,
-		realGlobalCmd, ripToVipCmd, allCmd}
+		realGlobalCmd, ripToVipCmd, pluginCmd, allCmd}
 	return commands
 }
 
@@ -181,6 +194,8 @@ func RegisterTrisolarisCommand() *cobra.Command {
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.GroupID, "gid", "", "", "vtap group ID")
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.ClusterID, "cid", "", "", "vtap k8s cluster ID")
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.Type, "type", "", "trident", "request type trdient/analyzer")
+	trisolarisCmd.PersistentFlags().StringVarP(&paramData.PluginType, "ptype", "", "wasm", "request plugin type")
+	trisolarisCmd.PersistentFlags().StringVarP(&paramData.PluginName, "pname", "", "", "request plugin name")
 	cmds := regiterCommand()
 	for _, handler := range cmds {
 		trisolarisCmd.AddCommand(handler)
@@ -567,4 +582,57 @@ func vpcIP(response *trident.SyncResponse) {
 	for index, podIP := range response.GetPodIps() {
 		JsonFormat(index+1, podIP)
 	}
+}
+
+func plugin(cmd *cobra.Command) {
+	conn := getConn(cmd)
+	if conn == nil {
+		return
+	}
+	defer conn.Close()
+	fmt.Printf("request trisolaris(%s), params(%+v)\n", conn.Target(), paramData)
+	var pluginType trident.PluginType
+	switch paramData.PluginType {
+	case "wasm":
+		pluginType = trident.PluginType_WASM
+	default:
+		fmt.Printf("request pluginType(%s) not supported, pluginType must be in %s\n",
+			paramData.PluginType, []string{"wasm"})
+		return
+	}
+	c := trident.NewSynchronizerClient(conn)
+	reqData := &trident.PluginRequest{
+		CtrlIp:     &paramData.CtrlIP,
+		CtrlMac:    &paramData.CtrlMac,
+		PluginType: &pluginType,
+		PluginName: &paramData.PluginName,
+	}
+	stream, err := c.Plugin(context.Background(), reqData)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	var (
+		data []byte
+		md5  string
+	)
+	for {
+		if res, err := stream.Recv(); err == nil {
+			data = append(data, res.GetContent()...)
+			md5 = res.GetMd5()
+		} else {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			fmt.Println(res, err)
+			return
+		}
+	}
+	fileName := paramData.PluginType + "-" + paramData.PluginName
+	err = ioutil.WriteFile(fileName, data, 0666)
+	if err != nil {
+		fmt.Printf("save plugin(%s) fail %s\n", fileName, err)
+		return
+	}
+	fmt.Printf("save plugin(%s) success, md5=%s\n", fileName, md5)
 }

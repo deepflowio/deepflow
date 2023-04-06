@@ -92,6 +92,7 @@ type StaticConfig struct {
 	OsProcSyncEnabled                *bool                 `yaml:"os-proc-sync-enabled,omitempty"`
 	GuardInterval                    *string               `yaml:"guard-interval,omitempty"`
 	CheckCoreFileDisabled            *bool                 `yaml:"check-core-file-disabled,omitempty"`
+	WasmPlugins                      []string              `yaml:"wasm-plugins,omitempty"`
 }
 
 type XflowCollectorConfig struct {
