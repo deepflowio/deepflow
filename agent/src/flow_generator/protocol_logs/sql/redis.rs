@@ -209,7 +209,8 @@ impl L7ProtocolParserInterface for RedisLog {
     }
 
     fn reset(&mut self) {
-        *self = Self::default();
+        self.info = RedisInfo::default();
+        self.perf_stats = self.perf_stats.take();
     }
 
     fn perf_stats(&mut self) -> Option<L7PerfStats> {
