@@ -516,7 +516,13 @@ impl Stash {
         }
         // 双端统计量：若双端direction都未知，则以direction=0（对应tap-side=rest）记录一次统计数据
         if directions[0] == Direction::None && directions[1] == Direction::None {
-            self.fill_edge_stats(acc_flow, Direction::None, inactive_ip_enabled);
+            // if otel data's directions are unknown, set direction =  Direction::App
+            let direction = if acc_flow.tagged_flow.flow.signal_source == SignalSource::OTel {
+                Direction::App
+            } else {
+                Direction::None
+            };
+            self.fill_edge_stats(acc_flow, direction, inactive_ip_enabled);
         }
     }
 
