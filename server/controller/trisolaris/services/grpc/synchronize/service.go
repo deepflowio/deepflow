@@ -36,6 +36,7 @@ type service struct {
 	upgradeEvent             *UpgradeEvent
 	kubernetesClusterIDEvent *KubernetesClusterIDEvent
 	processInfoEvent         *ProcessInfoEvent
+	pluginEvent              *PluginEvent
 }
 
 func init() {
@@ -49,6 +50,7 @@ func newService() *service {
 		ntpEvent:         NewNTPEvent(),
 		upgradeEvent:     NewUpgradeEvent(),
 		processInfoEvent: NewprocessInfoEvent(),
+		pluginEvent:      NewPluginEvent(),
 	}
 }
 
@@ -133,4 +135,8 @@ func (s *service) GPIDSync(ctx context.Context, in *api.GPIDSyncRequest) (*api.G
 
 func (s *service) ShareGPIDLocalData(ctx context.Context, in *api.ShareGPIDSyncRequests) (*api.ShareGPIDSyncRequests, error) {
 	return s.processInfoEvent.ShareGPIDLocalData(ctx, in)
+}
+
+func (s *service) Plugin(r *api.PluginRequest, in api.Synchronizer_PluginServer) error {
+	return s.pluginEvent.Plugin(r, in)
 }
