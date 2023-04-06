@@ -168,7 +168,7 @@ func (k *KubernetesInfo) createDomain(clusterID, clusterName string) (domainLcuu
 		"controller_ip":              k.cfg.NodeIP,
 		"pod_net_ipv4_cidr_max_mask": 16,
 		"pod_net_ipv6_cidr_max_mask": 64,
-		"port_name_regex":            DEFAULT_PORT_NAME_REGEX,
+		"node_port_name_regex":       DEFAULT_PORT_NAME_REGEX,
 		"region_uuid":                azConn.Region,
 		"vtap_id":                    "",
 	}
