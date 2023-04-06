@@ -16,6 +16,7 @@ service Synchronizer {
     rpc GetKubernetesClusterID (KubernetesClusterIDRequest) returns (KubernetesClusterIDResponse) {}
     rpc GPIDSync (GPIDSyncRequest) returns (GPIDSyncResponse) {}
     rpc ShareGPIDLocalData(ShareGPIDSyncRequests) returns (ShareGPIDSyncRequests) {}
+    rpc Plugin (PluginRequest) returns (stream PluginResponse) {}
 }
 
 // debug service
@@ -508,6 +509,24 @@ message NtpRequest {
 
 message NtpResponse {
     optional bytes response = 1; // 数据
+}
+
+enum  PluginType {
+    WASM = 1;
+}
+
+message  PluginRequest  {
+    optional string ctrl_ip = 1;
+    optional string ctrl_mac = 2;
+    optional PluginType  pluginType = 3;
+    optional string  pluginName = 4;
+}
+message PluginResponse  {
+    optional Status status = 1;     // 调用是否成功
+    optional bytes content = 2;     // 数据
+    optional string md5 = 3;        // 文件MD5
+    optional uint64 total_len = 4;  // 数据总长
+    optional uint32 pkt_count = 5;  // 包总个数
 }
 
 message GenesisPlatformData {
