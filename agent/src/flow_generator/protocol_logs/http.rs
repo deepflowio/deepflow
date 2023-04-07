@@ -1256,6 +1256,7 @@ mod tests {
             ("sw8.pcap", "sw8.result"),
             ("h2c_ascii.pcap", "h2c_ascii.result"),
             ("httpv2-stream-id.pcap", "httpv2-stream-id.result"),
+            ("istio-tcp-frag.pcap", "istio-tcp-frag.result"),
         ];
         for item in files.iter() {
             let expected = fs::read_to_string(&Path::new(FILE_DIR).join(item.1)).unwrap();
@@ -1353,6 +1354,36 @@ mod tests {
             );
             assert_eq!(res.is_ok(), true);
             println!("{:#?}", h);
+        }
+    }
+
+    #[test]
+    fn test_one_line_resp() {
+        let testcases = vec![
+            "HTTP/1.0 200 OK\r\n",
+            "HTTP/1.0 200 OK\r\n\r\n",
+            "HTT\n\rP/1.0 200 OK\r\n",
+            "HTT\n\rP/1.0 200\r OK",
+            "HTT\n\rP/1.0 200\n OK",
+            "\r\n",
+            "\r\n\r",
+            "\n\r",
+        ];
+        let mut iter = parse_v1_headers(testcases[0].as_bytes());
+        assert_eq!("HTTP/1.0 200 OK", iter.next().unwrap());
+        assert_eq!(None, iter.next());
+
+        let mut iter = parse_v1_headers(testcases[1].as_bytes());
+        assert_eq!("HTTP/1.0 200 OK", iter.next().unwrap());
+        assert_eq!(None, iter.next());
+
+        let mut iter = parse_v1_headers(testcases[2].as_bytes());
+        assert_eq!("HTT\n\rP/1.0 200 OK", iter.next().unwrap());
+        assert_eq!(None, iter.next());
+
+        for expected in &testcases[3..] {
+            let mut iter = parse_v1_headers(expected.as_bytes());
+            assert_eq!(None, iter.next());
         }
     }
 
