@@ -91,10 +91,6 @@ server: vendor $(proto) $(generated_libs)
 querier: vendor $(proto) $(generated_libs)
 	go build -mod vendor ${FLAGS} -o bin/querier${BINARY_SUFFIX} querier/cmd/querier/main.go
 
-.PHONY: profile
-profile: vendor $(proto) $(generated_libs)
-	go build -mod vendor ${FLAGS} -o bin/profile${BINARY_SUFFIX} profile/cmd/profile/main.go
-
 .PHONY: clean
 clean:
 	touch vendor

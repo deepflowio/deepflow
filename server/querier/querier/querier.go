@@ -30,6 +30,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
+	profile_router "github.com/deepflowio/deepflow/server/querier/profile/router"
 	"github.com/deepflowio/deepflow/server/querier/router"
 	"github.com/deepflowio/deepflow/server/querier/statsd"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
@@ -73,6 +74,7 @@ func Start(configPath, serverLogFile string) {
 	r.Use(StatdHandle())
 	r.Use(ErrHandle())
 	router.QueryRouter(r)
+	profile_router.ProfileRouter(r, &cfg)
 	// TODO: 增加router
 	if err := r.Run(fmt.Sprintf(":%d", cfg.ListenPort)); err != nil {
 		log.Errorf("startup service failed, err:%v\n", err)
