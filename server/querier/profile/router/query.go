@@ -20,17 +20,18 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 
-	"github.com/deepflowio/deepflow/server/profile/common"
-	"github.com/deepflowio/deepflow/server/profile/model"
-	"github.com/deepflowio/deepflow/server/profile/service"
+	"github.com/deepflowio/deepflow/server/querier/config"
+	"github.com/deepflowio/deepflow/server/querier/profile/common"
+	"github.com/deepflowio/deepflow/server/querier/profile/model"
+	"github.com/deepflowio/deepflow/server/querier/profile/service"
 )
 
-func ProfileRouter(e *gin.Engine) {
-	e.POST("/v1/profile/ProfileTracing", profileTracing())
+func ProfileRouter(e *gin.Engine, cfg *config.QuerierConfig) {
+	e.POST("/v1/profile/ProfileTracing", profileTracing(cfg))
 
 }
 
-func profileTracing() gin.HandlerFunc {
+func profileTracing(cfg *config.QuerierConfig) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		var profileTracing model.ProfileTracing
 
@@ -40,7 +41,7 @@ func profileTracing() gin.HandlerFunc {
 			BadRequestResponse(c, common.INVALID_POST_DATA, err.Error())
 			return
 		}
-		result, err := service.Tracing(profileTracing)
+		result, err := service.Tracing(profileTracing, cfg)
 		JsonResponse(c, result, err)
 	})
 }
