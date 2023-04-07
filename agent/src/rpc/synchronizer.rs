@@ -515,6 +515,10 @@ impl Synchronizer {
             }
         }
         listeners.push(module);
+        // The lock must be immediately released, and holding both flow_acl_listener and status
+        // simultaneously can cause a deadlock.
+        drop(listeners);
+
         // make sure agent can get the latest policy data
         // ===============================================
         // 保证 Agent 可以获取最新策略
@@ -655,6 +659,8 @@ impl Synchronizer {
         return (segments, macs);
     }
 
+    // Note that both 'status' and 'flow_acl_listener' will be locked here, and other places where 'status'
+    // and 'flow_acl_listener' are used need to be careful to avoid deadlocks
     fn on_response(
         remote: (String, u16),
         mut resp: tp::SyncResponse,
