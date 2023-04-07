@@ -26,8 +26,8 @@ import (
 	yaml "gopkg.in/yaml.v2"
 
 	"github.com/deepflowio/deepflow/server/libs/logger"
-	"github.com/deepflowio/deepflow/server/profile/config"
-	"github.com/deepflowio/deepflow/server/profile/router"
+	"github.com/deepflowio/deepflow/server/querier/profile/config"
+	"github.com/deepflowio/deepflow/server/querier/profile/router"
 )
 
 var log = logging.MustGetLogger("profile")

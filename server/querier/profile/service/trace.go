@@ -27,9 +27,9 @@ import (
 	logging "github.com/op/go-logging"
 
 	controllerCommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/profile/common"
-	"github.com/deepflowio/deepflow/server/profile/config"
-	"github.com/deepflowio/deepflow/server/profile/model"
+	"github.com/deepflowio/deepflow/server/querier/profile/common"
+	"github.com/deepflowio/deepflow/server/querier/profile/config"
+	"github.com/deepflowio/deepflow/server/querier/profile/model"
 )
 
 var log = logging.MustGetLogger("profile")

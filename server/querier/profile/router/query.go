@@ -20,9 +20,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 
-	"github.com/deepflowio/deepflow/server/profile/common"
-	"github.com/deepflowio/deepflow/server/profile/model"
-	"github.com/deepflowio/deepflow/server/profile/service"
+	"github.com/deepflowio/deepflow/server/querier/profile/common"
+	"github.com/deepflowio/deepflow/server/querier/profile/model"
+	"github.com/deepflowio/deepflow/server/querier/profile/service"
 )
 
 func ProfileRouter(e *gin.Engine) {
