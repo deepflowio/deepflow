@@ -31,6 +31,7 @@ const (
 
 type PcapStore struct {
 	Time      uint32
+	StartTime int64
 	EndTime   int64
 	FlowID    uint64
 	VtapID    uint16
@@ -41,6 +42,7 @@ type PcapStore struct {
 func PcapStoreColumns() []*ckdb.Column {
 	return []*ckdb.Column{
 		ckdb.NewColumn("time", ckdb.DateTime).SetComment("精度: 秒"),
+		ckdb.NewColumn("start_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
 		ckdb.NewColumn("end_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
 		ckdb.NewColumn("flow_id", ckdb.UInt64).SetIndex(ckdb.IndexMinmax),
 		ckdb.NewColumn("vtap_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
@@ -52,6 +54,7 @@ func PcapStoreColumns() []*ckdb.Column {
 func (s *PcapStore) WriteBlock(block *ckdb.Block) {
 	block.WriteDateTime(s.Time)
 	block.Write(
+		s.StartTime,
 		s.EndTime,
 		s.FlowID,
 		s.VtapID,
