@@ -775,6 +775,12 @@ var ColumnAdd626 = []*ColumnAdds{
 		ColumnNames: []string{"gprocess_id"},
 		ColumnType:  ckdb.UInt32,
 	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l4_packet", "l4_packet_local", "l7_packet", "l7_packet_local"},
+		ColumnNames: []string{"start_time"},
+		ColumnType:  ckdb.DateTime64us,
+	},
 }
 
 var TableRenames626 = []*TableRename{

@@ -165,7 +165,8 @@ func (d *Decoder) handlePcap(vtapID uint16, decoder *codec.SimpleDecoder, encode
 
 func pcapToStore(vtapID uint16, pcapHeader []byte, pcap *trident.Pcap) *dbwriter.PcapStore {
 	s := dbwriter.AcquirePcapStore()
-	s.Time = uint32(time.Duration(pcap.GetStartTime()) / time.Second)
+	s.Time = uint32(time.Duration(pcap.GetEndTime()) / time.Second)
+	s.StartTime = int64(pcap.GetStartTime() / uint64(time.Microsecond))
 	s.EndTime = int64(pcap.GetEndTime() / uint64(time.Microsecond))
 	s.VtapID = vtapID
 	s.FlowID = pcap.GetFlowId()
