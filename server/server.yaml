@@ -211,6 +211,10 @@ querier:
     max-connection: 20
     # user-password:
 
+  # profile相关配置
+  profile:
+    flame_query_limit: 1000000
+
   # deepflow-app相关配置
   deepflow-app:
     host: deepflow-app
@@ -467,13 +471,3 @@ ingester:
   #  export-data-types: [service_info,tracing_info,network_layer,flow_info,client_universal_tag,server_universal_tag,tunnel_info,transport_layer,application_layer,capture_info,native_tag,metrics]
   #  queue-count: 2       # parallelism of sender
   #  queue-size: 100000   # size of each exporter queue
-
-profile:
-  # profile http listenport
-  listen-port: 20419
-  flame_query_limit: 1000000
-
-  # querier相关配置
-  querier:
-    host: querier
-    port: 20416

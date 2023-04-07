@@ -34,7 +34,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 	"github.com/deepflowio/deepflow/server/ingester/ingester"
 	"github.com/deepflowio/deepflow/server/libs/logger"
-	"github.com/deepflowio/deepflow/server/profile/profile"
 	"github.com/deepflowio/deepflow/server/querier/querier"
 
 	logging "github.com/op/go-logging"
@@ -132,7 +131,6 @@ func main() {
 	go controller.Start(ctx, *configPath, cfg.LogFile, shared)
 
 	go querier.Start(*configPath, cfg.LogFile)
-	go profile.Start(*configPath, cfg.LogFile)
 	closers := ingester.Start(*configPath, shared)
 
 	common.NewMonitor()
