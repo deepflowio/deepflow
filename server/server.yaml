@@ -104,6 +104,8 @@ controller:
     # vtap rebalance config, interval uint:s
     auto_rebalance_vtap: true
     rebalance_check_interval: 300
+    # automatically delete lost vtaps, uint:s
+    vtap_auto_delete_interval: 3600
     # warrant
     warrant:
       host: warrant

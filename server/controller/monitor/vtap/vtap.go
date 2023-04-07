@@ -56,6 +56,12 @@ func (v *VTapCheck) Start() {
 			v.typeCheck()
 		}
 	}()
+
+	go func() {
+		for range time.Tick(time.Minute * time.Duration(v.cfg.VTapAutoDeleteInterval)) {
+			v.deleteLostVTap()
+		}
+	}()
 }
 
 func (v *VTapCheck) Stop() {
@@ -249,4 +255,23 @@ func (v *VTapCheck) typeCheck() {
 	}
 
 	log.Debug("vtap type check end")
+}
+
+func (v *VTapCheck) deleteLostVTap() {
+	var vtaps []*mysql.VTap
+	mysql.Db.Where("state = ? and type not in (?)",
+		common.VTAP_STATE_NOT_CONNECTED,
+		[]int{common.VTAP_TYPE_DEDICATED, common.VTAP_TYPE_TUNNEL_DECAPSULATION},
+	).Find(&vtaps)
+
+	if len(vtaps) == 0 {
+		return
+	}
+
+	var ids []int
+	for _, vtap := range vtaps {
+		ids = append(ids, vtap.ID)
+		log.Infof("delete lost vtap(name: %s, ctrl_ip: %s, ctrl_mac: %s)", vtap.Name, vtap.CtrlIP, vtap.CtrlMac)
+	}
+	mysql.Db.Delete(&vtaps, ids)
 }

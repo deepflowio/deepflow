@@ -30,6 +30,7 @@ type MonitorConfig struct {
 	VTapCheckInterval           int     `default:"60" yaml:"vtap_check_interval"`
 	ExceptionTimeFrame          int     `default:"3600" yaml:"exception_time_frame"`
 	AutoRebalanceVTap           bool    `default:"true" yaml:"auto_rebalance_vtap"`
-	RebalanceCheckInterval      int     `default:"300" yaml:"rebalance_check_interval"` // unit: second
+	RebalanceCheckInterval      int     `default:"300" yaml:"rebalance_check_interval"`   // unit: second
+	VTapAutoDeleteInterval      int     `default:"3600" yaml:"vtap_auto_delete_interval"` // uint: second
 	Warrant                     Warrant `yaml:"warrant"`
 }
