@@ -1476,7 +1476,7 @@ INSERT INTO alarm_policy(user_id, sub_view_type, sub_view_url, sub_view_params, 
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     upper_threshold, lower_threshold, lcuuid)
     values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server.ingester.ckwriter\",\"interval\":60,\"fill\":0,\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.write_failed_count`) AS `rx_drop_packets`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.write_failed_count`) AS `rx_drop_packets`\"]}]}",
-     "[{\"METRIC_LABEL\":\"rx_drop_packets\",\"unit\":\"\"}]",
+     "[{\"METRIC_LABEL\":\"rx_drop_packets\",\"return_field_description\":\"最近 1 分钟 ingester.ckwriter.metrics.write_failed_count\",\"unit\":\"\"}]",
      "数据节点数据丢失 (ingester.ckwriter.metrics.write_failed_count)",  0, 1, 1, 21, 1, "", "", "rx_drop_packets", 1, NULL, @lcuuid);
 
 CREATE TABLE IF NOT EXISTS report_policy (
