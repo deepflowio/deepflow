@@ -1182,9 +1182,22 @@ impl<'a> Iterator for V1HeaderIterator<'a> {
     type Item = &'a str;
 
     fn next(&mut self) -> Option<Self::Item> {
+        if self.0.len() < 2 {
+            return None;
+        }
         const SEP: &'static str = "\r\n";
         let mut end = 0;
         loop {
+            // handle the case len is odd (such as "HTTP/1.0 200 OK\r\n" where encounter in istio),
+            if end == self.0.len() - 1
+                && self.0[end] == b'\n'
+                && end >= 1
+                && self.0[end - 1] == b'\r'
+            {
+                end -= 1;
+                break;
+            }
+
             if end + SEP.len() > self.0.len() {
                 return None;
             }
