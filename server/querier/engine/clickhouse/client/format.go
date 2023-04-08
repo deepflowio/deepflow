@@ -28,6 +28,7 @@ const (
 	VALUE_TYPE_INT     = "Int"
 	VALUE_TYPE_STRING  = "String"
 	VALUE_TYPE_FLOAT64 = "Float64"
+	VALUE_TYPE_TUPLE   = "Tuple"
 )
 
 var VALUE_TYPE_MAP = map[string]int{
@@ -112,6 +113,8 @@ func TransType(value interface{}, columnName, columnDatabaseTypeName string) (in
 		return *v, VALUE_TYPE_FLOAT64, nil
 	case *string:
 		return *v, VALUE_TYPE_STRING, nil
+	case *[]interface{}:
+		return *v, VALUE_TYPE_TUPLE, nil
 	default:
 		// unkown type field return origin type
 		return value, columnDatabaseTypeName, nil
