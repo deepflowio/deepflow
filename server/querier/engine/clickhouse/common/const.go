@@ -30,6 +30,6 @@ var DB_TABLE_MAP = map[string][]string{
 	DB_NAME_FLOW_METRICS:    []string{"vtap_flow_port", "vtap_flow_edge_port", "vtap_app_port", "vtap_app_edge_port", "vtap_acl"},
 	DB_NAME_EXT_METRICS:     []string{"ext_common"},
 	DB_NAME_DEEPFLOW_SYSTEM: []string{"deepflow_system_common"},
-	DB_NAME_EVENT:           []string{"event"},
+	DB_NAME_EVENT:           []string{"event", "perf_event"},
 	DB_NAME_PROFILE:         []string{"in_process"},
 }

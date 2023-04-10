@@ -85,6 +85,9 @@ func TestCheckDBField(t *testing.T) {
 					case "event":
 						metrics = RESOURCE_EVENT_METRICS
 						replaceMetrics = RESOURCE_EVENT_METRICS_REPLACE
+					case "perf_event":
+						metrics = RESOURCE_PERF_EVENT_METRICS
+						replaceMetrics = RESOURCE_PERF_EVENT_METRICS_REPLACE
 					}
 				}
 				if metrics == nil {
