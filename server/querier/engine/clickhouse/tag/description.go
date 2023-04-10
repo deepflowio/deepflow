@@ -465,7 +465,7 @@ func GetTagValues(db, table, sql string) (*common.Result, []string, error) {
 	//$tag_name replace in with column 'value'
 	if len(showSqlList) > 1 {
 		showSqlList[1] = strings.ReplaceAll(showSqlList[1], "Enum("+tag+")", "display_name")
-		showSqlList[1] = strings.ReplaceAll(showSqlList[1], tag, "value")
+		showSqlList[1] = strings.ReplaceAll(showSqlList[1], " "+tag, " value")
 		showSqlList[1] = strings.ReplaceAll(showSqlList[1], "value_id", tag+"_id")
 		showSqlList[1] = strings.ReplaceAll(showSqlList[1], "value_ns_id", tag+"_ns_id")
 		sql = showSqlList[0] + " WHERE " + showSqlList[1]
