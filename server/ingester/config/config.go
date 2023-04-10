@@ -37,9 +37,9 @@ var log = logging.MustGetLogger("config")
 const (
 	DefaultContrallerIP             = "127.0.0.1"
 	DefaultControllerPort           = 20035
-	DefaultCheckInterval            = 600 // clickhouse是异步删除
-	DefaultDiskUsedPercent          = 90
-	DefaultDiskFreeSpace            = 50
+	DefaultCheckInterval            = 300 // clickhouse是异步删除
+	DefaultDiskUsedPercent          = 80
+	DefaultDiskFreeSpace            = 100
 	DefaultDFDiskPrefix             = "path_" // In the config.xml of ClickHouse, the disk name of the storage policy 'df_storage' written by deepflow-server starts with 'path_'
 	EnvK8sNodeIP                    = "K8S_NODE_IP_FOR_DEEPFLOW"
 	EnvK8sPodName                   = "K8S_POD_NAME_FOR_DEEPFLOW"
@@ -61,11 +61,16 @@ type DatabaseTable struct {
 	TablesContain string `yaml:"tables-contain"`
 }
 
+type DiskCleanup struct {
+	DiskNamePrefix string `yaml:"disk-name-prefix"`
+	UsedPercent    int    `yaml:"used-percent"` // 0-100
+	FreeSpace      int    `yaml:"free-space"`   // Gb
+	UsedSpace      int    `yaml:"used-space"`   // Gb
+}
+
 type CKDiskMonitor struct {
 	CheckInterval int             `yaml:"check-interval"` // s
-	UsedPercent   int             `yaml:"used-percent"`   // 0-100
-	FreeSpace     int             `yaml:"free-space"`     // Gb
-	DiskPrefix    string          `yaml:"disk-prefix"`
+	DiskCleanups  []DiskCleanup   `yaml:"disk-cleanups"`
 	PriorityDrops []DatabaseTable `yaml:"priority-drops"`
 }
 
@@ -354,9 +359,14 @@ func Load(path string) *Config {
 			TCPReaderBuffer: 1 << 20,
 			CKDiskMonitor: CKDiskMonitor{
 				DefaultCheckInterval,
-				DefaultDiskUsedPercent,
-				DefaultDiskFreeSpace,
-				DefaultDFDiskPrefix,
+				[]DiskCleanup{
+					{
+						DefaultDFDiskPrefix,
+						DefaultDiskUsedPercent,
+						DefaultDiskFreeSpace,
+						0,
+					},
+				},
 				[]DatabaseTable{{"flow_log", ""}, {"flow_metrics", "1s_local"}},
 			},
 			ListenPort:               DefaultListenPort,
