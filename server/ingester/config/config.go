@@ -38,9 +38,9 @@ var log = logging.MustGetLogger("config")
 const (
 	DefaultContrallerIP            = "127.0.0.1"
 	DefaultControllerPort          = 20035
-	DefaultCheckInterval           = 600 // clickhouse是异步删除
-	DefaultDiskUsedPercent         = 90
-	DefaultDiskFreeSpace           = 50
+	DefaultCheckInterval           = 300 // clickhouse是异步删除
+	DefaultDiskUsedPercent         = 80
+	DefaultDiskFreeSpace           = 100
 	DefaultDFDiskPrefix            = "path_" // In the config.xml of ClickHouse, the disk name of the storage policy 'df_storage' written by deepflow-server starts with 'path_'
 	DefaultInfluxdbHost            = "influxdb"
 	DefaultInfluxdbPort            = "20044"
@@ -62,11 +62,16 @@ type DatabaseTable struct {
 	TablesContain string `yaml:"tables-contain"`
 }
 
+type DiskCleanup struct {
+	DiskNamePrefix string `yaml:"disk-name-prefix"`
+	UsedPercent    int    `yaml:"used-percent"` // 0-100
+	FreeSpace      int    `yaml:"free-space"`   // Gb
+	UsedSpace      int    `yaml:"used-space"`   // Gb
+}
+
 type CKDiskMonitor struct {
 	CheckInterval int             `yaml:"check-interval"` // s
-	UsedPercent   int             `yaml:"used-percent"`   // 0-100
-	FreeSpace     int             `yaml:"free-space"`     // Gb
-	DiskPrefix    string          `yaml:"disk-prefix"`
+	DiskCleanups  []DiskCleanup   `yaml:"disk-cleanups"`
 	PriorityDrops []DatabaseTable `yaml:"priority-drops"`
 }
 
@@ -304,7 +309,7 @@ func (c *Config) ValidateAndSetckdbColdStorages() error {
 			return fmt.Errorf("'ingester.ckdb-cold-storage.settings[%d].db' is empty", i)
 		}
 		if setting.TTLToMove < 1 {
-			return fmt.Errorf("'ingester.ckdb-cold-storage.settings[%d].hour-to-move' is '%d', should > 0", i, setting.TTLToMove)
+			return fmt.Errorf("'ingester.ckdb-cold-storage.settings[%d].ttl-hour-to-move' is '%d', should > 0", i, setting.TTLToMove)
 		}
 		for _, table := range setting.Tables {
 			c.ckdbColdStorages[setting.Db+table] = &ckdb.ColdStorage{
@@ -346,9 +351,14 @@ func Load(path string) *Config {
 			TCPReaderBuffer:   1 << 20,
 			CKDiskMonitor: CKDiskMonitor{
 				DefaultCheckInterval,
-				DefaultDiskUsedPercent,
-				DefaultDiskFreeSpace,
-				DefaultDFDiskPrefix,
+				[]DiskCleanup{
+					{
+						DefaultDFDiskPrefix,
+						DefaultDiskUsedPercent,
+						DefaultDiskFreeSpace,
+						0,
+					},
+				},
 				[]DatabaseTable{{"flow_log", ""}, {"flow_metrics", "1s_local"}},
 			},
 			Influxdb:             HostPort{DefaultInfluxdbHost, DefaultInfluxdbPort},
