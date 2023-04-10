@@ -28,6 +28,7 @@ import (
 const BLOCK_HEAD_SIZE = 16
 
 type L4Packet struct {
+	StartTime   int64
 	EndTime     int64
 	FlowID      uint64
 	VtapID      uint16
@@ -38,6 +39,7 @@ type L4Packet struct {
 func L4PacketColumns() []*ckdb.Column {
 	return []*ckdb.Column{
 		ckdb.NewColumn("time", ckdb.DateTime).SetComment("精度: 秒"),
+		ckdb.NewColumn("start_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
 		ckdb.NewColumn("end_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
 		ckdb.NewColumn("flow_id", ckdb.UInt64).SetIndex(ckdb.IndexMinmax),
 		ckdb.NewColumn("vtap_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
@@ -48,6 +50,7 @@ func L4PacketColumns() []*ckdb.Column {
 
 func (s *L4Packet) WriteBlock(block *ckdb.Block) {
 	block.WriteDateTime(uint32(s.EndTime / US_TO_S_DEVISOR))
+	block.Write(s.StartTime)
 	block.Write(s.EndTime)
 	block.Write(s.FlowID)
 	block.Write(s.VtapID)
@@ -92,6 +95,8 @@ func DecodePacketSequence(decoder *codec.SimpleDecoder, vtapID uint16) (*L4Packe
 	l4Packet.FlowID = decoder.ReadU64()
 	endTimePacketCount := decoder.ReadU64()
 	l4Packet.EndTime = int64(endTimePacketCount << 8 >> 8)
+	// sequence packet defaults to a maximum of 5s timeout sending, so the minimum value of StartTime is EndTime - 5s
+	l4Packet.StartTime = l4Packet.EndTime - 5*US_TO_S_DEVISOR
 	l4Packet.PacketCount = uint32(endTimePacketCount >> 56)
 	l4Packet.PacketBatch = append(l4Packet.PacketBatch, decoder.ReadBytesN(int(blockSize)-BLOCK_HEAD_SIZE)...)
 
