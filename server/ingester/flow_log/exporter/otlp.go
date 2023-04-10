@@ -2,6 +2,7 @@ package exporter
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"strconv"
 	"strings"
 
@@ -28,117 +29,200 @@ func putIntWithoutZero(attrs pcommon.Map, key string, value int64) {
 	}
 }
 
-func putUniversalTags(attrs pcommon.Map, tags0, tags1 *UniversalTags) {
-	putStrWithoutEmpty(attrs, "df.universal_tag.region_0", tags0.Region)
-	putStrWithoutEmpty(attrs, "df.universal_tag.region_1", tags1.Region)
-	putStrWithoutEmpty(attrs, "df.universal_tag.az_0", tags0.AZ)
-	putStrWithoutEmpty(attrs, "df.universal_tag.az_1", tags1.AZ)
-	putStrWithoutEmpty(attrs, "df.universal_tag.host_0", tags0.Host)
-	putStrWithoutEmpty(attrs, "df.universal_tag.host_1", tags1.Host)
-	putStrWithoutEmpty(attrs, "df.universal_tag.epc_0", tags0.L3Epc)
-	putStrWithoutEmpty(attrs, "df.universal_tag.epc_1", tags1.L3Epc)
-	putStrWithoutEmpty(attrs, "df.universal_tag.pod_cluster_0", tags0.PodCluster)
-	putStrWithoutEmpty(attrs, "df.universal_tag.pod_cluster_1", tags1.PodCluster)
-	putStrWithoutEmpty(attrs, "df.universal_tag.pod_ns_0", tags0.PodNS)
-	putStrWithoutEmpty(attrs, "df.universal_tag.pod_ns_1", tags1.PodNS)
-	putStrWithoutEmpty(attrs, "df.universal_tag.pod_node_0", tags0.PodNode)
-	putStrWithoutEmpty(attrs, "df.universal_tag.pod_node_1", tags1.PodNode)
-	putStrWithoutEmpty(attrs, "df.universal_tag.pod_group_0", tags0.PodGroup)
-	putStrWithoutEmpty(attrs, "df.universal_tag.pod_group_1", tags1.PodGroup)
-	putStrWithoutEmpty(attrs, "df.universal_tag.pod_0", tags0.Pod)
-	putStrWithoutEmpty(attrs, "df.universal_tag.pod_1", tags1.Pod)
-	putStrWithoutEmpty(attrs, "df.universal_tag.service_0", tags0.Service)
-	putStrWithoutEmpty(attrs, "df.universal_tag.service_1", tags1.Service)
+func putUniversalTags(attrs pcommon.Map, tags0, tags1 *UniversalTags, dataTypeBits uint32) {
+	if dataTypeBits&CLIENT_UNIVERSAL_TAG != 0 {
+		putStrWithoutEmpty(attrs, "df.universal_tag.region_0", tags0.Region)
+		putStrWithoutEmpty(attrs, "df.universal_tag.az_0", tags0.AZ)
+		putStrWithoutEmpty(attrs, "df.universal_tag.host_0", tags0.Host)
+		putStrWithoutEmpty(attrs, "df.universal_tag.epc_0", tags0.L3Epc)
+		putStrWithoutEmpty(attrs, "df.universal_tag.pod_cluster_0", tags0.PodCluster)
+		putStrWithoutEmpty(attrs, "df.universal_tag.pod_ns_0", tags0.PodNS)
+		putStrWithoutEmpty(attrs, "df.universal_tag.pod_node_0", tags0.PodNode)
+		putStrWithoutEmpty(attrs, "df.universal_tag.pod_group_0", tags0.PodGroup)
+		putStrWithoutEmpty(attrs, "df.universal_tag.pod_0", tags0.Pod)
+		putStrWithoutEmpty(attrs, "df.universal_tag.service_0", tags0.Service)
+		putStrWithoutEmpty(attrs, "df.universal_tag.chost_0", tags0.CHost)
+		putStrWithoutEmpty(attrs, "df.universal_tag.router_0", tags0.Router)
+		putStrWithoutEmpty(attrs, "df.universal_tag.dhcpgw_0", tags0.DhcpGW)
+		putStrWithoutEmpty(attrs, "df.universal_tag.pod_service_0", tags0.PodService)
+		putStrWithoutEmpty(attrs, "df.universal_tag.redis_0", tags0.Redis)
+		putStrWithoutEmpty(attrs, "df.universal_tag.rds_0", tags0.RDS)
+		putStrWithoutEmpty(attrs, "df.universal_tag.lb_0", tags0.LB)
+		putStrWithoutEmpty(attrs, "df.universal_tag.natgw_0", tags0.NatGW)
+	}
+	if dataTypeBits&SERVER_UNIVERSAL_TAG != 0 {
+		putStrWithoutEmpty(attrs, "df.universal_tag.region_1", tags1.Region)
+		putStrWithoutEmpty(attrs, "df.universal_tag.az_1", tags1.AZ)
+		putStrWithoutEmpty(attrs, "df.universal_tag.host_1", tags1.Host)
+		putStrWithoutEmpty(attrs, "df.universal_tag.epc_1", tags1.L3Epc)
+		putStrWithoutEmpty(attrs, "df.universal_tag.pod_cluster_1", tags1.PodCluster)
+		putStrWithoutEmpty(attrs, "df.universal_tag.pod_ns_1", tags1.PodNS)
+		putStrWithoutEmpty(attrs, "df.universal_tag.pod_node_1", tags1.PodNode)
+		putStrWithoutEmpty(attrs, "df.universal_tag.pod_group_1", tags1.PodGroup)
+		putStrWithoutEmpty(attrs, "df.universal_tag.pod_1", tags1.Pod)
+		putStrWithoutEmpty(attrs, "df.universal_tag.service_1", tags1.Service)
+		putStrWithoutEmpty(attrs, "df.universal_tag.chost_1", tags1.CHost)
+		putStrWithoutEmpty(attrs, "df.universal_tag.router_1", tags1.Router)
+		putStrWithoutEmpty(attrs, "df.universal_tag.dhcpgw_1", tags1.DhcpGW)
+		putStrWithoutEmpty(attrs, "df.universal_tag.pod_service_1", tags1.PodService)
+		putStrWithoutEmpty(attrs, "df.universal_tag.redis_1", tags1.Redis)
+		putStrWithoutEmpty(attrs, "df.universal_tag.rds_1", tags1.RDS)
+		putStrWithoutEmpty(attrs, "df.universal_tag.lb_1", tags1.LB)
+		putStrWithoutEmpty(attrs, "df.universal_tag.natgw_1", tags1.NatGW)
+	}
 }
 
-func L7FlowLogToExportRequest(l7 *log_data.L7FlowLog, universalTagsManager *UniversalTagsManager) ptraceotlp.ExportRequest {
+func L7FlowLogToExportRequest(l7 *log_data.L7FlowLog, universalTagsManager *UniversalTagsManager, dataTypeBits uint32) ptraceotlp.ExportRequest {
 	tags0, tags1 := universalTagsManager.QueryUniversalTags(l7)
 	td := ptrace.NewTraces()
 
 	resSpan := td.ResourceSpans().AppendEmpty()
 	resAttrs := resSpan.Resource().Attributes()
-	putUniversalTags(resAttrs, tags0, tags1)
+	putUniversalTags(resAttrs, tags0, tags1, dataTypeBits)
 
 	span := resSpan.ScopeSpans().AppendEmpty().Spans().AppendEmpty()
 	spanAttrs := span.Attributes()
-	for i := range l7.AttributeNames {
-		putStrWithoutEmpty(spanAttrs, l7.AttributeNames[i], l7.AttributeValues[i])
+
+	if dataTypeBits&NATIVE_TAG != 0 {
+		for i := range l7.AttributeNames {
+			putStrWithoutEmpty(spanAttrs, l7.AttributeNames[i], l7.AttributeValues[i])
+		}
 	}
-	putStrWithoutEmpty(spanAttrs, "df.span.x_request_id", l7.XRequestId)
-	putIntWithoutZero(spanAttrs, "df.span.syscall_trace_id_request", int64(l7.SyscallTraceIDRequest))
-	putIntWithoutZero(spanAttrs, "df.span.syscall_trace_id_response", int64(l7.SyscallTraceIDResponse))
-	putIntWithoutZero(spanAttrs, "df.span.syscall_thread_0", int64(l7.SyscallThread0))
-	putIntWithoutZero(spanAttrs, "df.span.syscall_thread_1", int64(l7.SyscallThread1))
-	putIntWithoutZero(spanAttrs, "df.span.syscall_cap_seq_0", int64(l7.SyscallCapSeq0))
-	putIntWithoutZero(spanAttrs, "df.span.syscall_cap_seq_1", int64(l7.SyscallCapSeq1))
-	putIntWithoutZero(spanAttrs, "df.span.req_tcp_seq", int64(l7.ReqTcpSeq))
-	putIntWithoutZero(spanAttrs, "df.span.resp_tcp_seq", int64(l7.RespTcpSeq))
+
+	if dataTypeBits&TRACING_INFO != 0 {
+		putIntWithoutZero(spanAttrs, "df.span.req_tcp_seq", int64(l7.ReqTcpSeq))
+		putIntWithoutZero(spanAttrs, "df.span.resp_tcp_seq", int64(l7.RespTcpSeq))
+		putStrWithoutEmpty(spanAttrs, "df.span.x_request_id", l7.XRequestId)
+		putStrWithoutEmpty(spanAttrs, "df.span.http_proxy_client", l7.HttpProxyClient)
+		putIntWithoutZero(spanAttrs, "df.span.syscall_trace_id_request", int64(l7.SyscallTraceIDRequest))
+		putIntWithoutZero(spanAttrs, "df.span.syscall_trace_id_response", int64(l7.SyscallTraceIDResponse))
+		putIntWithoutZero(spanAttrs, "df.span.syscall_thread_0", int64(l7.SyscallThread0))
+		putIntWithoutZero(spanAttrs, "df.span.syscall_thread_1", int64(l7.SyscallThread1))
+		putIntWithoutZero(spanAttrs, "df.span.syscall_cap_seq_0", int64(l7.SyscallCapSeq0))
+		putIntWithoutZero(spanAttrs, "df.span.syscall_cap_seq_1", int64(l7.SyscallCapSeq1))
+
+		if l7.SignalSource == uint16(datatype.SIGNAL_SOURCE_OTEL) {
+			if spanId, err := hex.DecodeString(l7.SpanId); err != nil {
+				id := [8]byte{}
+				copy(id[:], spanId)
+				span.SetSpanID(pcommon.SpanID(id))
+			}
+			if traceId, err := hex.DecodeString(l7.TraceId); err != nil {
+				id := [16]byte{}
+				copy(id[:], traceId)
+				span.SetTraceID(pcommon.TraceID(id))
+			}
+			if parentSpanId, err := hex.DecodeString(l7.ParentSpanId); err != nil {
+				id := [8]byte{}
+				copy(id[:], parentSpanId)
+				span.SetSpanID(pcommon.SpanID(id))
+			}
+			span.SetKind(ptrace.SpanKind(l7.SpanKind))
+		} else {
+			span.SetSpanID(uint64ToSpanID(l7.ID()))
+			span.SetTraceID(genTraceID(int(l7.ID())))
+			span.SetParentSpanID(pcommon.NewSpanIDEmpty())
+			span.SetKind(tapSideToSpanKind(l7.TapSide))
+		}
+	}
+
 	msgType := datatype.LogMessageType(l7.Type)
 	putStrWithoutEmpty(spanAttrs, "df.span.type", strings.ToLower(msgType.String()))
-
 	putStrWithoutEmpty(spanAttrs, "df.span.app_service", l7.AppService)
 	putStrWithoutEmpty(spanAttrs, "df.span.app_instance", l7.AppInstance)
 	putStrWithoutEmpty(spanAttrs, "df.span.endpoint", l7.Endpoint)
-	putIntWithoutZero(spanAttrs, "df.span.process_id_0", int64(l7.ProcessID0))
-	putIntWithoutZero(spanAttrs, "df.span.process_id_1", int64(l7.ProcessID1))
-	putStrWithoutEmpty(spanAttrs, "df.span.process_kname_0", l7.ProcessKName0)
-	putStrWithoutEmpty(spanAttrs, "df.span.process_kname_1", l7.ProcessKName1)
 
-	putIntWithoutZero(resAttrs, "df.flow_info.id", int64(l7.ID()))
-	putIntWithoutZero(resAttrs, "df.flow_info.time", int64(l7.EndTime()))
-	putIntWithoutZero(resAttrs, "df.flow_info.flow_id", int64(l7.FlowID))
+	if dataTypeBits&SERVICE_INFO != 0 {
+		putIntWithoutZero(spanAttrs, "df.span.process_id_0", int64(l7.ProcessID0))
+		putIntWithoutZero(spanAttrs, "df.span.process_id_1", int64(l7.ProcessID1))
+		putStrWithoutEmpty(spanAttrs, "df.span.process_kname_0", l7.ProcessKName0)
+		putStrWithoutEmpty(spanAttrs, "df.span.process_kname_1", l7.ProcessKName1)
+	}
+
+	if dataTypeBits&FLOW_INFO != 0 {
+		putIntWithoutZero(resAttrs, "df.flow_info.id", int64(l7.ID()))
+		putIntWithoutZero(resAttrs, "df.flow_info.time", int64(l7.EndTime()))
+		putIntWithoutZero(resAttrs, "df.flow_info.flow_id", int64(l7.FlowID))
+	}
 
 	span.SetStartTimestamp(pcommon.Timestamp(l7.StartTime()))
 	span.SetEndTimestamp(pcommon.Timestamp(l7.EndTime()))
 	span.Status().SetCode(responseStatusToSpanStatus(l7.ResponseStatus))
-	span.SetSpanID(uint64ToSpanID(l7.ID()))
-	span.SetTraceID(genTraceID(int(l7.ID())))
-	span.SetParentSpanID(pcommon.NewSpanIDEmpty())
-	span.SetKind(tapSideToSpanKind(l7.TapSide))
 
-	putStrWithoutEmpty(resAttrs, "df.capture_info.signal_source", datatype.SignalSource(l7.SignalSource).String())
-	putStrWithoutEmpty(resAttrs, "df.capture_info.nat_source", datatype.NATSource(l7.NatSource).String())
-	putStrWithoutEmpty(resAttrs, "df.capture_info.tap_port", datatype.TapPort(l7.TapPort).String())
-	putStrWithoutEmpty(resAttrs, "df.capture_info.tap_port_type", tapPortTypeToString(l7.TapPortType))
-	putStrWithoutEmpty(resAttrs, "df.capture_info.tap_side", tapSideToName(l7.TapSide))
-	putStrWithoutEmpty(resAttrs, "df.capture_info.vtap", tags0.Vtap)
-
-	resAttrs.PutBool("df.network.is_ipv4", l7.IsIPv4)
-	resAttrs.PutBool("df.network.is_internet_0", l7.L3EpcID0 == datatype.EPC_FROM_INTERNET)
-	resAttrs.PutBool("df.network.is_internet_1", l7.L3EpcID1 == datatype.EPC_FROM_INTERNET)
-	if l7.IsIPv4 {
-		resAttrs.PutStr("df.network.ip_0", utils.IpFromUint32(l7.IP40).String())
-		resAttrs.PutStr("df.network.ip_1", utils.IpFromUint32(l7.IP41).String())
-	} else {
-		resAttrs.PutStr("df.network.ip_0", l7.IP60.String())
-		resAttrs.PutStr("df.network.ip_1", l7.IP61.String())
+	if dataTypeBits&CAPTURE_INFO != 0 {
+		putStrWithoutEmpty(resAttrs, "df.capture_info.signal_source", datatype.SignalSource(l7.SignalSource).String())
+		putStrWithoutEmpty(resAttrs, "df.capture_info.nat_source", datatype.NATSource(l7.NatSource).String())
+		putStrWithoutEmpty(resAttrs, "df.capture_info.tap_port", datatype.TapPort(l7.TapPort).String())
+		putStrWithoutEmpty(resAttrs, "df.capture_info.tap_port_type", tapPortTypeToString(l7.TapPortType))
+		putStrWithoutEmpty(resAttrs, "df.capture_info.tap_port_name", tags0.TapPortName)
+		putStrWithoutEmpty(resAttrs, "df.capture_info.tap_side", tapSideToName(l7.TapSide))
+		putStrWithoutEmpty(resAttrs, "df.capture_info.vtap", tags0.Vtap)
 	}
-	resAttrs.PutStr("df.network.protocol", layers.IPProtocol(l7.Protocol).String())
 
-	putIntWithoutZero(resAttrs, "df.transport.client_port", int64(l7.ClientPort))
-	putIntWithoutZero(resAttrs, "df.transport.server_port", int64(l7.ServerPort))
+	if dataTypeBits&NETWORK_LAYER != 0 {
+		resAttrs.PutBool("df.network.is_ipv4", l7.IsIPv4)
+		resAttrs.PutBool("df.network.is_internet_0", l7.L3EpcID0 == datatype.EPC_FROM_INTERNET)
+		resAttrs.PutBool("df.network.is_internet_1", l7.L3EpcID1 == datatype.EPC_FROM_INTERNET)
+		if l7.IsIPv4 {
+			resAttrs.PutStr("df.network.ip_0", utils.IpFromUint32(l7.IP40).String())
+			resAttrs.PutStr("df.network.ip_1", utils.IpFromUint32(l7.IP41).String())
+		} else {
+			resAttrs.PutStr("df.network.ip_0", l7.IP60.String())
+			resAttrs.PutStr("df.network.ip_1", l7.IP61.String())
+		}
+		resAttrs.PutStr("df.network.protocol", layers.IPProtocol(l7.Protocol).String())
+	}
 
-	putStrWithoutEmpty(resAttrs, "df.application.l7_protocol", datatype.L7Protocol(l7.L7Protocol).String())
+	if dataTypeBits&TUNNEL_INFO != 0 {
+		if l7.TunnelType != uint8(datatype.TUNNEL_TYPE_NONE) {
+			putStrWithoutEmpty(resAttrs, "df.tunnel.tunnel_type", datatype.TunnelType(l7.TunnelType).String())
+		}
+	}
 
-	switch datatype.L7Protocol(l7.L7Protocol) {
-	case datatype.L7_PROTOCOL_DNS:
-		setDNS(&span, spanAttrs, l7)
-	case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2, datatype.L7_PROTOCOL_HTTP_1_TLS, datatype.L7_PROTOCOL_HTTP_2_TLS:
-		setHTTP(&span, spanAttrs, l7)
-	case datatype.L7_PROTOCOL_DUBBO:
-		setDubbo(&span, spanAttrs, resAttrs, l7)
-	case datatype.L7_PROTOCOL_GRPC:
-		setGRPC(&span, spanAttrs, l7)
-	case datatype.L7_PROTOCOL_KAFKA:
-		setKafka(&span, spanAttrs, l7)
-	case datatype.L7_PROTOCOL_MQTT:
-		setMQTT(&span, spanAttrs, l7)
-	case datatype.L7_PROTOCOL_MYSQL:
-		setMySQL(&span, spanAttrs, l7)
-	case datatype.L7_PROTOCOL_REDIS:
-		setRedis(&span, spanAttrs, l7)
-	case datatype.L7_PROTOCOL_POSTGRE:
-		setPostgreSQL(&span, spanAttrs, l7)
+	if dataTypeBits&TRANSPORT_LAYER != 0 {
+		putIntWithoutZero(resAttrs, "df.transport.client_port", int64(l7.ClientPort))
+		putIntWithoutZero(resAttrs, "df.transport.server_port", int64(l7.ServerPort))
+	}
+
+	if dataTypeBits&APPLICATION_LAYER != 0 {
+		putStrWithoutEmpty(resAttrs, "df.application.l7_protocol", datatype.L7Protocol(l7.L7Protocol).String())
+
+		switch datatype.L7Protocol(l7.L7Protocol) {
+		case datatype.L7_PROTOCOL_DNS:
+			setDNS(&span, spanAttrs, l7)
+		case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2, datatype.L7_PROTOCOL_HTTP_1_TLS, datatype.L7_PROTOCOL_HTTP_2_TLS:
+			setHTTP(&span, spanAttrs, l7)
+		case datatype.L7_PROTOCOL_DUBBO:
+			setDubbo(&span, spanAttrs, resAttrs, l7)
+		case datatype.L7_PROTOCOL_GRPC:
+			setGRPC(&span, spanAttrs, l7)
+		case datatype.L7_PROTOCOL_KAFKA:
+			setKafka(&span, spanAttrs, l7)
+		case datatype.L7_PROTOCOL_MQTT:
+			setMQTT(&span, spanAttrs, l7)
+		case datatype.L7_PROTOCOL_MYSQL:
+			setMySQL(&span, spanAttrs, l7)
+		case datatype.L7_PROTOCOL_REDIS:
+			setRedis(&span, spanAttrs, l7)
+		case datatype.L7_PROTOCOL_POSTGRE:
+			setPostgreSQL(&span, spanAttrs, l7)
+		}
+	}
+	if dataTypeBits&METRICS != 0 {
+		if l7.RequestLength != nil {
+			spanAttrs.PutInt("df.metrics.request_length", *l7.RequestLength)
+		}
+		if l7.ResponseLength != nil {
+			spanAttrs.PutInt("df.metrics.response_length", *l7.ResponseLength)
+		}
+		if l7.SqlAffectedRows != nil {
+			spanAttrs.PutInt("df.metrics.sql_affected_rows", int64(*l7.SqlAffectedRows))
+		}
+		putIntWithoutZero(spanAttrs, "df.metrics.response_duration_us", int64(l7.ResponseDuration))
+		putIntWithoutZero(spanAttrs, "df.metrics.direction_score", int64(l7.DirectionScore))
+		for i := range l7.MetricsNames {
+			spanAttrs.PutDouble(l7.MetricsNames[i], l7.MetricsValues[i])
+		}
 	}
 
 	return ptraceotlp.NewExportRequestFromTraces(td)
