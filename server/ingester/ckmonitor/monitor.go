@@ -32,11 +32,8 @@ import (
 var log = logging.MustGetLogger("monitor")
 
 type Monitor struct {
-	cfg                  *config.Config
-	checkInterval        int
-	freeSpaceThreshold   int
-	usedPercentThreshold int
-	diskPrefix           string
+	cfg           *config.Config
+	checkInterval int
 
 	Conns              common.DBs
 	Addrs              []string
@@ -45,8 +42,8 @@ type Monitor struct {
 }
 
 type DiskInfo struct {
-	name, path                           string
-	freeSpace, totalSpace, keepFreeSpace uint64
+	name, path                                      string
+	freeSpace, totalSpace, keepFreeSpace, usedSpace uint64
 }
 
 type Partition struct {
@@ -57,14 +54,11 @@ type Partition struct {
 
 func NewCKMonitor(cfg *config.Config) (*Monitor, error) {
 	m := &Monitor{
-		cfg:                  cfg,
-		checkInterval:        cfg.CKDiskMonitor.CheckInterval,
-		usedPercentThreshold: cfg.CKDiskMonitor.UsedPercent,
-		freeSpaceThreshold:   cfg.CKDiskMonitor.FreeSpace << 30, // GB
-		diskPrefix:           cfg.CKDiskMonitor.DiskPrefix,
-		Addrs:                cfg.CKDB.ActualAddrs,
-		username:             cfg.CKDBAuth.Username,
-		password:             cfg.CKDBAuth.Password,
+		cfg:           cfg,
+		checkInterval: cfg.CKDiskMonitor.CheckInterval,
+		Addrs:         cfg.CKDB.ActualAddrs,
+		username:      cfg.CKDBAuth.Username,
+		password:      cfg.CKDBAuth.Password,
 	}
 	var err error
 	m.Conns, err = common.NewCKConnections(m.Addrs, m.username, m.password)
@@ -112,40 +106,59 @@ func (m *Monitor) getDiskInfos(connect *sql.DB) ([]*DiskInfo, error) {
 			return nil, nil
 		}
 		log.Debugf("name: %s, path: %s, freeSpace: %d, totalSpace: %d, keepFreeSpace: %d", name, path, freeSpace, totalSpace, keepFreeSpace)
-		if strings.HasPrefix(name, m.diskPrefix) {
-			diskInfos = append(diskInfos, &DiskInfo{name, path, freeSpace, totalSpace, keepFreeSpace})
+		for _, cleans := range m.cfg.CKDiskMonitor.DiskCleanups {
+			diskPrefix := cleans.DiskNamePrefix
+			if strings.HasPrefix(name, diskPrefix) {
+				usedSpace := totalSpace - freeSpace
+				diskInfos = append(diskInfos, &DiskInfo{name, path, freeSpace, totalSpace, keepFreeSpace, usedSpace})
+			}
 		}
 	}
 	if len(diskInfos) == 0 {
-		return nil, fmt.Errorf("can not find any deepflow data disk like '%s'", m.diskPrefix)
+		diskPrefixs := ""
+		for _, cleans := range m.cfg.CKDiskMonitor.DiskCleanups {
+			diskPrefixs += cleans.DiskNamePrefix + ","
+		}
+		return nil, fmt.Errorf("can not find any deepflow data disk like '%s'", diskPrefixs)
 	}
 	return diskInfos, nil
+}
+
+func (m *Monitor) getDiskCleanupConfig(diskName string) *config.DiskCleanup {
+	for i, c := range m.cfg.CKDiskMonitor.DiskCleanups {
+		if strings.HasPrefix(diskName, c.DiskNamePrefix) {
+			return &m.cfg.CKDiskMonitor.DiskCleanups[i]
+		}
+	}
+	return nil
 }
 
 func (m *Monitor) isDiskNeedClean(diskInfo *DiskInfo) bool {
 	if diskInfo.totalSpace == 0 {
 		return false
 	}
+	cleanCfg := m.getDiskCleanupConfig(diskInfo.name)
+	if cleanCfg == nil {
+		return false
+	}
 
-	usage := ((diskInfo.totalSpace-diskInfo.freeSpace)*100 + diskInfo.totalSpace - 1) / diskInfo.totalSpace
-	if usage > uint64(m.usedPercentThreshold) && diskInfo.freeSpace < uint64(m.freeSpaceThreshold) {
-		log.Infof("disk usage is over %d. disk name: %s, path: %s, total space: %d, free space: %d, usage: %d",
-			m.usedPercentThreshold, diskInfo.name, diskInfo.path, diskInfo.totalSpace, diskInfo.freeSpace, usage)
+	usage := (diskInfo.usedSpace*100 + diskInfo.totalSpace - 1) / diskInfo.totalSpace
+	if usage > uint64(cleanCfg.UsedPercent) && diskInfo.freeSpace < uint64(cleanCfg.FreeSpace)<<30 {
+		log.Infof("disk usage is over %d%. disk name: %s, path: %s, total space: %d, free space: %d, usage: %d",
+			cleanCfg.UsedPercent, diskInfo.name, diskInfo.path, diskInfo.totalSpace, diskInfo.freeSpace, usage)
+		return true
+	} else if cleanCfg.UsedSpace > 0 && diskInfo.usedSpace >= uint64(cleanCfg.UsedSpace)<<30 {
+		log.Infof("disk used space is over %dG, disk name: %s, path: %s, total space: %d, free space: %d, usage: %d, usedSpace: %d.",
+			cleanCfg.UsedSpace, diskInfo.name, diskInfo.path, diskInfo.totalSpace, diskInfo.freeSpace, usage, diskInfo.usedSpace)
 		return true
 	}
 	return false
 }
 
 // 当所有磁盘都要满足清理条件时，才清理数据
-func (m *Monitor) isDisksNeedClean(diskInfos []*DiskInfo) bool {
-	if len(diskInfos) == 0 {
+func (m *Monitor) isDisksNeedClean(diskInfo *DiskInfo) bool {
+	if !m.isDiskNeedClean(diskInfo) {
 		return false
-	}
-
-	for _, diskInfo := range diskInfos {
-		if !m.isDiskNeedClean(diskInfo) {
-			return false
-		}
 	}
 	log.Warningf("disk free space is not enough, will do drop or move partitions.")
 	return true
@@ -165,9 +178,9 @@ func (m *Monitor) isPriorityDrop(database, table string) bool {
 	return false
 }
 
-func (m *Monitor) getMinPartitions(connect *sql.DB) ([]Partition, error) {
-	sql := fmt.Sprintf("SELECT min(partition),count(distinct partition),database,table,min(min_time),max(max_time),sum(rows),sum(bytes_on_disk) FROM system.parts WHERE disk_name LIKE '%s' and active=1 GROUP BY database,table ORDER BY database,table ASC",
-		m.diskPrefix+"%")
+func (m *Monitor) getMinPartitions(connect *sql.DB, diskInfo *DiskInfo) ([]Partition, error) {
+	sql := fmt.Sprintf("SELECT min(partition),count(distinct partition),database,table,min(min_time),max(max_time),sum(rows),sum(bytes_on_disk) FROM system.parts WHERE disk_name='%s' and active=1 GROUP BY database,table ORDER BY database,table ASC",
+		diskInfo.name)
 	rows, err := connect.Query(sql)
 	if err != nil {
 		return nil, err
@@ -197,8 +210,8 @@ func (m *Monitor) getMinPartitions(connect *sql.DB) ([]Partition, error) {
 	return partitions, nil
 }
 
-func (m *Monitor) dropMinPartitions(connect *sql.DB) error {
-	partitions, err := m.getMinPartitions(connect)
+func (m *Monitor) dropMinPartitions(connect *sql.DB, diskInfo *DiskInfo) error {
+	partitions, err := m.getMinPartitions(connect, diskInfo)
 	if err != nil {
 		return err
 	}
@@ -214,8 +227,8 @@ func (m *Monitor) dropMinPartitions(connect *sql.DB) error {
 	return nil
 }
 
-func (m *Monitor) moveMinPartitions(connect *sql.DB) error {
-	partitions, err := m.getMinPartitions(connect)
+func (m *Monitor) moveMinPartitions(connect *sql.DB, diskInfo *DiskInfo) error {
+	partitions, err := m.getMinPartitions(connect, diskInfo)
 	if err != nil {
 		return err
 	}
@@ -255,13 +268,9 @@ func (m *Monitor) start() {
 				log.Warning(err)
 				continue
 			}
-			if m.isDisksNeedClean(diskInfos) {
-				if m.cfg.ColdStorage.Enabled {
-					if err := m.moveMinPartitions(connect); err != nil {
-						log.Warning("move partition failed.", err)
-					}
-				} else {
-					if err := m.dropMinPartitions(connect); err != nil {
+			for _, diskInfo := range diskInfos {
+				if m.isDisksNeedClean(diskInfo) {
+					if err := m.dropMinPartitions(connect, diskInfo); err != nil {
 						log.Warning("drop partition failed.", err)
 					}
 				}
