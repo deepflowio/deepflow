@@ -146,6 +146,8 @@ func GetMetricsByDBTableStatic(db string, table string, where string) (map[strin
 		switch table {
 		case "event":
 			return GetResourceEventMetrics(), err
+		case "perf_event":
+			return GetResourcePerfEventMetrics(), err
 		}
 	case ckcommon.DB_NAME_PROFILE:
 		switch table {
@@ -207,6 +209,8 @@ func GetMetricsByDBTable(db string, table string, where string, ctx context.Cont
 		switch table {
 		case "event":
 			return GetResourceEventMetrics(), err
+		case "perf_event":
+			return GetResourcePerfEventMetrics(), err
 		}
 	case ckcommon.DB_NAME_PROFILE:
 		switch table {
@@ -289,6 +293,7 @@ func LoadMetrics(db string, table string, dbDescription map[string]interface{}) 
 	if !ok {
 		return nil, errors.New(fmt.Sprintf("get metrics failed! db: %s", db))
 	}
+
 	if ok {
 		metricsData, ok := tableDate.(map[string]interface{})[table]
 		metricsDataLanguage, _ := tableDate.(map[string]interface{})[table+"."+config.Cfg.Language]
@@ -316,6 +321,7 @@ func LoadMetrics(db string, table string, dbDescription map[string]interface{}) 
 				)
 				loadMetrics[metrics[0].(string)] = lm
 			}
+
 		} else {
 			return nil, errors.New(fmt.Sprintf("get metrics failed! db:%s table:%s", db, table))
 		}
@@ -365,6 +371,9 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) erro
 		case "event":
 			metrics = RESOURCE_EVENT_METRICS
 			replaceMetrics = RESOURCE_EVENT_METRICS_REPLACE
+		case "perf_event":
+			metrics = RESOURCE_PERF_EVENT_METRICS
+			replaceMetrics = RESOURCE_PERF_EVENT_METRICS_REPLACE
 		}
 	case ckcommon.DB_NAME_PROFILE:
 		switch table {
