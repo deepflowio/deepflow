@@ -411,7 +411,7 @@ jobs:
         run: |
           cd agent
           mkdir -p pkg/debian/systemd/usr/sbin/
-          cp -af output/target/release/deepflow-agent pkg/debian/systemd/usr/sbin/
+          cp -af output/target/x86_64-unknown-linux-musl/release/deepflow-agent pkg/debian/systemd/usr/sbin/
           mkdir -p pkg/debian/systemd/etc/
           cp -af config/deepflow-agent.yaml pkg/debian/systemd/etc/
           cp -af config/deepflow-agent.yaml pkg/debian/systemd/etc/deepflow-agent.yaml.sample
@@ -420,7 +420,7 @@ jobs:
           sed -i "s/Version.*/Version: 1.0-${{ env.IMAGE_TAG }}/g" pkg/debian/systemd/DEBIAN/control
           dpkg-deb -Zxz --no-uniform-compression -b pkg/debian/systemd x86_64/deepflow-agent-1.0-${{ env.IMAGE_TAG }}.systemd.deb
           mkdir -p pkg/debian/upstart/usr/sbin/
-          cp -af output/target/release/deepflow-agent pkg/debian/upstart/usr/sbin/
+          cp -af output/target/x86_64-unknown-linux-musl/release/deepflow-agent pkg/debian/upstart/usr/sbin/
           mkdir -p pkg/debian/upstart/etc/
           cp -af config/deepflow-agent.yaml pkg/debian/upstart/etc/
           cp -af config/deepflow-agent.yaml pkg/debian/upstart/etc/deepflow-agent.yaml.sample
@@ -432,7 +432,7 @@ jobs:
       - name: build binary package  
         run: |
           mkdir -p agent/bin-package
-          cp -raf agent/output/target/release/deepflow-agent agent/bin-package/
+          cp -raf agent/output/target/x86_64-unknown-linux-musl/release/deepflow-agent agent/bin-package/
           cd agent/bin-package/
           tar -czvf deepflow-agent.tar.gz *
       - uses: manyuanrong/setup-ossutil@v2.0
