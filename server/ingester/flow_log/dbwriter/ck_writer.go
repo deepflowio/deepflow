@@ -81,13 +81,13 @@ func GetFlowLogTables(engine ckdb.EngineType, cluster, storagePolicy string, l4L
 	}
 }
 
-func NewFlowLogWriter(addrs []string, user, password, cluster, storagePolicy string, ckWriterCfg config.CKWriterConfig, flowLogTtl flowlogconfig.FlowLogTTL, coldStorages map[string]*ckdb.ColdStorage) (*FlowLogWriter, error) {
+func NewFlowLogWriter(addrs []string, user, password, cluster, storagePolicy, timeZone string, ckWriterCfg config.CKWriterConfig, flowLogTtl flowlogconfig.FlowLogTTL, coldStorages map[string]*ckdb.ColdStorage) (*FlowLogWriter, error) {
 	ckwriters := make([]*ckwriter.CKWriter, common.FLOWLOG_ID_MAX)
 	var err error
 	tables := GetFlowLogTables(ckdb.MergeTree, cluster, storagePolicy, flowLogTtl.L4FlowLog, flowLogTtl.L7FlowLog, flowLogTtl.L4Packet, coldStorages)
 	for i, table := range tables {
 		counterName := common.FlowLogID(table.ID).String()
-		ckwriters[i], err = ckwriter.NewCKWriter(addrs, user, password, counterName, table,
+		ckwriters[i], err = ckwriter.NewCKWriter(addrs, user, password, counterName, timeZone, table,
 			ckWriterCfg.QueueCount, ckWriterCfg.QueueSize, ckWriterCfg.BatchSize, ckWriterCfg.FlushTimeout)
 		if err != nil {
 			log.Error(err)

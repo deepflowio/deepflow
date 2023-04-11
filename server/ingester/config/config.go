@@ -112,6 +112,7 @@ type CKDB struct {
 	EndpointTCPPortName string `yaml:"endpoint-tcp-port-name"`
 	ClusterName         string `yaml:"cluster-name"`
 	StoragePolicy       string `yaml:"storage-policy"`
+	TimeZone            string `yaml:"time-zone"`
 }
 
 type Config struct {
@@ -212,14 +213,15 @@ func (c *Config) Validate() error {
 			c.CKDB.ClusterName = ckdb.DF_CLUSTER
 		}
 	}
-
 	if c.CKDB.StoragePolicy == "" {
 		if c.CKDB.External {
 			c.CKDB.StoragePolicy = "default"
 		} else {
 			c.CKDB.StoragePolicy = ckdb.DF_STORAGE_POLICY
-
 		}
+	}
+	if c.CKDB.TimeZone == "" {
+		c.CKDB.TimeZone = ckdb.DF_TIMEZONE
 	}
 
 	var watcher *Watcher

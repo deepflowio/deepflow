@@ -30,7 +30,7 @@ type ColdStorage struct {
 	Enabled   bool
 	Type      DiskType
 	Name      string
-	TTLToMove int // after 'TTLToMove' days, then move data to cold storage
+	TTLToMove int // after 'TTLToMove' hours, then move data to cold storage
 }
 
 func GetColdStorage(coldStorages map[string]*ColdStorage, db, table string) *ColdStorage {
@@ -53,7 +53,7 @@ type Table struct {
 	Columns         []*Column    // 表列结构
 	TimeKey         string       // 时间字段名，用来设置partition和ttl
 	SummingKey      string       // When using SummingMergeEngine, this field is used for Summing aggregation
-	TTL             int          // 数据默认保留时长。 单位:天
+	TTL             int          // 数据默认保留时长。 单位:小时
 	ColdStorage     ColdStorage  // 冷存储配置
 	PartitionFunc   TimeFuncType // partition函数作用于Time,
 	Cluster         string       // 对应的cluster
