@@ -338,7 +338,7 @@ ingester:
 
   ## perf event data write config
   #perf-event-ck-writer:
-  #  queue-count: 2      # 每个表并行写数量
+  #  queue-count: 1      # 每个表并行写数量
   #  queue-size: 50000  # 数据队列长度
   #  batch-size: 25600   # 多少行数据同时写入
   #  flush-timeout: 5    # 超时写入时间
