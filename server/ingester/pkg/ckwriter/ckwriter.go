@@ -142,7 +142,7 @@ func NewCKWriter(addrs []string, user, password, counterName, timeZone string, t
 
 	addrCount := len(addrs)
 	conns := make([]clickhouse.Conn, addrCount)
-	batchs := make([]driver.Batch, addrCount)
+	batchs := make([]driver.Batch, queueCount*addrCount)
 	for i := 0; i < addrCount; i++ {
 		if conns[i], err = clickhouse.Open(&clickhouse.Options{
 			Addr: []string{addrs[i]},
@@ -271,7 +271,7 @@ func (w *CKWriter) ResetConnection(connID int) error {
 
 func (w *CKWriter) Write(queueID int, items []CKItem) {
 	connID := int(atomic.AddUint64(&w.writeCounter, 1) % w.connCount)
-	if err := w.writeItems(connID, items); err != nil {
+	if err := w.writeItems(queueID, connID, items); err != nil {
 		// Prevent frequent log writing
 		logEnabled := w.counters[queueID].WriteFailedCount == 0
 		if logEnabled {
@@ -288,7 +288,7 @@ func (w *CKWriter) Write(queueID int, items []CKItem) {
 
 		w.counters[queueID].RetryCount++
 		// 写失败重连后重试一次, 规避偶尔写失败问题
-		err = w.writeItems(connID, items)
+		err = w.writeItems(queueID, connID, items)
 		if logEnabled {
 			if err != nil {
 				w.counters[queueID].RetryFailedCount++
@@ -322,7 +322,7 @@ func IsNil(i interface{}) bool {
 	return false
 }
 
-func (w *CKWriter) writeItems(connID int, items []CKItem) error {
+func (w *CKWriter) writeItems(queueID, connID int, items []CKItem) error {
 	if len(items) == 0 {
 		return nil
 	}
@@ -335,19 +335,20 @@ func (w *CKWriter) writeItems(connID int, items []CKItem) error {
 		ck = w.conns[connID]
 	}
 	var err error
-	batch := w.batchs[connID]
+	batchID := queueID*w.queueCount + connID
+	batch := w.batchs[batchID]
 	if IsNil(batch) {
-		w.batchs[connID], err = ck.PrepareBatch(context.Background(), w.prepare)
+		w.batchs[batchID], err = ck.PrepareBatch(context.Background(), w.prepare)
 		if err != nil {
 			return err
 		}
-		batch = w.batchs[connID]
+		batch = w.batchs[batchID]
 	} else {
 		batch, err = ck.PrepareReuseBatch(context.Background(), w.prepare, batch)
 		if err != nil {
 			return err
 		}
-		w.batchs[connID] = batch
+		w.batchs[batchID] = batch
 	}
 
 	ckdbBlock := ckdb.NewBlock(batch)
