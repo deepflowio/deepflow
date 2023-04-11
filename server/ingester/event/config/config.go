@@ -31,7 +31,7 @@ var log = logging.MustGetLogger("event.config")
 const (
 	DefaultDecoderQueueCount     = 1
 	DefaultDecoderQueueSize      = 10000
-	DefaultPerfDecoderQueueCount = 2
+	DefaultPerfDecoderQueueCount = 1
 	DefaultPerfDecoderQueueSize  = 100000
 	DefaultEventTTL              = 720 // hour
 	DefaultPerfEventTTL          = 168 // hour
@@ -85,7 +85,7 @@ func Load(base *config.Config, path string) *Config {
 			DecoderQueueSize:  DefaultDecoderQueueSize,
 			TTL:               DefaultEventTTL,
 
-			PerfCKWriterConfig:    config.CKWriterConfig{QueueCount: 2, QueueSize: 50000, BatchSize: 25600, FlushTimeout: 5},
+			PerfCKWriterConfig:    config.CKWriterConfig{QueueCount: 1, QueueSize: 50000, BatchSize: 25600, FlushTimeout: 5},
 			PerfDecoderQueueCount: DefaultPerfDecoderQueueCount,
 			PerfDecoderQueueSize:  DefaultPerfDecoderQueueSize,
 			PerfTTL:               DefaultPerfEventTTL,
