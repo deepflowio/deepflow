@@ -3,6 +3,7 @@ Description=deepflow-agent.service
 After=syslog.target network-online.target
 
 [Service]
+Delegate=true
 Environment=GOTRACEBACK=single
 Environment=RUST_BACKTRACE=1
 LimitCORE=1G
