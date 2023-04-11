@@ -41,7 +41,6 @@ use k8s_openapi::{
         extensions, networking,
     },
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
-    Metadata,
 };
 use kube::{
     api::ListParams,
@@ -54,6 +53,7 @@ use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
 use tokio::{runtime::Handle, sync::Mutex, task::JoinHandle, time};
 
+use super::crd::pingan::ServiceRule;
 use crate::utils::stats::{
     self, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption,
 };
@@ -79,6 +79,7 @@ pub enum GenericResourceWatcher {
     Node(ResourceWatcher<Node>),
     Namespace(ResourceWatcher<Namespace>),
     Service(ResourceWatcher<Service>),
+    ServiceRule(ResourceWatcher<ServiceRule>),
     Deployment(ResourceWatcher<Deployment>),
     Pod(ResourceWatcher<Pod>),
     StatefulSet(ResourceWatcher<StatefulSet>),
@@ -188,7 +189,6 @@ struct Context<K> {
 impl<K> Watcher for ResourceWatcher<K>
 where
     K: Clone + Debug + DeserializeOwned + Resource + Serialize + Trimmable,
-    K: Metadata<Ty = ObjectMeta>,
 {
     fn start(&self) -> Option<JoinHandle<()>> {
         let ctx = Context {
@@ -237,7 +237,6 @@ where
 impl<K> ResourceWatcher<K>
 where
     K: Clone + Debug + DeserializeOwned + Resource + Serialize + Trimmable,
-    K: Metadata<Ty = ObjectMeta>,
 {
     pub fn new(
         api: Api<K>,
@@ -373,17 +372,22 @@ where
                         }
                     }
 
-                    if object_list.metadata.continue_.is_none() {
-                        info!("list {} returned {} entries", ctx.kind, total_count);
-                        if !all_entries.is_empty() {
-                            *ctx.entries.lock().await = all_entries;
-                            ctx.version.fetch_add(1, Ordering::SeqCst);
+                    match object_list.metadata.continue_.as_ref().map(String::as_str) {
+                        // sometimes k8s api return Some("") instead of None even if
+                        // there is no more entries
+                        None | Some("") => {
+                            info!("list {} returned {} entries", ctx.kind, total_count);
+                            if !all_entries.is_empty() {
+                                *ctx.entries.lock().await = all_entries;
+                                ctx.version.fetch_add(1, Ordering::SeqCst);
+                            }
+                            ctx.resource_version = object_list.metadata.resource_version.take();
+                            ctx.stats_counter
+                                .list_length
+                                .fetch_add(total_count as u32, Ordering::Relaxed);
+                            return;
                         }
-                        ctx.resource_version = object_list.metadata.resource_version.take();
-                        ctx.stats_counter
-                            .list_length
-                            .fetch_add(total_count as u32, Ordering::Relaxed);
-                        return;
+                        _ => (),
                     }
                     params.continue_token = object_list.metadata.continue_.take();
                 }
@@ -759,7 +763,6 @@ impl ResourceWatcherFactory {
     ) -> ResourceWatcher<K>
     where
         K: Clone + Debug + DeserializeOwned + Resource + Serialize + Trimmable,
-        K: Metadata<Ty = ObjectMeta>,
         <K as Resource>::DynamicType: Default,
     {
         let watcher = ResourceWatcher::new(
@@ -804,6 +807,12 @@ impl ResourceWatcherFactory {
                     config,
                 )),
                 "services" => GenericResourceWatcher::Service(self.new_watcher_inner(
+                    kind,
+                    stats_collector,
+                    namespace,
+                    config,
+                )),
+                "servicerules" => GenericResourceWatcher::ServiceRule(self.new_watcher_inner(
                     kind,
                     stats_collector,
                     namespace,

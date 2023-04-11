@@ -58,10 +58,11 @@ use public::proto::{
  *     最新数据，此时进行一次全量同步。
  */
 
-const RESOURCES: [&str; 10] = [
+const RESOURCES: [&str; 11] = [
     "nodes",
     "namespaces",
     "services",
+    "servicerules",
     "deployments",
     "pods",
     "statefulsets",
@@ -75,10 +76,11 @@ const RESOURCES: [&str; 10] = [
     PB_RESOURCES 和 PB_INGRESS 用于打包发送k8s信息填写的资源类型，控制器根据类型作为key进行存储, 因为Route/Ingress 可以用Ingress一起表示，
     所以所有Ingress统一用*v1.Ingress。go里可以通过类型反射获取，然后控制器约定为key，rust还没好的方法获取，所以先手动填写，以后更新
 */
-const PB_RESOURCES: [&str; 10] = [
+const PB_RESOURCES: [&str; 11] = [
     "*v1.Node",
     "*v1.Namespace",
     "*v1.Service",
+    "*v1.ServiceRule",
     "*v1.Deployment",
     "*v1.Pod",
     "*v1.StatefulSet",
@@ -414,6 +416,11 @@ impl ApiWatcher {
                 {
                     let mut err_msgs_lock = err_msgs.lock().unwrap();
                     for &resource in RESOURCES[..RESOURCES.len() - 1].iter() {
+                        if resource == "servicerules" {
+                            // optional for pingan crd
+                            debug!("no service rules found");
+                            continue;
+                        }
                         if !watchers.contains_key(resource) {
                             let err_msg = format!("resource {} api not available", resource);
                             warn!("{}", err_msg);
