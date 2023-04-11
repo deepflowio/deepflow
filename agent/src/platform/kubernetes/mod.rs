@@ -22,6 +22,7 @@ use regex::Regex;
 
 mod active_poller;
 mod api_watcher;
+mod crd;
 mod passive_poller;
 mod resource_watcher;
 pub use active_poller::ActivePoller;
