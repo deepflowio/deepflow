@@ -96,6 +96,9 @@ func updateController(m *monitor.ControllerCheck, cfg *config.ControllerConfig) 
 
 		lcuuid := c.Param("lcuuid")
 		data, err := service.UpdateController(lcuuid, patchMap, m, cfg)
+		if err != nil {
+			log.Error(err)
+		}
 		JsonResponse(c, data, err)
 	})
 }
