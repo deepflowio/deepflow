@@ -589,6 +589,7 @@ dependencies = [
  "ipnetwork",
  "k8s-openapi",
  "kube",
+ "kube-derive 0.74.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc",
  "log 0.4.17",
  "lru",
@@ -615,6 +616,7 @@ dependencies = [
  "regex",
  "ring",
  "roxmltree",
+ "schemars",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -1269,6 +1271,7 @@ dependencies = [
  "chrono",
  "http",
  "percent-encoding",
+ "schemars",
  "serde",
  "serde-value",
  "serde_json",
@@ -1283,7 +1286,7 @@ dependencies = [
  "k8s-openapi",
  "kube-client",
  "kube-core",
- "kube-derive",
+ "kube-derive 0.74.0 (git+https://github.com/deepflowio/kube?tag=0.74.2)",
  "kube-runtime",
 ]
 
@@ -1337,6 +1340,19 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "kube-derive"
+version = "0.74.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "66d74121eb41af4480052901f31142d8d9bbdf1b7c6b856da43bcb02f5b1b177"
+dependencies = [
+ "darling",
+ "proc-macro2",
+ "quote",
+ "serde_json",
+ "syn",
 ]
 
 [[package]]
