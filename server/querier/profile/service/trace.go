@@ -140,6 +140,11 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*mo
 		if len(node.ParentNodeIDS) == 0 {
 			node.ParentNodeIDS = append(node.ParentNodeIDS, "")
 		}
+		// remove debug information
+		if !args.Debug {
+			node.ProfileNodeIDS = node.ProfileNodeIDS[:0]
+			node.ProfileParentNodeIDS = node.ProfileParentNodeIDS[:0]
+		}
 	}
 	return
 }

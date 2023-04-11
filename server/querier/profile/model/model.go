@@ -24,6 +24,7 @@ type ProfileTracing struct {
 	GroupBy             string `json:"group_by"`
 	TimeStart           int    `json:"time_start" binding:"required"`
 	TimeEnd             int    `json:"time_end" binding:"required"`
+	Debug               bool   `json:"debug"`
 }
 
 type ProfileTreeNode struct {
