@@ -19,6 +19,7 @@ package ckdb
 import (
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
@@ -142,12 +143,16 @@ var cloumnTypeString = []string{
 	ArrayUInt32:          "Array(UInt32)",
 	ArrayInt64:           "Array(Int64)",
 	ArrayFloat64:         "Array(Float64)",
-	DateTime:             "DateTime('Asia/Shanghai')",
-	DateTime64:           "DateTime64(0, 'Asia/Shanghai')",
-	DateTime64ms:         "DateTime64(3, 'Asia/Shanghai')",
-	DateTime64us:         "DateTime64(6, 'Asia/Shanghai')",
+	DateTime:             "DateTime('" + DF_TIMEZONE + "')",
+	DateTime64:           "DateTime64(0, '" + DF_TIMEZONE + "')",
+	DateTime64ms:         "DateTime64(3, '" + DF_TIMEZONE + "')",
+	DateTime64us:         "DateTime64(6, '" + DF_TIMEZONE + "')",
 	FixString8:           "FixedString(8)",
 	LowCardinalityString: "LowCardinality(String)",
+}
+
+func (t ColumnType) HasDFTimeZone() bool {
+	return strings.Contains(t.String(), DF_TIMEZONE)
 }
 
 func (t ColumnType) String() string {
@@ -285,6 +290,7 @@ const (
 	DF_STORAGE_POLICY     = "df_storage"
 	DF_CLUSTER            = "df_cluster"
 	DF_REPLICATED_CLUSTER = "df_replicated_cluster"
+	DF_TIMEZONE           = "Asia/Shanghai"
 )
 
 type Column struct {
@@ -294,6 +300,14 @@ type Column struct {
 	Index   IndexType  // 二级索引
 	GroupBy bool       // 在AggregatingMergeTree表中用于group by的字段
 	Comment string     // 列注释
+}
+
+func (c *Column) MakeModifyTimeZoneSQL(database, table, timeZone string) string {
+	if timeZone == "" || !c.Type.HasDFTimeZone() {
+		return ""
+	}
+	newTimeZoneType := strings.ReplaceAll(c.Type.String(), DF_TIMEZONE, timeZone)
+	return fmt.Sprintf("ALTER TABLE %s.`%s` MODIFY COLUMN %s %s", database, table, c.Name, newTimeZoneType)
 }
 
 func (c *Column) SetGroupBy() *Column {

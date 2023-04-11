@@ -82,7 +82,7 @@ func ExecSQL(conn clickhouse.Conn, query string) error {
 	return conn.Exec(context.Background(), query)
 }
 
-func InitTable(addr, user, password string, t *ckdb.Table) error {
+func InitTable(addr, user, password, timeZone string, t *ckdb.Table) error {
 	conn, err := clickhouse.Open(&clickhouse.Options{
 		Addr: []string{addr},
 		Auth: clickhouse.Auth{
@@ -105,13 +105,27 @@ func InitTable(addr, user, password string, t *ckdb.Table) error {
 	if err := ExecSQL(conn, t.MakeGlobalTableCreateSQL()); err != nil {
 		return err
 	}
+
+	for _, c := range t.Columns {
+		for _, table := range []string{t.GlobalName, t.LocalName} {
+			modTimeZoneSql := c.MakeModifyTimeZoneSQL(t.Database, table, timeZone)
+			if modTimeZoneSql == "" {
+				break
+			}
+
+			if err := ExecSQL(conn, modTimeZoneSql); err != nil {
+				log.Warningf("modify time zone failed, error: %s", err)
+			}
+		}
+	}
 	conn.Close()
+
 	return nil
 }
 
-func NewCKWriter(addrs []string, user, password, counterName string, table *ckdb.Table, queueCount, queueSize, batchSize, flushTimeout int) (*CKWriter, error) {
-	log.Infof("New CK writer: Addrs=%v, user=%s, database=%s, table=%s, queueCount=%d, queueSize=%d, batchSize=%d, flushTimeout=%ds, counterName=%s",
-		addrs, user, table.Database, table.LocalName, queueCount, queueSize, batchSize, flushTimeout, counterName)
+func NewCKWriter(addrs []string, user, password, counterName, timeZone string, table *ckdb.Table, queueCount, queueSize, batchSize, flushTimeout int) (*CKWriter, error) {
+	log.Infof("New CK writer: Addrs=%v, user=%s, database=%s, table=%s, queueCount=%d, queueSize=%d, batchSize=%d, flushTimeout=%ds, counterName=%s, timeZone=%s",
+		addrs, user, table.Database, table.LocalName, queueCount, queueSize, batchSize, flushTimeout, counterName, timeZone)
 
 	if len(addrs) == 0 {
 		return nil, fmt.Errorf("addrs is empty")
@@ -121,7 +135,7 @@ func NewCKWriter(addrs []string, user, password, counterName string, table *ckdb
 
 	// clickhouse的初始化创建表
 	for _, addr := range addrs {
-		if err = InitTable(addr, user, password, table); err != nil {
+		if err = InitTable(addr, user, password, timeZone, table); err != nil {
 			return nil, err
 		}
 	}

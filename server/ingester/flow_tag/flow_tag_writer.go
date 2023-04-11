@@ -89,6 +89,7 @@ func NewFlowTagWriter(
 		w.ckwriters[tagType], err = ckwriter.NewCKWriter(
 			w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
 			fmt.Sprintf("%s-%s-%d", name, tableName, decoderIndex),
+			config.CKDB.TimeZone,
 			t.GenCKTable(config.CKDB.ClusterName, config.CKDB.StoragePolicy, tableName, ttl, partition),
 			w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
 		if err != nil {

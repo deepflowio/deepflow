@@ -71,7 +71,7 @@ func NewFlowLog(config *config.Config, recv *receiver.Receiver, platformDataMana
 
 	flowLogWriter, err := dbwriter.NewFlowLogWriter(
 		config.Base.CKDB.ActualAddrs, config.Base.CKDBAuth.Username, config.Base.CKDBAuth.Password,
-		config.Base.CKDB.ClusterName, config.Base.CKDB.StoragePolicy,
+		config.Base.CKDB.ClusterName, config.Base.CKDB.StoragePolicy, config.Base.CKDB.TimeZone,
 		config.CKWriterConfig, config.FlowLogTTL, config.Base.GetCKDBColdStorages())
 	if err != nil {
 		return nil, err

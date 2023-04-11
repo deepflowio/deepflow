@@ -64,7 +64,7 @@ func NewProfileWriter(msgType datatype.MessageType, config *config.Config) (*Pro
 	table := GenProfileCKTable(writer.ckdbCluster, PROFILE_DB, PROFILE_TABLE, writer.ckdbStoragePolicy, writer.ttl, ckdb.GetColdStorage(writer.ckdbColdStorages, PROFILE_DB, PROFILE_TABLE))
 	ckwriter, err := ckwriter.NewCKWriter(
 		writer.ckdbAddrs, writer.ckdbUsername, writer.ckdbPassword,
-		PROFILE_TABLE, table,
+		PROFILE_TABLE, config.Base.CKDB.TimeZone, table,
 		writer.writerConfig.QueueCount, writer.writerConfig.QueueSize,
 		writer.writerConfig.BatchSize, writer.writerConfig.FlushTimeout)
 	if err != nil {
