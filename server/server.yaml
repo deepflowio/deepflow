@@ -237,6 +237,8 @@ ingester:
   #  cluster-name:
   #  # if `external` is 'true', default value 'default', else 'df_storage'
   #  storage-policy:
+  #  A list of supported time zones can be found in https://www.iana.org/time-zones and also can be queried by SELECT * FROM system.time_zones
+  #  time-zone: Asia/Shanghai
 
   ## This configuration is only valid when the ClickHouse tables have not yet been created. If the tables have been created, you need to delete the databases/tables and restart to create the tables according to the configuration
   #ckdb-cold-storage:
