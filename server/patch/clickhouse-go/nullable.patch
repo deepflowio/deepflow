@@ -1,0 +1,31 @@
+diff --git a/lib/column/nullable.go b/lib/column/nullable.go
+index 58aeae1..4497124 100644
+--- a/lib/column/nullable.go
++++ b/lib/column/nullable.go
+@@ -82,6 +82,26 @@ func (col *Nullable) Row(i int, ptr bool) interface{} {
+ func (col *Nullable) ScanRow(dest interface{}, row int) error {
+ 	if col.enable {
+ 		if col.nulls.data[row] == 1 {
++			switch v := dest.(type) {
++			case **uint64:
++				*v = nil
++			case **int64:
++				*v = nil
++			case **uint32:
++				*v = nil
++			case **int32:
++				*v = nil
++			case **uint16:
++				*v = nil
++			case **int16:
++				*v = nil
++			case **uint8:
++				*v = nil
++			case **int8:
++				*v = nil
++			case **string:
++				*v = nil
++			}
+ 			return nil
+ 		}
+ 	}
