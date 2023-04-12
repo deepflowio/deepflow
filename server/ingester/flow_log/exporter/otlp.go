@@ -3,6 +3,7 @@ package exporter
 import (
 	"encoding/binary"
 	"encoding/hex"
+	"net"
 	"strconv"
 	"strings"
 
@@ -11,6 +12,7 @@ import (
 	"go.opentelemetry.io/collector/pdata/ptrace/ptraceotlp"
 	_ "go.opentelemetry.io/proto/otlp/common/v1"
 
+	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/log_data"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/utils"
@@ -34,7 +36,7 @@ func putUniversalTags(attrs pcommon.Map, tags0, tags1 *UniversalTags, dataTypeBi
 		putStrWithoutEmpty(attrs, "df.universal_tag.region_0", tags0.Region)
 		putStrWithoutEmpty(attrs, "df.universal_tag.az_0", tags0.AZ)
 		putStrWithoutEmpty(attrs, "df.universal_tag.host_0", tags0.Host)
-		putStrWithoutEmpty(attrs, "df.universal_tag.epc_0", tags0.L3Epc)
+		putStrWithoutEmpty(attrs, "df.universal_tag.vpc_0", tags0.L3Epc)
 		putStrWithoutEmpty(attrs, "df.universal_tag.pod_cluster_0", tags0.PodCluster)
 		putStrWithoutEmpty(attrs, "df.universal_tag.pod_ns_0", tags0.PodNS)
 		putStrWithoutEmpty(attrs, "df.universal_tag.pod_node_0", tags0.PodNode)
@@ -54,7 +56,7 @@ func putUniversalTags(attrs pcommon.Map, tags0, tags1 *UniversalTags, dataTypeBi
 		putStrWithoutEmpty(attrs, "df.universal_tag.region_1", tags1.Region)
 		putStrWithoutEmpty(attrs, "df.universal_tag.az_1", tags1.AZ)
 		putStrWithoutEmpty(attrs, "df.universal_tag.host_1", tags1.Host)
-		putStrWithoutEmpty(attrs, "df.universal_tag.epc_1", tags1.L3Epc)
+		putStrWithoutEmpty(attrs, "df.universal_tag.vpc_1", tags1.L3Epc)
 		putStrWithoutEmpty(attrs, "df.universal_tag.pod_cluster_1", tags1.PodCluster)
 		putStrWithoutEmpty(attrs, "df.universal_tag.pod_ns_1", tags1.PodNS)
 		putStrWithoutEmpty(attrs, "df.universal_tag.pod_node_1", tags1.PodNode)
@@ -89,11 +91,11 @@ func L7FlowLogToExportRequest(l7 *log_data.L7FlowLog, universalTagsManager *Univ
 		}
 	}
 
+	spanKind := tapSideToSpanKind(l7.TapSide)
 	if dataTypeBits&TRACING_INFO != 0 {
 		putIntWithoutZero(spanAttrs, "df.span.req_tcp_seq", int64(l7.ReqTcpSeq))
 		putIntWithoutZero(spanAttrs, "df.span.resp_tcp_seq", int64(l7.RespTcpSeq))
 		putStrWithoutEmpty(spanAttrs, "df.span.x_request_id", l7.XRequestId)
-		putStrWithoutEmpty(spanAttrs, "df.span.http_proxy_client", l7.HttpProxyClient)
 		putIntWithoutZero(spanAttrs, "df.span.syscall_trace_id_request", int64(l7.SyscallTraceIDRequest))
 		putIntWithoutZero(spanAttrs, "df.span.syscall_trace_id_response", int64(l7.SyscallTraceIDResponse))
 		putIntWithoutZero(spanAttrs, "df.span.syscall_thread_0", int64(l7.SyscallThread0))
@@ -122,32 +124,31 @@ func L7FlowLogToExportRequest(l7 *log_data.L7FlowLog, universalTagsManager *Univ
 			span.SetSpanID(uint64ToSpanID(l7.ID()))
 			span.SetTraceID(genTraceID(int(l7.ID())))
 			span.SetParentSpanID(pcommon.NewSpanIDEmpty())
-			span.SetKind(tapSideToSpanKind(l7.TapSide))
+			span.SetKind(spanKind)
 		}
 	}
 
 	msgType := datatype.LogMessageType(l7.Type)
 	putStrWithoutEmpty(spanAttrs, "df.span.type", strings.ToLower(msgType.String()))
-	putStrWithoutEmpty(spanAttrs, "df.span.app_service", l7.AppService)
-	putStrWithoutEmpty(spanAttrs, "df.span.app_instance", l7.AppInstance)
 	putStrWithoutEmpty(spanAttrs, "df.span.endpoint", l7.Endpoint)
 
 	if dataTypeBits&SERVICE_INFO != 0 {
-		putIntWithoutZero(spanAttrs, "df.span.process_id_0", int64(l7.ProcessID0))
-		putIntWithoutZero(spanAttrs, "df.span.process_id_1", int64(l7.ProcessID1))
-		putStrWithoutEmpty(spanAttrs, "df.span.process_kname_0", l7.ProcessKName0)
-		putStrWithoutEmpty(spanAttrs, "df.span.process_kname_1", l7.ProcessKName1)
+		putStrWithoutEmpty(resAttrs, "service.name", l7.AppService)
+		putStrWithoutEmpty(resAttrs, "service.instance.id", l7.AppInstance)
+		putIntWithoutZero(resAttrs, "process.pid_0", int64(l7.ProcessID0))
+		putIntWithoutZero(resAttrs, "process.pid_1", int64(l7.ProcessID1))
+		putStrWithoutEmpty(resAttrs, "thread.name_0", l7.ProcessKName0)
+		putStrWithoutEmpty(resAttrs, "thread.name_1", l7.ProcessKName1)
 	}
 
 	if dataTypeBits&FLOW_INFO != 0 {
 		putIntWithoutZero(resAttrs, "df.flow_info.id", int64(l7.ID()))
 		putIntWithoutZero(resAttrs, "df.flow_info.time", int64(l7.EndTime()))
 		putIntWithoutZero(resAttrs, "df.flow_info.flow_id", int64(l7.FlowID))
+		span.SetStartTimestamp(pcommon.Timestamp(l7.StartTime()))
+		span.SetEndTimestamp(pcommon.Timestamp(l7.EndTime()))
+		span.Status().SetCode(responseStatusToSpanStatus(l7.ResponseStatus))
 	}
-
-	span.SetStartTimestamp(pcommon.Timestamp(l7.StartTime()))
-	span.SetEndTimestamp(pcommon.Timestamp(l7.EndTime()))
-	span.Status().SetCode(responseStatusToSpanStatus(l7.ResponseStatus))
 
 	if dataTypeBits&CAPTURE_INFO != 0 {
 		putStrWithoutEmpty(resAttrs, "df.capture_info.signal_source", datatype.SignalSource(l7.SignalSource).String())
@@ -186,6 +187,15 @@ func L7FlowLogToExportRequest(l7 *log_data.L7FlowLog, universalTagsManager *Univ
 
 	if dataTypeBits&APPLICATION_LAYER != 0 {
 		putStrWithoutEmpty(resAttrs, "df.application.l7_protocol", datatype.L7Protocol(l7.L7Protocol).String())
+
+		putStrWithoutEmpty(resAttrs, "telemetry.sdk.name", "deepflow")
+		putStrWithoutEmpty(resAttrs, "telemetry.sdk.version", common.CK_VERSION)
+
+		if spanKind == ptrace.SpanKindServer {
+			setServerSpanKindHostAndPeer(spanAttrs, l7, tags0, tags1)
+		} else {
+			setOtherSpanKindHostAndPeer(spanAttrs, l7, tags0, tags1)
+		}
 
 		switch datatype.L7Protocol(l7.L7Protocol) {
 		case datatype.L7_PROTOCOL_DNS:
@@ -228,6 +238,76 @@ func L7FlowLogToExportRequest(l7 *log_data.L7FlowLog, universalTagsManager *Univ
 	return ptraceotlp.NewExportRequestFromTraces(td)
 }
 
+//use server info (_1) to fill in 'host' information, use client info (_0) to fill in 'peer' information
+func setServerSpanKindHostAndPeer(spanAttrs pcommon.Map, l7 *log_data.L7FlowLog, tags0, tags1 *UniversalTags) {
+	if tags1.CHost != "" {
+		putStrWithoutEmpty(spanAttrs, "net.host.name", tags1.CHost)
+	} else {
+		putStrWithoutEmpty(spanAttrs, "net.host.name", tags1.PodNode)
+	}
+	putIntWithoutZero(spanAttrs, "net.host.port", int64(l7.ServerPort))
+	if l7.IsIPv4 {
+		if l7.IP41 != 0 {
+			spanAttrs.PutStr("net.sock.host.addr", utils.IpFromUint32(l7.IP41).String())
+		}
+	} else {
+		if !l7.IP61.Equal(net.IPv6zero) {
+			spanAttrs.PutStr("net.sock.host.addr", l7.IP61.String())
+		}
+	}
+
+	if tags0.CHost != "" {
+		putStrWithoutEmpty(spanAttrs, "net.peer.name", tags0.CHost)
+	} else {
+		putStrWithoutEmpty(spanAttrs, "net.peer.name", tags0.PodNode)
+	}
+	putIntWithoutZero(spanAttrs, "net.peer.port", int64(l7.ClientPort))
+	if l7.IsIPv4 {
+		if l7.IP40 != 0 {
+			spanAttrs.PutStr("net.sock.peer.addr", utils.IpFromUint32(l7.IP40).String())
+		}
+	} else {
+		if !l7.IP60.Equal(net.IPv6zero) {
+			spanAttrs.PutStr("net.sock.peer.addr", l7.IP60.String())
+		}
+	}
+}
+
+//use client info (_0) to fill in 'host' information, use server info (_1) to fill in 'peer' information
+func setOtherSpanKindHostAndPeer(spanAttrs pcommon.Map, l7 *log_data.L7FlowLog, tags0, tags1 *UniversalTags) {
+	if tags0.CHost != "" {
+		putStrWithoutEmpty(spanAttrs, "net.host.name", tags0.CHost)
+	} else {
+		putStrWithoutEmpty(spanAttrs, "net.host.name", tags0.PodNode)
+	}
+	putIntWithoutZero(spanAttrs, "net.host.port", int64(l7.ClientPort))
+	if l7.IsIPv4 {
+		if l7.IP40 != 0 {
+			spanAttrs.PutStr("net.sock.host.addr", utils.IpFromUint32(l7.IP40).String())
+		}
+	} else {
+		if !l7.IP60.Equal(net.IPv6zero) {
+			spanAttrs.PutStr("net.sock.host.addr", l7.IP60.String())
+		}
+	}
+
+	if tags1.CHost != "" {
+		putStrWithoutEmpty(spanAttrs, "net.peer.name", tags1.CHost)
+	} else {
+		putStrWithoutEmpty(spanAttrs, "net.peer.name", tags1.PodNode)
+	}
+	putIntWithoutZero(spanAttrs, "net.peer.port", int64(l7.ServerPort))
+	if l7.IsIPv4 {
+		if l7.IP41 != 0 {
+			spanAttrs.PutStr("net.sock.peer.addr", utils.IpFromUint32(l7.IP41).String())
+		}
+	} else {
+		if !l7.IP61.Equal(net.IPv6zero) {
+			spanAttrs.PutStr("net.sock.peer.addr", l7.IP61.String())
+		}
+	}
+}
+
 func setDNS(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
 	putStrWithoutEmpty(spanAttrs, "df.dns.request_type", l7.RequestType)
 	putStrWithoutEmpty(spanAttrs, "df.dns.request_resource", l7.RequestResource)
@@ -246,7 +326,7 @@ func setDNS(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
 	}
 }
 
-func setHTTP(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
+func setHTTPBase(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
 	putStrWithoutEmpty(spanAttrs, "http.flavor", l7.Version)
 	putStrWithoutEmpty(spanAttrs, "http.method", l7.RequestType)
 	putStrWithoutEmpty(spanAttrs, "net.peer.name", l7.RequestDomain)
@@ -261,6 +341,11 @@ func setHTTP(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
 		span.Events().AppendEmpty().SetName(l7.ResponseException)
 	}
 	putStrWithoutEmpty(spanAttrs, "df.http.proxy_client", l7.HttpProxyClient)
+}
+
+func setHTTP(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
+	setHTTPBase(span, spanAttrs, l7)
+	span.SetName(strings.Join([]string{l7.RequestType, l7.RequestResource}, " "))
 }
 
 func setDubbo(span *ptrace.Span, spanAttrs, resAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
@@ -284,7 +369,7 @@ func setDubbo(span *ptrace.Span, spanAttrs, resAttrs pcommon.Map, l7 *log_data.L
 }
 
 func setGRPC(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
-	setHTTP(span, spanAttrs, l7)
+	setHTTPBase(span, spanAttrs, l7)
 	if l7.Endpoint != "" {
 		spanAttrs.PutStr("df.grpc.endpoint", l7.Endpoint)
 	}
@@ -308,9 +393,6 @@ func setMQTT(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
 	putStrWithoutEmpty(spanAttrs, "df.mqtt.request_type", l7.RequestType)
 	putStrWithoutEmpty(spanAttrs, "df.mqtt.request_resource", l7.RequestResource)
 	putStrWithoutEmpty(spanAttrs, "df.mqtt.request_domain", l7.RequestDomain)
-	if l7.RequestId != nil {
-		spanAttrs.PutInt("df.global.request_id", int64(*l7.RequestId))
-	}
 	spanAttrs.PutStr("df.mqtt.response_status", datatype.LogMessageStatus(l7.ResponseStatus).String())
 	if l7.ResponseCode != nil {
 		spanAttrs.PutInt("df.mqtt.response_code", int64(*l7.ResponseCode))
@@ -318,8 +400,9 @@ func setMQTT(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
 }
 
 func setMySQL(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
+	putStrWithoutEmpty(spanAttrs, "df.system", "mysql")
 	putStrWithoutEmpty(spanAttrs, "df.mysql.request_type", l7.RequestType)
-	putStrWithoutEmpty(spanAttrs, "df.mysql.request_resource", l7.RequestResource)
+	putStrWithoutEmpty(spanAttrs, "db.statemen", l7.RequestResource)
 	spanAttrs.PutStr("df.mysql.response_status", datatype.LogMessageStatus(l7.ResponseStatus).String())
 	if l7.ResponseCode != nil {
 		spanAttrs.PutInt("df.mysql.response_code", int64(*l7.ResponseCode))
@@ -327,11 +410,13 @@ func setMySQL(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) 
 	if l7.ResponseException != "" {
 		span.Events().AppendEmpty().SetName(l7.ResponseException)
 	}
+	span.SetName(getSQLSpanName(l7.RequestResource))
 }
 
 func setPostgreSQL(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
+	putStrWithoutEmpty(spanAttrs, "df.system", "postgresql")
 	putStrWithoutEmpty(spanAttrs, "df.pg.request_type", l7.RequestType)
-	putStrWithoutEmpty(spanAttrs, "df.pg.request_resource", l7.RequestResource)
+	putStrWithoutEmpty(spanAttrs, "db.statemen", l7.RequestResource)
 	spanAttrs.PutStr("df.pg.response_status", datatype.LogMessageStatus(l7.ResponseStatus).String())
 	if l7.ResponseCode != nil {
 		spanAttrs.PutInt("df.pg.response_code", int64(*l7.ResponseCode))
@@ -339,15 +424,76 @@ func setPostgreSQL(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7Flow
 	if l7.ResponseException != "" {
 		span.Events().AppendEmpty().SetName(l7.ResponseException)
 	}
+	span.SetName(getSQLSpanName(l7.RequestResource))
 }
 
 func setRedis(span *ptrace.Span, spanAttrs pcommon.Map, l7 *log_data.L7FlowLog) {
+	putStrWithoutEmpty(spanAttrs, "df.system", "redis")
 	putStrWithoutEmpty(spanAttrs, "df.redis.request_type", l7.RequestType)
 	putStrWithoutEmpty(spanAttrs, "df.redis.request_resource", l7.RequestResource)
 	spanAttrs.PutStr("df.redis.response_status", datatype.LogMessageStatus(l7.ResponseStatus).String())
 	if l7.ResponseException != "" {
 		span.Events().AppendEmpty().SetName(l7.ResponseException)
 	}
+	span.SetName(l7.RequestType)
+}
+
+// Return the first part after 'key' from the 'parts' array.
+// Returns an empty string if 'key' does not exist or has no next part.
+func getFirstPartAfterKey(key string, parts []string) string {
+	for i := range parts {
+		if strings.ToUpper(parts[i]) == key && len(parts) > i+1 {
+			return parts[i+1]
+		}
+	}
+	return ""
+}
+
+// Extract the database, table, and command from the SQL statement to form SpanName("${comman} ${db}.${table}")
+// Returns "unknown" if it cannot be fetched.
+func getSQLSpanName(sql string) string {
+	sql = strings.TrimSpace(sql)
+	if sql == "" {
+		return "unknow"
+	}
+	parts := strings.Split(sql, " ")
+	if len(parts) <= 2 {
+		return parts[0]
+	}
+
+	var command, dbTable string
+	command = parts[0]
+	parts = parts[1:]
+	switch strings.ToUpper(command) {
+	case "SELECT", "DELETE":
+		dbTable = getFirstPartAfterKey("FROM", parts)
+	case "INSERT":
+		dbTable = getFirstPartAfterKey("INTO", parts)
+	case "UPDATE":
+		dbTable = parts[0]
+	case "CREATE", "DROP":
+		createType := strings.ToUpper(parts[0])
+		if createType == "DATABASE" || createType == "TABLE" {
+			// ignore 'if not exists' or 'if exists'
+			if strings.ToUpper(parts[1]) == "IF" {
+				dbTable = getFirstPartAfterKey("EXISTS", parts)
+			} else {
+				dbTable = parts[1]
+			}
+		}
+	case "ALTER":
+		dbTable = getFirstPartAfterKey("TABLE", parts)
+	}
+
+	if dbTable == "" {
+		return command
+	}
+	if i := strings.Index(dbTable, "("); i > 0 {
+		dbTable = dbTable[:i]
+	} else {
+		dbTable = strings.TrimRight(dbTable, ";")
+	}
+	return strings.Join([]string{command, dbTable}, " ")
 }
 
 func responseStatusToSpanStatus(status uint8) ptrace.StatusCode {
