@@ -25,6 +25,7 @@ service Debug {
     rpc DebugGPIDVTapData (GPIDSyncRequest) returns(GPIDVTapData) {}
     rpc DebugRealGlobalData (GPIDSyncRequest) returns(RealGlobalData) {}
     rpc DebugRIPToVIP (GPIDSyncRequest) returns(RVData) {}
+    rpc DebugAgentCache (AgentCacheRequest) returns(AgentCacheResponse) {}
 }
 
 enum State {
@@ -774,4 +775,13 @@ message RVData {
 message GPIDVTapData {
     optional uint32  update_time = 1 [default = 0];
     optional GPIDSyncRequest  sync_request = 2;    
+}
+
+message AgentCacheRequest {
+    optional string ctrl_ip = 1;
+    optional string ctrl_mac = 2;
+}
+
+message AgentCacheResponse {
+    optional bytes content = 1;     // json数据
 }
