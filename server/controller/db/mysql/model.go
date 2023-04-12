@@ -1033,7 +1033,7 @@ type VTapGroupConfiguration struct {
 	LogLevel                      *string `gorm:"column:log_level;type:char(64);default:null" json:"LOG_LEVEL"`
 	LogRetention                  *int    `gorm:"column:log_retention;type:int;default:null" json:"LOG_RETENTION"`
 	HTTPLogProxyClient            *string `gorm:"column:http_log_proxy_client;type:char(64);default:null" json:"HTTP_LOG_PROXY_CLIENT"`
-	HTTPLogTraceID                *string `gorm:"column:http_log_trace_id;type:char(64);default:null" json:"HTTP_LOG_TRACE_ID"`
+	HTTPLogTraceID                *string `gorm:"column:http_log_trace_id;type:text;default:null" json:"HTTP_LOG_TRACE_ID"`
 	L7LogPacketSize               *int    `gorm:"column:l7_log_packet_size;type:int;default:null" json:"L7_LOG_PACKET_SIZE"`
 	L4LogCollectNpsThreshold      *int    `gorm:"column:l4_log_collect_nps_threshold;type:int;default:null" json:"L4_LOG_COLLECT_NPS_THRESHOLD"`
 	L7LogCollectNpsThreshold      *int    `gorm:"column:l7_log_collect_nps_threshold;type:int;default:null" json:"L7_LOG_COLLECT_NPS_THRESHOLD"`
@@ -1050,7 +1050,7 @@ type VTapGroupConfiguration struct {
 	PodClusterInternalIP          *int    `gorm:"column:pod_cluster_internal_ip;type:tinyint(1);default:null" json:"POD_CLUSTER_INTERNAL_IP"` // 0:  1:
 	Domains                       *string `gorm:"column:domains;type:text;default:null" json:"DOMAINS"`                                       // domains info, separate by ","
 	DecapType                     *string `gorm:"column:decap_type;type:text;default:null" json:"DECAP_TYPE"`                                 // separate by ","
-	HTTPLogSpanID                 *string `gorm:"column:http_log_span_id;type:char(64);default:null" json:"HTTP_LOG_SPAN_ID"`
+	HTTPLogSpanID                 *string `gorm:"column:http_log_span_id;type:text;default:null" json:"HTTP_LOG_SPAN_ID"`
 	SysFreeMemoryLimit            *int    `gorm:"column:sys_free_memory_limit;type:int;default:null" json:"SYS_FREE_MEMORY_LIMIT"` // unit: %
 	LogFileSize                   *int    `gorm:"column:log_file_size;type:int;default:null" json:"LOG_FILE_SIZE"`                 // unit: MB
 	HTTPLogXRequestID             *string `gorm:"column:http_log_x_request_id;type:char(64);default:null" json:"HTTP_LOG_X_REQUEST_ID"`
@@ -1104,7 +1104,7 @@ type RVTapGroupConfiguration struct {
 	LogLevel                      string `gorm:"column:log_level;type:char(64);default:null" json:"LOG_LEVEL"`
 	LogRetention                  int    `gorm:"column:log_retention;type:int;default:null" json:"LOG_RETENTION"`
 	HTTPLogProxyClient            string `gorm:"column:http_log_proxy_client;type:char(64);default:null" json:"HTTP_LOG_PROXY_CLIENT"`
-	HTTPLogTraceID                string `gorm:"column:http_log_trace_id;type:char(64);default:null" json:"HTTP_LOG_TRACE_ID"`
+	HTTPLogTraceID                string `gorm:"column:http_log_trace_id;type:text;default:null" json:"HTTP_LOG_TRACE_ID"`
 	L7LogPacketSize               int    `gorm:"column:l7_log_packet_size;type:int;default:null" json:"L7_LOG_PACKET_SIZE"`
 	L4LogCollectNpsThreshold      int    `gorm:"column:l4_log_collect_nps_threshold;type:int;default:null" json:"L4_LOG_COLLECT_NPS_THRESHOLD"`
 	L7LogCollectNpsThreshold      int    `gorm:"column:l7_log_collect_nps_threshold;type:int;default:null" json:"L7_LOG_COLLECT_NPS_THRESHOLD"`
@@ -1121,7 +1121,7 @@ type RVTapGroupConfiguration struct {
 	PodClusterInternalIP          int    `gorm:"column:pod_cluster_internal_ip;type:tinyint(1);default:null" json:"POD_CLUSTER_INTERNAL_IP"` // 0:  1:
 	Domains                       string `gorm:"column:domains;type:text;default:null" json:"DOMAINS"`                                       // domains info, separate by ","
 	DecapType                     string `gorm:"column:decap_type;type:text;default:null" json:"DECAP_TYPE"`                                 // separate by ","
-	HTTPLogSpanID                 string `gorm:"column:http_log_span_id;type:char(64);default:null" json:"HTTP_LOG_SPAN_ID"`
+	HTTPLogSpanID                 string `gorm:"column:http_log_span_id;type:text;default:null" json:"HTTP_LOG_SPAN_ID"`
 	SysFreeMemoryLimit            int    `gorm:"column:sys_free_memory_limit;type:int;default:null" json:"SYS_FREE_MEMORY_LIMIT"` // unit: %
 	LogFileSize                   int    `gorm:"column:log_file_size;type:int;default:null" json:"LOG_FILE_SIZE"`                 // unit: MB
 	HTTPLogXRequestID             string `gorm:"column:http_log_x_request_id;type:char(64);default:null" json:"HTTP_LOG_X_REQUEST_ID"`
