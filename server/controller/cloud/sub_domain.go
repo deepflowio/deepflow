@@ -18,6 +18,7 @@ package cloud
 
 import (
 	"inet.af/netaddr"
+	"net"
 
 	kubernetes_model "github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
@@ -157,18 +158,60 @@ func (c *Cloud) getSubDomainPodNodes(subDomainLcuuid string, cResource model.Res
 		ipToVM[ip.IP] = vm
 	}
 
-	for _, podNode := range kResource.PodNodes {
-		vm, ok := ipToVM[podNode.IP]
+	networkLcuuidToAZLcuuid := make(map[string]string)
+	for _, network := range cResource.Networks {
+		if network.VPCLcuuid != vpcLcuuid {
+			continue
+		}
+		if network.AZLcuuid == "" {
+			continue
+		}
+		networkLcuuidToAZLcuuid[network.Lcuuid] = network.AZLcuuid
+	}
+
+	cidrToAZLcuuid := make(map[string]string)
+	for _, subnet := range cResource.Subnets {
+		if subnet.VPCLcuuid != vpcLcuuid {
+			continue
+		}
+		azLcuuid, ok := networkLcuuidToAZLcuuid[subnet.NetworkLcuuid]
 		if !ok {
 			continue
 		}
-		// 生成容器节点与虚拟机的关联关系
-		retVMPodNodeConnections = append(retVMPodNodeConnections, model.VMPodNodeConnection{
-			Lcuuid:          common.GenerateUUID(vm.Lcuuid + podNode.Lcuuid),
-			VMLcuuid:        vm.Lcuuid,
-			PodNodeLcuuid:   podNode.Lcuuid,
-			SubDomainLcuuid: subDomainLcuuid,
-		})
+		cidrToAZLcuuid[subnet.CIDR] = azLcuuid
+	}
+
+	for _, podNode := range kResource.PodNodes {
+		podNodeAZLcuuid := ""
+		vm, ok := ipToVM[podNode.IP]
+		if ok {
+			// generate vm_pod_node_connection
+			retVMPodNodeConnections = append(retVMPodNodeConnections, model.VMPodNodeConnection{
+				Lcuuid:          common.GenerateUUID(vm.Lcuuid + podNode.Lcuuid),
+				VMLcuuid:        vm.Lcuuid,
+				PodNodeLcuuid:   podNode.Lcuuid,
+				SubDomainLcuuid: subDomainLcuuid,
+			})
+			podNodeAZLcuuid = vm.AZLcuuid
+		} else {
+			// check if pod_node ip in vpc cidr
+			for cidr, azLcuuid := range cidrToAZLcuuid {
+				ip := net.ParseIP(podNode.IP)
+				_, ipNet, err := net.ParseCIDR(cidr)
+				if err != nil {
+					log.Error(err)
+					continue
+				}
+				if ipNet.Contains(ip) {
+					podNodeAZLcuuid = azLcuuid
+					break
+				}
+			}
+			// if not in vpc cidrs, skip the pod node
+			if podNodeAZLcuuid == "" {
+				continue
+			}
+		}
 		// 生成容器节点
 		retPodNodes = append(retPodNodes, model.PodNode{
 			Lcuuid:           podNode.Lcuuid,
@@ -180,8 +223,8 @@ func (c *Cloud) getSubDomainPodNodes(subDomainLcuuid string, cResource model.Res
 			VCPUNum:          podNode.VCPUNum,
 			MemTotal:         podNode.MemTotal,
 			PodClusterLcuuid: podNode.PodClusterLcuuid,
-			VPCLcuuid:        vm.VPCLcuuid,
-			AZLcuuid:         vm.AZLcuuid,
+			VPCLcuuid:        vpcLcuuid,
+			AZLcuuid:         podNodeAZLcuuid,
 			RegionLcuuid:     podNode.RegionLcuuid,
 			SubDomainLcuuid:  subDomainLcuuid,
 		})
