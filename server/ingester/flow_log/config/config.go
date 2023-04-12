@@ -36,6 +36,9 @@ const (
 	DefaultFlowLogTTL        = 72 // hour
 )
 
+var DefaultOtlpExportDatas = []string{"cbpf-net-span", "ebpf-sys-span"}
+var DefaultOtlpExportDataTypes = []string{"service_info", "tracing_info", "network_layer", "flow_info", "transport_layer", "application_layer", "metrics"}
+
 type FlowLogTTL struct {
 	L4FlowLog int `yaml:"l4-flow-log"`
 	L7FlowLog int `yaml:"l7-flow-log"`
@@ -83,6 +86,14 @@ func (c *Config) Validate() error {
 		c.FlowLogTTL.L4Packet = DefaultFlowLogTTL
 	}
 
+	if len(c.Exporter.ExportDatas) == 0 {
+		c.Exporter.ExportDatas = DefaultOtlpExportDatas
+	}
+
+	if len(c.Exporter.ExportDataTypes) == 0 {
+		c.Exporter.ExportDataTypes = DefaultOtlpExportDataTypes
+	}
+
 	return nil
 }
 
@@ -100,8 +111,8 @@ func Load(base *config.Config, path string) *Config {
 				"127.0.0.1:4317",
 				2,
 				100000,
-				[]string{"cbpf-net-span", "ebpf-sys-span"},
-				[]string{"service_info", "tracing_info", "network_layer", "flow_info", "client_universal_tag", "server_universal_tag", "tunnel_info", "transport_layer", "application_layer", "capture_info", "client_custom_tag", "server_custom_tag", "native_tag", "metrics"},
+				DefaultOtlpExportDatas,
+				DefaultOtlpExportDataTypes,
 			},
 		},
 	}
