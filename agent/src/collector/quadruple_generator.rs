@@ -822,10 +822,13 @@ impl QuadrupleGenerator {
                     .push_back(ConcurrentConnection::with_capacity(connection_lru_capacity));
             }
             stats.register_countable(
-                "second_quadruple_generator",
+                "quadruple_generator",
                 Countable::Ref(Arc::downgrade(&second_quad_gen.as_ref().unwrap().counter)
                     as Weak<dyn RefCountable>),
-                vec![StatsOption::Tag("index", id.to_string())],
+                vec![
+                    StatsOption::Tag("kind", "second".to_owned()),
+                    StatsOption::Tag("index", id.to_string()),
+                ],
             );
         }
 
@@ -858,10 +861,13 @@ impl QuadrupleGenerator {
                     .push_back(ConcurrentConnection::with_capacity(connection_lru_capacity));
             }
             stats.register_countable(
-                "minute_quadruple_generator",
+                "quadruple_generator",
                 Countable::Ref(Arc::downgrade(&minute_quad_gen.as_ref().unwrap().counter)
                     as Weak<dyn RefCountable>),
-                vec![StatsOption::Tag("index", id.to_string())],
+                vec![
+                    StatsOption::Tag("kind", "minute".to_owned()),
+                    StatsOption::Tag("index", id.to_string()),
+                ],
             );
         }
 
