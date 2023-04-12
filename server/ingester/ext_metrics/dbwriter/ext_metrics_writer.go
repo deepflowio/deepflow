@@ -67,6 +67,7 @@ type ExtMetricsWriter struct {
 	ckdbCluster       string
 	ckdbStoragePolicy string
 	ckdbColdStorages  map[string]*ckdb.ColdStorage
+	ckdbTimeZone      string
 	ttl               int
 	writerConfig      baseconfig.CKWriterConfig
 	ckdbWatcher       *baseconfig.Watcher
@@ -121,7 +122,7 @@ func (w *ExtMetricsWriter) getOrCreateCkwriter(s *ExtMetrics) (*ckwriter.CKWrite
 
 	ckwriter, err := ckwriter.NewCKWriter(
 		w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
-		fmt.Sprintf("%s-%s-%d", w.msgType, s.TableName(), w.decoderIndex),
+		fmt.Sprintf("%s-%s-%d", w.msgType, s.TableName(), w.decoderIndex), w.ckdbTimeZone,
 		table, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
 	if err != nil {
 		return nil, err
@@ -150,7 +151,7 @@ func (w *ExtMetricsWriter) createTableOnCluster(table *ckdb.Table) error {
 		return err
 	}
 	for _, endpoint := range endpoints {
-		err := ckwriter.InitTable(fmt.Sprintf("%s:%d", endpoint.Host, endpoint.Port), w.ckdbUsername, w.ckdbPassword, table)
+		err := ckwriter.InitTable(fmt.Sprintf("%s:%d", endpoint.Host, endpoint.Port), w.ckdbUsername, w.ckdbPassword, w.ckdbTimeZone, table)
 		if err != nil {
 			log.Warningf("node %s:%d init table failed. err: %s", endpoint.Host, endpoint.Port, err)
 		} else {
@@ -277,6 +278,7 @@ func NewExtMetricsWriter(
 		ckdbCluster:       config.Base.CKDB.ClusterName,
 		ckdbStoragePolicy: config.Base.CKDB.StoragePolicy,
 		ckdbColdStorages:  config.Base.GetCKDBColdStorages(),
+		ckdbTimeZone:      config.Base.CKDB.TimeZone,
 		tables:            make(map[string]*tableInfo),
 		ttl:               config.TTL,
 		ckdbWatcher:       config.Base.CKDB.Watcher,
