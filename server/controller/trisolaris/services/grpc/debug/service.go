@@ -84,3 +84,16 @@ func (s *service) DebugRIPToVIP(ctx context.Context, in *api.GPIDSyncRequest) (*
 		Entries: processInfo.GetRVData(),
 	}, nil
 }
+
+func (s *service) DebugAgentCache(ctx context.Context, in *api.AgentCacheRequest) (*api.AgentCacheResponse, error) {
+	vtapCacheKey := in.GetCtrlIp() + "-" + in.GetCtrlMac()
+	vtapCache := trisolaris.GetGVTapInfo().GetVTapCache(vtapCacheKey)
+	if vtapCache == nil {
+		log.Infof("not found vtap(ctrl_ip: %s, ctrl_mac: %s) cache", in.GetCtrlIp(), in.GetCtrlMac())
+		return &api.AgentCacheResponse{}, nil
+	}
+	agentCacheDebug := NewAgentCacheDebug(vtapCache)
+	return &api.AgentCacheResponse{
+		Content: agentCacheDebug.Marshal(),
+	}, nil
+}
