@@ -85,14 +85,14 @@ impl AccumulatedFlow {
         // 1. unknown协议可以被任何协议覆盖
         // 2. other可以被其他非unknown协议覆盖
         if let Some(other_stats) = tagged_flow.flow.flow_perf_stats.as_ref() {
-            if self.l7_protocol == L7Protocol::Unknown
+            if other_stats.l7_protocol == self.l7_protocol {
+                self.app_meter.sequential_merge(app_meter);
+            } else if self.l7_protocol == L7Protocol::Unknown
                 || (self.l7_protocol == L7Protocol::Other
                     && other_stats.l7_protocol != L7Protocol::Unknown)
             {
                 self.l7_protocol = other_stats.l7_protocol;
                 self.app_meter = *app_meter;
-            } else if other_stats.l7_protocol == self.l7_protocol {
-                self.app_meter.sequential_merge(app_meter);
             }
         }
     }

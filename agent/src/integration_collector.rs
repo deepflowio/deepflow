@@ -438,9 +438,9 @@ fn fill_tagged_flow(
     let start_time = span.start_time_unix_nano;
     let end_time = span.end_time_unix_nano;
     if time_diff >= 0 {
-        tagged_flow.flow.flow_stat_time = Timestamp::from_nanos(start_time + time_diff as u64);
+        tagged_flow.flow.flow_stat_time = Timestamp::from_nanos(end_time + time_diff as u64);
     } else {
-        tagged_flow.flow.flow_stat_time = Timestamp::from_nanos(start_time - -time_diff as u64);
+        tagged_flow.flow.flow_stat_time = Timestamp::from_nanos(end_time - -time_diff as u64);
     }
     let rrt = if end_time > start_time {
         (end_time - start_time) / 1000 // unit: μs
