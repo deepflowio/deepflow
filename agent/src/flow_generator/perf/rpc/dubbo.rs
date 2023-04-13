@@ -234,15 +234,20 @@ impl DubboPerfData {
         perf_stats.resp_count += 1;
 
         self.session_data.status = match self.session_data.dubbo_header.status_code {
-            OK => L7ResponseStatus::Ok,
             CLIENT_TIMEOUT | BAD_REQUEST | CLIENT_ERROR => {
                 perf_stats.req_err_count += 1;
                 L7ResponseStatus::ClientError
             }
-            _ => {
+            SERVER_TIMEOUT
+            | BAD_RESPONSE
+            | SERVICE_NOT_FOUND
+            | SERVICE_ERROR
+            | SERVER_ERROR
+            | SERVER_THREADPOOL_EXHAUSTED_ERROR => {
                 perf_stats.resp_err_count += 1;
                 L7ResponseStatus::ServerError
             }
+            _ => L7ResponseStatus::Ok,
         };
 
         perf_stats.rrt_last = Duration::ZERO;
