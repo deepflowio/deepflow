@@ -335,7 +335,7 @@ func (w *CKWriter) writeItems(queueID, connID int, items []CKItem) error {
 		ck = w.conns[connID]
 	}
 	var err error
-	batchID := queueID*w.queueCount + connID
+	batchID := queueID*int(w.connCount) + connID
 	batch := w.batchs[batchID]
 	if IsNil(batch) {
 		w.batchs[batchID], err = ck.PrepareBatch(context.Background(), w.prepare)
