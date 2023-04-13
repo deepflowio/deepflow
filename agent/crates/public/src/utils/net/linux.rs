@@ -349,11 +349,13 @@ pub fn links_by_name_regex<S: AsRef<str>>(regex: S) -> Result<Vec<Link>> {
         .filter(|link| {
             if !link.flags.contains(LinkFlags::LOOPBACK) {
                 // filter zero mac
-                if link.mac_addr == MacAddr::ZERO && regex.is_match(&link.name) {
-                    warn!(
-                        "link {} has invalid mac address {}",
-                        link.name, link.mac_addr
-                    );
+                if link.mac_addr == MacAddr::ZERO {
+                    if regex.is_match(&link.name) {
+                        warn!(
+                            "link {} has invalid mac address {}",
+                            link.name, link.mac_addr
+                        );
+                    }
                     return false;
                 }
             }
