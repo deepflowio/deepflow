@@ -168,7 +168,20 @@ impl FlowNode {
         trident_type: TridentType,
     ) -> bool {
         if meta_packet.signal_source == SignalSource::EBPF {
-            return self.tagged_flow.flow.flow_id == meta_packet.socket_id;
+            if self.tagged_flow.flow.flow_id != meta_packet.socket_id {
+                return false;
+            }
+
+            // After matching to the node, the packet needs to obtain the direction based on the IP and port
+            if self.tagged_flow.flow.flow_key.ip_src == meta_packet.lookup_key.src_ip
+                && self.tagged_flow.flow.flow_key.port_src == meta_packet.lookup_key.src_port
+            {
+                meta_packet.direction = PacketDirection::ClientToServer;
+            } else {
+                meta_packet.direction = PacketDirection::ServerToClient;
+            }
+
+            return true;
         }
 
         let flow = &self.tagged_flow.flow;
