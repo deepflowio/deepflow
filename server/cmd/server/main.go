@@ -66,6 +66,7 @@ type ContinuousProfile struct {
 	ProfileTypes  []string `yaml:"profile-types"` // pyroscope.ProfileType
 	MutexRate     int      `yaml:"mutex-rate"`    // valid when ProfileTypes contains 'mutex_count' or 'mutex_duration'
 	BlockRate     int      `yaml:"block-rate"`    // valid when ProfileTypes contains 'block_count' or 'block_duration'
+	LogEnabled    bool     `yaml:"log-enabled"`   // logging enabled
 }
 
 func loadConfig(path string) *Config {
@@ -73,11 +74,12 @@ func loadConfig(path string) *Config {
 		LogFile:  "/var/log/deepflow/server.log",
 		LogLevel: "info",
 		ContinuousProfile: ContinuousProfile{
-			Enabled:       true,
+			Enabled:       false,
 			ServerAddress: "http://deepflow-agent/api/v1/profile",
 			ProfileTypes:  []string{"cpu", "inuse_objects", "alloc_objects", "inuse_space", "alloc_space"},
 			MutexRate:     5,
 			BlockRate:     5,
+			LogEnabled:    true,
 		},
 	}
 	configBytes, err := ioutil.ReadFile(path)
@@ -182,13 +184,17 @@ func startContinuousProfile(config *ContinuousProfile) {
 	if hasBlockProfile {
 		runtime.SetBlockProfileRate(config.BlockRate)
 	}
+	logger := log
+	if !config.LogEnabled {
+		logger = nil
+	}
 
 	pyroscope.Start(pyroscope.Config{
 		ApplicationName: "deepflow-server",
 		// replace this with the address of pyroscope server
 		ServerAddress: config.ServerAddress,
 		// you can disable logging by setting this to nil
-		Logger: log,
+		Logger: logger,
 		// you can provide static tags via a map:
 		Tags:         map[string]string{"hostname": os.Getenv("K8S_NODE_NAME_FOR_DEEPFLOW")},
 		ProfileTypes: profileTypes,
