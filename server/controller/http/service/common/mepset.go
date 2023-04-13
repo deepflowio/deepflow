@@ -16,7 +16,9 @@
 
 package common
 
-import mapset "github.com/deckarep/golang-set"
+import (
+	mapset "github.com/deckarep/golang-set"
+)
 
 const (
 	EQUAL        = "EQUAL"
@@ -26,7 +28,14 @@ const (
 	INTERSECTING = "INTERSECTING"
 )
 
-// TODO(weiqiang): add comment
+// CompareSets takes two mapset.Set objects as input and returns a string indicating
+// their relationship. The possible relationships between the two sets are defined
+// by the following constants: EQUAL, DISJOINT, CONTAINED_BY, CONTAINS, and INTERSECTING.
+//   - EQUAL: Both sets are equal.
+//   - DISJOINT: Both sets are disjoint (no common elements).
+//   - CONTAINED_BY: Set1 is a subset of Set2.
+//   - CONTAINS: Set1 is a superset of Set2.
+//   - INTERSECTING: Both sets have at least one common element but are not equal.
 func CompareSets(set1, set2 mapset.Set) string {
 	intersectSet := set1.Intersect(set2)
 	set1DiffSet2 := set1.Difference(set2)
@@ -46,8 +55,13 @@ func CompareSets(set1, set2 mapset.Set) string {
 	}
 }
 
-// TODO(weiqiang): add comment and test
+// GetAddAndDelAZs takes two mapset.Set objects (oldSet and newSet) as input and returns
+// two mapset.Set objects: addAZs and delAZs. addAZs contains elements present in newSet
+// but not in oldSet, while delAZs contains elements present in oldSet but not in newSet.
+// The function uses the CompareSets function to determine the relationship between oldSet
+// and newSet and computes addAZs and delAZs accordingly.
 func GetAddAndDelAZs(oldSet, newSet mapset.Set) (addAZs mapset.Set, delAZs mapset.Set) {
+	addAZs, delAZs = mapset.NewSet(), mapset.NewSet()
 	switch CompareSets(oldSet, newSet) {
 	case EQUAL:
 		// addAZs = delAZs = null
@@ -62,7 +76,7 @@ func GetAddAndDelAZs(oldSet, newSet mapset.Set) (addAZs mapset.Set, delAZs mapse
 		delAZs = oldSet.Difference(newSet)
 	default:
 		addAZs = newSet.Difference(oldSet)
-		delAZs = oldSet.Difference(addAZs)
+		delAZs = oldSet.Difference(newSet)
 	}
 	return
 }

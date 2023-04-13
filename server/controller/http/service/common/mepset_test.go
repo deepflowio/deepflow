@@ -17,6 +17,7 @@
 package common
 
 import (
+	"reflect"
 	"testing"
 
 	mapset "github.com/deckarep/golang-set"
@@ -77,6 +78,76 @@ func TestCompareSets(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := CompareSets(tt.args.set1, tt.args.set2); got != tt.want {
 				t.Errorf("CompareSets() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetAddAndDelAZs(t *testing.T) {
+	type args struct {
+		oldSet mapset.Set
+		newSet mapset.Set
+	}
+	tests := []struct {
+		name       string
+		args       args
+		wantAddAZs mapset.Set
+		wantDelAZs mapset.Set
+	}{
+		{
+			name: "Test case EQUAL",
+			args: args{
+				oldSet: mapset.NewSetFromSlice([]interface{}{"a", "b"}),
+				newSet: mapset.NewSetFromSlice([]interface{}{"a", "b"}),
+			},
+			wantAddAZs: mapset.NewSet(),
+			wantDelAZs: mapset.NewSet(),
+		},
+		{
+			name: "Test case DISJOINT",
+			args: args{
+				oldSet: mapset.NewSetFromSlice([]interface{}{"a", "b"}),
+				newSet: mapset.NewSetFromSlice([]interface{}{"c", "d"}),
+			},
+			wantAddAZs: mapset.NewSetFromSlice([]interface{}{"c", "d"}),
+			wantDelAZs: mapset.NewSetFromSlice([]interface{}{"a", "b"}),
+		},
+		{
+			name: "Test case CONTAINED_BY",
+			args: args{
+				oldSet: mapset.NewSetFromSlice([]interface{}{"a", "b"}),
+				newSet: mapset.NewSetFromSlice([]interface{}{"a", "b", "c"}),
+			},
+			wantAddAZs: mapset.NewSetFromSlice([]interface{}{"c"}),
+			wantDelAZs: mapset.NewSet(),
+		},
+		{
+			name: "Test case CONTAINS",
+			args: args{
+				oldSet: mapset.NewSetFromSlice([]interface{}{"a", "b", "c"}),
+				newSet: mapset.NewSetFromSlice([]interface{}{"a", "b"}),
+			},
+			wantAddAZs: mapset.NewSet(),
+			wantDelAZs: mapset.NewSetFromSlice([]interface{}{"c"}),
+		},
+		{
+			name: "Test case INTERSECTING",
+			args: args{
+				oldSet: mapset.NewSetFromSlice([]interface{}{"a", "b", "c"}),
+				newSet: mapset.NewSetFromSlice([]interface{}{"b", "c", "d"}),
+			},
+			wantAddAZs: mapset.NewSetFromSlice([]interface{}{"d"}),
+			wantDelAZs: mapset.NewSetFromSlice([]interface{}{"a"}),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotAddAZs, gotDelAZs := GetAddAndDelAZs(tt.args.oldSet, tt.args.newSet)
+			if !reflect.DeepEqual(gotAddAZs, tt.wantAddAZs) {
+				t.Errorf("GetAddAndDelAZs() gotAddAZs = %v, want %v", gotAddAZs, tt.wantAddAZs)
+			}
+			if !reflect.DeepEqual(gotDelAZs, tt.wantDelAZs) {
+				t.Errorf("GetAddAndDelAZs() gotDelAZs = %v, want %v", gotDelAZs, tt.wantDelAZs)
 			}
 		})
 	}

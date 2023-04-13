@@ -318,18 +318,27 @@ func UpdateController(
 		} else {
 			_, ok := controllerUpdate["IS_ALL_AZ"]
 			if oldAzs.Contains("ALL") && ok {
+				// change from "ALL" to "ALL", do nothing
 				// 防止下面删除 az_controller_connection 表中 az 为 ALL 的数据
 				oldAzs = mapset.NewSet()
 			} else if oldAzs.Contains("ALL") {
 				// ALL -> 小范围
-				delAzs = mapset.NewSet("ALL")
+				//   - az_controller_connection: 1.delete "ALL" 2.add
+				//   - vtap: delete newAzs.Difference(oldAzs)
 				for _, az := range azs {
-					addAzs.Add(az)
+					addAzs.Add(az) // used to add az_controller_connection
 				}
+				deleteAzsWithoutALL := mapset.NewSet()
+				for _, dbAz := range dbAzs {
+					deleteAzsWithoutALL.Add(dbAz.Lcuuid)
+				}
+				delAzs = deleteAzsWithoutALL.Difference(addAzs) // used to delete vtap
 			} else if ok {
 				// 小范围 -> ALL
+				//   - az_controller_connection: 1.delete 2.add "ALL"
+				//   - vtap: do nothing
 				for _, az := range oldAzs.ToSlice() {
-					delAzs.Add(az.(string))
+					delAzs.Add(az.(string)) // used to remove az_controller_connection
 				}
 				addAzs = mapset.NewSet("ALL")
 			} else {
@@ -345,26 +354,19 @@ func UpdateController(
 		log.Infof("oldAzs: %v, newAzs: %v, delAzs: %v, addAzs: %v", oldAzs, newAzs, delAzs, addAzs)
 
 		// 针对delAzs, 删除azControllerconn
+		var azCondition []string
 		if oldAzs.Contains("ALL") {
-			if err = tx.Delete(mysql.AZControllerConnection{}, "controller_ip = ? AND az IN ('ALL')",
-				controller.IP).Error; err != nil {
+			azCondition = append(azCondition, "ALL")
+		} else {
+			for _, az := range delAzs.ToSlice() {
+				azCondition = append(azCondition, az.(string))
+			}
+		}
+		if len(azCondition) > 0 {
+			if err = tx.Delete(mysql.AZControllerConnection{},
+				"controller_ip = ? AND az IN (?)", controller.IP, azCondition).Error; err != nil {
 				tx.Rollback()
 				return model.Controller{}, err
-			}
-			for _, az := range dbAzs {
-				delAzs.Add(az.Lcuuid)
-			}
-		} else {
-			if len(delAzs.ToSlice()) > 0 {
-				var azCondition []string
-				for _, az := range delAzs.ToSlice() {
-					azCondition = append(azCondition, az.(string))
-				}
-				if err = tx.Delete(mysql.AZControllerConnection{}, "controller_ip = ? AND az IN (?)",
-					controller.IP, azCondition).Error; err != nil {
-					tx.Rollback()
-					return model.Controller{}, err
-				}
 			}
 		}
 
@@ -385,11 +387,27 @@ func UpdateController(
 		}
 
 		// 针对delAzs中的采集器, 更新控制器IP为空，触发重新分配控制器
+		// len(delAzs.ToSlice()) > 0: 小范围 -> 小范围
 		if len(delAzs.ToSlice()) > 0 {
-			if err = tx.Model(&mysql.VTap{}).Where("az IN (?)", delAzs.ToSlice()).Where("controller_ip = ?",
-				controller.IP).Update("controller_ip", "").Error; err != nil {
-				tx.Rollback()
-				return model.Controller{}, err
+			_, ok = controllerUpdate["REGION"]
+			if ok {
+				// modify region(and az)
+				// delAzs maybe equal "ALL"
+				if err = tx.Model(&mysql.VTap{}).Where("az IN (?)", delAzs.ToSlice()).Where("controller_ip = ?",
+					controller.IP).Update("controller_ip", "").Error; err != nil {
+					tx.Rollback()
+					return model.Controller{}, err
+				}
+			} else {
+				// only modify az
+				// !addAzs.Contains("ALL"): 小范围 -> ALL
+				if !addAzs.Contains("ALL") {
+					if err = tx.Model(&mysql.VTap{}).Where("az IN (?)", delAzs.ToSlice()).Where("controller_ip = ?",
+						controller.IP).Update("controller_ip", "").Error; err != nil {
+						tx.Rollback()
+						return model.Controller{}, err
+					}
+				}
 			}
 		}
 		if err = tx.Commit().Error; err != nil {
