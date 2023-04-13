@@ -86,6 +86,7 @@ func (c *Client) init(query_uuid string) error {
 			//     Ref: https://github.com/ClickHouse/clickhouse-go/blob/main/clickhouse.go#L296
 			MaxOpenConns: config.Cfg.Clickhouse.MaxConnection,
 			MaxIdleConns: config.Cfg.Clickhouse.MaxConnection,
+			DialTimeout:  time.Duration(config.Cfg.Clickhouse.Timeout) * time.Second,
 		})
 		if err != nil {
 			log.Errorf("connect clickhouse failed: %s, url: %s:%s@%s:%d", err, c.UserName, c.Password, c.Host, c.Port)

@@ -66,6 +66,7 @@ type Clickhouse struct {
 }
 
 type Prometheus struct {
+	QPSLimit              int    `default:"100" yaml:"qps-limit"`
 	SeriesLimit           int    `default:"100" yaml:"series-limit"`
 	AutoTaggingPrefix     string `default:"df_" yaml:"auto-tagging-prefix"`
 	RequestQueryWithDebug bool   `default:"false" yaml:"request-query-with-debug"`

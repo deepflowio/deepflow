@@ -23,13 +23,21 @@ import (
 
 	//logging "github.com/op/go-logging"
 	//"fmt"
+	"github.com/deepflowio/deepflow/server/libs/datastructure"
 	"github.com/deepflowio/deepflow/server/querier/common"
+	"github.com/deepflowio/deepflow/server/querier/config"
+	"github.com/deepflowio/deepflow/server/querier/prometheus"
 	"github.com/deepflowio/deepflow/server/querier/service"
 	//"github.com/k0kubun/pp"
 )
 
 func QueryRouter(e *gin.Engine) {
 	e.POST("/v1/query/", executeQuery())
+
+	// prometheus query rate limit
+	prometheus.QPSLeakyBucket = &datastructure.LeakyBucket{}
+	// Both SetRate and Acquire are expanded by 1000 times, making it suitable for small QPS scenarios.
+	prometheus.QPSLeakyBucket.Init(uint64(config.Cfg.Prometheus.QPSLimit * 1000))
 
 	// api router for prometheus
 	e.POST("/api/v1/prom/read", promReader())

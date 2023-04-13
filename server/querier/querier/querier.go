@@ -53,6 +53,7 @@ func Start(configPath, serverLogFile string) {
 		log.Error(err)
 		os.Exit(0)
 	}
+
 	// statsd
 	statsd.QuerierCounter = statsd.NewCounter()
 	statsd.RegisterCountableForIngester("querier_count", statsd.QuerierCounter)
