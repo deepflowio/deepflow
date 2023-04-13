@@ -75,6 +75,8 @@ vendor:
 	find vendor -type d -exec chmod +w {} \;
 	# optimize the write performance of Array(string) data type
 	patch -p1 -d vendor/github.com/ClickHouse/clickhouse-go/v2/ < patch/clickhouse-go/write_improve.patch
+	# reset the pointer to the nullable field
+	patch -p1 -d vendor/github.com/ClickHouse/clickhouse-go/v2/ < patch/clickhouse-go/nullable.patch
 
 .PHONY: test
 test: vendor $(proto) $(generated_libs)
@@ -88,10 +90,6 @@ server: vendor $(proto) $(generated_libs)
 .PHONY: querier
 querier: vendor $(proto) $(generated_libs)
 	go build -mod vendor ${FLAGS} -o bin/querier${BINARY_SUFFIX} querier/cmd/querier/main.go
-
-.PHONY: profile
-profile: vendor $(proto) $(generated_libs)
-	go build -mod vendor ${FLAGS} -o bin/profile${BINARY_SUFFIX} profile/cmd/profile/main.go
 
 .PHONY: clean
 clean:

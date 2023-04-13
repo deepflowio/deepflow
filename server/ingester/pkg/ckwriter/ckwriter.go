@@ -82,7 +82,7 @@ func ExecSQL(conn clickhouse.Conn, query string) error {
 	return conn.Exec(context.Background(), query)
 }
 
-func InitTable(addr, user, password string, t *ckdb.Table) error {
+func InitTable(addr, user, password, timeZone string, t *ckdb.Table) error {
 	conn, err := clickhouse.Open(&clickhouse.Options{
 		Addr: []string{addr},
 		Auth: clickhouse.Auth{
@@ -105,13 +105,27 @@ func InitTable(addr, user, password string, t *ckdb.Table) error {
 	if err := ExecSQL(conn, t.MakeGlobalTableCreateSQL()); err != nil {
 		return err
 	}
+
+	for _, c := range t.Columns {
+		for _, table := range []string{t.GlobalName, t.LocalName} {
+			modTimeZoneSql := c.MakeModifyTimeZoneSQL(t.Database, table, timeZone)
+			if modTimeZoneSql == "" {
+				break
+			}
+
+			if err := ExecSQL(conn, modTimeZoneSql); err != nil {
+				log.Warningf("modify time zone failed, error: %s", err)
+			}
+		}
+	}
 	conn.Close()
+
 	return nil
 }
 
-func NewCKWriter(addrs []string, user, password, counterName string, table *ckdb.Table, queueCount, queueSize, batchSize, flushTimeout int) (*CKWriter, error) {
-	log.Infof("New CK writer: Addrs=%v, user=%s, database=%s, table=%s, queueCount=%d, queueSize=%d, batchSize=%d, flushTimeout=%ds, counterName=%s",
-		addrs, user, table.Database, table.LocalName, queueCount, queueSize, batchSize, flushTimeout, counterName)
+func NewCKWriter(addrs []string, user, password, counterName, timeZone string, table *ckdb.Table, queueCount, queueSize, batchSize, flushTimeout int) (*CKWriter, error) {
+	log.Infof("New CK writer: Addrs=%v, user=%s, database=%s, table=%s, queueCount=%d, queueSize=%d, batchSize=%d, flushTimeout=%ds, counterName=%s, timeZone=%s",
+		addrs, user, table.Database, table.LocalName, queueCount, queueSize, batchSize, flushTimeout, counterName, timeZone)
 
 	if len(addrs) == 0 {
 		return nil, fmt.Errorf("addrs is empty")
@@ -121,14 +135,14 @@ func NewCKWriter(addrs []string, user, password, counterName string, table *ckdb
 
 	// clickhouse的初始化创建表
 	for _, addr := range addrs {
-		if err = InitTable(addr, user, password, table); err != nil {
+		if err = InitTable(addr, user, password, timeZone, table); err != nil {
 			return nil, err
 		}
 	}
 
 	addrCount := len(addrs)
 	conns := make([]clickhouse.Conn, addrCount)
-	batchs := make([]driver.Batch, addrCount)
+	batchs := make([]driver.Batch, queueCount*addrCount)
 	for i := 0; i < addrCount; i++ {
 		if conns[i], err = clickhouse.Open(&clickhouse.Options{
 			Addr: []string{addrs[i]},
@@ -257,7 +271,7 @@ func (w *CKWriter) ResetConnection(connID int) error {
 
 func (w *CKWriter) Write(queueID int, items []CKItem) {
 	connID := int(atomic.AddUint64(&w.writeCounter, 1) % w.connCount)
-	if err := w.writeItems(connID, items); err != nil {
+	if err := w.writeItems(queueID, connID, items); err != nil {
 		// Prevent frequent log writing
 		logEnabled := w.counters[queueID].WriteFailedCount == 0
 		if logEnabled {
@@ -274,7 +288,7 @@ func (w *CKWriter) Write(queueID int, items []CKItem) {
 
 		w.counters[queueID].RetryCount++
 		// 写失败重连后重试一次, 规避偶尔写失败问题
-		err = w.writeItems(connID, items)
+		err = w.writeItems(queueID, connID, items)
 		if logEnabled {
 			if err != nil {
 				w.counters[queueID].RetryFailedCount++
@@ -308,7 +322,7 @@ func IsNil(i interface{}) bool {
 	return false
 }
 
-func (w *CKWriter) writeItems(connID int, items []CKItem) error {
+func (w *CKWriter) writeItems(queueID, connID int, items []CKItem) error {
 	if len(items) == 0 {
 		return nil
 	}
@@ -321,19 +335,20 @@ func (w *CKWriter) writeItems(connID int, items []CKItem) error {
 		ck = w.conns[connID]
 	}
 	var err error
-	batch := w.batchs[connID]
+	batchID := queueID*int(w.connCount) + connID
+	batch := w.batchs[batchID]
 	if IsNil(batch) {
-		w.batchs[connID], err = ck.PrepareBatch(context.Background(), w.prepare)
+		w.batchs[batchID], err = ck.PrepareBatch(context.Background(), w.prepare)
 		if err != nil {
 			return err
 		}
-		batch = w.batchs[connID]
+		batch = w.batchs[batchID]
 	} else {
 		batch, err = ck.PrepareReuseBatch(context.Background(), w.prepare, batch)
 		if err != nil {
 			return err
 		}
-		w.batchs[connID] = batch
+		w.batchs[batchID] = batch
 	}
 
 	ckdbBlock := ckdb.NewBlock(batch)

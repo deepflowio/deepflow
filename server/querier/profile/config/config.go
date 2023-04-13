@@ -43,7 +43,7 @@ type ProfileConfig struct {
 }
 
 type Querier struct {
-	Host string `default:"querier" yaml:"host"`
+	Host string `default:"127.0.0.1" yaml:"host"`
 	Port int    `default:"20416" yaml:"port"`
 }
 

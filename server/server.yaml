@@ -4,12 +4,13 @@ log-file: /var/log/deepflow/server.log
 log-level: info
 
 #continuous-profile:
-#  enabled: true
+#  enabled: false
 #  server-addr: http://deepflow-agent/api/v1/profile
 #  # support profile types: "cpu", "inuse_objects", "alloc_objects", "inuse_space", "alloc_space", "goroutines", "mutex_count", "mutex_duration", "block_count", "block_duration"
 #  profile-types: ["cpu", "inuse_objects", "alloc_objects", "inuse_space", "alloc_space"]
 #  mutex-rate: 5 # valid when ProfileTypes contains 'mutex_count' or 'mutex_duration'
 #  block-rate: 5 # valid when ProfileTypes contains 'block_count' or 'block_duration'
+#  log-enabled: true # whether record profile debug logs
 
 controller:
   ## controller http listenport
@@ -211,6 +212,10 @@ querier:
     max-connection: 20
     # user-password:
 
+  # profile相关配置
+  profile:
+    flame_query_limit: 1000000
+
   # deepflow-app相关配置
   deepflow-app:
     host: deepflow-app
@@ -237,6 +242,8 @@ ingester:
   #  cluster-name:
   #  # if `external` is 'true', default value 'default', else 'df_storage'
   #  storage-policy:
+  #  A list of supported time zones can be found in https://www.iana.org/time-zones and also can be queried by SELECT * FROM system.time_zones
+  #  time-zone: Asia/Shanghai
 
   ## This configuration is only valid when the ClickHouse tables have not yet been created. If the tables have been created, you need to delete the databases/tables and restart to create the tables according to the configuration
   #ckdb-cold-storage:
@@ -336,7 +343,7 @@ ingester:
 
   ## perf event data write config
   #perf-event-ck-writer:
-  #  queue-count: 2      # 每个表并行写数量
+  #  queue-count: 1      # 每个表并行写数量
   #  queue-size: 50000  # 数据队列长度
   #  batch-size: 25600   # 多少行数据同时写入
   #  flush-timeout: 5    # 超时写入时间
@@ -468,13 +475,3 @@ ingester:
   #  export-data-types: [service_info,tracing_info,network_layer,flow_info,client_universal_tag,server_universal_tag,tunnel_info,transport_layer,application_layer,capture_info,native_tag,metrics]
   #  queue-count: 2       # parallelism of sender
   #  queue-size: 100000   # size of each exporter queue
-
-profile:
-  # profile http listenport
-  listen-port: 20419
-  flame_query_limit: 1000000
-
-  # querier相关配置
-  querier:
-    host: querier
-    port: 20416

@@ -26,15 +26,15 @@ import (
 
 	logging "github.com/op/go-logging"
 
-	controllerCommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/profile/common"
-	"github.com/deepflowio/deepflow/server/profile/config"
-	"github.com/deepflowio/deepflow/server/profile/model"
+	controller_common "github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/querier/config"
+	"github.com/deepflowio/deepflow/server/querier/profile/common"
+	"github.com/deepflowio/deepflow/server/querier/profile/model"
 )
 
 var log = logging.MustGetLogger("profile")
 
-func Tracing(args model.ProfileTracing) (result []*model.ProfileTreeNode, err error) {
+func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*model.ProfileTreeNode, err error) {
 	whereSlice := []string{}
 	whereSlice = append(whereSlice, fmt.Sprintf(" time>=%d", args.TimeStart))
 	whereSlice = append(whereSlice, fmt.Sprintf(" time<=%d", args.TimeEnd))
@@ -45,15 +45,15 @@ func Tracing(args model.ProfileTracing) (result []*model.ProfileTreeNode, err er
 		whereSlice = append(whereSlice, " "+args.TagFilter)
 	}
 	whereSql := strings.Join(whereSlice, " AND")
-	limitSql := config.Cfg.FlameQueryLimit
-	url := fmt.Sprintf("http://%s/v1/query/", net.JoinHostPort(config.Cfg.Querier.Host, fmt.Sprintf("%d", config.Cfg.Querier.Port)))
+	limitSql := cfg.Profile.FlameQueryLimit
+	url := fmt.Sprintf("http://%s/v1/query/", net.JoinHostPort("localhost", fmt.Sprintf("%d", cfg.ListenPort)))
 	body := map[string]interface{}{}
 	body["db"] = common.DATABASE_PROFILE
 	body["sql"] = fmt.Sprintf(
 		"SELECT %s, %s, %s, %s FROM %s WHERE %s LIMIT %d",
 		common.PROFILE_LOCATION_STR, common.PROFILE_NODE_ID, common.PROFILE_PARENT_NODE_ID, common.PROFILE_VALUE, common.TABLE_PROFILE, whereSql, limitSql,
 	)
-	resp, err := controllerCommon.CURLPerform("POST", url, body)
+	resp, err := controller_common.CURLPerform("POST", url, body)
 	if err != nil {
 		log.Errorf("call querier failed: %s, %s", err.Error(), url)
 		return
@@ -92,7 +92,7 @@ func Tracing(args model.ProfileTracing) (result []*model.ProfileTreeNode, err er
 	// merge profile_node_ids, profile_parent_node_ids, self_value
 	for valueIndex := range values.MustArray() {
 		profileLocationStr := values.GetIndex(valueIndex).GetIndex(profileLocationStrIndex).MustString()
-		nodeID := controllerCommon.GenerateUUID(profileLocationStr)
+		nodeID := controller_common.GenerateUUID(profileLocationStr)
 		profileNodeID := values.GetIndex(valueIndex).GetIndex(profileNodeIDIndex).MustInt()
 		profileParentNodeID := values.GetIndex(valueIndex).GetIndex(profileParentNodeIDIndex).MustInt()
 		profileValue := values.GetIndex(valueIndex).GetIndex(profileValueIndex).MustInt()
@@ -135,12 +135,22 @@ func Tracing(args model.ProfileTracing) (result []*model.ProfileTreeNode, err er
 		parentNode := &model.ProfileTreeNode{}
 		UpdateNodeTotalValue(nodeIDs, node, parentNode, NodeIDToProfileTree)
 	}
+	var noZeroResult []*model.ProfileTreeNode
 	// format root node
 	for _, node := range NodeIDToProfileTree {
 		if len(node.ParentNodeIDS) == 0 {
 			node.ParentNodeIDS = append(node.ParentNodeIDS, "")
 		}
+		// remove debug information
+		if !args.Debug {
+			node.ProfileNodeIDS = node.ProfileNodeIDS[:0]
+			node.ProfileParentNodeIDS = node.ProfileParentNodeIDS[:0]
+		}
+		if node.SelfValue != 0 || node.TotalValue != 0 {
+			noZeroResult = append(noZeroResult, node)
+		}
 	}
+	result = noZeroResult
 	return
 }
 
