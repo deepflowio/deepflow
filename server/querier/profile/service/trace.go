@@ -135,6 +135,7 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*mo
 		parentNode := &model.ProfileTreeNode{}
 		UpdateNodeTotalValue(nodeIDs, node, parentNode, NodeIDToProfileTree)
 	}
+	var noZeroResult []*model.ProfileTreeNode
 	// format root node
 	for _, node := range NodeIDToProfileTree {
 		if len(node.ParentNodeIDS) == 0 {
@@ -145,7 +146,11 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*mo
 			node.ProfileNodeIDS = node.ProfileNodeIDS[:0]
 			node.ProfileParentNodeIDS = node.ProfileParentNodeIDS[:0]
 		}
+		if node.SelfValue != 0 || node.TotalValue != 0 {
+			noZeroResult = append(noZeroResult, node)
+		}
 	}
+	result = noZeroResult
 	return
 }
 
