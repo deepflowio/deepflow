@@ -256,6 +256,8 @@ func UpdateController(
 	}
 
 	// 修改区域和可用区
+	oldConn, newConn := mapset.NewSet(), mapset.NewSet()
+	oldVtap, newVtap := mapset.NewSet(), mapset.NewSet()
 	if _, ok := controllerUpdate["AZS"]; ok {
 		azs := controllerUpdate["AZS"].([]interface{})
 		if len(azs) > cfg.Spec.AZMaxPerServer {
@@ -276,88 +278,59 @@ func UpdateController(
 		} else {
 			controllerRegion = common.DEFAULT_REGION
 		}
-
-		var oldAzs = mapset.NewSet()
 		for _, conn := range azControllerConns {
-			oldAzs.Add(conn.AZ)
+			oldConn.Add(conn.AZ)
+		}
+		var vtaps []mysql.VTap
+		tx.Where("region = ? and controller_ip = ?", controllerRegion, controller.IP).Find(&vtaps)
+		for _, vtap := range vtaps {
+			oldVtap.Add(vtap.AZ)
 		}
 
-		// 存在区域修改时
-		// - delAzs逻辑
-		//   - 如果原来是全部可用区，则delAzs=原来区域的全部可用区
-		//   - 否则delAzs=原有的可用区
-		// - addAzs逻辑
-		//   - 如果是配置全部可用区，则addAzs=ALL
-		//   - 否则addAzs=配置的可用区
-		// 不存在区域修改时
-		// - delAzs=oldAzs-newAzs
-		// - addAzs=newAzs-oldAzs
-		delAZControllerConn, addAZControllerConn, delVTap := mapset.NewSet(), mapset.NewSet(), mapset.NewSet()
 		var dbAzs []mysql.AZ
 		tx.Where("region = ?", controllerRegion).Find(&dbAzs)
-		if _, regionUpdate := controllerUpdate["REGION"]; regionUpdate {
-			if oldAzs.Contains("ALL") {
-				delAZControllerConn.Add("ALL")
-				for _, az := range dbAzs {
-					delVTap.Add(az.Lcuuid)
-				}
+		if _, ok := controllerUpdate["IS_ALL_AZ"]; ok {
+			newConn.Add("ALL")
+			for _, dbAz := range dbAzs {
+				newVtap.Add(dbAz.Lcuuid)
+			}
+		} else {
+			for _, az := range azs {
+				newConn.Add(az)
+				newVtap.Add(az)
+			}
+		}
+
+		addConn := newConn.Difference(oldConn)
+		delConn := oldConn.Difference(newConn)
+		delVtap := oldVtap.Difference(newConn)
+		log.Infof("oldConn: %v, newConn: %v, oldVtap: %v, newVtap: %v", oldConn, newConn, oldVtap, newVtap)
+		log.Infof("addConn: %v, delConn: %v, delVtap: %v", addConn, delConn, delVtap)
+
+		if _, ok := controllerUpdate["REGION"]; ok {
+			delConn, newConn = mapset.NewSet(), mapset.NewSet()
+			if oldConn.Contains("ALL") {
+				delConn.Add("ALL")
 			} else {
-				delAZControllerConn = oldAzs.Clone()
-				delVTap = oldAzs.Clone()
+				delConn = oldConn.Clone()
 			}
 
 			if _, ok := controllerUpdate["IS_ALL_AZ"]; ok {
-				addAZControllerConn.Add("ALL")
+				addConn.Add("ALL")
 			} else {
 				for _, az := range azs {
-					addAZControllerConn.Add(az)
+					addConn.Add(az)
 				}
 			}
 			controllerRegion = controllerUpdate["REGION"].(string)
-		} else {
-			_, ok := controllerUpdate["IS_ALL_AZ"]
-			if oldAzs.Contains("ALL") && ok {
-				// change from "ALL" to "ALL", do nothing
-			} else if oldAzs.Contains("ALL") {
-				// ALL -> 小范围
-				//   - az_controller_connection: 1.delete "ALL" 2.add
-				//   - vtap: delete  ${"ALL"} - addAZControllerConn
-				delAZControllerConn.Add("ALL")
-				for _, az := range azs {
-					addAZControllerConn.Add(az)
-				}
-				tempSet := mapset.NewSet()
-				for _, dbAz := range dbAzs {
-					tempSet.Add(dbAz.Lcuuid)
-				}
-				delVTap = tempSet.Difference(addAZControllerConn)
-			} else if ok {
-				// 小范围 -> ALL
-				//   - az_controller_connection: 1.delete 2.add "ALL"
-				//   - vtap: do nothing
-				for _, az := range oldAzs.ToSlice() {
-					delAZControllerConn.Add(az.(string))
-				}
-				addAZControllerConn.Add("ALL")
-			} else {
-				// 小范围 -> 小范围
-				oldAzsWithoutALL := oldAzs.Clone()
-				newAzsWithoutALL := mapset.NewSet()
-				for _, az := range azs {
-					newAzsWithoutALL.Add(az)
-				}
-				addAzs, delAzs := GetAddAndDelAZs(oldAzsWithoutALL, newAzsWithoutALL)
-				addAZControllerConn = addAzs.Clone()
-				delAZControllerConn = delAzs.Clone()
-				delVTap = delAzs.Clone()
-			}
 		}
-		log.Infof("oldAzs: %v, delAZControllerConn: %v, addAZControllerConn: %v, delVTap: %v", oldAzs, delAZControllerConn, addAZControllerConn, delVTap)
 
-		// 针对 delAZControllerConn, 删除 az_controller_connection
-		if len(delAZControllerConn.ToSlice()) > 0 {
+		log.Infof("oldConn: %v, newConn: %v, oldVtap: %v, newVtap: %v", oldConn, newConn, oldVtap, newVtap)
+		log.Infof("addConn: %v, delConn: %v, delVtap: %v", addConn, delConn, delVtap)
+
+		if len(delConn.ToSlice()) > 0 {
 			var azCondition []string
-			for _, az := range delAZControllerConn.ToSlice() {
+			for _, az := range delConn.ToSlice() {
 				azCondition = append(azCondition, az.(string))
 			}
 			if err = tx.Delete(mysql.AZControllerConnection{},
@@ -367,10 +340,9 @@ func UpdateController(
 			}
 		}
 
-		// 针对 addAZControllerConn, 插入 az_controller_connection
 		var addConns []mysql.AZControllerConnection
-		if len(addAZControllerConn.ToSlice()) > 0 {
-			for _, az := range addAZControllerConn.ToSlice() {
+		if len(addConn.ToSlice()) > 0 {
+			for _, az := range addConn.ToSlice() {
 				aConn := mysql.AZControllerConnection{}
 				aConn.Region = controllerRegion
 				aConn.AZ = az.(string)
@@ -385,8 +357,8 @@ func UpdateController(
 		}
 
 		// 针对 delVTap 中的采集器, 更新控制器IP为空，触发重新分配控制器
-		if len(delVTap.ToSlice()) > 0 {
-			if err = tx.Model(&mysql.VTap{}).Where("az IN (?)", delVTap.ToSlice()).Where("controller_ip = ?",
+		if len(delVtap.ToSlice()) > 0 {
+			if err = tx.Model(&mysql.VTap{}).Where("az IN (?)", delVtap.ToSlice()).Where("controller_ip = ?",
 				controller.IP).Update("controller_ip", "").Error; err != nil {
 				tx.Rollback()
 				return nil, err
