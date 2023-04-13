@@ -4,12 +4,13 @@ log-file: /var/log/deepflow/server.log
 log-level: info
 
 #continuous-profile:
-#  enabled: true
+#  enabled: false
 #  server-addr: http://deepflow-agent/api/v1/profile
 #  # support profile types: "cpu", "inuse_objects", "alloc_objects", "inuse_space", "alloc_space", "goroutines", "mutex_count", "mutex_duration", "block_count", "block_duration"
 #  profile-types: ["cpu", "inuse_objects", "alloc_objects", "inuse_space", "alloc_space"]
 #  mutex-rate: 5 # valid when ProfileTypes contains 'mutex_count' or 'mutex_duration'
 #  block-rate: 5 # valid when ProfileTypes contains 'block_count' or 'block_duration'
+#  log-enabled: true # whether record profile debug logs
 
 controller:
   ## controller http listenport
