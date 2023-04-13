@@ -1,5 +1,4 @@
 DROP PROCEDURE IF EXISTS update_data_sources;
-DELIMITER $$
 
 CREATE PROCEDURE update_data_sources()
 BEGIN
@@ -27,8 +26,6 @@ BEGIN
 
         COMMIT;
     END IF;
-END $$
-
-DELIMITER ;
+END;
 
 CALL update_data_sources();
