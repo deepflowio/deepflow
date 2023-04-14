@@ -223,6 +223,11 @@ func UpdateController(
 	log.Infof("update controller (%s) config %v", controller.Name, controllerUpdate)
 
 	tx := mysql.Db.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
 	// 修改最大关联采集器个数
 	if _, ok := controllerUpdate["VTAP_MAX"]; ok {
 		vtapMax := int(controllerUpdate["VTAP_MAX"].(float64))
@@ -255,6 +260,14 @@ func UpdateController(
 		}
 	}
 
+	// 检查: 如果区域内没有控制器，禁止将数据节点修改至该区域
+	if _, ok := controllerUpdate["REGION"]; ok {
+		var azControllerConns []mysql.AZControllerConnection
+		tx.Where("region = ?", controllerUpdate["REGION"]).Find(&azControllerConns)
+		if len(azControllerConns) == 0 {
+			return nil, NewError(common.INVALID_POST_DATA, fmt.Sprintf("no controller in region(%s)", controllerUpdate["REGION"]))
+		}
+	}
 	// 修改区域和可用区
 	oldConn, newConn := mapset.NewSet(), mapset.NewSet()
 	oldVTap, newVTap := mapset.NewSet(), mapset.NewSet()
