@@ -172,20 +172,29 @@ func GetAnalyzers(filter map[string]interface{}) (resp []model.Analyzer, err err
 func UpdateAnalyzer(
 	lcuuid string, analyzerUpdate map[string]interface{}, m *monitor.AnalyzerCheck,
 	cfg *config.ControllerConfig,
-) (resp model.Analyzer, err error) {
+) (resp *model.Analyzer, err error) {
 	var analyzer mysql.Analyzer
 	var dbUpdateMap = make(map[string]interface{})
 
 	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&analyzer); ret.Error != nil {
-		return model.Analyzer{}, NewError(common.RESOURCE_NOT_FOUND, fmt.Sprintf("analyzer (%s) not found", lcuuid))
+		return nil, NewError(common.RESOURCE_NOT_FOUND, fmt.Sprintf("analyzer (%s) not found", lcuuid))
 	}
 
 	log.Infof("update analyzer (%s) config %v", analyzer.Name, analyzerUpdate)
 
+	tx := mysql.Db.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
 	// 修改最大关联采集器个数
 	if _, ok := analyzerUpdate["VTAP_MAX"]; ok {
 		vtapMax := int(analyzerUpdate["VTAP_MAX"].(float64))
-		mysql.Db.Model(analyzer).Update("vtap_max", vtapMax)
+		if err = tx.Model(analyzer).Update("vtap_max", vtapMax).Error; err != nil {
+			tx.Rollback()
+			return nil, err
+		}
 
 		// TODO: 如果小于当前的最大采集器个数，则触发部分采集器的数据节点切换操作
 		if vtapMax < analyzer.VTapMax {
@@ -202,27 +211,28 @@ func UpdateAnalyzer(
 						updateVTapLcuuids = append(updateVTapLcuuids, vtaps[i].Lcuuid)
 					}
 				}
-				vtapDb := mysql.Db.Model(&mysql.VTap{})
-				vtapDb = vtapDb.Where("lcuuid IN (?)", updateVTapLcuuids)
-				vtapDb.Update("analyzer_ip", "")
+				if err = tx.Model(&mysql.VTap{}).Where("lcuuid IN (?)", updateVTapLcuuids).Update("analyzer_ip", "").Error; err != nil {
+					tx.Rollback()
+					return nil, err
+				}
 				m.TriggerReallocAnalyzer("")
 			}
 		}
 	}
 
-	// 修改区域和可用区
-	if _, regionUpdate := analyzerUpdate["REGION"]; regionUpdate {
-		var azControllerConns []mysql.AZControllerConnection
-		// 如果区域内没有控制器，禁止将数据节点修改至该区域
-		mysql.Db.Where("region = ?", analyzerUpdate["REGION"]).Find(&azControllerConns)
-		if len(azControllerConns) == 0 {
-			return model.Analyzer{}, NewError(common.INVALID_POST_DATA, "no controller in same region")
+	// 检查: 如果区域内没有控制器，禁止将数据节点修改至该区域
+	if _, ok := analyzerUpdate["REGION"]; ok {
+		var azAnalyzerConns []mysql.AZAnalyzerConnection
+		mysql.Db.Where("region = ?", analyzerUpdate["REGION"]).Find(&azAnalyzerConns)
+		if len(azAnalyzerConns) == 0 {
+			return nil, NewError(common.INVALID_POST_DATA, fmt.Sprintf("no controller in region(%s)", analyzerUpdate["REGION"]))
 		}
 	}
+	// 修改区域和可用区
 	if _, ok := analyzerUpdate["AZS"]; ok {
 		azs := analyzerUpdate["AZS"].([]interface{})
 		if len(azs) > cfg.Spec.AZMaxPerServer {
-			return model.Analyzer{}, NewError(
+			return nil, NewError(
 				common.INVALID_POST_DATA,
 				fmt.Sprintf(
 					"max az num associated analyzer is (%d)", cfg.Spec.AZMaxPerServer,
@@ -230,100 +240,141 @@ func UpdateAnalyzer(
 			)
 		}
 		// 判断哪些可用区存在控制器减少，触发对应的采集器重新分配数据节点
-		var azAnalyzerConns []mysql.AZAnalyzerConnection
-		var addConns []mysql.AZAnalyzerConnection
-		var dbAzs []mysql.AZ
+		var (
+			oldConnAzs, newConnAzs = mapset.NewSet(), mapset.NewSet()
+			oldVTapAzs, newVTapAzs = mapset.NewSet(), mapset.NewSet()
+			delConnAzs, addConnAzs = mapset.NewSet(), mapset.NewSet()
+			delVTapAzs             = mapset.NewSet()
+		)
 		var analyzerRegion string
-		var oldAzs = mapset.NewSet()
-		var newAzs = mapset.NewSet()
-		var delAzs = mapset.NewSet()
-		var addAzs = mapset.NewSet()
-
+		var azAnalyzerConns []mysql.AZAnalyzerConnection
 		mysql.Db.Where("analyzer_ip = ?", analyzer.IP).Find(&azAnalyzerConns)
 		if len(azAnalyzerConns) > 0 {
 			analyzerRegion = azAnalyzerConns[0].Region
 		} else {
 			analyzerRegion = common.DEFAULT_REGION
 		}
-
+		oldAnalyzerRegion := analyzerRegion
 		for _, conn := range azAnalyzerConns {
-			oldAzs.Add(conn.AZ)
+			oldConnAzs.Add(conn.AZ)
 		}
+		var dbAzs []mysql.AZ
+		tx.Where("region = ?", analyzerRegion).Find(&dbAzs)
 
-		// 存在区域修改时
-		// - delAzs逻辑
-		//   - 如果原来是全部可用区，则delAzs=原来区域的全部可用区
-		//   - 否则delAzs=原有的可用区
-		// - addAzs逻辑
-		//   - 如果是配置全部可用区，则addAzs=ALL
-		//   - 否则addAzs=配置的可用区
-		// 不存在区域修改时
-		// - delAzs=oldAzs-newAzs
-		// - addAzs=newAzs-oldAzs
-		if _, regionUpdate := analyzerUpdate["REGION"]; regionUpdate {
-			if oldAzs.Contains("ALL") {
-				mysql.Db.Where("region = ?", analyzerRegion).Find(&dbAzs)
+		// - 存在区域修改时
+		//   - 删除 vtap 逻辑
+		//     - 如果旧配置是全部可用区，delVTapAzs 为 az 表所有的可用区
+		//     - 否则 delVTapAzs 为 az_analyzer_connection 表的对应的可用区
+		//   - 删除 az_analyzer_connection 逻辑
+		//     - 如果旧配置是全部可用区，delConnAzs = "ALL"
+		//     - 否则 delConnAzs =  az_analyzer_connection 表的对应的可用区
+		//   - 增加 az_analyzer_connection 逻辑
+		//     - 如果新配置是全部可用区，addConnAzs = "ALL"
+		//     - 否则 addConnAzs = 新传入的 az
+		// - 不存在区域修改时
+		//   - 设置四个变量：oldVTapAzs、newVTapAzs、oldConnAzs、newConnAzs
+		//     - oldVTapAzs：
+		//       - 如果旧配置是全部可用区，oldVTapAzs = 原有区域（az表）中所有 az
+		//       - 否则 oldVTapAzs = az_analyzer_connection 表中的 az
+		//     - newVTapAzs：
+		//       - 如果新配置是全部可用区，newVTapAzs = 原有区域（az表）中所有 az
+		//       - 否则 newVTapAzs = 新传入的 az
+		//     - oldConnAzs：
+		//       - oldConnAzs =  az_analyzer_connection 表的 az
+		//     - newConnAzs
+		//       - 如果新配置是全部可用区，newConnAzs = "ALL"
+		//       - 否则 newConnAzs = 新传入的 az
+		//   - 删除 vtap 逻辑
+		//     - delVTapAzs = oldVTapAzs - newVTapAzs
+		//   - 删除 az_analyzer_connection 逻辑
+		//     - delConnAzs = oldConnAzs - newConnAzs
+		//   - 增加 az_analyzer_connection 逻辑
+		//     - addConnAzs = newConnAzs - oldConnAzs
+		if _, ok := analyzerUpdate["REGION"]; ok {
+			if oldConnAzs.Contains("ALL") {
+				delConnAzs.Add("ALL")
 				for _, az := range dbAzs {
-					delAzs.Add(az.Lcuuid)
+					delVTapAzs.Add(az.Lcuuid)
 				}
 			} else {
-				delAzs = oldAzs
+				delConnAzs = oldConnAzs.Clone()
+				delVTapAzs = delVTapAzs.Clone()
 			}
 
-			if _, azUpdate := analyzerUpdate["IS_ALL_AZ"]; azUpdate {
-				if analyzerUpdate["IS_ALL_AZ"].(bool) {
-					addAzs.Add("ALL")
-				}
-			}
-			if !addAzs.Contains("ALL") {
+			if _, ok := analyzerUpdate["IS_ALL_AZ"]; ok {
+				addConnAzs.Add("ALL")
+			} else {
 				for _, az := range azs {
-					addAzs.Add(az)
+					addConnAzs.Add(az)
 				}
 			}
+
 			analyzerRegion = analyzerUpdate["REGION"].(string)
 		} else {
+			if oldConnAzs.Contains("ALL") {
+				for _, az := range dbAzs {
+					oldVTapAzs.Add(az.Lcuuid)
+				}
+			} else {
+				oldVTapAzs = oldConnAzs.Clone()
+			}
 
-			if _, azUpdate := analyzerUpdate["IS_ALL_AZ"]; azUpdate {
-				if analyzerUpdate["IS_ALL_AZ"].(bool) {
-					newAzs.Add("ALL")
+			var dbAzs []mysql.AZ
+			tx.Where("region = ?", analyzerRegion).Find(&dbAzs)
+			if _, ok := analyzerUpdate["IS_ALL_AZ"]; ok {
+				newConnAzs.Add("ALL")
+				for _, dbAz := range dbAzs {
+					newVTapAzs.Add(dbAz.Lcuuid)
 				}
-			}
-			if !newAzs.Contains("ALL") {
+			} else {
 				for _, az := range azs {
-					newAzs.Add(az)
+					newConnAzs.Add(az)
+					newVTapAzs.Add(az)
 				}
 			}
-			delAzs = oldAzs.Difference(newAzs)
-			addAzs = newAzs.Difference(oldAzs)
+
+			addConnAzs = newConnAzs.Difference(oldConnAzs)
+			delConnAzs = oldConnAzs.Difference(newConnAzs)
+			delVTapAzs = oldVTapAzs.Difference(newVTapAzs)
 		}
 
-		// 针对delAzs, 删除azAnalyzerconn
-		var azCondition []string
-		if oldAzs.Contains("ALL") {
-			azCondition = append(azCondition, "ALL")
-		} else {
-			for _, az := range delAzs.ToSlice() {
+		if len(delConnAzs.ToSlice()) > 0 {
+			var azCondition []string
+			for _, az := range delConnAzs.ToSlice() {
 				azCondition = append(azCondition, az.(string))
 			}
+			if err = tx.Delete(mysql.AZAnalyzerConnection{},
+				"region = ? AND analyzer_ip = ? AND az IN (?)", oldAnalyzerRegion, analyzer.IP, azCondition).Error; err != nil {
+				tx.Rollback()
+				return nil, err
+			}
 		}
-		mysql.Db.Where("analyzer_ip = ? AND az IN (?)", analyzer.IP, azCondition).Delete(mysql.AZAnalyzerConnection{})
 
-		// 针对addAzs, 插入azAnalyzerconn
-		for _, az := range addAzs.ToSlice() {
-			aConn := mysql.AZAnalyzerConnection{}
-			aConn.Region = analyzerRegion
-			aConn.AZ = az.(string)
-			aConn.AnalyzerIP = analyzer.IP
-			aConn.Lcuuid = uuid.New().String()
-			addConns = append(addConns, aConn)
+		var addConnAzss []mysql.AZAnalyzerConnection
+		if len(addConnAzs.ToSlice()) > 0 {
+			for _, az := range addConnAzs.ToSlice() {
+				aConn := mysql.AZAnalyzerConnection{}
+				aConn.Region = analyzerRegion
+				aConn.AZ = az.(string)
+				aConn.AnalyzerIP = analyzer.IP
+				aConn.Lcuuid = uuid.New().String()
+				addConnAzss = append(addConnAzss, aConn)
+			}
+			if err = tx.Create(&addConnAzss).Error; err != nil {
+				tx.Rollback()
+				return nil, err
+			}
 		}
-		mysql.Db.Create(&addConns)
 
-		// 针对delAzs中的采集器, 更新数据节点IP为空，触发重新分配数据节点
-		vtapDb := mysql.Db.Model(&mysql.VTap{})
-		vtapDb = vtapDb.Where("az IN (?)", delAzs.ToSlice())
-		vtapDb = vtapDb.Where("analyzer_ip = ?", analyzer.IP)
-		vtapDb.Update("analyzer_ip", "")
+		// 针对 delVTapAzs 中的采集器, 更新控制器IP为空，触发重新分配控制器
+		if len(delVTapAzs.ToSlice()) > 0 {
+			if err = tx.Model(&mysql.VTap{}).Where("az IN (?)", delVTapAzs.ToSlice()).Where("analyzer_ip = ?",
+				analyzer.IP).Update("analyzer_ip", "").Error; err != nil {
+				tx.Rollback()
+				return nil, err
+			}
+		}
+
 		m.TriggerReallocAnalyzer("")
 	}
 
@@ -346,7 +397,10 @@ func UpdateAnalyzer(
 	}
 
 	// 更新analyzer DB
-	mysql.Db.Model(&analyzer).Updates(dbUpdateMap)
+	if err = tx.Model(&analyzer).Updates(dbUpdateMap).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
 
 	// if state equal to maintaince/exception, trigger realloc analyzer
 	// 如果是将状态修改为运维/异常，则触发对应的采集器重新分配数据节点
@@ -354,8 +408,12 @@ func UpdateAnalyzer(
 		m.TriggerReallocAnalyzer(analyzer.IP)
 	}
 
+	if err = tx.Commit().Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
 	response, _ := GetAnalyzers(map[string]interface{}{"lcuuid": lcuuid})
-	return response[0], nil
+	return &response[0], nil
 }
 
 func DeleteAnalyzer(lcuuid string, m *monitor.AnalyzerCheck) (resp map[string]string, err error) {
