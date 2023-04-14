@@ -450,12 +450,8 @@ fn fill_tagged_flow(
     let flow_perf_stats = FlowPerfStats {
         tcp: Default::default(),
         l7: L7PerfStats {
-            request_count: 1, // Because both TapSide::ClientApp and TapSide::ServerApp will have request, and the request_count is always 1
-            response_count: if tagged_flow.flow.tap_side == TapSide::ServerApp {
-                1
-            } else {
-                0
-            },
+            request_count: 1,
+            response_count: 1, // otel data is all session logs, so the number of requests is the same as the number of responses
             err_client_count: if status == L7ResponseStatus::ClientError {
                 1
             } else {
