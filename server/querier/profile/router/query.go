@@ -24,6 +24,7 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/profile/common"
 	"github.com/deepflowio/deepflow/server/querier/profile/model"
 	"github.com/deepflowio/deepflow/server/querier/profile/service"
+	"github.com/deepflowio/deepflow/server/querier/router"
 )
 
 func ProfileRouter(e *gin.Engine, cfg *config.QuerierConfig) {
@@ -38,10 +39,13 @@ func profileTracing(cfg *config.QuerierConfig) gin.HandlerFunc {
 		// 参数校验
 		err := c.ShouldBindBodyWith(&profileTracing, binding.JSON)
 		if err != nil {
-			BadRequestResponse(c, common.INVALID_POST_DATA, err.Error())
+			router.BadRequestResponse(c, common.INVALID_POST_DATA, err.Error())
 			return
 		}
-		result, err := service.Tracing(profileTracing, cfg)
-		JsonResponse(c, result, err)
+		result, debug, err := service.Tracing(profileTracing, cfg)
+		if err == nil && !profileTracing.Debug {
+			debug = nil
+		}
+		router.JsonResponse(c, result, debug, err)
 	})
 }
