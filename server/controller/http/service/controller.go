@@ -257,7 +257,7 @@ func UpdateController(
 
 	// 修改区域和可用区
 	oldConn, newConn := mapset.NewSet(), mapset.NewSet()
-	oldVtap, newVtap := mapset.NewSet(), mapset.NewSet()
+	oldVTap, newVTap := mapset.NewSet(), mapset.NewSet()
 	if _, ok := controllerUpdate["AZS"]; ok {
 		azs := controllerUpdate["AZS"].([]interface{})
 		if len(azs) > cfg.Spec.AZMaxPerServer {
@@ -281,10 +281,10 @@ func UpdateController(
 		for _, conn := range azControllerConns {
 			oldConn.Add(conn.AZ)
 		}
-		var vtaps []mysql.VTap
-		tx.Where("region = ? and controller_ip = ?", controllerRegion, controller.IP).Find(&vtaps)
-		for _, vtap := range vtaps {
-			oldVtap.Add(vtap.AZ)
+		var dbVTaps []mysql.VTap
+		tx.Where("region = ? and controller_ip = ?", controllerRegion, controller.IP).Find(&dbVTaps)
+		for _, vtap := range dbVTaps {
+			oldVTap.Add(vtap.AZ)
 		}
 
 		var dbAzs []mysql.AZ
@@ -292,20 +292,18 @@ func UpdateController(
 		if _, ok := controllerUpdate["IS_ALL_AZ"]; ok {
 			newConn.Add("ALL")
 			for _, dbAz := range dbAzs {
-				newVtap.Add(dbAz.Lcuuid)
+				newVTap.Add(dbAz.Lcuuid)
 			}
 		} else {
 			for _, az := range azs {
 				newConn.Add(az)
-				newVtap.Add(az)
+				newVTap.Add(az)
 			}
 		}
 
 		addConn := newConn.Difference(oldConn)
 		delConn := oldConn.Difference(newConn)
-		delVtap := oldVtap.Difference(newConn)
-		log.Infof("oldConn: %v, newConn: %v, oldVtap: %v, newVtap: %v", oldConn, newConn, oldVtap, newVtap)
-		log.Infof("addConn: %v, delConn: %v, delVtap: %v", addConn, delConn, delVtap)
+		delVTap := oldVTap.Difference(newVTap)
 
 		if _, ok := controllerUpdate["REGION"]; ok {
 			delConn, newConn = mapset.NewSet(), mapset.NewSet()
@@ -322,11 +320,16 @@ func UpdateController(
 					addConn.Add(az)
 				}
 			}
+
+			delVTap = mapset.NewSet()
+			for _, vtap := range dbVTaps {
+				delVTap.Add(vtap.AZ)
+			}
 			controllerRegion = controllerUpdate["REGION"].(string)
 		}
 
-		log.Infof("oldConn: %v, newConn: %v, oldVtap: %v, newVtap: %v", oldConn, newConn, oldVtap, newVtap)
-		log.Infof("addConn: %v, delConn: %v, delVtap: %v", addConn, delConn, delVtap)
+		log.Infof("oldConn: %v, newConn: %v, oldVTap: %v, newVTap: %v", oldConn, newConn, oldVTap, newVTap)
+		log.Infof("addConn: %v, delConn: %v, delVTap: %v", addConn, delConn, delVTap)
 
 		if len(delConn.ToSlice()) > 0 {
 			var azCondition []string
@@ -357,17 +360,14 @@ func UpdateController(
 		}
 
 		// 针对 delVTap 中的采集器, 更新控制器IP为空，触发重新分配控制器
-		if len(delVtap.ToSlice()) > 0 {
-			if err = tx.Model(&mysql.VTap{}).Where("az IN (?)", delVtap.ToSlice()).Where("controller_ip = ?",
+		if len(delVTap.ToSlice()) > 0 {
+			if err = tx.Model(&mysql.VTap{}).Where("az IN (?)", delVTap.ToSlice()).Where("controller_ip = ?",
 				controller.IP).Update("controller_ip", "").Error; err != nil {
 				tx.Rollback()
 				return nil, err
 			}
 		}
-		if err = tx.Commit().Error; err != nil {
-			tx.Rollback()
-			return nil, err
-		}
+
 		m.TriggerReallocController("")
 
 		// TODO: 触发给采集器下发信息的推送
@@ -387,7 +387,10 @@ func UpdateController(
 	}
 
 	// 更新controller DB
-	mysql.Db.Model(&controller).Updates(dbUpdateMap)
+	if err = tx.Model(&controller).Updates(dbUpdateMap).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
 
 	// if state equal to maintaince/exception, trigger realloc controller
 	// 如果是将状态修改为运维/异常，则触发对应的采集器重新分配控制器
@@ -395,6 +398,10 @@ func UpdateController(
 		m.TriggerReallocController(controller.IP)
 	}
 
+	if err = tx.Commit().Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
 	response, _ := GetControllers(map[string]string{"lcuuid": lcuuid})
 	return &response[0], nil
 }
