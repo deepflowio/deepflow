@@ -230,8 +230,6 @@ func UpdateAnalyzer(
 		}
 	}
 	// 修改区域和可用区
-	oldConn, newConn := mapset.NewSet(), mapset.NewSet()
-	oldVTap, newVTap := mapset.NewSet(), mapset.NewSet()
 	if _, ok := analyzerUpdate["AZS"]; ok {
 		azs := analyzerUpdate["AZS"].([]interface{})
 		if len(azs) > cfg.Spec.AZMaxPerServer {
@@ -243,6 +241,12 @@ func UpdateAnalyzer(
 			)
 		}
 		// 判断哪些可用区存在控制器减少，触发对应的采集器重新分配数据节点
+		var (
+			oldConnAzs, newConnAzs = mapset.NewSet(), mapset.NewSet()
+			oldVTapAzs, newVTapAzs = mapset.NewSet(), mapset.NewSet()
+			delConnAzs, addConnAzs = mapset.NewSet(), mapset.NewSet()
+			delVTapAzs             = mapset.NewSet()
+		)
 		var analyzerRegion string
 		var azAnalyzerConns []mysql.AZAnalyzerConnection
 		mysql.Db.Where("analyzer_ip = ?", analyzer.IP).Find(&azAnalyzerConns)
@@ -251,90 +255,121 @@ func UpdateAnalyzer(
 		} else {
 			analyzerRegion = common.DEFAULT_REGION
 		}
+		oldAnalyzerRegion := analyzerRegion
 		for _, conn := range azAnalyzerConns {
-			oldConn.Add(conn.AZ)
+			oldConnAzs.Add(conn.AZ)
 		}
-		var dbVTaps []mysql.VTap
-		tx.Where("region = ? and analyzer_ip = ?", analyzerRegion, analyzer.IP).Find(&dbVTaps)
-		for _, vtap := range dbVTaps {
-			oldVTap.Add(vtap.AZ)
-		}
-
 		var dbAzs []mysql.AZ
 		tx.Where("region = ?", analyzerRegion).Find(&dbAzs)
-		if _, ok := analyzerUpdate["IS_ALL_AZ"]; ok {
-			newConn.Add("ALL")
-			for _, dbAz := range dbAzs {
-				newVTap.Add(dbAz.Lcuuid)
-			}
-		} else {
-			for _, az := range azs {
-				newConn.Add(az)
-				newVTap.Add(az)
-			}
-		}
 
-		addConn := newConn.Difference(oldConn)
-		delConn := oldConn.Difference(newConn)
-		delVTap := oldVTap.Difference(newVTap)
-
+		// - 存在区域修改时
+		//   - 删除 vtap 逻辑
+		//     - 如果旧配置是全部可用区，delVTapAzs 为 az 表所有的可用区
+		//     - 否则 delVTapAzs 为 az_analyzer_connection 表的对应的可用区
+		//   - 删除 az_analyzer_connection 逻辑
+		//     - 如果旧配置是全部可用区，delConnAzs = "ALL"
+		//     - 否则 delConnAzs =  az_analyzer_connection 表的对应的可用区
+		//   - 增加 az_analyzer_connection 逻辑
+		//     - 如果新配置是全部可用区，addConnAzs = "ALL"
+		//     - 否则 addConnAzs = 新传入的 az
+		// - 不存在区域修改时
+		//   - 设置四个变量：oldVTapAzs、newVTapAzs、oldConnAzs、newConnAzs
+		//     - oldVTapAzs：
+		//       - 如果旧配置是全部可用区，oldVTapAzs = 原有区域（az表）中所有 az
+		//       - 否则 oldVTapAzs = az_analyzer_connection 表中的 az
+		//     - newVTapAzs：
+		//       - 如果新配置是全部可用区，newVTapAzs = 原有区域（az表）中所有 az
+		//       - 否则 newVTapAzs = 新传入的 az
+		//     - oldConnAzs：
+		//       - oldConnAzs =  az_analyzer_connection 表的 az
+		//     - newConnAzs
+		//       - 如果新配置是全部可用区，newConnAzs = "ALL"
+		//       - 否则 newConnAzs = 新传入的 az
+		//   - 删除 vtap 逻辑
+		//     - delVTapAzs = oldVTapAzs - newVTapAzs
+		//   - 删除 az_analyzer_connection 逻辑
+		//     - delConnAzs = oldConnAzs - newConnAzs
+		//   - 增加 az_analyzer_connection 逻辑
+		//     - addConnAzs = newConnAzs - oldConnAzs
 		if _, ok := analyzerUpdate["REGION"]; ok {
-			delConn, newConn = mapset.NewSet(), mapset.NewSet()
-			if oldConn.Contains("ALL") {
-				delConn.Add("ALL")
+			if oldConnAzs.Contains("ALL") {
+				delConnAzs.Add("ALL")
+				for _, az := range dbAzs {
+					delVTapAzs.Add(az.Lcuuid)
+				}
 			} else {
-				delConn = oldConn.Clone()
+				delConnAzs = oldConnAzs.Clone()
+				delVTapAzs = delVTapAzs.Clone()
 			}
 
 			if _, ok := analyzerUpdate["IS_ALL_AZ"]; ok {
-				addConn.Add("ALL")
+				addConnAzs.Add("ALL")
 			} else {
 				for _, az := range azs {
-					addConn.Add(az)
+					addConnAzs.Add(az)
 				}
 			}
 
-			delVTap = mapset.NewSet()
-			for _, vtap := range dbVTaps {
-				delVTap.Add(vtap.AZ)
-			}
 			analyzerRegion = analyzerUpdate["REGION"].(string)
+		} else {
+			if oldConnAzs.Contains("ALL") {
+				for _, az := range dbAzs {
+					oldVTapAzs.Add(az.Lcuuid)
+				}
+			} else {
+				oldVTapAzs = oldConnAzs.Clone()
+			}
+
+			var dbAzs []mysql.AZ
+			tx.Where("region = ?", analyzerRegion).Find(&dbAzs)
+			if _, ok := analyzerUpdate["IS_ALL_AZ"]; ok {
+				newConnAzs.Add("ALL")
+				for _, dbAz := range dbAzs {
+					newVTapAzs.Add(dbAz.Lcuuid)
+				}
+			} else {
+				for _, az := range azs {
+					newConnAzs.Add(az)
+					newVTapAzs.Add(az)
+				}
+			}
+
+			addConnAzs = newConnAzs.Difference(oldConnAzs)
+			delConnAzs = oldConnAzs.Difference(newConnAzs)
+			delVTapAzs = oldVTapAzs.Difference(newVTapAzs)
 		}
 
-		log.Infof("oldConn: %v, newConn: %v, oldVTap: %v, newVTap: %v", oldConn, newConn, oldVTap, newVTap)
-		log.Infof("addConn: %v, delConn: %v, delVTap: %v", addConn, delConn, delVTap)
-
-		if len(delConn.ToSlice()) > 0 {
+		if len(delConnAzs.ToSlice()) > 0 {
 			var azCondition []string
-			for _, az := range delConn.ToSlice() {
+			for _, az := range delConnAzs.ToSlice() {
 				azCondition = append(azCondition, az.(string))
 			}
 			if err = tx.Delete(mysql.AZAnalyzerConnection{},
-				"analyzer_ip = ? AND az IN (?)", analyzer.IP, azCondition).Error; err != nil {
+				"region = ? AND analyzer_ip = ? AND az IN (?)", oldAnalyzerRegion, analyzer.IP, azCondition).Error; err != nil {
 				tx.Rollback()
 				return nil, err
 			}
 		}
 
-		var addConns []mysql.AZAnalyzerConnection
-		if len(addConn.ToSlice()) > 0 {
-			for _, az := range addConn.ToSlice() {
+		var addConnAzss []mysql.AZAnalyzerConnection
+		if len(addConnAzs.ToSlice()) > 0 {
+			for _, az := range addConnAzs.ToSlice() {
 				aConn := mysql.AZAnalyzerConnection{}
 				aConn.Region = analyzerRegion
 				aConn.AZ = az.(string)
 				aConn.AnalyzerIP = analyzer.IP
 				aConn.Lcuuid = uuid.New().String()
-				addConns = append(addConns, aConn)
+				addConnAzss = append(addConnAzss, aConn)
 			}
-			if err = tx.Create(&addConns).Error; err != nil {
+			if err = tx.Create(&addConnAzss).Error; err != nil {
 				tx.Rollback()
 				return nil, err
 			}
 		}
 
-		// 针对 delVTap 中的采集器, 更新控制器IP为空，触发重新分配控制器
-		if len(delVTap.ToSlice()) > 0 {
-			if err = tx.Model(&mysql.VTap{}).Where("az IN (?)", delVTap.ToSlice()).Where("analyzer_ip = ?",
+		// 针对 delVTapAzs 中的采集器, 更新控制器IP为空，触发重新分配控制器
+		if len(delVTapAzs.ToSlice()) > 0 {
+			if err = tx.Model(&mysql.VTap{}).Where("az IN (?)", delVTapAzs.ToSlice()).Where("analyzer_ip = ?",
 				analyzer.IP).Update("analyzer_ip", "").Error; err != nil {
 				tx.Rollback()
 				return nil, err
