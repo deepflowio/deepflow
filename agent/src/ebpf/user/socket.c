@@ -183,7 +183,8 @@ next_cpu_client:
 	    accept(infer_socktrace_fd, (struct sockaddr *)&client_addr,
 		   &addr_len);
 	if (cli_fd < 0) {
-		ebpf_info("[%s] Fail to accept client request\n", __func__);
+		ebpf_warning("Fail to accept client request - %s\n",
+			     strerror(errno));
 		return ETR_IO;
 	}
 
@@ -225,18 +226,19 @@ static int kernel_offset_infer_client(void)
 	int len;
 
 	if ((cli_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-		ebpf_info("[%s] Fail client create socket\n", __func__);
+		ebpf_warning("Fail client create socket - %s\n",
+			     strerror(errno));
 		return ETR_IO;
 	}
 
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_port = htons(OFFSET_INFER_SERVER_PORT);
-	server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	server_addr.sin_addr.s_addr = inet_addr(OFFSET_INFER_SERVER_ADDR);
 
 	if (connect
 	    (cli_fd, (struct sockaddr *)&server_addr,
 	     sizeof(server_addr)) < 0) {
-		ebpf_info("[%s] Fail to connect\n", __func__);
+		ebpf_warning("Fail to connect - %s\n", strerror(errno));
 		return ETR_IO;
 	}
 
@@ -267,24 +269,52 @@ static int kernel_offset_infer_init(void)
 
 	infer_socktrace_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (infer_socktrace_fd < 0) {
-		ebpf_info("[%s] Fail to create server socket\n", __func__);
+		ebpf_warning("Fail to create server socket - %s\n",
+			     strerror(errno));
 		return ETR_IO;
 	}
 
 	srv_addr.sin_family = AF_INET;
 	srv_addr.sin_port = htons(OFFSET_INFER_SERVER_PORT);
-	srv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	srv_addr.sin_addr.s_addr = inet_addr(OFFSET_INFER_SERVER_ADDR);
 
 	if (-1 ==
 	    bind(infer_socktrace_fd, (struct sockaddr *)&srv_addr,
 		 sizeof(srv_addr))) {
-		ebpf_info("[%s] Fail to bind server socket\n", __func__);
+                ebpf_warning("Fail to bind server socket %s:%d - %s\n"
+                             "Please check the following two situations:\n"
+                             "(1) Whether the %s address has been "
+                             "configured on the loopback device.\n"
+                             "(2) Check if port %d has already been occupied "
+                             "by other services.\n\n"
+                             "%s:%d is used to trigger a temporary service"
+                             " for Linux kernel adaptation. It is important to ensure"
+                             " that %s is configured on the lo device and that"
+                             " port %d is not occupied by other services.\n\n"
+                             "If port %d is occupied by other services, you can either"
+                             " change the port number of the other service or wait until"
+                             " the deepflow-agent is started before starting this service."
+                             "This is because the deepflow-agent only temporarily uses "
+                             "port %d during its startup phase and will close the service"
+                             "once it is started.\n\n",
+                             OFFSET_INFER_SERVER_ADDR,
+                             OFFSET_INFER_SERVER_PORT,
+                             strerror(errno),
+                             OFFSET_INFER_SERVER_ADDR,
+                             OFFSET_INFER_SERVER_PORT,
+                             OFFSET_INFER_SERVER_ADDR,
+                             OFFSET_INFER_SERVER_PORT,
+                             OFFSET_INFER_SERVER_ADDR,
+                             OFFSET_INFER_SERVER_PORT,
+                             OFFSET_INFER_SERVER_PORT,
+                             OFFSET_INFER_SERVER_PORT);
 		close(infer_socktrace_fd);
 		return ETR_IO;
 	}
 
 	if (-1 == listen(infer_socktrace_fd, 1)) {
-		ebpf_info("[%s] Server socket listen failed\n", __func__);
+		ebpf_warning("Server socket listen failed - %s\n",
+			     strerror(errno));
 		close(infer_socktrace_fd);
 		return ETR_IO;
 	}
@@ -327,7 +357,7 @@ static int socktrace_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
 
 	*out = calloc(1, *outsize);
 	if (*out == NULL) {
-		ebpf_info("%s calloc, error:%s\n", __func__, strerror(errno));
+		ebpf_warning("calloc, error:%s\n", strerror(errno));
 		return -1;
 	}
 
@@ -1657,9 +1687,9 @@ int running_socket_tracer(l7_handle_fn handle,
 	    pthread_create(&proc_events_pthread, NULL,
 			   (void *)&process_events_handle_main, (void *)tracer);
 	if (ret) {
-		ebpf_info
-		    ("<%s> proc_events_pthread, pthread_create is error:%s\n",
-		     __func__, strerror(errno));
+		ebpf_warning
+		    ("proc_events_pthread, pthread_create is error:%s\n",
+		     strerror(errno));
 		return ret;
 	}
 

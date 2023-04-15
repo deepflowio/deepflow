@@ -113,8 +113,6 @@ struct cfg_feature_regex {
 extern struct cfg_feature_regex cfg_feature_regex_array[FEATURE_MAX];
 extern int ebpf_config_protocol_filter[PROTO_NUM];
 extern struct allow_port_bitmap allow_port_bitmap;
-// use for inference struct offset.
-#define OFFSET_INFER_SERVER_PORT 54583
 
 static inline unsigned int min_log2(unsigned int x)
 {

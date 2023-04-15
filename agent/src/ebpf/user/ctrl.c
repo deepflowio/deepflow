@@ -106,7 +106,8 @@ static inline int sockopt_init(void)
 
 	srv_fd = socket(PF_UNIX, SOCK_STREAM, 0);
 	if (srv_fd < 0) {
-		ebpf_info("[%s] Fail to create server socket\n", __func__);
+		ebpf_warning("Fail to create server socket - %s\n",
+			     strerror(errno));
 		return ETR_IO;
 	}
 
@@ -119,14 +120,16 @@ static inline int sockopt_init(void)
 	unlink(ipc_unix_domain);
 
 	if (-1 == bind(srv_fd, (struct sockaddr *)&srv_addr, sizeof(srv_addr))) {
-		ebpf_info("[%s] Fail to bind server socket\n", __func__);
+		ebpf_warning("Fail to bind server socket \"%s\" - %s\n",
+			     ipc_unix_domain, strerror(errno));
 		close(srv_fd);
 		unlink(ipc_unix_domain);
 		return ETR_IO;
 	}
 
 	if (-1 == listen(srv_fd, 1)) {
-		ebpf_info("[%s] Server socket listen failed\n", __func__);
+		ebpf_warning("Server socket listen failed - %s\n",
+			     strerror(errno));
 		close(srv_fd);
 		unlink(ipc_unix_domain);
 		return ETR_IO;
@@ -140,10 +143,9 @@ int ctrl_init(void)
 	init_list_head(&sockopt_list);
 	int ret = sockopt_init();
 	if (unlikely(ret < 0)) {
-		ebpf_info("[%s] sockopt module initialization failed!\n",
-			  __func__);
 		return ret;
 	}
+
 	return ETR_OK;
 }
 

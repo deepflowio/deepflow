@@ -22,6 +22,10 @@
 #define CACHE_LINE_SIZE 64
 #endif
 
+// use for inference struct offset.
+#define OFFSET_INFER_SERVER_ADDR "127.0.0.1"
+#define OFFSET_INFER_SERVER_PORT 54583
+
 #define CACHE_LINE_ROUNDUP(size) \
   (CACHE_LINE_SIZE * ((size + CACHE_LINE_SIZE - 1) / CACHE_LINE_SIZE))
 
