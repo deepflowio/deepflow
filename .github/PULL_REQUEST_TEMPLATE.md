@@ -34,7 +34,7 @@ One or more of:
 - [ ] Added unit test to verify the fix.
 - [ ] Verified eBPF program runs successfully on linux 4.14.x.
 - [ ] Verified eBPF program runs successfully on linux 4.19.x.
-- [ ] Verified eBPF program runs successfully on Linux 5.2+.
+- [ ] Verified eBPF program runs successfully on linux 5.2.x.
      ==== Remove this line WHEN AND ONLY WHEN you're fixing a bug, follow the checklist ==== -->
 
 <!-- ==== Remove this line WHEN AND ONLY WHEN you're improving the performance, follow the checklist ====
