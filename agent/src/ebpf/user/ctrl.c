@@ -55,13 +55,12 @@ static inline int sockopts_exist(struct tracer_sockopts *sockopts)
 int sockopt_register(struct tracer_sockopts *sockopts)
 {
 	if (unlikely(NULL == sockopts)) {
-		ebpf_info("%s: invalid socket msg type\n", __func__);
+		ebpf_warning("[deepflow-ebpfctl] invalid socket msg type\n");
 		return ETR_INVAL;
 	}
 
 	if (sockopts_exist(sockopts)) {
-		ebpf_info("%s: socket msg type already exist\n", __func__);
-		ebpf_info("sockopt type already exist "
+		ebpf_info("[deepflow-ebpfctl] sockopt type already exist "
 			  "get: %d - %d set: %d - %d\n",
 			  sockopts->get_opt_min, sockopts->get_opt_max,
 			  sockopts->set_opt_min, sockopts->set_opt_max);
@@ -69,7 +68,7 @@ int sockopt_register(struct tracer_sockopts *sockopts)
 		return ETR_EXIST;
 	}
 
-	ebpf_info("sockopt register succeed, type "
+	ebpf_info("[deepflow-ebpfctl] sockopt register succeed, type "
 		  "get: %d - %d set: %d - %d\n",
 		  sockopts->get_opt_min, sockopts->get_opt_max,
 		  sockopts->set_opt_min, sockopts->set_opt_max);
@@ -84,7 +83,7 @@ int sockopt_unregister(struct tracer_sockopts *sockopts)
 	struct tracer_sockopts *skopt, *next;
 
 	if (unlikely(NULL == sockopts)) {
-		ebpf_info("%s: invalid socket msg type\n", __func__);
+		ebpf_warning("[deepflow-ebpfctl] invalid socket msg type\n");
 		return ETR_INVAL;
 	}
 	list_for_each_entry_safe(skopt, next, &sockopt_list, list) {
@@ -106,8 +105,9 @@ static inline int sockopt_init(void)
 
 	srv_fd = socket(PF_UNIX, SOCK_STREAM, 0);
 	if (srv_fd < 0) {
-		ebpf_warning("Fail to create server socket - %s\n",
-			     strerror(errno));
+		ebpf_warning("[deepflow-ebpfctl] Fail to create server "
+			     "socket - %s(errno:%d)\n",
+			     strerror(errno), errno);
 		return ETR_IO;
 	}
 
@@ -120,15 +120,18 @@ static inline int sockopt_init(void)
 	unlink(ipc_unix_domain);
 
 	if (-1 == bind(srv_fd, (struct sockaddr *)&srv_addr, sizeof(srv_addr))) {
-		ebpf_warning("Fail to bind server socket \"%s\" - %s\n",
-			     ipc_unix_domain, strerror(errno));
+		ebpf_warning("[deepflow-ebpfctl] Fail to bind server socket \"%s\" - %s\n"
+			     "To ensure that the IPC Unix domain file exists and is not "
+			     "being used by other processes (use \"lsof "
+			     "%s\" command).",
+			     ipc_unix_domain, strerror(errno), ipc_unix_domain);
 		close(srv_fd);
 		unlink(ipc_unix_domain);
 		return ETR_IO;
 	}
 
 	if (-1 == listen(srv_fd, 1)) {
-		ebpf_warning("Server socket listen failed - %s\n",
+		ebpf_warning("[deepflow-ebpfctl] Server socket listen failed - %s\n",
 			     strerror(errno));
 		close(srv_fd);
 		unlink(ipc_unix_domain);
@@ -210,14 +213,15 @@ static inline int sockopt_msg_recv(int clt_fd, struct tracer_sock_msg **pmsg)
 	memset(&msg_hdr, 0, sizeof(msg_hdr));
 	res = read(clt_fd, &msg_hdr, sizeof(msg_hdr));
 	if (sizeof(msg_hdr) != res) {
-		ebpf_info("[%s] sockopt msg header recv fail: %s\n", __func__,
-			  strerror(errno));
+		ebpf_warning("[deepflow-ebpfctl] sockopt msg header "
+			     "recv fail: %s\n",
+			     strerror(errno));
 		return ETR_IO;
 	}
 
 	*pmsg = malloc(sizeof(struct tracer_sock_msg) + msg_hdr.len);
 	if (unlikely(NULL == *pmsg)) {
-		ebpf_warning("malloc() failed, no memory\n");
+		ebpf_warning("[deepflow-ebpfctl] malloc() failed, no memory\n");
 		return ETR_NOMEM;
 	}
 
@@ -230,8 +234,8 @@ static inline int sockopt_msg_recv(int clt_fd, struct tracer_sock_msg **pmsg)
 	if (msg_hdr.len > 0) {
 		res = read(clt_fd, msg->data, msg->len);
 		if (res != msg->len) {
-			ebpf_info("[%s] sockopt msg body recv fail: %s\n",
-				  __func__, strerror(errno));
+			ebpf_warning("[deepflow-ebpfctl] sockopt msg body recv fail: %s\n",
+				     strerror(errno));
 			free(msg);
 			*pmsg = NULL;
 			return ETR_IO;
@@ -253,9 +257,9 @@ static struct tracer_sockopts *sockopts_get(struct tracer_sock_msg *msg)
 			if (judge_id_betw
 			    (msg->id, skopt->get_opt_min, skopt->get_opt_max)) {
 				if (unlikely(skopt->version != msg->version)) {
-					ebpf_info
-					    ("%s: socket msg version not match\n",
-					     __func__);
+					ebpf_warning
+					    ("[deepflow-ebpfctl] socket msg version "
+					     "not match\n");
 					return NULL;
 				}
 				return skopt;
@@ -268,9 +272,9 @@ static struct tracer_sockopts *sockopts_get(struct tracer_sock_msg *msg)
 			if (judge_id_betw
 			    (msg->id, skopt->set_opt_min, skopt->set_opt_max)) {
 				if (unlikely(skopt->version != msg->version)) {
-					ebpf_info
-					    ("%s: socket msg version not match\n",
-					     __func__);
+					ebpf_warning
+					    ("[deepflow-ebpfctl] socket msg version"
+					     " not match\n");
 					return NULL;
 				}
 				return skopt;
@@ -279,8 +283,8 @@ static struct tracer_sockopts *sockopts_get(struct tracer_sock_msg *msg)
 		return NULL;
 		break;
 	default:
-		ebpf_info("%s: unkown sock msg type: %d\n", __func__,
-			  msg->type);
+		ebpf_warning("[deepflow-ebpfctl] unkown sock msg type: %d\n",
+			     msg->type);
 	}
 	return NULL;
 }
@@ -297,24 +301,26 @@ static int sockopt_msg_send(int clt_fd,
 	len = sizeof(struct tracer_sock_msg_reply);
 	res = sendn(clt_fd, hdr, len, MSG_NOSIGNAL);
 	if (len != res) {
-		ebpf_info("[%s:msg#%d] sockopt reply msg header send error"
-			  " -- %d/%d sent\n", __func__, hdr->id, res, len);
+		ebpf_warning("[deepflow-ebpfctl] [msg#%d] sockopt reply msg "
+			     "header send error -- %d/%d sent\n",
+			     hdr->id, res, len);
 		return ETR_IO;
 	}
 
 	if (hdr->errcode) {
-		ebpf_info("[%s:msg#%d] errcode set in sockopt msg reply: %s\n",
-			  __func__, hdr->id, trace_strerror(hdr->errcode));
+		ebpf_warning("[deepflow-ebpfctl] [msg#%d] errcode set in "
+			     "sockopt msg reply: %s\n",
+			     hdr->id, trace_strerror(hdr->errcode));
 		return hdr->errcode;
 	}
 
 	if (data_len) {
 		res = sendn(clt_fd, data, data_len, MSG_NOSIGNAL);
 		if (data_len != res) {
-			ebpf_info
-			    ("[%s:msg#%d] sockopt reply msg body send error"
-			     " -- %d/%d sent\n", __func__, hdr->id, res,
-			     data_len);
+			ebpf_warning
+			    ("[deepflow-ebpfctl] [msg#%d] sockopt reply "
+			     "msg body send error -- %d/%d sent\n",
+			     hdr->id, res, data_len);
 			return ETR_IO;
 		}
 	}
@@ -350,8 +356,9 @@ int sockopt_ctl(__unused void *arg)
 	clt_fd = accept(srv_fd, (struct sockaddr *)&clt_addr, &clt_len);
 	if (clt_fd < 0) {
 		if (EWOULDBLOCK != errno) {
-			ebpf_info("[%s] Fail to accept client request\n",
-				  __func__);
+			ebpf_warning("[deepflow-ebpfctl] Fail to "
+				     "accept client request - %s\n",
+				     strerror(errno));
 			close(srv_fd);
 			srv_fd = 0;
 			/*unlink(ipc_unix_domain); */
@@ -379,9 +386,10 @@ int sockopt_ctl(__unused void *arg)
 			/* assume that reply_data is freed by user when callback fails */
 			reply_data = NULL;
 			reply_data_len = 0;
-			ebpf_info
-			    ("[%s] socket msg<type=%s, id=%d> callback failed\n",
-			     __func__, msg->type == SOCKOPT_GET ? "GET" : "SET",
+			ebpf_warning
+			    ("[deepflow-ebpfctl] socket msg<type=%s, id=%d> "
+			     "callback failed\n",
+			     msg->type == SOCKOPT_GET ? "GET" : "SET",
 			     msg->id);
 		}
 
