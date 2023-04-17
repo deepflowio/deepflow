@@ -605,10 +605,14 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 		case "resource_gl0", "resource_gl1", "resource_gl2", "auto_instance", "auto_service":
 			results := &common.Result{}
 			for resourceKey, resourceType := range AutoMap {
-				// 增加资源ID
-				resourceId := resourceKey + "_id"
-				resourceName := resourceKey + "_name"
-				sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type, uid FROM flow_tag.ip_resource_map %s GROUP BY value, display_name, device_type, uid ORDER BY %s ASC %s", resourceId, resourceName, strconv.Itoa(resourceType), whereSql, orderBy, limitSql)
+				if resourceKey == "gprocess" {
+					sql = fmt.Sprintf("SELECT id AS value, name AS display_name, %s AS device_type, '' AS uid FROM flow_tag.gprocess_map %s GROUP BY value, display_name, device_type, uid ORDER BY %s ASC %s", strconv.Itoa(resourceType), whereSql, orderBy, limitSql)
+				} else {
+					// 增加资源ID
+					resourceId := resourceKey + "_id"
+					resourceName := resourceKey + "_name"
+					sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type, uid FROM flow_tag.ip_resource_map %s GROUP BY value, display_name, device_type, uid ORDER BY %s ASC %s", resourceId, resourceName, strconv.Itoa(resourceType), whereSql, orderBy, limitSql)
+				}
 				sql = strings.ReplaceAll(sql, " like ", " ilike ")
 				sql = strings.ReplaceAll(sql, " LIKE ", " ILIKE ")
 				log.Debug(sql)
