@@ -183,7 +183,8 @@ next_cpu_client:
 	    accept(infer_socktrace_fd, (struct sockaddr *)&client_addr,
 		   &addr_len);
 	if (cli_fd < 0) {
-		ebpf_warning("Fail to accept client request - %s\n",
+		ebpf_warning("[eBPF Kernel Adapt] Fail to accept client"
+			     "request - %s\n",
 			     strerror(errno));
 		return ETR_IO;
 	}
@@ -213,7 +214,8 @@ next_cpu_client:
 		goto next_cpu_client;
 
 	close(infer_socktrace_fd);
-	ebpf_info("kernel_offset_infer_server close. client_count:%d\n",
+	ebpf_info("[eBPF Kernel Adapt] kernel_offset_infer_server close."
+		  "client_count:%d\n",
 		  client_count);
 	return ETR_OK;
 }
@@ -226,7 +228,7 @@ static int kernel_offset_infer_client(void)
 	int len;
 
 	if ((cli_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-		ebpf_warning("Fail client create socket - %s\n",
+		ebpf_warning("[eBPF Kernel Adapt] Fail client create socket - %s\n",
 			     strerror(errno));
 		return ETR_IO;
 	}
@@ -238,7 +240,8 @@ static int kernel_offset_infer_client(void)
 	if (connect
 	    (cli_fd, (struct sockaddr *)&server_addr,
 	     sizeof(server_addr)) < 0) {
-		ebpf_warning("Fail to connect - %s\n", strerror(errno));
+		ebpf_warning("[eBPF Kernel Adapt] Fail to connect"
+			     " - %s\n", strerror(errno));
 		return ETR_IO;
 	}
 
@@ -269,7 +272,7 @@ static int kernel_offset_infer_init(void)
 
 	infer_socktrace_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (infer_socktrace_fd < 0) {
-		ebpf_warning("Fail to create server socket - %s\n",
+		ebpf_warning("[eBPF Kernel Adapt] Fail to create server socket - %s\n",
 			     strerror(errno));
 		return ETR_IO;
 	}
@@ -281,7 +284,8 @@ static int kernel_offset_infer_init(void)
 	if (-1 ==
 	    bind(infer_socktrace_fd, (struct sockaddr *)&srv_addr,
 		 sizeof(srv_addr))) {
-                ebpf_warning("Fail to bind server socket %s:%d - %s\n"
+                ebpf_warning("[eBPF Kernel Adapt] Fail to bind server socket"
+			     " %s:%d - %s\n"
                              "Please check the following two situations:\n"
                              "(1) Whether the %s address has been "
                              "configured on the loopback device.\n"
@@ -313,7 +317,7 @@ static int kernel_offset_infer_init(void)
 	}
 
 	if (-1 == listen(infer_socktrace_fd, 1)) {
-		ebpf_warning("Server socket listen failed - %s\n",
+		ebpf_warning("[eBPF Kernel Adapt] Server socket listen failed - %s\n",
 			     strerror(errno));
 		close(infer_socktrace_fd);
 		return ETR_IO;
@@ -925,7 +929,8 @@ static int check_kern_adapt_and_state_update(void)
 		return -1;
 
 	if (is_adapt_success(t)) {
-		ebpf_info("Linux %s adapt success. Set the status to TRACER_RUNNING\n",
+		ebpf_info("[eBPF Kernel Adapt] Linux %s adapt success. "
+			  "Set the status to TRACER_RUNNING\n",
 			  linux_release);
 		t->state = TRACER_RUNNING;
 		add_probes_act(ACT_DETACH);
@@ -1503,7 +1508,7 @@ int running_socket_tracer(l7_handle_fn handle,
 
 	if (check_kernel_version(4, 14) != 0) {
 		ebpf_warning
-		    ("Currnet linux %d.%d, not support, require Linux 4.14+\n",
+		    ("[eBPF Kernel Adapt] Currnet linux %d.%d, not support, require Linux 4.14+\n",
 		     major, minor);
 
 		return -EINVAL;
@@ -1597,12 +1602,12 @@ int running_socket_tracer(l7_handle_fn handle,
 
 	// Update kernel offsets map from btf vmlinux file.
 	if (update_offset_map_from_btf_vmlinux(tracer) != ETR_OK) {
-		ebpf_info("Set offsets map from btf_vmlinux, not support.\n");
+		ebpf_info("[eBPF Kernel Adapt] Set offsets map from btf_vmlinux, not support.\n");
 		if (update_offset_map_default(tracer) != ETR_OK) {
 			ebpf_error("Fatal error, failed to update default offset\n");
 		}
 	} else {
-		ebpf_info("Set offsets map from btf_vmlinux, success.\n");
+		ebpf_info("[eBPF Kernel Adapt] Set offsets map from btf_vmlinux, success.\n");
 	}
 
 	if (perf_map_init(tracer, MAP_PERF_SOCKET_DATA_NAME))
@@ -1704,8 +1709,9 @@ static int socket_tracer_stop(void)
 		return ret;
 	if (t->state == TRACER_INIT) {
 		ebpf_warning
-		    ("Adapting the linux kernel(%s) is in progress, please try "
-		     "the stop operation again later.\n", linux_release);
+		    ("[eBPF Kernel Adapt] Adapting the linux kernel(%s) is in "
+		     "progress, please try the stop operation again later.\n",
+		     linux_release);
 		return -1;
 	}
 
@@ -1730,8 +1736,10 @@ static int socket_tracer_start(void)
 
 	if (t->state == TRACER_INIT) {
 		ebpf_warning
-		    ("Adapting the linux kernel(%s) is in progress, please try "
-		     "the start operation again later.\n", linux_release);
+		    ("[eBPF Kernel Adapt] Adapting the linux kernel(%s) "
+		     "is in progress, please try "
+		     "the start operation again later.\n",
+		     linux_release);
 		return -1;
 	}
 
