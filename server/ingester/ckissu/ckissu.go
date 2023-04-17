@@ -781,6 +781,12 @@ var ColumnAdd626 = []*ColumnAdds{
 		ColumnNames: []string{"start_time"},
 		ColumnType:  ckdb.DateTime64us,
 	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l7_packet", "l7_packet_local"},
+		ColumnNames: []string{"acl_gids"},
+		ColumnType:  ckdb.ArrayUInt16,
+	},
 }
 
 var TableRenames626 = []*TableRename{
@@ -789,6 +795,15 @@ var TableRenames626 = []*TableRename{
 		OldTables: []string{"event", "event_local"},
 		NewDb:     "event",
 		NewTables: []string{"event_v625", "event_local_v625"},
+	},
+}
+
+var ColumnRenames626 = []*ColumnRenames{
+	&ColumnRenames{
+		Db:             "flow_log",
+		Tables:         []string{"l7_packet", "l7_packet_local"},
+		OldColumnNames: []string{"pcap_count", "pcap_batch"},
+		NewColumnNames: []string{"packet_count", "packet_batch"},
 	},
 }
 
@@ -1140,7 +1155,7 @@ func NewCKIssu(cfg *config.Config) (*Issu, error) {
 		i.columnMods = append(i.columnMods, v...)
 	}
 
-	for _, v := range [][]*ColumnRename{ColumnRename618, ColumnRename620, getColumnRenames(ColumnRename623)} {
+	for _, v := range [][]*ColumnRename{ColumnRename618, ColumnRename620, getColumnRenames(ColumnRename623), getColumnRenames(ColumnRenames626)} {
 		i.columnRenames = append(i.columnRenames, v...)
 	}
 
