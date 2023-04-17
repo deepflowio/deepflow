@@ -36,3 +36,13 @@ type ProfileTreeNode struct {
 	SelfValue            int      `json:"self_value"`
 	TotalValue           int      `json:"total_value"`
 }
+
+type Debug struct {
+	IP         string
+	Sql        string `json:"sql"`
+	SqlCH      string `json:"sql_CH"`
+	QueryTime  string `json:"query_time"`
+	FormatTime string `json:"format_time"`
+	QueryUUID  string `json:"query_uuid"`
+	Error      string `json:"error"`
+}

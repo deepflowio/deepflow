@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 
 	"golang.org/x/exp/slices"
 
@@ -34,7 +35,7 @@ import (
 
 var log = logging.MustGetLogger("profile")
 
-func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*model.ProfileTreeNode, err error) {
+func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*model.ProfileTreeNode, debug interface{}, err error) {
 	whereSlice := []string{}
 	whereSlice = append(whereSlice, fmt.Sprintf(" time>=%d", args.TimeStart))
 	whereSlice = append(whereSlice, fmt.Sprintf(" time<=%d", args.TimeEnd))
@@ -46,13 +47,16 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*mo
 	}
 	whereSql := strings.Join(whereSlice, " AND")
 	limitSql := cfg.Profile.FlameQueryLimit
-	url := fmt.Sprintf("http://%s/v1/query/", net.JoinHostPort("localhost", fmt.Sprintf("%d", cfg.ListenPort)))
+	url := fmt.Sprintf("http://%s/v1/query/?debug=true", net.JoinHostPort("localhost", fmt.Sprintf("%d", cfg.ListenPort)))
 	body := map[string]interface{}{}
 	body["db"] = common.DATABASE_PROFILE
-	body["sql"] = fmt.Sprintf(
+	sql := fmt.Sprintf(
 		"SELECT %s, %s, %s, %s FROM %s WHERE %s LIMIT %d",
 		common.PROFILE_LOCATION_STR, common.PROFILE_NODE_ID, common.PROFILE_PARENT_NODE_ID, common.PROFILE_VALUE, common.TABLE_PROFILE, whereSql, limitSql,
 	)
+	body["sql"] = sql
+	profileDebug := model.Debug{}
+	profileDebug.Sql = sql
 	resp, err := controller_common.CURLPerform("POST", url, body)
 	if err != nil {
 		log.Errorf("call querier failed: %s, %s", err.Error(), url)
@@ -62,6 +66,12 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*mo
 		log.Warningf("no data in curl response: %s", url)
 		return
 	}
+	profileDebug.IP = resp.Get("debug").Get("ip").MustString()
+	profileDebug.QueryUUID = resp.Get("debug").Get("query_uuid").MustString()
+	profileDebug.SqlCH = resp.Get("debug").Get("sql").MustString()
+	profileDebug.Error = resp.Get("debug").Get("error").MustString()
+	profileDebug.QueryTime = resp.Get("debug").Get("query_time").MustString()
+	formatStartTime := time.Now()
 	profileLocationStrIndex := -1
 	profileNodeIDIndex := -1
 	profileParentNodeIDIndex := -1
@@ -151,6 +161,10 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*mo
 		}
 	}
 	result = noZeroResult
+	formatEndTime := int64(time.Since(formatStartTime))
+	formatTime := fmt.Sprintf("%.9fs", float64(formatEndTime)/1e9)
+	profileDebug.FormatTime = formatTime
+	debug = profileDebug
 	return
 }
 
