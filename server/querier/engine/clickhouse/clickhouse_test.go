@@ -175,8 +175,8 @@ var (
 		input:  "select Sum(packet_count) as count from l4_packet",
 		output: "SELECT SUM(packet_count) AS `count` FROM flow_log.`l4_packet` LIMIT 10000",
 	}, {
-		input:  "select Sum(pcap_count) as count from l7_packet",
-		output: "SELECT SUM(pcap_count) AS `count` FROM flow_log.`l7_packet` LIMIT 10000",
+		input:  "select Sum(packet_count) as count from l7_packet",
+		output: "SELECT SUM(packet_count) AS `count` FROM flow_log.`l7_packet` LIMIT 10000",
 	}, {
 		input:  "select Sum(byte_tx) as max_byte from l4_flow_log order by length(tap_side) desc, `length(tap_side)`",
 		output: "SELECT SUM(byte_tx) AS `max_byte` FROM flow_log.`l4_flow_log` ORDER BY length(tap_side) desc,`length(tap_side)` asc LIMIT 10000",

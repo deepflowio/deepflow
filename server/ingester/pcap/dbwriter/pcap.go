@@ -30,13 +30,14 @@ const (
 )
 
 type PcapStore struct {
-	Time      uint32
-	StartTime int64
-	EndTime   int64
-	FlowID    uint64
-	VtapID    uint16
-	PcapCount uint32
-	PcapBatch []byte
+	Time        uint32
+	StartTime   int64
+	EndTime     int64
+	FlowID      uint64
+	VtapID      uint16
+	PacketCount uint32
+	PacketBatch []byte
+	AclGids     []uint16
 }
 
 func PcapStoreColumns() []*ckdb.Column {
@@ -46,8 +47,9 @@ func PcapStoreColumns() []*ckdb.Column {
 		ckdb.NewColumn("end_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
 		ckdb.NewColumn("flow_id", ckdb.UInt64).SetIndex(ckdb.IndexMinmax),
 		ckdb.NewColumn("vtap_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
-		ckdb.NewColumn("pcap_count", ckdb.UInt32).SetIndex(ckdb.IndexNone),
-		ckdb.NewColumn("pcap_batch", ckdb.String).SetIndex(ckdb.IndexNone).SetComment("data format reference: https://www.ietf.org/archive/id/draft-gharris-opsawg-pcap-01.html"),
+		ckdb.NewColumn("packet_count", ckdb.UInt32).SetIndex(ckdb.IndexNone),
+		ckdb.NewColumn("packet_batch", ckdb.String).SetIndex(ckdb.IndexNone).SetComment("data format reference: https://www.ietf.org/archive/id/draft-gharris-opsawg-pcap-01.html"),
+		ckdb.NewColumn("acl_gids", ckdb.ArrayUInt16).SetIndex(ckdb.IndexNone),
 	}
 }
 
@@ -58,8 +60,9 @@ func (s *PcapStore) WriteBlock(block *ckdb.Block) {
 		s.EndTime,
 		s.FlowID,
 		s.VtapID,
-		s.PcapCount,
-		utils.String(s.PcapBatch))
+		s.PacketCount,
+		utils.String(s.PacketBatch),
+		s.AclGids)
 }
 
 func (p *PcapStore) Release() {
@@ -83,9 +86,11 @@ func ReleasePcapStore(l *PcapStore) {
 	if l == nil {
 		return
 	}
-	t := l.PcapBatch[:0]
+	t := l.PacketBatch[:0]
+	ids := l.AclGids[:0]
 	*l = PcapStore{}
-	l.PcapBatch = t
+	l.PacketBatch = t
+	l.AclGids = ids
 	poolPcapStore.Put(l)
 }
 

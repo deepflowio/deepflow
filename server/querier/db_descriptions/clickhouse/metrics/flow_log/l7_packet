@@ -1,2 +1,2 @@
 # Field              , DBField              , Type        , Category   , Permission
-pcap_count           , pcap_count         , counter     , Counter    , 111
+packet_count         , packet_count         , counter     , Counter    , 111
