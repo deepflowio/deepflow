@@ -153,6 +153,7 @@ static struct ebpf_object *create_new_obj(const void *buf, size_t buf_sz,
 {
 	struct ebpf_object *obj = malloc(sizeof(struct ebpf_object));
 	if (obj == NULL) {
+		ebpf_warning("Malloc memory failed for ebpf_object.\n");
 		return NULL;
 	}
 
@@ -406,8 +407,8 @@ static int load_obj__progs(struct ebpf_object *obj)
 				  0 /*EBPF_LOG_LEVEL, log_buf, LOG_BUF_SZ */ );
 
 		if (new_prog->prog_fd < 0) {
-			ebpf_warning("bcc_prog_load() failed. name: %s, errno: %d\n",
-				     new_prog->name, errno);
+			ebpf_warning("bcc_prog_load() failed. name: %s, %s errno: %d\n",
+				     new_prog->name, strerror(errno), errno);
 			if (new_prog->insns_cnt > BPF_MAXINSNS) {
 				ebpf_warning("The number of EBPF instructions (%d) "
 					     "exceeded the maximum limit (%d).\n",
@@ -690,8 +691,8 @@ int ebpf_obj_load(struct ebpf_object *obj)
 				   map->def.value_size, map->def.max_entries,
 				   0);
 		if (map->fd < 0) {
-			ebpf_warning("bcc_create_map() failed, name:%s\n",
-				     map->name);
+			ebpf_warning("bcc_create_map() failed, map name:%s - %s\n",
+				     map->name, strerror(errno));
 			goto failed;
 		}
 		ebpf_debug
