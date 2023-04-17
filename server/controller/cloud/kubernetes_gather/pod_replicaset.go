@@ -74,8 +74,11 @@ func (k *KubernetesGather) getReplicaSetsAndReplicaSetControllers() (podRSs []mo
 		if !k.podGroupLcuuids.Contains(podGroupLcuuid) {
 			podGroupLcuuid = uID
 			// ReplicaSetController类型名称去掉最后的'-' + hash值
+			nName := name
 			targetIndex := strings.LastIndex(name, "-")
-			newName := name[:targetIndex]
+			if targetIndex != -1 {
+				nName = name[:targetIndex]
+			}
 			label := "replicasetcontroller:" + namespace + ":" + name
 			_, ok = k.nsLabelToGroupLcuuids[namespace+label]
 			if ok {
@@ -99,7 +102,7 @@ func (k *KubernetesGather) getReplicaSetsAndReplicaSetControllers() (podRSs []mo
 			}
 			podRSC := model.PodGroup{
 				Lcuuid:             uID,
-				Name:               newName,
+				Name:               nName,
 				Label:              labelString,
 				Type:               common.POD_GROUP_REPLICASET_CONTROLLER,
 				PodNum:             replicas,
