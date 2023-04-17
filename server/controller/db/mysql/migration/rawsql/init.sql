@@ -952,7 +952,8 @@ CREATE TABLE IF NOT EXISTS `report` (
   `content`                LONGTEXT,
   `lcuuid`                 varchar(64) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL DEFAULT '',
   `created_at`             datetime DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  INDEX lcuuid(`lcuuid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 COMMENT='report records';
 
 CREATE TABLE IF NOT EXISTS vtap (
