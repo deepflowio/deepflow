@@ -42,6 +42,7 @@ pub struct MiniPacket {
     pub packet: Vec<u8>,
     pub timestamp: Duration,
     pub flow_id: u64,
+    pub acl_gids: Vec<u16>,
 }
 
 impl fmt::Debug for MiniPacket {
@@ -50,6 +51,7 @@ impl fmt::Debug for MiniPacket {
             .field("packet_len", &self.packet.len())
             .field("timestamp", &self.timestamp)
             .field("flow_id", &self.flow_id)
+            .field("acl_gids", &self.flow_id)
             .finish()
     }
 }
