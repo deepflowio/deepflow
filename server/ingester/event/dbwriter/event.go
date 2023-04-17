@@ -137,6 +137,13 @@ func (e *EventStore) WriteBlock(block *ckdb.Block) {
 	}
 }
 
+func (e *EventStore) Table() string {
+	if e.HasMetrics {
+		return PERF_EVENT_TABLE
+	}
+	return EVENT_TABLE
+}
+
 func (e *EventStore) Release() {
 	ReleaseEventStore(e)
 }
@@ -223,7 +230,7 @@ func (e *EventStore) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 	// reset temporary buffers
 	flowTagInfo := &cache.FlowTagInfoBuffer
 	*flowTagInfo = flow_tag.FlowTagInfo{
-		Table:   EVENT_TABLE,
+		Table:   e.Table(),
 		VpcId:   e.L3EpcID,
 		PodNsId: e.PodNSID,
 	}
