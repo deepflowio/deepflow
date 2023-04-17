@@ -645,6 +645,7 @@ message Pcap {
     optional uint64 end_time = 3;   // ns
     optional uint32 packet_count  = 4;
     optional bytes  packet_records = 5;
+    repeated uint32 acl_gids = 6;
 }
 
 message PcapBatch {
