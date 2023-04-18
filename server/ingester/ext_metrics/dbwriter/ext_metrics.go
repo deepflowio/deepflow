@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	DefaultPartition = ckdb.TimeFuncTwelveHour
+	DefaultPartition = ckdb.TimeFuncTwoHour
 )
 
 type ExtMetrics struct {

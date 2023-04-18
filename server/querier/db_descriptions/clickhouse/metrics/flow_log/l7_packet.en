@@ -1,2 +1,2 @@
 # Field              , DisplayName             , Unit , Description
-pcap_count           , Pcap Count              ,      ,
+packet_count         , Packet Count            ,      ,
