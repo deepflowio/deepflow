@@ -11,6 +11,7 @@ import (
 	"github.com/goccy/go-json"
 	"github.com/prometheus/prometheus/prompb"
 
+	"github.com/deepflowio/deepflow/server/libs/datastructure"
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
 	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
@@ -40,6 +41,8 @@ const (
 	// e.g.: tag `k8s.label` will extract in tag `k8s.label.app` (or other)
 	IGNORABLE_TAG_TYPE = "map"
 )
+
+var QPSLeakyBucket *datastructure.LeakyBucket
 
 // /querier/engine/clickhouse/clickhouse.go: `pod_ingress` and `lb_listener` are not supported by select
 // `time` as tag is pointless
@@ -72,6 +75,12 @@ const (
 type ctxKeyPrefixType struct{}
 
 func PromReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (contxt context.Context, sql string, db string, datasource string, err error) {
+	// QPS Limit Check
+	// Both SetRate and Acquire are expanded by 1000 times, making it suitable for small QPS scenarios.
+	if !QPSLeakyBucket.Acquire(1000) {
+		return ctx, "", "", "", errors.New("Prometheus query rate exceeded!")
+	}
+
 	queriers := req.Queries
 	if len(queriers) < 1 {
 		// TODO
