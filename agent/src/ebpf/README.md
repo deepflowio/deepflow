@@ -11,7 +11,8 @@ Currently support `x86_64` and `arm64` architectures.
   - Linux 4.14+ (Recommend Linux 5.2+)
 - arm64
   - Linux 5.8+
-  - Centos8 linux 4.18 
+  - Centos8 Linux 4.18 
+  - EulerOS Linux5.10+
 
 # Protocol Tracing
 

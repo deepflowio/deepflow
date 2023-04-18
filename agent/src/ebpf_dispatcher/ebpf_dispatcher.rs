@@ -465,9 +465,15 @@ impl EbpfCollector {
                 retry_count = retry_count + 1;
                 if retry_count >= RETRY_MAX {
                     error!(
-                        "The tracer_start() error. Kernel offset adapt failed. \
-                            Provide the operating system name and the \
-                            'kernel-devel' package for developers to adapt."
+                        "[eBPF Kernel Adapt] The tracer_start() \
+                            error. Kernel offset adapt failed. \
+                            Please ensure that BTF is enabled (kernel built \
+                            with CONFIG_DEBUG_INFO_BTF=y option). If the current \
+                            kernel version is low (<5.3), upgrading the Linux kernel \
+                            to 5.3+ (kernel built with CONFIG_DEBUG_INFO_BTF=y option) \
+                            can solve the problem. If it is not possible to upgrade \
+                            the kernel, the kernel-devel package can be provided for \
+                            developers to adapt and solve the problem."
                     );
                 }
             }
