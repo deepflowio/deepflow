@@ -212,6 +212,7 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 	k.serviceLcuuidToIngressLcuuid = map[string]string{}
 	k.nsLabelToGroupLcuuids = map[string]mapset.Set{}
 	k.pgLcuuidTopodTargetPorts = map[string]map[string]int{}
+	k.namespaceToExLabels = map[string]map[string]interface{}{}
 	k.nsServiceNameToService = map[string]map[string]map[string]int{}
 	k.cloudStatsd.APICount = map[string][]int{}
 	k.cloudStatsd.APICost = map[string][]int{}
