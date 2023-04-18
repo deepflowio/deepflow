@@ -216,6 +216,7 @@ const (
 	TimeFuncMinute
 	TimeFuncTenMinute
 	TimeFuncHour
+	TimeFuncTwoHour
 	TimeFuncFourHour
 	TimeFuncTwelveHour
 	TimeFuncDay
@@ -230,6 +231,7 @@ var timeFuncTypeString = []string{
 	TimeFuncMinute:     "toStartOfMinute(%s)", // %s指代函数作用于的字段名
 	TimeFuncTenMinute:  "toStartOfTenMinute(%s)",
 	TimeFuncHour:       "toStartOfHour(%s)",
+	TimeFuncTwoHour:    "toStartOfInterval(%s, INTERVAL 2 hour)",
 	TimeFuncFourHour:   "toStartOfInterval(%s, INTERVAL 4 hour)",
 	TimeFuncTwelveHour: "toStartOfInterval(%s, INTERVAL 12 hour)",
 	TimeFuncDay:        "toStartOfDay(%s)",
