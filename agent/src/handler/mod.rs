@@ -28,6 +28,7 @@ use npb_handler::{NpbHandler, NpbMode};
 use npb_pcap_policy::{NpbTunnelType, PolicyData};
 use public::{enums::HeaderType, packet, queue::DebugSender, utils::net::MacAddr};
 
+use crate::collector::acc_flow::U16Set;
 use crate::common::meta_packet::MetaPacket;
 
 pub struct IpInfo {
@@ -103,6 +104,7 @@ impl PacketHandler {
     pub fn handle(&mut self, packet: &MiniPacket) {
         match self {
             Self::Pcap(sender) => {
+                let mut acl_gids = U16Set::new();
                 if packet.policy.is_none()
                     || !packet.policy.as_ref().unwrap().contain_pcap()
                     || packet.flow_id == 0
@@ -118,6 +120,9 @@ impl PacketHandler {
                 for action in policy.npb_actions.iter() {
                     if action.tunnel_type() != NpbTunnelType::Pcap {
                         continue;
+                    }
+                    for gid in action.acl_gids().iter() {
+                        acl_gids.add(*gid);
                     }
                     let mut raw_len = payload_offset + action.payload_slice();
                     if raw_len > packet.packet.len() {
@@ -139,6 +144,7 @@ impl PacketHandler {
                     packet: packet.packet[..max_raw_len].to_vec(),
                     flow_id: packet.flow_id,
                     timestamp: Duration::from_nanos(packet.timestamp),
+                    acl_gids: Vec::from(acl_gids.list()),
                 };
                 if let Err(e) = sender.send(mini_packet) {
                     debug!("send mini packet to pcap assembler error: {e:?}");
