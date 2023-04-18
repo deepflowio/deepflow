@@ -606,7 +606,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 			results := &common.Result{}
 			for resourceKey, resourceType := range AutoMap {
 				if resourceKey == "gprocess" {
-					sql = fmt.Sprintf("SELECT id AS value, name AS display_name, %s AS device_type, '' AS uid FROM flow_tag.gprocess_map %s GROUP BY value, display_name, device_type, uid ORDER BY %s ASC %s", strconv.Itoa(resourceType), whereSql, orderBy, limitSql)
+					continue
 				} else {
 					// 增加资源ID
 					resourceId := resourceKey + "_id"
@@ -674,8 +674,10 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 		case "tap":
 			sql = fmt.Sprintf("SELECT value, name AS display_name FROM flow_tag.tap_type_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 
-		case "vtap", "gprocess":
+		case "vtap":
 			sql = fmt.Sprintf("SELECT id AS value, name AS display_name FROM flow_tag.%s_map %s GROUP BY value, display_name ORDER BY %s ASC %s", tag, whereSql, orderBy, limitSql)
+		case "gprocess":
+			return &common.Result{}, sqlList, nil
 		case common.TAP_PORT_HOST, common.TAP_PORT_CHOST, common.TAP_PORT_POD_NODE:
 			if whereSql != "" {
 				whereSql += fmt.Sprintf(" AND device_type=%d", TAP_PORT_DEVICE_MAP[tag])
