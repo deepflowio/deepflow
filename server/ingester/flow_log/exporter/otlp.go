@@ -191,12 +191,6 @@ func L7FlowLogToExportRequest(l7 *log_data.L7FlowLog, universalTagsManager *Univ
 		putStrWithoutEmpty(resAttrs, "telemetry.sdk.name", "deepflow")
 		putStrWithoutEmpty(resAttrs, "telemetry.sdk.version", common.CK_VERSION)
 
-		if spanKind == ptrace.SpanKindServer {
-			setServerSpanKindHostAndPeer(spanAttrs, l7, tags0, tags1)
-		} else {
-			setOtherSpanKindHostAndPeer(spanAttrs, l7, tags0, tags1)
-		}
-
 		switch datatype.L7Protocol(l7.L7Protocol) {
 		case datatype.L7_PROTOCOL_DNS:
 			setDNS(&span, spanAttrs, l7)
@@ -216,6 +210,14 @@ func L7FlowLogToExportRequest(l7 *log_data.L7FlowLog, universalTagsManager *Univ
 			setRedis(&span, spanAttrs, l7)
 		case datatype.L7_PROTOCOL_POSTGRE:
 			setPostgreSQL(&span, spanAttrs, l7)
+		}
+
+		// the priority of the value of 'net.peer.name' is CHost > PodNode > RequestDomain(set in HTTPBase)
+		// if 'net.peer.name' is set multiple times, the value set later will overwrite the value set before
+		if spanKind == ptrace.SpanKindServer {
+			setServerSpanKindHostAndPeer(spanAttrs, l7, tags0, tags1)
+		} else {
+			setOtherSpanKindHostAndPeer(spanAttrs, l7, tags0, tags1)
 		}
 	}
 	if dataTypeBits&METRICS != 0 {
