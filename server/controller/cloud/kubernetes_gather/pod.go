@@ -81,8 +81,11 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, e
 				log.Debugf("sci pod (%s) not found provider resource name", name)
 				continue
 			}
+			abstractPGName := resourceName
 			targetIndex := strings.LastIndex(resourceName, "-")
-			abstractPGName := resourceName[:targetIndex]
+			if targetIndex != -1 {
+				abstractPGName = resourceName[:targetIndex]
+			}
 			uid := common.GetUUID(namespace+abstractPGName, uuid.Nil)
 			// 适配平安 serverless pod, 需要抽象出一个对应的 node , 在这里添加一个参考值 abstract 作为判断标志
 			podGroups, _ = simplejson.NewJson([]byte(fmt.Sprintf(`[{"uid": "%s","kind": "%s","abstract": true}]`, uid, abstractPGType)))

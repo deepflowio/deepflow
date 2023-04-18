@@ -106,8 +106,11 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 					log.Debugf("sci pod (%s) abstract pod group not found provider resource name", name)
 					continue
 				}
+				abstractPGName := resourceName
 				targetIndex := strings.LastIndex(resourceName, "-")
-				abstractPGName := resourceName[:targetIndex]
+				if targetIndex != -1 {
+					abstractPGName = resourceName[:targetIndex]
+				}
 				uID = common.GetUUID(namespace+abstractPGName, uuid.Nil)
 				if k.podGroupLcuuids.Contains(uID) {
 					log.Debugf("sci pod (%s) abstract workload already existed", name)
