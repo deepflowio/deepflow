@@ -196,7 +196,6 @@ func parseTime(s string) (time.Time, error) {
 }
 
 // API Spec: https://prometheus.io/docs/prometheus/latest/querying/api/#finding-series-by-label-matchers
-// TODO: 可以先不要返回 flow_metrics 以外的数据？并检查 deepflow_system 是否支持 promQL
 func Series(args *common.PromQueryParams) (result *common.PromQueryResponse, err error) {
 	start, err := parseTime(args.StartTime)
 	if err != nil {

@@ -16,6 +16,7 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/config"
 	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	tagdescription "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
 )
 
 const (
@@ -61,6 +62,24 @@ var matcherRules = map[string]string{
 	"cloud_tag_": "cloud.tag.",
 }
 
+// definition: https://github.com/prometheus/prometheus/blob/main/promql/parser/lex.go#L106
+// docs: https://prometheus.io/docs/prometheus/latest/querying/operators/#aggregation-operators
+// convert promql aggregation functions to querier functions
+var aggFunctions = map[string]string{
+	"sum":          view.FUNCTION_SUM,
+	"avg":          view.FUNCTION_AVG,
+	"count":        view.FUNCTION_COUNT, // in querier should query Sum(log_count)
+	"min":          view.FUNCTION_MIN,
+	"max":          view.FUNCTION_MAX,
+	"group":        "1", // all values in the resulting vector are 1
+	"stddev":       view.FUNCTION_STDDEV,
+	"stdvar":       "",                  // not supported
+	"topk":         "",                  // not supported in querier, but clickhouse does, FIXME: should supported in querier
+	"bottomk":      "",                  // not supported
+	"count_values": view.FUNCTION_COUNT, // equals count() group by value in ck
+	"quantile":     view.FUNCTION_PCTL,
+}
+
 // define `showtag` flag, it passed when and only [api/v1/series] been called
 type CtxKeyShowTag struct{}
 
@@ -99,6 +118,8 @@ func PromReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (contxt 
 	metrics := []string{fmt.Sprintf("toUnixTimestamp(time) AS %s", EXT_METRICS_TIME_COLUMNS)}
 	metricsName := ""
 	table := ""
+	var groupLabels []string
+
 	// get metrics_name and all filter columns from query statement
 	isShowTagStatement := false
 	if st, ok := ctx.Value(CtxKeyShowTag{}).(bool); ok {
@@ -122,9 +143,71 @@ func PromReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (contxt 
 					db = metricsSplit[0]
 					table = metricsSplit[1] // FIXME: should fix deepflow_system table name like 'deepflow_server.xxx'
 					metricsName = metricsSplit[2]
+					var aggOperator, aggMetrics string
+
+					if db != DB_NAME_EXT_METRICS {
+						// DeepFlow native metrics needs aggregation for query
+						if len(q.Hints.Grouping) == 0 {
+							// not specific cardinality
+							return ctx, "", "", "", fmt.Errorf("unknown series")
+						}
+						if !q.Hints.By {
+							// not support for `without` operation
+							return ctx, "", "", "", fmt.Errorf("not support for 'without' clause for aggregation")
+						}
+
+						// inner-nested should got supported agg functions
+						aggOperator = aggFunctions[q.Hints.Func]
+						if aggOperator == "" {
+							return ctx, "", "", "", fmt.Errorf("aggeration operator: %s is not supported yet", q.Hints.Func)
+						}
+
+						// time aggeration
+						if q.Hints.StepMs > 0 {
+							// range query, aggeration for time step
+							stepSecond := q.Hints.StepMs / 1e3
+							// rebuild `time` query in range query
+							// replace `toUnixTimestamp(time) as timestamp`
+							metrics[0] = fmt.Sprintf("time(time, %d) AS %s", stepSecond, EXT_METRICS_TIME_COLUMNS)
+						}
+
+						groupLabels = make([]string, 0, len(q.Hints.Grouping)+1)
+						// instant query only aggerate to 1 point
+						groupLabels = append(groupLabels, EXT_METRICS_TIME_COLUMNS)
+
+						// should append all labels in query & grouping clause
+						for _, g := range q.Hints.Grouping {
+							label := fmt.Sprintf("`%s`", convertToQuerierAllowedTagName(g))
+							groupLabels = append(groupLabels, label)
+							metrics = append(metrics, label)
+						}
+
+						// aggeration for metrics, assert aggOperator is not empty
+						switch aggOperator {
+						case view.FUNCTION_SUM, view.FUNCTION_AVG, view.FUNCTION_MIN, view.FUNCTION_MAX, view.FUNCTION_STDDEV:
+							aggMetrics = fmt.Sprintf("%s(`%s`)", aggOperator, metricsName)
+						case view.FUNCTION_PCTL:
+							// return Percentile(x,0) to prometheus, prometheus engine will calcul REAL percentile
+							aggMetrics = fmt.Sprintf("%s(`%s`, 0)", aggOperator, metricsName)
+						case "1":
+							// group
+							aggMetrics = aggOperator
+						case view.FUNCTION_COUNT:
+							if db != chCommon.DB_NAME_FLOW_LOG {
+								return ctx, "", "", "", fmt.Errorf("only supported Count for flow_log")
+							}
+							aggMetrics = "Sum(`log_count`)" // will be append as `metrics.$metricsName` in below
+
+							// count_values means count unique value
+							if q.Hints.Func == "count_values" {
+								metrics = append(metrics, fmt.Sprintf("`%s`", metricsName)) // append original metric name
+								groupLabels = append(groupLabels, fmt.Sprintf("`%s`", metricsName))
+							}
+						}
+					}
 
 					if db == DB_NAME_DEEPFLOW_SYSTEM {
-						metrics = append(metrics, fmt.Sprintf("metrics.%s", metricsName))
+						metrics = append(metrics, fmt.Sprintf("metrics.%s", aggMetrics))
 					} else if db == DB_NAME_EXT_METRICS {
 						// identify tag prefix as "tag_"
 						ctx = context.WithValue(ctx, ctxKeyPrefixType{}, prefixTag)
@@ -138,7 +221,7 @@ func PromReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (contxt 
 						metrics = append(metrics, fmt.Sprintf("metrics.%s", metricsName))
 					} else {
 						// To identify which columns belong to metrics, we prefix all metrics names with `metrics.`
-						metrics = append(metrics, fmt.Sprintf("%s as `metrics.%s`", metricsName, metricsName))
+						metrics = append(metrics, fmt.Sprintf("%s as `metrics.%s`", aggMetrics, metricsName))
 					}
 
 					if len(metricsSplit) > 3 {
@@ -202,16 +285,6 @@ func PromReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (contxt 
 	} else if db == "" || db == chCommon.DB_NAME_EXT_METRICS || db == chCommon.DB_NAME_DEEPFLOW_SYSTEM {
 		// append ext_metrics native tag
 		metrics = append(metrics, EXT_METRICS_NATIVE_TAG_NAME)
-	} else if db == chCommon.DB_NAME_FLOW_METRICS {
-		if table == VTAP_APP_PORT_TABLE || table == VTAP_FLOW_PORT_TABLE {
-			// append native tag
-			metrics = append(metrics, AUTO_INSTANCE_TAG_NAME)
-		} else if table == VTAP_APP_EDGE_PORT_TABLE || table == VTAP_FLOW_EDGE_PORT_TABLE {
-			// append native tag & capture info
-			metrics = append(metrics, fmt.Sprintf("`%s_0`", AUTO_INSTANCE_TAG_NAME)) // client side tag
-			metrics = append(metrics, fmt.Sprintf("`%s_1`", AUTO_INSTANCE_TAG_NAME)) // server side tag
-			metrics = append(metrics, TAP_SIDE_TAG_NAME)                             // capture info tag
-		}
 	} else {
 		// do nothing
 		// not supported for other db/tables currently
@@ -246,11 +319,6 @@ func PromReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (contxt 
 				// convert k8s label tag to query tag
 				tagName := convertToQuerierAllowedTagName(matcher.Name)
 				filters = append(filters, fmt.Sprintf("`%s` %s '%s'", tagName, operation, matcher.Value))
-
-				// append quering tags, but ignore auto_instance_x/tap_side / tag_
-				if !strings.HasPrefix(tagName, AUTO_INSTANCE_TAG_NAME) && tagName != TAP_SIDE_TAG_NAME {
-					metrics = append(metrics, tagName)
-				}
 			}
 		}
 	}
@@ -259,8 +327,8 @@ func PromReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (contxt 
 	// querier will be called later, so there is no need to display the declaration db
 	if db != "" {
 		// FIXME: if db is ext_metrics, only support for prometheus metrics now
-		sql = fmt.Sprintf("SELECT %s FROM %s WHERE %s ORDER BY time desc LIMIT %s",
-			strings.Join(metrics, ","), table, strings.Join(filters, " AND "), config.Cfg.Limit)
+		sql = fmt.Sprintf("SELECT %s FROM %s WHERE %s GROUP BY %s ORDER BY %s desc LIMIT %s",
+			strings.Join(metrics, ","), table, strings.Join(filters, " AND "), strings.Join(groupLabels, ","), EXT_METRICS_TIME_COLUMNS, config.Cfg.Limit)
 	} else {
 		sql = fmt.Sprintf("SELECT %s FROM prometheus.%s WHERE %s ORDER BY time desc LIMIT %s",
 			strings.Join(metrics, ","), metricsName, strings.Join(filters, " AND "), config.Cfg.Limit)
