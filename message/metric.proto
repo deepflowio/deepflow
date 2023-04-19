@@ -203,8 +203,8 @@ message Profile {
 }
 
 enum IoOperation {
-    Read = 0;
-    Write = 1;
+    Write = 0;
+    Read = 1;
 }
 
 message IoEventData {
