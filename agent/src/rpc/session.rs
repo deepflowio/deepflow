@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+use std::io;
+use std::net::ToSocketAddrs;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
     Arc, Weak,
@@ -219,10 +221,35 @@ impl Session {
         self.server_dispatcher.write().reset();
     }
 
-    async fn dial(&self, remote: &String, remote_port: u16) {
-        // TODO: 错误处理和tls
-        match Endpoint::from_shared(format!("http://{}:{}", remote, remote_port))
-            .unwrap()
+    async fn dial(&self, remote: &str, remote_port: u16) {
+        // TODO: tls
+        let socket_address = match (remote, remote_port)
+            .to_socket_addrs()
+            .and_then(|mut iter| {
+                iter.next()
+                    .ok_or(io::Error::new(io::ErrorKind::InvalidData, "result is empty").into())
+            }) {
+            Ok(addr) => addr,
+            Err(e) => {
+                self.exception_handler.set(Exception::ControllerSocketError);
+                self.set_request_failed(true);
+                error!(
+                    "resolve socket address remote({}) port({}) failed: {}",
+                    remote, remote_port, e
+                );
+                return;
+            }
+        };
+        let endpoint = match Endpoint::from_shared(format!("http://{}", socket_address)) {
+            Ok(ep) => ep,
+            Err(e) => {
+                self.exception_handler.set(Exception::ControllerSocketError);
+                self.set_request_failed(true);
+                error!("create endpoint http://{} failed {}", socket_address, e);
+                return;
+            }
+        };
+        match endpoint
             .connect_timeout(DEFAULT_TIMEOUT)
             .timeout(SESSION_TIMEOUT)
             .connect()
