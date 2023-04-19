@@ -885,9 +885,9 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"",
 		)}
 
-	tagResourceMap["pcap_batch"] = map[string]*Tag{
+	tagResourceMap["packet_batch"] = map[string]*Tag{
 		"default": NewTag(
-			"TO_BASE64(pcap_batch)",
+			"TO_BASE64(packet_batch)",
 			"",
 			"",
 			"",
