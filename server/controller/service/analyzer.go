@@ -222,9 +222,9 @@ func UpdateAnalyzer(
 
 	// 检查: 如果区域内没有控制器，禁止将数据节点修改至该区域
 	if _, ok := analyzerUpdate["REGION"]; ok {
-		var azAnalyzerConns []mysql.AZAnalyzerConnection
-		mysql.Db.Where("region = ?", analyzerUpdate["REGION"]).Find(&azAnalyzerConns)
-		if len(azAnalyzerConns) == 0 {
+		var azControllerConns []mysql.AZControllerConnection
+		mysql.Db.Where("region = ?", analyzerUpdate["REGION"]).Find(&azControllerConns)
+		if len(azControllerConns) == 0 {
 			return nil, NewError(common.INVALID_POST_DATA, fmt.Sprintf("no controller in region(%s)", analyzerUpdate["REGION"]))
 		}
 	}
