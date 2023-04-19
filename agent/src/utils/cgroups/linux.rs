@@ -146,7 +146,10 @@ impl Cgroups {
                     let max_memory = environment.max_memory;
                     if max_cpus != last_cpu || max_memory != last_memory {
                         if let Err(e) = Self::apply(cgroup.clone(), max_cpus, max_memory) {
-                            warn!("apply cgroup resource failed, {:?}, agent restart...", e);
+                            warn!(
+                                "apply cgroup resource failed, {}, deepflow-agent restart...",
+                                e
+                            );
                             thread::sleep(Duration::from_secs(1));
                             process::exit(1);
                         }
