@@ -892,10 +892,11 @@ impl Synchronizer {
                         let (ts, cvar) = &*trident_state;
                         *ts.lock().unwrap() = trident::State::Disabled(None);
                         cvar.notify_one();
-                        warn!("deepflow-agent restart, as max escape time expired");
+                        warn!("as max escape time expired, deepflow-agent restart...");
                         // 与控制器失联的时间超过设置的逃逸时间，这里直接重启主要有两个原因：
                         // 1. 如果仅是停用系统无法回收全部的内存资源
                         // 2. 控制器地址可能是通过域明解析的，如果域明解析发生变更需要重启来触发重新解析
+                        time::sleep(Duration::from_secs(1)).await;
                         process::exit(NORMAL_EXIT_WITH_RESTART);
                     }
                 }
@@ -1288,7 +1289,7 @@ impl Synchronizer {
                             let (ts, cvar) = &*trident_state;
                             *ts.lock().unwrap() = trident::State::Terminated;
                             cvar.notify_one();
-                            warn!("agent upgrade is successful and restarts normally, agent restart...");
+                            warn!("agent upgrade is successful and restarts normally, deepflow-agent restart...");
                             time::sleep(Duration::from_secs(1)).await;
                             process::exit(NORMAL_EXIT_WITH_RESTART);
                         },

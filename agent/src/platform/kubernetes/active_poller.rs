@@ -122,7 +122,7 @@ impl ActivePoller {
                 new_nss.extend(extra_ns);
             }
             if nss != new_nss {
-                info!("query net namespaces changed from {:?} to {:?}, restart agent to create dispatcher for extra namespaces", nss, new_nss);
+                info!("query net namespaces changed from {:?} to {:?}, restart agent to create dispatcher for extra namespaces, deepflow-agent restart...", nss, new_nss);
                 thread::sleep(Duration::from_secs(1));
                 process::exit(NORMAL_EXIT_WITH_RESTART);
             }

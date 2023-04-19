@@ -211,7 +211,7 @@ impl BaseDispatcher {
     pub(super) fn init(&mut self) {
         if let Err(e) = self.engine.init() {
             error!(
-                "dispatcher recv_engine init error: {:?}, deepflow-agent restart...",
+                "dispatcher recv_engine init error: {}, deepflow-agent restart...",
                 e
             );
             thread::sleep(Duration::from_secs(1));
@@ -401,7 +401,7 @@ impl BaseDispatcher {
             }
             Err(e) => {
                 error!(
-                    "dispatcher recv_engine init error: {:?}, deepflow-agent restart...",
+                    "dispatcher recv_engine init error: {}, deepflow-agent restart...",
                     e
                 );
                 thread::sleep(Duration::from_secs(1));
@@ -819,6 +819,7 @@ impl BaseDispatcherListener {
         if self.options.lock().unwrap().af_packet_version != config.capture_socket_type.into() {
             // TODO：目前通过进程退出的方式修改AfPacket版本，后面需要支持动态修改
             info!("Afpacket version update, deepflow-agent restart...");
+            thread::sleep(Duration::from_secs(1));
             process::exit(1);
         }
     }
