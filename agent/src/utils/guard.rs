@@ -253,7 +253,7 @@ impl Guard {
                                 thread_num, thread_limit
                             );
                             if thread_num > thread_limit * 2 {
-                                error!("the number of thread exceeds the limit by 2 times, trident restart...");
+                                error!("the number of thread exceeds the limit by 2 times, deepflow-agent restart...");
                                 thread::sleep(Duration::from_secs(1));
                                 exit(NORMAL_EXIT_WITH_RESTART);
                             }
