@@ -772,6 +772,16 @@ static struct proc_info *find_proc_info(int pid)
 	return NULL;
 }
 
+static void free_proc_info(struct proc_info *p_info)
+{
+	// Free memory occupied by structure members.
+	if (p_info->path != NULL) {
+		free(p_info->path);
+	}
+
+	free(p_info);
+}
+
 /*
  * Clear all probes, if probe->pid == pid
  */
@@ -786,7 +796,7 @@ static void clear_probes_by_pid(struct bpf_tracer *tracer, int pid,
 	struct proc_info *p_info = find_proc_info(pid);
 	if (p_info) {
 		list_head_del(&p_info->list);
-		free(p_info);
+		free_proc_info(p_info);
 	}
 
 	list_for_each_safe(p, n, &tracer->probes_head) {
