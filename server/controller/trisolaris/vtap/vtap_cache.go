@@ -251,6 +251,7 @@ func (c *VTapCache) unsetLicenseFunctionEnable() {
 func (c *VTapCache) convertLicenseFunctions() {
 	c.unsetLicenseFunctionEnable()
 	if c.licenseFunctions == nil || *c.licenseFunctions == "" {
+		c.licenseFunctionSet = mapset.NewSet()
 		log.Warningf("vtap(%s) no license functions", c.GetKey())
 		return
 	}
