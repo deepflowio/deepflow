@@ -240,7 +240,13 @@ func (c *Config) Validate() error {
 			log.Warningf("get clickhouse endpoints(%s) failed, err: %s", c.CKDB.Host, err)
 			continue
 		}
-		c.CKDB.ActualAddr = fmt.Sprintf("%s:%d", endpoint.Host, endpoint.Port)
+
+		// if it is an IPv6 address, it needs to be enclosed in []
+		if strings.Contains(endpoint.Host, ":") {
+			c.CKDB.ActualAddr = fmt.Sprintf("[%s]:%d", endpoint.Host, endpoint.Port)
+		} else {
+			c.CKDB.ActualAddr = fmt.Sprintf("%s:%d", endpoint.Host, endpoint.Port)
+		}
 		c.CKDB.Watcher = watcher
 		log.Infof("get clickhouse actual address: %s", c.CKDB.ActualAddr)
 
