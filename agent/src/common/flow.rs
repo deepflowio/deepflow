@@ -1011,6 +1011,13 @@ pub fn get_direction(
 ) -> (Direction, Direction, bool) {
     let src_ep = &flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC];
     let dst_ep = &flow.flow_metrics_peers[FLOW_METRICS_PEER_DST];
+
+    if flow.flow_key.mac_src == flow.flow_key.mac_dst
+        && (is_tt_pod(trident_type) || is_tt_workload(trident_type))
+    {
+        return (Direction::LocalToLocal, Direction::None, false);
+    }
+
     // For eBPF data, the direction can be calculated directly through l2_end,
     // and its l2_end has been set in MetaPacket::from_ebpf().
     if flow.signal_source == SignalSource::EBPF {
@@ -1026,10 +1033,6 @@ pub fn get_direction(
         return (src_direct, dst_direct, false);
     } else if flow.signal_source == SignalSource::XFlow {
         return (Direction::None, Direction::None, false);
-    } else if flow.flow_key.mac_src == flow.flow_key.mac_dst
-        && (is_tt_pod(trident_type) || is_tt_workload(trident_type))
-    {
-        return (Direction::LocalToLocal, Direction::None, false);
     }
 
     // 返回值分别为统计点对应的zerodoc.DirectionEnum以及及是否添加追踪数据的开关，在微软
