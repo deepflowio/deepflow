@@ -1138,14 +1138,6 @@ pub fn get_direction(
     let src_ep = &flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC];
     let dst_ep = &flow.flow_metrics_peers[FLOW_METRICS_PEER_DST];
 
-    // Data from otel may not have mac_src and mac_dst
-    if flow.flow_key.mac_src == flow.flow_key.mac_dst
-        && flow.signal_source != SignalSource::OTel
-        && (is_tt_pod(trident_type) || is_tt_workload(trident_type))
-    {
-        return [Direction::LocalToLocal, Direction::None];
-    }
-
     match flow.signal_source {
         SignalSource::OTel => {
             // The direction of otel data is obtained according to flow.tap_side.
@@ -1164,6 +1156,7 @@ pub fn get_direction(
                 Direction::ClientProcessToServer,
                 Direction::ServerProcessToClient,
             );
+            // FIXME: tap_side should be determined based on which side of the process_id
             if src_ep.is_l2_end {
                 dst_direct = Direction::None
             } else if dst_ep.is_l2_end {
@@ -1174,7 +1167,14 @@ pub fn get_direction(
         SignalSource::XFlow => {
             return [Direction::None, Direction::None];
         }
-        _ => {}
+        _ => {
+            // Data from otel may not have mac_src and mac_dst
+            if flow.flow_key.mac_src == flow.flow_key.mac_dst
+                && (is_tt_pod(trident_type) || is_tt_workload(trident_type))
+            {
+                return [Direction::LocalToLocal, Direction::None];
+            }
+        }
     }
 
     // 返回值分别为统计点对应的zerodoc.DirectionEnum以及及是否添加追踪数据的开关，在微软

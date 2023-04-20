@@ -604,8 +604,9 @@ impl Stash {
             tap_side: TapSide::from(direction),
             tap_port: flow_key.tap_port,
             tap_type: flow_key.tap_type,
-            // If the resource is located on the client, the service port is ignored, except flow, which belongs to LocalToLocal
-            server_port: if (ep == 0 && direction != Direction::LocalToLocal)
+            // If the resource is located on the client, the service port is ignored,
+            // the flow whose server and client belong to the same mac address is excluded
+            server_port: if (ep == 0 && flow.flow_key.mac_src != flow.flow_key.mac_dst)
                 || Self::ignore_server_port(
                     flow,
                     self.context.config.load().inactive_server_port_enabled,
