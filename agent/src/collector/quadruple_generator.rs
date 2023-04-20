@@ -1006,10 +1006,6 @@ impl QuadrupleGenerator {
                 direction_score: tagged_flow.flow.direction_score,
             };
 
-            let stats = match tagged_flow.flow.flow_perf_stats.as_ref() {
-                Some(s) => s,
-                None => return (flow_meter, app_meter),
-            };
             if tagged_flow.flow.flow_key.proto == IpProtocol::Tcp {
                 match tagged_flow.flow.close_type {
                     CloseType::TcpServerRst => flow_meter.anomaly.server_rst_flow = 1,
@@ -1036,6 +1032,11 @@ impl QuadrupleGenerator {
                     | CloseType::Max => (),
                 }
             }
+
+            let stats = match tagged_flow.flow.flow_perf_stats.as_ref() {
+                Some(s) => s,
+                None => return (flow_meter, app_meter),
+            };
 
             if tagged_flow.flow.flow_key.proto == IpProtocol::Tcp {
                 flow_meter.latency = Latency {
