@@ -1137,34 +1137,44 @@ pub fn get_direction(
 ) -> [Direction; 2] {
     let src_ep = &flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC];
     let dst_ep = &flow.flow_metrics_peers[FLOW_METRICS_PEER_DST];
-    // For eBPF data, the direction can be calculated directly through l2_end,
-    // and its l2_end has been set in MetaPacket::from_ebpf().
-    if flow.signal_source == SignalSource::EBPF {
-        let (mut src_direct, mut dst_direct) = (
-            Direction::ClientProcessToServer,
-            Direction::ServerProcessToClient,
-        );
-        if src_ep.is_l2_end {
-            dst_direct = Direction::None
-        } else if dst_ep.is_l2_end {
-            src_direct = Direction::None
-        }
-        return [src_direct, dst_direct];
-    } else if flow.signal_source == SignalSource::OTel {
-        // The direction of otel data is obtained according to flow.tap_side.
-        return if flow.tap_side == TapSide::ClientApp {
-            [Direction::ClientAppToServer, Direction::None]
-        } else if flow.tap_side == TapSide::ServerApp {
-            [Direction::None, Direction::ServerAppToClient]
-        } else {
-            [Direction::None, Direction::None]
-        };
-    } else if flow.signal_source == SignalSource::XFlow {
-        return [Direction::None, Direction::None];
-    } else if flow.flow_key.mac_src == flow.flow_key.mac_dst
+
+    // Data from otel may not have mac_src and mac_dst
+    if flow.flow_key.mac_src == flow.flow_key.mac_dst
+        && flow.signal_source != SignalSource::OTel
         && (is_tt_pod(trident_type) || is_tt_workload(trident_type))
     {
         return [Direction::LocalToLocal, Direction::None];
+    }
+
+    match flow.signal_source {
+        SignalSource::OTel => {
+            // The direction of otel data is obtained according to flow.tap_side.
+            return if flow.tap_side == TapSide::ClientApp {
+                [Direction::ClientAppToServer, Direction::None]
+            } else if flow.tap_side == TapSide::ServerApp {
+                [Direction::None, Direction::ServerAppToClient]
+            } else {
+                [Direction::None, Direction::None]
+            };
+        }
+        SignalSource::EBPF => {
+            // For eBPF data, the direction can be calculated directly through l2_end,
+            // and its l2_end has been set in MetaPacket::from_ebpf().
+            let (mut src_direct, mut dst_direct) = (
+                Direction::ClientProcessToServer,
+                Direction::ServerProcessToClient,
+            );
+            if src_ep.is_l2_end {
+                dst_direct = Direction::None
+            } else if dst_ep.is_l2_end {
+                src_direct = Direction::None
+            }
+            return [src_direct, dst_direct];
+        }
+        SignalSource::XFlow => {
+            return [Direction::None, Direction::None];
+        }
+        _ => {}
     }
 
     // 返回值分别为统计点对应的zerodoc.DirectionEnum以及及是否添加追踪数据的开关，在微软
