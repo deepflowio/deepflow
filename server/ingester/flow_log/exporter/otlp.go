@@ -117,7 +117,7 @@ func L7FlowLogToExportRequest(l7 *log_data.L7FlowLog, universalTagsManager *Univ
 			if parentSpanId, err := hex.DecodeString(l7.ParentSpanId); err != nil {
 				id := [8]byte{}
 				copy(id[:], parentSpanId)
-				span.SetSpanID(pcommon.SpanID(id))
+				span.SetParentSpanID(pcommon.SpanID(id))
 			}
 			span.SetKind(ptrace.SpanKind(l7.SpanKind))
 		} else {
