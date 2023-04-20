@@ -1,8 +1,16 @@
 diff --git a/lib/column/nullable.go b/lib/column/nullable.go
-index 58aeae1..4497124 100644
+index 58aeae1..83250f6 100644
 --- a/lib/column/nullable.go
 +++ b/lib/column/nullable.go
-@@ -82,6 +82,26 @@ func (col *Nullable) Row(i int, ptr bool) interface{} {
+@@ -19,6 +19,7 @@ package column
+ 
+ import (
+ 	"reflect"
++	"time"
+ 
+ 	"github.com/ClickHouse/clickhouse-go/v2/lib/binary"
+ )
+@@ -82,6 +83,32 @@ func (col *Nullable) Row(i int, ptr bool) interface{} {
  func (col *Nullable) ScanRow(dest interface{}, row int) error {
  	if col.enable {
  		if col.nulls.data[row] == 1 {
@@ -24,6 +32,12 @@ index 58aeae1..4497124 100644
 +			case **int8:
 +				*v = nil
 +			case **string:
++				*v = nil
++			case **float32:
++				*v = nil
++			case **float64:
++				*v = nil
++			case **time.Time:
 +				*v = nil
 +			}
  			return nil
