@@ -22,6 +22,8 @@
 #include <time.h>
 #include <string.h>
 #include <stdlib.h>
+#include "types.h"
+#include "clib.h"
 #include "log.h"
 
 #define __unused __attribute__((__unused__))
@@ -69,10 +71,6 @@ extern int sysinfo(struct sysinfo *__info);
 #define offsetof(TYPE, MEMBER)  __builtin_offsetof (TYPE, MEMBER)
 #endif
 
-#ifndef __always_inline
-#define __always_inline inline __attribute__((always_inline))
-#endif
-
 #define CACHE_LINE_SIZE   64
 #define CACHE_LINE_MASK (CACHE_LINE_SIZE-1)
 
@@ -82,29 +80,15 @@ do {				\
 	P = NULL;	        \
 } while(0)
 
-#define etr_max(x,y)                            \
-({                                              \
-	__typeof__ (x) _x = (x);                \
-	__typeof__ (y) _y = (y);                \
-	_x > _y ? _x : _y;                      \
-})
-
-#define etr_min(x,y)                            \
-({                                              \
-	__typeof__ (x) _x = (x);                \
-	__typeof__ (y) _y = (y);                \
-	_x < _y ? _x : _y;                      \
-})
-
-static __always_inline void safe_buf_copy(void *dst, int dst_len,
-					  void *src, int src_len)
+static_always_inline void safe_buf_copy(void *dst, int dst_len,
+					void *src, int src_len)
 {
 	if (dst == NULL || src == NULL) {
 		ebpf_error("dst:%p, src:%p\n", dst, src);
 		return;
 	}
 
-	int copy_count = etr_min(dst_len, src_len);
+	int copy_count = clib_min(dst_len, src_len);
 	if (copy_count <= 0) {
 		ebpf_error("dst_len:%d, src_len:%d\n", dst_len, src_len);
 		return;
@@ -153,7 +137,7 @@ enum {
 	ETR_IDLE = -12,		/* nothing to do */
 	ETR_BUSY = -13,		/* resource busy */
 	ETR_NOTSUPP = -14,	/* not support */
-	ETR_RESOURCE = -15,	/* no resource */
+	ETR_NORESOURCE = -15,	/* no resource */
 	ETR_OVERLOAD = -16,	/* overloaded */
 	ETR_NOSERV = -17,	/* no service */
 	ETR_DISABLED = -18,	/* disabled */
@@ -166,6 +150,7 @@ enum {
 	ETR_SYSCALL = -26,	/* system call failed */
 	ETR_PROC_FAIL = -27,	/* procfs failed */
 	ETR_NOHANDLE = -28,	/* not find event handle */
+	ETR_LOAD = -29,		/* bpf programe load failed */
 
 	/* positive code for non-error */
 	ETR_INPROGRESS = 2,	/* in progress */
@@ -191,7 +176,7 @@ static struct trace_err_tab err_tab[] = {
 	{ETR_IDLE, "nothing to do"},
 	{ETR_BUSY, "resource busy"},
 	{ETR_NOTSUPP, "not support"},
-	{ETR_RESOURCE, "no resource"},
+	{ETR_NORESOURCE, "no resource"},
 	{ETR_OVERLOAD, "overloaded"},
 	{ETR_NOSERV, "no service"},
 	{ETR_DISABLED, "disabled"},
@@ -204,6 +189,7 @@ static struct trace_err_tab err_tab[] = {
 	{ETR_SYSCALL, "system call failed"},
 	{ETR_PROC_FAIL, "procfs failed"},
 	{ETR_NOHANDLE, "not find event handle"},
+	{ETR_LOAD, "bpf programe load failed"},
 
 	{ETR_INPROGRESS, "in progress"},
 };
@@ -255,7 +241,7 @@ int sysfs_write(const char *file_name, char *v);
 int sysfs_read_num(const char *file_name);
 uint64_t gettime(clockid_t clk_id, int flag);
 uint32_t get_sys_uptime(void);
-unsigned long long get_process_starttime(int pid);
+u64 get_process_starttime(pid_t pid);
 int max_rlim_open_files_set(int num);
 int fetch_kernel_version(int *major, int *minor, int *patch);
 unsigned int fetch_kernel_version_code(void);

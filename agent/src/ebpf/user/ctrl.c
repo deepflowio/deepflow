@@ -398,8 +398,9 @@ int sockopt_ctl(__unused void *arg)
 		reply_hdr.id = msg->id;
 		reply_hdr.type = msg->type;
 		reply_hdr.errcode = ret;
+		memset(reply_hdr.errstr, 0, sizeof(reply_hdr.errstr));
 		strncpy(reply_hdr.errstr, trace_strerror(ret),
-			SOCKOPT_ERRSTR_LEN - 1);
+			sizeof(reply_hdr.errstr) - 1);
 		reply_hdr.len = reply_data_len;
 
 		/* send response */

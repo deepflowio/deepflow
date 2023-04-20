@@ -56,6 +56,8 @@ static long (*bpf_probe_read_str) (void *dst, __u32 size,
 // bpf_probe_read_user added in Linux 5.5, Instead of bpf_probe_read_user(), use bpf_probe_read() here.
 static long (*bpf_probe_read_user) (void *dst, __u32 size, const void *unsafe_ptr) = (void *)4;	// real value is 112
 
+static int (*bpf_get_stackid)(void *ctx, void *map, int flags) = (void *)27;
+
 #if __GNUC__ && !__clang__
 #define SEC(name) __attribute__((section(name), used))
 #else
@@ -210,8 +212,8 @@ _Pragma("GCC error \"PT_GO_REGS_PARM\"");
 #endif
 #endif
 
-#ifndef __always_inline
-#define __always_inline inline __attribute__((always_inline))
+#ifndef static_always_inline
+#define static_always_inline static inline __attribute__ ((__always_inline__))
 #endif
 
 #define _(P) ({typeof(P) val = 0; bpf_probe_read(&val, sizeof(val), &P); val;})
@@ -242,15 +244,15 @@ struct bpf_map_def SEC("maps") __##name = \
     .type = BPF_MAP_TYPE_ARRAY, \
     __BPF_MAP_DEF(key_type, value_type, max_entries), \
 }; \
-static __always_inline __attribute__((unused)) value_type * name ## __lookup(key_type *key) \
+static_always_inline __attribute__((unused)) value_type * name ## __lookup(key_type *key) \
 { \
     return (value_type *) bpf_map_lookup_elem(& __##name, (const void *)key); \
 } \
-static __always_inline __attribute__((unused)) int name ## __update(key_type *key, value_type *value) \
+static_always_inline __attribute__((unused)) int name ## __update(key_type *key, value_type *value) \
 { \
     return bpf_map_update_elem(& __##name, (const void *)key, (const void *)value, BPF_ANY); \
 } \
-static __always_inline __attribute__((unused)) int name ## __delete(key_type *key) \
+static_always_inline __attribute__((unused)) int name ## __delete(key_type *key) \
 { \
     return bpf_map_delete_elem(& __##name, (const void *)key); \
 }
@@ -262,15 +264,15 @@ struct bpf_map_def SEC("maps") __##name = \
     .type = BPF_MAP_TYPE_PERCPU_ARRAY, \
     __BPF_MAP_DEF(key_type, value_type, max_entries), \
 }; \
-static __always_inline __attribute__((unused)) value_type * name ## __lookup(key_type *key) \
+static_always_inline __attribute__((unused)) value_type * name ## __lookup(key_type *key) \
 { \
     return (value_type *) bpf_map_lookup_elem(& __##name, (const void *)key); \
 } \
-static __always_inline __attribute__((unused)) int name ## __update(key_type *key, value_type *value) \
+static_always_inline __attribute__((unused)) int name ## __update(key_type *key, value_type *value) \
 { \
     return bpf_map_update_elem(& __##name, (const void *)key, (const void *)value, BPF_ANY); \
 } \
-static __always_inline __attribute__((unused)) int name ## __delete(key_type *key) \
+static_always_inline __attribute__((unused)) int name ## __delete(key_type *key) \
 { \
     return bpf_map_delete_elem(& __##name, (const void *)key); \
 }
@@ -289,21 +291,29 @@ struct bpf_map_def SEC("maps") __ ## name = \
     __BPF_MAP_DEF(key_type, value_type, max_entries), \
 };
 
+#define MAP_STACK_TRACE(name, max) \
+struct bpf_map_def SEC("maps") __ ## name = { \
+        .type = BPF_MAP_TYPE_STACK_TRACE, \
+        .key_size = sizeof(__u32), \
+        .value_size = PERF_MAX_STACK_DEPTH * sizeof(__u64), \
+        .max_entries = (max), \
+};
+
 #define MAP_HASH(name, key_type, value_type, max_entries) \
 struct bpf_map_def SEC("maps") __##name = \
 {   \
     .type = BPF_MAP_TYPE_HASH, \
     __BPF_MAP_DEF(key_type, value_type, max_entries), \
 }; \
-static __always_inline __attribute__((unused)) value_type * name ## __lookup(key_type *key) \
+static_always_inline __attribute__((unused)) value_type * name ## __lookup(key_type *key) \
 { \
     return (value_type *) bpf_map_lookup_elem(& __##name, (const void *)key); \
 } \
-static __always_inline __attribute__((unused)) int name ## __update(key_type *key, value_type *value) \
+static_always_inline __attribute__((unused)) int name ## __update(key_type *key, value_type *value) \
 { \
     return bpf_map_update_elem(& __##name, (const void *)key, (const void *)value, BPF_ANY); \
 } \
-static __always_inline __attribute__((unused)) int name ## __delete(key_type *key) \
+static_always_inline __attribute__((unused)) int name ## __delete(key_type *key) \
 { \
     return bpf_map_delete_elem(& __##name, (const void *)key); \
 }

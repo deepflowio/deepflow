@@ -63,4 +63,11 @@ int program__detach_probe(struct ebpf_link *link,
 
 int bpf_get_program_fd(void *obj, const char *prog_name, void **p);
 struct ebpf_link *program__attach_tracepoint(void *prog);
-#endif
+int program__attach_perf_event(int prog_fd, uint32_t ev_type,
+			       uint32_t ev_config, uint64_t sample_period,
+			       uint64_t sample_freq, pid_t pid,
+			       int cpu, int group_fd,
+			       int *attach_fds,
+			       int fds_len);
+int program__detach_perf_event(int *attach_fds, int len);
+#endif /* _BPF_PROBE_H_ */

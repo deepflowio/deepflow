@@ -34,6 +34,8 @@
 #include <bcc/bcc_proc.h>
 #include <bcc/bcc_elf.h>
 #include <bcc/bcc_syms.h>
+#include <dirent.h>		// for opendir()
+#include "config.h"
 #include "log.h"
 #include "common.h"
 #include "symbol.h"
@@ -203,7 +205,7 @@ out:
 // https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/RET--Return-from-subroutine-
 static int is_a64_ret_ins(unsigned int code)
 {
-        return (code & 0xfffffc1f) == 0xd65f0000;
+	return (code & 0xfffffc1f) == 0xd65f0000;
 }
 
 static void resolve_func_ret_addr(struct symbol_uprobe *uprobe_sym)
@@ -230,9 +232,8 @@ static void resolve_func_ret_addr(struct symbol_uprobe *uprobe_sym)
 		goto free_buffer;
 
 	memset(uprobe_sym->rets, 0, sizeof(uprobe_sym->rets));
-	while (cnt < FUNC_RET_MAX &&
-	       offset <= uprobe_sym->size - ARM64_INS_LEN) {
-		code = *(uint32_t *)(buffer + offset);
+	while (cnt < FUNC_RET_MAX && offset <= uprobe_sym->size - ARM64_INS_LEN) {
+		code = *(uint32_t *) (buffer + offset);
 		if (is_a64_ret_ins(code)) {
 			uprobe_sym->rets[cnt++] = uprobe_sym->entry + offset;
 		}
@@ -326,8 +327,7 @@ struct symbol_uprobe *resolve_and_gen_uprobe_symbol(const char *bin_file,
 		error = bcc_elf_foreach_sym(uprobe_sym->binary_path, find_sym,
 					    &default_option, uprobe_sym);
 
-		if (!is_feature_enabled(FEATURE_UPROBE_GOLANG_SYMBOL) &&
-		    error) {
+		if (!is_feature_enabled(FEATURE_UPROBE_GOLANG_SYMBOL) && error) {
 			goto invalid;
 		}
 	}
@@ -336,7 +336,7 @@ struct symbol_uprobe *resolve_and_gen_uprobe_symbol(const char *bin_file,
 	// not be 0. try GoReSym
 	if (uprobe_sym->name && uprobe_sym->entry == 0x0 &&
 	    is_feature_matched(FEATURE_UPROBE_GOLANG_SYMBOL,
-					       uprobe_sym->binary_path)) {
+			       uprobe_sym->binary_path)) {
 		struct function_address_return func = {};
 		func = function_address((char *)uprobe_sym->binary_path,
 					(char *)uprobe_sym->name);
@@ -445,8 +445,7 @@ uint64_t get_symbol_addr_from_binary(const char *bin, const char *symname)
 
 	bcc_elf_foreach_sym(bin, find_sym, &default_option, &tmp);
 
-	if (!tmp.entry && is_feature_matched(
-				  FEATURE_UPROBE_GOLANG_SYMBOL, bin)) {
+	if (!tmp.entry && is_feature_matched(FEATURE_UPROBE_GOLANG_SYMBOL, bin)) {
 		// The function address is used to set the hook point.
 		// itab is used for http2 to obtain fd. Currently only
 		// net_TCPConn_itab can be obtained for HTTPS.
@@ -455,4 +454,137 @@ uint64_t get_symbol_addr_from_binary(const char *bin, const char *symname)
 
 	ebpf_info("Uprobe [%s] %s: %p\n", bin, symname, tmp.entry);
 	return tmp.entry;
+}
+
+static symbol_caches_hash_t syms_cache_hash;	// for user process symbol caches
+static void *k_resolver;		// for kernel symbol cache
+
+static int init_symbol_cache(const char *name)
+{
+	symbol_caches_hash_t *h = &syms_cache_hash;
+	memset(h, 0, sizeof(*h));
+	u32 nbuckets = SYMBOLIZER_CACHES_HASH_BUCKETS_NUM;
+	u64 hash_memory_size = SYMBOLIZER_CACHES_HASH_MEM_SZ;	// 2G bytes
+	return symbol_caches_hash_init(h, (char *)name, nbuckets,
+				       hash_memory_size);
+}
+
+void *get_symbol_cache(pid_t pid)
+{
+	ASSERT(pid >= 0);
+
+	static struct bcc_symbol_option lazy_opt = {
+		.use_debug_file = false,
+		.check_debug_file_crc = false,
+		.lazy_symbolize = true,
+		.use_symbol_type = ((1 << STT_FUNC) | (1 << STT_GNU_IFUNC)),
+	};
+
+	if (k_resolver == NULL && pid == 0)
+		k_resolver = (void *)bcc_symcache_new(-1, &lazy_opt);
+
+	if (pid == 0)
+		return k_resolver;
+
+	symbol_caches_hash_t *h = &syms_cache_hash;
+	struct symbolizer_cache_kvp kv;
+	kv.k.pid = (u64) pid;
+	kv.v.stime = 0;
+	kv.v.cache = 0;
+	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
+				      (symbol_caches_hash_kv *) & kv) == 0) {
+		if (kv.v.cache)
+			return (void *)kv.v.cache;
+		kv.v.cache = pointer_to_uword(bcc_symcache_new(pid, &lazy_opt));
+		if (symbol_caches_hash_add_del
+		    (h, (symbol_caches_hash_kv *) & kv, 1 /* is_add */ )) {
+			ebpf_warning
+			    ("symbol_caches_hash_add_del() failed.(pid %d)\n",
+			     pid);
+			bcc_free_symcache((void *)kv.v.cache, pid);
+			return NULL;
+		}
+
+		return (void *)kv.v.cache;
+	}
+
+	kv.k.pid = pid;
+	kv.v.stime = (u64) get_process_starttime(pid);
+	kv.v.cache = pointer_to_uword(bcc_symcache_new(pid, &lazy_opt));
+	if (symbol_caches_hash_add_del
+	    (h, (symbol_caches_hash_kv *) & kv, 1 /* is_add */ )) {
+		ebpf_warning
+		    ("symbol_caches_hash_add_del() failed.(pid %d)\n", pid);
+		bcc_free_symcache((void *)kv.v.cache, pid);
+		return NULL;
+	}
+
+	return (void *)kv.v.cache;
+}
+
+int create_and_init_symbolizer_caches(void)
+{
+	init_symbol_cache("symbolizer-caches");
+	struct dirent *entry = NULL;
+	DIR *fddir = NULL;
+
+	fddir = opendir("/proc/");
+	if (fddir == NULL) {
+		ebpf_warning("Failed to open %s.\n");
+		return ETR_PROC_FAIL;
+	}
+
+	pid_t pid;
+	symbol_caches_hash_t *h = &syms_cache_hash;
+	while ((entry = readdir(fddir)) != NULL) {
+		pid = atoi(entry->d_name);
+		if (entry->d_type == DT_DIR && pid > 0 && is_process(pid)) {
+			struct symbolizer_cache_kvp sym;
+			sym.k.pid = pid;
+			sym.v.stime = (u64) get_process_starttime(pid);
+			sym.v.cache = 0;
+			if (symbol_caches_hash_add_del
+			    (h, (symbol_caches_hash_kv *) & sym,
+			     1 /* is_add */ )) {
+				ebpf_warning
+				    ("symbol_caches_hash_add_del() failed.(pid %d)\n",
+				     pid);
+			}
+		}
+	}
+
+	closedir(fddir);
+	return ETR_OK;
+}
+
+static int free_symbolizer_kvp_cb(symbol_caches_hash_kv * kv, void *ctx)
+{
+	struct symbolizer_cache_kvp *sym = (struct symbolizer_cache_kvp *)kv;
+	if (sym->v.cache) {
+		bcc_free_symcache((void *)sym->v.cache, sym->k.pid);
+		(*(u64 *) ctx)++;
+		ebpf_info("release symbol cache pid %d stime %lu \n",
+			  sym->k.pid, sym->v.stime);
+	}
+
+	return BIHASH_WALK_CONTINUE;
+}
+
+void release_symbol_caches(void)
+{
+	/* user symbol caches release */
+	u64 elem_count = 0;
+	symbol_caches_hash_t *h = &syms_cache_hash;
+	symbol_caches_hash_foreach_key_value_pair(h, free_symbolizer_kvp_cb,
+						  (void *)&elem_count);
+	print_hash_symbol_caches(h);
+	symbol_caches_hash_free(h);
+	ebpf_info("clear symbol_caches_hashmap[k:pid, v:symbol cache] %lu elems.\n",
+		  elem_count);
+
+	/* kernel symbol caches release */
+	if (k_resolver) {
+		bcc_free_symcache(k_resolver, -1);
+		k_resolver = NULL;
+	}
 }

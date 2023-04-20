@@ -34,6 +34,13 @@ define compile_socket_trace_elf
 	@./tools/ebpftobuffer kernel/socket_trace.elf user/socket_trace_bpf_$(strip $1).c socket_trace_$(strip $1)_ebpf_data
 endef
 
+define compile_perf_profiler_elf
+	@echo "  COMPILE ELF kernel version $(1)"
+	@cd kernel && make clean --no-print-directory && make perf_profiler.elf $(2) --no-print-directory && cd ../
+	@echo "  Generate file user/perf_profiler_bpf_$(strip $1).c"
+	@./tools/ebpftobuffer kernel/perf_profiler.elf user/perf_profiler_bpf_$(strip $1).c perf_profiler_$(strip $1)_ebpf_data
+endef
+
 CURRDIR := $(PWD)
 CLANG_VER := $(shell ${CLANG} --version | grep "version" | awk '{if ($$3!="version"){print $$3}else{exit -1}}' || ${CLANG} --version | grep "version" | awk '{if ($$4!="version"){print $$4}else{exit -1}}')
 CLANG_VER_MAIN := $(shell ${CLANG} --version | grep "version" | awk '{print $$3}' | awk -F. '{print $$1}' | awk '{if (int($$0)!=0){print $$0}else{exit -1}}' || ${CLANG} --version | grep "version" | awk '{print $$4}' | awk -F. '{print $$1}' | awk '{if (int($$0)!=0){print $$0}else{exit -1}}')
@@ -52,10 +59,16 @@ OBJS := user/elf.o \
 	user/table.o \
 	user/socket.o \
 	user/ctrl.o \
-	user/offset.o
+	user/offset.o \
+	user/mem.o \
+	user/vec.o \
+	user/bihash.o \
+	user/perf_profiler.o \
+	user/stringifier.o \
+	user/test_symbol.o
 
 STATIC_OBJS := $(addprefix $(STATIC_OBJDIR)/,$(OBJS))
-CFLAGS ?= -std=gnu99 -g -O2 -ffunction-sections -fdata-sections -fPIC -fno-omit-frame-pointer -Wall -Wno-strict-aliasing -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers
+CFLAGS ?= -std=gnu99 -g -O2 -ffunction-sections -fdata-sections -fPIC -Wall -Wno-strict-aliasing -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers
 # '-Wformat-truncation' : The warning was added in gcc7.1
 GCC_VER_GTE71 := $(shell echo `gcc --version | grep ^gcc | cut -f3 -d' '|cut -f1-2 -d.` \>= 7.1 | sed -e 's/\./*100+/g' | bc )
 ifeq ($(GCC_VER_GTE71),1)
@@ -63,7 +76,13 @@ ifeq ($(GCC_VER_GTE71),1)
 endif
 
 # -DBPF_DEBUG for parse and load ebpf probes.
-CFLAGS += $(MACHINE_CFLAGS) -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -I.
+# -fsanitize=address: Enable the Address Sanitizer tool, which
+#  can detect memory errors such as using uninitialized memory,
+#  accessing freed memory, and so on.
+# -fno-omit-frame-pointer: When a memory error is detected, print
+#  the function call stack to facilitate locating the code line
+#  where the error occurred.
+CFLAGS += $(MACHINE_CFLAGS) -DBPF_DEBUG -fno-omit-frame-pointer -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -I.
 all: build
 
 ELFFILES = ./.data_done
@@ -78,6 +97,7 @@ $(ELFFILES):
 	$(call compile_socket_trace_elf, common)
 	$(call compile_socket_trace_elf, 5_2_plus, LINUX_VER_5_2_PLUS=1)
 	$(call compile_socket_trace_elf, kylin, LINUX_VER_KYLIN=1)
+	$(call compile_perf_profiler_elf, common)
 	@touch $(ELFFILES)
 
 $(STATIC_OBJDIR) $(SHARED_OBJDIR):
@@ -112,8 +132,15 @@ rust-sample: $(ELFFILES) $(LIBTRACE)
         elif [[ $(ARCH) == *"x86_64"* ]]; then \
             echo "  Architecture is x86_64"; \
             cp samples/rust/build-x86.rs samples/rust/build.rs; \
+            cp samples/rust/Cargo.rust_sample.toml samples/rust/Cargo.toml; \
+            cp samples/rust/src/rust_sample.rs samples/rust/src/main.rs; \
             cd samples/rust/ && cargo build --release && cd ../../; \
-            echo "  samples/rust/target/release/rust_sample"; \
+            echo "    samples/rust/target/release/rust_sample"; \
+            cp samples/rust/Cargo.perf_profiler.toml samples/rust/Cargo.toml; \
+            cp samples/rust/src/perf_profiler.rs samples/rust/src/main.rs; \
+            cp mod_perf_profiler.rs samples/rust/src/ebpf.rs; \
+            cd samples/rust/ && cargo build --release && cd ../../; \
+            echo "    samples/rust/target/release/perf_profiler"; \
         else \
             echo "  Error: Invalid arch. $(ARCH) is not support!"; \
             exit 1; \

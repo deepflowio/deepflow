@@ -17,9 +17,42 @@
 #ifndef _BPF_SYMBOL_H_
 #define _BPF_SYMBOL_H_
 #include <stdint.h>
+#include "types.h"
+#include "clib.h"
+#include "mem.h"
+#include "vec.h"
+#include "bihash_8_16.h"
 #include "list.h"
 
+/*
+ * symbol_caches_hash_t maps from pid to BCC symbol cache.
+ */
+
+#define symbol_caches_hash_t        clib_bihash_8_16_t
+#define symbol_caches_hash_init     clib_bihash_init_8_16
+#define symbol_caches_hash_kv       clib_bihash_kv_8_16_t
+#define print_hash_symbol_caches    print_bihash_8_16
+#define symbol_caches_hash_search   clib_bihash_search_8_16
+#define symbol_caches_hash_add_del  clib_bihash_add_del_8_16
+#define symbol_caches_hash_free     clib_bihash_free_8_16
+#define symbol_caches_hash_key_value_pair_cb        clib_bihash_foreach_key_value_pair_cb_8_16
+#define symbol_caches_hash_foreach_key_value_pair   clib_bihash_foreach_key_value_pair_8_16
+
 #define FUNC_RET_MAX 32
+
+struct symbolizer_cache_kvp {
+	struct {
+		u64 pid;
+	} k;
+
+	struct {
+		/* The process creation time since
+		 * system boot, in jiffies. */
+		u64 stime;
+		/* memoized bcc symbol caches */
+		u64 cache;
+	} v;
+};
 
 struct tracer_probes_conf;
 
@@ -85,4 +118,7 @@ struct symbol_uprobe *resolve_and_gen_uprobe_symbol(const char *bin_file,
 						    const uint64_t addr,
 						    int pid);
 uint64_t get_symbol_addr_from_binary(const char *bin, const char *symname);
-#endif
+void *get_symbol_cache(pid_t pid);
+int create_and_init_symbolizer_caches(void);
+void release_symbol_caches(void);
+#endif /* _BPF_SYMBOL_H_ */

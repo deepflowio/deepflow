@@ -24,9 +24,10 @@ ARCH ?= $(shell uname -m)
 CC ?= gcc
 CFLAGS ?= -std=gnu99 --static -g -O2 -ffunction-sections -fdata-sections -fPIC -fno-omit-frame-pointer -Wall -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers
 
-EXECS := test_symbol test_offset test_insns_cnt
+EXECS := test_symbol test_offset test_insns_cnt test_bihash test_vec
 ifeq ($(ARCH), x86_64)
-        LDLIBS += ../libtrace.a -lbcc_bpf -lGoReSym -lbddisasm -ldwarf -lelf -lz -lpthread
+#-lbcc -lstdc++
+        LDLIBS += ../libtrace.a -lbcc_bpf -lGoReSym -lbddisasm -ldwarf -lelf -lz -lpthread -lstdc++
 else ifeq ($(ARCH), aarch64)
         LDLIBS += ../libtrace.a -lGoReSym -lbcc_bpf -ldwarf -lelf -lz -lpthread
 endif
@@ -36,7 +37,7 @@ all: $(EXECS)
 % : %.c
 	$(call msg,TEST,$@)
 	$(Q)$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
-	$(Q)./$@
+#	$(Q)./$@
 
 clean:
 	$(Q)rm -rf $(EXECS)

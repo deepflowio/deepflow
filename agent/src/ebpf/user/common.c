@@ -36,6 +36,8 @@
 #include <inttypes.h>
 #include <sys/utsname.h>
 #include "config.h"
+#include "types.h"
+#include "clib.h"
 #include "list.h"
 #include "common.h"
 #include "log.h"
@@ -374,32 +376,46 @@ uint64_t gettime(clockid_t clk_id, int flag)
 	return time;
 }
 
-// refs: https://man7.org/linux/man-pages/man5/proc.5.html
-// /proc/[pid]/stat Status information about the process.
-unsigned long long get_process_starttime(int pid)
+/*
+ * Get the start time (in milliseconds) of a given PID.
+ */
+u64 get_process_starttime(pid_t pid)
 {
 	char file[PATH_MAX], buff[4096];
 	int fd;
-	unsigned long long starttime = 0;
+	unsigned long long etime_ticks = 0;
 
 	snprintf(file, sizeof(file), "/proc/%d/stat", pid);
 	if (access(file, F_OK))
 		return 0;
 
 	fd = open(file, O_RDONLY);
-	if (fd < 0)
-		return false;
+	ASSERT(fd > 2);
 
 	read(fd, buff, sizeof(buff));
 	close(fd);
 
 	if (sscanf(buff, "%*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s"
 		   " %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %llu ",
-		   &starttime) != 1) {
+		   &etime_ticks) != 1) {
 		return 0;
 	}
 
-	return starttime;
+	FILE *fp = fopen("/proc/stat", "r");
+	ASSERT(fp != NULL);
+
+	u64 sys_boot = 0;
+	while (fgets(buff, sizeof(buff), fp) != NULL) {
+		if (sscanf(buff, "btime %lu", &sys_boot) == 1)
+			break;
+	}
+
+	fclose(fp);
+	ASSERT(sys_boot > 0);
+
+	u64 msecs_per_tick = 1000UL / sysconf(_SC_CLK_TCK);
+
+	return ((etime_ticks * msecs_per_tick) + sys_boot * 1000UL);
 }
 
 int fetch_kernel_version(int *major, int *minor, int *patch)

@@ -23,7 +23,10 @@
 #include "tracer.h"
 #include "load.h"
 
+extern bool *cpu_online;
+extern int sys_cpus_count;
 extern int ioctl(int fd, unsigned long request, ...);
+
 int bpf_get_program_fd(void *obj, const char *name, void **p)
 {
 	struct ebpf_prog *prog;
@@ -250,4 +253,95 @@ struct ebpf_link *program__attach_tracepoint(void *prog)
 	link->fd = pfd;
 
 	return link;
+}
+
+/**
+ * attach perf event
+ *
+ * @ev_type
+ *     The type of perf event (e.g. PERF_TYPE_HARDWARE, PERF_TYPE_SOFTWARE, etc.)
+ * @ev_config
+ *     The actual event to be counted (e.g. PERF_COUNT_HW_CPU_CYCLES,
+ *     PERF_COUNT_SW_CPU_CLOCK).
+ * @sample_period
+ *     event->attr.sample_period = NSEC_PER_SEC / freq;
+ *     see linux kernel perf_swevent_init_hrtimer()
+ *     (kernel/events/core.c)
+ * @sample_freq
+ *     Mutually exclusive with sample_period.
+ *     sysctl kernel.perf_event_max_sample_rate limit
+ *     (e.g. centos7 40000, ubuntu 100000).
+ * @pid
+ *     the process ID to be monitored. If pid is -1, all processes.
+ * @cpu
+ *     the CPU core to be bound. If cpu is -1, then no binding is done.
+ * @group_fd
+ *     the file descriptor used to create the event group. If group_fd
+ *     is -1, then a new event group is created.
+ * @attach_fds
+ *     tracer->per_cpu_fds address
+ * @fds_len
+ *     attach_fds[] length
+ *
+ * @returns 0 on success, < 0 on error
+ *
+ */
+int program__attach_perf_event(int prog_fd, uint32_t ev_type,
+			       uint32_t ev_config, uint64_t sample_period,
+			       uint64_t sample_freq, pid_t pid,
+			       int cpu, int group_fd,
+			       int *attach_fds,
+			       int fds_len)
+{
+	int i,j;
+	int fds[fds_len];
+	memset(fds, 0, sizeof(fds));
+	for (i = 0; i < sys_cpus_count && i < fds_len; i++) {
+		if (!cpu_online[i])
+			continue;
+
+		int fd = bpf_attach_perf_event(prog_fd, ev_type,
+					       ev_config, sample_period,
+					       sample_freq, pid, i, group_fd);
+		if (fd < 0) {
+			for (j = 0; j < MAX_CPU_NR; j++) {
+				if (fds[i] > 0)
+					close(fds[i]);
+				return (-1);
+			}
+		}
+
+		fds[i] = fd;
+		ebpf_info("attach perf event sample_freq %d pid %d cpu %d done\n",
+			  sample_freq, pid, i);
+	}
+
+	memcpy((void *)attach_fds, (void *)fds, sizeof(fds));
+
+	return (0);
+}
+
+/**
+ * detach perf event
+ *
+ * @attach_fds
+ *     tracer->per_cpu_fds address
+ * @len
+ *     tracer->per_cpu_fds cpu count.
+ *
+ * @returns 0 on success, < 0 on error
+ */
+int program__detach_perf_event(int *attach_fds, int len)
+{
+	int i;
+	for (i = 0; i < len; i++) {
+		if (attach_fds[i] > 0) {
+			close(attach_fds[i]);
+			ebpf_info("detach cpu %d close fd %d\n",
+				  i, attach_fds[i]);
+			attach_fds[i] = 0;
+		}
+	}
+
+	return (0);
 }

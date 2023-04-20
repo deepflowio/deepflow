@@ -19,6 +19,8 @@
 #include <sched.h>
 #include <sys/prctl.h>
 #include <arpa/inet.h>
+#include <bcc/perf_reader.h>
+#include "clib.h"
 #include "symbol.h"
 #include "tracer.h"
 #include "probe.h"
@@ -63,10 +65,10 @@ static uint32_t conf_max_trace_entries;
  * The datadump related Settings
  */
 static bool datadump_enable;
-static int datadump_pid; // If the value is 0, process-ID/thread-ID filtering is not performed.
+static int datadump_pid;	// If the value is 0, process-ID/thread-ID filtering is not performed.
 static uint32_t datadump_start_time;
 static uint32_t datadump_timeout;
-static char datadump_comm[16]; // If null, process or thread name filtering is not performed.
+static char datadump_comm[16];	// If null, process or thread name filtering is not performed.
 static uint8_t datadump_proto;
 static char datadump_file_path[DATADUMP_FILE_PATH_SIZE];
 static FILE *datadump_file;
@@ -98,14 +100,11 @@ extern uint64_t adapt_kern_uid;
 static bool bpf_stats_map_collect(struct bpf_tracer *tracer,
 				  struct trace_stats *stats_total);
 static bool is_adapt_success(struct bpf_tracer *t);
-static int socket_tracer_stop(void);
-static int socket_tracer_start(void);
 static int update_offsets_table(struct bpf_tracer *t,
 				struct bpf_offset_param *offset);
 static void datadump_process(void *data);
 static bool bpf_stats_map_update(struct bpf_tracer *tracer,
-				 int socket_num,
-				 int trace_num);
+				 int socket_num, int trace_num);
 static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 {
 	int index = 0, curr_idx;
@@ -184,8 +183,7 @@ next_cpu_client:
 		   &addr_len);
 	if (cli_fd < 0) {
 		ebpf_warning("[eBPF Kernel Adapt] Fail to accept client"
-			     "request - %s\n",
-			     strerror(errno));
+			     "request - %s\n", strerror(errno));
 		return ETR_IO;
 	}
 
@@ -215,8 +213,7 @@ next_cpu_client:
 
 	close(infer_socktrace_fd);
 	ebpf_info("[eBPF Kernel Adapt] kernel_offset_infer_server close."
-		  "client_count:%d\n",
-		  client_count);
+		  "client_count:%d\n", client_count);
 	return ETR_OK;
 }
 
@@ -228,8 +225,9 @@ static int kernel_offset_infer_client(void)
 	int len;
 
 	if ((cli_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-		ebpf_warning("[eBPF Kernel Adapt] Fail client create socket - %s\n",
-			     strerror(errno));
+		ebpf_warning
+		    ("[eBPF Kernel Adapt] Fail client create socket - %s\n",
+		     strerror(errno));
 		return ETR_IO;
 	}
 
@@ -272,8 +270,9 @@ static int kernel_offset_infer_init(void)
 
 	infer_socktrace_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (infer_socktrace_fd < 0) {
-		ebpf_warning("[eBPF Kernel Adapt] Fail to create server socket - %s\n",
-			     strerror(errno));
+		ebpf_warning
+		    ("[eBPF Kernel Adapt] Fail to create server socket - %s\n",
+		     strerror(errno));
 		return ETR_IO;
 	}
 
@@ -284,41 +283,42 @@ static int kernel_offset_infer_init(void)
 	if (-1 ==
 	    bind(infer_socktrace_fd, (struct sockaddr *)&srv_addr,
 		 sizeof(srv_addr))) {
-                ebpf_warning("[eBPF Kernel Adapt] Fail to bind server socket"
+		ebpf_warning("[eBPF Kernel Adapt] Fail to bind server socket"
 			     " %s:%d - %s\n"
-                             "Please check the following two situations:\n"
-                             "(1) Whether the %s address has been "
-                             "configured on the loopback device.\n"
-                             "(2) Check if port %d has already been occupied "
-                             "by other services.\n\n"
-                             "%s:%d is used to trigger a temporary service"
-                             " for Linux kernel adaptation. It is important to ensure"
-                             " that %s is configured on the lo device and that"
-                             " port %d is not occupied by other services.\n\n"
-                             "If port %d is occupied by other services, you can either"
-                             " change the port number of the other service or wait until"
-                             " the deepflow-agent is started before starting this service."
-                             "This is because the deepflow-agent only temporarily uses "
-                             "port %d during its startup phase and will close the service"
-                             "once it is started.\n\n",
-                             OFFSET_INFER_SERVER_ADDR,
-                             OFFSET_INFER_SERVER_PORT,
-                             strerror(errno),
-                             OFFSET_INFER_SERVER_ADDR,
-                             OFFSET_INFER_SERVER_PORT,
-                             OFFSET_INFER_SERVER_ADDR,
-                             OFFSET_INFER_SERVER_PORT,
-                             OFFSET_INFER_SERVER_ADDR,
-                             OFFSET_INFER_SERVER_PORT,
-                             OFFSET_INFER_SERVER_PORT,
-                             OFFSET_INFER_SERVER_PORT);
+			     "Please check the following two situations:\n"
+			     "(1) Whether the %s address has been "
+			     "configured on the loopback device.\n"
+			     "(2) Check if port %d has already been occupied "
+			     "by other services.\n\n"
+			     "%s:%d is used to trigger a temporary service"
+			     " for Linux kernel adaptation. It is important to ensure"
+			     " that %s is configured on the lo device and that"
+			     " port %d is not occupied by other services.\n\n"
+			     "If port %d is occupied by other services, you can either"
+			     " change the port number of the other service or wait until"
+			     " the deepflow-agent is started before starting this service."
+			     "This is because the deepflow-agent only temporarily uses "
+			     "port %d during its startup phase and will close the service"
+			     "once it is started.\n\n",
+			     OFFSET_INFER_SERVER_ADDR,
+			     OFFSET_INFER_SERVER_PORT,
+			     strerror(errno),
+			     OFFSET_INFER_SERVER_ADDR,
+			     OFFSET_INFER_SERVER_PORT,
+			     OFFSET_INFER_SERVER_ADDR,
+			     OFFSET_INFER_SERVER_PORT,
+			     OFFSET_INFER_SERVER_ADDR,
+			     OFFSET_INFER_SERVER_PORT,
+			     OFFSET_INFER_SERVER_PORT,
+			     OFFSET_INFER_SERVER_PORT);
 		close(infer_socktrace_fd);
 		return ETR_IO;
 	}
 
 	if (-1 == listen(infer_socktrace_fd, 1)) {
-		ebpf_warning("[eBPF Kernel Adapt] Server socket listen failed - %s\n",
-			     strerror(errno));
+		ebpf_warning
+		    ("[eBPF Kernel Adapt] Server socket listen failed - %s\n",
+		     strerror(errno));
 		close(infer_socktrace_fd);
 		return ETR_IO;
 	}
@@ -350,7 +350,7 @@ static bool bpf_offset_map_collect(struct bpf_tracer *tracer,
 }
 
 static int socktrace_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
-				 void **out, size_t * outsize)
+				 void **out, size_t *outsize)
 {
 	struct bpf_tracer *t = find_bpf_tracer(SK_TRACER_NAME);
 	if (t == NULL)
@@ -418,9 +418,7 @@ static int datadump_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
 		safe_buf_copy(datadump_comm, sizeof(datadump_comm),
 			      (void *)msg->comm, sizeof(msg->comm));
 		ebpf_info("Set datadump pid %d comm %s proto %d\n",
-			  datadump_pid,
-			  datadump_comm,
-			  datadump_proto);
+			  datadump_pid, datadump_comm, datadump_proto);
 	} else {
 		if (!datadump_enable && msg->enable) {
 			// create a new output file
@@ -433,9 +431,11 @@ static int datadump_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
 						 DATADUMP_FILE_PATH_PREFIX,
 						 file);
 					free(file);
-					datadump_file = fopen(datadump_file_path, "a+");
+					datadump_file =
+					    fopen(datadump_file_path, "a+");
 					if (datadump_file == NULL) {
-						memcpy(datadump_file_path, "stdout", 7);
+						memcpy(datadump_file_path,
+						       "stdout", 7);
 						datadump_file = stdout;
 					}
 					ebpf_info("create datadump file %s\n",
@@ -454,11 +454,13 @@ static int datadump_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
 			datadump_pid = 0;
 			datadump_comm[0] = '\0';
 			datadump_proto = 0;
-			fprintf(datadump_file, "\n\nDump data is finished, use time: %us.\n\n",
+			fprintf(datadump_file,
+				"\n\nDump data is finished, use time: %us.\n\n",
 				get_sys_uptime() - datadump_start_time);
 			if (datadump_file != stdout) {
 				fclose(datadump_file);
-				ebpf_info("close datadump file %s\n", datadump_file_path);
+				ebpf_info("close datadump file %s\n",
+					  datadump_file_path);
 			}
 			memcpy(datadump_file_path, "stdout", 7);
 			datadump_file = stdout;
@@ -466,14 +468,15 @@ static int datadump_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
 		}
 
 		datadump_enable = msg->enable;
-		ebpf_info("datadump %s\n", datadump_enable ? "enable" : "disable");
+		ebpf_info("datadump %s\n",
+			  datadump_enable ? "enable" : "disable");
 	}
 	pthread_mutex_unlock(&datadump_mutex);
 	return 0;
 }
 
 static int datadump_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
-				void **out, size_t * outsize)
+				void **out, size_t *outsize)
 {
 	return 0;
 }
@@ -693,10 +696,11 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 		submit_data->tcp_seq = sd->tcp_seq;
 		submit_data->cap_seq = sd->data_seq;
 		submit_data->syscall_trace_id_call = sd->thread_trace_id;
-		safe_buf_copy(submit_data->process_kname, sizeof(submit_data->process_kname),
-		              sd->comm, sizeof(sd->comm));
+		safe_buf_copy(submit_data->process_kname,
+			      sizeof(submit_data->process_kname), sd->comm,
+			      sizeof(sd->comm));
 		submit_data->process_kname[sizeof(submit_data->process_kname) -
-					  1] = '\0';
+					   1] = '\0';
 		submit_data->msg_type = sd->msg_type;
 
 		// 各种协议的统计
@@ -759,9 +763,7 @@ static void reader_lost_cb(void *t, uint64_t lost)
 	atomic64_add(&tracer->lost, lost);
 }
 
-static bool inline insert_list(void *elt,
-			       uint32_t len,
-			       struct list_head *h)
+static bool inline insert_list(void *elt, uint32_t len, struct list_head *h)
 {
 	struct clear_list_elem *cle;
 	cle = calloc(sizeof(*cle) + len, 1);
@@ -827,7 +829,7 @@ static void reclaim_trace_map(struct bpf_tracer *tracer, uint32_t timeout)
 	}
 
 	reclaim_count = __reclaim_map(map_fd, &clear_elem_head);
-	// The trace statistics map needs to be updated to reflect the count.	
+	// The trace statistics map needs to be updated to reflect the count.   
 	curr_trace_count -= reclaim_count;
 	if (!bpf_stats_map_update(tracer, -1, curr_trace_count)) {
 		ebpf_warning("Update trace statistics failed.\n");
@@ -861,7 +863,7 @@ static void reclaim_socket_map(struct bpf_tracer *tracer, uint32_t timeout)
 			curr_socket_count++;
 			if ((uptime - value.update_time > timeout) &&
 			    (sockets_reclaim_count <
-				conf_socket_map_max_reclaim)) {
+			     conf_socket_map_max_reclaim)) {
 				if (insert_list(&next_conn_key,
 						sizeof(next_conn_key),
 						&clear_elem_head)) {
@@ -919,7 +921,7 @@ static int check_map_exceeded(void)
 
 static inline void add_probes_act(enum probes_act_type type)
 {
-	probes_act = type;	
+	probes_act = type;
 }
 
 static int check_kern_adapt_and_state_update(void)
@@ -930,9 +932,9 @@ static int check_kern_adapt_and_state_update(void)
 
 	if (is_adapt_success(t)) {
 		ebpf_info("[eBPF Kernel Adapt] Linux %s adapt success. "
-			  "Set the status to TRACER_RUNNING\n",
-			  linux_release);
+			  "Set the status to TRACER_RUNNING\n", linux_release);
 		t->state = TRACER_RUNNING;
+		CLIB_MEMORY_BARRIER();
 		add_probes_act(ACT_DETACH);
 		set_period_event_invalid("check-kern-adapt");
 		t->adapt_success = true;
@@ -947,12 +949,12 @@ static void process_probes_act(struct bpf_tracer *t)
 		return;
 	enum probes_act_type type = probes_act;
 
-        /*
-         * Probes attach/detach in multithreading, e.g.:
-         * 1. Snoop go process execute/exit events, then process events(add/remove probes).
-         * 2. Start/stop tracer need process probes.
-         * The above scenario is handled in different threads, so use thread locks for protection.
-         */
+	/*
+	 * Probes attach/detach in multithreading, e.g.:
+	 * 1. Snoop go process execute/exit events, then process events(add/remove probes).
+	 * 2. Start/stop tracer need process probes.
+	 * The above scenario is handled in different threads, so use thread locks for protection.
+	 */
 	pthread_mutex_lock(&t->mutex_probes_lock);
 	// If there is an unfinished attach/detach, return directly.
 	if (t->state == TRACER_WAIT_STOP || t->state == TRACER_WAIT_START) {
@@ -972,6 +974,7 @@ static void process_probes_act(struct bpf_tracer *t)
 			t->state = TRACER_STOP_ERR;
 			ebpf_warning("Set current state: TRACER_STOP_ERR.\n");
 		}
+		CLIB_MEMORY_BARRIER();
 		// clean socket map
 		reclaim_socket_map(t, 0);
 	} else if (type == ACT_ATTACH && t->state == TRACER_STOP) {
@@ -984,6 +987,7 @@ static void process_probes_act(struct bpf_tracer *t)
 			t->state = TRACER_START_ERR;
 			ebpf_warning("Set current state: TRACER_START_ERR.\n");
 		}
+		CLIB_MEMORY_BARRIER();
 	}
 	pthread_mutex_unlock(&t->mutex_probes_lock);
 }
@@ -1004,7 +1008,8 @@ static void check_datadump_timeout(void)
 				"\n\nDump data is finished, use time: %us.\n\n",
 				datadump_timeout);
 			if (datadump_file != stdout) {
-				ebpf_info("close datadump file %s\n", datadump_file_path);
+				ebpf_info("close datadump file %s\n",
+					  datadump_file_path);
 				fclose(datadump_file);
 			}
 			memcpy(datadump_file_path, "stdout", 7);
@@ -1013,7 +1018,7 @@ static void check_datadump_timeout(void)
 			ebpf_info("datadump disable\n");
 		}
 	}
-	pthread_mutex_unlock(&datadump_mutex);	
+	pthread_mutex_unlock(&datadump_mutex);
 }
 
 // Manage process start or exit events.
@@ -1021,7 +1026,7 @@ static void process_events_handle_main(__unused void *arg)
 {
 	prctl(PR_SET_NAME, "proc-events");
 	struct bpf_tracer *t = arg;
-	for(;;) {
+	for (;;) {
 		/*
 		 * Will attach/detach all probes in the following cases:
 		 *
@@ -1081,22 +1086,22 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 
 	int copied_seq_offs, write_seq_offs, files_offs, sk_flags_offs;
 	copied_seq_offs =
-		kernel_struct_field_offset(obj, "tcp_sock", "copied_seq");
+	    kernel_struct_field_offset(obj, "tcp_sock", "copied_seq");
 	write_seq_offs =
-		kernel_struct_field_offset(obj, "tcp_sock", "write_seq");
+	    kernel_struct_field_offset(obj, "tcp_sock", "write_seq");
 	files_offs = kernel_struct_field_offset(obj, "task_struct", "files");
 	sk_flags_offs =
-		kernel_struct_field_offset(obj, "sock", "__sk_flags_offset");
+	    kernel_struct_field_offset(obj, "sock", "__sk_flags_offset");
 
 	/*
 	 * From linux 5.6+, struct sock has changed(without '__sk_flags_offset[0]').
 	 * ...
-	 * 	u8 sk_padding : 1,
-	 *	   sk_kern_sock : 1,
-	 *	   sk_no_check_tx : 1,
-	 *	   sk_no_check_rx : 1,
-	 *	   sk_userlocks : 4;
-	 *	u8  sk_pacing_shift;
+	 *      u8 sk_padding : 1,
+	 *         sk_kern_sock : 1,
+	 *         sk_no_check_tx : 1,
+	 *         sk_no_check_rx : 1,
+	 *         sk_userlocks : 4;
+	 *      u8  sk_pacing_shift;
 	 *      u16 sk_type;
 	 * ...
 	 * Ajust:
@@ -1110,54 +1115,50 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 		}
 	}
 
-
-
 	int struct_files_struct_fdt_offset =
-		kernel_struct_field_offset(obj, "files_struct", "fdt");
+	    kernel_struct_field_offset(obj, "files_struct", "fdt");
 	int struct_files_private_data_offset =
-		kernel_struct_field_offset(obj, "file", "private_data");
+	    kernel_struct_field_offset(obj, "file", "private_data");
 	int struct_file_f_inode_offset =
-		kernel_struct_field_offset(obj, "file", "f_inode");
+	    kernel_struct_field_offset(obj, "file", "f_inode");
 	int struct_inode_i_mode_offset =
-		kernel_struct_field_offset(obj, "inode", "i_mode");
+	    kernel_struct_field_offset(obj, "inode", "i_mode");
 	int struct_file_dentry_offset_1 =
-		kernel_struct_field_offset(obj, "file", "f_path");
+	    kernel_struct_field_offset(obj, "file", "f_path");
 	int struct_file_dentry_offset_2 =
-		kernel_struct_field_offset(obj, "path", "dentry");
-	if (struct_file_dentry_offset_1 < 0 ||
-	    struct_file_dentry_offset_2 < 0) {
+	    kernel_struct_field_offset(obj, "path", "dentry");
+	if (struct_file_dentry_offset_1 < 0 || struct_file_dentry_offset_2 < 0) {
 		return ETR_NOTSUPP;
 	}
 	int struct_file_dentry_offset =
-		struct_file_dentry_offset_1 + struct_file_dentry_offset_2;
+	    struct_file_dentry_offset_1 + struct_file_dentry_offset_2;
 	int struct_dentry_name_offset_1 =
-		kernel_struct_field_offset(obj, "dentry", "d_name");
+	    kernel_struct_field_offset(obj, "dentry", "d_name");
 	int struct_dentry_name_offset_2 =
-		kernel_struct_field_offset(obj, "qstr", "name");
-	if (struct_dentry_name_offset_1 < 0 ||
-	    struct_dentry_name_offset_2 < 0) {
+	    kernel_struct_field_offset(obj, "qstr", "name");
+	if (struct_dentry_name_offset_1 < 0 || struct_dentry_name_offset_2 < 0) {
 		return ETR_NOTSUPP;
 	}
 	int struct_dentry_name_offset =
-		struct_dentry_name_offset_1 + struct_dentry_name_offset_2;
+	    struct_dentry_name_offset_1 + struct_dentry_name_offset_2;
 	int struct_sock_family_offset =
-		kernel_struct_field_offset(obj, "sock_common", "skc_family");
+	    kernel_struct_field_offset(obj, "sock_common", "skc_family");
 	int struct_sock_saddr_offset =
-		kernel_struct_field_offset(obj, "sock_common", "skc_rcv_saddr");
+	    kernel_struct_field_offset(obj, "sock_common", "skc_rcv_saddr");
 	int struct_sock_daddr_offset =
-		kernel_struct_field_offset(obj, "sock_common", "skc_daddr");
+	    kernel_struct_field_offset(obj, "sock_common", "skc_daddr");
 	int struct_sock_ip6saddr_offset =
-		kernel_struct_field_offset(obj, "sock_common", "skc_v6_rcv_saddr");
+	    kernel_struct_field_offset(obj, "sock_common", "skc_v6_rcv_saddr");
 	int struct_sock_ip6daddr_offset =
-		kernel_struct_field_offset(obj, "sock_common", "skc_v6_daddr");
+	    kernel_struct_field_offset(obj, "sock_common", "skc_v6_daddr");
 	int struct_sock_dport_offset =
-		kernel_struct_field_offset(obj, "sock_common", "skc_dport");
+	    kernel_struct_field_offset(obj, "sock_common", "skc_dport");
 	int struct_sock_sport_offset =
-		kernel_struct_field_offset(obj, "sock_common", "skc_num");
+	    kernel_struct_field_offset(obj, "sock_common", "skc_num");
 	int struct_sock_skc_state_offset =
-		kernel_struct_field_offset(obj, "sock_common", "skc_state");
+	    kernel_struct_field_offset(obj, "sock_common", "skc_state");
 	int struct_sock_common_ipv6only_offset =
-		kernel_struct_field_offset(obj, "sock_common", "skc_flags");
+	    kernel_struct_field_offset(obj, "sock_common", "skc_flags");
 
 	if (copied_seq_offs < 0 || write_seq_offs < 0 || files_offs < 0 ||
 	    sk_flags_offs < 0 || struct_files_struct_fdt_offset < 0 ||
@@ -1178,21 +1179,36 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	ebpf_info("    write_seq_offs: 0x%x\n", write_seq_offs);
 	ebpf_info("    files_offs: 0x%x\n", files_offs);
 	ebpf_info("    sk_flags_offs: 0x%x\n", sk_flags_offs);
-	ebpf_info("    struct_files_struct_fdt_offset: 0x%x\n", struct_files_struct_fdt_offset);
-	ebpf_info("    struct_files_private_data_offset: 0x%x\n", struct_files_private_data_offset);
-	ebpf_info("    struct_file_f_inode_offset: 0x%x\n", struct_file_f_inode_offset);
-	ebpf_info("    struct_inode_i_mode_offset: 0x%x\n", struct_inode_i_mode_offset);
-	ebpf_info("    struct_file_dentry_offset: 0x%x\n", struct_file_dentry_offset);
-	ebpf_info("    struct_dentry_name_offset: 0x%x\n", struct_dentry_name_offset);
-	ebpf_info("    struct_sock_family_offset: 0x%x\n", struct_sock_family_offset);
-	ebpf_info("    struct_sock_saddr_offset: 0x%x\n", struct_sock_saddr_offset);
-	ebpf_info("    struct_sock_daddr_offset: 0x%x\n", struct_sock_daddr_offset);
-	ebpf_info("    struct_sock_ip6saddr_offset: 0x%x\n", struct_sock_ip6saddr_offset);
-	ebpf_info("    struct_sock_ip6daddr_offset: 0x%x\n", struct_sock_ip6daddr_offset);
-	ebpf_info("    struct_sock_dport_offset: 0x%x\n", struct_sock_dport_offset);
-	ebpf_info("    struct_sock_sport_offset: 0x%x\n", struct_sock_sport_offset);
-	ebpf_info("    struct_sock_skc_state_offset: 0x%x\n", struct_sock_skc_state_offset);
-	ebpf_info("    struct_sock_common_ipv6only_offset: 0x%x\n", struct_sock_common_ipv6only_offset);
+	ebpf_info("    struct_files_struct_fdt_offset: 0x%x\n",
+		  struct_files_struct_fdt_offset);
+	ebpf_info("    struct_files_private_data_offset: 0x%x\n",
+		  struct_files_private_data_offset);
+	ebpf_info("    struct_file_f_inode_offset: 0x%x\n",
+		  struct_file_f_inode_offset);
+	ebpf_info("    struct_inode_i_mode_offset: 0x%x\n",
+		  struct_inode_i_mode_offset);
+	ebpf_info("    struct_file_dentry_offset: 0x%x\n",
+		  struct_file_dentry_offset);
+	ebpf_info("    struct_dentry_name_offset: 0x%x\n",
+		  struct_dentry_name_offset);
+	ebpf_info("    struct_sock_family_offset: 0x%x\n",
+		  struct_sock_family_offset);
+	ebpf_info("    struct_sock_saddr_offset: 0x%x\n",
+		  struct_sock_saddr_offset);
+	ebpf_info("    struct_sock_daddr_offset: 0x%x\n",
+		  struct_sock_daddr_offset);
+	ebpf_info("    struct_sock_ip6saddr_offset: 0x%x\n",
+		  struct_sock_ip6saddr_offset);
+	ebpf_info("    struct_sock_ip6daddr_offset: 0x%x\n",
+		  struct_sock_ip6daddr_offset);
+	ebpf_info("    struct_sock_dport_offset: 0x%x\n",
+		  struct_sock_dport_offset);
+	ebpf_info("    struct_sock_sport_offset: 0x%x\n",
+		  struct_sock_sport_offset);
+	ebpf_info("    struct_sock_skc_state_offset: 0x%x\n",
+		  struct_sock_skc_state_offset);
+	ebpf_info("    struct_sock_common_ipv6only_offset: 0x%x\n",
+		  struct_sock_common_ipv6only_offset);
 
 	struct bpf_offset_param offset;
 	offset.ready = 1;
@@ -1201,7 +1217,8 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	offset.tcp_sock__copied_seq_offset = copied_seq_offs;
 	offset.tcp_sock__write_seq_offset = write_seq_offs;
 	offset.struct_files_struct_fdt_offset = struct_files_struct_fdt_offset;
-	offset.struct_files_private_data_offset = struct_files_private_data_offset;
+	offset.struct_files_private_data_offset =
+	    struct_files_private_data_offset;
 	offset.struct_file_f_inode_offset = struct_file_f_inode_offset;
 	offset.struct_inode_i_mode_offset = struct_inode_i_mode_offset;
 	offset.struct_file_dentry_offset = struct_file_dentry_offset;
@@ -1214,7 +1231,8 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	offset.struct_sock_dport_offset = struct_sock_dport_offset;
 	offset.struct_sock_sport_offset = struct_sock_sport_offset;
 	offset.struct_sock_skc_state_offset = struct_sock_skc_state_offset;
-	offset.struct_sock_common_ipv6only_offset = struct_sock_common_ipv6only_offset;
+	offset.struct_sock_common_ipv6only_offset =
+	    struct_sock_common_ipv6only_offset;
 
 	if (update_offsets_table(t, &offset) != ETR_OK) {
 		ebpf_warning("Update offsets map failed.\n");
@@ -1244,7 +1262,7 @@ static void insert_adapt_kern_uid_to_map(struct bpf_tracer *tracer)
 			    &adapt_kern_uid);
 
 	ebpf_info("Insert adapt kern uid : %d , %d\n",
-		  adapt_kern_uid >> 32, (uint32_t)adapt_kern_uid);
+		  adapt_kern_uid >> 32, (uint32_t) adapt_kern_uid);
 }
 
 static inline int __set_data_limit_max(int limit_size)
@@ -1399,7 +1417,8 @@ int set_io_event_minimal_duration(uint64_t duration)
 	}
 
 	for (cpu = 0; cpu < nr_cpus; cpu++) {
-		values[cpu].io_event_minimal_duration = io_event_minimal_duration;
+		values[cpu].io_event_minimal_duration =
+		    io_event_minimal_duration;
 	}
 
 	if (!bpf_table_set_value
@@ -1413,8 +1432,7 @@ int set_io_event_minimal_duration(uint64_t duration)
 
 static void __insert_output_prog_to_map(struct bpf_tracer *tracer,
 					const char *map_name,
-					const char *prog_name,
-					int key)
+					const char *prog_name, int key)
 {
 	struct ebpf_prog *prog;
 	prog = ebpf_obj__get_prog_by_name(tracer->obj, prog_name);
@@ -1424,7 +1442,8 @@ static void __insert_output_prog_to_map(struct bpf_tracer *tracer,
 	}
 
 	if (!bpf_table_set_value(tracer, map_name, key, &prog->prog_fd)) {
-		ebpf_error("bpf_table_set_value() failed, prog fd:%d\n", prog->prog_fd);
+		ebpf_error("bpf_table_set_value() failed, prog fd:%d\n",
+			   prog->prog_fd);
 	}
 
 	ebpf_info("Insert into map('%s'), key %d, program name %s\n",
@@ -1464,6 +1483,157 @@ static void insert_output_prog_to_map(struct bpf_tracer *tracer)
 				    PROG_OUTPUT_DATA_KP_IDX);
 }
 
+/*
+ * The work thread retrieves data from the queue and processes it.
+ */
+static void process_data(void *queue)
+{
+	prctl(PR_SET_NAME, "queue-worker");
+	int nr;
+	struct queue *q = (struct queue *)queue;
+	struct ring *r = q->r;
+	void *rx_burst[MAX_PKT_BURST];
+	for (;;) {
+		nr = ring_sc_dequeue_burst(r, rx_burst, MAX_PKT_BURST, NULL);
+		if (nr == 0) {
+			/*
+			 * 等着生产者唤醒
+			 */
+			pthread_mutex_lock(&q->mutex);
+			pthread_cond_wait(&q->cond, &q->mutex);
+			pthread_mutex_unlock(&q->mutex);
+		} else {
+			atomic64_add(&q->dequeue_nr, nr);
+			prefetch_and_process_data(q->t, nr, rx_burst);
+			if (nr == MAX_PKT_BURST)
+				atomic64_inc(&q->burst_count);
+		}
+	}
+
+	/* never reached */
+	/* pthread_exit(NULL); */
+	/* return NULL; */
+}
+
+#ifdef PERFORMANCE_TEST
+static_always_inline uint32_t random_u32(uint32_t * seed)
+{
+	*seed = (1664525 * *seed) + 1013904223;
+	return *seed;
+}
+
+static_always_inline uint64_t clib_cpu_time_now(void)
+{
+	uint32_t a, d;
+	asm volatile ("rdtsc":"=a" (a), "=d"(d));
+	return (uint64_t) a + ((uint64_t) d << (uint64_t) 32);
+}
+#endif
+
+static void poller(void *t)
+{
+	struct bpf_tracer *tracer = (struct bpf_tracer *)t;
+	struct bpf_perf_reader *perf_reader;
+	int i;
+	for (;;) {
+#ifndef PERFORMANCE_TEST
+		for (i = 0; i < tracer->perf_readers_count; i++) {
+			perf_reader = &tracer->readers[i];
+			perf_reader_poll(perf_reader->readers_count,
+					 perf_reader->readers,
+					 perf_reader->poll_timeout);
+		}
+#else
+		uint64_t data_len, rand_seed;
+		rand_seed = clib_cpu_time_now();
+		struct bpf_tracer *tracer = t;
+		data_len = random_u32((uint32_t *) & rand_seed) & 0xffff;
+
+		int ring_idx = data_len % tracer->dispatch_workers_nr;
+		struct queue *q = &tracer->queues[ring_idx];
+
+		struct socket_bpf_data *prep_data =
+		    malloc(sizeof(struct socket_bpf_data) + data_len);
+		if (prep_data == NULL) {
+			ebpf_waring("malloc() failed, no memory.\n");
+			atomic64_inc(&q->heap_get_failed);
+			return;
+		}
+		prep_data->cap_data =
+		    (char *)((void **)&prep_data->cap_data + 1);
+		prep_data->len = data_len;
+		if (!ring_sp_enqueue_burst(q->r, (void **)&prep_data, 1, NULL)) {
+			printf("%s, ring_sp_enqueue failed.\n", __func__);
+			ebpf_info("%s, ring_sp_enqueue failed.\n", __func__);
+			free(prep_data);
+			atomic64_inc(&q->enqueue_lost);
+		} else {
+			pthread_mutex_lock(&q->mutex);
+			pthread_cond_signal(&q->cond);
+			pthread_mutex_unlock(&q->mutex);
+			atomic64_inc(&q->enqueue_nr);
+		}
+#endif
+	}
+	/* never reached */
+	/* pthread_exit(NULL); */
+	/* return NULL; */
+}
+
+static int dispatch_worker(struct bpf_tracer *tracer, unsigned int queue_size)
+{
+	int i, ret;
+
+	if (queue_size <= 0)
+		queue_size = RING_SIZE;
+	else
+		queue_size = 1 << min_log2((unsigned int)queue_size);
+
+	for (i = 0; i < tracer->dispatch_workers_nr; i++) {
+		struct ring *r = NULL;
+		char name[NAME_LEN];
+		snprintf(name, sizeof(name), "%s-ring-%d", tracer->name, i);
+		r = ring_create(name, queue_size,
+				SOCKET_ID_ANY, RING_F_SP_ENQ | RING_F_SC_DEQ);
+		if (r == NULL) {
+			ebpf_info("<%s> ring_create fail. err:%s\n", __func__,
+				  strerror(errno));
+			return -ENOMEM;
+		}
+
+		tracer->queues[i].r = r;
+		tracer->queues[i].t = tracer;
+		tracer->queues[i].nr = 0;
+		tracer->queues[i].ring_size = queue_size;
+
+		atomic64_init(&tracer->queues[i].enqueue_lost);
+		atomic64_init(&tracer->queues[i].enqueue_nr);
+		atomic64_init(&tracer->queues[i].dequeue_nr);
+		atomic64_init(&tracer->queues[i].burst_count);
+		atomic64_init(&tracer->queues[i].heap_get_failed);
+
+		pthread_mutex_init(&tracer->queues[i].mutex, NULL);
+		pthread_cond_init(&tracer->queues[i].cond, NULL);
+		ret =
+		    pthread_create(&tracer->dispatch_workers[i], NULL,
+				   (void *)&process_data,
+				   (void *)&tracer->queues[i]);
+		if (ret) {
+			ebpf_info
+			    ("<%s> process_data, pthread_create is error:%s\n",
+			     __func__, strerror(errno));
+			return ETR_INVAL;
+		}
+	}
+
+	ret = enable_tracer_reader_work("socket-reader",
+					tracer, (void *)&poller);
+	if (ret)
+		return ETR_INVAL;
+
+	return ETR_OK;
+}
+
 /**
  * Start socket tracer
  *
@@ -1492,7 +1662,7 @@ static void insert_output_prog_to_map(struct bpf_tracer *tracer)
  *
  * @return value: 0 on success, if not 0 is failed
  */
-int running_socket_tracer(l7_handle_fn handle,
+int running_socket_tracer(tracer_callback_t handle,
 			  int thread_nr,
 			  uint32_t perf_pages_cnt,
 			  uint32_t queue_size,
@@ -1546,8 +1716,7 @@ int running_socket_tracer(l7_handle_fn handle,
 	datadump_file = stdout;
 
 	// Initialize events_list
-	if (events_list.next == events_list.prev &&
-		events_list.next == NULL) {
+	if (events_list.next == events_list.prev && events_list.next == NULL) {
 		init_list_head(&events_list);
 	}
 
@@ -1561,24 +1730,15 @@ int running_socket_tracer(l7_handle_fn handle,
 	init_list_head(&tps->uprobe_syms_head);
 	socket_tracer_set_probes(tps);
 	struct bpf_tracer *tracer =
-	    create_bpf_tracer(SK_TRACER_NAME, bpf_load_buffer_name,
+	     setup_bpf_tracer(SK_TRACER_NAME, bpf_load_buffer_name,
 			      bpf_bin_buffer, buffer_sz, tps,
-			      thread_nr, (void *)handle, perf_pages_cnt);
+			      thread_nr, NULL, NULL, (void *)handle, 0);
 	if (tracer == NULL)
 		return -EINVAL;
 
-	tracer->state = TRACER_INIT;
 	probes_act = ACT_NONE;
 	tracer->adapt_success = false;
 
-	/*
-	 * config perf ring-buffer reader callback
-	 */
-	tracer->raw_cb = reader_raw_cb;
-	tracer->lost_cb = reader_lost_cb;
-
-	tracer->stop_handle = socket_tracer_stop;
-	tracer->start_handle = socket_tracer_start;
 	tracer->datadump = datadump_process;
 
 	if ((ret =
@@ -1597,21 +1757,34 @@ int running_socket_tracer(l7_handle_fn handle,
 	if (tracer_bpf_load(tracer))
 		return -EINVAL;
 
+	/*
+	 * create reader for read perf buffer data. 
+	 */
+	struct bpf_perf_reader *reader;
+	reader = create_perf_buffer_reader(tracer,
+					   MAP_PERF_SOCKET_DATA_NAME,
+					   reader_raw_cb,
+					   reader_lost_cb,
+					   perf_pages_cnt,
+					   PERF_READER_TIMEOUT_DEF);
+	if (reader == NULL)
+		return -EINVAL;
+
 	if (tracer_probes_init(tracer))
 		return -EINVAL;
 
 	// Update kernel offsets map from btf vmlinux file.
 	if (update_offset_map_from_btf_vmlinux(tracer) != ETR_OK) {
-		ebpf_info("[eBPF Kernel Adapt] Set offsets map from btf_vmlinux, not support.\n");
+		ebpf_info
+		    ("[eBPF Kernel Adapt] Set offsets map from btf_vmlinux, not support.\n");
 		if (update_offset_map_default(tracer) != ETR_OK) {
-			ebpf_error("Fatal error, failed to update default offset\n");
+			ebpf_error
+			    ("Fatal error, failed to update default offset\n");
 		}
 	} else {
-		ebpf_info("[eBPF Kernel Adapt] Set offsets map from btf_vmlinux, success.\n");
+		ebpf_info
+		    ("[eBPF Kernel Adapt] Set offsets map from btf_vmlinux, success.\n");
 	}
-
-	if (perf_map_init(tracer, MAP_PERF_SOCKET_DATA_NAME))
-		return -EINVAL;
 
 	// Set default maximum amount of data passed to the agent by eBPF.
 	if (socket_data_limit_max == 0)
@@ -1631,10 +1804,12 @@ int running_socket_tracer(l7_handle_fn handle,
 		t_conf[cpu].data_limit_max = socket_data_limit_max;
 		t_conf[cpu].go_tracing_timeout = go_tracing_timeout;
 		t_conf[cpu].io_event_collect_mode = io_event_collect_mode;
-		t_conf[cpu].io_event_minimal_duration = io_event_minimal_duration;
+		t_conf[cpu].io_event_minimal_duration =
+		    io_event_minimal_duration;
 	}
 
-	if (!bpf_table_set_value(tracer, MAP_TRACE_CONF_NAME, 0, (void *)&t_conf))
+	if (!bpf_table_set_value
+	    (tracer, MAP_TRACE_CONF_NAME, 0, (void *)&t_conf))
 		return -EINVAL;
 
 	tracer->data_limit_max = socket_data_limit_max;
@@ -1701,7 +1876,7 @@ int running_socket_tracer(l7_handle_fn handle,
 	return 0;
 }
 
-static int socket_tracer_stop(void)
+int socket_tracer_stop(void)
 {
 	int ret = -1;
 	struct bpf_tracer *t = find_bpf_tracer(SK_TRACER_NAME);
@@ -1718,7 +1893,7 @@ static int socket_tracer_stop(void)
 	if (probes_act == ACT_DETACH) {
 		ebpf_warning
 		    ("The latest probes_act is already ACT_DETACH, without operating.\n");
-			
+
 		return 0;
 	}
 
@@ -1727,7 +1902,7 @@ static int socket_tracer_stop(void)
 	return 0;
 }
 
-static int socket_tracer_start(void)
+int socket_tracer_start(void)
 {
 	int ret = -1;
 	struct bpf_tracer *t = find_bpf_tracer(SK_TRACER_NAME);
@@ -1738,8 +1913,7 @@ static int socket_tracer_start(void)
 		ebpf_warning
 		    ("[eBPF Kernel Adapt] Adapting the linux kernel(%s) "
 		     "is in progress, please try "
-		     "the start operation again later.\n",
-		     linux_release);
+		     "the start operation again later.\n", linux_release);
 		return -1;
 	}
 
@@ -1759,8 +1933,7 @@ static bool bpf_stats_map_collect(struct bpf_tracer *tracer,
 				  struct trace_stats *stats_total)
 {
 	struct trace_stats value = { 0 };
-	if (!bpf_table_get_value(tracer, MAP_TRACE_STATS_NAME,
-				 0, &value))
+	if (!bpf_table_get_value(tracer, MAP_TRACE_STATS_NAME, 0, &value))
 		return false;
 
 	memset(stats_total, 0, sizeof(*stats_total));
@@ -1771,12 +1944,10 @@ static bool bpf_stats_map_collect(struct bpf_tracer *tracer,
 }
 
 static bool bpf_stats_map_update(struct bpf_tracer *tracer,
-				 int socket_num,
-				 int trace_num)
+				 int socket_num, int trace_num)
 {
 	struct trace_stats value = { 0 };
-	if (!bpf_table_get_value(tracer, MAP_TRACE_STATS_NAME,
-				 0, &value))
+	if (!bpf_table_get_value(tracer, MAP_TRACE_STATS_NAME, 0, &value))
 		return false;
 
 	if (socket_num != -1) {
@@ -1788,8 +1959,7 @@ static bool bpf_stats_map_update(struct bpf_tracer *tracer,
 	}
 
 	if (!bpf_table_set_value(tracer,
-				 MAP_TRACE_STATS_NAME,
-				 0, (void *)&value)) {
+				 MAP_TRACE_STATS_NAME, 0, (void *)&value)) {
 		return false;
 	}
 
@@ -1869,7 +2039,7 @@ struct socket_trace_stats socket_tracer_stats(void)
 	stats.kern_lost = atomic64_read(&t->lost);
 	atomic64_init(&t->lost);
 	stats.worker_num = t->dispatch_workers_nr;
-	stats.perf_pages_cnt = t->perf_pages_cnt;
+	stats.perf_pages_cnt = t->readers[0].perf_pages_cnt;
 	stats.queue_capacity = t->queues[0].ring_size;
 	stats.kern_socket_map_max = conf_max_socket_entries;
 	stats.kern_trace_map_max = conf_max_trace_entries;
@@ -1923,7 +2093,7 @@ struct socket_trace_stats socket_tracer_stats(void)
  */
 int register_event_handle(uint32_t type, void (*fn)(void *))
 {
-	if (type < EVENT_TYPE_MIN || fn == NULL) {
+	if(type < EVENT_TYPE_MIN || fn == NULL) {
 		ebpf_warning("Parameter is invalid, type %d fn %p\n", type, fn);
 		return -1;
 	}
@@ -1931,8 +2101,7 @@ int register_event_handle(uint32_t type, void (*fn)(void *))
 	struct list_head *events_head;
 	events_head = &events_list;
 	// Initialize events_list
-	if (events_head->next == events_head->prev &&
-	    events_head->next == NULL) {
+	if (events_head->next == events_head->prev && events_head->next == NULL) {
 		init_list_head(events_head);
 	}
 
@@ -2026,7 +2195,7 @@ static unsigned char *read_name(unsigned char *reader, unsigned char *buffer,
 	//read the names in 3www6google3com format
 	while (*reader != 0) {
 		if (*reader >= 192) {
-			offset = (*reader) * 256 + *(reader + 1) - 49152;	//49152 = 11000000 00000000 ;)
+			offset = (*reader) * 256 + *(reader + 1) - 49152;
 			reader = buffer + offset - 1;
 			jumped = 1;	//we have jumped to another location so counting wont go up!
 		} else {
@@ -2081,7 +2250,7 @@ void print_uprobe_http2_info(const char *data, int len)
 	memcpy(&key, data + sizeof(header), header.header_len);
 	memcpy(&value, data + value_start, header.value_len);
 
-	fprintf(datadump_file,"header=[%s:%s]\n", key, value);
+	fprintf(datadump_file, "header=[%s:%s]\n", key, value);
 	fflush(datadump_file);
 	return;
 }
@@ -2098,7 +2267,7 @@ void print_io_event_info(const char *data, int len)
 	memcpy(&event, data, sizeof(event));
 
 	fprintf(datadump_file,
-		"bytes_count=[%u]\noperation=[%u]\nlatency=[%llu]\nfilename=[%s]\n",
+		"bytes_count=[%u]\noperation=[%u]\nlatency=[%lu]\nfilename=[%s]\n",
 		event.bytes_count, event.operation,
 		event.latency, event.filename);
 
@@ -2138,7 +2307,8 @@ void print_dns_info(const char *data, int len)
 		}
 		dns_name[q][i - 1] = '\0';	//remove the last dot
 		question = (struct QUESTION *)&qname[i + 1];
-		fprintf(datadump_file, "Name %s, QTYPE %s, QCLASS 0x%04x(%s)\n", dns_name[q],
+		fprintf(datadump_file, "Name %s, QTYPE %s, QCLASS 0x%04x(%s)\n",
+			dns_name[q],
 			question->qtype == 0x0100 ? "A (IPv4)" : "AAAA (IPv6)",
 			question->qclass,
 			question->qclass == 0x0100 ? "IN" : "unknown");
@@ -2156,8 +2326,10 @@ void print_dns_info(const char *data, int len)
 		unsigned char *reader = qname;
 
 		fprintf(datadump_file, "\nThe response contains : ");
-		fprintf(datadump_file, "\n - %d Questions.", ntohs(dns->q_count));
-		fprintf(datadump_file, "\n - %d Answers.", ntohs(dns->ans_count));
+		fprintf(datadump_file, "\n - %d Questions.",
+			ntohs(dns->q_count));
+		fprintf(datadump_file, "\n - %d Answers.",
+			ntohs(dns->ans_count));
 		fprintf(datadump_file, "\n - %d Authoritative Servers.",
 			ntohs(dns->auth_count));
 		fprintf(datadump_file, "\n - %d Additional records.\n\n",
@@ -2186,8 +2358,8 @@ void print_dns_info(const char *data, int len)
 					answers[i].rdata[j] = reader[j];
 
 				answers[i].rdata[ntohs
-						 (answers[i].resource->
-						  data_len)]
+						 (answers[i].
+						  resource->data_len)]
 				    = '\0';
 
 				reader =
@@ -2205,7 +2377,8 @@ void print_dns_info(const char *data, int len)
 
 		fprintf(datadump_file, "Answer :\n");
 		for (i = 0; i < ntohs(dns->ans_count); i++) {
-			fprintf(datadump_file, "  - Name : %s ", answers[i].name);
+			fprintf(datadump_file, "  - Name : %s ",
+				answers[i].name);
 			if (ntohs(answers[i].resource->type) == 1)	//IPv4 address
 			{
 				long *p;
@@ -2216,7 +2389,8 @@ void print_dns_info(const char *data, int len)
 			}
 			if (ntohs(answers[i].resource->type) == 5)	//Canonical name for an alias
 			{
-				fprintf(datadump_file, "has alias name : %s", answers[i].rdata);
+				fprintf(datadump_file, "has alias name : %s",
+					answers[i].rdata);
 			}
 			fprintf(datadump_file, "\n");
 		}
@@ -2391,30 +2565,31 @@ static void print_socket_data(struct socket_bpf_data *sd)
 		fprintf(datadump_file, "\n+-----------------------------+\n"
 			"%s <%s> DIR %s TYPE %s(%d) PID %u THREAD_ID %u "
 			"COROUTINE_ID %" PRIu64 " SOURCE %d COMM %s "
-			"%s LEN %d SYSCALL_LEN %" PRIu64 " SOCKET_ID %" PRIu64 " "
-			"TRACE_ID %" PRIu64 " TCP_SEQ %" PRIu64 " DATA_SEQ %" PRIu64 " "
-			"TimeStamp %" PRIu64 "\n%s",
-			timestamp, proto_tag, sd->direction == T_EGRESS ? "out" : "in",
-			type, sd->msg_type, sd->process_id, sd->thread_id,
+			"%s LEN %d SYSCALL_LEN %" PRIu64 " SOCKET_ID %" PRIu64
+			" " "TRACE_ID %" PRIu64 " TCP_SEQ %" PRIu64
+			" DATA_SEQ %" PRIu64 " " "TimeStamp %" PRIu64 "\n%s",
+			timestamp, proto_tag,
+			sd->direction == T_EGRESS ? "out" : "in", type,
+			sd->msg_type, sd->process_id, sd->thread_id,
 			sd->coroutine_id, sd->source, sd->process_kname,
-			flow_str, sd->cap_len, sd->syscall_len,
-			sd->socket_id, sd->syscall_trace_id_call,
-			sd->tcp_seq, sd->cap_seq, sd->timestamp,
-			sd->cap_data);
+			flow_str, sd->cap_len, sd->syscall_len, sd->socket_id,
+			sd->syscall_trace_id_call, sd->tcp_seq, sd->cap_seq,
+			sd->timestamp, sd->cap_data);
 	} else {
 		fprintf(datadump_file, "\n+-----------------------------+\n"
 			"%s <%s> DIR %s TYPE %s(%d) PID %u THREAD_ID %u "
 			"COROUTINE_ID %" PRIu64 " SOURCE %d COMM %s "
-			"%s LEN %d SYSCALL_LEN %" PRIu64 " SOCKET_ID %" PRIu64 " "
-			"TRACE_ID %" PRIu64 " TCP_SEQ %" PRIu64 " DATA_SEQ %" PRIu64 " "
-			"TimeStamp %" PRIu64 "\n",
-			timestamp, proto_tag, sd->direction == T_EGRESS ? "out" : "in",
-			type, sd->msg_type, sd->process_id, sd->thread_id,
+			"%s LEN %d SYSCALL_LEN %" PRIu64 " SOCKET_ID %" PRIu64
+			" " "TRACE_ID %" PRIu64 " TCP_SEQ %" PRIu64
+			" DATA_SEQ %" PRIu64 " " "TimeStamp %" PRIu64 "\n",
+			timestamp, proto_tag,
+			sd->direction == T_EGRESS ? "out" : "in", type,
+			sd->msg_type, sd->process_id, sd->thread_id,
 			sd->coroutine_id, sd->source, sd->process_kname,
-			flow_str, sd->cap_len, sd->syscall_len,
-			sd->socket_id, sd->syscall_trace_id_call,
-			sd->tcp_seq, sd->cap_seq, sd->timestamp);
-		
+			flow_str, sd->cap_len, sd->syscall_len, sd->socket_id,
+			sd->syscall_trace_id_call, sd->tcp_seq, sd->cap_seq,
+			sd->timestamp);
+
 		if (sd->l7_protocal_hint == PROTO_DNS) {
 			print_dns_info(sd->cap_data, sd->cap_len);
 		} else if (sd->source == 2) {
@@ -2427,7 +2602,8 @@ static void print_socket_data(struct socket_bpf_data *sd)
 			for (i = 0; i < sd->cap_len; i++) {
 				__len = snprintf(output_buf + len,
 						 sizeof(output_buf) - len,
-						 "%02X ", (uint8_t)sd->cap_data[i]);
+						 "%02X ",
+						 (uint8_t) sd->cap_data[i]);
 				len += __len;
 				if (__len <= 0 || len >= OUTPUT_DATA_SIZE)
 					break;

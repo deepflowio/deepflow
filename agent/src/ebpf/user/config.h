@@ -43,6 +43,11 @@
 #define PROG_OUTPUT_DATA_NAME_FOR_TP	"bpf_prog_tp__output_data"
 #define PROG_IO_EVENT_NAME_FOR_TP	"bpf_prog_tp__io_event"
 
+// perf profiler
+#define MAP_PERF_PROFILER_BUF_A_NAME	"__profiler_output_a"
+#define MAP_PERF_PROFILER_BUF_B_NAME    "__profiler_output_b"
+#define PROFILE_PG_CNT_DEF		16	// perf ring-buffer page count
+
 enum {
 	PROG_DATA_SUBMIT_TP_IDX,
 	PROG_OUTPUT_DATA_TP_IDX,
@@ -54,6 +59,12 @@ enum {
 	PROG_DATA_SUBMIT_KP_IDX,
 	PROG_OUTPUT_DATA_KP_IDX,
 	PROG_KP_NUM
+};
+
+//thread index for bihash
+enum {
+	THREAD_PROFILER_READER_IDX = 0,
+	THREAD_NUM
 };
 
 /*
@@ -92,5 +103,36 @@ enum {
 // Maximum proportion of trace map reclamation (refers to the proportion of
 // reclamation when the current quantity exceeds the capacity of the whole MAP)
 #define RECLAIM_TRACE_MAP_SCALE		0.9
+
+/*
+ * /proc/sys/kernel/perf_event_max_stack
+ * The default value of `/proc/sys/kernel/perf_event_max_stack
+ * is 127, which means that perf can capture up to 127 stack frames
+ * for each event.
+ *
+ * However, this value can be changed by system administrators to
+ * increase or decrease the amount of information captured by perf,
+ * depending on the needs of the user.
+ *
+ * Increasing the value of `/proc/sys/kernel/perf_event_max_stack`
+ * may lead to increased overhead and memory usage, so it is
+ * recommended to use it with caution.
+ */
+#ifndef PERF_MAX_STACK_DEPTH 
+#define PERF_MAX_STACK_DEPTH		127
+#endif
+
+/*
+ * continuous profiler 
+ */
+#define MAP_STACK_A_NAME	"__stack_map_a"
+#define MAP_STACK_B_NAME	"__stack_map_b"
+#define MAP_PROFILER_STATE_MAP	"__profiler_state_map"
+
+#define STRINGIFIER_STACK_STR_HASH_BUCKETS_NUM	8192
+#define STRINGIFIER_STACK_STR_HASH_MEM_SZ	(1ULL << 30) // 1Gbytes
+
+#define SYMBOLIZER_CACHES_HASH_BUCKETS_NUM	8192
+#define SYMBOLIZER_CACHES_HASH_MEM_SZ		(1ULL << 31) // 2Gbytes
 
 #endif /* DF_EBPF_CONFIG_H */

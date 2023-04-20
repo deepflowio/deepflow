@@ -1,5 +1,5 @@
 [package]
-name = "perf_profiler"
+name = "rust_sample"
 version = "0.1.0"
 authors = ["Yin Jiping <jiping@yunshan.net>"]
 edition = "2021"

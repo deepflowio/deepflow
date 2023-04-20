@@ -63,7 +63,7 @@ unsigned int bpf_table_flags(struct ebpf_map *map)
 	return 0;
 }
 
-bool bpf_table_get_value(struct bpf_tracer * tracer,
+bool bpf_table_get_value(struct bpf_tracer *tracer,
 			 const char *tb_name, uint64_t key, void *val_buf)
 {
 	struct ebpf_map *map = ebpf_obj__get_map_by_name(tracer->obj, tb_name);
@@ -85,7 +85,7 @@ bool bpf_table_get_value(struct bpf_tracer * tracer,
 	return true;
 }
 
-uint32_t bpf_table_elems_count(struct bpf_tracer * tracer, const char *tb_name)
+uint32_t bpf_table_elems_count(struct bpf_tracer *tracer, const char *tb_name)
 {
 	struct ebpf_map *map = ebpf_obj__get_map_by_name(tracer->obj, tb_name);
 	if (map == NULL) {
@@ -106,7 +106,7 @@ uint32_t bpf_table_elems_count(struct bpf_tracer * tracer, const char *tb_name)
 	return count;
 }
 
-bool bpf_table_set_value(struct bpf_tracer * tracer,
+bool bpf_table_set_value(struct bpf_tracer *tracer,
 			 const char *tb_name, uint64_t key, void *val_buf)
 {
 	struct ebpf_map *map = ebpf_obj__get_map_by_name(tracer->obj, tb_name);
@@ -120,6 +120,27 @@ bool bpf_table_set_value(struct bpf_tracer * tracer,
 	if (bpf_update_elem(map_fd, &key, val_buf, BPF_ANY) != 0) {
 		ebpf_warning("[%s] bpf_map_update_elem, err tb_name:%s, key : %"
 			     PRIu64 ", err_message:%s\n", __func__, tb_name,
+			     key, strerror(errno));
+		return false;
+	}
+
+	return true;
+}
+
+bool bpf_table_delete_key(struct bpf_tracer *tracer,
+			  const char *tb_name, uint64_t key)
+{
+	struct ebpf_map *map = ebpf_obj__get_map_by_name(tracer->obj, tb_name);
+	if (map == NULL) {
+		ebpf_info("[%s] map name \"%s\" map is NULL.\n", __func__,
+			  tb_name);
+		return false;
+	}
+	int map_fd = map->fd;
+
+	if (bpf_delete_elem(map_fd, (void *)&key)) {
+		ebpf_warning("bpf_map_delete_elem, err tb_name:%s, key : %"
+			     PRIu64 ", err_message:%s\n", tb_name,
 			     key, strerror(errno));
 		return false;
 	}

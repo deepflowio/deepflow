@@ -52,6 +52,8 @@ fn main() {
         bpf_tracer_finish();
 
         print!("test OK\n");
+        thread::sleep(Duration::from_secs(20));
+        stop_continuous_profiler();
     }
 
     loop {

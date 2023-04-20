@@ -37,31 +37,31 @@ enum probes_act_type {
 
 struct socket_bpf_data {
 	/* session info */
-	uint32_t process_id;	   // tgid in kernel struct task_struct
-	uint32_t thread_id;	   // pid in kernel struct task_struct, main thread iff pid==tgid
-	uint64_t coroutine_id;	   // CoroutineID, i.e., golang goroutine id
-	uint8_t source;		   // syscall,go_tls_uprobe,go_http2_uprobe
-	uint8_t  process_kname[TASK_COMM_LEN]; // comm in task_struct
+	uint32_t process_id;	// tgid in kernel struct task_struct
+	uint32_t thread_id;	// pid in kernel struct task_struct, main thread iff pid==tgid
+	uint64_t coroutine_id;	// CoroutineID, i.e., golang goroutine id
+	uint8_t source;		// syscall,go_tls_uprobe,go_http2_uprobe
+	uint8_t process_kname[TASK_COMM_LEN];	// comm in task_struct
 
-	struct __tuple_t tuple;	   // Socket五元组信息
-	uint64_t socket_id;	   // Socket的唯一标识，从启动时的时钟开始自增1
-	uint16_t l7_protocal_hint; // 应用数据（cap_data）的协议类型，枚举如下：1 SOCK_DATA_HTTP1, 2 SOCK_DATA_DNS, 3 ...
-				   // 存在一定误判性（例如标识为A协议但实际上是未知协议，或标识为多种协议），上层应用应继续深入判断
-	uint8_t msg_type;	   // 信息类型，值为MSG_UNKNOWN(0), MSG_REQUEST(1), MSG_RESPONSE(2)
-	bool need_reconfirm; 	   // 是否需要上层再确认 
+	struct __tuple_t tuple;	// Socket五元组信息
+	uint64_t socket_id;	// Socket的唯一标识，从启动时的时钟开始自增1
+	uint16_t l7_protocal_hint;	// 应用数据（cap_data）的协议类型，枚举如下：1 SOCK_DATA_HTTP1, 2 SOCK_DATA_DNS, 3 ...
+	// 存在一定误判性（例如标识为A协议但实际上是未知协议，或标识为多种协议），上层应用应继续深入判断
+	uint8_t msg_type;	// 信息类型，值为MSG_UNKNOWN(0), MSG_REQUEST(1), MSG_RESPONSE(2)
+	bool need_reconfirm;	// 是否需要上层再确认 
 
 	/* trace info */
-	uint64_t tcp_seq;		   // 收发cap_data数据时TCP协议栈将会用到的TCP SEQ，可用于关联eBPF DATA与网络中的TCP Packet
-	uint64_t syscall_trace_id_call;    // 应用数据的追踪ID，若应用为协程，L7代理、应用层负载均衡等类型时，可利用此值追踪一个请求或响应
-					   // 同一份应用数据（cap_data可能不同）接收、发送的两份cap_data会标记上相同标识
+	uint64_t tcp_seq;	// 收发cap_data数据时TCP协议栈将会用到的TCP SEQ，可用于关联eBPF DATA与网络中的TCP Packet
+	uint64_t syscall_trace_id_call;	// 应用数据的追踪ID，若应用为协程，L7代理、应用层负载均衡等类型时，可利用此值追踪一个请求或响应
+	// 同一份应用数据（cap_data可能不同）接收、发送的两份cap_data会标记上相同标识
 
 	/* data info */
 	uint64_t timestamp;	// cap_data获取的时间戳
-	uint8_t  direction;	// 数据的收发方向，枚举如下: 1 SOCK_DIR_SND, 2 SOCK_DIR_RCV
+	uint8_t direction;	// 数据的收发方向，枚举如下: 1 SOCK_DIR_SND, 2 SOCK_DIR_RCV
 	uint64_t syscall_len;	// 本次系统调用读、写数据的总长度
 	uint32_t cap_len;	// 返回的cap_data长度
 	uint64_t cap_seq;	// cap_data在Socket中的相对顺序号，从启动时的时钟开始自增1，用于数据乱序排序
-	char  *cap_data;        // 返回的应用数据
+	char *cap_data;		// 返回的应用数据
 };
 
 /*
@@ -127,7 +127,7 @@ struct socket_trace_stats {
 	 * kerenl 适配状态
 	 */
 	bool is_adapt_success;
-	uint8_t tracer_state; 
+	uint8_t tracer_state;
 
 	int64_t boot_time_update_diff;
 	uint32_t probes_count;
@@ -141,21 +141,21 @@ struct bpf_offset_param {
 	uint32_t tcp_sock__copied_seq_offset;
 	uint32_t tcp_sock__write_seq_offset;
 
-	uint32_t struct_files_struct_fdt_offset; // offsetof(struct files_struct, fdt)
-	uint32_t struct_files_private_data_offset; // offsetof(struct file, private_data)
-	uint32_t struct_file_f_inode_offset; // offsetof(struct file, f_inode)
-	uint32_t struct_inode_i_mode_offset; // offsetof(struct inode, i_mode)
-	uint32_t struct_file_dentry_offset; // offsetof(struct file, f_path) + offsetof(struct path, dentry)
-	uint32_t struct_dentry_name_offset; // offsetof(struct dentry, d_name) + offsetof(struct qstr, name)
-	uint32_t struct_sock_family_offset; // offsetof(struct sock_common, skc_family)
-	uint32_t struct_sock_saddr_offset; // offsetof(struct sock_common, skc_rcv_saddr)
-	uint32_t struct_sock_daddr_offset; // offsetof(struct sock_common, skc_daddr)
-	uint32_t struct_sock_ip6saddr_offset; // offsetof(struct sock_common, skc_v6_rcv_saddr)
-	uint32_t struct_sock_ip6daddr_offset; // offsetof(struct sock_common, skc_v6_daddr)
-	uint32_t struct_sock_dport_offset; // offsetof(struct sock_common, skc_dport)
-	uint32_t struct_sock_sport_offset; // offsetof(struct sock_common, skc_num)
-	uint32_t struct_sock_skc_state_offset; // offsetof(struct sock_common, skc_state)
-	uint32_t struct_sock_common_ipv6only_offset; // offsetof(struct sock_common, skc_flags)
+	uint32_t struct_files_struct_fdt_offset;	// offsetof(struct files_struct, fdt)
+	uint32_t struct_files_private_data_offset;	// offsetof(struct file, private_data)
+	uint32_t struct_file_f_inode_offset;	// offsetof(struct file, f_inode)
+	uint32_t struct_inode_i_mode_offset;	// offsetof(struct inode, i_mode)
+	uint32_t struct_file_dentry_offset;	// offsetof(struct file, f_path) + offsetof(struct path, dentry)
+	uint32_t struct_dentry_name_offset;	// offsetof(struct dentry, d_name) + offsetof(struct qstr, name)
+	uint32_t struct_sock_family_offset;	// offsetof(struct sock_common, skc_family)
+	uint32_t struct_sock_saddr_offset;	// offsetof(struct sock_common, skc_rcv_saddr)
+	uint32_t struct_sock_daddr_offset;	// offsetof(struct sock_common, skc_daddr)
+	uint32_t struct_sock_ip6saddr_offset;	// offsetof(struct sock_common, skc_v6_rcv_saddr)
+	uint32_t struct_sock_ip6daddr_offset;	// offsetof(struct sock_common, skc_v6_daddr)
+	uint32_t struct_sock_dport_offset;	// offsetof(struct sock_common, skc_dport)
+	uint32_t struct_sock_sport_offset;	// offsetof(struct sock_common, skc_num)
+	uint32_t struct_sock_skc_state_offset;	// offsetof(struct sock_common, skc_state)
+	uint32_t struct_sock_common_ipv6only_offset;	// offsetof(struct sock_common, skc_flags)
 };
 
 struct bpf_offset_param_array {
@@ -164,7 +164,7 @@ struct bpf_offset_param_array {
 };
 
 struct bpf_socktrace_params {
-	uint8_t  tracer_state;
+	uint8_t tracer_state;
 	uint32_t kern_socket_map_max;
 	uint32_t kern_socket_map_used;
 	uint32_t kern_trace_map_max;
@@ -227,15 +227,82 @@ static inline char *get_proto_name(uint16_t proto_id)
 
 static inline const char *get_tracer_state_name(enum tracer_state s)
 {
-	switch(s) {
-	case TRACER_INIT: return "TRACER_INIT";
-	case TRACER_RUNNING: return "TRACER_RUNNING";
-	case TRACER_STOP: return "TRACER_STOP";
-	case TRACER_WAIT_START: return "TRACER_WAIT_START";
-	case TRACER_START_ERR: return "TRACER_START_ERR";
-	case TRACER_WAIT_STOP: return "TRACER_WAIT_STOP";
-	case TRACER_STOP_ERR: return "TRACER_STOP_ERR";
-	default: return "TRACER_UNKNOWN";
+	switch (s) {
+	case TRACER_INIT:
+		return "TRACER_INIT";
+	case TRACER_RUNNING:
+		return "TRACER_RUNNING";
+	case TRACER_STOP:
+		return "TRACER_STOP";
+	case TRACER_WAIT_START:
+		return "TRACER_WAIT_START";
+	case TRACER_START_ERR:
+		return "TRACER_START_ERR";
+	case TRACER_WAIT_STOP:
+		return "TRACER_WAIT_STOP";
+	case TRACER_STOP_ERR:
+		return "TRACER_STOP_ERR";
+	default:
+		return "TRACER_UNKNOWN";
+	}
+}
+
+#define PREFETCH_READ 0
+#define PREFETCH_WRITE 1
+
+/* *INDENT-OFF* */
+#define _PREFETCH(n,size,type)				\
+  if ((size) > (n)*CACHE_LINE_BYTES)			\
+    __builtin_prefetch (_addr + (n)*CACHE_LINE_BYTES, 	\
+            PREFETCH_##type,              		\
+            /* locality */ 3);
+
+#define PREFETCH(addr,size,type)		\
+do {						\
+  void * _addr = (addr);			\
+	int __sz = (size);			\
+  if (__sz > 2*CACHE_LINE_BYTES)		\
+		__sz = 2*CACHE_LINE_BYTES;	\
+  _PREFETCH (0, __sz, type);			\
+  _PREFETCH (1, __sz, type);			\
+} while (0)
+/* *INDENT-ON* */
+
+static inline void
+prefetch_and_process_data(struct bpf_tracer *t, int nb_rx, void **datas_burst)
+{
+/* Configure how many socket_data ahead to prefetch, when reading socket_data */
+#define PREFETCH_OFFSET   3
+	int32_t j;
+	struct socket_bpf_data *sd;
+	struct mem_block_head *block_head;
+	tracer_callback_t callback = (tracer_callback_t) t->process_fn;
+
+	/* Prefetch first packets */
+	for (j = 0; j < PREFETCH_OFFSET && j < nb_rx; j++)
+		PREFETCH(datas_burst[j], 2 * CACHE_LINE_BYTES, READ);
+
+	/*
+	 * Prefetch and forward already prefetched
+	 * packets.
+	 */
+	for (j = 0; j < nb_rx; j++) {
+		if (j + PREFETCH_OFFSET < nb_rx)
+			PREFETCH(datas_burst[j + PREFETCH_OFFSET],
+				 2 * CACHE_LINE_BYTES, READ);
+		sd = (struct socket_bpf_data *)datas_burst[j];
+		block_head = (struct mem_block_head *)sd - 1;
+		if (block_head->fn != NULL) {
+			block_head->fn(sd);
+		} else {
+			if (t->datadump)
+				t->datadump((void *)sd);
+
+			callback(sd);
+		}
+
+		if (block_head->is_last == 1)
+			free(block_head->free_ptr);
 	}
 }
 
@@ -244,7 +311,7 @@ int set_go_tracing_timeout(int timeout);
 int set_io_event_collect_mode(uint32_t mode);
 int set_io_event_minimal_duration(uint64_t duration);
 struct socket_trace_stats socket_tracer_stats(void);
-int running_socket_tracer(l7_handle_fn handle,
+int running_socket_tracer(tracer_callback_t handle,
 			  int thread_nr,
 			  uint32_t perf_pages_cnt,
 			  uint32_t queue_size,
@@ -252,4 +319,6 @@ int running_socket_tracer(l7_handle_fn handle,
 			  uint32_t max_trace_entries,
 			  uint32_t socket_map_max_reclaim);
 int register_event_handle(uint32_t type, void (*fn)(void *));
+int socket_tracer_stop(void);
+int socket_tracer_start(void);
 #endif /* DF_USER_SOCKET_H */

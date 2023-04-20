@@ -401,12 +401,12 @@ extern "C" {
 
     // 停止tracer运行
     // 返回值：成功返回0，否则返回非0
-    pub fn tracer_stop() -> c_int;
+    pub fn socket_tracer_stop() -> c_int;
 
     // 启动tracer运行
     // 返回值：成功返回0，否则返回非0
-    pub fn tracer_start() -> c_int;
+    pub fn socket_tracer_start() -> c_int;
 
     // 注意：eBPF tracer初始化加载运行后进行内核适配，
-    // 适配完成后马上进入stop状态，需调用tracer_start()才开始工作。
+    // 适配完成后马上进入stop状态，需调用socket_tracer_start()才开始工作。
 }

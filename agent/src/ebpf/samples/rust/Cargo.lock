@@ -53,6 +53,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "perf_profiler"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "dunce",
+ "libc",
+ "serde",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.43"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -68,16 +78,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bbe448f377a7d6961e30f5955f9b8d106c3f5e449d493ee1b125c1d43c2b5179"
 dependencies = [
  "proc-macro2",
-]
-
-[[package]]
-name = "rust_sample"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "dunce",
- "libc",
- "serde",
 ]
 
 [[package]]
