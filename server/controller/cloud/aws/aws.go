@@ -46,6 +46,7 @@ type Aws struct {
 	lcuuid               string
 	regionUUID           string
 	uuidGenerate         string
+	apiDefaultRegion     string
 	includeRegions       []string
 	excludeRegions       []string
 	httpClient           *http.BuildableClient
@@ -112,14 +113,15 @@ func NewAws(domain mysql.Domain, cfg cloudconfig.CloudConfig) (*Aws, error) {
 
 	return &Aws{
 		// TODO: display_name后期需要修改为uuid_generate
-		name:           domain.Name,
-		lcuuid:         domain.Lcuuid,
-		uuidGenerate:   domain.DisplayName,
-		excludeRegions: excludeRegions,
-		includeRegions: includeRegions,
-		httpClient:     httpClient,
-		regionUUID:     config.Get("region_uuid").MustString(),
-		credential:     awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(secretID, decryptSecretKey, "")),
+		name:             domain.Name,
+		lcuuid:           domain.Lcuuid,
+		uuidGenerate:     domain.DisplayName,
+		excludeRegions:   excludeRegions,
+		includeRegions:   includeRegions,
+		httpClient:       httpClient,
+		apiDefaultRegion: cfg.AWSRegionName,
+		regionUUID:       config.Get("region_uuid").MustString(),
+		credential:       awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(secretID, decryptSecretKey, "")),
 
 		// 以下属性为获取资源所用的关联关系
 		azLcuuidMap:          map[string]int{},
@@ -131,7 +133,7 @@ func NewAws(domain mysql.Domain, cfg cloudconfig.CloudConfig) (*Aws, error) {
 }
 
 func (a *Aws) CheckAuth() error {
-	awsClientConfig, err := awsconfig.LoadDefaultConfig(context.TODO(), a.credential, awsconfig.WithRegion(REGION_NAME), awsconfig.WithHTTPClient(a.httpClient))
+	awsClientConfig, err := awsconfig.LoadDefaultConfig(context.TODO(), a.credential, awsconfig.WithRegion(a.apiDefaultRegion), awsconfig.WithHTTPClient(a.httpClient))
 	if err != nil {
 		log.Error("client config failed (%s)", err.Error())
 		return err

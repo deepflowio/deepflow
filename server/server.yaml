@@ -127,6 +127,8 @@ controller:
         kubernetes_gather_interval: 30
         # 阿里公有云API获取区域列表时，需要指定一个区域
         aliyun_region_name: cn-beijing
+        # AWS API获取区域列表时，需要指定一个区域，并通过这个区域区分国际版和国内版
+        aws_region_name: cn-north-1
         # 配置宿主机IP文件
         hostname_to_ip_file: /etc/hostname_to_ip.csv
         # 开启debug模式，支持debug云平台API/SDK原始数据
