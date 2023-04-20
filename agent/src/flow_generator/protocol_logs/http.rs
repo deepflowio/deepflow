@@ -590,7 +590,7 @@ impl HttpLog {
             self.perf_stats.as_mut().unwrap().inc_req();
         }
         self.info.is_resp_end = is_resp_end.unwrap_or_default();
-        if self.info.is_req_end {
+        if self.info.is_resp_end {
             self.perf_stats.as_mut().unwrap().inc_resp();
         }
         self.info.version = String::from("2");
