@@ -82,8 +82,8 @@ pcap = "0.9.1"
 schemars = "0.8"
 
 [patch.crates-io]
-openshift-openapi = { git = "https://github.com/deepflowio/openshift-openapi.git" }
-kube = { git = "https://github.com/deepflowio/kube", tag = "0.74.2" }
+openshift-openapi = { path = "../../openshift-openapi" }
+kube = { path = "../../kube/kube" }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 pcap = "0.10.1"

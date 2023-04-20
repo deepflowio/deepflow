@@ -139,6 +139,10 @@ pub struct FlowNode {
 }
 
 impl FlowNode {
+    pub fn reset(&mut self) {
+        *self = Self::default();
+    }
+
     pub(super) fn reset_flow_stat_info(&mut self) {
         self.policy_in_tick = [false; 2];
         self.packet_in_tick = false;

@@ -34,6 +34,7 @@ use arc_swap::{
     ArcSwap,
 };
 use log::{debug, warn};
+use lockfree_object_pool::{LinearObjectPool, LinearOwnedReusable};
 
 use super::{
     app_table::AppTable,
@@ -87,7 +88,8 @@ use packet_sequence_block::PacketSequenceBlock;
 
 // not thread-safe
 pub struct FlowMap {
-    node_map: Option<HashMap<FlowMapKey, Vec<Box<FlowNode>>>>,
+    node_pool: Arc<LinearObjectPool<Box<FlowNode>>>,
+    node_map: Option<HashMap<FlowMapKey, Vec<LinearOwnedReusable<Box<FlowNode>>>>>,
     time_set: Option<Vec<HashSet<FlowMapKey>>>,
     id: u32,
     state_machine_master: StateMachine,
@@ -162,6 +164,9 @@ impl FlowMap {
             - Duration::from_secs(1);
         let time_set_slot_size = config_guard.hash_slots as usize / time_window_size;
         Self {
+            node_pool: Arc::new(LinearObjectPool::new(
+                || Box::new(FlowNode::default()),
+                | v| v.reset())),
             node_map: Some(HashMap::with_capacity(config_guard.hash_slots as usize)),
             time_set: Some(vec![
                 HashSet::with_capacity(time_set_slot_size);
@@ -223,7 +228,7 @@ impl FlowMap {
     //     B refers to nodes timed out
     // returned index will be the first timed out node in nodes
     fn sort_nodes_by_timeout(
-        nodes: &mut Vec<Box<FlowNode>>,
+        nodes: &mut Vec<LinearOwnedReusable<Box<FlowNode>>>,
         timestamp: Duration,
         time_in_unit: u64,
     ) -> usize {
@@ -322,7 +327,7 @@ impl FlowMap {
                 // handle and remove timeout nodes
                 for node in nodes.drain(index..) {
                     let timeout = node.recent_time + node.timeout;
-                    self.node_removed_aftercare(&config, *node, timeout, None);
+                    self.node_removed_aftercare(&config, node, timeout, None);
                 }
                 if nodes.is_empty() {
                     node_map.remove(&flow_key);
@@ -425,7 +430,7 @@ impl FlowMap {
                     // 没有找到严格匹配的 FlowNode，插入新 Node
                     let node = self.new_flow_node(&flow_config, &log_parser_config, meta_packet);
                     if node.is_some() {
-                        let node = Box::new(node.unwrap());
+                        let node = node.unwrap();
                         time_set[node.timestamp_key as usize & (self.time_window_size - 1)].insert(pkt_key);
                         nodes.push(node);
                         max_depth += 1;
@@ -464,7 +469,7 @@ impl FlowMap {
                 };
 
                 if flow_closed {
-                    let node = *nodes.swap_remove(index);
+                    let node = nodes.swap_remove(index);
                     self.node_removed_aftercare(
                         &flow_config,
                         node,
@@ -495,7 +500,7 @@ impl FlowMap {
             None => {
                 let node = self.new_flow_node(&flow_config, &log_parser_config, meta_packet);
                 if node.is_some() {
-                    let node = Box::new(node.unwrap());
+                    let node = node.unwrap();
                     time_set[node.timestamp_key as usize & (self.time_window_size - 1)]
                         .insert(pkt_key);
                     node_map.insert(pkt_key, vec![node]);
@@ -803,10 +808,10 @@ impl FlowMap {
         config.l4_performance_enabled
     }
 
-    fn init_flow(&mut self, config: &FlowConfig, meta_packet: &mut MetaPacket) -> FlowNode {
+    fn init_flow(&mut self, config: &FlowConfig, meta_packet: &mut MetaPacket) -> LinearOwnedReusable<Box<FlowNode>> {
         meta_packet.direction = PacketDirection::ClientToServer;
 
-        let mut tagged_flow = TaggedFlow::default();
+        let mut node = self.node_pool.pull_owned();
         let lookup_key = &meta_packet.lookup_key;
         let is_active_service = if meta_packet.signal_source == SignalSource::EBPF {
             match lookup_key.proto {
@@ -816,92 +821,85 @@ impl FlowMap {
         } else {
             false
         };
-        let flow = Flow {
-            flow_key: FlowKey {
-                vtap_id: config.vtap_id,
-                mac_src: lookup_key.src_mac,
-                mac_dst: lookup_key.dst_mac,
-                ip_src: lookup_key.src_ip,
-                ip_dst: lookup_key.dst_ip,
-                port_src: lookup_key.src_port,
-                port_dst: lookup_key.dst_port,
-                proto: lookup_key.proto,
-                tap_type: lookup_key.tap_type,
-                tap_port: meta_packet.tap_port,
-            },
-            tunnel: if let Some(tunnel) = meta_packet.tunnel {
-                TunnelField {
-                    tx_ip0: tunnel.src,
-                    tx_ip1: tunnel.dst,
-                    tx_mac0: tunnel.mac_src,
-                    tx_mac1: tunnel.mac_dst,
-                    tx_id: tunnel.id,
-                    tier: tunnel.tier,
-                    tunnel_type: tunnel.tunnel_type,
-                    is_ipv6: tunnel.is_ipv6,
-                    ..Default::default()
-                }
-            } else {
-                TunnelField::default()
-            },
-            flow_id: if meta_packet.signal_source == SignalSource::EBPF {
-                meta_packet.socket_id
-            } else {
-                self.generate_flow_id(lookup_key.timestamp, self.id)
-            },
-            start_time: lookup_key.timestamp.into(),
-            flow_stat_time: Timestamp::from_nanos(
-                (lookup_key.timestamp.as_nanos() / TIME_UNIT.as_nanos() * TIME_UNIT.as_nanos())
-                    as u64,
-            ),
-            vlan: meta_packet.vlan,
-            eth_type: lookup_key.eth_type,
-            queue_hash: meta_packet.queue_hash,
-            is_new_flow: true,
-            // 统计量
-            flow_metrics_peers: [
-                FlowMetricsPeer {
-                    total_packet_count: 1,
-                    packet_count: 1,
-                    total_byte_count: meta_packet.packet_len as u64,
-                    byte_count: meta_packet.packet_len as u64,
-                    l3_byte_count: meta_packet.l3_payload_len() as u64,
-                    l4_byte_count: meta_packet.l4_payload_len() as u64,
-                    first: lookup_key.timestamp.into(),
-                    last: lookup_key.timestamp.into(),
-                    tcp_flags: meta_packet.tcp_data.flags,
-                    ..Default::default()
-                },
-                FlowMetricsPeer::default(),
-            ],
-            signal_source: meta_packet.signal_source,
-            is_active_service,
-            ..Default::default()
+        let flow = &mut node.tagged_flow.flow;
+        flow.flow_key = FlowKey {
+            vtap_id: config.vtap_id,
+            mac_src: lookup_key.src_mac,
+            mac_dst: lookup_key.dst_mac,
+            ip_src: lookup_key.src_ip,
+            ip_dst: lookup_key.dst_ip,
+            port_src: lookup_key.src_port,
+            port_dst: lookup_key.dst_port,
+            proto: lookup_key.proto,
+            tap_type: lookup_key.tap_type,
+            tap_port: meta_packet.tap_port,
         };
-        tagged_flow.flow = flow;
+        flow.tunnel = if let Some(tunnel) = meta_packet.tunnel {
+            TunnelField {
+                tx_ip0: tunnel.src,
+                tx_ip1: tunnel.dst,
+                tx_mac0: tunnel.mac_src,
+                tx_mac1: tunnel.mac_dst,
+                tx_id: tunnel.id,
+                tier: tunnel.tier,
+                tunnel_type: tunnel.tunnel_type,
+                is_ipv6: tunnel.is_ipv6,
+                ..Default::default()
+            }
+        } else {
+            TunnelField::default()
+        };
+        flow.flow_id = if meta_packet.signal_source == SignalSource::EBPF {
+            meta_packet.socket_id
+        } else {
+            self.generate_flow_id(lookup_key.timestamp, self.id)
+        };
+        flow.start_time = lookup_key.timestamp.into();
+        flow.flow_stat_time = Timestamp::from_nanos(
+            (lookup_key.timestamp.as_nanos() / TIME_UNIT.as_nanos() * TIME_UNIT.as_nanos())
+                as u64,
+        );
+        flow.vlan = meta_packet.vlan;
+        flow.eth_type = lookup_key.eth_type;
+        flow.queue_hash = meta_packet.queue_hash;
+        flow.is_new_flow = true;
+        flow.flow_metrics_peers = [
+            FlowMetricsPeer {
+                total_packet_count: 1,
+                packet_count: 1,
+                total_byte_count: meta_packet.packet_len as u64,
+                byte_count: meta_packet.packet_len as u64,
+                l3_byte_count: meta_packet.l3_payload_len() as u64,
+                l4_byte_count: meta_packet.l4_payload_len() as u64,
+                first: lookup_key.timestamp.into(),
+                last: lookup_key.timestamp.into(),
+                tcp_flags: meta_packet.tcp_data.flags,
+                ..Default::default()
+            },
+            FlowMetricsPeer::default(),
+        ];
+        flow.signal_source = meta_packet.signal_source;
+        flow.is_active_service = is_active_service;
 
         // FlowMap信息
         let mut policy_in_tick = [false; 2];
         policy_in_tick[meta_packet.direction as usize] = true;
 
-        let mut node = FlowNode {
-            timestamp_key: lookup_key.timestamp.as_secs(),
+        node.timestamp_key = lookup_key.timestamp.as_secs();
+        node.min_arrived_time = lookup_key.timestamp;
+        node.recent_time = lookup_key.timestamp;
+        node.timeout = Duration::ZERO;
+        node.packet_in_tick = true;
+        node.policy_in_tick = policy_in_tick;
+        node.flow_state = FlowState::Raw;
+        node.meta_flow_perf = None;
+        node.next_tcp_seq0 = 0;
+        node.next_tcp_seq1 = 0;
+        node.policy_data_cache = Default::default();
+        node.endpoint_data_cache = Default::default();
+        node.packet_sequence_block = None;
+        node.residual_request = 0;
 
-            tagged_flow,
-            min_arrived_time: lookup_key.timestamp,
-            recent_time: lookup_key.timestamp,
-            timeout: Duration::ZERO,
-            packet_in_tick: true,
-            policy_in_tick,
-            flow_state: FlowState::Raw,
-            meta_flow_perf: None,
-            next_tcp_seq0: 0,
-            next_tcp_seq1: 0,
-            policy_data_cache: Default::default(),
-            endpoint_data_cache: Default::default(),
-            packet_sequence_block: None, // Enterprise Edition Feature: packet-sequence
-            residual_request: 0,
-        };
         #[cfg(target_os = "linux")]
         let local_epc_id = if self.ebpf_config.is_some() {
             self.ebpf_config.as_ref().unwrap().load().epc_id as i32
@@ -1129,7 +1127,7 @@ impl FlowMap {
         flow_config: &FlowConfig,
         log_parser_config: &LogParserConfig,
         meta_packet: &mut MetaPacket,
-    ) -> FlowNode {
+    ) -> LinearOwnedReusable<Box<FlowNode>> {
         let mut node = self.init_flow(flow_config, meta_packet);
         meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
         let mut reverse = false;
@@ -1186,7 +1184,7 @@ impl FlowMap {
         flow_config: &FlowConfig,
         log_parser_config: &LogParserConfig,
         meta_packet: &mut MetaPacket,
-    ) -> FlowNode {
+    ) -> LinearOwnedReusable<Box<FlowNode>> {
         let mut node = self.init_flow(flow_config, meta_packet);
         meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
         node.flow_state = FlowState::Established;
@@ -1210,7 +1208,7 @@ impl FlowMap {
         node
     }
 
-    fn new_other_node(&mut self, config: &FlowConfig, meta_packet: &mut MetaPacket) -> FlowNode {
+    fn new_other_node(&mut self, config: &FlowConfig, meta_packet: &mut MetaPacket) -> LinearOwnedReusable<Box<FlowNode>> {
         let mut node = self.init_flow(config, meta_packet);
         node.flow_state = FlowState::Established;
         // opening timeout
@@ -1223,7 +1221,7 @@ impl FlowMap {
         flow_config: &FlowConfig,
         log_parser_config: &LogParserConfig,
         meta_packet: &mut MetaPacket,
-    ) -> Option<FlowNode> {
+    ) -> Option<LinearOwnedReusable<Box<FlowNode>>> {
         self.stats_counter.new.fetch_add(1, Ordering::Relaxed);
         let node = match meta_packet.lookup_key.proto {
             IpProtocol::Tcp => self.new_tcp_node(flow_config, log_parser_config, meta_packet),
@@ -1303,19 +1301,20 @@ impl FlowMap {
     fn node_removed_aftercare(
         &mut self,
         config: &FlowConfig,
-        mut node: FlowNode,
+        mut node: LinearOwnedReusable<Box<FlowNode>>,
         timeout: Duration,
         meta_packet: Option<&mut MetaPacket>,
     ) {
         // 统计数据输出前矫正流方向
         self.update_flow_direction(&mut node, meta_packet);
 
+        let flow_state = node.flow_state;
         let flow = &mut node.tagged_flow.flow;
         if flow.signal_source == SignalSource::EBPF {
             // the flow which from eBPF, it's close_type always be CloseType::Timeout
             flow.close_type = CloseType::Timeout;
         } else {
-            flow.update_close_type(node.flow_state);
+            flow.update_close_type(flow_state);
         }
         flow.end_time = timeout.into();
         flow.flow_stat_time = Timestamp::from_nanos(
@@ -1327,20 +1326,26 @@ impl FlowMap {
             && (flow.flow_key.proto == IpProtocol::Tcp || flow.flow_key.proto == IpProtocol::Udp)
         {
             let l7_timeout_count = self.rrt_cache.borrow_mut().get_timeout_count(flow.flow_id);
+
+            let signal_source = flow.signal_source;
+            let reversed = flow.reversed;
+            drop(flow);
             // 如果返回None，就清空掉flow_perf_stats
-            flow.flow_perf_stats = node.meta_flow_perf.as_mut().and_then(|perf| {
+            let flow_perf_stats = node.meta_flow_perf.as_mut().and_then(|perf| {
                 perf.copy_and_reset_perf_data(
-                    flow.reversed,
+                    reversed,
                     l7_timeout_count as u32,
-                    flow.signal_source == SignalSource::Packet && Self::l4_metrics_enabled(config),
+                    signal_source == SignalSource::Packet && Self::l4_metrics_enabled(config),
                     Self::l7_metrics_enabled(config),
                 )
                 .map(|o| Box::new(o))
             });
+
+            node.tagged_flow.flow.flow_perf_stats = flow_perf_stats;
         }
 
         // Enterprise Edition Feature: packet-sequence
-        if self.packet_sequence_enabled && flow.flow_key.proto == IpProtocol::Tcp {
+        if self.packet_sequence_enabled && node.tagged_flow.flow.flow_key.proto == IpProtocol::Tcp {
             if let Some(block) = node.packet_sequence_block.take() {
                 if let Err(_) = self.packet_sequence_queue.as_ref().unwrap().send(block) {
                     warn!("packet sequence block to queue failed maybe queue have terminated");
@@ -1353,7 +1358,7 @@ impl FlowMap {
             .fetch_sub(1, Ordering::Relaxed);
         self.stats_counter.closed.fetch_add(1, Ordering::Relaxed);
 
-        self.push_to_flow_stats_queue(config, node.tagged_flow);
+        self.push_to_flow_stats_queue(config, node.tagged_flow.clone());
     }
 
     // go 版本的copyAndOutput
