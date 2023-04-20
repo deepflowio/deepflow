@@ -181,7 +181,7 @@ type ChIPResource struct {
 	PodClusterID   int    `gorm:"column:pod_cluster_id;type:int;not null" json:"POD_CLUSTER_ID"`
 	PodClusterName string `gorm:"column:pod_cluster_name;type:varchar(256);default:null" json:"POD_CLUSTER_NAME"`
 	PodNSID        int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
-	PodNSName      string `gorm:"column:pod_ns_name;type:varchar(256);default:null" json:"pod_NS_NAME"`
+	PodNSName      string `gorm:"column:pod_ns_name;type:varchar(256);default:null" json:"POD_NS_NAME"`
 	PodNodeID      int    `gorm:"column:pod_node_id;type:int;not null" json:"POD_NODE_ID"`
 	PodNodeName    string `gorm:"column:pod_node_name;type:varchar(256);default:null" json:"POD_NODE_NAME"`
 	PodIngressID   int    `gorm:"column:pod_ingress_id;type:int;default:null" json:"POD_INGRESS_ID"`
