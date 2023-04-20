@@ -207,7 +207,6 @@ http2_fill_common_socket_1(struct http2_header_data *data,
 	__u64 id = bpf_get_current_pid_tgid();
 	// source, coroutine_id, timestamp, comm
 	send_buffer->source = DATA_SOURCE_GO_HTTP2_UPROBE;
-	send_buffer->coroutine_id = get_current_goroutine();
 	send_buffer->timestamp = bpf_ktime_get_ns();
 	bpf_get_current_comm(send_buffer->comm, sizeof(send_buffer->comm));
 
@@ -337,7 +336,7 @@ http2_fill_common_socket_2(struct http2_header_data *data,
 	}
 
 	__u32 timeout = trace_conf->go_tracing_timeout;
-	struct trace_key_t trace_key = get_trace_key(timeout);
+	struct trace_key_t trace_key = get_trace_key(timeout, true);
 	struct trace_info_t *trace_info_ptr = trace_map__lookup(&trace_key);
 
 	struct conn_info_t conn_info = {
@@ -353,6 +352,7 @@ http2_fill_common_socket_2(struct http2_header_data *data,
 			      send_buffer->timestamp, &trace_key);
 	}
 
+	send_buffer->coroutine_id = trace_key.goid;
 	send_buffer->pid = (__u32)id;
 	return true;
 }

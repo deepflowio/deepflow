@@ -312,13 +312,13 @@ static __inline int infer_iovecs_copy(struct infer_data_s *infer_buf,
 #define EVENT_BURST_NUM            16
 #define CONN_PERSIST_TIME_MAX_NS   100000000000ULL
 
-static __inline struct trace_key_t get_trace_key(__u64 timeout)
+static __inline struct trace_key_t get_trace_key(__u64 timeout, bool is_socket_io)
 {
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	__u64 goid = 0;
 
 	if (timeout){
-		goid = get_rw_goid(timeout * NS_PER_SEC);
+		goid = get_rw_goid(timeout * NS_PER_SEC, is_socket_io);
 	}
 
 	struct trace_key_t key = {};
@@ -1039,7 +1039,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 		return SUBMIT_INVALID;
 
 	__u32 timeout = trace_conf->go_tracing_timeout;
-	struct trace_key_t trace_key = get_trace_key(timeout);
+	struct trace_key_t trace_key = get_trace_key(timeout, true);
 	struct trace_info_t *trace_info_ptr = trace_map__lookup(&trace_key);
 
 	struct socket_info_t *socket_info_ptr = conn_info->socket_info_ptr;
@@ -1813,7 +1813,7 @@ TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx *ctx) {
 		return 0;
 
 	// nginx is not a go process, disable go tracking
-	struct trace_key_t key = get_trace_key(0);
+	struct trace_key_t key = get_trace_key(0, true);
 	struct trace_info_t *trace = trace_map__lookup(&key);
 	if (trace && trace->peer_fd != 0 && trace->peer_fd != (__u32)fd) {
 		struct socket_info_t sk_info = { 0 };
@@ -2080,7 +2080,7 @@ static __inline void trace_io_event_common(void *ctx,
 	}
 
 	__u32 timeout = trace_conf->go_tracing_timeout;
-	struct trace_key_t trace_key = get_trace_key(timeout);
+	struct trace_key_t trace_key = get_trace_key(timeout, false);
 	struct trace_info_t *trace_info_ptr = trace_map__lookup(&trace_key);
 	if (trace_info_ptr) {
 		trace_id = trace_info_ptr->thread_trace_id;
