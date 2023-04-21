@@ -18,7 +18,7 @@ package migration
 
 const (
 	CREATE_TABLE_DB_VERSION = `CREATE TABLE IF NOT EXISTS db_version (
-		version             CHAR(64),
+		version             CHAR(64) PRIMARY KEY,
 		created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	)ENGINE=innodb DEFAULT CHARSET=utf8;`
