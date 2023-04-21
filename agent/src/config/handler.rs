@@ -19,7 +19,7 @@ use std::cmp::{max, min};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt;
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::path::PathBuf;
 use std::process;
 use std::sync::Arc;
@@ -772,7 +772,10 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
         let dest_ip = if conf.analyzer_ip.len() > 0 {
             conf.analyzer_ip.clone()
         } else {
-            "0.0.0.0".to_string()
+            match ctrl_ip {
+                IpAddr::V4(_) => Ipv4Addr::UNSPECIFIED.to_string(),
+                IpAddr::V6(_) => Ipv6Addr::UNSPECIFIED.to_string(),
+            }
         };
         let proxy_controller_ip = if conf.proxy_controller_ip.len() > 0 {
             conf.proxy_controller_ip.clone()
