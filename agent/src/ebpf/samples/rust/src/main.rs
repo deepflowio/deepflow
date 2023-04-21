@@ -283,12 +283,10 @@ fn main() {
 
         set_io_event_collect_mode(1);
 
-        // Normal operating systems rarely have file io exceeding 1ms.
-        // Adjust the time to 1000 nanoseconds during the test
-        set_io_event_minimal_duration(1000);
+        set_io_event_minimal_duration(1000000);
 
         // enable go auto traceing,
-        set_go_tracing_timeout(1);
+        set_go_tracing_timeout(120);
 
         /*
             let allow_port = 443;
