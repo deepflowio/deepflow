@@ -42,7 +42,7 @@ var log = logging.MustGetLogger("db.mysql.common")
 
 var SQL_FILE_DIR = "/etc/mysql"
 
-func GetConnectionWithoudDatabase(cfg MySqlConfig) *gorm.DB {
+func GetConnectionWithoutDatabase(cfg MySqlConfig) *gorm.DB {
 	dsn := GetDSN(cfg, "", cfg.TimeOut, false)
 	return GetGormDB(dsn)
 }
@@ -126,7 +126,10 @@ func RollbackIfInitTablesFailed(db *gorm.DB, database string) bool {
 	log.Info("init db tables with rollback")
 	err := InitTables(db)
 	if err != nil {
-		DropDatabase(db, database)
+		err := DropDatabase(db, database)
+		if err != nil {
+			log.Errorf("drop database %s failed: %v", database, err)
+		}
 		return false
 	}
 	return true

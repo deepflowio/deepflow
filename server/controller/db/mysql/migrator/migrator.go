@@ -29,16 +29,16 @@ import (
 
 var log = logging.MustGetLogger("db.migrator.mysql")
 
-// if configured database does not exist, it is considered a new dployment, will create database and init tables;
-// if configured database exsits, but db_version table does not exist, it is also considered a new deployment,
+// if configured database does not exist, it is considered a new deployment, will create database and init tables;
+// if configured database exists, but db_version table does not exist, it is also considered a new deployment,
 //
 //	maybe we do not have permission to create database or other reasons, then will init all tables.
 //
-// if configured database exsits, and db_version table exists, check wheather db_version is the latest version
+// if configured database exists, and db_version table exists, check whether db_version is the latest version
 //
 //	and upgrade based the result.
 func MigrateMySQL(cfg MySqlConfig) bool {
-	db := GetConnectionWithoudDatabase(cfg)
+	db := GetConnectionWithoutDatabase(cfg)
 	if db == nil {
 		return false
 	}
