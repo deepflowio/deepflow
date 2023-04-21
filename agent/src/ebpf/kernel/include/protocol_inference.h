@@ -490,6 +490,10 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 		return MSG_PRESTORE;
 	}
 
+	/*
+	 * ref: https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query.html
+	 */
+
 	static const __u8 kComQuery = 0x03;
 	static const __u8 kComConnect = 0x0b;
 	static const __u8 kComStmtPrepare = 0x16;
@@ -523,12 +527,18 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 	if (count < 5 || len == 0)
 		return MSG_UNKNOWN;
 
-	if (is_socket_info_valid(conn_info->socket_info_ptr)){
+	bool is_mysqld = is_current_comm("mysqld");
+	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		if (seq == 0 || seq == 1)
 			goto out;
 		return MSG_UNKNOWN;
 	}
 
+	if (is_mysqld) {
+		return conn_info->direction == T_INGRESS ? MSG_REQUEST : MSG_RESPONSE;
+	}
+
+	// The packet number of a request should always be 0.
 	if (seq != 0)
 		return MSG_UNKNOWN;
 
@@ -543,7 +553,7 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 	}
 
 out:
-	if (is_current_comm("mysqld")) 
+	if (is_mysqld)
 		return conn_info->direction == T_INGRESS ? MSG_REQUEST : MSG_RESPONSE;
 	else 
 		return conn_info->direction == T_INGRESS ? MSG_RESPONSE : MSG_REQUEST;
@@ -593,21 +603,95 @@ out:
 	 */
 }
 
-/*
-ref: https://developer.aliyun.com/article/751984
-
-| char tag | int32 len | payload |
-
-len = len(payload) + 4 
-
-tag 的取值参考 src/flow_generator/protocol_logs/sql/postgresql.rs
-
-*/
-static __inline enum message_type infer_postgre_message(const char *buf,
-						      size_t count,
-						      struct conn_info_t
-						      *conn_info)
+static __inline bool infer_pgsql_startup_message(const char* buf,
+						 size_t count)
 {
+	// ref: https://developer.aliyun.com/article/751984#slide-5
+	// int32 len | int32 protocol | "user" string 4 bytes
+	static const __u8 min_msg_len = 12;
+	// startup message wont be larger than 10240 (10KiB).
+	static const __u32 max_msg_len = 10240;
+
+	if (count < min_msg_len)
+		return false;
+
+	__u32 length = __bpf_ntohl(*(__u32 *)&buf[0]);
+	if (length < min_msg_len || length > max_msg_len)
+		return false;
+
+	// PostgreSQL 3.0
+	if (!(buf[4] == 0 && buf[5] == 3 && buf[6] == 0 && buf[7] == 0))
+		return false;
+
+	// "user" string, We hope it is a valid string that checks for
+	// letter characters in a relaxed manner.
+	// This is a loose check and still covers some non alphabetic
+	// characters (e.g. `\`)
+	if (buf[8] < 'A' || buf[9] < 'A' || buf[10] < 'A' || buf[11] < 'A')
+		return false;
+
+	return true;
+}
+
+/*
+ * ref: https://developer.aliyun.com/article/751984
+ * | char tag | int32 len | payload |
+ * tag 的取值参考 src/flow_generator/protocol_logs/sql/postgresql.rs
+ */
+static __inline enum message_type infer_pgsql_query_message(const char *buf,
+							    const char *s_buf,
+							    size_t count)
+{
+	// Only a judgement query.
+	static const char tag_q = 'Q';
+	// In the protocol format, the size of the "len" field is 4 bytes,
+	// and the minimum command length is 4 bytes for "COPY/MOVE",
+	// The minimal length is therefore 8.
+	static const __u32 min_payload_len = 8;
+	// Typical query message size is below an artificial limit.
+	// 30000 is copied from postgres code base:
+	// https://github.com/postgres/postgres/tree/master/src/interfaces/libpq/fe-protocol3.c#L94
+	static const __u32 max_payload_len = 30000;
+	// Minimum length = tag(char) + len(int32)
+	static const int min_msg_len = 1 + sizeof(__u32);
+
+	// Msg length check
+	if (count < min_msg_len) {
+		return MSG_UNKNOWN;
+	}
+
+	// Tag check
+	if (buf[0] != tag_q) {
+		return MSG_UNKNOWN;
+	}
+
+	// Payload length check
+	__u32 length;
+	bpf_probe_read(&length, sizeof(length), s_buf + 1);
+	length = __bpf_ntohl(length);
+	if (length < min_payload_len || length > max_payload_len) {
+		return MSG_UNKNOWN;
+	}
+
+	// If the input includes a whole message (1 byte tag + length),
+	// check the last character.
+	if (length + 1 <= (__u32)count) {
+		char last_char = ' '; //Non-zero initial value
+		bpf_probe_read(&last_char, sizeof(last_char), s_buf + length);
+		if (last_char != '\0')
+			return MSG_UNKNOWN;
+	}
+
+	return MSG_REQUEST;
+}
+
+static __inline enum message_type infer_postgre_message(const char *buf,
+							size_t count,
+							struct conn_info_t
+							*conn_info)
+{
+#define POSTGRE_INFER_BUF_SIZE 32
+
 	if (!is_protocol_enabled(PROTO_POSTGRESQL)) {
 		return MSG_UNKNOWN;
 	}
@@ -615,112 +699,132 @@ static __inline enum message_type infer_postgre_message(const char *buf,
 	if (conn_info->tuple.l4_protocol != IPPROTO_TCP){
 		return MSG_UNKNOWN;
 	}
+
+	char infer_buf[POSTGRE_INFER_BUF_SIZE];
+	bpf_probe_read(infer_buf, sizeof(infer_buf), buf);
+	
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_POSTGRESQL)
 			return MSG_UNKNOWN;
+		char tag = infer_buf[0];
+		switch (tag) {
+		// req, common, can not infer msg type, return MSG_REQUEST
+		case 'Q': case 'P': case 'B': case 'F': case 'X': case 'f':
+		case 'C': case 'E': case 'S': case 'D': case 'H': case 'd':
+		case 'c':
+			return MSG_REQUEST;
+		case 'Z': case 'I': case '1': case '2': case '3': case 'K':
+		case 'T': case 'n': case 'N': case 't': case 'G': case 'W':
+		case 'R':
+			return MSG_RESPONSE;
+		default:
+			return MSG_UNKNOWN;
+		}
 	}
-	char tag = buf[0];
 
-	switch (tag)
-	{
-		// req
-		case 'Q': 
-		case 'P': 
-		case 'B': 
-		case 'F': 
-		case 'X': 
-		case 'f': 
 
-		// common, can not infer msg type, return MSG_REQUEST
-		case 'C':
-		case 'E':
-		case 'S':
-		case 'D':
-		case 'H':
-		case 'd':
-		case 'c': return MSG_REQUEST;
+	if (infer_pgsql_startup_message(infer_buf, count))
+		return MSG_REQUEST;
 
-		// resp
-		case 'Z': 
-		case 'I': 
-		case '1': 
-		case '2': 
-		case '3': 
-		case 'K': 
-		case 'T': 
-		case 'n': 
-		case 'N': 
-		case 't': 
-		case 'G': 
-		case 'W': 
-		case 'R': return MSG_RESPONSE;
-		
-		default: return MSG_UNKNOWN;
-	}
+	return infer_pgsql_query_message(infer_buf, buf, count);
 }
 
-
 /*
-	* Request command protocol for v1
-	* 0     1     2           4           6           8          10           12          14         16
-	* +-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+
-	* |proto| type| cmdcode   |ver2 |   requestId           |codec|        timeout        |  classLen |
-	* +-----------+-----------+-----------+-----------+-----------+-----------+-----------+-----------+
-	* |headerLen  | contentLen            |                             ... ...                       |
-	* +-----------+-----------+-----------+                                                           +
-	* |               className + header  + content  bytes                                            |
-	* +                                                                                               +
-	* |                               ... ...                                                         |
-	* +-----------------------------------------------------------------------------------------------+
-
-	* Response command protocol for v1
-	* 0     1     2     3     4           6           8          10           12          14         16
-	* +-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+
-	* |proto| type| cmdcode   |ver2 |   requestId           |codec|respstatus |  classLen |headerLen  |
-	* +-----------+-----------+-----------+-----------+-----------+-----------+-----------+-----------+
-	* | contentLen            |                  ... ...                                              |
-	* +-----------------------+                                                                       +
-	* |                         className + header  + content  bytes                                  |
-	* +                                                                                               +
-	* |                               ... ...                                                         |
-	* +-----------------------------------------------------------------------------------------------+
-*/
-
+ * Request command protocol for v1
+ * 0     1     2           4           6           8          10           12          14         16
+ * +-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+
+ * |proto| type| cmdcode   |ver2 |   requestId           |codec|        timeout        |  classLen |
+ * +-----------+-----------+-----------+-----------+-----------+-----------+-----------+-----------+
+ * |headerLen  | contentLen            |                             ... ...                       |
+ * +-----------+-----------+-----------+                                                           +
+ * |               className + header  + content  bytes                                            |
+ * +                                                                                               +
+ * |                               ... ...                                                         |
+ * +-----------------------------------------------------------------------------------------------+
+ *
+ * Response command protocol for v1
+ * 0     1     2     3     4           6           8          10           12          14         16
+ * +-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+
+ * |proto| type| cmdcode   |ver2 |   requestId           |codec|respstatus |  classLen |headerLen  |
+ * +-----------+-----------+-----------+-----------+-----------+-----------+-----------+-----------+
+ * | contentLen            |                  ... ...                                              |
+ * +-----------------------+                                                                       +
+ * |                         className + header  + content  bytes                                  |
+ * +                                                                                               +
+ * |                               ... ...                                                         |
+ * +-----------------------------------------------------------------------------------------------+
+ *
+ * ref: https://github.com/sofastack/sofa-bolt/blob/42e4e3d756b7655c0d4a058989c66d9eb09591fa/plugins/wireshark/bolt.lua
+ */
 static __inline enum message_type infer_sofarpc_message(const char *buf,
-						      size_t count,
-						      struct conn_info_t
-						      *conn_info)
+							size_t count,
+							struct conn_info_t
+							*conn_info)
 {
-	char const PROTO_BOLT_V1 = 1;
-	char const TYPE_REQ = 1;
-	char const TYPE_RESP = 0;
-	unsigned short const CMD_CODE_REQ = 1;
-	unsigned short const CMD_CODE_RESP = 2;
-	
-	if (count < 20 || !is_protocol_enabled(PROTO_SOFARPC)) 
+	static const __u8 bolt_resp_header_len = 20;
+	static const __u8 bolt_req_header_len = 22;
+	static const __u8 bolt_ver_v1 = 0x01;
+	static const __u8 type_req = 0x01;
+	static const __u8 type_resp = 0x0;
+	static const __u16 cmd_code_req = 0x01;
+	static const __u16 cmd_code_resp = 0x02;
+	static const __u8 codec_hessian = 0;
+	static const __u8 codec_hessian2 = 1;
+	static const __u8 codec_protobuf = 11;
+	static const __u8 codec_json = 12;
+
+	if (count < 20 || !is_protocol_enabled(PROTO_SOFARPC))
 		return MSG_UNKNOWN;
+
+	const __u8 *infer_buf = (const __u8 *)buf;
+	__u8 ver = infer_buf[0];	//version for protocol
+	__u8 type = infer_buf[1];	// request/response/request oneway
 
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_SOFARPC)
 			return MSG_UNKNOWN;
+		goto out;
 	}
-	
-	char proto = buf[0];
-	char type = buf[1];
-	unsigned short cmdcode = (((unsigned short)buf[2])<<8) + (unsigned short)buf[3];
+	// code for remoting command (Heartbeat, RpcRequest, RpcResponse)
+	__u16 cmdcode = __bpf_ntohs(*(__u16 *) & infer_buf[2]);
 
-	if (proto != PROTO_BOLT_V1 || (cmdcode != CMD_CODE_REQ && cmdcode != CMD_CODE_RESP)) 
+	// 0 -- "hessian", 1 -- "hessian2", 11 -- "protobuf", 12 -- "json"
+	__u8 codec = infer_buf[9];
+
+	if (!((ver == bolt_ver_v1)
+	      && (type == type_req || type == type_resp)
+	      && (cmdcode == cmd_code_req || cmdcode == cmd_code_resp)
+	      && (codec == codec_hessian || codec == codec_hessian2
+		  || codec == codec_protobuf || codec == codec_json)))
 		return MSG_UNKNOWN;
 
-	switch (type) {
-	case TYPE_REQ:
-		return MSG_REQUEST;
-	case TYPE_RESP:
-		return MSG_RESPONSE;
-	default:
-		return MSG_UNKNOWN;
+	// length of request or response class name
+	// length of header
+	__u16 class_len, header_len;
+
+	// bolt_ver_v1
+	if (type == type_req) {
+		class_len = __bpf_ntohs(*(__u16 *) & infer_buf[14]);
+		header_len = __bpf_ntohs(*(__u16 *) & infer_buf[16]);
+		if ((bolt_req_header_len + class_len + header_len) > count)
+			return MSG_UNKNOWN;
 	}
-	return MSG_UNKNOWN;
+
+	if (cmdcode == cmd_code_resp) {
+		// (resp)respStatus: response status
+		__u16 resp_status = __bpf_ntohl(*(__u16 *) & infer_buf[10]);
+		if (!(resp_status >= 0 && resp_status <= 18))
+			return MSG_UNKNOWN;
+		class_len = __bpf_ntohs(*(__u16 *) & infer_buf[12]);
+		header_len = __bpf_ntohs(*(__u16 *) & infer_buf[14]);
+		//content_len = __bpf_ntohl(*(__u32 *)&infer_buf[16]);
+		if ((bolt_resp_header_len + class_len + header_len) > count)
+			return MSG_UNKNOWN;
+
+	}
+
+out:
+	return type == type_req ? MSG_REQUEST : MSG_RESPONSE;
 }
 
 /*
@@ -1360,23 +1464,33 @@ infer_protocol(struct ctx_info_s *ctx,
 	const char *buf = args->buf;
 
 	struct infer_data_s *__infer_buf = &ctx->infer_buf;
-	char *http2_infer_buf = NULL;
-	__u32 http2_infer_len = 0;
+
+	/*
+	 * Some protocols are difficult to infer from the first 32 bytes
+	 * of data and require more data to be involved in the inference
+	 * process.
+	 *
+	 * In such cases, we can directly pass the buffer address of the
+	 * system call for inference.
+	 * Examples of such protocols include HTTP2 and Postgre.
+	 */
+	char *syscall_infer_buf = NULL;
+	__u32 syscall_infer_len = 0;
 	if (extra->vecs) {
 		__infer_buf->len = infer_iovecs_copy(__infer_buf, args,
 						     count, DATA_BUF_MAX,
-						     &http2_infer_buf,
-						     &http2_infer_len);
+						     &syscall_infer_buf,
+						     &syscall_infer_len);
 		/*
-		 * The http2_infer_len(iov_cpy.iov_len) may be larger than
+		 * The syscall_infer_len(iov_cpy.iov_len) may be larger than
 		 * syscall length, make adjustments here.
 		 */
-		if (http2_infer_len > count)
-			http2_infer_len = count;
+		if (syscall_infer_len > count)
+			syscall_infer_len = count;
 	} else {
 		bpf_probe_read(__infer_buf->data, sizeof(__infer_buf->data), buf);
-		http2_infer_buf = (char *)buf;
-		http2_infer_len = count;
+		syscall_infer_buf = (char *)buf;
+		syscall_infer_len = count;
 	}
 
 	char *infer_buf = __infer_buf->data;
@@ -1438,11 +1552,12 @@ infer_protocol(struct ctx_info_s *ctx,
 					conn_info)) != MSG_UNKNOWN){
 		inferred_message.protocol = PROTO_SOFARPC;
 	} else if ((inferred_message.type =
-		    infer_http2_message(http2_infer_buf, http2_infer_len, 
+		    infer_http2_message(syscall_infer_buf, syscall_infer_len, 
 					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_HTTP2;
 	}   else if ((inferred_message.type =
-			infer_postgre_message(infer_buf, count,
+			infer_postgre_message(syscall_infer_buf,
+					syscall_infer_len,
 					conn_info)) != MSG_UNKNOWN){
 		inferred_message.protocol = PROTO_POSTGRESQL;
 	}
