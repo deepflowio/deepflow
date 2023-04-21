@@ -55,6 +55,8 @@ controller:
     host: mysql
     port: 30130
     timeout: 30
+    # whether drop database when init failed
+    drop-database-enabled: false
 
   # redis相关配置
   redis:

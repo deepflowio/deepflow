@@ -17,10 +17,11 @@
 package config
 
 type MySqlConfig struct {
-	Database     string `default:"deepflow" yaml:"database"`
-	Host         string `default:"mysql" yaml:"host"`
-	Port         uint32 `default:"30130" yaml:"port"`
-	UserName     string `default:"root" yaml:"user-name"`
-	UserPassword string `default:"deepflow" yaml:"user-password"`
-	TimeOut      uint32 `default:"30" yaml:"timeout"`
+	Database            string `default:"deepflow" yaml:"database"`
+	Host                string `default:"mysql" yaml:"host"`
+	Port                uint32 `default:"30130" yaml:"port"`
+	UserName            string `default:"root" yaml:"user-name"`
+	UserPassword        string `default:"deepflow" yaml:"user-password"`
+	TimeOut             uint32 `default:"30" yaml:"timeout"`
+	DropDatabaseEnabled bool   `default:"false" yaml:"drop-database-enabled"`
 }
