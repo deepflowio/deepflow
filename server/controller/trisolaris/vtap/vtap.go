@@ -286,14 +286,16 @@ func (v *VTapInfo) loadDeviceData() {
 			if ok == false {
 				continue
 			}
-			vifs.Each(func(vif interface{}) bool {
+			vpcID := 0
+			for vif := range vifs.Iter() {
 				hVif := vif.(*models.VInterface)
 				if network, ok := idToNetwork[hVif.NetworkID]; ok {
-					hostIDToVPCID[hostDevice.ID] = network.VPCID
-					return true
+					if vpcID < network.VPCID {
+						vpcID = network.VPCID
+					}
 				}
-				return false
-			})
+			}
+			hostIDToVPCID[hostDevice.ID] = vpcID
 		}
 	}
 	vms := dbDataCache.GetVms()
