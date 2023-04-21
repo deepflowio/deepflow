@@ -145,11 +145,17 @@ func (a *Aws) getLoadBalances(region awsRegion) ([]model.LB, []model.LBListener,
 		if v2LData.Scheme == "internal" {
 			v2LBModel = common.LB_MODEL_INTERNAL
 		}
-		v2LBLcuuid := common.GetUUID(a.getStringPointerValue(v2LData.LoadBalancerArn), uuid.Nil)
+		v2LBName := a.getStringPointerValue(v2LData.LoadBalancerName)
+		v2LBArn := a.getStringPointerValue(v2LData.LoadBalancerArn)
+		if v2LBArn == "" {
+			log.Infof("load balance v2 lb (%s) LoadBalancerArn not found", v2LBName)
+			continue
+		}
+		v2LBLcuuid := common.GetUUID(v2LBArn, uuid.Nil)
 		v2VPCLcuuid := common.GetUUID(a.getStringPointerValue(v2LData.VpcId), uuid.Nil)
 		lbs = append(lbs, model.LB{
 			Lcuuid:       v2LBLcuuid,
-			Name:         a.getStringPointerValue(v2LData.LoadBalancerName),
+			Name:         v2LBName,
 			Model:        v2LBModel,
 			VPCLcuuid:    v2VPCLcuuid,
 			RegionLcuuid: a.getRegionLcuuid(region.lcuuid),
@@ -175,6 +181,9 @@ func (a *Aws) getLoadBalances(region awsRegion) ([]model.LB, []model.LBListener,
 			})
 
 			for _, targetGrop := range v2Listener.DefaultActions {
+				if a.getStringPointerValue(targetGrop.TargetGroupArn) == "" {
+					continue
+				}
 				v2RetServers, err := v2Client.DescribeTargetHealth(context.TODO(), &elasticloadbalancingv2.DescribeTargetHealthInput{TargetGroupArn: targetGrop.TargetGroupArn})
 				if err != nil {
 					log.Errorf("load balance target server v2 request aws api error: (%s)", err.Error())
