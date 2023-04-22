@@ -122,8 +122,8 @@ func CreateDatabaseIfNotExists(db *gorm.DB, database string) (bool, error) {
 	}
 }
 
-func RollbackIfInitTablesFailed(db *gorm.DB, database string) bool {
-	log.Info("init db tables with rollback")
+func DropDatabaseIfInitTablesFailed(db *gorm.DB, database string) bool {
+	log.Info("drop database if init tables failed")
 	err := InitTables(db)
 	if err != nil {
 		err := DropDatabase(db, database)
