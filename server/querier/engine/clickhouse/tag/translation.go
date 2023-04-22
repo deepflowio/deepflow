@@ -582,7 +582,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		tagResourceMap[k8sLabelSuffix] = map[string]*Tag{
 			"default": NewTag(
 				"dictGet(flow_tag.k8s_label_map, 'value', (toUInt64("+podIDSuffix+"),'%s'))",
-				podIDSuffix+"!=0",
+				"toUInt64("+podIDSuffix+") IN (SELECT pod_id FROM flow_tag.k8s_label_map WHERE key='%s')",
 				"toUInt64("+podIDSuffix+") IN (SELECT pod_id FROM flow_tag.k8s_label_map WHERE value %s %s and key='%s')",
 				"toUInt64("+podIDSuffix+") IN (SELECT pod_id FROM flow_tag.k8s_label_map WHERE %s(value,%s) and key='%s')",
 			),

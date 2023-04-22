@@ -17,8 +17,7 @@
 use std::cmp::{max, min};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
-use std::net::IpAddr;
-use std::net::Ipv4Addr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::path::PathBuf;
 use std::process;
 use std::sync::Arc;
@@ -749,10 +748,10 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
             get_ctrl_ip_and_mac(static_config.controller_ips[0].parse().unwrap());
         #[cfg(target_os = "windows")]
         let (ctrl_ip, _) = get_ctrl_ip_and_mac(static_config.controller_ips[0].parse().unwrap());
-        let dest_ip = conf
-            .analyzer_ip
-            .parse::<IpAddr>()
-            .unwrap_or(Ipv4Addr::UNSPECIFIED.into());
+        let dest_ip = conf.analyzer_ip.parse::<IpAddr>().unwrap_or(match ctrl_ip {
+            IpAddr::V4(_) => Ipv4Addr::UNSPECIFIED.into(),
+            IpAddr::V6(_) => Ipv6Addr::UNSPECIFIED.into(),
+        });
         let proxy_controller_ip = conf
             .proxy_controller_ip
             .parse()
