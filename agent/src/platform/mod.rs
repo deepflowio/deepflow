@@ -15,7 +15,7 @@
  */
 
 #[cfg(target_os = "linux")]
-mod kubernetes;
+pub mod kubernetes;
 mod libvirt_xml_extractor;
 mod platform_synchronizer;
 

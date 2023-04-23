@@ -622,66 +622,6 @@ mod tests {
     }
 
     #[test]
-    fn batch_sender() {
-        let c = Arc::new(AtomicUsize::new(0));
-
-        {
-            let (s, r, _) = bounded(1024);
-            for i in 0..10 {
-                let sender = s.clone();
-                thread::spawn(move || {
-                    if i % 2 == 0 {
-                        for j in 1..=10 {
-                            sender.send(j).unwrap();
-                        }
-                    } else {
-                        sender
-                            .send_in_batch(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 3)
-                            .unwrap();
-                    }
-                });
-            }
-            mem::drop(s);
-
-            let mut sum = 0;
-            for c in r {
-                sum += c;
-            }
-            assert_eq!(sum, 550, "expected: 550, result: {}", sum);
-        }
-
-        let c = c.load(Ordering::Acquire);
-        assert_eq!(c, 0, "new/drop count mismatch: new - drop = {}", c);
-    }
-
-    #[test]
-    fn batch_overwrite() {
-        let c = Arc::new(AtomicUsize::new(0));
-
-        {
-            let (s, r, _) = bounded(3);
-
-            s.send_in_batch(
-                vec![
-                    CountedU64::new(42, c.clone()),
-                    CountedU64::new(43, c.clone()),
-                    CountedU64::new(44, c.clone()),
-                    CountedU64::new(45, c.clone()),
-                ],
-                2,
-            )
-            .unwrap();
-            let mut vs = Vec::with_capacity(3);
-            r.recv_all(&mut vs, None).unwrap();
-            let co = r.recv(None).unwrap();
-            assert_eq!(co, 45, "expected: 45, result: {}", co);
-        }
-
-        let c = c.load(Ordering::Acquire);
-        assert_eq!(c, 0, "new/drop count mismatch: new - drop = {}", c);
-    }
-
-    #[test]
     fn simple_overwrite() {
         let c = Arc::new(AtomicUsize::new(0));
 

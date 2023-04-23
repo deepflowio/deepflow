@@ -31,6 +31,8 @@ use bytesize::ByteSize;
 use flexi_logger::writers::FileLogWriter;
 use flexi_logger::{Age, Cleanup, Criterion, FileSpec, LoggerHandle, Naming};
 use log::{info, warn, Level};
+#[cfg(target_os = "linux")]
+use regex::Regex;
 use sysinfo::SystemExt;
 
 #[cfg(target_os = "linux")]
@@ -58,7 +60,7 @@ use crate::{
 use crate::{
     dispatcher::recv_engine::af_packet::OptTpacketVersion,
     ebpf::CAP_LEN_MAX,
-    platform::ProcRegRewrite,
+    platform::{kubernetes::Poller, ProcRegRewrite},
     utils::{environment::is_tt_pod, environment::is_tt_workload},
 };
 
@@ -1255,8 +1257,16 @@ impl ConfigHandler {
                     new_config.dispatcher.extra_netns_regex
                 );
                 if let Some(c) = components.as_ref() {
-                    c.platform_synchronizer
-                        .set_netns_regex(&new_config.dispatcher.extra_netns_regex);
+                    let regex = new_config.dispatcher.extra_netns_regex.as_ref();
+                    let regex = if regex != "" {
+                        info!("platform monitoring extra netns: /{}/", regex);
+                        Some(Regex::new(regex).unwrap())
+                    } else {
+                        info!("platform monitoring no extra netns");
+                        None
+                    };
+                    c.platform_synchronizer.set_netns_regex(regex.clone());
+                    c.kubernetes_poller.set_netns_regex(regex);
                 }
             }
 
@@ -1697,9 +1707,9 @@ impl ConfigHandler {
                             || is_tt_pod(conf.trident_type))
                     {
                         if is_tt_pod(conf.trident_type) {
-                            components.platform_synchronizer.start_kubernetes_poller();
+                            components.kubernetes_poller.start();
                         } else {
-                            components.platform_synchronizer.stop_kubernetes_poller();
+                            components.kubernetes_poller.stop();
                         }
                         if conf.kubernetes_api_enabled {
                             components.api_watcher.start();
