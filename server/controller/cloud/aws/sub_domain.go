@@ -81,7 +81,7 @@ func (a *Aws) getSubDomains(region awsRegion) ([]model.SubDomain, error) {
 		}
 		configJson, _ := json.Marshal(config)
 		retSubDomains = append(retSubDomains, model.SubDomain{
-			Lcuuid:      common.GetUUID(vpcID, uuid.Nil),
+			Lcuuid:      common.GetUUID(name, uuid.Nil),
 			Name:        name,
 			DisplayName: name,
 			ClusterID:   name,
