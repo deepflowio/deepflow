@@ -249,7 +249,7 @@ impl KrpcLog {
             _ => unreachable!(),
         }
 
-        self.info.cal_rrt(param).map(|rrt| {
+        self.info.cal_rrt(param, None).map(|rrt| {
             self.info.rrt = rrt;
             self.perf_stats.as_mut().unwrap().update_rrt(rrt);
         });

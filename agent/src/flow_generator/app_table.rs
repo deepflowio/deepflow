@@ -312,10 +312,14 @@ impl AppTable {
 
     // set protocol to app_table from non ebpf packet
     pub fn set_protocol(&mut self, packet: &MetaPacket, protocol: L7ProtocolEnum) -> bool {
-        let (ip, epc, port) = Self::get_ip_epc_port(
+        let (mut ip, epc, mut port) = Self::get_ip_epc_port(
             packet,
             packet.lookup_key.direction == PacketDirection::ClientToServer,
         );
+
+        if protocol.get_l7_protocol() == L7Protocol::Redis {
+            (ip, port) = packet.get_redis_server_addr();
+        }
         let time_in_sec = packet.lookup_key.timestamp.as_secs();
         match ip {
             IpAddr::V4(i) => self.set_ipv4_protocol(time_in_sec, i, epc, port, protocol, 0),

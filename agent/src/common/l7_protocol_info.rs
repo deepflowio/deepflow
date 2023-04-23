@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-use super::flow::PacketDirection;
+use super::{flow::PacketDirection, l7_protocol_log::KafkaInfoCache};
 use enum_dispatch::enum_dispatch;
 use log::{debug, error};
 use serde::Serialize;
 
 use crate::{
+    common::l7_protocol_log::LogCache,
     flow_generator::{
         protocol_logs::{
             pb_adapter::L7ProtocolSendLog, DnsInfo, DubboInfo, HttpInfo, KafkaInfo, MqttInfo,
@@ -140,7 +141,7 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
 
         if have no previous log cache, cache the current log rrt
     */
-    fn cal_rrt(&self, param: &ParseParam) -> Option<u64> {
+    fn cal_rrt(&self, param: &ParseParam, kafka_info: Option<KafkaInfoCache>) -> Option<u64> {
         let mut perf_cache = param.l7_perf_cache.borrow_mut();
         let cache_key = self.cal_cache_key(param);
         let previous_log_info = perf_cache.rrt_cache.pop(&cache_key);
@@ -150,7 +151,7 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
 
         if time != 0 {
             let Some(previous_log_info) = previous_log_info else {
-                perf_cache.rrt_cache.put(cache_key, (param.direction.into(), param.time));
+                perf_cache.rrt_cache.put(cache_key, LogCache { msg_type: param.direction.into(),  time: param.time ,kafka_info});
                 let timeout_count = perf_cache.timeout_cache.get_or_insert_mut(param.flow_id, ||0);
                 *timeout_count += 1;
                 return None;
@@ -159,32 +160,36 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
             let timeout_count = perf_cache.timeout_cache.get_mut(&param.flow_id);
 
             // if previous is req and current is resp, calculate the round trip time.
-            if previous_log_info.0 == LogMessageType::Request
+            if previous_log_info.msg_type == LogMessageType::Request
                 && msg_type == LogMessageType::Response
-                && time > previous_log_info.1
+                && time > previous_log_info.time
             {
-                let rrt = time - previous_log_info.1;
+                let rrt = time - previous_log_info.time;
                 timeout_count.map(|x| *x -= 1);
                 Some(rrt)
 
             // if previous is resp and current is req and previous time gt current time, likely ebpf disorder,
             // calculate the round trip time.
-            } else if previous_log_info.0 == LogMessageType::Response
+            } else if previous_log_info.msg_type == LogMessageType::Response
                 && msg_type == LogMessageType::Request
-                && previous_log_info.1 > time
+                && previous_log_info.time > time
             {
-                let rrt = previous_log_info.1 - time;
+                let rrt = previous_log_info.time - time;
                 timeout_count.map(|x| *x -= 1);
                 Some(rrt)
             } else {
                 debug!(
                     "can not calculate rrt, flow_id: {}, previous log type:{:?}, previous time: {}, current log type: {:?}, current time: {}",
-                    param.flow_id, previous_log_info.0, previous_log_info.1, msg_type, param.time,
+                    param.flow_id, previous_log_info.msg_type, previous_log_info.time, msg_type, param.time,
                 );
                 timeout_count.map(|x| *x += 1);
                 perf_cache.rrt_cache.put(
                     self.cal_cache_key(param),
-                    (param.direction.into(), param.time),
+                    LogCache {
+                        msg_type: param.direction.into(),
+                        time: param.time,
+                        kafka_info,
+                    },
                 );
                 None
             }
