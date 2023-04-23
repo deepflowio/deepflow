@@ -166,7 +166,7 @@ impl L7ProtocolParserInterface for DnsLog {
             return Ok(vec![L7ProtocolInfo::DnsInfo(self.info.clone())]);
         }
         self.parse(payload, param.l4_protocol)?;
-        self.info.cal_rrt(param).map(|rrt| {
+        self.info.cal_rrt(param, None).map(|rrt| {
             self.info.rrt = rrt;
             self.perf_stats.as_mut().unwrap().update_rrt(rrt);
         });
