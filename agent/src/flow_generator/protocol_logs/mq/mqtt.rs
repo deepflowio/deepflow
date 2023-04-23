@@ -229,7 +229,7 @@ impl L7ProtocolParserInterface for MqttLog {
             let mut info = i.clone();
 
             // FIXME due to mqtt not parse and handle packet identity correctly, the rrt is incorrect now.
-            info.cal_rrt(param).map(|rrt| {
+            info.cal_rrt(param, None).map(|rrt| {
                 info.rrt = rrt;
                 self.perf_stats.as_mut().unwrap().update_rrt(rrt);
             });
