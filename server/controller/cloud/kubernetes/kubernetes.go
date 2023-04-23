@@ -22,7 +22,6 @@ import (
 	simplejson "github.com/bitly/go-simplejson"
 	logging "github.com/op/go-logging"
 
-	k8sGather "github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -50,7 +49,7 @@ func NewKubernetes(domain mysql.Domain) (*Kubernetes, error) {
 
 	portNameRegex := configJson.Get("node_port_name_regex").MustString()
 	if portNameRegex == "" {
-		portNameRegex = k8sGather.K8S_VINTERFACE_NAME_REGEX
+		portNameRegex = common.DEFAULT_PORT_NAME_REGEX
 	}
 
 	_, regxErr := regexp.Compile(portNameRegex)

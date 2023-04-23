@@ -31,9 +31,8 @@ import (
 )
 
 const (
-	K8S_VINTERFACE_NAME_REGEX = "^(cni|flannel|cali|vxlan.calico|tunl|en[ospx])"
-	K8S_VPC_NAME              = "kubernetes_vpc"
-	K8S_VERSION_PREFIX        = "Kubernetes"
+	K8S_VPC_NAME       = "kubernetes_vpc"
+	K8S_VERSION_PREFIX = "Kubernetes"
 )
 
 var log = logging.MustGetLogger("cloud.kubernetes_gather")
@@ -84,7 +83,7 @@ func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, isSub
 	domainConfigJson, err = simplejson.NewJson([]byte(domain.Config))
 	portNameRegex := domainConfigJson.Get("node_port_name_regex").MustString()
 	if portNameRegex == "" {
-		portNameRegex = K8S_VINTERFACE_NAME_REGEX
+		portNameRegex = common.DEFAULT_PORT_NAME_REGEX
 	}
 
 	// 如果是K8s云平台，转换domain表的config
