@@ -814,6 +814,7 @@ pub enum KubernetesPollerType {
     Adaptive,
     Active,
     Passive,
+    Sidecar,
 }
 
 #[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq)]

@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
+#[cfg(target_os = "linux")]
+use std::mem::swap;
 use std::{
     cmp::min,
     collections::HashMap,
-    mem::swap,
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Mutex,

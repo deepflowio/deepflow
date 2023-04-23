@@ -93,7 +93,10 @@ use crate::{
 #[cfg(target_os = "linux")]
 use crate::{
     ebpf_dispatcher::EbpfCollector,
-    platform::{ApiWatcher, LibvirtXmlExtractor, SocketSynchronizer},
+    platform::{
+        kubernetes::{GenericPoller, Poller},
+        ApiWatcher, LibvirtXmlExtractor, SocketSynchronizer,
+    },
     utils::{
         environment::{core_file_check, is_tt_pod, running_in_only_watch_k8s_mode},
         lru::Lru,
@@ -870,6 +873,7 @@ pub struct WatcherComponents {
     pub api_watcher: Arc<ApiWatcher>,
     pub libvirt_xml_extractor: Arc<LibvirtXmlExtractor>, // FIXME: Delete this component
     pub platform_synchronizer: Arc<PlatformSynchronizer>,
+    pub kubernetes_poller: Arc<GenericPoller>,
     pub domain_name_listener: DomainNameListener,
     pub running: AtomicBool,
     tap_mode: TapMode,
@@ -904,11 +908,22 @@ impl WatcherComponents {
             config_handler.static_config.controller_domain_name.clone(),
             config_handler.static_config.controller_ips.clone(),
         );
+        let kubernetes_poller = Arc::new(GenericPoller::new(
+            config_handler.static_config.controller_ips[0].parse()?,
+            config_handler.platform(),
+            config_handler
+                .candidate_config
+                .dispatcher
+                .extra_netns_regex
+                .clone(),
+        ));
+        platform_synchronizer.set_kubernetes_poller(kubernetes_poller.clone());
 
         info!("With ONLY_WATCH_K8S_RESOURCE and IN_CONTAINER environment variables set, the agent will only watch K8s resource");
         Ok(WatcherComponents {
             api_watcher,
             platform_synchronizer,
+            kubernetes_poller,
             domain_name_listener,
             libvirt_xml_extractor,
             running: AtomicBool::new(false),
@@ -926,7 +941,7 @@ impl WatcherComponents {
         if matches!(self.agent_mode, RunningMode::Managed) {
             self.api_watcher.start();
         }
-        self.platform_synchronizer.start_kubernetes_poller();
+        self.kubernetes_poller.start();
         self.domain_name_listener.start();
         info!("Started watcher components.");
     }
@@ -936,6 +951,7 @@ impl WatcherComponents {
             return;
         }
         self.api_watcher.stop();
+        self.kubernetes_poller.stop();
         self.domain_name_listener.stop();
         info!("Stopped watcher components.")
     }
@@ -956,6 +972,8 @@ pub struct AgentComponents {
     pub l7_flow_uniform_sender: UniformSenderThread<BoxAppProtoLogsData>,
     pub stats_sender: UniformSenderThread<ArcBatch>,
     pub platform_synchronizer: Arc<PlatformSynchronizer>,
+    #[cfg(target_os = "linux")]
+    pub kubernetes_poller: Arc<GenericPoller>,
     #[cfg(target_os = "linux")]
     pub socket_synchronizer: SocketSynchronizer,
     #[cfg(target_os = "linux")]
@@ -1226,6 +1244,19 @@ impl AgentComponents {
         // TODO: packet handler builders
 
         #[cfg(target_os = "linux")]
+        let kubernetes_poller = Arc::new(GenericPoller::new(
+            config_handler.static_config.controller_ips[0].parse()?,
+            config_handler.platform(),
+            config_handler
+                .candidate_config
+                .dispatcher
+                .extra_netns_regex
+                .clone(),
+        ));
+        #[cfg(target_os = "linux")]
+        platform_synchronizer.set_kubernetes_poller(kubernetes_poller.clone());
+
+        #[cfg(target_os = "linux")]
         let api_watcher = Arc::new(ApiWatcher::new(
             runtime.clone(),
             config_handler.platform(),
@@ -1239,7 +1270,7 @@ impl AgentComponents {
             #[cfg(target_os = "linux")]
             api_watcher: api_watcher.clone(),
             #[cfg(target_os = "linux")]
-            poller: platform_synchronizer.clone_poller(),
+            poller: kubernetes_poller.clone(),
             session: session.clone(),
             static_config: synchronizer.static_config.clone(),
             running_config: synchronizer.running_config.clone(),
@@ -1687,7 +1718,7 @@ impl AgentComponents {
             #[cfg(target_os = "linux")]
             let dispatcher = dispatcher_builder
                 .libvirt_xml_extractor(libvirt_xml_extractor.clone())
-                .platform_poller(platform_synchronizer.clone_poller())
+                .platform_poller(kubernetes_poller.clone())
                 .build()
                 .unwrap();
             #[cfg(target_os = "windows")]
@@ -2043,6 +2074,8 @@ impl AgentComponents {
             stats_sender,
             platform_synchronizer,
             #[cfg(target_os = "linux")]
+            kubernetes_poller,
+            #[cfg(target_os = "linux")]
             socket_synchronizer,
             #[cfg(target_os = "linux")]
             api_watcher,
@@ -2086,7 +2119,7 @@ impl AgentComponents {
         #[cfg(target_os = "linux")]
         {
             if is_tt_pod(self.config.trident_type) {
-                self.platform_synchronizer.start_kubernetes_poller();
+                self.kubernetes_poller.start();
             }
             if matches!(self.agent_mode, RunningMode::Managed) && running_in_container() {
                 self.api_watcher.start();
@@ -2177,7 +2210,7 @@ impl AgentComponents {
 
         #[cfg(target_os = "linux")]
         {
-            self.platform_synchronizer.stop_kubernetes_poller();
+            self.kubernetes_poller.stop();
             self.socket_synchronizer.stop();
             if let Some(h) = self.api_watcher.notify_stop() {
                 join_handles.push(h);

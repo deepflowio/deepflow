@@ -54,13 +54,16 @@ use super::process::get_process_num_by_name;
 #[cfg(target_os = "linux")]
 use public::utils::net::get_link_enabled_features;
 use public::utils::net::{
-    get_mac_by_ip, get_route_src_ip_and_mac, link_by_name, link_list, LinkFlags, MacAddr,
+    addr_list, get_mac_by_ip, get_route_src_ip_and_mac, is_global, link_by_name, link_list,
+    LinkFlags, MacAddr,
 };
 
 pub type Checker = Box<dyn Fn() -> Result<()>>;
 
 // K8S environment node ip environment variable
 pub const K8S_NODE_IP_FOR_DEEPFLOW: &str = "K8S_NODE_IP_FOR_DEEPFLOW";
+pub const ENV_INTERFACE_NAME: &str = "CTRL_NETWORK_INTERFACE";
+pub const K8S_POD_IP_FOR_DEEPFLOW: &str = "K8S_POD_IP_FOR_DEEPFLOW";
 #[cfg(target_os = "linux")]
 const CORE_FILE_CONFIG: &str = "/proc/sys/kernel/core_pattern";
 #[cfg(target_os = "linux")]
@@ -501,7 +504,55 @@ pub fn get_mac_by_name(src_interface: String) -> u32 {
 }
 
 pub fn get_ctrl_ip_and_mac(dest: IpAddr) -> (IpAddr, MacAddr) {
-    // Directlly use env.K8S_NODE_IP_FOR_DEEPFLOW as the ctrl_ip reported by deepflow-agent if available
+    // Steps to find ctrl ip and mac:
+    // 1. If environment variable `ENV_INTERFACE_NAME` exists, use it as ctrl interface
+    //    a) Use environment variable `K8S_NODE_IP_FOR_DEEPFLOW` as ctrl ip if it exists
+    //    b) If not, find addresses on the ctrl interface
+    // 2. Use env.K8S_NODE_IP_FOR_DEEPFLOW as the ctrl_ip reported by deepflow-agent if available
+    // 3. Find ctrl ip and mac from controller address
+    if let Ok(name) = env::var(ENV_INTERFACE_NAME) {
+        let Ok(link) = link_by_name(&name) else {
+            warn!("interface {} in env {} not found", name, ENV_INTERFACE_NAME);
+            thread::sleep(Duration::from_secs(1));
+            process::exit(-1);
+        };
+        let ips = match env::var(K8S_POD_IP_FOR_DEEPFLOW) {
+            Ok(ips) => ips
+                .split(",")
+                .filter_map(|s| match s.parse::<IpAddr>() {
+                    Ok(ip) => Some(ip),
+                    _ => {
+                        warn!("ip {} in env {} invalid", s, K8S_POD_IP_FOR_DEEPFLOW);
+                        None
+                    }
+                })
+                .collect(),
+            _ => match addr_list() {
+                Ok(addrs) => addrs
+                    .into_iter()
+                    .filter_map(|addr| {
+                        if addr.if_index == link.if_index {
+                            Some(addr.ip_addr)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect(),
+                _ => vec![],
+            },
+        };
+        for ip in ips {
+            if is_global(&ip) {
+                return (ip, link.mac_addr);
+            }
+        }
+        warn!(
+            "interface {} in env {} does not have valid ip address",
+            name, ENV_INTERFACE_NAME
+        );
+        thread::sleep(Duration::from_secs(1));
+        process::exit(-1);
+    };
     match get_k8s_local_node_ip() {
         Some(ip) => {
             let ctrl_mac = get_mac_by_ip(ip);
