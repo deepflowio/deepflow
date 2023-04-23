@@ -1015,6 +1015,14 @@ func (t *PlatformInfoTable) ReloadMaster() error {
 		return fmt.Errorf("grpc response failed. responseStatus is %v", status)
 	}
 
+	regionID := t.regionID
+	if config := response.GetConfig(); config != nil {
+		t.regionID = config.GetRegionId()
+	} else {
+		log.Warning("get regionID failed")
+	}
+	log.Infof("===== Update rpc ctlIP:%s modudleName:%s regionID: %d ->  %d", t.ctlIP, t.moduleName, regionID, t.regionID)
+
 	newGroupsVersion := response.GetVersionGroups()
 	if newGroupsVersion != t.versionGroups {
 		log.Infof("Update rpc groups version %d -> %d ", t.versionGroups, newGroupsVersion)

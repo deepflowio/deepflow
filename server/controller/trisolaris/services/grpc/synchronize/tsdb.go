@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/op/go-logging"
+	logging "github.com/op/go-logging"
 	context "golang.org/x/net/context"
 
 	api "github.com/deepflowio/deepflow/message/trident"
@@ -42,6 +42,7 @@ func (e *TSDBEvent) generateConfig(tsdbIP string) *api.Config {
 	nodeInfo := trisolaris.GetGNodeInfo()
 	pcapDataRetention := nodeInfo.GetPcapDataRetention()
 	regionID := nodeInfo.GetRegionIDByTSDBIP(tsdbIP)
+	log.Infof("=============generateConfig regionID:%d tsdbIP:%s nodeInfo:%+v", regionID, tsdbIP, *nodeInfo)
 	return &api.Config{
 		PcapDataRetention: proto.Uint32(pcapDataRetention),
 		RegionId:          &regionID,
