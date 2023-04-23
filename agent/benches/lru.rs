@@ -20,7 +20,9 @@ use std::time::Duration;
 use std::{net::Ipv4Addr, time::Instant};
 
 use criterion::*;
-use deepflow_agent::{_L7PerfCache as L7PerfCache, _LogMessageType as LogMessageType};
+use deepflow_agent::{
+    _L7PerfCache as L7PerfCache, _LogCache as LogCache, _LogMessageType as LogMessageType,
+};
 use lru::LruCache;
 use rand::prelude::*;
 use uluru::LRUCache;
@@ -429,7 +431,11 @@ fn rrt_lru(c: &mut Criterion) {
             for item in seeds {
                 cache.rrt_cache.put(
                     ((item.flow_id as u128) << 64) | item.stream_id.unwrap_or_default() as u128,
-                    (LogMessageType::Request, item.duration.as_micros() as u64),
+                    LogCache {
+                        msg_type: LogMessageType::Request,
+                        time: item.duration.as_micros() as u64,
+                        kafka_info: None,
+                    },
                 );
             }
             start.elapsed()
@@ -451,7 +457,11 @@ fn rrt_lru(c: &mut Criterion) {
             for item in &seeds {
                 cache.rrt_cache.put(
                     ((item.flow_id as u128) << 64) | item.stream_id.unwrap_or_default() as u128,
-                    (LogMessageType::Request, item.duration.as_micros() as u64),
+                    LogCache {
+                        msg_type: LogMessageType::Request,
+                        time: item.duration.as_micros() as u64,
+                        kafka_info: None,
+                    },
                 );
             }
             let start = Instant::now();
@@ -479,7 +489,11 @@ fn rrt_lru(c: &mut Criterion) {
             for item in &seeds {
                 cache.rrt_cache.put(
                     ((item.flow_id as u128) << 64) | item.stream_id.unwrap_or_default() as u128,
-                    (LogMessageType::Request, item.duration.as_micros() as u64),
+                    LogCache {
+                        msg_type: LogMessageType::Request,
+                        time: item.duration.as_micros() as u64,
+                        kafka_info: None,
+                    },
                 );
             }
             let start = Instant::now();
