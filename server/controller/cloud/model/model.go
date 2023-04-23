@@ -564,9 +564,14 @@ type AdditionalResource struct {
 	LB                    []LB
 	LBListeners           []LBListener
 	LBTargetServers       []LBTargetServer
+	SubDomainResources    map[string]*AdditionalSubdomainResource
 }
 
 type UUIDToCloudTags map[string]string
+
+type AdditionalSubdomainResource struct {
+	PodNamespaceCloudTags UUIDToCloudTags
+}
 
 type BasicInfo struct {
 	Lcuuid          string        `json:"lcuuid"`

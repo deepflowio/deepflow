@@ -52,10 +52,9 @@ type addtionalResourceToolDataSet struct {
 	additionalSubnets      []model.AdditionalResourceSubnet
 	additionalHosts        []model.AdditionalResourceHost
 	additionalCHosts       []model.AdditionalResourceChost
-	vpcIDToUUID            map[int]string
-	podClusterIDToUUID     map[int]string
 	cloudTagCHosts         []mysql.VM
 	cloudTagPodNamespaces  []mysql.PodNamespace
+	subdomainPodNamespaces []mysql.PodNamespace
 	additionalLBs          []model.AdditionalResourceLB
 }
 
@@ -157,15 +156,12 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 		toolDS.additionalAZs = append(toolDS.additionalAZs, az)
 	}
 
-	domainUUIDToVPCUUIDs, domainUUIDToVPCIDToUUID, err := getVPCDataFromDB(domainUUIDs)
+	domainUUIDToVPCUUIDs, err := getVPCDataFromDB(domainUUIDs)
 	if err != nil {
 		return nil, err
 	}
 	for domainUUID, vpcUUIDs := range domainUUIDToVPCUUIDs {
 		domainUUIDToToolDataSet[domainUUID].vpcUUIDs = vpcUUIDs
-	}
-	for domainUUID, vpcIDToUUID := range domainUUIDToVPCIDToUUID {
-		domainUUIDToToolDataSet[domainUUID].vpcIDToUUID = vpcIDToUUID
 	}
 	for _, vpc := range additionalRsc.VPCs {
 		toolDS, ok := domainUUIDToToolDataSet[vpc.DomainUUID]
@@ -348,14 +344,6 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 		toolDS.additionalLBs = append(toolDS.additionalLBs, lb)
 	}
 
-	// store podClusterIDToUUID
-	domainUUIDToPodClusterIDToUUID, err := getPodClusterDataFromDB(domainUUIDs)
-	if err != nil {
-		return nil, err
-	}
-	for domainUUID, podClusterIDToUUID := range domainUUIDToPodClusterIDToUUID {
-		domainUUIDToToolDataSet[domainUUID].podClusterIDToUUID = podClusterIDToUUID
-	}
 	// handle chosts and pod_namespaces
 	domainUUIDToCHostNameToInfo, err := getCHostsFromDB(domainUUIDs)
 	if err != nil {
@@ -365,6 +353,11 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 	if err != nil {
 		return nil, err
 	}
+	subdomainUUIDToPodNSNameToInfo, err := getPodNamespaceInSubdomainFromDB(domainUUIDs)
+	if err != nil {
+		return nil, err
+	}
+
 	for _, cloudTag := range additionalRsc.CloudTags {
 		toolDS, ok := domainUUIDToToolDataSet[cloudTag.DomainUUID]
 		if !ok {
@@ -373,6 +366,36 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 				fmt.Sprintf("cloud tag (resource name: %s) domain (uuid: %s) not found", cloudTag.ResourceName, cloudTag.DomainUUID),
 			)
 		}
+
+		// add cloud tags to subdomain
+		if cloudTag.SubDomainUUID != "" {
+			if cloudTag.ResourceType != CLOUD_TAGS_RESOURCE_TYPE_POD_NS {
+				return nil, servicecommon.NewError(
+					common.INVALID_POST_DATA,
+					fmt.Sprintf("cloud tag (resource type: %s) subdomain (uuid: %s) not support", cloudTag.ResourceType, cloudTag.SubDomainUUID),
+				)
+			}
+			podNSNameToInfo, ok := subdomainUUIDToPodNSNameToInfo[cloudTag.SubDomainUUID]
+			if !ok {
+				return nil, servicecommon.NewError(
+					common.RESOURCE_NOT_FOUND,
+					fmt.Sprintf("cloud tag subdomain (uuid: %s) not found", cloudTag.SubDomainUUID))
+			}
+			podNS, ok := podNSNameToInfo[cloudTag.ResourceName]
+			if !ok {
+				return nil, servicecommon.NewError(
+					common.INVALID_POST_DATA,
+					fmt.Sprintf("cloud tag (resource name: %s) subdomain (uuid: %s) not found", cloudTag.ResourceName, cloudTag.DomainUUID))
+			}
+			podNS.CloudTags, err = convertTagsToString(cloudTag.Tags)
+			if err != nil {
+				return nil, err
+			}
+			toolDS.subdomainPodNamespaces = append(toolDS.subdomainPodNamespaces, podNS)
+
+			continue
+		}
+
 		if cloudTag.ResourceType == CLOUD_TAGS_RESOURCE_TYPE_CHOST {
 			chostNameToInfo, ok := domainUUIDToCHostNameToInfo[cloudTag.DomainUUID]
 			if !ok {
@@ -615,7 +638,6 @@ func generateCloudModelData(domainUUIDToToolDataSet map[string]*addtionalResourc
 			}
 		}
 
-		// TODO(weiqiang): add chosts and cloud tags at the same time
 		for _, chost := range toolDS.cloudTagCHosts {
 			if cloudMD.CHostCloudTags == nil {
 				cloudMD.CHostCloudTags = make(cloudmodel.UUIDToCloudTags)
@@ -627,6 +649,17 @@ func generateCloudModelData(domainUUIDToToolDataSet map[string]*addtionalResourc
 				cloudMD.PodNamespaceCloudTags = make(cloudmodel.UUIDToCloudTags)
 			}
 			cloudMD.PodNamespaceCloudTags[podNamespace.Lcuuid] = podNamespace.CloudTags
+		}
+		for _, podNamespace := range toolDS.subdomainPodNamespaces {
+			if cloudMD.SubDomainResources == nil {
+				cloudMD.SubDomainResources = make(map[string]*cloudmodel.AdditionalSubdomainResource)
+			}
+			if cloudMD.SubDomainResources[podNamespace.SubDomain] == nil {
+				cloudMD.SubDomainResources[podNamespace.SubDomain] = &cloudmodel.AdditionalSubdomainResource{
+					PodNamespaceCloudTags: make(cloudmodel.UUIDToCloudTags),
+				}
+			}
+			cloudMD.SubDomainResources[podNamespace.SubDomain].PodNamespaceCloudTags[podNamespace.Lcuuid] = podNamespace.CloudTags
 		}
 
 		for _, lb := range toolDS.additionalLBs {
@@ -769,25 +802,20 @@ func getAZDataFromDB(domainUUIDs []string) (map[string][]string, error) {
 	return domainUUIDToAZUUIDs, nil
 }
 
-func getVPCDataFromDB(domainUUIDs []string) (map[string][]string, map[string]map[int]string, error) {
+func getVPCDataFromDB(domainUUIDs []string) (map[string][]string, error) {
 	var vpcs []mysql.VPC
 	err := mysql.Db.Where("domain IN (?)", domainUUIDs).Find(&vpcs).Error
 	if err != nil {
-		return nil, nil, servicecommon.NewError(
+		return nil, servicecommon.NewError(
 			common.SERVER_ERROR,
 			fmt.Sprintf("db query vpc failed: %s", err.Error()),
 		)
 	}
 	domainUUIDToVPCUUIDs := make(map[string][]string)
-	domainUUIDToVPCIDToUUID := make(map[string]map[int]string)
 	for _, vpc := range vpcs {
 		domainUUIDToVPCUUIDs[vpc.Domain] = append(domainUUIDToVPCUUIDs[vpc.Domain], vpc.Lcuuid)
-		if domainUUIDToVPCIDToUUID[vpc.Domain] == nil {
-			domainUUIDToVPCIDToUUID[vpc.Domain] = make(map[int]string)
-		}
-		domainUUIDToVPCIDToUUID[vpc.Domain][vpc.ID] = vpc.Lcuuid
 	}
-	return domainUUIDToVPCUUIDs, domainUUIDToVPCIDToUUID, nil
+	return domainUUIDToVPCUUIDs, nil
 }
 
 func getSubnetDataFromDB(domainUUIDs []string) (map[string]map[string]int, map[string]map[string]map[string]string, error) {
@@ -831,25 +859,6 @@ func getSubnetDataFromDB(domainUUIDs []string) (map[string]map[string]int, map[s
 		domainUUIDToSubnetCIDRInfoMap[subnet.Domain][subnet.Lcuuid] = subnetCIDRToUUID
 	}
 	return domainUUIDToSubnetInfoMap, domainUUIDToSubnetCIDRInfoMap, nil
-}
-
-func getPodClusterDataFromDB(domainUUIDs []string) (map[string]map[int]string, error) {
-	var podClusters []mysql.PodCluster
-	err := mysql.Db.Where("domain IN (?)", domainUUIDs).Find(&podClusters).Error
-	if err != nil {
-		return nil, servicecommon.NewError(
-			common.SERVER_ERROR,
-			fmt.Sprintf("db query pod_cluster failed: %s", err.Error()),
-		)
-	}
-	domainUUIDToPodClusterIDToUUID := make(map[string]map[int]string)
-	for _, podCluster := range podClusters {
-		if domainUUIDToPodClusterIDToUUID[podCluster.Domain] == nil {
-			domainUUIDToPodClusterIDToUUID[podCluster.Domain] = make(map[int]string)
-		}
-		domainUUIDToPodClusterIDToUUID[podCluster.Domain][podCluster.ID] = podCluster.Lcuuid
-	}
-	return domainUUIDToPodClusterIDToUUID, nil
 }
 
 func getDataInfoFromDB(domainUUIDs []string) (map[string]map[string]string, error) {
@@ -942,6 +951,25 @@ func getPodNamespaceFromDB(domainUUIDs []string) (map[string]map[string]mysql.Po
 		domainUUIDToPodNSNameToInfo[podNamespace.Domain][podNamespace.Name] = podNamespace
 	}
 	return domainUUIDToPodNSNameToInfo, nil
+}
+
+func getPodNamespaceInSubdomainFromDB(domainUUIDs []string) (map[string]map[string]mysql.PodNamespace, error) {
+	var podNamespaces []mysql.PodNamespace
+	err := mysql.Db.Where("domain IN (?) and sub_domain != ''", domainUUIDs).Find(&podNamespaces).Error
+	if err != nil {
+		return nil, servicecommon.NewError(
+			common.INVALID_POST_DATA,
+			fmt.Sprintf("db query pod_namespace failed: %s", err),
+		)
+	}
+	subdomainUUIDToPodNSNameToInfo := make(map[string]map[string]mysql.PodNamespace)
+	for _, podNamespace := range podNamespaces {
+		if _, ok := subdomainUUIDToPodNSNameToInfo[podNamespace.SubDomain]; !ok {
+			subdomainUUIDToPodNSNameToInfo[podNamespace.SubDomain] = make(map[string]mysql.PodNamespace)
+		}
+		subdomainUUIDToPodNSNameToInfo[podNamespace.SubDomain][podNamespace.Name] = podNamespace
+	}
+	return subdomainUUIDToPodNSNameToInfo, nil
 }
 
 func convertTagsToString(tags []model.AdditionalResourceTag) (string, error) {

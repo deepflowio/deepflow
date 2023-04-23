@@ -340,22 +340,39 @@ func (c *Cloud) appendAddtionalResourcesData(resource model.Resource) model.Reso
 	resource.VMs = append(resource.VMs, additionalResource.CHosts...)
 	resource.VInterfaces = append(resource.VInterfaces, additionalResource.VInterfaces...)
 	resource.IPs = append(resource.IPs, additionalResource.IPs...)
-	resource = c.appendCloudTags(resource, additionalResource.CHostCloudTags, additionalResource.PodNamespaceCloudTags)
+	resource = c.appendCloudTags(resource, additionalResource)
 	resource.LBs = append(resource.LBs, additionalResource.LB...)
 	resource.LBListeners = append(resource.LBListeners, additionalResource.LBListeners...)
 	resource.LBTargetServers = append(resource.LBTargetServers, additionalResource.LBTargetServers...)
 	return resource
 }
 
-func (c *Cloud) appendCloudTags(resource model.Resource, chostCloudTags model.UUIDToCloudTags, podNamespaceCloudTags model.UUIDToCloudTags) model.Resource {
+func (c *Cloud) appendCloudTags(resource model.Resource, additionalResource model.AdditionalResource) model.Resource {
+	chostCloudTags := additionalResource.CHostCloudTags
 	for i, chost := range resource.VMs {
 		if value, ok := chostCloudTags[chost.Lcuuid]; ok {
 			resource.VMs[i].CloudTags = value
 		}
 	}
+	podNamespaceCloudTags := additionalResource.PodNamespaceCloudTags
 	for i, podNamespace := range resource.PodNamespaces {
 		if value, ok := podNamespaceCloudTags[podNamespace.Lcuuid]; ok {
 			resource.PodNamespaces[i].CloudTags = value
+		}
+	}
+
+	additionalSubdomainResources := additionalResource.SubDomainResources
+	for subdomainUUID, subdomainResource := range resource.SubDomainResources {
+		additionalSubdomainResource, ok := additionalSubdomainResources[subdomainUUID]
+		if !ok {
+			continue
+		}
+		for i, podNamespace := range subdomainResource.PodNamespaces {
+			if additionalSubdomainResource.PodNamespaceCloudTags != nil {
+				if value, ok := additionalSubdomainResource.PodNamespaceCloudTags[podNamespace.Lcuuid]; ok {
+					subdomainResource.PodNamespaces[i].CloudTags = value
+				}
+			}
 		}
 	}
 	return resource
