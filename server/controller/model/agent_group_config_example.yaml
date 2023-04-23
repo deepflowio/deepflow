@@ -427,12 +427,14 @@ vtap_group_id: g-xxxxxx
   #ingress-flavour: kubernetes
 
   ## Pod MAC/IP Address Query Method
-  ## Default: adaptive. Options: adaptive, active, passive.
+  ## Default: adaptive. Options: adaptive, active, passive, sidecar.
   ## Note: In active mode, deepflow-agent enters the netns of other Pods through
   ##   setns syscall to query the MAC and IP addresses. In this mode, the setns
   ##   operation requires the SYS_ADMIN permission. In passive mode deepflow-agent
   ##   calculates the MAC and IP addresses used by Pods by capturing ARP/ND traffic.
-  ##   When set to adaptive, active mode will be used first.
+  ##   When set to adaptive, active mode will be used first. In sidecar mode,
+  ##   environment variable `CTRL_NETWORK_INTERFACE` must be specified and
+  ##   optionally `K8S_POD_IP_FOR_DEEPFLOW` can be set to override ip address.
   #kubernetes-poller-type: adaptive
 
   #########################
