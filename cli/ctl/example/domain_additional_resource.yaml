@@ -50,12 +50,13 @@ chosts:
     ips: ["x.x.x.x"]       # required
 
 cloud_tags:
-- resource_type: xxxx # required. options: chost, pod_ns 
-  resource_name: xxxx # required. (If there is a duplicate name, one will be chosen at random.)
-  domain_uuid: xxxx   # required
-  tags:               # required
-  - key: xxxx         # required. (Limited to 255 characters and does not support spaces, colon, back quotes, backslash, single quotes.)
-    value: xxxx       # required. (Limited to 255 characters and does not support spaces, colon, back quotes, backslash.)
+- resource_type: xxxx  # required. options: chost, pod_ns 
+  resource_name: xxxx  # required. (If there is a duplicate name, one will be chosen at random.)
+  domain_uuid: xxxx    # required
+  subdomain_uuid:      # optional. (Fill in this value if you need to set cloud tags for subdomain)
+  tags:                # required
+  - key: xxxx          # required. (Limited to 255 characters and does not support spaces, colon, back quotes, backslash, single quotes.)
+    value: xxxx        # required. (Limited to 255 characters and does not support spaces, colon, back quotes, backslash.)
 
 # lb, load balance
 lbs:
