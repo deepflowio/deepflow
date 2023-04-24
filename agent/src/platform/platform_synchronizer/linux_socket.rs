@@ -17,7 +17,7 @@
 use std::{
     collections::{HashMap, HashSet},
     ffi::OsString,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    net::{IpAddr, SocketAddr},
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -306,10 +306,7 @@ pub(super) fn get_all_socket(
 }
 
 fn is_zero_addr(addr: &SocketAddr) -> bool {
-    match addr {
-        SocketAddr::V4(v4) => v4.ip() == &Ipv4Addr::UNSPECIFIED,
-        SocketAddr::V6(v6) => v6.ip() == &Ipv6Addr::UNSPECIFIED,
-    }
+    addr.ip().is_unspecified()
 }
 
 fn get_proc_netns(proc: &Process) -> Result<u64, ProcError> {
