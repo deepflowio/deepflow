@@ -17,7 +17,7 @@
 use std::env;
 use std::fmt;
 use std::mem;
-use std::net::Ipv4Addr;
+use std::net::{Ipv4Addr, Ipv6Addr};
 use std::path::Path;
 use std::path::PathBuf;
 use std::process;
@@ -1190,7 +1190,11 @@ impl Components {
                     "get route to {} failed: {:?}",
                     candidate_config.dispatcher.analyzer_ip, e
                 );
-                Ipv4Addr::UNSPECIFIED.into()
+                if ctrl_ip.is_ipv6() {
+                    Ipv6Addr::UNSPECIFIED.into()
+                } else {
+                    Ipv4Addr::UNSPECIFIED.into()
+                }
             }
         };
         let bpf_builder = bpf::Builder {
