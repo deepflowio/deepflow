@@ -15,7 +15,7 @@
  */
 
 use std::collections::HashMap;
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::sync::{
     atomic::{AtomicI32, Ordering},
     Arc, RwLock,
@@ -112,7 +112,11 @@ impl Labeler {
                 }
             }
         }
-        return Ipv4Addr::UNSPECIFIED.into();
+        if is_ipv6 {
+            Ipv6Addr::UNSPECIFIED.into()
+        } else {
+            Ipv4Addr::UNSPECIFIED.into()
+        }
     }
 
     fn get_interface_by_mac(&self, mac: u64) -> Option<PlatformData> {
