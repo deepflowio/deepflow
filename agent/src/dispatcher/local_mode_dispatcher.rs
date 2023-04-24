@@ -29,6 +29,7 @@ use super::base_dispatcher::{BaseDispatcher, BaseDispatcherListener};
 #[cfg(target_os = "windows")]
 use super::error::Result;
 
+use crate::common::tagged_flow;
 #[cfg(target_os = "linux")]
 use crate::platform::{GenericPoller, LibvirtXmlExtractor, Poller};
 use crate::{
@@ -73,6 +74,7 @@ impl LocalModeDispatcher {
             base.ntp_diff.clone(),
             base.flow_map_config.clone(),
             base.log_parse_config.clone(),
+            base.tagged_flow_pool.clone(),
             None,
             Some(base.packet_sequence_output_queue.clone()), // Enterprise Edition Feature: packet-sequence
             &base.stats,
@@ -87,6 +89,7 @@ impl LocalModeDispatcher {
             base.ntp_diff.clone(),
             base.flow_map_config.clone(),
             base.log_parse_config.clone(),
+            base.tagged_flow_pool.clone(),
             Some(base.packet_sequence_output_queue.clone()), // Enterprise Edition Feature: packet-sequence
             &base.stats,
             false, // !from_ebpf

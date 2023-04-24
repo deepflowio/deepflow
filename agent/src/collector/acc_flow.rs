@@ -20,6 +20,8 @@ use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
+use lockfree_object_pool::SpinLockOwnedReusable;
+
 use super::quadruple_generator::QgKey;
 
 use crate::common::flow::{L7Protocol, SignalSource};
@@ -27,7 +29,7 @@ use crate::common::tagged_flow::TaggedFlow;
 use crate::metric::meter::{AppMeter, FlowMeter};
 
 pub struct AccumulatedFlow {
-    pub tagged_flow: Arc<TaggedFlow>,
+    pub tagged_flow: Arc<SpinLockOwnedReusable<TaggedFlow>>,
     pub l7_protocol: L7Protocol,
     pub is_active_host0: bool,
     pub is_active_host1: bool,
@@ -66,7 +68,7 @@ impl AccumulatedFlow {
         flow_meter: &FlowMeter,
         app_meter: &AppMeter,
         id_maps: &[HashMap<u16, u16>; 2],
-        tagged_flow: &Arc<TaggedFlow>,
+        tagged_flow: &Arc<SpinLockOwnedReusable<TaggedFlow>>,
     ) {
         self.time_in_second = time_in_second;
         // Only flow whose signal_source is Packet or XFlow has flow_meter

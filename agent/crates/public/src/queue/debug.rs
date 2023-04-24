@@ -33,6 +33,12 @@ pub struct DebugSender<T> {
     sender: Sender<T>,
 }
 
+impl<T> DebugSender<T> {
+    pub fn send_all_without_debug(&self, msgs: &mut Vec<T>) -> Result<(), Error<T>> {
+        self.sender.send_all(msgs)
+    }
+}
+
 impl<T: Debug> DebugSender<T> {
     pub fn send(&self, msg: T) -> Result<(), Error<T>> {
         if self.debug.1.load(Ordering::Relaxed) {

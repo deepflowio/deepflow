@@ -41,10 +41,11 @@ use tokio::{
     task::JoinHandle,
     time,
 };
+use lockfree_object_pool::{SpinLockObjectPool, SpinLockOwnedReusable};
 
 use crate::common::flow::{FlowPerfStats, L7PerfStats, SignalSource};
 use crate::common::lookup_key::LookupKey;
-use crate::common::{TaggedFlow, Timestamp};
+use crate::common::{TaggedFlow, Timestamp, tagged_flow};
 use crate::exception::ExceptionHandler;
 use crate::flow_generator::protocol_logs::L7ResponseStatus;
 use crate::metric::document::TapSide;
@@ -207,14 +208,15 @@ async fn aggregate_with_catch_exception(
 }
 
 fn decode_otel_trace_data(
+    tagged_flow_pool: &Arc<SpinLockObjectPool<TaggedFlow>>,
     peer_addr: SocketAddr,
     data: Vec<u8>,
     local_epc_id: u32,
     policy_getter: Arc<PolicyGetter>,
     time_diff: i64,
     is_collect: bool,
-) -> Result<(Vec<u8>, Vec<Box<TaggedFlow>>), GenericError> {
-    let mut tagged_flow: Vec<Box<TaggedFlow>> = vec![];
+) -> Result<(Vec<u8>, Vec<SpinLockOwnedReusable<TaggedFlow>>), GenericError> {
+    let mut tagged_flow: Vec<SpinLockOwnedReusable<TaggedFlow>> = vec![];
     let mut d = TracesData::decode(data.as_slice())?;
     // 因为collector传过来traceData的全部resource都有"app.host.ip"的属性，所以只检查第一个resource有没有“app.host.ip”即可，
     // sdk传过来的traceData因没有该属性则要补上(key: “app.host.ip”, value: 对端IP)属性值
@@ -278,6 +280,7 @@ fn decode_otel_trace_data(
             for scope_spans in resource_span.scope_spans.iter() {
                 for span in scope_spans.spans.iter() {
                     match fill_tagged_flow(
+                        &tagged_flow_pool,
                         span,
                         ip,
                         policy_getter.clone(),
@@ -287,7 +290,7 @@ fn decode_otel_trace_data(
                         time_diff,
                     ) {
                         Some(f) => {
-                            tagged_flow.push(Box::new(f));
+                            tagged_flow.push(f);
                         }
                         None => continue,
                     }
@@ -301,6 +304,7 @@ fn decode_otel_trace_data(
 }
 
 fn fill_tagged_flow(
+    tagged_flow_pool: &Arc<SpinLockObjectPool<TaggedFlow>>,
     span: &Span,
     ip: IpAddr,
     policy_getter: Arc<PolicyGetter>,
@@ -308,7 +312,9 @@ fn fill_tagged_flow(
     otel_service: Option<String>,
     otel_instance: Option<String>,
     time_diff: i64,
-) -> Option<TaggedFlow> {
+) -> Option<SpinLockOwnedReusable<TaggedFlow>> {
+    let mut tagged_flow = tagged_flow_pool.pull_owned();
+
     let (mut ip0, mut ip1, eth_type) = if ip.is_ipv4() {
         (
             IpAddr::from(Ipv4Addr::UNSPECIFIED),
@@ -327,7 +333,6 @@ fn fill_tagged_flow(
     let mut status = L7ResponseStatus::NotExist;
     let mut is_http2 = false;
 
-    let mut tagged_flow = TaggedFlow::default();
     tagged_flow.flow.signal_source = SignalSource::OTel;
     tagged_flow.flow.otel_service = otel_service;
     tagged_flow.flow.otel_instance = otel_instance;
@@ -480,12 +485,14 @@ fn fill_tagged_flow(
         .policy()
         .lookup_all_by_epc(&mut lookup_key, local_epc_id as i32);
     let (src_info, dst_info) = (endpoint.src_info, endpoint.dst_info);
+    let ip_src = tagged_flow.flow.flow_key.ip_src;
+    let ip_dst = tagged_flow.flow.flow_key.ip_dst;
     let peer_src = &mut tagged_flow.flow.flow_metrics_peers[0];
     peer_src.l3_epc_id = src_info.l3_epc_id;
-    peer_src.nat_real_ip = tagged_flow.flow.flow_key.ip_src;
+    peer_src.nat_real_ip = ip_src;
     let peer_dst = &mut tagged_flow.flow.flow_metrics_peers[1];
     peer_dst.l3_epc_id = dst_info.l3_epc_id;
-    peer_dst.nat_real_ip = tagged_flow.flow.flow_key.ip_dst;
+    peer_dst.nat_real_ip = ip_dst;
     tagged_flow.flow.flow_key.tap_type = TapType::Cloud;
     Some(tagged_flow)
 }
@@ -523,7 +530,7 @@ async fn handler(
     req: Request<Body>,
     otel_sender: DebugSender<OpenTelemetry>,
     compressed_otel_sender: DebugSender<OpenTelemetryCompressed>,
-    otel_metrics_collect_sender: Option<DebugSender<Box<TaggedFlow>>>,
+    otel_metrics_collect_sender: Option<DebugSender<SpinLockOwnedReusable<TaggedFlow>>>,
     prometheus_sender: DebugSender<PrometheusMetric>,
     telegraf_sender: DebugSender<TelegrafMetric>,
     profile_sender: DebugSender<Profile>,
@@ -533,6 +540,7 @@ async fn handler(
     local_epc_id: u32,
     policy_getter: Arc<PolicyGetter>,
     time_diff: Arc<AtomicI64>,
+    tagged_flow_pool: Arc<SpinLockObjectPool<TaggedFlow>>,
 ) -> Result<Response<Body>, GenericError> {
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/") => {
@@ -554,6 +562,7 @@ async fn handler(
             let tracing_data = decode_metric(whole_body, &part.headers)?;
             let time_diff = time_diff.load(Ordering::Relaxed);
             let mut decode_data = decode_otel_trace_data(
+                &tagged_flow_pool,
                 peer_addr,
                 tracing_data,
                 local_epc_id,
@@ -567,7 +576,7 @@ async fn handler(
             })?;
             if let Some(sender) = otel_metrics_collect_sender {
                 if !decode_data.1.is_empty() {
-                    if let Err(Error::Terminated(..)) = sender.send_all(&mut decode_data.1) {
+                    if let Err(Error::Terminated(..)) = sender.send_all_without_debug(&mut decode_data.1) {
                         warn!("sender queue has terminated");
                     }
                 }
@@ -753,7 +762,7 @@ pub struct MetricServer {
     thread: Arc<Mutex<Option<JoinHandle<()>>>>,
     otel_sender: DebugSender<OpenTelemetry>,
     compressed_otel_sender: DebugSender<OpenTelemetryCompressed>,
-    otel_metrics_collect_sender: Option<DebugSender<Box<TaggedFlow>>>,
+    otel_metrics_collect_sender: Option<DebugSender<SpinLockOwnedReusable<TaggedFlow>>>,
     prometheus_sender: DebugSender<PrometheusMetric>,
     telegraf_sender: DebugSender<TelegrafMetric>,
     profile_sender: DebugSender<Profile>,
@@ -765,6 +774,7 @@ pub struct MetricServer {
     local_epc_id: u32,
     policy_getter: Arc<PolicyGetter>,
     time_diff: Arc<AtomicI64>,
+    tagged_flow_pool: Arc<SpinLockObjectPool<TaggedFlow>>,
 }
 
 impl MetricServer {
@@ -772,7 +782,7 @@ impl MetricServer {
         runtime: Arc<Runtime>,
         otel_sender: DebugSender<OpenTelemetry>,
         compressed_otel_sender: DebugSender<OpenTelemetryCompressed>,
-        otel_metrics_collect_sender: Option<DebugSender<Box<TaggedFlow>>>,
+        otel_metrics_collect_sender: Option<DebugSender<SpinLockOwnedReusable<TaggedFlow>>>,
         prometheus_sender: DebugSender<PrometheusMetric>,
         telegraf_sender: DebugSender<TelegrafMetric>,
         profile_sender: DebugSender<Profile>,
@@ -782,6 +792,7 @@ impl MetricServer {
         local_epc_id: u32,
         policy_getter: PolicyGetter,
         time_diff: Arc<AtomicI64>,
+        tagged_flow_pool: Arc<SpinLockObjectPool<TaggedFlow>>,
     ) -> (Self, IntegrationCounter) {
         let counter = IntegrationCounter::default();
         (
@@ -803,6 +814,7 @@ impl MetricServer {
                 local_epc_id,
                 policy_getter: Arc::new(policy_getter),
                 time_diff,
+                tagged_flow_pool,
             },
             counter,
         )
@@ -844,6 +856,7 @@ impl MetricServer {
         let policy_getter = self.policy_getter.clone();
         let time_diff = self.time_diff.clone();
         let (tx, mut rx) = mpsc::channel(8);
+        let tagged_flow_pool = self.tagged_flow_pool.clone();
         self.runtime
             .spawn(Self::alive_check(monitor_port.clone(), tx.clone(), mon_rx));
         self.server_shutdown_tx.lock().unwrap().replace(tx);
@@ -899,6 +912,7 @@ impl MetricServer {
                     let local_epc_id = local_epc_id.clone();
                     let policy_getter = policy_getter.clone();
                     let time_diff = time_diff.clone();
+                    let tagged_flow_pool = tagged_flow_pool.clone();
                     let service = make_service_fn(move |conn: &AddrStream| {
                         let otel_sender = otel_sender.clone();
                         let compressed_otel_sender = compressed_otel_sender.clone();
@@ -913,6 +927,7 @@ impl MetricServer {
                         let local_epc_id = local_epc_id.clone();
                         let policy_getter = policy_getter.clone();
                         let time_diff = time_diff.clone();
+                        let tagged_flow_pool = tagged_flow_pool.clone();
                         async move {
                             Ok::<_, GenericError>(service_fn(move |req| {
                                 handler(
@@ -930,6 +945,7 @@ impl MetricServer {
                                     local_epc_id,
                                     policy_getter.clone(),
                                     time_diff.clone(),
+                                    tagged_flow_pool.clone(),
                                 )
                             }))
                         }

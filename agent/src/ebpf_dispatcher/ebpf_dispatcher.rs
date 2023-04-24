@@ -23,6 +23,7 @@ use std::time::Duration;
 use arc_swap::access::Access;
 use libc::{c_int, c_ulonglong};
 use log::{debug, error, info, warn};
+use lockfree_object_pool::{SpinLockObjectPool, SpinLockOwnedReusable};
 
 use super::{Error, Result};
 use crate::common::l7_protocol_log::{
@@ -189,8 +190,9 @@ struct EbpfDispatcher {
 
     config: EbpfAccess,
     output: DebugSender<Box<MetaAppProto>>, // Send MetaAppProtos to the AppProtoLogsParser
-    flow_output: DebugSender<Box<TaggedFlow>>, // Send TaggedFlows to the QuadrupleGenerator
+    flow_output: DebugSender<SpinLockOwnedReusable<TaggedFlow>>, // Send TaggedFlows to the QuadrupleGenerator
     stats_collector: Arc<stats::Collector>,
+    tagged_flow_pool: Arc<SpinLockObjectPool<TaggedFlow>>,
 }
 
 impl EbpfDispatcher {
@@ -205,6 +207,7 @@ impl EbpfDispatcher {
             self.time_diff.clone(),
             self.flow_map_config.clone(),
             self.log_parser_config.clone(),
+            self.tagged_flow_pool.clone(),
             Some(self.config.clone()),
             None, // Enterprise Edition Feature: packet-sequence
             &self.stats_collector,
@@ -495,10 +498,11 @@ impl EbpfCollector {
         flow_map_config: FlowAccess,
         policy_getter: PolicyGetter,
         output: DebugSender<Box<MetaAppProto>>,
-        flow_output: DebugSender<Box<TaggedFlow>>,
+        flow_output: DebugSender<SpinLockOwnedReusable<TaggedFlow>>,
         proc_event_output: DebugSender<BoxedProcEvents>,
         queue_debugger: &QueueDebugger,
         stats_collector: Arc<stats::Collector>,
+        tagged_flow_pool: Arc<SpinLockObjectPool<TaggedFlow>>,
     ) -> Result<Box<Self>> {
         let ebpf_config = config.load();
         if ebpf_config.ebpf.disabled {
@@ -530,6 +534,7 @@ impl EbpfCollector {
                 flow_output,
                 flow_map_config,
                 stats_collector,
+                tagged_flow_pool,
             },
             thread_handle: None,
             counter: EbpfCounter { rx: 0 },

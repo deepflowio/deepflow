@@ -406,7 +406,7 @@ impl<'a> MetaPacket<'a> {
         self.update_fields_except_raw(src_endpoint, dst_endpoint, timestamp, original_length)
     }
 
-    fn update_fields_except_raw(
+    pub fn update_fields_except_raw(
         &mut self,
         src_endpoint: bool,
         dst_endpoint: bool,

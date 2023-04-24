@@ -37,6 +37,11 @@ pub struct TaggedFlow {
 }
 
 impl TaggedFlow {
+    pub fn init(&mut self, other: &TaggedFlow) {
+        self.flow = other.flow.clone();
+        self.tag = other.tag.clone();
+    }
+
     pub fn sequential_merge(&mut self, other: &TaggedFlow) {
         self.flow.sequential_merge(&other.flow);
     }

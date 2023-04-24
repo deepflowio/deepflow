@@ -27,6 +27,7 @@ use arc_swap::access::Access;
 use log::{debug, info, warn};
 use npb_pcap_policy::NpbTunnelType;
 use rand::prelude::{Rng, SeedableRng, SmallRng};
+use lockfree_object_pool::SpinLockOwnedReusable;
 
 use super::consts::*;
 
@@ -57,7 +58,7 @@ pub struct FlowAggrCounter {
 
 pub struct FlowAggrThread {
     id: usize,
-    input: Arc<Receiver<Arc<TaggedFlow>>>,
+    input: Arc<Receiver<Arc<SpinLockOwnedReusable<TaggedFlow>>>>,
     output: DebugSender<BoxedTaggedFlow>,
     config: CollectorAccess,
 
@@ -72,7 +73,7 @@ pub struct FlowAggrThread {
 impl FlowAggrThread {
     pub fn new(
         id: usize,
-        input: Receiver<Arc<TaggedFlow>>,
+        input: Receiver<Arc<SpinLockOwnedReusable<TaggedFlow>>>,
         output: DebugSender<BoxedTaggedFlow>,
         config: CollectorAccess,
         ntp_diff: Arc<AtomicI64>,
@@ -138,7 +139,7 @@ impl FlowAggrThread {
 }
 
 pub struct FlowAggr {
-    input: Arc<Receiver<Arc<TaggedFlow>>>,
+    input: Arc<Receiver<Arc<SpinLockOwnedReusable<TaggedFlow>>>>,
     output: ThrottlingQueue,
     slot_start_time: Duration,
     stashs: VecDeque<HashMap<u64, TaggedFlow>>,
@@ -154,7 +155,7 @@ pub struct FlowAggr {
 
 impl FlowAggr {
     pub fn new(
-        input: Arc<Receiver<Arc<TaggedFlow>>>,
+        input: Arc<Receiver<Arc<SpinLockOwnedReusable<TaggedFlow>>>>,
         output: DebugSender<BoxedTaggedFlow>,
         running: Arc<AtomicBool>,
         config: CollectorAccess,
@@ -178,7 +179,7 @@ impl FlowAggr {
         }
     }
 
-    fn minute_merge(&mut self, f: Arc<TaggedFlow>) {
+    fn minute_merge(&mut self, f: Arc<SpinLockOwnedReusable<TaggedFlow>>) {
         let flow_time = f.flow.flow_stat_time;
         if flow_time < self.slot_start_time {
             debug!("flow drop before slot start time. flow stat time: {:?}, slot start time is {:?}, delay is {:?}", flow_time, self.slot_start_time, self.slot_start_time - flow_time);
@@ -210,9 +211,9 @@ impl FlowAggr {
             }
         } else {
             if f.flow.close_type != CloseType::ForcedReport {
-                self.send_flow(f.as_ref().clone());
+                self.send_flow((*f).clone());
             } else {
-                slot_map.insert(f.flow.flow_id, f.as_ref().clone());
+                slot_map.insert(f.flow.flow_id, (*f).clone());
             }
             // 收到flow下一分钟数据，则需要发送上一分钟的该flow
             if slot > 0 {

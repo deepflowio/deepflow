@@ -22,6 +22,7 @@ mod base_dispatcher;
 mod analyzer_mode_dispatcher;
 mod local_mode_dispatcher;
 mod mirror_mode_dispatcher;
+pub use analyzer_mode_dispatcher::Packet;
 
 #[cfg(target_os = "windows")]
 use std::process;
@@ -48,6 +49,7 @@ use public::debug::QueueDebugger;
 use public::enums::LinuxSllPacketType::Outgoing;
 #[cfg(target_os = "windows")]
 use windows_recv_engine::WinPacket;
+use lockfree_object_pool::{SpinLockObjectPool, SpinLockOwnedReusable};
 
 use analyzer_mode_dispatcher::{AnalyzerModeDispatcher, AnalyzerModeDispatcherListener}; // Enterprise Edition Feature: analyzer_mode
 use base_dispatcher::{BaseDispatcher, TapTypeHandler};
@@ -596,7 +598,7 @@ pub struct DispatcherBuilder {
     tap_typer: Option<Arc<TapTyper>>,
     analyzer_dedup_disabled: Option<bool>,
     libvirt_xml_extractor: Option<Arc<LibvirtXmlExtractor>>,
-    flow_output_queue: Option<DebugSender<Box<TaggedFlow>>>,
+    flow_output_queue: Option<DebugSender<SpinLockOwnedReusable<TaggedFlow>>>,
     log_output_queue: Option<DebugSender<Box<MetaAppProto>>>,
     packet_sequence_output_queue:
         Option<DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>>, // Enterprise Edition Feature: packet-sequence
@@ -613,6 +615,8 @@ pub struct DispatcherBuilder {
     netns: Option<NsFile>,
     trident_type: Option<TridentType>,
     queue_debugger: Option<Arc<QueueDebugger>>,
+    tagged_flow_pool: Option<Arc<SpinLockObjectPool<TaggedFlow>>>,    
+    packet_pool: Option<Arc<SpinLockObjectPool<Packet>>>,
 }
 
 impl DispatcherBuilder {
@@ -675,7 +679,7 @@ impl DispatcherBuilder {
         self
     }
 
-    pub fn flow_output_queue(mut self, v: DebugSender<Box<TaggedFlow>>) -> Self {
+    pub fn flow_output_queue(mut self, v: DebugSender<SpinLockOwnedReusable<TaggedFlow>>) -> Self {
         self.flow_output_queue = Some(v);
         self
     }
@@ -741,6 +745,16 @@ impl DispatcherBuilder {
 
     pub fn queue_debugger(mut self, v: Arc<QueueDebugger>) -> Self {
         self.queue_debugger = Some(v);
+        self
+    }
+
+    pub fn tagged_flow_pool(mut self, v: Arc<SpinLockObjectPool<TaggedFlow>>) -> Self {
+        self.tagged_flow_pool = Some(v);
+        self
+    }
+
+    pub fn packet_pool(mut self, v: Arc<SpinLockObjectPool<Packet>>) -> Self {
+        self.packet_pool = Some(v);
         self
     }
 
@@ -875,6 +889,8 @@ impl DispatcherBuilder {
                 .ok_or(Error::ConfigIncomplete("no packet_sequence_block".into()))?,
             netns,
             npb_dedup_enabled: Arc::new(AtomicBool::new(false)),
+            tagged_flow_pool: self.tagged_flow_pool.take()
+                .ok_or(Error::ConfigIncomplete("no tagged flow pool".into()))?,
         };
         collector.register_countable(
             "dispatcher",
@@ -950,6 +966,8 @@ impl DispatcherBuilder {
                     pipeline_thread_handler: None,
                     stats_collector: collector.clone(),
                     queue_debugger: self.queue_debugger.as_ref().unwrap().clone(),
+                    packet_pool: self.packet_pool.take()
+                        .ok_or(Error::ConfigIncomplete("no packet pool".into()))?,
                 })
             }
             _ => {

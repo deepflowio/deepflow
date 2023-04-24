@@ -98,7 +98,7 @@ impl Default for CloseType {
     }
 }
 
-#[derive(Serialize, PartialEq, Eq, PartialOrd, Ord, Debug, Clone)]
+#[derive(Serialize, PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Copy)]
 pub struct FlowKey {
     pub vtap_id: u16,
     pub tap_type: TapType,

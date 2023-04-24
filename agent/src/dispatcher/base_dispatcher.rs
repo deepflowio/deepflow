@@ -29,6 +29,7 @@ use std::time::Duration;
 
 use dns_lookup::lookup_host;
 use log::{error, info, warn};
+use lockfree_object_pool::{SpinLockObjectPool, SpinLockOwnedReusable};
 
 use super::{
     error::{Error, Result},
@@ -98,7 +99,7 @@ pub(super) struct BaseDispatcher {
 
     pub(super) analyzer_dedup_disabled: bool,
 
-    pub(super) flow_output_queue: DebugSender<Box<TaggedFlow>>,
+    pub(super) flow_output_queue: DebugSender<SpinLockOwnedReusable<TaggedFlow>>,
     pub(super) log_output_queue: DebugSender<Box<MetaAppProto>>,
 
     pub(super) counter: Arc<PacketCounter>,
@@ -121,6 +122,8 @@ pub(super) struct BaseDispatcher {
 
     // dispatcher id for easy debugging
     pub log_id: String,
+
+    pub(super) tagged_flow_pool: Arc<SpinLockObjectPool<TaggedFlow>>,
 }
 
 impl BaseDispatcher {

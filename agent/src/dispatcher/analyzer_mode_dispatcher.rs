@@ -17,21 +17,23 @@
 use std::{
     collections::HashMap,
     ops::Add,
-    sync::{atomic::Ordering, Arc, RwLock},
+    sync::{atomic::Ordering, Arc, RwLock, mpsc::{channel, Sender, Receiver}},
     thread::{self, JoinHandle},
     time::Duration,
+    borrow::Cow,
 };
 
 use arc_swap::access::Access;
 use log::{debug, info, warn};
 use packet_dedup::PacketDedupMap;
+use lockfree_object_pool::{SpinLockObjectPool, SpinLockOwnedReusable};
 
 use super::base_dispatcher::BaseDispatcher;
 use crate::{
     common::{
         decapsulate::{TunnelInfo, TunnelType, TunnelTypeBitmap},
         enums::TapType,
-        MetaPacket, TapPort, ETH_HEADER_SIZE, VLAN_HEADER_SIZE,
+        MetaPacket, TapPort, ETH_HEADER_SIZE, VLAN_HEADER_SIZE, tagged_flow,
     },
     config::DispatcherConfig,
     dispatcher::{
@@ -46,7 +48,7 @@ use crate::{
         stats::{self, Countable, StatsOption},
     },
 };
-use public::queue::{self, bounded_with_debug, DebugSender, Receiver};
+//use public::queue::{self, bounded_with_debug, DebugSender, Receiver};
 use public::utils::net::{Link, MacAddr};
 use public::{debug::QueueDebugger, proto::trident::IfMacSource};
 
@@ -57,13 +59,14 @@ const BILD_FLAGS: usize = 0xff;
 const BILD_FLAGS_OFFSET: usize = 6;
 const BILD_OVERLAY_OFFSET: usize = 7;
 
-const HANDLER_BATCH_SIZE: usize = 64;
+const HANDLER_BATCH_SIZE: usize = 8;
 const INNER_QUEUE_SIZE: usize = 65536;
 
 #[derive(Clone)]
 pub struct AnalyzerModeDispatcherListener {
     vm_mac_addrs: Arc<RwLock<HashMap<u32, MacAddr>>>,
     base: BaseDispatcherListener,
+    packet_pool: Arc<SpinLockObjectPool<Packet>>,
 }
 
 impl AnalyzerModeDispatcherListener {
@@ -122,12 +125,42 @@ pub(super) struct AnalyzerPipeline {
     timestamp: Duration,
 }
 
-#[derive(Clone, Debug)]
-struct Packet {
+#[derive(Clone, Debug, Default)]
+pub struct Packet {
     timestamp: Duration,
-    raw: Vec<u8>,
+    raw: Option<Vec<u8>>,
     original_length: u32,
     raw_length: u32,
+    meta_packet: MetaPacket<'static>,
+}
+
+impl Packet {
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            raw: Some(vec![0u8; capacity]),
+            ..Default::default()
+        }
+    }
+
+    pub fn reset(&mut self) {
+        if self.raw.is_none() {
+            let raw = self.meta_packet.raw.take().unwrap().into_owned();
+            self.raw.replace(raw);
+        }
+        self.meta_packet.reset();
+    }
+
+    fn init_meta_packet_raw(&mut self, decap_length: usize) {
+        let raw = if decap_length == 0 {
+            self.raw.take().unwrap()
+        } else {
+            let raw_length = self.raw_length as usize - decap_length;
+            let mut raw = vec![0u8; raw_length];
+            raw.clone_from_slice(&self.raw.as_ref().unwrap()[decap_length..decap_length+raw_length]);
+            raw
+        };
+        self.meta_packet.raw = Some(Cow::from(raw));
+    }
 }
 
 pub(super) struct AnalyzerModeDispatcher {
@@ -139,6 +172,7 @@ pub(super) struct AnalyzerModeDispatcher {
     pub(super) pipeline_thread_handler: Option<JoinHandle<()>>,
     pub(super) queue_debugger: Arc<QueueDebugger>,
     pub(super) stats_collector: Arc<stats::Collector>,
+    pub(super) packet_pool: Arc<SpinLockObjectPool<Packet>>,
 }
 
 impl AnalyzerModeDispatcher {
@@ -146,6 +180,7 @@ impl AnalyzerModeDispatcher {
         AnalyzerModeDispatcherListener {
             vm_mac_addrs: self.vm_mac_addrs.clone(),
             base: self.base.listener(),
+            packet_pool: self.packet_pool.clone(),
         }
     }
 
@@ -189,7 +224,7 @@ impl AnalyzerModeDispatcher {
         );
         let mut tap_port = TapPort::from_id(tunnel_info.tunnel_type, id as u32);
         let is_unicast =
-            tunnel_info.tier > 0 || MacAddr::is_multicast(&overlay_packet[..].to_vec()); // Consider unicast when there is a tunnel
+            tunnel_info.tier > 0 || MacAddr::is_multicast(&overlay_packet); // Consider unicast when there is a tunnel
 
         if src_remote && dst_remote && is_unicast {
             (tap_port, true, true)
@@ -214,8 +249,8 @@ impl AnalyzerModeDispatcher {
     // 3. Generate MetaPacket
     fn run_meta_packet_generator(
         &mut self,
-        receiver: Receiver<Packet>,
-        sender: DebugSender<(TapType, MetaPacket<'static>)>,
+        receiver: Receiver<Vec<SpinLockOwnedReusable<Packet>>>,
+        sender: Sender<Vec<SpinLockOwnedReusable<Packet>>>,
     ) {
         let terminated = self.base.terminated.clone();
         let tunnel_type_bitmap = self.base.tunnel_type_bitmap.clone();
@@ -233,26 +268,28 @@ impl AnalyzerModeDispatcher {
                 .name("dispatcher-meta-packet-generator".to_owned())
                 .spawn(move || {
                     let mut timestamp_map: HashMap<TapType, Duration> = HashMap::new();
-                    let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
-                    let mut output_batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
+                    //let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
+                    //let mut output_batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
 
                     while !terminated.load(Ordering::Relaxed) {
-                        match receiver.recv_all(&mut batch, Some(Duration::from_secs(1))) {
-                            Ok(_) => {}
-                            Err(queue::Error::Timeout) => continue,
-                            Err(queue::Error::Terminated(..)) => break,
-                        }
+                        let mut batch = match receiver.recv() {
+                            Ok(x) => x,
+                            Err(_) => continue,
+                        };
+                        // match receiver.recv_all(&mut batch, Some(Duration::from_secs(1))) {
+                        //     Ok(_) => {}
+                        //     Err(queue::Error::Timeout) => continue,
+                        //     Err(queue::Error::Terminated(..)) => break,
+                        // }
 
-                        for mut packet in batch.drain(..) {
+                        for mut packet in batch.iter_mut() {
                             // Truncate package according to configuration
-                            let raw_length = (packet.raw_length as usize)
-                                .min(packet.raw.len())
-                                .min(pool_raw_size);
+                            let raw_length = packet.raw_length as usize;
                             let tunnel_type_bitmap = tunnel_type_bitmap.lock().unwrap().clone();
                             let mut tunnel_info = TunnelInfo::default();
 
                             let (decap_length, tap_type) = match Self::decap_tunnel(
-                                &mut packet.raw[..raw_length],
+                                &mut packet.raw.as_mut().unwrap()[..raw_length],
                                 &tap_type_handler,
                                 &mut tunnel_info,
                                 tunnel_type_bitmap,
@@ -274,7 +311,7 @@ impl AnalyzerModeDispatcher {
                                 continue;
                             }
 
-                            let decap_length = if packet.raw.len() - decap_length
+                            let decap_length = if raw_length - decap_length
                                 > ETH_HEADER_SIZE + VLAN_HEADER_SIZE
                             {
                                 decap_length
@@ -282,10 +319,10 @@ impl AnalyzerModeDispatcher {
                                 tunnel_info = TunnelInfo::default();
                                 0
                             };
-                            let original_length = packet.raw.len() - decap_length;
+                            let original_length = packet.original_length as usize - decap_length;
                             let timestamp = packet.timestamp;
 
-                            let overlay_packet = &mut packet.raw[decap_length..raw_length];
+                            let overlay_packet = &mut packet.raw.as_mut().unwrap()[decap_length..raw_length];
                             // Only cloud traffic goes to de-duplication
                             if tap_type == TapType::Cloud
                                 && !analyzer_dedup_disabled
@@ -310,14 +347,13 @@ impl AnalyzerModeDispatcher {
                                 continue;
                             }
 
-                            let mut meta_packet = MetaPacket::empty();
-                            meta_packet.tap_port = tap_port;
-                            let offset = Duration::ZERO;
-                            if let Err(e) = meta_packet.update_with_raw_copy(
-                                overlay_packet.to_vec(),
+                            packet.init_meta_packet_raw(decap_length);
+                            packet.meta_packet.lookup_key.tap_type = tap_type;
+                            packet.meta_packet.tap_port = tap_port;
+                            if let Err(e) = packet.meta_packet.update_fields_except_raw(
                                 src_local,
                                 dst_local,
-                                timestamp + offset,
+                                timestamp,
                                 original_length,
                             ) {
                                 counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
@@ -326,26 +362,61 @@ impl AnalyzerModeDispatcher {
                             }
 
                             if tunnel_info.tunnel_type != TunnelType::None {
-                                meta_packet.tunnel = Some(tunnel_info);
+                                packet.meta_packet.tunnel = Some(tunnel_info);
                                 if tunnel_info.tunnel_type == TunnelType::TencentGre
                                     || tunnel_info.tunnel_type == TunnelType::Vxlan
                                 {
                                     // Tencent TCE and Qingyun Private Cloud need to query cloud platform information through TunnelID
                                     // Only the case of single-layer tunnel encapsulation needs to be considered here
                                     // In the double-layer encapsulation scenario, consider that the inner MAC exists and is valid (VXLAN-VXLAN) or needs to be judged by IP (VXLAN-IPIP)
-                                    meta_packet.lookup_key.tunnel_id = tunnel_info.id;
+                                    packet.meta_packet.lookup_key.tunnel_id = tunnel_info.id;
                                 }
                             }
 
-                            output_batch.push((tap_type, meta_packet));
+
+                            // let mut meta_packet = Box::new(MetaPacket::empty());
+                            // meta_packet.tap_port = tap_port;
+                            // let offset = Duration::ZERO;
+                            // if let Err(e) = meta_packet.update_with_raw_copy(
+                            //     overlay_packet.to_vec(),
+                            //     src_local,
+                            //     dst_local,
+                            //     timestamp + offset,
+                            //     original_length,
+                            // ) {
+                            //     counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
+                            //     debug!("meta_packet update failed: {:?}", e);
+                            //     continue;
+                            // }
+
+                            // if tunnel_info.tunnel_type != TunnelType::None {
+                            //     meta_packet.tunnel = Some(tunnel_info);
+                            //     if tunnel_info.tunnel_type == TunnelType::TencentGre
+                            //         || tunnel_info.tunnel_type == TunnelType::Vxlan
+                            //     {
+                            //         // Tencent TCE and Qingyun Private Cloud need to query cloud platform information through TunnelID
+                            //         // Only the case of single-layer tunnel encapsulation needs to be considered here
+                            //         // In the double-layer encapsulation scenario, consider that the inner MAC exists and is valid (VXLAN-VXLAN) or needs to be judged by IP (VXLAN-IPIP)
+                            //         meta_packet.lookup_key.tunnel_id = tunnel_info.id;
+                            //     }
+                            // }
+
+                            // output_batch.push(meta_packet);
                         }
-                        if let Err(e) = sender.send_all(&mut output_batch) {
-                            debug!(
-                                "dispatcher-meta-packet-generator {} sender failed: {:?}",
-                                id, e
-                            );
-                            output_batch.clear();
+
+                        if let Err(e) = sender.send(batch) {
+                            warn!("metapacket sender error");
                         }
+
+
+                        // if let Err(e) = sender.send_all_without_debug(&mut batch) {
+                        //     // debug!(
+                        //     //     "dispatcher-meta-packet-generator {} sender failed: {:?}",
+                        //     //     id, e
+                        //     // );
+                        //     //output_batch.clear();
+                        //     batch.clear();
+                        // }
                     }
                 })
                 .unwrap(),
@@ -356,8 +427,8 @@ impl AnalyzerModeDispatcher {
     // 1. Generate tagged flow
     fn run_tagged_flow_generator(
         &mut self,
-        receiver: Receiver<(TapType, MetaPacket<'static>)>,
-        sender: DebugSender<(TapType, MetaPacket<'static>)>,
+        receiver: Receiver<Vec<SpinLockOwnedReusable<Packet>>>,
+        sender: Sender<Vec<SpinLockOwnedReusable<Packet>>>,
     ) {
         let base = &self.base;
         let terminated = base.terminated.clone();
@@ -371,6 +442,7 @@ impl AnalyzerModeDispatcher {
         let log_parse_config = base.log_parse_config.clone();
         let packet_sequence_output_queue = base.packet_sequence_output_queue.clone(); // Enterprise Edition Feature: packet-sequence
         let stats = base.stats.clone();
+        let tagged_flow_pool = base.tagged_flow_pool.clone();
 
         self.flow_thread_handler.replace(
             thread::Builder::new()
@@ -384,39 +456,50 @@ impl AnalyzerModeDispatcher {
                         ntp_diff,
                         flow_map_config,
                         log_parse_config,
+                        tagged_flow_pool,
                         #[cfg(target_os = "linux")]
                         None,
                         Some(packet_sequence_output_queue), // Enterprise Edition Feature: packet-sequence
                         &stats,
                         false, // !from_ebpf
                     );
-                    let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
+                    //let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
                     while !terminated.load(Ordering::Relaxed) {
-                        match receiver.recv_all(&mut batch, Some(Duration::from_secs(1))) {
-                            Ok(_) => {}
-                            Err(queue::Error::Timeout) => {
-                                flow_map.inject_flush_ticker(Duration::ZERO);
-                                continue;
-                            }
-                            Err(queue::Error::Terminated(..)) => break,
-                        }
+                        let mut batch = match receiver.recv() {
+                            Ok(x) => x,
+                            Err(_) => continue,
+                        };
+                        // match receiver.recv_all(&mut batch, Some(Duration::from_secs(1))) {
+                        //     Ok(_) => {}
+                        //     Err(queue::Error::Timeout) => {
+                        //         flow_map.inject_flush_ticker(Duration::ZERO);
+                        //         continue;
+                        //     }
+                        //     Err(queue::Error::Terminated(..)) => break,
+                        // }
 
-                        for (tap_type, meta_packet) in batch.iter_mut() {
+                        for packet in batch.iter_mut() {
+                            let meta_packet = &mut packet.meta_packet;
+                            let tap_type = meta_packet.lookup_key.tap_type;
                             Self::prepare_flow(
                                 meta_packet,
-                                *tap_type,
+                                tap_type,
                                 id as u8,
                                 npb_dedup_enabled.load(Ordering::Relaxed),
                             );
                             flow_map.inject_meta_packet(meta_packet);
                         }
-                        if let Err(e) = sender.send_all(&mut batch) {
-                            debug!(
-                                "dispatcher-tagged-flow-generator {} sender failed: {:?}",
-                                id, e
-                            );
-                            batch.clear();
+                        if let Err(e) = sender.send(batch) {
+                            warn!("flowmap sender error");
                         }
+
+                        // if let Err(e) = sender.send_all_without_debug(&mut batch) {
+                        //     // debug!(
+                        //     //     "dispatcher-tagged-flow-generator {} sender failed: {:?}",
+                        //     //     id, e
+                        //     // );
+                        //     batch.clear();
+                        // }
                     }
                 })
                 .unwrap(),
@@ -428,7 +511,7 @@ impl AnalyzerModeDispatcher {
     // 2. NPB/PCAP/...
     fn run_additional_packet_pipeline(
         &mut self,
-        receiver: Receiver<(TapType, MetaPacket<'static>)>,
+        receiver: Receiver<Vec<SpinLockOwnedReusable<Packet>>>,
     ) {
         let base = &self.base;
         let terminated = base.terminated.clone();
@@ -440,15 +523,21 @@ impl AnalyzerModeDispatcher {
                 .name("dispatcher-additional-packet-pipeline".to_owned())
                 .spawn(move || {
                     let mut tap_pipelines: HashMap<TapType, AnalyzerPipeline> = HashMap::new();
-                    let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
+                    //let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
                     while !terminated.load(Ordering::Relaxed) {
-                        match receiver.recv_all(&mut batch, Some(Duration::from_secs(1))) {
-                            Ok(_) => {}
-                            Err(queue::Error::Timeout) => continue,
-                            Err(queue::Error::Terminated(..)) => break,
-                        }
+                        let mut batch = match receiver.recv() {
+                            Ok(x) => x,
+                            Err(_) => continue,
+                        };
+                        // match receiver.recv_all(&mut batch, Some(Duration::from_secs(1))) {
+                        //     Ok(_) => {}
+                        //     Err(queue::Error::Timeout) => continue,
+                        //     Err(queue::Error::Terminated(..)) => break,
+                        // }
 
-                        for (tap_type, meta_packet) in batch.drain(..) {
+                        for mut packet in batch.drain(..) {
+                            let meta_packet = &mut packet.meta_packet;
+                            let tap_type = meta_packet.lookup_key.tap_type;
                             let pipeline = match tap_pipelines.get_mut(&tap_type) {
                                 None => {
                                     // ff : ff : ff : ff : DispatcherID : TapType(1-255)
@@ -489,49 +578,60 @@ impl AnalyzerModeDispatcher {
         );
     }
 
-    fn setup_inner_thread_and_queue(&mut self) -> DebugSender<Packet> {
-        let id = self.base.id.to_string();
-        let name = "0.1-bytes-to-meta-packet-generator";
-        let (sender_to_parser, receiver_from_dispatcher, counter) =
-            bounded_with_debug(INNER_QUEUE_SIZE, name, &self.queue_debugger);
-        self.stats_collector.register_countable(
-            "queue",
-            Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag("module", name.to_string()),
-                StatsOption::Tag("index", id.clone()),
-            ],
-        );
-
-        let name = "0.2-packet-to-tagged-flow-generator";
-        let (sender_to_flow, receiver_from_parser, counter) =
-            bounded_with_debug(INNER_QUEUE_SIZE, name, &self.queue_debugger);
-        self.stats_collector.register_countable(
-            "queue",
-            Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag("module", name.to_string()),
-                StatsOption::Tag("index", id.clone()),
-            ],
-        );
-
-        let name = "0.3-packet-to-additional-pipeline";
-        let (sender_to_pipeline, receiver_from_flow, counter) =
-            bounded_with_debug(INNER_QUEUE_SIZE, name, &self.queue_debugger);
-        self.stats_collector.register_countable(
-            "queue",
-            Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag("module", name.to_string()),
-                StatsOption::Tag("index", id),
-            ],
-        );
+    fn setup_inner_thread_and_queue(&mut self) -> Sender<Vec<SpinLockOwnedReusable<Packet>>> {
+        let (sender_to_parser, receiver_from_dispatcher) = channel::<Vec<SpinLockOwnedReusable<Packet>>>();
+        let (sender_to_flow, receiver_from_parser) = channel::<Vec<SpinLockOwnedReusable<Packet>>>();
+        let (sender_to_pipeline, receiver_from_flow) = channel::<Vec<SpinLockOwnedReusable<Packet>>>();
 
         self.run_meta_packet_generator(receiver_from_dispatcher, sender_to_flow);
         self.run_tagged_flow_generator(receiver_from_parser, sender_to_pipeline);
         self.run_additional_packet_pipeline(receiver_from_flow);
         return sender_to_parser;
     }
+
+    // fn setup_inner_thread_and_queue(&mut self) -> DebugSender<SpinLockOwnedReusable<Packet>> {
+    //     let id = self.base.id.to_string();
+    //     let name = "0.1-bytes-to-meta-packet-generator";
+    //     let (sender_to_parser, receiver_from_dispatcher, counter) =
+    //         bounded_with_debug(INNER_QUEUE_SIZE, name, &self.queue_debugger);
+    //     self.stats_collector.register_countable(
+    //         "queue",
+    //         Countable::Owned(Box::new(counter)),
+    //         vec![
+    //             StatsOption::Tag("module", name.to_string()),
+    //             StatsOption::Tag("index", id.clone()),
+    //         ],
+    //     );
+
+    //     let name = "0.2-packet-to-tagged-flow-generator";
+    //     let (sender_to_flow, receiver_from_parser, counter) =
+    //         bounded_with_debug(INNER_QUEUE_SIZE, name, &self.queue_debugger);
+    //     self.stats_collector.register_countable(
+    //         "queue",
+    //         Countable::Owned(Box::new(counter)),
+    //         vec![
+    //             StatsOption::Tag("module", name.to_string()),
+    //             StatsOption::Tag("index", id.clone()),
+    //         ],
+    //     );
+
+    //     let name = "0.3-packet-to-additional-pipeline";
+    //     let (sender_to_pipeline, receiver_from_flow, counter) =
+    //         bounded_with_debug(INNER_QUEUE_SIZE, name, &self.queue_debugger);
+    //     self.stats_collector.register_countable(
+    //         "queue",
+    //         Countable::Owned(Box::new(counter)),
+    //         vec![
+    //             StatsOption::Tag("module", name.to_string()),
+    //             StatsOption::Tag("index", id),
+    //         ],
+    //     );
+
+    //     self.run_meta_packet_generator(receiver_from_dispatcher, sender_to_flow);
+    //     self.run_tagged_flow_generator(receiver_from_parser, sender_to_pipeline);
+    //     self.run_additional_packet_pipeline(receiver_from_flow);
+    //     return sender_to_parser;
+    // }
 
     pub(super) fn run(&mut self) {
         let sender_to_parser = self.setup_inner_thread_and_queue();
@@ -541,6 +641,8 @@ impl AnalyzerModeDispatcher {
         let mut prev_timestamp = get_timestamp(time_diff);
         let id = base.id;
         let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
+        let pool_raw_size = self.pool_raw_size;
+        let packet_pool = self.packet_pool.clone();
 
         while !base.terminated.load(Ordering::Relaxed) {
             if base.reset_whitelist.swap(false, Ordering::Relaxed) {
@@ -555,10 +657,14 @@ impl AnalyzerModeDispatcher {
                 &base.ntp_diff,
             );
             if recved.is_none() || batch.len() >= HANDLER_BATCH_SIZE {
-                if let Err(e) = sender_to_parser.send_all(&mut batch) {
-                    debug!("dispatcher {} sender failed: {:?}", id, e);
-                    batch.clear();
+                if let Err(e) = sender_to_parser.send(batch) {
+                    warn!("sender_to_parser sender error.");
                 }
+                batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
+                // if let Err(e) = sender_to_parser.send_all_without_debug(&mut batch) {
+                //     //debug!("dispatcher {} sender failed: {:?}", id, e);
+                //     batch.clear();
+                // }
             }
             if recved.is_none() {
                 if base.tap_interface_whitelist.next_sync(Duration::ZERO) {
@@ -575,13 +681,18 @@ impl AnalyzerModeDispatcher {
             base.counter
                 .rx_bytes
                 .fetch_add(packet.capture_length as u64, Ordering::Relaxed);
-
-            let info = Packet {
-                timestamp,
-                raw: packet.data.to_vec(),
-                original_length: packet.capture_length as u32,
-                raw_length: packet.data.len() as u32,
-            };
+            let mut info = packet_pool.pull_owned();
+            let raw_length = pool_raw_size.min(packet.data.len());
+            info.timestamp = timestamp;
+            info.original_length = packet.capture_length as u32;
+            info.raw_length = raw_length as u32;
+            info.raw.as_mut().unwrap()[..raw_length].clone_from_slice(&packet.data[..raw_length]);
+            // let info = Box::new(Packet {
+            //     timestamp,
+            //     raw: packet.data.to_vec(),
+            //     original_length: packet.capture_length as u32,
+            //     raw_length: packet.data.len() as u32,
+            // });
             batch.push(info);
         }
         if let Some(handler) = self.parser_thread_handler.take() {

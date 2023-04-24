@@ -34,6 +34,7 @@ use arc_swap::{
     ArcSwap,
 };
 use log::{debug, warn};
+use lockfree_object_pool::{SpinLockObjectPool, SpinLockOwnedReusable};
 
 use super::{
     app_table::AppTable,
@@ -62,7 +63,7 @@ use crate::{
         l7_protocol_log::{L7PerfCache, L7ProtocolParser, L7ProtocolParserInterface},
         lookup_key::LookupKey,
         meta_packet::{MetaPacket, MetaPacketTcpHeader},
-        tagged_flow::TaggedFlow,
+        tagged_flow::{TaggedFlow, self},
         tap_port::TapPort,
         Timestamp,
     },
@@ -102,9 +103,9 @@ pub struct FlowMap {
     total_flow: usize,
     time_set_slot_size: usize,
 
-    output_queue: DebugSender<Box<TaggedFlow>>,
+    output_queue: DebugSender<SpinLockOwnedReusable<TaggedFlow>>,
     out_log_queue: DebugSender<Box<MetaAppProto>>,
-    output_buffer: Vec<Box<TaggedFlow>>,
+    output_buffer: Vec<SpinLockOwnedReusable<TaggedFlow>>,
     protolog_buffer: Vec<Box<MetaAppProto>>,
     last_queue_flush: Duration,
     config: FlowAccess,
@@ -121,17 +122,19 @@ pub struct FlowMap {
     l7_protocol_checker: L7ProtocolChecker,
 
     time_key_buffer: Option<Vec<(u64, FlowMapKey)>>,
+    tagged_flow_pool: Arc<SpinLockObjectPool<TaggedFlow>>,
 }
 
 impl FlowMap {
     pub fn new(
         id: u32,
-        output_queue: DebugSender<Box<TaggedFlow>>,
+        output_queue: DebugSender<SpinLockOwnedReusable<TaggedFlow>>,
         policy_getter: PolicyGetter,
         app_proto_log_queue: DebugSender<Box<MetaAppProto>>,
         ntp_diff: Arc<AtomicI64>,
         config: FlowAccess,
         parse_config: LogParserAccess,
+        tagged_flow_pool: Arc<SpinLockObjectPool<TaggedFlow>>,
         #[cfg(target_os = "linux")] ebpf_config: Option<EbpfAccess>,
         packet_sequence_queue: Option<DebugSender<Box<PacketSequenceBlock>>>, // Enterprise Edition Feature: packet-sequence
         stats_collector: &stats::Collector,
@@ -213,6 +216,7 @@ impl FlowMap {
                     .collect(),
             ),
             time_key_buffer: None,
+            tagged_flow_pool,
         }
     }
 
@@ -1335,7 +1339,7 @@ impl FlowMap {
     fn flush_queue(&mut self, config: &FlowConfig, now: Duration) {
         if now - self.last_queue_flush > config.flush_interval {
             if self.output_buffer.len() > 0 {
-                if let Err(_) = self.output_queue.send_all(&mut self.output_buffer) {
+                if let Err(_) = self.output_queue.send_all_without_debug(&mut self.output_buffer) {
                     warn!(
                         "flow-map push tagged flows to queue failed because queue have terminated"
                     );
@@ -1346,7 +1350,9 @@ impl FlowMap {
         }
     }
 
-    fn push_to_flow_stats_queue(&mut self, config: &FlowConfig, mut tagged_flow: TaggedFlow) {
+    fn push_to_flow_stats_queue(&mut self, config: &FlowConfig, t: &TaggedFlow) {
+        let mut tagged_flow = self.tagged_flow_pool.pull_owned();
+        *tagged_flow = t.clone();
         // 流在未结束时应用日志会需要这个字段，为了避免重复计算，所以在流统计完成输出时赋值
         //
         // 目前仅虚拟流量会计算该统计位置
@@ -1376,9 +1382,9 @@ impl FlowMap {
                 stats.l7_protocol = L7Protocol::Other;
             }
         }
-        self.output_buffer.push(Box::new(tagged_flow));
+        self.output_buffer.push(tagged_flow);
         if self.output_buffer.len() >= QUEUE_BATCH_SIZE {
-            if let Err(_) = self.output_queue.send_all(&mut self.output_buffer) {
+            if let Err(_) = self.output_queue.send_all_without_debug(&mut self.output_buffer) {
                 warn!("flow-map push tagged flows to queue failed because queue have terminated");
                 self.output_buffer.clear();
             }
@@ -1443,7 +1449,7 @@ impl FlowMap {
             .fetch_sub(1, Ordering::Relaxed);
         self.stats_counter.closed.fetch_add(1, Ordering::Relaxed);
 
-        self.push_to_flow_stats_queue(config, node.tagged_flow);
+        self.push_to_flow_stats_queue(config, &node.tagged_flow);
     }
 
     // go 版本的copyAndOutput
@@ -1481,7 +1487,7 @@ impl FlowMap {
                     .map(|o| Box::new(o))
                 });
             }
-            self.push_to_flow_stats_queue(config, node.tagged_flow.clone());
+            self.push_to_flow_stats_queue(config, &node.tagged_flow);
             node.reset_flow_stat_info();
         }
     }
@@ -1835,7 +1841,7 @@ pub fn _reverse_meta_packet(packet: &mut MetaPacket) {
 pub fn _new_flow_map_and_receiver(
     trident_type: TridentType,
     flow_timeout: Option<FlowTimeout>,
-) -> (FlowMap, Receiver<Box<TaggedFlow>>) {
+) -> (FlowMap, Receiver<SpinLockOwnedReusable<TaggedFlow>>) {
     let (_, mut policy_getter) = Policy::new(1, 0, 1 << 10, false);
     policy_getter.disable();
     let queue_debugger = QueueDebugger::new();
@@ -1860,6 +1866,8 @@ pub fn _new_flow_map_and_receiver(
         },
         ..Default::default()
     };
+    let tagged_flow_pool = Arc::new(SpinLockObjectPool::<TaggedFlow>::new(
+        || Default::default(), |x| *x = Default::default()));
     // Any
     config.flow.l7_log_tap_types[0] = true;
     config.flow.trident_type = trident_type;
@@ -1876,6 +1884,7 @@ pub fn _new_flow_map_and_receiver(
         Map::new(current_config.clone(), |config| -> &LogParserConfig {
             &config.log_parser
         }),
+        tagged_flow_pool,
         #[cfg(target_os = "linux")]
         None,
         Some(packet_sequence_queue), // Enterprise Edition Feature: packet-sequence

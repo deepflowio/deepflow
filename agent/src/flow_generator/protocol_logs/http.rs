@@ -1021,12 +1021,26 @@ const HTTP_METHODS: [&'static str; 15] = [
 ];
 const RESPONSE_PREFIX: &'static str = "HTTP/";
 
+fn starts_with(buf: &[u8], prefix: &[u8]) -> bool {
+    if buf.len() < prefix.len() {
+        return false
+    }
+    for i in 0..prefix.len() {
+        unsafe {
+            if buf.get_unchecked(i) != prefix.get_unchecked(i) {
+                return false;
+            }
+        }
+    }
+    true
+}
+
 pub fn is_http_v1_payload(buf: &[u8]) -> bool {
-    if buf.starts_with(RESPONSE_PREFIX.as_bytes()) {
+    if starts_with(buf, RESPONSE_PREFIX.as_bytes()) {
         return true;
     }
     for m in HTTP_METHODS {
-        if buf.starts_with(m.as_bytes()) {
+        if starts_with(buf, m.as_bytes()) {
             return true;
         }
     }

@@ -40,6 +40,7 @@ use log::{info, warn};
 #[cfg(target_os = "linux")]
 use regex::Regex;
 use tokio::runtime::{Builder, Runtime};
+use lockfree_object_pool::{SpinLockObjectPool, SpinLockOwnedReusable};
 
 use crate::flow_generator::protocol_logs::SessionAggregator;
 use crate::{
@@ -62,7 +63,7 @@ use crate::{
     },
     debug::{ConstructDebugCtx, Debugger},
     dispatcher::{
-        self, recv_engine::bpf, BpfOptions, Dispatcher, DispatcherBuilder, DispatcherListener,
+        self, recv_engine::bpf, BpfOptions, Dispatcher, DispatcherBuilder, DispatcherListener, Packet,
     },
     exception::ExceptionHandler,
     flow_generator::{protocol_logs::BoxAppProtoLogsData, PacketSequenceParser},
@@ -984,6 +985,7 @@ pub struct AgentComponents {
     pub npb_bandwidth_watcher: Box<Arc<NpbBandwidthWatcher>>,
     pub npb_arp_table: Arc<NpbArpTable>,
     pub remote_log_config: RemoteLogConfig,
+    pub tagged_flow_pool: Arc<SpinLockObjectPool<TaggedFlow>>,
 
     max_memory: u64,
     tap_mode: TapMode,
@@ -996,7 +998,7 @@ impl AgentComponents {
     fn new_collector(
         id: usize,
         stats_collector: Arc<stats::Collector>,
-        flow_receiver: queue::Receiver<Box<TaggedFlow>>,
+        flow_receiver: queue::Receiver<SpinLockOwnedReusable<TaggedFlow>>,
         toa_info_sender: DebugSender<Box<(SocketAddr, SocketAddr)>>,
         l4_flow_aggr_sender: Option<DebugSender<BoxedTaggedFlow>>,
         metrics_sender: DebugSender<BoxedDocument>,
@@ -1514,6 +1516,11 @@ impl AgentComponents {
             exception_handler.clone(),
             false,
         );
+        let tagged_flow_pool = Arc::new(SpinLockObjectPool::<TaggedFlow>::new(
+            || Default::default(), |x| *x = Default::default()));
+        let capture_packet_size = config_handler.candidate_config.dispatcher.capture_packet_size as usize;
+        let packet_pool = Arc::new(SpinLockObjectPool::<Packet>::new(
+           move || Packet::with_capacity(capture_packet_size), |x| x.reset()));
 
         for (i, (src_interface, netns)) in src_interfaces_and_namespaces.into_iter().enumerate() {
             let (flow_sender, flow_receiver, counter) = queue::bounded_with_debug(
@@ -1584,7 +1591,8 @@ impl AgentComponents {
             packet_sequence_parsers.push(packet_sequence_parser);
             let (pcap_assembler, mini_packet_sender) = build_pcap_assembler(
                 // CE-AGENT always set pcap-assembler disabled
-                version_info.name != env!("AGENT_NAME"),
+                true,
+                //version_info.name != env!("AGENT_NAME"),
                 &yaml_config.pcap,
                 &stats_collector,
                 pcap_batch_sender.clone(),
@@ -1682,6 +1690,8 @@ impl AgentComponents {
                 .src_interface(src_interface.clone())
                 .netns(netns)
                 .trident_type(candidate_config.dispatcher.trident_type)
+                .tagged_flow_pool(tagged_flow_pool.clone())
+                .packet_pool(packet_pool.clone())
                 .queue_debugger(queue_debugger.clone());
 
             #[cfg(target_os = "linux")]
@@ -1831,6 +1841,7 @@ impl AgentComponents {
                 proc_event_sender,
                 &queue_debugger,
                 stats_collector.clone(),
+                tagged_flow_pool.clone(),
             )
             .ok();
             if let Some(collector) = &ebpf_collector {
@@ -1994,6 +2005,7 @@ impl AgentComponents {
             candidate_config.platform.epc_id,
             policy_getter,
             synchronizer.ntp_diff(),
+            tagged_flow_pool.clone(),
         );
 
         stats_collector.register_countable(
@@ -2075,6 +2087,7 @@ impl AgentComponents {
             npb_arp_table,
             remote_log_config,
             runtime,
+            tagged_flow_pool,
         })
     }
 

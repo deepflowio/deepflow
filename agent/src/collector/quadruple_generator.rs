@@ -28,6 +28,7 @@ use arc_swap::access::Access;
 use log::error;
 use log::{debug, info, warn};
 use thread::JoinHandle;
+use lockfree_object_pool::SpinLockOwnedReusable;
 
 use super::{acc_flow::AccumulatedFlow, consts::*, MetricsType};
 
@@ -505,7 +506,7 @@ impl SubQuadGen {
 
     pub fn inject_flow(
         &mut self,
-        tagged_flow: Arc<TaggedFlow>,
+        tagged_flow: Arc<SpinLockOwnedReusable<TaggedFlow>>,
         flow_meter: &FlowMeter,
         app_meter: &AppMeter,
         id_maps: &[HashMap<u16, u16>; 2],
@@ -571,11 +572,11 @@ impl SubQuadGen {
 
 pub struct QuadrupleGeneratorThread {
     id: usize,
-    input: Arc<Receiver<Box<TaggedFlow>>>,
+    input: Arc<Receiver<SpinLockOwnedReusable<TaggedFlow>>>,
     second_output: DebugSender<Box<AccumulatedFlow>>,
     minute_output: DebugSender<Box<AccumulatedFlow>>,
     toa_info_output: DebugSender<Box<(SocketAddr, SocketAddr)>>,
-    flow_output: Option<DebugSender<Arc<TaggedFlow>>>, // Send TaggedFlows to FlowAggr, equal to None when processing eBPF data.
+    flow_output: Option<DebugSender<Arc<SpinLockOwnedReusable<TaggedFlow>>>>, // Send TaggedFlows to FlowAggr, equal to None when processing eBPF data.
     connection_lru_capacity: usize,
     metrics_type: MetricsType,
     second_delay_seconds: u64,
@@ -597,11 +598,11 @@ pub struct QuadrupleGeneratorThread {
 impl QuadrupleGeneratorThread {
     pub fn new(
         id: usize,
-        input: Receiver<Box<TaggedFlow>>,
+        input: Receiver<SpinLockOwnedReusable<TaggedFlow>>,
         second_output: DebugSender<Box<AccumulatedFlow>>,
         minute_output: DebugSender<Box<AccumulatedFlow>>,
         toa_info_output: DebugSender<Box<(SocketAddr, SocketAddr)>>,
-        flow_output: Option<DebugSender<Arc<TaggedFlow>>>,
+        flow_output: Option<DebugSender<Arc<SpinLockOwnedReusable<TaggedFlow>>>>,
         connection_lru_capacity: usize,
         metrics_type: MetricsType,
         second_delay_seconds: u64,
@@ -731,7 +732,7 @@ impl QuadrupleGeneratorThread {
 
 pub struct QuadrupleGenerator {
     id: usize,
-    input: Arc<Receiver<Box<TaggedFlow>>>,
+    input: Arc<Receiver<SpinLockOwnedReusable<TaggedFlow>>>,
     name: String,
 
     second_quad_gen: Option<SubQuadGen>,
@@ -740,7 +741,7 @@ pub struct QuadrupleGenerator {
 
     key: QgKey,
     id_maps: [HashMap<u16, u16>; 2],
-    output_flow: Option<DebugSender<Arc<TaggedFlow>>>, // Send TaggedFlows to FlowAggr, equal to None when processing eBPF data.
+    output_flow: Option<DebugSender<Arc<SpinLockOwnedReusable<TaggedFlow>>>>, // Send TaggedFlows to FlowAggr, equal to None when processing eBPF data.
 
     l7_metrics_enabled: Arc<AtomicBool>,
     vtap_flow_1s_enabled: Arc<AtomicBool>,
@@ -761,12 +762,12 @@ pub struct QuadrupleGenerator {
 impl QuadrupleGenerator {
     pub fn new(
         id: usize,
-        input: Arc<Receiver<Box<TaggedFlow>>>,
+        input: Arc<Receiver<SpinLockOwnedReusable<TaggedFlow>>>,
         second_output: DebugSender<Box<AccumulatedFlow>>,
         minute_output: DebugSender<Box<AccumulatedFlow>>,
         toa_info_output: DebugSender<Box<(SocketAddr, SocketAddr)>>,
         proc_sync_enable: bool,
-        flow_output: Option<DebugSender<Arc<TaggedFlow>>>,
+        flow_output: Option<DebugSender<Arc<SpinLockOwnedReusable<TaggedFlow>>>>,
         connection_lru_capacity: usize,
         metrics_type: MetricsType,
         second_delay_seconds: u64,
@@ -896,7 +897,7 @@ impl QuadrupleGenerator {
         }
     }
 
-    fn handle(&mut self, tagged_flow: Option<Arc<TaggedFlow>>, time_in_second: Duration) {
+    fn handle(&mut self, tagged_flow: Option<Arc<SpinLockOwnedReusable<TaggedFlow>>>, time_in_second: Duration) {
         let mut second_inject = false;
         let mut minute_inject = false;
         if let Some(s) = self.second_quad_gen.as_mut() {
@@ -1137,7 +1138,7 @@ impl QuadrupleGenerator {
         (flow_meter, app_meter)
     }
 
-    fn set_key(key: &mut [u8], tagged_flow: &Arc<TaggedFlow>) {
+    fn set_key(key: &mut [u8], tagged_flow: &Arc<SpinLockOwnedReusable<TaggedFlow>>) {
         let src = &tagged_flow.flow.flow_metrics_peers[0];
         let dst = &tagged_flow.flow.flow_metrics_peers[1];
         let (tap_port, tap_port_type, tunnel_type) =
@@ -1184,7 +1185,7 @@ impl QuadrupleGenerator {
         }
     }
 
-    pub fn get_key(tagged_flow: &Arc<TaggedFlow>) -> QgKey {
+    pub fn get_key(tagged_flow: &Arc<SpinLockOwnedReusable<TaggedFlow>>) -> QgKey {
         if tagged_flow.flow.eth_type == EthernetType::Ipv6 {
             let mut key: [u8; IPV6_LRU_KEY_SIZE] = [0; IPV6_LRU_KEY_SIZE];
             Self::set_key(&mut key, tagged_flow);
@@ -1244,7 +1245,7 @@ impl QuadrupleGenerator {
                         }
                     }
                     if send_batch.len() > 0 {
-                        if let Err(_) = self.output_flow.as_mut().unwrap().send_all(&mut send_batch)
+                        if let Err(_) = self.output_flow.as_mut().unwrap().send_all_without_debug(&mut send_batch)
                         {
                             debug!("qg push TaggedFlow to l4_flow queue failed, maybe queue have terminated");
                             send_batch.clear();
