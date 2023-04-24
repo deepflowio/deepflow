@@ -1196,14 +1196,14 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, sub_view_url, sub_view_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     upper_threshold, lower_threshold, lcuuid)
-    values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server.monitor\",\"include_history\":\"true\",\"interval\":60,\"fill\":0,\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Avg(`metrics.load1`)*100/Avg(`metrics.cpu_num`) AS `load`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host_ip`\",\"METRICS\":[\"Avg(`metrics.load1`)*100/Avg(`metrics.cpu_num`) AS `load`\"]}]}",
+    values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server.monitor\",\"include_history\":\"true\",\"interval\":60,\"fill\":0,\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Min(`metrics.load1`*100/`metrics.cpu_num`) AS `load`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host_ip`\",\"METRICS\":[\"Min(`metrics.load1`*100/`metrics.cpu_num`) AS `load`\"]}]}",
     "[{\"METRIC_LABEL\":\"load\",\"return_field_description\":\"持续 5 分钟 (系统负载/CPU总数)\",\"unit\":\"%\"}]", "控制器系统负载高",  0, 1, 1, 21, 1, "", "", "load", 70, NULL, @lcuuid);
 
 set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, sub_view_url, sub_view_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     upper_threshold, lower_threshold, lcuuid)
-    values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server.monitor\",\"include_history\":\"true\",\"interval\":60,\"fill\":0,\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Avg(`metrics.load1`)*100/Avg(`metrics.cpu_num`) AS `load`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host_ip`\",\"METRICS\":[\"Avg(`metrics.load1`)*100/Avg(`metrics.cpu_num`) AS `load`\"]}]}",
+    values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server.monitor\",\"include_history\":\"true\",\"interval\":60,\"fill\":0,\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Min(`metrics.load1`*100/`metrics.cpu_num`) AS `load`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host_ip`\",\"METRICS\":[\"Min(`metrics.load1`*100/`metrics.cpu_num`) AS `load`\"]}]}",
     "[{\"METRIC_LABEL\":\"load\",\"return_field_description\":\"持续 5 分钟 (系统负载/CPU总数)\",\"unit\":\"%\"}]", "数据节点系统负载高",  0, 1, 1, 21, 1, "", "", "load", 70, NULL, @lcuuid);
 
 set @lcuuid = (select uuid());
@@ -1242,21 +1242,22 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, sub_view_url, sub_view_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     upper_threshold, lower_threshold, lcuuid)
-    values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_monitor\",\"include_history\":\"true\",\"interval\":60,\"fill\":0,\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Avg(`metrics.cpu_percent`)*100/Avg(`metrics.max_cpus`) AS `cpu_usage`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Avg(`metrics.cpu_percent`)*100/Avg(`metrics.max_cpus`) AS `cpu_usage`\"]}]}",
+    values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_monitor\",\"include_history\":\"true\",\"interval\":60,\"fill\":0,\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Min(`metrics.cpu_percent`*100/`metrics.max_cpus`) AS `cpu_usage`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Min(`metrics.cpu_percent`*100/`metrics.max_cpus`) AS `cpu_usage`\"]}]}",
     "[{\"METRIC_LABEL\":\"cpu_usage\",\"return_field_description\":\"持续 5 分钟 (CPU用量/阈值)\",\"unit\":\"%\"}]", "采集器 CPU 超限",  0, 1, 1, 21, 1, "", "", "cpu_usage", 70, NULL, @lcuuid);
 
 set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, sub_view_url, sub_view_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     upper_threshold, lower_threshold, lcuuid)
-    values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_monitor\",\"include_history\":\"true\",\"interval\":60,\"fill\":0,\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Last(`metrics.memory`)*1024*1024/Avg(`metrics.max_memory`) AS `used_bytes`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Last(`metrics.memory`)*1024*1024/Avg(`metrics.max_memory`) AS `used_bytes`\"]}]}",
+    values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_monitor\",\"include_history\":\"true\",\"interval\":60,\"fill\":0,\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Min(`metrics.memory`*1024*1024/`metrics.max_memory`) AS `used_bytes`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Min(`metrics.memory`*1024*1024/`metrics.max_memory`) AS `used_bytes`\"]}]}",
     "[{\"METRIC_LABEL\":\"used_bytes\",\"return_field_description\":\"持续 5 分钟 (内存用量/阈值)\",\"unit\":\"%\"}]", "采集器内存超限",  0, 1, 1, 21, 1, "", "", "used_bytes", 70, NULL, @lcuuid);
 
 set @lcuuid = (select uuid());
-INSERT INTO alarm_policy(sub_view_type, sub_view_url, sub_view_params, sub_view_metrics, name, level, state,
+INSERT INTO alarm_policy(user_id, sub_view_type, sub_view_url, sub_view_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field, agg,
     upper_threshold, lower_threshold, lcuuid)
-    values(1, "/v1/alarm/process-start/", "{}", "[{\"OPERATOR\": {\"return_field\": \"sysalarm_value\", \"return_field_description\": \"最近 1 分钟进程启动次数\", \"return_field_unit\": \" 次\"}}]", "进程启动",  0, 1, 1, 20, 1, "", "", "sysalarm_value", 1, 1, NULL, @lcuuid);
+    values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_monitor\",\"include_history\":\"true\",\"interval\":60,\"fill\":0,\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Spread(`metrics.create_time`) AS `process_start`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Spread(`metrics.create_time`) AS `process_start`\"]}]}",
+    "[{\"METRIC_LABEL\":\"process_start\",\"return_field_description\":\"最近 5 分钟进程启动时间变化\",\"unit\":\" 毫秒\"}]", "进程启动",  0, 1, 1, 20, 1, "", "", "process_start", 1, 1, NULL, @lcuuid);
 
 set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(sub_view_type, sub_view_url, sub_view_params, sub_view_metrics, name, level, state,
@@ -1304,7 +1305,7 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, sub_view_url, sub_view_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     upper_threshold, lower_threshold, lcuuid)
-    values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_monitor\",\"include_history\":\"true\",\"interval\":60,\"fill\":0,\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Avg(`metrics.sys_free_memory`)*100/Avg(`metrics.system_free_memory_limit`) AS `used_bytes`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Avg(`metrics.sys_free_memory`)*100/Avg(`metrics.system_free_memory_limit`) AS `used_bytes`\"]}]}",
+    values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_monitor\",\"include_history\":\"true\",\"interval\":60,\"fill\":0,\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Min(`metrics.sys_free_memory`*100/`metrics.system_free_memory_limit`) AS `used_bytes`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Min(`metrics.sys_free_memory`*100/`metrics.system_free_memory_limit`) AS `used_bytes`\"]}]}",
     "[{\"METRIC_LABEL\":\"used_bytes\",\"return_field_description\":\"持续 5 分钟 (系统空闲内存百分比/阈值)\",\"unit\":\"%\"}]", "采集器所在系统空闲内存低",  0, 1, 1, 21, 1, "", "", "used_bytes", NULL, 150, @lcuuid);
 
 set @lcuuid = (select uuid());
