@@ -401,10 +401,11 @@ type AdditionalResourceVInterface struct {
 }
 
 type AdditionalResourceCloudTag struct {
-	ResourceType string                  `json:"resource_type" yaml:"resource_type" binding:"required"`
-	ResourceName string                  `json:"resource_name" yaml:"resource_name" binding:"required"`
-	DomainUUID   string                  `json:"domain_uuid" yaml:"domain_uuid" binding:"required"`
-	Tags         []AdditionalResourceTag `json:"tags" yaml:"tags" binding:"required"`
+	ResourceType  string                  `json:"resource_type" yaml:"resource_type" binding:"required"`
+	ResourceName  string                  `json:"resource_name" yaml:"resource_name" binding:"required"`
+	DomainUUID    string                  `json:"domain_uuid" yaml:"domain_uuid" binding:"required"`
+	SubDomainUUID string                  `json:"subdomain_uuid" yaml:"subdomain_uuid"`
+	Tags          []AdditionalResourceTag `json:"tags" yaml:"tags" binding:"required"`
 }
 
 type AdditionalResourceTag struct {
@@ -436,12 +437,12 @@ type AdditionalResourceLBTargetServer struct {
 }
 
 type AdditionalResource struct {
-	AZs       []AdditionalResourceAZ       `json:"azs" yaml:"azs"`
-	VPCs      []AdditionalResourceVPC      `json:"vpcs" yaml:"vpcs"`
-	Subnets   []AdditionalResourceSubnet   `json:"subnets" yaml:"subnets"`
-	Hosts     []AdditionalResourceHost     `json:"hosts" yaml:"hosts"`
-	CHosts    []AdditionalResourceChost    `json:"chosts" yaml:"chosts"`
-	CloudTags []AdditionalResourceCloudTag `json:"cloud_tags" yaml:"cloud_tags"`
+	AZs       []AdditionalResourceAZ       `json:"azs" yaml:"azs" binding:"omitempty,dive"`
+	VPCs      []AdditionalResourceVPC      `json:"vpcs" yaml:"vpcs" binding:"omitempty,dive"`
+	Subnets   []AdditionalResourceSubnet   `json:"subnets" yaml:"subnets" binding:"omitempty,dive"`
+	Hosts     []AdditionalResourceHost     `json:"hosts" yaml:"hosts" binding:"omitempty,dive"`
+	CHosts    []AdditionalResourceChost    `json:"chosts" yaml:"chosts" binding:"omitempty,dive"`
+	CloudTags []AdditionalResourceCloudTag `json:"cloud_tags" yaml:"cloud_tags" binding:"omitempty,dive"`
 	LB        []AdditionalResourceLB       `json:"lbs" yaml:"lbs" binding:"omitempty,dive"`
 }
 
