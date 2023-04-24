@@ -481,10 +481,6 @@ impl Stash {
         inactive_ip_enabled: bool,
     ) {
         for ep in 0..2 {
-            // 不统计未知direction的数据
-            if directions[ep] == Direction::None {
-                continue;
-            }
             let is_active_host = if ep == 0 {
                 acc_flow.is_active_host0
             } else {
@@ -511,8 +507,11 @@ impl Stash {
                     );
                 }
             }
-            // 双端统计量：若某端direction已知，则以该direction（对应的tap-side）记录统计数据，最多记录两次
-            self.fill_edge_stats(acc_flow, directions[ep], inactive_ip_enabled);
+
+            if directions[ep] != Direction::None {
+                // 双端统计量：若某端direction已知，则以该direction（对应的tap-side）记录统计数据，最多记录两次
+                self.fill_edge_stats(acc_flow, directions[ep], inactive_ip_enabled);
+            }
         }
         // 双端统计量：若双端direction都未知，则以direction=0（对应tap-side=rest）记录一次统计数据
         if directions[0] == Direction::None && directions[1] == Direction::None {
@@ -549,7 +548,7 @@ impl Stash {
         let flow = &acc_flow.tagged_flow.flow;
         let flow_key = &flow.flow_key;
         let side = &flow.flow_metrics_peers[ep];
-        let is_active_host = if ep == 0 {
+        let is_active_host = if ep == FLOW_METRICS_PEER_SRC {
             acc_flow.is_active_host0
         } else {
             acc_flow.is_active_host1
@@ -660,6 +659,7 @@ impl Stash {
             if tagger.direction == Direction::ClientToServer
                 || tagger.direction == Direction::ServerToClient
                 || tagger.direction == Direction::LocalToLocal
+                || tagger.direction == Direction::None
                 || tagger.signal_source != SignalSource::Packet
             {
                 tagger.code |= Code::L7_PROTOCOL;
