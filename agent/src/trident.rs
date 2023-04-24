@@ -18,7 +18,7 @@ use std::env;
 use std::fmt;
 use std::mem;
 use std::net::SocketAddr;
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::path::{Path, PathBuf};
 use std::process;
 use std::sync::{
@@ -1352,7 +1352,7 @@ impl AgentComponents {
 
         // Sender/Collector
         info!(
-            "static analyzer ip: {} actual analyzer ip {}",
+            "static analyzer ip: '{}' actual analyzer ip '{}'",
             yaml_config.analyzer_ip, candidate_config.sender.dest_ip
         );
         let l4_flow_aggr_queue_name = "3-flowlog-to-collector-sender";
@@ -1441,8 +1441,12 @@ impl AgentComponents {
         let source_ip = match get_route_src_ip(&analyzer_ip) {
             Ok(ip) => ip,
             Err(e) => {
-                warn!("get route to {} failed: {:?}", &analyzer_ip, e);
-                Ipv4Addr::UNSPECIFIED.into()
+                warn!("get route to '{}' failed: {:?}", &analyzer_ip, e);
+                if ctrl_ip.is_ipv6() {
+                    Ipv6Addr::UNSPECIFIED.into()
+                } else {
+                    Ipv4Addr::UNSPECIFIED.into()
+                }
             }
         };
         let bpf_builder = bpf::Builder {
