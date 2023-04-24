@@ -816,6 +816,18 @@ static __inline enum message_type infer_dns_message(const char *buf,
 		return MSG_UNKNOWN;
 	}
 
+	// FIXME: Remove this code when the call chain can correctly handle the
+	// Go DNS case.
+	__u8 *queries_start = (__u8 *)(dns + 1);
+	conn_info->dns_q_type = 0;
+	for (int idx = 0; idx < 32; ++idx) {
+		if (queries_start[idx] == 0) {
+			conn_info->dns_q_type = __bpf_ntohs(
+				*(__u16 *)(queries_start + idx + 1));
+			break;
+		}
+	}
+
 	return (qr == 0) ? MSG_REQUEST : MSG_RESPONSE;
 }
 
