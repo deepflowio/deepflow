@@ -105,11 +105,7 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 			t.PodID1 = info1.PodID
 			t.PodClusterID1 = uint16(info1.PodClusterID)
 			if common.IsPodServiceIP(t.L3DeviceType1, t.PodID1, t.PodNodeID1) {
-				if t.Code&PortAddCode != 0 {
-					t.ServiceID1 = platformData.QueryService(t.PodID1, t.PodNodeID1, uint32(t.PodClusterID1), t.PodGroupID1, t.L3EpcID1, t.IsIPv6 == 1, t.IP1, t.IP61, t.Protocol, t.ServerPort)
-				} else {
-					t.ServiceID1 = platformData.QueryService(t.PodID1, t.PodNodeID1, uint32(t.PodClusterID1), t.PodGroupID1, t.L3EpcID1, t.IsIPv6 == 1, t.IP1, t.IP61, t.Protocol, 0)
-				}
+				t.ServiceID1 = platformData.QueryService(t.PodID1, t.PodNodeID1, uint32(t.PodClusterID1), t.PodGroupID1, t.L3EpcID1, t.IsIPv6 == 1, t.IP1, t.IP61, t.Protocol, t.ServerPort)
 			}
 			if info == nil {
 				var ip0 net.IP
@@ -165,11 +161,11 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 		t.PodID = info.PodID
 		t.PodClusterID = uint16(info.PodClusterID)
 		if common.IsPodServiceIP(t.L3DeviceType, t.PodID, t.PodNodeID) {
-			// 在0端, 有port无edge的数据计算serviceid，如:vtap_flow_port
-			if t.Code&PortAddCode != 0 && t.Code&EdgeCode == 0 {
+			//for a single-side table (vtap_xxx_port), if ServerPort is valid, it needs to match the serviceID
+			if t.ServerPort > 0 && t.Code&EdgeCode == 0 {
 				t.ServiceID = platformData.QueryService(t.PodID, t.PodNodeID, uint32(t.PodClusterID), t.PodGroupID, t.L3EpcID, t.IsIPv6 == 1, t.IP, t.IP6, t.Protocol, t.ServerPort)
+				// for the 0-side of the double-side table (vtap_xxx_edge_port) or serverPort is invalid, if it is PodServiceIP, then need to match the serviceID
 			} else if common.IsPodServiceIP(t.L3DeviceType, t.PodID, 0) { //On the 0 side, if it is just Pod Node, there is no need to match the service
-				// 有edge
 				t.ServiceID = platformData.QueryService(t.PodID, t.PodNodeID, uint32(t.PodClusterID), t.PodGroupID, t.L3EpcID, t.IsIPv6 == 1, t.IP, t.IP6, t.Protocol, 0)
 			}
 		}
