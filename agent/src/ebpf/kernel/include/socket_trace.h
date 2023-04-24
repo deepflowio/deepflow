@@ -149,6 +149,30 @@ struct conn_info_t {
 	__s32 correlation_id; // 目前用于kafka判断
 	enum traffic_direction prev_direction;
 	struct socket_info_t *socket_info_ptr; /* lookup __socket_info_map */
+
+	/*
+	The matching logic is:
+
+	DNS 1 req ---->
+	DNS 1 res <-------
+	DNS 2 req ----> ​
+	DNS 2 res <-------
+
+	and now it is
+
+	DNS 1 req ---->
+	DNS 2 req ---->
+	DNS 1 res <-------
+	DNS 2 res <-------
+
+	Such a scene affects the whole tracking
+
+	DNS 1 req is IPV6, DNS 2 req is IPV4
+	*/
+	// FIXME: Remove this field when the call chain can correctly handle
+	// the Go DNS case. Parse DNS save record type and ignore AAAA records
+	// in call chain trace
+	__u16 dns_q_type;
 };
 
 enum process_data_extra_source {

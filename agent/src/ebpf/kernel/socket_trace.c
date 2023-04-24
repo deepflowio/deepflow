@@ -1053,9 +1053,17 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 		socket_id = socket_info_ptr->uid;
 	}
 
+#define DNS_AAAA_TYPE_ID 0x1c
+	// FIXME: By default, the Go process continuously sends A record and
+	// AAAA record DNS request messages. In the current call chain tracking
+	// implementation, two consecutive request messages before receiving
+	// the response message will cause the link to be broken. Ignore the
+	// AAAA record To ensure that the call chain will not be broken.
 	if (conn_info->message_type != MSG_PRESTORE &&
 	    conn_info->message_type != MSG_RECONFIRM &&
-	    (timeout != 0 || extra->is_go_process == false))
+	    (timeout != 0 || extra->is_go_process == false) &&
+	    !(conn_info->protocol == PROTO_DNS &&
+	      conn_info->dns_q_type == DNS_AAAA_TYPE_ID))
 		trace_process(socket_info_ptr, conn_info, socket_id, pid_tgid,
 			      trace_info_ptr, trace_conf, trace_stats,
 			      &thread_trace_id, time_stamp, &trace_key);
