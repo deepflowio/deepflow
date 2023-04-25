@@ -294,7 +294,7 @@ impl Default for EbpfYamlConfig {
             socket_map_max_reclaim: 520000,
             kprobe_whitelist: EbpfKprobeWhitelist::default(),
             uprobe_proc_regexp: UprobeProcRegExp::default(),
-            go_tracing_timeout: 0,
+            go_tracing_timeout: 120,
             io_event_collect_mode: 1,
             io_event_minimal_duration: Duration::from_millis(1),
         }
