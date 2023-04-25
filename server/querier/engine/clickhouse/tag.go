@@ -99,7 +99,9 @@ func GetTagTranslator(name, alias, db, table string) (Statement, error) {
 			}
 			stmt = &SelectTag{Value: tagTranslator, Alias: selectTag}
 		} else if tagItem.TagTranslator != "" {
-			stmt = &SelectTag{Value: tagItem.TagTranslator, Alias: selectTag}
+			if name != "packet_batch" || table != "l4_packet" {
+				stmt = &SelectTag{Value: tagItem.TagTranslator, Alias: selectTag}
+			}
 		} else if alias != "" {
 			stmt = &SelectTag{Value: name, Alias: selectTag}
 		} else {
