@@ -384,6 +384,8 @@ impl<T: Sendable> UniformSender<T> {
                     }
                 }
                 self.counter.dropped.fetch_add(1, Ordering::Relaxed);
+                // reconnect after waiting 10 seconds to prevent frequent reconnection
+                thread::sleep(Duration::from_secs(10));
                 return;
             }
         }
