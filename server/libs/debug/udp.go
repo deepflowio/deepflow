@@ -23,6 +23,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	logging "github.com/op/go-logging"
@@ -84,7 +85,11 @@ func RecvFromServer(conn *net.UDPConn) (*bytes.Buffer, error) {
 }
 
 func SendToServer(module ModuleId, operate ModuleOperate, args *bytes.Buffer) (*net.UDPConn, *bytes.Buffer, error) {
-	conn, err := net.Dial("udp4", hostIp+":"+strconv.Itoa(hostPort))
+	ip := hostIp
+	if strings.Contains(ip, ":") {
+		ip = "[" + ip + "]"
+	}
+	conn, err := net.Dial("udp", ip+":"+strconv.Itoa(hostPort))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -171,10 +176,14 @@ func process(conn *net.UDPConn) {
 func debugListener() {
 	go func() {
 		addr := &net.UDPAddr{IP: net.ParseIP(hostIp), Port: hostPort}
-		listener, err := net.ListenUDP("udp4", addr)
+		listener, err := net.ListenUDP("udp", addr)
 		if err != nil {
-			log.Error(err)
-			return
+			log.Warning(err)
+			listener, err = net.ListenUDP("udp", &net.UDPAddr{Port: hostPort})
+			if err != nil {
+				log.Error(err)
+				return
+			}
 		}
 		defer listener.Close()
 		log.Infof("DebugListener <%v:%v>", hostIp, hostPort)
