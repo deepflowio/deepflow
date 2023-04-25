@@ -336,7 +336,7 @@ impl AppProtoLogsBaseInfo {
         self.head.msg_type = LogMessageType::Session;
 
         self.head.rrt = if self.end_time > self.start_time {
-            (self.end_time - self.start_time).as_micros() as u64
+            (self.end_time.as_micros() - self.start_time.as_micros()) as u64
         } else {
             0
         }
