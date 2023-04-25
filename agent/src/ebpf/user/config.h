@@ -81,7 +81,7 @@ enum {
 #define PROC_EVENT_DELAY_HANDLE_DEF     60
 
 // seconds
-#define GO_TRACING_TIMEOUT_DEFAULT      0
+#define GO_TRACING_TIMEOUT_DEFAULT      120
 
 #define SK_TRACER_NAME			"socket-trace"
 
