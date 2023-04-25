@@ -19,7 +19,7 @@ package ingesterctl
 import "github.com/deepflowio/deepflow/server/libs/debug"
 
 const (
-	DEBUG_LISTEN_IP   = "0.0.0.0"
+	DEBUG_LISTEN_IP   = "::"
 	DEBUG_LISTEN_PORT = 39527
 )
 
