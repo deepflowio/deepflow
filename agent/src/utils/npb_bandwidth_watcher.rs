@@ -87,7 +87,10 @@ impl Watcher {
         for remote in &ips {
             if let Ok(nic_name) = get_route_src_ip_interface_name(remote) {
                 *last_nic_name = nic_name.clone();
-                info!("Npb bandwidth watcher is monitoring {}.", &nic_name);
+                info!(
+                    "Npb bandwidth watcher is monitoring {} by {}.",
+                    &nic_name, remote
+                );
                 return nic_name;
             }
         }
@@ -118,7 +121,7 @@ impl Watcher {
             return Err(false);
         };
 
-        let tx_bps = if tx_bytes >= *last_tx_bytes {
+        let tx_bps = if tx_bytes >= *last_tx_bytes && *last_tx_bytes != 0 {
             ((tx_bytes - *last_tx_bytes) * 8) / interval
         } else {
             0
