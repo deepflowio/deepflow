@@ -88,7 +88,7 @@ func GetDataSources(filter map[string]interface{}) (resp []model.DataSource, err
 	return response, nil
 }
 
-func CreateDataSource(dataSourceCreate model.DataSourceCreate, cfg *config.ControllerConfig) (model.DataSource, error) {
+func CreateDataSource(dataSourceCreate *model.DataSourceCreate, cfg *config.ControllerConfig) (model.DataSource, error) {
 	var dataSource mysql.DataSource
 	var baseDataSource mysql.DataSource
 	var dataSourceCount int64

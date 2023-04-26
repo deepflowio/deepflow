@@ -433,9 +433,16 @@ impl FlowMap {
                 max_depth = nodes.len();
                 let ignore_l2_end = flow_config.ignore_l2_end;
                 let ignore_tor_mac = flow_config.ignore_tor_mac;
+                let ignore_vlan = flow_config.ignore_vlan;
                 let trident_type = flow_config.trident_type;
                 let index = nodes.iter().position(|node| {
-                    node.match_node(meta_packet, ignore_l2_end, ignore_tor_mac, trident_type)
+                    node.match_node(
+                        meta_packet,
+                        ignore_l2_end,
+                        ignore_tor_mac,
+                        ignore_vlan,
+                        trident_type,
+                    )
                 });
                 let Some(index) = index else {
                     // 没有找到严格匹配的 FlowNode，插入新 Node
@@ -1852,6 +1859,7 @@ pub fn _reverse_meta_packet(packet: &mut MetaPacket) {
 pub fn _new_flow_map_and_receiver(
     trident_type: TridentType,
     flow_timeout: Option<FlowTimeout>,
+    ignore_vlan: bool,
 ) -> (FlowMap, Receiver<Box<TaggedFlow>>) {
     let (_, mut policy_getter) = Policy::new(1, 0, 1 << 10, false);
     policy_getter.disable();
@@ -1867,6 +1875,7 @@ pub fn _new_flow_map_and_receiver(
             l4_performance_enabled: true,
             l7_metrics_enabled: true,
             app_proto_log_enabled: true,
+            ignore_vlan: ignore_vlan,
             flow_timeout: flow_timeout.unwrap_or(super::TcpTimeout::default().into()),
             ..(&RuntimeConfig::default()).into()
         },
@@ -1987,7 +1996,7 @@ mod tests {
     #[test]
     fn syn_rst() {
         let (mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess, None);
+            _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
         let mut packet0 = _new_meta_packet();
         flow_map.inject_meta_packet(&mut packet0);
         let mut packet1 = _new_meta_packet();
@@ -2016,7 +2025,7 @@ mod tests {
     #[test]
     fn syn_fin() {
         let (mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess, None);
+            _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
         let mut packet0 = _new_meta_packet();
         flow_map.inject_meta_packet(&mut packet0);
 
@@ -2049,7 +2058,7 @@ mod tests {
     #[test]
     fn platform_data() {
         let (mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess, None);
+            _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
         let mut packet1 = _new_meta_packet();
         packet1.tcp_data.seq = 1111;
         packet1.tcp_data.ack = 112;
@@ -2072,7 +2081,7 @@ mod tests {
     #[test]
     fn handshake_perf() {
         let (mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess, None);
+            _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
         let mut packet0 = _new_meta_packet();
         packet0.tcp_data.flags = TcpFlags::SYN;
         packet0.tcp_data.seq = 111;
@@ -2105,7 +2114,7 @@ mod tests {
 
     #[test]
     fn reverse_new_cycle() {
-        let (mut flow_map, _) = _new_flow_map_and_receiver(TridentType::TtProcess, None);
+        let (mut flow_map, _) = _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
         let npb_action = NpbAction::new(
             0,
             10,
@@ -2151,7 +2160,7 @@ mod tests {
     #[test]
     fn force_report() {
         let (mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess, None);
+            _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
         let mut packet0 = _new_meta_packet();
         flow_map.inject_meta_packet(&mut packet0);
 
@@ -2184,7 +2193,7 @@ mod tests {
     #[test]
     fn udp_arp_short_flow() {
         let (mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess, None);
+            _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
         let mut packet0 = _new_meta_packet();
         packet0.lookup_key.proto = IpProtocol::Udp;
         let flush_timestamp = packet0.lookup_key.timestamp;
@@ -2213,7 +2222,7 @@ mod tests {
     #[test]
     fn port_equal_tor() {
         let (mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtHyperVCompute, None);
+            _new_flow_map_and_receiver(TridentType::TtHyperVCompute, None, false);
         let mut packet0 = _new_meta_packet();
         packet0.lookup_key.tap_type = TapType::Cloud;
         flow_map.inject_meta_packet(&mut packet0);
@@ -2266,7 +2275,7 @@ mod tests {
 
     #[test]
     fn flow_state_machine() {
-        let (mut flow_map, _) = _new_flow_map_and_receiver(TridentType::TtProcess, None);
+        let (mut flow_map, _) = _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
 
         let config = (&RuntimeConfig::default()).into();
 
@@ -2329,7 +2338,7 @@ mod tests {
     #[test]
     fn double_fin_from_server() {
         let (mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess, None);
+            _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
         // SYN
         let mut packet0 = _new_meta_packet();
         packet0.lookup_key.timestamp = Duration::from_nanos(
@@ -2389,6 +2398,7 @@ mod tests {
                 max: Duration::from_secs(300),
                 min: Duration::ZERO,
             }),
+            false,
         );
 
         let capture = Capture::load_pcap("resources/test/flow_generator/ip-fragment.pcap", None);
@@ -2424,9 +2434,36 @@ mod tests {
     }
 
     #[test]
+    fn ignore_vlan() {
+        let (mut flow_map, output_queue_receiver) =
+            _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
+        let mut packet_0 = _new_meta_packet();
+        let mut packet_1 = _new_meta_packet();
+        packet_1.vlan = 100;
+        flow_map.inject_meta_packet(&mut packet_0);
+        flow_map.inject_meta_packet(&mut packet_1);
+        flow_map.inject_flush_ticker(packet_0.lookup_key.timestamp.add(Duration::from_secs(120)));
+        let tagged_flow = output_queue_receiver.recv(Some(TIME_UNIT)).unwrap();
+        assert_eq!(tagged_flow.flow.flow_metrics_peers[0].packet_count, 1);
+        let tagged_flow = output_queue_receiver.recv(Some(TIME_UNIT)).unwrap();
+        assert_eq!(tagged_flow.flow.flow_metrics_peers[0].packet_count, 1);
+
+        let (mut flow_map, output_queue_receiver) =
+            _new_flow_map_and_receiver(TridentType::TtProcess, None, true);
+        let mut packet_0 = _new_meta_packet();
+        let mut packet_1 = _new_meta_packet();
+        packet_1.vlan = 100;
+        flow_map.inject_meta_packet(&mut packet_0);
+        flow_map.inject_meta_packet(&mut packet_1);
+        flow_map.inject_flush_ticker(packet_0.lookup_key.timestamp.add(Duration::from_secs(120)));
+        let tagged_flow = output_queue_receiver.recv(Some(TIME_UNIT)).unwrap();
+        assert_eq!(tagged_flow.flow.flow_metrics_peers[0].packet_count, 2);
+    }
+
+    #[test]
     fn tcp_perf() {
         let (mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess, None);
+            _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
 
         let capture = Capture::load_pcap("resources/test/flow_generator/http.pcap", None);
         let packets = capture.as_meta_packets();
@@ -2461,7 +2498,7 @@ mod tests {
     #[test]
     fn tcp_syn_ack_zerowin() {
         let (mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess, None);
+            _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
 
         let capture = Capture::load_pcap(
             "resources/test/flow_generator/tcp-syn-ack-zerowin.pcap",

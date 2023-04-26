@@ -756,6 +756,7 @@ pub struct FlowGeneratorConfig {
 
     pub ignore_tor_mac: bool,
     pub ignore_l2_end: bool,
+    pub ignore_vlan: bool,
 }
 
 impl Default for FlowGeneratorConfig {
@@ -773,6 +774,7 @@ impl Default for FlowGeneratorConfig {
 
             ignore_tor_mac: false,
             ignore_l2_end: false,
+            ignore_vlan: false,
         }
     }
 }
