@@ -275,30 +275,23 @@ impl MysqlLog {
         self.info.context = mysql_string(payload);
     }
 
-    fn regular_extract<'a >(text:&'a str,re_txt:&'a str) -> Vec<&'a str>{
-        let re= Regex::new(re_txt).unwrap();
-        return re.captures_iter(text)
+
+    fn parse_comment(sql:&str) -> Vec<&str> {
+        // 匹配注释
+        // (?:#|--|\/*) 以--、#、/× 开头
+        // .* 任意数量字符
+        // (?:\*\/|$) 以*/ 或字符串末尾结尾
+        let re= Regex::new(r"(?:#|--|\/*).*(?:\*\/|$)").unwrap();
+        return re.captures_iter(sql)
             .filter_map(|c|c.get(0))
             .map(|m|m.as_str().trim())
             .collect();
-    }
-    fn parse_comment(sql:&str) -> Vec<&str> {
-        // 匹配单行注释#中的内容
-        let hashtag_comments=MysqlLog::regular_extract(sql,r"#(.*)\n");
-        let single_line_comments=MysqlLog::regular_extract(sql,r"--(.*)\n");
-        let multi_line_comments=MysqlLog::regular_extract(sql,r"/\*([^*]|[\r\n]|(\*+([^*/]|[\r\n])))*\*+/");
-        let all_comments: Vec<_> = single_line_comments
-            .into_iter()
-            .chain(hashtag_comments.into_iter())
-            .chain(multi_line_comments.into_iter())
-            .collect();
-        return all_comments;
     }
 
     fn parse_trace_id(&mut self){
         let all_comments= self::MysqlLog::parse_comment(self.info.context.as_str());
         let mut all_trace_ids: Vec<&str> = vec![];
-        let re = Regex::new(r"(?i)TRACEID:\s*([a-f\d]+)").unwrap();
+        let re = Regex::new(r"(?i)TRACE\s*(?i)ID\s*:\s*([a-f\d]+)").unwrap();
         for comment in all_comments {
             let trace_ids: Vec<&str> = re
                 .captures_iter(comment)
@@ -714,5 +707,58 @@ mod tests {
             }
         }
         mysql.perf_stats.unwrap()
+    }
+
+    #[test]
+    fn check_sql_parse(){
+        let sql_list = vec![
+            "SELECT * FROM orders WHERE status = 'pending' # TraceID: 2c2f8a47b754de66b45e1f0a7be8af1b",
+            "SELECT * FROM customers WHERE age > 30 -- TraceID: 2c2f8a47b754de66b45e1f0a7be8af1b",
+            "/* TraceID: 2c2f8a47b754de66b45e1f0a7be8af1b */\
+            SELECT * FROM products WHERE price < 10",
+            "SELECT /* TraceID: 2c2f8a47b754de66b45e1f0a7be8af1b */ *
+             FROM orders
+             WHERE customer_id IN (
+                 SELECT customer_id
+                 FROM customers
+                 WHERE age > 30
+             ) # This query returns orders for customers over 30",
+            "SELECT *
+             FROM products
+             WHERE category IN (
+                 SELECT category
+                 FROM categories
+                 WHERE -- This subquery filters out inactive categories
+                     is_active = 1 /* TraceID: 2c2f8a47b754de66b45e1f0a7be8af1b */
+             ) # This query returns products from active categories ",
+            "SELECT * FROM orders WHERE status = 'pending' # Trace ID: 2c2f8a47b754de66b45e1f0a7be8af1b",
+            "SELECT * FROM orders WHERE status = 'pending' # Traceid: 2c2f8a47b754de66b45e1f0a7be8af1b",
+            "SELECT * FROM orders WHERE status = 'pending' # traceid: 2c2f8a47b754de66b45e1f0a7be8af1b",
+            "SELECT * FROM orders WHERE status = 'pending' # Traceid:2c2f8a47b754de66b45e1f0a7be8af1b",
+        ];
+        for item in sql_list{
+            let mut mysql = MysqlLog{
+                info: MysqlInfo{
+                    msg_type: Default::default(),
+                    is_tls: false,
+                    protocol_version: 0,
+                    server_version: "".to_string(),
+                    server_thread_id: 0,
+                    command: 0,
+                    context: item.to_string(),
+                    response_code: 0,
+                    error_code: None,
+                    affected_rows: 0,
+                    error_message: "".to_string(),
+                    status: Default::default(),
+                    trace_id: "".to_string(),
+                    rrt: 0,
+                },
+                command: 0,
+                perf_stats: None,
+            };
+            mysql.parse_trace_id();
+            assert_eq!(mysql.info.trace_id,"2c2f8a47b754de66b45e1f0a7be8af1b","can not parse trace id")
+        }
     }
 }
