@@ -95,7 +95,9 @@ func (s *GrpcSession) Request(syncFunction SyncFunction) error {
 				s.synchronized = false
 				log.Warningf("Sync from server %s failed, reason: %s", s.ips[s.ipIndex], err.Error())
 			}
-			s.nextServer()
+			if err := s.nextServer(); err != nil {
+				return err
+			}
 			continue
 		}
 		if !s.synchronized {
