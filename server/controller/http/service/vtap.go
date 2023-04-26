@@ -24,6 +24,7 @@ import (
 	"strings"
 	"sync"
 
+	mapset "github.com/deckarep/golang-set"
 	"github.com/google/uuid"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
@@ -875,4 +876,84 @@ func BatchUpdateVtapTapMode(vtapUpdate *model.VtapUpdateTapMode) (interface{}, e
 	}
 
 	return nil, nil
+}
+
+// GetVTapPortsCount gets the number of virtual network cards covered by the deployed vtap,
+// and virtual network type is VIF_DEVICE_TYPE_VM or VIF_DEVICE_TYPE_POD.
+func GetVTapPortsCount() (int, error) {
+	var vtaps []mysql.VTap
+	if err := mysql.Db.Find(&vtaps).Error; err != nil {
+		return 0, err
+	}
+	vtapHostIPs, vtapNodeIPs, pubVTapServers := mapset.NewSet(), mapset.NewSet(), mapset.NewSet()
+	for _, vtap := range vtaps {
+		if utils.Find([]int{common.VTAP_TYPE_KVM, common.VTAP_TYPE_ESXI}, vtap.Type) {
+			vtapHostIPs.Add(vtap.LaunchServer)
+		} else if utils.Find([]int{common.VTAP_TYPE_POD_HOST, common.VTAP_TYPE_POD_VM}, vtap.Type) {
+			vtapNodeIPs.Add(vtap.LaunchServer)
+		} else if utils.Find([]int{common.VTAP_TYPE_WORKLOAD_V}, vtap.Type) {
+			pubVTapServers.Add(vtap.LaunchServer)
+		}
+	}
+
+	var vms []mysql.VM
+	if err := mysql.Db.Find(&vms).Error; err != nil {
+		return 0, err
+	}
+	vtapVMIDs := mapset.NewSet()
+	for _, vm := range vms {
+		if vtapHostIPs.Contains(vm.LaunchServer) {
+			vtapVMIDs.Add(vm.ID)
+		}
+	}
+
+	var podNodes []mysql.PodNode
+	if err := mysql.Db.Find(&podNodes).Error; err != nil {
+		return 0, err
+	}
+	podNodeIDs := mapset.NewSet()
+	for _, podNode := range podNodes {
+		if vtapNodeIPs.Contains(podNode.IP) {
+			podNodeIDs.Add(podNode.ID)
+		}
+	}
+
+	var pods []mysql.Pod
+	if err := mysql.Db.Find(&pods).Error; err != nil {
+		return 0, err
+	}
+	vtapPodIDs := mapset.NewSet()
+	for _, pod := range pods {
+		if podNodeIDs.Contains(pod.PodNodeID) {
+			vtapPodIDs.Add(pod.ID)
+		}
+	}
+
+	var lanIPs []mysql.LANIP
+	if err := mysql.Db.Find(&lanIPs).Error; err != nil {
+		return 0, err
+	}
+	pubVTapVIFs := mapset.NewSet()
+	for _, lanIP := range lanIPs {
+		if pubVTapServers.Contains(lanIP.IP) {
+			pubVTapVIFs.Add(lanIP.VInterfaceID)
+		}
+	}
+
+	vtapVifCount := 0
+	var vinterfaces []mysql.VInterface
+	if err := mysql.Db.Where("devicetype = ? or devicetype = ?", common.VIF_DEVICE_TYPE_VM, common.VIF_DEVICE_TYPE_POD).
+		Find(&vinterfaces).Error; err != nil {
+		return 0, err
+	}
+	for _, vif := range vinterfaces {
+		if vif.DeviceType == common.VIF_DEVICE_TYPE_VM && pubVTapVIFs.Contains(vif.ID) {
+			vtapVifCount++
+		}
+		if vif.DeviceType == common.VIF_DEVICE_TYPE_POD && vtapPodIDs.Contains(vif.DeviceID) {
+			vtapVifCount++
+		}
+	}
+
+	return vtapVifCount, nil
 }
