@@ -552,7 +552,7 @@ func (e *VTapEvent) noVTapResponse(in *api.SyncRequest) *api.SyncResponse {
 		}
 	}
 	return &api.SyncResponse{
-		Status: &STATUS_SUCCESS,
+		Status: &STATUS_AGENT_NOT_REGISTERED,
 		Config: configInfo,
 	}
 }
