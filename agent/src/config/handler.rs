@@ -296,6 +296,7 @@ pub struct FlowConfig {
     pub flow_timeout: FlowTimeout,
     pub ignore_tor_mac: bool,
     pub ignore_l2_end: bool,
+    pub ignore_vlan: bool,
 
     pub l7_metrics_enabled: bool,
     pub app_proto_log_enabled: bool,
@@ -345,6 +346,7 @@ impl From<&RuntimeConfig> for FlowConfig {
             }),
             ignore_tor_mac: flow_config.ignore_tor_mac,
             ignore_l2_end: flow_config.ignore_l2_end,
+            ignore_vlan: flow_config.ignore_vlan,
             l7_metrics_enabled: conf.l7_metrics_enabled,
             app_proto_log_enabled: conf.app_proto_log_enabled,
             l4_performance_enabled: conf.l4_performance_enabled,

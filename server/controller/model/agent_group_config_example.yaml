@@ -659,6 +659,12 @@ vtap_group_id: g-xxxxxx
     ##   exactly equal MAC addresses.
     #ignore-l2-end: false
 
+    ## Ignore VLAN when Generate Flow
+    ## Note: When the VLAN of the two-way traffic collected at the same location
+    ##   are asymmetrical, the traffic cannot be aggregated into a Flow. You can
+    ##   set this value at this time.
+    #ignore-vlan: false
+
     ## Timeouts for TCP State Machine
     ## Format: $number$time_unit
     ## Example: 1s, 2m, 10h
