@@ -57,12 +57,16 @@ func getDataSources(c *gin.Context) {
 func createDataSource(cfg *config.ControllerConfig) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		var err error
-		var dataSourceCreate model.DataSourceCreate
+		var dataSourceCreate *model.DataSourceCreate
 
 		// 参数校验
 		err = c.ShouldBindBodyWith(&dataSourceCreate, binding.JSON)
+		if dataSourceCreate != nil &&
+			!(dataSourceCreate.TsdbType == "app" || dataSourceCreate.TsdbType == "flow") {
+			BadRequestResponse(c, common.PARAMETER_ILLEGAL, "tsdb type only supports app and flow")
+		}
 		if err != nil {
-			BadRequestResponse(c, common.INVALID_POST_DATA, err.Error())
+			BadRequestResponse(c, common.PARAMETER_ILLEGAL, err.Error())
 			return
 		}
 
