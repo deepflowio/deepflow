@@ -1089,10 +1089,12 @@ func (v *VTapInfo) putChRegisterFisnish() {
 
 func (v *VTapInfo) StartRegister() {
 	if v.loadRegion() == "" {
+		log.Error("controller not found region")
 		return
 	}
 	if v.getDefaultVTapGroup() == "" {
 		if v.loadDefaultVTapGroup() == "" {
+			log.Error("controller not found default vtap group")
 			return
 		}
 	}
