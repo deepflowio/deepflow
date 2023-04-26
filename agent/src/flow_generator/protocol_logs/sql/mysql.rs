@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+use regex::Regex;
 use serde::Serialize;
 
 use super::super::{consts::*, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
@@ -30,7 +31,7 @@ use crate::{
     },
     flow_generator::{
         error::{Error, Result},
-        protocol_logs::pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response},
+        protocol_logs::pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response,TraceInfo},
     },
     utils::bytes,
 };
@@ -66,7 +67,8 @@ pub struct MysqlInfo {
     pub error_message: String,
     #[serde(rename = "response_status")]
     pub status: L7ResponseStatus,
-
+    #[serde(skip_serializing_if = "value_is_default")]
+    pub trace_id: String,
     rrt: u64,
 }
 
@@ -189,6 +191,10 @@ impl From<MysqlInfo> for L7ProtocolSendLog {
             ext_info: Some(ExtendedInfo {
                 ..Default::default()
             }),
+            trace_info: Some(TraceInfo {
+                trace_id: Some(f.trace_id),
+                ..Default::default()
+            }),
             ..Default::default()
         };
         return log;
@@ -269,6 +275,41 @@ impl MysqlLog {
         self.info.context = mysql_string(payload);
     }
 
+    fn regular_extract<'a >(text:&'a str,re_txt:&'a str) -> Vec<&'a str>{
+        let re= Regex::new(re_txt).unwrap();
+        return re.captures_iter(text)
+            .filter_map(|c|c.get(0))
+            .map(|m|m.as_str().trim())
+            .collect();
+    }
+    fn parse_comment(sql:&str) -> Vec<&str> {
+        // 匹配单行注释#中的内容
+        let hashtag_comments=MysqlLog::regular_extract(sql,r"#(.*)\n");
+        let single_line_comments=MysqlLog::regular_extract(sql,r"--(.*)\n");
+        let multi_line_comments=MysqlLog::regular_extract(sql,r"/\*([^*]|[\r\n]|(\*+([^*/]|[\r\n])))*\*+/");
+        let all_comments: Vec<_> = single_line_comments
+            .into_iter()
+            .chain(hashtag_comments.into_iter())
+            .chain(multi_line_comments.into_iter())
+            .collect();
+        return all_comments;
+    }
+
+    fn parse_trace_id(&mut self){
+        let all_comments= self::MysqlLog::parse_comment(self.info.context.as_str());
+        let mut all_trace_ids: Vec<&str> = vec![];
+        let re = Regex::new(r"(?i)TRACEID:\s*([a-f\d]+)").unwrap();
+        for comment in all_comments {
+            let trace_ids: Vec<&str> = re
+                .captures_iter(comment)
+                .map(|c| c.get(1).unwrap().as_str())
+                .collect();
+            all_trace_ids.extend(trace_ids);
+        }
+        if all_trace_ids.len() == 1 {
+            self.info.trace_id=all_trace_ids[0].to_string();
+        }
+    }
     fn greeting(&mut self, payload: &[u8]) -> Result<()> {
         let mut remain = payload.len();
         if remain < PROTOCOL_VERSION_LEN {
