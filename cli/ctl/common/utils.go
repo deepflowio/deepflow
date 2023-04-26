@@ -193,9 +193,9 @@ func PrettyPrint(data interface{}) {
 	fmt.Println(string(val))
 }
 
-func JsonFormat(jsonStr string) (string, error) {
+func JsonFormat(jsonByte []byte) (string, error) {
 	var str bytes.Buffer
-	err := json.Indent(&str, []byte(jsonStr), "", "    ")
+	err := json.Indent(&str, jsonByte, "", "    ")
 	if err != nil {
 		return "", err
 	}
@@ -242,8 +242,9 @@ func ConvertControllerAddrToPodIP(controllerIP string, controllerPort uint32) (s
 	var podIP string
 	for c := range resp.Get("DATA").MustArray() {
 		controller := resp.Get("DATA").GetIndex(c)
-		if controller.Get("IP").MustString() == controllerIP {
-			podIP = controller.Get("POD_IP").MustString()
+		pIP := controller.Get("POD_IP").MustString()
+		if controllerIP == pIP || controller.Get("IP").MustString() == controllerIP {
+			podIP = pIP
 			break
 		}
 	}

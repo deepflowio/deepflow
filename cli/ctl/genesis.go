@@ -145,7 +145,7 @@ func k8sInfo(cmd *cobra.Command, args []string, resType string) {
 		}
 		for i := range typeData.MustArray() {
 			tDataStr := typeData.GetIndex(i).MustString()
-			formatStr, err := common.JsonFormat(tDataStr)
+			formatStr, err := common.JsonFormat([]byte(tDataStr))
 			if err != nil {
 				fmt.Println("format json str faild: " + err.Error())
 				continue
@@ -156,7 +156,7 @@ func k8sInfo(cmd *cobra.Command, args []string, resType string) {
 	}
 	for _, v := range respData.MustMap() {
 		for _, item := range v.([]interface{}) {
-			formatStr, err := common.JsonFormat(item.(string))
+			formatStr, err := common.JsonFormat([]byte(item.(string)))
 			if err != nil {
 				fmt.Println("format json str faild: " + err.Error())
 				continue
