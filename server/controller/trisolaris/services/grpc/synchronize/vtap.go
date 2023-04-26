@@ -553,7 +553,13 @@ func (e *VTapEvent) noVTapResponse(in *api.SyncRequest) *api.SyncResponse {
 	}
 
 	// if vtap not exist & not k8s/agent sync, set vtap disable
-	configInfo.Enabled = proto.Bool(false)
+	if configInfo == nil {
+		configInfo = &api.Config{
+			Enabled: proto.Bool(false),
+		}
+	} else {
+		configInfo.Enabled = proto.Bool(false)
+	}
 
 	return &api.SyncResponse{
 		Status: &STATUS_SUCCESS,
