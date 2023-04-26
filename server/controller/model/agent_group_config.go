@@ -118,6 +118,7 @@ type FlowGeneratorConfig struct {
 
 	IgnoreTorMac *bool `yaml:"ignore-tor-mac,omitempty"`
 	IgnoreL2End  *bool `yaml:"ignore-l2-end,omitempty"`
+	IgnoreVlan   *bool `yaml:"ignore-vlan,omitempty"`
 }
 
 type EbpfUprobeProcessNameRegexsConfig struct {
