@@ -26,6 +26,7 @@ vendor:
 	sed -i '6,10s/^...//' vendor/${LIBS}/stats/pb/stats.proto
 	cd vendor/${MESSAGE} && go generate ./...
 	cd vendor/${LIBS} && go generate ./...
+	patch -p1 -d vendor/github.com/ClickHouse/clickhouse-go/v2/ < ../server/patch/clickhouse-go/write_improve.patch
 
 .PHONY: cli
 cli: vendor
