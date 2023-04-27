@@ -111,7 +111,7 @@ impl PacketHandler {
                 {
                     return;
                 }
-                let payload_offset = packet.header_type.min_header_size()
+                let payload_offset = packet.header_type.min_packet_size()
                     + packet.l2_l3_opt_size as usize
                     + packet.l4_opt_size as usize;
                 let policy = packet.policy.as_ref().unwrap();
