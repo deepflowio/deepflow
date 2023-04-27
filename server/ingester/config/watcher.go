@@ -104,7 +104,7 @@ func (w *Watcher) Run() {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		endpoint, err := w.GetMyClickhouseEndpoint()
+		endpoint, err := w.getMyExpectedClickhouseEndpoint()
 		if err != nil {
 			log.Warning(err)
 			continue
@@ -173,12 +173,19 @@ func (w *Watcher) getMyClickhouseEndpointInternal() (*Endpoint, error) {
 	return nil, fmt.Errorf("Can't find my clickhouse endpoint, myNodeName: %s myPodName: %s", w.myNodeName, w.myPodName)
 }
 
-func (w *Watcher) GetMyClickhouseEndpoint() (*Endpoint, error) {
+func (w *Watcher) getMyExpectedClickhouseEndpoint() (*Endpoint, error) {
 	if w.clickhouseIsExternal {
 		return w.getMyClickhouseEndpointExternal()
 	} else {
 		return w.getMyClickhouseEndpointInternal()
 	}
+}
+
+func (w *Watcher) GetMyClickhouseEndpoint() (Endpoint, error) {
+	if w.myClickhouseEndpoint.Host == "" && w.myClickhouseEndpoint.Port == 0 {
+		return Endpoint{}, fmt.Errorf("can't find my clickhouse endpoint now, pleate wait later...")
+	}
+	return w.myClickhouseEndpoint, nil
 }
 
 func (w *Watcher) GetClickhouseEndpointsWithoutMyself() ([]Endpoint, error) {
