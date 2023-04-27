@@ -679,6 +679,12 @@ vtap_group_id: g-xxxxxx
     ##   exactly equal MAC addresses.
     #ignore-l2-end: false
 
+    ## Ignore VLAN when Generate Flow
+    ## Note: When the VLAN of the two-way traffic collected at the same location
+    ##   are asymmetrical, the traffic cannot be aggregated into a Flow. You can
+    ##   set this value at this time.
+    #ignore-vlan: false
+
     ## Timeouts for TCP State Machine
     ## Format: $number$time_unit
     ## Example: 1s, 2m, 10h
@@ -770,6 +776,12 @@ vtap_group_id: g-xxxxxx
   ##   overhead of deepflow-agent.
   #bpf-disabled: false
 
+  ############
+  ## plugin ##
+  ############
+  ## wasm plugin need to load in agent
+  #wasm-plugins: []
+
   #################
   ## L7 Protocol ##
   #################
@@ -805,6 +817,7 @@ vtap_group_id: g-xxxxxx
   #- Kafka
   #- MQTT
   #- DNS
+  #- Custom ## custom protocol from plugin
 
   ## Application Protocol Port Numbers
   ## Default: 53 for DNS, 1-65535 for other Protocols.
@@ -813,6 +826,7 @@ vtap_group_id: g-xxxxxx
   #l7-protocol-ports:
     #"HTTP": "1-65535" # for both HTTP and HTTP_TLS
     #"HTTP2": "1-65535" # for HTTP2, HTTP2_TLS and gRPC
+    #"Wasm": "1-65535" # wasm plugins
     #"ProtobufRPC": "1-65535"
     #"SofaRPC": "1-65535"
     #"Dubbo": "1-65535"

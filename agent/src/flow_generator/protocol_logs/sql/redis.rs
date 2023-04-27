@@ -469,7 +469,6 @@ mod tests {
             let is_redis = redis.check_payload(payload, param);
 
             let _ = redis.parse_payload(payload, param);
-            println!("{:?}", redis.info);
             output.push_str(&format!("{} is_redis: {}\r\n", redis.info, is_redis));
         }
         output
