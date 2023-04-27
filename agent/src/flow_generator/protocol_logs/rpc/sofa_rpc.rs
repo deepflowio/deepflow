@@ -370,7 +370,7 @@ impl SofaRpcLog {
                 self.fill_with_trace_ctx(sofa_hdr.new_rpc_trace_context);
             }
         }
-        self.info.cal_rrt(param).map(|rrt| {
+        self.info.cal_rrt(param, None).map(|rrt| {
             self.info.rrt = rrt;
             self.perf_stats.as_mut().unwrap().update_rrt(rrt);
         });

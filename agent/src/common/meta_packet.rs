@@ -921,17 +921,15 @@ impl<'a> MetaPacket<'a> {
         otherwise use addr according to direction which may be wrong
     */
     pub fn get_redis_server_addr(&self) -> (IpAddr, u16) {
-        if self.signal_source != SignalSource::EBPF {
-            unreachable!()
-        }
-
         let (src, dst) = (
             (self.lookup_key.src_ip, self.lookup_key.src_port),
             (self.lookup_key.dst_ip, self.lookup_key.dst_port),
         );
 
         #[cfg(target_os = "linux")]
-        if (self.process_kname[..12]).eq(b"redis-server") {
+        if self.signal_source == SignalSource::EBPF
+            && (self.process_kname[..12]).eq(b"redis-server")
+        {
             return if self.lookup_key.l2_end_1 {
                 // if server side recv, dst addr is server addr
                 dst

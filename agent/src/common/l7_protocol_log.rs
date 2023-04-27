@@ -334,9 +334,23 @@ pub struct EbpfParam {
     pub process_kname: String,
 }
 
+pub struct KafkaInfoCache {
+    // kafka req
+    pub api_key: u16,
+    pub api_version: u16,
+
+    // kafka resp code
+    pub code: i16,
+}
+pub struct LogCache {
+    pub msg_type: LogMessageType,
+    pub time: u64,
+    pub kafka_info: Option<KafkaInfoCache>,
+}
+
 pub struct L7PerfCache {
     // lru cache previous rrt
-    pub rrt_cache: LruCache<u128, (LogMessageType, u64)>,
+    pub rrt_cache: LruCache<u128, LogCache>,
     // LruCache<flow_id, count>
     pub timeout_cache: LruCache<u64, usize>,
 }
