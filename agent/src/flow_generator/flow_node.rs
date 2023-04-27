@@ -165,7 +165,7 @@ impl FlowNode {
         meta_packet: &mut MetaPacket,
         ignore_l2_end: bool,
         ignore_tor_mac: bool,
-        ignore_vlan: bool,
+        ignore_idc_vlan: bool,
         trident_type: TridentType,
     ) -> bool {
         if meta_packet.signal_source == SignalSource::EBPF {
@@ -198,7 +198,10 @@ impl FlowNode {
             return false;
         }
 
-        if flow.vlan != meta_packet.vlan && !ignore_vlan {
+        if flow.vlan != meta_packet.vlan
+            && meta_lookup_key.tap_type != TapType::Cloud
+            && !ignore_idc_vlan
+        {
             return false;
         }
 

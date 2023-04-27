@@ -116,9 +116,9 @@ type FlowGeneratorConfig struct {
 	FlushInterval    *string `yaml:"flush-interval,omitempty"`
 	AggrQueueSize    *int    `yaml:"flow-aggr-queue-size,omitempty"`
 
-	IgnoreTorMac *bool `yaml:"ignore-tor-mac,omitempty"`
-	IgnoreL2End  *bool `yaml:"ignore-l2-end,omitempty"`
-	IgnoreVlan   *bool `yaml:"ignore-vlan,omitempty"`
+	IgnoreTorMac  *bool `yaml:"ignore-tor-mac,omitempty"`
+	IgnoreL2End   *bool `yaml:"ignore-l2-end,omitempty"`
+	IgnoreIdcVlan *bool `yaml:"ignore-idc-vlan,omitempty"`
 }
 
 type EbpfUprobeProcessNameRegexsConfig struct {
