@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -419,7 +419,10 @@ impl From<(&MetaPacket<'_>, Rc<RefCell<L7PerfCache>>, bool)> for ParseParam<'_> 
                 is_tls,
                 is_req_end: packet.is_request_end,
                 is_resp_end: packet.is_response_end,
+                #[cfg(target_os = "linux")]
                 process_kname: String::from_utf8_lossy(&packet.process_kname[..]).to_string(),
+                #[cfg(target_os = "windows")]
+                process_kname: "".into(),
             });
         }
 

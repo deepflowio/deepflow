@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -95,7 +95,9 @@ func (s *GrpcSession) Request(syncFunction SyncFunction) error {
 				s.synchronized = false
 				log.Warningf("Sync from server %s failed, reason: %s", s.ips[s.ipIndex], err.Error())
 			}
-			s.nextServer()
+			if err := s.nextServer(); err != nil {
+				return err
+			}
 			continue
 		}
 		if !s.synchronized {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -127,9 +127,9 @@ type FlowGeneratorConfig struct {
 	FlushInterval    *string `yaml:"flush-interval,omitempty"`
 	AggrQueueSize    *int    `yaml:"flow-aggr-queue-size,omitempty"`
 
-	IgnoreTorMac *bool `yaml:"ignore-tor-mac,omitempty"`
-	IgnoreL2End  *bool `yaml:"ignore-l2-end,omitempty"`
-	IgnoreVlan   *bool `yaml:"ignore-vlan,omitempty"`
+	IgnoreTorMac  *bool `yaml:"ignore-tor-mac,omitempty"`
+	IgnoreL2End   *bool `yaml:"ignore-l2-end,omitempty"`
+	IgnoreIdcVlan *bool `yaml:"ignore-idc-vlan,omitempty"`
 }
 
 type EbpfUprobeProcessNameRegexsConfig struct {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -756,7 +756,7 @@ pub struct FlowGeneratorConfig {
 
     pub ignore_tor_mac: bool,
     pub ignore_l2_end: bool,
-    pub ignore_vlan: bool,
+    pub ignore_idc_vlan: bool,
 }
 
 impl Default for FlowGeneratorConfig {
@@ -774,7 +774,7 @@ impl Default for FlowGeneratorConfig {
 
             ignore_tor_mac: false,
             ignore_l2_end: false,
-            ignore_vlan: false,
+            ignore_idc_vlan: false,
         }
     }
 }

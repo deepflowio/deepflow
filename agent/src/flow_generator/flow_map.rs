@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -433,14 +433,14 @@ impl FlowMap {
                 max_depth = nodes.len();
                 let ignore_l2_end = flow_config.ignore_l2_end;
                 let ignore_tor_mac = flow_config.ignore_tor_mac;
-                let ignore_vlan = flow_config.ignore_vlan;
+                let ignore_idc_vlan = flow_config.ignore_idc_vlan;
                 let trident_type = flow_config.trident_type;
                 let index = nodes.iter().position(|node| {
                     node.match_node(
                         meta_packet,
                         ignore_l2_end,
                         ignore_tor_mac,
-                        ignore_vlan,
+                        ignore_idc_vlan,
                         trident_type,
                     )
                 });
@@ -1859,7 +1859,7 @@ pub fn _reverse_meta_packet(packet: &mut MetaPacket) {
 pub fn _new_flow_map_and_receiver(
     trident_type: TridentType,
     flow_timeout: Option<FlowTimeout>,
-    ignore_vlan: bool,
+    ignore_idc_vlan: bool,
 ) -> (FlowMap, Receiver<Box<TaggedFlow>>) {
     let (_, mut policy_getter) = Policy::new(1, 0, 1 << 10, false);
     policy_getter.disable();
@@ -1875,7 +1875,7 @@ pub fn _new_flow_map_and_receiver(
             l4_performance_enabled: true,
             l7_metrics_enabled: true,
             app_proto_log_enabled: true,
-            ignore_vlan: ignore_vlan,
+            ignore_idc_vlan: ignore_idc_vlan,
             flow_timeout: flow_timeout.unwrap_or(super::TcpTimeout::default().into()),
             ..(&RuntimeConfig::default()).into()
         },

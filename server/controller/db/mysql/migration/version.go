@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,5 +18,5 @@ package migration
 
 const (
 	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "6.2.1.35"
+	DB_VERSION_EXPECTED = "6.2.1.36"
 )
