@@ -682,8 +682,8 @@ vtap_group_id: g-xxxxxx
     ## Ignore VLAN when Generate Flow
     ## Note: When the VLAN of the two-way traffic collected at the same location
     ##   are asymmetrical, the traffic cannot be aggregated into a Flow. You can
-    ##   set this value at this time.
-    #ignore-vlan: false
+    ##   set this value at this time. Only valid for IDC (not Cloud) traffic.
+    #ignore-idc-vlan: false
 
     ## Timeouts for TCP State Machine
     ## Format: $number$time_unit
