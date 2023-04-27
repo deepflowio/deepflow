@@ -1,8 +1,7 @@
 on: 
   push:
     branches:
-      - main
-      - 'feature-**'
+      - v6.2
     paths:
       - 'agent/**'
       - 'message/**'
@@ -122,13 +121,13 @@ jobs:
           ossutil cp -rf agent/output/target/release/deepflow-agent-ctl oss://deepflow-ce/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/deepflow-agent-ctl
           ossutil cp -rf agent/bin-package/deepflow-agent.tar.gz  oss://deepflow-ce/bin/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/deepflow-agent.tar.gz
           
-      - name: upload agent stable artifacts
+      - name: upload agent v6.2.6 artifacts
         if: "startsWith(github.ref, 'refs/tags/')"
         run: |
-          ossutil cp -rf agent/artifacts-rpm.zip oss://deepflow-ce/rpm/agent/stable/linux/amd64/deepflow-agent-rpm.zip
-          ossutil cp -rf agent/artifacts-deb.zip oss://deepflow-ce/deb/agent/stable/linux/amd64/deepflow-agent-deb.zip
-          ossutil cp -rf agent/output/target/release/deepflow-agent-ctl oss://deepflow-ce/bin/ctl/stable/linux/amd64/deepflow-agent-ctl
-          ossutil cp -rf agent/bin-package/deepflow-agent.tar.gz  oss://deepflow-ce/bin/agent/stable/linux/amd64/deepflow-agent.tar.gz
+          ossutil cp -rf agent/artifacts-rpm.zip oss://deepflow-ce/rpm/agent/v6.2.6/linux/amd64/deepflow-agent-rpm.zip
+          ossutil cp -rf agent/artifacts-deb.zip oss://deepflow-ce/deb/agent/v6.2.6/linux/amd64/deepflow-agent-deb.zip
+          ossutil cp -rf agent/output/target/release/deepflow-agent-ctl oss://deepflow-ce/bin/ctl/v6.2.6/linux/amd64/deepflow-agent-ctl
+          ossutil cp -rf agent/bin-package/deepflow-agent.tar.gz  oss://deepflow-ce/bin/agent/v6.2.6/linux/amd64/deepflow-agent.tar.gz
   build_agent_arm64:
     name: build agent arm64
     runs-on: "cirun-aws-arm64-32c--${{ github.run_id }}"
@@ -350,13 +349,13 @@ jobs:
           ossutil cp -rf agent/output/target/release/deepflow-agent-ctl oss://deepflow-ce/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/linux/arm64/deepflow-agent-ctl
           ossutil cp -rf agent/bin-package/deepflow-agent.tar.gz  oss://deepflow-ce/bin/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/arm64/deepflow-agent.tar.gz
           
-      - name: upload agent stable artifacts
+      - name: upload agent v6.2.6 artifacts
         if: "startsWith(github.ref, 'refs/tags/')"
         run: |
-          ossutil cp -rf agent/artifacts-rpm.zip oss://deepflow-ce/rpm/agent/stable/linux/arm64/deepflow-agent-rpm.zip
-          ossutil cp -rf agent/artifacts-deb.zip oss://deepflow-ce/deb/agent/stable/linux/arm64/deepflow-agent-deb.zip
-          ossutil cp -rf agent/output/target/release/deepflow-agent-ctl oss://deepflow-ce/bin/ctl/stable/linux/arm64/deepflow-agent-ctl
-          ossutil cp -rf agent/bin-package/deepflow-agent.tar.gz  oss://deepflow-ce/bin/agent/stable/linux/arm64/deepflow-agent.tar.gz
+          ossutil cp -rf agent/artifacts-rpm.zip oss://deepflow-ce/rpm/agent/v6.2.6/linux/arm64/deepflow-agent-rpm.zip
+          ossutil cp -rf agent/artifacts-deb.zip oss://deepflow-ce/deb/agent/v6.2.6/linux/arm64/deepflow-agent-deb.zip
+          ossutil cp -rf agent/output/target/release/deepflow-agent-ctl oss://deepflow-ce/bin/ctl/v6.2.6/linux/arm64/deepflow-agent-ctl
+          ossutil cp -rf agent/bin-package/deepflow-agent.tar.gz  oss://deepflow-ce/bin/agent/v6.2.6/linux/arm64/deepflow-agent.tar.gz
   build_agent_static_link:
     name: build agent static link
     runs-on: "cirun-aws-amd64-32c--${{ github.run_id }}"
@@ -445,11 +444,11 @@ jobs:
           ossutil cp -rf agent/artifacts-deb.zip oss://deepflow-ce/deb/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/static-link/amd64/deepflow-agent-deb.zip
           ossutil cp -rf agent/bin-package/deepflow-agent.tar.gz  oss://deepflow-ce/bin/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/static-link/amd64/deepflow-agent.tar.gz
           
-      - name: upload agent stable artifacts
+      - name: upload agent v6.2.6 artifacts
         run: |
-          ossutil cp -rf agent/artifacts-rpm.zip oss://deepflow-ce/rpm/agent/stable/linux/static-link/amd64/deepflow-agent-rpm.zip
-          ossutil cp -rf agent/artifacts-deb.zip oss://deepflow-ce/deb/agent/stable/linux/static-link/amd64/deepflow-agent-deb.zip
-          ossutil cp -rf agent/bin-package/deepflow-agent.tar.gz  oss://deepflow-ce/bin/agent/stable/linux/static-link/amd64/deepflow-agent.tar.gz
+          ossutil cp -rf agent/artifacts-rpm.zip oss://deepflow-ce/rpm/agent/v6.2.6/linux/static-link/amd64/deepflow-agent-rpm.zip
+          ossutil cp -rf agent/artifacts-deb.zip oss://deepflow-ce/deb/agent/v6.2.6/linux/static-link/amd64/deepflow-agent-deb.zip
+          ossutil cp -rf agent/bin-package/deepflow-agent.tar.gz  oss://deepflow-ce/bin/agent/v6.2.6/linux/static-link/amd64/deepflow-agent.tar.gz
   build_agent_arm64_static_link:
     name: build agent arm64 static link 
     runs-on: "cirun-aws-arm64-32c--${{ github.run_id }}"
@@ -574,8 +573,8 @@ jobs:
           ossutil cp -rf agent/artifacts-deb.zip oss://deepflow-ce/deb/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/static-link/arm64/deepflow-agent-deb.zip
           ossutil cp -rf agent/bin-package/deepflow-agent.tar.gz  oss://deepflow-ce/bin/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/static-link/arm64/deepflow-agent.tar.gz
           
-      - name: upload agent stable artifacts
+      - name: upload agent v6.2.6 artifacts
         run: |
-          ossutil cp -rf agent/artifacts-rpm.zip oss://deepflow-ce/rpm/agent/stable/linux/static-link/arm64/deepflow-agent-rpm.zip
-          ossutil cp -rf agent/artifacts-deb.zip oss://deepflow-ce/deb/agent/stable/linux/static-link/arm64/deepflow-agent-deb.zip
-          ossutil cp -rf agent/bin-package/deepflow-agent.tar.gz  oss://deepflow-ce/bin/agent/stable/linux/static-link/arm64/deepflow-agent.tar.gz
+          ossutil cp -rf agent/artifacts-rpm.zip oss://deepflow-ce/rpm/agent/v6.2.6/linux/static-link/arm64/deepflow-agent-rpm.zip
+          ossutil cp -rf agent/artifacts-deb.zip oss://deepflow-ce/deb/agent/v6.2.6/linux/static-link/arm64/deepflow-agent-deb.zip
+          ossutil cp -rf agent/bin-package/deepflow-agent.tar.gz  oss://deepflow-ce/bin/agent/v6.2.6/linux/static-link/arm64/deepflow-agent.tar.gz
