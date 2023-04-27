@@ -3486,6 +3486,26 @@ entries:
     - https://github.com/deepflowys/deepflow-charts/releases/download/deepflow-agent-6.2.102/deepflow-agent-6.2.102.tgz
     version: 6.2.102
   - apiVersion: v2
+    appVersion: 6.2.6
+    created: "2023-04-27T06:43:47.761060346Z"
+    description: An automated observability platform for cloud-native developers.
+    digest: 530e0030797ea675cf26108971b8f6eb1042173a3f81ea1cfe86539b745024d2
+    home: https://github.com/deepflowys/deepflow
+    icon: https://raw.githubusercontent.com/deepflowys/deepflow-charts/main/deepflow.svg
+    keywords:
+    - deepflow
+    kubeVersion: '>=1.16.0-0'
+    maintainers:
+    - name: deepflow
+      url: https://github.com/deepflowys/deepflow
+    name: deepflow-agent
+    sources:
+    - https://github.com/deepflowys/deepflow
+    type: application
+    urls:
+    - https://github.com/deepflowio/deepflow-charts/releases/download/deepflow-agent-6.2.6/deepflow-agent-6.2.6.tgz
+    version: 6.2.6
+  - apiVersion: v2
     appVersion: 6.2.0
     created: "2023-01-18T09:59:26.046399829Z"
     description: An automated observability platform for cloud-native developers.
@@ -4842,4 +4862,4 @@ entries:
     urls:
     - https://github.com/deepflowys/deepflow-charts/releases/download/deepflow-agent-0.1.030/deepflow-agent-0.1.030.tgz
     version: 0.1.030
-generated: "2023-04-21T06:05:14.066750497Z"
+generated: "2023-04-27T06:43:47.758994864Z"
