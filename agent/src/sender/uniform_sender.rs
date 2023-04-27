@@ -23,13 +23,13 @@ use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
     Arc, Weak,
 };
-use std::thread;
+use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 use arc_swap::access::Access;
 use log::{debug, error, info, warn};
 use public::sender::{SendMessageType, Sendable};
-use thread::JoinHandle;
+use rand::{thread_rng, RngCore};
 
 use super::{get_sender_id, QUEUE_BATCH_SIZE};
 
@@ -399,8 +399,8 @@ impl<T: Sendable> UniformSender<T> {
                     }
                 }
                 self.counter.dropped.fetch_add(1, Ordering::Relaxed);
-                // reconnect after waiting 10 seconds to prevent frequent reconnection
-                thread::sleep(Duration::from_secs(10));
+                // reconnect after waiting 10 seconds + random 5 seconds to prevent frequent reconnection
+                thread::sleep(Duration::from_secs(10 + (thread_rng().next_u64() % 5)));
                 return;
             }
         }
