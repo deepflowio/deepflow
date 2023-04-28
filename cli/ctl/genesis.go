@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -145,7 +145,7 @@ func k8sInfo(cmd *cobra.Command, args []string, resType string) {
 		}
 		for i := range typeData.MustArray() {
 			tDataStr := typeData.GetIndex(i).MustString()
-			formatStr, err := common.JsonFormat(tDataStr)
+			formatStr, err := common.JsonFormat([]byte(tDataStr))
 			if err != nil {
 				fmt.Println("format json str faild: " + err.Error())
 				continue
@@ -156,7 +156,7 @@ func k8sInfo(cmd *cobra.Command, args []string, resType string) {
 	}
 	for _, v := range respData.MustMap() {
 		for _, item := range v.([]interface{}) {
-			formatStr, err := common.JsonFormat(item.(string))
+			formatStr, err := common.JsonFormat([]byte(item.(string)))
 			if err != nil {
 				fmt.Println("format json str faild: " + err.Error())
 				continue

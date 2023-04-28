@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -99,7 +99,9 @@ func GetTagTranslator(name, alias, db, table string) (Statement, error) {
 			}
 			stmt = &SelectTag{Value: tagTranslator, Alias: selectTag}
 		} else if tagItem.TagTranslator != "" {
-			stmt = &SelectTag{Value: tagItem.TagTranslator, Alias: selectTag}
+			if name != "packet_batch" || table != "l4_packet" {
+				stmt = &SelectTag{Value: tagItem.TagTranslator, Alias: selectTag}
+			}
 		} else if alias != "" {
 			stmt = &SelectTag{Value: name, Alias: selectTag}
 		} else {

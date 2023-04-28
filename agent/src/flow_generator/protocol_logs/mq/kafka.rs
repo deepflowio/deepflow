@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ use crate::{
         enums::IpProtocol,
         flow::{L7PerfStats, L7Protocol, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{KafkaInfoCache, L7ProtocolParserInterface, ParseParam},
     },
     flow_generator::{
         error::{Error, Result},
@@ -62,11 +62,6 @@ pub struct KafkaInfo {
     #[serde(rename = "response_code", skip_serializing_if = "Option::is_none")]
     pub status_code: Option<i32>,
 
-    // the first 14 byte of resp_data, use to parse error code
-    // only fetch and api version > 7 can get the correct err code
-    #[serde(skip)]
-    pub resp_data: Option<[u8; 14]>,
-
     rrt: u64,
 }
 
@@ -102,37 +97,11 @@ impl KafkaInfo {
         if self.resp_msg_size.is_none() {
             self.resp_msg_size = other.resp_msg_size;
         }
-        /*
-            reference:  https://kafka.apache.org/protocol.html#protocol_messages
-
-            only fetch api and api version > 7 parse the error code
-
-            Fetch Response (Version: 7) => throttle_time_ms error_code session_id [responses]
-                throttle_time_ms => INT32
-                error_code => INT16
-                ...
-        */
-        match other.msg_type {
-            LogMessageType::Response if self.api_key == KAFKA_FETCH && self.api_version >= 7 => {
-                if let Some(d) = other.resp_data {
-                    self.set_status_code(read_i16_be(&d[12..]) as i32)
-                }
-            }
-            LogMessageType::Request if other.api_key == KAFKA_FETCH && other.api_version >= 7 => {
-                if let Some(d) = self.resp_data {
-                    self.set_status_code(read_i16_be(&d[12..]) as i32)
-                }
-            }
-            _ => {}
+        if other.status != L7ResponseStatus::default() {
+            self.status = other.status;
         }
-    }
-
-    pub fn set_status_code(&mut self, code: i32) {
-        self.status_code = Some(code);
-        if code == 0 {
-            self.status = L7ResponseStatus::Ok;
-        } else {
-            self.status = L7ResponseStatus::ServerError;
+        if other.status_code != None {
+            self.status_code = other.status_code;
         }
     }
 
@@ -267,10 +236,48 @@ impl L7ProtocolParserInterface for KafkaLog {
             self.perf_stats = Some(L7PerfStats::default())
         };
         Self::parse(self, payload, param.l4_protocol, param.direction)?;
-        self.info.cal_rrt(param).map(|rrt| {
-            self.info.rrt = rrt;
-            self.perf_stats.as_mut().unwrap().update_rrt(rrt);
-        });
+
+        // handle kafka status code
+        {
+            let mut log_cache = param.l7_perf_cache.borrow_mut();
+            if let Some(previous) = log_cache.rrt_cache.get(&self.info.cal_cache_key(param)) {
+                match (previous.msg_type, self.info.msg_type) {
+                    (LogMessageType::Request, LogMessageType::Response) => {
+                        if let Some(req) = previous.kafka_info.as_ref() {
+                            self.set_status_code(
+                                req.api_key,
+                                req.api_version,
+                                read_i16_be(&payload[12..]),
+                            )
+                        }
+                    }
+                    (LogMessageType::Response, LogMessageType::Request) => {
+                        if let Some(resp) = previous.kafka_info.as_ref() {
+                            self.set_status_code(
+                                self.info.api_key,
+                                self.info.api_version,
+                                resp.code,
+                            )
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        self.info
+            .cal_rrt(
+                param,
+                Some(KafkaInfoCache {
+                    api_key: self.info.api_key,
+                    api_version: self.info.api_version,
+                    code: read_i16_be(&payload[12..]),
+                }),
+            )
+            .map(|rrt| {
+                self.info.rrt = rrt;
+                self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+            });
         Ok(vec![L7ProtocolInfo::KafkaInfo(self.info.clone())])
     }
 
@@ -327,9 +334,6 @@ impl KafkaLog {
         self.info.resp_msg_size = Some(read_u32_be(payload));
         self.info.correlation_id = read_u32_be(&payload[4..]);
         self.info.msg_type = LogMessageType::Response;
-        if payload.len() >= 14 {
-            self.info.resp_data = Some(payload[..14].try_into().unwrap());
-        }
         Ok(())
     }
 
@@ -356,6 +360,28 @@ impl KafkaLog {
             }
         }
         Ok(())
+    }
+
+    /*
+        reference:  https://kafka.apache.org/protocol.html#protocol_messages
+
+        only fetch api and api version > 7 parse the error code
+
+        Fetch Response (Version: 7) => throttle_time_ms error_code session_id [responses]
+            throttle_time_ms => INT32
+            error_code => INT16
+            ...
+    */
+    pub fn set_status_code(&mut self, api_key: u16, api_version: u16, code: i16) {
+        if api_key == KAFKA_FETCH && api_version >= 7 {
+            self.info.status_code = Some(code as i32);
+            if code == 0 {
+                self.info.status = L7ResponseStatus::Ok;
+            } else {
+                self.info.status = L7ResponseStatus::ServerError;
+                self.perf_stats.as_mut().unwrap().inc_resp_err();
+            }
+        }
     }
 }
 

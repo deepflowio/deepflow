@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -88,7 +88,7 @@ func GetDataSources(filter map[string]interface{}) (resp []model.DataSource, err
 	return response, nil
 }
 
-func CreateDataSource(dataSourceCreate model.DataSourceCreate, cfg *config.ControllerConfig) (model.DataSource, error) {
+func CreateDataSource(dataSourceCreate *model.DataSourceCreate, cfg *config.ControllerConfig) (model.DataSource, error) {
 	var dataSource mysql.DataSource
 	var baseDataSource mysql.DataSource
 	var dataSourceCount int64

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -557,6 +557,14 @@ impl Trident {
                 None => {
                     let callbacks =
                         config_handler.on_config(runtime_config, &exception_handler, None);
+
+                    config_handler.load_plugin(
+                        &runtime,
+                        &session,
+                        ctrl_ip.to_string().as_str(),
+                        ctrl_mac.to_string().as_str(),
+                    );
+
                     let mut comp = Components::new(
                         &version_info,
                         &config_handler,
@@ -572,6 +580,7 @@ impl Trident {
                         config_handler.static_config.agent_mode,
                         runtime.clone(),
                     )?;
+
                     comp.start();
 
                     if let Components::Agent(components) = &mut comp {

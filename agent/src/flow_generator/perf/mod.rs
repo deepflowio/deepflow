@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,6 +34,7 @@ use super::protocol_logs::AppProtoHead;
 
 use crate::common::flow::L7PerfStats;
 use crate::common::l7_protocol_log::L7PerfCache;
+use crate::plugin::wasm::WasmVm;
 use crate::{
     common::{
         flow::{FlowPerfStats, L4Protocol, L7Protocol, PacketDirection, SignalSource},
@@ -184,6 +185,8 @@ pub struct FlowLog {
     is_from_app: bool,
     is_success: bool,
     is_skip: bool,
+
+    wasm_vm: Option<Rc<RefCell<WasmVm>>>,
 }
 
 impl FlowLog {
@@ -224,13 +227,13 @@ impl FlowLog {
                         SignalSource::EBPF => {
                             app_table.set_protocol_from_ebpf(
                                 packet,
-                                self.l7_protocol_enum,
+                                self.l7_protocol_enum.clone(),
                                 local_epc,
                                 remote_epc,
                             );
                         }
                         _ => {
-                            app_table.set_protocol(packet, self.l7_protocol_enum);
+                            app_table.set_protocol(packet, self.l7_protocol_enum.clone());
                         }
                     }
                     self.is_success = true;
@@ -268,12 +271,16 @@ impl FlowLog {
         }
 
         if let Some(payload) = packet.get_l4_payload() {
-            let param = ParseParam::from((
+            let mut param = ParseParam::from((
                 &*packet,
                 self.perf_cache.clone(),
                 !is_parse_log,
                 log_parser_config,
             ));
+            if let Some(vm) = self.wasm_vm.as_ref() {
+                param.set_wasm_vm(vm.clone());
+            }
+
             for protocol in checker.possible_protocols(
                 packet.lookup_key.proto.into(),
                 match packet.lookup_key.direction {
@@ -285,12 +292,10 @@ impl FlowLog {
                     continue;
                 };
                 if parser.check_payload(payload, &param) {
-                    self.l7_protocol_enum = parser.l7_protocl_enum();
+                    self.l7_protocol_enum = parser.l7_protocol_enum();
 
                     // redis can not determine dirction by RESP protocol when pakcet is from ebpf, special treatment
-                    if self.l7_protocol_enum.get_l7_protocol() == L7Protocol::Redis
-                        && packet.signal_source == SignalSource::EBPF
-                    {
+                    if self.l7_protocol_enum.get_l7_protocol() == L7Protocol::Redis {
                         (_, self.server_port) = packet.get_redis_server_addr();
                     } else {
                         self.server_port = packet.lookup_key.dst_port;
@@ -348,19 +353,16 @@ impl FlowLog {
         }
 
         if self.l7_protocol_log_parser.is_some() {
-            return self.l7_parse_log(
-                flow_config,
-                packet,
-                app_table,
-                &ParseParam::from((
-                    &*packet,
-                    self.perf_cache.clone(),
-                    !is_parse_log,
-                    log_parser_config,
-                )),
-                local_epc,
-                remote_epc,
-            );
+            let param = &mut ParseParam::from((
+                &*packet,
+                self.perf_cache.clone(),
+                !is_parse_log,
+                log_parser_config,
+            ));
+            if let Some(vm) = self.wasm_vm.as_ref() {
+                param.set_wasm_vm(vm.clone());
+            }
+            return self.l7_parse_log(flow_config, packet, app_table, param, local_epc, remote_epc);
         }
 
         if self.is_from_app {
@@ -392,6 +394,7 @@ impl FlowLog {
         is_from_app_tab: bool,
         counter: Arc<FlowPerfCounter>,
         server_port: u16,
+        wasm_vm: Option<Rc<RefCell<WasmVm>>>,
     ) -> Option<Self> {
         if !l4_enabled && !l7_enabled {
             return None;
@@ -408,13 +411,14 @@ impl FlowLog {
 
         Some(Self {
             l4: l4.map(|o| Box::new(o)),
-            l7_protocol_log_parser: get_parser(l7_protocol_enum).map(|o| Box::new(o)),
+            l7_protocol_log_parser: get_parser(l7_protocol_enum.clone()).map(|o| Box::new(o)),
             perf_cache,
             l7_protocol_enum,
             is_from_app: is_from_app_tab,
             is_success: false,
             is_skip: false,
             server_port: server_port,
+            wasm_vm: wasm_vm,
         })
     }
 

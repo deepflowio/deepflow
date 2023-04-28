@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ use public::proto::common::TridentType;
 pub(super) fn bench(c: &mut Criterion) {
     c.bench_function("flow_map_syn_flood", |b| {
         b.iter_custom(|iters| {
-            let (mut map, _) = new_flow_map_and_receiver(TridentType::TtProcess, None);
+            let (mut map, _) = new_flow_map_and_receiver(TridentType::TtProcess, None, false);
             let packets = (0..iters)
                 .into_iter()
                 .map(|i| {
@@ -48,7 +48,7 @@ pub(super) fn bench(c: &mut Criterion) {
 
     c.bench_function("flow_map_with_ten_packets_flow_flood", |b| {
         b.iter_custom(|iters| {
-            let (mut map, _) = new_flow_map_and_receiver(TridentType::TtProcess, None);
+            let (mut map, _) = new_flow_map_and_receiver(TridentType::TtProcess, None, false);
             let iters = (iters + 9) / 10 * 10;
 
             let mut packets = vec![];

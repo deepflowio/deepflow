@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ pub(crate) mod http;
 pub(crate) mod mq;
 mod parser;
 pub mod pb_adapter;
+pub(crate) mod plugin;
 pub(crate) mod rpc;
 pub(crate) mod sql;
 pub use self::http::{
@@ -27,6 +28,8 @@ pub use self::http::{
     is_http_v1_payload, parse_v1_headers, HttpInfo, HttpLog, Httpv2Headers,
 };
 use self::pb_adapter::L7ProtocolSendLog;
+pub use self::plugin::custom_wrap::CustomWrapLog;
+pub use self::plugin::wasm::{get_wasm_parser, WasmLog};
 pub use dns::{DnsInfo, DnsLog};
 pub use mq::{mqtt, KafkaInfo, KafkaLog, MqttInfo, MqttLog};
 pub use parser::{MetaAppProto, SessionAggregator};
@@ -336,7 +339,7 @@ impl AppProtoLogsBaseInfo {
         self.head.msg_type = LogMessageType::Session;
 
         self.head.rrt = if self.end_time > self.start_time {
-            (self.end_time - self.start_time).as_micros() as u64
+            (self.end_time.as_micros() - self.start_time.as_micros()) as u64
         } else {
             0
         }

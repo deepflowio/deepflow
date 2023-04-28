@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -105,7 +105,7 @@ func (w *Watcher) Run() {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		endpoints, err := w.GetMyClickhouseEndpoints()
+		endpoints, err := w.getMyExpectedClickhouseEndpoints()
 		if err != nil {
 			log.Warning(err)
 			continue
@@ -186,12 +186,19 @@ func (w *Watcher) getMyClickhouseEndpointsInternal() ([]Endpoint, error) {
 	return nil, fmt.Errorf("Can't find my clickhouse endpoint, myNodeName: %s myPodName: %s", w.myNodeName, w.myPodName)
 }
 
-func (w *Watcher) GetMyClickhouseEndpoints() ([]Endpoint, error) {
+func (w *Watcher) getMyExpectedClickhouseEndpoints() ([]Endpoint, error) {
 	if w.clickhouseIsExternal {
 		return w.getMyClickhouseEndpointsExternal()
 	} else {
 		return w.getMyClickhouseEndpointsInternal()
 	}
+}
+
+func (w *Watcher) GetMyClickhouseEndpoints() ([]Endpoint, error) {
+	if len(w.myClickhouseEndpoints) != 0 {
+		return w.myClickhouseEndpoints, nil
+	}
+	return nil, fmt.Errorf("can't find my clickhouse endpoint now, pleate wait later...")
 }
 
 func isInEndpoints(e Endpoint, es []Endpoint) bool {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -294,7 +294,7 @@ impl Default for EbpfYamlConfig {
             socket_map_max_reclaim: 520000,
             kprobe_whitelist: EbpfKprobeWhitelist::default(),
             uprobe_proc_regexp: UprobeProcRegExp::default(),
-            go_tracing_timeout: 0,
+            go_tracing_timeout: 120,
             io_event_collect_mode: 1,
             io_event_minimal_duration: Duration::from_millis(1),
         }
@@ -387,6 +387,7 @@ pub struct YamlConfig {
     #[serde(with = "humantime_serde")]
     pub guard_interval: Duration,
     pub check_core_file_disabled: bool,
+    pub wasm_plugins: Vec<String>,
 }
 
 impl YamlConfig {
@@ -664,6 +665,7 @@ impl Default for YamlConfig {
             os_proc_sync_enabled: false,
             guard_interval: Duration::from_secs(60),
             check_core_file_disabled: false,
+            wasm_plugins: vec![],
         }
     }
 }
@@ -754,6 +756,7 @@ pub struct FlowGeneratorConfig {
 
     pub ignore_tor_mac: bool,
     pub ignore_l2_end: bool,
+    pub ignore_idc_vlan: bool,
 }
 
 impl Default for FlowGeneratorConfig {
@@ -771,6 +774,7 @@ impl Default for FlowGeneratorConfig {
 
             ignore_tor_mac: false,
             ignore_l2_end: false,
+            ignore_idc_vlan: false,
         }
     }
 }

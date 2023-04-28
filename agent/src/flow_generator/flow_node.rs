@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -170,6 +170,7 @@ impl FlowNode {
         meta_packet: &mut MetaPacket,
         ignore_l2_end: bool,
         ignore_tor_mac: bool,
+        ignore_idc_vlan: bool,
         trident_type: TridentType,
     ) -> bool {
         if meta_packet.signal_source == SignalSource::EBPF {
@@ -199,6 +200,13 @@ impl FlowNode {
         }
 
         if flow.eth_type != meta_lookup_key.eth_type {
+            return false;
+        }
+
+        if flow.vlan != meta_packet.vlan
+            && meta_lookup_key.tap_type != TapType::Cloud
+            && !ignore_idc_vlan
+        {
             return false;
         }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,14 +20,16 @@ mod protobuf_rpc;
 pub use protobuf_rpc::*;
 
 use enum_dispatch::enum_dispatch;
-use public::l7_protocol::{L7Protocol, L7ProtocolEnum, ProtobufRpcProtocol};
+use public::l7_protocol::{CustomProtocol, L7Protocol, L7ProtocolEnum, ProtobufRpcProtocol};
 use serde::Serialize;
 
 use crate::{
     common::{
         flow::L7PerfStats,
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ProtocolParser, L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{
+            KafkaInfoCache, L7ProtocolParser, L7ProtocolParserInterface, ParseParam,
+        },
     },
     flow_generator::{protocol_logs::pb_adapter::L7ProtocolSendLog, AppProtoHead, Result},
 };

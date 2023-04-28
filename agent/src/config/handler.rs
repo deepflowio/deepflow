@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,10 +30,11 @@ use arc_swap::{access::Map, ArcSwap};
 use bytesize::ByteSize;
 use flexi_logger::writers::FileLogWriter;
 use flexi_logger::{Age, Cleanup, Criterion, FileSpec, LoggerHandle, Naming};
-use log::{info, warn, Level};
+use log::{error, info, warn, Level};
 #[cfg(target_os = "linux")]
 use regex::Regex;
 use sysinfo::SystemExt;
+use tokio::runtime::Runtime;
 
 #[cfg(target_os = "linux")]
 use super::{
@@ -44,6 +45,7 @@ use super::{
     config::{Config, PcapConfig, PortConfig, YamlConfig},
     ConfigError, IngressFlavour, KubernetesPollerType, RuntimeConfig,
 };
+use crate::rpc::Session;
 use crate::{
     common::{decapsulate::TunnelTypeBitmap, enums::TapType, l7_protocol_log::L7ProtocolBitmap},
     dispatcher::recv_engine,
@@ -317,6 +319,7 @@ pub struct FlowConfig {
     pub flow_timeout: FlowTimeout,
     pub ignore_tor_mac: bool,
     pub ignore_l2_end: bool,
+    pub ignore_idc_vlan: bool,
 
     pub l7_metrics_enabled: bool,
     pub app_proto_log_enabled: bool,
@@ -334,6 +337,9 @@ pub struct FlowConfig {
 
     // vec<protocolName, port bitmap>
     pub l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
+
+    // name, data
+    pub wasm_plugins: Vec<(String, Vec<u8>)>,
 }
 
 impl From<&RuntimeConfig> for FlowConfig {
@@ -366,6 +372,7 @@ impl From<&RuntimeConfig> for FlowConfig {
             }),
             ignore_tor_mac: flow_config.ignore_tor_mac,
             ignore_l2_end: flow_config.ignore_l2_end,
+            ignore_idc_vlan: flow_config.ignore_idc_vlan,
             l7_metrics_enabled: conf.l7_metrics_enabled,
             app_proto_log_enabled: conf.app_proto_log_enabled,
             l4_performance_enabled: conf.l4_performance_enabled,
@@ -382,6 +389,7 @@ impl From<&RuntimeConfig> for FlowConfig {
             l7_protocol_parse_port_bitmap: Arc::new(
                 (&conf.yaml_config).get_protocol_port_parse_bitmap(),
             ),
+            wasm_plugins: vec![],
         }
     }
 }
@@ -1992,6 +2000,19 @@ impl ConfigHandler {
 
         callbacks
     }
+
+    pub fn load_plugin(
+        &mut self,
+        rt: &Arc<Runtime>,
+        session: &Arc<Session>,
+        ctrl_ip: &str,
+        ctrl_mac: &str,
+    ) {
+        self.candidate_config
+            .fill_wasm_plugin_prog_from_server(rt, session, ctrl_ip, ctrl_mac);
+        self.current_config
+            .store(Arc::new(self.candidate_config.clone()));
+    }
 }
 
 impl ModuleConfig {
@@ -2009,6 +2030,28 @@ impl ModuleConfig {
         }
 
         min((mem_size / MB / 128 * 65536) as usize, 1 << 30)
+    }
+
+    pub fn fill_wasm_plugin_prog_from_server(
+        &mut self,
+        rt: &Arc<Runtime>,
+        session: &Arc<Session>,
+        ctrl_ip: &str,
+        ctrl_mac: &str,
+    ) {
+        let mut p = vec![];
+        rt.block_on(async {
+            for i in self.yaml_config.wasm_plugins.iter() {
+                match session.get_wasm_plugin(i.as_str(), ctrl_ip, ctrl_mac).await {
+                    Ok(prog) => p.push((i.clone(), prog)),
+                    Err(err) => {
+                        error!("get wasm plugin {} fail: {}", i, err);
+                        continue;
+                    }
+                }
+            }
+        });
+        self.flow.wasm_plugins = p;
     }
 }
 

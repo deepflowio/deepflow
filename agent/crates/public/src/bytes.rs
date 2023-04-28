@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,6 +47,11 @@ pub fn read_u64_be(bs: &[u8]) -> u64 {
 pub fn read_u64_le(bs: &[u8]) -> u64 {
     assert!(bs.len() >= 8);
     u64::from_le_bytes(bs[..8].try_into().unwrap())
+}
+
+pub fn read_u128_be(bs: &[u8]) -> u128 {
+    assert!(bs.len() >= 16);
+    u128::from_be_bytes(bs[..16].try_into().unwrap())
 }
 
 pub fn write_u16_be(bs: &mut [u8], v: u16) {

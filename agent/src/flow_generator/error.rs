@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -71,6 +71,14 @@ pub enum Error {
     L7LogCanNotMerge(AppProtoLogsData),
     #[error("parse config not provided")]
     NoParseConfig,
+    #[error("wasm parse fail")]
+    WasmParseFail,
+    #[error("{0}")]
+    WasmSerializeFail(String),
+    #[error("{0}")]
+    WasmVmError(String),
+    #[error("{0}")]
+    WasmInitFail(String),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

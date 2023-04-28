@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1089,10 +1089,12 @@ func (v *VTapInfo) putChRegisterFisnish() {
 
 func (v *VTapInfo) StartRegister() {
 	if v.loadRegion() == "" {
+		log.Error("controller not found region")
 		return
 	}
 	if v.getDefaultVTapGroup() == "" {
 		if v.loadDefaultVTapGroup() == "" {
+			log.Error("controller not found default vtap group")
 			return
 		}
 	}
