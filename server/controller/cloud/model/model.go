@@ -358,6 +358,7 @@ type PodService struct {
 	Lcuuid             string `json:"lcuuid" binding:"required"`
 	Name               string `json:"name" binding:"required"`
 	Label              string `json:"label"`
+	Annotation         string `json:"annotation"`
 	Type               int    `json:"type" binding:"required"`
 	Selector           string `json:"selector"`
 	ServiceClusterIP   string `json:"service_cluster_ip"`
@@ -450,6 +451,8 @@ type Pod struct {
 	Lcuuid              string    `json:"lcuuid" binding:"required"`
 	Name                string    `json:"name" binding:"required"`
 	Label               string    `json:"label"`
+	Annotation          string    `json:"annotation"`
+	ENV                 string    `json:"env"`
 	State               int       `json:"state" binding:"required"`
 	CreatedAt           time.Time `json:"created_at"`
 	PodReplicaSetLcuuid string    `json:"pod_replica_set_lcuuid"`
