@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,6 +53,8 @@ func VtapRouter(e *gin.Engine) {
 	e.PATCH("/v1/vtaps-tap-mode/", batchUpdateVtapTapMode)
 
 	e.POST("/v1/vtaps-csv/", getVtapCSV)
+
+	e.GET("/v1/vtap-ports/", getVTapPorts)
 }
 
 func getVtap(c *gin.Context) {
@@ -338,4 +340,16 @@ func getVtapCSVData(headerMap map[string]int, vtap *model.Vtap) []string {
 	}
 
 	return resp
+}
+
+func getVTapPorts(c *gin.Context) {
+	count, err := service.GetVTapPortsCount()
+	if err != nil {
+		BadRequestResponse(c, common.SERVER_ERROR, err.Error())
+		return
+	}
+	resp := map[string]int{
+		"COUNT": count,
+	}
+	JsonResponse(c, resp, nil)
 }

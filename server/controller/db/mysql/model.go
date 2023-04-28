@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -703,7 +703,8 @@ type PodService struct {
 	Base             `gorm:"embedded"`
 	SoftDeleteBase   `gorm:"embedded"`
 	Name             string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
-	Label            string `gorm:"column:label;type:text;default:''" json:"LABEL"` // separated by ,
+	Label            string `gorm:"column:label;type:text;default:''" json:"LABEL"`           // separated by ,
+	Annotation       string `gorm:"column:annotation;type:text;default:''" json:"ANNOTATION"` // separated by ,
 	Alias            string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS"`
 	Type             int    `gorm:"column:type;type:int;default:null" json:"TYPE"`        // 1: ClusterIP 2: NodePort
 	Selector         string `gorm:"column:selector;type:text;default:''" json:"SELECTOR"` // separated by ,
@@ -780,8 +781,10 @@ type Pod struct {
 	SoftDeleteBase  `gorm:"embedded"`
 	Name            string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
 	Alias           string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS"`
-	State           int    `gorm:"column:state;type:int;not null" json:"STATE"`    // 0.Exception 1.Running
-	Label           string `gorm:"column:label;type:text;default:''" json:"LABEL"` // separated by ,
+	State           int    `gorm:"column:state;type:int;not null" json:"STATE"`              // 0.Exception 1.Running
+	Label           string `gorm:"column:label;type:text;default:''" json:"LABEL"`           // separated by ,
+	Annotation      string `gorm:"column:annotation;type:text;default:''" json:"ANNOTATION"` // separated by ,
+	ENV             string `gorm:"column:env;type:text;default:''" json:"ENV"`               // separated by ,
 	PodReplicaSetID int    `gorm:"column:pod_rs_id;type:int;default:null" json:"POD_RS_ID"`
 	PodGroupID      int    `gorm:"column:pod_group_id;type:int;default:null" json:"POD_GROUP_ID"`
 	PodNamespaceID  int    `gorm:"column:pod_namespace_id;type:int;default:null" json:"POD_NAMESPACE_ID"`

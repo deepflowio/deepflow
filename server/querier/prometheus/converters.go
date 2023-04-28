@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2023 Yunshan Networks
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package prometheus
 
 import (
@@ -77,7 +93,7 @@ var aggFunctions = map[string]string{
 	"topk":         "",                  // not supported in querier, but clickhouse does, FIXME: should supported in querier
 	"bottomk":      "",                  // not supported
 	"count_values": view.FUNCTION_COUNT, // equals count() group by value in ck
-	"quantile":     view.FUNCTION_PCTL,
+	"quantile":     "",                  // not supported, FIXME: should support histogram in querier, and calcul Pxx by histogram
 }
 
 // define `showtag` flag, it passed when and only [api/v1/series] been called
@@ -145,7 +161,7 @@ func PromReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (contxt 
 					metricsName = metricsSplit[2]
 					var aggOperator, aggMetrics string
 
-					if db != DB_NAME_EXT_METRICS {
+					if db != DB_NAME_EXT_METRICS && db != DB_NAME_DEEPFLOW_SYSTEM && !isShowTagStatement {
 						// DeepFlow native metrics needs aggregation for query
 						if len(q.Hints.Grouping) == 0 {
 							// not specific cardinality
@@ -186,9 +202,6 @@ func PromReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (contxt 
 						switch aggOperator {
 						case view.FUNCTION_SUM, view.FUNCTION_AVG, view.FUNCTION_MIN, view.FUNCTION_MAX, view.FUNCTION_STDDEV:
 							aggMetrics = fmt.Sprintf("%s(`%s`)", aggOperator, metricsName)
-						case view.FUNCTION_PCTL:
-							// return Percentile(x,0) to prometheus, prometheus engine will calcul REAL percentile
-							aggMetrics = fmt.Sprintf("%s(`%s`, 0)", aggOperator, metricsName)
 						case "1":
 							// group
 							aggMetrics = aggOperator
@@ -207,7 +220,7 @@ func PromReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (contxt 
 					}
 
 					if db == DB_NAME_DEEPFLOW_SYSTEM {
-						metrics = append(metrics, fmt.Sprintf("metrics.%s", aggMetrics))
+						metrics = append(metrics, fmt.Sprintf("metrics.%s", metricsName))
 					} else if db == DB_NAME_EXT_METRICS {
 						// identify tag prefix as "tag_"
 						ctx = context.WithValue(ctx, ctxKeyPrefixType{}, prefixTag)
@@ -327,8 +340,13 @@ func PromReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (contxt 
 	// querier will be called later, so there is no need to display the declaration db
 	if db != "" {
 		// FIXME: if db is ext_metrics, only support for prometheus metrics now
-		sql = fmt.Sprintf("SELECT %s FROM %s WHERE %s GROUP BY %s ORDER BY %s desc LIMIT %s",
-			strings.Join(metrics, ","), table, strings.Join(filters, " AND "), strings.Join(groupLabels, ","), EXT_METRICS_TIME_COLUMNS, config.Cfg.Limit)
+		sqlBuilder := strings.Builder{}
+		sqlBuilder.WriteString(fmt.Sprintf("SELECT %s FROM %s WHERE %s ", strings.Join(metrics, ","), table, strings.Join(filters, " AND ")))
+		if len(groupLabels) > 0 {
+			sqlBuilder.WriteString("GROUP BY " + strings.Join(groupLabels, ","))
+		}
+		sqlBuilder.WriteString(fmt.Sprintf(" ORDER BY %s desc LIMIT %s", EXT_METRICS_TIME_COLUMNS, config.Cfg.Limit))
+		sql = sqlBuilder.String()
 	} else {
 		sql = fmt.Sprintf("SELECT %s FROM prometheus.%s WHERE %s ORDER BY time desc LIMIT %s",
 			strings.Join(metrics, ","), metricsName, strings.Join(filters, " AND "), config.Cfg.Limit)

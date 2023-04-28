@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -193,7 +193,7 @@ impl L7ProtocolParserInterface for RedisLog {
             self.perf_stats = Some(L7PerfStats::default())
         };
         self.parse(payload, param.l4_protocol, param.direction)?;
-        self.info.cal_rrt(param).map(|rrt| {
+        self.info.cal_rrt(param, None).map(|rrt| {
             self.info.rrt = rrt;
             self.perf_stats.as_mut().unwrap().update_rrt(rrt);
         });
@@ -469,7 +469,6 @@ mod tests {
             let is_redis = redis.check_payload(payload, param);
 
             let _ = redis.parse_payload(payload, param);
-            println!("{:?}", redis.info);
             output.push_str(&format!("{} is_redis: {}\r\n", redis.info, is_redis));
         }
         output

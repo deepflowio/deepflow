@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ mod integration_collector;
 mod metric;
 mod monitor;
 mod platform;
+mod plugin;
 mod policy;
 mod rpc;
 mod sender;
@@ -51,6 +52,7 @@ pub use {
         feature as _feature,
         flow::PacketDirection as _PacketDirection,
         l7_protocol_log::L7PerfCache as _L7PerfCache,
+        l7_protocol_log::LogCache as _LogCache,
         lookup_key::LookupKey as _LookupKey,
         platform_data::{IpSubnet as _IpSubnet, PlatformData as _PlatformData},
         policy::{Acl as _Acl, Cidr as _Cidr, IpGroupData as _IpGroupData},

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -91,7 +91,6 @@ func NewResourceInfoTable(ips []net.IP, port, rpcMaxMsgSize int) *ResourceInfoTa
 	info.GrpcSession.Init(ips, uint16(port), grpc.DEFAULT_SYNC_INTERVAL, rpcMaxMsgSize, runOnce)
 	info.Reload()
 	log.Infof("New ResourceInfoTable ips:%v port:%d rpcMaxMsgSize:%d", ips, port, rpcMaxMsgSize)
-	info.GrpcSession.Start()
 	return info
 }
 
@@ -113,7 +112,11 @@ func (p *ResourceInfoTable) Reload() error {
 			CtrlIp:              proto.String(p.ctlIP),
 			ProcessName:         proto.String("resource-info-watcher"),
 		}
-		client := trident.NewSynchronizerClient(p.GrpcSession.GetClient())
+		c := p.GrpcSession.GetClient()
+		if c == nil {
+			return fmt.Errorf("can't get grpc client to %s", remote)
+		}
+		client := trident.NewSynchronizerClient(c)
 		response, err = client.AnalyzerSync(ctx, &request)
 		return err
 	})

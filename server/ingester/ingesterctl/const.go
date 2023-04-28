@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ package ingesterctl
 import "github.com/deepflowio/deepflow/server/libs/debug"
 
 const (
-	DEBUG_LISTEN_IP   = "0.0.0.0"
+	DEBUG_LISTEN_IP   = "::"
 	DEBUG_LISTEN_PORT = 39527
 )
 

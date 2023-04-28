@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,14 +29,17 @@ use super::l7_protocol_info::L7ProtocolInfo;
 use super::MetaPacket;
 
 use crate::config::handler::LogParserConfig;
+use crate::flow_generator::protocol_logs::plugin::custom_wrap::CustomWrapLog;
+use crate::flow_generator::protocol_logs::plugin::get_custom_log_parser;
 use crate::flow_generator::protocol_logs::{
     get_protobuf_rpc_parser, DnsLog, DubboLog, HttpLog, KafkaLog, MqttLog, MysqlLog, PostgresqlLog,
     ProtobufRpcWrapLog, RedisLog, SofaRpcLog,
 };
 use crate::flow_generator::{LogMessageType, Result};
+use crate::plugin::wasm::WasmVm;
 
 use public::enums::IpProtocol;
-use public::l7_protocol::{L7Protocol, L7ProtocolEnum, ProtobufRpcProtocol};
+use public::l7_protocol::{CustomProtocol, L7Protocol, L7ProtocolEnum, ProtobufRpcProtocol};
 
 /*
  所有协议都需要实现L7ProtocolLogInterface这个接口.
@@ -89,15 +92,22 @@ macro_rules! impl_protocol_parser {
 
             fn protobuf_rpc_protocol(&self) -> Option<ProtobufRpcProtocol> {
                 match self {
-                    Self::Http(p) => p.protobuf_rpc_protocol(),
+                    Self::Http(_) => None,
                     $(Self::$proto(p) => p.protobuf_rpc_protocol()),*
                 }
             }
 
-            fn l7_protocl_enum(&self) -> L7ProtocolEnum {
+            fn custom_protocol(&self) -> Option<CustomProtocol> {
                 match self {
-                    Self::Http(p) => p.l7_protocl_enum(),
-                    $(Self::$proto(p) => p.l7_protocl_enum()),*
+                    Self::Http(_) => None,
+                    $(Self::$proto(p) => p.custom_protocol()),*
+                }
+            }
+
+            fn l7_protocol_enum(&self) -> L7ProtocolEnum {
+                match self {
+                    Self::Http(p) => p.l7_protocol_enum(),
+                    $(Self::$proto(p) => p.l7_protocol_enum()),*
                 }
             }
 
@@ -182,6 +192,7 @@ macro_rules! impl_protocol_parser {
                     _ => None,
                 },
                 L7ProtocolEnum::ProtobufRpc(p) => Some(get_protobuf_rpc_parser(p)),
+                L7ProtocolEnum::Custom(p) => Some(get_custom_log_parser(p)),
             }
         }
 
@@ -242,6 +253,7 @@ pub fn get_all_protocol() -> Vec<L7ProtocolParser> {
 impl_protocol_parser! {
     pub enum L7ProtocolParser {
         // http have two version but one parser, can not place in macro param.
+        Custom(CustomWrapLog),
         DNS(DnsLog),
         ProtobufRPC(Box<ProtobufRpcWrapLog>),
         SofaRPC(Box<SofaRpcLog>),
@@ -271,12 +283,19 @@ pub trait L7ProtocolParserInterface {
         None
     }
 
-    fn l7_protocl_enum(&self) -> L7ProtocolEnum {
+    // return inner proto of Custom, only when L7Protocol is Custom will not None
+    fn custom_protocol(&self) -> Option<CustomProtocol> {
+        None
+    }
+
+    // this func must call after log success check_payload, otherwise maybe panic
+    fn l7_protocol_enum(&self) -> L7ProtocolEnum {
         let proto = self.protocol();
         match proto {
             L7Protocol::ProtobufRPC => {
                 L7ProtocolEnum::ProtobufRpc(self.protobuf_rpc_protocol().unwrap())
             }
+            L7Protocol::Custom => L7ProtocolEnum::Custom(self.custom_protocol().unwrap()),
             _ => L7ProtocolEnum::L7Protocol(proto),
         }
     }
@@ -304,7 +323,7 @@ pub trait L7ProtocolParserInterface {
     fn perf_stats(&mut self) -> Option<L7PerfStats>;
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct EbpfParam {
     pub is_tls: bool,
     // 目前仅 http2 uprobe 有意义
@@ -312,28 +331,26 @@ pub struct EbpfParam {
     // now only http2 uprobe uses
     pub is_req_end: bool,
     pub is_resp_end: bool,
+    pub process_kname: String,
+}
 
-    /*
-        eBPF 程序为每一个 socket 维护一个 cap_seq 序列号，每次 read/write syscall 调用会自增 1。
-        目前仅用于处理ebpf乱序问题，并且仅能用于没有 request_id 并且是请求响应串行的模型。
-        当响应的 cap_seq 减去请求的 cap_seq 不等于1，就认为乱序无法聚合，直接发送请求和响应。
-        其中，mysql 和 postgresql 由于 预编译请求 和 执行结果之间有数个报文的间隔，所以不能通过序号差判断是否乱序。
-        所以现在只有 http1，redis 能使用这个方法处理乱序。
-        FIXME: http1 在 pipeline 模型下依然会有乱序的情况，目前不解决。
-        ====================================================================
-        The eBPF program maintains a cap_seq sequence number for each socket, which is incremented by 1 for each read/write syscall call.
-        Currently only used to deal with ebpf out-of-order problems, and can only be used for protocol without request_id and request-response serialization.
-        When the cap_seq of the response subtract the cap_seq of the request is not equal to 1, it is considered that the out-of-order cannot be aggregated, and the request and response are sent directly without merge.
-        MySQL and postgreSQL cannot judge whether the order is out of order due to the interval of several messages between the precompiled request and the execution result.
-        So now only http1, redis can use this method to deal with out-of-order.
-        FIXME: http1 will still be out of order under the pipeline model, which is not resolved at present.
-    */
-    pub cap_seq: u64,
+pub struct KafkaInfoCache {
+    // kafka req
+    pub api_key: u16,
+    pub api_version: u16,
+
+    // kafka resp code
+    pub code: i16,
+}
+pub struct LogCache {
+    pub msg_type: LogMessageType,
+    pub time: u64,
+    pub kafka_info: Option<KafkaInfoCache>,
 }
 
 pub struct L7PerfCache {
     // lru cache previous rrt
-    pub rrt_cache: LruCache<u128, (LogMessageType, u64)>,
+    pub rrt_cache: LruCache<u128, LogCache>,
     // LruCache<flow_id, count>
     pub timeout_cache: LruCache<u64, usize>,
 }
@@ -375,6 +392,8 @@ pub struct ParseParam<'a> {
     pub parse_config: Option<&'a LogParserConfig>,
 
     pub l7_perf_cache: Rc<RefCell<L7PerfCache>>,
+
+    pub wasm_vm: Option<Rc<RefCell<WasmVm>>>,
 }
 
 // from packet, previous_log_info_cache, perf_only
@@ -399,6 +418,8 @@ impl From<(&MetaPacket<'_>, Rc<RefCell<L7PerfCache>>, bool)> for ParseParam<'_> 
             parse_config: None,
 
             l7_perf_cache: cache,
+
+            wasm_vm: None,
         };
         if packet.ebpf_type != EbpfType::None {
             let is_tls = match packet.ebpf_type {
@@ -412,7 +433,10 @@ impl From<(&MetaPacket<'_>, Rc<RefCell<L7PerfCache>>, bool)> for ParseParam<'_> 
                 is_tls,
                 is_req_end: packet.is_request_end,
                 is_resp_end: packet.is_response_end,
-                cap_seq: packet.cap_seq,
+                #[cfg(target_os = "linux")]
+                process_kname: String::from_utf8_lossy(&packet.process_kname[..]).to_string(),
+                #[cfg(target_os = "windows")]
+                process_kname: "".into(),
             });
         }
 
@@ -445,10 +469,14 @@ impl<'a>
 
 impl ParseParam<'_> {
     pub fn is_tls(&self) -> bool {
-        if let Some(ebpf_param) = self.ebpf_param {
+        if let Some(ebpf_param) = self.ebpf_param.as_ref() {
             return ebpf_param.is_tls;
         }
         false
+    }
+
+    pub fn set_wasm_vm(&mut self, vm: Rc<RefCell<WasmVm>>) {
+        self.wasm_vm = Some(vm);
     }
 }
 

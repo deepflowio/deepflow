@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ use std::sync::{
 };
 use std::time::{Duration, Instant};
 
+use anyhow::{anyhow, Result};
 use log::{debug, error, info};
 use parking_lot::RwLock;
 use tonic::transport::{Channel, Endpoint};
@@ -29,13 +30,16 @@ use tonic::transport::{Channel, Endpoint};
 use crate::common::{DEFAULT_CONTROLLER_PORT, DEFAULT_CONTROLLER_TLS_PORT};
 use crate::exception::ExceptionHandler;
 use crate::utils::stats::{self, AtomicTimeStats, StatsOption};
-use public::counter::{Countable, Counter, CounterType, CounterValue, RefCountable};
-use public::proto::trident::{self, Exception};
+use public::proto::trident::{self, Exception, Status};
+use public::{
+    counter::{Countable, Counter, CounterType, CounterValue, RefCountable},
+    proto::trident::PluginType,
+};
 
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 pub const SESSION_TIMEOUT: Duration = Duration::from_secs(30);
 
-const GRPC_CALL_ENDPOINTS: [&str; 8] = [
+const GRPC_CALL_ENDPOINTS: [&str; 9] = [
     "push",
     "ntp",
     "upgrade",
@@ -44,6 +48,7 @@ const GRPC_CALL_ENDPOINTS: [&str; 8] = [
     "kubernetes_api_sync",
     "get_kubernetes_cluster_id",
     "gpid_sync",
+    "plugin",
 ];
 
 const PUSH_ENDPOINT: usize = 0;
@@ -54,6 +59,7 @@ const GENESIS_SYNC_ENDPOINT: usize = 4;
 const KUBERNETES_API_SYNC_ENDPOINT: usize = 5;
 const GET_KUBERNETES_CLUSTER_ID_ENDPOINT: usize = 6;
 const GPID_SYNC_ENDPOINT: usize = 7;
+const PLUGIN_ENDPOINT: usize = 8;
 
 struct Config {
     ips: Vec<String>,
@@ -115,6 +121,9 @@ macro_rules! response_size {
         "is stream"
     };
     (upgrade, $($_:ident),*) => {
+        "is stream"
+    };
+    (plugin, $($_:ident),*) => {
         "is stream"
     };
     ($_:ident,  $response:ident) => {
@@ -418,6 +427,47 @@ impl Session {
         request: trident::GpidSyncRequest,
     ) -> Result<tonic::Response<trident::GpidSyncResponse>, tonic::Status> {
         sync_grpc_call!(self, gpid_sync, request, GPID_SYNC_ENDPOINT)
+    }
+
+    pub async fn plugin(
+        &self,
+        request: trident::PluginRequest,
+    ) -> Result<tonic::Response<tonic::codec::Streaming<trident::PluginResponse>>, tonic::Status>
+    {
+        sync_grpc_call!(self, plugin, request, PLUGIN_ENDPOINT)
+    }
+
+    pub async fn get_wasm_plugin(
+        &self,
+        name: &str,
+        ctrl_ip: &str,
+        ctrl_mac: &str,
+    ) -> Result<Vec<u8>> {
+        let s = self
+            .plugin(trident::PluginRequest {
+                ctrl_ip: Some(ctrl_ip.into()),
+                ctrl_mac: Some(ctrl_mac.into()),
+                plugin_type: Some(PluginType::Wasm as i32),
+                plugin_name: Some(name.into()),
+            })
+            .await?;
+
+        let mut data = vec![];
+        let mut msg = s.into_inner();
+        let mut total_len = 0u64;
+        while let Some(message) = msg.message().await? {
+            if message.status.unwrap_or_default() != Status::Success as i32 {
+                return Err(anyhow!("fetch wasm prog fail, server return non success"));
+            }
+            if let Some(d) = message.content {
+                data.extend(d);
+            }
+            total_len = message.total_len.unwrap_or_default();
+        }
+        if data.is_empty() || data.len() != total_len as usize {
+            return Err(anyhow!("fetch wasm prog fail, length incorrect"));
+        }
+        Ok(data)
     }
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -551,6 +551,16 @@ func (e *VTapEvent) noVTapResponse(in *api.SyncRequest) *api.SyncResponse {
 			Config: configInfo,
 		}
 	}
+
+	// if vtap not exist & not k8s/agent sync, set vtap disable
+	if configInfo == nil {
+		configInfo = &api.Config{
+			Enabled: proto.Bool(false),
+		}
+	} else {
+		configInfo.Enabled = proto.Bool(false)
+	}
+
 	return &api.SyncResponse{
 		Status: &STATUS_SUCCESS,
 		Config: configInfo,

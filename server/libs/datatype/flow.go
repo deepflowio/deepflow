@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -162,6 +162,7 @@ const (
 	L7_PROTOCOL_KAFKA        L7Protocol = 100
 	L7_PROTOCOL_MQTT         L7Protocol = 101
 	L7_PROTOCOL_DNS          L7Protocol = 120
+	L7_PROTOCOL_CUSTOM       L7Protocol = 127
 )
 
 // size = 9 * 4B = 36B
@@ -636,6 +637,8 @@ func (p L7Protocol) String() string {
 		formatted = "Kafka"
 	case L7_PROTOCOL_MQTT:
 		formatted = "MQTT"
+	case L7_PROTOCOL_CUSTOM:
+		formatted = "Custom"
 	case L7_PROTOCOL_OTHER:
 		formatted = "Others"
 	default:

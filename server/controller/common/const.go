@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -261,7 +261,7 @@ const (
 
 const (
 	DEFAULT_ENCRYPTION_PASSWORD = "******"
-	DEFAULT_PORT_NAME_REGEX     = "(cni|flannel|vxlan.calico|tunl|en[ospx])"
+	DEFAULT_PORT_NAME_REGEX     = "^(cni|flannel|cali|vxlan.calico|tunl|en[ospx])"
 
 	OPENSTACK         = 1
 	VSPHERE           = 2
