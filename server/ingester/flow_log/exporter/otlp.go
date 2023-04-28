@@ -17,8 +17,10 @@
 package exporter
 
 import (
+	crand "crypto/rand"
 	"encoding/binary"
 	"encoding/hex"
+	"math/rand"
 	"net"
 	"strconv"
 	"strings"
@@ -118,11 +120,16 @@ func L7FlowLogToExportRequest(l7 *log_data.L7FlowLog, universalTagsManager *Univ
 		putIntWithoutZero(spanAttrs, "df.span.syscall_cap_seq_1", int64(l7.SyscallCapSeq1))
 
 		span.SetTraceID(getTraceID(l7.TraceId, l7.ID()))
-		span.SetSpanID(getSpanID(l7.SpanId, l7.ID()))
-		if l7.ParentSpanId == "" {
-			span.SetParentSpanID(pcommon.NewSpanIDEmpty())
+		if l7.SignalSource == uint16(datatype.SIGNAL_SOURCE_OTEL) {
+			span.SetSpanID(getSpanID(l7.SpanId, l7.ID()))
+			if l7.ParentSpanId == "" {
+				span.SetParentSpanID(pcommon.NewSpanIDEmpty())
+			} else {
+				span.SetParentSpanID(getSpanID(l7.ParentSpanId, l7.ID()))
+			}
 		} else {
-			span.SetParentSpanID(getSpanID(l7.ParentSpanId, l7.ID()))
+			span.SetParentSpanID(getSpanID(l7.SpanId, l7.ID()))
+			span.SetSpanID(newSpanId())
 		}
 
 		if l7.SpanKind != uint8(ptrace.SpanKindUnspecified) {
@@ -271,7 +278,17 @@ func getSpanID(spanID string, id uint64) pcommon.SpanID {
 	return pcommon.NewSpanIDEmpty()
 }
 
-//use server info (_1) to fill in 'host' information, use client info (_0) to fill in 'peer' information
+func newSpanId() pcommon.SpanID {
+	var rngSeed int64
+	_ = binary.Read(crand.Reader, binary.LittleEndian, &rngSeed)
+	var randSource = rand.New(rand.NewSource(rngSeed))
+
+	sid := pcommon.SpanID{}
+	randSource.Read(sid[:])
+	return sid
+}
+
+// use server info (_1) to fill in 'host' information, use client info (_0) to fill in 'peer' information
 func setServerSpanKindHostAndPeer(spanAttrs pcommon.Map, l7 *log_data.L7FlowLog, tags0, tags1 *UniversalTags) {
 	if tags1.CHost != "" {
 		putStrWithoutEmpty(spanAttrs, "net.host.name", tags1.CHost)
@@ -306,7 +323,7 @@ func setServerSpanKindHostAndPeer(spanAttrs pcommon.Map, l7 *log_data.L7FlowLog,
 	}
 }
 
-//use client info (_0) to fill in 'host' information, use server info (_1) to fill in 'peer' information
+// use client info (_0) to fill in 'host' information, use server info (_1) to fill in 'peer' information
 func setOtherSpanKindHostAndPeer(spanAttrs pcommon.Map, l7 *log_data.L7FlowLog, tags0, tags1 *UniversalTags) {
 	if tags0.CHost != "" {
 		putStrWithoutEmpty(spanAttrs, "net.host.name", tags0.CHost)
