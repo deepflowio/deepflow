@@ -231,9 +231,7 @@ func (c *Cloud) runKubernetesGatherTask() {
 		if len(c.kubernetesGatherTaskMap) != 0 {
 			return
 		}
-		kubernetesGatherTask := NewKubernetesGatherTask(
-			&domain, nil, c.cCtx, false, c.cfg.KubernetesGatherInterval,
-		)
+		kubernetesGatherTask := NewKubernetesGatherTask(c.cCtx, &domain, nil, c.cfg, false)
 		if kubernetesGatherTask == nil {
 			return
 		}
@@ -276,9 +274,7 @@ func (c *Cloud) runKubernetesGatherTask() {
 		addSubDomains = newSubDomains.Difference(oldSubDomains)
 		for _, subDomain := range addSubDomains.ToSlice() {
 			lcuuid := subDomain.(string)
-			kubernetesGatherTask := NewKubernetesGatherTask(
-				&domain, lcuuidToSubDomain[lcuuid], c.cCtx, true, c.cfg.KubernetesGatherInterval,
-			)
+			kubernetesGatherTask := NewKubernetesGatherTask(c.cCtx, &domain, lcuuidToSubDomain[lcuuid], c.cfg, true)
 			if kubernetesGatherTask == nil {
 				continue
 			}
@@ -299,9 +295,7 @@ func (c *Cloud) runKubernetesGatherTask() {
 				log.Infof("oldSubDomainConfig: %s", oldSubDomain.SubDomainConfig)
 				log.Infof("newSubDomainConfig: %s", newSubDomain.Config)
 				c.kubernetesGatherTaskMap[lcuuid].Stop()
-				kubernetesGatherTask := NewKubernetesGatherTask(
-					&domain, lcuuidToSubDomain[lcuuid], c.cCtx, true, c.cfg.KubernetesGatherInterval,
-				)
+				kubernetesGatherTask := NewKubernetesGatherTask(c.cCtx, &domain, lcuuidToSubDomain[lcuuid], c.cfg, true)
 				if kubernetesGatherTask == nil {
 					continue
 				}

@@ -103,6 +103,8 @@ func (p *Pod) generateDBItemToAdd(cloudItem *cloudmodel.Pod) (*mysql.Pod, bool) 
 	dbItem := &mysql.Pod{
 		Name:            cloudItem.Name,
 		Label:           cloudItem.Label,
+		ENV:             cloudItem.ENV,
+		Annotation:      cloudItem.Annotation,
 		State:           cloudItem.State,
 		PodClusterID:    podClusterID,
 		PodNamespaceID:  podNamespaceID,
@@ -166,6 +168,12 @@ func (p *Pod) generateUpdateInfo(diffBase *cache.Pod, cloudItem *cloudmodel.Pod)
 	}
 	if diffBase.Label != cloudItem.Label {
 		updateInfo["label"] = cloudItem.Label
+	}
+	if diffBase.Annotation != cloudItem.Annotation {
+		updateInfo["annotation"] = cloudItem.Annotation
+	}
+	if diffBase.ENV != cloudItem.ENV {
+		updateInfo["env"] = cloudItem.ENV
 	}
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
 		updateInfo["region"] = cloudItem.RegionLcuuid

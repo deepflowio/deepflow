@@ -806,6 +806,7 @@ func (b *DiffBaseDataSet) addPodService(dbItem *mysql.PodService, seq int, toolD
 		},
 		Name:             dbItem.Name,
 		Label:            dbItem.Label,
+		Annotation:       dbItem.Annotation,
 		Selector:         dbItem.Selector,
 		ServiceClusterIP: dbItem.ServiceClusterIP,
 		PodIngressLcuuid: podIngressLcuuid,
@@ -911,6 +912,8 @@ func (b *DiffBaseDataSet) addPod(dbItem *mysql.Pod, seq int, toolDataSet *ToolDa
 		},
 		Name:                dbItem.Name,
 		Label:               dbItem.Label,
+		Annotation:          dbItem.Annotation,
+		ENV:                 dbItem.ENV,
 		State:               dbItem.State,
 		CreatedAt:           dbItem.CreatedAt,
 		PodNodeLcuuid:       podNodeLcuuid,
@@ -1496,6 +1499,7 @@ type PodService struct {
 	DiffBase
 	Name             string `json:"name"`
 	Label            string `json:"label"`
+	Annotation       string `json:"annotation"`
 	Selector         string `json:"selector"`
 	ServiceClusterIP string `json:"service_cluster_ip"`
 	PodIngressLcuuid string `json:"pod_ingress_lcuuid"`
@@ -1507,6 +1511,7 @@ type PodService struct {
 func (p *PodService) Update(cloudItem *cloudmodel.PodService) {
 	p.Name = cloudItem.Name
 	p.Label = cloudItem.Label
+	p.Annotation = cloudItem.Annotation
 	p.Selector = cloudItem.Selector
 	p.ServiceClusterIP = cloudItem.ServiceClusterIP
 	p.PodIngressLcuuid = cloudItem.PodIngressLcuuid
@@ -1586,6 +1591,8 @@ type Pod struct {
 	DiffBase
 	Name                string    `json:"name"`
 	Label               string    `json:"label"`
+	Annotation          string    `json:"annotation"`
+	ENV                 string    `json:"env"`
 	State               int       `json:"state"`
 	CreatedAt           time.Time `json:"created_at"`
 	PodNodeLcuuid       string    `json:"pod_node_lcuuid"`
@@ -1599,6 +1606,8 @@ type Pod struct {
 func (p *Pod) Update(cloudItem *cloudmodel.Pod) {
 	p.Name = cloudItem.Name
 	p.Label = cloudItem.Label
+	p.ENV = cloudItem.ENV
+	p.Annotation = cloudItem.Annotation
 	p.State = cloudItem.State
 	p.CreatedAt = cloudItem.CreatedAt
 	p.PodNodeLcuuid = cloudItem.PodNodeLcuuid
