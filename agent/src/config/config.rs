@@ -242,6 +242,7 @@ impl Default for UprobeProcRegExp {
 pub const OS_PROC_REGEXP_MATCH_TYPE_CMD: &'static str = "cmdline";
 pub const OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME: &'static str = "process_name";
 pub const OS_PROC_REGEXP_MATCH_TYPE_PARENT_PROC_NAME: &'static str = "parent_process_name";
+pub const OS_PROC_REGEXP_MATCH_TYPE_TAG: &'static str = "tag";
 
 pub const OS_PROC_REGEXP_MATCH_ACTION_ACCEPT: &'static str = "accept";
 pub const OS_PROC_REGEXP_MATCH_ACTION_DROP: &'static str = "drop";
@@ -384,6 +385,8 @@ pub struct YamlConfig {
     // whether to sync os socket and proc info.
     // only make sense when process_info_enabled() == true
     pub os_proc_sync_enabled: bool,
+    // sync os socket and proc info only when the process has been tagged.
+    pub os_proc_sync_tagged_only: bool,
     #[serde(with = "humantime_serde")]
     pub guard_interval: Duration,
     pub check_core_file_disabled: bool,
@@ -663,6 +666,7 @@ impl Default for YamlConfig {
             os_app_tag_exec_user: "deepflow".to_string(),
             os_app_tag_exec: vec![],
             os_proc_sync_enabled: false,
+            os_proc_sync_tagged_only: false,
             guard_interval: Duration::from_secs(60),
             check_core_file_disabled: false,
             wasm_plugins: vec![],
