@@ -17,14 +17,15 @@
 package kubernetes_gather
 
 import (
-	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
-	"github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/common"
 	"strconv"
 	"strings"
 
 	"github.com/bitly/go-simplejson"
 	mapset "github.com/deckarep/golang-set"
+	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
+	"github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/expand"
+	"github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/common"
 	uuid "github.com/satori/go.uuid"
 )
 
@@ -72,7 +73,7 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 			log.Infof("service (%s) selector not found", name)
 			continue
 		}
-		selectorSlice := cloudcommon.StringInterfaceMapKVs(selector, ":")
+		selectorSlice := cloudcommon.StringInterfaceMapKVs(selector, ":", 0)
 		selectorStrings := strings.Join(selectorSlice, ",")
 		specTypeString := sData.Get("spec").Get("type").MustString()
 		specType, ok := serviceTypes[specTypeString]
@@ -85,12 +86,17 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 			clusterIP = ""
 		}
 		labels := metaData.Get("labels").MustMap()
-		labelSlice := cloudcommon.StringInterfaceMapKVs(labels, ":")
+		labelSlice := cloudcommon.StringInterfaceMapKVs(labels, ":", 0)
 		labelString := strings.Join(labelSlice, ", ")
+
+		annotations := metaData.Get("annotations")
+		annotationString := expand.GetAnnotation(annotations, k.annotationValueMaxLength)
+
 		service := model.PodService{
 			Lcuuid:             uID,
 			Name:               name,
 			Label:              labelString,
+			Annotation:         annotationString,
 			Type:               specType,
 			Selector:           selectorStrings,
 			ServiceClusterIP:   clusterIP,
