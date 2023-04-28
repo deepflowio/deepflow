@@ -227,7 +227,7 @@ func listAgent(cmd *cobra.Command, args []string, output string) {
 		}
 
 		cmdFormat := "%-8s %-*s %-10s %-16s %-18s %-8s %-*s %s\n"
-		fmt.Printf(cmdFormat, "VTAP_ID", nameMaxSize, "NAME", "TYPE", "CTRL_IP", "CTRL_MAC", "STATE", groupMaxSize, "GROUP", "EXCEPTIONS")
+		fmt.Printf(cmdFormat, "ID", nameMaxSize, "NAME", "TYPE", "CTRL_IP", "CTRL_MAC", "STATE", groupMaxSize, "GROUP", "EXCEPTIONS")
 		for i := range response.Get("DATA").MustArray() {
 			vtap := response.Get("DATA").GetIndex(i)
 
