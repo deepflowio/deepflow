@@ -90,6 +90,7 @@ type StaticConfig struct {
 	OsProcSocketMinLifetime          *int                  `yaml:"os-proc-socket-min-lifetime,omitempty"`
 	OsProcRegex                      []*OsProcRegex        `yaml:"os-proc-regex,omitempty"`
 	OsProcSyncEnabled                *bool                 `yaml:"os-proc-sync-enabled,omitempty"`
+	OsProcSyncTaggedOnly             *bool                 `yaml:"os-proc-sync-tagged-only,omitempty"`
 	GuardInterval                    *string               `yaml:"guard-interval,omitempty"`
 	CheckCoreFileDisabled            *bool                 `yaml:"check-core-file-disabled,omitempty"`
 	WasmPlugins                      []string              `yaml:"wasm-plugins,omitempty"`

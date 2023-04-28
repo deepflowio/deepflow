@@ -981,6 +981,10 @@ vtap_group_id: g-xxxxxx
   ## Note: only make sense when agent type is one of CHOST_VM, CHOST_BM, K8S_VM, K8S_BM
   #os-proc-sync-enabled: false
 
+  ## To sync tagged processed only
+  ## Default: false
+  #os-proc-sync-tagged-only: false
+
   ## The proc fs mount path
   ## Default: /proc
   #os-proc-root: /proc
@@ -1035,6 +1039,9 @@ vtap_group_id: g-xxxxxx
   ##     - match-regex: .*sleep.*
   ##       match-type: process_name
   ##       action: drop
+  ##     - match-regex: .+ # match after concatenating a tag key and value pair using colon, i.e., an regex `app:.+` can match all processes has a `app` tag
+  ##       match-type: tag
+  ##       action: accept
   #os-proc-regex:
 
     ## The regexp use for match the process

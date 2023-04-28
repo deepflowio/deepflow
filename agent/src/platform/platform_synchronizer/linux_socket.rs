@@ -35,7 +35,7 @@ use public::{
     proto::trident::{GpidSyncEntry, RoleType, ServiceProtocol},
 };
 
-use super::{get_all_pid_process_map, sym_uptime, RegExpAction};
+use super::{get_all_pid_process_map, get_os_app_tag_by_exec, sym_uptime, RegExpAction};
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum Role {
@@ -165,7 +165,20 @@ pub(super) fn get_all_socket(
     // HashSet<(SocketAddr)>, the listenning addr when socket listening specific addr
     let mut spec_addr_listen_sock = HashSet::new();
 
-    let (proc_root, min_sock_lifetime, now_sec, mut tcp_entries, mut udp_entries, mut sock_entries) = (
+    let (
+        user,
+        cmd,
+        tagged_only,
+        proc_root,
+        min_sock_lifetime,
+        now_sec,
+        mut tcp_entries,
+        mut udp_entries,
+        mut sock_entries,
+    ) = (
+        conf.os_app_tag_exec_user.as_str(),
+        conf.os_app_tag_exec.as_slice(),
+        conf.os_proc_sync_tagged_only,
         conf.os_proc_root.as_str(),
         conf.os_proc_socket_min_lifetime as u64,
         SystemTime::now()
@@ -176,6 +189,19 @@ pub(super) fn get_all_socket(
         vec![],
         vec![],
     );
+
+    let tags_map = match get_os_app_tag_by_exec(user, cmd) {
+        Ok(tags) => tags,
+        Err(err) => {
+            error!(
+                "get process tags by execute cmd `{}` with user {} fail: {}",
+                cmd.join(" "),
+                user,
+                err
+            );
+            HashMap::new()
+        }
+    };
 
     // netns idx increase every time get the new netns id
     let mut netns_idx = 0u16;
@@ -213,8 +239,12 @@ pub(super) fn get_all_socket(
         }
 
         for i in conf.os_proc_regex.as_slice() {
-            if i.match_and_rewrite_proc(&mut proc_data, &pid_proc_map, true) {
+            if i.match_and_rewrite_proc(&mut proc_data, &pid_proc_map, &tags_map, true) {
                 if i.action() == RegExpAction::Drop {
+                    break;
+                }
+
+                if tags_map.get(&(proc.pid as u64)).is_none() && tagged_only {
                     break;
                 }
 

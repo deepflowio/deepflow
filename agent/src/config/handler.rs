@@ -229,6 +229,8 @@ pub struct OsProcScanConfig {
     // whether to sync os socket and proc info
     // only make sense when process_info_enabled() == true
     pub os_proc_sync_enabled: bool,
+    // sync os socket and proc info only when the process has been tagged.
+    pub os_proc_sync_tagged_only: bool,
 }
 #[cfg(target_os = "windows")]
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -947,6 +949,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     os_app_tag_exec_user: conf.yaml_config.os_app_tag_exec_user.clone(),
                     os_app_tag_exec: conf.yaml_config.os_app_tag_exec.clone(),
                     os_proc_sync_enabled: conf.yaml_config.os_proc_sync_enabled,
+                    os_proc_sync_tagged_only: conf.yaml_config.os_proc_sync_tagged_only,
                 },
                 #[cfg(target_os = "windows")]
                 os_proc_scan_conf: OsProcScanConfig {},
