@@ -23,6 +23,7 @@ import (
 
 	"github.com/bitly/go-simplejson"
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
+	"github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/expand"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	uuid "github.com/satori/go.uuid"
@@ -46,6 +47,10 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, e
 			log.Errorf("pod initialization simplejson error: (%s)", pErr.Error())
 			return
 		}
+
+		containers := pData.GetPath("spec", "containers")
+		envString := expand.GetPodENV(containers)
+
 		metaData, ok := pData.CheckGet("metadata")
 		if !ok {
 			log.Info("pod metadata not found")
@@ -168,14 +173,21 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, e
 				labels[exK] = exV
 			}
 		}
-		labelSlice := cloudcommon.StringInterfaceMapKVs(labels, ":")
+		labelSlice := cloudcommon.StringInterfaceMapKVs(labels, ":", 0)
 		labelString := strings.Join(labelSlice, ", ")
+
+		annotations := metaData.Get("annotations")
+
+		annotationString := expand.GetAnnotation(annotations, k.annotationValueMaxLength)
+
 		pod := model.Pod{
 			Lcuuid:              podLcuuid,
 			Name:                name,
 			State:               status,
 			VPCLcuuid:           k.VPCUuid,
+			ENV:                 envString,
 			Label:               labelString,
+			Annotation:          annotationString,
 			PodReplicaSetLcuuid: podRSLcuuid,
 			PodNodeLcuuid:       nodeLcuuid,
 			PodGroupLcuuid:      podGroupLcuuid,

@@ -17,6 +17,7 @@
 package kubernetes_gather
 
 import (
+	"github.com/deepflowio/deepflow/server/controller/cloud/config"
 	"github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -47,6 +48,7 @@ type KubernetesGather struct {
 	PortNameRegex                string
 	PodNetIPv4CIDRMaxMask        int
 	PodNetIPv6CIDRMaxMask        int
+	annotationValueMaxLength     int
 	isSubDomain                  bool
 	azLcuuid                     string
 	podGroupLcuuids              mapset.Set
@@ -71,7 +73,7 @@ type networkLcuuidCIDRs struct {
 	cidrs         []string
 }
 
-func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, isSubDomain bool) *KubernetesGather {
+func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, cfg config.CloudConfig, isSubDomain bool) *KubernetesGather {
 	var name string
 	var displayName string
 	var clusterID string
@@ -147,6 +149,7 @@ func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, isSub
 
 		// 以下属性为获取资源所用的关联关系
 		azLcuuid:                     "",
+		annotationValueMaxLength:     cfg.K8SAnnotationValueMaxLength,
 		isSubDomain:                  isSubDomain,
 		podGroupLcuuids:              mapset.NewSet(),
 		nodeNetworkLcuuidCIDRs:       networkLcuuidCIDRs{},
