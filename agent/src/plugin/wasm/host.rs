@@ -16,7 +16,10 @@
 
 use anyhow::Result;
 use log::error;
-use wasmtime::{Engine, Linker, Module, Store, StoreLimits, StoreLimitsBuilder};
+use wasmtime::{
+    AsContextMut, Engine, Instance, Linker, Module, Store, StoreLimits, StoreLimitsBuilder,
+    TypedFunc, WasmParams, WasmResults,
+};
 use wasmtime_wasi::{WasiCtx, WasiCtxBuilder};
 
 use crate::{
@@ -27,6 +30,7 @@ use crate::{
             HttpInfo,
         },
         Error::{self, WasmVmError},
+        Result as WasmResult,
     },
     plugin::CustomInfo,
     wasm_error,
@@ -353,25 +357,36 @@ fn init_instance(
     prog: &[u8],
 ) -> Result<InstanceWrap> {
     let module = Module::from_binary(&store.engine().clone(), prog)?;
+    let instance = linker.instantiate(&mut *store, &module)?;
 
-    // check the module whether have memory export
-    module.get_export("memory").map_or(
+    let memory = instance.get_export(&mut *store, "memory").map_or(
         Err(Error::WasmInitFail(format!(
             "wasm {} have no memory export",
             name
         ))),
         |mem| {
-            mem.memory().map_or(
+            if let Some(memory) = mem.into_memory() {
+                Ok(memory)
+            } else {
                 Err(Error::WasmInitFail(format!(
                     "wasm {} can not get export memory",
                     name
-                ))),
-                |_| Ok(()),
-            )
+                )))
+            }
         },
     )?;
 
-    let instance = linker.instantiate(&mut *store, &module)?;
+    // get all vm export func
+    let vm_func_on_http_req =
+        get_instance_export_func::<(), i32>(&instance, &mut *store, EXPORT_FUNC_ON_HTTP_REQ)?;
+    let vm_func_on_http_resp =
+        get_instance_export_func::<(), i32>(&instance, &mut *store, EXPORT_FUNC_ON_HTTP_RESP)?;
+    let vm_func_check_payload =
+        get_instance_export_func::<(), i32>(&instance, &mut *store, EXPORT_FUNC_CHECK_PAYLOAD)?;
+    let vm_func_parse_payload =
+        get_instance_export_func::<(), i32>(&instance, &mut *store, EXPORT_FUNC_PARSE_PAYLOAD)?;
+    let vm_func_get_hook_bitmap =
+        get_instance_export_func::<(), i32>(&instance, &mut *store, EXPORT_FUNC_GET_HOOK_BITMAP)?;
 
     // run _start as main to set the parser
     instance
@@ -382,9 +397,29 @@ fn init_instance(
 
     let mut ins = InstanceWrap {
         ins: instance,
-        name: name.to_string(),
         hook_point_bitmap: HookPointBitmap(0),
+        name: name.to_string(),
+        memory,
+        vm_func_on_http_req,
+        vm_func_on_http_resp,
+        vm_func_check_payload,
+        vm_func_parse_payload,
+        vm_func_get_hook_bitmap,
     };
+
     ins.hook_point_bitmap = ins.get_hook_bitmap(store)?;
     Ok(ins)
+}
+
+fn get_instance_export_func<Params, Results>(
+    ins: &Instance,
+    store: impl AsContextMut,
+    fn_name: &str,
+) -> WasmResult<TypedFunc<Params, Results>>
+where
+    Params: WasmParams,
+    Results: WasmResults,
+{
+    ins.get_typed_func::<Params, Results>(store, fn_name)
+        .map_err(|e| WasmVmError(format!("get export function {} fail: {:?}", fn_name, e)))
 }
