@@ -23,10 +23,23 @@ use crate::flow_generator::{
     Result,
 };
 use public::bytes::read_u128_be;
-use wasmtime::{Instance, Store};
+use wasmtime::{Instance, Memory, Store, TypedFunc};
 
 // correspond the vm export function
 pub(super) trait VmParser {
+    fn on_http_req(&self, store: &mut Store<StoreDataType>) -> Result<bool>;
+    fn on_http_resp(&self, store: &mut Store<StoreDataType>) -> Result<bool>;
+    fn check_payload(&self, store: &mut Store<StoreDataType>) -> Result<u8>;
+    fn parse_payload(&self, store: &mut Store<StoreDataType>) -> Result<bool>;
+    fn get_hook_bitmap(&self, store: &mut Store<StoreDataType>) -> Result<HookPointBitmap>;
+}
+
+pub(super) struct InstanceWrap {
+    pub(super) name: String,
+    pub(super) hook_point_bitmap: HookPointBitmap,
+    pub(super) ins: Instance,
+    // the linear memory belong to this instance
+    pub(super) memory: Memory,
     /*
         correspond go export function:
 
@@ -35,7 +48,7 @@ pub(super) trait VmParser {
 
         }
     */
-    fn on_http_req(&self, store: &mut Store<StoreDataType>) -> Result<bool>;
+    pub(super) vm_func_on_http_req: TypedFunc<(), i32>,
     /*
         correspond go export function:
 
@@ -44,7 +57,7 @@ pub(super) trait VmParser {
 
         }
     */
-    fn on_http_resp(&self, store: &mut Store<StoreDataType>) -> Result<bool>;
+    pub(super) vm_func_on_http_resp: TypedFunc<(), i32>,
     /*
         correspond go export function:
 
@@ -53,7 +66,7 @@ pub(super) trait VmParser {
 
         }
     */
-    fn check_payload(&self, store: &mut Store<StoreDataType>) -> Result<u8>;
+    pub(super) vm_func_check_payload: TypedFunc<(), i32>,
     /*
         correspond go export function:
 
@@ -62,7 +75,7 @@ pub(super) trait VmParser {
 
         }
     */
-    fn parse_payload(&self, store: &mut Store<StoreDataType>) -> Result<bool>;
+    pub(super) vm_func_parse_payload: TypedFunc<(), i32>,
     /*
         correspond go export function:
 
@@ -71,26 +84,13 @@ pub(super) trait VmParser {
 
         }
     */
-    fn get_hook_bitmap(&self, store: &mut Store<StoreDataType>) -> Result<HookPointBitmap>;
-}
-
-pub(super) struct InstanceWrap {
-    pub(super) name: String,
-    pub(super) hook_point_bitmap: HookPointBitmap,
-    pub(super) ins: Instance,
+    pub(super) vm_func_get_hook_bitmap: TypedFunc<(), i32>,
 }
 
 impl VmParser for InstanceWrap {
     fn check_payload(&self, store: &mut Store<StoreDataType>) -> Result<u8> {
         let proto = self
-            .ins
-            .get_typed_func::<(), i32>(&mut *store, EXPORT_FUNC_CHECK_PAYLOAD)
-            .map_err(|e| {
-                WasmVmError(format!(
-                    "get export function {} fail: {:?}",
-                    EXPORT_FUNC_CHECK_PAYLOAD, e
-                ))
-            })?
+            .vm_func_check_payload
             .call(&mut *store, ())
             .map_err(|e| {
                 WasmVmError(format!(
@@ -111,14 +111,7 @@ impl VmParser for InstanceWrap {
 
     fn parse_payload(&self, store: &mut Store<StoreDataType>) -> Result<bool> {
         let res = self
-            .ins
-            .get_typed_func::<(), i32>(&mut *store, EXPORT_FUNC_PARSE_PAYLOAD)
-            .map_err(|e| {
-                WasmVmError(format!(
-                    "get export function {} fail: {:?}",
-                    EXPORT_FUNC_PARSE_PAYLOAD, e
-                ))
-            })?
+            .vm_func_parse_payload
             .call(&mut *store, ())
             .map_err(|e| {
                 WasmVmError(format!(
@@ -139,14 +132,7 @@ impl VmParser for InstanceWrap {
 
     fn on_http_req(&self, store: &mut Store<StoreDataType>) -> Result<bool> {
         let res = self
-            .ins
-            .get_typed_func::<(), i32>(&mut *store, EXPORT_FUNC_ON_HTTP_REQ)
-            .map_err(|e| {
-                WasmVmError(format!(
-                    "get export function {} fail: {:?}",
-                    EXPORT_FUNC_ON_HTTP_REQ, e
-                ))
-            })?
+            .vm_func_on_http_req
             .call(&mut *store, ())
             .map_err(|e| {
                 WasmVmError(format!("vm call {} fail: {:?}", EXPORT_FUNC_ON_HTTP_REQ, e))
@@ -164,14 +150,7 @@ impl VmParser for InstanceWrap {
 
     fn on_http_resp(&self, store: &mut Store<StoreDataType>) -> Result<bool> {
         let res = self
-            .ins
-            .get_typed_func::<(), i32>(&mut *store, EXPORT_FUNC_ON_HTTP_RESP)
-            .map_err(|e| {
-                WasmVmError(format!(
-                    "get export function {} fail: {:?}",
-                    EXPORT_FUNC_ON_HTTP_RESP, e
-                ))
-            })?
+            .vm_func_on_http_resp
             .call(&mut *store, ())
             .map_err(|e| {
                 WasmVmError(format!(
@@ -192,14 +171,7 @@ impl VmParser for InstanceWrap {
 
     fn get_hook_bitmap(&self, store: &mut Store<StoreDataType>) -> Result<HookPointBitmap> {
         let bitmap_ptr = self
-            .ins
-            .get_typed_func::<(), i32>(&mut *store, EXPORT_FUNC_GET_HOOK_BITMAP)
-            .map_err(|e| {
-                WasmVmError(format!(
-                    "get export function {} fail: {:?}",
-                    EXPORT_FUNC_GET_HOOK_BITMAP, e
-                ))
-            })?
+            .vm_func_get_hook_bitmap
             .call(&mut *store, ())
             .map_err(|e| {
                 WasmVmError(format!(
@@ -211,13 +183,8 @@ impl VmParser for InstanceWrap {
         if bitmap_ptr == 0 {
             return Ok(HookPointBitmap(0));
         }
-        let mem = self
-            .ins
-            .get_export(&mut *store, "memory")
-            .unwrap()
-            .into_memory()
-            .unwrap();
-        let data = mem.data(store);
+
+        let data = self.memory.data(store);
         if bitmap_ptr + 16 > data.len() {
             return Err(Error::WasmSerializeFail("get hook bitmap fail".to_string()));
         }
