@@ -359,20 +359,10 @@ impl L7ProtocolParserInterface for HttpLog {
                 };
                 match param.ebpf_type {
                     EbpfType::GoHttp2Uprobe => {
-                        if let Some(p) = &param.ebpf_param {
-                            self.parsed = self
-                                .parse_http2_go_uprobe(
-                                    &config.l7_log_dynamic,
-                                    payload,
-                                    param.direction,
-                                    Some(p.is_req_end),
-                                    Some(p.is_resp_end),
-                                )
-                                .is_ok();
-                            self.parsed
-                        } else {
-                            false
-                        }
+                        self.parsed = self
+                            .parse_http2_go_uprobe(&config.l7_log_dynamic, payload, param)
+                            .is_ok();
+                        self.parsed
                     }
                     _ => self.http2_check_protocol(payload, param),
                 }
@@ -403,34 +393,14 @@ impl L7ProtocolParserInterface for HttpLog {
             }
             L7Protocol::Http2 | L7Protocol::Grpc => match param.ebpf_type {
                 EbpfType::GoHttp2Uprobe => {
-                    if let Some(p) = &param.ebpf_param {
-                        self.parse_http2_go_uprobe(
-                            &config.l7_log_dynamic,
-                            payload,
-                            param.direction,
-                            Some(p.is_req_end),
-                            Some(p.is_resp_end),
-                        )?;
-                        if self.info.is_req_end || self.info.is_resp_end {
-                            self.info.cal_rrt(param, None).map(|rrt| {
-                                self.info.rrt = rrt;
-                                self.perf_stats.as_mut().unwrap().update_rrt(rrt);
-                            });
-                        }
-                        return Ok(vec![L7ProtocolInfo::HttpInfo(self.info.clone())]);
-                    } else {
-                        return Err(Error::L7ProtocolUnknown);
-                    };
+                    self.parse_http2_go_uprobe(&config.l7_log_dynamic, payload, param)?;
+                    return Ok(vec![L7ProtocolInfo::HttpInfo(self.info.clone())]);
                 }
                 _ => self.parse_http_v2(payload, param)?,
             },
             _ => unreachable!(),
         }
 
-        self.info.cal_rrt(param, None).map(|rrt| {
-            self.info.rrt = rrt;
-            self.perf_stats.as_mut().unwrap().update_rrt(rrt);
-        });
         Ok(vec![L7ProtocolInfo::HttpInfo(self.info.clone())])
     }
 
@@ -567,13 +537,18 @@ impl HttpLog {
         &mut self,
         config: &L7LogDynamicConfig,
         payload: &[u8],
-        direction: PacketDirection,
-        is_req_end: Option<bool>,
-        is_resp_end: Option<bool>,
+        param: &ParseParam,
     ) -> Result<()> {
         if payload.len() < HTTPV2_CUSTOM_DATA_MIN_LENGTH {
             return Err(Error::HttpHeaderParseFailed);
         }
+        let Some(p) = &param.ebpf_param else {
+            return Err(Error::L7ProtocolUnknown);
+        };
+
+        (self.info.is_req_end, self.info.is_resp_end) = (p.is_req_end, p.is_resp_end);
+        let direction = param.direction;
+
         let stream_id = read_u32_le(&payload[4..8]);
         let key_len = read_u32_le(&payload[8..12]) as usize;
         let val_len = read_u32_le(&payload[12..16]) as usize;
@@ -603,14 +578,20 @@ impl HttpLog {
             );
         }
 
-        self.info.is_req_end = is_req_end.unwrap_or_default();
         if self.info.is_req_end {
             self.perf_stats.as_mut().unwrap().inc_req();
         }
-        self.info.is_resp_end = is_resp_end.unwrap_or_default();
         if self.info.is_resp_end {
             self.perf_stats.as_mut().unwrap().inc_resp();
         }
+
+        if self.info.is_req_end || self.info.is_resp_end {
+            self.info.cal_rrt(param, None).map(|rrt| {
+                self.info.rrt = rrt;
+                self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+            });
+        }
+
         self.info.version = String::from("2");
         self.info.stream_id = Some(stream_id);
         return Ok(());
@@ -654,6 +635,12 @@ impl HttpLog {
             self.info.msg_type = LogMessageType::Request;
             self.perf_stats.as_mut().unwrap().inc_req();
         }
+
+        self.info.cal_rrt(param, None).map(|rrt| {
+            self.info.rrt = rrt;
+            self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+        });
+
         if param.perf_only {
             return Ok(());
         }
@@ -836,6 +823,10 @@ impl HttpLog {
             if self.info.stream_id.is_none() {
                 self.info.stream_id = Some(httpv2_header.stream_id);
             }
+            self.info.cal_rrt(param, None).map(|rrt| {
+                self.info.rrt = rrt;
+                self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+            });
             return Ok(());
         }
         Err(Error::HttpHeaderParseFailed)
@@ -1209,7 +1200,7 @@ pub fn parse_v1_headers(payload: &[u8]) -> V1HeaderIterator<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::common::l7_protocol_log::L7PerfCache;
+    use crate::common::l7_protocol_log::{EbpfParam, L7PerfCache};
     use crate::common::MetaPacket;
     use crate::config::handler::LogParserConfig;
     use crate::flow_generator::L7_RRT_CACHE_CAPACITY;
@@ -1219,6 +1210,7 @@ mod tests {
     use std::collections::HashSet;
     use std::fs;
     use std::mem::size_of;
+    use std::net::{IpAddr, Ipv4Addr};
     use std::path::Path;
     use std::rc::Rc;
     use std::slice::from_raw_parts;
@@ -1329,6 +1321,33 @@ mod tests {
                 return [hdr_p, key.as_bytes(), val.as_bytes()].concat();
             }
         }
+        let conf = LogParserConfig {
+            l7_log_collect_nps_threshold: 0,
+            l7_log_session_aggr_timeout: Duration::default(),
+            l7_log_dynamic: L7LogDynamicConfig::default(),
+        };
+        let param = &ParseParam {
+            l4_protocol: IpProtocol::Tcp,
+            ip_src: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            ip_dst: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            port_src: 0,
+            port_dst: 0,
+            flow_id: 0,
+            direction: PacketDirection::ClientToServer,
+            ebpf_type: EbpfType::GoHttp2Uprobe,
+            ebpf_param: Some(EbpfParam {
+                is_tls: false,
+                is_req_end: false,
+                is_resp_end: false,
+                process_kname: "".to_string(),
+            }),
+            packet_seq: 0,
+            time: 0,
+            perf_only: false,
+            parse_config: Some(&conf),
+            l7_perf_cache: Rc::new(RefCell::new(L7PerfCache::new(1))),
+            wasm_vm: None,
+        };
 
         //测试长度不正确
         {
@@ -1346,13 +1365,7 @@ mod tests {
                 let payload = hdr.to_bytes(key, val);
                 let mut h = HttpLog::new_v2(false);
                 h.info.raw_data_type = L7ProtoRawDataType::GoHttp2Uprobe;
-                let res = h.parse_http2_go_uprobe(
-                    &L7LogDynamicConfig::default(),
-                    &payload,
-                    PacketDirection::ClientToServer,
-                    None,
-                    None,
-                );
+                let res = h.parse_http2_go_uprobe(&L7LogDynamicConfig::default(), &payload, param);
                 assert_eq!(res.is_ok(), false);
                 println!("{:#?}", res.err().unwrap());
             }
@@ -1381,13 +1394,7 @@ mod tests {
             let payload = hdr.to_bytes(key, val);
             let mut h = HttpLog::new_v2(false);
             h.info.raw_data_type = L7ProtoRawDataType::GoHttp2Uprobe;
-            let res = h.parse_http2_go_uprobe(
-                &L7LogDynamicConfig::default(),
-                &payload,
-                PacketDirection::ClientToServer,
-                None,
-                None,
-            );
+            let res = h.parse_http2_go_uprobe(&L7LogDynamicConfig::default(), &payload, param);
             assert_eq!(res.is_ok(), true);
             println!("{:#?}", h);
         }
