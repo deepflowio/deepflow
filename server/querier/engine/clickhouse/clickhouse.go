@@ -587,6 +587,7 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 				interval, err := chCommon.GetDatasourceInterval(e.DB, e.Table, e.DataSource)
 				if err != nil {
 					log.Error(err)
+					return err
 				}
 				e.Model.Time.DatasourceInterval = interval
 			} else if e.DB == "deepflow_system" {
