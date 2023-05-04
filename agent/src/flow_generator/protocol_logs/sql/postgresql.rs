@@ -176,7 +176,7 @@ impl Default for PostgresqlLog {
 
 impl L7ProtocolParserInterface for PostgresqlLog {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
-        self.set_msg_type(param.direction);
+        self.set_msg_type(PacketDirection::ClientToServer);
         self.info.is_tls = param.is_tls();
         if self.check_is_ssl_req(payload) {
             return true;
@@ -554,7 +554,7 @@ mod test {
 
         let resp_param = &ParseParam::from((&p[1], log_cache.clone(), false));
         let resp_payload = p[1].get_l4_payload().unwrap();
-        assert_eq!((&mut parser).check_payload(resp_payload, resp_param), true);
+        assert_eq!((&mut parser).check_payload(resp_payload, resp_param), false);
         let resp = (&mut parser)
             .parse_payload(resp_payload, resp_param)
             .unwrap()
