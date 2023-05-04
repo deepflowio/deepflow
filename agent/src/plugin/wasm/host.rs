@@ -73,7 +73,6 @@ pub(super) struct StoreDataType {
 pub struct WasmVm {
     linker: Linker<StoreDataType>,
     store: Store<StoreDataType>,
-    // Vec<name, ins>
     instance: Vec<InstanceWrap>,
 }
 

@@ -25,7 +25,6 @@ use crate::flow_generator::{
 use public::bytes::read_u128_be;
 use wasmtime::{Instance, Memory, Store, TypedFunc};
 
-// correspond the vm export function
 pub(super) trait VmParser {
     fn on_http_req(&self, store: &mut Store<StoreDataType>) -> Result<bool>;
     fn on_http_resp(&self, store: &mut Store<StoreDataType>) -> Result<bool>;
