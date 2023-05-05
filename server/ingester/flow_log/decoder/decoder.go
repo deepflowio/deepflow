@@ -232,6 +232,7 @@ func (d *Decoder) handleOpenTelemetry(vtapID uint16, decoder *codec.SimpleDecode
 }
 
 func (d *Decoder) sendOpenMetetry(vtapID uint16, tracesData *v1.TracesData) {
+	log.Infof("decoder %d vtap %d recv otel: %s", d.index, vtapID, tracesData)
 	if d.debugEnabled {
 		log.Debugf("decoder %d vtap %d recv otel: %s", d.index, vtapID, tracesData)
 	}
