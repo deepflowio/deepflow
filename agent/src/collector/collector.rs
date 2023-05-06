@@ -15,7 +15,7 @@
  */
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
     hash::Hash,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     sync::{
@@ -69,6 +69,7 @@ pub struct CollectorCounter {
     no_endpoint: AtomicU64,
     stash_len: AtomicU64,
     stash_capacity: AtomicU64,
+    stash_shrinks: AtomicU64,
     running: Arc<AtomicBool>,
 }
 
@@ -114,6 +115,11 @@ impl RefCountable for CollectorCounter {
                 "stash-capacity",
                 CounterType::Counted,
                 CounterValue::Unsigned(self.stash_capacity.load(Ordering::Relaxed)),
+            ),
+            (
+                "stash-shrinks",
+                CounterType::Counted,
+                CounterValue::Unsigned(self.stash_shrinks.load(Ordering::Relaxed)),
             ),
         ]
     }
@@ -312,12 +318,17 @@ struct Stash {
     start_time: Duration,
     slot_interval: u64,
     inner: HashMap<StashKey, Document>,
+    history_length: VecDeque<usize>,
     global_thread_id: u8,
     doc_flag: DocumentFlag,
     context: Context,
 }
 
 impl Stash {
+    // record stash size in last N flushes to determine shrinking size
+    const HISTORY_RECORD_COUNT: usize = 10;
+    const MIN_STASH_CAPACITY: usize = 1024;
+
     fn new(
         ctx: Context,
         sender: DebugSender<BoxedDocument>,
@@ -338,7 +349,8 @@ impl Stash {
             start_time,
             global_thread_id: ctx.id as u8 + 1,
             slot_interval,
-            inner: HashMap::new(),
+            inner: HashMap::with_capacity(Self::MIN_STASH_CAPACITY),
+            history_length: [0; Self::HISTORY_RECORD_COUNT].into(),
             doc_flag,
             context: ctx,
         }
@@ -828,6 +840,9 @@ impl Stash {
     }
 
     fn flush_stats(&mut self) {
+        self.history_length.rotate_right(1);
+        self.history_length[0] = self.inner.len();
+
         let mut batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
         for (_, mut doc) in self.inner.drain() {
             if batch.len() >= QUEUE_BATCH_SIZE {
@@ -845,12 +860,20 @@ impl Stash {
                 warn!("{} queue terminated", self.context.name);
             }
         }
+
+        let max_history = self.history_length.iter().fold(0, |acc, n| acc.max(*n));
+        if self.inner.capacity() > 2 * max_history {
+            // shrink stash if its capacity is larger than 2 times of the max stash length in the past HISTORY_RECORD_COUNT flushes
+            self.counter.stash_shrinks.fetch_add(1, Ordering::Relaxed);
+            self.inner
+                .shrink_to(Self::MIN_STASH_CAPACITY.max(2 * max_history));
+        }
     }
 
     fn calc_stash_counters(&self) {
         self.counter
             .stash_len
-            .store(self.inner.len() as u64, Ordering::Relaxed);
+            .store(self.history_length[0] as u64, Ordering::Relaxed);
         self.counter
             .stash_capacity
             .store(self.inner.capacity() as u64, Ordering::Relaxed);
