@@ -55,7 +55,11 @@ func (h *Host) ProduceByAdd(items []*mysql.Host) {
 				eventapi.TagRegionID(info.RegionID),
 			}...)
 		}
-		opts = append(opts, eventapi.TagHostID(item.ID))
+		opts = append(opts, []eventapi.TagFieldOption{
+			eventapi.TagHostID(item.ID),
+			eventapi.TagL3DeviceID(item.ID),
+			eventapi.TagL3DeviceType(h.deviceType),
+		}...)
 
 		h.createAndEnqueue(
 			item.Lcuuid,
