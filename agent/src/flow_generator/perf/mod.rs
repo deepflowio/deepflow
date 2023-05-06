@@ -490,8 +490,8 @@ impl FlowLog {
                     }
                 },
                 |mut perf| {
+                    perf.err_timeout = l7_timeout_count;
                     if let Some(stats) = stats.as_mut() {
-                        perf.err_timeout = l7_timeout_count;
                         stats.l7 = perf;
                         stats.l7_protocol = self.l7_protocol_enum.get_l7_protocol();
                     } else {
