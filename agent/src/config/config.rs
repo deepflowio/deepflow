@@ -487,7 +487,7 @@ impl YamlConfig {
         }
         if c.guard_interval < Duration::from_secs(1) || c.guard_interval > Duration::from_secs(3600)
         {
-            c.guard_interval = Duration::from_secs(60);
+            c.guard_interval = Duration::from_secs(10);
         }
 
         if c.kubernetes_api_list_limit < 10 {
