@@ -298,6 +298,9 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 			eventStore.L3DeviceType,
 			eventStore.L3EpcID,
 		)
+	if event.InstanceType == uint32(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) {
+		eventStore.ServiceID = event.InstanceID
+	}
 	eventStore.AutoServiceID, eventStore.AutoServiceType =
 		ingestercommon.GetAutoService(
 			eventStore.ServiceID,
@@ -308,9 +311,6 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 			eventStore.L3DeviceType,
 			eventStore.L3EpcID,
 		)
-	if event.InstanceType == uint32(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) {
-		eventStore.ServiceID = event.InstanceID
-	}
 
 	d.eventWriter.Write(eventStore)
 }
