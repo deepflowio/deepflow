@@ -21,23 +21,20 @@ import (
 	"io/ioutil"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang/snappy"
+	"github.com/prometheus/prometheus/prompb"
 
 	//logging "github.com/op/go-logging"
-	"github.com/deepflowio/deepflow/server/querier/common"
-	"github.com/deepflowio/deepflow/server/querier/prometheus"
-	"github.com/deepflowio/deepflow/server/querier/service"
-	"github.com/golang/snappy"
-
-	//"github.com/k0kubun/pp"
-	"github.com/prometheus/prometheus/prompb"
+	"github.com/deepflowio/deepflow/server/querier/app/prometheus/model"
+	"github.com/deepflowio/deepflow/server/querier/app/prometheus/service"
 )
 
-var STATUS_FIAL = "fail"
+const _STATUS_FAIL = "fail"
 
 // PromQL Query API
 func promQuery() gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
-		args := common.PromQueryParams{}
+		args := model.PromQueryParams{}
 		args.Context = c.Request.Context()
 		args.Promql = c.Request.FormValue("query")
 
@@ -45,9 +42,9 @@ func promQuery() gin.HandlerFunc {
 		// ref: https://github.com/prometheus/prometheus/blob/main/prompb/types.proto#L157
 		args.StartTime = c.Request.FormValue("time")
 		args.EndTime = c.Request.FormValue("time")
-		result, err := service.PromQueryExecute(&args, c.Request.Context())
+		result, err := service.PromInstantQueryService(&args, c.Request.Context())
 		if err != nil {
-			c.JSON(500, &common.PromQueryResponse{Error: err.Error(), Status: STATUS_FIAL})
+			c.JSON(500, &model.PromQueryResponse{Error: err.Error(), Status: _STATUS_FAIL})
 		}
 		c.JSON(200, result)
 	})
@@ -56,7 +53,7 @@ func promQuery() gin.HandlerFunc {
 // PromQL Range Query API
 func promQueryRange() gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
-		args := common.PromQueryParams{}
+		args := model.PromQueryParams{}
 		args.Context = c.Request.Context()
 		args.Promql = c.Request.FormValue("query")
 		args.StartTime = c.Request.FormValue("start")
@@ -65,9 +62,9 @@ func promQueryRange() gin.HandlerFunc {
 		//pp.Println(c.Request.Header.Get("Accept"))
 		//pp.Println(args.Promql)
 
-		result, err := service.PromQueryRangeExecute(&args, c.Request.Context())
+		result, err := service.PromRangeQueryService(&args, c.Request.Context())
 		if err != nil {
-			c.JSON(500, &common.PromQueryResponse{Error: err.Error(), Status: STATUS_FIAL})
+			c.JSON(500, &model.PromQueryResponse{Error: err.Error(), Status: _STATUS_FAIL})
 		}
 		//pp.Println(result)
 		c.JSON(200, result)
@@ -89,7 +86,7 @@ func promReader() gin.HandlerFunc {
 			return
 		}
 		//pp.Println(req)
-		resp, err := service.PromReaderExecute(&req, c.Request.Context())
+		resp, err := service.PromRemoteReadService(&req, c.Request.Context())
 		//pp.Println(resp)
 		if err != nil {
 			c.JSON(500, err)
@@ -107,15 +104,15 @@ func promReader() gin.HandlerFunc {
 
 func promTagValuesReader() gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
-		args := common.PromMetaParams{
+		args := model.PromMetaParams{
 			LabelName: c.Param("labelName"),
 			StartTime: c.Request.FormValue("start"),
 			EndTime:   c.Request.FormValue("end"),
 			Context:   c.Request.Context(),
 		}
-		result, err := prometheus.GetTagValues(&args)
+		result, err := service.PromLabelValuesService(&args, c.Request.Context())
 		if err != nil {
-			c.JSON(500, &common.PromQueryResponse{Error: err.Error(), Status: STATUS_FIAL})
+			c.JSON(500, &model.PromQueryResponse{Error: err.Error(), Status: _STATUS_FAIL})
 			return
 		}
 		c.JSON(200, result)
@@ -124,17 +121,17 @@ func promTagValuesReader() gin.HandlerFunc {
 
 func promSeriesReader() gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
-		args := common.PromQueryParams{
+		args := model.PromQueryParams{
 			StartTime: c.Request.FormValue("start"),
 			EndTime:   c.Request.FormValue("end"),
 			Matchers:  c.Request.Form["match[]"],
 			Context:   c.Request.Context(),
 		}
 		// should show tags when get `Series`
-		args.Context = context.WithValue(args.Context, prometheus.CtxKeyShowTag{}, true)
-		result, err := prometheus.Series(&args)
+		ctx := context.WithValue(c.Request.Context(), service.CtxKeyShowTag{}, true)
+		result, err := service.PromSeriesQueryService(&args, ctx)
 		if err != nil {
-			c.JSON(500, &common.PromQueryResponse{Error: err.Error(), Status: STATUS_FIAL})
+			c.JSON(500, &model.PromQueryResponse{Error: err.Error(), Status: _STATUS_FAIL})
 			return
 		}
 		c.JSON(200, result)

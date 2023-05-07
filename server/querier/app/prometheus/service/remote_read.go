@@ -14,33 +14,28 @@
  * limitations under the License.
  */
 
-package prometheus
+package service
 
 import (
 	"context"
 	"strconv"
 	"strings"
 
-	//"strings"
-	//"strconv"
-	//"time"
-
-	"github.com/deepflowio/deepflow/server/querier/common"
-	"github.com/deepflowio/deepflow/server/querier/config"
-	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse"
 	"github.com/google/uuid"
+	logging "github.com/op/go-logging"
+	"github.com/prometheus/prometheus/prompb"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	//"github.com/k0kubun/pp"
-	logging "github.com/op/go-logging"
-	"github.com/prometheus/prometheus/prompb"
+	"github.com/deepflowio/deepflow/server/querier/common"
+	"github.com/deepflowio/deepflow/server/querier/config"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse"
 )
 
 var log = logging.MustGetLogger("promethues")
 
-func PromReaderExecute(req *prompb.ReadRequest, ctx context.Context) (resp *prompb.ReadResponse, err error) {
+func promReaderExecute(req *prompb.ReadRequest, ctx context.Context) (resp *prompb.ReadResponse, err error) {
 	// promrequest trans to sql
 	// pp.Println(req)
 	ctx, sql, db, datasource, err := PromReaderTransToSQL(ctx, req)

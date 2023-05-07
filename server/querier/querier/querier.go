@@ -28,6 +28,7 @@ import (
 	yaml "gopkg.in/yaml.v2"
 
 	"github.com/deepflowio/deepflow/server/libs/logger"
+	prometheus_router "github.com/deepflowio/deepflow/server/querier/app/prometheus/router"
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
 	profile_router "github.com/deepflowio/deepflow/server/querier/profile/router"
@@ -76,6 +77,7 @@ func Start(configPath, serverLogFile string) {
 	r.Use(ErrHandle())
 	router.QueryRouter(r)
 	profile_router.ProfileRouter(r, &cfg)
+	prometheus_router.PrometheusRouter(r)
 	// TODO: 增加router
 	if err := r.Run(fmt.Sprintf(":%d", cfg.ListenPort)); err != nil {
 		log.Errorf("startup service failed, err:%v\n", err)

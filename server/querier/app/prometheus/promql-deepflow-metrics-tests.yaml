@@ -1,0 +1,190 @@
+
+# test tools: https://github.com/prometheus/compliance
+# build: git clone https://github.com/prometheus/compliance.git && cd ./compliance/promql/ && go build -o ./cmd/promql-compliance-tester .
+# test: ./promql-compliance-tester --config-file=promql-deepflow-metrics-tests.yaml
+
+reference_target_config:
+  query_url: 'http://deepflow-server.deepflow:20416/prom'
+
+test_target_config:
+  query_url: http://deepflow-server.deepflow:20416/prom
+
+query_time_parameters:
+  end_time: 1683442312
+  range_in_seconds: 14
+
+test_cases:
+  # Scalar literals.
+  - query: '42'
+  - query: '1.234'
+  - query: '.123'
+  - query: '1.23e-3'
+  - query: '0x3d'
+  - query: 'Inf'
+  - query: '+Inf'
+  - query: '-Inf'
+  - query: 'NaN'
+
+  - query: 'ext_metrics__metrics__prometheus_node_cpu_seconds_total'
+  # DeepFlow Native Metrics
+  - query: 'flow_metrics__vtap_app_port__request__1m'
+    should_fail: true
+  - query: '{__name__="flow_metrics__vtap_app_port__request__1m"}'
+    should_fail: true
+  - query: 'deepflow_system__deepflow_agent_monitor__max_memory'
+
+  # DeepFlow Native Metrics with Aggregation Operator
+  - query: '{{.simpleAggrOp}}(flow_metrics__vtap_app_port__request__1m)'
+    variant_args: ['simpleAggrOp']
+    should_fail: true
+  - query: '{{.simpleAggrOp}}(nonexistent_metric_name)'
+    variant_args: ['simpleAggrOp']
+  - query: '{{.simpleAggrOp}} by() (nonexistent_metric_name)'
+    variant_args: ['simpleAggrOp']
+  - query: 'sum by(auto_instance) (flow_metrics__vtap_app_port__request__1m)'
+  - query: 'avg by(auto_instance) (flow_metrics__vtap_app_port__request__1m)'
+  - query: 'min by(auto_instance) (flow_metrics__vtap_app_port__request__1m)'
+  - query: 'max by(auto_instance) (flow_metrics__vtap_app_port__request__1m)'
+  - query: 'group by(auto_instance) (flow_metrics__vtap_app_port__request__1m)'
+  - query: 'stddev by(auto_instance) (flow_metrics__vtap_app_port__request__1m)'
+  - query: 'stdvar by(auto_instance) (flow_metrics__vtap_app_port__request__1m)'
+    should_fail: true
+  - query: 'topk by(auto_instance) (flow_metrics__vtap_app_port__request__1m)'
+    should_fail: true
+  - query: 'bottomk by(auto_instance) (flow_metrics__vtap_app_port__request__1m)'
+    should_fail: true
+  - query: 'quantile by(auto_instance) (flow_metrics__vtap_app_port__request__1m)'
+    should_fail: true
+  - query: 'sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m)'
+  - query: '{{.simpleAggrOp}} without() (flow_metrics__vtap_app_port__request__1m)'
+    variant_args: ['simpleAggrOp']
+    should_fail: true
+  - query: '{{.simpleAggrOp}} without(auto_instance) (flow_metrics__vtap_app_port__request__1m)'
+    variant_args: ['simpleAggrOp']
+    should_fail: true
+  - query: '{{.simpleAggrOp}} without(auto_instance, mode) (flow_metrics__vtap_app_port__request__1m)'
+    variant_args: ['simpleAggrOp']
+    should_fail: true
+  - query: '{{.simpleAggrOp}} without(nonexistent) (flow_metrics__vtap_app_port__request__1m)'
+    variant_args: ['simpleAggrOp']
+    should_fail: true
+  - query: '{{.topBottomOp}} (3, flow_metrics__vtap_app_port__request__1m)'
+    variant_args: ['topBottomOp']
+    should_fail: true
+  - query: '{{.topBottomOp}} by(auto_instance) (2, flow_metrics__vtap_app_port__request__1m)'
+    variant_args: ['topBottomOp']
+    should_fail: true
+  - query: '{{.topBottomOp}} without(auto_instance) (2, flow_metrics__vtap_app_port__request__1m)'
+    variant_args: ['topBottomOp']
+    should_fail: true
+  - query: '{{.topBottomOp}} without() (2, flow_metrics__vtap_app_port__request__1m)'
+    variant_args: ['topBottomOp']
+    should_fail: true
+  - query: 'quantile({{.quantile}}, flow_metrics__vtap_app_port__request__1m)'
+    variant_args: ['quantile']
+    should_fail: true
+  - query: 'avg(max by(auto_instance) (flow_metrics__vtap_app_port__request__1m))'
+
+  # Binary operators.
+  - query: 'sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}) {{.binOp}} on(auto_instance, auto_service) group_left(l7__protocol) sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"})'
+    variant_args: ['binOp']
+  - query: 'sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}) {{.compBinOp}} bool on(auto_instance, auto_service, l7__protocol) sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"})'
+    variant_args: ['compBinOp']
+    # Check that __name__ is always dropped, even if it's part of the matching labels.
+  - query: 'sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}) / on(auto_instance, auto_service, l7__protocol, __name__) sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"})'
+  - query: 'sum without(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}) / on(auto_instance, auto_service) sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"})'
+    should_fail: true
+  - query: 'sum without(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}) / on(auto_instance, auto_service) group_left sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"})'
+    should_fail: true
+  - query: 'sum without(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}) / on(auto_instance, auto_service) group_left(l7__protocol) sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"})'
+    should_fail: true
+  - query: 'sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}) / on(auto_instance, auto_service, l7__protocol) group_left sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"})'
+  - query: 'sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}) / on(auto_instance, auto_service, l7__protocol, non_existent) sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"})'
+  
+  # NaN/Inf/-Inf support.
+  - query: 'sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}) * Inf'
+  - query: 'sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}) * -Inf'
+  - query: 'sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}) * NaN'
+
+  # Functions.
+  - query: '{{.simpleTimeAggrOp}}_over_time(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"})[{{.range}}:1m])'
+    variant_args: ['simpleTimeAggrOp', 'range']
+  - query: 'quantile_over_time({{.quantile}}, sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"})[{{.range}}:1m])'
+    variant_args: ['quantile', 'range']
+  - query: 'timestamp(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}))'
+  - query: 'timestamp(timestamp(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"})))'
+  - query: '{{.simpleMathFunc}}(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}))'
+    variant_args: ['simpleMathFunc']
+  - query: '{{.simpleMathFunc}}(-sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}))'
+    variant_args: ['simpleMathFunc']
+  - query: '{{.extrapolatedRateFunc}}(nonexistent_metric[5m])'
+    variant_args: ['extrapolatedRateFunc']
+  - query: '{{.extrapolatedRateFunc}}(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"})[{{.range}}:1m])'
+    variant_args: ['extrapolatedRateFunc', 'range']
+  - query: 'deriv(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"})[{{.range}}:1m])'
+    variant_args: ['range']
+  - query: 'predict_linear(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"})[{{.range}}:1m], 600)'
+    variant_args: ['range']
+  - query: 'time()'
+    # label_replace does a full-string match and replace.
+  - query: 'label_replace(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}), "job", "$1", "auto_instance", "deepflow-(.*)")'
+    # label_replace does not do a sub-string match.
+  - query: 'label_replace(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}), "job", "destination-instance-$1", "auto_instance", "deepflow-(.*)")'
+    # label_replace works with multiple capture groups.
+  - query: 'label_replace(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}), "job", "$1:$2", "auto_instance", "(.*)-(.*)")'
+    # label_replace does not overwrite the destination label if the source label does not exist.
+  - query: 'label_replace(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}), "job", "value-$1", "nonexistent-src", "source-value-(.*)")'
+    # label_replace overwrites the destination label if the source label is empty, but matched.
+  - query: 'label_replace(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}), "job", "value-$1", "nonexistent-src", "(.*)")'
+    # label_replace does not overwrite the destination label if the source label is not matched.
+  - query: 'label_replace(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}), "job", "value-$1", "auto_instance", "non-matching-regex")'
+    # label_replace drops labels that are set to empty values.
+  - query: 'label_replace(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}), "job", "", "auto_instance", ".*")'
+    # label_replace fails when the regex is invalid.
+  - query: 'label_replace(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}), "job", "value-$1", "auto_instance", "(.*")'
+    should_fail: true
+    # label_replace fails when the destination label name is not a valid Prometheus label name.
+  - query: 'label_replace(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}), "~invalid", "", "auto_instance", "(.*)")'
+    should_fail: true
+    # label_replace fails when there would be duplicated identical output label sets.
+  - query: 'label_replace(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}), "auto_instance", "", "", "")'
+    should_fail: true
+  - query: 'label_join(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}), "new_label", "-", "auto_instance", "job")'
+  - query: 'label_join(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}), "job", "-", "auto_instance", "job")'
+  - query: 'label_join(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}), "job", "-", "auto_instance")'
+  - query: 'label_join(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}), "~invalid", "-", "auto_instance")'
+    should_fail: true
+  - query: '{{.dateFunc}}()'
+    variant_args: ['dateFunc']
+  - query: '{{.dateFunc}}(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"} offset {{.offset}}))'
+    variant_args: ['dateFunc', 'offset']
+  - query: '{{.instantRateFunc}}(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"})[{{.range}}:1m])'
+    variant_args: ['instantRateFunc', 'range']
+  - query: '{{.clampFunc}}(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}), 2)'
+    variant_args: ['clampFunc']
+  - query: 'clamp(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}), 0, 1)'
+  - query: 'clamp(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}), 0, 1000000000000)'
+  - query: 'clamp(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}), 1000000000000, 0)'
+  - query: 'clamp(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}), 1000000000000, 1000000000000)'
+  - query: 'resets(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"})[{{.range}}:1m])'
+    variant_args: ['range']
+  - query: 'changes(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"})[{{.range}}:1m])'
+    variant_args: ['range']
+  - query: 'vector(1.23)'
+  - query: 'vector(time())'
+  - query: 'histogram_quantile({{.quantile}}, rate(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"})[1m:1m]))'
+    variant_args: ['quantile']
+  - query: 'histogram_quantile(0.9, nonexistent_metric)'
+  - # Missing "le" label.
+    query: 'histogram_quantile(0.9, sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}))'
+  # - # Missing "le" label only in some series of the same grouping.
+  #  query: 'histogram_quantile(0.9, {__name__=~"demo_api_request_duration_seconds_.+"})'
+  - query: 'holt_winters(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"})[10m:1m], {{.smoothingFactor}}, {{.trendFactor}})'
+    variant_args: ['smoothingFactor', 'trendFactor']
+  - query: 'count_values("value", sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}))'
+  - query: 'absent(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}))'
+  - query: 'absent(nonexistent_metric_name)'
+
+  # Subqueries.
+  - query: 'max_over_time((time() - max(flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"}) by(auto_instance, auto_service) < 1000)[5m:10s] offset 5m)'
+  - query: 'avg_over_time(rate(sum by(auto_instance, auto_service) (flow_metrics__vtap_app_port__request__1m{auto_service="deepflow-server"})[1m:1m])[2m:10s])'
