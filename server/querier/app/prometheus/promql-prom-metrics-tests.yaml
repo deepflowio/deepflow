@@ -1,0 +1,224 @@
+# You will then also need to replace the host "deepflow-server.deepflow:20416" in the test queries below with whatever
+# host you are running DeepFlow on.
+
+# test tools: https://github.com/prometheus/compliance
+# build: git clone https://github.com/prometheus/compliance.git && cd ./compliance/promql/ && go build -o ./cmd/promql-compliance-tester .
+# test: ./promql-compliance-tester --config-file=promql-prom-metrics-tests.yaml
+
+reference_target_config:
+  query_url: 'http://deepflow-server.deepflow:20416/prom'
+
+test_target_config:
+  query_url: http://deepflow-server.deepflow:20416/prom
+
+query_time_parameters:
+  end_time: 1683442312
+  range_in_seconds: 14
+
+test_cases:
+  # Scalar literals.
+  - query: '42'
+  - query: '1.234'
+  - query: '.123'
+  - query: '1.23e-3'
+  - query: '0x3d'
+  - query: 'Inf'
+  - query: '+Inf'
+  - query: '-Inf'
+  - query: 'NaN'
+
+  # Vector selectors.
+  - query: 'node_cpu_seconds_total'
+  - query: '{__name__="node_cpu_seconds_total"}'
+  - query: 'node_cpu_seconds_total{mode="system"}'
+  - query: 'node_cpu_seconds_total{cpu!="3"}'
+  - query: 'node_cpu_seconds_total{instance=~"127.0.0.1:.*"}'
+  - query: 'node_cpu_seconds_total{instance=~"host"}'
+  - query: 'node_cpu_seconds_total{instance!~".*:10000"}'
+  - query: 'node_cpu_seconds_total{mode="idle", cpu="2"}'
+  - query: '{__name__=~".*"}'
+    should_fail: true
+  - query: "nonexistent_metric_name"
+  - query: 'node_cpu_seconds_total offset {{.offset}}'
+    variant_args: ['offset']
+  - query: 'node_cpu_seconds_total offset -{{.offset}}'
+    variant_args: ['offset']
+
+  # Aggregation operators.
+  - query: '{{.simpleAggrOp}}(node_cpu_seconds_total)'
+    variant_args: ['simpleAggrOp']
+  - query: '{{.simpleAggrOp}}(nonexistent_metric_name)'
+    variant_args: ['simpleAggrOp']
+  - query: '{{.simpleAggrOp}} by() (node_cpu_seconds_total)'
+    variant_args: ['simpleAggrOp']
+  - query: '{{.simpleAggrOp}} by(instance) (node_cpu_seconds_total)'
+    variant_args: ['simpleAggrOp']
+  - query: '{{.simpleAggrOp}} by(instance, mode) (node_cpu_seconds_total)'
+    variant_args: ['simpleAggrOp']
+  - query: '{{.simpleAggrOp}} by(nonexistent) (node_cpu_seconds_total)'
+    variant_args: ['simpleAggrOp']
+  - query: '{{.simpleAggrOp}} without() (node_cpu_seconds_total)'
+    variant_args: ['simpleAggrOp']
+  - query: '{{.simpleAggrOp}} without(instance) (node_cpu_seconds_total)'
+    variant_args: ['simpleAggrOp']
+  - query: '{{.simpleAggrOp}} without(instance, mode) (node_cpu_seconds_total)'
+    variant_args: ['simpleAggrOp']
+  - query: '{{.simpleAggrOp}} without(nonexistent) (node_cpu_seconds_total)'
+    variant_args: ['simpleAggrOp']
+  - query: '{{.topBottomOp}} (3, node_cpu_seconds_total)'
+    variant_args: ['topBottomOp']
+  - query: '{{.topBottomOp}} by(instance) (2, node_cpu_seconds_total)'
+    variant_args: ['topBottomOp']
+  - query: '{{.topBottomOp}} without(instance) (2, node_cpu_seconds_total)'
+    variant_args: ['topBottomOp']
+  - query: '{{.topBottomOp}} without() (2, node_cpu_seconds_total)'
+    variant_args: ['topBottomOp']
+  - query: 'quantile({{.quantile}}, node_cpu_seconds_total)'
+    variant_args: ['quantile']
+  - query: 'avg(max by(type) (node_cpu_seconds_total))'
+
+  # Binary operators.
+  - query: '1 * 2 + 4 / 6 - 10 % 2 ^ 2'
+  - query: 'sum(node_cpu_seconds_total{mode="idle"}) by (cpu) + (1 {{.compBinOp}} bool 2)'
+    variant_args: ['compBinOp']
+  - query: 'node_cpu_seconds_total {{.binOp}} 1.2345'
+    variant_args: ['binOp']
+  - query: 'node_cpu_seconds_total {{.compBinOp}} bool 1.2345'
+    variant_args: ['compBinOp']
+  - query: '1.2345 {{.compBinOp}} bool node_cpu_seconds_total'
+    variant_args: ['compBinOp']
+  - query: '0.12345 {{.binOp}} node_cpu_seconds_total'
+    variant_args: ['binOp']
+  - query: '(1 * 2 + 4 / 6 - (10%7)^2) {{.binOp}} node_cpu_seconds_total'
+    variant_args: ['binOp']
+  - query: 'node_cpu_seconds_total {{.binOp}} (1 * 2 + 4 / 6 - 10)'
+    variant_args: ['binOp']
+    # Check that vector-scalar binops set output timestamps correctly.
+  - query: 'timestamp(node_cpu_seconds_total * 1)'
+    # Check that unary minus sets timestamps correctly.
+    # TODO: Check this more systematically for every node type?
+  - query: 'timestamp(-node_cpu_seconds_total)'
+  - query: 'node_cpu_seconds_totalnode_cpu_seconds_total{mode="system", cpu="0"} {{.binOp}} on(instance, job, mode) node_cpu_seconds_total{mode="system", cpu="0"}'
+    variant_args: ['binOp']
+  - query: 'sum by(instance, mode) (node_cpu_seconds_total{mode="system", cpu="0"}) {{.binOp}} on(instance, mode) group_left(job) node_cpu_seconds_total{mode="system", cpu="0"}'
+    variant_args: ['binOp']
+  - query: 'node_cpu_seconds_total{mode="system", cpu="0"} {{.compBinOp}} bool on(instance, job, mode) node_cpu_seconds_total{mode="system", cpu="0"}'
+    variant_args: ['compBinOp']
+    # Check that __name__ is always dropped, even if it's part of the matching labels.
+  - query: 'node_cpu_seconds_total{mode="system", cpu="0"} / on(instance, job, mode, __name__) node_cpu_seconds_total{mode="system", cpu="0"}'
+  - query: 'sum without(job) (node_cpu_seconds_total{mode="system", cpu="0"}) / on(instance, mode) node_cpu_seconds_total{mode="system", cpu="0"}'
+  - query: 'sum without(job) (node_cpu_seconds_total{mode="system", cpu="0"}) / on(instance, mode) group_left node_cpu_seconds_total{mode="system", cpu="0"}'
+  - query: 'sum without(job) (node_cpu_seconds_total{mode="system", cpu="0"}) / on(instance, mode) group_left(job) node_cpu_seconds_total{mode="system", cpu="0"}'
+  - query: 'node_cpu_seconds_total{mode="system", cpu="0"} / on(instance, mode) group_left node_cpu_seconds_total{mode="system", cpu="0"}'
+
+  # NaN/Inf/-Inf support.
+  - query: 'sum(node_cpu_seconds_total{mode="system", cpu="0"}) by (cpu) * Inf'
+  - query: 'sum(node_cpu_seconds_total{mode="system", cpu="0"}) by (cpu) * -Inf'
+  - query: 'sum(node_cpu_seconds_total{mode="system", cpu="0"}) by (cpu) * NaN'
+
+  # Unary expressions.
+  - query: 'node_cpu_seconds_total + -(1)'
+  - query: '-node_cpu_seconds_total'
+    # Check precedence.
+  - query: -1 ^ 2
+
+  # Binops involving non-const scalars.
+  - query: '1 {{.arithBinOp}} time()'
+    variant_args: ['arithBinOp']
+  - query: 'time() {{.arithBinOp}} 1'
+    variant_args: ['arithBinOp']
+  - query: 'time() {{.compBinOp}} bool 1'
+    variant_args: ['compBinOp']
+  - query: '1 {{.compBinOp}} bool time()'
+    variant_args: ['compBinOp']
+  - query: 'time() {{.arithBinOp}} time()'
+    variant_args: ['arithBinOp']
+  - query: 'time() {{.compBinOp}} bool time()'
+    variant_args: ['compBinOp']
+  - query: 'time() {{.binOp}} node_cpu_seconds_total{mode="system", cpu="0"}'
+    variant_args: ['binOp']
+  - query: 'node_cpu_seconds_total{mode="system", cpu="0"} {{.binOp}} time()'
+    variant_args: ['binOp']
+
+  # Functions.
+  - query: '{{.simpleTimeAggrOp}}_over_time(node_cpu_seconds_total{mode="system", cpu="0"}[{{.range}}])'
+    variant_args: ['simpleTimeAggrOp', 'range']
+  - query: 'quantile_over_time({{.quantile}}, node_cpu_seconds_total{mode="system", cpu="0"}[{{.range}}])'
+    variant_args: ['quantile', 'range']
+  - query: 'timestamp(sum(node_cpu_seconds_total{mode="system", cpu="0"}) by (cpu))'
+  - query: 'timestamp(timestamp(sum(node_cpu_seconds_total{mode="system", cpu="0"}) by (cpu)))'
+  - query: '{{.simpleMathFunc}}(node_cpu_seconds_total{mode="system", cpu="0"})'
+    variant_args: ['simpleMathFunc']
+  - query: '{{.simpleMathFunc}}(-node_cpu_seconds_total{mode="system", cpu="0"})'
+    variant_args: ['simpleMathFunc']
+  - query: '{{.extrapolatedRateFunc}}(nonexistent_metric[5m])'
+    variant_args: ['extrapolatedRateFunc']
+  - query: '{{.extrapolatedRateFunc}}(node_cpu_seconds_total{mode="system", cpu="0"}[{{.range}}])'
+    variant_args: ['extrapolatedRateFunc', 'range']
+  - query: 'deriv(node_cpu_seconds_total{mode="system", cpu="0"}[{{.range}}])'
+    variant_args: ['range']
+  - query: 'predict_linear(node_cpu_seconds_total{mode="system", cpu="0"}[{{.range}}], 600)'
+    variant_args: ['range']
+  - query: 'time()'
+    # label_replace does a full-string match and replace.
+  - query: 'label_replace(demo_num_cpus, "job", "destination-value-$1", "instance", "10.34.0.237:(.*)")'
+    # label_replace does not do a sub-string match.
+  - query: 'label_replace(demo_num_cpus, "job", "destination-value-$1", "instance", "host:(.*)")'
+    # label_replace works with multiple capture groups.
+  - query: 'label_replace(demo_num_cpus, "job", "$1-$2", "instance", "local(.*):(.*)")'
+    # label_replace does not overwrite the destination label if the source label does not exist.
+  - query: 'label_replace(demo_num_cpus, "job", "value-$1", "nonexistent-src", "source-value-(.*)")'
+    # label_replace overwrites the destination label if the source label is empty, but matched.
+  - query: 'label_replace(demo_num_cpus, "job", "value-$1", "nonexistent-src", "(.*)")'
+    # label_replace does not overwrite the destination label if the source label is not matched.
+  - query: 'label_replace(demo_num_cpus, "job", "value-$1", "instance", "non-matching-regex")'
+    # label_replace drops labels that are set to empty values.
+  - query: 'label_replace(demo_num_cpus, "job", "", "dst", ".*")'
+    # label_replace fails when the regex is invalid.
+  - query: 'label_replace(demo_num_cpus, "job", "value-$1", "src", "(.*")'
+    should_fail: true
+    # label_replace fails when the destination label name is not a valid Prometheus label name.
+  - query: 'label_replace(demo_num_cpus, "~invalid", "", "src", "(.*)")'
+    should_fail: true
+    # label_replace fails when there would be duplicated identical output label sets.
+  - query: 'label_replace(demo_num_cpus, "instance", "", "", "")'
+    should_fail: true
+  - query: 'label_join(demo_num_cpus, "new_label", "-", "instance", "job")'
+  - query: 'label_join(demo_num_cpus, "job", "-", "instance", "job")'
+  - query: 'label_join(demo_num_cpus, "job", "-", "instance")'
+  - query: 'label_join(demo_num_cpus, "~invalid", "-", "instance")'
+    should_fail: true
+  - query: '{{.dateFunc}}()'
+    variant_args: ['dateFunc']
+  - query: '{{.dateFunc}}(demo_batch_last_success_timestamp_seconds offset {{.offset}})'
+    variant_args: ['dateFunc', 'offset']
+  - query: '{{.instantRateFunc}}(demo_cpu_usage_seconds_total[{{.range}}])'
+    variant_args: ['instantRateFunc', 'range']
+  - query: '{{.clampFunc}}(node_cpu_seconds_total{mode="system", cpu="0"}, 2)'
+    variant_args: ['clampFunc']
+  - query: 'clamp(node_cpu_seconds_total{mode="system", cpu="0"}, 0, 1)'
+  - query: 'clamp(node_cpu_seconds_total{mode="system", cpu="0"}, 0, 1000000000000)'
+  - query: 'clamp(node_cpu_seconds_total{mode="system", cpu="0"}, 1000000000000, 0)'
+  - query: 'clamp(node_cpu_seconds_total{mode="system", cpu="0"}, 1000000000000, 1000000000000)'
+  - query: 'resets(node_cpu_seconds_total{mode="system", cpu="0"}[{{.range}}])'
+    variant_args: ['range']
+  - query: 'changes(node_cpu_seconds_total{mode="system", cpu="0"}[{{.range}}])'
+    variant_args: ['range']
+  - query: 'vector(1.23)'
+  - query: 'vector(time())'
+  - query: 'histogram_quantile({{.quantile}}, rate(demo_api_request_duration_seconds_bucket[1m]))'
+    variant_args: ['quantile']
+  - query: 'histogram_quantile(0.9, nonexistent_metric)'
+  - # Missing "le" label.
+    query: 'histogram_quantile(0.9, node_cpu_seconds_total{mode="system", cpu="0"})'
+  # - # Missing "le" label only in some series of the same grouping.
+  #  query: 'histogram_quantile(0.9, {__name__=~"demo_api_request_duration_seconds_.+"})'
+  - query: 'holt_winters(node_cpu_seconds_total{mode="system", cpu="0"}[10m], {{.smoothingFactor}}, {{.trendFactor}})'
+    variant_args: ['smoothingFactor', 'trendFactor']
+  - query: 'count_values("value", demo_api_request_duration_seconds_bucket)'
+  - query: 'absent(node_cpu_seconds_total{mode="system", cpu="0"})'
+  - query: 'absent(nonexistent_metric_name)'
+
+  # Subqueries.
+  - query: 'max_over_time((time() - max(node_cpu_seconds_total{mode="system", cpu="0"}) < 1000)[5m:10s] offset 5m)'
+  - query: 'avg_over_time(rate(node_cpu_seconds_total{mode="system", cpu="0"}[1m])[2m:10s])'

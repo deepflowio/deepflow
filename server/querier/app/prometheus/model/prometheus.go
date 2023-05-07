@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package common
+package model
 
 import (
 	"context"
+
 	"github.com/prometheus/prometheus/promql/parser"
-	//"strings"
 )
 
 type PromQueryParams struct {

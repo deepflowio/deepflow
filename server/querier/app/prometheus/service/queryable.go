@@ -14,24 +14,22 @@
  * limitations under the License.
  */
 
-package prometheus
+package service
 
 import (
 	"context"
 	"strconv"
 
-	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/prompb"
-
-	//"github.com/prometheus/prometheus/promql/parser"
-
 	"github.com/prometheus/prometheus/storage"
 	"github.com/prometheus/prometheus/storage/remote"
+
+	"github.com/deepflowio/deepflow/server/querier/app/prometheus/model"
 )
 
 type RemoteReadQuerierable struct {
-	Args *common.PromQueryParams
+	Args *model.PromQueryParams
 	Ctx  context.Context
 }
 
@@ -40,7 +38,7 @@ func (q *RemoteReadQuerierable) Querier(ctx context.Context, mint, maxt int64) (
 }
 
 type RemoteReadQuerier struct {
-	Args *common.PromQueryParams
+	Args *model.PromQueryParams
 	Ctx  context.Context
 }
 
@@ -67,7 +65,7 @@ func (q *RemoteReadQuerier) Select(sortSeries bool, hints *storage.SelectHints, 
 		Queries:               []*prompb.Query{prompbQuery},
 		AcceptedResponseTypes: []prompb.ReadRequest_ResponseType{prompb.ReadRequest_STREAMED_XOR_CHUNKS},
 	}
-	resp, err := PromReaderExecute(req, q.Ctx)
+	resp, err := promReaderExecute(req, q.Ctx)
 	if err != nil {
 		log.Error(err)
 		return storage.ErrSeriesSet(err)
@@ -88,7 +86,7 @@ func (q *RemoteReadQuerier) Close() error {
 }
 
 type RemoteReadRangeQuerierable struct {
-	Args *common.PromQueryParams
+	Args *model.PromQueryParams
 	Ctx  context.Context
 }
 
@@ -97,7 +95,7 @@ func (q *RemoteReadRangeQuerierable) Querier(ctx context.Context, mint, maxt int
 }
 
 type RemoteReadRangeQuerier struct {
-	Args *common.PromQueryParams
+	Args *model.PromQueryParams
 	Ctx  context.Context
 }
 
@@ -124,7 +122,7 @@ func (q *RemoteReadRangeQuerier) Select(sortSeries bool, hints *storage.SelectHi
 		Queries:               []*prompb.Query{prompbQuery},
 		AcceptedResponseTypes: []prompb.ReadRequest_ResponseType{prompb.ReadRequest_STREAMED_XOR_CHUNKS},
 	}
-	resp, err := PromReaderExecute(req, q.Ctx)
+	resp, err := promReaderExecute(req, q.Ctx)
 	if err != nil {
 		log.Error(err)
 		return storage.ErrSeriesSet(err)

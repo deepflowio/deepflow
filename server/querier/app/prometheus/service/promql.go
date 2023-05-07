@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package prometheus
+package service
 
 import (
 	"context"
@@ -24,14 +24,15 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/deepflowio/deepflow/server/querier/common"
 	//"github.com/k0kubun/pp"
-	"github.com/prometheus/common/model"
+	pmmodel "github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/model/timestamp"
 	"github.com/prometheus/prometheus/promql"
 	"github.com/prometheus/prometheus/promql/parser"
 	"github.com/prometheus/prometheus/storage"
+
+	"github.com/deepflowio/deepflow/server/querier/app/prometheus/model"
 )
 
 // The Series API supports returning the following time series (metrics):
@@ -62,7 +63,7 @@ import (
 const _SUCCESS = "success"
 
 // API Spec: https://prometheus.io/docs/prometheus/latest/querying/api/#instant-queries
-func PromQueryExecute(args *common.PromQueryParams, ctx context.Context) (result *common.PromQueryResponse, err error) {
+func promQueryExecute(args *model.PromQueryParams, ctx context.Context) (result *model.PromQueryResponse, err error) {
 	timeS, err := (strconv.ParseFloat(args.StartTime, 64))
 	if err != nil {
 		return nil, err
@@ -96,8 +97,8 @@ func PromQueryExecute(args *common.PromQueryParams, ctx context.Context) (result
 	} else {
 		resultType = res.Value.Type()
 	}
-	return &common.PromQueryResponse{
-		Data: &common.PromQueryData{
+	return &model.PromQueryResponse{
+		Data: &model.PromQueryData{
 			ResultType: resultType,
 			Result:     res.Value,
 		}, Status: _SUCCESS}, err
@@ -107,7 +108,7 @@ func durationMilliseconds(d time.Duration) int64 {
 	return int64(d / (time.Millisecond / time.Nanosecond))
 }
 
-func PromQueryRangeExecute(args *common.PromQueryParams, ctx context.Context) (result *common.PromQueryResponse, err error) {
+func promQueryRangeExecute(args *model.PromQueryParams, ctx context.Context) (result *model.PromQueryResponse, err error) {
 	startS, err := (strconv.ParseFloat(args.StartTime, 64))
 	if err != nil {
 		log.Error(err)
@@ -152,8 +153,8 @@ func PromQueryRangeExecute(args *common.PromQueryParams, ctx context.Context) (r
 	} else {
 		resultType = res.Value.Type()
 	}
-	return &common.PromQueryResponse{
-		Data: &common.PromQueryData{
+	return &model.PromQueryResponse{
+		Data: &model.PromQueryData{
 			ResultType: resultType,
 			Result:     res.Value,
 		}, Status: _SUCCESS}, err
@@ -167,7 +168,7 @@ func parseDuration(s string) (time.Duration, error) {
 		}
 		return time.Duration(ts), nil
 	}
-	if d, err := model.ParseDuration(s); err == nil {
+	if d, err := pmmodel.ParseDuration(s); err == nil {
 		return time.Duration(d), nil
 	}
 	return 0, fmt.Errorf("cannot parse %q to a valid duration", s)
@@ -212,7 +213,7 @@ func parseTime(s string) (time.Time, error) {
 }
 
 // API Spec: https://prometheus.io/docs/prometheus/latest/querying/api/#finding-series-by-label-matchers
-func Series(args *common.PromQueryParams) (result *common.PromQueryResponse, err error) {
+func series(args *model.PromQueryParams, ctx context.Context) (result *model.PromQueryResponse, err error) {
 	start, err := parseTime(args.StartTime)
 	if err != nil {
 		log.Error("Parse StartTime failed: %v", err)
@@ -232,8 +233,8 @@ func Series(args *common.PromQueryParams) (result *common.PromQueryResponse, err
 		return nil, err
 	}
 
-	querierable := &RemoteReadQuerierable{Args: args, Ctx: args.Context}
-	q, err := querierable.Querier(args.Context, timestamp.FromTime(start), timestamp.FromTime(end))
+	querierable := &RemoteReadQuerierable{Args: args, Ctx: ctx}
+	q, err := querierable.Querier(ctx, timestamp.FromTime(start), timestamp.FromTime(end))
 	if err != nil {
 		log.Error(err)
 		return nil, err
@@ -269,5 +270,5 @@ func Series(args *common.PromQueryParams) (result *common.PromQueryResponse, err
 		return nil, seriesSet.Err()
 	}
 
-	return &common.PromQueryResponse{Data: metrics, Status: _SUCCESS}, err
+	return &model.PromQueryResponse{Data: metrics, Status: _SUCCESS}, err
 }

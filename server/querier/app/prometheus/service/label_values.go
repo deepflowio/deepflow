@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-package prometheus
+package service
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
-	"github.com/deepflowio/deepflow/server/querier/common"
+	"github.com/deepflowio/deepflow/server/querier/app/prometheus/model"
 	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/metrics"
 )
@@ -35,16 +36,16 @@ const (
 	METRICS_CATEGORY_CARDINALITY = "Cardinality"
 )
 
-func GetTagValues(args *common.PromMetaParams) (result *common.PromQueryResponse, err error) {
+func getTagValues(args *model.PromMetaParams, ctx context.Context) (result *model.PromQueryResponse, err error) {
 	if args.LabelName == LABEL_NAME_METRICS {
-		return &common.PromQueryResponse{
+		return &model.PromQueryResponse{
 			Data: getMetrics(args),
 		}, nil
 	}
 	return result, err
 }
 
-func getMetrics(args *common.PromMetaParams) (resp []string) {
+func getMetrics(args *model.PromMetaParams) (resp []string) {
 	// We speed up the return of the metrics list by querying the aggregation information in
 	// `flow_tag.ext_metrics_custom_field_value`. Since we do not query the original time series
 	// data, filtering metrics by time is currently not supported.
