@@ -46,12 +46,15 @@ type FlowLogTTL struct {
 }
 
 type ExporterConfig struct {
-	Enabled         bool     `yaml:"enabled"`
-	Addr            string   `yaml:"addr"`
-	QueueCount      int      `yaml:"queue-count"`
-	QueueSize       int      `yaml:"queue-size"`
-	ExportDatas     []string `yaml:"export-datas"`
-	ExportDataTypes []string `yaml:"export-data-types"`
+	Enabled                     bool              `yaml:"enabled"`
+	Addr                        string            `yaml:"addr"`
+	QueueCount                  int               `yaml:"queue-count"`
+	QueueSize                   int               `yaml:"queue-size"`
+	ExportDatas                 []string          `yaml:"export-datas"`
+	ExportDataTypes             []string          `yaml:"export-data-types"`
+	ExportCustomK8sLabelsRegexp string            `yaml:"export-custom-k8s-labels-regexp"`
+	ExportOnlyWithTraceID       bool              `yaml:"export-only-with-traceid"`
+	GrpcHeaders                 map[string]string `yaml:"grpc-headers"`
 }
 
 type Config struct {
@@ -113,6 +116,9 @@ func Load(base *config.Config, path string) *Config {
 				100000,
 				DefaultOtlpExportDatas,
 				DefaultOtlpExportDataTypes,
+				"",
+				false,
+				nil,
 			},
 		},
 	}

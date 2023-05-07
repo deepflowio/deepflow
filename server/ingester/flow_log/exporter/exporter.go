@@ -24,6 +24,7 @@ import (
 	"go.opentelemetry.io/collector/pdata/ptrace/ptraceotlp"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 
 	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/config"
@@ -105,6 +106,7 @@ const (
 	SERVER_CUSTOM_TAG
 	NATIVE_TAG
 	METRICS
+	K8S_LABEL
 )
 
 var exportedDataTypeStringMap = map[string]uint32{
@@ -122,6 +124,7 @@ var exportedDataTypeStringMap = map[string]uint32{
 	"server_custom_tag":    SERVER_CUSTOM_TAG,
 	"native_tag":           NATIVE_TAG,
 	"metrics":              METRICS,
+	"k8s_label":            K8S_LABEL,
 }
 
 func StringToExportedDataType(str string) uint32 {
@@ -138,9 +141,10 @@ func ExportedDataTypeBitsToString(bits uint32) string {
 }
 
 type Counter struct {
-	RecvCounter int64 `statsd:"recv-count"`
-	SendCounter int64 `statsd:"send-count"`
-	DropCounter int64 `statsd:"drop-count"`
+	RecvCounter          int64 `statsd:"recv-count"`
+	SendCounter          int64 `statsd:"send-count"`
+	DropCounter          int64 `statsd:"drop-count"`
+	DropNoTraceIDCounter int64 `statsd:"drop-no-traceid-count"`
 	utils.Closable
 }
 
@@ -171,6 +175,9 @@ func NewOtlpExporter(config *config.Config) *OtlpExporter {
 	for _, v := range config.Exporter.ExportDataTypes {
 		exportDataTypeBits |= uint32(StringToExportedDataType(v))
 	}
+	if config.Exporter.ExportCustomK8sLabelsRegexp != "" {
+		exportDataTypeBits |= K8S_LABEL
+	}
 	log.Infof("export data type bits: %08b, string: %s", exportDataTypeBits, ExportedDataTypeBitsToString(exportDataTypeBits))
 
 	dataQueues := queue.NewOverwriteQueues(
@@ -196,6 +203,10 @@ func NewOtlpExporter(config *config.Config) *OtlpExporter {
 }
 
 func (e *OtlpExporter) IsExportData(signalSource datatype.SignalSource) bool {
+	// always not export data from OTel
+	if signalSource == datatype.SIGNAL_SOURCE_OTEL {
+		return false
+	}
 	return (1<<uint32(signalSource))&e.exportDataBits != 0
 }
 
@@ -212,6 +223,10 @@ func (e *OtlpExporter) Start() {
 }
 
 func (e *OtlpExporter) queueProcess(queueID int) {
+	ctx := context.Background()
+	if len(e.config.Exporter.GrpcHeaders) > 0 {
+		ctx = metadata.NewOutgoingContext(ctx, metadata.New(e.config.Exporter.GrpcHeaders))
+	}
 	flows := make([]interface{}, 1024)
 	for {
 		n := e.dataQueues.Gets(queue.HashKey(queueID), flows)
@@ -222,7 +237,7 @@ func (e *OtlpExporter) queueProcess(queueID int) {
 			switch t := flow.(type) {
 			case (*log_data.L7FlowLog):
 				f := flow.(*log_data.L7FlowLog)
-				e.grpcExport(queueID, f)
+				e.grpcExport(ctx, queueID, f)
 				f.Release()
 			default:
 				log.Warningf("flow type(%T) unsupport", t)
@@ -232,7 +247,12 @@ func (e *OtlpExporter) queueProcess(queueID int) {
 	}
 }
 
-func (e *OtlpExporter) grpcExport(i int, f *log_data.L7FlowLog) {
+func (e *OtlpExporter) grpcExport(ctx context.Context, i int, f *log_data.L7FlowLog) {
+	if e.config.Exporter.ExportOnlyWithTraceID && f.TraceId == "" {
+		e.counter.DropNoTraceIDCounter++
+		e.counter.DropCounter++
+		return
+	}
 	req := L7FlowLogToExportRequest(f, e.universalTagsManager, e.exportDataTypeBits)
 	if e.grpcExporters[i] == nil {
 		if err := e.newGrpcExporter(i); err != nil {
@@ -243,7 +263,7 @@ func (e *OtlpExporter) grpcExport(i int, f *log_data.L7FlowLog) {
 			return
 		}
 	}
-	_, err := e.grpcExporters[i].Export(context.Background(), req)
+	_, err := e.grpcExporters[i].Export(ctx, req)
 	if err != nil {
 		if e.counter.DropCounter == 0 {
 			log.Warning("send grpc traces failed. err: %s", err)
