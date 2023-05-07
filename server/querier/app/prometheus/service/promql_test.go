@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package prometheus
+package service
 
 import (
 	"testing"

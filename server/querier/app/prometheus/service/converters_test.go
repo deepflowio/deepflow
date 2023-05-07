@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package prometheus
+package service
 
 import (
 	"context"
@@ -38,6 +38,17 @@ type promqlParse struct {
 	hasError bool
 }
 
+type metricParse struct {
+	input  string
+	output string
+
+	prefix prefix
+	db     string
+	table  string
+	ds     string
+	alias  string
+}
+
 type promqlHints struct {
 	matcher  string
 	stepMs   int64
@@ -56,6 +67,87 @@ func TestMain(m *testing.M) {
 
 	// run for test
 	m.Run()
+}
+
+func TestParseMetric(t *testing.T) {
+	metrics := []metricParse{
+		{
+			// illegal query
+			input:  "flow_metrics_vtap_flow_edge_port_rtt_max_1s",
+			output: "flow_metrics_vtap_flow_edge_port_rtt_max_1s",
+			table:  "flow_metrics_vtap_flow_edge_port_rtt_max_1s",
+			alias:  "metrics.%s",
+			prefix: prefixDeepFlow,
+		},
+		{
+			input:  "flow_metrics__vtap_flow_port__rtt_max__1m",
+			output: "rtt_max",
+			db:     "flow_metrics",
+			table:  "vtap_flow_port",
+			ds:     "1m",
+			alias:  "%s as `metrics.%s`",
+			prefix: prefixNone,
+		},
+		{
+			input:  "flow_metrics__vtap_flow_edge_port__rtt_max__1s",
+			output: "rtt_max",
+			db:     "flow_metrics",
+			table:  "vtap_flow_edge_port",
+			ds:     "1s",
+			alias:  "%s as `metrics.%s`",
+			prefix: prefixNone,
+		},
+		{
+			input:  "flow_log__l4_flow_log__duration",
+			output: "duration",
+			db:     "flow_log",
+			table:  "l4_flow_log",
+			alias:  "%s as `metrics.%s`",
+			prefix: prefixNone,
+		},
+		{
+			input:  "container_memory_usage_bytes",
+			output: "container_memory_usage_bytes",
+			table:  "container_memory_usage_bytes",
+			alias:  "metrics.%s",
+			prefix: prefixDeepFlow,
+		},
+		{
+			input:  "ext_metrics__metrics__prometheus_container_memory_usage_bytes",
+			output: "container_memory_usage_bytes",
+			db:     "ext_metrics",
+			table:  "prometheus.container_memory_usage_bytes",
+			alias:  "metrics.%s",
+			prefix: prefixTag,
+		},
+	}
+
+	Convey("TestParseMetric", t, func() {
+		for _, p := range metrics {
+			labelMatchers, err := parseMatchersParam([]string{p.input})
+			So(err, ShouldBeNil)
+			matchers := make([]*prompb.LabelMatcher, 0, len(labelMatchers[0]))
+
+			for _, l := range labelMatchers[0] {
+				matchers = append(matchers, &prompb.LabelMatcher{
+					Type:  prompb.LabelMatcher_Type(l.Type),
+					Name:  l.Name,
+					Value: l.Value,
+				})
+			}
+
+			Convey(p.input, func() {
+				prefix, metricName, db, table, ds, alias, err := parseMetric(matchers)
+				So(err, ShouldBeNil)
+				So(prefix, ShouldEqual, p.prefix)
+				So(metricName, ShouldEqual, p.output)
+				So(db, ShouldEqual, p.db)
+				So(table, ShouldEqual, p.table)
+				So(ds, ShouldEqual, p.ds)
+				So(alias, ShouldEqual, p.alias)
+			})
+		}
+	})
 }
 
 func TestPromReaderTransToSQL(t *testing.T) {
@@ -187,10 +279,7 @@ func TestPromReaderTransToSQL(t *testing.T) {
 		{
 			hints:    promqlHints{stepMs: 0, aggOp: "quantile", grouping: []string{"auto_instance_1"}, matcher: "flow_metrics__vtap_flow_edge_port__rtt_max__1s", by: true},
 			input:    "quantile by(auto_instance_1)(0.5,flow_metrics__vtap_flow_edge_port__rtt_max__1s)",
-			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,`auto_instance_1`,Percentile(`rtt_max`, 0) as `metrics.rtt_max` FROM vtap_flow_edge_port WHERE (time >= %d AND time <= %d) GROUP BY timestamp,`auto_instance_1` ORDER BY timestamp desc LIMIT %s", startS, endS, limit),
-			ds:       "1s",
-			db:       "flow_metrics",
-			hasError: false,
+			hasError: true,
 		},
 		{
 			hints:    promqlHints{stepMs: 0, aggOp: "", matcher: "demo_cpu_usage_seconds_total"},
@@ -271,8 +360,7 @@ func TestPromReaderTransToSQL(t *testing.T) {
 			So(sql, ShouldEqual, p.output)
 			So(db, ShouldEqual, p.db)
 			So(ds, ShouldEqual, p.ds)
-			log.Info(sql)
-
+			fmt.Println(sql)
 		}
 	})
 
