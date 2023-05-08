@@ -1031,7 +1031,7 @@ pub fn get_direction(
     } else if flow.flow_key.mac_src == flow.flow_key.mac_dst
         && (is_tt_pod(trident_type) || is_tt_workload(trident_type))
     {
-        return (Direction::LocalToLocal, Direction::None, false);
+        return (Direction::None, Direction::LocalToLocal, false);
     }
 
     // 返回值分别为统计点对应的zerodoc.DirectionEnum以及及是否添加追踪数据的开关，在微软
@@ -1393,7 +1393,7 @@ pub fn get_direction(
             | TridentType::TtPhysicalMachine
             | TridentType::TtHostPod
             | TridentType::TtVmPod => {
-                return (Direction::LocalToLocal, Direction::None, false);
+                return (Direction::None, Direction::LocalToLocal, false);
             }
             _ => (),
         }
