@@ -126,6 +126,7 @@ func (c *ControllerCheck) healthCheck() {
 			controllerIP = controller.PodIP
 			healthCheckPort = c.healthCheckPort
 		}
+		log.Infof("check controller(%s:%d) health", controllerIP, healthCheckPort)
 		active := isActive(common.HEALTH_CHECK_URL, controllerIP, healthCheckPort)
 		if controller.State == common.HOST_STATE_COMPLETE {
 			if active {
