@@ -43,7 +43,10 @@ func (h *dfHostCheck) duration() int64 {
 // TODO: 后续修改为通过RPC调用
 func isActive(urlPrefix string, ip string, port int) bool {
 	url := fmt.Sprintf(urlPrefix, ip, port)
-	response, err := http.Get(url)
+	client := http.Client{
+		Timeout: 60 * time.Second,
+	}
+	response, err := client.Get(url)
 	if err != nil {
 		log.Warningf("curl (%s) failed, (%v)", url, err)
 	} else if response.StatusCode != http.StatusOK {
