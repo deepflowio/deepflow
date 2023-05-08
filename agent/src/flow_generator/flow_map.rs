@@ -1268,21 +1268,24 @@ impl FlowMap {
     }
 
     fn push_to_flow_stats_queue(&mut self, config: &FlowConfig, mut tagged_flow: TaggedFlow) {
-        // 流在未结束时应用日志会需要这个字段，为了避免重复计算，所以在流统计完成输出时赋值
+        // This field is required for logging when the flow is not finished. To avoid
+        // double counting, it is assigned when the flow statistics are finished output
         //
-        // 目前仅虚拟流量会计算该统计位置
+        // Currently, only virtual traffic's tap_side is counted
         tagged_flow
             .flow
             .set_tap_side(config.trident_type, config.cloud_gateway_traffic);
 
-        // 未知应用仅统计指标量数据，并且判断条件需要考虑流持续时间等，所以在流统计完成输出时赋值
+        // Unknown application only counts metrics, and the judgment condition needs to consider
+        // the flow's duration, so the value is assigned when the flow is finished
         //
-        // 满足如下全部条件才会统计未知应用协议指标量：
-        // 1. TCP协议
-        // 2. 开启4层性能统计
-        // 3. 开启7层性能统计
-        // 4. 应用协议未能识别
-        // 5. 流结束或流持续60秒以上
+        // The L7Protocol::Unknown data's flow_perf_stats are collected only when all of the following conditions are met:
+        // 1. TCP protocol
+        // 2. l4_metrics_enabled = true
+        // 3. l7_metrics_enabled = true
+        // 4. The application protocol cannot be identified
+        // 5. The flow ends or the flow lasts more than 60 seconds
+        // 6. The L7PerfStats is valuable
 
         let flow = &mut tagged_flow.flow;
         if flow.flow_key.proto == IpProtocol::Tcp
@@ -1293,8 +1296,9 @@ impl FlowMap {
             if stats.l7_protocol == L7Protocol::Unknown
                 && (flow.close_type != CloseType::ForcedReport
                     || flow.duration >= L7_PROTOCOL_UNKNOWN_LIMIT)
+                && (stats.l7.request_count > 0 || stats.l7.response_count > 0)
             {
-                stats.l7_protocol = L7Protocol::Other;
+                stats.l7_protocol = L7Protocol::Other; // In order to the L7PerfStats to be counted, change it's l7_protocol to Other, the Unknown will not be counted
             }
         }
         self.output_buffer.push(Box::new(tagged_flow));
