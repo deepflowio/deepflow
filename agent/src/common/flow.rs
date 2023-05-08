@@ -18,7 +18,8 @@ use std::{
     fmt,
     mem::swap,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
-    process,
+    process, thread,
+    time::Duration,
 };
 
 use log::{error, warn};
@@ -1372,7 +1373,8 @@ pub fn get_direction(
             }
             _ => {
                 // 采集器类型不正确，不应该发生
-                error!("invalid trident type, trident will stop");
+                error!("invalid trident type, deepflow-agent restart...");
+                thread::sleep(Duration::from_secs(1));
                 process::exit(1)
             }
         }

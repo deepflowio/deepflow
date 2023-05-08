@@ -507,9 +507,15 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 		tagDes, ok := tag.GetTag(f.Args[0], f.DB, f.Table, f.Name)
 		if ok {
 			f.Value = tagDes.TagTranslator
-
 		} else {
-			f.Value = f.Args[0]
+			// Label
+			if strings.HasPrefix(f.Args[0], "label.") {
+				nodeType := strings.TrimSuffix(f.Args[0], "_0")
+				nodeType = strings.TrimSuffix(nodeType, "_1")
+				f.Value = "'" + nodeType + "'"
+			} else {
+				f.Value = f.Args[0]
+			}
 		}
 		return f.getViewNode()
 	case TAG_FUNCTION_ICON_ID:

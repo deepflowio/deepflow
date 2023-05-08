@@ -18,7 +18,7 @@ use std::collections::{HashMap, HashSet};
 #[cfg(target_os = "windows")]
 use std::ffi::CString;
 use std::mem;
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::process;
 use std::sync::{
     atomic::{AtomicBool, AtomicI64, Ordering},
@@ -140,6 +140,11 @@ impl BaseDispatcher {
     }
 
     pub(super) fn listener(&self) -> BaseDispatcherListener {
+        let default_address: IpAddr = if self.options.is_ipv6 {
+            Ipv6Addr::UNSPECIFIED.into()
+        } else {
+            Ipv4Addr::UNSPECIFIED.into()
+        };
         BaseDispatcherListener {
             id: self.id,
             src_interface: self.src_interface.clone(),
@@ -152,9 +157,9 @@ impl BaseDispatcher {
             #[cfg(target_os = "linux")]
             platform_poller: self.platform_poller.clone(),
             capture_bpf: "".into(),
-            proxy_controller_ip: Ipv4Addr::UNSPECIFIED.into(),
+            proxy_controller_ip: default_address,
             proxy_controller_port: DEFAULT_CONTROLLER_PORT,
-            analyzer_ip: Ipv4Addr::UNSPECIFIED.into(),
+            analyzer_ip: default_address,
             analyzer_port: DEFAULT_INGESTER_PORT,
             tunnel_type_bitmap: self.tunnel_type_bitmap.clone(),
             handler_builders: self.handler_builder.clone(),
@@ -203,7 +208,7 @@ impl BaseDispatcher {
     pub(super) fn init(&mut self) {
         if let Err(e) = self.engine.init() {
             error!(
-                "dispatcher recv_engine init error: {:?}, deepflow-agent restart...",
+                "dispatcher recv_engine init error: {}, deepflow-agent restart...",
                 e
             );
             thread::sleep(Duration::from_secs(1));
@@ -395,7 +400,7 @@ impl BaseDispatcher {
             }
             Err(e) => {
                 error!(
-                    "dispatcher recv_engine init error: {:?}, deepflow-agent restart...",
+                    "dispatcher recv_engine init error: {}, deepflow-agent restart...",
                     e
                 );
                 thread::sleep(Duration::from_secs(1));
@@ -798,6 +803,7 @@ impl BaseDispatcherListener {
         if self.options.af_packet_version != config.capture_socket_type.into() {
             // TODO：目前通过进程退出的方式修改AfPacket版本，后面需要支持动态修改
             info!("Afpacket version update, deepflow-agent restart...");
+            thread::sleep(Duration::from_secs(1));
             process::exit(1);
         }
     }

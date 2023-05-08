@@ -3,9 +3,7 @@ name: build cli
 on: 
   push:
     branches:
-      - main
       - v6.1
-      - 'feature-**'
     paths:
       - 'cli/**'
     tags:

@@ -242,7 +242,7 @@ pub fn controller_ip_check(ips: &[String]) {
     }
 
     error!(
-        "controller ip({:?}) is not support both IPv4 and IPv6, trident restart...",
+        "controller ip({:?}) is not support both IPv4 and IPv6, deepflow-agent restart...",
         ips
     );
 
@@ -388,7 +388,7 @@ pub fn trident_process_check(process_threshold: u32) {
         Ok(num) => {
             if num > process_threshold {
                 error!(
-                    "the number of process exceeds the limit({} > {})",
+                    "the number of process exceeds the limit({} > {}), deepflow-agent restart...",
                     num, process_threshold
                 );
                 thread::sleep(Duration::from_secs(1));
@@ -506,7 +506,10 @@ pub fn get_ctrl_ip_and_mac(dest: IpAddr) -> (IpAddr, MacAddr) {
         Some(ip) => {
             let ctrl_mac = get_mac_by_ip(ip);
             if ctrl_mac.is_err() {
-                error!("failed getting ctrl_mac from {}: {:?}", ip, ctrl_mac);
+                error!(
+                    "failed getting ctrl_mac from {}: {:?}, deepflow-agent restart...",
+                    ip, ctrl_mac
+                );
                 thread::sleep(Duration::from_secs(1));
                 process::exit(-1);
             }
@@ -515,7 +518,7 @@ pub fn get_ctrl_ip_and_mac(dest: IpAddr) -> (IpAddr, MacAddr) {
         None => {
             let tuple = get_route_src_ip_and_mac(&dest);
             if tuple.is_err() {
-                error!("failed getting control ip and mac");
+                error!("failed getting control ip and mac from {}, because: {:?}, deepflow-agent restart...", dest, tuple);
                 thread::sleep(Duration::from_secs(1));
                 process::exit(-1);
             }

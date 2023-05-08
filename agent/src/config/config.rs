@@ -487,7 +487,7 @@ impl YamlConfig {
         }
         if c.guard_interval < Duration::from_secs(1) || c.guard_interval > Duration::from_secs(3600)
         {
-            c.guard_interval = Duration::from_secs(60);
+            c.guard_interval = Duration::from_secs(10);
         }
 
         if c.kubernetes_api_list_limit < 10 {
@@ -693,6 +693,7 @@ pub struct FlowGeneratorConfig {
 
     pub ignore_tor_mac: bool,
     pub ignore_l2_end: bool,
+    pub ignore_idc_vlan: bool,
 }
 
 impl Default for FlowGeneratorConfig {
@@ -710,6 +711,7 @@ impl Default for FlowGeneratorConfig {
 
             ignore_tor_mac: false,
             ignore_l2_end: false,
+            ignore_idc_vlan: false,
         }
     }
 }

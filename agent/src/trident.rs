@@ -17,7 +17,7 @@
 use std::env;
 use std::fmt;
 use std::mem;
-use std::net::Ipv4Addr;
+use std::net::{Ipv4Addr, Ipv6Addr};
 use std::path::Path;
 use std::path::PathBuf;
 use std::process;
@@ -300,7 +300,10 @@ impl Trident {
                 stats_collector,
                 config_path,
             ) {
-                warn!("deepflow-agent exited: {}", e);
+                warn!(
+                    "Launching deepflow-agent failed: {}, deepflow-agent restart...",
+                    e
+                );
                 process::exit(1);
             }
         }));
@@ -410,7 +413,7 @@ impl Trident {
                 }
                 Err(e) => {
                     warn!(
-                        "initialize cgroup controller failed, {:?}, agent restart...",
+                        "initialize cgroup controller failed: {}, deepflow-agent restart...",
                         e
                     );
                     thread::sleep(Duration::from_secs(1));
@@ -524,7 +527,7 @@ impl Trident {
                     }
                     // EbpfCollector does not support recreation because it calls bpf_tracer_init, which can only be called once in a process
                     // Work around this problem by exiting and restart trident
-                    warn!("yaml_config updated, agent restart...");
+                    warn!("yaml_config updated, deepflow-agent restart...");
                     thread::sleep(Duration::from_secs(1));
                     process::exit(NORMAL_EXIT_WITH_RESTART);
                 }
@@ -1187,7 +1190,11 @@ impl Components {
                     "get route to {} failed: {:?}",
                     candidate_config.dispatcher.analyzer_ip, e
                 );
-                Ipv4Addr::UNSPECIFIED.into()
+                if ctrl_ip.is_ipv6() {
+                    Ipv6Addr::UNSPECIFIED.into()
+                } else {
+                    Ipv4Addr::UNSPECIFIED.into()
+                }
             }
         };
         let bpf_builder = bpf::Builder {

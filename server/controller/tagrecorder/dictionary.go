@@ -81,7 +81,6 @@ func (c *TagRecorder) UpdateChDictionary() {
 				} else {
 					clickHouseCfg.Host = address.IP
 				}
-				clickHouseCfg.Host = address.IP
 				for _, port := range subset.Ports {
 					if port.Name == "tcp-port" {
 						clickHouseCfg.Port = uint32(port.Port)

@@ -271,8 +271,16 @@ impl Collector {
         addr: A,
     ) -> MetricResult<StatsdClient> {
         info!("stats client connect to {:?}", &addr);
-
-        let socket = UdpSocket::bind("0.0.0.0:0")?;
+        let socket = match addr.to_socket_addrs()?.next() {
+            Some(SocketAddr::V4(_)) => UdpSocket::bind("0.0.0.0:0")?,
+            Some(SocketAddr::V6(_)) => UdpSocket::bind("[::]:0")?,
+            None => {
+                return Err(MetricError::from((
+                    cadence::ErrorKind::InvalidInput,
+                    "No socket addresses yielded",
+                )))
+            }
+        };
         let sink = DropletSink::from(addr, socket)?;
         Ok(StatsdClient::from_sink(STATS_PREFIX, sink))
     }

@@ -26,12 +26,10 @@ use std::{
 };
 
 use arc_swap::access::Access;
-#[cfg(target_os = "windows")]
 use bytesize::ByteSize;
 use chrono::prelude::*;
 use log::{debug, error, info, warn};
 
-#[cfg(target_os = "windows")]
 use super::process::get_memory_rss;
 use super::process::{
     get_current_sys_free_memory_percentage, get_file_and_size_sum, get_thread_num, FileAndSizeSum,
@@ -178,8 +176,7 @@ impl Guard {
         let log_dir = self.log_dir.clone();
         let interval = self.interval;
         let tap_mode = self.tap_mode;
-        #[cfg(target_os = "windows")]
-        let mut over_memory_limit = false; // Higher than the limit does not meet expectations, just for Windows, Linux will use cgroup to limit memory
+        let mut over_memory_limit = false; // Higher than the limit does not meet expectations
         let mut under_sys_free_memory_limit = false; // Below the limit, it does not meet expectations
         let cgroup_mount_path = self.cgroup_mount_path.clone();
         let is_cgroup_v2 = self.is_cgroup_v2;
@@ -189,8 +186,13 @@ impl Guard {
                 if !running_in_container() && tap_mode != TapMode::Analyzer && is_kernel_available_for_cgroup() {
                     Self::check_cgroup(cgroup_mount_path.clone(), is_cgroup_v2);
                 }
-                #[cfg(target_os = "windows")]
-                {
+
+                // Periodic memory checks are necessary:
+                // Cgroup does not count the memory of RssFile, and AF_PACKET Block occupies RssFile. 
+                // Therefore, using Cgroup to limit the memory usage may not be accurate in some scenarios. 
+                // Periodically checking the memory usage can determine whether the memory exceeds the limit.
+                // Reference: https://unix.stackexchange.com/questions/686814/cgroup-and-process-memory-statistics-mismatch
+                if tap_mode != TapMode::Analyzer {
                     let memory_limit = limit.load().max_memory;
                     if memory_limit != 0 {
                         match get_memory_rss() {
@@ -253,7 +255,7 @@ impl Guard {
                                 thread_num, thread_limit
                             );
                             if thread_num > thread_limit * 2 {
-                                error!("the number of thread exceeds the limit by 2 times, trident restart...");
+                                error!("the number of thread exceeds the limit by 2 times, deepflow-agent restart...");
                                 thread::sleep(Duration::from_secs(1));
                                 exit(NORMAL_EXIT_WITH_RESTART);
                             }

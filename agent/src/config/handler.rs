@@ -17,8 +17,7 @@
 use std::cmp::{max, min};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
-use std::net::IpAddr;
-use std::net::Ipv4Addr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::path::PathBuf;
 use std::process;
 use std::sync::Arc;
@@ -297,6 +296,7 @@ pub struct FlowConfig {
     pub flow_timeout: FlowTimeout,
     pub ignore_tor_mac: bool,
     pub ignore_l2_end: bool,
+    pub ignore_idc_vlan: bool,
 
     pub l7_metrics_enabled: bool,
     pub app_proto_log_enabled: bool,
@@ -346,6 +346,7 @@ impl From<&RuntimeConfig> for FlowConfig {
             }),
             ignore_tor_mac: flow_config.ignore_tor_mac,
             ignore_l2_end: flow_config.ignore_l2_end,
+            ignore_idc_vlan: flow_config.ignore_idc_vlan,
             l7_metrics_enabled: conf.l7_metrics_enabled,
             app_proto_log_enabled: conf.app_proto_log_enabled,
             l4_performance_enabled: conf.l4_performance_enabled,
@@ -749,10 +750,10 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
             get_ctrl_ip_and_mac(static_config.controller_ips[0].parse().unwrap());
         #[cfg(target_os = "windows")]
         let (ctrl_ip, _) = get_ctrl_ip_and_mac(static_config.controller_ips[0].parse().unwrap());
-        let dest_ip = conf
-            .analyzer_ip
-            .parse::<IpAddr>()
-            .unwrap_or(Ipv4Addr::UNSPECIFIED.into());
+        let dest_ip = conf.analyzer_ip.parse::<IpAddr>().unwrap_or(match ctrl_ip {
+            IpAddr::V4(_) => Ipv4Addr::UNSPECIFIED.into(),
+            IpAddr::V6(_) => Ipv6Addr::UNSPECIFIED.into(),
+        });
         let proxy_controller_ip = conf
             .proxy_controller_ip
             .parse()
@@ -1473,7 +1474,7 @@ impl ConfigHandler {
             }
         }
 
-        if candidate_config.tap_mode != TapMode::Analyzer && !running_in_container() {
+        if candidate_config.tap_mode != TapMode::Analyzer {
             if candidate_config.environment.max_memory != new_config.environment.max_memory {
                 info!(
                     "memory limit set to {}",
@@ -1486,7 +1487,7 @@ impl ConfigHandler {
                 info!("cpu limit set to {}", new_config.environment.max_cpus);
                 candidate_config.environment.max_cpus = new_config.environment.max_cpus;
             }
-        } else if candidate_config.tap_mode == TapMode::Analyzer || running_in_container() {
+        } else {
             let mut system = sysinfo::System::new();
             system.refresh_memory();
             let max_memory = system.total_memory();
@@ -1494,12 +1495,12 @@ impl ConfigHandler {
             let max_cpus = 1.max(system.cpus().len()) as u32;
 
             if candidate_config.environment.max_memory != max_memory {
-                info!("memory set ulimit when tap_mode=analyzer or running in a K8s pod");
+                info!("memory set ulimit when tap_mode=analyzer");
                 candidate_config.environment.max_memory = max_memory;
             }
 
             if candidate_config.environment.max_cpus != max_cpus {
-                info!("cpu set ulimit when tap_mode=analyzer or running in a K8s pod");
+                info!("cpu set ulimit when tap_mode=analyzer");
                 candidate_config.environment.max_cpus = max_cpus;
             }
         }

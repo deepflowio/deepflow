@@ -658,7 +658,7 @@ impl PlatformSynchronizer {
             if netns.is_empty() {
                 netns = new_netns;
             } else if netns != new_netns {
-                info!("query net namespaces changed from {:?} to {:?}, restart agent to create dispatcher for extra namespaces", netns, new_netns);
+                info!("query net namespaces changed from {:?} to {:?}, restart agent to create dispatcher for extra namespaces, deepflow-agent restart...", netns, new_netns);
                 thread::sleep(Duration::from_secs(1));
                 process::exit(NORMAL_EXIT_WITH_RESTART);
             }

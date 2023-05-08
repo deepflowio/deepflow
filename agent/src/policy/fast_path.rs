@@ -17,6 +17,8 @@
 use std::cmp::max;
 use std::net::IpAddr;
 use std::sync::{Arc, RwLock};
+use std::thread;
+use std::time::Duration;
 
 use ipnet::{IpNet, Ipv4Net};
 use log::{info, warn};
@@ -192,9 +194,10 @@ impl FastPath {
             }
             _ => {
                 warn!(
-                    "LookupKey({}) is invalid: ip address version is inconsistent.\n",
+                    "LookupKey({}) is invalid: ip address version is inconsistent, deepflow-agent restart...\n",
                     key
                 );
+                thread::sleep(Duration::from_secs(1));
                 std::process::exit(-1);
             }
         }
