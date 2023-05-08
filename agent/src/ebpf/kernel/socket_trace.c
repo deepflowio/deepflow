@@ -1115,11 +1115,15 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 		 * 同方向多个连续请求或回应的场景时，
 		 * 保持捕获数据的序列号保持不变。
 		 */
-		if (conn_info->keep_data_seq)
-			sk_info.seq = socket_info_ptr->seq;
-		else
-			sk_info.seq = ++socket_info_ptr->seq;
-
+		if (!conn_info->keep_data_seq) {
+			/*
+			 * Ensure that the accumulation operation of capturing the
+			 * data sequence number is an atomic operation when multiple
+			 * threads read/write to the socket simultaneously.
+			 */
+			__sync_fetch_and_add(&socket_info_ptr->seq, 1);
+		}
+		sk_info.seq = socket_info_ptr->seq;
 		socket_info_ptr->direction = conn_info->direction;
 		socket_info_ptr->msg_type = conn_info->message_type;
 		socket_info_ptr->update_time = time_stamp / NS_PER_SEC;
