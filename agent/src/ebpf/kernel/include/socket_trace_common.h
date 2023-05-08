@@ -95,8 +95,14 @@ struct trace_stats {
 };
 
 struct socket_info_t {
-	__u64 l7_proto: 8;
-	__u64 seq: 56; // socket 读写数据的序列号，用于排序
+	__u64 l7_proto;
+	/*
+	 * The serial number of the socket read and write data, used to
+	 * correct out-of-sequence.
+	 *
+	 * socket读写数据的序列号，用于纠正数据乱序。
+	 */
+	volatile __u64 seq;
 
 	/*
 	 * mysql, kafka这种类型在读取数据时，先读取4字节
