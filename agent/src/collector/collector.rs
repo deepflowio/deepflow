@@ -857,12 +857,15 @@ impl Stash {
             }
         }
 
-        let max_history = self.history_length.iter().fold(0, |acc, n| acc.max(*n));
-        if self.inner.capacity() > 2 * max_history {
-            // shrink stash if its capacity is larger than 2 times of the max stash length in the past HISTORY_RECORD_COUNT flushes
-            self.counter.stash_shrinks.fetch_add(1, Ordering::Relaxed);
-            self.inner
-                .shrink_to(Self::MIN_STASH_CAPACITY.max(2 * max_history));
+        let stash_cap = self.inner.capacity();
+        if stash_cap > Self::MIN_STASH_CAPACITY {
+            let max_history = self.history_length.iter().fold(0, |acc, n| acc.max(*n));
+            if stash_cap > 2 * max_history {
+                // shrink stash if its capacity is larger than 2 times of the max stash length in the past HISTORY_RECORD_COUNT flushes
+                self.counter.stash_shrinks.fetch_add(1, Ordering::Relaxed);
+                self.inner
+                    .shrink_to(Self::MIN_STASH_CAPACITY.max(2 * max_history));
+            }
         }
     }
 
