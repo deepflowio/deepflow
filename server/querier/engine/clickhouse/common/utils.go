@@ -164,6 +164,8 @@ func GetDatasourceInterval(db string, table string, name string) (int, error) {
 			tsdbType = "flow"
 		} else if table == "vtap_app_port" || table == "vtap_app_edge_port" {
 			tsdbType = "app"
+		} else if table == "vtap_acl" {
+			return 60, nil
 		}
 	default:
 		return 1, nil
