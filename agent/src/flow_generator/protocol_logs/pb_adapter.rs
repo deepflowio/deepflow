@@ -56,6 +56,7 @@ pub struct ExtendedInfo {
     pub x_request_id: Option<String>,
     pub user_agent: Option<String>,
     pub referer: Option<String>,
+    pub protocol_str: Option<String>,
     pub attributes: Option<Vec<KeyVal>>,
 }
 
@@ -151,6 +152,9 @@ impl L7ProtocolSendLog {
             }
             if let Some(referer) = ext.referer {
                 ext_info.http_referer = referer;
+            }
+            if let Some(proto_str) = ext.protocol_str {
+                ext_info.protocol_str = proto_str;
             }
             if let Some(attr) = ext.attributes {
                 for kv in attr.into_iter() {
