@@ -432,6 +432,12 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 			outerSlice = append(outerSlice, " PREWHERE ("+outerWhereLeftSql+") IN ("+innerTransSql+") AND ")
 			outerSlice = append(outerSlice, oldWhereSlice[1])
 			outerSql = strings.Join(outerSlice, "")
+		} else if strings.Contains(outerTransSql, " WHERE ") {
+			oldWhereSlice := strings.Split(outerTransSql, " WHERE ")
+			outerSlice = append(outerSlice, oldWhereSlice[0])
+			outerSlice = append(outerSlice, " WHERE ("+outerWhereLeftSql+") IN ("+innerTransSql+") AND ")
+			outerSlice = append(outerSlice, oldWhereSlice[1])
+			outerSql = strings.Join(outerSlice, "")
 		}
 	} else {
 		outerSql = outerTransSql
@@ -465,6 +471,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 	}
 	rst, err := chClient.DoQuery(params)
 	if err != nil {
+		log.Error(err)
 		return nil, debug.Get(), err
 	}
 	return rst, debug.Get(), err

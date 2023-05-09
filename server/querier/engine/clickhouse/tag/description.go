@@ -51,11 +51,11 @@ var TAG_STRING_ENUMS = map[string][]*TagEnum{}
 
 var tagTypeToOperators = map[string][]string{
 	"resource":    []string{"=", "!=", "IN", "NOT IN", "LIKE", "NOT LIKE", "REGEXP", "NOT REGEXP"},
-	"int":         []string{"=", "!=", "IN", "NOT IN", ">=", "<="},
-	"int_enum":    []string{"=", "!=", "IN", "NOT IN", ">=", "<="},
+	"int":         []string{"=", "!=", "IN", "NOT IN", ">=", "<=", ">", "<"},
+	"int_enum":    []string{"=", "!=", "IN", "NOT IN", ">=", "<=", ">", "<"},
 	"string":      []string{"=", "!=", "IN", "NOT IN", "LIKE", "NOT LIKE", "REGEXP", "NOT REGEXP"},
 	"string_enum": []string{"=", "!=", "IN", "NOT IN", "LIKE", "NOT LIKE", "REGEXP", "NOT REGEXP"},
-	"ip":          []string{"=", "!=", "IN", "NOT IN", ">=", "<="},
+	"ip":          []string{"=", "!=", "IN", "NOT IN", ">=", "<=", ">", "<"},
 	"time":        []string{"=", "!=", ">=", "<="},
 	"mac":         []string{"=", "!=", "IN", "NOT IN"},
 	"id":          []string{"=", "!=", "IN", "NOT IN"},

@@ -558,9 +558,9 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 				minIP := common.IPFilterStringToHex("'" + cidr.Masked().Range().From().String() + "'")
 				maxIP := common.IPFilterStringToHex("'" + cidr.Masked().Range().To().String() + "'")
 				cidrFilter := ""
-				if ipOp == ">=" {
+				if ipOp == ">=" || ipOp == ">" {
 					cidrFilter = fmt.Sprintf(tagItem.WhereTranslator, ipOp, maxIP)
-				} else if ipOp == "<=" {
+				} else if ipOp == "<=" || ipOp == "<" {
 					cidrFilter = fmt.Sprintf(tagItem.WhereTranslator, ipOp, minIP)
 				} else {
 					cidrFilter = "(" + fmt.Sprintf(tagItem.WhereTranslator, ">=", minIP) + " AND " + fmt.Sprintf(tagItem.WhereTranslator, "<=", maxIP) + ")"
@@ -572,7 +572,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 				cidrFilterStr = "(" + strings.Join(cidrFilters, " OR ") + ")"
 			}
 			if len(ips) != 0 {
-				if ipOp == ">=" || ipOp == "<=" {
+				if ipOp == ">=" || ipOp == "<=" || ipOp == ">" || ipOp == "<" {
 					ipFilters := []string{}
 					for _, ip := range ips {
 						ipFilters = append(ipFilters, fmt.Sprintf(tagItem.WhereTranslator, ipOp, ip))
