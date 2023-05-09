@@ -53,6 +53,7 @@ pub struct FlowAggrCounter {
     drop_in_throttle: AtomicU64,
     stash_total_len: AtomicU64,
     stash_total_capacity: AtomicU64,
+    stash_shrinks: AtomicU64,
 }
 
 pub struct FlowAggrThread {
@@ -133,6 +134,7 @@ pub struct FlowAggr {
     output: ThrottlingQueue,
     slot_start_time: Duration,
     stashs: VecDeque<HashMap<u64, TaggedFlow>>,
+    history_length: VecDeque<usize>,
 
     last_flush_time: Duration,
     config: CollectorAccess,
@@ -144,6 +146,10 @@ pub struct FlowAggr {
 }
 
 impl FlowAggr {
+    // record stash size in last N flushes to determine shrinking size
+    const HISTORY_RECORD_COUNT: usize = 10;
+    const MIN_STASH_CAPACITY: usize = 1024;
+
     pub fn new(
         input: Arc<Receiver<Arc<TaggedFlow>>>,
         output: DebugSender<BoxedTaggedFlow>,
@@ -160,6 +166,7 @@ impl FlowAggr {
             input,
             output: ThrottlingQueue::new(output, config.clone()),
             stashs,
+            history_length: [0; Self::HISTORY_RECORD_COUNT].into(),
             slot_start_time: Duration::ZERO,
             last_flush_time: Duration::ZERO,
             config,
@@ -255,9 +262,24 @@ impl FlowAggr {
 
     fn flush_front_slot_and_rotate(&mut self) {
         let mut slot_map = self.stashs.pop_front().unwrap();
+
+        self.history_length.rotate_right(1);
+        self.history_length[0] = slot_map.len();
+
         for (_, v) in slot_map.drain() {
             self.send_flow(v);
         }
+
+        let stash_cap = slot_map.capacity();
+        if stash_cap > Self::MIN_STASH_CAPACITY {
+            let max_history = self.history_length.iter().fold(0, |acc, n| acc.max(*n));
+            if stash_cap > 2 * max_history {
+                // shrink stash if its capacity is larger than 2 times of the max stash length in the past HISTORY_RECORD_COUNT flushes
+                self.metrics.stash_shrinks.fetch_add(1, Ordering::Relaxed);
+                slot_map.shrink_to(Self::MIN_STASH_CAPACITY.max(2 * max_history));
+            }
+        }
+
         self.stashs.push_back(slot_map);
         self.last_flush_time = get_timestamp(self.ntp_diff.load(Ordering::Relaxed));
         self.slot_start_time += Duration::from_secs(SECONDS_IN_MINUTE);
@@ -351,6 +373,11 @@ impl RefCountable for FlowAggrCounter {
                 "stash-total-capacity",
                 CounterType::Counted,
                 CounterValue::Unsigned(self.stash_total_capacity.load(Ordering::Relaxed)),
+            ),
+            (
+                "stash-shrinks",
+                CounterType::Counted,
+                CounterValue::Unsigned(self.stash_shrinks.load(Ordering::Relaxed)),
             ),
         ]
     }
