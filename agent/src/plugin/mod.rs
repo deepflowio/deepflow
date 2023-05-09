@@ -375,11 +375,7 @@ impl L7ProtocolInfoInterface for CustomInfo {
 }
 
 impl From<CustomInfo> for L7ProtocolSendLog {
-    fn from(mut w: CustomInfo) -> Self {
-        w.attributes.push(KeyVal {
-            key: "custom_proto_str".to_string(),
-            val: w.proto_str,
-        });
+    fn from(w: CustomInfo) -> Self {
         Self {
             req_len: w.req_len,
             resp_len: w.resp_len,
@@ -411,6 +407,7 @@ impl From<CustomInfo> for L7ProtocolSendLog {
             ext_info: Some(ExtendedInfo {
                 request_id: w.request_id,
                 attributes: Some(w.attributes),
+                protocol_str: Some(w.proto_str),
                 ..Default::default()
             }),
             ..Default::default()
