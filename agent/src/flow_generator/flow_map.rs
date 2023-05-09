@@ -70,6 +70,7 @@ use crate::{
         handler::{L7LogDynamicConfig, LogParserAccess, LogParserConfig},
         FlowAccess, FlowConfig, ModuleConfig, RuntimeConfig,
     },
+    metric::document::TapSide,
     policy::{Policy, PolicyGetter},
     rpc::get_timestamp,
     utils::stats::{self, Countable, StatsOption},
@@ -1611,9 +1612,12 @@ impl FlowMap {
             }
         }
 
+        let mut reset_tap_side;
         {
             let src_info = node.endpoint_data_cache[0].src_info;
             let peer_src = &mut node.tagged_flow.flow.flow_metrics_peers[0];
+            reset_tap_side =
+                peer_src.is_l2_end != src_info.l2_end || peer_src.is_l3_end != src_info.l3_end;
             peer_src.is_device = src_info.is_device;
             peer_src.is_vip_interface = src_info.is_vip_interface;
             peer_src.is_l2_end = src_info.l2_end;
@@ -1629,6 +1633,9 @@ impl FlowMap {
         {
             let dst_info = node.endpoint_data_cache[0].dst_info;
             let peer_dst = &mut node.tagged_flow.flow.flow_metrics_peers[1];
+            reset_tap_side = reset_tap_side
+                || peer_dst.is_l2_end != dst_info.l2_end
+                || peer_dst.is_l3_end != dst_info.l3_end;
             peer_dst.is_device = dst_info.is_device;
             peer_dst.is_vip_interface = dst_info.is_vip_interface;
             peer_dst.is_l2_end = dst_info.l2_end;
@@ -1640,6 +1647,10 @@ impl FlowMap {
             }
             peer_dst.is_local_mac = dst_info.is_local_mac;
             peer_dst.is_local_ip = dst_info.is_local_ip;
+        }
+        // When there is a change in l2end or l3end, the tap side needs to be recalculated
+        if reset_tap_side {
+            node.tagged_flow.flow.tap_side = TapSide::Rest;
         }
 
         // update policy data
