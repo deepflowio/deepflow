@@ -1173,7 +1173,7 @@ pub fn get_direction(
             if flow.flow_key.mac_src == flow.flow_key.mac_dst
                 && (is_tt_pod(trident_type) || is_tt_workload(trident_type))
             {
-                return [Direction::LocalToLocal, Direction::None];
+                return [Direction::None, Direction::LocalToLocal];
             }
         }
     }
@@ -1458,7 +1458,7 @@ pub fn get_direction(
             | TridentType::TtPhysicalMachine
             | TridentType::TtHostPod
             | TridentType::TtVmPod => {
-                return [Direction::LocalToLocal, Direction::None];
+                return [Direction::None, Direction::LocalToLocal];
             }
             _ => (),
         }
