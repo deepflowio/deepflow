@@ -17,6 +17,8 @@
 package tagrecorder
 
 import (
+	"time"
+
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder/config"
 )
@@ -84,12 +86,38 @@ func (b *UpdaterBase[MT, KT]) Refresh() {
 		if len(itemsToDelete) > 0 {
 			b.operateBatch(keysToDelete, itemsToDelete, b.delete)
 		}
+
+		if len(itemsToDelete) > 0 && len(itemsToAdd) == 0 {
+			updateDBItem, updateOK := b.generateOneData()
+			if updateOK {
+				for key, updateDBItem := range updateDBItem {
+					updateTimeInfo := make(map[string]interface{})
+					now := time.Now()
+					updateTimeInfo["updated_at"] = now.Format("2023-01-01 12:12:12")
+					b.update(updateDBItem, updateTimeInfo, key)
+				}
+			}
+		}
 	}
 }
 
 func (b *UpdaterBase[MT, KT]) generateOldData() (map[KT]MT, bool) {
 	var items []MT
 	err := mysql.Db.Unscoped().Find(&items).Error
+	if err != nil {
+		log.Errorf(dbQueryResourceFailed(b.resourceTypeName, err))
+		return nil, false
+	}
+	idToItem := make(map[KT]MT)
+	for _, item := range items {
+		idToItem[b.dataGenerator.generateKey(item)] = item
+	}
+	return idToItem, true
+}
+
+func (b *UpdaterBase[MT, KT]) generateOneData() (map[KT]MT, bool) {
+	var items []MT
+	err := mysql.Db.Unscoped().Find(&items, 1).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(b.resourceTypeName, err))
 		return nil, false

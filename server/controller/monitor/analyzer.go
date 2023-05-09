@@ -100,7 +100,10 @@ func (c *AnalyzerCheck) healthCheck() {
 		ipToController[controller.IP] = &controllers[i]
 	}
 
-	mysql.Db.Not("state = ?", common.HOST_STATE_MAINTENANCE).Order("state desc").Find(&analyzers)
+	if err := mysql.Db.Where("state != ?", common.HOST_STATE_MAINTENANCE).Order("state desc").Find(&analyzers).Error; err != nil {
+		log.Errorf("get analyzer from db error: %v", err)
+		return
+	}
 	for _, analyzer := range analyzers {
 		// use pod ip in master region if pod_ip != null
 		analyzerIP := analyzer.IP
