@@ -941,6 +941,7 @@ impl Flow {
 
         self.end_time = other.end_time;
         self.duration = other.duration;
+        self.tap_side = other.tap_side;
 
         if other.flow_perf_stats.is_some() {
             let x = other.flow_perf_stats.as_ref().unwrap();
