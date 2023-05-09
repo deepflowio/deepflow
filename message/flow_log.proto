@@ -193,6 +193,7 @@ message ExtendedInfo {
     string http_user_agent = 6;
     string http_referer = 7;
     string rpc_service = 8;
+    string protocol_str = 9;
 
     repeated string attribute_names = 16;
     repeated string attribute_values= 17;
