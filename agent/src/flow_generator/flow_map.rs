@@ -73,6 +73,7 @@ use crate::{
         handler::{L7LogDynamicConfig, LogParserAccess, LogParserConfig},
         FlowAccess, FlowConfig, ModuleConfig, RuntimeConfig,
     },
+    metric::document::TapSide,
     plugin::wasm::{
         get_all_wasm_export_func_name, get_wasm_metric_counter_map_key, init_wasmtime, WasmCounter,
         WasmCounterMap, WasmVm,
@@ -983,7 +984,7 @@ impl FlowMap {
         node.recent_time = lookup_key.timestamp;
         node.timeout = Duration::ZERO;
         node.packet_in_tick = true;
-        node.policy_in_tick;
+        node.policy_in_tick = policy_in_tick;
         node.flow_state = FlowState::Raw;
         node.meta_flow_log = None;
         node.next_tcp_seq0 = 0;
@@ -1802,6 +1803,8 @@ impl FlowMap {
         if let Some(ep) = node.endpoint_data_cache.as_ref() {
             let src_info = ep.src_info();
             let peer_src = &mut node.tagged_flow.flow.flow_metrics_peers[0];
+            let mut reset_tap_side =
+                peer_src.is_l2_end != src_info.l2_end || peer_src.is_l3_end != src_info.l3_end;
             peer_src.is_device = src_info.is_device;
             peer_src.is_vip_interface = src_info.is_vip_interface;
             peer_src.is_l2_end = src_info.l2_end;
@@ -1819,6 +1822,9 @@ impl FlowMap {
 
             let dst_info = ep.dst_info();
             let peer_dst = &mut node.tagged_flow.flow.flow_metrics_peers[1];
+            reset_tap_side = reset_tap_side
+                || peer_dst.is_l2_end != dst_info.l2_end
+                || peer_dst.is_l3_end != dst_info.l3_end;
             peer_dst.is_device = dst_info.is_device;
             peer_dst.is_vip_interface = dst_info.is_vip_interface;
             peer_dst.is_l2_end = dst_info.l2_end;
@@ -1832,6 +1838,10 @@ impl FlowMap {
             {
                 meta_packet.lookup_key.dst_nat_ip = dst_info.real_ip;
                 meta_packet.lookup_key.dst_nat_source = TapPort::NAT_SOURCE_VIP;
+            }
+            // When there is a change in l2end or l3end, the tap side needs to be recalculated
+            if reset_tap_side {
+                node.tagged_flow.flow.tap_side = TapSide::Rest;
             }
         }
 
