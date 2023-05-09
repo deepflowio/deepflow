@@ -33,7 +33,7 @@ use arc_swap::{
     access::{Access, Map},
     ArcSwap,
 };
-use log::{debug, error, warn};
+use log::{debug, error, info, warn};
 
 use super::{
     app_table::AppTable,
@@ -70,6 +70,7 @@ use crate::{
         handler::{L7LogDynamicConfig, LogParserAccess, LogParserConfig},
         FlowAccess, FlowConfig, ModuleConfig, RuntimeConfig,
     },
+    metric::document::TapSide,
     plugin::wasm::{init_wasmtime, WasmVm},
     policy::{Policy, PolicyGetter},
     rpc::get_timestamp,
@@ -1056,7 +1057,15 @@ impl FlowMap {
                 meta_packet.lookup_key.src_nat_source = TapPort::NAT_SOURCE_TOA;
             }
             (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
+            info!(
+                "flow_id: {:}: {:?}",
+                node.tagged_flow.flow.flow_id, &node.tagged_flow.flow
+            );
             self.update_endpoint_and_policy_data(node, meta_packet);
+            info!(
+                "flow_id: {:}: {:?}",
+                node.tagged_flow.flow.flow_id, &node.tagged_flow.flow
+            );
         } else {
             // copy endpoint and policy data
             meta_packet
@@ -1378,6 +1387,9 @@ impl FlowMap {
         tagged_flow
             .flow
             .set_tap_side(config.trident_type, config.cloud_gateway_traffic);
+        if tagged_flow.flow.tap_side == TapSide::ServerGateway {
+            info!("{:?}", &tagged_flow.flow);
+        }
 
         // Unknown application only counts metrics, and the judgment condition needs to consider
         // the flow's duration, so the value is assigned when the flow is finished
@@ -1740,6 +1752,8 @@ impl FlowMap {
         {
             let src_info = node.endpoint_data_cache[0].src_info;
             let peer_src = &mut node.tagged_flow.flow.flow_metrics_peers[0];
+            let reset_tap_side =
+                peer_src.is_l2_end != src_info.l2_end || peer_src.is_l3_end != src_info.l3_end;
             peer_src.is_device = src_info.is_device;
             peer_src.is_vip_interface = src_info.is_vip_interface;
             peer_src.is_l2_end = src_info.l2_end;
@@ -1754,10 +1768,15 @@ impl FlowMap {
                 meta_packet.lookup_key.src_nat_ip = src_info.real_ip;
                 meta_packet.lookup_key.src_nat_source = TapPort::NAT_SOURCE_VIP;
             }
+            if reset_tap_side {
+                node.tagged_flow.flow.tap_side = TapSide::Rest;
+            }
         }
         {
             let dst_info = node.endpoint_data_cache[0].dst_info;
             let peer_dst = &mut node.tagged_flow.flow.flow_metrics_peers[1];
+            let reset_tap_side =
+                peer_dst.is_l2_end != dst_info.l2_end || peer_dst.is_l3_end != dst_info.l3_end;
             peer_dst.is_device = dst_info.is_device;
             peer_dst.is_vip_interface = dst_info.is_vip_interface;
             peer_dst.is_l2_end = dst_info.l2_end;
@@ -1771,6 +1790,9 @@ impl FlowMap {
             {
                 meta_packet.lookup_key.dst_nat_ip = dst_info.real_ip;
                 meta_packet.lookup_key.dst_nat_source = TapPort::NAT_SOURCE_VIP;
+            }
+            if reset_tap_side {
+                node.tagged_flow.flow.tap_side = TapSide::Rest;
             }
         }
 

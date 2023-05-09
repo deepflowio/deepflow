@@ -22,7 +22,7 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use ipnetwork::IpNetwork;
-use log::debug;
+use log::info;
 use lru::LruCache;
 use pnet::datalink::NetworkInterface;
 
@@ -148,7 +148,7 @@ impl Forward {
         table: &mut TableLruCache,
         platforms: &Vec<Arc<PlatformData>>,
     ) {
-        debug!("Platform L3:");
+        info!("Platform L3:");
         for platform in platforms {
             if platform.mac == 0 {
                 continue;
@@ -181,7 +181,7 @@ impl Forward {
                     ip: ip.raw_ip,
                     mac,
                 };
-                debug!("\t{} {}", key.mac, key.ip);
+                info!("\t{} {}", key.mac, key.ip);
                 table.push(key, value);
             }
         }
@@ -227,7 +227,8 @@ impl Forward {
         interfaces: &Vec<NetworkInterface>,
     ) {
         let ips = Self::get_ip_from_lookback(trident_type, interfaces);
-        debug!("Interface L3:");
+        info!("Interface L3:");
+        info!("Interface L3: All {:?}", interfaces);
         for interface in interfaces {
             if interface.is_loopback() || !interface.is_up() || interface.mac.is_none() {
                 continue;
@@ -255,7 +256,7 @@ impl Forward {
                     ip: ip.ip(),
                     mac,
                 };
-                debug!("\t{} {}", key.mac, key.ip);
+                info!("\t{} {}", key.mac, key.ip);
                 table.push(key, value);
             }
         }

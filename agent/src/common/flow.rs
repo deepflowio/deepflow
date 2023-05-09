@@ -22,7 +22,7 @@ use std::{
     time::Duration,
 };
 
-use log::{error, warn};
+use log::{error, info, warn};
 use serde::{Serialize, Serializer};
 
 #[cfg(target_os = "linux")]
@@ -939,6 +939,7 @@ impl Flow {
 
         self.end_time = other.end_time;
         self.duration = other.duration;
+        self.tap_side = other.tap_side;
 
         if other.flow_perf_stats.is_some() {
             let x = other.flow_perf_stats.as_ref().unwrap();
@@ -1055,6 +1056,11 @@ impl Flow {
         // 链路追踪统计位置
         let [src_tap_side, dst_tap_side] =
             get_direction(&*self, trident_type, cloud_gateway_traffic);
+        if src_tap_side == Direction::ServerGatewayToClient
+            || dst_tap_side == Direction::ClientGatewayToServer
+        {
+            info!("{:?} {:?}: {:?}", src_tap_side, dst_tap_side, self);
+        }
 
         if src_tap_side != Direction::None && dst_tap_side == Direction::None {
             self.tap_side = src_tap_side.into();
