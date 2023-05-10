@@ -81,14 +81,14 @@ vtap_group_id: g-xxxxxx
 ## Length: [0, 65535]
 ## Default:
 ##   Localhost:   lo
-##   Common NIC:  eth.*|en[ospx].*
+##   Common NIC:  eth.*|en[osipx].*
 ##   QEMU VM NIC: tap.*
 ##   Flannel:     veth.*
 ##   Calico:      cali.*
 ##   Cilium:      lxc.*
 ##   Kube-OVN:    [0-9a-f]+_h$
 ## Note: Regular expression of NIC name for collecting traffic
-#tap_interface_regex: ^(tap.*|cali.*|veth.*|eth.*|en[ospx].*|lxc.*|lo|[0-9a-f]+_h)$
+#tap_interface_regex: ^(tap.*|cali.*|veth.*|eth.*|en[osipx].*|lxc.*|lo|[0-9a-f]+_h)$
 
 ## Traffic Capture Filter
 ## Length: [1, 512]
