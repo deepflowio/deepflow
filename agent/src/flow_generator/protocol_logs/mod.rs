@@ -352,7 +352,6 @@ pub struct AppProtoLogsData {
     pub base_info: AppProtoLogsBaseInfo,
     #[serde(flatten)]
     pub special_info: L7ProtocolInfo,
-    #[serde(flatten)]
     pub direction_score: u8,
 }
 

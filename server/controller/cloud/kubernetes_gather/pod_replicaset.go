@@ -69,7 +69,7 @@ func (k *KubernetesGather) getReplicaSetsAndReplicaSetControllers() (podRSs []mo
 			continue
 		}
 		labels := metaData.Get("labels").MustMap()
-		labelSlice := cloudcommon.StringInterfaceMapKVs(labels, ":")
+		labelSlice := cloudcommon.StringInterfaceMapKVs(labels, ":", 0)
 		labelString := strings.Join(labelSlice, ", ")
 		if !k.podGroupLcuuids.Contains(podGroupLcuuid) {
 			podGroupLcuuid = uID

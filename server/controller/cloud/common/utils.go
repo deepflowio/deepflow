@@ -62,9 +62,12 @@ func StringInterfaceMapKeys(m map[string]interface{}) (keys []string) {
 	return
 }
 
-func StringInterfaceMapKVs(m map[string]interface{}, sep string) (items []string) {
+func StringInterfaceMapKVs(m map[string]interface{}, sep string, valueMaxLength int) (items []string) {
 	keys := []string{}
 	for key := range m {
+		if valueMaxLength != 0 && len(m[key].(string)) > valueMaxLength {
+			continue
+		}
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)

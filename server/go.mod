@@ -4,6 +4,7 @@ go 1.18
 
 replace (
 	cloud.google.com/go => cloud.google.com/go v0.103.0
+	github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/expand => ./controller/cloud/kubernetes_gather/expand
 	github.com/deepflowio/deepflow/server/controller/cloud/platform => ./controller/cloud/platform
 	github.com/deepflowio/deepflow/server/controller/db/mysql/migrator => ./controller/db/mysql/migrator
 	github.com/deepflowio/deepflow/server/controller/http/service/configuration => ./controller/http/service/configuration
@@ -30,6 +31,7 @@ require (
 	github.com/deckarep/golang-set v1.8.0
 	github.com/deckarep/golang-set/v2 v2.1.0
 	github.com/deepflowio/deepflow/message v0.0.0-20230418145328-3e66ba01c379
+	github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/expand v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/cloud/platform v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/db/mysql/migrator v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/http/service/configuration v0.0.0-00010101000000-000000000000

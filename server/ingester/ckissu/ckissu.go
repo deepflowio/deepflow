@@ -564,12 +564,6 @@ var ColumnAdd620 = []*ColumnAdds{
 		ColumnType:  ckdb.UInt32,
 	},
 	&ColumnAdds{
-		Dbs:         []string{"event"},
-		Tables:      []string{"event", "event_local"},
-		ColumnNames: []string{"gprocess_id"},
-		ColumnType:  ckdb.UInt32,
-	},
-	&ColumnAdds{
 		Dbs:         []string{"flow_log"},
 		Tables:      []string{"l4_packet", "l4_packet_local"},
 		ColumnNames: []string{"packet_batch"},
