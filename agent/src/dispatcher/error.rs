@@ -17,7 +17,7 @@
 use num_enum::{TryFromPrimitive, TryFromPrimitiveError};
 use thiserror::Error;
 
-use public::netns;
+use public::{error, netns};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -29,6 +29,8 @@ pub enum Error {
     PacketInvalid(String),
     #[error("dispatcher stats collector: {0}")]
     StatsCollector(&'static str),
+    #[error("recv engine failure: {0}")]
+    RecvEngineFailure(String),
     #[error("dispatcher winpcap: {0}")]
     WinPcap(String), // Enterprise Edition Feature: windows-dispatcher
     #[error("flavor dispatcher is empty")]
@@ -46,6 +48,12 @@ impl<T: TryFromPrimitive> From<TryFromPrimitiveError<T>> for Error {
 impl From<netns::Error> for Error {
     fn from(e: netns::Error) -> Self {
         Error::NetNs(e.to_string())
+    }
+}
+
+impl From<error::Error> for Error {
+    fn from(e: error::Error) -> Self {
+        Error::RecvEngineFailure(e.to_string())
     }
 }
 
