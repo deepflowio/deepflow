@@ -146,6 +146,7 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 		Enabled:           proto.Bool(Int2Bool(c.GetVTapEnabled())),
 		Host:              proto.String(c.GetVTapHost()),
 		ProxyControllerIp: proto.String(c.GetControllerIP()),
+		AnalyzerIp:        proto.String(c.GetTSDBIP()),
 		VtapId:            &vtapID,
 		TridentType:       &tridentType,
 		EpcId:             &vpcID,
@@ -177,21 +178,24 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 		}
 	}
 
-	if vtapConfig.ProxyControllerIP != "" {
-		configure.ProxyControllerIp = proto.String(vtapConfig.ProxyControllerIP)
-		configure.ProxyControllerPort = proto.Uint32(uint32(vtapConfig.ProxyControllerPort))
-	} else {
-		if vtapConfig.NatIPEnabled == 1 {
-			configure.ProxyControllerIp = proto.String(trisolaris.GetGNodeInfo().GetControllerNatIP(c.GetControllerIP()))
-			configure.ProxyControllerPort = proto.Uint32(uint32(DefaultProxyControllerPort))
-		} else if isPodVTap(c.GetVTapType()) && gVTapInfo.IsTheSameCluster(clusterID) {
-			configure.ProxyControllerIp = proto.String(trisolaris.GetGNodeInfo().GetControllerPodIP(c.GetControllerIP()))
-			configure.ProxyControllerPort = proto.Uint32(uint32(trisolaris.GetGrpcPort()))
-		}
+	if vtapConfig.NatIPEnabled == 1 {
+		configure.ProxyControllerIp = proto.String(trisolaris.GetGNodeInfo().GetControllerNatIP(c.GetControllerIP()))
+		configure.ProxyControllerPort = proto.Uint32(uint32(DefaultProxyControllerPort))
+	} else if isPodVTap(c.GetVTapType()) && gVTapInfo.IsTheSameCluster(clusterID) {
+		configure.ProxyControllerIp = proto.String(trisolaris.GetGNodeInfo().GetControllerPodIP(c.GetControllerIP()))
+		configure.ProxyControllerPort = proto.Uint32(uint32(trisolaris.GetGrpcPort()))
 	}
 
+	if vtapConfig.ProxyControllerIP != "" {
+		configure.ProxyControllerIp = proto.String(vtapConfig.ProxyControllerIP)
+	}
+	if vtapConfig.ProxyControllerPort != 0 {
+		configure.ProxyControllerPort = proto.Uint32(uint32(vtapConfig.ProxyControllerPort))
+	}
 	if vtapConfig.AnalyzerIP != "" {
 		configure.AnalyzerIp = proto.String(vtapConfig.AnalyzerIP)
+	}
+	if vtapConfig.AnalyzerPort != 0 {
 		configure.AnalyzerPort = proto.Uint32(uint32(vtapConfig.AnalyzerPort))
 	}
 
