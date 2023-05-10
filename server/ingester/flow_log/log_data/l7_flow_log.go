@@ -328,7 +328,11 @@ func (h *L7FlowLog) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfo
 
 	h.Type = uint8(l.Base.Head.MsgType)
 	h.L7Protocol = uint8(l.Base.Head.Proto)
-	h.L7ProtocolStr = datatype.L7Protocol(h.L7Protocol).String()
+	if l.ExtInfo != nil && l.ExtInfo.ProtocolStr != "" {
+		h.L7ProtocolStr = l.ExtInfo.ProtocolStr
+	} else {
+		h.L7ProtocolStr = datatype.L7Protocol(h.L7Protocol).String()
+	}
 
 	h.ResponseStatus = uint8(datatype.STATUS_NOT_EXIST)
 	h.ResponseDuration = l.Base.Head.Rrt / uint64(time.Microsecond)
