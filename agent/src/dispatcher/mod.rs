@@ -1051,7 +1051,7 @@ impl DispatcherBuilder {
                     ..Default::default()
                 };
                 info!("Afpacket init with {:?}", afp);
-                Ok(RecvEngine::AfPacket(Tpacket::new(afp).unwrap()))
+                Ok(RecvEngine::AfPacket(Tpacket::new(afp)?))
             }
             _ => {
                 return Err(Error::ConfigInvalid("Tap-mode not support.".into()));
