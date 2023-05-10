@@ -1729,11 +1729,21 @@ impl AgentComponents {
                 .queue_debugger(queue_debugger.clone());
 
             #[cfg(target_os = "linux")]
-            let dispatcher = dispatcher_builder
+            let dispatcher = match dispatcher_builder
                 .libvirt_xml_extractor(libvirt_xml_extractor.clone())
                 .platform_poller(kubernetes_poller.clone())
                 .build()
-                .unwrap();
+            {
+                Ok(d) => d,
+                Err(e) => {
+                    warn!(
+                        "dispatcher creation failed: {}, deepflow-agent restart...",
+                        e
+                    );
+                    thread::sleep(Duration::from_secs(1));
+                    process::exit(1);
+                }
+            };
             #[cfg(target_os = "windows")]
             let pcap_interfaces = if candidate_config.tap_mode == TapMode::Local {
                 tap_interfaces.clone()
@@ -1747,10 +1757,17 @@ impl AgentComponents {
                 }
             };
             #[cfg(target_os = "windows")]
-            let dispatcher = dispatcher_builder
-                .pcap_interfaces(pcap_interfaces)
-                .build()
-                .unwrap();
+            let dispatcher = match dispatcher_builder.pcap_interfaces(pcap_interfaces).build() {
+                Ok(d) => d,
+                Err(e) => {
+                    warn!(
+                        "dispatcher creation failed: {}, deepflow-agent restart...",
+                        e
+                    );
+                    thread::sleep(Duration::from_secs(1));
+                    process::exit(1);
+                }
+            };
 
             let mut dispatcher_listener = dispatcher.listener();
             dispatcher_listener.on_config_change(&candidate_config.dispatcher);
