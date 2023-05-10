@@ -363,8 +363,8 @@ impl L7PerfCache {
         }
     }
 
-    pub fn get_timeout_count(&mut self, flow_id: &u64) -> usize {
-        *(self.timeout_cache.get(flow_id).unwrap_or(&0))
+    pub fn pop_timeout_count(&mut self, flow_id: &u64) -> usize {
+        self.timeout_cache.pop(flow_id).unwrap_or(0)
     }
 }
 
