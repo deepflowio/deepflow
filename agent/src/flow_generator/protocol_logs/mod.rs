@@ -336,7 +336,10 @@ impl AppProtoLogsBaseInfo {
         }
 
         self.syscall_trace_id_response = log.syscall_trace_id_response;
-        self.head.msg_type = LogMessageType::Session;
+        // go http2 uprobe  may merge multi times, if not req and resp merge can not set to session
+        if self.head.msg_type != log.head.msg_type {
+            self.head.msg_type = LogMessageType::Session;
+        }
 
         self.head.rrt = if self.end_time > self.start_time {
             (self.end_time.as_micros() - self.start_time.as_micros()) as u64
