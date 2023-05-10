@@ -223,6 +223,8 @@ impl FlowLog {
 
             if !self.is_success {
                 if ret.is_ok() {
+                    // due to http2 may be upgrade grpc, need to reset the flow node protocol
+                    self.l7_protocol_enum = parser.l7_protocol_enum();
                     match packet.signal_source {
                         SignalSource::EBPF => {
                             app_table.set_protocol_from_ebpf(
@@ -470,39 +472,31 @@ impl FlowLog {
         }
 
         if l7_performance_enabled {
-            let mut get_l7_perf_stat = || {
-                self.l7_protocol_log_parser
-                    .as_mut()
-                    .and_then(|l| l.perf_stats())
+            let default_l7_perf = L7PerfStats {
+                err_timeout: l7_timeout_count,
+                ..Default::default()
             };
 
-            get_l7_perf_stat().map_or(
-                {
-                    if l7_timeout_count > 0 {
-                        stats.replace(FlowPerfStats {
-                            l7_protocol: self.l7_protocol_enum.get_l7_protocol(),
-                            l7: L7PerfStats {
-                                err_timeout: l7_timeout_count,
-                                ..Default::default()
-                            },
-                            ..Default::default()
-                        });
-                    }
-                },
-                |mut perf| {
-                    perf.err_timeout = l7_timeout_count;
-                    if let Some(stats) = stats.as_mut() {
-                        stats.l7 = perf;
-                        stats.l7_protocol = self.l7_protocol_enum.get_l7_protocol();
-                    } else {
-                        stats.replace(FlowPerfStats {
-                            l7: perf,
-                            l7_protocol: self.l7_protocol_enum.get_l7_protocol(),
-                            ..Default::default()
-                        });
-                    }
-                },
-            );
+            let l7_perf =
+                self.l7_protocol_log_parser
+                    .as_mut()
+                    .map_or(default_l7_perf.clone(), |l| {
+                        l.perf_stats().map_or(default_l7_perf, |mut p| {
+                            p.err_timeout = l7_timeout_count;
+                            p
+                        })
+                    });
+
+            if let Some(stats) = stats.as_mut() {
+                stats.l7 = l7_perf;
+                stats.l7_protocol = self.l7_protocol_enum.get_l7_protocol();
+            } else {
+                stats.replace(FlowPerfStats {
+                    l7: l7_perf,
+                    l7_protocol: self.l7_protocol_enum.get_l7_protocol(),
+                    ..Default::default()
+                });
+            }
         }
         stats
     }
