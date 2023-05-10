@@ -187,7 +187,7 @@ message Config {
     // calico: cali.*
     // cilium: lxc.*
     // kube-ovn: [0-9a-f]+_h$
-    optional string  tap_interface_regex  = 8 [default = "^(tap.*|cali.*|veth.*|eth.*|en[ospx].*|lxc.*|lo|[0-9a-f]+_h)$"];
+    optional string  tap_interface_regex  = 8 [default = "^(tap.*|cali.*|veth.*|eth.*|en[osipx].*|lxc.*|lo|[0-9a-f]+_h)$"];
     optional string  host                 = 9;  // override statsd host tag
     optional bool    rsyslog_enabled      = 10 [default = true];
     optional uint32  output_vlan          = 11 [default = 0];
