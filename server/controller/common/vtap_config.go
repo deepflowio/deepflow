@@ -91,7 +91,7 @@ var (
 	DefaultRsyslogEnabled                = 1
 	DefaultMaxTxBandwidth                = int64(0)
 	DefaultBandwidthProbeInterval        = 10
-	DefaultTapInterfaceRegex             = "^(tap.*|cali.*|veth.*|eth.*|en[ospx].*|lxc.*|lo|[0-9a-f]+_h)$"
+	DefaultTapInterfaceRegex             = "^(tap.*|cali.*|veth.*|eth.*|en[osipx].*|lxc.*|lo|[0-9a-f]+_h)$"
 	DefaultMaxEscapeSeconds              = 3600
 	DefaultMtu                           = 1500
 	DefaultOutputVlan                    = 0
