@@ -26,6 +26,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	grpcserver "github.com/deepflowio/deepflow/server/controller/grpc"
+	prometheus "github.com/deepflowio/deepflow/server/controller/prometheus/service/grpc"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/services/grpc/statsd"
 )
 
@@ -37,6 +38,7 @@ type service struct {
 	kubernetesClusterIDEvent *KubernetesClusterIDEvent
 	processInfoEvent         *ProcessInfoEvent
 	pluginEvent              *PluginEvent
+	prometheusEvent          *prometheus.SynchronizerEvent
 }
 
 func init() {
@@ -51,6 +53,7 @@ func newService() *service {
 		upgradeEvent:     NewUpgradeEvent(),
 		processInfoEvent: NewprocessInfoEvent(),
 		pluginEvent:      NewPluginEvent(),
+		prometheusEvent:  prometheus.NewSynchronizerEvent(),
 	}
 }
 
@@ -146,8 +149,7 @@ func (s *service) ShareGPIDLocalData(ctx context.Context, in *api.ShareGPIDSyncR
 }
 
 func (s *service) GetPrometheusLabelIDs(ctx context.Context, in *api.PrometheusLabelRequest) (*api.PrometheusLabelResponse, error) {
-	// FIXME 6.3 add handler
-	return nil, nil
+	return s.prometheusEvent.GetLabelIDs(ctx, in)
 }
 
 func (s *service) Plugin(r *api.PluginRequest, in api.Synchronizer_PluginServer) error {
