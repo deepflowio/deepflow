@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,9 +14,18 @@
  * limitations under the License.
  */
 
-package migration
+package prometheus
 
-const (
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "6.3.1.1"
+var (
+	ResourcePrometheusMetricName           = "prometheus_metric_name"
+	ResourcePrometheusLabelName            = "prometheus_label_name"
+	ResourcePrometheusLabelValue           = "prometheus_label_value"
+	ResourcePrometheusMetricAPPLabelLayout = "prometheus_metric_app_label_layout"
+	ResourcePrometheusLabel                = "prometheus_label"
+	ResourcePrometheusMetricTarget         = "prometheus_metric_target"
+)
+
+var (
+	TargetLabelInstance = "instance"
+	TargetLabelJob      = "job"
 )

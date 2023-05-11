@@ -30,6 +30,7 @@ import (
 	genesis "github.com/deepflowio/deepflow/server/controller/genesis/config"
 	manager "github.com/deepflowio/deepflow/server/controller/manager/config"
 	monitor "github.com/deepflowio/deepflow/server/controller/monitor/config"
+	prometheus "github.com/deepflowio/deepflow/server/controller/side/prometheus/config"
 	statsd "github.com/deepflowio/deepflow/server/controller/statsd/config"
 	tagrecorder "github.com/deepflowio/deepflow/server/controller/tagrecorder/config"
 	trisolaris "github.com/deepflowio/deepflow/server/controller/trisolaris/config"
@@ -88,6 +89,7 @@ type ControllerConfig struct {
 	StatsdCfg      statsd.StatsdConfig           `yaml:"statsd"`
 	TrisolarisCfg  trisolaris.Config             `yaml:"trisolaris"`
 	TagRecorderCfg tagrecorder.TagRecorderConfig `yaml:"tagrecorder"`
+	PrometheusCfg  prometheus.Config             `yaml:"prometheus"`
 }
 
 type Config struct {

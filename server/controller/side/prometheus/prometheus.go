@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,9 +14,30 @@
  * limitations under the License.
  */
 
-package migration
+package prometheus
 
-const (
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "6.3.1.1"
+import (
+	"sync"
+
+	"github.com/deepflowio/deepflow/server/controller/side/prometheus/allocator"
 )
+
+var (
+	prometheusManagerOnce sync.Once
+	prometheusManager     *PrometheusManager
+)
+
+type PrometheusManager struct {
+	Allocator *allocator.Allocator
+	Cache     *Cache
+}
+
+func GetSingleton() *PrometheusManager {
+	prometheusManagerOnce.Do(func() {
+		prometheusManager = &PrometheusManager{
+			Allocator: allocator.GetSingleton(),
+			Cache:     GetSingletonCache(),
+		}
+	})
+	return prometheusManager
+}
