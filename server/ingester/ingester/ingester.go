@@ -57,6 +57,8 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/pcap/pcap"
 	profilecfg "github.com/deepflowio/deepflow/server/ingester/profile/config"
 	"github.com/deepflowio/deepflow/server/ingester/profile/profile"
+	prometheuscfg "github.com/deepflowio/deepflow/server/ingester/prometheus/config"
+	"github.com/deepflowio/deepflow/server/ingester/prometheus/prometheus"
 )
 
 var log = logging.MustGetLogger("ingester")
@@ -141,6 +143,10 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 		bytes, _ = yaml.Marshal(profileConfig)
 		log.Infof("profile config:\n%s", string(bytes))
 
+		prometheusConfig := prometheuscfg.Load(cfg, configPath)
+		bytes, _ = yaml.Marshal(prometheusConfig)
+		log.Infof("prometheus config:\n%s", string(bytes))
+
 		// 创建、修改、删除数据源及其存储时长
 		ds := datasource.NewDatasourceManager(cfg, flowMetricsConfig.CKReadTimeout)
 		ds.Start()
@@ -204,6 +210,12 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 		checkError(err)
 		profile.Start()
 		closers = append(closers, profile)
+
+		// write prometheus data
+		prometheus, err := prometheus.NewPrometheus(prometheusConfig, receiver, platformDataManager)
+		checkError(err)
+		prometheus.Start()
+		closers = append(closers, prometheus)
 
 		// 检查clickhouse的磁盘空间占用，达到阈值时，自动删除老数据
 		cm, err := ckmonitor.NewCKMonitor(cfg)

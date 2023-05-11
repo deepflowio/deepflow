@@ -32,6 +32,7 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/flow_metrics/flow_metrics"
 	"github.com/deepflowio/deepflow/server/ingester/ingesterctl"
 	"github.com/deepflowio/deepflow/server/ingester/ingesterctl/rpc"
+	"github.com/deepflowio/deepflow/server/ingester/prometheus/decoder"
 	"github.com/deepflowio/deepflow/server/libs/debug"
 	"github.com/deepflowio/deepflow/server/libs/receiver"
 )
@@ -41,7 +42,7 @@ func RegisterIngesterCommand(root *cobra.Command) {
 	debug.SetIpAndPort(ip, ingesterctl.DEBUG_LISTEN_PORT)
 	ingesterCmd := &cobra.Command{
 		Use:   "ingester",
-		Short: "ingester debug commands",
+		Short: "Ingester debug commands",
 	}
 
 	dropletCmd := &cobra.Command{
@@ -56,9 +57,13 @@ func RegisterIngesterCommand(root *cobra.Command) {
 		Use:   "flow",
 		Short: "Flow log debug commands",
 	}
+	prometheusCmd := &cobra.Command{
+		Use:   "prometheus",
+		Short: "Prometheus label debug commands",
+	}
 
 	root.AddCommand(ingesterCmd)
-	ingesterCmd.AddCommand(dropletCmd, flowMetricsCmd, flowLogCmd)
+	ingesterCmd.AddCommand(dropletCmd, flowMetricsCmd, flowLogCmd, prometheusCmd)
 	ingesterCmd.AddCommand(profiler.RegisterProfilerCommand())
 	ingesterCmd.AddCommand(debug.RegisterLogLevelCommand())
 	ingesterCmd.AddCommand(RegisterTimeConvertCommand())
@@ -83,6 +88,12 @@ func RegisterIngesterCommand(root *cobra.Command) {
 		"1-receive-to-decode-l7",
 	}))
 	flowLogCmd.AddCommand(debug.ClientRegisterSimple(flow_log.CMD_PLATFORMDATA, debug.CmdHelper{"platformData [filter]", "show flow log platform data statistics"}, nil))
+
+	prometheusCmd.AddCommand(decoder.RegisterClientPrometheusLabelCommand())
+	prometheusCmd.AddCommand(queue.RegisterCommand(ingesterctl.INGESTERCTL_PROMETHEUS_QUEUE, []string{
+		"1-receive-to-decode-prometheus",
+		"2-decode-to-slow-decode-prometheus",
+	}))
 
 	root.GenBashCompletionFile("/usr/share/bash-completion/completions/deepflow-ctl")
 }

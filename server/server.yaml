@@ -381,8 +381,25 @@ ingester:
   ## profile process database data retention time(unit: hour)
   #profile-ttl-hour: 72
 
-  ## 默认读超时，修改数据保留时长时使用
-  #ck-read-timeout: 300
+  ## prometheus data writer config
+  #metrics-ck-writer:
+  #  queue-count: 1      # parallelism of table writing
+  #  queue-size: 100000  # size of writing queue
+  #  batch-size: 51200   # size of batch writing
+  #  flush-timeout: 10    # timeout of table writing
+
+  ## prometheus decoder queue count/size
+  #prometheus-decoder-queue-count: 2
+  #prometheus-decoder-queue-size: 131072
+
+  ## prometheus database data retention time(unit: hour)
+  #prometheus-ttl-hour: 168
+
+  ## prometheus grpc buffer size (unit: bytes)
+  #prometheus-grpc-buffer-size: 104857600
+
+  #prometheus-grpc-metric-batch-count: 128
+  #prometheus-app-label-column-increment: 8
 
   #ck-disk-monitor:
   #  check-interval: 300 # 检查时间间隔(单位: 秒)

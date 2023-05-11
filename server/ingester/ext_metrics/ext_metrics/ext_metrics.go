@@ -43,7 +43,6 @@ const (
 type ExtMetrics struct {
 	Config        *config.Config
 	Telegraf      *Metricsor
-	Prometheus    *Metricsor
 	MetaflowStats *Metricsor
 }
 
@@ -62,10 +61,6 @@ func NewExtMetrics(config *config.Config, recv *receiver.Receiver, platformDataM
 	if err != nil {
 		return nil, err
 	}
-	prometheus, err := NewMetricsor(datatype.MESSAGE_TYPE_PROMETHEUS, dbwriter.EXT_METRICS_DB, config, platformDataManager, manager, recv, true)
-	if err != nil {
-		return nil, err
-	}
 	deepflowStats, err := NewMetricsor(datatype.MESSAGE_TYPE_DFSTATS, dbwriter.DEEPFLOW_SYSTEM_DB, config, platformDataManager, manager, recv, false)
 	if err != nil {
 		return nil, err
@@ -73,7 +68,6 @@ func NewExtMetrics(config *config.Config, recv *receiver.Receiver, platformDataM
 	return &ExtMetrics{
 		Config:        config,
 		Telegraf:      telegraf,
-		Prometheus:    prometheus,
 		MetaflowStats: deepflowStats,
 	}, nil
 }
@@ -153,13 +147,11 @@ func (m *Metricsor) Close() {
 
 func (s *ExtMetrics) Start() {
 	s.Telegraf.Start()
-	s.Prometheus.Start()
 	s.MetaflowStats.Start()
 }
 
 func (s *ExtMetrics) Close() error {
 	s.Telegraf.Close()
-	s.Prometheus.Close()
 	s.MetaflowStats.Close()
 	return nil
 }
