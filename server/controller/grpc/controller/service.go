@@ -20,6 +20,7 @@ import (
 	api "github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	grpcserver "github.com/deepflowio/deepflow/server/controller/grpc"
+	prometheus "github.com/deepflowio/deepflow/server/controller/side/prometheus/service/grpc"
 
 	"github.com/op/go-logging"
 	"golang.org/x/net/context"
@@ -31,6 +32,7 @@ var log = logging.MustGetLogger("grpc.controller")
 type service struct {
 	encryptKeyEvent *EncryptKeyEvent
 	resourceIDEvent *IDEvent
+	prometheusEvent *prometheus.AllocatorEvent
 }
 
 func init() {
@@ -41,6 +43,7 @@ func newService() *service {
 	return &service{
 		encryptKeyEvent: NewEncryptKeyEvent(),
 		resourceIDEvent: NewIDEvent(),
+		prometheusEvent: prometheus.NewAllocatorEvent(),
 	}
 }
 
@@ -72,4 +75,12 @@ func (s *service) GetResourceID(ctx context.Context, in *api.GetResourceIDReques
 
 func (s *service) ReleaseResourceID(ctx context.Context, in *api.ReleaseResourceIDRequest) (*api.ReleaseResourceIDResponse, error) {
 	return s.resourceIDEvent.Release(ctx, in)
+}
+
+func (s *service) GetPrometheusStrIDs(ctx context.Context, in *api.GetPrometheusStrIDsRequest) (*api.GetPrometheusStrIDsResponse, error) {
+	return s.prometheusEvent.GetStrIDs(ctx, in)
+}
+
+func (s *service) GetPrometheusAPPLabelIndexes(ctx context.Context, in *api.GetPrometheusAPPLabelIndexesRequest) (*api.GetPrometheusAPPLabelIndexesResponse, error) {
+	return s.prometheusEvent.GetAPPLabelIndexes(ctx, in)
 }

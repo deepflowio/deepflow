@@ -44,6 +44,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/monitor"
 	recorderdb "github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/report"
+	"github.com/deepflowio/deepflow/server/controller/side/prometheus"
 	"github.com/deepflowio/deepflow/server/controller/statsd"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
@@ -152,6 +153,13 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 	// 启动trisolaris
 	t := trisolaris.NewTrisolaris(&cfg.TrisolarisCfg, mysql.Db)
 	go t.Start()
+
+	prometheus := prometheus.GetSingleton()
+	prometheus.Cache.Start(ctx)
+	prometheus.Allocator.Init(ctx, &cfg.PrometheusCfg)
+	if isMasterController {
+		prometheus.Allocator.Start()
+	}
 
 	router.SetInitStageForHealthChecker("TagRecorder init")
 	tr := tagrecorder.NewTagRecorder(*cfg, ctx)

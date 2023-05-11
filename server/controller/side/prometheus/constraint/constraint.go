@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,9 +14,20 @@
  * limitations under the License.
  */
 
-package migration
+package constraint
 
-const (
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "6.3.1.1"
+import (
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
+
+type StrIDModel interface {
+	mysql.PrometheusMetricName | mysql.PrometheusLabelName | mysql.PrometheusLabelValue
+
+	GetID() int
+	GetStr() string
+}
+
+type OperateBatchModel interface {
+	mysql.PrometheusMetricName | mysql.PrometheusLabelName | mysql.PrometheusLabelValue | mysql.PrometheusMetricAPPLabelLayout |
+		mysql.PrometheusLabel | mysql.PrometheusMetricTarget
+}

@@ -12,6 +12,8 @@ service Controller {
     rpc GetEncryptKey (EncryptKeyRequest) returns (EncryptKeyResponse) {}
     rpc GetResourceID (GetResourceIDRequest) returns (GetResourceIDResponse) {}
     rpc ReleaseResourceID (ReleaseResourceIDRequest) returns (ReleaseResourceIDResponse) {}
+    rpc GetPrometheusStrIDs (GetPrometheusStrIDsRequest) returns (GetPrometheusStrIDsResponse) {}
+    rpc GetPrometheusAPPLabelIndexes (GetPrometheusAPPLabelIndexesRequest) returns (GetPrometheusAPPLabelIndexesResponse) {}
 }
 
 message GenesisSharingK8SRequest {
@@ -182,4 +184,39 @@ message ReleaseResourceIDRequest {
 }
 
 message ReleaseResourceIDResponse {
+}
+
+message GetPrometheusStrIDsRequest {
+    required string type = 1;
+    repeated string strs = 2;
+}
+
+message PrometheusStrID {
+    required string str = 1;
+    required uint32 id = 2;
+}
+
+message GetPrometheusStrIDsResponse {
+    optional string error_msg = 1;
+    repeated PrometheusStrID str_ids = 2;
+}
+
+message PrometheusAPPLabelIndexRequest {
+    required string metric_name = 1;
+    required string app_label_name = 2;
+}
+
+message GetPrometheusAPPLabelIndexesRequest {
+    repeated PrometheusAPPLabelIndexRequest request_indexes = 1; 
+}
+
+message PrometheusAPPLabelIndexesResponse {
+    required string metric_name = 1;
+    required string app_label_name = 2;
+    required uint32 app_label_column_index = 3;
+}
+
+message GetPrometheusAPPLabelIndexesResponse {
+    optional string error_msg = 1;
+    repeated PrometheusAPPLabelIndexesResponse response_indexes = 2;
 }

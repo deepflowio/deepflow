@@ -31,6 +31,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/monitor/vtap"
 	"github.com/deepflowio/deepflow/server/controller/recorder"
 	recorderdb "github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/side/prometheus"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
@@ -93,6 +94,7 @@ func checkAndStartMasterFunctions(
 	vtapLicenseAllocation := license.NewVTapLicenseAllocation(cfg.MonitorCfg, ctx)
 	resourceCleaner := recorder.NewResourceCleaner(&cfg.ManagerCfg.TaskCfg.RecorderCfg, ctx)
 	domainChecker := resoureservice.NewDomainCheck(ctx)
+	prometheus := prometheus.GetSingleton()
 
 	masterController := ""
 	thisIsMasterController := false
@@ -141,6 +143,8 @@ func checkAndStartMasterFunctions(
 
 				// domain检查及自愈
 				domainChecker.Start()
+
+				prometheus.Allocator.Start()
 			} else if thisIsMasterController {
 				thisIsMasterController = false
 				log.Infof("I am not the master controller anymore, new master controller is %s", newMasterController)
@@ -165,6 +169,8 @@ func checkAndStartMasterFunctions(
 				domainChecker.Stop()
 
 				recorderdb.IDMNG.Stop()
+
+				prometheus.Allocator.Stop()
 			} else {
 				log.Infof(
 					"current master controller is %s, previous master controller is %s",
