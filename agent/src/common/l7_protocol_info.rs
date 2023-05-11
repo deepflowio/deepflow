@@ -150,14 +150,30 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
         let msg_type: LogMessageType = param.direction.into();
 
         if time != 0 {
+            let (in_cached_req, timeout_count) = perf_cache
+                .timeout_cache
+                .get_or_insert_mut(param.flow_id, || (0, 0));
+
             let Some(previous_log_info) = previous_log_info else {
-                perf_cache.rrt_cache.put(cache_key, LogCache { msg_type: param.direction.into(),  time: param.time ,kafka_info});
-                let timeout_count = perf_cache.timeout_cache.get_or_insert_mut(param.flow_id, ||0);
-                *timeout_count += 1;
+                if msg_type == LogMessageType::Request {
+                    *in_cached_req += 1;
+                }
+                perf_cache.rrt_cache.put(
+                    cache_key,
+                    LogCache {
+                        msg_type: param.direction.into(),
+                        time: param.time,
+                        kafka_info,
+                    },
+                );
                 return None;
             };
 
-            let timeout_count = perf_cache.timeout_cache.get_mut(&param.flow_id);
+            if previous_log_info.msg_type == LogMessageType::Request {
+                if *in_cached_req > 0 {
+                    *in_cached_req -= 1;
+                }
+            }
 
             // if previous is req and current is resp, calculate the round trip time.
             if previous_log_info.msg_type == LogMessageType::Request
@@ -165,7 +181,6 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
                 && time > previous_log_info.time
             {
                 let rrt = time - previous_log_info.time;
-                timeout_count.map(|x| *x -= 1);
                 Some(rrt)
 
             // if previous is resp and current is req and previous time gt current time, likely ebpf disorder,
@@ -175,22 +190,39 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
                 && previous_log_info.time > time
             {
                 let rrt = previous_log_info.time - time;
-                timeout_count.map(|x| *x -= 1);
                 Some(rrt)
             } else {
                 debug!(
                     "can not calculate rrt, flow_id: {}, previous log type:{:?}, previous time: {}, current log type: {:?}, current time: {}",
                     param.flow_id, previous_log_info.msg_type, previous_log_info.time, msg_type, param.time,
                 );
-                timeout_count.map(|x| *x += 1);
-                perf_cache.rrt_cache.put(
-                    self.cal_cache_key(param),
-                    LogCache {
-                        msg_type: param.direction.into(),
-                        time: param.time,
-                        kafka_info,
-                    },
-                );
+
+                // save the latest
+                if previous_log_info.time > time {
+                    if msg_type == LogMessageType::Request {
+                        *timeout_count += 1;
+                    }
+                    if previous_log_info.msg_type == LogMessageType::Request {
+                        *in_cached_req += 1;
+                    }
+                    perf_cache.rrt_cache.put(cache_key, previous_log_info);
+                } else {
+                    if previous_log_info.msg_type == LogMessageType::Request {
+                        *timeout_count += 1;
+                    }
+                    if msg_type == LogMessageType::Request {
+                        *in_cached_req += 1;
+                    }
+                    perf_cache.rrt_cache.put(
+                        self.cal_cache_key(param),
+                        LogCache {
+                            msg_type: param.direction.into(),
+                            time: param.time,
+                            kafka_info,
+                        },
+                    );
+                }
+
                 None
             }
         } else {
