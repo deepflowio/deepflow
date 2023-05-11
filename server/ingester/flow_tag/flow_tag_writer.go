@@ -19,6 +19,7 @@ package flow_tag
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	logging "github.com/op/go-logging"
 
@@ -26,6 +27,7 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/config"
 	"github.com/deepflowio/deepflow/server/ingester/pkg/ckwriter"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
+	lru128 "github.com/deepflowio/deepflow/server/libs/hmap/lru"
 	"github.com/deepflowio/deepflow/server/libs/lru"
 	"github.com/deepflowio/deepflow/server/libs/stats"
 	"github.com/deepflowio/deepflow/server/libs/utils"
@@ -36,6 +38,7 @@ var log = logging.MustGetLogger("flow_tag.dbwriter")
 const (
 	FLOW_TAG_CACHE_INIT_SIZE = 1 << 14
 	MIN_FLUSH_CACHE_TIMEOUT  = 60
+	PROMETHEUS_KEYWORD       = "prometheus"
 )
 
 type Counter struct {
@@ -60,8 +63,12 @@ type FlowTagWriter struct {
 }
 
 type FlowTagCache struct {
+	Id                          int
 	FieldCache, FieldValueCache *lru.Cache
 	CacheFlushTimeout           uint32
+
+	// only for prometheus
+	PrometheusFieldCache, PrometheusFieldValueCache *lru128.U128LRU
 
 	// temporary buffers for generating new flow_tags
 	FlowTagInfoBuffer FlowTagInfo
@@ -69,12 +76,21 @@ type FlowTagCache struct {
 	FieldValues       []interface{}
 }
 
-func NewFlowTagCache(cacheFlushTimeout, cacheMaxSize uint32) *FlowTagCache {
-	return &FlowTagCache{
-		FieldCache:        lru.NewCache(int(cacheMaxSize)),
-		FieldValueCache:   lru.NewCache(int(cacheMaxSize)),
+func NewFlowTagCache(name string, id int, cacheFlushTimeout, cacheMaxSize uint32) *FlowTagCache {
+	c := &FlowTagCache{
+		Id:                id,
 		CacheFlushTimeout: cacheFlushTimeout,
 	}
+
+	// Prometheus data can be converted into IDs so use LRU128, others use ordinary LRU
+	if strings.Contains(name, PROMETHEUS_KEYWORD) {
+		c.PrometheusFieldCache = lru128.NewU128LRU(fmt.Sprintf("%s-flow-tag-field_%d", name, id), int(cacheMaxSize)>>3, int(cacheMaxSize))
+		c.PrometheusFieldValueCache = lru128.NewU128LRU(fmt.Sprintf("%s-flow-tag-field-value_%d", name, id), int(cacheMaxSize)>>3, int(cacheMaxSize))
+	} else {
+		c.FieldCache = lru.NewCache(int(cacheMaxSize))
+		c.FieldValueCache = lru.NewCache(int(cacheMaxSize))
+	}
+	return c
 }
 
 func NewFlowTagWriter(
@@ -90,9 +106,8 @@ func NewFlowTagWriter(
 		ckdbUsername: config.CKDBAuth.Username,
 		ckdbPassword: config.CKDBAuth.Password,
 		writerConfig: writerConfig,
-
-		Cache:   NewFlowTagCache(config.FlowTagCacheFlushTimeout, config.FlowTagCacheMaxSize),
-		counter: &Counter{},
+		Cache:        NewFlowTagCache(name, decoderIndex, config.FlowTagCacheFlushTimeout, config.FlowTagCacheMaxSize),
+		counter:      &Counter{},
 	}
 	t := FlowTag{}
 	var err error
@@ -136,7 +151,15 @@ func (w *FlowTagWriter) WriteFieldsAndFieldValuesInCache() {
 func (w *FlowTagWriter) GetCounter() interface{} {
 	var counter *Counter
 	counter, w.counter = w.counter, &Counter{}
-	counter.FieldCacheCount = int64(w.Cache.FieldCache.Len())
-	counter.FieldValueCacheCount = int64(w.Cache.FieldValueCache.Len())
+	if w.Cache.FieldCache != nil {
+		counter.FieldCacheCount = int64(w.Cache.FieldCache.Len())
+	} else {
+		counter.FieldCacheCount = int64(w.Cache.PrometheusFieldCache.Size())
+	}
+	if w.Cache.FieldValueCache != nil {
+		counter.FieldValueCacheCount = int64(w.Cache.FieldValueCache.Len())
+	} else {
+		counter.FieldValueCacheCount = int64(w.Cache.PrometheusFieldValueCache.Size())
+	}
 	return counter
 }

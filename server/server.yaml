@@ -398,6 +398,27 @@ ingester:
   ## 默认读超时，修改数据保留时长时使用
   #ck-read-timeout: 300
 
+  ## prometheus data writer config
+  #prometheus-ck-writer:
+  #  queue-count: 1      # parallelism of table writing
+  #  queue-size: 524288  # size of writing queue
+  #  batch-size: 262144  # size of batch writing
+  #  flush-timeout: 10   # timeout of table writing
+
+  ## prometheus decoder queue count/size
+  #prometheus-decoder-queue-count: 1
+  #prometheus-decoder-queue-size: 16384
+
+  ## prometheus database data retention time(unit: hour)
+  #prometheus-ttl-hour: 168
+
+  ## prometheus label request/response msg max size (unit: bytes)
+  #prometheus-label-msg-max-size: 104857600
+
+  # when prometheus requests labels, how many metric batch requests
+  #prometheus-label-request-metric-batch-count: 128
+  #prometheus-app-label-column-increment: 4
+
   #ck-disk-monitor:
   #  check-interval: 300 # 检查时间间隔(单位: 秒)
   ## 磁盘空间不足时，同时满足磁盘占用率>used-percent和磁盘空闲<free-space, 或磁盘占用大于used-space, 开始清理数据
