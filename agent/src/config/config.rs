@@ -601,7 +601,7 @@ impl Default for YamlConfig {
             log_file: DEFAULT_LOG_FILE.into(),
             l7_protocol_ports: HashMap::from([(String::from("DNS"), String::from("53"))]),
             ebpf: EbpfYamlConfig::default(),
-            guard_interval: Duration::from_secs(60),
+            guard_interval: Duration::from_secs(10),
             check_core_file_disabled: false,
         }
     }
