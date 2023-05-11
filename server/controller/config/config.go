@@ -47,7 +47,7 @@ type Specification struct {
 	VTapMaxPerGroup            int `default:"10000" yaml:"vtap_max_per_group"`
 	AZMaxPerServer             int `default:"10" yaml:"az_max_per_server"`
 	DataSourceMax              int `default:"15" yaml:"data_source_max"`
-	DataSourceRetentionTimeMax int `default:"1000" yaml:"data_source_retention_time_max"`
+	DataSourceRetentionTimeMax int `default:"24000" yaml:"data_source_retention_time_max"`
 }
 
 type DFWebService struct {
