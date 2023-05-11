@@ -43,10 +43,15 @@ type DBItemSetter[MT constraint.MySQLModel] interface {
 }
 
 type OperatorBase[MT constraint.MySQLModel] struct {
-	resourceTypeName string
-	softDelete       bool
-	allocateID       bool
-	setter           DBItemSetter[MT]
+	resourceTypeName        string
+	softDelete              bool
+	allocateID              bool
+	fieldsNeededAfterCreate []string // fields needed to be used after create
+	setter                  DBItemSetter[MT]
+}
+
+func (o *OperatorBase[MT]) setFieldsNeededAfterCreate(fs []string) {
+	o.fieldsNeededAfterCreate = fs
 }
 
 func (o *OperatorBase[MT]) AddBatch(items []*MT) ([]*MT, bool) {
@@ -65,6 +70,18 @@ func (o *OperatorBase[MT]) AddBatch(items []*MT) ([]*MT, bool) {
 		}
 		return nil, false
 	}
+	// If MySQL is not configured with auto_increment_increment=1, maybe 2 for HA or other reasons.
+	// When use gorm to insert batch data, it will fill the ids of the created items with increment by 1 not 2.
+	// Setting tag autoIncrementIncrement:2 can make it correct, but hardcoding doesn't work for all possible values.
+	// So we need to get the created items manually to make sure ids are correct when following situations all happen:
+	// 		1. MySQL is not configured with auto_increment_increment=1
+	// 		2. We need to use the ids of the created items
+	// 		3. Ids are not allocated by ourselves
+	// 		4. Use gorm to insert batch data
+	if mysql.DbConfig.AutoIncrementIncrement != 1 && len(o.fieldsNeededAfterCreate) != 0 && !o.allocateID && len(lcuuidsToAdd) > 1 {
+		mysql.Db.Select(o.fieldsNeededAfterCreate).Where("lcuuid IN ?", lcuuidsToAdd).Find(&itemsToAdd)
+	}
+
 	for _, item := range itemsToAdd {
 		log.Infof("add %s (detail: %+v) success", o.resourceTypeName, item)
 	}

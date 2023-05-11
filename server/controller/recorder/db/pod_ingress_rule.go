@@ -26,11 +26,13 @@ type PodIngressRule struct {
 }
 
 func NewPodIngressRule() *PodIngressRule {
-	return &PodIngressRule{
+	o := &PodIngressRule{
 		OperatorBase[mysql.PodIngressRule]{
 			resourceTypeName: common.RESOURCE_TYPE_POD_INGRESS_RULE_EN,
 			softDelete:       false,
 			allocateID:       false,
 		},
 	}
+	o.setFieldsNeededAfterCreate([]string{"id", "lcuuid", "sub_domain"})
+	return o
 }

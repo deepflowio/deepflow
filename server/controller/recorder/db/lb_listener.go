@@ -34,6 +34,7 @@ func NewLBListener() *LBListener {
 		},
 	}
 	operater.setter = operater
+	operater.setFieldsNeededAfterCreate([]string{"id", "lcuuid", "name", "ips", "snat_ips", "port", "protocol"})
 	return operater
 }
 
