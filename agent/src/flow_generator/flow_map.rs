@@ -1443,7 +1443,7 @@ impl FlowMap {
             let l7_timeout_count = self
                 .perf_cache
                 .borrow_mut()
-                .pop_timeout_count(&flow.flow_id);
+                .pop_timeout_count(&flow.flow_id, true);
 
             // 如果返回None，就清空掉flow_perf_stats
             flow.flow_perf_stats = node.meta_flow_log.as_mut().and_then(|perf| {
@@ -1501,7 +1501,9 @@ impl FlowMap {
                 flow.flow_perf_stats = node.meta_flow_log.as_mut().and_then(|perf| {
                     perf.copy_and_reset_perf_data(
                         flow.reversed,
-                        0,
+                        self.perf_cache
+                            .borrow_mut()
+                            .pop_timeout_count(&flow.flow_id, false) as u32,
                         flow.signal_source == SignalSource::Packet
                             && Self::l4_metrics_enabled(config),
                         Self::l7_metrics_enabled(config),
