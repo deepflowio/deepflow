@@ -162,28 +162,16 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 		configure.AnalyzerIp = &configTSDBIP
 		configure.AnalyzerPort = proto.Uint32(uint32(DefaultAnalyzerPort))
 	} else if cacheTSBIP != "" {
-		if vtapConfig.NatIPEnabled == 0 {
-			if isPodVTap(c.GetVTapType()) && gVTapInfo.IsTheSameCluster(clusterID) {
-				podIP := trisolaris.GetGNodeInfo().GetTSDBPodIP(cacheTSBIP)
-				configure.AnalyzerIp = &podIP
-				configure.AnalyzerPort = proto.Uint32(uint32(trisolaris.GetIngesterPort()))
-			} else {
-				configure.AnalyzerIp = &cacheTSBIP
-				configure.AnalyzerPort = proto.Uint32(uint32(DefaultAnalyzerPort))
-			}
-		} else {
-			natIP := trisolaris.GetGNodeInfo().GetTSDBNatIP(cacheTSBIP)
-			configure.AnalyzerIp = &natIP
-			configure.AnalyzerPort = proto.Uint32(uint32(DefaultAnalyzerPort))
-		}
+		configure.AnalyzerIp = &cacheTSBIP
+		configure.AnalyzerPort = proto.Uint32(uint32(DefaultAnalyzerPort))
 	}
 
 	if vtapConfig.NatIPEnabled == 1 {
 		configure.ProxyControllerIp = proto.String(trisolaris.GetGNodeInfo().GetControllerNatIP(c.GetControllerIP()))
 		configure.ProxyControllerPort = proto.Uint32(uint32(DefaultProxyControllerPort))
-	} else if isPodVTap(c.GetVTapType()) && gVTapInfo.IsTheSameCluster(clusterID) {
-		configure.ProxyControllerIp = proto.String(trisolaris.GetGNodeInfo().GetControllerPodIP(c.GetControllerIP()))
-		configure.ProxyControllerPort = proto.Uint32(uint32(trisolaris.GetGrpcPort()))
+
+		configure.AnalyzerIp = proto.String(trisolaris.GetGNodeInfo().GetTSDBNatIP(c.GetTSDBIP()))
+		configure.AnalyzerPort = proto.Uint32(uint32(DefaultAnalyzerPort))
 	}
 
 	if vtapConfig.ProxyControllerIP != "" {
@@ -197,6 +185,14 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 	}
 	if vtapConfig.AnalyzerPort != 0 {
 		configure.AnalyzerPort = proto.Uint32(uint32(vtapConfig.AnalyzerPort))
+	}
+
+	if isPodVTap(c.GetVTapType()) && gVTapInfo.IsTheSameCluster(clusterID) {
+		configure.AnalyzerIp = proto.String(trisolaris.GetGNodeInfo().GetTSDBPodIP(c.GetTSDBIP()))
+		configure.AnalyzerPort = proto.Uint32(uint32(trisolaris.GetIngesterPort()))
+
+		configure.ProxyControllerIp = proto.String(trisolaris.GetGNodeInfo().GetControllerPodIP(c.GetControllerIP()))
+		configure.ProxyControllerPort = proto.Uint32(uint32(trisolaris.GetGrpcPort()))
 	}
 
 	if configure.GetProxyControllerIp() == "" {
