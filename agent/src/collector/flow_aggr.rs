@@ -144,6 +144,7 @@ pub struct FlowAggr {
     slot_start_time: Duration,
     stashs: VecDeque<HashMap<u64, TaggedFlow>>,
     history_length: VecDeque<usize>,
+    stash_init_capacity: usize,
 
     last_flush_time: Duration,
     config: CollectorAccess,
@@ -168,14 +169,18 @@ impl FlowAggr {
         metrics: Arc<FlowAggrCounter>,
     ) -> Self {
         let mut stashs = VecDeque::new();
+        let mut stash_init_capacity = 0;
         for _ in 0..MINUTE_SLOTS {
-            stashs.push_front(HashMap::new())
+            let stash = HashMap::with_capacity(Self::MIN_STASH_CAPACITY);
+            stash_init_capacity = stash_init_capacity.max(stash.capacity());
+            stashs.push_front(stash);
         }
         Self {
             input,
             output: ThrottlingQueue::new(output, config.clone()),
             stashs,
             history_length: [0; Self::HISTORY_RECORD_COUNT].into(),
+            stash_init_capacity,
             slot_start_time: Duration::ZERO,
             last_flush_time: Duration::ZERO,
             config,
@@ -280,12 +285,12 @@ impl FlowAggr {
         }
 
         let stash_cap = slot_map.capacity();
-        if stash_cap > Self::MIN_STASH_CAPACITY {
+        if stash_cap > self.stash_init_capacity {
             let max_history = self.history_length.iter().fold(0, |acc, n| acc.max(*n));
             if stash_cap > 2 * max_history {
                 // shrink stash if its capacity is larger than 2 times of the max stash length in the past HISTORY_RECORD_COUNT flushes
                 self.metrics.stash_shrinks.fetch_add(1, Ordering::Relaxed);
-                slot_map.shrink_to(Self::MIN_STASH_CAPACITY.max(2 * max_history));
+                slot_map.shrink_to(self.stash_init_capacity.max(2 * max_history));
             }
         }
 
@@ -386,7 +391,7 @@ impl RefCountable for FlowAggrCounter {
             (
                 "stash-shrinks",
                 CounterType::Counted,
-                CounterValue::Unsigned(self.stash_shrinks.load(Ordering::Relaxed)),
+                CounterValue::Unsigned(self.stash_shrinks.swap(0, Ordering::Relaxed)),
             ),
         ]
     }

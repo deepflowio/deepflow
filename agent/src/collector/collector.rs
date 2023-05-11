@@ -119,7 +119,7 @@ impl RefCountable for CollectorCounter {
             (
                 "stash-shrinks",
                 CounterType::Counted,
-                CounterValue::Unsigned(self.stash_shrinks.load(Ordering::Relaxed)),
+                CounterValue::Unsigned(self.stash_shrinks.swap(0, Ordering::Relaxed)),
             ),
         ]
     }
@@ -327,6 +327,7 @@ struct Stash {
     slot_interval: u64,
     inner: HashMap<StashKey, Document>,
     history_length: VecDeque<usize>,
+    stash_init_capacity: usize,
     global_thread_id: u8,
     doc_flag: DocumentFlag,
     context: Context,
@@ -351,14 +352,17 @@ impl Stash {
             get_timestamp(ctx.ntp_diff.load(Ordering::Relaxed)).as_secs() / MINUTE * MINUTE
                 - 2 * MINUTE,
         );
+        let inner = HashMap::with_capacity(Self::MIN_STASH_CAPACITY);
+        let stash_init_capacity = inner.capacity();
         Self {
             sender,
             counter,
             start_time,
             global_thread_id: ctx.id as u8 + 1,
             slot_interval,
-            inner: HashMap::with_capacity(Self::MIN_STASH_CAPACITY),
+            inner,
             history_length: [0; Self::HISTORY_RECORD_COUNT].into(),
+            stash_init_capacity,
             doc_flag,
             context: ctx,
         }
@@ -858,13 +862,13 @@ impl Stash {
         }
 
         let stash_cap = self.inner.capacity();
-        if stash_cap > Self::MIN_STASH_CAPACITY {
+        if stash_cap > self.stash_init_capacity {
             let max_history = self.history_length.iter().fold(0, |acc, n| acc.max(*n));
             if stash_cap > 2 * max_history {
                 // shrink stash if its capacity is larger than 2 times of the max stash length in the past HISTORY_RECORD_COUNT flushes
                 self.counter.stash_shrinks.fetch_add(1, Ordering::Relaxed);
                 self.inner
-                    .shrink_to(Self::MIN_STASH_CAPACITY.max(2 * max_history));
+                    .shrink_to(self.stash_init_capacity.max(2 * max_history));
             }
         }
     }
