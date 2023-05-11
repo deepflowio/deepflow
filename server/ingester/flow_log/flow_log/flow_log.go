@@ -44,10 +44,6 @@ import (
 
 var log = logging.MustGetLogger("flow_log")
 
-const (
-	CMD_PLATFORMDATA = 34
-)
-
 type FlowLog struct {
 	FlowLogConfig        *config.Config
 	L4FlowLogger         *Logger
@@ -134,7 +130,7 @@ func NewLogger(msgType datatype.MessageType, config *config.Config, platformData
 		if platformDataManager != nil {
 			platformDatas[i], _ = platformDataManager.NewPlatformInfoTable(false, "flow-log-"+datatype.MessageTypeString[msgType]+"-"+strconv.Itoa(i))
 			if i == 0 {
-				debug.ServerRegisterSimple(CMD_PLATFORMDATA, platformDatas[i])
+				debug.ServerRegisterSimple(ingesterctl.CMD_PLATFORMDATA_FLOW_LOG, platformDatas[i])
 			}
 		}
 		decoders[i] = decoder.NewDecoder(
@@ -186,7 +182,7 @@ func NewL4FlowLogger(config *config.Config, platformDataManager *grpc.PlatformDa
 		)
 		platformDatas[i], _ = platformDataManager.NewPlatformInfoTable(false, "l4-flow-log-"+strconv.Itoa(i))
 		if i == 0 {
-			debug.ServerRegisterSimple(CMD_PLATFORMDATA, platformDatas[i])
+			debug.ServerRegisterSimple(ingesterctl.CMD_PLATFORMDATA_FLOW_LOG, platformDatas[i])
 		}
 		decoders[i] = decoder.NewDecoder(
 			i,

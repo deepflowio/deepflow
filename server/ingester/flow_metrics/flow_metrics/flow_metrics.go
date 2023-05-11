@@ -35,10 +35,6 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/receiver"
 )
 
-const (
-	CMD_PLATFORMDATA = 33
-)
-
 var log = logging.MustGetLogger("flow_metrics")
 
 type FlowMetrics struct {
@@ -74,7 +70,7 @@ func NewFlowMetrics(cfg *config.Config, recv *receiver.Receiver, platformDataMan
 		if i == 0 {
 			// 只第一个上报数据节点信息
 			flowMetrics.platformDatas[i], err = platformDataManager.NewPlatformInfoTable(true, "roze")
-			debug.ServerRegisterSimple(CMD_PLATFORMDATA, flowMetrics.platformDatas[i])
+			debug.ServerRegisterSimple(ingesterctl.CMD_PLATFORMDATA_FLOW_METRIC, flowMetrics.platformDatas[i])
 		} else {
 			flowMetrics.platformDatas[i], err = platformDataManager.NewPlatformInfoTable(false, "flowMetrics-"+strconv.Itoa(i))
 		}
