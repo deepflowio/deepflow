@@ -57,6 +57,7 @@ controller:
     timeout: 30
     # whether drop database when init failed
     drop-database-enabled: false
+    auto_increment_increment: 1
 
   # redis相关配置
   redis:
