@@ -1443,7 +1443,7 @@ impl FlowMap {
             let l7_timeout_count = self
                 .perf_cache
                 .borrow_mut()
-                .get_timeout_count(&flow.flow_id);
+                .pop_timeout_count(&flow.flow_id);
 
             // 如果返回None，就清空掉flow_perf_stats
             flow.flow_perf_stats = node.meta_flow_log.as_mut().and_then(|perf| {
