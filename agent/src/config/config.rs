@@ -667,7 +667,7 @@ impl Default for YamlConfig {
             os_app_tag_exec: vec![],
             os_proc_sync_enabled: false,
             os_proc_sync_tagged_only: false,
-            guard_interval: Duration::from_secs(60),
+            guard_interval: Duration::from_secs(10),
             check_core_file_disabled: false,
             wasm_plugins: vec![],
         }
