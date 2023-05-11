@@ -35,7 +35,7 @@ import (
 	. "github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 )
 
-var IDMNG *IDManager
+var IDMNG *IDManager // TODO use component in common
 
 type IDManager struct {
 	ctx                  context.Context

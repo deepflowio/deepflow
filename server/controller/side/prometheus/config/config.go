@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,9 +14,14 @@
  * limitations under the License.
  */
 
-package migration
+package config
 
-const (
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "6.3.1.1"
+import (
+	"time"
 )
+
+type Config struct {
+	IDPoolRefreshInterval time.Duration `default:"3600" yaml:"id_pool_refresh_interval"`
+	ResourceMaxID0        int           `default:"64000" yaml:"resource_max_id_0"`
+	ResourceMaxID1        int           `default:"499999" yaml:"resource_max_id_1"`
+}
