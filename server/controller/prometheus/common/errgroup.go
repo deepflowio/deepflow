@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,9 +14,29 @@
  * limitations under the License.
  */
 
-package migration
+package common
 
-const (
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "6.3.1.8"
+import (
+	"context"
+
+	"golang.org/x/sync/errgroup"
 )
+
+type ErrFunc func(...interface{}) error
+
+func AppendErrGroupWithContext(ctx context.Context, eg *errgroup.Group, f ErrFunc, args ...interface{}) {
+	eg.Go(func() error {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			return f(args...)
+		}
+	})
+}
+
+func AppendErrGroup(eg *errgroup.Group, f ErrFunc, args ...interface{}) {
+	eg.Go(func() error {
+		return f(args...)
+	})
+}
