@@ -22,6 +22,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/snappy"
@@ -118,6 +119,8 @@ func (d *Decoder) Run() {
 	common.RegisterCountableForIngester("decoder", d, stats.OptionStatTags{
 		"thread":   strconv.Itoa(d.index),
 		"msg_type": d.msgType.String()})
+
+	d.initMetricsTable()
 	buffer := make([]interface{}, BUFFER_SIZE)
 	decoder := &codec.SimpleDecoder{}
 	for {
@@ -142,6 +145,15 @@ func (d *Decoder) Run() {
 			}
 			receiver.ReleaseRecvBuffer(recvBytes)
 		}
+	}
+}
+
+func (d *Decoder) initMetricsTable() {
+	if d.msgType == datatype.MESSAGE_TYPE_TELEGRAF && d.extMetricsWriter != nil {
+		// send empty metrics, trigger the creation of ext_metrics.metrics table
+		m := dbwriter.AcquireExtMetrics()
+		m.Timestamp = uint32(time.Now().Unix())
+		d.extMetricsWriter.Write(m)
 	}
 }
 
