@@ -26,11 +26,13 @@ type Subnet struct {
 }
 
 func NewSubnet() *Subnet {
-	return &Subnet{
+	o := &Subnet{
 		OperatorBase[mysql.Subnet]{
 			resourceTypeName: common.RESOURCE_TYPE_SUBNET_EN,
 			softDelete:       false,
 			allocateID:       false,
 		},
 	}
+	o.setFieldsNeededAfterCreate([]string{"id", "lcuuid", "name", "label", "sub_domain"})
+	return o
 }
