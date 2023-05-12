@@ -125,6 +125,10 @@ func (s *service) KubernetesAPISync(ctx context.Context, in *api.KubernetesAPISy
 	return genesis.Synchronizer.KubernetesAPISync(ctx, in)
 }
 
+func (s *service) PrometheusAPISync(ctx context.Context, in *api.PrometheusAPISyncRequest) (*api.PrometheusAPISyncResponse, error) {
+	return genesis.Synchronizer.PrometheusAPISync(ctx, in)
+}
+
 func (s *service) GPIDSync(ctx context.Context, in *api.GPIDSyncRequest) (*api.GPIDSyncResponse, error) {
 	startTime := time.Now()
 	defer func() {
