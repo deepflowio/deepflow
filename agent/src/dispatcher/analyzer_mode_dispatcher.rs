@@ -188,7 +188,7 @@ impl AnalyzerModeDispatcher {
             vm_mac_addrs.contains_key(&sa_key),
         );
         let mut tap_port = TapPort::from_id(tunnel_info.tunnel_type, id as u32);
-        let is_unicast = tunnel_info.tier > 0 || MacAddr::is_multicast(&overlay_packet[..]); // Consider unicast when there is a tunnel
+        let is_unicast = tunnel_info.tier > 0 || MacAddr::is_multicast(overlay_packet); // Consider unicast when there is a tunnel
 
         if src_remote && dst_remote && is_unicast {
             (tap_port, true, true)
