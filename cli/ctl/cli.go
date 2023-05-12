@@ -64,6 +64,7 @@ func Execute(version string) {
 	root.AddCommand(RegisterRepoCommand())
 	root.AddCommand(RegisterPluginCommand())
 	root.AddCommand(RegisterPrometheusCacheCommand())
+	root.AddCommand(RegisterPromQLCommand())
 
 	cmd.RegisterIngesterCommand(root)
 

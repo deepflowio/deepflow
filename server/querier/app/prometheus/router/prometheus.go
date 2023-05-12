@@ -19,12 +19,12 @@ package router
 import (
 	"context"
 	"io/ioutil"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang/snappy"
 	"github.com/prometheus/prometheus/prompb"
 
-	//logging "github.com/op/go-logging"
 	"github.com/deepflowio/deepflow/server/querier/app/prometheus/model"
 	"github.com/deepflowio/deepflow/server/querier/app/prometheus/service"
 )
@@ -32,7 +32,7 @@ import (
 const _STATUS_FAIL = "fail"
 
 // PromQL Query API
-func promQuery() gin.HandlerFunc {
+func promQuery(svc *service.PrometheusService) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		args := model.PromQueryParams{}
 		args.Context = c.Request.Context()
@@ -42,7 +42,7 @@ func promQuery() gin.HandlerFunc {
 		// ref: https://github.com/prometheus/prometheus/blob/main/prompb/types.proto#L157
 		args.StartTime = c.Request.FormValue("time")
 		args.EndTime = c.Request.FormValue("time")
-		result, err := service.PromInstantQueryService(&args, c.Request.Context())
+		result, err := svc.PromInstantQueryService(&args, c.Request.Context())
 		if err != nil {
 			c.JSON(500, &model.PromQueryResponse{Error: err.Error(), Status: _STATUS_FAIL})
 		}
@@ -51,7 +51,7 @@ func promQuery() gin.HandlerFunc {
 }
 
 // PromQL Range Query API
-func promQueryRange() gin.HandlerFunc {
+func promQueryRange(svc *service.PrometheusService) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		args := model.PromQueryParams{}
 		args.Context = c.Request.Context()
@@ -62,7 +62,7 @@ func promQueryRange() gin.HandlerFunc {
 		//pp.Println(c.Request.Header.Get("Accept"))
 		//pp.Println(args.Promql)
 
-		result, err := service.PromRangeQueryService(&args, c.Request.Context())
+		result, err := svc.PromRangeQueryService(&args, c.Request.Context())
 		if err != nil {
 			c.JSON(500, &model.PromQueryResponse{Error: err.Error(), Status: _STATUS_FAIL})
 		}
@@ -72,7 +72,7 @@ func promQueryRange() gin.HandlerFunc {
 }
 
 // RemoteRead API
-func promReader() gin.HandlerFunc {
+func promReader(svc *service.PrometheusService) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		compressed, _ := ioutil.ReadAll(c.Request.Body)
 		reqBuf, err := snappy.Decode(nil, compressed)
@@ -86,7 +86,7 @@ func promReader() gin.HandlerFunc {
 			return
 		}
 		//pp.Println(req)
-		resp, err := service.PromRemoteReadService(&req, c.Request.Context())
+		resp, err := svc.PromRemoteReadService(&req, c.Request.Context())
 		//pp.Println(resp)
 		if err != nil {
 			c.JSON(500, err)
@@ -102,7 +102,7 @@ func promReader() gin.HandlerFunc {
 	})
 }
 
-func promTagValuesReader() gin.HandlerFunc {
+func promTagValuesReader(svc *service.PrometheusService) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		args := model.PromMetaParams{
 			LabelName: c.Param("labelName"),
@@ -110,7 +110,7 @@ func promTagValuesReader() gin.HandlerFunc {
 			EndTime:   c.Request.FormValue("end"),
 			Context:   c.Request.Context(),
 		}
-		result, err := service.PromLabelValuesService(&args, c.Request.Context())
+		result, err := svc.PromLabelValuesService(&args, c.Request.Context())
 		if err != nil {
 			c.JSON(500, &model.PromQueryResponse{Error: err.Error(), Status: _STATUS_FAIL})
 			return
@@ -119,7 +119,7 @@ func promTagValuesReader() gin.HandlerFunc {
 	})
 }
 
-func promSeriesReader() gin.HandlerFunc {
+func promSeriesReader(svc *service.PrometheusService) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		args := model.PromQueryParams{
 			StartTime: c.Request.FormValue("start"),
@@ -129,9 +129,34 @@ func promSeriesReader() gin.HandlerFunc {
 		}
 		// should show tags when get `Series`
 		ctx := context.WithValue(c.Request.Context(), service.CtxKeyShowTag{}, true)
-		result, err := service.PromSeriesQueryService(&args, ctx)
+		result, err := svc.PromSeriesQueryService(&args, ctx)
 		if err != nil {
 			c.JSON(500, &model.PromQueryResponse{Error: err.Error(), Status: _STATUS_FAIL})
+			return
+		}
+		c.JSON(200, result)
+	})
+}
+
+func promQLAnalysis(svc *service.PrometheusService) gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		metric := c.Query("metric")
+		targets := c.Query("target")
+		apps := c.Query("app")
+		from := c.Query("from")
+		to := c.Query("to")
+
+		var targetLabels, appLabels []string
+		if targets != "" {
+			targetLabels = strings.Split(targets, ",")
+		}
+		if apps != "" {
+			appLabels = strings.Split(apps, ",")
+		}
+
+		result, err := svc.PromQLAnalysis(c, metric, targetLabels, appLabels, from, to)
+		if err != nil {
+			c.JSON(500, result)
 			return
 		}
 		c.JSON(200, result)
