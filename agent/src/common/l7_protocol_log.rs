@@ -351,8 +351,8 @@ pub struct LogCache {
 pub struct L7PerfCache {
     // lru cache previous rrt
     pub rrt_cache: LruCache<u128, LogCache>,
-    // LruCache<flow_id, count>
-    pub timeout_cache: LruCache<u64, usize>,
+    // LruCache<flow_id, (in_cache_req, count)>
+    pub timeout_cache: LruCache<u64, (usize, usize)>,
 }
 
 impl L7PerfCache {
@@ -363,8 +363,14 @@ impl L7PerfCache {
         }
     }
 
-    pub fn pop_timeout_count(&mut self, flow_id: &u64) -> usize {
-        self.timeout_cache.pop(flow_id).unwrap_or(0)
+    pub fn pop_timeout_count(&mut self, flow_id: &u64, flow_end: bool) -> usize {
+        let (in_cache, t) = self.timeout_cache.pop(flow_id).unwrap_or((0, 0));
+        if flow_end {
+            in_cache + t
+        } else {
+            self.timeout_cache.put(*flow_id, (in_cache, 0));
+            t
+        }
     }
 }
 

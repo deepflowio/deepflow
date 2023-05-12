@@ -219,42 +219,37 @@ impl FlowLog {
                 },
                 parse_param,
             );
+
+            let mut cache_proto = |proto: L7ProtocolEnum| match packet.signal_source {
+                SignalSource::EBPF => {
+                    app_table.set_protocol_from_ebpf(packet, proto, local_epc, remote_epc)
+                }
+                _ => app_table.set_protocol(packet, proto),
+            };
+
+            let cached = if ret.is_ok() && self.l7_protocol_enum != parser.l7_protocol_enum() {
+                // due to http2 may be upgrade grpc, need to reset the flow node protocol
+                self.l7_protocol_enum = parser.l7_protocol_enum();
+                cache_proto(self.l7_protocol_enum.clone());
+                true
+            } else {
+                false
+            };
             parser.reset();
 
             if !self.is_success {
-                if ret.is_ok() {
-                    // due to http2 may be upgrade grpc, need to reset the flow node protocol
-                    self.l7_protocol_enum = parser.l7_protocol_enum();
-                    match packet.signal_source {
-                        SignalSource::EBPF => {
-                            app_table.set_protocol_from_ebpf(
-                                packet,
-                                self.l7_protocol_enum.clone(),
-                                local_epc,
-                                remote_epc,
-                            );
-                        }
-                        _ => {
-                            app_table.set_protocol(packet, self.l7_protocol_enum.clone());
-                        }
-                    }
-                    self.is_success = true;
-                } else {
-                    self.is_skip = match packet.signal_source {
-                        SignalSource::EBPF => app_table.set_protocol_from_ebpf(
-                            packet,
-                            L7ProtocolEnum::default(),
-                            local_epc,
-                            remote_epc,
-                        ),
-                        _ => app_table.set_protocol(packet, L7ProtocolEnum::default()),
-                    };
+                self.is_success = ret.is_ok();
+                if self.is_success && !cached {
+                    cache_proto(self.l7_protocol_enum.clone());
+                }
+                if !self.is_success {
+                    self.is_skip = cache_proto(L7ProtocolEnum::default());
                 }
             }
             return ret;
         }
 
-        return Err(Error::ZeroPayloadLen);
+        Err(Error::ZeroPayloadLen)
     }
 
     fn l7_check(
