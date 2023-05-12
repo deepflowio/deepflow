@@ -34,6 +34,7 @@ func NewSecurityGroup() *SecurityGroup {
 		},
 	}
 	operater.setter = operater
+	operater.setFieldsNeededAfterCreate([]string{"id", "lcuuid", "name", "label", "region"})
 	return operater
 }
 
