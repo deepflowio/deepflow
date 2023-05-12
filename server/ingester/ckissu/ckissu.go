@@ -1187,7 +1187,7 @@ func (i *Issu) RunRenameTable(ds *datasource.DatasourceManager) error {
 		if err != nil {
 			return err
 		}
-		if strings.Compare(oldVersion, "v6.2.6.2") >= 0 || oldVersion == "" {
+		if strings.Compare(oldVersion, "v6.2.6.2") >= 0 {
 			continue
 		}
 		for _, tableRename := range i.tableRenames {
