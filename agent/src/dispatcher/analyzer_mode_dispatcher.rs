@@ -58,7 +58,6 @@ const BILD_FLAGS_OFFSET: usize = 6;
 const BILD_OVERLAY_OFFSET: usize = 7;
 
 const HANDLER_BATCH_SIZE: usize = 64;
-const INNER_QUEUE_SIZE: usize = 65536;
 
 #[derive(Clone)]
 pub struct AnalyzerModeDispatcherListener {
@@ -139,6 +138,7 @@ pub(super) struct AnalyzerModeDispatcher {
     pub(super) pipeline_thread_handler: Option<JoinHandle<()>>,
     pub(super) queue_debugger: Arc<QueueDebugger>,
     pub(super) stats_collector: Arc<stats::Collector>,
+    pub(super) inner_queue_size: usize,
 }
 
 impl AnalyzerModeDispatcher {
@@ -493,7 +493,7 @@ impl AnalyzerModeDispatcher {
         let id = self.base.id.to_string();
         let name = "0.1-bytes-to-meta-packet-generator";
         let (sender_to_parser, receiver_from_dispatcher, counter) =
-            bounded_with_debug(INNER_QUEUE_SIZE, name, &self.queue_debugger);
+            bounded_with_debug(self.inner_queue_size, name, &self.queue_debugger);
         self.stats_collector.register_countable(
             "queue",
             Countable::Owned(Box::new(counter)),
@@ -505,7 +505,7 @@ impl AnalyzerModeDispatcher {
 
         let name = "0.2-packet-to-tagged-flow-generator";
         let (sender_to_flow, receiver_from_parser, counter) =
-            bounded_with_debug(INNER_QUEUE_SIZE, name, &self.queue_debugger);
+            bounded_with_debug(self.inner_queue_size, name, &self.queue_debugger);
         self.stats_collector.register_countable(
             "queue",
             Countable::Owned(Box::new(counter)),
@@ -517,7 +517,7 @@ impl AnalyzerModeDispatcher {
 
         let name = "0.3-packet-to-additional-pipeline";
         let (sender_to_pipeline, receiver_from_flow, counter) =
-            bounded_with_debug(INNER_QUEUE_SIZE, name, &self.queue_debugger);
+            bounded_with_debug(self.inner_queue_size, name, &self.queue_debugger);
         self.stats_collector.register_countable(
             "queue",
             Countable::Owned(Box::new(counter)),
