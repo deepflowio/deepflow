@@ -613,6 +613,7 @@ pub struct DispatcherBuilder {
     netns: Option<NsFile>,
     trident_type: Option<TridentType>,
     queue_debugger: Option<Arc<QueueDebugger>>,
+    analyzer_queue_size: Option<usize>,
 }
 
 impl DispatcherBuilder {
@@ -741,6 +742,11 @@ impl DispatcherBuilder {
 
     pub fn queue_debugger(mut self, v: Arc<QueueDebugger>) -> Self {
         self.queue_debugger = Some(v);
+        self
+    }
+
+    pub fn analyzer_queue_size(mut self, v: usize) -> Self {
+        self.analyzer_queue_size = Some(v);
         self
     }
 
@@ -950,6 +956,10 @@ impl DispatcherBuilder {
                     pipeline_thread_handler: None,
                     stats_collector: collector.clone(),
                     queue_debugger: self.queue_debugger.as_ref().unwrap().clone(),
+                    inner_queue_size: self
+                        .analyzer_queue_size
+                        .take()
+                        .ok_or(Error::ConfigIncomplete("no analyzer_queue_size".into()))?,
                 })
             }
             _ => {
