@@ -28,6 +28,8 @@ use std::{
 use arc_swap::access::Access;
 use bytesize::ByteSize;
 use chrono::prelude::*;
+#[cfg(target_os = "linux")]
+use libc::malloc_trim;
 use log::{debug, error, info, warn};
 
 use super::process::get_memory_rss;
@@ -54,6 +56,7 @@ pub struct Guard {
     exception_handler: ExceptionHandler,
     cgroup_mount_path: String,
     is_cgroup_v2: bool,
+    memory_trim_disabled: bool,
 }
 
 impl Guard {
@@ -65,6 +68,7 @@ impl Guard {
         exception_handler: ExceptionHandler,
         cgroup_mount_path: String,
         is_cgroup_v2: bool,
+        memory_trim_disabled: bool,
     ) -> Self {
         Self {
             config,
@@ -76,6 +80,7 @@ impl Guard {
             exception_handler,
             cgroup_mount_path,
             is_cgroup_v2,
+            memory_trim_disabled,
         }
     }
 
@@ -180,6 +185,7 @@ impl Guard {
         let mut under_sys_free_memory_limit = false; // Below the limit, it does not meet expectations
         let cgroup_mount_path = self.cgroup_mount_path.clone();
         let is_cgroup_v2 = self.is_cgroup_v2;
+        let memory_trim_disabled = self.memory_trim_disabled;
         let thread = thread::Builder::new().name("guard".to_owned()).spawn(move || {
             loop {
                 // If it is in a container or tap_mode is Analyzer, there is no need to limit resource, so there is no need to check cgroup
@@ -187,9 +193,14 @@ impl Guard {
                     Self::check_cgroup(cgroup_mount_path.clone(), is_cgroup_v2);
                 }
 
+                #[cfg(target_os = "linux")]
+                if !memory_trim_disabled {
+                    unsafe { let _ = malloc_trim(0); }
+                }
+
                 // Periodic memory checks are necessary:
-                // Cgroup does not count the memory of RssFile, and AF_PACKET Block occupies RssFile. 
-                // Therefore, using Cgroup to limit the memory usage may not be accurate in some scenarios. 
+                // Cgroup does not count the memory of RssFile, and AF_PACKET Block occupies RssFile.
+                // Therefore, using Cgroup to limit the memory usage may not be accurate in some scenarios.
                 // Periodically checking the memory usage can determine whether the memory exceeds the limit.
                 // Reference: https://unix.stackexchange.com/questions/686814/cgroup-and-process-memory-statistics-mismatch
                 if tap_mode != TapMode::Analyzer {
