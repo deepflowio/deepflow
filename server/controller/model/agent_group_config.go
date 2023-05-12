@@ -94,6 +94,7 @@ type StaticConfig struct {
 	GuardInterval                    *string               `yaml:"guard-interval,omitempty"`
 	CheckCoreFileDisabled            *bool                 `yaml:"check-core-file-disabled,omitempty"`
 	WasmPlugins                      []string              `yaml:"wasm-plugins,omitempty"`
+	MemoryTrimDisabled               *bool                 `yaml:"memory-trim-disabled,omitempty"`
 }
 
 type XflowCollectorConfig struct {
