@@ -432,6 +432,10 @@ impl Trident {
             exception_handler.clone(),
             cgroup_mount_path,
             is_cgroup_v2,
+            config_handler
+                .candidate_config
+                .yaml_config
+                .memory_trim_disabled,
         );
         guard.start();
 

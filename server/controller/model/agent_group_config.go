@@ -82,6 +82,7 @@ type StaticConfig struct {
 	Ebpf                             *EbpfConfig           `yaml:"ebpf,omitempty"`
 	GuardInterval                    *string               `yaml:"guard-interval,omitempty"`
 	CheckCoreFileDisabled            *bool                 `yaml:"check-core-file-disabled,omitempty"`
+	MemoryTrimDisabled               *bool                 `yaml:"memory-trim-disabled,omitempty"`
 }
 
 type XflowCollectorConfig struct {

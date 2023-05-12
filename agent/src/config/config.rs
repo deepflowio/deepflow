@@ -347,6 +347,7 @@ pub struct YamlConfig {
     #[serde(with = "humantime_serde")]
     pub guard_interval: Duration,
     pub check_core_file_disabled: bool,
+    pub memory_trim_disabled: bool,
 }
 
 impl YamlConfig {
@@ -603,6 +604,7 @@ impl Default for YamlConfig {
             ebpf: EbpfYamlConfig::default(),
             guard_interval: Duration::from_secs(10),
             check_core_file_disabled: false,
+            memory_trim_disabled: false,
         }
     }
 }
