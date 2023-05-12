@@ -39,12 +39,11 @@ const (
 	PROMETHEUS_METRICS_NAME     = "__name__"
 	EXT_METRICS_NATIVE_TAG_NAME = "tag"
 	EXT_METRICS_TIME_COLUMNS    = "timestamp"
-
-	TAP_SIDE_TAG_NAME      = "tap_side"
-	AUTO_INSTANCE_TAG_NAME = "auto_instance"
 )
+
 const (
 	EXT_METRICS_TABLE         = "metrics"
+	PROMETHEUS_TABLE          = "samples"
 	L4_FLOW_LOG_TABLE         = "l4_flow_log"
 	L7_FLOW_LOG_TABLE         = "l7_flow_log"
 	VTAP_APP_PORT_TABLE       = "vtap_app_port"
@@ -109,7 +108,7 @@ const (
 
 type ctxKeyPrefixType struct{}
 
-func PromReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (context.Context, string, string, string, error) {
+func promReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (context.Context, string, string, string, error) {
 	// QPS Limit Check
 	// Both SetRate and Acquire are expanded by 1000 times, making it suitable for small QPS scenarios.
 	if !QPSLeakyBucket.Acquire(1000) {
@@ -149,7 +148,7 @@ func PromReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (context
 		// append all `SHOW tags`
 		metricsArray = append(metricsArray, tagsArray...)
 	} else {
-		if db != DB_NAME_EXT_METRICS && db != DB_NAME_DEEPFLOW_SYSTEM && db != "" {
+		if db != DB_NAME_EXT_METRICS && db != DB_NAME_DEEPFLOW_SYSTEM && db != chCommon.DB_NAME_PROMETHEUS && db != "" {
 			// DeepFlow native metrics needs aggregation for query
 			if len(q.Hints.Grouping) == 0 {
 				// not specific cardinality
@@ -206,11 +205,11 @@ func PromReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (context
 		}
 	}
 
-	if db == "" || db == chCommon.DB_NAME_EXT_METRICS || db == chCommon.DB_NAME_DEEPFLOW_SYSTEM {
-		// append metricName as "metrics.%s"
+	if db == "" || db == chCommon.DB_NAME_EXT_METRICS || db == chCommon.DB_NAME_DEEPFLOW_SYSTEM || db == chCommon.DB_NAME_PROMETHEUS {
+		// append metricName as "`metrics.%s`"
 		metricsArray = append(metricsArray, fmt.Sprintf(metricAlias, metricName))
 		// append `tag` only for prometheus & ext_metrics & deepflow_system
-		metricsArray = append(metricsArray, EXT_METRICS_NATIVE_TAG_NAME)
+		metricsArray = append(metricsArray, fmt.Sprintf("`%s`", EXT_METRICS_NATIVE_TAG_NAME))
 	} else {
 		// append metricName as "%s as `metrics.%s`"
 		if metricWithAggFunc != "" {
@@ -240,14 +239,23 @@ func PromReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (context
 				filters = append(filters, fmt.Sprintf("`%s` %s '%s'", tagName, operation, matcher.Value))
 
 				// when PromQL mention a deepflow universal tag, append into metrics
-				metricsArray = append(metricsArray, tagName)
+				if config.Cfg.Prometheus.RequestQueryWithDebug {
+					metricsArray = append(metricsArray, tagName)
+				}
 			} else {
 				filters = append(filters, fmt.Sprintf("`tag.%s` %s '%s'", matcher.Name, operation, matcher.Value))
+				// append in query for analysis (findout if tag is target_label)
+				metricsArray = append(metricsArray, fmt.Sprintf("`tag.%s`", matcher.Name))
 			}
 		default:
-			// deepflow metrics (vtap_app/flow_part/edge_part & ext_metrics)
+			// deepflow metrics (vtap_app/flow_part/edge_part & ext_metrics & prometheus)
 			if strings.HasPrefix(matcher.Name, "tag_") {
-				filters = append(filters, fmt.Sprintf("`tag.%s` %s '%s'", removeTagPrefix(matcher.Name), operation, matcher.Value))
+				tagName := removeTagPrefix(matcher.Name)
+				filters = append(filters, fmt.Sprintf("`tag.%s` %s '%s'", tagName, operation, matcher.Value))
+				// for prometheus native tag, append in query for analysis (findout if tag is target_label)
+				if config.Cfg.Prometheus.RequestQueryWithDebug {
+					metricsArray = append(metricsArray, fmt.Sprintf("`tag.%s`", tagName))
+				}
 			} else {
 				// convert k8s label tag to query tag
 				tagName := convertToQuerierAllowedTagName(matcher.Name)
@@ -275,6 +283,8 @@ func parseMetric(matchers []*prompb.LabelMatcher) (prefixType prefix, metricName
 			// i.e.: flow_metrics__vtap_flow_port__byte_rx__1m
 			// Prometheus/InfluxDB integrated metrics: ext_metrics__metrics__${integratedSource}_${metricsName}
 			// i.e.: ext_metrics__metrics__prometheus_node_cpu_seconds_total
+			// Prometheus integrated metrics: prometheus__samples__${metricsName}
+			// i.e.: prometheus__samples__node_cpu_seconds_total
 			metricsSplit := strings.Split(metricName, "__")
 			if _, ok := chCommon.DB_TABLE_MAP[metricsSplit[0]]; ok {
 				db = metricsSplit[0]
@@ -293,6 +303,11 @@ func parseMetric(matchers []*prompb.LabelMatcher) (prefixType prefix, metricName
 						metricName = realMetrics[1]
 					}
 					metricAlias = "metrics.%s"
+				} else if db == chCommon.DB_NAME_PROMETHEUS {
+					prefixType = prefixTag
+					// query `prometheus`.`samples` table, should query metrics
+					table = metricName
+					metricAlias = "value as `metrics.%s`"
 				} else {
 					// To identify which columns belong to metrics, we prefix all metrics names with `metrics.`
 					metricAlias = "%s as `metrics.%s`"
@@ -309,7 +324,9 @@ func parseMetric(matchers []*prompb.LabelMatcher) (prefixType prefix, metricName
 			// Prometheus native metrics: ${metricsName}
 			// identify prefix for tag names with "df_"
 			prefixType = prefixDeepFlow
-			metricAlias = "metrics.%s"
+
+			// Prometheus native metrics only query `value` as metrics sample
+			metricAlias = "value as `metrics.%s`"
 			table = metricName
 		}
 		break
@@ -322,7 +339,9 @@ func showTags(ctx context.Context, db string, table string, startTime int64, end
 	var data *common.Result
 	var err error
 	var tagsArray []string
-	if db == "" || db == chCommon.DB_NAME_EXT_METRICS {
+	if db == "" || db == chCommon.DB_NAME_PROMETHEUS {
+		data, err = tagdescription.GetTagDescriptions(chCommon.DB_NAME_PROMETHEUS, PROMETHEUS_TABLE, fmt.Sprintf(showTags, chCommon.DB_NAME_PROMETHEUS, PROMETHEUS_TABLE, startTime, endTime), ctx)
+	} else if db == chCommon.DB_NAME_EXT_METRICS {
 		data, err = tagdescription.GetTagDescriptions(chCommon.DB_NAME_EXT_METRICS, EXT_METRICS_TABLE, fmt.Sprintf(showTags, chCommon.DB_NAME_EXT_METRICS, EXT_METRICS_TABLE, startTime, endTime), ctx)
 	} else {
 		data, err = tagdescription.GetTagDescriptions(db, table, fmt.Sprintf(showTags, db, table, startTime, endTime), ctx)
@@ -380,24 +399,28 @@ func parseToQuerierSQL(ctx context.Context, db string, table string, metrics []s
 		sqlBuilder.WriteString(fmt.Sprintf(" ORDER BY %s desc LIMIT %s", EXT_METRICS_TIME_COLUMNS, config.Cfg.Limit))
 		sql = sqlBuilder.String()
 	} else {
-		sql = fmt.Sprintf("SELECT %s FROM prometheus.%s WHERE %s ORDER BY time desc LIMIT %s", strings.Join(metrics, ","),
+		sql = fmt.Sprintf("SELECT %s FROM %s WHERE %s ORDER BY %s desc LIMIT %s", strings.Join(metrics, ","),
 			table, // equals prometheus metric name
-			strings.Join(filters, " AND "), config.Cfg.Limit)
+			strings.Join(filters, " AND "),
+			EXT_METRICS_TIME_COLUMNS, config.Cfg.Limit)
 	}
 	return
 }
 
 // querier result trans to Prom Response
-func RespTransToProm(ctx context.Context, result *common.Result) (resp *prompb.ReadResponse, err error) {
+func respTransToProm(ctx context.Context, result *common.Result) (resp *prompb.ReadResponse, err error) {
 	tagIndex := -1
 	metricsIndex := -1
 	timeIndex := -1
 	otherTagCount := 0
 	metricsName := ""
+	tagsFieldIndex := make(map[int]bool, len(result.Columns))
 	prefix, _ := ctx.Value(ctxKeyPrefixType{}).(prefix) // ignore if key not exist
 	for i, tag := range result.Columns {
 		if tag == EXT_METRICS_NATIVE_TAG_NAME {
 			tagIndex = i
+		} else if strings.HasPrefix(tag.(string), "tag.") {
+			tagsFieldIndex[i] = true
 		} else if strings.HasPrefix(tag.(string), "metrics.") {
 			metricsIndex = i
 			metricsName = strings.TrimPrefix(tag.(string), "metrics.")
@@ -415,7 +438,7 @@ func RespTransToProm(ctx context.Context, result *common.Result) (resp *prompb.R
 	// append other deepflow native tag into results
 	allDeepFlowNativeTags := make([]int, 0, otherTagCount)
 	for i := range result.Columns {
-		if i == tagIndex || i == metricsIndex || i == timeIndex {
+		if i == tagIndex || i == metricsIndex || i == timeIndex || tagsFieldIndex[i] {
 			continue
 		}
 		allDeepFlowNativeTags = append(allDeepFlowNativeTags, i)

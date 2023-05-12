@@ -98,7 +98,7 @@ test_cases:
     # Check that unary minus sets timestamps correctly.
     # TODO: Check this more systematically for every node type?
   - query: 'timestamp(-node_cpu_seconds_total)'
-  - query: 'node_cpu_seconds_totalnode_cpu_seconds_total{mode="system", cpu="0"} {{.binOp}} on(instance, job, mode) node_cpu_seconds_total{mode="system", cpu="0"}'
+  - query: 'node_cpu_seconds_total{mode="system", cpu="0"} {{.binOp}} on(instance, job, mode) node_cpu_seconds_total{mode="system", cpu="0"}'
     variant_args: ['binOp']
   - query: 'sum by(instance, mode) (node_cpu_seconds_total{mode="system", cpu="0"}) {{.binOp}} on(instance, mode) group_left(job) node_cpu_seconds_total{mode="system", cpu="0"}'
     variant_args: ['binOp']
@@ -222,3 +222,4 @@ test_cases:
   # Subqueries.
   - query: 'max_over_time((time() - max(node_cpu_seconds_total{mode="system", cpu="0"}) < 1000)[5m:10s] offset 5m)'
   - query: 'avg_over_time(rate(node_cpu_seconds_total{mode="system", cpu="0"}[1m])[2m:10s])'
+  

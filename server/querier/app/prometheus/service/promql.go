@@ -22,17 +22,23 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 	"time"
 
 	//"github.com/k0kubun/pp"
 	pmmodel "github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/model/timestamp"
+	"github.com/prometheus/prometheus/prompb"
 	"github.com/prometheus/prometheus/promql"
 	"github.com/prometheus/prometheus/promql/parser"
 	"github.com/prometheus/prometheus/storage"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/deepflowio/deepflow/server/querier/app/prometheus/model"
+	"github.com/deepflowio/deepflow/server/querier/config"
 )
 
 // The Series API supports returning the following time series (metrics):
@@ -62,102 +68,100 @@ import (
 
 const _SUCCESS = "success"
 
+// executors for prometheus query
+type prometheusExecutor struct{}
+
+func NewPrometheusExecutor() *prometheusExecutor {
+	return &prometheusExecutor{}
+}
+
 // API Spec: https://prometheus.io/docs/prometheus/latest/querying/api/#instant-queries
-func promQueryExecute(args *model.PromQueryParams, ctx context.Context) (result *model.PromQueryResponse, err error) {
-	timeS, err := (strconv.ParseFloat(args.StartTime, 64))
+func (p *prometheusExecutor) promQueryExecute(ctx context.Context, args *model.PromQueryParams, engine *promql.Engine) (result *model.PromQueryResponse, err error) {
+	queryTime, err := parseTime(args.StartTime)
 	if err != nil {
 		return nil, err
 	}
-	//timeMs := int64(timeS * 1000)
-	opts := promql.EngineOpts{
-		Logger:                   nil,
-		Reg:                      nil,
-		MaxSamples:               100000,
-		Timeout:                  100 * time.Second,
-		NoStepSubqueryIntervalFn: func(int64) int64 { return durationMilliseconds(1 * time.Minute) },
-		EnableAtModifier:         true,
-		EnableNegativeOffset:     true,
-		EnablePerStepStats:       true,
-	}
-	e := promql.NewEngine(opts)
-	//pp.Println(opts.MaxSamples)
-	qry, err := e.NewInstantQuery(&RemoteReadQuerierable{Args: args, Ctx: ctx}, nil, args.Promql, time.Unix(int64(timeS), 0))
-	if qry == nil || err != nil {
-		//pp.Println(err)
-		log.Error(err)
-		return nil, err
-	}
-	res := qry.Exec(ctx)
-	//pp.Println(res.Err)
-	//pp.Println(res)
-	//pp.Println(res.Value.(promql.Vector))
-	var resultType parser.ValueType
-	if res.Value == nil {
-		resultType = parser.ValueTypeNone
-	} else {
-		resultType = res.Value.Type()
-	}
-	return &model.PromQueryResponse{
-		Data: &model.PromQueryData{
-			ResultType: resultType,
-			Result:     res.Value,
-		}, Status: _SUCCESS}, err
-}
-
-func durationMilliseconds(d time.Duration) int64 {
-	return int64(d / (time.Millisecond / time.Nanosecond))
-}
-
-func promQueryRangeExecute(args *model.PromQueryParams, ctx context.Context) (result *model.PromQueryResponse, err error) {
-	startS, err := (strconv.ParseFloat(args.StartTime, 64))
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-	endS, err := (strconv.ParseFloat(args.EndTime, 64))
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-	step, err := (parseDuration(args.Step))
-	if err != nil {
-		log.Error(err)
-		return nil, err
+	if config.Cfg.Prometheus.RequestQueryWithDebug {
+		var span trace.Span
+		tr := otel.GetTracerProvider().Tracer("querier/app/PrometheusInstantQueryRequest")
+		ctx, span = tr.Start(ctx, "PrometheusInstantQuery",
+			trace.WithSpanKind(trace.SpanKindInternal),
+			trace.WithAttributes(
+				attribute.String("promql.query", args.Promql),
+			),
+		)
+		// record query cost in span cost time
+		defer span.End()
 	}
 
-	//timeMs := int64(timeS * 1000)
-	opts := promql.EngineOpts{
-		Logger:                   nil,
-		Reg:                      nil,
-		MaxSamples:               100000,
-		Timeout:                  100 * time.Second,
-		NoStepSubqueryIntervalFn: func(int64) int64 { return durationMilliseconds(1 * time.Minute) },
-		EnableAtModifier:         true,
-		EnableNegativeOffset:     true,
-		EnablePerStepStats:       true,
-	}
-	e := promql.NewEngine(opts)
-	//pp.Println(opts.MaxSamples)
-	qry, err := e.NewRangeQuery(&RemoteReadRangeQuerierable{Args: args, Ctx: ctx}, nil, args.Promql, time.Unix(int64(startS), 0), time.Unix(int64(endS), 0), step)
+	// instant query will hint default query range:
+	// query.lookback-delta: https://github.com/prometheus/prometheus/blob/main/cmd/prometheus/main.go#L398
+	qry, err := engine.NewInstantQuery(&RemoteReadQuerierable{Args: args, Ctx: ctx, MatchMetricNameFunc: p.matchMetricName}, nil, args.Promql, queryTime)
 	if qry == nil || err != nil {
 		log.Error(err)
 		return nil, err
 	}
 	res := qry.Exec(ctx)
-	//pp.Println(res.Value.(promql.Matrix))
-	//pp.Println(res.Err)
-	//pp.Println(res)
-	var resultType parser.ValueType
-	if res.Value == nil {
-		resultType = parser.ValueTypeNone
-	} else {
-		resultType = res.Value.Type()
+	if res.Err != nil {
+		log.Error(res.Err)
+		return nil, res.Err
 	}
 	return &model.PromQueryResponse{
-		Data: &model.PromQueryData{
-			ResultType: resultType,
-			Result:     res.Value,
-		}, Status: _SUCCESS}, err
+		Data:   &model.PromQueryData{ResultType: res.Value.Type(), Result: res.Value},
+		Status: _SUCCESS,
+	}, err
+}
+
+func (p *prometheusExecutor) promQueryRangeExecute(ctx context.Context, args *model.PromQueryParams, engine *promql.Engine) (result *model.PromQueryResponse, err error) {
+	start, err := parseTime(args.StartTime)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	end, err := parseTime(args.EndTime)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	step, err := parseDuration(args.Step)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	if config.Cfg.Prometheus.RequestQueryWithDebug {
+		var span trace.Span
+		tr := otel.GetTracerProvider().Tracer("querier/app/PrometheusRangeQueryRequest")
+		ctx, span = tr.Start(ctx, "PrometheusRangeQuery",
+			trace.WithSpanKind(trace.SpanKindInternal),
+			trace.WithAttributes(
+				attribute.String("promql.query", args.Promql),
+				attribute.Int64("promql.query.range", int64(end.Sub(start).Minutes())),
+				attribute.Int64("promql.query.step", int64(step.Seconds())),
+			),
+		)
+		defer span.End()
+	}
+
+	qry, err := engine.NewRangeQuery(&RemoteReadQuerierable{Args: args, Ctx: ctx, MatchMetricNameFunc: p.matchMetricName}, nil, args.Promql, start, end, step)
+	if qry == nil || err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	res := qry.Exec(ctx)
+	if res.Err != nil {
+		log.Error(res.Err)
+		return nil, res.Err
+	}
+	return &model.PromQueryResponse{
+		Data:   &model.PromQueryData{ResultType: res.Value.Type(), Result: res.Value},
+		Status: _SUCCESS,
+	}, err
+}
+
+func (p *prometheusExecutor) promRemoteReadExecute(ctx context.Context, req *prompb.ReadRequest) (resp *prompb.ReadResponse, err error) {
+	// analysis for ReadRequest
+	result, err := promReaderExecute(ctx, req)
+	return result, err
 }
 
 func parseDuration(s string) (time.Duration, error) {
@@ -213,7 +217,7 @@ func parseTime(s string) (time.Time, error) {
 }
 
 // API Spec: https://prometheus.io/docs/prometheus/latest/querying/api/#finding-series-by-label-matchers
-func series(args *model.PromQueryParams, ctx context.Context) (result *model.PromQueryResponse, err error) {
+func (p *prometheusExecutor) series(ctx context.Context, args *model.PromQueryParams) (result *model.PromQueryResponse, err error) {
 	start, err := parseTime(args.StartTime)
 	if err != nil {
 		log.Error("Parse StartTime failed: %v", err)
@@ -225,6 +229,19 @@ func series(args *model.PromQueryParams, ctx context.Context) (result *model.Pro
 		return nil, err
 	}
 
+	if config.Cfg.Prometheus.RequestQueryWithDebug {
+		var span trace.Span
+		tr := otel.GetTracerProvider().Tracer("querier/app/PrometheusSeriesRequest")
+		ctx, span = tr.Start(ctx, "PrometheusSeriesRequest",
+			trace.WithSpanKind(trace.SpanKindInternal),
+			trace.WithAttributes(
+				attribute.String("promql.query.matchers", strings.Join(args.Matchers, ",")),
+				attribute.Int64("promql.query.range", int64(end.Sub(start).Minutes())),
+			),
+		)
+		defer span.End()
+	}
+
 	labelMatchers, err := parseMatchersParam(args.Matchers)
 	// pp.Println(args.Matchers)
 	// pp.Println(matcherSets)
@@ -233,7 +250,7 @@ func series(args *model.PromQueryParams, ctx context.Context) (result *model.Pro
 		return nil, err
 	}
 
-	querierable := &RemoteReadQuerierable{Args: args, Ctx: ctx}
+	querierable := &RemoteReadQuerierable{Args: args, Ctx: ctx, MatchMetricNameFunc: p.matchMetricName}
 	q, err := querierable.Querier(ctx, timestamp.FromTime(start), timestamp.FromTime(end))
 	if err != nil {
 		log.Error(err)
@@ -259,7 +276,6 @@ func series(args *model.PromQueryParams, ctx context.Context) (result *model.Pro
 		// At this point at least one match exists.
 		seriesSet = q.Select(false, hints, labelMatchers[0]...)
 	}
-
 	metrics := []labels.Labels{}
 	for seriesSet.Next() {
 		metrics = append(metrics, seriesSet.At().Labels())
@@ -271,4 +287,15 @@ func series(args *model.PromQueryParams, ctx context.Context) (result *model.Pro
 	}
 
 	return &model.PromQueryResponse{Data: metrics, Status: _SUCCESS}, err
+}
+
+func (p *prometheusExecutor) matchMetricName(matchers *[]*labels.Matcher) string {
+	var metric string
+	for _, v := range *matchers {
+		if v.Name == PROMETHEUS_METRICS_NAME {
+			metric = v.Value
+			break
+		}
+	}
+	return metric
 }
