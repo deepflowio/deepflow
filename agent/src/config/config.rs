@@ -391,6 +391,7 @@ pub struct YamlConfig {
     pub guard_interval: Duration,
     pub check_core_file_disabled: bool,
     pub wasm_plugins: Vec<String>,
+    pub memory_trim_disabled: bool,
 }
 
 impl YamlConfig {
@@ -670,6 +671,7 @@ impl Default for YamlConfig {
             guard_interval: Duration::from_secs(10),
             check_core_file_disabled: false,
             wasm_plugins: vec![],
+            memory_trim_disabled: false,
         }
     }
 }

@@ -30,8 +30,10 @@ import (
 
 var log = logging.MustGetLogger("db.mysql")
 var Db *gorm.DB
+var DbConfig MySqlConfig
 
 func InitMySQL(cfg MySqlConfig) error {
+	DbConfig = cfg
 	Db = Gorm(cfg)
 	if Db == nil {
 		return errors.New("connect mysql failed")

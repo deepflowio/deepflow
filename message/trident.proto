@@ -13,6 +13,7 @@ service Synchronizer {
     rpc Query (NtpRequest) returns (NtpResponse) {}
     rpc GenesisSync (GenesisSyncRequest) returns (GenesisSyncResponse) {}
     rpc KubernetesAPISync (KubernetesAPISyncRequest) returns (KubernetesAPISyncResponse) {}
+    rpc PrometheusAPISync (PrometheusAPISyncRequest) returns (PrometheusAPISyncResponse) {}
     rpc GetKubernetesClusterID (KubernetesClusterIDRequest) returns (KubernetesClusterIDResponse) {}
     rpc GPIDSync (GPIDSyncRequest) returns (GPIDSyncResponse) {}
     rpc ShareGPIDLocalData(ShareGPIDSyncRequests) returns (ShareGPIDSyncRequests) {}
@@ -628,6 +629,19 @@ message KubernetesAPISyncRequest {
 }
 
 message KubernetesAPISyncResponse {
+    optional uint64 version = 1;
+}
+
+message PrometheusAPISyncRequest {
+    optional string cluster_id = 1;
+    optional uint64 version = 2;
+    optional string error_msg = 3;
+    optional uint32 vtap_id = 4;
+    optional string source_ip = 5;
+    repeated common.PrometheusAPIInfo entries = 10;
+}
+
+message PrometheusAPISyncResponse {
     optional uint64 version = 1;
 }
 
