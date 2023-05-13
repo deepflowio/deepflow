@@ -133,8 +133,7 @@ pub(super) struct AnalyzerModeDispatcher {
     pub(super) base: BaseDispatcher,
     pub(super) vm_mac_addrs: Arc<RwLock<HashMap<u32, MacAddr>>>,
     pub(super) pool_raw_size: usize,
-    pub(super) parser_thread_handler: Option<JoinHandle<()>>,
-    pub(super) flow_thread_handler: Option<JoinHandle<()>>,
+    pub(super) flow_generator_thread_handler: Option<JoinHandle<()>>,
     pub(super) pipeline_thread_handler: Option<JoinHandle<()>>,
     pub(super) queue_debugger: Arc<QueueDebugger>,
     pub(super) stats_collector: Arc<stats::Collector>,
@@ -211,34 +210,63 @@ impl AnalyzerModeDispatcher {
     // 1. Decap tunnel
     // 2. Lookup l2end
     // 3. Generate MetaPacket
-    fn run_meta_packet_generator(
+    // 4. Generate tagged flow
+    fn run_flow_generator(
         &mut self,
         receiver: Receiver<Packet>,
         sender: DebugSender<(TapType, MetaPacket<'static>)>,
     ) {
-        let terminated = self.base.terminated.clone();
-        let tunnel_type_bitmap = self.base.tunnel_type_bitmap.clone();
-        let tap_type_handler = self.base.tap_type_handler.clone();
-        let counter = self.base.counter.clone();
-        let analyzer_dedup_disabled = self.base.analyzer_dedup_disabled;
-        let flow_map_config = self.base.flow_map_config.clone();
+        let base = &self.base;
+
+        let terminated = base.terminated.clone();
+        let tunnel_type_bitmap = base.tunnel_type_bitmap.clone();
+        let tap_type_handler = base.tap_type_handler.clone();
+        let counter = base.counter.clone();
+        let analyzer_dedup_disabled = base.analyzer_dedup_disabled;
         let vm_mac_addrs = self.vm_mac_addrs.clone();
         let mut dedup = PacketDedupMap::new();
-        let id = self.base.id;
+        let id = base.id;
         let pool_raw_size = self.pool_raw_size;
 
-        self.parser_thread_handler.replace(
+        let npb_dedup_enabled = base.npb_dedup_enabled.clone();
+        let flow_output_queue = base.flow_output_queue.clone();
+        let policy_getter = base.policy_getter;
+        let log_output_queue = base.log_output_queue.clone();
+        let ntp_diff = base.ntp_diff.clone();
+        let flow_map_config = base.flow_map_config.clone();
+        let log_parse_config = base.log_parse_config.clone();
+        let packet_sequence_output_queue = base.packet_sequence_output_queue.clone(); // Enterprise Edition Feature: packet-sequence
+        let stats = base.stats.clone();
+
+        self.flow_generator_thread_handler.replace(
             thread::Builder::new()
-                .name("dispatcher-meta-packet-generator".to_owned())
+                .name("dispatcher-packet-to-flow-generator".to_owned())
                 .spawn(move || {
                     let mut timestamp_map: HashMap<TapType, Duration> = HashMap::new();
                     let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
                     let mut output_batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
+                    let mut flow_map = FlowMap::new(
+                        id as u32,
+                        flow_output_queue,
+                        policy_getter,
+                        log_output_queue,
+                        ntp_diff,
+                        flow_map_config.clone(),
+                        log_parse_config,
+                        #[cfg(target_os = "linux")]
+                        None,
+                        Some(packet_sequence_output_queue), // Enterprise Edition Feature: packet-sequence
+                        &stats,
+                        false, // !from_ebpf
+                    );
 
                     while !terminated.load(Ordering::Relaxed) {
                         match receiver.recv_all(&mut batch, Some(Duration::from_secs(1))) {
                             Ok(_) => {}
-                            Err(queue::Error::Timeout) => continue,
+                            Err(queue::Error::Timeout) => {
+                                flow_map.inject_flush_ticker(Duration::ZERO);
+                                continue;
+                            }
                             Err(queue::Error::Terminated(..)) => break,
                         }
 
@@ -284,11 +312,13 @@ impl AnalyzerModeDispatcher {
                             let original_length = packet.raw.len() - decap_length;
                             let timestamp = packet.timestamp;
 
-                            let overlay_packet = &mut packet.raw[decap_length..raw_length];
+                            let mut overlay_packet = packet.raw;
+                            overlay_packet.rotate_left(decap_length);
+                            overlay_packet.truncate(raw_length - decap_length);
                             // Only cloud traffic goes to de-duplication
                             if tap_type == TapType::Cloud
                                 && !analyzer_dedup_disabled
-                                && dedup.duplicate(overlay_packet, timestamp)
+                                && dedup.duplicate(&mut overlay_packet, timestamp)
                             {
                                 debug!("packet is duplicate");
                                 continue;
@@ -298,7 +328,7 @@ impl AnalyzerModeDispatcher {
                                 id,
                                 &vm_mac_addrs,
                                 &tunnel_info,
-                                overlay_packet,
+                                &mut overlay_packet,
                                 flow_map_config.load().cloud_gateway_traffic,
                             );
                             let (timestamp, ok) =
@@ -313,7 +343,7 @@ impl AnalyzerModeDispatcher {
                             meta_packet.tap_port = tap_port;
                             let offset = Duration::ZERO;
                             if let Err(e) = meta_packet.update_with_raw_copy(
-                                overlay_packet.to_vec(),
+                                overlay_packet,
                                 src_local,
                                 dst_local,
                                 timestamp + offset,
@@ -336,85 +366,21 @@ impl AnalyzerModeDispatcher {
                                 }
                             }
 
+                            Self::prepare_flow(
+                                &mut meta_packet,
+                                tap_type,
+                                id as u8,
+                                npb_dedup_enabled.load(Ordering::Relaxed),
+                            );
+                            flow_map.inject_meta_packet(&mut meta_packet);
                             output_batch.push((tap_type, meta_packet));
                         }
                         if let Err(e) = sender.send_all(&mut output_batch) {
                             debug!(
-                                "dispatcher-meta-packet-generator {} sender failed: {:?}",
+                                "dispatcher-meta-packet-flow-generator {} sender failed: {:?}",
                                 id, e
                             );
                             output_batch.clear();
-                        }
-                    }
-                })
-                .unwrap(),
-        );
-    }
-
-    // This thread implements the following functions:
-    // 1. Generate tagged flow
-    fn run_tagged_flow_generator(
-        &mut self,
-        receiver: Receiver<(TapType, MetaPacket<'static>)>,
-        sender: DebugSender<(TapType, MetaPacket<'static>)>,
-    ) {
-        let base = &self.base;
-        let terminated = base.terminated.clone();
-        let npb_dedup_enabled = base.npb_dedup_enabled.clone();
-        let id = base.id;
-        let flow_output_queue = base.flow_output_queue.clone();
-        let policy_getter = base.policy_getter;
-        let log_output_queue = base.log_output_queue.clone();
-        let ntp_diff = base.ntp_diff.clone();
-        let flow_map_config = base.flow_map_config.clone();
-        let log_parse_config = base.log_parse_config.clone();
-        let packet_sequence_output_queue = base.packet_sequence_output_queue.clone(); // Enterprise Edition Feature: packet-sequence
-        let stats = base.stats.clone();
-
-        self.flow_thread_handler.replace(
-            thread::Builder::new()
-                .name("dispatcher-tagged-flow-generator".to_owned())
-                .spawn(move || {
-                    let mut flow_map = FlowMap::new(
-                        id as u32,
-                        flow_output_queue,
-                        policy_getter,
-                        log_output_queue,
-                        ntp_diff,
-                        flow_map_config,
-                        log_parse_config,
-                        #[cfg(target_os = "linux")]
-                        None,
-                        Some(packet_sequence_output_queue), // Enterprise Edition Feature: packet-sequence
-                        &stats,
-                        false, // !from_ebpf
-                    );
-                    let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
-                    while !terminated.load(Ordering::Relaxed) {
-                        match receiver.recv_all(&mut batch, Some(Duration::from_secs(1))) {
-                            Ok(_) => {}
-                            Err(queue::Error::Timeout) => {
-                                flow_map.inject_flush_ticker(Duration::ZERO);
-                                continue;
-                            }
-                            Err(queue::Error::Terminated(..)) => break,
-                        }
-
-                        for (tap_type, meta_packet) in batch.iter_mut() {
-                            Self::prepare_flow(
-                                meta_packet,
-                                *tap_type,
-                                id as u8,
-                                npb_dedup_enabled.load(Ordering::Relaxed),
-                            );
-                            flow_map.inject_meta_packet(meta_packet);
-                        }
-                        if let Err(e) = sender.send_all(&mut batch) {
-                            debug!(
-                                "dispatcher-tagged-flow-generator {} sender failed: {:?}",
-                                id, e
-                            );
-                            batch.clear();
                         }
                     }
                 })
@@ -490,7 +456,7 @@ impl AnalyzerModeDispatcher {
 
     fn setup_inner_thread_and_queue(&mut self) -> DebugSender<Packet> {
         let id = self.base.id.to_string();
-        let name = "0.1-bytes-to-meta-packet-generator";
+        let name = "0.1-raw-packet-to-flow-generator";
         let (sender_to_parser, receiver_from_dispatcher, counter) =
             bounded_with_debug(self.inner_queue_size, name, &self.queue_debugger);
         self.stats_collector.register_countable(
@@ -502,19 +468,7 @@ impl AnalyzerModeDispatcher {
             ],
         );
 
-        let name = "0.2-packet-to-tagged-flow-generator";
-        let (sender_to_flow, receiver_from_parser, counter) =
-            bounded_with_debug(self.inner_queue_size, name, &self.queue_debugger);
-        self.stats_collector.register_countable(
-            "queue",
-            Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag("module", name.to_string()),
-                StatsOption::Tag("index", id.clone()),
-            ],
-        );
-
-        let name = "0.3-packet-to-additional-pipeline";
+        let name = "0.2-packet-to-additional-pipeline";
         let (sender_to_pipeline, receiver_from_flow, counter) =
             bounded_with_debug(self.inner_queue_size, name, &self.queue_debugger);
         self.stats_collector.register_countable(
@@ -526,8 +480,7 @@ impl AnalyzerModeDispatcher {
             ],
         );
 
-        self.run_meta_packet_generator(receiver_from_dispatcher, sender_to_flow);
-        self.run_tagged_flow_generator(receiver_from_parser, sender_to_pipeline);
+        self.run_flow_generator(receiver_from_dispatcher, sender_to_pipeline);
         self.run_additional_packet_pipeline(receiver_from_flow);
         return sender_to_parser;
     }
@@ -583,10 +536,7 @@ impl AnalyzerModeDispatcher {
             };
             batch.push(info);
         }
-        if let Some(handler) = self.parser_thread_handler.take() {
-            let _ = handler.join();
-        }
-        if let Some(handler) = self.flow_thread_handler.take() {
+        if let Some(handler) = self.flow_generator_thread_handler.take() {
             let _ = handler.join();
         }
         if let Some(handler) = self.pipeline_thread_handler.take() {
