@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
+	"sigs.k8s.io/yaml"
 
 	"github.com/deepflowio/deepflow/cli/ctl/common"
 )
