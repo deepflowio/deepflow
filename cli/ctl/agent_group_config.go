@@ -18,11 +18,11 @@ package ctl
 
 import (
 	"fmt"
-	"github.com/ghodss/yaml"
 	"io/ioutil"
 	"os"
 
 	"github.com/spf13/cobra"
+	"sigs.k8s.io/yaml"
 
 	"github.com/deepflowio/deepflow/cli/ctl/common"
 )
