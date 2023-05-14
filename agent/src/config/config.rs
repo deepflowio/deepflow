@@ -778,7 +778,7 @@ impl Default for FlowGeneratorConfig {
             capacity: 1048576,
             flush_interval: Duration::from_secs(1),
             aggr_queue_size: 65535,
-            memory_pool_size: 1024,
+            memory_pool_size: 65536,
 
             ignore_tor_mac: false,
             ignore_l2_end: false,

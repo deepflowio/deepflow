@@ -22,6 +22,7 @@ pub(crate) mod flow_node;
 pub(crate) mod flow_state;
 mod packet_sequence; // Enterprise Edition Feature: packet-sequence
 pub mod perf;
+mod pool;
 pub mod protocol_logs;
 mod service_table;
 

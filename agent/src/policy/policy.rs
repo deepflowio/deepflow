@@ -31,7 +31,7 @@ use super::{
     labeler::Labeler,
     Result as PResult,
 };
-use crate::common::endpoint::EndpointData;
+use crate::common::endpoint::{EndpointData, EndpointDataPov};
 use crate::common::enums::TapType;
 use crate::common::flow::{PacketDirection, SignalSource};
 use crate::common::lookup_key::LookupKey;
@@ -266,7 +266,7 @@ impl Policy {
 
         if packet.signal_source == SignalSource::EBPF {
             let (endpoints, gpid_entries) = self.lookup_all_by_epc(key, local_epc_id);
-            packet.endpoint_data = Some(Arc::new(endpoints));
+            packet.endpoint_data = Some(EndpointDataPov::new(Arc::new(endpoints)));
             packet.policy_data = Some(Arc::new(PolicyData::default())); // Only endpoint is required for ebpf data
             Self::fill_gpid_entry(packet, &gpid_entries);
             return;
@@ -275,7 +275,7 @@ impl Policy {
         // 策略查序会改变端口，为不影响后续业务， 这里保存
         if let Some((policy, endpoints, gpid_entries)) = self.lookup_all_by_key(key) {
             packet.policy_data = Some(policy);
-            packet.endpoint_data = Some(endpoints);
+            packet.endpoint_data = Some(EndpointDataPov::new(endpoints));
             Self::fill_gpid_entry(packet, &gpid_entries);
         }
     }

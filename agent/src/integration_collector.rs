@@ -470,7 +470,7 @@ fn fill_tagged_flow(
         l4_protocol,
         l7_protocol,
     };
-    tagged_flow.flow.flow_perf_stats = Some(Box::new(flow_perf_stats));
+    tagged_flow.flow.flow_perf_stats = Some(flow_perf_stats);
     let mut lookup_key = LookupKey {
         src_ip: tagged_flow.flow.flow_key.ip_src,
         dst_ip: tagged_flow.flow.flow_key.ip_dst,

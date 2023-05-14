@@ -89,8 +89,11 @@ impl AppTable {
     }
 
     fn get_ip_epc_port(packet: &MetaPacket, forward: bool) -> (IpAddr, i32, u16) {
-        let (src_epc, dst_epc) = if let Some(endponints) = packet.endpoint_data.as_ref() {
-            (endponints.src_info.l3_epc_id, endponints.dst_info.l3_epc_id)
+        let (src_epc, dst_epc) = if let Some(endpoints) = packet.endpoint_data.as_ref() {
+            (
+                endpoints.src_info().l3_epc_id,
+                endpoints.dst_info().l3_epc_id,
+            )
         } else {
             (0, 0)
         };
