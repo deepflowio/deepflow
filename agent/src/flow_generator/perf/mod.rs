@@ -384,6 +384,7 @@ impl FlowLog {
 
     pub fn new(
         l4_enabled: bool,
+        tcp_perf: Option<Box<TcpPerf>>,
         l7_enabled: bool,
         perf_cache: Rc<RefCell<L7PerfCache>>,
         l4_proto: L4Protocol,
@@ -398,7 +399,9 @@ impl FlowLog {
         }
         let l4 = if l4_enabled {
             match l4_proto {
-                L4Protocol::Tcp => Some(L4FlowPerfTable::Tcp(Box::new(TcpPerf::new(counter)))),
+                L4Protocol::Tcp => Some(L4FlowPerfTable::Tcp(
+                    tcp_perf.unwrap_or_else(|| Box::new(TcpPerf::new(counter))),
+                )),
                 L4Protocol::Udp => Some(L4FlowPerfTable::Udp(UdpPerf::new())),
                 _ => None,
             }
@@ -494,5 +497,59 @@ impl FlowLog {
             }
         }
         stats
+    }
+}
+
+pub struct FlowLogFactory {
+    size: usize,
+
+    tcp_perf_pool: Vec<Box<TcpPerf>>,
+}
+
+impl FlowLogFactory {
+    pub fn new(size: usize) -> Self {
+        Self {
+            size,
+            tcp_perf_pool: Vec::with_capacity(size),
+        }
+    }
+
+    pub fn new_flow_log(
+        &mut self,
+        l4_enabled: bool,
+        l7_enabled: bool,
+        perf_cache: Rc<RefCell<L7PerfCache>>,
+        l4_proto: L4Protocol,
+        l7_protocol_enum: L7ProtocolEnum,
+        is_from_app_tab: bool,
+        counter: Arc<FlowPerfCounter>,
+        server_port: u16,
+        wasm_vm: Option<Rc<RefCell<WasmVm>>>,
+    ) -> Option<FlowLog> {
+        FlowLog::new(
+            l4_enabled,
+            self.tcp_perf_pool.pop(),
+            l7_enabled,
+            perf_cache,
+            l4_proto,
+            l7_protocol_enum,
+            is_from_app_tab,
+            counter,
+            server_port,
+            wasm_vm,
+        )
+    }
+
+    pub fn recycle_flow_log(&mut self, flow_log: FlowLog) {
+        if self.tcp_perf_pool.len() >= self.size {
+            return;
+        }
+
+        if let Some(p) = flow_log.l4 {
+            if let L4FlowPerfTable::Tcp(mut t) = *p {
+                t.reset();
+                self.tcp_perf_pool.push(t);
+            }
+        }
     }
 }

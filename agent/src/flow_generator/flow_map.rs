@@ -39,7 +39,7 @@ use super::{
     app_table::AppTable,
     error::Error,
     flow_state::{StateMachine, StateValue},
-    perf::{FlowLog, FlowPerfCounter, L7ProtocolChecker},
+    perf::{FlowLogFactory, FlowPerfCounter, L7ProtocolChecker},
     protocol_logs::MetaAppProto,
     service_table::{ServiceKey, ServiceTable},
     FlowMapKey, FlowNode, FlowState, FlowTimeout, COUNTER_FLOW_ID_MASK, FLOW_METRICS_PEER_DST,
@@ -124,6 +124,8 @@ pub struct FlowMap {
     time_key_buffer: Option<Vec<(u64, FlowMapKey)>>,
 
     wasm_vm: Option<Rc<RefCell<WasmVm>>>,
+
+    flow_log_factory: FlowLogFactory,
 }
 
 impl FlowMap {
@@ -229,6 +231,7 @@ impl FlowMap {
                     Some(Rc::new(RefCell::new(vm)))
                 }
             },
+            flow_log_factory: FlowLogFactory::new(config_guard.memory_pool_size),
         }
     }
 
@@ -999,20 +1002,22 @@ impl FlowMap {
         };
 
         if config.collector_enabled {
-            node.meta_flow_log = FlowLog::new(
-                node.tagged_flow.flow.signal_source == SignalSource::Packet
-                    && Self::l4_metrics_enabled(config),
-                Self::l7_metrics_enabled(config)
-                    || Self::l7_log_parse_enabled(config, &meta_packet.lookup_key),
-                self.perf_cache.clone(),
-                L4Protocol::from(meta_packet.lookup_key.proto),
-                l7_proto_enum,
-                from_app_tab,
-                self.flow_perf_counter.clone(),
-                port,
-                self.wasm_vm.as_ref().map(|w| w.clone()),
-            )
-            .map(|o| Box::new(o));
+            node.meta_flow_log = self
+                .flow_log_factory
+                .new_flow_log(
+                    node.tagged_flow.flow.signal_source == SignalSource::Packet
+                        && Self::l4_metrics_enabled(config),
+                    Self::l7_metrics_enabled(config)
+                        || Self::l7_log_parse_enabled(config, &meta_packet.lookup_key),
+                    self.perf_cache.clone(),
+                    L4Protocol::from(meta_packet.lookup_key.proto),
+                    l7_proto_enum,
+                    from_app_tab,
+                    self.flow_perf_counter.clone(),
+                    port,
+                    self.wasm_vm.as_ref().map(|w| w.clone()),
+                )
+                .map(|o| Box::new(o));
         }
         node
     }
@@ -1472,6 +1477,9 @@ impl FlowMap {
         self.stats_counter.closed.fetch_add(1, Ordering::Relaxed);
 
         self.push_to_flow_stats_queue(config, node.tagged_flow);
+        if let Some(log) = node.meta_flow_log {
+            self.flow_log_factory.recycle_flow_log(*log);
+        }
     }
 
     // go 版本的copyAndOutput
