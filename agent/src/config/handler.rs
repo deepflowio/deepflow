@@ -323,6 +323,8 @@ pub struct FlowConfig {
     pub ignore_l2_end: bool,
     pub ignore_idc_vlan: bool,
 
+    pub memory_pool_size: usize,
+
     pub l7_metrics_enabled: bool,
     pub app_proto_log_enabled: bool,
     pub l4_performance_enabled: bool,
@@ -375,6 +377,7 @@ impl From<&RuntimeConfig> for FlowConfig {
             ignore_tor_mac: flow_config.ignore_tor_mac,
             ignore_l2_end: flow_config.ignore_l2_end,
             ignore_idc_vlan: flow_config.ignore_idc_vlan,
+            memory_pool_size: flow_config.memory_pool_size,
             l7_metrics_enabled: conf.l7_metrics_enabled,
             app_proto_log_enabled: conf.app_proto_log_enabled,
             l4_performance_enabled: conf.l4_performance_enabled,

@@ -759,6 +759,7 @@ pub struct FlowGeneratorConfig {
     pub flush_interval: Duration,
     #[serde(rename = "flow-aggr-queue-size")]
     pub aggr_queue_size: u32,
+    pub memory_pool_size: usize,
 
     pub ignore_tor_mac: bool,
     pub ignore_l2_end: bool,
@@ -777,6 +778,7 @@ impl Default for FlowGeneratorConfig {
             capacity: 1048576,
             flush_interval: Duration::from_secs(1),
             aggr_queue_size: 65535,
+            memory_pool_size: 1024,
 
             ignore_tor_mac: false,
             ignore_l2_end: false,

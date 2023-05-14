@@ -602,6 +602,12 @@ impl TcpPerf {
         }
     }
 
+    pub fn reset(&mut self) {
+        self.ctrl_info = Default::default();
+        self.perf_data = Default::default();
+        self.handshaking = false;
+    }
+
     // fpd for first packet direction
     fn is_invalid_retrans_packet(&mut self, p: &MetaPacket, fpd: bool) -> (bool, bool) {
         let (same_dir, oppo_dir) = if fpd {
