@@ -726,10 +726,9 @@ mod tests {
     use super::*;
 
     use crate::common::endpoint::{
-        EndpointData, EndpointInfo, EPC_FROM_DEEPFLOW, EPC_FROM_INTERNET,
+        EndpointData, EndpointDataPov, EndpointInfo, EPC_FROM_DEEPFLOW, EPC_FROM_INTERNET,
     };
     use crate::common::flow::{CloseType, PacketDirection};
-    use crate::common::tagged_flow::TaggedFlow;
     use crate::config::RuntimeConfig;
     use crate::flow_generator::flow_map::_new_flow_map_and_receiver;
     use crate::flow_generator::flow_node::FlowNode;
@@ -784,7 +783,7 @@ mod tests {
         let mut flow_node = FlowNode {
             timestamp_key: get_timestamp(0).as_nanos() as u64,
 
-            tagged_flow: TaggedFlow::default(),
+            tagged_flow: Default::default(),
             min_arrived_time: Duration::ZERO,
             recent_time: Duration::ZERO,
             timeout: Duration::ZERO,
@@ -818,7 +817,7 @@ mod tests {
                         is_local_ip: false,
                     },
                 };
-                [Arc::new(data), Arc::new(data.reversed())]
+                Some(EndpointDataPov::new(Arc::new(data)))
             },
             residual_request: 0,
             next_tcp_seq0: 0,
@@ -852,7 +851,7 @@ mod tests {
         let mut flow_node = FlowNode {
             timestamp_key: get_timestamp(0).as_nanos() as u64,
 
-            tagged_flow: TaggedFlow::default(),
+            tagged_flow: Default::default(),
             min_arrived_time: Duration::ZERO,
             recent_time: Duration::ZERO,
             timeout: Duration::ZERO,
@@ -886,7 +885,7 @@ mod tests {
                         is_local_ip: false,
                     },
                 };
-                [Arc::new(data), Arc::new(data.reversed())]
+                Some(EndpointDataPov::new(Arc::new(data)))
             },
             residual_request: 0,
             next_tcp_seq0: 0,
@@ -930,33 +929,34 @@ mod tests {
         let packets = capture.as_meta_packets();
         let delta = packets.first().unwrap().lookup_key.timestamp;
         let mut last_timestamp = Duration::ZERO;
+        let ep = EndpointDataPov::new(Arc::new(EndpointData {
+            src_info: EndpointInfo {
+                real_ip: Ipv4Addr::UNSPECIFIED.into(),
+                l2_epc_id: EPC_FROM_DEEPFLOW,
+                l3_epc_id: 1,
+                l2_end: false,
+                l3_end: false,
+                is_device: false,
+                is_vip_interface: false,
+                is_vip: false,
+                is_local_mac: false,
+                is_local_ip: false,
+            },
+            dst_info: EndpointInfo {
+                real_ip: Ipv4Addr::UNSPECIFIED.into(),
+                l2_epc_id: EPC_FROM_DEEPFLOW,
+                l3_epc_id: EPC_FROM_INTERNET,
+                l2_end: false,
+                l3_end: false,
+                is_device: false,
+                is_vip_interface: false,
+                is_vip: false,
+                is_local_mac: false,
+                is_local_ip: false,
+            },
+        }));
         for mut pkt in packets {
-            pkt.endpoint_data.replace(Arc::new(EndpointData {
-                src_info: EndpointInfo {
-                    real_ip: Ipv4Addr::UNSPECIFIED.into(),
-                    l2_epc_id: EPC_FROM_DEEPFLOW,
-                    l3_epc_id: 1,
-                    l2_end: false,
-                    l3_end: false,
-                    is_device: false,
-                    is_vip_interface: false,
-                    is_vip: false,
-                    is_local_mac: false,
-                    is_local_ip: false,
-                },
-                dst_info: EndpointInfo {
-                    real_ip: Ipv4Addr::UNSPECIFIED.into(),
-                    l2_epc_id: EPC_FROM_DEEPFLOW,
-                    l3_epc_id: EPC_FROM_INTERNET,
-                    l2_end: false,
-                    l3_end: false,
-                    is_device: false,
-                    is_vip_interface: false,
-                    is_vip: false,
-                    is_local_mac: false,
-                    is_local_ip: false,
-                },
-            }));
+            pkt.endpoint_data.replace(ep.clone());
 
             pkt.lookup_key.timestamp = get_timestamp(0) + (pkt.lookup_key.timestamp - delta);
             last_timestamp = pkt.lookup_key.timestamp;
