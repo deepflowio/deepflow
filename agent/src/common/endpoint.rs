@@ -129,6 +129,48 @@ impl EndpointData {
     }
 }
 
+#[derive(Debug, Default, Clone)]
+pub struct EndpointDataPov {
+    data: Arc<EndpointData>,
+    // point of view
+    // 0 for src -> dst
+    // 1 for dst -> src
+    pov: u8,
+}
+
+impl EndpointDataPov {
+    pub fn new(data: Arc<EndpointData>) -> Self {
+        Self { data, pov: 0 }
+    }
+
+    pub fn reverse(&mut self) {
+        self.pov = 1 - self.pov;
+    }
+
+    pub fn reversed(&self) -> Self {
+        Self {
+            data: self.data.clone(),
+            pov: 1 - self.pov,
+        }
+    }
+
+    pub fn src_info(&self) -> &EndpointInfo {
+        match self.pov {
+            0 => &self.data.src_info,
+            1 => &self.data.dst_info,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn dst_info(&self) -> &EndpointInfo {
+        match self.pov {
+            0 => &self.data.dst_info,
+            1 => &self.data.src_info,
+            _ => unreachable!(),
+        }
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum L3L2End {

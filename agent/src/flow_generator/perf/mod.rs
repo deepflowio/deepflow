@@ -28,9 +28,12 @@ use enum_dispatch::enum_dispatch;
 use public::bitmap::Bitmap;
 use public::l7_protocol::L7ProtocolEnum;
 
-use super::app_table::AppTable;
-use super::error::{Error, Result};
-use super::protocol_logs::AppProtoHead;
+use super::{
+    app_table::AppTable,
+    error::{Error, Result},
+    pool::MemoryPool,
+    protocol_logs::AppProtoHead,
+};
 
 use crate::common::flow::L7PerfStats;
 use crate::common::l7_protocol_log::L7PerfCache;
@@ -384,7 +387,7 @@ impl FlowLog {
 
     pub fn new(
         l4_enabled: bool,
-        tcp_perf: Option<Box<TcpPerf>>,
+        tcp_perf_pool: &mut MemoryPool<TcpPerf>,
         l7_enabled: bool,
         perf_cache: Rc<RefCell<L7PerfCache>>,
         l4_proto: L4Protocol,
@@ -400,7 +403,9 @@ impl FlowLog {
         let l4 = if l4_enabled {
             match l4_proto {
                 L4Protocol::Tcp => Some(L4FlowPerfTable::Tcp(
-                    tcp_perf.unwrap_or_else(|| Box::new(TcpPerf::new(counter))),
+                    tcp_perf_pool
+                        .get()
+                        .unwrap_or_else(|| Box::new(TcpPerf::new(counter))),
                 )),
                 L4Protocol::Udp => Some(L4FlowPerfTable::Udp(UdpPerf::new())),
                 _ => None,
@@ -420,6 +425,14 @@ impl FlowLog {
             server_port: server_port,
             wasm_vm: wasm_vm,
         })
+    }
+
+    pub fn recycle(tcp_perf_pool: &mut MemoryPool<TcpPerf>, log: FlowLog) {
+        if let Some(p) = log.l4 {
+            if let L4FlowPerfTable::Tcp(t) = *p {
+                tcp_perf_pool.put(t);
+            }
+        }
     }
 
     pub fn parse(
@@ -497,59 +510,5 @@ impl FlowLog {
             }
         }
         stats
-    }
-}
-
-pub struct FlowLogFactory {
-    size: usize,
-
-    tcp_perf_pool: Vec<Box<TcpPerf>>,
-}
-
-impl FlowLogFactory {
-    pub fn new(size: usize) -> Self {
-        Self {
-            size,
-            tcp_perf_pool: Vec::with_capacity(size),
-        }
-    }
-
-    pub fn new_flow_log(
-        &mut self,
-        l4_enabled: bool,
-        l7_enabled: bool,
-        perf_cache: Rc<RefCell<L7PerfCache>>,
-        l4_proto: L4Protocol,
-        l7_protocol_enum: L7ProtocolEnum,
-        is_from_app_tab: bool,
-        counter: Arc<FlowPerfCounter>,
-        server_port: u16,
-        wasm_vm: Option<Rc<RefCell<WasmVm>>>,
-    ) -> Option<FlowLog> {
-        FlowLog::new(
-            l4_enabled,
-            self.tcp_perf_pool.pop(),
-            l7_enabled,
-            perf_cache,
-            l4_proto,
-            l7_protocol_enum,
-            is_from_app_tab,
-            counter,
-            server_port,
-            wasm_vm,
-        )
-    }
-
-    pub fn recycle_flow_log(&mut self, flow_log: FlowLog) {
-        if self.tcp_perf_pool.len() >= self.size {
-            return;
-        }
-
-        if let Some(p) = flow_log.l4 {
-            if let L4FlowPerfTable::Tcp(mut t) = *p {
-                t.reset();
-                self.tcp_perf_pool.push(t);
-            }
-        }
     }
 }

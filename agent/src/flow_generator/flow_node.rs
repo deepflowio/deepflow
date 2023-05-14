@@ -19,7 +19,7 @@ use std::{net::IpAddr, sync::Arc, time::Duration};
 use super::{perf::FlowLog, FlowState, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC};
 use crate::common::{
     decapsulate::TunnelType,
-    endpoint::EndpointData,
+    endpoint::EndpointDataPov,
     enums::{EthernetType, TapType, TcpFlags},
     flow::{FlowMetricsPeer, PacketDirection, SignalSource},
     lookup_key::LookupKey,
@@ -127,8 +127,8 @@ pub struct FlowNode {
     pub timestamp_key: u64,
 
     pub meta_flow_log: Option<Box<FlowLog>>,
-    pub policy_data_cache: [Arc<PolicyData>; 2],
-    pub endpoint_data_cache: [Arc<EndpointData>; 2],
+    pub policy_data_cache: [Option<Arc<PolicyData>>; 2],
+    pub endpoint_data_cache: Option<EndpointDataPov>,
 
     // Only for eBPF TCP Flow, used to help confirm whether the Flow can be timed out.
     pub residual_request: i32,

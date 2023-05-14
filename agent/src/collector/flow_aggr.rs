@@ -240,6 +240,9 @@ impl FlowAggr {
         // Since acl_gid is used for both PCAP and NPB functions, only the acl_gid used by PCAP is sent here.
         let mut acl_gids = U16Set::new();
         for policy_data in f.tag.policy_data.iter() {
+            let Some(policy_data) = policy_data else {
+                continue;
+            };
             if !policy_data.contain_pcap() {
                 continue;
             }
