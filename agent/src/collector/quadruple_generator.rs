@@ -957,9 +957,11 @@ impl QuadrupleGenerator {
         if minute_inject {
             for i in 0..2 {
                 // policy_ids are only used for the calculation of vtap_acl metrics
-                for action in tagged_flow.tag.policy_data[i].npb_actions.iter() {
-                    for (&gid, &ip_id) in action.acl_gids().iter().zip(action.tunnel_ip_ids()) {
-                        self.id_maps[i].insert(gid, ip_id);
+                if let Some(policy_data) = tagged_flow.tag.policy_data[i].as_ref() {
+                    for action in policy_data.npb_actions.iter() {
+                        for (&gid, &ip_id) in action.acl_gids().iter().zip(action.tunnel_ip_ids()) {
+                            self.id_maps[i].insert(gid, ip_id);
+                        }
                     }
                 }
             }
