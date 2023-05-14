@@ -128,6 +128,7 @@ type FlowGeneratorConfig struct {
 	Capacity         *int    `yaml:"flow-count-limit,omitempty"`
 	FlushInterval    *string `yaml:"flush-interval,omitempty"`
 	AggrQueueSize    *int    `yaml:"flow-aggr-queue-size,omitempty"`
+	MemoryPoolSize   *int    `yaml:"memory-pool-size,omitempty"`
 
 	IgnoreTorMac  *bool `yaml:"ignore-tor-mac,omitempty"`
 	IgnoreL2End   *bool `yaml:"ignore-l2-end,omitempty"`
