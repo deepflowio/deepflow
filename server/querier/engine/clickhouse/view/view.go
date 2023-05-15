@@ -24,18 +24,19 @@ import (
 )
 
 /*
-	对外接口：
-		struct：
-			Model 包含withs tags filters等结构用于构造view
-			View  由Model生成，用于构造df-clickhouse-sql
-		func：
-			NewModel() Model          初始化Model结构
-			Model.AddTag()
-			Model.AddTable()
-			Model.AddGroup()
-			Model.AddFilter()
-			NewView(*Model) View      使用model初始化View结构
-			NewView.ToString() string 生成df-clickhouse-sql
+对外接口：
+
+	struct：
+		Model 包含withs tags filters等结构用于构造view
+		View  由Model生成，用于构造df-clickhouse-sql
+	func：
+		NewModel() Model          初始化Model结构
+		Model.AddTag()
+		Model.AddTable()
+		Model.AddGroup()
+		Model.AddFilter()
+		NewView(*Model) View      使用model初始化View结构
+		NewView.ToString() string 生成df-clickhouse-sql
 */
 type Model struct {
 	DB        string
