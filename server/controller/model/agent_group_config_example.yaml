@@ -380,10 +380,10 @@ vtap_group_id: g-xxxxxx
 #- 0
 
 ## Data Integration Socket
-## Default: 0. Options: 0 (disabled), 1 (enabled).
+## Default: 1. Options: 0 (disabled), 1 (enabled).
 ## Note: Whether to enable receiving external data sources such as Prometheus,
 ##   Telegraf, OpenTelemetry, and SkyWalking.
-#external_agent_http_proxy_enabled: 0
+#external_agent_http_proxy_enabled: 1
 
 ## Listen Port of the Data Integration Socket
 ## Default: 38086. Options: [1, 65535]
