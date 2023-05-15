@@ -135,7 +135,7 @@ var (
 	DefaultSysFreeMemoryLimit            = 0
 	DefaultLogFileSize                   = 1000
 	DefaultHTTPLogXRequestID             = "X-Request-ID"
-	DefaultExternalAgentHTTPProxyEnabled = 0
+	DefaultExternalAgentHTTPProxyEnabled = 1
 	DefaultExternalAgentHTTPProxyPort    = 38086
 	DefaultAnalyzerPort                  = 30033
 	DefaultProxyControllerPort           = 30035
