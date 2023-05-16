@@ -233,8 +233,8 @@ impl Default for UprobeProcRegExp {
     fn default() -> Self {
         Self {
             golang_symbol: String::new(),
-            golang: String::from(".*"),
-            openssl: String::from(".*"),
+            golang: String::new(),
+            openssl: String::new(),
         }
     }
 }
