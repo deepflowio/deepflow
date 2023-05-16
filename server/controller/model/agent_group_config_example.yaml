@@ -892,7 +892,7 @@ vtap_group_id: g-xxxxxx
     #uprobe-process-name-regexs:
 
       ## Note: Process name to enable Golang-specific symbol table parsing. The default
-      ##   value is empty, which means that this feature is not enabled for any process.
+      ##   value is "", which means that this feature is not enabled for any process.
       ##   This feature acts on Golang processes that have trimmed the standard symbol
       ##   table. For example, the management process of K8s generally belongs to this
       ##   category. When this feature is enabled, for processes with Golang
@@ -903,13 +903,13 @@ vtap_group_id: g-xxxxxx
       #golang-symbol: ""
 
       ## Note: The name of the Golang process that enables HTTP2/HTTPS protocol data collection.
-      ##   The default value is .*, which means it is enabled for all Golang processes.
-      #golang: ".*"
+      ##   The default value is "", which means it is disabled for all Golang processes.
+      #golang: ""
 
       ## Note: The name of the process that uses the openssl library to enable HTTPS
-      ##   protocol data collection. The default is .*, which means that it is enabled for
+      ##   protocol data collection. The default is "", which means that it is disabled for
       ##   all processes that use the openssl library.
-      #openssl: ".*"
+      #openssl: ""
 
     #kprobe-whitelist:
       ## Server Port Whitelist
