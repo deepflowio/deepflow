@@ -62,6 +62,10 @@ func (s *service) GenesisSharingSync(ctx context.Context, in *api.GenesisSharing
 	return genesis.Synchronizer.GenesisSharingSync(ctx, in)
 }
 
+func (s *service) GenesisSharingPrometheus(ctx context.Context, in *api.GenesisSharingPrometheusRequest) (*api.GenesisSharingPrometheusResponse, error) {
+	return genesis.Synchronizer.GenesisSharingPrometheus(ctx, in)
+}
+
 func (s *service) GetResourceID(ctx context.Context, in *api.GetResourceIDRequest) (*api.GetResourceIDResponse, error) {
 	return s.resourceIDEvent.Get(ctx, in)
 }
