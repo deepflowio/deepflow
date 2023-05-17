@@ -28,7 +28,7 @@ use std::{
 use arc_swap::access::Access;
 use bytesize::ByteSize;
 use chrono::prelude::*;
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
 use libc::malloc_trim;
 use log::{debug, error, info, warn};
 
@@ -193,7 +193,7 @@ impl Guard {
                     Self::check_cgroup(cgroup_mount_path.clone(), is_cgroup_v2);
                 }
 
-                #[cfg(target_os = "linux")]
+                #[cfg(all(target_os = "linux", target_env = "gnu"))]
                 if !memory_trim_disabled {
                     unsafe { let _ = malloc_trim(0); }
                 }
