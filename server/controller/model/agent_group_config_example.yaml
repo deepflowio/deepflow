@@ -693,6 +693,13 @@ vtap_group_id: g-xxxxxx
     #others-timeout: 5s
     #opening-rst-timeout: 1s
 
+    ## Size of memory pool used in flow_map
+    ## Default: 65536
+    ## Note: This value is used to set max length of memory pool in FlowMap
+    ##   Memory pools are used for frequently create and destroy objects like
+    ##   FlowNode, FlowLog, etc.
+    #memory-pool-size: 65536
+
   #####################
   ## DPDK RecvEngine ##
   #####################

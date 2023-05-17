@@ -34,7 +34,7 @@ use super::enums::TapType;
 use super::{
     consts::*,
     decapsulate::TunnelInfo,
-    endpoint::EndpointData,
+    endpoint::EndpointDataPov,
     enums::{EthernetType, HeaderType, IpProtocol, TcpFlags},
     flow::{L7Protocol, PacketDirection, SignalSource},
     lookup_key::LookupKey,
@@ -66,7 +66,7 @@ pub struct MetaPacket<'a> {
     pub vlan_tag_size: u8,
     pub ttl: u8,
     pub reset_ttl: bool,
-    pub endpoint_data: Option<Arc<EndpointData>>,
+    pub endpoint_data: Option<EndpointDataPov>,
     pub policy_data: Option<Arc<PolicyData>>,
 
     pub offset_ipv6_last_option: u16,

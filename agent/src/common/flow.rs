@@ -895,7 +895,7 @@ pub struct Flow {
 
     /* TCP Perf Data*/
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
-    pub flow_perf_stats: Option<Box<FlowPerfStats>>,
+    pub flow_perf_stats: Option<FlowPerfStats>,
 
     pub close_type: CloseType,
     pub signal_source: SignalSource,
@@ -1115,7 +1115,7 @@ impl From<Flow> for flow_log::Flow {
             eth_type: u16::from(f.eth_type) as u32,
             vlan: f.vlan as u32,
             has_perf_stats: f.flow_perf_stats.is_some() as u32,
-            perf_stats: f.flow_perf_stats.map(|stats| (*stats).into()),
+            perf_stats: f.flow_perf_stats.map(|stats| stats.into()),
             close_type: f.close_type as u32,
             signal_source: f.signal_source as u32,
             is_active_service: f.is_active_service as u32,
