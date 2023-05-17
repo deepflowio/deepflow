@@ -58,7 +58,6 @@ pub struct RedisInfo {
         skip_serializing_if = "value_is_default",
         serialize_with = "vec_u8_to_string"
     )]
-    pub response: Vec<u8>, // 整数回复 + 批量回复 + 多条批量回复
     #[serde(skip)]
     pub status: Vec<u8>, // '+'
     #[serde(
@@ -107,7 +106,6 @@ where
 
 impl RedisInfo {
     pub fn merge(&mut self, other: Self) -> Result<()> {
-        self.response = other.response;
         self.status = other.status;
         self.error = other.error;
         self.resp_status = other.resp_status;
@@ -126,11 +124,6 @@ impl fmt::Display for RedisInfo {
             f,
             "request_type: {:?}, ",
             str::from_utf8(&self.request_type).unwrap_or_default()
-        )?;
-        write!(
-            f,
-            "response: {:?}, ",
-            str::from_utf8(&self.response).unwrap_or_default()
         )?;
         write!(
             f,
@@ -156,7 +149,6 @@ impl From<RedisInfo> for L7ProtocolSendLog {
             resp: L7Response {
                 status: f.resp_status,
                 exception: String::from_utf8_lossy(f.error.as_slice()).to_string(),
-                result: String::from_utf8_lossy(f.response.as_slice()).to_string(),
                 ..Default::default()
             },
             ..Default::default()
@@ -248,8 +240,7 @@ impl RedisLog {
                 self.info.resp_status = L7ResponseStatus::ServerError;
                 self.perf_stats.as_mut().unwrap().inc_resp_err();
             }
-            b'-' if !error_response => self.info.response = context,
-            _ => self.info.response = context,
+            _ => {}
         }
     }
 
