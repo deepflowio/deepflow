@@ -459,3 +459,7 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *co
 func (g *SynchronizerServer) PrometheusAPISync(ctx context.Context, request *trident.PrometheusAPISyncRequest) (*trident.PrometheusAPISyncResponse, error) {
 	return &trident.PrometheusAPISyncResponse{}, nil
 }
+
+func (g *SynchronizerServer) GenesisSharingPrometheus(ctx context.Context, request *controller.GenesisSharingPrometheusRequest) (*controller.GenesisSharingPrometheusResponse, error) {
+	return &controller.GenesisSharingPrometheusResponse{}, nil
+}

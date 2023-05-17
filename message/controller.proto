@@ -8,6 +8,7 @@ import "common.proto";
 service Controller {
     rpc GenesisSharingK8S (GenesisSharingK8SRequest) returns (GenesisSharingK8SResponse) {}
     rpc GenesisSharingSync (GenesisSharingSyncRequest) returns (GenesisSharingSyncResponse) {}
+    rpc GenesisSharingPrometheus (GenesisSharingPrometheusRequest) returns (GenesisSharingPrometheusResponse) {}
     rpc GetEncryptKey (EncryptKeyRequest) returns (EncryptKeyResponse) {}
     rpc GetResourceID (GetResourceIDRequest) returns (GetResourceIDResponse) {}
     rpc ReleaseResourceID (ReleaseResourceIDRequest) returns (ReleaseResourceIDResponse) {}
@@ -21,6 +22,16 @@ message GenesisSharingK8SResponse {
     optional string epoch = 1;
     optional string error_msg = 2;
     repeated common.KubernetesAPIInfo entries = 3;
+}
+
+message GenesisSharingPrometheusRequest {
+    optional string cluster_id = 1;
+}
+
+message GenesisSharingPrometheusResponse {
+    optional string epoch = 1;
+    optional string error_msg = 2;
+    optional bytes entries = 3;
 }
 
 message GenesisSyncIP {
