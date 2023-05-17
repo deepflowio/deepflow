@@ -293,12 +293,21 @@ impl FlowLog {
 
                     // redis can not determine dirction by RESP protocol when pakcet is from ebpf, special treatment
                     if self.l7_protocol_enum.get_l7_protocol() == L7Protocol::Redis {
-                        (_, self.server_port) = packet.get_redis_server_addr();
+                        let host = packet.get_redis_server_addr();
+                        let server_ip = host.0;
+                        self.server_port = host.1;
+                        if packet.lookup_key.dst_port != self.server_port
+                            || packet.lookup_key.dst_ip != server_ip
+                        {
+                            packet.lookup_key.direction = PacketDirection::ServerToClient;
+                        } else {
+                            packet.lookup_key.direction = PacketDirection::ClientToServer;
+                        }
                     } else {
                         self.server_port = packet.lookup_key.dst_port;
+                        packet.lookup_key.direction = PacketDirection::ClientToServer;
                     }
-
-                    packet.lookup_key.direction = PacketDirection::ClientToServer;
+                    param.direction = packet.lookup_key.direction;
 
                     self.l7_protocol_log_parser = Some(Box::new(parser));
                     let ret = self.l7_parse_log(

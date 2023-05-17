@@ -990,6 +990,7 @@ impl Flow {
         self.tunnel.reverse();
         self.flow_key.reverse();
         self.flow_metrics_peers.swap(0, 1);
+        self.direction_score = 0;
     }
 
     pub fn update_close_type(&mut self, flow_state: FlowState) {
