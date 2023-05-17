@@ -921,6 +921,8 @@ impl<'a> MetaPacket<'a> {
         otherwise use addr according to direction which may be wrong
     */
     pub fn get_redis_server_addr(&self) -> (IpAddr, u16) {
+        const REDIS_PORT: u16 = 6379;
+
         let (src, dst) = (
             (self.lookup_key.src_ip, self.lookup_key.src_port),
             (self.lookup_key.dst_ip, self.lookup_key.dst_port),
@@ -930,18 +932,18 @@ impl<'a> MetaPacket<'a> {
         if self.signal_source == SignalSource::EBPF
             && (self.process_kname[..12]).eq(b"redis-server")
         {
-            return if self.lookup_key.l2_end_1 {
+            if self.lookup_key.l2_end_1 && self.lookup_key.src_port != REDIS_PORT {
                 // if server side recv, dst addr is server addr
-                dst
-            } else {
+                return dst;
+            } else if self.lookup_key.l2_end_0 && self.lookup_key.dst_port != REDIS_PORT {
                 // if server send, src addr is server addr
-                src
-            };
+                return src;
+            }
         }
 
-        if self.lookup_key.dst_port == 6379 {
+        if self.lookup_key.dst_port == REDIS_PORT {
             dst
-        } else if self.lookup_key.src_port == 6379 {
+        } else if self.lookup_key.src_port == REDIS_PORT {
             src
         } else {
             //FIXME: can not determine redis server addr, use addr according to direction which may be wrong.
