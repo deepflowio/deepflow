@@ -299,10 +299,10 @@ vtap_group_id: g-xxxxxx
 #rsyslog_enabled: 1
 
 ## NTP Synchronization
-## Default: 1, means enabled. Options: 0 (disabled), 1 (enabled).
+## Default: 0, means enabled. Options: 0 (disabled), 1 (enabled).
 ## Note: Whether to synchronize the clock to the deepflow-server, this behavior
 ##   will not change the time of the deepflow-agent running environment.
-#ntp_enabled: 1
+#ntp_enabled: 0
 
 ## Resource MAC/IP Address Delivery
 ## Default: 0, which means all domains, or can be set to a list of lcuuid of a
