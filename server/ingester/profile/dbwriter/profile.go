@@ -289,9 +289,11 @@ func genID(time uint32, counter *uint32, vtapID uint16) uint64 {
 
 func (p *InProcessProfile) fillResource(vtapID uint32, platformData *grpc.PlatformInfoTable) {
 	vtapInfo := platformData.QueryVtapInfo(vtapID)
-	p.L3EpcID = vtapInfo.EpcId
-	var info *grpc.Info
+	if vtapInfo != nil {
+		p.L3EpcID = vtapInfo.EpcId
+	}
 
+	var info *grpc.Info
 	if p.IsIPv4 {
 		info = platformData.QueryIPV4Infos(p.L3EpcID, p.IP4)
 	} else {
