@@ -257,6 +257,7 @@ func (r *Recorder) getDomainUpdatersInOrder(cloudData cloudmodel.Resource) []upd
 		updater.NewPodReplicaSet(r.cacheMng.DomainCache, cloudData.PodReplicaSets),
 		pod,
 		process,
+		updater.NewPrometheusTarget(r.cacheMng.DomainCache, cloudData.PrometheusTargets),
 		updater.NewNetwork(r.cacheMng.DomainCache, cloudData.Networks),
 		updater.NewSubnet(r.cacheMng.DomainCache, cloudData.Subnets),
 		vRouter,

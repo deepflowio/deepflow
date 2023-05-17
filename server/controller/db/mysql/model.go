@@ -776,6 +776,21 @@ func (PodReplicaSet) TableName() string {
 	return "pod_rs"
 }
 
+type PrometheusTarget struct {
+	Base           `gorm:"embedded"`
+	SoftDeleteBase `gorm:"embedded"`
+	Instance       string `gorm:"column:instance;type:varchar(255);default:''" json:"INSTANCE"`
+	Job            string `gorm:"column:job;type:varchar(255);default:''" json:"JOB"`
+	ScrapeURL      string `gorm:"column:scrape_url;type:varchar(2083);default:''" json:"SCRAPE_URL"`
+	OtherLabels    string `gorm:"column:other_labels;type:text;default:''" json:"OTHER_LABELS"` // separated by ,
+	SubDomain      string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
+	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
+}
+
+func (PrometheusTarget) TableName() string {
+	return "prometheus_target"
+}
+
 type Pod struct {
 	Base            `gorm:"embedded"`
 	SoftDeleteBase  `gorm:"embedded"`

@@ -74,10 +74,3 @@ type PrometheusMetricAPPLabelLayout struct {
 func (PrometheusMetricAPPLabelLayout) TableName() string {
 	return "prometheus_metric_app_label_layout"
 }
-
-type PrometheusTarget struct {
-	ID          int    `gorm:"primaryKey;column:id;type:int(10) unsigned;unique;not null"`
-	Instance    string `gorm:"column:instance;type:varchar(256);not null"`
-	Job         string `gorm:"column:job;type:varchar(256);not null"`
-	OtherLabels string `gorm:"column:other_labels;type:text;not null"`
-}
