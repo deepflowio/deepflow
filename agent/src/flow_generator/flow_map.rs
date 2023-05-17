@@ -1217,10 +1217,10 @@ impl FlowMap {
                 &self.l7_protocol_checker,
             ) {
                 Ok(info) => {
-                    if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
-                        // For ebpf data, after perf.parse() success, meta_packet's direction
-                        // is determined. Here we determine whether to reverse flow.
-                        Self::rectify_ebpf_flow_direction(node, meta_packet, is_first_packet);
+                    if node.tagged_flow.flow.direction_score != ServiceTable::MAX_SCORE {
+                        // After perf.parse() success, meta_packet's direction is determined.
+                        // Here we determine whether to reverse flow.
+                        self.rectify_flow_direction(node, meta_packet, is_first_packet);
                     }
                     for i in info.into_iter() {
                         self.write_to_app_proto_log(flow_config, node, &meta_packet, i);
@@ -1711,24 +1711,37 @@ impl FlowMap {
         }
     }
 
-    fn rectify_ebpf_flow_direction(
+    fn rectify_flow_direction(
+        &mut self,
         node: &mut FlowNode,
         meta_packet: &mut MetaPacket,
         is_first_packet: bool,
     ) {
-        if node.tagged_flow.flow.flow_key.ip_src == meta_packet.lookup_key.src_ip
+        let need_reverse = if node.tagged_flow.flow.flow_key.ip_src == meta_packet.lookup_key.src_ip
             && node.tagged_flow.flow.flow_key.port_src == meta_packet.lookup_key.src_port
         {
             // If flow_key.ip_src and flow_key.port_src of node.tagged_flow.flow are the same as
             // that of meta_packet, but the direction of meta_packet is S2C, reverse flow
-            if meta_packet.lookup_key.direction == PacketDirection::ServerToClient {
-                Self::reverse_flow(node, is_first_packet);
-            }
+            meta_packet.lookup_key.direction == PacketDirection::ServerToClient
         } else {
             // If flow_key.ip_src or flow_key.port_src of node.tagged_flow.flow is different
             // from that of meta_packet, and the direction of meta_packet is C2S, reverse flow
-            if meta_packet.lookup_key.direction == PacketDirection::ClientToServer {
-                Self::reverse_flow(node, is_first_packet);
+            meta_packet.lookup_key.direction == PacketDirection::ClientToServer
+        };
+
+        if need_reverse {
+            Self::reverse_flow(node, is_first_packet);
+            // After modifying the flow direction, it is necessary to synchronize the service table to
+            // avoid incorrect directions in subsequent queries
+            let flow = &node.tagged_flow.flow;
+            if flow.signal_source != SignalSource::EBPF {
+                let src_epc_id = flow.flow_metrics_peers[0].l3_epc_id as i16;
+                let dst_epc_id = flow.flow_metrics_peers[1].l3_epc_id as i16;
+                let flow_key = &flow.flow_key;
+                self.service_table.reset_score(
+                    ServiceKey::new(flow_key.ip_src, src_epc_id, flow_key.port_src),
+                    ServiceKey::new(flow_key.ip_dst, dst_epc_id, flow_key.port_dst),
+                )
             }
         }
     }
