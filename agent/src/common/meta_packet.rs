@@ -930,13 +930,13 @@ impl<'a> MetaPacket<'a> {
         if self.signal_source == SignalSource::EBPF
             && (self.process_kname[..12]).eq(b"redis-server")
         {
-            return if self.lookup_key.l2_end_1 {
+            if self.lookup_key.l2_end_1 && self.lookup_key.src_port != 6379 {
                 // if server side recv, dst addr is server addr
-                dst
-            } else {
+                return dst;
+            } else if self.lookup_key.l2_end_0 && self.lookup_key.dst_port != 6379 {
                 // if server send, src addr is server addr
-                src
-            };
+                return src;
+            }
         }
 
         if self.lookup_key.dst_port == 6379 {
