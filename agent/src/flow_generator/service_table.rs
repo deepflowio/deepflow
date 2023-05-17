@@ -86,7 +86,7 @@ pub struct ServiceTable {
 
 impl ServiceTable {
     const MIN_SCORE: u8 = 0;
-    const MAX_SCORE: u8 = 0xff;
+    pub const MAX_SCORE: u8 = 0xff;
     const SCORE_DIFF_THRESHOLD: u8 = 8;
     const PORT_MSB: u16 = 1 << 15;
 
@@ -94,6 +94,29 @@ impl ServiceTable {
         Self {
             ipv4: LruCache::new(ipv4_capacity.try_into().unwrap()),
             ipv6: LruCache::new(ipv6_capacity.try_into().unwrap()),
+        }
+    }
+
+    // When the direction of the flow is incorrect, the L7 parser will obtain the correct direction
+    // and synchronize it here, and after calling reset_score, adjust_score cannot modify direction
+    pub fn reset_score(&mut self, flow_src_key: ServiceKey, flow_dst_key: ServiceKey) {
+        // adjust_score
+        match (flow_src_key, flow_dst_key) {
+            (ServiceKey::V4(flow_src_key), ServiceKey::V4(flow_dst_key)) => {
+                self.ipv4.put(flow_src_key, Self::MIN_SCORE);
+                self.ipv4.put(
+                    flow_dst_key,
+                    Self::MIN_SCORE + Self::SCORE_DIFF_THRESHOLD + 1,
+                );
+            }
+            (ServiceKey::V6(flow_src_key), ServiceKey::V6(flow_dst_key)) => {
+                self.ipv6.put(flow_src_key, Self::MIN_SCORE);
+                self.ipv6.put(
+                    flow_dst_key,
+                    Self::MIN_SCORE + Self::SCORE_DIFF_THRESHOLD + 1,
+                );
+            }
+            _ => unimplemented!(),
         }
     }
 
