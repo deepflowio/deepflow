@@ -380,3 +380,33 @@ type ChGProcess struct {
 func (ChGProcess) TableName() string {
 	return "ch_gprocess"
 }
+
+type ChPodK8sAnnotation struct {
+	ID      int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Key     string `gorm:"primaryKey;column:key;type:varchar(64);default:null" json:"KEY"`
+	Value   string `gorm:"column:value;type:varchar(64);default:null" json:"VALUE"`
+	L3EPCID int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
+	PodNsID int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
+}
+
+type ChPodK8sAnnotations struct {
+	ID          int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Annotations string `gorm:"column:annotations;type:text;default:null" json:"ANNOTATIONS"`
+	L3EPCID     int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
+	PodNsID     int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
+}
+
+type ChPodServiceK8sAnnotation struct {
+	ID      int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Key     string `gorm:"primaryKey;column:key;type:varchar(64);default:null" json:"KEY"`
+	Value   string `gorm:"column:value;type:varchar(64);default:null" json:"VALUE"`
+	L3EPCID int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
+	PodNsID int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
+}
+
+type ChPodServiceK8sAnnotations struct {
+	ID          int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Annotations string `gorm:"column:annotations;type:text;default:null" json:"ANNOTATIONS"`
+	L3EPCID     int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
+	PodNsID     int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
+}
