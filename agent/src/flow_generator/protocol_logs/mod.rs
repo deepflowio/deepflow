@@ -324,7 +324,7 @@ impl AppProtoLogsBaseInfo {
         self.syscall_cap_seq_1 = log.syscall_cap_seq_1;
 
         self.start_time = log.start_time.min(self.start_time);
-        self.end_time = log.end_time.max(self.start_time);
+        self.end_time = log.end_time.max(self.end_time);
         match log.head.msg_type {
             LogMessageType::Request if self.req_tcp_seq == 0 && log.req_tcp_seq != 0 => {
                 self.req_tcp_seq = log.req_tcp_seq;
