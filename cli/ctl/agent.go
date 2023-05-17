@@ -343,7 +343,7 @@ func updateAgent(cmd *cobra.Command, args []string, updateFilename string) {
 
 	// update vtap_group_id
 	if vtapGroupID, ok := updateMap["vtap_group_id"]; ok {
-		url := fmt.Sprintf("http://%s:%d/v1/vtap-group-configuration/?vtap_group_id=%s", server.IP, server.Port, vtapGroupID)
+		url := fmt.Sprintf("http://%s:%d/v1/vtap-groups/?short_uuid=%s", server.IP, server.Port, vtapGroupID)
 		// call vtap-group api, get lcuuid
 		response, err := common.CURLPerform("GET", url, nil, "")
 		if err != nil {
