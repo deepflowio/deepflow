@@ -454,6 +454,9 @@ ingester:
   #  ## pcap文件存储的文件夹
   #  file-directory: /var/lib/pcap
 
+  ## receive stats information from deepflow-agent and send it to `statsd-hostname` to write to InfluxDB
+  # statsd-hostname: telegraf
+
   ## ########################### roze config #############################################
 
   ## 是否不写入秒级数据: 默认: false(写入)
