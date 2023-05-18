@@ -95,6 +95,8 @@ type StaticConfig struct {
 	CheckCoreFileDisabled            *bool                 `yaml:"check-core-file-disabled,omitempty"`
 	WasmPlugins                      []string              `yaml:"wasm-plugins,omitempty"`
 	MemoryTrimDisabled               *bool                 `yaml:"memory-trim-disabled,omitempty"`
+	FastPathDisabled                 *bool                 `yaml:"fast-path-disabled,omitempty"`
+	ForwardCapacity                  *uint32               `yaml:"forward-capacity,omitempty"`
 }
 
 type XflowCollectorConfig struct {

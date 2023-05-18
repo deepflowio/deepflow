@@ -510,6 +510,15 @@ vtap_group_id: g-xxxxxx
   ##   according to max_memory.
   #fast-path-map-size: 0
 
+  ## Fast Path Disabled
+  ## Note: When set to true, deepflow-agent will not use fast path.
+  #fast-path-disabled: false
+
+  ## Forward Table Capacity
+  ## Default: 16384. Range: [16384, +oo)
+  ## Note: When this value is larger, the more memory usage may be
+  #forward-capacity: 16384
+
   ## Fast Path Level
   ## Default: 8. Range: [1, 16]
   ## Note: When this value is larger, the memory overhead is smaller, but the
