@@ -84,12 +84,13 @@ impl Policy {
         queue_count: usize,
         level: usize,
         map_size: usize,
+        forward_capacity: usize,
         fast_disable: bool,
     ) -> (PolicySetter, PolicyGetter) {
         let policy = Box::into_raw(Box::new(Policy {
             labeler: Labeler::default(),
             table: FirstPath::new(queue_count, level, map_size, fast_disable),
-            forward: Forward::new(queue_count),
+            forward: Forward::new(queue_count, forward_capacity),
             queue_count,
             first_hit: 0,
             fast_hit: 0,
@@ -449,7 +450,7 @@ mod test {
 
     #[test]
     fn test_policy_normal() {
-        let (mut setter, mut getter) = Policy::new(10, 0, 1024, false);
+        let (mut setter, mut getter) = Policy::new(10, 0, 1024, 1024, false);
         let interface: PlatformData = PlatformData {
             mac: 0x002233445566,
             ips: vec![IpSubnet {
