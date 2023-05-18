@@ -532,7 +532,7 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 			f.Value = tagDes.TagTranslator
 		} else {
 			// Custom Tag
-			if strings.HasPrefix(f.Args[0], "k8s.label.") || strings.HasPrefix(f.Args[0], "cloud.tag.") || strings.HasPrefix(f.Args[0], "os.app.") {
+			if strings.HasPrefix(f.Args[0], "k8s.label.") || strings.HasPrefix(f.Args[0], "k8s.annotation.") || strings.HasPrefix(f.Args[0], "cloud.tag.") || strings.HasPrefix(f.Args[0], "os.app.") {
 				nodeType := strings.TrimSuffix(f.Args[0], "_0")
 				nodeType = strings.TrimSuffix(nodeType, "_1")
 				f.Value = "'" + nodeType + "'"

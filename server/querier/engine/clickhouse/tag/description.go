@@ -292,6 +292,49 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 		}
 	}
 
+	// 查询 k8s_annotation
+	podK8sAnnotationRst, err := chClient.DoQuery(&client.QueryParams{
+		Sql: "SELECT key FROM flow_tag.pod_k8s_annotation_map GROUP BY key"})
+	if err != nil {
+		return nil, err
+	}
+	for _, _key := range podK8sAnnotationRst.Values {
+		key := _key.([]interface{})[0]
+		annotationKey := "k8s.annotation." + key.(string)
+		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || table == "vtap_flow_port" || table == "vtap_app_port" {
+			response.Values = append(response.Values, []interface{}{
+				annotationKey, annotationKey, annotationKey, annotationKey, "map_item",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+			})
+		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
+			response.Values = append(response.Values, []interface{}{
+				annotationKey, annotationKey + "_0", annotationKey + "_1", annotationKey, "map_item",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+			})
+		}
+	}
+
+	podServiceK8sAnnotationRst, err := chClient.DoQuery(&client.QueryParams{
+		Sql: "SELECT key FROM flow_tag.pod_service_k8s_annotation_map GROUP BY key"})
+	if err != nil {
+		return nil, err
+	}
+	for _, _key := range podServiceK8sAnnotationRst.Values {
+		key := _key.([]interface{})[0]
+		annotationKey := "k8s.annotation." + key.(string)
+		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || table == "vtap_flow_port" || table == "vtap_app_port" {
+			response.Values = append(response.Values, []interface{}{
+				annotationKey, annotationKey, annotationKey, annotationKey, "map_item",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+			})
+		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
+			response.Values = append(response.Values, []interface{}{
+				annotationKey, annotationKey + "_0", annotationKey + "_1", annotationKey, "map_item",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+			})
+		}
+	}
+
 	// 查询cloud.tag
 	chostCloudTagSql := "SELECT key FROM flow_tag.chost_cloud_tag_map GROUP BY key"
 	chostCloudTagRst, err := chClient.DoQuery(&client.QueryParams{Sql: chostCloudTagSql})
@@ -472,7 +515,7 @@ func GetTagValues(db, table, sql string) (*common.Result, []string, error) {
 		sql = showSqlList[0] + " WHERE " + showSqlList[1]
 	}
 	// K8s Labels是动态的,不需要去tag_description里确认
-	if strings.HasPrefix(tag, "k8s.label.") || strings.HasPrefix(tag, "cloud.tag.") || strings.HasPrefix(tag, "os.app.") {
+	if strings.HasPrefix(tag, "k8s.label.") || strings.HasPrefix(tag, "k8s.annotation.") || strings.HasPrefix(tag, "cloud.tag.") || strings.HasPrefix(tag, "os.app.") {
 		return GetTagResourceValues(db, table, sql)
 	}
 	// 外部字段是动态的,不需要去tag_description里确认
@@ -707,6 +750,27 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 					results.Columns = rst.Columns
 				}
 				return results, sqlList, nil
+			} else if strings.HasPrefix(tag, "k8s.annotation.") {
+				annotationTag := strings.TrimPrefix(tag, "k8s.annotation.")
+				if whereSql != "" {
+					whereSql += fmt.Sprintf(" AND `key`='%s'", annotationTag)
+				} else {
+					whereSql = fmt.Sprintf("WHERE `key`='%s'", annotationTag)
+				}
+				results := &common.Result{}
+				for _, table := range []string{"pod_service_k8s_annotation_map", "pod_k8s_annotation_map"} {
+					sql = fmt.Sprintf("SELECT value, value AS display_name FROM flow_tag.%s %s GROUP BY value, display_name ORDER BY %s ASC %s", table, whereSql, orderBy, limitSql)
+					sql = strings.ReplaceAll(sql, " like ", " ilike ")
+					sql = strings.ReplaceAll(sql, " LIKE ", " ILIKE ")
+					log.Debug(sql)
+					rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
+					if err != nil {
+						return results, sqlList, err
+					}
+					results.Values = append(results.Values, rst.Values...)
+					results.Columns = rst.Columns
+				}
+				return results, sqlList, nil
 			} else if strings.HasPrefix(tag, "cloud.tag.") {
 				cloudTag := strings.TrimPrefix(tag, "cloud.tag.")
 				if whereSql != "" {
@@ -812,6 +876,27 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 			}
 			results := &common.Result{}
 			for _, table := range []string{"pod_service_k8s_label_map", "pod_k8s_label_map"} {
+				sql = fmt.Sprintf("SELECT value, value AS display_name FROM flow_tag.%s %s GROUP BY value, display_name ORDER BY %s ASC %s", table, whereSql, orderBy, limitSql)
+				sql = strings.ReplaceAll(sql, " like ", " ilike ")
+				sql = strings.ReplaceAll(sql, " LIKE ", " ILIKE ")
+				log.Debug(sql)
+				rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
+				if err != nil {
+					return results, sqlList, err
+				}
+				results.Values = append(results.Values, rst.Values...)
+				results.Columns = rst.Columns
+			}
+			return results, sqlList, nil
+		} else if strings.HasPrefix(tag, "k8s.annotation.") {
+			annotationTag := strings.TrimPrefix(tag, "k8s.annotation.")
+			if whereSql != "" {
+				whereSql += fmt.Sprintf(" AND `key`='%s'", annotationTag)
+			} else {
+				whereSql = fmt.Sprintf("WHERE `key`='%s'", annotationTag)
+			}
+			results := &common.Result{}
+			for _, table := range []string{"pod_service_k8s_annotation_map", "pod_k8s_annotation_map"} {
 				sql = fmt.Sprintf("SELECT value, value AS display_name FROM flow_tag.%s %s GROUP BY value, display_name ORDER BY %s ASC %s", table, whereSql, orderBy, limitSql)
 				sql = strings.ReplaceAll(sql, " like ", " ilike ")
 				sql = strings.ReplaceAll(sql, " LIKE ", " ILIKE ")

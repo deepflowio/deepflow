@@ -64,6 +64,19 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 					filterName = strings.TrimSuffix(filterName, "_1")
 					filter := fmt.Sprintf(tagItem.NotNullFilter, filterName, filterName)
 					return &view.Expr{Value: "(" + filter + ")"}, true
+				} else if strings.HasPrefix(preAsTag, "k8s.annotation.") {
+					if strings.HasSuffix(preAsTag, "_0") {
+						tagItem, ok = tag.GetTag("k8s_annotation_0", db, table, "default")
+					} else if strings.HasSuffix(preAsTag, "_1") {
+						tagItem, ok = tag.GetTag("k8s_annotation_1", db, table, "default")
+					} else {
+						tagItem, ok = tag.GetTag("k8s_annotation", db, table, "default")
+					}
+					filterName := strings.TrimPrefix(preAsTag, "k8s.annotation.")
+					filterName = strings.TrimSuffix(filterName, "_0")
+					filterName = strings.TrimSuffix(filterName, "_1")
+					filter := fmt.Sprintf(tagItem.NotNullFilter, filterName, filterName)
+					return &view.Expr{Value: "(" + filter + ")"}, true
 				} else if strings.HasPrefix(preAsTag, "cloud.tag.") {
 					if strings.HasSuffix(preAsTag, "_0") {
 						tagItem, ok = tag.GetTag("cloud_tag_0", db, table, "default")
@@ -116,6 +129,19 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 					tagItem, ok = tag.GetTag("k8s_label", db, table, "default")
 				}
 				filterName := strings.TrimPrefix(name, "k8s.label.")
+				filterName = strings.TrimSuffix(filterName, "_0")
+				filterName = strings.TrimSuffix(filterName, "_1")
+				filter := fmt.Sprintf(tagItem.NotNullFilter, filterName, filterName)
+				return &view.Expr{Value: "(" + filter + ")"}, true
+			} else if strings.HasPrefix(name, "k8s.annotation.") {
+				if strings.HasSuffix(name, "_0") {
+					tagItem, ok = tag.GetTag("k8s_annotation_0", db, table, "default")
+				} else if strings.HasSuffix(name, "_1") {
+					tagItem, ok = tag.GetTag("k8s_annotation_1", db, table, "default")
+				} else {
+					tagItem, ok = tag.GetTag("k8s_annotation", db, table, "default")
+				}
+				filterName := strings.TrimPrefix(name, "k8s.annotation.")
 				filterName = strings.TrimSuffix(filterName, "_0")
 				filterName = strings.TrimSuffix(filterName, "_1")
 				filter := fmt.Sprintf(tagItem.NotNullFilter, filterName, filterName)
