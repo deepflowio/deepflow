@@ -33,6 +33,7 @@ var log = logging.MustGetLogger("config")
 const (
 	DefaultESHostPort      = "elasticsearch:20042"
 	DefaultSyslogDirectory = "/var/log/deepflow-agent"
+	DefaultStatsdHostname  = "telegraf"
 )
 
 type ESAuth struct {
@@ -52,6 +53,7 @@ type Config struct {
 	AgentLogToFile  bool          `yaml:"agent-log-to-file"`
 	SyslogDirectory string        `yaml:"syslog-directory"`
 	ESSyslog        bool          `yaml:"es-syslog"`
+	StatsdHostname  string        `yaml:"statsd-hostname"`
 }
 
 type DropletConfig struct {
@@ -156,6 +158,10 @@ func (c *Config) Validate() error {
 
 	if c.SyslogDirectory == "" {
 		c.SyslogDirectory = DefaultSyslogDirectory
+	}
+
+	if c.StatsdHostname == "" {
+		c.StatsdHostname = DefaultStatsdHostname
 	}
 	return nil
 }
