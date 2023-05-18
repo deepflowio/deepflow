@@ -35,6 +35,7 @@ auto_service               , 资源-服务优先              , 在`auto_instanc
 gprocess                   , 进程                       ,
 
 k8s.label                  , K8s Label                  ,
+k8s.annotation             , K8s Annotation             ,
 cloud.tag                  , Cloud Tag                  ,
 os.app                     , OS APP                     ,
 

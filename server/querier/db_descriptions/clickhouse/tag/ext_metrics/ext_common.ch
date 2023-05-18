@@ -34,6 +34,7 @@ auto_service_type          , 类型-服务优先              , `auto_service`�
 auto_service               , 资源-服务优先              , 在`auto_instance`基础上，将容器服务的 ClusterIP 与工作负载聚合为服务。
 
 k8s.label                  , K8s Label                  ,
+k8s.annotation             , K8s Annotation             ,
 cloud.tag                  , Cloud Tag                  ,
 os.app                     , OS APP                     ,
 
