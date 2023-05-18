@@ -591,6 +591,35 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		}
 	}
 
+	// K8s annotations
+	// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
+	for _, suffix := range []string{"", "_0", "_1"} {
+		k8sAnnotationSuffix := "k8s_annotation" + suffix
+		podIDSuffix := "pod_id" + suffix
+		serviceIDSuffix := "service_id" + suffix
+		tagResourceMap[k8sAnnotationSuffix] = map[string]*Tag{
+			"default": NewTag(
+				"if(dictGet(flow_tag.pod_service_k8s_annotation_map, 'value', (toUInt64("+serviceIDSuffix+"),'%s'))!='', dictGet(flow_tag.pod_service_k8s_annotation_map, 'value', (toUInt64("+serviceIDSuffix+"),'%s')), dictGet(flow_tag.pod_k8s_annotation_map, 'value', (toUInt64("+podIDSuffix+"),'%s')) )",
+				"((toUInt64("+serviceIDSuffix+") IN (SELECT id FROM flow_tag.pod_service_k8s_annotation_map WHERE key='%s')) OR (toUInt64("+podIDSuffix+") IN (SELECT id FROM flow_tag.pod_k8s_annotation_map WHERE key='%s')))",
+				"((toUInt64("+serviceIDSuffix+") IN (SELECT id FROM flow_tag.pod_service_k8s_annotation_map WHERE value %s %s and key='%s')) OR (toUInt64("+podIDSuffix+") IN (SELECT id FROM flow_tag.pod_k8s_annotation_map WHERE value %s %s and key='%s')))",
+				"((toUInt64("+serviceIDSuffix+") IN (SELECT id FROM flow_tag.pod_service_k8s_annotation_map WHERE %s(value,%s) and key='%s')) OR (toUInt64("+podIDSuffix+") IN (SELECT id FROM flow_tag.pod_k8s_annotation_map WHERE %s(value,%s) and key='%s')))",
+			),
+		}
+	}
+	for _, suffix := range []string{"", "_0", "_1"} {
+		k8sAnnotationSuffix := "k8s.annotation" + suffix
+		podIDSuffix := "pod_id" + suffix
+		serviceIDSuffix := "service_id" + suffix
+		tagResourceMap[k8sAnnotationSuffix] = map[string]*Tag{
+			"default": NewTag(
+				"if(dictGetOrDefault(flow_tag.pod_service_k8s_annotations_map, 'annotations', toUInt64("+serviceIDSuffix+"),'{}')!='{}', dictGetOrDefault(flow_tag.pod_service_k8s_annotations_map, 'annotations', toUInt64("+serviceIDSuffix+"),'{}'), dictGetOrDefault(flow_tag.pod_k8s_annotations_map, 'annotations', toUInt64("+podIDSuffix+"),'{}')) ",
+				"("+serviceIDSuffix+"!=0 OR "+podIDSuffix+"!=0)",
+				"",
+				"",
+			),
+		}
+	}
+
 	// cloud tags
 	// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
 	for _, suffix := range []string{"", "_0", "_1"} {

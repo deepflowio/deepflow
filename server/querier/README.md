@@ -324,7 +324,7 @@ clickhouse指标量及算子特殊处理：
 - 以下Tag字段在使用时需要携带`反引号`
   - `AS`后的中文字符
   - `map_item`类型的tag
-  - `k8s.label`, `cloud.tag`, `os.app`
+  - `k8s.label`, `k8s.annotation`, `cloud.tag`, `os.app`
   - 所有指标量
 - 字符串类型的value需要携带`单引号`
 - pod_ingress, lb_listener只支持where，不支持select和group
