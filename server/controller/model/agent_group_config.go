@@ -83,6 +83,8 @@ type StaticConfig struct {
 	GuardInterval                    *string               `yaml:"guard-interval,omitempty"`
 	CheckCoreFileDisabled            *bool                 `yaml:"check-core-file-disabled,omitempty"`
 	MemoryTrimDisabled               *bool                 `yaml:"memory-trim-disabled,omitempty"`
+	FastPathDisabled                 *bool                 `yaml:"fast-path-disabled,omitempty"`
+	ForwardCapacity                  *uint32               `yaml:"forward-capacity,omitempty"`
 }
 
 type XflowCollectorConfig struct {

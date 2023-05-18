@@ -22,7 +22,7 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use ipnetwork::IpNetwork;
-use log::debug;
+use log::{debug, warn};
 use lru::LruCache;
 use pnet::datalink::NetworkInterface;
 
@@ -115,18 +115,17 @@ pub struct Forward {
     vip_device_tables: RwLock<HashMap<u64, bool>>,
 
     queue_count: usize,
+    capacity: usize,
 }
 
 impl Forward {
-    // safe because parameter to new_unchecked is not zero
-    const TABLE_SIZE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(1 << 14) };
-
-    pub fn new(queue_count: usize) -> Self {
+    pub fn new(queue_count: usize, capacity: usize) -> Self {
         assert!(queue_count < super::MAX_QUEUE_COUNT && queue_count > 0);
         Self {
-            mac_ip_tables: RwLock::new(TableLruCache::new(Self::TABLE_SIZE)),
+            mac_ip_tables: RwLock::new(TableLruCache::new(NonZeroUsize::new(capacity).unwrap())),
             vip_device_tables: RwLock::new(HashMap::new()),
             queue_count,
+            capacity,
         }
     }
 
@@ -259,6 +258,10 @@ impl Forward {
         platforms: &Vec<Arc<PlatformData>>,
         interfaces: &Vec<NetworkInterface>,
     ) {
+        if platforms.len() + interfaces.len() > self.capacity {
+            warn!("The capacity({}) of the Forward table will be exceeded, where platforms is {} and interfaces is {}. ",
+                self.capacity, platforms.len(), interfaces.len());
+        }
         let mut mac_ip_table = self.mac_ip_tables.write().unwrap();
         mac_ip_table.clear();
         self.update_l3_from_platforms(&mut mac_ip_table, platforms);
@@ -322,7 +325,7 @@ mod tests {
 
     #[test]
     fn test_forward() {
-        let mut forward = Forward::new(3);
+        let mut forward = Forward::new(3, 1024);
         let interfaces = datalink::interfaces();
         let mut platforms = Vec::new();
         platforms.push(Arc::new(PlatformData {

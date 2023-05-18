@@ -348,6 +348,8 @@ pub struct YamlConfig {
     pub guard_interval: Duration,
     pub check_core_file_disabled: bool,
     pub memory_trim_disabled: bool,
+    pub forward_capacity: usize,
+    pub fast_path_disabled: bool,
 }
 
 impl YamlConfig {
@@ -495,6 +497,10 @@ impl YamlConfig {
             c.kubernetes_api_list_limit = 10;
         }
 
+        if c.forward_capacity < 1 << 14 {
+            c.forward_capacity = 1 << 14;
+        }
+
         if let Err(e) = c.validate() {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string()));
         }
@@ -605,6 +611,8 @@ impl Default for YamlConfig {
             guard_interval: Duration::from_secs(10),
             check_core_file_disabled: false,
             memory_trim_disabled: false,
+            fast_path_disabled: false,
+            forward_capacity: 1 << 14,
         }
     }
 }
