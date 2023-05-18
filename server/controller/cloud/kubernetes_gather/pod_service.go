@@ -74,7 +74,7 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 			continue
 		}
 		selectorSlice := cloudcommon.StringInterfaceMapKVs(selector, ":", 0)
-		selectorStrings := strings.Join(selectorSlice, ",")
+		selectorStrings := strings.Join(selectorSlice, ", ")
 		specTypeString := sData.Get("spec").Get("type").MustString()
 		specType, ok := serviceTypes[specTypeString]
 		if !ok {

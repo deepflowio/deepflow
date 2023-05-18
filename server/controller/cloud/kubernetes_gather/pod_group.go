@@ -273,7 +273,7 @@ func (k *KubernetesGather) getPodReplicationControllers() (podRCs []model.PodGro
 			}
 		}
 		labelSlice := cloudcommon.StringInterfaceMapKVs(labels, ":", 0)
-		labelString := strings.Join(labelSlice, ",")
+		labelString := strings.Join(labelSlice, ", ")
 		podNum := rData.Get("spec").Get("replicas").MustInt()
 		podRC := model.PodGroup{
 			Lcuuid:             uID,
