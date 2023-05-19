@@ -116,7 +116,6 @@ func (c *Client) DoQuery(params *QueryParams) (result *common.Result, err error)
 		ctx = context.Background()
 	}
 	rows, err := c.connection.Query(ctx, sqlstr)
-
 	c.Debug.Sql = sqlstr
 	if err != nil {
 		log.Errorf("query clickhouse Error: %s, sql: %s, query_uuid: %s", err, sqlstr, c.Debug.QueryUUID)
@@ -164,6 +163,13 @@ func (c *Client) DoQuery(params *QueryParams) (result *common.Result, err error)
 			columnSchemas[i].ValueType = valueType
 		}
 		values = append(values, record)
+	}
+	// Even if the query operation produces an error, it does not necessarily return an error in the'err 'parameter,
+	// so the return value of the'rows. Err () ' method must be checked to ensure that the query operation is successful
+	if err := rows.Err(); err != nil {
+		log.Errorf("query clickhouse Error: %s, sql: %s, query_uuid: %s", err, sqlstr, c.Debug.QueryUUID)
+		c.Debug.Error = fmt.Sprintf("%s", err)
+		return nil, err
 	}
 	queryTime := time.Since(start)
 	resRows := len(values)
