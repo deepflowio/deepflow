@@ -126,7 +126,7 @@ var (
 	DefaultTapMode                       = TAPMODE_LOCAL
 	DefaultThreadThreshold               = 500
 	DefaultProcessThreshold              = 10
-	DefaultNtpEnabled                    = 1
+	DefaultNtpEnabled                    = 0
 	DefaultL4PerformanceEnabled          = 1
 	DefaultPodClusterInternalIP          = 0
 	DefaultDomains                       = "0"
