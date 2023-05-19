@@ -189,7 +189,7 @@ func TrafficColumns() []*ckdb.Column {
 			TRAFFIC_SYNACK_COUNT: {"synack_count", "Total SYNACK packet count"},
 		},
 		ckdb.UInt64)
-	columns = append(columns, ckdb.NewColumn("direction_score", ckdb.UInt8).SetIndex(ckdb.IndexNone))
+	columns = append(columns, ckdb.NewColumn("direction_score", ckdb.UInt8).SetIndex(ckdb.IndexMinmax))
 	return columns
 }
 
