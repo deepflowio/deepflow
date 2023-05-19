@@ -699,6 +699,8 @@ impl FlowMap {
         let direction = meta_packet.lookup_key.direction;
         let pkt_tcp_flags = meta_packet.tcp_data.flags;
         node.tagged_flow.flow.flow_metrics_peers[direction as usize].tcp_flags |= pkt_tcp_flags;
+        node.tagged_flow.flow.flow_metrics_peers[direction as usize].total_tcp_flags |=
+            pkt_tcp_flags;
         self.update_flow(node, meta_packet);
         if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
             // Because eBPF data does not have L4 information, the remaining steps of direction
@@ -924,6 +926,7 @@ impl FlowMap {
                     first: lookup_key.timestamp.into(),
                     last: lookup_key.timestamp.into(),
                     tcp_flags: meta_packet.tcp_data.flags,
+                    total_tcp_flags: meta_packet.tcp_data.flags,
                     ..Default::default()
                 },
                 FlowMetricsPeer::default(),
@@ -1887,7 +1890,7 @@ pub fn _new_flow_map_and_receiver(
     flow_timeout: Option<FlowTimeout>,
     ignore_idc_vlan: bool,
 ) -> (FlowMap, Receiver<Box<TaggedFlow>>) {
-    let (_, mut policy_getter) = Policy::new(1, 0, 1 << 10, false);
+    let (_, mut policy_getter) = Policy::new(1, 0, 1 << 10, 1 << 14, false);
     policy_getter.disable();
     let queue_debugger = QueueDebugger::new();
     let (output_queue_sender, output_queue_receiver, _) =

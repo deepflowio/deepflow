@@ -1248,7 +1248,8 @@ impl AgentComponents {
             1.max(yaml_config.src_interfaces.len()),
             yaml_config.first_path_level as usize,
             yaml_config.fast_path_map_size,
-            false,
+            yaml_config.forward_capacity,
+            yaml_config.fast_path_disabled,
         );
         synchronizer.add_flow_acl_listener(Box::new(policy_setter));
         policy_setter.set_memory_limit(max_memory);
