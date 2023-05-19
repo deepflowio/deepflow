@@ -172,14 +172,14 @@ type TransportLayer struct {
 
 var TransportLayerColumns = []*ckdb.Column{
 	// 传输层
-	ckdb.NewColumn("client_port", ckdb.UInt16).SetIndex(ckdb.IndexNone),
+	ckdb.NewColumn("client_port", ckdb.UInt16),
 	ckdb.NewColumn("server_port", ckdb.UInt16).SetIndex(ckdb.IndexSet),
 	ckdb.NewColumn("tcp_flags_bit_0", ckdb.UInt16).SetIndex(ckdb.IndexNone),
 	ckdb.NewColumn("tcp_flags_bit_1", ckdb.UInt16).SetIndex(ckdb.IndexNone),
-	ckdb.NewColumn("syn_seq", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("握手包的TCP SEQ序列号"),
-	ckdb.NewColumn("syn_ack_seq", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("握手回应包的TCP SEQ序列号"),
-	ckdb.NewColumn("last_keepalive_seq", ckdb.UInt32).SetIndex(ckdb.IndexNone),
-	ckdb.NewColumn("last_keepalive_ack", ckdb.UInt32).SetIndex(ckdb.IndexNone),
+	ckdb.NewColumn("syn_seq", ckdb.UInt32).SetComment("握手包的TCP SEQ序列号"),
+	ckdb.NewColumn("syn_ack_seq", ckdb.UInt32).SetComment("握手回应包的TCP SEQ序列号"),
+	ckdb.NewColumn("last_keepalive_seq", ckdb.UInt32),
+	ckdb.NewColumn("last_keepalive_ack", ckdb.UInt32),
 }
 
 func (t *TransportLayer) WriteBlock(block *ckdb.Block) {
@@ -407,7 +407,7 @@ var FlowInfoColumns = []*ckdb.Column{
 	ckdb.NewColumn("nat_real_ip4_1", ckdb.IPv4),
 	ckdb.NewColumn("nat_real_port_0", ckdb.UInt16),
 	ckdb.NewColumn("nat_real_port_1", ckdb.UInt16),
-	ckdb.NewColumn("direction_score", ckdb.UInt8),
+	ckdb.NewColumn("direction_score", ckdb.UInt8).SetIndex(ckdb.IndexMinmax),
 }
 
 func (f *FlowInfo) WriteBlock(block *ckdb.Block) {
@@ -507,8 +507,8 @@ var MetricsColumns = []*ckdb.Column{
 	ckdb.NewColumn("total_packet_rx", ckdb.UInt64),
 	ckdb.NewColumn("total_byte_tx", ckdb.UInt64),
 	ckdb.NewColumn("total_byte_rx", ckdb.UInt64),
-	ckdb.NewColumn("l7_request", ckdb.UInt32).SetIndex(ckdb.IndexNone),
-	ckdb.NewColumn("l7_response", ckdb.UInt32).SetIndex(ckdb.IndexNone),
+	ckdb.NewColumn("l7_request", ckdb.UInt32),
+	ckdb.NewColumn("l7_response", ckdb.UInt32),
 
 	ckdb.NewColumn("rtt", ckdb.Float64).SetComment("单位: 微秒"),
 	ckdb.NewColumn("rtt_client_sum", ckdb.Float64),
@@ -525,25 +525,25 @@ var MetricsColumns = []*ckdb.Column{
 	ckdb.NewColumn("rrt_count", ckdb.UInt64),
 	ckdb.NewColumn("cit_count", ckdb.UInt64),
 
-	ckdb.NewColumn("rtt_client_max", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("单位: 微秒"),
-	ckdb.NewColumn("rtt_server_max", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("单位: 微秒"),
-	ckdb.NewColumn("srt_max", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("单位: 微秒"),
-	ckdb.NewColumn("art_max", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("单位: 微秒"),
-	ckdb.NewColumn("rrt_max", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("单位: 微秒"),
-	ckdb.NewColumn("cit_max", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("单位: 微秒"),
+	ckdb.NewColumn("rtt_client_max", ckdb.UInt32).SetComment("单位: 微秒"),
+	ckdb.NewColumn("rtt_server_max", ckdb.UInt32).SetComment("单位: 微秒"),
+	ckdb.NewColumn("srt_max", ckdb.UInt32).SetComment("单位: 微秒"),
+	ckdb.NewColumn("art_max", ckdb.UInt32).SetComment("单位: 微秒"),
+	ckdb.NewColumn("rrt_max", ckdb.UInt32).SetComment("单位: 微秒"),
+	ckdb.NewColumn("cit_max", ckdb.UInt32).SetComment("单位: 微秒"),
 
-	ckdb.NewColumn("retrans_tx", ckdb.UInt32).SetIndex(ckdb.IndexNone),
-	ckdb.NewColumn("retrans_rx", ckdb.UInt32).SetIndex(ckdb.IndexNone),
-	ckdb.NewColumn("zero_win_tx", ckdb.UInt32).SetIndex(ckdb.IndexNone),
-	ckdb.NewColumn("zero_win_rx", ckdb.UInt32).SetIndex(ckdb.IndexNone),
-	ckdb.NewColumn("syn_count", ckdb.UInt32).SetIndex(ckdb.IndexNone),
-	ckdb.NewColumn("synack_count", ckdb.UInt32).SetIndex(ckdb.IndexNone),
-	ckdb.NewColumn("retrans_syn", ckdb.UInt32).SetIndex(ckdb.IndexNone),
-	ckdb.NewColumn("retrans_synack", ckdb.UInt32).SetIndex(ckdb.IndexNone),
-	ckdb.NewColumn("l7_client_error", ckdb.UInt32).SetIndex(ckdb.IndexNone),
-	ckdb.NewColumn("l7_server_error", ckdb.UInt32).SetIndex(ckdb.IndexNone),
-	ckdb.NewColumn("l7_server_timeout", ckdb.UInt32).SetIndex(ckdb.IndexNone),
-	ckdb.NewColumn("l7_error", ckdb.UInt32).SetIndex(ckdb.IndexNone),
+	ckdb.NewColumn("retrans_tx", ckdb.UInt32),
+	ckdb.NewColumn("retrans_rx", ckdb.UInt32),
+	ckdb.NewColumn("zero_win_tx", ckdb.UInt32),
+	ckdb.NewColumn("zero_win_rx", ckdb.UInt32),
+	ckdb.NewColumn("syn_count", ckdb.UInt32),
+	ckdb.NewColumn("synack_count", ckdb.UInt32),
+	ckdb.NewColumn("retrans_syn", ckdb.UInt32),
+	ckdb.NewColumn("retrans_synack", ckdb.UInt32),
+	ckdb.NewColumn("l7_client_error", ckdb.UInt32),
+	ckdb.NewColumn("l7_server_error", ckdb.UInt32),
+	ckdb.NewColumn("l7_server_timeout", ckdb.UInt32),
+	ckdb.NewColumn("l7_error", ckdb.UInt32),
 }
 
 func (m *Metrics) WriteBlock(block *ckdb.Block) {
