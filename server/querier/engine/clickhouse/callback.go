@@ -237,3 +237,47 @@ func MacTranslate(args []interface{}) func(result *common.Result) error {
 		return nil
 	}
 }
+
+func PrometheusTagTranslate(args []interface{}) func(result *common.Result) error {
+	return func(result *common.Result) error {
+		tagArgs := args[0].(*SelectTag)
+		newValues := make([]interface{}, len(result.Values))
+		var prometheusTagIndex int
+		for i, column := range result.Columns {
+			if column.(string) == args[1].(string) {
+				prometheusTagIndex = i
+				break
+			}
+		}
+		copy(newValues, result.Values)
+		if tagArgs.IsAppLabel {
+			for i, newValue := range newValues {
+				newValueSlice := newValue.([]interface{})
+				if metricID, ok := METRIC_NAME_TO_ID[tagArgs.Table]; ok {
+					if labelNameID, ok := LABEL_NAME_TO_ID[tagArgs.PrometheusTag]; ok {
+						if appLabel, ok := APP_LABEL[fmt.Sprintf("%d,%d", metricID, labelNameID)]; ok {
+							labelValue := appLabel[1].(string)
+							newValueSlice[prometheusTagIndex] = labelValue
+							newValues[i] = newValueSlice
+						}
+					}
+				}
+			}
+		} else {
+			for i, newValue := range newValues {
+				newValueSlice := newValue.([]interface{})
+				tagValue := newValueSlice[prometheusTagIndex].(int)
+				if metricID, ok := METRIC_NAME_TO_ID[tagArgs.Table]; ok {
+					if labelNameID, ok := LABEL_NAME_TO_ID[tagArgs.PrometheusTag]; ok {
+						if targetLabelValue, ok := TARGET_LABEL[fmt.Sprintf("%d,%d,%d", metricID, tagValue, labelNameID)]; ok {
+							newValueSlice[prometheusTagIndex] = targetLabelValue
+							newValues[i] = newValueSlice
+						}
+					}
+				}
+			}
+		}
+		result.Values = newValues
+		return nil
+	}
+}

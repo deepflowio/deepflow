@@ -204,8 +204,8 @@ func GetExtTables(db string, ctx context.Context) (values []interface{}) {
 		Context:  ctx,
 	}
 	sql := ""
-	if db == "ext_metrics" {
-		sql = "SELECT table FROM flow_tag.ext_metrics_custom_field GROUP BY table"
+	if db == "ext_metrics" || db == "prometheus" {
+		sql = fmt.Sprintf("SELECT table FROM flow_tag.%s_custom_field GROUP BY table", db)
 		chClient.DB = "flow_tag"
 	} else {
 		sql = "SHOW TABLES FROM " + db

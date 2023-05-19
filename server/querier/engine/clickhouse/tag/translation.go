@@ -25,6 +25,7 @@ import (
 )
 
 var TagResoureMap = GenerateTagResoureMap()
+var METRIC_NAME_TO_ID_Map = GenerateTagResoureMap()
 var DEVICE_MAP = map[string]int{
 	"chost":       VIF_DEVICE_TYPE_VM,
 	"router":      VIF_DEVICE_TYPE_VROUTER,

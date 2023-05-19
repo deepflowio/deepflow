@@ -79,6 +79,19 @@ func GetTagTranslator(name, alias, db, table string) (Statement, error) {
 			stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag}
 		} else if strings.HasPrefix(name, "tag.") || strings.HasPrefix(name, "attribute.") {
 			if strings.HasPrefix(name, "tag.") {
+				if db == "prometheus" {
+					log.Info("prometheus0")
+					nameNoPreffix := strings.TrimPrefix(name, "tag.")
+					// Determine whether the tag is app_label or target_label
+					if appLabelColumnIndex, ok := METRIC_APP_LABEL_LAYOUT[table+", "+nameNoPreffix]; ok {
+						TagTranslatorStr := fmt.Sprintf("app_label_value_id_%d", appLabelColumnIndex)
+						stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag, DataBase: "prometheus", Table: table, IsAppLabel: true, PrometheusTag: nameNoPreffix}
+					} else {
+						TagTranslatorStr := "target_id"
+						stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag, DataBase: "prometheus", Table: table, PrometheusTag: nameNoPreffix}
+					}
+					return stmt, nil
+				}
 				tagItem, ok = tag.GetTag("tag.", db, table, "default")
 			} else {
 				tagItem, ok = tag.GetTag("attribute.", db, table, "default")
@@ -115,14 +128,24 @@ func GetSelectNotNullFilter(name, as, db, table string) (view.Node, bool) {
 	tagItem, ok := tag.GetTag(name, db, table, "default")
 	if !ok {
 		if strings.HasPrefix(name, "`metrics.") && db == "ext_metrics" {
-			tagItem, ok = tag.GetTag("metrics.", db, table, "default")
-			filter := ""
-			if as == "" {
-				filter = fmt.Sprintf(tagItem.NotNullFilter, name)
-			} else {
-				filter = fmt.Sprintf(tagItem.NotNullFilter, as)
+			if db == "ext_metrics" {
+				tagItem, ok = tag.GetTag("metrics.", db, table, "default")
+				filter := ""
+				if as == "" {
+					filter = fmt.Sprintf(tagItem.NotNullFilter, name)
+				} else {
+					filter = fmt.Sprintf(tagItem.NotNullFilter, as)
+				}
+				return &view.Expr{Value: "(" + filter + ")"}, true
+			} else if db == "prometheus" {
+				filter := ""
+				metric_name := strings.Trim(name, "`")
+				metric_name = strings.TrimSuffix(metric_name, "metrics.")
+				if metricID, ok := METRIC_NAME_TO_ID[metric_name]; ok {
+					filter = fmt.Sprintf("metric_id=%d", metricID)
+					return &view.Expr{Value: "(" + filter + ")"}, true
+				}
 			}
-			return &view.Expr{Value: "(" + filter + ")"}, true
 		}
 	}
 	return &view.Expr{}, false
@@ -144,10 +167,14 @@ func GetDefaultTag(name string, alias string) Statement {
 }
 
 type SelectTag struct {
-	Value string
-	Alias string
-	Flag  int
-	Withs []view.Node
+	DataBase      string
+	Table         string
+	PrometheusTag string
+	Value         string
+	Alias         string
+	Flag          int
+	Withs         []view.Node
+	IsAppLabel    bool
 }
 
 func (t *SelectTag) Format(m *view.Model) {
@@ -161,5 +188,12 @@ func (t *SelectTag) Format(m *view.Model) {
 	}
 	if t.Value == "packet_batch" {
 		m.AddCallback(t.Value, packet_batch.PacketBatchFormat([]interface{}{}))
+	}
+	if t.DataBase == "prometheus" {
+		alias := t.Value
+		if t.Alias != "" {
+			alias = t.Alias
+		}
+		m.AddCallback(t.Value, PrometheusTagTranslate([]interface{}{t, alias, t.DataBase, t.Table, t.IsAppLabel}))
 	}
 }
