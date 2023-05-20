@@ -61,11 +61,7 @@ impl ActivePoller {
     }
 
     fn query(ns: &Vec<NsFile>) -> HashMap<NsFile, Vec<InterfaceInfo>> {
-        // always query root ns (/proc/1/ns/net)
-        let mut ns_files = vec![NsFile::Root];
-        ns_files.extend(ns.clone());
-
-        match NetNs::interfaces_linked_with(&ns_files) {
+        match NetNs::interfaces_linked_with(&ns) {
             Ok(mut map) => {
                 for (_, v) in map.iter_mut() {
                     v.sort_unstable();
@@ -88,6 +84,7 @@ impl ActivePoller {
         timeout: Duration,
     ) {
         // 初始化
+        // always query root ns (/proc/1/ns/net)
         let mut nss = vec![NsFile::Root];
         if let Some(re) = &*netns_regex.lock().unwrap() {
             let mut extra_ns = NetNs::find_ns_files_by_regex(&re);
@@ -115,6 +112,7 @@ impl ActivePoller {
             }
             drop(guard);
 
+            // always query root ns (/proc/1/ns/net)
             let mut new_nss = vec![NsFile::Root];
             if let Some(re) = &*netns_regex.lock().unwrap() {
                 let mut extra_ns = NetNs::find_ns_files_by_regex(&re);
