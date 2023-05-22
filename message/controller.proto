@@ -218,3 +218,27 @@ message GetPrometheusAPPLabelIndexesResponse {
     optional string error_msg = 1;
     repeated PrometheusAPPLabelIndexesResponse response_indexes = 2;
 }
+
+
+service PrometheusDebug {
+    rpc DebugPrometheusCache (PrometheusCacheRequest) returns (PrometheusCacheResponse) {}
+}
+
+enum PrometheusCacheType {
+    ALL = 0;
+    METRIC_NAME = 1;
+    LABEL_NAME = 2;
+    LABEL_VALUE = 3;
+    METRIC_AND_APP_LABEL_LAYOUT = 4;
+    TARGET = 5;
+    LABEL = 6;
+    METRIC_TARGET = 7;
+}
+
+message PrometheusCacheRequest {
+    optional PrometheusCacheType type = 1;
+}
+
+message PrometheusCacheResponse {
+    optional bytes content = 1;     // json data
+}

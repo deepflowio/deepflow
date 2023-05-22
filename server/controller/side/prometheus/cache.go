@@ -18,12 +18,14 @@ package prometheus
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"sync"
 	"time"
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
@@ -56,6 +58,133 @@ func GetSingletonCache() *Cache {
 		}
 	})
 	return cacheIns
+}
+
+func GetDebugCache(t controller.PrometheusCacheType) []byte {
+	cache := GetSingleton().Cache
+	content := make(map[string]interface{})
+
+	getMetricName := func() {
+		temp := map[string]interface{}{
+			"metric_name_to_id": make(map[string]interface{}),
+		}
+		cache.metricName.metricNameToID.Range(func(key, value any) bool {
+			temp["metric_name_to_id"].(map[string]interface{})[key.(string)] = value
+			return true
+		})
+		if len(temp["metric_name_to_id"].(map[string]interface{})) > 0 {
+			content["metric_name"] = temp
+		}
+	}
+	getLabelName := func() {
+		temp := map[string]interface{}{
+			"label_name_to_id": make(map[string]interface{}),
+		}
+		cache.labelName.labelNameToID.Range(func(key, value any) bool {
+			temp["label_name_to_id"].(map[string]interface{})[key.(string)] = value
+			return true
+		})
+		if len(temp["label_name_to_id"].(map[string]interface{})) > 0 {
+			content["label_name"] = temp
+		}
+	}
+	getLabelValue := func() {
+		temp := map[string]interface{}{
+			"label_value_to_id": make(map[string]interface{}),
+		}
+		cache.labelValue.labelValueToID.Range(func(key, value any) bool {
+			temp["label_value_to_id"].(map[string]interface{})[key.(string)] = value
+			return true
+		})
+		if len(temp["label_value_to_id"].(map[string]interface{})) > 0 {
+			content["label_value"] = temp
+		}
+	}
+	getMetricAndAppLabelLayout := func() {
+		temp := map[string]interface{}{
+			"metric_label_name_key_to_index": make(map[string]interface{}),
+		}
+		cache.metricAndAPPLabelLayout.metricLabelNameKeyToIndex.Range(func(key, value any) bool {
+			k := key.(appLabelIndexKey)
+			keyStr := k.MetricName + "-" + k.LabelName
+			temp["metric_label_name_key_to_index"].(map[string]interface{})[keyStr] = value
+			return true
+		})
+		if len(temp["metric_label_name_key_to_index"].(map[string]interface{})) > 0 {
+			content["metric_and_app_label_layout"] = temp
+		}
+	}
+	getTarget := func() {
+		temp := map[string]interface{}{
+			"instance_and_job_to_target_id": make(map[string]interface{}),
+			"label_names":                   []string{},
+		}
+		cache.target.instanceAndJobToTargetID.Range(func(key, value any) bool {
+			temp["instance_and_job_to_target_id"].(map[string]interface{})[key.(string)] = value
+			return true
+		})
+		for _, labelName := range cache.target.labelNames {
+			temp["label_names"] = append(temp["label_names"].([]string), labelName)
+		}
+		if len(temp["instance_and_job_to_target_id"].(map[string]interface{})) > 0 ||
+			len(temp["label_names"].([]string)) > 0 {
+			content["target"] = temp
+		}
+	}
+	getLabel := func() {
+		temp := map[string]interface{}{
+			"name_to_value": make(map[string]interface{}),
+		}
+		cache.label.nameToValue.Range(func(key, value any) bool {
+			temp["name_to_value"].(map[string]interface{})[key.(string)] = value
+			return true
+		})
+		if len(temp["name_to_value"].(map[string]interface{})) > 0 {
+			content["label"] = temp
+		}
+	}
+	getMetricTarget := func() {
+		temp := map[string]interface{}{
+			"metric_name_to_target_id": make(map[string]interface{}),
+		}
+		cache.metricTarget.metricNameToTargetID.Range(func(key, value any) bool {
+			temp["metric_name_to_target_id"].(map[string]interface{})[key.(string)] = value
+			return true
+		})
+		if len(temp["metric_name_to_target_id"].(map[string]interface{})) > 0 {
+			content["metric_target"] = temp
+		}
+	}
+
+	switch t {
+	case controller.PrometheusCacheType_ALL:
+		getMetricName()
+		getLabelName()
+		getLabelValue()
+		getMetricAndAppLabelLayout()
+		getTarget()
+		getLabel()
+		getMetricTarget()
+	case controller.PrometheusCacheType_METRIC_NAME:
+		getMetricName()
+	case controller.PrometheusCacheType_LABEL_NAME:
+		getLabelName()
+	case controller.PrometheusCacheType_LABEL_VALUE:
+		getLabelValue()
+	case controller.PrometheusCacheType_METRIC_AND_APP_LABEL_LAYOUT:
+		getMetricAndAppLabelLayout()
+	case controller.PrometheusCacheType_TARGET:
+		getTarget()
+	case controller.PrometheusCacheType_LABEL:
+		getLabel()
+	case controller.PrometheusCacheType_METRIC_TARGET:
+		getMetricTarget()
+	default:
+		return nil
+	}
+
+	b, _ := json.MarshalIndent(content, "", "	")
+	return b
 }
 
 func (t *Cache) Start(ctx context.Context) error {
