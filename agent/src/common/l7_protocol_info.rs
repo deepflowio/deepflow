@@ -158,7 +158,7 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
                 if msg_type == LogMessageType::Request {
                     *in_cached_req += 1;
                 }
-                perf_cache.rrt_cache.put(
+                perf_cache.put(
                     cache_key,
                     LogCache {
                         msg_type: param.direction.into(),
