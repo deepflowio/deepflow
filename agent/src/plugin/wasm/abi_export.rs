@@ -14,9 +14,12 @@
  * limitations under the License.
  */
 
+use std::sync::Arc;
+
 use super::{
-    HookPointBitmap, StoreDataType, EXPORT_FUNC_CHECK_PAYLOAD, EXPORT_FUNC_GET_HOOK_BITMAP,
-    EXPORT_FUNC_ON_HTTP_REQ, EXPORT_FUNC_ON_HTTP_RESP, EXPORT_FUNC_PARSE_PAYLOAD,
+    HookPointBitmap, StoreDataType, WasmCounter, EXPORT_FUNC_CHECK_PAYLOAD,
+    EXPORT_FUNC_GET_HOOK_BITMAP, EXPORT_FUNC_ON_HTTP_REQ, EXPORT_FUNC_ON_HTTP_RESP,
+    EXPORT_FUNC_PARSE_PAYLOAD,
 };
 use crate::flow_generator::{
     Error::{self, WasmVmError},
@@ -39,6 +42,13 @@ pub(super) struct InstanceWrap {
     pub(super) ins: Instance,
     // the linear memory belong to this instance
     pub(super) memory: Memory,
+
+    // metric counter
+    pub(super) check_payload_counter: Arc<WasmCounter>,
+    pub(super) parse_payload_counter: Arc<WasmCounter>,
+    pub(super) on_http_req_counter: Arc<WasmCounter>,
+    pub(super) on_http_resp_counter: Arc<WasmCounter>,
+
     /*
         correspond go export function:
 
@@ -190,5 +200,18 @@ impl VmParser for InstanceWrap {
         Ok(HookPointBitmap(read_u128_be(
             &data[bitmap_ptr..bitmap_ptr + 16],
         )))
+    }
+}
+
+impl InstanceWrap {
+    // linear memory size
+    pub fn get_mem_size(&self, store: &mut Store<StoreDataType>) -> usize {
+        let mem = self
+            .ins
+            .get_export(&mut *store, "memory")
+            .unwrap()
+            .into_memory()
+            .unwrap();
+        mem.data_size(store)
     }
 }

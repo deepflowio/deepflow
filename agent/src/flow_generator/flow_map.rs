@@ -73,7 +73,10 @@ use crate::{
         handler::{L7LogDynamicConfig, LogParserAccess, LogParserConfig},
         FlowAccess, FlowConfig, ModuleConfig, RuntimeConfig,
     },
-    plugin::wasm::{init_wasmtime, WasmVm},
+    plugin::wasm::{
+        get_all_wasm_export_func_name, get_wasm_metric_counter_map_key, init_wasmtime, WasmCounter,
+        WasmCounterMap, WasmVm,
+    },
     policy::{Policy, PolicyGetter},
     rpc::get_timestamp,
     utils::stats::{self, Countable, StatsOption},
@@ -155,6 +158,33 @@ impl FlowMap {
             let size = (config_guard.packet_delay + max_timeout + Duration::from_secs(1)).as_secs();
             size.next_power_of_two() as usize
         };
+
+        let wasm_counter_map = Arc::new(WasmCounterMap {
+            wasm_mertic: {
+                let mut h = HashMap::new();
+                for (name, _) in config_guard.wasm_plugins.iter() {
+                    for func_name in get_all_wasm_export_func_name() {
+                        let counter = Arc::new(WasmCounter::default());
+                        // TODO: remove source when plugin remove
+                        stats_collector.register_countable(
+                            "flow-map",
+                            Countable::Ref(Arc::downgrade(&counter) as Weak<dyn RefCountable>),
+                            vec![
+                                StatsOption::Tag("id", id.to_string()),
+                                StatsOption::Tag("plugin_name", name.clone()),
+                                StatsOption::Tag("export_func", func_name.to_string()),
+                            ],
+                        );
+                        h.insert(
+                            get_wasm_metric_counter_map_key(name.as_str(), func_name),
+                            counter,
+                        );
+                    }
+                }
+                h
+            },
+        });
+
         stats_collector.register_countable(
             "flow-map",
             Countable::Ref(Arc::downgrade(&stats_counter) as Weak<dyn RefCountable>),
@@ -226,9 +256,11 @@ impl FlowMap {
                 if config_guard.wasm_plugins.is_empty() {
                     None
                 } else {
-                    let mut vm = init_wasmtime(vec![]);
+                    let mut vm = init_wasmtime(vec![], &wasm_counter_map);
                     for (name, data) in config_guard.wasm_plugins.iter() {
-                        if let Err(err) = vm.append_prog(name.as_str(), data.as_slice()) {
+                        if let Err(err) =
+                            vm.append_prog(name.as_str(), data.as_slice(), &wasm_counter_map)
+                        {
                             wasm_error!(name, "add wasm prog fail: {}", err);
                         }
                     }
@@ -1022,6 +1054,7 @@ impl FlowMap {
                 self.flow_perf_counter.clone(),
                 port,
                 self.wasm_vm.as_ref().map(|w| w.clone()),
+                self.stats_counter.clone(),
             )
             .map(|o| Box::new(o));
         }
@@ -1818,14 +1851,16 @@ impl FlowMap {
 
 #[derive(Default)]
 pub struct FlowMapCounter {
-    new: AtomicU64,              // the number of  created flow
-    closed: AtomicU64,           // the number of closed flow
-    drop_by_window: AtomicU64,   // times of flush wihich drop by window
-    concurrent: AtomicU64,       // current the number of FlowNode
-    slots: AtomicU64,            // current the length of HashMap
-    slot_max_depth: AtomicU64,   // the max length of Vec<FlowNode>
-    total_scan: AtomicU64,       // the total number of iteration to scan over Vec<FlowNode>
-    time_set_shrinks: AtomicU64, // the total number of time_set HashSet shrinks
+    new: AtomicU64,                      // the number of  created flow
+    closed: AtomicU64,                   // the number of closed flow
+    drop_by_window: AtomicU64,           // times of flush wihich drop by window
+    concurrent: AtomicU64,               // current the number of FlowNode
+    slots: AtomicU64,                    // current the length of HashMap
+    slot_max_depth: AtomicU64,           // the max length of Vec<FlowNode>
+    total_scan: AtomicU64,               // the total number of iteration to scan over Vec<FlowNode>
+    time_set_shrinks: AtomicU64,         // the total number of time_set HashSet shrinks
+    pub l7_perf_cache_len: AtomicU64,    // the number of struct L7PerfCache::rrt_cache length
+    pub l7_timeout_cache_len: AtomicU64, // the number of struct L7PerfCache::timeout_cache length
 }
 
 impl RefCountable for FlowMapCounter {
@@ -1869,6 +1904,16 @@ impl RefCountable for FlowMapCounter {
                 "time_set_shrinks",
                 CounterType::Gauged,
                 CounterValue::Unsigned(self.time_set_shrinks.swap(0, Ordering::Relaxed)),
+            ),
+            (
+                "l7_perf_cache_len",
+                CounterType::Gauged,
+                CounterValue::Unsigned(self.l7_perf_cache_len.swap(0, Ordering::Relaxed)),
+            ),
+            (
+                "l7_timeout_cache_len",
+                CounterType::Gauged,
+                CounterValue::Unsigned(self.l7_timeout_cache_len.swap(0, Ordering::Relaxed)),
             ),
         ]
     }

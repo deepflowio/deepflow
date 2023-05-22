@@ -14,6 +14,11 @@
  * limitations under the License.
  */
 
+use std::{
+    sync::atomic::Ordering,
+    time::{SystemTime, UNIX_EPOCH},
+};
+
 use anyhow::Result;
 use log::error;
 use wasmtime::{
@@ -39,8 +44,9 @@ use crate::{
 use super::{
     abi_export::{InstanceWrap, VmParser},
     abi_import::get_linker,
-    HookPointBitmap, VmCtxBase, VmHttpReqCtx, VmHttpRespCtx, VmParseCtx, HOOK_POINT_HTTP_REQ,
-    HOOK_POINT_HTTP_RESP, HOOK_POINT_PAYLOAD_PARSE,
+    metric::get_wasm_metric_counter_map_key,
+    HookPointBitmap, VmCtxBase, VmHttpReqCtx, VmHttpRespCtx, VmParseCtx, WasmCounterMap,
+    HOOK_POINT_HTTP_REQ, HOOK_POINT_HTTP_RESP, HOOK_POINT_PAYLOAD_PARSE,
 };
 
 pub(super) const WASM_MODULE_NAME: &str = "deepflow";
@@ -63,6 +69,15 @@ pub(super) const IMPORT_FUNC_HOST_READ_STR_RESULT: &str = "host_read_str_result"
 pub(super) const LOG_LEVEL_INFO: i32 = 0;
 pub(super) const LOG_LEVEL_WARN: i32 = 1;
 pub(super) const LOG_LEVEL_ERR: i32 = 2;
+
+pub fn get_all_wasm_export_func_name() -> [&'static str; 4] {
+    [
+        EXPORT_FUNC_CHECK_PAYLOAD,
+        EXPORT_FUNC_PARSE_PAYLOAD,
+        EXPORT_FUNC_ON_HTTP_REQ,
+        EXPORT_FUNC_ON_HTTP_RESP,
+    ]
+}
 
 pub(super) struct StoreDataType {
     pub(super) parse_ctx: Option<VmParseCtx>,
@@ -95,6 +110,9 @@ impl WasmVm {
             if ins.hook_point_bitmap.skip(HOOK_POINT_PAYLOAD_PARSE) {
                 continue;
             }
+            let start_time = SystemTime::now();
+            let start_time = start_time.duration_since(UNIX_EPOCH).unwrap();
+
             self.store
                 .data_mut()
                 .parse_ctx
@@ -103,10 +121,27 @@ impl WasmVm {
                 .set_ins_name(ins.name.clone());
 
             let result = ins.check_payload(&mut self.store);
+
+            ins.check_payload_counter
+                .mem_size
+                .swap(ins.get_mem_size(&mut self.store) as u64, Ordering::Relaxed);
+
             if result.is_err() {
                 wasm_error!(ins.name, "check payload fail: {}", result.unwrap_err());
+                ins.check_payload_counter
+                    .fail_cnt
+                    .fetch_add(1, Ordering::Relaxed);
                 continue;
             }
+
+            ins.check_payload_counter.exe_duration.swap(
+                {
+                    let end_time = SystemTime::now();
+                    let end_time = end_time.duration_since(UNIX_EPOCH).unwrap();
+                    (end_time - start_time).as_micros() as u64
+                },
+                Ordering::Relaxed,
+            );
 
             let result = result.unwrap();
             if result == 0 {
@@ -155,6 +190,10 @@ impl WasmVm {
             if ins.hook_point_bitmap.skip(HOOK_POINT_PAYLOAD_PARSE) {
                 continue;
             }
+
+            let start_time = SystemTime::now();
+            let start_time = start_time.duration_since(UNIX_EPOCH).unwrap();
+
             self.store
                 .data_mut()
                 .parse_ctx
@@ -163,10 +202,27 @@ impl WasmVm {
                 .set_ins_name(ins.name.clone());
 
             let abort = ins.parse_payload(&mut self.store);
+
+            ins.parse_payload_counter
+                .mem_size
+                .swap(ins.get_mem_size(&mut self.store) as u64, Ordering::Relaxed);
+
             if abort.is_err() {
                 wasm_error!(ins.name, "parse payload fail: {}", abort.unwrap_err());
+                ins.parse_payload_counter
+                    .fail_cnt
+                    .fetch_add(1, Ordering::Relaxed);
                 continue;
             }
+
+            ins.parse_payload_counter.exe_duration.swap(
+                {
+                    let end_time = SystemTime::now();
+                    let end_time = end_time.duration_since(UNIX_EPOCH).unwrap();
+                    (end_time - start_time).as_micros() as u64
+                },
+                Ordering::Relaxed,
+            );
 
             if !abort.unwrap() {
                 continue;
@@ -211,6 +267,10 @@ impl WasmVm {
             if ins.hook_point_bitmap.skip(HOOK_POINT_HTTP_REQ) {
                 continue;
             }
+
+            let start_time = SystemTime::now();
+            let start_time = start_time.duration_since(UNIX_EPOCH).unwrap();
+
             self.store
                 .data_mut()
                 .parse_ctx
@@ -219,10 +279,27 @@ impl WasmVm {
                 .set_ins_name(ins.name.clone());
 
             let abort = ins.on_http_req(&mut self.store);
+
+            ins.on_http_req_counter
+                .mem_size
+                .swap(ins.get_mem_size(&mut self.store) as u64, Ordering::Relaxed);
+
             if abort.is_err() {
                 wasm_error!(ins.name, "wasm on http req fail: {}", abort.unwrap_err());
+                ins.on_http_req_counter
+                    .fail_cnt
+                    .fetch_add(1, Ordering::Relaxed);
                 continue;
             }
+
+            ins.on_http_req_counter.exe_duration.swap(
+                {
+                    let end_time = SystemTime::now();
+                    let end_time = end_time.duration_since(UNIX_EPOCH).unwrap();
+                    (end_time - start_time).as_micros() as u64
+                },
+                Ordering::Relaxed,
+            );
 
             if !abort.unwrap() {
                 continue;
@@ -268,6 +345,10 @@ impl WasmVm {
             if ins.hook_point_bitmap.skip(HOOK_POINT_HTTP_RESP) {
                 continue;
             }
+
+            let start_time = SystemTime::now();
+            let start_time = start_time.duration_since(UNIX_EPOCH).unwrap();
+
             self.store
                 .data_mut()
                 .parse_ctx
@@ -276,10 +357,27 @@ impl WasmVm {
                 .set_ins_name(ins.name.clone());
 
             let abort = ins.on_http_resp(&mut self.store);
+
+            ins.on_http_resp_counter
+                .mem_size
+                .swap(ins.get_mem_size(&mut self.store) as u64, Ordering::Relaxed);
+
             if abort.is_err() {
                 wasm_error!(ins.name, "wasm on http resp fail: {}", abort.unwrap_err());
+                ins.on_http_resp_counter
+                    .fail_cnt
+                    .fetch_add(1, Ordering::Relaxed);
                 continue;
             }
+
+            ins.on_http_resp_counter.exe_duration.swap(
+                {
+                    let end_time = SystemTime::now();
+                    let end_time = end_time.duration_since(UNIX_EPOCH).unwrap();
+                    (end_time - start_time).as_micros() as u64
+                },
+                Ordering::Relaxed,
+            );
 
             if !abort.unwrap() {
                 continue;
@@ -302,19 +400,24 @@ impl WasmVm {
         ret
     }
 
-    pub fn append_prog(&mut self, name: &str, prog: &[u8]) -> Result<()> {
+    pub fn append_prog(
+        &mut self,
+        name: &str,
+        prog: &[u8],
+        counter_map: &WasmCounterMap,
+    ) -> Result<()> {
         for ins in self.instance.iter() {
             if ins.name.as_str() == name {
                 return Ok(());
             }
         }
-        let ins = init_instance(&mut self.store, &self.linker, name, prog)?;
+        let ins = init_instance(&mut self.store, &self.linker, name, prog, counter_map)?;
         self.instance.push(ins);
         Ok(())
     }
 }
 
-pub fn init_wasmtime(modules: Vec<(String, &[u8])>) -> WasmVm {
+pub fn init_wasmtime(modules: Vec<(String, &[u8])>, counter_map: &WasmCounterMap) -> WasmVm {
     let limiter_builder = StoreLimitsBuilder::new();
     // load wasm instance up to 10
     let limiter = limiter_builder.memories(10).instances(10).build();
@@ -333,7 +436,7 @@ pub fn init_wasmtime(modules: Vec<(String, &[u8])>) -> WasmVm {
     let linker = get_linker(engine.clone(), &mut store);
     let mut ins = vec![];
     for (name, i) in modules.into_iter() {
-        match init_instance(&mut store, &linker, name.as_str(), i) {
+        match init_instance(&mut store, &linker, name.as_str(), i, counter_map) {
             Ok(instance) => ins.push(instance),
             Err(err) => {
                 wasm_error!(name, "instance init fail: {}", err);
@@ -354,6 +457,7 @@ fn init_instance(
     linker: &Linker<StoreDataType>,
     name: &str,
     prog: &[u8],
+    counter_map: &WasmCounterMap,
 ) -> Result<InstanceWrap> {
     let module = Module::from_binary(&store.engine().clone(), prog)?;
     let instance = linker.instantiate(&mut *store, &module)?;
@@ -399,6 +503,43 @@ fn init_instance(
         hook_point_bitmap: HookPointBitmap(0),
         name: name.to_string(),
         memory,
+        check_payload_counter: counter_map
+            .wasm_mertic
+            .get(&get_wasm_metric_counter_map_key(
+                name,
+                EXPORT_FUNC_CHECK_PAYLOAD,
+            ))
+            .map_or(Err(WasmVmError("get counter map error".into())), |m| {
+                Ok(m.clone())
+            })?,
+        parse_payload_counter: counter_map
+            .wasm_mertic
+            .get(&get_wasm_metric_counter_map_key(
+                name,
+                EXPORT_FUNC_PARSE_PAYLOAD,
+            ))
+            .map_or(Err(WasmVmError("get counter map error".into())), |m| {
+                Ok(m.clone())
+            })?,
+        on_http_req_counter: counter_map
+            .wasm_mertic
+            .get(&get_wasm_metric_counter_map_key(
+                name,
+                EXPORT_FUNC_ON_HTTP_REQ,
+            ))
+            .map_or(Err(WasmVmError("get counter map error".into())), |m| {
+                Ok(m.clone())
+            })?,
+        on_http_resp_counter: counter_map
+            .wasm_mertic
+            .get(&get_wasm_metric_counter_map_key(
+                name,
+                EXPORT_FUNC_ON_HTTP_RESP,
+            ))
+            .map_or(Err(WasmVmError("get counter map error".into())), |m| {
+                Ok(m.clone())
+            })?,
+
         vm_func_on_http_req,
         vm_func_on_http_resp,
         vm_func_check_payload,
