@@ -16,12 +16,21 @@
 
 use std::net::{IpAddr, Ipv6Addr};
 
+use log::error;
 use lru::LruCache;
-pub struct PossibleHost(LruCache<u64, bool>);
+
+pub struct PossibleHost {
+    cache: LruCache<u64, bool>,
+    last_log_time: u64, // time in second
+}
 
 impl PossibleHost {
+    const LOG_INTERVLAN: u64 = 60;
     pub fn new(capacity: usize) -> Self {
-        PossibleHost(LruCache::new(capacity.try_into().unwrap()))
+        PossibleHost {
+            cache: LruCache::new(capacity.try_into().unwrap()),
+            last_log_time: 0,
+        }
     }
 
     fn get_ip6_hash(ip6: &Ipv6Addr) -> u32 {
@@ -46,15 +55,21 @@ impl PossibleHost {
         }
     }
 
-    pub fn add(&mut self, host: &IpAddr, epc_id: i32) {
-        self.0.put(Self::gen_key(host, epc_id), true);
+    pub fn add(&mut self, now: u64, host: &IpAddr, epc_id: i32) {
+        if usize::from(self.cache.cap()) <= self.cache.len()
+            && now > self.last_log_time + Self::LOG_INTERVLAN
+        {
+            self.last_log_time = now;
+            error!("The capacity({}) of the possible-host table will be exceeded. please adjust the configuration", self.cache.cap())
+        }
+        self.cache.put(Self::gen_key(host, epc_id), true);
     }
 
     pub fn check(&mut self, host: &IpAddr, epc_id: i32) -> bool {
-        self.0.get(&Self::gen_key(host, epc_id)).is_some()
+        self.cache.get(&Self::gen_key(host, epc_id)).is_some()
     }
 
     pub fn clear(&mut self) {
-        self.0.clear();
+        self.cache.clear();
     }
 }
