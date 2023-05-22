@@ -1347,6 +1347,7 @@ mod tests {
             parse_config: Some(&conf),
             l7_perf_cache: Rc::new(RefCell::new(L7PerfCache::new(1))),
             wasm_vm: None,
+            stats_counter: None,
         };
 
         //测试长度不正确
