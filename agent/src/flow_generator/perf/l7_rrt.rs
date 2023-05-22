@@ -16,7 +16,7 @@
 
 use std::time::Duration;
 
-use log::debug;
+use log::{debug, warn};
 use lru::LruCache;
 
 use crate::{common::flow::PacketDirection, flow_generator::LogMessageType};
@@ -25,14 +25,35 @@ pub struct RrtCache {
     rrt_cache: LruCache<u128, (LogMessageType, Duration)>,
     // LruCache<flow_id, count>
     timeout_count: LruCache<u64, usize>,
+    // time in second
+    pub last_log_time: u64,
 }
 
 impl RrtCache {
+    // 60 seconds
+    const LOG_INTERVAL: u64 = 60;
+
     pub fn new(cap: usize) -> Self {
         RrtCache {
             rrt_cache: LruCache::new(cap.try_into().unwrap()),
             timeout_count: LruCache::new(cap.try_into().unwrap()),
+            last_log_time: 0,
         }
+    }
+
+    pub fn push(
+        &mut self,
+        key: u128,
+        value: (LogMessageType, Duration),
+    ) -> Option<(u128, (LogMessageType, Duration))> {
+        let now = value.1.as_secs();
+        if self.rrt_cache.len() >= usize::from(self.rrt_cache.cap())
+            && self.last_log_time + Self::LOG_INTERVAL < now
+        {
+            self.last_log_time = now;
+            warn!("The capacity({}) of the rrt table will be exceeded. please adjust the configuration", self.rrt_cache.cap());
+        }
+        self.rrt_cache.push(key, value)
     }
 
     pub fn cal_rrt(
@@ -57,12 +78,11 @@ impl RrtCache {
                 0
             },
         );
-        let c = &mut self.rrt_cache;
         let cur_type: LogMessageType = direction.into();
-        let Some((prev_type, prev_time)) = c.pop(&key) else {
+        let Some((prev_type, prev_time)) = self.rrt_cache.pop(&key) else {
             let count = self.timeout_count.get_or_insert_mut(flow_id, ||0);
             *count += 1;
-            c.push(key, (cur_type, cur_time));
+            self.push(key, (cur_type, cur_time));
             return Duration::ZERO;
         };
         let timeout_count = self.timeout_count.get_mut(&flow_id);
@@ -88,7 +108,7 @@ impl RrtCache {
                 flow_id, prev_type, prev_time, cur_type, cur_time
             );
             timeout_count.map(|c| *c += 1);
-            c.push(key, (cur_type, cur_time));
+            self.push(key, (cur_type, cur_time));
             return Duration::ZERO;
         }
     }
@@ -143,7 +163,7 @@ impl RrtCache {
                 0
             },
         );
-        let old_val = self.rrt_cache.push(key, (direction.into(), time));
+        let old_val = self.push(key, (direction.into(), time));
 
         if let Some((_, val)) = old_val {
             if let Some(v) = self.timeout_count.get_mut(&flow_id) {

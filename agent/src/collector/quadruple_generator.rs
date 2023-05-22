@@ -24,7 +24,7 @@ use std::thread;
 use std::time::Duration;
 
 use arc_swap::access::Access;
-use log::{debug, info, warn};
+use log::{debug, error, info, warn};
 use thread::JoinHandle;
 
 use super::{acc_flow::AccumulatedFlow, consts::*, MetricsType};
@@ -115,13 +115,16 @@ impl QuadrupleConnections {
 struct ConcurrentConnection {
     v4_connections: Lru<[u8; IPV4_LRU_KEY_SIZE], QuadrupleConnections>,
     v6_connections: Lru<[u8; IPV6_LRU_KEY_SIZE], QuadrupleConnections>,
+    last_log_time: u64,
 }
 
 impl ConcurrentConnection {
+    const LOG_INTERVAL: u64 = 60;
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
             v4_connections: Lru::with_capacity(capacity >> 5, capacity),
             v6_connections: Lru::with_capacity(capacity >> 5, capacity),
+            last_log_time: 0,
         }
     }
 
@@ -174,12 +177,24 @@ impl ConcurrentConnection {
         sum: i64,
     ) {
         match key {
-            QgKey::V6(k) => self
-                .v6_connections
-                .put(*k, QuadrupleConnections::new(sum, living, time_in_second)),
-            QgKey::V4(k) => self
-                .v4_connections
-                .put(*k, QuadrupleConnections::new(sum, living, time_in_second)),
+            QgKey::V6(k) => {
+                let now = time_in_second.as_secs();
+                if self.v6_connections.is_full() && now > self.last_log_time + Self::LOG_INTERVAL {
+                    self.last_log_time = now;
+                    error!("The capacity({:?}) of the concurrent table v6 will be exceeded. please adjust the configuration", self.v6_connections.cap());
+                }
+                self.v6_connections
+                    .put(*k, QuadrupleConnections::new(sum, living, time_in_second));
+            }
+            QgKey::V4(k) => {
+                let now = time_in_second.as_secs();
+                if self.v4_connections.is_full() && now > self.last_log_time + Self::LOG_INTERVAL {
+                    self.last_log_time = now;
+                    error!("The capacity({:?}) of the concurrent table v4 will be exceeded. please adjust the configuration", self.v4_connections.cap());
+                }
+                self.v4_connections
+                    .put(*k, QuadrupleConnections::new(sum, living, time_in_second));
+            }
         };
     }
 
@@ -384,11 +399,13 @@ impl SubQuadGen {
         }
         for acc_flow in flows.iter_mut() {
             acc_flow.is_active_host0 = Self::check_active_host(
+                acc_flow.time_in_second.as_secs(),
                 possible_host,
                 &acc_flow.tagged_flow.flow.flow_metrics_peers[0],
                 &acc_flow.tagged_flow.flow.flow_key.ip_src,
             );
             acc_flow.is_active_host1 = Self::check_active_host(
+                acc_flow.time_in_second.as_secs(),
                 possible_host,
                 &acc_flow.tagged_flow.flow.flow_metrics_peers[1],
                 &acc_flow.tagged_flow.flow.flow_key.ip_dst,
@@ -452,16 +469,19 @@ impl SubQuadGen {
     }
 
     fn check_active(
+        now: u64,
         possible_host: &mut PossibleHost,
         tagged_flow: &Arc<TaggedFlow>,
     ) -> (bool, bool) {
         (
             Self::check_active_host(
+                now,
                 possible_host,
                 &tagged_flow.flow.flow_metrics_peers[0],
                 &tagged_flow.flow.flow_key.ip_src,
             ),
             Self::check_active_host(
+                now,
                 possible_host,
                 &tagged_flow.flow.flow_metrics_peers[1],
                 &tagged_flow.flow.flow_key.ip_dst,
@@ -470,6 +490,7 @@ impl SubQuadGen {
     }
 
     fn check_active_host(
+        now: u64,
         possible_host: &mut PossibleHost,
         flow_metric: &FlowMetricsPeer,
         ip: &IpAddr,
@@ -483,7 +504,7 @@ impl SubQuadGen {
         }
         if flow_metric.total_packet_count > 0 {
             // 有EPC无Device的场景是通过CIDR获取的，这里需要加入的PossibleHost中
-            possible_host.add(ip, flow_metric.l3_epc_id);
+            possible_host.add(now, ip, flow_metric.l3_epc_id);
             true
         } else {
             possible_host.check(ip, flow_metric.l3_epc_id)
