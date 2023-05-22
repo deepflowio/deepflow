@@ -14,10 +14,12 @@
  * limitations under the License.
  */
 
+use std::panic;
 use std::path::Path;
 
 use anyhow::Result;
 use clap::{ArgAction, Parser};
+use log::error;
 #[cfg(target_os = "linux")]
 use signal_hook::{consts::TERM_SIGNALS, iterator::Signals};
 
@@ -87,6 +89,9 @@ const VERSION_INFO: &'static trident::VersionInfo = &trident::VersionInfo {
 };
 
 fn main() -> Result<()> {
+    panic::set_hook(Box::new(|panic_info| {
+        error!("{:?}", panic_info.to_string());
+    }));
     let opts = Opts::parse();
     if opts.version {
         println!("{}", VERSION_INFO);
