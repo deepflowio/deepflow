@@ -22,7 +22,7 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use ipnetwork::IpNetwork;
-use log::{debug, warn};
+use log::{debug, error};
 use lru::LruCache;
 use pnet::datalink::NetworkInterface;
 
@@ -267,7 +267,7 @@ impl Forward {
         interfaces: &Vec<NetworkInterface>,
     ) {
         if platforms.len() + interfaces.len() > self.capacity {
-            warn!("The capacity({}) of the Forward table will be exceeded, where platforms is {} and interfaces is {}. ",
+            error!("The capacity({}) of the Forward table will be exceeded, where platforms is {} and interfaces is {}. ",
                 self.capacity, platforms.len(), interfaces.len());
         }
         let mut mac_ip_table = self.mac_ip_tables.write().unwrap();
