@@ -450,6 +450,14 @@ pub fn running_in_container() -> bool {
     env::var_os("IN_CONTAINER").is_some()
 }
 
+pub fn k8s_mem_limit_for_deepflow() -> Option<u64> {
+    // Environment variable "K8S_MEM_LIMIT_FOR_DEEPFLOW" is set from container fields
+    // https://kubernetes.io/docs/tasks/inject-data-application/environment-variable-expose-pod-information/#use-container-fields-as-values-for-environment-variables
+    env::var("K8S_MEM_LIMIT_FOR_DEEPFLOW")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+}
+
 #[cfg(target_os = "linux")]
 pub fn get_executable_path() -> Result<PathBuf, io::Error> {
     let possible_paths = vec![
