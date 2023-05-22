@@ -24,8 +24,8 @@ import (
 )
 
 type LayoutKey struct {
-	MetricName string
-	LabelName  string
+	MetricName string `json:"metric_name"`
+	LabelName  string `json:"label_name"`
 }
 
 func NewLayoutKey(metricName, labelName string) LayoutKey {

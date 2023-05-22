@@ -25,14 +25,14 @@ import (
 )
 
 type TargetKey struct {
-	instance string
-	job      string
+	Instance string `json:"instance"`
+	Job      string `json:"job"`
 }
 
 func NewTargetKey(instance, job string) TargetKey {
 	return TargetKey{
-		instance: instance,
-		job:      job,
+		Instance: instance,
+		Job:      job,
 	}
 }
 
@@ -73,12 +73,12 @@ func (t *target) refresh(args ...interface{}) error {
 	fully := args[0].(bool)
 	if fully {
 		for _, tg := range targets {
-			t.keyToTargetID.Store(TargetKey{instance: tg.Instance, job: tg.Job}, tg.ID)
+			t.keyToTargetID.Store(TargetKey{Instance: tg.Instance, Job: tg.Job}, tg.ID)
 			t.targetIDToLabelNameToValue[tg.ID] = t.formatLabels(tg)
 		}
 	} else {
 		for _, tg := range targets {
-			t.keyToTargetID.Store(TargetKey{instance: tg.Instance, job: tg.Job}, tg.ID)
+			t.keyToTargetID.Store(TargetKey{Instance: tg.Instance, Job: tg.Job}, tg.ID)
 		}
 	}
 	return nil
