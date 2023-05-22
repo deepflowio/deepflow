@@ -21,6 +21,7 @@ use std::fs::File;
 use std::io::Read;
 use std::net::{IpAddr, Ipv4Addr};
 use std::rc::Rc;
+use std::sync::Arc;
 use std::time::Duration;
 
 use flate2::read::GzDecoder;
@@ -41,7 +42,10 @@ use crate::{
     HttpLog,
 };
 
-use super::WasmVm;
+use super::{
+    get_all_wasm_export_func_name, get_wasm_metric_counter_map_key, WasmCounter, WasmCounterMap,
+    WasmVm,
+};
 
 fn get_req_param<'a>(
     vm: Rc<RefCell<WasmVm>>,
@@ -68,6 +72,7 @@ fn get_req_param<'a>(
         parse_config: None,
         l7_perf_cache: rrt_cache.clone(),
         wasm_vm: Some(vm.clone()),
+        stats_counter: None,
     }
 }
 
@@ -97,6 +102,7 @@ fn get_resq_param<'a>(
         parse_config: None,
         l7_perf_cache: rrt_cache.clone(),
         wasm_vm: Some(vm.clone()),
+        stats_counter: None,
     }
 }
 
@@ -108,7 +114,22 @@ fn load_module() -> WasmVm {
     let mut d = GzDecoder::new(gz_prog.as_slice());
     let mut prog = vec![];
     d.read_to_end(&mut prog).unwrap();
-    init_wasmtime(vec![("vm0".to_string(), prog.as_slice())])
+
+    let wasm_counter_map = Arc::new(WasmCounterMap {
+        wasm_mertic: {
+            let mut h = HashMap::new();
+            for func_name in get_all_wasm_export_func_name() {
+                let counter = Arc::new(WasmCounter::default());
+                h.insert(get_wasm_metric_counter_map_key("vm0", func_name), counter);
+            }
+            h
+        },
+    });
+
+    init_wasmtime(
+        vec![("vm0".to_string(), prog.as_slice())],
+        &wasm_counter_map,
+    )
 }
 
 #[test]
