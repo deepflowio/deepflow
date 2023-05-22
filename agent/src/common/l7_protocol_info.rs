@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+use std::sync::atomic::Ordering;
+
 use super::{flow::PacketDirection, l7_protocol_log::KafkaInfoCache};
 use enum_dispatch::enum_dispatch;
 use log::{debug, error};
@@ -166,6 +168,14 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
                         kafka_info,
                     },
                 );
+
+                param.stats_counter.as_ref().map(|f| {
+                    f.l7_perf_cache_len
+                        .swap(perf_cache.rrt_cache.len() as u64, Ordering::Relaxed);
+                    f.l7_timeout_cache_len
+                        .swap(perf_cache.timeout_cache.len() as u64, Ordering::Relaxed)
+
+                });
                 return None;
             };
 
@@ -223,6 +233,12 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
                     );
                 }
 
+                param.stats_counter.as_ref().map(|f| {
+                    f.l7_perf_cache_len
+                        .swap(perf_cache.rrt_cache.len() as u64, Ordering::Relaxed);
+                    f.l7_timeout_cache_len
+                        .swap(perf_cache.timeout_cache.len() as u64, Ordering::Relaxed);
+                });
                 None
             }
         } else {

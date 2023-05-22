@@ -18,6 +18,7 @@ use std::cell::RefCell;
 use std::fmt::Debug;
 use std::net::IpAddr;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use enum_dispatch::enum_dispatch;
 use log::warn;
@@ -29,6 +30,7 @@ use super::l7_protocol_info::L7ProtocolInfo;
 use super::MetaPacket;
 
 use crate::config::handler::LogParserConfig;
+use crate::flow_generator::flow_map::FlowMapCounter;
 use crate::flow_generator::protocol_logs::plugin::custom_wrap::CustomWrapLog;
 use crate::flow_generator::protocol_logs::plugin::get_custom_log_parser;
 use crate::flow_generator::protocol_logs::{
@@ -417,6 +419,8 @@ pub struct ParseParam<'a> {
     pub l7_perf_cache: Rc<RefCell<L7PerfCache>>,
 
     pub wasm_vm: Option<Rc<RefCell<WasmVm>>>,
+
+    pub stats_counter: Option<Arc<FlowMapCounter>>,
 }
 
 // from packet, previous_log_info_cache, perf_only
@@ -443,6 +447,7 @@ impl From<(&MetaPacket<'_>, Rc<RefCell<L7PerfCache>>, bool)> for ParseParam<'_> 
             l7_perf_cache: cache,
 
             wasm_vm: None,
+            stats_counter: None,
         };
         if packet.ebpf_type != EbpfType::None {
             let is_tls = match packet.ebpf_type {
@@ -500,6 +505,10 @@ impl ParseParam<'_> {
 
     pub fn set_wasm_vm(&mut self, vm: Rc<RefCell<WasmVm>>) {
         self.wasm_vm = Some(vm);
+    }
+
+    pub fn set_counter(&mut self, stat: Arc<FlowMapCounter>) {
+        self.stats_counter = Some(stat);
     }
 }
 

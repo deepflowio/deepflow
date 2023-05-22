@@ -31,6 +31,7 @@ use public::l7_protocol::L7ProtocolEnum;
 use super::{
     app_table::AppTable,
     error::{Error, Result},
+    flow_map::FlowMapCounter,
     pool::MemoryPool,
     protocol_logs::AppProtoHead,
 };
@@ -190,6 +191,7 @@ pub struct FlowLog {
     is_skip: bool,
 
     wasm_vm: Option<Rc<RefCell<WasmVm>>>,
+    stats_counter: Arc<FlowMapCounter>,
 }
 
 impl FlowLog {
@@ -277,6 +279,7 @@ impl FlowLog {
                 !is_parse_log,
                 log_parser_config,
             ));
+            param.set_counter(self.stats_counter.clone());
             if let Some(vm) = self.wasm_vm.as_ref() {
                 param.set_wasm_vm(vm.clone());
             }
@@ -368,6 +371,7 @@ impl FlowLog {
                 !is_parse_log,
                 log_parser_config,
             ));
+            param.set_counter(self.stats_counter.clone());
             if let Some(vm) = self.wasm_vm.as_ref() {
                 param.set_wasm_vm(vm.clone());
             }
@@ -405,6 +409,7 @@ impl FlowLog {
         counter: Arc<FlowPerfCounter>,
         server_port: u16,
         wasm_vm: Option<Rc<RefCell<WasmVm>>>,
+        stats_counter: Arc<FlowMapCounter>,
     ) -> Option<Self> {
         if !l4_enabled && !l7_enabled {
             return None;
@@ -433,6 +438,7 @@ impl FlowLog {
             is_skip: false,
             server_port: server_port,
             wasm_vm: wasm_vm,
+            stats_counter: stats_counter,
         })
     }
 
