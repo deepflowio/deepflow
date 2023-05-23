@@ -32,7 +32,7 @@ import (
 	. "github.com/deepflowio/deepflow/server/controller/side/prometheus/common"
 )
 
-var log = logging.MustGetLogger("controller.side.prometheus")
+var log = logging.MustGetLogger("side.prometheus")
 
 type Encoder struct {
 	cache   *Cache
@@ -128,12 +128,11 @@ func (e *Encoder) addGoToErrGroup(ctx context.Context, eg *errgroup.Group, f egF
 
 func (e *Encoder) assemble(metrics []*trident.MetricLabelRequest) ([]*trident.MetricLabelResponse, error) {
 	respMetrics := make([]*trident.MetricLabelResponse, 0, len(metrics))
-	log.Debugf("cache: %+v", e.cache) // TODO delete
 	for _, m := range metrics {
 		mn := m.GetMetricName()
 		mni, ok := e.cache.metricName.getIDByName(mn)
 		if !ok {
-			log.Error("metric name id %s not found", mn)
+			log.Errorf("metric name id %s not found", mn)
 			return nil, errors.Errorf("metric name %s not found", mn)
 		}
 
@@ -143,18 +142,18 @@ func (e *Encoder) assemble(metrics []*trident.MetricLabelRequest) ([]*trident.Me
 			lv := l.GetValue()
 			ni, ok := e.cache.labelName.getIDByName(ln)
 			if !ok {
-				log.Error("label name id %s not found", ln)
+				log.Errorf("label name id %s not found", ln)
 				return nil, errors.Errorf("label name %s not found", ln)
 			}
 			vi, ok := e.cache.labelValue.getValueID(lv)
 			if !ok {
-				log.Error("label value id %s not found", lv)
+				log.Errorf("label value id %s not found", lv)
 				return nil, errors.Errorf("label value %s not found", lv)
 			}
 			idx, ok := e.cache.metricAndAPPLabelLayout.getIndex(appLabelIndexKey{MetricName: mn, LabelName: ln})
-			if !ok {
-				log.Error("metric name %s and label name %s index not found", mn, ln)
-				return nil, errors.Errorf("metric name %s and label name %s not found", mn, ln)
+			if !ok && ln != TargetLabelInstance && ln != TargetLabelJob && !common.Contains(e.cache.target.labelNames, ln) {
+				log.Errorf("metric name: %s, label name: %s index not found", mn, ln)
+				return nil, errors.Errorf("metric name: %s, label name: %s index not found", mn, ln)
 			}
 			rl := &trident.LabelIDResponse{
 				Name:                &ln,

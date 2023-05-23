@@ -29,7 +29,7 @@ import (
 	prometheuscfg "github.com/deepflowio/deepflow/server/controller/side/prometheus/config"
 )
 
-var log = logging.MustGetLogger("controller.side.prometheus.allocator")
+var log = logging.MustGetLogger("side.prometheus.allocator")
 
 var (
 	alcOnce sync.Once

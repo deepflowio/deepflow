@@ -25,7 +25,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/side/prometheus/allocator"
 )
 
-var log = logging.MustGetLogger("controller.side.prometheus.service.grpc")
+var log = logging.MustGetLogger("side.prometheus.service.grpc")
 
 type AllocatorEvent struct{}
 
@@ -34,7 +34,7 @@ func NewAllocatorEvent() *AllocatorEvent {
 }
 
 func (e *AllocatorEvent) GetStrIDs(ctx context.Context, in *controller.GetPrometheusStrIDsRequest) (*controller.GetPrometheusStrIDsResponse, error) {
-	log.Infof("StrIDsRequest: %s, %v", in.GetType(), in.GetStrs())
+	log.Debugf("StrIDsRequest: %s, %v", in.GetType(), in.GetStrs())
 	ids, err := allocator.GetSingleton().AllocateIDs(in.GetType(), in.GetStrs())
 	strIDs := make([]*controller.PrometheusStrID, 0, len(ids))
 	for _, id := range ids {
@@ -44,13 +44,13 @@ func (e *AllocatorEvent) GetStrIDs(ctx context.Context, in *controller.GetPromet
 	if err != nil {
 		errMsg = err.Error()
 	}
-	log.Infof("StrIDsResponse: %s, %v", in.GetType(), strIDs)
+	log.Debugf("StrIDsResponse: %s, %v", in.GetType(), strIDs)
 	return &controller.GetPrometheusStrIDsResponse{ErrorMsg: &errMsg, StrIds: strIDs}, nil
 }
 
 func (e *AllocatorEvent) GetAPPLabelIndexes(ctx context.Context, in *controller.GetPrometheusAPPLabelIndexesRequest) (*controller.GetPrometheusAPPLabelIndexesResponse, error) {
-	log.Infof("APPLabelIndexesRequest: %v", in.GetRequestIndexes())
+	log.Debugf("APPLabelIndexesRequest: %v", in.GetRequestIndexes())
 	respIdxs, err := allocator.GetSingleton().AllocateLabelIndexes(in.GetRequestIndexes())
-	log.Infof("APPLabelIndexesResponse: %v", respIdxs)
+	log.Debugf("APPLabelIndexesResponse: %v", respIdxs)
 	return &controller.GetPrometheusAPPLabelIndexesResponse{ResponseIndexes: respIdxs}, err
 }
