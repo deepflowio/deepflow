@@ -425,3 +425,38 @@ type ChPodK8sEnvs struct {
 	L3EPCID int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
 	PodNsID int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
 }
+
+type ChPrometheusLabelName struct {
+	ID   int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
+}
+
+type ChPrometheusMetricName struct {
+	ID   int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
+}
+
+type ChPrometheusMetricAPPLabelLayout struct {
+	ID                  int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	MetricName          string `gorm:"column:metric_name;type:varchar(256);not null" json:"METRIC_NAME"`
+	APPLabelName        string `gorm:"column:app_label_name;type:varchar(256);not null" json:"APP_LABEL_NAME"`
+	APPLabelColumnIndex uint8  `gorm:"column:app_label_column_index;type:int unsigned;not null" json:"APP_LABEL_COLUMN_INDEX"`
+}
+
+type ChAPPLabel struct {
+	MetricID     int    `gorm:"primaryKey;column:metric_id;type:int;not null" json:"METRIC_ID"`
+	LabelNameID  int    `gorm:"primaryKey;column:label_name_id;type:int;not null" json:"LABEL_NAME_ID"`
+	LabelValueID int    `gorm:"primaryKey;column:label_value_id;type:int unsigned;not null" json:"LABEL_VALUE_ID"`
+	LabelValue   string `gorm:"column:label_value;type:varchar(256);not null" json:"LABEL_VALUE"`
+}
+
+func (ChAPPLabel) TableName() string {
+	return "ch_app_label"
+}
+
+type ChTargetLabel struct {
+	MetricID    int    `gorm:"primaryKey;column:metric_id;type:int;not null" json:"METRIC_ID"`
+	LabelNameID int    `gorm:"primaryKey;column:label_name_id;type:int;not null" json:"LABEL_NAME_ID"`
+	TargetID    int    `gorm:"primaryKey;column:target_id;type:int unsigned;not null" json:"TARGET_ID"`
+	LabelValue  string `gorm:"column:label_value;type:varchar(256);not null" json:"LABEL_VALUE"`
+}

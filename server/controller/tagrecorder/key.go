@@ -122,3 +122,15 @@ type K8sEnvKey struct {
 type K8sEnvsKey struct {
 	ID int
 }
+
+type PrometheusAPPLabelKey struct {
+	MetricID     int
+	LabelNameID  int
+	LabelValueID int
+}
+
+type PrometheusTargetLabelKey struct {
+	MetricID    int
+	LabelNameID int
+	TargetID    int
+}
