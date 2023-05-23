@@ -567,46 +567,53 @@ pub fn get_ctrl_ip_and_mac(dest: IpAddr) -> (IpAddr, MacAddr) {
             (ip, ctrl_mac.unwrap())
         }
         None => {
-            let tuple = get_route_src_ip_and_mac(&dest);
-            if tuple.is_err() {
-                error!(
-                    "failed getting control ip and mac from {}, deepflow-agent restart...",
-                    dest
-                );
-                thread::sleep(Duration::from_secs(1));
-                process::exit(-1);
-            }
-            let (ip, mac) = tuple.unwrap();
-            let links = link_list();
-            if links.is_err() {
-                error!("failed getting local interfaces, deepflow-agent restart...");
-                thread::sleep(Duration::from_secs(1));
-                process::exit(-1);
-            }
-            // When the found IP is attached to a Down network card,
-            // use the public IP to check again to find the outgoing
-            // interface of the default route.
-            for link in links.unwrap().iter() {
-                if link.mac_addr == mac {
-                    if !link.flags.contains(LinkFlags::UP) {
-                        let dest = if dest.is_ipv4() {
-                            DNS_HOST_IPV4
-                        } else {
-                            DNS_HOST_IPV6
-                        };
-                        let tuple = get_route_src_ip_and_mac(&dest);
-                        if tuple.is_err() {
-                            error!("failed getting control ip and mac from {}, because: {:?}, deepflow-agent restart...", dest, tuple);
-                            thread::sleep(Duration::from_secs(1));
-                            process::exit(-1);
-                        }
-                        return tuple.unwrap();
-                    }
-                    break;
+            // FIXME: Getting ctrl_ip and ctrl_mac sometimes fails, increase three retry opportunities to ensure access to ctrl_ip and ctrl_mac
+            'outer: for _ in 0..3 {
+                let tuple = get_route_src_ip_and_mac(&dest);
+                if tuple.is_err() {
+                    warn!(
+                        "failed getting control ip and mac from {}, because: {:?}, wait 1 second",
+                        dest, tuple,
+                    );
+                    thread::sleep(Duration::from_secs(1));
+                    continue;
                 }
-            }
+                let (ip, mac) = tuple.unwrap();
+                let links = link_list();
+                if links.is_err() {
+                    warn!(
+                        "failed getting local interfaces, because: {:?}, wait 1 second",
+                        links
+                    );
+                    thread::sleep(Duration::from_secs(1));
+                    continue;
+                }
+                // When the found IP is attached to a Down network card,
+                // use the public IP to check again to find the outgoing
+                // interface of the default route.
+                for link in links.unwrap().iter() {
+                    if link.mac_addr == mac {
+                        if !link.flags.contains(LinkFlags::UP) {
+                            let dest = if dest.is_ipv4() {
+                                DNS_HOST_IPV4
+                            } else {
+                                DNS_HOST_IPV6
+                            };
+                            let tuple = get_route_src_ip_and_mac(&dest);
+                            if tuple.is_err() {
+                                warn!("failed getting control ip and mac from {}, because: {:?}, wait 1 second", dest, tuple);
+                                continue 'outer;
+                            }
+                            return tuple.unwrap();
+                        }
+                        break;
+                    }
+                }
 
-            (ip, mac)
+                return (ip, mac);
+            }
+            error!("failed getting control ip and mac, deepflow-agent restart...");
+            process::exit(-1);
         }
     }
 }
