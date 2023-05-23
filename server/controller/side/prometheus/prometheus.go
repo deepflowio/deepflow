@@ -19,7 +19,7 @@ package prometheus
 import (
 	"sync"
 
-	"github.com/deepflowio/deepflow/server/controller/side/prometheus/allocator"
+	"github.com/deepflowio/deepflow/server/controller/side/prometheus/synchronizer"
 )
 
 var (
@@ -28,15 +28,15 @@ var (
 )
 
 type PrometheusManager struct {
-	Allocator *allocator.Allocator
-	Cache     *Cache
+	Synchronizer *synchronizer.Synchronizer
+	EncoderCache *Cache
 }
 
 func GetSingleton() *PrometheusManager {
 	prometheusManagerOnce.Do(func() {
 		prometheusManager = &PrometheusManager{
-			Allocator: allocator.GetSingleton(),
-			Cache:     GetSingletonCache(),
+			Synchronizer: synchronizer.GetSingleton(),
+			EncoderCache: GetSingletonCache(),
 		}
 	})
 	return prometheusManager

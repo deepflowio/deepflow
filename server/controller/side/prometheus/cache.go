@@ -24,6 +24,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
@@ -77,7 +78,7 @@ func (t *Cache) Start(ctx context.Context) error {
 }
 
 func (t *Cache) refresh() error {
-	log.Info("refresh cache")
+	log.Info("refresh cache started")
 	eg := errgroup.Group{}
 	eg.Go(t.metricName.refresh)
 	eg.Go(t.labelName.refresh)
@@ -86,7 +87,9 @@ func (t *Cache) refresh() error {
 	eg.Go(t.target.refresh)
 	eg.Go(t.label.refresh)
 	eg.Go(t.metricTarget.refresh)
-	return eg.Wait()
+	err := eg.Wait()
+	log.Info("refresh cache finished")
+	return err
 }
 
 type metricName struct {
@@ -104,9 +107,9 @@ func (t *metricName) setNameID(n string, id int) {
 	t.metricNameToID.Store(n, id)
 }
 
-func (t *metricName) add(batch []mysql.PrometheusMetricName) {
+func (t *metricName) add(batch []*controller.PrometheusMetricName) {
 	for _, m := range batch {
-		t.metricNameToID.Store(m.Name, m.ID)
+		t.metricNameToID.Store(m.GetName(), int(m.GetId()))
 	}
 }
 
@@ -142,9 +145,9 @@ func (t *labelName) setNameID(n string, id int) {
 	t.labelNameToID.Store(n, id)
 }
 
-func (t *labelName) add(batch []mysql.PrometheusLabelName) {
+func (t *labelName) add(batch []*controller.PrometheusLabelName) {
 	for _, m := range batch {
-		t.labelNameToID.Store(m.Name, m.ID)
+		t.labelNameToID.Store(m.GetName(), int(m.GetId()))
 	}
 }
 
@@ -180,9 +183,9 @@ func (t *labelValue) setValueID(v string, id int) {
 	t.labelValueToID.Store(v, id)
 }
 
-func (t *labelValue) add(batch []mysql.PrometheusLabelValue) {
+func (t *labelValue) add(batch []*controller.PrometheusLabelValue) {
 	for _, m := range batch {
-		t.labelValueToID.Store(m.Value, m.ID)
+		t.labelValueToID.Store(m.GetValue(), int(m.GetId()))
 	}
 }
 
@@ -203,29 +206,29 @@ func (t *labelValue) load() ([]*mysql.PrometheusLabelValue, error) {
 	return labelValues, err
 }
 
-type appLabelIndexKey struct {
+type layoutKey struct {
 	MetricName string
 	LabelName  string
 }
 
 type metricAndAPPLabelLayout struct {
-	metricLabelNameKeyToIndex sync.Map
+	layoutKeyToIndex sync.Map
 }
 
-func (t *metricAndAPPLabelLayout) getIndex(key appLabelIndexKey) (uint8, bool) {
-	if index, ok := t.metricLabelNameKeyToIndex.Load(key); ok {
+func (t *metricAndAPPLabelLayout) getIndex(key layoutKey) (uint8, bool) {
+	if index, ok := t.layoutKeyToIndex.Load(key); ok {
 		return index.(uint8), true
 	}
 	return 0, false
 }
 
-func (t *metricAndAPPLabelLayout) setIndex(key appLabelIndexKey, index uint8) {
-	t.metricLabelNameKeyToIndex.Store(key, index)
+func (t *metricAndAPPLabelLayout) setIndex(key layoutKey, index uint8) {
+	t.layoutKeyToIndex.Store(key, index)
 }
 
-func (t *metricAndAPPLabelLayout) add(batch []mysql.PrometheusMetricAPPLabelLayout) {
+func (t *metricAndAPPLabelLayout) add(batch []*controller.PrometheusMetricAPPLabelLayout) {
 	for _, m := range batch {
-		t.metricLabelNameKeyToIndex.Store(appLabelIndexKey{MetricName: m.MetricName, LabelName: m.APPLabelName}, m.APPLabelColumnIndex)
+		t.layoutKeyToIndex.Store(layoutKey{MetricName: m.GetMetricName(), LabelName: m.GetAppLabelName()}, uint8(m.GetAppLabelColumnIndex()))
 	}
 }
 
@@ -235,7 +238,7 @@ func (t *metricAndAPPLabelLayout) refresh() error {
 		return err
 	}
 	for _, l := range metricAPPLabelLayouts {
-		t.metricLabelNameKeyToIndex.Store(strings.Join([]string{l.MetricName, l.APPLabelName}, keyJoiner), l.APPLabelColumnIndex)
+		t.layoutKeyToIndex.Store(layoutKey{MetricName: l.MetricName, LabelName: l.APPLabelName}, uint8(l.APPLabelColumnIndex))
 	}
 	return nil
 }
@@ -294,9 +297,9 @@ func (t *label) setNameValue(name, value string) {
 	t.nameToValue.Store(name, value)
 }
 
-func (t *label) add(batch []mysql.PrometheusLabel) {
+func (t *label) add(batch []*controller.PrometheusLabel) {
 	for _, m := range batch {
-		t.nameToValue.Store(m.Name, m.Value)
+		t.nameToValue.Store(m.GetName(), m.GetValue())
 	}
 }
 
@@ -332,9 +335,9 @@ func (t *metricTarget) setTargetID(metricName string, id int) {
 	t.metricNameToTargetID.Store(metricName, id)
 }
 
-func (t *metricTarget) add(batch []mysql.PrometheusMetricTarget) {
+func (t *metricTarget) add(batch []*controller.PrometheusMetricTarget) {
 	for _, m := range batch {
-		t.metricNameToTargetID.Store(m.MetricName, m.TargetID)
+		t.metricNameToTargetID.Store(m.GetMetricName(), int(m.GetTargetId()))
 	}
 }
 

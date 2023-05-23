@@ -17,7 +17,7 @@
 package config
 
 type Config struct {
-	IDPoolRefreshInterval int `default:"3600" yaml:"id_pool_refresh_interval"`
-	ResourceMaxID0        int `default:"64000" yaml:"resource_max_id_0"`
-	ResourceMaxID1        int `default:"499999" yaml:"resource_max_id_1"`
+	CacheRefreshInterval int `default:"3600" yaml:"cache_refresh_interval"`
+	ResourceMaxID0       int `default:"64000" yaml:"resource_max_id_0"`
+	ResourceMaxID1       int `default:"499999" yaml:"resource_max_id_1"`
 }

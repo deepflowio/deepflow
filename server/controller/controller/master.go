@@ -144,7 +144,7 @@ func checkAndStartMasterFunctions(
 				// domain检查及自愈
 				domainChecker.Start()
 
-				prometheus.Allocator.Start()
+				prometheus.Synchronizer.Start()
 			} else if thisIsMasterController {
 				thisIsMasterController = false
 				log.Infof("I am not the master controller anymore, new master controller is %s", newMasterController)
@@ -170,7 +170,7 @@ func checkAndStartMasterFunctions(
 
 				recorderdb.IDMNG.Stop()
 
-				prometheus.Allocator.Stop()
+				prometheus.Synchronizer.Stop()
 			} else {
 				log.Infof(
 					"current master controller is %s, previous master controller is %s",

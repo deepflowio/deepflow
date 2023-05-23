@@ -17,28 +17,25 @@
 package grpc
 
 import (
-	"github.com/op/go-logging"
 	"golang.org/x/net/context"
 
-	"github.com/deepflowio/deepflow/message/trident"
+	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/side/prometheus"
 )
 
-var log = logging.MustGetLogger("side.prometheus.grpc")
+type SynchronizerEvent struct{}
 
-type EncoderEvent struct{}
-
-func NewEncoderEvent() *EncoderEvent {
-	return &EncoderEvent{}
+func NewSynchronizerEvent() *SynchronizerEvent {
+	return &SynchronizerEvent{}
 }
 
-func (e *EncoderEvent) GetLabelIDs(ctx context.Context, in *trident.PrometheusLabelIDsRequest) (*trident.PrometheusLabelIDsResponse, error) {
-	log.Debugf("GetLabelIDsRequest: %v", in.GetRequestLabels())
-	resp, err := prometheus.NewEncoder().Encode(in.GetRequestLabels())
+func (e *SynchronizerEvent) Sync(ctx context.Context, in *controller.SyncPrometheusRequest) (*controller.SyncPrometheusResponse, error) {
+	log.Debugf("SyncPrometheusRequest: %+v", in)
+	resp, err := prometheus.GetSingleton().Synchronizer.Sync(in)
 	if err != nil {
-		log.Errorf("encode str error: %v", err)
-		return &trident.PrometheusLabelIDsResponse{}, nil
+		log.Errorf("sync error: %v", err)
+		return &controller.SyncPrometheusResponse{}, nil
 	}
-	log.Debugf("GetLabelIDsResponse: %v", resp)
-	return &trident.PrometheusLabelIDsResponse{ResponseLabelIds: resp}, err
+	log.Infof("SyncPrometheusResponse: %+v", resp)
+	return resp, nil
 }

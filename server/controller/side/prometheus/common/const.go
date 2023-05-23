@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package prometheus
+package common
 
 var (
 	ResourcePrometheusMetricName           = "prometheus_metric_name"

@@ -155,10 +155,10 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 	go t.Start()
 
 	prometheus := prometheus.GetSingleton()
-	prometheus.Cache.Start(ctx)
-	prometheus.Allocator.Init(ctx, &cfg.PrometheusCfg)
+	prometheus.EncoderCache.Start(ctx)
+	prometheus.Synchronizer.Init(ctx, &cfg.PrometheusCfg)
 	if isMasterController {
-		prometheus.Allocator.Start()
+		prometheus.Synchronizer.Start()
 	}
 
 	router.SetInitStageForHealthChecker("TagRecorder init")

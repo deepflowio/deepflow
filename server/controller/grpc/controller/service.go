@@ -32,7 +32,7 @@ var log = logging.MustGetLogger("grpc.controller")
 type service struct {
 	encryptKeyEvent *EncryptKeyEvent
 	resourceIDEvent *IDEvent
-	prometheusEvent *prometheus.AllocatorEvent
+	prometheusEvent *prometheus.SynchronizerEvent
 }
 
 func init() {
@@ -43,7 +43,7 @@ func newService() *service {
 	return &service{
 		encryptKeyEvent: NewEncryptKeyEvent(),
 		resourceIDEvent: NewIDEvent(),
-		prometheusEvent: prometheus.NewAllocatorEvent(),
+		prometheusEvent: prometheus.NewSynchronizerEvent(),
 	}
 }
 
@@ -77,10 +77,6 @@ func (s *service) ReleaseResourceID(ctx context.Context, in *api.ReleaseResource
 	return s.resourceIDEvent.Release(ctx, in)
 }
 
-func (s *service) GetPrometheusStrIDs(ctx context.Context, in *api.GetPrometheusStrIDsRequest) (*api.GetPrometheusStrIDsResponse, error) {
-	return s.prometheusEvent.GetStrIDs(ctx, in)
-}
-
-func (s *service) GetPrometheusAPPLabelIndexes(ctx context.Context, in *api.GetPrometheusAPPLabelIndexesRequest) (*api.GetPrometheusAPPLabelIndexesResponse, error) {
-	return s.prometheusEvent.GetAPPLabelIndexes(ctx, in)
+func (s *service) SyncPrometheus(ctx context.Context, in *api.SyncPrometheusRequest) (*api.SyncPrometheusResponse, error) {
+	return s.prometheusEvent.Sync(ctx, in)
 }
