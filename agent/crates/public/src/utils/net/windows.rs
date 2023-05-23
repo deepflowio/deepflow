@@ -19,7 +19,7 @@ use std::{
     ptr,
 };
 
-use log::warn;
+use log::{debug, warn};
 use pcap;
 use regex::Regex;
 use windows::Win32::{
@@ -126,6 +126,7 @@ pub fn neighbor_lookup(mut dest_addr: IpAddr) -> Result<NeighborEntry> {
 
 pub fn get_interface_by_index(if_index: u32) -> Result<Link> {
     let adapters = get_pcap_interfaces()?;
+    debug!("adapters: {:?}, if_index: {}", adapters.clone(), if_index);
     adapters
         .into_iter()
         .find(|link| link.if_index == if_index)

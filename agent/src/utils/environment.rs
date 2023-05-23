@@ -516,13 +516,21 @@ pub fn get_ctrl_ip_and_mac(dest: IpAddr) -> (IpAddr, MacAddr) {
             (ip, ctrl_mac.unwrap())
         }
         None => {
-            let tuple = get_route_src_ip_and_mac(&dest);
-            if tuple.is_err() {
-                error!("failed getting control ip and mac from {}, because: {:?}, deepflow-agent restart...", dest, tuple);
-                thread::sleep(Duration::from_secs(1));
-                process::exit(-1);
+            // FIXME: Getting ctrl_ip and ctrl_mac sometimes fails, increase three retry opportunities to ensure access to ctrl_ip and ctrl_mac
+            for _ in 0..3 {
+                let tuple = get_route_src_ip_and_mac(&dest);
+                if tuple.is_ok() {
+                    return tuple.unwrap();
+                } else {
+                    warn!(
+                        "failed getting control ip and mac from {}, because: {:?}, wait 1 second",
+                        dest, tuple
+                    );
+                    thread::sleep(Duration::from_secs(1));
+                }
             }
-            tuple.unwrap()
+            error!("failed getting control ip and mac, deepflow-agent restart...");
+            process::exit(-1);
         }
     }
 }
