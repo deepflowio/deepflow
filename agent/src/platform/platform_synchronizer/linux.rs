@@ -574,6 +574,7 @@ impl PlatformSynchronizer {
                 ip: interface_info.ips.iter().map(ToString::to_string).collect(),
                 device_name: None,
                 netns: Some(interface_info.tap_ns.to_string()),
+                netns_id: Some(0 as u32), // FIXME: set real netns_id
             })
             .chain(
                 self_xml_interfaces
@@ -586,6 +587,7 @@ impl PlatformSynchronizer {
                         ip: vec![],
                         tap_index: None,
                         netns: None,
+                        netns_id: Some(0 as u32),
                     }),
             )
             .collect();
