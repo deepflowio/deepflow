@@ -155,6 +155,7 @@ impl From<&ProcessData> for ProcessInfo {
             cmdline: Some(p.cmd.join(" ")),
             user: Some(p.user.clone()),
             start_time: Some(u32::try_from(p.start_time.as_secs()).unwrap_or_default()),
+            netns_id: Some(0 as u32), // FIXME: set real value
             os_app_tags: {
                 let mut tags = vec![];
                 for t in p.os_app_tags.iter() {
