@@ -21,7 +21,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use enum_dispatch::enum_dispatch;
-
+use log::warn;
 use lru::LruCache;
 
 use super::ebpf::EbpfType;
@@ -355,14 +355,31 @@ pub struct L7PerfCache {
     pub rrt_cache: LruCache<u128, LogCache>,
     // LruCache<flow_id, (in_cache_req, count)>
     pub timeout_cache: LruCache<u64, (usize, usize)>,
+    // time in microseconds
+    pub last_log_time: u64,
 }
 
 impl L7PerfCache {
+    // 60 seconds
+    const LOG_INTERVAL: u64 = 60_000_000;
+
     pub fn new(cap: usize) -> Self {
         L7PerfCache {
             rrt_cache: LruCache::new(cap.try_into().unwrap()),
             timeout_cache: LruCache::new(cap.try_into().unwrap()),
+            last_log_time: 0,
         }
+    }
+
+    pub fn put(&mut self, key: u128, value: LogCache) -> Option<LogCache> {
+        let now = value.time;
+        if self.rrt_cache.len() >= usize::from(self.rrt_cache.cap())
+            && self.last_log_time + Self::LOG_INTERVAL < now
+        {
+            self.last_log_time = now;
+            warn!("The capacity({}) of the rrt table will be exceeded. please adjust the configuration", self.rrt_cache.cap());
+        }
+        self.rrt_cache.put(key, value)
     }
 
     pub fn pop_timeout_count(&mut self, flow_id: &u64, flow_end: bool) -> usize {

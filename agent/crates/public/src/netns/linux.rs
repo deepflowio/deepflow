@@ -78,7 +78,7 @@ impl NsFile {
 impl fmt::Display for NsFile {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Root => write!(f, ""),
+            Self::Root => write!(f, "default"),
             Self::Named(s) => write!(f, "{:?}", s),
             Self::Proc(p) => write!(f, "net:[{}]", p),
         }
@@ -192,6 +192,7 @@ impl NetNs {
             all_ns.iter().map(|(k, v)| (k, &v[0])).collect::<Vec<_>>()
         );
 
+        debug!("tap namespace: {:?}", ns);
         let interested_files = ns
             .iter()
             .filter_map(|f| match Self::open_root_or_named_ns_file(f) {
@@ -207,10 +208,14 @@ impl NetNs {
         let current_ns = NetNs::open_current_ns()?;
 
         let mut result = HashMap::new();
+        // namespace id to nsfile in namespaces
+        // cleared and updated in each namespace
+        let mut nsid_map = HashMap::with_capacity(interested_files.len());
         // query net namespaces
         'outer: for (ino, paths) in all_ns.iter() {
             debug!("query namespace ino {}", ino);
             for path in paths {
+                trace!("query namespace ino {} in {}", ino, path.display());
                 let fp = match File::open(path) {
                     Ok(fp) => fp,
                     Err(e) => {
@@ -246,38 +251,43 @@ impl NetNs {
                     continue;
                 };
 
+                if links.is_empty() {
+                    continue 'outer;
+                }
+
+                nsid_map.clear();
+                for (ns, nsfp) in interested_files.iter() {
+                    match socket.get_nsid_by_file(nsfp) {
+                        Ok(id) if id >= 0 => {
+                            nsid_map.insert(id, ns);
+                        }
+                        Ok(_) => (),
+                        Err(e) => {
+                            debug!("get_nsid_by_file() failed for ns {:?}: {:?}", ns, e);
+                        }
+                    }
+                }
+                trace!("nsid map in ino {} is {:?}", ino, nsid_map);
+
                 for link in links {
-                    let mut tap_ns = None;
-                    if link.link_netnsid.is_none() {
+                    trace!("check {:?}", link);
+                    let tap_ns = if let Some(nsid) = link.link_netnsid {
+                        let Some(tap_ns) = nsid_map.get(&(nsid as i32)) else {
+                            debug!("no tap_ns found for link {:?}", link);
+                            continue;
+                        };
+                        tap_ns
+                    } else {
                         match link.if_type.as_ref() {
-                            Some(if_type) if if_type == IF_TYPE_IPVLAN => {
-                                tap_ns = Some(&NsFile::Root)
-                            }
+                            Some(if_type) if if_type == IF_TYPE_IPVLAN => &NsFile::Root,
                             _ => {
-                                trace!("{:?} has no link-netnsid", link);
+                                debug!("{:?} has no link-netnsid", link);
                                 continue;
                             }
                         }
-                    } else {
-                        for (ns, nsfp) in interested_files.iter() {
-                            match socket.get_nsid_by_file(nsfp) {
-                                Ok(id) if id == link.link_netnsid.unwrap() as i32 => {
-                                    tap_ns = Some(ns);
-                                    break;
-                                }
-                                Err(e) => {
-                                    debug!("get_nsid_by_file() failed for ns {:?}: {:?}", ns, e);
-                                }
-                                _ => (),
-                            }
-                        }
-                    }
-                    if tap_ns.is_none() {
-                        trace!("no tap_ns found for link {:?}", link);
-                        continue;
-                    }
+                    };
                     let info = InterfaceInfo {
-                        tap_ns: (*tap_ns.unwrap()).clone(),
+                        tap_ns: tap_ns.clone(),
                         // no peer index means same index
                         tap_idx: link.peer_index.unwrap_or(link.if_index),
                         mac: link.mac_addr,
@@ -294,7 +304,7 @@ impl NetNs {
                         name: link.name,
                         device_id: current_ns.to_string(),
                     };
-                    trace!("found {:?}", info);
+                    debug!("found {:?}", info);
                     result
                         .entry(info.tap_ns.clone())
                         .or_insert(vec![])
@@ -391,7 +401,7 @@ impl NetNs {
     }
 
     pub fn find_ns_files_by_regex(re: &Regex) -> Vec<NsFile> {
-        Self::get_named_files()
+        let files = Self::get_named_files()
             .into_iter()
             .filter(|entry| {
                 match entry {
@@ -404,7 +414,9 @@ impl NetNs {
                 }
                 false
             })
-            .collect()
+            .collect();
+        trace!("namespace files by regex /{}/ are: {:?}", re, files);
+        files
     }
 
     pub fn setns<P: AsRef<Path>>(fp: &File, path: Option<P>) -> Result<()> {
@@ -445,7 +457,7 @@ impl NetNs {
     }
 
     fn get_named_file_paths() -> Vec<PathBuf> {
-        if let Ok(entries) = fs::read_dir(Self::NAMED_PATH) {
+        let paths = if let Ok(entries) = fs::read_dir(Self::NAMED_PATH) {
             entries
                 .into_iter()
                 .filter_map(|entry| {
@@ -460,14 +472,18 @@ impl NetNs {
                 .collect()
         } else {
             vec![]
-        }
+        };
+        trace!("paths under {} are: {:?}", Self::NAMED_PATH, paths);
+        paths
     }
 
     fn get_named_files() -> Vec<NsFile> {
-        Self::get_named_file_paths()
+        let files = Self::get_named_file_paths()
             .into_iter()
             .map(|e| NsFile::Named(e.file_name().unwrap().to_owned()))
-            .collect()
+            .collect();
+        trace!("named namespace files: {:?}", files);
+        files
     }
 
     fn load_named_ns_map(&mut self, socket: &mut WrappedSocket) -> HashMap<u32, NsFile> {
