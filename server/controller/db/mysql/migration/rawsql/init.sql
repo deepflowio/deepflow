@@ -1381,14 +1381,6 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, sub_view_url, sub_view_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     upper_threshold, lower_threshold, lcuuid)
-    values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_dispatcher\",\"interval\":60,\"fill\":0,\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.retired`) AS `drop_packets`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.retired`) AS `drop_packets`\"]}]}",
-    "[{\"METRIC_LABEL\":\"drop_packets\",\"return_field_description\":\"最近 1 分钟 dispatcher.metrics.retired\",\"unit\":\"\"}]",
-     "采集器数据丢失 (dispatcher.metrics.retired)",  0, 1, 1, 21, 1, "", "", "drop_packets", 1, NULL, @lcuuid);
-
-set @lcuuid = (select uuid());
-INSERT INTO alarm_policy(user_id, sub_view_type, sub_view_url, sub_view_params, sub_view_metrics, name, level, state,
-    app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
-    upper_threshold, lower_threshold, lcuuid)
     values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_dispatcher\",\"interval\":60,\"fill\":0,\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.invalid_packets`) AS `drop_packets`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.invalid_packets`) AS `drop_packets`\"]}]}",
     "[{\"METRIC_LABEL\":\"drop_packets\",\"return_field_description\":\"最近 1 分钟 dispatcher.metrics.invalid_packets\",\"unit\":\"\"}]",
      "采集器数据丢失 (dispatcher.metrics.invalid_packets)",  0, 1, 1, 21, 1, "", "", "drop_packets", 1, NULL, @lcuuid);
