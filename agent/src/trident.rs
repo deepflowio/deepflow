@@ -978,6 +978,9 @@ impl Components {
             .process_threshold;
         let feature_flags = FeatureFlags::from(&yaml_config.feature_flags);
 
+        // require an update because platfrom_synchronizer starts before receiving config from server
+        platform_synchronizer.set_netns_regex(&candidate_config.dispatcher.extra_netns_regex);
+
         let mut stats_sender = UniformSenderThread::new(
             stats::DFSTATS_SENDER_ID,
             "stats",
