@@ -1197,7 +1197,15 @@ impl AgentComponents {
         let feature_flags = FeatureFlags::from(&yaml_config.feature_flags);
 
         // require an update because platfrom_synchronizer starts before receiving config from server
-        platform_synchronizer.set_netns_regex(&candidate_config.dispatcher.extra_netns_regex);
+        let regex = &candidate_config.dispatcher.extra_netns_regex;
+        let regex = if regex != "" {
+            info!("platform monitoring extra netns: /{}/", regex);
+            Some(Regex::new(regex).unwrap())
+        } else {
+            info!("platform monitoring no extra netns");
+            None
+        };
+        platform_synchronizer.set_netns_regex(regex);
 
         let mut stats_sender = UniformSenderThread::new(
             "stats",
