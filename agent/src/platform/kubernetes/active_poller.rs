@@ -31,7 +31,7 @@ use regex::Regex;
 use super::Poller;
 use public::{
     consts::NORMAL_EXIT_WITH_RESTART,
-    netns::{InterfaceInfo, NetNs, NsFile},
+    netns::{self, InterfaceInfo, NsFile},
 };
 
 const ENTRY_EXPIRE_COUNT: u8 = 3;
@@ -61,7 +61,7 @@ impl ActivePoller {
     }
 
     fn query(ns: &Vec<NsFile>) -> HashMap<NsFile, Vec<InterfaceInfo>> {
-        match NetNs::interfaces_linked_with(&ns) {
+        match netns::interfaces_linked_with(&ns) {
             Ok(mut map) => {
                 for (_, v) in map.iter_mut() {
                     v.sort_unstable();
@@ -87,7 +87,7 @@ impl ActivePoller {
         // always query root ns (/proc/1/ns/net)
         let mut nss = vec![NsFile::Root];
         if let Some(re) = &*netns_regex.lock().unwrap() {
-            let mut extra_ns = NetNs::find_ns_files_by_regex(&re);
+            let mut extra_ns = netns::find_ns_files_by_regex(&re);
             extra_ns.sort_unstable();
             nss.extend(extra_ns);
         }
@@ -115,7 +115,7 @@ impl ActivePoller {
             // always query root ns (/proc/1/ns/net)
             let mut new_nss = vec![NsFile::Root];
             if let Some(re) = &*netns_regex.lock().unwrap() {
-                let mut extra_ns = NetNs::find_ns_files_by_regex(&re);
+                let mut extra_ns = netns::find_ns_files_by_regex(&re);
                 extra_ns.sort_unstable();
                 new_nss.extend(extra_ns);
             }

@@ -404,8 +404,7 @@ impl Poller for PassivePoller {
             mac: entries[0].mac,
             ips: vec![entries[0].ip],
             device_id: "1".to_string(),
-            tap_ns: Default::default(),
-            name: Default::default(),
+            ..Default::default()
         };
         for entry in entries.iter().skip(1) {
             if entry.tap_index == info.tap_idx && entry.mac == info.mac {
@@ -417,8 +416,7 @@ impl Poller for PassivePoller {
                     mac: entry.mac,
                     ips: vec![entry.ip],
                     device_id: "1".to_string(),
-                    tap_ns: Default::default(),
-                    name: Default::default(),
+                    ..Default::default()
                 };
             }
         }
