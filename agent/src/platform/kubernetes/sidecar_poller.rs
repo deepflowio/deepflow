@@ -23,7 +23,7 @@ use super::Poller;
 use crate::utils::environment::get_ctrl_ip_and_mac;
 
 use public::{
-    netns::{InterfaceInfo, NetNs, NsFile},
+    netns::{self, InterfaceInfo, NsFile},
     utils::net::link_list,
 };
 
@@ -42,8 +42,8 @@ impl SidecarPoller {
             thread::sleep(Duration::from_secs(1));
             process::exit(-1);
         };
-        let Ok(ns): Result<NsFile, _> = Path::new(NetNs::CURRENT_NS_PATH).try_into() else {
-            warn!("cannot open ns file {}", NetNs::CURRENT_NS_PATH);
+        let Ok(ns): Result<NsFile, _> = Path::new(netns::CURRENT_NS_PATH).try_into() else {
+            warn!("cannot open ns file {}", netns::CURRENT_NS_PATH);
             thread::sleep(Duration::from_secs(1));
             process::exit(-1);
         };
@@ -54,6 +54,7 @@ impl SidecarPoller {
             name: link.name,
             device_id: ns.to_string(),
             tap_ns: ns,
+            ..Default::default()
         };
         info!("Sidecar poller: {:?}", info);
         Self(info)
