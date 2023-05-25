@@ -65,6 +65,7 @@ pub(super) struct SockEntry {
     pub(super) local: SockAddrData,
     pub(super) remote: SockAddrData,
     pub(super) real_client: Option<SockAddrData>,
+    // netns idx is the unique number of netns, not equal to netns inode.
     pub(super) netns_idx: u16,
 }
 
@@ -339,7 +340,7 @@ fn is_zero_addr(addr: &SocketAddr) -> bool {
     addr.ip().is_unspecified()
 }
 
-fn get_proc_netns(proc: &Process) -> Result<u64, ProcError> {
+pub(super) fn get_proc_netns(proc: &Process) -> Result<u64, ProcError> {
     // works with linux 3.0+ kernel only
     // refer to this [commit](https://github.com/torvalds/linux/commit/6b4e306aa3dc94a0545eb9279475b1ab6209a31f)
     // use 0 as default ns for old kernel
