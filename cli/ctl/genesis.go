@@ -286,7 +286,7 @@ func tableIp(response *simplejson.Json, table *tablewriter.Table) {
 }
 
 func tableVinterface(response *simplejson.Json, table *tablewriter.Table) {
-	table.SetHeader([]string{"MAC", "NAME", "TAP_MAC", "TAP_NAME", "DEVICE_TYPE", "DEVICE_NAME", "HOST_IP", "VTAP_ID", "CLUSTER_ID", "IP"})
+	table.SetHeader([]string{"MAC", "NAME", "TAP_MAC", "TAP_NAME", "DEVICE_TYPE", "DEVICE_NAME", "HOST_IP", "VTAP_ID", "CLUSTER_ID", "NETNS_ID", "IP"})
 
 	tableItems := [][]string{}
 	for i := range response.Get("DATA").MustArray() {
@@ -306,6 +306,7 @@ func tableVinterface(response *simplejson.Json, table *tablewriter.Table) {
 			tableItem = append(tableItem, data.Get("HOST_IP").MustString())
 			tableItem = append(tableItem, strconv.Itoa(data.Get("VTAP_ID").MustInt()))
 			tableItem = append(tableItem, data.Get("KUBERNETES_CLUSTER_ID").MustString())
+			tableItem = append(tableItem, strconv.Itoa(data.Get("NETNS_ID").MustInt()))
 			tableItem = append(tableItem, ip)
 			tableItems = append(tableItems, tableItem)
 		}
@@ -316,7 +317,7 @@ func tableVinterface(response *simplejson.Json, table *tablewriter.Table) {
 }
 
 func tableProcess(response *simplejson.Json, table *tablewriter.Table) {
-	table.SetHeader([]string{"PID", "VTAP_ID", "NAME", "PROCESS_NAME", "USER", "START_TIME"})
+	table.SetHeader([]string{"PID", "VTAP_ID", "NETNS_ID", "NAME", "PROCESS_NAME", "USER", "START_TIME"})
 
 	tableItems := [][]string{}
 	for i := range response.Get("DATA").MustArray() {
@@ -324,6 +325,7 @@ func tableProcess(response *simplejson.Json, table *tablewriter.Table) {
 		tableItem := []string{}
 		tableItem = append(tableItem, strconv.Itoa(data.Get("PID").MustInt()))
 		tableItem = append(tableItem, strconv.Itoa(data.Get("VTAP_ID").MustInt()))
+		tableItem = append(tableItem, strconv.Itoa(data.Get("NETNS_ID").MustInt()))
 		tableItem = append(tableItem, data.Get("NAME").MustString())
 		tableItem = append(tableItem, data.Get("PROCESS_NAME").MustString())
 		tableItem = append(tableItem, data.Get("USER").MustString())

@@ -406,6 +406,7 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *co
 		gVinterface := &controller.GenesisSyncVinterface{
 			VtapId:              &vData.VtapID,
 			Lcuuid:              &vData.Lcuuid,
+			NetnsId:             &vData.NetnsID,
 			Name:                &vData.Name,
 			Ips:                 &vData.IPs,
 			Mac:                 &vData.Mac,
@@ -430,6 +431,7 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *co
 			VtapId:      &pData.VtapID,
 			Pid:         &pData.PID,
 			Lcuuid:      &pData.Lcuuid,
+			NetnsId:     &pData.NetnsID,
 			Name:        &pData.Name,
 			ProcessName: &pData.ProcessName,
 			CmdLine:     &pData.CMDLine,

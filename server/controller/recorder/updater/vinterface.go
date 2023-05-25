@@ -91,6 +91,7 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*mys
 		SubDomain:  cloudItem.SubDomainLcuuid,
 		Domain:     i.cache.DomainLcuuid,
 		Region:     cloudItem.RegionLcuuid,
+		NetnsID:    cloudItem.NetnsID,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
