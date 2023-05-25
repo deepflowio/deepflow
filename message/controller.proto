@@ -122,6 +122,7 @@ message GenesisSyncVinterface {
     optional string kubernetes_cluster_id = 12;
     optional string node_ip = 13;
     optional string last_seen = 14;
+    optional uint32 netns_id = 15;
 }
 
 message GenesisSyncProcess {
@@ -135,6 +136,7 @@ message GenesisSyncProcess {
     optional string os_app_tags = 8;
     optional string node_ip = 9;
     optional string start_time = 10;
+    optional uint32 netns_id = 11;
 }
 
 message GenesisSyncData{
