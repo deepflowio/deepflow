@@ -57,6 +57,7 @@ func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysql.Pro
 		OSAPPTags:   cloudItem.OSAPPTags,
 		Domain:      p.cache.DomainLcuuid,
 		SubDomain:   cloudItem.SubDomainLcuuid,
+		NetnsID:     cloudItem.NetnsID,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 

@@ -147,6 +147,7 @@ type VInterface struct {
 	NetworkLcuuid   string `json:"network_lcuuid"`
 	VPCLcuuid       string `json:"vpc_lcuuid"` // TODO not used
 	RegionLcuuid    string `json:"region_lcuuid" binding:"required"`
+	NetnsID         uint32 `json:"netns_id"`
 	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
 }
 
@@ -476,6 +477,7 @@ type Process struct {
 	UserName        string    `json:"user_name"`
 	StartTime       time.Time `json:"start_time" binding:"required"`
 	OSAPPTags       string    `json:"os_app_tags"`
+	NetnsID         uint32    `json:"netns_id"`
 	SubDomainLcuuid string    `json:"sub_domain_lcuuid"`
 }
 

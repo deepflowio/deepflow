@@ -164,6 +164,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 				Type:          common.VIF_TYPE_LAN,
 				Mac:           vMAC,
 				TapMac:        vTAPMAC,
+				NetnsID:       vItem.NetnsID,
 				DeviceType:    common.VIF_DEVICE_TYPE_POD,
 				DeviceLcuuid:  podLcuuid,
 				NetworkLcuuid: k.podNetworkLcuuidCIDRs.networkLcuuid,
