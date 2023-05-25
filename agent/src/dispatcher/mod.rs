@@ -80,7 +80,7 @@ use crate::{
     utils::stats::{self, Collector},
 };
 #[cfg(target_os = "linux")]
-use public::netns::NetNs;
+use public::netns;
 use public::{
     netns::NsFile,
     proto::{
@@ -756,9 +756,9 @@ impl DispatcherBuilder {
         let mut current_ns = None;
         #[cfg(target_os = "linux")]
         if netns != NsFile::Root {
-            current_ns = Some(NetNs::open_current_ns()?);
+            current_ns = Some(netns::open_current_ns()?);
             // set ns before creating af packet socket
-            let _ = NetNs::open_named_and_setns(&netns)?;
+            let _ = netns::open_named_and_setns(&netns)?;
         };
         let options = self
             .options
@@ -971,7 +971,7 @@ impl DispatcherBuilder {
         dispatcher.init();
         #[cfg(target_os = "linux")]
         if let Some(ns) = current_ns {
-            let _ = NetNs::setns(&ns, Some(NetNs::CURRENT_NS_PATH))?;
+            let _ = netns::setns(&ns, Some(netns::CURRENT_NS_PATH))?;
         }
         Ok(Dispatcher {
             flavor: Mutex::new(Some(dispatcher)),

@@ -108,7 +108,7 @@ use pcap_assembler::{BoxedPcapBatch, PcapAssembler};
 
 use crate::common::proc_event::BoxedProcEvents;
 #[cfg(target_os = "linux")]
-use public::netns::{links_by_name_regex_in_netns, NetNs};
+use public::netns::{self, links_by_name_regex_in_netns};
 #[cfg(target_os = "windows")]
 use public::utils::net::link_by_name;
 use public::{
@@ -1549,7 +1549,7 @@ impl AgentComponents {
         #[cfg(target_os = "linux")]
         if candidate_config.dispatcher.extra_netns_regex != "" {
             let re = Regex::new(&candidate_config.dispatcher.extra_netns_regex).unwrap();
-            let mut nss = NetNs::find_ns_files_by_regex(&re);
+            let mut nss = netns::find_ns_files_by_regex(&re);
             nss.sort_unstable();
             for ns in nss {
                 src_interfaces_and_namespaces.push(("".into(), ns));

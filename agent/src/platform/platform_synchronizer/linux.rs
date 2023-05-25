@@ -56,7 +56,7 @@ use crate::{
 
 use public::{
     consts::NORMAL_EXIT_WITH_RESTART,
-    netns::{InterfaceInfo, NetNs, NsFile},
+    netns::{self, InterfaceInfo, NsFile},
     proto::{
         common::TridentType,
         trident::{
@@ -279,7 +279,7 @@ impl PlatformSynchronizer {
         let mut raw_ip_addrs = vec![];
         let current_ns = if netns.len() > 1 {
             // for restore
-            let current_ns = NetNs::open_current_ns();
+            let current_ns = netns::open_current_ns();
             if let Err(e) = current_ns {
                 warn!("get self net namespace failed: {:?}", e);
                 return;
@@ -290,7 +290,7 @@ impl PlatformSynchronizer {
         };
         for ns in netns {
             if ns != &NsFile::Root {
-                if let Err(e) = NetNs::open_named_and_setns(ns) {
+                if let Err(e) = netns::open_named_and_setns(ns) {
                     warn!("setns to {:?} failed: {}", ns, e);
                     continue;
                 }
@@ -311,7 +311,7 @@ impl PlatformSynchronizer {
             raw_ip_addrs.push(raw_host_ip_addr.unwrap_or_default());
         }
         if let Some(ns) = current_ns {
-            if let Err(e) = NetNs::setns(&ns, Some(NetNs::CURRENT_NS_PATH)) {
+            if let Err(e) = netns::setns(&ns, Some(netns::CURRENT_NS_PATH)) {
                 warn!("restore net namespace failed: {}", e);
                 return;
             }
@@ -574,7 +574,7 @@ impl PlatformSynchronizer {
                 ip: interface_info.ips.iter().map(ToString::to_string).collect(),
                 device_name: None,
                 netns: Some(interface_info.tap_ns.to_string()),
-                netns_id: Some(0 as u32), // FIXME: set real netns_id
+                netns_id: Some(interface_info.ns_inode as u32),
             })
             .chain(
                 self_xml_interfaces
@@ -587,7 +587,7 @@ impl PlatformSynchronizer {
                         ip: vec![],
                         tap_index: None,
                         netns: None,
-                        netns_id: Some(0 as u32),
+                        netns_id: None,
                     }),
             )
             .collect();
@@ -647,7 +647,7 @@ impl PlatformSynchronizer {
         loop {
             let mut new_netns = vec![NsFile::Root];
             if let Some(re) = &*args.extra_netns_regex.lock().unwrap() {
-                let mut extra_ns = NetNs::find_ns_files_by_regex(&re);
+                let mut extra_ns = netns::find_ns_files_by_regex(&re);
                 extra_ns.sort_unstable();
                 new_netns.extend(extra_ns);
             }
