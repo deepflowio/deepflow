@@ -401,6 +401,7 @@ func (c *Cloud) appendResourceProcess(resource model.Resource) model.Resource {
 			Name:        sProcess.Name,
 			VTapID:      int(sProcess.VtapID),
 			PID:         int(sProcess.PID),
+			NetnsID:     sProcess.NetnsID,
 			ProcessName: sProcess.ProcessName,
 			CommandLine: sProcess.CMDLine,
 			UserName:    sProcess.User,

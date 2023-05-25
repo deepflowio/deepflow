@@ -76,6 +76,29 @@ func getProcesses() ([]model.Process, error) {
 		podNodeIDToName[podNode.ID] = podNode.Name
 	}
 
+	// store pod info
+	var pods []mysql.Pod
+	if err := mysql.Db.Find(&pods).Error; err != nil {
+		return nil, err
+	}
+	podIDToName := make(map[int]string, len(pods))
+	for _, pod := range pods {
+		podIDToName[pod.ID] = pod.Name
+	}
+
+	var vinterfaces []mysql.VInterface
+	if err := mysql.Db.Where("netns_id != 0 and devicetype = ?", common.VIF_DEVICE_TYPE_POD).
+		Select("devicetype", "deviceid", "netns_id").Find(&vinterfaces).Error; err != nil {
+		return nil, err
+	}
+	deviceTypeToNetnsIDToID := make(map[int]map[uint32]int)
+	for _, vif := range vinterfaces {
+		if deviceTypeToNetnsIDToID[vif.DeviceType] == nil {
+			deviceTypeToNetnsIDToID[vif.DeviceType] = make(map[uint32]int)
+		}
+		deviceTypeToNetnsIDToID[vif.DeviceType][vif.NetnsID] = vif.DeviceID
+	}
+
 	// get processes
 	var processes []mysql.Process
 	if err := mysql.Db.Unscoped().Order("created_at DESC").Find(&processes).Error; err != nil {
@@ -83,12 +106,20 @@ func getProcesses() ([]model.Process, error) {
 	}
 	var resp []model.Process
 	for _, process := range processes {
+		var deviceType int
 		var resourceName string
-		deviceType := common.VTAP_TYPE_TO_DEVICE_TYPE[vtapIDToInfo[process.VTapID].Type]
-		if deviceType == common.VIF_DEVICE_TYPE_VM {
-			resourceName = vmIDToName[vtapIDToInfo[process.VTapID].LaunchServerID]
-		} else if deviceType == common.VIF_DEVICE_TYPE_POD_NODE {
-			resourceName = podNodeIDToName[vtapIDToInfo[process.VTapID].LaunchServerID]
+		if process.NetnsID != 0 {
+			if _, ok := deviceTypeToNetnsIDToID[common.VIF_DEVICE_TYPE_POD][process.NetnsID]; ok {
+				resourceName = podIDToName[deviceTypeToNetnsIDToID[common.VIF_DEVICE_TYPE_POD][process.NetnsID]]
+				deviceType = common.VIF_DEVICE_TYPE_POD
+			}
+		} else {
+			deviceType = common.VTAP_TYPE_TO_DEVICE_TYPE[vtapIDToInfo[process.VTapID].Type]
+			if deviceType == common.VIF_DEVICE_TYPE_VM {
+				resourceName = vmIDToName[vtapIDToInfo[process.VTapID].LaunchServerID]
+			} else if deviceType == common.VIF_DEVICE_TYPE_POD_NODE {
+				resourceName = podNodeIDToName[vtapIDToInfo[process.VTapID].LaunchServerID]
+			}
 		}
 
 		var deletedAt string

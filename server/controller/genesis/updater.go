@@ -272,6 +272,7 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info VIFRPCMessage, peer str
 			// 忽略workload类型
 			continue
 		}
+		vIF.NetnsID = iface.GetNetnsId()
 		vIF.HostIP = peer
 		vIF.LastSeen = epoch
 		vIF.VtapID = vtapID
@@ -440,6 +441,7 @@ func (v *GenesisSyncRpcUpdater) ParseProcessInfo(info VIFRPCMessage, vtapID uint
 		processes = append(processes, model.GenesisProcess{
 			Lcuuid:      common.GetUUID(strconv.Itoa(int(pID))+strconv.Itoa(int(vtapID)), uuid.Nil),
 			PID:         pID,
+			NetnsID:     p.GetNetnsId(),
 			Name:        p.GetName(),
 			ProcessName: p.GetProcessName(),
 			CMDLine:     p.GetCmdline(),

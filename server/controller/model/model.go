@@ -697,6 +697,7 @@ func (GenesisPort) TableName() string {
 
 type GenesisVinterface struct {
 	ID                  int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	NetnsID             uint32    `gorm:"column:netns_id;type:int unsigned;default:0" json:"NETNS_ID"`
 	VtapID              uint32    `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
 	Lcuuid              string    `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
 	Name                string    `gorm:"column:name;type:char(64);default:null" json:"NAME"`
@@ -748,6 +749,7 @@ func (GenesisVpc) TableName() string {
 
 type GenesisProcess struct {
 	ID          int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	NetnsID     uint32    `gorm:"column:netns_id;type:int unsigned;default:0" json:"NETNS_ID"`
 	VtapID      uint32    `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
 	PID         uint64    `gorm:"column:pid;type:int;default:null" json:"PID"`
 	Lcuuid      string    `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`

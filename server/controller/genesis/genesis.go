@@ -305,6 +305,7 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 			gVinterface := model.GenesisVinterface{
 				VtapID:              v.GetVtapId(),
 				Lcuuid:              v.GetLcuuid(),
+				NetnsID:             v.GetNetnsId(),
 				Name:                v.GetName(),
 				IPs:                 v.GetIps(),
 				Mac:                 v.GetMac(),
@@ -332,6 +333,7 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 				VtapID:      p.GetVtapId(),
 				PID:         p.GetPid(),
 				Lcuuid:      p.GetLcuuid(),
+				NetnsID:     p.GetNetnsId(),
 				Name:        p.GetName(),
 				ProcessName: p.GetProcessName(),
 				CMDLine:     p.GetCmdLine(),
