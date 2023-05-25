@@ -979,6 +979,7 @@ impl Components {
         let feature_flags = FeatureFlags::from(&yaml_config.feature_flags);
 
         // require an update because platfrom_synchronizer starts before receiving config from server
+        #[cfg(target_os = "linux")]
         platform_synchronizer.set_netns_regex(&candidate_config.dispatcher.extra_netns_regex);
 
         let mut stats_sender = UniformSenderThread::new(
