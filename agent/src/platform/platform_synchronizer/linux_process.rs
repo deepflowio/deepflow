@@ -31,7 +31,7 @@ use ring::digest;
 use serde::Deserialize;
 
 use super::proc_scan_hook::proc_scan_hook;
-use super::{dir_inode, SHA1_DIGEST_LEN};
+use super::{dir_inode, get_proc_netns, SHA1_DIGEST_LEN};
 
 use crate::config::handler::OsProcScanConfig;
 use crate::config::{
@@ -51,6 +51,8 @@ pub struct ProcessData {
     pub start_time: Duration, // the process start timestamp
     // Vec<key, val>
     pub os_app_tags: Vec<OsAppTagKV>,
+    // netns file inode
+    pub netns_id: u64,
 }
 
 impl ProcessData {
@@ -141,6 +143,7 @@ impl TryFrom<&Process> for ProcessData {
                 }
             },
             os_app_tags: vec![],
+            netns_id: get_proc_netns(proc)?,
         })
     }
 }
@@ -165,6 +168,7 @@ impl From<&ProcessData> for ProcessInfo {
                 }
                 tags
             },
+            netns_id: Some(p.netns_id as u32),
         }
     }
 }
@@ -609,6 +613,7 @@ mod test {
                         key: "root_key".into(),
                         value: "root_val".into(),
                     }],
+                    netns_id: 1,
                 },
                 ProcessData {
                     name: "parent".into(),
@@ -623,6 +628,7 @@ mod test {
                         key: "parent_key".into(),
                         value: "parent_val".into(),
                     }],
+                    netns_id: 1,
                 },
                 ProcessData {
                     name: "child".into(),
@@ -637,6 +643,7 @@ mod test {
                         key: "child_key".into(),
                         value: "child_val".into(),
                     }],
+                    netns_id: 1,
                 },
                 ProcessData {
                     name: "other".into(),
@@ -651,6 +658,7 @@ mod test {
                         key: "other_key".into(),
                         value: "other_val".into(),
                     }],
+                    netns_id: 1,
                 },
             ];
 
