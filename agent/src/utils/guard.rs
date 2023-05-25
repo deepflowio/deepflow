@@ -185,6 +185,7 @@ impl Guard {
         let mut under_sys_free_memory_limit = false; // Below the limit, it does not meet expectations
         let cgroup_mount_path = self.cgroup_mount_path.clone();
         let is_cgroup_v2 = self.is_cgroup_v2;
+        #[cfg(all(target_os = "linux", target_env = "gnu"))]
         let memory_trim_disabled = self.memory_trim_disabled;
         let thread = thread::Builder::new().name("guard".to_owned()).spawn(move || {
             loop {
