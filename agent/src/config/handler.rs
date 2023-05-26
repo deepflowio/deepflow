@@ -71,6 +71,8 @@ use public::proto::{
     common::TridentType,
     trident::{self, CaptureSocketType, Exception, IfMacSource, SocketType, TapMode},
 };
+#[cfg(target_os = "linux")]
+use public::{consts::NORMAL_EXIT_WITH_RESTART, netns};
 
 use crate::utils::cgroups::is_kernel_available_for_cgroup;
 #[cfg(target_os = "windows")]
@@ -1276,14 +1278,37 @@ impl ConfigHandler {
                     new_config.dispatcher.extra_netns_regex
                 );
                 if let Some(c) = components.as_ref() {
+                    let old_regex = if candidate_config.dispatcher.extra_netns_regex != "" {
+                        Regex::new(&candidate_config.dispatcher.extra_netns_regex).ok()
+                    } else {
+                        None
+                    };
+
                     let regex = new_config.dispatcher.extra_netns_regex.as_ref();
                     let regex = if regex != "" {
-                        info!("platform monitoring extra netns: /{}/", regex);
-                        Some(Regex::new(regex).unwrap())
+                        match Regex::new(regex) {
+                            Ok(re) => {
+                                info!("platform monitoring extra netns: /{}/", regex);
+                                Some(re)
+                            }
+                            Err(_) => {
+                                warn!("platform monitoring no extra netns because regex /{}/ is invalid", regex);
+                                None
+                            }
+                        }
                     } else {
                         info!("platform monitoring no extra netns");
                         None
                     };
+
+                    let old_netns = old_regex.map(|re| netns::find_ns_files_by_regex(&re));
+                    let new_netns = regex.as_ref().map(|re| netns::find_ns_files_by_regex(&re));
+                    if old_netns != new_netns {
+                        info!("query net namespaces changed from {:?} to {:?}, restart agent to create dispatcher for extra namespaces, deepflow-agent restart...", old_netns, new_netns);
+                        thread::sleep(Duration::from_secs(1));
+                        process::exit(NORMAL_EXIT_WITH_RESTART);
+                    }
+
                     c.platform_synchronizer.set_netns_regex(regex.clone());
                     c.kubernetes_poller.set_netns_regex(regex);
                 }
