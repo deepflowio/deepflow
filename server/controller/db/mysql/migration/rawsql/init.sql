@@ -1384,6 +1384,14 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, sub_view_url, sub_view_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     upper_threshold, lower_threshold, lcuuid)
+    values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_dispatcher\",\"interval\":60,\"fill\":0,\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.retired`) AS `drop_packets`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.retired`) AS `drop_packets`\"]}]}",
+    "[{\"METRIC_LABEL\":\"drop_packets\",\"return_field_description\":\"最近 1 分钟 dispatcher.metrics.retired\",\"unit\":\"\"}]",
+     "采集器数据丢失 (dispatcher.metrics.retired)",  0, 1, 1, 21, 1, "", "", "drop_packets", 1, NULL, @lcuuid);
+
+set @lcuuid = (select uuid());
+INSERT INTO alarm_policy(user_id, sub_view_type, sub_view_url, sub_view_params, sub_view_metrics, name, level, state,
+    app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
+    upper_threshold, lower_threshold, lcuuid)
     values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_dispatcher\",\"interval\":60,\"fill\":0,\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.invalid_packets`) AS `drop_packets`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.invalid_packets`) AS `drop_packets`\"]}]}",
     "[{\"METRIC_LABEL\":\"drop_packets\",\"return_field_description\":\"最近 1 分钟 dispatcher.metrics.invalid_packets\",\"unit\":\"\"}]",
      "采集器数据丢失 (dispatcher.metrics.invalid_packets)",  0, 1, 1, 21, 1, "", "", "drop_packets", 1, NULL, @lcuuid);
@@ -2460,3 +2468,41 @@ CREATE TABLE IF NOT EXISTS prometheus_metric_target (
     UNIQUE INDEX metric_target_index(metric_name, target_id)
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE prometheus_metric_target;
+
+CREATE TABLE IF NOT EXISTS ch_app_label (
+    `metric_id`          INT(10) NOT NULL,
+    `label_name_id`      VARCHAR(256) NOT NULL,
+    `label_value`        INT(10) NOT NULL,
+    `label_value_id`     INT(10) NOT NULL,
+    PRIMARY KEY (metric_id, label_name_id, label_value)
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_app_label;
+
+CREATE TABLE IF NOT EXISTS ch_target_label (
+    `metric_id`          INT(10) NOT NULL,
+    `label_name_id`      VARCHAR(256) NOT NULL,
+    `label_value`        INT(10) NOT NULL,
+    `target_id`          INT(10) NOT NULL,
+    PRIMARY KEY (metric_id, label_name_id, label_value)
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_target_label;
+
+CREATE TABLE IF NOT EXISTS ch_prometheus_label_name (
+    `id`            INT(10) NOT NULL PRIMARY KEY,
+    `name`          VARCHAR(256) NOT NULL
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_prometheus_label_name;
+
+CREATE TABLE IF NOT EXISTS ch_prometheus_metric_name (
+    `id`            INT(10) NOT NULL PRIMARY KEY,
+    `name`          VARCHAR(256) NOT NULL
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_prometheus_metric_name;
+
+CREATE TABLE IF NOT EXISTS ch_prometheus_metric_app_label_layout (
+    `id`                        INT(10) NOT NULL PRIMARY KEY,
+    `metric_name`               VARCHAR(256) NOT NULL,
+    `app_label_name`            VARCHAR(256) NOT NULL,
+    `app_label_column_index`    TINYINT(3) NOT NULL
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_prometheus_metric_app_label_layout;

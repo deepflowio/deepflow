@@ -23,7 +23,7 @@ import (
 
 // 资源的MySQL orm对象
 type MySQLChModel interface {
-	mysql.ChPodServiceK8sLabels | mysql.ChPodServiceK8sLabel | mysql.ChOSAppTags | mysql.ChOSAppTag | mysql.ChPodNSCloudTags | mysql.ChChostCloudTags | mysql.ChPodNSCloudTag | mysql.ChChostCloudTag | mysql.ChIntEnum | mysql.ChStringEnum | mysql.ChPodIngress | mysql.ChPodGroupPort | mysql.ChPodPort | mysql.ChVTapPort | mysql.ChAZ | mysql.ChIPResource | mysql.ChPodK8sLabel |
+	mysql.ChTargetLabel | mysql.ChAPPLabel | mysql.ChPrometheusMetricName | mysql.ChPrometheusLabelName | mysql.ChPrometheusMetricAPPLabelLayout | mysql.ChPodServiceK8sLabels | mysql.ChPodServiceK8sLabel | mysql.ChOSAppTags | mysql.ChOSAppTag | mysql.ChPodNSCloudTags | mysql.ChChostCloudTags | mysql.ChPodNSCloudTag | mysql.ChChostCloudTag | mysql.ChIntEnum | mysql.ChStringEnum | mysql.ChPodIngress | mysql.ChPodGroupPort | mysql.ChPodPort | mysql.ChVTapPort | mysql.ChAZ | mysql.ChIPResource | mysql.ChPodK8sLabel |
 		mysql.ChLBListener | mysql.ChPodNodePort | mysql.ChIPPort | mysql.ChDevicePort | mysql.ChRegion | mysql.ChVPC |
 		mysql.ChDevice | mysql.ChIPRelation | mysql.ChPodGroup | mysql.ChNetwork | mysql.ChPod | mysql.ChPodCluster |
 		mysql.ChPodNode | mysql.ChPodNamespace | mysql.ChTapType | mysql.ChVTap | mysql.ChPodK8sLabels | mysql.ChNodeType | mysql.ChGProcess
@@ -31,6 +31,6 @@ type MySQLChModel interface {
 
 // ch资源的组合key
 type ChModelKey interface {
-	OSAPPTagKey | OSAPPTagsKey | CloudTagsKey | CloudTagKey | IntEnumTagKey | StringEnumTagKey | VtapPortKey | IPResourceKey | K8sLabelKey | PortIDKey | PortIPKey | PortDeviceKey | IDKey | DeviceKey |
+	PrometheusLabelKey | OSAPPTagKey | OSAPPTagsKey | CloudTagsKey | CloudTagKey | IntEnumTagKey | StringEnumTagKey | VtapPortKey | IPResourceKey | K8sLabelKey | PortIDKey | PortIPKey | PortDeviceKey | IDKey | DeviceKey |
 		IPRelationKey | TapTypeKey | K8sLabelsKey | NodeTypeKey
 }
