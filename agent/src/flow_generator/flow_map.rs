@@ -1055,6 +1055,11 @@ impl FlowMap {
                 port,
                 self.wasm_vm.as_ref().map(|w| w.clone()),
                 self.stats_counter.clone(),
+                match meta_packet.lookup_key.proto {
+                    IpProtocol::Tcp => config.rrt_tcp_timeout,
+                    IpProtocol::Udp => config.rrt_udp_timeout,
+                    _ => 0,
+                },
             )
             .map(|o| Box::new(o));
         }
