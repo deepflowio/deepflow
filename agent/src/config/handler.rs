@@ -29,6 +29,8 @@ use bytesize::ByteSize;
 use flexi_logger::writers::FileLogWriter;
 use flexi_logger::{Age, Cleanup, Criterion, FileSpec, LoggerHandle, Naming};
 use log::{info, warn, Level};
+#[cfg(target_os = "linux")]
+use regex::Regex;
 use sysinfo::SystemExt;
 
 #[cfg(target_os = "linux")]
@@ -65,6 +67,8 @@ use public::proto::{
     common::TridentType,
     trident::{self, CaptureSocketType, Exception, IfMacSource, SocketType, TapMode},
 };
+#[cfg(target_os = "linux")]
+use public::{consts::NORMAL_EXIT_WITH_RESTART, netns::NetNs};
 
 #[cfg(target_os = "windows")]
 use public::utils::net::links_by_name_regex;
@@ -1202,6 +1206,24 @@ impl ConfigHandler {
                     new_config.dispatcher.extra_netns_regex
                 );
                 if let Some(c) = components.as_ref() {
+                    let old_regex = if candidate_config.dispatcher.extra_netns_regex != "" {
+                        Regex::new(&candidate_config.dispatcher.extra_netns_regex).ok()
+                    } else {
+                        None
+                    };
+                    let new_regex = if new_config.dispatcher.extra_netns_regex != "" {
+                        Regex::new(&new_config.dispatcher.extra_netns_regex).ok()
+                    } else {
+                        None
+                    };
+                    let old_netns = old_regex.map(|re| NetNs::find_ns_files_by_regex(&re));
+                    let new_netns = new_regex.map(|re| NetNs::find_ns_files_by_regex(&re));
+                    if old_netns != new_netns {
+                        info!("query net namespaces changed from {:?} to {:?}, restart agent to create dispatcher for extra namespaces, deepflow-agent restart...", old_netns, new_netns);
+                        thread::sleep(Duration::from_secs(1));
+                        process::exit(NORMAL_EXIT_WITH_RESTART);
+                    }
+
                     c.platform_synchronizer
                         .set_netns_regex(&new_config.dispatcher.extra_netns_regex);
                 }
