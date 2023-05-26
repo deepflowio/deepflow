@@ -16,7 +16,6 @@
 
 use std::{
     collections::{hash_map::Entry, HashMap},
-    process,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc, Condvar, Mutex,
@@ -29,10 +28,7 @@ use log::{debug, info, log_enabled, trace, warn, Level};
 use regex::Regex;
 
 use super::Poller;
-use public::{
-    consts::NORMAL_EXIT_WITH_RESTART,
-    netns::{InterfaceInfo, NetNs, NsFile},
-};
+use public::netns::{InterfaceInfo, NetNs, NsFile};
 
 const ENTRY_EXPIRE_COUNT: u8 = 3;
 
@@ -120,9 +116,11 @@ impl ActivePoller {
                 new_nss.extend(extra_ns);
             }
             if nss != new_nss {
-                info!("query net namespaces changed from {:?} to {:?}, restart agent to create dispatcher for extra namespaces, deepflow-agent restart...", nss, new_nss);
-                thread::sleep(Duration::from_secs(1));
-                process::exit(NORMAL_EXIT_WITH_RESTART);
+                info!(
+                    "query net namespaces changed from {:?} to {:?}",
+                    nss, new_nss
+                );
+                nss = new_nss;
             }
             let mut new_interface_info = Self::query(&nss);
             // compare two lists
