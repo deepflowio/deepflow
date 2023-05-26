@@ -192,6 +192,7 @@ pub struct FlowLog {
 
     wasm_vm: Option<Rc<RefCell<WasmVm>>>,
     stats_counter: Arc<FlowMapCounter>,
+    rrt_timeout: usize,
 }
 
 impl FlowLog {
@@ -280,6 +281,7 @@ impl FlowLog {
                 log_parser_config,
             ));
             param.set_counter(self.stats_counter.clone());
+            param.set_rrt_timeout(self.rrt_timeout);
             if let Some(vm) = self.wasm_vm.as_ref() {
                 param.set_wasm_vm(vm.clone());
             }
@@ -372,6 +374,7 @@ impl FlowLog {
                 log_parser_config,
             ));
             param.set_counter(self.stats_counter.clone());
+            param.set_rrt_timeout(self.rrt_timeout);
             if let Some(vm) = self.wasm_vm.as_ref() {
                 param.set_wasm_vm(vm.clone());
             }
@@ -410,6 +413,7 @@ impl FlowLog {
         server_port: u16,
         wasm_vm: Option<Rc<RefCell<WasmVm>>>,
         stats_counter: Arc<FlowMapCounter>,
+        rrt_timeout: usize,
     ) -> Option<Self> {
         if !l4_enabled && !l7_enabled {
             return None;
@@ -439,6 +443,7 @@ impl FlowLog {
             server_port: server_port,
             wasm_vm: wasm_vm,
             stats_counter: stats_counter,
+            rrt_timeout: rrt_timeout,
         })
     }
 
