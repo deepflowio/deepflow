@@ -17,7 +17,6 @@
 use std::{
     net::{IpAddr, SocketAddr, SocketAddrV4},
     path::Path,
-    process,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc, Condvar, Mutex, MutexGuard,
@@ -55,7 +54,6 @@ use crate::{
 };
 
 use public::{
-    consts::NORMAL_EXIT_WITH_RESTART,
     netns::{InterfaceInfo, NetNs, NsFile},
     proto::{
         common::TridentType,
@@ -652,9 +650,11 @@ impl PlatformSynchronizer {
             if netns.is_empty() {
                 netns = new_netns;
             } else if netns != new_netns {
-                info!("query net namespaces changed from {:?} to {:?}, restart agent to create dispatcher for extra namespaces, deepflow-agent restart...", netns, new_netns);
-                thread::sleep(Duration::from_secs(1));
-                process::exit(NORMAL_EXIT_WITH_RESTART);
+                info!(
+                    "query net namespaces changed from {:?} to {:?}",
+                    netns, new_netns
+                );
+                netns = new_netns;
             }
 
             let config_guard = args.config.load();
