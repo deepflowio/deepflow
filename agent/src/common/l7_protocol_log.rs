@@ -19,6 +19,7 @@ use std::fmt::Debug;
 use std::net::IpAddr;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::time::Duration;
 
 use enum_dispatch::enum_dispatch;
 use log::warn;
@@ -421,6 +422,9 @@ pub struct ParseParam<'a> {
     pub wasm_vm: Option<Rc<RefCell<WasmVm>>>,
 
     pub stats_counter: Option<Arc<FlowMapCounter>>,
+
+    // rrt cal timeout
+    pub rrt_timeout: usize, // micro second
 }
 
 // from packet, previous_log_info_cache, perf_only
@@ -448,6 +452,9 @@ impl From<(&MetaPacket<'_>, Rc<RefCell<L7PerfCache>>, bool)> for ParseParam<'_> 
 
             wasm_vm: None,
             stats_counter: None,
+
+            // the timeout will overwrite by set_rrt_timeout(), 10s set in here only use for test.
+            rrt_timeout: Duration::from_secs(10).as_micros() as usize,
         };
         if packet.ebpf_type != EbpfType::None {
             let is_tls = match packet.ebpf_type {
@@ -509,6 +516,10 @@ impl ParseParam<'_> {
 
     pub fn set_counter(&mut self, stat: Arc<FlowMapCounter>) {
         self.stats_counter = Some(stat);
+    }
+
+    pub fn set_rrt_timeout(&mut self, t: usize) {
+        self.rrt_timeout = t;
     }
 }
 

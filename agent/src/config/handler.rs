@@ -344,6 +344,9 @@ pub struct FlowConfig {
 
     // name, data
     pub wasm_plugins: Vec<(String, Vec<u8>)>,
+
+    pub rrt_tcp_timeout: usize, //micro sec
+    pub rrt_udp_timeout: usize, //micro sec
 }
 
 impl From<&RuntimeConfig> for FlowConfig {
@@ -395,6 +398,8 @@ impl From<&RuntimeConfig> for FlowConfig {
                 (&conf.yaml_config).get_protocol_port_parse_bitmap(),
             ),
             wasm_plugins: vec![],
+            rrt_tcp_timeout: conf.yaml_config.rrt_tcp_timeout.as_micros() as usize,
+            rrt_udp_timeout: conf.yaml_config.rrt_udp_timeout.as_micros() as usize,
         }
     }
 }

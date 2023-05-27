@@ -58,7 +58,7 @@ use public::{
 const QUEUE_BATCH_SIZE: usize = 1024;
 const RCV_TIMEOUT: Duration = Duration::from_secs(1);
 // 尽力而为的聚合默认120秒(AppProtoLogs.aggr*SLOT_WIDTH)内的请求和响应
-const SLOT_WIDTH: u64 = 10; // 每个slot存10秒
+pub const SLOT_WIDTH: u64 = 10; // 每个slot存10秒
 const SLOT_CACHED_COUNT: u64 = 100000; // 每个slot平均缓存的FLOW数
 
 const THROTTLE_BUCKET_BITS: u8 = 2;

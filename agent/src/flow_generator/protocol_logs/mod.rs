@@ -32,7 +32,7 @@ pub use self::plugin::custom_wrap::CustomWrapLog;
 pub use self::plugin::wasm::{get_wasm_parser, WasmLog};
 pub use dns::{DnsInfo, DnsLog};
 pub use mq::{mqtt, KafkaInfo, KafkaLog, MqttInfo, MqttLog};
-pub use parser::{MetaAppProto, SessionAggregator};
+pub use parser::{MetaAppProto, SessionAggregator, SLOT_WIDTH};
 pub use rpc::{
     decode_new_rpc_trace_context, decode_new_rpc_trace_context_with_type, get_protobuf_rpc_parser,
     DubboHeader, DubboInfo, DubboLog, ProtobufRpcInfo, ProtobufRpcWrapLog, SofaRpcInfo, SofaRpcLog,
