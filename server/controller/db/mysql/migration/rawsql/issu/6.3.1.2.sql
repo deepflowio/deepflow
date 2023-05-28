@@ -3,7 +3,7 @@ START TRANSACTION;
 CREATE TABLE IF NOT EXISTS ch_app_label (
     `metric_id`          INT(10) NOT NULL,
     `label_name_id`      VARCHAR(256) NOT NULL,
-    `label_value`        INT(10) NOT NULL,
+    `label_value`        VARCHAR(256) NOT NULL,
     `label_value_id`     INT(10) NOT NULL,
     PRIMARY KEY (metric_id, label_name_id, label_value)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS ch_app_label (
 CREATE TABLE IF NOT EXISTS ch_target_label (
     `metric_id`          INT(10) NOT NULL,
     `label_name_id`      VARCHAR(256) NOT NULL,
-    `label_value`        INT(10) NOT NULL,
+    `label_value`        VARCHAR(256) NOT NULL,
     `target_id`          INT(10) NOT NULL,
     PRIMARY KEY (metric_id, label_name_id, label_value)
 )ENGINE=innodb DEFAULT CHARSET=utf8;

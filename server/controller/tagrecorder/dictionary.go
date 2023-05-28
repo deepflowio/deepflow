@@ -221,15 +221,15 @@ func (c *TagRecorder) UpdateChDictionary() {
 						checkDicts := chDicts.Intersect(wantedDicts)
 						for _, dict := range checkDicts.ToSlice() {
 							dictName := dict.(string)
-							var clickhousrDatabase string
+							var clickhouseDatabase string
 							switch dictName {
 							case CH_TARGET_LABEL, CH_APP_LABEL, CH_PROMETHEUS_LABEL_NAME, CH_PROMETHEUS_METRIC_NAME, CH_PROMETHEUS_METRIC_APP_LABEL_LAYOUT:
-								clickhousrDatabase = "prometheus"
+								clickhouseDatabase = "prometheus"
 							default:
-								clickhousrDatabase = c.cfg.ClickHouseCfg.Database
+								clickhouseDatabase = c.cfg.ClickHouseCfg.Database
 							}
 							chTable := "ch_" + strings.TrimSuffix(dictName, "_map")
-							showSQL := fmt.Sprintf("SHOW CREATE DICTIONARY %s.%s", clickhousrDatabase, dictName)
+							showSQL := fmt.Sprintf("SHOW CREATE DICTIONARY %s.%s", clickhouseDatabase, dictName)
 							dictSQL := make([]string, 0)
 							if err := connect.Select(&dictSQL, showSQL); err != nil {
 								log.Error(err)
@@ -238,14 +238,14 @@ func (c *TagRecorder) UpdateChDictionary() {
 							}
 							createSQL := CREATE_SQL_MAP[dictName]
 							mysqlPortStr := strconv.Itoa(int(c.cfg.MySqlCfg.Port))
-							createSQL = fmt.Sprintf(createSQL, clickhousrDatabase, dictName, mysqlPortStr, c.cfg.MySqlCfg.UserName, c.cfg.MySqlCfg.UserPassword, replicaSQL, c.cfg.MySqlCfg.Database, chTable, chTable)
+							createSQL = fmt.Sprintf(createSQL, clickhouseDatabase, dictName, mysqlPortStr, c.cfg.MySqlCfg.UserName, c.cfg.MySqlCfg.UserPassword, replicaSQL, c.cfg.MySqlCfg.Database, chTable, chTable)
 							if createSQL == dictSQL[0] {
 								continue
 							}
 							log.Infof("update dictionary %s", dictName)
 							log.Infof("exist dictionary %s", dictSQL[0])
 							log.Infof("wanted dictionary %s", createSQL)
-							dropSQL := fmt.Sprintf("DROP DICTIONARY %s.%s", clickhousrDatabase, dictName)
+							dropSQL := fmt.Sprintf("DROP DICTIONARY %s.%s", clickhouseDatabase, dictName)
 							_, err = connect.Exec(dropSQL)
 							if err != nil {
 								log.Error(err)
