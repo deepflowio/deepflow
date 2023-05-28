@@ -85,7 +85,14 @@ impl Guard {
     }
 
     fn release_log_files(file_and_size_sum: FileAndSizeSum, log_file_size: u64) {
-        let zero_o_clock = Local::today().and_hms_milli(0, 0, 0, 0).timestamp_millis() as u64; // 当天零点时间
+        let today = Utc::now()
+            .date_naive()
+            .and_hms_milli_opt(0, 0, 0, 0)
+            .unwrap();
+        let zero_o_clock = Local
+            .from_local_datetime(&today)
+            .unwrap()
+            .timestamp_millis() as u128; // 当天零点时间
         let mut file_sizes_sum = file_and_size_sum.file_sizes_sum.clone();
         // 从旧到新删除日志文件直到低于限制值
         for file_info in file_and_size_sum.file_infos.iter() {
@@ -97,7 +104,7 @@ impl Guard {
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
                 .as_millis(); // 文件修改时间
-            if file_mt >= zero_o_clock.into() {
+            if file_mt >= zero_o_clock {
                 // 当天的文件清空
                 match File::create(Path::new(file_info.file_path.as_str()))
                     .unwrap()

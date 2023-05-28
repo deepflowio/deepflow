@@ -154,8 +154,8 @@ pub struct NtpTime(pub u64);
 
 impl From<&SystemTime> for NtpTime {
     fn from(t: &SystemTime) -> Self {
-        let n =
-            DateTime::<Utc>::from(*t).signed_duration_since(Utc.ymd(1900, 1, 1).and_hms(0, 0, 0));
+        let n = DateTime::<Utc>::from(*t)
+            .signed_duration_since(Utc.with_ymd_and_hms(1900, 1, 1, 0, 0, 0).unwrap());
         let secs = n.num_seconds() as u64;
         let frac = (((n.num_nanoseconds().unwrap() as u64 - secs * NSEC_IN_SEC as u64) << 32)
             + NSEC_IN_SEC as u64
@@ -169,8 +169,8 @@ impl From<&NtpTime> for SystemTime {
     fn from(t: &NtpTime) -> Self {
         let nanos =
             (t.0 >> 32) * NSEC_IN_SEC as u64 + ((t.0 & 0xFFFFFFFF) * NSEC_IN_SEC as u64 >> 32);
-        Utc.ymd(1900, 1, 1)
-            .and_hms(0, 0, 0)
+        Utc.with_ymd_and_hms(1900, 1, 1, 0, 0, 0)
+            .unwrap()
             .checked_add_signed(chrono::Duration::nanoseconds(nanos as i64))
             .unwrap()
             .into()
