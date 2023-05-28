@@ -42,6 +42,8 @@ use regex::Regex;
 use tokio::runtime::{Builder, Runtime};
 
 use crate::flow_generator::protocol_logs::SessionAggregator;
+#[cfg(target_os = "linux")]
+use crate::platform::prometheus::targets::TargetsWatcher;
 use crate::{
     collector::Collector,
     collector::{
@@ -884,6 +886,7 @@ pub enum Components {
 #[cfg(target_os = "linux")]
 pub struct WatcherComponents {
     pub api_watcher: Arc<ApiWatcher>,
+    pub prometheus_targets_watcher: Arc<TargetsWatcher>,
     pub libvirt_xml_extractor: Arc<LibvirtXmlExtractor>, // FIXME: Delete this component
     pub platform_synchronizer: Arc<PlatformSynchronizer>,
     pub kubernetes_poller: Arc<GenericPoller>,
@@ -931,12 +934,20 @@ impl WatcherComponents {
                 .clone(),
         ));
         platform_synchronizer.set_kubernetes_poller(kubernetes_poller.clone());
+        let prometheus_targets_watcher = Arc::new(TargetsWatcher::new(
+            runtime.clone(),
+            config_handler.platform(),
+            session.clone(),
+            exception_handler.clone(),
+            stats_collector.clone(),
+        ));
 
         info!("With ONLY_WATCH_K8S_RESOURCE and IN_CONTAINER environment variables set, the agent will only watch K8s resource");
         Ok(WatcherComponents {
             api_watcher,
             platform_synchronizer,
             kubernetes_poller,
+            prometheus_targets_watcher,
             domain_name_listener,
             libvirt_xml_extractor,
             running: AtomicBool::new(false),
@@ -956,6 +967,7 @@ impl WatcherComponents {
         }
         self.kubernetes_poller.start();
         self.domain_name_listener.start();
+        self.prometheus_targets_watcher.start();
         info!("Started watcher components.");
     }
 
@@ -966,6 +978,7 @@ impl WatcherComponents {
         self.api_watcher.stop();
         self.kubernetes_poller.stop();
         self.domain_name_listener.stop();
+        self.prometheus_targets_watcher.stop();
         info!("Stopped watcher components.")
     }
 }
@@ -991,6 +1004,8 @@ pub struct AgentComponents {
     pub socket_synchronizer: SocketSynchronizer,
     #[cfg(target_os = "linux")]
     pub api_watcher: Arc<ApiWatcher>,
+    #[cfg(target_os = "linux")]
+    pub prometheus_targets_watcher: Arc<TargetsWatcher>,
     pub debugger: Debugger,
     #[cfg(target_os = "linux")]
     pub ebpf_collector: Option<Box<EbpfCollector>>,
@@ -1286,6 +1301,15 @@ impl AgentComponents {
 
         #[cfg(target_os = "linux")]
         let api_watcher = Arc::new(ApiWatcher::new(
+            runtime.clone(),
+            config_handler.platform(),
+            session.clone(),
+            exception_handler.clone(),
+            stats_collector.clone(),
+        ));
+
+        #[cfg(target_os = "linux")]
+        let prometheus_targets_watcher = Arc::new(TargetsWatcher::new(
             runtime.clone(),
             config_handler.platform(),
             session.clone(),
@@ -2129,6 +2153,8 @@ impl AgentComponents {
             socket_synchronizer,
             #[cfg(target_os = "linux")]
             api_watcher,
+            #[cfg(target_os = "linux")]
+            prometheus_targets_watcher,
             debugger,
             session_aggrs,
             #[cfg(target_os = "linux")]
@@ -2173,6 +2199,7 @@ impl AgentComponents {
             }
             if matches!(self.agent_mode, RunningMode::Managed) && running_in_container() {
                 self.api_watcher.start();
+                self.prometheus_targets_watcher.start();
             }
             self.socket_synchronizer.start();
         }
@@ -2265,6 +2292,7 @@ impl AgentComponents {
             if let Some(h) = self.api_watcher.notify_stop() {
                 join_handles.push(h);
             }
+            self.prometheus_targets_watcher.stop();
         }
 
         for q in self.collectors.iter_mut() {

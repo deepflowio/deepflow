@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+use std::io::{self, Write};
+
+use flate2::write::ZlibEncoder;
+
 pub fn read_i16_be(bs: &[u8]) -> i16 {
     assert!(bs.len() >= 2);
     i16::from_be_bytes(bs[..2].try_into().unwrap())
@@ -67,4 +71,9 @@ pub fn write_u32_be(bs: &mut [u8], v: u32) {
 pub fn write_u64_be(bs: &mut [u8], v: u64) {
     assert!(bs.len() >= 8);
     bs[0..8].copy_from_slice(v.to_be_bytes().as_slice())
+}
+
+pub fn compress_entry(encoder: &mut ZlibEncoder<Vec<u8>>, entry: &[u8]) -> io::Result<Vec<u8>> {
+    encoder.write_all(entry)?;
+    encoder.reset(vec![])
 }

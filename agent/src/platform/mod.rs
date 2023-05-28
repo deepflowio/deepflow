@@ -18,6 +18,8 @@
 pub mod kubernetes;
 mod libvirt_xml_extractor;
 mod platform_synchronizer;
+#[cfg(target_os = "linux")]
+pub mod prometheus;
 
 #[cfg(target_os = "linux")]
 pub use kubernetes::{ActivePoller, ApiWatcher, GenericPoller, Poller};

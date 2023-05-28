@@ -246,6 +246,7 @@ pub struct OsProcScanConfig;
 pub struct PlatformConfig {
     pub sync_interval: Duration,
     pub kubernetes_cluster_id: String,
+    pub prometheus_http_api_address: String,
     pub libvirt_xml_path: PathBuf,
     pub kubernetes_poller_type: KubernetesPollerType,
     pub vtap_id: u16,
@@ -973,6 +974,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 },
                 #[cfg(target_os = "windows")]
                 os_proc_scan_conf: OsProcScanConfig {},
+                prometheus_http_api_address: conf.prometheus_http_api_address.clone(),
             },
             flow: (&conf).into(),
             log_parser: LogParserConfig {
@@ -1725,6 +1727,21 @@ impl ConfigHandler {
                     "Kubernetes API enabled set to {}",
                     new_cfg.kubernetes_api_enabled
                 );
+            }
+            if old_cfg.prometheus_http_api_address != new_cfg.prometheus_http_api_address {
+                info!(
+                    "prometheus_http_api_address set to {}",
+                    new_cfg.prometheus_http_api_address
+                );
+                if new_cfg.prometheus_http_api_address.is_empty() {
+                    callbacks.push(|_, components| {
+                        components.prometheus_targets_watcher.stop();
+                    });
+                } else {
+                    callbacks.push(|_, components| {
+                        components.prometheus_targets_watcher.start();
+                    });
+                }
             }
 
             // restart api watcher if it keeps running and config changes

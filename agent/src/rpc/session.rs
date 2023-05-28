@@ -39,7 +39,7 @@ use public::{
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 pub const SESSION_TIMEOUT: Duration = Duration::from_secs(30);
 
-const GRPC_CALL_ENDPOINTS: [&str; 9] = [
+const GRPC_CALL_ENDPOINTS: [&str; 10] = [
     "push",
     "ntp",
     "upgrade",
@@ -49,6 +49,7 @@ const GRPC_CALL_ENDPOINTS: [&str; 9] = [
     "get_kubernetes_cluster_id",
     "gpid_sync",
     "plugin",
+    "prometheus_api_sync",
 ];
 
 const PUSH_ENDPOINT: usize = 0;
@@ -60,6 +61,7 @@ const KUBERNETES_API_SYNC_ENDPOINT: usize = 5;
 const GET_KUBERNETES_CLUSTER_ID_ENDPOINT: usize = 6;
 const GPID_SYNC_ENDPOINT: usize = 7;
 const PLUGIN_ENDPOINT: usize = 8;
+const PROMETHEUS_API_SYNC_ENDPOINT: usize = 9;
 
 struct Config {
     ips: Vec<String>,
@@ -468,6 +470,18 @@ impl Session {
             return Err(anyhow!("fetch wasm prog fail, length incorrect"));
         }
         Ok(data)
+    }
+
+    pub async fn grpc_prometheus_api_sync(
+        &self,
+        request: trident::PrometheusApiSyncRequest,
+    ) -> Result<tonic::Response<trident::PrometheusApiSyncResponse>, tonic::Status> {
+        sync_grpc_call!(
+            self,
+            prometheus_api_sync,
+            request,
+            PROMETHEUS_API_SYNC_ENDPOINT
+        )
     }
 }
 
