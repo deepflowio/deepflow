@@ -128,6 +128,13 @@ func (c *TagRecorder) UpdateChDictionary() {
 							connect.Close()
 							continue
 						}
+						prometheusDistionaries := []string{}
+						if err := connect.Select(&dictionaries, fmt.Sprintf("SHOW DICTIONARIES IN %s", "prometheus")); err != nil {
+							log.Error(err)
+							connect.Close()
+							continue
+						}
+						dictionaries = append(dictionaries, prometheusDistionaries...)
 						wantedDicts := mapset.NewSet(
 							CH_DICTIONARY_IP_RESOURCE,
 							CH_DICTIONARY_IP_RELATION,
