@@ -166,7 +166,7 @@ func (e *Encoder) prepare(metrics []*trident.MetricLabelRequest) error {
 		return nil
 	}
 
-	log.Info(metricNamesToE)
+	log.Info(metricNamesToE) // TODO delete
 	log.Info(labelNamesToE)
 	log.Info(labelValuesToE)
 	log.Info(metricAPPLabelLayoutsToE)

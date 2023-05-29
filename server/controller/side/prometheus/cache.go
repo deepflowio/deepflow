@@ -315,6 +315,7 @@ func (t *target) refresh(args ...interface{}) error {
 			t.instanceJobToTargetID.Store(strings.Join([]string{tg.Instance, tg.Job}, keyJoiner), tg.ID)
 		}
 	}
+	log.Infof("refreshed targets: %d", t)
 	return nil
 }
 
