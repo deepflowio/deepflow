@@ -106,6 +106,7 @@ impl L7FlowPerf for HttpPerfData {
         config: Option<&LogParserConfig>,
         meta: &MetaPacket,
         flow_id: u64,
+        rrt_timeout: usize,
     ) -> Result<()> {
         if meta.lookup_key.proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
@@ -129,6 +130,7 @@ impl L7FlowPerf for HttpPerfData {
                 meta.lookup_key.timestamp,
                 meta.cap_seq,
                 meta.signal_source == SignalSource::EBPF,
+                rrt_timeout,
             );
             if !rrt.is_zero() {
                 if rrt > perf_stats.rrt_max {
@@ -159,6 +161,7 @@ impl L7FlowPerf for HttpPerfData {
                 meta.lookup_key.timestamp,
                 meta.cap_seq,
                 meta.signal_source == SignalSource::EBPF,
+                rrt_timeout,
             );
             if !rrt.is_zero() {
                 if rrt > perf_stats.rrt_max {
@@ -461,6 +464,7 @@ mod tests {
                 }),
                 packet,
                 0x1f3c01010,
+                Duration::from_secs(10).as_micros() as usize,
             );
         }
         http_perf_data

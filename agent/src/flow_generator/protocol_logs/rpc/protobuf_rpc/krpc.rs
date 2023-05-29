@@ -263,7 +263,7 @@ impl KrpcLog {
             _ => unreachable!(),
         }
 
-        self.revert_info_time(param.direction, param.time);
+        self.revert_info_time(param.direction, param.time, param.rrt_timeout);
         Ok(vec![L7ProtocolInfo::ProtobufRpcInfo(
             ProtobufRpcInfo::KrpcInfo(self.info.clone()),
         )])
@@ -320,6 +320,7 @@ impl L7FlowPerf for KrpcLog {
         _: Option<&LogParserConfig>,
         _packet: &MetaPacket,
         _flow_id: u64,
+        _rrt_timeout: usize,
     ) -> Result<()> {
         unreachable!()
     }

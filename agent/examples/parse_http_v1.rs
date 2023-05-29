@@ -1,6 +1,6 @@
-use std::cell::RefCell;
 use std::path::Path;
 use std::rc::Rc;
+use std::{cell::RefCell, time::Duration};
 
 use deepflow_agent::{
     _HttpPerfData as HttpPerfData, _L7FlowPerf as L7FlowPerf, _PacketDirection as PacketDirection,
@@ -36,7 +36,17 @@ fn main() {
     }
 
     for _ in 0..iters {
-        let _ = parser.parse(None, &packets[0], 0x1f3c01010);
-        let _ = parser.parse(None, &packets[1], 0x1f3c01010);
+        let _ = parser.parse(
+            None,
+            &packets[0],
+            0x1f3c01010,
+            Duration::from_secs(10).as_micros() as usize,
+        );
+        let _ = parser.parse(
+            None,
+            &packets[1],
+            0x1f3c01010,
+            Duration::from_secs(10).as_micros() as usize,
+        );
     }
 }

@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-use std::cell::RefCell;
 use std::path::Path;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Instant;
+use std::{cell::RefCell, time::Duration};
 
 use criterion::*;
 
@@ -86,8 +86,18 @@ pub(super) fn bench(c: &mut Criterion) {
 
             let start = Instant::now();
             for _ in 0..iters {
-                let _ = parser.parse(None, &packets[0], 0x1f3c01010);
-                let _ = parser.parse(None, &packets[1], 0x1f3c01010);
+                let _ = parser.parse(
+                    None,
+                    &packets[0],
+                    0x1f3c01010,
+                    Duration::from_secs(10).as_micros() as usize,
+                );
+                let _ = parser.parse(
+                    None,
+                    &packets[1],
+                    0x1f3c01010,
+                    Duration::from_secs(10).as_micros() as usize,
+                );
             }
             start.elapsed()
         })

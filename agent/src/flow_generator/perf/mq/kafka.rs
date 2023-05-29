@@ -103,6 +103,7 @@ impl L7FlowPerf for KafkaPerfData {
         _: Option<&LogParserConfig>,
         packet: &MetaPacket,
         flow_id: u64,
+        rrt_timeout: usize,
     ) -> Result<()> {
         if packet.lookup_key.proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
@@ -135,6 +136,7 @@ impl L7FlowPerf for KafkaPerfData {
                     packet.cap_seq,
                     packet.direction,
                     packet.signal_source == SignalSource::EBPF,
+                    rrt_timeout,
                 ) {
                     Err(Error::L7ReqNotFound(1))
                 } else {
@@ -307,6 +309,7 @@ impl KafkaPerfData {
         cap_seq: u64,
         direction: PacketDirection,
         from_ebpf: bool,
+        rrt_timeout: usize,
     ) -> bool {
         self.msg_type = LogMessageType::Response;
 
@@ -346,7 +349,10 @@ impl KafkaPerfData {
             self.status = L7ResponseStatus::NotExist;
         }
 
-        let rrt = Duration::from_nanos(resp_time - req_time);
+        let mut rrt = Duration::from_nanos(resp_time - req_time);
+        if rrt.as_micros() as usize > rrt_timeout {
+            rrt = Duration::ZERO;
+        }
         stats.rrt_max = stats.rrt_max.max(rrt);
         stats.rrt_last = rrt;
         stats.rrt_sum += rrt;
@@ -393,7 +399,12 @@ mod tests {
             } else {
                 packet.direction = PacketDirection::ServerToClient;
             }
-            let _ = kafka_perf_data.parse(None, packet, 1608373855724393643);
+            let _ = kafka_perf_data.parse(
+                None,
+                packet,
+                1608373855724393643,
+                Duration::from_secs(10).as_micros() as usize,
+            );
         }
         kafka_perf_data.stats.unwrap_or_default()
     }

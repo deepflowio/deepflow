@@ -95,13 +95,14 @@ impl L7FlowPerf for MqttPerfData {
         _: Option<&LogParserConfig>,
         packet: &MetaPacket,
         flow_id: u64,
+        rrt_timeout: usize,
     ) -> Result<()> {
         if packet.lookup_key.proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
         }
 
         let payload = packet.get_l4_payload().ok_or(Error::ZeroPayloadLen)?;
-        self.parse_mqtt(payload, packet, flow_id)?;
+        self.parse_mqtt(payload, packet, flow_id, rrt_timeout)?;
 
         Ok(())
     }
@@ -175,7 +176,13 @@ impl MqttPerfData {
         }
     }
 
-    fn parse_mqtt(&mut self, mut payload: &[u8], packet: &MetaPacket, flow_id: u64) -> Result<()> {
+    fn parse_mqtt(
+        &mut self,
+        mut payload: &[u8],
+        packet: &MetaPacket,
+        flow_id: u64,
+        rrt_timeout: usize,
+    ) -> Result<()> {
         // 现在只支持 MQTT 3.1.1解析
         let timestamp = packet.lookup_key.timestamp;
         if self.proto_version != 0 && self.proto_version != 4 {
@@ -201,6 +208,7 @@ impl MqttPerfData {
                         packet.cap_seq,
                         packet.direction,
                         packet.signal_source == SignalSource::EBPF,
+                        rrt_timeout,
                     );
                 }
                 PacketKind::Connack => {
@@ -215,6 +223,7 @@ impl MqttPerfData {
                         packet.cap_seq,
                         packet.direction,
                         packet.signal_source == SignalSource::EBPF,
+                        rrt_timeout,
                     );
                 }
                 PacketKind::Publish { dup, qos, .. } => {
@@ -233,6 +242,7 @@ impl MqttPerfData {
                                 packet.cap_seq,
                                 packet.direction,
                                 packet.signal_source == SignalSource::EBPF,
+                                rrt_timeout,
                             );
                         }
                         QualityOfService::AtMostOnce => {
@@ -243,6 +253,7 @@ impl MqttPerfData {
                                 packet.cap_seq,
                                 packet.direction,
                                 packet.signal_source == SignalSource::EBPF,
+                                rrt_timeout,
                             );
                         }
                     }
@@ -260,6 +271,7 @@ impl MqttPerfData {
                         packet.cap_seq,
                         packet.direction,
                         packet.signal_source == SignalSource::EBPF,
+                        rrt_timeout,
                     );
                 }
                 PacketKind::Subscribe
@@ -273,6 +285,7 @@ impl MqttPerfData {
                         packet.cap_seq,
                         packet.direction,
                         packet.signal_source == SignalSource::EBPF,
+                        rrt_timeout,
                     );
                 }
                 PacketKind::Disconnect => {
@@ -283,6 +296,7 @@ impl MqttPerfData {
                         packet.cap_seq,
                         packet.direction,
                         packet.signal_source == SignalSource::EBPF,
+                        rrt_timeout,
                     );
                 }
             }
@@ -306,14 +320,20 @@ impl MqttPerfData {
         cap_seq: u64,
         direction: PacketDirection,
         from_ebpf: bool,
+        rrt_timeout: usize,
     ) {
         let stats = self.stats.get_or_insert(PerfStats::default());
         stats.req_count += 1;
         stats.rrt_last = Duration::ZERO;
-        let rrt = self
-            .rrt_cache
-            .borrow_mut()
-            .cal_rrt(flow_id, None, direction, timestamp, cap_seq, from_ebpf);
+        let rrt = self.rrt_cache.borrow_mut().cal_rrt(
+            flow_id,
+            None,
+            direction,
+            timestamp,
+            cap_seq,
+            from_ebpf,
+            rrt_timeout,
+        );
         if !rrt.is_zero() {
             stats.rrt_max = stats.rrt_max.max(rrt);
             stats.rrt_last = rrt;
@@ -329,14 +349,20 @@ impl MqttPerfData {
         cap_seq: u64,
         direction: PacketDirection,
         from_ebpf: bool,
+        rrt_timeout: usize,
     ) {
         let stats = self.stats.get_or_insert(PerfStats::default());
         stats.rrt_last = Duration::ZERO;
         stats.resp_count += 1;
-        let rrt = self
-            .rrt_cache
-            .borrow_mut()
-            .cal_rrt(flow_id, None, direction, timestamp, cap_seq, from_ebpf);
+        let rrt = self.rrt_cache.borrow_mut().cal_rrt(
+            flow_id,
+            None,
+            direction,
+            timestamp,
+            cap_seq,
+            from_ebpf,
+            rrt_timeout,
+        );
         if !rrt.is_zero() {
             stats.rrt_max = stats.rrt_max.max(rrt);
             stats.rrt_last = rrt;
@@ -383,7 +409,12 @@ mod tests {
             } else {
                 packet.direction = PacketDirection::ServerToClient;
             }
-            let _ = mqtt_perf_data.parse(None, packet, 1608373855724393643);
+            let _ = mqtt_perf_data.parse(
+                None,
+                packet,
+                1608373855724393643,
+                Duration::from_secs(10).as_micros() as usize,
+            );
         }
         mqtt_perf_data.stats.unwrap_or_default()
     }

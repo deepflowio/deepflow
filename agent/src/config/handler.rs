@@ -318,6 +318,9 @@ pub struct FlowConfig {
 
     // vec<protocolName, port bitmap>
     pub l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
+
+    pub rrt_tcp_timeout: usize, //micro sec
+    pub rrt_udp_timeout: usize, //micro sec
 }
 
 impl From<&RuntimeConfig> for FlowConfig {
@@ -367,6 +370,8 @@ impl From<&RuntimeConfig> for FlowConfig {
             l7_protocol_parse_port_bitmap: Arc::new(
                 (&conf.yaml_config).get_protocol_port_parse_bitmap(),
             ),
+            rrt_tcp_timeout: conf.yaml_config.rrt_tcp_timeout.as_micros() as usize,
+            rrt_udp_timeout: conf.yaml_config.rrt_udp_timeout.as_micros() as usize,
         }
     }
 }

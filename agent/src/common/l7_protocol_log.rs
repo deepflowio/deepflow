@@ -135,7 +135,7 @@ macro_rules! perf_impl {
             }
 
             // revert the rrt from previous_log_info
-            fn revert_info_time(&mut self, direction: PacketDirection, cur_time: u64) {
+            fn revert_info_time(&mut self, direction: PacketDirection, cur_time: u64, rrt_timeout: usize) {
                 let Some((ref prev_typ,ref prev_time)) = self.previous_log_info.get(&self.info.session_id().unwrap_or_default()) else{
                     return ;
                 };
@@ -143,14 +143,15 @@ macro_rules! perf_impl {
                     // current is req and previous is resp and previous time gt current time,
                     // likely ebpf disorder, revert the info end time
                     PacketDirection::ClientToServer
-                        if *prev_typ == LogMessageType::Response && *prev_time > cur_time =>
+                        if *prev_typ == LogMessageType::Response && *prev_time > cur_time &&
+                        *prev_time - cur_time < rrt_timeout as u64 =>
                     {
                         self.info.end_time = *prev_time;
                     }
 
                     // current is resp and previous is req and current info time gt previous info time, revert the info start.
                     PacketDirection::ServerToClient
-                        if *prev_typ == LogMessageType::Request && cur_time > *prev_time =>
+                        if *prev_typ == LogMessageType::Request && cur_time > *prev_time && cur_time - *prev_time < rrt_timeout as u64 =>
                     {
                         self.info.start_time = *prev_time;
                     }
@@ -518,6 +519,7 @@ pub struct ParseParam {
     // not None when payload from ebpf
     pub ebpf_param: Option<EbpfParam>,
     pub time: u64,
+    pub rrt_timeout: usize,
 }
 
 impl From<&MetaPacket<'_>> for ParseParam {
@@ -533,6 +535,7 @@ impl From<&MetaPacket<'_>> for ParseParam {
             ebpf_type: packet.ebpf_type,
             ebpf_param: None,
             time: packet.lookup_key.timestamp.as_micros() as u64,
+            rrt_timeout: 0,
         };
         if packet.ebpf_type != EbpfType::None {
             let is_tls = match packet.ebpf_type {
@@ -560,6 +563,10 @@ impl ParseParam {
             return ebpf_param.is_tls;
         }
         false
+    }
+
+    pub fn set_rrt_timeout(&mut self, t: usize) {
+        self.rrt_timeout = t;
     }
 }
 
