@@ -59,7 +59,7 @@ type ColumnRenames struct {
 	Tables          []string
 	OldColumnNames  []string
 	CheckColumnType bool
-	OldColumnType   string
+	OldColumnType   ckdb.ColumnType
 	NewColumnNames  []string
 	DropIndex       bool
 	DropMvTable     bool
@@ -70,7 +70,7 @@ type ColumnRename struct {
 	Table           string
 	OldColumnName   string
 	CheckColumnType bool
-	OldColumnType   string
+	OldColumnType   ckdb.ColumnType
 	NewColumnName   string
 	DropIndex       bool
 	DropMvTable     bool
@@ -583,7 +583,7 @@ var ColumnRename620 = []*ColumnRename{
 		Table:           "l7_packet",
 		OldColumnName:   "pcap_batch",
 		CheckColumnType: true,
-		OldColumnType:   ckdb.ArrayUInt8.String(),
+		OldColumnType:   ckdb.ArrayUInt8,
 		NewColumnName:   "pcap_batch_bak",
 	},
 	&ColumnRename{
@@ -591,7 +591,7 @@ var ColumnRename620 = []*ColumnRename{
 		Table:           "l7_packet_local",
 		OldColumnName:   "pcap_batch",
 		CheckColumnType: true,
-		OldColumnType:   ckdb.ArrayUInt8.String(),
+		OldColumnType:   ckdb.ArrayUInt8,
 		NewColumnName:   "pcap_batch_bak",
 	},
 	&ColumnRename{
@@ -599,7 +599,7 @@ var ColumnRename620 = []*ColumnRename{
 		Table:           "l4_packet",
 		OldColumnName:   "packet_batch",
 		CheckColumnType: true,
-		OldColumnType:   ckdb.ArrayUInt8.String(),
+		OldColumnType:   ckdb.ArrayUInt8,
 		NewColumnName:   "packet_batch_bak",
 	},
 	&ColumnRename{
@@ -607,7 +607,7 @@ var ColumnRename620 = []*ColumnRename{
 		Table:           "l4_packet_local",
 		OldColumnName:   "packet_batch",
 		CheckColumnType: true,
-		OldColumnType:   ckdb.ArrayUInt8.String(),
+		OldColumnType:   ckdb.ArrayUInt8,
 		NewColumnName:   "packet_batch_bak",
 	},
 }
@@ -662,6 +662,7 @@ var ColumnRename623 = []*ColumnRenames{
 		Tables:         []string{"l7_flow_log", "l7_flow_log_local"},
 		OldColumnNames: []string{"service_name", "service_instance_id"},
 		NewColumnNames: []string{"app_service", "app_instance"},
+		OldColumnType:  ckdb.String,
 	},
 	&ColumnRenames{
 		Db:             "flow_log",
@@ -669,6 +670,7 @@ var ColumnRename623 = []*ColumnRenames{
 		OldColumnNames: u8OldColumnEdgeName623,
 		NewColumnNames: u8NewColumnEdgeName623,
 		DropIndex:      true,
+		OldColumnType:  ckdb.UInt8,
 	},
 	&ColumnRenames{
 		Db:             "flow_log",
@@ -676,6 +678,7 @@ var ColumnRename623 = []*ColumnRenames{
 		OldColumnNames: u32OldColumnEdgeName623,
 		NewColumnNames: u32NewColumnEdgeName623,
 		DropIndex:      true,
+		OldColumnType:  ckdb.UInt32,
 	},
 	&ColumnRenames{
 		Db:             "flow_metrics",
@@ -684,6 +687,7 @@ var ColumnRename623 = []*ColumnRenames{
 		NewColumnNames: u8NewColumnName623,
 		DropIndex:      true,
 		DropMvTable:    true,
+		OldColumnType:  ckdb.UInt8,
 	},
 	&ColumnRenames{
 		Db:             "flow_metrics",
@@ -692,6 +696,7 @@ var ColumnRename623 = []*ColumnRenames{
 		NewColumnNames: u32NewColumnName623,
 		DropIndex:      true,
 		DropMvTable:    true,
+		OldColumnType:  ckdb.UInt32,
 	},
 	&ColumnRenames{
 		Db:             "flow_metrics",
@@ -700,6 +705,7 @@ var ColumnRename623 = []*ColumnRenames{
 		NewColumnNames: u8NewColumnEdgeName623,
 		DropIndex:      true,
 		DropMvTable:    true,
+		OldColumnType:  ckdb.UInt8,
 	},
 	&ColumnRenames{
 		Db:             "flow_metrics",
@@ -708,6 +714,7 @@ var ColumnRename623 = []*ColumnRenames{
 		NewColumnNames: u32NewColumnEdgeName623,
 		DropIndex:      true,
 		DropMvTable:    true,
+		OldColumnType:  ckdb.UInt32,
 	},
 	&ColumnRenames{
 		Db:             "ext_metrics",
@@ -715,6 +722,7 @@ var ColumnRename623 = []*ColumnRenames{
 		OldColumnNames: u8OldColumnName623,
 		NewColumnNames: u8NewColumnName623,
 		DropIndex:      true,
+		OldColumnType:  ckdb.UInt8,
 	},
 	&ColumnRenames{
 		Db:             "ext_metrics",
@@ -722,6 +730,7 @@ var ColumnRename623 = []*ColumnRenames{
 		OldColumnNames: u32OldColumnName623,
 		NewColumnNames: u32NewColumnName623,
 		DropIndex:      true,
+		OldColumnType:  ckdb.UInt32,
 	},
 }
 
@@ -796,8 +805,16 @@ var ColumnRenames626 = []*ColumnRenames{
 	&ColumnRenames{
 		Db:             "flow_log",
 		Tables:         []string{"l7_packet", "l7_packet_local"},
-		OldColumnNames: []string{"pcap_count", "pcap_batch"},
-		NewColumnNames: []string{"packet_count", "packet_batch"},
+		OldColumnNames: []string{"pcap_count"},
+		NewColumnNames: []string{"packet_count"},
+		OldColumnType:  ckdb.UInt32,
+	},
+	&ColumnRenames{
+		Db:             "flow_log",
+		Tables:         []string{"l7_packet", "l7_packet_local"},
+		OldColumnNames: []string{"pcap_batch"},
+		NewColumnNames: []string{"packet_batch"},
+		OldColumnType:  ckdb.String,
 	},
 }
 
@@ -1277,6 +1294,36 @@ func (i *Issu) saveDatasourceInfo(connect *sql.DB, db, mvTable string) {
 	}
 }
 
+//  add column and copy data to new column replace rename column
+func (i *Issu) renameColumnWithAddNewColumn(connect *sql.DB, cr *ColumnRename) error {
+	// add new column
+	sql := fmt.Sprintf("ALTER TABLE %s.`%s` ADD COLUMN %s %s",
+		cr.Db, cr.Table, cr.NewColumnName, cr.OldColumnType)
+	log.Infof("rename add column: %s", sql)
+	_, err := connect.Exec(sql)
+	if err != nil {
+		// 如果已经增加，需要跳过该错误
+		if strings.Contains(err.Error(), "column with this name already exists") {
+			log.Infof("db: %s, table: %s error: %s", cr.Db, cr.Table, err)
+			return nil
+			// The 'metrics/metrics_local' table is created after receiving the ext_metric data. If the table field is modified just after the system starts, it will cause an error. Ignore it
+		} else if strings.Contains(err.Error(), "Table ext_metrics.metrics doesn't exist") || strings.Contains(err.Error(), "Table ext_metrics.metrics_local doesn't exist") {
+			log.Infof("db: %s, table: %s error: %s", cr.Db, cr.Table, err)
+			return nil
+		}
+		log.Error(err)
+		return err
+	}
+
+	// copy data to new column
+	sql = fmt.Sprintf("ALTER TABLE %s.`%s` update %s=%s WHERE 1",
+		cr.Db, cr.Table, cr.NewColumnName, cr.OldColumnName)
+	log.Info("rename copy column: ", sql)
+	_, err = connect.Exec(sql)
+
+	return err
+}
+
 func (i *Issu) renameColumn(connect *sql.DB, cr *ColumnRename) error {
 	if cr.CheckColumnType {
 		columnType, err := i.getColumnType(connect, cr.Db, cr.Table, cr.OldColumnName)
@@ -1284,29 +1331,10 @@ func (i *Issu) renameColumn(connect *sql.DB, cr *ColumnRename) error {
 			log.Error(err)
 			return err
 		}
-		if columnType != cr.OldColumnType {
+		if columnType != cr.OldColumnType.String() {
 			return nil
 		}
 	}
-	if cr.DropIndex {
-		sql := fmt.Sprintf("ALTER TABLE %s.`%s` DROP INDEX %s_idx",
-			cr.Db, cr.Table, cr.OldColumnName)
-		log.Info("drop index: ", sql)
-		_, err := connect.Exec(sql)
-		if err != nil {
-			if strings.Contains(err.Error(), "Cannot find index") {
-				log.Infof("db: %s, table: %s error: %s", cr.Db, cr.Table, err)
-			} else if strings.Contains(err.Error(), "is not supported by storage Distributed") {
-				log.Infof("db: %s, table: %s info: %s", cr.Db, cr.Table, err)
-			} else if strings.Contains(err.Error(), "doesn't exist") {
-				log.Infof("db: %s, table: %s info: %s", cr.Db, cr.Table, err)
-			} else {
-				log.Errorf("sql: %s, error: %s", sql, err)
-				return err
-			}
-		}
-	}
-
 	if cr.DropMvTable {
 		mvTables, err := getMvTables(connect, cr.Db, strings.Split(cr.Table, ".")[0])
 		if err != nil {
@@ -1321,6 +1349,29 @@ func (i *Issu) renameColumn(connect *sql.DB, cr *ColumnRename) error {
 			_, err := connect.Exec(sql)
 			if err != nil {
 				log.Error(err)
+				return err
+			}
+		}
+	}
+
+	if strings.HasSuffix(cr.Table, "_local") {
+		return i.renameColumnWithAddNewColumn(connect, cr)
+	}
+
+	if cr.DropIndex {
+		sql := fmt.Sprintf("ALTER TABLE %s.`%s` DROP INDEX %s_idx",
+			cr.Db, cr.Table, cr.OldColumnName)
+		log.Info("drop index: ", sql)
+		_, err := connect.Exec(sql)
+		if err != nil {
+			if strings.Contains(err.Error(), "Cannot find index") {
+				log.Infof("db: %s, table: %s error: %s", cr.Db, cr.Table, err)
+			} else if strings.Contains(err.Error(), "is not supported by storage Distributed") {
+				log.Infof("db: %s, table: %s info: %s", cr.Db, cr.Table, err)
+			} else if strings.Contains(err.Error(), "doesn't exist") {
+				log.Infof("db: %s, table: %s info: %s", cr.Db, cr.Table, err)
+			} else {
+				log.Errorf("sql: %s, error: %s", sql, err)
 				return err
 			}
 		}
