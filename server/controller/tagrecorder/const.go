@@ -504,7 +504,7 @@ const (
 		"PRIMARY KEY metric_id, label_name_id, label_value\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
-		"LAYOUT(FLAT())"
+		"LAYOUT(COMPLEX_KEY_HASHED())"
 	CREATE_TARGET_LABEL_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `metric_id` UInt64,\n" +
@@ -515,7 +515,7 @@ const (
 		"PRIMARY KEY metric_id, label_name_id, label_value\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
-		"LAYOUT(FLAT())"
+		"LAYOUT(COMPLEX_KEY_HASHED())"
 )
 
 var DBNodeTypeToResourceType = map[string]string{
