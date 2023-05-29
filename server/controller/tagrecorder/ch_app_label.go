@@ -66,9 +66,8 @@ func (l *ChAPPLabel) generateNewData() (map[PrometheusLabelKey]mysql.ChAPPLabel,
 		metricName := prometheusMetricName.Name
 		labelNames := metricLabelMap[metricName]
 		for _, labelName := range strings.Split(labelNames, ", ") {
-			log.Infof("app_label_test: labelname : %s", labelName)
 			labelNameID := labelsNameIDmap[labelName]
-			labelValue := labelsNameValueMap[metricName]
+			labelValue := labelsNameValueMap[labelName]
 			labelValueID:= labelsValueIDMap[labelValue]
 	
 			keyToItem[PrometheusLabelKey{MetricID: prometheusMetricName.ID, LabelNameID: labelNameID, LabelValue: labelValue }] = mysql.ChAPPLabel{
@@ -114,9 +113,7 @@ func (l *ChAPPLabel) generateLayoutData() (map[string]string, bool){
 		}else {
 			metricLabelMap[prometheusMetricAPPLabelLayout.MetricName] += ", "+prometheusMetricAPPLabelLayout.APPLabelName
 		}
-		log.Infof("app_label_test: metricLabelMap item: %s, %s", prometheusMetricAPPLabelLayout.MetricName, metricLabelMap[prometheusMetricAPPLabelLayout.MetricName])
 	}
-	log.Infof("app_label_test: metricLabelMap item: %s", metricLabelMap)
 	return metricLabelMap, true
 }
 
@@ -141,11 +138,9 @@ func (l *ChAPPLabel) generatelabelNameValueData() (map[string]string, map[string
 
 	for _, prometheusLabel := range prometheusLabels {
 		labelsNameValueMap[prometheusLabel.Name] = prometheusLabel.Value
-		log.Infof("app_label_test: labelsNameValueMap item: %s, %s", prometheusLabel.Name, prometheusLabel.Value)
 	}
 	for _, prometheusLabelName := range prometheusLabelNames {
 		labelsNameIDMap[prometheusLabelName.Name] = prometheusLabelName.ID
-		log.Infof("app_label_test: labelsNameIDMap item: %s, %d", prometheusLabelName.Name, prometheusLabelName.ID)
 	}
 	return labelsNameValueMap, labelsNameIDMap, true
 }
@@ -162,7 +157,6 @@ func (l *ChAPPLabel) generateLabelValueIDData() (map[string]int, bool){
 
 	for _, prometheusLabelValue := range prometheusLabelValues {
 		metricLabelValueIDMap[prometheusLabelValue.Value] = prometheusLabelValue.ID
-		log.Infof("app_label_test: metricLabelValueIDMap item: %s, %d", prometheusLabelValue.Value, prometheusLabelValue.ID)
 	}
 	return metricLabelValueIDMap, true
 }
