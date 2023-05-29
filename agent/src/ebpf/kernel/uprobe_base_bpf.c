@@ -373,8 +373,8 @@ _Pragma("error \"Must specify a BPF target arch\"");
 #endif
 }
 
-SEC("uprobe/runtime.casgstatus")
-int runtime_casgstatus(struct pt_regs *ctx)
+SEC("uprobe/runtime.execute")
+int runtime_execute(struct pt_regs *ctx)
 {
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	__u32 tgid = pid_tgid >> 32;
@@ -388,20 +388,12 @@ int runtime_casgstatus(struct pt_regs *ctx)
 		return 0;
 	}
 
-	__s32 newval;
 	void *g_ptr;
 
 	if (is_register_based_call(info)) {
 		g_ptr = (void *)PT_GO_REGS_PARM1(ctx);
-		newval = (__s32)PT_GO_REGS_PARM3(ctx);
 	} else {
 		bpf_probe_read(&g_ptr, sizeof(g_ptr), (void *)(PT_REGS_SP(ctx) + 8));
-		bpf_probe_read(&newval, sizeof(newval),
-			       (void *)(PT_REGS_SP(ctx) + 20));
-	}
-
-	if (newval != 2) {
-		return 0;
 	}
 
 	__s64 goid = 0;
