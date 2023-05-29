@@ -450,7 +450,7 @@ static int elf_section_collect(struct elf_info *info)
 			Elf_Data *data_prog;
 
 			// hdr.sh_info: Additional section information,  
-			// e.g.: from sec ".reluprobe/runtime.casgstatus", get sec "uprobe/runtime.casgstatus"
+			// e.g.: from sec ".reluprobe/runtime.execute", get sec "uprobe/runtime.execute"
 			scn = elf_getscn(info->elf, hdr.sh_info);
 			if (scn == NULL) {
 				ebpf_warning
