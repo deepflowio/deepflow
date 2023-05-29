@@ -19,6 +19,7 @@ package prometheus
 import (
 	"context"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/golang/protobuf/proto"
 	"github.com/op/go-logging"
 	"github.com/pkg/errors"
@@ -133,45 +134,79 @@ func (e *Encoder) assembleFully() ([]*trident.MetricLabelResponse, error) {
 }
 
 func (e *Encoder) prepare(metrics []*trident.MetricLabelRequest) error {
-	metricNamesToE := make([]string, 0)
-	labelNamesToE := make([]string, 0)
-	labelValuesToE := make([]string, 0)
-	metricAPPLabelLayoutsToE := make([]*controller.PrometheusMetricAPPLabelLayoutRequest, 0)
-	labelsToAdd := make([]*controller.PrometheusLabel, 0)
-	metricTargetsToAdd := make([]*controller.PrometheusMetricTarget, 0)
+	metricNamesToE := mapset.NewSet[string]()
+	labelNamesToE := mapset.NewSet[string]()
+	labelValuesToE := mapset.NewSet[string]()
+	metricAPPLabelLayoutsToE := mapset.NewSet[layoutKey]()
+	labelsToAdd := mapset.NewSet[labelKey]()
+	metricTargetsToAdd := mapset.NewSet[metricTargetKey]()
 	for _, m := range metrics {
 		mn := m.GetMetricName()
-		e.tryAppendMetricNameToEncode(&metricNamesToE, mn)
+		e.tryAppendMetricNameToEncode(metricNamesToE, mn)
 		var instanceValue string
 		var jobValue string
 		for _, l := range m.GetLabels() {
 			ln := l.GetName()
 			lv := l.GetValue()
-			e.tryAppendLabelNameToEncode(&labelNamesToE, ln)
-			e.tryAppendLabelValueToEncode(&labelValuesToE, lv)
+			e.tryAppendLabelNameToEncode(labelNamesToE, ln)
+			e.tryAppendLabelValueToEncode(labelValuesToE, lv)
 			if ln == TargetLabelInstance {
 				instanceValue = l.GetValue()
 			} else if ln == TargetLabelJob {
 				jobValue = l.GetValue()
 			} else if !common.Contains(e.cache.target.labelNames, ln) {
-				e.tryAppendMetricAPPLabelLayoutToEncode(&metricAPPLabelLayoutsToE, layoutKey{metricName: mn, labelName: ln})
+				e.tryAppendMetricAPPLabelLayoutToEncode(metricAPPLabelLayoutsToE, layoutKey{metricName: mn, labelName: ln})
 			}
-			e.tryAppendLabelToAdd(&labelsToAdd, ln, lv)
+			e.tryAppendLabelToAdd(labelsToAdd, ln, lv)
 		}
-		e.tryAppendMetricTargetToAdd(&metricTargetsToAdd, mn, instanceValue, jobValue)
+		e.tryAppendMetricTargetToAdd(metricTargetsToAdd, mn, instanceValue, jobValue)
 	}
 
-	if len(metricNamesToE) == 0 && len(labelNamesToE) == 0 && len(labelValuesToE) == 0 && len(metricAPPLabelLayoutsToE) == 0 && len(labelsToAdd) == 0 && len(metricTargetsToAdd) == 0 {
+	if metricNamesToE.Cardinality() == 0 && labelNamesToE.Cardinality() == 0 && labelValuesToE.Cardinality() == 0 && metricAPPLabelLayoutsToE.Cardinality() == 0 && labelsToAdd.Cardinality() == 0 && metricTargetsToAdd.Cardinality() == 0 {
 		return nil
 	}
+
+	log.Info(metricNamesToE)
+	log.Info(labelNamesToE)
+	log.Info(labelValuesToE)
+	log.Info(metricAPPLabelLayoutsToE)
+	log.Info(labelsToAdd)
+	log.Info(metricTargetsToAdd)
 	syncResp, err := e.grpcurl.Sync(
 		&controller.SyncPrometheusRequest{
-			MetricNames:           metricNamesToE,
-			LabelNames:            labelNamesToE,
-			LabelValues:           labelValuesToE,
-			MetricAppLabelLayouts: metricAPPLabelLayoutsToE,
-			Labels:                labelsToAdd,
-			MetricTargets:         metricTargetsToAdd,
+			MetricNames: metricNamesToE.ToSlice(),
+			LabelNames:  labelNamesToE.ToSlice(),
+			LabelValues: labelValuesToE.ToSlice(),
+			MetricAppLabelLayouts: func(ks []layoutKey) []*controller.PrometheusMetricAPPLabelLayoutRequest {
+				res := make([]*controller.PrometheusMetricAPPLabelLayoutRequest, 0, len(ks))
+				for i := range ks {
+					res = append(res, &controller.PrometheusMetricAPPLabelLayoutRequest{
+						MetricName:   &ks[i].metricName,
+						AppLabelName: &ks[i].labelName,
+					})
+				}
+				return res
+			}(metricAPPLabelLayoutsToE.ToSlice()),
+			Labels: func(ks []labelKey) []*controller.PrometheusLabel {
+				res := make([]*controller.PrometheusLabel, 0, len(ks))
+				for i := range ks {
+					res = append(res, &controller.PrometheusLabel{
+						Name:  &ks[i].name,
+						Value: &ks[i].value,
+					})
+				}
+				return res
+			}(labelsToAdd.ToSlice()),
+			MetricTargets: func(ks []metricTargetKey) []*controller.PrometheusMetricTarget {
+				res := make([]*controller.PrometheusMetricTarget, 0, len(ks))
+				for i := range ks {
+					res = append(res, &controller.PrometheusMetricTarget{
+						MetricName: &ks[i].metricName,
+						TargetId:   proto.Uint32(uint32(ks[i].targetID)),
+					})
+				}
+				return res
+			}(metricTargetsToAdd.ToSlice()),
 		},
 	)
 	if err != nil {
@@ -238,9 +273,9 @@ func (e *Encoder) assemble(metrics []*trident.MetricLabelRequest) ([]*trident.Me
 	return respMetrics, nil
 }
 
-func (e *Encoder) tryAppendMetricNameToEncode(toEn *[]string, name string) {
+func (e *Encoder) tryAppendMetricNameToEncode(toEn mapset.Set[string], name string) {
 	if _, ok := e.cache.metricName.getIDByName(name); !ok {
-		*toEn = append(*toEn, name)
+		toEn.Add(name)
 	}
 }
 
@@ -250,9 +285,9 @@ func (e *Encoder) addMetricNameCache(arg ...interface{}) error {
 	return nil
 }
 
-func (e *Encoder) tryAppendLabelNameToEncode(toEn *[]string, name string) {
+func (e *Encoder) tryAppendLabelNameToEncode(toEn mapset.Set[string], name string) {
 	if _, ok := e.cache.labelName.getIDByName(name); !ok {
-		*toEn = append(*toEn, name)
+		toEn.Add(name)
 	}
 }
 
@@ -262,9 +297,9 @@ func (e *Encoder) addLabelNameCache(arg ...interface{}) error {
 	return nil
 }
 
-func (e *Encoder) tryAppendLabelValueToEncode(toEn *[]string, name string) {
+func (e *Encoder) tryAppendLabelValueToEncode(toEn mapset.Set[string], name string) {
 	if _, ok := e.cache.labelValue.getValueID(name); !ok {
-		*toEn = append(*toEn, name)
+		toEn.Add(name)
 	}
 }
 
@@ -274,9 +309,9 @@ func (e *Encoder) addLabelValueCache(arg ...interface{}) error {
 	return nil
 }
 
-func (e *Encoder) tryAppendMetricAPPLabelLayoutToEncode(toEn *[]*controller.PrometheusMetricAPPLabelLayoutRequest, k layoutKey) {
+func (e *Encoder) tryAppendMetricAPPLabelLayoutToEncode(toEn mapset.Set[layoutKey], k layoutKey) {
 	if _, ok := e.cache.metricAndAPPLabelLayout.getIndex(k); !ok {
-		*toEn = append(*toEn, &controller.PrometheusMetricAPPLabelLayoutRequest{MetricName: &k.metricName, AppLabelName: &k.labelName})
+		toEn.Add(k)
 	}
 }
 
@@ -286,9 +321,9 @@ func (e *Encoder) addMetricAPPLabelLayoutCache(arg ...interface{}) error {
 	return nil
 }
 
-func (e *Encoder) tryAppendLabelToAdd(toAdd *[]*controller.PrometheusLabel, name, value string) {
+func (e *Encoder) tryAppendLabelToAdd(toAdd mapset.Set[labelKey], name, value string) {
 	if _, ok := e.cache.label.getValueByName(name); !ok {
-		*toAdd = append(*toAdd, &controller.PrometheusLabel{Name: &name, Value: &value})
+		toAdd.Add(labelKey{name: name, value: value})
 	}
 }
 
@@ -298,10 +333,10 @@ func (e *Encoder) addLabelCache(arg ...interface{}) error {
 	return nil
 }
 
-func (e *Encoder) tryAppendMetricTargetToAdd(toAdd *[]*controller.PrometheusMetricTarget, metricName, ins, job string) {
+func (e *Encoder) tryAppendMetricTargetToAdd(toAdd mapset.Set[metricTargetKey], metricName, ins, job string) {
 	if _, ok := e.cache.metricTarget.getTargetID(metricName); !ok {
 		if ti, ok := e.cache.target.getTargetID(ins, job); ok {
-			*toAdd = append(*toAdd, &controller.PrometheusMetricTarget{MetricName: &metricName, TargetId: proto.Uint32(uint32(ti))})
+			toAdd.Add(metricTargetKey{metricName: metricName, targetID: ti})
 		}
 	}
 }

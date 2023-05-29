@@ -69,12 +69,12 @@ func (m *labelLayout) sync(req []*controller.PrometheusMetricAPPLabelLayoutReque
 		tmpMetricNameToMaxIndex[k] = v
 	}
 
-	var dbToAdd []mysql.PrometheusMetricAPPLabelLayout
+	var dbToAdd []*mysql.PrometheusMetricAPPLabelLayout
 	for _, v := range req {
 		mn := v.GetMetricName()
 		ln := v.GetAppLabelName()
 		if _, ok := m.metricNameToLabelNameToIndex[mn][ln]; !ok {
-			dbToAdd = append(dbToAdd, mysql.PrometheusMetricAPPLabelLayout{
+			dbToAdd = append(dbToAdd, &mysql.PrometheusMetricAPPLabelLayout{
 				MetricName:          mn,
 				APPLabelName:        ln,
 				APPLabelColumnIndex: tmpMetricNameToMaxIndex[mn] + 1,
@@ -104,7 +104,7 @@ func (m *labelLayout) sync(req []*controller.PrometheusMetricAPPLabelLayoutReque
 	return resp, nil
 }
 
-func (m *labelLayout) addBatch(toAdd []mysql.PrometheusMetricAPPLabelLayout) error {
+func (m *labelLayout) addBatch(toAdd []*mysql.PrometheusMetricAPPLabelLayout) error {
 	count := len(toAdd)
 	offset := 1000
 	pages := count/offset + 1

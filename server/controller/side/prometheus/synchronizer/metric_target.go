@@ -53,11 +53,11 @@ func (l *metricTarget) sync(toAdd []*controller.PrometheusMetricTarget) error {
 	l.mux.Lock()
 	defer l.mux.Unlock()
 
-	var dbToAdd []mysql.PrometheusMetricTarget
+	var dbToAdd []*mysql.PrometheusMetricTarget
 	for i := range toAdd {
 		mn := toAdd[i].GetMetricName()
 		if _, ok := l.metricNameToTargetID[mn]; !ok {
-			dbToAdd = append(dbToAdd, mysql.PrometheusMetricTarget{
+			dbToAdd = append(dbToAdd, &mysql.PrometheusMetricTarget{
 				MetricName: mn,
 				TargetID:   int(toAdd[i].GetTargetId()),
 			})
@@ -73,7 +73,7 @@ func (l *metricTarget) sync(toAdd []*controller.PrometheusMetricTarget) error {
 	return nil
 }
 
-func (l *metricTarget) addBatch(toAdd []mysql.PrometheusMetricTarget) error {
+func (l *metricTarget) addBatch(toAdd []*mysql.PrometheusMetricTarget) error {
 	count := len(toAdd)
 	offset := 1000
 	pages := count/offset + 1

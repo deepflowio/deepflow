@@ -154,12 +154,12 @@ func (p *metricName) sync(strs []string) ([]*controller.PrometheusMetricName, er
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 	resp := make([]*controller.PrometheusMetricName, 0)
-	dbToAdd := make([]mysql.PrometheusMetricName, 0)
+	dbToAdd := make([]*mysql.PrometheusMetricName, 0)
 	var countToAllocate int
 	for _, str := range strs {
 		if _, ok := p.strToID[str]; !ok {
 			countToAllocate++
-			dbToAdd = append(dbToAdd, mysql.PrometheusMetricName{Name: str})
+			dbToAdd = append(dbToAdd, &mysql.PrometheusMetricName{Name: str})
 			continue
 		}
 		resp = append(resp, &controller.PrometheusMetricName{Name: &str, Id: proto.Uint32(uint32(p.strToID[str]))})
@@ -185,7 +185,7 @@ func (p *metricName) sync(strs []string) ([]*controller.PrometheusMetricName, er
 	return resp, nil
 }
 
-func (p *metricName) addBatch(toAdd []mysql.PrometheusMetricName) error {
+func (p *metricName) addBatch(toAdd []*mysql.PrometheusMetricName) error {
 	count := len(toAdd)
 	offset := 1000
 	pages := count/offset + 1

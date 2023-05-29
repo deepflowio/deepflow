@@ -155,12 +155,12 @@ func (p *labelName) check(ids []int) (inUseIDs []int, err error) {
 
 func (p *labelName) sync(strs []string) ([]*controller.PrometheusLabelName, error) {
 	resp := make([]*controller.PrometheusLabelName, 0)
-	dbToAdd := make([]mysql.PrometheusLabelName, 0)
+	dbToAdd := make([]*mysql.PrometheusLabelName, 0)
 	var countToAllocate int
 	for _, str := range strs {
 		if _, ok := p.strToID[str]; !ok {
 			countToAllocate++
-			dbToAdd = append(dbToAdd, mysql.PrometheusLabelName{Name: str})
+			dbToAdd = append(dbToAdd, &mysql.PrometheusLabelName{Name: str})
 			continue
 		}
 		resp = append(resp, &controller.PrometheusLabelName{Name: &str, Id: proto.Uint32(uint32(p.strToID[str]))})
@@ -186,7 +186,7 @@ func (p *labelName) sync(strs []string) ([]*controller.PrometheusLabelName, erro
 	return resp, nil
 }
 
-func (p *labelName) addBatch(toAdd []mysql.PrometheusLabelName) error {
+func (p *labelName) addBatch(toAdd []*mysql.PrometheusLabelName) error {
 	count := len(toAdd)
 	offset := 1000
 	pages := count/offset + 1

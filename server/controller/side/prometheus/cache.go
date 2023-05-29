@@ -341,6 +341,11 @@ func (t *target) load() ([]*mysql.PrometheusTarget, error) {
 	return targets, err
 }
 
+type labelKey struct {
+	name  string
+	value string
+}
+
 type label struct {
 	nameToValue sync.Map
 }
@@ -377,6 +382,11 @@ func (t *label) load() ([]*mysql.PrometheusLabel, error) {
 	var labels []*mysql.PrometheusLabel
 	err := mysql.Db.Find(&labels).Error
 	return labels, err
+}
+
+type metricTargetKey struct {
+	metricName string
+	targetID   int
 }
 
 type metricTarget struct {

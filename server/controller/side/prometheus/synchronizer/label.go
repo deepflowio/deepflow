@@ -53,11 +53,11 @@ func (l *label) sync(toAdd []*controller.PrometheusLabel) error {
 	l.mux.Lock()
 	defer l.mux.Unlock()
 
-	var dbToAdd []mysql.PrometheusLabel
+	var dbToAdd []*mysql.PrometheusLabel
 	for i := range toAdd {
 		n := toAdd[i].GetName()
 		if _, ok := l.nameToValue[n]; !ok {
-			dbToAdd = append(dbToAdd, mysql.PrometheusLabel{
+			dbToAdd = append(dbToAdd, &mysql.PrometheusLabel{
 				Name:  n,
 				Value: toAdd[i].GetValue(),
 			})
@@ -73,7 +73,7 @@ func (l *label) sync(toAdd []*controller.PrometheusLabel) error {
 	return nil
 }
 
-func (l *label) addBatch(toAdd []mysql.PrometheusLabel) error {
+func (l *label) addBatch(toAdd []*mysql.PrometheusLabel) error {
 	count := len(toAdd)
 	offset := 1000
 	pages := count/offset + 1

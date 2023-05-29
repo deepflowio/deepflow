@@ -2440,21 +2440,21 @@ CREATE TABLE IF NOT EXISTS prometheus_metric_name (
     `id`            INT(10) NOT NULL PRIMARY KEY,
     `name`          VARCHAR(256) NOT NULL UNIQUE,
     `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-)ENGINE=innodb DEFAULT CHARSET=utf8;
+)ENGINE=innodb DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 TRUNCATE TABLE prometheus_metric_name;
 
 CREATE TABLE IF NOT EXISTS prometheus_label_name (
     `id`            INT(10) NOT NULL PRIMARY KEY,
     `name`          VARCHAR(256) NOT NULL UNIQUE,
     `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-)ENGINE=innodb DEFAULT CHARSET=utf8;
+)ENGINE=innodb DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 TRUNCATE TABLE prometheus_label_name;
 
 CREATE TABLE IF NOT EXISTS prometheus_label_value (
     `id`            INT(10) NOT NULL PRIMARY KEY,
     `value`         VARCHAR(256) NOT NULL UNIQUE,
     `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-)ENGINE=innodb DEFAULT CHARSET=utf8;
+)ENGINE=innodb DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 TRUNCATE TABLE prometheus_label_value;
 
 CREATE TABLE IF NOT EXISTS prometheus_label (
@@ -2463,7 +2463,7 @@ CREATE TABLE IF NOT EXISTS prometheus_label (
     `value`         VARCHAR(256) NOT NULL,
     `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE INDEX label(name, value)
-)ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+)ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 TRUNCATE TABLE prometheus_label_value;
 
 CREATE TABLE IF NOT EXISTS prometheus_metric_app_label_layout (
@@ -2473,7 +2473,7 @@ CREATE TABLE IF NOT EXISTS prometheus_metric_app_label_layout (
     `app_label_column_index`    TINYINT(3) NOT NULL,
     `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE INDEX metric_label_index(metric_name, app_label_name)
-)ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+)ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 TRUNCATE TABLE prometheus_metric_app_label_layout;
 
 CREATE TABLE IF NOT EXISTS prometheus_metric_target (
@@ -2482,7 +2482,7 @@ CREATE TABLE IF NOT EXISTS prometheus_metric_target (
     `target_id`     INT(10) NOT NULL,
     `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE INDEX metric_target_index(metric_name, target_id)
-)ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+)ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 TRUNCATE TABLE prometheus_metric_target;
 
 CREATE TABLE IF NOT EXISTS ch_app_label (

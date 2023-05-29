@@ -155,12 +155,12 @@ func (p *labelValue) sync(strs []string) ([]*controller.PrometheusLabelValue, er
 	defer p.mutex.Unlock()
 
 	resp := make([]*controller.PrometheusLabelValue, 0)
-	dbToAdd := make([]mysql.PrometheusLabelValue, 0)
+	dbToAdd := make([]*mysql.PrometheusLabelValue, 0)
 	var countToAllocate int
 	for _, str := range strs {
 		if _, ok := p.strToID[str]; !ok {
 			countToAllocate++
-			dbToAdd = append(dbToAdd, mysql.PrometheusLabelValue{Value: str})
+			dbToAdd = append(dbToAdd, &mysql.PrometheusLabelValue{Value: str})
 			continue
 		}
 		resp = append(resp, &controller.PrometheusLabelValue{Value: &str, Id: proto.Uint32(uint32(p.strToID[str]))})
@@ -186,7 +186,7 @@ func (p *labelValue) sync(strs []string) ([]*controller.PrometheusLabelValue, er
 	return resp, nil
 }
 
-func (p *labelValue) addBatch(toAdd []mysql.PrometheusLabelValue) error {
+func (p *labelValue) addBatch(toAdd []*mysql.PrometheusLabelValue) error {
 	count := len(toAdd)
 	offset := 1000
 	pages := count/offset + 1
