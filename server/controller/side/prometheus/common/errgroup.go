@@ -24,7 +24,7 @@ import (
 
 type ErrFunc func(...interface{}) error
 
-func AppendErrGroup(ctx context.Context, eg *errgroup.Group, f ErrFunc, args ...interface{}) {
+func AppendErrGroupWithContext(ctx context.Context, eg *errgroup.Group, f ErrFunc, args ...interface{}) {
 	eg.Go(func() error {
 		select {
 		case <-ctx.Done():
@@ -32,5 +32,11 @@ func AppendErrGroup(ctx context.Context, eg *errgroup.Group, f ErrFunc, args ...
 		default:
 			return f(args...)
 		}
+	})
+}
+
+func AppendErrGroup(eg *errgroup.Group, f ErrFunc, args ...interface{}) {
+	eg.Go(func() error {
+		return f(args...)
 	})
 }

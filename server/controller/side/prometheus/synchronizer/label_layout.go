@@ -28,11 +28,13 @@ import (
 type labelLayout struct {
 	mux                          sync.Mutex
 	metricNameToLabelNameToIndex map[string]map[string]uint8
+	metricNameToMaxIndex         map[string]uint8
 }
 
 func newLabelLayout() *labelLayout {
 	return &labelLayout{
 		metricNameToLabelNameToIndex: make(map[string]map[string]uint8),
+		metricNameToMaxIndex:         make(map[string]uint8),
 	}
 }
 
@@ -51,6 +53,9 @@ func (m *labelLayout) refresh(args ...interface{}) error {
 			m.metricNameToLabelNameToIndex[v.MetricName] = make(map[string]uint8)
 		}
 		m.metricNameToLabelNameToIndex[v.MetricName][v.APPLabelName] = v.APPLabelColumnIndex
+		if m.metricNameToMaxIndex[v.MetricName] < v.APPLabelColumnIndex {
+			m.metricNameToMaxIndex[v.MetricName] = v.APPLabelColumnIndex
+		}
 	}
 	return nil
 }
@@ -59,16 +64,22 @@ func (m *labelLayout) sync(req []*controller.PrometheusMetricAPPLabelLayoutReque
 	m.mux.Lock()
 	defer m.mux.Unlock()
 
+	tmpMetricNameToMaxIndex := make(map[string]uint8)
+	for k, v := range m.metricNameToMaxIndex {
+		tmpMetricNameToMaxIndex[k] = v
+	}
+
 	var dbToAdd []mysql.PrometheusMetricAPPLabelLayout
 	for _, v := range req {
 		mn := v.GetMetricName()
 		ln := v.GetAppLabelName()
-		if _, ok := m.metricNameToLabelNameToIndex[mn]; !ok {
+		if _, ok := m.metricNameToLabelNameToIndex[mn][ln]; !ok {
 			dbToAdd = append(dbToAdd, mysql.PrometheusMetricAPPLabelLayout{
 				MetricName:          mn,
 				APPLabelName:        ln,
-				APPLabelColumnIndex: uint8(len(m.metricNameToLabelNameToIndex[mn]) + 1),
+				APPLabelColumnIndex: tmpMetricNameToMaxIndex[mn] + 1,
 			})
+			tmpMetricNameToMaxIndex[mn]++
 		}
 	}
 	err := m.addBatch(dbToAdd)
@@ -86,6 +97,9 @@ func (m *labelLayout) sync(req []*controller.PrometheusMetricAPPLabelLayoutReque
 			m.metricNameToLabelNameToIndex[l.MetricName] = make(map[string]uint8)
 		}
 		m.metricNameToLabelNameToIndex[l.MetricName][l.APPLabelName] = l.APPLabelColumnIndex
+		if m.metricNameToMaxIndex[l.MetricName] < l.APPLabelColumnIndex {
+			m.metricNameToMaxIndex[l.MetricName] = l.APPLabelColumnIndex
+		}
 	}
 	return resp, nil
 }

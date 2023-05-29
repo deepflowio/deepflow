@@ -26,6 +26,7 @@ import (
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	. "github.com/deepflowio/deepflow/server/controller/side/prometheus/common"
 )
 
 var keyJoiner = "-"
@@ -35,6 +36,10 @@ var (
 )
 
 type Cache struct {
+	ctx context.Context
+
+	canRefresh chan bool
+
 	metricName
 	labelName
 	labelValue
@@ -47,6 +52,7 @@ type Cache struct {
 func GetSingletonCache() *Cache {
 	cacheOnce.Do(func() {
 		cacheIns = &Cache{
+			canRefresh:              make(chan bool, 1),
 			metricName:              metricName{},
 			labelName:               labelName{},
 			labelValue:              labelValue{},
@@ -60,9 +66,10 @@ func GetSingletonCache() *Cache {
 }
 
 func (t *Cache) Start(ctx context.Context) error {
-	if err := t.refresh(); err != nil {
+	if err := t.refresh(false); err != nil {
 		return err
 	}
+	t.canRefresh <- true
 	go func() {
 		ticker := time.NewTicker(time.Hour)
 		for {
@@ -70,56 +77,73 @@ func (t *Cache) Start(ctx context.Context) error {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				t.refresh()
+				select {
+				case t.canRefresh <- true:
+					t.refresh(false)
+				default:
+					log.Info("last refresh cache not completed now")
+				}
 			}
 		}
 	}()
 	return nil
 }
 
-func (t *Cache) refresh() error {
+func (t *Cache) refresh(fully bool) error {
 	log.Info("refresh cache started")
-	eg := errgroup.Group{}
-	eg.Go(t.metricName.refresh)
-	eg.Go(t.labelName.refresh)
-	eg.Go(t.labelValue.refresh)
-	eg.Go(t.metricAndAPPLabelLayout.refresh)
-	eg.Go(t.target.refresh)
-	eg.Go(t.label.refresh)
-	eg.Go(t.metricTarget.refresh)
+	eg := &errgroup.Group{}
+	AppendErrGroup(eg, t.metricName.refresh, fully)
+	AppendErrGroup(eg, t.labelName.refresh, fully)
+	AppendErrGroup(eg, t.labelValue.refresh, fully)
+	AppendErrGroup(eg, t.metricAndAPPLabelLayout.refresh, fully)
+	AppendErrGroup(eg, t.target.refresh, fully)
+	AppendErrGroup(eg, t.label.refresh, fully)
+	AppendErrGroup(eg, t.metricTarget.refresh, fully)
 	err := eg.Wait()
-	log.Info("refresh cache finished")
+	log.Info("refresh cache completed")
+	return err
+
+}
+
+func (t *Cache) refreshFully() error {
+	t.clear()
+	err := t.refresh(true)
 	return err
 }
 
+func (t *Cache) clear() {
+	t.metricAndAPPLabelLayout.metricNameToAPPLabelNames = make(map[string][]string)
+	t.target.targetIDToLabelNameToValue = make(map[int]map[string]string)
+}
+
 type metricName struct {
-	metricNameToID sync.Map
+	nameToID sync.Map
 }
 
 func (t *metricName) getIDByName(n string) (int, bool) {
-	if id, ok := t.metricNameToID.Load(n); ok {
+	if id, ok := t.nameToID.Load(n); ok {
 		return id.(int), true
 	}
 	return 0, false
 }
 
 func (t *metricName) setNameID(n string, id int) {
-	t.metricNameToID.Store(n, id)
+	t.nameToID.Store(n, id)
 }
 
 func (t *metricName) add(batch []*controller.PrometheusMetricName) {
 	for _, m := range batch {
-		t.metricNameToID.Store(m.GetName(), int(m.GetId()))
+		t.nameToID.Store(m.GetName(), int(m.GetId()))
 	}
 }
 
-func (t *metricName) refresh() error {
+func (t *metricName) refresh(args ...interface{}) error {
 	metricNames, err := t.load()
 	if err != nil {
 		return err
 	}
 	for _, mn := range metricNames {
-		t.metricNameToID.Store(mn.Name, mn.ID)
+		t.nameToID.Store(mn.Name, mn.ID)
 	}
 	return nil
 }
@@ -131,33 +155,33 @@ func (t *metricName) load() ([]*mysql.PrometheusMetricName, error) {
 }
 
 type labelName struct {
-	labelNameToID sync.Map
+	nameToID sync.Map
 }
 
 func (t *labelName) getIDByName(n string) (int, bool) {
-	if id, ok := t.labelNameToID.Load(n); ok {
+	if id, ok := t.nameToID.Load(n); ok {
 		return id.(int), true
 	}
 	return 0, false
 }
 
 func (t *labelName) setNameID(n string, id int) {
-	t.labelNameToID.Store(n, id)
+	t.nameToID.Store(n, id)
 }
 
 func (t *labelName) add(batch []*controller.PrometheusLabelName) {
 	for _, m := range batch {
-		t.labelNameToID.Store(m.GetName(), int(m.GetId()))
+		t.nameToID.Store(m.GetName(), int(m.GetId()))
 	}
 }
 
-func (t *labelName) refresh() error {
+func (t *labelName) refresh(args ...interface{}) error {
 	labelNames, err := t.load()
 	if err != nil {
 		return err
 	}
 	for _, ln := range labelNames {
-		t.labelNameToID.Store(ln.Name, ln.ID)
+		t.nameToID.Store(ln.Name, ln.ID)
 	}
 	return nil
 }
@@ -169,33 +193,33 @@ func (t *labelName) load() ([]*mysql.PrometheusLabelName, error) {
 }
 
 type labelValue struct {
-	labelValueToID sync.Map
+	valueToID sync.Map
 }
 
 func (t *labelValue) getValueID(v string) (int, bool) {
-	if id, ok := t.labelValueToID.Load(v); ok {
+	if id, ok := t.valueToID.Load(v); ok {
 		return id.(int), true
 	}
 	return 0, false
 }
 
 func (t *labelValue) setValueID(v string, id int) {
-	t.labelValueToID.Store(v, id)
+	t.valueToID.Store(v, id)
 }
 
 func (t *labelValue) add(batch []*controller.PrometheusLabelValue) {
 	for _, m := range batch {
-		t.labelValueToID.Store(m.GetValue(), int(m.GetId()))
+		t.valueToID.Store(m.GetValue(), int(m.GetId()))
 	}
 }
 
-func (t *labelValue) refresh() error {
+func (t *labelValue) refresh(args ...interface{}) error {
 	labelValues, err := t.load()
 	if err != nil {
 		return err
 	}
 	for _, lv := range labelValues {
-		t.labelValueToID.Store(lv.Value, lv.ID)
+		t.valueToID.Store(lv.Value, lv.ID)
 	}
 	return nil
 }
@@ -207,12 +231,13 @@ func (t *labelValue) load() ([]*mysql.PrometheusLabelValue, error) {
 }
 
 type layoutKey struct {
-	MetricName string
-	LabelName  string
+	metricName string
+	labelName  string
 }
 
 type metricAndAPPLabelLayout struct {
-	layoutKeyToIndex sync.Map
+	layoutKeyToIndex          sync.Map
+	metricNameToAPPLabelNames map[string][]string // only for fully assembled
 }
 
 func (t *metricAndAPPLabelLayout) getIndex(key layoutKey) (uint8, bool) {
@@ -228,17 +253,25 @@ func (t *metricAndAPPLabelLayout) setIndex(key layoutKey, index uint8) {
 
 func (t *metricAndAPPLabelLayout) add(batch []*controller.PrometheusMetricAPPLabelLayout) {
 	for _, m := range batch {
-		t.layoutKeyToIndex.Store(layoutKey{MetricName: m.GetMetricName(), LabelName: m.GetAppLabelName()}, uint8(m.GetAppLabelColumnIndex()))
+		t.layoutKeyToIndex.Store(layoutKey{metricName: m.GetMetricName(), labelName: m.GetAppLabelName()}, uint8(m.GetAppLabelColumnIndex()))
 	}
 }
 
-func (t *metricAndAPPLabelLayout) refresh() error {
+func (t *metricAndAPPLabelLayout) refresh(args ...interface{}) error {
 	metricAPPLabelLayouts, err := t.load()
 	if err != nil {
 		return err
 	}
-	for _, l := range metricAPPLabelLayouts {
-		t.layoutKeyToIndex.Store(layoutKey{MetricName: l.MetricName, LabelName: l.APPLabelName}, uint8(l.APPLabelColumnIndex))
+	fully := args[0].(bool)
+	if fully {
+		for _, l := range metricAPPLabelLayouts {
+			t.layoutKeyToIndex.Store(layoutKey{metricName: l.MetricName, labelName: l.APPLabelName}, uint8(l.APPLabelColumnIndex))
+			t.metricNameToAPPLabelNames[l.MetricName] = append(t.metricNameToAPPLabelNames[l.MetricName], l.APPLabelName)
+		}
+	} else {
+		for _, l := range metricAPPLabelLayouts {
+			t.layoutKeyToIndex.Store(layoutKey{metricName: l.MetricName, labelName: l.APPLabelName}, uint8(l.APPLabelColumnIndex))
+		}
 	}
 	return nil
 }
@@ -250,12 +283,13 @@ func (t *metricAndAPPLabelLayout) load() ([]*mysql.PrometheusMetricAPPLabelLayou
 }
 
 type target struct {
-	instanceAndJobToTargetID sync.Map // joined key: instance_value + "-" + job_value
-	labelNames               []string
+	instanceJobToTargetID      sync.Map // joined key: instance_value + "-" + job_value
+	labelNames                 []string
+	targetIDToLabelNameToValue map[int]map[string]string // only for fully assembled
 }
 
-func (t *target) getTargetID(key string) (int, bool) {
-	if id, ok := t.instanceAndJobToTargetID.Load(key); ok {
+func (t *target) getTargetID(ins, job string) (int, bool) {
+	if id, ok := t.instanceJobToTargetID.Load(ins + keyJoiner + job); ok {
 		return id.(int), true
 	}
 	return 0, false
@@ -265,15 +299,40 @@ func (t *target) getLabelNames() []string {
 	return t.labelNames
 }
 
-func (t *target) refresh() error {
+func (t *target) refresh(args ...interface{}) error {
 	targets, err := t.load()
 	if err != nil {
 		return err
 	}
-	for _, tg := range targets {
-		t.instanceAndJobToTargetID.Store(strings.Join([]string{tg.Instance, tg.Job}, keyJoiner), tg.ID)
+	fully := args[0].(bool)
+	if fully {
+		for _, tg := range targets {
+			t.instanceJobToTargetID.Store(strings.Join([]string{tg.Instance, tg.Job}, keyJoiner), tg.ID)
+			t.targetIDToLabelNameToValue[tg.ID] = t.formatLabels(tg)
+		}
+	} else {
+		for _, tg := range targets {
+			t.instanceJobToTargetID.Store(strings.Join([]string{tg.Instance, tg.Job}, keyJoiner), tg.ID)
+		}
 	}
 	return nil
+}
+
+func (t *target) formatLabels(tg *mysql.PrometheusTarget) (labelNameToValue map[string]string) {
+	labelNameToValue = make(map[string]string)
+	labelNameToValue[TargetLabelInstance] = tg.Instance
+	labelNameToValue[TargetLabelJob] = tg.Job
+	for _, l := range strings.Split(tg.OtherLabels, ",") {
+		if l == "" {
+			continue
+		}
+		parts := strings.Split(l, "=")
+		if len(parts) != 2 {
+			continue
+		}
+		labelNameToValue[parts[0]] = parts[1]
+	}
+	return
 }
 
 func (t *target) load() ([]*mysql.PrometheusTarget, error) {
@@ -303,7 +362,7 @@ func (t *label) add(batch []*controller.PrometheusLabel) {
 	}
 }
 
-func (t *label) refresh() error {
+func (t *label) refresh(args ...interface{}) error {
 	labelNames, err := t.load()
 	if err != nil {
 		return err
@@ -341,7 +400,7 @@ func (t *metricTarget) add(batch []*controller.PrometheusMetricTarget) {
 	}
 }
 
-func (t *metricTarget) refresh() error {
+func (t *metricTarget) refresh(args ...interface{}) error {
 	metricTargets, err := t.load()
 	if err != nil {
 		return err
