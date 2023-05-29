@@ -392,7 +392,7 @@ impl SofaRpcLog {
                 self.fill_with_trace_ctx(sofa_hdr.new_rpc_trace_context);
             }
         }
-        self.revert_info_time(param.direction, param.time);
+        self.revert_info_time(param.direction, param.time, param.rrt_timeout);
         Ok(vec![L7ProtocolInfo::SofaRpcInfo(self.info.clone())])
     }
 
@@ -416,6 +416,7 @@ impl L7FlowPerf for SofaRpcLog {
         config: Option<&LogParserConfig>,
         packet: &MetaPacket,
         _: u64,
+        _: usize,
     ) -> Result<()> {
         if let Some(payload) = packet.get_l4_payload() {
             self.parse_payload(config, payload, &ParseParam::from(packet))?;

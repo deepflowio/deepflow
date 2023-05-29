@@ -768,6 +768,13 @@ vtap_group_id: g-xxxxxx
   #################
   ## L7 Protocol ##
   #################
+  ## L7 perf rrt calculate timeout
+  ## Note: the timeout of l7 log info rrt calculate, when rrt exceed the value will act as timeout and will not
+  ##   calculate the sum and average and will not merge the request and response in session aggregate. the value
+  ##   must greater than session aggregate SLOT_TIME(const 10s) and less than 3600 on tcp or 300 on udp.
+  #rrt-tcp-timeout: 1800s
+  #rrt-udp-timeout: 150s
+
   ## Maximum Fail Count
   ## Note: deepflow-agent will mark the application protocol for each
   ##   <vpc, ip, protocol, port> tuple, when the traffic corresponding to a tuple fails

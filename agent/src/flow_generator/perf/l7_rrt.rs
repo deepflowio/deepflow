@@ -64,6 +64,7 @@ impl RrtCache {
         cur_time: Duration,
         cap_seq: u64,
         from_ebpf: bool,
+        rrt_timeout: usize,
     ) -> Duration {
         let key = Self::cal_cache_key(
             flow_id,
@@ -91,17 +92,32 @@ impl RrtCache {
             && cur_type == LogMessageType::Response
             && cur_time > prev_time
         {
+            let rrt = cur_time - prev_time;
+            // rrt timeout, save the latest
+            if rrt.as_micros() as usize > rrt_timeout {
+                self.push(key, (cur_type, cur_time));
+                return Duration::ZERO;
+            }
+
             // if previous is req and current is resp and resp time gt req time, calculate the round trip time.
             timeout_count.map(|c| *c -= 1);
-            return cur_time - prev_time;
+            rrt
         } else if prev_type == LogMessageType::Response
             && cur_type == LogMessageType::Request
             && cur_time < prev_time
         {
+            let rrt = prev_time - cur_time;
+            // rrt timeout, save the latest. unlikely happen in disorder
+            if rrt.as_micros() as usize > rrt_timeout {
+                warn!("disorder unlikely large rrt");
+                self.push(key, (prev_type, prev_time));
+                return Duration::ZERO;
+            }
+
             // if previous is resp and current is req and resp time gt req time, likely ebpf disorder,
             // calculate the round trip time.
             timeout_count.map(|c| *c -= 1);
-            return prev_time - cur_time;
+            rrt
         } else {
             debug!(
                 "can not calculate rrt, flow_id: {}, previous log type:{:?}, previous time: {:?}, current log type: {:?}, current time: {:?}",
@@ -109,7 +125,7 @@ impl RrtCache {
             );
             timeout_count.map(|c| *c += 1);
             self.push(key, (cur_type, cur_time));
-            return Duration::ZERO;
+            Duration::ZERO
         }
     }
 

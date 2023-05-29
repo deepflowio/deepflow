@@ -85,6 +85,8 @@ type StaticConfig struct {
 	MemoryTrimDisabled               *bool                 `yaml:"memory-trim-disabled,omitempty"`
 	FastPathDisabled                 *bool                 `yaml:"fast-path-disabled,omitempty"`
 	ForwardCapacity                  *uint32               `yaml:"forward-capacity,omitempty"`
+	RrtTcpTimeout                    *string               `yaml:"rrt-tcp-timeout,omitempty"`
+	RrtUdpTimeout                    *string               `yaml:"rrt-udp-timeout,omitempty"`
 }
 
 type XflowCollectorConfig struct {

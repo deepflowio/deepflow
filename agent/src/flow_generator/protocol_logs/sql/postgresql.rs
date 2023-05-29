@@ -230,7 +230,7 @@ impl L7ProtocolParserInterface for PostgresqlLog {
         self.info.end_time = param.time;
         self.set_msg_type(param.direction);
         self.parse(payload, param)?;
-        self.revert_info_time(param.direction, param.time);
+        self.revert_info_time(param.direction, param.time, param.rrt_timeout);
         Ok(if self.info.ignore {
             vec![]
         } else {
@@ -261,6 +261,7 @@ impl L7FlowPerf for PostgresqlLog {
         config: Option<&LogParserConfig>,
         packet: &MetaPacket,
         _flow_id: u64,
+        _rrt_timeout: usize,
     ) -> Result<()> {
         if let Some(payload) = packet.get_l4_payload() {
             self.parse_payload(config, payload, &ParseParam::from(packet))?;

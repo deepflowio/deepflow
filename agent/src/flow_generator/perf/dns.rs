@@ -87,6 +87,7 @@ impl L7FlowPerf for DnsPerfData {
         _: Option<&LogParserConfig>,
         packet: &MetaPacket,
         flow_id: u64,
+        rrt_timeout: usize,
     ) -> Result<()> {
         let payload = packet.get_l4_payload().ok_or(Error::ZeroPayloadLen)?;
 
@@ -99,6 +100,7 @@ impl L7FlowPerf for DnsPerfData {
                     packet.direction,
                     packet.cap_seq,
                     packet.signal_source == SignalSource::EBPF,
+                    rrt_timeout,
                 )?;
             }
             IpProtocol::Tcp => {
@@ -115,6 +117,7 @@ impl L7FlowPerf for DnsPerfData {
                         packet.direction,
                         packet.cap_seq,
                         packet.signal_source == SignalSource::EBPF,
+                        rrt_timeout,
                     )?;
                 } else {
                     self.decode_payload(
@@ -124,6 +127,7 @@ impl L7FlowPerf for DnsPerfData {
                         packet.direction,
                         packet.cap_seq,
                         packet.signal_source == SignalSource::EBPF,
+                        rrt_timeout,
                     )
                     .or_else(|_| {
                         self.decode_payload(
@@ -133,6 +137,7 @@ impl L7FlowPerf for DnsPerfData {
                             packet.direction,
                             packet.cap_seq,
                             packet.signal_source == SignalSource::EBPF,
+                            rrt_timeout,
                         )
                     })?;
                 }
@@ -233,6 +238,7 @@ impl DnsPerfData {
         direction: PacketDirection,
         cap_seq: u64,
         from_ebpf: bool,
+        rrt_timeout: usize,
     ) -> Result<()> {
         if payload.len() < DNS_HEADER_SIZE {
             return Err(Error::DNSPerfParseFailed("protocol mismatch"));
@@ -257,6 +263,7 @@ impl DnsPerfData {
                 timestamp,
                 cap_seq,
                 from_ebpf,
+                rrt_timeout,
             );
             if !rrt.is_zero() {
                 if rrt > perf_stats.rrt_max {
@@ -295,6 +302,7 @@ impl DnsPerfData {
                 timestamp,
                 cap_seq,
                 from_ebpf,
+                rrt_timeout,
             );
             if !rrt.is_zero() {
                 if rrt > perf_stats.rrt_max {
@@ -338,7 +346,12 @@ mod tests {
             } else {
                 packet.direction = PacketDirection::ServerToClient;
             }
-            let _ = dns_perf_data.parse(None, packet, 0x1f3c01010);
+            let _ = dns_perf_data.parse(
+                None,
+                packet,
+                0x1f3c01010,
+                Duration::from_secs(10).as_micros() as usize,
+            );
         }
         dns_perf_data
     }

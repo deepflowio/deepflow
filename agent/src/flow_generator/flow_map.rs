@@ -955,6 +955,11 @@ impl FlowMap {
                 from_app_tab,
                 self.flow_perf_counter.clone(),
                 port,
+                match meta_packet.lookup_key.proto {
+                    IpProtocol::Tcp => config.rrt_tcp_timeout,
+                    IpProtocol::Udp => config.rrt_tcp_timeout,
+                    _ => 0,
+                },
             )
             .map(|o| Box::new(o));
         }

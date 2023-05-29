@@ -99,6 +99,7 @@ impl L7FlowPerf for ProtobufRpcWrapLog {
         config: Option<&LogParserConfig>,
         packet: &MetaPacket,
         _: u64,
+        _: usize,
     ) -> Result<()> {
         if let Some(payload) = packet.get_l4_payload() {
             if self.parser.is_none() {

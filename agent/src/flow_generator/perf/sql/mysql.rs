@@ -92,6 +92,7 @@ impl L7FlowPerf for MysqlPerfData {
         _: Option<&LogParserConfig>,
         packet: &MetaPacket,
         flow_id: u64,
+        rrt_timeout: usize,
     ) -> Result<()> {
         if packet.lookup_key.proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
@@ -111,7 +112,7 @@ impl L7FlowPerf for MysqlPerfData {
 
         match msg_type {
             LogMessageType::Request => {
-                self.parse_request(flow_id, packet);
+                self.parse_request(flow_id, packet, rrt_timeout);
                 self.l7_proto = L7Protocol::MySQL;
                 self.decode_response = true;
                 self.has_response = false;
@@ -123,7 +124,7 @@ impl L7FlowPerf for MysqlPerfData {
                     && self.l7_proto == L7Protocol::MySQL =>
             {
                 self.has_response = true;
-                if self.parse_response(flow_id, &payload[offset..], packet) {
+                if self.parse_response(flow_id, &payload[offset..], packet, rrt_timeout) {
                     Err(Error::L7ReqNotFound(1))
                 } else {
                     Ok(())
@@ -226,16 +227,22 @@ impl MysqlPerfData {
         cap_seq: u64,
         direction: PacketDirection,
         from_ebpf: bool,
+        rrt_timeout: usize,
     ) {
         let stats = self.stats.get_or_insert(PerfStats::default());
         stats.req_count += 1;
         self.active += 1;
         stats.rrt_last = Duration::ZERO;
 
-        let rrt = self
-            .rrt_cache
-            .borrow_mut()
-            .cal_rrt(flow_id, None, direction, timestamp, cap_seq, from_ebpf);
+        let rrt = self.rrt_cache.borrow_mut().cal_rrt(
+            flow_id,
+            None,
+            direction,
+            timestamp,
+            cap_seq,
+            from_ebpf,
+            rrt_timeout,
+        );
         if !rrt.is_zero() {
             if rrt > stats.rrt_max {
                 stats.rrt_max = rrt;
@@ -254,6 +261,7 @@ impl MysqlPerfData {
         cap_seq: u64,
         direction: PacketDirection,
         from_ebpf: bool,
+        rrt_timeout: usize,
     ) -> bool {
         let stats = self.stats.get_or_insert(PerfStats::default());
         stats.resp_count += 1;
@@ -278,10 +286,15 @@ impl MysqlPerfData {
 
         self.active -= 1;
 
-        let rrt = self
-            .rrt_cache
-            .borrow_mut()
-            .cal_rrt(flow_id, None, direction, timestamp, cap_seq, from_ebpf);
+        let rrt = self.rrt_cache.borrow_mut().cal_rrt(
+            flow_id,
+            None,
+            direction,
+            timestamp,
+            cap_seq,
+            from_ebpf,
+            rrt_timeout,
+        );
         if !rrt.is_zero() {
             if rrt > stats.rrt_max {
                 stats.rrt_max = rrt;
@@ -293,7 +306,7 @@ impl MysqlPerfData {
         false
     }
 
-    fn parse_request(&mut self, flow_id: u64, packet: &MetaPacket) {
+    fn parse_request(&mut self, flow_id: u64, packet: &MetaPacket, rrt_timeout: usize) {
         self.msg_type = LogMessageType::Request;
         self.has_log_data = true;
         self.calc_request(
@@ -302,11 +315,18 @@ impl MysqlPerfData {
             packet.cap_seq,
             packet.direction,
             packet.signal_source == SignalSource::EBPF,
+            rrt_timeout,
         );
     }
 
     // MySQL通过Greeting报文判断该流是否为MySQL
-    fn parse_response(&mut self, flow_id: u64, payload: &[u8], packet: &MetaPacket) -> bool {
+    fn parse_response(
+        &mut self,
+        flow_id: u64,
+        payload: &[u8],
+        packet: &MetaPacket,
+        rrt_timeout: usize,
+    ) -> bool {
         self.msg_type = LogMessageType::Response;
         self.has_log_data = true;
         let error_code: u16 = if payload[RESPONSE_CODE_OFFSET] == MYSQL_RESPONSE_CODE_ERR
@@ -323,6 +343,7 @@ impl MysqlPerfData {
             packet.cap_seq,
             packet.direction,
             packet.signal_source == SignalSource::EBPF,
+            rrt_timeout,
         )
     }
 }
@@ -351,7 +372,12 @@ mod test {
             } else {
                 packet.direction = PacketDirection::ServerToClient;
             }
-            let _ = perf_data.parse(None, packet, 0x1f3c01010);
+            let _ = perf_data.parse(
+                None,
+                packet,
+                0x1f3c01010,
+                Duration::from_secs(10).as_micros() as usize,
+            );
         }
         perf_data
     }

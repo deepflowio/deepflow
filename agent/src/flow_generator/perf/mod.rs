@@ -84,6 +84,7 @@ pub trait L7FlowPerf {
         config: Option<&LogParserConfig>,
         packet: &MetaPacket,
         flow_id: u64,
+        rrt_timeout: usize,
     ) -> Result<()>;
     fn data_updated(&self) -> bool;
     fn copy_and_reset_data(&mut self, l7_timeout_count: u32) -> FlowPerfStats;
@@ -130,9 +131,10 @@ macro_rules! impl_l7_flow_perf {
                 config: Option<&LogParserConfig>,
                 packet: &MetaPacket,
                 flow_id: u64,
+                rrt_timeout: usize,
             ) -> Result<()> {
                 match self {
-                    $(Self::$enum_name(p) => p.parse(config, packet, flow_id)),*
+                    $(Self::$enum_name(p) => p.parse(config, packet, flow_id, rrt_timeout)),*
                 }
             }
 
@@ -271,6 +273,7 @@ pub struct FlowPerf {
     is_from_app: bool,
     is_success: bool,
     is_skip: bool,
+    rrt_timeout: usize,
 }
 
 impl FlowPerf {
@@ -321,7 +324,7 @@ impl FlowPerf {
             return Err(Error::ZeroPayloadLen);
         }
         let perf_parser = self.l7.as_mut().unwrap();
-        let ret = perf_parser.parse(Some(log_parser_config), packet, flow_id);
+        let ret = perf_parser.parse(Some(log_parser_config), packet, flow_id, self.rrt_timeout);
 
         // TODO 目前rrt由perf计算， 用于聚合时计算slot，后面perf 抽象出来后，将去掉perf，rrt由log parser计算
         // =======================================================================================
@@ -457,7 +460,8 @@ impl FlowPerf {
         }
 
         if let Some(payload) = packet.get_l4_payload() {
-            let param = ParseParam::from(&*packet);
+            let mut param = ParseParam::from(&*packet);
+            param.set_rrt_timeout(self.rrt_timeout);
             for protocol in checker.possible_protocols(
                 packet.lookup_key.proto.into(),
                 match packet.direction {
@@ -574,12 +578,14 @@ impl FlowPerf {
         }
 
         if self.l7_protocol_log_parser.is_some() && is_parse_log {
+            let mut param = ParseParam::from(&*packet);
+            param.set_rrt_timeout(self.rrt_timeout);
             let ret = self.l7_parse_log(
                 flow_config,
                 log_parser_config,
                 packet,
                 app_table,
-                &ParseParam::from(&*packet),
+                &param,
                 local_epc,
                 remote_epc,
             )?;
@@ -615,6 +621,7 @@ impl FlowPerf {
         is_from_app_tab: bool,
         counter: Arc<FlowPerfCounter>,
         server_port: u16,
+        rrt_timeout: usize,
     ) -> Option<Self> {
         let l4 = match l4_proto {
             L4Protocol::Tcp => L4FlowPerfTable::Tcp(Box::new(TcpPerf::new(counter))),
@@ -635,6 +642,7 @@ impl FlowPerf {
             is_success: false,
             is_skip: false,
             server_port: server_port,
+            rrt_timeout,
         })
     }
 

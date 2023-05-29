@@ -39,6 +39,7 @@ use crate::common::{
     enums::TapType, DEFAULT_LOG_FILE, L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT,
     L7_PROTOCOL_INFERENCE_TTL,
 };
+use crate::flow_generator::protocol_logs::SLOT_WIDTH;
 use crate::rpc::Session;
 use crate::trident::RunningMode;
 use public::proto::{
@@ -350,6 +351,11 @@ pub struct YamlConfig {
     pub memory_trim_disabled: bool,
     pub forward_capacity: usize,
     pub fast_path_disabled: bool,
+    // rrt timeout must gt aggr SLOT_WIDTH
+    #[serde(with = "humantime_serde")]
+    pub rrt_tcp_timeout: Duration,
+    #[serde(with = "humantime_serde")]
+    pub rrt_udp_timeout: Duration,
 }
 
 impl YamlConfig {
@@ -504,6 +510,15 @@ impl YamlConfig {
         if let Err(e) = c.validate() {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string()));
         }
+        c.rrt_tcp_timeout = c
+            .rrt_tcp_timeout
+            .max(Duration::from_secs(SLOT_WIDTH))
+            .min(Duration::from_secs(3600));
+
+        c.rrt_udp_timeout = c
+            .rrt_udp_timeout
+            .max(Duration::from_secs(SLOT_WIDTH))
+            .min(Duration::from_secs(300));
         Ok(c)
     }
 
@@ -613,6 +628,8 @@ impl Default for YamlConfig {
             memory_trim_disabled: false,
             fast_path_disabled: false,
             forward_capacity: 1 << 14,
+            rrt_tcp_timeout: Duration::from_secs(1800),
+            rrt_udp_timeout: Duration::from_secs(150),
         }
     }
 }

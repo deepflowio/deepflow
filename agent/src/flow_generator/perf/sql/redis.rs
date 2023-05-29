@@ -80,6 +80,7 @@ impl L7FlowPerf for RedisPerfData {
         _: Option<&LogParserConfig>,
         packet: &MetaPacket,
         flow_id: u64,
+        rrt_timeout: usize,
     ) -> Result<()> {
         if packet.lookup_key.proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
@@ -105,6 +106,7 @@ impl L7FlowPerf for RedisPerfData {
                 packet.cap_seq,
                 packet.direction,
                 packet.signal_source == SignalSource::EBPF,
+                rrt_timeout,
             );
         } else if self.calc_response(
             packet.lookup_key.timestamp,
@@ -114,6 +116,7 @@ impl L7FlowPerf for RedisPerfData {
             packet.cap_seq,
             packet.direction,
             packet.signal_source == SignalSource::EBPF,
+            rrt_timeout,
         ) {
             return Err(Error::L7ReqNotFound(1));
         }
@@ -194,6 +197,7 @@ impl RedisPerfData {
         cap_seq: u64,
         direction: PacketDirection,
         from_ebpf: bool,
+        rrt_timeout: usize,
     ) {
         let stats = self.stats.get_or_insert(PerfStats::default());
         stats.rrt_last = Duration::ZERO;
@@ -201,10 +205,15 @@ impl RedisPerfData {
         self.active += 1;
         self.msg_type = LogMessageType::Request;
 
-        let rrt = self
-            .rrt_cache
-            .borrow_mut()
-            .cal_rrt(flow_id, None, direction, timestamp, cap_seq, from_ebpf);
+        let rrt = self.rrt_cache.borrow_mut().cal_rrt(
+            flow_id,
+            None,
+            direction,
+            timestamp,
+            cap_seq,
+            from_ebpf,
+            rrt_timeout,
+        );
         if !rrt.is_zero() {
             if rrt > stats.rrt_max {
                 stats.rrt_max = rrt;
@@ -225,6 +234,7 @@ impl RedisPerfData {
         cap_seq: u64,
         direction: PacketDirection,
         from_ebpf: bool,
+        rrt_timeout: usize,
     ) -> bool {
         let stats = self.stats.get_or_insert(PerfStats::default());
         stats.resp_count += 1;
@@ -243,10 +253,15 @@ impl RedisPerfData {
 
         self.active -= 1;
 
-        let rrt = self
-            .rrt_cache
-            .borrow_mut()
-            .cal_rrt(flow_id, None, direction, timestamp, cap_seq, from_ebpf);
+        let rrt = self.rrt_cache.borrow_mut().cal_rrt(
+            flow_id,
+            None,
+            direction,
+            timestamp,
+            cap_seq,
+            from_ebpf,
+            rrt_timeout,
+        );
         if !rrt.is_zero() {
             if rrt > stats.rrt_max {
                 stats.rrt_max = rrt;
@@ -295,7 +310,12 @@ mod tests {
             } else {
                 packet.direction = PacketDirection::ServerToClient;
             }
-            let _ = redis_perf_data.parse(None, packet, 0x1f3c01010);
+            let _ = redis_perf_data.parse(
+                None,
+                packet,
+                0x1f3c01010,
+                Duration::from_secs(10).as_micros() as usize,
+            );
         }
         redis_perf_data
     }

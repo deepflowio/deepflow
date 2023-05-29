@@ -84,6 +84,7 @@ impl L7FlowPerf for DubboPerfData {
         _: Option<&LogParserConfig>,
         packet: &MetaPacket,
         flow_id: u64,
+        rrt_timeout: usize,
     ) -> Result<()> {
         if packet.lookup_key.proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
@@ -100,6 +101,7 @@ impl L7FlowPerf for DubboPerfData {
                 packet.cap_seq,
                 packet.direction,
                 packet.signal_source == SignalSource::EBPF,
+                rrt_timeout,
             );
         } else if self.calc_response(
             packet.lookup_key.timestamp,
@@ -107,6 +109,7 @@ impl L7FlowPerf for DubboPerfData {
             packet.cap_seq,
             packet.direction,
             packet.signal_source == SignalSource::EBPF,
+            rrt_timeout,
         ) {
             return Err(Error::L7ReqNotFound(1));
         }
@@ -195,6 +198,7 @@ impl DubboPerfData {
         cap_seq: u64,
         direction: PacketDirection,
         from_ebpf: bool,
+        rrt_timeout: usize,
     ) {
         self.session_data.msg_type = LogMessageType::Request;
 
@@ -208,6 +212,7 @@ impl DubboPerfData {
             timestamp,
             cap_seq,
             from_ebpf,
+            rrt_timeout,
         );
         if !rrt.is_zero() {
             if rrt > perf_stats.rrt_max {
@@ -227,6 +232,7 @@ impl DubboPerfData {
         cap_seq: u64,
         direction: PacketDirection,
         from_ebpf: bool,
+        rrt_timeout: usize,
     ) -> bool {
         self.session_data.msg_type = LogMessageType::Response;
 
@@ -259,6 +265,7 @@ impl DubboPerfData {
             timestamp,
             cap_seq,
             from_ebpf,
+            rrt_timeout,
         );
         if !rrt.is_zero() {
             if rrt > perf_stats.rrt_max {
@@ -308,7 +315,12 @@ mod tests {
             } else {
                 packet.direction = PacketDirection::ServerToClient;
             }
-            let _ = dubbo_perf_data.parse(None, packet, 0x1f3c01010);
+            let _ = dubbo_perf_data.parse(
+                None,
+                packet,
+                0x1f3c01010,
+                Duration::from_secs(10).as_micros() as usize,
+            );
         }
         dubbo_perf_data
     }
