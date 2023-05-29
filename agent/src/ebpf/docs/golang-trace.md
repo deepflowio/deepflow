@@ -23,7 +23,7 @@
 
 ### Hook 点
 
-`runtime.casgstatus`
+`runtime.execute`
 
 ## Go TLS HTTP1
 
