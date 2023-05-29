@@ -129,7 +129,7 @@ func (c *TagRecorder) UpdateChDictionary() {
 							continue
 						}
 						prometheusDistionaries := []string{}
-						if err := connect.Select(&dictionaries, fmt.Sprintf("SHOW DICTIONARIES IN %s", "prometheus")); err != nil {
+						if err := connect.Select(&prometheusDistionaries, fmt.Sprintf("SHOW DICTIONARIES IN %s", "prometheus")); err != nil {
 							log.Error(err)
 							connect.Close()
 							continue
