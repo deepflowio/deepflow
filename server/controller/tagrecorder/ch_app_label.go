@@ -36,9 +36,10 @@ func NewChAPPLabel() *ChAPPLabel {
 	updater.dataGenerator = updater
 	return updater
 }
-
+ 
 func (l *ChAPPLabel) generateNewData() (map[PrometheusLabelKey]mysql.ChAPPLabel, bool) {
-	var prometheusMetricNames []mysql.PrometheusMetricName
+	var prometheusMetricNames  []mysql.PrometheusMetricName 
+
 
 	err := mysql.Db.Unscoped().Find(&prometheusMetricNames).Error
 	if err != nil {
@@ -65,18 +66,19 @@ func (l *ChAPPLabel) generateNewData() (map[PrometheusLabelKey]mysql.ChAPPLabel,
 		metricName := prometheusMetricName.Name
 		labelNames := metricLabelMap[metricName]
 		for _, labelName := range strings.Split(labelNames, ", ") {
+			log.Infof("app_label_test: labelname : %s", labelName)
 			labelNameID := labelsNameIDmap[labelName]
 			labelValue := labelsNameValueMap[metricName]
-			labelValueID := labelsValueIDMap[labelValue]
-
-			keyToItem[PrometheusLabelKey{MetricID: prometheusMetricName.ID, LabelNameID: labelNameID, LabelValue: labelValue}] = mysql.ChAPPLabel{
-				MetricID:     prometheusMetricName.ID,
-				LabelNameID:  labelNameID,
-				LabelValue:   labelValue,
-				LabelValueID: labelValueID,
+			labelValueID:= labelsValueIDMap[labelValue]
+	
+			keyToItem[PrometheusLabelKey{MetricID: prometheusMetricName.ID, LabelNameID: labelNameID, LabelValue: labelValue }] = mysql.ChAPPLabel{
+				MetricID:   prometheusMetricName.ID,
+				LabelNameID: labelNameID, 
+				LabelValue: labelValue, 
+				LabelValueID: labelValueID, 
 			}
 		}
-
+		
 	}
 	return keyToItem, true
 }
@@ -96,7 +98,7 @@ func (l *ChAPPLabel) generateUpdateInfo(oldItem, newItem mysql.ChAPPLabel) (map[
 	return nil, false
 }
 
-func (l *ChAPPLabel) generateLayoutData() (map[string]string, bool) {
+func (l *ChAPPLabel) generateLayoutData() (map[string]string, bool){
 	metricLabelMap := make(map[string]string)
 	var prometheusMetricAPPLabelLayouts []mysql.PrometheusMetricAPPLabelLayout
 	err := mysql.Db.Unscoped().Find(&prometheusMetricAPPLabelLayouts).Error
@@ -107,21 +109,21 @@ func (l *ChAPPLabel) generateLayoutData() (map[string]string, bool) {
 	}
 
 	for _, prometheusMetricAPPLabelLayout := range prometheusMetricAPPLabelLayouts {
-		if metricLabelMap[prometheusMetricAPPLabelLayout.MetricName] == "" {
+		if  metricLabelMap[prometheusMetricAPPLabelLayout.MetricName] == "" {
 			metricLabelMap[prometheusMetricAPPLabelLayout.MetricName] = prometheusMetricAPPLabelLayout.APPLabelName
-		} else {
-			metricLabelMap[prometheusMetricAPPLabelLayout.MetricName] += ", " + prometheusMetricAPPLabelLayout.APPLabelName
+		}else {
+			metricLabelMap[prometheusMetricAPPLabelLayout.MetricName] += ", "+prometheusMetricAPPLabelLayout.APPLabelName
 		}
-
+		log.Infof("app_label_test: metricLabelMap item: %s, %s", prometheusMetricAPPLabelLayout.MetricName, metricLabelMap[prometheusMetricAPPLabelLayout.MetricName])
 	}
-
+	log.Infof("app_label_test: metricLabelMap item: %s", metricLabelMap)
 	return metricLabelMap, true
 }
 
-func (l *ChAPPLabel) generatelabelNameValueData() (map[string]string, map[string]int, bool) {
+func (l *ChAPPLabel) generatelabelNameValueData() (map[string]string, map[string]int, bool){
 	labelsNameValueMap := make(map[string]string)
 	labelsNameIDMap := make(map[string]int)
-	var prometheusLabels []mysql.PrometheusLabel
+	var prometheusLabels  []mysql.PrometheusLabel
 	var prometheusLabelNames []mysql.PrometheusLabelName
 	err := mysql.Db.Unscoped().Find(&prometheusLabels).Error
 
@@ -139,17 +141,18 @@ func (l *ChAPPLabel) generatelabelNameValueData() (map[string]string, map[string
 
 	for _, prometheusLabel := range prometheusLabels {
 		labelsNameValueMap[prometheusLabel.Name] = prometheusLabel.Value
+		log.Infof("app_label_test: labelsNameValueMap item: %s, %s", prometheusLabel.Name, prometheusLabel.Value)
 	}
 	for _, prometheusLabelName := range prometheusLabelNames {
 		labelsNameIDMap[prometheusLabelName.Name] = prometheusLabelName.ID
+		log.Infof("app_label_test: labelsNameIDMap item: %s, %d", prometheusLabelName.Name, prometheusLabelName.ID)
 	}
-
 	return labelsNameValueMap, labelsNameIDMap, true
 }
 
-func (l *ChAPPLabel) generateLabelValueIDData() (map[string]int, bool) {
+func (l *ChAPPLabel) generateLabelValueIDData() (map[string]int, bool){
 	metricLabelValueIDMap := make(map[string]int)
-	var prometheusLabelValues []mysql.PrometheusLabelValue
+	var prometheusLabelValues []mysql.PrometheusLabelValue 
 	err := mysql.Db.Unscoped().Find(&prometheusLabelValues).Error
 
 	if err != nil {
@@ -159,7 +162,7 @@ func (l *ChAPPLabel) generateLabelValueIDData() (map[string]int, bool) {
 
 	for _, prometheusLabelValue := range prometheusLabelValues {
 		metricLabelValueIDMap[prometheusLabelValue.Value] = prometheusLabelValue.ID
+		log.Infof("app_label_test: metricLabelValueIDMap item: %s, %d", prometheusLabelValue.Value, prometheusLabelValue.ID)
 	}
-
 	return metricLabelValueIDMap, true
 }
