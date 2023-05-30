@@ -597,6 +597,7 @@ message ProcessInfo {
     optional string user = 5;
     optional uint32 start_time = 6;
     optional uint32 netns_id = 7 [default = 0];
+    optional string container_id = 8 [default = ""];
     repeated Tag os_app_tags = 11;
 }
 
