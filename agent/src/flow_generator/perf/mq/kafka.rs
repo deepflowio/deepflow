@@ -234,7 +234,7 @@ impl KafkaPerfData {
 
         let message_size = bytes::read_u32_be(payload);
 
-        if message_size + KAFKA_REMAIN != payload_len as u32 {
+        if message_size > payload_len as u32 || message_size + KAFKA_REMAIN != payload_len as u32 {
             return Err(Error::KafkaPerfParseFailed);
         }
         let client_id_len = bytes::read_u16_be(&payload[12..]) as usize;
