@@ -17,6 +17,8 @@
 package baidubce
 
 import (
+	"time"
+
 	"github.com/baidubce/bce-sdk-go/services/bcc"
 	bcc_api "github.com/baidubce/bce-sdk-go/services/bcc/api"
 	"github.com/baidubce/bce-sdk-go/services/eni"
@@ -43,11 +45,14 @@ func (b *BaiduBce) getVMs(
 	results := make([]*bcc_api.ListInstanceResult, 0)
 	for {
 		args.Marker = marker
+		startTime := time.Now()
 		result, err := bccClient.ListInstances(args)
 		if err != nil {
 			log.Error(err)
 			return nil, nil, nil, err
 		}
+		b.cloudStatsd.APICost["ListInstances"] = append(b.cloudStatsd.APICost["ListInstances"], int(time.Now().Sub(startTime).Milliseconds()))
+		b.cloudStatsd.APICount["ListInstances"] = append(b.cloudStatsd.APICount["ListInstances"], len(result.Instances))
 		results = append(results, result)
 		if !result.IsTruncated {
 			break
@@ -189,11 +194,14 @@ func (b *BaiduBce) getVMEnis(
 		results := make([]*eni.ListEniResult, 0)
 		for {
 			args.Marker = marker
+			startTime := time.Now()
 			result, err := eniClient.ListEni(args)
 			if err != nil {
 				log.Error(err)
 				return nil, nil, err
 			}
+			b.cloudStatsd.APICost["ListEni"] = append(b.cloudStatsd.APICost["ListEni"], int(time.Now().Sub(startTime).Milliseconds()))
+			b.cloudStatsd.APICount["ListEni"] = append(b.cloudStatsd.APICount["ListEni"], len(result.Eni))
 			results = append(results, result)
 			if !result.IsTruncated {
 				break

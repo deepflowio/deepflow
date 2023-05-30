@@ -19,6 +19,7 @@ package baidubce
 import (
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/baidubce/bce-sdk-go/services/bcc"
 	bcc_api "github.com/baidubce/bce-sdk-go/services/bcc/api"
@@ -42,11 +43,14 @@ func (b *BaiduBce) getSecurityGroups(region model.Region, vpcIdToLcuuid map[stri
 	results := make([]*bcc_api.ListSecurityGroupResult, 0)
 	for {
 		args.Marker = marker
+		startTime := time.Now()
 		result, err := bccClient.ListSecurityGroup(args)
 		if err != nil {
 			log.Error(err)
 			return nil, nil, err
 		}
+		b.cloudStatsd.APICost["ListSecurityGroup"] = append(b.cloudStatsd.APICost["ListSecurityGroup"], int(time.Now().Sub(startTime).Milliseconds()))
+		b.cloudStatsd.APICount["ListSecurityGroup"] = append(b.cloudStatsd.APICount["ListSecurityGroup"], len(result.SecurityGroups))
 		results = append(results, result)
 		if !result.IsTruncated {
 			break
