@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/bytedance/sonic"
 	"golang.org/x/exp/slices"
 
 	"github.com/deepflowio/deepflow/server/libs/utils"
@@ -250,28 +251,69 @@ func PrometheusTagTranslate(args []interface{}) func(result *common.Result) erro
 			}
 		}
 		copy(newValues, result.Values)
-		if tagArgs.IsAppLabel {
+		// tag
+		if args[1].(string) == "tag" {
+			tagMap := map[string]string{}
 			for i, newValue := range newValues {
 				newValueSlice := newValue.([]interface{})
-				if metricID, ok := METRIC_NAME_TO_ID[tagArgs.Table]; ok {
-					if labelNameID, ok := LABEL_NAME_TO_ID[tagArgs.PrometheusTag]; ok {
-						if appLabel, ok := APP_LABEL[fmt.Sprintf("%d,%d", metricID, labelNameID)]; ok {
-							labelValue := appLabel[1].(string)
-							newValueSlice[prometheusTagIndex] = labelValue
-							newValues[i] = newValueSlice
+				tagValue := newValueSlice[prometheusTagIndex].(string)
+				tagValueSlice := strings.Split(tagValue, ",")
+				for singleTagIndex, singleTagValue := range tagValueSlice {
+					if singleTagIndex == 0 {
+						if metricID, ok := METRIC_NAME_TO_ID[tagArgs.Table]; ok {
+							if targetLabels, ok := METRIC_ID_TARGET_ID_TO_LABELS[fmt.Sprintf("%d,%d", metricID, singleTagValue)]; ok {
+								for _, targetLabel := range targetLabels {
+									if labelName, ok := LABEL_ID_TO_NAME[targetLabel.LabelNameID]; ok {
+										tagMap[labelName] = targetLabel.LabelValue
+									}
+								}
+							}
+						}
+					} else {
+						if metricID, ok := METRIC_NAME_TO_ID[tagArgs.Table]; ok {
+							if appLabels, ok := METRIC_ID_APP_LABEL_VALUE_ID_TO_LABELS[fmt.Sprintf("%d,%d", metricID, singleTagValue)]; ok {
+								for _, appLabel := range appLabels {
+									if labelName, ok := LABEL_ID_TO_NAME[appLabel.LabelNameID]; ok {
+										tagMap[labelName] = appLabel.LabelValue
+									}
+								}
+							}
 						}
 					}
 				}
+				tagMapJson, err := sonic.Marshal(&tagMap)
+				if err != nil {
+					log.Error(err)
+					return err
+				}
+				newValueSlice[prometheusTagIndex] = string(tagMapJson)
+				newValues[i] = newValueSlice
 			}
 		} else {
-			for i, newValue := range newValues {
-				newValueSlice := newValue.([]interface{})
-				tagValue := newValueSlice[prometheusTagIndex].(int)
-				if metricID, ok := METRIC_NAME_TO_ID[tagArgs.Table]; ok {
-					if labelNameID, ok := LABEL_NAME_TO_ID[tagArgs.PrometheusTag]; ok {
-						if targetLabelValue, ok := TARGET_LABEL[fmt.Sprintf("%d,%d,%d", metricID, tagValue, labelNameID)]; ok {
-							newValueSlice[prometheusTagIndex] = targetLabelValue
-							newValues[i] = newValueSlice
+			// tag.$label_name
+			if tagArgs.IsAppLabel {
+				for i, newValue := range newValues {
+					newValueSlice := newValue.([]interface{})
+					if metricID, ok := METRIC_NAME_TO_ID[tagArgs.Table]; ok {
+						if labelNameID, ok := LABEL_NAME_TO_ID[tagArgs.PrometheusTag]; ok {
+							if appLabel, ok := APP_LABEL[fmt.Sprintf("%d,%d", metricID, labelNameID)]; ok {
+								labelValue := appLabel[1].(string)
+								newValueSlice[prometheusTagIndex] = labelValue
+								newValues[i] = newValueSlice
+							}
+						}
+					}
+				}
+			} else {
+				for i, newValue := range newValues {
+					newValueSlice := newValue.([]interface{})
+					tagValue := newValueSlice[prometheusTagIndex].(int)
+					if metricID, ok := METRIC_NAME_TO_ID[tagArgs.Table]; ok {
+						if labelNameID, ok := LABEL_NAME_TO_ID[tagArgs.PrometheusTag]; ok {
+							if targetLabelValue, ok := TARGET_LABEL[fmt.Sprintf("%d,%d,%d", metricID, tagValue, labelNameID)]; ok {
+								newValueSlice[prometheusTagIndex] = targetLabelValue
+								newValues[i] = newValueSlice
+							}
 						}
 					}
 				}

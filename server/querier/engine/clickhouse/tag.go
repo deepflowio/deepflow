@@ -111,6 +111,17 @@ func GetTagTranslator(name, alias, db, table string) (Statement, error) {
 
 			}
 			stmt = &SelectTag{Value: tagTranslator, Alias: selectTag}
+		} else if name == "tag" && db == "prometheus" {
+			tagTranslator := "toString(target_id)"
+			if appLabelMaxIndex, ok := METRIC_NAME_TO_MAX_INDEX[table]; ok {
+				appLabelTag := ""
+				for i := 1; i <= appLabelMaxIndex; i++ {
+					appLabelTag += fmt.Sprintf(",',',toString(app_label_value_id_%d)", i)
+				}
+				tagTranslator += appLabelTag
+				tagTranslator = fmt.Sprintf("concat(%s)", tagTranslator)
+				stmt = &SelectTag{Value: tagTranslator, Alias: selectTag}
+			}
 		} else if tagItem.TagTranslator != "" {
 			if name != "packet_batch" || table != "l4_packet" {
 				stmt = &SelectTag{Value: tagItem.TagTranslator, Alias: selectTag}
@@ -137,14 +148,11 @@ func GetSelectNotNullFilter(name, as, db, table string) (view.Node, bool) {
 					filter = fmt.Sprintf(tagItem.NotNullFilter, as)
 				}
 				return &view.Expr{Value: "(" + filter + ")"}, true
-			} else if db == "prometheus" {
-				filter := ""
-				metric_name := strings.Trim(name, "`")
-				metric_name = strings.TrimSuffix(metric_name, "metrics.")
-				if metricID, ok := METRIC_NAME_TO_ID[metric_name]; ok {
-					filter = fmt.Sprintf("metric_id=%d", metricID)
-					return &view.Expr{Value: "(" + filter + ")"}, true
-				}
+			}
+		} else if name == "value" && db == "prometheus" {
+			if metricID, ok := METRIC_NAME_TO_ID[table]; ok {
+				filter := fmt.Sprintf("metric_id=%d", metricID)
+				return &view.Expr{Value: "(" + filter + ")"}, true
 			}
 		}
 	}
