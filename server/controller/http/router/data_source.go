@@ -64,6 +64,7 @@ func createDataSource(cfg *config.ControllerConfig) gin.HandlerFunc {
 		if dataSourceCreate != nil &&
 			!(dataSourceCreate.TsdbType == "app" || dataSourceCreate.TsdbType == "flow") {
 			BadRequestResponse(c, common.PARAMETER_ILLEGAL, "tsdb type only supports app and flow")
+			return
 		}
 		if err != nil {
 			BadRequestResponse(c, common.PARAMETER_ILLEGAL, err.Error())
