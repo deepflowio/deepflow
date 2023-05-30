@@ -983,7 +983,7 @@ impl MetricServer {
             select! {
                 _ = ticker.tick() => {
                     let p = port.load(Ordering::Relaxed);
-                    if let Err(_) = TcpStream::connect(format!("127.0.0.1:{}", p)) {
+                    if let Err(_) = TcpStream::connect(("localhost", p)) {
                         warn!(
                             "the port=({}) listen by the integration collector lost, restart the collector",
                             p
