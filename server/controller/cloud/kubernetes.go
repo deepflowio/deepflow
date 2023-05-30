@@ -124,6 +124,7 @@ func (c *Cloud) getKubernetesData() model.Resource {
 		PodServicePorts:        kubernetesGatherResource.PodServicePorts,
 		PodIngressRules:        kubernetesGatherResource.PodIngressRules,
 		PodIngressRuleBackends: kubernetesGatherResource.PodIngressRuleBackends,
+		PrometheusTargets:      kubernetesGatherResource.PrometheusTargets,
 		IPs:                    ips,
 		VMs:                    vms,
 		Regions:                regions,
