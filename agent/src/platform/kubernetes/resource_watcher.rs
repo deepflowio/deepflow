@@ -35,8 +35,8 @@ use k8s_openapi::{
             StatefulSet, StatefulSetSpec,
         },
         core::v1::{
-            Container, Namespace, Node, NodeSpec, NodeStatus, Pod, PodSpec, PodStatus,
-            ReplicationController, ReplicationControllerSpec, Service, ServiceSpec,
+            Container, ContainerStatus, Namespace, Node, NodeSpec, NodeStatus, Pod, PodSpec,
+            PodStatus, ReplicationController, ReplicationControllerSpec, Service, ServiceSpec,
         },
         extensions, networking,
     },
@@ -512,6 +512,14 @@ impl Trimmable for Pod {
             trim_pod.status = Some(PodStatus {
                 host_ip: pod_status.host_ip,
                 conditions: pod_status.conditions,
+                container_statuses: pod_status.container_statuses.map(|cs| {
+                    cs.into_iter()
+                        .map(|mut s| ContainerStatus {
+                            container_id: s.container_id.take(),
+                            ..Default::default()
+                        })
+                        .collect()
+                }),
                 pod_ip: pod_status.pod_ip,
                 ..Default::default()
             });
