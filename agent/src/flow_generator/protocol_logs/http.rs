@@ -640,43 +640,44 @@ impl HttpLog {
             self.info.rrt = rrt;
             self.perf_stats.as_mut().unwrap().update_rrt(rrt);
         });
-
-        if param.perf_only {
-            return Ok(());
-        }
-        let mut content_length: Option<u32> = None;
-        for body_line in headers {
-            let col_index = body_line.find(':');
-            if col_index.is_none() {
-                continue;
-            }
-            let col_index = col_index.unwrap();
-            if col_index + 1 >= body_line.len() {
-                continue;
-            }
-
-            let key = &body_line[..col_index];
-            let value = &body_line[col_index + 1..];
-
-            let lower_key = key.to_ascii_lowercase();
-            self.on_header(
-                config,
-                lower_key.as_bytes(),
-                value.trim().as_bytes(),
-                direction,
-            );
-            if &lower_key == "content-length" {
-                content_length = Some(value.trim_start().parse::<u32>().unwrap_or_default());
-            }
-        }
-
-        // 当解析完所有Header仍未找到Content-Length，则认为该字段值为0
-        if direction == PacketDirection::ServerToClient {
-            self.info.resp_content_length = content_length;
-        } else {
-            self.info.req_content_length = content_length;
-        }
+        // 浅层解析 只解析第一行
         Ok(())
+        // if param.perf_only {
+        //     return Ok(());
+        // }
+        // let mut content_length: Option<u32> = None;
+        // for body_line in headers {
+        //     let col_index = body_line.find(':');
+        //     if col_index.is_none() {
+        //         continue;
+        //     }
+        //     let col_index = col_index.unwrap();
+        //     if col_index + 1 >= body_line.len() {
+        //         continue;
+        //     }
+
+        //     let key = &body_line[..col_index];
+        //     let value = &body_line[col_index + 1..];
+
+        //     let lower_key = key.to_ascii_lowercase();
+        //     self.on_header(
+        //         config,
+        //         lower_key.as_bytes(),
+        //         value.trim().as_bytes(),
+        //         direction,
+        //     );
+        //     if &lower_key == "content-length" {
+        //         content_length = Some(value.trim_start().parse::<u32>().unwrap_or_default());
+        //     }
+        // }
+
+        // // 当解析完所有Header仍未找到Content-Length，则认为该字段值为0
+        // if direction == PacketDirection::ServerToClient {
+        //     self.info.resp_content_length = content_length;
+        // } else {
+        //     self.info.req_content_length = content_length;
+        // }
+        // Ok(())
     }
 
     fn has_magic(payload: &[u8]) -> bool {
