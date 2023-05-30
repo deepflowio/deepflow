@@ -29,7 +29,7 @@ var RESOURCE_TYPES = []string{
 	"LBVMConnections", "PeerConnections", "CENs", "RedisInstances", "RDSInstances", "VInterfaces",
 	"IPs", "FloatingIPs", "PodClusters", "PodNodes", "VMPodNodeConnections", "PodNamespaces",
 	"PodGroups", "PodReplicaSets", "Pods", "PodServices", "PodServicePorts", "PodGroupPorts",
-	"PodIngresses", "PodIngressRules", "PodIngressRuleBackends",
+	"PodIngresses", "PodIngressRules", "PodIngressRuleBackends", "Processes", "PrometheusTargets",
 }
 
 //go:generate stringer -type=DomainType -trimprefix=DOMAIN_TYPE_ -linecomment

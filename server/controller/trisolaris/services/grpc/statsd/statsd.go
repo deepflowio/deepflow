@@ -73,6 +73,7 @@ const (
 	GetKubernetesClusterID
 	GenesisSync
 	KubernetesAPISync
+	PrometheusAPISync
 	GPIDSync
 	MaxApiType
 )
@@ -85,6 +86,7 @@ var ApiTypeToName = map[ApiType]string{
 	GetKubernetesClusterID: "GetKubernetesClusterID",
 	GenesisSync:            "GenesisSync",
 	KubernetesAPISync:      "KubernetesAPISync",
+	PrometheusAPISync:      "PrometheusAPISync",
 	GPIDSync:               "GPIDSync",
 }
 
