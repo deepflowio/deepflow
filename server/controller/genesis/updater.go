@@ -945,7 +945,7 @@ func (p *PrometheusRpcUpdater) ParsePrometheusEntries(info PrometheusMessage) ([
 			otherLabelsString := strings.Join(labelsSlice, ", ")
 
 			result = append(result, cloudmodel.PrometheusTarget{
-				Lcuuid:      common.GetUUID(instance+job, uuid.Nil),
+				Lcuuid:      common.GetUUID(instance+job+otherLabelsString, uuid.Nil),
 				ScrapeURL:   scrapeUrl,
 				Job:         job,
 				Instance:    instance,

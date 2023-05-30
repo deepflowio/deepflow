@@ -42,7 +42,7 @@ func (m *labelLayout) refresh(args ...interface{}) error {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 
-	var layouts []mysql.PrometheusMetricAPPLabelLayout
+	var layouts []*mysql.PrometheusMetricAPPLabelLayout
 	err := mysql.Db.Find(&layouts).Error
 	if err != nil {
 		return err

@@ -38,7 +38,7 @@ func (l *label) refresh(args ...interface{}) error {
 	l.mux.Lock()
 	defer l.mux.Unlock()
 
-	var ls []mysql.PrometheusLabel
+	var ls []*mysql.PrometheusLabel
 	err := mysql.Db.Find(&ls).Error
 	if err != nil {
 		return err

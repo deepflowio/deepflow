@@ -29,7 +29,10 @@ import (
 	. "github.com/deepflowio/deepflow/server/controller/side/prometheus/common"
 )
 
-var keyJoiner = "-"
+var (
+	instanceAndJobKeyJoiner = "-"
+	labelJoiner             = ":"
+)
 var (
 	cacheOnce sync.Once
 	cacheIns  *Cache
@@ -289,7 +292,7 @@ type target struct {
 }
 
 func (t *target) getTargetID(ins, job string) (int, bool) {
-	if id, ok := t.instanceJobToTargetID.Load(ins + keyJoiner + job); ok {
+	if id, ok := t.instanceJobToTargetID.Load(ins + instanceAndJobKeyJoiner + job); ok {
 		return id.(int), true
 	}
 	return 0, false
@@ -307,15 +310,15 @@ func (t *target) refresh(args ...interface{}) error {
 	fully := args[0].(bool)
 	if fully {
 		for _, tg := range targets {
-			t.instanceJobToTargetID.Store(strings.Join([]string{tg.Instance, tg.Job}, keyJoiner), tg.ID)
+			t.instanceJobToTargetID.Store(strings.Join([]string{tg.Instance, tg.Job}, instanceAndJobKeyJoiner), tg.ID)
 			t.targetIDToLabelNameToValue[tg.ID] = t.formatLabels(tg)
 		}
 	} else {
 		for _, tg := range targets {
-			t.instanceJobToTargetID.Store(strings.Join([]string{tg.Instance, tg.Job}, keyJoiner), tg.ID)
+			t.instanceJobToTargetID.Store(strings.Join([]string{tg.Instance, tg.Job}, instanceAndJobKeyJoiner), tg.ID)
 		}
 	}
-	log.Infof("refreshed targets: %d", t)
+	log.Infof("refreshed targets: %+v", t)
 	return nil
 }
 
@@ -327,7 +330,7 @@ func (t *target) formatLabels(tg *mysql.PrometheusTarget) (labelNameToValue map[
 		if l == "" {
 			continue
 		}
-		parts := strings.Split(l, "=")
+		parts := strings.Split(l, labelJoiner)
 		if len(parts) != 2 {
 			continue
 		}

@@ -47,7 +47,7 @@ func newLabelValue(max int) *labelValue {
 }
 
 func (p *labelValue) load() (ids mapset.Set[int], err error) {
-	var items []mysql.PrometheusLabelValue
+	var items []*mysql.PrometheusLabelValue
 	err = mysql.Db.Unscoped().Select("id").Find(&items).Error
 	if err != nil {
 		log.Errorf("db query %s failed: %v", p.resourceType, err)
@@ -135,7 +135,7 @@ func (p *labelValue) allocate(count int) (ids []int, err error) {
 }
 
 func (p *labelValue) check(ids []int) (inUseIDs []int, err error) {
-	var dbItems []mysql.PrometheusLabelValue
+	var dbItems []*mysql.PrometheusLabelValue
 	err = mysql.Db.Unscoped().Where("id IN ?", ids).Find(&dbItems).Error
 	if err != nil {
 		log.Errorf("db query %s failed: %v", p.resourceType, err)

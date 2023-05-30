@@ -33,7 +33,7 @@ func (e *SynchronizerEvent) Sync(ctx context.Context, in *controller.SyncPrometh
 	log.Infof("SyncPrometheusRequest: %+v", in) // TODO debug
 	resp, err := prometheus.GetSingleton().Synchronizer.Sync(in)
 	if err != nil {
-		log.Errorf("sync error: %v", err)
+		log.Errorf("sync error: %+v", err)
 		return &controller.SyncPrometheusResponse{}, nil
 	}
 	log.Infof("SyncPrometheusResponse: %+v", resp) // TODO debug

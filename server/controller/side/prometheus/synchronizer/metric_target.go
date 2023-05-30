@@ -38,7 +38,7 @@ func (l *metricTarget) refresh(args ...interface{}) error {
 	l.mux.Lock()
 	defer l.mux.Unlock()
 
-	var ls []mysql.PrometheusMetricTarget
+	var ls []*mysql.PrometheusMetricTarget
 	err := mysql.Db.Find(&ls).Error
 	if err != nil {
 		return err
