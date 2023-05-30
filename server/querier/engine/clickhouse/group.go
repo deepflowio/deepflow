@@ -38,7 +38,28 @@ func GetGroup(name string, asTagMap map[string]string, db, table string) (Statem
 			stmt = &GroupTag{Value: name, AsTagMap: asTagMap}
 		}
 	} else {
-		stmt = &GroupTag{Value: name, AsTagMap: asTagMap}
+		if db == "prometheus" {
+			nameNoPreffix := strings.Trim(name, "`")
+			_, ok := asTagMap[name]
+			if ok {
+				stmt = &GroupTag{Value: name, AsTagMap: asTagMap}
+			} else if strings.HasPrefix(nameNoPreffix, "tag.") {
+				nameNoPreffix := strings.Trim(name, "`")
+				nameNoPreffix = strings.TrimPrefix(nameNoPreffix, "tag.")
+				// Determine whether the tag is app_label or target_label
+				if appLabelColumnIndex, ok := METRIC_APP_LABEL_LAYOUT[table+", "+nameNoPreffix]; ok {
+					TagTranslatorStr := fmt.Sprintf("app_label_value_id_%d", appLabelColumnIndex)
+					stmt = &GroupTag{Value: TagTranslatorStr, AsTagMap: asTagMap}
+				} else {
+					TagTranslatorStr := "target_id"
+					stmt = &GroupTag{Value: TagTranslatorStr, AsTagMap: asTagMap}
+				}
+			} else {
+				stmt = &GroupTag{Value: name, AsTagMap: asTagMap}
+			}
+		} else {
+			stmt = &GroupTag{Value: name, AsTagMap: asTagMap}
+		}
 	}
 	return stmt, nil
 }
@@ -91,6 +112,9 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 					filter := fmt.Sprintf(tagItem.NotNullFilter, filterName)
 					return &view.Expr{Value: "(" + filter + ")"}, true
 				} else if strings.HasPrefix(preAsTag, "tag.") || strings.HasPrefix(preAsTag, "attribute.") {
+					if db == "prometheus" {
+						return &view.Expr{}, false
+					}
 					tagItem, ok = tag.GetTag("tag.", db, table, "default")
 					filter := fmt.Sprintf(tagItem.NotNullFilter, name)
 					return &view.Expr{Value: "(" + filter + ")"}, true
@@ -147,6 +171,9 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 				filter := fmt.Sprintf(tagItem.NotNullFilter, filterName)
 				return &view.Expr{Value: "(" + filter + ")"}, true
 			} else if strings.HasPrefix(name, "tag.") || strings.HasPrefix(name, "attribute.") {
+				if db == "prometheus" {
+					return &view.Expr{}, false
+				}
 				tagItem, ok = tag.GetTag("tag.", db, table, "default")
 				filter := fmt.Sprintf(tagItem.NotNullFilter, name)
 				return &view.Expr{Value: "(" + filter + ")"}, true

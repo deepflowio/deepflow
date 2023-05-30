@@ -28,13 +28,13 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
 )
 
-func GetTagTranslator(name, alias, db, table string) (Statement, error) {
+func GetTagTranslator(name, alias, db, table string) (Statement, string, error) {
 	var stmt Statement
 	selectTag := name
 	if alias != "" {
 		selectTag = alias
 	}
-
+	labelType := ""
 	tagItem, ok := tag.GetTag(strings.Trim(name, "`"), db, table, "default")
 	if !ok {
 		name := strings.Trim(name, "`")
@@ -80,17 +80,22 @@ func GetTagTranslator(name, alias, db, table string) (Statement, error) {
 		} else if strings.HasPrefix(name, "tag.") || strings.HasPrefix(name, "attribute.") {
 			if strings.HasPrefix(name, "tag.") {
 				if db == "prometheus" {
-					log.Info("prometheus0")
 					nameNoPreffix := strings.TrimPrefix(name, "tag.")
-					// Determine whether the tag is app_label or target_label
-					if appLabelColumnIndex, ok := METRIC_APP_LABEL_LAYOUT[table+", "+nameNoPreffix]; ok {
-						TagTranslatorStr := fmt.Sprintf("app_label_value_id_%d", appLabelColumnIndex)
-						stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag, DataBase: "prometheus", Table: table, IsAppLabel: true, PrometheusTag: nameNoPreffix}
-					} else {
-						TagTranslatorStr := "target_id"
-						stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag, DataBase: "prometheus", Table: table, PrometheusTag: nameNoPreffix}
+					if metricID, ok := METRIC_NAME_TO_ID[table]; ok {
+						if labelNameID, ok := LABEL_NAME_TO_ID[nameNoPreffix]; ok {
+							// Determine whether the tag is app_label or target_label
+							if appLabelColumnIndex, ok := METRIC_APP_LABEL_LAYOUT[table+", "+nameNoPreffix]; ok {
+								labelType = "app"
+								TagTranslatorStr := fmt.Sprintf("dictGet(prometheus.app_label_map, 'label_value', (%d, %d, app_label_value_id_%d))", metricID, labelNameID, appLabelColumnIndex)
+								stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag, DataBase: "prometheus", Table: table}
+							} else {
+								labelType = "target"
+								TagTranslatorStr := fmt.Sprintf("dictGet(prometheus.target_label_map, 'label_value', (%d, %d, target_id))", metricID, labelNameID)
+								stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag, DataBase: "prometheus", Table: table}
+							}
+						}
 					}
-					return stmt, nil
+					return stmt, labelType, nil
 				}
 				tagItem, ok = tag.GetTag("tag.", db, table, "default")
 			} else {
@@ -132,28 +137,14 @@ func GetTagTranslator(name, alias, db, table string) (Statement, error) {
 			stmt = &SelectTag{Value: selectTag}
 		}
 	}
-	return stmt, nil
+	return stmt, labelType, nil
 }
 
-func GetSelectNotNullFilter(name, as, db, table string) (view.Node, bool) {
-	tagItem, ok := tag.GetTag(name, db, table, "default")
-	if !ok {
-		if strings.HasPrefix(name, "`metrics.") && db == "ext_metrics" {
-			if db == "ext_metrics" {
-				tagItem, ok = tag.GetTag("metrics.", db, table, "default")
-				filter := ""
-				if as == "" {
-					filter = fmt.Sprintf(tagItem.NotNullFilter, name)
-				} else {
-					filter = fmt.Sprintf(tagItem.NotNullFilter, as)
-				}
-				return &view.Expr{Value: "(" + filter + ")"}, true
-			}
-		} else if name == "value" && db == "prometheus" {
-			if metricID, ok := METRIC_NAME_TO_ID[table]; ok {
-				filter := fmt.Sprintf("metric_id=%d", metricID)
-				return &view.Expr{Value: "(" + filter + ")"}, true
-			}
+func GetSelectMetricIDFilter(name, as, db, table string) (view.Node, bool) {
+	if name == "value" && db == "prometheus" {
+		if metricID, ok := METRIC_NAME_TO_ID[table]; ok {
+			filter := fmt.Sprintf("metric_id=%d", metricID)
+			return &view.Expr{Value: "(" + filter + ")"}, true
 		}
 	}
 	return &view.Expr{}, false
@@ -175,14 +166,12 @@ func GetDefaultTag(name string, alias string) Statement {
 }
 
 type SelectTag struct {
-	DataBase      string
-	Table         string
-	PrometheusTag string
-	Value         string
-	Alias         string
-	Flag          int
-	Withs         []view.Node
-	IsAppLabel    bool
+	DataBase string
+	Table    string
+	Value    string
+	Alias    string
+	Flag     int
+	Withs    []view.Node
 }
 
 func (t *SelectTag) Format(m *view.Model) {
@@ -197,11 +186,7 @@ func (t *SelectTag) Format(m *view.Model) {
 	if t.Value == "packet_batch" {
 		m.AddCallback(t.Value, packet_batch.PacketBatchFormat([]interface{}{}))
 	}
-	if t.DataBase == "prometheus" {
-		alias := t.Value
-		if t.Alias != "" {
-			alias = t.Alias
-		}
-		m.AddCallback(t.Value, PrometheusTagTranslate([]interface{}{t, alias, t.DataBase, t.Table, t.IsAppLabel}))
+	if t.DataBase == "prometheus" && t.Alias == "tag" {
+		m.AddCallback(t.Value, PrometheusTagTranslate([]interface{}{t}))
 	}
 }

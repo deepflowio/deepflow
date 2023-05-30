@@ -728,7 +728,7 @@ func (e *CHEngine) parseGroupBy(group sqlparser.Expr) error {
 		}
 		preAsGroup, ok := e.asTagMap[groupTag]
 		if !ok {
-			err := e.AddTag(groupTag, "")
+			_, err := e.AddTag(groupTag, "")
 			if err != nil {
 				return err
 			}
@@ -783,10 +783,11 @@ func (e *CHEngine) parseSelect(tag sqlparser.SelectExpr) error {
 
 func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 	as := chCommon.ParseAlias(item.As)
+	labelType := ""
 	if as != "" {
-		e.ColumnSchemas = append(e.ColumnSchemas, common.NewColumnSchema(as, strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", "")))
+		e.ColumnSchemas = append(e.ColumnSchemas, common.NewColumnSchema(as, strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", ""), labelType))
 	} else {
-		e.ColumnSchemas = append(e.ColumnSchemas, common.NewColumnSchema(strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", ""), ""))
+		e.ColumnSchemas = append(e.ColumnSchemas, common.NewColumnSchema(strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", ""), "", labelType))
 	}
 	//var args []string
 	switch expr := item.Expr.(type) {
@@ -800,10 +801,25 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 		e.Statements = append(e.Statements, binFunction)
 		return nil
 	case *sqlparser.ColName, *sqlparser.SQLVal:
-		err := e.AddTag(chCommon.ParseAlias(expr), as)
+		labelType, err := e.AddTag(chCommon.ParseAlias(expr), as)
 		if err != nil {
 			return err
 		}
+		if labelType != "" {
+			if as != "" {
+				e.ColumnSchemas[len(e.ColumnSchemas)-1] = common.NewColumnSchema(as, strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", ""), labelType)
+			} else {
+				e.ColumnSchemas[len(e.ColumnSchemas)-1] = common.NewColumnSchema(strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", ""), "", labelType)
+			}
+		}
+		whereStmt := Where{}
+		notNullExpr, ok := GetSelectMetricIDFilter(sqlparser.String(expr), as, e.DB, e.Table)
+		if !ok {
+			return nil
+		}
+		filter := view.Filters{Expr: notNullExpr}
+		whereStmt.filter = &filter
+		e.Statements = append(e.Statements, &whereStmt)
 		return nil
 	// func(field/tag)
 	case *sqlparser.FuncExpr:
@@ -1009,26 +1025,26 @@ func (e *CHEngine) AddTable(table string) {
 	e.Statements = append(e.Statements, stmt)
 }
 
-func (e *CHEngine) AddTag(tag string, alias string) error {
-	stmt, err := GetTagTranslator(tag, alias, e.DB, e.Table)
+func (e *CHEngine) AddTag(tag string, alias string) (string, error) {
+	stmt, labelType, err := GetTagTranslator(tag, alias, e.DB, e.Table)
 	if err != nil {
-		return err
+		return labelType, err
 	}
 	if stmt != nil {
 		e.Statements = append(e.Statements, stmt)
-		return nil
+		return labelType, nil
 	}
 	stmt, err = GetMetricsTag(tag, alias, e.DB, e.Table, e.Context)
 	if err != nil {
-		return err
+		return labelType, err
 	}
 	if stmt != nil {
 		e.Statements = append(e.Statements, stmt)
-		return nil
+		return labelType, nil
 	}
 	stmt = GetDefaultTag(tag, alias)
 	e.Statements = append(e.Statements, stmt)
-	return nil
+	return labelType, nil
 }
 
 func (e *CHEngine) SetLevelFlag(flag int) {

@@ -273,6 +273,28 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 						}
 					} else if strings.HasPrefix(preAsTag, "tag.") || strings.HasPrefix(preAsTag, "attribute.") {
 						if strings.HasPrefix(preAsTag, "tag.") {
+							if db == "prometheus" {
+								nameNoPreffix := strings.TrimPrefix(preAsTag, "tag.")
+								if metricID, ok := METRIC_NAME_TO_ID[table]; ok {
+									if labelNameID, ok := LABEL_NAME_TO_ID[nameNoPreffix]; ok {
+										// Determine whether the tag is app_label or target_label
+										if appLabelColumnIndex, ok := METRIC_APP_LABEL_LAYOUT[table+", "+nameNoPreffix]; ok {
+											if strings.Contains(op, "match") {
+												filter = fmt.Sprintf("app_label_value_id_%d IN (SELECT label_value_id FROM prometheus.app_label_map WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s))", appLabelColumnIndex, metricID, labelNameID, op, t.Value)
+											} else {
+												filter = fmt.Sprintf("app_label_value_id_%d IN (SELECT label_value_id FROM prometheus.app_label_map WHERE metric_id=%d and label_name_id=%d and label_value %s %s)", appLabelColumnIndex, metricID, labelNameID, op, t.Value)
+											}
+										} else {
+											if strings.Contains(op, "match") {
+												filter = fmt.Sprintf("target_id IN (SELECT target_id FROM prometheus.app_label_map WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s))", metricID, labelNameID, op, t.Value)
+											} else {
+												filter = fmt.Sprintf("target_id IN (SELECT target_id FROM prometheus.app_label_map WHERE metric_id=%d and label_name_id=%d and label_value %s %s)", metricID, labelNameID, op, t.Value)
+											}
+										}
+									}
+								}
+								return &view.Expr{Value: filter}, nil
+							}
 							tagItem, ok = tag.GetTag("tag.", db, table, "default")
 						} else {
 							tagItem, ok = tag.GetTag("attribute.", db, table, "default")
@@ -417,6 +439,28 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 					}
 				} else if strings.HasPrefix(t.Tag, "tag.") || strings.HasPrefix(t.Tag, "attribute.") {
 					if strings.HasPrefix(t.Tag, "tag.") {
+						if db == "prometheus" {
+							nameNoPreffix := strings.TrimPrefix(t.Tag, "tag.")
+							if metricID, ok := METRIC_NAME_TO_ID[table]; ok {
+								if labelNameID, ok := LABEL_NAME_TO_ID[nameNoPreffix]; ok {
+									// Determine whether the tag is app_label or target_label
+									if appLabelColumnIndex, ok := METRIC_APP_LABEL_LAYOUT[table+", "+nameNoPreffix]; ok {
+										if strings.Contains(op, "match") {
+											filter = fmt.Sprintf("app_label_value_id_%d IN (SELECT label_value_id FROM prometheus.app_label_map WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s))", appLabelColumnIndex, metricID, labelNameID, op, t.Value)
+										} else {
+											filter = fmt.Sprintf("app_label_value_id_%d IN (SELECT label_value_id FROM prometheus.app_label_map WHERE metric_id=%d and label_name_id=%d and label_value %s %s)", appLabelColumnIndex, metricID, labelNameID, op, t.Value)
+										}
+									} else {
+										if strings.Contains(op, "match") {
+											filter = fmt.Sprintf("target_id IN (SELECT target_id FROM prometheus.app_label_map WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s))", metricID, labelNameID, op, t.Value)
+										} else {
+											filter = fmt.Sprintf("target_id IN (SELECT target_id FROM prometheus.app_label_map WHERE metric_id=%d and label_name_id=%d and label_value %s %s)", metricID, labelNameID, op, t.Value)
+										}
+									}
+								}
+							}
+							return &view.Expr{Value: filter}, nil
+						}
 						tagItem, ok = tag.GetTag("tag.", db, table, "default")
 					} else {
 						tagItem, ok = tag.GetTag("attribute.", db, table, "default")

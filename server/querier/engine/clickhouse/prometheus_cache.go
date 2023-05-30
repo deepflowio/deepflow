@@ -26,8 +26,6 @@ import (
 )
 
 var METRIC_NAME_TO_ID = map[string]int{}
-var APP_LABEL = map[string][]interface{}{}
-var TARGET_LABEL = map[string]string{}
 var METRIC_APP_LABEL_LAYOUT = map[string]int{}
 var LABEL_NAME_TO_ID = map[string]int{}
 var LABEL_ID_TO_NAME = map[int]string{}
@@ -51,7 +49,7 @@ func GenerateMap() {
 	metricNameToIDSql := "SELECT name,id FROM prometheus.prometheus_metric_name_map"
 	metricNameToIDSqlRst, err := chClient.DoQuery(&client.QueryParams{Sql: metricNameToIDSql})
 	if err != nil {
-		log.Error(err)
+		log.Warning(err)
 		return
 	}
 	for _, _key := range metricNameToIDSqlRst.Values {
@@ -65,7 +63,7 @@ func GenerateMap() {
 	appLabelSql := "SELECT metric_id,label_name_id,label_value,label_value_id FROM prometheus.app_label_map"
 	appLabelSqlRst, err := chClient.DoQuery(&client.QueryParams{Sql: appLabelSql})
 	if err != nil {
-		log.Error(err)
+		log.Warning(err)
 		return
 	}
 	for _, _key := range appLabelSqlRst.Values {
@@ -77,7 +75,6 @@ func GenerateMap() {
 		labelNameID := labelNameIDKey.(int)
 		labelValue := labelValueKey.(string)
 		labelValueID := labelValueIDKey.(int)
-		APP_LABEL[fmt.Sprintf("%d,%d", metricID, labelNameID)] = []interface{}{labelValueID, labelValue}
 		label := Label{LabelNameID: labelNameID, LabelValue: labelValue}
 		metricIDAppLabelValueIDKey := fmt.Sprintf("%d,%d", metricID, labelValueID)
 		METRIC_ID_APP_LABEL_VALUE_ID_TO_LABELS[metricIDAppLabelValueIDKey] = append(METRIC_ID_APP_LABEL_VALUE_ID_TO_LABELS[metricIDAppLabelValueIDKey], label)
@@ -86,7 +83,7 @@ func GenerateMap() {
 	labelNameToIDSql := "SELECT name,id FROM prometheus.prometheus_label_name_map"
 	labelNameToIDSqlRst, err := chClient.DoQuery(&client.QueryParams{Sql: labelNameToIDSql})
 	if err != nil {
-		log.Error(err)
+		log.Warning(err)
 		return
 	}
 	for _, _key := range labelNameToIDSqlRst.Values {
@@ -101,7 +98,7 @@ func GenerateMap() {
 	metricAppLabelLayoutSql := "SELECT metric_name,app_label_name,app_label_column_index FROM prometheus.prometheus_metric_app_label_layout_map"
 	metricAppLabelLayoutSqlRst, err := chClient.DoQuery(&client.QueryParams{Sql: metricAppLabelLayoutSql})
 	if err != nil {
-		log.Error(err)
+		log.Warning(err)
 		return
 	}
 	for _, _key := range metricAppLabelLayoutSqlRst.Values {
@@ -117,7 +114,7 @@ func GenerateMap() {
 	targetLabelSql := "SELECT metric_id,label_name_id,label_value,target_id FROM prometheus.target_label_map"
 	targetLabelSqlRst, err := chClient.DoQuery(&client.QueryParams{Sql: targetLabelSql})
 	if err != nil {
-		log.Error(err)
+		log.Warning(err)
 		return
 	}
 	for _, _key := range targetLabelSqlRst.Values {
@@ -129,16 +126,15 @@ func GenerateMap() {
 		labelNameID := labelNameIDKey.(int)
 		labelValue := labelValueKey.(string)
 		targetID := targetIDKey.(int)
-		TARGET_LABEL[fmt.Sprintf("%d,%d,%d", metricID, targetID, labelNameID)] = labelValue
 		label := Label{LabelNameID: labelNameID, LabelValue: labelValue}
 		metricIDTargetIDKey := fmt.Sprintf("%d,%d", metricID, targetID)
 		METRIC_ID_TARGET_ID_TO_LABELS[metricIDTargetIDKey] = append(METRIC_ID_TARGET_ID_TO_LABELS[metricIDTargetIDKey], label)
 	}
 
-	metricNameToMaxIndexSql := "SELECT metric_name,max(app_label_column_index) FROM prometheus.prometheus_metric_app_label_layout_map"
+	metricNameToMaxIndexSql := "SELECT metric_name,max(app_label_column_index) FROM prometheus.prometheus_metric_app_label_layout_map GROUP BY metric_name"
 	metricNameToMaxIndexSqlRst, err := chClient.DoQuery(&client.QueryParams{Sql: metricNameToMaxIndexSql})
 	if err != nil {
-		log.Error(err)
+		log.Warning(err)
 		return
 	}
 	for _, _key := range metricNameToMaxIndexSqlRst.Values {
