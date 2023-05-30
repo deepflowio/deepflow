@@ -495,6 +495,7 @@ func DeleteDomain(lcuuid string) (map[string]string, error) { // TODO whether re
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.NATRule{})
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.NATGateway{})
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.Process{})
+	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.PrometheusTarget{})
 	var sgs []mysql.SecurityGroup
 	// mysql.Db.Unscoped().Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}}}).Where("domain = ?", lcuuid).Delete(&sgs)
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Find(&sgs)
@@ -739,6 +740,7 @@ func DeleteSubDomain(lcuuid string) (map[string]string, error) {
 		mysql.Db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.PodNode{})
 		mysql.Db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.PodCluster{})
 		mysql.Db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.Process{})
+		mysql.Db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.PrometheusTarget{})
 	}
 
 	mysql.Db.Delete(&subDomain)

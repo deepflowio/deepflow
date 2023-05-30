@@ -318,7 +318,7 @@ func (k *KubernetesStorage) Clear() {
 func (k *KubernetesStorage) Add(k8sInfo KubernetesInfo) {
 	k.mutex.Lock()
 	kInfo, ok := k.kubernetesData[k8sInfo.ClusterID]
-	// trident上报消息中version未变化时，只更新epoch和error_msg
+	// 上报消息中version未变化时，只更新epoch和error_msg
 	if ok && kInfo.Version == k8sInfo.Version {
 		kInfo.Epoch = time.Now()
 		kInfo.ErrorMSG = k8sInfo.ErrorMSG
@@ -328,14 +328,11 @@ func (k *KubernetesStorage) Add(k8sInfo KubernetesInfo) {
 	}
 	k.mutex.Unlock()
 
-	result, err := k.fetch()
-	if err == nil {
-		k.channel <- result
-	}
+	k.channel <- k.fetch()
 }
 
-func (k *KubernetesStorage) fetch() (map[string]KubernetesInfo, error) {
-	return k.kubernetesData, nil
+func (k *KubernetesStorage) fetch() map[string]KubernetesInfo {
+	return k.kubernetesData
 }
 
 func (k *KubernetesStorage) run() {
@@ -350,10 +347,8 @@ func (k *KubernetesStorage) run() {
 			delete(k.kubernetesData, key)
 		}
 		k.mutex.Unlock()
-		result, err := k.fetch()
-		if err == nil {
-			k.channel <- result
-		}
+
+		k.channel <- k.fetch()
 	}
 }
 
@@ -364,5 +359,76 @@ func (k *KubernetesStorage) Start() {
 func (k *KubernetesStorage) Stop() {
 	if k.kCancel != nil {
 		k.kCancel()
+	}
+}
+
+type PrometheusStorage struct {
+	cfg            config.GenesisConfig
+	kCtx           context.Context
+	kCancel        context.CancelFunc
+	channel        chan map[string]PrometheusInfo
+	prometheusData map[string]PrometheusInfo
+	mutex          sync.Mutex
+}
+
+func NewPrometheusStorage(cfg config.GenesisConfig, pChan chan map[string]PrometheusInfo, ctx context.Context) *PrometheusStorage {
+	pCtx, pCancel := context.WithCancel(ctx)
+	return &PrometheusStorage{
+		cfg:            cfg,
+		kCtx:           pCtx,
+		kCancel:        pCancel,
+		channel:        pChan,
+		prometheusData: map[string]PrometheusInfo{},
+		mutex:          sync.Mutex{},
+	}
+}
+
+func (p *PrometheusStorage) Clear() {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	p.prometheusData = map[string]PrometheusInfo{}
+}
+
+func (p *PrometheusStorage) Add(prometheusInfo PrometheusInfo) {
+	p.mutex.Lock()
+	if pInfo, ok := p.prometheusData[prometheusInfo.ClusterID]; ok && pInfo.Version == prometheusInfo.Version {
+		prometheusInfo.Entries = pInfo.Entries
+		p.prometheusData[prometheusInfo.ClusterID] = prometheusInfo
+	} else {
+		p.prometheusData[prometheusInfo.ClusterID] = prometheusInfo
+	}
+	p.mutex.Unlock()
+
+	p.channel <- p.fetch()
+}
+
+func (p *PrometheusStorage) fetch() map[string]PrometheusInfo {
+	return p.prometheusData
+}
+
+func (p *PrometheusStorage) run() {
+	for {
+		time.Sleep(time.Duration(p.cfg.DataPersistenceInterval) * time.Second)
+		now := time.Now()
+		p.mutex.Lock()
+		for key, s := range p.prometheusData {
+			if now.Sub(s.Epoch) <= time.Duration(p.cfg.AgingTime)*time.Second {
+				continue
+			}
+			delete(p.prometheusData, key)
+		}
+		p.mutex.Unlock()
+		p.channel <- p.fetch()
+	}
+}
+
+func (p *PrometheusStorage) Start() {
+	go p.run()
+}
+
+func (p *PrometheusStorage) Stop() {
+	if p.kCancel != nil {
+		p.kCancel()
 	}
 }

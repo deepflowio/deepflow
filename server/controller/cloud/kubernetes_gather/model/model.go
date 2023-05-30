@@ -51,6 +51,7 @@ type KubernetesGatherResource struct {
 	PodSubnets             []model.Subnet
 	PodVInterfaces         []model.VInterface
 	PodIPs                 []model.IP
+	PrometheusTargets      []model.PrometheusTarget
 }
 
 type KubernetesGatherBasicInfo struct {

@@ -64,6 +64,7 @@ const (
 	RESOURCE_TYPE_POD_REPLICA_SET_EN          = "pod_replica_set"
 	RESOURCE_TYPE_POD_EN                      = "pod"
 	RESOURCE_TYPE_PROCESS_EN                  = "process"
+	RESOURCE_TYPE_PROMETHEUS_TARGET_EN        = "prometheus_target"
 )
 
 const (

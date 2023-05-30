@@ -61,6 +61,15 @@ func RegisterGenesisCommand() *cobra.Command {
 	}
 	k8sInfo.Flags().StringVarP(&k8sType, "type", "t", "", "k8s info resource type: '*version.Info | *v1.Pod | *v1.ConfigMap | *v1.Namespace | \n*v1.Service | *v1.Deployment | *v1.DaemonSet | *v1.ReplicaSet | *v1beta1.Ingress'")
 
+	prometheusInfo := &cobra.Command{
+		Use:     "prometheus",
+		Short:   "genesis prometheus info",
+		Example: "deepflow-ctl genesis prometheus cluster_id",
+		Run: func(cmd *cobra.Command, args []string) {
+			prometheusInfo(cmd, args)
+		},
+	}
+
 	agentInfo := &cobra.Command{
 		Use:     "agent",
 		Short:   "genesis agent info",
@@ -73,6 +82,7 @@ func RegisterGenesisCommand() *cobra.Command {
 	genesis.AddCommand(syncInfo)
 	genesis.AddCommand(k8sInfo)
 	genesis.AddCommand(agentInfo)
+	genesis.AddCommand(prometheusInfo)
 	return genesis
 }
 
@@ -350,6 +360,37 @@ func agentInfo(cmd *cobra.Command, args []string) {
 	}
 
 	url := fmt.Sprintf("http://%s:%d/v1/agent-stats/%s/", podIP, server.SvcPort, args[0])
+	response, err := common.CURLPerform("GET", url, nil, "")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	responseByte, err := response.MarshalJSON()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	var str bytes.Buffer
+	err = json.Indent(&str, responseByte, "", "    ")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	fmt.Println(str.String())
+}
+
+func prometheusInfo(cmd *cobra.Command, args []string) {
+	if len(args) == 0 {
+		fmt.Fprintf(os.Stderr, "must specify cluster_id.\nExample: %s\n", cmd.Example)
+		return
+	}
+
+	server := common.GetServerInfo(cmd)
+	url := fmt.Sprintf("http://%s:%d/v1/prometheus-info/%s/", server.IP, server.Port, args[0])
+
 	response, err := common.CURLPerform("GET", url, nil, "")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

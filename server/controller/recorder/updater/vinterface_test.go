@@ -65,8 +65,8 @@ func (t *SuiteTest) TestHandleUpdateVInterfaceSucess() {
 	cloudItem.Type = common.VIF_TYPE_WAN
 	assert.Equal(t.T(), 1, len(cache_.LANIPs))
 
-	updater := NewVInterface(cache_, []cloudmodel.VInterface{cloudItem})
-	ipUpdater := NewIP(cache_, []cloudmodel.IP{cloudIP})
+	updater := NewVInterface(cache_, []cloudmodel.VInterface{cloudItem}, nil)
+	ipUpdater := NewIP(cache_, []cloudmodel.IP{cloudIP}, nil)
 	updater.HandleAddAndUpdate()
 	monkey := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVInterfaceIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
 		return 100, true

@@ -126,6 +126,10 @@ func (s *service) KubernetesAPISync(ctx context.Context, in *api.KubernetesAPISy
 }
 
 func (s *service) PrometheusAPISync(ctx context.Context, in *api.PrometheusAPISyncRequest) (*api.PrometheusAPISyncResponse, error) {
+	startTime := time.Now()
+	defer func() {
+		statsd.AddGrpcCostStatsd(statsd.PrometheusAPISync, int(time.Now().Sub(startTime).Milliseconds()))
+	}()
 	return genesis.Synchronizer.PrometheusAPISync(ctx, in)
 }
 

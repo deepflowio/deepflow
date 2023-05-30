@@ -72,6 +72,7 @@ type DiffBaseDataSet struct {
 	PodReplicaSets         map[string]*PodReplicaSet
 	Pods                   map[string]*Pod
 	Process                map[string]*Process
+	PrometheusTarget       map[string]*PrometheusTarget
 }
 
 func NewDiffBaseDataSet() DiffBaseDataSet {
@@ -119,6 +120,7 @@ func NewDiffBaseDataSet() DiffBaseDataSet {
 		PodReplicaSets:         make(map[string]*PodReplicaSet),
 		Pods:                   make(map[string]*Pod),
 		Process:                make(map[string]*Process),
+		PrometheusTarget:       make(map[string]*PrometheusTarget),
 	}
 }
 
@@ -964,6 +966,25 @@ func (b *DiffBaseDataSet) deleteProcess(lcuuid string) {
 	log.Info(deleteDiffBase(RESOURCE_TYPE_PROCESS_EN, lcuuid))
 }
 
+func (b *DiffBaseDataSet) addPrometheusTarget(dbItem *mysql.PrometheusTarget, seq int) {
+	b.PrometheusTarget[dbItem.Lcuuid] = &PrometheusTarget{
+		DiffBase: DiffBase{
+			Sequence: seq,
+			Lcuuid:   dbItem.Lcuuid,
+		},
+		Instance:    dbItem.Instance,
+		Job:         dbItem.Job,
+		ScrapeURL:   dbItem.ScrapeURL,
+		OtherLabels: dbItem.OtherLabels,
+	}
+	log.Info(addDiffBase(RESOURCE_TYPE_PROMETHEUS_TARGET_EN, b.PrometheusTarget[dbItem.Lcuuid]))
+}
+
+func (b *DiffBaseDataSet) deletePrometheusTarget(lcuuid string) {
+	delete(b.PrometheusTarget, lcuuid)
+	log.Info(deleteDiffBase(RESOURCE_TYPE_PROMETHEUS_TARGET_EN, lcuuid))
+}
+
 type DiffBase struct {
 	Sequence int    `json:"sequence"`
 	Lcuuid   string `json:"lcuuid"`
@@ -1647,4 +1668,20 @@ func (p *Process) Update(cloudItem *cloudmodel.Process) {
 	p.Name = cloudItem.Name
 	p.OSAPPTags = cloudItem.OSAPPTags
 	log.Info(updateDiffBase(RESOURCE_TYPE_PROCESS_EN, p))
+}
+
+type PrometheusTarget struct {
+	DiffBase
+	Instance    string `json:"instance" binding:"required"`
+	Job         string `json:"job" binding:"required"`
+	ScrapeURL   string `json:"scrape_url" binding:"required"`
+	OtherLabels string `json:"other_labels" binding:"required"`
+}
+
+func (p *PrometheusTarget) Update(cloudItem *cloudmodel.PrometheusTarget) {
+	p.Instance = cloudItem.Instance
+	p.Job = cloudItem.Job
+	p.ScrapeURL = cloudItem.ScrapeURL
+	p.OtherLabels = cloudItem.OtherLabels
+	log.Info(updateDiffBase(RESOURCE_TYPE_PROMETHEUS_TARGET_EN, p))
 }
