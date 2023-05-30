@@ -111,10 +111,10 @@ static struct symbol probe_syms[] = {
 		.is_probe_ret = true,
 	},
 
-	/*-------- runtime.casgstatus --------------*/
+	/*-------- runtime.execute --------------*/
 	{
-		.symbol = "runtime.casgstatus",
-		.probe_func = "uprobe/runtime_casgstatus",
+		.symbol = "runtime.execute",
+		.probe_func = "uprobe/runtime_execute",
 		.is_probe_ret = false,
 	},
 };
