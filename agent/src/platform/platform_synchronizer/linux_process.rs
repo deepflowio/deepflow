@@ -15,12 +15,12 @@
  */
 
 use std::collections::HashSet;
-use std::path::PathBuf;
+use std::path::{PathBuf, MAIN_SEPARATOR};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::{collections::HashMap, os::unix::process::CommandExt, process::Command};
 
 use envmnt::{ExpandOptions, ExpansionType};
-use log::error;
+use log::{error, warn};
 use nom::AsBytes;
 use procfs::{process::Process, ProcError, ProcResult};
 use public::bytes::write_u64_be;
@@ -39,6 +39,10 @@ use crate::config::{
     OS_PROC_REGEXP_MATCH_TYPE_CMD, OS_PROC_REGEXP_MATCH_TYPE_PARENT_PROC_NAME,
     OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME, OS_PROC_REGEXP_MATCH_TYPE_TAG,
 };
+
+const DOCKER_CRI_CONTAINER_ID_LEN: usize = 64;
+const CONTAINERD_CRI_CONTAINER_ID_LEN: usize = 64;
+
 #[derive(Debug, Clone)]
 pub struct ProcessData {
     pub name: String, // the replaced name
@@ -53,6 +57,8 @@ pub struct ProcessData {
     pub os_app_tags: Vec<OsAppTagKV>,
     // netns file inode
     pub netns_id: u64,
+    // pod container id in kubernetes
+    pub container_id: String,
 }
 
 impl ProcessData {
@@ -144,6 +150,7 @@ impl TryFrom<&Process> for ProcessData {
             },
             os_app_tags: vec![],
             netns_id: get_proc_netns(proc)?,
+            container_id: get_container_id(proc).unwrap_or("".to_string()),
         })
     }
 }
@@ -169,6 +176,7 @@ impl From<&ProcessData> for ProcessInfo {
                 tags
             },
             netns_id: Some(p.netns_id as u32),
+            container_id: Some(p.container_id.clone()),
         }
     }
 }
@@ -586,6 +594,59 @@ fn merge_tag(child_tag: &mut Vec<OsAppTagKV>, parent_tag: &[OsAppTagKV]) {
     }
 }
 
+fn get_container_id(proc: &Process) -> Option<String> {
+    let Ok(cgruop) = proc.cgroups() else {
+        return None
+    };
+
+    let mut path = "".to_string();
+
+    'l: for i in cgruop {
+        // cgroup version 2 have no controller
+        if i.controllers.len() == 0 {
+            path = i.pathname;
+            break;
+        } else {
+            for c in i.controllers {
+                match c.as_str() {
+                    "pids" | "cpuset" | "devices" | "memory" | "cpu" => {
+                        path = i.pathname;
+                        break 'l;
+                    }
+                    _ => {}
+                }
+            }
+        };
+    }
+    if path.is_empty() {
+        return None;
+    }
+
+    let Some((_, s)) = path.rsplit_once(MAIN_SEPARATOR) else {
+        warn!("cgroup path: `{:?}` get base path fail", path);
+        return None;
+    };
+
+    if s.len() == DOCKER_CRI_CONTAINER_ID_LEN {
+        // when length is 64 assume is docker cri
+        Some(s.to_string())
+    } else if s.starts_with("cri-containerd") {
+        // when start with `cri-containerd` assume as containerd cri, the path like
+        // cri-containerd-74541fe87421db054a995cdc6330f500cd2d0b5dd324f1ef460580087e2575e5.scope
+        let Some((_, sp))  = s.rsplit_once("-") else {
+            warn!("containerd cri path: `{:?}` get container id fail", path);
+            return None;
+        };
+        if !sp.len() == CONTAINERD_CRI_CONTAINER_ID_LEN + ".scope".len() {
+            warn!("containerd cri path: `{}` parse fail, length incorrect", sp);
+            return None;
+        }
+        Some(sp[..CONTAINERD_CRI_CONTAINER_ID_LEN].to_string())
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod test {
     use std::time::Duration;
@@ -614,6 +675,7 @@ mod test {
                         value: "root_val".into(),
                     }],
                     netns_id: 1,
+                    container_id: "".into(),
                 },
                 ProcessData {
                     name: "parent".into(),
@@ -629,6 +691,7 @@ mod test {
                         value: "parent_val".into(),
                     }],
                     netns_id: 1,
+                    container_id: "".into(),
                 },
                 ProcessData {
                     name: "child".into(),
@@ -644,6 +707,7 @@ mod test {
                         value: "child_val".into(),
                     }],
                     netns_id: 1,
+                    container_id: "".into(),
                 },
                 ProcessData {
                     name: "other".into(),
@@ -659,6 +723,7 @@ mod test {
                         value: "other_val".into(),
                     }],
                     netns_id: 1,
+                    container_id: "".into(),
                 },
             ];
 
