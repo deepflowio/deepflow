@@ -39,7 +39,7 @@ type labelValue struct {
 
 func newLabelValue(max int) *labelValue {
 	return &labelValue{
-		resourceType: "metric_name",
+		resourceType: "label_value",
 		Max:          max,
 		usableIDs:    make([]int, 0, max),
 		strToID:      make(map[string]int),
@@ -48,7 +48,7 @@ func newLabelValue(max int) *labelValue {
 
 func (p *labelValue) load() (ids mapset.Set[int], err error) {
 	var items []*mysql.PrometheusLabelValue
-	err = mysql.Db.Unscoped().Select("id").Find(&items).Error
+	err = mysql.Db.Unscoped().Find(&items).Error
 	if err != nil {
 		log.Errorf("db query %s failed: %v", p.resourceType, err)
 		return nil, err
@@ -63,6 +63,9 @@ func (p *labelValue) load() (ids mapset.Set[int], err error) {
 
 func (p *labelValue) refresh(args ...interface{}) error {
 	log.Infof("refresh %s id pools started", p.resourceType)
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
 	inUseIDsSet, err := p.load()
 	if err != nil {
 		return err
@@ -71,9 +74,6 @@ func (p *labelValue) refresh(args ...interface{}) error {
 	for i := 1; i <= p.Max; i++ {
 		allIDsSet.Add(i)
 	}
-
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
 	// 可用ID = 所有ID（1~max）- db中正在使用的ID
 	// 排序原则：大于db正在使用的max值的ID（未曾被使用过的ID）优先，小于db正在使用的max值的ID（已被使用过且已回收的ID）在后
 	var usableIDs []int
@@ -204,7 +204,7 @@ func (p *labelValue) addBatch(toAdd []*mysql.PrometheusLabelValue) error {
 		if err != nil {
 			return err
 		}
-		log.Infof("add %d labels success", len(oneP))
+		log.Infof("add %d %s success", len(oneP), p.resourceType)
 	}
 	return nil
 }

@@ -24,13 +24,15 @@ import (
 )
 
 type label struct {
-	mux         sync.Mutex
-	nameToValue map[string]string
+	mux          sync.Mutex
+	resourceType string
+	nameToValue  map[string]string
 }
 
 func newLabel() *label {
 	return &label{
-		nameToValue: make(map[string]string),
+		resourceType: "label",
+		nameToValue:  make(map[string]string),
 	}
 }
 
@@ -91,7 +93,7 @@ func (l *label) addBatch(toAdd []*mysql.PrometheusLabel) error {
 		if err != nil {
 			return err
 		}
-		log.Infof("add %d labels success", len(oneP))
+		log.Infof("add %d %s success", len(oneP), l.resourceType)
 	}
 	return nil
 }

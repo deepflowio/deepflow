@@ -48,7 +48,7 @@ func newMetricName(max int) *metricName {
 
 func (p *metricName) load() (ids mapset.Set[int], err error) {
 	var items []*mysql.PrometheusMetricName
-	err = mysql.Db.Unscoped().Select("id").Find(&items).Error
+	err = mysql.Db.Find(&items).Error
 	if err != nil {
 		log.Errorf("db query %s failed: %v", p.resourceType, err)
 		return nil, err
@@ -62,7 +62,10 @@ func (p *metricName) load() (ids mapset.Set[int], err error) {
 }
 
 func (p *metricName) refresh(args ...interface{}) error {
-	log.Infof("refresh %s id pools started", p.resourceType)
+	log.Infof("refresh %s id pools started", p.resourceType)	
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
 	inUseIDsSet, err := p.load()
 	if err != nil {
 		return err
@@ -71,9 +74,6 @@ func (p *metricName) refresh(args ...interface{}) error {
 	for i := 1; i <= p.maxID; i++ {
 		allIDsSet.Add(i)
 	}
-
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
 	// 可用ID = 所有ID（1~max）- db中正在使用的ID
 	// 排序原则：大于db正在使用的max值的ID（未曾被使用过的ID）优先，小于db正在使用的max值的ID（已被使用过且已回收的ID）在后
 	var usableIDs []int
@@ -153,6 +153,7 @@ func (p *metricName) check(ids []int) (inUseIDs []int, err error) {
 func (p *metricName) sync(strs []string) ([]*controller.PrometheusMetricName, error) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
+
 	resp := make([]*controller.PrometheusMetricName, 0)
 	dbToAdd := make([]*mysql.PrometheusMetricName, 0)
 	var countToAllocate int
@@ -203,7 +204,7 @@ func (p *metricName) addBatch(toAdd []*mysql.PrometheusMetricName) error {
 		if err != nil {
 			return err
 		}
-		log.Infof("add %d labels success", len(oneP))
+		log.Infof("add %d %s success", len(oneP), p.resourceType)
 	}
 	return nil
 }

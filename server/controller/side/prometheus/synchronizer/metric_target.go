@@ -25,11 +25,13 @@ import (
 
 type metricTarget struct {
 	mux                  sync.Mutex
+	resourceType         string
 	metricNameToTargetID map[string]int
 }
 
 func newMetricTarget() *metricTarget {
 	return &metricTarget{
+		resourceType:         "metric_target",
 		metricNameToTargetID: make(map[string]int),
 	}
 }
@@ -91,7 +93,7 @@ func (l *metricTarget) addBatch(toAdd []*mysql.PrometheusMetricTarget) error {
 		if err != nil {
 			return err
 		}
-		log.Infof("add %d metricTargets success", len(oneP))
+		log.Infof("add %d %s success", len(oneP), l.resourceType)
 	}
 	return nil
 }

@@ -28,19 +28,20 @@ import (
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/message/trident"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/side/prometheus/cache"
 	. "github.com/deepflowio/deepflow/server/controller/side/prometheus/common"
 )
 
 var log = logging.MustGetLogger("side.prometheus")
 
 type Encoder struct {
-	cache   *Cache
+	cache   *cache.Cache
 	grpcurl *GRPCURL
 }
 
 func NewEncoder() *Encoder {
 	return &Encoder{
-		cache:   GetSingletonCache(),
+		cache:   cache.GetSingletonCache(),
 		grpcurl: new(GRPCURL),
 	}
 }
@@ -58,33 +59,33 @@ func (e *Encoder) Encode(metrics []*trident.MetricLabelRequest) ([]*trident.Metr
 }
 
 func (e *Encoder) assembleFully() ([]*trident.MetricLabelResponse, error) {
-	defer e.cache.clear()
-	err := e.cache.refreshFully()
+	defer e.cache.Clear()
+	err := e.cache.RefreshFully()
 	if err != nil {
 		return nil, err
 	}
 	var res []*trident.MetricLabelResponse
-	e.cache.metricName.nameToID.Range(func(k, v interface{}) bool {
+	e.cache.MetricName.Get().Range(func(k, v interface{}) bool {
 		var labels []*trident.LabelIDResponse
 		metricName := k.(string)
 		metricID := v.(int)
-		for _, labelName := range e.cache.metricAndAPPLabelLayout.metricNameToAPPLabelNames[metricName] {
-			labelNameID, ok := e.cache.labelName.getIDByName(labelName)
+		for _, labelName := range e.cache.MetricAndAPPLabelLayout.Get()[metricName] {
+			labelNameID, ok := e.cache.LabelName.GetIDByName(labelName)
 			if !ok {
 				err = errors.Errorf("label_name %s not found", labelName)
 				return false
 			}
-			labelValue, ok := e.cache.label.getValueByName(labelName)
+			labelValue, ok := e.cache.Label.GetValueByName(labelName)
 			if !ok {
 				err = errors.Errorf("label_value %s not found", labelValue)
 				return false
 			}
-			labelValueID, ok := e.cache.labelValue.getValueID(labelValue)
+			labelValueID, ok := e.cache.LabelValue.GetValueID(labelValue)
 			if !ok {
 				err = errors.Errorf("label_value_id %s not found", labelValue)
 				return false
 			}
-			idx, ok := e.cache.metricAndAPPLabelLayout.getIndex(layoutKey{metricName: metricName, labelName: labelName})
+			idx, ok := e.cache.MetricAndAPPLabelLayout.GetIndex(cache.NewLayoutKey(metricName, labelName))
 			if !ok {
 				err = errors.Errorf("app_label_index (metric_name: %s, app_label_name) not found", metricName, labelName)
 				return false
@@ -98,15 +99,15 @@ func (e *Encoder) assembleFully() ([]*trident.MetricLabelResponse, error) {
 			}
 			labels = append(labels, label)
 		}
-		targetID, ok := e.cache.metricTarget.getTargetID(metricName)
+		targetID, ok := e.cache.MetricTarget.GetTargetID(metricName)
 		if !ok {
-			for n, v := range e.cache.target.targetIDToLabelNameToValue[targetID] {
-				nID, ok := e.cache.labelName.getIDByName(n)
+			for n, v := range e.cache.Target.Get()[targetID] {
+				nID, ok := e.cache.LabelName.GetIDByName(n)
 				if !ok {
 					log.Error("labelNameID not found")
 					return false
 				}
-				vID, ok := e.cache.labelValue.getValueID(v)
+				vID, ok := e.cache.LabelValue.GetValueID(v)
 				if !ok {
 					log.Error("labelValueID not found")
 					return false
@@ -137,9 +138,9 @@ func (e *Encoder) prepare(metrics []*trident.MetricLabelRequest) error {
 	metricNamesToE := mapset.NewSet[string]()
 	labelNamesToE := mapset.NewSet[string]()
 	labelValuesToE := mapset.NewSet[string]()
-	metricAPPLabelLayoutsToE := mapset.NewSet[layoutKey]()
-	labelsToAdd := mapset.NewSet[labelKey]()
-	metricTargetsToAdd := mapset.NewSet[metricTargetKey]()
+	metricAPPLabelLayoutsToE := mapset.NewSet[cache.LayoutKey]()
+	labelsToAdd := mapset.NewSet[cache.LabelKey]()
+	metricTargetsToAdd := mapset.NewSet[cache.MetricTargetKey]()
 	for _, m := range metrics {
 		mn := m.GetMetricName()
 		e.tryAppendMetricNameToEncode(metricNamesToE, mn)
@@ -154,8 +155,8 @@ func (e *Encoder) prepare(metrics []*trident.MetricLabelRequest) error {
 				instanceValue = l.GetValue()
 			} else if ln == TargetLabelJob {
 				jobValue = l.GetValue()
-			} else if !common.Contains(e.cache.target.labelNames, ln) {
-				e.tryAppendMetricAPPLabelLayoutToEncode(metricAPPLabelLayoutsToE, layoutKey{metricName: mn, labelName: ln})
+			} else if !common.Contains(e.cache.Target.GetLabelNames(), ln) {
+				e.tryAppendMetricAPPLabelLayoutToEncode(metricAPPLabelLayoutsToE, cache.NewLayoutKey(mn, ln))
 			}
 			e.tryAppendLabelToAdd(labelsToAdd, ln, lv)
 		}
@@ -166,43 +167,37 @@ func (e *Encoder) prepare(metrics []*trident.MetricLabelRequest) error {
 		return nil
 	}
 
-	log.Info(metricNamesToE) // TODO delete
-	log.Info(labelNamesToE)
-	log.Info(labelValuesToE)
-	log.Info(metricAPPLabelLayoutsToE)
-	log.Info(labelsToAdd)
-	log.Info(metricTargetsToAdd)
 	syncResp, err := e.grpcurl.Sync(
 		&controller.SyncPrometheusRequest{
 			MetricNames: metricNamesToE.ToSlice(),
 			LabelNames:  labelNamesToE.ToSlice(),
 			LabelValues: labelValuesToE.ToSlice(),
-			MetricAppLabelLayouts: func(ks []layoutKey) []*controller.PrometheusMetricAPPLabelLayoutRequest {
+			MetricAppLabelLayouts: func(ks []cache.LayoutKey) []*controller.PrometheusMetricAPPLabelLayoutRequest {
 				res := make([]*controller.PrometheusMetricAPPLabelLayoutRequest, 0, len(ks))
 				for i := range ks {
 					res = append(res, &controller.PrometheusMetricAPPLabelLayoutRequest{
-						MetricName:   &ks[i].metricName,
-						AppLabelName: &ks[i].labelName,
+						MetricName:   &ks[i].MetricName,
+						AppLabelName: &ks[i].LabelName,
 					})
 				}
 				return res
 			}(metricAPPLabelLayoutsToE.ToSlice()),
-			Labels: func(ks []labelKey) []*controller.PrometheusLabel {
+			Labels: func(ks []cache.LabelKey) []*controller.PrometheusLabel {
 				res := make([]*controller.PrometheusLabel, 0, len(ks))
 				for i := range ks {
 					res = append(res, &controller.PrometheusLabel{
-						Name:  &ks[i].name,
-						Value: &ks[i].value,
+						Name:  &ks[i].Name,
+						Value: &ks[i].Value,
 					})
 				}
 				return res
 			}(labelsToAdd.ToSlice()),
-			MetricTargets: func(ks []metricTargetKey) []*controller.PrometheusMetricTarget {
+			MetricTargets: func(ks []cache.MetricTargetKey) []*controller.PrometheusMetricTarget {
 				res := make([]*controller.PrometheusMetricTarget, 0, len(ks))
 				for i := range ks {
 					res = append(res, &controller.PrometheusMetricTarget{
-						MetricName: &ks[i].metricName,
-						TargetId:   proto.Uint32(uint32(ks[i].targetID)),
+						MetricName: &ks[i].MetricName,
+						TargetId:   proto.Uint32(uint32(ks[i].TargetID)),
 					})
 				}
 				return res
@@ -226,7 +221,7 @@ func (e *Encoder) assemble(metrics []*trident.MetricLabelRequest) ([]*trident.Me
 	respMetrics := make([]*trident.MetricLabelResponse, 0, len(metrics))
 	for _, m := range metrics {
 		mn := m.GetMetricName()
-		mni, ok := e.cache.metricName.getIDByName(mn)
+		mni, ok := e.cache.MetricName.GetIDByName(mn)
 		if !ok {
 			return nil, errors.Errorf("metric_name %s not found", mn)
 		}
@@ -235,16 +230,16 @@ func (e *Encoder) assemble(metrics []*trident.MetricLabelRequest) ([]*trident.Me
 		for _, l := range m.GetLabels() {
 			ln := l.GetName()
 			lv := l.GetValue()
-			ni, ok := e.cache.labelName.getIDByName(ln)
+			ni, ok := e.cache.LabelName.GetIDByName(ln)
 			if !ok {
 				return nil, errors.Errorf("label_name %s not found", ln)
 			}
-			vi, ok := e.cache.labelValue.getValueID(lv)
+			vi, ok := e.cache.LabelValue.GetValueID(lv)
 			if !ok {
 				return nil, errors.Errorf("label_value %s not found", lv)
 			}
-			idx, ok := e.cache.metricAndAPPLabelLayout.getIndex(layoutKey{metricName: mn, labelName: ln})
-			if !ok && ln != TargetLabelInstance && ln != TargetLabelJob && !common.Contains(e.cache.target.labelNames, ln) {
+			idx, ok := e.cache.MetricAndAPPLabelLayout.GetIndex(cache.NewLayoutKey(mn, ln))
+			if !ok && ln != TargetLabelInstance && ln != TargetLabelJob && !common.Contains(e.cache.Target.GetLabelNames(), ln) {
 				return nil, errors.Errorf("app_label_index (metric_name: %s, app_label_name) not found", mn, ln)
 			}
 
@@ -258,7 +253,7 @@ func (e *Encoder) assemble(metrics []*trident.MetricLabelRequest) ([]*trident.Me
 			labels = append(labels, rl)
 		}
 
-		ti, _ := e.cache.metricTarget.getTargetID(mn)
+		ti, _ := e.cache.MetricTarget.GetTargetID(mn)
 		rm := &trident.MetricLabelResponse{
 			MetricName: &mn,
 			MetricId:   proto.Uint32(uint32(mni)),
@@ -271,76 +266,76 @@ func (e *Encoder) assemble(metrics []*trident.MetricLabelRequest) ([]*trident.Me
 }
 
 func (e *Encoder) tryAppendMetricNameToEncode(toEn mapset.Set[string], name string) {
-	if _, ok := e.cache.metricName.getIDByName(name); !ok {
+	if _, ok := e.cache.MetricName.GetIDByName(name); !ok {
 		toEn.Add(name)
 	}
 }
 
 func (e *Encoder) addMetricNameCache(arg ...interface{}) error {
 	mns := arg[0].([]*controller.PrometheusMetricName)
-	e.cache.metricName.add(mns)
+	e.cache.MetricName.Add(mns)
 	return nil
 }
 
 func (e *Encoder) tryAppendLabelNameToEncode(toEn mapset.Set[string], name string) {
-	if _, ok := e.cache.labelName.getIDByName(name); !ok {
+	if _, ok := e.cache.LabelName.GetIDByName(name); !ok {
 		toEn.Add(name)
 	}
 }
 
 func (e *Encoder) addLabelNameCache(arg ...interface{}) error {
 	lns := arg[0].([]*controller.PrometheusLabelName)
-	e.cache.labelName.add(lns)
+	e.cache.LabelName.Add(lns)
 	return nil
 }
 
 func (e *Encoder) tryAppendLabelValueToEncode(toEn mapset.Set[string], name string) {
-	if _, ok := e.cache.labelValue.getValueID(name); !ok {
+	if _, ok := e.cache.LabelValue.GetValueID(name); !ok {
 		toEn.Add(name)
 	}
 }
 
 func (e *Encoder) addLabelValueCache(arg ...interface{}) error {
 	lvs := arg[0].([]*controller.PrometheusLabelValue)
-	e.cache.labelValue.add(lvs)
+	e.cache.LabelValue.Add(lvs)
 	return nil
 }
 
-func (e *Encoder) tryAppendMetricAPPLabelLayoutToEncode(toEn mapset.Set[layoutKey], k layoutKey) {
-	if _, ok := e.cache.metricAndAPPLabelLayout.getIndex(k); !ok {
+func (e *Encoder) tryAppendMetricAPPLabelLayoutToEncode(toEn mapset.Set[cache.LayoutKey], k cache.LayoutKey) {
+	if _, ok := e.cache.MetricAndAPPLabelLayout.GetIndex(k); !ok {
 		toEn.Add(k)
 	}
 }
 
 func (e *Encoder) addMetricAPPLabelLayoutCache(arg ...interface{}) error {
 	ls := arg[0].([]*controller.PrometheusMetricAPPLabelLayout)
-	e.cache.metricAndAPPLabelLayout.add(ls)
+	e.cache.MetricAndAPPLabelLayout.Add(ls)
 	return nil
 }
 
-func (e *Encoder) tryAppendLabelToAdd(toAdd mapset.Set[labelKey], name, value string) {
-	if _, ok := e.cache.label.getValueByName(name); !ok {
-		toAdd.Add(labelKey{name: name, value: value})
+func (e *Encoder) tryAppendLabelToAdd(toAdd mapset.Set[cache.LabelKey], name, value string) {
+	if _, ok := e.cache.Label.GetValueByName(name); !ok {
+		toAdd.Add(cache.NewLabelKey(name, value))
 	}
 }
 
 func (e *Encoder) addLabelCache(arg ...interface{}) error {
 	ls := arg[0].([]*controller.PrometheusLabel)
-	e.cache.label.add(ls)
+	e.cache.Label.Add(ls)
 	return nil
 }
 
-func (e *Encoder) tryAppendMetricTargetToAdd(toAdd mapset.Set[metricTargetKey], metricName, ins, job string) {
-	log.Infof("try add metric_target (metric_name: %s, instance: %s, job: %s)", metricName, ins, job) // TODO remove
-	if _, ok := e.cache.metricTarget.getTargetID(metricName); !ok {
-		if ti, ok := e.cache.target.getTargetID(ins, job); ok {
-			toAdd.Add(metricTargetKey{metricName: metricName, targetID: ti})
+func (e *Encoder) tryAppendMetricTargetToAdd(toAdd mapset.Set[cache.MetricTargetKey], metricName, ins, job string) {
+	if _, ok := e.cache.MetricTarget.GetTargetID(metricName); !ok {
+		log.Infof("try add metric_target (metric_name: %s, instance: %s, job: %s)", metricName, ins, job) // TODO remove
+		if ti, ok := e.cache.Target.GetTargetID(cache.NewTargetKey(ins, job)); ok {
+			toAdd.Add(cache.NewMetricTargetKey(metricName, ti))
 		}
 	}
 }
 
 func (e *Encoder) addMetricTargetCache(arg ...interface{}) error {
 	ts := arg[0].([]*controller.PrometheusMetricTarget)
-	e.cache.metricTarget.add(ts)
+	e.cache.MetricTarget.Add(ts)
 	return nil
 }

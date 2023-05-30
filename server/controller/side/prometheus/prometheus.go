@@ -19,6 +19,7 @@ package prometheus
 import (
 	"sync"
 
+	"github.com/deepflowio/deepflow/server/controller/side/prometheus/cache"
 	"github.com/deepflowio/deepflow/server/controller/side/prometheus/synchronizer"
 )
 
@@ -29,14 +30,14 @@ var (
 
 type PrometheusManager struct {
 	Synchronizer *synchronizer.Synchronizer
-	EncoderCache *Cache
+	EncoderCache *cache.Cache
 }
 
 func GetSingleton() *PrometheusManager {
 	prometheusManagerOnce.Do(func() {
 		prometheusManager = &PrometheusManager{
 			Synchronizer: synchronizer.GetSingleton(),
-			EncoderCache: GetSingletonCache(),
+			EncoderCache: cache.GetSingletonCache(),
 		}
 	})
 	return prometheusManager

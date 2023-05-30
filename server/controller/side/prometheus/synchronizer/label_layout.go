@@ -27,12 +27,14 @@ import (
 
 type labelLayout struct {
 	mux                          sync.Mutex
+	resourceType                 string
 	metricNameToLabelNameToIndex map[string]map[string]uint8
 	metricNameToMaxIndex         map[string]uint8
 }
 
 func newLabelLayout() *labelLayout {
 	return &labelLayout{
+		resourceType:                 "metric_app_label_layout",
 		metricNameToLabelNameToIndex: make(map[string]map[string]uint8),
 		metricNameToMaxIndex:         make(map[string]uint8),
 	}
@@ -122,7 +124,7 @@ func (m *labelLayout) addBatch(toAdd []*mysql.PrometheusMetricAPPLabelLayout) er
 		if err != nil {
 			return err
 		}
-		log.Infof("add %d layout success", len(oneP))
+		log.Infof("add %d %s success", len(oneP), m.resourceType)
 	}
 	return nil
 }
