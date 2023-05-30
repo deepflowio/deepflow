@@ -17,6 +17,8 @@
 package baidubce
 
 import (
+	"time"
+
 	"github.com/baidubce/bce-sdk-go/services/appblb"
 	"github.com/baidubce/bce-sdk-go/services/blb"
 
@@ -71,11 +73,14 @@ func (b *BaiduBce) getBLoadBalances(region model.Region, vpcIdToLcuuid map[strin
 	results := make([]*blb.DescribeLoadBalancersResult, 0)
 	for {
 		args.Marker = marker
+		startTime := time.Now()
 		result, err := blbClient.DescribeLoadBalancers(args)
 		if err != nil {
 			log.Error(err)
 			return nil, nil, nil, err
 		}
+		b.cloudStatsd.APICost["blbDescribeLoadBalancers"] = append(b.cloudStatsd.APICost["blbDescribeLoadBalancers"], int(time.Now().Sub(startTime).Milliseconds()))
+		b.cloudStatsd.APICount["blbDescribeLoadBalancers"] = append(b.cloudStatsd.APICount["blbDescribeLoadBalancers"], len(result.BlbList))
 		results = append(results, result)
 		if !result.IsTruncated {
 			break
@@ -135,11 +140,14 @@ func (b *BaiduBce) getAppBLoadBalances(region model.Region, vpcIdToLcuuid map[st
 	results := make([]*appblb.DescribeLoadBalancersResult, 0)
 	for {
 		args.Marker = marker
+		startTime := time.Now()
 		result, err := appblbClient.DescribeLoadBalancers(args)
 		if err != nil {
 			log.Error(err)
 			return nil, nil, nil, err
 		}
+		b.cloudStatsd.APICost["appblbDescribeLoadBalancers"] = append(b.cloudStatsd.APICost["appblbDescribeLoadBalancers"], int(time.Now().Sub(startTime).Milliseconds()))
+		b.cloudStatsd.APICount["appblbDescribeLoadBalancers"] = append(b.cloudStatsd.APICount["appblbDescribeLoadBalancers"], len(result.BlbList))
 		results = append(results, result)
 		if !result.IsTruncated {
 			break

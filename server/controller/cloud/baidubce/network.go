@@ -17,6 +17,8 @@
 package baidubce
 
 import (
+	"time"
+
 	"github.com/baidubce/bce-sdk-go/services/vpc"
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
@@ -39,11 +41,14 @@ func (b *BaiduBce) getNetworks(
 	results := make([]*vpc.ListSubnetResult, 0)
 	for {
 		args.Marker = marker
+		startTime := time.Now()
 		result, err := vpcClient.ListSubnets(args)
 		if err != nil {
 			log.Error(err)
 			return nil, nil, nil, err
 		}
+		b.cloudStatsd.APICost["ListSubnets"] = append(b.cloudStatsd.APICost["ListSubnets"], int(time.Now().Sub(startTime).Milliseconds()))
+		b.cloudStatsd.APICount["ListSubnets"] = append(b.cloudStatsd.APICount["ListSubnets"], len(result.Subnets))
 		results = append(results, result)
 		if !result.IsTruncated {
 			break

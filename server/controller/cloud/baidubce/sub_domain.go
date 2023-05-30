@@ -18,9 +18,9 @@ package baidubce
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/baidubce/bce-sdk-go/services/cce"
-
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 )
@@ -37,11 +37,14 @@ func (b *BaiduBce) getSubDomains(region model.Region, vpcIdToLcuuid map[string]s
 	results := make([]*cce.ListClusterResult, 0)
 	for {
 		args.Marker = marker
+		startTime := time.Now()
 		result, err := cceClient.ListClusters(args)
 		if err != nil {
 			log.Error(err)
 			return nil, err
 		}
+		b.cloudStatsd.APICost["ListClusters"] = append(b.cloudStatsd.APICost["ListClusters"], int(time.Now().Sub(startTime).Milliseconds()))
+		b.cloudStatsd.APICount["ListClusters"] = append(b.cloudStatsd.APICount["ListClusters"], len(result.Clusters))
 		results = append(results, result)
 		if !result.IsTruncated {
 			break
