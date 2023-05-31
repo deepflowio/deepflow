@@ -14,25 +14,19 @@
  * limitations under the License.
  */
 
-package debug
+package controller
 
 import (
 	"context"
 
-	"github.com/op/go-logging"
 	"google.golang.org/grpc"
 
-	"github.com/deepflowio/deepflow/message/controller"
 	api "github.com/deepflowio/deepflow/message/controller"
 	grpcserver "github.com/deepflowio/deepflow/server/controller/grpc"
 	"github.com/deepflowio/deepflow/server/controller/side/prometheus/cache"
 )
 
-var log = logging.MustGetLogger("controller/debug")
-
 type prometheusService struct{}
-
-type service struct{}
 
 func init() {
 	grpcserver.Add(newPrometheusService())
@@ -43,14 +37,15 @@ func newPrometheusService() *prometheusService {
 }
 
 func (p *prometheusService) Register(gs *grpc.Server) error {
+	log.Info("grpc register controller debug service")
 	api.RegisterPrometheusDebugServer(gs, p)
 	return nil
 }
 
 func (p *prometheusService) DebugPrometheusCache(ctx context.Context,
-	req *controller.PrometheusCacheRequest) (*controller.PrometheusCacheResponse, error) {
+	in *api.PrometheusCacheRequest) (*api.PrometheusCacheResponse, error) {
 
-	return &controller.PrometheusCacheResponse{
-		Content: cache.GetDebugCache(*req.Type),
+	return &api.PrometheusCacheResponse{
+		Content: cache.GetDebugCache(*in.Type),
 	}, nil
 }
