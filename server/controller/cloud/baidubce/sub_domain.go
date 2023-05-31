@@ -50,11 +50,12 @@ func (b *BaiduBce) getSubDomains(region model.Region, vpcIdToLcuuid map[string]s
 	}
 
 	b.debugger.WriteJson("ListClusters", " ", structToJson(results))
-	for _, r := range results {
+	for i, r := range results {
+		log.Infof("index (%d) response ListClusters count:(%d)", i, len(r.Clusters))
 		for _, cluster := range r.Clusters {
 			vpcLcuuid, ok := vpcIdToLcuuid[cluster.VpcId]
 			if !ok {
-				log.Debugf("cluster (%s) vpc (%s) not found", cluster.ClusterUuid, cluster.VpcId)
+				log.Infof("cluster (%s) vpc (%s) not found", cluster.ClusterUuid, cluster.VpcId)
 				continue
 			}
 
@@ -77,6 +78,8 @@ func (b *BaiduBce) getSubDomains(region model.Region, vpcIdToLcuuid map[string]s
 			})
 		}
 	}
+
+	log.Infof("return ListClusters count:(%d)", len(retSubDomains))
 	log.Debug("get sub_domains complete")
 	return retSubDomains, nil
 }
