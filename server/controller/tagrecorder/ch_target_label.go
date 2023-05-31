@@ -24,12 +24,12 @@ import (
 )
 
 type ChTargetLabel struct {
-	UpdaterBase[mysql.ChTargetLabel, PrometheusLabelKey]
+	UpdaterBase[mysql.ChTargetLabel, PrometheusTargetLabelKey]
 }
 
 func NewChTargetLabel() *ChTargetLabel {
 	updater := &ChTargetLabel{
-		UpdaterBase[mysql.ChTargetLabel, PrometheusLabelKey]{
+		UpdaterBase[mysql.ChTargetLabel, PrometheusTargetLabelKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_TARGET_LABEL,
 		},
 	}
@@ -38,7 +38,7 @@ func NewChTargetLabel() *ChTargetLabel {
 	return updater
 }
 
-func (l *ChTargetLabel) generateNewData() (map[PrometheusLabelKey]mysql.ChTargetLabel, bool) {
+func (l *ChTargetLabel) generateNewData() (map[PrometheusTargetLabelKey]mysql.ChTargetLabel, bool) {
 	var prometheusMetricNames []mysql.PrometheusMetricName
 
 	err := mysql.Db.Unscoped().Find(&prometheusMetricNames).Error
@@ -61,7 +61,7 @@ func (l *ChTargetLabel) generateNewData() (map[PrometheusLabelKey]mysql.ChTarget
 		return nil, false
 	}
 
-	keyToItem := make(map[PrometheusLabelKey]mysql.ChTargetLabel)
+	keyToItem := make(map[PrometheusTargetLabelKey]mysql.ChTargetLabel)
 	for _, prometheusMetricName := range prometheusMetricNames {
 		metricID := prometheusMetricName.ID
 		metricName := prometheusMetricName.Name
@@ -77,7 +77,7 @@ func (l *ChTargetLabel) generateNewData() (map[PrometheusLabelKey]mysql.ChTarget
 				if len(targetLabelItem) == 2 {
 					labelNameID := metricLabelNameIDMap[targetLabelItem[0]]
 					labelValue := targetLabelItem[1]
-					keyToItem[PrometheusLabelKey{MetricID: metricID, LabelNameID: labelNameID, LabelValue: labelValue}] = mysql.ChTargetLabel{
+					keyToItem[PrometheusTargetLabelKey{MetricID: metricID, LabelNameID: labelNameID, TargetID: targetID}] = mysql.ChTargetLabel{
 						MetricID:    metricID,
 						LabelNameID: labelNameID,
 						LabelValue:  labelValue,
@@ -91,14 +91,14 @@ func (l *ChTargetLabel) generateNewData() (map[PrometheusLabelKey]mysql.ChTarget
 	return keyToItem, true
 }
 
-func (l *ChTargetLabel) generateKey(dbItem mysql.ChTargetLabel) PrometheusLabelKey {
-	return PrometheusLabelKey{MetricID: dbItem.MetricID, LabelNameID: dbItem.LabelNameID, LabelValue: dbItem.LabelValue}
+func (l *ChTargetLabel) generateKey(dbItem mysql.ChTargetLabel) PrometheusTargetLabelKey {
+	return PrometheusTargetLabelKey{MetricID: dbItem.MetricID, LabelNameID: dbItem.LabelNameID, TargetID: dbItem.TargetID}
 }
 
 func (l *ChTargetLabel) generateUpdateInfo(oldItem, newItem mysql.ChTargetLabel) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
-	if oldItem.TargetID != newItem.TargetID {
-		updateInfo["target_id"] = newItem.TargetID
+	if oldItem.LabelValue != newItem.LabelValue {
+		updateInfo["label_value"] = newItem.LabelValue
 	}
 	if len(updateInfo) > 0 {
 		return updateInfo, true

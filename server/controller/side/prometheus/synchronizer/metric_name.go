@@ -62,7 +62,7 @@ func (p *metricName) load() (ids mapset.Set[int], err error) {
 }
 
 func (p *metricName) refresh(args ...interface{}) error {
-	log.Infof("refresh %s id pools started", p.resourceType)	
+	log.Infof("refresh %s id pools started", p.resourceType)
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 

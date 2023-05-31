@@ -105,8 +105,14 @@ type OSAPPTagsKey struct {
 	PID int
 }
 
-type PrometheusLabelKey struct {
+type PrometheusAPPLabelKey struct {
+	MetricID     int
+	LabelNameID  int
+	LabelValueID int
+}
+
+type PrometheusTargetLabelKey struct {
 	MetricID    int
 	LabelNameID int
-	LabelValue  string
+	TargetID    int
 }
