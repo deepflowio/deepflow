@@ -244,7 +244,7 @@ func getRealRevision(revision string) string {
 }
 
 func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncResponse, error) {
-	if in.GetKubernetesClusterId() != "" {
+	if trisolaris.GetConfig().DomainAutoRegister && in.GetKubernetesClusterId() != "" {
 		gKubernetesInfo := trisolaris.GetGKubernetesInfo()
 		exists := gKubernetesInfo.CreateDomainIfClusterIDNotExists(in.GetKubernetesClusterId(), in.GetKubernetesClusterName())
 		if !exists {

@@ -51,6 +51,7 @@ type Config struct {
 	NodeRefreshInterval            int  `default:"60" yaml:"node-refresh-interval"`
 	GPIDRefreshInterval            int  `default:"9" yaml:"gpid-refresh-interval"`
 	VTapAutoRegister               bool `default:"true" yaml:"vtap-auto-register"`
+	DomainAutoRegister             bool `default:"true" yaml:"domain-auto-register"`
 	DefaultTapMode                 int  `yaml:"default-tap-mode"`
 	BillingMethod                  string
 	GrpcPort                       int
