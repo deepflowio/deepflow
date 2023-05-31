@@ -48,8 +48,10 @@ func prometheusCache(cmd *cobra.Command, t string) error {
 	}
 	defer conn.Close()
 
-	prometheusType := controller.PrometheusCacheType_ALL
+	var prometheusType controller.PrometheusCacheType
 	switch t {
+	case "all":
+		prometheusType = controller.PrometheusCacheType_ALL
 	case "metric-name":
 		prometheusType = controller.PrometheusCacheType_METRIC_NAME
 	case "label-name":

@@ -23,6 +23,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/deepflowio/deepflow/message/controller"
+	api "github.com/deepflowio/deepflow/message/controller"
 	grpcserver "github.com/deepflowio/deepflow/server/controller/grpc"
 	"github.com/deepflowio/deepflow/server/controller/side/prometheus/cache"
 )
@@ -41,10 +42,15 @@ func newPrometheusService() *prometheusService {
 	return &prometheusService{}
 }
 
-func (p *prometheusService) DebugPrometheusCache(ctx context.Context, in *controller.PrometheusCacheRequest,
-	opts ...grpc.CallOption) (*controller.PrometheusCacheResponse, error) {
+func (p *prometheusService) Register(gs *grpc.Server) error {
+	api.RegisterPrometheusDebugServer(gs, p)
+	return nil
+}
+
+func (p *prometheusService) DebugPrometheusCache(ctx context.Context,
+	req *controller.PrometheusCacheRequest) (*controller.PrometheusCacheResponse, error) {
 
 	return &controller.PrometheusCacheResponse{
-		Content: cache.GetDebugCache(*in.Type),
+		Content: cache.GetDebugCache(*req.Type),
 	}, nil
 }
