@@ -176,6 +176,9 @@ controller:
 
     default-tap-mode:
 
+    # whether to register domain automatically
+    domain-auto-register: True
+
   genesis:
     # 平台数据老化时间，单位：秒
     aging_time: 86400
