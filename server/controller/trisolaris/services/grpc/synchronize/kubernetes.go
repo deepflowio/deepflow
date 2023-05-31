@@ -41,6 +41,9 @@ func (k *KubernetesClusterIDEvent) GetKubernetesClusterID(ctx context.Context, i
 		errorMsg := err.Error()
 		return &api.KubernetesClusterIDResponse{ErrorMsg: &errorMsg}, nil
 	}
+	if !trisolaris.GetConfig().DomainAutoRegister {
+		return &api.KubernetesClusterIDResponse{ClusterId: &clusterID}, nil
+	}
 
 	// cache clusterID & create kubernetes domain
 	kubernetesInfo := trisolaris.GetGKubernetesInfo()
