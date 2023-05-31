@@ -194,6 +194,7 @@ pub const RR_DATALENGTH_OFFSET: usize = 8;
 pub const RR_RDATA_OFFSET: usize = 10;
 pub const DNS_TYPE_A: u16 = 1;
 pub const DNS_TYPE_NS: u16 = 2;
+pub const DNS_TYPE_CNAME: u16 = 5;
 pub const DNS_TYPE_SOA: u16 = 6;
 pub const DNS_TYPE_WKS: u16 = 11;
 pub const DNS_TYPE_PTR: u16 = 12;
