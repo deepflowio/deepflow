@@ -89,7 +89,7 @@ func (k *KubernetesInfo) refresh() {
 }
 
 func (k *KubernetesInfo) CreateDomainIfClusterIDNotExists(clusterID, clusterName string) (exists bool) {
-	ok, err := k.CheckClusterID(clusterID)
+	ok, err := k.checkClusterID(clusterID)
 	if err != nil {
 		log.Errorf("check cluster_id: %s failed: %s", clusterID, err)
 		return true
@@ -101,7 +101,7 @@ func (k *KubernetesInfo) CreateDomainIfClusterIDNotExists(clusterID, clusterName
 	return true
 }
 
-func (k *KubernetesInfo) CheckClusterID(clusterID string) (bool, error) {
+func (k *KubernetesInfo) checkClusterID(clusterID string) (bool, error) {
 	k.mutex.Lock()
 	defer k.mutex.Unlock()
 	_, dok := k.clusterIDToDomain[clusterID]
