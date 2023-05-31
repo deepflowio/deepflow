@@ -377,6 +377,9 @@ impl DnsLog {
                     return Err(Error::DNSLogParseFailed(err_msg));
                 }
             }
+            DNS_TYPE_CNAME => {
+                // doing nothing
+            }
             _ => {
                 let err_msg = format!(
                     "other domain type {} data length {} invalid",
