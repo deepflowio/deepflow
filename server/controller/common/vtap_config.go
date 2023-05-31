@@ -75,6 +75,7 @@ var DefaultVTapGroupConfig = &mysql.VTapGroupConfiguration{
 	HTTPLogXRequestID:             &DefaultHTTPLogXRequestID,
 	ExternalAgentHTTPProxyEnabled: &DefaultExternalAgentHTTPProxyEnabled,
 	ExternalAgentHTTPProxyPort:    &DefaultExternalAgentHTTPProxyPort,
+	PrometheusHttpAPIAddress:      &DefaultPrometheusHttpAPIAddress,
 	AnalyzerPort:                  &DefaultAnalyzerPort,
 	ProxyControllerPort:           &DefaultProxyControllerPort,
 	ProxyControllerIP:             &DefaultProxyControllerIP,
@@ -137,6 +138,7 @@ var (
 	DefaultHTTPLogXRequestID             = "X-Request-ID"
 	DefaultExternalAgentHTTPProxyEnabled = 1
 	DefaultExternalAgentHTTPProxyPort    = 38086
+	DefaultPrometheusHttpAPIAddress      = ""
 	DefaultAnalyzerPort                  = 30033
 	DefaultProxyControllerPort           = 30035
 	DefaultProxyControllerIP             = ""

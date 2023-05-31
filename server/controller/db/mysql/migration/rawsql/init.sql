@@ -307,7 +307,7 @@ CREATE TABLE IF NOT EXISTS vinterface (
     vlantag             INTEGER DEFAULT 0,
     devicetype          INTEGER COMMENT 'Type 0.unknown 1.vm 2.vgw 3.third-party-device 4.vmwaf 5.NSP-vgateway 6.host-device 7.network-device 9.DHCP-port 10.pod 11.pod_service 12. redis_instance 13. rds_instance 14. pod_node 15. load_balance 16. nat_gateway',
     deviceid            INTEGER COMMENT 'unknown: Senseless ID, vm: vm ID, vgw/NSP-vgateway: vnet ID, third-party-device: third_party_device ID, vmwaf: vmwaf ID, host-device: host_device ID, network-device: network_device ID',
-    netns_ida            INTEGER UNSIGNED DEFAULT 0,
+    netns_id            INTEGER UNSIGNED DEFAULT 0,
     sub_domain          CHAR(64) DEFAULT '',
     domain              CHAR(64) DEFAULT '',
     region              CHAR(64) DEFAULT '',
@@ -1152,6 +1152,34 @@ CREATE TABLE IF NOT EXISTS alarm_policy (
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE alarm_policy;
 
+CREATE TABLE IF NOT EXISTS alarm_event (
+    id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    status                  CHAR(64),
+    timestamp               DATETIME,
+    end_time                BIGINT,
+    policy_id               INTEGER,
+    policy_name             TEXT,
+    policy_level            INTEGER,
+    policy_app_type         TINYINT,
+    policy_sub_type         TINYINT,
+    policy_contrast_type    TINYINT,
+    policy_data_level       CHAR(64),
+    policy_target_uid       TEXT,
+    policy_target_name      TEXT,
+    policy_go_to            TEXT,
+    policy_target_field     TEXT,
+    policy_endpoints        TEXT,
+    sub_view_id             INTEGER,
+    sub_view_name           TEXT,
+    trigger_condition       TEXT,
+    trigger_value           INTEGER,
+    end_value               TEXT,
+    value_unit              CHAR(64),
+    endpoint_results        TEXT,
+    lcuuid                  CHAR(64)
+) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
+TRUNCATE TABLE alarm_event;
+
 CREATE TABLE IF NOT EXISTS label (
     id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     name                    CHAR(64) NOT NULL,
@@ -1562,6 +1590,7 @@ CREATE TABLE IF NOT EXISTS vtap_group_configuration(
     log_file_size             INTEGER DEFAULT NULL COMMENT 'unit: MB',
     external_agent_http_proxy_enabled  TINYINT(1) COMMENT '0: disabled 1:enabled',
     external_agent_http_proxy_port     INTEGER DEFAULT NULL,
+    prometheus_http_api_address        VARCHAR(128),
     proxy_controller_port     INTEGER DEFAULT NULL,
     analyzer_port             INTEGER DEFAULT NULL,
     proxy_controller_ip       VARCHAR(128),

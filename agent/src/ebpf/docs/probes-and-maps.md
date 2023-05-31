@@ -45,7 +45,7 @@
 
 ## Uprobes
 - base
-  - runtime.casgstatus (for golang)
+  - runtime.execute (for golang)
   - runtime.newproc1 (for golang)
 - http2
   - net/http.(*http2serverConn).writeHeaders

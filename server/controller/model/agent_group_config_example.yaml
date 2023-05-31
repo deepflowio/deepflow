@@ -389,6 +389,11 @@ vtap_group_id: g-xxxxxx
 ## Default: 38086. Options: [1, 65535]
 #external_agent_http_proxy_port: 38086
 
+# Prometheus API address
+## Note: Get target from Prometheus and synchronize to the deepflow-server.
+## Example: ip:port
+#prometheus_http_api_address:
+
 ##################
 ## NPB Switches ##
 ##################
