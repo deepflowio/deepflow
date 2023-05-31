@@ -40,29 +40,25 @@ type metricAndAPPLabelLayout struct {
 	metricNameToAPPLabelNames map[string][]string // only for fully assembled
 }
 
-func (t *metricAndAPPLabelLayout) Get() map[string][]string {
+func (t *metricAndAPPLabelLayout) GetMetricNameToAPPLabelNames() map[string][]string {
 	return t.metricNameToAPPLabelNames
 }
 
-func (t *metricAndAPPLabelLayout) clear() {
-	t.metricNameToAPPLabelNames = make(map[string][]string)
-}
-
-func (t *metricAndAPPLabelLayout) GetIndex(key LayoutKey) (uint8, bool) {
+func (t *metricAndAPPLabelLayout) GetIndexByLayoutKey(key LayoutKey) (uint8, bool) {
 	if index, ok := t.layoutKeyToIndex.Load(key); ok {
 		return index.(uint8), true
 	}
 	return 0, false
 }
 
-func (t *metricAndAPPLabelLayout) setIndex(key LayoutKey, index uint8) {
-	t.layoutKeyToIndex.Store(key, index)
-}
-
 func (t *metricAndAPPLabelLayout) Add(batch []*controller.PrometheusMetricAPPLabelLayout) {
 	for _, m := range batch {
 		t.layoutKeyToIndex.Store(NewLayoutKey(m.GetMetricName(), m.GetAppLabelName()), uint8(m.GetAppLabelColumnIndex()))
 	}
+}
+
+func (t *metricAndAPPLabelLayout) clear() {
+	t.metricNameToAPPLabelNames = make(map[string][]string)
 }
 
 func (t *metricAndAPPLabelLayout) refresh(args ...interface{}) error {

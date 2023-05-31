@@ -38,10 +38,6 @@ func (t *metricName) GetIDByName(n string) (int, bool) {
 	return 0, false
 }
 
-func (t *metricName) setNameID(n string, id int) {
-	t.nameToID.Store(n, id)
-}
-
 func (t *metricName) Add(batch []*controller.PrometheusMetricName) {
 	for _, m := range batch {
 		t.nameToID.Store(m.GetName(), int(m.GetId()))

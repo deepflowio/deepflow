@@ -34,10 +34,6 @@ func (t *labelName) GetIDByName(n string) (int, bool) {
 	return 0, false
 }
 
-func (t *labelName) setNameID(n string, id int) {
-	t.nameToID.Store(n, id)
-}
-
 func (t *labelName) Add(batch []*controller.PrometheusLabelName) {
 	for _, m := range batch {
 		t.nameToID.Store(m.GetName(), int(m.GetId()))

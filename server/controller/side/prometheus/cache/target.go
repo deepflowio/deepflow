@@ -42,7 +42,7 @@ type target struct {
 	targetIDToLabelNameToValue map[int]map[string]string // only for fully assembled
 }
 
-func (t *target) Get() map[int]map[string]string {
+func (t *target) GetTargetIDToLabelNameToValue() map[int]map[string]string {
 	return t.targetIDToLabelNameToValue
 }
 
@@ -50,19 +50,15 @@ func (t *target) GetLabelNames() []string {
 	return t.labelNames
 }
 
-func (t *target) clear() {
-	t.targetIDToLabelNameToValue = make(map[int]map[string]string)
-}
-
-func (t *target) GetTargetID(key TargetKey) (int, bool) {
+func (t *target) GetTargetIDByTargetKey(key TargetKey) (int, bool) {
 	if id, ok := t.keyToTargetID.Load(key); ok {
 		return id.(int), true
 	}
 	return 0, false
 }
 
-func (t *target) getLabelNames() []string {
-	return t.labelNames
+func (t *target) clear() {
+	t.targetIDToLabelNameToValue = make(map[int]map[string]string)
 }
 
 func (t *target) refresh(args ...interface{}) error {
@@ -73,12 +69,12 @@ func (t *target) refresh(args ...interface{}) error {
 	fully := args[0].(bool)
 	if fully {
 		for _, tg := range targets {
-			t.keyToTargetID.Store(TargetKey{Instance: tg.Instance, Job: tg.Job}, tg.ID)
+			t.keyToTargetID.Store(NewTargetKey(tg.Instance, tg.Job), tg.ID)
 			t.targetIDToLabelNameToValue[tg.ID] = t.formatLabels(tg)
 		}
 	} else {
 		for _, tg := range targets {
-			t.keyToTargetID.Store(TargetKey{Instance: tg.Instance, Job: tg.Job}, tg.ID)
+			t.keyToTargetID.Store(NewTargetKey(tg.Instance, tg.Job), tg.ID)
 		}
 	}
 	return nil

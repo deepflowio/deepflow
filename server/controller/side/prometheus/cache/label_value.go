@@ -34,10 +34,6 @@ func (t *labelValue) GetValueID(v string) (int, bool) {
 	return 0, false
 }
 
-func (t *labelValue) setValueID(v string, id int) {
-	t.valueToID.Store(v, id)
-}
-
 func (t *labelValue) Add(batch []*controller.PrometheusLabelValue) {
 	for _, m := range batch {
 		t.valueToID.Store(m.GetValue(), int(m.GetId()))

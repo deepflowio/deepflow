@@ -46,10 +46,6 @@ func (t *label) GetValueByName(name string) (string, bool) {
 	return "", false
 }
 
-func (t *label) setNameValue(name, value string) {
-	t.nameToValue.Store(name, value)
-}
-
 func (t *label) Add(batch []*controller.PrometheusLabel) {
 	for _, m := range batch {
 		t.nameToValue.Store(m.GetName(), m.GetValue())

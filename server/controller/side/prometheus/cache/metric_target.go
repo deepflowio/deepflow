@@ -39,15 +39,11 @@ type metricTarget struct {
 	metricNameToTargetID sync.Map
 }
 
-func (t *metricTarget) GetTargetID(metricName string) (int, bool) {
+func (t *metricTarget) GetTargetIDByMetricName(metricName string) (int, bool) {
 	if id, ok := t.metricNameToTargetID.Load(metricName); ok {
 		return id.(int), true
 	}
 	return 0, false
-}
-
-func (t *metricTarget) setTargetID(metricName string, id int) {
-	t.metricNameToTargetID.Store(metricName, id)
 }
 
 func (t *metricTarget) Add(batch []*controller.PrometheusMetricTarget) {
