@@ -176,6 +176,8 @@ func (c *TagRecorder) UpdateChDictionary() {
 							CH_DICTIONARY_POD_K8S_ANNOTATIONS,
 							CH_DICTIONARY_POD_SERVICE_K8S_ANNOTATION,
 							CH_DICTIONARY_POD_SERVICE_K8S_ANNOTATIONS,
+							CH_DICTIONARY_POD_K8S_ENV,
+							CH_DICTIONARY_POD_K8S_ENVS,
 						)
 						chDicts := mapset.NewSet()
 						for _, dictionary := range dictionaries {

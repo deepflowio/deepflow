@@ -113,3 +113,12 @@ type K8sAnnotationKey struct {
 type K8sAnnotationsKey struct {
 	ID int
 }
+
+type K8sEnvKey struct {
+	ID  int
+	Key string
+}
+
+type K8sEnvsKey struct {
+	ID int
+}

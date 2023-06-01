@@ -59,6 +59,8 @@ const (
 const (
 	RESOURCE_TYPE_CH_K8S_ANNOTATION  = "ch_k8s_annotation"
 	RESOURCE_TYPE_CH_K8S_ANNOTATIONS = "ch_k8s_annotations"
+	RESOURCE_TYPE_CH_K8S_ENV         = "ch_k8s_env"
+	RESOURCE_TYPE_CH_K8S_ENVS        = "ch_k8s_envs"
 
 	RESOURCE_TYPE_CH_K8S_LABEL         = "ch_k8s_label"
 	RESOURCE_TYPE_CH_K8S_LABELS        = "ch_k8s_labels"
@@ -102,6 +104,8 @@ const (
 	CH_DICTIONARY_POD_K8S_ANNOTATIONS         = "pod_k8s_annotations_map"
 	CH_DICTIONARY_POD_SERVICE_K8S_ANNOTATION  = "pod_service_k8s_annotation_map"
 	CH_DICTIONARY_POD_SERVICE_K8S_ANNOTATIONS = "pod_service_k8s_annotations_map"
+	CH_DICTIONARY_POD_K8S_ENV                 = "pod_k8s_env_map"
+	CH_DICTIONARY_POD_K8S_ENVS                = "pod_k8s_envs_map"
 
 	CH_DICTIONARY_REGION        = "region_map"
 	CH_DICTIONARY_AZ            = "az_map"
@@ -494,6 +498,29 @@ const (
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(FLAT())"
+	CREATE_K8S_ENV_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
+		"(\n" +
+		"    `id` UInt64,\n" +
+		"    `key` String,\n" +
+		"    `value` String,\n" +
+		"    `l3_epc_id` UInt64,\n" +
+		"    `pod_ns_id` UInt64\n" +
+		")\n" +
+		"PRIMARY KEY id, key\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
+		"LIFETIME(MIN 0 MAX 60)\n" +
+		"LAYOUT(COMPLEX_KEY_HASHED())"
+	CREATE_K8S_ENVS_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
+		"(\n" +
+		"    `id` UInt64,\n" +
+		"    `envs` String,\n" +
+		"    `l3_epc_id` UInt64,\n" +
+		"    `pod_ns_id` UInt64\n" +
+		")\n" +
+		"PRIMARY KEY id\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
+		"LIFETIME(MIN 0 MAX 60)\n" +
+		"LAYOUT(FLAT())"
 )
 
 var DBNodeTypeToResourceType = map[string]string{
@@ -581,6 +608,8 @@ var CREATE_SQL_MAP = map[string]string{
 	CH_DICTIONARY_POD_K8S_ANNOTATIONS:         CREATE_K8S_ANNOTATIONS_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_SERVICE_K8S_ANNOTATION:  CREATE_K8S_ANNOTATION_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_SERVICE_K8S_ANNOTATIONS: CREATE_K8S_ANNOTATIONS_DICTIONARY_SQL,
+	CH_DICTIONARY_POD_K8S_ENV:                 CREATE_K8S_ENV_DICTIONARY_SQL,
+	CH_DICTIONARY_POD_K8S_ENVS:                CREATE_K8S_ENVS_DICTIONARY_SQL,
 }
 
 var VTAP_TYPE_TO_DEVICE_TYPE = map[int]int{

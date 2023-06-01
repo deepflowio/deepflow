@@ -410,3 +410,18 @@ type ChPodServiceK8sAnnotations struct {
 	L3EPCID     int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
 	PodNsID     int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
 }
+
+type ChPodK8sEnv struct {
+	ID      int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Key     string `gorm:"primaryKey;column:key;type:varchar(64);default:null" json:"KEY"`
+	Value   string `gorm:"column:value;type:varchar(64);default:null" json:"VALUE"`
+	L3EPCID int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
+	PodNsID int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
+}
+
+type ChPodK8sEnvs struct {
+	ID      int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Envs    string `gorm:"column:envs;type:text;default:null" json:"ENVS"`
+	L3EPCID int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
+	PodNsID int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
+}
