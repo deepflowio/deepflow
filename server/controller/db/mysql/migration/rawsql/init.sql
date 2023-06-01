@@ -2560,3 +2560,23 @@ CREATE TABLE IF NOT EXISTS prometheus_metric_target (
     UNIQUE INDEX metric_target_index(metric_name, target_id)
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 TRUNCATE TABLE prometheus_metric_target;
+
+CREATE TABLE IF NOT EXISTS ch_pod_k8s_env (
+    `id`            INTEGER NOT NULL,
+    `key`           VARCHAR(256) NOT NULL,
+    `value`         VARCHAR(256),
+    `l3_epc_id`     INTEGER,
+    `pod_ns_id`     INTEGER,
+    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`, `key`)
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_pod_k8s_env;
+
+CREATE TABLE IF NOT EXISTS ch_pod_k8s_envs (
+    `id`            INTEGER NOT NULL PRIMARY KEY,
+    `envs`          TEXT,
+    `l3_epc_id`     INTEGER,
+    `pod_ns_id`     INTEGER,
+    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_pod_k8s_envs;
