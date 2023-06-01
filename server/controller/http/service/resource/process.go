@@ -106,12 +106,14 @@ func getProcesses() ([]model.Process, error) {
 	}
 	var resp []model.Process
 	for _, process := range processes {
-		var deviceType int
+		var deviceType, resourceID int
 		var resourceName string
 		if process.NetnsID != 0 {
 			if _, ok := deviceTypeToNetnsIDToID[common.VIF_DEVICE_TYPE_POD][process.NetnsID]; ok {
-				resourceName = podIDToName[deviceTypeToNetnsIDToID[common.VIF_DEVICE_TYPE_POD][process.NetnsID]]
+				podID := deviceTypeToNetnsIDToID[common.VIF_DEVICE_TYPE_POD][process.NetnsID]
+				resourceName = podIDToName[podID]
 				deviceType = common.VIF_DEVICE_TYPE_POD
+				resourceID = podID
 			}
 		} else {
 			deviceType = common.VTAP_TYPE_TO_DEVICE_TYPE[vtapIDToInfo[process.VTapID].Type]
@@ -120,6 +122,7 @@ func getProcesses() ([]model.Process, error) {
 			} else if deviceType == common.VIF_DEVICE_TYPE_POD_NODE {
 				resourceName = podNodeIDToName[vtapIDToInfo[process.VTapID].LaunchServerID]
 			}
+			resourceID = vtapIDToInfo[process.VTapID].LaunchServerID
 		}
 
 		var deletedAt string
@@ -139,7 +142,7 @@ func getProcesses() ([]model.Process, error) {
 			CommandLine:  process.CommandLine,
 			UserName:     process.UserName,
 			OSAPPTags:    process.OSAPPTags,
-			ResourceID:   vtapIDToInfo[process.VTapID].LaunchServerID,
+			ResourceID:   resourceID,
 			StartTime:    process.StartTime.Format(common.GO_BIRTHDAY),
 			UpdateAt:     process.UpdatedAt.Format(common.GO_BIRTHDAY),
 			DeletedAt:    deletedAt,
