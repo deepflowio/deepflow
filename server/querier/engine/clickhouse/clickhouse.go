@@ -25,6 +25,7 @@ import (
 	//"github.com/k0kubun/pp"
 	logging "github.com/op/go-logging"
 	"github.com/xwb1989/sqlparser"
+	"golang.org/x/exp/slices"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
@@ -331,6 +332,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 			}
 		}
 	}
+	outerWhereLeftSlice = append(outerWhereLeftSlice, outerWhereLeftAppendSlice...)
 	// GroupBy解析
 	if pStmt.GroupBy != nil {
 		for _, group := range pStmt.GroupBy {
@@ -345,7 +347,9 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 					continue
 				}
 				groupTag := sqlparser.String(colName)
-				innerGroupBySlice = append(innerGroupBySlice, groupTag)
+				if slices.Contains(outerWhereLeftSlice, groupTag) {
+					innerGroupBySlice = append(innerGroupBySlice, groupTag)
+				}
 			}
 			funcName, ok := group.(*sqlparser.FuncExpr)
 			if ok {
@@ -353,7 +357,9 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 					continue
 				}
 				groupTag := sqlparser.String(funcName)
-				innerGroupBySlice = append(innerGroupBySlice, groupTag)
+				if slices.Contains(outerWhereLeftSlice, groupTag) {
+					innerGroupBySlice = append(innerGroupBySlice, groupTag)
+				}
 			}
 		}
 	}
@@ -421,7 +427,6 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 	outerEngine.View = view.NewView(outerEngine.Model)
 	outerTransSql := outerEngine.ToSQLString()
 	outerSlice := []string{}
-	outerWhereLeftSlice = append(outerWhereLeftSlice, outerWhereLeftAppendSlice...)
 	outerWhereLeftSql := strings.Join(outerWhereLeftSlice, ",")
 	outerSql := ""
 	// No internal sql required when only star grouping
