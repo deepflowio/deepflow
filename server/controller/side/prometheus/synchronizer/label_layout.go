@@ -79,6 +79,7 @@ func (m *labelLayout) sync(req []*controller.PrometheusMetricAPPLabelLayoutReque
 			dbToAdd = append(dbToAdd, &mysql.PrometheusMetricAPPLabelLayout{
 				MetricName:          mn,
 				APPLabelName:        ln,
+				APPLabelValue:       v.GetAppLabelValue(),
 				APPLabelColumnIndex: tmpMetricNameToMaxIndex[mn] + 1,
 			})
 			tmpMetricNameToMaxIndex[mn]++
@@ -93,6 +94,7 @@ func (m *labelLayout) sync(req []*controller.PrometheusMetricAPPLabelLayoutReque
 		resp = append(resp, &controller.PrometheusMetricAPPLabelLayout{
 			MetricName:          &l.MetricName,
 			AppLabelName:        &l.APPLabelName,
+			AppLabelValue:       &l.APPLabelValue,
 			AppLabelColumnIndex: proto.Uint32(uint32(l.APPLabelColumnIndex)),
 		})
 		if _, ok := m.metricNameToLabelNameToIndex[l.MetricName]; !ok {

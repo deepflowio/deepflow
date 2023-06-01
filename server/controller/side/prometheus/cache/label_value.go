@@ -27,7 +27,7 @@ type labelValue struct {
 	valueToID sync.Map
 }
 
-func (t *labelValue) GetValueID(v string) (int, bool) {
+func (t *labelValue) GetIDByValue(v string) (int, bool) {
 	if id, ok := t.valueToID.Load(v); ok {
 		return id.(int), true
 	}

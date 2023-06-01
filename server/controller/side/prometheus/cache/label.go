@@ -36,29 +36,29 @@ func NewLabelKey(name, value string) LabelKey {
 }
 
 type label struct {
-	nameToValue sync.Map
+	keyMap sync.Map
 }
 
-func (t *label) GetValueByName(name string) (string, bool) {
-	if value, ok := t.nameToValue.Load(name); ok {
-		return value.(string), true
+func (t *label) GetKey(key LabelKey) bool {
+	if _, ok := t.keyMap.Load(key); ok {
+		return true
 	}
-	return "", false
+	return false
 }
 
 func (t *label) Add(batch []*controller.PrometheusLabel) {
 	for _, m := range batch {
-		t.nameToValue.Store(m.GetName(), m.GetValue())
+		t.keyMap.Store(NewLabelKey(m.GetName(), m.GetValue()), struct{}{})
 	}
 }
 
 func (t *label) refresh(args ...interface{}) error {
-	labelNames, err := t.load()
+	labelKeys, err := t.load()
 	if err != nil {
 		return err
 	}
-	for _, ln := range labelNames {
-		t.nameToValue.Store(ln.Name, ln.Value)
+	for _, lk := range labelKeys {
+		t.keyMap.Store(lk, struct{}{})
 	}
 	return nil
 }

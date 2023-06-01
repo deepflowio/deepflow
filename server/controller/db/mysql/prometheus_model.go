@@ -16,12 +16,18 @@
 
 package mysql
 
+import "time"
+
 type IDField struct {
 	ID int `gorm:"primaryKey;column:id;type:int(10) unsigned;unique;not null"`
 }
 
 func (i IDField) GetID() int {
 	return i.ID
+}
+
+type CreatedAtField struct {
+	CreatedAt time.Time `gorm:"autoCreateTime;column:created_at;type:datetime" json:"CREATED_AT"`
 }
 
 type PrometheusMetricName struct {
@@ -68,6 +74,7 @@ type PrometheusMetricAPPLabelLayout struct {
 	IDField             `gorm:"embedded"`
 	MetricName          string `gorm:"column:metric_name;type:varchar(256);not null"`
 	APPLabelName        string `gorm:"column:app_label_name;type:varchar(256);not null"`
+	APPLabelValue       string `gorm:"column:app_label_value;type:varchar(256);not null"`
 	APPLabelColumnIndex uint8  `gorm:"column:app_label_column_index;type:tinyint(3) unsigned;not null"`
 }
 

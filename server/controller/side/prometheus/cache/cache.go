@@ -32,10 +32,6 @@ import (
 var log = logging.MustGetLogger("side.prometheus")
 
 var (
-	instanceAndJobKeyJoiner = "-"
-	labelJoiner             = ":"
-)
-var (
 	cacheOnce sync.Once
 	cacheIns  *Cache
 )
@@ -56,15 +52,16 @@ type Cache struct {
 
 func GetSingletonCache() *Cache {
 	cacheOnce.Do(func() {
+		tgt := &target{}
 		cacheIns = &Cache{
 			canRefresh:              make(chan bool, 1),
 			MetricName:              &metricName{},
 			LabelName:               &labelName{},
 			LabelValue:              &labelValue{},
 			MetricAndAPPLabelLayout: &metricAndAPPLabelLayout{},
-			Target:                  &target{},
+			Target:                  tgt,
 			Label:                   &label{},
-			MetricTarget:            &metricTarget{},
+			MetricTarget:            newMetricTarget(tgt),
 		}
 	})
 	return cacheIns
@@ -121,9 +118,10 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 			temp["layout_key_to_index"].(map[string]interface{})[string(k)] = value
 			return true
 		})
-		for k, v := range tempCache.MetricAndAPPLabelLayout.metricNameToAPPLabelNames {
-			temp["metric_name_to_app_label_names"].(map[string]interface{})[k] = v
-		}
+		// TODO: fix this
+		// for k, v := range tempCache.MetricAndAPPLabelLayout.metricNameToAPPLabelNames {
+		// 	temp["metric_name_to_app_label_names"].(map[string]interface{})[k] = v
+		// }
 		if len(temp["layout_key_to_index"].(map[string]interface{})) > 0 ||
 			len(temp["metric_name_to_app_label_names"].(map[string]interface{})) > 0 {
 			content["metric_and_app_label_layout"] = temp
@@ -141,17 +139,18 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 			temp["key_to_target_id"].(map[string]interface{})[string(k)] = value
 			return true
 		})
-		for _, labelName := range tempCache.Target.labelNames {
-			temp["label_names"] = append(temp["label_names"].([]string), labelName)
-		}
-		for id, labelNameToValue := range tempCache.Target.targetIDToLabelNameToValue {
-			if temp["target_id_to_label_name_value"].(map[int]map[string]string)[id] == nil {
-				temp["target_id_to_label_name_value"].(map[int]map[string]string)[id] = make(map[string]string)
-			}
-			for labelName, value := range labelNameToValue {
-				temp["target_id_to_label_name_value"].(map[int]map[string]string)[id][labelName] = value
-			}
-		}
+		// TODO fix this
+		// for _, labelName := range tempCache.Target.labelNames {
+		// 	temp["label_names"] = append(temp["label_names"].([]string), labelName)
+		// }
+		// for id, labelNameToValue := range tempCache.Target.targetIDToLabelNameToValue {
+		// 	if temp["target_id_to_label_name_value"].(map[int]map[string]string)[id] == nil {
+		// 		temp["target_id_to_label_name_value"].(map[int]map[string]string)[id] = make(map[string]string)
+		// 	}
+		// 	for labelName, value := range labelNameToValue {
+		// 		temp["target_id_to_label_name_value"].(map[int]map[string]string)[id][labelName] = value
+		// 	}
+		// }
 		if len(temp["key_to_target_id"].(map[string]interface{})) > 0 ||
 			len(temp["label_names"].([]string)) > 0 ||
 			len(temp["target_id_to_label_name_value"].(map[int]map[string]string)) > 0 {
@@ -162,10 +161,11 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 		temp := map[string]interface{}{
 			"name_to_value": make(map[string]interface{}),
 		}
-		tempCache.Label.nameToValue.Range(func(key, value any) bool {
-			temp["name_to_value"].(map[string]interface{})[key.(string)] = value
-			return true
-		})
+		// TODO fix this
+		// tempCache.Label.nameToValue.Range(func(key, value any) bool {
+		// 	temp["name_to_value"].(map[string]interface{})[key.(string)] = value
+		// 	return true
+		// })
 		if len(temp["name_to_value"].(map[string]interface{})) > 0 {
 			content["label"] = temp
 		}
@@ -174,10 +174,11 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 		temp := map[string]interface{}{
 			"metric_name_to_target_id": make(map[string]interface{}),
 		}
-		tempCache.MetricTarget.metricNameToTargetID.Range(func(key, value any) bool {
-			temp["metric_name_to_target_id"].(map[string]interface{})[key.(string)] = value
-			return true
-		})
+		// TODO fix this
+		// tempCache.MetricTarget.metricNameToTargetID.Range(func(key, value any) bool {
+		// 	temp["metric_name_to_target_id"].(map[string]interface{})[key.(string)] = value
+		// 	return true
+		// })
 		if len(temp["metric_name_to_target_id"].(map[string]interface{})) > 0 {
 			content["metric_target"] = temp
 		}
@@ -240,12 +241,12 @@ func (t *Cache) Start(ctx context.Context) error {
 
 func (t *Cache) refresh(fully bool) error {
 	log.Info("refresh cache started")
+	t.Target.refresh()
 	eg := &errgroup.Group{}
 	AppendErrGroup(eg, t.MetricName.refresh, fully)
 	AppendErrGroup(eg, t.LabelName.refresh, fully)
 	AppendErrGroup(eg, t.LabelValue.refresh, fully)
 	AppendErrGroup(eg, t.MetricAndAPPLabelLayout.refresh, fully)
-	AppendErrGroup(eg, t.Target.refresh, fully)
 	AppendErrGroup(eg, t.Label.refresh, fully)
 	AppendErrGroup(eg, t.MetricTarget.refresh, fully)
 	err := eg.Wait()
@@ -262,5 +263,5 @@ func (t *Cache) RefreshFully() error {
 
 func (t *Cache) Clear() {
 	t.MetricAndAPPLabelLayout.clear()
-	t.Target.clear()
+	t.MetricTarget.clear()
 }

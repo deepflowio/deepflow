@@ -26,22 +26,26 @@ import (
 type LayoutKey struct {
 	MetricName string `json:"metric_name"`
 	LabelName  string `json:"label_name"`
+	LabelValue string `json:"label_value"`
 }
 
-func NewLayoutKey(metricName, labelName string) LayoutKey {
+func NewLayoutKey(metricName, labelName, labelValue string) LayoutKey {
 	return LayoutKey{
 		MetricName: metricName,
 		LabelName:  labelName,
+		LabelValue: labelValue,
 	}
 }
 
+type appLabelNameToValue map[string]string
+
 type metricAndAPPLabelLayout struct {
-	layoutKeyToIndex          sync.Map
-	metricNameToAPPLabelNames map[string][]string // only for fully assembled
+	layoutKeyToIndex                sync.Map
+	metricNameToAPPLabelNameToValue map[string]appLabelNameToValue // only for fully assembled
 }
 
-func (t *metricAndAPPLabelLayout) GetMetricNameToAPPLabelNames() map[string][]string {
-	return t.metricNameToAPPLabelNames
+func (t *metricAndAPPLabelLayout) GetAPPLabelNameToValueByMetricName(n string) appLabelNameToValue {
+	return t.metricNameToAPPLabelNameToValue[n]
 }
 
 func (t *metricAndAPPLabelLayout) GetIndexByLayoutKey(key LayoutKey) (uint8, bool) {
@@ -53,12 +57,12 @@ func (t *metricAndAPPLabelLayout) GetIndexByLayoutKey(key LayoutKey) (uint8, boo
 
 func (t *metricAndAPPLabelLayout) Add(batch []*controller.PrometheusMetricAPPLabelLayout) {
 	for _, m := range batch {
-		t.layoutKeyToIndex.Store(NewLayoutKey(m.GetMetricName(), m.GetAppLabelName()), uint8(m.GetAppLabelColumnIndex()))
+		t.layoutKeyToIndex.Store(NewLayoutKey(m.GetMetricName(), m.GetAppLabelName(), m.GetAppLabelValue()), uint8(m.GetAppLabelColumnIndex()))
 	}
 }
 
 func (t *metricAndAPPLabelLayout) clear() {
-	t.metricNameToAPPLabelNames = make(map[string][]string)
+	t.metricNameToAPPLabelNameToValue = make(map[string]appLabelNameToValue)
 }
 
 func (t *metricAndAPPLabelLayout) refresh(args ...interface{}) error {
@@ -67,15 +71,14 @@ func (t *metricAndAPPLabelLayout) refresh(args ...interface{}) error {
 		return err
 	}
 	fully := args[0].(bool)
-	if fully {
-		for _, l := range metricAPPLabelLayouts {
-			t.layoutKeyToIndex.Store(NewLayoutKey(l.MetricName, l.APPLabelName), uint8(l.APPLabelColumnIndex))
-			t.metricNameToAPPLabelNames[l.MetricName] = append(t.metricNameToAPPLabelNames[l.MetricName], l.APPLabelName)
+	for _, l := range metricAPPLabelLayouts {
+		if fully {
+			if _, ok := t.metricNameToAPPLabelNameToValue[l.MetricName]; !ok {
+				t.metricNameToAPPLabelNameToValue[l.MetricName] = make(appLabelNameToValue)
+			}
+			t.metricNameToAPPLabelNameToValue[l.MetricName][l.APPLabelName] = l.APPLabelValue
 		}
-	} else {
-		for _, l := range metricAPPLabelLayouts {
-			t.layoutKeyToIndex.Store(NewLayoutKey(l.MetricName, l.APPLabelName), uint8(l.APPLabelColumnIndex))
-		}
+		t.layoutKeyToIndex.Store(NewLayoutKey(l.MetricName, l.APPLabelName, l.APPLabelValue), uint8(l.APPLabelColumnIndex))
 	}
 	return nil
 }

@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS prometheus_metric_app_label_layout (
     `id`                        INT(10) NOT NULL AUTO_INCREMENT PRIMARY KEY,
     `metric_name`               VARCHAR(256) NOT NULL,
     `app_label_name`            VARCHAR(256) NOT NULL,
+    `app_label_value`           VARCHAR(256) NOT NULL,
     `app_label_column_index`    TINYINT(3) NOT NULL,
     `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE INDEX metric_label_index(metric_name, app_label_name)

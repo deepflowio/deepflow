@@ -24,6 +24,10 @@ import (
 	. "github.com/deepflowio/deepflow/server/controller/side/prometheus/common"
 )
 
+var (
+	labelJoiner = ":"
+)
+
 type TargetKey struct {
 	Instance string `json:"instance"`
 	Job      string `json:"job"`
@@ -36,18 +40,19 @@ func NewTargetKey(instance, job string) TargetKey {
 	}
 }
 
+type targetLabelNameToValue map[string]string
+
 type target struct {
 	keyToTargetID              sync.Map
-	labelNames                 []string
-	targetIDToLabelNameToValue map[int]map[string]string // only for fully assembled
+	targetIDToKey              sync.Map
+	targetIDToLabelNameToValue sync.Map
 }
 
-func (t *target) GetTargetIDToLabelNameToValue() map[int]map[string]string {
-	return t.targetIDToLabelNameToValue
-}
-
-func (t *target) GetLabelNames() []string {
-	return t.labelNames
+func (t *target) GetTargetLabelNameToValueByTargetID(i int) targetLabelNameToValue {
+	if labelNameToValue, ok := t.targetIDToLabelNameToValue.Load(i); ok {
+		return labelNameToValue.(targetLabelNameToValue)
+	}
+	return make(targetLabelNameToValue)
 }
 
 func (t *target) GetTargetIDByTargetKey(key TargetKey) (int, bool) {
@@ -57,42 +62,41 @@ func (t *target) GetTargetIDByTargetKey(key TargetKey) (int, bool) {
 	return 0, false
 }
 
-func (t *target) clear() {
-	t.targetIDToLabelNameToValue = make(map[int]map[string]string)
+func (t *target) GetTargetKeyByTargetID(id int) (TargetKey, bool) {
+	if key, ok := t.targetIDToKey.Load(id); ok {
+		return key.(TargetKey), true
+	}
+	return TargetKey{}, false
 }
 
-func (t *target) refresh(args ...interface{}) error {
+func (t *target) refresh() error {
 	targets, err := t.load()
 	if err != nil {
 		return err
 	}
-	fully := args[0].(bool)
-	if fully {
-		for _, tg := range targets {
-			t.keyToTargetID.Store(NewTargetKey(tg.Instance, tg.Job), tg.ID)
-			t.targetIDToLabelNameToValue[tg.ID] = t.formatLabels(tg)
-		}
-	} else {
-		for _, tg := range targets {
-			t.keyToTargetID.Store(NewTargetKey(tg.Instance, tg.Job), tg.ID)
-		}
+	for _, tg := range targets {
+		key := NewTargetKey(tg.Instance, tg.Job)
+		t.keyToTargetID.Store(key, tg.ID)
+		t.targetIDToKey.Store(tg.ID, key)
+		t.targetIDToLabelNameToValue.Store(tg.ID, t.formatLabels(tg))
 	}
 	return nil
 }
 
-func (t *target) formatLabels(tg *mysql.PrometheusTarget) (labelNameToValue map[string]string) {
-	labelNameToValue = make(map[string]string)
+func (t *target) formatLabels(tg *mysql.PrometheusTarget) (labelNameToValue targetLabelNameToValue) {
+	labelNameToValue = make(targetLabelNameToValue)
 	labelNameToValue[TargetLabelInstance] = tg.Instance
 	labelNameToValue[TargetLabelJob] = tg.Job
 	for _, l := range strings.Split(tg.OtherLabels, ",") {
 		if l == "" {
 			continue
 		}
-		parts := strings.Split(l, labelJoiner)
-		if len(parts) != 2 {
+		k, v, ok := strings.Cut(l, labelJoiner)
+		if !ok {
+			log.Warningf("invalid prometheus_target_label: %s, target_id: %d", l, tg.ID)
 			continue
 		}
-		labelNameToValue[parts[0]] = parts[1]
+		labelNameToValue[k] = v
 	}
 	return
 }
