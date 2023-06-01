@@ -74,7 +74,7 @@ func (l *ChTargetLabel) generateNewData() (map[PrometheusTargetLabelKey]mysql.Ch
 			targetLabels := strings.Split(targetLabelNameValueMap[targetID], ", ")
 			for _, targetLabel := range targetLabels {
 				if len(strings.Split(targetLabel, ":")) >= 2 {
-					targetLabelItem := strings.SplitN(targetLabel, ":", 1)
+					targetLabelItem := strings.SplitN(targetLabel, ":", 2)
 					labelNameID := metricLabelNameIDMap[targetLabelItem[0]]
 					labelValue := targetLabelItem[1]
 					keyToItem[PrometheusTargetLabelKey{MetricID: metricID, LabelNameID: labelNameID, TargetID: targetID}] = mysql.ChTargetLabel{
