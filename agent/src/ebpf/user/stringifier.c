@@ -21,7 +21,7 @@
  * 1. It constructs a "folded stack trace string" based on the stack frame addresses.
  * 2. It records the result of (1) when reusing a stack identifier (stack-id).
  *
- * Example of a folded stack trace string (taken from a performance profiler test):
+ * Example of a folded stack trace string (taken from a perf profiler test):
  * main;xxx();yyy()
  * It is a list of symbols corresponding to addresses in the underlying stack trace,
  * separated by ';'.
@@ -70,7 +70,7 @@ static int free_kvp_cb(stack_str_hash_kv * kv, void *ctx)
 {
 	if (kv->value != 0) {
 		clib_mem_free((void *)kv->value);
-		(*(u64 *)ctx)++;
+		(*(u64 *) ctx)++;
 	}
 
 	return BIHASH_WALK_CONTINUE;
@@ -79,7 +79,8 @@ static int free_kvp_cb(stack_str_hash_kv * kv, void *ctx)
 void release_stack_strs(stack_str_hash_t * h)
 {
 	u64 elem_count = 0;
-	stack_str_hash_foreach_key_value_pair(h, free_kvp_cb, (void *)&elem_count);
+	stack_str_hash_foreach_key_value_pair(h, free_kvp_cb,
+					      (void *)&elem_count);
 	stack_str_hash_free(h);
 	ebpf_info("release_stack_strs hashmap clear %lu elems.\n", elem_count);
 }
@@ -99,8 +100,7 @@ static inline int symcache_resolve(pid_t pid, void *resolver, u64 address,
 	ASSERT(pid >= 0);
 
 	if (pid == 0)
-		return bcc_symcache_resolve_no_demangle(resolver, address,
-							sym);
+		return bcc_symcache_resolve_no_demangle(resolver, address, sym);
 	else
 		return bcc_symcache_resolve(resolver, address, sym);
 }
@@ -142,7 +142,8 @@ static char *resolve_addr(pid_t pid, u64 address)
 	int ret = symcache_resolve(pid, resolver, address, &sym);
 	if (ret == 0) {
 		ptr = symbol_name_fetch(pid, &sym);
-		if (ptr) goto finish;
+		if (ptr)
+			goto finish;
 	}
 
 	if (sym.module != NULL && strlen(sym.module) > 0) {
@@ -277,7 +278,7 @@ static char *__folded_stack_trace_string(struct bpf_tracer *t,
 	kv.key = (u64) stack_id;
 	kv.value = 0;
 	if (stack_str_hash_search(h, &kv, &kv) == 0) {
-		__sync_fetch_and_add(&h->hit_count_stat, 1);
+		__sync_fetch_and_add(&h->hit_stack_str_hash_count, 1);
 		return (char *)kv.value;
 	}
 
@@ -312,25 +313,47 @@ static char *__folded_stack_trace_string(struct bpf_tracer *t,
 	return str;
 }
 
-void folded_stack_trace_string(struct bpf_tracer *t,
-			       struct stack_trace_key_t *v,
-			       const char *stack_map_name, stack_str_hash_t * h)
-{
-	/*
-	 * We need to prepare a hashtable (stack_trace_strs) to record the results
-	 * of this iteration analysis. The key is the user-stack-ID or kernel-stack-ID,
-	 * and the value is the "folded stack trace string". There are two reasons why
-	 * we use this hashtable:
-	 *
-	 * 1. It is common to see reuse of individual stack trace identifiers
-	 *    (avoiding repetitive symbolization work).
-	 * 2. When the Stringifier reads the shared BPF stack trace address map,
-	 *    it uses a destructive read approach (it reads a stack trace from
-	 *    the table and then clears it). It means that when a stackID is
-	 *    deleted, the list of IPs (function addresses) associated with it
-	 *    no longer exists, and must be kept beforehand.
-	 */
+static const char *err_tag = "<stack trace error>";
+static const char *k_err_tag = "<kernel stack trace error>";
+static const char *u_err_tag = "<user stack trace error>";
+static const char *lost_tag = "<stack trace lost>";
 
+static inline stack_trace_msg_t *alloc_stack_trace_msg(int len)
+{
+	void *trace_msg;
+	/* add separator and '\0' */
+	len += 2;
+	trace_msg = clib_mem_alloc_aligned(len, 0, NULL);
+	if (trace_msg == NULL) {
+		ebpf_warning("stack trace str alloc memory failed.\n");
+	} else {
+		stack_trace_msg_t *msg = trace_msg;
+		return msg;
+	}
+
+	return NULL;
+}
+
+static void set_stack_trace_msg(stack_trace_msg_t * msg,
+				struct stack_trace_key_t *v)
+{
+	msg->pid = v->pid;
+	msg->cpu = v->cpu;
+	memcpy(msg->comm, v->comm, sizeof(msg->comm));
+	msg->u_stack_id = (u32) v->userstack;
+	msg->k_stack_id = (u32) v->kernstack;
+	msg->stime = get_pid_stime(v->pid);
+	msg->data_len = strlen((char *)&msg->data[0]);
+	msg->time_stamp = gettime(CLOCK_REALTIME, TIME_TYPE_NAN) / 1000UL; // usecs
+	msg->count = 1;
+	msg->data_ptr = pointer_to_uword(&msg->data[0]);
+}
+
+char *folded_stack_trace_string(struct bpf_tracer *t,
+				struct stack_trace_key_t *v,
+				const char *stack_map_name,
+				stack_str_hash_t * h)
+{
 	char *trace_str, *k_trace_str, *u_trace_str;
 	trace_str = k_trace_str = u_trace_str = NULL;
 
@@ -344,15 +367,6 @@ void folded_stack_trace_string(struct bpf_tracer *t,
 							  v->pid,
 							  stack_map_name, h);
 	}
-
-	//ebpf_debug
-	//    ("pid %d comm %s stack-user-id %d stack-kern-id %d cpu %d\n",
-	//     v->pid, v->comm, (int)v->userstack, (int)v->kernstack, v->cpu);
-
-	const char *err_tag = "<stack trace error>";
-	const char *k_err_tag = "<kernel stack trace error>";
-	const char *u_err_tag = "<user stack trace error>";
-	const char *lost_tag = "<stack trace lost>";
 
 	/* stack_trace_str = u_stack_str_fn() + ";" + k_stack_str_fn(); */
 	if (v->kernstack >= 0 && v->userstack >= 0) {
@@ -390,6 +404,110 @@ void folded_stack_trace_string(struct bpf_tracer *t,
 			    create_symbol_str(strlen(u_trace_str),
 					      (char *)u_trace_str, "");
 	} else {
+		trace_str =
+		    create_symbol_str(strlen(lost_tag), (char *)lost_tag, "");
+		ebpf_warning("stack trace data lost\n");
+	}
+
+	if (trace_str == NULL)
+		trace_str = create_symbol_str(strlen(err_tag), (char *)err_tag, "");
+
+	//ebpf_debug("stack trace: %s\n", trace_str);
+	//clib_mem_free(trace_str);
+	return trace_str;
+}
+
+stack_trace_msg_t *
+resolve_and_gen_stack_trace_msg(struct bpf_tracer *t,
+				struct stack_trace_key_t *v,
+				const char *stack_map_name,
+				stack_str_hash_t *h)
+{
+	/*
+	 * We need to prepare a hashtable (stack_trace_strs) to record the results
+	 * of this iteration analysis. The key is the user-stack-ID or kernel-stack-ID,
+	 * and the value is the "folded stack trace string". There are two reasons why
+	 * we use this hashtable:
+	 *
+	 * 1. It is common to see reuse of individual stack trace identifiers
+	 *    (avoiding repetitive symbolization work).
+	 * 2. When the Stringifier reads the shared BPF stack trace address map,
+	 *    it uses a destructive read approach (it reads a stack trace from
+	 *    the table and then clears it). It means that when a stackID is
+	 *    deleted, the list of IPs (function addresses) associated with it
+	 *    no longer exists, and must be kept beforehand.
+	 */
+
+	int len = 0;
+	static stack_trace_msg_t *msg;
+	char *k_trace_str, *u_trace_str;
+	k_trace_str = u_trace_str = NULL;
+
+	if (v->kernstack >= 0) {
+		k_trace_str = __folded_stack_trace_string(t, v->kernstack,
+							  0, stack_map_name, h);
+	}
+
+	if (v->userstack >= 0) {
+		u_trace_str = __folded_stack_trace_string(t, v->userstack,
+							  v->pid,
+							  stack_map_name, h);
+	}
+
+	/* stack_trace_str = u_stack_str_fn() + ";" + k_stack_str_fn(); */
+	len += sizeof(stack_trace_msg_t);
+	if (v->kernstack >= 0 && v->userstack >= 0) {
+		if (k_trace_str) {
+			len += strlen(k_trace_str);
+		} else {
+			len += strlen(k_err_tag);
+		}
+
+		if (u_trace_str) {
+			len += strlen(u_trace_str);
+		} else {
+			len += strlen(u_err_tag);
+		}
+
+		msg = alloc_stack_trace_msg(len);
+		if (msg == NULL) {
+			ebpf_warning("No available memory space.\n");
+			return NULL;
+		}
+
+		snprintf((char *)&msg->data[0], len, "%s;%s",
+			 u_trace_str ? u_trace_str : u_err_tag,
+			 k_trace_str ? k_trace_str : k_err_tag);
+
+	} else if (v->kernstack >= 0) {
+		if (k_trace_str) {
+			len += strlen(k_trace_str);
+		} else {
+			len += strlen(k_err_tag);
+		}
+		msg = alloc_stack_trace_msg(len);
+		if (msg == NULL) {
+			ebpf_warning("No available memory space.\n");
+			return NULL;
+		}
+
+		snprintf((char *)&msg->data[0], len, "%s",
+			 k_trace_str ? k_trace_str : k_err_tag);
+	} else if (v->userstack >= 0) {
+		if (u_trace_str) {
+			len += strlen(u_trace_str);
+		} else {
+			len += strlen(u_err_tag);
+		}
+		msg = alloc_stack_trace_msg(len);
+		if (msg == NULL) {
+			ebpf_warning("No available memory space.\n");
+			return NULL;
+		}
+
+		snprintf((char *)&msg->data[0], len, "%s",
+			 u_trace_str ? u_trace_str : u_err_tag);
+	} else {
 		/* 
 		 * The kernel can indicate the invalidity of a stack ID in two
 		 * different ways:
@@ -405,14 +523,18 @@ void folded_stack_trace_string(struct bpf_tracer *t,
 		 * both stack IDs are set to "invalid" with the error code -EFAULT.
 		 */
 
-		trace_str =
-		    create_symbol_str(strlen(lost_tag), (char *)lost_tag, "");
+		len += strlen(lost_tag);
+		msg = alloc_stack_trace_msg(len);
+		if (msg == NULL) {
+			ebpf_warning("No available memory space.\n");
+			return NULL;
+		}
+
+		snprintf((char *)&msg->data[0], len, "%s", lost_tag);
 		ebpf_warning("stack trace data lost\n");
 	}
 
-	if (trace_str == NULL)
-		trace_str = create_symbol_str(strlen(err_tag), (char *)err_tag, "");
+	set_stack_trace_msg(msg, v);
 
-	//ebpf_debug("stack trace: %s\n", trace_str);
-	clib_mem_free(trace_str);
+	return msg;
 }

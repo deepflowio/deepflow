@@ -24,12 +24,35 @@ pub use libc::c_ulonglong;
 pub use std::ffi::{CStr, CString};
 use std::fmt;
 
+// process_kname is up to 16 bytes, if the length of process_kname exceeds 15, the ending char is '\0'
+pub const PACKET_KNAME_MAX_PADDING: usize = 15;
+
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct stack_profile_data {
-    pub data_bytes: u32,
-    pub sample_count: u32,
-    pub data: *mut c_char,
+    pub timestamp: u64,  // Timestamp of the stack trace data(unit: nanoseconds).
+    pub pid: u32,	     // Process-ID of the stack trace data.
+    pub stime: u64,	     // The start time of the process is measured in milliseconds.
+    pub u_stack_id: u32, // User space stackID.
+    pub k_stack_id: u32, // Kernel space stackID.
+    pub cpu: u32,	     // The captured stack trace data is generated on which CPU?
+    pub count: u32,	     // The profiler captures the number of occurrences of the same
+                         // data by querying with the quadruple "<pid + stime + u_stack_id
+                         // + k_stack_id>" as the key.
+
+    pub comm: [u8; PACKET_KNAME_MAX_PADDING + 1], // comm in task_struct, always 16 bytes 
+    pub stack_data_len: u32,	 // stack data length
+
+    /*
+     * Example of a folded stack trace string (taken from a perf profiler test):
+     * main;xxx();yyy()
+     * It is a list of symbols corresponding to addresses in the underlying stack trace,
+     * separated by ';'.
+     *
+     * The merged folded stack trace string style for user space and kernel space would be:
+     * <user space folded stack trace string> + ";" + <kernel space folded stack trace string>
+     */
+    pub stack_data: *mut c_char,
 }
 
 extern "C" {

@@ -27,3 +27,7 @@ __thread uword thread_index = 0;
 
 #include "bihash_8_16.h"
 #include "bihash_template.c"
+
+#include "bihash_24_8.h"
+#include "bihash_template.c"
+

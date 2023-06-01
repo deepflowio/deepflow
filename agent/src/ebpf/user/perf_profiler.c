@@ -43,6 +43,7 @@ extern __thread uword thread_index;
 
 struct stack_trace_key_t *raw_stack_data;
 static u64 stack_trace_lost;
+static struct bpf_tracer *profiler_tracer;
 
 /*
  * The iteration count causes BPF to switch buffers with each iteration.
@@ -50,7 +51,8 @@ static u64 stack_trace_lost;
 static u64 transfer_count;
 static volatile u64 reader_exit;
 static void print_profiler_status(struct bpf_tracer *t, u64 iter_count,
-				  stack_str_hash_t *h);
+				  stack_str_hash_t *h,
+				  stack_trace_msg_hash_t *msg_h);
 
 static void reader_lost_cb(void *t, u64 lost)
 {
@@ -92,6 +94,60 @@ static int relase_profiler(struct bpf_tracer *tracer)
 	return ETR_OK;
 }
 
+static void set_msg_kvp(stack_trace_msg_kv_t * kvp,
+			struct stack_trace_key_t *v,
+			u64 stime,
+			void *msg_value)
+{
+	kvp->k.pid = (u64) v->pid;
+	kvp->k.stime = stime;
+	kvp->k.u_stack_id = (u32) v->userstack;
+	kvp->k.k_stack_id = (u32) v->kernstack;
+	kvp->msg_ptr = pointer_to_uword(msg_value);
+}
+
+static int init_stack_trace_msg_hash(stack_trace_msg_hash_t *h,
+				     const char *name)
+{
+	memset(h, 0, sizeof(*h));
+	u32 nbuckets = STACK_TRACE_MSG_HASH_BUCKETS_NUM;
+	u64 hash_memory_size = STACK_TRACE_MSG_HASH_MEM_SZ;
+	return stack_trace_msg_hash_init(h, (char *)name,
+					 nbuckets, hash_memory_size);
+}
+
+static int push_and_free_msg_kvp_cb(stack_trace_msg_hash_kv *kv, void *ctx)
+{
+	stack_trace_msg_kv_t *msg_kv = (stack_trace_msg_kv_t *)kv;
+	if (msg_kv->msg_ptr != 0) {
+		stack_trace_msg_t *msg = (stack_trace_msg_t *)msg_kv->msg_ptr;
+		//printf("tiemstamp %lu pid %u stime %lu u_stack_id %lu k_statck_id %lu cpu %u count %u comm %s datalen %u data %s\n",
+		//       msg->time_stamp, msg->pid, msg->stime, msg->u_stack_id, msg->k_stack_id, msg->cpu, msg->count, msg->comm, msg->data_len, msg->data);
+		tracer_callback_t fun = profiler_tracer->process_fn;
+		/*
+ 		 * Execute callback function to hand over the data to the
+ 		 * higher level for processing. The higher level will se-
+ 		 * nd the data to the server for storage as required.
+ 		 */ 
+		fun(msg);
+		clib_mem_free((void *)msg);
+		(*(u64 *) ctx)++;
+	}
+
+	return BIHASH_WALK_CONTINUE;
+}
+
+static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t *h)
+{
+	ASSERT(profiler_tracer != NULL);
+
+	u64 elem_count = 0;
+	stack_trace_msg_hash_foreach_key_value_pair(h, push_and_free_msg_kvp_cb,
+						    (void *)&elem_count);
+	stack_trace_msg_hash_free(h);
+	ebpf_info("stack_trace_msg hashmap clear %lu elems.\n", elem_count);
+}
+
 static void aggregate_stack_traces(struct bpf_tracer *t,
 				   const char *stack_map_name,
 				   u64 sample_cnt_idx)
@@ -110,8 +166,42 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 	 * iteration.
 	 */
 	stack_str_hash_t stack_str_hash;
-	if (init_stack_str_hash(&stack_str_hash, "profile_stack_str"))
+	if (init_stack_str_hash(&stack_str_hash, "profile_stack_str")) {
+		ebpf_warning("init_stack_str_hash() failed.\n");
 		return;
+	}
+
+	/*
+	 * During each transmission iteration, we have a hashmap structure in
+	 * place for the following purposes:
+	 *
+	 * 1 Pushing the data of this iteration to the higher-level processing.
+	 * 2 Performing data statistics based on the stack trace data, using the
+	 *   combination of "pid + pid_start_time + k_stack_id + u_stack_id" as
+	 *   the key.
+	 *
+	 * Here is the key-value pair structure of the hashmap:
+	 * ```
+	 * typedef struct {
+	 *         struct {
+	 *         u64 pid;
+	 *         u64 stime;
+	 *         u32 u_stack_id;
+	 *         u32 k_stack_id;
+	 *         } k;
+	 *         u64 msg_ptr; Store perf profiler data
+	 * } stack_trace_msg_kv_t;
+	 * ```
+	 *
+	 * This is the final form of the data. If the current stack trace message
+	 * is a match, we only need to increment the count field in the correspon-
+	 * ding value, thus avoiding duplicate parsing.
+	 */
+	stack_trace_msg_hash_t msg_hash;
+	if (init_stack_trace_msg_hash(&msg_hash, "stack_trace_msg")) {
+		ebpf_warning("init_stack_trace_msg_hash() failed.\n");
+		return;
+	}
 
 	vec_foreach(v, raw_stack_data) {
 		if (v == NULL)
@@ -124,14 +214,47 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 		if (v->userstack == -EEXIST)
 			stack_trace_lost++;
 
+		count++;
+
 		/*
+		 * Firstly, search the stack-trace-msg hash to see if the
+		 * stack trace messages has already been stored. 
+		 */
+		stack_trace_msg_kv_t kv; // stack_trace_msg_hash_kv
+		set_msg_kvp(&kv, v, get_pid_stime(v->pid), (void *)0);
+		//printf("kvp->k.pid %lu, kvp->k.stime %lu, kvp->k.u_stack_id %u, kvp->k.k_stack_id %u",
+		//     kv->k.pid, kv->k.stime, kv->k.u_stack_id, kv->k.k_stack_id);
+		if (stack_trace_msg_hash_search(&msg_hash, (stack_trace_msg_hash_kv *)&kv,
+						(stack_trace_msg_hash_kv *)&kv) == 0) {
+			__sync_fetch_and_add(&msg_hash.hit_stack_msg_hash_count, 1);
+			((stack_trace_msg_t *)kv.msg_ptr)->count++;
+			//printf("kvp->k.pid %lu, kvp->k.stime %lu, kvp->k.u_stack_id %u, kvp->k.k_stack_id %u count %u\n",
+	                //       kv.k.pid, kv.k.stime, kv.k.u_stack_id, kv.k.k_stack_id, ((stack_trace_msg_t *)kv.msg_ptr)->count);
+
+			continue;
+		}
+
+		/*
+		 * Folded stack trace string and generate stack trace messages.
+		 *
 		 * Folded stack trace string (taken from a performance profiler test):
 		 * main;xxx();yyy()
 		 * It is a list of symbols corresponding to addresses in the underlying
 		 * stack trace, separated by ';'.
 		 */
-		folded_stack_trace_string(t, v, stack_map_name, &stack_str_hash);
-		count++;
+
+		stack_trace_msg_t *msg =
+			resolve_and_gen_stack_trace_msg(t, v, stack_map_name,
+							&stack_str_hash);
+		if (msg) {
+			stack_trace_msg_kv_t msg_kvp;
+			set_msg_kvp(&msg_kvp, v, msg->stime, (void *)msg);
+			if (stack_trace_msg_hash_add_del(&msg_hash,
+							 (stack_trace_msg_hash_kv *)&msg_kvp,
+							 1 /* is_add */ )) {
+				ebpf_warning("stack_trace_msg_hash_add_del() failed.\n");
+			}
+		}
 	}
 
 	/*
@@ -146,10 +269,13 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 
 	vec_free(raw_stack_data);
 
-	print_profiler_status(t, count, &stack_str_hash);
+	print_profiler_status(t, count, &stack_str_hash, &msg_hash);
 
 	/* free all elems and free stack_str_hash */
 	release_stack_strs(&stack_str_hash);
+
+	/* Push messages and free stack_trace_msg_hash */
+	push_and_release_stack_trace_msg(&msg_hash);
 }
 
 static void process_bpf_stacktraces(struct bpf_tracer *t,
@@ -222,6 +348,8 @@ static int create_profiler(struct bpf_tracer *tracer)
 {
 	int ret;
 
+	profiler_tracer = tracer;
+
 	/* load ebpf perf profiler */
 	if (tracer_bpf_load(tracer))
 		return ETR_LOAD;
@@ -275,11 +403,13 @@ static int create_profiler(struct bpf_tracer *tracer)
 int stop_continuous_profiler(void)
 {
 	release_bpf_tracer(CP_TRACER_NAME);
+	profiler_tracer = NULL;
 	return (0);
 }
 
 static void print_profiler_status(struct bpf_tracer *t, u64 iter_count,
-				  stack_str_hash_t *h)
+				  stack_str_hash_t *h,
+				  stack_trace_msg_hash_t *msg_h)
 {
 	u64 alloc_b, free_b;
 	get_mem_stat(&alloc_b, &free_b);
@@ -287,11 +417,11 @@ static void print_profiler_status(struct bpf_tracer *t, u64 iter_count,
 		   "kern_lost:\t%lu\nstack_trace_lost:\t%lu\n"
 		   "ransfer_count:\t%lu iter_count:\t%lu\nall"
 		   "oc_b:\t%lu bytes free_b:\t%lu bytes use:\t%lu bytes\n"
-		   "stack_str_hash.hit_count %lu\n",
+		   "stack_str_hash.hit_count %lu\nstack_trace_msg_hash hit %lu\n",
 		   atomic64_read(&t->recv), atomic64_read(&t->lost),
 		   stack_trace_lost, transfer_count, iter_count,
 		   alloc_b, free_b, alloc_b - free_b,
-		   h->hit_count_stat);
+		   h->hit_stack_str_hash_count, msg_h->hit_stack_msg_hash_count);
 }
 
 /*

@@ -458,6 +458,7 @@ uint64_t get_symbol_addr_from_binary(const char *bin, const char *symname)
 
 static symbol_caches_hash_t syms_cache_hash;	// for user process symbol caches
 static void *k_resolver;		// for kernel symbol cache
+static u64 sys_btime_msecs;		// system boot time(milliseconds)
 
 static int init_symbol_cache(const char *name)
 {
@@ -467,6 +468,26 @@ static int init_symbol_cache(const char *name)
 	u64 hash_memory_size = SYMBOLIZER_CACHES_HASH_MEM_SZ;	// 2G bytes
 	return symbol_caches_hash_init(h, (char *)name, nbuckets,
 				       hash_memory_size);
+}
+
+u64 get_pid_stime(pid_t pid)
+{
+	ASSERT(pid >= 0);
+
+	if (pid == 0)
+		return sys_btime_msecs;
+
+	symbol_caches_hash_t *h = &syms_cache_hash;
+	struct symbolizer_cache_kvp kv;
+	kv.k.pid = (u64) pid;
+	kv.v.stime = 0;
+	kv.v.cache = 0;
+	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
+				      (symbol_caches_hash_kv *) & kv) == 0) {
+		return (u64)kv.v.stime;
+	}
+
+	return 0;
 }
 
 void *get_symbol_cache(pid_t pid)
@@ -480,8 +501,10 @@ void *get_symbol_cache(pid_t pid)
 		.use_symbol_type = ((1 << STT_FUNC) | (1 << STT_GNU_IFUNC)),
 	};
 
-	if (k_resolver == NULL && pid == 0)
+	if (k_resolver == NULL && pid == 0) {
 		k_resolver = (void *)bcc_symcache_new(-1, &lazy_opt);
+		sys_btime_msecs = get_sys_btime_msecs();
+	}
 
 	if (pid == 0)
 		return k_resolver;

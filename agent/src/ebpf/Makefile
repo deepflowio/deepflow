@@ -64,8 +64,7 @@ OBJS := user/elf.o \
 	user/vec.o \
 	user/bihash.o \
 	user/perf_profiler.o \
-	user/stringifier.o \
-	user/test_symbol.o
+	user/stringifier.o
 
 STATIC_OBJS := $(addprefix $(STATIC_OBJDIR)/,$(OBJS))
 CFLAGS ?= -std=gnu99 -g -O2 -ffunction-sections -fdata-sections -fPIC -Wall -Wno-strict-aliasing -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers

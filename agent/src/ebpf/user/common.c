@@ -377,6 +377,28 @@ uint64_t gettime(clockid_t clk_id, int flag)
 }
 
 /*
+ * Get system boot start time (in milliseconds).
+ */
+u64 get_sys_btime_msecs(void)
+{
+	char buff[4096];
+
+	FILE *fp = fopen("/proc/stat", "r");
+	ASSERT(fp != NULL);
+
+	u64 sys_boot = 0;
+	while (fgets(buff, sizeof(buff), fp) != NULL) {
+		if (sscanf(buff, "btime %lu", &sys_boot) == 1)
+			break;
+	}
+
+	fclose(fp);
+	ASSERT(sys_boot > 0);
+
+	return (sys_boot * 1000UL);
+}
+
+/*
  * Get the start time (in milliseconds) of a given PID.
  */
 u64 get_process_starttime(pid_t pid)
@@ -401,21 +423,10 @@ u64 get_process_starttime(pid_t pid)
 		return 0;
 	}
 
-	FILE *fp = fopen("/proc/stat", "r");
-	ASSERT(fp != NULL);
-
-	u64 sys_boot = 0;
-	while (fgets(buff, sizeof(buff), fp) != NULL) {
-		if (sscanf(buff, "btime %lu", &sys_boot) == 1)
-			break;
-	}
-
-	fclose(fp);
-	ASSERT(sys_boot > 0);
-
+	u64 sys_boot = get_sys_btime_msecs();
 	u64 msecs_per_tick = 1000UL / sysconf(_SC_CLK_TCK);
 
-	return ((etime_ticks * msecs_per_tick) + sys_boot * 1000UL);
+	return ((etime_ticks * msecs_per_tick) + sys_boot);
 }
 
 int fetch_kernel_version(int *major, int *minor, int *patch)

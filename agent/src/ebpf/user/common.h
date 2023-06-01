@@ -241,6 +241,7 @@ int sysfs_write(const char *file_name, char *v);
 int sysfs_read_num(const char *file_name);
 uint64_t gettime(clockid_t clk_id, int flag);
 uint32_t get_sys_uptime(void);
+u64 get_sys_btime_msecs(void);
 u64 get_process_starttime(pid_t pid);
 int max_rlim_open_files_set(int num);
 int fetch_kernel_version(int *major, int *minor, int *patch);

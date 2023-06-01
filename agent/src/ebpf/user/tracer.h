@@ -200,7 +200,7 @@ struct mem_block_head {
 	void (*fn)(void *);
 } __attribute__((packed));
 
-typedef void (*tracer_callback_t)(void *sd);
+typedef void (*tracer_callback_t)(void *cp_data);
 
 struct tracer_probes_conf {
 	char *bin_file;		// only use uprobe;

@@ -208,7 +208,16 @@ typedef BVS(clib_bihash)
 	u64 splits_increment_stat;
 	u64 resplit_increment_stat;
 	u64 linear_increment_stat;
-	u64 hit_count_stat;
+	/*
+	 * stack_str_hash hit count 
+	 * key:stack-ID, value: folded stack trace string.
+	 */ 
+	u64 hit_stack_str_hash_count;
+
+	/*
+	 * stack_trace_msg_hash hit count 
+	 */ 
+	u64 hit_stack_msg_hash_count;
 } BVT(clib_bihash);
 
 typedef struct {
