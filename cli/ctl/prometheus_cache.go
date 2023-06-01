@@ -36,7 +36,7 @@ func RegisterPrometheusCacheCommand() *cobra.Command {
 			}
 		},
 	}
-	prometheusCmd.Flags().StringVarP(&t, "", "t", "all", "cache type, options: metric-name, label-name, label-value, metric-and-app-layout, target, label, metric_target")
+	prometheusCmd.Flags().StringVarP(&t, "type", "t", "all", "cache type, options: metric-name, label-name, label-value, metric-and-app-layout, target, label, metric_target")
 
 	return prometheusCmd
 }
