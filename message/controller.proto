@@ -238,8 +238,6 @@ message SyncPrometheusResponse {
     repeated PrometheusLabelName label_names = 3;
     repeated PrometheusLabelValue label_values = 4;
     repeated PrometheusMetricAPPLabelLayout metric_app_label_layouts = 5;
-    repeated PrometheusLabel labels = 6;
-    repeated PrometheusMetricTarget metric_targets = 7;
 }
 
 

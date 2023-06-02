@@ -21,18 +21,19 @@ import (
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/side/prometheus/cache"
 )
 
 type label struct {
 	mux          sync.Mutex
 	resourceType string
-	nameToValue  map[string]string
+	labels       map[cache.LabelKey]struct{}
 }
 
 func newLabel() *label {
 	return &label{
 		resourceType: "label",
-		nameToValue:  make(map[string]string),
+		labels:       make(map[cache.LabelKey]struct{}),
 	}
 }
 
@@ -45,8 +46,8 @@ func (l *label) refresh(args ...interface{}) error {
 	if err != nil {
 		return err
 	}
-	for i := range ls {
-		l.nameToValue[ls[i].Name] = ls[i].Value
+	for _, item := range ls {
+		l.labels[cache.NewLabelKey(item.Name, item.Value)] = struct{}{}
 	}
 	return nil
 }
@@ -56,21 +57,24 @@ func (l *label) sync(toAdd []*controller.PrometheusLabel) error {
 	defer l.mux.Unlock()
 
 	var dbToAdd []*mysql.PrometheusLabel
-	for i := range toAdd {
-		n := toAdd[i].GetName()
-		if _, ok := l.nameToValue[n]; !ok {
+	for _, item := range toAdd {
+		n := item.GetName()
+		v := item.GetValue()
+		if _, ok := l.labels[cache.NewLabelKey(n, v)]; !ok {
 			dbToAdd = append(dbToAdd, &mysql.PrometheusLabel{
 				Name:  n,
-				Value: toAdd[i].GetValue(),
+				Value: v,
 			})
 		}
 	}
+
 	err := l.addBatch(dbToAdd)
 	if err != nil {
+		log.Errorf("add %s error: %s", l.resourceType, err.Error())
 		return err
 	}
-	for i := range dbToAdd {
-		l.nameToValue[dbToAdd[i].Name] = dbToAdd[i].Value
+	for _, item := range dbToAdd {
+		l.labels[cache.NewLabelKey(item.Name, item.Value)] = struct{}{}
 	}
 	return nil
 }

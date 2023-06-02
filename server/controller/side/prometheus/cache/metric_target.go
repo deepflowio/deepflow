@@ -19,7 +19,6 @@ package cache
 import (
 	"sync"
 
-	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
@@ -80,13 +79,13 @@ func (t *metricTarget) GetTargetLabelNamesByMetricName(metricName string) []stri
 	return []string{}
 }
 
-func (t *metricTarget) Add(batch []*controller.PrometheusMetricTarget) {
+func (t *metricTarget) Add(batch []MetricTargetKey) {
 	for _, m := range batch {
-		if _, ok := t.metricNameToRandomTargetID[m.GetMetricName()]; !ok {
-			t.metricNameToRandomTargetID[m.GetMetricName()] = int(m.GetTargetId())
+		if _, ok := t.metricNameToRandomTargetID[m.MetricName]; !ok {
+			t.metricNameToRandomTargetID[m.MetricName] = m.TargetID
 		}
-		if tk, ok := t.targetCache.GetTargetKeyByTargetID(int(m.GetTargetId())); ok {
-			t.metricTargetDetailKeyMap.Store(NewMetricTargetDetailKey(m.GetMetricName(), tk.Instance, tk.Job), struct{}{})
+		if tk, ok := t.targetCache.GetTargetKeyByTargetID(m.TargetID); ok {
+			t.metricTargetDetailKeyMap.Store(NewMetricTargetDetailKey(m.MetricName, tk.Instance, tk.Job), struct{}{})
 		}
 	}
 }

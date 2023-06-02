@@ -50,13 +50,13 @@ func (m *labelLayout) refresh(args ...interface{}) error {
 		return err
 	}
 
-	for _, v := range layouts {
-		if _, ok := m.metricNameToLabelNameToIndex[v.MetricName]; !ok {
-			m.metricNameToLabelNameToIndex[v.MetricName] = make(map[string]uint8)
+	for _, item := range layouts {
+		if _, ok := m.metricNameToLabelNameToIndex[item.MetricName]; !ok {
+			m.metricNameToLabelNameToIndex[item.MetricName] = make(map[string]uint8)
 		}
-		m.metricNameToLabelNameToIndex[v.MetricName][v.APPLabelName] = v.APPLabelColumnIndex
-		if m.metricNameToMaxIndex[v.MetricName] < v.APPLabelColumnIndex {
-			m.metricNameToMaxIndex[v.MetricName] = v.APPLabelColumnIndex
+		m.metricNameToLabelNameToIndex[item.MetricName][item.APPLabelName] = item.APPLabelColumnIndex
+		if m.metricNameToMaxIndex[item.MetricName] < item.APPLabelColumnIndex {
+			m.metricNameToMaxIndex[item.MetricName] = item.APPLabelColumnIndex
 		}
 	}
 	return nil
@@ -66,30 +66,38 @@ func (m *labelLayout) sync(req []*controller.PrometheusMetricAPPLabelLayoutReque
 	m.mux.Lock()
 	defer m.mux.Unlock()
 
+	resp := make([]*controller.PrometheusMetricAPPLabelLayout, 0, len(req))
+
 	tmpMetricNameToMaxIndex := make(map[string]uint8)
 	for k, v := range m.metricNameToMaxIndex {
 		tmpMetricNameToMaxIndex[k] = v
 	}
-
 	var dbToAdd []*mysql.PrometheusMetricAPPLabelLayout
 	for _, v := range req {
 		mn := v.GetMetricName()
 		ln := v.GetAppLabelName()
-		if _, ok := m.metricNameToLabelNameToIndex[mn][ln]; !ok {
-			dbToAdd = append(dbToAdd, &mysql.PrometheusMetricAPPLabelLayout{
-				MetricName:          mn,
-				APPLabelName:        ln,
-				APPLabelValue:       v.GetAppLabelValue(),
-				APPLabelColumnIndex: tmpMetricNameToMaxIndex[mn] + 1,
+		lv := v.GetAppLabelValue()
+		if _, ok := m.metricNameToLabelNameToIndex[mn][ln]; ok {
+			resp = append(resp, &controller.PrometheusMetricAPPLabelLayout{
+				MetricName:          &mn,
+				AppLabelName:        &ln,
+				AppLabelValue:       &lv,
+				AppLabelColumnIndex: proto.Uint32(uint32(m.metricNameToLabelNameToIndex[mn][ln])),
 			})
-			tmpMetricNameToMaxIndex[mn]++
 		}
+		dbToAdd = append(dbToAdd, &mysql.PrometheusMetricAPPLabelLayout{
+			MetricName:          mn,
+			APPLabelName:        ln,
+			APPLabelValue:       v.GetAppLabelValue(),
+			APPLabelColumnIndex: tmpMetricNameToMaxIndex[mn] + 1,
+		})
+		tmpMetricNameToMaxIndex[mn]++
 	}
 	err := m.addBatch(dbToAdd)
 	if err != nil {
+		log.Errorf("add %s error: %s", m.resourceType, err.Error())
 		return nil, err
 	}
-	resp := make([]*controller.PrometheusMetricAPPLabelLayout, 0, len(req))
 	for _, l := range dbToAdd {
 		resp = append(resp, &controller.PrometheusMetricAPPLabelLayout{
 			MetricName:          &l.MetricName,

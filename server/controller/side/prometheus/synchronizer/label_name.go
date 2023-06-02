@@ -178,6 +178,7 @@ func (p *labelName) sync(strs []string) ([]*controller.PrometheusLabelName, erro
 	}
 	err = p.addBatch(dbToAdd)
 	if err != nil {
+		log.Errorf("add %s error: %s", p.resourceType, err.Error())
 		return nil, err
 	}
 	for _, item := range dbToAdd {

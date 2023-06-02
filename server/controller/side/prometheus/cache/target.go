@@ -25,7 +25,8 @@ import (
 )
 
 var (
-	labelJoiner = ":"
+	labelKVJoiner = ":"
+	labelJoiner   = ", "
 )
 
 type TargetKey struct {
@@ -87,11 +88,11 @@ func (t *target) formatLabels(tg *mysql.PrometheusTarget) (labelNameToValue targ
 	labelNameToValue = make(targetLabelNameToValue)
 	labelNameToValue[TargetLabelInstance] = tg.Instance
 	labelNameToValue[TargetLabelJob] = tg.Job
-	for _, l := range strings.Split(tg.OtherLabels, ",") {
+	for _, l := range strings.Split(tg.OtherLabels, labelJoiner) {
 		if l == "" {
 			continue
 		}
-		k, v, ok := strings.Cut(l, labelJoiner)
+		k, v, ok := strings.Cut(l, labelKVJoiner)
 		if !ok {
 			log.Warningf("invalid prometheus_target_label: %s, target_id: %d", l, tg.ID)
 			continue

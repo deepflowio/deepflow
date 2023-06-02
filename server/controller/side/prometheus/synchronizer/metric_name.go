@@ -178,6 +178,7 @@ func (p *metricName) sync(strs []string) ([]*controller.PrometheusMetricName, er
 	}
 	err = p.addBatch(dbToAdd)
 	if err != nil {
+		log.Errorf("add %s error: %s", p.resourceType, err.Error())
 		return nil, err
 	}
 	for _, item := range dbToAdd {

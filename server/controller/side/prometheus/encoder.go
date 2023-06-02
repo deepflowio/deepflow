@@ -73,12 +73,12 @@ func (e *Encoder) assembleFully() ([]*trident.MetricLabelResponse, error) {
 		for labelName, labelValue := range e.cache.MetricAndAPPLabelLayout.GetAPPLabelNameToValueByMetricName(metricName) {
 			labelNameID, ok := e.cache.LabelName.GetIDByName(labelName)
 			if !ok {
-				err = errors.Errorf("label_name %s not found", labelName)
+				err = errors.Errorf("metric_name: %s label_name: %s id not found", metricName, labelName)
 				return false
 			}
 			labelValueID, ok := e.cache.LabelValue.GetIDByValue(labelValue)
 			if !ok {
-				err = errors.Errorf("label_value_id %s not found", labelValue)
+				err = errors.Errorf("metric_name: %s label_value: %s id not found", metricName, labelValue)
 				return false
 			}
 			idx, ok := e.cache.MetricAndAPPLabelLayout.GetIndexByLayoutKey(cache.NewLayoutKey(metricName, labelName, labelValue))
@@ -100,12 +100,12 @@ func (e *Encoder) assembleFully() ([]*trident.MetricLabelResponse, error) {
 			for n, v := range e.cache.Target.GetTargetLabelNameToValueByTargetID(targetID) {
 				nID, ok := e.cache.LabelName.GetIDByName(n)
 				if !ok {
-					err = errors.Errorf("label_name %s not found", n)
+					err = errors.Errorf("target_id: %d label_name: %s not found", targetID, n)
 					return false
 				}
 				vID, ok := e.cache.LabelValue.GetIDByValue(v)
 				if !ok {
-					err = errors.Errorf("label_value_id %s not found", v)
+					err = errors.Errorf("target_id: %d label_value: %s id not found", targetID, v)
 					return false
 				}
 				name := strings.Clone(n)
@@ -211,8 +211,8 @@ func (e *Encoder) prepare(metrics []*trident.MetricLabelRequest) error {
 	AppendErrGroupWithContext(ctx, eg, e.addLabelNameCache, syncResp.GetLabelNames())
 	AppendErrGroupWithContext(ctx, eg, e.addLabelValueCache, syncResp.GetLabelValues())
 	AppendErrGroupWithContext(ctx, eg, e.addMetricAPPLabelLayoutCache, syncResp.GetMetricAppLabelLayouts())
-	AppendErrGroupWithContext(ctx, eg, e.addLabelCache, syncResp.GetLabels())
-	AppendErrGroupWithContext(ctx, eg, e.addMetricTargetCache, syncResp.GetMetricTargets())
+	AppendErrGroupWithContext(ctx, eg, e.addLabelCache, labelsToAdd.ToSlice())
+	AppendErrGroupWithContext(ctx, eg, e.addMetricTargetCache, metricTargetsToAdd.ToSlice())
 	return eg.Wait()
 }
 
@@ -222,7 +222,7 @@ func (e *Encoder) assemble(metrics []*trident.MetricLabelRequest) ([]*trident.Me
 		mn := m.GetMetricName()
 		mni, ok := e.cache.MetricName.GetIDByName(mn)
 		if !ok {
-			return nil, errors.Errorf("metric_name %s not found", mn)
+			return nil, errors.Errorf("metric_name: %s id not found", mn)
 		}
 
 		var instanceValue string
@@ -233,11 +233,11 @@ func (e *Encoder) assemble(metrics []*trident.MetricLabelRequest) ([]*trident.Me
 			lv := l.GetValue()
 			ni, ok := e.cache.LabelName.GetIDByName(ln)
 			if !ok {
-				return nil, errors.Errorf("label_name %s not found", ln)
+				return nil, errors.Errorf("label_name: %s id not found", ln)
 			}
 			vi, ok := e.cache.LabelValue.GetIDByValue(lv)
 			if !ok {
-				return nil, errors.Errorf("label_value %s not found", lv)
+				return nil, errors.Errorf("label_value: %s id not found", lv)
 			}
 			var idx uint8
 			if ln == TargetLabelInstance {
@@ -325,7 +325,7 @@ func (e *Encoder) tryAppendLabelToAdd(toAdd mapset.Set[cache.LabelKey], name, va
 }
 
 func (e *Encoder) addLabelCache(arg ...interface{}) error {
-	ls := arg[0].([]*controller.PrometheusLabel)
+	ls := arg[0].([]cache.LabelKey)
 	e.cache.Label.Add(ls)
 	return nil
 }
@@ -349,7 +349,7 @@ func (e *Encoder) tryAppendMetricTargetToAdd(toAdd mapset.Set[cache.MetricTarget
 }
 
 func (e *Encoder) addMetricTargetCache(arg ...interface{}) error {
-	ts := arg[0].([]*controller.PrometheusMetricTarget)
+	ts := arg[0].([]cache.MetricTargetKey)
 	e.cache.MetricTarget.Add(ts)
 	return nil
 }

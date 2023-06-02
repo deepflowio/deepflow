@@ -19,7 +19,6 @@ package cache
 import (
 	"sync"
 
-	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
@@ -46,9 +45,9 @@ func (t *label) GetKey(key LabelKey) bool {
 	return false
 }
 
-func (t *label) Add(batch []*controller.PrometheusLabel) {
+func (t *label) Add(batch []LabelKey) {
 	for _, m := range batch {
-		t.keyMap.Store(NewLabelKey(m.GetName(), m.GetValue()), struct{}{})
+		t.keyMap.Store(m, struct{}{})
 	}
 }
 

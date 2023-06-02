@@ -55,6 +55,6 @@ func (s *GRPCURL) Sync(req *controller.SyncPrometheusRequest) (*controller.SyncP
 		return nil, err
 	}
 
-	log.Infof("sync prometheus: %+v ", resp)
+	// log.Infof("sync prometheus: %+v ", resp)
 	return resp, nil
 }

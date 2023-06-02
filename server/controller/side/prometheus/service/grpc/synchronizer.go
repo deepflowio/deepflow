@@ -29,13 +29,23 @@ func NewSynchronizerEvent() *SynchronizerEvent {
 	return &SynchronizerEvent{}
 }
 
-func (e *SynchronizerEvent) Sync(ctx context.Context, in *controller.SyncPrometheusRequest) (*controller.SyncPrometheusResponse, error) {
-	log.Infof("SyncPrometheusRequest: %+v", in) // TODO debug
+var logCount = 0 // TODO: remove
+
+func (e *SynchronizerEvent) Sync(ctx context.Context, in *controller.SyncPrometheusRequest) (*controller.SyncPrometheusResponse, error) {	print := false
+	logCount++
+	if logCount%10 == 0 {
+		print = true
+	}
+	if print {
+		log.Infof("SyncPrometheusRequest: %+v", in) // TODO debug
+	}
 	resp, err := prometheus.GetSingleton().Synchronizer.Sync(in)
 	if err != nil {
 		log.Errorf("sync error: %+v", err)
 		return &controller.SyncPrometheusResponse{}, nil
 	}
-	log.Infof("SyncPrometheusResponse: %+v", resp) // TODO debug
+	if print {
+		log.Infof("SyncPrometheusResponse: %+v", resp) // TODO debug
+	}
 	return resp, nil
 }

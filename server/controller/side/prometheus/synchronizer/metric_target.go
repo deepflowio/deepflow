@@ -21,18 +21,19 @@ import (
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/side/prometheus/cache"
 )
 
 type metricTarget struct {
-	mux                  sync.Mutex
-	resourceType         string
-	metricNameToTargetID map[string]int
+	mux           sync.Mutex
+	resourceType  string
+	metricTargets map[cache.MetricTargetKey]struct{}
 }
 
 func newMetricTarget() *metricTarget {
 	return &metricTarget{
-		resourceType:         "metric_target",
-		metricNameToTargetID: make(map[string]int),
+		resourceType:  "metric_target",
+		metricTargets: make(map[cache.MetricTargetKey]struct{}),
 	}
 }
 
@@ -45,8 +46,8 @@ func (l *metricTarget) refresh(args ...interface{}) error {
 	if err != nil {
 		return err
 	}
-	for i := range ls {
-		l.metricNameToTargetID[ls[i].MetricName] = ls[i].TargetID
+	for _, item := range ls {
+		l.metricTargets[cache.NewMetricTargetKey(item.MetricName, item.TargetID)] = struct{}{}
 	}
 	return nil
 }
@@ -56,21 +57,23 @@ func (l *metricTarget) sync(toAdd []*controller.PrometheusMetricTarget) error {
 	defer l.mux.Unlock()
 
 	var dbToAdd []*mysql.PrometheusMetricTarget
-	for i := range toAdd {
-		mn := toAdd[i].GetMetricName()
-		if _, ok := l.metricNameToTargetID[mn]; !ok {
+	for _, item := range toAdd {
+		mn := item.GetMetricName()
+		ti := int(item.GetTargetId())
+		if _, ok := l.metricTargets[cache.NewMetricTargetKey(mn, ti)]; !ok {
 			dbToAdd = append(dbToAdd, &mysql.PrometheusMetricTarget{
 				MetricName: mn,
-				TargetID:   int(toAdd[i].GetTargetId()),
+				TargetID:   ti,
 			})
 		}
 	}
 	err := l.addBatch(dbToAdd)
 	if err != nil {
+		log.Errorf("add %s error: %s", l.resourceType, err.Error())
 		return err
 	}
-	for i := range dbToAdd {
-		l.metricNameToTargetID[dbToAdd[i].MetricName] = dbToAdd[i].TargetID
+	for _, item := range dbToAdd {
+		l.metricTargets[cache.NewMetricTargetKey(item.MetricName, item.TargetID)] = struct{}{}
 	}
 	return nil
 }
