@@ -351,6 +351,7 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 				Name:        p.GetName(),
 				ProcessName: p.GetProcessName(),
 				CMDLine:     p.GetCmdLine(),
+				ContainerID: p.GetContainerId(),
 				User:        p.GetUser(),
 				OSAPPTags:   p.GetOsAppTags(),
 				NodeIP:      p.GetNodeIp(),

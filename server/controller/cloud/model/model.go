@@ -452,6 +452,7 @@ type Pod struct {
 	Lcuuid              string    `json:"lcuuid" binding:"required"`
 	Name                string    `json:"name" binding:"required"`
 	Label               string    `json:"label"`
+	ContainerIDs        string    `json:"container_ids"`
 	Annotation          string    `json:"annotation"`
 	ENV                 string    `json:"env"`
 	State               int       `json:"state" binding:"required"`
@@ -478,6 +479,7 @@ type Process struct {
 	StartTime       time.Time `json:"start_time" binding:"required"`
 	OSAPPTags       string    `json:"os_app_tags"`
 	NetnsID         uint32    `json:"netns_id"`
+	ContainerID     string    `json:"container_id"`
 	SubDomainLcuuid string    `json:"sub_domain_lcuuid"`
 }
 
