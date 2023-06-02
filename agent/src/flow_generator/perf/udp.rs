@@ -78,6 +78,7 @@ impl L4FlowPerf for UdpPerf {
         stats.tcp.art_max = (self.art_max.as_nanos() / Timestamp::from_micros(1).as_nanos()) as u32;
         stats.tcp.art_sum = (self.art_sum.as_nanos() / Timestamp::from_micros(1).as_nanos()) as u32;
         stats.tcp.art_count = self.art_count;
+        *self = UdpPerf::default();
 
         stats
     }

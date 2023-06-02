@@ -73,6 +73,7 @@ fn get_req_param<'a>(
         l7_perf_cache: rrt_cache.clone(),
         wasm_vm: Some(vm.clone()),
         stats_counter: None,
+        rrt_timeout: Duration::from_secs(10).as_micros() as usize,
     }
 }
 
@@ -103,6 +104,7 @@ fn get_resq_param<'a>(
         l7_perf_cache: rrt_cache.clone(),
         wasm_vm: Some(vm.clone()),
         stats_counter: None,
+        rrt_timeout: Duration::from_secs(10).as_micros() as usize,
     }
 }
 
