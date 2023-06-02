@@ -838,8 +838,8 @@ message TargetRequest {
 message TargetResponse {
     optional string job = 1;
     optional string instance = 2;
-    optional string job_id = 3;
-    optional string instance_id = 4;
+    optional uint32 job_id = 3;
+    optional uint32 instance_id = 4;
     optional uint32 target_id= 5; // when the Controller cannot determine the target_id, fill in 0
 }
 
