@@ -18,6 +18,7 @@ package kubernetes_gather
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -180,6 +181,18 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, e
 
 		annotationString := expand.GetAnnotation(annotations, k.annotationValueMaxLength)
 
+		containerIDs := []string{}
+		containerStatuses := pData.GetPath("status", "containerStatuses")
+		for c := range containerStatuses.MustArray() {
+			containerID := containerStatuses.GetIndex(c).Get("containerID").MustString()
+			cIndex := strings.Index(containerID, "://")
+			if cIndex != -1 {
+				containerID = containerID[cIndex+3:]
+			}
+			containerIDs = append(containerIDs, containerID)
+		}
+		sort.Strings(containerIDs)
+
 		pod := model.Pod{
 			Lcuuid:              podLcuuid,
 			Name:                name,
@@ -188,6 +201,7 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, e
 			ENV:                 envString,
 			Label:               labelString,
 			Annotation:          annotationString,
+			ContainerIDs:        strings.Join(containerIDs, ", "),
 			PodReplicaSetLcuuid: podRSLcuuid,
 			PodNodeLcuuid:       nodeLcuuid,
 			PodGroupLcuuid:      podGroupLcuuid,
