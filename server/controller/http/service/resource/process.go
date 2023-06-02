@@ -19,6 +19,7 @@ package resource
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	goredis "github.com/go-redis/redis/v9"
@@ -82,21 +83,16 @@ func getProcesses() ([]model.Process, error) {
 		return nil, err
 	}
 	podIDToName := make(map[int]string, len(pods))
+	containerIDToPodID := make(map[string]int)
 	for _, pod := range pods {
 		podIDToName[pod.ID] = pod.Name
-	}
-
-	var vinterfaces []mysql.VInterface
-	if err := mysql.Db.Where("netns_id != 0 and devicetype = ?", common.VIF_DEVICE_TYPE_POD).
-		Select("devicetype", "deviceid", "netns_id").Find(&vinterfaces).Error; err != nil {
-		return nil, err
-	}
-	deviceTypeToNetnsIDToID := make(map[int]map[uint32]int)
-	for _, vif := range vinterfaces {
-		if deviceTypeToNetnsIDToID[vif.DeviceType] == nil {
-			deviceTypeToNetnsIDToID[vif.DeviceType] = make(map[uint32]int)
+		var containerIDs []string
+		if len(pod.ContainerIDs) > 0 {
+			containerIDs = strings.Split(pod.ContainerIDs, ", ")
 		}
-		deviceTypeToNetnsIDToID[vif.DeviceType][vif.NetnsID] = vif.DeviceID
+		for _, id := range containerIDs {
+			containerIDToPodID[id] = pod.ID
+		}
 	}
 
 	// get processes
@@ -108,13 +104,11 @@ func getProcesses() ([]model.Process, error) {
 	for _, process := range processes {
 		var deviceType, resourceID int
 		var resourceName string
-		if process.NetnsID != 0 {
-			if _, ok := deviceTypeToNetnsIDToID[common.VIF_DEVICE_TYPE_POD][process.NetnsID]; ok {
-				podID := deviceTypeToNetnsIDToID[common.VIF_DEVICE_TYPE_POD][process.NetnsID]
-				resourceName = podIDToName[podID]
-				deviceType = common.VIF_DEVICE_TYPE_POD
-				resourceID = podID
-			}
+
+		if podID, ok := containerIDToPodID[process.ContainerID]; ok {
+			deviceType = common.VIF_DEVICE_TYPE_POD
+			resourceName = podIDToName[podID]
+			resourceID = podID
 		} else {
 			deviceType = common.VTAP_TYPE_TO_DEVICE_TYPE[vtapIDToInfo[process.VTapID].Type]
 			if deviceType == common.VIF_DEVICE_TYPE_VM {

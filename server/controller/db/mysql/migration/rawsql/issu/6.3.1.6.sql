@@ -1,4 +1,4 @@
-ALTER TABLE pod ADD COLUMN container_ids TEXT COMMENT 'separated by ,' DEFAULT "" AFTER env;
+ALTER TABLE pod ADD COLUMN container_ids TEXT COMMENT 'separated by ,' AFTER env;
 ALTER TABLE process ADD COLUMN container_id CHAR(64) DEFAULT "" AFTER lcuuid;
 ALTER TABLE go_genesis_process ADD COLUMN container_id CHAR(64) DEFAULT "" AFTER user;
 
