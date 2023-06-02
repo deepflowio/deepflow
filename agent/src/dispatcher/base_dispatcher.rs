@@ -112,6 +112,7 @@ pub(super) struct BaseDispatcher {
     pub(super) ntp_diff: Arc<AtomicI64>,
 
     pub(super) npb_dedup_enabled: Arc<AtomicBool>,
+    pub(super) pause: Arc<AtomicBool>,
 
     // Enterprise Edition Feature: packet-sequence
     pub(super) packet_sequence_output_queue:
@@ -168,6 +169,7 @@ impl BaseDispatcher {
             npb_dedup_enabled: self.npb_dedup_enabled.clone(),
             log_id: self.log_id.clone(),
             reset_whitelist: self.reset_whitelist.clone(),
+            pause: self.pause.clone(),
         }
     }
 
@@ -642,6 +644,7 @@ pub struct BaseDispatcherListener {
     pub tunnel_type_bitmap: Arc<Mutex<TunnelTypeBitmap>>,
     pub npb_dedup_enabled: Arc<AtomicBool>,
     pub reset_whitelist: Arc<AtomicBool>,
+    pub pause: Arc<AtomicBool>,
     capture_bpf: String,
     proxy_controller_ip: String,
     analyzer_ip: String,
