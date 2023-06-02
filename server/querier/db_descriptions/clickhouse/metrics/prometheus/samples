@@ -1,0 +1,2 @@
+# Field                     , DBField              , Type       , Category       , Permission
+value                       , value                , counter    , Prometheus    , 111
