@@ -228,7 +228,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 	}
 
 	for _, key := range TAG_DESCRIPTION_KEYS {
-		if key.DB != db || (key.Table != table && db != "ext_metrics" && db != "deepflow_system") {
+		if key.DB != db || (key.Table != table && db != "ext_metrics" && db != "deepflow_system" && db != "prometheus") {
 			continue
 		}
 		tag, _ := TAG_DESCRIPTIONS[key]
@@ -424,7 +424,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 	}
 
 	// 查询外部字段
-	if (db != "ext_metrics" && db != "flow_log" && db != "deepflow_system" && db != "event") || (db == "flow_log" && table != "l7_flow_log") {
+	if (db != "ext_metrics" && db != "flow_log" && db != "deepflow_system" && db != "event" && db != "prometheus") || (db == "flow_log" && table != "l7_flow_log") {
 		return response, nil
 	}
 	externalChClient := client.Client{
@@ -451,7 +451,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 	}
 	for _, _tagName := range externalRst.Values {
 		tagName := _tagName.([]interface{})[0]
-		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_DEEPFLOW_SYSTEM || db == ckcommon.DB_NAME_PROFILE {
+		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_DEEPFLOW_SYSTEM || db == ckcommon.DB_NAME_PROFILE || db == ckcommon.DB_NAME_PROMETHEUS {
 			externalTag := "tag." + tagName.(string)
 			response.Values = append(response.Values, []interface{}{
 				externalTag, externalTag, externalTag, externalTag, "map_item",

@@ -224,3 +224,34 @@ func GetExtTables(db string, ctx context.Context) (values []interface{}) {
 	}
 	return values
 }
+
+func GetPrometheusTables(db string, ctx context.Context) (values []interface{}) {
+	chClient := client.Client{
+		Host:     config.Cfg.Clickhouse.Host,
+		Port:     config.Cfg.Clickhouse.Port,
+		UserName: config.Cfg.Clickhouse.User,
+		Password: config.Cfg.Clickhouse.Password,
+		DB:       db,
+		Context:  ctx,
+	}
+	sql := ""
+	if db == "prometheus" {
+		sql = "SELECT table FROM flow_tag.prometheus_custom_field GROUP BY table"
+		chClient.DB = "flow_tag"
+	} else {
+		sql = "SHOW TABLES FROM " + db
+	}
+	rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
+	if err != nil {
+		log.Error(err)
+		return nil
+	}
+	for _, _table := range rst.Values {
+		table := _table.([]interface{})[0].(string)
+		if !strings.HasSuffix(table, "_local") {
+			datasources, _ := GetDatasources(db, table)
+			values = append(values, []interface{}{table, datasources})
+		}
+	}
+	return values
+}
