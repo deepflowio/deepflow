@@ -137,6 +137,7 @@ message GenesisSyncProcess {
     optional string node_ip = 9;
     optional string start_time = 10;
     optional uint32 netns_id = 11;
+    optional string container_id = 12;
 }
 
 message GenesisSyncData{
