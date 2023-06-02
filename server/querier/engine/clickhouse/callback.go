@@ -260,7 +260,7 @@ func PrometheusTagTranslate(args []interface{}) func(result *common.Result) erro
 			for singleTagIndex, singleTagValue := range tagValueSlice {
 				if singleTagIndex == 0 {
 					if metricID, ok := METRIC_NAME_TO_ID[tagArgs.Table]; ok {
-						if targetLabels, ok := METRIC_ID_TARGET_ID_TO_LABELS[fmt.Sprintf("%d,%d", metricID, singleTagValue)]; ok {
+						if targetLabels, ok := METRIC_ID_TARGET_ID_TO_LABELS[fmt.Sprintf("%d,%s", metricID, singleTagValue)]; ok {
 							for _, targetLabel := range targetLabels {
 								if labelName, ok := LABEL_ID_TO_NAME[targetLabel.LabelNameID]; ok {
 									tagMap[labelName] = targetLabel.LabelValue
@@ -270,7 +270,7 @@ func PrometheusTagTranslate(args []interface{}) func(result *common.Result) erro
 					}
 				} else {
 					if metricID, ok := METRIC_NAME_TO_ID[tagArgs.Table]; ok {
-						if appLabels, ok := METRIC_ID_APP_LABEL_VALUE_ID_TO_LABELS[fmt.Sprintf("%d,%d", metricID, singleTagValue)]; ok {
+						if appLabels, ok := METRIC_ID_APP_LABEL_VALUE_ID_TO_LABELS[fmt.Sprintf("%d,%s", metricID, singleTagValue)]; ok {
 							for _, appLabel := range appLabels {
 								if labelName, ok := LABEL_ID_TO_NAME[appLabel.LabelNameID]; ok {
 									tagMap[labelName] = appLabel.LabelValue

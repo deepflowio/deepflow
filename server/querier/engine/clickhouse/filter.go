@@ -147,13 +147,13 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 			op = "not match"
 		}
 	}
+	filter := "1=1"
 	if !ok {
 		preAsTag, ok := asTagMap[t.Tag]
 		if ok {
 			whereTag = preAsTag
 			tagItem, ok = tag.GetTag(strings.Trim(preAsTag, "`"), db, table, "default")
 			if !ok {
-				filter := ""
 				switch preAsTag {
 				case "mac_0", "mac_1", "tunnel_tx_mac_0", "tunnel_tx_mac_1", "tunnel_rx_mac_0", "tunnel_rx_mac_1":
 					macValue := strings.TrimLeft(t.Value, "(")
@@ -280,15 +280,15 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 										// Determine whether the tag is app_label or target_label
 										if appLabelColumnIndex, ok := METRIC_APP_LABEL_LAYOUT[table+", "+nameNoPreffix]; ok {
 											if strings.Contains(op, "match") {
-												filter = fmt.Sprintf("app_label_value_id_%d IN (SELECT label_value_id FROM prometheus.app_label_map WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s))", appLabelColumnIndex, metricID, labelNameID, op, t.Value)
+												filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM prometheus.app_label_map WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s))", appLabelColumnIndex, metricID, labelNameID, op, t.Value)
 											} else {
-												filter = fmt.Sprintf("app_label_value_id_%d IN (SELECT label_value_id FROM prometheus.app_label_map WHERE metric_id=%d and label_name_id=%d and label_value %s %s)", appLabelColumnIndex, metricID, labelNameID, op, t.Value)
+												filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM prometheus.app_label_map WHERE metric_id=%d and label_name_id=%d and label_value %s %s)", appLabelColumnIndex, metricID, labelNameID, op, t.Value)
 											}
 										} else {
 											if strings.Contains(op, "match") {
-												filter = fmt.Sprintf("target_id IN (SELECT target_id FROM prometheus.app_label_map WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s))", metricID, labelNameID, op, t.Value)
+												filter = fmt.Sprintf("toUInt64(target_id) IN (SELECT target_id FROM prometheus.target_label_map WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s))", metricID, labelNameID, op, t.Value)
 											} else {
-												filter = fmt.Sprintf("target_id IN (SELECT target_id FROM prometheus.app_label_map WHERE metric_id=%d and label_name_id=%d and label_value %s %s)", metricID, labelNameID, op, t.Value)
+												filter = fmt.Sprintf("toUInt64(target_id) IN (SELECT target_id FROM prometheus.target_label_map WHERE metric_id=%d and label_name_id=%d and label_value %s %s)", metricID, labelNameID, op, t.Value)
 											}
 										}
 									}
@@ -319,7 +319,6 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 				return &view.Expr{Value: filter}, nil
 			}
 		} else {
-			filter := ""
 			switch t.Tag {
 			case "mac_0", "mac_1", "tunnel_tx_mac_0", "tunnel_tx_mac_1", "tunnel_rx_mac_0", "tunnel_rx_mac_1":
 				macValue := strings.TrimLeft(t.Value, "(")
@@ -446,15 +445,15 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 									// Determine whether the tag is app_label or target_label
 									if appLabelColumnIndex, ok := METRIC_APP_LABEL_LAYOUT[table+", "+nameNoPreffix]; ok {
 										if strings.Contains(op, "match") {
-											filter = fmt.Sprintf("app_label_value_id_%d IN (SELECT label_value_id FROM prometheus.app_label_map WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s))", appLabelColumnIndex, metricID, labelNameID, op, t.Value)
+											filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM prometheus.app_label_map WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s))", appLabelColumnIndex, metricID, labelNameID, op, t.Value)
 										} else {
-											filter = fmt.Sprintf("app_label_value_id_%d IN (SELECT label_value_id FROM prometheus.app_label_map WHERE metric_id=%d and label_name_id=%d and label_value %s %s)", appLabelColumnIndex, metricID, labelNameID, op, t.Value)
+											filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM prometheus.app_label_map WHERE metric_id=%d and label_name_id=%d and label_value %s %s)", appLabelColumnIndex, metricID, labelNameID, op, t.Value)
 										}
 									} else {
 										if strings.Contains(op, "match") {
-											filter = fmt.Sprintf("target_id IN (SELECT target_id FROM prometheus.app_label_map WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s))", metricID, labelNameID, op, t.Value)
+											filter = fmt.Sprintf("toUInt64(target_id) IN (SELECT target_id FROM prometheus.target_label_map WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s))", metricID, labelNameID, op, t.Value)
 										} else {
-											filter = fmt.Sprintf("target_id IN (SELECT target_id FROM prometheus.app_label_map WHERE metric_id=%d and label_name_id=%d and label_value %s %s)", metricID, labelNameID, op, t.Value)
+											filter = fmt.Sprintf("toUInt64(target_id) IN (SELECT target_id FROM prometheus.target_label_map WHERE metric_id=%d and label_name_id=%d and label_value %s %s)", metricID, labelNameID, op, t.Value)
 										}
 									}
 								}
@@ -702,7 +701,6 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 			}
 		}
 	} else {
-		filter := ""
 		if strings.Contains(op, "match") {
 			filter = fmt.Sprintf("%s(%s,%s)", op, t.Tag, t.Value)
 		} else {

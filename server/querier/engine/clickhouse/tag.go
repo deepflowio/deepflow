@@ -125,8 +125,8 @@ func GetTagTranslator(name, alias, db, table string) (Statement, string, error) 
 				}
 				tagTranslator += appLabelTag
 				tagTranslator = fmt.Sprintf("concat(%s)", tagTranslator)
-				stmt = &SelectTag{Value: tagTranslator, Alias: selectTag}
 			}
+			stmt = &SelectTag{Value: tagTranslator, Alias: selectTag, DataBase: "prometheus", Table: table}
 		} else if tagItem.TagTranslator != "" {
 			if name != "packet_batch" || table != "l4_packet" {
 				stmt = &SelectTag{Value: tagItem.TagTranslator, Alias: selectTag}
