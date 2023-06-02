@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS process (
     sub_domain          CHAR(64) DEFAULT '',
     domain              CHAR(64) DEFAULT '',
     lcuuid              CHAR(64) DEFAULT '',
+    container_id        CHAR(64) DEFAULT '',
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted_at          DATETIME DEFAULT NULL
@@ -781,6 +782,7 @@ CREATE TABLE IF NOT EXISTS pod (
     label               TEXT COMMENT 'separated by ,',
     annotation          TEXT COMMENT 'separated by ,',
     env                 TEXT COMMENT 'separated by ,',
+    container_ids       TEXT COMMENT 'separated by ,',
     state               INTEGER NOT NULL COMMENT '0.Exception 1.Running',
     pod_rs_id           INTEGER DEFAULT NULL,
     pod_group_id        INTEGER DEFAULT NULL,
@@ -1850,6 +1852,7 @@ CREATE TABLE IF NOT EXISTS go_genesis_process (
     process_name        VARCHAR(256) DEFAULT '',
     cmd_line            TEXT,
     user                VARCHAR(256) DEFAULT '',
+    container_id        CHAR(64) DEFAULT '',
     os_app_tags         TEXT COMMENT 'separated by ,',
     node_ip             CHAR(48) DEFAULT '',
     start_time          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP

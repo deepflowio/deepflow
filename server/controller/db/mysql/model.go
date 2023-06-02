@@ -83,6 +83,7 @@ type Process struct {
 	UserName       string    `gorm:"column:user_name;type:varchar(256);default:''" json:"USER_NAME"`
 	StartTime      time.Time `gorm:"autoCreateTime;column:start_time;type:datetime" json:"START_TIME"`
 	OSAPPTags      string    `gorm:"column:os_app_tags;type:text" json:"OS_APP_TAGS"`
+	ContainerID    string    `gorm:"column:container_id;type:char(64);default:''" json:"CONTAINER_ID"`
 	NetnsID        uint32    `gorm:"column:netns_id;type:int unsigned;default:0" json:"NETNS_ID"` // used to associate processes with cloud and container resources
 	SubDomain      string    `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
 	Domain         string    `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN"`
@@ -798,10 +799,11 @@ type Pod struct {
 	SoftDeleteBase  `gorm:"embedded"`
 	Name            string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
 	Alias           string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS"`
-	State           int    `gorm:"column:state;type:int;not null" json:"STATE"`              // 0.Exception 1.Running
-	Label           string `gorm:"column:label;type:text;default:''" json:"LABEL"`           // separated by ,
-	Annotation      string `gorm:"column:annotation;type:text;default:''" json:"ANNOTATION"` // separated by ,
-	ENV             string `gorm:"column:env;type:text;default:''" json:"ENV"`               // separated by ,
+	State           int    `gorm:"column:state;type:int;not null" json:"STATE"`                    // 0.Exception 1.Running
+	Label           string `gorm:"column:label;type:text;default:''" json:"LABEL"`                 // separated by ,
+	Annotation      string `gorm:"column:annotation;type:text;default:''" json:"ANNOTATION"`       // separated by ,
+	ENV             string `gorm:"column:env;type:text;default:''" json:"ENV"`                     // separated by ,
+	ContainerIDs    string `gorm:"column:container_ids;type:text;default:''" json:"CONTAINER_IDS"` // separated by ,
 	PodReplicaSetID int    `gorm:"column:pod_rs_id;type:int;default:null" json:"POD_RS_ID"`
 	PodGroupID      int    `gorm:"column:pod_group_id;type:int;default:null" json:"POD_GROUP_ID"`
 	PodNamespaceID  int    `gorm:"column:pod_namespace_id;type:int;default:null" json:"POD_NAMESPACE_ID"`

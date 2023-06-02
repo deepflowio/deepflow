@@ -1614,6 +1614,7 @@ type Pod struct {
 	Label               string    `json:"label"`
 	Annotation          string    `json:"annotation"`
 	ENV                 string    `json:"env"`
+	ContainerIDs        string    `json:"container_ids"`
 	State               int       `json:"state"`
 	CreatedAt           time.Time `json:"created_at"`
 	PodNodeLcuuid       string    `json:"pod_node_lcuuid"`
@@ -1629,6 +1630,7 @@ func (p *Pod) Update(cloudItem *cloudmodel.Pod) {
 	p.Label = cloudItem.Label
 	p.ENV = cloudItem.ENV
 	p.Annotation = cloudItem.Annotation
+	p.ContainerIDs = cloudItem.ContainerIDs
 	p.State = cloudItem.State
 	p.CreatedAt = cloudItem.CreatedAt
 	p.PodNodeLcuuid = cloudItem.PodNodeLcuuid

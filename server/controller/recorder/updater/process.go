@@ -54,6 +54,7 @@ func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysql.Pro
 		ProcessName: cloudItem.ProcessName,
 		CommandLine: cloudItem.CommandLine,
 		UserName:    cloudItem.UserName,
+		ContainerID: cloudItem.ContainerID,
 		OSAPPTags:   cloudItem.OSAPPTags,
 		Domain:      p.cache.DomainLcuuid,
 		SubDomain:   cloudItem.SubDomainLcuuid,
