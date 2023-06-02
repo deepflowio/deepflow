@@ -1,5 +1,5 @@
 [package]
-name = "perf_profiler"
+name = "socket_tracer"
 version = "0.1.0"
 authors = ["Yin Jiping <jiping@yunshan.net>"]
 edition = "2021"

@@ -37,7 +37,7 @@ all: $(EXECS)
 % : %.c
 	$(call msg,TEST,$@)
 	$(Q)$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
-#	$(Q)./$@
+	$(Q)./$@
 
 clean:
 	$(Q)rm -rf $(EXECS)

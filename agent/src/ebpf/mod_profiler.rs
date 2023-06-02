@@ -22,7 +22,7 @@ pub use libc::c_uchar; // u8
 pub use libc::c_uint; // u32
 pub use libc::c_ulonglong;
 pub use std::ffi::{CStr, CString};
-use std::fmt;
+//use std::fmt;
 
 // process_kname is up to 16 bytes, if the length of process_kname exceeds 15, the ending char is '\0'
 pub const PACKET_KNAME_MAX_PADDING: usize = 15;

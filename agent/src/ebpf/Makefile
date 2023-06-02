@@ -81,7 +81,7 @@ endif
 # -fno-omit-frame-pointer: When a memory error is detected, print
 #  the function call stack to facilitate locating the code line
 #  where the error occurred.
-CFLAGS += $(MACHINE_CFLAGS) -DBPF_DEBUG -fno-omit-frame-pointer -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -I.
+CFLAGS += $(MACHINE_CFLAGS) -fno-omit-frame-pointer -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -I.
 all: build
 
 ELFFILES = ./.data_done
@@ -117,39 +117,65 @@ tools: $(LIBTRACE)
 	$(call msg,TOOLS,deepflow-ebpfctl)
 	$(Q)$(CC) $(CFLAGS) --static -g -O2 user/ctrl_tracer.c user/ctrl.c $(LIBTRACE) -o deepflow-ebpfctl -lelf -lz -lpthread
 
-rust-sample: $(ELFFILES) $(LIBTRACE)
+rust-sample: .socket-tracer .profiler
+socket-tracer: .socket-tracer
+profiler: .profiler
+.socket-tracer: $(ELFFILES) $(LIBTRACE)
 	$(call msg,Current-DIR,,$(CURR))
-	$(Q)rm -rf samples/rust/src/ebpf.rs
-	$(Q)cp mod.rs samples/rust/src/ebpf.rs
-	$(Q)rm -rf samples/rust/build.rs
-	$(Q)rm -rf samples/rust/target
+	$(Q)rm -rf samples/rust/socket-tracer/src/ebpf.rs
+	$(Q)cp mod_socket.rs samples/rust/socket-tracer/src/ebpf.rs
+	$(Q)rm -rf samples/rust/socket-tracer/build.rs
+	$(Q)rm -rf samples/rust/socket-tracer/target
 	@if [[ $(ARCH) == *"aarch64"* ]]; then \
             echo "  Architecture is aarch64"; \
-            cp samples/rust/build-aarch64.rs samples/rust/build.rs; \
-            cd samples/rust/ && cargo build --release --target aarch64-unknown-linux-musl && cd ../../; \
-            echo "  samples/rust/target/aarch64-unknown-linux-musl/release/rust_sample"; \
+            cp samples/rust/socket-tracer/build-aarch64.rs samples/rust/socket-tracer/build.rs; \
+            cd samples/rust/socket-tracer/ && cargo build --release --target aarch64-unknown-linux-musl && cd ../../; \
+            echo "  samples/rust/socket-tracer/target/aarch64-unknown-linux-musl/release/rust_sample"; \
         elif [[ $(ARCH) == *"x86_64"* ]]; then \
             echo "  Architecture is x86_64"; \
-            cp samples/rust/build-x86.rs samples/rust/build.rs; \
-            cp samples/rust/Cargo.rust_sample.toml samples/rust/Cargo.toml; \
-            cp samples/rust/src/rust_sample.rs samples/rust/src/main.rs; \
-            cd samples/rust/ && cargo build --release && cd ../../; \
-            echo "    samples/rust/target/release/rust_sample"; \
-            cp samples/rust/Cargo.perf_profiler.toml samples/rust/Cargo.toml; \
-            cp samples/rust/src/perf_profiler.rs samples/rust/src/main.rs; \
-            cp mod_perf_profiler.rs samples/rust/src/ebpf.rs; \
-            cd samples/rust/ && cargo build --release && cd ../../; \
-            echo "    samples/rust/target/release/perf_profiler"; \
+            cp samples/rust/socket-tracer/build-x86.rs samples/rust/socket-tracer/build.rs; \
+            cd samples/rust/socket-tracer/ && cargo build --release && cd ../../; \
+            echo "  samples/rust/socket-tracer/target/release/socket_tracer"; \
         else \
             echo "  Error: Invalid arch. $(ARCH) is not support!"; \
             exit 1; \
         fi
+	$(Q)touch .socket-tracer
+
+.profiler: $(ELFFILES) $(LIBTRACE)
+	$(call msg,Current-DIR,,$(CURR))
+	$(Q)rm -rf samples/rust/profiler/src/ebpf.rs
+	$(Q)cp mod_profiler.rs samples/rust/profiler/src/ebpf.rs
+	$(Q)rm -rf samples/rust/profiler/build.rs
+	$(Q)rm -rf samples/rust/profiler/target
+	@if [[ $(ARCH) == *"aarch64"* ]]; then \
+            echo "  Architecture is aarch64"; \
+            cp samples/rust/profiler/build-aarch64.rs samples/rust/profiler/build.rs; \
+            cd samples/rust/profiler/ && cargo build --release --target aarch64-unknown-linux-musl && cd ../../; \
+            echo "  samples/rust/profiler/target/aarch64-unknown-linux-musl/release/profiler"; \
+        elif [[ $(ARCH) == *"x86_64"* ]]; then \
+            echo "  Architecture is x86_64"; \
+            cp samples/rust/profiler/build-x86.rs samples/rust/profiler/build.rs; \
+            cd samples/rust/profiler/ && cargo build --release && cd ../../; \
+            echo "  samples/rust/profiler/target/release/profiler"; \
+        else \
+            echo "  Error: Invalid arch. $(ARCH) is not support!"; \
+            exit 1; \
+        fi
+	$(Q)touch .profiler
+
+clean-sample:
+	$(Q)rm -rf .profiler .socket-tracer
+	$(Q)rm -rf samples/rust/socket-tracer/target
+	$(Q)rm -rf samples/rust/profiler/target
 
 clean:
 	$(Q)$(MAKE) -C kernel clean --no-print-directory
 	$(Q)$(MAKE) -C test clean --no-print-directory
 	$(Q)rm -rf $(ELFFILES) data deepflow-ebpfctl $(STATIC_OBJDIR) $(LIBTRACE) *.a
-	$(Q)rm -rf samples/rust/target
+	$(Q)rm -rf .profiler .socket-tracer
+	$(Q)rm -rf samples/rust/socket-tracer/target
+	$(Q)rm -rf samples/rust/profiler/target
 
 test: $(ELFFILES) $(LIBTRACE)
 	$(Q)$(MAKE) -C test --no-print-directory

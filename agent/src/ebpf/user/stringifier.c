@@ -82,7 +82,7 @@ void release_stack_strs(stack_str_hash_t * h)
 	stack_str_hash_foreach_key_value_pair(h, free_kvp_cb,
 					      (void *)&elem_count);
 	stack_str_hash_free(h);
-	ebpf_info("release_stack_strs hashmap clear %lu elems.\n", elem_count);
+	//ebpf_info("release_stack_strs hashmap clear %lu elems.\n", elem_count);
 }
 
 static inline char *create_symbol_str(int len, char *src, const char *tag)
@@ -344,7 +344,7 @@ static void set_stack_trace_msg(stack_trace_msg_t * msg,
 	msg->k_stack_id = (u32) v->kernstack;
 	msg->stime = get_pid_stime(v->pid);
 	msg->data_len = strlen((char *)&msg->data[0]);
-	msg->time_stamp = gettime(CLOCK_REALTIME, TIME_TYPE_NAN) / 1000UL; // usecs
+	msg->time_stamp = gettime(CLOCK_REALTIME, TIME_TYPE_NAN);
 	msg->count = 1;
 	msg->data_ptr = pointer_to_uword(&msg->data[0]);
 }

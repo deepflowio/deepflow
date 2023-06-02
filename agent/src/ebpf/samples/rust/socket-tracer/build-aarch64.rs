@@ -21,7 +21,7 @@ use std::{env, path::PathBuf};
 fn set_build_libtrace() -> Result<(), Box<dyn Error>> {
     let library_name = "trace";
     let root = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap());
-    let library_dir = dunce::canonicalize(root.join("../../")).unwrap();
+    let library_dir = dunce::canonicalize(root.join("../../../")).unwrap();
     println!("cargo:rustc-link-lib=static={}", library_name);
     println!(
         "cargo:rustc-link-search=native={}",

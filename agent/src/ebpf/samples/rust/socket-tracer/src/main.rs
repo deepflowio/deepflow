@@ -17,7 +17,7 @@
 use chrono::prelude::DateTime;
 use chrono::FixedOffset;
 use chrono::Utc;
-use rust_sample::ebpf::*;
+use socket_tracer::ebpf::*;
 use std::convert::TryInto;
 use std::fmt::Write;
 use std::net::IpAddr;

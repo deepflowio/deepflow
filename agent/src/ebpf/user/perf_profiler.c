@@ -53,6 +53,7 @@ static volatile u64 reader_exit;
 static void print_profiler_status(struct bpf_tracer *t, u64 iter_count,
 				  stack_str_hash_t *h,
 				  stack_trace_msg_hash_t *msg_h);
+static void print_cp_status(struct bpf_tracer *t);
 
 static void reader_lost_cb(void *t, u64 lost)
 {
@@ -121,8 +122,13 @@ static int push_and_free_msg_kvp_cb(stack_trace_msg_hash_kv *kv, void *ctx)
 	stack_trace_msg_kv_t *msg_kv = (stack_trace_msg_kv_t *)kv;
 	if (msg_kv->msg_ptr != 0) {
 		stack_trace_msg_t *msg = (stack_trace_msg_t *)msg_kv->msg_ptr;
-		//printf("tiemstamp %lu pid %u stime %lu u_stack_id %lu k_statck_id %lu cpu %u count %u comm %s datalen %u data %s\n",
-		//       msg->time_stamp, msg->pid, msg->stime, msg->u_stack_id, msg->k_stack_id, msg->cpu, msg->count, msg->comm, msg->data_len, msg->data);
+#ifdef CP_DEBUG
+		ebpf_debug("tiemstamp %lu pid %u stime %lu u_stack_id %lu k_statck_id"
+			   "%lu cpu %u count %u comm %s datalen %u data %s\n",
+			   msg->time_stamp, msg->pid, msg->stime, msg->u_stack_id,
+			   msg->k_stack_id, msg->cpu, msg->count, msg->comm,
+			   msg->data_len, msg->data);
+#endif
 		tracer_callback_t fun = profiler_tracer->process_fn;
 		/*
  		 * Execute callback function to hand over the data to the
@@ -145,7 +151,7 @@ static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t *h)
 	stack_trace_msg_hash_foreach_key_value_pair(h, push_and_free_msg_kvp_cb,
 						    (void *)&elem_count);
 	stack_trace_msg_hash_free(h);
-	ebpf_info("stack_trace_msg hashmap clear %lu elems.\n", elem_count);
+	//ebpf_info("stack_trace_msg hashmap clear %lu elems.\n", elem_count);
 }
 
 static void aggregate_stack_traces(struct bpf_tracer *t,
@@ -222,14 +228,10 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 		 */
 		stack_trace_msg_kv_t kv; // stack_trace_msg_hash_kv
 		set_msg_kvp(&kv, v, get_pid_stime(v->pid), (void *)0);
-		//printf("kvp->k.pid %lu, kvp->k.stime %lu, kvp->k.u_stack_id %u, kvp->k.k_stack_id %u",
-		//     kv->k.pid, kv->k.stime, kv->k.u_stack_id, kv->k.k_stack_id);
 		if (stack_trace_msg_hash_search(&msg_hash, (stack_trace_msg_hash_kv *)&kv,
 						(stack_trace_msg_hash_kv *)&kv) == 0) {
 			__sync_fetch_and_add(&msg_hash.hit_stack_msg_hash_count, 1);
 			((stack_trace_msg_t *)kv.msg_ptr)->count++;
-			//printf("kvp->k.pid %lu, kvp->k.stime %lu, kvp->k.u_stack_id %u, kvp->k.k_stack_id %u count %u\n",
-	                //       kv.k.pid, kv.k.stime, kv.k.u_stack_id, kv.k.k_stack_id, ((stack_trace_msg_t *)kv.msg_ptr)->count);
 
 			continue;
 		}
@@ -341,6 +343,8 @@ exit:
 	/* resouce share release */
 	release_symbol_caches();
 
+	print_cp_status(t);
+
 	pthread_exit(NULL);
 }
 
@@ -405,6 +409,21 @@ int stop_continuous_profiler(void)
 	release_bpf_tracer(CP_TRACER_NAME);
 	profiler_tracer = NULL;
 	return (0);
+}
+
+static void print_cp_status(struct bpf_tracer *t)
+{
+	u64 alloc_b, free_b;
+	get_mem_stat(&alloc_b, &free_b);
+	ebpf_info("\n\n----------------------------\nrecv envent:\t%lu\n"
+		  "kern_lost:\t%lu\nstack_trace_lost:\t%lu\n"
+		  "ransfer_count:\t%lu iter_count_avg:\t%.2lf\nall"
+		  "oc_b:\t%lu bytes free_b:\t%lu bytes use:\t%lu bytes\n"
+		  "----------------------------\n\n",
+		  atomic64_read(&t->recv), atomic64_read(&t->lost),
+		  stack_trace_lost, transfer_count,
+		  ((double)atomic64_read(&t->recv) / (double)transfer_count),
+		  alloc_b, free_b, alloc_b - free_b);
 }
 
 static void print_profiler_status(struct bpf_tracer *t, u64 iter_count,

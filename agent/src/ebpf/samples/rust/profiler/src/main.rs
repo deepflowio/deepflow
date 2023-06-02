@@ -17,15 +17,13 @@
 use chrono::prelude::DateTime;
 use chrono::FixedOffset;
 use chrono::Utc;
-use perf_profiler::ebpf::*;
-use std::convert::TryInto;
-use std::fmt::Write;
+use profiler::ebpf::*;
 use std::thread;
 use std::time::{Duration, UNIX_EPOCH};
 
 fn date_time(ts: u64) -> String {
     // Creates a new SystemTime from the specified number of whole seconds
-    let d = UNIX_EPOCH + Duration::from_micros(ts);
+    let d = UNIX_EPOCH + Duration::from_nanos(ts);
     // Create DateTime from SystemTime
     let time = DateTime::<Utc>::from(d);
     let china_timezone = FixedOffset::east(8 * 3600);
@@ -53,7 +51,8 @@ fn cp_process_name_safe(cp: *mut stack_profile_data) -> String {
 extern "C" fn continuous_profiler_callback(cp: *mut stack_profile_data) {
     unsafe {
           let data = sk_data_str_safe(cp);
-          println!("{} PID {} START-TIME {} U-STACKID {} K-STACKID {} COMM {} CPU {} COUNT {} LEN {} \n  - {}\n",
+          println!("+ --------------------------------- +");
+          println!("{} PID {} START-TIME {} U-STACKID {} K-STACKID {} COMM {} CPU {} COUNT {} LEN {} \n  - {}",
                    date_time((*cp).timestamp),
                    (*cp).pid,
                    (*cp).stime,
@@ -63,6 +62,7 @@ extern "C" fn continuous_profiler_callback(cp: *mut stack_profile_data) {
                    (*cp).cpu,
                    (*cp).count,
                    (*cp).stack_data_len, data);
+          println!("+ --------------------------------- +");
     }
 }
 

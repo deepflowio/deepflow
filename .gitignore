@@ -33,3 +33,11 @@ target/
 /agent/src/ebpf/user/socket_trace_bpf_common.c
 /agent/src/ebpf/user/socket_trace_bpf_5_2_plus.c
 /agent/src/ebpf/user/socket_trace_bpf_kylin.c
+/agent/src/ebpf/.profiler
+/agent/src/ebpf/.socket-tracer
+/agent/src/ebpf/samples/rust/profiler/build.rs
+/agent/src/ebpf/samples/rust/profiler/target
+/agent/src/ebpf/samples/rust/profiler/src/ebpf.rs
+/agent/src/ebpf/samples/rust/socket-tracer/build.rs
+/agent/src/ebpf/samples/rust/socket-tracer/target
+/agent/src/ebpf/samples/rust/socket-tracer/src/ebpf.rs

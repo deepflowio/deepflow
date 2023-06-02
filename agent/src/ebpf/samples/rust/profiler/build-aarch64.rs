@@ -21,23 +21,26 @@ use std::{env, path::PathBuf};
 fn set_build_libtrace() -> Result<(), Box<dyn Error>> {
     let library_name = "trace";
     let root = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap());
-    let library_dir = dunce::canonicalize(root.join("../../")).unwrap();
+    let library_dir = dunce::canonicalize(root.join("../../../")).unwrap();
     println!("cargo:rustc-link-lib=static={}", library_name);
     println!(
         "cargo:rustc-link-search=native={}",
         env::join_paths(&[library_dir]).unwrap().to_str().unwrap()
     );
+
+    println!("cargo:rustc-link-search=native=/usr/aarch64-linux-musl/lib64");
     println!("cargo:rustc-link-lib=static=GoReSym");
-    println!("cargo:rustc-link-lib=static=bddisasm");
     println!("cargo:rustc-link-lib=static=dwarf");
     println!("cargo:rustc-link-lib=static=bcc_bpf");
-    println!("cargo:rustc-link-lib=static=bcc");
-    println!("cargo:rustc-link-search=native=/usr/lib");
-    println!("cargo:rustc-link-search=native=/usr/lib64");
-    println!("cargo:rustc-link-lib=dylib=pthread");
-    println!("cargo:rustc-link-lib=dylib=elf");
-    println!("cargo:rustc-link-lib=dylib=z");
-    println!("cargo:rustc-link-lib=dylib=stdc++");
+    println!("cargo:rustc-link-lib=static=c");
+    println!("cargo:rustc-link-lib=static=elf");
+    println!("cargo:rustc-link-lib=static=pcap");
+    println!("cargo:rustc-link-lib=static=m");
+    println!("cargo:rustc-link-lib=static=z");
+    println!("cargo:rustc-link-lib=static=pthread");
+    println!("cargo:rustc-link-lib=static=rt");
+    println!("cargo:rustc-link-lib=static=dl");
+
     Ok(())
 }
 
