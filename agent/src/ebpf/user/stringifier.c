@@ -133,7 +133,7 @@ static char *resolve_addr(pid_t pid, u64 address)
 
 	int len = 0;
 	char *ptr = NULL;
-	char format_str[24];
+	char format_str[32];
 	struct bcc_symbol sym;
 	void *resolver = get_symbol_cache(pid);
 	if (resolver == NULL)
@@ -150,10 +150,10 @@ static char *resolve_addr(pid_t pid, u64 address)
 		/*
 		 * Module is known (from /proc/<pid>/maps), but symbol is not known.
 		 * build a string:
-		 * [m] /lib64/xxx.so + 0x00001234
+		 * [m]/lib64/xxx.so + 0x00001234
 		 */
 		char format_str[4096];
-		snprintf(format_str, sizeof(format_str), "[m] %s + 0x%08lx",
+		snprintf(format_str, sizeof(format_str), "[m]%s + 0x%08lx",
 			 sym.module, sym.offset);
 		len = strlen(format_str);
 		ptr = create_symbol_str(len, format_str, "");
@@ -168,7 +168,10 @@ static char *resolve_addr(pid_t pid, u64 address)
 	 * hexadecimal string.
 	 */
 resolver_err:
-	snprintf(format_str, sizeof(format_str), "0x%016lx", address);
+	snprintf(format_str, sizeof(format_str), "%s0x%016lx",
+		 pid == 0 ? "[k]" : "[u]",
+		 address);
+
 	len = strlen(format_str);
 	ptr = create_symbol_str(len, format_str, "");
 
@@ -179,8 +182,7 @@ finish:
 static int get_stack_ips(struct bpf_tracer *t,
 			 const char *stack_map_name, int stack_id, u64 * ips)
 {
-	if (stack_id < 0)
-		return ETR_INVAL;
+	ASSERT(stack_id >= 0);
 
 	if (!bpf_table_get_value(t, stack_map_name, stack_id, (void *)ips)) {
 		ebpf_warning("Get map '%s' failed.\n", stack_map_name);
@@ -297,17 +299,14 @@ static char *__folded_stack_trace_string(struct bpf_tracer *t,
 		     stack_map_name, stack_id);
 	}
 
-	if (str) {
-		stack_str_hash_kv kv;
-		kv.key = (u64) stack_id;
-		kv.value = pointer_to_uword(str);
-		/* memoized stack trace string. Because the stack-ids
-		   are not stable across profiler iterations. */
-		if (stack_str_hash_add_del(h, &kv, 1 /* is_add */ )) {
-			ebpf_warning("stack_str_hash_add_del() failed.\n");
-			clib_mem_free((void *)str);
-			str = NULL;
-		}
+	kv.key = (u64) stack_id;
+	kv.value = pointer_to_uword(str);
+	/* memoized stack trace string. Because the stack-ids
+	   are not stable across profiler iterations. */
+	if (stack_str_hash_add_del(h, &kv, 1 /* is_add */ )) {
+		ebpf_warning("stack_str_hash_add_del() failed.\n");
+		clib_mem_free((void *)str);
+		str = NULL;
 	}
 
 	return str;

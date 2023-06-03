@@ -17,7 +17,7 @@
 #ifndef DF_BPF_PERF_PROFILER_H
 #define DF_BPF_PERF_PROFILER_H
 
-#define STACK_MAP_ENTRIES 16384
+#define STACK_MAP_ENTRIES 65536
 
 /*
  * The meaning of the "__profiler_state_map" index.
@@ -28,7 +28,8 @@ typedef enum {
 	SAMPLE_CNT_B_IDX,	/* sample count B */
 	SAMPLE_CNT_DROP,	/* sample drop */
 	SAMPLE_ITER_CNT_MAX,	/* Iteration sample number max value */
-	ERROR_IDX,
+	OUTPUT_CNT_IDX,		/* Count the total number of data outputs.*/
+	ERROR_IDX,		/* Count the number of failed push notifications.*/
 	PROFILER_CNT
 } profiler_idx;
 
@@ -41,6 +42,7 @@ struct stack_trace_key_t {
 	char comm[TASK_COMM_LEN];
 	int kernstack;
 	int userstack;
+	__u64 timestamp;
 };
 
 #endif /* DF_BPF_PERF_PROFILER_H */

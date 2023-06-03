@@ -94,21 +94,29 @@ int bpf_perf_event(struct bpf_perf_event_data *ctx)
 	__u64 *iter_count_ptr =
 		profiler_state_map__lookup(&count_idx);
 
+	count_idx = OUTPUT_CNT_IDX;
+	__u64 *output_count_ptr =
+		profiler_state_map__lookup(&count_idx);
+
+	count_idx = ERROR_IDX;
+	__u64 *error_count_ptr =
+		profiler_state_map__lookup(&count_idx);
+
 	if (transfer_count_ptr == NULL || sample_count_a_ptr == NULL ||
 	    sample_count_b_ptr == NULL || drop_count_ptr == NULL ||
-	    iter_count_ptr == NULL) {
+	    iter_count_ptr == NULL || error_count_ptr == NULL ||
+	    output_count_ptr == NULL) {
 		count_idx = ERROR_IDX;
 		__u64 err_val = 1;
 		profiler_state_map__update(&count_idx, &err_val);
 		return 0;
 	}
 
-	__u64 transfer_count = *transfer_count_ptr;
-
 	struct stack_trace_key_t key = {};
 	key.cpu = bpf_get_smp_processor_id();
 	bpf_get_current_comm(&key.comm, sizeof(key.comm));
 	key.tgid = bpf_get_current_pid_tgid() >> 32;
+	key.timestamp = bpf_ktime_get_ns();
 
 	/*
 	 * Note:
@@ -129,28 +137,57 @@ int bpf_perf_event(struct bpf_perf_event_data *ctx)
 	 */
 
 	__u64 sample_count = 0;
-	if (transfer_count % 2 == 0) {
+	if (!((*transfer_count_ptr) & 0x1ULL)) {
 		key.kernstack = bpf_get_stackid(ctx, &NAME(stack_map_a),
 						KERN_STACKID_FLAGS);
 		key.userstack = bpf_get_stackid(ctx, &NAME(stack_map_a),
 						USER_STACKID_FLAGS);
+
+		if (-EEXIST == key.kernstack)
+			__sync_fetch_and_add(drop_count_ptr, 1);
+
+		if (-EEXIST == key.userstack)
+			__sync_fetch_and_add(drop_count_ptr, 1);
+
+		/* If a sample is completely invalid, it should be discarded. */
+		if (key.kernstack < 0 && key.userstack < 0)
+			return 0;
+
 		sample_count = *sample_count_a_ptr;
 		__sync_fetch_and_add(sample_count_a_ptr, 1);
-		if (-EEXIST == bpf_perf_event_output(ctx,
-					&NAME(profiler_output_a),
-					BPF_F_CURRENT_CPU, &key, sizeof(key)))
-			__sync_fetch_and_add(drop_count_ptr, 1);
+
+		if (bpf_perf_event_output(ctx,
+					  &NAME(profiler_output_a),
+					  BPF_F_CURRENT_CPU, &key, sizeof(key)))
+			__sync_fetch_and_add(error_count_ptr, 1);
+		else
+			__sync_fetch_and_add(output_count_ptr, 1);
+
 	} else {
 		key.kernstack = bpf_get_stackid(ctx, &NAME(stack_map_b),
 						KERN_STACKID_FLAGS);
 		key.userstack = bpf_get_stackid(ctx, &NAME(stack_map_b),
 						USER_STACKID_FLAGS);
+
+		if (-EEXIST == key.kernstack)
+			__sync_fetch_and_add(drop_count_ptr, 1);
+
+		if (-EEXIST == key.userstack)
+			__sync_fetch_and_add(drop_count_ptr, 1);
+
+		/* If a sample is completely invalid, it should be discarded. */
+		if (key.kernstack < 0 && key.userstack < 0)
+			return 0;
+
 		sample_count = *sample_count_b_ptr;
 		__sync_fetch_and_add(sample_count_b_ptr, 1);
-		if (-EEXIST == bpf_perf_event_output(ctx,
-					&NAME(profiler_output_b),
-					BPF_F_CURRENT_CPU, &key, sizeof(key)))
-			__sync_fetch_and_add(drop_count_ptr, 1);
+
+		if (bpf_perf_event_output(ctx,
+					  &NAME(profiler_output_b),
+					  BPF_F_CURRENT_CPU, &key, sizeof(key)))
+			__sync_fetch_and_add(error_count_ptr, 1);
+		else
+			__sync_fetch_and_add(output_count_ptr, 1);
 	}
 
 	/*

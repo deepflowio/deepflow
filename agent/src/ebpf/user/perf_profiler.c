@@ -44,11 +44,12 @@ extern __thread uword thread_index;
 struct stack_trace_key_t *raw_stack_data;
 static u64 stack_trace_lost;
 static struct bpf_tracer *profiler_tracer;
-
+static volatile u64 profiler_stop;
 /*
  * The iteration count causes BPF to switch buffers with each iteration.
  */
 static u64 transfer_count;
+static u64 process_count;
 static volatile u64 reader_exit;
 static void print_profiler_status(struct bpf_tracer *t, u64 iter_count,
 				  stack_str_hash_t *h,
@@ -85,6 +86,8 @@ static int relase_profiler(struct bpf_tracer *tracer)
 
 	/* free all readers */
 	free_all_readers(tracer);
+
+	print_cp_status(tracer);
 
 	/* release object */
 	release_object(tracer->obj);
@@ -134,8 +137,10 @@ static int push_and_free_msg_kvp_cb(stack_trace_msg_hash_kv *kv, void *ctx)
  		 * Execute callback function to hand over the data to the
  		 * higher level for processing. The higher level will se-
  		 * nd the data to the server for storage as required.
- 		 */ 
-		fun(msg);
+ 		 */
+		if (!profiler_stop)
+			fun(msg);
+
 		clib_mem_free((void *)msg);
 		(*(u64 *) ctx)++;
 	}
@@ -151,15 +156,106 @@ static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t *h)
 	stack_trace_msg_hash_foreach_key_value_pair(h, push_and_free_msg_kvp_cb,
 						    (void *)&elem_count);
 	stack_trace_msg_hash_free(h);
-	//ebpf_info("stack_trace_msg hashmap clear %lu elems.\n", elem_count);
 }
 
 static void aggregate_stack_traces(struct bpf_tracer *t,
 				   const char *stack_map_name,
-				   u64 sample_cnt_idx)
+				   stack_str_hash_t *stack_str_hash,
+				   stack_trace_msg_hash_t *msg_hash,
+				   u32 *count)
 {
-	u32 count = 0;
 	struct stack_trace_key_t *v;
+	vec_foreach(v, raw_stack_data) {
+		if (v == NULL)
+			break;
+
+		if (profiler_stop == 1)
+			break;
+
+		/* -EEXIST: Hash bucket collision in the stack trace table */
+		if (v->kernstack == -EEXIST)
+			stack_trace_lost++;
+
+		if (v->userstack == -EEXIST)
+			stack_trace_lost++;
+
+		/* Total iteration count for this iteration. */
+		(*count)++;
+
+		/* Total iteration count for all iterations. */
+		process_count++;
+
+		/*
+		 * Firstly, search the stack-trace-msg hash to see if the
+		 * stack trace messages has already been stored. 
+		 */
+		stack_trace_msg_kv_t kv; // stack_trace_msg_hash_kv
+		set_msg_kvp(&kv, v, get_pid_stime(v->pid), (void *)0);
+		if (stack_trace_msg_hash_search(msg_hash, (stack_trace_msg_hash_kv *)&kv,
+						(stack_trace_msg_hash_kv *)&kv) == 0) {
+			__sync_fetch_and_add(&msg_hash->hit_stack_msg_hash_count, 1);
+			((stack_trace_msg_t *)kv.msg_ptr)->count++;
+
+			continue;
+		}
+
+		/*
+		 * Folded stack trace string and generate stack trace messages.
+		 *
+		 * Folded stack trace string (taken from a performance profiler test):
+		 * main;xxx();yyy()
+		 * It is a list of symbols corresponding to addresses in the underlying
+		 * stack trace, separated by ';'.
+		 */
+
+		stack_trace_msg_t *msg =
+			resolve_and_gen_stack_trace_msg(t, v, stack_map_name,
+							stack_str_hash);
+		if (msg) {
+			stack_trace_msg_kv_t msg_kvp;
+			set_msg_kvp(&msg_kvp, v, msg->stime, (void *)msg);
+			if (stack_trace_msg_hash_add_del(msg_hash,
+							 (stack_trace_msg_hash_kv *)&msg_kvp,
+							 1 /* is_add */ )) {
+				ebpf_warning("stack_trace_msg_hash_add_del() failed.\n");
+			}
+		}
+	}
+
+	vec_free(raw_stack_data);
+}
+
+static void process_bpf_stacktraces(struct bpf_tracer *t,
+				    struct bpf_perf_reader *r_a,
+				    struct bpf_perf_reader *r_b)
+{
+	struct bpf_perf_reader *r;
+	const char *stack_map_name;
+	bool using_map_set_a = (transfer_count % 2 == 0);
+	r = using_map_set_a ? r_a : r_b;
+	stack_map_name = using_map_set_a ? MAP_STACK_A_NAME : MAP_STACK_B_NAME;
+	const u64 sample_count_idx =
+	    using_map_set_a ? SAMPLE_CNT_A_IDX : SAMPLE_CNT_B_IDX;
+
+	struct pollfd pfds[r->readers_count];
+	bool has_event = reader_poll_wait(r, pfds);
+
+	transfer_count++;
+	/* update map MAP_PROFILER_STATE_MAP */
+	if (bpf_table_set_value(t, MAP_PROFILER_STATE_MAP,
+				TRANSFER_CNT_IDX, &transfer_count) == false) {
+		ebpf_warning("profiler state map update error."
+			     "(%s transfer_count %lu) - %s\n",
+			     MAP_PROFILER_STATE_MAP,
+			     transfer_count, strerror(errno));
+		transfer_count--;
+	}
+
+	/* Total iteration count for this iteration. */
+	u32 count = 0;
+
+	/* eBPF map record count for this iteration. */
+	u64 sample_cnt_val;
 
 	/*
 	 * Why use stack_str_hash?
@@ -209,67 +305,49 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 		return;
 	}
 
-	vec_foreach(v, raw_stack_data) {
-		if (v == NULL)
-			break;
+	if (has_event) {
 
-		/* -EEXIST: Hash bucket collision in the stack trace table */
-		if (v->kernstack == -EEXIST)
-			stack_trace_lost++;
-
-		if (v->userstack == -EEXIST)
-			stack_trace_lost++;
-
-		count++;
+check_again:
+		/* 
+		 * If there is data, the reader's callback
+		 * function will be called.
+		 */
+		reader_event_read(r, pfds);
 
 		/*
-		 * Firstly, search the stack-trace-msg hash to see if the
-		 * stack trace messages has already been stored. 
+		 * After the reader completes data reading, the work of
+		 * data aggregation will be blocked if there is no data.
 		 */
-		stack_trace_msg_kv_t kv; // stack_trace_msg_hash_kv
-		set_msg_kvp(&kv, v, get_pid_stime(v->pid), (void *)0);
-		if (stack_trace_msg_hash_search(&msg_hash, (stack_trace_msg_hash_kv *)&kv,
-						(stack_trace_msg_hash_kv *)&kv) == 0) {
-			__sync_fetch_and_add(&msg_hash.hit_stack_msg_hash_count, 1);
-			((stack_trace_msg_t *)kv.msg_ptr)->count++;
+		aggregate_stack_traces(t, stack_map_name, &stack_str_hash,
+				       &msg_hash, &count);
 
-			continue;
-		}
+		if (profiler_stop == 1)
+			goto release_iter;
 
 		/*
-		 * Folded stack trace string and generate stack trace messages.
-		 *
-		 * Folded stack trace string (taken from a performance profiler test):
-		 * main;xxx();yyy()
-		 * It is a list of symbols corresponding to addresses in the underlying
-		 * stack trace, separated by ';'.
+		 * To ensure that all data in the perf ring-buffer is processed
+		 * in this iteration, as this iteration will clean up all the
+		 * data recorded in the stackmap, any residual data in the perf
+		 * ring-buffer will be carried over to the next iteration for
+		 * processing. This poses a risk of not being able to find the
+		 * corresponding stackmap records in the next iteration, leading
+		 * to incomplete processing.
 		 */
-
-		stack_trace_msg_t *msg =
-			resolve_and_gen_stack_trace_msg(t, v, stack_map_name,
-							&stack_str_hash);
-		if (msg) {
-			stack_trace_msg_kv_t msg_kvp;
-			set_msg_kvp(&msg_kvp, v, msg->stime, (void *)msg);
-			if (stack_trace_msg_hash_add_del(&msg_hash,
-							 (stack_trace_msg_hash_kv *)&msg_kvp,
-							 1 /* is_add */ )) {
-				ebpf_warning("stack_trace_msg_hash_add_del() failed.\n");
+		if (bpf_table_get_value(t, MAP_PROFILER_STATE_MAP,
+					sample_count_idx, (void *)&sample_cnt_val)) {
+			if (sample_cnt_val > count) {
+				has_event = reader_poll_short_wait(r, pfds);
+				if (has_event)
+					goto check_again;
 			}
 		}
 	}
 
-	/*
-	 * Clear any kernel stack-ids, that were potentially not already
-	 * cleared, out of the stack traces table.
-	 */
-
+release_iter:
 	/* Now that we've consumed the data, reset the sample count in BPF. */
-	u64 sample_cnt_val = 0;
+	sample_cnt_val = 0;
 	bpf_table_set_value(t, MAP_PROFILER_STATE_MAP,
-			    sample_cnt_idx, &sample_cnt_val);
-
-	vec_free(raw_stack_data);
+			    sample_count_idx, &sample_cnt_val);
 
 	print_profiler_status(t, count, &stack_str_hash, &msg_hash);
 
@@ -278,43 +356,6 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 
 	/* Push messages and free stack_trace_msg_hash */
 	push_and_release_stack_trace_msg(&msg_hash);
-}
-
-static void process_bpf_stacktraces(struct bpf_tracer *t,
-				    struct bpf_perf_reader *r_a,
-				    struct bpf_perf_reader *r_b)
-{
-	struct bpf_perf_reader *r;
-	const char *stack_map_name;
-	bool using_map_set_a = (transfer_count % 2 == 0);
-	r = using_map_set_a ? r_a : r_b;
-	stack_map_name = using_map_set_a ? MAP_STACK_A_NAME : MAP_STACK_B_NAME;
-	const u64 sample_count_idx =
-	    using_map_set_a ? SAMPLE_CNT_A_IDX : SAMPLE_CNT_B_IDX;
-
-	struct pollfd pfds[r->readers_count];
-	bool has_event = reader_poll_wait(r, pfds);
-
-	transfer_count++;
-	/* update map MAP_PROFILER_STATE_MAP */
-	if (bpf_table_set_value(t, MAP_PROFILER_STATE_MAP,
-				TRANSFER_CNT_IDX, &transfer_count) == false) {
-		transfer_count--;
-	}
-
-	if (has_event) {
-		/* 
-		 * If there is data, the reader's callback
-		 * function will be called.
-		 */
-		reader_event_read(r, pfds);
-	}
-
-	/*
-	 * After the reader completes data reading, the work of
-	 * data aggregation will be blocked if there is no data.
-	 */
-	aggregate_stack_traces(t, stack_map_name, sample_count_idx);
 }
 
 static void cp_reader_work(void *arg)
@@ -342,8 +383,6 @@ exit:
 
 	/* resouce share release */
 	release_symbol_caches();
-
-	print_cp_status(t);
 
 	pthread_exit(NULL);
 }
@@ -406,6 +445,7 @@ static int create_profiler(struct bpf_tracer *tracer)
 
 int stop_continuous_profiler(void)
 {
+	profiler_stop = 1;
 	release_bpf_tracer(CP_TRACER_NAME);
 	profiler_tracer = NULL;
 	return (0);
@@ -415,15 +455,51 @@ static void print_cp_status(struct bpf_tracer *t)
 {
 	u64 alloc_b, free_b;
 	get_mem_stat(&alloc_b, &free_b);
+
+	u64 sample_drop_cnt = 0;
+	if (!bpf_table_get_value(t, MAP_PROFILER_STATE_MAP, SAMPLE_CNT_DROP,
+				 (void *)&sample_drop_cnt)) {
+		ebpf_warning("Get map '%s' sample_drop_cnt failed.\n",
+			     MAP_PROFILER_STATE_MAP);
+	}
+
+	u64 output_err_cnt = 0;
+	if (!bpf_table_get_value(t, MAP_PROFILER_STATE_MAP, ERROR_IDX,
+				 (void *)&output_err_cnt)) {
+		ebpf_warning("Get map '%s' output_err_cnt failed.\n",
+			     MAP_PROFILER_STATE_MAP);
+	}
+
+	u64 output_count = 0;
+	if (!bpf_table_get_value(t, MAP_PROFILER_STATE_MAP, OUTPUT_CNT_IDX,
+				 (void *)&output_count)) {
+		ebpf_warning("Get map '%s' output_cnt failed.\n",
+			     MAP_PROFILER_STATE_MAP);
+	}
+
+	u64 iter_max_cnt = 0;
+	if (!bpf_table_get_value(t, MAP_PROFILER_STATE_MAP, SAMPLE_ITER_CNT_MAX,
+				 (void *)&iter_max_cnt)) {
+		ebpf_warning("Get map '%s' iter_max_cnt failed.\n",
+			     MAP_PROFILER_STATE_MAP);
+	}
+
 	ebpf_info("\n\n----------------------------\nrecv envent:\t%lu\n"
-		  "kern_lost:\t%lu\nstack_trace_lost:\t%lu\n"
-		  "ransfer_count:\t%lu iter_count_avg:\t%.2lf\nall"
-		  "oc_b:\t%lu bytes free_b:\t%lu bytes use:\t%lu bytes\n"
+		  "process-cnt:\t%lu\nkern_lost:\t%lu\n"
+		  "stack_trace_lost:\t%lu\ntransfer_count:\t%lu "
+		  "iter_count_avg:\t%.2lf\nalloc_b:\t%lu bytes "
+		  "free_b:\t%lu bytes use:\t%lu bytes\n"
+		  "eBPF map status:\n"
+		  " - output_cnt:\t%lu\n"
+		  " - sample_drop_cnt:\t%lu\n"
+		  " - output_err_cnt:\t%lu\n"
+		  " - iter_max_cnt:\t%lu\n"
 		  "----------------------------\n\n",
-		  atomic64_read(&t->recv), atomic64_read(&t->lost),
+		  atomic64_read(&t->recv), process_count, atomic64_read(&t->lost),
 		  stack_trace_lost, transfer_count,
 		  ((double)atomic64_read(&t->recv) / (double)transfer_count),
-		  alloc_b, free_b, alloc_b - free_b);
+		  alloc_b, free_b, alloc_b - free_b, output_count, sample_drop_cnt,
+		  output_err_cnt, iter_max_cnt);
 }
 
 static void print_profiler_status(struct bpf_tracer *t, u64 iter_count,
@@ -466,6 +542,8 @@ int start_continuous_profiler(int freq,
 
 		return (-1);
 	}
+
+	profiler_stop = 0;
 
 	snprintf(bpf_load_buffer_name, NAME_LEN, "continuous_profiler");
 	bpf_bin_buffer = (void *)perf_profiler_common_ebpf_data;

@@ -51,7 +51,7 @@ fn cp_process_name_safe(cp: *mut stack_profile_data) -> String {
 extern "C" fn continuous_profiler_callback(cp: *mut stack_profile_data) {
     unsafe {
           let data = sk_data_str_safe(cp);
-          println!("+ --------------------------------- +");
+          println!("\n+ --------------------------------- +");
           println!("{} PID {} START-TIME {} U-STACKID {} K-STACKID {} COMM {} CPU {} COUNT {} LEN {} \n  - {}",
                    date_time((*cp).timestamp),
                    (*cp).pid,

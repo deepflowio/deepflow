@@ -533,6 +533,9 @@ void *get_symbol_cache(pid_t pid)
 
 	kv.k.pid = pid;
 	kv.v.stime = (u64) get_process_starttime(pid);
+	if (kv.v.stime == 0)
+		return NULL;
+
 	kv.v.cache = pointer_to_uword(bcc_symcache_new(pid, &lazy_opt));
 	if (symbol_caches_hash_add_del
 	    (h, (symbol_caches_hash_kv *) & kv, 1 /* is_add */ )) {
@@ -565,6 +568,8 @@ int create_and_init_symbolizer_caches(void)
 			struct symbolizer_cache_kvp sym;
 			sym.k.pid = pid;
 			sym.v.stime = (u64) get_process_starttime(pid);
+			if (sym.v.stime == 0)
+				continue;
 			sym.v.cache = 0;
 			if (symbol_caches_hash_add_del
 			    (h, (symbol_caches_hash_kv *) & sym,
@@ -586,8 +591,8 @@ static int free_symbolizer_kvp_cb(symbol_caches_hash_kv * kv, void *ctx)
 	if (sym->v.cache) {
 		bcc_free_symcache((void *)sym->v.cache, sym->k.pid);
 		(*(u64 *) ctx)++;
-		ebpf_info("release symbol cache pid %d stime %lu \n",
-			  sym->k.pid, sym->v.stime);
+		//ebpf_info("release symbol cache pid %d stime %lu \n",
+		//	  sym->k.pid, sym->v.stime);
 	}
 
 	return BIHASH_WALK_CONTINUE;

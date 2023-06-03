@@ -412,7 +412,8 @@ u64 get_process_starttime(pid_t pid)
 		return 0;
 
 	fd = open(file, O_RDONLY);
-	ASSERT(fd > 2);
+	if (fd <= 2)
+		return 0;
 
 	read(fd, buff, sizeof(buff));
 	close(fd);

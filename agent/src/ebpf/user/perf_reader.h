@@ -46,6 +46,18 @@ reader_poll_wait(struct bpf_perf_reader *r, struct pollfd *pfds)
 	return (poll(pfds, r->readers_count, r->poll_timeout) > 0);
 }
 
+static inline bool
+reader_poll_short_wait(struct bpf_perf_reader *r, struct pollfd *pfds)
+{
+	int i;
+	for (i = 0; i < r->readers_count; ++i) {
+		pfds[i].fd = r->readers[i]->fd;
+		pfds[i].events = POLLIN;
+	}
+
+	return (poll(pfds, r->readers_count, 10) > 0);
+}
+
 static inline void
 reader_event_read(struct bpf_perf_reader *r, struct pollfd *pfds)
 {
@@ -53,6 +65,15 @@ reader_event_read(struct bpf_perf_reader *r, struct pollfd *pfds)
 	for (i = 0; i < r->readers_count; ++i) {
 		if (pfds[i].revents & POLLIN)
 			perf_reader_event_read(r->readers[i]);
+	}
+}
+
+static inline void
+reader_event_read_polling(struct bpf_perf_reader *r, struct pollfd *pfds)
+{
+	int i;
+	for (i = 0; i < r->readers_count; ++i) {
+		perf_reader_event_read(r->readers[i]);
 	}
 }
 
