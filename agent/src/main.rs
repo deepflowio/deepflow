@@ -17,6 +17,8 @@
 use std::panic;
 use std::path::Path;
 
+use crate::dispatcher::VHost;
+
 use anyhow::Result;
 use clap::{ArgAction, Parser};
 use log::error;
@@ -89,25 +91,27 @@ const VERSION_INFO: &'static trident::VersionInfo = &trident::VersionInfo {
 };
 
 fn main() -> Result<()> {
-    panic::set_hook(Box::new(|panic_info| {
-        error!("{:?}", panic_info.to_string());
-    }));
-    let opts = Opts::parse();
-    if opts.version {
-        println!("{}", VERSION_INFO);
-        return Ok(());
-    }
-    let mut t = trident::Trident::start(
-        &Path::new(&opts.config_file),
-        VERSION_INFO,
-        if opts.standalone {
-            trident::RunningMode::Standalone
-        } else {
-            trident::RunningMode::Managed
-        },
-    )?;
+    VHost::new("/tmp/vhostclient1".to_string());
+    //std::thread::sleep(std::time::Duration::from_secs(10));
+    // panic::set_hook(Box::new(|panic_info| {
+    //     error!("{:?}", panic_info.to_string());
+    // }));
+    // let opts = Opts::parse();
+    // if opts.version {
+    //     println!("{}", VERSION_INFO);
+    //     return Ok(());
+    // }
+    // let mut t = trident::Trident::start(
+    //     &Path::new(&opts.config_file),
+    //     VERSION_INFO,
+    //     if opts.standalone {
+    //         trident::RunningMode::Standalone
+    //     } else {
+    //         trident::RunningMode::Managed
+    //     },
+    // )?;
     wait_on_signals();
-    t.stop();
+    // t.stop();
 
     Ok(())
 }

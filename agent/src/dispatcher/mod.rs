@@ -57,6 +57,7 @@ use mirror_mode_dispatcher::{MirrorModeDispatcher, MirrorModeDispatcherListener}
 pub use recv_engine::RecvEngine;
 #[cfg(target_os = "linux")]
 pub use recv_engine::{
+    vhost::VHost,
     af_packet::{self, bpf::*, BpfSyntax, OptTpacketVersion, RawInstruction, Tpacket},
     DEFAULT_BLOCK_SIZE, FRAME_SIZE_MAX, FRAME_SIZE_MIN, POLL_TIMEOUT,
 };
