@@ -19,7 +19,7 @@ extern crate libc;
 pub use libc::c_char;
 pub use libc::c_int;
 pub use libc::c_uchar; // u8
-pub use libc::c_uint; // u32
+pub use libc::c_uint;  // u32
 pub use libc::c_ulonglong;
 pub use std::ffi::{CStr, CString};
 //use std::fmt;
@@ -31,12 +31,12 @@ pub const PACKET_KNAME_MAX_PADDING: usize = 15;
 #[derive(Debug, Copy, Clone)]
 pub struct stack_profile_data {
     pub timestamp: u64,  // Timestamp of the stack trace data(unit: nanoseconds).
-    pub pid: u32,	     // Process-ID of the stack trace data.
-    pub stime: u64,	     // The start time of the process is measured in milliseconds.
+    pub pid: u32,	 // Process-ID of the stack trace data.
+    pub stime: u64,	 // The start time of the process is measured in milliseconds.
     pub u_stack_id: u32, // User space stackID.
     pub k_stack_id: u32, // Kernel space stackID.
-    pub cpu: u32,	     // The captured stack trace data is generated on which CPU?
-    pub count: u32,	     // The profiler captures the number of occurrences of the same
+    pub cpu: u32,	 // The captured stack trace data is generated on which CPU?
+    pub count: u32,	 // The profiler captures the number of occurrences of the same
                          // data by querying with the quadruple "<pid + stime + u_stack_id
                          // + k_stack_id>" as the key.
 
@@ -65,13 +65,11 @@ extern "C" {
 /*
  * start continuous profiler
  * @freq sample frequency, Hertz. (e.g. 99 profile stack traces at 99 Hertz)
- * @report_period How often is the data reported.
  * @callback Profile data processing callback interface
  * @returns 0 on success, < 0 on error
  */
 pub fn start_continuous_profiler(
         freq: c_int,
-        report_period: c_int,
         callback: extern "C" fn(_data: *mut stack_profile_data),
 ) -> c_int;
 

@@ -70,5 +70,5 @@ typedef struct {
 
 int stop_continuous_profiler(void);
 int start_continuous_profiler(int freq,
-			      int report_period, tracer_callback_t callback);
+			      tracer_callback_t callback);
 #endif /* DF_USER_PERF_PROFILER_H */

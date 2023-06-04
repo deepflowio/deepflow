@@ -138,7 +138,7 @@ static int push_and_free_msg_kvp_cb(stack_trace_msg_hash_kv *kv, void *ctx)
  		 * higher level for processing. The higher level will se-
  		 * nd the data to the server for storage as required.
  		 */
-		if (!profiler_stop)
+		if (likely(!profiler_stop))
 			fun(msg);
 
 		clib_mem_free((void *)msg);
@@ -169,7 +169,7 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 		if (v == NULL)
 			break;
 
-		if (profiler_stop == 1)
+		if (unlikely(profiler_stop == 1))
 			break;
 
 		/* -EEXIST: Hash bucket collision in the stack trace table */
@@ -308,6 +308,9 @@ static void process_bpf_stacktraces(struct bpf_tracer *t,
 	if (has_event) {
 
 check_again:
+		if (unlikely(profiler_stop == 1))
+			goto release_iter;
+
 		/* 
 		 * If there is data, the reader's callback
 		 * function will be called.
@@ -320,9 +323,6 @@ check_again:
 		 */
 		aggregate_stack_traces(t, stack_map_name, &stack_str_hash,
 				       &msg_hash, &count);
-
-		if (profiler_stop == 1)
-			goto release_iter;
 
 		/*
 		 * To ensure that all data in the perf ring-buffer is processed
@@ -522,12 +522,11 @@ static void print_profiler_status(struct bpf_tracer *t, u64 iter_count,
 /*
  * start continuous profiler
  * @freq sample frequency, Hertz. (e.g. 99 profile stack traces at 99 Hertz)
- * @report_period How often is the data reported.
  * @callback Profile data processing callback interface
  * @returns 0 on success, < 0 on error
  */
 int start_continuous_profiler(int freq,
-			      int report_period, tracer_callback_t callback)
+			      tracer_callback_t callback)
 {
 	char bpf_load_buffer_name[NAME_LEN];
 	void *bpf_bin_buffer;

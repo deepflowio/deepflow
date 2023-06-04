@@ -337,6 +337,34 @@ pub struct SK_TRACE_STATS {
     pub data_limit_max: u32,
 }
 
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct stack_profile_data {
+    pub timestamp: u64,  // Timestamp of the stack trace data(unit: nanoseconds).
+    pub pid: u32,	 // Process-ID of the stack trace data.
+    pub stime: u64,	 // The start time of the process is measured in milliseconds.
+    pub u_stack_id: u32, // User space stackID.
+    pub k_stack_id: u32, // Kernel space stackID.
+    pub cpu: u32,	 // The captured stack trace data is generated on which CPU?
+    pub count: u32,	 // The profiler captures the number of occurrences of the same
+                         // data by querying with the quadruple "<pid + stime + u_stack_id
+                         // + k_stack_id>" as the key.
+
+    pub comm: [u8; PACKET_KNAME_MAX_PADDING + 1], // comm in task_struct, always 16 bytes 
+    pub stack_data_len: u32,	 // stack data length
+
+    /*
+     * Example of a folded stack trace string (taken from a perf profiler test):
+     * main;xxx();yyy()
+     * It is a list of symbols corresponding to addresses in the underlying stack trace,
+     * separated by ';'.
+     *
+     * The merged folded stack trace string style for user space and kernel space would be:
+     * <user space folded stack trace string> + ";" + <kernel space folded stack trace string>
+     */
+    pub stack_data: *mut c_char,
+}
+
 extern "C" {
     /*
      * Set maximum amount of data passed to the agent by eBPF programe.
@@ -409,4 +437,21 @@ extern "C" {
 
     // 注意：eBPF tracer初始化加载运行后进行内核适配，
     // 适配完成后马上进入stop状态，需调用socket_tracer_start()才开始工作。
+
+    /*
+     * start continuous profiler
+     * @freq sample frequency, Hertz. (e.g. 99 profile stack traces at 99 Hertz)
+     * @callback Profile data processing callback interface
+     * @returns 0 on success, < 0 on error
+     */
+    pub fn start_continuous_profiler(
+        freq: c_int,
+        callback: extern "C" fn(_data: *mut stack_profile_data),
+    ) -> c_int;
+
+    /*
+     * stop continuous profiler
+     * @returns 0 on success, < 0 on error
+     */
+    pub fn stop_continuous_profiler()-> c_int;
 }

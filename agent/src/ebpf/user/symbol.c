@@ -460,6 +460,34 @@ static symbol_caches_hash_t syms_cache_hash;	// for user process symbol caches
 static void *k_resolver;		// for kernel symbol cache
 static u64 sys_btime_msecs;		// system boot time(milliseconds)
 
+static bool inline enable_symbol_cache(void)
+{
+	return (syms_cache_hash.buckets != NULL);
+}
+
+/* pid : The process ID (PID) that occurs when a process exits. */
+void update_symbol_cache(pid_t pid)
+{
+	if (!enable_symbol_cache())
+		return;
+
+	symbol_caches_hash_t *h = &syms_cache_hash;	
+	struct symbolizer_cache_kvp kv;
+	kv.k.pid = (u64) pid;
+	kv.v.stime = 0;
+	kv.v.cache = 0;
+	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
+				      (symbol_caches_hash_kv *) & kv) == 0) {
+		if (kv.v.cache != 0)
+			bcc_free_symcache((void *)kv.v.cache, pid);
+		if (symbol_caches_hash_add_del(h, (symbol_caches_hash_kv *) &kv,
+					       0 /* is_add */ )) {
+			ebpf_warning("symbol_caches_hash_add_del() failed.(pid %d)\n",
+				     pid);
+		}
+	}
+}
+
 static int init_symbol_cache(const char *name)
 {
 	symbol_caches_hash_t *h = &syms_cache_hash;

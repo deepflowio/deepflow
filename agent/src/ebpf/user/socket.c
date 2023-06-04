@@ -505,6 +505,9 @@ static void process_event(struct process_event_t *e)
 		go_process_exec(e->pid);
 		ssl_process_exec(e->pid);
 	} else if (e->meta.event_type == EVENT_TYPE_PROC_EXIT) {
+		/* Cache for updating process information used in
+		 * symbol resolution. */
+		update_symbol_cache(e->pid);
 		go_process_exit(e->pid);
 		ssl_process_exit(e->pid);
 	}
@@ -1530,11 +1533,13 @@ static_always_inline uint64_t clib_cpu_time_now(void)
 }
 #endif
 
+extern __thread uword thread_index; // for symbol pid caches hash
 static void poller(void *t)
 {
 	struct bpf_tracer *tracer = (struct bpf_tracer *)t;
 	struct bpf_perf_reader *perf_reader;
 	int i;
+	thread_index = THREAD_PROC_ACT_IDX;
 	for (;;) {
 #ifndef PERFORMANCE_TEST
 		for (i = 0; i < tracer->perf_readers_count; i++) {

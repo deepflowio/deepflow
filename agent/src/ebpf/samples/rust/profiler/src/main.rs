@@ -79,7 +79,6 @@ fn main() {
 
         if start_continuous_profiler(
             99,
-            30,
             continuous_profiler_callback,
         ) != 0
         {

@@ -210,7 +210,12 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 
 	u64 ips[PERF_MAX_STACK_DEPTH];
 	memset(ips, 0, sizeof(ips));
-	get_stack_ips(t, stack_map_name, stack_id, ips);
+	if (get_stack_ips(t, stack_map_name, stack_id, ips)) {
+		ebpf_warning("Not get stack ips, pid %d map %s stack_id %u\n",
+			     pid, stack_map_name, stack_id);
+		return NULL;
+	}
+
 	char *str = NULL;
 	int ret = VEC_OK;
 	uword *symbol_array = NULL;

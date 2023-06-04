@@ -122,4 +122,5 @@ void *get_symbol_cache(pid_t pid);
 int create_and_init_symbolizer_caches(void);
 void release_symbol_caches(void);
 u64 get_pid_stime(pid_t pid);
+void update_symbol_cache(pid_t pid);
 #endif /* _BPF_SYMBOL_H_ */

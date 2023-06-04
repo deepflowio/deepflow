@@ -123,7 +123,7 @@ profiler: .profiler
 .socket-tracer: $(ELFFILES) $(LIBTRACE)
 	$(call msg,Current-DIR,,$(CURR))
 	$(Q)rm -rf samples/rust/socket-tracer/src/ebpf.rs
-	$(Q)cp mod_socket.rs samples/rust/socket-tracer/src/ebpf.rs
+	$(Q)cp mod.rs samples/rust/socket-tracer/src/ebpf.rs
 	$(Q)rm -rf samples/rust/socket-tracer/build.rs
 	$(Q)rm -rf samples/rust/socket-tracer/target
 	@if [[ $(ARCH) == *"aarch64"* ]]; then \
