@@ -91,5 +91,7 @@ int main(void)
 	}
 
 	clib_bihash_free_8_8(h);
-	return 0;
+	printf("[OK]\n");
+
+        return 0;
 }

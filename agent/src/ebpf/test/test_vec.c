@@ -86,5 +86,7 @@ int main(void)
 	get_mem_stat(&alloc_b, &free_b);
 	printf("2 alloc_b %lu free_b %lu \n", alloc_b, free_b);
 
-	return (0);
+	printf("[OK]\n");
+
+        return 0;
 }
