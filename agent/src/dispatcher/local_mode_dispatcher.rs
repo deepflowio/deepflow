@@ -112,6 +112,9 @@ impl LocalModeDispatcher {
                 base.check_and_update_bpf();
                 continue;
             }
+            if base.pause.load(Ordering::Relaxed) {
+                continue;
+            }
             #[cfg(target_os = "windows")]
             let (mut packet, mut timestamp) = recved.unwrap();
             #[cfg(target_os = "linux")]
@@ -322,7 +325,8 @@ impl LocalModeDispatcherListener {
         return self.base.id;
     }
 
-    pub fn reset_bpf_white_list(&self) {
+    pub fn flow_acl_change(&self) {
+        self.base.pause.store(false, Ordering::Relaxed);
         self.base.reset_whitelist.store(true, Ordering::Relaxed);
     }
 

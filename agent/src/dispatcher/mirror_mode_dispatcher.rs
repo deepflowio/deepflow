@@ -144,7 +144,8 @@ impl MirrorModeDispatcherListener {
         return self.base.id;
     }
 
-    pub fn reset_bpf_white_list(&self) {
+    pub fn flow_acl_change(&self) {
+        self.base.pause.store(false, Ordering::Relaxed);
         self.base.reset_whitelist.store(true, Ordering::Relaxed);
     }
 }
@@ -415,6 +416,9 @@ impl MirrorModeDispatcher {
                     self.base.need_update_bpf.store(true, Ordering::Relaxed);
                 }
                 self.base.check_and_update_bpf();
+                continue;
+            }
+            if self.base.pause.load(Ordering::Relaxed) {
                 continue;
             }
             #[cfg(target_os = "linux")]
