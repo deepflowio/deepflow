@@ -15,6 +15,7 @@
  */
 
 pub mod af_packet;
+pub mod vhost;
 pub(crate) mod bpf;
 
 #[cfg(target_os = "windows")]
