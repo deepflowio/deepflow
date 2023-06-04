@@ -40,7 +40,7 @@ void os_exit(int code)
 	exit(code);
 }
 
-void os_puts(char *string, uint32_t string_length, bool is_stdout)
+void os_puts(FILE *stream, char *string, uint32_t string_length, bool is_stdout)
 {
 	int fd;
 	struct iovec iovs[2];
@@ -53,10 +53,10 @@ void os_puts(char *string, uint32_t string_length, bool is_stdout)
 	if (is_stdout)
 		writev(1, iovs, n_iovs);
 
-	if (!log_stream)
+	if (!stream)
 		return;
 
-	fd = fileno(log_stream);
+	fd = fileno(stream);
 	writev(fd, iovs, n_iovs);
 }
 
@@ -76,9 +76,9 @@ static char *dispatch_message(char *msg, uint16_t len)
 		return msg;
 
 	if (log_to_stdout)
-		os_puts(msg, len, true);
+		os_puts(log_stream, msg, len, true);
 	else
-		os_puts(msg, len, false);
+		os_puts(log_stream, msg, len, false);
 
 	return msg;
 }

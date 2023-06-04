@@ -68,4 +68,5 @@ void _ebpf_error(int how_to_die,
                  uint32_t line_number,
                  char *fmt, ...);
 void _ebpf_info(char *fmt, ...);
-#endif
+void os_puts(FILE *stream, char *string, uint32_t string_length, bool is_stdout);
+#endif /* __INCLUDE_LOG_H__ */

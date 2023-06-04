@@ -45,12 +45,17 @@ struct stack_trace_key_t *raw_stack_data;
 static u64 stack_trace_lost;
 static struct bpf_tracer *profiler_tracer;
 static volatile u64 profiler_stop;
+// for flame graph
+static stack_trace_msg_hash_t test_fg_hash;
+static FILE *folded_file;
+#define FOLDED_FILE_PATH "./profiler.folded" 
+
 /*
  * The iteration count causes BPF to switch buffers with each iteration.
  */
 static u64 transfer_count;
 static u64 process_count;
-static volatile u64 reader_exit;
+
 static void print_profiler_status(struct bpf_tracer *t, u64 iter_count,
 				  stack_str_hash_t *h,
 				  stack_trace_msg_hash_t *msg_h);
@@ -64,6 +69,9 @@ static void reader_lost_cb(void *t, u64 lost)
 
 static void reader_raw_cb(void *t, void *raw, int raw_size)
 {
+	if (unlikely(profiler_stop == 1))
+		return;
+
 	struct stack_trace_key_t *v;
 	struct bpf_tracer *tracer = (struct bpf_tracer *)t;
 	v = (struct stack_trace_key_t *)raw;
@@ -91,8 +99,7 @@ static int relase_profiler(struct bpf_tracer *tracer)
 
 	/* release object */
 	release_object(tracer->obj);
-	reader_exit = 1;
-	CLIB_MEMORY_STORE_BARRIER();
+
 	tracer_reader_unlock(tracer);
 
 	return ETR_OK;
@@ -138,7 +145,7 @@ static int push_and_free_msg_kvp_cb(stack_trace_msg_hash_kv *kv, void *ctx)
  		 * higher level for processing. The higher level will se-
  		 * nd the data to the server for storage as required.
  		 */
-		if (likely(!profiler_stop))
+		if (likely(profiler_stop == 0))
 			fun(msg);
 
 		clib_mem_free((void *)msg);
@@ -305,6 +312,7 @@ static void process_bpf_stacktraces(struct bpf_tracer *t,
 		return;
 	}
 
+
 	if (has_event) {
 
 check_again:
@@ -368,7 +376,7 @@ static void cp_reader_work(void *arg)
 
 	for (;;) {
 		tracer_reader_lock(t);
-		if (reader_exit)
+		if (profiler_stop == 1)
 			goto exit;
 		process_bpf_stacktraces(t, reader_a, reader_b);
 		tracer_reader_unlock(t);
@@ -407,7 +415,8 @@ static int create_profiler(struct bpf_tracer *tracer)
 					     MAP_PERF_PROFILER_BUF_A_NAME,
 					     reader_raw_cb,
 					     reader_lost_cb,
-					     PROFILE_PG_CNT_DEF, -1);
+					     PROFILE_PG_CNT_DEF,
+					     PROFILER_READER_POLL_TIMEOUT);
 	if (reader_a == NULL)
 		return ETR_NORESOURCE;
 
@@ -415,7 +424,8 @@ static int create_profiler(struct bpf_tracer *tracer)
 					     MAP_PERF_PROFILER_BUF_B_NAME,
 					     reader_raw_cb,
 					     reader_lost_cb,
-					     PROFILE_PG_CNT_DEF, -1);
+					     PROFILE_PG_CNT_DEF,
+					     PROFILER_READER_POLL_TIMEOUT);
 	if (reader_b == NULL) {
 		free_perf_buffer_reader(reader_a);
 		return ETR_NORESOURCE;
@@ -558,4 +568,77 @@ int start_continuous_profiler(int freq,
 
 	tracer->state = TRACER_RUNNING;
 	return (0);
+}
+
+void process_stack_trace_data_for_flame_graph(stack_trace_msg_t *val)
+{
+	if (unlikely(test_fg_hash.buckets == NULL)) {
+		init_stack_trace_msg_hash(&test_fg_hash,
+					  "flame_graph_test");
+		unlink(FOLDED_FILE_PATH);
+		folded_file = fopen(FOLDED_FILE_PATH, "a+");
+		if (folded_file == NULL)
+			return;
+	}
+
+	stack_trace_msg_kv_t msg_kvp;
+	msg_kvp.k.pid = (u64) val->pid;
+        msg_kvp.k.stime = val->stime;
+	msg_kvp.k.u_stack_id = val->u_stack_id;
+	msg_kvp.k.k_stack_id = val->k_stack_id;
+
+	if (stack_trace_msg_hash_search(&test_fg_hash, (stack_trace_msg_hash_kv *)&msg_kvp,
+					(stack_trace_msg_hash_kv *)&msg_kvp) == 0) {
+		((stack_trace_msg_t *)msg_kvp.msg_ptr)->count++;
+		return;
+	} else {
+		int len = sizeof(*val) + val->data_len + 1;
+		char *p = clib_mem_alloc_aligned(len, 0, NULL);
+		if (p == NULL) return;
+		msg_kvp.msg_ptr = pointer_to_uword(p);
+		memcpy(p, val, sizeof(*val) + val->data_len);
+		p[sizeof(*val) + val->data_len] = '\0';
+		if (stack_trace_msg_hash_add_del(&test_fg_hash,
+				 (stack_trace_msg_hash_kv *)&msg_kvp,
+				 1 /* is_add */ )) {
+			ebpf_warning("stack_trace_msg_hash_add_del() failed.\n");
+		}
+	}
+}
+
+static int gen_stack_trace_folded_file(stack_trace_msg_hash_kv *kv, void *ctx)
+{
+	stack_trace_msg_kv_t *msg_kv = (stack_trace_msg_kv_t *)kv;
+	if (msg_kv->msg_ptr != 0) {
+		stack_trace_msg_t *msg = (stack_trace_msg_t *)msg_kv->msg_ptr;
+		int len = msg->data_len + sizeof(msg->comm) + 18;
+		char str[len];
+		snprintf(str, len, "%s;%s %u\n", msg->comm, msg->data, msg->count);
+		os_puts(folded_file, str, strlen(str), false);
+#ifdef CP_DEBUG
+		ebpf_debug("tiemstamp %lu pid %u stime %lu u_stack_id %lu k_statck_id"
+			   "%lu cpu %u count %u comm %s datalen %u data %s\n",
+			   msg->time_stamp, msg->pid, msg->stime, msg->u_stack_id,
+			   msg->k_stack_id, msg->cpu, msg->count, msg->comm,
+			   msg->data_len, msg->data);
+#endif
+		clib_mem_free((void *)msg);
+		(*(u64 *) ctx)++;
+	}
+
+	return BIHASH_WALK_CONTINUE;
+}
+
+void release_flame_graph_hash(void)
+{
+	u64 elem_count = 0;
+	stack_trace_msg_hash_foreach_key_value_pair(&test_fg_hash,
+						    gen_stack_trace_folded_file,
+						    (void *)&elem_count);
+	ebpf_info("flame graph folded strings count %lu\n", elem_count);
+	ebpf_info("Please use the following command to generate a flame graph:"
+		  "\n\n\033[33;1mcat ./profiler.folded |./.flamegraph.pl --color=io"
+		  " --countname=ms > profiler-test.svg\033[0m\n");
+	fclose(folded_file);
+	stack_trace_msg_hash_free(&test_fg_hash);
 }

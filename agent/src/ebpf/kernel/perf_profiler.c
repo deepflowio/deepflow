@@ -31,9 +31,9 @@
 #define USER_STACKID_FLAGS (0 | BPF_F_FAST_STACK_CMP | BPF_F_USER_STACK)
 
 /*
- * This BPF probe utilizes two fundamental data structures to sample
- * stack traces:
- * 
+ * To keep the stack trace profiler "always on," we utilize a double
+ * buffering mechanism and allocate two identical data structures. 
+ *
  * 1 stack_map Used to collect the call stack information of kernel
  *   functions. Used to collect the call stack information. Maps the
  *   entire stack trace with stack IDs.

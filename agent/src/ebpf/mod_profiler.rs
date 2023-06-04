@@ -79,4 +79,9 @@ pub fn start_continuous_profiler(
  */
 pub fn stop_continuous_profiler()-> c_int;
 
+/*
+ * test flame graph
+ */
+pub fn process_stack_trace_data_for_flame_graph(_data: *mut stack_profile_data);
+pub fn release_flame_graph_hash();
 }

@@ -139,4 +139,5 @@ enum {
 #define STACK_TRACE_MSG_HASH_BUCKETS_NUM	8192
 #define STACK_TRACE_MSG_HASH_MEM_SZ		(1ULL << 31) // 2Gbytes
 
+#define PROFILER_READER_POLL_TIMEOUT		500 //msecs
 #endif /* DF_EBPF_CONFIG_H */

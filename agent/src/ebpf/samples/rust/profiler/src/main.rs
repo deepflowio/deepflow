@@ -50,6 +50,7 @@ fn cp_process_name_safe(cp: *mut stack_profile_data) -> String {
 
 extern "C" fn continuous_profiler_callback(cp: *mut stack_profile_data) {
     unsafe {
+          process_stack_trace_data_for_flame_graph(cp);
           let data = sk_data_str_safe(cp);
           println!("\n+ --------------------------------- +");
           println!("{} PID {} START-TIME {} U-STACKID {} K-STACKID {} COMM {} CPU {} COUNT {} LEN {} \n  - {}",
@@ -67,6 +68,7 @@ extern "C" fn continuous_profiler_callback(cp: *mut stack_profile_data) {
 }
 
 fn main() {
+    // cat ./.profiler.folded |./flamegraph.pl --color=io --countname=ms > profiler-test.svg
     let log_file = CString::new("/var/log/deepflow-ebpf.log".as_bytes()).unwrap();
     let log_file_c = log_file.as_c_str();
     unsafe {
@@ -92,6 +94,7 @@ fn main() {
         print!("test OK\n");
         thread::sleep(Duration::from_secs(20));
         stop_continuous_profiler();
+	release_flame_graph_hash();
     }
 
     loop {

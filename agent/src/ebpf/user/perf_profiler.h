@@ -71,4 +71,6 @@ typedef struct {
 int stop_continuous_profiler(void);
 int start_continuous_profiler(int freq,
 			      tracer_callback_t callback);
+void process_stack_trace_data_for_flame_graph(stack_trace_msg_t *val);
+void release_flame_graph_hash(void);
 #endif /* DF_USER_PERF_PROFILER_H */
