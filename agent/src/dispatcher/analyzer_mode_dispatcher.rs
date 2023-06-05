@@ -110,7 +110,9 @@ impl AnalyzerModeDispatcherListener {
         return self.base.id;
     }
 
-    pub fn reset_bpf_white_list(&self) {
+    pub fn flow_acl_change(&self) {
+        // Start capturing traffic after resource information is distributed
+        self.base.pause.store(false, Ordering::Relaxed);
         self.base.reset_whitelist.store(true, Ordering::Relaxed);
     }
 }
@@ -517,6 +519,9 @@ impl AnalyzerModeDispatcher {
                     base.need_update_bpf.store(true, Ordering::Relaxed);
                 }
                 base.check_and_update_bpf();
+                continue;
+            }
+            if base.pause.load(Ordering::Relaxed) {
                 continue;
             }
 
