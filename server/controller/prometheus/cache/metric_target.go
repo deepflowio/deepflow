@@ -35,15 +35,11 @@ func NewMetricTargetKey(metricName string, targetID int) MetricTargetKey {
 }
 
 type metricTarget struct {
-	targetCache                  *target
-	metricTargetKeyMap           sync.Map // for metric_target check
-	metricNameToTargetLabelNames sync.Map // for metric label type check
+	metricTargetKeyMap sync.Map
 }
 
-func newMetricTarget(tc *target) *metricTarget {
-	return &metricTarget{
-		targetCache: tc,
-	}
+func newMetricTarget() *metricTarget {
+	return &metricTarget{}
 }
 
 func (mt *metricTarget) IfKeyExists(k MetricTargetKey) bool {
@@ -57,13 +53,13 @@ func (mt *metricTarget) Add(batch []MetricTargetKey) {
 	}
 }
 
-func (t *metricTarget) refresh(args ...interface{}) error {
-	mts, err := t.load()
+func (mt *metricTarget) refresh(args ...interface{}) error {
+	mts, err := mt.load()
 	if err != nil {
 		return err
 	}
 	for _, item := range mts {
-		t.metricTargetKeyMap.Store(NewMetricTargetKey(item.MetricName, item.TargetID), struct{}{})
+		mt.metricTargetKeyMap.Store(NewMetricTargetKey(item.MetricName, item.TargetID), struct{}{})
 	}
 	return nil
 }

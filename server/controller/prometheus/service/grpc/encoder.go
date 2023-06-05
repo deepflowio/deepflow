@@ -30,12 +30,12 @@ func NewEncoderEvent() *EncoderEvent {
 }
 
 func (e *EncoderEvent) Encode(ctx context.Context, in *controller.SyncPrometheusRequest) (*controller.SyncPrometheusResponse, error) {
-	log.Debugf("SyncPrometheusRequest: %+v", in)
+	log.Infof("EncodePrometheusRequest: %+v", in)
 	resp, err := prometheus.GetSingleton().Encoder.Encode(in)
 	if err != nil {
 		log.Errorf("sync error: %+v", err)
 		return &controller.SyncPrometheusResponse{}, nil
 	}
-	log.Debugf("SyncPrometheusResponse: %+v", resp)
+	log.Infof("EncodePrometheusResponse: %+v", resp)
 	return resp, nil
 }

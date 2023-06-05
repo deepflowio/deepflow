@@ -386,10 +386,8 @@ func (e *Synchronizer) addLabelValueCache(arg ...interface{}) error {
 
 func (e *Synchronizer) tryAppendMetricAPPLabelLayoutToEncode(toEn mapset.Set[cache.LayoutKey], metricName, labelName string, targetID int) {
 	targetLabelNameToValue := e.cache.Target.GetLabelNameToValueByID(targetID)
-	for tln := range targetLabelNameToValue {
-		if tln == labelName {
-			return
-		}
+	if _, ok := targetLabelNameToValue[labelName]; ok {
+		return
 	}
 	k := cache.NewLayoutKey(metricName, labelName)
 	if _, ok := e.cache.MetricAndAPPLabelLayout.GetIndexByKey(k); !ok {
@@ -434,8 +432,9 @@ func (e *Synchronizer) addMetricLabelCache(arg ...interface{}) error {
 }
 
 func (e *Synchronizer) tryAppendMetricTargetToAdd(toAdd mapset.Set[cache.MetricTargetKey], metricName string, targetID int) {
-	if ok := e.cache.MetricTarget.IfKeyExists(cache.NewMetricTargetKey(metricName, targetID)); !ok {
-		toAdd.Add(cache.NewMetricTargetKey(metricName, targetID))
+	mtk := cache.NewMetricTargetKey(metricName, targetID)
+	if ok := e.cache.MetricTarget.IfKeyExists(mtk); !ok {
+		toAdd.Add(mtk)
 	}
 }
 
