@@ -1770,7 +1770,10 @@ impl AgentComponents {
                 .netns(netns)
                 .trident_type(candidate_config.dispatcher.trident_type)
                 .queue_debugger(queue_debugger.clone())
-                .analyzer_queue_size(yaml_config.analyzer_queue_size as usize);
+                .analyzer_queue_size(yaml_config.analyzer_queue_size as usize)
+                .analyzer_raw_packet_block_size(
+                    yaml_config.analyzer_raw_packet_block_size as usize,
+                );
 
             #[cfg(target_os = "linux")]
             let dispatcher = match dispatcher_builder

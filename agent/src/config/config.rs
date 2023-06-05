@@ -328,6 +328,7 @@ pub struct YamlConfig {
     pub flow_queue_size: usize,
     pub quadruple_queue_size: usize,
     pub analyzer_queue_size: usize,
+    pub analyzer_raw_packet_block_size: usize,
     #[serde(rename = "ovs-dpdk-enable")]
     pub ovs_dpdk_enabled: bool,
     pub dpdk_pmd_core_id: u32,
@@ -444,6 +445,9 @@ impl YamlConfig {
         }
         if c.analyzer_queue_size < 1 << 17 {
             c.analyzer_queue_size = 1 << 17;
+        }
+        if c.analyzer_raw_packet_block_size < 65536 {
+            c.analyzer_raw_packet_block_size = 65536;
         }
         if c.collector_sender_queue_size == 0 {
             c.collector_sender_queue_size = if tap_mode == trident::TapMode::Analyzer {
@@ -619,6 +623,7 @@ impl Default for YamlConfig {
             flow_queue_size: 65536,
             quadruple_queue_size: 262144,
             analyzer_queue_size: 131072,
+            analyzer_raw_packet_block_size: 65536,
             ovs_dpdk_enabled: false,
             dpdk_pmd_core_id: 0,
             dpdk_ring_port: "dpdkr0".into(),

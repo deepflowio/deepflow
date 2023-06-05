@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-use std::borrow::Cow;
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr};
+use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
 #[cfg(target_os = "linux")]
@@ -53,7 +53,36 @@ use crate::{
 };
 use npb_handler::NpbMode;
 use npb_pcap_policy::PolicyData;
-use public::utils::net::{is_unicast_link_local, MacAddr};
+use public::{
+    buffer::FixedBuffer,
+    utils::net::{is_unicast_link_local, MacAddr},
+};
+
+#[derive(Clone, Debug)]
+pub enum RawPacket<'a> {
+    Borrowed(&'a [u8]),
+    Owned(FixedBuffer<u8>),
+}
+
+impl<'a> RawPacket<'a> {
+    pub fn len(&self) -> usize {
+        match self {
+            Self::Borrowed(b) => b.len(),
+            Self::Owned(o) => o.len(),
+        }
+    }
+}
+
+impl<'a> Deref for RawPacket<'a> {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Borrowed(b) => b,
+            Self::Owned(o) => &o,
+        }
+    }
+}
 
 #[derive(Clone, Debug, Default)]
 pub struct MetaPacket<'a> {
@@ -61,7 +90,7 @@ pub struct MetaPacket<'a> {
     pub lookup_key: LookupKey,
     pub need_reverse_flow: bool, // Use socket_info to correct flow direction
 
-    pub raw: Option<Cow<'a, [u8]>>,
+    pub raw: Option<RawPacket<'a>>,
     pub packet_len: u32,
     pub vlan_tag_size: u8,
     pub ttl: u8,
@@ -384,13 +413,13 @@ impl<'a> MetaPacket<'a> {
 
     pub fn update_with_raw_copy(
         &mut self,
-        packet: Vec<u8>,
+        packet: FixedBuffer<u8>,
         src_endpoint: bool,
         dst_endpoint: bool,
         timestamp: Duration,
         original_length: usize,
     ) -> error::Result<()> {
-        self.raw = Some(Cow::from(packet));
+        self.raw = Some(RawPacket::Owned(packet));
         self.update_fields_except_raw(src_endpoint, dst_endpoint, timestamp, original_length)
     }
 
@@ -402,7 +431,7 @@ impl<'a> MetaPacket<'a> {
         timestamp: Duration,
         original_length: usize,
     ) -> error::Result<()> {
-        self.raw = Some(Cow::from(packet));
+        self.raw = Some(RawPacket::Borrowed(packet));
         self.update_fields_except_raw(src_endpoint, dst_endpoint, timestamp, original_length)
     }
 
