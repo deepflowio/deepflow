@@ -15,6 +15,7 @@
  */
 
 pub mod bitmap;
+pub mod buffer;
 pub mod bytes;
 pub mod consts;
 pub mod counter;

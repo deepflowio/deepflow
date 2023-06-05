@@ -475,6 +475,12 @@ vtap_group_id: g-xxxxxx
   ## Note: Whether to enable mirror traffic deduplication when tap_mode = 2.
   #analyzer-dedup-disabled: false
 
+  ## Buffer block size used to store raw packet.
+  ## Larger value will reduce memory allocation for raw packet, but will also
+  ## delay memory free.
+  ## Default: 65536, Range: [65536: +oo)
+  #analyzer-raw-packet-block-size: 65536
+
   ## Default TAP for Mirror Traffic
   ## Default: 3, means Cloud Network
   ## Options: 1-2,4-255 (IDC Network), 3 (Cloud Network)
