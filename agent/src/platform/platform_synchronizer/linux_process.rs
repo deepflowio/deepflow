@@ -40,8 +40,7 @@ use crate::config::{
     OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME, OS_PROC_REGEXP_MATCH_TYPE_TAG,
 };
 
-const DOCKER_CRI_CONTAINER_ID_LEN: usize = 64;
-const CONTAINERD_CRI_CONTAINER_ID_LEN: usize = 64;
+const CONTAINER_ID_LEN: usize = 64;
 
 #[derive(Debug, Clone)]
 pub struct ProcessData {
@@ -627,23 +626,20 @@ fn get_container_id(proc: &Process) -> Option<String> {
         return None;
     };
 
-    if s.len() == DOCKER_CRI_CONTAINER_ID_LEN {
+    if s.len() == CONTAINER_ID_LEN {
         // when length is 64 assume is docker cri
         Some(s.to_string())
-    } else if s.starts_with("cri-containerd") {
-        // when start with `cri-containerd` assume as containerd cri, the path like
-        // cri-containerd-74541fe87421db054a995cdc6330f500cd2d0b5dd324f1ef460580087e2575e5.scope
+    } else {
+        // other cri likely have format like `${cri-prefix}-${container id}.scope`
         let Some((_, sp))  = s.rsplit_once("-") else {
             warn!("containerd cri path: `{:?}` get container id fail", path);
             return None;
         };
-        if !sp.len() == CONTAINERD_CRI_CONTAINER_ID_LEN + ".scope".len() {
+        if !sp.len() == CONTAINER_ID_LEN + ".scope".len() {
             warn!("containerd cri path: `{}` parse fail, length incorrect", sp);
             return None;
         }
-        Some(sp[..CONTAINERD_CRI_CONTAINER_ID_LEN].to_string())
-    } else {
-        None
+        Some(sp[..CONTAINER_ID_LEN].to_string())
     }
 }
 
