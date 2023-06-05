@@ -141,7 +141,7 @@ func GetTagTranslator(name, alias, db, table string) (Statement, string, error) 
 }
 
 func GetSelectMetricIDFilter(name, as, db, table string) (view.Node, bool) {
-	if name == "value" && db == "prometheus" {
+	if (name == "value" || name == "tag") && db == "prometheus" {
 		if metricID, ok := METRIC_NAME_TO_ID[table]; ok {
 			filter := fmt.Sprintf("metric_id=%d", metricID)
 			return &view.Expr{Value: "(" + filter + ")"}, true
