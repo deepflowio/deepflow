@@ -428,6 +428,7 @@ func (c *Cloud) getSubDomainPods(
 			Annotation:          pod.Annotation,
 			ENV:                 pod.ENV,
 			Label:               pod.Label,
+			ContainerIDs:        pod.ContainerIDs,
 			State:               pod.State,
 			CreatedAt:           pod.CreatedAt,
 			PodReplicaSetLcuuid: pod.PodReplicaSetLcuuid,

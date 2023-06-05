@@ -37,7 +37,7 @@ use public::{
 
 const STATS_PREFIX: &'static str = "deepflow_agent";
 const TICK_CYCLE: Duration = Duration::from_secs(10);
-pub const DFSTATS_SENDER_ID: usize = 100;
+const STATS_SENDER_QUEUE_SIZE: usize = 4096;
 
 pub enum StatsOption {
     Tag(&'static str, String),
@@ -155,7 +155,7 @@ impl Collector {
     }
 
     pub fn with_min_interval<S: AsRef<str>>(hostname: S, interval: Duration) -> Self {
-        let (stats_queue_sender, stats_queue_receiver, counter) = bounded(1000);
+        let (stats_queue_sender, stats_queue_receiver, counter) = bounded(STATS_SENDER_QUEUE_SIZE);
         let min_interval = if interval <= TICK_CYCLE {
             TICK_CYCLE
         } else {

@@ -31,6 +31,7 @@ gprocess                   , 进程                       ,
 
 attribute                  , Attribute                  , 事件特有属性
 k8s.label                  , K8s Label                  ,
+k8s.annotation             , K8s Annotation             ,
 cloud.tag                  , Cloud Tag                  ,
 os.app                     , OS APP                     ,
 

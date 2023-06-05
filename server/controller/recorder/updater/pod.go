@@ -104,6 +104,7 @@ func (p *Pod) generateDBItemToAdd(cloudItem *cloudmodel.Pod) (*mysql.Pod, bool) 
 		Name:            cloudItem.Name,
 		Label:           cloudItem.Label,
 		ENV:             cloudItem.ENV,
+		ContainerIDs:    cloudItem.ContainerIDs,
 		Annotation:      cloudItem.Annotation,
 		State:           cloudItem.State,
 		PodClusterID:    podClusterID,

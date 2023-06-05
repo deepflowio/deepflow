@@ -104,3 +104,12 @@ type OSAPPTagKey struct {
 type OSAPPTagsKey struct {
 	PID int
 }
+
+type K8sAnnotationKey struct {
+	ID  int
+	Key string
+}
+
+type K8sAnnotationsKey struct {
+	ID int
+}

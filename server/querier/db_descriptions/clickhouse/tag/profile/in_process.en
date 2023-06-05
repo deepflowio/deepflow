@@ -24,6 +24,7 @@ pod                        , K8s POD                       ,
 service                    , Service                       ,
 
 k8s.label                  , K8s Label                     ,
+k8s.annotation             , K8s Annotation                ,
 cloud.tag                  , Cloud Tag                     ,
 
 ip                         , IP Address                    ,

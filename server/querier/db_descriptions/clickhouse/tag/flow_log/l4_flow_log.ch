@@ -40,6 +40,7 @@ tap_port_chost        , 采集网卡所属云服务器           ,
 tap_port_pod_node     , 采集网卡所属容器节点           ,
 
 k8s.label             , K8s Label                    ,
+k8s.annotation        , K8s Annotation               ,
 cloud.tag             , Cloud Tag                    ,
 os.app                , OS APP                       ,
 
