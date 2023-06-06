@@ -38,7 +38,8 @@ tap_port_chost             , tap_port_chost            , tap_port_chost         
 tap_port_pod_node          , tap_port_pod_node         , tap_port_pod_node         , resource      ,                        , Universal Tag   , 111
 
 k8s.label                  , k8s.label_0               , k8s.label_1               , map           ,                        , Custom Tag      , 111
-k8s.annotation             , k8s.annotation_0          , k8s.annotation_1          , map            ,                       , Custom Tag      , 111
+k8s.annotation             , k8s.annotation_0          , k8s.annotation_1          , map           ,                        , Custom Tag      , 111
+k8s.env                    , k8s.env_0                 , k8s.env_1                 , map           ,                        , Custom Tag      , 111
 cloud.tag                  , cloud.tag_0               , cloud.tag_1               , map           ,                        , Custom Tag      , 111
 os.app                     , os.app_0                  , os.app_1                  , map           ,                        , Custom Tag      , 111
 

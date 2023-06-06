@@ -77,6 +77,19 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 					filterName = strings.TrimSuffix(filterName, "_1")
 					filter := fmt.Sprintf(tagItem.NotNullFilter, filterName, filterName)
 					return &view.Expr{Value: "(" + filter + ")"}, true
+				} else if strings.HasPrefix(preAsTag, "k8s.env.") {
+					if strings.HasSuffix(preAsTag, "_0") {
+						tagItem, ok = tag.GetTag("k8s_env_0", db, table, "default")
+					} else if strings.HasSuffix(preAsTag, "_1") {
+						tagItem, ok = tag.GetTag("k8s_env_1", db, table, "default")
+					} else {
+						tagItem, ok = tag.GetTag("k8s_env", db, table, "default")
+					}
+					filterName := strings.TrimPrefix(preAsTag, "k8s.env.")
+					filterName = strings.TrimSuffix(filterName, "_0")
+					filterName = strings.TrimSuffix(filterName, "_1")
+					filter := fmt.Sprintf(tagItem.NotNullFilter, filterName)
+					return &view.Expr{Value: "(" + filter + ")"}, true
 				} else if strings.HasPrefix(preAsTag, "cloud.tag.") {
 					if strings.HasSuffix(preAsTag, "_0") {
 						tagItem, ok = tag.GetTag("cloud_tag_0", db, table, "default")
