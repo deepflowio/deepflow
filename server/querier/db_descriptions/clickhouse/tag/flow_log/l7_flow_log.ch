@@ -41,6 +41,7 @@ tap_port_pod_node         , 采集网卡所属容器节点       ,
 
 k8s.label                 , K8s Label                , K8s 自定义 Label。
 k8s.annotation            , K8s Annotation           ,
+k8s.env                   , K8s Env                  ,
 attribute                 , Attribute                , OpenTelemetry Span 属性，以及应用协议特有属性。
 cloud.tag                 , Cloud Tag                ,
 os.app                    , OS APP                   ,

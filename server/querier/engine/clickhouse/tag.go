@@ -64,6 +64,19 @@ func GetTagTranslator(name, alias, db, table string) (Statement, error) {
 			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.annotation.")
 			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix, nameNoPreffix, nameNoPreffix)
 			stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag}
+		} else if strings.HasPrefix(name, "k8s.env.") {
+			if strings.HasSuffix(name, "_0") {
+				tagItem, ok = tag.GetTag("k8s_env_0", db, table, "default")
+			} else if strings.HasSuffix(name, "_1") {
+				tagItem, ok = tag.GetTag("k8s_env_1", db, table, "default")
+			} else {
+				tagItem, ok = tag.GetTag("k8s_env", db, table, "default")
+			}
+			nameNoSuffix := strings.TrimSuffix(name, "_0")
+			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
+			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.env.")
+			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
+			stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag}
 		} else if strings.HasPrefix(name, "cloud.tag.") {
 			if strings.HasSuffix(name, "_0") {
 				tagItem, ok = tag.GetTag("cloud_tag_0", db, table, "default")

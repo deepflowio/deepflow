@@ -108,6 +108,10 @@ func TransWhereTagFunction(name string, args []string) (filter string) {
 			serviceIDSuffix := "service_id" + suffix
 			tagNoPreffix := strings.TrimPrefix(resourceNoSuffix, "k8s.annotation.")
 			filter = fmt.Sprintf("((toUInt64(%s) IN (SELECT id FROM flow_tag.pod_service_k8s_annotation_map WHERE key='%s')) OR (toUInt64(%s) IN (SELECT id FROM flow_tag.pod_k8s_annotation_map WHERE key='%s')))", serviceIDSuffix, tagNoPreffix, podIDSuffix, tagNoPreffix)
+		} else if strings.HasPrefix(resourceNoSuffix, "k8s.env.") {
+			podIDSuffix := "pod_id" + suffix
+			tagNoPreffix := strings.TrimPrefix(resourceNoSuffix, "k8s.env.")
+			filter = fmt.Sprintf("toUInt64(%s) IN (SELECT id FROM flow_tag.pod_k8s_env_map WHERE key='%s')", podIDSuffix, tagNoPreffix)
 		} else if strings.HasPrefix(resourceNoSuffix, "cloud.tag.") {
 			deviceIDSuffix := "l3_device_id" + suffix
 			deviceTypeSuffix := "l3_device_type" + suffix
@@ -254,6 +258,25 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 								filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, nameNoPreffix, op, t.Value, nameNoPreffix)
 							} else {
 								filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, nameNoPreffix, op, t.Value, nameNoPreffix)
+							}
+							return &view.Expr{Value: filter}, nil
+						}
+					} else if strings.HasPrefix(preAsTag, "k8s.env.") {
+						if strings.HasSuffix(preAsTag, "_0") {
+							tagItem, ok = tag.GetTag("k8s_env_0", db, table, "default")
+						} else if strings.HasSuffix(preAsTag, "_1") {
+							tagItem, ok = tag.GetTag("k8s_env_1", db, table, "default")
+						} else {
+							tagItem, ok = tag.GetTag("k8s_env", db, table, "default")
+						}
+						if ok {
+							nameNoSuffix := strings.TrimSuffix(preAsTag, "_0")
+							nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
+							nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.env.")
+							if strings.Contains(op, "match") {
+								filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, nameNoPreffix)
+							} else {
+								filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, nameNoPreffix)
 							}
 							return &view.Expr{Value: filter}, nil
 						}
@@ -417,6 +440,25 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, nameNoPreffix, op, t.Value, nameNoPreffix)
 						} else {
 							filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, nameNoPreffix, op, t.Value, nameNoPreffix)
+						}
+						return &view.Expr{Value: filter}, nil
+					}
+				} else if strings.HasPrefix(t.Tag, "k8s.env.") {
+					if strings.HasSuffix(t.Tag, "_0") {
+						tagItem, ok = tag.GetTag("k8s_env_0", db, table, "default")
+					} else if strings.HasSuffix(t.Tag, "_1") {
+						tagItem, ok = tag.GetTag("k8s_env_1", db, table, "default")
+					} else {
+						tagItem, ok = tag.GetTag("k8s_env", db, table, "default")
+					}
+					if ok {
+						nameNoSuffix := strings.TrimSuffix(t.Tag, "_0")
+						nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
+						nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.env.")
+						if strings.Contains(op, "match") {
+							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, nameNoPreffix)
+						} else {
+							filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, nameNoPreffix)
 						}
 						return &view.Expr{Value: filter}, nil
 					}
