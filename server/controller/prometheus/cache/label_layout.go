@@ -38,12 +38,7 @@ func NewLayoutKey(metricName, labelName string) LayoutKey {
 type appLabelNameToValue map[string]string
 
 type metricAndAPPLabelLayout struct {
-	layoutKeyToIndex                sync.Map
-	metricNameToAPPLabelNameToValue map[string]appLabelNameToValue // only for fully assembled
-}
-
-func (mll *metricAndAPPLabelLayout) GetLabelNameToValueByMetricName(n string) appLabelNameToValue {
-	return mll.metricNameToAPPLabelNameToValue[n]
+	layoutKeyToIndex sync.Map
 }
 
 func (mll *metricAndAPPLabelLayout) GetIndexByKey(key LayoutKey) (uint8, bool) {
@@ -59,22 +54,12 @@ func (mll *metricAndAPPLabelLayout) Add(batch []*controller.PrometheusMetricAPPL
 	}
 }
 
-func (mll *metricAndAPPLabelLayout) clear() {
-	mll.metricNameToAPPLabelNameToValue = make(map[string]appLabelNameToValue)
-}
-
 func (mll *metricAndAPPLabelLayout) refresh(args ...interface{}) error {
 	metricAPPLabelLayouts, err := mll.load()
 	if err != nil {
 		return err
 	}
-	fully := args[0].(bool)
 	for _, l := range metricAPPLabelLayouts {
-		if fully {
-			if _, ok := mll.metricNameToAPPLabelNameToValue[l.MetricName]; !ok {
-				mll.metricNameToAPPLabelNameToValue[l.MetricName] = make(appLabelNameToValue)
-			}
-		}
 		mll.layoutKeyToIndex.Store(NewLayoutKey(l.MetricName, l.APPLabelName), uint8(l.APPLabelColumnIndex))
 	}
 	return nil

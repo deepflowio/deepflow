@@ -45,31 +45,31 @@ func NewSynchronizer() *Synchronizer {
 	}
 }
 
-func (e *Synchronizer) Sync(req *trident.PrometheusLabelRequest) (*trident.PrometheusLabelResponse, error) {
+func (s *Synchronizer) Sync(req *trident.PrometheusLabelRequest) (*trident.PrometheusLabelResponse, error) {
 	if req == nil || (len(req.GetRequestLabels()) == 0 && len(req.GetRequestTargets()) == 0) {
-		return e.assembleFully()
+		return s.assembleFully()
 	}
-	err := e.prepare(req)
+	err := s.prepare(req)
 	if err != nil {
 		log.Errorf("prepare error: %+v", err)
 		return nil, err
 	}
-	return e.assemble(req)
+	return s.assemble(req)
 }
 
-func (e *Synchronizer) assembleFully() (*trident.PrometheusLabelResponse, error) {
-	defer e.cache.Clear()
-	err := e.cache.RefreshFully()
+func (s *Synchronizer) assembleFully() (*trident.PrometheusLabelResponse, error) {
+	defer s.cache.Clear()
+	err := s.cache.RefreshFully()
 	if err != nil {
 		return nil, err
 	}
 	resp := new(trident.PrometheusLabelResponse)
-	mls, err := e.assembleLabelFully()
+	mls, err := s.assembleMetricLabelFully()
 	if err != nil {
 		return nil, errors.Wrap(err, "assembleLabelFully")
 	}
 	resp.ResponseLabelIds = mls
-	ts, err := e.assembleTargetFully()
+	ts, err := s.assembleTargetFully()
 	if err != nil {
 		return nil, errors.Wrap(err, "assembleTargetFully")
 	}
@@ -77,31 +77,27 @@ func (e *Synchronizer) assembleFully() (*trident.PrometheusLabelResponse, error)
 	return resp, err
 }
 
-func (e *Synchronizer) assembleLabelFully() ([]*trident.MetricLabelResponse, error) {
+func (s *Synchronizer) assembleMetricLabelFully() ([]*trident.MetricLabelResponse, error) {
 	var err error
 	mLabels := make([]*trident.MetricLabelResponse, 0)
-	e.cache.MetricName.Get().Range(func(k, v interface{}) bool {
+	s.cache.MetricName.Get().Range(func(k, v interface{}) bool {
 		var labels []*trident.LabelResponse
 		metricName := k.(string)
 		metricID := v.(int)
-		labelKeys := e.cache.MetricLabel.GetLabelsByMetricName(metricName)
+		labelKeys := s.cache.MetricLabel.GetLabelsByMetricName(metricName)
 		for i := range labelKeys {
 			lk := labelKeys[i]
-			labelNameID, ok := e.cache.LabelName.GetIDByName(lk.Name)
+			labelNameID, ok := s.cache.LabelName.GetIDByName(lk.Name)
 			if !ok {
 				log.Warningf("metric_name: %s label_name: %s id not found", metricName, lk.Name)
 				continue
 			}
-			labelValueID, ok := e.cache.LabelValue.GetIDByValue(lk.Value)
+			labelValueID, ok := s.cache.LabelValue.GetIDByValue(lk.Value)
 			if !ok {
 				log.Warningf("metric_name: %s label_value: %s id not found", metricName, lk.Value)
 				continue
 			}
-			idx, ok := e.cache.MetricAndAPPLabelLayout.GetIndexByKey(cache.NewLayoutKey(metricName, lk.Name))
-			if !ok {
-				log.Warningf("app_label_index (metric_name: %s, app_label_name: %s) not found", metricName, lk.Name)
-				continue
-			}
+			idx, _ := s.cache.MetricAndAPPLabelLayout.GetIndexByKey(cache.NewLayoutKey(metricName, lk.Name))
 			label := &trident.LabelResponse{
 				Name:                &lk.Name,
 				Value:               &lk.Value,
@@ -121,17 +117,17 @@ func (e *Synchronizer) assembleLabelFully() ([]*trident.MetricLabelResponse, err
 	return mLabels, err
 }
 
-func (e *Synchronizer) assembleTargetFully() ([]*trident.TargetResponse, error) {
+func (s *Synchronizer) assembleTargetFully() ([]*trident.TargetResponse, error) {
 	var err error
 	targets := make([]*trident.TargetResponse, 0)
-	e.cache.Target.Get().Range(func(k, v interface{}) bool {
+	s.cache.Target.Get().Range(func(k, v interface{}) bool {
 		tk := k.(cache.TargetKey)
-		tInstanceID, ok := e.cache.LabelValue.GetIDByValue(tk.Instance)
+		tInstanceID, ok := s.cache.LabelValue.GetIDByValue(tk.Instance)
 		if !ok {
 			log.Warningf("target: %s instance id not found", tk.Instance)
 			return true
 		}
-		tJobID, ok := e.cache.LabelValue.GetIDByValue(tk.Job)
+		tJobID, ok := s.cache.LabelValue.GetIDByValue(tk.Job)
 		if !ok {
 			log.Warningf("target: %s job id not found", tk.Job)
 			return true
@@ -149,7 +145,7 @@ func (e *Synchronizer) assembleTargetFully() ([]*trident.TargetResponse, error) 
 	return targets, err
 }
 
-func (e *Synchronizer) prepare(req *trident.PrometheusLabelRequest) error {
+func (s *Synchronizer) prepare(req *trident.PrometheusLabelRequest) error {
 	metricNamesToE := mapset.NewSet[string]()
 	labelNamesToE := mapset.NewSet[string]()
 	labelValuesToE := mapset.NewSet[string]()
@@ -159,32 +155,32 @@ func (e *Synchronizer) prepare(req *trident.PrometheusLabelRequest) error {
 	metricTargetsToAdd := mapset.NewSet[cache.MetricTargetKey]()
 	for _, m := range req.GetRequestLabels() {
 		mn := m.GetMetricName()
-		e.tryAppendMetricNameToEncode(metricNamesToE, mn)
+		s.tryAppendMetricNameToEncode(metricNamesToE, mn)
 		var instanceValue string
 		var jobValue string
 		for _, l := range m.GetLabels() {
 			ln := l.GetName()
 			lv := l.GetValue()
-			e.tryAppendLabelNameToEncode(labelNamesToE, ln)
-			e.tryAppendLabelValueToEncode(labelValuesToE, lv)
+			s.tryAppendLabelNameToEncode(labelNamesToE, ln)
+			s.tryAppendLabelValueToEncode(labelValuesToE, lv)
 			if ln == TargetLabelInstance {
 				instanceValue = l.GetValue()
 			} else if ln == TargetLabelJob {
 				jobValue = l.GetValue()
 			}
-			e.tryAppendLabelToAdd(labelsToAdd, ln, lv)
-			e.tryAppendMetricLabelToAdd(metricLabelsToAdd, mn, ln, lv)
+			s.tryAppendLabelToAdd(labelsToAdd, ln, lv)
+			s.tryAppendMetricLabelToAdd(metricLabelsToAdd, mn, ln, lv)
 		}
-		targetID, ok := e.cache.Target.GetIDByKey(cache.NewTargetKey(instanceValue, jobValue))
+		targetID, ok := s.cache.Target.GetIDByKey(cache.NewTargetKey(instanceValue, jobValue))
 		for _, l := range m.GetLabels() {
 			ln := l.GetName()
 			if ln == TargetLabelInstance || ln == TargetLabelJob {
 				continue
 			}
-			e.tryAppendMetricAPPLabelLayoutToEncode(metricAPPLabelLayoutsToE, mn, ln, targetID)
+			s.tryAppendMetricAPPLabelLayoutToEncode(metricAPPLabelLayoutsToE, mn, ln, targetID)
 		}
 		if ok {
-			e.tryAppendMetricTargetToAdd(metricTargetsToAdd, mn, targetID)
+			s.tryAppendMetricTargetToAdd(metricTargetsToAdd, mn, targetID)
 		}
 	}
 
@@ -193,7 +189,7 @@ func (e *Synchronizer) prepare(req *trident.PrometheusLabelRequest) error {
 		return nil
 	}
 
-	syncResp, err := e.grpcurl.Sync(
+	syncResp, err := s.grpcurl.Sync(
 		&controller.SyncPrometheusRequest{
 			MetricNames: metricNamesToE.ToSlice(),
 			LabelNames:  labelNamesToE.ToSlice(),
@@ -253,23 +249,23 @@ func (e *Synchronizer) prepare(req *trident.PrometheusLabelRequest) error {
 		return errors.Wrap(err, "grpcurl.Sync")
 	}
 	eg, ctx := errgroup.WithContext(context.Background())
-	AppendErrGroupWithContext(ctx, eg, e.addMetricNameCache, syncResp.GetMetricNames())
-	AppendErrGroupWithContext(ctx, eg, e.addLabelNameCache, syncResp.GetLabelNames())
-	AppendErrGroupWithContext(ctx, eg, e.addLabelValueCache, syncResp.GetLabelValues())
-	AppendErrGroupWithContext(ctx, eg, e.addMetricAPPLabelLayoutCache, syncResp.GetMetricAppLabelLayouts())
-	AppendErrGroupWithContext(ctx, eg, e.addLabelCache, syncResp.GetLabels())
-	AppendErrGroupWithContext(ctx, eg, e.addMetricLabelCache, metricLabelsToAdd)
+	AppendErrGroupWithContext(ctx, eg, s.addMetricNameCache, syncResp.GetMetricNames())
+	AppendErrGroupWithContext(ctx, eg, s.addLabelNameCache, syncResp.GetLabelNames())
+	AppendErrGroupWithContext(ctx, eg, s.addLabelValueCache, syncResp.GetLabelValues())
+	AppendErrGroupWithContext(ctx, eg, s.addMetricAPPLabelLayoutCache, syncResp.GetMetricAppLabelLayouts())
+	AppendErrGroupWithContext(ctx, eg, s.addLabelCache, syncResp.GetLabels())
+	AppendErrGroupWithContext(ctx, eg, s.addMetricLabelCache, metricLabelsToAdd)
 	return eg.Wait()
 }
 
-func (e *Synchronizer) assemble(req *trident.PrometheusLabelRequest) (*trident.PrometheusLabelResponse, error) {
+func (s *Synchronizer) assemble(req *trident.PrometheusLabelRequest) (*trident.PrometheusLabelResponse, error) {
 	resp := new(trident.PrometheusLabelResponse)
-	mls, err := e.assembleMetricLabel(req.GetRequestLabels())
+	mls, err := s.assembleMetricLabel(req.GetRequestLabels())
 	if err != nil {
 		return nil, errors.Wrap(err, "assembleMetricLabel")
 	}
 	resp.ResponseLabelIds = mls
-	ts, err := e.assembleTarget(req.GetRequestTargets())
+	ts, err := s.assembleTarget(req.GetRequestTargets())
 	if err != nil {
 		return nil, errors.Wrap(err, "assembleTarget")
 	}
@@ -277,11 +273,11 @@ func (e *Synchronizer) assemble(req *trident.PrometheusLabelRequest) (*trident.P
 	return resp, nil
 }
 
-func (e *Synchronizer) assembleMetricLabel(mls []*trident.MetricLabelRequest) ([]*trident.MetricLabelResponse, error) {
+func (s *Synchronizer) assembleMetricLabel(mls []*trident.MetricLabelRequest) ([]*trident.MetricLabelResponse, error) {
 	respMLs := make([]*trident.MetricLabelResponse, 0)
 	for _, ml := range mls {
 		mn := ml.GetMetricName()
-		mni, ok := e.cache.MetricName.GetIDByName(mn)
+		mni, ok := s.cache.MetricName.GetIDByName(mn)
 		if !ok {
 			log.Errorf("metric_name: %s id not found", mn)
 			continue
@@ -291,21 +287,23 @@ func (e *Synchronizer) assembleMetricLabel(mls []*trident.MetricLabelRequest) ([
 		for _, l := range ml.GetLabels() {
 			ln := l.GetName()
 			lv := l.GetValue()
-			ni, ok := e.cache.LabelName.GetIDByName(ln)
+			ni, ok := s.cache.LabelName.GetIDByName(ln)
 			if !ok {
 				log.Errorf("label_name: %s id not found", ln)
 				continue
 			}
-			vi, ok := e.cache.LabelValue.GetIDByValue(lv)
+			vi, ok := s.cache.LabelValue.GetIDByValue(lv)
 			if !ok {
 				log.Errorf("label_value: %s id not found", lv)
 				continue
 			}
+			id, _ := s.cache.MetricAndAPPLabelLayout.GetIndexByKey(cache.NewLayoutKey(mn, ln))
 			rls = append(rls, &trident.LabelResponse{
-				Name:    &ln,
-				NameId:  proto.Uint32(uint32(ni)),
-				Value:   &lv,
-				ValueId: proto.Uint32(uint32(vi)),
+				Name:                &ln,
+				NameId:              proto.Uint32(uint32(ni)),
+				Value:               &lv,
+				ValueId:             proto.Uint32(uint32(vi)),
+				AppLabelColumnIndex: proto.Uint32(uint32(id)),
 			})
 		}
 		respMLs = append(respMLs, &trident.MetricLabelResponse{
@@ -317,22 +315,22 @@ func (e *Synchronizer) assembleMetricLabel(mls []*trident.MetricLabelRequest) ([
 	return respMLs, nil
 }
 
-func (e *Synchronizer) assembleTarget(ts []*trident.TargetRequest) ([]*trident.TargetResponse, error) {
+func (s *Synchronizer) assembleTarget(ts []*trident.TargetRequest) ([]*trident.TargetResponse, error) {
 	respTs := make([]*trident.TargetResponse, 0)
 	for _, t := range ts {
 		instance := t.GetInstance()
 		job := t.GetJob()
-		tID, ok := e.cache.Target.GetIDByKey(cache.NewTargetKey(instance, job))
+		tID, ok := s.cache.Target.GetIDByKey(cache.NewTargetKey(instance, job))
 		if !ok {
 			log.Errorf("target instance: %s, job: %s id not found", instance, job)
 			continue
 		}
-		insID, ok := e.cache.LabelValue.GetIDByValue(instance)
+		insID, ok := s.cache.LabelValue.GetIDByValue(instance)
 		if !ok {
 			log.Errorf("instance label_value: %s id not found", instance)
 			continue
 		}
-		jobID, ok := e.cache.LabelValue.GetIDByValue(job)
+		jobID, ok := s.cache.LabelValue.GetIDByValue(job)
 		if !ok {
 			log.Errorf("job label_value: %s id not found", job)
 			continue
@@ -348,74 +346,73 @@ func (e *Synchronizer) assembleTarget(ts []*trident.TargetRequest) ([]*trident.T
 	return respTs, nil
 }
 
-func (e *Synchronizer) tryAppendMetricNameToEncode(toEn mapset.Set[string], name string) {
-	if _, ok := e.cache.MetricName.GetIDByName(name); !ok {
+func (s *Synchronizer) tryAppendMetricNameToEncode(toEn mapset.Set[string], name string) {
+	if _, ok := s.cache.MetricName.GetIDByName(name); !ok {
 		toEn.Add(name)
 	}
 }
 
-func (e *Synchronizer) addMetricNameCache(arg ...interface{}) error {
+func (s *Synchronizer) addMetricNameCache(arg ...interface{}) error {
 	mns := arg[0].([]*controller.PrometheusMetricName)
-	e.cache.MetricName.Add(mns)
+	s.cache.MetricName.Add(mns)
 	return nil
 }
 
-func (e *Synchronizer) tryAppendLabelNameToEncode(toEn mapset.Set[string], name string) {
-	if _, ok := e.cache.LabelName.GetIDByName(name); !ok {
+func (s *Synchronizer) tryAppendLabelNameToEncode(toEn mapset.Set[string], name string) {
+	if _, ok := s.cache.LabelName.GetIDByName(name); !ok {
 		toEn.Add(name)
 	}
 }
 
-func (e *Synchronizer) addLabelNameCache(arg ...interface{}) error {
+func (s *Synchronizer) addLabelNameCache(arg ...interface{}) error {
 	lns := arg[0].([]*controller.PrometheusLabelName)
-	e.cache.LabelName.Add(lns)
+	s.cache.LabelName.Add(lns)
 	return nil
 }
 
-func (e *Synchronizer) tryAppendLabelValueToEncode(toEn mapset.Set[string], name string) {
-	if _, ok := e.cache.LabelValue.GetIDByValue(name); !ok {
+func (s *Synchronizer) tryAppendLabelValueToEncode(toEn mapset.Set[string], name string) {
+	if _, ok := s.cache.LabelValue.GetIDByValue(name); !ok {
 		toEn.Add(name)
 	}
 }
 
-func (e *Synchronizer) addLabelValueCache(arg ...interface{}) error {
+func (s *Synchronizer) addLabelValueCache(arg ...interface{}) error {
 	lvs := arg[0].([]*controller.PrometheusLabelValue)
-	e.cache.LabelValue.Add(lvs)
+	s.cache.LabelValue.Add(lvs)
 	return nil
 }
 
-func (e *Synchronizer) tryAppendMetricAPPLabelLayoutToEncode(toEn mapset.Set[cache.LayoutKey], metricName, labelName string, targetID int) {
-	targetLabelNameToValue := e.cache.Target.GetLabelNameToValueByID(targetID)
-	if _, ok := targetLabelNameToValue[labelName]; ok {
+func (s *Synchronizer) tryAppendMetricAPPLabelLayoutToEncode(toEn mapset.Set[cache.LayoutKey], metricName, labelName string, targetID int) {
+	if ok := s.cache.Target.IfTargetLabelKeyExists(cache.NewTargetLabelKey(targetID, labelName)); ok {
 		return
 	}
 	k := cache.NewLayoutKey(metricName, labelName)
-	if _, ok := e.cache.MetricAndAPPLabelLayout.GetIndexByKey(k); !ok {
+	if _, ok := s.cache.MetricAndAPPLabelLayout.GetIndexByKey(k); !ok {
 		toEn.Add(k)
 	}
 }
 
-func (e *Synchronizer) addMetricAPPLabelLayoutCache(arg ...interface{}) error {
+func (s *Synchronizer) addMetricAPPLabelLayoutCache(arg ...interface{}) error {
 	ls := arg[0].([]*controller.PrometheusMetricAPPLabelLayout)
-	e.cache.MetricAndAPPLabelLayout.Add(ls)
+	s.cache.MetricAndAPPLabelLayout.Add(ls)
 	return nil
 }
 
-func (e *Synchronizer) tryAppendLabelToAdd(toAdd mapset.Set[cache.LabelKey], name, value string) {
-	if ok := e.cache.Label.IfKeyExists(cache.NewLabelKey(name, value)); !ok {
+func (s *Synchronizer) tryAppendLabelToAdd(toAdd mapset.Set[cache.LabelKey], name, value string) {
+	if ok := s.cache.Label.IfKeyExists(cache.NewLabelKey(name, value)); !ok {
 		toAdd.Add(cache.NewLabelKey(name, value))
 	}
 }
 
-func (e *Synchronizer) addLabelCache(arg ...interface{}) error {
+func (s *Synchronizer) addLabelCache(arg ...interface{}) error {
 	ls := arg[0].([]*controller.PrometheusLabel)
-	e.cache.Label.Add(ls)
+	s.cache.Label.Add(ls)
 	return nil
 }
 
-func (e *Synchronizer) tryAppendMetricLabelToAdd(toAdd map[string]mapset.Set[cache.MetricLabelDetailKey], metricName, labelName, labelValue string) {
+func (s *Synchronizer) tryAppendMetricLabelToAdd(toAdd map[string]mapset.Set[cache.MetricLabelDetailKey], metricName, labelName, labelValue string) {
 	mlk := cache.NewMetricLabelDetailKey(metricName, labelName, labelValue)
-	if ok := e.cache.MetricLabel.IfKeyExists(mlk); !ok {
+	if ok := s.cache.MetricLabel.IfKeyExists(mlk); !ok {
 		if _, ok := toAdd[metricName]; !ok {
 			toAdd[metricName] = mapset.NewSet[cache.MetricLabelDetailKey]()
 		}
@@ -423,23 +420,23 @@ func (e *Synchronizer) tryAppendMetricLabelToAdd(toAdd map[string]mapset.Set[cac
 	}
 }
 
-func (e *Synchronizer) addMetricLabelCache(arg ...interface{}) error {
+func (s *Synchronizer) addMetricLabelCache(arg ...interface{}) error {
 	m := arg[0].(map[string]mapset.Set[cache.MetricLabelDetailKey])
 	for _, ks := range m {
-		e.cache.MetricLabel.Add(ks.ToSlice())
+		s.cache.MetricLabel.Add(ks.ToSlice())
 	}
 	return nil
 }
 
-func (e *Synchronizer) tryAppendMetricTargetToAdd(toAdd mapset.Set[cache.MetricTargetKey], metricName string, targetID int) {
+func (s *Synchronizer) tryAppendMetricTargetToAdd(toAdd mapset.Set[cache.MetricTargetKey], metricName string, targetID int) {
 	mtk := cache.NewMetricTargetKey(metricName, targetID)
-	if ok := e.cache.MetricTarget.IfKeyExists(mtk); !ok {
+	if ok := s.cache.MetricTarget.IfKeyExists(mtk); !ok {
 		toAdd.Add(mtk)
 	}
 }
 
-func (e *Synchronizer) addMetricTargetCache(arg ...interface{}) error {
+func (s *Synchronizer) addMetricTargetCache(arg ...interface{}) error {
 	ts := arg[0].([]cache.MetricTargetKey)
-	e.cache.MetricTarget.Add(ts)
+	s.cache.MetricTarget.Add(ts)
 	return nil
 }

@@ -55,7 +55,7 @@ func (ml *metricLabel) refresh(args ...interface{}) error {
 	return nil
 }
 
-func (ml *metricLabel) sync(rMLs []*controller.PrometheusMetricLabelRequest) error {
+func (ml *metricLabel) encode(rMLs []*controller.PrometheusMetricLabelRequest) error {
 	var dbToAdd []*mysql.PrometheusMetricLabel
 	for _, rML := range rMLs {
 		mn := rML.GetMetricName()

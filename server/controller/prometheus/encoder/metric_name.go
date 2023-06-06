@@ -18,6 +18,7 @@ package encoder
 
 import (
 	"errors"
+	"fmt"
 	"sort"
 	"sync"
 
@@ -112,8 +113,7 @@ func (mn *metricName) refresh(args ...interface{}) error {
 // 分配的ID中，若已有被实际使用的ID（闭源页面创建使用），排除已使用ID，仅分配剩余部分。
 func (mn *metricName) allocate(count int) (ids []int, err error) {
 	if len(mn.usableIDs) == 0 {
-		log.Errorf("%s has no more usable ids", mn.resourceType)
-		return
+		return nil, errors.New(fmt.Sprintf("%s has no more usable ids", mn.resourceType))
 	}
 
 	if len(mn.usableIDs) < count {
@@ -150,7 +150,7 @@ func (mn *metricName) check(ids []int) (inUseIDs []int, err error) {
 	return
 }
 
-func (mn *metricName) sync(strs []string) ([]*controller.PrometheusMetricName, error) {
+func (mn *metricName) encode(strs []string) ([]*controller.PrometheusMetricName, error) {
 	mn.mutex.Lock()
 	defer mn.mutex.Unlock()
 

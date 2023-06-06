@@ -20,13 +20,14 @@ import (
 	"strings"
 	"sync"
 
+	mapset "github.com/deckarep/golang-set/v2"
+
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
 var (
-	labelKVJoiner = ":"
 	labelJoiner   = ", "
+	labelKVJoiner = ":"
 )
 
 type TargetKey struct {
@@ -41,22 +42,37 @@ func NewTargetKey(instance, job string) TargetKey {
 	}
 }
 
+type TargetLabelKey struct {
+	TargetID  int    `json:"target_id"`
+	LabelName string `json:"label_name"`
+}
+
+func NewTargetLabelKey(targetID int, labelName string) TargetLabelKey {
+	return TargetLabelKey{
+		TargetID:  targetID,
+		LabelName: labelName,
+	}
+}
+
 type targetLabelNameToValue map[string]string
 
 type target struct {
-	keyToTargetID              sync.Map
-	targetIDToLabelNameToValue sync.Map
+	keyToTargetID   sync.Map
+	targetLabelKeys mapset.Set[TargetLabelKey]
+}
+
+func newTarget() *target {
+	return &target{
+		targetLabelKeys: mapset.NewSet[TargetLabelKey](),
+	}
 }
 
 func (t *target) Get() *sync.Map {
 	return &t.keyToTargetID
 }
 
-func (t *target) GetLabelNameToValueByID(i int) targetLabelNameToValue {
-	if labelNameToValue, ok := t.targetIDToLabelNameToValue.Load(i); ok {
-		return labelNameToValue.(targetLabelNameToValue)
-	}
-	return make(targetLabelNameToValue)
+func (t *target) IfTargetLabelKeyExists(key TargetLabelKey) bool {
+	return t.targetLabelKeys.Contains(key)
 }
 
 func (t *target) GetIDByKey(key TargetKey) (int, bool) {
@@ -76,28 +92,28 @@ func (t *target) refresh(args ...interface{}) error {
 		key := NewTargetKey(item.Instance, item.Job)
 		t.keyToTargetID.Store(key, item.ID)
 		if !fully {
-			t.targetIDToLabelNameToValue.Store(item.ID, t.formatLabels(item))
+			for _, ln := range t.getTargetLabelNames(item) {
+				t.targetLabelKeys.Add(NewTargetLabelKey(item.ID, ln))
+			}
 		}
 	}
 	return nil
 }
 
-func (t *target) formatLabels(tg *mysql.PrometheusTarget) (labelNameToValue targetLabelNameToValue) {
-	labelNameToValue = make(targetLabelNameToValue)
-	labelNameToValue[TargetLabelInstance] = tg.Instance
-	labelNameToValue[TargetLabelJob] = tg.Job
+func (t *target) getTargetLabelNames(tg *mysql.PrometheusTarget) []string {
+	var lns []string
 	for _, l := range strings.Split(tg.OtherLabels, labelJoiner) {
 		if l == "" {
 			continue
 		}
-		k, v, ok := strings.Cut(l, labelKVJoiner)
-		if !ok {
-			log.Warningf("invalid prometheus_target_label: %s, target_id: %d", l, tg.ID)
+		parts := strings.Split(l, labelKVJoiner)
+		if len(parts) != 2 {
+			log.Warningf("invalid label: %s", l)
 			continue
 		}
-		labelNameToValue[k] = v
+		lns = append(lns, parts[0])
 	}
-	return
+	return lns
 }
 
 func (t *target) load() ([]*mysql.PrometheusTarget, error) {

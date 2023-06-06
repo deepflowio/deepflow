@@ -19,6 +19,8 @@ package cache
 import (
 	"sync"
 
+	mapset "github.com/deckarep/golang-set/v2"
+
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
@@ -36,15 +38,18 @@ func NewLabelKey(name, value string) LabelKey {
 }
 
 type label struct {
-	keyMap  sync.Map
+	keys    mapset.Set[LabelKey]
 	idToKey sync.Map
 }
 
-func (l *label) IfKeyExists(key LabelKey) bool {
-	if _, ok := l.keyMap.Load(key); ok {
-		return true
+func newLabel() *label {
+	return &label{
+		keys: mapset.NewSet[LabelKey](),
 	}
-	return false
+}
+
+func (l *label) IfKeyExists(key LabelKey) bool {
+	return l.keys.Contains(key)
 }
 
 func (l *label) GetKeyByID(id int) (LabelKey, bool) {
@@ -56,7 +61,7 @@ func (l *label) GetKeyByID(id int) (LabelKey, bool) {
 
 func (l *label) Add(batch []*controller.PrometheusLabel) {
 	for _, item := range batch {
-		l.keyMap.Store(NewLabelKey(item.GetName(), item.GetValue()), struct{}{})
+		l.keys.Add(NewLabelKey(item.GetName(), item.GetValue()))
 		l.idToKey.Store(item.GetId(), NewLabelKey(item.GetName(), item.GetValue()))
 	}
 }
@@ -67,7 +72,7 @@ func (l *label) refresh(args ...interface{}) error {
 		return err
 	}
 	for _, item := range ls {
-		l.keyMap.Store(NewLabelKey(item.Name, item.Value), struct{}{})
+		l.keys.Add(NewLabelKey(item.Name, item.Value))
 		l.idToKey.Store(item.ID, NewLabelKey(item.Name, item.Value))
 	}
 	return nil
