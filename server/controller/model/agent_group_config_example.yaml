@@ -640,7 +640,9 @@ vtap_group_id: g-xxxxxx
 
     ## Maximum Flow
     ## Default: 1048576
-    ## Note: Maximum number of flows that can be stored in FlowMap.
+    ## Note: Maximum number of flows that can be stored in FlowMap, It will also affect the capacity of
+    ##   the RRT cache, Example: rrt-cache-capacity = flow-count-limit / 4. When rrt-cache-capacity is
+    ##   not enough, it will be unable to calculate the rrt of l7.
     #flow-count-limit: 1048576
 
     ## Queue Size of FlowAggregator (1s->1m)
