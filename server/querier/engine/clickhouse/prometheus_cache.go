@@ -39,6 +39,13 @@ type Label struct {
 }
 
 func GenerateMap() {
+	METRIC_NAME_TO_ID = map[string]int{}
+	METRIC_APP_LABEL_LAYOUT = map[string]int{}
+	LABEL_NAME_TO_ID = map[string]int{}
+	LABEL_ID_TO_NAME = map[int]string{}
+	METRIC_NAME_TO_MAX_INDEX = map[string]int{}
+	METRIC_ID_TARGET_ID_TO_LABELS = map[string][]Label{}
+	METRIC_ID_APP_LABEL_VALUE_ID_TO_LABELS = map[string][]Label{}
 	chClient := client.Client{
 		Host:     config.Cfg.Clickhouse.Host,
 		Port:     config.Cfg.Clickhouse.Port,
