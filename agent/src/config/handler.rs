@@ -317,6 +317,7 @@ pub struct FlowConfig {
     pub collector_enabled: bool,
     pub l7_log_tap_types: [bool; 256],
 
+    pub capacity: u32,
     pub hash_slots: u32,
     pub packet_delay: Duration,
     pub flush_interval: Duration,
@@ -370,6 +371,7 @@ impl From<&RuntimeConfig> for FlowConfig {
                 }
                 tap_types
             },
+            capacity: flow_config.capacity,
             hash_slots: flow_config.hash_slots,
             packet_delay: conf.yaml_config.packet_delay,
             flush_interval: flow_config.flush_interval,
@@ -422,6 +424,7 @@ impl fmt::Debug for FlowConfig {
                     .filter(|&(_, b)| *b)
                     .collect::<Vec<_>>(),
             )
+            .field("capacity", &self.capacity)
             .field("hash_slots", &self.hash_slots)
             .field("packet_delay", &self.packet_delay)
             .field("flush_interval", &self.flush_interval)

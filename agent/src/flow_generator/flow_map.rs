@@ -44,7 +44,7 @@ use super::{
     protocol_logs::MetaAppProto,
     service_table::{ServiceKey, ServiceTable},
     FlowMapKey, FlowNode, FlowState, FlowTimeout, COUNTER_FLOW_ID_MASK, FLOW_METRICS_PEER_DST,
-    FLOW_METRICS_PEER_SRC, L7_PROTOCOL_UNKNOWN_LIMIT, L7_RRT_CACHE_CAPACITY, QUEUE_BATCH_SIZE,
+    FLOW_METRICS_PEER_SRC, L7_PROTOCOL_UNKNOWN_LIMIT, QUEUE_BATCH_SIZE,
     SERVICE_TABLE_IPV4_CAPACITY, SERVICE_TABLE_IPV6_CAPACITY, STATISTICAL_INTERVAL,
     THREAD_FLOW_ID_MASK, TIMER_FLOW_ID_MASK, TIME_UNIT,
 };
@@ -234,7 +234,9 @@ impl FlowMap {
             parse_config,
             #[cfg(target_os = "linux")]
             ebpf_config,
-            perf_cache: Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY))),
+            perf_cache: Rc::new(RefCell::new(L7PerfCache::new(
+                (config_guard.capacity >> 2) as usize,
+            ))),
             flow_perf_counter,
             ntp_diff,
             packet_sequence_queue, // Enterprise Edition Feature: packet-sequence
