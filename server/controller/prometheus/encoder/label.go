@@ -68,7 +68,7 @@ func (l *label) refresh(args ...interface{}) error {
 	return nil
 }
 
-func (l *label) sync(toAdd []*controller.PrometheusLabelRequest) ([]*controller.PrometheusLabel, error) {
+func (l *label) encode(toAdd []*controller.PrometheusLabelRequest) ([]*controller.PrometheusLabel, error) {
 	resp := make([]*controller.PrometheusLabel, 0)
 	var dbToAdd []*mysql.PrometheusLabel
 	for _, item := range toAdd {

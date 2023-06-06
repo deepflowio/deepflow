@@ -17,7 +17,7 @@
 package cache
 
 import (
-	"sync"
+	mapset "github.com/deckarep/golang-set/v2"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
@@ -37,21 +37,21 @@ func NewMetricLabelDetailKey(metricName, labelName, labelValue string) MetricLab
 }
 
 type metricLabel struct {
-	LabelCache              *label
-	metricLabelDetailKeyMap sync.Map         // for metric_Label check
-	metricNameToLabelIDs    map[string][]int // only for fully assembled
+	LabelCache            *label
+	metricLabelDetailKeys mapset.Set[MetricLabelDetailKey] // for metric_label check
+	metricNameToLabelIDs  map[string][]int                 // only for fully assembled
 }
 
 func newMetricLabel(l *label) *metricLabel {
 	return &metricLabel{
-		LabelCache:           l,
-		metricNameToLabelIDs: make(map[string][]int),
+		LabelCache:            l,
+		metricLabelDetailKeys: mapset.NewSet[MetricLabelDetailKey](),
+		metricNameToLabelIDs:  make(map[string][]int),
 	}
 }
 
 func (ml *metricLabel) IfKeyExists(k MetricLabelDetailKey) bool {
-	_, ok := ml.metricLabelDetailKeyMap.Load(k)
-	return ok
+	return ml.metricLabelDetailKeys.Contains(k)
 }
 
 func (ml *metricLabel) GetLabelsByMetricName(metricName string) []LabelKey {
@@ -68,7 +68,7 @@ func (ml *metricLabel) GetLabelsByMetricName(metricName string) []LabelKey {
 
 func (ml *metricLabel) Add(batch []MetricLabelDetailKey) {
 	for _, item := range batch {
-		ml.metricLabelDetailKeyMap.Store(item, struct{}{})
+		ml.metricLabelDetailKeys.Add(item)
 	}
 }
 
@@ -83,11 +83,12 @@ func (ml *metricLabel) refresh(args ...interface{}) error {
 			if _, ok := ml.LabelCache.GetKeyByID(item.LabelID); ok {
 				ml.metricNameToLabelIDs[item.MetricName] = append(ml.metricNameToLabelIDs[item.MetricName], item.LabelID)
 			}
-		} else {
-			if lk, ok := ml.LabelCache.GetKeyByID(item.LabelID); ok {
-				ml.metricLabelDetailKeyMap.Store(NewMetricLabelDetailKey(item.MetricName, lk.Name, lk.Value), struct{}{})
-			}
+			continue
 		}
+		if lk, ok := ml.LabelCache.GetKeyByID(item.LabelID); ok {
+			ml.metricLabelDetailKeys.Add(NewMetricLabelDetailKey(item.MetricName, lk.Name, lk.Value))
+		}
+
 	}
 	return nil
 }

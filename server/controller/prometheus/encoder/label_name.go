@@ -18,6 +18,7 @@ package encoder
 
 import (
 	"errors"
+	"fmt"
 	"sort"
 	"sync"
 
@@ -115,8 +116,7 @@ func (ln *labelName) allocate(count int) (ids []int, err error) {
 	defer ln.mutex.Unlock()
 
 	if len(ln.usableIDs) == 0 {
-		log.Errorf("%s has no more usable ids", ln.resourceType)
-		return
+		return nil, errors.New(fmt.Sprintf("%s has no more usable ids", ln.resourceType))
 	}
 
 	if len(ln.usableIDs) < count {
@@ -153,7 +153,7 @@ func (ln *labelName) check(ids []int) (inUseIDs []int, err error) {
 	return
 }
 
-func (ln *labelName) sync(strs []string) ([]*controller.PrometheusLabelName, error) {
+func (ln *labelName) encode(strs []string) ([]*controller.PrometheusLabelName, error) {
 	resp := make([]*controller.PrometheusLabelName, 0)
 	dbToAdd := make([]*mysql.PrometheusLabelName, 0)
 	var countToAllocate int

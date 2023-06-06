@@ -62,7 +62,7 @@ func (ll *labelLayout) refresh(args ...interface{}) error {
 	return nil
 }
 
-func (ll *labelLayout) sync(req []*controller.PrometheusMetricAPPLabelLayoutRequest) ([]*controller.PrometheusMetricAPPLabelLayout, error) {
+func (ll *labelLayout) encode(req []*controller.PrometheusMetricAPPLabelLayoutRequest) ([]*controller.PrometheusMetricAPPLabelLayout, error) {
 	ll.mux.Lock()
 	defer ll.mux.Unlock()
 

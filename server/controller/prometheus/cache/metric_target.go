@@ -17,7 +17,7 @@
 package cache
 
 import (
-	"sync"
+	mapset "github.com/deckarep/golang-set/v2"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
@@ -35,21 +35,22 @@ func NewMetricTargetKey(metricName string, targetID int) MetricTargetKey {
 }
 
 type metricTarget struct {
-	metricTargetKeyMap sync.Map
+	metricTargetKeys mapset.Set[MetricTargetKey]
 }
 
 func newMetricTarget() *metricTarget {
-	return &metricTarget{}
+	return &metricTarget{
+		metricTargetKeys: mapset.NewSet[MetricTargetKey](),
+	}
 }
 
 func (mt *metricTarget) IfKeyExists(k MetricTargetKey) bool {
-	_, ok := mt.metricTargetKeyMap.Load(k)
-	return ok
+	return mt.metricTargetKeys.Contains(k)
 }
 
 func (mt *metricTarget) Add(batch []MetricTargetKey) {
 	for _, item := range batch {
-		mt.metricTargetKeyMap.Store(NewMetricTargetKey(item.MetricName, item.TargetID), struct{}{})
+		mt.metricTargetKeys.Add(item)
 	}
 }
 
@@ -59,7 +60,7 @@ func (mt *metricTarget) refresh(args ...interface{}) error {
 		return err
 	}
 	for _, item := range mts {
-		mt.metricTargetKeyMap.Store(NewMetricTargetKey(item.MetricName, item.TargetID), struct{}{})
+		mt.metricTargetKeys.Add(NewMetricTargetKey(item.MetricName, item.TargetID))
 	}
 	return nil
 }
