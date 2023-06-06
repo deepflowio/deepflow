@@ -41,6 +41,15 @@ define compile_perf_profiler_elf
 	@./tools/ebpftobuffer kernel/perf_profiler.elf user/perf_profiler_bpf_$(strip $1).c perf_profiler_$(strip $1)_ebpf_data
 endef
 
+define check_gcc_version
+	@gcc_version=$(shell gcc -dumpversion); \
+        required_version='8'; \
+        if [ "$$gcc_version" \< "$$required_version" ]; then \
+            echo "Warning: GCC version is less than 8.0.0."; \
+            exit 1; \
+        fi
+endef
+
 CURRDIR := $(PWD)
 CLANG_VER := $(shell ${CLANG} --version | grep "version" | awk '{if ($$3!="version"){print $$3}else{exit -1}}' || ${CLANG} --version | grep "version" | awk '{if ($$4!="version"){print $$4}else{exit -1}}')
 CLANG_VER_MAIN := $(shell ${CLANG} --version | grep "version" | awk '{print $$3}' | awk -F. '{print $$1}' | awk '{if (int($$0)!=0){print $$0}else{exit -1}}' || ${CLANG} --version | grep "version" | awk '{print $$4}' | awk -F. '{print $$1}' | awk '{if (int($$0)!=0){print $$0}else{exit -1}}')
@@ -86,6 +95,7 @@ all: build
 
 ELFFILES = ./.data_done
 $(ELFFILES):
+	$(call check_gcc_version)
 	$(call msg,Clang/LLVM,,$(CLANG_VER))
 	@if [ $(CLANG_VER_MAIN) -lt 10 ]; then \
                 echo "  check llvm-clang fail. expect Clang/LLVM 10+" && exit 1; \

@@ -58,6 +58,10 @@
 #include "stringifier.h"
 #include <bcc/bcc_syms.h>
 
+/* Temporary storage for releasing the stack_str_hash resource. */
+static __thread stack_str_hash_kv *stack_str_kvps;
+static __thread bool clear_hash;
+
 int init_stack_str_hash(stack_str_hash_t * h, const char *name)
 {
 	memset(h, 0, sizeof(*h));
@@ -73,6 +77,13 @@ static int free_kvp_cb(stack_str_hash_kv * kv, void *ctx)
 		(*(u64 *) ctx)++;
 	}
 
+	int ret = VEC_OK;
+	vec_add1(stack_str_kvps, *kv, ret);
+	if (ret != VEC_OK) {
+		ebpf_warning("vec add failed\n");
+		clear_hash = true;
+	}
+
 	return BIHASH_WALK_CONTINUE;
 }
 
@@ -81,8 +92,26 @@ void release_stack_strs(stack_str_hash_t * h)
 	u64 elem_count = 0;
 	stack_str_hash_foreach_key_value_pair(h, free_kvp_cb,
 					      (void *)&elem_count);
-	stack_str_hash_free(h);
-	//ebpf_info("release_stack_strs hashmap clear %lu elems.\n", elem_count);
+	/*
+	 * In this iteration, all elements will be cleared, and in the
+	 * next iteration, this hash will be reused.
+	 */
+	stack_str_hash_kv *v;
+	vec_foreach(v, stack_str_kvps) {
+		if (stack_str_hash_add_del(h, v, 0 /* delete */ )) {
+			ebpf_warning("stack_str_hash_add_del() failed.\n");
+			clear_hash = true;
+		}
+	}
+
+	vec_free(stack_str_kvps);
+
+	if (clear_hash) {
+		clear_hash = false;
+		stack_str_hash_free(h);
+	}
+
+	ebpf_debug("release_stack_strs hashmap clear %lu elems.\n", elem_count);
 }
 
 static inline char *create_symbol_str(int len, char *src, const char *tag)

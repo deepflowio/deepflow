@@ -21,6 +21,7 @@ use profiler::ebpf::*;
 use std::thread;
 use std::time::{Duration, UNIX_EPOCH};
 
+#[allow(dead_code)]
 fn date_time(ts: u64) -> String {
     // Creates a new SystemTime from the specified number of whole seconds
     let d = UNIX_EPOCH + Duration::from_nanos(ts);
@@ -33,14 +34,17 @@ fn date_time(ts: u64) -> String {
         .to_string()
 }
 
+#[allow(dead_code)]
 fn sk_str_safe(data: *mut c_char) -> String {
     unsafe { CStr::from_ptr(data).to_string_lossy().into_owned() }
 }
 
+#[allow(dead_code)]
 fn sk_data_str_safe(sd: *mut stack_profile_data) -> String {
     unsafe { sk_str_safe((*sd).stack_data) }
 }
 
+#[allow(dead_code)]
 fn cp_process_name_safe(cp: *mut stack_profile_data) -> String {
     unsafe {
         let v = &(*cp).comm;
@@ -51,19 +55,19 @@ fn cp_process_name_safe(cp: *mut stack_profile_data) -> String {
 extern "C" fn continuous_profiler_callback(cp: *mut stack_profile_data) {
     unsafe {
           process_stack_trace_data_for_flame_graph(cp);
-          let data = sk_data_str_safe(cp);
-          println!("\n+ --------------------------------- +");
-          println!("{} PID {} START-TIME {} U-STACKID {} K-STACKID {} COMM {} CPU {} COUNT {} LEN {} \n  - {}",
-                   date_time((*cp).timestamp),
-                   (*cp).pid,
-                   (*cp).stime,
-                   (*cp).u_stack_id,
-                   (*cp).k_stack_id,
-                   cp_process_name_safe(cp),
-                   (*cp).cpu,
-                   (*cp).count,
-                   (*cp).stack_data_len, data);
-          println!("+ --------------------------------- +");
+          //let data = sk_data_str_safe(cp);
+          //println!("\n+ --------------------------------- +");
+          //println!("{} PID {} START-TIME {} U-STACKID {} K-STACKID {} COMM {} CPU {} COUNT {} LEN {} \n  - {}",
+          //         date_time((*cp).timestamp),
+          //         (*cp).pid,
+          //         (*cp).stime,
+          //         (*cp).u_stack_id,
+          //         (*cp).k_stack_id,
+          //         cp_process_name_safe(cp),
+          //         (*cp).cpu,
+          //         (*cp).count,
+          //         (*cp).stack_data_len, data);
+          //println!("+ --------------------------------- +");
     }
 }
 
@@ -94,7 +98,7 @@ fn main() {
         print!("test OK\n");
         thread::sleep(Duration::from_secs(20));
         stop_continuous_profiler();
-	release_flame_graph_hash();
+        release_flame_graph_hash();
     }
 
     loop {

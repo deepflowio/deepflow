@@ -45,10 +45,25 @@ struct stack_trace_key_t *raw_stack_data;
 static u64 stack_trace_lost;
 static struct bpf_tracer *profiler_tracer;
 static volatile u64 profiler_stop;
-// for flame graph
+
+// for stack_trace_msg_hash relese
+static __thread stack_trace_msg_hash_kv *trace_msg_kvps;
+static __thread bool msg_clear_hash;
+
+// for flame-graph test
 static stack_trace_msg_hash_t test_fg_hash;
 static FILE *folded_file;
 #define FOLDED_FILE_PATH "./profiler.folded" 
+
+/*
+ * Cache hash: obtain folded stack trace string from stack ID.
+ */
+static stack_str_hash_t g_stack_str_hash;
+
+/*
+ * Used for tracking data statistics and pushing.
+ */
+static stack_trace_msg_hash_t g_msg_hash;
 
 /*
  * The iteration count causes BPF to switch buffers with each iteration.
@@ -152,6 +167,13 @@ static int push_and_free_msg_kvp_cb(stack_trace_msg_hash_kv *kv, void *ctx)
 		(*(u64 *) ctx)++;
 	}
 
+	int ret = VEC_OK;
+	vec_add1(trace_msg_kvps, *kv, ret);
+	if (ret != VEC_OK) {
+		ebpf_warning("vec add failed\n");
+		msg_clear_hash = true;
+	}
+
 	return BIHASH_WALK_CONTINUE;
 }
 
@@ -162,7 +184,26 @@ static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t *h)
 	u64 elem_count = 0;
 	stack_trace_msg_hash_foreach_key_value_pair(h, push_and_free_msg_kvp_cb,
 						    (void *)&elem_count);
-	stack_trace_msg_hash_free(h);
+	/*
+	 * In this iteration, all elements will be cleared, and in the
+	 * next iteration, this hash will be reused.
+	 */
+	stack_trace_msg_hash_kv *v;
+	vec_foreach(v, trace_msg_kvps) {
+		if (stack_trace_msg_hash_add_del(h, v, 0 /* delete */ )) {
+			ebpf_warning("stack_trace_msg_hash_add_del() failed.\n");
+			msg_clear_hash = true;
+		}
+	}
+
+	vec_free(trace_msg_kvps);
+
+	if (msg_clear_hash) {
+		msg_clear_hash = false;
+		stack_trace_msg_hash_free(h);
+	}
+
+	ebpf_debug("release_stack_trace_msg hashmap clear %lu elems.\n", elem_count);
 }
 
 static void aggregate_stack_traces(struct bpf_tracer *t,
@@ -262,10 +303,10 @@ static void process_bpf_stacktraces(struct bpf_tracer *t,
 	u32 count = 0;
 
 	/* eBPF map record count for this iteration. */
-	u64 sample_cnt_val;
+	u64 sample_cnt_val = 0;
 
 	/*
-	 * Why use stack_str_hash?
+	 * Why use g_stack_str_hash?
 	 *
 	 * When the stringizer encounters a stack-ID for the first time in
 	 * the stack trace table, it clears it. If a stack-ID is reused by
@@ -274,10 +315,11 @@ static void process_bpf_stacktraces(struct bpf_tracer *t,
 	 * iterations, we create and destroy the stringizer in each profile
 	 * iteration.
 	 */
-	stack_str_hash_t stack_str_hash;
-	if (init_stack_str_hash(&stack_str_hash, "profile_stack_str")) {
-		ebpf_warning("init_stack_str_hash() failed.\n");
-		return;
+	if (unlikely(g_stack_str_hash.buckets == NULL)) {
+		if (init_stack_str_hash(&g_stack_str_hash, "profile_stack_str")) {
+			ebpf_warning("init_stack_str_hash() failed.\n");
+			return;
+		}
 	}
 
 	/*
@@ -306,12 +348,12 @@ static void process_bpf_stacktraces(struct bpf_tracer *t,
 	 * is a match, we only need to increment the count field in the correspon-
 	 * ding value, thus avoiding duplicate parsing.
 	 */
-	stack_trace_msg_hash_t msg_hash;
-	if (init_stack_trace_msg_hash(&msg_hash, "stack_trace_msg")) {
-		ebpf_warning("init_stack_trace_msg_hash() failed.\n");
-		return;
+	if (unlikely(g_msg_hash.buckets == NULL)) {
+		if (init_stack_trace_msg_hash(&g_msg_hash, "stack_trace_msg")) {
+			ebpf_warning("init_stack_trace_msg_hash() failed.\n");
+			return;
+		}
 	}
-
 
 	if (has_event) {
 
@@ -329,8 +371,8 @@ check_again:
 		 * After the reader completes data reading, the work of
 		 * data aggregation will be blocked if there is no data.
 		 */
-		aggregate_stack_traces(t, stack_map_name, &stack_str_hash,
-				       &msg_hash, &count);
+		aggregate_stack_traces(t, stack_map_name, &g_stack_str_hash,
+				       &g_msg_hash, &count);
 
 		/*
 		 * To ensure that all data in the perf ring-buffer is processed
@@ -357,13 +399,13 @@ release_iter:
 	bpf_table_set_value(t, MAP_PROFILER_STATE_MAP,
 			    sample_count_idx, &sample_cnt_val);
 
-	print_profiler_status(t, count, &stack_str_hash, &msg_hash);
+	print_profiler_status(t, count, &g_stack_str_hash, &g_msg_hash);
 
-	/* free all elems and free stack_str_hash */
-	release_stack_strs(&stack_str_hash);
+	/* free all elems */
+	release_stack_strs(&g_stack_str_hash);
 
 	/* Push messages and free stack_trace_msg_hash */
-	push_and_release_stack_trace_msg(&msg_hash);
+	push_and_release_stack_trace_msg(&g_msg_hash);
 }
 
 static void cp_reader_work(void *arg)
@@ -375,22 +417,35 @@ static void cp_reader_work(void *arg)
 	reader_b = &t->readers[1];
 
 	for (;;) {
-		tracer_reader_lock(t);
-		if (profiler_stop == 1)
+		if (unlikely(profiler_stop == 1))
 			goto exit;
+
+		tracer_reader_lock(t);
 		process_bpf_stacktraces(t, reader_a, reader_b);
 		tracer_reader_unlock(t);
 	}
 
 exit:
-	tracer_reader_unlock(t);
+        print_cp_status(t);
+
+	print_hash_stack_str(&g_stack_str_hash);
+	/* free stack_str_hash */
+	if (likely(g_stack_str_hash.buckets != NULL)) {
+		stack_str_hash_free(&g_stack_str_hash);
+	}
+
+	print_hash_stack_trace_msg(&g_msg_hash);
+	/* free stack_str_hash */
+	if (likely(g_msg_hash.buckets != NULL)) {
+		stack_trace_msg_hash_free(&g_msg_hash);
+	}
+
+	/* resouce share release */
+	release_symbol_caches();
 
 	/* clear thread */
 	t->perf_worker[0] = 0;
 	ebpf_info(LOG_CP_TAG "perf profiler reader-thread exit.\n");
-
-	/* resouce share release */
-	release_symbol_caches();
 
 	pthread_exit(NULL);
 }
@@ -632,13 +687,24 @@ static int gen_stack_trace_folded_file(stack_trace_msg_hash_kv *kv, void *ctx)
 void release_flame_graph_hash(void)
 {
 	u64 elem_count = 0;
+	u64 alloc_b, free_b;
+	get_mem_stat(&alloc_b, &free_b);
+	ebpf_info("pre alloc_b:\t%lu bytes free_b:\t%lu bytes use:\t%lu bytes\n",
+		  alloc_b, free_b, alloc_b - free_b);
+
 	stack_trace_msg_hash_foreach_key_value_pair(&test_fg_hash,
 						    gen_stack_trace_folded_file,
 						    (void *)&elem_count);
 	ebpf_info("flame graph folded strings count %lu\n", elem_count);
+	fclose(folded_file);
+
+	stack_trace_msg_hash_free(&test_fg_hash);
+
+	get_mem_stat(&alloc_b, &free_b);
+	ebpf_info("after alloc_b:\t%lu bytes free_b:\t%lu bytes use:\t%lu bytes\n",
+		  alloc_b, free_b, alloc_b - free_b);
+
 	ebpf_info("Please use the following command to generate a flame graph:"
 		  "\n\n\033[33;1mcat ./profiler.folded |./.flamegraph.pl --color=io"
 		  " --countname=ms > profiler-test.svg\033[0m\n");
-	fclose(folded_file);
-	stack_trace_msg_hash_free(&test_fg_hash);
 }
