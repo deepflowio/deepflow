@@ -52,7 +52,9 @@ func GenerateMap() {
 		log.Warning(err)
 		return
 	}
-	for _, _key := range metricNameToIDSqlRst.Values {
+	metricNameToIDRst := make([]interface{}, len(metricNameToIDSqlRst.Values))
+	copy(metricNameToIDRst, metricNameToIDSqlRst.Values)
+	for _, _key := range metricNameToIDRst {
 		metricNameKey := _key.([]interface{})[0]
 		metricIDKey := _key.([]interface{})[1]
 		metricName := metricNameKey.(string)
@@ -66,7 +68,9 @@ func GenerateMap() {
 		log.Warning(err)
 		return
 	}
-	for _, _key := range appLabelSqlRst.Values {
+	appLabeRst := make([]interface{}, len(appLabelSqlRst.Values))
+	copy(appLabeRst, appLabelSqlRst.Values)
+	for _, _key := range appLabeRst {
 		metricIDKey := _key.([]interface{})[0]
 		labelNameIDKey := _key.([]interface{})[1]
 		labelValueKey := _key.([]interface{})[2]
@@ -86,7 +90,9 @@ func GenerateMap() {
 		log.Warning(err)
 		return
 	}
-	for _, _key := range labelNameToIDSqlRst.Values {
+	labelNameToIDRst := make([]interface{}, len(labelNameToIDSqlRst.Values))
+	copy(labelNameToIDRst, labelNameToIDSqlRst.Values)
+	for _, _key := range labelNameToIDRst {
 		labelNameKey := _key.([]interface{})[0]
 		labelNameIDKey := _key.([]interface{})[1]
 		labelName := labelNameKey.(string)
@@ -101,7 +107,9 @@ func GenerateMap() {
 		log.Warning(err)
 		return
 	}
-	for _, _key := range metricAppLabelLayoutSqlRst.Values {
+	metricAppLabelLayoutRst := make([]interface{}, len(metricAppLabelLayoutSqlRst.Values))
+	copy(metricAppLabelLayoutRst, metricAppLabelLayoutSqlRst.Values)
+	for _, _key := range metricAppLabelLayoutRst {
 		metricNameKey := _key.([]interface{})[0]
 		appLabelNameKey := _key.([]interface{})[1]
 		appLabelColumnIndexKey := _key.([]interface{})[2]
@@ -117,7 +125,9 @@ func GenerateMap() {
 		log.Warning(err)
 		return
 	}
-	for _, _key := range targetLabelSqlRst.Values {
+	targetLabelRst := make([]interface{}, len(targetLabelSqlRst.Values))
+	copy(targetLabelRst, targetLabelSqlRst.Values)
+	for _, _key := range targetLabelRst {
 		metricIDKey := _key.([]interface{})[0]
 		labelNameIDKey := _key.([]interface{})[1]
 		labelValueKey := _key.([]interface{})[2]
@@ -137,7 +147,9 @@ func GenerateMap() {
 		log.Warning(err)
 		return
 	}
-	for _, _key := range metricNameToMaxIndexSqlRst.Values {
+	metricNameToMaxIndexRst := make([]interface{}, len(metricNameToMaxIndexSqlRst.Values))
+	copy(metricNameToMaxIndexRst, metricNameToMaxIndexSqlRst.Values)
+	for _, _key := range metricNameToMaxIndexRst {
 		metricNameKey := _key.([]interface{})[0]
 		maxIndexKey := _key.([]interface{})[1]
 		metricName := metricNameKey.(string)
