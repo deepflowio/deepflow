@@ -1728,6 +1728,7 @@ impl ConfigHandler {
                     new_cfg.kubernetes_api_enabled
                 );
             }
+            #[cfg(target_os = "linux")]
             if old_cfg.prometheus_http_api_address != new_cfg.prometheus_http_api_address {
                 info!(
                     "prometheus_http_api_address set to {}",
