@@ -62,7 +62,7 @@ func (l *label) GetKeyByID(id int) (LabelKey, bool) {
 func (l *label) Add(batch []*controller.PrometheusLabel) {
 	for _, item := range batch {
 		l.keys.Add(NewLabelKey(item.GetName(), item.GetValue()))
-		l.idToKey.Store(item.GetId(), NewLabelKey(item.GetName(), item.GetValue()))
+		l.idToKey.Store(int(item.GetId()), NewLabelKey(item.GetName(), item.GetValue()))
 	}
 }
 
