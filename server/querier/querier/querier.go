@@ -31,7 +31,7 @@ import (
 	prometheus_router "github.com/deepflowio/deepflow/server/querier/app/prometheus/router"
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
-	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse"
+	// "github.com/deepflowio/deepflow/server/querier/engine/clickhouse"
 	profile_router "github.com/deepflowio/deepflow/server/querier/profile/router"
 	"github.com/deepflowio/deepflow/server/querier/router"
 	"github.com/deepflowio/deepflow/server/querier/statsd"
@@ -56,12 +56,12 @@ func Start(configPath, serverLogFile string) {
 		os.Exit(0)
 	}
 
-	go func() {
-		for range time.Tick(time.Minute) {
-			// Load prometheus tag cache
-			clickhouse.GenerateMap()
-		}
-	}()
+	// go func() {
+	// 	for range time.Tick(time.Minute) {
+	// 		// Load prometheus tag cache
+	// 		clickhouse.GenerateMap()
+	// 	}
+	// }()
 
 	// statsd
 	statsd.QuerierCounter = statsd.NewCounter()
