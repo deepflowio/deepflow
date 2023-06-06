@@ -88,7 +88,6 @@
 |__protocol_filter|BPF_MAP_TYPE_ARRAY|deepflow 定义的 l7 协议号|是否启用的状态标记|标记需要进行分析的协议,关闭无关协议可以提高性能.可以通过 deepflow-server 修改|
 |__http2_stack|BPF_MAP_TYPE_PERCPU_ARRAY|-|struct __http2_stack|类似 __socket_data,仅用于处理 go uprobe 获取的 http2 数据|
 |tls_conn_map|BPF_MAP_TYPE_HASH|系统中单个协程的标记,由进程号和协程号组合|连接的文件描述符,buffer 指针,栈指针等函数入参信息|用于在进入函数时保存函数参数,并在函数返回时取出参数使用|
-|goroutines_map|BPF_MAP_TYPE_HASH|线程号|协程号|保存线程号到协程号的映射,在需要协程号时可以直接根据线程号获取|
 |http2_tcp_seq_map|BPF_MAP_TYPE_LRU_HASH|进程号,文件描述符,读操作结束时的序列号|读操作开始前的序列号|在 Go http2 的读操作 hook 点命中时,已经读完 buffer, 导致此时获取的 tcp 序列号相比于此时正在处理的报文更靠后.在比 http2 读操作更下层的 hook 点获读前后的序列号的映射并保存,可以修正成正确的序列号.由于不存在明确的用于回收这个 map 中元素的方法,所以选用 LRU|
 |proc_info_map|BPF_MAP_TYPE_HASH|进程号|与该进程相关的偏移量|与 __members_offset 作用类似,__members_offset 保存的是内核中的偏移量,仅需要保存一份.proc_info_map 中保存的是与进程相关的结构体的偏移量,因此需要以进程号为 key 保存在 map 中 >这些值由用户态程序获取并设置到 map 中,由内核态程序使用|
 |pid_tgid_callerid_map|BPF_MAP_TYPE_HASH|进程号,线程号|struct go_newproc_caller|在 runtime.newproc1 函数进出时传递参数,用于生成父子协程的映射关系|

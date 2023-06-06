@@ -29,6 +29,14 @@
 #define STRUCT_FILES_PRIVATE_DATA_OFFSET	0xc8
 #endif
 
+// FIXME: thread 是 struct task_struct 的最后一个元素,偏移量变动非常大,
+// 对于不支持 BTF 的内核需要某种方式找到合适的值, 目前的实现仅支持自己编译的 4.19.17 内核
+// offsetof(typeof(struct task_struct), thread) + offsetof(typeof(struct thread_struct), fsbase);
+// 4.14.0: 0x1338
+// 4.19.0: 0x12e8
+// 4.19.17: 0x21e8
+#define STRUCT_TASK_TLS_OFFSET 0x21e8
+
 #define S_IFMT 00170000
 #define S_IFSOCK 0140000
 #define S_IFLNK 0120000

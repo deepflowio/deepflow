@@ -110,13 +110,6 @@ static struct symbol probe_syms[] = {
 		.probe_func = "uprobe/crypto_tls_conn_read",
 		.is_probe_ret = true,
 	},
-
-	/*-------- runtime.casgstatus --------------*/
-	{
-		.symbol = "runtime.casgstatus",
-		.probe_func = "uprobe/runtime_casgstatus",
-		.is_probe_ret = false,
-	},
 };
 /* *INDENT-ON* */
 

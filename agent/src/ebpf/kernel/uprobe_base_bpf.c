@@ -208,13 +208,29 @@ static __inline bool skip_http2_kprobe(void)
 
 static __inline __u64 get_current_goroutine(void)
 {
-	__u64 current_thread = bpf_get_current_pid_tgid();
-	__u64 *goid_ptr = bpf_map_lookup_elem(&goroutines_map, &current_thread);
-	if (goid_ptr) {
-		return *goid_ptr;
+	void *fsbase = NULL;
+	void *g = NULL;
+	__s64 goid = 0;
+	__u64 pid_tgid = bpf_get_current_pid_tgid();
+	__u32 tgid = pid_tgid >> 32;
+
+	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &tgid);
+	if (!info) {
+		return 0;
 	}
 
-	return 0;
+	int offset_g_goid = info->offsets[OFFSET_IDX_GOID_RUNTIME_G];
+	if (offset_g_goid < 0) {
+		return 0;
+	}
+
+	void *task = (void *)bpf_get_current_task();
+	// FIXME: 这里写死了两个偏移量, STRUCT_TASK_TLS_OFFSET 和 -8, 这两个值需要查 map
+	bpf_probe_read(&fsbase, sizeof(fsbase), task + STRUCT_TASK_TLS_OFFSET);
+	bpf_probe_read(&g, sizeof(g), fsbase - 8);
+	bpf_probe_read(&goid, sizeof(goid), g + offset_g_goid);
+
+	return goid;
 }
 
 static __inline bool is_final_ancestor(__u32 tgid, __u64 goid, __u64 now,
@@ -373,44 +389,6 @@ _Pragma("error \"Must specify a BPF target arch\"");
 #endif
 }
 
-SEC("uprobe/runtime.casgstatus")
-int runtime_casgstatus(struct pt_regs *ctx)
-{
-	__u64 pid_tgid = bpf_get_current_pid_tgid();
-	__u32 tgid = pid_tgid >> 32;
-
-	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &tgid);
-	if (!info) {
-		return 0;
-	}
-	int offset_g_goid = info->offsets[OFFSET_IDX_GOID_RUNTIME_G];
-	if (offset_g_goid < 0) {
-		return 0;
-	}
-
-	__s32 newval;
-	void *g_ptr;
-
-	if (is_register_based_call(info)) {
-		g_ptr = (void *)PT_GO_REGS_PARM1(ctx);
-		newval = (__s32)PT_GO_REGS_PARM3(ctx);
-	} else {
-		bpf_probe_read(&g_ptr, sizeof(g_ptr), (void *)(PT_REGS_SP(ctx) + 8));
-		bpf_probe_read(&newval, sizeof(newval),
-			       (void *)(PT_REGS_SP(ctx) + 20));
-	}
-
-	if (newval != 2) {
-		return 0;
-	}
-
-	__s64 goid = 0;
-	bpf_probe_read(&goid, sizeof(goid), g_ptr + offset_g_goid);
-	bpf_map_update_elem(&goroutines_map, &pid_tgid, &goid, BPF_ANY);
-
-	return 0;
-}
-
 // This function creates a new go coroutine, and the parent and child 
 // coroutine numbers are in the parameters and return values ​​respectively.
 // Pass the function parameters through pid_tgid_callerid_map
@@ -558,8 +536,6 @@ int bpf_func_sched_process_exit(struct sched_comm_exit_ctx *ctx)
 			     ret);
 		}
 	}
-
-	bpf_map_delete_elem(&goroutines_map, &id);
 	return 0;
 }
 

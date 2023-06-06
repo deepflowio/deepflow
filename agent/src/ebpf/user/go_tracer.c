@@ -164,12 +164,6 @@ static struct data_members offsets[] = {
 static struct symbol syms[] = {
 	{
 		.type = GO_UPROBE,
-		.symbol = "runtime.casgstatus",
-		.probe_func = "runtime_casgstatus",
-		.is_probe_ret = false,
-	},
-	{
-		.type = GO_UPROBE,
 		.symbol = "runtime.newproc1",
 		.probe_func = "enter_runtime_newproc1",
 		.is_probe_ret = false,
