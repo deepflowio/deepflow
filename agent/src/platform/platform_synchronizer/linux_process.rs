@@ -635,7 +635,7 @@ fn get_container_id(proc: &Process) -> Option<String> {
             warn!("containerd cri path: `{:?}` get container id fail", path);
             return None;
         };
-        if !sp.len() == CONTAINER_ID_LEN + ".scope".len() {
+        if sp.len() != CONTAINER_ID_LEN + ".scope".len() {
             warn!("containerd cri path: `{}` parse fail, length incorrect", sp);
             return None;
         }
