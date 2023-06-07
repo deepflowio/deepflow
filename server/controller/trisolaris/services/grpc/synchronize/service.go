@@ -149,7 +149,12 @@ func (s *service) ShareGPIDLocalData(ctx context.Context, in *api.ShareGPIDSyncR
 }
 
 func (s *service) GetPrometheusLabelIDs(ctx context.Context, in *api.PrometheusLabelRequest) (*api.PrometheusLabelResponse, error) {
-	return s.prometheusEvent.GetLabelIDs(ctx, in)
+	startTime := time.Now()
+	defer func() {
+		statsd.AddGrpcCostStatsd(statsd.GetPrometheusLabelIDs, int(time.Now().Sub(startTime).Milliseconds()))
+	}()
+	resp, err := s.prometheusEvent.GetLabelIDs(ctx, in)
+	return resp, err
 }
 
 func (s *service) Plugin(r *api.PluginRequest, in api.Synchronizer_PluginServer) error {

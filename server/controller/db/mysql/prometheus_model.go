@@ -19,11 +19,7 @@ package mysql
 import "time"
 
 type IDField struct {
-	ID int `gorm:"primaryKey;column:id;type:int(10) unsigned;unique;not null"`
-}
-
-func (i IDField) GetID() int {
-	return i.ID
+	ID int `gorm:"primaryKey;column:id;type:int(10);unique;not null"`
 }
 
 type CreatedAtField struct {
@@ -35,27 +31,14 @@ type PrometheusMetricName struct {
 	Name    string `gorm:"column:name;type:varchar(256);unique;not null"`
 }
 
-func (p PrometheusMetricName) GetStr() string {
-	return p.Name
-}
-
 type PrometheusLabelName struct {
 	IDField `gorm:"embedded"`
 	Name    string `gorm:"column:name;type:varchar(256);unique;not null"`
-	// Type    uint8  `gorm:"column:type;type:tinyint(3) unsigned;not null"`
-}
-
-func (p PrometheusLabelName) GetStr() string {
-	return p.Name
 }
 
 type PrometheusLabelValue struct {
 	IDField `gorm:"embedded"`
 	Value   string `gorm:"column:value;type:varchar(256);unique;not null"`
-}
-
-func (p PrometheusLabelValue) GetStr() string {
-	return p.Value
 }
 
 type PrometheusLabel struct {
@@ -67,13 +50,13 @@ type PrometheusLabel struct {
 type PrometheusMetricLabel struct {
 	IDField    `gorm:"embedded"`
 	MetricName string `gorm:"column:metric_name;type:varchar(256);not null"`
-	LabelID    int    `gorm:"column:label_id;type:int(10) unsigned;not null"`
+	LabelID    int    `gorm:"column:label_id;type:int(10);not null"`
 }
 
 type PrometheusMetricTarget struct {
 	IDField    `gorm:"embedded"`
 	MetricName string `gorm:"column:metric_name;type:varchar(256);not null"`
-	TargetID   int    `gorm:"column:target_id;type:int(10) unsigned;not null"`
+	TargetID   int    `gorm:"column:target_id;type:int(10);not null"`
 }
 
 type PrometheusMetricAPPLabelLayout struct {
