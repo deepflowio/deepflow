@@ -36,6 +36,7 @@ gprocess                   , gprocess                  , gprocess               
 
 k8s.label                  , k8s.label                 , k8s.label                 , map           ,                       , Custom Tag      , 111
 k8s.annotation             , k8s.annotation            , k8s.annotation            , map           ,                       , Custom Tag      , 111
+k8s.env                    , k8s.env                   , k8s.env                   , map           ,                       , Custom Tag      , 111
 cloud.tag                  , cloud.tag                 , cloud.tag                 , map           ,                       , Custom Tag      , 111
 os.app                     , os.app                    , os.app                    , map           ,                       , Custom Tag      , 111
 

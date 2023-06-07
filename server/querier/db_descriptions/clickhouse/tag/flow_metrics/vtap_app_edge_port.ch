@@ -39,6 +39,7 @@ tap_port_pod_node          , 采集网卡所属容器节点         ,
 
 k8s.label                  , K8s Label                  ,
 k8s.annotation             , K8s Annotation             ,
+k8s.env                    , K8s Env                    ,
 cloud.tag                  , Cloud Tag                  ,
 os.app                     , OS APP                     ,
 

@@ -620,6 +620,33 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		}
 	}
 
+	// K8s envs
+	// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
+	for _, suffix := range []string{"", "_0", "_1"} {
+		k8senvSuffix := "k8s_env" + suffix
+		podIDSuffix := "pod_id" + suffix
+		tagResourceMap[k8senvSuffix] = map[string]*Tag{
+			"default": NewTag(
+				"dictGet(flow_tag.pod_k8s_env_map, 'value', (toUInt64("+podIDSuffix+"),'%s'))",
+				"toUInt64("+podIDSuffix+") IN (SELECT id FROM flow_tag.pod_k8s_env_map WHERE key='%s')",
+				"toUInt64("+podIDSuffix+") IN (SELECT id FROM flow_tag.pod_k8s_env_map WHERE value %s %s and key='%s')",
+				"toUInt64("+podIDSuffix+") IN (SELECT id FROM flow_tag.pod_k8s_env_map WHERE %s(value,%s) and key='%s')",
+			),
+		}
+	}
+	for _, suffix := range []string{"", "_0", "_1"} {
+		k8senvSuffix := "k8s.env" + suffix
+		podIDSuffix := "pod_id" + suffix
+		tagResourceMap[k8senvSuffix] = map[string]*Tag{
+			"default": NewTag(
+				"dictGetOrDefault(flow_tag.pod_k8s_envs_map, 'envs', toUInt64("+podIDSuffix+"),'{}') ",
+				podIDSuffix+"!=0",
+				"",
+				"",
+			),
+		}
+	}
+
 	// cloud tags
 	// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
 	for _, suffix := range []string{"", "_0", "_1"} {

@@ -52,7 +52,7 @@ func (mt *metricTarget) refresh(args ...interface{}) error {
 	return nil
 }
 
-func (mt *metricTarget) sync(toAdd []*controller.PrometheusMetricTarget) error {
+func (mt *metricTarget) encode(toAdd []*controller.PrometheusMetricTarget) error {
 	mt.mux.Lock()
 	defer mt.mux.Unlock()
 
