@@ -29,7 +29,7 @@ func (c *Cloud) getKubernetesData() model.Resource {
 	k8sGatherTask, ok := c.kubernetesGatherTaskMap[c.basicInfo.Lcuuid]
 	if !ok {
 		errMSG := fmt.Sprintf("domain (%s) no related kubernetes_gather_task", c.basicInfo.Name)
-		log.Error(errMSG)
+		log.Warning(errMSG)
 		return model.Resource{
 			ErrorMessage: errMSG,
 			ErrorState:   common.RESOURCE_STATE_CODE_EXCEPTION,
