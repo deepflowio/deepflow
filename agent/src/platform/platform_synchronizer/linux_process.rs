@@ -20,7 +20,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::{collections::HashMap, os::unix::process::CommandExt, process::Command};
 
 use envmnt::{ExpandOptions, ExpansionType};
-use log::{error, warn};
+use log::{debug, error};
 use nom::AsBytes;
 use procfs::{process::Process, ProcError, ProcResult};
 use public::bytes::write_u64_be;
@@ -622,7 +622,7 @@ fn get_container_id(proc: &Process) -> Option<String> {
     }
 
     let Some((_, s)) = path.rsplit_once(MAIN_SEPARATOR) else {
-        warn!("cgroup path: `{:?}` get base path fail", path);
+        debug!("cgroup path: `{:?}` get base path fail", path);
         return None;
     };
 
@@ -632,11 +632,11 @@ fn get_container_id(proc: &Process) -> Option<String> {
     } else {
         // other cri likely have format like `${cri-prefix}-${container id}.scope`
         let Some((_, sp))  = s.rsplit_once("-") else {
-            warn!("containerd cri path: `{:?}` get container id fail", path);
+            debug!("containerd cri path: `{:?}` get container id fail", path);
             return None;
         };
         if sp.len() != CONTAINER_ID_LEN + ".scope".len() {
-            warn!("containerd cri path: `{}` parse fail, length incorrect", sp);
+            debug!("containerd cri path: `{}` parse fail, length incorrect", sp);
             return None;
         }
         Some(sp[..CONTAINER_ID_LEN].to_string())
