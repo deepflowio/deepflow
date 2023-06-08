@@ -128,32 +128,26 @@ func GetTagTranslator(name, alias, db, table string) (Statement, string, error) 
 			stmt = &SelectTag{Value: tagTranslator, Alias: selectTag}
 		} else if name == "tag" && db == "prometheus" {
 			tagTranslatorStr := ""
+			appLabelTranslatorStr := ""
 			if appLabels, ok := Prometheus.MetricAppLabelLayout[table]; ok {
 				// appLabel
+				appLabelTranslatorSlice := []string{}
 				for _, appLabel := range appLabels {
 					if labelNameID, ok := Prometheus.LabelNameToID[appLabel.AppLabelName]; ok {
-						labelTranslatorStr := ""
-						if tagTranslatorStr == "" {
-							labelTranslatorStr = fmt.Sprintf("toJSONString(map('%s',dictGet(flow_tag.app_label_map, 'label_value', (metric_id, %d, app_label_value_id_%d))", appLabel.AppLabelName, labelNameID, appLabel.appLabelColumnIndex)
-						} else {
-							labelTranslatorStr = fmt.Sprintf(",'%s',dictGet(flow_tag.app_label_map, 'label_value', (metric_id, %d, app_label_value_id_%d))", appLabel.AppLabelName, labelNameID, appLabel.appLabelColumnIndex)
-						}
-						tagTranslatorStr += labelTranslatorStr
+						appLabelTranslator := fmt.Sprintf("'%s',dictGet(flow_tag.app_label_map, 'label_value', (metric_id, %d, app_label_value_id_%d))", appLabel.AppLabelName, labelNameID, appLabel.appLabelColumnIndex)
+						appLabelTranslatorSlice = append(appLabelTranslatorSlice, appLabelTranslator)
 					}
 				}
+				appLabelTranslatorStr = strings.Join(appLabelTranslatorSlice, ",")
 			}
-			// targetLabel
-			targetLabelTranslatorStr := ""
-			if tagTranslatorStr == "" {
-				targetLabelTranslatorStr = "toJSONString(map(dictGet(flow_tag.prometheus_target_label_layout_map, 'target_labels', (target_id))"
 
-				stmt = &SelectTag{Value: tagTranslatorStr, Alias: selectTag}
+			// targetLabel
+			targetLabelTranslatorStr := "CAST((splitByString(', ', dictGet(flow_tag.prometheus_target_label_layout_map, 'label_names', target_id)), splitByString(', ', dictGet(flow_tag.prometheus_target_label_layout_map, 'label_values', target_id))), 'Map(String, String)')"
+			stmt = &SelectTag{Value: tagTranslatorStr, Alias: selectTag}
+			if appLabelTranslatorStr != "" {
+				tagTranslatorStr = "toJSONString(mapConcat(map(" + appLabelTranslatorStr + ")," + targetLabelTranslatorStr + "))"
 			} else {
-				targetLabelTranslatorStr = ",dictGet(flow_tag.prometheus_target_label_layout_map, 'target_labels', (target_id))"
-			}
-			tagTranslatorStr += targetLabelTranslatorStr
-			if tagTranslatorStr != "" {
-				tagTranslatorStr += "))"
+				tagTranslatorStr = "toJSONString(" + targetLabelTranslatorStr + ")"
 			}
 			stmt = &SelectTag{Value: tagTranslatorStr, Alias: selectTag}
 		} else if tagItem.TagTranslator != "" {
