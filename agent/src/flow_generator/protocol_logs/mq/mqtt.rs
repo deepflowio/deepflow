@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use std::{collections::HashMap, fmt};
+use std::fmt;
 
 use log::{debug, warn};
 use nom::{
@@ -204,7 +204,6 @@ pub struct MqttLog {
     msg_type: LogMessageType,
     status: L7ResponseStatus,
     version: u8,
-    client_map: HashMap<u64, String>,
 
     perf_stats: Option<L7PerfStats>,
 }
