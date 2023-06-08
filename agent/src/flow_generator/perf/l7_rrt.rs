@@ -51,7 +51,7 @@ impl RrtCache {
             && self.last_log_time + Self::LOG_INTERVAL < now
         {
             self.last_log_time = now;
-            warn!("The capacity({}) of the rrt table will be exceeded. please adjust the configuration", self.rrt_cache.cap());
+            debug!("The capacity({}) of the rrt table will be exceeded. please adjust the configuration", self.rrt_cache.cap());
         }
         self.rrt_cache.push(key, value)
     }
