@@ -118,14 +118,14 @@ func GetTagTranslator(name, alias, db, table string) (Statement, string, error) 
 			stmt = &SelectTag{Value: tagTranslator, Alias: selectTag}
 		} else if name == "tag" && db == "prometheus" {
 			tagTranslator := "toString(target_id)"
-			if appLabelMaxIndex, ok := Prometheus.MetricNameToMaxIndex[table]; ok {
-				appLabelTag := ""
-				for i := 1; i <= appLabelMaxIndex; i++ {
-					appLabelTag += fmt.Sprintf(",',',toString(app_label_value_id_%d)", i)
-				}
-				tagTranslator += appLabelTag
-				tagTranslator = fmt.Sprintf("concat(%s)", tagTranslator)
-			}
+			// if appLabelMaxIndex, ok := Prometheus.MetricNameToMaxIndex[table]; ok {
+			// 	appLabelTag := ""
+			// 	for i := 1; i <= appLabelMaxIndex; i++ {
+			// 		appLabelTag += fmt.Sprintf(",',',toString(app_label_value_id_%d)", i)
+			// 	}
+			// 	tagTranslator += appLabelTag
+			// 	tagTranslator = fmt.Sprintf("concat(%s)", tagTranslator)
+			// }
 			stmt = &SelectTag{Value: tagTranslator, Alias: selectTag, DataBase: "prometheus", Table: table}
 		} else if tagItem.TagTranslator != "" {
 			if name != "packet_batch" || table != "l4_packet" {

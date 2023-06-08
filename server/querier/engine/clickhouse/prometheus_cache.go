@@ -28,7 +28,6 @@ type PrometheusMap struct {
 	MetricAppLabelLayout map[string]int
 	LabelNameToID        map[string]int
 	LabelIDToName        map[int]string
-	MetricNameToMaxIndex map[string]int
 }
 
 type Label struct {
@@ -41,7 +40,6 @@ func GenerateMap() {
 	METRIC_APP_LABEL_LAYOUT := map[string]int{}
 	LABEL_NAME_TO_ID := map[string]int{}
 	LABEL_ID_TO_NAME := map[int]string{}
-	METRIC_NAME_TO_MAX_INDEX := map[string]int{}
 	chClient := client.Client{
 		Host:     config.Cfg.Clickhouse.Host,
 		Port:     config.Cfg.Clickhouse.Port,
@@ -103,21 +101,4 @@ func GenerateMap() {
 		METRIC_APP_LABEL_LAYOUT[metricName+", "+appLabelName] = appLabelColumnIndex
 	}
 	Prometheus.MetricAppLabelLayout = METRIC_APP_LABEL_LAYOUT
-
-	metricNameToMaxIndexSql := "SELECT metric_name,max(app_label_column_index) FROM prometheus.prometheus_metric_app_label_layout_map GROUP BY metric_name"
-	metricNameToMaxIndexSqlRst, err := chClient.DoQuery(&client.QueryParams{Sql: metricNameToMaxIndexSql})
-	if err != nil {
-		log.Warning(err)
-		return
-	}
-	metricNameToMaxIndexRst := make([]interface{}, len(metricNameToMaxIndexSqlRst.Values))
-	copy(metricNameToMaxIndexRst, metricNameToMaxIndexSqlRst.Values)
-	for _, _key := range metricNameToMaxIndexRst {
-		metricNameKey := _key.([]interface{})[0]
-		maxIndexKey := _key.([]interface{})[1]
-		metricName := metricNameKey.(string)
-		maxIndex := maxIndexKey.(int)
-		METRIC_NAME_TO_MAX_INDEX[metricName] = maxIndex
-	}
-	Prometheus.MetricNameToMaxIndex = METRIC_NAME_TO_MAX_INDEX
 }
