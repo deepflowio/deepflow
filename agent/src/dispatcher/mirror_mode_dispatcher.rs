@@ -255,6 +255,7 @@ impl MirrorModeDispatcher {
     ) -> &'a mut MirrorPipeline {
         if updated.load(Ordering::Relaxed) {
             pipelines.clear();
+            pipelines.shrink_to_fit();
             updated.store(false, Ordering::Relaxed);
         }
 
