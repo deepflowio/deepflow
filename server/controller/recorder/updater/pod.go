@@ -176,6 +176,9 @@ func (p *Pod) generateUpdateInfo(diffBase *cache.Pod, cloudItem *cloudmodel.Pod)
 	if diffBase.ENV != cloudItem.ENV {
 		updateInfo["env"] = cloudItem.ENV
 	}
+	if diffBase.ContainerIDs != cloudItem.ContainerIDs {
+		updateInfo["container_ids"] = cloudItem.ContainerIDs
+	}
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
 		updateInfo["region"] = cloudItem.RegionLcuuid
 	}
