@@ -84,14 +84,24 @@ func GetTagTranslator(name, alias, db, table string) (Statement, string, error) 
 					if metricID, ok := Prometheus.MetricNameToID[table]; ok {
 						if labelNameID, ok := Prometheus.LabelNameToID[nameNoPreffix]; ok {
 							// Determine whether the tag is app_label or target_label
-							if appLabelColumnIndex, ok := Prometheus.MetricAppLabelLayout[table+", "+nameNoPreffix]; ok {
-								labelType = "app"
-								TagTranslatorStr := fmt.Sprintf("dictGet(flow_tag.app_label_map, 'label_value', (%d, %d, app_label_value_id_%d))", metricID, labelNameID, appLabelColumnIndex)
-								stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag, DataBase: "prometheus", Table: table}
-							} else {
-								labelType = "target"
-								TagTranslatorStr := fmt.Sprintf("dictGet(flow_tag.target_label_map, 'label_value', (%d, %d, target_id))", metricID, labelNameID)
-								stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag, DataBase: "prometheus", Table: table}
+							isAppLabel := false
+							if appLabels, ok := Prometheus.MetricAppLabelLayout[table]; ok {
+								for _, appLabel := range appLabels {
+									if appLabel.AppLabelName == nameNoPreffix {
+										isAppLabel = true
+										labelType = "app"
+										TagTranslatorStr := fmt.Sprintf("dictGet(flow_tag.app_label_map, 'label_value', (%d, %d, app_label_value_id_%d))", metricID, labelNameID, appLabel.appLabelColumnIndex)
+										stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag}
+										break
+									} else {
+										continue
+									}
+								}
+								if !isAppLabel {
+									labelType = "target"
+									TagTranslatorStr := fmt.Sprintf("dictGet(flow_tag.target_label_map, 'label_value', (%d, %d, target_id))", metricID, labelNameID)
+									stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag}
+								}
 							}
 						}
 					}
@@ -117,16 +127,35 @@ func GetTagTranslator(name, alias, db, table string) (Statement, string, error) 
 			}
 			stmt = &SelectTag{Value: tagTranslator, Alias: selectTag}
 		} else if name == "tag" && db == "prometheus" {
-			tagTranslator := "toString(target_id)"
-			// if appLabelMaxIndex, ok := Prometheus.MetricNameToMaxIndex[table]; ok {
-			// 	appLabelTag := ""
-			// 	for i := 1; i <= appLabelMaxIndex; i++ {
-			// 		appLabelTag += fmt.Sprintf(",',',toString(app_label_value_id_%d)", i)
-			// 	}
-			// 	tagTranslator += appLabelTag
-			// 	tagTranslator = fmt.Sprintf("concat(%s)", tagTranslator)
-			// }
-			stmt = &SelectTag{Value: tagTranslator, Alias: selectTag, DataBase: "prometheus", Table: table}
+			tagTranslatorStr := ""
+			if appLabels, ok := Prometheus.MetricAppLabelLayout[table]; ok {
+				// appLabel
+				for _, appLabel := range appLabels {
+					if labelNameID, ok := Prometheus.LabelNameToID[appLabel.AppLabelName]; ok {
+						labelTranslatorStr := ""
+						if tagTranslatorStr == "" {
+							labelTranslatorStr = fmt.Sprintf("toJSONString(map('%s',dictGet(flow_tag.app_label_map, 'label_value', (metric_id, %d, app_label_value_id_%d))", appLabel.AppLabelName, labelNameID, appLabel.appLabelColumnIndex)
+						} else {
+							labelTranslatorStr = fmt.Sprintf(",'%s',dictGet(flow_tag.app_label_map, 'label_value', (metric_id, %d, app_label_value_id_%d))", appLabel.AppLabelName, labelNameID, appLabel.appLabelColumnIndex)
+						}
+						tagTranslatorStr += labelTranslatorStr
+					}
+				}
+			}
+			// targetLabel
+			targetLabelTranslatorStr := ""
+			if tagTranslatorStr == "" {
+				targetLabelTranslatorStr = "toJSONString(map(dictGet(flow_tag.prometheus_target_label_layout_map, 'target_labels', (target_id))"
+
+				stmt = &SelectTag{Value: tagTranslatorStr, Alias: selectTag}
+			} else {
+				targetLabelTranslatorStr = ",dictGet(flow_tag.prometheus_target_label_layout_map, 'target_labels', (target_id))"
+			}
+			tagTranslatorStr += targetLabelTranslatorStr
+			if tagTranslatorStr != "" {
+				tagTranslatorStr += "))"
+			}
+			stmt = &SelectTag{Value: tagTranslatorStr, Alias: selectTag}
 		} else if tagItem.TagTranslator != "" {
 			if name != "packet_batch" || table != "l4_packet" {
 				stmt = &SelectTag{Value: tagItem.TagTranslator, Alias: selectTag}
@@ -166,12 +195,10 @@ func GetDefaultTag(name string, alias string) Statement {
 }
 
 type SelectTag struct {
-	DataBase string
-	Table    string
-	Value    string
-	Alias    string
-	Flag     int
-	Withs    []view.Node
+	Value string
+	Alias string
+	Flag  int
+	Withs []view.Node
 }
 
 func (t *SelectTag) Format(m *view.Model) {

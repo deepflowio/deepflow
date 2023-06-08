@@ -278,17 +278,27 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 								if metricID, ok := Prometheus.MetricNameToID[table]; ok {
 									if labelNameID, ok := Prometheus.LabelNameToID[nameNoPreffix]; ok {
 										// Determine whether the tag is app_label or target_label
-										if appLabelColumnIndex, ok := Prometheus.MetricAppLabelLayout[table+", "+nameNoPreffix]; ok {
-											if strings.Contains(op, "match") {
-												filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM flow_tag.app_label_map WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s))", appLabelColumnIndex, metricID, labelNameID, op, t.Value)
-											} else {
-												filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM flow_tag.app_label_map WHERE metric_id=%d and label_name_id=%d and label_value %s %s)", appLabelColumnIndex, metricID, labelNameID, op, t.Value)
+										isAppLabel := false
+										if appLabels, ok := Prometheus.MetricAppLabelLayout[table]; ok {
+											for _, appLabel := range appLabels {
+												if appLabel.AppLabelName == nameNoPreffix {
+													isAppLabel = true
+													if strings.Contains(op, "match") {
+														filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM flow_tag.app_label_map WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s))", appLabel.appLabelColumnIndex, metricID, labelNameID, op, t.Value)
+													} else {
+														filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM flow_tag.app_label_map WHERE metric_id=%d and label_name_id=%d and label_value %s %s)", appLabel.appLabelColumnIndex, metricID, labelNameID, op, t.Value)
+													}
+													break
+												} else {
+													continue
+												}
 											}
-										} else {
-											if strings.Contains(op, "match") {
-												filter = fmt.Sprintf("toUInt64(target_id) IN (SELECT target_id FROM flow_tag.target_label_map WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s))", metricID, labelNameID, op, t.Value)
-											} else {
-												filter = fmt.Sprintf("toUInt64(target_id) IN (SELECT target_id FROM flow_tag.target_label_map WHERE metric_id=%d and label_name_id=%d and label_value %s %s)", metricID, labelNameID, op, t.Value)
+											if !isAppLabel {
+												if strings.Contains(op, "match") {
+													filter = fmt.Sprintf("toUInt64(target_id) IN (SELECT target_id FROM flow_tag.target_label_map WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s))", metricID, labelNameID, op, t.Value)
+												} else {
+													filter = fmt.Sprintf("toUInt64(target_id) IN (SELECT target_id FROM flow_tag.target_label_map WHERE metric_id=%d and label_name_id=%d and label_value %s %s)", metricID, labelNameID, op, t.Value)
+												}
 											}
 										}
 									}
@@ -443,17 +453,27 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 							if metricID, ok := Prometheus.MetricNameToID[table]; ok {
 								if labelNameID, ok := Prometheus.LabelNameToID[nameNoPreffix]; ok {
 									// Determine whether the tag is app_label or target_label
-									if appLabelColumnIndex, ok := Prometheus.MetricAppLabelLayout[table+", "+nameNoPreffix]; ok {
-										if strings.Contains(op, "match") {
-											filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM flow_tag.app_label_map WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s))", appLabelColumnIndex, metricID, labelNameID, op, t.Value)
-										} else {
-											filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM flow_tag.app_label_map WHERE metric_id=%d and label_name_id=%d and label_value %s %s)", appLabelColumnIndex, metricID, labelNameID, op, t.Value)
+									isAppLabel := false
+									if appLabels, ok := Prometheus.MetricAppLabelLayout[table]; ok {
+										for _, appLabel := range appLabels {
+											if appLabel.AppLabelName == nameNoPreffix {
+												isAppLabel = true
+												if strings.Contains(op, "match") {
+													filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM flow_tag.app_label_map WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s))", appLabel.appLabelColumnIndex, metricID, labelNameID, op, t.Value)
+												} else {
+													filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM flow_tag.app_label_map WHERE metric_id=%d and label_name_id=%d and label_value %s %s)", appLabel.appLabelColumnIndex, metricID, labelNameID, op, t.Value)
+												}
+												break
+											} else {
+												continue
+											}
 										}
-									} else {
-										if strings.Contains(op, "match") {
-											filter = fmt.Sprintf("toUInt64(target_id) IN (SELECT target_id FROM flow_tag.target_label_map WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s))", metricID, labelNameID, op, t.Value)
-										} else {
-											filter = fmt.Sprintf("toUInt64(target_id) IN (SELECT target_id FROM flow_tag.target_label_map WHERE metric_id=%d and label_name_id=%d and label_value %s %s)", metricID, labelNameID, op, t.Value)
+										if !isAppLabel {
+											if strings.Contains(op, "match") {
+												filter = fmt.Sprintf("toUInt64(target_id) IN (SELECT target_id FROM flow_tag.target_label_map WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s))", metricID, labelNameID, op, t.Value)
+											} else {
+												filter = fmt.Sprintf("toUInt64(target_id) IN (SELECT target_id FROM flow_tag.target_label_map WHERE metric_id=%d and label_name_id=%d and label_value %s %s)", metricID, labelNameID, op, t.Value)
+											}
 										}
 									}
 								}

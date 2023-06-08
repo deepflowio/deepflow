@@ -21,11 +21,11 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
 )
 
-var Prometheus *PrometheusMap
+var Prometheus = &PrometheusMap{}
 
 type PrometheusMap struct {
 	MetricNameToID       map[string]int
-	MetricAppLabelLayout map[string]int
+	MetricAppLabelLayout map[string][]AppLabel
 	LabelNameToID        map[string]int
 	LabelIDToName        map[int]string
 }
@@ -35,12 +35,16 @@ type Label struct {
 	LabelValue  string
 }
 
+type AppLabel struct {
+	AppLabelName        string
+	appLabelColumnIndex int
+}
+
 func GenerateMap() {
 	METRIC_NAME_TO_ID := map[string]int{}
-	METRIC_APP_LABEL_LAYOUT := map[string]int{}
+	METRIC_APP_LABEL_LAYOUT := map[string][]AppLabel{}
 	LABEL_NAME_TO_ID := map[string]int{}
 	LABEL_ID_TO_NAME := map[int]string{}
-	prometheus := PrometheusMap{}
 	chClient := client.Client{
 		Host:     config.Cfg.Clickhouse.Host,
 		Port:     config.Cfg.Clickhouse.Port,
@@ -63,7 +67,7 @@ func GenerateMap() {
 		metricID := metricIDKey.(int)
 		METRIC_NAME_TO_ID[metricName] = metricID
 	}
-	prometheus.MetricNameToID = METRIC_NAME_TO_ID
+	Prometheus.MetricNameToID = METRIC_NAME_TO_ID
 
 	labelNameToIDSql := "SELECT name,id FROM flow_tag.prometheus_label_name_map"
 	labelNameToIDSqlRst, err := chClient.DoQuery(&client.QueryParams{Sql: labelNameToIDSql})
@@ -81,8 +85,8 @@ func GenerateMap() {
 		LABEL_NAME_TO_ID[labelName] = labelNameID
 		LABEL_ID_TO_NAME[labelNameID] = labelName
 	}
-	prometheus.LabelIDToName = LABEL_ID_TO_NAME
-	prometheus.LabelNameToID = LABEL_NAME_TO_ID
+	Prometheus.LabelIDToName = LABEL_ID_TO_NAME
+	Prometheus.LabelNameToID = LABEL_NAME_TO_ID
 
 	metricAppLabelLayoutSql := "SELECT metric_name,app_label_name,app_label_column_index FROM flow_tag.prometheus_metric_app_label_layout_map"
 	metricAppLabelLayoutSqlRst, err := chClient.DoQuery(&client.QueryParams{Sql: metricAppLabelLayoutSql})
@@ -99,8 +103,8 @@ func GenerateMap() {
 		metricName := metricNameKey.(string)
 		appLabelName := appLabelNameKey.(string)
 		appLabelColumnIndex := appLabelColumnIndexKey.(int)
-		METRIC_APP_LABEL_LAYOUT[metricName+", "+appLabelName] = appLabelColumnIndex
+		appLabel := AppLabel{AppLabelName: appLabelName, appLabelColumnIndex: appLabelColumnIndex}
+		METRIC_APP_LABEL_LAYOUT[metricName] = append(METRIC_APP_LABEL_LAYOUT[metricName], appLabel)
 	}
-	prometheus.MetricAppLabelLayout = METRIC_APP_LABEL_LAYOUT
-	Prometheus = &prometheus
+	Prometheus.MetricAppLabelLayout = METRIC_APP_LABEL_LAYOUT
 }
