@@ -1662,13 +1662,15 @@ type LBVMConnection struct {
 
 type Process struct {
 	DiffBase
-	Name      string `json:"name"`
-	OSAPPTags string `json:"os_app_tags"`
+	Name        string `json:"name"`
+	OSAPPTags   string `json:"os_app_tags"`
+	ContainerID string `json:"container_id"`
 }
 
 func (p *Process) Update(cloudItem *cloudmodel.Process) {
 	p.Name = cloudItem.Name
 	p.OSAPPTags = cloudItem.OSAPPTags
+	p.ContainerID = cloudItem.ContainerID
 	log.Info(updateDiffBase(RESOURCE_TYPE_PROCESS_EN, p))
 }
 

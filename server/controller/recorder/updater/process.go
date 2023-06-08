@@ -73,6 +73,9 @@ func (p *Process) generateUpdateInfo(diffBase *cache.Process, cloudItem *cloudmo
 	if diffBase.OSAPPTags != cloudItem.OSAPPTags {
 		updateInfo["os_app_tags"] = cloudItem.OSAPPTags
 	}
+	if diffBase.ContainerID != cloudItem.ContainerID {
+		updateInfo["container_id"] = cloudItem.ContainerID
+	}
 
 	if len(updateInfo) > 0 {
 		return updateInfo, true
