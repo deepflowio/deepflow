@@ -460,3 +460,9 @@ type ChTargetLabel struct {
 	TargetID    int    `gorm:"primaryKey;column:target_id;type:int unsigned;not null" json:"TARGET_ID"`
 	LabelValue  string `gorm:"column:label_value;type:varchar(256);not null" json:"LABEL_VALUE"`
 }
+
+type ChPrometheusTargetLabelLayout struct {
+	TargetID          int    `gorm:"primaryKey;column:target_id;type:int;not null" json:"TARGET_ID"`
+	TargetLabelNames  string `gorm:"column:target_label_names;type:text;not null" json:"TARGET_LABEL_NAMES"`
+	TargetLabelValues string `gorm:"column:target_label_values;type:text;not null" json:"TARGET_LABEL_VALUES"`
+}
