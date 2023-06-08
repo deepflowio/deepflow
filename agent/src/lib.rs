@@ -59,7 +59,8 @@ pub use {
         port_range::PortRange as _PortRange,
     },
     flow_generator::flow_map::{
-        _new_flow_map_and_receiver, _new_meta_packet, _reverse_meta_packet,
+        Config as _FlowMapConfig, _new_flow_map_and_receiver, _new_meta_packet,
+        _reverse_meta_packet,
     },
     flow_generator::perf::{
         tcp::{
