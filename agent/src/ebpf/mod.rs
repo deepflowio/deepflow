@@ -198,6 +198,7 @@ pub struct SK_BPF_DATA {
      *     请求/回应都有各自不同的syscall_trace_id_call。
      */
     pub syscall_trace_id_call: u64,
+    pub stream_seq: u32,
 
     /* data info */
     pub timestamp: u64, // cap_data获取的时间戳（从1970.1.1开始到数据捕获时的时间间隔，精度为微妙）

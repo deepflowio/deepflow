@@ -63,6 +63,7 @@ struct __socket_data {
 	__u8  msg_type:  7;  // bits[1-7]: 信息类型，值为MSG_UNKNOWN(0), MSG_REQUEST(1), MSG_RESPONSE(2)
 
 	__u64 syscall_len;   // 本次系统调用读、写数据的总长度
+	__u32 stream_seq;
 	__u64 data_seq;      // cap_data在Socket中的相对顺序号
 	__u16 data_type;     // HTTP, DNS, MySQL
 	__u16 data_len;      // 数据长度
@@ -95,7 +96,6 @@ struct trace_stats {
 };
 
 struct socket_info_t {
-	__u64 l7_proto;
 	/*
 	 * The serial number of the socket read and write data, used to
 	 * correct out-of-sequence.
@@ -110,12 +110,7 @@ struct socket_info_t {
 	 * 用于后续的协议分析。
 	 */
 	__u8 prev_data[4];
-	__u8 direction: 1;
-	__u8 msg_type: 2;	// 保存数据类型，值为MSG_UNKNOWN(0), MSG_REQUEST(1), MSG_RESPONSE(2)
-	__u8 role: 5;           // 标识socket角色：ROLE_CLIENT, ROLE_SERVER, ROLE_UNKNOWN
-	bool need_reconfirm;    // l7协议推断是否需要再次确认。
 	__s32 correlation_id;   // 目前用于kafka协议推断。
-
 	__u32 peer_fd;		// 用于记录socket间数据转移的对端fd。
 
 	/*
@@ -126,6 +121,20 @@ struct socket_info_t {
 	__u32 prev_data_len;
 	__u64 trace_id;
 	__u64 uid; // socket唯一标识ID
+
+	// Sequence number used to reassemble data stream
+	__u32 ingress_seq;
+	__u32 egress_seq;
+
+	// The number of consecutive reports in the same direction for a
+	// specific socket.
+	__u8 ingress_cd;
+	__u8 egress_cd;
+	__u8 l7_proto;
+	__u8 direction : 1;
+	__u8 msg_type : 2; // 保存数据类型，值为MSG_UNKNOWN(0), MSG_REQUEST(1), MSG_RESPONSE(2)
+	__u8 role : 5; // 标识socket角色：ROLE_CLIENT, ROLE_SERVER, ROLE_UNKNOWN
+	bool need_reconfirm; // l7协议推断是否需要再次确认。
 } __attribute__((packed));
 
 struct trace_key_t {

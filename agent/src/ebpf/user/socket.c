@@ -692,6 +692,7 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 		submit_data->syscall_len = sd->syscall_len;
 		submit_data->tcp_seq = sd->tcp_seq;
 		submit_data->cap_seq = sd->data_seq;
+		submit_data->stream_seq = sd->stream_seq;
 		submit_data->syscall_trace_id_call = sd->thread_trace_id;
 		safe_buf_copy(submit_data->process_kname, sizeof(submit_data->process_kname),
 		              sd->comm, sizeof(sd->comm));
