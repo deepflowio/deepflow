@@ -517,6 +517,7 @@ impl SessionQueue {
                 .cached
                 .fetch_sub(map.len() as u64, Ordering::Relaxed);
             self.send_all(map.drain().map(|(_, item)| item).collect());
+            map.shrink_to_fit();
         }
         let mut maps = time_window.drain(0..delete_num).collect();
         time_window.append(&mut maps);
