@@ -45,9 +45,9 @@ func GenerateMap() {
 		Port:     config.Cfg.Clickhouse.Port,
 		UserName: config.Cfg.Clickhouse.User,
 		Password: config.Cfg.Clickhouse.Password,
-		DB:       "prometheus",
+		DB:       "flow_tag",
 	}
-	metricNameToIDSql := "SELECT name,id FROM prometheus.prometheus_metric_name_map"
+	metricNameToIDSql := "SELECT name,id FROM flow_tag.prometheus_metric_name_map"
 	metricNameToIDSqlRst, err := chClient.DoQuery(&client.QueryParams{Sql: metricNameToIDSql})
 	if err != nil {
 		log.Warning(err)
@@ -64,7 +64,7 @@ func GenerateMap() {
 	}
 	Prometheus.MetricNameToID = METRIC_NAME_TO_ID
 
-	labelNameToIDSql := "SELECT name,id FROM prometheus.prometheus_label_name_map"
+	labelNameToIDSql := "SELECT name,id FROM flow_tag.prometheus_label_name_map"
 	labelNameToIDSqlRst, err := chClient.DoQuery(&client.QueryParams{Sql: labelNameToIDSql})
 	if err != nil {
 		log.Warning(err)
@@ -83,7 +83,7 @@ func GenerateMap() {
 	Prometheus.LabelIDToName = LABEL_ID_TO_NAME
 	Prometheus.LabelNameToID = LABEL_NAME_TO_ID
 
-	metricAppLabelLayoutSql := "SELECT metric_name,app_label_name,app_label_column_index FROM prometheus.prometheus_metric_app_label_layout_map"
+	metricAppLabelLayoutSql := "SELECT metric_name,app_label_name,app_label_column_index FROM flow_tag.prometheus_metric_app_label_layout_map"
 	metricAppLabelLayoutSqlRst, err := chClient.DoQuery(&client.QueryParams{Sql: metricAppLabelLayoutSql})
 	if err != nil {
 		log.Warning(err)
