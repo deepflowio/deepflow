@@ -38,7 +38,7 @@ use crate::{
         base_dispatcher::{BaseDispatcherListener, TapTypeHandler},
         error::Result,
     },
-    flow_generator::FlowMap,
+    flow_generator::{flow_map::Config, FlowMap},
     handler::{MiniPacket, PacketHandler},
     rpc::get_timestamp,
     utils::{
@@ -258,20 +258,24 @@ impl AnalyzerModeDispatcher {
                         policy_getter,
                         log_output_queue,
                         ntp_diff,
-                        flow_map_config.clone(),
-                        log_parse_config,
-                        #[cfg(target_os = "linux")]
-                        None,
+                        &flow_map_config.load(),
                         Some(packet_sequence_output_queue), // Enterprise Edition Feature: packet-sequence
                         &stats,
                         false, // !from_ebpf
                     );
 
                     while !terminated.load(Ordering::Relaxed) {
+                        let config = Config {
+                            flow: &flow_map_config.load(),
+                            log_parser: &log_parse_config.load(),
+                            #[cfg(target_os = "linux")]
+                            ebpf: None,
+                        };
+
                         match receiver.recv_all(&mut batch, Some(Duration::from_secs(1))) {
                             Ok(_) => {}
                             Err(queue::Error::Timeout) => {
-                                flow_map.inject_flush_ticker(Duration::ZERO);
+                                flow_map.inject_flush_ticker(&config, Duration::ZERO);
                                 continue;
                             }
                             Err(queue::Error::Terminated(..)) => break,
@@ -378,7 +382,7 @@ impl AnalyzerModeDispatcher {
                                 id as u8,
                                 npb_dedup_enabled.load(Ordering::Relaxed),
                             );
-                            flow_map.inject_meta_packet(&mut meta_packet);
+                            flow_map.inject_meta_packet(&config, &mut meta_packet);
                             output_batch.push((tap_type, meta_packet));
                         }
                         if let Err(e) = sender.send_all(&mut output_batch) {

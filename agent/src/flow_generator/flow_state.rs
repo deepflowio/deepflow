@@ -730,7 +730,7 @@ mod tests {
     };
     use crate::common::flow::{CloseType, PacketDirection};
     use crate::config::RuntimeConfig;
-    use crate::flow_generator::flow_map::_new_flow_map_and_receiver;
+    use crate::flow_generator::flow_map::{Config, _new_flow_map_and_receiver};
     use crate::flow_generator::flow_node::FlowNode;
     use crate::flow_generator::{FlowTimeout, TcpTimeout};
     use crate::flow_generator::{FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC, TIME_UNIT};
@@ -779,7 +779,7 @@ mod tests {
             (TcpFlags::ACK, PacketDirection::ClientToServer),
         ];
 
-        let (mut flow_map, _) = _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
+        let (_, mut flow_map, _) = _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
         let mut flow_node = FlowNode {
             timestamp_key: get_timestamp(0).as_nanos() as u64,
 
@@ -847,7 +847,7 @@ mod tests {
 
     #[test]
     fn state_machine() {
-        let (mut flow_map, _) = _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
+        let (_, mut flow_map, _) = _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
         let mut flow_node = FlowNode {
             timestamp_key: get_timestamp(0).as_nanos() as u64,
 
@@ -922,7 +922,7 @@ mod tests {
     }
 
     fn state_machine_helper<P: AsRef<Path>>(pcap_file: P, expect_close_type: CloseType) {
-        let (mut flow_map, output_queue_receiver) =
+        let (module_config, mut flow_map, output_queue_receiver) =
             _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
 
         let capture = Capture::load_pcap(pcap_file, None);
@@ -955,16 +955,22 @@ mod tests {
                 is_local_ip: false,
             },
         }));
+        let config = Config {
+            flow: &module_config.flow,
+            log_parser: &module_config.log_parser,
+            #[cfg(target_os = "linux")]
+            ebpf: None,
+        };
         for mut pkt in packets {
             pkt.endpoint_data.replace(ep.clone());
 
             pkt.lookup_key.timestamp = get_timestamp(0) + (pkt.lookup_key.timestamp - delta);
             last_timestamp = pkt.lookup_key.timestamp;
-            flow_map.inject_meta_packet(&mut pkt);
+            flow_map.inject_meta_packet(&config, &mut pkt);
         }
 
-        flow_map.inject_flush_ticker(last_timestamp);
-        flow_map.inject_flush_ticker(last_timestamp + Duration::from_secs(600));
+        flow_map.inject_flush_ticker(&config, last_timestamp);
+        flow_map.inject_flush_ticker(&config, last_timestamp + Duration::from_secs(600));
 
         let mut tagged_flows = vec![];
         // 如果不设置超时，队列就会永远等待

@@ -23,6 +23,7 @@ use std::{
     time::Duration,
 };
 
+use arc_swap::access::Access;
 #[cfg(target_os = "linux")]
 use log::debug;
 use log::{info, warn};
@@ -46,7 +47,7 @@ use crate::{
         error::{Error, Result},
         PacketCounter,
     },
-    flow_generator::FlowMap,
+    flow_generator::{flow_map::Config, FlowMap},
     handler::PacketHandlerBuilder,
     handler::{MiniPacket, PacketHandler},
     rpc::get_timestamp,
@@ -330,6 +331,7 @@ impl MirrorModeDispatcher {
         pipelines: &mut HashMap<u32, MirrorPipeline>,
         handler_builder: &Arc<Mutex<Vec<PacketHandlerBuilder>>>,
         tunnel_info: &TunnelInfo,
+        config: &Config,
         flow_map: &mut FlowMap,
         counter: &Arc<PacketCounter>,
         trident_type: TridentType,
@@ -358,7 +360,7 @@ impl MirrorModeDispatcher {
             npb_dedup,
         );
         // flowProcesser
-        flow_map.inject_meta_packet(&mut meta_packet);
+        flow_map.inject_meta_packet(&config, &mut meta_packet);
         let mini_packet = MiniPacket::new(overlay_packet, &meta_packet);
         for i in pipeline.handlers.iter_mut() {
             i.handle(&mini_packet);
@@ -372,35 +374,25 @@ impl MirrorModeDispatcher {
         let time_diff = self.base.ntp_diff.load(Ordering::Relaxed);
         let mut prev_timestamp = get_timestamp(time_diff);
 
-        #[cfg(target_os = "linux")]
         let mut flow_map = FlowMap::new(
             self.base.id as u32,
             self.base.flow_output_queue.clone(),
             self.base.policy_getter,
             self.base.log_output_queue.clone(),
             self.base.ntp_diff.clone(),
-            self.base.flow_map_config.clone(),
-            self.base.log_parse_config.clone(),
-            None,
-            Some(self.base.packet_sequence_output_queue.clone()), // Enterprise Edition Feature: packet-sequence
-            &self.base.stats,
-            false, // !from_ebpf
-        );
-        #[cfg(target_os = "windows")]
-        let mut flow_map = FlowMap::new(
-            self.base.id as u32,
-            self.base.flow_output_queue.clone(),
-            self.base.policy_getter,
-            self.base.log_output_queue.clone(),
-            self.base.ntp_diff.clone(),
-            self.base.flow_map_config.clone(),
-            self.base.log_parse_config.clone(),
+            &self.base.flow_map_config.load(),
             Some(self.base.packet_sequence_output_queue.clone()), // Enterprise Edition Feature: packet-sequence
             &self.base.stats,
             false, // !from_ebpf
         );
 
         while !self.base.terminated.load(Ordering::Relaxed) {
+            let config = Config {
+                flow: &self.base.flow_map_config.load(),
+                log_parser: &self.base.log_parse_config.load(),
+                #[cfg(target_os = "linux")]
+                ebpf: None,
+            };
             if self.base.reset_whitelist.swap(false, Ordering::Relaxed) {
                 self.base.tap_interface_whitelist.reset();
             }
@@ -413,7 +405,7 @@ impl MirrorModeDispatcher {
                 &self.base.ntp_diff,
             );
             if recved.is_none() {
-                flow_map.inject_flush_ticker(Duration::ZERO);
+                flow_map.inject_flush_ticker(&config, Duration::ZERO);
                 if self.base.tap_interface_whitelist.next_sync(Duration::ZERO) {
                     self.base.need_update_bpf.store(true, Ordering::Relaxed);
                 }
@@ -493,6 +485,7 @@ impl MirrorModeDispatcher {
                     &mut self.pipelines,
                     &self.base.handler_builder,
                     &self.base.tunnel_info,
+                    &config,
                     &mut flow_map,
                     &self.base.counter,
                     trident_type,
@@ -515,6 +508,7 @@ impl MirrorModeDispatcher {
                     &mut self.pipelines,
                     &self.base.handler_builder,
                     &self.base.tunnel_info,
+                    &config,
                     &mut flow_map,
                     &self.base.counter,
                     trident_type,
@@ -535,6 +529,7 @@ impl MirrorModeDispatcher {
                     &mut self.pipelines,
                     &self.base.handler_builder,
                     &self.base.tunnel_info,
+                    &config,
                     &mut flow_map,
                     &self.base.counter,
                     trident_type,
