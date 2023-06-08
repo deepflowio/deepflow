@@ -47,7 +47,7 @@ func GetGroup(name string, asTagMap map[string]string, db, table string) (Statem
 				nameNoPreffix := strings.Trim(name, "`")
 				nameNoPreffix = strings.TrimPrefix(nameNoPreffix, "tag.")
 				// Determine whether the tag is app_label or target_label
-				if appLabelColumnIndex, ok := METRIC_APP_LABEL_LAYOUT[table+", "+nameNoPreffix]; ok {
+				if appLabelColumnIndex, ok := Prometheus.MetricAppLabelLayout[table+", "+nameNoPreffix]; ok {
 					TagTranslatorStr := fmt.Sprintf("app_label_value_id_%d", appLabelColumnIndex)
 					stmt = &GroupTag{Value: TagTranslatorStr, AsTagMap: asTagMap}
 				} else {

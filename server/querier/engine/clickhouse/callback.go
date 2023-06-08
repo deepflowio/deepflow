@@ -23,7 +23,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/bytedance/sonic"
 	"golang.org/x/exp/slices"
 
 	"github.com/deepflowio/deepflow/server/libs/utils"
@@ -233,60 +232,6 @@ func MacTranslate(args []interface{}) func(result *common.Result) error {
 					newValues[i] = newValueSlice
 				}
 			}
-		}
-		result.Values = newValues
-		return nil
-	}
-}
-
-func PrometheusTagTranslate(args []interface{}) func(result *common.Result) error {
-	return func(result *common.Result) error {
-		tagArgs := args[0].(*SelectTag)
-		newValues := make([]interface{}, len(result.Values))
-		var prometheusTagIndex int
-		for i, column := range result.Columns {
-			if column.(string) == tagArgs.Alias {
-				prometheusTagIndex = i
-				break
-			}
-		}
-		copy(newValues, result.Values)
-		// tag
-		tagMap := map[string]string{}
-		for i, newValue := range newValues {
-			newValueSlice := newValue.([]interface{})
-			tagValue := newValueSlice[prometheusTagIndex].(string)
-			tagValueSlice := strings.Split(tagValue, ",")
-			for singleTagIndex, singleTagValue := range tagValueSlice {
-				if singleTagIndex == 0 {
-					if metricID, ok := METRIC_NAME_TO_ID[tagArgs.Table]; ok {
-						if targetLabels, ok := METRIC_ID_TARGET_ID_TO_LABELS[fmt.Sprintf("%d,%s", metricID, singleTagValue)]; ok {
-							for _, targetLabel := range targetLabels {
-								if labelName, ok := LABEL_ID_TO_NAME[targetLabel.LabelNameID]; ok {
-									tagMap[labelName] = targetLabel.LabelValue
-								}
-							}
-						}
-					}
-				} else {
-					if metricID, ok := METRIC_NAME_TO_ID[tagArgs.Table]; ok {
-						if appLabels, ok := METRIC_ID_APP_LABEL_VALUE_ID_TO_LABELS[fmt.Sprintf("%d,%s", metricID, singleTagValue)]; ok {
-							for _, appLabel := range appLabels {
-								if labelName, ok := LABEL_ID_TO_NAME[appLabel.LabelNameID]; ok {
-									tagMap[labelName] = appLabel.LabelValue
-								}
-							}
-						}
-					}
-				}
-			}
-			tagMapJson, err := sonic.Marshal(&tagMap)
-			if err != nil {
-				log.Error(err)
-				return err
-			}
-			newValueSlice[prometheusTagIndex] = string(tagMapJson)
-			newValues[i] = newValueSlice
 		}
 		result.Values = newValues
 		return nil

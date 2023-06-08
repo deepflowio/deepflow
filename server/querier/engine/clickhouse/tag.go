@@ -81,16 +81,16 @@ func GetTagTranslator(name, alias, db, table string) (Statement, string, error) 
 			if strings.HasPrefix(name, "tag.") {
 				if db == "prometheus" {
 					nameNoPreffix := strings.TrimPrefix(name, "tag.")
-					if metricID, ok := METRIC_NAME_TO_ID[table]; ok {
-						if labelNameID, ok := LABEL_NAME_TO_ID[nameNoPreffix]; ok {
+					if metricID, ok := Prometheus.MetricNameToID[table]; ok {
+						if labelNameID, ok := Prometheus.LabelNameToID[nameNoPreffix]; ok {
 							// Determine whether the tag is app_label or target_label
-							if appLabelColumnIndex, ok := METRIC_APP_LABEL_LAYOUT[table+", "+nameNoPreffix]; ok {
+							if appLabelColumnIndex, ok := Prometheus.MetricAppLabelLayout[table+", "+nameNoPreffix]; ok {
 								labelType = "app"
-								TagTranslatorStr := fmt.Sprintf("dictGet(prometheus.app_label_map, 'label_value', (%d, %d, app_label_value_id_%d))", metricID, labelNameID, appLabelColumnIndex)
+								TagTranslatorStr := fmt.Sprintf("dictGet(flow_tag.app_label_map, 'label_value', (%d, %d, app_label_value_id_%d))", metricID, labelNameID, appLabelColumnIndex)
 								stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag, DataBase: "prometheus", Table: table}
 							} else {
 								labelType = "target"
-								TagTranslatorStr := fmt.Sprintf("dictGet(prometheus.target_label_map, 'label_value', (%d, %d, target_id))", metricID, labelNameID)
+								TagTranslatorStr := fmt.Sprintf("dictGet(flow_tag.target_label_map, 'label_value', (%d, %d, target_id))", metricID, labelNameID)
 								stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag, DataBase: "prometheus", Table: table}
 							}
 						}
@@ -118,7 +118,7 @@ func GetTagTranslator(name, alias, db, table string) (Statement, string, error) 
 			stmt = &SelectTag{Value: tagTranslator, Alias: selectTag}
 		} else if name == "tag" && db == "prometheus" {
 			tagTranslator := "toString(target_id)"
-			if appLabelMaxIndex, ok := METRIC_NAME_TO_MAX_INDEX[table]; ok {
+			if appLabelMaxIndex, ok := Prometheus.MetricNameToMaxIndex[table]; ok {
 				appLabelTag := ""
 				for i := 1; i <= appLabelMaxIndex; i++ {
 					appLabelTag += fmt.Sprintf(",',',toString(app_label_value_id_%d)", i)
@@ -142,7 +142,7 @@ func GetTagTranslator(name, alias, db, table string) (Statement, string, error) 
 
 func GetSelectMetricIDFilter(name, as, db, table string) (view.Node, bool) {
 	if (name == "value" || name == "tag") && db == "prometheus" {
-		if metricID, ok := METRIC_NAME_TO_ID[table]; ok {
+		if metricID, ok := Prometheus.MetricNameToID[table]; ok {
 			filter := fmt.Sprintf("metric_id=%d", metricID)
 			return &view.Expr{Value: "(" + filter + ")"}, true
 		}
@@ -185,8 +185,5 @@ func (t *SelectTag) Format(m *view.Model) {
 	}
 	if t.Value == "packet_batch" {
 		m.AddCallback(t.Value, packet_batch.PacketBatchFormat([]interface{}{}))
-	}
-	if t.DataBase == "prometheus" && t.Alias == "tag" {
-		m.AddCallback(t.Value, PrometheusTagTranslate([]interface{}{t}))
 	}
 }

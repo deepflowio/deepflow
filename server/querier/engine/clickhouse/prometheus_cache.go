@@ -17,21 +17,19 @@
 package clickhouse
 
 import (
-	"fmt"
-
-	// "github.com/deepflowio/deepflow/server/querier/engine/clickhouse"
-
 	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
 )
 
-var METRIC_NAME_TO_ID = map[string]int{}
-var METRIC_APP_LABEL_LAYOUT = map[string]int{}
-var LABEL_NAME_TO_ID = map[string]int{}
-var LABEL_ID_TO_NAME = map[int]string{}
-var METRIC_NAME_TO_MAX_INDEX = map[string]int{}
-var METRIC_ID_TARGET_ID_TO_LABELS = map[string][]Label{}
-var METRIC_ID_APP_LABEL_VALUE_ID_TO_LABELS = map[string][]Label{}
+var Prometheus *PrometheusMap
+
+type PrometheusMap struct {
+	MetricNameToID       map[string]int
+	MetricAppLabelLayout map[string]int
+	LabelNameToID        map[string]int
+	LabelIDToName        map[int]string
+	MetricNameToMaxIndex map[string]int
+}
 
 type Label struct {
 	LabelNameID int
@@ -39,13 +37,11 @@ type Label struct {
 }
 
 func GenerateMap() {
-	METRIC_NAME_TO_ID = map[string]int{}
-	METRIC_APP_LABEL_LAYOUT = map[string]int{}
-	LABEL_NAME_TO_ID = map[string]int{}
-	LABEL_ID_TO_NAME = map[int]string{}
-	METRIC_NAME_TO_MAX_INDEX = map[string]int{}
-	METRIC_ID_TARGET_ID_TO_LABELS = map[string][]Label{}
-	METRIC_ID_APP_LABEL_VALUE_ID_TO_LABELS = map[string][]Label{}
+	METRIC_NAME_TO_ID := map[string]int{}
+	METRIC_APP_LABEL_LAYOUT := map[string]int{}
+	LABEL_NAME_TO_ID := map[string]int{}
+	LABEL_ID_TO_NAME := map[int]string{}
+	METRIC_NAME_TO_MAX_INDEX := map[string]int{}
 	chClient := client.Client{
 		Host:     config.Cfg.Clickhouse.Host,
 		Port:     config.Cfg.Clickhouse.Port,
@@ -68,28 +64,7 @@ func GenerateMap() {
 		metricID := metricIDKey.(int)
 		METRIC_NAME_TO_ID[metricName] = metricID
 	}
-
-	appLabelSql := "SELECT metric_id,label_name_id,label_value,label_value_id FROM prometheus.app_label_map"
-	appLabelSqlRst, err := chClient.DoQuery(&client.QueryParams{Sql: appLabelSql})
-	if err != nil {
-		log.Warning(err)
-		return
-	}
-	appLabeRst := make([]interface{}, len(appLabelSqlRst.Values))
-	copy(appLabeRst, appLabelSqlRst.Values)
-	for _, _key := range appLabeRst {
-		metricIDKey := _key.([]interface{})[0]
-		labelNameIDKey := _key.([]interface{})[1]
-		labelValueKey := _key.([]interface{})[2]
-		labelValueIDKey := _key.([]interface{})[3]
-		metricID := metricIDKey.(int)
-		labelNameID := labelNameIDKey.(int)
-		labelValue := labelValueKey.(string)
-		labelValueID := labelValueIDKey.(int)
-		label := Label{LabelNameID: labelNameID, LabelValue: labelValue}
-		metricIDAppLabelValueIDKey := fmt.Sprintf("%d,%d", metricID, labelValueID)
-		METRIC_ID_APP_LABEL_VALUE_ID_TO_LABELS[metricIDAppLabelValueIDKey] = append(METRIC_ID_APP_LABEL_VALUE_ID_TO_LABELS[metricIDAppLabelValueIDKey], label)
-	}
+	Prometheus.MetricNameToID = METRIC_NAME_TO_ID
 
 	labelNameToIDSql := "SELECT name,id FROM prometheus.prometheus_label_name_map"
 	labelNameToIDSqlRst, err := chClient.DoQuery(&client.QueryParams{Sql: labelNameToIDSql})
@@ -107,6 +82,8 @@ func GenerateMap() {
 		LABEL_NAME_TO_ID[labelName] = labelNameID
 		LABEL_ID_TO_NAME[labelNameID] = labelName
 	}
+	Prometheus.LabelIDToName = LABEL_ID_TO_NAME
+	Prometheus.LabelNameToID = LABEL_NAME_TO_ID
 
 	metricAppLabelLayoutSql := "SELECT metric_name,app_label_name,app_label_column_index FROM prometheus.prometheus_metric_app_label_layout_map"
 	metricAppLabelLayoutSqlRst, err := chClient.DoQuery(&client.QueryParams{Sql: metricAppLabelLayoutSql})
@@ -125,28 +102,7 @@ func GenerateMap() {
 		appLabelColumnIndex := appLabelColumnIndexKey.(int)
 		METRIC_APP_LABEL_LAYOUT[metricName+", "+appLabelName] = appLabelColumnIndex
 	}
-
-	targetLabelSql := "SELECT metric_id,label_name_id,label_value,target_id FROM prometheus.target_label_map"
-	targetLabelSqlRst, err := chClient.DoQuery(&client.QueryParams{Sql: targetLabelSql})
-	if err != nil {
-		log.Warning(err)
-		return
-	}
-	targetLabelRst := make([]interface{}, len(targetLabelSqlRst.Values))
-	copy(targetLabelRst, targetLabelSqlRst.Values)
-	for _, _key := range targetLabelRst {
-		metricIDKey := _key.([]interface{})[0]
-		labelNameIDKey := _key.([]interface{})[1]
-		labelValueKey := _key.([]interface{})[2]
-		targetIDKey := _key.([]interface{})[3]
-		metricID := metricIDKey.(int)
-		labelNameID := labelNameIDKey.(int)
-		labelValue := labelValueKey.(string)
-		targetID := targetIDKey.(int)
-		label := Label{LabelNameID: labelNameID, LabelValue: labelValue}
-		metricIDTargetIDKey := fmt.Sprintf("%d,%d", metricID, targetID)
-		METRIC_ID_TARGET_ID_TO_LABELS[metricIDTargetIDKey] = append(METRIC_ID_TARGET_ID_TO_LABELS[metricIDTargetIDKey], label)
-	}
+	Prometheus.MetricAppLabelLayout = METRIC_APP_LABEL_LAYOUT
 
 	metricNameToMaxIndexSql := "SELECT metric_name,max(app_label_column_index) FROM prometheus.prometheus_metric_app_label_layout_map GROUP BY metric_name"
 	metricNameToMaxIndexSqlRst, err := chClient.DoQuery(&client.QueryParams{Sql: metricNameToMaxIndexSql})
@@ -163,4 +119,5 @@ func GenerateMap() {
 		maxIndex := maxIndexKey.(int)
 		METRIC_NAME_TO_MAX_INDEX[metricName] = maxIndex
 	}
+	Prometheus.MetricNameToMaxIndex = METRIC_NAME_TO_MAX_INDEX
 }
