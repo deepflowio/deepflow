@@ -40,6 +40,7 @@ func GenerateMap() {
 	METRIC_APP_LABEL_LAYOUT := map[string]int{}
 	LABEL_NAME_TO_ID := map[string]int{}
 	LABEL_ID_TO_NAME := map[int]string{}
+	prometheus := Prometheus
 	chClient := client.Client{
 		Host:     config.Cfg.Clickhouse.Host,
 		Port:     config.Cfg.Clickhouse.Port,
@@ -62,7 +63,7 @@ func GenerateMap() {
 		metricID := metricIDKey.(int)
 		METRIC_NAME_TO_ID[metricName] = metricID
 	}
-	Prometheus.MetricNameToID = METRIC_NAME_TO_ID
+	prometheus.MetricNameToID = METRIC_NAME_TO_ID
 
 	labelNameToIDSql := "SELECT name,id FROM flow_tag.prometheus_label_name_map"
 	labelNameToIDSqlRst, err := chClient.DoQuery(&client.QueryParams{Sql: labelNameToIDSql})
@@ -80,8 +81,8 @@ func GenerateMap() {
 		LABEL_NAME_TO_ID[labelName] = labelNameID
 		LABEL_ID_TO_NAME[labelNameID] = labelName
 	}
-	Prometheus.LabelIDToName = LABEL_ID_TO_NAME
-	Prometheus.LabelNameToID = LABEL_NAME_TO_ID
+	prometheus.LabelIDToName = LABEL_ID_TO_NAME
+	prometheus.LabelNameToID = LABEL_NAME_TO_ID
 
 	metricAppLabelLayoutSql := "SELECT metric_name,app_label_name,app_label_column_index FROM flow_tag.prometheus_metric_app_label_layout_map"
 	metricAppLabelLayoutSqlRst, err := chClient.DoQuery(&client.QueryParams{Sql: metricAppLabelLayoutSql})
@@ -100,5 +101,5 @@ func GenerateMap() {
 		appLabelColumnIndex := appLabelColumnIndexKey.(int)
 		METRIC_APP_LABEL_LAYOUT[metricName+", "+appLabelName] = appLabelColumnIndex
 	}
-	Prometheus.MetricAppLabelLayout = METRIC_APP_LABEL_LAYOUT
+	prometheus.MetricAppLabelLayout = METRIC_APP_LABEL_LAYOUT
 }
