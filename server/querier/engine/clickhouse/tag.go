@@ -142,7 +142,7 @@ func GetTagTranslator(name, alias, db, table string) (Statement, string, error) 
 			}
 
 			// targetLabel
-			targetLabelTranslatorStr := "CAST((splitByString(', ', dictGet(flow_tag.prometheus_target_label_layout_map, 'label_names', target_id)), splitByString(', ', dictGet(flow_tag.prometheus_target_label_layout_map, 'label_values', target_id))), 'Map(String, String)')"
+			targetLabelTranslatorStr := "CAST((splitByString(', ', dictGet(flow_tag.prometheus_target_label_layout_map, 'target_label_names', target_id)), splitByString(', ', dictGet(flow_tag.prometheus_target_label_layout_map, 'target_label_values', target_id))), 'Map(String, String)')"
 			stmt = &SelectTag{Value: tagTranslatorStr, Alias: selectTag}
 			if appLabelTranslatorStr != "" {
 				tagTranslatorStr = "toJSONString(mapConcat(map(" + appLabelTranslatorStr + ")," + targetLabelTranslatorStr + "))"
