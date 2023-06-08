@@ -40,7 +40,7 @@ func GenerateMap() {
 	METRIC_APP_LABEL_LAYOUT := map[string]int{}
 	LABEL_NAME_TO_ID := map[string]int{}
 	LABEL_ID_TO_NAME := map[int]string{}
-	prometheus := Prometheus
+	prometheus := PrometheusMap{}
 	chClient := client.Client{
 		Host:     config.Cfg.Clickhouse.Host,
 		Port:     config.Cfg.Clickhouse.Port,
@@ -102,4 +102,5 @@ func GenerateMap() {
 		METRIC_APP_LABEL_LAYOUT[metricName+", "+appLabelName] = appLabelColumnIndex
 	}
 	prometheus.MetricAppLabelLayout = METRIC_APP_LABEL_LAYOUT
+	Prometheus = &prometheus
 }
