@@ -98,6 +98,7 @@ func (c *TagRecorder) refresh(domainLcuuidToIconID map[string]int, resourceTypeT
 		NewChNodeType(),
 		NewChAPPLabel(),
 		NewChTargetLabel(),
+		NewChPrometheusTargetLabelLayout(),
 		NewChPrometheusLabelName(),
 		NewChPrometheusMetricNames(),
 		NewChPrometheusMetricAPPLabelLayout(),
