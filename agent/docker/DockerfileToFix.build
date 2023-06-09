@@ -12,10 +12,11 @@ ENV RUSTUP_HOME=/usr/local/rustup \
 RUN yum install make epel-release centos-release-scl -y && yum -y install jq
 
 # 安装基础依赖#
-RUN  yum install curl devtoolset-8-gcc devtoolset-8-gdb devtoolset-8-gcc-c++ devtoolset-8-binutils openssl-devel libpcap-devel perl-Digest-MD5 elfutils-libelf-devel-static glibc-static zlib-static git -y && \
-     echo "source /opt/rh/devtoolset-8/enable" >> /etc/profile && \
+RUN  yum install curl devtoolset-8-gcc devtoolset-8-gdb devtoolset-8-gcc-c++ devtoolset-8-binutils devtoolset-11-gcc* openssl-devel libpcap-devel perl-Digest-MD5 elfutils-libelf-devel-static glibc-static zlib-static git -y && \
+     echo "source /opt/rh/devtoolset-11/enable" >> /etc/profile && \
      curl  https://sh.rustup.rs -so restup.sh; bash restup.sh -y
-RUN  curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/protoc --silent -O && chmod a+x protoc && mv protoc /usr/bin/ && whereis protoc && protoc --version
+RUN  curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/protoc --silent -O && chmod a+x protoc && mv protoc /usr/bin/ && whereis protoc && protoc --version && \
+     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/indent --silent -o /usr/bin/indent && chmod a+x /usr/bin/indent 
 
 RUN  curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/llvm-clang-11.0.0-2.el7.x86_64.rpm --silent -O && \
      yum --disablerepo=* localinstall -y ./llvm-clang-*.rpm && rm -rf llvm-clang-*.rpm && \
@@ -29,17 +30,17 @@ RUN  curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/llv
      yum --disablerepo=* localinstall -y ./libGoReSym-*.rpm && rm -rf libGoReSym-*.rpm && \
      yum clean all
 
-
-
-
 # 静态编译
-
 RUN yum -y install https://forensics.cert.org/cert-forensics-tools-release-el7.rpm  && \
     yum -y install musl-libc musl-libc-static musl-clang musl-gcc  && \
     cd /usr/x86_64-linux-musl/lib64  && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/musl/libbcc_bpf.a --silent -O && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/musl/libpcap.a --silent -O && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/musl/libz.a --silent -O && \
+    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/musl/libbcc.a --silent -O && \
+    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/musl/libc.a --silent -O && \
+    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/musl/libelf.a --silent -O && \
+    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/musl/libstdc++.a --silent -O && \
     cd /usr/x86_64-linux-musl/include  && \
     ln -s /usr/include/bcc bcc && \
     ln -s /usr/include/asm asm  && \
@@ -53,7 +54,9 @@ RUN yum -y install https://forensics.cert.org/cert-forensics-tools-release-el7.r
     ln -s /usr/include/sys/queue.h sys/queue.h && \
     ln -s /usr/include/zlib.h zlib.h && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/libpcap.a --silent -o /usr/lib64/libpcap.a && \
-    chmod 755 /usr/lib64/libpcap.a
+    chmod 755 /usr/lib64/libpcap.a && \
+    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/libbcc.a --silent -o /usr/lib64/libbcc.a && \
+    chmod 755 /usr/lib64/libbcc.a
 
 RUN rustup target add x86_64-unknown-linux-musl
 ## 使用依赖缓存
