@@ -970,7 +970,6 @@ impl WatcherComponents {
 pub struct AgentComponents {
     pub config: ModuleConfig,
     pub rx_leaky_bucket: Arc<LeakyBucket>,
-    pub l7_log_rate: Arc<LeakyBucket>,
     pub tap_typer: Arc<TapTyper>,
     pub cur_tap_types: Vec<trident::TapType>,
     pub dispatchers: Vec<Dispatcher>,
@@ -1489,10 +1488,6 @@ impl AgentComponents {
         #[cfg(target_os = "windows")]
         let bpf_syntax_str = bpf_builder.build_pcap_syntax_to_str();
 
-        let l7_log_rate = Arc::new(LeakyBucket::new(Some(
-            candidate_config.log_parser.l7_log_collect_nps_threshold,
-        )));
-
         // Enterprise Edition Feature: packet-sequence
         let packet_sequence_queue_name = "2-packet-sequence-block-to-sender";
         let (packet_sequence_uniform_output, packet_sequence_uniform_input, counter) =
@@ -1610,7 +1605,6 @@ impl AgentComponents {
                 proto_log_sender.clone(),
                 i as u32,
                 config_handler.log_parser(),
-                l7_log_rate.clone(),
             );
             stats_collector.register_countable(
                 "l7_session_aggr",
@@ -1888,7 +1882,6 @@ impl AgentComponents {
                 proto_log_sender.clone(),
                 ebpf_dispatcher_id as u32,
                 config_handler.log_parser(),
-                l7_log_rate.clone(),
             );
             stats_collector.register_countable(
                 "l7_session_aggr",
@@ -2109,7 +2102,6 @@ impl AgentComponents {
         Ok(AgentComponents {
             config: candidate_config.clone(),
             rx_leaky_bucket,
-            l7_log_rate,
             tap_typer,
             cur_tap_types: vec![],
             dispatchers,

@@ -1874,25 +1874,10 @@ impl ConfigHandler {
             if candidate_config.log_parser.l7_log_collect_nps_threshold
                 != new_config.log_parser.l7_log_collect_nps_threshold
             {
-                fn l7_log_collect_nps_threshold_callback(
-                    config: &ConfigHandler,
-                    components: &mut AgentComponents,
-                ) {
-                    info!(
-                        "l7 log collect nps threshold set to {}",
-                        config
-                            .candidate_config
-                            .log_parser
-                            .l7_log_collect_nps_threshold
-                    );
-                    components.l7_log_rate.set_rate(Some(
-                        config
-                            .candidate_config
-                            .log_parser
-                            .l7_log_collect_nps_threshold,
-                    ));
-                }
-                callbacks.push(l7_log_collect_nps_threshold_callback);
+                info!(
+                    "l7 log collect nps threshold set to {}",
+                    new_config.log_parser.l7_log_collect_nps_threshold
+                );
             }
 
             candidate_config.log_parser = new_config.log_parser;
