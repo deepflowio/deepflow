@@ -22,7 +22,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use enum_dispatch::enum_dispatch;
-use log::warn;
+use log::debug;
 use lru::LruCache;
 
 use super::ebpf::EbpfType;
@@ -378,7 +378,7 @@ impl L7PerfCache {
             && self.last_log_time + Self::LOG_INTERVAL < now
         {
             self.last_log_time = now;
-            warn!("The capacity({}) of the rrt table will be exceeded. please adjust the configuration", self.rrt_cache.cap());
+            debug!("The capacity({}) of the rrt table will be exceeded. please adjust the configuration", self.rrt_cache.cap());
         }
         self.rrt_cache.put(key, value)
     }
