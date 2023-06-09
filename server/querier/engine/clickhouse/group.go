@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
+	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
 )
@@ -38,9 +39,43 @@ func GetGroup(name string, asTagMap map[string]string, db, table string) (Statem
 			stmt = &GroupTag{Value: name, AsTagMap: asTagMap}
 		}
 	} else {
-		stmt = &GroupTag{Value: name, AsTagMap: asTagMap}
+		if db == chCommon.DB_NAME_PROMETHEUS {
+			tagTranslatorStr := GetPrometheusGroup(name, table, asTagMap)
+			stmt = &GroupTag{Value: tagTranslatorStr, AsTagMap: asTagMap}
+		} else {
+			stmt = &GroupTag{Value: name, AsTagMap: asTagMap}
+		}
 	}
 	return stmt, nil
+}
+
+func GetPrometheusGroup(name, table string, asTagMap map[string]string) string {
+	nameNoPreffix := strings.Trim(name, "`")
+	tagTranslatorStr := ""
+	_, ok := asTagMap[name]
+	if ok {
+		tagTranslatorStr = name
+	} else if strings.HasPrefix(nameNoPreffix, "tag.") {
+		nameNoPreffix := strings.Trim(name, "`")
+		nameNoPreffix = strings.TrimPrefix(nameNoPreffix, "tag.")
+		// Determine whether the tag is app_label or target_label
+		isAppLabel := false
+		if appLabels, ok := Prometheus.MetricAppLabelLayout[table]; ok {
+			for _, appLabel := range appLabels {
+				if appLabel.AppLabelName == nameNoPreffix {
+					isAppLabel = true
+					tagTranslatorStr = fmt.Sprintf("app_label_value_id_%d", appLabel.appLabelColumnIndex)
+					break
+				}
+			}
+		}
+		if !isAppLabel {
+			tagTranslatorStr = "target_id"
+		}
+	} else {
+		tagTranslatorStr = name
+	}
+	return tagTranslatorStr
 }
 
 func GetNotNullFilter(name string, asTagMap map[string]string, db, table string) (view.Node, bool) {
@@ -117,6 +152,9 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 					filter := fmt.Sprintf(tagItem.NotNullFilter, filterName)
 					return &view.Expr{Value: "(" + filter + ")"}, true
 				} else if strings.HasPrefix(preAsTag, "tag.") || strings.HasPrefix(preAsTag, "attribute.") {
+					if db == chCommon.DB_NAME_PROMETHEUS {
+						return &view.Expr{}, false
+					}
 					tagItem, ok = tag.GetTag("tag.", db, table, "default")
 					filter := fmt.Sprintf(tagItem.NotNullFilter, name)
 					return &view.Expr{Value: "(" + filter + ")"}, true
@@ -186,6 +224,9 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 				filter := fmt.Sprintf(tagItem.NotNullFilter, filterName)
 				return &view.Expr{Value: "(" + filter + ")"}, true
 			} else if strings.HasPrefix(name, "tag.") || strings.HasPrefix(name, "attribute.") {
+				if db == chCommon.DB_NAME_PROMETHEUS {
+					return &view.Expr{}, false
+				}
 				tagItem, ok = tag.GetTag("tag.", db, table, "default")
 				filter := fmt.Sprintf(tagItem.NotNullFilter, name)
 				return &view.Expr{Value: "(" + filter + ")"}, true

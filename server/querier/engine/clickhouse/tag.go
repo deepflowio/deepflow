@@ -18,23 +18,25 @@ package clickhouse
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
+	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/metrics"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/packet_batch"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
 )
 
-func GetTagTranslator(name, alias, db, table string) (Statement, error) {
+func GetTagTranslator(name, alias, db, table string) (Statement, string, error) {
 	var stmt Statement
 	selectTag := name
 	if alias != "" {
 		selectTag = alias
 	}
-
+	labelType := ""
 	tagItem, ok := tag.GetTag(strings.Trim(name, "`"), db, table, "default")
 	if !ok {
 		name := strings.Trim(name, "`")
@@ -105,6 +107,14 @@ func GetTagTranslator(name, alias, db, table string) (Statement, error) {
 			stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag}
 		} else if strings.HasPrefix(name, "tag.") || strings.HasPrefix(name, "attribute.") {
 			if strings.HasPrefix(name, "tag.") {
+				if db == chCommon.DB_NAME_PROMETHEUS {
+					TagTranslatorStr, labelType, err := GetPrometheusSingleTagTranslator(name, table)
+					if err != nil {
+						return nil, "", err
+					}
+					stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag}
+					return stmt, labelType, nil
+				}
 				tagItem, ok = tag.GetTag("tag.", db, table, "default")
 			} else {
 				tagItem, ok = tag.GetTag("attribute.", db, table, "default")
@@ -121,8 +131,10 @@ func GetTagTranslator(name, alias, db, table string) (Statement, error) {
 				tagTranslator = fmt.Sprintf(tagItem.TagTranslator, "metrics_names", "metrics_values")
 			} else {
 				tagTranslator = fmt.Sprintf(tagItem.TagTranslator, "metrics_float_names", "metrics_float_values")
-
 			}
+			stmt = &SelectTag{Value: tagTranslator, Alias: selectTag}
+		} else if name == "tag" && db == chCommon.DB_NAME_PROMETHEUS {
+			tagTranslator := GetPrometheusAllTagTranslator(table)
 			stmt = &SelectTag{Value: tagTranslator, Alias: selectTag}
 		} else if tagItem.TagTranslator != "" {
 			if name != "packet_batch" || table != "l4_packet" {
@@ -134,20 +146,71 @@ func GetTagTranslator(name, alias, db, table string) (Statement, error) {
 			stmt = &SelectTag{Value: selectTag}
 		}
 	}
-	return stmt, nil
+	return stmt, labelType, nil
 }
 
-func GetSelectNotNullFilter(name, as, db, table string) (view.Node, bool) {
-	tagItem, ok := tag.GetTag(name, db, table, "default")
+func GetPrometheusSingleTagTranslator(tag, table string) (string, string, error) {
+	labelType := ""
+	TagTranslatorStr := ""
+	nameNoPreffix := strings.TrimPrefix(tag, "tag.")
+	metricID, ok := Prometheus.MetricNameToID[table]
 	if !ok {
-		if strings.HasPrefix(name, "`metrics.") && db == "ext_metrics" {
-			tagItem, ok = tag.GetTag("metrics.", db, table, "default")
-			filter := ""
-			if as == "" {
-				filter = fmt.Sprintf(tagItem.NotNullFilter, name)
-			} else {
-				filter = fmt.Sprintf(tagItem.NotNullFilter, as)
+		errorMessage := fmt.Sprintf("%s not found", table)
+		return "", "", errors.New(errorMessage)
+	}
+	labelNameID, ok := Prometheus.LabelNameToID[nameNoPreffix]
+	if !ok {
+		errorMessage := fmt.Sprintf("%s not found", nameNoPreffix)
+		return "", "", errors.New(errorMessage)
+	}
+	// Determine whether the tag is app_label or target_label
+	isAppLabel := false
+	if appLabels, ok := Prometheus.MetricAppLabelLayout[table]; ok {
+		for _, appLabel := range appLabels {
+			if appLabel.AppLabelName == nameNoPreffix {
+				isAppLabel = true
+				labelType = "app"
+				TagTranslatorStr = fmt.Sprintf("dictGet(flow_tag.app_label_map, 'label_value', (%d, %d, app_label_value_id_%d))", metricID, labelNameID, appLabel.appLabelColumnIndex)
+				break
 			}
+		}
+	}
+	if !isAppLabel {
+		labelType = "target"
+		TagTranslatorStr = fmt.Sprintf("dictGet(flow_tag.target_label_map, 'label_value', (%d, %d, target_id))", metricID, labelNameID)
+	}
+	return TagTranslatorStr, labelType, nil
+}
+
+func GetPrometheusAllTagTranslator(table string) string {
+	tagTranslatorStr := ""
+	appLabelTranslatorStr := ""
+	if appLabels, ok := Prometheus.MetricAppLabelLayout[table]; ok {
+		// appLabel
+		appLabelTranslatorSlice := []string{}
+		for _, appLabel := range appLabels {
+			if labelNameID, ok := Prometheus.LabelNameToID[appLabel.AppLabelName]; ok {
+				appLabelTranslator := fmt.Sprintf("'%s',dictGet(flow_tag.app_label_map, 'label_value', (metric_id, %d, app_label_value_id_%d))", appLabel.AppLabelName, labelNameID, appLabel.appLabelColumnIndex)
+				appLabelTranslatorSlice = append(appLabelTranslatorSlice, appLabelTranslator)
+			}
+		}
+		appLabelTranslatorStr = strings.Join(appLabelTranslatorSlice, ",")
+	}
+
+	// targetLabel
+	targetLabelTranslatorStr := "CAST((splitByString(', ', dictGet(flow_tag.prometheus_target_label_layout_map, 'target_label_names', target_id)), splitByString(', ', dictGet(flow_tag.prometheus_target_label_layout_map, 'target_label_values', target_id))), 'Map(String, String)')"
+	if appLabelTranslatorStr != "" {
+		tagTranslatorStr = "toJSONString(mapUpdate(map(" + appLabelTranslatorStr + ")," + targetLabelTranslatorStr + "))"
+	} else {
+		tagTranslatorStr = "toJSONString(" + targetLabelTranslatorStr + ")"
+	}
+	return tagTranslatorStr
+}
+
+func GetSelectMetricIDFilter(name, as, db, table string) (view.Node, bool) {
+	if (name == "value" || name == "tag") && db == chCommon.DB_NAME_PROMETHEUS {
+		if metricID, ok := Prometheus.MetricNameToID[table]; ok {
+			filter := fmt.Sprintf("metric_id=%d", metricID)
 			return &view.Expr{Value: "(" + filter + ")"}, true
 		}
 	}

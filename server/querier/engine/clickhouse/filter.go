@@ -156,13 +156,13 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 			op = "not match"
 		}
 	}
+	filter := ""
 	if !ok {
 		preAsTag, ok := asTagMap[t.Tag]
 		if ok {
 			whereTag = preAsTag
 			tagItem, ok = tag.GetTag(strings.Trim(preAsTag, "`"), db, table, "default")
 			if !ok {
-				filter := ""
 				switch preAsTag {
 				case "mac_0", "mac_1", "tunnel_tx_mac_0", "tunnel_tx_mac_1", "tunnel_rx_mac_0", "tunnel_rx_mac_1":
 					macValue := strings.TrimLeft(t.Value, "(")
@@ -320,7 +320,15 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 						}
 					} else if strings.HasPrefix(preAsTag, "tag.") || strings.HasPrefix(preAsTag, "attribute.") {
 						if strings.HasPrefix(preAsTag, "tag.") {
-							tagItem, ok = tag.GetTag("tag.", db, table, "default")
+							if db == common.DB_NAME_PROMETHEUS {
+								filter, err := GetPrometheusFilter(preAsTag, table, op, t.Value)
+								if err != nil {
+									return nil, err
+								}
+								return &view.Expr{Value: filter}, nil
+							} else {
+								tagItem, ok = tag.GetTag("tag.", db, table, "default")
+							}
 						} else {
 							tagItem, ok = tag.GetTag("attribute.", db, table, "default")
 						}
@@ -344,7 +352,6 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 				return &view.Expr{Value: filter}, nil
 			}
 		} else {
-			filter := ""
 			switch t.Tag {
 			case "mac_0", "mac_1", "tunnel_tx_mac_0", "tunnel_tx_mac_1", "tunnel_rx_mac_0", "tunnel_rx_mac_1":
 				macValue := strings.TrimLeft(t.Value, "(")
@@ -502,7 +509,15 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 					}
 				} else if strings.HasPrefix(t.Tag, "tag.") || strings.HasPrefix(t.Tag, "attribute.") {
 					if strings.HasPrefix(t.Tag, "tag.") {
-						tagItem, ok = tag.GetTag("tag.", db, table, "default")
+						if db == common.DB_NAME_PROMETHEUS {
+							filter, err := GetPrometheusFilter(t.Tag, table, op, t.Value)
+							if err != nil {
+								return nil, err
+							}
+							return &view.Expr{Value: filter}, nil
+						} else {
+							tagItem, ok = tag.GetTag("tag.", db, table, "default")
+						}
 					} else {
 						tagItem, ok = tag.GetTag("attribute.", db, table, "default")
 					}
@@ -743,7 +758,6 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 			}
 		}
 	} else {
-		filter := ""
 		if strings.Contains(op, "match") {
 			filter = fmt.Sprintf("%s(%s,%s)", op, t.Tag, t.Value)
 		} else {
@@ -752,6 +766,44 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 		return &view.Expr{Value: filter}, nil
 	}
 	return &view.Expr{Value: "(" + whereFilter + ")"}, nil
+}
+
+func GetPrometheusFilter(promTag, table, op, value string) (string, error) {
+	filter := ""
+	nameNoPreffix := strings.TrimPrefix(promTag, "tag.")
+	metricID, ok := Prometheus.MetricNameToID[table]
+	if !ok {
+		errorMessage := fmt.Sprintf("%s not found", table)
+		return filter, errors.New(errorMessage)
+	}
+	labelNameID, ok := Prometheus.LabelNameToID[nameNoPreffix]
+	if !ok {
+		errorMessage := fmt.Sprintf("%s not found", nameNoPreffix)
+		return filter, errors.New(errorMessage)
+	}
+	// Determine whether the tag is app_label or target_label
+	isAppLabel := false
+	if appLabels, ok := Prometheus.MetricAppLabelLayout[table]; ok {
+		for _, appLabel := range appLabels {
+			if appLabel.AppLabelName == nameNoPreffix {
+				isAppLabel = true
+				if strings.Contains(op, "match") {
+					filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM flow_tag.app_label_map WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s))", appLabel.appLabelColumnIndex, metricID, labelNameID, op, value)
+				} else {
+					filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM flow_tag.app_label_map WHERE metric_id=%d and label_name_id=%d and label_value %s %s)", appLabel.appLabelColumnIndex, metricID, labelNameID, op, value)
+				}
+				break
+			}
+		}
+	}
+	if !isAppLabel {
+		if strings.Contains(op, "match") {
+			filter = fmt.Sprintf("toUInt64(target_id) IN (SELECT target_id FROM flow_tag.target_label_map WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s))", metricID, labelNameID, op, value)
+		} else {
+			filter = fmt.Sprintf("toUInt64(target_id) IN (SELECT target_id FROM flow_tag.target_label_map WHERE metric_id=%d and label_name_id=%d and label_value %s %s)", metricID, labelNameID, op, value)
+		}
+	}
+	return filter, nil
 }
 
 type TimeTag struct {
