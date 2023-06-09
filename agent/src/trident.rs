@@ -80,7 +80,7 @@ use crate::{
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
     sender::{npb_sender::NpbArpTable, uniform_sender::UniformSenderThread},
     utils::{
-        cgroups::{is_kernel_available_for_cgroup, Cgroups},
+        cgroups::{is_kernel_available_for_cgroups, Cgroups},
         command::get_hostname,
         environment::{
             check, controller_ip_check, free_memory_check, free_space_checker, get_ctrl_ip_and_mac,
@@ -117,7 +117,7 @@ use public::{
     debug::QueueDebugger,
     netns::NsFile,
     packet::MiniPacket,
-    proto::trident::{self, IfMacSource, SocketType, TapMode},
+    proto::trident::{self, Exception, IfMacSource, SocketType, TapMode},
     queue::{self, DebugSender},
     sender::SendMessageType,
     utils::net::{get_route_src_ip, links_by_name_regex, MacAddr},
@@ -414,10 +414,10 @@ impl Trident {
         let mut is_cgroup_v2 = false;
         let mut cgroups_controller = None;
         if running_in_container() {
-            info!("don't initialize cgroup controller, because agent is running in container");
-        } else if !is_kernel_available_for_cgroup() {
-            // fixme: Linux after kernel version 2.6.24 can use cgroup
-            info!("don't initialize cgroup controller, because kernel version < 3 or agent is in Windows");
+            info!("don't initialize cgroups controller, because agent is running in container");
+        } else if !is_kernel_available_for_cgroups() {
+            // fixme: Linux after kernel version 2.6.24 can use cgroups
+            info!("don't initialize cgroups controller, because kernel version < 3 or agent is in Windows");
         } else {
             match Cgroups::new(process::id() as u64, config_handler.environment()) {
                 Ok(cg_controller) => {
@@ -427,12 +427,8 @@ impl Trident {
                     cgroups_controller = Some(cg_controller);
                 }
                 Err(e) => {
-                    warn!(
-                        "initialize cgroup controller failed: {}, deepflow-agent restart...",
-                        e
-                    );
-                    thread::sleep(Duration::from_secs(1));
-                    process::exit(1);
+                    warn!("initialize cgroups controller failed: {}, resource utilization will be checked regularly to prevent resource usage from exceeding the limit.", e);
+                    exception_handler.set(Exception::CgroupsConfigError);
                 }
             }
         }
@@ -443,7 +439,6 @@ impl Trident {
             config_handler.environment(),
             log_dir.to_string(),
             config_handler.candidate_config.yaml_config.guard_interval,
-            config_handler.candidate_config.tap_mode,
             exception_handler.clone(),
             cgroup_mount_path,
             is_cgroup_v2,
@@ -517,7 +512,7 @@ impl Trident {
                         libvirt_xml_extractor.stop();
                         if let Some(cg_controller) = cgroups_controller {
                             if let Err(e) = cg_controller.stop() {
-                                info!("stop cgroup controller failed, {:?}", e);
+                                info!("stop cgroups controller failed, {:?}", e);
                             }
                         }
                     }
@@ -2221,7 +2216,7 @@ impl AgentComponents {
         // in the environment where cgroup is not supported, we need to check free memory
         if self.tap_mode != TapMode::Analyzer
             && !running_in_container()
-            && !is_kernel_available_for_cgroup()
+            && !is_kernel_available_for_cgroups()
         {
             match free_memory_check(self.max_memory, &self.exception_handler) {
                 Ok(()) => {

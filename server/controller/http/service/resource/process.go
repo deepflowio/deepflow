@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	goredis "github.com/go-redis/redis/v9"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
@@ -38,9 +39,61 @@ func GetProcesses(c *gin.Context, redisConfig *redis.RedisConfig) (responseData 
 }
 
 func getProcesses() ([]model.Process, error) {
+	// get processes
+	var processes []*mysql.Process
+	if err := mysql.Db.Unscoped().Order("created_at DESC").Find(&processes).Error; err != nil {
+		return nil, err
+	}
+	processData, err := GetProcessData(processes)
+	if err != nil {
+		return nil, err
+	}
+	var resp []model.Process
+	for _, process := range processes {
+
+		var deletedAt string
+		if process.DeletedAt.Valid {
+			deletedAt = process.DeletedAt.Time.Format(common.GO_BIRTHDAY)
+		}
+
+		processResp := model.Process{
+			ResourceType: processData[process.ID].ResourceType,
+			ResourceName: processData[process.ID].ResourceName,
+			Name:         process.Name,
+			VTapName:     processData[process.ID].VTapName,
+			GPID:         process.ID,
+			GPName:       process.ProcessName,
+			PID:          process.PID,
+			ProcessName:  process.ProcessName,
+			CommandLine:  process.CommandLine,
+			UserName:     process.UserName,
+			OSAPPTags:    process.OSAPPTags,
+			ResourceID:   processData[process.ID].ResourceID,
+			StartTime:    process.StartTime.Format(common.GO_BIRTHDAY),
+			UpdateAt:     process.UpdatedAt.Format(common.GO_BIRTHDAY),
+			DeletedAt:    deletedAt,
+		}
+		resp = append(resp, processResp)
+	}
+
+	return resp, nil
+}
+
+type ProcessData struct {
+	ResourceType int
+	ResourceName string
+	ResourceID   int
+	VTapName     string
+}
+
+func GetProcessData(processes []*mysql.Process) (map[int]ProcessData, error) {
 	// store vtap info
+	vtapIDs := mapset.NewSet[int]()
+	for _, item := range processes {
+		vtapIDs.Add(item.VTapID)
+	}
 	var vtaps []mysql.VTap
-	if err := mysql.Db.Find(&vtaps).Error; err != nil {
+	if err := mysql.Db.Where("id IN (?)", vtapIDs.ToSlice()).Find(&vtaps).Error; err != nil {
 		return nil, err
 	}
 	type vtapInfo struct {
@@ -49,17 +102,19 @@ func getProcesses() ([]model.Process, error) {
 		LaunchServerID int
 	}
 	vtapIDToInfo := make(map[int]vtapInfo, len(vtaps))
+	launchServerIDs := mapset.NewSet[int]()
 	for _, vtap := range vtaps {
 		vtapIDToInfo[vtap.ID] = vtapInfo{
 			Name:           vtap.Name,
 			Type:           vtap.Type,
 			LaunchServerID: vtap.LaunchServerID,
 		}
+		launchServerIDs.Add(vtap.LaunchServerID)
 	}
 
 	// store vm info
 	var vms []mysql.VM
-	if err := mysql.Db.Find(&vms).Error; err != nil {
+	if err := mysql.Db.Where("id IN (?)", launchServerIDs.ToSlice()).Find(&vms).Error; err != nil {
 		return nil, err
 	}
 	vmIDToName := make(map[int]string, len(vms))
@@ -69,7 +124,7 @@ func getProcesses() ([]model.Process, error) {
 
 	// store pod node info
 	var podNodes []mysql.PodNode
-	if err := mysql.Db.Find(&podNodes).Error; err != nil {
+	if err := mysql.Db.Where("id IN (?)", launchServerIDs.ToSlice()).Find(&podNodes).Error; err != nil {
 		return nil, err
 	}
 	podNodeIDToName := make(map[int]string, len(podNodes))
@@ -95,12 +150,7 @@ func getProcesses() ([]model.Process, error) {
 		}
 	}
 
-	// get processes
-	var processes []mysql.Process
-	if err := mysql.Db.Unscoped().Order("created_at DESC").Find(&processes).Error; err != nil {
-		return nil, err
-	}
-	var resp []model.Process
+	resp := make(map[int]ProcessData, len(processes))
 	for _, process := range processes {
 		var deviceType, resourceID int
 		var resourceName string
@@ -118,32 +168,13 @@ func getProcesses() ([]model.Process, error) {
 			}
 			resourceID = vtapIDToInfo[process.VTapID].LaunchServerID
 		}
-
-		var deletedAt string
-		if process.DeletedAt.Valid {
-			deletedAt = process.DeletedAt.Time.Format(common.GO_BIRTHDAY)
-		}
-
-		processResp := model.Process{
+		resp[process.ID] = ProcessData{
 			ResourceType: deviceType,
-			ResourceName: resourceName,
-			Name:         process.Name,
-			VTapName:     vtapIDToInfo[process.VTapID].Name,
-			GPID:         process.ID,
-			GPName:       process.ProcessName,
-			PID:          process.PID,
-			ProcessName:  process.ProcessName,
-			CommandLine:  process.CommandLine,
-			UserName:     process.UserName,
-			OSAPPTags:    process.OSAPPTags,
 			ResourceID:   resourceID,
-			StartTime:    process.StartTime.Format(common.GO_BIRTHDAY),
-			UpdateAt:     process.UpdatedAt.Format(common.GO_BIRTHDAY),
-			DeletedAt:    deletedAt,
+			ResourceName: resourceName,
+			VTapName:     vtapIDToInfo[process.VTapID].Name,
 		}
-		resp = append(resp, processResp)
 	}
-
 	return resp, nil
 }
 
