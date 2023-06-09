@@ -21,7 +21,7 @@ pub struct Cgroups;
 
 impl Cgroups {
     pub fn new(_pid: u64, _config: EnvironmentAccess) -> Result<Self, Error> {
-        Err(Error::CgroupNotSupported(
+        Err(Error::CgroupsNotSupported(
             "Windows agent's cgroups is not supported".to_string(),
         ))
     }
@@ -33,7 +33,7 @@ impl Cgroups {
         false
     }
     pub fn stop(&self) -> Result<(), Error> {
-        Err(Error::CgroupNotSupported(
+        Err(Error::CgroupsNotSupported(
             "Windows agent's cgroups is not supported".to_string(),
         ))
     }
