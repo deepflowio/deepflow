@@ -17,6 +17,8 @@
 package clickhouse
 
 import (
+	"time"
+
 	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
 )
@@ -107,4 +109,10 @@ func GenerateMap() {
 		METRIC_APP_LABEL_LAYOUT[metricName] = append(METRIC_APP_LABEL_LAYOUT[metricName], appLabel)
 	}
 	Prometheus.MetricAppLabelLayout = METRIC_APP_LABEL_LAYOUT
+}
+
+func GeneratePrometheusMap() {
+	for range time.Tick(time.Minute) {
+		GenerateMap()
+	}
 }

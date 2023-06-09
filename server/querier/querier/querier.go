@@ -55,12 +55,9 @@ func Start(configPath, serverLogFile string) {
 		log.Error(err)
 		os.Exit(0)
 	}
-	go func() {
-		for range time.Tick(time.Minute) {
-			// Load prometheus tag cache
-			clickhouse.GenerateMap()
-		}
-	}()
+
+	// prometheus cache
+	go clickhouse.GeneratePrometheusMap()
 
 	// statsd
 	statsd.QuerierCounter = statsd.NewCounter()
