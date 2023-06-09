@@ -142,7 +142,7 @@ pub struct FlowAggr {
     input: Arc<Receiver<Arc<TaggedFlow>>>,
     output: ThrottlingQueue,
     slot_start_time: Duration,
-    stashs: VecDeque<HashMap<u64, TaggedFlow>>,
+    stashs: VecDeque<HashMap<u64, Box<TaggedFlow>>>,
     history_length: VecDeque<usize>,
     stash_init_capacity: usize,
 
@@ -222,9 +222,9 @@ impl FlowAggr {
             }
         } else {
             if f.flow.close_type != CloseType::ForcedReport {
-                self.send_flow(f.as_ref().clone());
+                self.send_flow(Box::new(f.as_ref().clone()));
             } else {
-                slot_map.insert(f.flow.flow_id, f.as_ref().clone());
+                slot_map.insert(f.flow.flow_id, Box::new(f.as_ref().clone()));
             }
             // 收到flow下一分钟数据，则需要发送上一分钟的该flow
             if slot > 0 {
@@ -235,7 +235,7 @@ impl FlowAggr {
         }
     }
 
-    fn send_flow(&mut self, mut f: TaggedFlow) {
+    fn send_flow(&mut self, mut f: Box<TaggedFlow>) {
         // We use acl_gid to mark which flows are configured with PCAP storage policies.
         // Since acl_gid is used for both PCAP and NPB functions, only the acl_gid used by PCAP is sent here.
         let mut acl_gids = U16Set::new();
@@ -447,7 +447,7 @@ impl ThrottlingQueue {
         }
     }
 
-    pub fn send_with_throttling(&mut self, f: TaggedFlow) -> bool {
+    pub fn send_with_throttling(&mut self, f: Box<TaggedFlow>) -> bool {
         let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
 
         if now.as_secs() >> Self::THROTTLE_BUCKET_BITS
@@ -461,13 +461,12 @@ impl ThrottlingQueue {
 
         self.period_count += 1;
         if self.cache_with_throttling.len() < self.throttle as usize {
-            self.cache_with_throttling
-                .push(BoxedTaggedFlow(Box::new(f)));
+            self.cache_with_throttling.push(BoxedTaggedFlow(f));
             true
         } else {
             let r = self.small_rng.gen_range(0..self.period_count);
             if r < self.throttle as usize {
-                self.cache_with_throttling[r] = BoxedTaggedFlow(Box::new(f));
+                self.cache_with_throttling[r] = BoxedTaggedFlow(f);
             }
             false
         }
@@ -480,7 +479,7 @@ impl ThrottlingQueue {
         }
     }
 
-    pub fn send_without_throttling(&mut self, f: TaggedFlow) {
+    pub fn send_without_throttling(&mut self, f: Box<TaggedFlow>) {
         let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
         if self.cache_without_throttling.len() >= Self::CACHE_WITHOUT_THROTTLING_SIZE
             || now.as_secs() >> Self::THROTTLE_BUCKET_BITS
@@ -490,8 +489,7 @@ impl ThrottlingQueue {
             self.flush_cache_without_throttling();
             self.last_flush_cache_without_throttling_time = now;
         }
-        self.cache_without_throttling
-            .push(BoxedTaggedFlow(Box::new(f)));
+        self.cache_without_throttling.push(BoxedTaggedFlow(f));
     }
 
     pub fn update_throttle(&mut self) {
