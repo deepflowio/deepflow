@@ -45,6 +45,7 @@ type ColumnSchema struct {
 	Type      int
 	ValueType string
 	PreAS     string
+	LabelType string
 }
 
 func (c *ColumnSchema) ToMap() map[string]interface{} {
@@ -53,11 +54,12 @@ func (c *ColumnSchema) ToMap() map[string]interface{} {
 		"type":       c.Type,
 		"value_type": c.ValueType,
 		"pre_as":     c.PreAS,
+		"label_type": c.LabelType,
 	}
 }
 
-func NewColumnSchema(name, preAS string) *ColumnSchema {
-	return &ColumnSchema{Name: strings.Trim(name, "`"), PreAS: preAS}
+func NewColumnSchema(name, preAS, labelType string) *ColumnSchema {
+	return &ColumnSchema{Name: strings.Trim(name, "`"), PreAS: preAS, LabelType: labelType}
 }
 
 type ColumnSchemas []*ColumnSchema
