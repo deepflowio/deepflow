@@ -37,6 +37,7 @@
 int major, minor;		// Linux kernel主版本，次版本
 char linux_release[128];	// Record the contents of 'uname -r'
 
+volatile uint32_t *tracers_lock;
 volatile uint64_t sys_boot_time_ns;	// 当前系统启动时间，单位：纳秒
 volatile uint64_t prev_sys_boot_time_ns;	// 上一次更新的系统启动时间，单位：纳秒
 uint64_t boot_time_update_count;	// 用于记录boot_time_update()调用次数。
@@ -1383,7 +1384,7 @@ static int tracer_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
 		}
 
 		for (j = 0; j < btp->dispatch_workers_nr; j++) {
-			rx_q = &btp->rx_queues[j];
+			rx_q = (struct rx_queue_info *)&btp->rx_queues[j];
 			rx_q->enqueue_lost =
 			    atomic64_read(&t->queues[j].enqueue_lost);
 			rx_q->enqueue_nr =

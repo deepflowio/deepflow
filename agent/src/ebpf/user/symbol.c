@@ -456,6 +456,7 @@ uint64_t get_symbol_addr_from_binary(const char *bin, const char *symname)
 	return tmp.entry;
 }
 
+#ifndef AARCH64_MUSL
 static symbol_caches_hash_t syms_cache_hash;	// for user process symbol caches
 static void *k_resolver;		// for kernel symbol cache
 static u64 sys_btime_msecs;		// system boot time(milliseconds)
@@ -644,3 +645,10 @@ void release_symbol_caches(void)
 		k_resolver = NULL;
 	}
 }
+#else /* defined AARCH64_MUSL */
+/* pid : The process ID (PID) that occurs when a process exits. */
+void update_symbol_cache(pid_t pid)
+{
+	return;
+}
+#endif /* AARCH64_MUSL */

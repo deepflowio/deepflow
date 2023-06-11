@@ -27,6 +27,7 @@
 #define stack_str_hash_key_value_pair_cb	clib_bihash_foreach_key_value_pair_cb_8_8
 #define stack_str_hash_foreach_key_value_pair	clib_bihash_foreach_key_value_pair_8_8
 
+#ifndef AARCH64_MUSL
 char *folded_stack_trace_string(struct bpf_tracer *t,
 				struct stack_trace_key_t *v,
 				const char *stack_map_name,
@@ -38,5 +39,5 @@ resolve_and_gen_stack_trace_msg(struct bpf_tracer *t,
 				struct stack_trace_key_t *v,
 				const char *stack_map_name,
 				stack_str_hash_t *h);
-
+#endif /* AARCH64_MUSL */
 #endif /* DF_USER_STRINGIFIER_H */

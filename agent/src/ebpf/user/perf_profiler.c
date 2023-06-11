@@ -14,6 +14,13 @@
  * limitations under the License.
  */
 
+/*
+ * TODO (@jiping)
+ * There are some issues with aarch64 musl compilation, and the profiler
+ * cannot be applied temporarily in scenarios where aarch64 is compiled
+ * using musl.
+ */
+#ifndef AARCH64_MUSL
 #include <bcc/perf_reader.h>
 #include "config.h"
 #include "common.h"
@@ -708,3 +715,34 @@ void release_flame_graph_hash(void)
 		  "\n\n\033[33;1mcat ./profiler.folded |./.flamegraph.pl --color=io"
 		  " --countname=ms > profiler-test.svg\033[0m\n");
 }
+#else /* defined AARCH64_MUSL */
+#include "tracer.h"
+#include "perf_profiler.h"
+
+/*
+ * start continuous profiler
+ * @freq sample frequency, Hertz. (e.g. 99 profile stack traces at 99 Hertz)
+ * @callback Profile data processing callback interface
+ * @returns 0 on success, < 0 on error
+ */
+int start_continuous_profiler(int freq,
+			      tracer_callback_t callback)
+{
+	return (-1);
+}
+
+int stop_continuous_profiler(void)
+{
+	return (0);
+}
+
+void process_stack_trace_data_for_flame_graph(stack_trace_msg_t *val)
+{
+	return;
+}
+
+void release_flame_graph_hash(void)
+{
+	return;
+}
+#endif /* AARCH64_MUSL */

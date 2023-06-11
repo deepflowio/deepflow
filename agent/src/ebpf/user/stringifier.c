@@ -40,6 +40,7 @@
  * caches the result of its stringification. In each iteration of a continuous perf profiler.
  */
 
+#ifndef AARCH64_MUSL
 #include "config.h"
 #include "common.h"
 #include "mem.h"
@@ -571,3 +572,4 @@ resolve_and_gen_stack_trace_msg(struct bpf_tracer *t,
 
 	return msg;
 }
+#endif /* AARCH64_MUSL */

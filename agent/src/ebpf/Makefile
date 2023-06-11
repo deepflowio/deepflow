@@ -11,6 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+# gnu compile:
+#     source /opt/rh/devtoolset-8/enable (need gcc8+)
+#     make rust-sample
+#
+# musl compile: (x86_64)
+#     source /opt/rh/devtoolset-11/enable (need gcc11+)
+#     CC=musl-gcc CLANG=musl-clang make rust-sample
+#
 
 ifeq ($(V),1)
 	Q =
@@ -42,12 +51,17 @@ define compile_perf_profiler_elf
 endef
 
 define check_gcc_version
-	@gcc_version=$(shell gcc -dumpversion); \
-        required_version='8'; \
-        if [ "$$gcc_version" \< "$$required_version" ]; then \
-            echo "Warning: GCC version is less than 8.0.0."; \
+        @GCC_VER=`gcc --version | grep ^gcc | cut -f3 -d' '|cut -f1-2 -d.`; \
+	VER_GTE112=`echo $${GCC_VER} \>= 11.2 | sed -e 's/\./*100+/g' | bc`; \
+	VER_GTE80=`echo $${GCC_VER} \>= 8.0 | sed -e 's/\./*100+/g' | bc`; \
+	if [ $${VER_GTE80} -eq 0 ]; then \
+            echo "Error: GCC version is less than 8.0.0"; \
             exit 1; \
-        fi
+        fi; \
+	if [ $(1) -eq 1 -a $${VER_GTE112} -eq 0 ]; then \
+	    echo "Error: musl compile need less than 11.2.0"; \
+	    exit 1; \
+        fi;
 endef
 
 CURRDIR := $(PWD)
@@ -91,11 +105,19 @@ endif
 #  the function call stack to facilitate locating the code line
 #  where the error occurred.
 CFLAGS += $(MACHINE_CFLAGS) -fno-omit-frame-pointer -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -I.
+ifeq ($(findstring musl,$(CC)),musl)
+    IS_MUSL := 1
+    ifeq ($(findstring aarch64,$(ARCH)),aarch64)
+	CFLAGS += -DAARCH64_MUSL
+    endif
+else
+    IS_MUSL := 0
+endif
+
 all: build
 
 ELFFILES = ./.data_done
 $(ELFFILES):
-	$(call check_gcc_version)
 	$(call msg,Clang/LLVM,,$(CLANG_VER))
 	@if [ $(CLANG_VER_MAIN) -lt 10 ]; then \
                 echo "  check llvm-clang fail. expect Clang/LLVM 10+" && exit 1; \
@@ -134,18 +156,25 @@ profiler: .profiler
 	$(call msg,Current-DIR,,$(CURR))
 	$(Q)rm -rf samples/rust/socket-tracer/src/ebpf.rs
 	$(Q)cp mod.rs samples/rust/socket-tracer/src/ebpf.rs
-	$(Q)rm -rf samples/rust/socket-tracer/build.rs
 	$(Q)rm -rf samples/rust/socket-tracer/target
 	@if [[ $(ARCH) == *"aarch64"* ]]; then \
             echo "  Architecture is aarch64"; \
-            cp samples/rust/socket-tracer/build-aarch64.rs samples/rust/socket-tracer/build.rs; \
-            cd samples/rust/socket-tracer/ && cargo build --release --target aarch64-unknown-linux-musl && cd ../../; \
-            echo "  samples/rust/socket-tracer/target/aarch64-unknown-linux-musl/release/rust_sample"; \
+	    if [ $(IS_MUSL) -eq 1 ]; then \
+                cd samples/rust/socket-tracer/ && cargo build --release --target aarch64-unknown-linux-musl && cd ../../; \
+                echo "  samples/rust/socket-tracer/target/aarch64-unknown-linux-musl/release/rust_sample"; \
+            else \
+                cd samples/rust/socket-tracer/ && cargo build --release && cd ../../; \
+                echo "  samples/rust/socket-tracer/target/release/socket_tracer"; \
+            fi; \
         elif [[ $(ARCH) == *"x86_64"* ]]; then \
             echo "  Architecture is x86_64"; \
-            cp samples/rust/socket-tracer/build-x86.rs samples/rust/socket-tracer/build.rs; \
-            cd samples/rust/socket-tracer/ && cargo build --release && cd ../../; \
-            echo "  samples/rust/socket-tracer/target/release/socket_tracer"; \
+	    if [ $(IS_MUSL) -eq 1 ]; then \
+                cd samples/rust/socket-tracer/ && cargo build --release --target x86_64-unknown-linux-musl && cd ../../; \
+		echo "  samples/rust/socket-tracer/target/x86_64-unknown-linux-musl/release/socket_tracer"; \
+            else \
+                cd samples/rust/socket-tracer/ && cargo build --release && cd ../../; \
+                echo "  samples/rust/socket-tracer/target/release/socket_tracer"; \
+	    fi; \
         else \
             echo "  Error: Invalid arch. $(ARCH) is not support!"; \
             exit 1; \
@@ -156,18 +185,25 @@ profiler: .profiler
 	$(call msg,Current-DIR,,$(CURR))
 	$(Q)rm -rf samples/rust/profiler/src/ebpf.rs
 	$(Q)cp mod_profiler.rs samples/rust/profiler/src/ebpf.rs
-	$(Q)rm -rf samples/rust/profiler/build.rs
 	$(Q)rm -rf samples/rust/profiler/target
 	@if [[ $(ARCH) == *"aarch64"* ]]; then \
             echo "  Architecture is aarch64"; \
-            cp samples/rust/profiler/build-aarch64.rs samples/rust/profiler/build.rs; \
-            cd samples/rust/profiler/ && cargo build --release --target aarch64-unknown-linux-musl && cd ../../; \
-            echo "  samples/rust/profiler/target/aarch64-unknown-linux-musl/release/profiler"; \
+	    if [ $(IS_MUSL) -eq 1 ]; then \
+                cd samples/rust/profiler/ && cargo build --release --target aarch64-unknown-linux-musl && cd ../../; \
+                echo "  samples/rust/profiler/target/aarch64-unknown-linux-musl/release/profiler"; \
+            else \
+                cd samples/rust/profiler/ && cargo build --release && cd ../../; \
+                echo "  samples/rust/profiler/target/release/profiler"; \
+            fi; \
         elif [[ $(ARCH) == *"x86_64"* ]]; then \
             echo "  Architecture is x86_64"; \
-            cp samples/rust/profiler/build-x86.rs samples/rust/profiler/build.rs; \
-            cd samples/rust/profiler/ && cargo build --release && cd ../../; \
-            echo "  samples/rust/profiler/target/release/profiler"; \
+	    if [ $(IS_MUSL) -eq 1 ]; then \
+                cd samples/rust/profiler/ && cargo build --release --target x86_64-unknown-linux-musl && cd ../../; \
+                echo "  samples/rust/profiler/target/x86_64-unknown-linux-musl/release/profiler"; \
+	    else \
+                cd samples/rust/profiler/ && cargo build --release && cd ../../; \
+                echo "  samples/rust/profiler/target/release/profiler"; \
+	    fi; \
         else \
             echo "  Error: Invalid arch. $(ARCH) is not support!"; \
             exit 1; \

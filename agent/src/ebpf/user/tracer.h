@@ -396,14 +396,14 @@ struct rx_queue_info {
 	uint64_t heap_get_failed;
 	int queue_size;
 	int ring_capacity;
-};
+} __attribute__((aligned(8)));
 
 struct bpf_tracer_param {
 	char name[NAME_LEN];
 	char bpf_load_name[NAME_LEN];
 	int dispatch_workers_nr;
 	unsigned int perf_pg_cnt;
-	struct rx_queue_info rx_queues[MAX_CPU_NR];
+	struct rx_queue_info rx_queues[MAX_CPU_NR] __attribute__((aligned(8)));
 	uint64_t lost;
 	int probes_count;
 	int state;
@@ -417,7 +417,7 @@ struct bpf_tracer_param_array {
 	struct bpf_tracer_param tracers[0];
 };
 
-volatile uint32_t *tracers_lock;
+extern volatile uint32_t *tracers_lock;
 
 /*
  * Protecting the creation, release, start and stop behaviors of tracer.
