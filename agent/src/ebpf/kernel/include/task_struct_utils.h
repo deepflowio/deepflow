@@ -24,17 +24,10 @@
 #define NSEC_PER_SEC	1000000000L
 #define USER_HZ		100
 
-#ifdef LINUX_VER_5_2_PLUS
-static __inline void *
-get_socket_file_addr_with_check(struct task_struct *task,
-				int fd_num,
-				int files_off,struct member_fields_offset *offset)
-#else
 static __inline void *
 get_socket_file_addr_with_check(struct task_struct *task,
 				int fd_num,
 				int files_off)
-#endif
 {
 	void *file = NULL;
 	void *files, *files_ptr = (void *)task + files_off;
@@ -44,13 +37,8 @@ get_socket_file_addr_with_check(struct task_struct *task,
 		return NULL;
 
 	struct fdtable *fdt, __fdt;
-#ifdef LINUX_VER_5_2_PLUS
-	bpf_probe_read(&fdt, sizeof(fdt),
-		       files + offset->struct_files_struct_fdt_offset);
-#else
 	bpf_probe_read(&fdt, sizeof(fdt),
 		       files + STRUCT_FILES_STRUCT_FDT_OFFSET);
-#endif
 	bpf_probe_read(&__fdt, sizeof(__fdt), (void *)fdt);
 
 	if (fd_num >= (int)__fdt.max_fds)
@@ -93,7 +81,6 @@ static __inline void *infer_and_get_socket_from_fd(int fd_num,
 
 	// 成员 files 在 struct task_struct 中的偏移量
 	// 0xd08 for kernel-devel-4.19.91-26.6.al7
-	// 0xa48 for 5.10.0-60.18.0.50.h322_1.hce2.aarch64
 #ifdef LINUX_VER_5_2_PLUS
 	int files_offset_array[] = {
 		0x790, 0xa80, 0xa88, 0xa90, 0xa98, 0xaa0, 0xaa8, 0xab0, 0xab8, 0xac0,
@@ -101,7 +88,7 @@ static __inline void *infer_and_get_socket_from_fd(int fd_num,
 		0xb18, 0xb20, 0xb28, 0xb48, 0xb50, 0xb58, 0xb60, 0xb68, 0xb70, 0xb78,
 		0xb80, 0xb88, 0xb90, 0xb98, 0xba0, 0xba8, 0xbb0, 0xbb8, 0xbc0, 0xbc8,
 		0xbd0, 0xbd8, 0xbe0, 0xbe8, 0xbf0, 0xbf8, 0xc00, 0xc08, 0xc10, 0xc18,
-		0xcc8, 0xa48
+		0xcc8
 	};
 #else
 	int files_offset_array[] = {
@@ -119,7 +106,6 @@ static __inline void *infer_and_get_socket_from_fd(int fd_num,
 			file =
 			    retry_get_socket_file_addr(task, fd_num,
 						       files_offset_array[i]);
-
 			if (file) {
 				bpf_probe_read(&private_data,
 					       sizeof(private_data),
@@ -149,13 +135,9 @@ static __inline void *infer_and_get_socket_from_fd(int fd_num,
 		//bpf_debug("file == NULL\n");
 		return NULL;
 	}
-#ifdef LINUX_VER_5_2_PLUS
-	bpf_probe_read(&private_data, sizeof(private_data),
-		       file + offset->struct_files_private_data_offset);
-#else
+
 	bpf_probe_read(&private_data, sizeof(private_data),
 		       file + STRUCT_FILES_PRIVATE_DATA_OFFSET);
-#endif
 	if (private_data == NULL) {
 		if (debug)
 			bpf_debug("private_data == NULL\n");
@@ -194,24 +176,14 @@ static __inline void *get_socket_from_fd(int fd_num,
 {
 	struct task_struct *task = (struct task_struct *)bpf_get_current_task();
 	void *file = NULL;
-#ifdef LINUX_VER_5_2_PLUS
-	file = get_socket_file_addr_with_check(
-		task, fd_num, offset->task__files_offset, offset);
-#else
 	file =
 	    get_socket_file_addr_with_check(task, fd_num,
 					    offset->task__files_offset);
-#endif
 	if (file == NULL)
 		return NULL;
 	void *private_data = NULL;
-#ifdef LINUX_VER_5_2_PLUS
-	bpf_probe_read(&private_data, sizeof(private_data),
-		       file + offset->struct_files_private_data_offset);
-#else
 	bpf_probe_read(&private_data, sizeof(private_data),
 		       file + STRUCT_FILES_PRIVATE_DATA_OFFSET);
-#endif
 	if (private_data == NULL) {
 		return NULL;
 	}
@@ -247,41 +219,32 @@ static __inline void *fd_to_file(int fd_num,
 	}
 
 	struct task_struct *task = (struct task_struct *)bpf_get_current_task();
-#ifdef LINUX_VER_5_2_PLUS
-	void *file = get_socket_file_addr_with_check(
-		task, fd_num, offset->task__files_offset, offset);
-#else
 	void *file = get_socket_file_addr_with_check(
 		task, fd_num, offset->task__files_offset);
-#endif
 	return file;
 }
 
-static __inline __u32 file_to_i_mode(void *file, struct member_fields_offset *offset)
+static __inline __u32 file_to_i_mode(void *file)
 {
 	if (!file) {
 		return 0;
 	}
 
 	void *f_inode = NULL;
-
 	bpf_probe_read(&f_inode, sizeof(f_inode),
-		       file + offset->struct_file_f_inode_offset);
+		       file + STRUCT_FILE_F_INODE_OFFSET);
 
 	if (!f_inode) {
 		return 0;
 	}
 
 	__u32 i_mode = 0;
-
 	bpf_probe_read(&i_mode, sizeof(i_mode),
-		       f_inode + offset->struct_inode_i_mode_offset);
-
+		       f_inode + STRUCT_INODE_I_MODE_OFFSET);
 	return i_mode;
 }
 
-static __inline char *file_to_name(void *file,
-				   struct member_fields_offset *offset)
+static __inline char *file_to_name(void *file)
 {
 	if (!file) {
 		return 0;
@@ -289,15 +252,14 @@ static __inline char *file_to_name(void *file,
 
 	void *dentry = NULL;
 	bpf_probe_read(&dentry, sizeof(dentry),
-		       file + offset->struct_file_dentry_offset);
+		       file + STRUCT_FILE_DENTRY_OFFSET);
 
 	if (!dentry) {
 		return 0;
 	}
 
 	char *name = NULL;
-	bpf_probe_read(&name, sizeof(name),
-		       dentry + offset->struct_dentry_name_offset);
+	bpf_probe_read(&name, sizeof(name), dentry + STRUCT_DENTRY_NAME_OFFSET);
 	return name;
 }
 
