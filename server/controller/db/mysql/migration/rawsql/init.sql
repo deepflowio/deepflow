@@ -2618,3 +2618,10 @@ CREATE TABLE IF NOT EXISTS ch_prometheus_metric_app_label_layout (
     `app_label_column_index`    TINYINT(3) UNSIGNED NOT NULL
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_prometheus_metric_app_label_layout;
+
+CREATE TABLE IF NOT EXISTS ch_prometheus_target_label_layout (
+    `target_id`           INT(10) NOT NULL PRIMARY KEY,
+    `target_label_names`  TEXT,
+    `target_label_values` TEXT
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_prometheus_target_label_layout;

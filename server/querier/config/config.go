@@ -38,17 +38,18 @@ type Config struct {
 }
 
 type QuerierConfig struct {
-	LogFile       string                `default:"/var/log/querier.log" yaml:"log-file"`
-	LogLevel      string                `default:"info" yaml:"log-level"`
-	ListenPort    int                   `default:"20416" yaml:"listen-port"`
-	Clickhouse    Clickhouse            `yaml:clickhouse`
-	Profile       profile.ProfileConfig `yaml:profile`
-	DeepflowApp   DeepflowApp           `yaml:"deepflow-app"`
-	Prometheus    prometheus.Prometheus `yaml:"prometheus"`
-	Language      string                `default:"en" yaml:"language"`
-	OtelEndpoint  string                `default:"http://${K8S_NODE_IP_FOR_DEEPFLOW}:38086/api/v1/otel/trace" yaml:"otel-endpoint"`
-	Limit         string                `default:"10000" yaml:"limit"`
-	TimeFillLimit int                   `default:"20" yaml:"time-fill-limit"`
+	LogFile                       string                `default:"/var/log/querier.log" yaml:"log-file"`
+	LogLevel                      string                `default:"info" yaml:"log-level"`
+	ListenPort                    int                   `default:"20416" yaml:"listen-port"`
+	Clickhouse                    Clickhouse            `yaml:clickhouse`
+	Profile                       profile.ProfileConfig `yaml:profile`
+	DeepflowApp                   DeepflowApp           `yaml:"deepflow-app"`
+	Prometheus                    prometheus.Prometheus `yaml:"prometheus"`
+	Language                      string                `default:"en" yaml:"language"`
+	OtelEndpoint                  string                `default:"http://${K8S_NODE_IP_FOR_DEEPFLOW}:38086/api/v1/otel/trace" yaml:"otel-endpoint"`
+	Limit                         string                `default:"10000" yaml:"limit"`
+	TimeFillLimit                 int                   `default:"20" yaml:"time-fill-limit"`
+	PrometheusCacheUpdateInterval int                   `default:"60" yaml:"prometheus-cache-update-interval"`
 }
 
 type DeepflowApp struct {

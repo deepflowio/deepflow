@@ -183,6 +183,7 @@ func (c *TagRecorder) UpdateChDictionary() {
 							CH_PROMETHEUS_LABEL_NAME,
 							CH_PROMETHEUS_METRIC_NAME,
 							CH_PROMETHEUS_METRIC_APP_LABEL_LAYOUT,
+							CH_PROMETHEUS_TARGET_LABEL_LAYOUT,
 						)
 						chDicts := mapset.NewSet()
 						for _, dictionary := range dictionaries {

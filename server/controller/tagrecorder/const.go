@@ -103,6 +103,7 @@ const (
 	RESOURCE_TYPE_CH_APP_LABEL                          = "ch_app_label"
 	RESOURCE_TYPE_CH_LABEL_NAME                         = "ch_prometheus_label_name"
 	RESOURCE_TYPE_CH_METRIC_NAME                        = "ch_prometheus_metric_name"
+	RESOURCE_TYPE_CH_PROMETHEUS_TARGET_LABEL_LAYOUT     = "ch_prometheus_target_label_layout"
 )
 
 const (
@@ -163,6 +164,7 @@ const (
 	CH_PROMETHEUS_LABEL_NAME              = "prometheus_label_name_map"
 	CH_PROMETHEUS_METRIC_NAME             = "prometheus_metric_name_map"
 	CH_PROMETHEUS_METRIC_APP_LABEL_LAYOUT = "prometheus_metric_app_label_layout_map"
+	CH_PROMETHEUS_TARGET_LABEL_LAYOUT     = "prometheus_target_label_layout_map"
 )
 
 const (
@@ -575,6 +577,16 @@ const (
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(COMPLEX_KEY_HASHED())"
+	CREATE_PROMETHEUS_TARGET_LABEL_LAYOUT_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
+		"(\n" +
+		"    `target_id` UInt64,\n" +
+		"    `target_label_names` String,\n" +
+		"    `target_label_values` String\n" +
+		")\n" +
+		"PRIMARY KEY target_id\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
+		"LIFETIME(MIN 0 MAX 60)\n" +
+		"LAYOUT(COMPLEX_KEY_HASHED())"
 )
 
 var DBNodeTypeToResourceType = map[string]string{
@@ -670,6 +682,7 @@ var CREATE_SQL_MAP = map[string]string{
 	CH_PROMETHEUS_METRIC_APP_LABEL_LAYOUT: CREATE_PROMETHEUS_METRIC_APP_LABEL_LAYOUT_DICTIONARY_SQL,
 	CH_APP_LABEL:                          CREATE_APP_LABEL_SQL,
 	CH_TARGET_LABEL:                       CREATE_TARGET_LABEL_SQL,
+	CH_PROMETHEUS_TARGET_LABEL_LAYOUT:     CREATE_PROMETHEUS_TARGET_LABEL_LAYOUT_DICTIONARY_SQL,
 }
 
 var VTAP_TYPE_TO_DEVICE_TYPE = map[int]int{

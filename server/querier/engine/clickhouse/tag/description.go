@@ -228,7 +228,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 	}
 
 	for _, key := range TAG_DESCRIPTION_KEYS {
-		if key.DB != db || (key.Table != table && db != "ext_metrics" && db != "deepflow_system" && db != "prometheus") {
+		if key.DB != db || (key.Table != table && db != "ext_metrics" && db != "deepflow_system" && db != ckcommon.DB_NAME_PROMETHEUS) {
 			continue
 		}
 		tag, _ := TAG_DESCRIPTIONS[key]
@@ -424,7 +424,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 	}
 
 	// 查询外部字段
-	if (db != "ext_metrics" && db != "flow_log" && db != "deepflow_system" && db != "event" && db != "prometheus") || (db == "flow_log" && table != "l7_flow_log") {
+	if (db != "ext_metrics" && db != "flow_log" && db != "deepflow_system" && db != "event" && db != ckcommon.DB_NAME_PROMETHEUS) || (db == "flow_log" && table != "l7_flow_log") {
 		return response, nil
 	}
 	externalChClient := client.Client{
