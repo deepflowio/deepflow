@@ -19,9 +19,10 @@ package view
 import (
 	"bytes"
 	"fmt"
-	"github.com/deepflowio/deepflow/server/querier/common"
 	"strconv"
 	"strings"
+
+	"github.com/deepflowio/deepflow/server/querier/common"
 )
 
 const (
@@ -506,11 +507,11 @@ type HistogramFunction struct {
 }
 
 func (f *HistogramFunction) WriteTo(buf *bytes.Buffer) {
-	buf.WriteString("histogram(")
+	buf.WriteString("histogramIf(")
 	buf.WriteString(FormatField(f.Fields[1].ToString()))
 	buf.WriteString(")(")
 	buf.WriteString(f.Fields[0].ToString())
-	buf.WriteString(")")
+	buf.WriteString(fmt.Sprintf(",%s>0)", f.Fields[0].ToString()))
 	if f.Alias != "" {
 		buf.WriteString(" AS ")
 		buf.WriteString("`")
