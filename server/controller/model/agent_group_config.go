@@ -65,6 +65,7 @@ type StaticConfig struct {
 	KubernetesNamespace              *string               `yaml:"kubernetes-namespace,omitempty"`
 	KubernetesAPIListLimit           *uint32               `yaml:"kubernetes-api-list-limit,omitempty"`
 	KubernetesAPIListInterval        *string               `yaml:"kubernetes-api-list-interval,omitempty"`
+	KubernetesAPIMemoryTrimPercent   *uint8                `yaml:"kubernetes-api-memory-trim-percent,omitempty"`
 	IngressFlavour                   *string               `yaml:"ingress-flavour,omitempty"`
 	GrpcBufferSize                   *int                  `yaml:"grpc-buffer-size,omitempty"`            // 单位：M
 	L7LogSessionAggrTimeout          *string               `yaml:"l7-log-session-aggr-timeout,omitempty"` // 单位: s
