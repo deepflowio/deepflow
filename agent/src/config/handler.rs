@@ -259,6 +259,8 @@ pub struct PlatformConfig {
     pub kubernetes_api_enabled: bool,
     pub kubernetes_api_list_limit: u32,
     pub kubernetes_api_list_interval: Duration,
+    pub kubernetes_api_memory_trim_percent: Option<u8>,
+    pub max_memory: u64,
     pub namespace: Option<String>,
     pub thread_threshold: u32,
     pub tap_mode: TapMode,
@@ -940,6 +942,12 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 kubernetes_api_enabled: conf.kubernetes_api_enabled,
                 kubernetes_api_list_limit: conf.yaml_config.kubernetes_api_list_limit,
                 kubernetes_api_list_interval: conf.yaml_config.kubernetes_api_list_interval,
+                kubernetes_api_memory_trim_percent: if !conf.yaml_config.memory_trim_disabled {
+                    Some(conf.yaml_config.kubernetes_api_memory_trim_percent)
+                } else {
+                    None
+                },
+                max_memory: conf.max_memory,
                 namespace: if conf.yaml_config.kubernetes_namespace.is_empty() {
                     None
                 } else {
@@ -1727,6 +1735,14 @@ impl ConfigHandler {
                     new_cfg.kubernetes_api_list_interval
                 );
             }
+            if old_cfg.kubernetes_api_memory_trim_percent
+                != new_cfg.kubernetes_api_memory_trim_percent
+            {
+                info!(
+                    "Kubernetes API memory_trim_percent set to {:?}",
+                    new_cfg.kubernetes_api_memory_trim_percent
+                );
+            }
             if old_cfg.kubernetes_api_enabled != new_cfg.kubernetes_api_enabled {
                 info!(
                     "Kubernetes API enabled set to {}",
@@ -1756,7 +1772,10 @@ impl ConfigHandler {
                 && new_cfg.kubernetes_api_enabled
                 && (old_cfg.kubernetes_api_list_limit != new_cfg.kubernetes_api_list_limit
                     || old_cfg.kubernetes_api_list_interval
-                        != new_cfg.kubernetes_api_list_interval);
+                        != new_cfg.kubernetes_api_list_interval
+                    || old_cfg.kubernetes_api_memory_trim_percent
+                        != new_cfg.kubernetes_api_memory_trim_percent
+                    || old_cfg.max_memory != new_cfg.max_memory);
 
             info!(
                 "platform config change from {:#?} to {:#?}",
