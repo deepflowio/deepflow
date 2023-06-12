@@ -61,9 +61,9 @@ type EventWriter struct {
 }
 
 func (w *EventWriter) Write(e *EventStore) {
-	w.ckWriter.Put(e)
 	e.GenerateNewFlowTags(w.flowTagWriter.Cache)
 	w.flowTagWriter.WriteFieldsAndFieldValuesInCache()
+	w.ckWriter.Put(e)
 }
 
 func NewEventWriter(table string, decoderIndex int, config *config.Config) (*EventWriter, error) {
