@@ -48,7 +48,7 @@ type KubernetesGather struct {
 	PortNameRegex                string
 	PodNetIPv4CIDRMaxMask        int
 	PodNetIPv6CIDRMaxMask        int
-	annotationValueMaxLength     int
+	customTagLenMax              int
 	isSubDomain                  bool
 	azLcuuid                     string
 	podGroupLcuuids              mapset.Set
@@ -149,7 +149,7 @@ func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, cfg c
 
 		// 以下属性为获取资源所用的关联关系
 		azLcuuid:                     "",
-		annotationValueMaxLength:     cfg.K8SAnnotationValueMaxLength,
+		customTagLenMax:              cfg.CustomTagLenMax,
 		isSubDomain:                  isSubDomain,
 		podGroupLcuuids:              mapset.NewSet(),
 		nodeNetworkLcuuidCIDRs:       networkLcuuidCIDRs{},

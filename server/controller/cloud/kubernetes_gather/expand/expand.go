@@ -4,10 +4,10 @@ import (
 	"github.com/bitly/go-simplejson"
 )
 
-func GetPodENV(containers *simplejson.Json) string {
+func GetPodENV(containers *simplejson.Json, maxLen int) string {
 	return ""
 }
 
-func GetAnnotation(annotations *simplejson.Json, maxLength int) string {
+func GetAnnotation(annotations *simplejson.Json, maxLen int) string {
 	return ""
 }
