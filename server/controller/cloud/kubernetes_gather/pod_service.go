@@ -90,7 +90,7 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 		labelString := strings.Join(labelSlice, ", ")
 
 		annotations := metaData.Get("annotations")
-		annotationString := expand.GetAnnotation(annotations, k.annotationValueMaxLength)
+		annotationString := expand.GetAnnotation(annotations, k.customTagLenMax)
 
 		service := model.PodService{
 			Lcuuid:             uID,

@@ -50,7 +50,7 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, e
 		}
 
 		containers := pData.GetPath("spec", "containers")
-		envString := expand.GetPodENV(containers)
+		envString := expand.GetPodENV(containers, k.customTagLenMax)
 
 		metaData, ok := pData.CheckGet("metadata")
 		if !ok {
@@ -179,7 +179,7 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, e
 
 		annotations := metaData.Get("annotations")
 
-		annotationString := expand.GetAnnotation(annotations, k.annotationValueMaxLength)
+		annotationString := expand.GetAnnotation(annotations, k.customTagLenMax)
 
 		containerIDs := []string{}
 		containerStatuses := pData.GetPath("status", "containerStatuses")
