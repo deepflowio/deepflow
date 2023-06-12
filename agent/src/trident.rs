@@ -85,7 +85,8 @@ use crate::{
         cgroups::{is_kernel_available_for_cgroups, Cgroups},
         environment::{
             check, controller_ip_check, free_memory_check, free_space_checker, get_ctrl_ip_and_mac,
-            kernel_check, running_in_container, tap_interface_check, trident_process_check,
+            get_env, kernel_check, running_in_container, tap_interface_check,
+            trident_process_check,
         },
         guard::Guard,
         logger::{LogLevelWriter, LogWriterAdapter, RemoteLogConfig, RemoteLogWriter},
@@ -321,6 +322,7 @@ impl Trident {
         config_path: Option<PathBuf>,
     ) -> Result<()> {
         info!("==================== Launching DeepFlow-Agent ====================");
+        info!("Environment variables: {:?}", get_env());
 
         let (ctrl_ip, ctrl_mac) = get_ctrl_ip_and_mac(config.controller_ips[0].parse()?);
         if running_in_container() {
