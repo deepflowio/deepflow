@@ -645,6 +645,7 @@ impl NpbArpTable {
             for key in &timeout_ips {
                 table.write().unwrap().remove(key);
             }
+            table.write().unwrap().shrink_to_fit();
 
             // Lookup all stale entrys.
             for (last_lookup, key) in &lookup_ips {
