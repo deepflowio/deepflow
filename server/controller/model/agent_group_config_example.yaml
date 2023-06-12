@@ -413,12 +413,20 @@ vtap_group_id: g-xxxxxx
   ## K8s api list limit
   ## Default: 1000. Options: [10, 4294967296)
   ## Note: Used when limit k8s api list entry size.
-  #kubernetes-api-list-limit:
+  #kubernetes-api-list-limit: 1000
 
   ## K8s api list interval
   ## Default: 10m. Must be larger than or equal to 10m.
   ## Note: Interval of listing resource when watcher idles
-  #kubernetes-api-list-interval:
+  #kubernetes-api-list-interval: 10m
+
+  ## K8s api memory trim percentage
+  ## Default: 100. Options: [0, 100]
+  ## Note: The memory percentage is calculated by `RssAnon * 100 / (max_memory - RssFile - RssShmem)`.
+  #    If `memory-trim-disabled` is set to false (the default), memory will be checked
+  #    after processing each batch `Api::list` returns, a percentage above this threshold
+  #    will trigger a `malloc_trim`.
+  #kubernetes-api-memory-trim-percent: 100
 
   ## Type of Ingress
   ## Default: kubernetes. Options: kubernetes, openshift

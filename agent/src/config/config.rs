@@ -359,6 +359,7 @@ pub struct YamlConfig {
     pub kubernetes_api_list_limit: u32,
     #[serde(with = "humantime_serde")]
     pub kubernetes_api_list_interval: Duration,
+    pub kubernetes_api_memory_trim_percent: u8,
     pub external_metrics_sender_queue_size: usize,
     pub l7_protocol_inference_max_fail_count: usize,
     pub l7_protocol_inference_ttl: usize,
@@ -557,6 +558,10 @@ impl YamlConfig {
             c.kubernetes_api_list_interval = Duration::from_secs(600);
         }
 
+        if c.kubernetes_api_memory_trim_percent > 100 {
+            c.kubernetes_api_memory_trim_percent = 100;
+        }
+
         if c.forward_capacity < 1 << 14 {
             c.forward_capacity = 1 << 14;
         }
@@ -651,6 +656,7 @@ impl Default for YamlConfig {
             kubernetes_namespace: "".into(),
             kubernetes_api_list_limit: 1000,
             kubernetes_api_list_interval: Duration::from_secs(600),
+            kubernetes_api_memory_trim_percent: 100,
             external_metrics_sender_queue_size: 1 << 12,
             l7_protocol_inference_max_fail_count: L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT,
             l7_protocol_inference_ttl: L7_PROTOCOL_INFERENCE_TTL,
