@@ -232,11 +232,13 @@ type VtapGroupUpdate struct {
 
 type DataSource struct {
 	ID                        int    `json:"ID"`
-	Name                      string `json:"NAME"`
+	DisplayName               string `json:"DISPLAY_NAME"`
+	DataTableCollection       string `json:"DATA_TABLE_COLLECTION"`
+	DataTable                 string `json:"DATA_TABLE"`
 	TsdbType                  string `json:"TSDB_TYPE"`
 	State                     int    `json:"STATE"`
 	BaseDataSourceID          int    `json:"BASE_DATA_SOURCE_ID"`
-	BaseDataSourceName        string `json:"BASE_DATA_SOURCE_NAME"`
+	BaseDataSourceDataTable   string `json:"BASE_DATA_SOURCE_DATA_TABLE"`
 	Interval                  int    `json:"INTERVAL"`
 	RetentionTime             int    `json:"RETENTION_TIME"`
 	SummableMetricsOperator   string `json:"SUMMABLE_METRICS_OPERATOR"`
@@ -247,7 +249,9 @@ type DataSource struct {
 }
 
 type DataSourceCreate struct {
-	Name                      string `json:"NAME" binding:"required,min=1,max=10"`
+	DisplayName               string `json:"DISPLAY_NAME" binding:"required,min=1,max=64"`
+	DataTableCollection       string `json:"DATA_TABLE_COLLECTION" binding:"required,min=1,max=64"`
+	DataTable                 string `json:"DATA_TABLE" binding:"required,min=1,max=64"`
 	TsdbType                  string `json:"TSDB_TYPE" binding:"required,oneof=flow app"`
 	BaseDataSourceID          int    `json:"BASE_DATA_SOURCE_ID" binding:"required"`
 	Interval                  int    `json:"INTERVAL" binding:"required"`
