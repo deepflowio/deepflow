@@ -1147,7 +1147,7 @@ CREATE TABLE IF NOT EXISTS alarm_policy (
     sub_view_metrics        TEXT,
     sub_view_extra          TEXT,
     user_id                 INTEGER,
-    name                    CHAR(64) NOT NULL,
+    name                    CHAR(128) NOT NULL,
     level                   TINYINT(1) NOT NULL COMMENT '0.low 1.middle 2.high',
     state                   TINYINT(1) DEFAULT 1 COMMENT '0.disabled 1.enabled',
     app_type                TINYINT(1) NOT NULL COMMENT '1-system 2-360view',
