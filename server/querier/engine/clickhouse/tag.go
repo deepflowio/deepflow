@@ -134,7 +134,10 @@ func GetTagTranslator(name, alias, db, table string) (Statement, string, error) 
 			}
 			stmt = &SelectTag{Value: tagTranslator, Alias: selectTag}
 		} else if name == "tag" && db == chCommon.DB_NAME_PROMETHEUS {
-			tagTranslator := GetPrometheusAllTagTranslator(table)
+			tagTranslator, err := GetPrometheusAllTagTranslator(table)
+			if err != nil {
+				return nil, "", err
+			}
 			stmt = &SelectTag{Value: tagTranslator, Alias: selectTag}
 		} else if tagItem.TagTranslator != "" {
 			if name != "packet_batch" || table != "l4_packet" {
@@ -182,15 +185,20 @@ func GetPrometheusSingleTagTranslator(tag, table string) (string, string, error)
 	return TagTranslatorStr, labelType, nil
 }
 
-func GetPrometheusAllTagTranslator(table string) string {
+func GetPrometheusAllTagTranslator(table string) (string, error) {
 	tagTranslatorStr := ""
 	appLabelTranslatorStr := ""
+	metricID, ok := Prometheus.MetricNameToID[table]
+	if !ok {
+		errorMessage := fmt.Sprintf("%s not found", table)
+		return "", errors.New(errorMessage)
+	}
 	if appLabels, ok := Prometheus.MetricAppLabelLayout[table]; ok {
 		// appLabel
 		appLabelTranslatorSlice := []string{}
 		for _, appLabel := range appLabels {
 			if labelNameID, ok := Prometheus.LabelNameToID[appLabel.AppLabelName]; ok {
-				appLabelTranslator := fmt.Sprintf("'%s',dictGet(flow_tag.app_label_map, 'label_value', (metric_id, %d, app_label_value_id_%d))", appLabel.AppLabelName, labelNameID, appLabel.appLabelColumnIndex)
+				appLabelTranslator := fmt.Sprintf("'%s',dictGet(flow_tag.app_label_map, 'label_value', (%d, %d, app_label_value_id_%d))", appLabel.AppLabelName, metricID, labelNameID, appLabel.appLabelColumnIndex)
 				appLabelTranslatorSlice = append(appLabelTranslatorSlice, appLabelTranslator)
 			}
 		}
@@ -204,17 +212,7 @@ func GetPrometheusAllTagTranslator(table string) string {
 	} else {
 		tagTranslatorStr = "toJSONString(" + targetLabelTranslatorStr + ")"
 	}
-	return tagTranslatorStr
-}
-
-func GetSelectMetricIDFilter(name, as, db, table string) (view.Node, bool) {
-	if (name == "value" || name == "tag") && db == chCommon.DB_NAME_PROMETHEUS {
-		if metricID, ok := Prometheus.MetricNameToID[table]; ok {
-			filter := fmt.Sprintf("metric_id=%d", metricID)
-			return &view.Expr{Value: "(" + filter + ")"}, true
-		}
-	}
-	return &view.Expr{}, false
+	return tagTranslatorStr, nil
 }
 
 func GetMetricsTag(name string, alias string, db string, table string, ctx context.Context) (Statement, error) {

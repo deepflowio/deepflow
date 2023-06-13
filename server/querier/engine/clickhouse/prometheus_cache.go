@@ -90,7 +90,7 @@ func GenerateMap() {
 	Prometheus.LabelIDToName = LABEL_ID_TO_NAME
 	Prometheus.LabelNameToID = LABEL_NAME_TO_ID
 
-	metricAppLabelLayoutSql := "SELECT metric_name,app_label_name,app_label_column_index FROM flow_tag.prometheus_metric_app_label_layout_map"
+	metricAppLabelLayoutSql := "SELECT metric_name,app_label_name,app_label_column_index FROM flow_tag.prometheus_metric_app_label_layout_map ORDER BY app_label_column_index"
 	metricAppLabelLayoutSqlRst, err := chClient.DoQuery(&client.QueryParams{Sql: metricAppLabelLayoutSql})
 	if err != nil {
 		log.Warning(err)
