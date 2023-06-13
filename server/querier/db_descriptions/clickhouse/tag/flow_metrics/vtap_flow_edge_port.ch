@@ -29,9 +29,9 @@ resource_gl1               , 资源-工作负载优先          , 已废弃，�
 resource_gl2_type          , 类型-服务优先              , 已废弃，请使用 auto_service_type。
 resource_gl2               , 资源-服务优先              , 已废弃，请使用 auto_service。
 auto_instance_type         , 类型-容器 POD 优先         , `auto_instance`实例对应的类型。
-auto_instance              , 资源-容器 POD 优先         , IP 对应的实例。
+auto_instance              , 资源-容器 POD 优先         , IP 对应的实例，实例为IP时，auto_instance_id显示为子网ID。
 auto_service_type          , 类型-服务优先              , `auto_service`实例对应的类型。
-auto_service               , 资源-服务优先              , 在`auto_instance`基础上，将容器服务的 ClusterIP 与工作负载聚合为服务。
+auto_service               , 资源-服务优先              , 在`auto_instance`基础上，将容器服务的 ClusterIP 与工作负载聚合为服务，实例为IP时，auto_service_id显示为子网ID。
 gprocess                   , 进程                       ,
 tap_port_host              , 采集网卡所属宿主机          ,
 tap_port_chost             , 采集网卡所属云服务器        ,
