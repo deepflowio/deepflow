@@ -1168,11 +1168,12 @@ type SysConfiguration struct {
 }
 
 type KubernetesCluster struct {
-	ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	ClusterID string    `gorm:"column:cluster_id;type:varchar(256);" json:"CLUSTER_ID"`
-	Value     string    `gorm:"column:value;type:varchar(256);" json:"VALUE"`
-	CreatedAt time.Time `gorm:"column:created_at;type:datetime;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
-	SyncedAt  time.Time `gorm:"column:synced_at" json:"SYNCED_AT"`
+	ID          int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	ClusterID   string    `gorm:"column:cluster_id;type:varchar(256);" json:"CLUSTER_ID"`
+	Value       string    `gorm:"column:value;type:varchar(256);" json:"VALUE"`
+	CreatedAt   time.Time `gorm:"column:created_at;type:datetime;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
+	SyncedAt    time.Time `gorm:"column:synced_at;type:datetime" json:"SYNCED_AT"`
+	UpdatedTime time.Time `gorm:"column:updated_time;type:datetime" json:"UPDATED_TIME"`
 }
 
 type GoGenesisVInterface struct {
