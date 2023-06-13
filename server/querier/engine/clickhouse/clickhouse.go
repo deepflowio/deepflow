@@ -594,6 +594,14 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 			if e.DB == "ext_metrics" {
 				table = "metrics"
 			} else if e.DB == chCommon.DB_NAME_PROMETHEUS {
+				whereStmt := Where{}
+				metricIDFilter, err := GetMetricIDFilter(e.DB, e.Table)
+				if err != nil {
+					return err
+				}
+				filter := view.Filters{Expr: metricIDFilter}
+				whereStmt.filter = &filter
+				e.Statements = append(e.Statements, &whereStmt)
 				table = "samples"
 			}
 			if e.DataSource != "" {
@@ -817,14 +825,6 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 				e.ColumnSchemas[len(e.ColumnSchemas)-1] = common.NewColumnSchema(strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", ""), "", labelType)
 			}
 		}
-		whereStmt := Where{}
-		notNullExpr, ok := GetSelectMetricIDFilter(sqlparser.String(expr), as, e.DB, e.Table)
-		if !ok {
-			return nil
-		}
-		filter := view.Filters{Expr: notNullExpr}
-		whereStmt.filter = &filter
-		e.Statements = append(e.Statements, &whereStmt)
 		return nil
 	// func(field/tag)
 	case *sqlparser.FuncExpr:
