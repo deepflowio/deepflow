@@ -24,9 +24,9 @@ pod_group             , K8s Workload                 ,
 pod                   , K8s POD                      ,
 service               , Service                      ,
 auto_instance_type    , Type - K8s POD First         , The type of 'auto_instance'.
-auto_instance         , Instance - K8s POD First     , The instance of IP.
+auto_instance         , Instance - K8s POD First     , The instance of IP, when the instance is an IP, auto_instance_id displayed as a subnet ID.
 auto_service_type     , Type - K8s Service First     , The type of 'auto_service'.
-auto_service          , Instance - K8s Service First , On the basis of 'auto_instance', aggregate K8s service ClusterIP and workload into service.
+auto_service          , Instance - K8s Service First , On the basis of 'auto_instance', aggregate K8s service ClusterIP and workload into service, when the instance is an IP, auto_service_id displayed as a subnet ID.
 gprocess              , Process                      ,
 
 attribute             , Attribute                    ,
