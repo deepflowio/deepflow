@@ -43,10 +43,7 @@ use crate::common::{
 };
 use crate::config::handler::EnvironmentAccess;
 use crate::exception::ExceptionHandler;
-use crate::utils::{
-    cgroups::is_kernel_available_for_cgroups,
-    environment::{k8s_mem_limit_for_deepflow, running_in_container},
-};
+use crate::utils::{cgroups::is_kernel_available_for_cgroups, environment::running_in_container};
 
 use public::proto::trident::{Exception, TapMode};
 
@@ -62,7 +59,6 @@ pub struct Guard {
     memory_trim_disabled: bool,
     system: Arc<Mutex<System>>,
     pid: Pid,
-    k8s_memory_limit: u64,
 }
 
 impl Guard {
@@ -98,7 +94,6 @@ impl Guard {
             memory_trim_disabled,
             system: Arc::new(Mutex::new(System::new())),
             pid,
-            k8s_memory_limit: k8s_mem_limit_for_deepflow().unwrap_or_default(),
         }
     }
 
@@ -219,7 +214,8 @@ impl Guard {
         let mut check_cgroup_result = true; // It is used to determine whether subsequent checks are required. If the first check fails, the check is stopped
         let system = self.system.clone();
         let pid: Pid = self.pid.clone();
-        let k8s_memory_limit = self.k8s_memory_limit;
+        let cgroups_available = is_kernel_available_for_cgroups();
+        let in_container = running_in_container();
 
         let thread = thread::Builder::new().name("guard".to_owned()).spawn(move || {
             loop {
@@ -249,14 +245,29 @@ impl Guard {
                     }
                 }
                 // If it is in a container or tap_mode is Analyzer, there is no need to limit resource, so there is no need to check cgroups
-                if !running_in_container() && config.tap_mode != TapMode::Analyzer && is_kernel_available_for_cgroups() {
-                    if check_cgroup_result {
-                        check_cgroup_result = Self::check_cgroups(cgroup_mount_path.clone(), is_cgroup_v2);
-                        if !check_cgroup_result {
-                            error!("check cgroups failed, limit cpu or memory without cgroups");
+                if !in_container && config.tap_mode != TapMode::Analyzer {
+                    if cgroups_available {
+                        if check_cgroup_result {
+                            check_cgroup_result = Self::check_cgroups(cgroup_mount_path.clone(), is_cgroup_v2);
+                            if !check_cgroup_result {
+                                error!("check cgroups failed, limit cpu or memory without cgroups");
+                            }
                         }
-                    }
-                    if !check_cgroup_result {
+                        if !check_cgroup_result {
+                            if !Self::check_cpu(system.clone(), pid.clone(), cpu_limit) {
+                                if over_cpu_limit {
+                                    error!("cpu usage over cpu limit twice, deepflow-agent restart...");
+                                    thread::sleep(Duration::from_secs(1));
+                                    exit(-1);
+                                } else {
+                                    warn!("cpu usage over cpu limit");
+                                    over_cpu_limit = true;
+                                }
+                            } else {
+                                over_cpu_limit = false;
+                            }
+                        }
+                    } else {
                         if !Self::check_cpu(system.clone(), pid.clone(), cpu_limit) {
                             if over_cpu_limit {
                                 error!("cpu usage over cpu limit twice, deepflow-agent restart...");
@@ -270,7 +281,6 @@ impl Guard {
                             over_cpu_limit = false;
                         }
                     }
-
                 }
 
                 #[cfg(all(target_os = "linux", target_env = "gnu"))]
@@ -284,11 +294,7 @@ impl Guard {
                 // Periodically checking the memory usage can determine whether the memory exceeds the limit.
                 // Reference: https://unix.stackexchange.com/questions/686814/cgroup-and-process-memory-statistics-mismatch
                 if tap_mode != TapMode::Analyzer {
-                    let memory_limit = if k8s_memory_limit > 0 {
-                        k8s_memory_limit
-                    } else {
-                        config.max_memory
-                    };
+                    let memory_limit = config.max_memory;
                     if memory_limit != 0 {
                         match get_memory_rss() {
                             Ok(memory_usage) => {
