@@ -1205,6 +1205,7 @@ impl QuadrupleGenerator {
                     }
                     break;
                 }
+                Err(Error::BatchTooLarge(_)) => unreachable!(),
             }
         }
     }

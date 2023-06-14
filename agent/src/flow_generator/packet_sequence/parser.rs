@@ -81,6 +81,7 @@ impl PacketSequenceParser {
                         }
                         Err(Error::Timeout) => continue,
                         Err(Error::Terminated(..)) => break,
+                        Err(Error::BatchTooLarge(_)) => unreachable!(),
                     };
                 }
             })

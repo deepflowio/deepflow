@@ -15,7 +15,7 @@
  */
 
 use std::io::{Read, Write};
-use std::net::{IpAddr, Ipv6Addr, SocketAddr, TcpStream};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, TcpStream};
 use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
@@ -42,14 +42,20 @@ use tokio::{
 };
 
 use crate::exception::ExceptionHandler;
-use public::counter::{Counter, CounterType, CounterValue, OwnedCountable};
-use public::proto::integration::opentelemetry::proto::{
-    common::v1::any_value::Value,
-    common::v1::{AnyValue, KeyValue},
-    trace::v1::TracesData,
+
+use public::{
+    counter::{Counter, CounterType, CounterValue, OwnedCountable},
+    proto::{
+        integration::opentelemetry::proto::{
+            common::v1::any_value::Value,
+            common::v1::{AnyValue, KeyValue},
+            trace::v1::TracesData,
+        },
+        trident::Exception,
+    },
+    queue::{DebugSender, Error},
+    utils::net::ipv6_enabled,
 };
-use public::proto::trident::Exception;
-use public::queue::{DebugSender, Error};
 
 type GenericError = Box<dyn std::error::Error + Send + Sync>;
 
@@ -475,7 +481,11 @@ impl MetricServer {
                         }
                         while let Ok(_) = rx.try_recv() {} // drain useless messages
                         let port = port.load(Ordering::Acquire);
-                        let addr = (IpAddr::from(Ipv6Addr::UNSPECIFIED), port).into();
+                        let addr = if ipv6_enabled() {
+                            (Ipv6Addr::UNSPECIFIED, port).into()
+                        } else {
+                            (Ipv4Addr::UNSPECIFIED, port).into()
+                        };
                         match Server::try_bind(&addr) {
                             Ok(s) => {
                                 monitor_port.store(port, Ordering::Release);

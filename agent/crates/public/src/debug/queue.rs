@@ -199,6 +199,7 @@ impl QueueDebugger {
                             msg_counter = 0;
                             continue;
                         }
+                        Err(Error::BatchTooLarge(_)) => unreachable!(),
                     };
                     msg_counter += 1;
                     let msg = QueueMessage::Send(s);

@@ -24,4 +24,5 @@ pub use overwrite_queue::{bounded, Counter, Receiver, Sender, StatsHandle};
 pub enum Error<T> {
     Timeout,
     Terminated(Option<T>, Option<Vec<T>>),
+    BatchTooLarge(Option<Vec<T>>),
 }

@@ -346,6 +346,7 @@ impl FlowAggr {
                 Err(Error::Terminated(..)) => {
                     break;
                 }
+                Err(Error::BatchTooLarge(_)) => unreachable!(),
             }
         }
     }

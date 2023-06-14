@@ -479,13 +479,14 @@ impl<T: Sendable> UniformSender<T> {
                         self.flush_encoder();
                     }
                 },
-                Err(Error::Terminated(_, _)) => {
+                Err(Error::Terminated(..)) => {
                     match socket_type {
                         SocketType::File => self.flush_writer(),
                         _ => self.flush_encoder(),
                     }
                     break;
                 }
+                Err(Error::BatchTooLarge(_)) => unreachable!(),
             }
         }
     }

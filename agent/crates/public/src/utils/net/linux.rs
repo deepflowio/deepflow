@@ -16,8 +16,10 @@
 
 use std::{
     ffi::{CStr, CString},
+    fs,
     mem::MaybeUninit,
     net::{IpAddr, Ipv6Addr, SocketAddrV6},
+    path::{Path, PathBuf},
     time::Duration,
 };
 
@@ -527,6 +529,34 @@ pub fn get_route_src_ip_interface_name(dest_addr: &IpAddr) -> Result<String> {
         }
     }
     return Err(Error::LinkNotFound(dest_addr.to_string()));
+}
+
+fn read_u8_from_file<P: AsRef<Path>>(path: P) -> Option<u8> {
+    match fs::read_to_string(path.as_ref()) {
+        Ok(value) => value.trim().parse().ok(),
+        _ => None,
+    }
+}
+
+pub fn ipv6_enabled() -> bool {
+    match read_u8_from_file("/sys/module/ipv6/parameters/disable") {
+        Some(v) if v != 0 => false,
+        _ => true,
+    }
+}
+
+pub fn ipv6_enabled_for_link<S: AsRef<str>>(name: S) -> bool {
+    if !ipv6_enabled() {
+        return false;
+    }
+
+    let mut path = PathBuf::from("/proc/sys/net/ipv6/conf");
+    path.push(name.as_ref());
+    path.push("disable_ipv6");
+    match read_u8_from_file(&path) {
+        None => false, // file not found means no ipv6
+        Some(v) => v == 0,
+    }
 }
 
 #[cfg(test)]

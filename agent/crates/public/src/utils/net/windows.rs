@@ -553,3 +553,13 @@ unsafe fn count_len<T: Copy + PartialEq>(p: *const T, terminator: T) -> Option<u
         .into_iter()
         .find(|&len| *p.add(len) == terminator)
 }
+
+pub fn ipv6_enabled() -> bool {
+    // TODO: implement this
+    true
+}
+
+pub fn ipv6_enabled_for_link<S: AsRef<str>>(_: S) -> bool {
+    // TODO: implement this
+    true
+}

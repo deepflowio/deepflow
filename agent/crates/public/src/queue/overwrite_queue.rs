@@ -90,12 +90,9 @@ impl<T> OverwriteQueue<T> {
         if self.terminated.load(Ordering::Acquire) {
             return Err(Error::Terminated(None, None));
         }
-        assert!(
-            count <= self.size,
-            "message length {} larger than queue size {}",
-            count,
-            self.size
-        );
+        if count > self.size {
+            return Err(Error::BatchTooLarge(None));
+        }
         let _lock = self.writer_lock.lock().unwrap();
         let start = self.start.load(Ordering::Acquire);
         let raw_end = self.end.load(Ordering::Acquire);
@@ -320,6 +317,7 @@ impl<T> Sender<T> {
                     Ok(())
                 }
                 Err(Error::Terminated(..)) => Err(Error::Terminated(None, None)),
+                Err(Error::BatchTooLarge(_)) => Err(Error::BatchTooLarge(None)),
                 _ => unreachable!(),
             }
         }

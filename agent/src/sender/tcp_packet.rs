@@ -163,6 +163,7 @@ impl TcpPacketSender {
                         }
                         Err(Error::Terminated(..)) => break,
                         Err(Error::Timeout) => continue,
+                        Err(Error::BatchTooLarge(_)) => unreachable!(),
                     }
                 }
             })

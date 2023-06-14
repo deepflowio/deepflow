@@ -987,6 +987,7 @@ impl Collector {
                             get_timestamp(stash.context.ntp_diff.load(Ordering::Relaxed)).as_secs(),
                         ),
                         Err(Error::Terminated(..)) => break,
+                        Err(Error::BatchTooLarge(_)) => unreachable!(),
                     }
                 }
                 stash.flush_stats();
