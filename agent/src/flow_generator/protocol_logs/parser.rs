@@ -522,16 +522,25 @@ impl SessionQueue {
             Some(t) => t,
             None => return,
         };
-        let mut batch = Vec::new();
-        for map in time_window.drain(..) {
+        let mut batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
+        'outer: for map in time_window.drain(..) {
             self.counter
                 .cached
                 .fetch_sub(map.len() as u64, Ordering::Relaxed);
-            batch.reserve(map.len());
-            batch.extend(map.into_values().map(|item| BoxAppProtoLogsData(item)));
+            for item in map.into_values() {
+                if batch.len() >= QUEUE_BATCH_SIZE {
+                    if let Err(Error::Terminated(..)) = self.output_queue.send_all(&mut batch) {
+                        warn!("output queue terminated");
+                        batch.clear();
+                        break 'outer;
+                    }
+                }
+                batch.push(BoxAppProtoLogsData(item));
+            }
+        }
+        if !batch.is_empty() {
             if let Err(Error::Terminated(..)) = self.output_queue.send_all(&mut batch) {
                 warn!("output queue terminated");
-                break;
             }
         }
         self.time_window.replace(time_window);
@@ -663,6 +672,7 @@ impl SessionAggregator {
                             continue;
                         }
                         Err(Error::Terminated(..)) => break,
+                        Err(Error::BatchTooLarge(_)) => unreachable!(),
                     };
                 }
                 session_queue.clear();
