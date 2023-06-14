@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import (
 	"github.com/op/go-logging"
 	"gopkg.in/yaml.v2"
 
+	prometheus "github.com/deepflowio/deepflow/server/querier/app/prometheus/config"
 	profile "github.com/deepflowio/deepflow/server/querier/profile/config"
 )
 
@@ -37,17 +38,18 @@ type Config struct {
 }
 
 type QuerierConfig struct {
-	LogFile       string                `default:"/var/log/querier.log" yaml:"log-file"`
-	LogLevel      string                `default:"info" yaml:"log-level"`
-	ListenPort    int                   `default:"20416" yaml:"listen-port"`
-	Clickhouse    Clickhouse            `yaml:clickhouse`
-	Profile       profile.ProfileConfig `yaml:profile`
-	DeepflowApp   DeepflowApp           `yaml:"deepflow-app"`
-	Prometheus    Prometheus            `yaml:"prometheus"`
-	Language      string                `default:"en" yaml:"language"`
-	OtelEndpoint  string                `default:"http://${K8S_NODE_IP_FOR_DEEPFLOW}:38086/api/v1/otel/trace" yaml:"otel-endpoint"`
-	Limit         string                `default:"10000" yaml:"limit"`
-	TimeFillLimit int                   `default:"20" yaml:"time-fill-limit"`
+	LogFile                       string                `default:"/var/log/querier.log" yaml:"log-file"`
+	LogLevel                      string                `default:"info" yaml:"log-level"`
+	ListenPort                    int                   `default:"20416" yaml:"listen-port"`
+	Clickhouse                    Clickhouse            `yaml:clickhouse`
+	Profile                       profile.ProfileConfig `yaml:profile`
+	DeepflowApp                   DeepflowApp           `yaml:"deepflow-app"`
+	Prometheus                    prometheus.Prometheus `yaml:"prometheus"`
+	Language                      string                `default:"en" yaml:"language"`
+	OtelEndpoint                  string                `default:"http://${K8S_NODE_IP_FOR_DEEPFLOW}:38086/api/v1/otel/trace" yaml:"otel-endpoint"`
+	Limit                         string                `default:"10000" yaml:"limit"`
+	TimeFillLimit                 int                   `default:"20" yaml:"time-fill-limit"`
+	PrometheusCacheUpdateInterval int                   `default:"60" yaml:"prometheus-cache-update-interval"`
 }
 
 type DeepflowApp struct {
@@ -63,13 +65,6 @@ type Clickhouse struct {
 	Timeout        int    `default:"60" yaml:"timeout"`
 	ConnectTimeout int    `default:"2" yaml:"connect-timeout"`
 	MaxConnection  int    `default:"20" yaml:"max-connection"`
-}
-
-type Prometheus struct {
-	QPSLimit              int    `default:"100" yaml:"qps-limit"`
-	SeriesLimit           int    `default:"100" yaml:"series-limit"`
-	AutoTaggingPrefix     string `default:"df_" yaml:"auto-tagging-prefix"`
-	RequestQueryWithDebug bool   `default:"false" yaml:"request-query-with-debug"`
 }
 
 func (c *Config) expendEnv() {

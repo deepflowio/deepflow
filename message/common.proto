@@ -23,3 +23,8 @@ message KubernetesAPIInfo {
     optional string info = 2;
     optional bytes compressed_info = 3;
 }
+
+message PrometheusAPIInfo {
+    optional string type = 1;
+    optional bytes compressed_info = 2;
+}

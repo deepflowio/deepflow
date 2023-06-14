@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -111,7 +111,7 @@ impl PacketHandler {
                 {
                     return;
                 }
-                let payload_offset = packet.header_type.min_header_size()
+                let payload_offset = packet.header_type.min_packet_size()
                     + packet.l2_l3_opt_size as usize
                     + packet.l4_opt_size as usize;
                 let policy = packet.policy.as_ref().unwrap();

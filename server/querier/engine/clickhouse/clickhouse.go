@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import (
 	//"github.com/k0kubun/pp"
 	logging "github.com/op/go-logging"
 	"github.com/xwb1989/sqlparser"
+	"golang.org/x/exp/slices"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
@@ -331,6 +332,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 			}
 		}
 	}
+	outerWhereLeftSlice = append(outerWhereLeftSlice, outerWhereLeftAppendSlice...)
 	// GroupBy解析
 	if pStmt.GroupBy != nil {
 		for _, group := range pStmt.GroupBy {
@@ -345,7 +347,9 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 					continue
 				}
 				groupTag := sqlparser.String(colName)
-				innerGroupBySlice = append(innerGroupBySlice, groupTag)
+				if slices.Contains(outerWhereLeftSlice, groupTag) {
+					innerGroupBySlice = append(innerGroupBySlice, groupTag)
+				}
 			}
 			funcName, ok := group.(*sqlparser.FuncExpr)
 			if ok {
@@ -353,7 +357,9 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 					continue
 				}
 				groupTag := sqlparser.String(funcName)
-				innerGroupBySlice = append(innerGroupBySlice, groupTag)
+				if slices.Contains(outerWhereLeftSlice, groupTag) {
+					innerGroupBySlice = append(innerGroupBySlice, groupTag)
+				}
 			}
 		}
 	}
@@ -421,7 +427,6 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 	outerEngine.View = view.NewView(outerEngine.Model)
 	outerTransSql := outerEngine.ToSQLString()
 	outerSlice := []string{}
-	outerWhereLeftSlice = append(outerWhereLeftSlice, outerWhereLeftAppendSlice...)
 	outerWhereLeftSql := strings.Join(outerWhereLeftSlice, ",")
 	outerSql := ""
 	// No internal sql required when only star grouping
@@ -430,6 +435,12 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 			oldWhereSlice := strings.Split(outerTransSql, " PREWHERE ")
 			outerSlice = append(outerSlice, oldWhereSlice[0])
 			outerSlice = append(outerSlice, " PREWHERE ("+outerWhereLeftSql+") IN ("+innerTransSql+") AND ")
+			outerSlice = append(outerSlice, oldWhereSlice[1])
+			outerSql = strings.Join(outerSlice, "")
+		} else if strings.Contains(outerTransSql, " WHERE ") {
+			oldWhereSlice := strings.Split(outerTransSql, " WHERE ")
+			outerSlice = append(outerSlice, oldWhereSlice[0])
+			outerSlice = append(outerSlice, " WHERE ("+outerWhereLeftSql+") IN ("+innerTransSql+") AND ")
 			outerSlice = append(outerSlice, oldWhereSlice[1])
 			outerSql = strings.Join(outerSlice, "")
 		}
@@ -465,6 +476,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 	}
 	rst, err := chClient.DoQuery(params)
 	if err != nil {
+		log.Error(err)
 		return nil, debug.Get(), err
 	}
 	return rst, debug.Get(), err
@@ -581,12 +593,23 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 			// ext_metrics只有metrics表，使用virtual_table_name做过滤区分
 			if e.DB == "ext_metrics" {
 				table = "metrics"
+			} else if e.DB == chCommon.DB_NAME_PROMETHEUS {
+				whereStmt := Where{}
+				metricIDFilter, err := GetMetricIDFilter(e.DB, e.Table)
+				if err != nil {
+					return err
+				}
+				filter := view.Filters{Expr: metricIDFilter}
+				whereStmt.filter = &filter
+				e.Statements = append(e.Statements, &whereStmt)
+				table = "samples"
 			}
 			if e.DataSource != "" {
 				e.AddTable(fmt.Sprintf("%s.`%s.%s`", e.DB, table, e.DataSource))
 				interval, err := chCommon.GetDatasourceInterval(e.DB, e.Table, e.DataSource)
 				if err != nil {
 					log.Error(err)
+					return err
 				}
 				e.Model.Time.DatasourceInterval = interval
 			} else if e.DB == "deepflow_system" {
@@ -718,7 +741,7 @@ func (e *CHEngine) parseGroupBy(group sqlparser.Expr) error {
 		}
 		preAsGroup, ok := e.asTagMap[groupTag]
 		if !ok {
-			err := e.AddTag(groupTag, "")
+			_, err := e.AddTag(groupTag, "")
 			if err != nil {
 				return err
 			}
@@ -773,10 +796,11 @@ func (e *CHEngine) parseSelect(tag sqlparser.SelectExpr) error {
 
 func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 	as := chCommon.ParseAlias(item.As)
+	labelType := ""
 	if as != "" {
-		e.ColumnSchemas = append(e.ColumnSchemas, common.NewColumnSchema(as, strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", "")))
+		e.ColumnSchemas = append(e.ColumnSchemas, common.NewColumnSchema(as, strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", ""), labelType))
 	} else {
-		e.ColumnSchemas = append(e.ColumnSchemas, common.NewColumnSchema(strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", ""), ""))
+		e.ColumnSchemas = append(e.ColumnSchemas, common.NewColumnSchema(strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", ""), "", labelType))
 	}
 	//var args []string
 	switch expr := item.Expr.(type) {
@@ -790,9 +814,16 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 		e.Statements = append(e.Statements, binFunction)
 		return nil
 	case *sqlparser.ColName, *sqlparser.SQLVal:
-		err := e.AddTag(chCommon.ParseAlias(expr), as)
+		labelType, err := e.AddTag(chCommon.ParseAlias(expr), as)
 		if err != nil {
 			return err
+		}
+		if labelType != "" {
+			if as != "" {
+				e.ColumnSchemas[len(e.ColumnSchemas)-1] = common.NewColumnSchema(as, strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", ""), labelType)
+			} else {
+				e.ColumnSchemas[len(e.ColumnSchemas)-1] = common.NewColumnSchema(strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", ""), "", labelType)
+			}
 		}
 		return nil
 	// func(field/tag)
@@ -999,26 +1030,26 @@ func (e *CHEngine) AddTable(table string) {
 	e.Statements = append(e.Statements, stmt)
 }
 
-func (e *CHEngine) AddTag(tag string, alias string) error {
-	stmt, err := GetTagTranslator(tag, alias, e.DB, e.Table)
+func (e *CHEngine) AddTag(tag string, alias string) (string, error) {
+	stmt, labelType, err := GetTagTranslator(tag, alias, e.DB, e.Table)
 	if err != nil {
-		return err
+		return labelType, err
 	}
 	if stmt != nil {
 		e.Statements = append(e.Statements, stmt)
-		return nil
+		return labelType, nil
 	}
 	stmt, err = GetMetricsTag(tag, alias, e.DB, e.Table, e.Context)
 	if err != nil {
-		return err
+		return labelType, err
 	}
 	if stmt != nil {
 		e.Statements = append(e.Statements, stmt)
-		return nil
+		return labelType, nil
 	}
 	stmt = GetDefaultTag(tag, alias)
 	e.Statements = append(e.Statements, stmt)
-	return nil
+	return labelType, nil
 }
 
 func (e *CHEngine) SetLevelFlag(flag int) {

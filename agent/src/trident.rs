@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ use std::env;
 use std::fmt;
 use std::mem;
 use std::net::SocketAddr;
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::path::{Path, PathBuf};
 use std::process;
 use std::sync::{
@@ -42,6 +42,8 @@ use regex::Regex;
 use tokio::runtime::{Builder, Runtime};
 
 use crate::flow_generator::protocol_logs::SessionAggregator;
+#[cfg(target_os = "linux")]
+use crate::platform::prometheus::targets::TargetsWatcher;
 use crate::{
     collector::Collector,
     collector::{
@@ -78,11 +80,12 @@ use crate::{
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
     sender::{npb_sender::NpbArpTable, uniform_sender::UniformSenderThread},
     utils::{
-        cgroups::{is_kernel_available_for_cgroup, Cgroups},
+        cgroups::{is_kernel_available_for_cgroups, Cgroups},
         command::get_hostname,
         environment::{
             check, controller_ip_check, free_memory_check, free_space_checker, get_ctrl_ip_and_mac,
-            kernel_check, running_in_container, tap_interface_check, trident_process_check,
+            get_env, kernel_check, running_in_container, tap_interface_check,
+            trident_process_check,
         },
         guard::Guard,
         logger::{LogLevelWriter, LogWriterAdapter, RemoteLogConfig, RemoteLogWriter},
@@ -93,7 +96,10 @@ use crate::{
 #[cfg(target_os = "linux")]
 use crate::{
     ebpf_dispatcher::EbpfCollector,
-    platform::{ApiWatcher, LibvirtXmlExtractor, SocketSynchronizer},
+    platform::{
+        kubernetes::{GenericPoller, Poller},
+        ApiWatcher, LibvirtXmlExtractor, SocketSynchronizer,
+    },
     utils::{
         environment::{core_file_check, is_tt_pod, running_in_only_watch_k8s_mode},
         lru::Lru,
@@ -105,14 +111,14 @@ use pcap_assembler::{BoxedPcapBatch, PcapAssembler};
 
 use crate::common::proc_event::BoxedProcEvents;
 #[cfg(target_os = "linux")]
-use public::netns::{links_by_name_regex_in_netns, NetNs};
+use public::netns::{self, links_by_name_regex_in_netns};
 #[cfg(target_os = "windows")]
 use public::utils::net::link_by_name;
 use public::{
     debug::QueueDebugger,
     netns::NsFile,
     packet::MiniPacket,
-    proto::trident::{self, IfMacSource, SocketType, TapMode},
+    proto::trident::{self, Exception, IfMacSource, SocketType, TapMode},
     queue::{self, DebugSender},
     sender::SendMessageType,
     utils::net::{get_route_src_ip, links_by_name_regex, MacAddr},
@@ -309,7 +315,10 @@ impl Trident {
                 stats_collector,
                 config_path,
             ) {
-                warn!("deepflow-agent exited: {}", e);
+                warn!(
+                    "Launching deepflow-agent failed: {}, deepflow-agent restart...",
+                    e
+                );
                 process::exit(1);
             }
         }));
@@ -327,6 +336,7 @@ impl Trident {
         config_path: Option<PathBuf>,
     ) -> Result<()> {
         info!("==================== Launching DeepFlow-Agent ====================");
+        info!("Environment variables: {:?}", get_env());
 
         let (ctrl_ip, ctrl_mac) = get_ctrl_ip_and_mac(config.controller_ips[0].parse()?);
         if running_in_container() {
@@ -406,10 +416,10 @@ impl Trident {
         let mut is_cgroup_v2 = false;
         let mut cgroups_controller = None;
         if running_in_container() {
-            info!("don't initialize cgroup controller, because agent is running in container");
-        } else if !is_kernel_available_for_cgroup() {
-            // fixme: Linux after kernel version 2.6.24 can use cgroup
-            info!("don't initialize cgroup controller, because kernel version < 3 or agent is in Windows");
+            info!("don't initialize cgroups controller, because agent is running in container");
+        } else if !is_kernel_available_for_cgroups() {
+            // fixme: Linux after kernel version 2.6.24 can use cgroups
+            info!("don't initialize cgroups controller, because kernel version < 3 or agent is in Windows");
         } else {
             match Cgroups::new(process::id() as u64, config_handler.environment()) {
                 Ok(cg_controller) => {
@@ -419,12 +429,8 @@ impl Trident {
                     cgroups_controller = Some(cg_controller);
                 }
                 Err(e) => {
-                    warn!(
-                        "initialize cgroup controller failed, {:?}, agent restart...",
-                        e
-                    );
-                    thread::sleep(Duration::from_secs(1));
-                    process::exit(1);
+                    warn!("initialize cgroups controller failed: {}, resource utilization will be checked regularly to prevent resource usage from exceeding the limit.", e);
+                    exception_handler.set(Exception::CgroupsConfigError);
                 }
             }
         }
@@ -435,10 +441,13 @@ impl Trident {
             config_handler.environment(),
             log_dir.to_string(),
             config_handler.candidate_config.yaml_config.guard_interval,
-            config_handler.candidate_config.tap_mode,
             exception_handler.clone(),
             cgroup_mount_path,
             is_cgroup_v2,
+            config_handler
+                .candidate_config
+                .yaml_config
+                .memory_trim_disabled,
         );
         guard.start();
 
@@ -505,7 +514,7 @@ impl Trident {
                         libvirt_xml_extractor.stop();
                         if let Some(cg_controller) = cgroups_controller {
                             if let Err(e) = cg_controller.stop() {
-                                info!("stop cgroup controller failed, {:?}", e);
+                                info!("stop cgroups controller failed, {:?}", e);
                             }
                         }
                     }
@@ -541,7 +550,7 @@ impl Trident {
                     }
                     // EbpfCollector does not support recreation because it calls bpf_tracer_init, which can only be called once in a process
                     // Work around this problem by exiting and restart trident
-                    warn!("yaml_config updated, agent restart...");
+                    warn!("yaml_config updated, deepflow-agent restart...");
                     thread::sleep(Duration::from_secs(1));
                     process::exit(NORMAL_EXIT_WITH_RESTART);
                 }
@@ -551,6 +560,14 @@ impl Trident {
                 None => {
                     let callbacks =
                         config_handler.on_config(runtime_config, &exception_handler, None);
+
+                    config_handler.load_plugin(
+                        &runtime,
+                        &session,
+                        ctrl_ip.to_string().as_str(),
+                        ctrl_mac.to_string().as_str(),
+                    );
+
                     let mut comp = Components::new(
                         &version_info,
                         &config_handler,
@@ -566,6 +583,7 @@ impl Trident {
                         config_handler.static_config.agent_mode,
                         runtime.clone(),
                     )?;
+
                     comp.start();
 
                     if let Components::Agent(components) = &mut comp {
@@ -865,8 +883,10 @@ pub enum Components {
 #[cfg(target_os = "linux")]
 pub struct WatcherComponents {
     pub api_watcher: Arc<ApiWatcher>,
+    pub prometheus_targets_watcher: Arc<TargetsWatcher>,
     pub libvirt_xml_extractor: Arc<LibvirtXmlExtractor>, // FIXME: Delete this component
     pub platform_synchronizer: Arc<PlatformSynchronizer>,
+    pub kubernetes_poller: Arc<GenericPoller>,
     pub domain_name_listener: DomainNameListener,
     pub running: AtomicBool,
     tap_mode: TapMode,
@@ -901,11 +921,30 @@ impl WatcherComponents {
             config_handler.static_config.controller_domain_name.clone(),
             config_handler.static_config.controller_ips.clone(),
         );
+        let kubernetes_poller = Arc::new(GenericPoller::new(
+            config_handler.static_config.controller_ips[0].parse()?,
+            config_handler.platform(),
+            config_handler
+                .candidate_config
+                .dispatcher
+                .extra_netns_regex
+                .clone(),
+        ));
+        platform_synchronizer.set_kubernetes_poller(kubernetes_poller.clone());
+        let prometheus_targets_watcher = Arc::new(TargetsWatcher::new(
+            runtime.clone(),
+            config_handler.platform(),
+            session.clone(),
+            exception_handler.clone(),
+            stats_collector.clone(),
+        ));
 
         info!("With ONLY_WATCH_K8S_RESOURCE and IN_CONTAINER environment variables set, the agent will only watch K8s resource");
         Ok(WatcherComponents {
             api_watcher,
             platform_synchronizer,
+            kubernetes_poller,
+            prometheus_targets_watcher,
             domain_name_listener,
             libvirt_xml_extractor,
             running: AtomicBool::new(false),
@@ -923,8 +962,9 @@ impl WatcherComponents {
         if matches!(self.agent_mode, RunningMode::Managed) {
             self.api_watcher.start();
         }
-        self.platform_synchronizer.start_kubernetes_poller();
+        self.kubernetes_poller.start();
         self.domain_name_listener.start();
+        self.prometheus_targets_watcher.start();
         info!("Started watcher components.");
     }
 
@@ -933,7 +973,9 @@ impl WatcherComponents {
             return;
         }
         self.api_watcher.stop();
+        self.kubernetes_poller.stop();
         self.domain_name_listener.stop();
+        self.prometheus_targets_watcher.stop();
         info!("Stopped watcher components.")
     }
 }
@@ -941,7 +983,6 @@ impl WatcherComponents {
 pub struct AgentComponents {
     pub config: ModuleConfig,
     pub rx_leaky_bucket: Arc<LeakyBucket>,
-    pub l7_log_rate: Arc<LeakyBucket>,
     pub tap_typer: Arc<TapTyper>,
     pub cur_tap_types: Vec<trident::TapType>,
     pub dispatchers: Vec<Dispatcher>,
@@ -954,9 +995,13 @@ pub struct AgentComponents {
     pub stats_sender: UniformSenderThread<ArcBatch>,
     pub platform_synchronizer: Arc<PlatformSynchronizer>,
     #[cfg(target_os = "linux")]
+    pub kubernetes_poller: Arc<GenericPoller>,
+    #[cfg(target_os = "linux")]
     pub socket_synchronizer: SocketSynchronizer,
     #[cfg(target_os = "linux")]
     pub api_watcher: Arc<ApiWatcher>,
+    #[cfg(target_os = "linux")]
+    pub prometheus_targets_watcher: Arc<TargetsWatcher>,
     pub debugger: Debugger,
     #[cfg(target_os = "linux")]
     pub ebpf_collector: Option<Box<EbpfCollector>>,
@@ -1162,6 +1207,20 @@ impl AgentComponents {
             .process_threshold;
         let feature_flags = FeatureFlags::from(&yaml_config.feature_flags);
 
+        #[cfg(target_os = "linux")]
+        {
+            // require an update because platfrom_synchronizer starts before receiving config from server
+            let regex = &candidate_config.dispatcher.extra_netns_regex;
+            let regex = if regex != "" {
+                info!("platform monitoring extra netns: /{}/", regex);
+                Some(Regex::new(regex).unwrap())
+            } else {
+                info!("platform monitoring no extra netns");
+                None
+            };
+            platform_synchronizer.set_netns_regex(regex);
+        }
+
         let mut stats_sender = UniformSenderThread::new(
             "stats",
             stats_collector.get_receiver(),
@@ -1214,7 +1273,8 @@ impl AgentComponents {
             1.max(yaml_config.src_interfaces.len()),
             yaml_config.first_path_level as usize,
             yaml_config.fast_path_map_size,
-            false,
+            yaml_config.forward_capacity,
+            yaml_config.fast_path_disabled,
         );
         synchronizer.add_flow_acl_listener(Box::new(policy_setter));
         policy_setter.set_memory_limit(max_memory);
@@ -1223,7 +1283,29 @@ impl AgentComponents {
         // TODO: packet handler builders
 
         #[cfg(target_os = "linux")]
+        let kubernetes_poller = Arc::new(GenericPoller::new(
+            config_handler.static_config.controller_ips[0].parse()?,
+            config_handler.platform(),
+            config_handler
+                .candidate_config
+                .dispatcher
+                .extra_netns_regex
+                .clone(),
+        ));
+        #[cfg(target_os = "linux")]
+        platform_synchronizer.set_kubernetes_poller(kubernetes_poller.clone());
+
+        #[cfg(target_os = "linux")]
         let api_watcher = Arc::new(ApiWatcher::new(
+            runtime.clone(),
+            config_handler.platform(),
+            session.clone(),
+            exception_handler.clone(),
+            stats_collector.clone(),
+        ));
+
+        #[cfg(target_os = "linux")]
+        let prometheus_targets_watcher = Arc::new(TargetsWatcher::new(
             runtime.clone(),
             config_handler.platform(),
             session.clone(),
@@ -1236,7 +1318,7 @@ impl AgentComponents {
             #[cfg(target_os = "linux")]
             api_watcher: api_watcher.clone(),
             #[cfg(target_os = "linux")]
-            poller: platform_synchronizer.clone_poller(),
+            poller: kubernetes_poller.clone(),
             session: session.clone(),
             static_config: synchronizer.static_config.clone(),
             running_config: synchronizer.running_config.clone(),
@@ -1318,7 +1400,7 @@ impl AgentComponents {
 
         // Sender/Collector
         info!(
-            "static analyzer ip: {} actual analyzer ip {}",
+            "static analyzer ip: '{}' actual analyzer ip '{}'",
             yaml_config.analyzer_ip, candidate_config.sender.dest_ip
         );
         let l4_flow_aggr_queue_name = "3-flowlog-to-collector-sender";
@@ -1407,8 +1489,12 @@ impl AgentComponents {
         let source_ip = match get_route_src_ip(&analyzer_ip) {
             Ok(ip) => ip,
             Err(e) => {
-                warn!("get route to {} failed: {:?}", &analyzer_ip, e);
-                Ipv4Addr::UNSPECIFIED.into()
+                warn!("get route to '{}' failed: {:?}", &analyzer_ip, e);
+                if ctrl_ip.is_ipv6() {
+                    Ipv6Addr::UNSPECIFIED.into()
+                } else {
+                    Ipv4Addr::UNSPECIFIED.into()
+                }
             }
         };
         let bpf_builder = bpf::Builder {
@@ -1425,10 +1511,6 @@ impl AgentComponents {
         let bpf_syntax = bpf_builder.build_pcap_syntax();
         #[cfg(target_os = "windows")]
         let bpf_syntax_str = bpf_builder.build_pcap_syntax_to_str();
-
-        let l7_log_rate = Arc::new(LeakyBucket::new(Some(
-            candidate_config.log_parser.l7_log_collect_nps_threshold,
-        )));
 
         // Enterprise Edition Feature: packet-sequence
         let packet_sequence_queue_name = "2-packet-sequence-block-to-sender";
@@ -1483,7 +1565,7 @@ impl AgentComponents {
         #[cfg(target_os = "linux")]
         if candidate_config.dispatcher.extra_netns_regex != "" {
             let re = Regex::new(&candidate_config.dispatcher.extra_netns_regex).unwrap();
-            let mut nss = NetNs::find_ns_files_by_regex(&re);
+            let mut nss = netns::find_ns_files_by_regex(&re);
             nss.sort_unstable();
             for ns in nss {
                 src_interfaces_and_namespaces.push(("".into(), ns));
@@ -1494,7 +1576,7 @@ impl AgentComponents {
         let pcap_batch_queue = "2-pcap-batch-to-sender";
         let (pcap_batch_sender, pcap_batch_receiver, pcap_batch_counter) =
             queue::bounded_with_debug(
-                yaml_config.packet_sequence_queue_size,
+                yaml_config.pcap.queue_size as usize,
                 pcap_batch_queue,
                 &queue_debugger,
             );
@@ -1547,7 +1629,6 @@ impl AgentComponents {
                 proto_log_sender.clone(),
                 i as u32,
                 config_handler.log_parser(),
-                l7_log_rate.clone(),
             );
             stats_collector.register_countable(
                 "l7_session_aggr",
@@ -1679,14 +1760,28 @@ impl AgentComponents {
                 .src_interface(src_interface.clone())
                 .netns(netns)
                 .trident_type(candidate_config.dispatcher.trident_type)
-                .queue_debugger(queue_debugger.clone());
+                .queue_debugger(queue_debugger.clone())
+                .analyzer_queue_size(yaml_config.analyzer_queue_size as usize)
+                .analyzer_raw_packet_block_size(
+                    yaml_config.analyzer_raw_packet_block_size as usize,
+                );
 
             #[cfg(target_os = "linux")]
-            let dispatcher = dispatcher_builder
+            let dispatcher = match dispatcher_builder
                 .libvirt_xml_extractor(libvirt_xml_extractor.clone())
-                .platform_poller(platform_synchronizer.clone_poller())
+                .platform_poller(kubernetes_poller.clone())
                 .build()
-                .unwrap();
+            {
+                Ok(d) => d,
+                Err(e) => {
+                    warn!(
+                        "dispatcher creation failed: {}, deepflow-agent restart...",
+                        e
+                    );
+                    thread::sleep(Duration::from_secs(1));
+                    process::exit(1);
+                }
+            };
             #[cfg(target_os = "windows")]
             let pcap_interfaces = if candidate_config.tap_mode == TapMode::Local {
                 tap_interfaces.clone()
@@ -1700,10 +1795,17 @@ impl AgentComponents {
                 }
             };
             #[cfg(target_os = "windows")]
-            let dispatcher = dispatcher_builder
-                .pcap_interfaces(pcap_interfaces)
-                .build()
-                .unwrap();
+            let dispatcher = match dispatcher_builder.pcap_interfaces(pcap_interfaces).build() {
+                Ok(d) => d,
+                Err(e) => {
+                    warn!(
+                        "dispatcher creation failed: {}, deepflow-agent restart...",
+                        e
+                    );
+                    thread::sleep(Duration::from_secs(1));
+                    process::exit(1);
+                }
+            };
 
             let mut dispatcher_listener = dispatcher.listener();
             dispatcher_listener.on_config_change(&candidate_config.dispatcher);
@@ -1807,7 +1909,6 @@ impl AgentComponents {
                 proto_log_sender.clone(),
                 ebpf_dispatcher_id as u32,
                 config_handler.log_parser(),
-                l7_log_rate.clone(),
             );
             stats_collector.register_countable(
                 "l7_session_aggr",
@@ -2028,7 +2129,6 @@ impl AgentComponents {
         Ok(AgentComponents {
             config: candidate_config.clone(),
             rx_leaky_bucket,
-            l7_log_rate,
             tap_typer,
             cur_tap_types: vec![],
             dispatchers,
@@ -2040,9 +2140,13 @@ impl AgentComponents {
             stats_sender,
             platform_synchronizer,
             #[cfg(target_os = "linux")]
+            kubernetes_poller,
+            #[cfg(target_os = "linux")]
             socket_synchronizer,
             #[cfg(target_os = "linux")]
             api_watcher,
+            #[cfg(target_os = "linux")]
+            prometheus_targets_watcher,
             debugger,
             session_aggrs,
             #[cfg(target_os = "linux")]
@@ -2083,10 +2187,11 @@ impl AgentComponents {
         #[cfg(target_os = "linux")]
         {
             if is_tt_pod(self.config.trident_type) {
-                self.platform_synchronizer.start_kubernetes_poller();
+                self.kubernetes_poller.start();
             }
             if matches!(self.agent_mode, RunningMode::Managed) && running_in_container() {
                 self.api_watcher.start();
+                self.prometheus_targets_watcher.start();
             }
             self.socket_synchronizer.start();
         }
@@ -2105,7 +2210,7 @@ impl AgentComponents {
         // in the environment where cgroup is not supported, we need to check free memory
         if self.tap_mode != TapMode::Analyzer
             && !running_in_container()
-            && !is_kernel_available_for_cgroup()
+            && !is_kernel_available_for_cgroups()
         {
             match free_memory_check(self.max_memory, &self.exception_handler) {
                 Ok(()) => {
@@ -2174,11 +2279,12 @@ impl AgentComponents {
 
         #[cfg(target_os = "linux")]
         {
-            self.platform_synchronizer.stop_kubernetes_poller();
+            self.kubernetes_poller.stop();
             self.socket_synchronizer.stop();
             if let Some(h) = self.api_watcher.notify_stop() {
                 join_handles.push(h);
             }
+            self.prometheus_targets_watcher.stop();
         }
 
         for q in self.collectors.iter_mut() {

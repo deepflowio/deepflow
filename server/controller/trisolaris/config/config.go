@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,6 +51,7 @@ type Config struct {
 	NodeRefreshInterval            int  `default:"60" yaml:"node-refresh-interval"`
 	GPIDRefreshInterval            int  `default:"9" yaml:"gpid-refresh-interval"`
 	VTapAutoRegister               bool `default:"true" yaml:"vtap-auto-register"`
+	DomainAutoRegister             bool `default:"true" yaml:"domain-auto-register"`
 	DefaultTapMode                 int  `yaml:"default-tap-mode"`
 	BillingMethod                  string
 	GrpcPort                       int

@@ -8,9 +8,11 @@ import "common.proto";
 service Controller {
     rpc GenesisSharingK8S (GenesisSharingK8SRequest) returns (GenesisSharingK8SResponse) {}
     rpc GenesisSharingSync (GenesisSharingSyncRequest) returns (GenesisSharingSyncResponse) {}
+    rpc GenesisSharingPrometheus (GenesisSharingPrometheusRequest) returns (GenesisSharingPrometheusResponse) {}
     rpc GetEncryptKey (EncryptKeyRequest) returns (EncryptKeyResponse) {}
     rpc GetResourceID (GetResourceIDRequest) returns (GetResourceIDResponse) {}
     rpc ReleaseResourceID (ReleaseResourceIDRequest) returns (ReleaseResourceIDResponse) {}
+    rpc SyncPrometheus (SyncPrometheusRequest) returns (SyncPrometheusResponse) {}
 }
 
 message GenesisSharingK8SRequest {
@@ -21,6 +23,16 @@ message GenesisSharingK8SResponse {
     optional string epoch = 1;
     optional string error_msg = 2;
     repeated common.KubernetesAPIInfo entries = 3;
+}
+
+message GenesisSharingPrometheusRequest {
+    optional string cluster_id = 1;
+}
+
+message GenesisSharingPrometheusResponse {
+    optional string epoch = 1;
+    optional string error_msg = 2;
+    optional bytes entries = 3;
 }
 
 message GenesisSyncIP {
@@ -111,6 +123,7 @@ message GenesisSyncVinterface {
     optional string kubernetes_cluster_id = 12;
     optional string node_ip = 13;
     optional string last_seen = 14;
+    optional uint32 netns_id = 15;
 }
 
 message GenesisSyncProcess {
@@ -124,6 +137,8 @@ message GenesisSyncProcess {
     optional string os_app_tags = 8;
     optional string node_ip = 9;
     optional string start_time = 10;
+    optional uint32 netns_id = 11;
+    optional string container_id = 12;
 }
 
 message GenesisSyncData{
@@ -169,4 +184,94 @@ message ReleaseResourceIDRequest {
 }
 
 message ReleaseResourceIDResponse {
+}
+
+message PrometheusMetricName {
+    required uint32 id = 1;
+    required string name = 2;
+}
+
+message PrometheusLabelName {
+    required uint32 id = 1;
+    required string name = 2;
+}
+
+message PrometheusLabelValue {
+    required uint32 id = 1;
+    required string value = 2;
+}
+
+message PrometheusMetricLabelRequest {
+    required string metric_name = 1;
+    repeated PrometheusLabelRequest labels = 2;
+}
+
+message PrometheusMetricAPPLabelLayout {
+    required string metric_name = 1;
+    required string app_label_name = 2;
+    required uint32 app_label_column_index = 3;
+}
+
+message PrometheusMetricAPPLabelLayoutRequest {
+    required string metric_name = 1;
+    required string app_label_name = 2;
+}
+
+message PrometheusLabelRequest {
+    required string name = 1;
+    required string value = 2;
+}
+
+message PrometheusMetricTarget {
+    required string metric_name = 1;
+    required uint32 target_id = 2;
+}
+
+message PrometheusLabel {
+    required uint32 id = 1;
+    required string name = 2;
+    required string value = 3;
+}
+
+message SyncPrometheusRequest {
+    repeated string metric_names = 1;
+    repeated string label_names = 2;
+    repeated string label_values = 3;
+    repeated PrometheusMetricAPPLabelLayoutRequest metric_app_label_layouts = 4;
+    repeated PrometheusLabelRequest labels = 5;
+    repeated PrometheusMetricLabelRequest metric_labels = 6;
+    repeated PrometheusMetricTarget metric_targets = 7;
+}
+
+message SyncPrometheusResponse {
+    optional string error_msg = 1;
+    repeated PrometheusMetricName metric_names = 2;
+    repeated PrometheusLabelName label_names = 3;
+    repeated PrometheusLabelValue label_values = 4;
+    repeated PrometheusMetricAPPLabelLayout metric_app_label_layouts = 5;
+    repeated PrometheusLabel labels = 6;
+}
+
+service PrometheusDebug {
+    rpc DebugPrometheusCache (PrometheusCacheRequest) returns (PrometheusCacheResponse) {}
+}
+
+enum PrometheusCacheType {
+    ALL = 0;
+    METRIC_NAME = 1;
+    LABEL_NAME = 2;
+    LABEL_VALUE = 3;
+    METRIC_AND_APP_LABEL_LAYOUT = 4;
+    TARGET = 5;
+    LABEL = 6;
+    METRIC_LABEL = 7;
+    METRIC_TARGET = 8;
+}
+
+message PrometheusCacheRequest {
+    optional PrometheusCacheType type = 1;
+}
+
+message PrometheusCacheResponse {
+    optional bytes content = 1;     // json data
 }

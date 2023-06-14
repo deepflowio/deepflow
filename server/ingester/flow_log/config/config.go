@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,12 +46,15 @@ type FlowLogTTL struct {
 }
 
 type ExporterConfig struct {
-	Enabled         bool     `yaml:"enabled"`
-	Addr            string   `yaml:"addr"`
-	QueueCount      int      `yaml:"queue-count"`
-	QueueSize       int      `yaml:"queue-size"`
-	ExportDatas     []string `yaml:"export-datas"`
-	ExportDataTypes []string `yaml:"export-data-types"`
+	Enabled                     bool              `yaml:"enabled"`
+	Addr                        string            `yaml:"addr"`
+	QueueCount                  int               `yaml:"queue-count"`
+	QueueSize                   int               `yaml:"queue-size"`
+	ExportDatas                 []string          `yaml:"export-datas"`
+	ExportDataTypes             []string          `yaml:"export-data-types"`
+	ExportCustomK8sLabelsRegexp string            `yaml:"export-custom-k8s-labels-regexp"`
+	ExportOnlyWithTraceID       bool              `yaml:"export-only-with-traceid"`
+	GrpcHeaders                 map[string]string `yaml:"grpc-headers"`
 }
 
 type Config struct {
@@ -113,6 +116,9 @@ func Load(base *config.Config, path string) *Config {
 				100000,
 				DefaultOtlpExportDatas,
 				DefaultOtlpExportDataTypes,
+				"",
+				false,
+				nil,
 			},
 		},
 	}

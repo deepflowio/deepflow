@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ use npb_pcap_policy::PolicyData;
 
 #[derive(Debug, Default, Clone)]
 pub struct Tag {
-    pub policy_data: [Arc<PolicyData>; 2],
+    pub policy_data: [Option<Arc<PolicyData>>; 2],
 }
 
 impl Tag {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,7 +58,6 @@ pub struct RedisInfo {
         skip_serializing_if = "value_is_default",
         serialize_with = "vec_u8_to_string"
     )]
-    pub response: Vec<u8>, // 整数回复 + 批量回复 + 多条批量回复
     #[serde(skip)]
     pub status: Vec<u8>, // '+'
     #[serde(
@@ -107,7 +106,6 @@ where
 
 impl RedisInfo {
     pub fn merge(&mut self, other: Self) -> Result<()> {
-        self.response = other.response;
         self.status = other.status;
         self.error = other.error;
         self.resp_status = other.resp_status;
@@ -126,11 +124,6 @@ impl fmt::Display for RedisInfo {
             f,
             "request_type: {:?}, ",
             str::from_utf8(&self.request_type).unwrap_or_default()
-        )?;
-        write!(
-            f,
-            "response: {:?}, ",
-            str::from_utf8(&self.response).unwrap_or_default()
         )?;
         write!(
             f,
@@ -156,7 +149,6 @@ impl From<RedisInfo> for L7ProtocolSendLog {
             resp: L7Response {
                 status: f.resp_status,
                 exception: String::from_utf8_lossy(f.error.as_slice()).to_string(),
-                result: String::from_utf8_lossy(f.response.as_slice()).to_string(),
                 ..Default::default()
             },
             ..Default::default()
@@ -193,7 +185,7 @@ impl L7ProtocolParserInterface for RedisLog {
             self.perf_stats = Some(L7PerfStats::default())
         };
         self.parse(payload, param.l4_protocol, param.direction)?;
-        self.info.cal_rrt(param).map(|rrt| {
+        self.info.cal_rrt(param, None).map(|rrt| {
             self.info.rrt = rrt;
             self.perf_stats.as_mut().unwrap().update_rrt(rrt);
         });
@@ -248,8 +240,7 @@ impl RedisLog {
                 self.info.resp_status = L7ResponseStatus::ServerError;
                 self.perf_stats.as_mut().unwrap().inc_resp_err();
             }
-            b'-' if !error_response => self.info.response = context,
-            _ => self.info.response = context,
+            _ => {}
         }
     }
 
@@ -469,7 +460,6 @@ mod tests {
             let is_redis = redis.check_payload(payload, param);
 
             let _ = redis.parse_payload(payload, param);
-            println!("{:?}", redis.info);
             output.push_str(&format!("{} is_redis: {}\r\n", redis.info, is_redis));
         }
         output

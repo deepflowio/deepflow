@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -248,15 +248,21 @@ impl Default for SofaRpcLog {
 }
 
 impl L7ProtocolParserInterface for SofaRpcLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
-        self.parsed = self.parse_with_strict(payload, param, true).is_ok()
+    fn check_payload(&mut self, payload: &[u8], _: &ParseParam) -> bool {
+        self.parsed = self.parse_with_strict(payload, true).is_ok()
             && self.info.msg_type == LogMessageType::Request
             && self.info.cmd_code != CMD_CODE_HEARTBEAT;
         self.parsed
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
-        self.parse_with_strict(payload, param, false)
+        match self.parse_with_strict(payload, false) {
+            Ok(ret) => {
+                self.cal_perf(param);
+                Ok(ret)
+            }
+            Err(e) => Err(e),
+        }
     }
 
     fn protocol(&self) -> L7Protocol {
@@ -281,7 +287,6 @@ impl SofaRpcLog {
     fn parse_with_strict(
         &mut self,
         mut payload: &[u8],
-        param: &ParseParam,
         strict: bool,
     ) -> Result<Vec<L7ProtocolInfo>> {
         if self.parsed {
@@ -320,21 +325,14 @@ impl SofaRpcLog {
                 self.info.resp_len =
                     hdr.content_len + (hdr.hdr_len as u32) + (hdr.class_len as u32);
                 if self.info.resp_code == 8 {
-                    self.perf_stats.as_mut().unwrap().inc_req_err();
                     self.info.status = L7ResponseStatus::ClientError;
                 } else if self.info.resp_code != 0 {
-                    self.perf_stats.as_mut().unwrap().inc_resp_err();
                     self.info.status = L7ResponseStatus::ServerError;
                 }
                 LogMessageType::Response
             }
             _ => return Err(Error::L7ProtocolUnknown),
         };
-        match self.info.msg_type {
-            LogMessageType::Request => self.perf_stats.as_mut().unwrap().inc_req(),
-            LogMessageType::Response => self.perf_stats.as_mut().unwrap().inc_resp(),
-            _ => {}
-        }
 
         if hdr.class_len as usize > payload.len() {
             return if strict {
@@ -370,10 +368,6 @@ impl SofaRpcLog {
                 self.fill_with_trace_ctx(sofa_hdr.new_rpc_trace_context);
             }
         }
-        self.info.cal_rrt(param).map(|rrt| {
-            self.info.rrt = rrt;
-            self.perf_stats.as_mut().unwrap().update_rrt(rrt);
-        });
         Ok(vec![L7ProtocolInfo::SofaRpcInfo(self.info.clone())])
     }
 
@@ -388,6 +382,25 @@ impl SofaRpcLog {
         if !ctx.parent_span_id.is_empty() {
             self.info.parent_span_id = ctx.parent_span_id;
         }
+    }
+
+    fn cal_perf(&mut self, param: &ParseParam) {
+        match self.info.msg_type {
+            LogMessageType::Request => self.perf_stats.as_mut().unwrap().inc_req(),
+            LogMessageType::Response => self.perf_stats.as_mut().unwrap().inc_resp(),
+            _ => {}
+        }
+
+        match self.info.status {
+            L7ResponseStatus::ClientError => self.perf_stats.as_mut().unwrap().inc_req_err(),
+            L7ResponseStatus::ServerError => self.perf_stats.as_mut().unwrap().inc_resp_err(),
+            _ => {}
+        }
+
+        self.info.cal_rrt(param, None).map(|rrt| {
+            self.info.rrt = rrt;
+            self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+        });
     }
 }
 

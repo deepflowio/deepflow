@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@
 use std::cmp::max;
 use std::net::IpAddr;
 use std::sync::{Arc, RwLock};
+use std::thread;
+use std::time::Duration;
 
 use ipnet::{IpNet, Ipv4Net};
 use log::{info, warn};
@@ -192,9 +194,10 @@ impl FastPath {
             }
             _ => {
                 warn!(
-                    "LookupKey({}) is invalid: ip address version is inconsistent.\n",
+                    "LookupKey({}) is invalid: ip address version is inconsistent, deepflow-agent restart...\n",
                     key
                 );
+                thread::sleep(Duration::from_secs(1));
                 std::process::exit(-1);
             }
         }

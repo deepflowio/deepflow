@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -89,8 +89,11 @@ impl AppTable {
     }
 
     fn get_ip_epc_port(packet: &MetaPacket, forward: bool) -> (IpAddr, i32, u16) {
-        let (src_epc, dst_epc) = if let Some(endponints) = packet.endpoint_data.as_ref() {
-            (endponints.src_info.l3_epc_id, endponints.dst_info.l3_epc_id)
+        let (src_epc, dst_epc) = if let Some(endpoints) = packet.endpoint_data.as_ref() {
+            (
+                endpoints.src_info().l3_epc_id,
+                endpoints.dst_info().l3_epc_id,
+            )
         } else {
             (0, 0)
         };
@@ -132,7 +135,7 @@ impl AppTable {
             {
                 return None;
             } else {
-                return Some(v.l7_protocol_enum);
+                return Some(v.l7_protocol_enum.clone());
             }
         }
         None
@@ -161,7 +164,7 @@ impl AppTable {
             {
                 return None;
             } else {
-                return Some(v.l7_protocol_enum);
+                return Some(v.l7_protocol_enum.clone());
             }
         }
         None
@@ -204,7 +207,8 @@ impl AppTable {
             IpAddr::V4(i) => self.get_ipv4_protocol(time_in_sec, i, epc, dport, pid),
             IpAddr::V6(i) => self.get_ipv6_protocol(time_in_sec, i, epc, dport, pid),
         };
-        if dst_protocol.is_some() && dst_protocol.unwrap().get_l7_protocol() != L7Protocol::Unknown
+        if dst_protocol.is_some()
+            && dst_protocol.as_ref().unwrap().get_l7_protocol() != L7Protocol::Unknown
         {
             return Some((dst_protocol.unwrap(), dport));
         }
@@ -224,7 +228,8 @@ impl AppTable {
             IpAddr::V4(i) => self.get_ipv4_protocol(time_in_sec, i, epc, sport, pid),
             IpAddr::V6(i) => self.get_ipv6_protocol(time_in_sec, i, epc, sport, pid),
         };
-        if src_protocol.is_some() && src_protocol.unwrap().get_l7_protocol() != L7Protocol::Unknown
+        if src_protocol.is_some()
+            && src_protocol.as_ref().unwrap().get_l7_protocol() != L7Protocol::Unknown
         {
             return Some((src_protocol.unwrap(), sport));
         }
@@ -310,10 +315,14 @@ impl AppTable {
 
     // set protocol to app_table from non ebpf packet
     pub fn set_protocol(&mut self, packet: &MetaPacket, protocol: L7ProtocolEnum) -> bool {
-        let (ip, epc, port) = Self::get_ip_epc_port(
+        let (mut ip, epc, mut port) = Self::get_ip_epc_port(
             packet,
             packet.lookup_key.direction == PacketDirection::ClientToServer,
         );
+
+        if protocol.get_l7_protocol() == L7Protocol::Redis {
+            (ip, port) = packet.get_redis_server_addr();
+        }
         let time_in_sec = packet.lookup_key.timestamp.as_secs();
         match ip {
             IpAddr::V4(i) => self.set_ipv4_protocol(time_in_sec, i, epc, port, protocol, 0),

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -286,14 +286,16 @@ func (v *VTapInfo) loadDeviceData() {
 			if ok == false {
 				continue
 			}
-			vifs.Each(func(vif interface{}) bool {
+			vpcID := 0
+			for vif := range vifs.Iter() {
 				hVif := vif.(*models.VInterface)
 				if network, ok := idToNetwork[hVif.NetworkID]; ok {
-					hostIDToVPCID[hostDevice.ID] = network.VPCID
-					return true
+					if vpcID < network.VPCID {
+						vpcID = network.VPCID
+					}
 				}
-				return false
-			})
+			}
+			hostIDToVPCID[hostDevice.ID] = vpcID
 		}
 	}
 	vms := dbDataCache.GetVms()
@@ -1087,10 +1089,12 @@ func (v *VTapInfo) putChRegisterFisnish() {
 
 func (v *VTapInfo) StartRegister() {
 	if v.loadRegion() == "" {
+		log.Error("controller not found region")
 		return
 	}
 	if v.getDefaultVTapGroup() == "" {
 		if v.loadDefaultVTapGroup() == "" {
+			log.Error("controller not found default vtap group")
 			return
 		}
 	}

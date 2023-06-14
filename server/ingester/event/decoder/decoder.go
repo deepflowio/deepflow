@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -242,7 +242,6 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 			strings.Join(event.AttributeIPs, SEPARATOR))
 
 	}
-	eventStore.AutoInstanceID, eventStore.AutoInstanceType = getAutoInstance(event.InstanceID, event.InstanceType, event.GProcessID)
 
 	if event.IfNeedTagged {
 		eventStore.Tagged = 1
@@ -280,9 +279,9 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 
 	}
 	eventStore.SubnetID = uint16(event.SubnetID)
+	eventStore.IsIPv4 = true
 	if ip := net.ParseIP(event.IP); ip != nil {
 		if ip4 := ip.To4(); ip4 != nil {
-			eventStore.IsIPv4 = true
 			eventStore.IP4 = utils.IpToUint32(ip4)
 		} else {
 			eventStore.IsIPv4 = false
@@ -298,6 +297,14 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 			eventStore.L3DeviceType,
 			eventStore.L3EpcID,
 		)
+	// if resource information is not matched, it will be filled with event(InstanceID, InstanceType, GProcessID) information
+	if eventStore.AutoInstanceID == 0 {
+		eventStore.AutoInstanceID, eventStore.AutoInstanceType = getAutoInstance(event.InstanceID, event.InstanceType, event.GProcessID)
+	}
+
+	if event.InstanceType == uint32(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) {
+		eventStore.ServiceID = event.InstanceID
+	}
 	eventStore.AutoServiceID, eventStore.AutoServiceType =
 		ingestercommon.GetAutoService(
 			eventStore.ServiceID,
@@ -308,9 +315,6 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 			eventStore.L3DeviceType,
 			eventStore.L3EpcID,
 		)
-	if event.InstanceType == uint32(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) {
-		eventStore.ServiceID = event.InstanceID
-	}
 
 	d.eventWriter.Write(eventStore)
 }

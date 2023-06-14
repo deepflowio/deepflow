@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -171,7 +171,7 @@ mod tests {
         let mut flow_perf_stats = FlowPerfStats::default();
         flow_perf_stats.l4_protocol = L4Protocol::Tcp;
         flow_perf_stats.tcp.rtt = 10;
-        tflow.flow.flow_perf_stats = Some(Box::new(flow_perf_stats));
+        tflow.flow.flow_perf_stats = Some(flow_perf_stats);
         tflow.flow.is_active_service = true;
 
         let mut buf: Vec<u8> = vec![];

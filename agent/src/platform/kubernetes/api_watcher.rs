@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -709,6 +709,8 @@ impl ApiWatcher {
         let watcher_config = WatcherConfig {
             list_limit: config.kubernetes_api_list_limit,
             list_interval: config.kubernetes_api_list_interval,
+            max_memory: config.max_memory,
+            memory_trim_percent: config.kubernetes_api_memory_trim_percent,
         };
 
         let (resource_watchers, task_handles) = loop {

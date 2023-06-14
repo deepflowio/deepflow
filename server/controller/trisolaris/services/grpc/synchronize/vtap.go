@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -137,6 +137,7 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 		LogFileSize:                   proto.Uint32(uint32(vtapConfig.LogFileSize)),
 		ExternalAgentHttpProxyEnabled: proto.Bool(Int2Bool(vtapConfig.ExternalAgentHTTPProxyEnabled)),
 		ExternalAgentHttpProxyPort:    proto.Uint32(uint32(vtapConfig.ExternalAgentHTTPProxyPort)),
+		PrometheusHttpApiAddress:      proto.String(vtapConfig.PrometheusHttpAPIAddress),
 		AnalyzerPort:                  proto.Uint32(uint32(vtapConfig.AnalyzerPort)),
 		ProxyControllerPort:           proto.Uint32(uint32(vtapConfig.ProxyControllerPort)),
 		// 调整后采集器配置信息
@@ -146,6 +147,7 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 		Enabled:           proto.Bool(Int2Bool(c.GetVTapEnabled())),
 		Host:              proto.String(c.GetVTapHost()),
 		ProxyControllerIp: proto.String(c.GetControllerIP()),
+		AnalyzerIp:        proto.String(c.GetTSDBIP()),
 		VtapId:            &vtapID,
 		TridentType:       &tridentType,
 		EpcId:             &vpcID,
@@ -161,38 +163,37 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 		configure.AnalyzerIp = &configTSDBIP
 		configure.AnalyzerPort = proto.Uint32(uint32(DefaultAnalyzerPort))
 	} else if cacheTSBIP != "" {
-		if vtapConfig.NatIPEnabled == 0 {
-			if isPodVTap(c.GetVTapType()) && gVTapInfo.IsTheSameCluster(clusterID) {
-				podIP := trisolaris.GetGNodeInfo().GetTSDBPodIP(cacheTSBIP)
-				configure.AnalyzerIp = &podIP
-				configure.AnalyzerPort = proto.Uint32(uint32(trisolaris.GetIngesterPort()))
-			} else {
-				configure.AnalyzerIp = &cacheTSBIP
-				configure.AnalyzerPort = proto.Uint32(uint32(DefaultAnalyzerPort))
-			}
-		} else {
-			natIP := trisolaris.GetGNodeInfo().GetTSDBNatIP(cacheTSBIP)
-			configure.AnalyzerIp = &natIP
-			configure.AnalyzerPort = proto.Uint32(uint32(DefaultAnalyzerPort))
-		}
+		configure.AnalyzerIp = &cacheTSBIP
+		configure.AnalyzerPort = proto.Uint32(uint32(DefaultAnalyzerPort))
+	}
+
+	if vtapConfig.NatIPEnabled == 1 {
+		configure.ProxyControllerIp = proto.String(trisolaris.GetGNodeInfo().GetControllerNatIP(c.GetControllerIP()))
+		configure.ProxyControllerPort = proto.Uint32(uint32(DefaultProxyControllerPort))
+
+		configure.AnalyzerIp = proto.String(trisolaris.GetGNodeInfo().GetTSDBNatIP(c.GetTSDBIP()))
+		configure.AnalyzerPort = proto.Uint32(uint32(DefaultAnalyzerPort))
 	}
 
 	if vtapConfig.ProxyControllerIP != "" {
 		configure.ProxyControllerIp = proto.String(vtapConfig.ProxyControllerIP)
-		configure.ProxyControllerPort = proto.Uint32(uint32(vtapConfig.ProxyControllerPort))
-	} else {
-		if vtapConfig.NatIPEnabled == 1 {
-			configure.ProxyControllerIp = proto.String(trisolaris.GetGNodeInfo().GetControllerNatIP(c.GetControllerIP()))
-			configure.ProxyControllerPort = proto.Uint32(uint32(DefaultProxyControllerPort))
-		} else if isPodVTap(c.GetVTapType()) && gVTapInfo.IsTheSameCluster(clusterID) {
-			configure.ProxyControllerIp = proto.String(trisolaris.GetGNodeInfo().GetControllerPodIP(c.GetControllerIP()))
-			configure.ProxyControllerPort = proto.Uint32(uint32(trisolaris.GetGrpcPort()))
-		}
 	}
-
+	if vtapConfig.ProxyControllerPort != 0 {
+		configure.ProxyControllerPort = proto.Uint32(uint32(vtapConfig.ProxyControllerPort))
+	}
 	if vtapConfig.AnalyzerIP != "" {
 		configure.AnalyzerIp = proto.String(vtapConfig.AnalyzerIP)
+	}
+	if vtapConfig.AnalyzerPort != 0 {
 		configure.AnalyzerPort = proto.Uint32(uint32(vtapConfig.AnalyzerPort))
+	}
+
+	if isPodVTap(c.GetVTapType()) && gVTapInfo.IsTheSameCluster(clusterID) {
+		configure.AnalyzerIp = proto.String(trisolaris.GetGNodeInfo().GetTSDBPodIP(c.GetTSDBIP()))
+		configure.AnalyzerPort = proto.Uint32(uint32(trisolaris.GetIngesterPort()))
+
+		configure.ProxyControllerIp = proto.String(trisolaris.GetGNodeInfo().GetControllerPodIP(c.GetControllerIP()))
+		configure.ProxyControllerPort = proto.Uint32(uint32(trisolaris.GetGrpcPort()))
 	}
 
 	if configure.GetProxyControllerIp() == "" {
@@ -244,7 +245,7 @@ func getRealRevision(revision string) string {
 }
 
 func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncResponse, error) {
-	if in.GetKubernetesClusterId() != "" {
+	if trisolaris.GetConfig().DomainAutoRegister && in.GetKubernetesClusterId() != "" {
 		gKubernetesInfo := trisolaris.GetGKubernetesInfo()
 		exists := gKubernetesInfo.CreateDomainIfClusterIDNotExists(in.GetKubernetesClusterId(), in.GetKubernetesClusterName())
 		if !exists {
@@ -479,6 +480,7 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string) *api.Config {
 		LogFileSize:                   proto.Uint32(uint32(vtapConfig.LogFileSize)),
 		ExternalAgentHttpProxyEnabled: proto.Bool(Int2Bool(vtapConfig.ExternalAgentHTTPProxyEnabled)),
 		ExternalAgentHttpProxyPort:    proto.Uint32(uint32(vtapConfig.ExternalAgentHTTPProxyPort)),
+		PrometheusHttpApiAddress:      proto.String(vtapConfig.PrometheusHttpAPIAddress),
 		AnalyzerPort:                  proto.Uint32(uint32(vtapConfig.AnalyzerPort)),
 		ProxyControllerPort:           proto.Uint32(uint32(vtapConfig.ProxyControllerPort)),
 		TapMode:                       &tapMode,
@@ -551,6 +553,16 @@ func (e *VTapEvent) noVTapResponse(in *api.SyncRequest) *api.SyncResponse {
 			Config: configInfo,
 		}
 	}
+
+	// if vtap not exist & not k8s/agent sync, set vtap disable
+	if configInfo == nil {
+		configInfo = &api.Config{
+			Enabled: proto.Bool(false),
+		}
+	} else {
+		configInfo.Enabled = proto.Bool(false)
+	}
+
 	return &api.SyncResponse{
 		Status: &STATUS_SUCCESS,
 		Config: configInfo,

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 
+use arc_swap::access::Access;
 use log::{debug, info, log_enabled, warn};
 use regex::Regex;
 
@@ -38,7 +39,7 @@ use crate::{
         MetaPacket, TapPort, FIELD_OFFSET_ETH_TYPE, MAC_ADDR_LEN, VLAN_HEADER_SIZE,
     },
     config::DispatcherConfig,
-    flow_generator::FlowMap,
+    flow_generator::{flow_map::Config, FlowMap},
     handler::MiniPacket,
     rpc::get_timestamp,
     utils::bytes::read_u16_be,
@@ -64,35 +65,26 @@ impl LocalModeDispatcher {
         let time_diff = base.ntp_diff.load(Ordering::Relaxed);
         let mut prev_timestamp = get_timestamp(time_diff);
 
-        #[cfg(target_os = "linux")]
         let mut flow_map = FlowMap::new(
             base.id as u32,
             base.flow_output_queue.clone(),
             base.policy_getter,
             base.log_output_queue.clone(),
             base.ntp_diff.clone(),
-            base.flow_map_config.clone(),
-            base.log_parse_config.clone(),
-            None,
-            Some(base.packet_sequence_output_queue.clone()), // Enterprise Edition Feature: packet-sequence
-            &base.stats,
-            false, // !from_ebpf
-        );
-        #[cfg(target_os = "windows")]
-        let mut flow_map = FlowMap::new(
-            base.id as u32,
-            base.flow_output_queue.clone(),
-            base.policy_getter,
-            base.log_output_queue.clone(),
-            base.ntp_diff.clone(),
-            base.flow_map_config.clone(),
-            base.log_parse_config.clone(),
+            &base.flow_map_config.load(),
             Some(base.packet_sequence_output_queue.clone()), // Enterprise Edition Feature: packet-sequence
             &base.stats,
             false, // !from_ebpf
         );
 
         while !base.terminated.load(Ordering::Relaxed) {
+            let config = Config {
+                flow: &base.flow_map_config.load(),
+                log_parser: &base.log_parse_config.load(),
+                #[cfg(target_os = "linux")]
+                ebpf: None,
+            };
+
             if base.reset_whitelist.swap(false, Ordering::Relaxed) {
                 base.tap_interface_whitelist.reset();
             }
@@ -105,11 +97,14 @@ impl LocalModeDispatcher {
                 &base.ntp_diff,
             );
             if recved.is_none() {
-                flow_map.inject_flush_ticker(Duration::ZERO);
+                flow_map.inject_flush_ticker(&config, Duration::ZERO);
                 if base.tap_interface_whitelist.next_sync(Duration::ZERO) {
                     base.need_update_bpf.store(true, Ordering::Relaxed);
                 }
                 base.check_and_update_bpf();
+                continue;
+            }
+            if base.pause.load(Ordering::Relaxed) {
                 continue;
             }
             #[cfg(target_os = "windows")]
@@ -244,7 +239,7 @@ impl LocalModeDispatcher {
                 base.id as u8,
                 base.npb_dedup_enabled.load(Ordering::Relaxed),
             );
-            flow_map.inject_meta_packet(&mut meta_packet);
+            flow_map.inject_meta_packet(&config, &mut meta_packet);
             let mini_packet = MiniPacket::new(overlay_packet, &meta_packet);
             for h in pipeline.handlers.iter_mut() {
                 h.handle(&mini_packet);
@@ -322,7 +317,9 @@ impl LocalModeDispatcherListener {
         return self.base.id;
     }
 
-    pub fn reset_bpf_white_list(&self) {
+    pub fn flow_acl_change(&self) {
+        // Start capturing traffic after resource information is distributed
+        self.base.pause.store(false, Ordering::Relaxed);
         self.base.reset_whitelist.store(true, Ordering::Relaxed);
     }
 

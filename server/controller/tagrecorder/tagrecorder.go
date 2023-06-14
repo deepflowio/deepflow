@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -96,6 +96,12 @@ func (c *TagRecorder) refresh(domainLcuuidToIconID map[string]int, resourceTypeT
 		NewChStringEnum(),
 		NewChIntEnum(),
 		NewChNodeType(),
+		NewChAPPLabel(),
+		NewChTargetLabel(),
+		NewChPrometheusTargetLabelLayout(),
+		NewChPrometheusLabelName(),
+		NewChPrometheusMetricNames(),
+		NewChPrometheusMetricAPPLabelLayout(),
 		NewChNetwork(resourceTypeToIconID),
 		NewChTapType(resourceTypeToIconID),
 		NewChVTap(resourceTypeToIconID),
@@ -107,6 +113,13 @@ func (c *TagRecorder) refresh(domainLcuuidToIconID map[string]int, resourceTypeT
 		NewChLbListener(resourceTypeToIconID),
 		NewChPodIngress(resourceTypeToIconID),
 		NewChGProcess(resourceTypeToIconID),
+
+		NewChPodK8sAnnotation(),
+		NewChPodK8sAnnotations(),
+		NewChPodServiceK8sAnnotation(),
+		NewChPodServiceK8sAnnotations(),
+		NewChPodK8sEnv(),
+		NewChPodK8sEnvs(),
 	}
 	if c.cfg.RedisCfg.Enabled {
 		updaters = append(updaters, NewChIPResource(c.tCtx))

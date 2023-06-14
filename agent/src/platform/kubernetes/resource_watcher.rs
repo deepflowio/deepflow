@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,8 +35,8 @@ use k8s_openapi::{
             StatefulSet, StatefulSetSpec,
         },
         core::v1::{
-            Namespace, Node, NodeSpec, NodeStatus, Pod, PodStatus, ReplicationController,
-            ReplicationControllerSpec, Service, ServiceSpec,
+            Container, ContainerStatus, Namespace, Node, NodeSpec, NodeStatus, Pod, PodSpec,
+            PodStatus, ReplicationController, ReplicationControllerSpec, Service, ServiceSpec,
         },
         extensions, networking,
     },
@@ -154,6 +154,8 @@ impl RefCountable for WatcherCounter {
 pub struct WatcherConfig {
     pub list_limit: u32,
     pub list_interval: Duration,
+    pub max_memory: u64,
+    pub memory_trim_percent: Option<u8>,
 }
 
 // 发生错误，需要重新构造实例
@@ -302,15 +304,71 @@ where
         ctx.listing.store(false, Ordering::SeqCst);
     }
 
+    fn memory_trim(ctx: &mut Context<K>) {
+        #[cfg(all(target_os = "linux", target_env = "gnu"))]
+        if let Some(percent) = ctx.config.memory_trim_percent {
+            let process = match procfs::process::Process::myself() {
+                Ok(p) => p,
+                Err(e) => {
+                    warn!("Get self process failed: {}", e);
+                    return;
+                }
+            };
+            let status = match process.status() {
+                Ok(s) => s,
+                Err(e) => {
+                    warn!("Get process status failed: {}", e);
+                    return;
+                }
+            };
+            let max_memory = ctx.config.max_memory >> 10;
+            debug!(
+                "max memory: {}KB Rss: anon={}KB file={}KB shmem={}KB",
+                max_memory,
+                status.rssanon.unwrap_or_default(),
+                status.rssfile.unwrap_or_default(),
+                status.rssshmem.unwrap_or_default()
+            );
+            if max_memory
+                <= status.rssfile.unwrap_or_default() + status.rssshmem.unwrap_or_default()
+            {
+                warn!(
+                    "max memory {}KB is smaller than RssFile + RssShmem",
+                    max_memory
+                );
+                return;
+            }
+            let real_percent = status.rssanon.unwrap_or_default() * 100
+                / (max_memory
+                    - status.rssfile.unwrap_or_default()
+                    - status.rssshmem.unwrap_or_default());
+            if real_percent < percent as u64 {
+                debug!(
+                    "RssAnon percent is {} < {}, skip trimming",
+                    real_percent, percent
+                );
+                return;
+            }
+            unsafe {
+                if libc::malloc_trim(0) > 0 {
+                    debug!("malloc_trim released memory");
+                } else {
+                    debug!("malloc_trim cannot release memory");
+                }
+            }
+        }
+    }
+
     // calling list on multiple resources simultaneously may consume a lot of memory
     // use serialized_get_list_entry to avoid oom
     async fn get_list_entry(ctx: &mut Context<K>, encoder: &mut ZlibEncoder<Vec<u8>>) {
         info!(
-            "list {} entries with limit {}",
-            ctx.kind, ctx.config.list_limit
+            "list {} entries with limit {}, memory trim percent: {:?}",
+            ctx.kind, ctx.config.list_limit, ctx.config.memory_trim_percent,
         );
         let mut all_entries = HashMap::new();
         let mut total_count = 0;
+        let mut total_bytes = 0;
         let mut params = ListParams::default().limit(ctx.config.list_limit);
         loop {
             trace!("{} list with {:?}", ctx.kind, params);
@@ -358,6 +416,7 @@ where
                                         continue;
                                     }
                                 };
+                                total_bytes += compressed_object.len();
                                 all_entries.insert(
                                     trim_object.meta_mut().uid.take().unwrap(),
                                     compressed_object,
@@ -376,7 +435,10 @@ where
                         // sometimes k8s api return Some("") instead of None even if
                         // there is no more entries
                         None | Some("") => {
-                            info!("list {} returned {} entries", ctx.kind, total_count);
+                            info!(
+                                "list {} returned {} entries in {}B",
+                                ctx.kind, total_count, total_bytes
+                            );
                             if !all_entries.is_empty() {
                                 *ctx.entries.lock().await = all_entries;
                                 ctx.version.fetch_add(1, Ordering::SeqCst);
@@ -385,11 +447,14 @@ where
                             ctx.stats_counter
                                 .list_length
                                 .fetch_add(total_count as u32, Ordering::Relaxed);
+                            Self::memory_trim(ctx);
                             return;
                         }
                         _ => (),
                     }
                     params.continue_token = object_list.metadata.continue_.take();
+
+                    Self::memory_trim(ctx);
                 }
                 Err(err) => {
                     ctx.stats_counter.list_error.fetch_add(1, Ordering::Relaxed);
@@ -491,12 +556,35 @@ impl Trimmable for Pod {
             owner_references: self.metadata.owner_references.take(),
             creation_timestamp: self.metadata.creation_timestamp.take(),
             labels: self.metadata.labels.take(),
+            annotations: self.metadata.annotations.take(),
             ..Default::default()
         };
+        if let Some(spec) = self.spec.take() {
+            trim_pod.spec = Some(PodSpec {
+                containers: spec
+                    .containers
+                    .into_iter()
+                    .map(|mut c| Container {
+                        name: c.name,
+                        env: c.env.take(),
+                        ..Default::default()
+                    })
+                    .collect(),
+                ..Default::default()
+            });
+        }
         if let Some(pod_status) = self.status.take() {
             trim_pod.status = Some(PodStatus {
                 host_ip: pod_status.host_ip,
                 conditions: pod_status.conditions,
+                container_statuses: pod_status.container_statuses.map(|cs| {
+                    cs.into_iter()
+                        .map(|mut s| ContainerStatus {
+                            container_id: s.container_id.take(),
+                            ..Default::default()
+                        })
+                        .collect()
+                }),
                 pod_ip: pod_status.pod_ip,
                 ..Default::default()
             });

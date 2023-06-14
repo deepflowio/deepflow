@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -251,6 +251,7 @@ func (c *VTapCache) unsetLicenseFunctionEnable() {
 func (c *VTapCache) convertLicenseFunctions() {
 	c.unsetLicenseFunctionEnable()
 	if c.licenseFunctions == nil || *c.licenseFunctions == "" {
+		c.licenseFunctionSet = mapset.NewSet()
 		log.Warningf("vtap(%s) no license functions", c.GetKey())
 		return
 	}

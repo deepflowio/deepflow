@@ -13,10 +13,12 @@ service Synchronizer {
     rpc Query (NtpRequest) returns (NtpResponse) {}
     rpc GenesisSync (GenesisSyncRequest) returns (GenesisSyncResponse) {}
     rpc KubernetesAPISync (KubernetesAPISyncRequest) returns (KubernetesAPISyncResponse) {}
+    rpc PrometheusAPISync (PrometheusAPISyncRequest) returns (PrometheusAPISyncResponse) {}
     rpc GetKubernetesClusterID (KubernetesClusterIDRequest) returns (KubernetesClusterIDResponse) {}
     rpc GPIDSync (GPIDSyncRequest) returns (GPIDSyncResponse) {}
     rpc ShareGPIDLocalData(ShareGPIDSyncRequests) returns (ShareGPIDSyncRequests) {}
     rpc Plugin (PluginRequest) returns (stream PluginResponse) {}
+    rpc GetPrometheusLabelIDs (PrometheusLabelRequest) returns (PrometheusLabelResponse) {}
 }
 
 // debug service
@@ -58,6 +60,7 @@ enum Exception {
     ANALYZER_SOCKET_ERROR      = 65536;
     NPB_SOCKET_ERROR           = 131072;
     INTEGRATION_SOCKET_ERROR   = 262144;
+    CGROUPS_CONFIG_ERROR       = 524288;
     // 2^31及以下由采集器使用，采集器最大可用异常是2^31，顺序从前往后
     // 2^32及以上由控制器使用，顺序从后往前
 }
@@ -187,7 +190,7 @@ message Config {
     // calico: cali.*
     // cilium: lxc.*
     // kube-ovn: [0-9a-f]+_h$
-    optional string  tap_interface_regex  = 8 [default = "^(tap.*|cali.*|veth.*|eth.*|en[ospx].*|lxc.*|lo|[0-9a-f]+_h)$"];
+    optional string  tap_interface_regex  = 8 [default = "^(tap.*|cali.*|veth.*|eth.*|en[osipx].*|lxc.*|lo|[0-9a-f]+_h)$"];
     optional string  host                 = 9;  // override statsd host tag
     optional bool    rsyslog_enabled      = 10 [default = true];
     optional uint32  output_vlan          = 11 [default = 0];
@@ -260,6 +263,7 @@ message Config {
     optional bool   l7_metrics_enabled     = 405 [default = true];
     optional bool external_agent_http_proxy_enabled = 406 [default = false]; // 外部Agent数据HTTP代理开关
     optional uint32 external_agent_http_proxy_port = 407 [default = 38086]; // 外部Agent数据HTTP代理端口
+    optional string prometheus_http_api_address = 408 [default = ""];
 
     optional uint32 packet_sequence_flag = 410 [default = 0];
 
@@ -318,6 +322,7 @@ message Interface {
     optional uint32 pod_ns_id = 24;
     optional uint32 pod_id = 25;
     optional uint32 pod_cluster_id = 26;
+    optional uint32 netns_id = 27 [default = 0];
 
     optional bool is_vip_interface = 100 [default = false]; // 目前仅微软MUX设配为true
 }
@@ -577,6 +582,7 @@ message InterfaceInfo {
     optional string device_name = 6;
 
     optional string netns = 7 [default = ""];
+    optional uint32 netns_id = 8 [default = 0];
 }
 
 message Tag {
@@ -591,6 +597,8 @@ message ProcessInfo {
     optional string cmdline = 4;
     optional string user = 5;
     optional uint32 start_time = 6;
+    optional uint32 netns_id = 7 [default = 0];
+    optional string container_id = 8 [default = ""];
     repeated Tag os_app_tags = 11;
 }
 
@@ -627,6 +635,19 @@ message KubernetesAPISyncRequest {
 }
 
 message KubernetesAPISyncResponse {
+    optional uint64 version = 1;
+}
+
+message PrometheusAPISyncRequest {
+    optional string cluster_id = 1;
+    optional uint64 version = 2;
+    optional string error_msg = 3;
+    optional uint32 vtap_id = 4;
+    optional string source_ip = 5;
+    repeated common.PrometheusAPIInfo entries = 10;
+}
+
+message PrometheusAPISyncResponse {
     optional uint64 version = 1;
 }
 
@@ -784,4 +805,51 @@ message AgentCacheRequest {
 
 message AgentCacheResponse {
     optional bytes content = 1;     // json数据
+}
+
+message LabelRequest {
+    optional string name = 1;
+    optional string value = 2;
+}
+
+message LabelResponse {
+    optional string name = 1;
+    optional string value = 2;
+    optional uint32 name_id = 3;
+    optional uint32 value_id = 4;
+    optional uint32 app_label_column_index = 5; // starting from 1, if it is 0, it means the label is the target label
+}
+
+message MetricLabelRequest {
+    optional string metric_name = 1;
+    repeated LabelRequest labels = 2;  // must contain instance and job label
+}
+
+message MetricLabelResponse {
+    optional string metric_name = 1;
+    optional uint32 metric_id = 2;
+    repeated LabelResponse label_ids = 3;
+}
+
+message TargetRequest {
+    optional string job = 1;
+    optional string instance = 2;
+}
+
+message TargetResponse {
+    optional string job = 1;
+    optional string instance = 2;
+    optional uint32 job_id = 3;
+    optional uint32 instance_id = 4;
+    optional uint32 target_id= 5; // when the Controller cannot determine the target_id, fill in 0
+}
+
+message PrometheusLabelRequest {
+   repeated MetricLabelRequest request_labels = 1;
+   repeated TargetRequest request_targets = 2;
+}
+
+message PrometheusLabelResponse {
+   repeated MetricLabelResponse response_label_ids = 1;
+   repeated TargetResponse response_target_ids = 2;
 }

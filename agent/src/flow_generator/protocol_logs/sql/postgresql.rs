@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -176,7 +176,7 @@ impl Default for PostgresqlLog {
 
 impl L7ProtocolParserInterface for PostgresqlLog {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
-        self.set_msg_type(param.direction);
+        self.set_msg_type(PacketDirection::ClientToServer);
         self.info.is_tls = param.is_tls();
         if self.check_is_ssl_req(payload) {
             return true;
@@ -258,16 +258,16 @@ impl PostgresqlLog {
             let sub_payload = &payload[offset..];
             if let Some((tag, len)) = read_block(sub_payload) {
                 offset += len + 5; // len(data) + len 4B + tag 1B
-                match self.info.msg_type {
+                let parsed = match self.info.msg_type {
                     LogMessageType::Request => self.on_req_block(tag, &sub_payload[5..5 + len])?,
                     LogMessageType::Response => {
                         self.on_resp_block(tag, &sub_payload[5..5 + len])?
                     }
 
-                    _ => {}
-                }
+                    _ => unreachable!(),
+                };
 
-                if !at_lease_one_block {
+                if parsed && !at_lease_one_block {
                     at_lease_one_block = true;
                 }
             } else {
@@ -276,7 +276,7 @@ impl PostgresqlLog {
         }
         if at_lease_one_block {
             if !self.info.ignore {
-                self.info.cal_rrt(param).map(|rrt| {
+                self.info.cal_rrt(param, None).map(|rrt| {
                     self.info.rrt = rrt;
                     self.perf_stats.as_mut().unwrap().update_rrt(rrt);
                 });
@@ -292,14 +292,14 @@ impl PostgresqlLog {
             && read_u64_be(payload) == SSL_REQ
     }
 
-    fn on_req_block(&mut self, tag: char, data: &[u8]) -> Result<()> {
+    fn on_req_block(&mut self, tag: char, data: &[u8]) -> Result<bool> {
         match tag {
             'Q' => {
                 self.info.req_type = tag;
                 self.info.context = strip_string_end_with_zero(data)?;
                 self.info.ignore = false;
                 self.perf_stats.as_mut().unwrap().inc_req();
-                Ok(())
+                Ok(true)
             }
             'P' => {
                 self.info.req_type = tag;
@@ -317,18 +317,18 @@ impl PostgresqlLog {
                         self.info.context = String::from_utf8_lossy(&data[..idx]).to_string();
                         if is_postgresql(&self.info.context) {
                             self.perf_stats.as_mut().unwrap().inc_req();
-                            return Ok(());
+                            return Ok(true);
                         }
                     }
                 }
                 Err(Error::L7ProtocolUnknown)
             }
-            'B' | 'F' | 'C' | 'D' | 'H' | 'S' | 'X' | 'd' | 'c' | 'f' => Ok(()),
+            'B' | 'F' | 'C' | 'D' | 'H' | 'S' | 'X' | 'd' | 'c' | 'f' => Ok(false),
             _ => Err(Error::L7ProtocolUnknown),
         }
     }
 
-    fn on_resp_block(&mut self, tag: char, data: &[u8]) -> Result<()> {
+    fn on_resp_block(&mut self, tag: char, data: &[u8]) -> Result<bool> {
         let mut data = data;
         match tag {
             'C' => {
@@ -347,14 +347,14 @@ impl PostgresqlLog {
                         if let Some(idx) = data.iter().position(|x| *x == 0x20) {
                             data = &data[idx + 1..];
                         } else {
-                            return Ok(());
+                            return Ok(true);
                         }
                     } else {
                         if !(op.eq("DELETE".as_bytes())
                             || op.eq("UPDATE".as_bytes())
                             || op.eq("SELECT".as_bytes()))
                         {
-                            return Ok(());
+                            return Ok(true);
                         }
                     }
                 }
@@ -364,7 +364,7 @@ impl PostgresqlLog {
                     self.info.affected_rows = row_eff.parse().unwrap_or(0);
                 }
                 self.perf_stats.as_mut().unwrap().inc_resp();
-                Ok(())
+                Ok(true)
             }
             'E' => {
                 self.info.status = L7ResponseStatus::ClientError;
@@ -382,7 +382,7 @@ impl PostgresqlLog {
                     if let Some(idx) = data.iter().position(|x| *x == 0) {
                         data = &data[idx + 1..];
                     } else {
-                        return Ok(());
+                        return Ok(true);
                     }
                 }
                 // code, such as `C42601`
@@ -404,14 +404,14 @@ impl PostgresqlLog {
                         _ => {}
                     }
                     self.perf_stats.as_mut().unwrap().inc_resp();
-                    return Ok(());
+                    return Ok(true);
                 }
 
                 Err(Error::L7ProtocolUnknown)
             }
 
             'Z' | 'I' | '1' | '2' | '3' | 'S' | 'K' | 'T' | 'n' | 'N' | 't' | 'D' | 'G' | 'H'
-            | 'W' | 'd' | 'c' => Ok(()),
+            | 'W' | 'd' | 'c' => Ok(false),
             _ => Err(Error::L7ProtocolUnknown),
         }
     }
@@ -554,7 +554,7 @@ mod test {
 
         let resp_param = &ParseParam::from((&p[1], log_cache.clone(), false));
         let resp_payload = p[1].get_l4_payload().unwrap();
-        assert_eq!((&mut parser).check_payload(resp_payload, resp_param), true);
+        assert_eq!((&mut parser).check_payload(resp_payload, resp_param), false);
         let resp = (&mut parser)
             .parse_payload(resp_payload, resp_param)
             .unwrap()

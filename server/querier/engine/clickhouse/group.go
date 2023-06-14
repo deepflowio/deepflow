@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
+	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
 )
@@ -38,9 +39,43 @@ func GetGroup(name string, asTagMap map[string]string, db, table string) (Statem
 			stmt = &GroupTag{Value: name, AsTagMap: asTagMap}
 		}
 	} else {
-		stmt = &GroupTag{Value: name, AsTagMap: asTagMap}
+		if db == chCommon.DB_NAME_PROMETHEUS {
+			tagTranslatorStr := GetPrometheusGroup(name, table, asTagMap)
+			stmt = &GroupTag{Value: tagTranslatorStr, AsTagMap: asTagMap}
+		} else {
+			stmt = &GroupTag{Value: name, AsTagMap: asTagMap}
+		}
 	}
 	return stmt, nil
+}
+
+func GetPrometheusGroup(name, table string, asTagMap map[string]string) string {
+	nameNoPreffix := strings.Trim(name, "`")
+	tagTranslatorStr := ""
+	_, ok := asTagMap[name]
+	if ok {
+		tagTranslatorStr = name
+	} else if strings.HasPrefix(nameNoPreffix, "tag.") {
+		nameNoPreffix := strings.Trim(name, "`")
+		nameNoPreffix = strings.TrimPrefix(nameNoPreffix, "tag.")
+		// Determine whether the tag is app_label or target_label
+		isAppLabel := false
+		if appLabels, ok := Prometheus.MetricAppLabelLayout[table]; ok {
+			for _, appLabel := range appLabels {
+				if appLabel.AppLabelName == nameNoPreffix {
+					isAppLabel = true
+					tagTranslatorStr = fmt.Sprintf("app_label_value_id_%d", appLabel.appLabelColumnIndex)
+					break
+				}
+			}
+		}
+		if !isAppLabel {
+			tagTranslatorStr = "target_id"
+		}
+	} else {
+		tagTranslatorStr = name
+	}
+	return tagTranslatorStr
 }
 
 func GetNotNullFilter(name string, asTagMap map[string]string, db, table string) (view.Node, bool) {
@@ -63,6 +98,32 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 					filterName = strings.TrimSuffix(filterName, "_0")
 					filterName = strings.TrimSuffix(filterName, "_1")
 					filter := fmt.Sprintf(tagItem.NotNullFilter, filterName, filterName)
+					return &view.Expr{Value: "(" + filter + ")"}, true
+				} else if strings.HasPrefix(preAsTag, "k8s.annotation.") {
+					if strings.HasSuffix(preAsTag, "_0") {
+						tagItem, _ = tag.GetTag("k8s_annotation_0", db, table, "default")
+					} else if strings.HasSuffix(preAsTag, "_1") {
+						tagItem, _ = tag.GetTag("k8s_annotation_1", db, table, "default")
+					} else {
+						tagItem, _ = tag.GetTag("k8s_annotation", db, table, "default")
+					}
+					filterName := strings.TrimPrefix(preAsTag, "k8s.annotation.")
+					filterName = strings.TrimSuffix(filterName, "_0")
+					filterName = strings.TrimSuffix(filterName, "_1")
+					filter := fmt.Sprintf(tagItem.NotNullFilter, filterName, filterName)
+					return &view.Expr{Value: "(" + filter + ")"}, true
+				} else if strings.HasPrefix(preAsTag, "k8s.env.") {
+					if strings.HasSuffix(preAsTag, "_0") {
+						tagItem, _ = tag.GetTag("k8s_env_0", db, table, "default")
+					} else if strings.HasSuffix(preAsTag, "_1") {
+						tagItem, _ = tag.GetTag("k8s_env_1", db, table, "default")
+					} else {
+						tagItem, _ = tag.GetTag("k8s_env", db, table, "default")
+					}
+					filterName := strings.TrimPrefix(preAsTag, "k8s.env.")
+					filterName = strings.TrimSuffix(filterName, "_0")
+					filterName = strings.TrimSuffix(filterName, "_1")
+					filter := fmt.Sprintf(tagItem.NotNullFilter, filterName)
 					return &view.Expr{Value: "(" + filter + ")"}, true
 				} else if strings.HasPrefix(preAsTag, "cloud.tag.") {
 					if strings.HasSuffix(preAsTag, "_0") {
@@ -91,6 +152,9 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 					filter := fmt.Sprintf(tagItem.NotNullFilter, filterName)
 					return &view.Expr{Value: "(" + filter + ")"}, true
 				} else if strings.HasPrefix(preAsTag, "tag.") || strings.HasPrefix(preAsTag, "attribute.") {
+					if db == chCommon.DB_NAME_PROMETHEUS {
+						return &view.Expr{}, false
+					}
 					tagItem, ok = tag.GetTag("tag.", db, table, "default")
 					filter := fmt.Sprintf(tagItem.NotNullFilter, name)
 					return &view.Expr{Value: "(" + filter + ")"}, true
@@ -120,6 +184,32 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 				filterName = strings.TrimSuffix(filterName, "_1")
 				filter := fmt.Sprintf(tagItem.NotNullFilter, filterName, filterName)
 				return &view.Expr{Value: "(" + filter + ")"}, true
+			} else if strings.HasPrefix(name, "k8s.annotation.") {
+				if strings.HasSuffix(name, "_0") {
+					tagItem, _ = tag.GetTag("k8s_annotation_0", db, table, "default")
+				} else if strings.HasSuffix(name, "_1") {
+					tagItem, _ = tag.GetTag("k8s_annotation_1", db, table, "default")
+				} else {
+					tagItem, _ = tag.GetTag("k8s_annotation", db, table, "default")
+				}
+				filterName := strings.TrimPrefix(name, "k8s.annotation.")
+				filterName = strings.TrimSuffix(filterName, "_0")
+				filterName = strings.TrimSuffix(filterName, "_1")
+				filter := fmt.Sprintf(tagItem.NotNullFilter, filterName, filterName)
+				return &view.Expr{Value: "(" + filter + ")"}, true
+			} else if strings.HasPrefix(name, "k8s.env.") {
+				if strings.HasSuffix(name, "_0") {
+					tagItem, _ = tag.GetTag("k8s_env_0", db, table, "default")
+				} else if strings.HasSuffix(name, "_1") {
+					tagItem, _ = tag.GetTag("k8s_env_1", db, table, "default")
+				} else {
+					tagItem, _ = tag.GetTag("k8s_env", db, table, "default")
+				}
+				filterName := strings.TrimPrefix(name, "k8s.env.")
+				filterName = strings.TrimSuffix(filterName, "_0")
+				filterName = strings.TrimSuffix(filterName, "_1")
+				filter := fmt.Sprintf(tagItem.NotNullFilter, filterName)
+				return &view.Expr{Value: "(" + filter + ")"}, true
 			} else if strings.HasPrefix(name, "cloud.tag.") {
 				if strings.HasSuffix(name, "_0") {
 					tagItem, ok = tag.GetTag("cloud_tag_0", db, table, "default")
@@ -147,6 +237,9 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 				filter := fmt.Sprintf(tagItem.NotNullFilter, filterName)
 				return &view.Expr{Value: "(" + filter + ")"}, true
 			} else if strings.HasPrefix(name, "tag.") || strings.HasPrefix(name, "attribute.") {
+				if db == chCommon.DB_NAME_PROMETHEUS {
+					return &view.Expr{}, false
+				}
 				tagItem, ok = tag.GetTag("tag.", db, table, "default")
 				filter := fmt.Sprintf(tagItem.NotNullFilter, name)
 				return &view.Expr{Value: "(" + filter + ")"}, true

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,8 +23,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
+	"sigs.k8s.io/yaml"
 
 	"github.com/deepflowio/deepflow/cli/ctl/common"
 	"github.com/deepflowio/deepflow/cli/ctl/example"
@@ -190,7 +190,17 @@ func createDomain(cmd *cobra.Command, args []string, filename string) {
 		fmt.Fprintln(os.Stderr, err)
 		return
 	}
-	fmt.Println(resp)
+	respByte, err := resp.MarshalJSON()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+	formatStr, err := common.JsonFormat(respByte)
+	if err != nil {
+		fmt.Println("format json str faild: " + err.Error())
+		return
+	}
+	fmt.Println(formatStr)
 }
 
 func updateDomain(cmd *cobra.Command, args []string, filename string) {
@@ -228,7 +238,17 @@ func updateDomain(cmd *cobra.Command, args []string, filename string) {
 			fmt.Fprintln(os.Stderr, err)
 			return
 		}
-		fmt.Println(resp)
+		respByte, err := resp.MarshalJSON()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return
+		}
+		formatStr, err := common.JsonFormat(respByte)
+		if err != nil {
+			fmt.Println("format json str faild: " + err.Error())
+			return
+		}
+		fmt.Println(formatStr)
 	}
 }
 
@@ -256,7 +276,17 @@ func deleteDomain(cmd *cobra.Command, args []string) {
 			fmt.Fprintln(os.Stderr, err)
 			return
 		}
-		fmt.Println(resp)
+		respByte, err := resp.MarshalJSON()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return
+		}
+		formatStr, err := common.JsonFormat(respByte)
+		if err != nil {
+			fmt.Println("format json str faild: " + err.Error())
+			return
+		}
+		fmt.Println(formatStr)
 	}
 }
 

@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS db_version (
-    version             CHAR(64),
+    version             CHAR(64) PRIMARY KEY,
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
@@ -58,14 +58,31 @@ CREATE TABLE IF NOT EXISTS process (
     user_name           VARCHAR(256) DEFAULT '',
     start_time          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     os_app_tags         TEXT COMMENT 'separated by ,',
+    netns_id            INTEGER UNSIGNED DEFAULT 0,
     sub_domain          CHAR(64) DEFAULT '',
     domain              CHAR(64) DEFAULT '',
     lcuuid              CHAR(64) DEFAULT '',
+    container_id        CHAR(64) DEFAULT '',
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted_at          DATETIME DEFAULT NULL
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE process;
+
+CREATE TABLE IF NOT EXISTS prometheus_target (
+    id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    lcuuid              CHAR(64) DEFAULT '',
+    instance            VARCHAR(255) DEFAULT '',
+    job                 VARCHAR(255) DEFAULT '',
+    scrape_url          VARCHAR(2083) DEFAULT '',
+    other_labels        TEXT COMMENT 'separated by ,',
+    domain              CHAR(64) DEFAULT '',
+    sub_domain          CHAR(64) DEFAULT '',
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    deleted_at          DATETIME DEFAULT NULL
+) ENGINE = innodb DEFAULT CHARSET = utf8mb4 AUTO_INCREMENT = 1;
+TRUNCATE TABLE prometheus_target;
 
 CREATE TABLE IF NOT EXISTS host_device (
     id                  INTEGER NOT NULL AUTO_INCREMENT,
@@ -306,6 +323,7 @@ CREATE TABLE IF NOT EXISTS vinterface (
     vlantag             INTEGER DEFAULT 0,
     devicetype          INTEGER COMMENT 'Type 0.unknown 1.vm 2.vgw 3.third-party-device 4.vmwaf 5.NSP-vgateway 6.host-device 7.network-device 9.DHCP-port 10.pod 11.pod_service 12. redis_instance 13. rds_instance 14. pod_node 15. load_balance 16. nat_gateway',
     deviceid            INTEGER COMMENT 'unknown: Senseless ID, vm: vm ID, vgw/NSP-vgateway: vnet ID, third-party-device: third_party_device ID, vmwaf: vmwaf ID, host-device: host_device ID, network-device: network_device ID',
+    netns_id            INTEGER UNSIGNED DEFAULT 0,
     sub_domain          CHAR(64) DEFAULT '',
     domain              CHAR(64) DEFAULT '',
     region              CHAR(64) DEFAULT '',
@@ -762,6 +780,9 @@ CREATE TABLE IF NOT EXISTS pod (
     name                VARCHAR(256) DEFAULT '',
     alias               CHAR(64) DEFAULT '',
     label               TEXT COMMENT 'separated by ,',
+    annotation          TEXT COMMENT 'separated by ,',
+    env                 TEXT COMMENT 'separated by ,',
+    container_ids       TEXT COMMENT 'separated by ,',
     state               INTEGER NOT NULL COMMENT '0.Exception 1.Running',
     pod_rs_id           INTEGER DEFAULT NULL,
     pod_group_id        INTEGER DEFAULT NULL,
@@ -841,6 +862,7 @@ CREATE TABLE IF NOT EXISTS pod_service (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     name                VARCHAR(256) DEFAULT '',
     label               TEXT COMMENT 'separated by ,',
+    annotation          TEXT COMMENT 'separated by ,',
     alias               CHAR(64) DEFAULT '',
     type                INTEGER DEFAULT NULL COMMENT '1: ClusterIP 2: NodePort',
     selector            TEXT COMMENT 'separated by ,',
@@ -1125,7 +1147,7 @@ CREATE TABLE IF NOT EXISTS alarm_policy (
     sub_view_metrics        TEXT,
     sub_view_extra          TEXT,
     user_id                 INTEGER,
-    name                    CHAR(64) NOT NULL,
+    name                    CHAR(128) NOT NULL,
     level                   TINYINT(1) NOT NULL COMMENT '0.low 1.middle 2.high',
     state                   TINYINT(1) DEFAULT 1 COMMENT '0.disabled 1.enabled',
     app_type                TINYINT(1) NOT NULL COMMENT '1-system 2-360view',
@@ -1146,6 +1168,34 @@ CREATE TABLE IF NOT EXISTS alarm_policy (
     lcuuid                  CHAR(64)
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE alarm_policy;
+
+CREATE TABLE IF NOT EXISTS alarm_event (
+    id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    status                  CHAR(64),
+    timestamp               DATETIME,
+    end_time                BIGINT,
+    policy_id               INTEGER,
+    policy_name             TEXT,
+    policy_level            INTEGER,
+    policy_app_type         TINYINT,
+    policy_sub_type         TINYINT,
+    policy_contrast_type    TINYINT,
+    policy_data_level       CHAR(64),
+    policy_target_uid       TEXT,
+    policy_target_name      TEXT,
+    policy_go_to            TEXT,
+    policy_target_field     TEXT,
+    policy_endpoints        TEXT,
+    sub_view_id             INTEGER,
+    sub_view_name           TEXT,
+    trigger_condition       TEXT,
+    trigger_value           INTEGER,
+    end_value               TEXT,
+    value_unit              CHAR(64),
+    endpoint_results        TEXT,
+    lcuuid                  CHAR(64)
+) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
+TRUNCATE TABLE alarm_event;
 
 CREATE TABLE IF NOT EXISTS label (
     id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -1196,14 +1246,14 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, sub_view_url, sub_view_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     upper_threshold, lower_threshold, lcuuid)
-    values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server.monitor\",\"include_history\":\"true\",\"interval\":60,\"fill\":0,\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Avg(`metrics.load1`)*100/Avg(`metrics.cpu_num`) AS `load`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host_ip`\",\"METRICS\":[\"Avg(`metrics.load1`)*100/Avg(`metrics.cpu_num`) AS `load`\"]}]}",
+    values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server.monitor\",\"include_history\":\"true\",\"interval\":60,\"fill\":0,\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Min(`metrics.load1`*100/`metrics.cpu_num`) AS `load`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host_ip`\",\"METRICS\":[\"Min(`metrics.load1`*100/`metrics.cpu_num`) AS `load`\"]}]}",
     "[{\"METRIC_LABEL\":\"load\",\"return_field_description\":\"持续 5 分钟 (系统负载/CPU总数)\",\"unit\":\"%\"}]", "控制器系统负载高",  0, 1, 1, 21, 1, "", "", "load", 70, NULL, @lcuuid);
 
 set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, sub_view_url, sub_view_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     upper_threshold, lower_threshold, lcuuid)
-    values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server.monitor\",\"include_history\":\"true\",\"interval\":60,\"fill\":0,\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Avg(`metrics.load1`)*100/Avg(`metrics.cpu_num`) AS `load`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host_ip`\",\"METRICS\":[\"Avg(`metrics.load1`)*100/Avg(`metrics.cpu_num`) AS `load`\"]}]}",
+    values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server.monitor\",\"include_history\":\"true\",\"interval\":60,\"fill\":0,\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Min(`metrics.load1`*100/`metrics.cpu_num`) AS `load`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host_ip`\",\"METRICS\":[\"Min(`metrics.load1`*100/`metrics.cpu_num`) AS `load`\"]}]}",
     "[{\"METRIC_LABEL\":\"load\",\"return_field_description\":\"持续 5 分钟 (系统负载/CPU总数)\",\"unit\":\"%\"}]", "数据节点系统负载高",  0, 1, 1, 21, 1, "", "", "load", 70, NULL, @lcuuid);
 
 set @lcuuid = (select uuid());
@@ -1242,21 +1292,22 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, sub_view_url, sub_view_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     upper_threshold, lower_threshold, lcuuid)
-    values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_monitor\",\"include_history\":\"true\",\"interval\":60,\"fill\":0,\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Avg(`metrics.cpu_percent`)*100/Avg(`metrics.max_cpus`) AS `cpu_usage`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Avg(`metrics.cpu_percent`)*100/Avg(`metrics.max_cpus`) AS `cpu_usage`\"]}]}",
+    values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_monitor\",\"include_history\":\"true\",\"interval\":60,\"fill\":0,\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Min(`metrics.cpu_percent`/`metrics.max_cpus`) AS `cpu_usage`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Min(`metrics.cpu_percent`/`metrics.max_cpus`) AS `cpu_usage`\"]}]}",
     "[{\"METRIC_LABEL\":\"cpu_usage\",\"return_field_description\":\"持续 5 分钟 (CPU用量/阈值)\",\"unit\":\"%\"}]", "采集器 CPU 超限",  0, 1, 1, 21, 1, "", "", "cpu_usage", 70, NULL, @lcuuid);
 
 set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, sub_view_url, sub_view_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     upper_threshold, lower_threshold, lcuuid)
-    values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_monitor\",\"include_history\":\"true\",\"interval\":60,\"fill\":0,\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Last(`metrics.memory`)*1024*1024/Avg(`metrics.max_memory`) AS `used_bytes`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Last(`metrics.memory`)*1024*1024/Avg(`metrics.max_memory`) AS `used_bytes`\"]}]}",
+    values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_monitor\",\"include_history\":\"true\",\"interval\":60,\"fill\":0,\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Min(`metrics.memory`*100/`metrics.max_memory`) AS `used_bytes`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Min(`metrics.memory`*100/`metrics.max_memory`) AS `used_bytes`\"]}]}",
     "[{\"METRIC_LABEL\":\"used_bytes\",\"return_field_description\":\"持续 5 分钟 (内存用量/阈值)\",\"unit\":\"%\"}]", "采集器内存超限",  0, 1, 1, 21, 1, "", "", "used_bytes", 70, NULL, @lcuuid);
 
 set @lcuuid = (select uuid());
-INSERT INTO alarm_policy(sub_view_type, sub_view_url, sub_view_params, sub_view_metrics, name, level, state,
+INSERT INTO alarm_policy(user_id, sub_view_type, sub_view_url, sub_view_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field, agg,
     upper_threshold, lower_threshold, lcuuid)
-    values(1, "/v1/alarm/process-start/", "{}", "[{\"OPERATOR\": {\"return_field\": \"sysalarm_value\", \"return_field_description\": \"最近 1 分钟进程启动次数\", \"return_field_unit\": \" 次\"}}]", "进程启动",  0, 1, 1, 20, 1, "", "", "sysalarm_value", 1, 1, NULL, @lcuuid);
+    values(1, 1, "/v1/stats/querier/UniversalPromHistory", "{\"DATABASE\":\"\",\"include_history\":\"true\",\"PROM_SQL\":\"delta(min(deepflow_system__deepflow_agent_monitor__create_time)by(host)[1m:])\",\"interval\":60,\"metric\":\"process_start\",\"time_tag\":\"toi\"}",
+    "[{\"METRIC_LABEL\":\"process_start\",\"return_field_description\":\"最近 1 分钟进程启动时间变化\",\"unit\":\" 毫秒\"}]", "进程启动",  0, 1, 1, 20, 1, "", "", "process_start", 1, 1, NULL, @lcuuid);
 
 set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(sub_view_type, sub_view_url, sub_view_params, sub_view_metrics, name, level, state,
@@ -1304,7 +1355,7 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, sub_view_url, sub_view_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     upper_threshold, lower_threshold, lcuuid)
-    values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_monitor\",\"include_history\":\"true\",\"interval\":60,\"fill\":0,\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Avg(`metrics.sys_free_memory`)*100/Avg(`metrics.system_free_memory_limit`) AS `used_bytes`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Avg(`metrics.sys_free_memory`)*100/Avg(`metrics.system_free_memory_limit`) AS `used_bytes`\"]}]}",
+    values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_monitor\",\"include_history\":\"true\",\"interval\":60,\"fill\":\"null\",\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Min(`metrics.sys_free_memory`*100/`metrics.system_free_memory_limit`) AS `used_bytes`\",\"WHERE\":\"`metrics.system_free_memory_limit`!=0\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Min(`metrics.sys_free_memory`*100/`metrics.system_free_memory_limit`) AS `used_bytes`\"]}]}",
     "[{\"METRIC_LABEL\":\"used_bytes\",\"return_field_description\":\"持续 5 分钟 (系统空闲内存百分比/阈值)\",\"unit\":\"%\"}]", "采集器所在系统空闲内存低",  0, 1, 1, 21, 1, "", "", "used_bytes", NULL, 150, @lcuuid);
 
 set @lcuuid = (select uuid());
@@ -1375,14 +1426,6 @@ INSERT INTO alarm_policy(user_id, sub_view_type, sub_view_url, sub_view_params, 
     values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_ebpf_collector\",\"interval\":60,\"fill\":0,\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.user_enqueue_lost`) AS `drop_packets`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.kernuser_enqueue_lost_lost`) AS `drop_packets`\"]}]}",
     "[{\"METRIC_LABEL\":\"drop_packets\",\"return_field_description\":\"最近 1 分钟 ebpf_collector.metrics.user_enqueue_lost\",\"unit\":\"\"}]",
      "采集器数据丢失 (ebpf_collector.metrics.user_enqueue_lost)",  0, 1, 1, 21, 1, "", "", "drop_packets", 1, NULL, @lcuuid);
-
-set @lcuuid = (select uuid());
-INSERT INTO alarm_policy(user_id, sub_view_type, sub_view_url, sub_view_params, sub_view_metrics, name, level, state,
-    app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
-    upper_threshold, lower_threshold, lcuuid)
-    values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_dispatcher\",\"interval\":60,\"fill\":0,\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.retired`) AS `drop_packets`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.retired`) AS `drop_packets`\"]}]}",
-    "[{\"METRIC_LABEL\":\"drop_packets\",\"return_field_description\":\"最近 1 分钟 dispatcher.metrics.retired\",\"unit\":\"\"}]",
-     "采集器数据丢失 (dispatcher.metrics.retired)",  0, 1, 1, 21, 1, "", "", "drop_packets", 1, NULL, @lcuuid);
 
 set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, sub_view_url, sub_view_params, sub_view_metrics, name, level, state,
@@ -1564,6 +1607,7 @@ CREATE TABLE IF NOT EXISTS vtap_group_configuration(
     log_file_size             INTEGER DEFAULT NULL COMMENT 'unit: MB',
     external_agent_http_proxy_enabled  TINYINT(1) COMMENT '0: disabled 1:enabled',
     external_agent_http_proxy_port     INTEGER DEFAULT NULL,
+    prometheus_http_api_address        VARCHAR(128),
     proxy_controller_port     INTEGER DEFAULT NULL,
     analyzer_port             INTEGER DEFAULT NULL,
     proxy_controller_ip       VARCHAR(128),
@@ -1780,6 +1824,7 @@ TRUNCATE TABLE go_genesis_lldp;
 
 CREATE TABLE IF NOT EXISTS go_genesis_vinterface (
     id                    INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    netns_id              INTEGER UNSIGNED DEFAULT 0, 
     lcuuid                CHAR(64),
     name                  CHAR(64),
     mac                   CHAR(32),
@@ -1799,6 +1844,7 @@ TRUNCATE TABLE go_genesis_vinterface;
 
 CREATE TABLE IF NOT EXISTS go_genesis_process (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    netns_id            INTEGER UNSIGNED DEFAULT 0,
     vtap_id             INTEGER NOT NULL DEFAULT 0,
     pid                 INTEGER NOT NULL,
     lcuuid              CHAR(64) DEFAULT '',
@@ -1806,6 +1852,7 @@ CREATE TABLE IF NOT EXISTS go_genesis_process (
     process_name        VARCHAR(256) DEFAULT '',
     cmd_line            TEXT,
     user                VARCHAR(256) DEFAULT '',
+    container_id        CHAR(64) DEFAULT '',
     os_app_tags         TEXT COMMENT 'separated by ,',
     node_ip             CHAR(48) DEFAULT '',
     start_time          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -2416,3 +2463,165 @@ CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_labels (
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_service_k8s_labels;
 
+CREATE TABLE IF NOT EXISTS ch_pod_k8s_annotation (
+    `id`            INTEGER NOT NULL,
+    `key`           VARCHAR(256) NOT NULL,
+    `value`         VARCHAR(256),
+    `l3_epc_id`     INTEGER,
+    `pod_ns_id`     INTEGER,
+    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`, `key`)
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_pod_k8s_annotation;
+
+CREATE TABLE IF NOT EXISTS ch_pod_k8s_annotations (
+    `id`            INTEGER NOT NULL PRIMARY KEY,
+    `annotations`   TEXT,
+    `l3_epc_id`     INTEGER,
+    `pod_ns_id`     INTEGER,
+    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_pod_k8s_annotations;
+
+CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_annotation (
+    `id`            INTEGER NOT NULL,
+    `key`           VARCHAR(256) NOT NULL,
+    `value`         VARCHAR(256),
+    `l3_epc_id`     INTEGER,
+    `pod_ns_id`     INTEGER,
+    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`, `key`)
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_pod_k8s_annotation;
+
+CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_annotations (
+    `id`            INTEGER NOT NULL PRIMARY KEY,
+    `annotations`   TEXT,
+    `l3_epc_id`     INTEGER,
+    `pod_ns_id`     INTEGER,
+    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_pod_k8s_annotations;
+
+CREATE TABLE IF NOT EXISTS prometheus_metric_name (
+    `id`            INT(10) NOT NULL PRIMARY KEY,
+    `name`          VARCHAR(256) NOT NULL UNIQUE,
+    `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+)ENGINE=innodb DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
+TRUNCATE TABLE prometheus_metric_name;
+
+CREATE TABLE IF NOT EXISTS prometheus_label_name (
+    `id`            INT(10) NOT NULL PRIMARY KEY,
+    `name`          VARCHAR(256) NOT NULL UNIQUE,
+    `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+)ENGINE=innodb DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
+TRUNCATE TABLE prometheus_label_name;
+
+CREATE TABLE IF NOT EXISTS prometheus_label_value (
+    `id`            INT(10) NOT NULL PRIMARY KEY,
+    `value`         VARCHAR(256) NOT NULL UNIQUE,
+    `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+)ENGINE=innodb DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
+TRUNCATE TABLE prometheus_label_value;
+
+CREATE TABLE IF NOT EXISTS prometheus_label (
+    `id`            INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `name`          VARCHAR(256) NOT NULL,
+    `value`         VARCHAR(256) NOT NULL,
+    `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE INDEX label(name, value)
+)ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
+TRUNCATE TABLE prometheus_label;
+
+CREATE TABLE IF NOT EXISTS prometheus_metric_app_label_layout (
+    `id`                        INT(10) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `metric_name`               VARCHAR(256) NOT NULL,
+    `app_label_name`            VARCHAR(256) NOT NULL,
+    `app_label_column_index`    TINYINT(3) UNSIGNED NOT NULL,
+    `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE INDEX metric_label_index(metric_name, app_label_name)
+)ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
+TRUNCATE TABLE prometheus_metric_app_label_layout;
+
+CREATE TABLE IF NOT EXISTS prometheus_metric_label (
+    `id`            INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `metric_name`   VARCHAR(256) NOT NULL,
+    `label_id`      INT NOT NULL,
+    `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE INDEX metric_label_index(metric_name, label_id)
+)ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
+TRUNCATE TABLE prometheus_metric_label;
+
+CREATE TABLE IF NOT EXISTS prometheus_metric_target (
+    `id`            INT(10) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `metric_name`   VARCHAR(256) NOT NULL,
+    `target_id`     INT(10) NOT NULL,
+    `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE INDEX metric_target_index(metric_name, target_id)
+)ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
+TRUNCATE TABLE prometheus_metric_target;
+
+CREATE TABLE IF NOT EXISTS ch_pod_k8s_env (
+    `id`            INTEGER NOT NULL,
+    `key`           VARCHAR(256) NOT NULL,
+    `value`         VARCHAR(256),
+    `l3_epc_id`     INTEGER,
+    `pod_ns_id`     INTEGER,
+    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`, `key`)
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_pod_k8s_env;
+
+CREATE TABLE IF NOT EXISTS ch_pod_k8s_envs (
+    `id`            INTEGER NOT NULL PRIMARY KEY,
+    `envs`          TEXT,
+    `l3_epc_id`     INTEGER,
+    `pod_ns_id`     INTEGER,
+    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_pod_k8s_envs;
+
+CREATE TABLE IF NOT EXISTS ch_app_label (
+    `metric_id`          INT(10) NOT NULL,
+    `label_name_id`      INT(10) NOT NULL,
+    `label_value_id`     INT(10) NOT NULL,
+    `label_value`        VARCHAR(256) NOT NULL,
+    PRIMARY KEY (metric_id, label_name_id, label_value_id)
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_app_label;
+
+CREATE TABLE IF NOT EXISTS ch_target_label (
+    `metric_id`          INT(10) NOT NULL,
+    `label_name_id`      INT(10) NOT NULL,
+    `target_id`          INT(10) NOT NULL,
+    `label_value`        VARCHAR(256) NOT NULL,
+    PRIMARY KEY (metric_id, label_name_id, target_id)
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_target_label;
+
+CREATE TABLE IF NOT EXISTS ch_prometheus_label_name (
+    `id`            INT(10) NOT NULL PRIMARY KEY,
+    `name`          VARCHAR(256) NOT NULL
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_prometheus_label_name;
+
+CREATE TABLE IF NOT EXISTS ch_prometheus_metric_name (
+    `id`            INT(10) NOT NULL PRIMARY KEY,
+    `name`          VARCHAR(256) NOT NULL
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_prometheus_metric_name;
+
+CREATE TABLE IF NOT EXISTS ch_prometheus_metric_app_label_layout (
+    `id`                        INT(10) NOT NULL PRIMARY KEY,
+    `metric_name`               VARCHAR(256) NOT NULL,
+    `app_label_name`            VARCHAR(256) NOT NULL,
+    `app_label_column_index`    TINYINT(3) UNSIGNED NOT NULL
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_prometheus_metric_app_label_layout;
+
+CREATE TABLE IF NOT EXISTS ch_prometheus_target_label_layout (
+    `target_id`           INT(10) NOT NULL PRIMARY KEY,
+    `target_label_names`  TEXT,
+    `target_label_values` TEXT
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_prometheus_target_label_layout;

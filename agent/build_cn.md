@@ -6,11 +6,13 @@
 
 最简单的方法是使用我们构建好的编译环境：
 ```bash
+git clone --recursive https://github.com/deepflowio/deepflow.git 
+cd deepflow 
 docker run --privileged --rm -it -v \
-    $(pwd):/deepflow hub.deepflow.yunshan.net/public/rust-build bash -c \
-    "source /opt/rh/devtoolset-8/enable && git clone --recursive https://github.com/deepflowio/deepflow.git /deepflow && cd /deepflow/agent && cargo build"
+    $(pwd):/deepflow -v ~/.cargo:/usr/local/cargo hub.deepflow.yunshan.net/public/rust-build bash -c \
+    "source /opt/rh/devtoolset-8/enable && cd /deepflow/agent && cargo build"
 
-# binary file directory: ./deepflow/agent/target/debug/deepflow-agent
+# binary file directory: ./agent/target/debug/deepflow-agent
 ```
 
 ## 手动编译

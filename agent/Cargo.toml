@@ -53,6 +53,11 @@ prost = "0.11.0"
 public = { path = "crates/public" }
 rand = "0.8.5"
 regex = "1"
+reqwest = { version = "0.11", default-features = false, features = [
+    "blocking",
+    "json",
+    "rustls-tls",
+] }
 ring = "0.16.20"
 roxmltree = "0.14.1"
 serde = { version = "1.0", features = ["derive"] }
@@ -66,6 +71,8 @@ time = "0.3.9"
 tokio = { version = "1.20.1", features = ["full"] }
 tonic = "0.8.1"
 envmnt = "0.10.4"
+wasmtime = "7.0.0"
+wasmtime-wasi = "7.0.0"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 cgroups-rs = "0.2.9"

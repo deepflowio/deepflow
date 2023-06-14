@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ pub(crate) mod flow_node;
 pub(crate) mod flow_state;
 mod packet_sequence; // Enterprise Edition Feature: packet-sequence
 pub mod perf;
+mod pool;
 pub mod protocol_logs;
 mod service_table;
 

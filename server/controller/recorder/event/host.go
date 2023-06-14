@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,7 +55,11 @@ func (h *Host) ProduceByAdd(items []*mysql.Host) {
 				eventapi.TagRegionID(info.RegionID),
 			}...)
 		}
-		opts = append(opts, eventapi.TagHostID(item.ID))
+		opts = append(opts, []eventapi.TagFieldOption{
+			eventapi.TagHostID(item.ID),
+			eventapi.TagL3DeviceID(item.ID),
+			eventapi.TagL3DeviceType(h.deviceType),
+		}...)
 
 		h.createAndEnqueue(
 			item.Lcuuid,

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,12 +15,12 @@
  */
 
 use std::collections::HashSet;
-use std::path::PathBuf;
+use std::path::{PathBuf, MAIN_SEPARATOR};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::{collections::HashMap, os::unix::process::CommandExt, process::Command};
 
 use envmnt::{ExpandOptions, ExpansionType};
-use log::error;
+use log::{debug, error};
 use nom::AsBytes;
 use procfs::{process::Process, ProcError, ProcResult};
 use public::bytes::write_u64_be;
@@ -31,14 +31,17 @@ use ring::digest;
 use serde::Deserialize;
 
 use super::proc_scan_hook::proc_scan_hook;
-use super::{dir_inode, SHA1_DIGEST_LEN};
+use super::{dir_inode, get_proc_netns, SHA1_DIGEST_LEN};
 
 use crate::config::handler::OsProcScanConfig;
 use crate::config::{
     OsProcRegexp, OS_PROC_REGEXP_MATCH_ACTION_ACCEPT, OS_PROC_REGEXP_MATCH_ACTION_DROP,
     OS_PROC_REGEXP_MATCH_TYPE_CMD, OS_PROC_REGEXP_MATCH_TYPE_PARENT_PROC_NAME,
-    OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME,
+    OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME, OS_PROC_REGEXP_MATCH_TYPE_TAG,
 };
+
+const CONTAINER_ID_LEN: usize = 64;
+
 #[derive(Debug, Clone)]
 pub struct ProcessData {
     pub name: String, // the replaced name
@@ -51,6 +54,10 @@ pub struct ProcessData {
     pub start_time: Duration, // the process start timestamp
     // Vec<key, val>
     pub os_app_tags: Vec<OsAppTagKV>,
+    // netns file inode
+    pub netns_id: u64,
+    // pod container id in kubernetes
+    pub container_id: String,
 }
 
 impl ProcessData {
@@ -141,6 +148,8 @@ impl TryFrom<&Process> for ProcessData {
                 }
             },
             os_app_tags: vec![],
+            netns_id: get_proc_netns(proc)?,
+            container_id: get_container_id(proc).unwrap_or("".to_string()),
         })
     }
 }
@@ -165,6 +174,8 @@ impl From<&ProcessData> for ProcessInfo {
                 }
                 tags
             },
+            netns_id: Some(p.netns_id as u32),
+            container_id: Some(p.container_id.clone()),
         }
     }
 }
@@ -187,6 +198,7 @@ pub enum ProcRegRewrite {
     Cmd(Regex, RegExpAction, String),
     ProcessName(Regex, RegExpAction, String),
     ParentProcessName(Regex, RegExpAction),
+    Tag(Regex, RegExpAction),
 }
 
 impl ProcRegRewrite {
@@ -195,6 +207,7 @@ impl ProcRegRewrite {
             ProcRegRewrite::Cmd(_, act, _) => *act,
             ProcRegRewrite::ProcessName(_, act, _) => *act,
             ProcRegRewrite::ParentProcessName(_, act) => *act,
+            ProcRegRewrite::Tag(_, act) => *act,
         }
     }
 }
@@ -209,6 +222,9 @@ impl PartialEq for ProcRegRewrite {
                 lr.as_str() == rr.as_str() && lact == ract && ls == rs
             }
             (Self::ParentProcessName(lr, lact), Self::ParentProcessName(rr, ract)) => {
+                lr.as_str() == rr.as_str() && lact == ract
+            }
+            (Self::Tag(lr, lact), Self::Tag(rr, ract)) => {
                 lr.as_str() == rr.as_str() && lact == ract
             }
             _ => false,
@@ -250,6 +266,7 @@ impl TryFrom<&OsProcRegexp> for ProcRegRewrite {
                 env_rewrite(value.rewrite_name.clone()),
             )),
             OS_PROC_REGEXP_MATCH_TYPE_PARENT_PROC_NAME => Ok(Self::ParentProcessName(re, action)),
+            OS_PROC_REGEXP_MATCH_TYPE_TAG => Ok(Self::Tag(re, action)),
             _ => Err(regex::Error::__Nonexhaustive),
         }
     }
@@ -260,6 +277,7 @@ impl ProcRegRewrite {
         &self,
         proc: &mut ProcessData,
         pid_process_map: &PidProcMap,
+        tags: &HashMap<u64, OsAppTag>,
         match_only: bool,
     ) -> bool {
         let mut match_replace_fn =
@@ -304,6 +322,21 @@ impl ProcRegRewrite {
 
                 match_parent(&*proc, pid_process_map, reg)
             }
+            ProcRegRewrite::Tag(reg, _) => {
+                if let Some(tag) = tags.get(&proc.pid) {
+                    let mut found = false;
+                    for tag_kv in tag.tags.iter() {
+                        let composed = format!("{}:{}", &tag_kv.key, &tag_kv.value);
+                        if reg.is_match(&composed.as_str()) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    found
+                } else {
+                    false
+                }
+            }
         }
     }
 }
@@ -315,7 +348,7 @@ pub struct OsAppTagKV {
 }
 
 #[derive(Default, Deserialize)]
-struct OsAppTag {
+pub struct OsAppTag {
     pid: u64,
     // Vec<key, val>
     tags: Vec<OsAppTagKV>,
@@ -347,11 +380,12 @@ pub(super) fn get_all_pid_process_map(proc_root: &str) -> PidProcMap {
 pub(super) fn get_all_process(conf: &OsProcScanConfig) -> Vec<ProcessData> {
     // Hashmap<root_inode, PasswordInfo>
     let mut pwd_info = HashMap::new();
-    let (user, cmd, proc_root, proc_regexp, now_sec) = (
+    let (user, cmd, proc_root, proc_regexp, tagged_only, now_sec) = (
         conf.os_app_tag_exec_user.as_str(),
         conf.os_app_tag_exec.as_slice(),
         conf.os_proc_root.as_str(),
         conf.os_proc_regex.as_slice(),
+        conf.os_proc_sync_tagged_only,
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -396,7 +430,7 @@ pub(super) fn get_all_process(conf: &OsProcScanConfig) -> Vec<ProcessData> {
             }
 
             for i in proc_regexp.iter() {
-                if i.match_and_rewrite_proc(&mut proc_data, &pid_proc_map, false) {
+                if i.match_and_rewrite_proc(&mut proc_data, &pid_proc_map, &tags_map, false) {
                     if i.action() == RegExpAction::Drop {
                         break;
                     }
@@ -426,6 +460,8 @@ pub(super) fn get_all_process(conf: &OsProcScanConfig) -> Vec<ProcessData> {
                     // fill tags
                     if let Some(tags) = tags_map.remove(&proc_data.pid) {
                         proc_data.os_app_tags = tags.tags
+                    } else if tagged_only {
+                        break;
                     }
 
                     ret.push(proc_data);
@@ -450,7 +486,7 @@ pub(super) fn get_self_proc() -> ProcResult<ProcessData> {
 }
 
 // return Hashmap<pid, OsAppTag>
-fn get_os_app_tag_by_exec(
+pub(super) fn get_os_app_tag_by_exec(
     username: &str,
     cmd: &[String],
 ) -> Result<HashMap<u64, OsAppTag>, String> {
@@ -557,6 +593,56 @@ fn merge_tag(child_tag: &mut Vec<OsAppTagKV>, parent_tag: &[OsAppTagKV]) {
     }
 }
 
+fn get_container_id(proc: &Process) -> Option<String> {
+    let Ok(cgruop) = proc.cgroups() else {
+        return None
+    };
+
+    let mut path = "".to_string();
+
+    'l: for i in cgruop {
+        // cgroup version 2 have no controller
+        if i.controllers.len() == 0 {
+            path = i.pathname;
+            break;
+        } else {
+            for c in i.controllers {
+                match c.as_str() {
+                    "pids" | "cpuset" | "devices" | "memory" | "cpu" => {
+                        path = i.pathname;
+                        break 'l;
+                    }
+                    _ => {}
+                }
+            }
+        };
+    }
+    if path.is_empty() {
+        return None;
+    }
+
+    let Some((_, s)) = path.rsplit_once(MAIN_SEPARATOR) else {
+        debug!("cgroup path: `{:?}` get base path fail", path);
+        return None;
+    };
+
+    if s.len() == CONTAINER_ID_LEN {
+        // when length is 64 assume is docker cri
+        Some(s.to_string())
+    } else {
+        // other cri likely have format like `${cri-prefix}-${container id}.scope`
+        let Some((_, sp))  = s.rsplit_once("-") else {
+            debug!("containerd cri path: `{:?}` get container id fail", path);
+            return None;
+        };
+        if sp.len() != CONTAINER_ID_LEN + ".scope".len() {
+            debug!("containerd cri path: `{}` parse fail, length incorrect", sp);
+            return None;
+        }
+        Some(sp[..CONTAINER_ID_LEN].to_string())
+    }
+}
+
 #[cfg(test)]
 mod test {
     use std::time::Duration;
@@ -584,6 +670,8 @@ mod test {
                         key: "root_key".into(),
                         value: "root_val".into(),
                     }],
+                    netns_id: 1,
+                    container_id: "".into(),
                 },
                 ProcessData {
                     name: "parent".into(),
@@ -598,6 +686,8 @@ mod test {
                         key: "parent_key".into(),
                         value: "parent_val".into(),
                     }],
+                    netns_id: 1,
+                    container_id: "".into(),
                 },
                 ProcessData {
                     name: "child".into(),
@@ -612,6 +702,8 @@ mod test {
                         key: "child_key".into(),
                         value: "child_val".into(),
                     }],
+                    netns_id: 1,
+                    container_id: "".into(),
                 },
                 ProcessData {
                     name: "other".into(),
@@ -626,6 +718,8 @@ mod test {
                         key: "other_key".into(),
                         value: "other_val".into(),
                     }],
+                    netns_id: 1,
+                    container_id: "".into(),
                 },
             ];
 

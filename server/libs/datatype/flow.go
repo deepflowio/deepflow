@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -162,6 +162,7 @@ const (
 	L7_PROTOCOL_KAFKA        L7Protocol = 100
 	L7_PROTOCOL_MQTT         L7Protocol = 101
 	L7_PROTOCOL_DNS          L7Protocol = 120
+	L7_PROTOCOL_CUSTOM       L7Protocol = 127
 )
 
 // size = 9 * 4B = 36B
@@ -196,12 +197,13 @@ type FlowMetricsPeer struct {
 	TotalPacketCount uint64        // 整个Flow生命周期的统计量
 	First, Last      time.Duration // 整个Flow生命周期首包和尾包的时间戳
 
-	L3EpcID      int32
-	IsL2End      bool
-	IsL3End      bool
-	IsActiveHost bool
-	IsDevice     bool  // true表明是从平台数据中获取的
-	TCPFlags     uint8 // 所有TCP的Flags或运算
+	L3EpcID       int32
+	IsL2End       bool
+	IsL3End       bool
+	IsActiveHost  bool
+	IsDevice      bool  // true表明是从平台数据中获取的
+	TCPFlags      uint8 // 每个流统计周期的TCP Flags或运算
+	TotalTCPFlags uint8 // 整个Flow生命周期的TCP Flags或运算
 	// TODO: IsVIPInterface、IsVIP流日志没有存储，Encode\Decode可以不做
 	IsVIPInterface bool // 目前仅支持微软Mux设备，从grpc Interface中获取
 	IsVIP          bool // 从grpc cidr中获取
@@ -636,6 +638,8 @@ func (p L7Protocol) String() string {
 		formatted = "Kafka"
 	case L7_PROTOCOL_MQTT:
 		formatted = "MQTT"
+	case L7_PROTOCOL_CUSTOM:
+		formatted = "Custom"
 	case L7_PROTOCOL_OTHER:
 		formatted = "Others"
 	default:

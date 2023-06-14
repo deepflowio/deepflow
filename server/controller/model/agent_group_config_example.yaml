@@ -81,14 +81,14 @@ vtap_group_id: g-xxxxxx
 ## Length: [0, 65535]
 ## Default:
 ##   Localhost:   lo
-##   Common NIC:  eth.*|en[ospx].*
+##   Common NIC:  eth.*|en[osipx].*
 ##   QEMU VM NIC: tap.*
 ##   Flannel:     veth.*
 ##   Calico:      cali.*
 ##   Cilium:      lxc.*
 ##   Kube-OVN:    [0-9a-f]+_h$
 ## Note: Regular expression of NIC name for collecting traffic
-#tap_interface_regex: ^(tap.*|cali.*|veth.*|eth.*|en[ospx].*|lxc.*|lo|[0-9a-f]+_h)$
+#tap_interface_regex: ^(tap.*|cali.*|veth.*|eth.*|en[osipx].*|lxc.*|lo|[0-9a-f]+_h)$
 
 ## Traffic Capture Filter
 ## Length: [1, 512]
@@ -299,10 +299,10 @@ vtap_group_id: g-xxxxxx
 #rsyslog_enabled: 1
 
 ## NTP Synchronization
-## Default: 1, means enabled. Options: 0 (disabled), 1 (enabled).
+## Default: 0, means enabled. Options: 0 (disabled), 1 (enabled).
 ## Note: Whether to synchronize the clock to the deepflow-server, this behavior
 ##   will not change the time of the deepflow-agent running environment.
-#ntp_enabled: 1
+#ntp_enabled: 0
 
 ## Resource MAC/IP Address Delivery
 ## Default: 0, which means all domains, or can be set to a list of lcuuid of a
@@ -380,14 +380,19 @@ vtap_group_id: g-xxxxxx
 #- 0
 
 ## Data Integration Socket
-## Default: 0. Options: 0 (disabled), 1 (enabled).
+## Default: 1. Options: 0 (disabled), 1 (enabled).
 ## Note: Whether to enable receiving external data sources such as Prometheus,
 ##   Telegraf, OpenTelemetry, and SkyWalking.
-#external_agent_http_proxy_enabled: 0
+#external_agent_http_proxy_enabled: 1
 
 ## Listen Port of the Data Integration Socket
 ## Default: 38086. Options: [1, 65535]
 #external_agent_http_proxy_port: 38086
+
+# Prometheus API address
+## Note: Get target from Prometheus and synchronize to the deepflow-server.
+## Example: ip:port
+#prometheus_http_api_address:
 
 ##################
 ## NPB Switches ##
@@ -413,12 +418,20 @@ vtap_group_id: g-xxxxxx
   ## K8s api list limit
   ## Default: 1000. Options: [10, 4294967296)
   ## Note: Used when limit k8s api list entry size.
-  #kubernetes-api-list-limit:
+  #kubernetes-api-list-limit: 1000
 
   ## K8s api list interval
   ## Default: 10m. Must be larger than or equal to 10m.
   ## Note: Interval of listing resource when watcher idles
-  #kubernetes-api-list-interval:
+  #kubernetes-api-list-interval: 10m
+
+  ## K8s api memory trim percentage
+  ## Default: 100. Options: [0, 100]
+  ## Note: The memory percentage is calculated by `RssAnon * 100 / (max_memory - RssFile - RssShmem)`.
+  #    If `memory-trim-disabled` is set to false (the default), memory will be checked
+  #    after processing each batch `Api::list` returns, a percentage above this threshold
+  #    will trigger a `malloc_trim`.
+  #kubernetes-api-memory-trim-percent: 100
 
   ## Type of Ingress
   ## Default: kubernetes. Options: kubernetes, openshift
@@ -427,12 +440,14 @@ vtap_group_id: g-xxxxxx
   #ingress-flavour: kubernetes
 
   ## Pod MAC/IP Address Query Method
-  ## Default: adaptive. Options: adaptive, active, passive.
+  ## Default: adaptive. Options: adaptive, active, passive, sidecar.
   ## Note: In active mode, deepflow-agent enters the netns of other Pods through
   ##   setns syscall to query the MAC and IP addresses. In this mode, the setns
   ##   operation requires the SYS_ADMIN permission. In passive mode deepflow-agent
   ##   calculates the MAC and IP addresses used by Pods by capturing ARP/ND traffic.
-  ##   When set to adaptive, active mode will be used first.
+  ##   When set to adaptive, active mode will be used first. In sidecar mode,
+  ##   environment variable `CTRL_NETWORK_INTERFACE` must be specified and
+  ##   optionally `K8S_POD_IP_FOR_DEEPFLOW` can be set to override ip address.
   #kubernetes-poller-type: adaptive
 
   #########################
@@ -473,6 +488,12 @@ vtap_group_id: g-xxxxxx
   ## Note: Whether to enable mirror traffic deduplication when tap_mode = 2.
   #analyzer-dedup-disabled: false
 
+  ## Buffer block size used to store raw packet.
+  ## Larger value will reduce memory allocation for raw packet, but will also
+  ## delay memory free.
+  ## Default: 65536, Range: [65536: +oo)
+  #analyzer-raw-packet-block-size: 65536
+
   ## Default TAP for Mirror Traffic
   ## Default: 3, means Cloud Network
   ## Options: 1-2,4-255 (IDC Network), 3 (Cloud Network)
@@ -507,6 +528,15 @@ vtap_group_id: g-xxxxxx
   ## Note: When set to 0, deepflow-agent will automatically adjust the map size
   ##   according to max_memory.
   #fast-path-map-size: 0
+
+  ## Fast Path Disabled
+  ## Note: When set to true, deepflow-agent will not use fast path.
+  #fast-path-disabled: false
+
+  ## Forward Table Capacity
+  ## Default: 16384. Range: [16384, +oo)
+  ## Note: When this value is larger, the more memory usage may be
+  #forward-capacity: 16384
 
   ## Fast Path Level
   ## Default: 8. Range: [1, 16]
@@ -649,7 +679,9 @@ vtap_group_id: g-xxxxxx
 
     ## Maximum Flow
     ## Default: 1048576
-    ## Note: Maximum number of flows that can be stored in FlowMap.
+    ## Note: Maximum number of flows that can be stored in FlowMap, It will also affect the capacity of
+    ##   the RRT cache, Example: rrt-cache-capacity = flow-count-limit / 4. When rrt-cache-capacity is
+    ##   not enough, it will be unable to calculate the rrt of l7.
     #flow-count-limit: 1048576
 
     ## Queue Size of FlowAggregator (1s->1m)
@@ -677,6 +709,12 @@ vtap_group_id: g-xxxxxx
     ##   exactly equal MAC addresses.
     #ignore-l2-end: false
 
+    ## Ignore VLAN when Generate Flow
+    ## Note: When the VLAN of the two-way traffic collected at the same location
+    ##   are asymmetrical, the traffic cannot be aggregated into a Flow. You can
+    ##   set this value at this time. Only valid for IDC (not Cloud) traffic.
+    #ignore-idc-vlan: false
+
     ## Timeouts for TCP State Machine
     ## Format: $number$time_unit
     ## Example: 1s, 2m, 10h
@@ -684,6 +722,13 @@ vtap_group_id: g-xxxxxx
     #closing-rst-timeout: 35s
     #others-timeout: 5s
     #opening-rst-timeout: 1s
+
+    ## Size of memory pool used in flow_map
+    ## Default: 65536
+    ## Note: This value is used to set max length of memory pool in FlowMap
+    ##   Memory pools are used for frequently create and destroy objects like
+    ##   FlowNode, FlowLog, etc.
+    #memory-pool-size: 65536
 
   #####################
   ## DPDK RecvEngine ##
@@ -768,9 +813,22 @@ vtap_group_id: g-xxxxxx
   ##   overhead of deepflow-agent.
   #bpf-disabled: false
 
+  ############
+  ## plugin ##
+  ############
+  ## wasm plugin need to load in agent
+  #wasm-plugins: []
+
   #################
   ## L7 Protocol ##
   #################
+  ## L7 perf rrt calculate timeout
+  ## Note: the timeout of l7 log info rrt calculate, when rrt exceed the value will act as timeout and will not
+  ##   calculate the sum and average and will not merge the request and response in session aggregate. the value
+  ##   must greater than session aggregate SLOT_TIME(const 10s) and less than 3600 on tcp or 300 on udp.
+  #rrt-tcp-timeout: 1800s
+  #rrt-udp-timeout: 150s
+
   ## Maximum Fail Count
   ## Note: deepflow-agent will mark the application protocol for each
   ##   <vpc, ip, protocol, port> tuple, when the traffic corresponding to a tuple fails
@@ -803,6 +861,7 @@ vtap_group_id: g-xxxxxx
   #- Kafka
   #- MQTT
   #- DNS
+  #- Custom ## custom protocol from plugin
 
   ## Application Protocol Port Numbers
   ## Default: 53 for DNS, 1-65535 for other Protocols.
@@ -811,6 +870,7 @@ vtap_group_id: g-xxxxxx
   #l7-protocol-ports:
     #"HTTP": "1-65535" # for both HTTP and HTTP_TLS
     #"HTTP2": "1-65535" # for HTTP2, HTTP2_TLS and gRPC
+    #"Wasm": "1-65535" # wasm plugins
     #"ProtobufRPC": "1-65535"
     #"SofaRPC": "1-65535"
     #"Dubbo": "1-65535"
@@ -876,7 +936,7 @@ vtap_group_id: g-xxxxxx
     #uprobe-process-name-regexs:
 
       ## Note: Process name to enable Golang-specific symbol table parsing. The default
-      ##   value is empty, which means that this feature is not enabled for any process.
+      ##   value is "", which means that this feature is not enabled for any process.
       ##   This feature acts on Golang processes that have trimmed the standard symbol
       ##   table. For example, the management process of K8s generally belongs to this
       ##   category. When this feature is enabled, for processes with Golang
@@ -887,13 +947,13 @@ vtap_group_id: g-xxxxxx
       #golang-symbol: ""
 
       ## Note: The name of the Golang process that enables HTTP2/HTTPS protocol data collection.
-      ##   The default value is .*, which means it is enabled for all Golang processes.
-      #golang: ".*"
+      ##   The default value is "", which means it is disabled for all Golang processes.
+      #golang: ""
 
       ## Note: The name of the process that uses the openssl library to enable HTTPS
-      ##   protocol data collection. The default is .*, which means that it is enabled for
+      ##   protocol data collection. The default is "", which means that it is disabled for
       ##   all processes that use the openssl library.
-      #openssl: ".*"
+      #openssl: ""
 
     #kprobe-whitelist:
       ## Server Port Whitelist
@@ -934,10 +994,10 @@ vtap_group_id: g-xxxxxx
     #max-trace-entries: 524288
 
     ## eBPF go trace timeout
-    ## Default: 0 second[s]. Range: [0, +]
+    ## Default: 120 second[s]. Range: [0, +]
     ## Note: The expected maximum time interval between the server receiving the request and returning the response,
     ##   If the value is 0, this feature is disabled. Tracing only considers the thread number.
-    #go-tracing-timeout: 0
+    #go-tracing-timeout: 120
 
     ## eBPF IO event collect mode
     ## Default: 1 . Range: [0, 1, 2]
@@ -980,6 +1040,10 @@ vtap_group_id: g-xxxxxx
   ## Default: false
   ## Note: only make sense when agent type is one of CHOST_VM, CHOST_BM, K8S_VM, K8S_BM
   #os-proc-sync-enabled: false
+
+  ## To sync tagged processed only
+  ## Default: false
+  #os-proc-sync-tagged-only: false
 
   ## The proc fs mount path
   ## Default: /proc
@@ -1035,6 +1099,9 @@ vtap_group_id: g-xxxxxx
   ##     - match-regex: .*sleep.*
   ##       match-type: process_name
   ##       action: drop
+  ##     - match-regex: .+ # match after concatenating a tag key and value pair using colon, i.e., an regex `app:.+` can match all processes has a `app` tag
+  ##       match-type: tag
+  ##       action: accept
   #os-proc-regex:
 
     ## The regexp use for match the process
@@ -1060,12 +1127,19 @@ vtap_group_id: g-xxxxxx
   ## Guard Interval ##
   ####################
   ## Time interval for the agent to detect its own state.
-  ## Default: 60s. Unit: s. Range: [1s, 3600s].
+  ## Default: 10s. Unit: s. Range: [1s, 3600s].
   ## Note: The agent will detect:
   ##   1. System free memory;
   ##   2. Get the number of threads of the agent itself by reading the file information under the /proc directory;
   ##   3. Size and number of log files generated by the agent.
-  #guard-interval: 60s
+  #guard-interval: 10s
+
+  #################
+  ## Memory trim ##
+  #################
+  ## Note:
+  ##   Using memory trimming can effectively reduce memory usage, but there may be performance loss
+  #memory-trim-disabled: false
 
   #####################
   ## Check core file ##

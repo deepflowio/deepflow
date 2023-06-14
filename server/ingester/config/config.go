@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -249,7 +249,12 @@ func (c *Config) Validate() error {
 			continue
 		}
 		for _, endpoint := range endpoints {
-			c.CKDB.ActualAddrs = append(c.CKDB.ActualAddrs, fmt.Sprintf("%s:%d", endpoint.Host, endpoint.Port))
+			// if it is an IPv6 address, it needs to be enclosed in []
+			if strings.Contains(endpoint.Host, ":") {
+				c.CKDB.ActualAddrs = append(c.CKDB.ActualAddrs, fmt.Sprintf("[%s]:%d", endpoint.Host, endpoint.Port))
+			} else {
+				c.CKDB.ActualAddrs = append(c.CKDB.ActualAddrs, fmt.Sprintf("%s:%d", endpoint.Host, endpoint.Port))
+			}
 		}
 		c.CKDB.Watcher = watcher
 		log.Infof("get clickhouse actual address: %s", c.CKDB.ActualAddrs)

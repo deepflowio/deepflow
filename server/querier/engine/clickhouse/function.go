@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -532,7 +532,7 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 			f.Value = tagDes.TagTranslator
 		} else {
 			// Custom Tag
-			if strings.HasPrefix(f.Args[0], "k8s.label.") || strings.HasPrefix(f.Args[0], "cloud.tag.") || strings.HasPrefix(f.Args[0], "os.app.") {
+			if strings.HasPrefix(f.Args[0], "k8s.label.") || strings.HasPrefix(f.Args[0], "k8s.annotation.") || strings.HasPrefix(f.Args[0], "k8s.env.") || strings.HasPrefix(f.Args[0], "cloud.tag.") || strings.HasPrefix(f.Args[0], "os.app.") {
 				nodeType := strings.TrimSuffix(f.Args[0], "_0")
 				nodeType = strings.TrimSuffix(nodeType, "_1")
 				f.Value = "'" + nodeType + "'"

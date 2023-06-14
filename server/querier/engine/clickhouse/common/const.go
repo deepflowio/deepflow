@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ const DB_NAME_EXT_METRICS = "ext_metrics"
 const DB_NAME_DEEPFLOW_SYSTEM = "deepflow_system"
 const DB_NAME_EVENT = "event"
 const DB_NAME_PROFILE = "profile"
+const DB_NAME_PROMETHEUS = "prometheus"
 const DB_DEEPFLOW_SYSTEM_INTERVAL = 10
 
 var DB_TABLE_MAP = map[string][]string{
@@ -32,4 +33,5 @@ var DB_TABLE_MAP = map[string][]string{
 	DB_NAME_DEEPFLOW_SYSTEM: []string{"deepflow_system_common"},
 	DB_NAME_EVENT:           []string{"event", "perf_event"},
 	DB_NAME_PROFILE:         []string{"in_process"},
+	DB_NAME_PROMETHEUS:      []string{"samples"},
 }

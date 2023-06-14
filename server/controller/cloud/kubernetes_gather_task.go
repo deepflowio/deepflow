@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/deepflowio/deepflow/server/controller/cloud/config"
 	"github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather"
 	kmodel "github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
@@ -37,8 +38,8 @@ type KubernetesGatherTask struct {
 }
 
 func NewKubernetesGatherTask(
-	domain *mysql.Domain, subDomain *mysql.SubDomain, ctx context.Context, isSubDomain bool, interval uint32) *KubernetesGatherTask {
-	kubernetesGather := kubernetes_gather.NewKubernetesGather(domain, subDomain, isSubDomain)
+	ctx context.Context, domain *mysql.Domain, subDomain *mysql.SubDomain, cfg config.CloudConfig, isSubDomain bool) *KubernetesGatherTask {
+	kubernetesGather := kubernetes_gather.NewKubernetesGather(domain, subDomain, cfg, isSubDomain)
 	if kubernetesGather == nil {
 		log.Errorf("kubernetes_gather (%s) task init faild", subDomain.Name)
 		return nil
@@ -63,7 +64,7 @@ func NewKubernetesGatherTask(
 		},
 		kCtx:             kCtx,
 		kCancel:          kCancel,
-		interval:         interval,
+		interval:         cfg.KubernetesGatherInterval,
 		kubernetesGather: kubernetesGather,
 		SubDomainConfig:  subDomainConfig,
 	}

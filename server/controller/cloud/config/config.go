@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,10 +22,12 @@ type CloudConfig struct {
 	CloudGatherInterval      uint32 `default:"30" yaml:"cloud_gather_interval"`
 	KubernetesGatherInterval uint32 `default:"30" yaml:"kubernetes_gather_interval"`
 	AliyunRegionName         string `default:"cn-beijing" yaml:"aliyun_region_name"`
+	AWSRegionName            string `default:"cn-north-1" yaml:"aws_region_name"`
 	GenesisDefaultVpcName    string `default:"default_vpc" yaml:"genesis_default_vpc"`
 	HostnameToIPFile         string `default:"/etc/hostname_to_ip.csv" yaml:"hostname_to_ip_file"`
 	DNSEnable                bool   `default:"false" yaml:"dns_enable"`
 	HTTPTimeout              int    `default:"30" yaml:"http_timeout"`
+	CustomTagLenMax          int    `default:"256" yaml:"custom_tag_len_max"`
 	DebugEnabled             bool   `default:"false" yaml:"debug_enabled"`
 }
 
@@ -35,5 +37,7 @@ func SetCloudGlobalConfig(c CloudConfig) {
 		DNSEnable:        c.DNSEnable,
 		HTTPTimeout:      c.HTTPTimeout,
 		DebugEnabled:     c.DebugEnabled,
+		AWSRegionName:    c.AWSRegionName,
+		CustomTagLenMax:  c.CustomTagLenMax,
 	}
 }

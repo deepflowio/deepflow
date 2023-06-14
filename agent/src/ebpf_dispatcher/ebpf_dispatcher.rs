@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ use crate::common::TaggedFlow;
 use crate::config::handler::{EbpfAccess, EbpfConfig, LogParserAccess};
 use crate::config::FlowAccess;
 use crate::ebpf::{self, set_allow_port_bitmap};
-use crate::flow_generator::{FlowMap, MetaAppProto};
+use crate::flow_generator::{flow_map::Config, FlowMap, MetaAppProto};
 use crate::policy::PolicyGetter;
 use crate::utils::stats;
 use public::counter::{Counter, CounterType, CounterValue, OwnedCountable};
@@ -203,9 +203,7 @@ impl EbpfDispatcher {
             self.policy_getter,
             self.output.clone(),
             self.time_diff.clone(),
-            self.flow_map_config.clone(),
-            self.log_parser_config.clone(),
-            Some(self.config.clone()),
+            &self.flow_map_config.load(),
             None, // Enterprise Edition Feature: packet-sequence
             &self.stats_collector,
             true, // from_ebpf
@@ -221,13 +219,18 @@ impl EbpfDispatcher {
             {
                 continue;
             }
+            let config = Config {
+                flow: &self.flow_map_config.load(),
+                log_parser: &self.log_parser_config.load(),
+                ebpf: Some(&ebpf_config),
+            };
 
             for mut packet in batch.drain(..) {
                 sync_counter.counter().rx += 1;
 
                 packet.timestamp_adjust(self.time_diff.load(Ordering::Relaxed));
                 packet.set_loopback_mac(ebpf_config.ctrl_mac);
-                flow_map.inject_meta_packet(&mut packet);
+                flow_map.inject_meta_packet(&config, &mut packet);
             }
         }
     }

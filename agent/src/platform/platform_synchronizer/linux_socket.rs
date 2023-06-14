@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 use std::{
     collections::{HashMap, HashSet},
     ffi::OsString,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    net::{IpAddr, SocketAddr},
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -35,7 +35,7 @@ use public::{
     proto::trident::{GpidSyncEntry, RoleType, ServiceProtocol},
 };
 
-use super::{get_all_pid_process_map, sym_uptime, RegExpAction};
+use super::{get_all_pid_process_map, get_os_app_tag_by_exec, sym_uptime, RegExpAction};
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum Role {
@@ -65,6 +65,7 @@ pub(super) struct SockEntry {
     pub(super) local: SockAddrData,
     pub(super) remote: SockAddrData,
     pub(super) real_client: Option<SockAddrData>,
+    // netns idx is the unique number of netns, not equal to netns inode.
     pub(super) netns_idx: u16,
 }
 
@@ -165,7 +166,20 @@ pub(super) fn get_all_socket(
     // HashSet<(SocketAddr)>, the listenning addr when socket listening specific addr
     let mut spec_addr_listen_sock = HashSet::new();
 
-    let (proc_root, min_sock_lifetime, now_sec, mut tcp_entries, mut udp_entries, mut sock_entries) = (
+    let (
+        user,
+        cmd,
+        tagged_only,
+        proc_root,
+        min_sock_lifetime,
+        now_sec,
+        mut tcp_entries,
+        mut udp_entries,
+        mut sock_entries,
+    ) = (
+        conf.os_app_tag_exec_user.as_str(),
+        conf.os_app_tag_exec.as_slice(),
+        conf.os_proc_sync_tagged_only,
         conf.os_proc_root.as_str(),
         conf.os_proc_socket_min_lifetime as u64,
         SystemTime::now()
@@ -176,6 +190,19 @@ pub(super) fn get_all_socket(
         vec![],
         vec![],
     );
+
+    let tags_map = match get_os_app_tag_by_exec(user, cmd) {
+        Ok(tags) => tags,
+        Err(err) => {
+            error!(
+                "get process tags by execute cmd `{}` with user {} fail: {}",
+                cmd.join(" "),
+                user,
+                err
+            );
+            HashMap::new()
+        }
+    };
 
     // netns idx increase every time get the new netns id
     let mut netns_idx = 0u16;
@@ -213,8 +240,12 @@ pub(super) fn get_all_socket(
         }
 
         for i in conf.os_proc_regex.as_slice() {
-            if i.match_and_rewrite_proc(&mut proc_data, &pid_proc_map, true) {
+            if i.match_and_rewrite_proc(&mut proc_data, &pid_proc_map, &tags_map, true) {
                 if i.action() == RegExpAction::Drop {
+                    break;
+                }
+
+                if tags_map.get(&(proc.pid as u64)).is_none() && tagged_only {
                     break;
                 }
 
@@ -306,13 +337,10 @@ pub(super) fn get_all_socket(
 }
 
 fn is_zero_addr(addr: &SocketAddr) -> bool {
-    match addr {
-        SocketAddr::V4(v4) => v4.ip() == &Ipv4Addr::UNSPECIFIED,
-        SocketAddr::V6(v6) => v6.ip() == &Ipv6Addr::UNSPECIFIED,
-    }
+    addr.ip().is_unspecified()
 }
 
-fn get_proc_netns(proc: &Process) -> Result<u64, ProcError> {
+pub(super) fn get_proc_netns(proc: &Process) -> Result<u64, ProcError> {
     // works with linux 3.0+ kernel only
     // refer to this [commit](https://github.com/torvalds/linux/commit/6b4e306aa3dc94a0545eb9279475b1ab6209a31f)
     // use 0 as default ns for old kernel

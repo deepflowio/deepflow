@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,12 +17,9 @@
 package service
 
 import (
-	"context"
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/engine"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse"
-	"github.com/deepflowio/deepflow/server/querier/prometheus"
-	"github.com/prometheus/prometheus/prompb"
 )
 
 func Execute(args *common.QuerierParams) (jsonData map[string]interface{}, debug map[string]interface{}, err error) {
@@ -42,16 +39,4 @@ func Execute(args *common.QuerierParams) (jsonData map[string]interface{}, debug
 
 func getDbBy() string {
 	return "clickhouse"
-}
-
-func PromReaderExecute(req *prompb.ReadRequest, ctx context.Context) (resp *prompb.ReadResponse, err error) {
-	return prometheus.PromReaderExecute(req, ctx)
-}
-
-func PromQueryExecute(args *common.PromQueryParams, ctx context.Context) (*common.PromQueryResponse, error) {
-	return prometheus.PromQueryExecute(args, ctx)
-}
-
-func PromQueryRangeExecute(args *common.PromQueryParams, ctx context.Context) (*common.PromQueryResponse, error) {
-	return prometheus.PromQueryRangeExecute(args, ctx)
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -72,6 +72,7 @@ type DiffBaseDataSet struct {
 	PodReplicaSets         map[string]*PodReplicaSet
 	Pods                   map[string]*Pod
 	Process                map[string]*Process
+	PrometheusTarget       map[string]*PrometheusTarget
 }
 
 func NewDiffBaseDataSet() DiffBaseDataSet {
@@ -119,6 +120,7 @@ func NewDiffBaseDataSet() DiffBaseDataSet {
 		PodReplicaSets:         make(map[string]*PodReplicaSet),
 		Pods:                   make(map[string]*Pod),
 		Process:                make(map[string]*Process),
+		PrometheusTarget:       make(map[string]*PrometheusTarget),
 	}
 }
 
@@ -806,6 +808,7 @@ func (b *DiffBaseDataSet) addPodService(dbItem *mysql.PodService, seq int, toolD
 		},
 		Name:             dbItem.Name,
 		Label:            dbItem.Label,
+		Annotation:       dbItem.Annotation,
 		Selector:         dbItem.Selector,
 		ServiceClusterIP: dbItem.ServiceClusterIP,
 		PodIngressLcuuid: podIngressLcuuid,
@@ -911,6 +914,8 @@ func (b *DiffBaseDataSet) addPod(dbItem *mysql.Pod, seq int, toolDataSet *ToolDa
 		},
 		Name:                dbItem.Name,
 		Label:               dbItem.Label,
+		Annotation:          dbItem.Annotation,
+		ENV:                 dbItem.ENV,
 		State:               dbItem.State,
 		CreatedAt:           dbItem.CreatedAt,
 		PodNodeLcuuid:       podNodeLcuuid,
@@ -959,6 +964,25 @@ func (b *DiffBaseDataSet) addProcess(dbItem *mysql.Process, seq int) {
 func (b *DiffBaseDataSet) deleteProcess(lcuuid string) {
 	delete(b.Process, lcuuid)
 	log.Info(deleteDiffBase(RESOURCE_TYPE_PROCESS_EN, lcuuid))
+}
+
+func (b *DiffBaseDataSet) addPrometheusTarget(dbItem *mysql.PrometheusTarget, seq int) {
+	b.PrometheusTarget[dbItem.Lcuuid] = &PrometheusTarget{
+		DiffBase: DiffBase{
+			Sequence: seq,
+			Lcuuid:   dbItem.Lcuuid,
+		},
+		Instance:    dbItem.Instance,
+		Job:         dbItem.Job,
+		ScrapeURL:   dbItem.ScrapeURL,
+		OtherLabels: dbItem.OtherLabels,
+	}
+	log.Info(addDiffBase(RESOURCE_TYPE_PROMETHEUS_TARGET_EN, b.PrometheusTarget[dbItem.Lcuuid]))
+}
+
+func (b *DiffBaseDataSet) deletePrometheusTarget(lcuuid string) {
+	delete(b.PrometheusTarget, lcuuid)
+	log.Info(deleteDiffBase(RESOURCE_TYPE_PROMETHEUS_TARGET_EN, lcuuid))
 }
 
 type DiffBase struct {
@@ -1496,6 +1520,7 @@ type PodService struct {
 	DiffBase
 	Name             string `json:"name"`
 	Label            string `json:"label"`
+	Annotation       string `json:"annotation"`
 	Selector         string `json:"selector"`
 	ServiceClusterIP string `json:"service_cluster_ip"`
 	PodIngressLcuuid string `json:"pod_ingress_lcuuid"`
@@ -1507,6 +1532,7 @@ type PodService struct {
 func (p *PodService) Update(cloudItem *cloudmodel.PodService) {
 	p.Name = cloudItem.Name
 	p.Label = cloudItem.Label
+	p.Annotation = cloudItem.Annotation
 	p.Selector = cloudItem.Selector
 	p.ServiceClusterIP = cloudItem.ServiceClusterIP
 	p.PodIngressLcuuid = cloudItem.PodIngressLcuuid
@@ -1586,6 +1612,9 @@ type Pod struct {
 	DiffBase
 	Name                string    `json:"name"`
 	Label               string    `json:"label"`
+	Annotation          string    `json:"annotation"`
+	ENV                 string    `json:"env"`
+	ContainerIDs        string    `json:"container_ids"`
 	State               int       `json:"state"`
 	CreatedAt           time.Time `json:"created_at"`
 	PodNodeLcuuid       string    `json:"pod_node_lcuuid"`
@@ -1599,6 +1628,9 @@ type Pod struct {
 func (p *Pod) Update(cloudItem *cloudmodel.Pod) {
 	p.Name = cloudItem.Name
 	p.Label = cloudItem.Label
+	p.ENV = cloudItem.ENV
+	p.Annotation = cloudItem.Annotation
+	p.ContainerIDs = cloudItem.ContainerIDs
 	p.State = cloudItem.State
 	p.CreatedAt = cloudItem.CreatedAt
 	p.PodNodeLcuuid = cloudItem.PodNodeLcuuid
@@ -1630,12 +1662,30 @@ type LBVMConnection struct {
 
 type Process struct {
 	DiffBase
-	Name      string `json:"name"`
-	OSAPPTags string `json:"os_app_tags"`
+	Name        string `json:"name"`
+	OSAPPTags   string `json:"os_app_tags"`
+	ContainerID string `json:"container_id"`
 }
 
 func (p *Process) Update(cloudItem *cloudmodel.Process) {
 	p.Name = cloudItem.Name
 	p.OSAPPTags = cloudItem.OSAPPTags
+	p.ContainerID = cloudItem.ContainerID
 	log.Info(updateDiffBase(RESOURCE_TYPE_PROCESS_EN, p))
+}
+
+type PrometheusTarget struct {
+	DiffBase
+	Instance    string `json:"instance" binding:"required"`
+	Job         string `json:"job" binding:"required"`
+	ScrapeURL   string `json:"scrape_url" binding:"required"`
+	OtherLabels string `json:"other_labels" binding:"required"`
+}
+
+func (p *PrometheusTarget) Update(cloudItem *cloudmodel.PrometheusTarget) {
+	p.Instance = cloudItem.Instance
+	p.Job = cloudItem.Job
+	p.ScrapeURL = cloudItem.ScrapeURL
+	p.OtherLabels = cloudItem.OtherLabels
+	log.Info(updateDiffBase(RESOURCE_TYPE_PROMETHEUS_TARGET_EN, p))
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -59,20 +59,21 @@ func InitIDManager(cfg *RecorderConfig, ctx context.Context) (err error) {
 			RESOURCE_TYPE_POD_CLUSTER_EN:   &IDPool[mysql.PodCluster]{resourceType: RESOURCE_TYPE_POD_CLUSTER_EN, max: cfg.ResourceMaxID0},
 			RESOURCE_TYPE_POD_NAMESPACE_EN: &IDPool[mysql.PodNamespace]{resourceType: RESOURCE_TYPE_POD_NAMESPACE_EN, max: cfg.ResourceMaxID0},
 
-			RESOURCE_TYPE_VM_EN:              &IDPool[mysql.VM]{resourceType: RESOURCE_TYPE_VM_EN, max: cfg.ResourceMaxID1},
-			RESOURCE_TYPE_VROUTER_EN:         &IDPool[mysql.VRouter]{resourceType: RESOURCE_TYPE_VROUTER_EN, max: cfg.ResourceMaxID1},
-			RESOURCE_TYPE_DHCP_PORT_EN:       &IDPool[mysql.DHCPPort]{resourceType: RESOURCE_TYPE_DHCP_PORT_EN, max: cfg.ResourceMaxID1},
-			RESOURCE_TYPE_RDS_INSTANCE_EN:    &IDPool[mysql.RDSInstance]{resourceType: RESOURCE_TYPE_RDS_INSTANCE_EN, max: cfg.ResourceMaxID1},
-			RESOURCE_TYPE_REDIS_INSTANCE_EN:  &IDPool[mysql.RedisInstance]{resourceType: RESOURCE_TYPE_REDIS_INSTANCE_EN, max: cfg.ResourceMaxID1},
-			RESOURCE_TYPE_NAT_GATEWAY_EN:     &IDPool[mysql.NATGateway]{resourceType: RESOURCE_TYPE_NAT_GATEWAY_EN, max: cfg.ResourceMaxID1},
-			RESOURCE_TYPE_LB_EN:              &IDPool[mysql.LB]{resourceType: RESOURCE_TYPE_LB_EN, max: cfg.ResourceMaxID1},
-			RESOURCE_TYPE_POD_NODE_EN:        &IDPool[mysql.PodNode]{resourceType: RESOURCE_TYPE_POD_NODE_EN, max: cfg.ResourceMaxID1},
-			RESOURCE_TYPE_POD_SERVICE_EN:     &IDPool[mysql.PodService]{resourceType: RESOURCE_TYPE_POD_SERVICE_EN, max: cfg.ResourceMaxID1},
-			RESOURCE_TYPE_POD_EN:             &IDPool[mysql.Pod]{resourceType: RESOURCE_TYPE_POD_EN, max: cfg.ResourceMaxID1},
-			RESOURCE_TYPE_POD_INGRESS_EN:     &IDPool[mysql.PodIngress]{resourceType: RESOURCE_TYPE_POD_INGRESS_EN, max: cfg.ResourceMaxID1},
-			RESOURCE_TYPE_POD_GROUP_EN:       &IDPool[mysql.PodGroup]{resourceType: RESOURCE_TYPE_POD_GROUP_EN, max: cfg.ResourceMaxID1},
-			RESOURCE_TYPE_POD_REPLICA_SET_EN: &IDPool[mysql.PodReplicaSet]{resourceType: RESOURCE_TYPE_POD_REPLICA_SET_EN, max: cfg.ResourceMaxID1},
-			RESOURCE_TYPE_PROCESS_EN:         &IDPool[mysql.Process]{resourceType: RESOURCE_TYPE_PROCESS_EN, max: cfg.ResourceMaxID1},
+			RESOURCE_TYPE_VM_EN:                &IDPool[mysql.VM]{resourceType: RESOURCE_TYPE_VM_EN, max: cfg.ResourceMaxID1},
+			RESOURCE_TYPE_VROUTER_EN:           &IDPool[mysql.VRouter]{resourceType: RESOURCE_TYPE_VROUTER_EN, max: cfg.ResourceMaxID1},
+			RESOURCE_TYPE_DHCP_PORT_EN:         &IDPool[mysql.DHCPPort]{resourceType: RESOURCE_TYPE_DHCP_PORT_EN, max: cfg.ResourceMaxID1},
+			RESOURCE_TYPE_RDS_INSTANCE_EN:      &IDPool[mysql.RDSInstance]{resourceType: RESOURCE_TYPE_RDS_INSTANCE_EN, max: cfg.ResourceMaxID1},
+			RESOURCE_TYPE_REDIS_INSTANCE_EN:    &IDPool[mysql.RedisInstance]{resourceType: RESOURCE_TYPE_REDIS_INSTANCE_EN, max: cfg.ResourceMaxID1},
+			RESOURCE_TYPE_NAT_GATEWAY_EN:       &IDPool[mysql.NATGateway]{resourceType: RESOURCE_TYPE_NAT_GATEWAY_EN, max: cfg.ResourceMaxID1},
+			RESOURCE_TYPE_LB_EN:                &IDPool[mysql.LB]{resourceType: RESOURCE_TYPE_LB_EN, max: cfg.ResourceMaxID1},
+			RESOURCE_TYPE_POD_NODE_EN:          &IDPool[mysql.PodNode]{resourceType: RESOURCE_TYPE_POD_NODE_EN, max: cfg.ResourceMaxID1},
+			RESOURCE_TYPE_POD_SERVICE_EN:       &IDPool[mysql.PodService]{resourceType: RESOURCE_TYPE_POD_SERVICE_EN, max: cfg.ResourceMaxID1},
+			RESOURCE_TYPE_POD_EN:               &IDPool[mysql.Pod]{resourceType: RESOURCE_TYPE_POD_EN, max: cfg.ResourceMaxID1},
+			RESOURCE_TYPE_POD_INGRESS_EN:       &IDPool[mysql.PodIngress]{resourceType: RESOURCE_TYPE_POD_INGRESS_EN, max: cfg.ResourceMaxID1},
+			RESOURCE_TYPE_POD_GROUP_EN:         &IDPool[mysql.PodGroup]{resourceType: RESOURCE_TYPE_POD_GROUP_EN, max: cfg.ResourceMaxID1},
+			RESOURCE_TYPE_POD_REPLICA_SET_EN:   &IDPool[mysql.PodReplicaSet]{resourceType: RESOURCE_TYPE_POD_REPLICA_SET_EN, max: cfg.ResourceMaxID1},
+			RESOURCE_TYPE_PROCESS_EN:           &IDPool[mysql.Process]{resourceType: RESOURCE_TYPE_PROCESS_EN, max: cfg.ResourceMaxID1},
+			RESOURCE_TYPE_PROMETHEUS_TARGET_EN: &IDPool[mysql.PrometheusTarget]{resourceType: RESOURCE_TYPE_PROMETHEUS_TARGET_EN, max: cfg.ResourceMaxID1},
 		},
 	}
 	return

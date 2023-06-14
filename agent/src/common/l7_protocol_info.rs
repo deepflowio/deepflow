@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,17 +14,23 @@
  * limitations under the License.
  */
 
-use super::flow::PacketDirection;
+use std::sync::atomic::Ordering;
+
+use super::{flow::PacketDirection, l7_protocol_log::KafkaInfoCache};
 use enum_dispatch::enum_dispatch;
-use log::{debug, error};
+use log::{debug, error, warn};
 use serde::Serialize;
 
-use crate::flow_generator::{
-    protocol_logs::{
-        pb_adapter::L7ProtocolSendLog, DnsInfo, DubboInfo, HttpInfo, KafkaInfo, MqttInfo,
-        MysqlInfo, PostgreInfo, ProtobufRpcInfo, RedisInfo, SofaRpcInfo,
+use crate::{
+    common::l7_protocol_log::LogCache,
+    flow_generator::{
+        protocol_logs::{
+            pb_adapter::L7ProtocolSendLog, DnsInfo, DubboInfo, HttpInfo, KafkaInfo, MqttInfo,
+            MysqlInfo, PostgreInfo, ProtobufRpcInfo, RedisInfo, SofaRpcInfo,
+        },
+        AppProtoHead, LogMessageType, Result,
     },
-    AppProtoHead, LogMessageType, Result,
+    plugin::CustomInfo,
 };
 
 use super::{ebpf::EbpfType, l7_protocol_log::ParseParam};
@@ -63,6 +69,7 @@ all_protocol_info!(
     PostgreInfo(PostgreInfo),
     ProtobufRpcInfo(ProtobufRpcInfo),
     SofaRpcInfo(SofaRpcInfo),
+    CustomInfo(CustomInfo),
     // add new protocol info below
 );
 
@@ -136,52 +143,126 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
 
         if have no previous log cache, cache the current log rrt
     */
-    fn cal_rrt(&self, param: &ParseParam) -> Option<u64> {
+    fn cal_rrt(&self, param: &ParseParam, kafka_info: Option<KafkaInfoCache>) -> Option<u64> {
         let mut perf_cache = param.l7_perf_cache.borrow_mut();
         let cache_key = self.cal_cache_key(param);
         let previous_log_info = perf_cache.rrt_cache.pop(&cache_key);
 
         let time = param.time;
         let msg_type: LogMessageType = param.direction.into();
+        let timeout = param.rrt_timeout as u64;
 
         if time != 0 {
+            let (in_cached_req, timeout_count) = perf_cache
+                .timeout_cache
+                .get_or_insert_mut(param.flow_id, || (0, 0));
+
             let Some(previous_log_info) = previous_log_info else {
-                perf_cache.rrt_cache.put(cache_key, (param.direction.into(), param.time));
-                let timeout_count = perf_cache.timeout_cache.get_or_insert_mut(param.flow_id, ||0);
-                *timeout_count += 1;
+                if msg_type == LogMessageType::Request {
+                    *in_cached_req += 1;
+                }
+                perf_cache.put(
+                    cache_key,
+                    LogCache {
+                        msg_type: param.direction.into(),
+                        time: param.time,
+                        kafka_info,
+                    },
+                );
+
+                param.stats_counter.as_ref().map(|f| {
+                    f.l7_perf_cache_len
+                        .swap(perf_cache.rrt_cache.len() as u64, Ordering::Relaxed);
+                    f.l7_timeout_cache_len
+                        .swap(perf_cache.timeout_cache.len() as u64, Ordering::Relaxed)
+
+                });
                 return None;
             };
 
-            let timeout_count = perf_cache.timeout_cache.get_mut(&param.flow_id);
+            if previous_log_info.msg_type == LogMessageType::Request {
+                if *in_cached_req > 0 {
+                    *in_cached_req -= 1;
+                }
+            }
 
             // if previous is req and current is resp, calculate the round trip time.
-            if previous_log_info.0 == LogMessageType::Request
+            if previous_log_info.msg_type == LogMessageType::Request
                 && msg_type == LogMessageType::Response
-                && time > previous_log_info.1
+                && time > previous_log_info.time
             {
-                let rrt = time - previous_log_info.1;
-                timeout_count.map(|x| *x -= 1);
-                Some(rrt)
+                let rrt = time - previous_log_info.time;
+                // timeout, save the latest
+                if rrt > timeout {
+                    *timeout_count += 1;
+                    perf_cache.rrt_cache.put(
+                        cache_key,
+                        LogCache {
+                            msg_type: param.direction.into(),
+                            time: param.time,
+                            kafka_info,
+                        },
+                    );
+                    None
+                } else {
+                    Some(rrt)
+                }
 
             // if previous is resp and current is req and previous time gt current time, likely ebpf disorder,
             // calculate the round trip time.
-            } else if previous_log_info.0 == LogMessageType::Response
+            } else if previous_log_info.msg_type == LogMessageType::Response
                 && msg_type == LogMessageType::Request
-                && previous_log_info.1 > time
+                && previous_log_info.time > time
             {
-                let rrt = previous_log_info.1 - time;
-                timeout_count.map(|x| *x -= 1);
-                Some(rrt)
+                let rrt = previous_log_info.time - time;
+                if rrt > timeout {
+                    // disorder info rrt unlikely have large rrt gt timeout
+                    warn!("l7 log info disorder with long time rrt {}", rrt);
+                    // timeout, save latest
+                    *timeout_count += 1;
+                    perf_cache.rrt_cache.put(cache_key, previous_log_info);
+                    None
+                } else {
+                    Some(rrt)
+                }
             } else {
                 debug!(
                     "can not calculate rrt, flow_id: {}, previous log type:{:?}, previous time: {}, current log type: {:?}, current time: {}",
-                    param.flow_id, previous_log_info.0, previous_log_info.1, msg_type, param.time,
+                    param.flow_id, previous_log_info.msg_type, previous_log_info.time, msg_type, param.time,
                 );
-                timeout_count.map(|x| *x += 1);
-                perf_cache.rrt_cache.put(
-                    self.cal_cache_key(param),
-                    (param.direction.into(), param.time),
-                );
+
+                // save the latest
+                if previous_log_info.time > time {
+                    if msg_type == LogMessageType::Request {
+                        *timeout_count += 1;
+                    }
+                    if previous_log_info.msg_type == LogMessageType::Request {
+                        *in_cached_req += 1;
+                    }
+                    perf_cache.rrt_cache.put(cache_key, previous_log_info);
+                } else {
+                    if previous_log_info.msg_type == LogMessageType::Request {
+                        *timeout_count += 1;
+                    }
+                    if msg_type == LogMessageType::Request {
+                        *in_cached_req += 1;
+                    }
+                    perf_cache.rrt_cache.put(
+                        cache_key,
+                        LogCache {
+                            msg_type: param.direction.into(),
+                            time: param.time,
+                            kafka_info,
+                        },
+                    );
+                }
+
+                param.stats_counter.as_ref().map(|f| {
+                    f.l7_perf_cache_len
+                        .swap(perf_cache.rrt_cache.len() as u64, Ordering::Relaxed);
+                    f.l7_timeout_cache_len
+                        .swap(perf_cache.timeout_cache.len() as u64, Ordering::Relaxed);
+                });
                 None
             }
         } else {

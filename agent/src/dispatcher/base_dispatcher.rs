@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ use std::collections::{HashMap, HashSet};
 #[cfg(target_os = "windows")]
 use std::ffi::CString;
 use std::mem;
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::process;
 use std::sync::{
     atomic::{AtomicBool, AtomicI64, Ordering},
@@ -112,6 +112,7 @@ pub(super) struct BaseDispatcher {
     pub(super) ntp_diff: Arc<AtomicI64>,
 
     pub(super) npb_dedup_enabled: Arc<AtomicBool>,
+    pub(super) pause: Arc<AtomicBool>,
 
     // Enterprise Edition Feature: packet-sequence
     pub(super) packet_sequence_output_queue:
@@ -141,6 +142,11 @@ impl BaseDispatcher {
     }
 
     pub(super) fn listener(&self) -> BaseDispatcherListener {
+        let default_address: IpAddr = if self.options.lock().unwrap().is_ipv6 {
+            Ipv6Addr::UNSPECIFIED.into()
+        } else {
+            Ipv4Addr::UNSPECIFIED.into()
+        };
         BaseDispatcherListener {
             id: self.id,
             src_interface: self.src_interface.clone(),
@@ -153,9 +159,9 @@ impl BaseDispatcher {
             #[cfg(target_os = "linux")]
             platform_poller: self.platform_poller.clone(),
             capture_bpf: "".into(),
-            proxy_controller_ip: "0.0.0.0".into(),
+            proxy_controller_ip: default_address.to_string(),
             proxy_controller_port: DEFAULT_CONTROLLER_PORT,
-            analyzer_ip: "0.0.0.0".into(),
+            analyzer_ip: default_address.to_string(),
             analyzer_port: DEFAULT_INGESTER_PORT,
             tunnel_type_bitmap: self.tunnel_type_bitmap.clone(),
             handler_builders: self.handler_builder.clone(),
@@ -163,6 +169,7 @@ impl BaseDispatcher {
             npb_dedup_enabled: self.npb_dedup_enabled.clone(),
             log_id: self.log_id.clone(),
             reset_whitelist: self.reset_whitelist.clone(),
+            pause: self.pause.clone(),
         }
     }
 
@@ -206,7 +213,7 @@ impl BaseDispatcher {
     pub(super) fn init(&mut self) {
         if let Err(e) = self.engine.init() {
             error!(
-                "dispatcher recv_engine init error: {:?}, deepflow-agent restart...",
+                "dispatcher recv_engine init error: {}, deepflow-agent restart...",
                 e
             );
             thread::sleep(Duration::from_secs(1));
@@ -396,7 +403,7 @@ impl BaseDispatcher {
             }
             Err(e) => {
                 error!(
-                    "dispatcher recv_engine init error: {:?}, deepflow-agent restart...",
+                    "dispatcher recv_engine init error: {}, deepflow-agent restart...",
                     e
                 );
                 thread::sleep(Duration::from_secs(1));
@@ -637,6 +644,7 @@ pub struct BaseDispatcherListener {
     pub tunnel_type_bitmap: Arc<Mutex<TunnelTypeBitmap>>,
     pub npb_dedup_enabled: Arc<AtomicBool>,
     pub reset_whitelist: Arc<AtomicBool>,
+    pub pause: Arc<AtomicBool>,
     capture_bpf: String,
     proxy_controller_ip: String,
     analyzer_ip: String,
@@ -814,6 +822,7 @@ impl BaseDispatcherListener {
         if self.options.lock().unwrap().af_packet_version != config.capture_socket_type.into() {
             // TODO：目前通过进程退出的方式修改AfPacket版本，后面需要支持动态修改
             info!("Afpacket version update, deepflow-agent restart...");
+            thread::sleep(Duration::from_secs(1));
             process::exit(1);
         }
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ use std::{net::IpAddr, sync::Arc, time::Duration};
 use super::{perf::FlowLog, FlowState, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC};
 use crate::common::{
     decapsulate::TunnelType,
-    endpoint::EndpointData,
+    endpoint::EndpointDataPov,
     enums::{EthernetType, TapType, TcpFlags},
     flow::{FlowMetricsPeer, PacketDirection, SignalSource},
     lookup_key::LookupKey,
@@ -127,8 +127,8 @@ pub struct FlowNode {
     pub timestamp_key: u64,
 
     pub meta_flow_log: Option<Box<FlowLog>>,
-    pub policy_data_cache: [Arc<PolicyData>; 2],
-    pub endpoint_data_cache: [Arc<EndpointData>; 2],
+    pub policy_data_cache: [Option<Arc<PolicyData>>; 2],
+    pub endpoint_data_cache: Option<EndpointDataPov>,
 
     // Only for eBPF TCP Flow, used to help confirm whether the Flow can be timed out.
     pub residual_request: i32,
@@ -170,6 +170,7 @@ impl FlowNode {
         meta_packet: &mut MetaPacket,
         ignore_l2_end: bool,
         ignore_tor_mac: bool,
+        ignore_idc_vlan: bool,
         trident_type: TridentType,
     ) -> bool {
         if meta_packet.signal_source == SignalSource::EBPF {
@@ -199,6 +200,13 @@ impl FlowNode {
         }
 
         if flow.eth_type != meta_lookup_key.eth_type {
+            return false;
+        }
+
+        if flow.vlan != meta_packet.vlan
+            && meta_lookup_key.tap_type != TapType::Cloud
+            && !ignore_idc_vlan
+        {
             return false;
         }
 

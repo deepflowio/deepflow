@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,8 @@ import (
 	"github.com/agiledragon/gomonkey/v2"
 	. "github.com/smartystreets/goconvey/convey"
 
+	cloudconfig "github.com/deepflowio/deepflow/server/controller/cloud/config"
+	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -41,7 +43,7 @@ func TestKubernetes(t *testing.T) {
 			Config:      fmt.Sprintf(`{"node_port_name_regex": "","pod_net_ipv4_cidr_max_mask": %v,"pod_net_ipv6_cidr_max_mask": %v,"region_uuid": "%s","vpc_uuid": ""}`, common.K8S_POD_IPV4_NETMASK, common.K8S_POD_IPV6_NETMASK, common.DEFAULT_REGION),
 		}
 
-		k8s := NewKubernetesGather(nil, &k8sConfig, false)
+		k8s := NewKubernetesGather(nil, &k8sConfig, cloudconfig.CloudConfig{}, false)
 		type KResource struct {
 			Pod        []string `json:"*v1.Pod"`
 			Info       []string `json:"*version.Info"`
@@ -89,6 +91,12 @@ func TestKubernetes(t *testing.T) {
 			return vData, nil
 		})
 		defer vinterfacesInfoPatch.Reset()
+
+		pData := []model.PrometheusTarget{}
+		prometheusTargetInfoPatch := gomonkey.ApplyMethod(reflect.TypeOf(g), "GetPrometheusResponse", func(_ *genesis.Genesis) ([]model.PrometheusTarget, error) {
+			return pData, nil
+		})
+		defer prometheusTargetInfoPatch.Reset()
 
 		k8sGatherData, _ := k8s.GetKubernetesGatherData()
 		Convey("k8sGatherResource number should be equal", func() {

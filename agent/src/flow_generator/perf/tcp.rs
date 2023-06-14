@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -600,6 +600,12 @@ impl TcpPerf {
             counter,
             handshaking: false,
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.ctrl_info = Default::default();
+        self.perf_data = Default::default();
+        self.handshaking = false;
     }
 
     // fpd for first packet direction

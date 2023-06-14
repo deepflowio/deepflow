@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,7 +42,7 @@ var log = logging.MustGetLogger("db.mysql.common")
 
 var SQL_FILE_DIR = "/etc/mysql"
 
-func GetConnectionWithoudDatabase(cfg MySqlConfig) *gorm.DB {
+func GetConnectionWithoutDatabase(cfg MySqlConfig) *gorm.DB {
 	dsn := GetDSN(cfg, "", cfg.TimeOut, false)
 	return GetGormDB(dsn)
 }
@@ -122,11 +122,14 @@ func CreateDatabaseIfNotExists(db *gorm.DB, database string) (bool, error) {
 	}
 }
 
-func RollbackIfInitTablesFailed(db *gorm.DB, database string) bool {
-	log.Info("init db tables with rollback")
+func DropDatabaseIfInitTablesFailed(db *gorm.DB, database string) bool {
+	log.Info("drop database if init tables failed")
 	err := InitTables(db)
 	if err != nil {
-		DropDatabase(db, database)
+		err := DropDatabase(db, database)
+		if err != nil {
+			log.Errorf("drop database %s failed: %v", database, err)
+		}
 		return false
 	}
 	return true

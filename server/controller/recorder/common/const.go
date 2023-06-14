@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -64,6 +64,7 @@ const (
 	RESOURCE_TYPE_POD_REPLICA_SET_EN          = "pod_replica_set"
 	RESOURCE_TYPE_POD_EN                      = "pod"
 	RESOURCE_TYPE_PROCESS_EN                  = "process"
+	RESOURCE_TYPE_PROMETHEUS_TARGET_EN        = "prometheus_target"
 )
 
 const (

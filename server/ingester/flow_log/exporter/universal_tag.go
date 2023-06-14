@@ -1,8 +1,25 @@
+/*
+ * Copyright (c) 2023 Yunshan Networks
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package exporter
 
 import (
 	"database/sql"
 	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/deepflowio/deepflow/server/ingester/common"
@@ -163,10 +180,18 @@ func (u *UniversalTagsManager) QueryUniversalTags(l7FlowLog *log_data.L7FlowLog)
 		}
 }
 
+func (u *UniversalTagsManager) QueryCustomK8sLabels(podID uint32) Labels {
+	return u.podIDLabelsMap[podID]
+}
+
+type Labels map[string]string
+
 type UniversalTagsManager struct {
 	config           *config.Config
 	universalTagMaps *UniversalTagMaps
 	tapPortNameMap   map[uint64]string
+	podIDLabelsMap   map[uint32]Labels
+	k8sLabelsRegexp  *regexp.Regexp
 
 	connection *sql.DB
 }
@@ -176,10 +201,20 @@ func NewUniversalTagsManager(config *config.Config) *UniversalTagsManager {
 	for i := range universalTagMaps {
 		universalTagMaps[i] = make(map[uint32]string)
 	}
+	var k8sLabelsRegexp *regexp.Regexp
+	if config.Exporter.ExportCustomK8sLabelsRegexp != "" {
+		var err error
+		k8sLabelsRegexp, err = regexp.Compile(config.Exporter.ExportCustomK8sLabelsRegexp)
+		if err != nil {
+			log.Warningf("OTLP exporter compile k8s label regexp pattern failed: %s", err)
+		}
+	}
 	return &UniversalTagsManager{
 		config:           config,
 		universalTagMaps: universalTagMaps,
 		tapPortNameMap:   make(map[uint64]string),
+		podIDLabelsMap:   make(map[uint32]Labels),
+		k8sLabelsRegexp:  k8sLabelsRegexp,
 	}
 }
 
@@ -204,6 +239,12 @@ func (u *UniversalTagsManager) Start() {
 		if newTapPortMap, err := u.queryTapPortMap(); err == nil {
 			if newTapPortMap != nil {
 				u.tapPortNameMap = newTapPortMap
+			}
+		}
+
+		if newPodIdLabelsMap, err := u.queryPodIdLabelsMap(); err == nil {
+			if len(newPodIdLabelsMap) != 0 {
+				u.podIDLabelsMap = newPodIdLabelsMap
 			}
 		}
 	}
@@ -323,6 +364,47 @@ func (u *UniversalTagsManager) queryTapPortMap() (map[uint64]string, error) {
 			return nil, err
 		}
 		m[vtapId<<32|tapPort] = name
+	}
+	return m, err
+}
+
+func (u *UniversalTagsManager) isK8sLabelExport(name string) bool {
+	// if not configured, all are not exported
+	if len(u.config.Exporter.ExportCustomK8sLabelsRegexp) == 0 {
+		return false
+	}
+
+	if u.k8sLabelsRegexp != nil && u.k8sLabelsRegexp.MatchString(name) {
+		return true
+	}
+
+	return false
+}
+
+func (u *UniversalTagsManager) queryPodIdLabelsMap() (map[uint32]Labels, error) {
+	sql := fmt.Sprintf("SELECT id,key,value FROM flow_tag.`pod_k8s_label_map`")
+	m := make(map[uint32]Labels)
+	rows, err := u.connection.Query(sql)
+	if err != nil {
+		log.Warning(err)
+		return nil, err
+	}
+	var podId uint64
+	var key, value string
+	for rows.Next() {
+		err := rows.Scan(&podId, &key, &value)
+		if err != nil {
+			log.Warning(err)
+			return nil, err
+		}
+		if !u.isK8sLabelExport(key) {
+			continue
+		}
+		if labels, ok := m[uint32(podId)]; ok {
+			labels[key] = value
+		} else {
+			m[uint32(podId)] = map[string]string{key: value}
+		}
 	}
 	return m, err
 }

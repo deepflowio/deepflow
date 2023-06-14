@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -89,7 +89,7 @@ func (k *KubernetesInfo) refresh() {
 }
 
 func (k *KubernetesInfo) CreateDomainIfClusterIDNotExists(clusterID, clusterName string) (exists bool) {
-	ok, err := k.CheckClusterID(clusterID)
+	ok, err := k.checkClusterID(clusterID)
 	if err != nil {
 		log.Errorf("check cluster_id: %s failed: %s", clusterID, err)
 		return true
@@ -101,7 +101,7 @@ func (k *KubernetesInfo) CreateDomainIfClusterIDNotExists(clusterID, clusterName
 	return true
 }
 
-func (k *KubernetesInfo) CheckClusterID(clusterID string) (bool, error) {
+func (k *KubernetesInfo) checkClusterID(clusterID string) (bool, error) {
 	k.mutex.Lock()
 	defer k.mutex.Unlock()
 	_, dok := k.clusterIDToDomain[clusterID]

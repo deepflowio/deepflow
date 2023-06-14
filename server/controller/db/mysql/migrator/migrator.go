@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,13 +29,16 @@ import (
 
 var log = logging.MustGetLogger("db.migrator.mysql")
 
-// if configured database does not exist, it is considered a new dployment, will create database and init tables;
-// if configured database exsits, but db_version table does not exist, it is also considered a new deployment,
-// 		maybe we do not have permission to create database or other reasons, then will init all tables.
-// if configured database exsits, and db_version table exists, check wheather db_version is the latest version
-// 		and upgrade based the result.
+// if configured database does not exist, it is considered a new deployment, will create database and init tables;
+// if configured database exists, but db_version table does not exist, it is also considered a new deployment,
+//
+//	maybe we do not have permission to create database or other reasons, then will init all tables.
+//
+// if configured database exists, and db_version table exists, check whether db_version is the latest version
+//
+//	and upgrade based the result.
 func MigrateMySQL(cfg MySqlConfig) bool {
-	db := GetConnectionWithoudDatabase(cfg)
+	db := GetConnectionWithoutDatabase(cfg)
 	if db == nil {
 		return false
 	}
@@ -50,7 +53,7 @@ func MigrateMySQL(cfg MySqlConfig) bool {
 		return false
 	}
 	if !databaseExisted {
-		return RollbackIfInitTablesFailed(db, cfg.Database)
+		return DropDatabaseIfInitTablesFailed(db, cfg.Database)
 	} else {
 		var dbVersionTable string
 		err = db.Raw(fmt.Sprintf("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='%s' AND TABLE_NAME='%s'", cfg.Database, migration.DB_VERSION_TABLE)).Scan(&dbVersionTable).Error
@@ -85,23 +88,12 @@ func UpgradeIfDBVersionNotLatest(db *gorm.DB, cfg MySqlConfig) bool {
 	}
 	log.Infof("current db version: %s, expected db version: %s", version, migration.DB_VERSION_EXPECTED)
 	if version == "" {
-		// TODO delete this block
-		DropDatabase(db, cfg.Database)
-		db = GetConnectionWithoudDatabase(cfg)
-		if db == nil {
+		if cfg.DropDatabaseEnabled {
+			return RecreateDatabaseAndInitTables(db, cfg)
+		} else {
+			log.Errorf("current db version is null, need manual handling")
 			return false
 		}
-		err = CreateDatabase(db, cfg.Database)
-		if err != nil {
-			log.Errorf("created database %s failed: %v", cfg.Database, err)
-			return false
-		}
-
-		db = GetConnectionWithDatabase(cfg)
-		if db == nil {
-			return false
-		}
-		return RollbackIfInitTablesFailed(db, cfg.Database)
 	} else if version != migration.DB_VERSION_EXPECTED {
 		err = ExecuteIssus(db, version)
 		if err != nil {
@@ -110,4 +102,24 @@ func UpgradeIfDBVersionNotLatest(db *gorm.DB, cfg MySqlConfig) bool {
 		return true
 	}
 	return true
+}
+
+func RecreateDatabaseAndInitTables(db *gorm.DB, cfg MySqlConfig) bool {
+	log.Info("recreate database and init tables")
+	DropDatabase(db, cfg.Database)
+	db = GetConnectionWithoutDatabase(cfg)
+	if db == nil {
+		return false
+	}
+	err := CreateDatabase(db, cfg.Database)
+	if err != nil {
+		log.Errorf("created database %s failed: %v", cfg.Database, err)
+		return false
+	}
+
+	db = GetConnectionWithDatabase(cfg)
+	if db == nil {
+		return false
+	}
+	return DropDatabaseIfInitTablesFailed(db, cfg.Database)
 }

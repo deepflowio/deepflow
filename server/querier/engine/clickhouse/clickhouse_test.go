@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -195,7 +195,7 @@ var (
 		output: "SELECT if(type IN [0, 2],1,0) AS `request` FROM flow_log.`l7_flow_log` PREWHERE (tap_side IN (SELECT value FROM flow_tag.string_enum_map WHERE name ilike 'xxx' and tag_name='tap_side')) LIMIT 0, 50",
 	}, {
 		input:  "select Histogram(Sum(byte),10) AS histo from l4_flow_log",
-		output: "SELECT histogram(10)(`_sum_byte_tx+byte_rx`) AS `histo` FROM (SELECT SUM(byte_tx+byte_rx) AS `_sum_byte_tx+byte_rx` FROM flow_log.`l4_flow_log` LIMIT 10000)",
+		output: "SELECT histogramIf(10)(`_sum_byte_tx+byte_rx`,`_sum_byte_tx+byte_rx`>0) AS `histo` FROM (SELECT SUM(byte_tx+byte_rx) AS `_sum_byte_tx+byte_rx` FROM flow_log.`l4_flow_log` LIMIT 10000)",
 	}, {
 		input:  "select Sum(log_count) from event",
 		output: "SELECT SUM(1) AS `Sum(log_count)` FROM event.`event` LIMIT 10000",
@@ -227,6 +227,27 @@ var (
 	}, {
 		input:  "SELECT `cloud.tag.xx` from l4_flow_log WHERE NOT exist(`cloud.tag.xx`) LIMIT 1",
 		output: "SELECT if(if(l3_device_type=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64(l3_device_id),'xx')), '')!='',if(l3_device_type=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64(l3_device_id),'xx')), ''), dictGet(flow_tag.pod_ns_cloud_tag_map, 'value', (toUInt64(pod_ns_id),'xx')) ) AS `cloud.tag.xx` FROM flow_log.`l4_flow_log` PREWHERE NOT (((toUInt64(l3_device_id) IN (SELECT id FROM flow_tag.chost_cloud_tag_map WHERE key='xx') AND l3_device_type=1) OR (toUInt64(pod_ns_id) IN (SELECT id FROM flow_tag.pod_ns_cloud_tag_map WHERE key='xx')))) LIMIT 1",
+	}, {
+		input:  "select `k8s.annotation.statefulset.kubernetes.io/pod-name_0` from l4_flow_log where `k8s.annotation.statefulset.kubernetes.io/pod-name_0`='opensource-loki-0' group by `k8s.annotation.statefulset.kubernetes.io/pod-name_0`",
+		output: "SELECT if(dictGet(flow_tag.pod_service_k8s_annotation_map, 'value', (toUInt64(service_id_0),'statefulset.kubernetes.io/pod-name'))!='', dictGet(flow_tag.pod_service_k8s_annotation_map, 'value', (toUInt64(service_id_0),'statefulset.kubernetes.io/pod-name')), dictGet(flow_tag.pod_k8s_annotation_map, 'value', (toUInt64(pod_id_0),'statefulset.kubernetes.io/pod-name')) ) AS `k8s.annotation.statefulset.kubernetes.io/pod-name_0` FROM flow_log.`l4_flow_log` PREWHERE ((toUInt64(service_id_0) IN (SELECT id FROM flow_tag.pod_service_k8s_annotation_map WHERE value = 'opensource-loki-0' and key='statefulset.kubernetes.io/pod-name')) OR (toUInt64(pod_id_0) IN (SELECT id FROM flow_tag.pod_k8s_annotation_map WHERE value = 'opensource-loki-0' and key='statefulset.kubernetes.io/pod-name'))) AND (((toUInt64(service_id_0) IN (SELECT id FROM flow_tag.pod_service_k8s_annotation_map WHERE key='statefulset.kubernetes.io/pod-name')) OR (toUInt64(pod_id_0) IN (SELECT id FROM flow_tag.pod_k8s_annotation_map WHERE key='statefulset.kubernetes.io/pod-name')))) GROUP BY `k8s.annotation.statefulset.kubernetes.io/pod-name_0` LIMIT 10000",
+	}, {
+		input:  "select `k8s.annotation.statefulset.kubernetes.io/pod-name_0` as `k8s.annotation.abc` from l4_flow_log where `k8s.annotation.abc`='opensource-loki-0' group by `k8s.annotation.abc`",
+		output: "SELECT if(dictGet(flow_tag.pod_service_k8s_annotation_map, 'value', (toUInt64(service_id_0),'statefulset.kubernetes.io/pod-name'))!='', dictGet(flow_tag.pod_service_k8s_annotation_map, 'value', (toUInt64(service_id_0),'statefulset.kubernetes.io/pod-name')), dictGet(flow_tag.pod_k8s_annotation_map, 'value', (toUInt64(pod_id_0),'statefulset.kubernetes.io/pod-name')) ) AS `k8s.annotation.abc` FROM flow_log.`l4_flow_log` PREWHERE ((toUInt64(service_id_0) IN (SELECT id FROM flow_tag.pod_service_k8s_annotation_map WHERE value = 'opensource-loki-0' and key='statefulset.kubernetes.io/pod-name')) OR (toUInt64(pod_id_0) IN (SELECT id FROM flow_tag.pod_k8s_annotation_map WHERE value = 'opensource-loki-0' and key='statefulset.kubernetes.io/pod-name'))) AND (((toUInt64(service_id_0) IN (SELECT id FROM flow_tag.pod_service_k8s_annotation_map WHERE key='statefulset.kubernetes.io/pod-name')) OR (toUInt64(pod_id_0) IN (SELECT id FROM flow_tag.pod_k8s_annotation_map WHERE key='statefulset.kubernetes.io/pod-name')))) GROUP BY `k8s.annotation.abc` LIMIT 10000",
+	}, {
+		input:  "select `k8s.annotation_0` from l7_flow_log",
+		output: "SELECT if(dictGetOrDefault(flow_tag.pod_service_k8s_annotations_map, 'annotations', toUInt64(service_id_0),'{}')!='{}', dictGetOrDefault(flow_tag.pod_service_k8s_annotations_map, 'annotations', toUInt64(service_id_0),'{}'), dictGetOrDefault(flow_tag.pod_k8s_annotations_map, 'annotations', toUInt64(pod_id_0),'{}'))  AS `k8s.annotation_0` FROM flow_log.`l7_flow_log` LIMIT 10000",
+	}, {
+		input:  "select `k8s.env.statefulset.kubernetes.io/pod-name_0` from l4_flow_log group by `k8s.env.statefulset.kubernetes.io/pod-name_0`",
+		output: "SELECT dictGet(flow_tag.pod_k8s_env_map, 'value', (toUInt64(pod_id_0),'statefulset.kubernetes.io/pod-name')) AS `k8s.env.statefulset.kubernetes.io/pod-name_0` FROM flow_log.`l4_flow_log` PREWHERE (toUInt64(pod_id_0) IN (SELECT id FROM flow_tag.pod_k8s_env_map WHERE key='statefulset.kubernetes.io/pod-name')) GROUP BY `k8s.env.statefulset.kubernetes.io/pod-name_0` LIMIT 10000",
+	}, {
+		input:  "select `k8s.env.statefulset.kubernetes.io/pod-name_0` from l4_flow_log where `k8s.env.statefulset.kubernetes.io/pod-name_0`='opensource-loki-0' group by `k8s.env.statefulset.kubernetes.io/pod-name_0`",
+		output: "SELECT dictGet(flow_tag.pod_k8s_env_map, 'value', (toUInt64(pod_id_0),'statefulset.kubernetes.io/pod-name')) AS `k8s.env.statefulset.kubernetes.io/pod-name_0` FROM flow_log.`l4_flow_log` PREWHERE toUInt64(pod_id_0) IN (SELECT id FROM flow_tag.pod_k8s_env_map WHERE value = 'opensource-loki-0' and key='statefulset.kubernetes.io/pod-name') AND (toUInt64(pod_id_0) IN (SELECT id FROM flow_tag.pod_k8s_env_map WHERE key='statefulset.kubernetes.io/pod-name')) GROUP BY `k8s.env.statefulset.kubernetes.io/pod-name_0` LIMIT 10000",
+	}, {
+		input:  "select `k8s.env.statefulset.kubernetes.io/pod-name_0` as `k8s.env.abc` from l4_flow_log where `k8s.env.abc`='opensource-loki-0' group by `k8s.env.abc`",
+		output: "SELECT dictGet(flow_tag.pod_k8s_env_map, 'value', (toUInt64(pod_id_0),'statefulset.kubernetes.io/pod-name')) AS `k8s.env.abc` FROM flow_log.`l4_flow_log` PREWHERE toUInt64(pod_id_0) IN (SELECT id FROM flow_tag.pod_k8s_env_map WHERE value = 'opensource-loki-0' and key='statefulset.kubernetes.io/pod-name') AND (toUInt64(pod_id_0) IN (SELECT id FROM flow_tag.pod_k8s_env_map WHERE key='statefulset.kubernetes.io/pod-name')) GROUP BY `k8s.env.abc` LIMIT 10000",
+	}, {
+		input:  "select `k8s.env_0` from l7_flow_log",
+		output: "SELECT dictGetOrDefault(flow_tag.pod_k8s_envs_map, 'envs', toUInt64(pod_id_0),'{}')  AS `k8s.env_0` FROM flow_log.`l7_flow_log` LIMIT 10000",
 	}}
 )
 

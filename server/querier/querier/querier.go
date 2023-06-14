@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,8 +28,10 @@ import (
 	yaml "gopkg.in/yaml.v2"
 
 	"github.com/deepflowio/deepflow/server/libs/logger"
+	prometheus_router "github.com/deepflowio/deepflow/server/querier/app/prometheus/router"
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse"
 	profile_router "github.com/deepflowio/deepflow/server/querier/profile/router"
 	"github.com/deepflowio/deepflow/server/querier/router"
 	"github.com/deepflowio/deepflow/server/querier/statsd"
@@ -54,6 +56,9 @@ func Start(configPath, serverLogFile string) {
 		os.Exit(0)
 	}
 
+	// prometheus dict cache
+	go clickhouse.GeneratePrometheusMap()
+
 	// statsd
 	statsd.QuerierCounter = statsd.NewCounter()
 	statsd.RegisterCountableForIngester("querier_count", statsd.QuerierCounter)
@@ -76,6 +81,7 @@ func Start(configPath, serverLogFile string) {
 	r.Use(ErrHandle())
 	router.QueryRouter(r)
 	profile_router.ProfileRouter(r, &cfg)
+	prometheus_router.PrometheusRouter(r)
 	// TODO: 增加router
 	if err := r.Run(fmt.Sprintf(":%d", cfg.ListenPort)); err != nil {
 		log.Errorf("startup service failed, err:%v\n", err)

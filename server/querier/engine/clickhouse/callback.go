@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"golang.org/x/exp/slices"
 
 	"github.com/deepflowio/deepflow/server/libs/utils"
 	"github.com/deepflowio/deepflow/server/querier/common"
@@ -109,6 +111,10 @@ func TimeFill(args []interface{}) func(result *common.Result) error { // group b
 			timeFillLimit = config.Cfg.TimeFillLimit
 		}
 		for i, group := range groups {
+			groupIndexs := []int{}
+			for _, groupIndex := range group.GroupIndex {
+				groupIndexs = append(groupIndexs, groupIndex)
+			}
 			if timeFillLimit > 0 && i >= timeFillLimit {
 				for _, series := range group.Series {
 					resultNewValues = append(resultNewValues, series.Values)
@@ -158,6 +164,25 @@ func TimeFill(args []interface{}) func(result *common.Result) error { // group b
 					}
 					newValue[timeFieldIndex] = timestamp
 					newValues[i] = newValue
+				} else {
+					// if point exist && metrics is null, fill the metrics
+					switch value.(type) {
+					case []interface{}:
+						newValue := value.([]interface{})
+						for i := range newValue {
+							indexOK := slices.Contains[int](groupIndexs, i)
+							if indexOK {
+								continue
+							}
+							if newValue[i] == nil {
+								if intField, err := strconv.Atoi(m.Time.Fill); err == nil {
+									newValue[i] = int(intField)
+								} else {
+									newValue[i] = m.Time.Fill
+								}
+							}
+						}
+					}
 				}
 			}
 			resultNewValues = append(resultNewValues, newValues...)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -200,6 +200,7 @@ func (c *Cache) Refresh() {
 	c.refreshWANIPs()
 	c.refreshLANIPs()
 	c.refreshProcesses()
+	c.refreshPrometheusTarget()
 }
 
 func (c *Cache) AddRegion(item *mysql.Region) {
@@ -1511,4 +1512,27 @@ func (c *Cache) refreshProcesses() {
 	}
 
 	c.AddProcesses(processes)
+}
+
+func (c *Cache) AddPrometheusTarget(items []*mysql.PrometheusTarget) {
+	for _, item := range items {
+		c.DiffBaseDataSet.addPrometheusTarget(item, c.Sequence)
+	}
+}
+
+func (c *Cache) DeletePrometheusTarget(lcuuids []string) {
+	for _, lcuuid := range lcuuids {
+		c.DiffBaseDataSet.deletePrometheusTarget(lcuuid)
+	}
+}
+
+func (c *Cache) refreshPrometheusTarget() {
+	log.Infof(refreshResource(RESOURCE_TYPE_PROMETHEUS_TARGET_EN))
+	var prometheusTargets []*mysql.PrometheusTarget
+	if err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid).Find(&prometheusTargets).Error; err != nil {
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_PROMETHEUS_TARGET_EN, err))
+		return
+	}
+
+	c.AddPrometheusTarget(prometheusTargets)
 }

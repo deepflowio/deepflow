@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,6 +34,8 @@ const (
 	NLIKE
 	REGEXP
 	NREGEXP
+	GT
+	LT
 )
 
 type Operator struct {
@@ -65,6 +67,10 @@ func (n *Operator) ToString() string {
 		return " MATCH "
 	case NREGEXP:
 		return " NOT MATCH "
+	case GT:
+		return " > "
+	case LT:
+		return " < "
 	}
 	return ""
 }
@@ -100,6 +106,10 @@ func GetOperator(op string) (*Operator, int) {
 		opType = REGEXP
 	case "not regexp":
 		opType = NREGEXP
+	case ">":
+		opType = GT
+	case "<":
+		opType = LT
 	}
 	return &Operator{Type: opType}, opType
 }

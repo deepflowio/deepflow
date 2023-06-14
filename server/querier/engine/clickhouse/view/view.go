@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,18 +24,19 @@ import (
 )
 
 /*
-	对外接口：
-		struct：
-			Model 包含withs tags filters等结构用于构造view
-			View  由Model生成，用于构造df-clickhouse-sql
-		func：
-			NewModel() Model          初始化Model结构
-			Model.AddTag()
-			Model.AddTable()
-			Model.AddGroup()
-			Model.AddFilter()
-			NewView(*Model) View      使用model初始化View结构
-			NewView.ToString() string 生成df-clickhouse-sql
+对外接口：
+
+	struct：
+		Model 包含withs tags filters等结构用于构造view
+		View  由Model生成，用于构造df-clickhouse-sql
+	func：
+		NewModel() Model          初始化Model结构
+		Model.AddTag()
+		Model.AddTable()
+		Model.AddGroup()
+		Model.AddFilter()
+		NewView(*Model) View      使用model初始化View结构
+		NewView.ToString() string 生成df-clickhouse-sql
 */
 type Model struct {
 	DB        string

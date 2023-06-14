@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -164,6 +164,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 				Type:          common.VIF_TYPE_LAN,
 				Mac:           vMAC,
 				TapMac:        vTAPMAC,
+				NetnsID:       vItem.NetnsID,
 				DeviceType:    common.VIF_DEVICE_TYPE_POD,
 				DeviceLcuuid:  podLcuuid,
 				NetworkLcuuid: k.podNetworkLcuuidCIDRs.networkLcuuid,

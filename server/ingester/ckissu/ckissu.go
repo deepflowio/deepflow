@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -561,12 +561,6 @@ var ColumnAdd620 = []*ColumnAdds{
 		Dbs:         []string{"flow_log"},
 		Tables:      []string{"l4_flow_log", "l4_flow_log_local", "l7_flow_log", "l7_flow_log_local"},
 		ColumnNames: u32ColumnNameEdgeAdd620,
-		ColumnType:  ckdb.UInt32,
-	},
-	&ColumnAdds{
-		Dbs:         []string{"event"},
-		Tables:      []string{"event", "event_local"},
-		ColumnNames: []string{"gprocess_id"},
 		ColumnType:  ckdb.UInt32,
 	},
 	&ColumnAdds{
@@ -1193,7 +1187,7 @@ func (i *Issu) RunRenameTable(ds *datasource.DatasourceManager) error {
 		if err != nil {
 			return err
 		}
-		if strings.Compare(oldVersion, "v6.2.6.2") >= 0 || oldVersion == "" {
+		if strings.Compare(oldVersion, "v6.2.6.2") >= 0 {
 			continue
 		}
 		for _, tableRename := range i.tableRenames {

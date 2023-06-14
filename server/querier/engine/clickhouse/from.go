@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,9 @@
 package clickhouse
 
 import (
+	"errors"
 	"fmt"
+
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
 )
 
@@ -35,4 +37,14 @@ func GetVirtualTableFilter(db, table string) (view.Node, bool) {
 		return &view.Expr{Value: "(" + filter + ")"}, true
 	}
 	return nil, false
+}
+
+func GetMetricIDFilter(db, table string) (view.Node, error) {
+	metricID, ok := Prometheus.MetricNameToID[table]
+	if !ok {
+		errorMessage := fmt.Sprintf("%s not found", table)
+		return nil, errors.New(errorMessage)
+	}
+	filter := fmt.Sprintf("metric_id=%d", metricID)
+	return &view.Expr{Value: "(" + filter + ")"}, nil
 }

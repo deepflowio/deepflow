@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ type StaticConfig struct {
 	Profiler                         *bool                 `yaml:"profiler,omitempty"`
 	AfpacketBlocksEnabled            *bool                 `yaml:"afpacket-blocks-enabled,omitempty"`
 	AfpacketBlocks                   *int                  `yaml:"afpacket-blocks,omitempty"`
+	AnalyzerRawPacketBlockSize       *int                  `yaml:"analyzer-raw-packet-block-size,omitempty"`
 	EnableDebugStats                 *bool                 `yaml:"enable-debug-stats,omitempty"`
 	AnalyzerDedupDisabled            *bool                 `yaml:"analyzer-dedup-disabled,omitempty"`
 	DefaultTapType                   *uint32               `yaml:"default-tap-type,omitempty"`
@@ -64,6 +65,7 @@ type StaticConfig struct {
 	KubernetesNamespace              *string               `yaml:"kubernetes-namespace,omitempty"`
 	KubernetesAPIListLimit           *uint32               `yaml:"kubernetes-api-list-limit,omitempty"`
 	KubernetesAPIListInterval        *string               `yaml:"kubernetes-api-list-interval,omitempty"`
+	KubernetesAPIMemoryTrimPercent   *uint8                `yaml:"kubernetes-api-memory-trim-percent,omitempty"`
 	IngressFlavour                   *string               `yaml:"ingress-flavour,omitempty"`
 	GrpcBufferSize                   *int                  `yaml:"grpc-buffer-size,omitempty"`            // 单位：M
 	L7LogSessionAggrTimeout          *string               `yaml:"l7-log-session-aggr-timeout,omitempty"` // 单位: s
@@ -90,9 +92,15 @@ type StaticConfig struct {
 	OsProcSocketMinLifetime          *int                  `yaml:"os-proc-socket-min-lifetime,omitempty"`
 	OsProcRegex                      []*OsProcRegex        `yaml:"os-proc-regex,omitempty"`
 	OsProcSyncEnabled                *bool                 `yaml:"os-proc-sync-enabled,omitempty"`
+	OsProcSyncTaggedOnly             *bool                 `yaml:"os-proc-sync-tagged-only,omitempty"`
 	GuardInterval                    *string               `yaml:"guard-interval,omitempty"`
 	CheckCoreFileDisabled            *bool                 `yaml:"check-core-file-disabled,omitempty"`
 	WasmPlugins                      []string              `yaml:"wasm-plugins,omitempty"`
+	MemoryTrimDisabled               *bool                 `yaml:"memory-trim-disabled,omitempty"`
+	FastPathDisabled                 *bool                 `yaml:"fast-path-disabled,omitempty"`
+	ForwardCapacity                  *uint32               `yaml:"forward-capacity,omitempty"`
+	RrtTcpTimeout                    *string               `yaml:"rrt-tcp-timeout,omitempty"`
+	RrtUdpTimeout                    *string               `yaml:"rrt-udp-timeout,omitempty"`
 }
 
 type XflowCollectorConfig struct {
@@ -126,9 +134,11 @@ type FlowGeneratorConfig struct {
 	Capacity         *int    `yaml:"flow-count-limit,omitempty"`
 	FlushInterval    *string `yaml:"flush-interval,omitempty"`
 	AggrQueueSize    *int    `yaml:"flow-aggr-queue-size,omitempty"`
+	MemoryPoolSize   *int    `yaml:"memory-pool-size,omitempty"`
 
-	IgnoreTorMac *bool `yaml:"ignore-tor-mac,omitempty"`
-	IgnoreL2End  *bool `yaml:"ignore-l2-end,omitempty"`
+	IgnoreTorMac  *bool `yaml:"ignore-tor-mac,omitempty"`
+	IgnoreL2End   *bool `yaml:"ignore-l2-end,omitempty"`
+	IgnoreIdcVlan *bool `yaml:"ignore-idc-vlan,omitempty"`
 }
 
 type EbpfUprobeProcessNameRegexsConfig struct {

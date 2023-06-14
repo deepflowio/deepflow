@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -181,7 +181,7 @@ type ChIPResource struct {
 	PodClusterID   int    `gorm:"column:pod_cluster_id;type:int;not null" json:"POD_CLUSTER_ID"`
 	PodClusterName string `gorm:"column:pod_cluster_name;type:varchar(256);default:null" json:"POD_CLUSTER_NAME"`
 	PodNSID        int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
-	PodNSName      string `gorm:"column:pod_ns_name;type:varchar(256);default:null" json:"pod_NS_NAME"`
+	PodNSName      string `gorm:"column:pod_ns_name;type:varchar(256);default:null" json:"POD_NS_NAME"`
 	PodNodeID      int    `gorm:"column:pod_node_id;type:int;not null" json:"POD_NODE_ID"`
 	PodNodeName    string `gorm:"column:pod_node_name;type:varchar(256);default:null" json:"POD_NODE_NAME"`
 	PodIngressID   int    `gorm:"column:pod_ingress_id;type:int;default:null" json:"POD_INGRESS_ID"`
@@ -275,8 +275,8 @@ type ChPodIngress struct {
 
 type ChPodK8sLabel struct {
 	ID      int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Key     string `gorm:"primaryKey;column:key;type:varchar(64);default:null" json:"KEY"`
-	Value   string `gorm:"column:value;type:varchar(64);default:null" json:"VALUE"`
+	Key     string `gorm:"primaryKey;column:key;type:varchar(256);default:null" json:"KEY"`
+	Value   string `gorm:"column:value;type:varchar(256);default:null" json:"VALUE"`
 	L3EPCID int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
 	PodNsID int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
 }
@@ -290,8 +290,8 @@ type ChPodK8sLabels struct {
 
 type ChPodServiceK8sLabel struct {
 	ID      int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Key     string `gorm:"primaryKey;column:key;type:varchar(64);default:null" json:"KEY"`
-	Value   string `gorm:"column:value;type:varchar(64);default:null" json:"VALUE"`
+	Key     string `gorm:"primaryKey;column:key;type:varchar(256);default:null" json:"KEY"`
+	Value   string `gorm:"column:value;type:varchar(256);default:null" json:"VALUE"`
 	L3EPCID int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
 	PodNsID int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
 }
@@ -379,4 +379,90 @@ type ChGProcess struct {
 
 func (ChGProcess) TableName() string {
 	return "ch_gprocess"
+}
+
+type ChPodK8sAnnotation struct {
+	ID      int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Key     string `gorm:"primaryKey;column:key;type:varchar(256);default:null" json:"KEY"`
+	Value   string `gorm:"column:value;type:varchar(256);default:null" json:"VALUE"`
+	L3EPCID int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
+	PodNsID int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
+}
+
+type ChPodK8sAnnotations struct {
+	ID          int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Annotations string `gorm:"column:annotations;type:text;default:null" json:"ANNOTATIONS"`
+	L3EPCID     int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
+	PodNsID     int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
+}
+
+type ChPodServiceK8sAnnotation struct {
+	ID      int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Key     string `gorm:"primaryKey;column:key;type:varchar(256);default:null" json:"KEY"`
+	Value   string `gorm:"column:value;type:varchar(256);default:null" json:"VALUE"`
+	L3EPCID int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
+	PodNsID int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
+}
+
+type ChPodServiceK8sAnnotations struct {
+	ID          int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Annotations string `gorm:"column:annotations;type:text;default:null" json:"ANNOTATIONS"`
+	L3EPCID     int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
+	PodNsID     int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
+}
+
+type ChPodK8sEnv struct {
+	ID      int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Key     string `gorm:"primaryKey;column:key;type:varchar(256);default:null" json:"KEY"`
+	Value   string `gorm:"column:value;type:varchar(256);default:null" json:"VALUE"`
+	L3EPCID int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
+	PodNsID int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
+}
+
+type ChPodK8sEnvs struct {
+	ID      int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Envs    string `gorm:"column:envs;type:text;default:null" json:"ENVS"`
+	L3EPCID int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
+	PodNsID int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
+}
+
+type ChPrometheusLabelName struct {
+	ID   int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
+}
+
+type ChPrometheusMetricName struct {
+	ID   int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
+}
+
+type ChPrometheusMetricAPPLabelLayout struct {
+	ID                  int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	MetricName          string `gorm:"column:metric_name;type:varchar(256);not null" json:"METRIC_NAME"`
+	APPLabelName        string `gorm:"column:app_label_name;type:varchar(256);not null" json:"APP_LABEL_NAME"`
+	APPLabelColumnIndex uint8  `gorm:"column:app_label_column_index;type:int unsigned;not null" json:"APP_LABEL_COLUMN_INDEX"`
+}
+
+type ChAPPLabel struct {
+	MetricID     int    `gorm:"primaryKey;column:metric_id;type:int;not null" json:"METRIC_ID"`
+	LabelNameID  int    `gorm:"primaryKey;column:label_name_id;type:int;not null" json:"LABEL_NAME_ID"`
+	LabelValueID int    `gorm:"primaryKey;column:label_value_id;type:int unsigned;not null" json:"LABEL_VALUE_ID"`
+	LabelValue   string `gorm:"column:label_value;type:varchar(256);not null" json:"LABEL_VALUE"`
+}
+
+func (ChAPPLabel) TableName() string {
+	return "ch_app_label"
+}
+
+type ChTargetLabel struct {
+	MetricID    int    `gorm:"primaryKey;column:metric_id;type:int;not null" json:"METRIC_ID"`
+	LabelNameID int    `gorm:"primaryKey;column:label_name_id;type:int;not null" json:"LABEL_NAME_ID"`
+	TargetID    int    `gorm:"primaryKey;column:target_id;type:int unsigned;not null" json:"TARGET_ID"`
+	LabelValue  string `gorm:"column:label_value;type:varchar(256);not null" json:"LABEL_VALUE"`
+}
+
+type ChPrometheusTargetLabelLayout struct {
+	TargetID          int    `gorm:"primaryKey;column:target_id;type:int;not null" json:"TARGET_ID"`
+	TargetLabelNames  string `gorm:"column:target_label_names;type:text;not null" json:"TARGET_LABEL_NAMES"`
+	TargetLabelValues string `gorm:"column:target_label_values;type:text;not null" json:"TARGET_LABEL_VALUES"`
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -62,9 +62,12 @@ func StringInterfaceMapKeys(m map[string]interface{}) (keys []string) {
 	return
 }
 
-func StringInterfaceMapKVs(m map[string]interface{}, sep string) (items []string) {
+func StringInterfaceMapKVs(m map[string]interface{}, sep string, valueMaxLength int) (items []string) {
 	keys := []string{}
 	for key := range m {
+		if valueMaxLength != 0 && len(m[key].(string)) > valueMaxLength {
+			continue
+		}
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
@@ -491,6 +494,7 @@ func GetHostNics(hosts []model.Host, domainName, uuidGenerate, portNameRegex str
 			// 增加接口信息
 			retVInterfaces = append(retVInterfaces, model.VInterface{
 				Lcuuid:        vinterfaceLcuuid,
+				NetnsID:       vinterface.NetnsID,
 				Type:          common.VIF_TYPE_LAN,
 				Mac:           vinterface.Mac,
 				DeviceType:    common.VIF_DEVICE_TYPE_HOST,

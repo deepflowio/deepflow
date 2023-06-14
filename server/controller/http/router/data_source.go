@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,12 +57,17 @@ func getDataSources(c *gin.Context) {
 func createDataSource(cfg *config.ControllerConfig) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		var err error
-		var dataSourceCreate model.DataSourceCreate
+		var dataSourceCreate *model.DataSourceCreate
 
 		// 参数校验
 		err = c.ShouldBindBodyWith(&dataSourceCreate, binding.JSON)
+		if dataSourceCreate != nil &&
+			!(dataSourceCreate.TsdbType == "app" || dataSourceCreate.TsdbType == "flow") {
+			BadRequestResponse(c, common.PARAMETER_ILLEGAL, "tsdb type only supports app and flow")
+			return
+		}
 		if err != nil {
-			BadRequestResponse(c, common.INVALID_POST_DATA, err.Error())
+			BadRequestResponse(c, common.PARAMETER_ILLEGAL, err.Error())
 			return
 		}
 

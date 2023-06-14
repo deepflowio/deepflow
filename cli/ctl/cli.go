@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,6 +63,7 @@ func Execute(version string) {
 	root.AddCommand(RegisterServerCommand())
 	root.AddCommand(RegisterRepoCommand())
 	root.AddCommand(RegisterPluginCommand())
+	root.AddCommand(RegisterPrometheusCacheCommand())
 
 	cmd.RegisterIngesterCommand(root)
 

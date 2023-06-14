@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	api "github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	grpcserver "github.com/deepflowio/deepflow/server/controller/grpc"
+	prometheus "github.com/deepflowio/deepflow/server/controller/prometheus/service/grpc"
 
 	"github.com/op/go-logging"
 	"golang.org/x/net/context"
@@ -31,6 +32,7 @@ var log = logging.MustGetLogger("grpc.controller")
 type service struct {
 	encryptKeyEvent *EncryptKeyEvent
 	resourceIDEvent *IDEvent
+	prometheusEvent *prometheus.EncoderEvent
 }
 
 func init() {
@@ -41,6 +43,7 @@ func newService() *service {
 	return &service{
 		encryptKeyEvent: NewEncryptKeyEvent(),
 		resourceIDEvent: NewIDEvent(),
+		prometheusEvent: prometheus.NewEncoderEvent(),
 	}
 }
 
@@ -62,10 +65,18 @@ func (s *service) GenesisSharingSync(ctx context.Context, in *api.GenesisSharing
 	return genesis.Synchronizer.GenesisSharingSync(ctx, in)
 }
 
+func (s *service) GenesisSharingPrometheus(ctx context.Context, in *api.GenesisSharingPrometheusRequest) (*api.GenesisSharingPrometheusResponse, error) {
+	return genesis.Synchronizer.GenesisSharingPrometheus(ctx, in)
+}
+
 func (s *service) GetResourceID(ctx context.Context, in *api.GetResourceIDRequest) (*api.GetResourceIDResponse, error) {
 	return s.resourceIDEvent.Get(ctx, in)
 }
 
 func (s *service) ReleaseResourceID(ctx context.Context, in *api.ReleaseResourceIDRequest) (*api.ReleaseResourceIDResponse, error) {
 	return s.resourceIDEvent.Release(ctx, in)
+}
+
+func (s *service) SyncPrometheus(ctx context.Context, in *api.SyncPrometheusRequest) (*api.SyncPrometheusResponse, error) {
+	return s.prometheusEvent.Encode(ctx, in)
 }

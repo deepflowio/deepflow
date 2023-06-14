@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -95,7 +95,10 @@ func (c *ControllerCheck) healthCheck() {
 
 	log.Info("controller health check start")
 
-	mysql.Db.Not("state = ?", common.HOST_STATE_MAINTENANCE).Order("state desc").Find(&controllers)
+	if err := mysql.Db.Where("state != ?", common.HOST_STATE_MAINTENANCE).Order("state desc").Find(&controllers).Error; err != nil {
+		log.Errorf("get controller from db error: %v", err)
+		return
+	}
 	for _, controller := range controllers {
 		// 健康检查过程，为了防止网络抖动，(3 * interval)时间内都正常/异常才进行状态修改
 		// 如果数据库状态是正常，且检查正常

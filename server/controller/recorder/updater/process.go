@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,9 +54,11 @@ func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysql.Pro
 		ProcessName: cloudItem.ProcessName,
 		CommandLine: cloudItem.CommandLine,
 		UserName:    cloudItem.UserName,
+		ContainerID: cloudItem.ContainerID,
 		OSAPPTags:   cloudItem.OSAPPTags,
 		Domain:      p.cache.DomainLcuuid,
 		SubDomain:   cloudItem.SubDomainLcuuid,
+		NetnsID:     cloudItem.NetnsID,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 
@@ -70,6 +72,9 @@ func (p *Process) generateUpdateInfo(diffBase *cache.Process, cloudItem *cloudmo
 	}
 	if diffBase.OSAPPTags != cloudItem.OSAPPTags {
 		updateInfo["os_app_tags"] = cloudItem.OSAPPTags
+	}
+	if diffBase.ContainerID != cloudItem.ContainerID {
+		updateInfo["container_id"] = cloudItem.ContainerID
 	}
 
 	if len(updateInfo) > 0 {

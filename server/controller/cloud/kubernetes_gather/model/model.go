@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,6 +51,7 @@ type KubernetesGatherResource struct {
 	PodSubnets             []model.Subnet
 	PodVInterfaces         []model.VInterface
 	PodIPs                 []model.IP
+	PrometheusTargets      []model.PrometheusTarget
 }
 
 type KubernetesGatherBasicInfo struct {

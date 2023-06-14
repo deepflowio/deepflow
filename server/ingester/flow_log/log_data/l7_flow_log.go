@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -98,7 +98,7 @@ func L7BaseColumns() []*ckdb.Column {
 		ckdb.NewColumn("protocol", ckdb.UInt8).SetIndex(ckdb.IndexMinmax),
 
 		// 传输层
-		ckdb.NewColumn("client_port", ckdb.UInt16).SetIndex(ckdb.IndexNone),
+		ckdb.NewColumn("client_port", ckdb.UInt16),
 		ckdb.NewColumn("server_port", ckdb.UInt16).SetIndex(ckdb.IndexSet),
 
 		// 流信息
@@ -111,8 +111,8 @@ func L7BaseColumns() []*ckdb.Column {
 		ckdb.NewColumn("tap_port", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 		ckdb.NewColumn("tap_side", ckdb.LowCardinalityString),
 		ckdb.NewColumn("vtap_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
-		ckdb.NewColumn("req_tcp_seq", ckdb.UInt32).SetIndex(ckdb.IndexNone),
-		ckdb.NewColumn("resp_tcp_seq", ckdb.UInt32).SetIndex(ckdb.IndexNone),
+		ckdb.NewColumn("req_tcp_seq", ckdb.UInt32),
+		ckdb.NewColumn("resp_tcp_seq", ckdb.UInt32),
 		ckdb.NewColumn("start_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
 		ckdb.NewColumn("end_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
 		ckdb.NewColumn("gprocess_id_0", ckdb.UInt32).SetComment("全局客户端进程ID"),
@@ -261,7 +261,7 @@ func L7FlowLogColumns() []*ckdb.Column {
 		ckdb.NewColumn("request_length", ckdb.Int64Nullable).SetComment("请求长度"),
 		ckdb.NewColumn("response_length", ckdb.Int64Nullable).SetComment("响应长度"),
 		ckdb.NewColumn("sql_affected_rows", ckdb.UInt64Nullable).SetComment("sql影响行数"),
-		ckdb.NewColumn("direction_score", ckdb.UInt8),
+		ckdb.NewColumn("direction_score", ckdb.UInt8).SetIndex(ckdb.IndexMinmax),
 
 		ckdb.NewColumn("attribute_names", ckdb.ArrayString).SetComment("额外的属性"),
 		ckdb.NewColumn("attribute_values", ckdb.ArrayString).SetComment("额外的属性对应的值"),
@@ -328,7 +328,11 @@ func (h *L7FlowLog) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfo
 
 	h.Type = uint8(l.Base.Head.MsgType)
 	h.L7Protocol = uint8(l.Base.Head.Proto)
-	h.L7ProtocolStr = datatype.L7Protocol(h.L7Protocol).String()
+	if l.ExtInfo != nil && l.ExtInfo.ProtocolStr != "" {
+		h.L7ProtocolStr = l.ExtInfo.ProtocolStr
+	} else {
+		h.L7ProtocolStr = datatype.L7Protocol(h.L7Protocol).String()
+	}
 
 	h.ResponseStatus = uint8(datatype.STATUS_NOT_EXIST)
 	h.ResponseDuration = l.Base.Head.Rrt / uint64(time.Microsecond)

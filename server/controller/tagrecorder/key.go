@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -103,4 +103,34 @@ type OSAPPTagKey struct {
 
 type OSAPPTagsKey struct {
 	PID int
+}
+
+type K8sAnnotationKey struct {
+	ID  int
+	Key string
+}
+
+type K8sAnnotationsKey struct {
+	ID int
+}
+
+type K8sEnvKey struct {
+	ID  int
+	Key string
+}
+
+type K8sEnvsKey struct {
+	ID int
+}
+
+type PrometheusAPPLabelKey struct {
+	MetricID     int
+	LabelNameID  int
+	LabelValueID int
+}
+
+type PrometheusTargetLabelKey struct {
+	MetricID    int
+	LabelNameID int
+	TargetID    int
 }

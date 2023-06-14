@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	grpcserver "github.com/deepflowio/deepflow/server/controller/grpc"
+	prometheus "github.com/deepflowio/deepflow/server/controller/prometheus/service/grpc"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/services/grpc/statsd"
 )
 
@@ -37,6 +38,7 @@ type service struct {
 	kubernetesClusterIDEvent *KubernetesClusterIDEvent
 	processInfoEvent         *ProcessInfoEvent
 	pluginEvent              *PluginEvent
+	prometheusEvent          *prometheus.SynchronizerEvent
 }
 
 func init() {
@@ -51,6 +53,7 @@ func newService() *service {
 		upgradeEvent:     NewUpgradeEvent(),
 		processInfoEvent: NewprocessInfoEvent(),
 		pluginEvent:      NewPluginEvent(),
+		prometheusEvent:  prometheus.NewSynchronizerEvent(),
 	}
 }
 
@@ -125,6 +128,14 @@ func (s *service) KubernetesAPISync(ctx context.Context, in *api.KubernetesAPISy
 	return genesis.Synchronizer.KubernetesAPISync(ctx, in)
 }
 
+func (s *service) PrometheusAPISync(ctx context.Context, in *api.PrometheusAPISyncRequest) (*api.PrometheusAPISyncResponse, error) {
+	startTime := time.Now()
+	defer func() {
+		statsd.AddGrpcCostStatsd(statsd.PrometheusAPISync, int(time.Now().Sub(startTime).Milliseconds()))
+	}()
+	return genesis.Synchronizer.PrometheusAPISync(ctx, in)
+}
+
 func (s *service) GPIDSync(ctx context.Context, in *api.GPIDSyncRequest) (*api.GPIDSyncResponse, error) {
 	startTime := time.Now()
 	defer func() {
@@ -135,6 +146,10 @@ func (s *service) GPIDSync(ctx context.Context, in *api.GPIDSyncRequest) (*api.G
 
 func (s *service) ShareGPIDLocalData(ctx context.Context, in *api.ShareGPIDSyncRequests) (*api.ShareGPIDSyncRequests, error) {
 	return s.processInfoEvent.ShareGPIDLocalData(ctx, in)
+}
+
+func (s *service) GetPrometheusLabelIDs(ctx context.Context, in *api.PrometheusLabelRequest) (*api.PrometheusLabelResponse, error) {
+	return s.prometheusEvent.GetLabelIDs(ctx, in)
 }
 
 func (s *service) Plugin(r *api.PluginRequest, in api.Synchronizer_PluginServer) error {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@
 package baidubce
 
 import (
+	"time"
+
 	"github.com/baidubce/bce-sdk-go/services/vpc"
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
@@ -35,11 +37,14 @@ func (b *BaiduBce) getPeerConnections(region model.Region, vpcIdToLcuuid map[str
 	results := make([]*vpc.ListPeerConnsResult, 0)
 	for {
 		args.Marker = marker
+		startTime := time.Now()
 		result, err := vpcClient.ListPeerConn(args)
 		if err != nil {
 			log.Error(err)
 			return nil, err
 		}
+		b.cloudStatsd.APICost["ListPeerConn"] = append(b.cloudStatsd.APICost["ListPeerConn"], int(time.Now().Sub(startTime).Milliseconds()))
+		b.cloudStatsd.APICount["ListPeerConn"] = append(b.cloudStatsd.APICount["ListPeerConn"], len(result.PeerConns))
 		results = append(results, result)
 		if !result.IsTruncated {
 			break

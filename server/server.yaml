@@ -55,6 +55,9 @@ controller:
     host: mysql
     port: 30130
     timeout: 30
+    # whether drop database when init failed
+    drop-database-enabled: false
+    auto_increment_increment: 1
 
   # redis相关配置
   redis:
@@ -88,7 +91,7 @@ controller:
     vtap_max_per_group: 10000
     az_max_per_server: 10
     data_source_max: 15
-    data_source_retention_time_max: 1000
+    data_source_retention_time_max: 24000
 
   # monitor module config
   monitor:
@@ -127,6 +130,8 @@ controller:
         kubernetes_gather_interval: 30
         # 阿里公有云API获取区域列表时，需要指定一个区域
         aliyun_region_name: cn-beijing
+        # AWS API获取区域列表时，需要指定一个区域，并通过这个区域区分国际版和国内版
+        aws_region_name: cn-north-1
         # 配置宿主机IP文件
         hostname_to_ip_file: /etc/hostname_to_ip.csv
         # 开启debug模式，支持debug云平台API/SDK原始数据
@@ -170,6 +175,9 @@ controller:
     vtap-auto-register: True
 
     default-tap-mode:
+
+    # whether to register domain automatically
+    domain-auto-register: True
 
   genesis:
     # 平台数据老化时间，单位：秒
@@ -470,9 +478,14 @@ ingester:
   #otlp-exporter:
   #  enabled: false
   #  addr: 127.0.0.1:4317 # grpc protobuf addr
-  #  # export datas ranges: cbpf-net-span, ebpf-sys-span,otel-app-span
+  #  # export datas ranges: cbpf-net-span, ebpf-sys-span
   #  export-datas: [cbpf-net-span,ebpf-sys-span]
   #  # export-data-types ranges: service_info,tracing_info,network_layer,flow_info,client_universal_tag,server_universal_tag,tunnel_info,transport_layer,application_layer,capture_info,native_tag,metrics
   #  export-data-types: [service_info,tracing_info,network_layer,flow_info,transport_layer,application_layer,metrics]
   #  queue-count: 2       # parallelism of sender
   #  queue-size: 100000   # size of each exporter queue
+  #  export-custom-k8s-labels-regexp:  # type string, default: "", means not export custom k8s labels. for example: ".+", means export all custom k8s labels; "aaa|bbb": means export labels which contains 'aaa' or 'bbb' string. ref: https://github.com/google/re2/wiki/Syntax
+  #  export-only-with-traceid: false # if set 'true', if the span has no trace id, it will not be exported
+  #  grpc-headers: # grpc headers, type: map[string]string, default is null, the following is an example configuration
+  #    key1: value1
+  #    key2: value2

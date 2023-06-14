@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -342,11 +342,13 @@ func NewColumn(name string, t ColumnType) *Column {
 		index = IndexMinmax
 	case UInt64, Int64:
 		codec = CodecT64
+		index = IndexMinmax
 	case DateTime, DateTime64ms, DateTime64us:
 		codec = CodecDoubleDelta
 		index = IndexMinmax // 时间默认设置minmax的二级索引
 	case Float64:
 		codec = CodecGorilla
+		index = IndexMinmax
 	}
 	return &Column{name, t, codec, index, false, ""}
 }

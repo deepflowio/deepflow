@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,6 +35,7 @@ func DebugRouter(e *gin.Engine, m *manager.Manager, g *genesis.Genesis) {
 	e.GET("/v1/sync/:type/", getGenesisSyncData(g, false))
 	e.GET("/v1/agent-stats/:ip/", getAgentStats(g))
 	e.GET("/v1/kubernetes-info/:clusterID/", getGenesisKubernetesData(g))
+	e.GET("/v1/prometheus-info/:clusterID/", getGenesisPrometheusData(g))
 	e.GET("/v1/sub-tasks/:lcuuid/", getKubernetesGatherBasicInfos(m))
 	e.GET("/v1/kubernetes-gather-infos/:lcuuid/", getKubernetesGatherResources(m))
 	e.GET("/v1/recorders/:domainLcuuid/:subDomainLcuuid/cache/", getRecorderCache(m))
@@ -191,6 +192,13 @@ func getGenesisSyncData(g *genesis.Genesis, isLocal bool) gin.HandlerFunc {
 func getGenesisKubernetesData(g *genesis.Genesis) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		data, err := service.GetGenesisKubernetesData(g, c.Param("clusterID"))
+		JsonResponse(c, data, err)
+	})
+}
+
+func getGenesisPrometheusData(g *genesis.Genesis) gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		data, err := service.GetGenesisPrometheusData(g, c.Param("clusterID"))
 		JsonResponse(c, data, err)
 	})
 }

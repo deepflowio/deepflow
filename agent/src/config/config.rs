@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,6 +40,7 @@ use crate::common::{
     enums::TapType, DEFAULT_LOG_FILE, L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT,
     L7_PROTOCOL_INFERENCE_TTL,
 };
+use crate::flow_generator::protocol_logs::SLOT_WIDTH;
 use crate::rpc::Session;
 use crate::trident::RunningMode;
 use public::proto::{
@@ -233,8 +234,8 @@ impl Default for UprobeProcRegExp {
     fn default() -> Self {
         Self {
             golang_symbol: String::new(),
-            golang: String::from(".*"),
-            openssl: String::from(".*"),
+            golang: String::new(),
+            openssl: String::new(),
         }
     }
 }
@@ -242,6 +243,7 @@ impl Default for UprobeProcRegExp {
 pub const OS_PROC_REGEXP_MATCH_TYPE_CMD: &'static str = "cmdline";
 pub const OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME: &'static str = "process_name";
 pub const OS_PROC_REGEXP_MATCH_TYPE_PARENT_PROC_NAME: &'static str = "parent_process_name";
+pub const OS_PROC_REGEXP_MATCH_TYPE_TAG: &'static str = "tag";
 
 pub const OS_PROC_REGEXP_MATCH_ACTION_ACCEPT: &'static str = "accept";
 pub const OS_PROC_REGEXP_MATCH_ACTION_DROP: &'static str = "drop";
@@ -294,7 +296,7 @@ impl Default for EbpfYamlConfig {
             socket_map_max_reclaim: 520000,
             kprobe_whitelist: EbpfKprobeWhitelist::default(),
             uprobe_proc_regexp: UprobeProcRegExp::default(),
-            go_tracing_timeout: 0,
+            go_tracing_timeout: 120,
             io_event_collect_mode: 1,
             io_event_minimal_duration: Duration::from_millis(1),
         }
@@ -326,6 +328,7 @@ pub struct YamlConfig {
     pub flow_queue_size: usize,
     pub quadruple_queue_size: usize,
     pub analyzer_queue_size: usize,
+    pub analyzer_raw_packet_block_size: usize,
     #[serde(rename = "ovs-dpdk-enable")]
     pub ovs_dpdk_enabled: bool,
     pub dpdk_pmd_core_id: u32,
@@ -356,6 +359,7 @@ pub struct YamlConfig {
     pub kubernetes_api_list_limit: u32,
     #[serde(with = "humantime_serde")]
     pub kubernetes_api_list_interval: Duration,
+    pub kubernetes_api_memory_trim_percent: u8,
     pub external_metrics_sender_queue_size: usize,
     pub l7_protocol_inference_max_fail_count: usize,
     pub l7_protocol_inference_ttl: usize,
@@ -384,9 +388,20 @@ pub struct YamlConfig {
     // whether to sync os socket and proc info.
     // only make sense when process_info_enabled() == true
     pub os_proc_sync_enabled: bool,
+    // sync os socket and proc info only when the process has been tagged.
+    pub os_proc_sync_tagged_only: bool,
     #[serde(with = "humantime_serde")]
     pub guard_interval: Duration,
     pub check_core_file_disabled: bool,
+    pub wasm_plugins: Vec<String>,
+    pub memory_trim_disabled: bool,
+    pub forward_capacity: usize,
+    pub fast_path_disabled: bool,
+    // rrt timeout must gt aggr SLOT_WIDTH
+    #[serde(with = "humantime_serde")]
+    pub rrt_tcp_timeout: Duration,
+    #[serde(with = "humantime_serde")]
+    pub rrt_udp_timeout: Duration,
 }
 
 impl YamlConfig {
@@ -431,6 +446,9 @@ impl YamlConfig {
         }
         if c.analyzer_queue_size < 1 << 17 {
             c.analyzer_queue_size = 1 << 17;
+        }
+        if c.analyzer_raw_packet_block_size < 65536 {
+            c.analyzer_raw_packet_block_size = 65536;
         }
         if c.collector_sender_queue_size == 0 {
             c.collector_sender_queue_size = if tap_mode == trident::TapMode::Analyzer {
@@ -529,7 +547,7 @@ impl YamlConfig {
         }
         if c.guard_interval < Duration::from_secs(1) || c.guard_interval > Duration::from_secs(3600)
         {
-            c.guard_interval = Duration::from_secs(60);
+            c.guard_interval = Duration::from_secs(10);
         }
 
         if c.kubernetes_api_list_limit < 10 {
@@ -540,9 +558,26 @@ impl YamlConfig {
             c.kubernetes_api_list_interval = Duration::from_secs(600);
         }
 
+        if c.kubernetes_api_memory_trim_percent > 100 {
+            c.kubernetes_api_memory_trim_percent = 100;
+        }
+
+        if c.forward_capacity < 1 << 14 {
+            c.forward_capacity = 1 << 14;
+        }
+
         if let Err(e) = c.validate() {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string()));
         }
+        c.rrt_tcp_timeout = c
+            .rrt_tcp_timeout
+            .max(Duration::from_secs(SLOT_WIDTH))
+            .min(Duration::from_secs(3600));
+
+        c.rrt_udp_timeout = c
+            .rrt_udp_timeout
+            .max(Duration::from_secs(SLOT_WIDTH))
+            .min(Duration::from_secs(300));
         Ok(c)
     }
 
@@ -593,6 +628,7 @@ impl Default for YamlConfig {
             flow_queue_size: 65536,
             quadruple_queue_size: 262144,
             analyzer_queue_size: 131072,
+            analyzer_raw_packet_block_size: 65536,
             ovs_dpdk_enabled: false,
             dpdk_pmd_core_id: 0,
             dpdk_ring_port: "dpdkr0".into(),
@@ -620,6 +656,7 @@ impl Default for YamlConfig {
             kubernetes_namespace: "".into(),
             kubernetes_api_list_limit: 1000,
             kubernetes_api_list_interval: Duration::from_secs(600),
+            kubernetes_api_memory_trim_percent: 100,
             external_metrics_sender_queue_size: 1 << 12,
             l7_protocol_inference_max_fail_count: L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT,
             l7_protocol_inference_ttl: L7_PROTOCOL_INFERENCE_TTL,
@@ -662,8 +699,15 @@ impl Default for YamlConfig {
             os_app_tag_exec_user: "deepflow".to_string(),
             os_app_tag_exec: vec![],
             os_proc_sync_enabled: false,
-            guard_interval: Duration::from_secs(60),
+            os_proc_sync_tagged_only: false,
+            guard_interval: Duration::from_secs(10),
             check_core_file_disabled: false,
+            wasm_plugins: vec![],
+            memory_trim_disabled: false,
+            fast_path_disabled: false,
+            forward_capacity: 1 << 14,
+            rrt_tcp_timeout: Duration::from_secs(1800),
+            rrt_udp_timeout: Duration::from_secs(150),
         }
     }
 }
@@ -751,9 +795,11 @@ pub struct FlowGeneratorConfig {
     pub flush_interval: Duration,
     #[serde(rename = "flow-aggr-queue-size")]
     pub aggr_queue_size: u32,
+    pub memory_pool_size: usize,
 
     pub ignore_tor_mac: bool,
     pub ignore_l2_end: bool,
+    pub ignore_idc_vlan: bool,
 }
 
 impl Default for FlowGeneratorConfig {
@@ -768,9 +814,11 @@ impl Default for FlowGeneratorConfig {
             capacity: 1048576,
             flush_interval: Duration::from_secs(1),
             aggr_queue_size: 65535,
+            memory_pool_size: 65536,
 
             ignore_tor_mac: false,
             ignore_l2_end: false,
+            ignore_idc_vlan: false,
         }
     }
 }
@@ -814,6 +862,7 @@ pub enum KubernetesPollerType {
     Adaptive,
     Active,
     Passive,
+    Sidecar,
 }
 
 #[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq)]
@@ -932,6 +981,7 @@ pub struct RuntimeConfig {
     pub external_agent_http_proxy_port: u16,
     #[serde(skip)]
     pub tap_mode: TapMode,
+    pub prometheus_http_api_address: String,
     // TODO: expand and remove
     #[serde(rename = "static_config")]
     pub yaml_config: YamlConfig,
@@ -1031,6 +1081,7 @@ impl RuntimeConfig {
             external_agent_http_proxy_port: 38086,
             tap_mode: TapMode::Local,
             yaml_config: YamlConfig::load("", TapMode::Local).unwrap(), // Default configuration that needs to be corrected to be available
+            prometheus_http_api_address: "".into(),
         }
     }
 
@@ -1234,6 +1285,7 @@ impl TryFrom<trident::Config> for RuntimeConfig {
             external_agent_http_proxy_enabled: conf.external_agent_http_proxy_enabled(),
             external_agent_http_proxy_port: conf.external_agent_http_proxy_port() as u16,
             tap_mode: conf.tap_mode(),
+            prometheus_http_api_address: conf.prometheus_http_api_address().to_owned(),
             yaml_config: YamlConfig::load(conf.local_config(), conf.tap_mode())?,
         };
         rc.validate()

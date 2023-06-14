@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -89,6 +89,9 @@ func (c *Cloud) getSubDomainData(cResource model.Resource) map[string]model.SubD
 		// networks
 		networks := c.getSubDomainNetworks(lcuuid, &kubernetesGatherResource, azLcuuid)
 
+		// prometheusTargets
+		prometheusTargets := c.getSubDomainPrometheusTargets(lcuuid, &kubernetesGatherResource)
+
 		// 生成SubDomainResource
 		subDomainResource := model.SubDomainResource{
 			Verified:               true,
@@ -111,6 +114,7 @@ func (c *Cloud) getSubDomainData(cResource model.Resource) map[string]model.SubD
 			Subnets:                subnets,
 			VInterfaces:            vinterfaces,
 			IPs:                    ips,
+			PrometheusTargets:      prometheusTargets,
 		}
 		subDomainResources[lcuuid] = subDomainResource
 	}
@@ -325,6 +329,7 @@ func (c *Cloud) getSubDomainPodServices(
 			Lcuuid:             podService.Lcuuid,
 			Name:               podService.Name,
 			Label:              podService.Label,
+			Annotation:         podService.Annotation,
 			Type:               podService.Type,
 			Selector:           podService.Selector,
 			ServiceClusterIP:   podService.ServiceClusterIP,
@@ -420,7 +425,10 @@ func (c *Cloud) getSubDomainPods(
 		retPods = append(retPods, model.Pod{
 			Lcuuid:              pod.Lcuuid,
 			Name:                pod.Name,
+			Annotation:          pod.Annotation,
+			ENV:                 pod.ENV,
 			Label:               pod.Label,
+			ContainerIDs:        pod.ContainerIDs,
 			State:               pod.State,
 			CreatedAt:           pod.CreatedAt,
 			PodReplicaSetLcuuid: pod.PodReplicaSetLcuuid,
@@ -611,4 +619,23 @@ func (c *Cloud) getSubDomainNetworks(
 	}
 
 	return retNetworks
+}
+
+func (c *Cloud) getSubDomainPrometheusTargets(
+	subDomainLcuuid string, resource *kubernetes_model.KubernetesGatherResource) []model.PrometheusTarget {
+	var retPrometheusTargets []model.PrometheusTarget
+
+	// 遍历PrometheusTargets，更新subDomain信息
+	for _, p := range resource.PrometheusTargets {
+		retPrometheusTargets = append(retPrometheusTargets, model.PrometheusTarget{
+			Lcuuid:          p.Lcuuid,
+			ScrapeURL:       p.ScrapeURL,
+			Instance:        p.Instance,
+			Job:             p.Job,
+			OtherLabels:     p.OtherLabels,
+			SubDomainLcuuid: subDomainLcuuid,
+		})
+	}
+
+	return retPrometheusTargets
 }

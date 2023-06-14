@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -726,12 +726,11 @@ mod tests {
     use super::*;
 
     use crate::common::endpoint::{
-        EndpointData, EndpointInfo, EPC_FROM_DEEPFLOW, EPC_FROM_INTERNET,
+        EndpointData, EndpointDataPov, EndpointInfo, EPC_FROM_DEEPFLOW, EPC_FROM_INTERNET,
     };
     use crate::common::flow::{CloseType, PacketDirection};
-    use crate::common::tagged_flow::TaggedFlow;
     use crate::config::RuntimeConfig;
-    use crate::flow_generator::flow_map::_new_flow_map_and_receiver;
+    use crate::flow_generator::flow_map::{Config, _new_flow_map_and_receiver};
     use crate::flow_generator::flow_node::FlowNode;
     use crate::flow_generator::{FlowTimeout, TcpTimeout};
     use crate::flow_generator::{FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC, TIME_UNIT};
@@ -780,11 +779,11 @@ mod tests {
             (TcpFlags::ACK, PacketDirection::ClientToServer),
         ];
 
-        let (mut flow_map, _) = _new_flow_map_and_receiver(TridentType::TtProcess, None);
+        let (_, mut flow_map, _) = _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
         let mut flow_node = FlowNode {
             timestamp_key: get_timestamp(0).as_nanos() as u64,
 
-            tagged_flow: TaggedFlow::default(),
+            tagged_flow: Default::default(),
             min_arrived_time: Duration::ZERO,
             recent_time: Duration::ZERO,
             timeout: Duration::ZERO,
@@ -818,7 +817,7 @@ mod tests {
                         is_local_ip: false,
                     },
                 };
-                [Arc::new(data), Arc::new(data.reversed())]
+                Some(EndpointDataPov::new(Arc::new(data)))
             },
             residual_request: 0,
             next_tcp_seq0: 0,
@@ -848,11 +847,11 @@ mod tests {
 
     #[test]
     fn state_machine() {
-        let (mut flow_map, _) = _new_flow_map_and_receiver(TridentType::TtProcess, None);
+        let (_, mut flow_map, _) = _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
         let mut flow_node = FlowNode {
             timestamp_key: get_timestamp(0).as_nanos() as u64,
 
-            tagged_flow: TaggedFlow::default(),
+            tagged_flow: Default::default(),
             min_arrived_time: Duration::ZERO,
             recent_time: Duration::ZERO,
             timeout: Duration::ZERO,
@@ -886,7 +885,7 @@ mod tests {
                         is_local_ip: false,
                     },
                 };
-                [Arc::new(data), Arc::new(data.reversed())]
+                Some(EndpointDataPov::new(Arc::new(data)))
             },
             residual_request: 0,
             next_tcp_seq0: 0,
@@ -923,48 +922,55 @@ mod tests {
     }
 
     fn state_machine_helper<P: AsRef<Path>>(pcap_file: P, expect_close_type: CloseType) {
-        let (mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess, None);
+        let (module_config, mut flow_map, output_queue_receiver) =
+            _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
 
         let capture = Capture::load_pcap(pcap_file, None);
         let packets = capture.as_meta_packets();
         let delta = packets.first().unwrap().lookup_key.timestamp;
         let mut last_timestamp = Duration::ZERO;
+        let ep = EndpointDataPov::new(Arc::new(EndpointData {
+            src_info: EndpointInfo {
+                real_ip: Ipv4Addr::UNSPECIFIED.into(),
+                l2_epc_id: EPC_FROM_DEEPFLOW,
+                l3_epc_id: 1,
+                l2_end: false,
+                l3_end: false,
+                is_device: false,
+                is_vip_interface: false,
+                is_vip: false,
+                is_local_mac: false,
+                is_local_ip: false,
+            },
+            dst_info: EndpointInfo {
+                real_ip: Ipv4Addr::UNSPECIFIED.into(),
+                l2_epc_id: EPC_FROM_DEEPFLOW,
+                l3_epc_id: EPC_FROM_INTERNET,
+                l2_end: false,
+                l3_end: false,
+                is_device: false,
+                is_vip_interface: false,
+                is_vip: false,
+                is_local_mac: false,
+                is_local_ip: false,
+            },
+        }));
+        let config = Config {
+            flow: &module_config.flow,
+            log_parser: &module_config.log_parser,
+            #[cfg(target_os = "linux")]
+            ebpf: None,
+        };
         for mut pkt in packets {
-            pkt.endpoint_data.replace(Arc::new(EndpointData {
-                src_info: EndpointInfo {
-                    real_ip: Ipv4Addr::UNSPECIFIED.into(),
-                    l2_epc_id: EPC_FROM_DEEPFLOW,
-                    l3_epc_id: 1,
-                    l2_end: false,
-                    l3_end: false,
-                    is_device: false,
-                    is_vip_interface: false,
-                    is_vip: false,
-                    is_local_mac: false,
-                    is_local_ip: false,
-                },
-                dst_info: EndpointInfo {
-                    real_ip: Ipv4Addr::UNSPECIFIED.into(),
-                    l2_epc_id: EPC_FROM_DEEPFLOW,
-                    l3_epc_id: EPC_FROM_INTERNET,
-                    l2_end: false,
-                    l3_end: false,
-                    is_device: false,
-                    is_vip_interface: false,
-                    is_vip: false,
-                    is_local_mac: false,
-                    is_local_ip: false,
-                },
-            }));
+            pkt.endpoint_data.replace(ep.clone());
 
             pkt.lookup_key.timestamp = get_timestamp(0) + (pkt.lookup_key.timestamp - delta);
             last_timestamp = pkt.lookup_key.timestamp;
-            flow_map.inject_meta_packet(&mut pkt);
+            flow_map.inject_meta_packet(&config, &mut pkt);
         }
 
-        flow_map.inject_flush_ticker(last_timestamp);
-        flow_map.inject_flush_ticker(last_timestamp + Duration::from_secs(600));
+        flow_map.inject_flush_ticker(&config, last_timestamp);
+        flow_map.inject_flush_ticker(&config, last_timestamp + Duration::from_secs(600));
 
         let mut tagged_flows = vec![];
         // 如果不设置超时，队列就会永远等待

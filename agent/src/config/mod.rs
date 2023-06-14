@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,6 @@ pub use config::{
     PcapConfig, RuntimeConfig, TripleMapConfig, UprobeProcRegExp, XflowGeneratorConfig, YamlConfig,
     OS_PROC_REGEXP_MATCH_ACTION_ACCEPT, OS_PROC_REGEXP_MATCH_ACTION_DROP,
     OS_PROC_REGEXP_MATCH_TYPE_CMD, OS_PROC_REGEXP_MATCH_TYPE_PARENT_PROC_NAME,
-    OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME,
+    OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME, OS_PROC_REGEXP_MATCH_TYPE_TAG,
 };
 pub use handler::{DispatcherConfig, FlowAccess, FlowConfig, ModuleConfig, NpbConfig};

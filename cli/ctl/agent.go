@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,8 +28,8 @@ import (
 	"strings"
 
 	"github.com/bitly/go-simplejson"
-	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
+	"sigs.k8s.io/yaml"
 
 	"github.com/deepflowio/deepflow/cli/ctl/common"
 	"github.com/deepflowio/deepflow/cli/ctl/common/jsonparser"
@@ -227,7 +227,7 @@ func listAgent(cmd *cobra.Command, args []string, output string) {
 		}
 
 		cmdFormat := "%-8s %-*s %-10s %-16s %-18s %-8s %-*s %s\n"
-		fmt.Printf(cmdFormat, "VTAP_ID", nameMaxSize, "NAME", "TYPE", "CTRL_IP", "CTRL_MAC", "STATE", groupMaxSize, "GROUP", "EXCEPTIONS")
+		fmt.Printf(cmdFormat, "ID", nameMaxSize, "NAME", "TYPE", "CTRL_IP", "CTRL_MAC", "STATE", groupMaxSize, "GROUP", "EXCEPTIONS")
 		for i := range response.Get("DATA").MustArray() {
 			vtap := response.Get("DATA").GetIndex(i)
 
@@ -343,7 +343,7 @@ func updateAgent(cmd *cobra.Command, args []string, updateFilename string) {
 
 	// update vtap_group_id
 	if vtapGroupID, ok := updateMap["vtap_group_id"]; ok {
-		url := fmt.Sprintf("http://%s:%d/v1/vtap-group-configuration/?vtap_group_id=%s", server.IP, server.Port, vtapGroupID)
+		url := fmt.Sprintf("http://%s:%d/v1/vtap-groups/?short_uuid=%s", server.IP, server.Port, vtapGroupID)
 		// call vtap-group api, get lcuuid
 		response, err := common.CURLPerform("GET", url, nil, "")
 		if err != nil {
@@ -429,19 +429,26 @@ func upgadeAgent(cmd *cobra.Command, args []string) {
 	var (
 		vtapController string
 		vtapLcuuid     string
+		vtapType       int
 	)
 
 	if len(response.Get("DATA").MustArray()) > 0 {
 		vtapLcuuid = response.Get("DATA").GetIndex(0).Get("LCUUID").MustString()
 		vtapController = response.Get("DATA").GetIndex(0).Get("CONTROLLER_IP").MustString()
+		vtapType = response.Get("DATA").GetIndex(0).Get("TYPE").MustInt()
 	} else {
 		fmt.Printf("get agent(%s) info failed, url: %s\n", vtapName, vtapURL)
+		return
+	}
+	if vtapType == int(common.VTAP_TYPE_POD_VM) || vtapType == int(common.VTAP_TYPE_POD_HOST) {
+		fmt.Printf("agent (%s) type is %v, not supported upgrade by cli\n", vtapName, common.VtapType(vtapType))
 		return
 	}
 	if vtapController == "" || vtapLcuuid == "" {
 		fmt.Printf("get agent(%s) info failed, url: %s\n", vtapName, vtapURL)
 		return
 	}
+
 	hosts[vtapController] = struct{}{}
 	url_format := "http://%s:%d/v1/upgrade/vtap/%s/"
 	body := map[string]interface{}{

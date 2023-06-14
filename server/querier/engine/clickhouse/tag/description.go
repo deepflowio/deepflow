@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,11 +51,11 @@ var TAG_STRING_ENUMS = map[string][]*TagEnum{}
 
 var tagTypeToOperators = map[string][]string{
 	"resource":    []string{"=", "!=", "IN", "NOT IN", "LIKE", "NOT LIKE", "REGEXP", "NOT REGEXP"},
-	"int":         []string{"=", "!=", "IN", "NOT IN", ">=", "<="},
-	"int_enum":    []string{"=", "!=", "IN", "NOT IN", ">=", "<="},
+	"int":         []string{"=", "!=", "IN", "NOT IN", ">=", "<=", ">", "<"},
+	"int_enum":    []string{"=", "!=", "IN", "NOT IN", ">=", "<=", ">", "<"},
 	"string":      []string{"=", "!=", "IN", "NOT IN", "LIKE", "NOT LIKE", "REGEXP", "NOT REGEXP"},
 	"string_enum": []string{"=", "!=", "IN", "NOT IN", "LIKE", "NOT LIKE", "REGEXP", "NOT REGEXP"},
-	"ip":          []string{"=", "!=", "IN", "NOT IN", ">=", "<="},
+	"ip":          []string{"=", "!=", "IN", "NOT IN", ">=", "<=", ">", "<"},
 	"time":        []string{"=", "!=", ">=", "<="},
 	"mac":         []string{"=", "!=", "IN", "NOT IN"},
 	"id":          []string{"=", "!=", "IN", "NOT IN"},
@@ -228,7 +228,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 	}
 
 	for _, key := range TAG_DESCRIPTION_KEYS {
-		if key.DB != db || (key.Table != table && db != "ext_metrics" && db != "deepflow_system") {
+		if key.DB != db || (key.Table != table && db != "ext_metrics" && db != "deepflow_system" && db != ckcommon.DB_NAME_PROMETHEUS) {
 			continue
 		}
 		tag, _ := TAG_DESCRIPTIONS[key]
@@ -287,6 +287,71 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
 			response.Values = append(response.Values, []interface{}{
 				labelKey, labelKey + "_0", labelKey + "_1", labelKey, "map_item",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+			})
+		}
+	}
+
+	// 查询 k8s_annotation
+	podK8sAnnotationRst, err := chClient.DoQuery(&client.QueryParams{
+		Sql: "SELECT key FROM flow_tag.pod_k8s_annotation_map GROUP BY key"})
+	if err != nil {
+		return nil, err
+	}
+	for _, _key := range podK8sAnnotationRst.Values {
+		key := _key.([]interface{})[0]
+		annotationKey := "k8s.annotation." + key.(string)
+		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || table == "vtap_flow_port" || table == "vtap_app_port" {
+			response.Values = append(response.Values, []interface{}{
+				annotationKey, annotationKey, annotationKey, annotationKey, "map_item",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+			})
+		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
+			response.Values = append(response.Values, []interface{}{
+				annotationKey, annotationKey + "_0", annotationKey + "_1", annotationKey, "map_item",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+			})
+		}
+	}
+
+	podServiceK8sAnnotationRst, err := chClient.DoQuery(&client.QueryParams{
+		Sql: "SELECT key FROM flow_tag.pod_service_k8s_annotation_map GROUP BY key"})
+	if err != nil {
+		return nil, err
+	}
+	for _, _key := range podServiceK8sAnnotationRst.Values {
+		key := _key.([]interface{})[0]
+		annotationKey := "k8s.annotation." + key.(string)
+		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || table == "vtap_flow_port" || table == "vtap_app_port" {
+			response.Values = append(response.Values, []interface{}{
+				annotationKey, annotationKey, annotationKey, annotationKey, "map_item",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+			})
+		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
+			response.Values = append(response.Values, []interface{}{
+				annotationKey, annotationKey + "_0", annotationKey + "_1", annotationKey, "map_item",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+			})
+		}
+	}
+
+	// 查询 k8s_env
+	podK8senvRst, err := chClient.DoQuery(&client.QueryParams{
+		Sql: "SELECT key FROM flow_tag.pod_k8s_env_map GROUP BY key"})
+	if err != nil {
+		return nil, err
+	}
+	for _, _key := range podK8senvRst.Values {
+		key := _key.([]interface{})[0]
+		envKey := "k8s.env." + key.(string)
+		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || table == "vtap_flow_port" || table == "vtap_app_port" {
+			response.Values = append(response.Values, []interface{}{
+				envKey, envKey, envKey, envKey, "map_item",
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
+			})
+		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
+			response.Values = append(response.Values, []interface{}{
+				envKey, envKey + "_0", envKey + "_1", envKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
 			})
 		}
@@ -359,7 +424,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 	}
 
 	// 查询外部字段
-	if (db != "ext_metrics" && db != "flow_log" && db != "deepflow_system" && db != "event") || (db == "flow_log" && table != "l7_flow_log") {
+	if (db != "ext_metrics" && db != "flow_log" && db != "deepflow_system" && db != "event" && db != ckcommon.DB_NAME_PROMETHEUS) || (db == "flow_log" && table != "l7_flow_log") {
 		return response, nil
 	}
 	externalChClient := client.Client{
@@ -386,7 +451,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response
 	}
 	for _, _tagName := range externalRst.Values {
 		tagName := _tagName.([]interface{})[0]
-		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_DEEPFLOW_SYSTEM || db == ckcommon.DB_NAME_PROFILE {
+		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_DEEPFLOW_SYSTEM || db == ckcommon.DB_NAME_PROFILE || db == ckcommon.DB_NAME_PROMETHEUS {
 			externalTag := "tag." + tagName.(string)
 			response.Values = append(response.Values, []interface{}{
 				externalTag, externalTag, externalTag, externalTag, "map_item",
@@ -472,7 +537,7 @@ func GetTagValues(db, table, sql string) (*common.Result, []string, error) {
 		sql = showSqlList[0] + " WHERE " + showSqlList[1]
 	}
 	// K8s Labels是动态的,不需要去tag_description里确认
-	if strings.HasPrefix(tag, "k8s.label.") || strings.HasPrefix(tag, "cloud.tag.") || strings.HasPrefix(tag, "os.app.") {
+	if strings.HasPrefix(tag, "k8s.label.") || strings.HasPrefix(tag, "k8s.annotation.") || strings.HasPrefix(tag, "k8s.env.") || strings.HasPrefix(tag, "cloud.tag.") || strings.HasPrefix(tag, "os.app.") {
 		return GetTagResourceValues(db, table, sql)
 	}
 	// 外部字段是动态的,不需要去tag_description里确认
@@ -606,7 +671,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 			results := &common.Result{}
 			for resourceKey, resourceType := range AutoMap {
 				if resourceKey == "gprocess" {
-					sql = fmt.Sprintf("SELECT id AS value, name AS display_name, %s AS device_type, '' AS uid FROM flow_tag.gprocess_map %s GROUP BY value, display_name, device_type, uid ORDER BY %s ASC %s", strconv.Itoa(resourceType), whereSql, orderBy, limitSql)
+					continue
 				} else {
 					// 增加资源ID
 					resourceId := resourceKey + "_id"
@@ -674,8 +739,10 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 		case "tap":
 			sql = fmt.Sprintf("SELECT value, name AS display_name FROM flow_tag.tap_type_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 
-		case "vtap", "gprocess":
+		case "vtap":
 			sql = fmt.Sprintf("SELECT id AS value, name AS display_name FROM flow_tag.%s_map %s GROUP BY value, display_name ORDER BY %s ASC %s", tag, whereSql, orderBy, limitSql)
+		case "gprocess":
+			return &common.Result{}, sqlList, nil
 		case common.TAP_PORT_HOST, common.TAP_PORT_CHOST, common.TAP_PORT_POD_NODE:
 			if whereSql != "" {
 				whereSql += fmt.Sprintf(" AND device_type=%d", TAP_PORT_DEVICE_MAP[tag])
@@ -704,6 +771,48 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 					results.Values = append(results.Values, rst.Values...)
 					results.Columns = rst.Columns
 				}
+				return results, sqlList, nil
+			} else if strings.HasPrefix(tag, "k8s.annotation.") {
+				annotationTag := strings.TrimPrefix(tag, "k8s.annotation.")
+				if whereSql != "" {
+					whereSql += fmt.Sprintf(" AND `key`='%s'", annotationTag)
+				} else {
+					whereSql = fmt.Sprintf("WHERE `key`='%s'", annotationTag)
+				}
+				results := &common.Result{}
+				for _, table := range []string{"pod_service_k8s_annotation_map", "pod_k8s_annotation_map"} {
+					sql = fmt.Sprintf("SELECT value, value AS display_name FROM flow_tag.%s %s GROUP BY value, display_name ORDER BY %s ASC %s", table, whereSql, orderBy, limitSql)
+					sql = strings.ReplaceAll(sql, " like ", " ilike ")
+					sql = strings.ReplaceAll(sql, " LIKE ", " ILIKE ")
+					log.Debug(sql)
+					rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
+					if err != nil {
+						return results, sqlList, err
+					}
+					results.Values = append(results.Values, rst.Values...)
+					results.Columns = rst.Columns
+				}
+				return results, sqlList, nil
+			} else if strings.HasPrefix(tag, "k8s.env.") {
+				envTag := strings.TrimPrefix(tag, "k8s.env.")
+				if whereSql != "" {
+					whereSql += fmt.Sprintf(" AND `key`='%s'", envTag)
+				} else {
+					whereSql = fmt.Sprintf("WHERE `key`='%s'", envTag)
+				}
+				results := &common.Result{}
+
+				sql = fmt.Sprintf("SELECT value, value AS display_name FROM flow_tag.pod_k8s_env_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+				sql = strings.ReplaceAll(sql, " like ", " ilike ")
+				sql = strings.ReplaceAll(sql, " LIKE ", " ILIKE ")
+				log.Debug(sql)
+				rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
+				if err != nil {
+					return results, sqlList, err
+				}
+				results.Values = append(results.Values, rst.Values...)
+				results.Columns = rst.Columns
+
 				return results, sqlList, nil
 			} else if strings.HasPrefix(tag, "cloud.tag.") {
 				cloudTag := strings.TrimPrefix(tag, "cloud.tag.")
@@ -821,6 +930,48 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 				results.Values = append(results.Values, rst.Values...)
 				results.Columns = rst.Columns
 			}
+			return results, sqlList, nil
+		} else if strings.HasPrefix(tag, "k8s.annotation.") {
+			annotationTag := strings.TrimPrefix(tag, "k8s.annotation.")
+			if whereSql != "" {
+				whereSql += fmt.Sprintf(" AND `key`='%s'", annotationTag)
+			} else {
+				whereSql = fmt.Sprintf("WHERE `key`='%s'", annotationTag)
+			}
+			results := &common.Result{}
+			for _, table := range []string{"pod_service_k8s_annotation_map", "pod_k8s_annotation_map"} {
+				sql = fmt.Sprintf("SELECT value, value AS display_name FROM flow_tag.%s %s GROUP BY value, display_name ORDER BY %s ASC %s", table, whereSql, orderBy, limitSql)
+				sql = strings.ReplaceAll(sql, " like ", " ilike ")
+				sql = strings.ReplaceAll(sql, " LIKE ", " ILIKE ")
+				log.Debug(sql)
+				rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
+				if err != nil {
+					return results, sqlList, err
+				}
+				results.Values = append(results.Values, rst.Values...)
+				results.Columns = rst.Columns
+			}
+			return results, sqlList, nil
+		} else if strings.HasPrefix(tag, "k8s.env.") {
+			envTag := strings.TrimPrefix(tag, "k8s.env.")
+			if whereSql != "" {
+				whereSql += fmt.Sprintf(" AND `key`='%s'", envTag)
+			} else {
+				whereSql = fmt.Sprintf("WHERE `key`='%s'", envTag)
+			}
+			results := &common.Result{}
+
+			sql = fmt.Sprintf("SELECT value, value AS display_name FROM flow_tag.pod_k8s_env_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+			sql = strings.ReplaceAll(sql, " like ", " ilike ")
+			sql = strings.ReplaceAll(sql, " LIKE ", " ILIKE ")
+			log.Debug(sql)
+			rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
+			if err != nil {
+				return results, sqlList, err
+			}
+			results.Values = append(results.Values, rst.Values...)
+			results.Columns = rst.Columns
+
 			return results, sqlList, nil
 		} else if strings.HasPrefix(tag, "cloud.tag.") {
 			cloudTag := strings.TrimPrefix(tag, "cloud.tag.")

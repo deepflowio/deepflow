@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -163,10 +163,14 @@ impl L7ProtocolParserInterface for DnsLog {
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
         if self.parsed {
+            self.info.cal_rrt(param, None).map(|rrt| {
+                self.info.rrt = rrt;
+                self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+            });
             return Ok(vec![L7ProtocolInfo::DnsInfo(self.info.clone())]);
         }
         self.parse(payload, param.l4_protocol)?;
-        self.info.cal_rrt(param).map(|rrt| {
+        self.info.cal_rrt(param, None).map(|rrt| {
             self.info.rrt = rrt;
             self.perf_stats.as_mut().unwrap().update_rrt(rrt);
         });
@@ -373,6 +377,9 @@ impl DnsLog {
                     return Err(Error::DNSLogParseFailed(err_msg));
                 }
             }
+            DNS_TYPE_CNAME => {
+                // doing nothing
+            }
             _ => {
                 let err_msg = format!(
                     "other domain type {} data length {} invalid",
@@ -391,7 +398,7 @@ impl DnsLog {
             self.perf_stats.as_mut().unwrap().inc_req_err();
             self.info.status = L7ResponseStatus::ClientError;
         } else {
-            self.perf_stats.as_mut().unwrap().inc_resp();
+            self.perf_stats.as_mut().unwrap().inc_resp_err();
             self.info.status = L7ResponseStatus::ServerError;
         }
     }

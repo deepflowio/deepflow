@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 #[cfg(target_os = "linux")]
 mod linux;
 #[cfg(target_os = "linux")]
-pub use linux::{link_list_in_netns, links_by_name_regex_in_netns, NetNs, NsFile};
+pub use linux::*;
 
 #[cfg(target_os = "windows")]
 mod windows;
@@ -66,7 +66,7 @@ impl From<SerError> for Error {
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct InterfaceInfo {
     pub tap_ns: NsFile,
     pub tap_idx: u32,
@@ -74,6 +74,7 @@ pub struct InterfaceInfo {
     pub ips: Vec<IpAddr>,
     pub name: String,
     pub device_id: String,
+    pub ns_inode: u64,
 }
 
 impl fmt::Display for InterfaceInfo {
@@ -87,8 +88,8 @@ impl fmt::Display for InterfaceInfo {
             .join(",");
         write!(
             f,
-            "{}: {}: {} [{}] device {}",
-            self.tap_idx, self.name, self.mac, ips_str, self.device_id
+            "{}: {}: {} [{}] device {} ino {}",
+            self.tap_idx, self.name, self.mac, ips_str, self.device_id, self.ns_inode
         )
     }
 }

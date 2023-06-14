@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -91,6 +91,7 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*mys
 		SubDomain:  cloudItem.SubDomainLcuuid,
 		Domain:     i.cache.DomainLcuuid,
 		Region:     cloudItem.RegionLcuuid,
+		NetnsID:    cloudItem.NetnsID,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true

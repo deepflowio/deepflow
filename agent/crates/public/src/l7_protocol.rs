@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,6 +50,8 @@ pub enum L7Protocol {
     // INFRA
     DNS = 120,
 
+    Custom = 127,
+
     Max = 255,
 }
 
@@ -63,6 +65,7 @@ impl From<String> for L7Protocol {
             "dubbo" => Self::Dubbo,
             "grpc" => Self::Grpc,
             "protobufrpc" => Self::ProtobufRPC,
+            "custom" => Self::Custom,
             "sofarpc" => Self::SofaRPC,
             "mysql" => Self::MySQL,
             "postgresql" => Self::PostgreSQL,
@@ -82,10 +85,16 @@ pub enum ProtobufRpcProtocol {
     Krpc = 1,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Serialize, Debug, Clone, PartialEq, Hash, Eq)]
+pub enum CustomProtocol {
+    Wasm(u8, String),
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum L7ProtocolEnum {
     L7Protocol(L7Protocol),
     ProtobufRpc(ProtobufRpcProtocol),
+    Custom(CustomProtocol),
 }
 
 impl Default for L7ProtocolEnum {
@@ -99,13 +108,7 @@ impl L7ProtocolEnum {
         match self {
             L7ProtocolEnum::L7Protocol(p) => *p,
             L7ProtocolEnum::ProtobufRpc(_) => L7Protocol::ProtobufRPC,
-        }
-    }
-
-    pub fn get_protobuf_rpc_protocol(&self) -> Option<ProtobufRpcProtocol> {
-        match self {
-            L7ProtocolEnum::L7Protocol(_) => None,
-            L7ProtocolEnum::ProtobufRpc(p) => Some(*p),
+            L7ProtocolEnum::Custom(_) => L7Protocol::Custom,
         }
     }
 }

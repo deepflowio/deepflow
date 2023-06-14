@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -165,7 +165,7 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 					k.nsLabelToGroupLcuuids[nsL] = nsGIDsSet
 				}
 			}
-			labelSlice := cloudcommon.StringInterfaceMapKVs(labels, ":")
+			labelSlice := cloudcommon.StringInterfaceMapKVs(labels, ":", 0)
 			labelString := strings.Join(labelSlice, ", ")
 			containers := cData.Get("spec").Get("template").Get("spec").Get("containers")
 			for i := range containers.MustArray() {
@@ -272,8 +272,8 @@ func (k *KubernetesGather) getPodReplicationControllers() (podRCs []model.PodGro
 				podTargetPorts[cPortName] = cPort.Get("containerPort").MustInt()
 			}
 		}
-		labelSlice := cloudcommon.StringInterfaceMapKVs(labels, ":")
-		labelString := strings.Join(labelSlice, ",")
+		labelSlice := cloudcommon.StringInterfaceMapKVs(labels, ":", 0)
+		labelString := strings.Join(labelSlice, ", ")
 		podNum := rData.Get("spec").Get("replicas").MustInt()
 		podRC := model.PodGroup{
 			Lcuuid:             uID,

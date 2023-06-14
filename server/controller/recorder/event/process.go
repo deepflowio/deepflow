@@ -19,10 +19,10 @@ package event
 import (
 	"fmt"
 
-	mapset "github.com/deckarep/golang-set/v2"
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/http/service/resource"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
@@ -46,25 +46,27 @@ func NewProcess(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *Process {
 }
 
 func (p *Process) ProduceByAdd(items []*mysql.Process) {
-	vtapIDs := mapset.NewSet[int]()
-	for _, item := range items {
-		vtapIDs.Add(item.VTapID)
-	}
-
-	var vtaps []mysql.VTap
-	err := mysql.Db.Where("id IN (?)", vtapIDs.ToSlice()).Find(&vtaps).Error
+	processData, err := resource.GetProcessData(items)
 	if err != nil {
-		log.Errorf("db query vtap failed: %s", err)
+		log.Error(err)
 	}
-	vtapIDToName := make(map[int]string)
-	for _, vtap := range vtaps {
-		vtapIDToName[vtap.ID] = vtap.Name
-	}
-
+	var opts []eventapi.TagFieldOption
 	for _, item := range items {
 		description := fmt.Sprintf("agent %s report process %s cmdline %s",
-			vtapIDToName[item.VTapID], item.ProcessName, item.CommandLine)
-		opt := eventapi.TagDescription(description)
+			processData[item.ID].VTapName, item.ProcessName, item.CommandLine)
+
+		switch t := processData[item.ID].ResourceType; t {
+		case common.VIF_DEVICE_TYPE_POD:
+			opts = append(opts, eventapi.TagPodID(processData[item.ID].ResourceID))
+		case common.VIF_DEVICE_TYPE_POD_NODE:
+			opts = append(opts, eventapi.TagPodNodeID(processData[item.ID].ResourceID))
+		case common.VIF_DEVICE_TYPE_VM:
+			opts = append(opts, eventapi.TagL3DeviceID(processData[item.ID].ResourceID))
+			opts = append(opts, eventapi.TagL3DeviceType(processData[item.ID].ResourceType))
+		default:
+			log.Error("cannot support type: %s", t)
+		}
+		opts = append(opts, eventapi.TagDescription(description))
 
 		p.createProcessAndEnqueue(
 			item.Lcuuid,
@@ -72,7 +74,7 @@ func (p *Process) ProduceByAdd(items []*mysql.Process) {
 			item.Name,
 			p.deviceType,
 			item.ID,
-			opt,
+			opts...,
 		)
 	}
 }

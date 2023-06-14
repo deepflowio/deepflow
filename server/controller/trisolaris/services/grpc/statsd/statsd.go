@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -73,6 +73,7 @@ const (
 	GetKubernetesClusterID
 	GenesisSync
 	KubernetesAPISync
+	PrometheusAPISync
 	GPIDSync
 	MaxApiType
 )
@@ -85,6 +86,7 @@ var ApiTypeToName = map[ApiType]string{
 	GetKubernetesClusterID: "GetKubernetesClusterID",
 	GenesisSync:            "GenesisSync",
 	KubernetesAPISync:      "KubernetesAPISync",
+	PrometheusAPISync:      "PrometheusAPISync",
 	GPIDSync:               "GPIDSync",
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,15 +26,16 @@ use std::{
 };
 
 use arc_swap::access::Access;
-#[cfg(target_os = "windows")]
 use bytesize::ByteSize;
 use chrono::prelude::*;
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+use libc::malloc_trim;
 use log::{debug, error, info, warn};
+use sysinfo::{get_current_pid, Pid, ProcessExt, ProcessRefreshKind, System, SystemExt};
 
-#[cfg(target_os = "windows")]
-use super::process::get_memory_rss;
 use super::process::{
-    get_current_sys_free_memory_percentage, get_file_and_size_sum, get_thread_num, FileAndSizeSum,
+    get_current_sys_free_memory_percentage, get_file_and_size_sum, get_memory_rss, get_thread_num,
+    FileAndSizeSum,
 };
 use crate::common::{
     CGROUP_PROCS_PATH, CGROUP_TASKS_PATH, CGROUP_V2_PROCS_PATH, CGROUP_V2_THREADS_PATH,
@@ -42,7 +43,7 @@ use crate::common::{
 };
 use crate::config::handler::EnvironmentAccess;
 use crate::exception::ExceptionHandler;
-use crate::utils::{cgroups::is_kernel_available_for_cgroup, environment::running_in_container};
+use crate::utils::{cgroups::is_kernel_available_for_cgroups, environment::running_in_container};
 
 use public::proto::trident::{Exception, TapMode};
 
@@ -50,12 +51,14 @@ pub struct Guard {
     config: EnvironmentAccess,
     log_dir: String,
     interval: Duration,
-    tap_mode: TapMode,
     thread: Mutex<Option<JoinHandle<()>>>,
     running: Arc<(Mutex<bool>, Condvar)>,
     exception_handler: ExceptionHandler,
     cgroup_mount_path: String,
     is_cgroup_v2: bool,
+    memory_trim_disabled: bool,
+    system: Arc<Mutex<System>>,
+    pid: Pid,
 }
 
 impl Guard {
@@ -63,26 +66,46 @@ impl Guard {
         config: EnvironmentAccess,
         log_dir: String,
         interval: Duration,
-        tap_mode: TapMode,
         exception_handler: ExceptionHandler,
         cgroup_mount_path: String,
         is_cgroup_v2: bool,
+        memory_trim_disabled: bool,
     ) -> Self {
+        let pid = match get_current_pid() {
+            Ok(p) => p,
+            Err(e) => {
+                error!(
+                    "get the process' pid failed: {}, deepflow-agent restart...",
+                    e
+                );
+                thread::sleep(Duration::from_secs(1));
+                exit(-1);
+            }
+        };
         Self {
             config,
             log_dir,
             interval,
-            tap_mode,
             thread: Mutex::new(None),
             running: Arc::new((Mutex::new(false), Condvar::new())),
             exception_handler,
             cgroup_mount_path,
             is_cgroup_v2,
+            memory_trim_disabled,
+            system: Arc::new(Mutex::new(System::new())),
+            pid,
         }
     }
 
     fn release_log_files(file_and_size_sum: FileAndSizeSum, log_file_size: u64) {
-        let zero_o_clock = Local::today().and_hms_milli(0, 0, 0, 0).timestamp_millis() as u64; // 当天零点时间
+        let today = Utc::now()
+            .date_naive()
+            .and_hms_milli_opt(0, 0, 0, 0)
+            .unwrap();
+        let zero_o_clock = Local
+            .from_local_datetime(&today)
+            .unwrap()
+            .timestamp_millis() as u128; // 当天零点时间
         let mut file_sizes_sum = file_and_size_sum.file_sizes_sum.clone();
         // 从旧到新删除日志文件直到低于限制值
         for file_info in file_and_size_sum.file_infos.iter() {
@@ -94,7 +117,7 @@ impl Guard {
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
                 .as_millis(); // 文件修改时间
-            if file_mt >= zero_o_clock.into() {
+            if file_mt >= zero_o_clock {
                 // 当天的文件清空
                 match File::create(Path::new(file_info.file_path.as_str()))
                     .unwrap()
@@ -123,23 +146,23 @@ impl Guard {
         }
     }
 
-    fn check_cgroup<P: AsRef<Path>>(cgroup_mount_path: P, is_cgroup_v2: bool) {
+    fn check_cgroups<P: AsRef<Path>>(cgroup_mount_path: P, is_cgroup_v2: bool) -> bool {
         fn check_file(path: &str) -> bool {
             match File::open(path) {
                 Ok(mut file) => {
                     let mut buf: Vec<u8> = Vec::new();
-                    // Because the cgroup file system is vfs, it is necessary to determine
+                    // Because the cgroups file system is vfs, it is necessary to determine
                     // whether the file is empty by reading the contents of the file
                     file.read_to_end(&mut buf).unwrap_or_default();
                     if buf.len() == 0 {
-                        warn!("check cgroup file failed: {} is empty", path);
+                        warn!("check cgroups file failed: {} is empty", path);
                         return false;
                     }
                     return true;
                 }
                 Err(e) => {
                     warn!(
-                        "check cgroup file failed, cannot open file: {}, {}",
+                        "check cgroups file failed, cannot open file: {}, {}",
                         path, e
                     );
                     return false;
@@ -153,13 +176,24 @@ impl Guard {
         };
         let cgroup_proc_path = cgroup_mount_path.as_ref().join(proc_path).to_owned();
         let cgroup_task_path = cgroup_mount_path.as_ref().join(task_path).to_owned();
-        if !check_file(cgroup_proc_path.to_str().unwrap())
-            || !check_file(cgroup_task_path.to_str().unwrap())
-        {
-            error!("check cgroup file failed, deepflow-agent restart...");
-            thread::sleep(Duration::from_secs(1));
-            exit(-1);
+        check_file(cgroup_proc_path.to_str().unwrap())
+            && check_file(cgroup_task_path.to_str().unwrap())
+    }
+
+    fn check_cpu(system: Arc<Mutex<System>>, pid: Pid, cpu_limit: u32) -> bool {
+        let mut system_guard = system.lock().unwrap();
+        if !system_guard.refresh_process_specifics(pid, ProcessRefreshKind::new().with_cpu()) {
+            warn!("refresh process with cpu failed");
+            return false;
         }
+        let cpu_usage = match system_guard.process(pid) {
+            Some(process) => process.cpu_usage(),
+            None => {
+                warn!("get the process' cpu_usage failed");
+                return false;
+            }
+        };
+        (cpu_limit * 100) as f32 > cpu_usage
     }
 
     pub fn start(&self) {
@@ -172,26 +206,102 @@ impl Guard {
             *started = true;
         }
 
-        let limit = self.config.clone();
+        let config = self.config.clone();
         let running = self.running.clone();
         let exception_handler = self.exception_handler.clone();
         let log_dir = self.log_dir.clone();
         let interval = self.interval;
-        let tap_mode = self.tap_mode;
-        #[cfg(target_os = "windows")]
-        let mut over_memory_limit = false; // Higher than the limit does not meet expectations, just for Windows, Linux will use cgroup to limit memory
+        let mut over_memory_limit = false; // Higher than the limit does not meet expectations
+        let mut over_cpu_limit = false; // Higher than the limit does not meet expectations
         let mut under_sys_free_memory_limit = false; // Below the limit, it does not meet expectations
         let cgroup_mount_path = self.cgroup_mount_path.clone();
         let is_cgroup_v2 = self.is_cgroup_v2;
+        #[cfg(all(target_os = "linux", target_env = "gnu"))]
+        let memory_trim_disabled = self.memory_trim_disabled;
+        let mut check_cgroup_result = true; // It is used to determine whether subsequent checks are required. If the first check fails, the check is stopped
+        let system = self.system.clone();
+        let pid: Pid = self.pid.clone();
+        let cgroups_available = is_kernel_available_for_cgroups();
+        let in_container = running_in_container();
+
         let thread = thread::Builder::new().name("guard".to_owned()).spawn(move || {
             loop {
-                // If it is in a container or tap_mode is Analyzer, there is no need to limit resource, so there is no need to check cgroup
-                if !running_in_container() && tap_mode != TapMode::Analyzer && is_kernel_available_for_cgroup() {
-                    Self::check_cgroup(cgroup_mount_path.clone(), is_cgroup_v2);
+                let config = config.load();
+                let tap_mode = config.tap_mode;
+                let cpu_limit = config.max_cpus;
+                match get_file_and_size_sum(log_dir.clone()) {
+                    Ok(file_and_size_sum) => {
+                        let log_file_size = config.log_file_size; // Log file size limit (unit: M)
+                        let file_sizes_sum = file_and_size_sum.file_sizes_sum.clone(); // Total size of current log files (unit: B)
+                        debug!(
+                            "current log files' size: {}B, log_file_size_limit: {}B",
+                            file_sizes_sum,
+                            (log_file_size << 20)
+                        );
+                        if file_sizes_sum > (log_file_size as u64) << 20 {
+                            error!("log files' size is over log_file_size_limit, current: {}B, log_file_size_limit: {}B",
+                               file_sizes_sum, (log_file_size << 20));
+                            Self::release_log_files(file_and_size_sum, log_file_size as u64);
+                            exception_handler.set(Exception::LogFileExceeded);
+                        } else {
+                            // exception_handler.clear(Exception::LogFileExceeded);
+                        }
+                    }
+                    Err(e) => {
+                        warn!("{}", e);
+                    }
                 }
-                #[cfg(target_os = "windows")]
-                {
-                    let memory_limit = limit.load().max_memory;
+                // If it is in a container or tap_mode is Analyzer, there is no need to limit resource, so there is no need to check cgroups
+                if !in_container && config.tap_mode != TapMode::Analyzer {
+                    if cgroups_available {
+                        if check_cgroup_result {
+                            check_cgroup_result = Self::check_cgroups(cgroup_mount_path.clone(), is_cgroup_v2);
+                            if !check_cgroup_result {
+                                error!("check cgroups failed, limit cpu or memory without cgroups");
+                            }
+                        }
+                        if !check_cgroup_result {
+                            if !Self::check_cpu(system.clone(), pid.clone(), cpu_limit) {
+                                if over_cpu_limit {
+                                    error!("cpu usage over cpu limit twice, deepflow-agent restart...");
+                                    thread::sleep(Duration::from_secs(1));
+                                    exit(-1);
+                                } else {
+                                    warn!("cpu usage over cpu limit");
+                                    over_cpu_limit = true;
+                                }
+                            } else {
+                                over_cpu_limit = false;
+                            }
+                        }
+                    } else {
+                        if !Self::check_cpu(system.clone(), pid.clone(), cpu_limit) {
+                            if over_cpu_limit {
+                                error!("cpu usage over cpu limit twice, deepflow-agent restart...");
+                                thread::sleep(Duration::from_secs(1));
+                                exit(-1);
+                            } else {
+                                warn!("cpu usage over cpu limit");
+                                over_cpu_limit = true;
+                            }
+                        } else {
+                            over_cpu_limit = false;
+                        }
+                    }
+                }
+
+                #[cfg(all(target_os = "linux", target_env = "gnu"))]
+                if !memory_trim_disabled {
+                    unsafe { let _ = malloc_trim(0); }
+                }
+
+                // Periodic memory checks are necessary:
+                // Cgroups does not count the memory of RssFile, and AF_PACKET Block occupies RssFile.
+                // Therefore, using Cgroups to limit the memory usage may not be accurate in some scenarios.
+                // Periodically checking the memory usage can determine whether the memory exceeds the limit.
+                // Reference: https://unix.stackexchange.com/questions/686814/cgroup-and-process-memory-statistics-mismatch
+                if tap_mode != TapMode::Analyzer {
+                    let memory_limit = config.max_memory;
                     if memory_limit != 0 {
                         match get_memory_rss() {
                             Ok(memory_usage) => {
@@ -219,7 +329,7 @@ impl Guard {
                     }
                 }
 
-                let sys_free_memory_limit = limit.load().sys_free_memory_limit;
+                let sys_free_memory_limit = config.sys_free_memory_limit;
                 let current_sys_free_memory_percentage = get_current_sys_free_memory_percentage();
                 debug!(
                     "current_sys_free_memory_percentage: {}, sys_free_memory_limit: {}",
@@ -246,43 +356,20 @@ impl Guard {
 
                 match get_thread_num() {
                     Ok(thread_num) => {
-                        let thread_limit = limit.load().thread_threshold;
+                        let thread_limit = config.thread_threshold;
                         if thread_num > thread_limit {
                             warn!(
                                 "the number of thread exceeds the limit({} > {})",
                                 thread_num, thread_limit
                             );
                             if thread_num > thread_limit * 2 {
-                                error!("the number of thread exceeds the limit by 2 times, trident restart...");
+                                error!("the number of thread exceeds the limit by 2 times, deepflow-agent restart...");
                                 thread::sleep(Duration::from_secs(1));
                                 exit(NORMAL_EXIT_WITH_RESTART);
                             }
                             exception_handler.set(Exception::ThreadThresholdExceeded);
                         } else {
                             exception_handler.clear(Exception::ThreadThresholdExceeded);
-                        }
-                    }
-                    Err(e) => {
-                        warn!("{}", e);
-                    }
-                }
-
-                match get_file_and_size_sum(log_dir.clone()) {
-                    Ok(file_and_size_sum) => {
-                        let log_file_size = limit.load().log_file_size; // 日志文件大小限制值，单位：M
-                        let file_sizes_sum = file_and_size_sum.file_sizes_sum.clone(); // 当前日志文件大小总和，单位：B
-                        debug!(
-                            "current log files' size: {}B, log_file_size_limit: {}B",
-                            file_sizes_sum,
-                            (log_file_size << 20)
-                        );
-                        if file_sizes_sum > (log_file_size as u64) << 20 {
-                            error!("log files' size is over log_file_size_limit, current: {}B, log_file_size_limit: {}B",
-                               file_sizes_sum, (log_file_size << 20));
-                            Self::release_log_files(file_and_size_sum, log_file_size as u64);
-                            exception_handler.set(Exception::LogFileExceeded);
-                        } else {
-                            exception_handler.clear(Exception::LogFileExceeded);
                         }
                     }
                     Err(e) => {

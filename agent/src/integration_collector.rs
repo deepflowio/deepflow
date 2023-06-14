@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -470,7 +470,7 @@ fn fill_tagged_flow(
         l4_protocol,
         l7_protocol,
     };
-    tagged_flow.flow.flow_perf_stats = Some(Box::new(flow_perf_stats));
+    tagged_flow.flow.flow_perf_stats = Some(flow_perf_stats);
     let mut lookup_key = LookupKey {
         src_ip: tagged_flow.flow.flow_key.ip_src,
         dst_ip: tagged_flow.flow.flow_key.ip_dst,
@@ -983,7 +983,7 @@ impl MetricServer {
             select! {
                 _ = ticker.tick() => {
                     let p = port.load(Ordering::Relaxed);
-                    if let Err(_) = TcpStream::connect(format!("127.0.0.1:{}", p)) {
+                    if let Err(_) = TcpStream::connect(("localhost", p)) {
                         warn!(
                             "the port=({}) listen by the integration collector lost, restart the collector",
                             p

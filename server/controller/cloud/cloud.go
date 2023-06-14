@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -231,9 +231,7 @@ func (c *Cloud) runKubernetesGatherTask() {
 		if len(c.kubernetesGatherTaskMap) != 0 {
 			return
 		}
-		kubernetesGatherTask := NewKubernetesGatherTask(
-			&domain, nil, c.cCtx, false, c.cfg.KubernetesGatherInterval,
-		)
+		kubernetesGatherTask := NewKubernetesGatherTask(c.cCtx, &domain, nil, c.cfg, false)
 		if kubernetesGatherTask == nil {
 			return
 		}
@@ -276,9 +274,7 @@ func (c *Cloud) runKubernetesGatherTask() {
 		addSubDomains = newSubDomains.Difference(oldSubDomains)
 		for _, subDomain := range addSubDomains.ToSlice() {
 			lcuuid := subDomain.(string)
-			kubernetesGatherTask := NewKubernetesGatherTask(
-				&domain, lcuuidToSubDomain[lcuuid], c.cCtx, true, c.cfg.KubernetesGatherInterval,
-			)
+			kubernetesGatherTask := NewKubernetesGatherTask(c.cCtx, &domain, lcuuidToSubDomain[lcuuid], c.cfg, true)
 			if kubernetesGatherTask == nil {
 				continue
 			}
@@ -299,9 +295,7 @@ func (c *Cloud) runKubernetesGatherTask() {
 				log.Infof("oldSubDomainConfig: %s", oldSubDomain.SubDomainConfig)
 				log.Infof("newSubDomainConfig: %s", newSubDomain.Config)
 				c.kubernetesGatherTaskMap[lcuuid].Stop()
-				kubernetesGatherTask := NewKubernetesGatherTask(
-					&domain, lcuuidToSubDomain[lcuuid], c.cCtx, true, c.cfg.KubernetesGatherInterval,
-				)
+				kubernetesGatherTask := NewKubernetesGatherTask(c.cCtx, &domain, lcuuidToSubDomain[lcuuid], c.cfg, true)
 				if kubernetesGatherTask == nil {
 					continue
 				}
@@ -340,22 +334,39 @@ func (c *Cloud) appendAddtionalResourcesData(resource model.Resource) model.Reso
 	resource.VMs = append(resource.VMs, additionalResource.CHosts...)
 	resource.VInterfaces = append(resource.VInterfaces, additionalResource.VInterfaces...)
 	resource.IPs = append(resource.IPs, additionalResource.IPs...)
-	resource = c.appendCloudTags(resource, additionalResource.CHostCloudTags, additionalResource.PodNamespaceCloudTags)
+	resource = c.appendCloudTags(resource, additionalResource)
 	resource.LBs = append(resource.LBs, additionalResource.LB...)
 	resource.LBListeners = append(resource.LBListeners, additionalResource.LBListeners...)
 	resource.LBTargetServers = append(resource.LBTargetServers, additionalResource.LBTargetServers...)
 	return resource
 }
 
-func (c *Cloud) appendCloudTags(resource model.Resource, chostCloudTags model.UUIDToCloudTags, podNamespaceCloudTags model.UUIDToCloudTags) model.Resource {
+func (c *Cloud) appendCloudTags(resource model.Resource, additionalResource model.AdditionalResource) model.Resource {
+	chostCloudTags := additionalResource.CHostCloudTags
 	for i, chost := range resource.VMs {
 		if value, ok := chostCloudTags[chost.Lcuuid]; ok {
 			resource.VMs[i].CloudTags = value
 		}
 	}
+	podNamespaceCloudTags := additionalResource.PodNamespaceCloudTags
 	for i, podNamespace := range resource.PodNamespaces {
 		if value, ok := podNamespaceCloudTags[podNamespace.Lcuuid]; ok {
 			resource.PodNamespaces[i].CloudTags = value
+		}
+	}
+
+	additionalSubdomainResources := additionalResource.SubDomainResources
+	for subdomainUUID, subdomainResource := range resource.SubDomainResources {
+		additionalSubdomainResource, ok := additionalSubdomainResources[subdomainUUID]
+		if !ok {
+			continue
+		}
+		for i, podNamespace := range subdomainResource.PodNamespaces {
+			if additionalSubdomainResource.PodNamespaceCloudTags != nil {
+				if value, ok := additionalSubdomainResource.PodNamespaceCloudTags[podNamespace.Lcuuid]; ok {
+					subdomainResource.PodNamespaces[i].CloudTags = value
+				}
+			}
 		}
 	}
 	return resource
@@ -390,9 +401,11 @@ func (c *Cloud) appendResourceProcess(resource model.Resource) model.Resource {
 			Name:        sProcess.Name,
 			VTapID:      int(sProcess.VtapID),
 			PID:         int(sProcess.PID),
+			NetnsID:     sProcess.NetnsID,
 			ProcessName: sProcess.ProcessName,
 			CommandLine: sProcess.CMDLine,
 			UserName:    sProcess.User,
+			ContainerID: sProcess.ContainerID,
 			StartTime:   sProcess.StartTime,
 			OSAPPTags:   sProcess.OSAPPTags,
 		}

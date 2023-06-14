@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -147,6 +147,7 @@ type VInterface struct {
 	NetworkLcuuid   string `json:"network_lcuuid"`
 	VPCLcuuid       string `json:"vpc_lcuuid"` // TODO not used
 	RegionLcuuid    string `json:"region_lcuuid" binding:"required"`
+	NetnsID         uint32 `json:"netns_id"`
 	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
 }
 
@@ -358,6 +359,7 @@ type PodService struct {
 	Lcuuid             string `json:"lcuuid" binding:"required"`
 	Name               string `json:"name" binding:"required"`
 	Label              string `json:"label"`
+	Annotation         string `json:"annotation"`
 	Type               int    `json:"type" binding:"required"`
 	Selector           string `json:"selector"`
 	ServiceClusterIP   string `json:"service_cluster_ip"`
@@ -450,6 +452,9 @@ type Pod struct {
 	Lcuuid              string    `json:"lcuuid" binding:"required"`
 	Name                string    `json:"name" binding:"required"`
 	Label               string    `json:"label"`
+	ContainerIDs        string    `json:"container_ids"`
+	Annotation          string    `json:"annotation"`
+	ENV                 string    `json:"env"`
 	State               int       `json:"state" binding:"required"`
 	CreatedAt           time.Time `json:"created_at"`
 	PodReplicaSetLcuuid string    `json:"pod_replica_set_lcuuid"`
@@ -473,7 +478,18 @@ type Process struct {
 	UserName        string    `json:"user_name"`
 	StartTime       time.Time `json:"start_time" binding:"required"`
 	OSAPPTags       string    `json:"os_app_tags"`
+	NetnsID         uint32    `json:"netns_id"`
+	ContainerID     string    `json:"container_id"`
 	SubDomainLcuuid string    `json:"sub_domain_lcuuid"`
+}
+
+type PrometheusTarget struct {
+	Lcuuid          string `json:"lcuuid" binding:"required"`
+	ScrapeURL       string `json:"scrape_url" binding:"required"`
+	Instance        string `json:"instance" binding:"required"`
+	Job             string `json:"job" binding:"required"`
+	OtherLabels     string `json:"other_labels" binding:"required"`
+	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
 }
 
 type SubDomainResource struct {
@@ -498,6 +514,7 @@ type SubDomainResource struct {
 	PodReplicaSets         []PodReplicaSet
 	Pods                   []Pod
 	Processes              []Process
+	PrometheusTargets      []PrometheusTarget
 }
 
 type Resource struct {
@@ -547,6 +564,7 @@ type Resource struct {
 	PodIngressRules        []PodIngressRule
 	PodIngressRuleBackends []PodIngressRuleBackend
 	Processes              []Process
+	PrometheusTargets      []PrometheusTarget
 	SubDomainResources     map[string]SubDomainResource
 }
 
@@ -564,9 +582,14 @@ type AdditionalResource struct {
 	LB                    []LB
 	LBListeners           []LBListener
 	LBTargetServers       []LBTargetServer
+	SubDomainResources    map[string]*AdditionalSubdomainResource
 }
 
 type UUIDToCloudTags map[string]string
+
+type AdditionalSubdomainResource struct {
+	PodNamespaceCloudTags UUIDToCloudTags
+}
 
 type BasicInfo struct {
 	Lcuuid          string        `json:"lcuuid"`

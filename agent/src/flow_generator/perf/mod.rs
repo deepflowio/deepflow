@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,12 +28,17 @@ use enum_dispatch::enum_dispatch;
 use public::bitmap::Bitmap;
 use public::l7_protocol::L7ProtocolEnum;
 
-use super::app_table::AppTable;
-use super::error::{Error, Result};
-use super::protocol_logs::AppProtoHead;
+use super::{
+    app_table::AppTable,
+    error::{Error, Result},
+    flow_map::FlowMapCounter,
+    pool::MemoryPool,
+    protocol_logs::AppProtoHead,
+};
 
 use crate::common::flow::L7PerfStats;
 use crate::common::l7_protocol_log::L7PerfCache;
+use crate::plugin::wasm::WasmVm;
 use crate::{
     common::{
         flow::{FlowPerfStats, L4Protocol, L7Protocol, PacketDirection, SignalSource},
@@ -184,6 +189,10 @@ pub struct FlowLog {
     is_from_app: bool,
     is_success: bool,
     is_skip: bool,
+
+    wasm_vm: Option<Rc<RefCell<WasmVm>>>,
+    stats_counter: Arc<FlowMapCounter>,
+    rrt_timeout: usize,
 }
 
 impl FlowLog {
@@ -216,40 +225,37 @@ impl FlowLog {
                 },
                 parse_param,
             );
+
+            let mut cache_proto = |proto: L7ProtocolEnum| match packet.signal_source {
+                SignalSource::EBPF => {
+                    app_table.set_protocol_from_ebpf(packet, proto, local_epc, remote_epc)
+                }
+                _ => app_table.set_protocol(packet, proto),
+            };
+
+            let cached = if ret.is_ok() && self.l7_protocol_enum != parser.l7_protocol_enum() {
+                // due to http2 may be upgrade grpc, need to reset the flow node protocol
+                self.l7_protocol_enum = parser.l7_protocol_enum();
+                cache_proto(self.l7_protocol_enum.clone());
+                true
+            } else {
+                false
+            };
             parser.reset();
 
             if !self.is_success {
-                if ret.is_ok() {
-                    match packet.signal_source {
-                        SignalSource::EBPF => {
-                            app_table.set_protocol_from_ebpf(
-                                packet,
-                                self.l7_protocol_enum,
-                                local_epc,
-                                remote_epc,
-                            );
-                        }
-                        _ => {
-                            app_table.set_protocol(packet, self.l7_protocol_enum);
-                        }
-                    }
-                    self.is_success = true;
-                } else {
-                    self.is_skip = match packet.signal_source {
-                        SignalSource::EBPF => app_table.set_protocol_from_ebpf(
-                            packet,
-                            L7ProtocolEnum::default(),
-                            local_epc,
-                            remote_epc,
-                        ),
-                        _ => app_table.set_protocol(packet, L7ProtocolEnum::default()),
-                    };
+                self.is_success = ret.is_ok();
+                if self.is_success && !cached {
+                    cache_proto(self.l7_protocol_enum.clone());
+                }
+                if !self.is_success {
+                    self.is_skip = cache_proto(L7ProtocolEnum::default());
                 }
             }
             return ret;
         }
 
-        return Err(Error::ZeroPayloadLen);
+        Err(Error::ZeroPayloadLen)
     }
 
     fn l7_check(
@@ -268,12 +274,18 @@ impl FlowLog {
         }
 
         if let Some(payload) = packet.get_l4_payload() {
-            let param = ParseParam::from((
+            let mut param = ParseParam::from((
                 &*packet,
                 self.perf_cache.clone(),
                 !is_parse_log,
                 log_parser_config,
             ));
+            param.set_counter(self.stats_counter.clone());
+            param.set_rrt_timeout(self.rrt_timeout);
+            if let Some(vm) = self.wasm_vm.as_ref() {
+                param.set_wasm_vm(vm.clone());
+            }
+
             for protocol in checker.possible_protocols(
                 packet.lookup_key.proto.into(),
                 match packet.lookup_key.direction {
@@ -285,18 +297,25 @@ impl FlowLog {
                     continue;
                 };
                 if parser.check_payload(payload, &param) {
-                    self.l7_protocol_enum = parser.l7_protocl_enum();
+                    self.l7_protocol_enum = parser.l7_protocol_enum();
 
                     // redis can not determine dirction by RESP protocol when pakcet is from ebpf, special treatment
-                    if self.l7_protocol_enum.get_l7_protocol() == L7Protocol::Redis
-                        && packet.signal_source == SignalSource::EBPF
-                    {
-                        (_, self.server_port) = packet.get_redis_server_addr();
+                    if self.l7_protocol_enum.get_l7_protocol() == L7Protocol::Redis {
+                        let host = packet.get_redis_server_addr();
+                        let server_ip = host.0;
+                        self.server_port = host.1;
+                        if packet.lookup_key.dst_port != self.server_port
+                            || packet.lookup_key.dst_ip != server_ip
+                        {
+                            packet.lookup_key.direction = PacketDirection::ServerToClient;
+                        } else {
+                            packet.lookup_key.direction = PacketDirection::ClientToServer;
+                        }
                     } else {
                         self.server_port = packet.lookup_key.dst_port;
+                        packet.lookup_key.direction = PacketDirection::ClientToServer;
                     }
-
-                    packet.lookup_key.direction = PacketDirection::ClientToServer;
+                    param.direction = packet.lookup_key.direction;
 
                     self.l7_protocol_log_parser = Some(Box::new(parser));
                     let ret = self.l7_parse_log(
@@ -348,19 +367,18 @@ impl FlowLog {
         }
 
         if self.l7_protocol_log_parser.is_some() {
-            return self.l7_parse_log(
-                flow_config,
-                packet,
-                app_table,
-                &ParseParam::from((
-                    &*packet,
-                    self.perf_cache.clone(),
-                    !is_parse_log,
-                    log_parser_config,
-                )),
-                local_epc,
-                remote_epc,
-            );
+            let param = &mut ParseParam::from((
+                &*packet,
+                self.perf_cache.clone(),
+                !is_parse_log,
+                log_parser_config,
+            ));
+            param.set_counter(self.stats_counter.clone());
+            param.set_rrt_timeout(self.rrt_timeout);
+            if let Some(vm) = self.wasm_vm.as_ref() {
+                param.set_wasm_vm(vm.clone());
+            }
+            return self.l7_parse_log(flow_config, packet, app_table, param, local_epc, remote_epc);
         }
 
         if self.is_from_app {
@@ -385,6 +403,7 @@ impl FlowLog {
 
     pub fn new(
         l4_enabled: bool,
+        tcp_perf_pool: &mut MemoryPool<TcpPerf>,
         l7_enabled: bool,
         perf_cache: Rc<RefCell<L7PerfCache>>,
         l4_proto: L4Protocol,
@@ -392,13 +411,20 @@ impl FlowLog {
         is_from_app_tab: bool,
         counter: Arc<FlowPerfCounter>,
         server_port: u16,
+        wasm_vm: Option<Rc<RefCell<WasmVm>>>,
+        stats_counter: Arc<FlowMapCounter>,
+        rrt_timeout: usize,
     ) -> Option<Self> {
         if !l4_enabled && !l7_enabled {
             return None;
         }
         let l4 = if l4_enabled {
             match l4_proto {
-                L4Protocol::Tcp => Some(L4FlowPerfTable::Tcp(Box::new(TcpPerf::new(counter)))),
+                L4Protocol::Tcp => Some(L4FlowPerfTable::Tcp(
+                    tcp_perf_pool
+                        .get()
+                        .unwrap_or_else(|| Box::new(TcpPerf::new(counter))),
+                )),
                 L4Protocol::Udp => Some(L4FlowPerfTable::Udp(UdpPerf::new())),
                 _ => None,
             }
@@ -408,14 +434,25 @@ impl FlowLog {
 
         Some(Self {
             l4: l4.map(|o| Box::new(o)),
-            l7_protocol_log_parser: get_parser(l7_protocol_enum).map(|o| Box::new(o)),
+            l7_protocol_log_parser: get_parser(l7_protocol_enum.clone()).map(|o| Box::new(o)),
             perf_cache,
             l7_protocol_enum,
             is_from_app: is_from_app_tab,
             is_success: false,
             is_skip: false,
             server_port: server_port,
+            wasm_vm: wasm_vm,
+            stats_counter: stats_counter,
+            rrt_timeout: rrt_timeout,
         })
+    }
+
+    pub fn recycle(tcp_perf_pool: &mut MemoryPool<TcpPerf>, log: FlowLog) {
+        if let Some(p) = log.l4 {
+            if let L4FlowPerfTable::Tcp(t) = *p {
+                tcp_perf_pool.put(t);
+            }
+        }
     }
 
     pub fn parse(
@@ -466,39 +503,31 @@ impl FlowLog {
         }
 
         if l7_performance_enabled {
-            let mut get_l7_perf_stat = || {
-                self.l7_protocol_log_parser
-                    .as_mut()
-                    .and_then(|l| l.perf_stats())
+            let default_l7_perf = L7PerfStats {
+                err_timeout: l7_timeout_count,
+                ..Default::default()
             };
 
-            get_l7_perf_stat().map_or(
-                {
-                    if l7_timeout_count > 0 {
-                        stats.replace(FlowPerfStats {
-                            l7_protocol: self.l7_protocol_enum.get_l7_protocol(),
-                            l7: L7PerfStats {
-                                err_timeout: l7_timeout_count,
-                                ..Default::default()
-                            },
-                            ..Default::default()
-                        });
-                    }
-                },
-                |mut perf| {
-                    if let Some(stats) = stats.as_mut() {
-                        perf.err_timeout = l7_timeout_count;
-                        stats.l7 = perf;
-                        stats.l7_protocol = self.l7_protocol_enum.get_l7_protocol();
-                    } else {
-                        stats.replace(FlowPerfStats {
-                            l7: perf,
-                            l7_protocol: self.l7_protocol_enum.get_l7_protocol(),
-                            ..Default::default()
-                        });
-                    }
-                },
-            );
+            let l7_perf =
+                self.l7_protocol_log_parser
+                    .as_mut()
+                    .map_or(default_l7_perf.clone(), |l| {
+                        l.perf_stats().map_or(default_l7_perf, |mut p| {
+                            p.err_timeout = l7_timeout_count;
+                            p
+                        })
+                    });
+
+            if let Some(stats) = stats.as_mut() {
+                stats.l7 = l7_perf;
+                stats.l7_protocol = self.l7_protocol_enum.get_l7_protocol();
+            } else {
+                stats.replace(FlowPerfStats {
+                    l7: l7_perf,
+                    l7_protocol: self.l7_protocol_enum.get_l7_protocol(),
+                    ..Default::default()
+                });
+            }
         }
         stats
     }

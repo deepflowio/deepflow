@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -75,6 +75,7 @@ var DefaultVTapGroupConfig = &mysql.VTapGroupConfiguration{
 	HTTPLogXRequestID:             &DefaultHTTPLogXRequestID,
 	ExternalAgentHTTPProxyEnabled: &DefaultExternalAgentHTTPProxyEnabled,
 	ExternalAgentHTTPProxyPort:    &DefaultExternalAgentHTTPProxyPort,
+	PrometheusHttpAPIAddress:      &DefaultPrometheusHttpAPIAddress,
 	AnalyzerPort:                  &DefaultAnalyzerPort,
 	ProxyControllerPort:           &DefaultProxyControllerPort,
 	ProxyControllerIP:             &DefaultProxyControllerIP,
@@ -91,7 +92,7 @@ var (
 	DefaultRsyslogEnabled                = 1
 	DefaultMaxTxBandwidth                = int64(0)
 	DefaultBandwidthProbeInterval        = 10
-	DefaultTapInterfaceRegex             = "^(tap.*|cali.*|veth.*|eth.*|en[ospx].*|lxc.*|lo|[0-9a-f]+_h)$"
+	DefaultTapInterfaceRegex             = "^(tap.*|cali.*|veth.*|eth.*|en[osipx].*|lxc.*|lo|[0-9a-f]+_h)$"
 	DefaultMaxEscapeSeconds              = 3600
 	DefaultMtu                           = 1500
 	DefaultOutputVlan                    = 0
@@ -126,7 +127,7 @@ var (
 	DefaultTapMode                       = TAPMODE_LOCAL
 	DefaultThreadThreshold               = 500
 	DefaultProcessThreshold              = 10
-	DefaultNtpEnabled                    = 1
+	DefaultNtpEnabled                    = 0
 	DefaultL4PerformanceEnabled          = 1
 	DefaultPodClusterInternalIP          = 0
 	DefaultDomains                       = "0"
@@ -135,8 +136,9 @@ var (
 	DefaultSysFreeMemoryLimit            = 0
 	DefaultLogFileSize                   = 1000
 	DefaultHTTPLogXRequestID             = "X-Request-ID"
-	DefaultExternalAgentHTTPProxyEnabled = 0
+	DefaultExternalAgentHTTPProxyEnabled = 1
 	DefaultExternalAgentHTTPProxyPort    = 38086
+	DefaultPrometheusHttpAPIAddress      = ""
 	DefaultAnalyzerPort                  = 30033
 	DefaultProxyControllerPort           = 30035
 	DefaultProxyControllerIP             = ""

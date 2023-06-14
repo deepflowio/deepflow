@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ func (a *Aws) getRegions() ([]awsRegion, error) {
 	log.Debug("get regions starting")
 	var regions []awsRegion
 
-	awsClientConfig, _ := config.LoadDefaultConfig(context.TODO(), a.credential, config.WithRegion(REGION_NAME), config.WithHTTPClient(a.httpClient))
+	awsClientConfig, _ := config.LoadDefaultConfig(context.TODO(), a.credential, config.WithRegion(a.apiDefaultRegion), config.WithHTTPClient(a.httpClient))
 	result, err := ec2.NewFromConfig(awsClientConfig).DescribeRegions(context.TODO(), &ec2.DescribeRegionsInput{})
 	if err != nil {
 		log.Errorf("region request aws api error: (%s)", err.Error())

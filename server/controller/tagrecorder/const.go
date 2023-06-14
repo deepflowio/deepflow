@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,6 +57,11 @@ const (
 )
 
 const (
+	RESOURCE_TYPE_CH_K8S_ANNOTATION  = "ch_k8s_annotation"
+	RESOURCE_TYPE_CH_K8S_ANNOTATIONS = "ch_k8s_annotations"
+	RESOURCE_TYPE_CH_K8S_ENV         = "ch_k8s_env"
+	RESOURCE_TYPE_CH_K8S_ENVS        = "ch_k8s_envs"
+
 	RESOURCE_TYPE_CH_K8S_LABEL         = "ch_k8s_label"
 	RESOURCE_TYPE_CH_K8S_LABELS        = "ch_k8s_labels"
 	RESOURCE_TYPE_CH_VM_CLOUD_TAG      = "ch_chost_cloud_tag"
@@ -92,9 +97,23 @@ const (
 	RESOURCE_TYPE_CH_INT_ENUM      = "ch_int_enum"
 	RESOURCE_TYPE_CH_NODE_TYPE     = "ch_node_type"
 	RESOURCE_TYPE_CH_GPROCESS      = "ch_gprocess"
+
+	RESOURCE_TYPE_CH_PROMETHEUS_METRIC_APP_LABEL_LAYOUT = "ch_promytheus_metric_app_label_layout"
+	RESOURCE_TYPE_CH_TARGET_LABEL                       = "ch_target_label"
+	RESOURCE_TYPE_CH_APP_LABEL                          = "ch_app_label"
+	RESOURCE_TYPE_CH_LABEL_NAME                         = "ch_prometheus_label_name"
+	RESOURCE_TYPE_CH_METRIC_NAME                        = "ch_prometheus_metric_name"
+	RESOURCE_TYPE_CH_PROMETHEUS_TARGET_LABEL_LAYOUT     = "ch_prometheus_target_label_layout"
 )
 
 const (
+	CH_DICTIONARY_POD_K8S_ANNOTATION          = "pod_k8s_annotation_map"
+	CH_DICTIONARY_POD_K8S_ANNOTATIONS         = "pod_k8s_annotations_map"
+	CH_DICTIONARY_POD_SERVICE_K8S_ANNOTATION  = "pod_service_k8s_annotation_map"
+	CH_DICTIONARY_POD_SERVICE_K8S_ANNOTATIONS = "pod_service_k8s_annotations_map"
+	CH_DICTIONARY_POD_K8S_ENV                 = "pod_k8s_env_map"
+	CH_DICTIONARY_POD_K8S_ENVS                = "pod_k8s_envs_map"
+
 	CH_DICTIONARY_REGION        = "region_map"
 	CH_DICTIONARY_AZ            = "az_map"
 	CH_DICTIONARY_DEVICE        = "device_map" // vm, host, vgw, dhcp_port, pod, pod_service, pod_node, redis, rds, lb, nat
@@ -139,6 +158,13 @@ const (
 
 	CH_DICTIONARY_NODE_TYPE = "node_type_map"
 	CH_DICTIONARY_GPROCESS  = "gprocess_map"
+
+	CH_TARGET_LABEL                       = "target_label_map"
+	CH_APP_LABEL                          = "app_label_map"
+	CH_PROMETHEUS_LABEL_NAME              = "prometheus_label_name_map"
+	CH_PROMETHEUS_METRIC_NAME             = "prometheus_metric_name_map"
+	CH_PROMETHEUS_METRIC_APP_LABEL_LAYOUT = "prometheus_metric_app_label_layout_map"
+	CH_PROMETHEUS_TARGET_LABEL_LAYOUT     = "prometheus_target_label_layout_map"
 )
 
 const (
@@ -462,6 +488,105 @@ const (
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(FLAT())"
+
+	CREATE_K8S_ANNOTATION_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
+		"(\n" +
+		"    `id` UInt64,\n" +
+		"    `key` String,\n" +
+		"    `value` String,\n" +
+		"    `l3_epc_id` UInt64,\n" +
+		"    `pod_ns_id` UInt64\n" +
+		")\n" +
+		"PRIMARY KEY id, key\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
+		"LIFETIME(MIN 0 MAX 60)\n" +
+		"LAYOUT(COMPLEX_KEY_HASHED())"
+	CREATE_K8S_ANNOTATIONS_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
+		"(\n" +
+		"    `id` UInt64,\n" +
+		"    `annotations` String,\n" +
+		"    `l3_epc_id` UInt64,\n" +
+		"    `pod_ns_id` UInt64\n" +
+		")\n" +
+		"PRIMARY KEY id\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
+		"LIFETIME(MIN 0 MAX 60)\n" +
+		"LAYOUT(FLAT())"
+	CREATE_K8S_ENV_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
+		"(\n" +
+		"    `id` UInt64,\n" +
+		"    `key` String,\n" +
+		"    `value` String,\n" +
+		"    `l3_epc_id` UInt64,\n" +
+		"    `pod_ns_id` UInt64\n" +
+		")\n" +
+		"PRIMARY KEY id, key\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
+		"LIFETIME(MIN 0 MAX 60)\n" +
+		"LAYOUT(COMPLEX_KEY_HASHED())"
+	CREATE_K8S_ENVS_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
+		"(\n" +
+		"    `id` UInt64,\n" +
+		"    `envs` String,\n" +
+		"    `l3_epc_id` UInt64,\n" +
+		"    `pod_ns_id` UInt64\n" +
+		")\n" +
+		"PRIMARY KEY id\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
+		"LIFETIME(MIN 0 MAX 60)\n" +
+		"LAYOUT(FLAT())"
+	CREATE_PROMETHEUS_LABEL_NAME_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
+		"(\n" +
+		"    `id` UInt64,\n" +
+		"    `name` String\n" +
+		")\n" +
+		"PRIMARY KEY id\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
+		"LIFETIME(MIN 0 MAX 60)\n" +
+		"LAYOUT(FLAT())"
+	CREATE_PROMETHEUS_METRIC_APP_LABEL_LAYOUT_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
+		"(\n" +
+		"    `id` UInt64,\n" +
+		"    `metric_name` String,\n" +
+		"    `app_label_name` String,\n" +
+		"    `app_label_column_index` UInt64\n" +
+		")\n" +
+		"PRIMARY KEY id\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
+		"LIFETIME(MIN 0 MAX 60)\n" +
+		"LAYOUT(COMPLEX_KEY_HASHED())"
+	CREATE_APP_LABEL_SQL = "CREATE DICTIONARY %s.%s\n" +
+		"(\n" +
+		"    `metric_id` UInt64,\n" +
+		"    `label_name_id` UInt64,\n" +
+		"    `label_value` String,\n" +
+		"    `label_value_id` UInt64\n" +
+		")\n" +
+		"PRIMARY KEY metric_id, label_name_id, label_value_id\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
+		"LIFETIME(MIN 0 MAX 60)\n" +
+		"LAYOUT(COMPLEX_KEY_HASHED())"
+	CREATE_TARGET_LABEL_SQL = "CREATE DICTIONARY %s.%s\n" +
+		"(\n" +
+		"    `metric_id` UInt64,\n" +
+		"    `label_name_id` UInt64,\n" +
+		"    `label_value` String,\n" +
+		"    `target_id` UInt64\n" +
+		")\n" +
+		"PRIMARY KEY metric_id, label_name_id, target_id\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
+		"LIFETIME(MIN 0 MAX 60)\n" +
+		"LAYOUT(COMPLEX_KEY_HASHED())"
+	CREATE_PROMETHEUS_TARGET_LABEL_LAYOUT_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
+		"(\n" +
+		"    `target_id` UInt64,\n" +
+		"    `target_label_names` String,\n" +
+		"    `target_label_values` String\n" +
+		")\n" +
+		"PRIMARY KEY target_id\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
+		"LIFETIME(MIN 0 MAX 60)\n" +
+		"LAYOUT(COMPLEX_KEY_HASHED())"
 )
 
 var DBNodeTypeToResourceType = map[string]string{
@@ -544,6 +669,20 @@ var CREATE_SQL_MAP = map[string]string{
 	CH_DICTIONARY_GPROCESS:               CREATE_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_SERVICE_K8S_LABEL:  CREATE_K8S_LABEL_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_SERVICE_K8S_LABELS: CREATE_K8S_LABELS_DICTIONARY_SQL,
+
+	CH_DICTIONARY_POD_K8S_ANNOTATION:          CREATE_K8S_ANNOTATION_DICTIONARY_SQL,
+	CH_DICTIONARY_POD_K8S_ANNOTATIONS:         CREATE_K8S_ANNOTATIONS_DICTIONARY_SQL,
+	CH_DICTIONARY_POD_SERVICE_K8S_ANNOTATION:  CREATE_K8S_ANNOTATION_DICTIONARY_SQL,
+	CH_DICTIONARY_POD_SERVICE_K8S_ANNOTATIONS: CREATE_K8S_ANNOTATIONS_DICTIONARY_SQL,
+	CH_DICTIONARY_POD_K8S_ENV:                 CREATE_K8S_ENV_DICTIONARY_SQL,
+	CH_DICTIONARY_POD_K8S_ENVS:                CREATE_K8S_ENVS_DICTIONARY_SQL,
+
+	CH_PROMETHEUS_LABEL_NAME:              CREATE_PROMETHEUS_LABEL_NAME_DICTIONARY_SQL,
+	CH_PROMETHEUS_METRIC_NAME:             CREATE_PROMETHEUS_LABEL_NAME_DICTIONARY_SQL,
+	CH_PROMETHEUS_METRIC_APP_LABEL_LAYOUT: CREATE_PROMETHEUS_METRIC_APP_LABEL_LAYOUT_DICTIONARY_SQL,
+	CH_APP_LABEL:                          CREATE_APP_LABEL_SQL,
+	CH_TARGET_LABEL:                       CREATE_TARGET_LABEL_SQL,
+	CH_PROMETHEUS_TARGET_LABEL_LAYOUT:     CREATE_PROMETHEUS_TARGET_LABEL_LAYOUT_DICTIONARY_SQL,
 }
 
 var VTAP_TYPE_TO_DEVICE_TYPE = map[int]int{

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package kubernetes_gather
 
 import (
+	"github.com/deepflowio/deepflow/server/controller/cloud/config"
 	"github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -31,9 +32,8 @@ import (
 )
 
 const (
-	K8S_VINTERFACE_NAME_REGEX = "^(cni|flannel|cali|vxlan.calico|tunl|en[ospx])"
-	K8S_VPC_NAME              = "kubernetes_vpc"
-	K8S_VERSION_PREFIX        = "Kubernetes"
+	K8S_VPC_NAME       = "kubernetes_vpc"
+	K8S_VERSION_PREFIX = "Kubernetes"
 )
 
 var log = logging.MustGetLogger("cloud.kubernetes_gather")
@@ -48,6 +48,7 @@ type KubernetesGather struct {
 	PortNameRegex                string
 	PodNetIPv4CIDRMaxMask        int
 	PodNetIPv6CIDRMaxMask        int
+	customTagLenMax              int
 	isSubDomain                  bool
 	azLcuuid                     string
 	podGroupLcuuids              mapset.Set
@@ -72,7 +73,7 @@ type networkLcuuidCIDRs struct {
 	cidrs         []string
 }
 
-func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, isSubDomain bool) *KubernetesGather {
+func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, cfg config.CloudConfig, isSubDomain bool) *KubernetesGather {
 	var name string
 	var displayName string
 	var clusterID string
@@ -84,7 +85,7 @@ func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, isSub
 	domainConfigJson, err = simplejson.NewJson([]byte(domain.Config))
 	portNameRegex := domainConfigJson.Get("node_port_name_regex").MustString()
 	if portNameRegex == "" {
-		portNameRegex = K8S_VINTERFACE_NAME_REGEX
+		portNameRegex = common.DEFAULT_PORT_NAME_REGEX
 	}
 
 	// 如果是K8s云平台，转换domain表的config
@@ -148,6 +149,7 @@ func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, isSub
 
 		// 以下属性为获取资源所用的关联关系
 		azLcuuid:                     "",
+		customTagLenMax:              cfg.CustomTagLenMax,
 		isSubDomain:                  isSubDomain,
 		podGroupLcuuids:              mapset.NewSet(),
 		nodeNetworkLcuuidCIDRs:       networkLcuuidCIDRs{},
@@ -243,6 +245,12 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 	}
 	k.k8sInfo = k8sInfo
 
+	prometheusTargets, err := genesis.GenesisService.GetPrometheusResponse(k.ClusterID)
+	if err != nil {
+		// TODO: 可能会因为采集器版本的问题阻塞正常对接，暂时只记录问题，后续调整为和k8s info相同的处理方式
+		log.Debug(err.Error())
+	}
+
 	podCluster, err := k.getPodCluster()
 	if err != nil {
 		return model.KubernetesGatherResource{}, err
@@ -331,7 +339,11 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 		PodReplicaSets:         replicaSets,
 		PodGroups:              podGroups,
 		Pods:                   pods,
+		PrometheusTargets:      prometheusTargets,
 	}
+
+	k.cloudStatsd.APICost["PrometheusTarget"] = []int{0}
+	k.cloudStatsd.APICount["PrometheusTarget"] = []int{len(prometheusTargets)}
 	k.cloudStatsd.ResCount = statsd.GetResCount(resource)
 	statsd.MetaStatsd.RegisterStatsdTable(k)
 	return resource, nil

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -100,7 +100,10 @@ func (c *AnalyzerCheck) healthCheck() {
 		ipToController[controller.IP] = &controllers[i]
 	}
 
-	mysql.Db.Not("state = ?", common.HOST_STATE_MAINTENANCE).Order("state desc").Find(&analyzers)
+	if err := mysql.Db.Where("state != ?", common.HOST_STATE_MAINTENANCE).Order("state desc").Find(&analyzers).Error; err != nil {
+		log.Errorf("get analyzer from db error: %v", err)
+		return
+	}
 	for _, analyzer := range analyzers {
 		// use pod ip in master region if pod_ip != null
 		analyzerIP := analyzer.IP

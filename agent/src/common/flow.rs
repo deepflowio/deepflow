@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,8 @@ use std::{
     fmt::{self, Display},
     mem::swap,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
-    process,
+    process, thread,
+    time::Duration,
 };
 
 use log::{error, warn};
@@ -621,12 +622,13 @@ pub struct FlowMetricsPeer {
     pub is_l2_end: bool,
     pub is_l3_end: bool,
     pub is_active_host: bool,
-    pub is_device: bool,        // ture表明是从平台数据获取的
-    pub tcp_flags: TcpFlags,    // 所有TCP的Flags的或运算结果
-    pub is_vip_interface: bool, // 目前仅支持微软Mux设备，从grpc Interface中获取
-    pub is_vip: bool,           // 从grpc cidr中获取
-    pub is_local_mac: bool,     // 同EndpointInfo中的IsLocalMac, 流日志中不需要存储
-    pub is_local_ip: bool,      // 同EndpointInfo中的IsLocalIp, 流日志中不需要存储
+    pub is_device: bool,           // ture表明是从平台数据获取的
+    pub tcp_flags: TcpFlags,       // 每个流统计周期的TCP的Flags的或运算结果
+    pub total_tcp_flags: TcpFlags, // 整个Flow生命周期的TCP的Flags的或运算结果
+    pub is_vip_interface: bool,    // 目前仅支持微软Mux设备，从grpc Interface中获取
+    pub is_vip: bool,              // 从grpc cidr中获取
+    pub is_local_mac: bool,        // 同EndpointInfo中的IsLocalMac, 流日志中不需要存储
+    pub is_local_ip: bool,         // 同EndpointInfo中的IsLocalIp, 流日志中不需要存储
 
     // This field is valid for the following two scenarios:
     // VIP: Mac query acquisition
@@ -742,6 +744,7 @@ impl Default for FlowMetricsPeer {
             is_active_host: false,
             is_device: false,
             tcp_flags: TcpFlags::empty(),
+            total_tcp_flags: TcpFlags::empty(),
             is_vip_interface: false,
             is_vip: false,
             is_local_mac: false,
@@ -894,7 +897,7 @@ pub struct Flow {
 
     /* TCP Perf Data*/
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
-    pub flow_perf_stats: Option<Box<FlowPerfStats>>,
+    pub flow_perf_stats: Option<FlowPerfStats>,
 
     pub close_type: CloseType,
     pub signal_source: SignalSource,
@@ -938,6 +941,7 @@ impl Flow {
 
         self.end_time = other.end_time;
         self.duration = other.duration;
+        self.tap_side = other.tap_side;
 
         if other.flow_perf_stats.is_some() {
             let x = other.flow_perf_stats.as_ref().unwrap();
@@ -989,6 +993,7 @@ impl Flow {
         self.tunnel.reverse();
         self.flow_key.reverse();
         self.flow_metrics_peers.swap(0, 1);
+        self.direction_score = 0;
     }
 
     pub fn update_close_type(&mut self, flow_state: FlowState) {
@@ -1002,7 +1007,7 @@ impl Flow {
             FlowState::ClosingTx2 | FlowState::ClosingRx2 | FlowState::Closed => CloseType::TcpFin,
             FlowState::Reset => {
                 if self.flow_metrics_peers[FlowMetricsPeer::DST as usize]
-                    .tcp_flags
+                    .total_tcp_flags
                     .contains(TcpFlags::RST)
                 {
                     CloseType::TcpServerRst
@@ -1025,7 +1030,7 @@ impl Flow {
             }
             FlowState::EstablishReset | FlowState::OpeningRst => {
                 if self.flow_metrics_peers[FlowMetricsPeer::DST as usize]
-                    .tcp_flags
+                    .total_tcp_flags
                     .contains(TcpFlags::RST)
                 {
                     CloseType::ServerEstablishReset
@@ -1113,7 +1118,7 @@ impl From<Flow> for flow_log::Flow {
             eth_type: u16::from(f.eth_type) as u32,
             vlan: f.vlan as u32,
             has_perf_stats: f.flow_perf_stats.is_some() as u32,
-            perf_stats: f.flow_perf_stats.map(|stats| (*stats).into()),
+            perf_stats: f.flow_perf_stats.map(|stats| stats.into()),
             close_type: f.close_type as u32,
             signal_source: f.signal_source as u32,
             is_active_service: f.is_active_service as u32,
@@ -1137,34 +1142,44 @@ pub fn get_direction(
 ) -> [Direction; 2] {
     let src_ep = &flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC];
     let dst_ep = &flow.flow_metrics_peers[FLOW_METRICS_PEER_DST];
-    // For eBPF data, the direction can be calculated directly through l2_end,
-    // and its l2_end has been set in MetaPacket::from_ebpf().
-    if flow.signal_source == SignalSource::EBPF {
-        let (mut src_direct, mut dst_direct) = (
-            Direction::ClientProcessToServer,
-            Direction::ServerProcessToClient,
-        );
-        if src_ep.is_l2_end {
-            dst_direct = Direction::None
-        } else if dst_ep.is_l2_end {
-            src_direct = Direction::None
+
+    match flow.signal_source {
+        SignalSource::OTel => {
+            // The direction of otel data is obtained according to flow.tap_side.
+            return if flow.tap_side == TapSide::ClientApp {
+                [Direction::ClientAppToServer, Direction::None]
+            } else if flow.tap_side == TapSide::ServerApp {
+                [Direction::None, Direction::ServerAppToClient]
+            } else {
+                [Direction::None, Direction::None]
+            };
         }
-        return [src_direct, dst_direct];
-    } else if flow.signal_source == SignalSource::OTel {
-        // The direction of otel data is obtained according to flow.tap_side.
-        return if flow.tap_side == TapSide::ClientApp {
-            [Direction::ClientAppToServer, Direction::None]
-        } else if flow.tap_side == TapSide::ServerApp {
-            [Direction::None, Direction::ServerAppToClient]
-        } else {
-            [Direction::None, Direction::None]
-        };
-    } else if flow.signal_source == SignalSource::XFlow {
-        return [Direction::None, Direction::None];
-    } else if flow.flow_key.mac_src == flow.flow_key.mac_dst
-        && (is_tt_pod(trident_type) || is_tt_workload(trident_type))
-    {
-        return [Direction::LocalToLocal, Direction::None];
+        SignalSource::EBPF => {
+            // For eBPF data, the direction can be calculated directly through l2_end,
+            // and its l2_end has been set in MetaPacket::from_ebpf().
+            let (mut src_direct, mut dst_direct) = (
+                Direction::ClientProcessToServer,
+                Direction::ServerProcessToClient,
+            );
+            // FIXME: tap_side should be determined based on which side of the process_id
+            if src_ep.is_l2_end {
+                dst_direct = Direction::None
+            } else if dst_ep.is_l2_end {
+                src_direct = Direction::None
+            }
+            return [src_direct, dst_direct];
+        }
+        SignalSource::XFlow => {
+            return [Direction::None, Direction::None];
+        }
+        _ => {
+            // Data from otel may not have mac_src and mac_dst
+            if flow.flow_key.mac_src == flow.flow_key.mac_dst
+                && (is_tt_pod(trident_type) || is_tt_workload(trident_type))
+            {
+                return [Direction::None, Direction::LocalToLocal];
+            }
+        }
     }
 
     // 返回值分别为统计点对应的zerodoc.DirectionEnum以及及是否添加追踪数据的开关，在微软
@@ -1427,7 +1442,8 @@ pub fn get_direction(
             }
             _ => {
                 // 采集器类型不正确，不应该发生
-                error!("invalid trident type, trident will stop");
+                error!("invalid trident type, deepflow-agent restart...");
+                thread::sleep(Duration::from_secs(1));
                 process::exit(1)
             }
         }
@@ -1446,7 +1462,7 @@ pub fn get_direction(
             | TridentType::TtPhysicalMachine
             | TridentType::TtHostPod
             | TridentType::TtVmPod => {
-                return [Direction::LocalToLocal, Direction::None];
+                return [Direction::None, Direction::LocalToLocal];
             }
             _ => (),
         }

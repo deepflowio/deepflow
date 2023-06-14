@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,7 +60,7 @@ func ParseAlias(node sqlparser.SQLNode) string {
 		return fmt.Sprintf("`%s`", alias)
 	}
 	// K8s Labels字带上``
-	if strings.HasPrefix(alias, "k8s.label") || strings.HasPrefix(alias, "os.app") || strings.HasPrefix(alias, "cloud.tag") {
+	if strings.HasPrefix(alias, "k8s.label") || strings.HasPrefix(alias, "k8s.annotation") || strings.HasPrefix(alias, "k8s.env") || strings.HasPrefix(alias, "os.app") || strings.HasPrefix(alias, "cloud.tag") {
 		return fmt.Sprintf("`%s`", alias)
 	}
 	// 外部字段带上``
@@ -164,6 +164,8 @@ func GetDatasourceInterval(db string, table string, name string) (int, error) {
 			tsdbType = "flow"
 		} else if table == "vtap_app_port" || table == "vtap_app_edge_port" {
 			tsdbType = "app"
+		} else if table == "vtap_acl" {
+			return 60, nil
 		}
 	default:
 		return 1, nil
@@ -204,6 +206,37 @@ func GetExtTables(db string, ctx context.Context) (values []interface{}) {
 	sql := ""
 	if db == "ext_metrics" {
 		sql = "SELECT table FROM flow_tag.ext_metrics_custom_field GROUP BY table"
+		chClient.DB = "flow_tag"
+	} else {
+		sql = "SHOW TABLES FROM " + db
+	}
+	rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
+	if err != nil {
+		log.Error(err)
+		return nil
+	}
+	for _, _table := range rst.Values {
+		table := _table.([]interface{})[0].(string)
+		if !strings.HasSuffix(table, "_local") {
+			datasources, _ := GetDatasources(db, table)
+			values = append(values, []interface{}{table, datasources})
+		}
+	}
+	return values
+}
+
+func GetPrometheusTables(db string, ctx context.Context) (values []interface{}) {
+	chClient := client.Client{
+		Host:     config.Cfg.Clickhouse.Host,
+		Port:     config.Cfg.Clickhouse.Port,
+		UserName: config.Cfg.Clickhouse.User,
+		Password: config.Cfg.Clickhouse.Password,
+		DB:       db,
+		Context:  ctx,
+	}
+	sql := ""
+	if db == "prometheus" {
+		sql = "SELECT table FROM flow_tag.prometheus_custom_field GROUP BY table"
 		chClient.DB = "flow_tag"
 	} else {
 		sql = "SHOW TABLES FROM " + db

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,11 +35,13 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/statsd"
 )
 
 var log = logging.MustGetLogger("cloud.baidu")
 
 type BaiduBce struct {
+	name         string
 	uuid         string
 	uuidGenerate string
 	regionUuid   string
@@ -52,7 +54,8 @@ type BaiduBce struct {
 	regionLcuuidToResourceNum map[string]int
 	azLcuuidToResourceNum     map[string]int
 
-	debugger *cloudcommon.Debugger
+	cloudStatsd statsd.CloudStatsd
+	debugger    *cloudcommon.Debugger
 }
 
 func NewBaiduBce(domain mysql.Domain, cfg cloudconfig.CloudConfig) (*BaiduBce, error) {
@@ -87,6 +90,7 @@ func NewBaiduBce(domain mysql.Domain, cfg cloudconfig.CloudConfig) (*BaiduBce, e
 
 	return &BaiduBce{
 		uuid: domain.Lcuuid,
+		name: domain.Name,
 		// TODO: display_name后期需要修改为uuid_generate
 		uuidGenerate: domain.DisplayName,
 		regionUuid:   config.Get("region_uuid").MustString(),
@@ -98,6 +102,11 @@ func NewBaiduBce(domain mysql.Domain, cfg cloudconfig.CloudConfig) (*BaiduBce, e
 		regionLcuuidToResourceNum: make(map[string]int),
 		azLcuuidToResourceNum:     make(map[string]int),
 
+		cloudStatsd: statsd.CloudStatsd{
+			APICount: make(map[string][]int),
+			APICost:  make(map[string][]int),
+			ResCount: make(map[string][]int),
+		},
 		debugger: cloudcommon.NewDebugger(domain.Name),
 	}, nil
 }
@@ -110,10 +119,26 @@ func (b *BaiduBce) CheckAuth() error {
 	return nil
 }
 
+func (b *BaiduBce) GetStatter() statsd.StatsdStatter {
+	globalTags := map[string]string{
+		"domain_name": b.name,
+		"domain":      b.uuid,
+		"platform":    common.BAIDU_BCE_EN,
+	}
+
+	return statsd.StatsdStatter{
+		GlobalTags: globalTags,
+		Element:    statsd.GetCloudStatsd(b.cloudStatsd),
+	}
+}
+
 func (b *BaiduBce) GetCloudData() (model.Resource, error) {
 	var resource model.Resource
 	var vinterfaces []model.VInterface
 	var ips []model.IP
+	b.cloudStatsd.APICount = map[string][]int{}
+	b.cloudStatsd.APICost = map[string][]int{}
+	b.cloudStatsd.ResCount = map[string][]int{}
 
 	// 区域和可用区
 	regions, azs, zoneNameToAZLcuuid, err := b.getRegionAndAZs()
@@ -235,6 +260,8 @@ func (b *BaiduBce) GetCloudData() (model.Resource, error) {
 	resource.CENs = cens
 	resource.RDSInstances = rdsInstances
 	resource.SubDomains = subDomains
+	b.cloudStatsd.ResCount = statsd.GetResCount(resource)
+	statsd.MetaStatsd.RegisterStatsdTable(b)
 	b.debugger.Refresh()
 	return resource, nil
 }

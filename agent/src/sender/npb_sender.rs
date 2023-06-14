@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -645,6 +645,7 @@ impl NpbArpTable {
             for key in &timeout_ips {
                 table.write().unwrap().remove(key);
             }
+            table.write().unwrap().shrink_to_fit();
 
             // Lookup all stale entrys.
             for (last_lookup, key) in &lookup_ips {

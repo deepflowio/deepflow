@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,14 +27,14 @@ pub use self::windows::*;
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("cgroup is not supported: {0}")]
-    CgroupNotSupported(String),
+    #[error("cgroups is not supported: {0}")]
+    CgroupsNotSupported(String),
     #[error("set cpu controller failed: {0}")]
     CpuControllerSetFailed(String),
     #[error("set mem controller failed: {0}")]
     MemControllerSetFailed(String),
     #[error("apply resources failed: {0}")]
     ApplyResourcesFailed(String),
-    #[error("delete cgroup failed: {0}")]
-    DeleteCgroupFailed(String),
+    #[error("delete cgroups failed: {0}")]
+    DeleteCgroupsFailed(String),
 }

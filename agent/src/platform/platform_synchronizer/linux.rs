@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@
 use std::{
     net::{IpAddr, SocketAddr, SocketAddrV4},
     path::Path,
-    process,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc, Condvar, Mutex, MutexGuard,
@@ -36,16 +35,11 @@ use tokio::runtime::Runtime;
 
 use crate::{
     common::policy::GpidEntry,
-    config::{
-        handler::{OsProcScanConfig, PlatformAccess},
-        KubernetesPollerType,
-    },
+    config::handler::{OsProcScanConfig, PlatformAccess},
     exception::ExceptionHandler,
     handler,
     platform::{
-        kubernetes::{
-            check_read_link_ns, check_set_ns, ActivePoller, GenericPoller, PassivePoller, Poller,
-        },
+        kubernetes::{GenericPoller, Poller},
         InterfaceEntry, LibvirtXmlExtractor,
     },
     policy::{PolicyGetter, PolicySetter},
@@ -55,14 +49,12 @@ use crate::{
             get_all_vm_xml, get_brctl_show, get_hostname, get_ip_address, get_ovs_interfaces,
             get_ovs_ports, get_vlan_config, get_vm_states,
         },
-        environment::is_tt_pod,
         lru::Lru,
     },
 };
 
 use public::{
-    consts::NORMAL_EXIT_WITH_RESTART,
-    netns::{InterfaceInfo, NetNs, NsFile},
+    netns::{self, InterfaceInfo, NsFile},
     proto::{
         common::TridentType,
         trident::{
@@ -88,7 +80,7 @@ pub(super) struct ProcessArgs {
     pub(super) sniffer: Arc<sniffer_builder::Sniffer>,
     pub(super) timer: Arc<Condvar>,
     pub(super) xml_extractor: Arc<LibvirtXmlExtractor>,
-    pub(super) kubernetes_poller: Arc<GenericPoller>,
+    pub(super) kubernetes_poller: Arc<Mutex<Option<Arc<GenericPoller>>>>,
     pub(super) exception_handler: ExceptionHandler,
     pub(super) extra_netns_regex: Arc<Mutex<Option<Regex>>>,
     pub(super) override_os_hostname: Arc<Option<String>>,
@@ -123,7 +115,7 @@ pub struct PlatformSynchronizer {
     version: Arc<AtomicU64>,
     running: Arc<Mutex<bool>>,
     timer: Arc<Condvar>,
-    kubernetes_poller: Arc<GenericPoller>,
+    kubernetes_poller: Arc<Mutex<Option<Arc<GenericPoller>>>>,
     thread: Mutex<Option<JoinHandle<()>>>,
     session: Arc<Session>,
     xml_extractor: Arc<LibvirtXmlExtractor>,
@@ -143,20 +135,6 @@ impl PlatformSynchronizer {
         extra_netns_regex: String,
         override_os_hostname: Option<String>,
     ) -> Self {
-        let (can_set_ns, can_read_link_ns) = (check_set_ns(), check_read_link_ns());
-
-        if !can_set_ns || !can_read_link_ns {
-            warn!(
-                "kubernetes poller privileges: set_ns={} read_link_ns={}",
-                can_set_ns, can_read_link_ns
-            );
-        } else {
-            info!(
-                "kubernetes poller privileges: set_ns={} read_link_ns={}",
-                can_set_ns, can_read_link_ns
-            );
-        }
-
         let extra_netns_regex = if extra_netns_regex != "" {
             info!("platform monitoring extra netns: /{}/", extra_netns_regex);
             Some(Regex::new(&extra_netns_regex).unwrap())
@@ -165,27 +143,6 @@ impl PlatformSynchronizer {
             None
         };
 
-        let sync_interval = config.load().sync_interval;
-        let kubernetes_poller_type = config.load().kubernetes_poller_type;
-        let poller = match kubernetes_poller_type {
-            KubernetesPollerType::Adaptive => {
-                if can_set_ns && can_read_link_ns {
-                    GenericPoller::from(ActivePoller::new(sync_interval, extra_netns_regex.clone()))
-                } else {
-                    GenericPoller::from(PassivePoller::new(sync_interval, config.clone()))
-                }
-            }
-            KubernetesPollerType::Active => {
-                GenericPoller::from(ActivePoller::new(sync_interval, extra_netns_regex.clone()))
-            }
-            KubernetesPollerType::Passive => {
-                GenericPoller::from(PassivePoller::new(sync_interval, config.clone()))
-            }
-        };
-
-        let kubernetes_poller = Arc::new(poller);
-        let mappings = mappings::Mappings;
-        mappings.set_kubernetes_poller(kubernetes_poller.clone());
         let sniffer = Arc::new(sniffer_builder::Sniffer);
 
         Self {
@@ -197,7 +154,7 @@ impl PlatformSynchronizer {
                     .unwrap()
                     .as_secs(),
             )),
-            kubernetes_poller,
+            kubernetes_poller: Default::default(),
             running: Arc::new(Mutex::new(false)),
             timer: Arc::new(Condvar::new()),
             thread: Mutex::new(None),
@@ -210,32 +167,16 @@ impl PlatformSynchronizer {
         }
     }
 
-    pub fn start_kubernetes_poller(&self) {
-        self.kubernetes_poller.start()
-    }
-
-    pub fn stop_kubernetes_poller(&self) {
-        self.kubernetes_poller.stop()
-    }
-
-    pub fn set_netns_regex<S: AsRef<str>>(&self, regex: S) {
-        let regex = if regex.as_ref() != "" {
-            info!("platform monitoring extra netns: /{}/", regex.as_ref());
-            Some(Regex::new(regex.as_ref()).unwrap())
-        } else {
-            info!("platform monitoring no extra netns");
-            None
-        };
-        self.kubernetes_poller.set_netns_regex(regex.clone());
+    pub fn set_netns_regex(&self, regex: Option<Regex>) {
         *self.extra_netns_regex.lock().unwrap() = regex;
+    }
+
+    pub fn set_kubernetes_poller(&self, poller: Arc<GenericPoller>) {
+        self.kubernetes_poller.lock().unwrap().replace(poller);
     }
 
     pub fn is_running(&self) -> bool {
         *self.running.lock().unwrap()
-    }
-
-    pub fn clone_poller(&self) -> Arc<GenericPoller> {
-        self.kubernetes_poller.clone()
     }
 
     pub fn stop(&self) {
@@ -257,7 +198,6 @@ impl PlatformSynchronizer {
             let _ = handle.join();
         }
 
-        self.stop_kubernetes_poller();
         info!("PlatformSynchronizer stopped");
     }
 
@@ -296,9 +236,6 @@ impl PlatformSynchronizer {
             .unwrap();
         *self.thread.lock().unwrap() = Some(handle);
 
-        if is_tt_pod(self.config.load().trident_type) {
-            self.kubernetes_poller.start();
-        }
         info!("PlatformSynchronizer started");
     }
 
@@ -340,7 +277,7 @@ impl PlatformSynchronizer {
         let mut raw_ip_addrs = vec![];
         let current_ns = if netns.len() > 1 {
             // for restore
-            let current_ns = NetNs::open_current_ns();
+            let current_ns = netns::open_current_ns();
             if let Err(e) = current_ns {
                 warn!("get self net namespace failed: {:?}", e);
                 return;
@@ -351,7 +288,7 @@ impl PlatformSynchronizer {
         };
         for ns in netns {
             if ns != &NsFile::Root {
-                if let Err(e) = NetNs::open_named_and_setns(ns) {
+                if let Err(e) = netns::open_named_and_setns(ns) {
                     warn!("setns to {:?} failed: {}", ns, e);
                     continue;
                 }
@@ -372,7 +309,7 @@ impl PlatformSynchronizer {
             raw_ip_addrs.push(raw_host_ip_addr.unwrap_or_default());
         }
         if let Some(ns) = current_ns {
-            if let Err(e) = NetNs::setns(&ns, Some(NetNs::CURRENT_NS_PATH)) {
+            if let Err(e) = netns::setns(&ns, Some(netns::CURRENT_NS_PATH)) {
                 warn!("restore net namespace failed: {}", e);
                 return;
             }
@@ -487,10 +424,14 @@ impl PlatformSynchronizer {
             }
         }
 
-        let new_kubernetes_version = process_args.kubernetes_poller.get_version();
-        if new_kubernetes_version != *self_kubernetes_version {
-            debug!("kubernetes info changed");
-            changed += 1;
+        let kubernetes_poller = process_args.kubernetes_poller.lock().unwrap();
+        let mut new_kubernetes_version = *self_kubernetes_version;
+        if let Some(poller) = kubernetes_poller.as_ref() {
+            new_kubernetes_version = poller.get_version();
+            if new_kubernetes_version != *self_kubernetes_version {
+                debug!("kubernetes info changed");
+                changed += 1;
+            }
         }
 
         let xml_interfaces = process_args.xml_extractor.get_entries();
@@ -542,7 +483,7 @@ impl PlatformSynchronizer {
             }
 
             if new_kubernetes_version != *self_kubernetes_version {
-                *self_interface_infos = process_args.kubernetes_poller.get_interface_info();
+                *self_interface_infos = kubernetes_poller.as_ref().unwrap().get_interface_info();
                 *self_kubernetes_version = new_kubernetes_version;
             }
 
@@ -631,6 +572,7 @@ impl PlatformSynchronizer {
                 ip: interface_info.ips.iter().map(ToString::to_string).collect(),
                 device_name: None,
                 netns: Some(interface_info.tap_ns.to_string()),
+                netns_id: Some(interface_info.ns_inode as u32),
             })
             .chain(
                 self_xml_interfaces
@@ -643,6 +585,7 @@ impl PlatformSynchronizer {
                         ip: vec![],
                         tap_index: None,
                         netns: None,
+                        netns_id: None,
                     }),
             )
             .collect();
@@ -702,16 +645,18 @@ impl PlatformSynchronizer {
         loop {
             let mut new_netns = vec![NsFile::Root];
             if let Some(re) = &*args.extra_netns_regex.lock().unwrap() {
-                let mut extra_ns = NetNs::find_ns_files_by_regex(&re);
+                let mut extra_ns = netns::find_ns_files_by_regex(&re);
                 extra_ns.sort_unstable();
                 new_netns.extend(extra_ns);
             }
             if netns.is_empty() {
                 netns = new_netns;
             } else if netns != new_netns {
-                info!("query net namespaces changed from {:?} to {:?}, restart agent to create dispatcher for extra namespaces", netns, new_netns);
-                thread::sleep(Duration::from_secs(1));
-                process::exit(NORMAL_EXIT_WITH_RESTART);
+                info!(
+                    "query net namespaces changed from {:?} to {:?}",
+                    netns, new_netns
+                );
+                netns = new_netns;
             }
 
             let config_guard = args.config.load();
@@ -1136,13 +1081,3 @@ mod sniffer_builder {
         }
     }
 }
-
-mod mappings {
-    use crate::platform::kubernetes::GenericPoller;
-    use std::sync::Arc;
-    pub struct Mappings;
-    impl Mappings {
-        pub fn set_kubernetes_poller(&self, _poller: Arc<GenericPoller>) {}
-    }
-}
-//END

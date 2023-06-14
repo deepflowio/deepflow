@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan VInterfaces
+ * Copyright (c) 2023 Yunshan VInterfaces
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -65,8 +65,8 @@ func (t *SuiteTest) TestHandleUpdateVInterfaceSucess() {
 	cloudItem.Type = common.VIF_TYPE_WAN
 	assert.Equal(t.T(), 1, len(cache_.LANIPs))
 
-	updater := NewVInterface(cache_, []cloudmodel.VInterface{cloudItem})
-	ipUpdater := NewIP(cache_, []cloudmodel.IP{cloudIP})
+	updater := NewVInterface(cache_, []cloudmodel.VInterface{cloudItem}, nil)
+	ipUpdater := NewIP(cache_, []cloudmodel.IP{cloudIP}, nil)
 	updater.HandleAddAndUpdate()
 	monkey := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVInterfaceIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
 		return 100, true

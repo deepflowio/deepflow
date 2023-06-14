@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,10 +17,12 @@
 package config
 
 type MySqlConfig struct {
-	Database     string `default:"deepflow" yaml:"database"`
-	Host         string `default:"mysql" yaml:"host"`
-	Port         uint32 `default:"30130" yaml:"port"`
-	UserName     string `default:"root" yaml:"user-name"`
-	UserPassword string `default:"deepflow" yaml:"user-password"`
-	TimeOut      uint32 `default:"30" yaml:"timeout"`
+	Database               string `default:"deepflow" yaml:"database"`
+	Host                   string `default:"mysql" yaml:"host"`
+	Port                   uint32 `default:"30130" yaml:"port"`
+	UserName               string `default:"root" yaml:"user-name"`
+	UserPassword           string `default:"deepflow" yaml:"user-password"`
+	TimeOut                uint32 `default:"30" yaml:"timeout"`
+	DropDatabaseEnabled    bool   `default:"false" yaml:"drop-database-enabled"`
+	AutoIncrementIncrement uint32 `default:"1" yaml:"auto_increment_increment"`
 }

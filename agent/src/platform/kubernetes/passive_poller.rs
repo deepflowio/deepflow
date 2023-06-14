@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -404,8 +404,7 @@ impl Poller for PassivePoller {
             mac: entries[0].mac,
             ips: vec![entries[0].ip],
             device_id: "1".to_string(),
-            tap_ns: Default::default(),
-            name: Default::default(),
+            ..Default::default()
         };
         for entry in entries.iter().skip(1) {
             if entry.tap_index == info.tap_idx && entry.mac == info.mac {
@@ -417,8 +416,7 @@ impl Poller for PassivePoller {
                     mac: entry.mac,
                     ips: vec![entry.ip],
                     device_id: "1".to_string(),
-                    tap_ns: Default::default(),
-                    name: Default::default(),
+                    ..Default::default()
                 };
             }
         }

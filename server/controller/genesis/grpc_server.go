@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package genesis
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"time"
 
@@ -47,35 +48,44 @@ type TridentStats struct {
 	Proxy                           string
 	K8sVersion                      uint64
 	SyncVersion                     uint64
+	PrometheusVersion               uint64
 	K8sLastSeen                     time.Time
 	SyncLastSeen                    time.Time
+	PrometheusLastSeen              time.Time
 	K8sClusterID                    string
+	PrometheusClusterID             string
 	SyncTridentType                 tridentcommon.TridentType
 	GenesisSyncDataOperation        *trident.GenesisPlatformData
 	GenesisSyncProcessDataOperation *trident.GenesisProcessData
 }
 
 type SynchronizerServer struct {
-	cfg                 config.GenesisConfig
-	k8sQueue            queue.QueueWriter
-	genesisSyncQueue    queue.QueueWriter
-	vtapIDToVersion     sync.Map
-	clusterIDToVersion  sync.Map
-	vtapIDToLastSeen    sync.Map
-	clusterIDToLastSeen sync.Map
-	tridentStatsMap     sync.Map
+	cfg                           config.GenesisConfig
+	k8sQueue                      queue.QueueWriter
+	prometheusQueue               queue.QueueWriter
+	genesisSyncQueue              queue.QueueWriter
+	vtapIDToVersion               sync.Map
+	clusterIDToVersion            sync.Map
+	prometheusClusterIDToVersion  sync.Map
+	vtapIDToLastSeen              sync.Map
+	clusterIDToLastSeen           sync.Map
+	prometheusClusterIDToLastSeen sync.Map
+	tridentStatsMap               sync.Map
 }
 
-func NewGenesisSynchronizerServer(cfg config.GenesisConfig, genesisSyncQueue, k8sQueue queue.QueueWriter) *SynchronizerServer {
+func NewGenesisSynchronizerServer(cfg config.GenesisConfig, genesisSyncQueue, k8sQueue, prometheusQueue queue.QueueWriter) *SynchronizerServer {
 	return &SynchronizerServer{
-		cfg:                 cfg,
-		k8sQueue:            k8sQueue,
-		genesisSyncQueue:    genesisSyncQueue,
-		vtapIDToVersion:     sync.Map{},
-		clusterIDToVersion:  sync.Map{},
-		vtapIDToLastSeen:    sync.Map{},
-		clusterIDToLastSeen: sync.Map{},
-		tridentStatsMap:     sync.Map{},
+		cfg:                           cfg,
+		k8sQueue:                      k8sQueue,
+		prometheusQueue:               prometheusQueue,
+		genesisSyncQueue:              genesisSyncQueue,
+		vtapIDToVersion:               sync.Map{},
+		clusterIDToVersion:            sync.Map{},
+		prometheusClusterIDToVersion:  sync.Map{},
+		vtapIDToLastSeen:              sync.Map{},
+		clusterIDToLastSeen:           sync.Map{},
+		prometheusClusterIDToLastSeen: sync.Map{},
+		tridentStatsMap:               sync.Map{},
 	}
 }
 
@@ -184,7 +194,6 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *trident.G
 }
 
 func (g *SynchronizerServer) KubernetesAPISync(ctx context.Context, request *trident.KubernetesAPISyncRequest) (*trident.KubernetesAPISyncResponse, error) {
-
 	remote := ""
 	peerIP, _ := peer.FromContext(ctx)
 	sourceIP := request.GetSourceIp()
@@ -269,6 +278,91 @@ func (g *SynchronizerServer) KubernetesAPISync(ctx context.Context, request *tri
 	}
 }
 
+func (g *SynchronizerServer) PrometheusAPISync(ctx context.Context, request *trident.PrometheusAPISyncRequest) (*trident.PrometheusAPISyncResponse, error) {
+	remote := ""
+	peerIP, _ := peer.FromContext(ctx)
+	sourceIP := request.GetSourceIp()
+	if sourceIP != "" {
+		remote = sourceIP
+	} else {
+		remote = peerIP.Addr.String()
+	}
+	vtapID := request.GetVtapId()
+	if vtapID == 0 {
+		log.Warningf("prometheus api sync received message with vtap_id 0 from %s", remote)
+	}
+	version := request.GetVersion()
+	if version == 0 {
+		log.Warningf("prometheus api sync ignore message with version 0 from ip: %s, vtap id: %d", remote, vtapID)
+		return &trident.PrometheusAPISyncResponse{}, nil
+	}
+	clusterID := request.GetClusterId()
+	if clusterID == "" {
+		log.Warningf("prometheus api sync ignore message with cluster id null from ip: %s, vtap id: %v", remote, vtapID)
+		return &trident.PrometheusAPISyncResponse{}, nil
+	}
+	entries := request.GetEntries()
+
+	var stats TridentStats
+	if s, ok := g.tridentStatsMap.Load(vtapID); ok {
+		stats = s.(TridentStats)
+	}
+	if sourceIP != "" {
+		stats.Proxy = peerIP.Addr.String()
+	}
+	stats.IP = remote
+	stats.VtapID = vtapID
+	stats.PrometheusClusterID = clusterID
+	stats.PrometheusLastSeen = time.Now()
+	stats.PrometheusVersion = version
+	g.tridentStatsMap.Store(vtapID, stats)
+	now := time.Now()
+	if vtapID != 0 {
+		if lastTime, ok := g.prometheusClusterIDToLastSeen.Load(clusterID); ok {
+			if now.Sub(lastTime.(time.Time)).Seconds() >= g.cfg.AgingTime {
+				g.prometheusClusterIDToVersion.Store(clusterID, uint64(0))
+			}
+		}
+		var localVersion uint64 = 0
+		lVersion, ok := g.prometheusClusterIDToVersion.Load(clusterID)
+		if ok {
+			localVersion = lVersion.(uint64)
+		}
+		log.Infof("prometheus api sync received version %v -> %v from ip %s vtap_id %v len %v", localVersion, version, remote, vtapID, len(entries))
+
+		// 如果version有更新，但消息中没有任何kubernetes数据，触发trident重新上报数据
+		if localVersion != version && len(entries) == 0 {
+			return &trident.PrometheusAPISyncResponse{Version: &localVersion}, nil
+		}
+
+		// 正常推送消息到队列中
+		g.prometheusQueue.Put(PrometheusMessage{
+			peer:    remote,
+			vtapID:  vtapID,
+			msgType: 0,
+			message: request,
+		})
+
+		// 更新内存中的last_seen和version
+		g.prometheusClusterIDToLastSeen.Store(clusterID, now)
+		g.prometheusClusterIDToVersion.Store(clusterID, version)
+		return &trident.PrometheusAPISyncResponse{Version: &version}, nil
+	} else {
+		log.Infof("kubernetes api sync received version %v from ip %s no vtap_id", version, remote)
+		//正常上报数据，才推送消息到队列中
+		if len(entries) > 0 {
+			g.prometheusQueue.Put(PrometheusMessage{
+				peer:    remote,
+				vtapID:  vtapID,
+				msgType: 0,
+				message: request,
+			})
+		}
+		// 采集器未自动发现时，触发trident上报完整数据
+		return &trident.PrometheusAPISyncResponse{}, nil
+	}
+}
+
 func (g *SynchronizerServer) GenesisSharingK8S(ctx context.Context, request *controller.GenesisSharingK8SRequest) (*controller.GenesisSharingK8SResponse, error) {
 	clusterID := request.GetClusterId()
 	k8sDatas := GenesisService.GetKubernetesData()
@@ -283,6 +377,22 @@ func (g *SynchronizerServer) GenesisSharingK8S(ctx context.Context, request *con
 	}
 
 	return &controller.GenesisSharingK8SResponse{}, nil
+}
+
+func (g *SynchronizerServer) GenesisSharingPrometheus(ctx context.Context, request *controller.GenesisSharingPrometheusRequest) (*controller.GenesisSharingPrometheusResponse, error) {
+	clusterID := request.GetClusterId()
+	prometheusDatas := GenesisService.GetPrometheusData()
+
+	if prometheusData, ok := prometheusDatas[clusterID]; ok {
+		epochStr := prometheusData.Epoch.Format(controllercommon.GO_BIRTHDAY)
+		entriesByte, _ := json.Marshal(prometheusData.Entries)
+		return &controller.GenesisSharingPrometheusResponse{
+			Epoch:    &epochStr,
+			ErrorMsg: &prometheusData.ErrorMSG,
+			Entries:  entriesByte,
+		}, nil
+	}
+	return &controller.GenesisSharingPrometheusResponse{}, nil
 }
 
 func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *controller.GenesisSharingSyncRequest) (*controller.GenesisSharingSyncResponse, error) {
@@ -406,6 +516,7 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *co
 		gVinterface := &controller.GenesisSyncVinterface{
 			VtapId:              &vData.VtapID,
 			Lcuuid:              &vData.Lcuuid,
+			NetnsId:             &vData.NetnsID,
 			Name:                &vData.Name,
 			Ips:                 &vData.IPs,
 			Mac:                 &vData.Mac,
@@ -430,10 +541,12 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *co
 			VtapId:      &pData.VtapID,
 			Pid:         &pData.PID,
 			Lcuuid:      &pData.Lcuuid,
+			NetnsId:     &pData.NetnsID,
 			Name:        &pData.Name,
 			ProcessName: &pData.ProcessName,
 			CmdLine:     &pData.CMDLine,
 			User:        &pData.User,
+			ContainerId: &pData.ContainerID,
 			OsAppTags:   &pData.OSAPPTags,
 			NodeIp:      &pData.NodeIP,
 			StartTime:   &pStartTime,

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -131,6 +131,11 @@ func GetGenesisSyncData(g *genesis.Genesis) (genesis.GenesisSyncData, error) {
 
 func GetGenesisKubernetesData(g *genesis.Genesis, clusterID string) (map[string][]string, error) {
 	data, err := g.GetKubernetesResponse(clusterID)
+	return data, err
+}
+
+func GetGenesisPrometheusData(g *genesis.Genesis, clusterID string) ([]cloudmodel.PrometheusTarget, error) {
+	data, err := g.GetPrometheusResponse(clusterID)
 	return data, err
 }
 

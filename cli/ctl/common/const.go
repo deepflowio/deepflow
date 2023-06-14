@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ var RESOURCE_TYPES = []string{
 	"LBVMConnections", "PeerConnections", "CENs", "RedisInstances", "RDSInstances", "VInterfaces",
 	"IPs", "FloatingIPs", "PodClusters", "PodNodes", "VMPodNodeConnections", "PodNamespaces",
 	"PodGroups", "PodReplicaSets", "Pods", "PodServices", "PodServicePorts", "PodGroupPorts",
-	"PodIngresses", "PodIngressRules", "PodIngressRuleBackends",
+	"PodIngresses", "PodIngressRules", "PodIngressRuleBackends", "Processes", "PrometheusTargets",
 }
 
 //go:generate stringer -type=DomainType -trimprefix=DOMAIN_TYPE_ -linecomment

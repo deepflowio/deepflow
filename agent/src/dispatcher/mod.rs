@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -80,7 +80,7 @@ use crate::{
     utils::stats::{self, Collector},
 };
 #[cfg(target_os = "linux")]
-use public::netns::NetNs;
+use public::netns;
 use public::{
     netns::NsFile,
     proto::{
@@ -221,9 +221,9 @@ impl FlowAclListener for DispatcherListener {
         _: &Vec<Arc<crate::_Acl>>,
     ) -> Result<(), String> {
         match self {
-            DispatcherListener::Local(a) => a.reset_bpf_white_list(),
-            DispatcherListener::Mirror(a) => a.reset_bpf_white_list(),
-            DispatcherListener::Analyzer(a) => a.reset_bpf_white_list(),
+            DispatcherListener::Local(a) => a.flow_acl_change(),
+            DispatcherListener::Mirror(a) => a.flow_acl_change(),
+            DispatcherListener::Analyzer(a) => a.flow_acl_change(),
         }
         Ok(())
     }
@@ -613,6 +613,8 @@ pub struct DispatcherBuilder {
     netns: Option<NsFile>,
     trident_type: Option<TridentType>,
     queue_debugger: Option<Arc<QueueDebugger>>,
+    analyzer_queue_size: Option<usize>,
+    analyzer_raw_packet_block_size: Option<usize>,
 }
 
 impl DispatcherBuilder {
@@ -744,15 +746,25 @@ impl DispatcherBuilder {
         self
     }
 
+    pub fn analyzer_queue_size(mut self, v: usize) -> Self {
+        self.analyzer_queue_size = Some(v);
+        self
+    }
+
+    pub fn analyzer_raw_packet_block_size(mut self, v: usize) -> Self {
+        self.analyzer_raw_packet_block_size = Some(v);
+        self
+    }
+
     pub fn build(mut self) -> Result<Dispatcher> {
         let netns = self.netns.unwrap_or_default();
         #[cfg(target_os = "linux")]
         let mut current_ns = None;
         #[cfg(target_os = "linux")]
         if netns != NsFile::Root {
-            current_ns = Some(NetNs::open_current_ns()?);
+            current_ns = Some(netns::open_current_ns()?);
             // set ns before creating af packet socket
-            let _ = NetNs::open_named_and_setns(&netns)?;
+            let _ = netns::open_named_and_setns(&netns)?;
         };
         let options = self
             .options
@@ -875,6 +887,7 @@ impl DispatcherBuilder {
                 .ok_or(Error::ConfigIncomplete("no packet_sequence_block".into()))?,
             netns,
             npb_dedup_enabled: Arc::new(AtomicBool::new(false)),
+            pause: Arc::new(AtomicBool::new(true)),
         };
         collector.register_countable(
             "dispatcher",
@@ -945,11 +958,17 @@ impl DispatcherBuilder {
                     base,
                     vm_mac_addrs: Arc::new(RwLock::new(Default::default())),
                     pool_raw_size: snap_len,
-                    parser_thread_handler: None,
-                    flow_thread_handler: None,
+                    flow_generator_thread_handler: None,
                     pipeline_thread_handler: None,
                     stats_collector: collector.clone(),
                     queue_debugger: self.queue_debugger.as_ref().unwrap().clone(),
+                    inner_queue_size: self
+                        .analyzer_queue_size
+                        .take()
+                        .ok_or(Error::ConfigIncomplete("no analyzer-queue-size".into()))?,
+                    raw_packet_block_size: self.analyzer_raw_packet_block_size.take().ok_or(
+                        Error::ConfigIncomplete("no analyzer-raw-packet-block-size".into()),
+                    )?,
                 })
             }
             _ => {
@@ -962,7 +981,7 @@ impl DispatcherBuilder {
         dispatcher.init();
         #[cfg(target_os = "linux")]
         if let Some(ns) = current_ns {
-            let _ = NetNs::setns(&ns, Some(NetNs::CURRENT_NS_PATH))?;
+            let _ = netns::setns(&ns, Some(netns::CURRENT_NS_PATH))?;
         }
         Ok(Dispatcher {
             flavor: Mutex::new(Some(dispatcher)),
@@ -1051,7 +1070,7 @@ impl DispatcherBuilder {
                     ..Default::default()
                 };
                 info!("Afpacket init with {:?}", afp);
-                Ok(RecvEngine::AfPacket(Tpacket::new(afp).unwrap()))
+                Ok(RecvEngine::AfPacket(Tpacket::new(afp)?))
             }
             _ => {
                 return Err(Error::ConfigInvalid("Tap-mode not support.".into()));

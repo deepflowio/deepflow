@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,6 +41,8 @@ func GetTables(db string, ctx context.Context) *common.Result {
 	}
 	if db == "ext_metrics" || db == "deepflow_system" {
 		values = append(values, chCommon.GetExtTables(db, ctx)...)
+	} else if db == chCommon.DB_NAME_PROMETHEUS {
+		values = append(values, chCommon.GetPrometheusTables(db, ctx)...)
 	} else {
 		for _, table := range tables {
 			if table == "vtap_acl" {

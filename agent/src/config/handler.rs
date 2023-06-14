@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ use std::cmp::{max, min};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt;
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::path::PathBuf;
 use std::process;
 use std::sync::Arc;
@@ -30,8 +30,11 @@ use arc_swap::{access::Map, ArcSwap};
 use bytesize::ByteSize;
 use flexi_logger::writers::FileLogWriter;
 use flexi_logger::{Age, Cleanup, Criterion, FileSpec, LoggerHandle, Naming};
-use log::{info, warn, Level};
+use log::{error, info, warn, Level};
+#[cfg(target_os = "linux")]
+use regex::Regex;
 use sysinfo::SystemExt;
+use tokio::runtime::Runtime;
 
 #[cfg(target_os = "linux")]
 use super::{
@@ -42,6 +45,7 @@ use super::{
     config::{Config, PcapConfig, PortConfig, YamlConfig},
     ConfigError, IngressFlavour, KubernetesPollerType, RuntimeConfig,
 };
+use crate::rpc::Session;
 use crate::{
     common::{decapsulate::TunnelTypeBitmap, enums::TapType, l7_protocol_log::L7ProtocolBitmap},
     dispatcher::recv_engine,
@@ -50,7 +54,10 @@ use crate::{
     handler::PacketHandlerBuilder,
     trident::{AgentComponents, RunningMode},
     utils::{
-        environment::{free_memory_check, get_ctrl_ip_and_mac, running_in_container},
+        environment::{
+            free_memory_check, get_ctrl_ip_and_mac, k8s_mem_limit_for_deepflow,
+            running_in_container,
+        },
         logger::RemoteLogConfig,
     },
 };
@@ -58,7 +65,7 @@ use crate::{
 use crate::{
     dispatcher::recv_engine::af_packet::OptTpacketVersion,
     ebpf::CAP_LEN_MAX,
-    platform::ProcRegRewrite,
+    platform::{kubernetes::Poller, ProcRegRewrite},
     utils::{environment::is_tt_pod, environment::is_tt_workload},
 };
 
@@ -67,8 +74,10 @@ use public::proto::{
     common::TridentType,
     trident::{self, CaptureSocketType, Exception, IfMacSource, SocketType, TapMode},
 };
+#[cfg(target_os = "linux")]
+use public::{consts::NORMAL_EXIT_WITH_RESTART, netns};
 
-use crate::utils::cgroups::is_kernel_available_for_cgroup;
+use crate::utils::cgroups::is_kernel_available_for_cgroups;
 #[cfg(target_os = "windows")]
 use public::utils::net::links_by_name_regex;
 use public::utils::net::MacAddr;
@@ -166,6 +175,7 @@ pub struct EnvironmentConfig {
     pub thread_threshold: u32,
     pub sys_free_memory_limit: u32,
     pub log_file_size: u32,
+    pub tap_mode: TapMode,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -229,6 +239,8 @@ pub struct OsProcScanConfig {
     // whether to sync os socket and proc info
     // only make sense when process_info_enabled() == true
     pub os_proc_sync_enabled: bool,
+    // sync os socket and proc info only when the process has been tagged.
+    pub os_proc_sync_tagged_only: bool,
 }
 #[cfg(target_os = "windows")]
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -238,6 +250,7 @@ pub struct OsProcScanConfig;
 pub struct PlatformConfig {
     pub sync_interval: Duration,
     pub kubernetes_cluster_id: String,
+    pub prometheus_http_api_address: String,
     pub libvirt_xml_path: PathBuf,
     pub kubernetes_poller_type: KubernetesPollerType,
     pub vtap_id: u16,
@@ -249,6 +262,8 @@ pub struct PlatformConfig {
     pub kubernetes_api_enabled: bool,
     pub kubernetes_api_list_limit: u32,
     pub kubernetes_api_list_interval: Duration,
+    pub kubernetes_api_memory_trim_percent: Option<u8>,
+    pub max_memory: u64,
     pub namespace: Option<String>,
     pub thread_threshold: u32,
     pub tap_mode: TapMode,
@@ -309,12 +324,16 @@ pub struct FlowConfig {
     pub collector_enabled: bool,
     pub l7_log_tap_types: [bool; 256],
 
+    pub capacity: u32,
     pub hash_slots: u32,
     pub packet_delay: Duration,
     pub flush_interval: Duration,
     pub flow_timeout: FlowTimeout,
     pub ignore_tor_mac: bool,
     pub ignore_l2_end: bool,
+    pub ignore_idc_vlan: bool,
+
+    pub memory_pool_size: usize,
 
     pub l7_metrics_enabled: bool,
     pub app_proto_log_enabled: bool,
@@ -332,6 +351,12 @@ pub struct FlowConfig {
 
     // vec<protocolName, port bitmap>
     pub l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
+
+    // name, data
+    pub wasm_plugins: Vec<(String, Vec<u8>)>,
+
+    pub rrt_tcp_timeout: usize, //micro sec
+    pub rrt_udp_timeout: usize, //micro sec
 }
 
 impl From<&RuntimeConfig> for FlowConfig {
@@ -353,6 +378,7 @@ impl From<&RuntimeConfig> for FlowConfig {
                 }
                 tap_types
             },
+            capacity: flow_config.capacity,
             hash_slots: flow_config.hash_slots,
             packet_delay: conf.yaml_config.packet_delay,
             flush_interval: flow_config.flush_interval,
@@ -364,6 +390,8 @@ impl From<&RuntimeConfig> for FlowConfig {
             }),
             ignore_tor_mac: flow_config.ignore_tor_mac,
             ignore_l2_end: flow_config.ignore_l2_end,
+            ignore_idc_vlan: flow_config.ignore_idc_vlan,
+            memory_pool_size: flow_config.memory_pool_size,
             l7_metrics_enabled: conf.l7_metrics_enabled,
             app_proto_log_enabled: conf.app_proto_log_enabled,
             l4_performance_enabled: conf.l4_performance_enabled,
@@ -380,6 +408,9 @@ impl From<&RuntimeConfig> for FlowConfig {
             l7_protocol_parse_port_bitmap: Arc::new(
                 (&conf.yaml_config).get_protocol_port_parse_bitmap(),
             ),
+            wasm_plugins: vec![],
+            rrt_tcp_timeout: conf.yaml_config.rrt_tcp_timeout.as_micros() as usize,
+            rrt_udp_timeout: conf.yaml_config.rrt_udp_timeout.as_micros() as usize,
         }
     }
 }
@@ -400,6 +431,7 @@ impl fmt::Debug for FlowConfig {
                     .filter(|&(_, b)| *b)
                     .collect::<Vec<_>>(),
             )
+            .field("capacity", &self.capacity)
             .field("hash_slots", &self.hash_slots)
             .field("packet_delay", &self.packet_delay)
             .field("flush_interval", &self.flush_interval)
@@ -763,7 +795,11 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
     type Error = ConfigError;
 
     fn try_from(conf: (Config, RuntimeConfig)) -> Result<Self, Self::Error> {
-        let (static_config, conf) = conf;
+        let (static_config, mut conf) = conf;
+        if let Some(k8s_mem_limit) = k8s_mem_limit_for_deepflow() {
+            // If the environment variable K8S_MEM_LIMIT_FOR_DEEPFLOW is set, its value is preferred as the memory limit
+            conf.max_memory = k8s_mem_limit;
+        }
         #[cfg(target_os = "linux")]
         let (ctrl_ip, ctrl_mac) =
             get_ctrl_ip_and_mac(static_config.controller_ips[0].parse().unwrap());
@@ -772,7 +808,10 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
         let dest_ip = if conf.analyzer_ip.len() > 0 {
             conf.analyzer_ip.clone()
         } else {
-            "0.0.0.0".to_string()
+            match ctrl_ip {
+                IpAddr::V4(_) => Ipv4Addr::UNSPECIFIED.to_string(),
+                IpAddr::V6(_) => Ipv6Addr::UNSPECIFIED.to_string(),
+            }
         };
         let proxy_controller_ip = if conf.proxy_controller_ip.len() > 0 {
             conf.proxy_controller_ip.clone()
@@ -795,6 +834,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 thread_threshold: conf.thread_threshold,
                 sys_free_memory_limit: conf.sys_free_memory_limit,
                 log_file_size: conf.log_file_size,
+                tap_mode: conf.tap_mode,
             },
             synchronizer: SynchronizerConfig {
                 sync_interval: Duration::from_secs(conf.sync_interval),
@@ -909,6 +949,12 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 kubernetes_api_enabled: conf.kubernetes_api_enabled,
                 kubernetes_api_list_limit: conf.yaml_config.kubernetes_api_list_limit,
                 kubernetes_api_list_interval: conf.yaml_config.kubernetes_api_list_interval,
+                kubernetes_api_memory_trim_percent: if !conf.yaml_config.memory_trim_disabled {
+                    Some(conf.yaml_config.kubernetes_api_memory_trim_percent)
+                } else {
+                    None
+                },
+                max_memory: conf.max_memory,
                 namespace: if conf.yaml_config.kubernetes_namespace.is_empty() {
                     None
                 } else {
@@ -944,9 +990,11 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     os_app_tag_exec_user: conf.yaml_config.os_app_tag_exec_user.clone(),
                     os_app_tag_exec: conf.yaml_config.os_app_tag_exec.clone(),
                     os_proc_sync_enabled: conf.yaml_config.os_proc_sync_enabled,
+                    os_proc_sync_tagged_only: conf.yaml_config.os_proc_sync_tagged_only,
                 },
                 #[cfg(target_os = "windows")]
                 os_proc_scan_conf: OsProcScanConfig {},
+                prometheus_http_api_address: conf.prometheus_http_api_address.clone(),
             },
             flow: (&conf).into(),
             log_parser: LogParserConfig {
@@ -1198,8 +1246,8 @@ impl ConfigHandler {
 
         if candidate_config.tap_mode != TapMode::Analyzer
             && !running_in_container()
-            && !is_kernel_available_for_cgroup()
-        // In the environment where cgroup is not supported, we need to check free memory
+            && !is_kernel_available_for_cgroups()
+        // In the environment where cgroups is not supported, we need to check free memory
         {
             // Check and send out exceptions in time
             if let Err(e) = free_memory_check(new_config.environment.max_memory, exception_handler)
@@ -1252,8 +1300,39 @@ impl ConfigHandler {
                     new_config.dispatcher.extra_netns_regex
                 );
                 if let Some(c) = components.as_ref() {
-                    c.platform_synchronizer
-                        .set_netns_regex(&new_config.dispatcher.extra_netns_regex);
+                    let old_regex = if candidate_config.dispatcher.extra_netns_regex != "" {
+                        Regex::new(&candidate_config.dispatcher.extra_netns_regex).ok()
+                    } else {
+                        None
+                    };
+
+                    let regex = new_config.dispatcher.extra_netns_regex.as_ref();
+                    let regex = if regex != "" {
+                        match Regex::new(regex) {
+                            Ok(re) => {
+                                info!("platform monitoring extra netns: /{}/", regex);
+                                Some(re)
+                            }
+                            Err(_) => {
+                                warn!("platform monitoring no extra netns because regex /{}/ is invalid", regex);
+                                None
+                            }
+                        }
+                    } else {
+                        info!("platform monitoring no extra netns");
+                        None
+                    };
+
+                    let old_netns = old_regex.map(|re| netns::find_ns_files_by_regex(&re));
+                    let new_netns = regex.as_ref().map(|re| netns::find_ns_files_by_regex(&re));
+                    if old_netns != new_netns {
+                        info!("query net namespaces changed from {:?} to {:?}, restart agent to create dispatcher for extra namespaces, deepflow-agent restart...", old_netns, new_netns);
+                        thread::sleep(Duration::from_secs(1));
+                        process::exit(NORMAL_EXIT_WITH_RESTART);
+                    }
+
+                    c.platform_synchronizer.set_netns_regex(regex.clone());
+                    c.kubernetes_poller.set_netns_regex(regex);
                 }
             }
 
@@ -1317,8 +1396,8 @@ impl ConfigHandler {
                                 }
                             }
                             _ => {
-                                if !running_in_container() && !is_kernel_available_for_cgroup() {
-                                    // In the environment where cgroup is not supported, we need to check free memory
+                                if !running_in_container() && !is_kernel_available_for_cgroups() {
+                                    // In the environment where cgroups is not supported, we need to check free memory
                                     match free_memory_check(
                                         // fixme: It can skip this check because it has been checked before
                                         handler.candidate_config.environment.max_memory,
@@ -1523,7 +1602,7 @@ impl ConfigHandler {
             }
         }
 
-        if candidate_config.tap_mode != TapMode::Analyzer && !running_in_container() {
+        if candidate_config.tap_mode != TapMode::Analyzer {
             if candidate_config.environment.max_memory != new_config.environment.max_memory {
                 info!(
                     "memory limit set to {}",
@@ -1536,7 +1615,7 @@ impl ConfigHandler {
                 info!("cpu limit set to {}", new_config.environment.max_cpus);
                 candidate_config.environment.max_cpus = new_config.environment.max_cpus;
             }
-        } else if candidate_config.tap_mode == TapMode::Analyzer || running_in_container() {
+        } else {
             let mut system = sysinfo::System::new();
             system.refresh_memory();
             let max_memory = system.total_memory();
@@ -1544,12 +1623,12 @@ impl ConfigHandler {
             let max_cpus = 1.max(system.cpus().len()) as u32;
 
             if candidate_config.environment.max_memory != max_memory {
-                info!("memory set ulimit when tap_mode=analyzer or running in a K8s pod");
+                info!("memory set ulimit when tap_mode=analyzer");
                 candidate_config.environment.max_memory = max_memory;
             }
 
             if candidate_config.environment.max_cpus != max_cpus {
-                info!("cpu set ulimit when tap_mode=analyzer or running in a K8s pod");
+                info!("cpu set ulimit when tap_mode=analyzer");
                 candidate_config.environment.max_cpus = max_cpus;
             }
         }
@@ -1663,11 +1742,35 @@ impl ConfigHandler {
                     new_cfg.kubernetes_api_list_interval
                 );
             }
+            if old_cfg.kubernetes_api_memory_trim_percent
+                != new_cfg.kubernetes_api_memory_trim_percent
+            {
+                info!(
+                    "Kubernetes API memory_trim_percent set to {:?}",
+                    new_cfg.kubernetes_api_memory_trim_percent
+                );
+            }
             if old_cfg.kubernetes_api_enabled != new_cfg.kubernetes_api_enabled {
                 info!(
                     "Kubernetes API enabled set to {}",
                     new_cfg.kubernetes_api_enabled
                 );
+            }
+            #[cfg(target_os = "linux")]
+            if old_cfg.prometheus_http_api_address != new_cfg.prometheus_http_api_address {
+                info!(
+                    "prometheus_http_api_address set to {}",
+                    new_cfg.prometheus_http_api_address
+                );
+                if new_cfg.prometheus_http_api_address.is_empty() {
+                    callbacks.push(|_, components| {
+                        components.prometheus_targets_watcher.stop();
+                    });
+                } else {
+                    callbacks.push(|_, components| {
+                        components.prometheus_targets_watcher.start();
+                    });
+                }
             }
 
             // restart api watcher if it keeps running and config changes
@@ -1676,7 +1779,10 @@ impl ConfigHandler {
                 && new_cfg.kubernetes_api_enabled
                 && (old_cfg.kubernetes_api_list_limit != new_cfg.kubernetes_api_list_limit
                     || old_cfg.kubernetes_api_list_interval
-                        != new_cfg.kubernetes_api_list_interval);
+                        != new_cfg.kubernetes_api_list_interval
+                    || old_cfg.kubernetes_api_memory_trim_percent
+                        != new_cfg.kubernetes_api_memory_trim_percent
+                    || old_cfg.max_memory != new_cfg.max_memory);
 
             info!(
                 "platform config change from {:#?} to {:#?}",
@@ -1694,9 +1800,9 @@ impl ConfigHandler {
                             || is_tt_pod(conf.trident_type))
                     {
                         if is_tt_pod(conf.trident_type) {
-                            components.platform_synchronizer.start_kubernetes_poller();
+                            components.kubernetes_poller.start();
                         } else {
-                            components.platform_synchronizer.stop_kubernetes_poller();
+                            components.kubernetes_poller.stop();
                         }
                         if conf.kubernetes_api_enabled {
                             components.api_watcher.start();
@@ -1812,25 +1918,10 @@ impl ConfigHandler {
             if candidate_config.log_parser.l7_log_collect_nps_threshold
                 != new_config.log_parser.l7_log_collect_nps_threshold
             {
-                fn l7_log_collect_nps_threshold_callback(
-                    config: &ConfigHandler,
-                    components: &mut AgentComponents,
-                ) {
-                    info!(
-                        "l7 log collect nps threshold set to {}",
-                        config
-                            .candidate_config
-                            .log_parser
-                            .l7_log_collect_nps_threshold
-                    );
-                    components.l7_log_rate.set_rate(Some(
-                        config
-                            .candidate_config
-                            .log_parser
-                            .l7_log_collect_nps_threshold,
-                    ));
-                }
-                callbacks.push(l7_log_collect_nps_threshold_callback);
+                info!(
+                    "l7 log collect nps threshold set to {}",
+                    new_config.log_parser.l7_log_collect_nps_threshold
+                );
             }
 
             candidate_config.log_parser = new_config.log_parser;
@@ -1946,8 +2037,8 @@ impl ConfigHandler {
                 }
                 if handler.candidate_config.tap_mode != TapMode::Analyzer
                     && !running_in_container()
-                    && !is_kernel_available_for_cgroup()
-                // In the environment where cgroup is not supported, we need to check free memory
+                    && !is_kernel_available_for_cgroups()
+                // In the environment where cgroups is not supported, we need to check free memory
                 {
                     match free_memory_check(
                         // fixme: It can skip this check because it has been checked before
@@ -1979,6 +2070,19 @@ impl ConfigHandler {
 
         callbacks
     }
+
+    pub fn load_plugin(
+        &mut self,
+        rt: &Arc<Runtime>,
+        session: &Arc<Session>,
+        ctrl_ip: &str,
+        ctrl_mac: &str,
+    ) {
+        self.candidate_config
+            .fill_wasm_plugin_prog_from_server(rt, session, ctrl_ip, ctrl_mac);
+        self.current_config
+            .store(Arc::new(self.candidate_config.clone()));
+    }
 }
 
 impl ModuleConfig {
@@ -1996,6 +2100,28 @@ impl ModuleConfig {
         }
 
         min((mem_size / MB / 128 * 65536) as usize, 1 << 30)
+    }
+
+    pub fn fill_wasm_plugin_prog_from_server(
+        &mut self,
+        rt: &Arc<Runtime>,
+        session: &Arc<Session>,
+        ctrl_ip: &str,
+        ctrl_mac: &str,
+    ) {
+        let mut p = vec![];
+        rt.block_on(async {
+            for i in self.yaml_config.wasm_plugins.iter() {
+                match session.get_wasm_plugin(i.as_str(), ctrl_ip, ctrl_mac).await {
+                    Ok(prog) => p.push((i.clone(), prog)),
+                    Err(err) => {
+                        error!("get wasm plugin {} fail: {}", i, err);
+                        continue;
+                    }
+                }
+            }
+        });
+        self.flow.wasm_plugins = p;
     }
 }
 

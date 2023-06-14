@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package event
 
 import (
 	"encoding/json"
+	"reflect"
 	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -125,27 +126,15 @@ func (e *EventManagerBase) convertAndEnqueue(resourceLcuuid string, ev *eventapi
 
 func (e *EventManagerBase) convertToEventBeEnqueued(ev *eventapi.ResourceEvent) *eventapi.ResourceEvent {
 	event := eventapi.AcquireResourceEvent()
-	event.Time = ev.Time
-	event.TimeMilli = ev.TimeMilli
-	event.Type = ev.Type
-	event.InstanceType = ev.InstanceType
-	event.InstanceName = ev.InstanceName
-	event.InstanceID = ev.InstanceID
-	event.AttributeSubnetIDs = ev.AttributeSubnetIDs
-	event.AttributeIPs = ev.AttributeIPs
-	event.IfNeedTagged = ev.IfNeedTagged
-	event.RegionID = ev.RegionID
-	event.AZID = ev.AZID
-	event.VPCID = ev.VPCID
-	event.L3DeviceType = ev.L3DeviceType
-	event.L3DeviceID = ev.L3DeviceID
-	event.HostID = ev.HostID
-	event.PodClusterID = ev.PodClusterID
-	event.PodNSID = ev.PodNSID
-	event.PodNodeID = ev.PodNodeID
-	event.PodServiceID = ev.PodServiceID
-	event.PodGroupID = ev.PodGroupID
-	event.PodID = ev.PodID
-	event.Description = ev.Description
+	if ev == nil {
+		return event
+	}
+
+	src := reflect.ValueOf(ev).Elem()
+	dst := reflect.ValueOf(event).Elem()
+	for i := 0; i < src.NumField(); i++ {
+		dst.Field(i).Set(src.Field(i))
+	}
+
 	return event
 }

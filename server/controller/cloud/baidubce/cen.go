@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@
 package baidubce
 
 import (
+	"time"
+
 	"github.com/baidubce/bce-sdk-go/services/csn"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
@@ -34,11 +36,14 @@ func (b *BaiduBce) getCENs() ([]model.CEN, error) {
 	retCsns := []csn.Csn{}
 	for {
 		args.Marker = marker
+		startTime := time.Now()
 		result, err := csnClient.ListCsn(args)
 		if err != nil {
 			log.Error(err)
 			return []model.CEN{}, err
 		}
+		b.cloudStatsd.APICost["ListCsn"] = append(b.cloudStatsd.APICost["ListCsn"], int(time.Now().Sub(startTime).Milliseconds()))
+		b.cloudStatsd.APICount["ListCsn"] = append(b.cloudStatsd.APICount["ListCsn"], 1)
 		retCsns = append(retCsns, result.Csns...)
 		if !result.IsTruncated {
 			break
@@ -47,6 +52,7 @@ func (b *BaiduBce) getCENs() ([]model.CEN, error) {
 			marker = *result.NextMarker
 		}
 	}
+
 	b.debugger.WriteJson("ListCsn", " ", structToJson(retCsns))
 
 	for _, c := range retCsns {

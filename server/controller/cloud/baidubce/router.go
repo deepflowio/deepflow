@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,8 +17,9 @@
 package baidubce
 
 import (
-	"github.com/baidubce/bce-sdk-go/services/vpc"
+	"time"
 
+	"github.com/baidubce/bce-sdk-go/services/vpc"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 )
@@ -35,12 +36,15 @@ func (b *BaiduBce) getRouterAndTables(
 	vpcClient, _ := vpc.NewClient(b.secretID, b.secretKey, "bcc."+b.endpoint)
 	vpcClient.Config.ConnectionTimeoutInMillis = b.httpTimeout * 1000
 	for vpcId, vpcLcuuid := range vpcIdToLcuuid {
+		startTime := time.Now()
 		result, err := vpcClient.GetRouteTableDetail("", vpcId)
 		if err != nil {
 			log.Error(err)
 			return nil, nil, err
 		}
 
+		b.cloudStatsd.APICost["GetRouteTableDetail"] = append(b.cloudStatsd.APICost["GetRouteTableDetail"], int(time.Now().Sub(startTime).Milliseconds()))
+		b.cloudStatsd.APICount["GetRouteTableDetail"] = append(b.cloudStatsd.APICount["GetRouteTableDetail"], len(result.RouteRules))
 		b.debugger.WriteJson("GetRouteTableDetail", " ", structToJson([]*vpc.GetRouteTableResult{result}))
 		vrouterLcuuid := common.GenerateUUID(result.RouteTableId)
 		vrouterName, _ := vpcIdToName[vpcId]

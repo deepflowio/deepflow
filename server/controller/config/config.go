@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ import (
 	genesis "github.com/deepflowio/deepflow/server/controller/genesis/config"
 	manager "github.com/deepflowio/deepflow/server/controller/manager/config"
 	monitor "github.com/deepflowio/deepflow/server/controller/monitor/config"
+	prometheus "github.com/deepflowio/deepflow/server/controller/prometheus/config"
 	statsd "github.com/deepflowio/deepflow/server/controller/statsd/config"
 	tagrecorder "github.com/deepflowio/deepflow/server/controller/tagrecorder/config"
 	trisolaris "github.com/deepflowio/deepflow/server/controller/trisolaris/config"
@@ -47,7 +48,7 @@ type Specification struct {
 	VTapMaxPerGroup            int `default:"10000" yaml:"vtap_max_per_group"`
 	AZMaxPerServer             int `default:"10" yaml:"az_max_per_server"`
 	DataSourceMax              int `default:"15" yaml:"data_source_max"`
-	DataSourceRetentionTimeMax int `default:"1000" yaml:"data_source_retention_time_max"`
+	DataSourceRetentionTimeMax int `default:"24000" yaml:"data_source_retention_time_max"`
 }
 
 type DFWebService struct {
@@ -88,6 +89,7 @@ type ControllerConfig struct {
 	StatsdCfg      statsd.StatsdConfig           `yaml:"statsd"`
 	TrisolarisCfg  trisolaris.Config             `yaml:"trisolaris"`
 	TagRecorderCfg tagrecorder.TagRecorderConfig `yaml:"tagrecorder"`
+	PrometheusCfg  prometheus.Config             `yaml:"prometheus"`
 }
 
 type Config struct {

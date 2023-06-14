@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -401,10 +401,11 @@ type AdditionalResourceVInterface struct {
 }
 
 type AdditionalResourceCloudTag struct {
-	ResourceType string                  `json:"resource_type" yaml:"resource_type" binding:"required"`
-	ResourceName string                  `json:"resource_name" yaml:"resource_name" binding:"required"`
-	DomainUUID   string                  `json:"domain_uuid" yaml:"domain_uuid" binding:"required"`
-	Tags         []AdditionalResourceTag `json:"tags" yaml:"tags" binding:"required"`
+	ResourceType  string                  `json:"resource_type" yaml:"resource_type" binding:"required"`
+	ResourceName  string                  `json:"resource_name" yaml:"resource_name" binding:"required"`
+	DomainUUID    string                  `json:"domain_uuid" yaml:"domain_uuid" binding:"required"`
+	SubDomainUUID string                  `json:"subdomain_uuid" yaml:"subdomain_uuid"`
+	Tags          []AdditionalResourceTag `json:"tags" yaml:"tags" binding:"required"`
 }
 
 type AdditionalResourceTag struct {
@@ -436,12 +437,12 @@ type AdditionalResourceLBTargetServer struct {
 }
 
 type AdditionalResource struct {
-	AZs       []AdditionalResourceAZ       `json:"azs" yaml:"azs"`
-	VPCs      []AdditionalResourceVPC      `json:"vpcs" yaml:"vpcs"`
-	Subnets   []AdditionalResourceSubnet   `json:"subnets" yaml:"subnets"`
-	Hosts     []AdditionalResourceHost     `json:"hosts" yaml:"hosts"`
-	CHosts    []AdditionalResourceChost    `json:"chosts" yaml:"chosts"`
-	CloudTags []AdditionalResourceCloudTag `json:"cloud_tags" yaml:"cloud_tags"`
+	AZs       []AdditionalResourceAZ       `json:"azs" yaml:"azs" binding:"omitempty,dive"`
+	VPCs      []AdditionalResourceVPC      `json:"vpcs" yaml:"vpcs" binding:"omitempty,dive"`
+	Subnets   []AdditionalResourceSubnet   `json:"subnets" yaml:"subnets" binding:"omitempty,dive"`
+	Hosts     []AdditionalResourceHost     `json:"hosts" yaml:"hosts" binding:"omitempty,dive"`
+	CHosts    []AdditionalResourceChost    `json:"chosts" yaml:"chosts" binding:"omitempty,dive"`
+	CloudTags []AdditionalResourceCloudTag `json:"cloud_tags" yaml:"cloud_tags" binding:"omitempty,dive"`
 	LB        []AdditionalResourceLB       `json:"lbs" yaml:"lbs" binding:"omitempty,dive"`
 }
 
@@ -504,6 +505,7 @@ type VTapGroupConfiguration struct {
 	HTTPLogXRequestID             *string       `json:"HTTP_LOG_X_REQUEST_ID" yaml:"http_log_x_request_id,omitempty"`
 	ExternalAgentHTTPProxyEnabled *int          `json:"EXTERNAL_AGENT_HTTP_PROXY_ENABLED" yaml:"external_agent_http_proxy_enabled,omitempty"`
 	ExternalAgentHTTPProxyPort    *int          `json:"EXTERNAL_AGENT_HTTP_PROXY_PORT" yaml:"external_agent_http_proxy_port,omitempty"`
+	PrometheusHttpAPIAddress      *string       `json:"PROMETHEUS_HTTP_API_ADDRESS" yaml:"prometheus_http_api_address,omitempty"` // ip:port
 	AnalyzerPort                  *int          `json:"ANALYZER_PORT" yaml:"analyzer_port,omitempty"`
 	ProxyControllerPort           *int          `json:"PROXY_CONTROLLER_PORT" yaml:"proxy_controller_port,omitempty"`
 	ProxyControllerIP             *string       `json:"PROXY_CONTROLLER_IP" yaml:"proxy_controller_ip,omitempty"`
@@ -696,6 +698,7 @@ func (GenesisPort) TableName() string {
 
 type GenesisVinterface struct {
 	ID                  int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	NetnsID             uint32    `gorm:"column:netns_id;type:int unsigned;default:0" json:"NETNS_ID"`
 	VtapID              uint32    `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
 	Lcuuid              string    `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
 	Name                string    `gorm:"column:name;type:char(64);default:null" json:"NAME"`
@@ -747,12 +750,14 @@ func (GenesisVpc) TableName() string {
 
 type GenesisProcess struct {
 	ID          int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	NetnsID     uint32    `gorm:"column:netns_id;type:int unsigned;default:0" json:"NETNS_ID"`
 	VtapID      uint32    `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
 	PID         uint64    `gorm:"column:pid;type:int;default:null" json:"PID"`
 	Lcuuid      string    `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
 	Name        string    `gorm:"column:name;type:varchar(256);default:null" json:"NAME"`
 	ProcessName string    `gorm:"column:process_name;type:varchar(256);default:null" json:"PROCESS_NAME"`
 	CMDLine     string    `gorm:"column:cmd_line;type:text;default:null" json:"CMD_LINE"`
+	ContainerID string    `gorm:"column:container_id;type:char(64);default:''" json:"CONTAINER_ID"`
 	User        string    `gorm:"column:user;type:varchar(256);default:null" json:"USER"`
 	OSAPPTags   string    `gorm:"column:os_app_tags;type:text;default:null" json:"OS_APP_TAGS"`
 	NodeIP      string    `gorm:"column:node_ip;type:char(48);default:null" json:"NODE_IP"`

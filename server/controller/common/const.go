@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -198,6 +198,7 @@ var VTapExceptionChinese = map[int64]string{
 	2 << 15:                                "数据SOCKET错误",
 	2 << 16:                                "分发SOCKET错误",
 	2 << 17:                                "集成SOCKET错误",
+	2 << 18:                                "CGROUPS配置错误",
 	VTAP_EXCEPTION_LICENSE_NOT_ENGOUTH:     "采集器授权个数不足",
 	VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED:   "分配数据节点失败",
 	VTAP_EXCEPTION_ALLOC_CONTROLLER_FAILED: "分配控制器失败",
@@ -261,7 +262,7 @@ const (
 
 const (
 	DEFAULT_ENCRYPTION_PASSWORD = "******"
-	DEFAULT_PORT_NAME_REGEX     = "(cni|flannel|vxlan.calico|tunl|en[ospx])"
+	DEFAULT_PORT_NAME_REGEX     = "^(cni|flannel|cali|vxlan.calico|tunl|en[ospx])"
 
 	OPENSTACK         = 1
 	VSPHERE           = 2

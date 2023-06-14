@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ use super::{
     labeler::Labeler,
     Result as PResult,
 };
-use crate::common::endpoint::EndpointData;
+use crate::common::endpoint::{EndpointData, EndpointDataPov};
 use crate::common::enums::TapType;
 use crate::common::flow::{PacketDirection, SignalSource};
 use crate::common::lookup_key::LookupKey;
@@ -108,12 +108,13 @@ impl Policy {
         queue_count: usize,
         level: usize,
         map_size: usize,
+        forward_capacity: usize,
         fast_disable: bool,
     ) -> (PolicySetter, PolicyGetter) {
         let policy = Box::into_raw(Box::new(Policy {
             labeler: Labeler::default(),
             table: FirstPath::new(queue_count, level, map_size, fast_disable),
-            forward: Forward::new(queue_count),
+            forward: Forward::new(queue_count, forward_capacity),
             nat: RwLock::new(vec![HashMap::new(), HashMap::new()]),
             queue_count,
             first_hit: 0,
@@ -266,7 +267,7 @@ impl Policy {
 
         if packet.signal_source == SignalSource::EBPF {
             let (endpoints, gpid_entries) = self.lookup_all_by_epc(key, local_epc_id);
-            packet.endpoint_data = Some(Arc::new(endpoints));
+            packet.endpoint_data = Some(EndpointDataPov::new(Arc::new(endpoints)));
             packet.policy_data = Some(Arc::new(PolicyData::default())); // Only endpoint is required for ebpf data
             Self::fill_gpid_entry(packet, &gpid_entries);
             return;
@@ -275,7 +276,7 @@ impl Policy {
         // 策略查序会改变端口，为不影响后续业务， 这里保存
         if let Some((policy, endpoints, gpid_entries)) = self.lookup_all_by_key(key) {
             packet.policy_data = Some(policy);
-            packet.endpoint_data = Some(endpoints);
+            packet.endpoint_data = Some(EndpointDataPov::new(endpoints));
             Self::fill_gpid_entry(packet, &gpid_entries);
         }
     }
@@ -676,7 +677,7 @@ mod test {
 
     #[test]
     fn test_policy_normal() {
-        let (mut setter, mut getter) = Policy::new(10, 0, 1024, false);
+        let (mut setter, mut getter) = Policy::new(10, 0, 1024, 1024, false);
         let interface: PlatformData = PlatformData {
             mac: 0x002233445566,
             ips: vec![IpSubnet {

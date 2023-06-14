@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,6 +53,7 @@ pub struct FlowAggrCounter {
     drop_in_throttle: AtomicU64,
     stash_total_len: AtomicU64,
     stash_total_capacity: AtomicU64,
+    stash_shrinks: AtomicU64,
 }
 
 pub struct FlowAggrThread {
@@ -141,7 +142,9 @@ pub struct FlowAggr {
     input: Arc<Receiver<Arc<TaggedFlow>>>,
     output: ThrottlingQueue,
     slot_start_time: Duration,
-    stashs: VecDeque<HashMap<u64, TaggedFlow>>,
+    stashs: VecDeque<HashMap<u64, Box<TaggedFlow>>>,
+    history_length: VecDeque<usize>,
+    stash_init_capacity: usize,
 
     last_flush_time: Duration,
     config: CollectorAccess,
@@ -153,6 +156,10 @@ pub struct FlowAggr {
 }
 
 impl FlowAggr {
+    // record stash size in last N flushes to determine shrinking size
+    const HISTORY_RECORD_COUNT: usize = 10;
+    const MIN_STASH_CAPACITY: usize = 1024;
+
     pub fn new(
         input: Arc<Receiver<Arc<TaggedFlow>>>,
         output: DebugSender<BoxedTaggedFlow>,
@@ -162,13 +169,18 @@ impl FlowAggr {
         metrics: Arc<FlowAggrCounter>,
     ) -> Self {
         let mut stashs = VecDeque::new();
+        let mut stash_init_capacity = 0;
         for _ in 0..MINUTE_SLOTS {
-            stashs.push_front(HashMap::new())
+            let stash = HashMap::with_capacity(Self::MIN_STASH_CAPACITY);
+            stash_init_capacity = stash_init_capacity.max(stash.capacity());
+            stashs.push_front(stash);
         }
         Self {
             input,
             output: ThrottlingQueue::new(output, config.clone()),
             stashs,
+            history_length: [0; Self::HISTORY_RECORD_COUNT].into(),
+            stash_init_capacity,
             slot_start_time: Duration::ZERO,
             last_flush_time: Duration::ZERO,
             config,
@@ -210,9 +222,9 @@ impl FlowAggr {
             }
         } else {
             if f.flow.close_type != CloseType::ForcedReport {
-                self.send_flow(f.as_ref().clone());
+                self.send_flow(Box::new(f.as_ref().clone()));
             } else {
-                slot_map.insert(f.flow.flow_id, f.as_ref().clone());
+                slot_map.insert(f.flow.flow_id, Box::new(f.as_ref().clone()));
             }
             // 收到flow下一分钟数据，则需要发送上一分钟的该flow
             if slot > 0 {
@@ -223,11 +235,14 @@ impl FlowAggr {
         }
     }
 
-    fn send_flow(&mut self, mut f: TaggedFlow) {
+    fn send_flow(&mut self, mut f: Box<TaggedFlow>) {
         // We use acl_gid to mark which flows are configured with PCAP storage policies.
         // Since acl_gid is used for both PCAP and NPB functions, only the acl_gid used by PCAP is sent here.
         let mut acl_gids = U16Set::new();
         for policy_data in f.tag.policy_data.iter() {
+            let Some(policy_data) = policy_data else {
+                continue;
+            };
             if !policy_data.contain_pcap() {
                 continue;
             }
@@ -264,9 +279,24 @@ impl FlowAggr {
 
     fn flush_front_slot_and_rotate(&mut self) {
         let mut slot_map = self.stashs.pop_front().unwrap();
+
+        self.history_length.rotate_right(1);
+        self.history_length[0] = slot_map.len();
+
         for (_, v) in slot_map.drain() {
             self.send_flow(v);
         }
+
+        let stash_cap = slot_map.capacity();
+        if stash_cap > self.stash_init_capacity {
+            let max_history = self.history_length.iter().fold(0, |acc, n| acc.max(*n));
+            if stash_cap > 2 * max_history {
+                // shrink stash if its capacity is larger than 2 times of the max stash length in the past HISTORY_RECORD_COUNT flushes
+                self.metrics.stash_shrinks.fetch_add(1, Ordering::Relaxed);
+                slot_map.shrink_to(self.stash_init_capacity.max(2 * max_history));
+            }
+        }
+
         self.stashs.push_back(slot_map);
         self.last_flush_time = get_timestamp(self.ntp_diff.load(Ordering::Relaxed));
         self.slot_start_time += Duration::from_secs(SECONDS_IN_MINUTE);
@@ -361,6 +391,11 @@ impl RefCountable for FlowAggrCounter {
                 CounterType::Counted,
                 CounterValue::Unsigned(self.stash_total_capacity.load(Ordering::Relaxed)),
             ),
+            (
+                "stash-shrinks",
+                CounterType::Counted,
+                CounterValue::Unsigned(self.stash_shrinks.swap(0, Ordering::Relaxed)),
+            ),
         ]
     }
 }
@@ -412,7 +447,7 @@ impl ThrottlingQueue {
         }
     }
 
-    pub fn send_with_throttling(&mut self, f: TaggedFlow) -> bool {
+    pub fn send_with_throttling(&mut self, f: Box<TaggedFlow>) -> bool {
         let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
 
         if now.as_secs() >> Self::THROTTLE_BUCKET_BITS
@@ -426,13 +461,12 @@ impl ThrottlingQueue {
 
         self.period_count += 1;
         if self.cache_with_throttling.len() < self.throttle as usize {
-            self.cache_with_throttling
-                .push(BoxedTaggedFlow(Box::new(f)));
+            self.cache_with_throttling.push(BoxedTaggedFlow(f));
             true
         } else {
             let r = self.small_rng.gen_range(0..self.period_count);
             if r < self.throttle as usize {
-                self.cache_with_throttling[r] = BoxedTaggedFlow(Box::new(f));
+                self.cache_with_throttling[r] = BoxedTaggedFlow(f);
             }
             false
         }
@@ -445,7 +479,7 @@ impl ThrottlingQueue {
         }
     }
 
-    pub fn send_without_throttling(&mut self, f: TaggedFlow) {
+    pub fn send_without_throttling(&mut self, f: Box<TaggedFlow>) {
         let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
         if self.cache_without_throttling.len() >= Self::CACHE_WITHOUT_THROTTLING_SIZE
             || now.as_secs() >> Self::THROTTLE_BUCKET_BITS
@@ -455,8 +489,7 @@ impl ThrottlingQueue {
             self.flush_cache_without_throttling();
             self.last_flush_cache_without_throttling_time = now;
         }
-        self.cache_without_throttling
-            .push(BoxedTaggedFlow(Box::new(f)));
+        self.cache_without_throttling.push(BoxedTaggedFlow(f));
     }
 
     pub fn update_throttle(&mut self) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ pub(crate) mod http;
 pub(crate) mod mq;
 mod parser;
 pub mod pb_adapter;
+pub(crate) mod plugin;
 pub(crate) mod rpc;
 pub(crate) mod sql;
 pub use self::http::{
@@ -27,9 +28,11 @@ pub use self::http::{
     is_http_v1_payload, parse_v1_headers, HttpInfo, HttpLog, Httpv2Headers,
 };
 use self::pb_adapter::L7ProtocolSendLog;
+pub use self::plugin::custom_wrap::CustomWrapLog;
+pub use self::plugin::wasm::{get_wasm_parser, WasmLog};
 pub use dns::{DnsInfo, DnsLog};
 pub use mq::{mqtt, KafkaInfo, KafkaLog, MqttInfo, MqttLog};
-pub use parser::{MetaAppProto, SessionAggregator};
+pub use parser::{MetaAppProto, SessionAggregator, SLOT_WIDTH};
 pub use rpc::{
     decode_new_rpc_trace_context, decode_new_rpc_trace_context_with_type, get_protobuf_rpc_parser,
     DubboHeader, DubboInfo, DubboLog, ProtobufRpcInfo, ProtobufRpcWrapLog, SofaRpcInfo, SofaRpcLog,
@@ -321,7 +324,7 @@ impl AppProtoLogsBaseInfo {
         self.syscall_cap_seq_1 = log.syscall_cap_seq_1;
 
         self.start_time = log.start_time.min(self.start_time);
-        self.end_time = log.end_time.max(self.start_time);
+        self.end_time = log.end_time.max(self.end_time);
         match log.head.msg_type {
             LogMessageType::Request if self.req_tcp_seq == 0 && log.req_tcp_seq != 0 => {
                 self.req_tcp_seq = log.req_tcp_seq;
@@ -333,10 +336,13 @@ impl AppProtoLogsBaseInfo {
         }
 
         self.syscall_trace_id_response = log.syscall_trace_id_response;
-        self.head.msg_type = LogMessageType::Session;
+        // go http2 uprobe  may merge multi times, if not req and resp merge can not set to session
+        if self.head.msg_type != log.head.msg_type {
+            self.head.msg_type = LogMessageType::Session;
+        }
 
         self.head.rrt = if self.end_time > self.start_time {
-            (self.end_time - self.start_time).as_micros() as u64
+            (self.end_time.as_micros() - self.start_time.as_micros()) as u64
         } else {
             0
         }
@@ -349,7 +355,6 @@ pub struct AppProtoLogsData {
     pub base_info: AppProtoLogsBaseInfo,
     #[serde(flatten)]
     pub special_info: L7ProtocolInfo,
-    #[serde(flatten)]
     pub direction_score: u8,
 }
 

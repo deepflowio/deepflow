@@ -317,13 +317,13 @@ static __inline int infer_iovecs_copy(struct infer_data_s *infer_buf,
 #define EVENT_BURST_NUM            16
 #define CONN_PERSIST_TIME_MAX_NS   100000000000ULL
 
-static __inline struct trace_key_t get_trace_key(__u64 timeout)
+static __inline struct trace_key_t get_trace_key(__u64 timeout, bool is_socket_io)
 {
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	__u64 goid = 0;
 
 	if (timeout){
-		goid = get_rw_goid(timeout * NS_PER_SEC);
+		goid = get_rw_goid(timeout * NS_PER_SEC, is_socket_io);
 	}
 
 	struct trace_key_t key = {};
@@ -696,7 +696,8 @@ static __inline void infer_tcp_seq_offset(void *sk,
 	int copied_seq_offsets[] = {0x514, 0x51c, 0x524, 0x52c, 0x534,
 				    0x53c, 0x544, 0x54c, 0x554, 0x55c,
 				    0x564, 0x56c, 0x574, 0x57c, 0x584,
-				    0x58c, 0x594, 0x59c, 0x5dc, 0x644};
+				    0x58c, 0x594, 0x59c, 0x5dc, 0x644,
+				    0x664};
 #endif
 
 	// 成员 write_seq 在 struct tcp_sock 中的偏移量
@@ -721,7 +722,7 @@ static __inline void infer_tcp_seq_offset(void *sk,
 				   0x69c, 0x6a4, 0x6ac, 0x6b4, 0x6bc, 0x6c4,
 				   0x6cc, 0x6d4, 0x6dc, 0x6e4, 0x6ec, 0x6f4,
 				   0x6fc, 0x704, 0x70c, 0x714, 0x71c, 0x74c,
-				   0x7b4};
+				   0x7b4, 0x7d4};
 #endif
 
 	int i, snd_nxt_offset = 0;
@@ -1044,7 +1045,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 		return SUBMIT_INVALID;
 
 	__u32 timeout = trace_conf->go_tracing_timeout;
-	struct trace_key_t trace_key = get_trace_key(timeout);
+	struct trace_key_t trace_key = get_trace_key(timeout, true);
 	struct trace_info_t *trace_info_ptr = trace_map__lookup(&trace_key);
 
 	struct socket_info_t *socket_info_ptr = conn_info->socket_info_ptr;
@@ -1058,9 +1059,17 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 		socket_id = socket_info_ptr->uid;
 	}
 
+#define DNS_AAAA_TYPE_ID 0x1c
+	// FIXME: By default, the Go process continuously sends A record and
+	// AAAA record DNS request messages. In the current call chain tracking
+	// implementation, two consecutive request messages before receiving
+	// the response message will cause the link to be broken. Ignore the
+	// AAAA record To ensure that the call chain will not be broken.
 	if (conn_info->message_type != MSG_PRESTORE &&
 	    conn_info->message_type != MSG_RECONFIRM &&
-	    (timeout != 0 || extra->is_go_process == false))
+	    (timeout != 0 || extra->is_go_process == false) &&
+	    !(conn_info->protocol == PROTO_DNS &&
+	      conn_info->dns_q_type == DNS_AAAA_TYPE_ID))
 		trace_process(socket_info_ptr, conn_info, socket_id, pid_tgid,
 			      trace_info_ptr, trace_conf, trace_stats,
 			      &thread_trace_id, time_stamp, &trace_key);
@@ -1112,11 +1121,15 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 		 * 同方向多个连续请求或回应的场景时，
 		 * 保持捕获数据的序列号保持不变。
 		 */
-		if (conn_info->keep_data_seq)
-			sk_info.seq = socket_info_ptr->seq;
-		else
-			sk_info.seq = ++socket_info_ptr->seq;
-
+		if (!conn_info->keep_data_seq) {
+			/*
+			 * Ensure that the accumulation operation of capturing the
+			 * data sequence number is an atomic operation when multiple
+			 * threads read/write to the socket simultaneously.
+			 */
+			__sync_fetch_and_add(&socket_info_ptr->seq, 1);
+		}
+		sk_info.seq = socket_info_ptr->seq;
 		socket_info_ptr->direction = conn_info->direction;
 		socket_info_ptr->msg_type = conn_info->message_type;
 		socket_info_ptr->update_time = time_stamp / NS_PER_SEC;
@@ -1818,7 +1831,7 @@ TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx *ctx) {
 		return 0;
 
 	// nginx is not a go process, disable go tracking
-	struct trace_key_t key = get_trace_key(0);
+	struct trace_key_t key = get_trace_key(0, true);
 	struct trace_info_t *trace = trace_map__lookup(&key);
 	if (trace && trace->peer_fd != 0 && trace->peer_fd != (__u32)fd) {
 		struct socket_info_t sk_info = { 0 };
@@ -2085,7 +2098,7 @@ static __inline void trace_io_event_common(void *ctx,
 	}
 
 	__u32 timeout = trace_conf->go_tracing_timeout;
-	struct trace_key_t trace_key = get_trace_key(timeout);
+	struct trace_key_t trace_key = get_trace_key(timeout, false);
 	struct trace_info_t *trace_info_ptr = trace_map__lookup(&trace_key);
 	if (trace_info_ptr) {
 		trace_id = trace_info_ptr->thread_trace_id;

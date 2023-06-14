@@ -23,14 +23,16 @@ pod_service                , K8s 容器服务               ,
 pod_group                  , K8s 工作负载               ,
 pod                        , K8s 容器 POD               ,
 service                    , 服务                       ,
-auto_instance_type         , 类型-容器 POD 优先         , `auto_intance`实例对应的类型。
-auto_instance              , 资源-容器 POD 优先         , IP 对应的实例。
+auto_instance_type         , 类型-容器 POD 优先         , `auto_instance`实例对应的类型。
+auto_instance              , 资源-容器 POD 优先         , IP 对应的实例，实例为IP时，auto_instance_id显示为子网ID。
 auto_service_type          , 类型-服务优先              , `auto_service`实例对应的类型。
-auto_service               , 资源-服务优先              , 在`auto_instance`基础上，将容器服务的 ClusterIP 与工作负载聚合为服务。
+auto_service               , 资源-服务优先              , 在`auto_instance`基础上，将容器服务的 ClusterIP 与工作负载聚合为服务，实例为IP时，auto_service_id显示为子网ID。
 gprocess                   , 进程                       ,
 
 attribute                  , Attribute                  , 事件特有属性
 k8s.label                  , K8s Label                  ,
+k8s.annotation             , K8s Annotation             ,
+k8s.env                    , K8s Env                    ,
 cloud.tag                  , Cloud Tag                  ,
 os.app                     , OS APP                     ,
 

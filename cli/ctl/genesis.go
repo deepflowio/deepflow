@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -61,6 +61,15 @@ func RegisterGenesisCommand() *cobra.Command {
 	}
 	k8sInfo.Flags().StringVarP(&k8sType, "type", "t", "", "k8s info resource type: '*version.Info | *v1.Pod | *v1.ConfigMap | *v1.Namespace | \n*v1.Service | *v1.Deployment | *v1.DaemonSet | *v1.ReplicaSet | *v1beta1.Ingress'")
 
+	prometheusInfo := &cobra.Command{
+		Use:     "prometheus",
+		Short:   "genesis prometheus info",
+		Example: "deepflow-ctl genesis prometheus cluster_id",
+		Run: func(cmd *cobra.Command, args []string) {
+			prometheusInfo(cmd, args)
+		},
+	}
+
 	agentInfo := &cobra.Command{
 		Use:     "agent",
 		Short:   "genesis agent info",
@@ -73,6 +82,7 @@ func RegisterGenesisCommand() *cobra.Command {
 	genesis.AddCommand(syncInfo)
 	genesis.AddCommand(k8sInfo)
 	genesis.AddCommand(agentInfo)
+	genesis.AddCommand(prometheusInfo)
 	return genesis
 }
 
@@ -145,7 +155,7 @@ func k8sInfo(cmd *cobra.Command, args []string, resType string) {
 		}
 		for i := range typeData.MustArray() {
 			tDataStr := typeData.GetIndex(i).MustString()
-			formatStr, err := common.JsonFormat(tDataStr)
+			formatStr, err := common.JsonFormat([]byte(tDataStr))
 			if err != nil {
 				fmt.Println("format json str faild: " + err.Error())
 				continue
@@ -156,7 +166,7 @@ func k8sInfo(cmd *cobra.Command, args []string, resType string) {
 	}
 	for _, v := range respData.MustMap() {
 		for _, item := range v.([]interface{}) {
-			formatStr, err := common.JsonFormat(item.(string))
+			formatStr, err := common.JsonFormat([]byte(item.(string)))
 			if err != nil {
 				fmt.Println("format json str faild: " + err.Error())
 				continue
@@ -286,7 +296,7 @@ func tableIp(response *simplejson.Json, table *tablewriter.Table) {
 }
 
 func tableVinterface(response *simplejson.Json, table *tablewriter.Table) {
-	table.SetHeader([]string{"MAC", "NAME", "TAP_MAC", "TAP_NAME", "DEVICE_TYPE", "DEVICE_NAME", "HOST_IP", "VTAP_ID", "CLUSTER_ID", "IP"})
+	table.SetHeader([]string{"MAC", "NAME", "TAP_MAC", "TAP_NAME", "DEVICE_TYPE", "DEVICE_NAME", "HOST_IP", "VTAP_ID", "CLUSTER_ID", "NETNS_ID", "IP"})
 
 	tableItems := [][]string{}
 	for i := range response.Get("DATA").MustArray() {
@@ -306,6 +316,7 @@ func tableVinterface(response *simplejson.Json, table *tablewriter.Table) {
 			tableItem = append(tableItem, data.Get("HOST_IP").MustString())
 			tableItem = append(tableItem, strconv.Itoa(data.Get("VTAP_ID").MustInt()))
 			tableItem = append(tableItem, data.Get("KUBERNETES_CLUSTER_ID").MustString())
+			tableItem = append(tableItem, strconv.Itoa(data.Get("NETNS_ID").MustInt()))
 			tableItem = append(tableItem, ip)
 			tableItems = append(tableItems, tableItem)
 		}
@@ -316,7 +327,7 @@ func tableVinterface(response *simplejson.Json, table *tablewriter.Table) {
 }
 
 func tableProcess(response *simplejson.Json, table *tablewriter.Table) {
-	table.SetHeader([]string{"PID", "VTAP_ID", "NAME", "PROCESS_NAME", "USER", "START_TIME"})
+	table.SetHeader([]string{"PID", "VTAP_ID", "NETNS_ID", "NAME", "PROCESS_NAME", "USER", "START_TIME"})
 
 	tableItems := [][]string{}
 	for i := range response.Get("DATA").MustArray() {
@@ -324,6 +335,7 @@ func tableProcess(response *simplejson.Json, table *tablewriter.Table) {
 		tableItem := []string{}
 		tableItem = append(tableItem, strconv.Itoa(data.Get("PID").MustInt()))
 		tableItem = append(tableItem, strconv.Itoa(data.Get("VTAP_ID").MustInt()))
+		tableItem = append(tableItem, strconv.Itoa(data.Get("NETNS_ID").MustInt()))
 		tableItem = append(tableItem, data.Get("NAME").MustString())
 		tableItem = append(tableItem, data.Get("PROCESS_NAME").MustString())
 		tableItem = append(tableItem, data.Get("USER").MustString())
@@ -348,6 +360,37 @@ func agentInfo(cmd *cobra.Command, args []string) {
 	}
 
 	url := fmt.Sprintf("http://%s:%d/v1/agent-stats/%s/", podIP, server.SvcPort, args[0])
+	response, err := common.CURLPerform("GET", url, nil, "")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	responseByte, err := response.MarshalJSON()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	var str bytes.Buffer
+	err = json.Indent(&str, responseByte, "", "    ")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	fmt.Println(str.String())
+}
+
+func prometheusInfo(cmd *cobra.Command, args []string) {
+	if len(args) == 0 {
+		fmt.Fprintf(os.Stderr, "must specify cluster_id.\nExample: %s\n", cmd.Example)
+		return
+	}
+
+	server := common.GetServerInfo(cmd)
+	url := fmt.Sprintf("http://%s:%d/v1/prometheus-info/%s/", server.IP, server.Port, args[0])
+
 	response, err := common.CURLPerform("GET", url, nil, "")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

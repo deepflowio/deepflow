@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,9 +18,9 @@ package baidubce
 
 import (
 	"strings"
+	"time"
 
 	"github.com/baidubce/bce-sdk-go/services/vpc"
-
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 )
@@ -41,11 +41,14 @@ func (b *BaiduBce) getNatGateways(region model.Region, vpcIdToLcuuid map[string]
 	results := make([]*vpc.ListNatGatewayResult, 0)
 	for {
 		args.Marker = marker
+		startTime := time.Now()
 		result, err := vpcClient.ListNatGateway(args)
 		if err != nil {
 			log.Error(err)
 			return nil, nil, nil, err
 		}
+		b.cloudStatsd.APICost["ListNatGateway"] = append(b.cloudStatsd.APICost["ListNatGateway"], int(time.Now().Sub(startTime).Milliseconds()))
+		b.cloudStatsd.APICount["ListNatGateway"] = append(b.cloudStatsd.APICount["ListNatGateway"], len(result.Nats))
 		results = append(results, result)
 		if !result.IsTruncated {
 			break

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -180,9 +180,9 @@ const (
 // Columns列和WriteBlock的列需要按顺序一一对应
 func AppTrafficColumns() []*ckdb.Column {
 	columns := []*ckdb.Column{}
-	columns = append(columns, ckdb.NewColumn("request", ckdb.UInt32).SetComment("累计请求次数").SetIndex(ckdb.IndexNone))
-	columns = append(columns, ckdb.NewColumn("response", ckdb.UInt32).SetComment("累计响应次数").SetIndex(ckdb.IndexNone))
-	columns = append(columns, ckdb.NewColumn("direction_score", ckdb.UInt8).SetComment("for correcting direction").SetIndex(ckdb.IndexNone))
+	columns = append(columns, ckdb.NewColumn("request", ckdb.UInt32).SetComment("累计请求次数"))
+	columns = append(columns, ckdb.NewColumn("response", ckdb.UInt32).SetComment("累计响应次数"))
+	columns = append(columns, ckdb.NewColumn("direction_score", ckdb.UInt8).SetComment("for correcting direction").SetIndex(ckdb.IndexMinmax))
 	return columns
 }
 
@@ -240,7 +240,7 @@ const (
 // Columns列和WriteBlock的列需要按顺序一一对应
 func AppLatencyColumns() []*ckdb.Column {
 	columns := []*ckdb.Column{}
-	columns = append(columns, ckdb.NewColumn("rrt_max", ckdb.UInt32).SetComment("所有请求响应时延最大值(us)").SetIndex(ckdb.IndexNone))
+	columns = append(columns, ckdb.NewColumn("rrt_max", ckdb.UInt32).SetComment("所有请求响应时延最大值(us)"))
 	columns = append(columns, ckdb.NewColumn("rrt_sum", ckdb.Float64).SetComment("累计所有请求响应时延(us)"))
 	columns = append(columns, ckdb.NewColumn("rrt_count", ckdb.UInt64).SetComment("请求响应时延计算次数"))
 	return columns
@@ -309,9 +309,6 @@ func AppAnomalyColumns() []*ckdb.Column {
 			APPANOMALY_TIMEOUT:      {"timeout", "请求超时次数"},
 			APPANOMALY_ERROR:        {"error", "异常次数"},
 		}, ckdb.UInt64)
-	for _, v := range columns {
-		v.SetIndex(ckdb.IndexNone)
-	}
 	return columns
 }
 

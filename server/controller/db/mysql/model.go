@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -83,6 +83,8 @@ type Process struct {
 	UserName       string    `gorm:"column:user_name;type:varchar(256);default:''" json:"USER_NAME"`
 	StartTime      time.Time `gorm:"autoCreateTime;column:start_time;type:datetime" json:"START_TIME"`
 	OSAPPTags      string    `gorm:"column:os_app_tags;type:text" json:"OS_APP_TAGS"`
+	ContainerID    string    `gorm:"column:container_id;type:char(64);default:''" json:"CONTAINER_ID"`
+	NetnsID        uint32    `gorm:"column:netns_id;type:int unsigned;default:0" json:"NETNS_ID"` // used to associate processes with cloud and container resources
 	SubDomain      string    `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
 	Domain         string    `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN"`
 }
@@ -355,8 +357,9 @@ type VInterface struct {
 	TapMac       string    `gorm:"column:tap_mac;type:char(32);default:''" json:"TAP_MAC"`
 	NetworkID    int       `gorm:"column:subnetid;type:int;default:0" json:"SUBNETID"` // vl2 id
 	VlanTag      int       `gorm:"column:vlantag;type:int;default:0" json:"VLANTAG"`
-	DeviceType   int       `gorm:"column:devicetype;type:int;default:null" json:"DEVICETYPE"` // Type 0.unknown 1.vm 2.vgw 3.third-party-device 4.vmwaf 5.NSP-vgateway 6.host-device 7.network-device 9.DHCP-port 10.pod 11.pod_service 12. redis_instance 13. rds_instance 14. pod_node 15. load_balance 16. nat_gateway
-	DeviceID     int       `gorm:"column:deviceid;type:int;default:null" json:"DEVICEID"`     // unknown: Senseless ID, vm: vm ID, vgw/NSP-vgateway: vnet ID, third-party-device: third_party_device ID, vmwaf: vmwaf ID, host-device: host_device ID, network-device: network_device ID
+	DeviceType   int       `gorm:"column:devicetype;type:int;default:null" json:"DEVICETYPE"`   // Type 0.unknown 1.vm 2.vgw 3.third-party-device 4.vmwaf 5.NSP-vgateway 6.host-device 7.network-device 9.DHCP-port 10.pod 11.pod_service 12. redis_instance 13. rds_instance 14. pod_node 15. load_balance 16. nat_gateway
+	DeviceID     int       `gorm:"column:deviceid;type:int;default:null" json:"DEVICEID"`       // unknown: Senseless ID, vm: vm ID, vgw/NSP-vgateway: vnet ID, third-party-device: third_party_device ID, vmwaf: vmwaf ID, host-device: host_device ID, network-device: network_device ID
+	NetnsID      uint32    `gorm:"column:netns_id;type:int unsigned;default:0" json:"NETNS_ID"` // used to associate processes with cloud and container resources
 	SubDomain    string    `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
 	Domain       string    `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
 	Region       string    `gorm:"column:region;type:char(64);default:''" json:"REGION"`
@@ -703,7 +706,8 @@ type PodService struct {
 	Base             `gorm:"embedded"`
 	SoftDeleteBase   `gorm:"embedded"`
 	Name             string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
-	Label            string `gorm:"column:label;type:text;default:''" json:"LABEL"` // separated by ,
+	Label            string `gorm:"column:label;type:text;default:''" json:"LABEL"`           // separated by ,
+	Annotation       string `gorm:"column:annotation;type:text;default:''" json:"ANNOTATION"` // separated by ,
 	Alias            string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS"`
 	Type             int    `gorm:"column:type;type:int;default:null" json:"TYPE"`        // 1: ClusterIP 2: NodePort
 	Selector         string `gorm:"column:selector;type:text;default:''" json:"SELECTOR"` // separated by ,
@@ -775,13 +779,31 @@ func (PodReplicaSet) TableName() string {
 	return "pod_rs"
 }
 
+type PrometheusTarget struct {
+	Base           `gorm:"embedded"`
+	SoftDeleteBase `gorm:"embedded"`
+	Instance       string `gorm:"column:instance;type:varchar(255);default:''" json:"INSTANCE"`
+	Job            string `gorm:"column:job;type:varchar(255);default:''" json:"JOB"`
+	ScrapeURL      string `gorm:"column:scrape_url;type:varchar(2083);default:''" json:"SCRAPE_URL"`
+	OtherLabels    string `gorm:"column:other_labels;type:text;default:''" json:"OTHER_LABELS"` // separated by ,
+	SubDomain      string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
+	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
+}
+
+func (PrometheusTarget) TableName() string {
+	return "prometheus_target"
+}
+
 type Pod struct {
 	Base            `gorm:"embedded"`
 	SoftDeleteBase  `gorm:"embedded"`
 	Name            string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
 	Alias           string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS"`
-	State           int    `gorm:"column:state;type:int;not null" json:"STATE"`    // 0.Exception 1.Running
-	Label           string `gorm:"column:label;type:text;default:''" json:"LABEL"` // separated by ,
+	State           int    `gorm:"column:state;type:int;not null" json:"STATE"`                    // 0.Exception 1.Running
+	Label           string `gorm:"column:label;type:text;default:''" json:"LABEL"`                 // separated by ,
+	Annotation      string `gorm:"column:annotation;type:text;default:''" json:"ANNOTATION"`       // separated by ,
+	ENV             string `gorm:"column:env;type:text;default:''" json:"ENV"`                     // separated by ,
+	ContainerIDs    string `gorm:"column:container_ids;type:text;default:''" json:"CONTAINER_IDS"` // separated by ,
 	PodReplicaSetID int    `gorm:"column:pod_rs_id;type:int;default:null" json:"POD_RS_ID"`
 	PodGroupID      int    `gorm:"column:pod_group_id;type:int;default:null" json:"POD_GROUP_ID"`
 	PodNamespaceID  int    `gorm:"column:pod_namespace_id;type:int;default:null" json:"POD_NAMESPACE_ID"`
@@ -1056,6 +1078,7 @@ type VTapGroupConfiguration struct {
 	HTTPLogXRequestID             *string `gorm:"column:http_log_x_request_id;type:char(64);default:null" json:"HTTP_LOG_X_REQUEST_ID"`
 	ExternalAgentHTTPProxyEnabled *int    `gorm:"column:external_agent_http_proxy_enabled;type:tinyint(1);default:null" json:"EXTERNAL_AGENT_HTTP_PROXY_ENABLED"`
 	ExternalAgentHTTPProxyPort    *int    `gorm:"column:external_agent_http_proxy_port;type:int;default:null" json:"EXTERNAL_AGENT_HTTP_PROXY_PORT"`
+	PrometheusHttpAPIAddress      *string `gorm:"column:prometheus_http_api_address;type:string;default:null" json:"PROMETHEUS_HTTP_API_ADDRESS"` // ip:port
 	AnalyzerPort                  *int    `gorm:"column:analyzer_port;type:int;default:null" json:"ANALYZER_PORT"`
 	ProxyControllerPort           *int    `gorm:"column:proxy_controller_port;type:int;default:null" json:"PROXY_CONTROLLER_PORT"`
 	ProxyControllerIP             *string `gorm:"column:proxy_controller_ip;type:varchar(512);default:null" json:"PROXY_CONTROLLER_IP"`
@@ -1127,6 +1150,7 @@ type RVTapGroupConfiguration struct {
 	HTTPLogXRequestID             string `gorm:"column:http_log_x_request_id;type:char(64);default:null" json:"HTTP_LOG_X_REQUEST_ID"`
 	ExternalAgentHTTPProxyEnabled int    `gorm:"column:external_agent_http_proxy_enabled;type:tinyint(1);default:null" json:"EXTERNAL_AGENT_HTTP_PROXY_ENABLED"`
 	ExternalAgentHTTPProxyPort    int    `gorm:"column:external_agent_http_proxy_port;type:int;default:null" json:"EXTERNAL_AGENT_HTTP_PROXY_PORT"`
+	PrometheusHttpAPIAddress      string `gorm:"column:prometheus_http_api_address;type:string;default:null" json:"PROMETHEUS_HTTP_API_ADDRESS"` // ip:port
 	AnalyzerPort                  int    `gorm:"column:analyzer_port;type:int;default:null" json:"ANALYZER_PORT"`
 	ProxyControllerPort           int    `gorm:"column:proxy_controller_port;type:int;default:null" json:"PROXY_CONTROLLER_PORT"`
 	ProxyControllerIP             string `gorm:"column:proxy_controller_ip;type:varchar(512);default:null" json:"PROXY_CONTROLLER_IP"`

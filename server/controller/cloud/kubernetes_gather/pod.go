@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,11 +18,13 @@ package kubernetes_gather
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/bitly/go-simplejson"
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
+	"github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/expand"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	uuid "github.com/satori/go.uuid"
@@ -46,6 +48,10 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, e
 			log.Errorf("pod initialization simplejson error: (%s)", pErr.Error())
 			return
 		}
+
+		containers := pData.GetPath("spec", "containers")
+		envString := expand.GetPodENV(containers, k.customTagLenMax)
+
 		metaData, ok := pData.CheckGet("metadata")
 		if !ok {
 			log.Info("pod metadata not found")
@@ -168,14 +174,34 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, e
 				labels[exK] = exV
 			}
 		}
-		labelSlice := cloudcommon.StringInterfaceMapKVs(labels, ":")
+		labelSlice := cloudcommon.StringInterfaceMapKVs(labels, ":", 0)
 		labelString := strings.Join(labelSlice, ", ")
+
+		annotations := metaData.Get("annotations")
+
+		annotationString := expand.GetAnnotation(annotations, k.customTagLenMax)
+
+		containerIDs := []string{}
+		containerStatuses := pData.GetPath("status", "containerStatuses")
+		for c := range containerStatuses.MustArray() {
+			containerID := containerStatuses.GetIndex(c).Get("containerID").MustString()
+			cIndex := strings.Index(containerID, "://")
+			if cIndex != -1 {
+				containerID = containerID[cIndex+3:]
+			}
+			containerIDs = append(containerIDs, containerID)
+		}
+		sort.Strings(containerIDs)
+
 		pod := model.Pod{
 			Lcuuid:              podLcuuid,
 			Name:                name,
 			State:               status,
 			VPCLcuuid:           k.VPCUuid,
+			ENV:                 envString,
 			Label:               labelString,
+			Annotation:          annotationString,
+			ContainerIDs:        strings.Join(containerIDs, ", "),
 			PodReplicaSetLcuuid: podRSLcuuid,
 			PodNodeLcuuid:       nodeLcuuid,
 			PodGroupLcuuid:      podGroupLcuuid,

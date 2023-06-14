@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -76,7 +76,11 @@ func (c *TagRecorder) UpdateChDictionary() {
 		for _, subset := range subsets {
 			for _, address := range subset.Addresses {
 				clickHouseCfg := c.cfg.ClickHouseCfg
-				clickHouseCfg.Host = address.IP
+				if strings.Contains(address.IP, ":") {
+					clickHouseCfg.Host = fmt.Sprintf("[%s]", address.IP)
+				} else {
+					clickHouseCfg.Host = address.IP
+				}
 				for _, port := range subset.Ports {
 					if port.Name == "tcp-port" {
 						clickHouseCfg.Port = uint32(port.Port)
@@ -167,6 +171,19 @@ func (c *TagRecorder) UpdateChDictionary() {
 							CH_DICTIONARY_GPROCESS,
 							CH_DICTIONARY_POD_SERVICE_K8S_LABEL,
 							CH_DICTIONARY_POD_SERVICE_K8S_LABELS,
+
+							CH_DICTIONARY_POD_K8S_ANNOTATION,
+							CH_DICTIONARY_POD_K8S_ANNOTATIONS,
+							CH_DICTIONARY_POD_SERVICE_K8S_ANNOTATION,
+							CH_DICTIONARY_POD_SERVICE_K8S_ANNOTATIONS,
+							CH_DICTIONARY_POD_K8S_ENV,
+							CH_DICTIONARY_POD_K8S_ENVS,
+							CH_TARGET_LABEL,
+							CH_APP_LABEL,
+							CH_PROMETHEUS_LABEL_NAME,
+							CH_PROMETHEUS_METRIC_NAME,
+							CH_PROMETHEUS_METRIC_APP_LABEL_LAYOUT,
+							CH_PROMETHEUS_TARGET_LABEL_LAYOUT,
 						)
 						chDicts := mapset.NewSet()
 						for _, dictionary := range dictionaries {

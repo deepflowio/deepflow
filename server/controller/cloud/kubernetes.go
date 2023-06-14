@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ func (c *Cloud) getKubernetesData() model.Resource {
 	k8sGatherTask, ok := c.kubernetesGatherTaskMap[c.basicInfo.Lcuuid]
 	if !ok {
 		errMSG := fmt.Sprintf("domain (%s) no related kubernetes_gather_task", c.basicInfo.Name)
-		log.Error(errMSG)
+		log.Warning(errMSG)
 		return model.Resource{
 			ErrorMessage: errMSG,
 			ErrorState:   common.RESOURCE_STATE_CODE_EXCEPTION,
@@ -124,6 +124,7 @@ func (c *Cloud) getKubernetesData() model.Resource {
 		PodServicePorts:        kubernetesGatherResource.PodServicePorts,
 		PodIngressRules:        kubernetesGatherResource.PodIngressRules,
 		PodIngressRuleBackends: kubernetesGatherResource.PodIngressRuleBackends,
+		PrometheusTargets:      kubernetesGatherResource.PrometheusTargets,
 		IPs:                    ips,
 		VMs:                    vms,
 		Regions:                regions,

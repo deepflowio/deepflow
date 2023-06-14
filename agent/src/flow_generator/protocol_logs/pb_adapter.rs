@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@ pub struct TraceInfo {
     pub parent_span_id: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct KeyVal {
     pub key: String,
     pub val: String,
@@ -56,6 +56,7 @@ pub struct ExtendedInfo {
     pub x_request_id: Option<String>,
     pub user_agent: Option<String>,
     pub referer: Option<String>,
+    pub protocol_str: Option<String>,
     pub attributes: Option<Vec<KeyVal>>,
 }
 
@@ -151,6 +152,9 @@ impl L7ProtocolSendLog {
             }
             if let Some(referer) = ext.referer {
                 ext_info.http_referer = referer;
+            }
+            if let Some(proto_str) = ext.protocol_str {
+                ext_info.protocol_str = proto_str;
             }
             if let Some(attr) = ext.attributes {
                 for kv in attr.into_iter() {

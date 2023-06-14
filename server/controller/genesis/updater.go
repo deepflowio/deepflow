@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,17 +17,22 @@
 package genesis
 
 import (
+	"bytes"
+	"compress/zlib"
 	"context"
 	"fmt"
 	"net"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"inet.af/netaddr"
 
+	"github.com/bitly/go-simplejson"
 	tridentcommon "github.com/deepflowio/deepflow/message/common"
+	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	genesiscommon "github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/config"
@@ -272,6 +277,7 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info VIFRPCMessage, peer str
 			// 忽略workload类型
 			continue
 		}
+		vIF.NetnsID = iface.GetNetnsId()
 		vIF.HostIP = peer
 		vIF.LastSeen = epoch
 		vIF.VtapID = vtapID
@@ -440,10 +446,12 @@ func (v *GenesisSyncRpcUpdater) ParseProcessInfo(info VIFRPCMessage, vtapID uint
 		processes = append(processes, model.GenesisProcess{
 			Lcuuid:      common.GetUUID(strconv.Itoa(int(pID))+strconv.Itoa(int(vtapID)), uuid.Nil),
 			PID:         pID,
+			NetnsID:     p.GetNetnsId(),
 			Name:        p.GetName(),
 			ProcessName: p.GetProcessName(),
 			CMDLine:     p.GetCmdline(),
 			User:        p.GetUser(),
+			ContainerID: p.GetContainerId(),
 			VtapID:      vtapID,
 			OSAPPTags:   osAppTagString,
 			StartTime:   startTime,
@@ -783,11 +791,11 @@ func (v *GenesisSyncRpcUpdater) run() {
 		genesisSyncDataOper := GenesisSyncDataOperation{}
 		info := v.outputQueue.Get().(VIFRPCMessage)
 		if info.msgType == genesiscommon.TYPE_EXIT {
-			log.Warningf("from (%s) vtap_id (%v) type (%v)", info.peer, info.vtapID, info.msgType)
+			log.Warningf("sync from (%s) vtap_id (%v) type (%v)", info.peer, info.vtapID, info.msgType)
 			continue
 		}
 
-		log.Debugf("received (%s) vtap_id (%v) type (%v) received (%s)", info.peer, info.vtapID, info.msgType, info.message)
+		log.Debugf("sync received (%s) vtap_id (%v) type (%v) received (%s)", info.peer, info.vtapID, info.msgType, info.message)
 
 		if info.msgType == genesiscommon.TYPE_RENEW {
 			if info.vtapID != 0 {
@@ -846,10 +854,10 @@ func (k *KubernetesRpcUpdater) run() {
 	for {
 		info := k.outputQueue.Get().(K8SRPCMessage)
 		if info.msgType == genesiscommon.TYPE_EXIT {
-			log.Warningf("from (%s) vtap_id (%v) type (%v)", info.peer, info.vtapID, info.msgType)
+			log.Warningf("k8s from (%s) vtap_id (%v) type (%v)", info.peer, info.vtapID, info.msgType)
 			break
 		}
-		log.Debugf("from %s vtap_id %v received cluster_id %s version %s", info.peer, info.vtapID, info.message.GetClusterId(), info.message.GetVersion())
+		log.Debugf("k8s from %s vtap_id %v received cluster_id %s version %s", info.peer, info.vtapID, info.message.GetClusterId(), info.message.GetVersion())
 		// 更新和保存内存数据
 		k8sInfo := KubernetesInfo{
 			Epoch:     time.Now(),
@@ -870,5 +878,124 @@ func (k *KubernetesRpcUpdater) Start() {
 func (k *KubernetesRpcUpdater) Stop() {
 	if k.kCancel != nil {
 		k.kCancel()
+	}
+}
+
+type PrometheusRpcUpdater struct {
+	kCtx        context.Context
+	kCancel     context.CancelFunc
+	storage     *PrometheusStorage
+	outputQueue queue.QueueReader
+}
+
+func NewPrometheuspInfoRpcUpdater(storage *PrometheusStorage, queue queue.QueueReader, ctx context.Context) *PrometheusRpcUpdater {
+	pCtx, pCancel := context.WithCancel(ctx)
+	return &PrometheusRpcUpdater{
+		kCtx:        pCtx,
+		kCancel:     pCancel,
+		storage:     storage,
+		outputQueue: queue,
+	}
+}
+
+func (p *PrometheusRpcUpdater) ParsePrometheusEntries(info PrometheusMessage) ([]cloudmodel.PrometheusTarget, error) {
+	result := []cloudmodel.PrometheusTarget{}
+	entries := info.message.GetEntries()
+	for _, e := range entries {
+		eInfo := e.GetCompressedInfo()
+		reader := bytes.NewReader(eInfo)
+		var out bytes.Buffer
+		r, err := zlib.NewReader(reader)
+		if err != nil {
+			log.Warningf("zlib decompress error: %s", err.Error())
+			return []cloudmodel.PrometheusTarget{}, err
+		}
+		_, err = out.ReadFrom(r)
+		if err != nil {
+			log.Warningf("read decompress error: %s", err.Error())
+			return []cloudmodel.PrometheusTarget{}, err
+		}
+		entryJson, err := simplejson.NewJson(out.Bytes())
+		if err != nil {
+			log.Warningf("marshal json error: %s", err.Error())
+			return []cloudmodel.PrometheusTarget{}, err
+		}
+		status := entryJson.Get("status").MustString()
+		if status != "success" {
+			log.Warningf("prometheus target api status (%s)", status)
+			return []cloudmodel.PrometheusTarget{}, err
+		}
+		targets := entryJson.GetPath("data", "activeTargets")
+		for t := range targets.MustArray() {
+			target := targets.GetIndex(t)
+			scrapeUrl := target.Get("scrapeUrl").MustString()
+			labels := target.Get("labels")
+			job := labels.Get("job").MustString()
+			instance := labels.Get("instance").MustString()
+			labelsMap := labels.MustMap()
+			delete(labelsMap, "job")
+			delete(labelsMap, "instance")
+			keys := []string{}
+			labelsSlice := []string{}
+			for key := range labelsMap {
+				keys = append(keys, key)
+			}
+			sort.Strings(keys)
+			for _, k := range keys {
+				newString := k + ":" + labelsMap[k].(string)
+				labelsSlice = append(labelsSlice, newString)
+			}
+			otherLabelsString := strings.Join(labelsSlice, ", ")
+
+			result = append(result, cloudmodel.PrometheusTarget{
+				Lcuuid:      common.GetUUID(instance+job+otherLabelsString, uuid.Nil),
+				ScrapeURL:   scrapeUrl,
+				Job:         job,
+				Instance:    instance,
+				OtherLabels: otherLabelsString,
+			})
+		}
+	}
+
+	return result, nil
+}
+
+func (p *PrometheusRpcUpdater) run() {
+	for {
+		info := p.outputQueue.Get().(PrometheusMessage)
+		if info.msgType == genesiscommon.TYPE_EXIT {
+			log.Warningf("prometheus from (%s) vtap_id (%v) type (%v)", info.peer, info.vtapID, info.msgType)
+			break
+		}
+		// 更新和保存内存数据
+		clusterID := info.message.GetClusterId()
+		version := info.message.GetVersion()
+		entries, err := p.ParsePrometheusEntries(info)
+		if err != nil {
+			log.Warningf("prometheus from vtap_id %v received cluster_id %s version %s parse failed (%s)", info.vtapID, clusterID, version, err.Error())
+			continue
+		}
+
+		log.Debugf("prometheus from %s vtap_id %v received cluster_id %s version %s", info.peer, info.vtapID, clusterID, version)
+
+		prometheusInfo := PrometheusInfo{
+			ClusterID: clusterID,
+			Version:   version,
+			Entries:   entries,
+			Epoch:     time.Now(),
+			ErrorMSG:  info.message.GetErrorMsg(),
+			VtapID:    info.message.GetVtapId(),
+		}
+		p.storage.Add(prometheusInfo)
+	}
+}
+
+func (p *PrometheusRpcUpdater) Start() {
+	go p.run()
+}
+
+func (p *PrometheusRpcUpdater) Stop() {
+	if p.kCancel != nil {
+		p.kCancel()
 	}
 }

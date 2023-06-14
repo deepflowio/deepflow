@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,6 +42,7 @@ import (
 	resourcerouter "github.com/deepflowio/deepflow/server/controller/http/router/resource"
 	"github.com/deepflowio/deepflow/server/controller/manager"
 	"github.com/deepflowio/deepflow/server/controller/monitor"
+	"github.com/deepflowio/deepflow/server/controller/prometheus"
 	recorderdb "github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/report"
 	"github.com/deepflowio/deepflow/server/controller/statsd"
@@ -152,6 +153,13 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 	// 启动trisolaris
 	t := trisolaris.NewTrisolaris(&cfg.TrisolarisCfg, mysql.Db)
 	go t.Start()
+
+	prometheus := prometheus.GetSingleton()
+	prometheus.SynchronizerCache.Start(ctx)
+	prometheus.Encoder.Init(ctx, &cfg.PrometheusCfg)
+	if isMasterController {
+		prometheus.Encoder.Start()
+	}
 
 	router.SetInitStageForHealthChecker("TagRecorder init")
 	tr := tagrecorder.NewTagRecorder(*cfg, ctx)
