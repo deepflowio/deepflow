@@ -172,7 +172,7 @@ profiler: .profiler
                 cd samples/rust/socket-tracer/ && cargo build --release --target x86_64-unknown-linux-musl && cd ../../; \
 		echo "  samples/rust/socket-tracer/target/x86_64-unknown-linux-musl/release/socket_tracer"; \
             else \
-                cd samples/rust/socket-tracer/ && cargo build --release && cd ../../; \
+                cd samples/rust/socket-tracer/ && RUSTFLAGS='-D warnings -C force-frame-pointers=yes' && cargo build --release && cd ../../; \
                 echo "  samples/rust/socket-tracer/target/release/socket_tracer"; \
 	    fi; \
         else \
@@ -201,7 +201,7 @@ profiler: .profiler
                 cd samples/rust/profiler/ && cargo build --release --target x86_64-unknown-linux-musl && cd ../../; \
                 echo "  samples/rust/profiler/target/x86_64-unknown-linux-musl/release/profiler"; \
 	    else \
-                cd samples/rust/profiler/ && cargo build --release && cd ../../; \
+                cd samples/rust/profiler/ && RUSTFLAGS='-D warnings -C force-frame-pointers=yes' && cargo build --release && cd ../../; \
                 echo "  samples/rust/profiler/target/release/profiler"; \
 	    fi; \
         else \
