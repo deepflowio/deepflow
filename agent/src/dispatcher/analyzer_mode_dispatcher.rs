@@ -279,6 +279,7 @@ impl AnalyzerModeDispatcher {
                                 continue;
                             }
                             Err(queue::Error::Terminated(..)) => break,
+                            Err(queue::Error::BatchTooLarge(_)) => unreachable!(),
                         }
 
                         for mut packet in batch.drain(..) {
@@ -421,6 +422,7 @@ impl AnalyzerModeDispatcher {
                             Ok(_) => {}
                             Err(queue::Error::Timeout) => continue,
                             Err(queue::Error::Terminated(..)) => break,
+                            Err(queue::Error::BatchTooLarge(_)) => unreachable!(),
                         }
 
                         for (tap_type, meta_packet) in batch.drain(..) {
