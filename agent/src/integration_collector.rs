@@ -42,25 +42,36 @@ use tokio::{
     time,
 };
 
-use crate::common::flow::{FlowPerfStats, L7PerfStats, SignalSource};
-use crate::common::lookup_key::LookupKey;
-use crate::common::{TaggedFlow, Timestamp};
-use crate::exception::ExceptionHandler;
-use crate::flow_generator::protocol_logs::L7ResponseStatus;
-use crate::metric::document::TapSide;
-use crate::policy::PolicyGetter;
-
-use public::counter::{Counter, CounterType, CounterValue, OwnedCountable};
-use public::enums::{EthernetType, L4Protocol, TapType};
-use public::l7_protocol::L7Protocol;
-use public::proto::integration::opentelemetry::proto::common::v1::any_value::Value::IntValue;
-use public::proto::integration::opentelemetry::proto::trace::v1::Span;
-use public::proto::integration::opentelemetry::proto::{
-    common::v1::{any_value::Value::StringValue, AnyValue, KeyValue},
-    trace::v1::{span::SpanKind, TracesData},
+use crate::{
+    common::{
+        flow::{FlowPerfStats, L7PerfStats, SignalSource},
+        lookup_key::LookupKey,
+        TaggedFlow, Timestamp,
+    },
+    exception::ExceptionHandler,
+    flow_generator::protocol_logs::L7ResponseStatus,
+    metric::document::TapSide,
+    policy::PolicyGetter,
 };
-use public::proto::{metric, trident::Exception};
-use public::queue::{DebugSender, Error};
+
+use public::{
+    counter::{Counter, CounterType, CounterValue, OwnedCountable},
+    enums::{EthernetType, L4Protocol, TapType},
+    l7_protocol::L7Protocol,
+    proto::{
+        integration::opentelemetry::proto::{
+            common::v1::{
+                any_value::Value::{IntValue, StringValue},
+                AnyValue, KeyValue,
+            },
+            trace::v1::{span::SpanKind, Span, TracesData},
+        },
+        metric,
+        trident::Exception,
+    },
+    queue::{DebugSender, Error},
+    utils::net::ipv6_enabled,
+};
 
 type GenericError = Box<dyn std::error::Error + Send + Sync>;
 
@@ -861,7 +872,11 @@ impl MetricServer {
                         }
                         while let Ok(_) = rx.try_recv() {} // drain useless messages
                         let port = port.load(Ordering::Acquire);
-                        let addr = (IpAddr::from(Ipv6Addr::UNSPECIFIED), port).into();
+                        let addr = if ipv6_enabled() {
+                            (Ipv6Addr::UNSPECIFIED, port).into()
+                        } else {
+                            (Ipv4Addr::UNSPECIFIED, port).into()
+                        };
                         match Server::try_bind(&addr) {
                             Ok(s) => {
                                 monitor_port.store(port, Ordering::Release);

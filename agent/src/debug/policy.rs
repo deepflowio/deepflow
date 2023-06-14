@@ -98,6 +98,7 @@ impl PolicyDebugger {
                     return;
                 }
                 Err(Error::Timeout) => continue,
+                Err(Error::BatchTooLarge(_)) => unreachable!(),
             };
 
             if let Err(e) = send_to(&sock, conn, PolicyMessage::Context(s), serialize_conf) {
