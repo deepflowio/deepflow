@@ -44,6 +44,35 @@ get_socket_file_addr_with_check(struct task_struct *task,
 		return NULL;
 
 	struct fdtable *fdt, __fdt;
+
+	/*
+	 * Here, we consider the Kylin operating system in China,
+	 * for which we have separately compiled a BPF bytecode
+	 * that is compatible with a kernel version lower than 5.2.
+	 * In KYLIN, the value of STRUCT_FILES_PRIVATE_DATA_OFFSET
+	 * is different from other systems:
+	 *
+	 * #ifdef LINUX_VER_KYLIN
+	 * #define STRUCT_FILES_PRIVATE_DATA_OFFSET 0xc0
+	 * #else
+	 * #define STRUCT_FILES_PRIVATE_DATA_OFFSET 0xc8
+	 * #endif
+	 *
+	 * This approach is mainly designed to accommodate this sp-
+	 * ecific system (and there may be other system differences
+	 * in the future).
+	 *
+	 * For kernel versions 5.2 and above, which support BTF, we
+	 * don't need to consider kernel compatibility issues in this
+	 * section. As a general rule, for kernel versions 5.2 and
+	 * above, the BTF feature should be enabled to avoid any com-
+	 * patibility issues.
+	 *
+	 * Apart from the mentioned special offsets for systems like
+	 * Kylin, currently, all feature offsets are written to the
+	 * eBPF map, using a unified approach of both manual inference
+	 * and BTF.
+	 */
 #ifdef LINUX_VER_5_2_PLUS
 	bpf_probe_read(&fdt, sizeof(fdt),
 		       files + offset->struct_files_struct_fdt_offset);

@@ -469,8 +469,8 @@ impl EbpfCollector {
                             error. Kernel offset adapt failed. \
                             Please ensure that BTF is enabled (kernel built \
                             with CONFIG_DEBUG_INFO_BTF=y option). If the current \
-                            kernel version is low (<5.3), upgrading the Linux kernel \
-                            to 5.3+ (kernel built with CONFIG_DEBUG_INFO_BTF=y option) \
+                            kernel version is low (<5.2), upgrading the Linux kernel \
+                            to 5.2+ (kernel built with CONFIG_DEBUG_INFO_BTF=y option) \
                             can solve the problem. If it is not possible to upgrade \
                             the kernel, the kernel-devel package can be provided for \
                             developers to adapt and solve the problem."
