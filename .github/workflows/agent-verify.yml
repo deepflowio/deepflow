@@ -36,13 +36,13 @@ jobs:
       - name: verify agent
         run: |
           docker run --rm  -t  --privileged --workdir /deepflow/  -v $(pwd):"/deepflow/"  --entrypoint "bash" ghcr.io/deepflowio/rust-build:1.20 "-c" "\
-          source /opt/rh/devtoolset-8/enable && \
+          source /opt/rh/devtoolset-11/enable && \
           cp agent/docker/rust-proxy-config /usr/local/cargo/config && \
           cd  agent/src/ebpf && \
-          make clean && \
-          make rust-sample && \
-          make test && \
-          make tools && \
+          CC=musl-gcc CLANG=musl-clang make clean && \
+          CC=musl-gcc CLANG=musl-clang make rust-sample && \
+          CC=musl-gcc CLANG=musl-clang make test && \
+          CC=musl-gcc CLANG=musl-clang make tools && \
           cd ../../ && \
           RUSTFLAGS='-D warnings -C force-frame-pointers=yes' cargo check --all-targets && \
           cargo fmt --all -- --check"

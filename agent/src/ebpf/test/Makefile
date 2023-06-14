@@ -27,7 +27,7 @@ CFLAGS ?= -std=gnu99 --static -g -O2 -ffunction-sections -fdata-sections -fPIC -
 EXECS := test_symbol test_offset test_insns_cnt test_bihash test_vec
 ifeq ($(ARCH), x86_64)
 #-lbcc -lstdc++
-        LDLIBS += ../libtrace.a -lbcc_bpf -lGoReSym -lbddisasm -ldwarf -lelf -lz -lpthread -lstdc++
+        LDLIBS += ../libtrace.a -lbcc_bpf -lGoReSym -lbddisasm -ldwarf -lelf -lz -lpthread -lbcc -lstdc++
 else ifeq ($(ARCH), aarch64)
         LDLIBS += ../libtrace.a -lGoReSym -lbcc_bpf -ldwarf -lelf -lz -lpthread
 endif
