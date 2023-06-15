@@ -49,8 +49,7 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, e
 			return
 		}
 
-		containers := pData.GetPath("spec", "containers")
-		envString := expand.GetPodENV(containers, k.customTagLenMax)
+		envString := expand.GetPodENV(pData, k.customTagLenMax)
 
 		metaData, ok := pData.CheckGet("metadata")
 		if !ok {
