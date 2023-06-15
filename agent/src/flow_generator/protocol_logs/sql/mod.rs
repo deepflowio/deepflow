@@ -23,3 +23,4 @@ mod sql_check;
 pub use mysql::{MysqlHeader, MysqlInfo, MysqlLog};
 pub use postgresql::{PostgreInfo, PostgresqlLog};
 pub use redis::{decode, RedisInfo, RedisLog};
+use sql_check::trim_head_comment_and_first_upper;

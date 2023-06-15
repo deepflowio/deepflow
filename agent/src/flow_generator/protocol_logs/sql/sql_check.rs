@@ -157,7 +157,10 @@ pub(super) fn is_mysql(sql: &String) -> bool {
 
         reference: https://dev.mysql.com/doc/refman/5.6/en/comments.html
 */
-fn trim_head_comment_and_first_upper(mut sql: &str, first_word_max_len: usize) -> Option<String> {
+pub(super) fn trim_head_comment_and_first_upper(
+    mut sql: &str,
+    first_word_max_len: usize,
+) -> Option<String> {
     sql = sql.trim_start();
     // if start with /*, strip all comment block before sql string.
     while sql.starts_with("/*") {
