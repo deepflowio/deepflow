@@ -326,6 +326,10 @@ func (h *L7FlowLog) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platform
 	h.SpanId = hex.EncodeToString(l.SpanId)
 	h.ParentSpanId = hex.EncodeToString(l.ParentSpanId)
 	h.TapSide = spanKindToTapSide(l.Kind)
+	// only show data for services as 'server side'
+	if h.TapSide == zerodoc.ServerApp.String() && h.ServerPort == 0 {
+		h.ServerPort = 65535
+	}
 	h.Endpoint = l.Name
 	h.SpanKind = uint8(l.Kind)
 	h.spanKind = &h.SpanKind
