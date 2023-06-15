@@ -1242,6 +1242,8 @@ impl FlowMap {
         log_parser_config: &LogParserConfig,
         meta_packet: &mut MetaPacket,
     ) -> Option<FlowNode> {
+        // To avoid using each package to query policies that may lead to CPU increase and performance decrease,
+        // there will not be use config.capacity to limit the addition of FlowNode
         self.stats_counter.new.fetch_add(1, Ordering::Relaxed);
         let node = match meta_packet.lookup_key.proto {
             IpProtocol::Tcp => self.new_tcp_node(flow_config, log_parser_config, meta_packet),
