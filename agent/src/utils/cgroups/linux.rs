@@ -63,7 +63,6 @@ impl Cgroups {
             )));
         }
         let hier = hierarchies::auto();
-        let mount_path = hier.root().to_str().unwrap().to_string();
         let is_v2 = hier.v2();
         let cg: Cgroup = CgroupBuilder::new(PROCESS_NAME).build(hier);
         let cpus: &cpu::CpuController = match cg.controller_of() {
@@ -109,7 +108,7 @@ impl Cgroups {
             thread: Mutex::new(None),
             running: Arc::new((Mutex::new(false), Condvar::new())),
             cgroup: cg,
-            mount_path,
+            mount_path: hierarchies::auto().root().to_str().unwrap().to_string(),
             is_v2,
         })
     }

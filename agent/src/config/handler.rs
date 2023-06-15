@@ -54,7 +54,10 @@ use crate::{
     handler::PacketHandlerBuilder,
     trident::{AgentComponents, RunningMode},
     utils::{
-        environment::{free_memory_check, get_ctrl_ip_and_mac, running_in_container},
+        environment::{
+            free_memory_check, get_ctrl_ip_and_mac, k8s_mem_limit_for_deepflow,
+            running_in_container,
+        },
         logger::RemoteLogConfig,
     },
 };
@@ -792,7 +795,11 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
     type Error = ConfigError;
 
     fn try_from(conf: (Config, RuntimeConfig)) -> Result<Self, Self::Error> {
-        let (static_config, conf) = conf;
+        let (static_config, mut conf) = conf;
+        if let Some(k8s_mem_limit) = k8s_mem_limit_for_deepflow() {
+            // If the environment variable K8S_MEM_LIMIT_FOR_DEEPFLOW is set, its value is preferred as the memory limit
+            conf.max_memory = k8s_mem_limit;
+        }
         #[cfg(target_os = "linux")]
         let (ctrl_ip, ctrl_mac) =
             get_ctrl_ip_and_mac(static_config.controller_ips[0].parse().unwrap());
