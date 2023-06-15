@@ -44,7 +44,7 @@ RUN yum -y install https://forensics.cert.org/cert-forensics-tools-release-el7.r
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/musl/libbcc.a --silent -O && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/musl/libc.a --silent -O && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/musl/libelf.a --silent -O && \
-    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/musl/libstdc++.a --silent -O && \
+    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/musl/libstdc%2B%2B.a --silent -o ./libstdc++.a && \
     cd /usr/x86_64-linux-musl/include  && \
     ln -s /usr/include/bcc bcc && \
     ln -s /usr/include/asm asm  && \
