@@ -24,7 +24,7 @@ use std::sync::{
     Arc, Weak,
 };
 use std::thread::{self, JoinHandle};
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use arc_swap::access::Access;
 use log::{debug, error, info, warn};
@@ -279,6 +279,8 @@ pub struct UniformSender<T> {
     dst_port: u16,
     config: SenderAccess,
     reconnect: bool,
+    reconnect_interval: u8,
+    last_reconnect: Duration,
 
     running: Arc<AtomicBool>,
     stats: Arc<Collector>,
@@ -295,6 +297,7 @@ pub struct UniformSender<T> {
 impl<T: Sendable> UniformSender<T> {
     const TCP_WRITE_TIMEOUT: u64 = 3; // s
     const QUEUE_READ_TIMEOUT: u64 = 3; // s
+    const DEFAULT_RECONNECT_INTERVAL: u8 = 10; // s
 
     pub fn new(
         id: usize,
@@ -318,6 +321,8 @@ impl<T: Sendable> UniformSender<T> {
             config,
             tcp_stream: None,
             reconnect: false,
+            reconnect_interval: Self::DEFAULT_RECONNECT_INTERVAL,
+            last_reconnect: Duration::ZERO,
             running,
             stats,
             stats_registered: false,
@@ -339,6 +344,7 @@ impl<T: Sendable> UniformSender<T> {
                 self.config.load().dest_ip
             );
             self.reconnect = true;
+            self.last_reconnect = Duration::ZERO;
             self.dst_ip = self.config.load().dest_ip.clone();
         }
 
@@ -350,6 +356,7 @@ impl<T: Sendable> UniformSender<T> {
                 self.config.load().dest_port
             );
             self.reconnect = true;
+            self.last_reconnect = Duration::ZERO;
             self.dst_port = self.config.load().dest_port;
         }
     }
@@ -369,6 +376,16 @@ impl<T: Sendable> UniformSender<T> {
                     debug!("{} sender tcp stream shutdown failed {}", self.name, e);
                 }
             }
+            let now = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap();
+            if now > self.last_reconnect
+                && now - self.last_reconnect < Duration::from_secs(self.reconnect_interval as u64)
+            {
+                return;
+            }
+
+            self.last_reconnect = now;
             self.tcp_stream = TcpStream::connect((self.dst_ip.clone(), self.dst_port)).ok();
             if let Some(tcp_stream) = self.tcp_stream.as_mut() {
                 if let Err(e) =
@@ -386,11 +403,12 @@ impl<T: Sendable> UniformSender<T> {
                     self.name, self.dst_ip, self.dst_port
                 );
                 self.reconnect = false;
+                self.reconnect_interval = 0;
             } else {
                 if self.counter.dropped.load(Ordering::Relaxed) == 0 {
                     self.exception_handler.set(Exception::AnalyzerSocketError);
-                    if self.dst_ip.is_empty() {
-                        error!("'analyzer_ip' is not assigned, please check whether the Agent is successfully registered");
+                    if self.dst_ip.is_empty() || self.dst_ip == "0.0.0.0" {
+                        warn!("'analyzer_ip' is not assigned, please check whether the Agent is successfully registered");
                     } else {
                         error!(
                             "{} sender tcp connection to {}:{} failed",
@@ -400,7 +418,8 @@ impl<T: Sendable> UniformSender<T> {
                 }
                 self.counter.dropped.fetch_add(1, Ordering::Relaxed);
                 // reconnect after waiting 10 seconds + random 5 seconds to prevent frequent reconnection
-                thread::sleep(Duration::from_secs(10 + (thread_rng().next_u64() % 5)));
+                self.reconnect_interval =
+                    Self::DEFAULT_RECONNECT_INTERVAL + (thread_rng().next_u64() % 5) as u8;
                 return;
             }
         }
