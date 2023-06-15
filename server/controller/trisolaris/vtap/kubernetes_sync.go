@@ -182,6 +182,9 @@ func (k *KubernetesCluster) loadAndCheck(clearTime int) {
 			if cacheKC.syncFlag.IsSet() {
 				updateData = append(updateData, dbkc)
 			}
+			if dbkc.Value != cacheKC.getValue() {
+				log.Infof("value change from %v to %v", cacheKC.getValue(), dbkc.Value)
+			}
 			keyToCache[dbkc.ClusterID] = newCacheKC(dbkc)
 		}
 	}
