@@ -184,6 +184,9 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, e
 		containerStatuses := pData.GetPath("status", "containerStatuses")
 		for c := range containerStatuses.MustArray() {
 			containerID := containerStatuses.GetIndex(c).Get("containerID").MustString()
+			if containerID == "" {
+				continue
+			}
 			cIndex := strings.Index(containerID, "://")
 			if cIndex != -1 {
 				containerID = containerID[cIndex+3:]
