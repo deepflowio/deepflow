@@ -333,6 +333,7 @@ pub struct YamlConfig {
     pub ovs_dpdk_enabled: bool,
     pub dpdk_pmd_core_id: u32,
     pub dpdk_ring_port: String,
+    pub libpcap_enabled: bool,
     pub xflow_collector: XflowGeneratorConfig,
     pub vxlan_flags: u8,
     pub collector_sender_queue_size: usize,
@@ -632,6 +633,10 @@ impl Default for YamlConfig {
             ovs_dpdk_enabled: false,
             dpdk_pmd_core_id: 0,
             dpdk_ring_port: "dpdkr0".into(),
+            #[cfg(target_os = "linux")]
+            libpcap_enabled: false,
+            #[cfg(target_os = "windows")]
+            libpcap_enabled: true,
             xflow_collector: Default::default(),
             vxlan_flags: 0xff,
             // default size changes according to tap_mode

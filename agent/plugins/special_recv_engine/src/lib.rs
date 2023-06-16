@@ -23,17 +23,17 @@ use public::error::Result;
 use public::packet;
 
 #[derive(Default)]
-pub struct WinPcapCounter;
+pub struct LibpcapCounter;
 
-impl counter::RefCountable for WinPcapCounter {
+impl counter::RefCountable for LibpcapCounter {
     fn get_counters(&self) -> Vec<counter::Counter> {
         unimplemented!();
     }
 }
 
-pub struct WinPacket;
+pub struct Libpcap;
 
-impl WinPacket {
+impl Libpcap {
     pub fn new(_: Vec<(&str, isize)>, _: usize, _: usize) -> Result<Self> {
         unimplemented!();
     }

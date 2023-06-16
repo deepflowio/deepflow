@@ -27,7 +27,6 @@ use log::{debug, info, log_enabled, warn};
 use regex::Regex;
 
 use super::base_dispatcher::{BaseDispatcher, BaseDispatcherListener};
-#[cfg(target_os = "windows")]
 use super::error::Result;
 
 #[cfg(target_os = "linux")]
@@ -274,8 +273,6 @@ impl LocalModeDispatcher {
     }
 }
 
-/// Enterprise Edition Feature: windows-dispatcher
-#[cfg(target_os = "windows")]
 impl LocalModeDispatcher {
     pub(super) fn switch_recv_engine(&mut self, pcap_interfaces: Vec<Link>) -> Result<()> {
         self.base.switch_recv_engine(pcap_interfaces)
