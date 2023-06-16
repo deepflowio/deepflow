@@ -46,6 +46,7 @@ type StaticConfig struct {
 	OvsDpdkEnable                    *bool                 `yaml:"ovs-dpdk-enable,omitempty"`
 	DpdkPmdCoreId                    *uint32               `yaml:"dpdk-pmd-core-id,omitempty"`
 	DpdkRingPort                     *string               `yaml:"dpdk-ring-port,omitempty"`
+	LibpcapEnabled                   *bool                 `yaml:"libpcap-enabled,omitempty"`
 	XflowCollector                   *XflowCollectorConfig `yaml:"xflow-collector,omitempty"`
 	NpbPort                          *uint16               `yaml:"npb-port,omitempty"`
 	VxlanFlags                       *uint8                `yaml:"vxlan-flags,omitempty"`

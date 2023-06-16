@@ -754,9 +754,8 @@ impl Builder {
     }
 }
 
-#[cfg(target_os = "windows")]
 impl Builder {
-    pub fn build_pcap_syntax_to_str(self) -> String {
+    pub fn build_pcap_syntax_to_str(&self) -> String {
         let mut conditions = vec![];
         let ip_version = if self.is_ipv6 { "ip6" } else { "ip" };
 

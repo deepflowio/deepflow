@@ -17,6 +17,7 @@
 use std::{
     cmp,
     collections::HashSet,
+    ffi::CString,
     fmt,
     net::IpAddr,
     sync::{
@@ -232,7 +233,7 @@ impl PassivePoller {
                 return;
             }
         };
-        if let Err(e) = engine.set_bpf(Self::get_bpf()) {
+        if let Err(e) = engine.set_bpf(Self::get_bpf(), &CString::new("").unwrap()) {
             error!("RecvEngine set bpf error: {e}");
             return;
         }
