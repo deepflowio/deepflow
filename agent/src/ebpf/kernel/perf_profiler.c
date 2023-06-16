@@ -112,11 +112,23 @@ int bpf_perf_event(struct bpf_perf_event_data *ctx)
 		return 0;
 	}
 
-	struct stack_trace_key_t key = {};
+	__u64 id = bpf_get_current_pid_tgid();
+	struct stack_trace_key_t key = { 0 };
 	key.cpu = bpf_get_smp_processor_id();
 	bpf_get_current_comm(&key.comm, sizeof(key.comm));
-	key.tgid = bpf_get_current_pid_tgid() >> 32;
+	key.tgid = id >> 32;
 	key.timestamp = bpf_ktime_get_ns();
+
+	/*
+	 * If it is a kernel thread, stack tracing data
+	 * statistics are performed using the kernel
+	 * thread-ID.
+	 */
+
+	if (key.tgid == 0 || key.tgid == 2) {
+		key.tgid = (__u32)id;
+		key.is_kern = 1;
+	}
 
 	/*
 	 * Note:

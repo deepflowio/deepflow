@@ -71,8 +71,8 @@ struct protocol_message_t {
 	enum message_type type;
 };
 
-enum {
-	TASK_COMM_LEN = 16,
-};
+#ifndef TASK_COMM_LEN
+#define TASK_COMM_LEN 16
+#endif
 
 #endif /* DF_BPF_COMMON_H */

@@ -35,7 +35,7 @@ typedef enum {
 
 struct stack_trace_key_t {
 	union {
-		__u32 pid;	// for user
+		__u32 pid;	// for user process-ID
 		__u32 tgid;	// for kernel
 	};
 	__u32 cpu;
@@ -43,6 +43,7 @@ struct stack_trace_key_t {
 	int kernstack;
 	int userstack;
 	__u64 timestamp;
+	__u64 is_kern;          // is kernel thread ?
 };
 
 #endif /* DF_BPF_PERF_PROFILER_H */

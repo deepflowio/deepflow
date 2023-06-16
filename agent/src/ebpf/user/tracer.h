@@ -403,6 +403,7 @@ struct bpf_tracer_param {
 	char bpf_load_name[NAME_LEN];
 	int dispatch_workers_nr;
 	unsigned int perf_pg_cnt;
+	/* rx_queues start address 8-byte alignment */
 	struct rx_queue_info rx_queues[MAX_CPU_NR] __attribute__((aligned(8)));
 	uint64_t lost;
 	int probes_count;

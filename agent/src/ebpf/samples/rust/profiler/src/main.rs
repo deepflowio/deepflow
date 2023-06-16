@@ -20,6 +20,11 @@ use chrono::Utc;
 use profiler::ebpf::*;
 use std::thread;
 use std::time::{Duration, UNIX_EPOCH};
+use std::sync::Mutex;
+
+lazy_static::lazy_static! {
+    static ref COUNTER: Mutex<u32> = Mutex::new(0);
+}
 
 #[allow(dead_code)]
 fn date_time(ts: u64) -> String {
@@ -52,9 +57,15 @@ fn cp_process_name_safe(cp: *mut stack_profile_data) -> String {
     }
 }
 
+fn increment_counter(num: u32) {
+    let mut counter = COUNTER.lock().unwrap();
+    *counter += num;
+}
+
 extern "C" fn continuous_profiler_callback(cp: *mut stack_profile_data) {
     unsafe {
           process_stack_trace_data_for_flame_graph(cp);
+          increment_counter((*cp).count);
           //let data = sk_data_str_safe(cp);
           //println!("\n+ --------------------------------- +");
           //println!("{} PID {} START-TIME {} U-STACKID {} K-STACKID {} COMM {} CPU {} COUNT {} LEN {} \n  - {}",
@@ -69,6 +80,10 @@ extern "C" fn continuous_profiler_callback(cp: *mut stack_profile_data) {
           //         (*cp).stack_data_len, data);
           //println!("+ --------------------------------- +");
     }
+}
+
+fn get_counter() -> u32 {
+    *COUNTER.lock().unwrap()
 }
 
 fn main() {
@@ -98,6 +113,7 @@ fn main() {
         print!("test OK\n");
         thread::sleep(Duration::from_secs(20));
         stop_continuous_profiler();
+        print!("====== capture count {}\n", get_counter());
         release_flame_graph_hash();
     }
 

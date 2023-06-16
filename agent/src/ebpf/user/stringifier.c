@@ -373,10 +373,19 @@ static void set_stack_trace_msg(stack_trace_msg_t * msg,
 {
 	msg->pid = v->pid;
 	msg->cpu = v->cpu;
-	memcpy(msg->comm, v->comm, sizeof(msg->comm));
 	msg->u_stack_id = (u32) v->userstack;
 	msg->k_stack_id = (u32) v->kernstack;
-	msg->stime = get_pid_stime(v->pid);
+	if (!v->is_kern) {
+		msg->stime = get_pid_stime_and_name(v->pid,
+						    (char *)msg->comm);
+		if (msg->stime > 0)
+			goto skip_kern_or_no_proc;
+	}
+
+	msg->stime = get_pid_stime(0);
+	memcpy(msg->comm, v->comm, sizeof(msg->comm));
+
+skip_kern_or_no_proc:
 	msg->data_len = strlen((char *)&msg->data[0]);
 	msg->time_stamp = gettime(CLOCK_REALTIME, TIME_TYPE_NAN);
 	msg->count = 1;

@@ -97,6 +97,7 @@ always_inline uword pow2_mask (uword x)
 /* Hints to compiler about hot/cold code. */
 #define PREDICT_FALSE(x) __builtin_expect((x),0)
 #define PREDICT_TRUE(x) __builtin_expect((x),1)
+#define COMPILE_TIME_CONST(x) __builtin_constant_p (x)
 
 #define clib_max(x,y)                           \
 ({                                              \

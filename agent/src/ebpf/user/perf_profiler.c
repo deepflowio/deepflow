@@ -632,8 +632,11 @@ int start_continuous_profiler(int freq,
 	return (0);
 }
 
+static u64 test_add_count, stack_count;
+static u64 test_hit_count, msg_ptr_zero_count;
 void process_stack_trace_data_for_flame_graph(stack_trace_msg_t *val)
 {
+	stack_count++;
 	if (unlikely(test_fg_hash.buckets == NULL)) {
 		init_stack_trace_msg_hash(&test_fg_hash,
 					  "flame_graph_test");
@@ -651,7 +654,8 @@ void process_stack_trace_data_for_flame_graph(stack_trace_msg_t *val)
 
 	if (stack_trace_msg_hash_search(&test_fg_hash, (stack_trace_msg_hash_kv *)&msg_kvp,
 					(stack_trace_msg_hash_kv *)&msg_kvp) == 0) {
-		((stack_trace_msg_t *)msg_kvp.msg_ptr)->count++;
+		((stack_trace_msg_t *)msg_kvp.msg_ptr)->count += val->count;
+		test_hit_count += val->count;
 		return;
 	} else {
 		int len = sizeof(*val) + val->data_len + 1;
@@ -664,6 +668,8 @@ void process_stack_trace_data_for_flame_graph(stack_trace_msg_t *val)
 				 (stack_trace_msg_hash_kv *)&msg_kvp,
 				 1 /* is_add */ )) {
 			ebpf_warning("stack_trace_msg_hash_add_del() failed.\n");
+		} else {
+			test_add_count += val->count;
 		}
 	}
 }
@@ -686,6 +692,8 @@ static int gen_stack_trace_folded_file(stack_trace_msg_hash_kv *kv, void *ctx)
 #endif
 		clib_mem_free((void *)msg);
 		(*(u64 *) ctx)++;
+	} else {
+		msg_ptr_zero_count++;
 	}
 
 	return BIHASH_WALK_CONTINUE;
@@ -710,6 +718,10 @@ void release_flame_graph_hash(void)
 	get_mem_stat(&alloc_b, &free_b);
 	ebpf_info("after alloc_b:\t%lu bytes free_b:\t%lu bytes use:\t%lu bytes\n",
 		  alloc_b, free_b, alloc_b - free_b);
+
+	ebpf_info("<<< stack_count %lu add_count %lu hit_count %lu msg_ptr_zero"
+		  "_count %lu  >>>\n", stack_count, test_add_count, test_hit_count,
+		  msg_ptr_zero_count);
 
 	ebpf_info("Please use the following command to generate a flame graph:"
 		  "\n\n\033[33;1mcat ./profiler.folded |./.flamegraph.pl --color=io"

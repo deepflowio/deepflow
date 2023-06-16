@@ -41,6 +41,7 @@
 #include "list.h"
 #include "common.h"
 #include "log.h"
+#include "string.h"
 
 bool is_core_kernel(void)
 {
@@ -430,6 +431,62 @@ u64 get_process_starttime(pid_t pid)
 	return ((etime_ticks * msecs_per_tick) + sys_boot);
 }
 
+/*
+ * Get the start time (in milliseconds) of a given PID,
+ * and fetch process comm.
+ *
+ * @pid processID
+ * @comm_base store process name address
+ * @len store process name max length
+ *
+ * @return process start time,
+ * 	   if is 0, it indicates that an error has been encountered.
+ */
+u64 get_process_starttime_and_comm(pid_t pid,
+				   char *name_base,
+				   int len)
+{
+	char file[PATH_MAX], buff[4096];
+	int fd;
+	unsigned long long etime_ticks = 0;
+
+	snprintf(file, sizeof(file), "/proc/%d/stat", pid);
+	if (access(file, F_OK))
+		return 0;
+
+	fd = open(file, O_RDONLY);
+	if (fd <= 2)
+		return 0;
+
+	read(fd, buff, sizeof(buff));
+	close(fd);
+
+	char *start = NULL; // process name start address;
+	if (sscanf(buff, "%*s %ms %*s %*s %*s %*s %*s %*s %*s %*s %*s"
+		   " %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %llu ",
+		   &start, &etime_ticks) != 2) {
+		return 0;
+	}
+
+	if (name_base != NULL && len > 0) {
+		int src_len = strlen(start);
+		start[src_len - 1] = '\0';
+		src_len -= 2;
+		if (src_len > len)
+			src_len = len;
+		memset(name_base, 0, len);
+		memcpy_s_inline((void *)name_base, len,
+				(void *)start + 1, src_len);
+	}
+
+	free(start);
+
+	u64 sys_boot = get_sys_btime_msecs();
+	u64 msecs_per_tick = 1000UL / sysconf(_SC_CLK_TCK);
+
+	return ((etime_ticks * msecs_per_tick) + sys_boot);
+}
+
 int fetch_kernel_version(int *major, int *minor, int *patch)
 {
 	struct utsname sys_info;
@@ -524,11 +581,11 @@ unsigned int fetch_kernel_version_code(void)
 	return KERNEL_VERSION(major, minor, patch);
 }
 
-bool is_process(int pid)
+bool is_user_process(int pid)
 {
 	char file[PATH_MAX], buff[4096];
 	int fd;
-	int read_tgid = -1, read_pid = -1;
+	int read_tgid = -1, read_pid = -1, ppid = -1;
 
 	snprintf(file, sizeof(file), "/proc/%d/status", pid);
 	if (access(file, F_OK))
@@ -541,7 +598,16 @@ bool is_process(int pid)
 	read(fd, buff, sizeof(buff));
 	close(fd);
 
-	char *p = strstr(buff, "Tgid:");
+	/*
+	 * All kernel threads in Linux have their parent process
+	 * as either 0 or 2, and not any other value.
+	 */
+	char *p = strstr(buff, "PPid:");
+        sscanf(p, "PPid:\t%d", &ppid);
+	if (ppid == 0 || ppid == 2 || ppid == -1)
+		return false;
+
+	p = strstr(buff, "Tgid:");
 	sscanf(p, "Tgid:\t%d", &read_tgid);
 
 	p = strstr(buff, "Pid:");
