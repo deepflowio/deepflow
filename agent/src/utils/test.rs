@@ -50,8 +50,8 @@ impl Capture {
             .iter()
             .map(|(h, p)| {
                 let mut meta = MetaPacket::empty();
-                meta.update_without_raw_copy(
-                    &p,
+                meta.update(
+                    p.as_ref(),
                     true,
                     true,
                     Duration::new(h.ts.tv_sec as u64, h.ts.tv_usec as u32 * 1000),

@@ -217,6 +217,12 @@ impl<T> DerefMut for FixedBuffer<T> {
     }
 }
 
+impl<T> AsRef<[T]> for FixedBuffer<T> {
+    fn as_ref(&self) -> &[T] {
+        self
+    }
+}
+
 impl<T: fmt::Debug> fmt::Debug for FixedBuffer<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s: &[T] = &self;
