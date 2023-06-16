@@ -353,7 +353,7 @@ impl AnalyzerModeDispatcher {
                             let mut meta_packet = MetaPacket::empty();
                             meta_packet.tap_port = tap_port;
                             let offset = Duration::ZERO;
-                            if let Err(e) = meta_packet.update_with_raw_copy(
+                            if let Err(e) = meta_packet.update(
                                 overlay_packet,
                                 src_local,
                                 dst_local,
