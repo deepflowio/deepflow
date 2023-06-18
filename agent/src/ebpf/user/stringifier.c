@@ -107,6 +107,9 @@ void release_stack_strs(stack_str_hash_t * h)
 
 	vec_free(stack_str_kvps);
 
+	h->hit_hash_count = 0;
+	h->hash_elems_count = 0;
+
 	if (clear_hash) {
 		clear_hash = false;
 		stack_str_hash_free(h);
@@ -315,7 +318,7 @@ static char *__folded_stack_trace_string(struct bpf_tracer *t,
 	kv.key = (u64) stack_id;
 	kv.value = 0;
 	if (stack_str_hash_search(h, &kv, &kv) == 0) {
-		__sync_fetch_and_add(&h->hit_stack_str_hash_count, 1);
+		__sync_fetch_and_add(&h->hit_hash_count, 1);
 		return (char *)kv.value;
 	}
 

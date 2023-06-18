@@ -188,9 +188,9 @@ static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t *h)
 {
 	ASSERT(profiler_tracer != NULL);
 
-	u64 elem_count = 0;
+	u64 elems_count = 0;
 	stack_trace_msg_hash_foreach_key_value_pair(h, push_and_free_msg_kvp_cb,
-						    (void *)&elem_count);
+						    (void *)&elems_count);
 	/*
 	 * In this iteration, all elements will be cleared, and in the
 	 * next iteration, this hash will be reused.
@@ -205,12 +205,15 @@ static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t *h)
 
 	vec_free(trace_msg_kvps);
 
+	h->hit_hash_count = 0;
+	h->hash_elems_count = 0;
+
 	if (msg_clear_hash) {
 		msg_clear_hash = false;
 		stack_trace_msg_hash_free(h);
 	}
 
-	ebpf_debug("release_stack_trace_msg hashmap clear %lu elems.\n", elem_count);
+	ebpf_debug("release_stack_trace_msg hashmap clear %lu elems.\n", elems_count);
 }
 
 static void aggregate_stack_traces(struct bpf_tracer *t,
@@ -248,7 +251,7 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 		set_msg_kvp(&kv, v, get_pid_stime(v->pid), (void *)0);
 		if (stack_trace_msg_hash_search(msg_hash, (stack_trace_msg_hash_kv *)&kv,
 						(stack_trace_msg_hash_kv *)&kv) == 0) {
-			__sync_fetch_and_add(&msg_hash->hit_stack_msg_hash_count, 1);
+			__sync_fetch_and_add(&msg_hash->hit_hash_count, 1);
 			((stack_trace_msg_t *)kv.msg_ptr)->count++;
 
 			continue;
@@ -273,6 +276,8 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 							 (stack_trace_msg_hash_kv *)&msg_kvp,
 							 1 /* is_add */ )) {
 				ebpf_warning("stack_trace_msg_hash_add_del() failed.\n");
+			} else {
+				__sync_fetch_and_add(&msg_hash->hash_elems_count, 1);
 			}
 		}
 	}
@@ -588,7 +593,7 @@ static void print_profiler_status(struct bpf_tracer *t, u64 iter_count,
 		   atomic64_read(&t->recv), atomic64_read(&t->lost),
 		   stack_trace_lost, transfer_count, iter_count,
 		   alloc_b, free_b, alloc_b - free_b,
-		   h->hit_stack_str_hash_count, msg_h->hit_stack_msg_hash_count);
+		   h->hit_hash_count, msg_h->hit_hash_count);
 }
 
 /*
@@ -701,7 +706,7 @@ static int gen_stack_trace_folded_file(stack_trace_msg_hash_kv *kv, void *ctx)
 
 void release_flame_graph_hash(void)
 {
-	u64 elem_count = 0;
+	u64 elems_count = 0;
 	u64 alloc_b, free_b;
 	get_mem_stat(&alloc_b, &free_b);
 	ebpf_info("pre alloc_b:\t%lu bytes free_b:\t%lu bytes use:\t%lu bytes\n",
@@ -709,8 +714,8 @@ void release_flame_graph_hash(void)
 
 	stack_trace_msg_hash_foreach_key_value_pair(&test_fg_hash,
 						    gen_stack_trace_folded_file,
-						    (void *)&elem_count);
-	ebpf_info("flame graph folded strings count %lu\n", elem_count);
+						    (void *)&elems_count);
+	ebpf_info("flame graph folded strings count %lu\n", elems_count);
 	fclose(folded_file);
 
 	stack_trace_msg_hash_free(&test_fg_hash);
