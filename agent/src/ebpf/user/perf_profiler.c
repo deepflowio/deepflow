@@ -62,6 +62,17 @@ static stack_trace_msg_hash_t test_fg_hash;
 static FILE *folded_file;
 #define FOLDED_FILE_PATH "./profiler.folded" 
 
+/* "Maximum data push interval time (in seconds). */
+#define MAX_PUSH_MSG_TIME_INTERVAL 10
+/* "Maximum data push messages count. */
+#define MAX_PUSH_MSG_COUNT 1000
+/* profiler start time(monotonic seconds). */
+static u64 start_time;
+/* Record the time of the last data push
+ * (in seconds since system startup)*/
+static u64 last_push_time;
+static u64 push_count;
+
 /*
  * Cache hash: obtain folded stack trace string from stack ID.
  */
@@ -187,6 +198,30 @@ static int push_and_free_msg_kvp_cb(stack_trace_msg_hash_kv *kv, void *ctx)
 static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t *h)
 {
 	ASSERT(profiler_tracer != NULL);
+
+	u64 curr_time, elapsed;
+	curr_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_SEC);
+	elapsed = curr_time - last_push_time;
+	/*
+	 * If the aggregated stack trace data obtained by the profiler
+	 * satisfies one of the following conditions, it should be pushed
+	 * to the upper-level processing:
+	 *
+	 * 1 If the aggregated count exceeds or equals the maximum push
+	 *   count (MAX_PUSH_MSG_COUNT).
+	 *
+	 * 2 If the time interval since the last push exceeds or equals
+	 *   the maximum time interval (MAX_PUSH_MSG_TIME_INTERVAL).
+	 *
+	 * Otherwise, it should return directly.
+	 */
+	if (!((h->hash_elems_count >= MAX_PUSH_MSG_COUNT) ||
+	      (elapsed >= MAX_PUSH_MSG_TIME_INTERVAL)))
+		return;
+
+	/* update last push time. */
+	last_push_time = curr_time;
+	push_count++;
 
 	u64 elems_count = 0;
 	stack_trace_msg_hash_foreach_key_value_pair(h, push_and_free_msg_kvp_cb,
@@ -620,6 +655,7 @@ int start_continuous_profiler(int freq,
 	}
 
 	profiler_stop = 0;
+	start_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_SEC);
 
 	snprintf(bpf_load_buffer_name, NAME_LEN, "continuous_profiler");
 	bpf_bin_buffer = (void *)perf_profiler_common_ebpf_data;
@@ -725,12 +761,12 @@ void release_flame_graph_hash(void)
 		  alloc_b, free_b, alloc_b - free_b);
 
 	ebpf_info("<<< stack_count %lu add_count %lu hit_count %lu msg_ptr_zero"
-		  "_count %lu  >>>\n", stack_count, test_add_count, test_hit_count,
-		  msg_ptr_zero_count);
+		  "_count %lu push_count %lu >>>\n", stack_count, test_add_count, test_hit_count,
+		  msg_ptr_zero_count, push_count);
 
 	ebpf_info("Please use the following command to generate a flame graph:"
 		  "\n\n\033[33;1mcat ./profiler.folded |./.flamegraph.pl --color=io"
-		  " --countname=ms > profiler-test.svg\033[0m\n");
+		  " --countname=samples > profiler-test.svg\033[0m\n");
 }
 #else /* defined AARCH64_MUSL */
 #include "tracer.h"

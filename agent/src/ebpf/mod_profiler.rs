@@ -31,7 +31,7 @@ pub const PACKET_KNAME_MAX_PADDING: usize = 15;
 #[derive(Debug, Copy, Clone)]
 pub struct stack_profile_data {
     pub timestamp: u64,  // Timestamp of the stack trace data(unit: nanoseconds).
-    pub pid: u32,	 // Process-ID of the stack trace data.
+    pub pid: u32,	 // User-space process-ID or kernel thread-ID.
     pub stime: u64,	 // The start time of the process is measured in milliseconds.
     pub u_stack_id: u32, // User space stackID.
     pub k_stack_id: u32, // Kernel space stackID.

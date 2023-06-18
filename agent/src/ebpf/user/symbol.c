@@ -493,10 +493,11 @@ void update_symbol_cache(pid_t pid)
 		}
 
 		if (symbol_caches_hash_add_del(h, (symbol_caches_hash_kv *) &kv,
-					       0 /* is_add */ )) {
+					       0 /* delete */ )) {
 			ebpf_warning("symbol_caches_hash_add_del() failed.(pid %d)\n",
 				     pid);
-		}
+		} else
+			__sync_fetch_and_add(&h->hash_elems_count, -1);
 	}
 }
 
@@ -620,7 +621,8 @@ void *get_symbol_cache(pid_t pid)
 		    ("symbol_caches_hash_add_del() failed.(pid %d)\n", pid);
 		free_symbolizer_cache_kvp(&kv);
 		return NULL;
-	}
+	} else
+		__sync_fetch_and_add(&h->hash_elems_count, 1);
 
 	return (void *)kv.v.cache;
 }
@@ -674,6 +676,7 @@ int create_and_init_symbolizer_caches(void)
 				ebpf_debug("Process '%s'(pid %d start time %lu) has been"
 					   " brought under management.\n",
 					   p->comm, pid, p->stime);
+				__sync_fetch_and_add(&h->hash_elems_count, 1);
 			}
 		}
 	}
@@ -698,14 +701,16 @@ static int free_symbolizer_kvp_cb(symbol_caches_hash_kv * kv, void *ctx)
 void release_symbol_caches(void)
 {
 	/* user symbol caches release */
-	u64 elem_count = 0;
+	u64 elems_count = 0;
 	symbol_caches_hash_t *h = &syms_cache_hash;
+	ebpf_info("Release symbol_caches %lu elements\n", h->hash_elems_count);
+
 	symbol_caches_hash_foreach_key_value_pair(h, free_symbolizer_kvp_cb,
-						  (void *)&elem_count);
+						  (void *)&elems_count);
 	print_hash_symbol_caches(h);
 	symbol_caches_hash_free(h);
-	ebpf_info("clear symbol_caches_hashmap[k:pid, v:symbol cache] %lu elems.\n",
-		  elem_count);
+	ebpf_info("Clear symbol_caches_hashmap[k:pid, v:symbol cache] %lu elems.\n",
+		  elems_count);
 
 	/* kernel symbol caches release */
 	if (k_resolver) {
@@ -713,6 +718,7 @@ void release_symbol_caches(void)
 		k_resolver = NULL;
 	}
 }
+
 #else /* defined AARCH64_MUSL */
 /* pid : The process ID (PID) that occurs when a process exits. */
 void update_symbol_cache(pid_t pid)
