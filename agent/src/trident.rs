@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+use std::collections::HashMap;
 use std::env;
 use std::fmt;
 use std::mem;
@@ -473,6 +474,7 @@ impl Trident {
                     .extra_netns_regex
                     .clone(),
                 config_handler.static_config.override_os_hostname.clone(),
+                HashMap::new(),
             ));
             ext.start();
             (ext, syn)
@@ -1929,6 +1931,7 @@ impl AgentComponents {
                 proc_event_sender,
                 &queue_debugger,
                 stats_collector.clone(),
+                platform_synchronizer.clone(),
             )
             .ok();
             if let Some(collector) = &ebpf_collector {

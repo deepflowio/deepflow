@@ -157,6 +157,8 @@ pub struct MetaPacket<'a> {
     pub is_response_end: bool,
 
     pub process_id: u32,
+    pub netns_id: u64,
+
     pub thread_id: u32,
     pub syscall_trace_id: u64,
     #[cfg(target_os = "linux")]

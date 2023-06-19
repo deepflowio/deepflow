@@ -35,6 +35,7 @@ use crate::config::handler::{EbpfAccess, EbpfConfig, LogParserAccess};
 use crate::config::FlowAccess;
 use crate::ebpf::{self, set_allow_port_bitmap};
 use crate::flow_generator::{flow_map::Config, FlowMap, MetaAppProto};
+use crate::platform::PlatformSynchronizer;
 use crate::policy::PolicyGetter;
 use crate::utils::stats;
 use public::counter::{Counter, CounterType, CounterValue, OwnedCountable};
@@ -259,6 +260,7 @@ pub struct EbpfCollector {
 static mut SWITCH: bool = false;
 static mut SENDER: Option<DebugSender<Box<MetaPacket>>> = None;
 static mut PROC_EVENT_SENDER: Option<DebugSender<BoxedProcEvents>> = None;
+static mut PLATFORM_SYNC: Option<Arc<PlatformSynchronizer>> = None;
 
 impl EbpfCollector {
     extern "C" fn ebpf_callback(sd: *mut ebpf::SK_BPF_DATA) {
@@ -274,7 +276,10 @@ impl EbpfCollector {
                     warn!("proc event parse from ebpf error: {}", event.unwrap_err());
                     return;
                 }
-                let event = event.unwrap();
+                let mut event = event.unwrap();
+                if let Some(m) = PLATFORM_SYNC.as_ref() {
+                    event.0.netns_id = m.get_netns_id_by_pid(event.0.pid).unwrap_or_default();
+                }
                 if let Err(e) = PROC_EVENT_SENDER.as_mut().unwrap().send(event) {
                     warn!("event send ebpf error: {:?}", e);
                 }
@@ -285,7 +290,10 @@ impl EbpfCollector {
                 warn!("meta packet parse from ebpf error: {}", packet.unwrap_err());
                 return;
             }
-            let packet = packet.unwrap();
+            let mut packet = packet.unwrap();
+            if let Some(m) = PLATFORM_SYNC.as_ref() {
+                packet.netns_id = m.get_netns_id_by_pid(packet.process_id).unwrap_or_default();
+            }
             if let Err(e) = SENDER.as_mut().unwrap().send(Box::new(packet)) {
                 warn!("meta packet send ebpf error: {:?}", e);
             }
@@ -297,6 +305,7 @@ impl EbpfCollector {
         sender: DebugSender<Box<MetaPacket<'static>>>,
         proc_event_sender: DebugSender<BoxedProcEvents>,
         l7_protocol_enabled_bitmap: L7ProtocolBitmap,
+        platform_sync: Arc<PlatformSynchronizer>,
     ) -> Result<()> {
         // ebpf内核模块初始化
         unsafe {
@@ -430,6 +439,7 @@ impl EbpfCollector {
             SWITCH = false;
             SENDER = Some(sender);
             PROC_EVENT_SENDER = Some(proc_event_sender);
+            PLATFORM_SYNC = Some(platform_sync);
         }
 
         Ok(())
@@ -502,6 +512,7 @@ impl EbpfCollector {
         proc_event_output: DebugSender<BoxedProcEvents>,
         queue_debugger: &QueueDebugger,
         stats_collector: Arc<stats::Collector>,
+        platform_sync: Arc<PlatformSynchronizer>,
     ) -> Result<Box<Self>> {
         let ebpf_config = config.load();
         if ebpf_config.ebpf.disabled {
@@ -517,11 +528,12 @@ impl EbpfCollector {
             sender,
             proc_event_output,
             ebpf_config.l7_protocol_enabled_bitmap,
+            platform_sync,
         )?;
         Self::ebpf_on_config_change(ebpf::CAP_LEN_MAX);
 
         info!("ebpf collector initialized.");
-        return Ok(Box::new(EbpfCollector {
+        Ok(Box::new(EbpfCollector {
             thread_dispatcher: EbpfDispatcher {
                 dispatcher_id,
                 time_diff,
@@ -536,7 +548,7 @@ impl EbpfCollector {
             },
             thread_handle: None,
             counter: EbpfCounter { rx: 0 },
-        }));
+        }))
     }
 
     pub fn get_sync_counter(&self) -> SyncEbpfCounter {
