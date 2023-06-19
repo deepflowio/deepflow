@@ -283,6 +283,11 @@ impl Collector {
         b.send();
     }
 
+    pub fn notify_stop(&self) -> Option<JoinHandle<()>> {
+        *self.running.0.lock().unwrap() = false;
+        self.thread.lock().unwrap().take()
+    }
+
     pub fn start(&self) {
         {
             let (started, _) = &*self.running;
