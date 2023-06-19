@@ -1,6 +1,4 @@
-START TRANSACTION;
 
--- modify start, add upgrade sql
 CREATE TABLE IF NOT EXISTS ch_pod_k8s_annotation (
     `id`            INTEGER NOT NULL,
     `key`           VARCHAR(256) NOT NULL,
@@ -39,5 +37,3 @@ CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_annotations (
 -- update db_version to latest, remeber update DB_VERSION_EXPECT in migrate/version.go
 UPDATE db_version SET version='6.3.1.7';
 -- modify end
-
-COMMIT;
