@@ -413,9 +413,16 @@ fn open_root_or_named_ns_file(ns: &NsFile) -> Result<(File, PathBuf)> {
 fn get_proc_cache() -> Result<HashMap<u64, Vec<u32>>> {
     let mut cache = HashMap::new();
     for proc in fs::read_dir(PROC_PATH)? {
-        let proc = proc?;
-        if !proc.file_type()?.is_dir() {
+        let Ok(proc) = proc else {
+            // ignore file not found probably caused by process terminated
             continue;
+        };
+        match proc.file_type() {
+            Ok(t) if t.is_dir() => (),
+            _ => {
+                debug!("skipped {}", proc.path().display());
+                continue;
+            }
         }
         let pid = proc
             .file_name()

@@ -55,7 +55,7 @@ make && make install && make clean
 ln -s /usr/local/lib/libbddisasm.a /usr/lib/libbddisasm.a # 建立软链接, agent 静态库目录是 /usr/lib/ 和 /usr/lib64
 
 # zlib
-wget https://zlib.net/zlib-1.2.12.tar.gz
+wget https://www.zlib.net/fossils/zlib-1.2.12.tar.gz
 tar -xzf zlib-1.2.12.tar.gz
 cd zlib-1.2.12
 ./configure
