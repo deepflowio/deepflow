@@ -147,6 +147,7 @@ name = "labeler"
 harness = false
 
 [profile.release]
+debug = true
 panic = 'abort'
 
 [profile.dev]
