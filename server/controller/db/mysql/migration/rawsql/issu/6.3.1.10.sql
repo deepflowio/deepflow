@@ -1,4 +1,3 @@
-START TRANSACTION;
 
 CREATE TABLE IF NOT EXISTS ch_app_label (
     `metric_id`          INT(10) NOT NULL,
@@ -37,4 +36,3 @@ CREATE TABLE IF NOT EXISTS ch_prometheus_metric_app_label_layout (
 UPDATE db_version SET version='6.3.1.10';
 -- modify end
 
-COMMIT;
