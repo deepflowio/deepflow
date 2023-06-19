@@ -15,6 +15,7 @@
  */
 
 use std::{
+    collections::HashMap,
     net::{IpAddr, SocketAddr, SocketAddrV4},
     path::Path,
     sync::{
@@ -84,6 +85,7 @@ pub(super) struct ProcessArgs {
     pub(super) exception_handler: ExceptionHandler,
     pub(super) extra_netns_regex: Arc<Mutex<Option<Regex>>>,
     pub(super) override_os_hostname: Arc<Option<String>>,
+    pub(super) pid_netns_id_map: Arc<RwLock<HashMap<u32, u64>>>,
 }
 
 #[derive(Default)]
@@ -123,6 +125,7 @@ pub struct PlatformSynchronizer {
     exception_handler: ExceptionHandler,
     extra_netns_regex: Arc<Mutex<Option<Regex>>>,
     override_os_hostname: Arc<Option<String>>,
+    pid_netns_id_map: Arc<RwLock<HashMap<u32, u64>>>,
 }
 
 impl PlatformSynchronizer {
@@ -134,6 +137,7 @@ impl PlatformSynchronizer {
         exception_handler: ExceptionHandler,
         extra_netns_regex: String,
         override_os_hostname: Option<String>,
+        pid_netns_id_map: HashMap<u32, u64>,
     ) -> Self {
         let extra_netns_regex = if extra_netns_regex != "" {
             info!("platform monitoring extra netns: /{}/", extra_netns_regex);
@@ -164,6 +168,7 @@ impl PlatformSynchronizer {
             exception_handler,
             extra_netns_regex: Arc::new(Mutex::new(extra_netns_regex)),
             override_os_hostname: Arc::new(override_os_hostname),
+            pid_netns_id_map: Arc::new(RwLock::new(pid_netns_id_map)),
         }
     }
 
@@ -228,6 +233,7 @@ impl PlatformSynchronizer {
             exception_handler: self.exception_handler.clone(),
             extra_netns_regex: self.extra_netns_regex.clone(),
             override_os_hostname: self.override_os_hostname.clone(),
+            pid_netns_id_map: self.pid_netns_id_map.clone(),
         };
 
         let handle = thread::Builder::new()
@@ -421,6 +427,12 @@ impl PlatformSynchronizer {
                 debug!("proc info changed");
                 hash_args.process_data_hash = proc_sha1;
                 changed += 1;
+
+                let mut w = process_args.pid_netns_id_map.write();
+                w.clear();
+                for p in process_info.iter() {
+                    w.insert(p.pid as u32, p.netns_id);
+                }
             }
         }
 
@@ -791,6 +803,11 @@ impl PlatformSynchronizer {
             return true;
         }
         false
+    }
+
+    pub fn get_netns_id_by_pid(&self, pid: u32) -> Option<u64> {
+        let r = self.pid_netns_id_map.read();
+        r.get(&pid).and_then(|n| Some(*n))
     }
 }
 

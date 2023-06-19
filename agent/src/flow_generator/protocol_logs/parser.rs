@@ -118,6 +118,7 @@ impl MetaAppProto {
             syscall_cap_seq_0: 0,
             syscall_cap_seq_1: 0,
             ebpf_type: meta_packet.ebpf_type,
+            netns_id: meta_packet.netns_id,
         };
 
         #[cfg(target_os = "linux")]
