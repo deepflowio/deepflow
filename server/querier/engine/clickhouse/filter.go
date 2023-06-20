@@ -788,9 +788,9 @@ func GetPrometheusFilter(promTag, table, op, value string) (string, error) {
 			if appLabel.AppLabelName == nameNoPreffix {
 				isAppLabel = true
 				if strings.Contains(op, "match") {
-					filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM flow_tag.app_label_map WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s))", appLabel.appLabelColumnIndex, metricID, labelNameID, op, value)
+					filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM flow_tag.app_label_live_view WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s))", appLabel.appLabelColumnIndex, metricID, labelNameID, op, value)
 				} else {
-					filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM flow_tag.app_label_map WHERE metric_id=%d and label_name_id=%d and label_value %s %s)", appLabel.appLabelColumnIndex, metricID, labelNameID, op, value)
+					filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM flow_tag.app_label_live_view WHERE metric_id=%d and label_name_id=%d and label_value %s %s)", appLabel.appLabelColumnIndex, metricID, labelNameID, op, value)
 				}
 				break
 			}
@@ -798,9 +798,9 @@ func GetPrometheusFilter(promTag, table, op, value string) (string, error) {
 	}
 	if !isAppLabel {
 		if strings.Contains(op, "match") {
-			filter = fmt.Sprintf("toUInt64(target_id) IN (SELECT target_id FROM flow_tag.target_label_map WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s))", metricID, labelNameID, op, value)
+			filter = fmt.Sprintf("toUInt64(target_id) IN (SELECT target_id FROM flow_tag.target_label_live_view WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s))", metricID, labelNameID, op, value)
 		} else {
-			filter = fmt.Sprintf("toUInt64(target_id) IN (SELECT target_id FROM flow_tag.target_label_map WHERE metric_id=%d and label_name_id=%d and label_value %s %s)", metricID, labelNameID, op, value)
+			filter = fmt.Sprintf("toUInt64(target_id) IN (SELECT target_id FROM flow_tag.target_label_live_view WHERE metric_id=%d and label_name_id=%d and label_value %s %s)", metricID, labelNameID, op, value)
 		}
 	}
 	return filter, nil
