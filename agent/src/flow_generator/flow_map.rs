@@ -29,6 +29,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+use ahash::AHashMap;
 use log::{debug, error, warn};
 
 use super::{
@@ -99,7 +100,13 @@ pub struct Config<'a> {
 
 // not thread-safe
 pub struct FlowMap {
-    node_map: Option<HashMap<FlowMapKey, Vec<Box<FlowNode>>>>,
+    // The original std HashMap uses SipHash-1-3 and is slow.
+    // Use ahash for better performance.
+    //
+    //     https://github.com/tkaitchuck/aHash/blob/master/FAQ.md#how-is-ahash-so-fast
+    //
+    // Strangely, using AES reduces performance.
+    node_map: Option<AHashMap<FlowMapKey, Vec<Box<FlowNode>>>>,
     time_set: Option<Vec<HashSet<FlowMapKey>>>,
     id: u32,
     state_machine_master: StateMachine,
@@ -199,7 +206,7 @@ impl FlowMap {
             - Duration::from_secs(1);
         let time_set_slot_size = config.hash_slots as usize / time_window_size;
         Self {
-            node_map: Some(HashMap::with_capacity(config.hash_slots as usize)),
+            node_map: Some(AHashMap::with_capacity(config.hash_slots as usize)),
             time_set: Some(vec![
                 HashSet::with_capacity(time_set_slot_size);
                 time_window_size
