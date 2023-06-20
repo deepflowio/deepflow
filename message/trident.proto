@@ -841,9 +841,11 @@ message TargetResponse {
     optional string instance = 2;
     optional uint32 job_id = 3;
     optional uint32 instance_id = 4;
-    optional uint32 target_id= 5; // when the Controller cannot determine the target_id, fill in 0
+    optional uint32 target_id = 5; // when the Controller cannot determine the target_id, fill in 0
+    repeated uint32 metric_ids = 6; // when requesting all prometheus information, you need to carry the metric list related to the target
 }
 
+// when the request content is empty, it means requesting all metric label and target information
 message PrometheusLabelRequest {
    repeated MetricLabelRequest request_labels = 1;
    repeated TargetRequest request_targets = 2;
