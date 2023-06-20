@@ -115,9 +115,10 @@ func generateDataToInsertDB(domainUUIDToCloudModelData map[string]*cloudmodel.Ad
 				fmt.Sprintf("json marshal domain (uuid: %s) cloud data (detail: %#v) failed: %s", domainUUID, cloudMD, err.Error()),
 			)
 		}
+
 		dbItem := mysql.DomainAdditionalResource{
-			Domain:  domainUUID,
-			Content: string(content),
+			Domain:            domainUUID,
+			CompressedContent: content,
 		}
 		dbItems = append(dbItems, dbItem)
 	}
