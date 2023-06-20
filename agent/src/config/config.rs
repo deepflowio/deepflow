@@ -40,6 +40,7 @@ use crate::common::{
     enums::TapType, DEFAULT_LOG_FILE, L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT,
     L7_PROTOCOL_INFERENCE_TTL,
 };
+use crate::flow_generator::protocol_logs::SLOT_WIDTH;
 use crate::rpc::Session;
 use crate::trident::RunningMode;
 use public::proto::{
@@ -327,6 +328,7 @@ pub struct YamlConfig {
     pub flow_queue_size: usize,
     pub quadruple_queue_size: usize,
     pub analyzer_queue_size: usize,
+    pub analyzer_raw_packet_block_size: usize,
     #[serde(rename = "ovs-dpdk-enable")]
     pub ovs_dpdk_enabled: bool,
     pub dpdk_pmd_core_id: u32,
@@ -357,6 +359,7 @@ pub struct YamlConfig {
     pub kubernetes_api_list_limit: u32,
     #[serde(with = "humantime_serde")]
     pub kubernetes_api_list_interval: Duration,
+    pub kubernetes_api_memory_trim_percent: u8,
     pub external_metrics_sender_queue_size: usize,
     pub l7_protocol_inference_max_fail_count: usize,
     pub l7_protocol_inference_ttl: usize,
@@ -392,6 +395,13 @@ pub struct YamlConfig {
     pub check_core_file_disabled: bool,
     pub wasm_plugins: Vec<String>,
     pub memory_trim_disabled: bool,
+    pub forward_capacity: usize,
+    pub fast_path_disabled: bool,
+    // rrt timeout must gt aggr SLOT_WIDTH
+    #[serde(with = "humantime_serde")]
+    pub rrt_tcp_timeout: Duration,
+    #[serde(with = "humantime_serde")]
+    pub rrt_udp_timeout: Duration,
 }
 
 impl YamlConfig {
@@ -436,6 +446,9 @@ impl YamlConfig {
         }
         if c.analyzer_queue_size < 1 << 17 {
             c.analyzer_queue_size = 1 << 17;
+        }
+        if c.analyzer_raw_packet_block_size < 65536 {
+            c.analyzer_raw_packet_block_size = 65536;
         }
         if c.collector_sender_queue_size == 0 {
             c.collector_sender_queue_size = if tap_mode == trident::TapMode::Analyzer {
@@ -545,9 +558,26 @@ impl YamlConfig {
             c.kubernetes_api_list_interval = Duration::from_secs(600);
         }
 
+        if c.kubernetes_api_memory_trim_percent > 100 {
+            c.kubernetes_api_memory_trim_percent = 100;
+        }
+
+        if c.forward_capacity < 1 << 14 {
+            c.forward_capacity = 1 << 14;
+        }
+
         if let Err(e) = c.validate() {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string()));
         }
+        c.rrt_tcp_timeout = c
+            .rrt_tcp_timeout
+            .max(Duration::from_secs(SLOT_WIDTH))
+            .min(Duration::from_secs(3600));
+
+        c.rrt_udp_timeout = c
+            .rrt_udp_timeout
+            .max(Duration::from_secs(SLOT_WIDTH))
+            .min(Duration::from_secs(300));
         Ok(c)
     }
 
@@ -598,6 +628,7 @@ impl Default for YamlConfig {
             flow_queue_size: 65536,
             quadruple_queue_size: 262144,
             analyzer_queue_size: 131072,
+            analyzer_raw_packet_block_size: 65536,
             ovs_dpdk_enabled: false,
             dpdk_pmd_core_id: 0,
             dpdk_ring_port: "dpdkr0".into(),
@@ -625,6 +656,7 @@ impl Default for YamlConfig {
             kubernetes_namespace: "".into(),
             kubernetes_api_list_limit: 1000,
             kubernetes_api_list_interval: Duration::from_secs(600),
+            kubernetes_api_memory_trim_percent: 100,
             external_metrics_sender_queue_size: 1 << 12,
             l7_protocol_inference_max_fail_count: L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT,
             l7_protocol_inference_ttl: L7_PROTOCOL_INFERENCE_TTL,
@@ -672,6 +704,10 @@ impl Default for YamlConfig {
             check_core_file_disabled: false,
             wasm_plugins: vec![],
             memory_trim_disabled: false,
+            fast_path_disabled: false,
+            forward_capacity: 1 << 14,
+            rrt_tcp_timeout: Duration::from_secs(1800),
+            rrt_udp_timeout: Duration::from_secs(150),
         }
     }
 }

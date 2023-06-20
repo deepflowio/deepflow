@@ -221,9 +221,9 @@ impl FlowAclListener for DispatcherListener {
         _: &Vec<Arc<crate::_Acl>>,
     ) -> Result<(), String> {
         match self {
-            DispatcherListener::Local(a) => a.reset_bpf_white_list(),
-            DispatcherListener::Mirror(a) => a.reset_bpf_white_list(),
-            DispatcherListener::Analyzer(a) => a.reset_bpf_white_list(),
+            DispatcherListener::Local(a) => a.flow_acl_change(),
+            DispatcherListener::Mirror(a) => a.flow_acl_change(),
+            DispatcherListener::Analyzer(a) => a.flow_acl_change(),
         }
         Ok(())
     }
@@ -614,6 +614,7 @@ pub struct DispatcherBuilder {
     trident_type: Option<TridentType>,
     queue_debugger: Option<Arc<QueueDebugger>>,
     analyzer_queue_size: Option<usize>,
+    analyzer_raw_packet_block_size: Option<usize>,
 }
 
 impl DispatcherBuilder {
@@ -750,6 +751,11 @@ impl DispatcherBuilder {
         self
     }
 
+    pub fn analyzer_raw_packet_block_size(mut self, v: usize) -> Self {
+        self.analyzer_raw_packet_block_size = Some(v);
+        self
+    }
+
     pub fn build(mut self) -> Result<Dispatcher> {
         let netns = self.netns.unwrap_or_default();
         #[cfg(target_os = "linux")]
@@ -881,6 +887,7 @@ impl DispatcherBuilder {
                 .ok_or(Error::ConfigIncomplete("no packet_sequence_block".into()))?,
             netns,
             npb_dedup_enabled: Arc::new(AtomicBool::new(false)),
+            pause: Arc::new(AtomicBool::new(true)),
         };
         collector.register_countable(
             "dispatcher",
@@ -958,7 +965,10 @@ impl DispatcherBuilder {
                     inner_queue_size: self
                         .analyzer_queue_size
                         .take()
-                        .ok_or(Error::ConfigIncomplete("no analyzer_queue_size".into()))?,
+                        .ok_or(Error::ConfigIncomplete("no analyzer-queue-size".into()))?,
+                    raw_packet_block_size: self.analyzer_raw_packet_block_size.take().ok_or(
+                        Error::ConfigIncomplete("no analyzer-raw-packet-block-size".into()),
+                    )?,
                 })
             }
             _ => {

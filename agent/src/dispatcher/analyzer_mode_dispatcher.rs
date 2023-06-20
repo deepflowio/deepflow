@@ -38,7 +38,7 @@ use crate::{
         base_dispatcher::{BaseDispatcherListener, TapTypeHandler},
         error::Result,
     },
-    flow_generator::FlowMap,
+    flow_generator::{flow_map::Config, FlowMap},
     handler::{MiniPacket, PacketHandler},
     rpc::get_timestamp,
     utils::{
@@ -46,9 +46,13 @@ use crate::{
         stats::{self, Countable, StatsOption},
     },
 };
-use public::queue::{self, bounded_with_debug, DebugSender, Receiver};
-use public::utils::net::{Link, MacAddr};
-use public::{debug::QueueDebugger, proto::trident::IfMacSource};
+use public::{
+    buffer::{Allocator, FixedBuffer},
+    debug::QueueDebugger,
+    proto::trident::IfMacSource,
+    queue::{self, bounded_with_debug, DebugSender, Receiver},
+    utils::net::{Link, MacAddr},
+};
 
 // BILD to reduce the processing flow of Trident tunnel traffic, the tunnel traffic will be marked
 // Use the first byte of the source MAC to mark the ERSPAN traffic, which is 0xff
@@ -110,7 +114,9 @@ impl AnalyzerModeDispatcherListener {
         return self.base.id;
     }
 
-    pub fn reset_bpf_white_list(&self) {
+    pub fn flow_acl_change(&self) {
+        // Start capturing traffic after resource information is distributed
+        self.base.pause.store(false, Ordering::Relaxed);
         self.base.reset_whitelist.store(true, Ordering::Relaxed);
     }
 }
@@ -121,10 +127,10 @@ pub(super) struct AnalyzerPipeline {
     timestamp: Duration,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 struct Packet {
     timestamp: Duration,
-    raw: Vec<u8>,
+    raw: FixedBuffer<u8>,
     original_length: u32,
     raw_length: u32,
 }
@@ -138,6 +144,7 @@ pub(super) struct AnalyzerModeDispatcher {
     pub(super) queue_debugger: Arc<QueueDebugger>,
     pub(super) stats_collector: Arc<stats::Collector>,
     pub(super) inner_queue_size: usize,
+    pub(super) raw_packet_block_size: usize,
 }
 
 impl AnalyzerModeDispatcher {
@@ -251,23 +258,28 @@ impl AnalyzerModeDispatcher {
                         policy_getter,
                         log_output_queue,
                         ntp_diff,
-                        flow_map_config.clone(),
-                        log_parse_config,
-                        #[cfg(target_os = "linux")]
-                        None,
+                        &flow_map_config.load(),
                         Some(packet_sequence_output_queue), // Enterprise Edition Feature: packet-sequence
                         &stats,
                         false, // !from_ebpf
                     );
 
                     while !terminated.load(Ordering::Relaxed) {
+                        let config = Config {
+                            flow: &flow_map_config.load(),
+                            log_parser: &log_parse_config.load(),
+                            #[cfg(target_os = "linux")]
+                            ebpf: None,
+                        };
+
                         match receiver.recv_all(&mut batch, Some(Duration::from_secs(1))) {
                             Ok(_) => {}
                             Err(queue::Error::Timeout) => {
-                                flow_map.inject_flush_ticker(Duration::ZERO);
+                                flow_map.inject_flush_ticker(&config, Duration::ZERO);
                                 continue;
                             }
                             Err(queue::Error::Terminated(..)) => break,
+                            Err(queue::Error::BatchTooLarge(_)) => unreachable!(),
                         }
 
                         for mut packet in batch.drain(..) {
@@ -313,12 +325,11 @@ impl AnalyzerModeDispatcher {
                             let timestamp = packet.timestamp;
 
                             let mut overlay_packet = packet.raw;
-                            overlay_packet.rotate_left(decap_length);
-                            overlay_packet.truncate(raw_length - decap_length);
+                            overlay_packet.truncate(decap_length..raw_length);
                             // Only cloud traffic goes to de-duplication
                             if tap_type == TapType::Cloud
                                 && !analyzer_dedup_disabled
-                                && dedup.duplicate(&mut overlay_packet, timestamp)
+                                && dedup.duplicate(overlay_packet.as_mut(), timestamp)
                             {
                                 debug!("packet is duplicate");
                                 continue;
@@ -328,7 +339,7 @@ impl AnalyzerModeDispatcher {
                                 id,
                                 &vm_mac_addrs,
                                 &tunnel_info,
-                                &mut overlay_packet,
+                                overlay_packet.as_mut(),
                                 flow_map_config.load().cloud_gateway_traffic,
                             );
                             let (timestamp, ok) =
@@ -372,7 +383,7 @@ impl AnalyzerModeDispatcher {
                                 id as u8,
                                 npb_dedup_enabled.load(Ordering::Relaxed),
                             );
-                            flow_map.inject_meta_packet(&mut meta_packet);
+                            flow_map.inject_meta_packet(&config, &mut meta_packet);
                             output_batch.push((tap_type, meta_packet));
                         }
                         if let Err(e) = sender.send_all(&mut output_batch) {
@@ -411,6 +422,7 @@ impl AnalyzerModeDispatcher {
                             Ok(_) => {}
                             Err(queue::Error::Timeout) => continue,
                             Err(queue::Error::Terminated(..)) => break,
+                            Err(queue::Error::BatchTooLarge(_)) => unreachable!(),
                         }
 
                         for (tap_type, meta_packet) in batch.drain(..) {
@@ -493,6 +505,7 @@ impl AnalyzerModeDispatcher {
         let mut prev_timestamp = get_timestamp(time_diff);
         let id = base.id;
         let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
+        let mut allocator = Allocator::new(self.raw_packet_block_size);
 
         while !base.terminated.load(Ordering::Relaxed) {
             if base.reset_whitelist.swap(false, Ordering::Relaxed) {
@@ -519,6 +532,9 @@ impl AnalyzerModeDispatcher {
                 base.check_and_update_bpf();
                 continue;
             }
+            if base.pause.load(Ordering::Relaxed) {
+                continue;
+            }
 
             let (packet, timestamp) = recved.unwrap();
 
@@ -528,9 +544,18 @@ impl AnalyzerModeDispatcher {
                 .rx_bytes
                 .fetch_add(packet.capture_length as u64, Ordering::Relaxed);
 
+            let mut buffer = match allocator.allocate(packet.data.len()) {
+                Some(buffer) => buffer,
+                None => {
+                    allocator = Allocator::new(self.raw_packet_block_size);
+                    // packet len is less than raw_packet_block_size (not less than 65536)
+                    allocator.allocate(packet.data.len()).unwrap()
+                }
+            };
+            buffer.as_mut().copy_from_slice(&packet.data);
             let info = Packet {
                 timestamp,
-                raw: packet.data.to_vec(),
+                raw: buffer,
                 original_length: packet.capture_length as u32,
                 raw_length: packet.data.len() as u32,
             };

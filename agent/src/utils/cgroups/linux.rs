@@ -46,7 +46,7 @@ impl Cgroups {
         let contents = match fs::read_to_string("/proc/filesystems") {
             Ok(file_contents) => file_contents,
             Err(e) => {
-                return Err(Error::CgroupNotSupported(e.to_string()));
+                return Err(Error::CgroupsNotSupported(e.to_string()));
             }
         };
         let mut cgroup_supported = false;
@@ -58,19 +58,18 @@ impl Cgroups {
             }
         }
         if !cgroup_supported {
-            return Err(Error::CgroupNotSupported(format!(
-                "cgroup v1 or v2 is not found."
+            return Err(Error::CgroupsNotSupported(format!(
+                "cgroups v1 or v2 is not found."
             )));
         }
         let hier = hierarchies::auto();
-        let mount_path = hier.root().to_str().unwrap().to_string();
         let is_v2 = hier.v2();
         let cg: Cgroup = CgroupBuilder::new(PROCESS_NAME).build(hier);
         let cpus: &cpu::CpuController = match cg.controller_of() {
             Some(controller) => controller,
             None => {
                 return Err(Error::CpuControllerSetFailed(format!(
-                    "maybe cgroup is not installed"
+                    "maybe cgroups is not installed"
                 )));
             }
         };
@@ -78,7 +77,7 @@ impl Cgroups {
             Some(controller) => controller,
             None => {
                 return Err(Error::MemControllerSetFailed(format!(
-                    "maybe cgroup is not installed"
+                    "maybe cgroups is not installed"
                 )));
             }
         };
@@ -94,7 +93,7 @@ impl Cgroups {
             }
         } else {
             // In versions after Linux 3.0, we call the add_task_by_tgid method, which will
-            // write the pid to the cgroup.procs file, so cgroup will automatically synchronize
+            // write the pid to the cgroup.procs file, so cgroups will automatically synchronize
             // the tasks file. Refer to: https://wudaijun.com/2018/10/linux-cgroup/
             if let Err(e) = cpus.add_task_by_tgid(&CgroupPid::from(pid)) {
                 return Err(Error::CpuControllerSetFailed(e.to_string()));
@@ -109,7 +108,7 @@ impl Cgroups {
             thread: Mutex::new(None),
             running: Arc::new((Mutex::new(false), Condvar::new())),
             cgroup: cg,
-            mount_path,
+            mount_path: hierarchies::auto().root().to_str().unwrap().to_string(),
             is_v2,
         })
     }
@@ -138,7 +137,7 @@ impl Cgroups {
         let mut last_memory = 0;
         let cgroup = self.cgroup.clone();
         let thread = thread::Builder::new()
-            .name("cgroup-controller".to_owned())
+            .name("cgroups-controller".to_owned())
             .spawn(move || {
                 loop {
                     let environment = environment_config.load();
@@ -147,7 +146,7 @@ impl Cgroups {
                     if max_cpus != last_cpu || max_memory != last_memory {
                         if let Err(e) = Self::apply(cgroup.clone(), max_cpus, max_memory) {
                             warn!(
-                                "apply cgroup resource failed, {}, deepflow-agent restart...",
+                                "apply cgroups resource failed, {}, deepflow-agent restart...",
                                 e
                             );
                             thread::sleep(Duration::from_secs(1));
@@ -167,12 +166,12 @@ impl Cgroups {
                         break;
                     }
                 }
-                info!("cgroup controller exited");
+                info!("cgroups controller exited");
             })
             .unwrap();
 
         self.thread.lock().unwrap().replace(thread);
-        info!("cgroup controller started");
+        info!("cgroups controller started");
     }
 
     /// 更改资源限制
@@ -213,14 +212,14 @@ impl Cgroups {
             let _ = thread.join();
         }
         if let Err(e) = self.cgroup.delete() {
-            return Err(Error::DeleteCgroupFailed(e.to_string()));
+            return Err(Error::DeleteCgroupsFailed(e.to_string()));
         }
-        info!("cgroup controller stopped");
+        info!("cgroups controller stopped");
         Ok(())
     }
 }
 
-pub fn is_kernel_available_for_cgroup() -> bool {
+pub fn is_kernel_available_for_cgroups() -> bool {
     const MIN_KERNEL_VERSION_SUPPORT_CGROUP: &str = "2.6.24"; // Support cgroups from Linux 2.6.24
     let sys_uname = uname(); // kernel_version is in the format of 5.4.0-13
     sys_uname

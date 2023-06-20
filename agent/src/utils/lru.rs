@@ -66,4 +66,12 @@ impl<K: Hash + Eq, V> Lru<K, V> {
         self.cap = self.init_cap;
         self.cache.clear();
     }
+
+    pub fn cap(&self) -> (usize, usize) {
+        (self.init_cap, self.max_cap)
+    }
+
+    pub fn is_full(&self) -> bool {
+        self.cache.len() >= self.max_cap
+    }
 }

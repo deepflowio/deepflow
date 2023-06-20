@@ -16,7 +16,6 @@
 
 use std::{
     collections::{hash_map::Entry, HashMap},
-    process,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc, Condvar, Mutex,
@@ -29,10 +28,7 @@ use log::{debug, info, log_enabled, trace, warn, Level};
 use regex::Regex;
 
 use super::Poller;
-use public::{
-    consts::NORMAL_EXIT_WITH_RESTART,
-    netns::{InterfaceInfo, NetNs, NsFile},
-};
+use public::netns::{InterfaceInfo, NetNs, NsFile};
 
 const ENTRY_EXPIRE_COUNT: u8 = 3;
 
@@ -61,11 +57,7 @@ impl ActivePoller {
     }
 
     fn query(ns: &Vec<NsFile>) -> HashMap<NsFile, Vec<InterfaceInfo>> {
-        // always query root ns (/proc/1/ns/net)
-        let mut ns_files = vec![NsFile::Root];
-        ns_files.extend(ns.clone());
-
-        match NetNs::interfaces_linked_with(&ns_files) {
+        match NetNs::interfaces_linked_with(&ns) {
             Ok(mut map) => {
                 for (_, v) in map.iter_mut() {
                     v.sort_unstable();
@@ -88,6 +80,7 @@ impl ActivePoller {
         timeout: Duration,
     ) {
         // 初始化
+        // always query root ns (/proc/1/ns/net)
         let mut nss = vec![NsFile::Root];
         if let Some(re) = &*netns_regex.lock().unwrap() {
             let mut extra_ns = NetNs::find_ns_files_by_regex(&re);
@@ -115,6 +108,7 @@ impl ActivePoller {
             }
             drop(guard);
 
+            // always query root ns (/proc/1/ns/net)
             let mut new_nss = vec![NsFile::Root];
             if let Some(re) = &*netns_regex.lock().unwrap() {
                 let mut extra_ns = NetNs::find_ns_files_by_regex(&re);
@@ -122,9 +116,11 @@ impl ActivePoller {
                 new_nss.extend(extra_ns);
             }
             if nss != new_nss {
-                info!("query net namespaces changed from {:?} to {:?}, restart agent to create dispatcher for extra namespaces, deepflow-agent restart...", nss, new_nss);
-                thread::sleep(Duration::from_secs(1));
-                process::exit(NORMAL_EXIT_WITH_RESTART);
+                info!(
+                    "query net namespaces changed from {:?} to {:?}",
+                    nss, new_nss
+                );
+                nss = new_nss;
             }
             let mut new_interface_info = Self::query(&nss);
             // compare two lists

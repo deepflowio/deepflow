@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
+use std::sync::atomic::Ordering;
+
 use super::{flow::PacketDirection, l7_protocol_log::KafkaInfoCache};
 use enum_dispatch::enum_dispatch;
-use log::{debug, error};
+use log::{debug, error, warn};
 use serde::Serialize;
 
 use crate::{
@@ -148,6 +150,7 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
 
         let time = param.time;
         let msg_type: LogMessageType = param.direction.into();
+        let timeout = param.rrt_timeout as u64;
 
         if time != 0 {
             let (in_cached_req, timeout_count) = perf_cache
@@ -158,7 +161,7 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
                 if msg_type == LogMessageType::Request {
                     *in_cached_req += 1;
                 }
-                perf_cache.rrt_cache.put(
+                perf_cache.put(
                     cache_key,
                     LogCache {
                         msg_type: param.direction.into(),
@@ -166,6 +169,14 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
                         kafka_info,
                     },
                 );
+
+                param.stats_counter.as_ref().map(|f| {
+                    f.l7_perf_cache_len
+                        .swap(perf_cache.rrt_cache.len() as u64, Ordering::Relaxed);
+                    f.l7_timeout_cache_len
+                        .swap(perf_cache.timeout_cache.len() as u64, Ordering::Relaxed)
+
+                });
                 return None;
             };
 
@@ -181,7 +192,21 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
                 && time > previous_log_info.time
             {
                 let rrt = time - previous_log_info.time;
-                Some(rrt)
+                // timeout, save the latest
+                if rrt > timeout {
+                    *timeout_count += 1;
+                    perf_cache.rrt_cache.put(
+                        cache_key,
+                        LogCache {
+                            msg_type: param.direction.into(),
+                            time: param.time,
+                            kafka_info,
+                        },
+                    );
+                    None
+                } else {
+                    Some(rrt)
+                }
 
             // if previous is resp and current is req and previous time gt current time, likely ebpf disorder,
             // calculate the round trip time.
@@ -190,7 +215,16 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
                 && previous_log_info.time > time
             {
                 let rrt = previous_log_info.time - time;
-                Some(rrt)
+                if rrt > timeout {
+                    // disorder info rrt unlikely have large rrt gt timeout
+                    warn!("l7 log info disorder with long time rrt {}", rrt);
+                    // timeout, save latest
+                    *timeout_count += 1;
+                    perf_cache.rrt_cache.put(cache_key, previous_log_info);
+                    None
+                } else {
+                    Some(rrt)
+                }
             } else {
                 debug!(
                     "can not calculate rrt, flow_id: {}, previous log type:{:?}, previous time: {}, current log type: {:?}, current time: {}",
@@ -214,7 +248,7 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
                         *in_cached_req += 1;
                     }
                     perf_cache.rrt_cache.put(
-                        self.cal_cache_key(param),
+                        cache_key,
                         LogCache {
                             msg_type: param.direction.into(),
                             time: param.time,
@@ -223,6 +257,12 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
                     );
                 }
 
+                param.stats_counter.as_ref().map(|f| {
+                    f.l7_perf_cache_len
+                        .swap(perf_cache.rrt_cache.len() as u64, Ordering::Relaxed);
+                    f.l7_timeout_cache_len
+                        .swap(perf_cache.timeout_cache.len() as u64, Ordering::Relaxed);
+                });
                 None
             }
         } else {

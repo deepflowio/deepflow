@@ -30,6 +30,7 @@ use std::{
 
 use arc_swap::access::Access;
 use log::{info, warn};
+use rand::prelude::{Rng, SeedableRng, SmallRng};
 
 use super::{
     AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, BoxAppProtoLogsData, LogMessageType,
@@ -52,13 +53,12 @@ use public::utils::string::get_string_from_chars;
 use public::{
     queue::{DebugSender, Error, Receiver},
     utils::net::MacAddr,
-    LeakyBucket,
 };
 
 const QUEUE_BATCH_SIZE: usize = 1024;
 const RCV_TIMEOUT: Duration = Duration::from_secs(1);
 // 尽力而为的聚合默认120秒(AppProtoLogs.aggr*SLOT_WIDTH)内的请求和响应
-const SLOT_WIDTH: u64 = 10; // 每个slot存10秒
+pub const SLOT_WIDTH: u64 = 5; // 每个slot存5秒
 const SLOT_CACHED_COUNT: u64 = 100000; // 每个slot平均缓存的FLOW数
 
 const THROTTLE_BUCKET_BITS: u8 = 2;
@@ -221,14 +221,59 @@ impl RefCountable for SessionAggrCounter {
     }
 }
 
+struct Throttle {
+    interval: Duration,
+    last_flush_time: Duration,
+    throttle: u32,
+    throttle_multiple: u32,
+    period_count: u32,
+    config: LogParserAccess,
+    small_rng: SmallRng,
+}
+
+impl Throttle {
+    fn new(config: LogParserAccess, interval: u64) -> Self {
+        Self {
+            config,
+            interval: Duration::from_secs(interval),
+            throttle: 0,
+            throttle_multiple: interval as u32,
+            period_count: 0,
+            last_flush_time: Duration::ZERO,
+            small_rng: SmallRng::from_entropy(),
+        }
+    }
+
+    fn tick(&mut self, current: Duration) {
+        self.last_flush_time = current;
+        self.period_count = 0;
+        self.throttle =
+            (self.config.load().l7_log_collect_nps_threshold as u32) * self.throttle_multiple;
+    }
+
+    fn acquire(&mut self, current: Duration) -> bool {
+        self.period_count += 1;
+
+        if current > self.last_flush_time + self.interval || self.last_flush_time.is_zero() {
+            self.tick(current);
+        }
+
+        if self.period_count >= self.throttle {
+            return self.small_rng.gen_range(0..self.period_count) < self.throttle;
+        }
+
+        true
+    }
+}
+
 struct SessionQueue {
     aggregate_start_time: Duration,
     last_flush_time: Duration,
 
     window_size: usize,
-    time_window: Option<Vec<HashMap<u64, AppProtoLogsData>>>,
+    time_window: Option<Vec<HashMap<u64, Box<AppProtoLogsData>>>>,
 
-    log_rate: Arc<LeakyBucket>,
+    throttle: Throttle,
 
     counter: Arc<SessionAggrCounter>,
     output_queue: DebugSender<BoxAppProtoLogsData>,
@@ -240,13 +285,12 @@ impl SessionQueue {
         counter: Arc<SessionAggrCounter>,
         output_queue: DebugSender<BoxAppProtoLogsData>,
         config: LogParserAccess,
-        log_rate: Arc<LeakyBucket>,
     ) -> Self {
-        //l7_log_session_timeout 20s-300s ，window_size = 2-30，所以 SessionQueue.time_window 预分配内存
+        //l7_log_session_timeout 20s-300s ，window_size = 4-60，所以 SessionQueue.time_window 预分配内存
         let window_size =
             (config.load().l7_log_session_aggr_timeout.as_secs() / SLOT_WIDTH) as usize;
         let time_window = vec![HashMap::new(); window_size];
-
+        let throttle = Throttle::new(config.clone(), SLOT_WIDTH);
         Self {
             aggregate_start_time: Duration::ZERO,
             last_flush_time: Duration::ZERO,
@@ -254,7 +298,7 @@ impl SessionQueue {
             config,
             window_size,
 
-            log_rate,
+            throttle,
 
             counter,
             output_queue,
@@ -295,7 +339,7 @@ impl SessionQueue {
     //   - 收到响应，根据报文时间-RRT时间，找到对应的时间窗口，查找是否有匹配的请求
     //      - 若有， 则合并请求和响应(将响应的数据填入请求中，并修改请求的类型为会话)，释放当前响应，发送会话
     //      - 若没有, 则直接发送当前响应
-    fn aggregate_session_and_send(&mut self, item: AppProtoLogsData) {
+    fn aggregate_session_and_send(&mut self, item: Box<AppProtoLogsData>) {
         self.counter.receive.fetch_add(1, Ordering::Relaxed);
 
         let slot_time = if item.base_info.head.msg_type == LogMessageType::Response {
@@ -360,13 +404,13 @@ impl SessionQueue {
 
     fn on_request_log(
         &mut self,
-        map: &mut HashMap<u64, AppProtoLogsData>,
-        mut item: AppProtoLogsData,
+        map: &mut HashMap<u64, Box<AppProtoLogsData>>,
+        mut item: Box<AppProtoLogsData>,
         key: u64,
     ) {
         if let Some(mut p) = map.remove(&key) {
             if item.need_protocol_merge() {
-                let _ = p.session_merge(item);
+                let _ = p.session_merge(*item);
                 if p.special_info.is_session_end() {
                     self.counter.cached.fetch_sub(1, Ordering::Relaxed);
                     self.send(p);
@@ -378,8 +422,8 @@ impl SessionQueue {
                 // If the order is out of order and there is a response, it can be matched as a session, and the aggregated response is sent
                 if p.is_response() && p.base_info.start_time > item.base_info.start_time {
                     // if can not merge, send req and resp directly.
-                    if let Err(L7LogCanNotMerge(p)) = item.session_merge(p) {
-                        self.send(p);
+                    if let Err(L7LogCanNotMerge(p)) = item.session_merge(*p) {
+                        self.send(Box::new(p));
                     }
                     self.counter.cached.fetch_sub(1, Ordering::Relaxed);
                     self.counter.merge.fetch_add(1, Ordering::Relaxed);
@@ -417,14 +461,14 @@ impl SessionQueue {
 
     fn on_response_log(
         &mut self,
-        map: &mut HashMap<u64, AppProtoLogsData>,
-        item: AppProtoLogsData,
+        map: &mut HashMap<u64, Box<AppProtoLogsData>>,
+        item: Box<AppProtoLogsData>,
         key: u64,
     ) {
         // response, 需要找到request并merge
         if let Some(mut p) = map.remove(&key) {
             if item.need_protocol_merge() {
-                let _ = p.session_merge(item);
+                let _ = p.session_merge(*item);
 
                 if p.special_info.is_session_end() {
                     self.counter.cached.fetch_sub(1, Ordering::Relaxed);
@@ -435,8 +479,8 @@ impl SessionQueue {
             } else {
                 if p.is_request() && item.base_info.start_time > p.base_info.start_time {
                     // if can not merge, send req and resp directly.
-                    if let Err(L7LogCanNotMerge(item)) = p.session_merge(item) {
-                        self.send(item);
+                    if let Err(L7LogCanNotMerge(item)) = p.session_merge(*item) {
+                        self.send(Box::new(item));
                     }
                     self.counter.cached.fetch_sub(1, Ordering::Relaxed);
                     self.counter.merge.fetch_add(1, Ordering::Relaxed);
@@ -478,19 +522,25 @@ impl SessionQueue {
             Some(t) => t,
             None => return,
         };
-        let mut batch = Vec::new();
-        for map in time_window.drain(..) {
+        let mut batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
+        'outer: for map in time_window.drain(..) {
             self.counter
                 .cached
                 .fetch_sub(map.len() as u64, Ordering::Relaxed);
-            batch.reserve(map.len());
-            batch.extend(
-                map.into_values()
-                    .map(|item| BoxAppProtoLogsData(Box::new(item))),
-            );
+            for item in map.into_values() {
+                if batch.len() >= QUEUE_BATCH_SIZE {
+                    if let Err(Error::Terminated(..)) = self.output_queue.send_all(&mut batch) {
+                        warn!("output queue terminated");
+                        batch.clear();
+                        break 'outer;
+                    }
+                }
+                batch.push(BoxAppProtoLogsData(item));
+            }
+        }
+        if !batch.is_empty() {
             if let Err(Error::Terminated(..)) = self.output_queue.send_all(&mut batch) {
                 warn!("output queue terminated");
-                break;
             }
         }
         self.time_window.replace(time_window);
@@ -509,7 +559,11 @@ impl SessionQueue {
         get_uniq_flow_id_in_one_minute(item.base_info.flow_id) << 32 | (request_id as u64)
     }
 
-    fn flush_window(&mut self, n: usize, time_window: &mut Vec<HashMap<u64, AppProtoLogsData>>) {
+    fn flush_window(
+        &mut self,
+        n: usize,
+        time_window: &mut Vec<HashMap<u64, Box<AppProtoLogsData>>>,
+    ) {
         let delete_num = min(n, self.window_size);
         for i in 0..delete_num {
             let map = time_window.get_mut(i).unwrap();
@@ -517,6 +571,7 @@ impl SessionQueue {
                 .cached
                 .fetch_sub(map.len() as u64, Ordering::Relaxed);
             self.send_all(map.drain().map(|(_, item)| item).collect());
+            map.shrink_to_fit();
         }
         let mut maps = time_window.drain(0..delete_num).collect();
         time_window.append(&mut maps);
@@ -526,23 +581,22 @@ impl SessionQueue {
             Duration::from_secs(self.aggregate_start_time.as_secs() + n as u64 * SLOT_WIDTH);
     }
 
-    fn send(&mut self, item: AppProtoLogsData) {
+    fn send(&mut self, item: Box<AppProtoLogsData>) {
         if item.special_info.skip_send() {
             return;
         }
-        if !self.log_rate.acquire(1) {
+
+        if !self.throttle.acquire(item.base_info.start_time) {
             self.counter.throttle_drop.fetch_add(1, Ordering::Relaxed);
             return;
         }
 
-        if let Err(Error::Terminated(..)) =
-            self.output_queue.send(BoxAppProtoLogsData(Box::new(item)))
-        {
+        if let Err(Error::Terminated(..)) = self.output_queue.send(BoxAppProtoLogsData(item)) {
             warn!("output queue terminated");
         }
     }
 
-    fn send_all(&mut self, items: Vec<AppProtoLogsData>) {
+    fn send_all(&mut self, items: Vec<Box<AppProtoLogsData>>) {
         for item in items {
             self.send(item);
         }
@@ -557,8 +611,6 @@ pub struct SessionAggregator {
     thread: Mutex<Option<JoinHandle<()>>>,
     counter: Arc<SessionAggrCounter>,
     config: LogParserAccess,
-
-    log_rate: Arc<LeakyBucket>,
 }
 
 impl SessionAggregator {
@@ -567,7 +619,6 @@ impl SessionAggregator {
         output_queue: DebugSender<BoxAppProtoLogsData>,
         id: u32,
         config: LogParserAccess,
-        log_rate: Arc<LeakyBucket>,
     ) -> (Self, Arc<SessionAggrCounter>) {
         let counter: Arc<SessionAggrCounter> = Default::default();
         (
@@ -579,7 +630,6 @@ impl SessionAggregator {
                 thread: Mutex::new(None),
                 counter: counter.clone(),
                 config,
-                log_rate,
             },
             counter,
         )
@@ -596,13 +646,11 @@ impl SessionAggregator {
         let output_queue = self.output_queue.clone();
 
         let config = self.config.clone();
-        let log_rate = self.log_rate.clone();
 
         let thread = thread::Builder::new()
             .name("protocol-logs-parser".to_owned())
             .spawn(move || {
-                let mut session_queue =
-                    SessionQueue::new(counter, output_queue, config.clone(), log_rate);
+                let mut session_queue = SessionQueue::new(counter, output_queue, config.clone());
 
                 let mut batch_buffer = Vec::with_capacity(QUEUE_BATCH_SIZE);
 
@@ -610,11 +658,13 @@ impl SessionAggregator {
                     match input_queue.recv_all(&mut batch_buffer, Some(RCV_TIMEOUT)) {
                         Ok(_) => {
                             for app_proto in batch_buffer.drain(..) {
-                                session_queue.aggregate_session_and_send(AppProtoLogsData {
-                                    base_info: (*app_proto).base_info.clone(),
-                                    special_info: (*app_proto).l7_info,
-                                    direction_score: (*app_proto).direction_score,
-                                });
+                                session_queue.aggregate_session_and_send(Box::new(
+                                    AppProtoLogsData {
+                                        base_info: (*app_proto).base_info.clone(),
+                                        special_info: (*app_proto).l7_info,
+                                        direction_score: (*app_proto).direction_score,
+                                    },
+                                ));
                             }
                         }
                         Err(Error::Timeout) => {
@@ -622,6 +672,7 @@ impl SessionAggregator {
                             continue;
                         }
                         Err(Error::Terminated(..)) => break,
+                        Err(Error::BatchTooLarge(_)) => unreachable!(),
                     };
                 }
                 session_queue.clear();

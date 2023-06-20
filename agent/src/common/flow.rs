@@ -622,12 +622,13 @@ pub struct FlowMetricsPeer {
     pub is_l2_end: bool,
     pub is_l3_end: bool,
     pub is_active_host: bool,
-    pub is_device: bool,        // ture表明是从平台数据获取的
-    pub tcp_flags: TcpFlags,    // 所有TCP的Flags的或运算结果
-    pub is_vip_interface: bool, // 目前仅支持微软Mux设备，从grpc Interface中获取
-    pub is_vip: bool,           // 从grpc cidr中获取
-    pub is_local_mac: bool,     // 同EndpointInfo中的IsLocalMac, 流日志中不需要存储
-    pub is_local_ip: bool,      // 同EndpointInfo中的IsLocalIp, 流日志中不需要存储
+    pub is_device: bool,           // ture表明是从平台数据获取的
+    pub tcp_flags: TcpFlags,       // 每个流统计周期的TCP的Flags的或运算结果
+    pub total_tcp_flags: TcpFlags, // 整个Flow生命周期的TCP的Flags的或运算结果
+    pub is_vip_interface: bool,    // 目前仅支持微软Mux设备，从grpc Interface中获取
+    pub is_vip: bool,              // 从grpc cidr中获取
+    pub is_local_mac: bool,        // 同EndpointInfo中的IsLocalMac, 流日志中不需要存储
+    pub is_local_ip: bool,         // 同EndpointInfo中的IsLocalIp, 流日志中不需要存储
 
     // This field is valid for the following two scenarios:
     // VIP: Mac query acquisition
@@ -743,6 +744,7 @@ impl Default for FlowMetricsPeer {
             is_active_host: false,
             is_device: false,
             tcp_flags: TcpFlags::empty(),
+            total_tcp_flags: TcpFlags::empty(),
             is_vip_interface: false,
             is_vip: false,
             is_local_mac: false,
@@ -939,6 +941,7 @@ impl Flow {
 
         self.end_time = other.end_time;
         self.duration = other.duration;
+        self.tap_side = other.tap_side;
 
         if other.flow_perf_stats.is_some() {
             let x = other.flow_perf_stats.as_ref().unwrap();
@@ -1004,7 +1007,7 @@ impl Flow {
             FlowState::ClosingTx2 | FlowState::ClosingRx2 | FlowState::Closed => CloseType::TcpFin,
             FlowState::Reset => {
                 if self.flow_metrics_peers[FlowMetricsPeer::DST as usize]
-                    .tcp_flags
+                    .total_tcp_flags
                     .contains(TcpFlags::RST)
                 {
                     CloseType::TcpServerRst
@@ -1027,7 +1030,7 @@ impl Flow {
             }
             FlowState::EstablishReset | FlowState::OpeningRst => {
                 if self.flow_metrics_peers[FlowMetricsPeer::DST as usize]
-                    .tcp_flags
+                    .total_tcp_flags
                     .contains(TcpFlags::RST)
                 {
                     CloseType::ServerEstablishReset

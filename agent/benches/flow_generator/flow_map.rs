@@ -19,8 +19,9 @@ use std::time::{Duration, Instant};
 use criterion::*;
 
 use deepflow_agent::{
-    _TcpFlags as TcpFlags, _new_flow_map_and_receiver as new_flow_map_and_receiver,
-    _new_meta_packet as new_meta_packet, _reverse_meta_packet as reverse_meta_packet,
+    _FlowMapConfig as Config, _TcpFlags as TcpFlags,
+    _new_flow_map_and_receiver as new_flow_map_and_receiver, _new_meta_packet as new_meta_packet,
+    _reverse_meta_packet as reverse_meta_packet,
 };
 
 use public::proto::common::TridentType;
@@ -28,7 +29,14 @@ use public::proto::common::TridentType;
 pub(super) fn bench(c: &mut Criterion) {
     c.bench_function("flow_map_syn_flood", |b| {
         b.iter_custom(|iters| {
-            let (mut map, _) = new_flow_map_and_receiver(TridentType::TtProcess, None, false);
+            let (module_config, mut map, _) =
+                new_flow_map_and_receiver(TridentType::TtProcess, None, false);
+            let config = Config {
+                flow: &module_config.flow,
+                log_parser: &module_config.log_parser,
+                #[cfg(target_os = "linux")]
+                ebpf: None,
+            };
             let packets = (0..iters)
                 .into_iter()
                 .map(|i| {
@@ -40,7 +48,7 @@ pub(super) fn bench(c: &mut Criterion) {
                 .collect::<Vec<_>>();
             let start = Instant::now();
             for mut pkt in packets {
-                map.inject_meta_packet(&mut pkt);
+                map.inject_meta_packet(&config, &mut pkt);
             }
             start.elapsed()
         })
@@ -48,7 +56,14 @@ pub(super) fn bench(c: &mut Criterion) {
 
     c.bench_function("flow_map_with_ten_packets_flow_flood", |b| {
         b.iter_custom(|iters| {
-            let (mut map, _) = new_flow_map_and_receiver(TridentType::TtProcess, None, false);
+            let (module_config, mut map, _) =
+                new_flow_map_and_receiver(TridentType::TtProcess, None, false);
+            let config = Config {
+                flow: &module_config.flow,
+                log_parser: &module_config.log_parser,
+                #[cfg(target_os = "linux")]
+                ebpf: None,
+            };
             let iters = (iters + 9) / 10 * 10;
 
             let mut packets = vec![];
@@ -82,7 +97,7 @@ pub(super) fn bench(c: &mut Criterion) {
 
             let start = Instant::now();
             for mut pkt in packets {
-                map.inject_meta_packet(&mut pkt);
+                map.inject_meta_packet(&config, &mut pkt);
             }
             start.elapsed()
         })

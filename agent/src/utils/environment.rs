@@ -61,9 +61,17 @@ use public::utils::net::{
 pub type Checker = Box<dyn Fn() -> Result<()>>;
 
 // K8S environment node ip environment variable
-pub const K8S_NODE_IP_FOR_DEEPFLOW: &str = "K8S_NODE_IP_FOR_DEEPFLOW";
-pub const ENV_INTERFACE_NAME: &str = "CTRL_NETWORK_INTERFACE";
-pub const K8S_POD_IP_FOR_DEEPFLOW: &str = "K8S_POD_IP_FOR_DEEPFLOW";
+const K8S_NODE_IP_FOR_DEEPFLOW: &str = "K8S_NODE_IP_FOR_DEEPFLOW";
+const ENV_INTERFACE_NAME: &str = "CTRL_NETWORK_INTERFACE";
+const K8S_POD_IP_FOR_DEEPFLOW: &str = "K8S_POD_IP_FOR_DEEPFLOW";
+const IN_CONTAINER: &str = "IN_CONTAINER";
+const K8S_MEM_LIMIT_FOR_DEEPFLOW: &str = "K8S_MEM_LIMIT_FOR_DEEPFLOW";
+const ONLY_WATCH_K8S_RESOURCE: &str = "ONLY_WATCH_K8S_RESOURCE";
+
+const BYTES_PER_MEGABYTE: u64 = 1024 * 1024;
+const MIN_MEMORY_LIMIT_MEGABYTE: u64 = 128; // uint: Megabyte
+const MAX_MEMORY_LIMIT_MEGABYTE: u64 = 100000; // uint: Megabyte
+
 #[cfg(target_os = "linux")]
 const CORE_FILE_CONFIG: &str = "/proc/sys/kernel/core_pattern";
 #[cfg(target_os = "linux")]
@@ -446,11 +454,39 @@ pub fn get_k8s_local_node_ip() -> Option<IpAddr> {
 
 pub fn running_in_container() -> bool {
     // Environment variable "IN_CONTAINTER" is set in dockerfile
-    env::var_os("IN_CONTAINER").is_some()
+    env::var_os(IN_CONTAINER).is_some()
+}
+
+pub fn k8s_mem_limit_for_deepflow() -> Option<u64> {
+    // Environment variable "K8S_MEM_LIMIT_FOR_DEEPFLOW" is set from container fields
+    // https://kubernetes.io/docs/tasks/inject-data-application/environment-variable-expose-pod-information/#use-container-fields-as-values-for-environment-variables
+    env::var(K8S_MEM_LIMIT_FOR_DEEPFLOW).ok().and_then(|v| {
+        v.parse::<u64>().ok().and_then(|v| {
+            if v < MIN_MEMORY_LIMIT_MEGABYTE || v > MAX_MEMORY_LIMIT_MEGABYTE {
+                warn!("the K8S_MEM_LIMIT_FOR_DEEPFLOW: {} Mi is out of [{} Mi, {} Mi], use the limit value from server instead", v, MIN_MEMORY_LIMIT_MEGABYTE, MAX_MEMORY_LIMIT_MEGABYTE);
+                None
+            } else {
+                Some(v * BYTES_PER_MEGABYTE)
+            }
+        })
+    })
+}
+
+pub fn get_env() -> String {
+    format!(
+        "
+    K8S_NODE_IP_FOR_DEEPFLOW: {:?}, ENV_INTERFACE_NAME: {:?}, K8S_POD_IP_FOR_DEEPFLOW: {:?}, IN_CONTAINER: {:?}, K8S_MEM_LIMIT_FOR_DEEPFLOW: {:?}, ONLY_WATCH_K8S_RESOURCE: {:?}",
+        env::var(K8S_NODE_IP_FOR_DEEPFLOW).ok(),
+        env::var(ENV_INTERFACE_NAME).ok(),
+        env::var(K8S_POD_IP_FOR_DEEPFLOW).ok(),
+        env::var(IN_CONTAINER).ok(),
+        env::var(K8S_MEM_LIMIT_FOR_DEEPFLOW).ok(),
+        env::var(ONLY_WATCH_K8S_RESOURCE).ok()
+    )
 }
 
 pub fn running_in_only_watch_k8s_mode() -> bool {
-    running_in_container() && env::var_os("ONLY_WATCH_K8S_RESOURCE").is_some()
+    running_in_container() && env::var_os(ONLY_WATCH_K8S_RESOURCE).is_some()
 }
 
 #[cfg(target_os = "linux")]
@@ -567,46 +603,53 @@ pub fn get_ctrl_ip_and_mac(dest: IpAddr) -> (IpAddr, MacAddr) {
             (ip, ctrl_mac.unwrap())
         }
         None => {
-            let tuple = get_route_src_ip_and_mac(&dest);
-            if tuple.is_err() {
-                error!(
-                    "failed getting control ip and mac from {}, deepflow-agent restart...",
-                    dest
-                );
-                thread::sleep(Duration::from_secs(1));
-                process::exit(-1);
-            }
-            let (ip, mac) = tuple.unwrap();
-            let links = link_list();
-            if links.is_err() {
-                error!("failed getting local interfaces, deepflow-agent restart...");
-                thread::sleep(Duration::from_secs(1));
-                process::exit(-1);
-            }
-            // When the found IP is attached to a Down network card,
-            // use the public IP to check again to find the outgoing
-            // interface of the default route.
-            for link in links.unwrap().iter() {
-                if link.mac_addr == mac {
-                    if !link.flags.contains(LinkFlags::UP) {
-                        let dest = if dest.is_ipv4() {
-                            DNS_HOST_IPV4
-                        } else {
-                            DNS_HOST_IPV6
-                        };
-                        let tuple = get_route_src_ip_and_mac(&dest);
-                        if tuple.is_err() {
-                            error!("failed getting control ip and mac from {}, because: {:?}, deepflow-agent restart...", dest, tuple);
-                            thread::sleep(Duration::from_secs(1));
-                            process::exit(-1);
-                        }
-                        return tuple.unwrap();
-                    }
-                    break;
+            // FIXME: Getting ctrl_ip and ctrl_mac sometimes fails, increase three retry opportunities to ensure access to ctrl_ip and ctrl_mac
+            'outer: for _ in 0..3 {
+                let tuple = get_route_src_ip_and_mac(&dest);
+                if tuple.is_err() {
+                    warn!(
+                        "failed getting control ip and mac from {}, because: {:?}, wait 1 second",
+                        dest, tuple,
+                    );
+                    thread::sleep(Duration::from_secs(1));
+                    continue;
                 }
-            }
+                let (ip, mac) = tuple.unwrap();
+                let links = link_list();
+                if links.is_err() {
+                    warn!(
+                        "failed getting local interfaces, because: {:?}, wait 1 second",
+                        links
+                    );
+                    thread::sleep(Duration::from_secs(1));
+                    continue;
+                }
+                // When the found IP is attached to a Down network card,
+                // use the public IP to check again to find the outgoing
+                // interface of the default route.
+                for link in links.unwrap().iter() {
+                    if link.mac_addr == mac {
+                        if !link.flags.contains(LinkFlags::UP) {
+                            let dest = if dest.is_ipv4() {
+                                DNS_HOST_IPV4
+                            } else {
+                                DNS_HOST_IPV6
+                            };
+                            let tuple = get_route_src_ip_and_mac(&dest);
+                            if tuple.is_err() {
+                                warn!("failed getting control ip and mac from {}, because: {:?}, wait 1 second", dest, tuple);
+                                continue 'outer;
+                            }
+                            return tuple.unwrap();
+                        }
+                        break;
+                    }
+                }
 
-            (ip, mac)
+                return (ip, mac);
+            }
+            error!("failed getting control ip and mac, deepflow-agent restart...");
+            process::exit(-1);
         }
     }
 }

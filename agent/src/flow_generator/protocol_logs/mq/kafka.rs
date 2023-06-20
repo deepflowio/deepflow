@@ -242,7 +242,10 @@ impl L7ProtocolParserInterface for KafkaLog {
             let mut log_cache = param.l7_perf_cache.borrow_mut();
             if let Some(previous) = log_cache.rrt_cache.get(&self.info.cal_cache_key(param)) {
                 match (previous.msg_type, self.info.msg_type) {
-                    (LogMessageType::Request, LogMessageType::Response) => {
+                    (LogMessageType::Request, LogMessageType::Response)
+                        if param.time > previous.time
+                            && param.time - previous.time > param.rrt_timeout as u64 =>
+                    {
                         if let Some(req) = previous.kafka_info.as_ref() {
                             self.set_status_code(
                                 req.api_key,
@@ -251,7 +254,10 @@ impl L7ProtocolParserInterface for KafkaLog {
                             )
                         }
                     }
-                    (LogMessageType::Response, LogMessageType::Request) => {
+                    (LogMessageType::Response, LogMessageType::Request)
+                        if previous.time > param.time
+                            && previous.time - param.time > param.rrt_timeout as u64 =>
+                    {
                         if let Some(resp) = previous.kafka_info.as_ref() {
                             self.set_status_code(
                                 self.info.api_key,

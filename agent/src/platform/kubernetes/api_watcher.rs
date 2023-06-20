@@ -709,6 +709,8 @@ impl ApiWatcher {
         let watcher_config = WatcherConfig {
             list_limit: config.kubernetes_api_list_limit,
             list_interval: config.kubernetes_api_list_interval,
+            max_memory: config.max_memory,
+            memory_trim_percent: config.kubernetes_api_memory_trim_percent,
         };
 
         let (resource_watchers, task_handles) = loop {

@@ -1125,7 +1125,7 @@ CREATE TABLE IF NOT EXISTS alarm_policy (
     sub_view_metrics        TEXT,
     sub_view_extra          TEXT,
     user_id                 INTEGER,
-    name                    CHAR(64) NOT NULL,
+    name                    CHAR(128) NOT NULL,
     level                   TINYINT(1) NOT NULL COMMENT '0.low 1.middle 2.high',
     state                   TINYINT(1) DEFAULT 1 COMMENT '0.disabled 1.enabled',
     app_type                TINYINT(1) NOT NULL COMMENT '1-system 2-360view',
@@ -1242,7 +1242,7 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, sub_view_url, sub_view_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     upper_threshold, lower_threshold, lcuuid)
-    values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_monitor\",\"include_history\":\"true\",\"interval\":60,\"fill\":0,\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Min(`metrics.cpu_percent`*100/`metrics.max_cpus`) AS `cpu_usage`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Min(`metrics.cpu_percent`*100/`metrics.max_cpus`) AS `cpu_usage`\"]}]}",
+    values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_monitor\",\"include_history\":\"true\",\"interval\":60,\"fill\":0,\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Min(`metrics.cpu_percent`/`metrics.max_cpus`) AS `cpu_usage`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Min(`metrics.cpu_percent`/`metrics.max_cpus`) AS `cpu_usage`\"]}]}",
     "[{\"METRIC_LABEL\":\"cpu_usage\",\"return_field_description\":\"持续 5 分钟 (CPU用量/阈值)\",\"unit\":\"%\"}]", "采集器 CPU 超限",  0, 1, 1, 21, 1, "", "", "cpu_usage", 70, NULL, @lcuuid);
 
 set @lcuuid = (select uuid());
@@ -1376,14 +1376,6 @@ INSERT INTO alarm_policy(user_id, sub_view_type, sub_view_url, sub_view_params, 
     values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_ebpf_collector\",\"interval\":60,\"fill\":0,\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.user_enqueue_lost`) AS `drop_packets`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.kernuser_enqueue_lost_lost`) AS `drop_packets`\"]}]}",
     "[{\"METRIC_LABEL\":\"drop_packets\",\"return_field_description\":\"最近 1 分钟 ebpf_collector.metrics.user_enqueue_lost\",\"unit\":\"\"}]",
      "采集器数据丢失 (ebpf_collector.metrics.user_enqueue_lost)",  0, 1, 1, 21, 1, "", "", "drop_packets", 1, NULL, @lcuuid);
-
-set @lcuuid = (select uuid());
-INSERT INTO alarm_policy(user_id, sub_view_type, sub_view_url, sub_view_params, sub_view_metrics, name, level, state,
-    app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
-    upper_threshold, lower_threshold, lcuuid)
-    values(1, 1, "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_dispatcher\",\"interval\":60,\"fill\":0,\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.retired`) AS `drop_packets`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.retired`) AS `drop_packets`\"]}]}",
-    "[{\"METRIC_LABEL\":\"drop_packets\",\"return_field_description\":\"最近 1 分钟 dispatcher.metrics.retired\",\"unit\":\"\"}]",
-     "采集器数据丢失 (dispatcher.metrics.retired)",  0, 1, 1, 21, 1, "", "", "drop_packets", 1, NULL, @lcuuid);
 
 set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, sub_view_url, sub_view_params, sub_view_metrics, name, level, state,

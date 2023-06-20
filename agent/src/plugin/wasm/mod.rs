@@ -107,6 +107,7 @@
 mod abi_export;
 mod abi_import;
 mod host;
+mod metric;
 #[cfg(test)]
 mod test;
 mod vm;
@@ -122,7 +123,8 @@ use host::{
 use public::bytes::read_u16_be;
 use vm::{VmCtxBase, VmHttpReqCtx, VmHttpRespCtx, VmParseCtx, VmResult};
 
-pub use host::{init_wasmtime, WasmVm};
+pub use host::{get_all_wasm_export_func_name, init_wasmtime, WasmVm};
+pub use metric::{get_wasm_metric_counter_map_key, WasmCounter, WasmCounterMap};
 
 #[macro_export]
 macro_rules! wasm_info {

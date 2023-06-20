@@ -413,12 +413,20 @@ vtap_group_id: g-xxxxxx
   ## K8s api list limit
   ## Default: 1000. Options: [10, 4294967296)
   ## Note: Used when limit k8s api list entry size.
-  #kubernetes-api-list-limit:
+  #kubernetes-api-list-limit: 1000
 
   ## K8s api list interval
   ## Default: 10m. Must be larger than or equal to 10m.
   ## Note: Interval of listing resource when watcher idles
-  #kubernetes-api-list-interval:
+  #kubernetes-api-list-interval: 10m
+
+  ## K8s api memory trim percentage
+  ## Default: 100. Options: [0, 100]
+  ## Note: The memory percentage is calculated by `RssAnon * 100 / (max_memory - RssFile - RssShmem)`.
+  #    If `memory-trim-disabled` is set to false (the default), memory will be checked
+  #    after processing each batch `Api::list` returns, a percentage above this threshold
+  #    will trigger a `malloc_trim`.
+  #kubernetes-api-memory-trim-percent: 100
 
   ## Type of Ingress
   ## Default: kubernetes. Options: kubernetes, openshift
@@ -475,6 +483,12 @@ vtap_group_id: g-xxxxxx
   ## Note: Whether to enable mirror traffic deduplication when tap_mode = 2.
   #analyzer-dedup-disabled: false
 
+  ## Buffer block size used to store raw packet.
+  ## Larger value will reduce memory allocation for raw packet, but will also
+  ## delay memory free.
+  ## Default: 65536, Range: [65536: +oo)
+  #analyzer-raw-packet-block-size: 65536
+
   ## Default TAP for Mirror Traffic
   ## Default: 3, means Cloud Network
   ## Options: 1-2,4-255 (IDC Network), 3 (Cloud Network)
@@ -509,6 +523,15 @@ vtap_group_id: g-xxxxxx
   ## Note: When set to 0, deepflow-agent will automatically adjust the map size
   ##   according to max_memory.
   #fast-path-map-size: 0
+
+  ## Fast Path Disabled
+  ## Note: When set to true, deepflow-agent will not use fast path.
+  #fast-path-disabled: false
+
+  ## Forward Table Capacity
+  ## Default: 16384. Range: [16384, +oo)
+  ## Note: When this value is larger, the more memory usage may be
+  #forward-capacity: 16384
 
   ## Fast Path Level
   ## Default: 8. Range: [1, 16]
@@ -651,7 +674,9 @@ vtap_group_id: g-xxxxxx
 
     ## Maximum Flow
     ## Default: 1048576
-    ## Note: Maximum number of flows that can be stored in FlowMap.
+    ## Note: Maximum number of flows that can be stored in FlowMap, It will also affect the capacity of
+    ##   the RRT cache, Example: rrt-cache-capacity = flow-count-limit / 4. When rrt-cache-capacity is
+    ##   not enough, it will be unable to calculate the rrt of l7.
     #flow-count-limit: 1048576
 
     ## Queue Size of FlowAggregator (1s->1m)
@@ -792,6 +817,13 @@ vtap_group_id: g-xxxxxx
   #################
   ## L7 Protocol ##
   #################
+  ## L7 perf rrt calculate timeout
+  ## Note: the timeout of l7 log info rrt calculate, when rrt exceed the value will act as timeout and will not
+  ##   calculate the sum and average and will not merge the request and response in session aggregate. the value
+  ##   must greater than session aggregate SLOT_TIME(const 10s) and less than 3600 on tcp or 300 on udp.
+  #rrt-tcp-timeout: 1800s
+  #rrt-udp-timeout: 150s
+
   ## Maximum Fail Count
   ## Note: deepflow-agent will mark the application protocol for each
   ##   <vpc, ip, protocol, port> tuple, when the traffic corresponding to a tuple fails

@@ -27,6 +27,7 @@ type StaticConfig struct {
 	Profiler                         *bool                 `yaml:"profiler,omitempty"`
 	AfpacketBlocksEnabled            *bool                 `yaml:"afpacket-blocks-enabled,omitempty"`
 	AfpacketBlocks                   *int                  `yaml:"afpacket-blocks,omitempty"`
+	AnalyzerRawPacketBlockSize       *int                  `yaml:"analyzer-raw-packet-block-size,omitempty"`
 	EnableDebugStats                 *bool                 `yaml:"enable-debug-stats,omitempty"`
 	AnalyzerDedupDisabled            *bool                 `yaml:"analyzer-dedup-disabled,omitempty"`
 	DefaultTapType                   *uint32               `yaml:"default-tap-type,omitempty"`
@@ -64,6 +65,7 @@ type StaticConfig struct {
 	KubernetesNamespace              *string               `yaml:"kubernetes-namespace,omitempty"`
 	KubernetesAPIListLimit           *uint32               `yaml:"kubernetes-api-list-limit,omitempty"`
 	KubernetesAPIListInterval        *string               `yaml:"kubernetes-api-list-interval,omitempty"`
+	KubernetesAPIMemoryTrimPercent   *uint8                `yaml:"kubernetes-api-memory-trim-percent,omitempty"`
 	IngressFlavour                   *string               `yaml:"ingress-flavour,omitempty"`
 	GrpcBufferSize                   *int                  `yaml:"grpc-buffer-size,omitempty"`            // 单位：M
 	L7LogSessionAggrTimeout          *string               `yaml:"l7-log-session-aggr-timeout,omitempty"` // 单位: s
@@ -95,6 +97,10 @@ type StaticConfig struct {
 	CheckCoreFileDisabled            *bool                 `yaml:"check-core-file-disabled,omitempty"`
 	WasmPlugins                      []string              `yaml:"wasm-plugins,omitempty"`
 	MemoryTrimDisabled               *bool                 `yaml:"memory-trim-disabled,omitempty"`
+	FastPathDisabled                 *bool                 `yaml:"fast-path-disabled,omitempty"`
+	ForwardCapacity                  *uint32               `yaml:"forward-capacity,omitempty"`
+	RrtTcpTimeout                    *string               `yaml:"rrt-tcp-timeout,omitempty"`
+	RrtUdpTimeout                    *string               `yaml:"rrt-udp-timeout,omitempty"`
 }
 
 type XflowCollectorConfig struct {

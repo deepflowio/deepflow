@@ -78,11 +78,12 @@ use crate::{
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
     sender::{npb_sender::NpbArpTable, uniform_sender::UniformSenderThread},
     utils::{
-        cgroups::{is_kernel_available_for_cgroup, Cgroups},
+        cgroups::{is_kernel_available_for_cgroups, Cgroups},
         command::get_hostname,
         environment::{
             check, controller_ip_check, free_memory_check, free_space_checker, get_ctrl_ip_and_mac,
-            kernel_check, running_in_container, tap_interface_check, trident_process_check,
+            get_env, kernel_check, running_in_container, tap_interface_check,
+            trident_process_check,
         },
         guard::Guard,
         logger::{LogLevelWriter, LogWriterAdapter, RemoteLogConfig, RemoteLogWriter},
@@ -115,7 +116,7 @@ use public::{
     debug::QueueDebugger,
     netns::NsFile,
     packet::MiniPacket,
-    proto::trident::{self, IfMacSource, SocketType, TapMode},
+    proto::trident::{self, Exception, IfMacSource, SocketType, TapMode},
     queue::{self, DebugSender},
     sender::SendMessageType,
     utils::net::{get_route_src_ip, links_by_name_regex, MacAddr},
@@ -333,6 +334,7 @@ impl Trident {
         config_path: Option<PathBuf>,
     ) -> Result<()> {
         info!("==================== Launching DeepFlow-Agent ====================");
+        info!("Environment variables: {:?}", get_env());
 
         let (ctrl_ip, ctrl_mac) = get_ctrl_ip_and_mac(config.controller_ips[0].parse()?);
         if running_in_container() {
@@ -412,10 +414,10 @@ impl Trident {
         let mut is_cgroup_v2 = false;
         let mut cgroups_controller = None;
         if running_in_container() {
-            info!("don't initialize cgroup controller, because agent is running in container");
-        } else if !is_kernel_available_for_cgroup() {
-            // fixme: Linux after kernel version 2.6.24 can use cgroup
-            info!("don't initialize cgroup controller, because kernel version < 3 or agent is in Windows");
+            info!("don't initialize cgroups controller, because agent is running in container");
+        } else if !is_kernel_available_for_cgroups() {
+            // fixme: Linux after kernel version 2.6.24 can use cgroups
+            info!("don't initialize cgroups controller, because kernel version < 3 or agent is in Windows");
         } else {
             match Cgroups::new(process::id() as u64, config_handler.environment()) {
                 Ok(cg_controller) => {
@@ -425,12 +427,8 @@ impl Trident {
                     cgroups_controller = Some(cg_controller);
                 }
                 Err(e) => {
-                    warn!(
-                        "initialize cgroup controller failed: {}, deepflow-agent restart...",
-                        e
-                    );
-                    thread::sleep(Duration::from_secs(1));
-                    process::exit(1);
+                    warn!("initialize cgroups controller failed: {}, resource utilization will be checked regularly to prevent resource usage from exceeding the limit.", e);
+                    exception_handler.set(Exception::CgroupsConfigError);
                 }
             }
         }
@@ -441,7 +439,6 @@ impl Trident {
             config_handler.environment(),
             log_dir.to_string(),
             config_handler.candidate_config.yaml_config.guard_interval,
-            config_handler.candidate_config.tap_mode,
             exception_handler.clone(),
             cgroup_mount_path,
             is_cgroup_v2,
@@ -515,7 +512,7 @@ impl Trident {
                         libvirt_xml_extractor.stop();
                         if let Some(cg_controller) = cgroups_controller {
                             if let Err(e) = cg_controller.stop() {
-                                info!("stop cgroup controller failed, {:?}", e);
+                                info!("stop cgroups controller failed, {:?}", e);
                             }
                         }
                     }
@@ -973,7 +970,6 @@ impl WatcherComponents {
 pub struct AgentComponents {
     pub config: ModuleConfig,
     pub rx_leaky_bucket: Arc<LeakyBucket>,
-    pub l7_log_rate: Arc<LeakyBucket>,
     pub tap_typer: Arc<TapTyper>,
     pub cur_tap_types: Vec<trident::TapType>,
     pub dispatchers: Vec<Dispatcher>,
@@ -1196,6 +1192,20 @@ impl AgentComponents {
             .process_threshold;
         let feature_flags = FeatureFlags::from(&yaml_config.feature_flags);
 
+        #[cfg(target_os = "linux")]
+        {
+            // require an update because platfrom_synchronizer starts before receiving config from server
+            let regex = &candidate_config.dispatcher.extra_netns_regex;
+            let regex = if regex != "" {
+                info!("platform monitoring extra netns: /{}/", regex);
+                Some(Regex::new(regex).unwrap())
+            } else {
+                info!("platform monitoring no extra netns");
+                None
+            };
+            platform_synchronizer.set_netns_regex(regex);
+        }
+
         let mut stats_sender = UniformSenderThread::new(
             "stats",
             stats_collector.get_receiver(),
@@ -1248,7 +1258,8 @@ impl AgentComponents {
             1.max(yaml_config.src_interfaces.len()),
             yaml_config.first_path_level as usize,
             yaml_config.fast_path_map_size,
-            false,
+            yaml_config.forward_capacity,
+            yaml_config.fast_path_disabled,
         );
         synchronizer.add_flow_acl_listener(Box::new(policy_setter));
         policy_setter.set_memory_limit(max_memory);
@@ -1477,10 +1488,6 @@ impl AgentComponents {
         #[cfg(target_os = "windows")]
         let bpf_syntax_str = bpf_builder.build_pcap_syntax_to_str();
 
-        let l7_log_rate = Arc::new(LeakyBucket::new(Some(
-            candidate_config.log_parser.l7_log_collect_nps_threshold,
-        )));
-
         // Enterprise Edition Feature: packet-sequence
         let packet_sequence_queue_name = "2-packet-sequence-block-to-sender";
         let (packet_sequence_uniform_output, packet_sequence_uniform_input, counter) =
@@ -1545,7 +1552,7 @@ impl AgentComponents {
         let pcap_batch_queue = "2-pcap-batch-to-sender";
         let (pcap_batch_sender, pcap_batch_receiver, pcap_batch_counter) =
             queue::bounded_with_debug(
-                yaml_config.packet_sequence_queue_size,
+                yaml_config.pcap.queue_size as usize,
                 pcap_batch_queue,
                 &queue_debugger,
             );
@@ -1598,7 +1605,6 @@ impl AgentComponents {
                 proto_log_sender.clone(),
                 i as u32,
                 config_handler.log_parser(),
-                l7_log_rate.clone(),
             );
             stats_collector.register_countable(
                 "l7_session_aggr",
@@ -1731,7 +1737,10 @@ impl AgentComponents {
                 .netns(netns)
                 .trident_type(candidate_config.dispatcher.trident_type)
                 .queue_debugger(queue_debugger.clone())
-                .analyzer_queue_size(yaml_config.analyzer_queue_size as usize);
+                .analyzer_queue_size(yaml_config.analyzer_queue_size as usize)
+                .analyzer_raw_packet_block_size(
+                    yaml_config.analyzer_raw_packet_block_size as usize,
+                );
 
             #[cfg(target_os = "linux")]
             let dispatcher = match dispatcher_builder
@@ -1876,7 +1885,6 @@ impl AgentComponents {
                 proto_log_sender.clone(),
                 ebpf_dispatcher_id as u32,
                 config_handler.log_parser(),
-                l7_log_rate.clone(),
             );
             stats_collector.register_countable(
                 "l7_session_aggr",
@@ -2097,7 +2105,6 @@ impl AgentComponents {
         Ok(AgentComponents {
             config: candidate_config.clone(),
             rx_leaky_bucket,
-            l7_log_rate,
             tap_typer,
             cur_tap_types: vec![],
             dispatchers,
@@ -2176,7 +2183,7 @@ impl AgentComponents {
         // in the environment where cgroup is not supported, we need to check free memory
         if self.tap_mode != TapMode::Analyzer
             && !running_in_container()
-            && !is_kernel_available_for_cgroup()
+            && !is_kernel_available_for_cgroups()
         {
             match free_memory_check(self.max_memory, &self.exception_handler) {
                 Ok(()) => {

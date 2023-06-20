@@ -17,6 +17,8 @@
 package baidubce
 
 import (
+	"time"
+
 	"github.com/baidubce/bce-sdk-go/services/rds"
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
@@ -52,11 +54,14 @@ func (b *BaiduBce) getRDSInstances(
 	results := make([]*rds.ListRdsResult, 0)
 	for {
 		args.Marker = marker
+		startTime := time.Now()
 		result, err := rdsClient.ListRds(args)
 		if err != nil {
 			log.Error(err)
 			return nil, nil, nil, err
 		}
+		b.cloudStatsd.APICost["ListRds"] = append(b.cloudStatsd.APICost["ListRds"], int(time.Now().Sub(startTime).Milliseconds()))
+		b.cloudStatsd.APICount["ListRds"] = append(b.cloudStatsd.APICount["ListRds"], len(result.Instances))
 		results = append(results, result)
 		if !result.IsTruncated {
 			break

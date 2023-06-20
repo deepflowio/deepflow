@@ -18,9 +18,11 @@ use std::cell::RefCell;
 use std::fmt::Debug;
 use std::net::IpAddr;
 use std::rc::Rc;
+use std::sync::Arc;
+use std::time::Duration;
 
 use enum_dispatch::enum_dispatch;
-
+use log::debug;
 use lru::LruCache;
 
 use super::ebpf::EbpfType;
@@ -29,6 +31,7 @@ use super::l7_protocol_info::L7ProtocolInfo;
 use super::MetaPacket;
 
 use crate::config::handler::LogParserConfig;
+use crate::flow_generator::flow_map::FlowMapCounter;
 use crate::flow_generator::protocol_logs::plugin::custom_wrap::CustomWrapLog;
 use crate::flow_generator::protocol_logs::plugin::get_custom_log_parser;
 use crate::flow_generator::protocol_logs::{
@@ -353,14 +356,31 @@ pub struct L7PerfCache {
     pub rrt_cache: LruCache<u128, LogCache>,
     // LruCache<flow_id, (in_cache_req, count)>
     pub timeout_cache: LruCache<u64, (usize, usize)>,
+    // time in microseconds
+    pub last_log_time: u64,
 }
 
 impl L7PerfCache {
+    // 60 seconds
+    const LOG_INTERVAL: u64 = 60_000_000;
+
     pub fn new(cap: usize) -> Self {
         L7PerfCache {
             rrt_cache: LruCache::new(cap.try_into().unwrap()),
             timeout_cache: LruCache::new(cap.try_into().unwrap()),
+            last_log_time: 0,
         }
+    }
+
+    pub fn put(&mut self, key: u128, value: LogCache) -> Option<LogCache> {
+        let now = value.time;
+        if self.rrt_cache.len() >= usize::from(self.rrt_cache.cap())
+            && self.last_log_time + Self::LOG_INTERVAL < now
+        {
+            self.last_log_time = now;
+            debug!("The capacity({}) of the rrt table will be exceeded. please adjust the configuration", self.rrt_cache.cap());
+        }
+        self.rrt_cache.put(key, value)
     }
 
     pub fn pop_timeout_count(&mut self, flow_id: &u64, flow_end: bool) -> usize {
@@ -400,6 +420,11 @@ pub struct ParseParam<'a> {
     pub l7_perf_cache: Rc<RefCell<L7PerfCache>>,
 
     pub wasm_vm: Option<Rc<RefCell<WasmVm>>>,
+
+    pub stats_counter: Option<Arc<FlowMapCounter>>,
+
+    // rrt cal timeout
+    pub rrt_timeout: usize, // micro second
 }
 
 // from packet, previous_log_info_cache, perf_only
@@ -426,6 +451,10 @@ impl From<(&MetaPacket<'_>, Rc<RefCell<L7PerfCache>>, bool)> for ParseParam<'_> 
             l7_perf_cache: cache,
 
             wasm_vm: None,
+            stats_counter: None,
+
+            // the timeout will overwrite by set_rrt_timeout(), 10s set in here only use for test.
+            rrt_timeout: Duration::from_secs(10).as_micros() as usize,
         };
         if packet.ebpf_type != EbpfType::None {
             let is_tls = match packet.ebpf_type {
@@ -483,6 +512,14 @@ impl ParseParam<'_> {
 
     pub fn set_wasm_vm(&mut self, vm: Rc<RefCell<WasmVm>>) {
         self.wasm_vm = Some(vm);
+    }
+
+    pub fn set_counter(&mut self, stat: Arc<FlowMapCounter>) {
+        self.stats_counter = Some(stat);
+    }
+
+    pub fn set_rrt_timeout(&mut self, t: usize) {
+        self.rrt_timeout = t;
     }
 }
 
