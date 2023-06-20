@@ -443,6 +443,7 @@ pub struct Synchronizer {
 }
 
 impl Synchronizer {
+    const LOG_THRESHOLD: usize = 3;
     pub fn new(
         runtime: Arc<Runtime>,
         session: Arc<Session>,
@@ -775,6 +776,15 @@ impl Synchronizer {
         cvar.notify_one();
     }
 
+    fn grpc_failed_log(grpc_failed_count: &mut usize, detail: String) {
+        *grpc_failed_count += 1;
+        if *grpc_failed_count > Self::LOG_THRESHOLD {
+            error!("Grpc error {} count {}", detail, grpc_failed_count);
+        } else {
+            warn!("Grpc error {} count {}", detail, grpc_failed_count);
+        }
+    }
+
     fn run_triggered_session(&self, escape_tx: UnboundedSender<Duration>) {
         let session = self.session.clone();
         let trident_state = self.trident_state.clone();
@@ -787,6 +797,7 @@ impl Synchronizer {
         let exception_handler = self.exception_handler.clone();
         let ntp_diff = self.ntp_diff.clone();
         self.threads.lock().push(self.runtime.spawn(async move {
+            let mut grpc_failed_count = 0;
             while running.load(Ordering::SeqCst) {
                 let response = session
                     .grpc_push_with_statsd(Synchronizer::generate_sync_request(
@@ -802,11 +813,12 @@ impl Synchronizer {
                 if let Err(m) = response {
                     exception_handler.set(Exception::ControllerSocketError);
                     session.set_request_failed(true);
-                    error!("rpc error {:?}", m);
+                    Self::grpc_failed_log(&mut grpc_failed_count, format!("from trigger {:?}", m));
                     time::sleep(RPC_RETRY_INTERVAL).await;
                     continue;
                 }
                 session.set_request_failed(false);
+                grpc_failed_count = 0;
 
                 let mut stream = response.unwrap().into_inner();
                 while running.load(Ordering::SeqCst) {
@@ -817,7 +829,10 @@ impl Synchronizer {
                     }
                     if let Err(m) = message {
                         exception_handler.set(Exception::ControllerSocketError);
-                        error!("rpc error {:?}", m);
+                        Self::grpc_failed_log(
+                            &mut grpc_failed_count,
+                            format!("from trigger {:?}", m),
+                        );
                         break;
                     }
                     let message = message.unwrap();
@@ -1203,6 +1218,7 @@ impl Synchronizer {
         let exception_handler = self.exception_handler.clone();
         let ntp_diff = self.ntp_diff.clone();
         self.threads.lock().push(self.runtime.spawn(async move {
+            let mut grpc_failed_count = 0;
             while running.load(Ordering::SeqCst) {
                 let upgrade_hostname = |s: &str| {
                     let r = status.upgradable_read();
@@ -1246,18 +1262,15 @@ impl Synchronizer {
                 if let Err(m) = response {
                     exception_handler.set(Exception::ControllerSocketError);
                     let (ip, port) = session.get_current_server();
-                    error!(
-                        "grpc sync error, server {} {} unavailable, status-code {}, message: \"{}\"",
-                        ip,
-                        port,
-                        m.code(),
-                        m.message()
-                    );
                     session.set_request_failed(true);
+                    Self::grpc_failed_log(&mut grpc_failed_count,
+                        format!("from sync server {} {} unavailable {:?}\"",
+                                    ip, port, &m));
                     time::sleep(RPC_RETRY_INTERVAL).await;
                     continue;
                 }
                 session.set_request_failed(false);
+                grpc_failed_count = 0;
 
                 Self::on_response(
                     session.get_current_server(),

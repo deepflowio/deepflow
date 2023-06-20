@@ -563,6 +563,81 @@ func DeleteDomain(lcuuid string) (map[string]string, error) { // TODO whether re
 	return map[string]string{"LCUUID": lcuuid}, nil
 }
 
+func KubernetesSetVtap(domainLcuuid, subDomainLcuuid, value string) error {
+	if value == "" {
+		return nil
+	}
+
+	var err error
+	var clusterID string
+	if domainLcuuid != "" {
+		var domain mysql.Domain
+		err = mysql.Db.Where("lcuuid = ?", domainLcuuid).First(&domain).Error
+		if err != nil {
+			return err
+		}
+		clusterID = domain.ClusterID
+	} else if subDomainLcuuid != "" {
+		var subDomain mysql.SubDomain
+		err = mysql.Db.Where("lcuuid = ?", subDomainLcuuid).First(&subDomain).Error
+		if err != nil {
+			return err
+		}
+		clusterID = subDomain.ClusterID
+	}
+	if clusterID == "" {
+		return errors.New("domain or subdomain lcuuid not found cluster id")
+	}
+
+	vTapInfo := strings.Split(value, "-")
+	if len(vTapInfo) != 2 {
+		return errors.New(fmt.Sprintf("invalid kubernetes cluster value: (%s)", value))
+	}
+	var vTap mysql.VTap
+	err = mysql.Db.Where("ctrl_ip = ? and ctrl_mac = ?", vTapInfo[0], vTapInfo[1]).First(&vTap).Error
+	if err != nil {
+		return errors.New(fmt.Sprintf("query vtap (%s) failed: (%s)", value, err.Error()))
+	}
+	var kubernetesClusters []mysql.KubernetesCluster
+	err = mysql.Db.Where("cluster_id = ? and value = ?", clusterID, value).Find(&kubernetesClusters).Error
+	if err != nil {
+		return err
+	}
+	if len(kubernetesClusters) > 0 {
+		return nil
+	}
+
+	var podNodes []mysql.PodNode
+	err = mysql.Db.Where("domain = ? and sub_domain = ?", domainLcuuid, subDomainLcuuid).Find(&podNodes).Error
+	if err != nil {
+		return err
+	}
+	nodeIPs := []string{}
+	for _, node := range podNodes {
+		nodeIPs = append(nodeIPs, node.IP)
+	}
+	var vTaps []mysql.VTap
+	err = mysql.Db.Where("launch_server in ?", nodeIPs).Find(&vTaps).Error
+	if err != nil {
+		return err
+	}
+	vTapInfos := map[string]bool{}
+	for _, v := range vTaps {
+		vTapInfos[v.CtrlIP+"-"+v.CtrlMac] = false
+	}
+	if _, ok := vTapInfos[value]; !ok {
+		return errors.New(fmt.Sprintf("vtap (%s) not belong to the current domain"))
+	}
+
+	var kubernetesCluster mysql.KubernetesCluster
+	err = mysql.Db.Model(&kubernetesCluster).Where("cluster_id = ?", clusterID).Updates(mysql.KubernetesCluster{Value: value, UpdatedTime: time.Now()}).Error
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func GetSubDomains(filter map[string]interface{}) ([]*model.SubDomain, error) {
 	var response []*model.SubDomain
 	var subDomains []mysql.SubDomain

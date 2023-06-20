@@ -270,7 +270,7 @@ impl Session {
             Err(e) => {
                 self.exception_handler.set(Exception::ControllerSocketError);
                 self.set_request_failed(true);
-                error!("dial server({}) failed {}", remote, e);
+                error!("dial server({} {}) failed {}", remote, remote_port, e);
             }
         }
     }

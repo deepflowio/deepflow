@@ -205,6 +205,12 @@ controller:
     # 忽略网卡正则表达式配置，匹配到会忽略该网卡，默认为 ^(kube-ipvs) ，增加其他的网卡名称需要在此基础上新增
     ignore_nic_regex:
 
+  prometheus:
+    # synchronizer cache refresh interval, unit: second
+    synchronizer_cache_refresh_interval: 60
+    # encoder cache refresh interval, unit: second
+    encoder_cache_refresh_interval: 3600
+
 querier:
   # querier http listenport
   listen-port: 20416

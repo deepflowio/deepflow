@@ -2345,6 +2345,7 @@ CREATE TABLE IF NOT EXISTS kubernetes_cluster (
     id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     cluster_id              VARCHAR(256) NOT NULL ,
     value                   VARCHAR(256) NOT NULL,
+    updated_time            DATETIME DEFAULT NULL,
     created_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     synced_at               DATETIME DEFAULT NULL,
     unique (cluster_id)
