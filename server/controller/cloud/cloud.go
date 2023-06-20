@@ -318,7 +318,7 @@ func (c *Cloud) runKubernetesGatherTask() {
 
 func (c *Cloud) appendAddtionalResourcesData(resource model.Resource) model.Resource {
 	var dbItem mysql.DomainAdditionalResource
-	result := mysql.Db.Where("domain = ?", c.basicInfo.Lcuuid).Find(&dbItem)
+	result := mysql.Db.Select("compressed_content").Where("domain = ?", c.basicInfo.Lcuuid).Find(&dbItem)
 	if result.Error != nil {
 		log.Errorf("domain (lcuuid: %s) db query additional resources failed: %s", c.basicInfo.Lcuuid, result.Error.Error())
 		return resource
@@ -327,7 +327,7 @@ func (c *Cloud) appendAddtionalResourcesData(resource model.Resource) model.Reso
 		return resource
 	}
 	var additionalResource model.AdditionalResource
-	err := json.Unmarshal([]byte(dbItem.Content), &additionalResource)
+	err := json.Unmarshal(dbItem.CompressedContent, &additionalResource)
 	if err != nil {
 		log.Errorf("domain (lcuuid: %s) json unmarshal content failed: %s", err.Error())
 		return resource
