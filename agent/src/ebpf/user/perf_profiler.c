@@ -296,7 +296,11 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 		 * stack trace messages has already been stored. 
 		 */
 		stack_trace_msg_kv_t kv; // stack_trace_msg_hash_kv
-		set_msg_kvp(&kv, v, get_pid_stime(v->pid), (void *)0);
+		u64 stime = get_pid_stime(v->pid);
+		if (stime == 0) {
+			stime = v->timestamp / NS_IN_MSEC;
+		}
+		set_msg_kvp(&kv, v, stime, (void *)0);
 		if (stack_trace_msg_hash_search(msg_hash, (stack_trace_msg_hash_kv *)&kv,
 						(stack_trace_msg_hash_kv *)&kv) == 0) {
 			__sync_fetch_and_add(&msg_hash->hit_hash_count, 1);

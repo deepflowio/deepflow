@@ -150,10 +150,6 @@ int bpf_perf_event(struct bpf_perf_event_data *ctx)
 		if (-EEXIST == key.userstack)
 			__sync_fetch_and_add(drop_count_ptr, 1);
 
-		/* If a sample is completely invalid, it should be discarded. */
-		if (key.kernstack < 0 && key.userstack < 0)
-			return 0;
-
 		sample_count = *sample_count_a_ptr;
 		__sync_fetch_and_add(sample_count_a_ptr, 1);
 
@@ -175,10 +171,6 @@ int bpf_perf_event(struct bpf_perf_event_data *ctx)
 
 		if (-EEXIST == key.userstack)
 			__sync_fetch_and_add(drop_count_ptr, 1);
-
-		/* If a sample is completely invalid, it should be discarded. */
-		if (key.kernstack < 0 && key.userstack < 0)
-			return 0;
 
 		sample_count = *sample_count_b_ptr;
 		__sync_fetch_and_add(sample_count_b_ptr, 1);

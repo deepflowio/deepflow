@@ -175,8 +175,20 @@ static char *resolve_addr(pid_t pid, u64 address)
 	int ret = symcache_resolve(pid, resolver, address, &sym);
 	if (ret == 0) {
 		ptr = symbol_name_fetch(pid, &sym);
-		if (ptr)
+		if (ptr) {
+			char *p = ptr;
+			/*
+			 * If the parsed string contains a semicolon (';'), replace
+			 * it with a space, as the semicolon is a specific delimiter
+			 * we use to separate symbolic strings.
+			 */
+			for (p = ptr; *p != '\0'; p++) {
+				if (*p == ';')
+					*p = ' ';
+			}
+
 			goto finish;
+		}
 	}
 
 	if (sym.module != NULL && strlen(sym.module) > 0) {
@@ -350,10 +362,10 @@ static char *__folded_stack_trace_string(struct bpf_tracer *t,
 	return str;
 }
 
-static const char *err_tag = "<stack trace error>";
-static const char *k_err_tag = "<kernel stack trace error>";
-static const char *u_err_tag = "<user stack trace error>";
-static const char *lost_tag = "<stack trace lost>";
+static const char *err_tag = "[stack trace error]";
+static const char *k_err_tag = "[kernel stack trace error]";
+static const char *u_err_tag = "[user stack trace error]";
+static const char *lost_tag = "[stack trace lost]";
 
 static inline stack_trace_msg_t *alloc_stack_trace_msg(int len)
 {
@@ -393,8 +405,9 @@ static bool set_stack_trace_msg(stack_trace_msg_t * msg,
 		goto skip_no_proc;
 	}
 
-	clib_mem_free(msg);
-	return false;
+	/* the process is exit. */
+	msg->stime = v->timestamp / NS_IN_MSEC;
+	memcpy(msg->comm, v->comm, sizeof(msg->comm));
 
 skip_no_proc:
 	msg->data_len = strlen((char *)&msg->data[0]);
@@ -590,7 +603,6 @@ resolve_and_gen_stack_trace_msg(struct bpf_tracer *t,
 		}
 
 		snprintf((char *)&msg->data[0], len, "%s", lost_tag);
-		ebpf_warning("stack trace data lost\n");
 	}
 
 	if (!set_stack_trace_msg(msg, v))
