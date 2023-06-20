@@ -182,6 +182,7 @@ static int push_and_free_msg_kvp_cb(stack_trace_msg_hash_kv *kv, void *ctx)
 			fun(msg);
 
 		clib_mem_free((void *)msg);
+		msg_kv->msg_ptr = 0;
 		(*(u64 *) ctx)++;
 	}
 
@@ -195,7 +196,12 @@ static int push_and_free_msg_kvp_cb(stack_trace_msg_hash_kv *kv, void *ctx)
 	return BIHASH_WALK_CONTINUE;
 }
 
-static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t *h)
+/*
+ * Push the data and release the resources.
+ * @is_force: Do you need to perform a forced release?
+ */
+static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t *h,
+					     bool is_force)
 {
 	ASSERT(profiler_tracer != NULL);
 
@@ -216,7 +222,7 @@ static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t *h)
 	 * Otherwise, it should return directly.
 	 */
 	if (!((h->hash_elems_count >= MAX_PUSH_MSG_COUNT) ||
-	      (elapsed >= MAX_PUSH_MSG_TIME_INTERVAL)))
+	      (elapsed >= MAX_PUSH_MSG_TIME_INTERVAL) || is_force))
 		return;
 
 	/* update last push time. */
@@ -240,6 +246,12 @@ static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t *h)
 
 	vec_free(trace_msg_kvps);
 
+	if (elems_count != h->hash_elems_count) {
+		ebpf_warning("elems_count %lu hash_elems_count %lu "
+			     "hit_hash_count %lu\n", elems_count,
+			     h->hash_elems_count, h->hit_hash_count);
+	}
+
 	h->hit_hash_count = 0;
 	h->hash_elems_count = 0;
 
@@ -248,7 +260,8 @@ static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t *h)
 		stack_trace_msg_hash_free(h);
 	}
 
-	ebpf_debug("release_stack_trace_msg hashmap clear %lu elems.\n", elems_count);
+	ebpf_debug("release_stack_trace_msg hashmap clear %lu "
+		   "elems.\n", elems_count);
 }
 
 static void aggregate_stack_traces(struct bpf_tracer *t,
@@ -307,10 +320,21 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 		if (msg) {
 			stack_trace_msg_kv_t msg_kvp;
 			set_msg_kvp(&msg_kvp, v, msg->stime, (void *)msg);
+			if (msg->stime == 0) {
+				ebpf_warning("tiemstamp %lu pid %u stime %lu u_stack_id %lu k_statck_id"
+					     " %lu cpu %u count %u comm %s datalen %u data %s\n",
+					     msg->time_stamp, msg->pid, msg->stime, msg->u_stack_id,
+					     msg->k_stack_id, msg->cpu, msg->count, msg->comm,
+					     msg->data_len, msg->data);
+				clib_mem_free(msg);
+				continue;
+			}
+
 			if (stack_trace_msg_hash_add_del(msg_hash,
 							 (stack_trace_msg_hash_kv *)&msg_kvp,
 							 1 /* is_add */ )) {
 				ebpf_warning("stack_trace_msg_hash_add_del() failed.\n");
+				clib_mem_free(msg);
 			} else {
 				__sync_fetch_and_add(&msg_hash->hash_elems_count, 1);
 			}
@@ -452,7 +476,7 @@ release_iter:
 	release_stack_strs(&g_stack_str_hash);
 
 	/* Push messages and free stack_trace_msg_hash */
-	push_and_release_stack_trace_msg(&g_msg_hash);
+	push_and_release_stack_trace_msg(&g_msg_hash, false);
 }
 
 static void cp_reader_work(void *arg)
@@ -484,6 +508,8 @@ exit:
 	print_hash_stack_trace_msg(&g_msg_hash);
 	/* free stack_str_hash */
 	if (likely(g_msg_hash.buckets != NULL)) {
+		/* Ensure that all elements are released properly/cleanly */
+		push_and_release_stack_trace_msg(&g_msg_hash, true);
 		stack_trace_msg_hash_free(&g_msg_hash);
 	}
 
@@ -560,6 +586,14 @@ int stop_continuous_profiler(void)
 	profiler_stop = 1;
 	release_bpf_tracer(CP_TRACER_NAME);
 	profiler_tracer = NULL;
+
+	u64 alloc_b, free_b;
+	get_mem_stat(&alloc_b, &free_b);
+#ifdef DF_MEM_DEBUG
+	show_mem_list();
+#endif
+	ebpf_info("== alloc_b %lu bytes, free_b %lu bytes, use %lu "
+		  "bytes ==\n", alloc_b, free_b, alloc_b - free_b);
 	return (0);
 }
 
@@ -697,10 +731,11 @@ void process_stack_trace_data_for_flame_graph(stack_trace_msg_t *val)
 					(stack_trace_msg_hash_kv *)&msg_kvp) == 0) {
 		((stack_trace_msg_t *)msg_kvp.msg_ptr)->count += val->count;
 		test_hit_count += val->count;
+		__sync_fetch_and_add(&test_fg_hash.hit_hash_count, 1);
 		return;
 	} else {
 		int len = sizeof(*val) + val->data_len + 1;
-		char *p = clib_mem_alloc_aligned(len, 0, NULL);
+		char *p = clib_mem_alloc_aligned("flame_msg", len, 0, NULL);
 		if (p == NULL) return;
 		msg_kvp.msg_ptr = pointer_to_uword(p);
 		memcpy(p, val, sizeof(*val) + val->data_len);
@@ -708,9 +743,11 @@ void process_stack_trace_data_for_flame_graph(stack_trace_msg_t *val)
 		if (stack_trace_msg_hash_add_del(&test_fg_hash,
 				 (stack_trace_msg_hash_kv *)&msg_kvp,
 				 1 /* is_add */ )) {
+			clib_mem_free(p);
 			ebpf_warning("stack_trace_msg_hash_add_del() failed.\n");
 		} else {
 			test_add_count += val->count;
+			__sync_fetch_and_add(&test_fg_hash.hash_elems_count, 1);
 		}
 	}
 }
@@ -751,6 +788,11 @@ void release_flame_graph_hash(void)
 	stack_trace_msg_hash_foreach_key_value_pair(&test_fg_hash,
 						    gen_stack_trace_folded_file,
 						    (void *)&elems_count);
+
+	ebpf_info("elems_count %lu hash_elems_count %lu "
+		  "hit_hash_count %lu\n", elems_count,
+		  test_fg_hash.hash_elems_count, test_fg_hash.hit_hash_count);
+
 	ebpf_info("flame graph folded strings count %lu\n", elems_count);
 	fclose(folded_file);
 

@@ -891,7 +891,7 @@ int BV(clib_bihash_init2) (BVT(clib_bihash_init2_args) * a) {
 	 * Set up the lock now, so we can use it to make the first add
 	 * thread-safe
 	 */
-	h->alloc_lock = clib_mem_alloc_aligned(CLIB_CACHE_LINE_BYTES,
+	h->alloc_lock = clib_mem_alloc_aligned("hash_lock", CLIB_CACHE_LINE_BYTES,
 					       CLIB_CACHE_LINE_BYTES, NULL);
 	if (h->alloc_lock == NULL) {
 		ebpf_warning("clib_mem_alloc_aligned() error\n");

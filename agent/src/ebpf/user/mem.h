@@ -20,6 +20,7 @@
 #include <malloc.h>
 #include <sys/mman.h>
 #include "atomic.h"
+#include "list.h"
 
 // need install libasan5
 //#include <sanitizer/asan_interface.h>
@@ -55,7 +56,34 @@ typedef struct {
 	/* total memory bytes statistics*/
 	atomic64_t clib_alloc_mem_bytes;
 	atomic64_t clib_free_mem_bytes;
+
+#ifdef DF_MEM_DEBUG
+	volatile uint32_t *list_lock;
+	/* Used for managing all allocated memory.*/
+	struct list_head mem_list_head;
+#endif
 } clib_mem_main_t;
+
+
+#ifdef DF_MEM_DEBUG
+struct mem_list_elem {
+	struct list_head list;
+	char name[16];
+	uword address;
+	u32 size;
+};
+
+static_always_inline void mem_list_lock(clib_mem_main_t *m)
+{
+	while (__atomic_test_and_set(m->list_lock, __ATOMIC_ACQUIRE))
+		CLIB_PAUSE();
+}
+
+static_always_inline void mem_list_unlock(clib_mem_main_t *m)
+{
+	__atomic_clear(m->list_lock, __ATOMIC_RELEASE);
+}
+#endif
 
 #ifndef __NR_memfd_create
 #if defined __x86_64__
@@ -102,8 +130,12 @@ clib_mem_vm_free (void *addr, uword size)
 
 void clib_mem_init(void);
 uword clib_mem_vm_reserve(uword size, clib_mem_page_sz_t log2_page_sz);
-void *clib_mem_realloc_aligned(void *p, uword size, u32 align, uword *alloc_sz);
-void *clib_mem_alloc_aligned(uword size, u32 align, uword *alloc_sz);
+void *clib_mem_realloc_aligned(const char *name, void *p, uword size, u32 align, uword *alloc_sz);
+void *clib_mem_alloc_aligned(const char *name, uword size, u32 align, uword *alloc_sz);
 void clib_mem_free(void *p);
 void get_mem_stat(u64 *alloc_b, u64 *free_b);
+#ifdef DF_MEM_DEBUG
+void show_mem_list(void);
+#endif
+
 #endif /* _included_clib_mem_h */

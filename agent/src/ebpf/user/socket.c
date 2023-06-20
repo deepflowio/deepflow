@@ -2549,7 +2549,7 @@ static void print_socket_data(struct socket_bpf_data *sd)
 	if (!output)
 		return;
 
-	char *timestamp = gen_timestamp_prefix();
+	char *timestamp = gen_timestamp_str(0);
 	if (timestamp == NULL)
 		return;
 

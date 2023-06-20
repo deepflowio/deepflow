@@ -50,7 +50,7 @@ typedef struct {
 		u32 k_stack_id;
 	} k;
 	/* Store perf profiler data */
-	u64 msg_ptr;
+	uword msg_ptr;
 } stack_trace_msg_kv_t; 
 
 /* stack trace message value, push data */

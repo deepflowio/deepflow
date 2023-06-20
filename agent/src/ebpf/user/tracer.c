@@ -331,7 +331,7 @@ struct bpf_tracer *setup_bpf_tracer(const char *name,
 	init_list_head(&bt->maps_conf_head);
 
 	pthread_mutex_init(&bt->mutex_probes_lock, NULL);
-	bt->lock = clib_mem_alloc_aligned(CLIB_CACHE_LINE_BYTES,
+	bt->lock = clib_mem_alloc_aligned("tracer_lock", CLIB_CACHE_LINE_BYTES,
 					  CLIB_CACHE_LINE_BYTES,
 					  NULL);
         if (bt->lock == NULL) {
@@ -1521,6 +1521,9 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 		    ("\"/proc/sys/net/core/bpf_jit_enable value is invalid\n");
 	}
 
+	/* Memory management initialization. */
+	clib_mem_init();
+
 	fetch_linux_release(linux_release, sizeof(linux_release) - 1);
 	max_rlim_open_files_set(OPEN_FILES_MAX);
 	sys_cpus_count = get_cpus_count(&cpu_online);
@@ -1543,7 +1546,7 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 	 * Set up the lock now, so we can use it to make the first add
 	 * thread-safe for tracer alloc.
 	 */
-	tracers_lock = clib_mem_alloc_aligned(CLIB_CACHE_LINE_BYTES,
+	tracers_lock = clib_mem_alloc_aligned("t_alloc_lock", CLIB_CACHE_LINE_BYTES,
 					      CLIB_CACHE_LINE_BYTES,
 					      NULL);
 	if (tracers_lock == NULL) {

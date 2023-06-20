@@ -120,7 +120,7 @@ void release_stack_strs(stack_str_hash_t * h)
 
 static inline char *create_symbol_str(int len, char *src, const char *tag)
 {
-	char *dst = clib_mem_alloc_aligned(len + 1, 0, NULL);
+	char *dst = clib_mem_alloc_aligned("symbol_str", len + 1, 0, NULL);
 	if (dst == NULL)
 		return NULL;
 	snprintf(dst, len + 1, "%s%s", tag, src);
@@ -228,7 +228,7 @@ static int get_stack_ips(struct bpf_tracer *t,
 static char *build_stack_trace_string(struct bpf_tracer *t,
 				      const char *stack_map_name,
 				      pid_t pid,
-				      int stack_id, stack_str_hash_t * h)
+				      int stack_id, stack_str_hash_t *h)
 {
 	ASSERT(pid >= 0 && stack_id >= 0);
 
@@ -272,7 +272,7 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 	folded_size += PERF_MAX_STACK_DEPTH;
 
 	char *fold_stack_trace_str =
-	    clib_mem_alloc_aligned(folded_size, 0, NULL);
+	    clib_mem_alloc_aligned("folded_str", folded_size, 0, NULL);
 	if (fold_stack_trace_str == NULL)
 		goto failed;
 
@@ -306,7 +306,7 @@ static char *__folded_stack_trace_string(struct bpf_tracer *t,
 					 int stack_id,
 					 pid_t pid,
 					 const char *stack_map_name,
-					 stack_str_hash_t * h)
+					 stack_str_hash_t *h)
 {
 	ASSERT(pid >= 0 && stack_id >= 0);
 
@@ -360,7 +360,7 @@ static inline stack_trace_msg_t *alloc_stack_trace_msg(int len)
 	void *trace_msg;
 	/* add separator and '\0' */
 	len += 2;
-	trace_msg = clib_mem_alloc_aligned(len, 0, NULL);
+	trace_msg = clib_mem_alloc_aligned("stack_msg", len, 0, NULL);
 	if (trace_msg == NULL) {
 		ebpf_warning("stack trace str alloc memory failed.\n");
 	} else {
@@ -371,28 +371,37 @@ static inline stack_trace_msg_t *alloc_stack_trace_msg(int len)
 	return NULL;
 }
 
-static void set_stack_trace_msg(stack_trace_msg_t * msg,
+static bool set_stack_trace_msg(stack_trace_msg_t * msg,
 				struct stack_trace_key_t *v)
 {
 	msg->pid = v->pid;
 	msg->cpu = v->cpu;
 	msg->u_stack_id = (u32) v->userstack;
 	msg->k_stack_id = (u32) v->kernstack;
-	if (!v->is_kern) {
-		msg->stime = get_pid_stime_and_name(v->pid,
-						    (char *)msg->comm);
-		if (msg->stime > 0)
-			goto skip_kern_or_no_proc;
+	msg->stime = get_pid_stime_and_name(v->pid,
+					    (char *)msg->comm);
+	if (msg->stime > 0) {
+		/*
+		 * Note: There is no process with PID 0 in procfs.
+		 * If the PID is 0, it will return the kernel's
+		 * startup time, and the process name will be
+		 * obtained from data retrieved through eBPF.
+		 */
+		if (v->pid == 0)
+			memcpy(msg->comm, v->comm, sizeof(msg->comm));
+
+		goto skip_no_proc;
 	}
 
-	msg->stime = get_pid_stime(0);
-	memcpy(msg->comm, v->comm, sizeof(msg->comm));
+	clib_mem_free(msg);
+	return false;
 
-skip_kern_or_no_proc:
+skip_no_proc:
 	msg->data_len = strlen((char *)&msg->data[0]);
 	msg->time_stamp = gettime(CLOCK_REALTIME, TIME_TYPE_NAN);
 	msg->count = 1;
 	msg->data_ptr = pointer_to_uword(&msg->data[0]);
+	return true;
 }
 
 char *folded_stack_trace_string(struct bpf_tracer *t,
@@ -405,13 +414,15 @@ char *folded_stack_trace_string(struct bpf_tracer *t,
 
 	if (v->kernstack >= 0) {
 		k_trace_str = __folded_stack_trace_string(t, v->kernstack,
-							  0, stack_map_name, h);
+							  0, stack_map_name,
+							  h);
 	}
 
 	if (v->userstack >= 0) {
 		u_trace_str = __folded_stack_trace_string(t, v->userstack,
 							  v->pid,
-							  stack_map_name, h);
+							  stack_map_name,
+							  h);
 	}
 
 	/* stack_trace_str = u_stack_str_fn() + ";" + k_stack_str_fn(); */
@@ -431,7 +442,7 @@ char *folded_stack_trace_string(struct bpf_tracer *t,
 
 		/* add separator and '\0' */
 		len += 2;
-		trace_str = clib_mem_alloc_aligned(len, 0, NULL);
+		trace_str = clib_mem_alloc_aligned("k_link_u_str", len, 0, NULL);
 		if (trace_str == NULL) {
 			ebpf_warning("stack trace str alloc memory failed.\n");
 		} else {
@@ -491,13 +502,15 @@ resolve_and_gen_stack_trace_msg(struct bpf_tracer *t,
 
 	if (v->kernstack >= 0) {
 		k_trace_str = __folded_stack_trace_string(t, v->kernstack,
-							  0, stack_map_name, h);
+							  0, stack_map_name,
+							  h);
 	}
 
 	if (v->userstack >= 0) {
 		u_trace_str = __folded_stack_trace_string(t, v->userstack,
 							  v->pid,
-							  stack_map_name, h);
+							  stack_map_name,
+							  h);
 	}
 
 	/* stack_trace_str = u_stack_str_fn() + ";" + k_stack_str_fn(); */
@@ -580,7 +593,8 @@ resolve_and_gen_stack_trace_msg(struct bpf_tracer *t,
 		ebpf_warning("stack trace data lost\n");
 	}
 
-	set_stack_trace_msg(msg, v);
+	if (!set_stack_trace_msg(msg, v))
+		return NULL;
 
 	return msg;
 }

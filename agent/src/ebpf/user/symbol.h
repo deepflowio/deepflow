@@ -59,9 +59,9 @@ struct symbolizer_cache_kvp {
 
 	struct {
 		/* struct symbolizer_proc_info address */
-		u64 proc_info_p;
+		uword proc_info_p;
 		/* memoized bcc symbol caches */
-		u64 cache;
+		uword cache;
 	} v;
 };
 

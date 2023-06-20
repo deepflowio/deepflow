@@ -581,11 +581,11 @@ unsigned int fetch_kernel_version_code(void)
 	return KERNEL_VERSION(major, minor, patch);
 }
 
-bool is_user_process(int pid)
+static bool __is_process(int pid, bool is_user)
 {
 	char file[PATH_MAX], buff[4096];
 	int fd;
-	int read_tgid = -1, read_pid = -1, ppid = -1;
+	int read_tgid = -1, read_pid = -1;
 
 	snprintf(file, sizeof(file), "/proc/%d/status", pid);
 	if (access(file, F_OK))
@@ -602,10 +602,14 @@ bool is_user_process(int pid)
 	 * All kernel threads in Linux have their parent process
 	 * as either 0 or 2, and not any other value.
 	 */
-	char *p = strstr(buff, "PPid:");
-        sscanf(p, "PPid:\t%d", &ppid);
-	if (ppid == 0 || ppid == 2 || ppid == -1)
-		return false;
+	char *p;
+	if (is_user) {
+		int ppid = -1;
+		p = strstr(buff, "PPid:");
+		sscanf(p, "PPid:\t%d", &ppid);
+		if ((ppid == 0 && pid != 1) || ppid == 2 || ppid == -1)
+			return false;
+	}
 
 	p = strstr(buff, "Tgid:");
 	sscanf(p, "Tgid:\t%d", &read_tgid);
@@ -622,7 +626,17 @@ bool is_user_process(int pid)
 	return false;
 }
 
-static char *gen_datetime_str(const char *fmt)
+bool is_user_process(int pid)
+{
+	return __is_process(pid, true);
+}
+
+bool is_process(int pid)
+{
+	return __is_process(pid, false);
+}
+
+static char *__gen_datetime_str(const char *fmt, u64 ns)
 {
 	const int strlen = DATADUMP_FILE_PATH_SIZE;
 	time_t timep;
@@ -634,12 +648,18 @@ static char *gen_datetime_str(const char *fmt)
 		return NULL;
 	}
 
-	time(&timep);
-	p = localtime(&timep);
-	struct timeval msectime;
-	gettimeofday(&msectime, NULL);
 	long msec = 0;
-	msec = msectime.tv_usec / 1000;
+	if (ns > 0) {
+		timep = ns / NS_IN_SEC;
+		msec = (ns % NS_IN_SEC) / NS_IN_MSEC;
+	} else {
+		time(&timep);
+		struct timeval msectime;
+		gettimeofday(&msectime, NULL);
+		msec = msectime.tv_usec / 1000;
+	}
+
+	p = localtime(&timep);
 	snprintf(str, strlen, fmt,
 		 (1900 + p->tm_year), (1 + p->tm_mon),
 		 p->tm_mday, p->tm_hour, p->tm_min,
@@ -650,10 +670,15 @@ static char *gen_datetime_str(const char *fmt)
 
 char *gen_file_name_by_datetime(void)
 {
-	return gen_datetime_str("%d_%02d_%02d_%02d_%02d_%02d_%ld");
+	return __gen_datetime_str("%d_%02d_%02d_%02d_%02d_%02d_%ld", 0);
 }
 
 char *gen_timestamp_prefix(void)
 {
-	return gen_datetime_str("%d-%02d-%02d %02d:%02d:%02d.%ld");
+	return __gen_datetime_str("%d-%02d-%02d %02d:%02d:%02d.%ld", 0);
+}
+
+char *gen_timestamp_str(u64 ns)
+{
+	return __gen_datetime_str("%d-%02d-%02d %02d:%02d:%02d.%ld", ns);
 }

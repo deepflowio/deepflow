@@ -110,7 +110,7 @@ fn main() {
         
         bpf_tracer_finish();
 
-        thread::sleep(Duration::from_secs(25));
+        thread::sleep(Duration::from_secs(65));
         stop_continuous_profiler();
         print!("====== capture count {}\n", get_counter());
         release_flame_graph_hash();

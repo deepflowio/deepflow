@@ -104,7 +104,9 @@ endif
 # -fno-omit-frame-pointer: When a memory error is detected, print
 #  the function call stack to facilitate locating the code line
 #  where the error occurred.
-CFLAGS += $(MACHINE_CFLAGS) -fno-omit-frame-pointer -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -I.
+# -DDF_MEM_DEBUG Used for memory leak detection, to check for memory
+#  leak issues during the debugging phase.
+CFLAGS += $(MACHINE_CFLAGS) -fno-omit-frame-pointer -I.
 ifeq ($(findstring musl,$(CC)),musl)
     IS_MUSL := 1
     ifeq ($(findstring aarch64,$(ARCH)),aarch64)

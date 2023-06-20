@@ -22,6 +22,7 @@
 #include "clib.h"
 #include "mem.h"
 #include "log.h"
+#include "string.h"
 
 #ifndef MFD_HUGETLB
 #define MFD_HUGETLB 0x0004U
@@ -55,15 +56,77 @@ static clib_mem_page_sz_t mem_get_fd_log2_page_size(int fd)
 	return page_size ? min_log2(page_size) : CLIB_MEM_PAGE_SZ_UNKNOWN;
 }
 
+#ifdef DF_MEM_DEBUG
+static inline void mem_add_list(const char *name,
+				uword address, u32 size)
+{
+	struct mem_list_elem *e = malloc(sizeof(struct mem_list_elem));
+	if (e == NULL)
+		ebpf_error("malloc() failed.\n");
+	memset(e, 0, sizeof(*e));
+	e->size = size;
+	e->address = address;
+
+	if (name == NULL)
+		memcpy_s_inline(e->name, sizeof(e->name) - 1,
+				"unkown", 6);
+	else {
+		int dst_max = sizeof(e->name) - 1;
+		int src_len = strlen(name) >= dst_max ? dst_max : strlen(name);
+		memcpy_s_inline(e->name, dst_max, name, src_len);
+	}
+
+	mem_list_lock(&mem_main);
+	list_add_tail(&e->list, &mem_main.mem_list_head);
+	mem_list_unlock(&mem_main);
+}
+
+static inline void mem_del_list(uword address)
+{
+	struct list_head *p, *n;
+	struct mem_list_elem *e;
+	mem_list_lock(&mem_main);
+	list_for_each_safe(p, n, &mem_main.mem_list_head) {
+		e = container_of(p, struct mem_list_elem, list);
+		if (e->address == address) {
+			list_head_del(&e->list);
+			free(e);
+		}
+	}
+	mem_list_unlock(&mem_main);
+}
+
+void show_mem_list(void)
+{
+	u64 alloc_sz = 0;
+	struct list_head *p, *n;
+	struct mem_list_elem *e;
+	mem_list_lock(&mem_main);
+	list_for_each_safe(p, n, &mem_main.mem_list_head) {
+		e = container_of(p, struct mem_list_elem, list);
+		ebpf_info("mem_list_elem '%s' addr %lu size %u\n",
+			  e->name, e->address, e->size);
+		alloc_sz += e->size;
+	}
+	mem_list_unlock(&mem_main);
+
+	ebpf_info("== memory in list, all alloc size %lu ==\n", alloc_sz);
+}
+#endif
+
 void clib_mem_free(void *p)
 {
 	void *start = p - sizeof(u64);
 	u64 mem_size = *(u64 *)start;
 	atomic64_add(&mem_main.clib_free_mem_bytes, mem_size);
+#ifdef DF_MEM_DEBUG
+	mem_del_list(pointer_to_uword(start));
+#endif
 	free(start);
 }
 
-void *clib_mem_alloc_aligned(uword size, u32 align, uword *alloc_sz)
+void *clib_mem_alloc_aligned(const char *name, uword size,
+			     u32 align, uword *alloc_sz)
 {
 	align = clib_max(CLIB_MEM_MIN_ALIGN, align);
 
@@ -88,10 +151,15 @@ void *clib_mem_alloc_aligned(uword size, u32 align, uword *alloc_sz)
 	*(u64 *)ptr = size;
 	atomic64_add(&mem_main.clib_alloc_mem_bytes, size);
 
+#ifdef DF_MEM_DEBUG
+	mem_add_list(name, pointer_to_uword(ptr), size);
+#endif
+
 	return ptr + sizeof(u64);
 }
 
-void *clib_mem_realloc_aligned(void *p, uword size, u32 align, uword *alloc_sz)
+void *clib_mem_realloc_aligned(const char *name, void *p, uword size,
+			       u32 align, uword *alloc_sz)
 {
 	align = clib_max(CLIB_MEM_MIN_ALIGN, align);
 	int extra_len = sizeof(u64);
@@ -116,6 +184,11 @@ void *clib_mem_realloc_aligned(void *p, uword size, u32 align, uword *alloc_sz)
 	*alloc_sz = size;
 	*(u64 *)ptr = size + extra_len;
 	atomic64_add(&mem_main.clib_alloc_mem_bytes, (size + extra_len - old_size));
+
+#ifdef DF_MEM_DEBUG
+	mem_del_list(pointer_to_uword(start));
+	mem_add_list(name, pointer_to_uword(ptr), size + extra_len);
+#endif
 
 	return ptr + sizeof(u64);
 }
@@ -191,4 +264,13 @@ void clib_mem_init(void)
 		ebpf_error
 		    ("Not fetch system hugeppage size. need linux 4.14+\n");
 	}
+
+#ifdef DF_MEM_DEBUG
+	init_list_head(&mm->mem_list_head);
+	mm->list_lock = malloc(CLIB_CACHE_LINE_BYTES);
+	if (mm->list_lock == NULL) {
+		ebpf_error("mallloc() failed.\n");
+	}
+	mm->list_lock[0] = 0;
+#endif
 }

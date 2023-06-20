@@ -511,21 +511,80 @@ static int init_symbol_cache(const char *name)
 				       hash_memory_size);
 }
 
+/*
+ * Called by get_pid_stime() and get_pid_stime_and_name(),
+ * use for fetching pid start time or process name only.
+ */
+static void add_proc_info_to_cache_hash(pid_t pid)
+{
+	ASSERT(pid >= 0);
+
+	symbol_caches_hash_t *h = &syms_cache_hash;
+	struct symbolizer_cache_kvp kv;
+	kv.k.pid = (u64) pid;
+	kv.k.pid = pid;
+	struct symbolizer_proc_info *p = clib_mem_alloc_aligned("sym_proc_info",
+						sizeof(struct symbolizer_proc_info),
+						0, NULL);
+	if (p == NULL) {
+		/* exit process */
+		ebpf_warning("Failed to build process information table.\n");
+		return;
+	}
+
+	p->stime = (u64) get_process_starttime_and_comm(pid,
+							p->comm,
+							sizeof(p->comm));
+	p->comm[sizeof(p->comm) - 1] = '\0';
+	if (p->stime == 0) {
+		clib_mem_free(p);
+		return;
+	}
+
+	kv.v.proc_info_p = pointer_to_uword(p);
+	/*
+	 * This is not meant for parsing, but rather for adding
+	 * process information to management, such as obtaining
+	 * the process's startup time or process name. The most
+	 * typical usage is for kernel processes (where all
+	 * kernel processes share the same kernel symbol cache),
+	 * without the need to establish a separate cache for
+	 * each kernel process.
+	 */
+	kv.v.cache = 0;
+	if (symbol_caches_hash_add_del
+	    (h, (symbol_caches_hash_kv *) & kv, 1 /* is_add */ )) {
+		ebpf_warning
+		    ("symbol_caches_hash_add_del() failed.(pid %d)\n", pid);
+		free_symbolizer_cache_kvp(&kv);
+	} else
+		__sync_fetch_and_add(&h->hash_elems_count, 1);
+}
+
 u64 get_pid_stime(pid_t pid)
 {
 	ASSERT(pid >= 0);
 
+	symbol_caches_hash_t *h = &syms_cache_hash;
+	struct symbolizer_cache_kvp kv;
+
 	if (pid == 0)
 		return sys_btime_msecs;
 
-	symbol_caches_hash_t *h = &syms_cache_hash;
-	struct symbolizer_cache_kvp kv;
+	bool is_retry = true;
+retry:
 	kv.k.pid = (u64) pid;
 	kv.v.proc_info_p = 0;
 	kv.v.cache = 0;
 	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
 				      (symbol_caches_hash_kv *) & kv) == 0) {
 		return cache_process_stime(&kv);
+	}
+
+	if (is_retry) {
+		add_proc_info_to_cache_hash(pid);
+		is_retry = false;
+		goto retry;
 	}
 
 	return 0;
@@ -535,11 +594,14 @@ u64 get_pid_stime_and_name(pid_t pid, char *name)
 {
 	ASSERT(pid >= 0);
 
+	symbol_caches_hash_t *h = &syms_cache_hash;
+	struct symbolizer_cache_kvp kv;
+
 	if (pid == 0)
 		return sys_btime_msecs;
 
-	symbol_caches_hash_t *h = &syms_cache_hash;
-	struct symbolizer_cache_kvp kv;
+	bool is_retry = true;
+retry:
 	kv.k.pid = (u64) pid;
 	kv.v.proc_info_p = 0;
 	kv.v.cache = 0;
@@ -551,9 +613,26 @@ u64 get_pid_stime_and_name(pid_t pid, char *name)
 		return cache_process_stime(&kv);
 	}
 
+	if (is_retry) {
+		add_proc_info_to_cache_hash(pid);
+		is_retry = false;
+		goto retry;
+	}
+
 	return 0;
 }
 
+/*
+ * Cache for obtaining symbol information of the binary
+ * executable corresponding to a PID, and rebuilding it
+ * if the cache does not exist.
+ *
+ * Only used for parsing stack trace data in kernel space
+ * and user space. If it is a kernel space stack trace
+ * (k_stack_trace_id), the PID is always 0. If it is a
+ * user space stack trace (u_stack_trace_id), the PID is
+ * the PID of the user process.
+ */
 void *get_symbol_cache(pid_t pid)
 {
 	ASSERT(pid >= 0);
@@ -596,7 +675,7 @@ void *get_symbol_cache(pid_t pid)
 	}
 
 	kv.k.pid = pid;
-	struct symbolizer_proc_info *p = clib_mem_alloc_aligned(
+	struct symbolizer_proc_info *p = clib_mem_alloc_aligned("sym_proc_info",
 						sizeof(struct symbolizer_proc_info),
 						0, NULL);
 	if (p == NULL) {
@@ -605,7 +684,8 @@ void *get_symbol_cache(pid_t pid)
 		return NULL;
 	}
 
-	p->stime = (u64) get_process_starttime_and_comm(pid, p->comm,
+	p->stime = (u64) get_process_starttime_and_comm(pid,
+							p->comm,
 							sizeof(p->comm));
 	p->comm[sizeof(p->comm) - 1] = '\0';
 	if (p->stime == 0) {
@@ -643,11 +723,11 @@ int create_and_init_symbolizer_caches(void)
 	symbol_caches_hash_t *h = &syms_cache_hash;
 	while ((entry = readdir(fddir)) != NULL) {
 		pid = atoi(entry->d_name);
-		if (entry->d_type == DT_DIR && pid > 0 && is_user_process(pid)) {
+		if (entry->d_type == DT_DIR && pid > 0 && is_process(pid)) {
 			struct symbolizer_cache_kvp sym;
 			sym.k.pid = pid;
 
-			struct symbolizer_proc_info *p = clib_mem_alloc_aligned(
+			struct symbolizer_proc_info *p = clib_mem_alloc_aligned("sym_proc_info",
 							sizeof(struct symbolizer_proc_info),
 							0, NULL);
 			if (p == NULL) {
@@ -688,13 +768,8 @@ int create_and_init_symbolizer_caches(void)
 static int free_symbolizer_kvp_cb(symbol_caches_hash_kv * kv, void *ctx)
 {
 	struct symbolizer_cache_kvp *sym = (struct symbolizer_cache_kvp *)kv;
-	if (sym->v.cache) {
-		//ebpf_info("release symbol cache pid %d stime %lu \n",
-		//	  sym->k.pid, ((strust proc_info *)sym->v.proc_info_p)->stime);
-		free_symbolizer_cache_kvp(sym);
-		(*(u64 *) ctx)++;
-	}
-
+	free_symbolizer_cache_kvp(sym);
+	(*(u64 *) ctx)++;
 	return BIHASH_WALK_CONTINUE;
 }
 

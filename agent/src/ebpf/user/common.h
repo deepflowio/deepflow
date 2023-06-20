@@ -29,6 +29,7 @@
 #define __unused __attribute__((__unused__))
 
 #define NS_IN_SEC       1000000000ULL
+#define NS_IN_MSEC      1000000ULL
 #define TIME_TYPE_NAN   1
 #define TIME_TYPE_SEC   0
 
@@ -251,8 +252,10 @@ int get_num_possible_cpus(void);
 // Check if task is the main thread based on pid.
 // Ignore threads other than the main thread in uprobe to avoid repeating hooks
 bool is_user_process(int pid);
+bool is_process(int pid);
 char *gen_file_name_by_datetime(void);
 char *gen_timestamp_prefix(void);
+char *gen_timestamp_str(u64 ns);
 int fetch_system_type(const char *sys_type, int type_len);
 void fetch_linux_release(const char *buf, int buf_len);
 u64 get_process_starttime_and_comm(pid_t pid,

@@ -88,7 +88,7 @@ void *_vec_realloc_internal(void *v, uword n_elts,
 		 * for memory, we will allocate extra elts as redundancy.*/
 		req_size += n_data_bytes / 2;
 
-		p = clib_mem_realloc_aligned(p, req_size, vec_get_align(v),
+		p = clib_mem_realloc_aligned("vec_realloc", p, req_size, vec_get_align(v),
 					     &new_alloc_sz);
 		if (p == NULL) {
 			ebpf_warning("_vec_realloc_internal realloc error.\n");
@@ -146,7 +146,7 @@ void *_vec_alloc_internal(uword n_elts, const vec_attr_t * const attr)
 	data_offset = round_pow2(data_offset, align);
 
 	req_size = data_offset + n_elts * elt_sz;
-	p = clib_mem_alloc_aligned(req_size, align, &alloc_size);
+	p = clib_mem_alloc_aligned("vec_alloc", req_size, align, &alloc_size);
 	if (p == NULL) {
 		ebpf_warning("mem_alloc_aligned failed.\n");
 		return NULL;

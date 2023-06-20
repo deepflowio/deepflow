@@ -120,17 +120,6 @@ int bpf_perf_event(struct bpf_perf_event_data *ctx)
 	key.timestamp = bpf_ktime_get_ns();
 
 	/*
-	 * If it is a kernel thread, stack tracing data
-	 * statistics are performed using the kernel
-	 * thread-ID.
-	 */
-
-	if (key.tgid == 0 || key.tgid == 2) {
-		key.tgid = (__u32)id;
-		key.is_kern = 1;
-	}
-
-	/*
 	 * Note:
 	 * ------------------------------------------------------
 	 * int bpf_get_stackid(struct pt_reg *ctx,
