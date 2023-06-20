@@ -28,7 +28,7 @@ import (
 
 // 缓存资源可用于分配的ID，提供ID的刷新、分配、回收接口
 type labelName struct {
-	mutex        sync.Mutex
+	lock         sync.Mutex
 	resourceType string
 	strToID      map[string]int
 	idAllocator
@@ -49,15 +49,15 @@ func newLabelName(max int) *labelName {
 }
 
 func (ln *labelName) refresh(args ...interface{}) error {
-	ln.mutex.Lock()
-	defer ln.mutex.Unlock()
+	ln.lock.Lock()
+	defer ln.lock.Unlock()
 
 	return ln.idAllocator.refresh()
 }
 
 func (ln *labelName) encode(strs []string) ([]*controller.PrometheusLabelName, error) {
-	ln.mutex.Lock()
-	defer ln.mutex.Unlock()
+	ln.lock.Lock()
+	defer ln.lock.Unlock()
 
 	resp := make([]*controller.PrometheusLabelName, 0)
 	var dbToAdd []*mysql.PrometheusLabelName
