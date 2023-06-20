@@ -29,7 +29,7 @@ use npb_pcap_policy::{NpbTunnelType, PolicyData};
 use public::{enums::HeaderType, packet, queue::DebugSender, utils::net::MacAddr};
 
 use crate::collector::acc_flow::U16Set;
-use crate::common::meta_packet::MetaPacket;
+use crate::common::meta_packet::{MetaPacket, RawPacket};
 
 pub struct IpInfo {
     pub mac: MacAddr,
@@ -53,7 +53,7 @@ pub struct LldpDuInfo {
 pub struct MiniPacket<'a> {
     policy: Option<Arc<PolicyData>>,
     timestamp: u64,
-    packet: &'a [u8],
+    packet: RawPacket<'a>,
     npb_mode: NpbMode,
     l2_opt_size: u8,
     l3_opt_size: u16,
@@ -70,20 +70,24 @@ pub struct MiniPacket<'a> {
 }
 
 impl<'a> MiniPacket<'a> {
-    pub fn new(overlay_packet: &'a [u8], meta_packet: &MetaPacket) -> MiniPacket<'a> {
+    pub fn new<P>(overlay_packet: P, meta_packet: &MetaPacket) -> MiniPacket<'a>
+    where
+        P: Into<RawPacket<'a>>,
+    {
+        let overlay_packet = overlay_packet.into();
         MiniPacket {
             policy: meta_packet.policy_data.clone(),
+            packet_size: if meta_packet.packet_len as usize > overlay_packet.len() {
+                overlay_packet.len() as u32
+            } else {
+                meta_packet.packet_len as u32
+            },
             packet: overlay_packet,
             timestamp: meta_packet.lookup_key.timestamp.as_nanos() as u64,
             npb_mode: meta_packet.npb_mode(),
             l2_opt_size: meta_packet.vlan_tag_size,
             l3_opt_size: meta_packet.l2_l3_opt_size - meta_packet.vlan_tag_size as u16,
             l4_opt_size: meta_packet.l4_opt_size,
-            packet_size: if meta_packet.packet_len as usize > overlay_packet.len() {
-                overlay_packet.len() as u32
-            } else {
-                meta_packet.packet_len as u32
-            },
             ipv6_last_option_offset: meta_packet.offset_ipv6_last_option,
             ipv6_fragment_option_offset: meta_packet.offset_ipv6_fragment_option,
             flow_id: meta_packet.flow_id,
@@ -154,7 +158,7 @@ impl PacketHandler {
                 packet.policy.as_ref(),
                 &packet.npb_mode,
                 packet.timestamp,
-                packet.packet,
+                &packet.packet,
                 packet.packet_size as usize,
                 packet.l2_opt_size as usize,
                 packet.l3_opt_size as usize,
