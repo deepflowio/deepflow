@@ -23,38 +23,36 @@ import (
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/prometheus/cache"
 )
 
 type labelLayout struct {
-	mux                          sync.Mutex
-	resourceType                 string
-	metricNameToLabelNameToIndex map[string]map[string]uint8
-	metricNameToMaxIndex         map[string]uint8
+	lock                 sync.Mutex
+	resourceType         string
+	layoutKeyToIndex     map[cache.LayoutKey]uint8
+	metricNameToMaxIndex map[string]uint8
 }
 
 func newLabelLayout() *labelLayout {
 	return &labelLayout{
-		resourceType:                 "metric_app_label_layout",
-		metricNameToLabelNameToIndex: make(map[string]map[string]uint8),
-		metricNameToMaxIndex:         make(map[string]uint8),
+		resourceType:         "metric_app_label_layout",
+		layoutKeyToIndex:     make(map[cache.LayoutKey]uint8),
+		metricNameToMaxIndex: make(map[string]uint8),
 	}
 }
 
 func (ll *labelLayout) refresh(args ...interface{}) error {
-	ll.mux.Lock()
-	defer ll.mux.Unlock()
+	ll.lock.Lock()
+	defer ll.lock.Unlock()
 
-	var layouts []*mysql.PrometheusMetricAPPLabelLayout
-	err := mysql.Db.Find(&layouts).Error
+	var items []*mysql.PrometheusMetricAPPLabelLayout
+	err := mysql.Db.Find(&items).Error
 	if err != nil {
 		return err
 	}
 
-	for _, item := range layouts {
-		if _, ok := ll.metricNameToLabelNameToIndex[item.MetricName]; !ok {
-			ll.metricNameToLabelNameToIndex[item.MetricName] = make(map[string]uint8)
-		}
-		ll.metricNameToLabelNameToIndex[item.MetricName][item.APPLabelName] = item.APPLabelColumnIndex
+	for _, item := range items {
+		ll.layoutKeyToIndex[cache.NewLayoutKey(item.MetricName, item.APPLabelName)] = item.APPLabelColumnIndex
 		if ll.metricNameToMaxIndex[item.MetricName] < item.APPLabelColumnIndex {
 			ll.metricNameToMaxIndex[item.MetricName] = item.APPLabelColumnIndex
 		}
@@ -63,8 +61,8 @@ func (ll *labelLayout) refresh(args ...interface{}) error {
 }
 
 func (ll *labelLayout) encode(req []*controller.PrometheusMetricAPPLabelLayoutRequest) ([]*controller.PrometheusMetricAPPLabelLayout, error) {
-	ll.mux.Lock()
-	defer ll.mux.Unlock()
+	ll.lock.Lock()
+	defer ll.lock.Unlock()
 
 	resp := make([]*controller.PrometheusMetricAPPLabelLayout, 0, len(req))
 
@@ -76,12 +74,13 @@ func (ll *labelLayout) encode(req []*controller.PrometheusMetricAPPLabelLayoutRe
 	for _, v := range req {
 		mn := v.GetMetricName()
 		ln := v.GetAppLabelName()
-		if _, ok := ll.metricNameToLabelNameToIndex[mn][ln]; ok {
+		if idx, ok := ll.layoutKeyToIndex[cache.NewLayoutKey(mn, ln)]; ok {
 			resp = append(resp, &controller.PrometheusMetricAPPLabelLayout{
 				MetricName:          &mn,
 				AppLabelName:        &ln,
-				AppLabelColumnIndex: proto.Uint32(uint32(ll.metricNameToLabelNameToIndex[mn][ln])),
+				AppLabelColumnIndex: proto.Uint32(uint32(idx)),
 			})
+			continue
 		}
 		dbToAdd = append(dbToAdd, &mysql.PrometheusMetricAPPLabelLayout{
 			MetricName:          mn,
@@ -101,10 +100,7 @@ func (ll *labelLayout) encode(req []*controller.PrometheusMetricAPPLabelLayoutRe
 			AppLabelName:        &l.APPLabelName,
 			AppLabelColumnIndex: proto.Uint32(uint32(l.APPLabelColumnIndex)),
 		})
-		if _, ok := ll.metricNameToLabelNameToIndex[l.MetricName]; !ok {
-			ll.metricNameToLabelNameToIndex[l.MetricName] = make(map[string]uint8)
-		}
-		ll.metricNameToLabelNameToIndex[l.MetricName][l.APPLabelName] = l.APPLabelColumnIndex
+		ll.layoutKeyToIndex[cache.NewLayoutKey(l.MetricName, l.APPLabelName)] = l.APPLabelColumnIndex
 		if ll.metricNameToMaxIndex[l.MetricName] < l.APPLabelColumnIndex {
 			ll.metricNameToMaxIndex[l.MetricName] = l.APPLabelColumnIndex
 		}

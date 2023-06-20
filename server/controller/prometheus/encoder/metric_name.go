@@ -28,7 +28,7 @@ import (
 
 // 缓存资源可用于分配的ID，提供ID的刷新、分配、回收接口
 type metricName struct {
-	mutex        sync.Mutex
+	lock         sync.Mutex
 	resourceType string
 	strToID      map[string]int
 	idAllocator
@@ -49,15 +49,15 @@ func newMetricName(max int) *metricName {
 }
 
 func (mn *metricName) refresh(args ...interface{}) error {
-	mn.mutex.Lock()
-	defer mn.mutex.Unlock()
+	mn.lock.Lock()
+	defer mn.lock.Unlock()
 
 	return mn.idAllocator.refresh()
 }
 
 func (mn *metricName) encode(strs []string) ([]*controller.PrometheusMetricName, error) {
-	mn.mutex.Lock()
-	defer mn.mutex.Unlock()
+	mn.lock.Lock()
+	defer mn.lock.Unlock()
 
 	resp := make([]*controller.PrometheusMetricName, 0)
 	dbToAdd := make([]*mysql.PrometheusMetricName, 0)

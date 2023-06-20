@@ -32,8 +32,8 @@ import (
 var log = logging.MustGetLogger("prometheus.synchronizer.encoder")
 
 var (
-	syncOnce sync.Once
-	syncIns  *Encoder
+	encoderOnce sync.Once
+	encoder     *Encoder
 )
 
 type Encoder struct {
@@ -54,10 +54,10 @@ type Encoder struct {
 }
 
 func GetSingleton() *Encoder {
-	syncOnce.Do(func() {
-		syncIns = &Encoder{}
+	encoderOnce.Do(func() {
+		encoder = &Encoder{}
 	})
-	return syncIns
+	return encoder
 }
 
 func (e *Encoder) Init(ctx context.Context, cfg *prometheuscfg.Config) {
