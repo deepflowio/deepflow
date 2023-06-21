@@ -238,7 +238,7 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 				if !strings.Contains(vTapPort.Name, ", ...") {
 					vTapPort.Name = vTapPort.Name + ", ..."
 				}
-			} else if !common.IsValueInSliceString("lo", nameSlice) {
+			} else if !common.Contains(nameSlice, "lo") {
 				vTapPort.Name = strings.Join([]string{"lo", vTapPort.Name}, ", ")
 			}
 			if vTapPort.DeviceID == 0 && vTapPort.DeviceType == 0 && deviceInfo.DeviceID != 0 && deviceInfo.DeviceType != 0 {
