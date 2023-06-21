@@ -16,7 +16,7 @@
 
 use std::env;
 use std::io::Result;
-use std::net::{Ipv4Addr, SocketAddr, UdpSocket};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
 use std::process;
 use std::sync::{
     atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, Ordering},
@@ -25,7 +25,9 @@ use std::sync::{
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chrono::{DateTime, Local};
+use dns_lookup::lookup_host;
 use flexi_logger::{writers::LogWriter, DeferredNow, Level, Record};
+use log::error;
 
 use super::stats;
 
@@ -51,10 +53,18 @@ impl RemoteLogConfig {
     }
 
     pub fn set_remotes<S: AsRef<str>>(&self, addrs: &[S], port: u16) {
-        let remotes = addrs
-            .iter()
-            .map(|addr| SocketAddr::new(addr.as_ref().parse().unwrap(), port))
-            .collect();
+        let mut remotes = vec![];
+        for addr in addrs {
+            if let Ok(ip) = addr.as_ref().parse::<IpAddr>() {
+                remotes.push(SocketAddr::new(ip, port))
+            } else {
+                if let Ok(host_ips) = lookup_host(addr.as_ref()) {
+                    remotes.push(SocketAddr::new(host_ips[0], port))
+                } else {
+                    error!("Invalid remote address {}, please check the configuration and domain name server.", addr.as_ref());
+                }
+            }
+        }
         *self.remotes.write().unwrap() = remotes;
     }
 }
