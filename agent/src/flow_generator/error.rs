@@ -79,6 +79,10 @@ pub enum Error {
     WasmVmError(String),
     #[error("{0}")]
     WasmInitFail(String),
+    #[error("so plugin return unexpect value")]
+    SoReturnUnexpectVal,
+    #[error("so plugin parse fail")]
+    SoParseFail,
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

@@ -32,6 +32,7 @@ pub use self::plugin::custom_wrap::CustomWrapLog;
 pub use self::plugin::wasm::{get_wasm_parser, WasmLog};
 pub use dns::{DnsInfo, DnsLog};
 pub use mq::{mqtt, KafkaInfo, KafkaLog, MqttInfo, MqttLog};
+use num_enum::TryFromPrimitive;
 pub use parser::{MetaAppProto, SessionAggregator, SLOT_WIDTH};
 pub use rpc::{
     decode_new_rpc_trace_context, decode_new_rpc_trace_context_with_type, get_protobuf_rpc_parser,
@@ -71,7 +72,7 @@ use public::utils::net::MacAddr;
 const NANOS_PER_MICRO: u64 = 1000;
 const FLOW_LOG_VERSION: u32 = 20220128;
 
-#[derive(Serialize, Debug, PartialEq, Copy, Clone, Eq)]
+#[derive(Serialize, Debug, PartialEq, Copy, Clone, Eq, TryFromPrimitive)]
 #[repr(u8)]
 pub enum L7ResponseStatus {
     Ok,
@@ -87,7 +88,7 @@ impl Default for L7ResponseStatus {
     }
 }
 
-#[derive(Serialize, Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Serialize, Debug, PartialEq, Eq, Clone, Copy, TryFromPrimitive)]
 #[repr(u8)]
 pub enum LogMessageType {
     Request,

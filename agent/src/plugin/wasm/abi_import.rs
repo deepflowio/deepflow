@@ -341,7 +341,7 @@ pub(super) fn host_read_l7_protocol_info(
         .as_mut()
         .unwrap()
         .get_ctx_base_mut()
-        .set_result(VmResult::ParsePaloadResult(infos));
+        .set_result(VmResult::ParsePayloadResult(infos));
 
     1
 }

@@ -96,8 +96,14 @@ func createPlugin(cmd *cobra.Command, t, image, name string) error {
 	bodyBuf := &bytes.Buffer{}
 	bodyWriter := multipart.NewWriter(bodyBuf)
 	bodyWriter.WriteField("NAME", name)
-	if t == "wasm" {
+
+	switch t {
+	case "wasm":
 		bodyWriter.WriteField("TYPE", "1")
+	case "so":
+		bodyWriter.WriteField("TYPE", "2")
+	default:
+		return errors.New(fmt.Sprintf("unknown type %s", t))
 	}
 
 	fileWriter, err := bodyWriter.CreateFormFile("IMAGE", path.Base(image))

@@ -72,8 +72,10 @@ fn get_req_param<'a>(
         parse_config: None,
         l7_perf_cache: rrt_cache.clone(),
         wasm_vm: Some(vm.clone()),
+        so_func: None,
         stats_counter: None,
         rrt_timeout: Duration::from_secs(10).as_micros() as usize,
+        buf_size: 0,
     }
 }
 
@@ -103,8 +105,10 @@ fn get_resq_param<'a>(
         parse_config: None,
         l7_perf_cache: rrt_cache.clone(),
         wasm_vm: Some(vm.clone()),
+        so_func: None,
         stats_counter: None,
         rrt_timeout: Duration::from_secs(10).as_micros() as usize,
+        buf_size: 0,
     }
 }
 

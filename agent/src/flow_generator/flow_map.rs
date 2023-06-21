@@ -71,9 +71,12 @@ use crate::{
         FlowConfig, ModuleConfig, RuntimeConfig,
     },
     metric::document::TapSide,
-    plugin::wasm::{
-        get_all_wasm_export_func_name, get_wasm_metric_counter_map_key, init_wasmtime, WasmCounter,
-        WasmCounterMap, WasmVm,
+    plugin::{
+        c_ffi::SoPluginFunc,
+        wasm::{
+            get_all_wasm_export_func_name, get_wasm_metric_counter_map_key, init_wasmtime,
+            WasmCounter, WasmCounterMap, WasmVm,
+        },
     },
     policy::{Policy, PolicyGetter},
     rpc::get_timestamp,
@@ -139,6 +142,7 @@ pub struct FlowMap {
     time_key_buffer: Option<Vec<(u64, FlowMapKey)>>,
 
     wasm_vm: Option<Rc<RefCell<WasmVm>>>,
+    so_plugin: Option<Rc<Vec<SoPluginFunc>>>,
 
     tcp_perf_pool: MemoryPool<TcpPerf>,
     flow_node_pool: MemoryPool<FlowNode>,
@@ -270,6 +274,11 @@ impl FlowMap {
                     }
                     Some(Rc::new(RefCell::new(vm)))
                 }
+            },
+            so_plugin: if config.so_plugins.is_empty() {
+                None
+            } else {
+                Some(Rc::new(config.so_plugins.clone()))
             },
             tcp_perf_pool: MemoryPool::new(config.memory_pool_size),
             flow_node_pool: MemoryPool::new(config.memory_pool_size),
@@ -1065,6 +1074,7 @@ impl FlowMap {
                 self.flow_perf_counter.clone(),
                 port,
                 self.wasm_vm.as_ref().map(|w| w.clone()),
+                self.so_plugin.as_ref().map(|s| s.clone()),
                 self.stats_counter.clone(),
                 match meta_packet.lookup_key.proto {
                     IpProtocol::Tcp => flow_config.rrt_tcp_timeout,

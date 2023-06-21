@@ -34,7 +34,7 @@ use public::enums::IpProtocol;
 #[derive(Debug)]
 pub(super) enum VmResult {
     // result of parse_payload
-    ParsePaloadResult(Vec<CustomInfo>),
+    ParsePayloadResult(Vec<CustomInfo>),
     StringResult(String),
     // result of on_http_req and on_http_resp
     HTTPResult(Option<TraceInfo>, Vec<KeyVal>),
@@ -78,7 +78,7 @@ impl VmParseCtx {
 
     pub(super) fn take_parse_payload_result(&mut self) -> Option<Vec<CustomInfo>> {
         self.take_result().map_or(None, |r| match r {
-            VmResult::ParsePaloadResult(info) => Some(info),
+            VmResult::ParsePayloadResult(info) => Some(info),
             _ => {
                 wasm_error!(
                     self.get_ins_name(),
@@ -136,14 +136,14 @@ pub struct VmCtxBase {
     pub(super) port_src: u16,
     pub(super) port_dst: u16,
     pub(super) l4_protocol: IpProtocol,
-    // proto is return from on_check_payload, when on_check_paylaod, it set to 0, other wise will set to non zero value
+    // proto is return from on_check_payload, when on_check_payload, it set to 0, other wise will set to non zero value
     pub(super) proto: u8,
     pub(super) ebpf_type: EbpfType,
     pub(super) time: u64,
     pub(super) direction: PacketDirection,
     pub(super) process_kname: Option<String>,
     /*
-        paylaod is from the payload: &[u8] in L7ProtocolParserInterface::check_payload() and L7ProtocolParserInterface::parse_payload(),
+        payload is from the payload: &[u8] in L7ProtocolParserInterface::check_payload() and L7ProtocolParserInterface::parse_payload(),
         it can not modify and drop.
     */
     pub(super) payload: ManuallyDrop<Vec<u8>>,

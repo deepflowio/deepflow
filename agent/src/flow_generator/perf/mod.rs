@@ -36,9 +36,9 @@ use super::{
     protocol_logs::AppProtoHead,
 };
 
-use crate::common::flow::L7PerfStats;
 use crate::common::l7_protocol_log::L7PerfCache;
 use crate::plugin::wasm::WasmVm;
+use crate::{common::flow::L7PerfStats, plugin::c_ffi::SoPluginFunc};
 use crate::{
     common::{
         flow::{FlowPerfStats, L4Protocol, L7Protocol, PacketDirection, SignalSource},
@@ -191,6 +191,7 @@ pub struct FlowLog {
     is_skip: bool,
 
     wasm_vm: Option<Rc<RefCell<WasmVm>>>,
+    so_plugin: Option<Rc<Vec<SoPluginFunc>>>,
     stats_counter: Arc<FlowMapCounter>,
     rrt_timeout: usize,
 }
@@ -274,6 +275,7 @@ impl FlowLog {
         }
 
         if let Some(payload) = packet.get_l4_payload() {
+            let pkt_size = flow_config.l7_log_packet_size as usize;
             let mut param = ParseParam::from((
                 &*packet,
                 self.perf_cache.clone(),
@@ -282,8 +284,12 @@ impl FlowLog {
             ));
             param.set_counter(self.stats_counter.clone());
             param.set_rrt_timeout(self.rrt_timeout);
+            param.set_buf_size(pkt_size);
             if let Some(vm) = self.wasm_vm.as_ref() {
                 param.set_wasm_vm(vm.clone());
+            }
+            if let Some(p) = self.so_plugin.as_ref() {
+                param.set_so_func(p.clone());
             }
 
             for protocol in checker.possible_protocols(
@@ -375,6 +381,10 @@ impl FlowLog {
             ));
             param.set_counter(self.stats_counter.clone());
             param.set_rrt_timeout(self.rrt_timeout);
+            param.set_buf_size(flow_config.l7_log_packet_size as usize);
+            if let Some(p) = self.so_plugin.as_ref() {
+                param.set_so_func(p.clone());
+            }
             if let Some(vm) = self.wasm_vm.as_ref() {
                 param.set_wasm_vm(vm.clone());
             }
@@ -412,6 +422,7 @@ impl FlowLog {
         counter: Arc<FlowPerfCounter>,
         server_port: u16,
         wasm_vm: Option<Rc<RefCell<WasmVm>>>,
+        so_plugin: Option<Rc<Vec<SoPluginFunc>>>,
         stats_counter: Arc<FlowMapCounter>,
         rrt_timeout: usize,
     ) -> Option<Self> {
@@ -441,7 +452,8 @@ impl FlowLog {
             is_success: false,
             is_skip: false,
             server_port: server_port,
-            wasm_vm: wasm_vm,
+            wasm_vm,
+            so_plugin,
             stats_counter: stats_counter,
             rrt_timeout: rrt_timeout,
         })
