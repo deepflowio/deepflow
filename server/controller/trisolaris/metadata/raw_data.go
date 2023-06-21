@@ -1050,7 +1050,7 @@ func (r *PlatformRawData) ConvertDBCache(dbDataCache *DBDataCache) {
 }
 
 func (r *PlatformRawData) checkIsVip(ip string, vif *models.VInterface, platformVips []string) bool {
-	if IsValueInSliceString(ip, platformVips) == true {
+	if Contains(platformVips, ip) == true {
 		return true
 	}
 
