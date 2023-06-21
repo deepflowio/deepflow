@@ -35,17 +35,25 @@ func NewMetricTargetKey(metricName string, targetID int) MetricTargetKey {
 }
 
 type metricTarget struct {
-	metricTargetKeys mapset.Set[MetricTargetKey]
+	metricNameCache     *metricName
+	metricTargetKeys    mapset.Set[MetricTargetKey]
+	targetIDToMetricIDs map[int][]uint32 // only for fully assembled
 }
 
-func newMetricTarget() *metricTarget {
+func newMetricTarget(c *metricName) *metricTarget {
 	return &metricTarget{
-		metricTargetKeys: mapset.NewSet[MetricTargetKey](),
+		metricNameCache:     c,
+		metricTargetKeys:    mapset.NewSet[MetricTargetKey](),
+		targetIDToMetricIDs: make(map[int][]uint32),
 	}
 }
 
 func (mt *metricTarget) IfKeyExists(k MetricTargetKey) bool {
 	return mt.metricTargetKeys.Contains(k)
+}
+
+func (mt *metricTarget) GetMetricIDsByTargetID(id int) []uint32 {
+	return mt.targetIDToMetricIDs[id]
 }
 
 func (mt *metricTarget) Add(batch []MetricTargetKey) {
@@ -59,9 +67,14 @@ func (mt *metricTarget) refresh(args ...interface{}) error {
 	if err != nil {
 		return err
 	}
+	targetIDToMetricIDs := make(map[int][]uint32)
 	for _, item := range mts {
 		mt.metricTargetKeys.Add(NewMetricTargetKey(item.MetricName, item.TargetID))
+		if mni, ok := mt.metricNameCache.GetIDByName(item.MetricName); ok {
+			targetIDToMetricIDs[item.TargetID] = append(targetIDToMetricIDs[item.TargetID], uint32(mni))
+		}
 	}
+	mt.targetIDToMetricIDs = targetIDToMetricIDs
 	return nil
 }
 

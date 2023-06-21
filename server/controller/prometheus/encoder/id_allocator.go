@@ -83,7 +83,7 @@ func (ia *idAllocator) allocate(count int) (ids []int, err error) {
 	}
 
 	if len(ia.usableIDs) < count {
-		return nil, errors.New("no more usable ids")
+		return nil, errors.New(fmt.Sprintf("%s has no more usable ids", ia.resourceType))
 	}
 	ids = make([]int, count)
 	copy(ids, ia.usableIDs[:count])
@@ -93,7 +93,7 @@ func (ia *idAllocator) allocate(count int) (ids []int, err error) {
 		return
 	}
 	if len(inUseIDs) != 0 {
-		return nil, errors.New("some ids are in use")
+		return nil, errors.New(fmt.Sprintf("%s some ids are in use", ia.resourceType))
 	}
 	log.Infof("allocate %s ids: %v (expected count: %d, true count: %d)", ia.resourceType, ids, count, len(ids))
 	ia.usableIDs = ia.usableIDs[count:]

@@ -26,6 +26,7 @@ import (
 )
 
 type label struct {
+	lock         sync.Mutex
 	resourceType string
 	labelKeyToID sync.Map
 	labelIDToKey sync.Map
@@ -57,18 +58,21 @@ func (l *label) getID(key cache.LabelKey) (int, bool) {
 }
 
 func (l *label) refresh(args ...interface{}) error {
-	var ls []*mysql.PrometheusLabel
-	err := mysql.Db.Find(&ls).Error
+	var items []*mysql.PrometheusLabel
+	err := mysql.Db.Find(&items).Error
 	if err != nil {
 		return err
 	}
-	for _, item := range ls {
+	for _, item := range items {
 		l.store(item)
 	}
 	return nil
 }
 
 func (l *label) encode(toAdd []*controller.PrometheusLabelRequest) ([]*controller.PrometheusLabel, error) {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
 	resp := make([]*controller.PrometheusLabel, 0)
 	var dbToAdd []*mysql.PrometheusLabel
 	for _, item := range toAdd {
@@ -80,6 +84,7 @@ func (l *label) encode(toAdd []*controller.PrometheusLabelRequest) ([]*controlle
 				Value: &v,
 				Id:    proto.Uint32(uint32(id)),
 			})
+			continue
 		}
 		dbToAdd = append(dbToAdd, &mysql.PrometheusLabel{
 			Name:  n,

@@ -63,11 +63,6 @@ func (s *Synchronizer) GetStatsdCounter() *statsd.PrometheusLabelIDsCounter {
 }
 
 func (s *Synchronizer) assembleFully() (*trident.PrometheusLabelResponse, error) {
-	defer s.cache.Clear()
-	err := s.cache.RefreshFully()
-	if err != nil {
-		return nil, err
-	}
 	resp := new(trident.PrometheusLabelResponse)
 	mls, err := s.assembleMetricLabelFully()
 	if err != nil {
@@ -146,6 +141,7 @@ func (s *Synchronizer) assembleTargetFully() ([]*trident.TargetResponse, error) 
 			InstanceId: proto.Uint32(uint32(tInstanceID)),
 			JobId:      proto.Uint32(uint32(tJobID)),
 			TargetId:   proto.Uint32(uint32(targetID)),
+			MetricIds:  s.cache.MetricTarget.GetMetricIDsByTargetID(targetID),
 		})
 		s.statsdCounter.SendTargetCount++
 		return true
@@ -280,6 +276,7 @@ func (s *Synchronizer) prepare(req *trident.PrometheusLabelRequest) error {
 	AppendErrGroup(eg, s.addMetricAPPLabelLayoutCache, syncResp.GetMetricAppLabelLayouts())
 	AppendErrGroup(eg, s.addLabelCache, syncResp.GetLabels())
 	AppendErrGroup(eg, s.addMetricLabelCache, metricLabelsToAdd)
+	AppendErrGroup(eg, s.addMetricTargetCache, metricTargetsToAdd)
 	return eg.Wait()
 }
 
@@ -473,7 +470,7 @@ func (s *Synchronizer) tryAppendMetricTargetToAdd(toAdd mapset.Set[cache.MetricT
 }
 
 func (s *Synchronizer) addMetricTargetCache(arg ...interface{}) error {
-	ts := arg[0].([]cache.MetricTargetKey)
+	ts := arg[0].(mapset.Set[cache.MetricTargetKey]).ToSlice()
 	s.cache.MetricTarget.Add(ts)
 	return nil
 }

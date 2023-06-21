@@ -87,14 +87,11 @@ func (t *target) refresh(args ...interface{}) error {
 	if err != nil {
 		return err
 	}
-	fully := args[0].(bool)
 	for _, item := range targets {
 		key := NewTargetKey(item.Instance, item.Job)
 		t.keyToTargetID.Store(key, item.ID)
-		if !fully {
-			for _, ln := range t.getTargetLabelNames(item) {
-				t.targetLabelKeys.Add(NewTargetLabelKey(item.ID, ln))
-			}
+		for _, ln := range t.getTargetLabelNames(item) {
+			t.targetLabelKeys.Add(NewTargetLabelKey(item.ID, ln))
 		}
 	}
 	return nil
