@@ -47,6 +47,8 @@ use super::{
     config::{Config, PcapConfig, PortConfig, YamlConfig},
     ConfigError, IngressFlavour, KubernetesPollerType, RuntimeConfig,
 };
+use crate::plugin::c_ffi::SoPluginFunc;
+use crate::plugin::shared_obj::load_plugin;
 use crate::rpc::Session;
 use crate::{
     common::{decapsulate::TunnelTypeBitmap, enums::TapType, l7_protocol_log::L7ProtocolBitmap},
@@ -352,6 +354,7 @@ pub struct FlowConfig {
 
     // name, data
     pub wasm_plugins: Vec<(String, Vec<u8>)>,
+    pub so_plugins: Vec<SoPluginFunc>,
 
     pub rrt_tcp_timeout: usize, //micro sec
     pub rrt_udp_timeout: usize, //micro sec
@@ -407,6 +410,7 @@ impl From<&RuntimeConfig> for FlowConfig {
                 (&conf.yaml_config).get_protocol_port_parse_bitmap(),
             ),
             wasm_plugins: vec![],
+            so_plugins: vec![],
             rrt_tcp_timeout: conf.yaml_config.rrt_tcp_timeout.as_micros() as usize,
             rrt_udp_timeout: conf.yaml_config.rrt_udp_timeout.as_micros() as usize,
         }
@@ -2070,7 +2074,7 @@ impl ConfigHandler {
         ctrl_mac: &str,
     ) {
         self.candidate_config
-            .fill_wasm_plugin_prog_from_server(rt, session, ctrl_ip, ctrl_mac);
+            .fill_plugin_prog_from_server(rt, session, ctrl_ip, ctrl_mac);
         self.current_config
             .store(Arc::new(self.candidate_config.clone()));
     }
@@ -2093,18 +2097,22 @@ impl ModuleConfig {
         min((mem_size / MB / 128 * 65536) as usize, 1 << 30)
     }
 
-    pub fn fill_wasm_plugin_prog_from_server(
+    pub fn fill_plugin_prog_from_server(
         &mut self,
         rt: &Arc<Runtime>,
         session: &Arc<Session>,
         ctrl_ip: &str,
         ctrl_mac: &str,
     ) {
-        let mut p = vec![];
+        let mut wasm = vec![];
+        let mut so = vec![];
         rt.block_on(async {
             for i in self.yaml_config.wasm_plugins.iter() {
-                match session.get_wasm_plugin(i.as_str(), ctrl_ip, ctrl_mac).await {
-                    Ok(prog) => p.push((i.clone(), prog)),
+                match session
+                    .get_plugin(i.as_str(), trident::PluginType::Wasm, ctrl_ip, ctrl_mac)
+                    .await
+                {
+                    Ok(prog) => wasm.push((i.clone(), prog)),
                     Err(err) => {
                         error!("get wasm plugin {} fail: {}", i, err);
                         continue;
@@ -2112,7 +2120,29 @@ impl ModuleConfig {
                 }
             }
         });
-        self.flow.wasm_plugins = p;
+
+        rt.block_on(async {
+            for i in self.yaml_config.so_plugins.iter() {
+                match session
+                    .get_plugin(i.as_str(), trident::PluginType::So, ctrl_ip, ctrl_mac)
+                    .await
+                {
+                    Ok(prog) => match load_plugin(prog.as_slice(), i) {
+                        Ok(p) => {
+                            so.push(p);
+                        }
+                        Err(e) => error!("load so plugin {} fail: {}", i, e),
+                    },
+                    Err(err) => {
+                        error!("get so plugin {} fail: {}", i, err);
+                        continue;
+                    }
+                }
+            }
+        });
+
+        self.flow.wasm_plugins = wasm;
+        self.flow.so_plugins = so;
     }
 }
 

@@ -39,6 +39,7 @@ use crate::flow_generator::protocol_logs::{
     ProtobufRpcWrapLog, RedisLog, SofaRpcLog,
 };
 use crate::flow_generator::{LogMessageType, Result};
+use crate::plugin::c_ffi::SoPluginFunc;
 use crate::plugin::wasm::WasmVm;
 
 use public::enums::IpProtocol;
@@ -419,15 +420,20 @@ pub struct ParseParam<'a> {
 
     pub l7_perf_cache: Rc<RefCell<L7PerfCache>>,
 
+    // plugins
     pub wasm_vm: Option<Rc<RefCell<WasmVm>>>,
+    pub so_func: Option<Rc<Vec<SoPluginFunc>>>,
 
     pub stats_counter: Option<Arc<FlowMapCounter>>,
 
     // rrt cal timeout
     pub rrt_timeout: usize, // micro second
+
+    // the config of `l7_log_packet_size`, must set in parse_payload and check_payload
+    pub buf_size: u16,
 }
 
-// from packet, previous_log_info_cache, perf_only
+// from packet, previous_log_info_cache, l7_log_packet_size, perf_only
 impl From<(&MetaPacket<'_>, Rc<RefCell<L7PerfCache>>, bool)> for ParseParam<'_> {
     fn from(f: (&MetaPacket<'_>, Rc<RefCell<L7PerfCache>>, bool)) -> Self {
         let (packet, cache, perf_only) = f;
@@ -451,10 +457,14 @@ impl From<(&MetaPacket<'_>, Rc<RefCell<L7PerfCache>>, bool)> for ParseParam<'_> 
             l7_perf_cache: cache,
 
             wasm_vm: None,
+            so_func: None,
+
             stats_counter: None,
 
             // the timeout will overwrite by set_rrt_timeout(), 10s set in here only use for test.
             rrt_timeout: Duration::from_secs(10).as_micros() as usize,
+
+            buf_size: 0,
         };
         if packet.ebpf_type != EbpfType::None {
             let is_tls = match packet.ebpf_type {
@@ -514,8 +524,16 @@ impl ParseParam<'_> {
         self.wasm_vm = Some(vm);
     }
 
+    pub fn set_so_func(&mut self, so_func: Rc<Vec<SoPluginFunc>>) {
+        self.so_func = Some(so_func);
+    }
+
     pub fn set_counter(&mut self, stat: Arc<FlowMapCounter>) {
         self.stats_counter = Some(stat);
+    }
+
+    pub fn set_buf_size(&mut self, buf_size: usize) {
+        self.buf_size = buf_size as u16;
     }
 
     pub fn set_rrt_timeout(&mut self, t: usize) {

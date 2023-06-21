@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+pub mod c_ffi;
+#[cfg(target_os = "linux")]
+pub mod shared_obj;
 pub mod wasm;
 
 use public::{bytes::read_u32_be, l7_protocol::L7Protocol};
