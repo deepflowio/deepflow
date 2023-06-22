@@ -1084,6 +1084,11 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 		sk_info.update_time = time_stamp / NS_PER_SEC;
 		sk_info.need_reconfirm = conn_info->need_reconfirm;
 		sk_info.correlation_id = conn_info->correlation_id;
+		if (sk_info.direction == T_INGRESS) {
+			sk_info.ingress_cd = 2;
+		} else {
+			sk_info.egress_cd = 2;
+		}
 
 		/*
 		 * MSG_PRESTORE 目前只用于MySQL, Kafka协议推断
@@ -1125,6 +1130,15 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 			__sync_fetch_and_add(&socket_info_ptr->seq, 1);
 		}
 		sk_info.seq = socket_info_ptr->seq;
+
+		if (conn_info->direction == T_INGRESS) {
+			sk_info.ingress_seq = socket_info_ptr->ingress_seq;
+			__sync_fetch_and_add(&socket_info_ptr->ingress_seq, 1);
+		} else {
+			sk_info.egress_seq = socket_info_ptr->egress_seq;
+			__sync_fetch_and_add(&socket_info_ptr->egress_seq, 1);
+		}
+
 		socket_info_ptr->direction = conn_info->direction;
 		socket_info_ptr->msg_type = conn_info->message_type;
 		socket_info_ptr->update_time = time_stamp / NS_PER_SEC;
@@ -1172,6 +1186,13 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 
 	v->socket_id = sk_info.uid;
 	v->data_seq = sk_info.seq;
+
+	if (conn_info->direction == T_INGRESS) {
+		v->stream_seq = sk_info.ingress_seq;
+	} else {
+		v->stream_seq = sk_info.egress_seq;
+	}
+
 	v->tgid = tgid;
 	v->pid = (__u32) pid_tgid;
 
@@ -1304,6 +1325,27 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 	} else {
 		infer_l7_class(ctx_map, conn_info, direction, args,
 			       bytes_count, sock_state, extra);
+	}
+
+	struct socket_info_t *socket_info_ptr = conn_info->socket_info_ptr;
+	if (is_socket_info_valid(socket_info_ptr)) {
+		if (direction == T_INGRESS) {
+			if (conn_info->protocol != PROTO_UNKNOWN) {
+				socket_info_ptr->ingress_cd = 2;
+			} else if (socket_info_ptr->ingress_cd > 0) {
+				conn_info->protocol = PROTO_ORTHER;
+				conn_info->message_type = MSG_REQUEST;
+				socket_info_ptr->ingress_cd -= 1;
+			}
+		} else {
+			if (conn_info->protocol != PROTO_UNKNOWN) {
+				socket_info_ptr->egress_cd = 2;
+			} else if (socket_info_ptr->egress_cd > 0) {
+				conn_info->protocol = PROTO_ORTHER;
+				conn_info->message_type = MSG_REQUEST;
+				socket_info_ptr->egress_cd -= 1;
+			}
+		}
 	}
 
 	// When at least one of protocol or message_type is valid, 

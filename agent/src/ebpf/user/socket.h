@@ -54,7 +54,7 @@ struct socket_bpf_data {
 	uint64_t tcp_seq;		   // 收发cap_data数据时TCP协议栈将会用到的TCP SEQ，可用于关联eBPF DATA与网络中的TCP Packet
 	uint64_t syscall_trace_id_call;    // 应用数据的追踪ID，若应用为协程，L7代理、应用层负载均衡等类型时，可利用此值追踪一个请求或响应
 					   // 同一份应用数据（cap_data可能不同）接收、发送的两份cap_data会标记上相同标识
-
+	uint32_t stream_seq;
 	/* data info */
 	uint64_t timestamp;	// cap_data获取的时间戳
 	uint8_t  direction;	// 数据的收发方向，枚举如下: 1 SOCK_DIR_SND, 2 SOCK_DIR_RCV
