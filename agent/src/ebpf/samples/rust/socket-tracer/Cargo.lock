@@ -71,16 +71,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rust_sample"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "dunce",
- "libc",
- "serde",
-]
-
-[[package]]
 name = "serde"
 version = "1.0.144"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -98,6 +88,16 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "socket_tracer"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "dunce",
+ "libc",
+ "serde",
 ]
 
 [[package]]
