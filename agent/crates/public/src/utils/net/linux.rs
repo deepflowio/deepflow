@@ -326,7 +326,7 @@ fn request_link_info(name: Option<&str>) -> Result<Vec<Link>> {
     Ok(links)
 }
 
-pub fn link_by_name<S: AsRef<str>>(name: S) -> Result<Link> {
+fn inner_link_by_name<S: AsRef<str>>(name: S) -> Result<Link> {
     request_link_info(Some(name.as_ref())).map(|mut links| {
         if links.len() > 0 {
             links.pop().unwrap()
@@ -334,6 +334,36 @@ pub fn link_by_name<S: AsRef<str>>(name: S) -> Result<Link> {
             unreachable!()
         }
     })
+}
+
+pub fn link_by_name<S: AsRef<str>>(name: S) -> Result<Link> {
+    let name = name.as_ref();
+    match inner_link_by_name(name) {
+        Ok(link) => return Ok(link),
+        Err(last_error) => {
+            // In some Centos6 environments link_by_name will return an error,
+            // by using link_list instead.
+            match link_list() {
+                Err(e) => {
+                    return Err(Error::LinkNotFound(format!(
+                        "link_by_name error: {:?} and link_list error: {:?}",
+                        last_error, e
+                    )))
+                }
+                Ok(list) => {
+                    for nic in &list {
+                        if nic.name == name.to_string() {
+                            return Ok(nic.clone());
+                        }
+                    }
+                    return Err(Error::LinkNotFound(format!(
+                        "link_by_name error: {:?} and link_list error: not found by name {}",
+                        last_error, name
+                    )));
+                }
+            };
+        }
+    };
 }
 
 pub fn links_by_name_regex<S: AsRef<str>>(regex: S) -> Result<Vec<Link>> {
