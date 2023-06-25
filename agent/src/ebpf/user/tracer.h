@@ -39,7 +39,7 @@
 #include "atomic.h"
 #include <bcc/libbpf.h>
 #include "../kernel/include/common.h"
-#include "../kernel/include/xxhash.h"
+#include "xxhash.h"
 #include "../kernel/include/socket_trace_common.h"
 #include <bcc/libbpf.h>
 #include "symbol.h"

@@ -48,7 +48,7 @@
 #define __u32 u32
 #define __u64 u64
 #define __u8  u8
-#include "../kernel/include/xxhash.h"
+#include "xxhash.h"
 
 typedef struct {
 	u64 key[2];
