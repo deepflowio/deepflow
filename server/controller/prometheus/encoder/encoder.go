@@ -29,11 +29,11 @@ import (
 	prometheuscfg "github.com/deepflowio/deepflow/server/controller/prometheus/config"
 )
 
-var log = logging.MustGetLogger("prometheus.encoder")
+var log = logging.MustGetLogger("prometheus.synchronizer.encoder")
 
 var (
-	syncOnce sync.Once
-	syncIns  *Encoder
+	encoderOnce sync.Once
+	encoder     *Encoder
 )
 
 type Encoder struct {
@@ -54,10 +54,10 @@ type Encoder struct {
 }
 
 func GetSingleton() *Encoder {
-	syncOnce.Do(func() {
-		syncIns = &Encoder{}
+	encoderOnce.Do(func() {
+		encoder = &Encoder{}
 	})
-	return syncIns
+	return encoder
 }
 
 func (e *Encoder) Init(ctx context.Context, cfg *prometheuscfg.Config) {
@@ -72,7 +72,7 @@ func (e *Encoder) Init(ctx context.Context, cfg *prometheuscfg.Config) {
 	e.labelLayout = newLabelLayout()
 	e.metricLabel = newMetricLabel(e.label)
 	e.metricTarget = newMetricTarget()
-	e.refreshInterval = time.Duration(cfg.CacheRefreshInterval) * time.Second
+	e.refreshInterval = time.Duration(cfg.EncoderCacheRefreshInterval) * time.Second
 	return
 }
 
@@ -112,26 +112,26 @@ func (e *Encoder) Stop() {
 
 func (e *Encoder) refresh() error {
 	e.label.refresh()
-	eg, ctx := errgroup.WithContext(e.ctx)
-	AppendErrGroupWithContext(ctx, eg, e.metricName.refresh)
-	AppendErrGroupWithContext(ctx, eg, e.labelName.refresh)
-	AppendErrGroupWithContext(ctx, eg, e.labelValue.refresh)
-	AppendErrGroupWithContext(ctx, eg, e.labelLayout.refresh)
-	AppendErrGroupWithContext(ctx, eg, e.metricLabel.refresh)
-	AppendErrGroupWithContext(ctx, eg, e.metricTarget.refresh)
+	eg := &errgroup.Group{}
+	AppendErrGroup(eg, e.metricName.refresh)
+	AppendErrGroup(eg, e.labelName.refresh)
+	AppendErrGroup(eg, e.labelValue.refresh)
+	AppendErrGroup(eg, e.labelLayout.refresh)
+	AppendErrGroup(eg, e.metricLabel.refresh)
+	AppendErrGroup(eg, e.metricTarget.refresh)
 	return eg.Wait()
 }
 
 func (e *Encoder) Encode(req *controller.SyncPrometheusRequest) (*controller.SyncPrometheusResponse, error) {
 	resp := new(controller.SyncPrometheusResponse)
 	e.encodeLabel(resp, req.GetLabels())
-	eg, ctx := errgroup.WithContext(e.ctx)
-	AppendErrGroupWithContext(ctx, eg, e.encodeMetricName, resp, req.GetMetricNames())
-	AppendErrGroupWithContext(ctx, eg, e.encodeLabelName, resp, req.GetLabelNames())
-	AppendErrGroupWithContext(ctx, eg, e.encodeLabelValue, resp, req.GetLabelValues())
-	AppendErrGroupWithContext(ctx, eg, e.encodeLabelIndex, resp, req.GetMetricAppLabelLayouts())
-	AppendErrGroupWithContext(ctx, eg, e.encodeMetricLabel, req.GetMetricLabels())
-	AppendErrGroupWithContext(ctx, eg, e.encodeMetricTarget, req.GetMetricTargets())
+	eg := &errgroup.Group{}
+	AppendErrGroup(eg, e.encodeMetricName, resp, req.GetMetricNames())
+	AppendErrGroup(eg, e.encodeLabelName, resp, req.GetLabelNames())
+	AppendErrGroup(eg, e.encodeLabelValue, resp, req.GetLabelValues())
+	AppendErrGroup(eg, e.encodeLabelIndex, resp, req.GetMetricAppLabelLayouts())
+	AppendErrGroup(eg, e.encodeMetricLabel, req.GetMetricLabels())
+	AppendErrGroup(eg, e.encodeMetricTarget, req.GetMetricTargets())
 	err := eg.Wait()
 	return resp, err
 }

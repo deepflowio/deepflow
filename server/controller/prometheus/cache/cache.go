@@ -27,9 +27,10 @@ import (
 
 	"github.com/deepflowio/deepflow/message/controller"
 	. "github.com/deepflowio/deepflow/server/controller/prometheus/common"
+	"github.com/deepflowio/deepflow/server/controller/prometheus/config"
 )
 
-var log = logging.MustGetLogger("prometheus")
+var log = logging.MustGetLogger("prometheus.synchronizer.cache")
 
 var (
 	cacheOnce sync.Once
@@ -39,7 +40,8 @@ var (
 type Cache struct {
 	ctx context.Context
 
-	canRefresh chan bool
+	canRefresh      chan bool
+	refreshInterval time.Duration
 
 	MetricName              *metricName
 	LabelName               *labelName
@@ -53,20 +55,26 @@ type Cache struct {
 
 func GetSingleton() *Cache {
 	cacheOnce.Do(func() {
+		mn := new(metricName)
 		l := newLabel()
 		cacheIns = &Cache{
 			canRefresh:              make(chan bool, 1),
-			MetricName:              &metricName{},
-			LabelName:               &labelName{},
-			LabelValue:              &labelValue{},
-			MetricAndAPPLabelLayout: &metricAndAPPLabelLayout{},
+			MetricName:              mn,
+			LabelName:               new(labelName),
+			LabelValue:              new(labelValue),
+			MetricAndAPPLabelLayout: new(metricAndAPPLabelLayout),
 			Target:                  newTarget(),
 			Label:                   l,
 			MetricLabel:             newMetricLabel(l),
-			MetricTarget:            newMetricTarget(),
+			MetricTarget:            newMetricTarget(mn),
 		}
 	})
 	return cacheIns
+}
+
+func (c *Cache) Init(ctx context.Context, cfg *config.Config) {
+	c.ctx = ctx
+	c.refreshInterval = time.Duration(cfg.SynchronizerCacheRefreshInterval) * time.Second
 }
 
 func GetDebugCache(t controller.PrometheusCacheType) []byte {
@@ -175,11 +183,11 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 			"metric_name_to_label_ids": make(map[string][]int),
 			"metric_label_detail_keys": make(map[string]interface{}),
 		}
-		tempCache.MetricLabel.LabelCache.keys.Each(func(lk LabelKey) bool {
+		tempCache.MetricLabel.labelCache.keys.Each(func(lk LabelKey) bool {
 			temp["label_cache"].(map[string]interface{})["keys"].(map[string]interface{})[marshal(lk)] = struct{}{}
 			return true
 		})
-		tempCache.MetricLabel.LabelCache.idToKey.Range(func(key, value any) bool {
+		tempCache.MetricLabel.labelCache.idToKey.Range(func(key, value any) bool {
 			temp["label_cache"].(map[string]interface{})["id_to_key"].(map[int]string)[key.(int)] = marshal(value)
 			return true
 		})
@@ -199,13 +207,18 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 	}
 	getMetricTarget := func() {
 		temp := map[string]interface{}{
-			"metric_target_keys": make(map[string]interface{}),
+			"metric_target_keys":      make(map[string]interface{}),
+			"target_id_to_metric_ids": make(map[int][]uint32),
 		}
 		tempCache.MetricTarget.metricTargetKeys.Each(func(mtk MetricTargetKey) bool {
 			temp["metric_target_keys"].(map[string]interface{})[marshal(mtk)] = struct{}{}
 			return true
 		})
-		if len(temp["metric_target_keys"].(map[string]interface{})) > 0 {
+		for k, v := range tempCache.MetricTarget.targetIDToMetricIDs {
+			temp["target_id_to_metric_ids"].(map[int][]uint32)[k] = v
+		}
+		if len(temp["metric_target_keys"].(map[string]interface{})) > 0 ||
+			len(temp["target_id_to_metric_ids"].(map[int][]uint32)) > 0 {
 			content["metric_target"] = temp
 		}
 	}
@@ -248,53 +261,57 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 	return b
 }
 
-func (t *Cache) Start(ctx context.Context) error {
-	if err := t.refresh(false); err != nil {
+func (c *Cache) Start(ctx context.Context, cfg *config.Config) error {
+	c.Init(ctx, cfg)
+	c.canRefresh <- true
+	if err := c.tryRefresh(); err != nil {
 		return err
 	}
-	t.canRefresh <- true
 	go func() {
-		ticker := time.NewTicker(time.Hour)
+		ticker := time.NewTicker(c.refreshInterval)
 		for {
 			select {
+			case <-ticker.C:
+				c.tryRefresh()
 			case <-ctx.Done():
 				return
-			case <-ticker.C:
-				select {
-				case t.canRefresh <- true:
-					t.refresh(false)
-				default:
-					log.Info("last refresh cache not completed now")
-				}
 			}
 		}
 	}()
 	return nil
 }
 
-func (t *Cache) refresh(fully bool) error {
+func (c *Cache) tryRefresh() (err error) {
+LOOP:
+	for {
+		select {
+		case <-c.canRefresh:
+			err = c.refresh()
+			c.canRefresh <- true
+			break LOOP
+		default:
+			time.Sleep(time.Second)
+			log.Info("last refresh cache not completed now")
+		}
+	}
+	return
+}
+
+func (c *Cache) refresh() error {
 	log.Info("refresh cache started")
-	t.Label.refresh(fully)
+	egRunAhead := &errgroup.Group{}
+	AppendErrGroup(egRunAhead, c.MetricName.refresh)
+	AppendErrGroup(egRunAhead, c.Label.refresh)
+	egRunAhead.Wait()
 	eg := &errgroup.Group{}
-	AppendErrGroup(eg, t.MetricName.refresh, fully)
-	AppendErrGroup(eg, t.LabelName.refresh, fully)
-	AppendErrGroup(eg, t.LabelValue.refresh, fully)
-	AppendErrGroup(eg, t.MetricAndAPPLabelLayout.refresh, fully)
-	AppendErrGroup(eg, t.MetricLabel.refresh, fully)
-	AppendErrGroup(eg, t.Target.refresh, fully)
-	AppendErrGroup(eg, t.MetricTarget.refresh, fully)
+	AppendErrGroup(eg, c.LabelName.refresh)
+	AppendErrGroup(eg, c.LabelValue.refresh)
+	AppendErrGroup(eg, c.MetricAndAPPLabelLayout.refresh)
+	AppendErrGroup(eg, c.MetricLabel.refresh)
+	AppendErrGroup(eg, c.Target.refresh)
+	AppendErrGroup(eg, c.MetricTarget.refresh)
 	err := eg.Wait()
 	log.Info("refresh cache completed")
 	return err
 
-}
-
-func (t *Cache) RefreshFully() error {
-	t.Clear()
-	err := t.refresh(true)
-	return err
-}
-
-func (t *Cache) Clear() {
-	t.MetricLabel.clear()
 }

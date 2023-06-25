@@ -92,11 +92,25 @@ func updateDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 			return
 		}
 
+		var vTapValue string
+		v, ok := domainUpdate.Config["vtap_id"]
+		if ok && v != nil {
+			vTapValue = v.(string)
+		}
+
 		// transfer json format to map
 		patchMap := map[string]interface{}{}
 		c.ShouldBindBodyWith(&patchMap, binding.JSON)
 
 		lcuuid := c.Param("lcuuid")
+
+		// set vtap
+		err = KubernetesSetVtap(lcuuid, "", vTapValue)
+		if err != nil {
+			BadRequestResponse(c, common.K8S_SET_VTAP_FAIL, err.Error())
+			return
+		}
+
 		data, err := UpdateDomain(lcuuid, patchMap, cfg)
 		JsonResponse(c, data, err)
 	})
@@ -163,12 +177,25 @@ func updateSubDomain(c *gin.Context) {
 		return
 	}
 
+	var vTapValue string
+	v, ok := subDomainUpdate.Config["vtap_id"]
+	if ok && v != nil {
+		vTapValue = v.(string)
+	}
+
 	// 接收参数
 	// 避免struct会有默认值，这里转为map作为函数入参
 	patchMap := map[string]interface{}{}
 	c.ShouldBindBodyWith(&patchMap, binding.JSON)
 
 	lcuuid := c.Param("lcuuid")
+
+	err = KubernetesSetVtap("", lcuuid, vTapValue)
+	if err != nil {
+		BadRequestResponse(c, common.K8S_SET_VTAP_FAIL, err.Error())
+		return
+	}
+
 	data, err := UpdateSubDomain(lcuuid, patchMap)
 	JsonResponse(c, data, err)
 }

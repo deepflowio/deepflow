@@ -16,16 +16,18 @@
 
 use std::env;
 use std::io::Result;
-use std::net::{Ipv4Addr, SocketAddr, UdpSocket};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
 use std::process;
 use std::sync::{
-    atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, Ordering},
+    atomic::{AtomicBool, AtomicU16, AtomicU32, AtomicU64, AtomicU8, Ordering},
     Arc, Mutex, RwLock, Weak,
 };
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chrono::{DateTime, Local};
+use dns_lookup::lookup_host;
 use flexi_logger::{writers::LogWriter, DeferredNow, Level, Record};
+use log::{error, info};
 
 use super::stats;
 
@@ -34,7 +36,10 @@ pub struct RemoteLogConfig {
     enabled: Arc<AtomicBool>,
     threshold: Arc<AtomicU32>,
     hostname: Arc<Mutex<String>>,
-    remotes: Arc<RwLock<Vec<SocketAddr>>>,
+    remotes: Arc<RwLock<Vec<String>>>,
+    remote_port: Arc<AtomicU16>,
+    remote_addrs: Arc<RwLock<Vec<SocketAddr>>>,
+    last_domain_name_lookup: Arc<AtomicU64>,
 }
 
 impl RemoteLogConfig {
@@ -51,21 +56,22 @@ impl RemoteLogConfig {
     }
 
     pub fn set_remotes<S: AsRef<str>>(&self, addrs: &[S], port: u16) {
-        let remotes = addrs
-            .iter()
-            .map(|addr| SocketAddr::new(addr.as_ref().parse().unwrap(), port))
-            .collect();
+        let remotes = addrs.iter().map(|addr| addr.as_ref().to_string()).collect();
         *self.remotes.write().unwrap() = remotes;
+        self.remote_port.store(port, Ordering::Relaxed);
     }
 }
 
 pub struct RemoteLogWriter {
     socket: UdpSocket,
 
-    remotes: Arc<RwLock<Vec<SocketAddr>>>,
+    remotes: Arc<RwLock<Vec<String>>>,
+    remote_port: Arc<AtomicU16>,
     enabled: Arc<AtomicBool>,
     threshold: Arc<AtomicU32>,
     hostname: Arc<Mutex<String>>,
+    remote_addrs: Arc<RwLock<Vec<SocketAddr>>>,
+    last_domain_name_lookup: Arc<AtomicU64>,
 
     tag: String,
     header: Vec<u8>,
@@ -75,6 +81,7 @@ pub struct RemoteLogWriter {
 }
 
 impl RemoteLogWriter {
+    const DOMAIN_LOOKUP_INTERVAL: u64 = 180; // Seconds
     pub fn new<S1: AsRef<str>, S2: AsRef<str>>(
         hostname: S1,
         addrs: &[S2],
@@ -86,14 +93,16 @@ impl RemoteLogWriter {
         let threshold: Arc<AtomicU32> = Default::default();
         let hostname = Arc::new(Mutex::new(hostname.as_ref().to_owned()));
         let remotes = Arc::new(RwLock::new(
-            addrs
-                .iter()
-                .map(|addr| SocketAddr::new(addr.as_ref().parse().unwrap(), port))
-                .collect(),
+            addrs.iter().map(|addr| addr.as_ref().to_string()).collect(),
         ));
+        let remote_addrs = Arc::new(RwLock::new(vec![]));
+        let last_domain_name_lookup = Arc::new(AtomicU64::new(0));
+
+        let remote_port = Arc::new(AtomicU16::new(port));
         (
             Self {
                 remotes: remotes.clone(),
+                remote_port: remote_port.clone(),
                 socket: UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)).unwrap(),
                 enabled: enabled.clone(),
                 threshold: threshold.clone(),
@@ -104,6 +113,8 @@ impl RemoteLogWriter {
                     tag
                 },
                 header,
+                remote_addrs: remote_addrs.clone(),
+                last_domain_name_lookup: last_domain_name_lookup.clone(),
                 hourly_count: Default::default(),
                 last_hour: Default::default(),
             },
@@ -112,6 +123,9 @@ impl RemoteLogWriter {
                 threshold,
                 hostname,
                 remotes,
+                remote_port,
+                remote_addrs,
+                last_domain_name_lookup,
             },
         )
     }
@@ -155,6 +169,50 @@ impl RemoteLogWriter {
         false
     }
 
+    fn domain_name_lookup(&self, now: SystemTime) {
+        let now = now
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        if self
+            .last_domain_name_lookup
+            .fetch_update(Ordering::Acquire, Ordering::Relaxed, |x| {
+                if now < x + Self::DOMAIN_LOOKUP_INTERVAL {
+                    None
+                } else {
+                    Some(now)
+                }
+            })
+            .is_err()
+        {
+            return;
+        }
+
+        let remotes = self.remotes.read().unwrap().clone();
+        let port = self.remote_port.load(Ordering::Relaxed);
+        let mut remote_addrs = vec![];
+        for addr in &remotes {
+            if let Ok(ip) = addr.parse::<IpAddr>() {
+                remote_addrs.push(SocketAddr::new(ip, port))
+            } else {
+                if let Ok(mut host_ips) = lookup_host(addr.as_ref()) {
+                    host_ips.sort();
+                    remote_addrs.push(SocketAddr::new(host_ips[0], port))
+                } else {
+                    error!("Invalid remote address {}, please check the configuration and domain name server.", addr);
+                }
+            }
+        }
+        let last_remote_addrs = self.remote_addrs.read().unwrap().clone();
+        if last_remote_addrs != remote_addrs {
+            info!(
+                "Logger remote update from {:?} to {:?} by {:?}",
+                last_remote_addrs, remote_addrs, remotes
+            );
+            *self.remote_addrs.write().unwrap() = remote_addrs;
+        }
+    }
+
     fn write_message(&self, now: &SystemTime, message: String) -> Result<()> {
         // TODO: avoid buffer allocation
         let mut buffer = self.header.clone();
@@ -172,8 +230,7 @@ impl RemoteLogWriter {
             buffer.push('\n' as u8);
         }
         let mut result = Ok(());
-        let remotes = self.remotes.read().unwrap();
-        for remote in remotes.iter() {
+        for remote in self.remote_addrs.read().unwrap().iter() {
             match self.socket.send_to(buffer.as_slice(), remote) {
                 Err(e) => result = Err(e),
                 _ => (),
@@ -192,6 +249,7 @@ impl LogWriter for RemoteLogWriter {
         if self.over_threshold(&now) {
             return Ok(());
         }
+        self.domain_name_lookup(now);
         if let Some((file, line)) = record.file().zip(record.line()) {
             self.write_message(
                 &now,

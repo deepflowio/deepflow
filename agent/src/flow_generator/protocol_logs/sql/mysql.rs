@@ -18,6 +18,7 @@ use serde::Serialize;
 
 use super::super::{consts::*, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
 use super::sql_check::is_mysql;
+use super::trim_head_comment_and_first_upper;
 
 use crate::common::flow::L7PerfStats;
 use crate::{
@@ -174,7 +175,17 @@ impl From<MysqlInfo> for L7ProtocolSendLog {
             } else {
                 Some(f.protocol_version.to_string())
             },
-            row_effect: f.affected_rows as u32,
+
+            row_effect: if f.command == COM_QUERY {
+                trim_head_comment_and_first_upper(&f.context, 8)
+                    .map(|first| match first.as_str() {
+                        "INSERT" | "UPDATE" | "DELETE" => f.affected_rows as u32,
+                        _ => 0,
+                    })
+                    .unwrap_or_default()
+            } else {
+                0
+            },
             req: L7Request {
                 req_type: String::from(f.get_command_str()),
                 resource: f.context,
@@ -198,7 +209,6 @@ impl From<MysqlInfo> for L7ProtocolSendLog {
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct MysqlLog {
     info: MysqlInfo,
-    command: u8,
     #[serde(skip)]
     perf_stats: Option<L7PerfStats>,
 }
@@ -238,7 +248,6 @@ impl L7ProtocolParserInterface for MysqlLog {
 
     fn reset(&mut self) {
         *self = Self {
-            command: self.command,
             info: MysqlInfo {
                 protocol_version: self.info.protocol_version,
                 status: L7ResponseStatus::Ok,
@@ -301,7 +310,6 @@ impl MysqlLog {
             return Err(Error::MysqlLogParseFailed);
         }
         self.info.command = payload[COMMAND_OFFSET];
-        self.command = payload[COMMAND_OFFSET];
         match self.info.command {
             COM_QUIT | COM_FIELD_LIST | COM_STMT_EXECUTE | COM_STMT_CLOSE | COM_STMT_FETCH => (),
             COM_INIT_DB | COM_QUERY | COM_STMT_PREPARE => {
@@ -376,14 +384,11 @@ impl MysqlLog {
             }
             MYSQL_RESPONSE_CODE_OK => {
                 self.info.status = L7ResponseStatus::Ok;
-                if self.command == COM_QUERY {
-                    self.info.affected_rows =
-                        MysqlLog::decode_compress_int(&payload[AFFECTED_ROWS_OFFSET..]);
-                }
+                self.info.affected_rows =
+                    MysqlLog::decode_compress_int(&payload[AFFECTED_ROWS_OFFSET..]);
             }
             _ => (),
         }
-        self.command = 0;
         self.perf_stats.as_mut().unwrap().inc_resp();
         Ok(())
     }

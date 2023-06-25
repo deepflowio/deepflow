@@ -58,6 +58,21 @@ fn queue(c: &mut Criterion) {
             start.elapsed()
         })
     });
+    c.bench_function("queue_send_batch_1024", |b| {
+        b.iter_custom(|iters| {
+            let mut batch = Vec::with_capacity(1024);
+            let (s, _r, _) = queue::bounded((iters as usize) << 1);
+            let start = Instant::now();
+            for i in 0..iters {
+                if i != 0 && i % 1024 == 0 {
+                    s.send_all(&mut batch).unwrap();
+                } else {
+                    batch.push(i);
+                }
+            }
+            start.elapsed()
+        })
+    });
 }
 
 fn leaky_bucket(c: &mut Criterion) {

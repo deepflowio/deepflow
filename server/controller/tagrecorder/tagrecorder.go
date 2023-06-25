@@ -126,6 +126,12 @@ func (c *TagRecorder) refresh(domainLcuuidToIconID map[string]int, resourceTypeT
 	}
 	for _, updater := range updaters {
 		updater.SetConfig(c.cfg.TagRecorderCfg)
-		updater.Refresh()
+		isUpdate := updater.Refresh()
+		if isUpdate {
+			go func() {
+				time.Sleep(time.Duration(c.cfg.TagRecorderCfg.DictionaryRefreshInterval+10) * time.Second)
+				c.RefreshLiveView()
+			}()
+		}
 	}
 }

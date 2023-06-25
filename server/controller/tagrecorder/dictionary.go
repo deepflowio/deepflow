@@ -211,7 +211,7 @@ func (c *TagRecorder) UpdateChDictionary() {
 							chTable := "ch_" + strings.TrimSuffix(dictName, "_map")
 							createSQL := CREATE_SQL_MAP[dictName]
 							mysqlPortStr := strconv.Itoa(int(c.cfg.MySqlCfg.Port))
-							createSQL = fmt.Sprintf(createSQL, c.cfg.ClickHouseCfg.Database, dictName, mysqlPortStr, c.cfg.MySqlCfg.UserName, c.cfg.MySqlCfg.UserPassword, replicaSQL, c.cfg.MySqlCfg.Database, chTable, chTable)
+							createSQL = fmt.Sprintf(createSQL, c.cfg.ClickHouseCfg.Database, dictName, mysqlPortStr, c.cfg.MySqlCfg.UserName, c.cfg.MySqlCfg.UserPassword, replicaSQL, c.cfg.MySqlCfg.Database, chTable, chTable, c.cfg.TagRecorderCfg.DictionaryRefreshInterval)
 							log.Infof("create dictionary %s", dictName)
 							log.Info(createSQL)
 							_, err = connect.Exec(createSQL)
@@ -237,7 +237,7 @@ func (c *TagRecorder) UpdateChDictionary() {
 							}
 							createSQL := CREATE_SQL_MAP[dictName]
 							mysqlPortStr := strconv.Itoa(int(c.cfg.MySqlCfg.Port))
-							createSQL = fmt.Sprintf(createSQL, c.cfg.ClickHouseCfg.Database, dictName, mysqlPortStr, c.cfg.MySqlCfg.UserName, c.cfg.MySqlCfg.UserPassword, replicaSQL, c.cfg.MySqlCfg.Database, chTable, chTable)
+							createSQL = fmt.Sprintf(createSQL, c.cfg.ClickHouseCfg.Database, dictName, mysqlPortStr, c.cfg.MySqlCfg.UserName, c.cfg.MySqlCfg.UserPassword, replicaSQL, c.cfg.MySqlCfg.Database, chTable, chTable, c.cfg.TagRecorderCfg.DictionaryRefreshInterval)
 							if createSQL == dictSQL[0] {
 								continue
 							}
@@ -265,4 +265,96 @@ func (c *TagRecorder) UpdateChDictionary() {
 		}
 	}
 	return
+}
+
+func (c *TagRecorder) RefreshLiveView() {
+	log.Info("tagrecorder refresh live view")
+	kubeconfig := c.cfg.Kubeconfig
+	var config *rest.Config
+	var err error
+	if kubeconfig != "" {
+		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+	} else {
+		config, err = rest.InClusterConfig()
+		if err != nil {
+			log.Error(err)
+			return
+		}
+	}
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	ctx := context.Background()
+	namespace := os.Getenv(common.NAME_SPACE_KEY)
+	endpoints, err := clientset.CoreV1().Endpoints(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	if len(endpoints.Items) == 0 {
+		log.Warningf("no endpoints in %s", namespace)
+		return
+	}
+	endpointName := c.cfg.ClickHouseCfg.Host
+	for _, endpoint := range endpoints.Items {
+		if endpoint.Name != endpointName {
+			continue
+		}
+		subsets := endpoint.Subsets
+		for _, subset := range subsets {
+			for _, address := range subset.Addresses {
+				clickHouseCfg := c.cfg.ClickHouseCfg
+				if strings.Contains(address.IP, ":") {
+					clickHouseCfg.Host = fmt.Sprintf("[%s]", address.IP)
+				} else {
+					clickHouseCfg.Host = address.IP
+				}
+				for _, port := range subset.Ports {
+					if port.Name == "tcp-port" {
+						clickHouseCfg.Port = uint32(port.Port)
+						connect, err := clickhouse.Connect(clickHouseCfg)
+						if err != nil {
+							continue
+						}
+						_, err = connect.Exec(CREATE_APP_LABEL_LIVE_VIEW_SQL)
+						if err != nil {
+							log.Error(err)
+							connect.Close()
+							continue
+						}
+						log.Infof("refresh live view app_label_live_view in (%s: %d)", address.IP, clickHouseCfg.Port)
+						appLabelSql := "ALTER LIVE VIEW flow_tag.app_label_live_view REFRESH"
+						_, err = connect.Exec(appLabelSql)
+						if err != nil {
+							log.Error(err)
+							connect.Close()
+							continue
+						}
+
+						_, err = connect.Exec(CREATE_TARGET_LABEL_LIVE_VIEW_SQL)
+						if err != nil {
+							log.Error(err)
+							connect.Close()
+							continue
+						}
+						log.Infof("refresh live view target_label_live_view in (%s: %d)", address.IP, clickHouseCfg.Port)
+						targetLabelSql := "ALTER LIVE VIEW flow_tag.target_label_live_view REFRESH"
+						_, err = connect.Exec(targetLabelSql)
+						if err != nil {
+							log.Error(err)
+							connect.Close()
+							continue
+						}
+						connect.Close()
+					}
+				}
+			}
+		}
+	}
 }

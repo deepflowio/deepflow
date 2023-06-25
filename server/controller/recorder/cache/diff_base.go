@@ -916,6 +916,7 @@ func (b *DiffBaseDataSet) addPod(dbItem *mysql.Pod, seq int, toolDataSet *ToolDa
 		Label:               dbItem.Label,
 		Annotation:          dbItem.Annotation,
 		ENV:                 dbItem.ENV,
+		ContainerIDs:        dbItem.ContainerIDs,
 		State:               dbItem.State,
 		CreatedAt:           dbItem.CreatedAt,
 		PodNodeLcuuid:       podNodeLcuuid,
@@ -955,8 +956,9 @@ func (b *DiffBaseDataSet) addProcess(dbItem *mysql.Process, seq int) {
 			Sequence: seq,
 			Lcuuid:   dbItem.Lcuuid,
 		},
-		Name:      dbItem.Name,
-		OSAPPTags: dbItem.OSAPPTags,
+		Name:        dbItem.Name,
+		OSAPPTags:   dbItem.OSAPPTags,
+		ContainerID: dbItem.ContainerID,
 	}
 	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_PROCESS_EN, b.Process[dbItem.Lcuuid]))
 }
