@@ -38,7 +38,6 @@ func NewLBListener(wholeCache *cache.Cache, cloudData []cloudmodel.LBListener) *
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -93,16 +92,4 @@ func (l *LBListener) generateUpdateInfo(diffBase *cache.LBListener, cloudItem *c
 		return updateInfo, true
 	}
 	return nil, false
-}
-
-func (l *LBListener) addCache(dbItems []*mysql.LBListener) {
-	l.cache.AddLBListeners(dbItems)
-}
-
-func (l *LBListener) updateCache(cloudItem *cloudmodel.LBListener, diffBase *cache.LBListener) {
-	diffBase.Update(cloudItem)
-}
-
-func (l *LBListener) deleteCache(lcuuids []string) {
-	l.cache.DeleteLBListeners(lcuuids)
 }

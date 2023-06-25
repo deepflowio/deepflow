@@ -37,7 +37,6 @@ func NewPrometheusTarget(wholeCache *cache.Cache, cloudData []cloudmodel.Prometh
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -81,16 +80,4 @@ func (p *PrometheusTarget) generateUpdateInfo(diffBase *cache.PrometheusTarget, 
 		return updateInfo, true
 	}
 	return nil, false
-}
-
-func (p *PrometheusTarget) addCache(dbItems []*mysql.PrometheusTarget) {
-	p.cache.AddPrometheusTarget(dbItems)
-}
-
-func (p *PrometheusTarget) updateCache(cloudItem *cloudmodel.PrometheusTarget, diffBase *cache.PrometheusTarget) {
-	diffBase.Update(cloudItem)
-}
-
-func (p *PrometheusTarget) deleteCache(lcuuids []string) {
-	p.cache.DeletePrometheusTarget(lcuuids)
 }

@@ -38,7 +38,6 @@ func NewSubnet(wholeCache *cache.Cache, cloudData []cloudmodel.Subnet) *Subnet {
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -87,16 +86,4 @@ func (s *Subnet) generateUpdateInfo(diffBase *cache.Subnet, cloudItem *cloudmode
 		return updateInfo, true
 	}
 	return nil, false
-}
-
-func (s *Subnet) addCache(dbItems []*mysql.Subnet) {
-	s.cache.AddSubnets(dbItems)
-}
-
-func (s *Subnet) updateCache(cloudItem *cloudmodel.Subnet, diffBase *cache.Subnet) {
-	diffBase.Update(cloudItem)
-}
-
-func (s *Subnet) deleteCache(lcuuids []string) {
-	s.cache.DeleteSubnets(lcuuids)
 }

@@ -37,7 +37,6 @@ func NewProcess(wholeCache *cache.Cache, cloudData []cloudmodel.Process) *Proces
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -81,16 +80,4 @@ func (p *Process) generateUpdateInfo(diffBase *cache.Process, cloudItem *cloudmo
 		return updateInfo, true
 	}
 	return nil, false
-}
-
-func (p *Process) addCache(dbItems []*mysql.Process) {
-	p.cache.AddProcesses(dbItems)
-}
-
-func (p *Process) updateCache(cloudItem *cloudmodel.Process, diffBase *cache.Process) {
-	diffBase.Update(cloudItem)
-}
-
-func (p *Process) deleteCache(lcuuids []string) {
-	p.cache.DeleteProcesses(lcuuids)
 }

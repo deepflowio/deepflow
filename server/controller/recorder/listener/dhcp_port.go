@@ -30,25 +30,25 @@ type DHCPPort struct {
 }
 
 func NewDHCPPort(c *cache.Cache, eq *queue.OverwriteQueue) *DHCPPort {
-	lisener := &DHCPPort{
+	listener := &DHCPPort{
 		cache:         c,
 		eventProducer: event.NewDHCPPort(&c.ToolDataSet, eq),
 	}
-	return lisener
+	return listener
 }
 
 func (p *DHCPPort) OnUpdaterAdded(addedDBItems []*mysql.DHCPPort) {
-	// p.cache.AddDHCPPorts(addedDBItems)
 	p.eventProducer.ProduceByAdd(addedDBItems)
+	p.cache.AddDHCPPorts(addedDBItems)
 }
 
 func (p *DHCPPort) OnUpdaterUpdated(cloudItem *cloudmodel.DHCPPort, diffBase *cache.DHCPPort) {
 	p.eventProducer.ProduceByUpdate(cloudItem, diffBase)
-	// diffBase.Update(cloudItem)
-	// p.cache.UpdateDHCPPort(cloudItem)
+	diffBase.Update(cloudItem)
+	p.cache.UpdateDHCPPort(cloudItem)
 }
 
 func (p *DHCPPort) OnUpdaterDeleted(lcuuids []string) {
 	p.eventProducer.ProduceByDelete(lcuuids)
-	// p.cache.DeleteDHCPPorts(lcuuids)
+	p.cache.DeleteDHCPPorts(lcuuids)
 }

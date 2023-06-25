@@ -38,7 +38,6 @@ func NewPodIngress(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngress) *
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -93,16 +92,4 @@ func (i *PodIngress) generateUpdateInfo(diffBase *cache.PodIngress, cloudItem *c
 		return updateInfo, true
 	}
 	return nil, false
-}
-
-func (i *PodIngress) addCache(dbItems []*mysql.PodIngress) {
-	i.cache.AddPodIngresses(dbItems)
-}
-
-func (i *PodIngress) updateCache(cloudItem *cloudmodel.PodIngress, diffBase *cache.PodIngress) {
-	diffBase.Update(cloudItem)
-}
-
-func (i *PodIngress) deleteCache(lcuuids []string) {
-	i.cache.DeletePodIngresses(lcuuids)
 }

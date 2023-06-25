@@ -38,7 +38,6 @@ func NewSecurityGroup(wholeCache *cache.Cache, cloudData []cloudmodel.SecurityGr
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -85,16 +84,4 @@ func (g *SecurityGroup) generateUpdateInfo(diffBase *cache.SecurityGroup, cloudI
 		return updateInfo, true
 	}
 	return nil, false
-}
-
-func (g *SecurityGroup) addCache(dbItems []*mysql.SecurityGroup) {
-	g.cache.AddSecurityGroups(dbItems)
-}
-
-func (g *SecurityGroup) updateCache(cloudItem *cloudmodel.SecurityGroup, diffBase *cache.SecurityGroup) {
-	diffBase.Update(cloudItem)
-}
-
-func (g *SecurityGroup) deleteCache(lcuuids []string) {
-	g.cache.DeleteSecurityGroups(lcuuids)
 }

@@ -38,7 +38,6 @@ func NewLANIP(wholeCache *cache.Cache, domainToolDataSet *cache.ToolDataSet) *LA
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -125,16 +124,4 @@ func (i *LANIP) generateUpdateInfo(diffBase *cache.LANIP, cloudItem *cloudmodel.
 	}
 
 	return updateInfo, len(updateInfo) > 0
-}
-
-func (i *LANIP) addCache(dbItems []*mysql.LANIP) {
-	i.cache.AddLANIPs(dbItems)
-}
-
-func (i *LANIP) updateCache(cloudItem *cloudmodel.IP, diffBase *cache.LANIP) {
-	diffBase.Update(cloudItem)
-}
-
-func (i *LANIP) deleteCache(lcuuids []string) {
-	i.cache.DeleteLANIPs(lcuuids)
 }

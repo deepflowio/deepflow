@@ -38,7 +38,6 @@ func NewVRouter(wholeCache *cache.Cache, cloudData []cloudmodel.VRouter) *VRoute
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -96,17 +95,4 @@ func (r *VRouter) generateUpdateInfo(diffBase *cache.VRouter, cloudItem *cloudmo
 		return updateInfo, true
 	}
 	return nil, false
-}
-
-func (r *VRouter) addCache(dbItems []*mysql.VRouter) {
-	r.cache.AddVRouters(dbItems)
-}
-
-func (r *VRouter) updateCache(cloudItem *cloudmodel.VRouter, diffBase *cache.VRouter) {
-	diffBase.Update(cloudItem)
-	r.cache.UpdateVRouter(cloudItem)
-}
-
-func (r *VRouter) deleteCache(lcuuids []string) {
-	r.cache.DeleteVRouters(lcuuids)
 }

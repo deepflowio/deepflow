@@ -38,7 +38,6 @@ func NewPeerConnection(wholeCache *cache.Cache, cloudData []cloudmodel.PeerConne
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -125,16 +124,4 @@ func (c *PeerConnection) generateUpdateInfo(diffBase *cache.PeerConnection, clou
 		return updateInfo, true
 	}
 	return nil, false
-}
-
-func (c *PeerConnection) addCache(dbItems []*mysql.PeerConnection) {
-	c.cache.AddPeerConnections(dbItems)
-}
-
-func (c *PeerConnection) updateCache(cloudItem *cloudmodel.PeerConnection, diffBase *cache.PeerConnection) {
-	diffBase.Update(cloudItem)
-}
-
-func (c *PeerConnection) deleteCache(lcuuids []string) {
-	c.cache.DeletePeerConnections(lcuuids)
 }

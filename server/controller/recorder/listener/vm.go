@@ -30,25 +30,25 @@ type VM struct {
 }
 
 func NewVM(c *cache.Cache, eq *queue.OverwriteQueue) *VM {
-	lisener := &VM{
+	listener := &VM{
 		cache:         c,
 		eventProducer: event.NewVM(&c.ToolDataSet, eq),
 	}
-	return lisener
+	return listener
 }
 
-func (p *VM) OnUpdaterAdded(addedDBItems []*mysql.VM) {
-	// p.cache.AddVMs(addedDBItems)
-	p.eventProducer.ProduceByAdd(addedDBItems)
+func (vm *VM) OnUpdaterAdded(addedDBItems []*mysql.VM) {
+	vm.eventProducer.ProduceByAdd(addedDBItems)
+	vm.cache.AddVMs(addedDBItems)
 }
 
-func (p *VM) OnUpdaterUpdated(cloudItem *cloudmodel.VM, diffBase *cache.VM) {
-	p.eventProducer.ProduceByUpdate(cloudItem, diffBase)
-	// diffBase.Update(cloudItem)
-	// p.cache.UpdateVM(cloudItem)
+func (vm *VM) OnUpdaterUpdated(cloudItem *cloudmodel.VM, diffBase *cache.VM) {
+	vm.eventProducer.ProduceByUpdate(cloudItem, diffBase)
+	diffBase.Update(cloudItem)
+	vm.cache.UpdateVM(cloudItem)
 }
 
-func (p *VM) OnUpdaterDeleted(lcuuids []string) {
-	p.eventProducer.ProduceByDelete(lcuuids)
-	// p.cache.DeleteVMs(lcuuids)
+func (vm *VM) OnUpdaterDeleted(lcuuids []string) {
+	vm.eventProducer.ProduceByDelete(lcuuids)
+	vm.cache.DeleteVMs(lcuuids)
 }
