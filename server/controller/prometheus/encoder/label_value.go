@@ -17,9 +17,6 @@
 package encoder
 
 import (
-	"errors"
-	"fmt"
-	"sort"
 	"sync"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -31,20 +28,69 @@ import (
 
 // 缓存资源可用于分配的ID，提供ID的刷新、分配、回收接口
 type labelValue struct {
-	mutex        sync.Mutex
+	lock         sync.Mutex
 	resourceType string
-	Max          int
-	usableIDs    []int
 	strToID      map[string]int
+	idAllocator
 }
 
 func newLabelValue(max int) *labelValue {
-	return &labelValue{
+	lv := &labelValue{
 		resourceType: "label_value",
-		Max:          max,
-		usableIDs:    make([]int, 0, max),
 		strToID:      make(map[string]int),
+		idAllocator: idAllocator{
+			resourceType: "label_value",
+			max:          max,
+			usableIDs:    make([]int, 0, max),
+		},
 	}
+	lv.rawDataProvider = lv
+	return lv
+}
+
+func (lv *labelValue) refresh(args ...interface{}) error {
+	lv.lock.Lock()
+	defer lv.lock.Unlock()
+
+	return lv.idAllocator.refresh()
+}
+
+func (lv *labelValue) encode(strs []string) ([]*controller.PrometheusLabelValue, error) {
+	lv.lock.Lock()
+	defer lv.lock.Unlock()
+
+	resp := make([]*controller.PrometheusLabelValue, 0)
+	dbToAdd := make([]*mysql.PrometheusLabelValue, 0)
+	for i := range strs {
+		str := strs[i]
+		if id, ok := lv.strToID[str]; ok {
+			resp = append(resp, &controller.PrometheusLabelValue{Value: &str, Id: proto.Uint32(uint32(id))})
+			continue
+		}
+		dbToAdd = append(dbToAdd, &mysql.PrometheusLabelValue{Value: str})
+	}
+	if len(dbToAdd) == 0 {
+		return resp, nil
+	}
+	ids, err := lv.allocate(len(dbToAdd))
+	if err != nil {
+		return nil, err
+	}
+	for i := range dbToAdd {
+		dbToAdd[i].ID = ids[i]
+	}
+	err = addBatch(dbToAdd, lv.resourceType)
+	if err != nil {
+		log.Errorf("add %s error: %s", lv.resourceType, err.Error())
+		return nil, err
+	}
+	for i := range dbToAdd {
+		id := dbToAdd[i].ID
+		str := dbToAdd[i].Value
+		lv.strToID[str] = id
+		resp = append(resp, &controller.PrometheusLabelValue{Value: &str, Id: proto.Uint32(uint32(id))})
+	}
+	return resp, nil
 }
 
 func (lv *labelValue) load() (ids mapset.Set[int], err error) {
@@ -62,78 +108,6 @@ func (lv *labelValue) load() (ids mapset.Set[int], err error) {
 	return inUseIDsSet, nil
 }
 
-func (lv *labelValue) refresh(args ...interface{}) error {
-	log.Infof("refresh %s id pools started", lv.resourceType)
-	lv.mutex.Lock()
-	defer lv.mutex.Unlock()
-
-	inUseIDsSet, err := lv.load()
-	if err != nil {
-		return err
-	}
-	allIDsSet := mapset.NewSet[int]()
-	for i := 1; i <= lv.Max; i++ {
-		allIDsSet.Add(i)
-	}
-	// 可用ID = 所有ID（1~max）- db中正在使用的ID
-	// 排序原则：大于db正在使用的max值的ID（未曾被使用过的ID）优先，小于db正在使用的max值的ID（已被使用过且已回收的ID）在后
-	var usableIDs []int
-	if inUseIDsSet.Cardinality() != 0 {
-		inUseIDs := inUseIDsSet.ToSlice()
-		sort.IntSlice(inUseIDs).Sort()
-		maxInUseID := inUseIDs[len(inUseIDs)-1]
-
-		usableIDsSet := allIDsSet.Difference(inUseIDsSet)
-		usedIDs := []int{}
-		usableIDs = usableIDsSet.ToSlice()
-		sort.IntSlice(usableIDs).Sort()
-		for _, id := range usableIDs {
-			if id < maxInUseID {
-				usedIDs = append(usedIDs, id)
-				usableIDsSet.Remove(id)
-			} else {
-				break
-			}
-		}
-		usableIDs = usableIDsSet.ToSlice()
-		sort.IntSlice(usableIDs).Sort()
-		sort.IntSlice(usedIDs).Sort()
-		usableIDs = append(usableIDs, usedIDs...)
-	} else {
-		usableIDs = allIDsSet.ToSlice()
-		sort.IntSlice(usableIDs).Sort()
-	}
-	lv.usableIDs = usableIDs
-
-	log.Infof("refresh %s id pools (usable ids count: %d) completed", lv.resourceType, len(lv.usableIDs))
-	return nil
-}
-
-// 批量分配ID，若ID池中数量不足，分配ID池所有ID；反之分配指定个数ID。
-// 分配的ID中，若已有被实际使用的ID（闭源页面创建使用），排除已使用ID，仅分配剩余部分。
-func (lv *labelValue) allocate(count int) (ids []int, err error) {
-	if len(lv.usableIDs) == 0 {
-		return nil, errors.New(fmt.Sprintf("%s has no more usable ids", lv.resourceType))
-	}
-
-	if len(lv.usableIDs) < count {
-		return nil, errors.New("no more usable ids")
-	}
-	ids = make([]int, count)
-	copy(ids, lv.usableIDs[:count])
-
-	inUseIDs, err := lv.check(ids)
-	if err != nil {
-		return
-	}
-	if len(inUseIDs) != 0 {
-		return nil, errors.New("some ids are in use")
-	}
-	log.Infof("allocate %s ids: %v (expected count: %d, true count: %d)", lv.resourceType, ids, count, len(ids))
-	lv.usableIDs = lv.usableIDs[count:]
-	return
-}
-
 func (lv *labelValue) check(ids []int) (inUseIDs []int, err error) {
 	var dbItems []*mysql.PrometheusLabelValue
 	err = mysql.Db.Unscoped().Where("id IN ?", ids).Find(&dbItems).Error
@@ -148,41 +122,4 @@ func (lv *labelValue) check(ids []int) (inUseIDs []int, err error) {
 		log.Infof("%s ids: %+v are in use.", lv.resourceType, inUseIDs)
 	}
 	return
-}
-
-func (lv *labelValue) encode(strs []string) ([]*controller.PrometheusLabelValue, error) {
-	lv.mutex.Lock()
-	defer lv.mutex.Unlock()
-
-	resp := make([]*controller.PrometheusLabelValue, 0)
-	dbToAdd := make([]*mysql.PrometheusLabelValue, 0)
-	var countToAllocate int
-	for _, str := range strs {
-		if _, ok := lv.strToID[str]; !ok {
-			countToAllocate++
-			dbToAdd = append(dbToAdd, &mysql.PrometheusLabelValue{Value: str})
-			continue
-		}
-		resp = append(resp, &controller.PrometheusLabelValue{Value: &str, Id: proto.Uint32(uint32(lv.strToID[str]))})
-	}
-	if countToAllocate == 0 {
-		return resp, nil
-	}
-	ids, err := lv.allocate(countToAllocate)
-	if err != nil {
-		return nil, err
-	}
-	for i := range dbToAdd {
-		dbToAdd[i].ID = ids[i]
-		resp = append(resp, &controller.PrometheusLabelValue{Value: &dbToAdd[i].Value, Id: proto.Uint32(uint32(dbToAdd[i].ID))})
-	}
-	err = addBatch(dbToAdd, lv.resourceType)
-	if err != nil {
-		log.Errorf("add %s error: %s", lv.resourceType, err.Error())
-		return nil, err
-	}
-	for _, item := range dbToAdd {
-		lv.strToID[item.Value] = item.ID
-	}
-	return resp, nil
 }

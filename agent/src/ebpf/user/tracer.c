@@ -22,6 +22,8 @@
 #include <bcc/libbpf.h>
 #include <bcc/perf_reader.h>
 #include "config.h"
+#include "types.h"
+#include "clib.h"
 #include "probe.h"
 #include "table.h"
 #include "common.h"
@@ -30,11 +32,12 @@
 #include "tracer.h"
 #include "elf.h"
 #include "load.h"
-#include <libgen.h>
+#include "mem.h"
 
 int major, minor;		// Linux kernel主版本，次版本
 char linux_release[128];	// Record the contents of 'uname -r'
 
+volatile uint32_t *tracers_lock;
 volatile uint64_t sys_boot_time_ns;	// 当前系统启动时间，单位：纳秒
 volatile uint64_t prev_sys_boot_time_ns;	// 上一次更新的系统启动时间，单位：纳秒
 uint64_t boot_time_update_count;	// 用于记录boot_time_update()调用次数。
@@ -46,12 +49,12 @@ int ebpf_config_protocol_filter[PROTO_NUM];
 
 struct allow_port_bitmap allow_port_bitmap;
 
-uint64_t adapt_kern_uid; // Indicates the identifier of the adaptation kernel
+uint64_t adapt_kern_uid;	// Indicates the identifier of the adaptation kernel
 
 /*
  * tracers
  */
-static struct bpf_tracer *tracers[BPF_TRACER_NUM_MAX];
+static struct bpf_tracer tracers[BPF_TRACER_NUM_MAX];
 static int tracers_count;
 
 /*
@@ -67,7 +70,7 @@ static volatile int ready_flag_cpus[MAX_CPU_NR];
 
 static struct list_head extra_waiting_head;	// 额外事务处理的注册
 
-#define EVENT_PERIOD_TIME	1	// 事件处理的周期时间，单位：秒
+#define EVENT_PERIOD_TIME	1		// 事件处理的周期时间，单位：秒
 static struct list_head period_events_head;	// 周期性事件处理的注册
 
 int sys_cpus_count;
@@ -77,6 +80,8 @@ bool *cpu_online;		// 用于判断CPU是否是online
 static volatile uint64_t all_probes_ready;
 
 static int tracepoint_attach(struct tracepoint *tp);
+static int perf_reader_setup(struct bpf_perf_reader *perf_reader);
+static void perf_reader_release(struct bpf_perf_reader *perf_reader);
 
 /*
  * 内核版本依赖检查
@@ -90,7 +95,8 @@ int check_kernel_version(int maj_limit, int min_limit)
 	}
 
 	if (!strstr(uts.machine, "x86_64") && !strstr(uts.machine, "aarch64")) {
-		ebpf_warning("Current machine is \"%s\", not support.\n", uts.machine);
+		ebpf_warning("Current machine is \"%s\", not support.\n",
+			     uts.machine);
 		return ETR_INVAL;
 	}
 
@@ -111,23 +117,150 @@ int check_kernel_version(int maj_limit, int min_limit)
 	return ETR_OK;
 }
 
-struct bpf_tracer *find_bpf_tracer(const char *name)
+static struct bpf_tracer *__find_bpf_tracer(const char *name)
 {
+	ASSERT(tracers_lock[0]);
+
 	struct bpf_tracer *t = NULL;
 	int i;
-	for (i = 0; i < tracers_count; i++) {
-		t = tracers[i];
-		if (strcmp(t->name, name) == 0)
+	for (i = 0; i < BPF_TRACER_NUM_MAX; i++) {
+		t = &tracers[i];
+		if (t->is_use && (strcmp(t->name, name) == 0))
 			return t;
 	}
 
-	ebpf_info("Tracer '%s', Not Found.", name);
+	ebpf_info("Tracer '%s', Not Found.\n", name);
 
 	return NULL;
 }
 
+struct bpf_tracer *find_bpf_tracer(const char *name)
+{
+	if (tracers_lock == NULL)
+		return NULL;
+
+	struct bpf_tracer *t = NULL;
+	tracers_ctl_lock();
+	t = __find_bpf_tracer(name);
+	tracers_ctl_unlock();
+
+	return t;
+}
+
+static struct bpf_tracer *alloc_bpf_tracer(void)
+{
+	ASSERT(tracers_lock[0]);
+
+	struct bpf_tracer *t = NULL;
+	int i;
+	for (i = 0; i < BPF_TRACER_NUM_MAX; i++) {
+		t = &tracers[i];
+		if (!t->is_use) {
+			memset(t, 0, sizeof(*t));
+			tracers_count++;
+			t->is_use = true;
+			return t;
+		}
+	}
+
+	ebpf_warning("Tracer alloc failed.\n");
+
+	return NULL;
+}
+
+static void free_bpf_tracer(struct bpf_tracer *t)
+{
+	ASSERT(tracers_lock[0]);
+
+	memset((void *)t, 0, sizeof(*t));
+	tracers_count--;
+}
+
+/*
+ * Release the tracer resources.
+ */
+int release_bpf_tracer(const char *name)
+{
+	struct bpf_tracer *t;
+	tracers_ctl_lock();
+	if ((t = __find_bpf_tracer(name)) == NULL) {
+		ebpf_warning("Tracer '%s', not existed.", name);
+		tracers_ctl_unlock();
+		return ETR_NOTEXIST;
+	}
+
+	/*
+	 * Execute the resource release callback function of
+	 * tracer to release the resources of a specific tracer.
+	 */
+	if (t->release_cb != NULL)
+		t->release_cb(t);
+
+	/*
+	 * Check if the reader thread has exited before releasing
+	 * the reader lock.
+	 */
+	while (t->perf_worker[0] != 0)
+		sleep(1);
+
+	if (t->lock) {
+		clib_mem_free((void *)t->lock);
+		t->lock = NULL;
+	}
+
+	/* t->is_use set 0 */
+	free_bpf_tracer(t);
+	tracers_ctl_unlock();
+
+	return ETR_OK;
+}
+
 /**
- * create_bpf_tracer - create a eBPF tracer
+ * Activate a tracer reader to start working.
+ *
+ * @name thread name.
+ * @tracer Activated tracer
+ * @fn callback for reader read ebpf ring-buffer data.
+ *
+ * @returns 0(ETR_OK) on success, < 0 on error
+ */
+int enable_tracer_reader_work(const char *name,
+			      struct bpf_tracer *tracer,
+			      void *fn)
+{
+	int ret;
+	ret =
+	    pthread_create(&tracer->perf_worker[0], NULL, fn,
+			   (void *)tracer);
+	if (ret) {
+                ebpf_warning("tracer reader(%s), pthread_create "
+			     "is error:%s\n",
+			     name, strerror(errno));
+                return ETR_INVAL;
+        }
+
+	/* set thread name */
+	pthread_setname_np(tracer->perf_worker[0], name);
+
+	/*
+	 * Separating threads is to automatically release
+	 * resources after pthread_exit(), without being
+	 * blocked or stuck.
+	 */
+	ret = pthread_detach(tracer->perf_worker[0]);
+	if (ret != 0) {
+		ebpf_warning("Error detaching thread, error:%s\n",
+			     strerror(errno));
+		return ETR_INVAL;
+	} else {
+		ebpf_info("thread %s, detached successful.", name);
+	}
+
+	return ETR_OK;
+}
+
+/**
+ * setup_bpf_tracer - create a eBPF tracer
  *
  * @name Tracer name
  * @load_name eBPF load buffer name
@@ -135,62 +268,201 @@ struct bpf_tracer *find_bpf_tracer(const char *name)
  * @buffer_sz eBPF buffer size
  * @tps Tracer configuration information
  * @workers_nr How many threads process the queues
+ * @free_cb The callback interface for releasing tracer resources.
+ * @create_cb The callback interface for create tracer.
  * @handle The upper callback function address
- * @perf_pages_cnt How many memory pages are used for ring-buffer
+ * @sample_freq sample frequency, Hertz. (e.g. 99 profile stack traces at 99 Hertz)
+ *    only type is TRACER_TYPE_PERF_EVENT.
  *
  * @returns
  *      Return struct bpf_tracer pointer on success, NULL otherwise.
  */
-struct bpf_tracer *create_bpf_tracer(const char *name,
-				     char *load_name,
-				     void *bpf_bin_buffer,
-				     int buffer_sz,
-				     struct tracer_probes_conf *tps,
-				     int workers_nr,
-				     void *handle, unsigned int perf_pages_cnt)
+struct bpf_tracer *setup_bpf_tracer(const char *name,
+				    char *load_name,
+				    void *bpf_bin_buffer,
+				    int buffer_sz,
+				    struct tracer_probes_conf *tps,
+				    int workers_nr,
+				    tracer_op_fun_t free_cb,
+				    tracer_op_fun_t create_cb,
+				    void *handle, int sample_freq)
 {
-	if (find_bpf_tracer(name) != NULL) {
+	int ret;
+	/*
+	 * Protect the resources of the BPF tracer to avoid
+	 * simultaneous operations on the tracer.
+	 */
+	tracers_ctl_lock();
+	if (__find_bpf_tracer(name) != NULL) {
 		ebpf_warning("Tracer '%s', already existed.", name);
+		tracers_ctl_unlock();
 		return NULL;
 	}
 
-	struct bpf_tracer *bt = malloc(sizeof(struct bpf_tracer));
+	struct bpf_tracer *bt = alloc_bpf_tracer();
 	if (bt == NULL) {
-		ebpf_warning("Tracer '%s' failed, no memory!", name);
+		ebpf_warning("Tracer '%s' alloc failed, current tracers count %d (limit %d)",
+			     tracers_count, BPF_TRACER_NUM_MAX);
+		tracers_ctl_unlock();
 		return NULL;
 	}
-
-	memset(bt, 0, sizeof(*bt));
+	snprintf(bt->name, sizeof(bt->name), "%s", name);
+	bt->name[sizeof(bt->name) - 1] = '\0';
+	atomic64_init(&bt->recv);
 	atomic64_init(&bt->lost);
-
 	int i;
 	for (i = 0; i < PROTO_NUM; i++)
 		atomic64_init(&bt->proto_status[i]);
 
 	snprintf(bt->bpf_load_name, sizeof(bt->bpf_load_name), "%s", load_name);
+	bt->bpf_load_name[sizeof(bt->bpf_load_name) - 1] = '\0';
 	bt->tps = tps;
 	bt->buffer_ptr = bpf_bin_buffer;
 	bt->buffer_sz = buffer_sz;
+	bt->state = TRACER_INIT;
+	bt->release_cb = free_cb;
+	bt->create_cb = create_cb;
+	bt->sample_freq = sample_freq;
 
-	snprintf(bt->name, sizeof(bt->name), "%s", name);
 	bt->dispatch_workers_nr = workers_nr;
-
-	tracers[tracers_count++] = bt;
 	bt->process_fn = handle;
-
-	if (perf_pages_cnt <= 0)
-		perf_pages_cnt = BPF_PERF_READER_PAGE_CNT;
-	else
-		perf_pages_cnt = 1 << min_log2((unsigned int)perf_pages_cnt);
-
-	bt->perf_pages_cnt = perf_pages_cnt;
 
 	init_list_head(&bt->probes_head);
 	init_list_head(&bt->maps_conf_head);
 
 	pthread_mutex_init(&bt->mutex_probes_lock, NULL);
+	bt->lock = clib_mem_alloc_aligned("tracer_lock", CLIB_CACHE_LINE_BYTES,
+					  CLIB_CACHE_LINE_BYTES,
+					  NULL);
+        if (bt->lock == NULL) {
+		ebpf_warning("clib_mem_alloc_aligned() error\n");
+		free_bpf_tracer(bt);
+		tracers_ctl_unlock();
+		return NULL;
+        }
+        bt->lock[0] = 0;
+
+	/*
+	 * Execute the create tracer callback function.
+	 */
+	if (bt->create_cb != NULL) {
+		ret = bt->create_cb(bt);
+		if (ret != ETR_OK) {
+			free_bpf_tracer(bt);
+			bt = NULL;
+		}
+	}
+
+	tracers_ctl_unlock();
 
 	return bt;
+}
+
+static inline struct bpf_perf_reader*
+alloc_reader(struct bpf_tracer *t)
+{
+	if (t->perf_readers_count >= PERF_READER_NUM_MAX) {
+		ebpf_error("No available reader is free, current count %d"
+			   " exceeds the maximum value %d.",
+			   t->perf_readers_count, PERF_READER_NUM_MAX);
+		return NULL;
+	}
+
+	int i;
+	struct bpf_perf_reader *reader;
+	for (i = 0; i < PERF_READER_NUM_MAX; i++) {
+		reader = &t->readers[i];
+		if (!reader->is_use) {
+			reader->is_use = true;
+			t->perf_readers_count++;
+			return reader;
+		}
+	}
+
+	return NULL;
+}
+
+static inline void
+free_reader(struct bpf_perf_reader *reader)
+{
+	reader->tracer->perf_readers_count--;
+	memset(reader, 0, sizeof(*reader));
+}
+
+void free_all_readers(struct bpf_tracer *t)
+{
+	ASSERT(t != NULL);
+
+	int i;
+	struct bpf_perf_reader *reader;
+	for (i = 0; i < PERF_READER_NUM_MAX; i++) {
+		reader = &t->readers[i];
+		if (reader->is_use) {
+			free_perf_buffer_reader(reader);
+		}
+	}
+}
+
+/**
+ * create a perf buffer reader.
+ * @t tracer
+ * @map_name perf buffer map name
+ * @raw_cb perf reader raw data callback
+ * @lost_cb perf reader data lost callback
+ * @pages_cnt How many memory pages are used for ring-buffer
+ *            (system page size * pages_cnt)
+ * @poll_timeout perf poll timeout
+ *
+ * @returns perf_reader address on success, NULL on error
+ */
+struct bpf_perf_reader*
+create_perf_buffer_reader(struct bpf_tracer *t,
+			  const char *map_name,
+			  perf_reader_raw_cb raw_cb,
+			  perf_reader_lost_cb lost_cb,
+			  unsigned int pages_cnt,
+			  int poll_timeout)
+{
+	if (t == NULL || map_name == NULL ||
+	    raw_cb == NULL || lost_cb == NULL) {
+		ebpf_error("register_perf_buffer_reader() Invalid parameter."
+			   "t %p map_name %s raw_cb %p lost_cb %p\n",
+			   t, map_name, raw_cb, lost_cb);
+		return NULL;
+	}
+
+	struct bpf_perf_reader *reader = alloc_reader(t);
+	if (reader == NULL)
+		return NULL;
+
+	strncpy(reader->name, map_name, sizeof(reader->name));
+	reader->name[sizeof(reader->name) - 1] = '\0';
+
+	reader->raw_cb = raw_cb;
+	reader->lost_cb = lost_cb;
+	if (pages_cnt <= 0)
+		pages_cnt = BPF_PERF_READER_PAGE_CNT;
+	else
+		pages_cnt = 1 << min_log2((unsigned int)pages_cnt);
+
+	reader->tracer = t;
+	reader->perf_pages_cnt = pages_cnt;
+	reader->poll_timeout = poll_timeout;
+
+	if (perf_reader_setup(reader))
+                goto failed;
+
+	return reader;
+
+failed:
+	free_reader(reader);
+	return NULL;
+}
+
+void free_perf_buffer_reader(struct bpf_perf_reader *reader)
+{
+	perf_reader_release(reader);
+	free_reader(reader);
 }
 
 static int map_resize_set(struct ebpf_object *obj, struct map_config *m_conf)
@@ -230,26 +502,24 @@ int tracer_bpf_load(struct bpf_tracer *tracer)
 		ebpf_warning("bpf load \"%s\" failed, error:%s (%d).\n",
 			     tracer->bpf_load_name, strerror(errno), errno);
 		if (errno == EACCES) {
-			ebpf_warning("Check the selinux status, if found SELinux"
-				     " 'status: enabled' and 'Current mode:"
-				     "enforcing', please try the following way "
-				     "to solve:\n"
-				     "1 Create file 'deepflow-agent.te',"
-				     "contents:\n\n"
-				     "module deepflow-agent 1.0;\n"
-				     "require {\n"
-				     "  type container_runtime_t;\n"
-				     "  class bpf { map_create map_read "
-				     "map_write prog_load prog_run };\n"
-				     "}\nallow container_runtime_t self:"
-				     "bpf { map_create map_read map_write "
-				     "prog_load prog_run };\n\n"
-				     "2 checkmodule -M -m -o deepflow-agent.mod"
-				     " deepflow-agent.te\n"
-				     "3 semodule_package -o deepflow-agent.pp "
-				     "-m deepflow-agent.mod\n"
-				     "4 semodule -i deepflow-agent.pp\n"
-				     "5 restart pods\n");
+			ebpf_warning
+			    ("Check the selinux status, if found SELinux"
+			     " 'status: enabled' and 'Current mode:"
+			     "enforcing', please try the following way "
+			     "to solve:\n" "1 Create file 'deepflow-agent.te',"
+			     "contents:\n\n" "module deepflow-agent 1.0;\n"
+			     "require {\n" "  type container_runtime_t;\n"
+			     "  class bpf { map_create map_read "
+			     "map_write prog_load prog_run };\n"
+			     "}\nallow container_runtime_t self:"
+			     "bpf { map_create map_read map_write "
+			     "prog_load prog_run };\n\n"
+			     "2 checkmodule -M -m -o deepflow-agent.mod"
+			     " deepflow-agent.te\n"
+			     "3 semodule_package -o deepflow-agent.pp "
+			     "-m deepflow-agent.mod\n"
+			     "4 semodule -i deepflow-agent.pp\n"
+			     "5 restart pods\n");
 		}
 
 		return ret;
@@ -562,8 +832,8 @@ static int tracepoint_detach(struct tracepoint *tp)
 int tracer_hooks_process(struct bpf_tracer *tracer, enum tracer_hook_type type,
 			 int *probes_count)
 {
-	int (*probe_fun) (struct probe * p) = NULL;
-	int (*tracepoint_fun) (struct tracepoint * p) = NULL;
+	int (*probe_fun)(struct probe * p) = NULL;
+	int (*tracepoint_fun)(struct tracepoint * p) = NULL;
 	if (type == HOOK_ATTACH) {
 		probe_fun = probe_attach;
 		tracepoint_fun = tracepoint_attach;
@@ -623,6 +893,9 @@ int tracer_hooks_process(struct bpf_tracer *tracer, enum tracer_hook_type type,
 	struct tracepoint *tp;
 	int i;
 	struct tracer_probes_conf *tps = tracer->tps;
+	if (tps == NULL)
+		goto perf_event;
+
 	for (i = 0; i < tps->tps_nr; i++) {
 		tp = get_tracepoint_from_tracer(tracer, tps->tps[i].name);
 		if (!tp)
@@ -644,6 +917,65 @@ int tracer_hooks_process(struct bpf_tracer *tracer, enum tracer_hook_type type,
 			ebpf_info("%s tracepoint: '%s', succeed!",
 				  type == HOOK_ATTACH ? "attach" : "detach",
 				  tp->name);
+	}
+
+perf_event:
+	/*
+	 * perf event
+	 */
+	if (type == HOOK_ATTACH) {
+		struct ebpf_object *obj = tracer->obj;
+		for (i = 0; i < obj->progs_cnt; i++) {
+			if (obj->progs[i].type == BPF_PROG_TYPE_PERF_EVENT) {
+				errno = 0;
+				int ret =
+				    program__attach_perf_event(obj->progs[i].prog_fd,
+							       PERF_TYPE_SOFTWARE,
+							       PERF_COUNT_SW_CPU_CLOCK,
+							       0, /* sample_period */
+							       tracer->sample_freq,
+							       -1, /* pid, current process */
+							       -1, /* cpu, no binding */
+							       -1, /* new event group is created */
+							       tracer->per_cpu_fds,
+							       ARRAY_SIZE(tracer->per_cpu_fds));
+				if (!ret) {
+					ebpf_info("tracer \"%s\" attach perf event prog successful.\n",
+						  tracer->name);
+				} else {
+					ebpf_warning("tracer \"%s\" attach perf event prog, failed (%s).\n",
+						     tracer->name, strerror(errno));
+
+				}
+
+				return ret;
+			}
+		}
+	} else {
+		bool has_perf_event = false;
+		for (i = 0; i < ARRAY_SIZE(tracer->per_cpu_fds); i++) {
+			if (tracer->per_cpu_fds[i] > 0) {
+				has_perf_event = true;
+				break;
+			}
+		}
+
+		if (has_perf_event) {
+			errno = 0;
+			int ret =
+				program__detach_perf_event(tracer->per_cpu_fds,
+							   ARRAY_SIZE(tracer->per_cpu_fds));
+			if (!ret) {
+				ebpf_info("tracer \"%s\" detach perf event prog successful.\n",
+					  tracer->name);
+			} else {
+				ebpf_warning("tracer \"%s\" detach perf event prog, failed (%s).\n",
+					     tracer->name, strerror(errno));
+
+			}
+
+			return ret;
+		}
 	}
 
 	return ETR_OK;
@@ -715,33 +1047,78 @@ int tracer_uprobes_update(struct bpf_tracer *tracer)
 
 int tracer_hooks_attach(struct bpf_tracer *tracer)
 {
-	return tracer_hooks_process(tracer, HOOK_ATTACH, NULL);
+	int ret;
+	ebpf_info("tracer(%s) attach ...\n", tracer->name);
+	ret = tracer_hooks_process(tracer, HOOK_ATTACH, NULL);
+	if (ret) {
+		ebpf_warning("Not finish attach, tracer name %s\n",
+			     tracer->name);
+		return(-1);
+	}
+
+	ebpf_info("Successfully completed attach.\n");
+	return (0);
 }
 
 int tracer_hooks_detach(struct bpf_tracer *tracer)
 {
-	return tracer_hooks_process(tracer, HOOK_DETACH, NULL);
+	int ret;
+	ebpf_info("tracer(%s) detach ...\n", tracer->name);
+	ret = tracer_hooks_process(tracer, HOOK_DETACH, NULL);
+	if (ret) {
+		ebpf_warning("Not finish detach, tracer name : %s\n",
+			     tracer->name);
+		return (-1);
+	}
+
+	ebpf_info("Successfully completed detach.\n");
+	return (0);
 }
 
-int perf_map_init(struct bpf_tracer *tracer, const char *perf_map_name)
+static void perf_reader_release(struct bpf_perf_reader *perf_reader)
 {
+	int i;
+	for (i = 0; i < perf_reader->readers_count; i++) {
+		perf_reader_free(perf_reader->readers[i]);
+	}
+
+	ebpf_info("bpf_perf_reader %s release.\n", perf_reader->name);
+}
+
+static int perf_reader_setup(struct bpf_perf_reader *perf_reader)
+{
+	ASSERT(perf_reader != NULL);
+
+	int i;
 	struct ebpf_map *map =
-	    ebpf_obj__get_map_by_name(tracer->obj, perf_map_name);
+	    ebpf_obj__get_map_by_name(perf_reader->tracer->obj,
+				      (const char *)perf_reader->name);
+
 	int map_fd = map->fd;
 	void *reader;
 	int perf_fd, ret;
-	int i, reader_idx;
-	int pages_cnt = tracer->perf_pages_cnt;
+	int reader_idx;
+	int pages_cnt = perf_reader->perf_pages_cnt;
 	for (i = 0; i < sys_cpus_count; i++) {
 		if (!cpu_online[i])
 			continue;
 		reader =
-		    (struct perf_reader *)bpf_open_perf_buffer(tracer->raw_cb,
-							       tracer->lost_cb,
-							       (void *)tracer,
+		    (struct perf_reader *)bpf_open_perf_buffer(perf_reader->
+							       raw_cb,
+							       perf_reader->
+							       lost_cb,
+							       (void *)perf_reader->
+							       tracer,
 							       -1, i,
 							       pages_cnt);
+		if (reader == NULL) {
+			ebpf_error("bpf_open_perf_buffer() failed.\n");
+			return ETR_NORESOURCE;
+		}
+
 		perf_fd = perf_reader_fd(reader);
+		ASSERT(perf_fd >= 3);
+
 		if ((ret = bpf_update_elem(map_fd, &i, &perf_fd, BPF_ANY))) {
 			ebpf_info
 			    ("fun: %s, bpf_map_update_elem reader setting failed.\n",
@@ -749,72 +1126,14 @@ int perf_map_init(struct bpf_tracer *tracer, const char *perf_map_name)
 			return ret;
 		}
 
-		reader_idx = tracer->readers_count++;
-		tracer->reader_fds[reader_idx] = perf_fd;
-		tracer->readers[reader_idx] = reader;
+		reader_idx = perf_reader->readers_count++;
+		perf_reader->reader_fds[reader_idx] = perf_fd;
+		perf_reader->readers[reader_idx] = reader;
 	}
 
-	tracer->data_map = map;
+	perf_reader->map = map;
 
 	return ETR_OK;
-}
-
-#ifdef PERFORMANCE_TEST
-__always_inline uint32_t random_u32(uint32_t * seed)
-{
-	*seed = (1664525 * *seed) + 1013904223;
-	return *seed;
-}
-
-__always_inline uint64_t clib_cpu_time_now(void)
-{
-	uint32_t a, d;
-	asm volatile ("rdtsc":"=a" (a), "=d"(d));
-	return (uint64_t) a + ((uint64_t) d << (uint64_t) 32);
-}
-#endif
-
-static void poller(void *t)
-{
-	prctl(PR_SET_NAME, "perf-reader");
-	struct bpf_tracer *tracer = (struct bpf_tracer *)t;
-	for (;;) {
-#ifndef PERFORMANCE_TEST
-		perf_reader_poll(tracer->readers_count, tracer->readers, 500);
-#else
-		uint64_t data_len, rand_seed;
-		rand_seed = clib_cpu_time_now();
-		data_len = random_u32((uint32_t *) & rand_seed) & 0xffff;
-
-		int ring_idx = data_len % tracer->dispatch_workers_nr;
-		struct queue *q = &tracer->queues[ring_idx];
-
-		struct socket_bpf_data *prep_data =
-		    malloc(sizeof(struct socket_bpf_data) + data_len);
-		if (prep_data == NULL) {
-			ebpf_waring("malloc() failed, no memory.\n");
-			atomic64_inc(&q->heap_get_failed);
-			return;
-		}
-		prep_data->cap_data =
-		    (char *)((void **)&prep_data->cap_data + 1);
-		prep_data->len = data_len;
-		if (!ring_sp_enqueue_burst(q->r, (void **)&prep_data, 1, NULL)) {
-			printf("%s, ring_sp_enqueue failed.\n", __func__);
-			ebpf_info("%s, ring_sp_enqueue failed.\n", __func__);
-			free(prep_data);
-			atomic64_inc(&q->enqueue_lost);
-		} else {
-			pthread_mutex_lock(&q->mutex);
-			pthread_cond_signal(&q->cond);
-			pthread_mutex_unlock(&q->mutex);
-			atomic64_inc(&q->enqueue_nr);
-		}
-#endif
-	}
-	/* never reached */
-	/* pthread_exit(NULL); */
-	/* return NULL; */
 }
 
 static void extra_waiting_process(int type)
@@ -978,7 +1297,8 @@ static void period_process_main(__unused void *arg)
 	prctl(PR_SET_NAME, "period-process");
 
 	// Only this unique identifier can be adapted to the kernel
-	adapt_kern_uid = (uint64_t)getpid() << 32 | (uint32_t)syscall(__NR_gettid);
+	adapt_kern_uid =
+	    (uint64_t) getpid() << 32 | (uint32_t) syscall(__NR_gettid);
 
 	// 确保所有tracer都运行了，之后触发kick内核操作
 	while (all_probes_ready == 0)
@@ -997,38 +1317,6 @@ static void period_process_main(__unused void *arg)
 	}
 }
 
-/*
- * 工作线程从queue获取数据，进行数据处理。
- */
-static void process_datas(void *queue)
-{
-	prctl(PR_SET_NAME, "queue-worker");
-	int nr;
-	struct queue *q = (struct queue *)queue;
-	struct ring *r = q->r;
-	void *rx_burst[MAX_PKT_BURST];
-	for (;;) {
-		nr = ring_sc_dequeue_burst(r, rx_burst, MAX_PKT_BURST, NULL);
-		if (nr == 0) {
-			/*
-			 * 等着生产者唤醒
-			 */
-			pthread_mutex_lock(&q->mutex);
-			pthread_cond_wait(&q->cond, &q->mutex);
-			pthread_mutex_unlock(&q->mutex);
-		} else {
-			atomic64_add(&q->dequeue_nr, nr);
-			prefetch_and_process_datas(q->t, nr, rx_burst);
-			if (nr == MAX_PKT_BURST)
-				atomic64_inc(&q->burst_count);
-		}
-	}
-
-	/* never reached */
-	/* pthread_exit(NULL); */
-	/* return NULL; */
-}
-
 int maps_config(struct bpf_tracer *tracer, const char *map_name, int entries)
 {
 	struct map_config *map_conf = calloc(1, sizeof(struct map_config));
@@ -1042,64 +1330,6 @@ int maps_config(struct bpf_tracer *tracer, const char *map_name, int entries)
 	return ETR_OK;
 }
 
-int dispatch_worker(struct bpf_tracer *tracer, unsigned int queue_size)
-{
-	int i, ret;
-
-	if (queue_size <= 0)
-		queue_size = RING_SIZE;
-	else
-		queue_size = 1 << min_log2((unsigned int)queue_size);
-
-	for (i = 0; i < tracer->dispatch_workers_nr; i++) {
-		struct ring *r = NULL;
-		char name[NAME_LEN];
-		snprintf(name, sizeof(name), "%s-ring-%d", tracer->name, i);
-		r = ring_create(name, queue_size,
-				SOCKET_ID_ANY, RING_F_SP_ENQ | RING_F_SC_DEQ);
-		if (r == NULL) {
-			ebpf_info("<%s> ring_create fail. err:%s\n", __func__,
-				  strerror(errno));
-			return -ENOMEM;
-		}
-
-		tracer->queues[i].r = r;
-		tracer->queues[i].t = tracer;
-		tracer->queues[i].nr = 0;
-		tracer->queues[i].ring_size = queue_size;
-
-		atomic64_init(&tracer->queues[i].enqueue_lost);
-		atomic64_init(&tracer->queues[i].enqueue_nr);
-		atomic64_init(&tracer->queues[i].dequeue_nr);
-		atomic64_init(&tracer->queues[i].burst_count);
-		atomic64_init(&tracer->queues[i].heap_get_failed);
-
-		pthread_mutex_init(&tracer->queues[i].mutex, NULL);
-		pthread_cond_init(&tracer->queues[i].cond, NULL);
-		ret =
-		    pthread_create(&tracer->dispatch_workers[i], NULL,
-				   (void *)&process_datas,
-				   (void *)&tracer->queues[i]);
-		if (ret) {
-			ebpf_info
-			    ("<%s> process_data, pthread_create is error:%s\n",
-			     __func__, strerror(errno));
-			return ETR_INVAL;
-		}
-	}
-
-	ret =
-	    pthread_create(&tracer->perf_worker[0], NULL, (void *)&poller,
-			   (void *)tracer);
-	if (ret) {
-		ebpf_info("<%s> perf_worker, pthread_create is error:%s\n",
-			  __func__, strerror(errno));
-		return ETR_INVAL;
-	}
-
-	return ETR_OK;
-}
-
 /*
  * control plane
  */
@@ -1109,7 +1339,7 @@ static int tracer_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
 }
 
 static int tracer_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
-			      void **out, size_t * outsize)
+			      void **out, size_t *outsize)
 {
 	*outsize = sizeof(struct bpf_tracer_param_array) +
 	    sizeof(struct bpf_tracer_param) * tracers_count;
@@ -1127,14 +1357,21 @@ static int tracer_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
 	int i, j;
 	struct bpf_tracer *t;
 	struct rx_queue_info *rx_q;
-	for (i = 0; i < tracers_count; i++) {
-		t = tracers[i];
+	for (i = 0; i < BPF_TRACER_NUM_MAX; i++) {
+		t = &tracers[i];
+		if (!t->is_use)
+			continue;
 		btp = btp + i;
 		snprintf(btp->name, sizeof(btp->name), "%s", t->name);
 		snprintf(btp->bpf_load_name, sizeof(btp->bpf_load_name), "%s",
 			 t->bpf_load_name);
 		btp->dispatch_workers_nr = t->dispatch_workers_nr;
-		btp->perf_pg_cnt = t->perf_pages_cnt;
+		/*
+		 * TODO(@jiping), How to report multiple reader page counts?
+		 * Currently, all readers' page counts are consistent for a
+		 * tracer, and readers[0]'s page count can be reported here.
+		 */
+		btp->perf_pg_cnt = t->readers[0].perf_pages_cnt;
 		btp->lost = atomic64_read(&t->lost);
 		btp->probes_count = t->probes_count;
 		btp->state = t->state;
@@ -1147,7 +1384,7 @@ static int tracer_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
 		}
 
 		for (j = 0; j < btp->dispatch_workers_nr; j++) {
-			rx_q = &btp->rx_queues[j];
+			rx_q = (struct rx_queue_info *)&btp->rx_queues[j];
 			rx_q->enqueue_lost =
 			    atomic64_read(&t->queues[j].enqueue_lost);
 			rx_q->enqueue_nr =
@@ -1206,7 +1443,8 @@ int set_feature_regex(int feature, const char *pattern)
 	return 0;
 }
 
-bool is_feature_enabled(int feature){
+bool is_feature_enabled(int feature)
+{
 	if (feature < 0 || feature >= FEATURE_MAX) {
 		return false;
 	}
@@ -1283,6 +1521,9 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 		    ("\"/proc/sys/net/core/bpf_jit_enable value is invalid\n");
 	}
 
+	/* Memory management initialization. */
+	clib_mem_init();
+
 	fetch_linux_release(linux_release, sizeof(linux_release) - 1);
 	max_rlim_open_files_set(OPEN_FILES_MAX);
 	sys_cpus_count = get_cpus_count(&cpu_online);
@@ -1300,6 +1541,19 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 	sys_boot_time_ns = real_time - monotonic_time;
 	prev_sys_boot_time_ns = sys_boot_time_ns;
 	ebpf_info("sys_boot_time_ns : %llu\n", sys_boot_time_ns);
+
+	/*
+	 * Set up the lock now, so we can use it to make the first add
+	 * thread-safe for tracer alloc.
+	 */
+	tracers_lock = clib_mem_alloc_aligned("t_alloc_lock", CLIB_CACHE_LINE_BYTES,
+					      CLIB_CACHE_LINE_BYTES,
+					      NULL);
+	if (tracers_lock == NULL) {
+		ebpf_warning("clib_mem_alloc_aligned() error\n");
+		return ETR_INVAL;
+	}
+	tracers_lock[0] = 0;
 
 	clear_residual_probes();
 
@@ -1324,7 +1578,7 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 	 * 由于系统运行过程中会存在系统时间被改动而发生变化的情况，
 	 * 因此需要对系统启动时间(精度为纳秒)进行周期性的更新，是之
 	 * 随系统时间变化而相应进行调整。由于eBPF捕获时间的计算是在
-	 * 系统启动时间（sys_boot_time_ns）的基础上加单调时间（monotonic 
+	 * 系统启动时间（sys_boot_time_ns）的基础上加单调时间（monotonic
 	 * time，指系统启动后流失的时间），所以系统启动时间要进行周期性
 	 * 检查调整，以免系统时间改变而使eBPF数据的捕获时间较之AF_PACKET
 	 * 捕获数据的时间发生较大差异。
@@ -1349,30 +1603,4 @@ void bpf_tracer_finish(void)
 {
 	all_probes_ready = 1;
 	ebpf_info("All tracers finish!!!\n");
-}
-
-int tracer_stop(void)
-{
-	struct bpf_tracer *t = NULL;
-	int i, ret = 0;
-
-	for (i = 0; i < tracers_count; i++) {
-		t = tracers[i];
-		ret = t->stop_handle();
-	}
-
-	return ret;
-}
-
-int tracer_start(void)
-{
-	struct bpf_tracer *t = NULL;
-	int i, ret = 0;
-
-	for (i = 0; i < tracers_count; i++) {
-		t = tracers[i];
-		ret = t->start_handle();
-	}
-
-	return ret;
 }

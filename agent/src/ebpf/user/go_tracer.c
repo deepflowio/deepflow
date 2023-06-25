@@ -686,7 +686,7 @@ int collect_go_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
 	int pid;
 	while ((entry = readdir(fddir)) != NULL) {
 		pid = atoi(entry->d_name);
-		if (entry->d_type == DT_DIR && pid > 1 && is_process(pid))
+		if (entry->d_type == DT_DIR && pid > 1 && is_user_process(pid))
 			proc_parse_and_register(pid, conf);
 	}
 
@@ -992,7 +992,7 @@ void go_process_events_handle(void)
 				 * Threads and processes share the code section,
 				 * here only processes are concerned.
 				 */
-				if (is_process(pe->pid)
+				if (is_user_process(pe->pid)
 				    && access(pe->path, F_OK) == 0) {
 					process_execute_handle(pe->pid,
 							       pe->tracer);

@@ -19,48 +19,47 @@ package encoder
 import (
 	"sync"
 
+	mapset "github.com/deckarep/golang-set/v2"
+
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/cache"
 )
 
 type metricTarget struct {
-	mux           sync.Mutex
+	lock          sync.Mutex
 	resourceType  string
-	metricTargets map[cache.MetricTargetKey]struct{}
+	metricTargets mapset.Set[cache.MetricTargetKey]
 }
 
 func newMetricTarget() *metricTarget {
 	return &metricTarget{
 		resourceType:  "metric_target",
-		metricTargets: make(map[cache.MetricTargetKey]struct{}),
+		metricTargets: mapset.NewSet[cache.MetricTargetKey](),
 	}
 }
 
 func (mt *metricTarget) refresh(args ...interface{}) error {
-	mt.mux.Lock()
-	defer mt.mux.Unlock()
-
-	var ls []*mysql.PrometheusMetricTarget
-	err := mysql.Db.Find(&ls).Error
+	var items []*mysql.PrometheusMetricTarget
+	err := mysql.Db.Find(&items).Error
 	if err != nil {
 		return err
 	}
-	for _, item := range ls {
-		mt.metricTargets[cache.NewMetricTargetKey(item.MetricName, item.TargetID)] = struct{}{}
+	for _, item := range items {
+		mt.metricTargets.Add(cache.NewMetricTargetKey(item.MetricName, item.TargetID))
 	}
 	return nil
 }
 
 func (mt *metricTarget) encode(toAdd []*controller.PrometheusMetricTarget) error {
-	mt.mux.Lock()
-	defer mt.mux.Unlock()
+	mt.lock.Lock()
+	defer mt.lock.Unlock()
 
 	var dbToAdd []*mysql.PrometheusMetricTarget
 	for _, item := range toAdd {
 		mn := item.GetMetricName()
 		ti := int(item.GetTargetId())
-		if _, ok := mt.metricTargets[cache.NewMetricTargetKey(mn, ti)]; !ok {
+		if ok := mt.metricTargets.Contains(cache.NewMetricTargetKey(mn, ti)); !ok {
 			dbToAdd = append(dbToAdd, &mysql.PrometheusMetricTarget{
 				MetricName: mn,
 				TargetID:   ti,
@@ -73,7 +72,7 @@ func (mt *metricTarget) encode(toAdd []*controller.PrometheusMetricTarget) error
 		return err
 	}
 	for _, item := range dbToAdd {
-		mt.metricTargets[cache.NewMetricTargetKey(item.MetricName, item.TargetID)] = struct{}{}
+		mt.metricTargets.Add(cache.NewMetricTargetKey(item.MetricName, item.TargetID))
 	}
 	return nil
 }

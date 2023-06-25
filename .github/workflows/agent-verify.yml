@@ -35,16 +35,16 @@ jobs:
 
       - name: verify agent
         run: |
-          docker run --rm  -t  --privileged --workdir /deepflow/  -v $(pwd):"/deepflow/"  --entrypoint "bash" ghcr.io/deepflowio/rust-build:1.19 "-c" "\
-          source /opt/rh/devtoolset-8/enable && \
+          docker run --rm  -t  --privileged --workdir /deepflow/  -v $(pwd):"/deepflow/"  --entrypoint "bash" ghcr.io/deepflowio/rust-build:1.21 "-c" "\
+          source /opt/rh/devtoolset-11/enable && \
           cp agent/docker/rust-proxy-config /usr/local/cargo/config && \
           cd  agent/src/ebpf && \
-          make clean && \
-          make rust-sample && \
-          make test && \
-          make tools && \
+          CC=musl-gcc CLANG=musl-clang make clean && \
+          CC=musl-gcc CLANG=musl-clang make rust-sample && \
+          CC=musl-gcc CLANG=musl-clang make test && \
+          CC=musl-gcc CLANG=musl-clang make tools && \
           cd ../../ && \
-          RUSTFLAGS='-D warnings' cargo check --all-targets && \
+          RUSTFLAGS='-D warnings -C force-frame-pointers=yes' cargo check --all-targets && \
           cargo fmt --all -- --check"
 
   verify_agent_arm64:
@@ -75,7 +75,7 @@ jobs:
 
       - name: verify agent
         run: |
-          docker run --rm  -t  --privileged --workdir /deepflow/  -v $(pwd):"/deepflow/"  --entrypoint "bash" ghcr.io/deepflowio/rust-build:1.19-arm64 "-c" "\
+          docker run --rm  -t  --privileged --workdir /deepflow/  -v $(pwd):"/deepflow/"  --entrypoint "bash" ghcr.io/deepflowio/rust-build:1.20-arm64 "-c" "\
           source /opt/rh/devtoolset-8/enable && \
           cd  agent/src/ebpf && \
           CC=musl-gcc CLANG=musl-clang make clean && \

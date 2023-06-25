@@ -201,8 +201,13 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 		t.AutoServiceID, t.AutoServiceType = common.GetAutoService(t.ServiceID, t.PodGroupID, t.GPID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
 	}
 
-	// OTel data always not from INTERNET
 	if t.SignalSource == SIGNAL_SOURCE_OTEL {
+		// only show OTel data for services as 'server side'
+		if t.TAPSide == zerodoc.ServerApp && t.ServerPort == 0 {
+			t.ServerPort = 65535
+		}
+
+		// OTel data always not from INTERNET
 		if t.L3EpcID == datatype.EPC_FROM_INTERNET {
 			t.L3EpcID = datatype.EPC_UNKNOWN
 		}

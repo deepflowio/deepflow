@@ -24,7 +24,6 @@
 #include <string.h>
 #include <libgen.h>
 #include <stdio.h>
-#include <dirent.h>
 #include <stdlib.h>
 #include <limits.h>
 #include <gelf.h>
@@ -32,13 +31,22 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <limits.h>		//PATH_MAX(4096)
-#include <arpa/inet.h>
-#include <memory.h>
-#include "../user/common.h"
+#include <bcc/bcc_proc.h>
+#include <bcc/bcc_elf.h>
+#include <bcc/bcc_syms.h>
+#include <dirent.h>		// for opendir()
+#include "../user/config.h"
 #include "../user/log.h"
+#include "../user/common.h"
 #include "../user/symbol.h"
 #include "../user/tracer.h"
 #include "../user/go_tracer.h"
+#if defined __x86_64__
+#include "bddisasm/bddisasm.h"
+#include "bddisasm/disasmtypes.h"
+#endif
+#include "libGoReSym.h"
+
 
 const char *test_go_file =
     "../../../resources/test/ebpf/go-elf";

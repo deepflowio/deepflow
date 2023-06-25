@@ -458,22 +458,22 @@ impl EbpfCollector {
             const RETRY_MAX: i32 = 50;
             let mut retry_count = 0;
             /*
-             * The eBPF tracer_start() can be executed successfully only after the eBPF
+             * The eBPF socket_tracer_start() can be executed successfully only after the eBPF
              * initialization is complete and the eBPF is in the STOP state.Need to wait
              * for the initialization of tracer and the state transition to complete.
              * The maximum waiting time is 100 seconds, more than this will throw an error.
              */
-            while ebpf::tracer_start() != 0 && retry_count < RETRY_MAX {
+            while ebpf::socket_tracer_start() != 0 && retry_count < RETRY_MAX {
                 std::thread::sleep(Duration::from_secs(2));
                 retry_count = retry_count + 1;
                 if retry_count >= RETRY_MAX {
                     error!(
-                        "[eBPF Kernel Adapt] The tracer_start() \
+                        "[eBPF Kernel Adapt] The socket_tracer_start() \
                             error. Kernel offset adapt failed. \
                             Please ensure that BTF is enabled (kernel built \
                             with CONFIG_DEBUG_INFO_BTF=y option). If the current \
-                            kernel version is low (<5.3), upgrading the Linux kernel \
-                            to 5.3+ (kernel built with CONFIG_DEBUG_INFO_BTF=y option) \
+                            kernel version is low (<5.2), upgrading the Linux kernel \
+                            to 5.2+ (kernel built with CONFIG_DEBUG_INFO_BTF=y option) \
                             can solve the problem. If it is not possible to upgrade \
                             the kernel, the kernel-devel package can be provided for \
                             developers to adapt and solve the problem."
@@ -486,7 +486,7 @@ impl EbpfCollector {
     fn ebpf_stop() {
         info!("ebpf collector stopping ebpf-kernel.");
         unsafe {
-            ebpf::tracer_stop();
+            ebpf::socket_tracer_stop();
         }
     }
 

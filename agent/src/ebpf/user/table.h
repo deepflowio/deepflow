@@ -30,4 +30,6 @@ bool bpf_table_set_value(struct bpf_tracer * tracer,
                          const char *tb_name, uint64_t key, void *val_buf);
 uint32_t bpf_table_elems_count(struct bpf_tracer * tracer,
 			       const char *tb_name);
+bool bpf_table_delete_key(struct bpf_tracer * tracer,
+			  const char *tb_name, uint64_t key);
 #endif /* DF_BPF_TABLE_H */

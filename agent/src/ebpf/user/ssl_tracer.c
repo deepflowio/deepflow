@@ -233,7 +233,7 @@ static void openssl_parse_and_register(int pid, struct tracer_probes_conf *conf)
 	if (pid <= 1)
 		goto out;
 
-	if (!is_process(pid))
+	if (!is_user_process(pid))
 		goto out;
 
 	path = get_openssl_so_path_by_pid(pid);

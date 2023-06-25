@@ -54,6 +54,7 @@ static void ebpf_object__release_elf(struct ebpf_object *obj)
 		obj->elf_info.fd = -1;
 	}
 
+	/* free ebpf byte-codes name */
 	if (obj->elf_info.path != NULL) {
 		zfree(obj->elf_info.path);
 	}
@@ -101,6 +102,8 @@ void release_object(struct ebpf_object *obj)
 {
 	int i;
 
+	ebpf_info("release object (\"%s\") ...\n", obj->name);
+
 	// release elf resource.
 	ebpf_object__release_elf(obj);
 
@@ -143,9 +146,10 @@ void release_object(struct ebpf_object *obj)
 		btf_ext__free(obj->btf_ext);
 	}
 
-	ebpf_debug("Free ebpf object.\n");
-
+	/* free obj */
 	zfree(obj);
+
+	ebpf_info("release object done\n");
 }
 
 static struct ebpf_object *create_new_obj(const void *buf, size_t buf_sz,
@@ -161,6 +165,7 @@ static struct ebpf_object *create_new_obj(const void *buf, size_t buf_sz,
 	obj->elf_info.path = strdup(name);
 	if (obj->elf_info.path == NULL) {
 		zfree(obj);
+		return NULL;
 	}
 	safe_buf_copy(obj->name, sizeof(obj->name), (void *)name, strlen(name));
 	obj->name[sizeof(obj->name) - 1] = '\0';
@@ -305,6 +310,8 @@ static enum bpf_prog_type get_prog_type(struct sec_desc *desc)
 		prog_type = BPF_PROG_TYPE_KPROBE;
 	} else if (!memcmp(desc->name, "tracepoint/", 11)) {
 		prog_type = BPF_PROG_TYPE_TRACEPOINT;
+	} else if (!memcmp(desc->name, "perf_event", 10)) {
+		prog_type = BPF_PROG_TYPE_PERF_EVENT;
 	} else {
 		prog_type = BPF_PROG_TYPE_UNSPEC; 
 	}
