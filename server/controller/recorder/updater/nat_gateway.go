@@ -38,7 +38,6 @@ func NewNATGateway(wholeCache *cache.Cache, cloudData []cloudmodel.NATGateway) *
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -86,17 +85,4 @@ func (g *NATGateway) generateUpdateInfo(diffBase *cache.NATGateway, cloudItem *c
 		return updateInfo, true
 	}
 	return nil, false
-}
-
-func (g *NATGateway) addCache(dbItems []*mysql.NATGateway) {
-	g.cache.AddNATGateways(dbItems)
-}
-
-func (g *NATGateway) updateCache(cloudItem *cloudmodel.NATGateway, diffBase *cache.NATGateway) {
-	diffBase.Update(cloudItem)
-	g.cache.UpdateNATGateway(cloudItem)
-}
-
-func (g *NATGateway) deleteCache(lcuuids []string) {
-	g.cache.DeleteNATGateways(lcuuids)
 }

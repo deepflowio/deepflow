@@ -38,7 +38,6 @@ func NewVMPodNodeConnection(wholeCache *cache.Cache, cloudData []cloudmodel.VMPo
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -78,16 +77,4 @@ func (c *VMPodNodeConnection) generateDBItemToAdd(cloudItem *cloudmodel.VMPodNod
 // 保留接口
 func (c *VMPodNodeConnection) generateUpdateInfo(diffBase *cache.VMPodNodeConnection, cloudItem *cloudmodel.VMPodNodeConnection) (map[string]interface{}, bool) {
 	return nil, false
-}
-
-func (c *VMPodNodeConnection) addCache(dbItems []*mysql.VMPodNodeConnection) {
-	c.cache.AddVMPodNodeConnections(dbItems)
-}
-
-// 保留接口
-func (c *VMPodNodeConnection) updateCache(cloudItem *cloudmodel.VMPodNodeConnection, diffBase *cache.VMPodNodeConnection) {
-}
-
-func (c *VMPodNodeConnection) deleteCache(lcuuids []string) {
-	c.cache.DeleteVMPodNodeConnections(lcuuids)
 }

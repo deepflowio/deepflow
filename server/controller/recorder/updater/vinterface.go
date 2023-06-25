@@ -41,7 +41,6 @@ func NewVInterface(wholeCache *cache.Cache, cloudData []cloudmodel.VInterface, d
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -132,17 +131,4 @@ func (i *VInterface) generateUpdateInfo(diffBase *cache.VInterface, cloudItem *c
 		updateInfo["iftype"] = cloudItem.Type
 	}
 	return updateInfo, len(updateInfo) > 0
-}
-
-func (i *VInterface) addCache(dbItems []*mysql.VInterface) {
-	i.cache.AddVInterfaces(dbItems)
-}
-
-func (i *VInterface) updateCache(cloudItem *cloudmodel.VInterface, diffBase *cache.VInterface) {
-	diffBase.Update(cloudItem)
-	i.cache.UpdateVInterface(cloudItem)
-}
-
-func (i *VInterface) deleteCache(lcuuids []string) {
-	i.cache.DeleteVInterfaces(lcuuids)
 }

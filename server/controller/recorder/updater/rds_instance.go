@@ -38,7 +38,6 @@ func NewRDSInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RDSInstance)
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -99,17 +98,4 @@ func (r *RDSInstance) generateUpdateInfo(diffBase *cache.RDSInstance, cloudItem 
 		return updateInfo, true
 	}
 	return nil, false
-}
-
-func (r *RDSInstance) addCache(dbItems []*mysql.RDSInstance) {
-	r.cache.AddRDSInstances(dbItems)
-}
-
-func (r *RDSInstance) updateCache(cloudItem *cloudmodel.RDSInstance, diffBase *cache.RDSInstance) {
-	diffBase.Update(cloudItem)
-	r.cache.UpdateRDSInstance(cloudItem)
-}
-
-func (r *RDSInstance) deleteCache(lcuuids []string) {
-	r.cache.DeleteRDSInstances(lcuuids)
 }

@@ -38,7 +38,6 @@ func NewHost(wholeCache *cache.Cache, cloudData []cloudmodel.Host) *Host {
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -98,17 +97,4 @@ func (h *Host) generateUpdateInfo(diffBase *cache.Host, cloudItem *cloudmodel.Ho
 		return updateInfo, true
 	}
 	return nil, false
-}
-
-func (h *Host) addCache(dbItems []*mysql.Host) {
-	h.cache.AddHosts(dbItems)
-}
-
-func (h *Host) updateCache(cloudItem *cloudmodel.Host, diffBase *cache.Host) {
-	diffBase.Update(cloudItem)
-	h.cache.UpdateHost(cloudItem)
-}
-
-func (h *Host) deleteCache(lcuuids []string) {
-	h.cache.DeleteHosts(lcuuids)
 }

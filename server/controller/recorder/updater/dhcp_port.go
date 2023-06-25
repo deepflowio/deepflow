@@ -38,7 +38,6 @@ func NewDHCPPort(wholeCache *cache.Cache, cloudData []cloudmodel.DHCPPort) *DHCP
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -94,17 +93,4 @@ func (p *DHCPPort) generateDBItemToAdd(cloudItem *cloudmodel.DHCPPort) (*mysql.D
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
-}
-
-func (p *DHCPPort) addCache(dbItems []*mysql.DHCPPort) {
-	p.cache.AddDHCPPorts(dbItems)
-}
-
-func (p *DHCPPort) updateCache(cloudItem *cloudmodel.DHCPPort, diffBase *cache.DHCPPort) {
-	diffBase.Update(cloudItem)
-	p.cache.UpdateDHCPPort(cloudItem)
-}
-
-func (p *DHCPPort) deleteCache(lcuuids []string) {
-	p.cache.DeleteDHCPPorts(lcuuids)
 }

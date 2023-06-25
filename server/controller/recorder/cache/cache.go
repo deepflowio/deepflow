@@ -1514,13 +1514,13 @@ func (c *Cache) refreshProcesses() {
 	c.AddProcesses(processes)
 }
 
-func (c *Cache) AddPrometheusTarget(items []*mysql.PrometheusTarget) {
+func (c *Cache) AddPrometheusTargets(items []*mysql.PrometheusTarget) {
 	for _, item := range items {
 		c.DiffBaseDataSet.addPrometheusTarget(item, c.Sequence)
 	}
 }
 
-func (c *Cache) DeletePrometheusTarget(lcuuids []string) {
+func (c *Cache) DeletePrometheusTargets(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
 		c.DiffBaseDataSet.deletePrometheusTarget(lcuuid)
 	}
@@ -1534,5 +1534,5 @@ func (c *Cache) refreshPrometheusTarget() {
 		return
 	}
 
-	c.AddPrometheusTarget(prometheusTargets)
+	c.AddPrometheusTargets(prometheusTargets)
 }

@@ -30,25 +30,25 @@ type PodService struct {
 }
 
 func NewPodService(c *cache.Cache, eq *queue.OverwriteQueue) *PodService {
-	lisener := &PodService{
+	listener := &PodService{
 		cache:         c,
 		eventProducer: event.NewPodService(&c.ToolDataSet, eq),
 	}
-	return lisener
+	return listener
 }
 
-func (p *PodService) OnUpdaterAdded(addedDBItems []*mysql.PodService) {
-	// p.cache.AddPodServices(addedDBItems)
-	p.eventProducer.ProduceByAdd(addedDBItems)
+func (ps *PodService) OnUpdaterAdded(addedDBItems []*mysql.PodService) {
+	ps.eventProducer.ProduceByAdd(addedDBItems)
+	ps.cache.AddPodServices(addedDBItems)
 }
 
-func (p *PodService) OnUpdaterUpdated(cloudItem *cloudmodel.PodService, diffBase *cache.PodService) {
-	p.eventProducer.ProduceByUpdate(cloudItem, diffBase)
-	// diffBase.Update(cloudItem)
-	// p.cache.UpdatePodService(cloudItem)
+func (ps *PodService) OnUpdaterUpdated(cloudItem *cloudmodel.PodService, diffBase *cache.PodService) {
+	ps.eventProducer.ProduceByUpdate(cloudItem, diffBase)
+	diffBase.Update(cloudItem)
+	ps.cache.UpdatePodService(cloudItem)
 }
 
-func (p *PodService) OnUpdaterDeleted(lcuuids []string) {
-	p.eventProducer.ProduceByDelete(lcuuids)
-	// p.cache.DeletePodServices(lcuuids)
+func (ps *PodService) OnUpdaterDeleted(lcuuids []string) {
+	ps.eventProducer.ProduceByDelete(lcuuids)
+	ps.cache.DeletePodServices(lcuuids)
 }

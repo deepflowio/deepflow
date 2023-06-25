@@ -30,25 +30,25 @@ type VRouter struct {
 }
 
 func NewVRouter(c *cache.Cache, eq *queue.OverwriteQueue) *VRouter {
-	lisener := &VRouter{
+	listener := &VRouter{
 		cache:         c,
 		eventProducer: event.NewVRouter(&c.ToolDataSet, eq),
 	}
-	return lisener
+	return listener
 }
 
-func (p *VRouter) OnUpdaterAdded(addedDBItems []*mysql.VRouter) {
-	// p.cache.AddVRouters(addedDBItems)
-	p.eventProducer.ProduceByAdd(addedDBItems)
+func (r *VRouter) OnUpdaterAdded(addedDBItems []*mysql.VRouter) {
+	r.eventProducer.ProduceByAdd(addedDBItems)
+	r.cache.AddVRouters(addedDBItems)
 }
 
-func (p *VRouter) OnUpdaterUpdated(cloudItem *cloudmodel.VRouter, diffBase *cache.VRouter) {
-	p.eventProducer.ProduceByUpdate(cloudItem, diffBase)
-	// diffBase.Update(cloudItem)
-	// p.cache.UpdateVRouter(cloudItem)
+func (r *VRouter) OnUpdaterUpdated(cloudItem *cloudmodel.VRouter, diffBase *cache.VRouter) {
+	r.eventProducer.ProduceByUpdate(cloudItem, diffBase)
+	diffBase.Update(cloudItem)
+	r.cache.UpdateVRouter(cloudItem)
 }
 
-func (p *VRouter) OnUpdaterDeleted(lcuuids []string) {
-	p.eventProducer.ProduceByDelete(lcuuids)
-	// p.cache.DeleteVRouters(lcuuids)
+func (r *VRouter) OnUpdaterDeleted(lcuuids []string) {
+	r.eventProducer.ProduceByDelete(lcuuids)
+	r.cache.DeleteVRouters(lcuuids)
 }

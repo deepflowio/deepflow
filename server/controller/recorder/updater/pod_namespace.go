@@ -38,7 +38,6 @@ func NewPodNamespace(wholeCache *cache.Cache, cloudData []cloudmodel.PodNamespac
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -85,16 +84,4 @@ func (n *PodNamespace) generateUpdateInfo(diffBase *cache.PodNamespace, cloudIte
 		return updateInfo, true
 	}
 	return nil, false
-}
-
-func (n *PodNamespace) addCache(dbItems []*mysql.PodNamespace) {
-	n.cache.AddPodNamespaces(dbItems)
-}
-
-func (n *PodNamespace) updateCache(cloudItem *cloudmodel.PodNamespace, diffBase *cache.PodNamespace) {
-	diffBase.Update(cloudItem)
-}
-
-func (n *PodNamespace) deleteCache(lcuuids []string) {
-	n.cache.DeletePodNamespaces(lcuuids)
 }

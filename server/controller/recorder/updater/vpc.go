@@ -38,7 +38,6 @@ func NewVPC(wholeCache *cache.Cache, cloudData []cloudmodel.VPC) *VPC {
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -84,16 +83,4 @@ func (v *VPC) generateUpdateInfo(diffBase *cache.VPC, cloudItem *cloudmodel.VPC)
 		return updateInfo, true
 	}
 	return nil, false
-}
-
-func (v *VPC) addCache(dbItems []*mysql.VPC) {
-	v.cache.AddVPCs(dbItems)
-}
-
-func (v *VPC) updateCache(cloudItem *cloudmodel.VPC, diffBase *cache.VPC) {
-	diffBase.Update(cloudItem)
-}
-
-func (v *VPC) deleteCache(lcuuids []string) {
-	v.cache.DeleteVPCs(lcuuids)
 }

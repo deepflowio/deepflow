@@ -38,7 +38,6 @@ func NewVMSecurityGroup(wholeCache *cache.Cache, cloudData []cloudmodel.VMSecuri
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -84,16 +83,4 @@ func (v *VMSecurityGroup) generateUpdateInfo(diffBase *cache.VMSecurityGroup, cl
 		return updateInfo, true
 	}
 	return nil, false
-}
-
-func (v *VMSecurityGroup) addCache(dbItems []*mysql.VMSecurityGroup) {
-	v.cache.AddVMSecurityGroups(dbItems)
-}
-
-func (v *VMSecurityGroup) updateCache(cloudItem *cloudmodel.VMSecurityGroup, diffBase *cache.VMSecurityGroup) {
-	diffBase.Update(cloudItem)
-}
-
-func (v *VMSecurityGroup) deleteCache(lcuuids []string) {
-	v.cache.DeleteVMSecurityGroups(lcuuids)
 }
