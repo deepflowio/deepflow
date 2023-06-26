@@ -44,7 +44,10 @@ use crate::common::{
     UDP6_PACKET_SIZE, UDP_PACKET_SIZE,
 };
 #[cfg(unix)]
-use crate::common::{IPV4_SRC_OFFSET, IPV6_SRC_OFFSET};
+use crate::common::{
+    ETH_HEADER_SIZE, IPV4_CSUM_OFFSET, IPV4_HEADER_SIZE, IPV4_SRC_OFFSET, IPV6_SRC_OFFSET,
+    UDP6_CHKSUM_OFFSET,
+};
 use crate::config::NpbConfig;
 #[cfg(unix)]
 use crate::dispatcher::af_packet::{Options, Tpacket};
@@ -122,6 +125,24 @@ impl AfpacketSender {
         }
     }
 
+    fn checksum(data: &[u8]) -> u16 {
+        let mut checksum = 0;
+        let mut i = 0;
+
+        while i + 1 < data.len() {
+            checksum += u16::from_be_bytes([data[i], data[i + 1]]) as u32;
+            i += 2;
+        }
+        if i < data.len() {
+            checksum += (data[i] as u32) << 8;
+        }
+
+        while checksum > u16::MAX as u32 {
+            checksum = (checksum >> 16) + (checksum & 0xffff);
+        }
+        return !(checksum as u16);
+    }
+
     fn serialize_underlay(&self, underlay_l2_opt_size: usize, packet: &mut Vec<u8>) {
         packet[..MAC_ADDR_LEN].copy_from_slice(&self.underlay_dst_mac.octets()[..]);
         packet[MAC_ADDR_LEN..MAC_ADDR_LEN + MAC_ADDR_LEN]
@@ -132,11 +153,27 @@ impl AfpacketSender {
                 let src_ip_offset = IPV4_SRC_OFFSET + underlay_l2_opt_size;
                 packet[src_ip_offset..src_ip_offset + IPV4_ADDR_LEN]
                     .copy_from_slice(&addr.octets());
+
+                let ip_header_offset = ETH_HEADER_SIZE + underlay_l2_opt_size;
+                let checksum =
+                    Self::checksum(&packet[ip_header_offset..ip_header_offset + IPV4_HEADER_SIZE]);
+                let checksum_offset = IPV4_CSUM_OFFSET + underlay_l2_opt_size;
+                packet[checksum_offset..checksum_offset + 2]
+                    .copy_from_slice(&checksum.to_be_bytes());
             }
             IpAddr::V6(addr) => {
                 let src_ip_offset = IPV6_SRC_OFFSET + underlay_l2_opt_size;
                 packet[src_ip_offset..src_ip_offset + IPV6_ADDR_LEN]
                     .copy_from_slice(&addr.octets());
+
+                let protocol_offset = IPV6_PROTO_OFFSET + underlay_l2_opt_size;
+                if packet[protocol_offset] == IpProtocol::Udp {
+                    let udp_header_offset = IPV6_PACKET_SIZE + underlay_l2_opt_size;
+                    let checksum_offset = UDP6_CHKSUM_OFFSET + underlay_l2_opt_size;
+                    let checksum = Self::checksum(&packet[udp_header_offset..]);
+                    packet[checksum_offset..checksum_offset + 2]
+                        .copy_from_slice(&checksum.to_be_bytes());
+                }
             }
         }
     }
@@ -186,14 +223,13 @@ impl AfpacketSender {
         mut packet: Vec<u8>,
         arp: &Arc<NpbArpTable>,
     ) -> IOResult<usize> {
-        let seq = self.check_arp(timestamp, arp)?;
-        self.serialize_underlay(underlay_l2_opt_size, &mut packet);
         serialize_seq(
             &mut packet,
-            seq,
+            self.check_arp(timestamp, arp)?,
             underlay_l2_opt_size,
             self.underlay_src_ip.is_ipv6(),
         );
+        self.serialize_underlay(underlay_l2_opt_size, &mut packet);
         let n = self.af_packet.as_mut().unwrap().write(&packet.as_slice());
         if n > 0 {
             return Ok(n as usize);
