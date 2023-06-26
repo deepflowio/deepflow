@@ -342,7 +342,7 @@ pub struct YamlConfig {
     pub toa_lru_cache_size: usize,
     pub flow_sender_queue_size: usize,
     pub flow_sender_queue_count: usize,
-    #[serde(with = "humantime_serde")]
+    #[serde(rename = "second-flow-extra-delay-second", with = "humantime_serde")]
     pub second_flow_extra_delay: Duration,
     #[serde(with = "humantime_serde")]
     pub packet_delay: Duration,

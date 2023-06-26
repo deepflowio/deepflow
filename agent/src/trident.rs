@@ -1126,10 +1126,9 @@ impl AgentComponents {
             + yaml_config.flow.flush_interval.as_secs()
             + COMMON_DELAY as u64)
             + yaml_config.second_flow_extra_delay.as_secs();
-        let minute_quadruple_tolerable_delay = (60 + yaml_config.packet_delay.as_secs())
-            + 1
-            + yaml_config.flow.flush_interval.as_secs()
-            + COMMON_DELAY as u64;
+        // minute QG window is also pushed forward by flow stat time,
+        // therefore its delay should be 60 + second delay (including extra flow delay)
+        let minute_quadruple_tolerable_delay = 60 + second_quadruple_tolerable_delay;
 
         let quadruple_generator = QuadrupleGeneratorThread::new(
             id,
