@@ -179,6 +179,10 @@ controller:
     # whether to register domain automatically
     domain-auto-register: True
 
+    # clean up the data and cache of the table kubernetes_cluster according to the data 
+    # that was not synchronized before a certain period of time 
+    clear-kubernetes-time: 600
+
   genesis:
     # 平台数据老化时间，单位：秒
     aging_time: 86400
