@@ -32,7 +32,7 @@ pub enum Error {
     #[error("recv engine failure: {0}")]
     RecvEngineFailure(String),
     #[error("dispatcher winpcap: {0}")]
-    WinPcap(String), // Enterprise Edition Feature: windows-dispatcher
+    Libpcap(String), // Enterprise Edition Feature: windows-dispatcher
     #[error("flavor dispatcher is empty")]
     DispatcherFlavorEmpty, // Enterprise Edition Feature: windows-dispatcher
     #[error("netns failure: {0}")]

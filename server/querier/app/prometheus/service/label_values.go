@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/querier/app/prometheus/model"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse"
 	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/metrics"
 )
@@ -33,19 +34,20 @@ const (
 	DB_NAME_FLOW_METRICS         = "flow_metrics"
 	TABLE_NAME_METRICS           = "metrics"
 	TABLE_NAME_L7_FLOW_LOG       = "l7_flow_log"
+	TABLE_NAME_SAMPLES           = "samples"
 	METRICS_CATEGORY_CARDINALITY = "Cardinality"
 )
 
-func getTagValues(args *model.PromMetaParams, ctx context.Context) (result *model.PromQueryResponse, err error) {
+func (p *prometheusExecutor) getTagValues(ctx context.Context, args *model.PromMetaParams) (result *model.PromQueryResponse, err error) {
 	if args.LabelName == LABEL_NAME_METRICS {
 		return &model.PromQueryResponse{
-			Data: getMetrics(args),
+			Data: getMetrics(ctx, args),
 		}, nil
 	}
 	return result, err
 }
 
-func getMetrics(args *model.PromMetaParams) (resp []string) {
+func getMetrics(ctx context.Context, args *model.PromMetaParams) (resp []string) {
 	// We speed up the return of the metrics list by querying the aggregation information in
 	// `flow_tag.ext_metrics_custom_field_value`. Since we do not query the original time series
 	// data, filtering metrics by time is currently not supported.
@@ -64,9 +66,16 @@ func getMetrics(args *model.PromMetaParams) (resp []string) {
 			extMetrics, _ := metrics.GetExtMetrics(DB_NAME_EXT_METRICS, "", where, args.Context)
 			for _, v := range extMetrics {
 				resp = append(resp, strings.TrimPrefix(v.DisplayName, "metrics."))
-				// append ext_metrics__metrics__prometheus_${metrics_name}
-				fieldName := strings.Replace(v.Table, ".", "_", 1) // convert prometheus.xxx to prometheus_xxx
-				metricsName := fmt.Sprintf("%s__%s__%s", db, TABLE_NAME_METRICS, fieldName)
+			}
+		} else if db == chCommon.DB_NAME_PROMETHEUS {
+			// prometheus samples should get all metrcis from `table`
+			samples := clickhouse.GetTables(db, ctx)
+			for _, v := range samples.Values {
+				tableName := v.([]interface{})[0].(string)
+				// append ${metrics_name}
+				resp = append(resp, tableName)
+				// append prometheus__samples__${metrics_name}
+				metricsName := fmt.Sprintf("%s__%s__%s", db, TABLE_NAME_SAMPLES, tableName)
 				resp = append(resp, metricsName)
 			}
 		} else {

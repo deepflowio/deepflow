@@ -19,12 +19,14 @@ package cloud
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strconv"
 	"sync"
 	"time"
 
 	mapset "github.com/deckarep/golang-set"
 	logging "github.com/op/go-logging"
+	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/config"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
@@ -311,21 +313,26 @@ func (c *Cloud) runKubernetesGatherTask() {
 }
 
 func (c *Cloud) appendAddtionalResourcesData(resource model.Resource) model.Resource {
-	var dbItem mysql.DomainAdditionalResource
-	result := mysql.Db.Where("domain = ?", c.basicInfo.Lcuuid).Find(&dbItem)
-	if result.Error != nil {
-		log.Errorf("domain (lcuuid: %s) db query additional resources failed: %s", c.basicInfo.Lcuuid, result.Error.Error())
+	dbItem, err := getContentFromAdditionalResource(c.basicInfo.Lcuuid)
+	if err != nil {
+		log.Errorf("domain (lcuuid: %s) get additional resources failed: %s", c.basicInfo.Lcuuid, err)
 		return resource
-	} else if result.RowsAffected == 0 {
+	}
+	if dbItem == nil {
 		log.Debugf("domain (lcuuid: %s) has no additional resources to append", c.basicInfo.Lcuuid)
 		return resource
 	}
+
+	content := dbItem.CompressedContent
+	if len(dbItem.CompressedContent) == 0 {
+		content = []byte(dbItem.Content)
+	}
 	var additionalResource model.AdditionalResource
-	err := json.Unmarshal([]byte(dbItem.Content), &additionalResource)
-	if err != nil {
-		log.Errorf("domain (lcuuid: %s) json unmarshal content failed: %s", err.Error())
+	if err = json.Unmarshal(content, &additionalResource); err != nil {
+		log.Errorf("domain (lcuuid: %s) json unmarshal content failed: %s", c.basicInfo.Lcuuid, err.Error())
 		return resource
 	}
+
 	resource.AZs = append(resource.AZs, additionalResource.AZs...)
 	resource.VPCs = append(resource.VPCs, additionalResource.VPCs...)
 	resource.Networks = append(resource.Networks, additionalResource.Subnets...)
@@ -339,6 +346,29 @@ func (c *Cloud) appendAddtionalResourcesData(resource model.Resource) model.Reso
 	resource.LBListeners = append(resource.LBListeners, additionalResource.LBListeners...)
 	resource.LBTargetServers = append(resource.LBTargetServers, additionalResource.LBTargetServers...)
 	return resource
+}
+
+// getContentFromAdditionalResource gets domain_additional_resource by uuid, get the field content if it exists,
+// otherwise get the field compressed_content.
+// old content field: content
+// new centent field: compressed_content
+func getContentFromAdditionalResource(domainUUID string) (*mysql.DomainAdditionalResource, error) {
+	var dbItem mysql.DomainAdditionalResource
+	result := mysql.Db.Select("content").Where("domain = ? and content!=''", domainUUID).First(&dbItem)
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		result = mysql.Db.Select("compressed_content").Where("domain = ?", domainUUID).First(&dbItem)
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+	}
+
+	if result.RowsAffected != 0 {
+		return &dbItem, nil
+	}
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return &dbItem, nil
 }
 
 func (c *Cloud) appendCloudTags(resource model.Resource, additionalResource model.AdditionalResource) model.Resource {

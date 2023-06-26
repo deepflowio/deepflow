@@ -113,7 +113,6 @@ use pcap_assembler::{BoxedPcapBatch, PcapAssembler};
 use crate::common::proc_event::BoxedProcEvents;
 #[cfg(target_os = "linux")]
 use public::netns::{self, links_by_name_regex_in_netns};
-#[cfg(target_os = "windows")]
 use public::utils::net::link_by_name;
 use public::{
     debug::QueueDebugger,
@@ -1509,10 +1508,9 @@ impl AgentComponents {
             analyzer_source_ip: source_ip,
             analyzer_port: candidate_config.dispatcher.analyzer_port,
         };
+        let bpf_syntax_str = bpf_builder.build_pcap_syntax_to_str();
         #[cfg(target_os = "linux")]
         let bpf_syntax = bpf_builder.build_pcap_syntax();
-        #[cfg(target_os = "windows")]
-        let bpf_syntax_str = bpf_builder.build_pcap_syntax_to_str();
 
         // Enterprise Edition Feature: packet-sequence
         let packet_sequence_queue_name = "2-packet-sequence-block-to-sender";
@@ -1544,7 +1542,6 @@ impl AgentComponents {
             capture_bpf: candidate_config.dispatcher.capture_bpf.clone(),
             #[cfg(target_os = "linux")]
             bpf_syntax,
-            #[cfg(target_os = "windows")]
             bpf_syntax_str,
         }));
 
@@ -1716,6 +1713,18 @@ impl AgentComponents {
                 tap_interfaces.clone()
             };
 
+            let pcap_interfaces = if candidate_config.tap_mode == TapMode::Local {
+                tap_interfaces.clone()
+            } else {
+                match link_by_name(&src_interface) {
+                    Ok(link) => vec![link],
+                    Err(e) => {
+                        warn!("link_by_name: {}, error: {}", src_interface, e);
+                        vec![]
+                    }
+                }
+            };
+
             let dispatcher_builder = DispatcherBuilder::new()
                 .id(i)
                 .handler_builders(handler_builder)
@@ -1723,11 +1732,8 @@ impl AgentComponents {
                 .leaky_bucket(rx_leaky_bucket.clone())
                 .options(Arc::new(Mutex::new(dispatcher::Options {
                     #[cfg(target_os = "linux")]
-                    af_packet_blocks: config_handler.candidate_config.dispatcher.af_packet_blocks,
-                    #[cfg(target_os = "linux")]
                     af_packet_version: config_handler.candidate_config.dispatcher.af_packet_version,
-                    #[cfg(target_os = "windows")]
-                    win_packet_blocks: config_handler.candidate_config.dispatcher.af_packet_blocks,
+                    packet_blocks: config_handler.candidate_config.dispatcher.af_packet_blocks,
                     tap_mode: candidate_config.tap_mode,
                     tap_mac_script: yaml_config.tap_mac_script.clone(),
                     is_ipv6: ctrl_ip.is_ipv6(),
@@ -1735,6 +1741,7 @@ impl AgentComponents {
                     vxlan_flags: yaml_config.vxlan_flags,
                     controller_port: static_config.controller_port,
                     controller_tls_port: static_config.controller_tls_port,
+                    libpcap_enabled: yaml_config.libpcap_enabled,
                     snap_len: config_handler
                         .candidate_config
                         .dispatcher
@@ -1764,16 +1771,15 @@ impl AgentComponents {
                 .trident_type(candidate_config.dispatcher.trident_type)
                 .queue_debugger(queue_debugger.clone())
                 .analyzer_queue_size(yaml_config.analyzer_queue_size as usize)
+                .pcap_interfaces(pcap_interfaces)
                 .analyzer_raw_packet_block_size(
                     yaml_config.analyzer_raw_packet_block_size as usize,
                 );
-
             #[cfg(target_os = "linux")]
-            let dispatcher = match dispatcher_builder
+            let dispatcher_builder = dispatcher_builder
                 .libvirt_xml_extractor(libvirt_xml_extractor.clone())
-                .platform_poller(kubernetes_poller.clone())
-                .build()
-            {
+                .platform_poller(kubernetes_poller.clone());
+            let dispatcher = match dispatcher_builder.build() {
                 Ok(d) => d,
                 Err(e) => {
                     warn!(
@@ -1784,31 +1790,6 @@ impl AgentComponents {
                     process::exit(1);
                 }
             };
-            #[cfg(target_os = "windows")]
-            let pcap_interfaces = if candidate_config.tap_mode == TapMode::Local {
-                tap_interfaces.clone()
-            } else {
-                match link_by_name(&src_interface) {
-                    Ok(link) => vec![link],
-                    Err(e) => {
-                        warn!("link_by_name: {}, error: {}", src_interface, e);
-                        vec![]
-                    }
-                }
-            };
-            #[cfg(target_os = "windows")]
-            let dispatcher = match dispatcher_builder.pcap_interfaces(pcap_interfaces).build() {
-                Ok(d) => d,
-                Err(e) => {
-                    warn!(
-                        "dispatcher creation failed: {}, deepflow-agent restart...",
-                        e
-                    );
-                    thread::sleep(Duration::from_secs(1));
-                    process::exit(1);
-                }
-            };
-
             let mut dispatcher_listener = dispatcher.listener();
             dispatcher_listener.on_config_change(&candidate_config.dispatcher);
             dispatcher_listener.on_tap_interface_change(
