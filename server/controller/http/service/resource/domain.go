@@ -563,27 +563,30 @@ func DeleteDomain(lcuuid string) (map[string]string, error) { // TODO whether re
 	return map[string]string{"LCUUID": lcuuid}, nil
 }
 
-func KubernetesSetVtap(domainLcuuid, subDomainLcuuid, value string) error {
+func KubernetesSetVtap(lcuuid, value string, isSubDomain bool) error {
 	if value == "" {
 		return nil
 	}
 
 	var err error
-	var clusterID string
-	if domainLcuuid != "" {
-		var domain mysql.Domain
-		err = mysql.Db.Where("lcuuid = ?", domainLcuuid).First(&domain).Error
-		if err != nil {
-			return err
-		}
-		clusterID = domain.ClusterID
-	} else if subDomainLcuuid != "" {
+	var clusterID, domainLcuuid, subDomainLcuuid string
+	if isSubDomain {
 		var subDomain mysql.SubDomain
-		err = mysql.Db.Where("lcuuid = ?", subDomainLcuuid).First(&subDomain).Error
+		err = mysql.Db.Where("lcuuid = ?", lcuuid).First(&subDomain).Error
 		if err != nil {
 			return err
 		}
 		clusterID = subDomain.ClusterID
+		domainLcuuid = subDomain.Domain
+		subDomainLcuuid = lcuuid
+	} else {
+		var domain mysql.Domain
+		err = mysql.Db.Where("lcuuid = ?", lcuuid).First(&domain).Error
+		if err != nil {
+			return err
+		}
+		clusterID = domain.ClusterID
+		domainLcuuid = lcuuid
 	}
 	if clusterID == "" {
 		return errors.New("domain or subdomain lcuuid not found cluster id")
@@ -612,6 +615,9 @@ func KubernetesSetVtap(domainLcuuid, subDomainLcuuid, value string) error {
 	if err != nil {
 		return err
 	}
+	if len(podNodes) == 0 {
+		return errors.New(fmt.Sprintf("the cluster (%s) not found pod node", clusterID))
+	}
 	nodeIPs := []string{}
 	for _, node := range podNodes {
 		nodeIPs = append(nodeIPs, node.IP)
@@ -621,12 +627,15 @@ func KubernetesSetVtap(domainLcuuid, subDomainLcuuid, value string) error {
 	if err != nil {
 		return err
 	}
+	if len(vTaps) == 0 {
+		return errors.New(fmt.Sprintf("not found vtap in launch server (%s)", nodeIPs))
+	}
 	vTapInfos := map[string]bool{}
 	for _, v := range vTaps {
 		vTapInfos[v.CtrlIP+"-"+v.CtrlMac] = false
 	}
 	if _, ok := vTapInfos[value]; !ok {
-		return errors.New(fmt.Sprintf("vtap (%s) not belong to the current domain"))
+		return errors.New(fmt.Sprintf("vtap (%s) not belong to the current domain", value))
 	}
 
 	var kubernetesCluster mysql.KubernetesCluster
