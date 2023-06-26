@@ -20,22 +20,12 @@ use std::time::Duration;
 
 use crate::consts::RECORD_HEADER_LEN;
 
-#[cfg(target_os = "linux")]
 #[derive(Debug)]
 pub struct Packet<'a> {
     pub timestamp: Duration,
     pub if_index: isize,
     pub capture_length: isize,
     pub data: &'a mut [u8],
-}
-
-#[cfg(target_os = "windows")]
-#[derive(Debug)]
-pub struct Packet {
-    pub timestamp: Duration,
-    pub if_index: isize,
-    pub capture_length: isize,
-    pub data: Vec<u8>,
 }
 
 pub struct MiniPacket {

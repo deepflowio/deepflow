@@ -154,7 +154,7 @@ struct tailq_entry {
 #define RING_NAMESIZE (MEMZONE_NAMESIZE - \
 			   sizeof(RING_MZ_PREFIX) + 1)
 
-struct memzone;		/* forward declaration, so as not to require memzone.h */
+struct memzone;			/* forward declaration, so as not to require memzone.h */
 
 #if CACHE_LINE_SIZE < 128
 #define PROD_ALIGN (CACHE_LINE_SIZE * 2)
@@ -278,8 +278,7 @@ ssize_t ring_get_memsize(unsigned count);
  * @return
  *   0 on success, or a negative value on error.
  */
-int ring_init(struct ring *r, const char *name, unsigned count,
-		  unsigned flags);
+int ring_init(struct ring *r, const char *name, unsigned count, unsigned flags);
 
 /**
  * Create a new ring named *name* in memory.
@@ -321,7 +320,7 @@ int ring_init(struct ring *r, const char *name, unsigned count,
  *    - ENOMEM - no appropriate memory area found in which to create memzone
  */
 struct ring *ring_create(const char *name, unsigned count,
-				 int socket_id, unsigned flags);
+			 int socket_id, unsigned flags);
 /**
  * De-allocate all memory used by the ring.
  *
@@ -402,7 +401,7 @@ void ring_dump(FILE * f, const struct ring *r);
 	} \
 } while (0)
 
-static __always_inline void
+static_always_inline void
 update_tail(struct ring_headtail *ht, uint32_t old_val, uint32_t new_val,
 	    uint32_t single)
 {
@@ -440,11 +439,11 @@ update_tail(struct ring_headtail *ht, uint32_t old_val, uint32_t new_val,
  *   Actual number of objects enqueued.
  *   If behavior == RING_QUEUE_FIXED, this will be 0 or n only.
  */
-static __always_inline unsigned int
+static_always_inline unsigned int
 __ring_move_prod_head(struct ring *r, unsigned int is_sp,
-			  unsigned int n, enum ring_queue_behavior behavior,
-			  uint32_t * old_head, uint32_t * new_head,
-			  uint32_t * free_entries)
+		      unsigned int n, enum ring_queue_behavior behavior,
+		      uint32_t * old_head, uint32_t * new_head,
+		      uint32_t * free_entries)
 {
 	const uint32_t capacity = r->capacity;
 	unsigned int max = n;
@@ -471,8 +470,7 @@ __ring_move_prod_head(struct ring *r, unsigned int is_sp,
 
 		/* check that we have enough room in ring */
 		if (unlikely(n > *free_entries))
-			n = (behavior == RING_QUEUE_FIXED) ?
-			    0 : *free_entries;
+			n = (behavior == RING_QUEUE_FIXED) ? 0 : *free_entries;
 
 		if (n == 0)
 			return 0;
@@ -482,7 +480,7 @@ __ring_move_prod_head(struct ring *r, unsigned int is_sp,
 			r->prod.head = *new_head, success = 1;
 		else
 			success = atomic32_cmpset(&r->prod.head,
-						      *old_head, *new_head);
+						  *old_head, *new_head);
 	} while (unlikely(success == 0));
 	return n;
 }
@@ -507,16 +505,16 @@ __ring_move_prod_head(struct ring *r, unsigned int is_sp,
  *   Actual number of objects enqueued.
  *   If behavior == RING_QUEUE_FIXED, this will be 0 or n only.
  */
-static __always_inline unsigned int
+static_always_inline unsigned int
 __ring_do_enqueue(struct ring *r, void *const *obj_table,
-		      unsigned int n, enum ring_queue_behavior behavior,
-		      unsigned int is_sp, unsigned int *free_space)
+		  unsigned int n, enum ring_queue_behavior behavior,
+		  unsigned int is_sp, unsigned int *free_space)
 {
 	uint32_t prod_head, prod_next;
 	uint32_t free_entries;
 
 	n = __ring_move_prod_head(r, is_sp, n, behavior,
-				      &prod_head, &prod_next, &free_entries);
+				  &prod_head, &prod_next, &free_entries);
 	if (n == 0)
 		goto end;
 
@@ -553,11 +551,11 @@ end:
  *   - Actual number of objects dequeued.
  *     If behavior == RING_QUEUE_FIXED, this will be 0 or n only.
  */
-static __always_inline unsigned int
+static_always_inline unsigned int
 __ring_move_cons_head(struct ring *r, unsigned int is_sc,
-			  unsigned int n, enum ring_queue_behavior behavior,
-			  uint32_t * old_head, uint32_t * new_head,
-			  uint32_t * entries)
+		      unsigned int n, enum ring_queue_behavior behavior,
+		      uint32_t * old_head, uint32_t * new_head,
+		      uint32_t * entries)
 {
 	unsigned int max = n;
 	int success;
@@ -592,7 +590,7 @@ __ring_move_cons_head(struct ring *r, unsigned int is_sc,
 			r->cons.head = *new_head, success = 1;
 		else
 			success = atomic32_cmpset(&r->cons.head, *old_head,
-						      *new_head);
+						  *new_head);
 	} while (unlikely(success == 0));
 	return n;
 }
@@ -617,16 +615,16 @@ __ring_move_cons_head(struct ring *r, unsigned int is_sc,
  *   - Actual number of objects dequeued.
  *     If behavior == RING_QUEUE_FIXED, this will be 0 or n only.
  */
-static __always_inline unsigned int
+static_always_inline unsigned int
 __ring_do_dequeue(struct ring *r, void **obj_table,
-		      unsigned int n, enum ring_queue_behavior behavior,
-		      unsigned int is_sc, unsigned int *available)
+		  unsigned int n, enum ring_queue_behavior behavior,
+		  unsigned int is_sc, unsigned int *available)
 {
 	uint32_t cons_head, cons_next;
 	uint32_t entries;
 
 	n = __ring_move_cons_head(r, (int)is_sc, n, behavior,
-				      &cons_head, &cons_next, &entries);
+				  &cons_head, &cons_next, &entries);
 	if (n == 0)
 		goto end;
 
@@ -659,12 +657,12 @@ end:
  * @return
  *   The number of objects enqueued, either 0 or n
  */
-static __always_inline unsigned int
+static_always_inline unsigned int
 ring_mp_enqueue_bulk(struct ring *r, void *const *obj_table,
-			 unsigned int n, unsigned int *free_space)
+		     unsigned int n, unsigned int *free_space)
 {
 	return __ring_do_enqueue(r, obj_table, n, RING_QUEUE_FIXED,
-				     __IS_MP, free_space);
+				 __IS_MP, free_space);
 }
 
 /**
@@ -682,12 +680,12 @@ ring_mp_enqueue_bulk(struct ring *r, void *const *obj_table,
  * @return
  *   The number of objects enqueued, either 0 or n
  */
-static __always_inline unsigned int
+static_always_inline unsigned int
 ring_sp_enqueue_bulk(struct ring *r, void *const *obj_table,
-			 unsigned int n, unsigned int *free_space)
+		     unsigned int n, unsigned int *free_space)
 {
 	return __ring_do_enqueue(r, obj_table, n, RING_QUEUE_FIXED,
-				     __IS_SP, free_space);
+				 __IS_SP, free_space);
 }
 
 /**
@@ -709,12 +707,12 @@ ring_sp_enqueue_bulk(struct ring *r, void *const *obj_table,
  * @return
  *   The number of objects enqueued, either 0 or n
  */
-static __always_inline unsigned int
+static_always_inline unsigned int
 ring_enqueue_bulk(struct ring *r, void *const *obj_table,
-		      unsigned int n, unsigned int *free_space)
+		  unsigned int n, unsigned int *free_space)
 {
 	return __ring_do_enqueue(r, obj_table, n, RING_QUEUE_FIXED,
-				     r->prod.single, free_space);
+				 r->prod.single, free_space);
 }
 
 /**
@@ -731,8 +729,7 @@ ring_enqueue_bulk(struct ring *r, void *const *obj_table,
  *   - 0: Success; objects enqueued.
  *   - -ENOBUFS: Not enough room in the ring to enqueue; no object is enqueued.
  */
-static __always_inline int
-ring_mp_enqueue(struct ring *r, void *obj)
+static_always_inline int ring_mp_enqueue(struct ring *r, void *obj)
 {
 	return ring_mp_enqueue_bulk(r, &obj, 1, NULL) ? 0 : -ENOBUFS;
 }
@@ -748,8 +745,7 @@ ring_mp_enqueue(struct ring *r, void *obj)
  *   - 0: Success; objects enqueued.
  *   - -ENOBUFS: Not enough room in the ring to enqueue; no object is enqueued.
  */
-static __always_inline int
-ring_sp_enqueue(struct ring *r, void *obj)
+static_always_inline int ring_sp_enqueue(struct ring *r, void *obj)
 {
 	return ring_sp_enqueue_bulk(r, &obj, 1, NULL) ? 0 : -ENOBUFS;
 }
@@ -769,7 +765,7 @@ ring_sp_enqueue(struct ring *r, void *obj)
  *   - 0: Success; objects enqueued.
  *   - -ENOBUFS: Not enough room in the ring to enqueue; no object is enqueued.
  */
-static __always_inline int ring_enqueue(struct ring *r, void *obj)
+static_always_inline int ring_enqueue(struct ring *r, void *obj)
 {
 	return ring_enqueue_bulk(r, &obj, 1, NULL) ? 0 : -ENOBUFS;
 }
@@ -792,12 +788,12 @@ static __always_inline int ring_enqueue(struct ring *r, void *obj)
  * @return
  *   The number of objects dequeued, either 0 or n
  */
-static __always_inline unsigned int
+static_always_inline unsigned int
 ring_mc_dequeue_bulk(struct ring *r, void **obj_table,
-			 unsigned int n, unsigned int *available)
+		     unsigned int n, unsigned int *available)
 {
 	return __ring_do_dequeue(r, obj_table, n, RING_QUEUE_FIXED,
-				     __IS_MC, available);
+				 __IS_MC, available);
 }
 
 /**
@@ -816,12 +812,12 @@ ring_mc_dequeue_bulk(struct ring *r, void **obj_table,
  * @return
  *   The number of objects dequeued, either 0 or n
  */
-static __always_inline unsigned int
+static_always_inline unsigned int
 ring_sc_dequeue_bulk(struct ring *r, void **obj_table,
-			 unsigned int n, unsigned int *available)
+		     unsigned int n, unsigned int *available)
 {
 	return __ring_do_dequeue(r, obj_table, n, RING_QUEUE_FIXED,
-				     __IS_SC, available);
+				 __IS_SC, available);
 }
 
 /**
@@ -843,12 +839,12 @@ ring_sc_dequeue_bulk(struct ring *r, void **obj_table,
  * @return
  *   The number of objects dequeued, either 0 or n
  */
-static __always_inline unsigned int
+static_always_inline unsigned int
 ring_dequeue_bulk(struct ring *r, void **obj_table, unsigned int n,
-		      unsigned int *available)
+		  unsigned int *available)
 {
 	return __ring_do_dequeue(r, obj_table, n, RING_QUEUE_FIXED,
-				     r->cons.single, available);
+				 r->cons.single, available);
 }
 
 /**
@@ -866,8 +862,7 @@ ring_dequeue_bulk(struct ring *r, void **obj_table, unsigned int n,
  *   - -ENOENT: Not enough entries in the ring to dequeue; no object is
  *     dequeued.
  */
-static __always_inline int
-ring_mc_dequeue(struct ring *r, void **obj_p)
+static_always_inline int ring_mc_dequeue(struct ring *r, void **obj_p)
 {
 	return ring_mc_dequeue_bulk(r, obj_p, 1, NULL) ? 0 : -ENOENT;
 }
@@ -884,8 +879,7 @@ ring_mc_dequeue(struct ring *r, void **obj_p)
  *   - -ENOENT: Not enough entries in the ring to dequeue, no object is
  *     dequeued.
  */
-static __always_inline int
-ring_sc_dequeue(struct ring *r, void **obj_p)
+static_always_inline int ring_sc_dequeue(struct ring *r, void **obj_p)
 {
 	return ring_sc_dequeue_bulk(r, obj_p, 1, NULL) ? 0 : -ENOENT;
 }
@@ -906,8 +900,7 @@ ring_sc_dequeue(struct ring *r, void **obj_p)
  *   - -ENOENT: Not enough entries in the ring to dequeue, no object is
  *     dequeued.
  */
-static __always_inline int
-ring_dequeue(struct ring *r, void **obj_p)
+static_always_inline int ring_dequeue(struct ring *r, void **obj_p)
 {
 	return ring_dequeue_bulk(r, obj_p, 1, NULL) ? 0 : -ENOENT;
 }
@@ -1035,13 +1028,12 @@ struct ring *ring_lookup(const char *name);
  * @return
  *   - n: Actual number of objects enqueued.
  */
-static __always_inline unsigned
+static_always_inline unsigned
 ring_mp_enqueue_burst(struct ring *r, void *const *obj_table,
-			  unsigned int n, unsigned int *free_space)
+		      unsigned int n, unsigned int *free_space)
 {
 	return __ring_do_enqueue(r, obj_table, n,
-				     RING_QUEUE_VARIABLE, __IS_MP,
-				     free_space);
+				 RING_QUEUE_VARIABLE, __IS_MP, free_space);
 }
 
 /**
@@ -1059,13 +1051,12 @@ ring_mp_enqueue_burst(struct ring *r, void *const *obj_table,
  * @return
  *   - n: Actual number of objects enqueued.
  */
-static __always_inline unsigned
+static_always_inline unsigned
 ring_sp_enqueue_burst(struct ring *r, void *const *obj_table,
-			  unsigned int n, unsigned int *free_space)
+		      unsigned int n, unsigned int *free_space)
 {
 	return __ring_do_enqueue(r, obj_table, n,
-				     RING_QUEUE_VARIABLE, __IS_SP,
-				     free_space);
+				 RING_QUEUE_VARIABLE, __IS_SP, free_space);
 }
 
 /**
@@ -1087,12 +1078,12 @@ ring_sp_enqueue_burst(struct ring *r, void *const *obj_table,
  * @return
  *   - n: Actual number of objects enqueued.
  */
-static __always_inline unsigned
+static_always_inline unsigned
 ring_enqueue_burst(struct ring *r, void *const *obj_table,
-		       unsigned int n, unsigned int *free_space)
+		   unsigned int n, unsigned int *free_space)
 {
 	return __ring_do_enqueue(r, obj_table, n, RING_QUEUE_VARIABLE,
-				     r->prod.single, free_space);
+				 r->prod.single, free_space);
 }
 
 /**
@@ -1115,13 +1106,12 @@ ring_enqueue_burst(struct ring *r, void *const *obj_table,
  * @return
  *   - n: Actual number of objects dequeued, 0 if ring is empty
  */
-static __always_inline unsigned
+static_always_inline unsigned
 ring_mc_dequeue_burst(struct ring *r, void **obj_table,
-			  unsigned int n, unsigned int *available)
+		      unsigned int n, unsigned int *available)
 {
 	return __ring_do_dequeue(r, obj_table, n,
-				     RING_QUEUE_VARIABLE, __IS_MC,
-				     available);
+				 RING_QUEUE_VARIABLE, __IS_MC, available);
 }
 
 /**
@@ -1141,13 +1131,12 @@ ring_mc_dequeue_burst(struct ring *r, void **obj_table,
  * @return
  *   - n: Actual number of objects dequeued, 0 if ring is empty
  */
-static __always_inline unsigned
+static_always_inline unsigned
 ring_sc_dequeue_burst(struct ring *r, void **obj_table,
-			  unsigned int n, unsigned int *available)
+		      unsigned int n, unsigned int *available)
 {
 	return __ring_do_dequeue(r, obj_table, n,
-				     RING_QUEUE_VARIABLE, __IS_SC,
-				     available);
+				 RING_QUEUE_VARIABLE, __IS_SC, available);
 }
 
 /**
@@ -1169,12 +1158,12 @@ ring_sc_dequeue_burst(struct ring *r, void **obj_table,
  * @return
  *   - Number of objects dequeued
  */
-static __always_inline unsigned
+static_always_inline unsigned
 ring_dequeue_burst(struct ring *r, void **obj_table,
-		       unsigned int n, unsigned int *available)
+		   unsigned int n, unsigned int *available)
 {
 	return __ring_do_dequeue(r, obj_table, n,
-				     RING_QUEUE_VARIABLE,
-				     r->cons.single, available);
+				 RING_QUEUE_VARIABLE,
+				 r->cons.single, available);
 }
 #endif

@@ -22,10 +22,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/deepflowio/deepflow/server/libs/datastructure"
-	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/prometheus/prometheus/prompb"
 	. "github.com/smartystreets/goconvey/convey"
+
+	"github.com/deepflowio/deepflow/server/libs/datastructure"
+	"github.com/deepflowio/deepflow/server/querier/config"
 )
 
 type promqlParse struct {
@@ -76,7 +77,7 @@ func TestParseMetric(t *testing.T) {
 			input:  "flow_metrics_vtap_flow_edge_port_rtt_max_1s",
 			output: "flow_metrics_vtap_flow_edge_port_rtt_max_1s",
 			table:  "flow_metrics_vtap_flow_edge_port_rtt_max_1s",
-			alias:  "metrics.%s",
+			alias:  "value as `metrics.%s`",
 			prefix: prefixDeepFlow,
 		},
 		{
@@ -109,7 +110,7 @@ func TestParseMetric(t *testing.T) {
 			input:  "container_memory_usage_bytes",
 			output: "container_memory_usage_bytes",
 			table:  "container_memory_usage_bytes",
-			alias:  "metrics.%s",
+			alias:  "value as `metrics.%s`",
 			prefix: prefixDeepFlow,
 		},
 		{
@@ -284,17 +285,25 @@ func TestPromReaderTransToSQL(t *testing.T) {
 		{
 			hints:    promqlHints{stepMs: 0, aggOp: "", matcher: "demo_cpu_usage_seconds_total"},
 			input:    "demo_cpu_usage_seconds_total",
-			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,metrics.demo_cpu_usage_seconds_total,tag FROM prometheus.demo_cpu_usage_seconds_total WHERE (time >= %d AND time <= %d) ORDER BY time desc LIMIT %s", startS, endS, limit),
+			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,value as `metrics.demo_cpu_usage_seconds_total`,`tag` FROM demo_cpu_usage_seconds_total WHERE (time >= %d AND time <= %d) ORDER BY timestamp desc LIMIT %s", startS, endS, limit),
 			ds:       "",
 			db:       "",
 			hasError: false,
 		},
 		{
-			hints:    promqlHints{stepMs: 0, aggOp: "", matcher: "demo_cpu_usage_seconds_total"},
+			hints:    promqlHints{stepMs: 0, aggOp: "", matcher: "ext_metrics__metrics__prometheus_demo_cpu_usage_seconds_total"},
 			input:    "ext_metrics__metrics__prometheus_demo_cpu_usage_seconds_total",
-			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,metrics.demo_cpu_usage_seconds_total,tag FROM prometheus.demo_cpu_usage_seconds_total WHERE (time >= %d AND time <= %d) ORDER BY time desc LIMIT %s", startS, endS, limit),
+			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,metrics.demo_cpu_usage_seconds_total,`tag` FROM prometheus.demo_cpu_usage_seconds_total WHERE (time >= %d AND time <= %d)  ORDER BY timestamp desc LIMIT %s", startS, endS, limit),
 			ds:       "",
-			db:       "",
+			db:       "ext_metrics",
+			hasError: false,
+		},
+		{
+			hints:    promqlHints{stepMs: 0, aggOp: "", matcher: "prometheus__samples__demo_cpu_usage_seconds_total"},
+			input:    "prometheus__samples__demo_cpu_usage_seconds_total",
+			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,value as `metrics.demo_cpu_usage_seconds_total`,`tag` FROM demo_cpu_usage_seconds_total WHERE (time >= %d AND time <= %d)  ORDER BY timestamp desc LIMIT %s", startS, endS, limit),
+			ds:       "",
+			db:       "prometheus",
 			hasError: false,
 		},
 
@@ -349,7 +358,7 @@ func TestPromReaderTransToSQL(t *testing.T) {
 				},
 			})
 
-			_, sql, db, ds, err := PromReaderTransToSQL(ctx, &prompb.ReadRequest{Queries: queries})
+			_, sql, db, ds, err := promReaderTransToSQL(ctx, &prompb.ReadRequest{Queries: queries})
 
 			if !p.hasError {
 				So(err, ShouldBeNil)

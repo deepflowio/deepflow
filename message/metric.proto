@@ -228,5 +228,6 @@ message ProcEvent {
     uint64 end_time = 6;
     EventType event_type = 7;
     IoEventData io_event_data = 8;
+    uint64 netns_id = 9;
 }
 

@@ -30,13 +30,18 @@ func PrometheusRouter(e *gin.Engine) {
 	// Both SetRate and Acquire are expanded by 1000 times, making it suitable for small QPS scenarios.
 	service.QPSLeakyBucket.Init(uint64(config.Cfg.Prometheus.QPSLimit * 1000))
 
+	// only one instance during server lifetime
+	prometheusService := service.NewPrometheusService()
+
 	// api router for prometheus
-	e.POST("/api/v1/prom/read", promReader())
-	e.GET("/prom/api/v1/query", promQuery())
-	e.GET("/prom/api/v1/query_range", promQueryRange())
-	e.POST("/prom/api/v1/query", promQuery())
-	e.POST("/prom/api/v1/query_range", promQueryRange())
-	e.GET("/prom/api/v1/label/:labelName/values", promTagValuesReader())
-	e.GET("/prom/api/v1/series", promSeriesReader())
-	e.POST("/prom/api/v1/series", promSeriesReader())
+	e.POST("/api/v1/prom/read", promReader(prometheusService))
+	e.GET("/prom/api/v1/query", promQuery(prometheusService))
+	e.GET("/prom/api/v1/query_range", promQueryRange(prometheusService))
+	e.POST("/prom/api/v1/query", promQuery(prometheusService))
+	e.POST("/prom/api/v1/query_range", promQueryRange(prometheusService))
+	e.GET("/prom/api/v1/series", promSeriesReader(prometheusService))
+	e.POST("/prom/api/v1/series", promSeriesReader(prometheusService))
+	e.GET("/prom/api/v1/label/:labelName/values", promTagValuesReader(prometheusService))
+
+	e.GET("/prom/api/v1/analysis", promQLAnalysis(prometheusService))
 }

@@ -222,6 +222,8 @@ pub struct AppProtoLogsBaseInfo {
     pub is_vip_interface_src: bool,
     #[serde(skip)]
     pub is_vip_interface_dst: bool,
+    #[serde(skip)]
+    pub netns_id: u64,
 }
 
 pub fn duration_to_micros<S>(d: &Duration, serializer: S) -> Result<S::Ok, S::Error>
@@ -301,6 +303,7 @@ impl From<AppProtoLogsBaseInfo> for flow_log::AppProtoLogsBaseInfo {
             syscall_cap_seq_1: f.syscall_cap_seq_1 as u32,
             gpid_0: f.gpid_0,
             gpid_1: f.gpid_1,
+            netns_id: f.netns_id,
         }
     }
 }
