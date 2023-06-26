@@ -34,6 +34,8 @@
 #include <bcc/bcc_proc.h>
 #include <bcc/bcc_elf.h>
 #include <bcc/bcc_syms.h>
+#include <dirent.h>		// for opendir()
+#include "config.h"
 #include "log.h"
 #include "common.h"
 #include "symbol.h"
@@ -203,7 +205,7 @@ out:
 // https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/RET--Return-from-subroutine-
 static int is_a64_ret_ins(unsigned int code)
 {
-        return (code & 0xfffffc1f) == 0xd65f0000;
+	return (code & 0xfffffc1f) == 0xd65f0000;
 }
 
 static void resolve_func_ret_addr(struct symbol_uprobe *uprobe_sym)
@@ -230,9 +232,8 @@ static void resolve_func_ret_addr(struct symbol_uprobe *uprobe_sym)
 		goto free_buffer;
 
 	memset(uprobe_sym->rets, 0, sizeof(uprobe_sym->rets));
-	while (cnt < FUNC_RET_MAX &&
-	       offset <= uprobe_sym->size - ARM64_INS_LEN) {
-		code = *(uint32_t *)(buffer + offset);
+	while (cnt < FUNC_RET_MAX && offset <= uprobe_sym->size - ARM64_INS_LEN) {
+		code = *(uint32_t *) (buffer + offset);
 		if (is_a64_ret_ins(code)) {
 			uprobe_sym->rets[cnt++] = uprobe_sym->entry + offset;
 		}
@@ -326,8 +327,7 @@ struct symbol_uprobe *resolve_and_gen_uprobe_symbol(const char *bin_file,
 		error = bcc_elf_foreach_sym(uprobe_sym->binary_path, find_sym,
 					    &default_option, uprobe_sym);
 
-		if (!is_feature_enabled(FEATURE_UPROBE_GOLANG_SYMBOL) &&
-		    error) {
+		if (!is_feature_enabled(FEATURE_UPROBE_GOLANG_SYMBOL) && error) {
 			goto invalid;
 		}
 	}
@@ -336,7 +336,7 @@ struct symbol_uprobe *resolve_and_gen_uprobe_symbol(const char *bin_file,
 	// not be 0. try GoReSym
 	if (uprobe_sym->name && uprobe_sym->entry == 0x0 &&
 	    is_feature_matched(FEATURE_UPROBE_GOLANG_SYMBOL,
-					       uprobe_sym->binary_path)) {
+			       uprobe_sym->binary_path)) {
 		struct function_address_return func = {};
 		func = function_address((char *)uprobe_sym->binary_path,
 					(char *)uprobe_sym->name);
@@ -445,8 +445,7 @@ uint64_t get_symbol_addr_from_binary(const char *bin, const char *symname)
 
 	bcc_elf_foreach_sym(bin, find_sym, &default_option, &tmp);
 
-	if (!tmp.entry && is_feature_matched(
-				  FEATURE_UPROBE_GOLANG_SYMBOL, bin)) {
+	if (!tmp.entry && is_feature_matched(FEATURE_UPROBE_GOLANG_SYMBOL, bin)) {
 		// The function address is used to set the hook point.
 		// itab is used for http2 to obtain fd. Currently only
 		// net_TCPConn_itab can be obtained for HTTPS.
@@ -456,3 +455,349 @@ uint64_t get_symbol_addr_from_binary(const char *bin, const char *symname)
 	ebpf_info("Uprobe [%s] %s: %p\n", bin, symname, tmp.entry);
 	return tmp.entry;
 }
+
+#ifndef AARCH64_MUSL
+static symbol_caches_hash_t syms_cache_hash;	// for user process symbol caches
+static void *k_resolver;		// for kernel symbol cache
+static u64 sys_btime_msecs;		// system boot time(milliseconds)
+
+static bool inline enable_symbol_cache(void)
+{
+	return (syms_cache_hash.buckets != NULL);
+}
+
+static inline void free_symbolizer_cache_kvp(struct symbolizer_cache_kvp *kv)
+{
+	if (kv->v.cache)
+		bcc_free_symcache((void *)kv->v.cache, kv->k.pid);
+
+	if (kv->v.proc_info_p)
+		clib_mem_free((void *)kv->v.proc_info_p);
+}
+
+/* pid : The process ID (PID) that occurs when a process exits. */
+void update_symbol_cache(pid_t pid)
+{
+	if (!enable_symbol_cache())
+		return;
+
+	symbol_caches_hash_t *h = &syms_cache_hash;	
+	struct symbolizer_cache_kvp kv;
+	kv.k.pid = (u64) pid;
+	kv.v.proc_info_p = 0;
+	kv.v.cache = 0;
+	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *)&kv,
+				      (symbol_caches_hash_kv *)&kv) == 0) {
+		if (kv.v.cache != 0) {
+			free_symbolizer_cache_kvp(&kv);
+		}
+
+		if (symbol_caches_hash_add_del(h, (symbol_caches_hash_kv *) &kv,
+					       0 /* delete */ )) {
+			ebpf_warning("symbol_caches_hash_add_del() failed.(pid %d)\n",
+				     pid);
+		} else
+			__sync_fetch_and_add(&h->hash_elems_count, -1);
+	}
+}
+
+static int init_symbol_cache(const char *name)
+{
+	symbol_caches_hash_t *h = &syms_cache_hash;
+	memset(h, 0, sizeof(*h));
+	u32 nbuckets = SYMBOLIZER_CACHES_HASH_BUCKETS_NUM;
+	u64 hash_memory_size = SYMBOLIZER_CACHES_HASH_MEM_SZ;	// 2G bytes
+	return symbol_caches_hash_init(h, (char *)name, nbuckets,
+				       hash_memory_size);
+}
+
+/*
+ * Called by get_pid_stime() and get_pid_stime_and_name(),
+ * use for fetching pid start time or process name only.
+ */
+static void add_proc_info_to_cache_hash(pid_t pid)
+{
+	ASSERT(pid >= 0);
+
+	symbol_caches_hash_t *h = &syms_cache_hash;
+	struct symbolizer_cache_kvp kv;
+	kv.k.pid = (u64) pid;
+	kv.k.pid = pid;
+	struct symbolizer_proc_info *p = clib_mem_alloc_aligned("sym_proc_info",
+						sizeof(struct symbolizer_proc_info),
+						0, NULL);
+	if (p == NULL) {
+		/* exit process */
+		ebpf_warning("Failed to build process information table.\n");
+		return;
+	}
+
+	p->stime = (u64) get_process_starttime_and_comm(pid,
+							p->comm,
+							sizeof(p->comm));
+	p->comm[sizeof(p->comm) - 1] = '\0';
+	if (p->stime == 0) {
+		clib_mem_free(p);
+		return;
+	}
+
+	kv.v.proc_info_p = pointer_to_uword(p);
+	/*
+	 * This is not meant for parsing, but rather for adding
+	 * process information to management, such as obtaining
+	 * the process's startup time or process name. The most
+	 * typical usage is for kernel processes (where all
+	 * kernel processes share the same kernel symbol cache),
+	 * without the need to establish a separate cache for
+	 * each kernel process.
+	 */
+	kv.v.cache = 0;
+	if (symbol_caches_hash_add_del
+	    (h, (symbol_caches_hash_kv *) & kv, 1 /* is_add */ )) {
+		ebpf_warning
+		    ("symbol_caches_hash_add_del() failed.(pid %d)\n", pid);
+		free_symbolizer_cache_kvp(&kv);
+	} else
+		__sync_fetch_and_add(&h->hash_elems_count, 1);
+}
+
+u64 get_pid_stime(pid_t pid)
+{
+	ASSERT(pid >= 0);
+
+	symbol_caches_hash_t *h = &syms_cache_hash;
+	struct symbolizer_cache_kvp kv;
+
+	if (pid == 0)
+		return sys_btime_msecs;
+
+	bool is_retry = true;
+retry:
+	kv.k.pid = (u64) pid;
+	kv.v.proc_info_p = 0;
+	kv.v.cache = 0;
+	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
+				      (symbol_caches_hash_kv *) & kv) == 0) {
+		return cache_process_stime(&kv);
+	}
+
+	if (is_retry) {
+		add_proc_info_to_cache_hash(pid);
+		is_retry = false;
+		goto retry;
+	}
+
+	return 0;
+}
+
+u64 get_pid_stime_and_name(pid_t pid, char *name)
+{
+	ASSERT(pid >= 0);
+
+	symbol_caches_hash_t *h = &syms_cache_hash;
+	struct symbolizer_cache_kvp kv;
+
+	if (pid == 0)
+		return sys_btime_msecs;
+
+	bool is_retry = true;
+retry:
+	kv.k.pid = (u64) pid;
+	kv.v.proc_info_p = 0;
+	kv.v.cache = 0;
+	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
+				      (symbol_caches_hash_kv *) & kv) == 0) {
+		if (name != NULL)
+			copy_process_name(&kv, name);
+
+		return cache_process_stime(&kv);
+	}
+
+	if (is_retry) {
+		add_proc_info_to_cache_hash(pid);
+		is_retry = false;
+		goto retry;
+	}
+
+	return 0;
+}
+
+/*
+ * Cache for obtaining symbol information of the binary
+ * executable corresponding to a PID, and rebuilding it
+ * if the cache does not exist.
+ *
+ * Only used for parsing stack trace data in kernel space
+ * and user space. If it is a kernel space stack trace
+ * (k_stack_trace_id), the PID is always 0. If it is a
+ * user space stack trace (u_stack_trace_id), the PID is
+ * the PID of the user process.
+ */
+void *get_symbol_cache(pid_t pid)
+{
+	ASSERT(pid >= 0);
+
+	static struct bcc_symbol_option lazy_opt = {
+		.use_debug_file = false,
+		.check_debug_file_crc = false,
+		.lazy_symbolize = true,
+		.use_symbol_type = ((1 << STT_FUNC) | (1 << STT_GNU_IFUNC)),
+	};
+
+	if (k_resolver == NULL && pid == 0) {
+		k_resolver = (void *)bcc_symcache_new(-1, &lazy_opt);
+		sys_btime_msecs = get_sys_btime_msecs();
+	}
+
+	if (pid == 0)
+		return k_resolver;
+
+	symbol_caches_hash_t *h = &syms_cache_hash;
+	struct symbolizer_cache_kvp kv;
+	kv.k.pid = (u64) pid;
+	kv.v.proc_info_p = 0;
+	kv.v.cache = 0;
+	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
+				      (symbol_caches_hash_kv *) & kv) == 0) {
+		if (kv.v.cache)
+			return (void *)kv.v.cache;
+		kv.v.cache = pointer_to_uword(bcc_symcache_new(pid, &lazy_opt));
+		if (symbol_caches_hash_add_del
+		    (h, (symbol_caches_hash_kv *) & kv, 1 /* is_add */ )) {
+			ebpf_warning
+			    ("symbol_caches_hash_add_del() failed.(pid %d)\n",
+			     pid);
+			free_symbolizer_cache_kvp(&kv);
+			return NULL;
+		}
+
+		return (void *)kv.v.cache;
+	}
+
+	kv.k.pid = pid;
+	struct symbolizer_proc_info *p = clib_mem_alloc_aligned("sym_proc_info",
+						sizeof(struct symbolizer_proc_info),
+						0, NULL);
+	if (p == NULL) {
+		/* exit process */
+		ebpf_warning("Failed to build process information table.\n");
+		return NULL;
+	}
+
+	p->stime = (u64) get_process_starttime_and_comm(pid,
+							p->comm,
+							sizeof(p->comm));
+	p->comm[sizeof(p->comm) - 1] = '\0';
+	if (p->stime == 0) {
+		clib_mem_free(p);
+		return NULL;
+	}
+
+	kv.v.proc_info_p = pointer_to_uword(p);
+	kv.v.cache = pointer_to_uword(bcc_symcache_new(pid, &lazy_opt));
+	if (symbol_caches_hash_add_del
+	    (h, (symbol_caches_hash_kv *) & kv, 1 /* is_add */ )) {
+		ebpf_warning
+		    ("symbol_caches_hash_add_del() failed.(pid %d)\n", pid);
+		free_symbolizer_cache_kvp(&kv);
+		return NULL;
+	} else
+		__sync_fetch_and_add(&h->hash_elems_count, 1);
+
+	return (void *)kv.v.cache;
+}
+
+int create_and_init_symbolizer_caches(void)
+{
+	init_symbol_cache("symbolizer-caches");
+	struct dirent *entry = NULL;
+	DIR *fddir = NULL;
+
+	fddir = opendir("/proc/");
+	if (fddir == NULL) {
+		ebpf_warning("Failed to open %s.\n");
+		return ETR_PROC_FAIL;
+	}
+
+	pid_t pid;
+	symbol_caches_hash_t *h = &syms_cache_hash;
+	while ((entry = readdir(fddir)) != NULL) {
+		pid = atoi(entry->d_name);
+		if (entry->d_type == DT_DIR && pid > 0 && is_process(pid)) {
+			struct symbolizer_cache_kvp sym;
+			sym.k.pid = pid;
+
+			struct symbolizer_proc_info *p = clib_mem_alloc_aligned("sym_proc_info",
+							sizeof(struct symbolizer_proc_info),
+							0, NULL);
+			if (p == NULL) {
+				/* exit process */
+				ebpf_error("Failed to build process information table.\n");
+				return ETR_NOMEM;
+			}
+
+			p->stime = (u64) get_process_starttime_and_comm(pid, p->comm,
+									sizeof(p->comm));
+			p->comm[sizeof(p->comm) - 1] = '\0';
+			if (p->stime == 0) {
+				clib_mem_free(p);
+				continue;
+			}
+
+			sym.v.proc_info_p = pointer_to_uword(p);
+			sym.v.cache = 0;
+			if (symbol_caches_hash_add_del
+			    (h, (symbol_caches_hash_kv *) & sym,
+			     1 /* is_add */ )) {
+				ebpf_warning
+				    ("symbol_caches_hash_add_del() failed.(pid %d)\n",
+				     pid);
+			} else {
+				ebpf_debug("Process '%s'(pid %d start time %lu) has been"
+					   " brought under management.\n",
+					   p->comm, pid, p->stime);
+				__sync_fetch_and_add(&h->hash_elems_count, 1);
+			}
+		}
+	}
+
+	closedir(fddir);
+	return ETR_OK;
+}
+
+static int free_symbolizer_kvp_cb(symbol_caches_hash_kv * kv, void *ctx)
+{
+	struct symbolizer_cache_kvp *sym = (struct symbolizer_cache_kvp *)kv;
+	free_symbolizer_cache_kvp(sym);
+	(*(u64 *) ctx)++;
+	return BIHASH_WALK_CONTINUE;
+}
+
+void release_symbol_caches(void)
+{
+	/* user symbol caches release */
+	u64 elems_count = 0;
+	symbol_caches_hash_t *h = &syms_cache_hash;
+	ebpf_info("Release symbol_caches %lu elements\n", h->hash_elems_count);
+
+	symbol_caches_hash_foreach_key_value_pair(h, free_symbolizer_kvp_cb,
+						  (void *)&elems_count);
+	print_hash_symbol_caches(h);
+	symbol_caches_hash_free(h);
+	ebpf_info("Clear symbol_caches_hashmap[k:pid, v:symbol cache] %lu elems.\n",
+		  elems_count);
+
+	/* kernel symbol caches release */
+	if (k_resolver) {
+		bcc_free_symcache(k_resolver, -1);
+		k_resolver = NULL;
+	}
+}
+
+#else /* defined AARCH64_MUSL */
+/* pid : The process ID (PID) that occurs when a process exits. */
+void update_symbol_cache(pid_t pid)
+{
+	return;
+}
+#endif /* AARCH64_MUSL */

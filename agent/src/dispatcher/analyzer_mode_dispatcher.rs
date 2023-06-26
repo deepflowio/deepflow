@@ -221,7 +221,7 @@ impl AnalyzerModeDispatcher {
     fn run_flow_generator(
         &mut self,
         receiver: Receiver<Packet>,
-        sender: DebugSender<(TapType, MetaPacket<'static>)>,
+        sender: DebugSender<(TapType, MiniPacket<'static>)>,
     ) {
         let base = &self.base;
 
@@ -353,7 +353,7 @@ impl AnalyzerModeDispatcher {
                             let mut meta_packet = MetaPacket::empty();
                             meta_packet.tap_port = tap_port;
                             let offset = Duration::ZERO;
-                            if let Err(e) = meta_packet.update_with_raw_copy(
+                            if let Err(e) = meta_packet.update(
                                 overlay_packet,
                                 src_local,
                                 dst_local,
@@ -384,7 +384,9 @@ impl AnalyzerModeDispatcher {
                                 npb_dedup_enabled.load(Ordering::Relaxed),
                             );
                             flow_map.inject_meta_packet(&config, &mut meta_packet);
-                            output_batch.push((tap_type, meta_packet));
+                            let mini_packet =
+                                MiniPacket::new(meta_packet.raw.take().unwrap(), &meta_packet);
+                            output_batch.push((tap_type, mini_packet));
                         }
                         if let Err(e) = sender.send_all(&mut output_batch) {
                             debug!(
@@ -404,7 +406,7 @@ impl AnalyzerModeDispatcher {
     // 2. NPB/PCAP/...
     fn run_additional_packet_pipeline(
         &mut self,
-        receiver: Receiver<(TapType, MetaPacket<'static>)>,
+        receiver: Receiver<(TapType, MiniPacket<'static>)>,
     ) {
         let base = &self.base;
         let terminated = base.terminated.clone();
@@ -425,7 +427,7 @@ impl AnalyzerModeDispatcher {
                             Err(queue::Error::BatchTooLarge(_)) => unreachable!(),
                         }
 
-                        for (tap_type, meta_packet) in batch.drain(..) {
+                        for (tap_type, mini_packet) in batch.drain(..) {
                             let pipeline = match tap_pipelines.get_mut(&tap_type) {
                                 None => {
                                     // ff : ff : ff : ff : DispatcherID : TapType(1-255)
@@ -451,10 +453,6 @@ impl AnalyzerModeDispatcher {
                                 Some(p) => p,
                             };
 
-                            let mini_packet = MiniPacket::new(
-                                meta_packet.raw.as_ref().unwrap().as_ref(),
-                                &meta_packet,
-                            );
                             for i in pipeline.handlers.iter_mut() {
                                 i.handle(&mini_packet);
                             }

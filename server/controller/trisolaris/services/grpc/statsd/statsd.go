@@ -75,6 +75,7 @@ const (
 	KubernetesAPISync
 	PrometheusAPISync
 	GPIDSync
+	GetPrometheusLabelIDs
 	MaxApiType
 )
 
@@ -87,6 +88,7 @@ var ApiTypeToName = map[ApiType]string{
 	GenesisSync:            "GenesisSync",
 	KubernetesAPISync:      "KubernetesAPISync",
 	PrometheusAPISync:      "PrometheusAPISync",
+	GetPrometheusLabelIDs:  "GetPrometheusLabelIDs",
 	GPIDSync:               "GPIDSync",
 }
 
@@ -121,6 +123,10 @@ func Start() {
 	}
 
 	err := stats.RegisterCountableWithModulePrefix("controller.", "trisolaris", gpidCounter, stats.OptionStatTags{"grpc_type": "GPIDCount"})
+	if err != nil {
+		log.Error(err)
+	}
+	err = stats.RegisterCountableWithModulePrefix("controller.", "trisolaris", GetPrometheusLabelIDsCounterSingleton(), stats.OptionStatTags{"grpc_type": "GetPrometheusLabelIDsDetail"})
 	if err != nil {
 		log.Error(err)
 	}

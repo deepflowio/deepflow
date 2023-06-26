@@ -19,55 +19,67 @@ package encoder
 import (
 	"sync"
 
+	mapset "github.com/deckarep/golang-set/v2"
+
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/cache"
 )
 
 type metricLabel struct {
+	lock                  sync.Mutex
 	resourceType          string
 	label                 *label
-	metricLabelDetailKeys sync.Map
+	metricLabelDetailKeys mapset.Set[cache.MetricLabelDetailKey]
 }
 
 func newMetricLabel(l *label) *metricLabel {
 	return &metricLabel{
-		resourceType: "metric_label",
-		label:        l,
+		resourceType:          "metric_label",
+		label:                 l,
+		metricLabelDetailKeys: mapset.NewSet[cache.MetricLabelDetailKey](),
 	}
 }
 
 func (ml *metricLabel) store(item *mysql.PrometheusMetricLabel) {
 	if labelKey, ok := ml.label.getKey(item.LabelID); ok {
-		ml.metricLabelDetailKeys.Store(cache.NewMetricLabelDetailKey(item.MetricName, labelKey.Name, labelKey.Value), item.LabelID)
+		ml.metricLabelDetailKeys.Add(cache.NewMetricLabelDetailKey(item.MetricName, labelKey.Name, labelKey.Value))
 	}
 }
 
 func (ml *metricLabel) refresh(args ...interface{}) error {
-	var ls []*mysql.PrometheusMetricLabel
-	err := mysql.Db.Find(&ls).Error
+	var items []*mysql.PrometheusMetricLabel
+	err := mysql.Db.Find(&items).Error
 	if err != nil {
 		return err
 	}
-	for _, item := range ls {
+	for _, item := range items {
 		ml.store(item)
 	}
 	return nil
 }
 
 func (ml *metricLabel) encode(rMLs []*controller.PrometheusMetricLabelRequest) error {
+	ml.lock.Lock()
+	defer ml.lock.Unlock()
+
 	var dbToAdd []*mysql.PrometheusMetricLabel
 	for _, rML := range rMLs {
 		mn := rML.GetMetricName()
 		for _, l := range rML.GetLabels() {
 			ln := l.GetName()
 			lv := l.GetValue()
+			if ok := ml.metricLabelDetailKeys.Contains(cache.NewMetricLabelDetailKey(mn, ln, lv)); ok {
+				continue
+			}
 			if li, ok := ml.label.getID(cache.NewLabelKey(ln, lv)); ok {
 				dbToAdd = append(dbToAdd, &mysql.PrometheusMetricLabel{
 					MetricName: mn,
 					LabelID:    li,
 				})
+				continue
 			}
+			log.Warningf("%s label_id (name: %s, value: %s) not found", ml.resourceType, ln, lv)
 		}
 	}
 	err := addBatch(dbToAdd, ml.resourceType)

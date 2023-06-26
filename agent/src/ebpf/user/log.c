@@ -40,7 +40,7 @@ void os_exit(int code)
 	exit(code);
 }
 
-void os_puts(char *string, uint32_t string_length, bool is_stdout)
+void os_puts(FILE *stream, char *string, uint32_t string_length, bool is_stdout)
 {
 	int fd;
 	struct iovec iovs[2];
@@ -53,10 +53,10 @@ void os_puts(char *string, uint32_t string_length, bool is_stdout)
 	if (is_stdout)
 		writev(1, iovs, n_iovs);
 
-	if (!log_stream)
+	if (!stream)
 		return;
 
-	fd = fileno(log_stream);
+	fd = fileno(stream);
 	writev(fd, iovs, n_iovs);
 }
 
@@ -76,9 +76,9 @@ static char *dispatch_message(char *msg, uint16_t len)
 		return msg;
 
 	if (log_to_stdout)
-		os_puts(msg, len, true);
+		os_puts(log_stream, msg, len, true);
 	else
-		os_puts(msg, len, false);
+		os_puts(log_stream, msg, len, false);
 
 	return msg;
 }
@@ -98,13 +98,13 @@ void _ebpf_error(int how_to_die, char *function_name, char *file_path,
 	if (function_name) {
 		if (how_to_die & ERROR_WARNING) {
 			len += snprintf(msg + len, max - len,
-					"%d-%02d-%02d %02d:%02d:%02d \033[0;35m[eBPF] ",
+					"%d-%02d-%02d %02d:%02d:%02d \033[33;1m[eBPF] ",
 					(1900 + p->tm_year), (1 + p->tm_mon), p->tm_mday,
 					p->tm_hour, p->tm_min, p->tm_sec);
 			len += snprintf(msg + len, max - len, "WARNING: func %s()", function_name);
 		} else {
 			len += snprintf(msg + len, max - len,
-					"%d-%02d-%02d %02d:%02d:%02d \033[0;31m[eBPF] ",
+					"%d-%02d-%02d %02d:%02d:%02d \033[41;37m[eBPF] ",
 					(1900 + p->tm_year), (1 + p->tm_mon), p->tm_mday,
 					p->tm_hour, p->tm_min, p->tm_sec);
 			len += snprintf(msg + len, max - len, "ERROR: func %s()", function_name);

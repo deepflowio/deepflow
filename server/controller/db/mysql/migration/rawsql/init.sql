@@ -44,7 +44,8 @@ CREATE TABLE IF NOT EXISTS domain_additional_resource (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     domain              CHAR(64) DEFAULT '',
     content             LONGTEXT,
-    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    compressed_content  LONGBLOB
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE domain_additional_resource;
 
@@ -2345,6 +2346,7 @@ CREATE TABLE IF NOT EXISTS kubernetes_cluster (
     id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     cluster_id              VARCHAR(256) NOT NULL ,
     value                   VARCHAR(256) NOT NULL,
+    updated_time            DATETIME DEFAULT NULL,
     created_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     synced_at               DATETIME DEFAULT NULL,
     unique (cluster_id)

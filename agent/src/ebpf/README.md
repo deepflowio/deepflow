@@ -123,7 +123,7 @@ end
     running_socket_tracer-2 --> running_socket_tracer-2-2(4.2.2 collect_go_uprobe_syms_from_procfs)
     running_socket_tracer-2 --> running_socket_tracer-2-3(4.2.3 collect_ssl_uprobe_syms_from_procfs)
     running_socket_tracer --> running_socket_tracer-3(4.3 extra events list init) -.- running_socket_tracer-3-i([process exec/exit event snoop])
-    running_socket_tracer --> running_socket_tracer-6(4.4 create_bpf_tracer)
+    running_socket_tracer --> running_socket_tracer-6(4.4 setup_bpf_tracer)
 
     running_socket_tracer --> running_socket_tracer-4(4.5 maps_config)-.-running_socket_tracer-4-i([set socket/trace map entries count])
     running_socket_tracer --> running_socket_tracer-5(4.6 set perf buffer reader callback) 
@@ -136,7 +136,7 @@ end
     running_socket_tracer-11-.->|store uprobe offsets for the executable file|proc_info_map[(proc_info_map)]
     running_socket_tracer --> running_socket_tracer-12(4.12 update_protocol_filter_array)
     running_socket_tracer --> running_socket_tracer-13(4.13 tracer_hooks_attach) -.-running_socket_tracer-13-i([attach all probes])
-    running_socket_tracer --> running_socket_tracer-14(4.14 perf_map_init) -.- running_socket_tracer-14-i([set perf buffer reader share memory])
+    running_socket_tracer --> running_socket_tracer-14(4.14 perf_map_config) -.- running_socket_tracer-14-i([set perf buffer reader share memory])
     running_socket_tracer --> running_socket_tracer-15(4.15 set trace uid) -.- running_socket_tracer-15-i([use for socketID,traceID,capSeq])
     running_socket_tracer-15 -.-> |Prepare various UIDs to map|trace_conf_map[(trace_conf_map)]
     running_socket_tracer --> running_socket_tracer-16(4.16 dispatch_worker) -.- running_socket_tracer-16-i([userspace receive and distribute eBPF data to work queue initialization])
@@ -258,11 +258,11 @@ end
     style worker_1  fill:#fff,color:#000,stroke:#000,stroke-width:2px
     style worker_2  fill:#fff,color:#000,stroke:#000,stroke-width:2px
     style perf_reader_poll fill:#ccff,color:#000, stroke-width:2px
-    style process_datas fill:#ccff,color:#000, stroke-width:2px
+    style process_data fill:#ccff,color:#000, stroke-width:2px
     style reader_raw_cb fill:#ccff,color:#000, stroke-width:2px
     style register_events_handle fill:#ccff,color:#000, stroke-width:2px
     style dispatch_queue_index fill:#ccff,color:#000, stroke-width:2px
-    style prefetch_and_process_datas fill:#ccff,color:#000, stroke-width:2px
+    style prefetch_and_process_data fill:#ccff,color:#000, stroke-width:2px
     style rust_callback stroke-width:2px
     style free stroke-width:2px
 
@@ -271,18 +271,18 @@ end
     reader_raw_cb-->|4|dispatch_queue_index(5 dispatch_queue_index)
     reader_raw_cb-->|5|copy_data_and_enqueue(6 Copy socket data and enqueue)
     subgraph Copy socket data and enqueue
-    id0((data))-->|ring_sp_enqueue_burst|ring0{{ -- queue 0 -- }}-.-worker>worker thread-1] --- process_datas(7 process_datas)
-    id1((data))-->|ring_sp_enqueue_burst|ring1{{ -- queue 1 -- }}-.-worker_1>worker thread-2] --- process_datas
-    idn((data))-->|ring_sp_enqueue_burst|ring2{{ -- queue n -- }}-.-worker_2>worker thread-n] --- process_datas
+    id0((data))-->|ring_sp_enqueue_burst|ring0{{ -- queue 0 -- }}-.-worker>worker thread-1] --- process_data(7 process_data)
+    id1((data))-->|ring_sp_enqueue_burst|ring1{{ -- queue 1 -- }}-.-worker_1>worker thread-2] --- process_data
+    idn((data))-->|ring_sp_enqueue_burst|ring2{{ -- queue n -- }}-.-worker_2>worker thread-n] --- process_data
     end
     copy_data_and_enqueue---|6|id0
-    copy_data_and_enqueue-->|7 wakeup worker threads|process_datas
-    process_datas-->|ring_sc_dequeue_burst|prefetch_and_process_datas(8 prefetch_and_process_datas)
-    prefetch_and_process_datas-->rust_callback(9 Call rust callback func)
+    copy_data_and_enqueue-->|7 wakeup worker threads|process_data
+    process_data-->|ring_sc_dequeue_burst|prefetch_and_process_data(8 prefetch_and_process_data)
+    prefetch_and_process_data-->rust_callback(9 Call rust callback func)
     rust_callback-->free(free data)
 
     copy_data_and_enqueue-->|8 loop|poller
-    free-->|loop|process_datas
+    free-->|loop|process_data
 ```
 
 ## Uprobe userspace boot
@@ -363,7 +363,7 @@ end
 
 ## Probes management
 
-For all probes we provide two APIs(tracer_start()/tracer_stop()) to enable/disable probes, it will attach/detach all probes.
+For all probes we provide two APIs(socket_tracer_start()/socket_tracer_stop()) to enable/disable probes, it will attach/detach all probes.
 
 ### Uprobes monitor
 

@@ -18,6 +18,8 @@ package datatype
 
 import (
 	"fmt"
+	"strings"
+	"unicode"
 
 	"github.com/deepflowio/deepflow/server/libs/datatype/pb"
 	"github.com/deepflowio/deepflow/server/libs/pool"
@@ -92,10 +94,45 @@ func (i *MysqlInfo) String() string {
 	return fmt.Sprintf("%#v", i)
 }
 
+func TrimCommand(sql string, commandMaxLength int) string {
+	index := 0
+	if len(sql) > 2 && sql[:2] == "/*" {
+		index = strings.LastIndex(sql, "*/")
+		if index < 0 {
+			return ""
+		}
+		index += 2
+	}
+	subSql := sql[index:]
+	i := 0
+	start := -1
+	for ; i < commandMaxLength && i < len(subSql); i++ {
+		if start == -1 && subSql[i] == ' ' {
+			commandMaxLength += 1
+			continue
+		}
+		if !unicode.IsLetter(rune(subSql[i])) {
+			if start == -1 {
+				return ""
+			}
+			return strings.ToUpper(subSql[start:i])
+		}
+		if start == -1 {
+			start = i
+		}
+	}
+	return strings.ToUpper(subSql[start:i])
+}
+
 func (i *MysqlInfo) Merge(r interface{}) {
 	if response, ok := r.(*MysqlInfo); ok {
 		i.ResponseCode = response.ResponseCode
-		i.AffectedRows = response.AffectedRows
+		if i.Command == COM_QUERY && len(i.Context) > 0 {
+			command := TrimCommand(i.Context, 8)
+			if command == "INSERT" || command == "UPDATE" || command == "DELETE" {
+				i.AffectedRows = response.AffectedRows
+			}
+		}
 		i.ErrorCode = response.ErrorCode
 		i.ErrorMessage = response.ErrorMessage
 	}

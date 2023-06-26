@@ -1,17 +1,22 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * This code runs using bpf in the Linux kernel.
+ * Copyright 2022- The Yunshan Networks Authors.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #ifndef DF_TASK_STRUCT_UTILS_H
@@ -44,6 +49,35 @@ get_socket_file_addr_with_check(struct task_struct *task,
 		return NULL;
 
 	struct fdtable *fdt, __fdt;
+
+	/*
+	 * Here, we consider the Kylin operating system in China,
+	 * for which we have separately compiled a BPF bytecode
+	 * that is compatible with a kernel version lower than 5.2.
+	 * In KYLIN, the value of STRUCT_FILES_PRIVATE_DATA_OFFSET
+	 * is different from other systems:
+	 *
+	 * #ifdef LINUX_VER_KYLIN
+	 * #define STRUCT_FILES_PRIVATE_DATA_OFFSET 0xc0
+	 * #else
+	 * #define STRUCT_FILES_PRIVATE_DATA_OFFSET 0xc8
+	 * #endif
+	 *
+	 * This approach is mainly designed to accommodate this sp-
+	 * ecific system (and there may be other system differences
+	 * in the future).
+	 *
+	 * For kernel versions 5.2 and above, which support BTF, we
+	 * don't need to consider kernel compatibility issues in this
+	 * section. As a general rule, for kernel versions 5.2 and
+	 * above, the BTF feature should be enabled to avoid any com-
+	 * patibility issues.
+	 *
+	 * Apart from the mentioned special offsets for systems like
+	 * Kylin, currently, all feature offsets are written to the
+	 * eBPF map, using a unified approach of both manual inference
+	 * and BTF.
+	 */
 #ifdef LINUX_VER_5_2_PLUS
 	bpf_probe_read(&fdt, sizeof(fdt),
 		       files + offset->struct_files_struct_fdt_offset);

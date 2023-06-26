@@ -37,14 +37,14 @@ func NewMetricLabelDetailKey(metricName, labelName, labelValue string) MetricLab
 }
 
 type metricLabel struct {
-	LabelCache            *label
+	labelCache            *label
 	metricLabelDetailKeys mapset.Set[MetricLabelDetailKey] // for metric_label check
 	metricNameToLabelIDs  map[string][]int                 // only for fully assembled
 }
 
 func newMetricLabel(l *label) *metricLabel {
 	return &metricLabel{
-		LabelCache:            l,
+		labelCache:            l,
 		metricLabelDetailKeys: mapset.NewSet[MetricLabelDetailKey](),
 		metricNameToLabelIDs:  make(map[string][]int),
 	}
@@ -58,7 +58,7 @@ func (ml *metricLabel) GetLabelsByMetricName(metricName string) []LabelKey {
 	var ret []LabelKey
 	if labelIDs, ok := ml.metricNameToLabelIDs[metricName]; ok {
 		for _, labelID := range labelIDs {
-			if labelKey, ok := ml.LabelCache.GetKeyByID(labelID); ok {
+			if labelKey, ok := ml.labelCache.GetKeyByID(labelID); ok {
 				ret = append(ret, labelKey)
 			}
 		}
@@ -77,19 +77,16 @@ func (ml *metricLabel) refresh(args ...interface{}) error {
 	if err != nil {
 		return err
 	}
-	fully := args[0].(bool)
+	metricNameToLabelIDs := make(map[string][]int)
 	for _, item := range metricLabels {
-		if fully {
-			if _, ok := ml.LabelCache.GetKeyByID(item.LabelID); ok {
-				ml.metricNameToLabelIDs[item.MetricName] = append(ml.metricNameToLabelIDs[item.MetricName], item.LabelID)
-			}
-			continue
-		}
-		if lk, ok := ml.LabelCache.GetKeyByID(item.LabelID); ok {
+		if lk, ok := ml.labelCache.GetKeyByID(item.LabelID); ok {
 			ml.metricLabelDetailKeys.Add(NewMetricLabelDetailKey(item.MetricName, lk.Name, lk.Value))
 		}
-
+		if _, ok := ml.labelCache.GetKeyByID(item.LabelID); ok {
+			metricNameToLabelIDs[item.MetricName] = append(metricNameToLabelIDs[item.MetricName], item.LabelID)
+		}
 	}
+	ml.metricNameToLabelIDs = metricNameToLabelIDs
 	return nil
 }
 
@@ -97,8 +94,4 @@ func (ml *metricLabel) load() ([]*mysql.PrometheusMetricLabel, error) {
 	var metricLabels []*mysql.PrometheusMetricLabel
 	err := mysql.Db.Find(&metricLabels).Error
 	return metricLabels, err
-}
-
-func (ml *metricLabel) clear() {
-	ml.metricNameToLabelIDs = make(map[string][]int)
 }

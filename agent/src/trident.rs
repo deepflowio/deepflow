@@ -504,7 +504,7 @@ impl Trident {
                 }
                 State::Terminated => {
                     if let Some(mut c) = components {
-                        c.stop();
+                        c.stop(false);
                         guard.stop();
                         monitor.stop();
                         platform_synchronizer.stop();
@@ -521,7 +521,7 @@ impl Trident {
                 }
                 State::Disabled(config) => {
                     if let Some(ref mut c) = components {
-                        c.stop();
+                        c.stop(true);
                     }
                     if let Some(c) = config.take() {
                         config_handler.on_config(c, &exception_handler, None);
@@ -545,7 +545,7 @@ impl Trident {
             if let Some(old_yaml) = yaml_conf {
                 if old_yaml != runtime_config.yaml_config {
                     if let Some(mut c) = components.take() {
-                        c.stop();
+                        c.stop(false);
                     }
                     // EbpfCollector does not support recreation because it calls bpf_tracer_init, which can only be called once in a process
                     // Work around this problem by exiting and restart trident
@@ -2247,7 +2247,7 @@ impl AgentComponents {
         info!("Started agent components.");
     }
 
-    fn stop(&mut self) {
+    fn stop(&mut self, half: bool) {
         if !self.running.swap(false, Ordering::Relaxed) {
             return;
         }
@@ -2259,7 +2259,7 @@ impl AgentComponents {
         }
 
         #[cfg(target_os = "linux")]
-        {
+        if !half {
             self.kubernetes_poller.stop();
             self.socket_synchronizer.stop();
             if let Some(h) = self.api_watcher.notify_stop() {
@@ -2317,8 +2317,10 @@ impl AgentComponents {
         if let Some(h) = self.packet_sequence_uniform_sender.notify_stop() {
             join_handles.push(h);
         }
-        if let Some(h) = self.domain_name_listener.notify_stop() {
-            join_handles.push(h);
+        if !half {
+            if let Some(h) = self.domain_name_listener.notify_stop() {
+                join_handles.push(h);
+            }
         }
         self.handler_builders.iter().for_each(|x| {
             x.lock().unwrap().iter_mut().for_each(|y| {
@@ -2336,6 +2338,9 @@ impl AgentComponents {
             }
         }
         if let Some(h) = self.npb_arp_table.notify_stop() {
+            join_handles.push(h);
+        }
+        if let Some(h) = self.stats_collector.notify_stop() {
             join_handles.push(h);
         }
 
@@ -2410,9 +2415,9 @@ impl Components {
         return Ok(Components::Agent(components));
     }
 
-    fn stop(&mut self) {
+    fn stop(&mut self, half: bool) {
         match self {
-            Self::Agent(a) => a.stop(),
+            Self::Agent(a) => a.stop(half),
             #[cfg(target_os = "linux")]
             Self::Watcher(w) => w.stop(),
             _ => {}

@@ -66,12 +66,12 @@ type ResourceEvent struct {
 }
 
 type DomainAdditionalResource struct {
-	ID        int       `gorm:"primaryKey;autoIncrement;unique;column:id;type:int;not null" json:"ID"`
-	Domain    string    `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN"`
-	Content   string    `gorm:"column:content;type:longtext" json:"CONTENT"`
-	CreatedAt time.Time `gorm:"autoCreateTime;column:created_at;type:datetime" json:"CREATED_AT"`
+	ID                int             `gorm:"primaryKey;autoIncrement;unique;column:id;type:int;not null" json:"ID"`
+	Domain            string          `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN"`
+	Content           string          `gorm:"column:content;type:longtext" json:"CONTENT"`
+	CompressedContent compressedBytes `gorm:"column:compressed_content;type:longblob" json:"COMPRESSED_CONTENT"`
+	CreatedAt         time.Time       `gorm:"autoCreateTime;column:created_at;type:datetime" json:"CREATED_AT"`
 }
-
 type Process struct {
 	Base           `gorm:"embedded"`
 	SoftDeleteBase `gorm:"embedded"`
@@ -1168,11 +1168,12 @@ type SysConfiguration struct {
 }
 
 type KubernetesCluster struct {
-	ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	ClusterID string    `gorm:"column:cluster_id;type:varchar(256);" json:"CLUSTER_ID"`
-	Value     string    `gorm:"column:value;type:varchar(256);" json:"VALUE"`
-	CreatedAt time.Time `gorm:"column:created_at;type:datetime;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
-	SyncedAt  time.Time `gorm:"column:synced_at" json:"SYNCED_AT"`
+	ID          int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	ClusterID   string    `gorm:"column:cluster_id;type:varchar(256);" json:"CLUSTER_ID"`
+	Value       string    `gorm:"column:value;type:varchar(256);" json:"VALUE"`
+	CreatedAt   time.Time `gorm:"column:created_at;type:datetime;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
+	SyncedAt    time.Time `gorm:"column:synced_at;type:datetime" json:"SYNCED_AT"`
+	UpdatedTime time.Time `gorm:"column:updated_time;type:datetime" json:"UPDATED_TIME"`
 }
 
 type GoGenesisVInterface struct {
@@ -1317,19 +1318,19 @@ type VTapRepo struct {
 	Branch    string          `gorm:"column:branch;type:varchar(256);default:''" json:"BRANCH"`
 	RevCount  string          `gorm:"column:rev_count;type:varchar(256);default:''" json:"REV_COUNT"`
 	CommitID  string          `gorm:"column:commit_id;type:varchar(256);default:''" json:"COMMIT_ID"`
-	Image     compressedImage `gorm:"column:image;type:logblob;not null" json:"IMAGE"`
+	Image     compressedBytes `gorm:"column:image;type:logblob;not null" json:"IMAGE"`
 	CreatedAt time.Time       `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
 	UpdatedAt time.Time       `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
 }
 
-type compressedImage []byte
+type compressedBytes []byte
 
-// Scan scan decompress value into compressedImage, implements sql.Scanner interface
-func (c *compressedImage) Scan(value interface{}) error {
+// Scan scan decompress value into compressedBytes, implements sql.Scanner interface
+func (c *compressedBytes) Scan(value interface{}) error {
 	// decompress
 	compressedData, ok := value.([]byte)
 	if !ok {
-		return errors.New(fmt.Sprint("Failed to decompress compressedImage value:", value))
+		return errors.New(fmt.Sprint("failed to decompress compressedImage value:", value))
 	}
 
 	var b bytes.Buffer
@@ -1349,12 +1350,19 @@ func (c *compressedImage) Scan(value interface{}) error {
 }
 
 // Value return compress value, implement driver.Valuer interface
-func (c compressedImage) Value() (driver.Value, error) {
+func (c compressedBytes) Value() (driver.Value, error) {
 	// compress
+	t1 := time.Now()
 	var b bytes.Buffer
 	w := zlib.NewWriter(&b)
-	w.Write(c)
-	w.Close()
+	_, err := w.Write(c)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write compressed data: %v", err)
+	}
+	if err = w.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close zlib writer: %v", err)
+	}
+	log.Info("compress time comsumed: %v", time.Since(t1))
 	return b.String(), nil
 }
 
@@ -1366,7 +1374,7 @@ type Plugin struct {
 	ID        int             `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	Name      string          `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
 	Type      int             `gorm:"column:type;type:int" json:"TYPE"` // 1: wasm
-	Image     compressedImage `gorm:"column:image;type:logblob;not null" json:"IMAGE"`
+	Image     compressedBytes `gorm:"column:image;type:logblob;not null" json:"IMAGE"`
 	CreatedAt time.Time       `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
 	UpdatedAt time.Time       `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
 }

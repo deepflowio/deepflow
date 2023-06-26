@@ -84,6 +84,18 @@ impl<'a> Deref for RawPacket<'a> {
     }
 }
 
+impl<'a> From<&'a [u8]> for RawPacket<'a> {
+    fn from(b: &'a [u8]) -> Self {
+        Self::Borrowed(b)
+    }
+}
+
+impl<'a> From<FixedBuffer<u8>> for RawPacket<'a> {
+    fn from(b: FixedBuffer<u8>) -> Self {
+        Self::Owned(b)
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct MetaPacket<'a> {
     // 主机序, 不因L2End1而颠倒, 端口会在查询策略时被修改
@@ -226,8 +238,7 @@ impl<'a> MetaPacket<'a> {
         size + (self.tcp_options_flag & TCP_OPT_FLAG_SACK) as usize
     }
 
-    fn update_tcp_opt(&mut self) {
-        let packet = self.raw.as_ref().unwrap();
+    fn update_tcp_opt(&mut self, packet: &[u8]) {
         let mut offset = self.header_type.min_packet_size() + self.l2_l3_opt_size as usize;
         let payload_offset = (offset + self.l4_opt_size as usize).min(packet.len());
 
@@ -297,8 +308,7 @@ impl<'a> MetaPacket<'a> {
         }
     }
 
-    fn update_ip6_opt(&mut self, l2_opt_size: usize) -> (u8, usize) {
-        let packet = self.raw.as_ref().unwrap();
+    fn update_ip6_opt(&mut self, packet: &[u8], l2_opt_size: usize) -> (u8, usize) {
         let mut next_header = packet[IPV6_PROTO_OFFSET + l2_opt_size];
         let original_offset = ETH_HEADER_SIZE + IPV6_HEADER_SIZE + l2_opt_size;
         let mut option_offset = original_offset;
@@ -410,48 +420,35 @@ impl<'a> MetaPacket<'a> {
         }
         None
     }
-
-    pub fn update_with_raw_copy(
+    pub fn update<P: AsRef<[u8]> + Into<RawPacket<'a>>>(
         &mut self,
-        packet: FixedBuffer<u8>,
+        raw_packet: P,
         src_endpoint: bool,
         dst_endpoint: bool,
         timestamp: Duration,
         original_length: usize,
     ) -> error::Result<()> {
-        self.raw = Some(RawPacket::Owned(packet));
-        self.update_fields_except_raw(src_endpoint, dst_endpoint, timestamp, original_length)
+        self.update_fields(
+            raw_packet.as_ref(),
+            src_endpoint,
+            dst_endpoint,
+            timestamp,
+            original_length,
+        )?;
+        self.raw = Some(raw_packet.into());
+        Ok(())
     }
 
-    pub fn update_without_raw_copy(
+    fn update_fields(
         &mut self,
-        packet: &'a [u8],
+        raw_packet: &[u8],
         src_endpoint: bool,
         dst_endpoint: bool,
         timestamp: Duration,
         original_length: usize,
     ) -> error::Result<()> {
-        self.raw = Some(RawPacket::Borrowed(packet));
-        self.update_fields_except_raw(src_endpoint, dst_endpoint, timestamp, original_length)
-    }
-
-    fn update_fields_except_raw(
-        &mut self,
-        src_endpoint: bool,
-        dst_endpoint: bool,
-        timestamp: Duration,
-        original_length: usize,
-    ) -> error::Result<()> {
-        fn read_u16_be(bs: &[u8]) -> u16 {
-            assert!(bs.len() >= 2);
-            u16::from_be_bytes(*<&[u8; 2]>::try_from(&bs[..2]).unwrap())
-        }
-        fn read_u32_be(bs: &[u8]) -> u32 {
-            assert!(bs.len() >= 4);
-            u32::from_be_bytes(*<&[u8; 4]>::try_from(&bs[..4]).unwrap())
-        }
+        let packet = raw_packet.as_ref();
         self.lookup_key.timestamp = timestamp;
-        let packet = self.raw.as_ref().unwrap();
         self.lookup_key.l2_end_0 = src_endpoint;
         self.lookup_key.l2_end_1 = dst_endpoint;
         self.packet_len = packet.len() as u32;
@@ -553,7 +550,7 @@ impl<'a> MetaPacket<'a> {
                 if payload == 0 {
                     payload = size_checker as u16;
                 }
-                let r = self.update_ip6_opt(vlan_tag_size);
+                let r = self.update_ip6_opt(packet, vlan_tag_size);
                 ip_protocol = IpProtocol::from(r.0);
                 let options_length = r.1;
                 self.l2_l3_opt_size += options_length as u16;
@@ -632,7 +629,6 @@ impl<'a> MetaPacket<'a> {
             _ => return Ok(()),
         }
 
-        let packet = self.raw.as_ref().unwrap();
         match ip_protocol {
             IpProtocol::Icmpv4 => {
                 // 错包时取最小包长
@@ -763,7 +759,7 @@ impl<'a> MetaPacket<'a> {
                 self.tcp_data.seq = read_u32_be(&packet[seq_off + self.l2_l3_opt_size as usize..]);
                 self.tcp_data.ack = read_u32_be(&packet[ack_off + self.l2_l3_opt_size as usize..]);
                 if data_offset > 5 {
-                    self.update_tcp_opt();
+                    self.update_tcp_opt(packet);
                 }
             }
             IpProtocol::Icmpv6 => {
@@ -789,7 +785,6 @@ impl<'a> MetaPacket<'a> {
                 return Ok(());
             }
         }
-        let packet = self.raw.as_ref().unwrap();
         if self.header_type >= HeaderType::Ipv4 {
             self.lookup_key.src_port =
                 read_u16_be(&packet[offset_port_0 + self.l2_l3_opt_size as usize..]);
