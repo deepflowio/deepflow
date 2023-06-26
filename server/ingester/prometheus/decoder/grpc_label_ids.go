@@ -177,7 +177,7 @@ func (t *PrometheusLabelTable) updatePrometheusLabels(resp *trident.PrometheusLa
 		targetId := target.GetTargetId()
 		if targetId == 0 {
 			if t.counter.TargetUnknown == 0 {
-				log.Warningf("prometheus label response target invalid: %s", resp)
+				log.Warningf("prometheus label response target invalid: %s", target)
 			}
 			t.counter.TargetUnknown++
 			continue
@@ -231,7 +231,7 @@ func (t *PrometheusLabelTable) updatePrometheusLabels(resp *trident.PrometheusLa
 		targetId, ok := t.targetIDs.Get(targetIdKey(jobId, instanceId))
 		if !ok {
 			if t.counter.TargetUnknown == 0 {
-				log.Warningf("prometheus label response label target invalid: %s", resp)
+				log.Warningf("prometheus label response label target invalid: jobId: %d, instanceId: %d, metric: %s", jobId, instanceId, metric)
 			}
 			t.counter.TargetUnknown++
 			continue
