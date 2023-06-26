@@ -25,29 +25,23 @@ import (
 
 // ResourceUpdater 实现资源进行新旧数据比对，并根据比对结果增删改资源
 type ResourceUpdater interface {
-	// 以资源的lcuuid为key，逐一检查cloud数据
-	// 若cache的diff base中不存在，则添加
-	// 若cache的diff base中存在，基于可更新字段，检查cloud数据是否发生变化，若发生变化，则更新；
-	// 无论已存在资源有无变化，根据cache的sequence更新的diff base中的sequence，用于标记资源是否需要被删除
+	// 以资源的 lcuuid 为 key ，逐一检查 cloud 数据
+	// 若 cache 的 diff base 中不存在，则添加
+	// 若 cache 的 diff base 中存在，基于可更新字段，检查 cloud 数据是否发生变化，若发生变化，则更新；
+	// 无论已存在资源有无变化，根据 cache 的 sequence 更新的 diff base 中的 sequence，用于标记资源是否需要被删除
 	HandleAddAndUpdate()
-	// 逐一检查diff base中的资源，若sequence不等于cache中的sequence，则删除
+	// 逐一检查 diff base 中的资源，若 sequence 不等于 cache 中的 sequence，则删除
 	HandleDelete()
 }
 
 type DataGenerator[CT constraint.CloudModel, MT constraint.MySQLModel, BT constraint.DiffBase[MT]] interface {
-	// 根据cloud数据获取对应的diff base数据
+	// 根据 cloud 数据获取对应的 diff base 数据
 	getDiffBaseByCloudItem(*CT) (BT, bool)
-	// 生成插入DB所需的数据
+	// 生成插入 DB 所需的数据
 	generateDBItemToAdd(*CT) (*MT, bool)
-	// 生产更新DB所需的数据
+	// 生产更新 DB 所需的数据
 	generateUpdateInfo(BT, *CT) (map[string]interface{}, bool)
 }
-
-// type Callbacks[CT constraint.CloudModel, MT constraint.MySQLModel, BT constraint.DiffBase[MT]] struct {
-// 	onAdded   func(addedDBItems []*MT)
-// 	onUpdated func(cloudItem *CT, diffBaseItem BT)
-// 	onDeleted func(lcuuids []string)
-// }
 
 type UpdaterBase[CT constraint.CloudModel, MT constraint.MySQLModel, BT constraint.DiffBase[MT]] struct {
 	cache             *cache.Cache                    // 基于 Domain 或者 SubDomain 范围构造
@@ -57,14 +51,7 @@ type UpdaterBase[CT constraint.CloudModel, MT constraint.MySQLModel, BT constrai
 	cloudData         []CT                            // 定时获取的新资源数据
 	dataGenerator     DataGenerator[CT, MT, BT]       // 提供各类数据生成的方法
 	listeners         []listener.Listener[CT, MT, BT] // 关注 Updater 的增删改操作行为及详情的监听器
-	// callbacks         Callbacks[CT, MT, BT]
 }
-
-// func (u *UpdaterBase[CT, MT, BT]) RegisterCallbacks(onAdded func(addedDBItems []*MT), onUpdated func(cloudItem *CT, diffBaseItem BT), onDeleted func(lcuuids []string)) {
-// 	u.callbacks.onAdded = onAdded
-// 	u.callbacks.onUpdated = onUpdated
-// 	u.callbacks.onDeleted = onDeleted
-// }
 
 func (u *UpdaterBase[CT, MT, BT]) RegisterListener(listener listener.Listener[CT, MT, BT]) ResourceUpdater {
 	u.listeners = append(u.listeners, listener)
@@ -164,21 +151,18 @@ func (u *UpdaterBase[CT, MT, BT]) deletePage(lcuuids []string) {
 }
 
 func (u *UpdaterBase[CT, MT, BT]) notifyOnAdded(addedDBItems []*MT) {
-	// u.callbacks.onAdded(addedDBItems)
 	for _, l := range u.listeners {
 		l.OnUpdaterAdded(addedDBItems)
 	}
 }
 
 func (u *UpdaterBase[CT, MT, BT]) notifyOnUpdated(cloudItem *CT, diffBaseItem BT) {
-	// u.callbacks.onUpdated(cloudItem, diffBaseItem)
 	for _, l := range u.listeners {
 		l.OnUpdaterUpdated(cloudItem, diffBaseItem)
 	}
 }
 
 func (u *UpdaterBase[CT, MT, BT]) notifyOnDeleted(lcuuids []string) {
-	// u.callbacks.onDeleted(lcuuids)
 	for _, l := range u.listeners {
 		l.OnUpdaterDeleted(lcuuids)
 	}

@@ -24,7 +24,7 @@ import (
 
 func (b *DiffBaseDataSet) addCEN(dbItem *mysql.CEN, seq int, toolDataSet *ToolDataSet) {
 	vpcLcuuids := []string{}
-	for _, vpcID := range StringToIntArray(dbItem.VPCIDs) {
+	for _, vpcID := range StringToIntSlice(dbItem.VPCIDs) {
 		vpcLcuuid, exists := toolDataSet.GetVPCLcuuidByID(vpcID)
 		if exists {
 			vpcLcuuids = append(vpcLcuuids, vpcLcuuid)

@@ -19,6 +19,7 @@ package recorder
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
@@ -28,18 +29,30 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 )
 
-type ResourceCleaner struct {
+var (
+	cleanerOnce sync.Once
+	cleaner     *Cleaner
+)
+
+type Cleaner struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	cfg    *RecorderConfig
 }
 
-func NewResourceCleaner(cfg *RecorderConfig, ctx context.Context) *ResourceCleaner {
-	cCtx, cCancel := context.WithCancel(ctx)
-	return &ResourceCleaner{cfg: cfg, ctx: cCtx, cancel: cCancel}
+func GetSingletonCleaner() *Cleaner {
+	cleanerOnce.Do(func() {
+		cleaner = new(Cleaner)
+	})
+	return cleaner
 }
 
-func (c *ResourceCleaner) Start() {
+func (c *Cleaner) Init(cfg *RecorderConfig) {
+	c.ctx, c.cancel = context.WithCancel(context.Background())
+	c.cfg = cfg
+}
+
+func (c *Cleaner) Start() {
 	log.Info("resource clean started")
 	// 定时清理软删除资源数据
 	// timed clean soft deleted resource data
@@ -50,18 +63,26 @@ func (c *ResourceCleaner) Start() {
 	c.timedCleanDirtyData()
 }
 
-func (c *ResourceCleaner) Stop() {
+func (c *Cleaner) Stop() {
 	if c.cancel != nil {
 		c.cancel()
 	}
 	log.Info("resource clean stopped")
 }
 
-func (c *ResourceCleaner) timedCleanDeletedData(cleanInterval, retentionInterval int) {
+func (c *Cleaner) timedCleanDeletedData(cleanInterval, retentionInterval int) {
 	c.cleanDeletedData(retentionInterval)
 	go func() {
-		for range time.Tick(time.Duration(cleanInterval) * time.Hour) {
-			c.cleanDeletedData(retentionInterval)
+		ticker := time.NewTicker(time.Duration(cleanInterval) * time.Hour)
+		defer ticker.Stop()
+	LOOP:
+		for {
+			select {
+			case <-ticker.C:
+				c.cleanDeletedData(retentionInterval)
+			case <-c.ctx.Done():
+				break LOOP
+			}
 		}
 	}()
 }
@@ -74,7 +95,7 @@ func forceDelete[MT constraint.MySQLSoftDeleteModel](expiredAt time.Time) {
 	}
 }
 
-func (c *ResourceCleaner) cleanDeletedData(retentionInterval int) {
+func (c *Cleaner) cleanDeletedData(retentionInterval int) {
 	expiredAt := time.Now().Add(time.Duration(-retentionInterval) * time.Hour)
 	log.Infof("clean soft deleted resources (deleted_at < %s) started", expiredAt.Format(common.GO_BIRTHDAY))
 	forceDelete[mysql.Region](expiredAt)
@@ -114,16 +135,24 @@ func getIDs[MT constraint.MySQLModel]() (ids []int) {
 	return
 }
 
-func (c *ResourceCleaner) timedCleanDirtyData() {
+func (c *Cleaner) timedCleanDirtyData() {
 	c.cleanDirtyData()
 	go func() {
-		for range time.Tick(time.Duration(50) * time.Minute) {
-			c.cleanDirtyData()
+		ticker := time.NewTicker(time.Duration(50) * time.Minute)
+		defer ticker.Stop()
+	LOOP:
+		for {
+			select {
+			case <-ticker.C:
+				c.cleanDirtyData()
+			case <-c.ctx.Done():
+				break LOOP
+			}
 		}
 	}()
 }
 
-func (c *ResourceCleaner) cleanDirtyData() {
+func (c *Cleaner) cleanDirtyData() {
 	log.Info("clean dirty data started")
 	c.cleanNetworkDirty()
 	c.cleanVRouterDirty()
@@ -136,7 +165,7 @@ func (c *ResourceCleaner) cleanDirtyData() {
 	log.Info("clean dirty data completed")
 }
 
-func (c *ResourceCleaner) cleanNetworkDirty() {
+func (c *Cleaner) cleanNetworkDirty() {
 	networkIDs := getIDs[mysql.Network]()
 	if len(networkIDs) != 0 {
 		var subnets []mysql.Subnet
@@ -148,7 +177,7 @@ func (c *ResourceCleaner) cleanNetworkDirty() {
 	}
 }
 
-func (c *ResourceCleaner) cleanVRouterDirty() {
+func (c *Cleaner) cleanVRouterDirty() {
 	vrouterIDs := getIDs[mysql.VRouter]()
 	if len(vrouterIDs) != 0 {
 		var rts []mysql.RoutingTable
@@ -159,7 +188,7 @@ func (c *ResourceCleaner) cleanVRouterDirty() {
 		}
 	}
 }
-func (c *ResourceCleaner) cleanSecurityGroupDirty() {
+func (c *Cleaner) cleanSecurityGroupDirty() {
 	securityGroupIDs := getIDs[mysql.SecurityGroup]()
 	if len(securityGroupIDs) != 0 {
 		var sgRules []mysql.SecurityGroupRule
@@ -178,7 +207,7 @@ func (c *ResourceCleaner) cleanSecurityGroupDirty() {
 	}
 }
 
-func (c *ResourceCleaner) cleanPodIngressDirty() {
+func (c *Cleaner) cleanPodIngressDirty() {
 	podIngressIDs := getIDs[mysql.PodIngress]()
 	if len(podIngressIDs) != 0 {
 		var podIngressRules []mysql.PodIngressRule
@@ -197,7 +226,7 @@ func (c *ResourceCleaner) cleanPodIngressDirty() {
 	}
 }
 
-func (c *ResourceCleaner) cleanPodServiceDirty() {
+func (c *Cleaner) cleanPodServiceDirty() {
 	podServiceIDs := getIDs[mysql.PodService]()
 	if len(podServiceIDs) != 0 {
 		var podServicePorts []mysql.PodServicePort
@@ -223,7 +252,7 @@ func (c *ResourceCleaner) cleanPodServiceDirty() {
 	}
 }
 
-func (c *ResourceCleaner) cleanPodNodeDirty() {
+func (c *Cleaner) cleanPodNodeDirty() {
 	podNodeIDs := getIDs[mysql.PodNode]()
 	if len(podNodeIDs) != 0 {
 		var vifs []mysql.VInterface
@@ -249,7 +278,7 @@ func (c *ResourceCleaner) cleanPodNodeDirty() {
 	}
 }
 
-func (c *ResourceCleaner) cleanPodDirty() {
+func (c *Cleaner) cleanPodDirty() {
 	podIDs := getIDs[mysql.Pod]()
 	if len(podIDs) != 0 {
 		var vifs []mysql.VInterface
@@ -261,7 +290,7 @@ func (c *ResourceCleaner) cleanPodDirty() {
 	}
 }
 
-func (c *ResourceCleaner) cleanVInterfaceDirty() {
+func (c *Cleaner) cleanVInterfaceDirty() {
 	vifIDs := getIDs[mysql.VInterface]()
 	if len(vifIDs) != 0 {
 		var lanIPs []mysql.LANIP

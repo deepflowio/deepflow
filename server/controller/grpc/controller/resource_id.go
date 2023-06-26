@@ -20,7 +20,7 @@ import (
 	"golang.org/x/net/context"
 
 	api "github.com/deepflowio/deepflow/message/controller"
-	recorderdb "github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/db/idmng"
 )
 
 type IDEvent struct{}
@@ -30,7 +30,7 @@ func NewIDEvent() *IDEvent {
 }
 
 func (e *IDEvent) Get(ctx context.Context, in *api.GetResourceIDRequest) (*api.GetResourceIDResponse, error) {
-	ids := recorderdb.IDMNG.AllocateIDs(*in.Type, int(*in.Count))
+	ids := idmng.GetSingleton().AllocateIDs(*in.Type, int(*in.Count))
 	uIDs := make([]uint32, 0, len(ids))
 	for _, id := range ids {
 		uIDs = append(uIDs, uint32(id))
@@ -43,6 +43,6 @@ func (e *IDEvent) Release(ctx context.Context, in *api.ReleaseResourceIDRequest)
 	for _, uID := range in.Ids {
 		ids = append(ids, int(uID))
 	}
-	recorderdb.IDMNG.RecycleIDs(*in.Type, ids)
+	idmng.GetSingleton().RecycleIDs(*in.Type, ids)
 	return &api.ReleaseResourceIDResponse{}, nil
 }
