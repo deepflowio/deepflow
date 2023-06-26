@@ -39,8 +39,19 @@
  */
 typedef struct {
 	struct {
-		/* processID */
-		u64 pid;
+		/*
+		 * tgid:
+		 *   The tgid (Thread Group ID) in kernel space
+		 *   is equivalent to the process ID in user space.
+		 * pid:
+		 *   The process ID or thread ID in kernel space.
+		 * cpu:
+		 *   Which CPU core does the perf event occur on?
+		 */
+		u64 tgid: 24,
+		    pid: 24, 
+		    cpu: 16;
+
 		/*
 		 * process start time(the number of millisecond
 		 * elapsed since January 1, 1970 00:00:00).
@@ -53,16 +64,56 @@ typedef struct {
 	uword msg_ptr;
 } stack_trace_msg_kv_t; 
 
-/* stack trace message value, push data */
+/*
+ * stack trace message value, push data
+ *
+ * @time_stamp
+ *   Timestamp of the stack trace data(unit: nanoseconds).
+ * @pid
+ *   User-space process-ID.
+ * @tid
+ *   Identified within the eBPF program in kernel space.
+ *   If the current is a process and not a thread this field(tid) is filled
+ *   with the ID of the process.
+ * @stime
+ *   The start time of the process is measured in milliseconds.
+ * @u_stack_id
+ *   User space stackID.
+ * @k_stack_id
+ *   Kernel space stackID.
+ * @cpu
+ *   The captured stack trace data is generated on which CPU?
+ * @count
+ *   The profiler captures the number of occurrences of the same
+ *   data by querying with the quadruple
+ *   "<pid + stime + u_stack_id + k_stack_id + tid + cpu>" as the key.
+ * @comm
+ *   comm in task_struct(linux kernel), always 16 bytes
+ *   If the capture is a process, fill in the process name here.
+ *   If the capture is a thread, fill in the thread name.
+ * @process_name
+ *   process name
+ * @data_len
+ *   stack data length
+ * @data_ptr
+ *   Example of a folded stack trace string (taken from a perf profiler test):
+ *   main;xxx();yyy()
+ *   It is a list of symbols corresponding to addresses in the underlying stack trace,
+ *   separated by ';'.
+ *   The merged folded stack trace string style for user space and kernel space would be:
+ *   <user space folded stack trace string> + ";" + <kernel space folded stack trace string>
+ */
 typedef struct {
 	u64 time_stamp;
 	u32 pid;
+	u32 tid;
 	u64 stime;
 	u32 u_stack_id;
 	u32 k_stack_id;
 	u32 cpu;
 	u32 count;
 	u8 comm[TASK_COMM_LEN];
+	u8 process_name[TASK_COMM_LEN];
 	u32 data_len;
 	u64 data_ptr;
 	u8 data[0];

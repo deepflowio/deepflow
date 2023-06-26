@@ -23,6 +23,10 @@ use std::time::{Duration, UNIX_EPOCH};
 use std::sync::Mutex;
 
 lazy_static::lazy_static! {
+    static ref SUM: Mutex<u32> = Mutex::new(0);
+}
+
+lazy_static::lazy_static! {
     static ref COUNTER: Mutex<u32> = Mutex::new(0);
 }
 
@@ -57,15 +61,21 @@ fn cp_process_name_safe(cp: *mut stack_profile_data) -> String {
     }
 }
 
-fn increment_counter(num: u32) {
-    let mut counter = COUNTER.lock().unwrap();
-    *counter += num;
+fn increment_counter(num: u32, counter_type: u32) {
+    if counter_type == 0 {
+        let mut counter = COUNTER.lock().unwrap();
+        *counter += num;
+    } else {
+        let mut counter = SUM.lock().unwrap();
+        *counter += num;
+    }
 }
 
 extern "C" fn continuous_profiler_callback(cp: *mut stack_profile_data) {
     unsafe {
           process_stack_trace_data_for_flame_graph(cp);
-          increment_counter((*cp).count);
+          increment_counter((*cp).count, 1);
+          increment_counter(1, 0);
           //let data = sk_data_str_safe(cp);
           //println!("\n+ --------------------------------- +");
           //println!("{} PID {} START-TIME {} U-STACKID {} K-STACKID {} COMM {} CPU {} COUNT {} LEN {} \n  - {}",
@@ -82,8 +92,12 @@ extern "C" fn continuous_profiler_callback(cp: *mut stack_profile_data) {
     }
 }
 
-fn get_counter() -> u32 {
-    *COUNTER.lock().unwrap()
+fn get_counter(counter_type: u32) -> u32 {
+    if counter_type == 0 {
+        *COUNTER.lock().unwrap()
+    } else {
+        *SUM.lock().unwrap()
+    }
 }
 
 fn main() {
@@ -112,7 +126,7 @@ fn main() {
 
         thread::sleep(Duration::from_secs(65));
         stop_continuous_profiler();
-        print!("====== capture count {}\n", get_counter());
+        print!("====== capture count {}, sum {}\n", get_counter(0), get_counter(1));
         release_flame_graph_hash();
     }
 

@@ -117,6 +117,7 @@ int bpf_perf_event(struct bpf_perf_event_data *ctx)
 	key.cpu = bpf_get_smp_processor_id();
 	bpf_get_current_comm(&key.comm, sizeof(key.comm));
 	key.tgid = id >> 32;
+	key.pid = (__u32)id;
 	key.timestamp = bpf_ktime_get_ns();
 
 	/*
