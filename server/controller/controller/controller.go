@@ -39,7 +39,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/manager"
 	"github.com/deepflowio/deepflow/server/controller/monitor"
 	"github.com/deepflowio/deepflow/server/controller/prometheus"
-	recorderdb "github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder"
 	"github.com/deepflowio/deepflow/server/controller/report"
 	"github.com/deepflowio/deepflow/server/controller/statsd"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
@@ -94,11 +94,11 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 
 	// 启动资源ID管理器
 	router.SetInitStageForHealthChecker("Resource ID manager init")
-	recorderdb.InitIDManager(&cfg.ManagerCfg.TaskCfg.RecorderCfg, ctx)
+	recorderResource := recorder.GetSingletonResource().Init(&cfg.ManagerCfg.TaskCfg.RecorderCfg)
 	if isMasterController {
-		err := recorderdb.IDMNG.Start()
+		err := recorderResource.IDManager.Start()
 		if err != nil {
-			log.Errorf("resource id mananger start failed: %s", err.Error())
+			log.Errorf("resource id manager start failed: %s", err.Error())
 			time.Sleep(time.Second)
 			os.Exit(0)
 		}
