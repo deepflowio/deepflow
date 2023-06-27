@@ -87,14 +87,17 @@ impl LocalModeDispatcher {
             if base.reset_whitelist.swap(false, Ordering::Relaxed) {
                 base.tap_interface_whitelist.reset();
             }
-            let recved = BaseDispatcher::recv(
-                &mut base.engine,
-                &base.leaky_bucket,
-                &base.exception_handler,
-                &mut prev_timestamp,
-                &base.counter,
-                &base.ntp_diff,
-            );
+            // The lifecycle of the recved will end before the next call to recv.
+            let recved = unsafe {
+                BaseDispatcher::recv(
+                    &mut base.engine,
+                    &base.leaky_bucket,
+                    &base.exception_handler,
+                    &mut prev_timestamp,
+                    &base.counter,
+                    &base.ntp_diff,
+                )
+            };
             if recved.is_none() {
                 flow_map.inject_flush_ticker(&config, Duration::ZERO);
                 if base.tap_interface_whitelist.next_sync(Duration::ZERO) {
