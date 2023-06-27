@@ -243,7 +243,8 @@ impl PassivePoller {
         let mut last_expire = SystemTime::now();
         let mut ignored_indice = Self::get_ignored_interface_indice();
         while running.load(Ordering::Relaxed) {
-            let packet = match engine.recv() {
+            // The lifecycle of the packet will end before the next call to recv.
+            let packet = match unsafe { engine.recv() } {
                 Ok(p) => p,
                 Err(Error::Timeout) => continue,
                 Err(e) => {

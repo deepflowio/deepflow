@@ -327,7 +327,7 @@ impl BaseDispatcher {
 }
 
 impl BaseDispatcher {
-    pub(super) fn recv<'a>(
+    pub(super) unsafe fn recv<'a>(
         engine: &'a mut RecvEngine,
         leaky_bucket: &LeakyBucket,
         exception_handler: &ExceptionHandler,

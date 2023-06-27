@@ -38,7 +38,7 @@ impl Libpcap {
         unimplemented!();
     }
 
-    pub fn read(&mut self) -> Result<packet::Packet> {
+    pub unsafe fn read(&mut self) -> Result<packet::Packet> {
         unimplemented!();
     }
 
