@@ -267,8 +267,14 @@ func UpdateVtap(lcuuid, name string, vtapUpdate map[string]interface{}) (resp mo
 		dbUpdateMap["license_functions"] = strings.Join(licenseFunctionStrs, ",")
 	}
 
-	// 更新vtap DB
 	mysql.Db.Model(&vtap).Updates(dbUpdateMap)
+
+	if value, ok := vtapUpdate["ENABLE"]; ok && value == float64(0) {
+		key := vtap.CtrlIP + "-" + vtap.CtrlMac
+		if err := mysql.Db.Delete(&mysql.KubernetesCluster{}, "value = ?", key).Error; err != nil {
+			log.Error(err)
+		}
+	}
 
 	response, _ := GetVtaps(map[string]interface{}{"lcuuid": vtap.Lcuuid})
 	return response[0], nil
