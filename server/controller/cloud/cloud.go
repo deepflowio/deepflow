@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"strconv"
 	"sync"
 	"time"
 
@@ -28,6 +27,8 @@ import (
 	logging "github.com/op/go-logging"
 	"gorm.io/gorm"
 
+	"github.com/bitly/go-simplejson"
+	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/config"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/cloud/platform"
@@ -117,13 +118,26 @@ func (c *Cloud) GetStatter() statsd.StatsdStatter {
 }
 
 func (c *Cloud) getCloudGatherInterval() int {
-	var cloudSyncConfig mysql.SysConfiguration
-	if ret := mysql.Db.Where("param_name = ?", "cloud_sync_timer").First(&cloudSyncConfig); ret.Error != nil {
-		log.Warning("get cloud_sync_timer failed")
-		return int(c.cfg.CloudGatherInterval)
+	var domain mysql.Domain
+	err := mysql.Db.Where("lcuuid = ?", c.basicInfo.Lcuuid).First(&domain).Error
+	if err != nil {
+		log.Warningf("get cloud gather interval failed: (%s)", err.Error())
+		return cloudcommon.CLOUD_SYNC_TIMER_MIN
 	}
-	valueInt, _ := strconv.Atoi(cloudSyncConfig.Value)
-	return valueInt
+	domainConfig, err := simplejson.NewJson([]byte(domain.Config))
+	if err != nil {
+		log.Warningf("parse domain (%s) config failed: (%s)", c.basicInfo.Name, err.Error())
+		return cloudcommon.CLOUD_SYNC_TIMER_MIN
+	}
+	domainSyncTimer := domainConfig.Get("sync_timer").MustInt()
+	if domainSyncTimer == 0 {
+		return cloudcommon.CLOUD_SYNC_TIMER_MIN
+	}
+	if domainSyncTimer < cloudcommon.CLOUD_SYNC_TIMER_MIN || domainSyncTimer > cloudcommon.CLOUD_SYNC_TIMER_MAX {
+		log.Warningf("cloud sync timer invalid: (%d)", domainSyncTimer)
+		return cloudcommon.CLOUD_SYNC_TIMER_MIN
+	}
+	return domainSyncTimer
 }
 
 func (c *Cloud) getCloudData() {
@@ -196,7 +210,7 @@ LOOP:
 			curCloudGatherInterval := c.getCloudGatherInterval()
 			if curCloudGatherInterval != cloudGatherInterval {
 				ticker.Stop()
-				log.Info("cloud_gather_interval from %d changed to %d", cloudGatherInterval, curCloudGatherInterval)
+				log.Infof("cloud_gather_interval from %d changed to %d", cloudGatherInterval, curCloudGatherInterval)
 				cloudGatherInterval = curCloudGatherInterval
 				ticker = time.NewTicker(time.Second * time.Duration(cloudGatherInterval))
 			}
