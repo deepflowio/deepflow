@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,9 +14,24 @@
  * limitations under the License.
  */
 
-package migration
+package common
 
-const (
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "6.3.1.22"
+import (
+	"fmt"
+	"net"
+	"time"
 )
+
+func IsTCPActive(ip string, port int) error {
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", ip, port), 2*time.Second)
+	if err != nil {
+		return err
+	} else {
+		if conn != nil {
+			conn.Close()
+		} else {
+			return fmt.Errorf("check tcp alive failed (ip:%s, port:%d)", ip, port)
+		}
+	}
+	return nil
+}

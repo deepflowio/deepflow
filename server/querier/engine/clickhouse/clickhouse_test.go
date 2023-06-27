@@ -248,6 +248,9 @@ var (
 	}, {
 		input:  "select `k8s.env_0` from l7_flow_log",
 		output: "SELECT dictGetOrDefault(flow_tag.pod_k8s_envs_map, 'envs', toUInt64(pod_id_0),'{}')  AS `k8s.env_0` FROM flow_log.`l7_flow_log` LIMIT 10000",
+	}, {
+		input:  "SELECT Sum(log_count) as sum_log_count FROM l7_flow_log  WHERE `会话长度`>=893689408 ",
+		output: "SELECT SUM(1) AS `sum_log_count` FROM flow_log.`l7_flow_log` PREWHERE `会话长度` >= 893689408 LIMIT 10000",
 	}}
 )
 
@@ -267,7 +270,7 @@ func TestGetSql(t *testing.T) {
 		parser.ParseSQL(pcase.input)
 		out := parser.Engine.ToSQLString()
 		if out != pcase.output {
-			t.Errorf("Parse(%q) = %q, want: %q", pcase.input, out, pcase.output)
+			t.Errorf("Parse \n\t%q \n get: \n\t %q \n want: \n\t %q", pcase.input, out, pcase.output)
 		}
 	}
 }
