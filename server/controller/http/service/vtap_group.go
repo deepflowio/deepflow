@@ -18,6 +18,7 @@ package service
 
 import (
 	"fmt"
+	"regexp"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/google/uuid"
@@ -31,6 +32,8 @@ import (
 )
 
 const VTAP_GROUP_SHORT_UUID_PREFIX = "g-"
+
+var vtapGroupShortUUIDRegexp, _ = regexp.Compile(`^g-[A-Za-z0-9]{10}$`)
 
 func GetVtapGroups(filter map[string]interface{}) (resp []model.VtapGroup, err error) {
 	var response []model.VtapGroup
@@ -154,11 +157,17 @@ func CreateVtapGroup(vtapGroupCreate model.VtapGroupCreate, cfg *config.Controll
 	return response[0], nil
 }
 
+// IsVtapGroupShortUUID checks uuid consists of numbers and English letters with g- prefix.
+func IsVtapGroupShortUUID(uuid string) bool {
+	result := vtapGroupShortUUIDRegexp.FindAllStringSubmatch(uuid, -1)
+	return len(result) != 0
+}
+
 func verifyGroupID(groupID string) error {
 	if groupID == "" {
 		return nil
 	}
-	if !common.IsVtapGroupShortUUID(groupID) {
+	if !IsVtapGroupShortUUID(groupID) {
 		return NewError(
 			common.INVALID_POST_DATA,
 			fmt.Sprintf("id(%s) invalid, requires %s prefix, number and letter length %d, such as g-1yhIguXABC",

@@ -15,7 +15,6 @@
  */
 
 use std::collections::{HashMap, HashSet};
-#[cfg(target_os = "windows")]
 use std::ffi::CString;
 use std::mem;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
@@ -36,8 +35,7 @@ use super::{
     BpfOptions, Options, PacketCounter, Pipeline,
 };
 
-#[cfg(target_os = "windows")]
-use windows_recv_engine::WinPacket;
+use special_recv_engine::Libpcap;
 
 use crate::config::handler::LogParserAccess;
 #[cfg(target_os = "linux")]
@@ -191,20 +189,53 @@ impl BaseDispatcher {
 
         let bpf_options = self.bpf_options.lock().unwrap();
         #[cfg(target_os = "linux")]
-        if let Err(e) = self.engine.set_bpf(bpf_options.get_bpf_instructions(
-            &tap_interfaces,
-            &self.tap_interface_whitelist,
-            self.options.lock().unwrap().snap_len,
-        )) {
+        if let Err(e) = self.engine.set_bpf(
+            bpf_options.get_bpf_instructions(
+                &tap_interfaces,
+                &self.tap_interface_whitelist,
+                self.options.lock().unwrap().snap_len,
+            ),
+            &CString::new(bpf_options.get_bpf_syntax()).unwrap(),
+        ) {
             warn!("set_bpf failed: {}", e);
         }
         #[cfg(target_os = "windows")]
         if let Err(e) = self
             .engine
-            .set_bpf(&CString::new(bpf_options.get_bpf_instructions()).unwrap())
+            .set_bpf(vec![], &CString::new(bpf_options.get_bpf_syntax()).unwrap())
         {
             warn!("set_bpf failed: {}", e);
         }
+    }
+
+    pub(super) fn switch_recv_engine(&mut self, pcap_interfaces: Vec<Link>) -> Result<()> {
+        let options = self.options.lock().unwrap();
+        self.engine = if options.tap_mode == TapMode::Local && options.libpcap_enabled {
+            if pcap_interfaces.is_empty() {
+                return Err(Error::Libpcap(
+                    "libpcap capture must give interface to capture packet".into(),
+                ));
+            }
+            #[cfg(target_os = "windows")]
+            let src_ifaces = pcap_interfaces
+                .iter()
+                .map(|src_iface| (src_iface.device_name.as_str(), src_iface.if_index as isize))
+                .collect();
+            #[cfg(target_os = "linux")]
+            let src_ifaces = pcap_interfaces
+                .iter()
+                .map(|src_iface| (src_iface.name.as_str(), src_iface.if_index as isize))
+                .collect();
+            let libpcap = Libpcap::new(src_ifaces, options.packet_blocks, options.snap_len)
+                .map_err(|e| Error::Libpcap(e.to_string()))?;
+            info!("WinPacket init");
+            self.need_update_bpf.store(true, Ordering::Relaxed);
+            RecvEngine::Libpcap(Some(libpcap))
+        } else {
+            todo!()
+        };
+
+        Ok(())
     }
 }
 
@@ -219,88 +250,6 @@ impl BaseDispatcher {
             thread::sleep(Duration::from_secs(1));
             process::exit(1);
         }
-    }
-
-    pub(super) fn switch_recv_engine(&mut self, pcap_interfaces: Vec<Link>) -> Result<()> {
-        let options = self.options.lock().unwrap();
-        self.engine = if options.tap_mode == TapMode::Local {
-            if pcap_interfaces.is_empty() {
-                return Err(Error::WinPcap(
-                    "windows pcap capture must give interface to capture packet".into(),
-                ));
-            }
-            let src_ifaces = pcap_interfaces
-                .iter()
-                .map(|src_iface| (src_iface.device_name.as_str(), src_iface.if_index as isize))
-                .collect();
-            let win_packet =
-                WinPacket::new(src_ifaces, options.win_packet_blocks, options.snap_len)
-                    .map_err(|e| Error::WinPcap(e.to_string()))?;
-            info!("WinPacket init");
-            self.need_update_bpf.store(true, Ordering::Relaxed);
-            RecvEngine::WinPcap(Some(win_packet))
-        } else {
-            todo!()
-        };
-
-        Ok(())
-    }
-
-    pub(super) fn recv(
-        engine: &mut RecvEngine,
-        leaky_bucket: &LeakyBucket,
-        exception_handler: &ExceptionHandler,
-        prev_timestamp: &mut Duration,
-        counter: &PacketCounter,
-        ntp_diff: &AtomicI64,
-    ) -> Option<(Packet, Duration)> {
-        let packet = engine.recv();
-        if packet.is_err() {
-            if let recv_engine::Error::Timeout = packet.unwrap_err() {
-                return None;
-            }
-            counter.err.fetch_add(1, Ordering::Relaxed);
-            // Sleep to avoid wasting cpu during consequential errors
-            thread::sleep(Duration::from_millis(1));
-            return None;
-        }
-        let packet = packet.unwrap();
-        // Receiving incomplete eth header under some environments, unlikely to happen
-        if packet.data.len() < ETH_HEADER_SIZE + VLAN_HEADER_SIZE {
-            counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
-            return None;
-        }
-        let mut timestamp = packet.timestamp;
-        let time_diff = ntp_diff.load(Ordering::Relaxed);
-        if time_diff >= 0 {
-            timestamp += Duration::from_nanos(time_diff as u64);
-        } else {
-            timestamp -= Duration::from_nanos(-time_diff as u64);
-        }
-        if timestamp > *prev_timestamp {
-            if timestamp - *prev_timestamp > Duration::from_secs(60) {
-                // Correct invalid timestamp under some environments. Root cause unclear.
-                // A large timestamp will lead to discarding of following packets, correct
-                // this by setting it to present time
-                let now = get_timestamp(time_diff);
-                if timestamp > now && timestamp - now > Duration::from_secs(60) {
-                    timestamp = now;
-                }
-            }
-            *prev_timestamp = timestamp;
-        }
-        while !leaky_bucket.acquire(1) {
-            counter.get_token_failed.fetch_add(1, Ordering::Relaxed);
-            exception_handler.set(Exception::RxPpsThresholdExceeded);
-            thread::sleep(Duration::from_millis(1));
-        }
-
-        counter.rx_all.fetch_add(1, Ordering::Relaxed);
-        counter
-            .rx_all_bytes
-            .fetch_add(packet.data.len() as u64, Ordering::Relaxed);
-
-        Some((packet, timestamp))
     }
 
     pub(super) fn decapsulate(
@@ -377,42 +326,8 @@ impl BaseDispatcher {
     }
 }
 
-#[cfg(target_os = "linux")]
 impl BaseDispatcher {
-    #[cfg(not(target_arch = "s390x"))]
-    fn is_engine_dpdk(&self) -> bool {
-        match &self.engine {
-            RecvEngine::Dpdk(..) => true,
-            _ => false,
-        }
-    }
-
-    #[cfg(target_arch = "s390x")]
-    fn is_engine_dpdk(&self) -> bool {
-        false
-    }
-
-    pub(super) fn init(&mut self) {
-        match self.engine.init() {
-            Ok(_) => {
-                if &self.src_interface != "" {
-                    if let Ok(link) = net::link_by_name(&self.src_interface) {
-                        self.src_interface_index = link.if_index;
-                    }
-                }
-            }
-            Err(e) => {
-                error!(
-                    "dispatcher recv_engine init error: {}, deepflow-agent restart...",
-                    e
-                );
-                thread::sleep(Duration::from_secs(1));
-                process::exit(1);
-            }
-        }
-    }
-
-    pub(super) fn recv<'a>(
+    pub(super) unsafe fn recv<'a>(
         engine: &'a mut RecvEngine,
         leaky_bucket: &LeakyBucket,
         exception_handler: &ExceptionHandler,
@@ -467,6 +382,42 @@ impl BaseDispatcher {
             .fetch_add(packet.data.len() as u64, Ordering::Relaxed);
 
         Some((packet, timestamp))
+    }
+}
+
+#[cfg(target_os = "linux")]
+impl BaseDispatcher {
+    #[cfg(not(target_arch = "s390x"))]
+    fn is_engine_dpdk(&self) -> bool {
+        match &self.engine {
+            RecvEngine::Dpdk(..) => true,
+            _ => false,
+        }
+    }
+
+    #[cfg(target_arch = "s390x")]
+    fn is_engine_dpdk(&self) -> bool {
+        false
+    }
+
+    pub(super) fn init(&mut self) {
+        match self.engine.init() {
+            Ok(_) => {
+                if &self.src_interface != "" {
+                    if let Ok(link) = net::link_by_name(&self.src_interface) {
+                        self.src_interface_index = link.if_index;
+                    }
+                }
+            }
+            Err(e) => {
+                error!(
+                    "dispatcher recv_engine init error: {}, deepflow-agent restart...",
+                    e
+                );
+                thread::sleep(Duration::from_secs(1));
+                process::exit(1);
+            }
+        }
     }
 
     pub(super) fn decapsulate(

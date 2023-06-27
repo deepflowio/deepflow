@@ -570,6 +570,7 @@ impl Trimmable for Pod {
                         ..Default::default()
                     })
                     .collect(),
+                node_name: spec.node_name,
                 ..Default::default()
             });
         }

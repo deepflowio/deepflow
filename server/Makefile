@@ -77,6 +77,8 @@ vendor:
 	patch -p1 -d vendor/github.com/ClickHouse/clickhouse-go/v2/ < patch/clickhouse-go/write_improve.patch
 	# reset the pointer to the nullable field
 	patch -p1 -d vendor/github.com/ClickHouse/clickhouse-go/v2/ < patch/clickhouse-go/nullable.patch
+	# optimize the performance of hashmap when writing a large amount of data
+	patch -p1 -d vendor/github.com/cornelk/hashmap < patch/cornelk_hashmap/perf.patch
 
 .PHONY: test
 test: vendor $(proto) $(generated_libs)

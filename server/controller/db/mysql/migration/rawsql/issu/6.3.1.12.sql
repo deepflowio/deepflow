@@ -1,4 +1,3 @@
-START TRANSACTION;
 
 ALTER TABLE alarm_policy MODIFY COLUMN name CHAR(128) NOT NULL;
 
@@ -6,4 +5,3 @@ ALTER TABLE alarm_policy MODIFY COLUMN name CHAR(128) NOT NULL;
 UPDATE db_version SET version='6.3.1.12';
 -- modify end
 
-COMMIT;

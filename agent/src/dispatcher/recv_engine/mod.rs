@@ -17,7 +17,6 @@
 pub mod af_packet;
 pub(crate) mod bpf;
 
-#[cfg(target_os = "windows")]
 use std::ffi::CStr;
 use std::sync::{atomic::AtomicU64, Arc};
 use std::time::Duration;
@@ -29,8 +28,7 @@ use public::packet;
 
 use crate::utils::stats;
 
-#[cfg(target_os = "windows")]
-pub use windows_recv_engine::{WinPacket, WinPcapCounter};
+pub use special_recv_engine::{Libpcap, LibpcapCounter};
 
 pub const DEFAULT_BLOCK_SIZE: usize = 1 << 20;
 pub const FRAME_SIZE_MAX: usize = 1 << 16; // local and mirror
@@ -41,34 +39,31 @@ pub enum RecvEngine {
     #[cfg(target_os = "linux")]
     AfPacket(Tpacket),
     Dpdk(),
-    #[cfg(target_os = "windows")]
-    WinPcap(Option<WinPacket>),
+    Libpcap(Option<Libpcap>),
 }
 
 impl RecvEngine {
-    const WIN_PCAP_NONE: &'static str = "windows packet capture is none";
+    const LIBPCAP_NONE: &'static str = "libpcap packet capture is none";
 
     pub fn init(&mut self) -> Result<()> {
         match self {
             #[cfg(target_os = "linux")]
             Self::AfPacket(_) => Ok(()),
             Self::Dpdk() => todo!(),
-            #[cfg(target_os = "windows")]
-            Self::WinPcap(_) => Ok(()),
+            Self::Libpcap(_) => Ok(()),
         }
     }
 
     pub fn close(&mut self) {
         match self {
-            #[cfg(target_os = "windows")]
-            Self::WinPcap(w) => {
+            Self::Libpcap(w) => {
                 let _ = w.take();
             }
             _ => (),
         }
     }
 
-    pub fn recv(&mut self) -> Result<packet::Packet> {
+    pub unsafe fn recv(&mut self) -> Result<packet::Packet> {
         match self {
             #[cfg(target_os = "linux")]
             Self::AfPacket(e) => match e.read() {
@@ -76,31 +71,23 @@ impl RecvEngine {
                 None => Err(Error::Timeout),
             },
             Self::Dpdk() => todo!(),
-            // Enterprise Edition Feature: windows-dispatcher
-            #[cfg(target_os = "windows")]
-            Self::WinPcap(w) => w
+            Self::Libpcap(w) => w
                 .as_mut()
-                .ok_or(Error::WinpcapError(Self::WIN_PCAP_NONE.to_string()))
+                .ok_or(Error::LibpcapError(Self::LIBPCAP_NONE.to_string()))
                 .and_then(|e| e.read()),
         }
     }
 
-    #[cfg(target_os = "linux")]
-    pub fn set_bpf(&mut self, s: Vec<af_packet::RawInstruction>) -> Result<()> {
+    #[allow(unused_variables)]
+    pub fn set_bpf(&mut self, ins: Vec<af_packet::RawInstruction>, syntax: &CStr) -> Result<()> {
         match self {
-            Self::AfPacket(e) => e.set_bpf(s).map_err(|e| e.into()),
-            Self::Dpdk() => todo!(),
-        }
-    }
-
-    #[cfg(target_os = "windows")]
-    pub fn set_bpf(&mut self, s: &CStr) -> Result<()> {
-        match self {
-            Self::WinPcap(w) => w
+            #[cfg(target_os = "linux")]
+            Self::AfPacket(e) => e.set_bpf(ins).map_err(|e| e.into()),
+            Self::Libpcap(w) => w
                 .as_mut()
-                .ok_or(Error::WinpcapError(Self::WIN_PCAP_NONE.to_string()))
-                .and_then(|e| e.set_bpf(s.to_str().unwrap())),
-            _ => todo!(),
+                .ok_or(Error::LibpcapError(Self::LIBPCAP_NONE.to_string()))
+                .and_then(|e| e.set_bpf(syntax.to_str().unwrap())),
+            Self::Dpdk() => todo!(),
         }
     }
 
@@ -109,10 +96,9 @@ impl RecvEngine {
             #[cfg(target_os = "linux")]
             Self::AfPacket(e) => Arc::new(e.get_counter_handle()),
             Self::Dpdk() => todo!(),
-            #[cfg(target_os = "windows")]
-            Self::WinPcap(w) => match w {
+            Self::Libpcap(w) => match w {
                 Some(w) => w.get_counter_handle(),
-                None => Arc::new(WinPcapCounter::default()),
+                None => Arc::new(LibpcapCounter::default()),
             },
         }
     }
@@ -128,7 +114,7 @@ impl Default for RecvEngine {
 #[cfg(target_os = "windows")]
 impl Default for RecvEngine {
     fn default() -> Self {
-        Self::WinPcap(None)
+        Self::Libpcap(None)
     }
 }
 

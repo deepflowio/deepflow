@@ -28,9 +28,8 @@ pub enum Error {
     #[cfg(target_os = "linux")]
     #[error("create raw socket error")]
     CreateRawSocketError(#[from] std::io::Error),
-    #[cfg(target_os = "windows")]
-    #[error("winpcap error {0}")]
-    WinpcapError(String),
+    #[error("libpcap error {0}")]
+    LibpcapError(String),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

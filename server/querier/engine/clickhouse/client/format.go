@@ -96,9 +96,9 @@ func TransType(value interface{}, columnName, columnDatabaseTypeName string) (in
 		}
 		return int(**v), VALUE_TYPE_INT, nil
 	case *time.Time:
-		return v.String(), VALUE_TYPE_STRING, nil
+		return *v, VALUE_TYPE_STRING, nil
 	case *net.IP:
-		return v.String(), VALUE_TYPE_STRING, nil
+		return *v, VALUE_TYPE_STRING, nil
 	case **float64: // Nullable(float64)
 		// NaN, Inf
 		if *v == nil || math.IsNaN(**v) || **v == math.Inf(1) || **v == math.Inf(-1) {

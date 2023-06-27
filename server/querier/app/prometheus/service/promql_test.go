@@ -17,10 +17,12 @@
 package service
 
 import (
+	"fmt"
 	"testing"
 
-	"github.com/prometheus/prometheus/model/labels"
 	. "github.com/smartystreets/goconvey/convey"
+
+	"github.com/prometheus/prometheus/model/labels"
 )
 
 func TestParseMatchersParam(t *testing.T) {
@@ -55,4 +57,54 @@ func TestParseMatchersParam(t *testing.T) {
 		}
 	})
 
+}
+
+func BenchmarkForMatchMetricName(b *testing.B) {
+	executor := &prometheusExecutor{}
+	matchers := [][]*labels.Matcher{
+		{
+			{Type: labels.MatchEqual, Name: "job", Value: "prometheus-demo-job"},
+			{Type: labels.MatchEqual, Name: "instance", Value: "prometheus-demo-service-1"},
+			{Type: labels.MatchEqual, Name: "__name__", Value: "demo_cpu_usage_seconds_total"},
+			{Type: labels.MatchEqual, Name: "mode", Value: "system"},
+			{Type: labels.MatchEqual, Name: "namespace", Value: "prometheus"},
+		},
+		{
+			{Type: labels.MatchEqual, Name: "job", Value: "kubernetes-service-endpoints"},
+			{Type: labels.MatchEqual, Name: "instance", Value: "prometheus-demo-service-1"},
+			{Type: labels.MatchEqual, Name: "mode", Value: "system"},
+			{Type: labels.MatchEqual, Name: "namespace", Value: "prometheus"},
+			{Type: labels.MatchEqual, Name: "service", Value: "prometheus-node-exporter"},
+			{Type: labels.MatchEqual, Name: "app_kubernetes_io_component", Value: "metrics"},
+			{Type: labels.MatchEqual, Name: "__name__", Value: "node_cpu_seconds_total"},
+			{Type: labels.MatchEqual, Name: "app_kubernetes_io_instance", Value: "prometheus"},
+			{Type: labels.MatchEqual, Name: "app_kubernetes_io_managed_by", Value: "Helm"},
+			{Type: labels.MatchEqual, Name: "app_kubernetes_io_name", Value: "prometheus-node-exporter"},
+			{Type: labels.MatchEqual, Name: "app_kubernetes_io_part_of", Value: "prometheus-node-exporter"},
+		},
+		{
+			{Type: labels.MatchEqual, Name: "job", Value: "prometheus-demo-job"},
+			{Type: labels.MatchEqual, Name: "instance", Value: "prometheus-demo-service-1"},
+			{Type: labels.MatchEqual, Name: "mode", Value: "system"},
+			{Type: labels.MatchEqual, Name: "namespace", Value: "prometheus"},
+			{Type: labels.MatchEqual, Name: "service", Value: "prometheus-node-exporter"},
+			{Type: labels.MatchEqual, Name: "node", Value: "vm-1"},
+			{Type: labels.MatchEqual, Name: "helm_sh_chart", Value: "prometheus-node-exporter-x.x.x"},
+			{Type: labels.MatchEqual, Name: "app_kubernetes_io_component", Value: "metrics"},
+			{Type: labels.MatchEqual, Name: "app_kubernetes_io_instance", Value: "prometheus"},
+			{Type: labels.MatchEqual, Name: "__name__", Value: "node_memory_Cached_bytes"},
+			{Type: labels.MatchEqual, Name: "app_kubernetes_io_managed_by", Value: "Helm"},
+			{Type: labels.MatchEqual, Name: "app_kubernetes_io_name", Value: "prometheus-node-exporter"},
+			{Type: labels.MatchEqual, Name: "app_kubernetes_io_part_of", Value: "prometheus-node-exporter"},
+		},
+	}
+
+	b.ResetTimer()
+	for j := 0; j < len(matchers); j++ {
+		b.Run(fmt.Sprintf("BenchmarkTestFor[%d]", j), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				executor.matchMetricName(&matchers[j])
+			}
+		})
+	}
 }

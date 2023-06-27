@@ -1,4 +1,3 @@
-START TRANSACTION;
 
 CREATE TABLE IF NOT EXISTS ch_prometheus_target_label_layout (
     `target_id`           INT(10) NOT NULL PRIMARY KEY,
@@ -10,4 +9,3 @@ CREATE TABLE IF NOT EXISTS ch_prometheus_target_label_layout (
 UPDATE db_version SET version='6.3.1.11';
 -- modify end
 
-COMMIT;
