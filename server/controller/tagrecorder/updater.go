@@ -100,7 +100,7 @@ func (b *UpdaterBase[MT, KT]) Refresh() bool {
 				}
 			}
 		}
-		if isUpdate || len(itemsToDelete) > 0 || len(itemsToAdd) > 0 && (b.resourceTypeName == RESOURCE_TYPE_CH_APP_LABEL || b.resourceTypeName == RESOURCE_TYPE_CH_TARGET_LABEL) {
+		if (isUpdate || len(itemsToDelete) > 0 || len(itemsToAdd) > 0) && (b.resourceTypeName == RESOURCE_TYPE_CH_APP_LABEL || b.resourceTypeName == RESOURCE_TYPE_CH_TARGET_LABEL) {
 			return true
 		}
 	}

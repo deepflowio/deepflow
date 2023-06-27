@@ -29,6 +29,8 @@ const (
 	VALUE_TYPE_STRING  = "String"
 	VALUE_TYPE_FLOAT64 = "Float64"
 	VALUE_TYPE_TUPLE   = "Tuple"
+	VALUE_TYPE_TIME    = "Time"
+	VALUE_TYPE_IP      = "IP"
 )
 
 var VALUE_TYPE_MAP = map[string]int{
@@ -96,9 +98,9 @@ func TransType(value interface{}, columnName, columnDatabaseTypeName string) (in
 		}
 		return int(**v), VALUE_TYPE_INT, nil
 	case *time.Time:
-		return v.String(), VALUE_TYPE_STRING, nil
+		return *v, VALUE_TYPE_TIME, nil
 	case *net.IP:
-		return v.String(), VALUE_TYPE_STRING, nil
+		return *v, VALUE_TYPE_IP, nil
 	case **float64: // Nullable(float64)
 		// NaN, Inf
 		if *v == nil || math.IsNaN(**v) || **v == math.Inf(1) || **v == math.Inf(-1) {
