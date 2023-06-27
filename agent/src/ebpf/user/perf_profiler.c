@@ -138,18 +138,6 @@ static int relase_profiler(struct bpf_tracer *tracer)
 	return ETR_OK;
 }
 
-static void set_msg_kvp(stack_trace_msg_kv_t * kvp,
-			struct stack_trace_key_t *v,
-			u64 stime,
-			void *msg_value)
-{
-	kvp->k.pid = (u64) v->pid;
-	kvp->k.stime = stime;
-	kvp->k.u_stack_id = (u32) v->userstack;
-	kvp->k.k_stack_id = (u32) v->kernstack;
-	kvp->msg_ptr = pointer_to_uword(msg_value);
-}
-
 static int init_stack_trace_msg_hash(stack_trace_msg_hash_t *h,
 				     const char *name)
 {
@@ -296,7 +284,7 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 		 * stack trace messages has already been stored. 
 		 */
 		stack_trace_msg_kv_t kv; // stack_trace_msg_hash_kv
-		u64 stime = get_pid_stime(v->pid);
+		u64 stime = get_pid_stime(v->tgid);
 		if (stime == 0) {
 			stime = v->timestamp / NS_IN_MSEC;
 		}
@@ -596,8 +584,8 @@ int stop_continuous_profiler(void)
 #ifdef DF_MEM_DEBUG
 	show_mem_list();
 #endif
-	ebpf_info("== alloc_b %lu bytes, free_b %lu bytes, use %lu "
-		  "bytes ==\n", alloc_b, free_b, alloc_b - free_b);
+	ebpf_info(LOG_CP_TAG "== alloc_b %lu bytes, free_b %lu bytes, "
+		  "use %lu bytes ==\n", alloc_b, free_b, alloc_b - free_b);
 	return (0);
 }
 
@@ -726,7 +714,9 @@ void process_stack_trace_data_for_flame_graph(stack_trace_msg_t *val)
 	}
 
 	stack_trace_msg_kv_t msg_kvp;
-	msg_kvp.k.pid = (u64) val->pid;
+	msg_kvp.k.tgid = val->pid;
+	msg_kvp.k.pid = val->tid;
+	msg_kvp.k.cpu = val->cpu;
         msg_kvp.k.stime = val->stime;
 	msg_kvp.k.u_stack_id = val->u_stack_id;
 	msg_kvp.k.k_stack_id = val->k_stack_id;
@@ -761,9 +751,18 @@ static int gen_stack_trace_folded_file(stack_trace_msg_hash_kv *kv, void *ctx)
 	stack_trace_msg_kv_t *msg_kv = (stack_trace_msg_kv_t *)kv;
 	if (msg_kv->msg_ptr != 0) {
 		stack_trace_msg_t *msg = (stack_trace_msg_t *)msg_kv->msg_ptr;
-		int len = msg->data_len + sizeof(msg->comm) + 18;
+
+		/* Ensure that the buffer is long enough to accommodate the stack trace string. */
+		int len = msg->data_len + sizeof(msg->comm) + sizeof(msg->process_name) + 64;
 		char str[len];
-		snprintf(str, len, "%s;%s %u\n", msg->comm, msg->data, msg->count);
+		/* Is it a thread? */
+		if (msg->pid != msg->tid)
+			snprintf(str, len, "%s(%d);%s;%s %u\n", msg->process_name, msg->pid,
+				 msg->comm, msg->data, msg->count);
+		else /* is process */
+			snprintf(str, len, "%s(%d);%s %u\n", msg->process_name, msg->pid,
+				 msg->data, msg->count);
+
 		os_puts(folded_file, str, strlen(str), false);
 #ifdef CP_DEBUG
 		ebpf_debug("tiemstamp %lu pid %u stime %lu u_stack_id %lu k_statck_id"
@@ -786,31 +785,31 @@ void release_flame_graph_hash(void)
 	u64 elems_count = 0;
 	u64 alloc_b, free_b;
 	get_mem_stat(&alloc_b, &free_b);
-	ebpf_info("pre alloc_b:\t%lu bytes free_b:\t%lu bytes use:\t%lu bytes\n",
-		  alloc_b, free_b, alloc_b - free_b);
+	ebpf_info(LOG_CP_TAG "pre alloc_b:\t%lu bytes free_b:\t%lu bytes use:\t%lu"
+		  " bytes\n", alloc_b, free_b, alloc_b - free_b);
 
 	stack_trace_msg_hash_foreach_key_value_pair(&test_fg_hash,
 						    gen_stack_trace_folded_file,
 						    (void *)&elems_count);
 
-	ebpf_info("elems_count %lu hash_elems_count %lu "
+	ebpf_info(LOG_CP_TAG "elems_count %lu hash_elems_count %lu "
 		  "hit_hash_count %lu\n", elems_count,
 		  test_fg_hash.hash_elems_count, test_fg_hash.hit_hash_count);
 
-	ebpf_info("flame graph folded strings count %lu\n", elems_count);
+	ebpf_info(LOG_CP_TAG "flame graph folded strings count %lu\n", elems_count);
 	fclose(folded_file);
 
 	stack_trace_msg_hash_free(&test_fg_hash);
 
 	get_mem_stat(&alloc_b, &free_b);
-	ebpf_info("after alloc_b:\t%lu bytes free_b:\t%lu bytes use:\t%lu bytes\n",
-		  alloc_b, free_b, alloc_b - free_b);
+	ebpf_info(LOG_CP_TAG "after alloc_b:\t%lu bytes free_b:\t%lu bytes use:\t%lu"
+		  " bytes\n",alloc_b, free_b, alloc_b - free_b);
 
-	ebpf_info("<<< stack_count %lu add_count %lu hit_count %lu msg_ptr_zero"
+	ebpf_info(LOG_CP_TAG "<<< stack_count %lu add_count %lu hit_count %lu msg_ptr_zero"
 		  "_count %lu push_count %lu >>>\n", stack_count, test_add_count, test_hit_count,
 		  msg_ptr_zero_count, push_count);
 
-	ebpf_info("Please use the following command to generate a flame graph:"
+	ebpf_info(LOG_CP_TAG "Please use the following command to generate a flame graph:"
 		  "\n\n\033[33;1mcat ./profiler.folded |./.flamegraph.pl --color=io"
 		  " --countname=samples > profiler-test.svg\033[0m\n");
 }

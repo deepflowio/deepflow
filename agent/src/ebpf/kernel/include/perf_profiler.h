@@ -39,10 +39,8 @@ typedef enum {
 } profiler_idx;
 
 struct stack_trace_key_t {
-	union {
-		__u32 pid;	// for user process-ID
-		__u32 tgid;	// for kernel
-	};
+	__u32 pid;	// processID or threadID
+	__u32 tgid;	// processID
 	__u32 cpu;
 	char comm[TASK_COMM_LEN];
 	int kernstack;

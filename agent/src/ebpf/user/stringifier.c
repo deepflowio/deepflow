@@ -383,15 +383,31 @@ static inline stack_trace_msg_t *alloc_stack_trace_msg(int len)
 	return NULL;
 }
 
+void set_msg_kvp(stack_trace_msg_kv_t * kvp,
+		 struct stack_trace_key_t *v,
+		 u64 stime,
+		 void *msg_value)
+{
+	kvp->k.tgid = v->tgid;
+	kvp->k.pid = v->pid;
+	kvp->k.stime = stime;
+	kvp->k.cpu = v->cpu;
+	kvp->k.u_stack_id = (u32) v->userstack;
+	kvp->k.k_stack_id = (u32) v->kernstack;
+	kvp->msg_ptr = pointer_to_uword(msg_value);
+}
+
 static bool set_stack_trace_msg(stack_trace_msg_t * msg,
 				struct stack_trace_key_t *v)
 {
-	msg->pid = v->pid;
+	msg->pid = v->tgid;
+	msg->tid = v->pid;
 	msg->cpu = v->cpu;
 	msg->u_stack_id = (u32) v->userstack;
 	msg->k_stack_id = (u32) v->kernstack;
-	msg->stime = get_pid_stime_and_name(v->pid,
-					    (char *)msg->comm);
+	memcpy(msg->comm, v->comm, sizeof(msg->comm));
+	msg->stime = get_pid_stime_and_name(msg->pid,
+					    (char *)msg->process_name);
 	if (msg->stime > 0) {
 		/*
 		 * Note: There is no process with PID 0 in procfs.
@@ -399,15 +415,16 @@ static bool set_stack_trace_msg(stack_trace_msg_t * msg,
 		 * startup time, and the process name will be
 		 * obtained from data retrieved through eBPF.
 		 */
-		if (v->pid == 0)
-			memcpy(msg->comm, v->comm, sizeof(msg->comm));
+		if (msg->pid == 0) {
+			memcpy(msg->process_name, v->comm, sizeof(msg->comm));
+		}
 
 		goto skip_no_proc;
 	}
 
 	/* the process is exit. */
 	msg->stime = v->timestamp / NS_IN_MSEC;
-	memcpy(msg->comm, v->comm, sizeof(msg->comm));
+	memcpy(msg->process_name, v->comm, sizeof(msg->comm));
 
 skip_no_proc:
 	msg->data_len = strlen((char *)&msg->data[0]);
@@ -433,7 +450,7 @@ char *folded_stack_trace_string(struct bpf_tracer *t,
 
 	if (v->userstack >= 0) {
 		u_trace_str = __folded_stack_trace_string(t, v->userstack,
-							  v->pid,
+							  v->tgid,
 							  stack_map_name,
 							  h);
 	}
@@ -521,7 +538,7 @@ resolve_and_gen_stack_trace_msg(struct bpf_tracer *t,
 
 	if (v->userstack >= 0) {
 		u_trace_str = __folded_stack_trace_string(t, v->userstack,
-							  v->pid,
+							  v->tgid,
 							  stack_map_name,
 							  h);
 	}

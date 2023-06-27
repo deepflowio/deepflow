@@ -39,5 +39,8 @@ resolve_and_gen_stack_trace_msg(struct bpf_tracer *t,
 				struct stack_trace_key_t *v,
 				const char *stack_map_name,
 				stack_str_hash_t *h);
+void set_msg_kvp(stack_trace_msg_kv_t * kvp,
+		 struct stack_trace_key_t *v,
+		 u64 stime, void *msg_value);
 #endif /* AARCH64_MUSL */
 #endif /* DF_USER_STRINGIFIER_H */

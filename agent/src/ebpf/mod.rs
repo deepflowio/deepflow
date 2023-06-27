@@ -340,17 +340,32 @@ pub struct SK_TRACE_STATS {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct stack_profile_data {
-    pub timestamp: u64,  // Timestamp of the stack trace data(unit: nanoseconds).
-    pub pid: u32,        // User-space process-ID or kernel thread-ID.
+    pub timestamp: u64, // Timestamp of the stack trace data(unit: nanoseconds).
+    pub pid: u32,       // User-space process-ID.
+    /*
+     * Identified within the eBPF program in kernel space.
+     * If the current is a process and not a thread this field(tid) is filled
+     * with the ID of the process.
+     */
+    pub tid: u32,
     pub stime: u64,      // The start time of the process is measured in milliseconds.
     pub u_stack_id: u32, // User space stackID.
     pub k_stack_id: u32, // Kernel space stackID.
     pub cpu: u32,        // The captured stack trace data is generated on which CPU?
-    pub count: u32,      // The profiler captures the number of occurrences of the same
-    // data by querying with the quadruple "<pid + stime + u_stack_id
-    // + k_stack_id>" as the key.
-    pub comm: [u8; PACKET_KNAME_MAX_PADDING + 1], // comm in task_struct, always 16 bytes
-    pub stack_data_len: u32,                      // stack data length
+    /*
+     * The profiler captures the number of occurrences of the same
+     * data by querying with the quadruple
+     * "<pid + stime + u_stack_id + k_stack_id + tid + cpu>" as the key.
+     */
+    pub count: u32,
+    /*
+     * comm in task_struct(linux kernel), always 16 bytes
+     * If the capture is a process, fill in the process name here.
+     * If the capture is a thread, fill in the thread name.
+     */
+    pub comm: [u8; PACKET_KNAME_MAX_PADDING + 1],
+    pub process_name: [u8; PACKET_KNAME_MAX_PADDING + 1], // process name
+    pub stack_data_len: u32,                              // stack data length
 
     /*
      * Example of a folded stack trace string (taken from a perf profiler test):
