@@ -199,6 +199,7 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 		log.Errorf("vtap(%s) has no proxy_controller_ip", c.GetCtrlIP())
 	}
 	if configure.GetAnalyzerIp() == "" {
+		configure.Enabled = proto.Bool(false)
 		log.Errorf("vtap(%s) has no analyzer_ip", c.GetCtrlIP())
 	}
 	if vtapConfig.TapInterfaceRegex != "" {
@@ -209,6 +210,12 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 		configure.PcapDataRetention = proto.Uint32(pcapDataRetention)
 	}
 	configure.LocalConfig = proto.String(c.GetLocalConfig())
+
+	if c.GetVTapEnabled() == 0 {
+		configure.KubernetesApiEnabled = proto.Bool(false)
+		configure.PlatformEnabled = proto.Bool(false)
+		configure.Enabled = proto.Bool(false)
+	}
 
 	return configure
 }
