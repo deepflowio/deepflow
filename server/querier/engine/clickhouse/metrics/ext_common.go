@@ -75,3 +75,52 @@ func GetExtMetrics(db, table, where string, ctx context.Context) (map[string]*Me
 	}
 	return loadMetrics, err
 }
+
+func GetPrometheusMetrics(db, table, where string, ctx context.Context) (map[string]*Metrics, error) {
+	loadMetrics := make(map[string]*Metrics)
+	allMetrics := GetSamplesMetrics()
+	var err error
+	if config.Cfg == nil {
+		return nil, nil
+	}
+	externalChClient := client.Client{
+		Host:     config.Cfg.Clickhouse.Host,
+		Port:     config.Cfg.Clickhouse.Port,
+		UserName: config.Cfg.Clickhouse.User,
+		Password: config.Cfg.Clickhouse.Password,
+		DB:       "flow_tag",
+		Context:  ctx,
+	}
+	var prometheusTableSql string
+	var tableFilter string
+	var whereSql string
+	prometheusTableSql = "SELECT table FROM flow_tag.%s_custom_field WHERE %s field_type!='' %s GROUP BY table ORDER BY table ASC"
+	if table != "" {
+		tableFilter = fmt.Sprintf("table='%s' AND", table)
+	}
+	if where != "" {
+		whereSql = fmt.Sprintf("AND (%s)", where)
+	}
+	prometheusTableSql = fmt.Sprintf(prometheusTableSql, db, tableFilter, whereSql)
+
+	prometheusTableRst, err := externalChClient.DoQuery(&client.QueryParams{Sql: prometheusTableSql})
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	for _, metric := range allMetrics {
+		metricName := metric.DisplayName
+		for i, value := range prometheusTableRst.Values {
+			tableName := value.([]interface{})[0].(string)
+			if tableName == "" {
+				continue
+			}
+			lm := NewMetrics(
+				i, metricName, metricName, "", METRICS_TYPE_COUNTER,
+				"metrics", []bool{true, true, true}, "", tableName, "",
+			)
+			loadMetrics[fmt.Sprintf("%s-%s", metricName, tableName)] = lm
+		}
+	}
+	return loadMetrics, err
+}

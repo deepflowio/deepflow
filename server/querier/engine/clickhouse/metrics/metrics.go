@@ -106,6 +106,12 @@ func GetMetrics(field string, db string, table string, ctx context.Context) (*Me
 				), true
 			}
 		}
+	} else if db == ckcommon.DB_NAME_PROMETHEUS {
+		return NewMetrics(
+			0, field,
+			field, "", METRICS_TYPE_COUNTER,
+			"metrics", []bool{true, true, true}, "", table, "",
+		), true
 	}
 	allMetrics, err := GetMetricsByDBTableStatic(db, table, "")
 	if err != nil {
@@ -153,11 +159,6 @@ func GetMetricsByDBTableStatic(db string, table string, where string) (map[strin
 		switch table {
 		case "in_process":
 			return GetInProcessMetrics(), err
-		}
-	case ckcommon.DB_NAME_PROMETHEUS:
-		switch table {
-		case "samples":
-			return GetSamplesMetrics(), err
 		}
 	}
 	return nil, err
@@ -225,10 +226,7 @@ func GetMetricsByDBTable(db string, table string, where string, ctx context.Cont
 	case "ext_metrics", "deepflow_system":
 		return GetExtMetrics(db, table, where, ctx)
 	case ckcommon.DB_NAME_PROMETHEUS:
-		switch table {
-		case "samples":
-			return GetSamplesMetrics(), err
-		}
+		return GetPrometheusMetrics(db, table, where, ctx)
 	}
 
 	return nil, err
@@ -245,7 +243,7 @@ func GetMetricsDescriptionsByDBTable(db string, table string, where string, ctx 
 	} */
 	values := make([]interface{}, len(allMetrics))
 	for field, metrics := range allMetrics {
-		if db == "ext_metrics" || db == "deepflow_system" || (table == "l7_flow_log" && strings.Contains(field, "metrics.")) {
+		if db == "ext_metrics" || db == ckcommon.DB_NAME_PROMETHEUS || db == "deepflow_system" || (table == "l7_flow_log" && strings.Contains(field, "metrics.")) {
 			field = metrics.DisplayName
 		}
 		values[metrics.Index] = []interface{}{
@@ -259,7 +257,7 @@ func GetMetricsDescriptionsByDBTable(db string, table string, where string, ctx 
 
 func GetMetricsDescriptions(db string, table string, where string, ctx context.Context) (*common.Result, error) {
 	var values []interface{}
-	if table == "" {
+	if table == "" && db != ckcommon.DB_NAME_PROMETHEUS {
 		var tables []interface{}
 		if db == "ext_metrics" {
 			tables = append(tables, table)
@@ -393,11 +391,9 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) erro
 			replaceMetrics = IN_PROCESS_METRICS_REPLACE
 		}
 	case ckcommon.DB_NAME_PROMETHEUS:
-		switch table {
-		case "samples":
-			metrics = PROMETHEUS_METRICS
-			replaceMetrics = PROMETHEUS_METRICS_REPLACE
-		}
+		metrics = PROMETHEUS_METRICS
+		replaceMetrics = PROMETHEUS_METRICS_REPLACE
+
 	case "ext_metrics", "deepflow_system":
 		metrics = EXT_METRICS
 	}
