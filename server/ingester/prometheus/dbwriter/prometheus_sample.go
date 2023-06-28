@@ -126,9 +126,10 @@ func (m *PrometheusSample) GenerateNewFlowTags(cache *flow_tag.FlowTagCache, met
 	// reset temporary buffers
 	flowTagInfo := &cache.FlowTagInfoBuffer
 	*flowTagInfo = flow_tag.FlowTagInfo{
-		TableId: m.MetricID,
-		VpcId:   m.UniversalTag.L3EpcID,
-		PodNsId: m.UniversalTag.PodNSID,
+		FieldType: flow_tag.FieldTag,
+		TableId:   m.MetricID,
+		VpcId:     m.UniversalTag.L3EpcID,
+		PodNsId:   m.UniversalTag.PodNSID,
 	}
 	cache.Fields = cache.Fields[:0]
 	cache.FieldValues = cache.FieldValues[:0]
@@ -141,7 +142,6 @@ func (m *PrometheusSample) GenerateNewFlowTags(cache *flow_tag.FlowTagCache, met
 		}
 		j++
 
-		flowTagInfo.FieldType = flow_tag.FieldMetrics
 		// tag + value
 		flowTagInfo.FieldNameId = tsLabelNameIDs[j]
 		flowTagInfo.FieldValueId = tsLabelValueIDs[j]
@@ -170,7 +170,6 @@ func (m *PrometheusSample) GenerateNewFlowTags(cache *flow_tag.FlowTagCache, met
 		cache.FieldValues = append(cache.FieldValues, tagFieldValue)
 
 		// only tag
-		flowTagInfo.FieldType = flow_tag.FieldTag
 		flowTagInfo.FieldValueId = 0
 		lruKey1, lruKey2 = genLru128Key(flowTagInfo)
 		if old := cache.PrometheusFieldCache.AddOrGet(lruKey1, lruKey2, m.Timestamp); old != nil {
