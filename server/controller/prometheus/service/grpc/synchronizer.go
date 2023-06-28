@@ -21,8 +21,8 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/deepflowio/deepflow/message/trident"
+	"github.com/deepflowio/deepflow/server/controller/grpc/statsd"
 	"github.com/deepflowio/deepflow/server/controller/prometheus"
-	"github.com/deepflowio/deepflow/server/controller/trisolaris/services/grpc/statsd"
 )
 
 var log = logging.MustGetLogger("prometheus.synchronizer.grpc")
