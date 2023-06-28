@@ -33,7 +33,8 @@ func GetUnverifyHTTPClient(timeout time.Duration) *http.Client {
 	return &http.Client{
 		Timeout: timeout,
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
+			DisableKeepAlives: true,
 		},
 	}
 }
@@ -50,7 +51,6 @@ func RequestGet(url, token string, timeout time.Duration) (jsonResp *simplejson.
 	req.Header.Set("X-Auth-Token", token)
 	req.Header.Set("Accept", "application/json, text/plain")
 
-	// TODO: 通过配置文件获取API超时时间
 	client := GetUnverifyHTTPClient(time.Second * timeout)
 	resp, err := client.Do(req)
 	if err != nil {
@@ -88,7 +88,6 @@ func RequestPost(url string, timeout time.Duration, body map[string]interface{})
 	}
 	req.Header.Set("content-type", "application/json")
 
-	// TODO: 通过配置文件获取API超时时间
 	client := GetUnverifyHTTPClient(time.Second * timeout)
 	resp, err := client.Do(req)
 	if err != nil {
