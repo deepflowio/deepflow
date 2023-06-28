@@ -118,7 +118,8 @@ struct cfg_feature_regex {
 
 extern struct cfg_feature_regex cfg_feature_regex_array[FEATURE_MAX];
 extern int ebpf_config_protocol_filter[PROTO_NUM];
-extern struct allow_port_bitmap allow_port_bitmap;
+extern struct kprobe_port_bitmap allow_port_bitmap;
+extern struct kprobe_port_bitmap bypass_port_bitmap;
 
 /* *INDENT-OFF* */
 #define probes_set_enter_symbol(t, fn)						\
@@ -448,6 +449,7 @@ static inline void tracer_reader_unlock(struct bpf_tracer *t)
 #define CACHE_LINE_BYTES 64
 
 int set_allow_port_bitmap(void *bitmap);
+int set_bypass_port_bitmap(void *bitmap);
 int enable_ebpf_protocol(int protocol);
 int set_feature_regex(int feature, const char *pattern);
 bool is_feature_enabled(int feature);

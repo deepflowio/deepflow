@@ -84,7 +84,7 @@
 |__trace_map|BPF_MAP_TYPE_HASH|__u64 {tgid, pid}|struct trace_info_t|用于记录追踪信息|
 |__progs_jmp_kp_map|BPF_MAP_TYPE_PROG_ARRAY|__u32|__u32|Tail Calls jmp table for [k/u]probe|
 |__progs_jmp_tp_map|BPF_MAP_TYPE_PROG_ARRAY|__u32|__u32|Tail Calls jmp table for tracepoint|
-|__allow_port_bitmap|BPF_MAP_TYPE_ARRAY|__u32|struct allow_port_bitmap|服务端口白名单|
+|__kprobe_port_bitmap|BPF_MAP_TYPE_ARRAY|__u32|struct kprobe_port_bitmap|根据端口跳过协议识别直接上报或不处理数据包也不上报|
 |__protocol_filter|BPF_MAP_TYPE_ARRAY|deepflow 定义的 l7 协议号|是否启用的状态标记|标记需要进行分析的协议,关闭无关协议可以提高性能.可以通过 deepflow-server 修改|
 |__http2_stack|BPF_MAP_TYPE_PERCPU_ARRAY|-|struct __http2_stack|类似 __socket_data,仅用于处理 go uprobe 获取的 http2 数据|
 |tls_conn_map|BPF_MAP_TYPE_HASH|系统中单个协程的标记,由进程号和协程号组合|连接的文件描述符,buffer 指针,栈指针等函数入参信息|用于在进入函数时保存函数参数,并在函数返回时取出参数使用|

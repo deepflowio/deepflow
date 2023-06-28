@@ -109,7 +109,8 @@ MAP_ARRAY(trace_stats_map, __u32, struct trace_stats, 1)
 // key: protocol id, value: is protocol enabled, size: PROTO_NUM
 MAP_ARRAY(protocol_filter, int, int, PROTO_NUM)
 
-MAP_ARRAY(allow_port_bitmap, __u32, struct allow_port_bitmap, 1)
+// 0: allow bitmap; 1: bypass bitmap
+MAP_ARRAY(kprobe_port_bitmap, __u32, struct kprobe_port_bitmap, 2)
 
 // write() syscall's input argument.
 // Key is {tgid, pid}.
@@ -1273,7 +1274,7 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 
 	// TODO : 此处可以根据配置对进程号进行过滤
 
-	__u32 k0 = 0;
+	__u32 k0 = 0, k1 = 1;
 	struct member_fields_offset *offset = members_offset__lookup(&k0);
 	if (!offset)
 		return -1;
@@ -1299,11 +1300,19 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 	if (!ctx_map)
 		return -1;
 
+	struct kprobe_port_bitmap *bypass = kprobe_port_bitmap__lookup(&k1);
+	if (bypass) {
+		if (is_set_bitmap(bypass->bitmap, conn_info->tuple.dport) ||
+		    is_set_bitmap(bypass->bitmap, conn_info->tuple.num)) {
+			return -1;
+		}
+	}
+
 	bool data_submit_dircet = false;
-	struct allow_port_bitmap *bp = allow_port_bitmap__lookup(&k0);
-	if (bp) {
-		if (is_set_bitmap(bp->bitmap, conn_info->tuple.dport) ||
-		    is_set_bitmap(bp->bitmap, conn_info->tuple.num)) {
+	struct kprobe_port_bitmap *allow = kprobe_port_bitmap__lookup(&k0);
+	if (allow) {
+		if (is_set_bitmap(allow->bitmap, conn_info->tuple.dport) ||
+		    is_set_bitmap(allow->bitmap, conn_info->tuple.num)) {
 			data_submit_dircet = true;
 		}
 	}
