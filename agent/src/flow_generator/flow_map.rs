@@ -132,6 +132,7 @@ pub struct FlowMap {
     packet_sequence_queue: Option<DebugSender<Box<PacketSequenceBlock>>>, // Enterprise Edition Feature: packet-sequence
     packet_sequence_enabled: bool,
     stats_counter: Arc<FlowMapCounter>,
+    system_time: Duration,
 
     l7_protocol_checker: L7ProtocolChecker,
 
@@ -201,9 +202,8 @@ impl FlowMap {
             Countable::Ref(Arc::downgrade(&flow_perf_counter) as Weak<dyn RefCountable>),
             vec![StatsOption::Tag("id", format!("{}", id))],
         );
-        let start_time = get_timestamp(ntp_diff.load(Ordering::Relaxed))
-            - config.packet_delay
-            - Duration::from_secs(1);
+        let system_time = get_timestamp(ntp_diff.load(Ordering::Relaxed));
+        let start_time = system_time - config.packet_delay - Duration::from_secs(1);
         let time_set_slot_size = config.hash_slots as usize / time_window_size;
         Self {
             node_map: Some(AHashMap::with_capacity(config.hash_slots as usize)),
@@ -242,6 +242,7 @@ impl FlowMap {
             packet_sequence_queue, // Enterprise Edition Feature: packet-sequence
             packet_sequence_enabled,
             stats_counter,
+            system_time,
             l7_protocol_checker: L7ProtocolChecker::new(
                 &config.l7_protocol_enabled_bitmap,
                 &config
@@ -321,13 +322,20 @@ impl FlowMap {
     }
 
     pub fn inject_flush_ticker(&mut self, config: &Config, mut timestamp: Duration) -> bool {
+        self.system_time = get_timestamp(self.ntp_diff.load(Ordering::Relaxed));
         if timestamp.is_zero() {
-            timestamp = get_timestamp(self.ntp_diff.load(Ordering::Relaxed));
+            timestamp = self.system_time;
         } else if timestamp < self.start_time {
             self.stats_counter
                 .drop_by_window
                 .fetch_add(1, Ordering::Relaxed);
             return false;
+        } else {
+            // called from inject_meta_packet
+            self.stats_counter.packet_delay.fetch_max(
+                self.system_time.as_nanos() as i64 - timestamp.as_nanos() as i64,
+                Ordering::Relaxed,
+            );
         }
 
         let config = &config.flow;
@@ -337,9 +345,21 @@ impl FlowMap {
             return true;
         }
 
+        self.stats_counter.flush_delay.fetch_max(
+            self.system_time.as_nanos() as i64 - self.start_time.as_nanos() as i64,
+            Ordering::Relaxed,
+        );
         // 根据包到达时间的容差调整
         let next_start_time_in_unit =
             ((timestamp - config.packet_delay).as_nanos() / TIME_UNIT.as_nanos()) as u64;
+        debug!(
+            "flow_map#{} ticker flush [{:?}, {:?}) at {:?} time diff is {:?}",
+            self.id,
+            self.start_time,
+            Duration::from_nanos(next_start_time_in_unit * TIME_UNIT.as_nanos() as u64),
+            timestamp,
+            self.system_time - self.start_time
+        );
         self.start_time =
             Duration::from_nanos(next_start_time_in_unit * TIME_UNIT.as_nanos() as u64);
         timestamp = self.start_time - Duration::from_nanos(1);
@@ -752,9 +772,9 @@ impl FlowMap {
 
     // 协议参考：https://datatracker.ietf.org/doc/html/rfc1122#section-4.2.3.6
     // TCP Keepalive报文特征：
-    //		1.payloadLen为0/1
-    //		2.非FIN、SYN、RST
-    //		3.TCP保活探测报文序列号(Seq)为前一个TCP报文序列号(Seq)减一
+    //      1.payloadLen为0/1
+    //      2.非FIN、SYN、RST
+    //      3.TCP保活探测报文序列号(Seq)为前一个TCP报文序列号(Seq)减一
     fn update_tcp_keepalive_seq(&mut self, node: &mut FlowNode, meta_packet: &MetaPacket) {
         // 保存TCP Seq用于TCP Keepalive报文判断
 
@@ -1407,6 +1427,12 @@ impl FlowMap {
         // 6. The L7PerfStats is valuable
 
         let flow = &mut tagged_flow.flow;
+
+        self.stats_counter.flow_delay.fetch_max(
+            self.system_time.as_nanos() as i64 - flow.flow_stat_time.as_nanos() as i64,
+            Ordering::Relaxed,
+        );
+
         if flow.flow_key.proto == IpProtocol::Tcp
             && flow.flow_perf_stats.is_some()
             && Self::l7_metrics_enabled(config)
@@ -1830,11 +1856,15 @@ impl FlowMap {
     }
 }
 
+#[rustfmt::skip]
 #[derive(Default)]
 pub struct FlowMapCounter {
-    new: AtomicU64,                      // the number of  created flow
+    new: AtomicU64,                      // the number of created flow
     closed: AtomicU64,                   // the number of closed flow
-    drop_by_window: AtomicU64,           // times of flush wihich drop by window
+    drop_by_window: AtomicU64,           // times of flush which drop by window
+    packet_delay: AtomicI64,             // inject_meta_packet delay compared to ntp corrected system time
+    flush_delay: AtomicI64,              // inject_flush_ticker delay compared to ntp corrected system time
+    flow_delay: AtomicI64,               // output flow `flow_stat_time` delay compared to ntp corrected system time
     concurrent: AtomicU64,               // current the number of FlowNode
     slots: AtomicU64,                    // current the length of HashMap
     slot_max_depth: AtomicU64,           // the max length of Vec<FlowNode>
@@ -1864,6 +1894,21 @@ impl RefCountable for FlowMapCounter {
                 "drop_by_window",
                 CounterType::Gauged,
                 CounterValue::Unsigned(self.drop_by_window.swap(0, Ordering::Relaxed)),
+            ),
+            (
+                "packet_delay",
+                CounterType::Gauged,
+                CounterValue::Signed(self.packet_delay.swap(0, Ordering::Relaxed)),
+            ),
+            (
+                "flush_delay",
+                CounterType::Gauged,
+                CounterValue::Signed(self.flush_delay.swap(0, Ordering::Relaxed)),
+            ),
+            (
+                "flow_delay",
+                CounterType::Gauged,
+                CounterValue::Signed(self.flow_delay.swap(0, Ordering::Relaxed)),
             ),
             (
                 "concurrent",
