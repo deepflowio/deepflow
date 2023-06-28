@@ -841,7 +841,7 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 			e.Statements = append(e.Statements, binFunction)
 			return nil
 		}
-		if e.DB == chCommon.DB_NAME_EXT_METRICS || e.DB == chCommon.DB_NAME_DEEPFLOW_SYSTEM {
+		if e.DB == chCommon.DB_NAME_EXT_METRICS || e.DB == chCommon.DB_NAME_PROMETHEUS || e.DB == chCommon.DB_NAME_DEEPFLOW_SYSTEM {
 			funcName := strings.Trim(sqlparser.String(expr.Name), "`")
 			if _, ok := metrics.METRICS_FUNCTIONS_MAP[funcName]; ok {
 				if as == "" {
@@ -1107,7 +1107,7 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where, isCheck bool) (view
 		switch comparExpr.(type) {
 		case *sqlparser.ColName, *sqlparser.SQLVal:
 			whereTag := chCommon.ParseAlias(node.Left)
-			if (e.DB == "ext_metrics" || e.DB == "deepflow_system") && strings.Contains(whereTag, "metrics.") {
+			if ((e.DB == "ext_metrics" || e.DB == "deepflow_system") && strings.Contains(whereTag, "metrics.")) || e.DB == chCommon.DB_NAME_PROMETHEUS {
 				metricStruct, ok := metrics.GetMetrics(whereTag, e.DB, e.Table, e.Context)
 				if ok {
 					whereTag = metricStruct.DBField
