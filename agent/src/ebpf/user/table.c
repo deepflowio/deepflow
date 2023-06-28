@@ -27,42 +27,6 @@
 #include "table.h"
 #include "log.h"
 
-unsigned int bpf_table_key_size(struct ebpf_map *map)
-{
-	if (map != NULL) {
-		return map->def.key_size;
-	}
-
-	return 0;
-}
-
-unsigned int bpf_table_value_size(struct ebpf_map *map)
-{
-	if (map != NULL) {
-		return map->def.value_size;
-	}
-
-	return 0;
-}
-
-unsigned int bpf_table_max_entries(struct ebpf_map *map)
-{
-	if (map != NULL) {
-		return map->def.max_entries;
-	}
-
-	return 0;
-}
-
-unsigned int bpf_table_flags(struct ebpf_map *map)
-{
-	if (map != NULL) {
-		return map->def.map_flags;
-	}
-
-	return 0;
-}
-
 bool bpf_table_get_value(struct bpf_tracer *tracer,
 			 const char *tb_name, uint64_t key, void *val_buf)
 {
@@ -95,7 +59,6 @@ uint32_t bpf_table_elems_count(struct bpf_tracer *tracer, const char *tb_name)
 	}
 	int map_fd = map->fd;
 
-	//int key_size = bpf_table_key_size(map);
 	uint64_t key, next_key, count = 0;
 	key = 0;
 	while (bpf_get_next_key(map_fd, &key, &next_key) == 0) {
