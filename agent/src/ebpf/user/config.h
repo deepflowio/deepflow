@@ -29,7 +29,7 @@
 #define MAP_TRACE_CONF_NAME             "__trace_conf_map"
 #define MAP_TRACE_STATS_NAME            "__trace_stats_map"
 #define MAP_PROTO_FILTER_NAME		"__protocol_filter"
-#define MAP_ALLOW_PORT_BITMAP_NAME	"__allow_port_bitmap"
+#define MAP_KPROBE_PORT_BITMAP_NAME	"__kprobe_port_bitmap"
 #define MAP_ADAPT_KERN_UID_NAME		"__adapt_kern_uid_map"
 
 //Program jmp tables

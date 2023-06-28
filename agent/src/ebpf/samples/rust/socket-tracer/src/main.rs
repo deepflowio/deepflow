@@ -271,9 +271,9 @@ fn cp_process_name_safe(cp: *mut stack_profile_data) -> String {
 #[allow(dead_code)]
 extern "C" fn continuous_profiler_callback(cp: *mut stack_profile_data) {
     unsafe {
-          let data = cp_data_str_safe(cp);
-          println!("\n+ --------------------------------- +");
-          println!("{} PID {} START-TIME {} U-STACKID {} K-STACKID {} COMM {} CPU {} COUNT {} LEN {} \n  - {}",
+        let data = cp_data_str_safe(cp);
+        println!("\n+ --------------------------------- +");
+        println!("{} PID {} START-TIME {} U-STACKID {} K-STACKID {} COMM {} CPU {} COUNT {} LEN {} \n  - {}",
                    date_time((*cp).timestamp / 1000),
                    (*cp).pid,
                    (*cp).stime,
@@ -283,7 +283,7 @@ extern "C" fn continuous_profiler_callback(cp: *mut stack_profile_data) {
                    (*cp).cpu,
                    (*cp).count,
                    (*cp).stack_data_len, data);
-          println!("+ --------------------------------- +");
+        println!("+ --------------------------------- +");
     }
 }
 
@@ -321,6 +321,11 @@ fn main() {
         set_go_tracing_timeout(120);
 
         /*
+            let bypass_port = 443;
+            let mut bypass_port_bitmap: [u8; 65536 / 8] = [0; 65536 / 8];
+            bypass_port_bitmap[bypass_port / 8] |= 1 << (bypass_port % 8);
+            set_bypass_port_bitmap(bypass_port_bitmap.as_ptr());
+
             let allow_port = 443;
             let mut allow_port_bitmap: [u8; 65536 / 8] = [0; 65536 / 8];
             allow_port_bitmap[allow_port / 8] |= 1 << (allow_port % 8);
@@ -365,7 +370,7 @@ fn main() {
         let stats = socket_tracer_stats();
         print!("{:#?}\n", stats);
 
-	//// enable continuous profiler
+        //// enable continuous profiler
         //if start_continuous_profiler(
         //    99,
         //    continuous_profiler_callback,

@@ -1253,10 +1253,10 @@ static void update_protocol_filter_array(struct bpf_tracer *tracer)
 	}
 }
 
-static void update_allow_port_bitmap(struct bpf_tracer *tracer)
+static void update_kprobe_port_bitmap(struct bpf_tracer *tracer)
 {
-	bpf_table_set_value(tracer, MAP_ALLOW_PORT_BITMAP_NAME, 0,
-			    &allow_port_bitmap);
+	bpf_table_set_value(tracer, MAP_KPROBE_PORT_BITMAP_NAME, 0, &allow_port_bitmap);
+	bpf_table_set_value(tracer, MAP_KPROBE_PORT_BITMAP_NAME, 1, &bypass_port_bitmap);
 }
 
 static void insert_adapt_kern_uid_to_map(struct bpf_tracer *tracer)
@@ -1831,7 +1831,7 @@ int running_socket_tracer(tracer_callback_t handle,
 	// Update protocol filter array
 	update_protocol_filter_array(tracer);
 
-	update_allow_port_bitmap(tracer);
+	update_kprobe_port_bitmap(tracer);
 
 	if (tracer_hooks_attach(tracer))
 		return -EINVAL;

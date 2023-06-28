@@ -47,7 +47,8 @@ struct cfg_feature_regex cfg_feature_regex_array[FEATURE_MAX];
 // eBPF protocol filter.
 int ebpf_config_protocol_filter[PROTO_NUM];
 
-struct allow_port_bitmap allow_port_bitmap;
+struct kprobe_port_bitmap allow_port_bitmap;
+struct kprobe_port_bitmap bypass_port_bitmap;
 
 uint64_t adapt_kern_uid;	// Indicates the identifier of the adaptation kernel
 
@@ -1425,6 +1426,12 @@ int enable_ebpf_protocol(int protocol)
 int set_allow_port_bitmap(void *bitmap)
 {
 	memcpy(&allow_port_bitmap, bitmap, sizeof(allow_port_bitmap));
+	return 0;
+}
+
+int set_bypass_port_bitmap(void *bitmap)
+{
+	memcpy(&bypass_port_bitmap, bitmap, sizeof(bypass_port_bitmap));
 	return 0;
 }
 
