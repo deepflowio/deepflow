@@ -741,7 +741,7 @@ func generateCloudModelData(domainUUIDToToolDataSet map[string]*addtionalResourc
 				// add load balance target server if exists
 				for _, lbTargetServer := range lbListener.LBTargetServers {
 					modelLBTargetServer := cloudmodel.LBTargetServer{
-						Lcuuid:           common.GenerateUUID(lbListenerUUID + lbTargetServer.IP + strconv.Itoa(lbListener.Port)),
+						Lcuuid:           common.GenerateUUID(lbListenerUUID + lbTargetServer.IP + strconv.Itoa(lbTargetServer.Port)),
 						LBLcuuid:         lbUUID,
 						LBListenerLcuuid: lbListenerUUID,
 						Type:             controllercommon.LB_SERVER_TYPE_IP,
