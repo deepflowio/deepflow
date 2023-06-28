@@ -60,7 +60,9 @@ RUN yum -y install https://forensics.cert.org/cert-forensics-tools-release-el7.r
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/libpcap.a --silent -o /usr/lib64/libpcap.a && \
     chmod 755 /usr/lib64/libpcap.a && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/libbcc.a --silent -o /usr/lib64/libbcc.a && \
-    chmod 755 /usr/lib64/libbcc.a
+    chmod 755 /usr/lib64/libbcc.a && \
+    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/x86_64/libbcc_bpf.a --silent -o /usr/lib64/libbcc_bpf.a && \
+    chmod 755 /usr/lib64/libbcc_bpf.a
 
 RUN rustup target add x86_64-unknown-linux-musl
 ## 使用依赖缓存
