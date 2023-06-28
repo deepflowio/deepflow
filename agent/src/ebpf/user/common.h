@@ -261,4 +261,5 @@ void fetch_linux_release(const char *buf, int buf_len);
 u64 get_process_starttime_and_comm(pid_t pid,
 				   char *name_base,
 				   int len);
+u32 legacy_fetch_log2_page_size(void);
 #endif /* DF_COMMON_H */
