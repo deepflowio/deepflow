@@ -63,7 +63,9 @@ RUN cd /usr/aarch64-linux-musl/lib64  && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/libpcap.a --silent -o /usr/lib64/libpcap.a && \
     chmod 755 /usr/lib64/libpcap.a && \
     curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/libbcc.a --silent -o /usr/lib64/libbcc.a && \
-    chmod 755 /usr/lib64/libbcc.a
+    chmod 755 /usr/lib64/libbcc.a && \
+    curl https://deepflow-ce.oss-cn-beijing.aliyuncs.com/pkg/compile/aarch64/libbcc_bpf.a --silent -o /usr/lib64/libbcc_bpf.a && \
+    chmod 755 /usr/lib64/libbcc_bpf.a
 
 RUN rustup target add aarch64-unknown-linux-musl
 # rust uses dependency cache
