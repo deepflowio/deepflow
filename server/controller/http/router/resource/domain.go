@@ -28,7 +28,10 @@ import (
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/service/resource"
 	"github.com/deepflowio/deepflow/server/controller/model"
+	logging "github.com/op/go-logging"
 )
+
+var log = logging.MustGetLogger("router.resource")
 
 func DomainRouter(e *gin.Engine, cfg *config.ControllerConfig) {
 	// TODO: 后续统一为v2
@@ -48,13 +51,16 @@ func DomainRouter(e *gin.Engine, cfg *config.ControllerConfig) {
 }
 
 func getDomain(c *gin.Context) {
+	log.Info("getDomain")
 	args := make(map[string]interface{})
 	args["lcuuid"] = c.Param("lcuuid")
+	log.Infof("%#v", args)
 	data, err := GetDomains(args)
 	JsonResponse(c, data, err)
 }
 
 func getDomains(c *gin.Context) {
+	log.Info("getDomains")
 	args := make(map[string]interface{})
 	if value, ok := c.GetQuery("name"); ok {
 		args["name"] = value
