@@ -668,6 +668,32 @@ static char *__gen_datetime_str(const char *fmt, u64 ns)
 	return str;
 }
 
+u32 legacy_fetch_log2_page_size(void)
+{
+#define LOG2_PAFE_SIZE_DEF 21
+
+	u32 log2_page_size = 0;
+	FILE *fp;
+	char tmp[33] = { };
+
+	if ((fp = fopen ("/proc/meminfo", "r")) == NULL) {
+		ebpf_warning("fopen file '/proc/meminfo' failed.\n");
+		return LOG2_PAFE_SIZE_DEF;
+	}
+
+	while (fscanf (fp, "%32s", tmp) > 0) {
+		if (strncmp ("Hugepagesize:", tmp, 13) == 0) {
+			u32 size;
+			if (fscanf (fp, "%u", &size) > 0)
+				log2_page_size = 10 + min_log2 (size);
+			break;
+		}
+	}
+
+	fclose (fp);
+	return log2_page_size;
+}
+	
 char *gen_file_name_by_datetime(void)
 {
 	return __gen_datetime_str("%d_%02d_%02d_%02d_%02d_%02d_%ld", 0);

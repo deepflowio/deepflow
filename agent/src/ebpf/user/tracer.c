@@ -109,8 +109,8 @@ int check_kernel_version(int maj_limit, int min_limit)
 
 	if (major < maj_limit || (major == maj_limit && minor < min_limit)) {
 		ebpf_info
-		    ("Current kernel version is %s, but need > %s, eBPF not support.\n",
-		     uts.release, "4.14");
+		    ("Current kernel version is %s, but need > %d.%d, eBPF not support.\n",
+		     uts.release, maj_limit, min_limit);
 		return ETR_INVAL;
 	}
 

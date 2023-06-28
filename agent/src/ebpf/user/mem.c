@@ -289,9 +289,11 @@ void clib_mem_init(void)
 		mm->log2_default_hugepage_sz = mem_get_fd_log2_page_size(fd);
 		close(fd);
 	} else {
-		ebpf_error
-		    ("Not fetch system hugeppage size. need linux 4.14+\n");
+		/* likely kernel older than 4.14 */
+		mm->log2_default_hugepage_sz = legacy_fetch_log2_page_size();
 	}
+
+	ebpf_info("log2_default_hugepage_sz %d\n", mm->log2_default_hugepage_sz);
 
 #ifdef DF_MEM_DEBUG
 	init_list_head(&mm->mem_list_head);
