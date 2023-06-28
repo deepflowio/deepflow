@@ -960,7 +960,7 @@ func (f *L4FlowLog) WriteBlock(block *ckdb.Block) {
 }
 
 func (f *L4FlowLog) EndTime() time.Duration {
-	return time.Duration(f.FlowInfo.EndTime) * time.Second
+	return time.Duration(f.FlowInfo.EndTime) * time.Microsecond
 }
 
 func (f *L4FlowLog) String() string {
