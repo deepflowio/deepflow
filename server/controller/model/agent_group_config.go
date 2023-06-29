@@ -148,7 +148,7 @@ type EbpfUprobeProcessNameRegexsConfig struct {
 	Openssl      *string `yaml:"openssl,omitempty"`
 }
 
-type EbpfKprobeWhitelist struct {
+type EbpfKprobePortlist struct {
 	PortList string `yaml:"port-list,omitempty"`
 }
 
@@ -156,7 +156,8 @@ type EbpfConfig struct {
 	Disabled                *bool                              `yaml:"disabled,omitempty"`
 	LogFile                 *string                            `yaml:"log-file,omitempty"`
 	UprobeProcessNameRegexs *EbpfUprobeProcessNameRegexsConfig `yaml:"uprobe-process-name-regexs,omitempty"`
-	KprobeWhitelist         *EbpfKprobeWhitelist               `yaml:"kprobe-whitelist,omitempty"`
+	KprobeWhitelist         *EbpfKprobePortlist                `yaml:"kprobe-whitelist,omitempty"`
+	KprobeBlacklist         *EbpfKprobePortlist                `yaml:"kprobe-blacklist,omitempty"`
 	ThreadNum               *int                               `yaml:"thread-num,omitempty"`
 	PerfPagesCount          *int                               `yaml:"perf-pages-count,omitempty"`
 	RingSize                *int                               `yaml:"ring-size,omitempty"`
