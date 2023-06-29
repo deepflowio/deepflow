@@ -225,7 +225,8 @@ func (s *Synchronizer) prepare(req *trident.PrometheusLabelRequest) error {
 	}
 
 	if metricNamesToE.Cardinality() == 0 && labelNamesToE.Cardinality() == 0 && labelValuesToE.Cardinality() == 0 &&
-		metricAPPLabelLayoutsToE.Cardinality() == 0 && labelsToAdd.Cardinality() == 0 && len(metricLabelsToAdd) == 0 {
+		metricAPPLabelLayoutsToE.Cardinality() == 0 && labelsToAdd.Cardinality() == 0 && len(metricLabelsToAdd) == 0 &&
+		metricTargetsToAdd.Cardinality() == 0 {
 		return nil
 	}
 
@@ -503,9 +504,7 @@ func (s *Synchronizer) addMetricLabelCache(arg ...interface{}) error {
 
 func (s *Synchronizer) tryAppendMetricTargetToAdd(toAdd mapset.Set[cache.MetricTargetKey], metricName string, targetID int) {
 	mtk := cache.NewMetricTargetKey(metricName, targetID)
-	log.Debugf("tryAppendMetricTargetToAdd, key: %v", mtk)
 	if ok := s.cache.MetricTarget.IfKeyExists(mtk); !ok {
-		log.Debugf("tryAppendMetricTargetToAdd, key: %v, not exists", mtk)
 		toAdd.Add(mtk)
 	}
 }
