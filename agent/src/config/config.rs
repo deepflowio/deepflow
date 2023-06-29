@@ -259,7 +259,7 @@ pub struct OsProcRegexp {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Default)]
 #[serde(default, rename_all = "kebab-case")]
-pub struct EbpfKprobeWhitelist {
+pub struct EbpfKprobePortlist {
     pub port_list: String,
 }
 
@@ -268,7 +268,8 @@ pub struct EbpfKprobeWhitelist {
 pub struct EbpfYamlConfig {
     pub disabled: bool,
     pub log_file: String,
-    pub kprobe_whitelist: EbpfKprobeWhitelist,
+    pub kprobe_whitelist: EbpfKprobePortlist,
+    pub kprobe_blacklist: EbpfKprobePortlist,
     #[serde(rename = "uprobe-process-name-regexs")]
     pub uprobe_proc_regexp: UprobeProcRegExp,
     pub thread_num: usize,
@@ -294,7 +295,8 @@ impl Default for EbpfYamlConfig {
             max_socket_entries: 524288,
             max_trace_entries: 524288,
             socket_map_max_reclaim: 520000,
-            kprobe_whitelist: EbpfKprobeWhitelist::default(),
+            kprobe_whitelist: EbpfKprobePortlist::default(),
+            kprobe_blacklist: EbpfKprobePortlist::default(),
             uprobe_proc_regexp: UprobeProcRegExp::default(),
             go_tracing_timeout: 120,
             io_event_collect_mode: 1,
