@@ -963,8 +963,14 @@ vtap_group_id: g-xxxxxx
       ##   all processes that use the openssl library.
       #openssl: ""
 
+    #kprobe-blacklist:
+      ## TCP&UDP Port Blacklist, Priority higher than kprobe-whitelist.
+      ## Default: null, means no port
+      ## Format: x-y, z
+      #port-list:
+
     #kprobe-whitelist:
-      ## Server Port Whitelist
+      ## TCP&UDP Port Whitelist, Priority lower than kprobe-blacklist.
       ## Default: null, means no port
       ## Format: x-y, z
       #port-list:

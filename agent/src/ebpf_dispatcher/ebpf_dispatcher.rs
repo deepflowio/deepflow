@@ -33,7 +33,7 @@ use crate::common::proc_event::{BoxedProcEvents, EventType, ProcEvent};
 use crate::common::TaggedFlow;
 use crate::config::handler::{EbpfAccess, EbpfConfig, LogParserAccess};
 use crate::config::FlowAccess;
-use crate::ebpf::{self, set_allow_port_bitmap};
+use crate::ebpf::{self, set_allow_port_bitmap, set_bypass_port_bitmap};
 use crate::flow_generator::{flow_map::Config, FlowMap, MetaAppProto};
 use crate::platform::PlatformSynchronizer;
 use crate::policy::PolicyGetter;
@@ -385,6 +385,13 @@ impl EbpfCollector {
             if !white_list.port_list.is_empty() {
                 if let Some(b) = parse_u16_range_list_to_bitmap(&white_list.port_list, false) {
                     set_allow_port_bitmap(b.get_raw_ptr());
+                }
+            }
+
+            let black_list = &config.ebpf.kprobe_blacklist;
+            if !black_list.port_list.is_empty() {
+                if let Some(b) = parse_u16_range_list_to_bitmap(&black_list.port_list, false) {
+                    set_bypass_port_bitmap(b.get_raw_ptr());
                 }
             }
 
