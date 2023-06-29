@@ -288,6 +288,7 @@ const (
 	AGENT_SYNC        = 23
 	MICROSOFT_ACS     = 24
 	BAIDU_BCE         = 25
+	ESHORE            = 26
 
 	OPENSTACK_EN         = "openstack"
 	VSPHERE_EN           = "vsphere"
@@ -309,6 +310,7 @@ const (
 	AZURE_EN             = "azure"
 	APSARA_STACK_EN      = "apsara_stack"
 	TENCENT_TCE_EN       = "tencent_tce"
+	ESHORE_EN            = "eshore"
 	QINGCLOUD_K8S_EN     = "qingcloud_k8s"
 	KINGSOFT_PRIVATE_EN  = "kingsoft_private"
 	AGENT_SYNC_EN        = "genesis"
@@ -323,6 +325,7 @@ const (
 	KINGSOFT_PRIVATE_CH = "金山银河云"
 	MICROSOFT_CH        = "微软云"
 	BAIDU_BCE_CH        = "百度云"
+	ESHORE_CH           = "亿迅云"
 )
 
 var DomainTypeToIconID = map[int]int{
