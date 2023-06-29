@@ -279,8 +279,9 @@ impl Tpacket {
                     revents: 0,
                 };
 
-                unsafe {
-                    poll(&mut poll_fd, 1, timeout as i32);
+                let n = unsafe { poll(&mut poll_fd, 1, timeout as i32) };
+                if n == 0 {
+                    return false;
                 }
 
                 if poll_fd.revents & POLLERR > 0 {
