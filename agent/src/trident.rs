@@ -2167,6 +2167,7 @@ impl AgentComponents {
             return;
         }
         info!("Staring agent components.");
+        self.stats_collector.start();
         #[cfg(target_os = "linux")]
         {
             if is_tt_pod(self.config.trident_type) {
