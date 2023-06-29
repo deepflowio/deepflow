@@ -2297,8 +2297,8 @@ INSERT INTO vtap_group(lcuuid, id, name, short_uuid) values(@lcuuid, 1, "default
 
 CREATE TABLE IF NOT EXISTS data_source (
     id                          INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    name                        CHAR(64),
-    tsdb_type                   CHAR(64),
+    display_name                CHAR(64),
+    data_table_collection       CHAR(64),
     state                       INTEGER DEFAULT 1 COMMENT '0: Exception 1: Normal',
     base_data_source_id         INTEGER,
     `interval`                  INTEGER NOT NULL COMMENT 'uint: s',
@@ -2311,23 +2311,47 @@ CREATE TABLE IF NOT EXISTS data_source (
 TRUNCATE TABLE data_source;
 
 set @lcuuid = (select uuid());
-INSERT INTO data_source (id, name, tsdb_type, `interval`, retention_time, lcuuid) VALUES (1, '1s', 'flow', 1, 1*24, @lcuuid);
+INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid) 
+                 VALUES (1, '网络-指标（秒级）', 'flow_metrics.vtap_flow*', 1, 1*24, @lcuuid);
 set @lcuuid = (select uuid());
-INSERT INTO data_source (id, name, tsdb_type, base_data_source_id, `interval`, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid) VALUES (3, '1m', 'flow', 1, 60, 7*24, 'Sum', 'Avg', @lcuuid);
+INSERT INTO data_source (id, display_name, data_table_collection, base_data_source_id, `interval`, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid) 
+                 VALUES (3, '网络-指标（分钟级）', 'flow_metrics.vtap_flow*', 1, 60, 7*24, 'Sum', 'Avg', @lcuuid);
 set @lcuuid = (select uuid());
-INSERT INTO data_source (id, name, tsdb_type, `interval`, retention_time, lcuuid) VALUES (6, 'flow_log.l4_flow_log', 'flow_log.l4_flow_log', 0, 3*24, @lcuuid);
+INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid) 
+                 VALUES (6, '网络-流日志', 'flow_log.l4_flow_log', 0, 3*24, @lcuuid);
 set @lcuuid = (select uuid());
-INSERT INTO data_source (id, name, tsdb_type, `interval`, retention_time, lcuuid) VALUES (7, '1s', 'app', 1, 1*24, @lcuuid);
+INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid) 
+                 VALUES (7, '应用-指标（秒级）', 'flow_metrics.vtap_app*', 1, 1*24, @lcuuid);
 set @lcuuid = (select uuid());
-INSERT INTO data_source (id, name, tsdb_type, base_data_source_id, `interval`, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid) VALUES (8, '1m', 'app', 7, 60, 7*24, 'Sum', 'Avg', @lcuuid);
+INSERT INTO data_source (id, display_name, data_table_collection, base_data_source_id, `interval`, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid) 
+                 VALUES (8, '应用-指标（分钟级）', 'flow_metrics.vtap_app*', 7, 60, 7*24, 'Sum', 'Avg', @lcuuid);
 set @lcuuid = (select uuid());
-INSERT INTO data_source (id, name, tsdb_type, `interval`, retention_time, lcuuid) VALUES (9, 'flow_log.l7_flow_log', 'flow_log.l7_flow_log', 0, 3*24, @lcuuid);
+INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid) 
+                 VALUES (9, '应用-调用日志', 'flow_log.l7_flow_log', 0, 3*24, @lcuuid);
 set @lcuuid = (select uuid());
-INSERT INTO data_source (id, name, tsdb_type, `interval`, retention_time, lcuuid) VALUES (10, 'flow_log.l4_packet', 'flow_log.l4_packet', 0, 3*24, @lcuuid);
+INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid) 
+                 VALUES (10, '网络-TCP 时序数据', 'flow_log.l4_packet', 0, 3*24, @lcuuid);
 set @lcuuid = (select uuid());
-INSERT INTO data_source (id, name, tsdb_type, `interval`, retention_time, lcuuid) VALUES (11, 'flow_log.l7_packet', 'flow_log.l7_packet', 0, 3*24, @lcuuid);
+INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid) 
+                 VALUES (11, '网络-PCAP 数据', 'flow_log.l7_packet', 0, 3*24, @lcuuid);
 set @lcuuid = (select uuid());
-INSERT INTO data_source (id, name, tsdb_type, `interval`, retention_time, lcuuid) VALUES (12, 'deepflow_system', 'deepflow_system', 0, 7*24, @lcuuid);
+INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid) 
+                 VALUES (12, '系统监控数据', 'deepflow_system.*', 0, 3*24, @lcuuid);
+set @lcuuid = (select uuid());
+INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid) 
+                 VALUES (13, '外部指标数据', 'ext_metrics.*', 0, 7*24, @lcuuid);
+set @lcuuid = (select uuid());
+INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid) 
+                 VALUES (14, 'Prometheus 数据', 'prometheus.*', 0, 7*24, @lcuuid);
+set @lcuuid = (select uuid());
+INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid) 
+                 VALUES (15, '事件-资源变更事件', 'event.event', 0, 3*24, @lcuuid);
+set @lcuuid = (select uuid());
+INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid) 
+                 VALUES (16, '事件-IO 事件', 'event.perf_event', 0, 3*24, @lcuuid);
+set @lcuuid = (select uuid());
+INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid) 
+                 VALUES (17, '事件-告警事件', 'event.alarm_event', 0, 3*24, @lcuuid);
 
 CREATE TABLE IF NOT EXISTS license (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,

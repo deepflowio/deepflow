@@ -1019,8 +1019,8 @@ func (VTapGroup) TableName() string {
 
 type DataSource struct {
 	ID                        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name                      string    `gorm:"column:name;type:char(64);default:''" json:"NAME"`
-	TsdbType                  string    `gorm:"column:tsdb_type;type:char(64);default:''" json:"TSDB_TYPE"`
+	DisplayName               string    `gorm:"column:display_name;type:char(64);default:''" json:"DISPLAY_NAME"`
+	DataTableCollection       string    `gorm:"column:data_table_collection;type:char(64);default:''" json:"DATA_TABLE_COLLECTION"`
 	State                     int       `gorm:"column:state;type:int;default:1" json:"STATE"`
 	BaseDataSourceID          int       `gorm:"column:base_data_source_id;type:int" json:"BASE_DATA_SOURCE_ID"`
 	Interval                  int       `gorm:"column:interval;type:int" json:"INTERVAL"`
