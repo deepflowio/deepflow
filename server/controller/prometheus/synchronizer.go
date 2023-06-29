@@ -188,6 +188,8 @@ func (s *Synchronizer) prepare(req *trident.PrometheusLabelRequest) error {
 		targetKey := cache.NewTargetKey(instanceValue, jobValue)
 		targetID, ok := s.cache.Target.GetIDByKey(targetKey)
 		if ok {
+			log.Debugf("metric: %s target id found, instance: %s, job: %s, id: %d", mn, instanceValue, jobValue, targetID)
+			s.tryAppendMetricTargetToAdd(metricTargetsToAdd, mn, targetID)
 			for _, l := range m.GetLabels() {
 				ln := l.GetName()
 				if ln == TargetLabelInstance || ln == TargetLabelJob {
@@ -195,7 +197,6 @@ func (s *Synchronizer) prepare(req *trident.PrometheusLabelRequest) error {
 				}
 				s.tryAppendMetricAPPLabelLayoutToEncode(metricAPPLabelLayoutsToE, mn, ln, targetID)
 			}
-			s.tryAppendMetricTargetToAdd(metricTargetsToAdd, mn, targetID)
 		} else {
 			nonTargetKeyToCount[targetKey]++
 		}
@@ -464,7 +465,9 @@ func (s *Synchronizer) addMetricLabelCache(arg ...interface{}) error {
 
 func (s *Synchronizer) tryAppendMetricTargetToAdd(toAdd mapset.Set[cache.MetricTargetKey], metricName string, targetID int) {
 	mtk := cache.NewMetricTargetKey(metricName, targetID)
+	log.Debugf("tryAppendMetricTargetToAdd, key: %v", mtk)
 	if ok := s.cache.MetricTarget.IfKeyExists(mtk); !ok {
+		log.Debugf("tryAppendMetricTargetToAdd, key: %v, not exists", mtk)
 		toAdd.Add(mtk)
 	}
 }
