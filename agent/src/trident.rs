@@ -2342,9 +2342,6 @@ impl AgentComponents {
         if let Some(h) = self.npb_arp_table.notify_stop() {
             join_handles.push(h);
         }
-        if let Some(h) = self.stats_collector.notify_stop() {
-            join_handles.push(h);
-        }
 
         for handle in join_handles {
             if !handle.is_finished() {
