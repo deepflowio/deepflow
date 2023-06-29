@@ -233,10 +233,11 @@ type VtapGroupUpdate struct {
 type DataSource struct {
 	ID                        int    `json:"ID"`
 	Name                      string `json:"NAME"`
-	TsdbType                  string `json:"TSDB_TYPE"`
+	DisplayName               string `json:"DISPLAY_NAME"`
+	DataTableCollection       string `json:"DATA_TABLE_COLLECTION"`
 	State                     int    `json:"STATE"`
 	BaseDataSourceID          int    `json:"BASE_DATA_SOURCE_ID"`
-	BaseDataSourceName        string `json:"BASE_DATA_SOURCE_NAME"`
+	BaseDataSourceDisplayName string `json:"BASE_DATA_SOURCE_NAME"`
 	Interval                  int    `json:"INTERVAL"`
 	RetentionTime             int    `json:"RETENTION_TIME"`
 	SummableMetricsOperator   string `json:"SUMMABLE_METRICS_OPERATOR"`
@@ -247,8 +248,8 @@ type DataSource struct {
 }
 
 type DataSourceCreate struct {
-	Name                      string `json:"NAME" binding:"required,min=1,max=10"`
-	TsdbType                  string `json:"TSDB_TYPE" binding:"required,oneof=flow app"`
+	DisplayName               string `json:"DISPLAY_NAME" binding:"required,min=1,max=10"`
+	DataTableCollection       string `json:"DATA_TABLE_COLLECTION" binding:"required,oneof=flow_metrics.vtap_flow* flow_metrics.vtap_app*"`
 	BaseDataSourceID          int    `json:"BASE_DATA_SOURCE_ID" binding:"required"`
 	Interval                  int    `json:"INTERVAL" binding:"required"`
 	RetentionTime             int    `json:"RETENTION_TIME" binding:"required,min=1"`
@@ -257,7 +258,8 @@ type DataSourceCreate struct {
 }
 
 type DataSourceUpdate struct {
-	RetentionTime int `json:"RETENTION_TIME" binding:"required,min=1"`
+	RetentionTime int    `json:"RETENTION_TIME" binding:"required,min=1"`
+	DisplayName   string `json:"DISPLAY_NAME" binding:"required,min=1,max=10"`
 }
 
 type LicenseConsumption struct {
