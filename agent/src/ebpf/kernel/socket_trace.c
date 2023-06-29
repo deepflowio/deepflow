@@ -1,17 +1,22 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * This code runs using bpf in the Linux kernel.
+ * Copyright 2022- The Yunshan Networks Authors.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include "config.h"
@@ -104,7 +109,8 @@ MAP_ARRAY(trace_stats_map, __u32, struct trace_stats, 1)
 // key: protocol id, value: is protocol enabled, size: PROTO_NUM
 MAP_ARRAY(protocol_filter, int, int, PROTO_NUM)
 
-MAP_ARRAY(allow_port_bitmap, __u32, struct allow_port_bitmap, 1)
+// 0: allow bitmap; 1: bypass bitmap
+MAP_ARRAY(kprobe_port_bitmap, __u32, struct kprobe_port_bitmap, 2)
 
 // write() syscall's input argument.
 // Key is {tgid, pid}.
@@ -688,10 +694,12 @@ static __inline void infer_tcp_seq_offset(void *sk,
 				    0x58c, 0x594, 0x59c, 0x5dc, 0x644,
 				    0x654, 0x63c};
 #else
+	// 0x65c for 4.18.0-372.9.1.15.po1.x86_64
+	// 0x664 for 4.19.90-2107.6.0.0100.oe1.bclinux
 	int copied_seq_offsets[] = {0x514, 0x51c, 0x524, 0x52c, 0x534,
 				    0x53c, 0x544, 0x54c, 0x554, 0x55c,
 				    0x564, 0x56c, 0x574, 0x57c, 0x584,
-				    0x58c, 0x594, 0x59c, 0x5dc, 0x644,
+				    0x594, 0x59c, 0x5dc, 0x644, 0x65c,
 				    0x664};
 #endif
 
@@ -713,11 +721,13 @@ static __inline void infer_tcp_seq_offset(void *sk,
 				   0x6fc, 0x704, 0x70c, 0x714, 0x71c, 0x74c,
 				   0x7b4, 0x7d4, 0x7bc};
 #else
+	// 0x7d4 for 4.19.90-2107.6.0.0100.oe1.bclinux
+	// 0x7dc for 4.18.0-372.9.1.15.po1.x86_64
 	int write_seq_offsets[] = {0x66c, 0x674, 0x67c, 0x684, 0x68c, 0x694,
 				   0x69c, 0x6a4, 0x6ac, 0x6b4, 0x6bc, 0x6c4,
 				   0x6cc, 0x6d4, 0x6dc, 0x6e4, 0x6ec, 0x6f4,
-				   0x6fc, 0x704, 0x70c, 0x714, 0x71c, 0x74c,
-				   0x7b4, 0x7d4};
+				   0x6fc, 0x704, 0x714, 0x71c, 0x74c, 0x7b4,
+				   0x7d4, 0x7dc};
 #endif
 
 	int i, snd_nxt_offset = 0;
@@ -1264,7 +1274,7 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 
 	// TODO : 此处可以根据配置对进程号进行过滤
 
-	__u32 k0 = 0;
+	__u32 k0 = 0, k1 = 1;
 	struct member_fields_offset *offset = members_offset__lookup(&k0);
 	if (!offset)
 		return -1;
@@ -1290,11 +1300,19 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 	if (!ctx_map)
 		return -1;
 
+	struct kprobe_port_bitmap *bypass = kprobe_port_bitmap__lookup(&k1);
+	if (bypass) {
+		if (is_set_bitmap(bypass->bitmap, conn_info->tuple.dport) ||
+		    is_set_bitmap(bypass->bitmap, conn_info->tuple.num)) {
+			return -1;
+		}
+	}
+
 	bool data_submit_dircet = false;
-	struct allow_port_bitmap *bp = allow_port_bitmap__lookup(&k0);
-	if (bp) {
-		if (is_set_bitmap(bp->bitmap, conn_info->tuple.dport) ||
-		    is_set_bitmap(bp->bitmap, conn_info->tuple.num)) {
+	struct kprobe_port_bitmap *allow = kprobe_port_bitmap__lookup(&k0);
+	if (allow) {
+		if (is_set_bitmap(allow->bitmap, conn_info->tuple.dport) ||
+		    is_set_bitmap(allow->bitmap, conn_info->tuple.num)) {
 			data_submit_dircet = true;
 		}
 	}

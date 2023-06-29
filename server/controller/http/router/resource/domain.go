@@ -105,7 +105,7 @@ func updateDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 		lcuuid := c.Param("lcuuid")
 
 		// set vtap
-		err = KubernetesSetVtap(lcuuid, "", vTapValue)
+		err = KubernetesSetVtap(lcuuid, vTapValue, false)
 		if err != nil {
 			BadRequestResponse(c, common.K8S_SET_VTAP_FAIL, err.Error())
 			return
@@ -190,7 +190,7 @@ func updateSubDomain(c *gin.Context) {
 
 	lcuuid := c.Param("lcuuid")
 
-	err = KubernetesSetVtap("", lcuuid, vTapValue)
+	err = KubernetesSetVtap(lcuuid, vTapValue, true)
 	if err != nil {
 		BadRequestResponse(c, common.K8S_SET_VTAP_FAIL, err.Error())
 		return

@@ -509,14 +509,17 @@ impl AnalyzerModeDispatcher {
             if base.reset_whitelist.swap(false, Ordering::Relaxed) {
                 base.tap_interface_whitelist.reset();
             }
-            let recved = BaseDispatcher::recv(
-                &mut base.engine,
-                &base.leaky_bucket,
-                &base.exception_handler,
-                &mut prev_timestamp,
-                &base.counter,
-                &base.ntp_diff,
-            );
+            // The lifecycle of the recved will end before the next call to recv.
+            let recved = unsafe {
+                BaseDispatcher::recv(
+                    &mut base.engine,
+                    &base.leaky_bucket,
+                    &base.exception_handler,
+                    &mut prev_timestamp,
+                    &base.counter,
+                    &base.ntp_diff,
+                )
+            };
             if recved.is_none() || batch.len() >= HANDLER_BATCH_SIZE {
                 if let Err(e) = sender_to_parser.send_all(&mut batch) {
                     debug!("dispatcher {} sender failed: {:?}", id, e);

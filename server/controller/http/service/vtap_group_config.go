@@ -71,7 +71,7 @@ func copyStruct(from, to interface{}, ignoreName []string) {
 	toElem := toValue.Elem()
 	for i := 0; i < toElem.NumField(); i++ {
 		toField := toElem.Type().Field(i)
-		if common.IsValueInSliceString(toField.Name, ignoreName) == true {
+		if common.Contains(ignoreName, toField.Name) == true {
 			continue
 		}
 		fromFieldName, ok := fromElem.Type().FieldByName(toField.Name)
@@ -427,7 +427,7 @@ func getRealVTapGroupConfig(config *mysql.VTapGroupConfiguration) *mysql.VTapGro
 	typeOfRealConfiguration := reflect.ValueOf(realConfiguration).Elem()
 	for i := 0; i < tv.NumField(); i++ {
 		field := tt.Field(i)
-		if common.IsValueInSliceString(field.Name, ignoreName) == true {
+		if common.Contains(ignoreName, field.Name) == true {
 			typeOfRealConfiguration.Field(i).Set(tv.Field(i))
 		}
 		value := tv.Field(i)

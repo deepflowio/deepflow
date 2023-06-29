@@ -337,6 +337,48 @@ pub struct SK_TRACE_STATS {
     pub data_limit_max: u32,
 }
 
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct stack_profile_data {
+    pub timestamp: u64, // Timestamp of the stack trace data(unit: nanoseconds).
+    pub pid: u32,       // User-space process-ID.
+    /*
+     * Identified within the eBPF program in kernel space.
+     * If the current is a process and not a thread this field(tid) is filled
+     * with the ID of the process.
+     */
+    pub tid: u32,
+    pub stime: u64,      // The start time of the process is measured in milliseconds.
+    pub u_stack_id: u32, // User space stackID.
+    pub k_stack_id: u32, // Kernel space stackID.
+    pub cpu: u32,        // The captured stack trace data is generated on which CPU?
+    /*
+     * The profiler captures the number of occurrences of the same
+     * data by querying with the quadruple
+     * "<pid + stime + u_stack_id + k_stack_id + tid + cpu>" as the key.
+     */
+    pub count: u32,
+    /*
+     * comm in task_struct(linux kernel), always 16 bytes
+     * If the capture is a process, fill in the process name here.
+     * If the capture is a thread, fill in the thread name.
+     */
+    pub comm: [u8; PACKET_KNAME_MAX_PADDING + 1],
+    pub process_name: [u8; PACKET_KNAME_MAX_PADDING + 1], // process name
+    pub stack_data_len: u32,                              // stack data length
+
+    /*
+     * Example of a folded stack trace string (taken from a perf profiler test):
+     * main;xxx();yyy()
+     * It is a list of symbols corresponding to addresses in the underlying stack trace,
+     * separated by ';'.
+     *
+     * The merged folded stack trace string style for user space and kernel space would be:
+     * <user space folded stack trace string> + ";" + <kernel space folded stack trace string>
+     */
+    pub stack_data: *mut c_char,
+}
+
 extern "C" {
     /*
      * Set maximum amount of data passed to the agent by eBPF programe.
@@ -351,6 +393,7 @@ extern "C" {
     pub fn set_io_event_collect_mode(mode: c_int) -> c_int;
     pub fn set_io_event_minimal_duration(duration: c_ulonglong) -> c_int;
     pub fn set_allow_port_bitmap(bitmap: *const c_uchar) -> c_int;
+    pub fn set_bypass_port_bitmap(bitmap: *const c_uchar) -> c_int;
     pub fn enable_ebpf_protocol(protocol: c_int) -> c_int;
     pub fn set_feature_regex(idx: c_int, pattern: *const c_char) -> c_int;
 
@@ -401,12 +444,29 @@ extern "C" {
 
     // 停止tracer运行
     // 返回值：成功返回0，否则返回非0
-    pub fn tracer_stop() -> c_int;
+    pub fn socket_tracer_stop() -> c_int;
 
     // 启动tracer运行
     // 返回值：成功返回0，否则返回非0
-    pub fn tracer_start() -> c_int;
+    pub fn socket_tracer_start() -> c_int;
 
     // 注意：eBPF tracer初始化加载运行后进行内核适配，
-    // 适配完成后马上进入stop状态，需调用tracer_start()才开始工作。
+    // 适配完成后马上进入stop状态，需调用socket_tracer_start()才开始工作。
+
+    /*
+     * start continuous profiler
+     * @freq sample frequency, Hertz. (e.g. 99 profile stack traces at 99 Hertz)
+     * @callback Profile data processing callback interface
+     * @returns 0 on success, < 0 on error
+     */
+    pub fn start_continuous_profiler(
+        freq: c_int,
+        callback: extern "C" fn(_data: *mut stack_profile_data),
+    ) -> c_int;
+
+    /*
+     * stop continuous profiler
+     * @returns 0 on success, < 0 on error
+     */
+    pub fn stop_continuous_profiler() -> c_int;
 }

@@ -89,18 +89,18 @@ func (b *UpdaterBase[MT, KT]) Refresh() bool {
 			b.operateBatch(keysToDelete, itemsToDelete, b.delete)
 		}
 
-		if len(itemsToDelete) > 0 && len(itemsToAdd) == 0 {
+		if len(itemsToDelete) > 0 && len(itemsToAdd) == 0 && !isUpdate {
 			updateDBItem, updateOK := b.generateOneData()
 			if updateOK {
 				for key, updateDBItem := range updateDBItem {
 					updateTimeInfo := make(map[string]interface{})
 					now := time.Now()
-					updateTimeInfo["updated_at"] = now.Format("2023-01-01 12:12:12")
+					updateTimeInfo["updated_at"] = now.Format("2006-01-02 15:04:05")
 					b.update(updateDBItem, updateTimeInfo, key)
 				}
 			}
 		}
-		if isUpdate || len(itemsToDelete) > 0 || len(itemsToAdd) > 0 && (b.resourceTypeName == RESOURCE_TYPE_CH_APP_LABEL || b.resourceTypeName == RESOURCE_TYPE_CH_TARGET_LABEL) {
+		if (isUpdate || len(itemsToDelete) > 0 || len(itemsToAdd) > 0) && (b.resourceTypeName == RESOURCE_TYPE_CH_APP_LABEL || b.resourceTypeName == RESOURCE_TYPE_CH_TARGET_LABEL) {
 			return true
 		}
 	}
@@ -123,7 +123,7 @@ func (b *UpdaterBase[MT, KT]) generateOldData() (map[KT]MT, bool) {
 
 func (b *UpdaterBase[MT, KT]) generateOneData() (map[KT]MT, bool) {
 	var items []MT
-	err := mysql.Db.Unscoped().Find(&items, 1).Error
+	err := mysql.Db.Unscoped().First(&items).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(b.resourceTypeName, err))
 		return nil, false

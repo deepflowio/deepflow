@@ -1,0 +1,41 @@
+diff --git a/hashmap.go b/hashmap.go
+index 3bf83c1..3594560 100644
+--- a/hashmap.go
++++ b/hashmap.go
+@@ -170,7 +170,7 @@ func (m *Map[Key, Value]) Set(key Key, value Value) {
+ 
+ 	for {
+ 		store := m.store.Load()
+-		searchStart := store.item(hash)
++		searchStart := store.itemOrPreNotNull(hash)
+ 
+ 		element, added := m.linkedList.AddOrUpdate(searchStart, hash, key, value)
+ 		if !added {
+diff --git a/store.go b/store.go
+index 8fc1d59..7fc6a2d 100644
+--- a/store.go
++++ b/store.go
+@@ -20,6 +20,23 @@ func (s *store[Key, Value]) item(hashedKey uintptr) *ListElement[Key, Value] {
+ 	return item
+ }
+ 
++func (s *store[Key, Value]) itemOrPreNotNull(hashedKey uintptr) *ListElement[Key, Value] {
++	index := hashedKey >> s.keyShifts
++	ptr := (*unsafe.Pointer)(unsafe.Pointer(uintptr(s.array) + index*intSizeBytes))
++	item := (*ListElement[Key, Value])(atomic.LoadPointer(ptr))
++	// 若index的item为空时或新增的item的hash值小于该index的hash值时，
++	// 则会从表头开始检索，这样导致性能太慢，修改为从前一个非nil的index开始检索
++	// ---------------------------------------------------------------------------
++	// If the item at the index position is empty or the hashedKey is less than the hash value of the item,
++	// It will be retrieved from the header of the table, which will lead to too slow performance. It will be modified to retrieve from the previous non-nil index
++	for (item == nil || hashedKey < item.keyHash) && index > 0 {
++		index--
++		ptr = (*unsafe.Pointer)(unsafe.Pointer(uintptr(s.array) + index*intSizeBytes))
++		item = (*ListElement[Key, Value])(atomic.LoadPointer(ptr))
++	}
++	return item
++}
++
+ // adds an item to the index if needed and returns the new item counter if it changed, otherwise 0.
+ func (s *store[Key, Value]) addItem(item *ListElement[Key, Value]) uintptr {
+ 	index := item.keyHash >> s.keyShifts

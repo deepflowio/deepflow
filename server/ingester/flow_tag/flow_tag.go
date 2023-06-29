@@ -69,6 +69,11 @@ type FlowTagInfo struct {
 	FieldName  string
 	FieldValue string
 
+	// IDs only for prometheus
+	TableId      uint32
+	FieldNameId  uint32
+	FieldValueId uint32
+
 	VpcId     int32 // XXX: can use int16
 	PodNsId   uint16
 	FieldType FieldType

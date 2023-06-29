@@ -115,9 +115,10 @@ func generateDataToInsertDB(domainUUIDToCloudModelData map[string]*cloudmodel.Ad
 				fmt.Sprintf("json marshal domain (uuid: %s) cloud data (detail: %#v) failed: %s", domainUUID, cloudMD, err.Error()),
 			)
 		}
+
 		dbItem := mysql.DomainAdditionalResource{
-			Domain:  domainUUID,
-			Content: string(content),
+			Domain:            domainUUID,
+			CompressedContent: content,
 		}
 		dbItems = append(dbItems, dbItem)
 	}
@@ -740,7 +741,7 @@ func generateCloudModelData(domainUUIDToToolDataSet map[string]*addtionalResourc
 				// add load balance target server if exists
 				for _, lbTargetServer := range lbListener.LBTargetServers {
 					modelLBTargetServer := cloudmodel.LBTargetServer{
-						Lcuuid:           common.GenerateUUID(lbListenerUUID + lbTargetServer.IP + strconv.Itoa(lbListener.Port)),
+						Lcuuid:           common.GenerateUUID(lbListenerUUID + lbTargetServer.IP + strconv.Itoa(lbTargetServer.Port)),
 						LBLcuuid:         lbUUID,
 						LBListenerLcuuid: lbListenerUUID,
 						Type:             controllercommon.LB_SERVER_TYPE_IP,

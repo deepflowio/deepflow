@@ -23,7 +23,6 @@ mod analyzer_mode_dispatcher;
 mod local_mode_dispatcher;
 mod mirror_mode_dispatcher;
 
-#[cfg(target_os = "windows")]
 use std::process;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
@@ -46,8 +45,7 @@ use pcap_sys::{bpf_program, pcap_compile_nopcap};
 use public::debug::QueueDebugger;
 #[cfg(target_os = "linux")]
 use public::enums::LinuxSllPacketType::Outgoing;
-#[cfg(target_os = "windows")]
-use windows_recv_engine::WinPacket;
+use special_recv_engine::Libpcap;
 
 use analyzer_mode_dispatcher::{AnalyzerModeDispatcher, AnalyzerModeDispatcherListener}; // Enterprise Edition Feature: analyzer_mode
 use base_dispatcher::{BaseDispatcher, TapTypeHandler};
@@ -124,7 +122,6 @@ impl DispatcherFlavor {
         }
     }
 
-    #[cfg(target_os = "windows")]
     fn switch_recv_engine(&mut self, pcap_interfaces: Vec<Link>) -> Result<()> {
         match self {
             DispatcherFlavor::Local(d) => d.switch_recv_engine(pcap_interfaces),
@@ -182,7 +179,6 @@ impl Dispatcher {
     }
 }
 
-#[cfg(target_os = "windows")]
 impl Dispatcher {
     pub fn switch_recv_engine(&self, pcap_interfaces: Vec<Link>) {
         self.stop();
@@ -300,7 +296,6 @@ pub struct BpfOptions {
     pub capture_bpf: String,
     #[cfg(target_os = "linux")]
     pub bpf_syntax: Vec<BpfSyntax>,
-    #[cfg(target_os = "windows")]
     pub bpf_syntax_str: String,
 }
 
@@ -310,14 +305,13 @@ impl Default for BpfOptions {
             capture_bpf: "".to_string(),
             #[cfg(target_os = "linux")]
             bpf_syntax: Vec::new(),
-            #[cfg(target_os = "windows")]
             bpf_syntax_str: "".to_string(),
         }
     }
 }
 
-#[cfg(target_os = "linux")]
 impl BpfOptions {
+    #[cfg(target_os = "linux")]
     fn skip_tap_interface(
         &self,
         tap_interfaces: &Vec<Link>,
@@ -353,6 +347,7 @@ impl BpfOptions {
         return bpf_syntax;
     }
 
+    #[cfg(target_os = "linux")]
     fn to_pcap_bpf_prog(&self) -> Option<bpf_program> {
         let mut prog: bpf_program = bpf_program {
             bf_len: 0,
@@ -385,6 +380,7 @@ impl BpfOptions {
         return Some(prog);
     }
 
+    #[cfg(target_os = "linux")]
     pub fn get_bpf_instructions(
         &self,
         tap_interfaces: &Vec<Link>,
@@ -453,11 +449,8 @@ impl BpfOptions {
         }
         return syntaxs;
     }
-}
 
-#[cfg(target_os = "windows")]
-impl BpfOptions {
-    pub fn get_bpf_instructions(&self) -> String {
+    pub fn get_bpf_syntax(&self) -> String {
         if self.capture_bpf.len() > 0 {
             let syntax = format!("({}) and ({})", self.capture_bpf, self.bpf_syntax_str);
             debug!("Capture bpf set to: {}", syntax);
@@ -470,15 +463,13 @@ impl BpfOptions {
 
 #[derive(Default)]
 pub struct Options {
-    #[cfg(target_os = "windows")]
-    pub win_packet_blocks: usize,
-    #[cfg(target_os = "linux")]
-    pub af_packet_blocks: usize,
+    pub packet_blocks: usize,
     #[cfg(target_os = "linux")]
     pub af_packet_version: OptTpacketVersion,
     pub snap_len: usize,
     pub tap_mode: TapMode,
     pub dpdk_conf: DpdkRingPortConf,
+    pub libpcap_enabled: bool,
     pub tap_mac_script: String,
     pub is_ipv6: bool,
     pub vxlan_flags: u8,
@@ -608,7 +599,6 @@ pub struct DispatcherBuilder {
     platform_poller: Option<Arc<GenericPoller>>,
     exception_handler: Option<ExceptionHandler>,
     ntp_diff: Option<Arc<AtomicI64>>,
-    #[cfg(target_os = "windows")]
     pcap_interfaces: Option<Vec<Link>>,
     netns: Option<NsFile>,
     trident_type: Option<TridentType>,
@@ -629,6 +619,11 @@ impl DispatcherBuilder {
 
     pub fn src_interface(mut self, v: String) -> Self {
         self.src_interface = Some(v);
+        self
+    }
+
+    pub fn pcap_interfaces(mut self, v: Vec<Link>) -> Self {
+        self.pcap_interfaces = Some(v);
         self
     }
 
@@ -771,10 +766,12 @@ impl DispatcherBuilder {
             .ok_or(Error::ConfigIncomplete("no options".into()))?;
         let tap_mode = options.lock().unwrap().tap_mode;
         let snap_len = options.lock().unwrap().snap_len;
-        #[cfg(target_os = "windows")]
-        let engine = Self::get_engine(&self.pcap_interfaces, tap_mode, &options)?;
-        #[cfg(target_os = "linux")]
-        let engine = Self::get_engine(&mut self.src_interface, tap_mode, &options)?;
+        let engine = Self::get_engine(
+            &self.pcap_interfaces,
+            &mut self.src_interface,
+            tap_mode,
+            &options,
+        )?;
 
         let kernel_counter = engine.get_counter_handle();
         let id = self.id.ok_or(Error::ConfigIncomplete("no id".into()))?;
@@ -990,61 +987,45 @@ impl DispatcherBuilder {
             handle: Mutex::new(None),
         })
     }
-}
 
-#[cfg(target_os = "windows")]
-impl DispatcherBuilder {
+    #[allow(unused_variables)]
     fn get_engine(
         pcap_interfaces: &Option<Vec<Link>>,
-        tap_mode: TapMode,
-        options: &Arc<Mutex<Options>>,
-    ) -> Result<RecvEngine> {
-        match tap_mode {
-            TapMode::Mirror | TapMode::Local => {
-                if pcap_interfaces.is_none() || pcap_interfaces.as_ref().unwrap().is_empty() {
-                    return Err(error::Error::WinPcap(
-                        "windows pcap capture must give interface to capture packet".into(),
-                    ));
-                }
-                let src_ifaces = pcap_interfaces
-                    .as_ref()
-                    .unwrap()
-                    .iter()
-                    .map(|src_iface| (src_iface.device_name.as_str(), src_iface.if_index as isize))
-                    .collect();
-                let options = options.lock().unwrap();
-                let win_packet =
-                    WinPacket::new(src_ifaces, options.win_packet_blocks, options.snap_len)
-                        .map_err(|e| error::Error::WinPcap(e.to_string()))?;
-                info!("WinPacket init");
-                Ok(RecvEngine::WinPcap(Some(win_packet)))
-            }
-            _ => {
-                return Err(Error::ConfigInvalid("Tap-mode not support.".into()));
-            }
-        }
-    }
-
-    pub fn pcap_interfaces(mut self, v: Vec<Link>) -> Self {
-        self.pcap_interfaces = Some(v);
-        self
-    }
-}
-
-#[cfg(target_os = "linux")]
-impl DispatcherBuilder {
-    pub fn platform_poller(mut self, v: Arc<GenericPoller>) -> Self {
-        self.platform_poller = Some(v);
-        self
-    }
-
-    fn get_engine(
         src_interface: &mut Option<String>,
         tap_mode: TapMode,
         options: &Arc<Mutex<Options>>,
     ) -> Result<RecvEngine> {
         let options = options.lock().unwrap();
         match tap_mode {
+            TapMode::Mirror | TapMode::Local if options.libpcap_enabled => {
+                if pcap_interfaces.is_none() || pcap_interfaces.as_ref().unwrap().is_empty() {
+                    return Err(error::Error::Libpcap(
+                        "libpcap capture must give interface to capture packet".into(),
+                    ));
+                }
+                #[cfg(target_os = "windows")]
+                let src_ifaces = pcap_interfaces
+                    .as_ref()
+                    .unwrap()
+                    .iter()
+                    .map(|src_iface| (src_iface.device_name.as_str(), src_iface.if_index as isize))
+                    .collect();
+                #[cfg(target_os = "linux")]
+                let src_ifaces = pcap_interfaces
+                    .as_ref()
+                    .unwrap()
+                    .iter()
+                    .map(|src_iface| (src_iface.name.as_str(), src_iface.if_index as isize))
+                    .collect();
+                info!(
+                    "Libpcap init with: {:?} {} {}",
+                    &src_ifaces, options.packet_blocks, options.snap_len
+                );
+                let libpcap = Libpcap::new(src_ifaces, options.packet_blocks, options.snap_len)
+                    .map_err(|e| error::Error::Libpcap(e.to_string()))?;
+                Ok(RecvEngine::Libpcap(Some(libpcap)))
+            }
+            #[cfg(target_os = "linux")]
             TapMode::Mirror if options.dpdk_conf.enabled => {
                 #[cfg(target_arch = "s390x")]
                 return Err(Error::ConfigInvalid(
@@ -1055,6 +1036,7 @@ impl DispatcherBuilder {
                     Ok(RecvEngine::Dpdk())
                 }
             }
+            #[cfg(target_os = "linux")]
             TapMode::Local | TapMode::Mirror | TapMode::Analyzer => {
                 let afp = af_packet::Options {
                     frame_size: if options.tap_mode == TapMode::Analyzer {
@@ -1063,7 +1045,7 @@ impl DispatcherBuilder {
                         FRAME_SIZE_MAX as u32
                     },
                     block_size: DEFAULT_BLOCK_SIZE as u32,
-                    num_blocks: options.af_packet_blocks as u32,
+                    num_blocks: options.packet_blocks as u32,
                     poll_timeout: POLL_TIMEOUT.as_nanos() as isize,
                     version: options.af_packet_version,
                     iface: src_interface.as_ref().unwrap_or(&"".to_string()).clone(),
@@ -1076,6 +1058,14 @@ impl DispatcherBuilder {
                 return Err(Error::ConfigInvalid("Tap-mode not support.".into()));
             }
         }
+    }
+}
+
+#[cfg(target_os = "linux")]
+impl DispatcherBuilder {
+    pub fn platform_poller(mut self, v: Arc<GenericPoller>) -> Self {
+        self.platform_poller = Some(v);
+        self
     }
 }
 

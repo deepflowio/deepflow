@@ -4,8 +4,10 @@ COMMIT_DATE = $(shell git show -s --format=%cd --date=short HEAD)
 REVISION = $(shell git rev-parse HEAD)
 BRANCH = $(shell git branch  --show-current)
 COMPILE_TIME= $(shell date +"%Y-%m-%d %H:%M:%S")
+# build tags: [-tags=go-json] used for [gin-gonic/gin] marshal json
 FLAGS = -gcflags "-l -l" -ldflags "-X main.Branch=${BRANCH} -X main.RevCount=${REV_COUNT} -X main.Revision=${REVISION} -X main.CommitDate=${COMMIT_DATE} \
-		-X 'main.goVersion=$(shell go version)' -X 'main.CompileTime=${COMPILE_TIME}'"
+		-X 'main.goVersion=$(shell go version)' -X 'main.CompileTime=${COMPILE_TIME}'" \
+		-tags=go_json
 BINARY_SUFFIX :=
 
 .PHONY: all
@@ -77,6 +79,8 @@ vendor:
 	patch -p1 -d vendor/github.com/ClickHouse/clickhouse-go/v2/ < patch/clickhouse-go/write_improve.patch
 	# reset the pointer to the nullable field
 	patch -p1 -d vendor/github.com/ClickHouse/clickhouse-go/v2/ < patch/clickhouse-go/nullable.patch
+	# optimize the performance of hashmap when writing a large amount of data
+	patch -p1 -d vendor/github.com/cornelk/hashmap < patch/cornelk_hashmap/perf.patch
 
 .PHONY: test
 test: vendor $(proto) $(generated_libs)

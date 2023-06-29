@@ -748,6 +748,14 @@ vtap_group_id: g-xxxxxx
   ## Note: Mirror port to capture DPDK traffic.
   #dpdk-ring-port: "dpdkr0"
 
+  ########################
+  ## Libpcap RecvEngine ##
+  ########################
+  ## Enable for Libpcap RecvEngine
+  ## Note: Supports running on Windows and Linux, Low performance when using multiple interfaces.
+  ##   Default to true in Windows, false in Linux.
+  #libpcap-enabled: false
+
   #################################
   ## sFlow / NetFlow / NetStream ##
   #################################
@@ -955,8 +963,14 @@ vtap_group_id: g-xxxxxx
       ##   all processes that use the openssl library.
       #openssl: ""
 
+    #kprobe-blacklist:
+      ## TCP&UDP Port Blacklist, Priority higher than kprobe-whitelist.
+      ## Default: null, means no port
+      ## Format: x-y, z
+      #port-list:
+
     #kprobe-whitelist:
-      ## Server Port Whitelist
+      ## TCP&UDP Port Whitelist, Priority lower than kprobe-blacklist.
       ## Default: null, means no port
       ## Format: x-y, z
       #port-list:

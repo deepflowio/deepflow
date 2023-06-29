@@ -1,17 +1,22 @@
 /*
- * Copyright (c) 2022 Yunshan Networks
+ * This code runs using bpf in the Linux kernel.
+ * Copyright 2022- The Yunshan Networks Authors.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #ifndef DF_BPF_BASE_H
@@ -55,6 +60,8 @@ static long (*bpf_probe_read_str) (void *dst, __u32 size,
 				   const void *unsafe_ptr) = (void *)45;
 // bpf_probe_read_user added in Linux 5.5, Instead of bpf_probe_read_user(), use bpf_probe_read() here.
 static long (*bpf_probe_read_user) (void *dst, __u32 size, const void *unsafe_ptr) = (void *)4;	// real value is 112
+
+static int (*bpf_get_stackid)(void *ctx, void *map, int flags) = (void *)27;
 
 #if __GNUC__ && !__clang__
 #define SEC(name) __attribute__((section(name), used))
@@ -210,8 +217,8 @@ _Pragma("GCC error \"PT_GO_REGS_PARM\"");
 #endif
 #endif
 
-#ifndef __always_inline
-#define __always_inline inline __attribute__((always_inline))
+#ifndef static_always_inline
+#define static_always_inline static inline __attribute__ ((__always_inline__))
 #endif
 
 #define _(P) ({typeof(P) val = 0; bpf_probe_read(&val, sizeof(val), &P); val;})
@@ -242,15 +249,15 @@ struct bpf_map_def SEC("maps") __##name = \
     .type = BPF_MAP_TYPE_ARRAY, \
     __BPF_MAP_DEF(key_type, value_type, max_entries), \
 }; \
-static __always_inline __attribute__((unused)) value_type * name ## __lookup(key_type *key) \
+static_always_inline __attribute__((unused)) value_type * name ## __lookup(key_type *key) \
 { \
     return (value_type *) bpf_map_lookup_elem(& __##name, (const void *)key); \
 } \
-static __always_inline __attribute__((unused)) int name ## __update(key_type *key, value_type *value) \
+static_always_inline __attribute__((unused)) int name ## __update(key_type *key, value_type *value) \
 { \
     return bpf_map_update_elem(& __##name, (const void *)key, (const void *)value, BPF_ANY); \
 } \
-static __always_inline __attribute__((unused)) int name ## __delete(key_type *key) \
+static_always_inline __attribute__((unused)) int name ## __delete(key_type *key) \
 { \
     return bpf_map_delete_elem(& __##name, (const void *)key); \
 }
@@ -262,15 +269,15 @@ struct bpf_map_def SEC("maps") __##name = \
     .type = BPF_MAP_TYPE_PERCPU_ARRAY, \
     __BPF_MAP_DEF(key_type, value_type, max_entries), \
 }; \
-static __always_inline __attribute__((unused)) value_type * name ## __lookup(key_type *key) \
+static_always_inline __attribute__((unused)) value_type * name ## __lookup(key_type *key) \
 { \
     return (value_type *) bpf_map_lookup_elem(& __##name, (const void *)key); \
 } \
-static __always_inline __attribute__((unused)) int name ## __update(key_type *key, value_type *value) \
+static_always_inline __attribute__((unused)) int name ## __update(key_type *key, value_type *value) \
 { \
     return bpf_map_update_elem(& __##name, (const void *)key, (const void *)value, BPF_ANY); \
 } \
-static __always_inline __attribute__((unused)) int name ## __delete(key_type *key) \
+static_always_inline __attribute__((unused)) int name ## __delete(key_type *key) \
 { \
     return bpf_map_delete_elem(& __##name, (const void *)key); \
 }
@@ -289,21 +296,29 @@ struct bpf_map_def SEC("maps") __ ## name = \
     __BPF_MAP_DEF(key_type, value_type, max_entries), \
 };
 
+#define MAP_STACK_TRACE(name, max) \
+struct bpf_map_def SEC("maps") __ ## name = { \
+        .type = BPF_MAP_TYPE_STACK_TRACE, \
+        .key_size = sizeof(__u32), \
+        .value_size = PERF_MAX_STACK_DEPTH * sizeof(__u64), \
+        .max_entries = (max), \
+};
+
 #define MAP_HASH(name, key_type, value_type, max_entries) \
 struct bpf_map_def SEC("maps") __##name = \
 {   \
     .type = BPF_MAP_TYPE_HASH, \
     __BPF_MAP_DEF(key_type, value_type, max_entries), \
 }; \
-static __always_inline __attribute__((unused)) value_type * name ## __lookup(key_type *key) \
+static_always_inline __attribute__((unused)) value_type * name ## __lookup(key_type *key) \
 { \
     return (value_type *) bpf_map_lookup_elem(& __##name, (const void *)key); \
 } \
-static __always_inline __attribute__((unused)) int name ## __update(key_type *key, value_type *value) \
+static_always_inline __attribute__((unused)) int name ## __update(key_type *key, value_type *value) \
 { \
     return bpf_map_update_elem(& __##name, (const void *)key, (const void *)value, BPF_ANY); \
 } \
-static __always_inline __attribute__((unused)) int name ## __delete(key_type *key) \
+static_always_inline __attribute__((unused)) int name ## __delete(key_type *key) \
 { \
     return bpf_map_delete_elem(& __##name, (const void *)key); \
 }

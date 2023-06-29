@@ -17,7 +17,6 @@
 package tagrecorder
 
 import (
-	"strconv"
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -65,12 +64,8 @@ func (l *ChTargetLabel) generateNewData() (map[PrometheusTargetLabelKey]mysql.Ch
 	for _, prometheusMetricName := range prometheusMetricNames {
 		metricID := prometheusMetricName.ID
 		metricName := prometheusMetricName.Name
-		targetIDs := strings.Split(metricNameTargetIDMap[metricName], ", ")
-		for _, targetIDStr := range targetIDs {
-			targetID, err := strconv.Atoi(targetIDStr)
-			if err != nil {
-				continue
-			}
+		targetIDs := metricNameTargetIDMap[metricName]
+		for _, targetID := range targetIDs {
 			targetLabels := strings.Split(targetLabelNameValueMap[targetID], ", ")
 			for _, targetLabel := range targetLabels {
 				if len(strings.Split(targetLabel, ":")) >= 2 {
@@ -106,8 +101,8 @@ func (l *ChTargetLabel) generateUpdateInfo(oldItem, newItem mysql.ChTargetLabel)
 	return nil, false
 }
 
-func (l *ChTargetLabel) generateMetricTargetData() (map[string]string, bool) {
-	metricNameTargetIDMap := make(map[string]string)
+func (l *ChTargetLabel) generateMetricTargetData() (map[string][]int, bool) {
+	metricNameTargetIDMap := make(map[string][]int)
 	var prometheusMetricTargets []mysql.PrometheusMetricTarget
 	err := mysql.Db.Unscoped().Find(&prometheusMetricTargets).Error
 
@@ -117,12 +112,7 @@ func (l *ChTargetLabel) generateMetricTargetData() (map[string]string, bool) {
 	}
 
 	for _, prometheusMetricTarget := range prometheusMetricTargets {
-		if metricNameTargetIDMap[prometheusMetricTarget.MetricName] == "" {
-			metricNameTargetIDMap[prometheusMetricTarget.MetricName] = strconv.Itoa(prometheusMetricTarget.TargetID)
-		} else {
-			metricNameTargetIDMap[prometheusMetricTarget.MetricName] += ", " + strconv.Itoa(prometheusMetricTarget.TargetID)
-		}
-
+		metricNameTargetIDMap[prometheusMetricTarget.MetricName] = append(metricNameTargetIDMap[prometheusMetricTarget.MetricName], prometheusMetricTarget.TargetID)
 	}
 
 	return metricNameTargetIDMap, true

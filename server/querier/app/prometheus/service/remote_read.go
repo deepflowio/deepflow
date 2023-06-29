@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	logging "github.com/op/go-logging"
 	"github.com/prometheus/prometheus/prompb"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -33,18 +32,16 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse"
 )
 
-var log = logging.MustGetLogger("promethues")
-
-func promReaderExecute(req *prompb.ReadRequest, ctx context.Context) (resp *prompb.ReadResponse, err error) {
+func promReaderExecute(ctx context.Context, req *prompb.ReadRequest) (resp *prompb.ReadResponse, err error) {
 	// promrequest trans to sql
 	// pp.Println(req)
-	ctx, sql, db, datasource, err := PromReaderTransToSQL(ctx, req)
+	ctx, sql, db, datasource, err := promReaderTransToSQL(ctx, req)
 	// fmt.Println(sql, db)
 	if err != nil {
 		return nil, err
 	}
 	if db == "" {
-		db = "ext_metrics"
+		db = "prometheus"
 	}
 	query_uuid := uuid.New()
 	args := common.QuerierParams{
@@ -55,6 +52,9 @@ func promReaderExecute(req *prompb.ReadRequest, ctx context.Context) (resp *prom
 		QueryUUID:  query_uuid.String(),
 		Context:    ctx,
 	}
+	// get parentSpan for inject others attribute below
+	parentSpan := trace.SpanFromContext(ctx)
+
 	// start span trace query time of any query uuid
 	var span trace.Span
 	if config.Cfg.Prometheus.RequestQueryWithDebug {
@@ -62,6 +62,8 @@ func promReaderExecute(req *prompb.ReadRequest, ctx context.Context) (resp *prom
 		ctx, span = tr.Start(ctx, "PromReaderExecute",
 			trace.WithSpanKind(trace.SpanKindClient),
 			trace.WithAttributes(attribute.String("query_uuid", query_uuid.String())))
+
+		defer span.End()
 	}
 
 	ckEngine := &clickhouse.CHEngine{DB: args.DB, DataSource: args.DataSource}
@@ -74,13 +76,31 @@ func promReaderExecute(req *prompb.ReadRequest, ctx context.Context) (resp *prom
 	}
 
 	if config.Cfg.Prometheus.RequestQueryWithDebug {
+		// inject query_time for current span
 		query_time := extractDebugInfoFromQueryResponse(debug)
 		span.SetAttributes(attribute.Float64("query_time", query_time))
-		span.End()
+
+		// inject labels for parent span
+		targetLabels := make([]string, 0, len(result.Schemas))
+		appLabels := make([]string, 0, len(result.Schemas))
+		for i := 0; i < len(result.Schemas); i++ {
+			labelType := result.Schemas[i].LabelType
+			if labelType == "app" {
+				appLabels = append(appLabels, strings.TrimPrefix(result.Columns[i].(string), "tag."))
+			} else if labelType == "target" {
+				targetLabels = append(targetLabels, strings.TrimPrefix(result.Columns[i].(string), "tag."))
+			}
+		}
+		if len(targetLabels) > 0 {
+			parentSpan.SetAttributes(attribute.String("promql.query.metric.targetLabel", strings.Join(targetLabels, ",")))
+		}
+		if len(appLabels) > 0 {
+			parentSpan.SetAttributes(attribute.String("promql.query.metric.appLabel", strings.Join(appLabels, ",")))
+		}
 	}
 
 	// response trans to prom resp
-	resp, err = RespTransToProm(ctx, result)
+	resp, err = respTransToProm(ctx, result)
 	if err != nil {
 		log.Error(err)
 		return nil, err
@@ -97,4 +117,24 @@ func extractDebugInfoFromQueryResponse(debug map[string]interface{}) float64 {
 		return query_time
 	}
 	return 0
+}
+
+func queryDataExecute(ctx context.Context, sql string, db string, ds string) (*common.Result, error) {
+	query_uuid := uuid.New()
+	args := common.QuerierParams{
+		DB:         db,
+		Sql:        sql,
+		DataSource: ds,
+		Debug:      strconv.FormatBool(config.Cfg.Prometheus.RequestQueryWithDebug),
+		QueryUUID:  query_uuid.String(),
+		Context:    ctx,
+	}
+	ckEngine := &clickhouse.CHEngine{DB: args.DB, DataSource: args.DataSource}
+	ckEngine.Init()
+	result, debug, err := ckEngine.ExecuteQuery(&args)
+	if err != nil {
+		log.Errorf("ExecuteQuery failed, debug info = %v, err info = %v", debug, err)
+		return nil, err
+	}
+	return result, err
 }

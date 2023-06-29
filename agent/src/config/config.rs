@@ -259,7 +259,7 @@ pub struct OsProcRegexp {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Default)]
 #[serde(default, rename_all = "kebab-case")]
-pub struct EbpfKprobeWhitelist {
+pub struct EbpfKprobePortlist {
     pub port_list: String,
 }
 
@@ -268,7 +268,8 @@ pub struct EbpfKprobeWhitelist {
 pub struct EbpfYamlConfig {
     pub disabled: bool,
     pub log_file: String,
-    pub kprobe_whitelist: EbpfKprobeWhitelist,
+    pub kprobe_whitelist: EbpfKprobePortlist,
+    pub kprobe_blacklist: EbpfKprobePortlist,
     #[serde(rename = "uprobe-process-name-regexs")]
     pub uprobe_proc_regexp: UprobeProcRegExp,
     pub thread_num: usize,
@@ -294,7 +295,8 @@ impl Default for EbpfYamlConfig {
             max_socket_entries: 524288,
             max_trace_entries: 524288,
             socket_map_max_reclaim: 520000,
-            kprobe_whitelist: EbpfKprobeWhitelist::default(),
+            kprobe_whitelist: EbpfKprobePortlist::default(),
+            kprobe_blacklist: EbpfKprobePortlist::default(),
             uprobe_proc_regexp: UprobeProcRegExp::default(),
             go_tracing_timeout: 120,
             io_event_collect_mode: 1,
@@ -333,6 +335,7 @@ pub struct YamlConfig {
     pub ovs_dpdk_enabled: bool,
     pub dpdk_pmd_core_id: u32,
     pub dpdk_ring_port: String,
+    pub libpcap_enabled: bool,
     pub xflow_collector: XflowGeneratorConfig,
     pub vxlan_flags: u8,
     pub collector_sender_queue_size: usize,
@@ -341,7 +344,7 @@ pub struct YamlConfig {
     pub toa_lru_cache_size: usize,
     pub flow_sender_queue_size: usize,
     pub flow_sender_queue_count: usize,
-    #[serde(with = "humantime_serde")]
+    #[serde(rename = "second-flow-extra-delay-second", with = "humantime_serde")]
     pub second_flow_extra_delay: Duration,
     #[serde(with = "humantime_serde")]
     pub packet_delay: Duration,
@@ -632,6 +635,10 @@ impl Default for YamlConfig {
             ovs_dpdk_enabled: false,
             dpdk_pmd_core_id: 0,
             dpdk_ring_port: "dpdkr0".into(),
+            #[cfg(target_os = "linux")]
+            libpcap_enabled: false,
+            #[cfg(target_os = "windows")]
+            libpcap_enabled: true,
             xflow_collector: Default::default(),
             vxlan_flags: 0xff,
             // default size changes according to tap_mode

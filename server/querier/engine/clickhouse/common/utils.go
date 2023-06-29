@@ -35,6 +35,7 @@ import (
 )
 
 var log = logging.MustGetLogger("common")
+var symbolRegexp = regexp.MustCompile("[\u3002\uff1b\uff0c\uff1a\u201c\u201d\uff08\uff09\u3001\uff1f\u300a\u300b]")
 
 func ParseAlias(node sqlparser.SQLNode) string {
 	alias := sqlparser.String(node)
@@ -48,7 +49,7 @@ func ParseAlias(node sqlparser.SQLNode) string {
 	// 中文带上``
 	// 部分特殊字符带上`
 	for _, r := range alias {
-		if unicode.Is(unicode.Scripts["Han"], r) || (regexp.MustCompile("[\u3002\uff1b\uff0c\uff1a\u201c\u201d\uff08\uff09\u3001\uff1f\u300a\u300b]").MatchString(string(r))) {
+		if unicode.Is(unicode.Scripts["Han"], r) || (symbolRegexp.MatchString(string(r))) {
 			return fmt.Sprintf("`%s`", alias)
 		}
 		if string(r) == "(" || string(r) == ")" {

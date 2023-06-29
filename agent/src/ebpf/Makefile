@@ -11,6 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+# gnu compile:
+#     source /opt/rh/devtoolset-8/enable (need gcc8+)
+#     make rust-sample
+#
+# musl compile: (x86_64)
+#     source /opt/rh/devtoolset-11/enable (need gcc11+)
+#     CC=musl-gcc CLANG=musl-clang make rust-sample
+#
 
 ifeq ($(V),1)
 	Q =
@@ -34,6 +43,27 @@ define compile_socket_trace_elf
 	@./tools/ebpftobuffer kernel/socket_trace.elf user/socket_trace_bpf_$(strip $1).c socket_trace_$(strip $1)_ebpf_data
 endef
 
+define compile_perf_profiler_elf
+	@echo "  COMPILE ELF kernel version $(1)"
+	@cd kernel && make clean --no-print-directory && make perf_profiler.elf $(2) --no-print-directory && cd ../
+	@echo "  Generate file user/perf_profiler_bpf_$(strip $1).c"
+	@./tools/ebpftobuffer kernel/perf_profiler.elf user/perf_profiler_bpf_$(strip $1).c perf_profiler_$(strip $1)_ebpf_data
+endef
+
+define check_gcc_version
+        @GCC_VER=`gcc --version | grep ^gcc | cut -f3 -d' '|cut -f1-2 -d.`; \
+	VER_GTE112=`echo $${GCC_VER} \>= 11.2 | sed -e 's/\./*100+/g' | bc`; \
+	VER_GTE80=`echo $${GCC_VER} \>= 8.0 | sed -e 's/\./*100+/g' | bc`; \
+	if [ $${VER_GTE80} -eq 0 ]; then \
+            echo "Error: GCC version is less than 8.0.0"; \
+            exit 1; \
+        fi; \
+	if [ $(1) -eq 1 -a $${VER_GTE112} -eq 0 ]; then \
+	    echo "Error: musl compile need less than 11.2.0"; \
+	    exit 1; \
+        fi;
+endef
+
 CURRDIR := $(PWD)
 CLANG_VER := $(shell ${CLANG} --version | grep "version" | awk '{if ($$3!="version"){print $$3}else{exit -1}}' || ${CLANG} --version | grep "version" | awk '{if ($$4!="version"){print $$4}else{exit -1}}')
 CLANG_VER_MAIN := $(shell ${CLANG} --version | grep "version" | awk '{print $$3}' | awk -F. '{print $$1}' | awk '{if (int($$0)!=0){print $$0}else{exit -1}}' || ${CLANG} --version | grep "version" | awk '{print $$4}' | awk -F. '{print $$1}' | awk '{if (int($$0)!=0){print $$0}else{exit -1}}')
@@ -52,10 +82,15 @@ OBJS := user/elf.o \
 	user/table.o \
 	user/socket.o \
 	user/ctrl.o \
-	user/offset.o
+	user/offset.o \
+	user/mem.o \
+	user/vec.o \
+	user/bihash.o \
+	user/perf_profiler.o \
+	user/stringifier.o
 
 STATIC_OBJS := $(addprefix $(STATIC_OBJDIR)/,$(OBJS))
-CFLAGS ?= -std=gnu99 -g -O2 -ffunction-sections -fdata-sections -fPIC -fno-omit-frame-pointer -Wall -Wno-strict-aliasing -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers
+CFLAGS ?= -std=gnu99 -g -O2 -ffunction-sections -fdata-sections -fPIC -Wall -Wno-strict-aliasing -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers
 # '-Wformat-truncation' : The warning was added in gcc7.1
 GCC_VER_GTE71 := $(shell echo `gcc --version | grep ^gcc | cut -f3 -d' '|cut -f1-2 -d.` \>= 7.1 | sed -e 's/\./*100+/g' | bc )
 ifeq ($(GCC_VER_GTE71),1)
@@ -63,7 +98,24 @@ ifeq ($(GCC_VER_GTE71),1)
 endif
 
 # -DBPF_DEBUG for parse and load ebpf probes.
-CFLAGS += $(MACHINE_CFLAGS) -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -I.
+# -fsanitize=address: Enable the Address Sanitizer tool, which
+#  can detect memory errors such as using uninitialized memory,
+#  accessing freed memory, and so on.
+# -fno-omit-frame-pointer: When a memory error is detected, print
+#  the function call stack to facilitate locating the code line
+#  where the error occurred.
+# -DDF_MEM_DEBUG Used for memory leak detection, to check for memory
+#  leak issues during the debugging phase.
+CFLAGS += $(MACHINE_CFLAGS) -fno-omit-frame-pointer -I.
+ifeq ($(findstring musl,$(CC)),musl)
+    IS_MUSL := 1
+    ifeq ($(findstring aarch64,$(ARCH)),aarch64)
+	CFLAGS += -DAARCH64_MUSL
+    endif
+else
+    IS_MUSL := 0
+endif
+
 all: build
 
 ELFFILES = ./.data_done
@@ -78,6 +130,7 @@ $(ELFFILES):
 	$(call compile_socket_trace_elf, common)
 	$(call compile_socket_trace_elf, 5_2_plus, LINUX_VER_5_2_PLUS=1)
 	$(call compile_socket_trace_elf, kylin, LINUX_VER_KYLIN=1)
+	$(call compile_perf_profiler_elf, common)
 	@touch $(ELFFILES)
 
 $(STATIC_OBJDIR) $(SHARED_OBJDIR):
@@ -98,32 +151,79 @@ tools: $(LIBTRACE)
 	$(call msg,TOOLS,deepflow-ebpfctl)
 	$(Q)$(CC) $(CFLAGS) --static -g -O2 user/ctrl_tracer.c user/ctrl.c $(LIBTRACE) -o deepflow-ebpfctl -lelf -lz -lpthread
 
-rust-sample: $(ELFFILES) $(LIBTRACE)
+rust-sample: .socket-tracer .profiler
+socket-tracer: .socket-tracer
+profiler: .profiler
+.socket-tracer: $(ELFFILES) $(LIBTRACE)
 	$(call msg,Current-DIR,,$(CURR))
-	$(Q)rm -rf samples/rust/src/ebpf.rs
-	$(Q)cp mod.rs samples/rust/src/ebpf.rs
-	$(Q)rm -rf samples/rust/build.rs
-	$(Q)rm -rf samples/rust/target
+	$(Q)rm -rf samples/rust/socket-tracer/src/ebpf.rs
+	$(Q)cp mod.rs samples/rust/socket-tracer/src/ebpf.rs
+	$(Q)rm -rf samples/rust/socket-tracer/target
 	@if [[ $(ARCH) == *"aarch64"* ]]; then \
             echo "  Architecture is aarch64"; \
-            cp samples/rust/build-aarch64.rs samples/rust/build.rs; \
-            cd samples/rust/ && cargo build --release --target aarch64-unknown-linux-musl && cd ../../; \
-            echo "  samples/rust/target/aarch64-unknown-linux-musl/release/rust_sample"; \
+	    if [ $(IS_MUSL) -eq 1 ]; then \
+                cd samples/rust/socket-tracer/ && cargo build --release --target aarch64-unknown-linux-musl && cd ../../; \
+                echo "  samples/rust/socket-tracer/target/aarch64-unknown-linux-musl/release/rust_sample"; \
+            else \
+                cd samples/rust/socket-tracer/ && cargo build --release && cd ../../; \
+                echo "  samples/rust/socket-tracer/target/release/socket_tracer"; \
+            fi; \
         elif [[ $(ARCH) == *"x86_64"* ]]; then \
             echo "  Architecture is x86_64"; \
-            cp samples/rust/build-x86.rs samples/rust/build.rs; \
-            cd samples/rust/ && cargo build --release && cd ../../; \
-            echo "  samples/rust/target/release/rust_sample"; \
+	    if [ $(IS_MUSL) -eq 1 ]; then \
+                cd samples/rust/socket-tracer/ && RUSTFLAGS='-D warnings -C force-frame-pointers=yes' cargo build --release --target x86_64-unknown-linux-musl && cd ../../; \
+		echo "  samples/rust/socket-tracer/target/x86_64-unknown-linux-musl/release/socket_tracer"; \
+            else \
+                cd samples/rust/socket-tracer/ && RUSTFLAGS=-Cforce-frame-pointers=yes cargo build --release && cd ../../; \
+                echo "  samples/rust/socket-tracer/target/release/socket_tracer"; \
+	    fi; \
         else \
             echo "  Error: Invalid arch. $(ARCH) is not support!"; \
             exit 1; \
         fi
+	$(Q)touch .socket-tracer
+
+.profiler: $(ELFFILES) $(LIBTRACE)
+	$(call msg,Current-DIR,,$(CURR))
+	$(Q)rm -rf samples/rust/profiler/src/ebpf.rs
+	$(Q)cp mod_profiler.rs samples/rust/profiler/src/ebpf.rs
+	$(Q)rm -rf samples/rust/profiler/target
+	@if [[ $(ARCH) == *"aarch64"* ]]; then \
+            echo "  Architecture is aarch64"; \
+	    if [ $(IS_MUSL) -eq 1 ]; then \
+                cd samples/rust/profiler/ && cargo build --release --target aarch64-unknown-linux-musl && cd ../../; \
+                echo "  samples/rust/profiler/target/aarch64-unknown-linux-musl/release/profiler"; \
+            else \
+                cd samples/rust/profiler/ && cargo build --release && cd ../../; \
+                echo "  samples/rust/profiler/target/release/profiler"; \
+            fi; \
+        elif [[ $(ARCH) == *"x86_64"* ]]; then \
+            echo "  Architecture is x86_64"; \
+	    if [ $(IS_MUSL) -eq 1 ]; then \
+                cd samples/rust/profiler/ && cargo build --release --target x86_64-unknown-linux-musl && cd ../../; \
+                echo "  samples/rust/profiler/target/x86_64-unknown-linux-musl/release/profiler"; \
+	    else \
+                cd samples/rust/profiler/ && RUSTFLAGS="-C force-frame-pointers=yes" cargo build --release && cd ../../; \
+                echo "  samples/rust/profiler/target/release/profiler"; \
+	    fi; \
+        else \
+            echo "  Error: Invalid arch. $(ARCH) is not support!"; \
+            exit 1; \
+        fi
+	$(Q)touch .profiler
+
+clean-sample:
+	$(Q)rm -rf .profiler .socket-tracer
+	$(Q)rm -rf samples/rust/socket-tracer/target
+	$(Q)rm -rf samples/rust/profiler/target
 
 clean:
 	$(Q)$(MAKE) -C kernel clean --no-print-directory
 	$(Q)$(MAKE) -C test clean --no-print-directory
 	$(Q)rm -rf $(ELFFILES) data deepflow-ebpfctl $(STATIC_OBJDIR) $(LIBTRACE) *.a
-	$(Q)rm -rf samples/rust/target
+	$(Q)rm -rf .profiler .socket-tracer
+	$(Q)rm -rf samples/rust/socket-tracer/target
+	$(Q)rm -rf samples/rust/profiler/target
 
 test: $(ELFFILES) $(LIBTRACE)
 	$(Q)$(MAKE) -C test --no-print-directory

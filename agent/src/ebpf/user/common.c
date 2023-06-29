@@ -36,9 +36,12 @@
 #include <inttypes.h>
 #include <sys/utsname.h>
 #include "config.h"
+#include "types.h"
+#include "clib.h"
 #include "list.h"
 #include "common.h"
 #include "log.h"
+#include "string.h"
 
 bool is_core_kernel(void)
 {
@@ -374,32 +377,114 @@ uint64_t gettime(clockid_t clk_id, int flag)
 	return time;
 }
 
-// refs: https://man7.org/linux/man-pages/man5/proc.5.html
-// /proc/[pid]/stat Status information about the process.
-unsigned long long get_process_starttime(int pid)
+/*
+ * Get system boot start time (in milliseconds).
+ */
+u64 get_sys_btime_msecs(void)
+{
+	char buff[4096];
+
+	FILE *fp = fopen("/proc/stat", "r");
+	ASSERT(fp != NULL);
+
+	u64 sys_boot = 0;
+	while (fgets(buff, sizeof(buff), fp) != NULL) {
+		if (sscanf(buff, "btime %lu", &sys_boot) == 1)
+			break;
+	}
+
+	fclose(fp);
+	ASSERT(sys_boot > 0);
+
+	return (sys_boot * 1000UL);
+}
+
+/*
+ * Get the start time (in milliseconds) of a given PID.
+ */
+u64 get_process_starttime(pid_t pid)
 {
 	char file[PATH_MAX], buff[4096];
 	int fd;
-	unsigned long long starttime = 0;
+	unsigned long long etime_ticks = 0;
 
 	snprintf(file, sizeof(file), "/proc/%d/stat", pid);
 	if (access(file, F_OK))
 		return 0;
 
 	fd = open(file, O_RDONLY);
-	if (fd < 0)
-		return false;
+	if (fd <= 2)
+		return 0;
 
 	read(fd, buff, sizeof(buff));
 	close(fd);
 
 	if (sscanf(buff, "%*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s"
 		   " %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %llu ",
-		   &starttime) != 1) {
+		   &etime_ticks) != 1) {
 		return 0;
 	}
 
-	return starttime;
+	u64 sys_boot = get_sys_btime_msecs();
+	u64 msecs_per_tick = 1000UL / sysconf(_SC_CLK_TCK);
+
+	return ((etime_ticks * msecs_per_tick) + sys_boot);
+}
+
+/*
+ * Get the start time (in milliseconds) of a given PID,
+ * and fetch process comm.
+ *
+ * @pid processID
+ * @comm_base store process name address
+ * @len store process name max length
+ *
+ * @return process start time,
+ * 	   if is 0, it indicates that an error has been encountered.
+ */
+u64 get_process_starttime_and_comm(pid_t pid,
+				   char *name_base,
+				   int len)
+{
+	char file[PATH_MAX], buff[4096];
+	int fd;
+	unsigned long long etime_ticks = 0;
+
+	snprintf(file, sizeof(file), "/proc/%d/stat", pid);
+	if (access(file, F_OK))
+		return 0;
+
+	fd = open(file, O_RDONLY);
+	if (fd <= 2)
+		return 0;
+
+	read(fd, buff, sizeof(buff));
+	close(fd);
+
+	char *start = NULL; // process name start address;
+	if (sscanf(buff, "%*s %ms %*s %*s %*s %*s %*s %*s %*s %*s %*s"
+		   " %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %llu ",
+		   &start, &etime_ticks) != 2) {
+		return 0;
+	}
+
+	if (name_base != NULL && len > 0) {
+		int src_len = strlen(start);
+		start[src_len - 1] = '\0';
+		src_len -= 2;
+		if (src_len > len)
+			src_len = len;
+		memset(name_base, 0, len);
+		memcpy_s_inline((void *)name_base, len,
+				(void *)start + 1, src_len);
+	}
+
+	free(start);
+
+	u64 sys_boot = get_sys_btime_msecs();
+	u64 msecs_per_tick = 1000UL / sysconf(_SC_CLK_TCK);
+
+	return ((etime_ticks * msecs_per_tick) + sys_boot);
 }
 
 int fetch_kernel_version(int *major, int *minor, int *patch)
@@ -496,7 +581,7 @@ unsigned int fetch_kernel_version_code(void)
 	return KERNEL_VERSION(major, minor, patch);
 }
 
-bool is_process(int pid)
+static bool __is_process(int pid, bool is_user)
 {
 	char file[PATH_MAX], buff[4096];
 	int fd;
@@ -513,7 +598,20 @@ bool is_process(int pid)
 	read(fd, buff, sizeof(buff));
 	close(fd);
 
-	char *p = strstr(buff, "Tgid:");
+	/*
+	 * All kernel threads in Linux have their parent process
+	 * as either 0 or 2, and not any other value.
+	 */
+	char *p;
+	if (is_user) {
+		int ppid = -1;
+		p = strstr(buff, "PPid:");
+		sscanf(p, "PPid:\t%d", &ppid);
+		if ((ppid == 0 && pid != 1) || ppid == 2 || ppid == -1)
+			return false;
+	}
+
+	p = strstr(buff, "Tgid:");
 	sscanf(p, "Tgid:\t%d", &read_tgid);
 
 	p = strstr(buff, "Pid:");
@@ -528,7 +626,17 @@ bool is_process(int pid)
 	return false;
 }
 
-static char *gen_datetime_str(const char *fmt)
+bool is_user_process(int pid)
+{
+	return __is_process(pid, true);
+}
+
+bool is_process(int pid)
+{
+	return __is_process(pid, false);
+}
+
+static char *__gen_datetime_str(const char *fmt, u64 ns)
 {
 	const int strlen = DATADUMP_FILE_PATH_SIZE;
 	time_t timep;
@@ -540,12 +648,18 @@ static char *gen_datetime_str(const char *fmt)
 		return NULL;
 	}
 
-	time(&timep);
-	p = localtime(&timep);
-	struct timeval msectime;
-	gettimeofday(&msectime, NULL);
 	long msec = 0;
-	msec = msectime.tv_usec / 1000;
+	if (ns > 0) {
+		timep = ns / NS_IN_SEC;
+		msec = (ns % NS_IN_SEC) / NS_IN_MSEC;
+	} else {
+		time(&timep);
+		struct timeval msectime;
+		gettimeofday(&msectime, NULL);
+		msec = msectime.tv_usec / 1000;
+	}
+
+	p = localtime(&timep);
 	snprintf(str, strlen, fmt,
 		 (1900 + p->tm_year), (1 + p->tm_mon),
 		 p->tm_mday, p->tm_hour, p->tm_min,
@@ -554,12 +668,43 @@ static char *gen_datetime_str(const char *fmt)
 	return str;
 }
 
+u32 legacy_fetch_log2_page_size(void)
+{
+#define LOG2_PAFE_SIZE_DEF 21
+
+	u32 log2_page_size = 0;
+	FILE *fp;
+	char tmp[33] = { };
+
+	if ((fp = fopen ("/proc/meminfo", "r")) == NULL) {
+		ebpf_warning("fopen file '/proc/meminfo' failed.\n");
+		return LOG2_PAFE_SIZE_DEF;
+	}
+
+	while (fscanf (fp, "%32s", tmp) > 0) {
+		if (strncmp ("Hugepagesize:", tmp, 13) == 0) {
+			u32 size;
+			if (fscanf (fp, "%u", &size) > 0)
+				log2_page_size = 10 + min_log2 (size);
+			break;
+		}
+	}
+
+	fclose (fp);
+	return log2_page_size;
+}
+	
 char *gen_file_name_by_datetime(void)
 {
-	return gen_datetime_str("%d_%02d_%02d_%02d_%02d_%02d_%ld");
+	return __gen_datetime_str("%d_%02d_%02d_%02d_%02d_%02d_%ld", 0);
 }
 
 char *gen_timestamp_prefix(void)
 {
-	return gen_datetime_str("%d-%02d-%02d %02d:%02d:%02d.%ld");
+	return __gen_datetime_str("%d-%02d-%02d %02d:%02d:%02d.%ld", 0);
+}
+
+char *gen_timestamp_str(u64 ns)
+{
+	return __gen_datetime_str("%d-%02d-%02d %02d:%02d:%02d.%ld", ns);
 }

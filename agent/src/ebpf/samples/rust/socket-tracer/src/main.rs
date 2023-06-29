@@ -17,7 +17,7 @@
 use chrono::prelude::DateTime;
 use chrono::FixedOffset;
 use chrono::Utc;
-use rust_sample::ebpf::*;
+use socket_tracer::ebpf::*;
 use std::convert::TryInto;
 use std::fmt::Write;
 use std::net::IpAddr;
@@ -255,6 +255,38 @@ extern "C" fn process_event_handle(p: *mut PROCESS_EVENT) {
     }
 }
 
+#[allow(dead_code)]
+fn cp_data_str_safe(cp: *mut stack_profile_data) -> String {
+    unsafe { sk_str_safe((*cp).stack_data) }
+}
+
+#[allow(dead_code)]
+fn cp_process_name_safe(cp: *mut stack_profile_data) -> String {
+    unsafe {
+        let v = &(*cp).comm;
+        String::from_utf8_lossy(v).to_string()
+    }
+}
+
+#[allow(dead_code)]
+extern "C" fn continuous_profiler_callback(cp: *mut stack_profile_data) {
+    unsafe {
+        let data = cp_data_str_safe(cp);
+        println!("\n+ --------------------------------- +");
+        println!("{} PID {} START-TIME {} U-STACKID {} K-STACKID {} COMM {} CPU {} COUNT {} LEN {} \n  - {}",
+                   date_time((*cp).timestamp / 1000),
+                   (*cp).pid,
+                   (*cp).stime,
+                   (*cp).u_stack_id,
+                   (*cp).k_stack_id,
+                   cp_process_name_safe(cp),
+                   (*cp).cpu,
+                   (*cp).count,
+                   (*cp).stack_data_len, data);
+        println!("+ --------------------------------- +");
+    }
+}
+
 fn main() {
     let log_file = CString::new("/var/log/deepflow-ebpf.log".as_bytes()).unwrap();
     let log_file_c = log_file.as_c_str();
@@ -289,6 +321,11 @@ fn main() {
         set_go_tracing_timeout(120);
 
         /*
+            let bypass_port = 443;
+            let mut bypass_port_bitmap: [u8; 65536 / 8] = [0; 65536 / 8];
+            bypass_port_bitmap[bypass_port / 8] |= 1 << (bypass_port % 8);
+            set_bypass_port_bitmap(bypass_port_bitmap.as_ptr());
+
             let allow_port = 443;
             let mut allow_port_bitmap: [u8; 65536 / 8] = [0; 65536 / 8];
             allow_port_bitmap[allow_port / 8] |= 1 << (allow_port % 8);
@@ -328,20 +365,34 @@ fn main() {
         // test data limit max
         set_data_limit_max(10000);
 
+        print!("socket_tracer_start() finish\n");
+
+        let stats = socket_tracer_stats();
+        print!("{:#?}\n", stats);
+
+        //// enable continuous profiler
+        //if start_continuous_profiler(
+        //    99,
+        //    continuous_profiler_callback,
+        //) != 0
+        //{
+        //    println!("start_continuous_profiler() error.");
+        //    ::std::process::exit(1);
+        //}
+
         bpf_tracer_finish();
 
         let stats = socket_tracer_stats();
         print!("{:#?}\n", stats);
 
         print!("start start ...\n");
-        while tracer_start() != 0 {
-            print!("tracer_start() error, sleep 1s retry.\n");
+        while socket_tracer_start() != 0 {
+            print!("socket_tracer_start() error, sleep 1s retry.\n");
             std::thread::sleep(Duration::from_secs(1));
         }
-        print!("tracer_start() finish\n");
 
-        let stats = socket_tracer_stats();
-        print!("{:#?}\n", stats);
+        //thread::sleep(Duration::from_secs(20));
+        //stop_continuous_profiler();
     }
 
     loop {

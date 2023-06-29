@@ -1,5 +1,5 @@
 [package]
-name = "windows_recv_engine"
+name = "special_recv_engine"
 version = "0.1.0"
 edition = "2021"
 

@@ -396,14 +396,17 @@ impl MirrorModeDispatcher {
             if self.base.reset_whitelist.swap(false, Ordering::Relaxed) {
                 self.base.tap_interface_whitelist.reset();
             }
-            let recved = BaseDispatcher::recv(
-                &mut self.base.engine,
-                &self.base.leaky_bucket,
-                &self.base.exception_handler,
-                &mut prev_timestamp,
-                &self.base.counter,
-                &self.base.ntp_diff,
-            );
+            // The lifecycle of the recved will end before the next call to recv.
+            let recved = unsafe {
+                BaseDispatcher::recv(
+                    &mut self.base.engine,
+                    &self.base.leaky_bucket,
+                    &self.base.exception_handler,
+                    &mut prev_timestamp,
+                    &self.base.counter,
+                    &self.base.ntp_diff,
+                )
+            };
             if recved.is_none() {
                 flow_map.inject_flush_ticker(&config, Duration::ZERO);
                 if self.base.tap_interface_whitelist.next_sync(Duration::ZERO) {
