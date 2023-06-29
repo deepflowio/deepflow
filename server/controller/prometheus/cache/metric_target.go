@@ -62,10 +62,7 @@ func (mt *metricTarget) Add(batch []MetricTargetKey) {
 	}
 }
 
-var count = 0
-
 func (mt *metricTarget) refresh(args ...interface{}) error {
-	count++
 	mts, err := mt.load()
 	if err != nil {
 		return err
@@ -78,9 +75,6 @@ func (mt *metricTarget) refresh(args ...interface{}) error {
 		}
 	}
 	mt.targetIDToMetricIDs = targetIDToMetricIDs
-	if count%10 == 0 {
-		log.Debugf("metricTargetKeys detail: %+v", mt.metricTargetKeys.ToSlice())
-	}
 	return nil
 }
 
