@@ -19,7 +19,6 @@ package service
 import (
 	"context"
 	"math"
-	"strconv"
 	"time"
 
 	"github.com/prometheus/prometheus/model/labels"
@@ -51,18 +50,16 @@ type RemoteReadQuerier struct {
 
 // For PromQL instant query
 func (q *RemoteReadQuerier) Select(sortSeries bool, hints *storage.SelectHints, matchers ...*labels.Matcher) storage.SeriesSet {
-	startTimeS, err := (strconv.ParseFloat(q.Args.StartTime, 64))
+	startTimeS, err := parseTime(q.Args.StartTime)
 	if err != nil {
 		log.Error(err)
 		return storage.ErrSeriesSet(err)
 	}
-	startTimeMs := int64(startTimeS * 1000)
-	endTimeS, err := (strconv.ParseFloat(q.Args.EndTime, 64))
+	endTimeS, err := parseTime(q.Args.EndTime)
 	if err != nil {
 		log.Error(err)
 		return storage.ErrSeriesSet(err)
 	}
-	endTimeMs := int64(endTimeS * 1000)
 	queryRange := time.Duration(hints.End-hints.Start) * time.Millisecond
 
 	if config.Cfg.Prometheus.RequestQueryWithDebug {
@@ -75,7 +72,7 @@ func (q *RemoteReadQuerier) Select(sortSeries bool, hints *storage.SelectHints, 
 		span.SetAttributes(attribute.String("promql.query.metric.name", metric))
 	}
 
-	prompbQuery, err := remote.ToQuery(startTimeMs, endTimeMs, matchers, hints)
+	prompbQuery, err := remote.ToQuery(startTimeS.UnixMilli(), endTimeS.UnixMilli(), matchers, hints)
 	if err != nil {
 		log.Error(err)
 		return storage.ErrSeriesSet(err)
