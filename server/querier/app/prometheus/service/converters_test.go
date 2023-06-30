@@ -26,6 +26,7 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 
 	"github.com/deepflowio/deepflow/server/libs/datastructure"
+	cfg "github.com/deepflowio/deepflow/server/querier/app/prometheus/config"
 	"github.com/deepflowio/deepflow/server/querier/config"
 )
 
@@ -63,11 +64,11 @@ func TestMain(m *testing.M) {
 	// init runtime objects for tests
 	QPSLeakyBucket = new(datastructure.LeakyBucket)
 	QPSLeakyBucket.Init(1e9)
-
-	config.Cfg = &config.QuerierConfig{Limit: "10000"}
+	config.Cfg = &config.QuerierConfig{Limit: "10000", Prometheus: cfg.Prometheus{AutoTaggingPrefix: "df_"}}
 
 	// run for test
 	m.Run()
+	QPSLeakyBucket.Close()
 }
 
 func TestParseMetric(t *testing.T) {
