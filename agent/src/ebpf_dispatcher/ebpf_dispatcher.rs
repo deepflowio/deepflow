@@ -212,18 +212,20 @@ impl EbpfDispatcher {
         const QUEUE_BATCH_SIZE: usize = 1024;
         let mut batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
         while unsafe { SWITCH } {
-            if self
-                .receiver
-                .recv_all(&mut batch, Some(Duration::from_secs(1)))
-                .is_err()
-            {
-                continue;
-            }
             let config = Config {
                 flow: &self.flow_map_config.load(),
                 log_parser: &self.log_parser_config.load(),
                 ebpf: Some(&ebpf_config),
             };
+
+            if self
+                .receiver
+                .recv_all(&mut batch, Some(Duration::from_secs(1)))
+                .is_err()
+            {
+                flow_map.inject_flush_ticker(&config, Duration::ZERO);
+                continue;
+            }
 
             for mut packet in batch.drain(..) {
                 sync_counter.counter().rx += 1;
