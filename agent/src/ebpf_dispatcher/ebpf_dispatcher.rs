@@ -218,6 +218,7 @@ impl EbpfDispatcher {
                 .recv_all(&mut batch, Some(Duration::from_secs(1)))
                 .is_err()
             {
+                flow_map.inject_flush_ticker(Duration::ZERO);
                 continue;
             }
 
