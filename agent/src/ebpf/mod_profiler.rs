@@ -76,26 +76,43 @@ extern "C" {
     pub fn bpf_tracer_init(log_file: *const u8, is_stdout: bool) -> c_int;
     pub fn bpf_tracer_finish();
 
-/*
- * start continuous profiler
- * @freq sample frequency, Hertz. (e.g. 99 profile stack traces at 99 Hertz)
- * @callback Profile data processing callback interface
- * @returns 0 on success, < 0 on error
- */
-pub fn start_continuous_profiler(
+    /*
+     * start continuous profiler
+     * @freq sample frequency, Hertz. (e.g. 99 profile stack traces at 99 Hertz)
+     * @callback Profile data processing callback interface
+     * @returns 0 on success, < 0 on error
+     */
+    pub fn start_continuous_profiler(
         freq: c_int,
         callback: extern "C" fn(_data: *mut stack_profile_data),
-) -> c_int;
+    ) -> c_int;
 
-/*
- * stop continuous profiler
- * @returns 0 on success, < 0 on error
- */
-pub fn stop_continuous_profiler()-> c_int;
+    /*
+     * stop continuous profiler
+     * @returns 0 on success, < 0 on error
+     */
+    pub fn stop_continuous_profiler()-> c_int;
 
-/*
- * test flame graph
- */
-pub fn process_stack_trace_data_for_flame_graph(_data: *mut stack_profile_data);
-pub fn release_flame_graph_hash();
+    /*
+     * test flame graph
+     */
+    pub fn process_stack_trace_data_for_flame_graph(_data: *mut stack_profile_data);
+    pub fn release_flame_graph_hash();
+
+    /*
+     * To set the regex matching for the profiler. 
+     * 
+     * Perform regular expression matching on process names.
+     * Processes that successfully match the regular expression are
+     * aggregated using the key:
+     *     `{pid + stime + u_stack_id + k_stack_id + tid + cpu}`.
+     *
+     * For processes that do not match, they are aggregated using the
+     * key:
+     *     `<process name + u_stack_id + k_stack_id + cpu>`.
+     *
+     * @pattern : Regular expression pattern. e.g. "^(java|nginx|.*ser.*)$"
+     * @returns 0 on success, < 0 on error
+     */
+    pub fn set_profiler_regex(pattern: *const c_char) -> c_int;
 }

@@ -63,6 +63,10 @@
 static __thread stack_str_hash_kv *stack_str_kvps;
 static __thread bool clear_hash;
 
+static const char *k_err_tag = "[kernel stack trace error]";
+static const char *u_err_tag = "[user stack trace error]";
+static const char *lost_tag = "[stack trace lost]";
+
 int init_stack_str_hash(stack_str_hash_t * h, const char *name)
 {
 	memset(h, 0, sizeof(*h));
@@ -314,11 +318,12 @@ failed:
 	return NULL;
 }
 
-static char *__folded_stack_trace_string(struct bpf_tracer *t,
-					 int stack_id,
-					 pid_t pid,
-					 const char *stack_map_name,
-					 stack_str_hash_t *h)
+static char *
+folded_stack_trace_string(struct bpf_tracer *t,
+			  int stack_id,
+			  pid_t pid,
+			  const char *stack_map_name,
+			  stack_str_hash_t *h)
 {
 	ASSERT(pid >= 0 && stack_id >= 0);
 
@@ -362,150 +367,19 @@ static char *__folded_stack_trace_string(struct bpf_tracer *t,
 	return str;
 }
 
-static const char *err_tag = "[stack trace error]";
-static const char *k_err_tag = "[kernel stack trace error]";
-static const char *u_err_tag = "[user stack trace error]";
-static const char *lost_tag = "[stack trace lost]";
-
-static inline stack_trace_msg_t *alloc_stack_trace_msg(int len)
+static inline char *alloc_stack_trace_str(int len)
 {
-	void *trace_msg;
-	/* add separator and '\0' */
-	len += 2;
-	trace_msg = clib_mem_alloc_aligned("stack_msg", len, 0, NULL);
-	if (trace_msg == NULL) {
+	void *trace_str;
+	trace_str = clib_mem_alloc_aligned("stack_str", len, 0, NULL);
+	if (trace_str == NULL) {
 		ebpf_warning("stack trace str alloc memory failed.\n");
-	} else {
-		stack_trace_msg_t *msg = trace_msg;
-		return msg;
 	}
 
-	return NULL;
-}
-
-void set_msg_kvp(stack_trace_msg_kv_t * kvp,
-		 struct stack_trace_key_t *v,
-		 u64 stime,
-		 void *msg_value)
-{
-	kvp->k.tgid = v->tgid;
-	kvp->k.pid = v->pid;
-	kvp->k.stime = stime;
-	kvp->k.cpu = v->cpu;
-	kvp->k.u_stack_id = (u32) v->userstack;
-	kvp->k.k_stack_id = (u32) v->kernstack;
-	kvp->msg_ptr = pointer_to_uword(msg_value);
-}
-
-static bool set_stack_trace_msg(stack_trace_msg_t * msg,
-				struct stack_trace_key_t *v)
-{
-	msg->pid = v->tgid;
-	msg->tid = v->pid;
-	msg->cpu = v->cpu;
-	msg->u_stack_id = (u32) v->userstack;
-	msg->k_stack_id = (u32) v->kernstack;
-	memcpy(msg->comm, v->comm, sizeof(msg->comm));
-	msg->stime = get_pid_stime_and_name(msg->pid,
-					    (char *)msg->process_name);
-	if (msg->stime > 0) {
-		/*
-		 * Note: There is no process with PID 0 in procfs.
-		 * If the PID is 0, it will return the kernel's
-		 * startup time, and the process name will be
-		 * obtained from data retrieved through eBPF.
-		 */
-		if (msg->pid == 0) {
-			memcpy(msg->process_name, v->comm, sizeof(msg->comm));
-		}
-
-		goto skip_no_proc;
-	}
-
-	/* the process is exit. */
-	msg->stime = v->timestamp / NS_IN_MSEC;
-	memcpy(msg->process_name, v->comm, sizeof(msg->comm));
-
-skip_no_proc:
-	msg->data_len = strlen((char *)&msg->data[0]);
-	msg->time_stamp = gettime(CLOCK_REALTIME, TIME_TYPE_NAN);
-	msg->count = 1;
-	msg->data_ptr = pointer_to_uword(&msg->data[0]);
-	return true;
-}
-
-char *folded_stack_trace_string(struct bpf_tracer *t,
-				struct stack_trace_key_t *v,
-				const char *stack_map_name,
-				stack_str_hash_t * h)
-{
-	char *trace_str, *k_trace_str, *u_trace_str;
-	trace_str = k_trace_str = u_trace_str = NULL;
-
-	if (v->kernstack >= 0) {
-		k_trace_str = __folded_stack_trace_string(t, v->kernstack,
-							  0, stack_map_name,
-							  h);
-	}
-
-	if (v->userstack >= 0) {
-		u_trace_str = __folded_stack_trace_string(t, v->userstack,
-							  v->tgid,
-							  stack_map_name,
-							  h);
-	}
-
-	/* stack_trace_str = u_stack_str_fn() + ";" + k_stack_str_fn(); */
-	if (v->kernstack >= 0 && v->userstack >= 0) {
-		int len = 0;
-		if (k_trace_str) {
-			len += strlen(k_trace_str);
-		} else {
-			len += strlen(k_err_tag);
-		}
-
-		if (u_trace_str) {
-			len += strlen(u_trace_str);
-		} else {
-			len += strlen(u_err_tag);
-		}
-
-		/* add separator and '\0' */
-		len += 2;
-		trace_str = clib_mem_alloc_aligned("k_link_u_str", len, 0, NULL);
-		if (trace_str == NULL) {
-			ebpf_warning("stack trace str alloc memory failed.\n");
-		} else {
-			snprintf(trace_str, len, "%s;%s",
-				 k_trace_str ? k_trace_str : k_err_tag,
-				 u_trace_str ? u_trace_str : u_err_tag);
-		}
-	} else if (v->kernstack >= 0) {
-		if (k_trace_str)
-			trace_str =
-			    create_symbol_str(strlen(k_trace_str),
-					      (char *)k_trace_str, "");
-	} else if (v->userstack >= 0) {
-		if (u_trace_str)
-			trace_str =
-			    create_symbol_str(strlen(u_trace_str),
-					      (char *)u_trace_str, "");
-	} else {
-		trace_str =
-		    create_symbol_str(strlen(lost_tag), (char *)lost_tag, "");
-		ebpf_warning("stack trace data lost\n");
-	}
-
-	if (trace_str == NULL)
-		trace_str = create_symbol_str(strlen(err_tag), (char *)err_tag, "");
-
-	//ebpf_debug("stack trace: %s\n", trace_str);
-	//clib_mem_free(trace_str);
 	return trace_str;
 }
 
-stack_trace_msg_t *
-resolve_and_gen_stack_trace_msg(struct bpf_tracer *t,
+char *
+resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 				struct stack_trace_key_t *v,
 				const char *stack_map_name,
 				stack_str_hash_t *h)
@@ -525,26 +399,25 @@ resolve_and_gen_stack_trace_msg(struct bpf_tracer *t,
 	 *    no longer exists, and must be kept beforehand.
 	 */
 
-	int len = 0;
-	static stack_trace_msg_t *msg;
-	char *k_trace_str, *u_trace_str;
-	k_trace_str = u_trace_str = NULL;
+	/* add separator and '\0' */
+	int len = 2;
+	char *k_trace_str, *u_trace_str, *trace_str;
+	k_trace_str = u_trace_str = trace_str = NULL;
 
 	if (v->kernstack >= 0) {
-		k_trace_str = __folded_stack_trace_string(t, v->kernstack,
-							  0, stack_map_name,
-							  h);
+		k_trace_str = folded_stack_trace_string(t, v->kernstack,
+							0, stack_map_name,
+							h);
 	}
 
 	if (v->userstack >= 0) {
-		u_trace_str = __folded_stack_trace_string(t, v->userstack,
-							  v->tgid,
-							  stack_map_name,
-							  h);
+		u_trace_str = folded_stack_trace_string(t, v->userstack,
+							v->tgid,
+							stack_map_name,
+							h);
 	}
 
-	/* stack_trace_str = u_stack_str_fn() + ";" + k_stack_str_fn(); */
-	len += sizeof(stack_trace_msg_t);
+	/* trace_str = u_stack_str_fn() + ";" + k_stack_str_fn(); */
 	if (v->kernstack >= 0 && v->userstack >= 0) {
 		if (k_trace_str) {
 			len += strlen(k_trace_str);
@@ -558,13 +431,12 @@ resolve_and_gen_stack_trace_msg(struct bpf_tracer *t,
 			len += strlen(u_err_tag);
 		}
 
-		msg = alloc_stack_trace_msg(len);
-		if (msg == NULL) {
+		trace_str = alloc_stack_trace_str(len);
+		if (trace_str == NULL) {
 			ebpf_warning("No available memory space.\n");
 			return NULL;
 		}
-
-		snprintf((char *)&msg->data[0], len, "%s;%s",
+		snprintf(trace_str, len, "%s;%s",
 			 u_trace_str ? u_trace_str : u_err_tag,
 			 k_trace_str ? k_trace_str : k_err_tag);
 
@@ -574,13 +446,14 @@ resolve_and_gen_stack_trace_msg(struct bpf_tracer *t,
 		} else {
 			len += strlen(k_err_tag);
 		}
-		msg = alloc_stack_trace_msg(len);
-		if (msg == NULL) {
+
+		trace_str = alloc_stack_trace_str(len);
+		if (trace_str == NULL) {
 			ebpf_warning("No available memory space.\n");
 			return NULL;
 		}
 
-		snprintf((char *)&msg->data[0], len, "%s",
+		snprintf(trace_str, len, "%s",
 			 k_trace_str ? k_trace_str : k_err_tag);
 	} else if (v->userstack >= 0) {
 		if (u_trace_str) {
@@ -588,13 +461,14 @@ resolve_and_gen_stack_trace_msg(struct bpf_tracer *t,
 		} else {
 			len += strlen(u_err_tag);
 		}
-		msg = alloc_stack_trace_msg(len);
-		if (msg == NULL) {
+
+		trace_str = alloc_stack_trace_str(len);
+		if (trace_str == NULL) {
 			ebpf_warning("No available memory space.\n");
 			return NULL;
 		}
 
-		snprintf((char *)&msg->data[0], len, "%s",
+		snprintf(trace_str, len, "%s",
 			 u_trace_str ? u_trace_str : u_err_tag);
 	} else {
 		/* 
@@ -613,18 +487,15 @@ resolve_and_gen_stack_trace_msg(struct bpf_tracer *t,
 		 */
 
 		len += strlen(lost_tag);
-		msg = alloc_stack_trace_msg(len);
-		if (msg == NULL) {
+		trace_str = alloc_stack_trace_str(len);
+		if (trace_str == NULL) {
 			ebpf_warning("No available memory space.\n");
 			return NULL;
 		}
 
-		snprintf((char *)&msg->data[0], len, "%s", lost_tag);
+		snprintf(trace_str, len, "%s", lost_tag);
 	}
 
-	if (!set_stack_trace_msg(msg, v))
-		return NULL;
-
-	return msg;
+	return trace_str;
 }
 #endif /* AARCH64_MUSL */

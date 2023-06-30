@@ -108,12 +108,14 @@ void show_mem_list(void)
 			typedef struct {
 				u64 time_stamp;
 				u32 pid;
+				u32 tid;
 				u64 stime;
 				u32 u_stack_id;
 				u32 k_stack_id;
 				u32 cpu;
 				u32 count;
 				u8 comm[16];
+				u8 process_name[16];
 				u32 data_len;
 				u64 data_ptr;
 				u8 data[0];

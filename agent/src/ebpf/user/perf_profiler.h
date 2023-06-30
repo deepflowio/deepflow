@@ -37,29 +37,45 @@
 /*
  * stack trace messages for push-hash kvp.
  */
-typedef struct {
-	struct {
-		/*
-		 * tgid:
-		 *   The tgid (Thread Group ID) in kernel space
-		 *   is equivalent to the process ID in user space.
-		 * pid:
-		 *   The process ID or thread ID in kernel space.
-		 * cpu:
-		 *   Which CPU core does the perf event occur on?
-		 */
-		u64 tgid: 24,
-		    pid: 24, 
-		    cpu: 16;
 
-		/*
-		 * process start time(the number of millisecond
-		 * elapsed since January 1, 1970 00:00:00).
- 		 */
-		u64 stime;
-		u32 u_stack_id;
-		u32 k_stack_id;
-	} k;
+#define BIT_26_MAX_VAL	0x3ffffffU
+#define PID_MAX_VAL	BIT_26_MAX_VAL
+#define STACK_ID_MAX	BIT_26_MAX_VAL
+
+typedef struct {
+	union {
+		struct {
+			/*
+		 	 * tgid:(max 67,108,864)
+		 	 *   The tgid (Thread Group ID) in kernel space
+		 	 *   is equivalent to the process ID in user space.
+		 	 * pid:(max 67,108,864)
+		 	 *   The process ID or thread ID in kernel space.
+		 	 * cpu: (max 4,096)
+		 	 *   Which CPU core does the perf event occur on?
+		 	 */
+			u64 tgid: 26,
+			    pid: 26, 
+			    cpu: 12;
+
+			/*
+			 * process start time(the number of millisecond
+			 * elapsed since January 1, 1970 00:00:00).
+ 			 */
+			u64 stime;
+			u32 u_stack_id;
+			u32 k_stack_id;
+		} k;
+
+		/* Matching and combining for process/thread name. */
+		struct {
+			u8 comm[TASK_COMM_LEN];
+			u64 u_stack_id: 26,
+			    k_stack_id: 26,
+			    cpu: 12;
+		} c_k;
+	};
+
 	/* Store perf profiler data */
 	uword msg_ptr;
 } stack_trace_msg_kv_t; 
@@ -124,4 +140,5 @@ int start_continuous_profiler(int freq,
 			      tracer_callback_t callback);
 void process_stack_trace_data_for_flame_graph(stack_trace_msg_t *val);
 void release_flame_graph_hash(void);
+int set_profiler_regex(const char *pattern);
 #endif /* DF_USER_PERF_PROFILER_H */
