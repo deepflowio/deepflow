@@ -108,9 +108,8 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 			if fErr == nil && labels != "[]" && labels != "null" {
 				labelArray, lErr := simplejson.NewJson([]byte(labels))
 				if lErr != nil {
-					err = lErr
-					log.Errorf("service labels initialization simplejson error: (%s)", lErr.Error())
-					return
+					log.Infof("service annotation (%s) init json error: (%s)", labels, lErr.Error())
+					continue
 				}
 				for i := range labelArray.MustArray() {
 					if groupLcuuids, ok := k.nsLabelToGroupLcuuids[namespace+labelArray.GetIndex(i).MustString()]; ok {
