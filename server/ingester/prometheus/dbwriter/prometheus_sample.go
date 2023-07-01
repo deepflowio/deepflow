@@ -63,7 +63,7 @@ func (m *PrometheusSample) WriteBlock(block *ckdb.Block) {
 	for _, v := range m.AppLabelValueIDs[1:] {
 		block.Write(v)
 	}
-	m.UniversalTag.WriteBlock(block)
+	// m.UniversalTag.WriteBlock(block)
 	block.Write(m.Value)
 }
 
@@ -79,7 +79,7 @@ func (m *PrometheusSample) Columns(appLabelColumnCount int) []*ckdb.Column {
 	for i := 1; i <= appLabelColumnCount; i++ {
 		columns = append(columns, ckdb.NewColumn(fmt.Sprintf("app_label_value_id_%d", i), ckdb.UInt32))
 	}
-	columns = zerodoc.GenUniversalTagColumns(columns)
+	// columns = zerodoc.GenUniversalTagColumns(columns)
 	columns = append(columns, ckdb.NewColumn("value", ckdb.Float64))
 
 	return columns
@@ -199,7 +199,7 @@ func AcquirePrometheusSample() *PrometheusSample {
 var emptyUniversalTag = zerodoc.UniversalTag{}
 
 func ReleasePrometheusSample(p *PrometheusSample) {
-	p.UniversalTag = emptyUniversalTag
+	// p.UniversalTag = emptyUniversalTag
 	p.AppLabelValueIDs = p.AppLabelValueIDs[:0]
 	prometheusSamplePool.Put(p)
 }

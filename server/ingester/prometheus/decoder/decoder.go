@@ -358,8 +358,8 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID uint16, ts *prompb.T
 		b.appLabelValueIDsBuffer[index] = b.tsLabelValueIDsBuffer[i]
 	}
 
-	var universalTag *zerodoc.UniversalTag
-	for i, s := range ts.Samples {
+	// var universalTag *zerodoc.UniversalTag
+	for _, s := range ts.Samples {
 		v := float64(s.Value)
 		if math.IsNaN(v) || math.IsInf(v, 0) {
 			continue
@@ -372,13 +372,13 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID uint16, ts *prompb.T
 		m.AppLabelValueIDs = append(m.AppLabelValueIDs, b.appLabelValueIDsBuffer...)
 		m.Value = v
 
-		if i == 0 {
-			b.fillUniversalTag(m, vtapID, podName, instance, instanceID, false)
-			universalTag = &m.UniversalTag
-		} else {
-			// all samples share the same universal tag
-			m.UniversalTag = *universalTag
-		}
+		//if i == 0 {
+		//	b.fillUniversalTag(m, vtapID, podName, instance, instanceID, false)
+		//	universalTag = &m.UniversalTag
+		//} else {
+		//	// all samples share the same universal tag
+		//	m.UniversalTag = *universalTag
+		//}
 		b.samplesBuffer = append(b.samplesBuffer, m)
 		b.counter.Sample++
 	}
