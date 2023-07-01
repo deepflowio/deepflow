@@ -63,7 +63,7 @@ const _SUCCESS = "success"
 
 // API Spec: https://prometheus.io/docs/prometheus/latest/querying/api/#instant-queries
 func PromQueryExecute(args *common.PromQueryParams, ctx context.Context) (result *common.PromQueryResponse, err error) {
-	timeS, err := (strconv.ParseFloat(args.StartTime, 64))
+	timeS, err := parseTime(args.StartTime)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func PromQueryExecute(args *common.PromQueryParams, ctx context.Context) (result
 	}
 	e := promql.NewEngine(opts)
 	//pp.Println(opts.MaxSamples)
-	qry, err := e.NewInstantQuery(&RemoteReadQuerierable{Args: args, Ctx: ctx}, nil, args.Promql, time.Unix(int64(timeS), 0))
+	qry, err := e.NewInstantQuery(&RemoteReadQuerierable{Args: args, Ctx: ctx}, nil, args.Promql, timeS)
 	if qry == nil || err != nil {
 		//pp.Println(err)
 		log.Error(err)
@@ -108,12 +108,12 @@ func durationMilliseconds(d time.Duration) int64 {
 }
 
 func PromQueryRangeExecute(args *common.PromQueryParams, ctx context.Context) (result *common.PromQueryResponse, err error) {
-	startS, err := (strconv.ParseFloat(args.StartTime, 64))
+	startS, err := parseTime(args.StartTime)
 	if err != nil {
 		log.Error(err)
 		return nil, err
 	}
-	endS, err := (strconv.ParseFloat(args.EndTime, 64))
+	endS, err := parseTime(args.EndTime)
 	if err != nil {
 		log.Error(err)
 		return nil, err
@@ -137,7 +137,7 @@ func PromQueryRangeExecute(args *common.PromQueryParams, ctx context.Context) (r
 	}
 	e := promql.NewEngine(opts)
 	//pp.Println(opts.MaxSamples)
-	qry, err := e.NewRangeQuery(&RemoteReadRangeQuerierable{Args: args, Ctx: ctx}, nil, args.Promql, time.Unix(int64(startS), 0), time.Unix(int64(endS), 0), step)
+	qry, err := e.NewRangeQuery(&RemoteReadRangeQuerierable{Args: args, Ctx: ctx}, nil, args.Promql, startS, endS, step)
 	if qry == nil || err != nil {
 		log.Error(err)
 		return nil, err
