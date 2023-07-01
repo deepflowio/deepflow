@@ -18,7 +18,6 @@ package prometheus
 
 import (
 	"context"
-	"strconv"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/prometheus/prometheus/model/labels"
@@ -46,19 +45,17 @@ type RemoteReadQuerier struct {
 
 // For PromQL instant query
 func (q *RemoteReadQuerier) Select(sortSeries bool, hints *storage.SelectHints, matchers ...*labels.Matcher) storage.SeriesSet {
-	startTimeS, err := (strconv.ParseFloat(q.Args.StartTime, 64))
+	startTimeS, err := parseTime(q.Args.StartTime)
 	if err != nil {
 		log.Error(err)
 		return storage.ErrSeriesSet(err)
 	}
-	startTimeMs := int64(startTimeS * 1000)
-	endTimeS, err := (strconv.ParseFloat(q.Args.EndTime, 64))
+	endTimeS, err := parseTime(q.Args.EndTime)
 	if err != nil {
 		log.Error(err)
 		return storage.ErrSeriesSet(err)
 	}
-	endTimeMs := int64(endTimeS * 1000)
-	prompbQuery, err := remote.ToQuery(startTimeMs, endTimeMs, matchers, hints)
+	prompbQuery, err := remote.ToQuery(startTimeS.UnixMilli(), endTimeS.UnixMilli(), matchers, hints)
 	if err != nil {
 		log.Error(err)
 		return storage.ErrSeriesSet(err)
@@ -103,19 +100,17 @@ type RemoteReadRangeQuerier struct {
 
 // For PromQL range query
 func (q *RemoteReadRangeQuerier) Select(sortSeries bool, hints *storage.SelectHints, matchers ...*labels.Matcher) storage.SeriesSet {
-	startS, err := (strconv.ParseFloat(q.Args.StartTime, 64))
+	startS, err := parseTime(q.Args.StartTime)
 	if err != nil {
 		log.Error(err)
 		return storage.ErrSeriesSet(err)
 	}
-	endS, err := (strconv.ParseFloat(q.Args.EndTime, 64))
+	endS, err := parseTime(q.Args.EndTime)
 	if err != nil {
 		log.Error(err)
 		return storage.ErrSeriesSet(err)
 	}
-	startMs := int64(startS * 1000)
-	endMs := int64(endS * 1000)
-	prompbQuery, err := remote.ToQuery(startMs, endMs, matchers, hints)
+	prompbQuery, err := remote.ToQuery(startS.UnixMilli(), endS.UnixMilli(), matchers, hints)
 	if err != nil {
 		log.Error(err)
 		return storage.ErrSeriesSet(err)
