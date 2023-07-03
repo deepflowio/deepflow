@@ -258,8 +258,10 @@ impl RedisLog {
             decode(payload, direction == PacketDirection::ClientToServer)
                 .ok_or(Error::RedisLogParseFailed)?;
         match direction {
-            PacketDirection::ClientToServer => self.fill_request(context),
+            // only parse the request with payload start with '*' which indicate is a command start, otherwise assume tcp fragment of request
+            PacketDirection::ClientToServer if payload[0] == b'*' => self.fill_request(context),
             PacketDirection::ServerToClient => self.fill_response(context, error_response),
+            _ => {}
         };
         Ok(())
     }
