@@ -398,10 +398,17 @@ message Cidr {
     optional bool is_vip = 20 [default = false];
 }
 
+message GProcessInfo {
+    optional uint32 gprocess_id = 1;
+    optional uint32 netns_id = 2 [default = 0];
+    optional uint32 vtap_id = 3;  // 限制在64000
+}
+
 message PlatformData {
     repeated Interface interfaces = 1;
     repeated PeerConnection peer_connections = 3;
     repeated Cidr cidrs = 4;
+    repeated GProcessInfo gprocess_infos = 5;
 }
 
 enum Action {
