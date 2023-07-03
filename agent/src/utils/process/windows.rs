@@ -17,7 +17,7 @@
 use std::{mem::size_of, path::PathBuf, process};
 
 use windows::Win32::{
-    Foundation::{GetLastError, BOOL, CHAR, HINSTANCE, INVALID_HANDLE_VALUE, PWSTR},
+    Foundation::{CloseHandle, GetLastError, BOOL, CHAR, HINSTANCE, INVALID_HANDLE_VALUE, PWSTR},
     System::{
         Diagnostics::ToolHelp::{
             CreateToolhelp32Snapshot, Process32Next, PROCESSENTRY32, TH32CS_SNAPPROCESS,
@@ -56,6 +56,7 @@ pub fn get_memory_rss() -> Result<u64> {
         )
         .as_bool()
         {
+            let _ = CloseHandle(handle);
             Ok(pmc.WorkingSetSize as u64)
         } else {
             Err(Error::Windows(format!(
@@ -91,6 +92,9 @@ pub fn get_process_num() -> Result<u32> {
         if entry.th32ProcessID == pid || entry.th32ParentProcessID == pid {
             num += 1;
         }
+    }
+    unsafe {
+        let _ = CloseHandle(snap);
     }
     Ok(num)
 }
@@ -132,6 +136,9 @@ pub fn get_process_num_by_name(name: &str) -> Result<u32> {
             num += 1;
         }
     }
+    unsafe {
+        let _ = CloseHandle(snap);
+    }
     Ok(num)
 }
 
@@ -160,6 +167,9 @@ pub fn get_thread_num() -> Result<u32> {
         if entry.th32ProcessID == pid || entry.th32ParentProcessID == pid {
             num += entry.cntThreads;
         }
+    }
+    unsafe {
+        let _ = CloseHandle(snap);
     }
     Ok(num)
 }

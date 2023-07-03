@@ -230,7 +230,6 @@ pub struct PlatformConfig {
     pub enabled: bool,
     pub ingress_flavour: IngressFlavour,
     pub trident_type: TridentType,
-    pub source_ip: IpAddr,
     pub epc_id: u32,
     pub kubernetes_api_enabled: bool,
     pub kubernetes_api_list_limit: u32,
@@ -762,15 +761,12 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
             // If the environment variable K8S_MEM_LIMIT_FOR_DEEPFLOW is set, its value is preferred as the memory limit
             conf.max_memory = k8s_mem_limit;
         }
-        #[cfg(target_os = "linux")]
-        let (ctrl_ip, ctrl_mac) =
-            get_ctrl_ip_and_mac(static_config.controller_ips[0].parse().unwrap());
-        #[cfg(target_os = "windows")]
-        let (ctrl_ip, _) = get_ctrl_ip_and_mac(static_config.controller_ips[0].parse().unwrap());
-        let dest_ip = conf.analyzer_ip.parse::<IpAddr>().unwrap_or(match ctrl_ip {
-            IpAddr::V4(_) => Ipv4Addr::UNSPECIFIED.into(),
-            IpAddr::V6(_) => Ipv6Addr::UNSPECIFIED.into(),
-        });
+        let dest_ip = conf.analyzer_ip.parse::<IpAddr>().unwrap_or(
+            match static_config.controller_ips[0].parse::<IpAddr>().unwrap() {
+                IpAddr::V4(_) => Ipv4Addr::UNSPECIFIED.into(),
+                IpAddr::V6(_) => Ipv6Addr::UNSPECIFIED.into(),
+            },
+        );
         let proxy_controller_ip = conf
             .proxy_controller_ip
             .parse()
@@ -906,7 +902,6 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 enabled: conf.platform_enabled,
                 ingress_flavour: conf.yaml_config.ingress_flavour,
                 trident_type: conf.trident_type,
-                source_ip: ctrl_ip,
                 epc_id: conf.epc_id,
                 kubernetes_api_enabled: conf.kubernetes_api_enabled,
                 kubernetes_api_list_limit: conf.yaml_config.kubernetes_api_list_limit,
@@ -980,6 +975,8 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     .l7_protocol_inference_max_fail_count,
                 l7_protocol_inference_ttl: conf.yaml_config.l7_protocol_inference_ttl,
                 ctrl_mac: if is_tt_workload(conf.trident_type) {
+                    let (_, ctrl_mac) =
+                        get_ctrl_ip_and_mac(static_config.controller_ips[0].parse().unwrap());
                     ctrl_mac
                 } else {
                     MacAddr::ZERO

@@ -108,7 +108,6 @@ impl Config {
                     cfg.controller_ips[i] = ip.unwrap();
                 }
             }
-
             Ok(cfg)
         }
     }
