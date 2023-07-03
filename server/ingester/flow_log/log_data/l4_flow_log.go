@@ -261,6 +261,9 @@ type KnowledgeGraph struct {
 	AutoInstanceType1 uint8
 	AutoServiceID1    uint32
 	AutoServiceType1  uint8
+
+	TagSource0 uint8
+	TagSource1 uint8
 }
 
 var KnowledgeGraphColumns = []*ckdb.Column{
@@ -303,6 +306,9 @@ var KnowledgeGraphColumns = []*ckdb.Column{
 	ckdb.NewColumn("auto_instance_type_1", ckdb.UInt8),
 	ckdb.NewColumn("auto_service_id_1", ckdb.UInt32),
 	ckdb.NewColumn("auto_service_type_1", ckdb.UInt8),
+
+	ckdb.NewColumn("tag_source_0", ckdb.UInt8),
+	ckdb.NewColumn("tag_source_1", ckdb.UInt8),
 }
 
 func (k *KnowledgeGraph) WriteBlock(block *ckdb.Block) {
@@ -345,6 +351,9 @@ func (k *KnowledgeGraph) WriteBlock(block *ckdb.Block) {
 		k.AutoInstanceType1,
 		k.AutoServiceID1,
 		k.AutoServiceType1,
+
+		k.TagSource0,
+		k.TagSource1,
 	)
 }
 
@@ -686,11 +695,13 @@ func (k *KnowledgeGraph) fill(
 	ip60, ip61 net.IP,
 	mac0, mac1 uint64,
 	gpID0, gpID1 uint32,
+	vtapId, netnsId0, netnsId1 uint32,
 	port uint16,
 	tapSide uint32,
 	protocol layers.IPProtocol) {
 
 	var info0, info1 *grpc.Info
+
 	// 对于VIP的流量，需要使用MAC来匹配
 	lookupByMac0, lookupByMac1 := isVipInterface0, isVipInterface1
 	// 对于本地的流量，也需要使用MAC来匹配
@@ -707,38 +718,36 @@ func (k *KnowledgeGraph) fill(
 	}
 	l3EpcMac0, l3EpcMac1 := mac0|uint64(l3EpcID0)<<48, mac1|uint64(l3EpcID1)<<48 // 使用l3EpcID和mac查找，防止跨AZ mac冲突
 
-	if lookupByMac0 && lookupByMac1 {
-		info0, info1 = platformData.QueryMacInfosPair(l3EpcMac0, l3EpcMac1)
+	// use vtapId + netnsId to match first
+	if netnsId0 != 0 {
+		k.TagSource0 |= uint8(zerodoc.NetnsId)
+		info0 = platformData.QueryNetnsIdInfo(vtapId, netnsId0)
+	}
+	if netnsId1 != 0 {
+		k.TagSource1 |= uint8(zerodoc.NetnsId)
+		info1 = platformData.QueryNetnsIdInfo(vtapId, netnsId1)
+	}
+
+	if info0 == nil {
+		if lookupByMac0 {
+			k.TagSource0 |= uint8(zerodoc.Mac)
+			info0 = platformData.QueryMacInfo(l3EpcMac0)
+		}
 		if info0 == nil {
+			k.TagSource0 |= uint8(zerodoc.EpcIP)
 			info0 = common.RegetInfoFromIP(isIPv6, ip60, ip40, l3EpcID0, platformData)
 		}
+	}
+
+	if info1 == nil {
+		if lookupByMac1 {
+			k.TagSource1 |= uint8(zerodoc.Mac)
+			info1 = platformData.QueryMacInfo(l3EpcMac1)
+		}
 		if info1 == nil {
+			k.TagSource1 |= uint8(zerodoc.EpcIP)
 			info1 = common.RegetInfoFromIP(isIPv6, ip61, ip41, l3EpcID1, platformData)
 		}
-	} else if lookupByMac0 {
-		info0 = platformData.QueryMacInfo(l3EpcMac0)
-		if info0 == nil {
-			info0 = common.RegetInfoFromIP(isIPv6, ip60, ip40, l3EpcID0, platformData)
-		}
-		if isIPv6 {
-			info1 = platformData.QueryIPV6Infos(l3EpcID1, ip61)
-		} else {
-			info1 = platformData.QueryIPV4Infos(l3EpcID1, ip41)
-		}
-	} else if lookupByMac1 {
-		if isIPv6 {
-			info0 = platformData.QueryIPV6Infos(l3EpcID0, ip60)
-		} else {
-			info0 = platformData.QueryIPV4Infos(l3EpcID0, ip40)
-		}
-		info1 = platformData.QueryMacInfo(l3EpcMac1)
-		if info1 == nil {
-			info1 = common.RegetInfoFromIP(isIPv6, ip61, ip41, l3EpcID1, platformData)
-		}
-	} else if isIPv6 {
-		info0, info1 = platformData.QueryIPV6InfosPair(l3EpcID0, ip60, l3EpcID1, ip61)
-	} else {
-		info0, info1 = platformData.QueryIPV4InfosPair(l3EpcID0, ip40, l3EpcID1, ip41)
 	}
 
 	var l2Info0, l2Info1 *grpc.Info
@@ -808,6 +817,7 @@ func (k *KnowledgeGraph) FillL4(f *pb.Flow, isIPv6 bool, platformData *grpc.Plat
 		f.FlowKey.Ip6Src, f.FlowKey.Ip6Dst,
 		f.FlowKey.MacSrc, f.FlowKey.MacDst,
 		f.MetricsPeerSrc.Gpid, f.MetricsPeerDst.Gpid,
+		0, 0, 0,
 		uint16(f.FlowKey.PortDst),
 		f.TapSide,
 		layers.IPProtocol(f.FlowKey.Proto))

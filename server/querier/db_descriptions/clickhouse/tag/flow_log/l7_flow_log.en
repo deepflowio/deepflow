@@ -76,6 +76,7 @@ app_instance              , Application Instance          ,
 endpoint                  , API Endpoint                  ,
 process_id                , Process ID                    ,
 process_kname             , Kernel Thread Name            ,
+netns_id                  , Netns ID                      ,
 
 trace_id                  , TraceID                       ,
 span_id                   , SpanID                        ,
