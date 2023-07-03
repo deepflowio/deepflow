@@ -305,8 +305,8 @@ impl From<AppProtoLogsBaseInfo> for flow_log::AppProtoLogsBaseInfo {
             syscall_cap_seq_1: f.syscall_cap_seq_1 as u32,
             gpid_0: f.gpid_0,
             gpid_1: f.gpid_1,
-            netns_id_0: f.netns_id_0,
-            netns_id_1: f.netns_id_1,
+            netns_id_0: f.netns_id_0 as u32,
+            netns_id_1: f.netns_id_1 as u32,
         }
     }
 }
