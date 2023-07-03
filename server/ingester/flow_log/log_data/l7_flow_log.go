@@ -70,6 +70,8 @@ type L7Base struct {
 	EndTime      int64  `json:"end_time"`   // us
 	GPID0        uint32
 	GPID1        uint32
+	NetnsID0     uint32
+	NetnsID1     uint32
 
 	ProcessID0             uint32
 	ProcessID1             uint32
@@ -117,6 +119,8 @@ func L7BaseColumns() []*ckdb.Column {
 		ckdb.NewColumn("end_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
 		ckdb.NewColumn("gprocess_id_0", ckdb.UInt32).SetComment("全局客户端进程ID"),
 		ckdb.NewColumn("gprocess_id_1", ckdb.UInt32).SetComment("全局服务端进程ID"),
+		ckdb.NewColumn("netns_id_0", ckdb.UInt32).SetComment("客户端网络命名空间ID"),
+		ckdb.NewColumn("netns_id_1", ckdb.UInt32).SetComment("服务端网络命名空间ID"),
 
 		ckdb.NewColumn("process_id_0", ckdb.Int32).SetComment("客户端进程ID"),
 		ckdb.NewColumn("process_id_1", ckdb.Int32).SetComment("服务端进程ID"),
@@ -162,6 +166,8 @@ func (f *L7Base) WriteBlock(block *ckdb.Block) {
 		f.EndTime,
 		f.GPID0,
 		f.GPID1,
+		f.NetnsID0,
+		f.NetnsID1,
 
 		int32(f.ProcessID0),
 		int32(f.ProcessID1),
@@ -491,12 +497,9 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	b.ClientPort = uint16(l.PortSrc)
 	b.ServerPort = uint16(l.PortDst)
 
-	// 知识图谱
-	b.Protocol = uint8(log.Base.Protocol)
-	b.KnowledgeGraph.FillL7(l, platformData, layers.IPProtocol(b.Protocol))
-
 	// 流信息
 	b.FlowID = l.FlowId
+
 	b.TapType = uint8(l.TapType)
 	tunnelType := datatype.TunnelType(0)
 	var natSource datatype.NATSource
@@ -517,6 +520,8 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	b.EndTime = int64(l.EndTime) / int64(time.Microsecond)
 	b.GPID0 = l.Gpid_0
 	b.GPID1 = l.Gpid_1
+	b.NetnsID0 = l.NetnsId_0
+	b.NetnsID1 = l.NetnsId_1
 
 	b.ProcessID0 = l.ProcessId_0
 	b.ProcessID1 = l.ProcessId_1
@@ -528,6 +533,24 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	b.SyscallThread1 = l.SyscallTraceIdThread_1
 	b.SyscallCapSeq0 = l.SyscallCapSeq_0
 	b.SyscallCapSeq1 = l.SyscallCapSeq_1
+
+	// 知识图谱
+	b.Protocol = uint8(log.Base.Protocol)
+	if l.Gpid_0 != 0 && l.NetnsId_0 == 0 {
+		vtapId, netnsId := platformData.QueryGprocessInfo(l.Gpid_0)
+		if netnsId != 0 && l.VtapId == vtapId {
+			b.NetnsID0 = netnsId
+			b.TagSource0 |= uint8(zerodoc.GpId)
+		}
+	}
+	if l.Gpid_1 != 0 && l.NetnsId_1 == 0 {
+		vtapId, netnsId := platformData.QueryGprocessInfo(l.Gpid_0)
+		if netnsId != 0 && l.VtapId == vtapId {
+			b.NetnsID1 = netnsId
+			b.TagSource1 |= uint8(zerodoc.GpId)
+		}
+	}
+	b.KnowledgeGraph.FillL7(l, platformData, layers.IPProtocol(b.Protocol))
 }
 
 func (k *KnowledgeGraph) FillL7(l *pb.AppProtoLogsBaseInfo, platformData *grpc.PlatformInfoTable, protocol layers.IPProtocol) {
@@ -539,6 +562,7 @@ func (k *KnowledgeGraph) FillL7(l *pb.AppProtoLogsBaseInfo, platformData *grpc.P
 		l.Ip6Src, l.Ip6Dst,
 		l.MacSrc, l.MacDst,
 		l.Gpid_0, l.Gpid_1,
+		l.VtapId, l.NetnsId_0, l.NetnsId_1,
 		uint16(l.PortDst),
 		l.TapSide,
 		protocol,

@@ -37,6 +37,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/receiver"
 	"github.com/deepflowio/deepflow/server/libs/stats"
 	"github.com/deepflowio/deepflow/server/libs/utils"
+	"github.com/deepflowio/deepflow/server/libs/zerodoc"
 	"github.com/deepflowio/deepflow/server/libs/zerodoc/pb"
 )
 
@@ -146,36 +147,65 @@ func (d *Decoder) Run() {
 }
 
 func (d *Decoder) WriteProcEvent(vtapId uint16, e *pb.ProcEvent) {
-	eventStore := dbwriter.AcquireEventStore()
-	eventStore.HasMetrics = true
-	eventStore.Time = uint32(time.Duration(e.StartTime) / time.Second)
-	eventStore.StartTime = int64(time.Duration(e.StartTime) / time.Microsecond)
-	eventStore.EndTime = int64(time.Duration(e.EndTime) / time.Microsecond)
-	eventStore.Duration = uint64(e.EndTime - e.StartTime)
+	s := dbwriter.AcquireEventStore()
+	s.HasMetrics = true
+	s.Time = uint32(time.Duration(e.StartTime) / time.Second)
+	s.StartTime = int64(time.Duration(e.StartTime) / time.Microsecond)
+	s.EndTime = int64(time.Duration(e.EndTime) / time.Microsecond)
+	s.Duration = uint64(e.EndTime - e.StartTime)
+	s.NetnsID = e.NetnsId
 
 	if e.EventType == pb.EventType_IoEvent {
-		eventStore.SignalSource = uint8(dbwriter.SIGNAL_SOURCE_IO)
+		s.SignalSource = uint8(dbwriter.SIGNAL_SOURCE_IO)
 	} else {
-		eventStore.SignalSource = uint8(e.EventType)
+		s.SignalSource = uint8(e.EventType)
 	}
 
 	if e.IoEventData != nil {
 		ioData := e.IoEventData
-		eventStore.EventType = strings.ToLower(ioData.Operation.String())
-		eventStore.EventDescription = fmt.Sprintf("process %s (%d) %s %d bytes and took %dms", string(e.ProcessKname), e.Pid, eventStore.EventType, ioData.BytesCount, ioData.Latency/uint64(time.Millisecond))
-		eventStore.AttributeNames = append(eventStore.AttributeNames, "file_name", "thread_id", "coroutine_id")
-		eventStore.AttributeValues = append(eventStore.AttributeValues, string(ioData.Filename), strconv.Itoa(int(e.ThreadId)), strconv.Itoa(int(e.CoroutineId)))
-		eventStore.Bytes = ioData.BytesCount
-		eventStore.Duration = uint64(eventStore.EndTime - eventStore.StartTime)
+		s.EventType = strings.ToLower(ioData.Operation.String())
+		s.EventDescription = fmt.Sprintf("process %s (%d) %s %d bytes and took %dms", string(e.ProcessKname), e.Pid, s.EventType, ioData.BytesCount, ioData.Latency/uint64(time.Millisecond))
+		s.AttributeNames = append(s.AttributeNames, "file_name", "thread_id", "coroutine_id")
+		s.AttributeValues = append(s.AttributeValues, string(ioData.Filename), strconv.Itoa(int(e.ThreadId)), strconv.Itoa(int(e.CoroutineId)))
+		s.Bytes = ioData.BytesCount
+		s.Duration = uint64(s.EndTime - s.StartTime)
 	}
-	eventStore.VTAPID = vtapId
-	eventStore.L3EpcID = d.platformData.QueryVtapEpc0(uint32(vtapId))
-	if baseInfo := d.platformData.QueryEpcIDBaseInfo(eventStore.L3EpcID); baseInfo != nil {
-		eventStore.RegionID = uint16(baseInfo.RegionID)
-	}
-	eventStore.AppInstance = strconv.Itoa(int(e.Pid))
+	s.VTAPID = vtapId
+	s.L3EpcID = d.platformData.QueryVtapEpc0(uint32(vtapId))
 
-	d.eventWriter.Write(eventStore)
+	info := d.platformData.QueryNetnsIdInfo(uint32(s.VTAPID), s.NetnsID)
+	if info != nil {
+		s.RegionID = uint16(info.RegionID)
+		s.AZID = uint16(info.AZID)
+		s.L3EpcID = info.EpcID
+
+		s.HostID = uint16(info.HostID)
+		s.PodID = info.PodID
+		s.PodNodeID = info.PodNodeID
+		s.PodNSID = uint16(info.PodNSID)
+		s.PodClusterID = uint16(info.PodClusterID)
+		s.PodGroupID = info.PodGroupID
+		s.L3DeviceType = uint8(info.DeviceType)
+		s.L3DeviceID = info.DeviceID
+		s.SubnetID = uint16(info.SubnetID)
+		s.IsIPv4 = info.IsIPv4
+		s.IP4 = info.IP4
+		s.IP6 = info.IP6
+		// if it is just Pod Node, there is no need to match the service
+		if ingestercommon.IsPodServiceIP(zerodoc.DeviceType(s.L3DeviceType), s.PodID, 0) {
+			s.ServiceID = d.platformData.QueryService(
+				s.PodID, s.PodNodeID, uint32(s.PodClusterID), s.PodGroupID, s.L3EpcID, !s.IsIPv4, s.IP4, s.IP6, 0, 0)
+		}
+	} else if baseInfo := d.platformData.QueryEpcIDBaseInfo(s.L3EpcID); baseInfo != nil {
+		s.RegionID = uint16(baseInfo.RegionID)
+	}
+
+	s.AutoInstanceID, s.AutoInstanceType = ingestercommon.GetAutoInstance(s.PodID, s.GProcessID, s.PodNodeID, s.L3DeviceID, uint8(s.L3DeviceType), s.L3EpcID)
+	s.AutoServiceID, s.AutoServiceType = ingestercommon.GetAutoService(s.ServiceID, s.PodGroupID, s.GProcessID, s.PodNodeID, s.L3DeviceID, uint8(s.L3DeviceType), s.L3EpcID)
+
+	s.AppInstance = strconv.Itoa(int(e.Pid))
+
+	d.eventWriter.Write(s)
 }
 
 func (d *Decoder) handleProcEvent(vtapId uint16, decoder *codec.SimpleDecoder) {
@@ -219,102 +249,102 @@ func getAutoInstance(instanceID, instanceType, GProcessID uint32) (uint32, uint8
 }
 
 func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
-	eventStore := dbwriter.AcquireEventStore()
-	eventStore.HasMetrics = false
-	eventStore.Time = uint32(event.Time)
-	eventStore.StartTime = event.TimeMilli * 1000 // convert to microsecond
-	eventStore.EndTime = eventStore.StartTime
+	s := dbwriter.AcquireEventStore()
+	s.HasMetrics = false
+	s.Time = uint32(event.Time)
+	s.StartTime = event.TimeMilli * 1000 // convert to microsecond
+	s.EndTime = s.StartTime
 
-	eventStore.SignalSource = uint8(dbwriter.SIGNAL_SOURCE_RESOURCE)
-	eventStore.EventType = event.Type
-	eventStore.EventDescription = event.Description
+	s.SignalSource = uint8(dbwriter.SIGNAL_SOURCE_RESOURCE)
+	s.EventType = event.Type
+	s.EventDescription = event.Description
 
-	eventStore.GProcessID = event.GProcessID
+	s.GProcessID = event.GProcessID
 
 	if len(event.AttributeSubnetIDs) > 0 {
-		eventStore.AttributeNames = append(eventStore.AttributeNames, "subnet_ids")
-		eventStore.AttributeValues = append(eventStore.AttributeValues,
+		s.AttributeNames = append(s.AttributeNames, "subnet_ids")
+		s.AttributeValues = append(s.AttributeValues,
 			uint32ArrayToStr(event.AttributeSubnetIDs))
 	}
 	if len(event.AttributeIPs) > 0 {
-		eventStore.AttributeNames = append(eventStore.AttributeNames, "ips")
-		eventStore.AttributeValues = append(eventStore.AttributeValues,
+		s.AttributeNames = append(s.AttributeNames, "ips")
+		s.AttributeValues = append(s.AttributeValues,
 			strings.Join(event.AttributeIPs, SEPARATOR))
 
 	}
 
 	if event.IfNeedTagged {
-		eventStore.Tagged = 1
+		s.Tagged = 1
 		resourceInfo := d.resourceInfoTable.QueryResourceInfo(event.InstanceType, event.InstanceID)
 		if resourceInfo != nil {
-			eventStore.RegionID = uint16(resourceInfo.RegionID)
-			eventStore.AZID = uint16(resourceInfo.AZID)
-			eventStore.L3EpcID = resourceInfo.L3EpcID
-			eventStore.HostID = uint16(resourceInfo.HostID)
-			eventStore.PodID = resourceInfo.PodID
-			eventStore.PodNodeID = resourceInfo.PodNodeID
-			eventStore.PodNSID = uint16(resourceInfo.PodNSID)
-			eventStore.PodClusterID = uint16(resourceInfo.PodClusterID)
-			eventStore.PodGroupID = resourceInfo.PodGroupID
-			eventStore.L3DeviceType = uint8(resourceInfo.L3DeviceType)
-			eventStore.L3DeviceID = resourceInfo.L3DeviceID
+			s.RegionID = uint16(resourceInfo.RegionID)
+			s.AZID = uint16(resourceInfo.AZID)
+			s.L3EpcID = resourceInfo.L3EpcID
+			s.HostID = uint16(resourceInfo.HostID)
+			s.PodID = resourceInfo.PodID
+			s.PodNodeID = resourceInfo.PodNodeID
+			s.PodNSID = uint16(resourceInfo.PodNSID)
+			s.PodClusterID = uint16(resourceInfo.PodClusterID)
+			s.PodGroupID = resourceInfo.PodGroupID
+			s.L3DeviceType = uint8(resourceInfo.L3DeviceType)
+			s.L3DeviceID = resourceInfo.L3DeviceID
 		}
 	} else {
-		eventStore.Tagged = 0
-		eventStore.RegionID = uint16(event.RegionID)
-		eventStore.AZID = uint16(event.AZID)
+		s.Tagged = 0
+		s.RegionID = uint16(event.RegionID)
+		s.AZID = uint16(event.AZID)
 		if event.VPCID == 0 {
-			eventStore.L3EpcID = -2
+			s.L3EpcID = -2
 		} else {
-			eventStore.L3EpcID = int32(event.VPCID)
+			s.L3EpcID = int32(event.VPCID)
 		}
-		eventStore.HostID = uint16(event.HostID)
-		eventStore.PodID = event.PodID
-		eventStore.PodNodeID = event.PodNodeID
-		eventStore.PodNSID = uint16(event.PodNSID)
-		eventStore.PodClusterID = uint16(event.PodClusterID)
-		eventStore.PodGroupID = event.PodGroupID
-		eventStore.L3DeviceType = uint8(event.L3DeviceType)
-		eventStore.L3DeviceID = event.L3DeviceID
+		s.HostID = uint16(event.HostID)
+		s.PodID = event.PodID
+		s.PodNodeID = event.PodNodeID
+		s.PodNSID = uint16(event.PodNSID)
+		s.PodClusterID = uint16(event.PodClusterID)
+		s.PodGroupID = event.PodGroupID
+		s.L3DeviceType = uint8(event.L3DeviceType)
+		s.L3DeviceID = event.L3DeviceID
 
 	}
-	eventStore.SubnetID = uint16(event.SubnetID)
-	eventStore.IsIPv4 = true
+	s.SubnetID = uint16(event.SubnetID)
+	s.IsIPv4 = true
 	if ip := net.ParseIP(event.IP); ip != nil {
 		if ip4 := ip.To4(); ip4 != nil {
-			eventStore.IP4 = utils.IpToUint32(ip4)
+			s.IP4 = utils.IpToUint32(ip4)
 		} else {
-			eventStore.IsIPv4 = false
-			eventStore.IP6 = ip
+			s.IsIPv4 = false
+			s.IP6 = ip
 		}
 	}
-	eventStore.AutoInstanceID, eventStore.AutoInstanceType =
+	s.AutoInstanceID, s.AutoInstanceType =
 		ingestercommon.GetAutoInstance(
-			eventStore.PodID,
-			eventStore.GProcessID,
-			eventStore.PodNodeID,
-			eventStore.L3DeviceID,
-			eventStore.L3DeviceType,
-			eventStore.L3EpcID,
+			s.PodID,
+			s.GProcessID,
+			s.PodNodeID,
+			s.L3DeviceID,
+			s.L3DeviceType,
+			s.L3EpcID,
 		)
 	// if resource information is not matched, it will be filled with event(InstanceID, InstanceType, GProcessID) information
-	if eventStore.AutoInstanceID == 0 {
-		eventStore.AutoInstanceID, eventStore.AutoInstanceType = getAutoInstance(event.InstanceID, event.InstanceType, event.GProcessID)
+	if s.AutoInstanceID == 0 {
+		s.AutoInstanceID, s.AutoInstanceType = getAutoInstance(event.InstanceID, event.InstanceType, event.GProcessID)
 	}
 
 	if event.InstanceType == uint32(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) {
-		eventStore.ServiceID = event.InstanceID
+		s.ServiceID = event.InstanceID
 	}
-	eventStore.AutoServiceID, eventStore.AutoServiceType =
+	s.AutoServiceID, s.AutoServiceType =
 		ingestercommon.GetAutoService(
-			eventStore.ServiceID,
-			eventStore.PodGroupID,
-			eventStore.GProcessID,
-			eventStore.PodNodeID,
-			eventStore.L3DeviceID,
-			eventStore.L3DeviceType,
-			eventStore.L3EpcID,
+			s.ServiceID,
+			s.PodGroupID,
+			s.GProcessID,
+			s.PodNodeID,
+			s.L3DeviceID,
+			s.L3DeviceType,
+			s.L3EpcID,
 		)
 
-	d.eventWriter.Write(eventStore)
+	d.eventWriter.Write(s)
 }

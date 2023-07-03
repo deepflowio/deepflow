@@ -37,6 +37,78 @@ const (
 	SIGNAL_SOURCE_OTEL = 4
 )
 
+func getPlatformInfos(t *zerodoc.Tag, platformData *grpc.PlatformInfoTable) (*grpc.Info, *grpc.Info) {
+	var info, info1 *grpc.Info
+	if t.L3EpcID != datatype.EPC_FROM_INTERNET {
+		// if the GpId exists but the netnsId does not exist, first obtain the netnsId through the GprocessId table delivered by the Controller
+		if t.GPID != 0 && t.NetnsID == 0 {
+			vtapId, netnsId := platformData.QueryGprocessInfo(t.GPID)
+			if netnsId != 0 && vtapId == uint32(t.VTAPID) {
+				t.NetnsID = netnsId
+				t.TagSource |= uint8(zerodoc.GpId)
+			}
+		}
+
+		// if netnsId exist, use vtapId + netnsId to match first
+		if t.NetnsID != 0 {
+			info = platformData.QueryNetnsIdInfo(uint32(t.VTAPID), t.NetnsID)
+			t.TagSource |= uint8(zerodoc.NetnsId)
+		}
+
+		// If vtapId + netnsId cannot be matched, finally use Mac/EpcIP to match resources
+		if info == nil {
+			if t.MAC != 0 {
+				t.TagSource |= uint8(zerodoc.Mac)
+				info = platformData.QueryMacInfo(t.MAC | uint64(t.L3EpcID)<<48)
+				if info == nil {
+					t.TagSource |= uint8(zerodoc.EpcIP)
+					info = common.RegetInfoFromIP(t.IsIPv6 == 1, t.IP6, t.IP, t.L3EpcID, platformData)
+				}
+			} else if t.IsIPv6 != 0 {
+				t.TagSource |= uint8(zerodoc.EpcIP)
+				info = platformData.QueryIPV6Infos(t.L3EpcID, t.IP6)
+			} else {
+				t.TagSource |= uint8(zerodoc.EpcIP)
+				info = platformData.QueryIPV4Infos(t.L3EpcID, t.IP)
+			}
+		}
+	}
+
+	if t.Code&EdgeCode == EdgeCode && t.L3EpcID1 != datatype.EPC_FROM_INTERNET {
+		if t.GPID1 != 0 && t.NetnsID1 == 0 {
+			vtapId, netnsId := platformData.QueryGprocessInfo(t.GPID1)
+			if netnsId != 0 && vtapId == uint32(t.VTAPID) {
+				t.NetnsID1 = netnsId
+				t.TagSource1 |= uint8(zerodoc.GpId)
+			}
+		}
+
+		if t.NetnsID1 != 0 {
+			info1 = platformData.QueryNetnsIdInfo(uint32(t.VTAPID), t.NetnsID1)
+			t.TagSource1 |= uint8(zerodoc.NetnsId)
+		}
+
+		if info1 == nil {
+			if t.MAC1 != 0 {
+				t.TagSource1 |= uint8(zerodoc.Mac)
+				info1 = platformData.QueryMacInfo(t.MAC1 | uint64(t.L3EpcID1)<<48)
+				if info1 == nil {
+					t.TagSource1 |= uint8(zerodoc.EpcIP)
+					info1 = common.RegetInfoFromIP(t.IsIPv6 == 1, t.IP61, t.IP1, t.L3EpcID1, platformData)
+				}
+			} else if t.IsIPv6 != 0 {
+				t.TagSource1 |= uint8(zerodoc.EpcIP)
+				info1 = platformData.QueryIPV6Infos(t.L3EpcID1, t.IP61)
+			} else {
+				t.TagSource1 |= uint8(zerodoc.EpcIP)
+				info1 = platformData.QueryIPV4Infos(t.L3EpcID1, t.IP1)
+			}
+		}
+	}
+
+	return info, info1
+}
+
 func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) error {
 	t := doc.Tagger.(*zerodoc.Tag)
 	t.SetID("") // 由于需要修改Tag增删Field，清空ID避免字段脏
@@ -47,106 +119,58 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 		return nil
 	}
 
-	var info, info1 *grpc.Info
 	myRegionID := uint16(platformData.QueryRegionID())
+
 	if t.Code&zerodoc.ServerPort == zerodoc.ServerPort {
 		t.Code |= PortAddCode
 	}
+
+	info, info1 := getPlatformInfos(t, platformData)
 	if t.Code&EdgeCode == EdgeCode {
 		t.Code |= EdgeAddCode
-
-		if t.L3EpcID == datatype.EPC_FROM_INTERNET && t.L3EpcID1 == datatype.EPC_FROM_INTERNET {
-			return nil
-		}
-		// 当MAC/MAC1非0时，通过MAC来获取资源信息
-		if t.MAC != 0 && t.MAC1 != 0 {
-			info, info1 = platformData.QueryMacInfosPair(t.MAC|uint64(t.L3EpcID)<<48, t.MAC1|uint64(t.L3EpcID1)<<48)
-			if info == nil {
-				info = common.RegetInfoFromIP(t.IsIPv6 == 1, t.IP6, t.IP, t.L3EpcID, platformData)
-			}
-			if info1 == nil {
-				info1 = common.RegetInfoFromIP(t.IsIPv6 == 1, t.IP61, t.IP1, t.L3EpcID1, platformData)
-			}
-		} else if t.MAC != 0 {
-			info = platformData.QueryMacInfo(t.MAC | uint64(t.L3EpcID)<<48)
-			if info == nil {
-				info = common.RegetInfoFromIP(t.IsIPv6 == 1, t.IP6, t.IP, t.L3EpcID, platformData)
-			}
-			if t.IsIPv6 != 0 {
-				info1 = platformData.QueryIPV6Infos(t.L3EpcID1, t.IP61)
-			} else {
-				info1 = platformData.QueryIPV4Infos(t.L3EpcID1, t.IP1)
-			}
-		} else if t.MAC1 != 0 {
-			if t.IsIPv6 != 0 {
-				info = platformData.QueryIPV6Infos(t.L3EpcID, t.IP6)
-			} else {
-				info = platformData.QueryIPV4Infos(t.L3EpcID, t.IP)
-			}
-			info1 = platformData.QueryMacInfo(t.MAC1 | uint64(t.L3EpcID1)<<48)
-			if info1 == nil {
-				info1 = common.RegetInfoFromIP(t.IsIPv6 == 1, t.IP61, t.IP1, t.L3EpcID1, platformData)
-			}
-		} else if t.IsIPv6 != 0 {
-			info, info1 = platformData.QueryIPV6InfosPair(t.L3EpcID, t.IP6, t.L3EpcID1, t.IP61)
-		} else {
-			info, info1 = platformData.QueryIPV4InfosPair(t.L3EpcID, t.IP, t.L3EpcID1, t.IP1)
-		}
-		if info1 != nil {
-			t.RegionID1 = uint16(info1.RegionID)
-			t.HostID1 = uint16(info1.HostID)
-			t.L3DeviceID1 = info1.DeviceID
-			t.L3DeviceType1 = zerodoc.DeviceType(info1.DeviceType)
-			t.SubnetID1 = uint16(info1.SubnetID)
-			t.PodNodeID1 = info1.PodNodeID
-			t.PodNSID1 = uint16(info1.PodNSID)
-			t.AZID1 = uint16(info1.AZID)
-			t.PodGroupID1 = info1.PodGroupID
-			t.PodID1 = info1.PodID
-			t.PodClusterID1 = uint16(info1.PodClusterID)
-			if common.IsPodServiceIP(t.L3DeviceType1, t.PodID1, t.PodNodeID1) {
-				t.ServiceID1 = platformData.QueryService(t.PodID1, t.PodNodeID1, uint32(t.PodClusterID1), t.PodGroupID1, t.L3EpcID1, t.IsIPv6 == 1, t.IP1, t.IP61, t.Protocol, t.ServerPort)
-			}
-			if info == nil {
-				var ip0 net.IP
-				if t.IsIPv6 != 0 {
-					ip0 = t.IP6
-				} else {
-					ip0 = utils.IpFromUint32(t.IP)
-				}
-				// 当0侧是组播ip时，使用1侧的region_id,subnet_id,az_id来填充
-				if ip0.IsMulticast() {
-					t.RegionID = t.RegionID1
-					t.SubnetID = t.SubnetID1
-					t.AZID = t.AZID1
-				}
-			}
-			if myRegionID != 0 && t.RegionID1 != 0 {
-				if t.TAPSide == zerodoc.Server && t.RegionID1 != myRegionID { // 对于双端 的统计值，需要去掉 tap_side 对应的一侧与自身region_id 不匹配的内容。
-					platformData.AddOtherRegion()
-					return fmt.Errorf("My regionID is %d, but document regionID1 is %d", myRegionID, t.RegionID1)
-				}
-			}
-		}
-		t.AutoInstanceID1, t.AutoInstanceType1 = common.GetAutoInstance(t.PodID1, t.GPID1, t.PodNodeID1, t.L3DeviceID1, uint8(t.L3DeviceType1), t.L3EpcID1)
-		t.AutoServiceID1, t.AutoServiceType1 = common.GetAutoService(t.ServiceID1, t.PodGroupID1, t.GPID1, t.PodNodeID1, t.L3DeviceID1, uint8(t.L3DeviceType1), t.L3EpcID1)
 	} else {
 		t.Code |= MainAddCode
-		if t.L3EpcID == datatype.EPC_FROM_INTERNET {
-			return nil
-		}
+	}
 
-		if t.MAC != 0 {
-			info = platformData.QueryMacInfo(t.MAC | uint64(t.L3EpcID)<<48)
-			if info == nil {
-				info = common.RegetInfoFromIP(t.IsIPv6 == 1, t.IP6, t.IP, t.L3EpcID, platformData)
+	if info1 != nil {
+		t.RegionID1 = uint16(info1.RegionID)
+		t.HostID1 = uint16(info1.HostID)
+		t.L3DeviceID1 = info1.DeviceID
+		t.L3DeviceType1 = zerodoc.DeviceType(info1.DeviceType)
+		t.SubnetID1 = uint16(info1.SubnetID)
+		t.PodNodeID1 = info1.PodNodeID
+		t.PodNSID1 = uint16(info1.PodNSID)
+		t.AZID1 = uint16(info1.AZID)
+		t.PodGroupID1 = info1.PodGroupID
+		t.PodID1 = info1.PodID
+		t.PodClusterID1 = uint16(info1.PodClusterID)
+		if common.IsPodServiceIP(t.L3DeviceType1, t.PodID1, t.PodNodeID1) {
+			t.ServiceID1 = platformData.QueryService(t.PodID1, t.PodNodeID1, uint32(t.PodClusterID1), t.PodGroupID1, t.L3EpcID1, t.IsIPv6 == 1, t.IP1, t.IP61, t.Protocol, t.ServerPort)
+		}
+		if info == nil {
+			var ip0 net.IP
+			if t.IsIPv6 != 0 {
+				ip0 = t.IP6
+			} else {
+				ip0 = utils.IpFromUint32(t.IP)
 			}
-		} else if t.IsIPv6 != 0 {
-			info = platformData.QueryIPV6Infos(t.L3EpcID, t.IP6)
-		} else {
-			info = platformData.QueryIPV4Infos(t.L3EpcID, t.IP)
+			// 当0侧是组播ip时，使用1侧的region_id,subnet_id,az_id来填充
+			if ip0.IsMulticast() {
+				t.RegionID = t.RegionID1
+				t.SubnetID = t.SubnetID1
+				t.AZID = t.AZID1
+				t.TagSource |= uint8(zerodoc.Peer)
+			}
+		}
+		if myRegionID != 0 && t.RegionID1 != 0 {
+			if t.TAPSide == zerodoc.Server && t.RegionID1 != myRegionID { // 对于双端 的统计值，需要去掉 tap_side 对应的一侧与自身region_id 不匹配的内容。
+				platformData.AddOtherRegion()
+				return fmt.Errorf("My regionID is %d, but document regionID1 is %d", myRegionID, t.RegionID1)
+			}
 		}
 	}
+	t.AutoInstanceID1, t.AutoInstanceType1 = common.GetAutoInstance(t.PodID1, t.GPID1, t.PodNodeID1, t.L3DeviceID1, uint8(t.L3DeviceType1), t.L3EpcID1)
+	t.AutoServiceID1, t.AutoServiceType1 = common.GetAutoService(t.ServiceID1, t.PodGroupID1, t.GPID1, t.PodNodeID1, t.L3DeviceID1, uint8(t.L3DeviceType1), t.L3EpcID1)
 
 	if info != nil {
 		t.RegionID = uint16(info.RegionID)
@@ -181,6 +205,7 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 				t.RegionID1 = t.RegionID
 				t.SubnetID1 = t.SubnetID
 				t.AZID1 = t.AZID
+				t.TagSource1 |= uint8(zerodoc.Peer)
 			}
 		}
 
@@ -197,9 +222,9 @@ func DocumentExpand(doc *app.Document, platformData *grpc.PlatformInfoTable) err
 				}
 			}
 		}
-		t.AutoInstanceID, t.AutoInstanceType = common.GetAutoInstance(t.PodID, t.GPID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
-		t.AutoServiceID, t.AutoServiceType = common.GetAutoService(t.ServiceID, t.PodGroupID, t.GPID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
 	}
+	t.AutoInstanceID, t.AutoInstanceType = common.GetAutoInstance(t.PodID, t.GPID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
+	t.AutoServiceID, t.AutoServiceType = common.GetAutoService(t.ServiceID, t.PodGroupID, t.GPID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
 
 	if t.SignalSource == SIGNAL_SOURCE_OTEL {
 		// only show OTel data for services as 'server side'

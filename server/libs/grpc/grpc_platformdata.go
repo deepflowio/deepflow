@@ -73,6 +73,11 @@ type Info struct {
 	AZID         uint32
 	IsVip        bool
 	IsWan        bool
+	VtapID       uint32
+	NetnsID      uint32
+	IsIPv4       bool
+	IP4          uint32
+	IP6          net.IP
 	HitCount     *uint64
 }
 
@@ -139,6 +144,9 @@ type PlatformInfoTable struct {
 
 	epcIDBaseInfos     map[int32]*BaseInfo
 	epcIDBaseMissCount map[int32]*uint64
+
+	netnsIdInfos  map[uint64]*Info
+	gprocessInfos map[uint32]uint64
 
 	bootTime            uint32
 	moduleName          string
@@ -287,6 +295,14 @@ func (t *PlatformInfoTable) QueryIPV6InfosPair(epcID0 int32, ipv60 net.IP, epcID
 	return
 }
 
+func (t *PlatformInfoTable) QueryNetnsIdInfo(vtapId, netnsId uint32) *Info {
+	if info, ok := t.netnsIdInfos[uint64(vtapId)<<32|uint64(netnsId)]; ok {
+		atomic.AddUint64(info.HitCount, 1)
+		return info
+	}
+	return nil
+}
+
 type PlatformDataManager struct {
 	masterTable       *PlatformInfoTable
 	slaveTables       []*PlatformInfoTable
@@ -352,6 +368,8 @@ func NewPlatformInfoTable(ips []net.IP, port, index, rpcMaxMsgSize int, moduleNa
 		epcIDIPV6CidrInfos: make(map[int32][]*CidrInfo),
 		epcIDBaseInfos:     make(map[int32]*BaseInfo),
 		epcIDBaseMissCount: make(map[int32]*uint64),
+		netnsIdInfos:       make(map[uint64]*Info),
+		gprocessInfos:      make(map[uint32]uint64),
 		moduleName:         moduleName,
 		runtimeEnv:         utils.GetRuntimeEnv(),
 		ServiceTable:       NewServiceTable(nil),
@@ -669,8 +687,8 @@ func (t *PlatformInfoTable) String() string {
 		t.moduleName, t.ctlIP, t.hostname, t.regionID))
 	sb.WriteString(fmt.Sprintf("ARCH:%s OS:%s Kernel:%s CPUNum:%d MemorySize:%d\n", t.runtimeEnv.Arch, t.runtimeEnv.OS, t.runtimeEnv.KernelVersion, t.runtimeEnv.CpuNum, t.runtimeEnv.MemorySize))
 	if len(t.epcIDIPV4Infos) > 0 {
-		sb.WriteString("\n1 *epcID  *ipv4           mac          host            hostID  regionID  deviceType  deviceID    subnetID  podNodeID podNSID podGroupID podID podClusterID azID isVip isWan hitCount (ipv4平台信息)\n")
-		sb.WriteString("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n")
+		sb.WriteString("\n1 *epcID  *ipv4           mac          host            hostID  regionID  deviceType  deviceID    subnetID  podNodeID podNSID podGroupID podID podClusterID azID isVip isWan vtapId    netnsId       hitCount (ipv4平台信息)\n")
+		sb.WriteString("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n")
 	}
 	epcIP4s := make([]uint64, 0)
 	for epcIP := range t.epcIDIPV4Infos {
@@ -684,14 +702,14 @@ func (t *PlatformInfoTable) String() string {
 		if info == nil {
 			continue
 		}
-		fmt.Fprintf(sb, "  %-6d  %-15s %-12x %-15s %-6d  %-7d   %-10d   %-7d    %-8d  %-9d %-7d %-10d %-5d %-12d %-4d %-5t %-5t %d\n", epcIP>>32, utils.IpFromUint32(uint32(epcIP)).String(),
-			info.Mac, info.HostStr, info.HostID, info.RegionID, info.DeviceType, info.DeviceID, info.SubnetID, info.PodNodeID, info.PodNSID, info.PodGroupID, info.PodID, info.PodClusterID, info.AZID, info.IsVip, info.IsWan, *info.HitCount)
+		fmt.Fprintf(sb, "  %-6d  %-15s %-12x %-15s %-6d  %-7d   %-10d   %-7d    %-8d  %-9d %-7d %-10d %-5d %-12d %-4d %-5t %-5t %-6d    %-10d    %d\n", epcIP>>32, utils.IpFromUint32(uint32(epcIP)).String(),
+			info.Mac, info.HostStr, info.HostID, info.RegionID, info.DeviceType, info.DeviceID, info.SubnetID, info.PodNodeID, info.PodNSID, info.PodGroupID, info.PodID, info.PodClusterID, info.AZID, info.IsVip, info.IsWan, info.VtapID, info.NetnsID, *info.HitCount)
 	}
 
 	if len(t.epcIDIPV6Infos) > 0 {
 		sb.WriteString("\n\n")
-		sb.WriteString("2 *epcID  *ipv6                                        mac          host            hostID  regionID deviceType  deviceID subnetID  podNodeID podNSID podGroupID podID podClusterID azID isVip isWan hitCount (ipv6平台信息)\n")
-		sb.WriteString("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n")
+		sb.WriteString("2 *epcID  *ipv6                                        mac          host            hostID  regionID deviceType  deviceID subnetID  podNodeID podNSID podGroupID podID podClusterID azID isVip isWan vtapId  netnsId    hitCount (ipv6平台信息)\n")
+		sb.WriteString("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n")
 	}
 	epcIP6s := make([][EpcIDIPV6_LEN]byte, 0)
 	for epcIP := range t.epcIDIPV6Infos {
@@ -705,8 +723,8 @@ func (t *PlatformInfoTable) String() string {
 		if info == nil {
 			continue
 		}
-		fmt.Fprintf(sb, "  %-6d  %-44s %-12x %-15s %-6d  %-7d  %-10d  %-7d  %-8d  %-9d %-7d %-10d %-5d %-12d %-4d %-5t %-5t %d\n", int32(binary.LittleEndian.Uint32(epcIP[:4])), net.IP(epcIP[4:]).String(),
-			info.Mac, info.HostStr, info.HostID, info.RegionID, info.DeviceType, info.DeviceID, info.SubnetID, info.PodNodeID, info.PodNSID, info.PodGroupID, info.PodID, info.PodClusterID, info.AZID, info.IsVip, info.IsWan, *info.HitCount)
+		fmt.Fprintf(sb, "  %-6d  %-44s %-12x %-15s %-6d  %-7d  %-10d  %-7d  %-8d  %-9d %-7d %-10d %-5d %-12d %-4d %-5t %-5t %-6d  %-10d %d\n", int32(binary.LittleEndian.Uint32(epcIP[:4])), net.IP(epcIP[4:]).String(),
+			info.Mac, info.HostStr, info.HostID, info.RegionID, info.DeviceType, info.DeviceID, info.SubnetID, info.PodNodeID, info.PodNSID, info.PodGroupID, info.PodID, info.PodClusterID, info.AZID, info.IsVip, info.IsWan, info.VtapID, info.NetnsID, *info.HitCount)
 	}
 	if len(t.epcIDIPV4CidrInfos) > 0 || len(t.epcIDIPV6CidrInfos) > 0 {
 		sb.WriteString("\n3 *epcID  *cidr                                          regionID  subnetID   azID   isWan hitCount (cidr平台信息) \n")
@@ -818,6 +836,8 @@ func (t *PlatformInfoTable) HandleSimpleCommand(op uint16, arg string) string {
 		return t.communicationVtapsString()
 	} else if arg == "service-" {
 		return t.ServiceTable.String()
+	} else if arg == "gprocess-" {
+		return t.gprocessInfosString()
 	}
 
 	all := t.String()
@@ -877,14 +897,16 @@ func (t *PlatformInfoTable) updatePlatformData(platformData *trident.PlatformDat
 	newEpcIDBaseInfos := make(map[int32]*BaseInfo)
 	newEpcIDIPV4CidrInfos := make(map[int32][]*CidrInfo)
 	newEpcIDIPV6CidrInfos := make(map[int32][]*CidrInfo)
+	newNetnsIdInfos := make(map[uint64]*Info)
 
 	for _, intf := range platformData.GetInterfaces() {
-		updateInterfaceInfos(newEpcIDIPV4Infos, newEpcIDIPV6Infos, newMacInfos, newEpcIDBaseInfos, intf)
+		updateInterfaceInfos(newEpcIDIPV4Infos, newEpcIDIPV6Infos, newMacInfos, newEpcIDBaseInfos, newNetnsIdInfos, intf)
 	}
 	for _, cidr := range platformData.GetCidrs() {
 		updateCidrInfos(newEpcIDIPV4CidrInfos, newEpcIDIPV6CidrInfos, newEpcIDBaseInfos, cidr)
 	}
 	t.updatePeerConnections(platformData.GetPeerConnections())
+	t.updateGprocessInfos(platformData.GetGprocessInfos())
 
 	t.epcIDIPV4Infos = newEpcIDIPV4Infos
 	t.epcIDIPV4CidrInfos = newEpcIDIPV4CidrInfos
@@ -901,6 +923,8 @@ func (t *PlatformInfoTable) updatePlatformData(platformData *trident.PlatformDat
 
 	t.epcIDBaseInfos = newEpcIDBaseInfos
 	t.epcIDBaseMissCount = make(map[int32]*uint64)
+
+	t.netnsIdInfos = newNetnsIdInfos
 }
 
 func (t *PlatformInfoTable) updateOthers(response *trident.SyncResponse) {
@@ -937,6 +961,8 @@ func (t *PlatformInfoTable) ReloadSlave() error {
 	if newVersion != t.versionPlatformData {
 		log.Infof("Update slave(%s) rpc platformdata version %d -> %d  regionID=%d", t.moduleName, t.versionPlatformData, newVersion, t.regionID)
 		t.peerConnections = masterTable.peerConnections
+		t.gprocessInfos = masterTable.gprocessInfos
+		t.netnsIdInfos = masterTable.netnsIdInfos
 
 		t.epcIDIPV4Infos = masterTable.epcIDIPV4Infos
 		t.epcIDIPV4CidrInfos = masterTable.epcIDIPV4CidrInfos
@@ -1169,7 +1195,7 @@ func updateCidrInfos(IPV4CidrInfos, IPV6CidrInfos map[int32][]*CidrInfo, epcIDBa
 	}
 }
 
-func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[EpcIDIPV6_LEN]byte]*Info, macInfos map[uint64]*Info, epcIDBaseInfos map[int32]*BaseInfo, intf *trident.Interface) {
+func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[EpcIDIPV6_LEN]byte]*Info, macInfos map[uint64]*Info, epcIDBaseInfos map[int32]*BaseInfo, netnsIdInfos map[uint64]*Info, intf *trident.Interface) {
 	// intf.GetEpcId() in range (0,64000], when convert to int32, 0 need convert to datatype.EPC_FROM_INTERNET
 	epcID := int32(intf.GetEpcId())
 	// 由于doc中epcID为-2，对应trisolaris的epcID为0.故在此统一将收到epcID为0的，修改为-2，便于doc数据查找
@@ -1199,6 +1225,8 @@ func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[E
 		host = utils.IpToUint32(utils.ParserStringIpV4(hostStr))
 	}
 	hostID := intf.GetLaunchServerId()
+	netnsId := intf.GetNetnsId()
+	vtapId := intf.GetVtapId()
 
 	firstSubnetID := uint32(0)
 	var epcIDIPV6 [EpcIDIPV6_LEN]byte
@@ -1211,7 +1239,7 @@ func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[E
 		ipStr := ipRes.GetIp()
 		if isIPV4(ipStr) {
 			ipU32 := utils.IpToUint32(utils.ParserStringIpV4(ipStr))
-			epcIDIPV4Infos[uint64(epcID)<<32|uint64(ipU32)] = &Info{
+			info := &Info{
 				EpcID:        epcID,
 				Host:         host,
 				HostStr:      hostStr,
@@ -1228,8 +1256,14 @@ func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[E
 				PodClusterID: podClusterID,
 				AZID:         azID,
 				IsWan:        isWan,
+				NetnsID:      netnsId,
+				VtapID:       vtapId,
+				IsIPv4:       true,
+				IP4:          ipU32,
 				HitCount:     new(uint64),
 			}
+			epcIDIPV4Infos[uint64(epcID)<<32|uint64(ipU32)] = info
+			netnsIdInfos[uint64(vtapId)<<32|uint64(netnsId)] = info
 			if isWan {
 				// 对于WAN数据，额外插入一条epcid为零的数据，方便忽略epc进行搜索
 				epcIDIPV4Infos[uint64(ipU32)] = &Info{
@@ -1245,7 +1279,7 @@ func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[E
 			}
 			binary.LittleEndian.PutUint32(epcIDIPV6[:4], uint32(epcID))
 			copy(epcIDIPV6[4:], netIP)
-			epcIDIPV6Infos[epcIDIPV6] = &Info{
+			info := &Info{
 				EpcID:        epcID,
 				Host:         host,
 				HostStr:      hostStr,
@@ -1262,8 +1296,15 @@ func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[E
 				PodClusterID: podClusterID,
 				AZID:         azID,
 				IsWan:        isWan,
+				NetnsID:      netnsId,
+				VtapID:       vtapId,
 				HitCount:     new(uint64),
+				IsIPv4:       false,
+				IP6:          netIP,
 			}
+
+			epcIDIPV6Infos[epcIDIPV6] = info
+			netnsIdInfos[uint64(vtapId)<<32|uint64(netnsId)] = info
 			if isWan {
 				// 对于WAN数据，额外插入一条epcid为零的数据，方便忽略epc进行搜索
 				binary.LittleEndian.PutUint32(epcIDIPV6[:4], 0)
@@ -1289,6 +1330,8 @@ func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[E
 		PodID:        podID,
 		PodClusterID: podClusterID,
 		AZID:         azID,
+		NetnsID:      netnsId,
+		VtapID:       vtapId,
 		HitCount:     new(uint64),
 	}
 }
@@ -1472,6 +1515,38 @@ func (t *PlatformInfoTable) peerConnectionsString() string {
 
 func (t *PlatformInfoTable) queryPeerConnections(epcId int32) []int32 {
 	return t.peerConnections[epcId]
+}
+
+func (t *PlatformInfoTable) updateGprocessInfos(infos []*trident.GProcessInfo) {
+	gProcessInfos := make(map[uint32]uint64, 1024)
+
+	for _, info := range infos {
+		vtapId := info.GetVtapId()
+		gProcessId := info.GetGprocessId()
+		netnsId := info.GetNetnsId()
+		if vtapId == 0 || gProcessId == 0 || netnsId == 0 {
+			continue
+		}
+		gProcessInfos[gProcessId] = uint64(vtapId)<<32 | uint64(netnsId)
+	}
+
+	t.gprocessInfos = gProcessInfos
+}
+
+func (t *PlatformInfoTable) gprocessInfosString() string {
+	sb := &strings.Builder{}
+	sb.WriteString("gprocessId         vtapId        netnsId\n")
+	for gpid, vtapNetnsId := range t.gprocessInfos {
+		sb.WriteString(fmt.Sprintf("%-10d         %-6d       %d\n", gpid, vtapNetnsId>>32, vtapNetnsId<<32>>32))
+	}
+	return sb.String()
+}
+
+func (t *PlatformInfoTable) QueryGprocessInfo(gprocessId uint32) (uint32, uint32) {
+	if vtapNetns, ok := t.gprocessInfos[gprocessId]; ok {
+		return uint32(vtapNetns >> 32), uint32(vtapNetns << 32 >> 32)
+	}
+	return 0, 0
 }
 
 func RegisterPlatformDataCommand(ips []net.IP, port int) *cobra.Command {
