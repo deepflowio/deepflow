@@ -18,6 +18,7 @@ use std::{
     collections::HashMap,
     io::prelude::*,
     mem,
+    net::IpAddr,
     ops::Deref,
     sync::{
         atomic::{AtomicU64, Ordering},
@@ -32,6 +33,7 @@ use flate2::{write::ZlibEncoder, Compression};
 use k8s_openapi::apimachinery::pkg::version::Info;
 use kube::{Client, Config};
 use log::{debug, error, info, log_enabled, warn, Level};
+use parking_lot::RwLock;
 use tokio::{runtime::Runtime, task::JoinHandle};
 
 use super::resource_watcher::{GenericResourceWatcher, Watcher, WatcherConfig};
@@ -109,12 +111,14 @@ pub struct ApiWatcher {
     session: Arc<Session>,
     exception_handler: ExceptionHandler,
     stats_collector: Arc<stats::Collector>,
+    ctrl_ip: Arc<RwLock<IpAddr>>,
 }
 
 impl ApiWatcher {
     pub fn new(
         runtime: Arc<Runtime>,
         config: PlatformAccess,
+        ctrl_ip: IpAddr,
         session: Arc<Session>,
         exception_handler: ExceptionHandler,
         stats_collector: Arc<stats::Collector>,
@@ -139,6 +143,7 @@ impl ApiWatcher {
             watchers: Arc::new(Mutex::new(HashMap::new())),
             exception_handler,
             stats_collector,
+            ctrl_ip: Arc::new(RwLock::new(ctrl_ip)),
         }
     }
 
@@ -205,6 +210,7 @@ impl ApiWatcher {
         let watchers = self.watchers.clone();
         let exception_handler = self.exception_handler.clone();
         let stats_collector = self.stats_collector.clone();
+        let ctrl_ip = self.ctrl_ip.clone();
 
         let handle = thread::Builder::new()
             .name("kubernetes-api-watcher".to_owned())
@@ -219,10 +225,17 @@ impl ApiWatcher {
                     watchers,
                     exception_handler,
                     stats_collector,
+                    ctrl_ip,
                 )
             })
             .unwrap();
         self.thread.lock().unwrap().replace(handle);
+    }
+
+    pub fn reset_session(&self, controller_ips: Vec<String>, new_ctrl_ip: IpAddr) {
+        self.session.reset_server_ip(controller_ips);
+        let mut ctrl_ip = self.ctrl_ip.write();
+        *ctrl_ip = new_ctrl_ip;
     }
 
     async fn set_up(
@@ -527,6 +540,7 @@ impl ApiWatcher {
         watcher_versions: &mut HashMap<String, u64>,
         resource_watchers: &Arc<Mutex<HashMap<String, GenericResourceWatcher>>>,
         exception_handler: &ExceptionHandler,
+        ctrl_ip: Arc<RwLock<IpAddr>>,
     ) {
         let version = &context.version;
         // 将缓存的entry 上报，如果没有则跳过
@@ -578,7 +592,7 @@ impl ApiWatcher {
                 cluster_id: Some(config_guard.kubernetes_cluster_id.to_string()),
                 version: pb_version,
                 vtap_id: Some(config_guard.vtap_id as u32),
-                source_ip: Some(config_guard.source_ip.to_string()),
+                source_ip: Some(ctrl_ip.read().to_string()),
                 error_msg: Some(
                     err_msgs
                         .lock()
@@ -680,6 +694,7 @@ impl ApiWatcher {
         watchers: Arc<Mutex<HashMap<String, GenericResourceWatcher>>>,
         exception_handler: ExceptionHandler,
         stats_collector: Arc<stats::Collector>,
+        ctrl_ip: Arc<RwLock<IpAddr>>,
     ) {
         info!("kubernetes api watcher starting");
 
@@ -709,7 +724,7 @@ impl ApiWatcher {
                         cluster_id: Some(config_guard.kubernetes_cluster_id.to_string()),
                         version: Some(context.version.load(Ordering::SeqCst)),
                         vtap_id: Some(config_guard.vtap_id as u32),
-                        source_ip: Some(config_guard.source_ip.to_string()),
+                        source_ip: Some(ctrl_ip.read().to_string()),
                         error_msg: Some(e.to_string()),
                         entries: vec![],
                     };
@@ -763,6 +778,7 @@ impl ApiWatcher {
                 &mut watcher_versions,
                 &resource_watchers,
                 &exception_handler,
+                ctrl_ip.clone(),
             );
             break;
         }
@@ -777,6 +793,7 @@ impl ApiWatcher {
                 &mut watcher_versions,
                 &resource_watchers,
                 &exception_handler,
+                ctrl_ip.clone(),
             );
         }
         info!("kubernetes api watcher stopping");

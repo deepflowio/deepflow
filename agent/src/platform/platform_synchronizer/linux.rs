@@ -27,6 +27,7 @@ use std::{
 
 use arc_swap::access::Access;
 use log::{debug, error, info, warn};
+use parking_lot::RwLock;
 use regex::Regex;
 use ring::digest;
 use tokio::runtime::Runtime;
@@ -70,6 +71,7 @@ struct ProcessArgs {
     kubernetes_poller: Arc<GenericPoller>,
     exception_handler: ExceptionHandler,
     extra_netns_regex: Arc<Mutex<Option<Regex>>>,
+    ctrl_ip: Arc<RwLock<IpAddr>>,
 }
 
 #[derive(Default)]
@@ -107,12 +109,14 @@ pub struct PlatformSynchronizer {
     sniffer: Arc<sniffer_builder::Sniffer>,
     exception_handler: ExceptionHandler,
     extra_netns_regex: Arc<Mutex<Option<Regex>>>,
+    ctrl_ip: Arc<RwLock<IpAddr>>,
 }
 
 impl PlatformSynchronizer {
     pub fn new(
         runtime: Arc<Runtime>,
         config: PlatformAccess,
+        ctrl_ip: IpAddr,
         session: Arc<Session>,
         xml_extractor: Arc<LibvirtXmlExtractor>,
         exception_handler: ExceptionHandler,
@@ -181,6 +185,7 @@ impl PlatformSynchronizer {
             sniffer,
             exception_handler,
             extra_netns_regex: Arc::new(Mutex::new(extra_netns_regex)),
+            ctrl_ip: Arc::new(RwLock::new(ctrl_ip)),
         }
     }
 
@@ -218,7 +223,8 @@ impl PlatformSynchronizer {
             let config_guard = self.config.load();
             let err = format!(
                 "PlatformSynchronizer has already stopped with ctrl-ip:{} vtap-id:{}",
-                config_guard.source_ip, config_guard.vtap_id
+                self.ctrl_ip.read(),
+                config_guard.vtap_id
             );
             debug!("{}", err);
             return;
@@ -241,7 +247,8 @@ impl PlatformSynchronizer {
             let config_guard = self.config.load();
             let err = format!(
                 "PlatformSynchronizer has already running with ctrl-ip:{} vtap-id:{}",
-                config_guard.source_ip, config_guard.vtap_id
+                self.ctrl_ip.read(),
+                config_guard.vtap_id
             );
             debug!("{}", err);
             return;
@@ -261,6 +268,7 @@ impl PlatformSynchronizer {
             sniffer: self.sniffer.clone(),
             exception_handler: self.exception_handler.clone(),
             extra_netns_regex: self.extra_netns_regex.clone(),
+            ctrl_ip: self.ctrl_ip.clone(),
         };
 
         let handle = thread::Builder::new()
@@ -273,6 +281,12 @@ impl PlatformSynchronizer {
             self.kubernetes_poller.start();
         }
         info!("PlatformSynchronizer started");
+    }
+
+    pub fn reset_session(&self, controller_ips: Vec<String>, new_ctrl_ip: IpAddr) {
+        self.session.reset_server_ip(controller_ips);
+        let mut ctrl_ip = self.ctrl_ip.write();
+        *ctrl_ip = new_ctrl_ip;
     }
 
     fn query_platform(
@@ -522,7 +536,7 @@ impl PlatformSynchronizer {
     ) -> Result<u64, tonic::Status> {
         let config_guard = process_args.config.load();
         let trident_type = config_guard.trident_type;
-        let ctrl_ip = config_guard.source_ip;
+        let ctrl_ip = process_args.ctrl_ip.read();
         let platform_enabled = config_guard.enabled;
         drop(config_guard);
 
@@ -678,7 +692,7 @@ impl PlatformSynchronizer {
             let config_guard = args.config.load();
             let cur_vtap_id = config_guard.vtap_id;
             let trident_type = config_guard.trident_type;
-            let ctrl_ip = config_guard.source_ip;
+            let ctrl_ip = args.ctrl_ip.read();
             let poll_interval = config_guard.sync_interval;
             drop(config_guard);
 
