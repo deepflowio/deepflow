@@ -43,6 +43,7 @@ message MiniField {
     string app_service = 23;
     string app_instance = 24;
     string endpoint = 25;
+    uint32 netns_id = 26;
 }
 
 message MiniTag {
