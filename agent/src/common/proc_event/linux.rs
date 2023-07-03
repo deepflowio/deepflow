@@ -213,7 +213,7 @@ impl Sendable for BoxedProcEvents {
             process_kname: self.0.process_kname,
             end_time: self.0.end_time,
             event_type: self.0.event_type.into(),
-            netns_id: self.0.netns_id,
+            netns_id: self.0.netns_id as u32,
             ..Default::default()
         };
         match self.0.event_data {
