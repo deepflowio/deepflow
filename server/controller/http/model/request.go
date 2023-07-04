@@ -16,6 +16,10 @@
 
 package model
 
+import (
+	"github.com/deepflowio/deepflow/server/controller/http/service/resource/common"
+)
+
 // UserInfo defines the user information parsed from the request header, used to build redis cache key and build memory cache filter conditions
 // 定义从 request header 中解析出的用户信息，用于构建 redis 缓存 key 以及构建 memory 缓存过滤条件
 type UserInfo struct { // TODO HeaderInfo?
@@ -23,16 +27,16 @@ type UserInfo struct { // TODO HeaderInfo?
 	ID   int
 }
 
-// URLInfo defines the URL information parsed from the request url, which is used to build redis cache key and memory cache filter condition
+// URLInfo defines the URL information parsed from the request url, which is used to build redis cache key and memory cache filter conditions
 // 定义从 request url 中解析出的 URL 信息，用于构建 redis 缓存 key 以及构建 memory 缓存过滤条件
 type URLInfo struct {
-	RawString        string
-	UserID           int
-	IncludedFields   []string
-	FilterConditions map[string]interface{} // TODO use type FilterConditions
+	RawString        string                  // url raw string
+	UserID           int                     // user_id from query string
+	IncludedFields   []string                // field from query string
+	FilterConditions common.FilterConditions // filter from query string
 }
 
-func NewURLInfo(u string, ifs []string, fcs map[string]interface{}, userID int) *URLInfo {
+func NewURLInfo(u string, ifs []string, fcs common.FilterConditions, userID int) *URLInfo {
 	return &URLInfo{
 		RawString:        u,
 		IncludedFields:   ifs,
