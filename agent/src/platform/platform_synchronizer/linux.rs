@@ -85,7 +85,7 @@ pub(super) struct ProcessArgs {
     pub(super) exception_handler: ExceptionHandler,
     pub(super) extra_netns_regex: Arc<Mutex<Option<Regex>>>,
     pub(super) override_os_hostname: Arc<Option<String>>,
-    pub(super) pid_netns_id_map: Arc<RwLock<HashMap<u32, u64>>>,
+    pub(super) pid_netns_id_map: Arc<RwLock<HashMap<u32, u32>>>,
 }
 
 #[derive(Default)]
@@ -125,7 +125,7 @@ pub struct PlatformSynchronizer {
     exception_handler: ExceptionHandler,
     extra_netns_regex: Arc<Mutex<Option<Regex>>>,
     override_os_hostname: Arc<Option<String>>,
-    pid_netns_id_map: Arc<RwLock<HashMap<u32, u64>>>,
+    pid_netns_id_map: Arc<RwLock<HashMap<u32, u32>>>,
 }
 
 impl PlatformSynchronizer {
@@ -137,7 +137,7 @@ impl PlatformSynchronizer {
         exception_handler: ExceptionHandler,
         extra_netns_regex: String,
         override_os_hostname: Option<String>,
-        pid_netns_id_map: HashMap<u32, u64>,
+        pid_netns_id_map: HashMap<u32, u32>,
     ) -> Self {
         let extra_netns_regex = if extra_netns_regex != "" {
             info!("platform monitoring extra netns: /{}/", extra_netns_regex);
@@ -805,7 +805,7 @@ impl PlatformSynchronizer {
         false
     }
 
-    pub fn get_netns_id_by_pid(&self, pid: u32) -> Option<u64> {
+    pub fn get_netns_id_by_pid(&self, pid: u32) -> Option<u32> {
         let r = self.pid_netns_id_map.read();
         r.get(&pid).and_then(|n| Some(*n))
     }
