@@ -29,7 +29,7 @@ Feature | Kernel version | Commit
 --------|----------------|-------
 Kernel helpers | 3.15 | [`bd4cf0ed331a`](https://github.com/torvalds/linux/commit/bd4cf0ed331a275e9bf5a49e6d0fd55dffc551b8)
 `bpf()` syscall | 3.18 | [`99c55f7d47c0`](https://github.com/torvalds/linux/commit/99c55f7d47c0dc6fc64729f37bf435abf43f4c60)
-Maps (_a.k.a._ Tables; details below) | 3.18 | [`99c55f7d47c0`](https://github.com/torvalds/linux/commit/99c55f7d47c0dc6fc64729f37bf435abf43f4c60)
+Maps | 3.18 | [`99c55f7d47c0`](https://github.com/torvalds/linux/commit/99c55f7d47c0dc6fc64729f37bf435abf43f4c60)
 BPF attached to `kprobes` | 4.1 | [`2541517c32be`](https://github.com/torvalds/linux/commit/2541517c32be2531e0da59dfd7efc1ce844644f5)
 Tail calls | 4.2 | [`04fd61ab36ec`](https://github.com/torvalds/linux/commit/04fd61ab36ec065e194ab5e74ae34a5240d992bb)
 Persistent maps and programs (virtual FS) | 4.4 | [`b2197755b263`](https://github.com/torvalds/linux/commit/b2197755b2633e164a439682fb05a9b5ea48f706)
@@ -41,7 +41,6 @@ Tracepoints to debug BPF | 4.11 (removed in 4.18) | [`a67edbf4fb6d`](https://git
 Testing / benchmarking BPF programs | 4.12 | [`1cf1cae963c2`](https://github.com/torvalds/linux/commit/1cf1cae963c2e6032aebe1637e995bc2f5d330f4)
 BPF programs and maps IDs | 4.13 | [`dc4bb0e23561`](https://github.com/torvalds/linux/commit/dc4bb0e2356149aee4cdae061936f3bbdd45595c)
 BPF Type Format (BTF) | 4.18 | [`69b693f0aefa`](https://github.com/torvalds/linux/commit/69b693f0aefa0ed521e8bd02260523b5ae446ad7)
-BPF 1M insn limit | 5.2 | [`c04c0d2b968a`](https://github.com/torvalds/linux/commit/c04c0d2b968ac45d6ef020316808ef6c82325a82)
 
 ### Program types
 
