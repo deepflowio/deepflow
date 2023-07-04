@@ -96,7 +96,8 @@ func (p *prometheusExecutor) promQueryExecute(ctx context.Context, args *model.P
 
 	// instant query will hint default query range:
 	// query.lookback-delta: https://github.com/prometheus/prometheus/blob/main/cmd/prometheus/main.go#L398
-	qry, err := engine.NewInstantQuery(&RemoteReadQuerierable{Args: args, Ctx: ctx, MatchMetricNameFunc: p.matchMetricName}, nil, args.Promql, queryTime)
+	queriable := &RemoteReadQuerierable{Args: args, Ctx: ctx, MatchMetricNameFunc: p.matchMetricName}
+	qry, err := engine.NewInstantQuery(queriable, nil, args.Promql, queryTime)
 	if qry == nil || err != nil {
 		log.Error(err)
 		return nil, err
@@ -106,10 +107,14 @@ func (p *prometheusExecutor) promQueryExecute(ctx context.Context, args *model.P
 		log.Error(res.Err)
 		return nil, res.Err
 	}
-	return &model.PromQueryResponse{
+	result = &model.PromQueryResponse{
 		Data:   &model.PromQueryData{ResultType: res.Value.Type(), Result: res.Value},
 		Status: _SUCCESS,
-	}, err
+	}
+	if args.Debug {
+		result.Stats = model.PromQueryStats{SQL: queriable.sql, QueryTime: queriable.query_time}
+	}
+	return result, err
 }
 
 func (p *prometheusExecutor) promQueryRangeExecute(ctx context.Context, args *model.PromQueryParams, engine *promql.Engine) (result *model.PromQueryResponse, err error) {
@@ -142,7 +147,8 @@ func (p *prometheusExecutor) promQueryRangeExecute(ctx context.Context, args *mo
 		defer span.End()
 	}
 
-	qry, err := engine.NewRangeQuery(&RemoteReadQuerierable{Args: args, Ctx: ctx, MatchMetricNameFunc: p.matchMetricName}, nil, args.Promql, start, end, step)
+	queriable := &RemoteReadQuerierable{Args: args, Ctx: ctx, MatchMetricNameFunc: p.matchMetricName}
+	qry, err := engine.NewRangeQuery(queriable, nil, args.Promql, start, end, step)
 	if qry == nil || err != nil {
 		log.Error(err)
 		return nil, err
@@ -152,15 +158,20 @@ func (p *prometheusExecutor) promQueryRangeExecute(ctx context.Context, args *mo
 		log.Error(res.Err)
 		return nil, res.Err
 	}
-	return &model.PromQueryResponse{
+	result = &model.PromQueryResponse{
 		Data:   &model.PromQueryData{ResultType: res.Value.Type(), Result: res.Value},
 		Status: _SUCCESS,
-	}, err
+	}
+	if args.Debug {
+		// if query with `debug` parmas, return sql & query time
+		result.Stats = model.PromQueryStats{SQL: queriable.sql, QueryTime: queriable.query_time}
+	}
+	return result, err
 }
 
 func (p *prometheusExecutor) promRemoteReadExecute(ctx context.Context, req *prompb.ReadRequest) (resp *prompb.ReadResponse, err error) {
 	// analysis for ReadRequest
-	result, err := promReaderExecute(ctx, req)
+	result, _, _, err := promReaderExecute(ctx, req, false)
 	return result, err
 }
 
