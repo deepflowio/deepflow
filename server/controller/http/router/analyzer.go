@@ -17,9 +17,9 @@
 package router
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/election"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 	"github.com/deepflowio/deepflow/server/controller/model"
@@ -29,11 +29,20 @@ import (
 	"github.com/gin-gonic/gin/binding"
 )
 
-func AnalyzerRouter(e *gin.Engine, m *monitor.AnalyzerCheck, cfg *config.ControllerConfig) {
+type Analyzer struct {
+	cfg *config.ControllerConfig
+	ac  *monitor.AnalyzerCheck
+}
+
+func NewAnalyzer(cfg *config.ControllerConfig, ac *monitor.AnalyzerCheck) *Analyzer {
+	return &Analyzer{cfg: cfg, ac: ac}
+}
+
+func (a *Analyzer) RegisterTo(e *gin.Engine) {
 	e.GET("/v1/analyzers/:lcuuid/", getAnalyzer)
 	e.GET("/v1/analyzers/", getAnalyzers)
-	e.PATCH("/v1/analyzers/:lcuuid/", updateAnalyzer(m, cfg))
-	e.DELETE("/v1/analyzers/:lcuuid/", deleteAnalyzer(m, cfg))
+	e.PATCH("/v1/analyzers/:lcuuid/", updateAnalyzer(a.ac, a.cfg))
+	e.DELETE("/v1/analyzers/:lcuuid/", deleteAnalyzer(a.ac, a.cfg))
 }
 
 func getAnalyzer(c *gin.Context) {
@@ -76,7 +85,7 @@ func updateAnalyzer(m *monitor.AnalyzerCheck, cfg *config.ControllerConfig) gin.
 		// 参数校验
 		err = c.ShouldBindBodyWith(&analyzerUpdate, binding.JSON)
 		if err != nil {
-			BadRequestResponse(c, common.INVALID_PARAMETERS, err.Error())
+			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
 			return
 		}
 

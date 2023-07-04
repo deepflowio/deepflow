@@ -19,12 +19,17 @@ package router
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/deepflowio/deepflow/server/controller/config"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 )
 
-func VTapInterface(e *gin.Engine, cfg *config.ControllerConfig) {
+type VTapInterface struct{}
+
+func NewVTapInterface() *VTapInterface {
+	return new(VTapInterface)
+}
+
+func (vti *VTapInterface) RegisterTo(e *gin.Engine) {
 	e.GET("/v1/vtap-interfaces/", getVTapInterfaces)
 }
 

@@ -17,7 +17,6 @@
 package common
 
 import (
-	"errors"
 	"time"
 )
 
@@ -34,27 +33,6 @@ const (
 const (
 	LOCALHOST                    = "127.0.0.1"
 	MASTER_CONTROLLER_CHECK_PORT = 4040
-)
-
-const (
-	SUCCESS                         = "SUCCESS"
-	FAIL                            = "FAIL"
-	CONFIG_PENDING                  = "CONFIG_PENDING"
-	INVALID_PARAMETERS              = "INVALID_PARAMETERS"
-	RESOURCE_NOT_FOUND              = "RESOURCE_NOT_FOUND"
-	RESOURCE_ALREADY_EXIST          = "RESOURCE_ALREADY_EXIST"
-	PARAMETER_ILLEGAL               = "PARAMETER_ILLEGAL"
-	INVALID_POST_DATA               = "INVALID_POST_DATA"
-	SERVER_ERROR                    = "SERVER_ERROR"
-	RESOURCE_NUM_EXCEEDED           = "RESOURCE_NUM_EXCEEDED"
-	SELECTED_RESOURCES_NUM_EXCEEDED = "SELECTED_RESOURCES_NUM_EXCEEDED"
-	SERVICE_UNAVAILABLE             = "SERVICE_UNAVAILABLE"
-	K8S_SET_VTAP_FAIL               = "K8S_SET_VTAP_FAIL"
-)
-
-var (
-	ErrorFail    = errors.New("FAIL")
-	ErrorPending = errors.New("PENDING")
 )
 
 const (

@@ -21,6 +21,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func ConfigurationRouter(e *gin.Engine) {
+type Configuration struct{}
+
+func NewConfiguration() *Configuration {
+	return new(Configuration)
+}
+
+func (c *Configuration) RegisterTo(e *gin.Engine) {
 	vTapGroupConfigRouter(e)
 }

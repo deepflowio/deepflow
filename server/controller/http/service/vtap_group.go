@@ -26,6 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
@@ -111,20 +112,20 @@ func CreateVtapGroup(vtapGroupCreate model.VtapGroupCreate, cfg *config.Controll
 
 	mysql.Db.Model(&mysql.VTapGroup{}).Where("name = ?", vtapGroupCreate.Name).Count(&vtapGroupCount)
 	if vtapGroupCount > 0 {
-		return model.VtapGroup{}, NewError(common.RESOURCE_ALREADY_EXIST, fmt.Sprintf("vtap_group (%s) already exist", vtapGroupCreate.Name))
+		return model.VtapGroup{}, NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("vtap_group (%s) already exist", vtapGroupCreate.Name))
 	}
 
 	mysql.Db.Model(&mysql.VTapGroup{}).Count(&vtapGroupCount)
 	if int(vtapGroupCount) > cfg.Spec.VTapGroupMax {
 		return model.VtapGroup{}, NewError(
-			common.RESOURCE_NUM_EXCEEDED,
+			httpcommon.RESOURCE_NUM_EXCEEDED,
 			fmt.Sprintf("vtap_group count exceeds (limit %d)", cfg.Spec.VTapGroupMax),
 		)
 	}
 
 	if len(vtapGroupCreate.VtapLcuuids) > cfg.Spec.VTapMaxPerGroup {
 		return model.VtapGroup{}, NewError(
-			common.SELECTED_RESOURCES_NUM_EXCEEDED,
+			httpcommon.SELECTED_RESOURCES_NUM_EXCEEDED,
 			fmt.Sprintf("vtap count exceeds (limit %d)", cfg.Spec.VTapMaxPerGroup),
 		)
 	}
@@ -133,7 +134,7 @@ func CreateVtapGroup(vtapGroupCreate model.VtapGroupCreate, cfg *config.Controll
 	groupID := vtapGroupCreate.GroupID
 	// verify vtap group id in deepflow-ctl command model
 	if err := verifyGroupID(groupID); err != nil {
-		return model.VtapGroup{}, NewError(common.INVALID_POST_DATA, err.Error())
+		return model.VtapGroup{}, NewError(httpcommon.INVALID_POST_DATA, err.Error())
 	}
 	if groupID != "" {
 		shortUUID = groupID
@@ -169,7 +170,7 @@ func verifyGroupID(groupID string) error {
 	}
 	if !IsVtapGroupShortUUID(groupID) {
 		return NewError(
-			common.INVALID_POST_DATA,
+			httpcommon.INVALID_POST_DATA,
 			fmt.Sprintf("id(%s) invalid, requires %s prefix, number and letter length %d, such as g-1yhIguXABC",
 				groupID, VTAP_GROUP_SHORT_UUID_PREFIX, common.SHORT_UUID_LENGTH),
 		)
@@ -178,7 +179,7 @@ func verifyGroupID(groupID string) error {
 	var vtapGroupCount int64
 	mysql.Db.Model(&mysql.VTapGroup{}).Where("short_uuid = ?", groupID).Count(&vtapGroupCount)
 	if vtapGroupCount > 0 {
-		return NewError(common.RESOURCE_ALREADY_EXIST, fmt.Sprintf("id(%s) already exist", groupID))
+		return NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("id(%s) already exist", groupID))
 	}
 	return nil
 }
@@ -188,7 +189,7 @@ func UpdateVtapGroup(lcuuid string, vtapGroupUpdate map[string]interface{}, cfg 
 	var dbUpdateMap = make(map[string]interface{})
 
 	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&vtapGroup); ret.Error != nil {
-		return model.VtapGroup{}, NewError(common.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap_group (%s) not found", lcuuid))
+		return model.VtapGroup{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap_group (%s) not found", lcuuid))
 	}
 
 	log.Infof("update vtap_group (%s) config %v", vtapGroup.Name, vtapGroupUpdate)
@@ -212,7 +213,7 @@ func UpdateVtapGroup(lcuuid string, vtapGroupUpdate map[string]interface{}, cfg 
 	if _, ok := vtapGroupUpdate["VTAP_LCUUIDS"]; ok {
 		if len(vtapGroupUpdate["VTAP_LCUUIDS"].([]interface{})) > cfg.Spec.VTapMaxPerGroup {
 			return model.VtapGroup{}, NewError(
-				common.SELECTED_RESOURCES_NUM_EXCEEDED,
+				httpcommon.SELECTED_RESOURCES_NUM_EXCEEDED,
 				fmt.Sprintf("vtap count exceeds (limit %d)", cfg.Spec.VTapMaxPerGroup),
 			)
 		}
@@ -242,7 +243,7 @@ func UpdateVtapGroup(lcuuid string, vtapGroupUpdate map[string]interface{}, cfg 
 
 		var defaultVtapGroup mysql.VTapGroup
 		if ret := mysql.Db.Where("id = ?", common.DEFAULT_VTAP_GROUP_ID).First(&defaultVtapGroup); ret.Error != nil {
-			return model.VtapGroup{}, NewError(common.RESOURCE_NOT_FOUND, "default vtap_group not found")
+			return model.VtapGroup{}, NewError(httpcommon.RESOURCE_NOT_FOUND, "default vtap_group not found")
 		}
 
 		for _, lcuuid := range delVtapLcuuids.ToSlice() {
@@ -270,12 +271,12 @@ func DeleteVtapGroup(lcuuid string) (resp map[string]string, err error) {
 	var vtapGroup mysql.VTapGroup
 
 	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&vtapGroup); ret.Error != nil {
-		return map[string]string{}, NewError(common.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap_group (%s) not found", lcuuid))
+		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap_group (%s) not found", lcuuid))
 	}
 
 	var defaultVtapGroup mysql.VTapGroup
 	if ret := mysql.Db.Where("id = ?", common.DEFAULT_VTAP_GROUP_ID).First(&defaultVtapGroup); ret.Error != nil {
-		return map[string]string{}, NewError(common.RESOURCE_NOT_FOUND, "default vtap_group not found")
+		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, "default vtap_group not found")
 	}
 
 	log.Infof("delete vtap_group (%s)", vtapGroup.Name)

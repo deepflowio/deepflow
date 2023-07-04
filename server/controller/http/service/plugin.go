@@ -22,6 +22,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"gorm.io/gorm"
@@ -31,7 +32,7 @@ func CreatePlugin(pluginCreate *mysql.Plugin) (*model.Plugin, error) {
 	var pluginFirst mysql.Plugin
 	if err := mysql.Db.Where("name = ?", pluginCreate.Name).First(&pluginFirst).Error; err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, NewError(common.SERVER_ERROR,
+			return nil, NewError(httpcommon.SERVER_ERROR,
 				fmt.Sprintf("fail to query plugin by name(%s), error: %s", pluginCreate.Name, err))
 		}
 
@@ -79,11 +80,11 @@ func GetPlugin(filter map[string]interface{}) ([]model.Plugin, error) {
 func DeletePlugin(name string) error {
 	var plugin model.Plugin
 	if err := mysql.Db.Where("name = ?", name).First(&plugin).Error; err != nil {
-		return NewError(common.RESOURCE_NOT_FOUND, fmt.Sprintf("plugin (name: %s) not found", name))
+		return NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("plugin (name: %s) not found", name))
 	}
 
 	if err := mysql.Db.Where("name = ?", name).Delete(&mysql.Plugin{}).Error; err != nil {
-		return NewError(common.SERVER_ERROR, fmt.Sprintf("delete plugin (name: %s) failed, err: %v", name, err))
+		return NewError(httpcommon.SERVER_ERROR, fmt.Sprintf("delete plugin (name: %s) failed, err: %v", name, err))
 	}
 	return nil
 }

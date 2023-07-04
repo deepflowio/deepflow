@@ -20,18 +20,26 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 
-	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
-func VtapGroupRouter(e *gin.Engine, cfg *config.ControllerConfig) {
+type VtapGroup struct {
+	cfg *config.ControllerConfig
+}
+
+func NewVtapGroup(cfg *config.ControllerConfig) *VtapGroup {
+	return &VtapGroup{cfg: cfg}
+}
+
+func (v *VtapGroup) RegisterTo(e *gin.Engine) {
 	e.GET("/v1/vtap-groups/:lcuuid/", getVtapGroup)
 	e.GET("/v1/vtap-groups/", getVtapGroups)
-	e.POST("/v1/vtap-groups/", createVtapGroup(cfg))
-	e.PATCH("/v1/vtap-groups/:lcuuid/", updateVtapGroup(cfg))
+	e.POST("/v1/vtap-groups/", createVtapGroup(v.cfg))
+	e.PATCH("/v1/vtap-groups/:lcuuid/", updateVtapGroup(v.cfg))
 	e.DELETE("/v1/vtap-groups/:lcuuid/", deleteVtapGroup)
 }
 
@@ -62,7 +70,7 @@ func createVtapGroup(cfg *config.ControllerConfig) gin.HandlerFunc {
 		// 参数校验
 		err = c.ShouldBindBodyWith(&vtapGroupCreate, binding.JSON)
 		if err != nil {
-			BadRequestResponse(c, common.INVALID_POST_DATA, err.Error())
+			BadRequestResponse(c, httpcommon.INVALID_POST_DATA, err.Error())
 			return
 		}
 
@@ -79,7 +87,7 @@ func updateVtapGroup(cfg *config.ControllerConfig) gin.HandlerFunc {
 		// 参数校验
 		err = c.ShouldBindBodyWith(&vtapGroupUpdate, binding.JSON)
 		if err != nil {
-			BadRequestResponse(c, common.INVALID_PARAMETERS, err.Error())
+			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
 			return
 		}
 

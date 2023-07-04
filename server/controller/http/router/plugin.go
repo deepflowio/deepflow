@@ -28,7 +28,13 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 )
 
-func PluginRouter(e *gin.Engine) {
+type Plugin struct{}
+
+func NewPlugin() *Plugin {
+	return new(Plugin)
+}
+
+func (p *Plugin) RegisterTo(e *gin.Engine) {
 	e.GET("/v1/plugin/", getPlugin)
 	e.POST("/v1/plugin/", createPlugin)
 	e.DELETE("/v1/plugin/:name/", deletePlugin)

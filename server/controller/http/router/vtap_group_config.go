@@ -27,7 +27,13 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
-func VTapGroupConfigRouter(e *gin.Engine) {
+type VTapGroupConfig struct{}
+
+func NewVTapGroupConfig() *VTapGroupConfig {
+	return new(VTapGroupConfig)
+}
+
+func (cgc *VTapGroupConfig) RegisterTo(e *gin.Engine) {
 	e.POST("/v1/vtap-group-configuration/", createVTapGroupConfig)
 	e.DELETE("/v1/vtap-group-configuration/:lcuuid/", deleteVTapGroupConfig)
 	e.PATCH("/v1/vtap-group-configuration/:lcuuid/", updateVTapGroupConfig)
