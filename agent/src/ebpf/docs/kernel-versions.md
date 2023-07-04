@@ -40,7 +40,6 @@ BPF program tag | 4.10 | [`7bd509e311f4`](https://github.com/torvalds/linux/comm
 Tracepoints to debug BPF | 4.11 (removed in 4.18) | [`a67edbf4fb6d`](https://github.com/torvalds/linux/commit/a67edbf4fb6deadcfe57a04a134abed4a5ba3bb5) [`4d220ed0f814`](https://github.com/torvalds/linux/commit/4d220ed0f8140c478ab7b0a14d96821da639b646)
 Testing / benchmarking BPF programs | 4.12 | [`1cf1cae963c2`](https://github.com/torvalds/linux/commit/1cf1cae963c2e6032aebe1637e995bc2f5d330f4)
 BPF programs and maps IDs | 4.13 | [`dc4bb0e23561`](https://github.com/torvalds/linux/commit/dc4bb0e2356149aee4cdae061936f3bbdd45595c)
-BPF Type Format (BTF) | 4.18 | [`69b693f0aefa`](https://github.com/torvalds/linux/commit/69b693f0aefa0ed521e8bd02260523b5ae446ad7)
 
 ### Program types
 
