@@ -21,20 +21,20 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/deepflowio/deepflow/server/controller/common"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	servicecommon "github.com/deepflowio/deepflow/server/controller/http/service/common"
 )
 
 func GetUserInfoFromHTTPHeader(header http.Header) (userType, userID int, err error) {
 	userTypes, _ := header[HEADER_KEY_X_USER_TYPE]
 	if len(userTypes) == 0 {
-		err = servicecommon.NewError(common.INVALID_PARAMETERS, fmt.Sprintf("No %s in request header", HEADER_KEY_X_USER_TYPE))
+		err = servicecommon.NewError(httpcommon.INVALID_PARAMETERS, fmt.Sprintf("No %s in request header", HEADER_KEY_X_USER_TYPE))
 	} else {
 		userType, err = strconv.Atoi(userTypes[0])
 	}
 	userIDs, _ := header[HEADER_KEY_X_USER_ID]
 	if len(userIDs) == 0 {
-		err = servicecommon.NewError(common.INVALID_PARAMETERS, fmt.Sprintf("No %s in request header", HEADER_KEY_X_USER_ID))
+		err = servicecommon.NewError(httpcommon.INVALID_PARAMETERS, fmt.Sprintf("No %s in request header", HEADER_KEY_X_USER_ID))
 	} else {
 		userID, err = strconv.Atoi(userIDs[0])
 	}

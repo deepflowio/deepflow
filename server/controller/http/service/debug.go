@@ -21,8 +21,8 @@ import (
 
 	kubernetes_gather_model "github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/manager"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
@@ -47,7 +47,7 @@ func GetCloudResource(lcuuid string, m *manager.Manager) (resp cloudmodel.Resour
 	if c, err := m.GetCloudResource(lcuuid); err == nil {
 		return c, nil
 	} else {
-		return cloudmodel.Resource{}, NewError(common.RESOURCE_NOT_FOUND, fmt.Sprintf("domain (%s) not found", lcuuid))
+		return cloudmodel.Resource{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("domain (%s) not found", lcuuid))
 	}
 }
 
@@ -65,7 +65,7 @@ func GetRecorderDomainCache(domainLcuuid, subDomainLcuuid string, m *manager.Man
 	if recorder, err := m.GetRecorder(domainLcuuid); err == nil {
 		return recorder.GetCache(domainLcuuid, subDomainLcuuid), nil
 	} else {
-		return cache.Cache{}, NewError(common.RESOURCE_NOT_FOUND, err.Error())
+		return cache.Cache{}, NewError(httpcommon.RESOURCE_NOT_FOUND, err.Error())
 	}
 }
 
@@ -73,7 +73,7 @@ func GetRecorderCacheDiffBaseDataSet(domainLcuuid, subDomainLcuuid string, m *ma
 	if recorder, err := m.GetRecorder(domainLcuuid); err == nil {
 		return recorder.GetCache(domainLcuuid, subDomainLcuuid).DiffBaseDataSet, nil
 	} else {
-		return cache.DiffBaseDataSet{}, NewError(common.RESOURCE_NOT_FOUND, err.Error())
+		return cache.DiffBaseDataSet{}, NewError(httpcommon.RESOURCE_NOT_FOUND, err.Error())
 	}
 }
 
@@ -81,7 +81,7 @@ func GetRecorderCacheToolDataSet(domainLcuuid, subDomainLcuuid string, m *manage
 	if recorder, err := m.GetRecorder(domainLcuuid); err == nil {
 		return recorder.GetCache(domainLcuuid, subDomainLcuuid).ToolDataSet, nil
 	} else {
-		return cache.ToolDataSet{}, NewError(common.RESOURCE_NOT_FOUND, err.Error())
+		return cache.ToolDataSet{}, NewError(httpcommon.RESOURCE_NOT_FOUND, err.Error())
 	}
 }
 
@@ -89,11 +89,11 @@ func GetRecorderDiffBaseDataSetByResourceType(domainLcuuid, subDomainLcuuid, res
 	if recorder, err := m.GetRecorder(domainLcuuid); err == nil {
 		resp = recorder.GetCacheDiffBaseDataSet(domainLcuuid, subDomainLcuuid, resourceType)
 		if resp == nil {
-			return nil, NewError(common.RESOURCE_NOT_FOUND, fmt.Sprintf("recorder cache diff base data set of %s not found", resourceType))
+			return nil, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("recorder cache diff base data set of %s not found", resourceType))
 		}
 		return resp, nil
 	} else {
-		return map[string]interface{}{}, NewError(common.RESOURCE_NOT_FOUND, err.Error())
+		return map[string]interface{}{}, NewError(httpcommon.RESOURCE_NOT_FOUND, err.Error())
 	}
 }
 
@@ -101,11 +101,11 @@ func GetRecorderDiffBaseByResourceLcuuid(domainLcuuid, subDomainLcuuid, resource
 	if recorder, err := m.GetRecorder(domainLcuuid); err == nil {
 		resp = recorder.GetCacheDiffBase(domainLcuuid, subDomainLcuuid, resourceType, resourceLcuuid)
 		if resp == nil {
-			return nil, NewError(common.RESOURCE_NOT_FOUND, fmt.Sprintf("recorder cache diff base of %s %s not found", resourceType, resourceLcuuid))
+			return nil, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("recorder cache diff base of %s %s not found", resourceType, resourceLcuuid))
 		}
 		return resp, nil
 	} else {
-		return map[string]interface{}{}, NewError(common.RESOURCE_NOT_FOUND, err.Error())
+		return map[string]interface{}{}, NewError(httpcommon.RESOURCE_NOT_FOUND, err.Error())
 	}
 }
 
@@ -113,11 +113,11 @@ func GetRecorderToolMapByField(domainLcuuid, subDomainLcuuid, field string, m *m
 	if recorder, err := m.GetRecorder(domainLcuuid); err == nil {
 		resp = recorder.GetToolMap(domainLcuuid, subDomainLcuuid, field)
 		if resp == nil {
-			return nil, NewError(common.RESOURCE_NOT_FOUND, fmt.Sprintf("recorder tool map %s not found", field))
+			return nil, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("recorder tool map %s not found", field))
 		}
 		return resp, nil
 	} else {
-		return map[interface{}]interface{}{}, NewError(common.RESOURCE_NOT_FOUND, err.Error())
+		return map[interface{}]interface{}{}, NewError(httpcommon.RESOURCE_NOT_FOUND, err.Error())
 	}
 }
 

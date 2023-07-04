@@ -29,6 +29,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/monitor/license"
@@ -193,14 +194,14 @@ func CreateVtap(vtapCreate model.VtapCreate) (model.Vtap, error) {
 
 	if ret := mysql.Db.Where("ctrl_ip = ?", vtapCreate.CtrlIP).First(&vtap); ret.Error == nil {
 		return model.Vtap{}, NewError(
-			common.RESOURCE_ALREADY_EXIST,
+			httpcommon.RESOURCE_ALREADY_EXIST,
 			fmt.Sprintf("vtap (ctrl_ip: %s) already exist", vtapCreate.CtrlIP),
 		)
 	}
 
 	if ret := mysql.Db.Where("name = ?", vtapCreate.Name).First(&vtap); ret.Error == nil {
 		return model.Vtap{}, NewError(
-			common.RESOURCE_ALREADY_EXIST,
+			httpcommon.RESOURCE_ALREADY_EXIST,
 			fmt.Sprintf("vtap (%s) already exist", vtapCreate.Name),
 		)
 	}
@@ -240,14 +241,14 @@ func UpdateVtap(lcuuid, name string, vtapUpdate map[string]interface{}) (resp mo
 
 	if lcuuid != "" {
 		if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&vtap); ret.Error != nil {
-			return model.Vtap{}, NewError(common.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap (%s) not found", lcuuid))
+			return model.Vtap{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap (%s) not found", lcuuid))
 		}
 	} else if name != "" {
 		if ret := mysql.Db.Where("name = ?", name).First(&vtap); ret.Error != nil {
-			return model.Vtap{}, NewError(common.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap (%s) not found", name))
+			return model.Vtap{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap (%s) not found", name))
 		}
 	} else {
-		return model.Vtap{}, NewError(common.INVALID_PARAMETERS, "must specify name or lcuuid")
+		return model.Vtap{}, NewError(httpcommon.INVALID_PARAMETERS, "must specify name or lcuuid")
 	}
 
 	log.Infof("update vtap (%s) config %v", vtap.Name, vtapUpdate)
@@ -303,7 +304,7 @@ func BatchUpdateVtap(updateMap []map[string]interface{}) (resp map[string][]stri
 	}
 
 	if description != "" {
-		return response, NewError(common.SERVER_ERROR, description)
+		return response, NewError(httpcommon.SERVER_ERROR, description)
 	} else {
 		return response, nil
 	}
@@ -316,10 +317,10 @@ func checkLicenseType(vtap mysql.VTap, licenseType int) (err error) {
 		sort.Ints(supportedLicenseTypes)
 		index := sort.SearchInts(supportedLicenseTypes, licenseType)
 		if index >= len(supportedLicenseTypes) || supportedLicenseTypes[index] != licenseType {
-			return NewError(common.INVALID_POST_DATA, fmt.Sprintf(VTAP_LICENSE_CHECK_EXCEPTION, vtap.Name))
+			return NewError(httpcommon.INVALID_POST_DATA, fmt.Sprintf(VTAP_LICENSE_CHECK_EXCEPTION, vtap.Name))
 		}
 	} else {
-		return NewError(common.INVALID_POST_DATA, fmt.Sprintf(VTAP_LICENSE_CHECK_EXCEPTION, vtap.Name))
+		return NewError(httpcommon.INVALID_POST_DATA, fmt.Sprintf(VTAP_LICENSE_CHECK_EXCEPTION, vtap.Name))
 	}
 	return nil
 }
@@ -329,7 +330,7 @@ func UpdateVtapLicenseType(lcuuid string, vtapUpdate map[string]interface{}) (re
 	var dbUpdateMap = make(map[string]interface{})
 
 	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&vtap); ret.Error != nil {
-		return model.Vtap{}, NewError(common.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap (%s) not found", lcuuid))
+		return model.Vtap{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap (%s) not found", lcuuid))
 	}
 
 	log.Infof("update vtap (%s) license %v", vtap.Name, vtapUpdate)
@@ -372,7 +373,7 @@ func BatchUpdateVtapLicenseType(updateMap []map[string]interface{}) (resp map[st
 			var dbUpdateMap = make(map[string]interface{})
 
 			if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&vtap); ret.Error != nil {
-				_err = NewError(common.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap (%s) not found", lcuuid))
+				_err = NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap (%s) not found", lcuuid))
 			} else {
 				// 检查是否可以修改
 				licenseType := int(vtapUpdate["LICENSE_TYPE"].(float64))
@@ -409,7 +410,7 @@ func BatchUpdateVtapLicenseType(updateMap []map[string]interface{}) (resp map[st
 	}
 
 	if description != "" {
-		return response, NewError(common.SERVER_ERROR, description)
+		return response, NewError(httpcommon.SERVER_ERROR, description)
 	} else {
 		return response, nil
 	}
@@ -419,7 +420,7 @@ func DeleteVtap(lcuuid string) (resp map[string]string, err error) {
 	var vtap mysql.VTap
 
 	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&vtap); ret.Error != nil {
-		return map[string]string{}, NewError(common.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap (%s) not found", lcuuid))
+		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap (%s) not found", lcuuid))
 	}
 
 	log.Infof("delete vtap (%s)", vtap.Name)
@@ -451,7 +452,7 @@ func BatchDeleteVtap(deleteMap []map[string]string) (resp map[string][]string, e
 	}
 
 	if description != "" {
-		return response, NewError(common.SERVER_ERROR, description)
+		return response, NewError(httpcommon.SERVER_ERROR, description)
 	} else {
 		return response, nil
 	}
@@ -592,7 +593,7 @@ func vtapControllerRebalance(azs []mysql.AZ, ifCheck bool) (*model.VTapRebalance
 	}
 	if normalControllerNum == 0 {
 		errMsg := "No available controllers，Global equalization is not possible"
-		return nil, NewError(common.SERVER_ERROR, errMsg)
+		return nil, NewError(httpcommon.SERVER_ERROR, errMsg)
 	}
 
 	// 获取各可用区中的控制列表
@@ -689,7 +690,7 @@ func vtapAnalyzerRebalance(azs []mysql.AZ, ifCheck bool) (*model.VTapRebalanceRe
 	}
 	if normalAnalyzerNum == 0 {
 		errMsg := "No available analyzers，Global equalization is not possible"
-		return nil, NewError(common.SERVER_ERROR, errMsg)
+		return nil, NewError(httpcommon.SERVER_ERROR, errMsg)
 	}
 
 	azToAnalyzers := make(map[string][]*mysql.Analyzer)
@@ -878,7 +879,7 @@ func BatchUpdateVtapTapMode(vtapUpdate *model.VtapUpdateTapMode) (interface{}, e
 	close(responseChannel)
 	wgResponse.Wait()
 	if len(errorMessage) > 0 {
-		return nil, NewError(common.SERVER_ERROR, strings.Join(errorMessage, ";"))
+		return nil, NewError(httpcommon.SERVER_ERROR, strings.Join(errorMessage, ";"))
 	}
 
 	return nil, nil

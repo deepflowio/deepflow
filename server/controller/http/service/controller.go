@@ -25,6 +25,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/monitor"
@@ -217,7 +218,7 @@ func UpdateController(
 	var dbUpdateMap = make(map[string]interface{})
 
 	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&controller); ret.Error != nil {
-		return nil, NewError(common.RESOURCE_NOT_FOUND, fmt.Sprintf("controller (%s) not found", lcuuid))
+		return nil, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("controller (%s) not found", lcuuid))
 	}
 
 	log.Infof("update controller (%s) config %v", controller.Name, controllerUpdate)
@@ -265,7 +266,7 @@ func UpdateController(
 		azs := controllerUpdate["AZS"].([]interface{})
 		if len(azs) > cfg.Spec.AZMaxPerServer {
 			return nil, NewError(
-				common.INVALID_POST_DATA,
+				httpcommon.INVALID_POST_DATA,
 				fmt.Sprintf(
 					"max az num associated controller is (%d)", cfg.Spec.AZMaxPerServer,
 				),
@@ -454,14 +455,14 @@ func DeleteController(lcuuid string, m *monitor.ControllerCheck) (resp map[strin
 	var vtapCount int64
 
 	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&controller); ret.Error != nil {
-		return map[string]string{}, NewError(common.RESOURCE_NOT_FOUND, fmt.Sprintf("controller (%s) not found", lcuuid))
+		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("controller (%s) not found", lcuuid))
 	}
 
 	log.Infof("delete controller (%s)", controller.Name)
 
 	mysql.Db.Where("controller_ip = ?", controller.IP).Count(&vtapCount)
 	if vtapCount > 0 {
-		return map[string]string{}, NewError(common.INVALID_POST_DATA, fmt.Sprintf("controller (%s) is being used by vtap", lcuuid))
+		return map[string]string{}, NewError(httpcommon.INVALID_POST_DATA, fmt.Sprintf("controller (%s) is being used by vtap", lcuuid))
 	}
 
 	mysql.Db.Delete(mysql.AZControllerConnection{}, "controller_ip = ?", controller.IP)

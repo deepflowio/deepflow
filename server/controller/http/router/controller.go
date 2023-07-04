@@ -20,20 +20,29 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 
-	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/election"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/monitor"
 )
 
-func ControllerRouter(e *gin.Engine, m *monitor.ControllerCheck, cfg *config.ControllerConfig) {
+type Controller struct {
+	cfg *config.ControllerConfig
+	cc  *monitor.ControllerCheck
+}
+
+func NewController(cfg *config.ControllerConfig, cc *monitor.ControllerCheck) *Controller {
+	return &Controller{cfg: cfg, cc: cc}
+}
+
+func (c *Controller) RegisterTo(e *gin.Engine) {
 	e.GET("/v1/controllers/:lcuuid/", getController)
 	e.GET("/v1/controllers/", getControllers)
-	e.PATCH("/v1/controllers/:lcuuid/", updateController(m, cfg))
-	e.DELETE("/v1/controllers/:lcuuid/", deleteController(m, cfg))
+	e.PATCH("/v1/controllers/:lcuuid/", updateController(c.cc, c.cfg))
+	e.DELETE("/v1/controllers/:lcuuid/", deleteController(c.cc, c.cfg))
 }
 
 func getController(c *gin.Context) {
@@ -85,7 +94,7 @@ func updateController(m *monitor.ControllerCheck, cfg *config.ControllerConfig) 
 		// 参数校验
 		err = c.ShouldBindBodyWith(&controllerUpdate, binding.JSON)
 		if err != nil {
-			BadRequestResponse(c, common.INVALID_PARAMETERS, err.Error())
+			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
 			return
 		}
 

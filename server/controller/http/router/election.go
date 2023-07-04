@@ -22,7 +22,13 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 )
 
-func ElectionRouter(e *gin.Engine) {
+type Election struct{}
+
+func NewElection() *Election {
+	return new(Election)
+}
+
+func (el *Election) RegisterTo(e *gin.Engine) {
 	e.GET("/v1/election-leader/", getLeaderInfo)
 }
 

@@ -24,8 +24,16 @@ import (
 	. "github.com/deepflowio/deepflow/server/controller/http/service/resource"
 )
 
-func ProcessRouter(e *gin.Engine, redisConfig *redis.RedisConfig) {
-	e.GET("/v1/processes/", getProcesses(redisConfig))
+type Process struct {
+	redisConfig redis.RedisConfig
+}
+
+func NewProcess(redisConfig redis.RedisConfig) *Process {
+	return &Process{redisConfig: redisConfig}
+}
+
+func (p *Process) RegisterTo(e *gin.Engine) {
+	e.GET("/v1/processes/", getProcesses(&p.redisConfig))
 }
 
 func getProcesses(redisConfig *redis.RedisConfig) gin.HandlerFunc {

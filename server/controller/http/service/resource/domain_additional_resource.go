@@ -31,6 +31,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	controllercommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	servicecommon "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
@@ -96,7 +97,7 @@ func fullUpdateDB(dbItems []mysql.DomainAdditionalResource) error {
 	})
 	if err != nil {
 		return servicecommon.NewError(
-			common.SERVER_ERROR,
+			httpcommon.SERVER_ERROR,
 			fmt.Sprintf("apply domain additional resources error: %s", err.Error()),
 		)
 	}
@@ -111,7 +112,7 @@ func generateDataToInsertDB(domainUUIDToCloudModelData map[string]*cloudmodel.Ad
 		content, err := json.Marshal(cloudMD)
 		if err != nil {
 			return nil, servicecommon.NewError(
-				common.SERVER_ERROR,
+				httpcommon.SERVER_ERROR,
 				fmt.Sprintf("json marshal domain (uuid: %s) cloud data (detail: %#v) failed: %s", domainUUID, cloudMD, err.Error()),
 			)
 		}
@@ -149,7 +150,7 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 		toolDS, ok := domainUUIDToToolDataSet[az.DomainUUID]
 		if !ok {
 			return nil, servicecommon.NewError(
-				common.RESOURCE_NOT_FOUND,
+				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("az (name: %s) domain (uuid: %s) not found", az.Name, az.DomainUUID),
 			)
 		}
@@ -168,7 +169,7 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 		toolDS, ok := domainUUIDToToolDataSet[vpc.DomainUUID]
 		if !ok {
 			return nil, servicecommon.NewError(
-				common.RESOURCE_NOT_FOUND,
+				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("vpc (name: %s) domain (uuid: %s) not found", vpc.Name, vpc.DomainUUID),
 			)
 		}
@@ -190,19 +191,19 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 		toolDS, ok := domainUUIDToToolDataSet[subnet.DomainUUID]
 		if !ok {
 			return nil, servicecommon.NewError(
-				common.RESOURCE_NOT_FOUND,
+				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("subnet (name: %s) domain (uuid: %s) not found", subnet.Name, subnet.DomainUUID),
 			)
 		}
 		if subnet.AZUUID != "" && !common.Contains(toolDS.azUUIDs, subnet.AZUUID) {
 			return nil, servicecommon.NewError(
-				common.RESOURCE_NOT_FOUND,
+				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("subnet (name: %s) az (uuid: %s) not found", subnet.Name, subnet.AZUUID),
 			)
 		}
 		if !common.Contains(toolDS.vpcUUIDs, subnet.VPCUUID) {
 			return nil, servicecommon.NewError(
-				common.RESOURCE_NOT_FOUND,
+				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("subnet (name: %s) vpc (uuid: %s) not found", subnet.Name, subnet.VPCUUID),
 			)
 		}
@@ -218,7 +219,7 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 			cidr := formatCIDR(cidr)
 			if cidr == "" {
 				return nil, servicecommon.NewError(
-					common.INVALID_PARAMETERS,
+					httpcommon.INVALID_PARAMETERS,
 					fmt.Sprintf("subnet (name: %s) cidr: %s is invalid", subnet.Name, cidr),
 				)
 			}
@@ -237,13 +238,13 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 		toolDS, ok := domainUUIDToToolDataSet[host.DomainUUID]
 		if !ok {
 			return nil, servicecommon.NewError(
-				common.RESOURCE_NOT_FOUND,
+				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("host (name: %s) domain (uuid: %s) not found", host.Name, host.DomainUUID),
 			)
 		}
 		if !common.Contains(toolDS.azUUIDs, host.AZUUID) {
 			return nil, servicecommon.NewError(
-				common.RESOURCE_NOT_FOUND,
+				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("host (name: %s) az (uuid: %s) not found", host.Name, host.AZUUID),
 			)
 		}
@@ -253,7 +254,7 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 			if vif.SubnetUUID == "" {
 				if len(vif.IPs) != 0 {
 					return nil, servicecommon.NewError(
-						common.RESOURCE_NOT_FOUND,
+						httpcommon.RESOURCE_NOT_FOUND,
 						fmt.Sprintf("host (name: %s) vinterface (mac: %s) subnet (uuid: %s) not found", host.Name, vif.Mac, vif.SubnetUUID),
 					)
 				}
@@ -261,7 +262,7 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 			}
 			if _, ok := toolDS.subnetUUIDToType[vif.SubnetUUID]; !ok {
 				return nil, servicecommon.NewError(
-					common.RESOURCE_NOT_FOUND,
+					httpcommon.RESOURCE_NOT_FOUND,
 					fmt.Sprintf("host (name: %s) vinterface (mac: %s) subnet (uuid: %s) not found", host.Name, vif.Mac, vif.SubnetUUID),
 				)
 			}
@@ -269,7 +270,7 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 				ip := formatIP(ip)
 				if ip == "" {
 					return nil, servicecommon.NewError(
-						common.INVALID_PARAMETERS,
+						httpcommon.INVALID_PARAMETERS,
 						fmt.Sprintf("host (name: %s) vinterface (mac: %s) ip: %s is invalid", host.Name, vif.Mac, ip),
 					)
 				}
@@ -281,25 +282,25 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 		toolDS, ok := domainUUIDToToolDataSet[chost.DomainUUID]
 		if !ok {
 			return nil, servicecommon.NewError(
-				common.RESOURCE_NOT_FOUND,
+				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("chost (name: %s) domain (uuid: %s) not found", chost.Name, chost.DomainUUID),
 			)
 		}
 		if !common.Contains(toolDS.azUUIDs, chost.AZUUID) {
 			return nil, servicecommon.NewError(
-				common.RESOURCE_NOT_FOUND,
+				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("chost (name: %s) az (uuid: %s) not found", chost.Name, chost.AZUUID),
 			)
 		}
 		if !common.Contains(toolDS.vpcUUIDs, chost.VPCUUID) {
 			return nil, servicecommon.NewError(
-				common.RESOURCE_NOT_FOUND,
+				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("chost (name: %s) vpc (uuid: %s) not found", chost.Name, chost.VPCUUID),
 			)
 		}
 		if _, ok := toolDS.hostIPToUUID[chost.HostIP]; !ok && chost.HostIP != "" {
 			return nil, servicecommon.NewError(
-				common.RESOURCE_NOT_FOUND,
+				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("chost (name: %s) host (ip: %s) not found", chost.Name, chost.HostIP),
 			)
 		}
@@ -307,7 +308,7 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 		for _, vif := range chost.VInterfaces {
 			if _, ok := toolDS.subnetUUIDToType[vif.SubnetUUID]; !ok {
 				return nil, servicecommon.NewError(
-					common.RESOURCE_NOT_FOUND,
+					httpcommon.RESOURCE_NOT_FOUND,
 					fmt.Sprintf("chost (name: %s) vinterface (mac: %s) subnet (uuid: %s) not found", chost.Name, vif.Mac, vif.SubnetUUID),
 				)
 			}
@@ -318,26 +319,26 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 		toolDS, ok := domainUUIDToToolDataSet[lb.DomainUUID]
 		if !ok {
 			return nil, servicecommon.NewError(
-				common.RESOURCE_NOT_FOUND,
+				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("lb (name: %s) domain (uuid: %s) not found", lb.Name, lb.DomainUUID),
 			)
 		}
 		if toolDS.regionUUID != lb.RegionUUID {
 			return nil, servicecommon.NewError(
-				common.RESOURCE_NOT_FOUND,
+				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("lb (name: %s) domain (uuid: %s) region(: %s) not found", lb.Name, lb.DomainUUID, lb.RegionUUID),
 			)
 		}
 		if !common.Contains(toolDS.vpcUUIDs, lb.VPCUUID) {
 			return nil, servicecommon.NewError(
-				common.RESOURCE_NOT_FOUND,
+				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("chost (name: %s) vpc (uuid: %s) not found", lb.Name, lb.VPCUUID),
 			)
 		}
 		for _, vif := range lb.VInterfaces {
 			if _, ok := toolDS.subnetUUIDToType[vif.SubnetUUID]; !ok {
 				return nil, servicecommon.NewError(
-					common.RESOURCE_NOT_FOUND,
+					httpcommon.RESOURCE_NOT_FOUND,
 					fmt.Sprintf("lb (name: %s) vinterface (mac: %s) subnet (uuid: %s) not found", lb.Name, vif.Mac, vif.SubnetUUID),
 				)
 			}
@@ -363,7 +364,7 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 		toolDS, ok := domainUUIDToToolDataSet[cloudTag.DomainUUID]
 		if !ok {
 			return nil, servicecommon.NewError(
-				common.RESOURCE_NOT_FOUND,
+				httpcommon.RESOURCE_NOT_FOUND,
 				fmt.Sprintf("cloud tag (resource name: %s) domain (uuid: %s) not found", cloudTag.ResourceName, cloudTag.DomainUUID),
 			)
 		}
@@ -372,20 +373,20 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 		if cloudTag.SubDomainUUID != "" {
 			if cloudTag.ResourceType != CLOUD_TAGS_RESOURCE_TYPE_POD_NS {
 				return nil, servicecommon.NewError(
-					common.INVALID_POST_DATA,
+					httpcommon.INVALID_POST_DATA,
 					fmt.Sprintf("cloud tag (resource type: %s) subdomain (uuid: %s) not support", cloudTag.ResourceType, cloudTag.SubDomainUUID),
 				)
 			}
 			podNSNameToInfo, ok := subdomainUUIDToPodNSNameToInfo[cloudTag.SubDomainUUID]
 			if !ok {
 				return nil, servicecommon.NewError(
-					common.RESOURCE_NOT_FOUND,
+					httpcommon.RESOURCE_NOT_FOUND,
 					fmt.Sprintf("cloud tag subdomain (uuid: %s) not found", cloudTag.SubDomainUUID))
 			}
 			podNS, ok := podNSNameToInfo[cloudTag.ResourceName]
 			if !ok {
 				return nil, servicecommon.NewError(
-					common.INVALID_POST_DATA,
+					httpcommon.INVALID_POST_DATA,
 					fmt.Sprintf("cloud tag (resource name: %s) subdomain (uuid: %s) not found", cloudTag.ResourceName, cloudTag.DomainUUID))
 			}
 			podNS.CloudTags, err = convertTagsToString(cloudTag.Tags)
@@ -401,14 +402,14 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 			chostNameToInfo, ok := domainUUIDToCHostNameToInfo[cloudTag.DomainUUID]
 			if !ok {
 				return nil, servicecommon.NewError(
-					common.RESOURCE_NOT_FOUND,
+					httpcommon.RESOURCE_NOT_FOUND,
 					fmt.Sprintf("cloud tag (resource name: %s) domain (uuid: %s) not found", cloudTag.ResourceName, cloudTag.DomainUUID),
 				)
 			}
 			chost, ok := chostNameToInfo[cloudTag.ResourceName]
 			if !ok {
 				return nil, servicecommon.NewError(
-					common.INVALID_POST_DATA,
+					httpcommon.INVALID_POST_DATA,
 					fmt.Sprintf("cloud tag (resource name: %s) domain (uuid: %s) not found", cloudTag.ResourceName, cloudTag.DomainUUID))
 			}
 			chost.CloudTags, err = convertTagsToString(cloudTag.Tags)
@@ -420,13 +421,13 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 			podNSNameToInfo, ok := domainUUIDToPodNSNameToInfo[cloudTag.DomainUUID]
 			if !ok {
 				return nil, servicecommon.NewError(
-					common.RESOURCE_NOT_FOUND,
+					httpcommon.RESOURCE_NOT_FOUND,
 					fmt.Sprintf("cloud tag (resource name: %s) domain (uuid: %s) not found", cloudTag.ResourceName, cloudTag.DomainUUID))
 			}
 			podNS, ok := podNSNameToInfo[cloudTag.ResourceName]
 			if !ok {
 				return nil, servicecommon.NewError(
-					common.INVALID_POST_DATA,
+					httpcommon.INVALID_POST_DATA,
 					fmt.Sprintf("cloud tag (resource name: %s) domain (uuid: %s) not found", cloudTag.ResourceName, cloudTag.DomainUUID))
 			}
 			podNS.CloudTags, err = convertTagsToString(cloudTag.Tags)
@@ -436,7 +437,7 @@ func generateToolDataSet(additionalRsc model.AdditionalResource) (map[string]*ad
 			toolDS.cloudTagPodNamespaces = append(toolDS.cloudTagPodNamespaces, podNS)
 		} else {
 			return nil, servicecommon.NewError(
-				common.INVALID_POST_DATA,
+				httpcommon.INVALID_POST_DATA,
 				fmt.Sprintf("cloud tag (resource type: %s) not support", cloudTag.ResourceType),
 			)
 		}
@@ -562,7 +563,7 @@ func generateCloudModelData(domainUUIDToToolDataSet map[string]*addtionalResourc
 					}
 					if subnetCIDRUUID == "" {
 						return nil, servicecommon.NewError(
-							common.RESOURCE_NOT_FOUND,
+							httpcommon.RESOURCE_NOT_FOUND,
 							fmt.Sprintf("host (name: %s) vinterface (mac: %s) ip: %s is not in any cidr", host.Name, vif.Mac, ip),
 						)
 					}
@@ -621,7 +622,7 @@ func generateCloudModelData(domainUUIDToToolDataSet map[string]*addtionalResourc
 					}
 					if subnetCIDRUUID == "" {
 						return nil, servicecommon.NewError(
-							common.RESOURCE_NOT_FOUND,
+							httpcommon.RESOURCE_NOT_FOUND,
 							fmt.Sprintf("chost (name: %s) vinterface (mac: %s) ip: %s is not in any cidr", chost.Name, vif.Mac, ip),
 						)
 					}
@@ -698,7 +699,7 @@ func generateCloudModelData(domainUUIDToToolDataSet map[string]*addtionalResourc
 					}
 					if subnetCIDRUUID == "" {
 						return nil, servicecommon.NewError(
-							common.RESOURCE_NOT_FOUND,
+							httpcommon.RESOURCE_NOT_FOUND,
 							fmt.Sprintf("lb (name: %s) vinterface (mac: %s) ip: %s is not in any cidr", lb.Name, vif.Mac, ip),
 						)
 					}
@@ -768,7 +769,7 @@ func getRegionDataFromDB(domainUUIDs []string) (map[string]string, error) {
 	err := mysql.Db.Where("lcuuid IN (?)", domainUUIDs).Find(&dbItems).Error
 	if err != nil {
 		return nil, servicecommon.NewError(
-			common.SERVER_ERROR,
+			httpcommon.SERVER_ERROR,
 			fmt.Sprintf("db query domain failed: %s", err.Error()),
 		)
 	}
@@ -778,7 +779,7 @@ func getRegionDataFromDB(domainUUIDs []string) (map[string]string, error) {
 		err := json.Unmarshal([]byte(domain.Config), &conf)
 		if err != nil {
 			return nil, servicecommon.NewError(
-				common.SERVER_ERROR,
+				httpcommon.SERVER_ERROR,
 				fmt.Sprintf("get domain (uuid: %s) region info failed: %s", domain.Lcuuid, err.Error()),
 			)
 		}
@@ -792,7 +793,7 @@ func getAZDataFromDB(domainUUIDs []string) (map[string][]string, error) {
 	err := mysql.Db.Where("domain IN (?)", domainUUIDs).Find(&azs).Error
 	if err != nil {
 		return nil, servicecommon.NewError(
-			common.SERVER_ERROR,
+			httpcommon.SERVER_ERROR,
 			fmt.Sprintf("db query az failed: %s", err.Error()),
 		)
 	}
@@ -808,7 +809,7 @@ func getVPCDataFromDB(domainUUIDs []string) (map[string][]string, error) {
 	err := mysql.Db.Where("domain IN (?)", domainUUIDs).Find(&vpcs).Error
 	if err != nil {
 		return nil, servicecommon.NewError(
-			common.SERVER_ERROR,
+			httpcommon.SERVER_ERROR,
 			fmt.Sprintf("db query vpc failed: %s", err.Error()),
 		)
 	}
@@ -824,7 +825,7 @@ func getSubnetDataFromDB(domainUUIDs []string) (map[string]map[string]int, map[s
 	err := mysql.Db.Where("domain IN (?)", domainUUIDs).Find(&subnets).Error
 	if err != nil {
 		return nil, nil, servicecommon.NewError(
-			common.SERVER_ERROR,
+			httpcommon.SERVER_ERROR,
 			fmt.Sprintf("db query subnet failed: %s", err.Error()),
 		)
 	}
@@ -843,7 +844,7 @@ func getSubnetDataFromDB(domainUUIDs []string) (map[string]map[string]int, map[s
 		err := mysql.Db.Where("vl2id = ?", subnet.ID).Find(&subnetCIDRs).Error
 		if err != nil {
 			return nil, nil, servicecommon.NewError(
-				common.SERVER_ERROR,
+				httpcommon.SERVER_ERROR,
 				fmt.Sprintf("db query subnet_cidr failed: %s", err.Error()),
 			)
 		}
@@ -851,7 +852,7 @@ func getSubnetDataFromDB(domainUUIDs []string) (map[string]map[string]int, map[s
 			cidr := ipAndStrMaskToCIDR(subnetCIDR.Prefix, subnetCIDR.Netmask)
 			if cidr == "" {
 				return nil, nil, servicecommon.NewError(
-					common.SERVER_ERROR,
+					httpcommon.SERVER_ERROR,
 					fmt.Sprintf("format db subnet_cidr (uuid: %s) failed", subnetCIDR.Lcuuid),
 				)
 			}
@@ -867,7 +868,7 @@ func getDataInfoFromDB(domainUUIDs []string) (map[string]map[string]string, erro
 	err := mysql.Db.Where("domain IN (?)", domainUUIDs).Find(&hosts).Error
 	if err != nil {
 		return nil, servicecommon.NewError(
-			common.SERVER_ERROR,
+			httpcommon.SERVER_ERROR,
 			fmt.Sprintf("db query host failed: %s", err.Error()),
 		)
 	}
@@ -921,7 +922,7 @@ func getCHostsFromDB(domainUUIDs []string) (map[string]map[string]mysql.VM, erro
 	err := mysql.Db.Where("domain IN (?)", domainUUIDs).Find(&chosts).Error
 	if err != nil {
 		return nil, servicecommon.NewError(
-			common.SERVER_ERROR,
+			httpcommon.SERVER_ERROR,
 			fmt.Sprintf("db query vm failed: %s", err.Error()),
 		)
 	}
@@ -940,7 +941,7 @@ func getPodNamespaceFromDB(domainUUIDs []string) (map[string]map[string]mysql.Po
 	err := mysql.Db.Where("domain IN (?)", domainUUIDs).Find(&podNamespaces).Error
 	if err != nil {
 		return nil, servicecommon.NewError(
-			common.INVALID_POST_DATA,
+			httpcommon.INVALID_POST_DATA,
 			fmt.Sprintf("db query pod_namespace failed: %s", err),
 		)
 	}
@@ -959,7 +960,7 @@ func getPodNamespaceInSubdomainFromDB(domainUUIDs []string) (map[string]map[stri
 	err := mysql.Db.Where("domain IN (?) and sub_domain != ''", domainUUIDs).Find(&podNamespaces).Error
 	if err != nil {
 		return nil, servicecommon.NewError(
-			common.INVALID_POST_DATA,
+			httpcommon.INVALID_POST_DATA,
 			fmt.Sprintf("db query pod_namespace failed: %s", err),
 		)
 	}

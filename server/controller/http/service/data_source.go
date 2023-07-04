@@ -27,6 +27,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
@@ -97,7 +98,7 @@ func CreateDataSource(dataSourceCreate *model.DataSourceCreate, cfg *config.Cont
 	// TODO: 名称只能包含数字字母和下划线的校验
 	if ret := mysql.Db.Where("name = ?", dataSourceCreate.Name).First(&dataSource); ret.Error == nil {
 		return model.DataSource{}, NewError(
-			common.RESOURCE_ALREADY_EXIST,
+			httpcommon.RESOURCE_ALREADY_EXIST,
 			fmt.Sprintf("data_source (%s) already exist", dataSourceCreate.Name),
 		)
 	}
@@ -112,13 +113,13 @@ func CreateDataSource(dataSourceCreate *model.DataSourceCreate, cfg *config.Cont
 		},
 	).First(&dataSource); ret.Error == nil {
 		return model.DataSource{}, NewError(
-			common.RESOURCE_ALREADY_EXIST, "data_source with same effect already exists",
+			httpcommon.RESOURCE_ALREADY_EXIST, "data_source with same effect already exists",
 		)
 	}
 
 	if dataSourceCreate.RetentionTime > cfg.Spec.DataSourceRetentionTimeMax {
 		return model.DataSource{}, NewError(
-			common.PARAMETER_ILLEGAL,
+			httpcommon.PARAMETER_ILLEGAL,
 			fmt.Sprintf("data_source retention_time should le %d", cfg.Spec.DataSourceRetentionTimeMax),
 		)
 	}
@@ -126,34 +127,34 @@ func CreateDataSource(dataSourceCreate *model.DataSourceCreate, cfg *config.Cont
 	mysql.Db.Model(&model.DataSource{}).Count(&dataSourceCount)
 	if int(dataSourceCount) >= cfg.Spec.DataSourceMax {
 		return model.DataSource{}, NewError(
-			common.RESOURCE_NUM_EXCEEDED,
+			httpcommon.RESOURCE_NUM_EXCEEDED,
 			fmt.Sprintf("data_source count exceeds (limit %d)", cfg.Spec.DataSourceMax),
 		)
 	}
 
 	if ret := mysql.Db.Where("id = ?", dataSourceCreate.BaseDataSourceID).First(&baseDataSource); ret.Error != nil {
 		return model.DataSource{}, NewError(
-			common.PARAMETER_ILLEGAL,
+			httpcommon.PARAMETER_ILLEGAL,
 			fmt.Sprintf("base data_source (%d) not exist", dataSourceCreate.BaseDataSourceID),
 		)
 	}
 
 	if baseDataSource.TsdbType != dataSourceCreate.TsdbType || baseDataSource.Interval == common.INTERVAL_1DAY {
 		return model.DataSource{}, NewError(
-			common.PARAMETER_ILLEGAL,
+			httpcommon.PARAMETER_ILLEGAL,
 			"base data_source tsdb_type should the same as tsdb and interval should ne 1 day",
 		)
 	}
 
 	if baseDataSource.Interval >= dataSourceCreate.Interval {
 		return model.DataSource{}, NewError(
-			common.PARAMETER_ILLEGAL, "interval should gt base data_source interval",
+			httpcommon.PARAMETER_ILLEGAL, "interval should gt base data_source interval",
 		)
 	}
 
 	if baseDataSource.SummableMetricsOperator == "Sum" && dataSourceCreate.SummableMetricsOperator != "Sum" {
 		return model.DataSource{}, NewError(
-			common.PARAMETER_ILLEGAL,
+			httpcommon.PARAMETER_ILLEGAL,
 			"summable_metrics_operator only support Sum, if base data_source summable_metrics_operator is Sum",
 		)
 	}
@@ -161,7 +162,7 @@ func CreateDataSource(dataSourceCreate *model.DataSourceCreate, cfg *config.Cont
 	if (baseDataSource.SummableMetricsOperator == "Max" || baseDataSource.SummableMetricsOperator == "Min") &&
 		!(dataSourceCreate.SummableMetricsOperator == "Max" || dataSourceCreate.SummableMetricsOperator == "Min") {
 		return model.DataSource{}, NewError(
-			common.PARAMETER_ILLEGAL,
+			httpcommon.PARAMETER_ILLEGAL,
 			"summable_metrics_operator only support Max/Min, if base data_source summable_metrics_operator is Max/Min",
 		)
 	}
@@ -188,7 +189,7 @@ func CreateDataSource(dataSourceCreate *model.DataSourceCreate, cfg *config.Cont
 				"config analyzer (%s) add data_source (%s) failed", analyzer.IP, dataSource.Name,
 			)
 			log.Error(errMsg)
-			err = NewError(common.SERVER_ERROR, errMsg)
+			err = NewError(httpcommon.SERVER_ERROR, errMsg)
 			break
 		}
 		log.Infof(
@@ -212,13 +213,13 @@ func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cf
 
 	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&dataSource); ret.Error != nil {
 		return model.DataSource{}, NewError(
-			common.RESOURCE_NOT_FOUND, fmt.Sprintf("data_source (%s) not found", lcuuid),
+			httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("data_source (%s) not found", lcuuid),
 		)
 	}
 
 	if dataSourceUpdate.RetentionTime > cfg.Spec.DataSourceRetentionTimeMax {
 		return model.DataSource{}, NewError(
-			common.INVALID_POST_DATA,
+			httpcommon.INVALID_POST_DATA,
 			fmt.Sprintf("data_source retention_time should le %d", cfg.Spec.DataSourceRetentionTimeMax),
 		)
 	}
@@ -247,18 +248,18 @@ func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cf
 		log.Infof("update data_source (%s), retention time change: %ds -> %ds",
 			dataSource.Name, oldRetentionTime, dataSource.RetentionTime)
 	}
-	if errors.Is(err, common.ErrorFail) {
+	if errors.Is(err, httpcommon.ErrorFail) {
 		mysql.Db.Model(&dataSource).Updates(
 			map[string]interface{}{"state": common.DATA_SOURCE_STATE_EXCEPTION},
 		)
 		errMsg := fmt.Sprintf("config analyzer (%s) mod data_source (%s) failed", errAnalyzerIP, dataSource.Name)
 		log.Error(errMsg)
-		err = NewError(common.SERVER_ERROR, errMsg)
+		err = NewError(httpcommon.SERVER_ERROR, errMsg)
 	}
-	if errors.Is(err, common.ErrorPending) {
+	if errors.Is(err, httpcommon.ErrorPending) {
 		warnMsg := fmt.Sprintf("config analyzer (%s) mod data_source (%s) is pending", errAnalyzerIP, dataSource.Name)
-		log.Warning(NewError(common.CONFIG_PENDING, warnMsg))
-		err = NewError(common.CONFIG_PENDING, warnMsg)
+		log.Warning(NewError(httpcommon.CONFIG_PENDING, warnMsg))
+		err = NewError(httpcommon.CONFIG_PENDING, warnMsg)
 	}
 
 	response, _ := GetDataSources(map[string]interface{}{"lcuuid": lcuuid})
@@ -272,7 +273,7 @@ func DeleteDataSource(lcuuid string, cfg *config.ControllerConfig) (map[string]s
 
 	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&dataSource); ret.Error != nil {
 		return map[string]string{}, NewError(
-			common.RESOURCE_NOT_FOUND, fmt.Sprintf("data_source (%s) not found", lcuuid),
+			httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("data_source (%s) not found", lcuuid),
 		)
 	}
 
@@ -281,14 +282,14 @@ func DeleteDataSource(lcuuid string, cfg *config.ControllerConfig) (map[string]s
 	index := sort.SearchStrings(DEFAULT_DATA_SOURCE_NAMES, dataSource.Name)
 	if index < len(DEFAULT_DATA_SOURCE_NAMES) && DEFAULT_DATA_SOURCE_NAMES[index] == dataSource.Name {
 		return map[string]string{}, NewError(
-			common.INVALID_POST_DATA, "Not support delete default data_source",
+			httpcommon.INVALID_POST_DATA, "Not support delete default data_source",
 		)
 	}
 
 	// 被其他数据源引用的数据源禁止删除
 	if ret := mysql.Db.Where("base_data_source_id = ?", dataSource.ID).First(&baseDataSource); ret.Error == nil {
 		return map[string]string{}, NewError(
-			common.INVALID_POST_DATA,
+			httpcommon.INVALID_POST_DATA,
 			fmt.Sprintf("data_source (%s) is used by other data_source", dataSource.Name),
 		)
 	}
@@ -305,7 +306,7 @@ func DeleteDataSource(lcuuid string, cfg *config.ControllerConfig) (map[string]s
 				"config analyzer (%s) del data_source (%s) failed", analyzer.IP, dataSource.Name,
 			)
 			log.Error(errMsg)
-			err = NewError(common.SERVER_ERROR, errMsg)
+			err = NewError(httpcommon.SERVER_ERROR, errMsg)
 			break
 		}
 		log.Infof(
@@ -388,7 +389,7 @@ func ConfigAnalyzerDataSource(ip string) error {
 					"config analyzer (%s) mod data_source (%s) failed", ip, dataSource.Name,
 				)
 				log.Error(errMsg)
-				err = NewError(common.SERVER_ERROR, errMsg)
+				err = NewError(httpcommon.SERVER_ERROR, errMsg)
 				continue
 			}
 		} else {
@@ -396,7 +397,7 @@ func ConfigAnalyzerDataSource(ip string) error {
 			if !ok {
 				errMsg := fmt.Sprintf("base data_source (%d) not exist", dataSource.BaseDataSourceID)
 				log.Error(errMsg)
-				err = NewError(common.SERVER_ERROR, errMsg)
+				err = NewError(httpcommon.SERVER_ERROR, errMsg)
 				continue
 			}
 			if CallRozeAPIAddRP(ip, dataSource, baseDataSource, common.ROZE_PORT) != nil {
@@ -404,7 +405,7 @@ func ConfigAnalyzerDataSource(ip string) error {
 					"config analyzer (%s) add data_source (%s) failed", ip, dataSource.Name,
 				)
 				log.Error(errMsg)
-				err = NewError(common.SERVER_ERROR, errMsg)
+				err = NewError(httpcommon.SERVER_ERROR, errMsg)
 				continue
 			}
 		}

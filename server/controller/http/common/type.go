@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,4 +14,11 @@
  * limitations under the License.
  */
 
-package service
+package common
+
+import "errors"
+
+var (
+	ErrorFail    = errors.New("FAIL")
+	ErrorPending = errors.New("PENDING")
+)

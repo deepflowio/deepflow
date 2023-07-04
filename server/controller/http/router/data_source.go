@@ -20,19 +20,27 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 
-	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
-func DataSourceRouter(e *gin.Engine, cfg *config.ControllerConfig) {
+type DataSource struct {
+	cfg *config.ControllerConfig
+}
+
+func NewDataSource(cfg *config.ControllerConfig) *DataSource {
+	return &DataSource{cfg: cfg}
+}
+
+func (ds *DataSource) RegisterTo(e *gin.Engine) {
 	e.GET("/v1/data-sources/:lcuuid/", getDataSource)
 	e.GET("/v1/data-sources/", getDataSources)
-	e.POST("/v1/data-sources/", createDataSource(cfg))
-	e.PATCH("/v1/data-sources/:lcuuid/", updateDataSource(cfg))
-	e.DELETE("/v1/data-sources/:lcuuid/", deleteDataSource(cfg))
+	e.POST("/v1/data-sources/", createDataSource(ds.cfg))
+	e.PATCH("/v1/data-sources/:lcuuid/", updateDataSource(ds.cfg))
+	e.DELETE("/v1/data-sources/:lcuuid/", deleteDataSource(ds.cfg))
 }
 
 func getDataSource(c *gin.Context) {
@@ -63,11 +71,11 @@ func createDataSource(cfg *config.ControllerConfig) gin.HandlerFunc {
 		err = c.ShouldBindBodyWith(&dataSourceCreate, binding.JSON)
 		if dataSourceCreate != nil &&
 			!(dataSourceCreate.TsdbType == "app" || dataSourceCreate.TsdbType == "flow") {
-			BadRequestResponse(c, common.PARAMETER_ILLEGAL, "tsdb type only supports app and flow")
+			BadRequestResponse(c, httpcommon.PARAMETER_ILLEGAL, "tsdb type only supports app and flow")
 			return
 		}
 		if err != nil {
-			BadRequestResponse(c, common.PARAMETER_ILLEGAL, err.Error())
+			BadRequestResponse(c, httpcommon.PARAMETER_ILLEGAL, err.Error())
 			return
 		}
 
@@ -84,7 +92,7 @@ func updateDataSource(cfg *config.ControllerConfig) gin.HandlerFunc {
 		// 参数校验
 		err = c.ShouldBindBodyWith(&dataSourceUpdate, binding.JSON)
 		if err != nil {
-			BadRequestResponse(c, common.INVALID_POST_DATA, err.Error())
+			BadRequestResponse(c, httpcommon.INVALID_POST_DATA, err.Error())
 			return
 		}
 
