@@ -46,6 +46,7 @@ type Config struct {
 	LabelMsgMaxSize              int                   `yaml:"prometheus-label-msg-max-size"`
 	LabelRequestMetricBatchCount int                   `yaml:"prometheus-label-request-metric-batch-count"`
 	AppLabelColumnIncrement      int                   `yaml:"prometheus-app-label-column-increment"`
+	IgnoreUniversalTag           bool                  `yaml:"prometheus-sample-ignore-universal-tag"`
 }
 
 type PrometheusConfig struct {
