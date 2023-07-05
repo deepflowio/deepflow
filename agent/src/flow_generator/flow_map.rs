@@ -115,8 +115,10 @@ pub struct FlowMap {
     //     https://github.com/tkaitchuck/aHash/blob/master/FAQ.md#how-is-ahash-so-fast
     //
     // Strangely, using AES reduces performance.
-    node_map: Option<AHashMap<FlowMapKey, Vec<Box<FlowNode>>>>,
-    time_set: Option<Vec<HashSet<FlowMapKey>>>,
+    node_map: Option<(
+        AHashMap<FlowMapKey, Vec<Box<FlowNode>>>,
+        Vec<HashSet<FlowMapKey>>,
+    )>,
     id: u32,
     state_machine_master: StateMachine,
     state_machine_slave: StateMachine,
@@ -252,11 +254,10 @@ impl FlowMap {
         let start_time = system_time - config.packet_delay - Duration::from_secs(1);
         let time_set_slot_size = config.hash_slots as usize / time_window_size;
         Self {
-            node_map: Some(AHashMap::with_capacity(config.hash_slots as usize)),
-            time_set: Some(vec![
-                HashSet::with_capacity(time_set_slot_size);
-                time_window_size
-            ]),
+            node_map: Some((
+                AHashMap::with_capacity(config.hash_slots as usize),
+                vec![HashSet::with_capacity(time_set_slot_size); time_window_size],
+            )),
             id,
             state_machine_master: StateMachine::new_master(&config.flow_timeout),
             state_machine_slave: StateMachine::new_slave(&config.flow_timeout),
@@ -376,20 +377,14 @@ impl FlowMap {
     }
 
     pub fn inject_flush_ticker(&mut self, config: &Config, mut timestamp: Duration) -> bool {
-        self.system_time = get_timestamp(self.ntp_diff.load(Ordering::Relaxed));
-        if timestamp.is_zero() {
-            timestamp = self.system_time;
+        let is_tick = timestamp.is_zero();
+        if is_tick {
+            timestamp = get_timestamp(self.ntp_diff.load(Ordering::Relaxed));
         } else if timestamp < self.start_time {
             self.stats_counter
                 .drop_by_window
                 .fetch_add(1, Ordering::Relaxed);
             return false;
-        } else {
-            // called from inject_meta_packet
-            self.stats_counter.packet_delay.fetch_max(
-                self.system_time.as_nanos() as i64 - timestamp.as_nanos() as i64,
-                Ordering::Relaxed,
-            );
         }
 
         let config = &config.flow;
@@ -398,6 +393,19 @@ impl FlowMap {
         if timestamp - config.packet_delay - TIME_UNIT < self.start_time {
             return true;
         }
+
+        self.system_time = if is_tick {
+            timestamp
+        } else {
+            // calculate packet delay only when window will be pushed forward
+            // to avoid calling `get_timestamp` for each packet
+            let ts = get_timestamp(self.ntp_diff.load(Ordering::Relaxed));
+            self.stats_counter.packet_delay.fetch_max(
+                ts.as_nanos() as i64 - timestamp.as_nanos() as i64,
+                Ordering::Relaxed,
+            );
+            ts
+        };
 
         self.stats_counter.flush_delay.fetch_max(
             self.system_time.as_nanos() as i64 - self.start_time.as_nanos() as i64,
@@ -418,12 +426,9 @@ impl FlowMap {
             Duration::from_nanos(next_start_time_in_unit * TIME_UNIT.as_nanos() as u64);
         timestamp = self.start_time - Duration::from_nanos(1);
 
-        let (mut node_map, mut time_set) = match self.node_map.take().zip(self.time_set.take()) {
-            Some(pair) => pair,
-            None => {
-                warn!("cannot get node map or time set");
-                return false;
-            }
+        let Some((mut node_map, mut time_set)) = self.node_map.take() else {
+            warn!("cannot get node map and time set");
+            return false;
         };
 
         let mut moved_key = self
@@ -503,8 +508,7 @@ impl FlowMap {
         Self::update_stats_counter(&self.stats_counter, node_map.len() as u64, 0);
 
         self.time_key_buffer.replace(moved_key);
-        self.node_map.replace(node_map);
-        self.time_set.replace(time_set);
+        self.node_map.replace((node_map, time_set));
 
         self.start_time_in_unit = next_start_time_in_unit;
         self.flush_queue(&config, timestamp);
@@ -532,12 +536,9 @@ impl FlowMap {
 
         let pkt_key = FlowMapKey::new(&meta_packet.lookup_key, meta_packet.tap_port);
 
-        let (mut node_map, mut time_set) = match self.node_map.take().zip(self.time_set.take()) {
-            Some(pair) => pair,
-            None => {
-                warn!("cannot get node map or time set");
-                return;
-            }
+        let Some((mut node_map, mut time_set)) = self.node_map.take() else {
+            warn!("cannot get node map and time set");
+            return;
         };
 
         let pkt_timestamp = meta_packet.lookup_key.timestamp;
@@ -575,8 +576,7 @@ impl FlowMap {
                     self.stats_counter
                         .total_scan
                         .fetch_add(max_depth as u64, Ordering::Relaxed);
-                    self.node_map.replace(node_map);
-                    self.time_set.replace(time_set);
+                    self.node_map.replace((node_map, time_set));
                     return;
                 };
                 self.stats_counter
@@ -635,8 +635,7 @@ impl FlowMap {
             }
         }
         Self::update_stats_counter(&self.stats_counter, node_map.len() as u64, max_depth as u64);
-        self.node_map.replace(node_map);
-        self.time_set.replace(time_set);
+        self.node_map.replace((node_map, time_set));
         // go实现只有插入node的时候，插入的节点数目大于ring buffer 的capacity 才会执行policy_getter,
         // rust 版本用了std的hashmap自动处理扩容，所以无需执行policy_gettelr
     }
@@ -2376,7 +2375,7 @@ mod tests {
             let total_flow = flow_map
                 .node_map
                 .as_ref()
-                .map(|map| map.len())
+                .map(|(map, _)| map.len())
                 .unwrap_or_default();
             assert_eq!(total_flow, 1);
         }
