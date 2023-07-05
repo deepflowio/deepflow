@@ -500,6 +500,7 @@ impl<'a> MetaPacket<'a> {
 
         self.header_type = HeaderType::Eth;
         self.vlan_tag_size = vlan_tag_size as u8;
+        self.l2_l3_opt_size = vlan_tag_size as u16;
         let mut is_ipv6 = false;
         let ip_protocol;
         let mut offset_port_0 = FIELD_OFFSET_SPORT;
@@ -543,7 +544,6 @@ impl<'a> MetaPacket<'a> {
                         .unwrap(),
                 );
                 self.ttl = packet[IPV6_HOP_LIMIT_OFFSET + vlan_tag_size];
-                self.l2_l3_opt_size = vlan_tag_size as u16;
                 let mut payload = read_u16_be(&packet[FIELD_OFFSET_PAYLOAD_LEN + vlan_tag_size..]);
                 // e1000网卡驱动，在开启TSO功能时，IPv6的payload可能为0
                 // e1000网卡驱动：https://elixir.bootlin.com/linux/v3.0/source/drivers/net/e1000e/netdev.c#L4423
@@ -610,7 +610,7 @@ impl<'a> MetaPacket<'a> {
                     self.npb_ignore_l4 = true;
                     return Ok(());
                 }
-                self.l2_l3_opt_size = vlan_tag_size as u16 + l3_opt_size as u16;
+                self.l2_l3_opt_size += l3_opt_size as u16;
                 self.l3_payload_len =
                     (self.packet_len - (packet.len() - size_checker as usize) as u32) as u16;
 
