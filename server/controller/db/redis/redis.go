@@ -19,6 +19,7 @@ package redis
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/go-redis/redis/v9"
@@ -26,9 +27,12 @@ import (
 )
 
 var log = logging.MustGetLogger("db.redis")
-var RedisDB *RedisClient
+var (
+	clientOnce sync.Once
+	client     *Client
+)
 
-type RedisConfig struct {
+type Config struct {
 	ResourceAPIDatabase       int      `default:"1" yaml:"resource_api_database"`
 	ResourceAPIExpireInterval int      `default:"3600" yaml:"resource_api_expire_interval"`
 	DimensionResourceDatabase int      `default:"2" yaml:"dimension_resource_database"`
@@ -40,12 +44,17 @@ type RedisConfig struct {
 	ClusterEnabled            bool     `default:"false" yaml:"cluster_enabled"`
 }
 
-type RedisClient struct {
-	ResourceAPI       redis.UniversalClient
-	DimensionResource redis.UniversalClient
+func GetClient() *Client {
+	return client
 }
 
-func generateAddrs(cfg RedisConfig) []string {
+type Client struct {
+	ResourceAPI       redis.UniversalClient
+	DimensionResource redis.UniversalClient
+	Config            *Config
+}
+
+func generateAddrs(cfg Config) []string {
 	var addrs []string
 	for i := range cfg.Host {
 		addrs = append(addrs, fmt.Sprintf("%s:%d", cfg.Host[i], cfg.Port))
@@ -53,11 +62,11 @@ func generateAddrs(cfg RedisConfig) []string {
 	return addrs
 }
 
-func generateSimpleAddr(cfg RedisConfig) string {
+func generateSimpleAddr(cfg Config) string {
 	return generateAddrs(cfg)[0]
 }
 
-func createSimpleClient(cfg RedisConfig, database int) redis.UniversalClient {
+func createSimpleClient(cfg Config, database int) redis.UniversalClient {
 	addr := generateSimpleAddr(cfg)
 	log.Infof("redis addr: %v", addr)
 	return redis.NewClient(&redis.Options{
@@ -68,11 +77,11 @@ func createSimpleClient(cfg RedisConfig, database int) redis.UniversalClient {
 	})
 }
 
-func generateClusterAddrs(cfg RedisConfig) []string {
+func generateClusterAddrs(cfg Config) []string {
 	return generateAddrs(cfg)
 }
 
-func createClusterClient(cfg RedisConfig) redis.UniversalClient {
+func createClusterClient(cfg Config) redis.UniversalClient {
 	addrs := generateClusterAddrs(cfg)
 	log.Infof("redis addrs: %v", addrs)
 	return redis.NewClusterClient(&redis.ClusterOptions{
@@ -82,7 +91,7 @@ func createClusterClient(cfg RedisConfig) redis.UniversalClient {
 	})
 }
 
-func createUniversalRedisClient(cfg RedisConfig, database int) redis.UniversalClient {
+func createUniversalClient(cfg Config, database int) redis.UniversalClient {
 	if cfg.ClusterEnabled {
 		return createClusterClient(cfg)
 	} else {
@@ -90,15 +99,18 @@ func createUniversalRedisClient(cfg RedisConfig, database int) redis.UniversalCl
 	}
 }
 
-func InitRedis(cfg RedisConfig, ctx context.Context) (err error) {
-	RedisDB = &RedisClient{
-		ResourceAPI:       createUniversalRedisClient(cfg, cfg.ResourceAPIDatabase), // TODO ClusterClient sync once
-		DimensionResource: createUniversalRedisClient(cfg, cfg.DimensionResourceDatabase),
-	}
-	_, err = RedisDB.ResourceAPI.Ping(ctx).Result()
-	if err != nil {
+func Init(ctx context.Context, cfg Config) (err error) {
+	clientOnce.Do(func() {
+		client = &Client{
+			ResourceAPI:       createUniversalClient(cfg, cfg.ResourceAPIDatabase),
+			DimensionResource: createUniversalClient(cfg, cfg.DimensionResourceDatabase),
+		}
+		_, err = client.ResourceAPI.Ping(ctx).Result()
+		if err != nil {
+			return
+		}
+		_, err = client.DimensionResource.Ping(ctx).Result()
 		return
-	}
-	_, err = RedisDB.DimensionResource.Ping(ctx).Result()
+	})
 	return
 }

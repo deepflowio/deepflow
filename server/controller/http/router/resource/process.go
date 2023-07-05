@@ -25,10 +25,10 @@ import (
 )
 
 type Process struct {
-	redisConfig redis.RedisConfig
+	redisConfig redis.Config
 }
 
-func NewProcess(redisConfig redis.RedisConfig) *Process {
+func NewProcess(redisConfig redis.Config) *Process {
 	return &Process{redisConfig: redisConfig}
 }
 
@@ -36,7 +36,7 @@ func (p *Process) RegisterTo(e *gin.Engine) {
 	e.GET("/v1/processes/", getProcesses(&p.redisConfig))
 }
 
-func getProcesses(redisConfig *redis.RedisConfig) gin.HandlerFunc {
+func getProcesses(redisConfig *redis.Config) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		data, err := GetProcesses(c, redisConfig)
 		JsonResponse(c, data, err)
