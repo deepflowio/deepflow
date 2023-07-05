@@ -127,12 +127,19 @@ fn set_linkage() -> Result<(), Box<dyn Error>> {
 
     match target_env.as_str() {
         "gnu" => {
+            println!("cargo:rustc-link-lib=static=bcc");
             println!("cargo:rustc-link-lib=dylib=pthread");
             println!("cargo:rustc-link-lib=dylib=elf");
             println!("cargo:rustc-link-lib=dylib=z");
             println!("cargo:rustc-link-lib=dylib=stdc++");
         }
         "musl" => {
+            #[cfg(target_arch = "x86_64")]
+            println!("cargo:rustc-link-lib=static=bcc");
+
+            #[cfg(target_arch = "x86_64")]
+            println!("cargo:rustc-link-lib=static=stdc++");
+
             println!("cargo:rustc-link-lib=static=c");
             println!("cargo:rustc-link-lib=static=elf");
             println!("cargo:rustc-link-lib=static=m");
