@@ -43,20 +43,20 @@ pub fn get_memory_rss() -> Result<u64> {
     unsafe {
         let handle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, BOOL(0), pid);
         if handle == INVALID_HANDLE_VALUE {
+            let _ = CloseHandle(handle);
             return Err(Error::Windows(format!(
                 "get process handle failed pid={}",
                 pid
             )));
         }
 
-        if K32GetProcessMemoryInfo(
+        let result = K32GetProcessMemoryInfo(
             handle,
             &mut pmc,
             size_of::<PROCESS_MEMORY_COUNTERS>() as u32,
-        )
-        .as_bool()
-        {
-            let _ = CloseHandle(handle);
+        );
+        let _ = CloseHandle(handle);
+        if result.as_bool() {
             Ok(pmc.WorkingSetSize as u64)
         } else {
             Err(Error::Windows(format!(
@@ -72,6 +72,9 @@ pub fn get_process_num() -> Result<u32> {
     let pid = process::id();
     let snap = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
     if snap == INVALID_HANDLE_VALUE {
+        unsafe {
+            let _ = CloseHandle(snap);
+        }
         let err_msg = format!(
             "failed to run get_process_num function because of win32 error code({}),\n{}",
             unsafe { GetLastError() },
@@ -102,6 +105,9 @@ pub fn get_process_num() -> Result<u32> {
 pub fn get_process_num_by_name(name: &str) -> Result<u32> {
     let snap = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
     if snap == INVALID_HANDLE_VALUE {
+        unsafe {
+            let _ = CloseHandle(snap);
+        }
         let err_msg = format!(
             "failed to run get_process_num_by_name function because of win32 error code({}),\n{}",
             unsafe { GetLastError() },
@@ -147,6 +153,9 @@ pub fn get_thread_num() -> Result<u32> {
     // 0 表示全部抓取
     let snap = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
     if snap == INVALID_HANDLE_VALUE {
+        unsafe {
+            let _ = CloseHandle(snap);
+        }
         let err_msg = format!(
             "failed to run get_thread_num function because of win32 error code({}),\n{}",
             unsafe { GetLastError() },
