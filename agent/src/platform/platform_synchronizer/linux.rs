@@ -84,6 +84,7 @@ pub(super) struct ProcessArgs {
     pub(super) exception_handler: ExceptionHandler,
     pub(super) extra_netns_regex: Arc<Mutex<Option<Regex>>>,
     pub(super) override_os_hostname: Arc<Option<String>>,
+    pub(super) running_config: Arc<RwLock<RunningConfig>>,
 }
 
 #[derive(Default)]
@@ -123,12 +124,14 @@ pub struct PlatformSynchronizer {
     exception_handler: ExceptionHandler,
     extra_netns_regex: Arc<Mutex<Option<Regex>>>,
     override_os_hostname: Arc<Option<String>>,
+    running_config: Arc<RwLock<RunningConfig>>,
 }
 
 impl PlatformSynchronizer {
     pub fn new(
         runtime: Arc<Runtime>,
         config: PlatformAccess,
+        running_config: Arc<RwLock<RunningConfig>>,
         session: Arc<Session>,
         xml_extractor: Arc<LibvirtXmlExtractor>,
         exception_handler: ExceptionHandler,
@@ -148,6 +151,7 @@ impl PlatformSynchronizer {
         Self {
             runtime,
             config,
+            running_config,
             version: Arc::new(AtomicU64::new(
                 SystemTime::now()
                     .duration_since(SystemTime::UNIX_EPOCH)
@@ -185,7 +189,8 @@ impl PlatformSynchronizer {
             let config_guard = self.config.load();
             let err = format!(
                 "PlatformSynchronizer has already stopped with ctrl-ip:{} vtap-id:{}",
-                config_guard.source_ip, config_guard.vtap_id
+                self.running_config.read().ctrl_ip,
+                config_guard.vtap_id
             );
             debug!("{}", err);
             return;
@@ -207,7 +212,8 @@ impl PlatformSynchronizer {
             let config_guard = self.config.load();
             let err = format!(
                 "PlatformSynchronizer has already running with ctrl-ip:{} vtap-id:{}",
-                config_guard.source_ip, config_guard.vtap_id
+                self.running_config.read().ctrl_ip.clone(),
+                config_guard.vtap_id
             );
             debug!("{}", err);
             return;
@@ -218,6 +224,7 @@ impl PlatformSynchronizer {
         let process_args = ProcessArgs {
             runtime: self.runtime.clone(),
             config: self.config.clone(),
+            running_config: self.running_config.clone(),
             running: self.running.clone(),
             version: self.version.clone(),
             kubernetes_poller: self.kubernetes_poller.clone(),
@@ -237,6 +244,10 @@ impl PlatformSynchronizer {
         *self.thread.lock().unwrap() = Some(handle);
 
         info!("PlatformSynchronizer started");
+    }
+
+    pub fn reset_session(&self, controller_ips: Vec<String>) {
+        self.session.reset_server_ip(controller_ips);
     }
 
     fn query_platform(
@@ -511,7 +522,7 @@ impl PlatformSynchronizer {
         proc_data: &Vec<ProcessData>,
         vtap_id: u16,
         version: u64,
-        ctrl_ip: IpAddr,
+        ctrl_ip: String,
         trident_type: TridentType,
         platform_enabled: bool,
         kubernetes_cluster_id: String,
@@ -613,7 +624,7 @@ impl PlatformSynchronizer {
             trident_type: Some(trident_type as i32),
             platform_data: Some(platform_data),
             process_data: Some(process_data),
-            source_ip: Some(ctrl_ip.to_string()),
+            source_ip: Some(ctrl_ip),
             vtap_id: Some(vtap_id as u32),
             kubernetes_cluster_id: Some(kubernetes_cluster_id),
             nat_ip: None,
@@ -664,7 +675,7 @@ impl PlatformSynchronizer {
             let proc_scan_conf = &config_guard.os_proc_scan_conf;
             let cur_vtap_id = config_guard.vtap_id;
             let trident_type = config_guard.trident_type;
-            let ctrl_ip = config_guard.source_ip.clone();
+            let ctrl_ip = args.running_config.read().ctrl_ip.clone();
             let poll_interval = config_guard.sync_interval;
             let kubernetes_cluster_id = config_guard.kubernetes_cluster_id.clone();
             let libvirt_xml_path = config_guard.libvirt_xml_path.clone();
@@ -704,7 +715,7 @@ impl PlatformSynchronizer {
                 let msg = trident::GenesisSyncRequest {
                     version: Some(cur_version),
                     trident_type: Some(trident_type as i32),
-                    source_ip: Some(ctrl_ip.to_string()),
+                    source_ip: Some(ctrl_ip.clone()),
                     vtap_id: Some(cur_vtap_id as u32),
                     kubernetes_cluster_id: Some(kubernetes_cluster_id.clone()),
                     platform_data: None,
@@ -927,7 +938,8 @@ impl SocketSynchronizer {
                     continue;
                 }
 
-                let ctl_mac = running_config.read().ctrl_mac.clone();
+                let ctrl_ip = running_config.read().ctrl_ip.clone();
+                let ctrl_mac = running_config.read().ctrl_mac.clone();
                 let mut policy_getter = policy_getter.lock().unwrap();
 
                 let sock_entries = match get_all_socket(
@@ -971,8 +983,8 @@ impl SocketSynchronizer {
 
                 match runtime.block_on(
                     session.gpid_sync(GpidSyncRequest {
-                        ctrl_ip: Some(conf_guard.source_ip.to_string()),
-                        ctrl_mac: Some(ctl_mac),
+                        ctrl_ip: Some(ctrl_ip),
+                        ctrl_mac: Some(ctrl_mac),
                         vtap_id: Some(conf_guard.vtap_id as u32),
                         entries: sock_entries
                             .into_iter()

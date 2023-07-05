@@ -26,13 +26,14 @@ use std::{
 
 use arc_swap::access::Access;
 use log::{debug, error, info};
+use parking_lot::RwLock;
 use ring::digest;
 use tokio::runtime::Runtime;
 
 use crate::{
     config::handler::PlatformAccess,
     exception::ExceptionHandler,
-    rpc::Session,
+    rpc::{RunningConfig, Session},
     utils::command::{get_hostname, get_ip_address},
 };
 use public::proto::trident::{self, Exception};
@@ -48,6 +49,7 @@ struct ProcessArgs {
     timer: Arc<Condvar>,
     exception_handler: ExceptionHandler,
     override_os_hostname: Arc<Option<String>>,
+    running_config: Arc<RwLock<RunningConfig>>,
 }
 
 #[derive(Default)]
@@ -64,6 +66,7 @@ struct HashArgs {
 pub struct PlatformSynchronizer {
     runtime: Arc<Runtime>,
     config: PlatformAccess,
+    running_config: Arc<RwLock<RunningConfig>>,
     version: Arc<AtomicU64>,
     running: Arc<Mutex<bool>>,
     timer: Arc<Condvar>,
@@ -77,6 +80,7 @@ impl PlatformSynchronizer {
     pub fn new(
         runtime: Arc<Runtime>,
         config: PlatformAccess,
+        running_config: Arc<RwLock<RunningConfig>>,
         session: Arc<Session>,
         exception_handler: ExceptionHandler,
         override_os_hostname: Option<String>,
@@ -84,6 +88,7 @@ impl PlatformSynchronizer {
         Self {
             runtime,
             config,
+            running_config,
             version: Arc::new(AtomicU64::new(
                 SystemTime::now()
                     .duration_since(SystemTime::UNIX_EPOCH)
@@ -109,7 +114,8 @@ impl PlatformSynchronizer {
             let config_guard = self.config.load();
             let err = format!(
                 "PlatformSynchronizer has already stopped with ctrl-ip:{} vtap-id:{}",
-                config_guard.source_ip, config_guard.vtap_id
+                self.running_config.read().ctrl_ip,
+                config_guard.vtap_id
             );
             debug!("{}", err);
             return;
@@ -131,7 +137,8 @@ impl PlatformSynchronizer {
             let config_guard = self.config.load();
             let err = format!(
                 "PlatformSynchronizer has already running with ctrl-ip:{} vtap-id:{}",
-                config_guard.source_ip, config_guard.vtap_id
+                self.running_config.read().ctrl_ip,
+                config_guard.vtap_id
             );
             debug!("{}", err);
             return;
@@ -142,6 +149,7 @@ impl PlatformSynchronizer {
         let process_args = ProcessArgs {
             runtime: self.runtime.clone(),
             config: self.config.clone(),
+            running_config: self.running_config.clone(),
             running: self.running.clone(),
             version: self.version.clone(),
             timer: self.timer.clone(),
@@ -157,6 +165,10 @@ impl PlatformSynchronizer {
         *self.thread.lock().unwrap() = Some(handle);
 
         info!("PlatformSynchronizer started");
+    }
+
+    pub fn reset_session(&self, controller_ips: Vec<String>) {
+        self.session.reset_server_ip(controller_ips);
     }
 
     fn query_platform(
@@ -226,7 +238,7 @@ impl PlatformSynchronizer {
     ) -> Result<u64, tonic::Status> {
         let config_guard = process_args.config.load();
         let trident_type = config_guard.trident_type;
-        let ctrl_ip = config_guard.source_ip;
+        let ctrl_ip = process_args.running_config.read().ctrl_ip.clone();
         let platform_enabled = config_guard.enabled;
         drop(config_guard);
 
@@ -241,7 +253,7 @@ impl PlatformSynchronizer {
             version: Some(version),
             trident_type: Some(trident_type as i32),
             platform_data: Some(platform_data),
-            source_ip: Some(ctrl_ip.to_string()),
+            source_ip: Some(ctrl_ip),
             vtap_id: Some(vtap_id as u32),
             kubernetes_cluster_id: Some(
                 process_args.config.load().kubernetes_cluster_id.to_string(),
@@ -270,7 +282,7 @@ impl PlatformSynchronizer {
             let config_guard = args.config.load();
             let cur_vtap_id = config_guard.vtap_id;
             let trident_type = config_guard.trident_type;
-            let ctrl_ip = config_guard.source_ip;
+            let ctrl_ip = args.running_config.read().ctrl_ip.clone();
             let poll_interval = config_guard.sync_interval;
             drop(config_guard);
 
