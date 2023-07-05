@@ -31,7 +31,9 @@ use crate::{
         protocol_logs::{
             consts::*,
             decode_base64_to_string,
-            pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
+            pb_adapter::{
+                ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
+            },
             value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus, LogMessageType,
         },
     },
@@ -48,6 +50,8 @@ pub struct DubboInfo {
     is_tls: bool,
 
     // header
+    #[serde(skip)]
+    pub event: u8,
     #[serde(skip)]
     pub serial_id: u8,
     #[serde(skip)]
@@ -147,6 +151,16 @@ impl From<DubboInfo> for L7ProtocolSendLog {
             ext_info: Some(ExtendedInfo {
                 rpc_service: Some(f.service_name),
                 request_id: Some(f.request_id as u32),
+                attributes: Some(vec![
+                    KeyVal {
+                        key: "event".into(),
+                        val: f.event.to_string(),
+                    },
+                    KeyVal {
+                        key: "serialization_id".into(),
+                        val: f.serial_id.to_string(),
+                    },
+                ]),
                 ..Default::default()
             }),
             ..Default::default()
@@ -456,7 +470,7 @@ impl DubboLog {
 
     fn request(&mut self, config: &L7LogDynamicConfig, payload: &[u8], dubbo_header: &DubboHeader) {
         self.info.msg_type = LogMessageType::Request;
-
+        self.info.event = dubbo_header.event;
         self.info.data_type = dubbo_header.data_type;
         self.info.req_msg_size = Some(dubbo_header.data_length as u32);
         self.info.serial_id = dubbo_header.serial_id;
@@ -482,7 +496,7 @@ impl DubboLog {
 
     fn response(&mut self, dubbo_header: &DubboHeader) {
         self.info.msg_type = LogMessageType::Response;
-
+        self.info.event = dubbo_header.event;
         self.info.data_type = dubbo_header.data_type;
         self.info.resp_msg_size = Some(dubbo_header.data_length as u32);
         self.info.serial_id = dubbo_header.serial_id;
@@ -522,6 +536,7 @@ impl DubboLog {
 #[derive(Debug, Default, PartialEq)]
 pub struct DubboHeader {
     // Dubbo Header
+    pub event: u8,
     pub serial_id: u8,
     pub data_type: u8,
     pub status_code: u8,
@@ -547,6 +562,7 @@ impl DubboHeader {
             return Err(Error::DubboHeaderParseFailed);
         }
 
+        self.event = (payload[2] & 0x20) >> 5;
         self.serial_id = payload[2] & 0x1f;
         self.data_type = payload[2] & 0x80;
         self.status_code = payload[3];
