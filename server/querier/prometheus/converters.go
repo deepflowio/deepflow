@@ -159,7 +159,8 @@ func PromReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (contxt 
 					db = metricsSplit[0]
 					table = metricsSplit[1] // FIXME: should fix deepflow_system table name like 'deepflow_server.xxx'
 					metricsName = metricsSplit[2]
-					var aggOperator, aggMetrics string
+					aggMetrics := metricsName
+					var aggOperator string
 
 					if db != DB_NAME_EXT_METRICS && db != DB_NAME_DEEPFLOW_SYSTEM && !isShowTagStatement {
 						// DeepFlow native metrics needs aggregation for query
