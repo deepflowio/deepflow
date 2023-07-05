@@ -108,7 +108,7 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 	if cfg.RedisCfg.Enabled && cfg.TrisolarisCfg.NodeType == "master" {
 		router.SetInitStageForHealthChecker("Redis init")
 
-		err := redis.InitRedis(cfg.RedisCfg, ctx)
+		err := redis.Init(ctx, cfg.RedisCfg)
 		if err != nil {
 			log.Errorf("connect redis failed: %s", err.Error())
 			time.Sleep(time.Second)
