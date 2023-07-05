@@ -58,6 +58,7 @@ use crate::{
 };
 
 use public::{
+    debug::QueueDebugger,
     netns::NsFile,
     packet::Packet,
     proto::trident::{Exception, IfMacSource, TapMode},
@@ -111,6 +112,7 @@ pub(super) struct BaseDispatcher {
 
     pub(super) npb_dedup_enabled: Arc<AtomicBool>,
     pub(super) pause: Arc<AtomicBool>,
+    pub(super) queue_debugger: Arc<QueueDebugger>,
 
     // Enterprise Edition Feature: packet-sequence
     pub(super) packet_sequence_output_queue:
@@ -217,18 +219,30 @@ impl BaseDispatcher {
                 ));
             }
             #[cfg(target_os = "windows")]
-            let src_ifaces = pcap_interfaces
+            let src_ifaces: Vec<_> = pcap_interfaces
                 .iter()
                 .map(|src_iface| (src_iface.device_name.as_str(), src_iface.if_index as isize))
                 .collect();
             #[cfg(target_os = "linux")]
-            let src_ifaces = pcap_interfaces
+            let src_ifaces: Vec<_> = pcap_interfaces
                 .iter()
                 .map(|src_iface| (src_iface.name.as_str(), src_iface.if_index as isize))
                 .collect();
-            let libpcap = Libpcap::new(src_ifaces, options.packet_blocks, options.snap_len)
+            #[cfg(target_os = "linux")]
+            let libpcap = Libpcap::new(
+                src_ifaces.clone(),
+                options.packet_blocks,
+                options.snap_len,
+                &self.queue_debugger,
+            )
+            .map_err(|e| Error::Libpcap(e.to_string()))?;
+            #[cfg(target_os = "windows")]
+            let libpcap = Libpcap::new(src_ifaces.clone(), options.packet_blocks, options.snap_len)
                 .map_err(|e| Error::Libpcap(e.to_string()))?;
-            info!("WinPacket init");
+            info!(
+                "libpcap init with {:?} block {} snap {}",
+                src_ifaces, options.packet_blocks, options.snap_len
+            );
             self.need_update_bpf.store(true, Ordering::Relaxed);
             RecvEngine::Libpcap(Some(libpcap))
         } else {

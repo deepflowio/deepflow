@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#[cfg(target_os = "linux")]
 use std::collections::HashMap;
 use std::env;
 use std::fmt;
