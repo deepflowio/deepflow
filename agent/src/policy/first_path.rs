@@ -711,8 +711,10 @@ impl FirstPath {
                     action_flags: policy.action_flags,
                     npb_actions: policy.npb_actions.clone(),
                 };
-                policy.dedup(key);
-                return Some((Arc::new(policy), endpoints));
+                // create new policy if changed
+                if policy.dedup(key) {
+                    return Some((Arc::new(policy), endpoints));
+                }
             }
             return Some((policy, endpoints));
         }

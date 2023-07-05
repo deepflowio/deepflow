@@ -236,12 +236,9 @@ impl PolicyData {
         })
     }
 
-    fn dedup_npb_actions(&self, _packet: &dyn DedupOperator) -> Vec<NpbAction> {
-        vec![]
-    }
-
-    pub fn dedup(&mut self, packet: &dyn DedupOperator) {
-        let _ = self.dedup_npb_actions(packet);
+    // return true if policy have changes
+    pub fn dedup(&mut self, _: &dyn DedupOperator) -> bool {
+        false
     }
 
     pub fn set_action_flags(&mut self, _actions: &NpbAction) {}
