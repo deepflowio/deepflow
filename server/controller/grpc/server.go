@@ -25,7 +25,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/grpc/statsd"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/services/grpc/statsd"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
 

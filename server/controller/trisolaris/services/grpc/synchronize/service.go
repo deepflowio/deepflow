@@ -26,19 +26,18 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	grpcserver "github.com/deepflowio/deepflow/server/controller/grpc"
-	"github.com/deepflowio/deepflow/server/controller/grpc/statsd"
 	prometheus "github.com/deepflowio/deepflow/server/controller/prometheus/service/grpc"
-	trisolaris "github.com/deepflowio/deepflow/server/controller/trisolaris/services/grpc/synchronize"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/services/grpc/statsd"
 )
 
 type service struct {
-	vTapEvent                *trisolaris.VTapEvent
-	tsdbEvent                *trisolaris.TSDBEvent
-	ntpEvent                 *trisolaris.NTPEvent
-	upgradeEvent             *trisolaris.UpgradeEvent
-	kubernetesClusterIDEvent *trisolaris.KubernetesClusterIDEvent
-	processInfoEvent         *trisolaris.ProcessInfoEvent
-	pluginEvent              *trisolaris.PluginEvent
+	vTapEvent                *VTapEvent
+	tsdbEvent                *TSDBEvent
+	ntpEvent                 *NTPEvent
+	upgradeEvent             *UpgradeEvent
+	kubernetesClusterIDEvent *KubernetesClusterIDEvent
+	processInfoEvent         *ProcessInfoEvent
+	pluginEvent              *PluginEvent
 	prometheusEvent          *prometheus.SynchronizerEvent
 }
 
@@ -48,12 +47,12 @@ func init() {
 
 func newService() *service {
 	return &service{
-		vTapEvent:        trisolaris.NewVTapEvent(),
-		tsdbEvent:        trisolaris.NewTSDBEvent(),
-		ntpEvent:         trisolaris.NewNTPEvent(),
-		upgradeEvent:     trisolaris.NewUpgradeEvent(),
-		processInfoEvent: trisolaris.NewprocessInfoEvent(),
-		pluginEvent:      trisolaris.NewPluginEvent(),
+		vTapEvent:        NewVTapEvent(),
+		tsdbEvent:        NewTSDBEvent(),
+		ntpEvent:         NewNTPEvent(),
+		upgradeEvent:     NewUpgradeEvent(),
+		processInfoEvent: NewprocessInfoEvent(),
+		pluginEvent:      NewPluginEvent(),
 		prometheusEvent:  prometheus.NewSynchronizerEvent(),
 	}
 }

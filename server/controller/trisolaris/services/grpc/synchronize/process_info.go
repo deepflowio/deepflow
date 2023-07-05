@@ -20,8 +20,8 @@ import (
 	context "golang.org/x/net/context"
 
 	api "github.com/deepflowio/deepflow/message/trident"
-	"github.com/deepflowio/deepflow/server/controller/grpc/statsd"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/services/grpc/statsd"
 )
 
 var EmptyGPIDResponse = &api.GPIDSyncResponse{}
