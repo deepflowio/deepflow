@@ -28,11 +28,15 @@ target/
 /server/libs/datatype/pb/flow_log.proto
 /server/libs/stats/pb/stats.proto
 /server/libs/stats/pb/stats.pb.go
+/agent/src/ebpf/kernel/*.ll
+/agent/src/ebpf/kernel/*.objdump
+/agent/src/ebpf/kernel/*.elf
 /agent/src/ebpf/user/socket_trace_bpf_5_2.c
 /agent/src/ebpf/user/socket_trace_bpf_core.c
 /agent/src/ebpf/user/socket_trace_bpf_common.c
 /agent/src/ebpf/user/socket_trace_bpf_5_2_plus.c
 /agent/src/ebpf/user/socket_trace_bpf_kylin.c
+/agent/src/ebpf/user/perf_profiler_bpf_common.c
 /agent/src/ebpf/.profiler
 /agent/src/ebpf/.socket-tracer
 /agent/src/ebpf/samples/rust/profiler/target
