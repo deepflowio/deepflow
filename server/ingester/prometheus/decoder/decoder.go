@@ -79,6 +79,7 @@ type PrometheusSamplesBuilder struct {
 	platformData        *grpc.PlatformInfoTable
 	platformDataVersion uint64
 	appLabelColumnAlign int
+	ignoreUniversalTag  bool
 
 	// temporary buffers
 	metricName              string
@@ -104,7 +105,7 @@ func (d *PrometheusSamplesBuilder) GetCounter() interface{} {
 	return counter
 }
 
-func NewPrometheusSamplesBuilder(name string, index int, platformData *grpc.PlatformInfoTable, labelTable *PrometheusLabelTable, appLabelColumnAlign int) *PrometheusSamplesBuilder {
+func NewPrometheusSamplesBuilder(name string, index int, platformData *grpc.PlatformInfoTable, labelTable *PrometheusLabelTable, appLabelColumnAlign int, ignoreUniversalTag bool) *PrometheusSamplesBuilder {
 	p := &PrometheusSamplesBuilder{
 		name:                     name,
 		platformData:             platformData,
@@ -113,6 +114,7 @@ func NewPrometheusSamplesBuilder(name string, index int, platformData *grpc.Plat
 		instanceIPToUniversalTag: make(map[uint32]zerodoc.UniversalTag),
 		vtapIDToUniversalTag:     make(map[uint16]zerodoc.UniversalTag),
 		appLabelColumnAlign:      appLabelColumnAlign,
+		ignoreUniversalTag:       ignoreUniversalTag,
 		counter:                  &BuilderCounter{},
 	}
 	common.RegisterCountableForIngester("decoder", p, stats.OptionStatTags{
@@ -146,7 +148,7 @@ func NewDecoder(
 ) *Decoder {
 	return &Decoder{
 		index:            index,
-		samplesBuilder:   NewPrometheusSamplesBuilder("prometheus-builder", index, platformData, prometheusLabelTable, config.AppLabelColumnIncrement),
+		samplesBuilder:   NewPrometheusSamplesBuilder("prometheus-builder", index, platformData, prometheusLabelTable, config.AppLabelColumnIncrement, config.IgnoreUniversalTag),
 		inQueue:          inQueue,
 		slowDecodeQueue:  slowDecodeQueue,
 		debugEnabled:     log.IsEnabledFor(logging.DEBUG),
@@ -287,8 +289,10 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID uint16, ts *prompb.T
 		}
 	}
 
+	metricHasSkipped := false
 	for _, l := range ts.Labels {
-		if l.Name == model.MetricNameLabel {
+		if !metricHasSkipped && l.Name == model.MetricNameLabel {
+			metricHasSkipped = true
 			continue
 		}
 		b.counter.LabelCount++
@@ -366,21 +370,32 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID uint16, ts *prompb.T
 			continue
 		}
 
-		m := dbwriter.AcquirePrometheusSample()
-		m.Timestamp = uint32(model.Time(s.Timestamp).Unix())
-		m.MetricID = metricID
-		m.TargetID = targetID
-		m.AppLabelValueIDs = append(m.AppLabelValueIDs, b.appLabelValueIDsBuffer...)
-		m.Value = v
-
-		if i == 0 {
-			b.fillUniversalTag(m, vtapID, podName, instance, podNameID, instanceID, false)
-			universalTag = &m.UniversalTag
+		if b.ignoreUniversalTag {
+			m := dbwriter.AcquirePrometheusSampleMini()
+			m.Timestamp = uint32(model.Time(s.Timestamp).Unix())
+			m.MetricID = metricID
+			m.TargetID = targetID
+			m.AppLabelValueIDs = append(m.AppLabelValueIDs, b.appLabelValueIDsBuffer...)
+			m.Value = v
+			b.samplesBuffer = append(b.samplesBuffer, m)
 		} else {
-			// all samples share the same universal tag
-			m.UniversalTag = *universalTag
+			m := dbwriter.AcquirePrometheusSample()
+			m.Timestamp = uint32(model.Time(s.Timestamp).Unix())
+			m.MetricID = metricID
+			m.TargetID = targetID
+			m.AppLabelValueIDs = append(m.AppLabelValueIDs, b.appLabelValueIDsBuffer...)
+			m.Value = v
+
+			if i == 0 {
+				b.fillUniversalTag(m, vtapID, podName, instance, podNameID, instanceID, false)
+				universalTag = &m.UniversalTag
+			} else {
+				// all samples share the same universal tag
+				m.UniversalTag = *universalTag
+			}
+			b.samplesBuffer = append(b.samplesBuffer, m)
 		}
-		b.samplesBuffer = append(b.samplesBuffer, m)
+
 		b.counter.Sample++
 	}
 	return false, nil

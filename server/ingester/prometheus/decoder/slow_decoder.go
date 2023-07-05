@@ -106,7 +106,7 @@ func NewSlowDecoder(
 ) *SlowDecoder {
 	return &SlowDecoder{
 		index:            index,
-		samplesBuilder:   NewPrometheusSamplesBuilder("slow-prometheus-builder", index, platformData, prometheusLabelTable, config.AppLabelColumnIncrement),
+		samplesBuilder:   NewPrometheusSamplesBuilder("slow-prometheus-builder", index, platformData, prometheusLabelTable, config.AppLabelColumnIncrement, config.IgnoreUniversalTag),
 		labelTable:       prometheusLabelTable,
 		inQueue:          inQueue,
 		debugEnabled:     log.IsEnabledFor(logging.DEBUG),
