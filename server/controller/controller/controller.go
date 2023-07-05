@@ -52,9 +52,9 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 
 	_ "github.com/deepflowio/deepflow/server/controller/grpc/controller"
+	_ "github.com/deepflowio/deepflow/server/controller/grpc/synchronizer"
 	_ "github.com/deepflowio/deepflow/server/controller/trisolaris/services/grpc/debug"
 	_ "github.com/deepflowio/deepflow/server/controller/trisolaris/services/grpc/healthcheck"
-	_ "github.com/deepflowio/deepflow/server/controller/trisolaris/services/grpc/synchronize"
 	_ "github.com/deepflowio/deepflow/server/controller/trisolaris/services/http/cache"
 	_ "github.com/deepflowio/deepflow/server/controller/trisolaris/services/http/upgrade"
 )
