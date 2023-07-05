@@ -15,6 +15,7 @@
  */
 
 use std::{
+    net::IpAddr,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc, Condvar, Mutex,
@@ -26,6 +27,7 @@ use std::{
 
 use arc_swap::access::Access;
 use log::{debug, error, info};
+use parking_lot::RwLock;
 use ring::digest;
 use tokio::runtime::Runtime;
 
@@ -35,7 +37,7 @@ use crate::{
     rpc::Session,
     utils::command::{get_hostname, get_ip_address},
 };
-use public::proto::trident::{self, Exception, GenesisSyncRequest, GenesisSyncResponse};
+use public::proto::trident::{self, Exception};
 
 const SHA1_DIGEST_LEN: usize = 20;
 
@@ -47,6 +49,7 @@ struct ProcessArgs {
     session: Arc<Session>,
     timer: Arc<Condvar>,
     exception_handler: ExceptionHandler,
+    ctrl_ip: Arc<RwLock<IpAddr>>,
 }
 
 #[derive(Default)]
@@ -69,12 +72,14 @@ pub struct PlatformSynchronizer {
     thread: Mutex<Option<JoinHandle<()>>>,
     session: Arc<Session>,
     exception_handler: ExceptionHandler,
+    ctrl_ip: Arc<RwLock<IpAddr>>,
 }
 
 impl PlatformSynchronizer {
     pub fn new(
         runtime: Arc<Runtime>,
         config: PlatformAccess,
+        ctrl_ip: IpAddr,
         session: Arc<Session>,
         exception_handler: ExceptionHandler,
     ) -> Self {
@@ -92,6 +97,7 @@ impl PlatformSynchronizer {
             thread: Mutex::new(None),
             session,
             exception_handler,
+            ctrl_ip: Arc::new(RwLock::new(ctrl_ip)),
         }
     }
 
@@ -105,7 +111,8 @@ impl PlatformSynchronizer {
             let config_guard = self.config.load();
             let err = format!(
                 "PlatformSynchronizer has already stopped with ctrl-ip:{} vtap-id:{}",
-                config_guard.source_ip, config_guard.vtap_id
+                self.ctrl_ip.read(),
+                config_guard.vtap_id
             );
             debug!("{}", err);
             return;
@@ -127,7 +134,8 @@ impl PlatformSynchronizer {
             let config_guard = self.config.load();
             let err = format!(
                 "PlatformSynchronizer has already running with ctrl-ip:{} vtap-id:{}",
-                config_guard.source_ip, config_guard.vtap_id
+                self.ctrl_ip.read(),
+                config_guard.vtap_id
             );
             debug!("{}", err);
             return;
@@ -143,6 +151,7 @@ impl PlatformSynchronizer {
             timer: self.timer.clone(),
             session: self.session.clone(),
             exception_handler: self.exception_handler.clone(),
+            ctrl_ip: self.ctrl_ip.clone(),
         };
 
         let handle = thread::Builder::new()
@@ -152,6 +161,12 @@ impl PlatformSynchronizer {
         *self.thread.lock().unwrap() = Some(handle);
 
         info!("PlatformSynchronizer started");
+    }
+
+    pub fn reset_session(&self, controller_ips: Vec<String>, new_ctrl_ip: IpAddr) {
+        self.session.reset_server_ip(controller_ips);
+        let mut ctrl_ip = self.ctrl_ip.write();
+        *ctrl_ip = new_ctrl_ip;
     }
 
     fn query_platform(
@@ -213,7 +228,7 @@ impl PlatformSynchronizer {
     ) -> Result<u64, tonic::Status> {
         let config_guard = process_args.config.load();
         let trident_type = config_guard.trident_type;
-        let ctrl_ip = config_guard.source_ip;
+        let ctrl_ip = process_args.ctrl_ip.read();
         let platform_enabled = config_guard.enabled;
         drop(config_guard);
 
@@ -257,7 +272,7 @@ impl PlatformSynchronizer {
             let config_guard = args.config.load();
             let cur_vtap_id = config_guard.vtap_id;
             let trident_type = config_guard.trident_type;
-            let ctrl_ip = config_guard.source_ip;
+            let ctrl_ip = args.ctrl_ip.read();
             let poll_interval = config_guard.sync_interval;
             drop(config_guard);
 

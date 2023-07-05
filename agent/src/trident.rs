@@ -447,6 +447,7 @@ impl Trident {
             let syn = Arc::new(PlatformSynchronizer::new(
                 runtime.clone(),
                 config_handler.platform(),
+                ctrl_ip,
                 session.clone(),
                 ext.clone(),
                 exception_handler.clone(),
@@ -463,6 +464,7 @@ impl Trident {
         let platform_synchronizer = Arc::new(PlatformSynchronizer::new(
             runtime.clone(),
             config_handler.platform(),
+            ctrl_ip,
             session.clone(),
             exception_handler.clone(),
         ));
@@ -714,6 +716,9 @@ fn parse_tap_type(components: &mut Components, tap_types: Vec<trident::TapType>)
 pub struct DomainNameListener {
     stats_collector: Arc<stats::Collector>,
     synchronizer: Arc<Synchronizer>,
+    platform_synchronizer: Arc<PlatformSynchronizer>,
+    #[cfg(target_os = "linux")]
+    api_watcher: Arc<ApiWatcher>,
 
     ips: Vec<String>,
     domain_names: Vec<String>,
@@ -728,12 +733,17 @@ impl DomainNameListener {
     fn new(
         stats_collector: Arc<stats::Collector>,
         synchronizer: Arc<Synchronizer>,
+        platform_synchronizer: Arc<PlatformSynchronizer>,
+        #[cfg(target_os = "linux")] api_watcher: Arc<ApiWatcher>,
         domain_names: Vec<String>,
         ips: Vec<String>,
     ) -> DomainNameListener {
         Self {
             stats_collector: stats_collector.clone(),
             synchronizer: synchronizer.clone(),
+            platform_synchronizer: platform_synchronizer.clone(),
+            #[cfg(target_os = "linux")]
+            api_watcher: api_watcher.clone(),
 
             domain_names: domain_names.clone(),
             ips: ips.clone(),
@@ -766,6 +776,9 @@ impl DomainNameListener {
             return;
         }
         let synchronizer = self.synchronizer.clone();
+        let platform_synchronizer = self.platform_synchronizer.clone();
+        #[cfg(target_os = "linux")]
+        let api_watcher = self.api_watcher.clone();
 
         let mut ips = self.ips.clone();
         let domain_names = self.domain_names.clone();
@@ -813,6 +826,9 @@ impl DomainNameListener {
                                 ctrl_ip.to_string(),
                                 ctrl_mac.to_string(),
                             );
+                            platform_synchronizer.reset_session(ips.clone(), ctrl_ip);
+                            #[cfg(target_os = "linux")]
+                            api_watcher.reset_session(ips.clone(), ctrl_ip);
                         }
                     }
                 })
@@ -1046,6 +1062,7 @@ impl Components {
         let api_watcher = Arc::new(ApiWatcher::new(
             runtime.clone(),
             config_handler.platform(),
+            ctrl_ip,
             session.clone(),
             exception_handler.clone(),
             stats_collector.clone(),
@@ -1747,6 +1764,9 @@ impl Components {
         let domain_name_listener = DomainNameListener::new(
             stats_collector.clone(),
             synchronizer.clone(),
+            platform_synchronizer.clone(),
+            #[cfg(target_os = "linux")]
+            api_watcher.clone(),
             config_handler.static_config.controller_domain_name.clone(),
             config_handler.static_config.controller_ips.clone(),
         );
