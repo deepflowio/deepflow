@@ -136,19 +136,17 @@ func (s *Synchronizer) assembleTargetFully() ([]*trident.TargetResponse, error) 
 	nonInstances := mapset.NewSet[string]()
 	nonJobs := mapset.NewSet[string]()
 	targets := make([]*trident.TargetResponse, 0)
-	s.cache.Target.Get().Range(func(k, v interface{}) bool {
-		tk := k.(cache.TargetKey)
+	for tk, targetID := range s.cache.Target.Get() {
 		tInstanceID, ok := s.cache.LabelValue.GetIDByValue(tk.Instance)
 		if !ok {
 			nonInstances.Add(tk.Instance)
-			return true
+			continue
 		}
 		tJobID, ok := s.cache.LabelValue.GetIDByValue(tk.Job)
 		if !ok {
 			nonJobs.Add(tk.Job)
-			return true
+			continue
 		}
-		targetID := v.(int)
 		targets = append(targets, &trident.TargetResponse{
 			Instance:   &tk.Instance,
 			Job:        &tk.Job,
@@ -158,8 +156,7 @@ func (s *Synchronizer) assembleTargetFully() ([]*trident.TargetResponse, error) 
 			MetricIds:  s.cache.MetricTarget.GetMetricIDsByTargetID(targetID),
 		})
 		s.statsdCounter.SendTargetCount++
-		return true
-	})
+	}
 	if nonInstances.Cardinality() > 0 {
 		log.Warningf("target instance ids: %v not found", nonInstances.ToSlice())
 	}
@@ -206,7 +203,6 @@ func (s *Synchronizer) prepare(req *trident.PrometheusLabelRequest) error {
 		targetKey := cache.NewTargetKey(instanceValue, jobValue)
 		targetID, ok := s.cache.Target.GetIDByKey(targetKey)
 		if ok {
-			log.Debugf("metric: %s target id found, instance: %s, job: %s, id: %d", mn, instanceValue, jobValue, targetID)
 			s.tryAppendMetricTargetToAdd(metricTargetsToAdd, mn, targetID)
 			for _, l := range m.GetLabels() {
 				ln := l.GetName()
@@ -332,29 +328,45 @@ func (s *Synchronizer) assembleMetricLabel(mls []*trident.MetricLabelRequest) ([
 		}
 
 		var rls []*trident.LabelResponse
+		var instanceValue string
+		var jobValue string
 		for _, l := range ml.GetLabels() {
 			s.statsdCounter.ReceiveLabelCount++
 			ln := l.GetName()
-			lv := l.GetValue()
-			ni, ok := s.cache.LabelName.GetIDByName(ln)
-			if !ok {
-				nonLabelNames.Add(ln)
-				continue
+			if ln == TargetLabelInstance {
+				instanceValue = l.GetValue()
+			} else if ln == TargetLabelJob {
+				jobValue = l.GetValue()
 			}
-			vi, ok := s.cache.LabelValue.GetIDByValue(lv)
-			if !ok {
-				nonLabelValues.Add(lv)
-				continue
+			if instanceValue != "" && jobValue != "" {
+				break
 			}
-			id, _ := s.cache.MetricAndAPPLabelLayout.GetIndexByKey(cache.NewLayoutKey(mn, ln))
-			rls = append(rls, &trident.LabelResponse{
-				Name:                &ln,
-				NameId:              proto.Uint32(uint32(ni)),
-				Value:               &lv,
-				ValueId:             proto.Uint32(uint32(vi)),
-				AppLabelColumnIndex: proto.Uint32(uint32(id)),
-			})
-			s.statsdCounter.SendLabelCount++
+		}
+		// responses column index only if instance and job matches one target
+		if _, ok := s.cache.Target.GetIDByKey(cache.NewTargetKey(instanceValue, jobValue)); ok {
+			for _, l := range ml.GetLabels() {
+				ln := l.GetName()
+				lv := l.GetValue()
+				ni, ok := s.cache.LabelName.GetIDByName(ln)
+				if !ok {
+					nonLabelNames.Add(ln)
+					continue
+				}
+				vi, ok := s.cache.LabelValue.GetIDByValue(lv)
+				if !ok {
+					nonLabelValues.Add(lv)
+					continue
+				}
+				id, _ := s.cache.MetricAndAPPLabelLayout.GetIndexByKey(cache.NewLayoutKey(mn, ln))
+				rls = append(rls, &trident.LabelResponse{
+					Name:                &ln,
+					NameId:              proto.Uint32(uint32(ni)),
+					Value:               &lv,
+					ValueId:             proto.Uint32(uint32(vi)),
+					AppLabelColumnIndex: proto.Uint32(uint32(id)),
+				})
+				s.statsdCounter.SendLabelCount++
+			}
 		}
 		respMLs = append(respMLs, &trident.MetricLabelResponse{
 			MetricName: &mn,
