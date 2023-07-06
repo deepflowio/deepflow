@@ -526,7 +526,7 @@ func (e *VTapEvent) noVTapResponse(in *api.SyncRequest) *api.SyncResponse {
 			}
 		}
 		configInfo.TridentType = &tridentType
-		configInfo.Enabled = proto.Bool(true)
+		configInfo.Enabled = proto.Bool(false)
 		value := gVTapInfo.GetKubernetesClusterID(in.GetKubernetesClusterId(), vtapCacheKey, in.GetKubernetesForceWatch())
 		if value == vtapCacheKey {
 			configInfo.KubernetesApiEnabled = proto.Bool(true)
