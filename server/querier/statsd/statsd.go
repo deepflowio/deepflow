@@ -54,7 +54,7 @@ func (c *Counter) WriteCk(qc *ClickhouseCounter) {
 		defer c.writeCkM.Unlock()
 		c.ck.ResponseSize += qc.ResponseSize
 		c.ck.RowCount += qc.RowCount
-		c.ck.ColumnCount += qc.ColumnCount
+		c.ck.ColumnCount += qc.ColumnCount * qc.RowCount
 		c.ck.QueryCount++
 
 		c.ck.QueryTimeSum += qc.QueryTime

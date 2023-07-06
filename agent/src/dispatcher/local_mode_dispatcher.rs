@@ -502,12 +502,15 @@ impl LocalModeDispatcherListener {
     fn get_if_index_to_inner_mac_map(poller: &GenericPoller, ns: &NsFile) -> HashMap<u32, MacAddr> {
         let mut result = HashMap::new();
 
-        if let Some(entries) = poller.get_interface_info_in(ns) {
-            debug!("Poller Mac:");
-            for entry in entries {
-                debug!("\tif_index: {}, mac: {}, mapped", entry.tap_idx, entry.mac);
-                result.insert(entry.tap_idx, entry.mac);
+        match poller.get_interface_info_in(ns) {
+            Some(entries) if !entries.is_empty() => {
+                debug!("Poller Mac:");
+                for entry in entries {
+                    debug!("\tif_index: {}, mac: {}, mapped", entry.tap_idx, entry.mac);
+                    result.insert(entry.tap_idx, entry.mac);
+                }
             }
+            _ => return result,
         }
 
         let links = if matches!(ns, NsFile::Root) {

@@ -19,6 +19,7 @@ package router
 import (
 	"context"
 	"io/ioutil"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -42,6 +43,8 @@ func promQuery(svc *service.PrometheusService) gin.HandlerFunc {
 		// ref: https://github.com/prometheus/prometheus/blob/main/prompb/types.proto#L157
 		args.StartTime = c.Request.FormValue("time")
 		args.EndTime = c.Request.FormValue("time")
+		debug := c.Request.FormValue("debug")
+		args.Debug, _ = strconv.ParseBool(debug)
 		result, err := svc.PromInstantQueryService(&args, c.Request.Context())
 		if err != nil {
 			c.JSON(500, &model.PromQueryResponse{Error: err.Error(), Status: _STATUS_FAIL})
@@ -59,8 +62,8 @@ func promQueryRange(svc *service.PrometheusService) gin.HandlerFunc {
 		args.StartTime = c.Request.FormValue("start")
 		args.EndTime = c.Request.FormValue("end")
 		args.Step = c.Request.FormValue("step")
-		//pp.Println(c.Request.Header.Get("Accept"))
-		//pp.Println(args.Promql)
+		debug := c.Request.FormValue("debug")
+		args.Debug, _ = strconv.ParseBool(debug)
 
 		result, err := svc.PromRangeQueryService(&args, c.Request.Context())
 		if err != nil {

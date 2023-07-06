@@ -1372,24 +1372,26 @@ impl FlowMap {
         // To avoid using each package to query policies that may lead to CPU increase and performance decrease,
         // there will not be use config.capacity to limit the addition of FlowNode
         self.stats_counter.new.fetch_add(1, Ordering::Relaxed);
-        let node = match meta_packet.lookup_key.proto {
+        let mut node = match meta_packet.lookup_key.proto {
             IpProtocol::Tcp => self.new_tcp_node(config, meta_packet),
             IpProtocol::Udp => self.new_udp_node(config, meta_packet),
             _ => self.new_other_node(config, meta_packet),
         };
-        if meta_packet.signal_source == SignalSource::EBPF
-            && node.meta_flow_log.is_some()
-            && node.meta_flow_log.as_ref().unwrap().server_port == 0
-        {
-            // For ebpf data, if server_port is 0, it means that parsed data failed,
-            // the info in node maybe wrong, we should not create this node.
-            None
-        } else {
-            self.stats_counter
-                .concurrent
-                .fetch_add(1, Ordering::Relaxed);
-            Some(node)
+
+        if meta_packet.signal_source == SignalSource::EBPF {
+            node.tagged_flow.flow.netns_id = meta_packet.netns_id;
+            if node.meta_flow_log.is_some() && node.meta_flow_log.as_ref().unwrap().server_port == 0
+            {
+                // For ebpf data, if server_port is 0, it means that parsed data failed,
+                // the info in node maybe wrong, we should not create this node.
+                return None;
+            }
         }
+
+        self.stats_counter
+            .concurrent
+            .fetch_add(1, Ordering::Relaxed);
+        Some(node)
     }
 
     fn flush_queue(&mut self, config: &FlowConfig, now: Duration) {

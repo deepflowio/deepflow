@@ -142,6 +142,7 @@ func L7FlowLogToExportRequest(l7 *log_data.L7FlowLog, universalTagsManager *Univ
 		putIntWithoutZero(spanAttrs, "df.span.syscall_cap_seq_0", int64(l7.SyscallCapSeq0))
 		putIntWithoutZero(spanAttrs, "df.span.syscall_cap_seq_1", int64(l7.SyscallCapSeq1))
 		putStrWithoutEmpty(spanAttrs, "df.span.native.trace_id", l7.TraceId)
+		putStrWithoutEmpty(spanAttrs, "df.span.native.span_id", l7.SpanId)
 
 		span.SetTraceID(getTraceID(l7.TraceId, l7.ID()))
 		if l7.SignalSource == uint16(datatype.SIGNAL_SOURCE_OTEL) {

@@ -223,9 +223,9 @@ pub struct AppProtoLogsBaseInfo {
     #[serde(skip)]
     pub is_vip_interface_dst: bool,
     #[serde(skip)]
-    pub netns_id_0: u64,
+    pub netns_id_0: u32,
     #[serde(skip)]
-    pub netns_id_1: u64,
+    pub netns_id_1: u32,
 }
 
 pub fn duration_to_micros<S>(d: &Duration, serializer: S) -> Result<S::Ok, S::Error>

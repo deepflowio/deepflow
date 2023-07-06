@@ -55,7 +55,7 @@ pub struct ProcessData {
     // Vec<key, val>
     pub os_app_tags: Vec<OsAppTagKV>,
     // netns file inode
-    pub netns_id: u64,
+    pub netns_id: u32,
     // pod container id in kubernetes
     pub container_id: String,
 }
@@ -148,7 +148,7 @@ impl TryFrom<&Process> for ProcessData {
                 }
             },
             os_app_tags: vec![],
-            netns_id: get_proc_netns(proc)?,
+            netns_id: get_proc_netns(proc)? as u32,
             container_id: get_container_id(proc).unwrap_or("".to_string()),
         })
     }
@@ -174,7 +174,7 @@ impl From<&ProcessData> for ProcessInfo {
                 }
                 tags
             },
-            netns_id: Some(p.netns_id as u32),
+            netns_id: Some(p.netns_id),
             container_id: Some(p.container_id.clone()),
         }
     }

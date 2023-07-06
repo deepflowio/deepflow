@@ -32,23 +32,28 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse"
 )
 
-func promReaderExecute(ctx context.Context, req *prompb.ReadRequest) (resp *prompb.ReadResponse, err error) {
+func promReaderExecute(ctx context.Context, req *prompb.ReadRequest, debug bool) (resp *prompb.ReadResponse, sql string, duration float64, err error) {
 	// promrequest trans to sql
 	// pp.Println(req)
 	ctx, sql, db, datasource, err := promReaderTransToSQL(ctx, req)
 	// fmt.Println(sql, db)
 	if err != nil {
-		return nil, err
+		return nil, "", 0, err
 	}
 	if db == "" {
 		db = "prometheus"
 	}
 	query_uuid := uuid.New()
+	// mark query comes from promql
+	//lint:ignore SA1029 use string as context key, ensure no `type` reference to app/prometheus
+	ctx = context.WithValue(ctx, "remote_read", true)
+	// if `api` pass `debug` or config debug, get debug info from querier
+	debugQuerier := debug || config.Cfg.Prometheus.RequestQueryWithDebug
 	args := common.QuerierParams{
 		DB:         db,
 		Sql:        sql,
 		DataSource: datasource,
-		Debug:      strconv.FormatBool(config.Cfg.Prometheus.RequestQueryWithDebug),
+		Debug:      strconv.FormatBool(debugQuerier),
 		QueryUUID:  query_uuid.String(),
 		Context:    ctx,
 	}
@@ -68,17 +73,20 @@ func promReaderExecute(ctx context.Context, req *prompb.ReadRequest) (resp *prom
 
 	ckEngine := &clickhouse.CHEngine{DB: args.DB, DataSource: args.DataSource}
 	ckEngine.Init()
-	result, debug, err := ckEngine.ExecuteQuery(&args)
+	result, debugInfo, err := ckEngine.ExecuteQuery(&args)
 	if err != nil {
-		// TODO
-		log.Errorf("ExecuteQuery failed, debug info = %v, err info = %v", debug, err)
-		return nil, err
+		log.Errorf("ExecuteQuery failed, debug info = %v, err info = %v", debugInfo, err)
+		return nil, "", 0, err
+	}
+
+	if debugQuerier {
+		duration = extractQueryTimeFromQueryResponse(debugInfo)
+		sql = extractQuerySQLFromQueryResponse(debugInfo)
 	}
 
 	if config.Cfg.Prometheus.RequestQueryWithDebug {
 		// inject query_time for current span
-		query_time := extractDebugInfoFromQueryResponse(debug)
-		span.SetAttributes(attribute.Float64("query_time", query_time))
+		span.SetAttributes(attribute.Float64("query_time", duration))
 
 		// inject labels for parent span
 		targetLabels := make([]string, 0, len(result.Schemas))
@@ -103,20 +111,27 @@ func promReaderExecute(ctx context.Context, req *prompb.ReadRequest) (resp *prom
 	resp, err = respTransToProm(ctx, result)
 	if err != nil {
 		log.Error(err)
-		return nil, err
+		return nil, "", 0, err
 	}
 	// pp.Println(resp)
-	return resp, nil
+	return resp, sql, duration, nil
 }
 
 // extract query_time from query debug(map[string]interface{}) infos
-func extractDebugInfoFromQueryResponse(debug map[string]interface{}) float64 {
+func extractQueryTimeFromQueryResponse(debug map[string]interface{}) float64 {
 	if debug["query_time"] != nil {
 		query_time_str := strings.ReplaceAll(debug["query_time"].(string), "s", "")
 		query_time, _ := strconv.ParseFloat(query_time_str, 64)
 		return query_time
 	}
 	return 0
+}
+
+func extractQuerySQLFromQueryResponse(debug map[string]interface{}) string {
+	if debug["sql"] != nil {
+		return debug["sql"].(string)
+	}
+	return ""
 }
 
 func queryDataExecute(ctx context.Context, sql string, db string, ds string) (*common.Result, error) {

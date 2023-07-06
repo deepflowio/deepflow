@@ -886,9 +886,6 @@ pub enum Components {
 pub struct WatcherComponents {
     pub api_watcher: Arc<ApiWatcher>,
     pub prometheus_targets_watcher: Arc<TargetsWatcher>,
-    pub libvirt_xml_extractor: Arc<LibvirtXmlExtractor>, // FIXME: Delete this component
-    pub platform_synchronizer: Arc<PlatformSynchronizer>,
-    pub kubernetes_poller: Arc<GenericPoller>,
     pub domain_name_listener: DomainNameListener,
     pub running: AtomicBool,
     tap_mode: TapMode,
@@ -904,8 +901,6 @@ impl WatcherComponents {
         session: &Arc<Session>,
         synchronizer: &Arc<Synchronizer>,
         exception_handler: ExceptionHandler,
-        libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
-        platform_synchronizer: Arc<PlatformSynchronizer>,
         agent_mode: RunningMode,
         runtime: Arc<Runtime>,
     ) -> Result<Self> {
@@ -923,16 +918,6 @@ impl WatcherComponents {
             config_handler.static_config.controller_domain_name.clone(),
             config_handler.static_config.controller_ips.clone(),
         );
-        let kubernetes_poller = Arc::new(GenericPoller::new(
-            config_handler.static_config.controller_ips[0].parse()?,
-            config_handler.platform(),
-            config_handler
-                .candidate_config
-                .dispatcher
-                .extra_netns_regex
-                .clone(),
-        ));
-        platform_synchronizer.set_kubernetes_poller(kubernetes_poller.clone());
         let prometheus_targets_watcher = Arc::new(TargetsWatcher::new(
             runtime.clone(),
             config_handler.platform(),
@@ -944,11 +929,8 @@ impl WatcherComponents {
         info!("With ONLY_WATCH_K8S_RESOURCE and IN_CONTAINER environment variables set, the agent will only watch K8s resource");
         Ok(WatcherComponents {
             api_watcher,
-            platform_synchronizer,
-            kubernetes_poller,
             prometheus_targets_watcher,
             domain_name_listener,
-            libvirt_xml_extractor,
             running: AtomicBool::new(false),
             tap_mode: candidate_config.tap_mode,
             agent_mode,
@@ -964,7 +946,6 @@ impl WatcherComponents {
         if matches!(self.agent_mode, RunningMode::Managed) {
             self.api_watcher.start();
         }
-        self.kubernetes_poller.start();
         self.domain_name_listener.start();
         self.prometheus_targets_watcher.start();
         info!("Started watcher components.");
@@ -975,7 +956,6 @@ impl WatcherComponents {
             return;
         }
         self.api_watcher.stop();
-        self.kubernetes_poller.stop();
         self.domain_name_listener.stop();
         self.prometheus_targets_watcher.stop();
         info!("Stopped watcher components.")
@@ -2394,8 +2374,6 @@ impl Components {
                 session,
                 synchronizer,
                 exception_handler,
-                libvirt_xml_extractor,
-                platform_synchronizer,
                 agent_mode,
                 runtime,
             )?;
