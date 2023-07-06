@@ -17,6 +17,8 @@
 package clickhouse
 
 import (
+	"context"
+
 	//"github.com/k0kubun/pp"
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/parse"
@@ -265,6 +267,7 @@ func TestGetSql(t *testing.T) {
 			db = "flow_log"
 		}
 		e := CHEngine{DB: db}
+		e.Context = context.Background()
 		e.Init()
 		parser := parse.Parser{Engine: &e}
 		parser.ParseSQL(pcase.input)

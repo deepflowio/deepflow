@@ -28,6 +28,7 @@ import (
 	"github.com/Knetic/govaluate"
 	"github.com/deepflowio/deepflow/server/libs/utils"
 	"github.com/deepflowio/deepflow/server/querier/config"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
@@ -130,7 +131,7 @@ func TransWhereTagFunction(name string, args []string) (filter string) {
 }
 
 type WhereStatement interface {
-	Trans(sqlparser.Expr, *Where, map[string]string, string, string) (view.Node, error)
+	Trans(sqlparser.Expr, *Where, *CHEngine) (view.Node, error)
 }
 
 type WhereTag struct {
@@ -138,8 +139,16 @@ type WhereTag struct {
 	Value string
 }
 
-func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]string, db, table string) (view.Node, error) {
+func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node, error) {
 	op := expr.(*sqlparser.ComparisonExpr).Operator
+	asTagMap := e.AsTagMap
+	db := e.DB
+	table := e.Table
+	isRemoteRead := false
+	remoteRead := e.Context.Value("remote_read")
+	if remoteRead != nil {
+		isRemoteRead = remoteRead.(bool)
+	}
 	tagItem, ok := tag.GetTag(strings.Trim(t.Tag, "`"), db, table, "default")
 	whereTag := t.Tag
 	if strings.ToLower(op) == "like" || strings.ToLower(op) == "not like" {
@@ -320,6 +329,14 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 						}
 					} else if strings.HasPrefix(preAsTag, "tag.") || strings.HasPrefix(preAsTag, "attribute.") {
 						if strings.HasPrefix(preAsTag, "tag.") {
+							if isRemoteRead {
+								originFilter := sqlparser.String(expr)
+								filter, err := GetRemoteReadFilter(preAsTag, table, op, t.Value, originFilter, e)
+								if err != nil {
+									return nil, err
+								}
+								return &view.Expr{Value: filter}, nil
+							}
 							if db == common.DB_NAME_PROMETHEUS {
 								filter, err := GetPrometheusFilter(preAsTag, table, op, t.Value)
 								if err != nil {
@@ -509,6 +526,14 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 					}
 				} else if strings.HasPrefix(tagName, "tag.") || strings.HasPrefix(tagName, "attribute.") {
 					if strings.HasPrefix(tagName, "tag.") {
+						if isRemoteRead {
+							originFilter := sqlparser.String(expr)
+							filter, err := GetRemoteReadFilter(tagName, table, op, t.Value, originFilter, e)
+							if err != nil {
+								return nil, err
+							}
+							return &view.Expr{Value: filter}, nil
+						}
 						if db == common.DB_NAME_PROMETHEUS {
 							filter, err := GetPrometheusFilter(tagName, table, op, t.Value)
 							if err != nil {
@@ -806,11 +831,81 @@ func GetPrometheusFilter(promTag, table, op, value string) (string, error) {
 	return filter, nil
 }
 
+func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEngine) (string, error) {
+	filter := ""
+	sql := ""
+	isAppLabel := false
+	nameNoPreffix := strings.TrimPrefix(promTag, "tag.")
+	metricID, ok := Prometheus.MetricNameToID[table]
+	if !ok {
+		errorMessage := fmt.Sprintf("%s not found", table)
+		return filter, errors.New(errorMessage)
+	}
+	labelNameID, ok := Prometheus.LabelNameToID[nameNoPreffix]
+	if !ok {
+		errorMessage := fmt.Sprintf("%s not found", nameNoPreffix)
+		return filter, errors.New(errorMessage)
+	}
+	// Determine whether the tag is app_label or target_label
+	if appLabels, ok := Prometheus.MetricAppLabelLayout[table]; ok {
+		for _, appLabel := range appLabels {
+			if appLabel.AppLabelName == nameNoPreffix {
+				isAppLabel = true
+				cacheFilter, ok := LRUCache.Get(originFilter)
+				if ok {
+					filter = cacheFilter
+					break
+				}
+				if strings.Contains(op, "match") {
+					sql = fmt.Sprintf("SELECT label_value_id FROM flow_tag.app_label_live_view WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s) GROUP BY label_value_id", metricID, labelNameID, op, value)
+				} else {
+					sql = fmt.Sprintf("SELECT label_value_id FROM flow_tag.app_label_live_view WHERE metric_id=%d and label_name_id=%d and label_value %s %s GROUP BY label_value_id", metricID, labelNameID, op, value)
+				}
+				chClient := client.Client{
+					Host:     config.Cfg.Clickhouse.Host,
+					Port:     config.Cfg.Clickhouse.Port,
+					UserName: config.Cfg.Clickhouse.User,
+					Password: config.Cfg.Clickhouse.Password,
+					DB:       "flow_tag",
+				}
+				appLabelRst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
+				if err != nil {
+					return "", err
+				}
+				valueIDs := []string{}
+				for _, v := range appLabelRst.Values {
+					valueID := v.([]interface{})[0]
+					valueIDInt := valueID.(int)
+					valueIDString := fmt.Sprintf("%d", valueIDInt)
+					valueIDs = append(valueIDs, valueIDString)
+				}
+				valueIDFilter := strings.Join(valueIDs, ",")
+				filter = fmt.Sprintf("app_label_value_id_%d IN (%s)", appLabel.appLabelColumnIndex, valueIDFilter)
+				LRUCache.Add(originFilter, filter)
+				break
+			}
+		}
+	}
+	if !isAppLabel {
+		transFilter := ""
+		if strings.Contains(op, "match") {
+			transFilter = fmt.Sprintf("SELECT target_id FROM flow_tag.target_label_live_view WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s) GROUP BY target_id", metricID, labelNameID, op, value)
+		} else {
+			transFilter = fmt.Sprintf("SELECT target_id FROM flow_tag.target_label_live_view WHERE metric_id=%d and label_name_id=%d and label_value %s %s GROUP BY target_id", metricID, labelNameID, op, value)
+		}
+		targetLabelFilter := TargetLabelFilter{OriginFilter: originFilter, TransFilter: transFilter}
+		e.TargetLabelFilters = append(e.TargetLabelFilters, targetLabelFilter)
+		// FIXME Delete placeholders
+		filter = "1=1"
+	}
+	return filter, nil
+}
+
 type TimeTag struct {
 	Value string
 }
 
-func (t *TimeTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]string, db, table string) (view.Node, error) {
+func (t *TimeTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node, error) {
 	compareExpr := expr.(*sqlparser.ComparisonExpr)
 	time, err := strconv.ParseInt(t.Value, 10, 64)
 	if err == nil {
