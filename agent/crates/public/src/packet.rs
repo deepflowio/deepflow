@@ -20,13 +20,27 @@ use std::time::Duration;
 
 use crate::consts::RECORD_HEADER_LEN;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Packet<'a> {
     pub timestamp: Duration,
     pub if_index: isize,
     pub capture_length: isize,
     pub data: &'a mut [u8],
-    pub raw: Option<Vec<u8>>,
+    // Some scene packet will be copied and stored in raw, and referenced by data
+    pub raw: Option<*mut u8>,
+}
+
+unsafe impl Send for Packet<'_> {}
+unsafe impl Sync for Packet<'_> {}
+
+impl Drop for Packet<'_> {
+    fn drop(&mut self) {
+        if let Some(p) = self.raw {
+            unsafe {
+                Vec::from_raw_parts(p, 0, self.data.len());
+            }
+        }
+    }
 }
 
 pub struct MiniPacket {
