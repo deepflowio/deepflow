@@ -27,6 +27,8 @@ import (
 	"github.com/xwb1989/sqlparser"
 	"golang.org/x/exp/slices"
 
+	"github.com/deepflowio/deepflow/server/libs/lru"
+
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
@@ -40,17 +42,24 @@ import (
 var log = logging.MustGetLogger("clickhouse")
 
 var DEFAULT_LIMIT = "10000"
+var LRUCache = lru.NewCache[string, string](common.MAX_LRU_ENTRY)
+
+type TargetLabelFilter struct {
+	OriginFilter string
+	TransFilter  string
+}
 
 type CHEngine struct {
-	Model         *view.Model
-	Statements    []Statement
-	DB            string
-	Table         string
-	DataSource    string
-	asTagMap      map[string]string
-	ColumnSchemas []*common.ColumnSchema
-	View          *view.View
-	Context       context.Context
+	Model              *view.Model
+	Statements         []Statement
+	DB                 string
+	Table              string
+	DataSource         string
+	AsTagMap           map[string]string
+	ColumnSchemas      []*common.ColumnSchema
+	View               *view.View
+	Context            context.Context
+	TargetLabelFilters []TargetLabelFilter
 }
 
 func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map[string]interface{}, error) {
@@ -59,6 +68,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	var sqlList []string
 	var err error
 	sql := args.Sql
+	e.Context = args.Context
 	query_uuid := args.QueryUUID // FIXME: should be queryUUID
 	log.Debugf("query_uuid: %s | raw sql: %s", query_uuid, sql)
 	// Parse slimitSql
@@ -557,7 +567,7 @@ func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
 		return errors.New("tap_port and tap_port_type must exist together in select")
 	}
 
-	e.asTagMap = make(map[string]string)
+	e.AsTagMap = make(map[string]string)
 	for _, tag := range tags {
 		err := e.parseSelect(tag)
 		if err != nil {
@@ -579,26 +589,26 @@ func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
 					}
 				}
 				if as != "" {
-					e.asTagMap[as] = chCommon.ParseAlias(colName)
+					e.AsTagMap[as] = chCommon.ParseAlias(colName)
 				}
 			}
 			function, ok := item.Expr.(*sqlparser.FuncExpr)
 			if ok {
 				if as != "" {
-					e.asTagMap[as] = strings.Trim(sqlparser.String(function.Name), "`")
+					e.AsTagMap[as] = strings.Trim(sqlparser.String(function.Name), "`")
 				}
 			}
 			binary, ok := item.Expr.(*sqlparser.BinaryExpr)
 			if ok {
 				if as != "" {
-					e.asTagMap[as] = sqlparser.String(binary)
+					e.AsTagMap[as] = sqlparser.String(binary)
 				}
 			}
 			// Integer tag
 			val, ok := item.Expr.(*sqlparser.SQLVal)
 			if ok {
 				if as != "" {
-					e.asTagMap[as] = sqlparser.String(val)
+					e.AsTagMap[as] = sqlparser.String(val)
 				}
 			}
 		}
@@ -611,6 +621,59 @@ func (e *CHEngine) TransWhere(node *sqlparser.Where) error {
 	whereStmt := Where{time: e.Model.Time}
 	// 解析ast树并生成view.Node结构
 	expr, err := e.parseWhere(node.Expr, &whereStmt, false)
+	isRemoteRead := false
+	remoteRead := e.Context.Value("remote_read")
+	if remoteRead != nil {
+		isRemoteRead = remoteRead.(bool)
+	}
+	if isRemoteRead && len(e.TargetLabelFilters) > 0 {
+		trgetOriginFilters := make([]string, len(e.TargetLabelFilters))
+		trgetTransFilters := make([]string, len(e.TargetLabelFilters))
+		for i, trgetFilter := range e.TargetLabelFilters {
+			trgetOriginFilters[i] = trgetFilter.OriginFilter
+			trgetTransFilters[i] = trgetFilter.TransFilter
+		}
+		targetOriginFilterStr := strings.Join(trgetOriginFilters, " AND ")
+		targetFilter, ok := LRUCache.Get(targetOriginFilterStr)
+		if ok {
+			rightExpr := &view.Expr{Value: targetFilter}
+			op := view.Operator{Type: view.AND}
+			expr = &view.BinaryExpr{Left: expr, Right: rightExpr, Op: &op}
+		} else {
+			sql := strings.Join(trgetTransFilters, " INTERSECT ")
+			chClient := client.Client{
+				Host:     config.Cfg.Clickhouse.Host,
+				Port:     config.Cfg.Clickhouse.Port,
+				UserName: config.Cfg.Clickhouse.User,
+				Password: config.Cfg.Clickhouse.Password,
+				DB:       "flow_tag",
+			}
+			targetLabelRst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
+			if err != nil {
+				return err
+			}
+			targetIDs := []string{}
+			for _, v := range targetLabelRst.Values {
+				targetID := v.([]interface{})[0]
+				targetIDInt := targetID.(int)
+				targetIDString := fmt.Sprintf("%d", targetIDInt)
+				targetIDs = append(targetIDs, targetIDString)
+			}
+			if len(targetIDs) > 0 && len(targetIDs) < config.Cfg.MaxTupleElement {
+				targetIDFilter := strings.Join(targetIDs, ",")
+				targetFilter := fmt.Sprintf("target_id IN (%s)", targetIDFilter)
+				rightExpr := &view.Expr{Value: targetFilter}
+				op := view.Operator{Type: view.AND}
+				expr = &view.BinaryExpr{Left: expr, Right: rightExpr, Op: &op}
+				LRUCache.Add(targetOriginFilterStr, targetFilter)
+			} else if len(targetIDs) >= config.Cfg.MaxTupleElement {
+				targetFilter := fmt.Sprintf("target_id IN (%s)", sql)
+				rightExpr := &view.Expr{Value: targetFilter}
+				op := view.Operator{Type: view.AND}
+				expr = &view.BinaryExpr{Left: expr, Right: rightExpr, Op: &op}
+			}
+		}
+	}
 	filter := view.Filters{Expr: expr}
 	whereStmt.filter = &filter
 	e.Statements = append(e.Statements, &whereStmt)
@@ -687,7 +750,7 @@ func (e *CHEngine) TransGroupBy(groups sqlparser.GroupBy) error {
 		colName, ok := group.(*sqlparser.ColName)
 		if ok {
 			groupTag := sqlparser.String(colName)
-			preAsGroup, ok := e.asTagMap[groupTag]
+			preAsGroup, ok := e.AsTagMap[groupTag]
 			if ok {
 				groupSlice = append(groupSlice, preAsGroup)
 			} else {
@@ -697,7 +760,7 @@ func (e *CHEngine) TransGroupBy(groups sqlparser.GroupBy) error {
 		funcName, ok := group.(*sqlparser.FuncExpr)
 		if ok {
 			groupTag := sqlparser.String(funcName)
-			preAsGroup, ok := e.asTagMap[groupTag]
+			preAsGroup, ok := e.AsTagMap[groupTag]
 			if ok {
 				groupSlice = append(groupSlice, preAsGroup)
 			} else {
@@ -789,7 +852,7 @@ func (e *CHEngine) parseGroupBy(group sqlparser.Expr) error {
 		if err != nil {
 			return err
 		}
-		preAsGroup, ok := e.asTagMap[groupTag]
+		preAsGroup, ok := e.AsTagMap[groupTag]
 		if !ok {
 			_, err := e.AddTag(groupTag, "")
 			if err != nil {
@@ -804,7 +867,7 @@ func (e *CHEngine) parseGroupBy(group sqlparser.Expr) error {
 		}
 		// TODO: 特殊处理塞进group的fromat中
 		whereStmt := Where{}
-		notNullExpr, ok := GetNotNullFilter(groupTag, e.asTagMap, e.DB, e.Table)
+		notNullExpr, ok := GetNotNullFilter(groupTag, e.AsTagMap, e.DB, e.Table)
 		if !ok {
 			return nil
 		}
@@ -1065,7 +1128,7 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 }
 
 func (e *CHEngine) AddGroup(group string) error {
-	stmt, err := GetGroup(group, e.asTagMap, e.DB, e.Table)
+	stmt, err := GetGroup(group, e.AsTagMap, e.DB, e.Table)
 	if err != nil {
 		return err
 	}
@@ -1165,7 +1228,7 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where, isCheck bool) (view
 			}
 			whereValue := sqlparser.String(node.Right)
 			stmt := GetWhere(whereTag, whereValue)
-			return stmt.Trans(node, w, e.asTagMap, e.DB, e.Table)
+			return stmt.Trans(node, w, e)
 		case *sqlparser.FuncExpr, *sqlparser.BinaryExpr:
 			function, err := e.parseSelectBinaryExpr(comparExpr)
 			if err != nil {
@@ -1176,7 +1239,7 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where, isCheck bool) (view
 			}
 			outfunc := function.Trans(e.Model)
 			stmt := &WhereFunction{Function: outfunc, Value: sqlparser.String(node.Right)}
-			return stmt.Trans(node, w, e.asTagMap, e.DB, e.Table)
+			return stmt.Trans(node, w, e.AsTagMap, e.DB, e.Table)
 		}
 	case *sqlparser.FuncExpr:
 		args := []string{}
