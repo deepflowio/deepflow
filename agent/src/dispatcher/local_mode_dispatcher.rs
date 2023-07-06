@@ -15,6 +15,7 @@
  */
 
 use std::collections::{HashMap, HashSet};
+use std::mem::drop;
 use std::process::Command;
 use std::str;
 use std::sync::atomic::Ordering;
@@ -105,6 +106,7 @@ impl LocalModeDispatcher {
                 if base.tap_interface_whitelist.next_sync(Duration::ZERO) {
                     base.need_update_bpf.store(true, Ordering::Relaxed);
                 }
+                drop(recved);
                 base.check_and_update_bpf();
                 continue;
             }
@@ -263,6 +265,7 @@ impl LocalModeDispatcher {
             {
                 base.need_update_bpf.store(true, Ordering::Relaxed);
             }
+            drop(packet);
             base.check_and_update_bpf();
         }
 

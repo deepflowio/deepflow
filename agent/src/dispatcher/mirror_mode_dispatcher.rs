@@ -16,6 +16,7 @@
 
 use std::{
     collections::HashMap,
+    mem::drop,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
@@ -412,6 +413,7 @@ impl MirrorModeDispatcher {
                 if self.base.tap_interface_whitelist.next_sync(Duration::ZERO) {
                     self.base.need_update_bpf.store(true, Ordering::Relaxed);
                 }
+                drop(recved);
                 self.base.check_and_update_bpf();
                 continue;
             }
