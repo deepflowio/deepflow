@@ -28,8 +28,10 @@ use std::time::Duration;
 
 use arc_swap::{access::Map, ArcSwap};
 use bytesize::ByteSize;
-use flexi_logger::writers::FileLogWriter;
-use flexi_logger::{Age, Cleanup, Criterion, FileSpec, LoggerHandle, Naming};
+use flexi_logger::{
+    writers::FileLogWriter, Age, Cleanup, Criterion, FileSpec, FlexiLoggerError, LoggerHandle,
+    Naming,
+};
 use log::{error, info, warn, Level};
 #[cfg(target_os = "linux")]
 use regex::Regex;
@@ -1512,8 +1514,14 @@ impl ConfigHandler {
                     .set_threshold(new_config.log.log_threshold);
             }
             if candidate_config.log.log_retention != new_config.log.log_retention {
-                match self.logger_handle.reset_flw(
-                    &FileLogWriter::builder(FileSpec::try_from(&static_config.log_file).unwrap())
+                match self.logger_handle.flw_config() {
+                    Err(FlexiLoggerError::NoFileLogger) => {
+                        info!("no file logger, skipped log_retention change")
+                    }
+                    _ => match self.logger_handle.reset_flw(
+                        &FileLogWriter::builder(
+                            FileSpec::try_from(&static_config.log_file).unwrap(),
+                        )
                         .rotate(
                             Criterion::Age(Age::Day),
                             Naming::Timestamps,
@@ -1521,13 +1529,14 @@ impl ConfigHandler {
                         )
                         .create_symlink(&static_config.log_file)
                         .append(),
-                ) {
-                    Ok(_) => {
-                        info!("log_retention set to {}", new_config.log.log_retention);
-                    }
-                    Err(e) => {
-                        warn!("failed to set log_retention: {}", e);
-                    }
+                    ) {
+                        Ok(_) => {
+                            info!("log_retention set to {}", new_config.log.log_retention);
+                        }
+                        Err(e) => {
+                            warn!("failed to set log_retention: {}", e);
+                        }
+                    },
                 }
             }
             if candidate_config.log.analyzer_ip != new_config.log.analyzer_ip

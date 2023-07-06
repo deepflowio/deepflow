@@ -473,16 +473,19 @@ pub fn k8s_mem_limit_for_deepflow() -> Option<u64> {
 }
 
 pub fn get_env() -> String {
-    format!(
-        "
-    K8S_NODE_IP_FOR_DEEPFLOW: {:?}, ENV_INTERFACE_NAME: {:?}, K8S_POD_IP_FOR_DEEPFLOW: {:?}, IN_CONTAINER: {:?}, K8S_MEM_LIMIT_FOR_DEEPFLOW: {:?}, ONLY_WATCH_K8S_RESOURCE: {:?}",
-        env::var(K8S_NODE_IP_FOR_DEEPFLOW).ok(),
-        env::var(ENV_INTERFACE_NAME).ok(),
-        env::var(K8S_POD_IP_FOR_DEEPFLOW).ok(),
-        env::var(IN_CONTAINER).ok(),
-        env::var(K8S_MEM_LIMIT_FOR_DEEPFLOW).ok(),
-        env::var(ONLY_WATCH_K8S_RESOURCE).ok()
-    )
+    let items = vec![
+        K8S_NODE_IP_FOR_DEEPFLOW,
+        ENV_INTERFACE_NAME,
+        K8S_POD_IP_FOR_DEEPFLOW,
+        IN_CONTAINER,
+        K8S_MEM_LIMIT_FOR_DEEPFLOW,
+        ONLY_WATCH_K8S_RESOURCE,
+    ];
+    items
+        .into_iter()
+        .map(|name| format!("{}={}", name, env::var(name).unwrap_or_default()))
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 pub fn running_in_only_watch_k8s_mode() -> bool {

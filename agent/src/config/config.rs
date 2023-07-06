@@ -15,6 +15,7 @@
  */
 
 use std::collections::HashMap;
+use std::env;
 use std::fs;
 use std::io;
 use std::net::{IpAddr, ToSocketAddrs};
@@ -108,6 +109,23 @@ impl Config {
                     cfg.controller_domain_name
                         .push(cfg.controller_ips[i].clone());
                     cfg.controller_ips[i] = ip.unwrap();
+                }
+            }
+
+            // convert relative path to absolute
+            if Path::new(&cfg.log_file).is_relative() {
+                let Ok(mut pb) = env::current_dir() else {
+                    return Err(ConfigError::YamlConfigInvalid("get cwd failed".to_owned()));
+                };
+                pb.push(&cfg.log_file);
+                match pb.to_str() {
+                    Some(s) => cfg.log_file = s.to_owned(),
+                    None => {
+                        return Err(ConfigError::YamlConfigInvalid(format!(
+                            "invalid log path {}",
+                            cfg.log_file
+                        )))
+                    }
                 }
             }
 
