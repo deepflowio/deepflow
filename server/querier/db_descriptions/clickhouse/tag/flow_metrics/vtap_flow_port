@@ -48,4 +48,5 @@ server_port                , server_port               , server_port            
 
 tap                        , tap                       , tap                       , resource      ,                       , Capture Info    , 110
 vtap                       , vtap                      , vtap                      , resource      ,                       , Capture Info    , 111
-signal_source              , signal_source             , signal_source             , int_enum      , l4_signal_source    , Capture Info    , 111
+signal_source              , signal_source             , signal_source             , int_enum      , l4_signal_source      , Capture Info    , 111
+direction                  , direction                 , direction                 , string_enum   , direction             , Capture Info      , 111
