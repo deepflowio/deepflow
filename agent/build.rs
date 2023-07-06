@@ -123,6 +123,7 @@ fn set_linkage() -> Result<(), Box<dyn Error>> {
 
     println!("cargo:rustc-link-lib=static=dwarf");
     println!("cargo:rustc-link-lib=static=bcc_bpf");
+    #[cfg(target_arch = "x86_64")]
     println!("cargo:rustc-link-lib=static=pcap");
 
     match target_env.as_str() {

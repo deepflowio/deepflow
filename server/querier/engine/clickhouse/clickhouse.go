@@ -230,10 +230,35 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 		return nil, nil, nil
 	}
 	newSql := strings.ReplaceAll(sql, " SLIMIT ", " slimit ")
+	newSql = strings.ReplaceAll(newSql, " SORDER BY ", " sorder by ")
+	newSql = strings.ReplaceAll(newSql, " ORDER BY ", " order by ")
 	newSql = strings.ReplaceAll(newSql, " LIMIT ", " limit ")
 	newSql = strings.ReplaceAll(newSql, " WHERE ", " where ")
 	newSql = strings.ReplaceAll(newSql, " GROUP BY ", " group by ")
 	newSqlSlice := []string{}
+
+	var sorderByTag string
+	var sorderByTagSql string
+	if strings.Contains(newSql, " sorder by ") {
+		sorderBySlice := strings.Split(newSql, " sorder by ")
+		if strings.Contains(sorderBySlice[1], " order by ") {
+			orderBySlice := strings.Split(sorderBySlice[1], " order by ")
+			sorderByTagSql = orderBySlice[0]
+			sorderByTag = strings.Trim(orderBySlice[0], " ASC")
+			sorderByTag = strings.Trim(sorderByTag, " asc")
+			sorderByTag = strings.Trim(sorderByTag, " DESC")
+			sorderByTag = strings.Trim(sorderByTag, " desc")
+			newSql = sorderBySlice[0] + " order by " + orderBySlice[1]
+		} else {
+			slimitSlice := strings.Split(sorderBySlice[1], " slimit ")
+			sorderByTagSql = slimitSlice[0]
+			sorderByTag = strings.Trim(slimitSlice[0], " ASC")
+			sorderByTag = strings.Trim(sorderByTag, " asc")
+			sorderByTag = strings.Trim(sorderByTag, " DESC")
+			sorderByTag = strings.Trim(sorderByTag, " desc")
+			newSql = sorderBySlice[0] + " slimit " + slimitSlice[1]
+		}
+	}
 	if !strings.Contains(newSql, " where ") {
 		if strings.Contains(newSql, " group by ") {
 			groupSlice := strings.Split(newSql, " group by ")
@@ -325,6 +350,16 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 					}
 				}
 				funcName, ok := item.Expr.(*sqlparser.FuncExpr)
+				if ok && (as == sorderByTag || sqlparser.String(funcName) == sorderByTag) {
+					if as != "" {
+						metricTag := sqlparser.String(funcName) + " AS " + as
+						innerSelectSlice = append(innerSelectSlice, metricTag)
+					} else {
+						innerSelectSlice = append(innerSelectSlice, sqlparser.String(funcName))
+					}
+
+				}
+
 				if ok && strings.HasPrefix(sqlparser.String(funcName), "enum") {
 					innerSelectSlice = append(innerSelectSlice, strings.ReplaceAll(sqlparser.String(funcName), "enum", "Enum"))
 					outerWhereLeftSlice = append(outerWhereLeftSlice, "`"+strings.ReplaceAll(sqlparser.String(funcName), "enum", "Enum")+"`")
@@ -384,14 +419,22 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 				whereSql := whereSlice[0]
 				limitSlice := strings.Split(whereSlice[1], " slimit ")
 				limitSql := limitSlice[1]
-				innerSql = "SELECT " + innerSelectSql + " FROM " + table + " WHERE " + whereSql + " GROUP BY " + innerGroupBySql + " LIMIT " + limitSql
+				if sorderByTag != "" {
+					innerSql = "SELECT " + innerSelectSql + " FROM " + table + " WHERE " + whereSql + " GROUP BY " + innerGroupBySql + " ORDER BY " + sorderByTagSql + " LIMIT " + limitSql
+				} else {
+					innerSql = "SELECT " + innerSelectSql + " FROM " + table + " WHERE " + whereSql + " GROUP BY " + innerGroupBySql + " LIMIT " + limitSql
+				}
 			}
 		} else {
 			if strings.Contains(lowerSql, " group by ") {
 				groupSlice := strings.Split(lowerSql, " group by ")
 				limitSlice := strings.Split(groupSlice[1], " slimit ")
 				limitSql := limitSlice[1]
-				innerSql = "SELECT " + innerSelectSql + " FROM " + table + " GROUP BY " + innerGroupBySql + " LIMIT " + limitSql
+				if sorderByTag != "" {
+					innerSql = "SELECT " + innerSelectSql + " FROM " + table + " GROUP BY " + innerGroupBySql + " ORDER BY " + sorderByTagSql + " LIMIT " + limitSql
+				} else {
+					innerSql = "SELECT " + innerSelectSql + " FROM " + table + " GROUP BY " + innerGroupBySql + " LIMIT " + limitSql
+				}
 			}
 		}
 		innerEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context}
@@ -410,7 +453,6 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 		innerEngine.View = view.NewView(innerEngine.Model)
 		innerTransSql = innerEngine.ToSQLString()
 	}
-
 	outerEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context}
 	outerEngine.Init()
 	outerParser := parse.Parser{Engine: outerEngine}
@@ -434,13 +476,21 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (*comm
 		if strings.Contains(outerTransSql, " PREWHERE ") {
 			oldWhereSlice := strings.Split(outerTransSql, " PREWHERE ")
 			outerSlice = append(outerSlice, oldWhereSlice[0])
-			outerSlice = append(outerSlice, " PREWHERE ("+outerWhereLeftSql+") IN ("+innerTransSql+") AND ")
+			if sorderByTag != "" {
+				outerSlice = append(outerSlice, " PREWHERE ("+outerWhereLeftSql+") IN (SELECT "+outerWhereLeftSql+" FROM ("+innerTransSql+")) AND ")
+			} else {
+				outerSlice = append(outerSlice, " PREWHERE ("+outerWhereLeftSql+") IN ("+innerTransSql+") AND ")
+			}
 			outerSlice = append(outerSlice, oldWhereSlice[1])
 			outerSql = strings.Join(outerSlice, "")
 		} else if strings.Contains(outerTransSql, " WHERE ") {
 			oldWhereSlice := strings.Split(outerTransSql, " WHERE ")
 			outerSlice = append(outerSlice, oldWhereSlice[0])
-			outerSlice = append(outerSlice, " WHERE ("+outerWhereLeftSql+") IN ("+innerTransSql+") AND ")
+			if sorderByTag != "" {
+				outerSlice = append(outerSlice, " WHERE ("+outerWhereLeftSql+") IN (SELECT "+outerWhereLeftSql+" FROM ("+innerTransSql+")) AND ")
+			} else {
+				outerSlice = append(outerSlice, " WHERE ("+outerWhereLeftSql+") IN ("+innerTransSql+") AND ")
+			}
 			outerSlice = append(outerSlice, oldWhereSlice[1])
 			outerSql = strings.Join(outerSlice, "")
 		}

@@ -26,6 +26,7 @@ pub struct Packet<'a> {
     pub if_index: isize,
     pub capture_length: isize,
     pub data: &'a mut [u8],
+    pub raw: Option<Vec<u8>>,
 }
 
 pub struct MiniPacket {
