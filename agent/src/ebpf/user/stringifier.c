@@ -59,10 +59,6 @@
 #include "stringifier.h"
 #include <bcc/bcc_syms.h>
 
-/* Temporary storage for releasing the stack_str_hash resource. */
-static __thread stack_str_hash_kv *stack_str_kvps;
-static __thread bool clear_hash;
-
 static const char *k_err_tag = "[kernel stack trace error]";
 static const char *u_err_tag = "[user stack trace error]";
 static const char *lost_tag = "[stack trace lost]";
@@ -71,55 +67,64 @@ int init_stack_str_hash(stack_str_hash_t * h, const char *name)
 {
 	memset(h, 0, sizeof(*h));
 	u32 nbuckets = STRINGIFIER_STACK_STR_HASH_BUCKETS_NUM;
-	u64 hash_memory_size = STRINGIFIER_STACK_STR_HASH_MEM_SZ;	// 1G bytes
+	u64 hash_memory_size = STRINGIFIER_STACK_STR_HASH_MEM_SZ; // 1G bytes
+	h->private =
+		clib_mem_alloc_aligned("hash_ext_data",
+				       sizeof(struct stack_str_hash_ext_data),
+				       0, NULL);
+	if (h->private == NULL)
+		return ETR_NOMEM;
+
+	struct stack_str_hash_ext_data *ext = h->private;
+	ext->stack_str_kvps = NULL;
+	ext->clear_hash = false;
+
 	return stack_str_hash_init(h, (char *)name, nbuckets, hash_memory_size);
 }
 
-static int free_kvp_cb(stack_str_hash_kv * kv, void *ctx)
+void release_stack_str_hash(stack_str_hash_t *h)
 {
-	if (kv->value != 0) {
-		clib_mem_free((void *)kv->value);
-		(*(u64 *) ctx)++;
+	if (h->private) {
+		struct stack_str_hash_ext_data *ext = h->private;
+		vec_free(ext->stack_str_kvps);
+		clib_mem_free(ext);
 	}
 
-	int ret = VEC_OK;
-	vec_add1(stack_str_kvps, *kv, ret);
-	if (ret != VEC_OK) {
-		ebpf_warning("vec add failed\n");
-		clear_hash = true;
-	}
-
-	return BIHASH_WALK_CONTINUE;
+	stack_str_hash_free(h);
 }
 
-void release_stack_strs(stack_str_hash_t * h)
+void clean_stack_strs(stack_str_hash_t * h)
 {
-	u64 elem_count = 0;
-	stack_str_hash_foreach_key_value_pair(h, free_kvp_cb,
-					      (void *)&elem_count);
+	u64 elems_count = 0;
+
 	/*
 	 * In this iteration, all elements will be cleared, and in the
 	 * next iteration, this hash will be reused.
 	 */
 	stack_str_hash_kv *v;
-	vec_foreach(v, stack_str_kvps) {
+	struct stack_str_hash_ext_data *ext = h->private;
+	vec_foreach(v, ext->stack_str_kvps) {
+		if (v->value != 0)
+			clib_mem_free((void *)v->value);
+
 		if (stack_str_hash_add_del(h, v, 0 /* delete */ )) {
 			ebpf_warning("stack_str_hash_add_del() failed.\n");
-			clear_hash = true;
+			ext->clear_hash = true;
 		}
+
+		elems_count++;
 	}
 
-	vec_free(stack_str_kvps);
+	vec_free(ext->stack_str_kvps);
 
 	h->hit_hash_count = 0;
 	h->hash_elems_count = 0;
 
-	if (clear_hash) {
-		clear_hash = false;
-		stack_str_hash_free(h);
+	if (ext->clear_hash) {
+		release_stack_str_hash(h);
 	}
 
-	ebpf_debug("release_stack_strs hashmap clear %lu elems.\n", elem_count);
+	ebpf_debug("clean_stack_strs hashmap clear %lu elems.\n", elems_count);
 }
 
 static inline char *create_symbol_str(int len, char *src, const char *tag)
@@ -362,6 +367,18 @@ folded_stack_trace_string(struct bpf_tracer *t,
 		ebpf_warning("stack_str_hash_add_del() failed.\n");
 		clib_mem_free((void *)str);
 		str = NULL;
+	} else {
+		/*
+		 * The new key-value pair has been successfully added.
+		 * At the same time, add it to the additional data fo
+		 * quick reference and easy access.
+		 */
+		int ret = VEC_OK;
+		struct stack_str_hash_ext_data *ext = h->private;
+		vec_add1(ext->stack_str_kvps, kv, ret);
+		if (ret != VEC_OK) {
+			ebpf_warning("vec add failed\n");
+		}
 	}
 
 	return str;
