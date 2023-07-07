@@ -625,7 +625,7 @@ release_iter:
 	print_profiler_status(t, count, &g_stack_str_hash, &g_msg_hash);
 
 	/* free all elems */
-	release_stack_strs(&g_stack_str_hash);
+	clean_stack_strs(&g_stack_str_hash);
 
 	/* Push messages and free stack_trace_msg_hash */
 	push_and_release_stack_trace_msg(&g_msg_hash, false);
@@ -654,7 +654,7 @@ exit:
 	print_hash_stack_str(&g_stack_str_hash);
 	/* free stack_str_hash */
 	if (likely(g_stack_str_hash.buckets != NULL)) {
-		stack_str_hash_free(&g_stack_str_hash);
+		release_stack_str_hash(&g_stack_str_hash);
 	}
 
 	print_hash_stack_trace_msg(&g_msg_hash);

@@ -27,9 +27,18 @@
 #define stack_str_hash_key_value_pair_cb	clib_bihash_foreach_key_value_pair_cb_8_8
 #define stack_str_hash_foreach_key_value_pair	clib_bihash_foreach_key_value_pair_8_8
 
+struct stack_str_hash_ext_data {
+	/*
+	 * It is used for quickly releasing the stack_str_hash resource.
+	 */
+	stack_str_hash_kv *stack_str_kvps;
+	bool clear_hash;
+};
+
 #ifndef AARCH64_MUSL
 int init_stack_str_hash(stack_str_hash_t *h, const char *name);
-void release_stack_strs(stack_str_hash_t *h);
+void clean_stack_strs(stack_str_hash_t *h);
+void release_stack_str_hash(stack_str_hash_t *h);
 char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 				      struct stack_trace_key_t *v,
 				      const char *stack_map_name,
