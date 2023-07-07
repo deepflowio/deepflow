@@ -62,7 +62,7 @@ use crate::{
 use crate::{
     dispatcher::recv_engine::af_packet::OptTpacketVersion,
     ebpf::CAP_LEN_MAX,
-    platform::{kubernetes::Poller, ProcRegRewrite},
+    platform::{kubernetes::Poller, ApiWatcher, ProcRegRewrite},
     utils::environment::{get_ctrl_ip_and_mac, is_tt_pod, is_tt_workload},
 };
 
@@ -1222,6 +1222,7 @@ impl ConfigHandler {
         new_config: RuntimeConfig,
         exception_handler: &ExceptionHandler,
         mut components: Option<&mut AgentComponents>,
+        #[cfg(target_os = "linux")] api_watcher: &Arc<ApiWatcher>,
     ) -> Vec<fn(&ConfigHandler, &mut AgentComponents)> {
         let candidate_config = &mut self.candidate_config;
         let static_config = &self.static_config;
@@ -1767,6 +1768,16 @@ impl ConfigHandler {
 
             #[cfg(target_os = "linux")]
             if static_config.agent_mode == RunningMode::Managed {
+                if restart_api_watcher {
+                    api_watcher.stop();
+                    api_watcher.start();
+                }
+                if candidate_config.platform.kubernetes_api_enabled {
+                    api_watcher.start();
+                } else {
+                    api_watcher.stop();
+                }
+
                 fn platform_callback(handler: &ConfigHandler, components: &mut AgentComponents) {
                     let conf = &handler.candidate_config.platform;
 
@@ -1779,25 +1790,9 @@ impl ConfigHandler {
                         } else {
                             components.kubernetes_poller.stop();
                         }
-                        if conf.kubernetes_api_enabled {
-                            components.api_watcher.start();
-                        } else {
-                            components.api_watcher.stop();
-                        }
-                    }
-                    if conf.kubernetes_api_enabled {
-                        components.api_watcher.start();
-                    } else {
-                        components.api_watcher.stop();
                     }
                 }
                 callbacks.push(platform_callback);
-                if restart_api_watcher {
-                    callbacks.push(|_, components| {
-                        components.api_watcher.stop();
-                        components.api_watcher.start();
-                    })
-                }
             }
         }
 

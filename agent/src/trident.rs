@@ -492,6 +492,16 @@ impl Trident {
             platform_synchronizer.start();
         }
 
+        #[cfg(target_os = "linux")]
+        let api_watcher = Arc::new(ApiWatcher::new(
+            runtime.clone(),
+            config_handler.platform(),
+            synchronizer.running_config.clone(),
+            session.clone(),
+            exception_handler.clone(),
+            stats_collector.clone(),
+        ));
+
         let (state, cond) = &*state;
         let mut state_guard = state.lock().unwrap();
         let mut components: Option<Components> = None;
@@ -509,7 +519,8 @@ impl Trident {
                         guard.stop();
                         monitor.stop();
                         platform_synchronizer.stop();
-
+                        #[cfg(target_os = "linux")]
+                        api_watcher.stop();
                         #[cfg(target_os = "linux")]
                         libvirt_xml_extractor.stop();
                         if let Some(cg_controller) = cgroups_controller {
@@ -525,7 +536,13 @@ impl Trident {
                         c.stop(true);
                     }
                     if let Some(c) = config.take() {
-                        config_handler.on_config(c, &exception_handler, None);
+                        config_handler.on_config(
+                            c,
+                            &exception_handler,
+                            None,
+                            #[cfg(target_os = "linux")]
+                            &api_watcher,
+                        );
                     }
                     state_guard = cond.wait(state_guard).unwrap();
                     continue;
@@ -558,8 +575,13 @@ impl Trident {
             yaml_conf = Some(runtime_config.yaml_config.clone());
             match components.as_mut() {
                 None => {
-                    let callbacks =
-                        config_handler.on_config(runtime_config, &exception_handler, None);
+                    let callbacks = config_handler.on_config(
+                        runtime_config,
+                        &exception_handler,
+                        None,
+                        #[cfg(target_os = "linux")]
+                        &api_watcher,
+                    );
 
                     config_handler.load_plugin(
                         &runtime,
@@ -579,6 +601,8 @@ impl Trident {
                         #[cfg(target_os = "linux")]
                         libvirt_xml_extractor.clone(),
                         platform_synchronizer.clone(),
+                        #[cfg(target_os = "linux")]
+                        api_watcher.clone(),
                         vm_mac_addrs,
                         config_handler.static_config.agent_mode,
                         runtime.clone(),
@@ -605,6 +629,8 @@ impl Trident {
                             runtime_config,
                             &exception_handler,
                             Some(components),
+                            #[cfg(target_os = "linux")]
+                            &api_watcher,
                         );
 
                         components.start();
@@ -896,7 +922,6 @@ pub enum Components {
 
 #[cfg(target_os = "linux")]
 pub struct WatcherComponents {
-    pub api_watcher: Arc<ApiWatcher>,
     pub domain_name_listener: DomainNameListener,
     pub running: AtomicBool,
     tap_mode: TapMode,
@@ -909,22 +934,13 @@ impl WatcherComponents {
     fn new(
         config_handler: &ConfigHandler,
         stats_collector: Arc<stats::Collector>,
-        session: &Arc<Session>,
         synchronizer: &Arc<Synchronizer>,
         platform_synchronizer: Arc<PlatformSynchronizer>,
-        exception_handler: ExceptionHandler,
+        api_watcher: Arc<ApiWatcher>,
         agent_mode: RunningMode,
         runtime: Arc<Runtime>,
     ) -> Result<Self> {
         let candidate_config = &config_handler.candidate_config;
-        let api_watcher = Arc::new(ApiWatcher::new(
-            runtime.clone(),
-            config_handler.platform(),
-            synchronizer.running_config.clone(),
-            session.clone(),
-            exception_handler.clone(),
-            stats_collector.clone(),
-        ));
         let domain_name_listener = DomainNameListener::new(
             stats_collector.clone(),
             synchronizer.clone(),
@@ -937,7 +953,6 @@ impl WatcherComponents {
 
         info!("With ONLY_WATCH_K8S_RESOURCE and IN_CONTAINER environment variables set, the agent will only watch K8s resource");
         Ok(WatcherComponents {
-            api_watcher,
             domain_name_listener,
             running: AtomicBool::new(false),
             tap_mode: candidate_config.tap_mode,
@@ -951,9 +966,6 @@ impl WatcherComponents {
             return;
         }
         info!("Staring watcher components.");
-        if matches!(self.agent_mode, RunningMode::Managed) {
-            self.api_watcher.start();
-        }
         self.domain_name_listener.start();
         info!("Started watcher components.");
     }
@@ -962,7 +974,6 @@ impl WatcherComponents {
         if !self.running.swap(false, Ordering::Relaxed) {
             return;
         }
-        self.api_watcher.stop();
         self.domain_name_listener.stop();
         info!("Stopped watcher components.")
     }
@@ -986,8 +997,6 @@ pub struct AgentComponents {
     pub kubernetes_poller: Arc<GenericPoller>,
     #[cfg(target_os = "linux")]
     pub socket_synchronizer: SocketSynchronizer,
-    #[cfg(target_os = "linux")]
-    pub api_watcher: Arc<ApiWatcher>,
     pub debugger: Debugger,
     #[cfg(target_os = "linux")]
     pub ebpf_collector: Option<Box<EbpfCollector>>,
@@ -1176,6 +1185,7 @@ impl AgentComponents {
         remote_log_config: RemoteLogConfig,
         #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
         platform_synchronizer: Arc<PlatformSynchronizer>,
+        #[cfg(target_os = "linux")] api_watcher: Arc<ApiWatcher>,
         vm_mac_addrs: Vec<MacAddr>,
         agent_mode: RunningMode,
         runtime: Arc<Runtime>,
@@ -1279,16 +1289,6 @@ impl AgentComponents {
         ));
         #[cfg(target_os = "linux")]
         platform_synchronizer.set_kubernetes_poller(kubernetes_poller.clone());
-
-        #[cfg(target_os = "linux")]
-        let api_watcher = Arc::new(ApiWatcher::new(
-            runtime.clone(),
-            config_handler.platform(),
-            synchronizer.running_config.clone(),
-            session.clone(),
-            exception_handler.clone(),
-            stats_collector.clone(),
-        ));
 
         let context = ConstructDebugCtx {
             runtime: runtime.clone(),
@@ -2123,8 +2123,6 @@ impl AgentComponents {
             kubernetes_poller,
             #[cfg(target_os = "linux")]
             socket_synchronizer,
-            #[cfg(target_os = "linux")]
-            api_watcher,
             debugger,
             session_aggrs,
             #[cfg(target_os = "linux")]
@@ -2167,9 +2165,6 @@ impl AgentComponents {
         {
             if is_tt_pod(self.config.trident_type) {
                 self.kubernetes_poller.start();
-            }
-            if matches!(self.agent_mode, RunningMode::Managed) && running_in_container() {
-                self.api_watcher.start();
             }
             self.socket_synchronizer.start();
         }
@@ -2256,12 +2251,9 @@ impl AgentComponents {
         }
 
         #[cfg(target_os = "linux")]
-        if !half {
+        {
             self.kubernetes_poller.stop();
             self.socket_synchronizer.stop();
-            if let Some(h) = self.api_watcher.notify_stop() {
-                join_handles.push(h);
-            }
         }
 
         for q in self.collectors.iter_mut() {
@@ -2374,6 +2366,7 @@ impl Components {
         remote_log_config: RemoteLogConfig,
         #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
         platform_synchronizer: Arc<PlatformSynchronizer>,
+        #[cfg(target_os = "linux")] api_watcher: Arc<ApiWatcher>,
         vm_mac_addrs: Vec<MacAddr>,
         agent_mode: RunningMode,
         runtime: Arc<Runtime>,
@@ -2383,10 +2376,9 @@ impl Components {
             let components = WatcherComponents::new(
                 config_handler,
                 stats_collector,
-                session,
                 synchronizer,
                 platform_synchronizer,
-                exception_handler,
+                api_watcher,
                 agent_mode,
                 runtime,
             )?;
@@ -2403,6 +2395,8 @@ impl Components {
             #[cfg(target_os = "linux")]
             libvirt_xml_extractor,
             platform_synchronizer,
+            #[cfg(target_os = "linux")]
+            api_watcher,
             vm_mac_addrs,
             agent_mode,
             runtime,
