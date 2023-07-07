@@ -181,31 +181,20 @@ func (s *Synchronizer) prepare(req *trident.PrometheusLabelRequest) error {
 		if mn == "" {
 			continue
 		}
-		s.tryAppendMetricNameToEncode(metricNamesToE, mn)
-		var instanceValue string
-		var jobValue string
-		for _, l := range m.GetLabels() {
-			ln := l.GetName()
-			if ln == "" {
-				continue
-			}
-			lv := l.GetValue()
-			s.tryAppendLabelNameToEncode(labelNamesToE, ln)
-			s.tryAppendLabelValueToEncode(labelValuesToE, lv)
-			if ln == TargetLabelInstance {
-				instanceValue = l.GetValue()
-			} else if ln == TargetLabelJob {
-				jobValue = l.GetValue()
-			}
-			s.tryAppendLabelToAdd(labelsToAdd, ln, lv)
-			s.tryAppendMetricLabelToAdd(metricLabelsToAdd, mn, ln, lv)
-		}
-		targetKey := cache.NewTargetKey(instanceValue, jobValue)
-		targetID, ok := s.cache.Target.GetIDByKey(targetKey)
+		targetKey, targetID, ok := s.getTargetInfoFromLabels(m.GetLabels())
 		if ok {
+			s.tryAppendMetricNameToEncode(metricNamesToE, mn)
 			s.tryAppendMetricTargetToAdd(metricTargetsToAdd, mn, targetID)
 			for _, l := range m.GetLabels() {
 				ln := l.GetName()
+				if ln == "" {
+					continue
+				}
+				lv := l.GetValue()
+				s.tryAppendLabelNameToEncode(labelNamesToE, ln)
+				s.tryAppendLabelValueToEncode(labelValuesToE, lv)
+				s.tryAppendLabelToAdd(labelsToAdd, ln, lv)
+				s.tryAppendMetricLabelToAdd(metricLabelsToAdd, mn, ln, lv)
 				if ln == TargetLabelInstance || ln == TargetLabelJob {
 					continue
 				}
@@ -296,6 +285,25 @@ func (s *Synchronizer) prepare(req *trident.PrometheusLabelRequest) error {
 	return eg.Wait()
 }
 
+func (s *Synchronizer) getTargetInfoFromLabels(labels []*trident.LabelRequest) (cache.TargetKey, int, bool) {
+	var instanceValue string
+	var jobValue string
+	for _, l := range labels {
+		ln := l.GetName()
+		if ln == TargetLabelInstance {
+			instanceValue = l.GetValue()
+		} else if ln == TargetLabelJob {
+			jobValue = l.GetValue()
+		}
+		if instanceValue != "" && jobValue != "" {
+			break
+		}
+	}
+	targetKey := cache.NewTargetKey(instanceValue, jobValue)
+	targetID, ok := s.cache.Target.GetIDByKey(targetKey)
+	return targetKey, targetID, ok
+}
+
 func (s *Synchronizer) assemble(req *trident.PrometheusLabelRequest) (*trident.PrometheusLabelResponse, error) {
 	resp := new(trident.PrometheusLabelResponse)
 	mls, err := s.assembleMetricLabel(req.GetRequestLabels())
@@ -319,31 +327,18 @@ func (s *Synchronizer) assembleMetricLabel(mls []*trident.MetricLabelRequest) ([
 	nonLabelValues := mapset.NewSet[string]()
 	for _, ml := range mls {
 		s.statsdCounter.ReceiveMetricCount++
+		s.statsdCounter.ReceiveLabelCount += uint64(len(ml.GetLabels()))
 		mn := ml.GetMetricName()
 		mni, ok := s.cache.MetricName.GetIDByName(mn)
 		if !ok {
-			s.statsdCounter.ReceiveLabelCount += uint64(len(ml.GetLabels()))
 			nonMetricNameToCount[mn]++
 			continue
 		}
 
 		var rls []*trident.LabelResponse
-		var instanceValue string
-		var jobValue string
-		for _, l := range ml.GetLabels() {
-			s.statsdCounter.ReceiveLabelCount++
-			ln := l.GetName()
-			if ln == TargetLabelInstance {
-				instanceValue = l.GetValue()
-			} else if ln == TargetLabelJob {
-				jobValue = l.GetValue()
-			}
-			if instanceValue != "" && jobValue != "" {
-				break
-			}
-		}
+		_, _, ok = s.getTargetInfoFromLabels(ml.GetLabels())
 		// responses column index only if instance and job matches one target
-		if _, ok := s.cache.Target.GetIDByKey(cache.NewTargetKey(instanceValue, jobValue)); ok {
+		if ok {
 			for _, l := range ml.GetLabels() {
 				ln := l.GetName()
 				lv := l.GetValue()
