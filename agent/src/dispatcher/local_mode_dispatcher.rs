@@ -398,7 +398,6 @@ impl LocalModeDispatcherListener {
                 // kubernetes环境POD场景，需要根据平台数据来获取TAP口对应的主机MAC
                 if let Some(mac) = index_to_mac_map.get(&iface.if_index) {
                     macs.push(*mac);
-                    warn!("if_mac {} > {:?}", iface.if_index, mac);
                     continue;
                 }
             }
