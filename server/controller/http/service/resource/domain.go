@@ -40,7 +40,7 @@ import (
 )
 
 var DOMAIN_PASSWORD_KEYS = []string{
-	"admin_password", "secret_key", "password", "boss_secret_key", "manage_one_password",
+	"admin_password", "secret_key", "password", "boss_secret_key", "manage_one_password", "token",
 }
 
 func getGrpcServerAndPort(controllerIP string, cfg *config.ControllerConfig) (string, string) {
