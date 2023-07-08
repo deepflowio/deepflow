@@ -274,7 +274,7 @@ impl PassivePoller {
             }
 
             let packet_len = packet.data.len();
-            let packet_data = packet.data;
+            let packet_data = &packet.data;
             if packet_len < ETH_TYPE_OFFSET + 2 * VLAN_HEADER_SIZE + 2 {
                 // 22
                 debug!("ignore short packet, size={packet_len}");

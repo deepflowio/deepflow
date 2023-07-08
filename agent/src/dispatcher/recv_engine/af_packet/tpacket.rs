@@ -327,6 +327,7 @@ impl Tpacket {
                 if_index: x.get_iface_index(),
                 data: x.get_data(),
                 capture_length: x.get_length(),
+                ..Default::default()
             };
             self.header_next_needed = true;
             return Some(packet);

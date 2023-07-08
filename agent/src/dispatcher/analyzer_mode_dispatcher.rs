@@ -16,6 +16,7 @@
 
 use std::{
     collections::HashMap,
+    mem::drop,
     ops::Add,
     sync::{atomic::Ordering, Arc, RwLock},
     thread::{self, JoinHandle},
@@ -530,6 +531,7 @@ impl AnalyzerModeDispatcher {
                 if base.tap_interface_whitelist.next_sync(Duration::ZERO) {
                     base.need_update_bpf.store(true, Ordering::Relaxed);
                 }
+                drop(recved);
                 base.check_and_update_bpf();
                 continue;
             }
