@@ -232,3 +232,8 @@ message ProcEvent {
     uint32 netns_id = 9;
 }
 
+message PrometheusMetric {
+    bytes metrics = 1;
+    repeated string extra_label_names = 2;
+    repeated string extra_label_values = 3;
+}
