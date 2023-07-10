@@ -124,15 +124,20 @@ func (e *Encoder) refresh() error {
 
 func (e *Encoder) Encode(req *controller.SyncPrometheusRequest) (*controller.SyncPrometheusResponse, error) {
 	resp := new(controller.SyncPrometheusResponse)
-	e.encodeLabel(resp, req.GetLabels())
+	egRunAhead := &errgroup.Group{}
+	AppendErrGroup(egRunAhead, e.encodeLabel, resp, req.GetLabels())
+	AppendErrGroup(egRunAhead, e.encodeLabelIndex, resp, req.GetMetricAppLabelLayouts())
+	err := egRunAhead.Wait()
+	if err != nil {
+		return resp, err
+	}
 	eg := &errgroup.Group{}
 	AppendErrGroup(eg, e.encodeMetricName, resp, req.GetMetricNames())
 	AppendErrGroup(eg, e.encodeLabelName, resp, req.GetLabelNames())
 	AppendErrGroup(eg, e.encodeLabelValue, resp, req.GetLabelValues())
-	AppendErrGroup(eg, e.encodeLabelIndex, resp, req.GetMetricAppLabelLayouts())
 	AppendErrGroup(eg, e.encodeMetricLabel, req.GetMetricLabels())
 	AppendErrGroup(eg, e.encodeMetricTarget, req.GetMetricTargets())
-	err := eg.Wait()
+	err = eg.Wait()
 	return resp, err
 }
 
