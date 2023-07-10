@@ -323,6 +323,7 @@ message Interface {
     optional uint32 pod_id = 25;
     optional uint32 pod_cluster_id = 26;
     optional uint32 netns_id = 27 [default = 0];
+    optional uint32 vtap_id = 28; // 限制在64000
 
     optional bool is_vip_interface = 100 [default = false]; // 目前仅微软MUX设配为true
 }
