@@ -19,7 +19,6 @@ package service
 import (
 	"context"
 	"math"
-	"strconv"
 	"time"
 
 	"github.com/prometheus/prometheus/model/labels"
@@ -37,6 +36,8 @@ type RemoteReadQuerierable struct {
 	Args                *model.PromQueryParams
 	Ctx                 context.Context
 	MatchMetricNameFunc func(*[]*labels.Matcher) string
+	sql                 []string
+	query_time          []float64
 }
 
 func (q *RemoteReadQuerierable) Querier(ctx context.Context, mint, maxt int64) (storage.Querier, error) {
@@ -51,18 +52,16 @@ type RemoteReadQuerier struct {
 
 // For PromQL instant query
 func (q *RemoteReadQuerier) Select(sortSeries bool, hints *storage.SelectHints, matchers ...*labels.Matcher) storage.SeriesSet {
-	startTimeS, err := (strconv.ParseFloat(q.Args.StartTime, 64))
+	startTimeS, err := parseTime(q.Args.StartTime)
 	if err != nil {
 		log.Error(err)
 		return storage.ErrSeriesSet(err)
 	}
-	startTimeMs := int64(startTimeS * 1000)
-	endTimeS, err := (strconv.ParseFloat(q.Args.EndTime, 64))
+	endTimeS, err := parseTime(q.Args.EndTime)
 	if err != nil {
 		log.Error(err)
 		return storage.ErrSeriesSet(err)
 	}
-	endTimeMs := int64(endTimeS * 1000)
 	queryRange := time.Duration(hints.End-hints.Start) * time.Millisecond
 
 	if config.Cfg.Prometheus.RequestQueryWithDebug {
@@ -75,7 +74,7 @@ func (q *RemoteReadQuerier) Select(sortSeries bool, hints *storage.SelectHints, 
 		span.SetAttributes(attribute.String("promql.query.metric.name", metric))
 	}
 
-	prompbQuery, err := remote.ToQuery(startTimeMs, endTimeMs, matchers, hints)
+	prompbQuery, err := remote.ToQuery(startTimeS.UnixMilli(), endTimeS.UnixMilli(), matchers, hints)
 	if err != nil {
 		log.Error(err)
 		return storage.ErrSeriesSet(err)
@@ -84,10 +83,20 @@ func (q *RemoteReadQuerier) Select(sortSeries bool, hints *storage.SelectHints, 
 		Queries:               []*prompb.Query{prompbQuery},
 		AcceptedResponseTypes: []prompb.ReadRequest_ResponseType{prompb.ReadRequest_STREAMED_XOR_CHUNKS},
 	}
-	resp, err := promReaderExecute(q.Ctx, req)
+	resp, sql, query_time, err := promReaderExecute(q.Ctx, req, q.Args.Debug)
 	if err != nil {
 		log.Error(err)
 		return storage.ErrSeriesSet(err)
+	}
+	if q.Args.Debug {
+		if q.Querierable.sql == nil {
+			q.Querierable.sql = make([]string, 0)
+		}
+		if q.Querierable.query_time == nil {
+			q.Querierable.query_time = make([]float64, 0)
+		}
+		q.Querierable.sql = append(q.Querierable.sql, sql)
+		q.Querierable.query_time = append(q.Querierable.query_time, query_time)
 	}
 	return remote.FromQueryResult(sortSeries, resp.Results[0])
 }

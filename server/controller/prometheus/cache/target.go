@@ -54,21 +54,75 @@ func NewTargetLabelKey(targetID int, labelName string) TargetLabelKey {
 	}
 }
 
-type targetLabelNameToValue map[string]string
+type keyToTargetID struct {
+	lock sync.Mutex
+	data map[TargetKey]int
+}
+
+func newKeyToTargetID() *keyToTargetID {
+	return &keyToTargetID{data: make(map[TargetKey]int)}
+}
+
+func (k *keyToTargetID) Load(tk TargetKey) (int, bool) {
+	k.lock.Lock()
+	defer k.lock.Unlock()
+	id, ok := k.data[tk]
+	return id, ok
+}
+
+func (k *keyToTargetID) Get() map[TargetKey]int {
+	k.lock.Lock()
+	defer k.lock.Unlock()
+	return k.data
+}
+
+func (k *keyToTargetID) Coverage(data map[TargetKey]int) {
+	k.lock.Lock()
+	defer k.lock.Unlock()
+	k.data = data
+}
+
+type targetLabelKeys struct {
+	lock sync.Mutex
+	data mapset.Set[TargetLabelKey]
+}
+
+func newTargetLabelKeys() *targetLabelKeys {
+	return &targetLabelKeys{data: mapset.NewThreadUnsafeSet[TargetLabelKey]()}
+}
+
+func (t *targetLabelKeys) Contains(tlk TargetLabelKey) bool {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	return t.data.Contains(tlk)
+}
+
+func (t *targetLabelKeys) Get() mapset.Set[TargetLabelKey] {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	return t.data
+}
+
+func (t *targetLabelKeys) Coverage(data mapset.Set[TargetLabelKey]) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.data = data
+}
 
 type target struct {
-	keyToTargetID   sync.Map
-	targetLabelKeys mapset.Set[TargetLabelKey]
+	keyToTargetID   *keyToTargetID
+	targetLabelKeys *targetLabelKeys
 }
 
 func newTarget() *target {
 	return &target{
-		targetLabelKeys: mapset.NewSet[TargetLabelKey](),
+		keyToTargetID:   newKeyToTargetID(),
+		targetLabelKeys: newTargetLabelKeys(),
 	}
 }
 
-func (t *target) Get() *sync.Map {
-	return &t.keyToTargetID
+func (t *target) Get() map[TargetKey]int {
+	return t.keyToTargetID.Get()
 }
 
 func (t *target) IfTargetLabelKeyExists(key TargetLabelKey) bool {
@@ -76,10 +130,7 @@ func (t *target) IfTargetLabelKeyExists(key TargetLabelKey) bool {
 }
 
 func (t *target) GetIDByKey(key TargetKey) (int, bool) {
-	if id, ok := t.keyToTargetID.Load(key); ok {
-		return id.(int), true
-	}
-	return 0, false
+	return t.keyToTargetID.Load(key)
 }
 
 func (t *target) refresh(args ...interface{}) error {
@@ -87,13 +138,16 @@ func (t *target) refresh(args ...interface{}) error {
 	if err != nil {
 		return err
 	}
+	keyToTargetID := make(map[TargetKey]int)
+	targetLabelKeys := mapset.NewThreadUnsafeSet[TargetLabelKey]()
 	for _, item := range targets {
-		key := NewTargetKey(item.Instance, item.Job)
-		t.keyToTargetID.Store(key, item.ID)
+		keyToTargetID[NewTargetKey(item.Instance, item.Job)] = item.ID
 		for _, ln := range t.getTargetLabelNames(item) {
-			t.targetLabelKeys.Add(NewTargetLabelKey(item.ID, ln))
+			targetLabelKeys.Add(NewTargetLabelKey(item.ID, ln))
 		}
 	}
+	t.keyToTargetID.Coverage(keyToTargetID)
+	t.targetLabelKeys.Coverage(targetLabelKeys)
 	return nil
 }
 

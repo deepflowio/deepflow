@@ -766,11 +766,15 @@ impl DispatcherBuilder {
             .ok_or(Error::ConfigIncomplete("no options".into()))?;
         let tap_mode = options.lock().unwrap().tap_mode;
         let snap_len = options.lock().unwrap().snap_len;
+        let queue_debugger = self
+            .queue_debugger
+            .ok_or(Error::ConfigIncomplete("no queue debugger".into()))?;
         let engine = Self::get_engine(
             &self.pcap_interfaces,
             &mut self.src_interface,
             tap_mode,
             &options,
+            &queue_debugger,
         )?;
 
         let kernel_counter = engine.get_counter_handle();
@@ -885,6 +889,7 @@ impl DispatcherBuilder {
             netns,
             npb_dedup_enabled: Arc::new(AtomicBool::new(false)),
             pause: Arc::new(AtomicBool::new(true)),
+            queue_debugger: queue_debugger.clone(),
         };
         collector.register_countable(
             "dispatcher",
@@ -958,7 +963,7 @@ impl DispatcherBuilder {
                     flow_generator_thread_handler: None,
                     pipeline_thread_handler: None,
                     stats_collector: collector.clone(),
-                    queue_debugger: self.queue_debugger.as_ref().unwrap().clone(),
+                    queue_debugger,
                     inner_queue_size: self
                         .analyzer_queue_size
                         .take()
@@ -994,6 +999,7 @@ impl DispatcherBuilder {
         src_interface: &mut Option<String>,
         tap_mode: TapMode,
         options: &Arc<Mutex<Options>>,
+        queue_debugger: &Arc<QueueDebugger>,
     ) -> Result<RecvEngine> {
         let options = options.lock().unwrap();
         match tap_mode {
@@ -1021,6 +1027,15 @@ impl DispatcherBuilder {
                     "Libpcap init with: {:?} {} {}",
                     &src_ifaces, options.packet_blocks, options.snap_len
                 );
+                #[cfg(target_os = "linux")]
+                let libpcap = Libpcap::new(
+                    src_ifaces,
+                    options.packet_blocks,
+                    options.snap_len,
+                    queue_debugger,
+                )
+                .map_err(|e| error::Error::Libpcap(e.to_string()))?;
+                #[cfg(target_os = "windows")]
                 let libpcap = Libpcap::new(src_ifaces, options.packet_blocks, options.snap_len)
                     .map_err(|e| error::Error::Libpcap(e.to_string()))?;
                 Ok(RecvEngine::Libpcap(Some(libpcap)))

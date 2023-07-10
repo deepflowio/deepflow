@@ -169,15 +169,13 @@ func (m *ExtMetrics) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 
 		// tag + value
 		flowTagInfo.FieldValue = m.TagValues[i]
-		v1 := m.Timestamp
-		if old := cache.FieldValueCache.AddOrGet(*flowTagInfo, &v1); old != nil {
-			oldv, _ := old.(*uint32)
-			if *oldv+cache.CacheFlushTimeout >= m.Timestamp {
+		if old, ok := cache.FieldValueCache.AddOrGet(*flowTagInfo, m.Timestamp); ok {
+			if old+cache.CacheFlushTimeout >= m.Timestamp {
 				// If there is no new fieldValue, of course there will be no new field.
 				// So we can just skip the rest of the process in the loop.
 				continue
 			} else {
-				*oldv = m.Timestamp
+				cache.FieldValueCache.Add(*flowTagInfo, m.Timestamp)
 			}
 		}
 		tagFieldValue := flow_tag.AcquireFlowTag()
@@ -187,13 +185,11 @@ func (m *ExtMetrics) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 
 		// only tag
 		flowTagInfo.FieldValue = ""
-		v2 := m.Timestamp
-		if old := cache.FieldCache.AddOrGet(*flowTagInfo, &v2); old != nil {
-			oldv, _ := old.(*uint32)
-			if *oldv+cache.CacheFlushTimeout >= m.Timestamp {
+		if old, ok := cache.FieldCache.AddOrGet(*flowTagInfo, m.Timestamp); ok {
+			if old+cache.CacheFlushTimeout >= m.Timestamp {
 				continue
 			} else {
-				*oldv = m.Timestamp
+				cache.FieldCache.Add(*flowTagInfo, m.Timestamp)
 			}
 		}
 		tagField := flow_tag.AcquireFlowTag()
@@ -207,13 +203,11 @@ func (m *ExtMetrics) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 	flowTagInfo.FieldValue = ""
 	for _, name := range m.MetricsFloatNames {
 		flowTagInfo.FieldName = name
-		v := m.Timestamp
-		if old := cache.FieldCache.AddOrGet(*flowTagInfo, &v); old != nil {
-			oldv, _ := old.(*uint32)
-			if *oldv+cache.CacheFlushTimeout >= m.Timestamp {
+		if old, ok := cache.FieldCache.AddOrGet(*flowTagInfo, m.Timestamp); ok {
+			if old+cache.CacheFlushTimeout >= m.Timestamp {
 				continue
 			} else {
-				*oldv = m.Timestamp
+				cache.FieldCache.Add(*flowTagInfo, m.Timestamp)
 			}
 		}
 		tagField := flow_tag.AcquireFlowTag()

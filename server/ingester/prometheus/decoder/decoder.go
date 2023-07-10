@@ -79,6 +79,7 @@ type PrometheusSamplesBuilder struct {
 	platformData        *grpc.PlatformInfoTable
 	platformDataVersion uint64
 	appLabelColumnAlign int
+	ignoreUniversalTag  bool
 
 	// temporary buffers
 	metricName              string
@@ -90,7 +91,7 @@ type PrometheusSamplesBuilder struct {
 	appLabelValueIDsBuffer  []uint32
 
 	// universal tag cache
-	podNameToUniversalTag    map[string]zerodoc.UniversalTag
+	podNameIDToUniversalTag  map[uint32]zerodoc.UniversalTag
 	instanceIPToUniversalTag map[uint32]zerodoc.UniversalTag
 	vtapIDToUniversalTag     map[uint16]zerodoc.UniversalTag
 
@@ -104,15 +105,16 @@ func (d *PrometheusSamplesBuilder) GetCounter() interface{} {
 	return counter
 }
 
-func NewPrometheusSamplesBuilder(name string, index int, platformData *grpc.PlatformInfoTable, labelTable *PrometheusLabelTable, appLabelColumnAlign int) *PrometheusSamplesBuilder {
+func NewPrometheusSamplesBuilder(name string, index int, platformData *grpc.PlatformInfoTable, labelTable *PrometheusLabelTable, appLabelColumnAlign int, ignoreUniversalTag bool) *PrometheusSamplesBuilder {
 	p := &PrometheusSamplesBuilder{
 		name:                     name,
 		platformData:             platformData,
 		labelTable:               labelTable,
-		podNameToUniversalTag:    make(map[string]zerodoc.UniversalTag),
+		podNameIDToUniversalTag:  make(map[uint32]zerodoc.UniversalTag),
 		instanceIPToUniversalTag: make(map[uint32]zerodoc.UniversalTag),
 		vtapIDToUniversalTag:     make(map[uint16]zerodoc.UniversalTag),
 		appLabelColumnAlign:      appLabelColumnAlign,
+		ignoreUniversalTag:       ignoreUniversalTag,
 		counter:                  &BuilderCounter{},
 	}
 	common.RegisterCountableForIngester("decoder", p, stats.OptionStatTags{
@@ -146,7 +148,7 @@ func NewDecoder(
 ) *Decoder {
 	return &Decoder{
 		index:            index,
-		samplesBuilder:   NewPrometheusSamplesBuilder("prometheus-builder", index, platformData, prometheusLabelTable, config.AppLabelColumnIncrement),
+		samplesBuilder:   NewPrometheusSamplesBuilder("prometheus-builder", index, platformData, prometheusLabelTable, config.AppLabelColumnIncrement, config.IgnoreUniversalTag),
 		inQueue:          inQueue,
 		slowDecodeQueue:  slowDecodeQueue,
 		debugEnabled:     log.IsEnabledFor(logging.DEBUG),
@@ -270,7 +272,7 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID uint16, ts *prompb.T
 	b.appLabelValueIDsBuffer = b.appLabelValueIDsBuffer[:0]
 
 	metricName, podName, instance, job := "", "", "", ""
-	var metricID, maxColumnIndex, jobID, instanceID uint32
+	var metricID, maxColumnIndex, podNameID, jobID, instanceID uint32
 	var ok bool
 
 	// get metricID first
@@ -287,8 +289,10 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID uint16, ts *prompb.T
 		}
 	}
 
+	metricHasSkipped := false
 	for _, l := range ts.Labels {
-		if l.Name == model.MetricNameLabel {
+		if !metricHasSkipped && l.Name == model.MetricNameLabel {
+			metricHasSkipped = true
 			continue
 		}
 		b.counter.LabelCount++
@@ -305,6 +309,7 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID uint16, ts *prompb.T
 
 		if podName == "" && l.Name == PROMETHEUS_POD {
 			podName = l.Value
+			podNameID = valueID
 		}
 
 		var columnIndex uint32
@@ -365,27 +370,38 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID uint16, ts *prompb.T
 			continue
 		}
 
-		m := dbwriter.AcquirePrometheusSample()
-		m.Timestamp = uint32(model.Time(s.Timestamp).Unix())
-		m.MetricID = metricID
-		m.TargetID = targetID
-		m.AppLabelValueIDs = append(m.AppLabelValueIDs, b.appLabelValueIDsBuffer...)
-		m.Value = v
-
-		if i == 0 {
-			b.fillUniversalTag(m, vtapID, podName, instance, instanceID, false)
-			universalTag = &m.UniversalTag
+		if b.ignoreUniversalTag {
+			m := dbwriter.AcquirePrometheusSampleMini()
+			m.Timestamp = uint32(model.Time(s.Timestamp).Unix())
+			m.MetricID = metricID
+			m.TargetID = targetID
+			m.AppLabelValueIDs = append(m.AppLabelValueIDs, b.appLabelValueIDsBuffer...)
+			m.Value = v
+			b.samplesBuffer = append(b.samplesBuffer, m)
 		} else {
-			// all samples share the same universal tag
-			m.UniversalTag = *universalTag
+			m := dbwriter.AcquirePrometheusSample()
+			m.Timestamp = uint32(model.Time(s.Timestamp).Unix())
+			m.MetricID = metricID
+			m.TargetID = targetID
+			m.AppLabelValueIDs = append(m.AppLabelValueIDs, b.appLabelValueIDsBuffer...)
+			m.Value = v
+
+			if i == 0 {
+				b.fillUniversalTag(m, vtapID, podName, instance, podNameID, instanceID, false)
+				universalTag = &m.UniversalTag
+			} else {
+				// all samples share the same universal tag
+				m.UniversalTag = *universalTag
+			}
+			b.samplesBuffer = append(b.samplesBuffer, m)
 		}
-		b.samplesBuffer = append(b.samplesBuffer, m)
+
 		b.counter.Sample++
 	}
 	return false, nil
 }
 
-func (b *PrometheusSamplesBuilder) fillUniversalTag(m *dbwriter.PrometheusSample, vtapID uint16, podName, instance string, instanceID uint32, fillWithVtapId bool) {
+func (b *PrometheusSamplesBuilder) fillUniversalTag(m *dbwriter.PrometheusSample, vtapID uint16, podName, instance string, podNameID, instanceID uint32, fillWithVtapId bool) {
 	// fast path
 	platformDataVersion := b.platformData.Version()
 	if platformDataVersion != b.platformDataVersion {
@@ -394,12 +410,12 @@ func (b *PrometheusSamplesBuilder) fillUniversalTag(m *dbwriter.PrometheusSample
 				b.platformDataVersion, platformDataVersion)
 		}
 		b.platformDataVersion = platformDataVersion
-		b.podNameToUniversalTag = make(map[string]zerodoc.UniversalTag)
+		b.podNameIDToUniversalTag = make(map[uint32]zerodoc.UniversalTag)
 		b.instanceIPToUniversalTag = make(map[uint32]zerodoc.UniversalTag)
 		b.vtapIDToUniversalTag = make(map[uint16]zerodoc.UniversalTag)
 	} else {
-		if podName != "" {
-			if universalTag, ok := b.podNameToUniversalTag[podName]; ok {
+		if podNameID != 0 {
+			if universalTag, ok := b.podNameIDToUniversalTag[podNameID]; ok {
 				m.UniversalTag = universalTag
 				return
 			}
@@ -420,8 +436,8 @@ func (b *PrometheusSamplesBuilder) fillUniversalTag(m *dbwriter.PrometheusSample
 	b.fillUniversalTagSlow(m, vtapID, podName, instance, fillWithVtapId)
 
 	// update fast path
-	if podName != "" {
-		b.podNameToUniversalTag[strings.Clone(podName)] = m.UniversalTag
+	if podName != "" && podNameID != 0 {
+		b.podNameIDToUniversalTag[podNameID] = m.UniversalTag
 	} else if instanceID != 0 {
 		b.instanceIPToUniversalTag[instanceID] = m.UniversalTag
 	} else if fillWithVtapId {

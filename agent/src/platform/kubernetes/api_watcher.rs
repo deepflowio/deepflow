@@ -32,6 +32,7 @@ use flate2::{write::ZlibEncoder, Compression};
 use k8s_openapi::apimachinery::pkg::version::Info;
 use kube::{Client, Config};
 use log::{debug, error, info, log_enabled, warn, Level};
+use parking_lot::RwLock;
 use tokio::{runtime::Runtime, task::JoinHandle};
 
 use super::resource_watcher::{GenericResourceWatcher, Watcher, WatcherConfig};
@@ -40,7 +41,7 @@ use crate::{
     error::{Error, Result},
     exception::ExceptionHandler,
     platform::kubernetes::resource_watcher::ResourceWatcherFactory,
-    rpc::Session,
+    rpc::{RunningConfig, Session},
     utils::{
         environment::{running_in_container, running_in_only_watch_k8s_mode},
         stats,
@@ -112,12 +113,14 @@ pub struct ApiWatcher {
     session: Arc<Session>,
     exception_handler: ExceptionHandler,
     stats_collector: Arc<stats::Collector>,
+    running_config: Arc<RwLock<RunningConfig>>,
 }
 
 impl ApiWatcher {
     pub fn new(
         runtime: Arc<Runtime>,
         config: PlatformAccess,
+        running_config: Arc<RwLock<RunningConfig>>,
         session: Arc<Session>,
         exception_handler: ExceptionHandler,
         stats_collector: Arc<stats::Collector>,
@@ -137,6 +140,7 @@ impl ApiWatcher {
             session,
             timer: Arc::new(Condvar::new()),
             running: Arc::new(Mutex::new(false)),
+            running_config,
             apiserver_version: Arc::new(Mutex::new(Info::default())),
             err_msgs: Arc::new(Mutex::new(vec![])),
             watchers: Arc::new(Mutex::new(HashMap::new())),
@@ -219,6 +223,7 @@ impl ApiWatcher {
         let session = self.session.clone();
         let timer = self.timer.clone();
         let running = self.running.clone();
+        let running_config = self.running_config.clone();
         let apiserver_version = self.apiserver_version.clone();
         let err_msgs = self.err_msgs.clone();
         let watchers = self.watchers.clone();
@@ -238,10 +243,15 @@ impl ApiWatcher {
                     watchers,
                     exception_handler,
                     stats_collector,
+                    running_config,
                 )
             })
             .unwrap();
         self.thread.lock().unwrap().replace(handle);
+    }
+
+    pub fn reset_session(&self, controller_ips: Vec<String>) {
+        self.session.reset_server_ip(controller_ips);
     }
 
     async fn set_up(
@@ -546,6 +556,7 @@ impl ApiWatcher {
         watcher_versions: &mut HashMap<String, u64>,
         resource_watchers: &Arc<Mutex<HashMap<String, GenericResourceWatcher>>>,
         exception_handler: &ExceptionHandler,
+        running_config: &Arc<RwLock<RunningConfig>>,
     ) {
         let version = &context.version;
         // 将缓存的entry 上报，如果没有则跳过
@@ -597,7 +608,7 @@ impl ApiWatcher {
                 cluster_id: Some(config_guard.kubernetes_cluster_id.to_string()),
                 version: pb_version,
                 vtap_id: Some(config_guard.vtap_id as u32),
-                source_ip: Some(config_guard.source_ip.to_string()),
+                source_ip: Some(running_config.read().ctrl_ip.clone()),
                 error_msg: Some(
                     err_msgs
                         .lock()
@@ -699,6 +710,7 @@ impl ApiWatcher {
         watchers: Arc<Mutex<HashMap<String, GenericResourceWatcher>>>,
         exception_handler: ExceptionHandler,
         stats_collector: Arc<stats::Collector>,
+        running_config: Arc<RwLock<RunningConfig>>,
     ) {
         info!("kubernetes api watcher starting");
 
@@ -731,7 +743,7 @@ impl ApiWatcher {
                         cluster_id: Some(config_guard.kubernetes_cluster_id.to_string()),
                         version: Some(context.version.load(Ordering::SeqCst)),
                         vtap_id: Some(config_guard.vtap_id as u32),
-                        source_ip: Some(config_guard.source_ip.to_string()),
+                        source_ip: Some(running_config.read().ctrl_ip.clone()),
                         error_msg: Some(e.to_string()),
                         entries: vec![],
                     };
@@ -785,6 +797,7 @@ impl ApiWatcher {
                 &mut watcher_versions,
                 &resource_watchers,
                 &exception_handler,
+                &running_config,
             );
             break;
         }
@@ -799,6 +812,7 @@ impl ApiWatcher {
                 &mut watcher_versions,
                 &resource_watchers,
                 &exception_handler,
+                &running_config,
             );
         }
         info!("kubernetes api watcher stopping");

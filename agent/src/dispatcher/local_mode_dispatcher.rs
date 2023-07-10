@@ -15,6 +15,7 @@
  */
 
 use std::collections::{HashMap, HashSet};
+use std::mem::drop;
 use std::process::Command;
 use std::str;
 use std::sync::atomic::Ordering;
@@ -58,6 +59,8 @@ pub(super) struct LocalModeDispatcher {
 }
 
 impl LocalModeDispatcher {
+    const VALID_MAC_INDEX: usize = 3;
+
     pub(super) fn run(&mut self) {
         let base = &mut self.base;
         info!("Start dispatcher {}", base.log_id);
@@ -103,6 +106,7 @@ impl LocalModeDispatcher {
                 if base.tap_interface_whitelist.next_sync(Duration::ZERO) {
                     base.need_update_bpf.store(true, Ordering::Relaxed);
                 }
+                drop(recved);
                 base.check_and_update_bpf();
                 continue;
             }
@@ -145,13 +149,14 @@ impl LocalModeDispatcher {
 
             pipeline.timestamp = timestamp;
 
-            // compare 4 low bytes
-            let mac_low = &pipeline.vm_mac.octets()[2..];
+            // compare 3 low bytes
+            let mac_low = &pipeline.vm_mac.octets()[Self::VALID_MAC_INDEX..];
             // src mac
-            let src_local = mac_low == &packet.data[MAC_ADDR_LEN + 2..MAC_ADDR_LEN + MAC_ADDR_LEN];
+            let src_local = mac_low
+                == &packet.data[MAC_ADDR_LEN + Self::VALID_MAC_INDEX..MAC_ADDR_LEN + MAC_ADDR_LEN];
             // dst mac
             let dst_local = !src_local
-                && (mac_low == &packet.data[2..MAC_ADDR_LEN]
+                && (mac_low == &packet.data[Self::VALID_MAC_INDEX..MAC_ADDR_LEN]
                     || MacAddr::is_multicast(&packet.data));
 
             // LOCAL模式L2END使用underlay网络的MAC地址，实际流量解析使用overlay
@@ -260,6 +265,7 @@ impl LocalModeDispatcher {
             {
                 base.need_update_bpf.store(true, Ordering::Relaxed);
             }
+            drop(packet);
             base.check_and_update_bpf();
         }
 
@@ -498,12 +504,15 @@ impl LocalModeDispatcherListener {
     fn get_if_index_to_inner_mac_map(poller: &GenericPoller, ns: &NsFile) -> HashMap<u32, MacAddr> {
         let mut result = HashMap::new();
 
-        if let Some(entries) = poller.get_interface_info_in(ns) {
-            debug!("Poller Mac:");
-            for entry in entries {
-                debug!("\tif_index: {}, mac: {}, mapped", entry.tap_idx, entry.mac);
-                result.insert(entry.tap_idx, entry.mac);
+        match poller.get_interface_info_in(ns) {
+            Some(entries) if !entries.is_empty() => {
+                debug!("Poller Mac:");
+                for entry in entries {
+                    debug!("\tif_index: {}, mac: {}, mapped", entry.tap_idx, entry.mac);
+                    result.insert(entry.tap_idx, entry.mac);
+                }
             }
+            _ => return result,
         }
 
         let links = if matches!(ns, NsFile::Root) {
@@ -548,6 +557,7 @@ struct MacRewriter {
     qing_cloud_vm_regex: Regex,
     qing_cloud_sriov_regex: Regex,
     qing_cloud_sriov_mac_regex: Regex,
+    tce_cloud_dpdk_regex: Regex,
 }
 
 impl MacRewriter {
@@ -555,6 +565,7 @@ impl MacRewriter {
     const QING_CLOUD_VM_REGEX: &'static str = "^[0-9a-f]{8}";
     const QING_CLOUD_SRIOV_REGEX: &'static str = "^[0-9a-zA-Z]+_[0-9]{1,3}$";
     const QING_CLOUD_SRIOV_MAC_REGEX: &'static str = "^52:54:9b";
+    const TCE_CLOUD_DPDK_REGEX: &'static str = "^veth_[0-9a-fA-F]{8}$";
 
     pub fn new() -> Self {
         Self {
@@ -563,6 +574,7 @@ impl MacRewriter {
             qing_cloud_vm_regex: Regex::new(Self::QING_CLOUD_VM_REGEX).unwrap(),
             qing_cloud_sriov_regex: Regex::new(Self::QING_CLOUD_SRIOV_REGEX).unwrap(),
             qing_cloud_sriov_mac_regex: Regex::new(Self::QING_CLOUD_SRIOV_MAC_REGEX).unwrap(),
+            tce_cloud_dpdk_regex: Regex::new(Self::TCE_CLOUD_DPDK_REGEX).unwrap(),
         }
     }
 
@@ -579,6 +591,11 @@ impl MacRewriter {
         } else if self.qing_cloud_sriov_regex.is_match(ifname) {
             self.get_mac_by_bridge_fdb(interface)
                 .unwrap_or(interface.mac_addr)
+        } else if self.tce_cloud_dpdk_regex.is_match(ifname) {
+            let first = u8::from_str_radix(&ifname[5..7], 16).unwrap();
+            let second = u8::from_str_radix(&ifname[7..9], 16).unwrap();
+            let thired = u8::from_str_radix(&ifname[9..11], 16).unwrap();
+            MacAddr::from([0, 0, 0, first, second, thired])
         } else {
             interface.mac_addr
         }

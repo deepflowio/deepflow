@@ -132,7 +132,7 @@ impl fmt::Display for EventType {
 
 pub struct ProcEvent {
     pub pid: u32,
-    pub netns_id: u64,
+    pub netns_id: u32,
     thread_id: u32,
     coroutine_id: u64, // optional
     process_kname: Vec<u8>,

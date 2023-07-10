@@ -141,13 +141,11 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 			"key_to_target_id":  make(map[string]interface{}),
 			"target_label_keys": make(map[string]interface{}),
 		}
-		tempCache.Target.keyToTargetID.Range(func(key, value any) bool {
-			t := key.(TargetKey)
-			k, _ := json.Marshal(t)
+		for key, value := range tempCache.Target.keyToTargetID.Get() {
+			k, _ := json.Marshal(key)
 			temp["key_to_target_id"].(map[string]interface{})[string(k)] = value
-			return true
-		})
-		for item := range tempCache.Target.targetLabelKeys.Iterator().C {
+		}
+		for item := range tempCache.Target.targetLabelKeys.Get().Iterator().C {
 			temp["target_label_keys"].(map[string]interface{})[marshal(item)] = struct{}{}
 		}
 		if len(temp["key_to_target_id"].(map[string]interface{})) > 0 ||

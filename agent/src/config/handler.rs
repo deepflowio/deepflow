@@ -54,10 +54,7 @@ use crate::{
     handler::PacketHandlerBuilder,
     trident::{AgentComponents, RunningMode},
     utils::{
-        environment::{
-            free_memory_check, get_ctrl_ip_and_mac, k8s_mem_limit_for_deepflow,
-            running_in_container,
-        },
+        environment::{free_memory_check, k8s_mem_limit_for_deepflow, running_in_container},
         logger::RemoteLogConfig,
     },
 };
@@ -65,8 +62,8 @@ use crate::{
 use crate::{
     dispatcher::recv_engine::af_packet::OptTpacketVersion,
     ebpf::CAP_LEN_MAX,
-    platform::{kubernetes::Poller, ProcRegRewrite},
-    utils::{environment::is_tt_pod, environment::is_tt_workload},
+    platform::{kubernetes::Poller, ApiWatcher, ProcRegRewrite},
+    utils::environment::{get_ctrl_ip_and_mac, is_tt_pod, is_tt_workload},
 };
 
 use public::bitmap::Bitmap;
@@ -257,7 +254,6 @@ pub struct PlatformConfig {
     pub enabled: bool,
     pub ingress_flavour: IngressFlavour,
     pub trident_type: TridentType,
-    pub source_ip: IpAddr,
     pub epc_id: u32,
     pub kubernetes_api_enabled: bool,
     pub kubernetes_api_list_limit: u32,
@@ -800,15 +796,11 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
             // If the environment variable K8S_MEM_LIMIT_FOR_DEEPFLOW is set, its value is preferred as the memory limit
             conf.max_memory = k8s_mem_limit;
         }
-        #[cfg(target_os = "linux")]
-        let (ctrl_ip, ctrl_mac) =
-            get_ctrl_ip_and_mac(static_config.controller_ips[0].parse().unwrap());
-        #[cfg(target_os = "windows")]
-        let (ctrl_ip, _) = get_ctrl_ip_and_mac(static_config.controller_ips[0].parse().unwrap());
+        let controller_ip = static_config.controller_ips[0].parse::<IpAddr>().unwrap();
         let dest_ip = if conf.analyzer_ip.len() > 0 {
             conf.analyzer_ip.clone()
         } else {
-            match ctrl_ip {
+            match controller_ip {
                 IpAddr::V4(_) => Ipv4Addr::UNSPECIFIED.to_string(),
                 IpAddr::V6(_) => Ipv6Addr::UNSPECIFIED.to_string(),
             }
@@ -899,7 +891,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
             },
             npb: NpbConfig {
                 mtu: conf.mtu,
-                underlay_is_ipv6: ctrl_ip.is_ipv6(),
+                underlay_is_ipv6: controller_ip.is_ipv6(),
                 npb_port: conf.yaml_config.npb_port,
                 vxlan_flags: conf.yaml_config.vxlan_flags,
                 enable_qos_bypass: conf.yaml_config.enable_qos_bypass,
@@ -944,7 +936,6 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 enabled: conf.platform_enabled,
                 ingress_flavour: conf.yaml_config.ingress_flavour,
                 trident_type: conf.trident_type,
-                source_ip: ctrl_ip,
                 epc_id: conf.epc_id,
                 kubernetes_api_enabled: conf.kubernetes_api_enabled,
                 kubernetes_api_list_limit: conf.yaml_config.kubernetes_api_list_limit,
@@ -1058,6 +1049,8 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     .l7_protocol_inference_max_fail_count,
                 l7_protocol_inference_ttl: conf.yaml_config.l7_protocol_inference_ttl,
                 ctrl_mac: if is_tt_workload(conf.trident_type) {
+                    let (_, ctrl_mac) =
+                        get_ctrl_ip_and_mac(static_config.controller_ips[0].parse().unwrap());
                     ctrl_mac
                 } else {
                     MacAddr::ZERO
@@ -1231,6 +1224,7 @@ impl ConfigHandler {
         new_config: RuntimeConfig,
         exception_handler: &ExceptionHandler,
         mut components: Option<&mut AgentComponents>,
+        #[cfg(target_os = "linux")] api_watcher: &Arc<ApiWatcher>,
     ) -> Vec<fn(&ConfigHandler, &mut AgentComponents)> {
         let candidate_config = &mut self.candidate_config;
         let static_config = &self.static_config;
@@ -1792,6 +1786,16 @@ impl ConfigHandler {
 
             #[cfg(target_os = "linux")]
             if static_config.agent_mode == RunningMode::Managed {
+                if restart_api_watcher {
+                    api_watcher.stop();
+                    api_watcher.start();
+                }
+                if candidate_config.platform.kubernetes_api_enabled {
+                    api_watcher.start();
+                } else {
+                    api_watcher.stop();
+                }
+
                 fn platform_callback(handler: &ConfigHandler, components: &mut AgentComponents) {
                     let conf = &handler.candidate_config.platform;
 
@@ -1804,25 +1808,9 @@ impl ConfigHandler {
                         } else {
                             components.kubernetes_poller.stop();
                         }
-                        if conf.kubernetes_api_enabled {
-                            components.api_watcher.start();
-                        } else {
-                            components.api_watcher.stop();
-                        }
-                    }
-                    if conf.kubernetes_api_enabled {
-                        components.api_watcher.start();
-                    } else {
-                        components.api_watcher.stop();
                     }
                 }
                 callbacks.push(platform_callback);
-                if restart_api_watcher {
-                    callbacks.push(|_, components| {
-                        components.api_watcher.stop();
-                        components.api_watcher.start();
-                    })
-                }
             }
         }
 

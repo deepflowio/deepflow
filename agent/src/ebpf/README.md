@@ -9,10 +9,11 @@ Currently support `x86_64` and `arm64` architectures.
 **Kernel version support:**
 - x86_64
   - Linux 4.14+ (Recommend Linux 5.2+)
-- arm64
+- aarch64
   - Linux 5.8+
   - Centos8 Linux 4.18 
   - EulerOS Linux5.10+
+  - KylinOS V10 SP3+ 4.19.90-52.25
 
 # Protocol Tracing
 

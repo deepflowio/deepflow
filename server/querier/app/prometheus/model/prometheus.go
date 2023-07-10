@@ -28,6 +28,7 @@ type PromQueryParams struct {
 	StartTime         string
 	EndTime           string
 	Step              string
+	Debug             bool
 	Matchers          []string
 	Context           context.Context
 }
@@ -38,10 +39,11 @@ type PromQueryData struct {
 }
 
 type PromQueryResponse struct {
-	Status    string      `json:"status"`
-	Data      interface{} `json:"data,omitempty"`
-	ErrorType errorType   `json:"errorType,omitempty"`
-	Error     string      `json:"error,omitempty"`
+	Status    string         `json:"status"`
+	Data      interface{}    `json:"data,omitempty"`
+	ErrorType errorType      `json:"errorType,omitempty"`
+	Error     string         `json:"error,omitempty"`
+	Stats     PromQueryStats `json:"stats,omitempty"`
 }
 
 type PromMetaParams struct {
@@ -49,6 +51,11 @@ type PromMetaParams struct {
 	EndTime   string
 	LabelName string
 	Context   context.Context
+}
+
+type PromQueryStats struct {
+	SQL       []string  `json:"sql,omitempty"`
+	QueryTime []float64 `json:"query_time,omitempty"`
 }
 
 type errorType string

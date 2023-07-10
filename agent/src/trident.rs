@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#[cfg(target_os = "linux")]
 use std::collections::HashMap;
 use std::env;
 use std::fmt;
@@ -464,6 +465,7 @@ impl Trident {
             let syn = Arc::new(PlatformSynchronizer::new(
                 runtime.clone(),
                 config_handler.platform(),
+                synchronizer.running_config.clone(),
                 session.clone(),
                 ext.clone(),
                 exception_handler.clone(),
@@ -482,6 +484,7 @@ impl Trident {
         let platform_synchronizer = Arc::new(PlatformSynchronizer::new(
             runtime.clone(),
             config_handler.platform(),
+            synchronizer.running_config.clone(),
             session.clone(),
             exception_handler.clone(),
             config_handler.static_config.override_os_hostname.clone(),
@@ -492,6 +495,16 @@ impl Trident {
         ) {
             platform_synchronizer.start();
         }
+
+        #[cfg(target_os = "linux")]
+        let api_watcher = Arc::new(ApiWatcher::new(
+            runtime.clone(),
+            config_handler.platform(),
+            synchronizer.running_config.clone(),
+            session.clone(),
+            exception_handler.clone(),
+            stats_collector.clone(),
+        ));
 
         let (state, cond) = &*state;
         let mut state_guard = state.lock().unwrap();
@@ -510,7 +523,8 @@ impl Trident {
                         guard.stop();
                         monitor.stop();
                         platform_synchronizer.stop();
-
+                        #[cfg(target_os = "linux")]
+                        api_watcher.stop();
                         #[cfg(target_os = "linux")]
                         libvirt_xml_extractor.stop();
                         if let Some(cg_controller) = cgroups_controller {
@@ -526,7 +540,13 @@ impl Trident {
                         c.stop(true);
                     }
                     if let Some(c) = config.take() {
-                        config_handler.on_config(c, &exception_handler, None);
+                        config_handler.on_config(
+                            c,
+                            &exception_handler,
+                            None,
+                            #[cfg(target_os = "linux")]
+                            &api_watcher,
+                        );
                     }
                     state_guard = cond.wait(state_guard).unwrap();
                     continue;
@@ -559,8 +579,13 @@ impl Trident {
             yaml_conf = Some(runtime_config.yaml_config.clone());
             match components.as_mut() {
                 None => {
-                    let callbacks =
-                        config_handler.on_config(runtime_config, &exception_handler, None);
+                    let callbacks = config_handler.on_config(
+                        runtime_config,
+                        &exception_handler,
+                        None,
+                        #[cfg(target_os = "linux")]
+                        &api_watcher,
+                    );
 
                     config_handler.load_plugin(
                         &runtime,
@@ -580,6 +605,8 @@ impl Trident {
                         #[cfg(target_os = "linux")]
                         libvirt_xml_extractor.clone(),
                         platform_synchronizer.clone(),
+                        #[cfg(target_os = "linux")]
+                        api_watcher.clone(),
                         vm_mac_addrs,
                         config_handler.static_config.agent_mode,
                         runtime.clone(),
@@ -606,6 +633,8 @@ impl Trident {
                             runtime_config,
                             &exception_handler,
                             Some(components),
+                            #[cfg(target_os = "linux")]
+                            &api_watcher,
                         );
 
                         components.start();
@@ -759,6 +788,11 @@ fn parse_tap_type(components: &mut AgentComponents, tap_types: Vec<trident::TapT
 pub struct DomainNameListener {
     stats_collector: Arc<stats::Collector>,
     synchronizer: Arc<Synchronizer>,
+    platform_synchronizer: Arc<PlatformSynchronizer>,
+    #[cfg(target_os = "linux")]
+    api_watcher: Arc<ApiWatcher>,
+    #[cfg(target_os = "linux")]
+    prometheus_targets_watcher: Arc<TargetsWatcher>,
 
     ips: Vec<String>,
     domain_names: Vec<String>,
@@ -773,12 +807,20 @@ impl DomainNameListener {
     fn new(
         stats_collector: Arc<stats::Collector>,
         synchronizer: Arc<Synchronizer>,
+        platform_synchronizer: Arc<PlatformSynchronizer>,
+        #[cfg(target_os = "linux")] api_watcher: Arc<ApiWatcher>,
+        #[cfg(target_os = "linux")] prometheus_targets_watcher: Arc<TargetsWatcher>,
         domain_names: Vec<String>,
         ips: Vec<String>,
     ) -> DomainNameListener {
         Self {
             stats_collector: stats_collector.clone(),
             synchronizer: synchronizer.clone(),
+            platform_synchronizer: platform_synchronizer.clone(),
+            #[cfg(target_os = "linux")]
+            api_watcher: api_watcher.clone(),
+            #[cfg(target_os = "linux")]
+            prometheus_targets_watcher: prometheus_targets_watcher.clone(),
 
             domain_names: domain_names.clone(),
             ips: ips.clone(),
@@ -819,6 +861,11 @@ impl DomainNameListener {
             return;
         }
         let synchronizer = self.synchronizer.clone();
+        let platform_synchronizer = self.platform_synchronizer.clone();
+        #[cfg(target_os = "linux")]
+        let api_watcher = self.api_watcher.clone();
+        #[cfg(target_os = "linux")]
+        let prometheus_targets_watcher = self.prometheus_targets_watcher.clone();
 
         let mut ips = self.ips.clone();
         let domain_names = self.domain_names.clone();
@@ -866,6 +913,11 @@ impl DomainNameListener {
                                 ctrl_ip.to_string(),
                                 ctrl_mac.to_string(),
                             );
+                            platform_synchronizer.reset_session(ips.clone());
+                            #[cfg(target_os = "linux")]
+                            api_watcher.reset_session(ips.clone());
+                            #[cfg(target_os = "linux")]
+                            prometheus_targets_watcher.reset_session(ips.clone());
                         }
                     }
                 })
@@ -883,11 +935,7 @@ pub enum Components {
 
 #[cfg(target_os = "linux")]
 pub struct WatcherComponents {
-    pub api_watcher: Arc<ApiWatcher>,
     pub prometheus_targets_watcher: Arc<TargetsWatcher>,
-    pub libvirt_xml_extractor: Arc<LibvirtXmlExtractor>, // FIXME: Delete this component
-    pub platform_synchronizer: Arc<PlatformSynchronizer>,
-    pub kubernetes_poller: Arc<GenericPoller>,
     pub domain_name_listener: DomainNameListener,
     pub running: AtomicBool,
     tap_mode: TapMode,
@@ -902,52 +950,36 @@ impl WatcherComponents {
         stats_collector: Arc<stats::Collector>,
         session: &Arc<Session>,
         synchronizer: &Arc<Synchronizer>,
-        exception_handler: ExceptionHandler,
-        libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
         platform_synchronizer: Arc<PlatformSynchronizer>,
+        api_watcher: Arc<ApiWatcher>,
+        exception_handler: ExceptionHandler,
         agent_mode: RunningMode,
         runtime: Arc<Runtime>,
     ) -> Result<Self> {
         let candidate_config = &config_handler.candidate_config;
-        let api_watcher = Arc::new(ApiWatcher::new(
-            runtime.clone(),
-            config_handler.platform(),
-            session.clone(),
-            exception_handler.clone(),
-            stats_collector.clone(),
-        ));
-        let domain_name_listener = DomainNameListener::new(
-            stats_collector.clone(),
-            synchronizer.clone(),
-            config_handler.static_config.controller_domain_name.clone(),
-            config_handler.static_config.controller_ips.clone(),
-        );
-        let kubernetes_poller = Arc::new(GenericPoller::new(
-            config_handler.static_config.controller_ips[0].parse()?,
-            config_handler.platform(),
-            config_handler
-                .candidate_config
-                .dispatcher
-                .extra_netns_regex
-                .clone(),
-        ));
-        platform_synchronizer.set_kubernetes_poller(kubernetes_poller.clone());
         let prometheus_targets_watcher = Arc::new(TargetsWatcher::new(
             runtime.clone(),
             config_handler.platform(),
+            synchronizer.running_config.clone(),
             session.clone(),
             exception_handler.clone(),
             stats_collector.clone(),
         ));
 
+        let domain_name_listener = DomainNameListener::new(
+            stats_collector.clone(),
+            synchronizer.clone(),
+            platform_synchronizer.clone(),
+            api_watcher.clone(),
+            prometheus_targets_watcher.clone(),
+            config_handler.static_config.controller_domain_name.clone(),
+            config_handler.static_config.controller_ips.clone(),
+        );
+
         info!("With ONLY_WATCH_K8S_RESOURCE and IN_CONTAINER environment variables set, the agent will only watch K8s resource");
         Ok(WatcherComponents {
-            api_watcher,
-            platform_synchronizer,
-            kubernetes_poller,
             prometheus_targets_watcher,
             domain_name_listener,
-            libvirt_xml_extractor,
             running: AtomicBool::new(false),
             tap_mode: candidate_config.tap_mode,
             agent_mode,
@@ -960,10 +992,6 @@ impl WatcherComponents {
             return;
         }
         info!("Staring watcher components.");
-        if matches!(self.agent_mode, RunningMode::Managed) {
-            self.api_watcher.start();
-        }
-        self.kubernetes_poller.start();
         self.domain_name_listener.start();
         self.prometheus_targets_watcher.start();
         info!("Started watcher components.");
@@ -973,8 +1001,6 @@ impl WatcherComponents {
         if !self.running.swap(false, Ordering::Relaxed) {
             return;
         }
-        self.api_watcher.stop();
-        self.kubernetes_poller.stop();
         self.domain_name_listener.stop();
         self.prometheus_targets_watcher.stop();
         info!("Stopped watcher components.")
@@ -999,8 +1025,6 @@ pub struct AgentComponents {
     pub kubernetes_poller: Arc<GenericPoller>,
     #[cfg(target_os = "linux")]
     pub socket_synchronizer: SocketSynchronizer,
-    #[cfg(target_os = "linux")]
-    pub api_watcher: Arc<ApiWatcher>,
     #[cfg(target_os = "linux")]
     pub prometheus_targets_watcher: Arc<TargetsWatcher>,
     pub debugger: Debugger,
@@ -1191,6 +1215,7 @@ impl AgentComponents {
         remote_log_config: RemoteLogConfig,
         #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
         platform_synchronizer: Arc<PlatformSynchronizer>,
+        #[cfg(target_os = "linux")] api_watcher: Arc<ApiWatcher>,
         vm_mac_addrs: Vec<MacAddr>,
         agent_mode: RunningMode,
         runtime: Arc<Runtime>,
@@ -1296,18 +1321,10 @@ impl AgentComponents {
         platform_synchronizer.set_kubernetes_poller(kubernetes_poller.clone());
 
         #[cfg(target_os = "linux")]
-        let api_watcher = Arc::new(ApiWatcher::new(
-            runtime.clone(),
-            config_handler.platform(),
-            session.clone(),
-            exception_handler.clone(),
-            stats_collector.clone(),
-        ));
-
-        #[cfg(target_os = "linux")]
         let prometheus_targets_watcher = Arc::new(TargetsWatcher::new(
             runtime.clone(),
             config_handler.platform(),
+            synchronizer.running_config.clone(),
             session.clone(),
             exception_handler.clone(),
             stats_collector.clone(),
@@ -2090,6 +2107,11 @@ impl AgentComponents {
         let domain_name_listener = DomainNameListener::new(
             stats_collector.clone(),
             synchronizer.clone(),
+            platform_synchronizer.clone(),
+            #[cfg(target_os = "linux")]
+            api_watcher.clone(),
+            #[cfg(target_os = "linux")]
+            prometheus_targets_watcher.clone(),
             config_handler.static_config.controller_domain_name.clone(),
             config_handler.static_config.controller_ips.clone(),
         );
@@ -2126,8 +2148,6 @@ impl AgentComponents {
             kubernetes_poller,
             #[cfg(target_os = "linux")]
             socket_synchronizer,
-            #[cfg(target_os = "linux")]
-            api_watcher,
             #[cfg(target_os = "linux")]
             prometheus_targets_watcher,
             debugger,
@@ -2174,7 +2194,6 @@ impl AgentComponents {
                 self.kubernetes_poller.start();
             }
             if matches!(self.agent_mode, RunningMode::Managed) && running_in_container() {
-                self.api_watcher.start();
                 self.prometheus_targets_watcher.start();
             }
             self.socket_synchronizer.start();
@@ -2262,12 +2281,9 @@ impl AgentComponents {
         }
 
         #[cfg(target_os = "linux")]
-        if !half {
+        {
             self.kubernetes_poller.stop();
             self.socket_synchronizer.stop();
-            if let Some(h) = self.api_watcher.notify_stop() {
-                join_handles.push(h);
-            }
             self.prometheus_targets_watcher.stop();
         }
 
@@ -2381,6 +2397,7 @@ impl Components {
         remote_log_config: RemoteLogConfig,
         #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
         platform_synchronizer: Arc<PlatformSynchronizer>,
+        #[cfg(target_os = "linux")] api_watcher: Arc<ApiWatcher>,
         vm_mac_addrs: Vec<MacAddr>,
         agent_mode: RunningMode,
         runtime: Arc<Runtime>,
@@ -2392,9 +2409,9 @@ impl Components {
                 stats_collector,
                 session,
                 synchronizer,
-                exception_handler,
-                libvirt_xml_extractor,
                 platform_synchronizer,
+                api_watcher,
+                exception_handler,
                 agent_mode,
                 runtime,
             )?;
@@ -2411,6 +2428,8 @@ impl Components {
             #[cfg(target_os = "linux")]
             libvirt_xml_extractor,
             platform_synchronizer,
+            #[cfg(target_os = "linux")]
+            api_watcher,
             vm_mac_addrs,
             agent_mode,
             runtime,
