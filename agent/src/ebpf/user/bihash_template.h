@@ -227,6 +227,8 @@ typedef BVS(clib_bihash)
 
 	/* current hash's elements count */
 	u64 hash_elems_count;
+
+	void *private; /* It is used to store the user's private data. */
 } BVT(clib_bihash);
 
 typedef struct {

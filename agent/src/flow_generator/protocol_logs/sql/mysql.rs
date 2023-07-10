@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+mod comment_parser;
+
 use serde::Serialize;
 
 use super::super::{consts::*, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
@@ -21,6 +23,7 @@ use super::sql_check::is_mysql;
 use super::trim_head_comment_and_first_upper;
 
 use crate::common::flow::L7PerfStats;
+use crate::flow_generator::protocol_logs::pb_adapter::TraceInfo;
 use crate::{
     common::{
         enums::IpProtocol,
@@ -69,6 +72,8 @@ pub struct MysqlInfo {
     pub status: L7ResponseStatus,
 
     rrt: u64,
+
+    trace_id: Option<String>,
 }
 
 impl L7ProtocolInfoInterface for MysqlInfo {
@@ -200,6 +205,15 @@ impl From<MysqlInfo> for L7ProtocolSendLog {
             ext_info: Some(ExtendedInfo {
                 ..Default::default()
             }),
+            trace_info: if f.trace_id.is_some() {
+                Some(TraceInfo {
+                    trace_id: f.trace_id,
+                    ..Default::default()
+                })
+            } else {
+                None
+            },
+
             ..Default::default()
         };
         return log;
@@ -227,7 +241,20 @@ impl L7ProtocolParserInterface for MysqlLog {
         if self.perf_stats.is_none() {
             self.perf_stats = Some(L7PerfStats::default())
         };
-        if self.parse(payload, param.l4_protocol, param.direction)? {
+        if self.parse(
+            payload,
+            param.l4_protocol,
+            param.direction,
+            param.parse_config.and_then(|c| {
+                for i in c.l7_log_dynamic.trace_types.iter() {
+                    match i {
+                        crate::config::handler::TraceType::Customize(c) => return Some(c.as_str()),
+                        _ => continue,
+                    }
+                }
+                None
+            }),
+        )? {
             // ignore greeting
             return Ok(vec![]);
         }
@@ -274,8 +301,11 @@ fn mysql_string(payload: &[u8]) -> String {
 }
 
 impl MysqlLog {
-    fn request_string(&mut self, payload: &[u8]) {
+    fn request_string(&mut self, payload: &[u8], trace_id: Option<&str>) {
         self.info.context = mysql_string(payload);
+        if let Some(t) = trace_id {
+            self.info.trace_id = extra_sql_trace_id(&self.info.context, t);
+        }
     }
 
     fn greeting(&mut self, payload: &[u8]) -> Result<()> {
@@ -305,7 +335,7 @@ impl MysqlLog {
         Ok(())
     }
 
-    fn request(&mut self, payload: &[u8]) -> Result<()> {
+    fn request(&mut self, payload: &[u8], trace_id: Option<&str>) -> Result<()> {
         if payload.len() < COMMAND_LEN {
             return Err(Error::MysqlLogParseFailed);
         }
@@ -313,7 +343,7 @@ impl MysqlLog {
         match self.info.command {
             COM_QUIT | COM_FIELD_LIST | COM_STMT_EXECUTE | COM_STMT_CLOSE | COM_STMT_FETCH => (),
             COM_INIT_DB | COM_QUERY | COM_STMT_PREPARE => {
-                self.request_string(&payload[COMMAND_OFFSET + COMMAND_LEN..]);
+                self.request_string(&payload[COMMAND_OFFSET + COMMAND_LEN..], trace_id);
             }
             COM_PING => {}
             _ => return Err(Error::MysqlLogParseFailed),
@@ -426,6 +456,7 @@ impl MysqlLog {
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
+        trace_id: Option<&str>,
     ) -> Result<bool> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
@@ -442,7 +473,7 @@ impl MysqlLog {
             .ok_or(Error::MysqlLogParseFailed)?;
 
         match msg_type {
-            LogMessageType::Request => self.request(&payload[offset..])?,
+            LogMessageType::Request => self.request(&payload[offset..], trace_id)?,
             LogMessageType::Response => self.response(&payload[offset..])?,
             LogMessageType::Other => {
                 self.greeting(&payload[offset..])?;
@@ -517,6 +548,22 @@ impl MysqlHeader {
             _ => None,
         }
     }
+}
+
+// extra trace id from comment like # TraceID: xxxxxxxxxxxxxxx
+fn extra_sql_trace_id(sql: &str, trace_id: &str) -> Option<String> {
+    for i in comment_parser::MysqlCommentParserIter::new(sql) {
+        let s = i.trim();
+        let Some(idx) = s.find(trace_id) else {
+            continue;
+        };
+
+        let start = idx + trace_id.len() + 1;
+        if start < s.len() {
+            return Some((&s[start..].trim()).to_string());
+        }
+    }
+    None
 }
 
 // test log parse

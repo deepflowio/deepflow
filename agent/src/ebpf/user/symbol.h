@@ -130,9 +130,9 @@ copy_process_name(struct symbolizer_cache_kvp *kv, char *dst)
 	static const int len =
 		sizeof(((struct symbolizer_proc_info *)kv->v.proc_info_p)->comm);
 
-	memcpy_s_inline(dst, len,
+	strcpy_s_inline(dst, len,
 			((struct symbolizer_proc_info *)kv->v.proc_info_p)->comm,
-			len);
+			strlen(((struct symbolizer_proc_info *)kv->v.proc_info_p)->comm));
 }
 
 void free_uprobe_symbol(struct symbol_uprobe *u_sym,

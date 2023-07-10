@@ -469,4 +469,21 @@ extern "C" {
      * @returns 0 on success, < 0 on error
      */
     pub fn stop_continuous_profiler() -> c_int;
+
+    /*
+     * To set the regex matching for the profiler.
+     *
+     * Perform regular expression matching on process names.
+     * Processes that successfully match the regular expression are
+     * aggregated using the key:
+     *     `{pid + stime + u_stack_id + k_stack_id + tid + cpu}`.
+     *
+     * For processes that do not match, they are aggregated using the
+     * key:
+     *     `<process name + u_stack_id + k_stack_id + cpu>`.
+     *
+     * @pattern : Regular expression pattern. e.g. "^(java|nginx|.*ser.*)$"
+     * @returns 0 on success, < 0 on error
+     */
+    pub fn set_profiler_regex(pattern: *const c_char) -> c_int;
 }

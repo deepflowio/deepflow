@@ -371,14 +371,17 @@ fn main() {
         print!("{:#?}\n", stats);
 
         //// enable continuous profiler
-        //if start_continuous_profiler(
-        //    99,
-        //    continuous_profiler_callback,
-        //) != 0
-        //{
+        //if start_continuous_profiler(99, continuous_profiler_callback) != 0 {
         //    println!("start_continuous_profiler() error.");
         //    ::std::process::exit(1);
         //}
+
+        //set_profiler_regex(
+        //    CString::new("^(java|nginx|profiler|telegraf|mysqld|.*deepflow.*)$".as_bytes())
+        //        .unwrap()
+        //        .as_c_str()
+        //        .as_ptr(),
+        //);
 
         bpf_tracer_finish();
 
