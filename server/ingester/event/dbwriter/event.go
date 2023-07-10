@@ -244,15 +244,13 @@ func (e *EventStore) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 
 		// tag + value
 		flowTagInfo.FieldValue = e.AttributeValues[i]
-		v1 := e.Time
-		if old := cache.FieldValueCache.AddOrGet(*flowTagInfo, &v1); old != nil {
-			oldv, _ := old.(*uint32)
-			if *oldv+cache.CacheFlushTimeout >= e.Time {
+		if old, ok := cache.FieldValueCache.AddOrGet(*flowTagInfo, e.Time); ok {
+			if old+cache.CacheFlushTimeout >= e.Time {
 				// If there is no new fieldValue, of course there will be no new field.
 				// So we can just skip the rest of the process in the loop.
 				continue
 			} else {
-				*oldv = e.Time
+				cache.FieldValueCache.Add(*flowTagInfo, e.Time)
 			}
 		}
 		tagFieldValue := flow_tag.AcquireFlowTag()
@@ -262,13 +260,11 @@ func (e *EventStore) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 
 		// only tag
 		flowTagInfo.FieldValue = ""
-		v2 := e.Time
-		if old := cache.FieldCache.AddOrGet(*flowTagInfo, &v2); old != nil {
-			oldv, _ := old.(*uint32)
-			if *oldv+cache.CacheFlushTimeout >= e.Time {
+		if old, ok := cache.FieldCache.AddOrGet(*flowTagInfo, e.Time); ok {
+			if old+cache.CacheFlushTimeout >= e.Time {
 				continue
 			} else {
-				*oldv = e.Time
+				cache.FieldCache.Add(*flowTagInfo, e.Time)
 			}
 		}
 		tagField := flow_tag.AcquireFlowTag()

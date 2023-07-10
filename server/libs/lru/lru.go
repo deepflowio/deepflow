@@ -20,74 +20,74 @@ import (
 	"container/list"
 )
 
-type Cache struct {
+type Cache[Key comparable, Value any] struct {
 	capacity int
 	lruList  *list.List
-	cache    map[interface{}]*list.Element
+	cache    map[Key]*list.Element
 }
 
-type entry struct {
-	key   interface{}
-	value interface{}
+type entry[Key comparable, Value any] struct {
+	key   Key
+	value Value
 }
 
-func NewCache(maxEntries int) *Cache {
-	return &Cache{
+func NewCache[Key comparable, Value any](maxEntries int) *Cache[Key, Value] {
+	return &Cache[Key, Value]{
 		capacity: maxEntries,
 		lruList:  list.New(),
-		cache:    make(map[interface{}]*list.Element),
+		cache:    make(map[Key]*list.Element),
 	}
 }
 
-// When the key already exists, return its current value in lru,
-// otherwise insert the new key-value and return nil.
-func (c *Cache) AddOrGet(key interface{}, value interface{}) interface{} {
+// When the key already exists, return its current value in lru and true
+// otherwise insert the new key-value and return nil and false
+func (c *Cache[Key, Value]) AddOrGet(key Key, value Value) (Value, bool) {
 	if c.cache == nil {
-		c.cache = make(map[interface{}]*list.Element)
+		c.cache = make(map[Key]*list.Element)
 		c.lruList = list.New()
 	}
 	if ee, ok := c.cache[key]; ok {
 		c.lruList.MoveToFront(ee)
-		return ee.Value.(*entry).value
+		return ee.Value.(*entry[Key, Value]).value, true
 	}
-	ele := c.lruList.PushFront(&entry{key, value})
+	ele := c.lruList.PushFront(&entry[Key, Value]{key, value})
 	c.cache[key] = ele
 	if c.lruList.Len() > c.capacity {
 		c.removeOldest()
 	}
-	return nil
+	return value, false
 }
 
-func (c *Cache) Add(key interface{}, value interface{}) {
+func (c *Cache[Key, Value]) Add(key Key, value Value) {
 	if c.cache == nil {
-		c.cache = make(map[interface{}]*list.Element)
+		c.cache = make(map[Key]*list.Element)
 		c.lruList = list.New()
 	}
 	if ee, ok := c.cache[key]; ok {
 		c.lruList.MoveToFront(ee)
-		ee.Value.(*entry).value = value
+		ee.Value.(*entry[Key, Value]).value = value
 		return
 	}
-	ele := c.lruList.PushFront(&entry{key, value})
+	ele := c.lruList.PushFront(&entry[Key, Value]{key, value})
 	c.cache[key] = ele
 	if c.lruList.Len() > c.capacity {
 		c.removeOldest()
 	}
 }
 
-func (c *Cache) Get(key interface{}) (value interface{}, ok bool) {
+func (c *Cache[Key, Value]) Get(key Key) (value Value, ok bool) {
 	if c.cache == nil {
 		return
 	}
 	if ele, hit := c.cache[key]; hit {
 		c.lruList.MoveToFront(ele)
-		return ele.Value.(*entry).value, true
+		return ele.Value.(*entry[Key, Value]).value, true
 	}
 	return
 }
 
 // Contain will check if a key is in the cache, but not modify the list
-func (c *Cache) Contain(key interface{}) bool {
+func (c *Cache[Key, Value]) Contain(key Key) bool {
 	if c.cache == nil {
 		return false
 	}
@@ -96,39 +96,39 @@ func (c *Cache) Contain(key interface{}) bool {
 }
 
 // Peek will return the key value but not modify the list
-func (c *Cache) Peek(key interface{}) (value interface{}, ok bool) {
+func (c *Cache[Key, Value]) Peek(key Key) (value Value, ok bool) {
 	if c.cache == nil {
 		return
 	}
 	if ele, hit := c.cache[key]; hit {
-		return ele.Value.(*entry).value, true
+		return ele.Value.(*entry[Key, Value]).value, true
 	}
 	return
 }
 
 // Keys returns a slice of all keys, from oldest to newest
-func (c *Cache) Keys() []interface{} {
-	keys := make([]interface{}, len(c.cache))
+func (c *Cache[Key, Value]) Keys() []Key {
+	keys := make([]Key, len(c.cache))
 	i := 0
 	for ele := c.lruList.Back(); ele != nil; ele = ele.Prev() {
-		keys[i] = ele.Value.(*entry).key
+		keys[i] = ele.Value.(*entry[Key, Value]).key
 		i++
 	}
 	return keys
 }
 
 // Values returns a slice of all values, from oldest to newest
-func (c *Cache) Values() []interface{} {
-	values := make([]interface{}, len(c.cache))
+func (c *Cache[Key, Value]) Values() []Value {
+	values := make([]Value, len(c.cache))
 	i := 0
 	for ele := c.lruList.Back(); ele != nil; ele = ele.Prev() {
-		values[i] = ele.Value.(*entry).value
+		values[i] = ele.Value.(*entry[Key, Value]).value
 		i++
 	}
 	return values
 }
 
-func (c *Cache) Remove(key interface{}) {
+func (c *Cache[Key, Value]) Remove(key Key) {
 	if c.cache == nil {
 		return
 	}
@@ -137,7 +137,7 @@ func (c *Cache) Remove(key interface{}) {
 	}
 }
 
-func (c *Cache) removeOldest() {
+func (c *Cache[Key, Value]) removeOldest() {
 	if c.cache == nil {
 		return
 	}
@@ -147,20 +147,20 @@ func (c *Cache) removeOldest() {
 	}
 }
 
-func (c *Cache) removeElement(e *list.Element) {
+func (c *Cache[Key, Value]) removeElement(e *list.Element) {
 	c.lruList.Remove(e)
-	kv := e.Value.(*entry)
+	kv := e.Value.(*entry[Key, Value])
 	delete(c.cache, kv.key)
 }
 
-func (c *Cache) Len() int {
+func (c *Cache[Key, Value]) Len() int {
 	if c.cache == nil {
 		return 0
 	}
 	return c.lruList.Len()
 }
 
-func (c *Cache) Clear() {
+func (c *Cache[Key, Value]) Clear() {
 	c.lruList = nil
 	c.cache = nil
 }

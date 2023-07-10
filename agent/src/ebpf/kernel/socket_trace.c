@@ -361,6 +361,7 @@ static __inline void infer_sock_flags(void *sk,
 		unsigned int sk_type : 16;
 	};
 
+	// TAG: STRUCT_SOCK_FLAGS_OFFSET
 	// Member '__sk_flags_offset' the offset in struct sock
 	// 0x220 for 4.19.90-23.15.v2101.ky10.x86_64
 	// 0x238 for 5.10.0-60.18.0.50.h322_1.hce2.aarch64
@@ -677,6 +678,7 @@ static __inline __u32 retry_get_copied_seq(void *sk,
 static __inline void infer_tcp_seq_offset(void *sk,
 					  struct member_fields_offset *offset)
 {
+	// TAG: STRUCT_TCP_SOCK_COPIED_SEQ_OFFSET
 	// 成员 copied_seq 在 struct tcp_sock 中的偏移量
 	// 0x644 for EulerOS 4.18.0-147
 	// 0x65c for 4.19.90-23.15.v2101.ky10.x86_64
@@ -703,6 +705,7 @@ static __inline void infer_tcp_seq_offset(void *sk,
 				    0x664};
 #endif
 
+	// TAG: STRUCT_TCP_SOCK_WRITE_SEQ_OFFSET
 	// 成员 write_seq 在 struct tcp_sock 中的偏移量
 	// 0x7b4 for EulerOS 4.18.0-147
 	// 0x7cc for 4.19.90-23.15.v2101.ky10.x86_64
