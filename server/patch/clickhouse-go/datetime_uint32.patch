@@ -1,0 +1,22 @@
+diff --git a/lib/column/datetime.go b/lib/column/datetime.go
+index 2f9f685..af7077a 100644
+--- a/lib/column/datetime.go
++++ b/lib/column/datetime.go
+@@ -93,6 +93,8 @@ func (col *DateTime) ScanRow(dest interface{}, row int) error {
+ 
+ func (col *DateTime) Append(v interface{}) (nulls []uint8, err error) {
+ 	switch v := v.(type) {
++	case []uint32:
++		col.values.data, nulls = append(col.values.data, v...), make([]uint8, len(v))
+ 	case []time.Time:
+ 		in := make([]uint32, 0, len(v))
+ 		for _, t := range v {
+@@ -128,6 +130,8 @@ func (col *DateTime) Append(v interface{}) (nulls []uint8, err error) {
+ func (col *DateTime) AppendRow(v interface{}) error {
+ 	var datetime uint32
+ 	switch v := v.(type) {
++	case uint32:
++		datetime = v
+ 	case time.Time:
+ 		if err := dateOverflow(minDateTime, maxDateTime, v, "2006-01-02 15:04:05"); err != nil {
+ 			return err

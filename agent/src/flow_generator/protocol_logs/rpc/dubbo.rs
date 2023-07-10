@@ -42,6 +42,24 @@ use crate::{
 
 const TRACE_ID_MAX_LEN: usize = 1024;
 
+const HESSIAN2_SERIALIZATION_ID: u8 = 2;
+const JAVA_SERIALIZATION_ID: u8 = 3;
+const COMPACTED_JAVA_SERIALIZATION_ID: u8 = 4;
+const FASTJSON_SERIALIZATION_ID: u8 = 6;
+const NATIVE_JAVA_SERIALIZATION_ID: u8 = 7;
+const KRYO_SERIALIZATION_ID: u8 = 8;
+const FST_SERIALIZATION_ID: u8 = 9;
+const NATIVE_HESSIAN_SERIALIZATION_ID: u8 = 10;
+const PROTOSTUFF_SERIALIZATION_ID: u8 = 12;
+const AVRO_SERIALIZATION_ID: u8 = 11;
+const GSON_SERIALIZATION_ID: u8 = 16;
+const PROTOBUF_JSON_SERIALIZATION_ID: u8 = 21;
+
+const PROTOBUF_SERIALIZATION_ID: u8 = 22;
+const FASTJSON2_SERIALIZATION_ID: u8 = 23;
+const KRYO_SERIALIZATION2_ID: u8 = 25;
+const CUSTOM_MESSAGE_PACK_ID: u8 = 31;
+
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct DubboInfo {
     #[serde(skip)]
@@ -128,6 +146,30 @@ impl L7ProtocolInfoInterface for DubboInfo {
 impl From<DubboInfo> for L7ProtocolSendLog {
     fn from(f: DubboInfo) -> Self {
         let endpoint = format!("{}/{}", f.service_name, f.method_name);
+        let serial_id_attr = KeyVal {
+            key: "serialization_id".into(),
+            // reference https://github.com/apache/dubbo/blob/3.2/dubbo-serialization/dubbo-serialization-api/src/main/java/org/apache/dubbo/common/serialize/Constants.java
+            val: match f.serial_id {
+                HESSIAN2_SERIALIZATION_ID => "HESSIAN2".to_string(),
+                JAVA_SERIALIZATION_ID => "JAVA".to_string(),
+                COMPACTED_JAVA_SERIALIZATION_ID => "COMPACTED_JAVA".to_string(),
+                FASTJSON_SERIALIZATION_ID => "FASTJSON".to_string(),
+                NATIVE_JAVA_SERIALIZATION_ID => "NATIVE_JAVA".to_string(),
+                KRYO_SERIALIZATION_ID => "KRYO".to_string(),
+                FST_SERIALIZATION_ID => "FST".to_string(),
+                NATIVE_HESSIAN_SERIALIZATION_ID => "NATIVE_HESSIAN".to_string(),
+                PROTOSTUFF_SERIALIZATION_ID => "PROTOSTUFF".to_string(),
+                AVRO_SERIALIZATION_ID => "AVRO".to_string(),
+                GSON_SERIALIZATION_ID => "GSON".to_string(),
+                PROTOBUF_JSON_SERIALIZATION_ID => "PROTOBUF_JSON".to_string(),
+                PROTOBUF_SERIALIZATION_ID => "PROTOBUF".to_string(),
+                FASTJSON2_SERIALIZATION_ID => "FASTJSON2".to_string(),
+                KRYO_SERIALIZATION2_ID => "KRYO_".to_string(),
+                CUSTOM_MESSAGE_PACK_ID => "CUSTO".to_string(),
+                _ => f.serial_id.to_string(),
+            },
+        };
+
         L7ProtocolSendLog {
             req_len: f.req_msg_size,
             resp_len: f.resp_msg_size,
@@ -151,16 +193,17 @@ impl From<DubboInfo> for L7ProtocolSendLog {
             ext_info: Some(ExtendedInfo {
                 rpc_service: Some(f.service_name),
                 request_id: Some(f.request_id as u32),
-                attributes: Some(vec![
-                    KeyVal {
-                        key: "event".into(),
-                        val: f.event.to_string(),
-                    },
-                    KeyVal {
-                        key: "serialization_id".into(),
-                        val: f.serial_id.to_string(),
-                    },
-                ]),
+                attributes: Some(if f.event == 0 {
+                    vec![serial_id_attr]
+                } else {
+                    vec![
+                        KeyVal {
+                            key: "event".into(),
+                            val: f.event.to_string(),
+                        },
+                        serial_id_attr,
+                    ]
+                }),
                 ..Default::default()
             }),
             ..Default::default()

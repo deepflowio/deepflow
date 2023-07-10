@@ -612,16 +612,14 @@ func (h *L7FlowLog) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 
 			// tag + value
 			flowTagInfo.FieldValue = attributeValues[i]
-			v1 := time
 
-			if old := cache.FieldValueCache.AddOrGet(*flowTagInfo, &v1); old != nil {
-				oldv, _ := old.(*uint32)
-				if *oldv+cache.CacheFlushTimeout >= time {
+			if old, ok := cache.FieldValueCache.AddOrGet(*flowTagInfo, time); ok {
+				if old+cache.CacheFlushTimeout >= time {
 					// If there is no new fieldValue, of course there will be no new field.
 					// So we can just skip the rest of the process in the loop.
 					continue
 				} else {
-					*oldv = time
+					cache.FieldValueCache.Add(*flowTagInfo, time)
 				}
 			}
 			tagFieldValue := flow_tag.AcquireFlowTag()
@@ -635,13 +633,11 @@ func (h *L7FlowLog) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 			}
 			// only tag
 			flowTagInfo.FieldValue = ""
-			v2 := time
-			if old := cache.FieldCache.AddOrGet(*flowTagInfo, &v2); old != nil {
-				oldv, _ := old.(*uint32)
-				if *oldv+cache.CacheFlushTimeout >= time {
+			if old, ok := cache.FieldCache.AddOrGet(*flowTagInfo, time); ok {
+				if old+cache.CacheFlushTimeout >= time {
 					continue
 				} else {
-					*oldv = time
+					cache.FieldCache.Add(*flowTagInfo, time)
 				}
 			}
 			tagField := flow_tag.AcquireFlowTag()
@@ -655,13 +651,11 @@ func (h *L7FlowLog) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 		flowTagInfo.FieldValue = ""
 		for _, name := range h.MetricsNames {
 			flowTagInfo.FieldName = name
-			v := time
-			if old := cache.FieldCache.AddOrGet(*flowTagInfo, &v); old != nil {
-				oldv, _ := old.(*uint32)
-				if *oldv+cache.CacheFlushTimeout >= time {
+			if old, ok := cache.FieldCache.AddOrGet(*flowTagInfo, time); ok {
+				if old+cache.CacheFlushTimeout >= time {
 					continue
 				} else {
-					*oldv = time
+					cache.FieldCache.Add(*flowTagInfo, time)
 				}
 			}
 			tagField := flow_tag.AcquireFlowTag()

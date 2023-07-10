@@ -64,7 +64,7 @@ type FlowTagWriter struct {
 
 type FlowTagCache struct {
 	Id                          int
-	FieldCache, FieldValueCache *lru.Cache
+	FieldCache, FieldValueCache *lru.Cache[FlowTagInfo, uint32]
 	CacheFlushTimeout           uint32
 
 	// only for prometheus
@@ -87,8 +87,8 @@ func NewFlowTagCache(name string, id int, cacheFlushTimeout, cacheMaxSize uint32
 		c.PrometheusFieldCache = lru128.NewU128LRU(fmt.Sprintf("%s-flow-tag-field_%d", name, id), int(cacheMaxSize)>>3, int(cacheMaxSize))
 		c.PrometheusFieldValueCache = lru128.NewU128LRU(fmt.Sprintf("%s-flow-tag-field-value_%d", name, id), int(cacheMaxSize)>>3, int(cacheMaxSize))
 	} else {
-		c.FieldCache = lru.NewCache(int(cacheMaxSize))
-		c.FieldValueCache = lru.NewCache(int(cacheMaxSize))
+		c.FieldCache = lru.NewCache[FlowTagInfo, uint32](int(cacheMaxSize))
+		c.FieldValueCache = lru.NewCache[FlowTagInfo, uint32](int(cacheMaxSize))
 	}
 	return c
 }

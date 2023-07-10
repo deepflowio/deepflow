@@ -109,18 +109,18 @@ func (w *PrometheusWriter) InitTable() error {
 	}
 	_, err := w.ckdbConn.Exec(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", PROMETHEUS_DB))
 
-	w.getOrCreateCkwriter(&PrometheusSample{AppLabelValueIDs: make([]uint32, 1)})
+	w.getOrCreateCkwriter(&PrometheusSample{PrometheusSampleMini: PrometheusSampleMini{AppLabelValueIDs: make([]uint32, 1)}})
 	return err
 }
 
-func (w *PrometheusWriter) getOrCreateCkwriter(s *PrometheusSample) (*ckwriter.CKWriter, error) {
+func (w *PrometheusWriter) getOrCreateCkwriter(s PrometheusSampleInterface) (*ckwriter.CKWriter, error) {
 	// AppLabelValueIDs[0] is target label
-	if len(s.AppLabelValueIDs) == 0 {
+	if s.AppLabelLen() == 0 {
 		return nil, fmt.Errorf("AppLabelValueIDs is empty")
 	}
-	appLabelCount := len(s.AppLabelValueIDs) - 1
+	appLabelCount := s.AppLabelLen() - 1
 	if appLabelCount > MAX_APP_LABEL_COLUMN_INDEX {
-		return nil, fmt.Errorf("the length of AppLabelValueIDs(%d) is > MAX_APP_LABEL_COLUMN_INDEX(%d)", len(s.AppLabelValueIDs), MAX_APP_LABEL_COLUMN_INDEX)
+		return nil, fmt.Errorf("the length of AppLabelValueIDs(%d) is > MAX_APP_LABEL_COLUMN_INDEX(%d)", s.AppLabelLen(), MAX_APP_LABEL_COLUMN_INDEX)
 	}
 	if writer := getPrometheusCKWriters(appLabelCount); writer != nil {
 		return writer, nil
@@ -262,7 +262,7 @@ func (w *PrometheusWriter) WriteBatch(batch []interface{}, metricName string, ti
 	}
 
 	// Only the FlowTag in the first item needs to be written.
-	prometheusMetrics := batch[0].(*PrometheusSample)
+	prometheusMetrics := batch[0].(PrometheusSampleInterface)
 	ckwriter, err := w.getOrCreateCkwriter(prometheusMetrics)
 	if err != nil {
 		if w.counter.WriteErr == 0 {
