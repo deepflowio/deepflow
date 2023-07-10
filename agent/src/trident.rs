@@ -539,6 +539,16 @@ impl Trident {
             match &mut *state_guard {
                 State::Running => {
                     state_guard = cond.wait(state_guard).unwrap();
+                    #[cfg(target_os = "linux")]
+                    if config_handler
+                        .candidate_config
+                        .platform
+                        .kubernetes_api_enabled
+                    {
+                        api_watcher.start();
+                    } else {
+                        api_watcher.stop();
+                    }
                     continue;
                 }
                 State::Terminated => {
@@ -571,6 +581,17 @@ impl Trident {
                             #[cfg(target_os = "linux")]
                             &api_watcher,
                         );
+
+                        #[cfg(target_os = "linux")]
+                        if config_handler
+                            .candidate_config
+                            .platform
+                            .kubernetes_api_enabled
+                        {
+                            api_watcher.start();
+                        } else {
+                            api_watcher.stop();
+                        }
                     }
                     state_guard = cond.wait(state_guard).unwrap();
                     continue;
@@ -610,6 +631,17 @@ impl Trident {
                         #[cfg(target_os = "linux")]
                         &api_watcher,
                     );
+
+                    #[cfg(target_os = "linux")]
+                    if config_handler
+                        .candidate_config
+                        .platform
+                        .kubernetes_api_enabled
+                    {
+                        api_watcher.start();
+                    } else {
+                        api_watcher.stop();
+                    }
 
                     config_handler.load_plugin(
                         &runtime,
@@ -651,15 +683,27 @@ impl Trident {
 
                     components.replace(comp);
                 }
-                Some(components) => {
-                    if let Components::Agent(components) = components {
-                        let callbacks = config_handler.on_config(
-                            runtime_config,
-                            &exception_handler,
-                            Some(components),
-                            #[cfg(target_os = "linux")]
-                            &api_watcher,
-                        );
+                Some(components) => match components {
+                    Components::Agent(components) => {
+                        let callbacks: Vec<fn(&ConfigHandler, &mut AgentComponents)> =
+                            config_handler.on_config(
+                                runtime_config,
+                                &exception_handler,
+                                Some(components),
+                                #[cfg(target_os = "linux")]
+                                &api_watcher,
+                            );
+
+                        #[cfg(target_os = "linux")]
+                        if config_handler
+                            .candidate_config
+                            .platform
+                            .kubernetes_api_enabled
+                        {
+                            api_watcher.start();
+                        } else {
+                            api_watcher.stop();
+                        }
 
                         components.start();
                         components.config = config_handler.candidate_config.clone();
@@ -678,7 +722,27 @@ impl Trident {
                             listener.on_config_change(&config_handler.candidate_config.dispatcher);
                         }
                     }
-                }
+                    _ => {
+                        config_handler.on_config(
+                            runtime_config,
+                            &exception_handler,
+                            None,
+                            #[cfg(target_os = "linux")]
+                            &api_watcher,
+                        );
+
+                        #[cfg(target_os = "linux")]
+                        if config_handler
+                            .candidate_config
+                            .platform
+                            .kubernetes_api_enabled
+                        {
+                            api_watcher.start();
+                        } else {
+                            api_watcher.stop();
+                        }
+                    }
+                },
             }
             state_guard = state.lock().unwrap();
         }

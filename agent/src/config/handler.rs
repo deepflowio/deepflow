@@ -1786,6 +1786,9 @@ impl ConfigHandler {
                     || old_cfg.kubernetes_api_memory_trim_percent
                         != new_cfg.kubernetes_api_memory_trim_percent
                     || old_cfg.max_memory != new_cfg.max_memory);
+            if restart_api_watcher {
+                api_watcher.stop();
+            }
 
             info!(
                 "platform config change from {:#?} to {:#?}",
@@ -1795,16 +1798,6 @@ impl ConfigHandler {
 
             #[cfg(target_os = "linux")]
             if static_config.agent_mode == RunningMode::Managed {
-                if restart_api_watcher {
-                    api_watcher.stop();
-                    api_watcher.start();
-                }
-                if candidate_config.platform.kubernetes_api_enabled {
-                    api_watcher.start();
-                } else {
-                    api_watcher.stop();
-                }
-
                 fn platform_callback(handler: &ConfigHandler, components: &mut AgentComponents) {
                     let conf = &handler.candidate_config.platform;
 
