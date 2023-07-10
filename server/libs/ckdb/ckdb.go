@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net"
 	"strings"
-	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	logging "github.com/op/go-logging"
@@ -63,7 +62,7 @@ func (b *Block) WriteBool(v bool) {
 }
 
 func (b *Block) WriteDateTime(v uint32) {
-	b.items = append(b.items, time.Unix(int64(v), 0))
+	b.items = append(b.items, v)
 }
 
 func (b *Block) WriteIPv4(v uint32) {
