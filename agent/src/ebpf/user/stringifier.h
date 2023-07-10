@@ -27,20 +27,21 @@
 #define stack_str_hash_key_value_pair_cb	clib_bihash_foreach_key_value_pair_cb_8_8
 #define stack_str_hash_foreach_key_value_pair	clib_bihash_foreach_key_value_pair_8_8
 
+struct stack_str_hash_ext_data {
+	/*
+	 * It is used for quickly releasing the stack_str_hash resource.
+	 */
+	stack_str_hash_kv *stack_str_kvps;
+	bool clear_hash;
+};
+
 #ifndef AARCH64_MUSL
-char *folded_stack_trace_string(struct bpf_tracer *t,
-				struct stack_trace_key_t *v,
-				const char *stack_map_name,
-				stack_str_hash_t *h);
 int init_stack_str_hash(stack_str_hash_t *h, const char *name);
-void release_stack_strs(stack_str_hash_t *h);
-stack_trace_msg_t *
-resolve_and_gen_stack_trace_msg(struct bpf_tracer *t,
-				struct stack_trace_key_t *v,
-				const char *stack_map_name,
-				stack_str_hash_t *h);
-void set_msg_kvp(stack_trace_msg_kv_t * kvp,
-		 struct stack_trace_key_t *v,
-		 u64 stime, void *msg_value);
+void clean_stack_strs(stack_str_hash_t *h);
+void release_stack_str_hash(stack_str_hash_t *h);
+char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
+				      struct stack_trace_key_t *v,
+				      const char *stack_map_name,
+				      stack_str_hash_t *h);
 #endif /* AARCH64_MUSL */
 #endif /* DF_USER_STRINGIFIER_H */
