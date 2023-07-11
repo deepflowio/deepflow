@@ -521,12 +521,12 @@ func formatString(data *trident.Interface) string {
 	buffer := bytes.Buffer{}
 	format := "Id: %d Mac: %s EpcId: %d DeviceType: %d DeviceId: %d IfType: %d" +
 		" LaunchServer: %s LaunchServerId: %d RegionId: %d AzId: %d, PodGroupId: %d, " +
-		"PodNsId: %d, PodId: %d PodClusterId: %d IsVipInterface: %t "
+		"PodNsId: %d, PodId: %d, PodClusterId: %d, NetnsId: %d, VtapId: %d, IsVipInterface: %t "
 	buffer.WriteString(fmt.Sprintf(format, data.GetId(), Uint64ToMac(data.GetMac()), data.GetEpcId(),
 		data.GetDeviceType(), data.GetDeviceId(), data.GetIfType(),
 		data.GetLaunchServer(), data.GetLaunchServerId(), data.GetRegionId(),
 		data.GetAzId(), data.GetPodGroupId(), data.GetPodNsId(), data.GetPodId(),
-		data.GetPodClusterId(), data.GetIsVipInterface()))
+		data.GetPodClusterId(), data.GetNetnsId(), data.GetVtapId(), data.GetIsVipInterface()))
 	if data.GetPodNodeId() > 0 {
 		buffer.WriteString(fmt.Sprintf("PodNodeId: %d ", data.GetPodNodeId()))
 	}
@@ -552,6 +552,10 @@ func platformData(response *trident.SyncResponse) {
 			}
 			fmt.Println("cidrs:")
 			for index, entry := range platform.Cidrs {
+				JsonFormat(index+1, entry)
+			}
+			fmt.Println("gprocess infos:")
+			for index, entry := range platform.GprocessInfos {
 				JsonFormat(index+1, entry)
 			}
 		}
