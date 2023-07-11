@@ -101,7 +101,6 @@ func (a *Aliyun) getNatGateways(region model.Region) (
 					Lcuuid:           ipLcuuid,
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               ip,
-					SubnetLcuuid:     common.NETWORK_ISP_LCUUID,
 					RegionLcuuid:     a.getRegionLcuuid(region.Lcuuid),
 				}
 				retIPs = append(retIPs, retIP)
