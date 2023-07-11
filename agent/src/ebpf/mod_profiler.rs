@@ -100,8 +100,8 @@ extern "C" {
     pub fn release_flame_graph_hash();
 
     /*
-     * To set the regex matching for the profiler. 
-     * 
+     * To set the regex matching for the profiler.
+     *
      * Perform regular expression matching on process names.
      * Processes that successfully match the regular expression are
      * aggregated using the key:
@@ -111,8 +111,29 @@ extern "C" {
      * key:
      *     `<process name + u_stack_id + k_stack_id + cpu>`.
      *
+     * The profiler startup will be set to ".*" by default.
+     *
      * @pattern : Regular expression pattern. e.g. "^(java|nginx|.*ser.*)$"
      * @returns 0 on success, < 0 on error
      */
     pub fn set_profiler_regex(pattern: *const c_char) -> c_int;
+
+    /*
+     * This interface is used to set whether CPUID should be included in the
+     * aggregation of stack trace data.
+     *
+     * @flag:
+     *   If the flag is set to 1, CPUID will be included in the aggregation
+     *   of stack trace data. If the flag is set to 0, it will not be incl-
+     *   uded in the aggregation. Any other value is considered invalid.
+     *
+     * The profiler startup will be set to 0 by default.
+     * 
+     * @returns 0 on success, < 0 on error
+     *
+     * Note:
+     *   If flag=0, the CPU value for stack trace data reporting is a special
+     *   value (CPU_INVALID:0xfff) used to indicate that it is an invalid value.
+     */
+    pub fn set_profiler_cpu_aggregation(flag: c_int) -> c_int;
 }
