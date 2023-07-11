@@ -2420,6 +2420,9 @@ impl AgentComponents {
         if let Some(h) = self.proc_event_uniform_sender.notify_stop() {
             join_handles.push(h);
         }
+        if let Some(h) = self.pcap_batch_uniform_sender.notify_stop() {
+            join_handles.push(h);
+        }
         // Enterprise Edition Feature: packet-sequence
         if let Some(h) = self.packet_sequence_uniform_sender.notify_stop() {
             join_handles.push(h);
