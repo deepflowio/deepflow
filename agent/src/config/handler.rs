@@ -1759,6 +1759,7 @@ impl ConfigHandler {
                     || old_cfg.kubernetes_api_memory_trim_percent
                         != new_cfg.kubernetes_api_memory_trim_percent
                     || old_cfg.max_memory != new_cfg.max_memory);
+            #[cfg(target_os = "linux")]
             if restart_api_watcher {
                 api_watcher.stop();
             }
