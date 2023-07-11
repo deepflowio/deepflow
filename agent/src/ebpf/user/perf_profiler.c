@@ -89,6 +89,17 @@ static regex_t profiler_regex;
 static bool regex_existed = false;
 
 /*
+ * 'cpu_aggregation_flag' is used to set whether to retrieve CPUID
+ * and include it in the aggregation of stack trace data.
+ *
+ * If valude is set to 1, CPUID will be retrieved and included in
+ * the aggregation of stack trace data. If value is set to 0,
+ * CPUID will not be retrieved and will not be included in the
+ * aggregation. Any other value is considered invalid.
+ */
+static volatile u64 cpu_aggregation_flag;
+
+/*
  * Cache hash: obtain folded stack trace string from stack ID.
  */
 static stack_str_hash_t g_stack_str_hash;
@@ -405,6 +416,26 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 		if (unlikely(profiler_stop == 1))
 			break;
 
+		/*
+		 * If cpu_aggregation_flag=0, the CPU value for stack trace data
+		 * reporting is a special value (CPU_INVALID:0xfff) used to indicate
+		 * that it is an invalid value, the  CPUID will not be included in
+		 * the aggregation.
+		 */
+		if (cpu_aggregation_flag == 0)
+			v->cpu = CPU_INVALID;
+
+		/*
+		 * Uniform idle process names to reduce the aggregated count of stack
+		 * trace data (when we aggregate using process names as part of the key).
+		 * "swapper/0", "swapper/1", "swapper/2" ... > "swapper" 
+		 */
+		if (v->pid == v->tgid && v->pid == 0) {
+			const char *idle_name = "swapper";
+			strcpy_s_inline(v->comm, sizeof(v->comm),
+					idle_name, strlen(idle_name));
+		}
+
 		/* -EEXIST: Hash bucket collision in the stack trace table */
 		if (v->kernstack == -EEXIST)
 			stack_trace_lost++;
@@ -489,6 +520,9 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 				__sync_fetch_and_add(&msg_hash->hash_elems_count, 1);
 			}
 		}
+
+		/* check and clean symbol cache */
+		exec_symbol_cache_update();
 	}
 
 	vec_free(raw_stack_data);
@@ -742,9 +776,6 @@ int stop_continuous_profiler(void)
 
 	u64 alloc_b, free_b;
 	get_mem_stat(&alloc_b, &free_b);
-#ifdef DF_MEM_DEBUG
-	show_mem_list();
-#endif
 	if (regex_existed) {
 		regfree(&profiler_regex);
 		regex_existed = false;
@@ -851,6 +882,9 @@ int start_continuous_profiler(int freq,
 	profiler_stop = 0;
 	start_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_SEC);
 
+	// CPUID will not be included in the aggregation of stack trace data.
+	set_profiler_cpu_aggregation(0);
+
 	snprintf(bpf_load_buffer_name, NAME_LEN, "continuous_profiler");
 	bpf_bin_buffer = (void *)perf_profiler_common_ebpf_data;
 	buffer_sz = sizeof(perf_profiler_common_ebpf_data);
@@ -893,7 +927,6 @@ void process_stack_trace_data_for_flame_graph(stack_trace_msg_t *val)
 		strcpy_s_inline(msg_kvp.c_k.comm, sizeof(msg_kvp.c_k.comm),
 				val->process_name, strlen((char *)val->process_name));
 		msg_kvp.c_k.cpu = val->cpu;
-
 		if (val->u_stack_id >= STACK_ID_MAX)
 			msg_kvp.c_k.u_stack_id = STACK_ID_MAX;
 		else
@@ -986,6 +1019,9 @@ void release_flame_graph_hash(void)
 	stack_trace_msg_hash_free(&test_fg_hash);
 
 	get_mem_stat(&alloc_b, &free_b);
+#ifdef DF_MEM_DEBUG
+	show_mem_list();
+#endif
 	ebpf_info(LOG_CP_TAG "after alloc_b:\t%lu bytes free_b:\t%lu bytes use:\t%lu"
 		  " bytes\n",alloc_b, free_b, alloc_b - free_b);
 
@@ -1034,6 +1070,19 @@ int set_profiler_regex(const char *pattern)
 	return (0);
 }
 
+int set_profiler_cpu_aggregation(int flag)
+{
+	if (flag != 0 && flag != 1) {
+		ebpf_info(LOG_CP_TAG "Set 'cpu_aggregation_flag' parameter invalid.\n");
+		return (-1);
+	}
+
+	cpu_aggregation_flag = (u64)flag;
+
+	ebpf_info(LOG_CP_TAG "Set 'cpu_aggregation_flag' successful, value %d\n", flag);
+	return (0);
+}
+
 #else /* defined AARCH64_MUSL */
 #include "tracer.h"
 #include "perf_profiler.h"
@@ -1066,6 +1115,11 @@ void release_flame_graph_hash(void)
 }
 
 int set_profiler_regex(const char *pattern)
+{
+	return (-1);
+}
+
+int set_profiler_cpu_aggregation(int flag)
 {
 	return (-1);
 }

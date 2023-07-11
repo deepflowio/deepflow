@@ -21,6 +21,7 @@ use socket_tracer::ebpf::*;
 use std::convert::TryInto;
 use std::fmt::Write;
 use std::net::IpAddr;
+use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, UNIX_EPOCH};
 
@@ -28,6 +29,25 @@ extern "C" {
     fn print_dns_info(data: *mut c_char, len: c_uint);
     fn print_uprobe_http2_info(data: *mut c_char, len: c_uint);
     fn print_io_event_info(data: *mut c_char, len: c_uint);
+}
+
+lazy_static::lazy_static! {
+    static ref SUM: Mutex<u32> = Mutex::new(0);
+}
+
+lazy_static::lazy_static! {
+    static ref COUNTER: Mutex<u32> = Mutex::new(0);
+}
+
+#[allow(dead_code)]
+fn increment_counter(num: u32, counter_type: u32) {
+    if counter_type == 0 {
+        let mut counter = COUNTER.lock().unwrap();
+        *counter += num;
+    } else {
+        let mut counter = SUM.lock().unwrap();
+        *counter += num;
+    }
 }
 
 fn flow_info(sd: *mut SK_BPF_DATA) -> String {
@@ -271,19 +291,31 @@ fn cp_process_name_safe(cp: *mut stack_profile_data) -> String {
 #[allow(dead_code)]
 extern "C" fn continuous_profiler_callback(cp: *mut stack_profile_data) {
     unsafe {
-        let data = cp_data_str_safe(cp);
-        println!("\n+ --------------------------------- +");
-        println!("{} PID {} START-TIME {} U-STACKID {} K-STACKID {} COMM {} CPU {} COUNT {} LEN {} \n  - {}",
-                   date_time((*cp).timestamp / 1000),
-                   (*cp).pid,
-                   (*cp).stime,
-                   (*cp).u_stack_id,
-                   (*cp).k_stack_id,
-                   cp_process_name_safe(cp),
-                   (*cp).cpu,
-                   (*cp).count,
-                   (*cp).stack_data_len, data);
-        println!("+ --------------------------------- +");
+        process_stack_trace_data_for_flame_graph(cp);
+        increment_counter((*cp).count, 1);
+        increment_counter(1, 0);
+        //let data = cp_data_str_safe(cp);
+        //println!("\n+ --------------------------------- +");
+        //println!("{} PID {} START-TIME {} U-STACKID {} K-STACKID {} COMM {} CPU {} COUNT {} LEN {} \n  - {}",
+        //           date_time((*cp).timestamp / 1000),
+        //           (*cp).pid,
+        //           (*cp).stime,
+        //           (*cp).u_stack_id,
+        //           (*cp).k_stack_id,
+        //           cp_process_name_safe(cp),
+        //           (*cp).cpu,
+        //           (*cp).count,
+        //           (*cp).stack_data_len, data);
+        //println!("+ --------------------------------- +");
+    }
+}
+
+#[allow(dead_code)]
+fn get_counter(counter_type: u32) -> u32 {
+    if counter_type == 0 {
+        *COUNTER.lock().unwrap()
+    } else {
+        *SUM.lock().unwrap()
     }
 }
 
@@ -383,6 +415,9 @@ fn main() {
         //        .as_ptr(),
         //);
 
+        //// CPUID will not be included in the aggregation of stack trace data.
+        //set_profiler_cpu_aggregation(0);
+
         bpf_tracer_finish();
 
         let stats = socket_tracer_stats();
@@ -394,8 +429,14 @@ fn main() {
             std::thread::sleep(Duration::from_secs(1));
         }
 
-        //thread::sleep(Duration::from_secs(20));
+        //thread::sleep(Duration::from_secs(60));
         //stop_continuous_profiler();
+        //print!(
+        //    "====== capture count {}, sum {}\n",
+        //    get_counter(0),
+        //    get_counter(1)
+        //);
+        //release_flame_graph_hash();
     }
 
     loop {
