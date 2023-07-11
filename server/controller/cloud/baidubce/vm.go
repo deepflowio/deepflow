@@ -157,7 +157,6 @@ func (b *BaiduBce) getVMs(
 					Lcuuid:           publicIPLcuuid,
 					VInterfaceLcuuid: publicVInterfaceLcuuid,
 					IP:               ip.Eip,
-					SubnetLcuuid:     common.NETWORK_ISP_LCUUID,
 					RegionLcuuid:     region.Lcuuid,
 				}
 				retIPs = append(retIPs, retIP)
@@ -278,7 +277,6 @@ func (b *BaiduBce) getVMEnis(
 						),
 						VInterfaceLcuuid: publicVInterfaceLcuuid,
 						IP:               privateIP.PublicIpAddress,
-						SubnetLcuuid:     common.NETWORK_ISP_LCUUID,
 						RegionLcuuid:     region.Lcuuid,
 					}
 					retIPs = append(retIPs, retIP)
