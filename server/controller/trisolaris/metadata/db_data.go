@@ -68,6 +68,7 @@ type DBDataCache struct {
 	npbPolicies             []*models.NpbPolicy
 	pcapPolicies            []*models.PcapPolicy
 	cens                    []*models.CEN
+	processes               []*models.Process
 }
 
 func newDBDataCache() *DBDataCache {
@@ -245,6 +246,10 @@ func (d *DBDataCache) GetPcapPolicies() []*models.PcapPolicy {
 
 func (d *DBDataCache) GetCENs() []*models.CEN {
 	return d.cens
+}
+
+func (d *DBDataCache) GetProcesses() []*models.Process {
+	return d.processes
 }
 
 func GetTapTypesFromDB(db *gorm.DB) []*models.TapType {
@@ -550,6 +555,13 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 	cens, err := dbmgr.DBMgr[models.CEN](db).Gets()
 	if err == nil {
 		d.cens = cens
+	} else {
+		log.Error(err)
+	}
+
+	processes, err := dbmgr.DBMgr[models.Process](db).Gets()
+	if err == nil {
+		d.processes = processes
 	} else {
 		log.Error(err)
 	}

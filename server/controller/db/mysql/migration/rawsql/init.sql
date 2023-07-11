@@ -326,7 +326,6 @@ CREATE TABLE IF NOT EXISTS vinterface (
     deviceid            INTEGER COMMENT 'unknown: Senseless ID, vm: vm ID, vgw/NSP-vgateway: vnet ID, third-party-device: third_party_device ID, vmwaf: vmwaf ID, host-device: host_device ID, network-device: network_device ID',
     netns_id            INTEGER UNSIGNED DEFAULT 0,
     vtap_id             INTEGER DEFAULT 0,
-    vtap_id             INTEGER,
     sub_domain          CHAR(64) DEFAULT '',
     domain              CHAR(64) DEFAULT '',
     region              CHAR(64) DEFAULT '',
