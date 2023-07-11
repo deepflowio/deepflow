@@ -137,7 +137,7 @@ func promReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (context
 	var groupBy []string
 	var metricWithAggFunc string
 	// use map for duplicate tags removal
-	var expectedDeepFlowNativeTags map[string]struct{}
+	var expectedDeepFlowNativeTags map[string]string
 
 	// append query field: 1. show tags OR aggregation tags
 	isShowTagStatement := false
@@ -182,9 +182,15 @@ func promReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (context
 
 			// should append all labels in query & grouping clause
 			for _, groupLabel := range q.Hints.Grouping {
-				queryTag, filterTag, _ := parseQueryTag(prefixType, db, groupLabel)
-				groupBy = append(groupBy, filterTag)
-				metricsArray = append(metricsArray, queryTag)
+				tagName, tagAlias, _ := parsePromQLTag(prefixType, db, groupLabel)
+
+				if tagAlias == "" {
+					groupBy = append(groupBy, tagName)
+					metricsArray = append(metricsArray, tagName)
+				} else {
+					groupBy = append(groupBy, tagAlias)
+					metricsArray = append(metricsArray, fmt.Sprintf("%s as %s", tagName, tagAlias))
+				}
 			}
 
 			// aggregation for metrics, assert aggOperator is not empty
@@ -208,15 +214,15 @@ func promReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (context
 			}
 		} else {
 			if len(q.Hints.Grouping) > 0 {
-				expectedDeepFlowNativeTags = make(map[string]struct{}, len(q.Hints.Grouping)+len(q.Matchers))
+				expectedDeepFlowNativeTags = make(map[string]string, len(q.Hints.Grouping)+len(q.Matchers))
 				for _, q := range q.Hints.Grouping {
-					queryTag, _, isDeepFlowTag := parseQueryTag(prefixType, db, q)
+					tagName, tagAlias, isDeepFlowTag := parsePromQLTag(prefixType, db, q)
 					if isDeepFlowTag {
-						expectedDeepFlowNativeTags[queryTag] = struct{}{}
+						expectedDeepFlowNativeTags[tagName] = tagAlias
 					}
 				}
 			} else {
-				expectedDeepFlowNativeTags = make(map[string]struct{}, len(q.Matchers))
+				expectedDeepFlowNativeTags = make(map[string]string, len(q.Matchers))
 			}
 		}
 	}
@@ -250,24 +256,42 @@ func promReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (context
 			return ctx, "", "", "", fmt.Errorf("unknown match type %v", matcher.Type)
 		}
 
-		queryTag, filterTag, isDeepFlowTag := parseQueryTag(prefixType, db, matcher.Name)
-		filters = append(filters, fmt.Sprintf("%s %s '%s'", filterTag, operation, matcher.Value))
+		tagName, tagAlias, isDeepFlowTag := parsePromQLTag(prefixType, db, matcher.Name)
+		if prefixType != prefixNone && isDeepFlowTag && tagAlias != "" {
+			// for Prometheus metrics, query DeepFlow enum tag can only use tag alias(x_enum) in filter clause
+			filters = append(filters, fmt.Sprintf("%s %s '%s'", tagAlias, operation, matcher.Value))
+		} else {
+			// for normal query
+			// for DeepFlow metrics, query enum tag can only use tag name(Enum(x)) in filter clause
+			filters = append(filters, fmt.Sprintf("%s %s '%s'", tagName, operation, matcher.Value))
+		}
 
 		if db == "" || db == chCommon.DB_NAME_PROMETHEUS || db == chCommon.DB_NAME_EXT_METRICS {
 			if isDeepFlowTag {
-				if len(q.Hints.Grouping) == 0 {
-					expectedDeepFlowNativeTags[queryTag] = struct{}{}
+				if len(q.Hints.Grouping) == 0 || tagAlias != "" {
+					expectedDeepFlowNativeTags[tagName] = tagAlias
 				}
 			} else if config.Cfg.Prometheus.RequestQueryWithDebug {
 				// append in query for analysis (findout if tag is target_label)
-				expectedDeepFlowNativeTags[queryTag] = struct{}{}
+				expectedDeepFlowNativeTags[tagName] = tagAlias
 			}
 		}
 	}
 
 	// append query field: 4. append DeepFlow native tags for Prometheus metrics
-	for tag := range expectedDeepFlowNativeTags {
-		metricsArray = append(metricsArray, tag)
+	for tagName, tagAlias := range expectedDeepFlowNativeTags {
+		// reduce Prometheus query DeepFlow tags
+		// append tags into `select` clause only when:
+		// 1. grouping DeepFlow tags or filter DeepFlow tags
+		// 2. filer enum tags when grouping
+		// will not append tags:
+		// 1. neither grouping nor filter any DeepFlow tags
+		// 2. filter normal tags when grouping
+		if tagAlias == "" {
+			metricsArray = append(metricsArray, tagName)
+		} else {
+			metricsArray = append(metricsArray, fmt.Sprintf("%s as %s", tagName, tagAlias))
+		}
 	}
 
 	sql := parseToQuerierSQL(ctx, db, table, metricsArray, filters, groupBy)
@@ -382,61 +406,71 @@ func showTags(ctx context.Context, db string, table string, startTime int64, end
 		// `edgeTable` storage data which contains both client and server-side, so metrics should cover both, else only one of them
 		// e.g.: auto_instance_0/auto_instance_1 in `vtap_app_edge_port`, auto_instance in `vtap_app_port`
 		if common.IsValueInSliceString(table, edgeTableNames) && tagName != clientTagName {
-			tagsArray = append(tagsArray, fmt.Sprintf("`%s`", clientTagName))
-			tagsArray = append(tagsArray, fmt.Sprintf("`%s`", serverTagName))
+			// tagType=int_enum/string_enum
+			if strings.Contains(tagType, ENUM_TAG_SUFFIX) {
+				clientTagName = fmt.Sprintf("Enum(`%s`) as `%s%s`", clientTagName, clientTagName, ENUM_TAG_SUFFIX)
+				serverTagName = fmt.Sprintf("Enum(`%s`) as `%s%s`", serverTagName, serverTagName, ENUM_TAG_SUFFIX)
+				tagsArray = append(tagsArray, clientTagName, serverTagName)
+			} else {
+				tagsArray = append(tagsArray, fmt.Sprintf("`%s`", clientTagName))
+				tagsArray = append(tagsArray, fmt.Sprintf("`%s`", serverTagName))
+			}
 		} else {
-			tagsArray = append(tagsArray, fmt.Sprintf("`%s`", tagName))
+			if strings.Contains(tagType, ENUM_TAG_SUFFIX) {
+				tagName = fmt.Sprintf("Enum(`%s`) as `%s%s`", tagName, tagName, ENUM_TAG_SUFFIX)
+				tagsArray = append(tagsArray, tagName)
+			} else {
+				tagsArray = append(tagsArray, fmt.Sprintf("`%s`", tagName))
+			}
 		}
 	}
 
 	return tagsArray, nil
 }
 
-func parseDeepFlowTag(tag string) (queryTag string, filterTag string) {
+func parseDeepFlowTag(prefixType prefix, tag string) (tagName string, tagAlias string) {
 	if enumAlias, ok := formatEnumTag(tag); ok {
-		queryTag = fmt.Sprintf("%s as `%s%s`", enumAlias, tag, ENUM_TAG_SUFFIX)
-		filterTag = fmt.Sprintf("`%s%s`", tag, ENUM_TAG_SUFFIX)
+		return enumAlias, fmt.Sprintf("`%s%s`", tag, ENUM_TAG_SUFFIX)
 	} else {
-		queryTag = fmt.Sprintf("`%s`", tag)
-		filterTag = queryTag
+		tagName = fmt.Sprintf("`%s`", tag)
 	}
-	return queryTag, filterTag
+	return tagName, tagAlias
 }
 
-func parsePrometheusTag(tag string) (string, string) {
-	result := fmt.Sprintf("`tag.%s`", tag)
-	return result, result
+func parsePrometheusTag(tag string) string {
+	return fmt.Sprintf("`tag.%s`", tag)
 }
 
-func parseQueryTag(prefixType prefix, db, tag string) (queryTag string, filterTag string, isDeepFlowTag bool) {
+func parsePromQLTag(prefixType prefix, db, tag string) (tagName string, tagAlias string, isDeepFlowTag bool) {
 	switch prefixType {
 	case prefixTag:
 		// query ext_metrics/prometheus
 		if strings.HasPrefix(tag, "tag_") {
-			queryTag, filterTag = parsePrometheusTag(removeTagPrefix(tag))
+			tagName = parsePrometheusTag(removeTagPrefix(tag))
 			isDeepFlowTag = false
 		} else {
-			queryTag, filterTag = parseDeepFlowTag(convertToQuerierAllowedTagName(tag))
+			tagName, tagAlias = parseDeepFlowTag(prefixType, convertToQuerierAllowedTagName(tag))
 			isDeepFlowTag = true
 		}
 	case prefixDeepFlow:
 		// query prometheus native metrics
 		if strings.HasPrefix(tag, config.Cfg.Prometheus.AutoTaggingPrefix) {
-			queryTag, filterTag = parseDeepFlowTag(convertToQuerierAllowedTagName(removeDeepFlowPrefix(tag)))
+			tagName, tagAlias = parseDeepFlowTag(prefixType, convertToQuerierAllowedTagName(removeDeepFlowPrefix(tag)))
 			isDeepFlowTag = true
 		} else {
-			queryTag, filterTag = parsePrometheusTag(removeTagPrefix(tag))
+			tagName = parsePrometheusTag(removeTagPrefix(tag))
 			isDeepFlowTag = false
 		}
 	default:
 		// query deepflow native metrics (deepflow_system/flow_metrics/flow_log)
 		if db == chCommon.DB_NAME_DEEPFLOW_SYSTEM {
-			queryTag, filterTag = parsePrometheusTag(tag)
+			tagName = parsePrometheusTag(tag)
 		} else {
-			queryTag, filterTag = parseDeepFlowTag(convertToQuerierAllowedTagName(tag))
+			tagName, tagAlias = parseDeepFlowTag(prefixType, convertToQuerierAllowedTagName(tag))
 		}
 		isDeepFlowTag = true
 	}
+	// `tagAlias` return only when tag is `enum tag`
 	return
 }
 
@@ -707,9 +741,11 @@ func extractEnumTag(tag string) string {
 }
 
 func formatEnumTag(tagName string) (string, bool) {
-	enumFile := fmt.Sprintf("%s.%s", tagName, config.Cfg.Language)
-	if common.IsValueInSliceString(tagName, tagdescription.NoLanguageTag) {
-		enumFile = tagName
+	// parse when query client/server side enum tag
+	enumFile := strings.TrimSuffix(tagName, "_0")
+	enumFile = strings.TrimSuffix(enumFile, "_1")
+	if !common.IsValueInSliceString(tagName, tagdescription.NoLanguageTag) {
+		enumFile = fmt.Sprintf("%s.%s", enumFile, config.Cfg.Language)
 	}
 	_, exists := tagdescription.TAG_ENUMS[enumFile]
 	if exists {
