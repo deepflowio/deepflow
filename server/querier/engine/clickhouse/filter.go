@@ -22,14 +22,16 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"time"
 
 	"golang.org/x/exp/slices"
 
 	"github.com/Knetic/govaluate"
 	"github.com/deepflowio/deepflow/server/libs/utils"
+	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
-	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
+	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
 	"github.com/xwb1989/sqlparser"
@@ -337,7 +339,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 								}
 								return &view.Expr{Value: filter}, nil
 							}
-							if db == common.DB_NAME_PROMETHEUS {
+							if db == chCommon.DB_NAME_PROMETHEUS {
 								filter, err := GetPrometheusFilter(preAsTag, table, op, t.Value)
 								if err != nil {
 									return nil, err
@@ -534,7 +536,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 							}
 							return &view.Expr{Value: filter}, nil
 						}
-						if db == common.DB_NAME_PROMETHEUS {
+						if db == chCommon.DB_NAME_PROMETHEUS {
 							filter, err := GetPrometheusFilter(tagName, table, op, t.Value)
 							if err != nil {
 								return nil, err
@@ -671,7 +673,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 				if strings.Contains(ipValue, "/") {
 					cidrIPs = append(cidrIPs, ipValue)
 				} else {
-					ips = append(ips, common.IPFilterStringToHex(ipValue))
+					ips = append(ips, chCommon.IPFilterStringToHex(ipValue))
 				}
 			}
 			for _, cidrIP := range cidrIPs {
@@ -680,8 +682,8 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 				if err != nil {
 					return nil, err
 				}
-				minIP := common.IPFilterStringToHex("'" + cidr.Masked().Range().From().String() + "'")
-				maxIP := common.IPFilterStringToHex("'" + cidr.Masked().Range().To().String() + "'")
+				minIP := chCommon.IPFilterStringToHex("'" + cidr.Masked().Range().From().String() + "'")
+				maxIP := chCommon.IPFilterStringToHex("'" + cidr.Masked().Range().To().String() + "'")
 				cidrFilter := ""
 				if ipOp == ">=" || ipOp == ">" {
 					cidrFilter = fmt.Sprintf(tagItem.WhereTranslator, ipOp, maxIP)
@@ -846,16 +848,22 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 		errorMessage := fmt.Sprintf("%s not found", nameNoPreffix)
 		return filter, errors.New(errorMessage)
 	}
+	prometheusSubqueryCache := GetPrometheusSubqueryCache()
 	// Determine whether the tag is app_label or target_label
 	if appLabels, ok := Prometheus.MetricAppLabelLayout[table]; ok {
 		for _, appLabel := range appLabels {
 			if appLabel.AppLabelName == nameNoPreffix {
 				isAppLabel = true
-				cacheFilter, ok := LRUCache.Get(originFilter)
+				cacheFilter, ok := prometheusSubqueryCache.PrometheusSubqueryCache.Get(originFilter)
 				if ok {
-					filter = cacheFilter
-					break
+					filter = cacheFilter.Filter
+					timeout := cacheFilter.Time
+					if time.Since(timeout) < time.Duration(config.Cfg.PrometheusIdSubqueryLruTimeout) {
+						return filter, nil
+					}
 				}
+
+				// lru timeout
 				if strings.Contains(op, "match") {
 					sql = fmt.Sprintf("SELECT label_value_id FROM flow_tag.app_label_live_view WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s) GROUP BY label_value_id", metricID, labelNameID, op, value)
 				} else {
@@ -881,8 +889,9 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 				}
 				valueIDFilter := strings.Join(valueIDs, ",")
 				filter = fmt.Sprintf("app_label_value_id_%d IN (%s)", appLabel.appLabelColumnIndex, valueIDFilter)
-				LRUCache.Add(originFilter, filter)
-				break
+				entryValue := common.EntryValue{Time: time.Now(), Filter: filter}
+				prometheusSubqueryCache.PrometheusSubqueryCache.Add(originFilter, entryValue)
+				return filter, nil
 			}
 		}
 	}
@@ -895,7 +904,7 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 		}
 		targetLabelFilter := TargetLabelFilter{OriginFilter: originFilter, TransFilter: transFilter}
 		e.TargetLabelFilters = append(e.TargetLabelFilters, targetLabelFilter)
-		// FIXME Delete placeholders
+		// FIXME delete placeholders
 		filter = "1=1"
 	}
 	return filter, nil

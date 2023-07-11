@@ -41,6 +41,10 @@ var TAP_PORT_DEVICE_MAP = map[string]int{
 	common.TAP_PORT_POD_NODE: VIF_DEVICE_TYPE_POD_NODE,
 }
 
+var INT_ENUM_TAG = []string{"close_type", "eth_type", "signal_source", "is_ipv4", "l7_ip_protocol", "type", "l7_protocol", "protocol", "response_status", "server_port", "status", "tap_port_type", "tunnel_tier", "tunnel_type", "instance_type", "nat_source", "role"}
+var INT_ENUM_PEER_TAG = []string{"resource_gl0_type", "resource_gl1_type", "resource_gl2_type", "tcp_flags_bit", "auto_instance_type", "auto_service_type"}
+var STRING_ENUM_TAG = []string{"tap_side", "event_type", "profile_language_type"}
+
 func GenerateTagResoureMap() map[string]map[string]*Tag {
 	tagResourceMap := make(map[string]map[string]*Tag)
 	// 资源:区域，可用区，容器节点，命名空间，工作负载，容器POD，容器集群，子网
@@ -867,7 +871,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"",
 		)}
 	// enum_tag
-	for _, enumName := range []string{"close_type", "eth_type", "signal_source", "is_ipv4", "l7_ip_protocol", "type", "l7_protocol", "protocol", "response_status", "server_port", "status", "tap_port_type", "tunnel_tier", "tunnel_type", "instance_type", "nat_source"} {
+	for _, enumName := range INT_ENUM_TAG {
 		tagResourceMap[enumName] = map[string]*Tag{
 			"enum": NewTag(
 				"dictGetOrDefault(flow_tag.int_enum_map, 'name', ('%s',toUInt64("+enumName+")), "+enumName+")",
@@ -877,7 +881,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			),
 		}
 	}
-	for _, enumName := range []string{"resource_gl0_type", "resource_gl1_type", "resource_gl2_type", "tcp_flags_bit", "auto_instance_type", "auto_service_type"} {
+	for _, enumName := range INT_ENUM_PEER_TAG {
 		for _, suffix := range []string{"", "_0", "_1"} {
 			tagEnumNameSuffix := enumName + suffix
 			enumNameSuffix := enumName + suffix
@@ -915,7 +919,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"toUInt64(span_kind) IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
 			"toUInt64(span_kind) IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
 		)}
-	for _, enumName := range []string{"tap_side", "event_type", "profile_language_type"} {
+	for _, enumName := range STRING_ENUM_TAG {
 		tagResourceMap[enumName] = map[string]*Tag{
 			"enum": NewTag(
 				"dictGetOrDefault(flow_tag.string_enum_map, 'name', ('%s',"+enumName+"), "+enumName+")",
