@@ -39,6 +39,9 @@ type PlatformDataOP struct {
 	domainInterfaceProto *atomic.Value // *DomainInterfaceProto
 	domainPeerConnProto  *atomic.Value // *DomainPeerConnProto
 	domainCIDRProto      *atomic.Value // *DomainCIDRProto
+
+	GProcessInfoProto *atomic.Value // *GProcessInfoProto
+
 	// ingester used platform data
 	allPlatformDataForIngester *atomic.Value //*PlatformData
 
@@ -69,6 +72,9 @@ func newPlatformDataOP(db *gorm.DB, metaData *MetaData) *PlatformDataOP {
 	domainCIDRProto := &atomic.Value{}
 	domainCIDRProto.Store(newDomainCIDRProto(0))
 
+	gprocessInfoProto := &atomic.Value{}
+	gprocessInfoProto.Store(newGProcessInfoProto(0))
+
 	allPlatformDataForIngester := &atomic.Value{}
 	allPlatformDataForIngester.Store(NewPlatformData("", "", 0, INGESTER_ALL_PLATFORM_DATA))
 
@@ -77,6 +83,7 @@ func newPlatformDataOP(db *gorm.DB, metaData *MetaData) *PlatformDataOP {
 		domainInterfaceProto:       domainInterfaceProto,
 		domainPeerConnProto:        domainPeerConnProto,
 		domainCIDRProto:            domainCIDRProto,
+		GProcessInfoProto:          gprocessInfoProto,
 		allPlatformDataForIngester: allPlatformDataForIngester,
 		DomainToPlatformData:       newDomainToPlatformData(),
 		db:                         db,
@@ -328,15 +335,31 @@ func (p *PlatformDataOP) generateCIDRs() {
 	p.updateDomainCIDRProto(dcProto)
 }
 
+func (p *PlatformDataOP) generateGProcessInfo() {
+	dbDataCache := p.metaData.GetDBDataCache()
+	processes := dbDataCache.GetProcesses()
+	gprocessData := newGProcessInfoProto(len(processes))
+	for _, process := range processes {
+		p := &trident.GProcessInfo{
+			GprocessId: proto.Uint32(uint32(process.ID)),
+			NetnsId:    proto.Uint32(process.NetnsID),
+			VtapId:     proto.Uint32(uint32(process.VTapID)),
+		}
+		gprocessData.gprocessInfo = append(gprocessData.gprocessInfo, p)
+	}
+	p.updateGProcessInfoProto(gprocessData)
+}
+
 func (p *PlatformDataOP) generateIngesterPlatformData() {
 	domainInterfaceProto := p.getDomainInterfaceProto()
 	domainPeerConnProto := p.getDomainPeerConnProto()
 	domainCIDRProto := p.getDomainCIDRProto()
+	gprocessInfo := p.getGProcessInfoProto().gprocessInfo
 
 	// AllPlatformDataForIngester
 	newIngesterPlatformData := NewPlatformData("", "", 0, INGESTER_ALL_PLATFORM_DATA)
 	newIngesterPlatformData.setPlatformData(domainInterfaceProto.allCompleteInterfaces,
-		domainPeerConnProto.peerConns, domainCIDRProto.cidrs)
+		domainPeerConnProto.peerConns, domainCIDRProto.cidrs, gprocessInfo)
 	oldIngesterPlatformData := p.GetAllPlatformDataForIngester()
 	if oldIngesterPlatformData.GetVersion() == 0 {
 		newIngesterPlatformData.setVersion(uint64(time.Now().Unix()))
@@ -351,7 +374,8 @@ func (p *PlatformDataOP) generateIngesterPlatformData() {
 	newACPData.setPlatformData(
 		domainInterfaceProto.allCompleteInterfacesExceptPod,
 		domainPeerConnProto.peerConns,
-		domainCIDRProto.simplecidrs)
+		domainCIDRProto.simplecidrs,
+		gprocessInfo)
 	oldACPData := p.GetAllCompletePlatformDataExceptPod()
 	if oldACPData == nil {
 		newACPData.initVersion()
@@ -366,7 +390,7 @@ func (p *PlatformDataOP) generateIngesterPlatformData() {
 	for _, region := range regions {
 		interfaces := domainInterfaceProto.regionToInterfacesOnlyPod[region.Lcuuid]
 		regionData := NewPlatformData(region.Name, region.Lcuuid, 0, REGION_TO_PLATFORM_DATA_ONLY_POD)
-		regionData.setPlatformData(interfaces, nil, nil)
+		regionData.setPlatformData(interfaces, nil, nil, nil)
 		regionToData[region.Lcuuid] = regionData
 	}
 	if !p.GetRegionToPlatformDataOnlyPod().checkVersion(regionToData) {
@@ -378,7 +402,7 @@ func (p *PlatformDataOP) generateIngesterPlatformData() {
 	for _, az := range azs {
 		interfaces := domainInterfaceProto.azToInterfacesOnlyPod[az.Lcuuid]
 		azData := NewPlatformData(az.Name, az.Lcuuid, 0, AZ_TO_PLATFORM_DATA_ONLY_POD)
-		azData.setPlatformData(interfaces, nil, nil)
+		azData.setPlatformData(interfaces, nil, nil, nil)
 		azToData[az.Lcuuid] = azData
 	}
 	if !p.GetAZToPlatformDataOnlyPod().checkVersion(azToData) {
@@ -400,7 +424,8 @@ func (p *PlatformDataOP) generateAllSimplePlatformData() {
 	aSPData.setPlatformData(
 		domainInterfaceProto.allSimpleInterfaces,
 		domainPeerConnProto.peerConns,
-		domainCIDRProto.simplecidrs)
+		domainCIDRProto.simplecidrs,
+		nil)
 	pASPData := p.GetAllSimplePlatformData()
 	if pASPData == nil {
 		aSPData.initVersion()
@@ -416,7 +441,8 @@ func (p *PlatformDataOP) generateAllSimplePlatformData() {
 	aSPDExceptPod.setPlatformData(
 		domainInterfaceProto.allSimpleInterfacesExceptPod,
 		domainPeerConnProto.peerConns,
-		domainCIDRProto.simplecidrs)
+		domainCIDRProto.simplecidrs,
+		nil)
 	pASPDExceptPod := p.GetAllSimplePlatformDataExceptPod()
 	if pASPDExceptPod == nil {
 		aSPDExceptPod.initVersion()
@@ -447,20 +473,20 @@ func (p *PlatformDataOP) generateDomainPlatformData() {
 		peerConnections := domainPeerConnProto.domainToPeerConns[domain.Lcuuid]
 		cidrs := domainCIDRProto.domainToCIDRs[domain.Lcuuid]
 		domainDate := NewPlatformData(domain.Name, domain.Lcuuid, 0, DOMAIN_TO_ALL_SIMPLE_PLATFORM_DATA)
-		domainDate.setPlatformData(interfaces, peerConnections, cidrs)
+		domainDate.setPlatformData(interfaces, peerConnections, cidrs, nil)
 		dToAPData[domain.Lcuuid] = domainDate
 
 		// vinterface包含集群内非pod信息
 		interfacesExceptPod := domainInterfaceProto.domainToInterfacesExceptPod[domain.Lcuuid]
 		domainCIDRs := domainCIDRProto.domainOrSubdomainToCIDRs[domain.Lcuuid]
 		domainDataExceptPod := NewPlatformData(domain.Name, domain.Lcuuid, 0, DOMAIN_TO_PLATFORM_DATA_EXCEPT_POD)
-		domainDataExceptPod.setPlatformData(interfacesExceptPod, peerConnections, domainCIDRs)
+		domainDataExceptPod.setPlatformData(interfacesExceptPod, peerConnections, domainCIDRs, nil)
 		dToPDExceptPod[domain.Lcuuid] = domainDataExceptPod
 
 		// domain仅包含pod信息
 		interfacesOnlyPod := domainInterfaceProto.domainOrSubdomainToInterfacesOnlyPod[domain.Lcuuid]
 		domainDataOnlyPod := NewPlatformData(domain.Name, domain.Lcuuid, 0, DOMAIN_TO_PLATFORM_DATA_ONLY_POD)
-		domainDataOnlyPod.setPlatformData(interfacesOnlyPod, peerConnections, domainCIDRs)
+		domainDataOnlyPod.setPlatformData(interfacesOnlyPod, peerConnections, domainCIDRs, nil)
 		dToPDOnlyPod[domain.Lcuuid] = domainDataOnlyPod
 	}
 
@@ -471,12 +497,12 @@ func (p *PlatformDataOP) generateDomainPlatformData() {
 		peerConnections := domainPeerConnProto.domainToPeerConns[subDomain.Lcuuid]
 		cidrs := domainCIDRProto.domainOrSubdomainToCIDRs[subDomain.Lcuuid]
 		domainDataOnlyPod := NewPlatformData(subDomain.Name, subDomain.Lcuuid, 0, DOMAIN_TO_PLATFORM_DATA_ONLY_POD)
-		domainDataOnlyPod.setPlatformData(interfaces, peerConnections, cidrs)
+		domainDataOnlyPod.setPlatformData(interfaces, peerConnections, cidrs, nil)
 		dToPDOnlyPod[subDomain.Lcuuid] = domainDataOnlyPod
 	}
 
 	noDomainData := NewPlatformData("no domain", "", 0, NO_DOMAIN_TO_PLATFORM)
-	noDomainData.setPlatformData(nil, domainPeerConnProto.getNoDomainPeerConns(), nil)
+	noDomainData.setPlatformData(nil, domainPeerConnProto.getNoDomainPeerConns(), nil, nil)
 	oldNoDOmainDat := p.GetNoDomainPlatformData()
 	if oldNoDOmainDat == nil {
 		noDomainData.initVersion()
@@ -570,6 +596,14 @@ func (p *PlatformDataOP) updateDomainCIDRProto(c *DomainCIDRProto) {
 	p.domainCIDRProto.Store(c)
 }
 
+func (p *PlatformDataOP) getGProcessInfoProto() *GProcessInfoProto {
+	return p.GProcessInfoProto.Load().(*GProcessInfoProto)
+}
+
+func (p *PlatformDataOP) updateGProcessInfoProto(c *GProcessInfoProto) {
+	p.GProcessInfoProto.Store(c)
+}
+
 func (p *PlatformDataOP) GetAllPlatformDataForIngester() *PlatformData {
 	return p.allPlatformDataForIngester.Load().(*PlatformData)
 }
@@ -588,6 +622,7 @@ func (p *PlatformDataOP) generateBasePlatformData() {
 	p.generateVInterfaces()
 	p.generatePeerConnections()
 	p.generateCIDRs()
+	p.generateGProcessInfo()
 	p.generateIngesterPlatformData()
 	p.generateAllSimplePlatformData()
 	p.generateDomainPlatformData()

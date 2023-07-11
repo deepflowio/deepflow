@@ -103,6 +103,7 @@ type PlatformRawData struct {
 	lbIDs                         mapset.Set
 	natIDs                        mapset.Set
 	podServicePortIDs             mapset.Set
+	processIDs                    mapset.Set
 	subnetPrefix                  []string
 	subnetMask                    []string
 	serverToVmIDs                 map[string]mapset.Set
@@ -168,6 +169,7 @@ func NewPlatformRawData() *PlatformRawData {
 		lbIDs:                         mapset.NewSet(),
 		natIDs:                        mapset.NewSet(),
 		podServicePortIDs:             mapset.NewSet(),
+		processIDs:                    mapset.NewSet(),
 		serverToVmIDs:                 make(map[string]mapset.Set),
 		floatingIPs:                   make(map[int]*IPData),
 		podServiceIDToPodGroupPortIDs: make(map[int]mapset.Set),
@@ -1021,6 +1023,16 @@ func (r *PlatformRawData) ConvertSkipVTapVIfIDs(dbDataCache *DBDataCache) {
 	log.Debug(r.launchServerToSkipInterface)
 }
 
+func (r *PlatformRawData) ConvertDBProcesses(dbDataCache *DBDataCache) {
+	processes := dbDataCache.GetProcesses()
+	if processes == nil {
+		return
+	}
+	for _, process := range processes {
+		r.processIDs.Add(process.ID)
+	}
+}
+
 // 有依赖 需要按顺序convert
 func (r *PlatformRawData) ConvertDBCache(dbDataCache *DBDataCache) {
 	r.ConvertHost(dbDataCache)
@@ -1047,6 +1059,7 @@ func (r *PlatformRawData) ConvertDBCache(dbDataCache *DBDataCache) {
 	r.ConvertDBVmPodNodeConn(dbDataCache)
 	r.ConvertDBVipDomain(dbDataCache)
 	r.ConvertSkipVTapVIfIDs(dbDataCache)
+	r.ConvertDBProcesses(dbDataCache)
 }
 
 func (r *PlatformRawData) checkIsVip(ip string, vif *models.VInterface, platformVips []string) bool {
@@ -1115,6 +1128,8 @@ func (r *PlatformRawData) vInterfaceToProto(
 		PodId:          proto.Uint32(uint32(device.PodID)),
 		IsVipInterface: proto.Bool(ipResourceData.isVipInterface),
 		NetnsId:        proto.Uint32(uint32(vif.NetnsID)),
+		// TODO(weiqiang): add vtap_id
+		// VtapId: proto.Uint32(),
 	}
 	sInterface := &trident.Interface{
 		Id:             proto.Uint32(uint32(vif.ID)),
@@ -1431,6 +1446,11 @@ func (r *PlatformRawData) equal(o *PlatformRawData) bool {
 
 	if !r.podServicePortIDs.Equal(o.podServicePortIDs) {
 		log.Info("platform pod service ports changed")
+		return false
+	}
+
+	if !r.processIDs.Equal(o.processIDs) {
+		log.Info("platform processes changed")
 		return false
 	}
 

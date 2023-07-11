@@ -554,6 +554,10 @@ func platformData(response *trident.SyncResponse) {
 			for index, entry := range platform.Cidrs {
 				JsonFormat(index+1, entry)
 			}
+			fmt.Println("gprocess infos:")
+			for index, entry := range platform.GprocessInfos {
+				JsonFormat(index+1, entry)
+			}
 		}
 	}
 }

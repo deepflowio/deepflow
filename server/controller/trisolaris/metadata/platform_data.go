@@ -37,6 +37,7 @@ type PlatformData struct {
 	interfaceProtos    []*trident.Interface
 	peerConnProtos     []*trident.PeerConnection
 	cidrProtos         []*trident.Cidr
+	gprocessInfoProtos []*trident.GProcessInfo
 	version            uint64
 	mergeDomains       []string
 	dataType           uint32
@@ -52,14 +53,16 @@ func NewPlatformData(domain string, lcuuid string, version uint64, dataType uint
 		interfaceProtos:    []*trident.Interface{},
 		peerConnProtos:     []*trident.PeerConnection{},
 		cidrProtos:         []*trident.Cidr{},
+		gprocessInfoProtos: []*trident.GProcessInfo{},
 		version:            version,
 		mergeDomains:       []string{},
 		dataType:           dataType,
 	}
 }
 
-func (f *PlatformData) setPlatformData(ifs []*trident.Interface, pcs []*trident.PeerConnection, cidrs []*trident.Cidr) {
-	f.initPlatformData(ifs, pcs, cidrs)
+func (f *PlatformData) setPlatformData(ifs []*trident.Interface, pcs []*trident.PeerConnection, cidrs []*trident.Cidr,
+	gpis []*trident.GProcessInfo) {
+	f.initPlatformData(ifs, pcs, cidrs, gpis)
 	f.GeneratePlatformDataResult()
 }
 
@@ -89,10 +92,12 @@ func (f *PlatformData) initVersion() {
 	offsetVersion += offsetInterval
 }
 
-func (f *PlatformData) initPlatformData(ifs []*trident.Interface, pcs []*trident.PeerConnection, cidrs []*trident.Cidr) {
+func (f *PlatformData) initPlatformData(ifs []*trident.Interface, pcs []*trident.PeerConnection, cidrs []*trident.Cidr,
+	gpi []*trident.GProcessInfo) {
 	f.interfaceProtos = ifs
 	f.peerConnProtos = pcs
 	f.cidrProtos = cidrs
+	f.gprocessInfoProtos = gpi
 }
 
 func (f *PlatformData) GeneratePlatformDataResult() {
@@ -100,6 +105,7 @@ func (f *PlatformData) GeneratePlatformDataResult() {
 		Interfaces:      f.interfaceProtos,
 		PeerConnections: f.peerConnProtos,
 		Cidrs:           f.cidrProtos,
+		GprocessInfos:   f.gprocessInfoProtos,
 	}
 	var err error
 	f.platformDataStr, err = f.platformDataProtos.Marshal()
@@ -118,6 +124,7 @@ func (f *PlatformData) Merge(other *PlatformData) {
 	f.interfaceProtos = append(f.interfaceProtos, other.interfaceProtos...)
 	f.peerConnProtos = append(f.peerConnProtos, other.peerConnProtos...)
 	f.cidrProtos = append(f.cidrProtos, other.cidrProtos...)
+	f.gprocessInfoProtos = append(f.gprocessInfoProtos, other.gprocessInfoProtos...)
 	f.version += other.version
 	if len(other.domain) != 0 {
 		f.mergeDomains = append(f.mergeDomains, other.domain)
@@ -159,6 +166,6 @@ func (f *PlatformData) equal(other *PlatformData) bool {
 }
 
 func (f *PlatformData) String() string {
-	return fmt.Sprintf("name: %s, lcuuid: %s, data_type: %d, version: %d, platform_data_hash: %d, interfaces: %d, peer_connections: %d, cidrs: %d, merge_domains: %s",
-		f.domain, f.lcuuid, f.dataType, f.version, f.platformDataHash, len(f.interfaceProtos), len(f.peerConnProtos), len(f.cidrProtos), f.mergeDomains)
+	return fmt.Sprintf("name: %s, lcuuid: %s, data_type: %d, version: %d, platform_data_hash: %d, interfaces: %d, peer_connections: %d, cidrs: %d, gprocess_info: %d, merge_domains: %s",
+		f.domain, f.lcuuid, f.dataType, f.version, f.platformDataHash, len(f.interfaceProtos), len(f.peerConnProtos), len(f.cidrProtos), len(f.gprocessInfoProtos), f.mergeDomains)
 }
