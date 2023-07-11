@@ -62,9 +62,10 @@ func (i *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.WANIP, boo
 		))
 		return nil, false
 	}
-	subnetID, exists := i.cache.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
-	if !exists {
-		if i.domainToolDataSet != nil {
+	var subnetID int
+	if cloudItem.SubnetLcuuid != "" {
+		subnetID, exists = i.cache.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
+		if !exists && i.domainToolDataSet != nil {
 			subnetID, _ = i.domainToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
 		}
 	}
