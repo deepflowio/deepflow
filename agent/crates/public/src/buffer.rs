@@ -19,7 +19,7 @@ use std::{
     marker::PhantomData,
     mem,
     ops::{Deref, DerefMut, Range},
-    slice,
+    ptr, slice,
     sync::atomic::{AtomicUsize, Ordering},
 };
 
@@ -63,22 +63,13 @@ struct RefCounter<T> {
     buffer: Buffer<T>,
 }
 
-/// `Allocator<T>` for `FixedBuffer<T>`
-///
-/// `Allocator<T>` is used to create fixed buffers.
-/// The allocator holds a fixed sized memory and use it to allocate fixed buffers.
-///
-/// `Allocator<T>` and `FixedBuffer<T>`s it allocated share a same `RefCounter<T>`.
-/// The memory is released when `ref_count == 0`, that is when `Allocator<T>` and
-/// all its `FixedBuffer<T>`s are dropped.
-pub struct Allocator<T> {
+struct InnerAllocator<T> {
     allocated: usize,
-
     counter: *mut RefCounter<T>,
 }
 
-impl<T> Allocator<T> {
-    pub fn new(capacity: usize) -> Self {
+impl<T> InnerAllocator<T> {
+    fn new(capacity: usize) -> Self {
         Self {
             allocated: 0,
             counter: Box::into_raw(Box::new(RefCounter {
@@ -94,24 +85,21 @@ impl<T> Allocator<T> {
         unsafe { &*self.counter }
     }
 
-    pub fn allocate(&mut self, size: usize) -> Option<FixedBuffer<T>> {
+    unsafe fn allocate(&mut self, size: usize) -> (*mut RefCounter<T>, usize) {
         let counter = self.counter();
         if self.allocated + size > counter.buffer.size {
-            return None;
+            return (ptr::null_mut(), 0);
         }
 
+        let index = self.allocated;
         counter.ref_count.fetch_add(1, Ordering::Release);
-        let b = Some(FixedBuffer {
-            start: self.allocated,
-            len: size,
-            counter: self.counter,
-        });
         self.allocated += size;
-        b
+
+        (self.counter, index)
     }
 }
 
-impl<T> Drop for Allocator<T> {
+impl<T> Drop for InnerAllocator<T> {
     fn drop(&mut self) {
         let counter = self.counter();
         if counter.ref_count.fetch_sub(1, Ordering::Acquire) != 1 {
@@ -125,27 +113,150 @@ impl<T> Drop for Allocator<T> {
     }
 }
 
-/// Fixed size buffer
+/// `Allocator<T>` for `BatchedBuffer<T>`
+///
+/// `Allocator<T>` is used to create fixed buffers.
+/// The allocator holds a fixed sized memory and use it to allocate fixed buffers.
+///
+/// `Allocator<T>` and `BatchedBuffer<T>`s it allocated share a same `RefCounter<T>`.
+/// The memory is released when `ref_count == 0`, that is when `Allocator<T>` and
+/// all its `BatchedBuffer<T>`s are dropped.
+pub struct Allocator<T> {
+    capacity: usize,
+    inner: InnerAllocator<T>,
+}
+
+impl<T> Allocator<T> {
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            capacity,
+            inner: InnerAllocator::new(capacity),
+        }
+    }
+
+    fn ensure_capacity(&mut self, size: usize) {
+        if self.inner.allocated + size > self.capacity {
+            self.inner = InnerAllocator::new(self.capacity);
+            // old `InnerAllocator` will drop
+        }
+    }
+
+    // UNSAFE: T not initialized
+    unsafe fn allocate_one_uninit(&mut self) -> BatchedBox<T> {
+        self.ensure_capacity(1);
+
+        let (counter, index) = self.inner.allocate(1);
+        // capacity checked, `counter` should not be null
+        assert!(
+            !counter.is_null(),
+            "allocate {} failed: allocated={} capacity={}",
+            1,
+            self.inner.allocated,
+            self.capacity
+        );
+
+        BatchedBox { index, counter }
+    }
+
+    pub fn allocate_one_with(&mut self, value: T) -> BatchedBox<T> {
+        unsafe {
+            // SAFETY:
+            // - item in box is initialized
+            let mut b = self.allocate_one_uninit();
+            ptr::write(b.as_mut_ptr(), value);
+            b
+        }
+    }
+}
+
+impl<T: Copy> Allocator<T> {
+    // UNSAFE: T not initialized
+    unsafe fn allocate_uninit(&mut self, size: usize) -> BatchedBuffer<T> {
+        self.ensure_capacity(size);
+
+        let (counter, index) = self.inner.allocate(size);
+        // capacity checked, `counter` should not be null
+        assert!(!counter.is_null());
+
+        BatchedBuffer {
+            start: index,
+            len: size,
+            counter,
+        }
+    }
+
+    // allocate and copy values to buffer
+    pub fn allocate_with(&mut self, values: &[T]) -> BatchedBuffer<T> {
+        unsafe {
+            // SAFETY:
+            // - T is `Copy`
+            // - both `values` and `b` are valid for `values.len() * size_of::<T>()` bytes
+            let len = values.len();
+            let mut b = self.allocate_uninit(len);
+            ptr::copy_nonoverlapping(values.as_ptr(), b.as_mut_ptr(), len);
+            b
+        }
+    }
+}
+
+impl<T: Copy + Default> Allocator<T> {
+    pub fn allocate(&mut self, size: usize) -> BatchedBuffer<T> {
+        unsafe {
+            // SAFETY:
+            // - buffer is initialized
+            let mut b = self.allocate_uninit(size);
+            let value = T::default();
+            for i in 0..b.len {
+                ptr::write(b.as_mut_ptr().offset(i as isize), value);
+            }
+            b
+        }
+    }
+}
+
+impl<T: Default> Allocator<T> {
+    pub fn allocate_one(&mut self) -> BatchedBox<T> {
+        self.allocate_one_with(T::default())
+    }
+}
+
+/// Batch allocated buffer
 ///
 /// Allocated by `Allocator<T>`.
 ///
 /// Different buffers allocated by the same `Allocator<T>` use separated segments of
 /// the same buffer to avoid race.
-pub struct FixedBuffer<T> {
+pub struct BatchedBuffer<T: Copy> {
     start: usize,
     len: usize,
 
     counter: *mut RefCounter<T>,
 }
 
-unsafe impl<T: Send> Send for FixedBuffer<T> {}
-unsafe impl<T: Send> Sync for FixedBuffer<T> {}
+unsafe impl<T: Copy + Send> Send for BatchedBuffer<T> {}
+unsafe impl<T: Copy + Send> Sync for BatchedBuffer<T> {}
 
-impl<T> FixedBuffer<T> {
+impl<T: Copy> BatchedBuffer<T> {
     fn counter(&self) -> &RefCounter<T> {
         // SAFETY:
         // - `self.counter` is valid if `ref_count > 0`
         unsafe { &*self.counter }
+    }
+
+    fn as_ptr(&self) -> *const T {
+        unsafe {
+            // SAFETY:
+            // - `self.start` will not exceed buffer boundaries
+            self.counter().buffer.buffer.offset(self.start as isize) as *const T
+        }
+    }
+
+    fn as_mut_ptr(&mut self) -> *mut T {
+        unsafe {
+            // SAFETY:
+            // - `self.start` will not exceed buffer boundaries
+            self.counter().buffer.buffer.offset(self.start as isize)
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -158,21 +269,29 @@ impl<T> FixedBuffer<T> {
     }
 }
 
-impl<T: Copy> Clone for FixedBuffer<T> {
-    /// Copies a `FixedBuffer<T>`
+impl<T: Copy> Clone for BatchedBuffer<T> {
+    /// Copies a `BatchedBuffer<T>`
     ///
     /// Rather expensive because it allocates a new dedicated buffer.
     /// Should be avoided if possible.
     fn clone(&self) -> Self {
-        let mut allocator = Allocator::new(self.len());
-        let mut new_buffer = allocator.allocate(self.len()).unwrap();
-        new_buffer.copy_from_slice(self);
-        new_buffer
+        let mut allocator: Allocator<T> = Allocator::new(self.len);
+        unsafe {
+            // SAFETY:
+            // - buffer is initialized
+            // - buffers have the same length
+            // - T is Copy, no memory violation
+            let mut nb = allocator.allocate_uninit(self.len);
+            ptr::copy_nonoverlapping(self.as_ptr(), nb.as_mut_ptr(), self.len);
+            nb
+        }
     }
 }
 
-impl<T> Drop for FixedBuffer<T> {
+impl<T: Copy> Drop for BatchedBuffer<T> {
     fn drop(&mut self) {
+        // don't need to release items for T: Copy
+
         let counter = self.counter();
         if counter.ref_count.fetch_sub(1, Ordering::Acquire) != 1 {
             return;
@@ -185,55 +304,165 @@ impl<T> Drop for FixedBuffer<T> {
     }
 }
 
-impl<T> Deref for FixedBuffer<T> {
+impl<T: Copy> Deref for BatchedBuffer<T> {
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
         // SAFETY:
         // - The buffer is allocated by `Vec[T]`
         // - Range `self.start`..`self.len` will not exceed buffer boundaries
-        // - Buffer of different `FixedBuffer<T>`s will not overlap.
-        unsafe {
-            slice::from_raw_parts(
-                self.counter().buffer.buffer.offset(self.start as isize),
-                self.len,
-            )
-        }
+        // - Buffer of different `BatchedBuffer<T>`s will not overlap.
+        unsafe { slice::from_raw_parts(self.as_ptr(), self.len) }
     }
 }
 
-impl<T> DerefMut for FixedBuffer<T> {
+impl<T: Copy> DerefMut for BatchedBuffer<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         // SAFETY:
         // - The buffer is allocated by `Vec[T]`
         // - Range `self.start`..`self.len` will not exceed buffer boundaries
-        // - Buffer of different `FixedBuffer<T>`s will not overlap.
-        unsafe {
-            slice::from_raw_parts_mut(
-                self.counter().buffer.buffer.offset(self.start as isize),
-                self.len,
-            )
-        }
+        // - Buffer of different `BatchedBuffer<T>`s will not overlap.
+        unsafe { slice::from_raw_parts_mut(self.as_mut_ptr(), self.len) }
     }
 }
 
-impl<T> AsRef<[T]> for FixedBuffer<T> {
+impl<T: Copy> AsRef<[T]> for BatchedBuffer<T> {
     fn as_ref(&self) -> &[T] {
         self
     }
 }
 
-impl<T: fmt::Debug> fmt::Debug for FixedBuffer<T> {
+impl<T: Copy + fmt::Debug> fmt::Debug for BatchedBuffer<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s: &[T] = &self;
         s.fmt(f)
     }
 }
 
-impl<T: PartialEq> PartialEq for FixedBuffer<T> {
+impl<T: Copy + PartialEq> PartialEq for BatchedBuffer<T> {
     fn eq(&self, other: &Self) -> bool {
         let s: &[T] = self;
         let other: &[T] = other;
+        s.eq(other)
+    }
+}
+
+/// Batch allocated box
+///
+/// Allocated by `Allocator<T>`.
+///
+/// Different boxes allocated by the same `Allocator<T>` use separated segments of
+/// the same buffer to avoid race.
+pub struct BatchedBox<T> {
+    index: usize,
+
+    counter: *mut RefCounter<T>,
+}
+
+unsafe impl<T: Send> Send for BatchedBox<T> {}
+unsafe impl<T: Send> Sync for BatchedBox<T> {}
+
+impl<T> BatchedBox<T> {
+    fn counter(&self) -> &RefCounter<T> {
+        // SAFETY:
+        // - `self.counter` is valid if `ref_count > 0`
+        unsafe { &*self.counter }
+    }
+
+    fn as_ptr(&self) -> *const T {
+        unsafe {
+            // SAFETY:
+            // - Offset `self.index` is valid for present `BatchedBox`
+            self.counter().buffer.buffer.offset(self.index as isize) as *const T
+        }
+    }
+
+    fn as_mut_ptr(&mut self) -> *mut T {
+        unsafe {
+            // SAFETY:
+            // - Offset `self.index` is valid for present `BatchedBox`
+            self.counter().buffer.buffer.offset(self.index as isize)
+        }
+    }
+}
+
+impl<T: Clone> Clone for BatchedBox<T> {
+    /// Copies a `BatchedBox<T>`
+    ///
+    /// Rather expensive because it allocates a new dedicated buffer.
+    /// Should be avoided if possible.
+    fn clone(&self) -> Self {
+        let mut allocator: Allocator<T> = Allocator::new(1);
+        unsafe {
+            // SAFETY:
+            // - item in box is initialized
+            let mut b = allocator.allocate_one_uninit();
+            ptr::write(b.as_mut_ptr(), self.as_ref().clone());
+            b
+        }
+    }
+}
+
+impl<T> Drop for BatchedBox<T> {
+    fn drop(&mut self) {
+        // release T in buffer
+        // SAFETY:
+        // - Offset `self.start` is valid for this `BatchedBox`
+        // - T is owned by `BatchedBox`
+        unsafe {
+            ptr::drop_in_place(self.as_mut_ptr());
+        }
+
+        let counter = self.counter();
+        if counter.ref_count.fetch_sub(1, Ordering::Acquire) != 1 {
+            return;
+        }
+        // SAFETY:
+        // - Last referer drops `self.counter`
+        unsafe {
+            mem::drop(Box::from_raw(self.counter));
+        }
+    }
+}
+
+impl<T> Deref for BatchedBox<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        // SAFETY:
+        // - The buffer is allocated by `Vec[T]`
+        // - Index `self.index` will not exceed buffer boundaries
+        unsafe { &*self.as_ptr() }
+    }
+}
+
+impl<T> DerefMut for BatchedBox<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        // SAFETY:
+        // - The buffer is allocated by `Vec[T]`
+        // - Index `self.index` will not exceed buffer boundaries
+        // - Different `BatchedBox<T>`s will not have same index.
+        unsafe { &mut *self.as_mut_ptr() }
+    }
+}
+
+impl<T> AsRef<T> for BatchedBox<T> {
+    fn as_ref(&self) -> &T {
+        self
+    }
+}
+
+impl<T: fmt::Debug> fmt::Debug for BatchedBox<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s: &T = &self;
+        s.fmt(f)
+    }
+}
+
+impl<T: PartialEq> PartialEq for BatchedBox<T> {
+    fn eq(&self, other: &Self) -> bool {
+        let s: &T = self;
+        let other: &T = other;
         s.eq(other)
     }
 }
@@ -243,29 +472,43 @@ mod tests {
     use super::*;
 
     #[test]
-    fn allocation() {
-        let mut size = 65536;
-        let mut allocator: Allocator<u8> = Allocator::new(size);
-        while size > 0 {
-            size >>= 1;
-            let buffer = allocator.allocate(size);
-            assert_ne!(buffer, None);
+    fn single_allocation() {
+        let mut allocator: Allocator<u8> = Allocator::new(1024);
+        for i in 0..4096 {
+            let _ = allocator.allocate_one_with(i as u8);
         }
-        // just 1 byte left
+    }
+
+    #[test]
+    fn batch_allocation() {
+        let mut size = 65536;
+        let mut allocator: Allocator<u8> = Allocator::new(size << 1);
+        // must preserve at least one reference to buffer
+        // or the memory location might be reused
+        let mut first_buffer = allocator.allocate(size);
+        first_buffer[0] = 42;
+        size >>= 1;
+        let old_location = allocator.inner.counter;
+        while size > 0 {
+            let mut buffer = allocator.allocate(size);
+            buffer[0] = size as u8;
+            assert_eq!(allocator.inner.counter, old_location);
+            size >>= 1;
+        }
+
+        // just 1 byte left, will trigger new buffer allocation
         let buffer = allocator.allocate(2);
-        assert_eq!(buffer, None);
-        let buffer = allocator.allocate(1);
-        assert_ne!(buffer, None);
-        let buffer = allocator.allocate(1);
-        assert_eq!(buffer, None);
+        // validate buffer not reused
+        assert_ne!(first_buffer[0], buffer[0]);
+        assert_ne!(allocator.inner.counter, old_location);
     }
 
     #[test]
     fn modification() {
         let mut allocator = Allocator::new(1024);
-        let mut front = allocator.allocate(512).unwrap();
-        let mut check = allocator.allocate(1).unwrap();
-        let mut tail = allocator.allocate(511).unwrap();
+        let mut front = allocator.allocate(512);
+        let mut check = allocator.allocate(1);
+        let mut tail = allocator.allocate(511);
         check.copy_from_slice(&[42u8]);
         front.copy_from_slice(&[233u8; 512]);
         tail.copy_from_slice(&[125u8; 511]);
@@ -275,7 +518,7 @@ mod tests {
     #[test]
     fn truncation() {
         let mut allocator = Allocator::new(1024);
-        let mut buffer = allocator.allocate(512).unwrap();
+        let mut buffer = allocator.allocate(512);
         for i in 0..512 {
             buffer[i] = i as u8;
         }

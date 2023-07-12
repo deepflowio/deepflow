@@ -90,6 +90,7 @@ use crate::{
     },
 };
 use public::{
+    buffer::{Allocator, BatchedBox},
     counter::{Counter, CounterType, CounterValue, RefCountable},
     debug::QueueDebugger,
     l7_protocol::L7ProtocolEnum,
@@ -132,9 +133,10 @@ pub struct FlowMap {
     total_flow: usize,
     time_set_slot_size: usize,
 
-    output_queue: DebugSender<Box<TaggedFlow>>,
+    tagged_flow_allocator: Allocator<TaggedFlow>,
+    output_queue: DebugSender<BatchedBox<TaggedFlow>>,
     out_log_queue: DebugSender<Box<MetaAppProto>>,
-    output_buffer: Vec<Box<TaggedFlow>>,
+    output_buffer: Vec<BatchedBox<TaggedFlow>>,
     protolog_buffer: Vec<Box<MetaAppProto>>,
     last_queue_flush: Duration,
     perf_cache: Rc<RefCell<L7PerfCache>>,
@@ -162,7 +164,7 @@ pub struct FlowMap {
 impl FlowMap {
     pub fn new(
         id: u32,
-        output_queue: DebugSender<Box<TaggedFlow>>,
+        output_queue: DebugSender<BatchedBox<TaggedFlow>>,
         policy_getter: PolicyGetter,
         app_proto_log_queue: DebugSender<Box<MetaAppProto>>,
         ntp_diff: Arc<AtomicI64>,
@@ -253,6 +255,7 @@ impl FlowMap {
         let system_time = get_timestamp(ntp_diff.load(Ordering::Relaxed));
         let start_time = system_time - config.packet_delay - Duration::from_secs(1);
         let time_set_slot_size = config.hash_slots as usize / time_window_size;
+
         Self {
             node_map: Some((
                 AHashMap::with_capacity(config.hash_slots as usize),
@@ -276,6 +279,10 @@ impl FlowMap {
             time_window_size,
             total_flow: 0,
             time_set_slot_size,
+            tagged_flow_allocator: {
+                let n = (config.batched_buffer_size_limit - 1) / mem::size_of::<TaggedFlow>();
+                Allocator::new(n.max(1))
+            },
             output_queue,
             out_log_queue: app_proto_log_queue,
             output_buffer: Vec::with_capacity(QUEUE_BATCH_SIZE),
@@ -1465,7 +1472,11 @@ impl FlowMap {
         }
     }
 
-    fn push_to_flow_stats_queue(&mut self, config: &FlowConfig, mut tagged_flow: Box<TaggedFlow>) {
+    fn push_to_flow_stats_queue(
+        &mut self,
+        config: &FlowConfig,
+        mut tagged_flow: BatchedBox<TaggedFlow>,
+    ) {
         // This field is required for logging when the flow is not finished. To avoid
         // double counting, it is assigned when the flow statistics are finished output
         //
@@ -1571,7 +1582,10 @@ impl FlowMap {
             .fetch_sub(1, Ordering::Relaxed);
         self.stats_counter.closed.fetch_add(1, Ordering::Relaxed);
 
-        self.push_to_flow_stats_queue(config, Box::new(node.tagged_flow.clone()));
+        let tagged_flow = self
+            .tagged_flow_allocator
+            .allocate_one_with(node.tagged_flow.clone());
+        self.push_to_flow_stats_queue(config, tagged_flow);
         if let Some(log) = node.meta_flow_log.take() {
             FlowLog::recycle(&mut self.tcp_perf_pool, *log);
         }
@@ -1614,7 +1628,10 @@ impl FlowMap {
                     );
                 }
             }
-            self.push_to_flow_stats_queue(config, Box::new(node.tagged_flow.clone()));
+            let tagged_flow = self
+                .tagged_flow_allocator
+                .allocate_one_with(node.tagged_flow.clone());
+            self.push_to_flow_stats_queue(config, tagged_flow);
             node.reset_flow_stat_info();
         }
     }
@@ -2019,7 +2036,7 @@ pub fn _new_flow_map_and_receiver(
     trident_type: TridentType,
     flow_timeout: Option<FlowTimeout>,
     ignore_idc_vlan: bool,
-) -> (ModuleConfig, FlowMap, Receiver<Box<TaggedFlow>>) {
+) -> (ModuleConfig, FlowMap, Receiver<BatchedBox<TaggedFlow>>) {
     let (_, mut policy_getter) = Policy::new(1, 0, 1 << 10, 1 << 14, false);
     policy_getter.disable();
     let queue_debugger = QueueDebugger::new();
@@ -2733,7 +2750,7 @@ mod tests {
         flow_map.inject_flush_ticker(&config, timestamp.add(Duration::from_secs(120)));
 
         let tagged_flow = output_queue_receiver.recv(Some(TIME_UNIT)).unwrap();
-        let perf_stats = &tagged_flow.flow.flow_perf_stats.unwrap().tcp;
+        let perf_stats = &tagged_flow.flow.flow_perf_stats.as_ref().unwrap().tcp;
         assert_eq!(perf_stats.rtt_client_max, 114);
         assert_eq!(perf_stats.rtt_server_max, 44);
         assert_eq!(perf_stats.srt_max, 12);
@@ -2768,7 +2785,7 @@ mod tests {
         flow_map.inject_flush_ticker(&config, timestamp.add(Duration::from_secs(120)));
 
         let tagged_flow = output_queue_receiver.recv(Some(TIME_UNIT)).unwrap();
-        let perf_stats = &tagged_flow.flow.flow_perf_stats.unwrap().tcp;
+        let perf_stats = &tagged_flow.flow.flow_perf_stats.as_ref().unwrap().tcp;
         assert_eq!(perf_stats.counts_peers[0].zero_win_count, 0);
         assert_eq!(perf_stats.counts_peers[1].zero_win_count, 1);
     }
