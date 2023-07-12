@@ -56,6 +56,7 @@ const (
 	DOMAIN_TYPE_AGENT_SYNC        DomainType = 23 // agent_sync
 	DOMAIN_TYPE_MICROSOFT_ACS     DomainType = 24 // microsoft_acs
 	DOMAIN_TYPE_BAIDU_BCE         DomainType = 25 // baidu_bce
+	DOMAIN_TYPE_ESHORE            DomainType = 26 // eshore
 )
 
 var DomainTypes []DomainType = []DomainType{
@@ -77,6 +78,7 @@ var DomainTypes []DomainType = []DomainType{
 	DOMAIN_TYPE_AGENT_SYNC,
 	DOMAIN_TYPE_MICROSOFT_ACS,
 	DOMAIN_TYPE_BAIDU_BCE,
+	DOMAIN_TYPE_ESHORE,
 }
 
 func GetDomainTypeByName(domainTypeName string) DomainType {
