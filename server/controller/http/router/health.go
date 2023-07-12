@@ -23,7 +23,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/op/go-logging"
 
-	"github.com/deepflowio/deepflow/server/controller/common"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	servicecommon "github.com/deepflowio/deepflow/server/controller/http/service/common"
 )
@@ -35,7 +35,13 @@ const OK = "ok"
 var curStage string
 var curStageStartedAt time.Time
 
-func HealthRouter(e *gin.Engine) {
+type Health struct{}
+
+func NewHealth() *Health {
+	return new(Health)
+}
+
+func (s *Health) RegisterTo(e *gin.Engine) {
 	e.GET("/v1/health/", func(c *gin.Context) {
 		if curStage == OK {
 			JsonResponse(c, make(map[string]string), nil)
@@ -44,7 +50,7 @@ func HealthRouter(e *gin.Engine) {
 			log.Errorf(msg)
 			JsonResponse(
 				c, make(map[string]string),
-				servicecommon.NewError(common.SERVICE_UNAVAILABLE, msg),
+				servicecommon.NewError(httpcommon.SERVICE_UNAVAILABLE, msg),
 			)
 		}
 	})

@@ -38,7 +38,6 @@ func NewLB(wholeCache *cache.Cache, cloudData []cloudmodel.LB) *LB {
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -90,17 +89,4 @@ func (l *LB) generateUpdateInfo(diffBase *cache.LB, cloudItem *cloudmodel.LB) (m
 		return updateInfo, true
 	}
 	return nil, false
-}
-
-func (l *LB) addCache(dbItems []*mysql.LB) {
-	l.cache.AddLBs(dbItems)
-}
-
-func (l *LB) updateCache(cloudItem *cloudmodel.LB, diffBase *cache.LB) {
-	diffBase.Update(cloudItem)
-	l.cache.UpdateLB(cloudItem)
-}
-
-func (l *LB) deleteCache(lcuuids []string) {
-	l.cache.DeleteLBs(lcuuids)
 }

@@ -123,10 +123,10 @@ func (s *Synchronizer) assembleMetricLabelFully() ([]*trident.MetricLabelRespons
 		return true
 	})
 	if nonLabelNames.Cardinality() > 0 {
-		log.Warningf("label name ids: %v not found", nonLabelNames.ToSlice())
+		log.Warningf("label name id not found, names: %v", nonLabelNames.ToSlice())
 	}
 	if nonLabelValues.Cardinality() > 0 {
-		log.Warningf("label value ids: %v not found", nonLabelValues.ToSlice())
+		log.Warningf("label value id not found, values: %v", nonLabelValues.ToSlice())
 	}
 	return mLabels, err
 }
@@ -158,10 +158,10 @@ func (s *Synchronizer) assembleTargetFully() ([]*trident.TargetResponse, error) 
 		s.statsdCounter.SendTargetCount++
 	}
 	if nonInstances.Cardinality() > 0 {
-		log.Warningf("target instance ids: %v not found", nonInstances.ToSlice())
+		log.Warningf("target instance id not found, instances: %v", nonInstances.ToSlice())
 	}
 	if nonJobs.Cardinality() > 0 {
-		log.Warningf("target job ids: %v not found", nonJobs.ToSlice())
+		log.Warningf("target job id not found, jobs: %v", nonJobs.ToSlice())
 	}
 	return targets, err
 }
@@ -205,8 +205,8 @@ func (s *Synchronizer) prepare(req *trident.PrometheusLabelRequest) error {
 		}
 	}
 
-	for k, v := range nonTargetKeyToCount {
-		log.Warningf("target id not found, instance: %s, job: %s, count: %d", k.Instance, k.Job, v)
+	if len(nonTargetKeyToCount) != 0 {
+		log.Warningf("target id not found, target key to request count: %+v", nonTargetKeyToCount)
 	}
 
 	if metricNamesToE.Cardinality() == 0 && labelNamesToE.Cardinality() == 0 && labelValuesToE.Cardinality() == 0 &&
@@ -328,17 +328,18 @@ func (s *Synchronizer) assembleMetricLabel(mls []*trident.MetricLabelRequest) ([
 	for _, ml := range mls {
 		s.statsdCounter.ReceiveMetricCount++
 		s.statsdCounter.ReceiveLabelCount += uint64(len(ml.GetLabels()))
-		mn := ml.GetMetricName()
-		mni, ok := s.cache.MetricName.GetIDByName(mn)
-		if !ok {
-			nonMetricNameToCount[mn]++
-			continue
-		}
 
 		var rls []*trident.LabelResponse
-		_, _, ok = s.getTargetInfoFromLabels(ml.GetLabels())
+		_, _, ok := s.getTargetInfoFromLabels(ml.GetLabels())
 		// responses column index only if instance and job matches one target
 		if ok {
+			mn := ml.GetMetricName()
+			mni, ok := s.cache.MetricName.GetIDByName(mn)
+			if !ok {
+				nonMetricNameToCount[mn]++
+				continue
+			}
+
 			for _, l := range ml.GetLabels() {
 				ln := l.GetName()
 				lv := l.GetValue()
@@ -362,22 +363,22 @@ func (s *Synchronizer) assembleMetricLabel(mls []*trident.MetricLabelRequest) ([
 				})
 				s.statsdCounter.SendLabelCount++
 			}
+			respMLs = append(respMLs, &trident.MetricLabelResponse{
+				MetricName: &mn,
+				MetricId:   proto.Uint32(uint32(mni)),
+				LabelIds:   rls,
+			})
+			s.statsdCounter.SendMetricCount++
 		}
-		respMLs = append(respMLs, &trident.MetricLabelResponse{
-			MetricName: &mn,
-			MetricId:   proto.Uint32(uint32(mni)),
-			LabelIds:   rls,
-		})
-		s.statsdCounter.SendMetricCount++
 	}
-	for k, v := range nonMetricNameToCount {
-		log.Errorf("metric_name: %s id not found, count: %d", k, v)
+	if len(nonMetricNameToCount) != 0 {
+		log.Errorf("metric name id not found, name to request count: %+v", nonMetricNameToCount)
 	}
 	if nonLabelNames.Cardinality() > 0 {
-		log.Errorf("label name ids: %v not found", nonLabelNames.ToSlice())
+		log.Errorf("label name id not found, names: %v", nonLabelNames.ToSlice())
 	}
 	if nonLabelValues.Cardinality() > 0 {
-		log.Errorf("label value ids: %v not found", nonLabelValues.ToSlice())
+		log.Errorf("label value id not found, values: %v", nonLabelValues.ToSlice())
 	}
 	return respMLs, nil
 }
@@ -416,13 +417,13 @@ func (s *Synchronizer) assembleTarget(ts []*trident.TargetRequest) ([]*trident.T
 		s.statsdCounter.SendTargetCount++
 	}
 	if nonTargetKeys.Cardinality() > 0 {
-		log.Debugf("target ids: %v not found", nonTargetKeys.ToSlice())
+		log.Debugf("target id not found, target keys: %+v ", nonTargetKeys.ToSlice())
 	}
 	if nonInstances.Cardinality() > 0 {
-		log.Errorf("target instance ids: %v not found", nonInstances.ToSlice())
+		log.Errorf("target instance id not found, instances: %v", nonInstances.ToSlice())
 	}
 	if nonJobs.Cardinality() > 0 {
-		log.Errorf("target job ids: %v not found", nonJobs.ToSlice())
+		log.Errorf("target job id not found, jobs: %v", nonJobs.ToSlice())
 	}
 	return respTs, nil
 }

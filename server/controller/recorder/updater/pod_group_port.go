@@ -38,7 +38,6 @@ func NewPodGroupPort(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroupPor
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -83,16 +82,4 @@ func (p *PodGroupPort) generateUpdateInfo(diffBase *cache.PodGroupPort, cloudIte
 		updateInfo["name"] = cloudItem.Name
 	}
 	return updateInfo, len(updateInfo) > 0
-}
-
-func (p *PodGroupPort) addCache(dbItems []*mysql.PodGroupPort) {
-	p.cache.AddPodGroupPorts(dbItems)
-}
-
-func (p *PodGroupPort) updateCache(cloudItem *cloudmodel.PodGroupPort, diffBase *cache.PodGroupPort) {
-	diffBase.Update(cloudItem)
-}
-
-func (p *PodGroupPort) deleteCache(lcuuids []string) {
-	p.cache.DeletePodGroupPorts(lcuuids)
 }

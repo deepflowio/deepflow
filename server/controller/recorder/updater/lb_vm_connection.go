@@ -38,7 +38,6 @@ func NewLBVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.LBVMConne
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -77,16 +76,4 @@ func (c *LBVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.LBVMConnectio
 // 保留接口
 func (c *LBVMConnection) generateUpdateInfo(diffBase *cache.LBVMConnection, cloudItem *cloudmodel.LBVMConnection) (map[string]interface{}, bool) {
 	return nil, false
-}
-
-func (c *LBVMConnection) addCache(dbItems []*mysql.LBVMConnection) {
-	c.cache.AddLBVMConnections(dbItems)
-}
-
-// 保留接口
-func (c *LBVMConnection) updateCache(cloudItem *cloudmodel.LBVMConnection, diffBase *cache.LBVMConnection) {
-}
-
-func (c *LBVMConnection) deleteCache(lcuuids []string) {
-	c.cache.DeleteLBVMConnections(lcuuids)
 }

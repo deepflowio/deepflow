@@ -38,7 +38,6 @@ func NewPodIngressRule(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngres
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -71,16 +70,4 @@ func (r *PodIngressRule) generateDBItemToAdd(cloudItem *cloudmodel.PodIngressRul
 // 保留接口
 func (r *PodIngressRule) generateUpdateInfo(diffBase *cache.PodIngressRule, cloudItem *cloudmodel.PodIngressRule) (map[string]interface{}, bool) {
 	return nil, false
-}
-
-func (b *PodIngressRule) addCache(dbItems []*mysql.PodIngressRule) {
-	b.cache.AddPodIngressRules(dbItems)
-}
-
-// 保留接口
-func (b *PodIngressRule) updateCache(cloudItem *cloudmodel.PodIngressRule, diffBase *cache.PodIngressRule) {
-}
-
-func (b *PodIngressRule) deleteCache(lcuuids []string) {
-	b.cache.DeletePodIngressRules(lcuuids)
 }

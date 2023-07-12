@@ -38,7 +38,6 @@ func NewNATVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.NATVMCon
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -77,16 +76,4 @@ func (c *NATVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.NATVMConnect
 // 保留接口
 func (c *NATVMConnection) generateUpdateInfo(diffBase *cache.NATVMConnection, cloudItem *cloudmodel.NATVMConnection) (map[string]interface{}, bool) {
 	return nil, false
-}
-
-func (c *NATVMConnection) addCache(dbItems []*mysql.NATVMConnection) {
-	c.cache.AddNATVMConnections(dbItems)
-}
-
-// 保留接口
-func (c *NATVMConnection) updateCache(cloudItem *cloudmodel.NATVMConnection, diffBase *cache.NATVMConnection) {
-}
-
-func (c *NATVMConnection) deleteCache(lcuuids []string) {
-	c.cache.DeleteNATVMConnections(lcuuids)
 }

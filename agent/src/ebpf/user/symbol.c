@@ -481,24 +481,28 @@ void update_symbol_cache(pid_t pid)
 	if (!enable_symbol_cache())
 		return;
 
-	symbol_caches_hash_t *h = &syms_cache_hash;	
-	struct symbolizer_cache_kvp kv;
-	kv.k.pid = (u64) pid;
-	kv.v.proc_info_p = 0;
-	kv.v.cache = 0;
-	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *)&kv,
-				      (symbol_caches_hash_kv *)&kv) == 0) {
-		if (kv.v.cache != 0) {
-			free_symbolizer_cache_kvp(&kv);
-		}
+	/*
+	 * TODO(@jiping) Clean up using a synchronous approach.
+	 */
 
-		if (symbol_caches_hash_add_del(h, (symbol_caches_hash_kv *) &kv,
-					       0 /* delete */ )) {
-			ebpf_warning("symbol_caches_hash_add_del() failed.(pid %d)\n",
-				     pid);
-		} else
-			__sync_fetch_and_add(&h->hash_elems_count, -1);
-	}
+	//symbol_caches_hash_t *h = &syms_cache_hash;
+	//struct symbolizer_cache_kvp kv;
+	//kv.k.pid = (u64) pid;
+	//kv.v.proc_info_p = 0;
+	//kv.v.cache = 0;
+	//if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *)&kv,
+	//			      (symbol_caches_hash_kv *)&kv) == 0) {
+	//	if (kv.v.cache != 0) {
+	//		free_symbolizer_cache_kvp(&kv);
+	//	}
+
+	//	if (symbol_caches_hash_add_del(h, (symbol_caches_hash_kv *) &kv,
+	//				       0 /* delete */ )) {
+	//		ebpf_warning("symbol_caches_hash_add_del() failed.(pid %d)\n",
+	//			     pid);
+	//	} else
+	//		__sync_fetch_and_add(&h->hash_elems_count, -1);
+	//}
 }
 
 static int init_symbol_cache(const char *name)

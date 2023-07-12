@@ -30,25 +30,24 @@ type LANIP struct {
 }
 
 func NewLANIP(c *cache.Cache, eq *queue.OverwriteQueue) *LANIP {
-	lisener := &LANIP{
+	listener := &LANIP{
 		cache:         c,
 		eventProducer: event.NewLANIP(&c.ToolDataSet, eq),
 	}
-	return lisener
+	return listener
 }
 
-func (p *LANIP) OnUpdaterAdded(addedDBItems []*mysql.LANIP) {
-	// p.cache.AddLANIPs(addedDBItems)
-	p.eventProducer.ProduceByAdd(addedDBItems)
+func (i *LANIP) OnUpdaterAdded(addedDBItems []*mysql.LANIP) {
+	i.eventProducer.ProduceByAdd(addedDBItems)
+	i.cache.AddLANIPs(addedDBItems)
 }
 
-func (p *LANIP) OnUpdaterUpdated(cloudItem *cloudmodel.IP, diffBase *cache.LANIP) {
-	p.eventProducer.ProduceByUpdate(cloudItem, diffBase)
-	// diffBase.Update(cloudItem)
-	// p.cache.UpdateLANIP(cloudItem)
+func (i *LANIP) OnUpdaterUpdated(cloudItem *cloudmodel.IP, diffBase *cache.LANIP) {
+	i.eventProducer.ProduceByUpdate(cloudItem, diffBase)
+	diffBase.Update(cloudItem)
 }
 
-func (p *LANIP) OnUpdaterDeleted(lcuuids []string) {
-	p.eventProducer.ProduceByDelete(lcuuids)
-	// p.cache.DeleteLANIPs(lcuuids)
+func (i *LANIP) OnUpdaterDeleted(lcuuids []string) {
+	i.eventProducer.ProduceByDelete(lcuuids)
+	i.cache.DeleteLANIPs(lcuuids)
 }

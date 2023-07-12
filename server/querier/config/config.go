@@ -50,6 +50,7 @@ type QuerierConfig struct {
 	Limit                         string                `default:"10000" yaml:"limit"`
 	TimeFillLimit                 int                   `default:"20" yaml:"time-fill-limit"`
 	PrometheusCacheUpdateInterval int                   `default:"60" yaml:"prometheus-cache-update-interval"`
+	MaxTupleElement               int                   `default:"1000" yaml:"max-tuple-element"`
 }
 
 type DeepflowApp struct {

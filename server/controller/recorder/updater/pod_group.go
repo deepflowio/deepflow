@@ -38,7 +38,6 @@ func NewPodGroup(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroup) *PodG
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -104,16 +103,4 @@ func (p *PodGroup) generateUpdateInfo(diffBase *cache.PodGroup, cloudItem *cloud
 		return updateInfo, true
 	}
 	return nil, false
-}
-
-func (p *PodGroup) addCache(dbItems []*mysql.PodGroup) {
-	p.cache.AddPodGroups(dbItems)
-}
-
-func (p *PodGroup) updateCache(cloudItem *cloudmodel.PodGroup, diffBase *cache.PodGroup) {
-	diffBase.Update(cloudItem)
-}
-
-func (p *PodGroup) deleteCache(lcuuids []string) {
-	p.cache.DeletePodGroups(lcuuids)
 }

@@ -38,7 +38,6 @@ func NewNATRule(wholeCache *cache.Cache, cloudData []cloudmodel.NATRule) *NATRul
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -90,16 +89,4 @@ func (r *NATRule) generateDBItemToAdd(cloudItem *cloudmodel.NATRule) (*mysql.NAT
 // 保留接口
 func (r *NATRule) generateUpdateInfo(diffBase *cache.NATRule, cloudItem *cloudmodel.NATRule) (map[string]interface{}, bool) {
 	return nil, false
-}
-
-func (r *NATRule) addCache(dbItems []*mysql.NATRule) {
-	r.cache.AddNATRules(dbItems)
-}
-
-// 保留接口
-func (r *NATRule) updateCache(cloudItem *cloudmodel.NATRule, diffBase *cache.NATRule) {
-}
-
-func (r *NATRule) deleteCache(lcuuids []string) {
-	r.cache.DeleteNATRules(lcuuids)
 }

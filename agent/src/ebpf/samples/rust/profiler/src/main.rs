@@ -18,9 +18,9 @@ use chrono::prelude::DateTime;
 use chrono::FixedOffset;
 use chrono::Utc;
 use profiler::ebpf::*;
+use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, UNIX_EPOCH};
-use std::sync::Mutex;
 
 lazy_static::lazy_static! {
     static ref SUM: Mutex<u32> = Mutex::new(0);
@@ -73,22 +73,22 @@ fn increment_counter(num: u32, counter_type: u32) {
 
 extern "C" fn continuous_profiler_callback(cp: *mut stack_profile_data) {
     unsafe {
-          process_stack_trace_data_for_flame_graph(cp);
-          increment_counter((*cp).count, 1);
-          increment_counter(1, 0);
-          //let data = sk_data_str_safe(cp);
-          //println!("\n+ --------------------------------- +");
-          //println!("{} PID {} START-TIME {} U-STACKID {} K-STACKID {} COMM {} CPU {} COUNT {} LEN {} \n  - {}",
-          //         date_time((*cp).timestamp),
-          //         (*cp).pid,
-          //         (*cp).stime,
-          //         (*cp).u_stack_id,
-          //         (*cp).k_stack_id,
-          //         cp_process_name_safe(cp),
-          //         (*cp).cpu,
-          //         (*cp).count,
-          //         (*cp).stack_data_len, data);
-          //println!("+ --------------------------------- +");
+        process_stack_trace_data_for_flame_graph(cp);
+        increment_counter((*cp).count, 1);
+        increment_counter(1, 0);
+        //let data = sk_data_str_safe(cp);
+        //println!("\n+ --------------------------------- +");
+        //println!("{} PID {} START-TIME {} U-STACKID {} K-STACKID {} COMM {} CPU {} COUNT {} LEN {} \n  - {}",
+        //         date_time((*cp).timestamp),
+        //         (*cp).pid,
+        //         (*cp).stime,
+        //         (*cp).u_stack_id,
+        //         (*cp).k_stack_id,
+        //         cp_process_name_safe(cp),
+        //         (*cp).cpu,
+        //         (*cp).count,
+        //         (*cp).stack_data_len, data);
+        //println!("+ --------------------------------- +");
     }
 }
 
@@ -112,21 +112,26 @@ fn main() {
             ::std::process::exit(1);
         }
 
-        if start_continuous_profiler(
-            99,
-            continuous_profiler_callback,
-        ) != 0
-        {
+        if start_continuous_profiler(99, continuous_profiler_callback) != 0 {
             println!("start_continuous_profiler() error.");
             ::std::process::exit(1);
         }
 
-        
+        set_profiler_regex(
+            CString::new("^(java|nginx|profiler|telegraf|mysqld|.*deepflow.*)$".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
         bpf_tracer_finish();
 
         thread::sleep(Duration::from_secs(65));
         stop_continuous_profiler();
-        print!("====== capture count {}, sum {}\n", get_counter(0), get_counter(1));
+        print!(
+            "====== capture count {}, sum {}\n",
+            get_counter(0),
+            get_counter(1)
+        );
         release_flame_graph_hash();
     }
 

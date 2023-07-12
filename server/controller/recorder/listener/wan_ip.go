@@ -30,25 +30,24 @@ type WANIP struct {
 }
 
 func NewWANIP(c *cache.Cache, eq *queue.OverwriteQueue) *WANIP {
-	lisener := &WANIP{
+	listener := &WANIP{
 		cache:         c,
 		eventProducer: event.NewWANIP(&c.ToolDataSet, eq),
 	}
-	return lisener
+	return listener
 }
 
-func (p *WANIP) OnUpdaterAdded(addedDBItems []*mysql.WANIP) {
-	// p.cache.AddWANIPs(addedDBItems)
-	p.eventProducer.ProduceByAdd(addedDBItems)
+func (i *WANIP) OnUpdaterAdded(addedDBItems []*mysql.WANIP) {
+	i.eventProducer.ProduceByAdd(addedDBItems)
+	i.cache.AddWANIPs(addedDBItems)
 }
 
-func (p *WANIP) OnUpdaterUpdated(cloudItem *cloudmodel.IP, diffBase *cache.WANIP) {
-	p.eventProducer.ProduceByUpdate(cloudItem, diffBase)
-	// diffBase.Update(cloudItem)
-	// p.cache.UpdateWANIP(cloudItem)
+func (i *WANIP) OnUpdaterUpdated(cloudItem *cloudmodel.IP, diffBase *cache.WANIP) {
+	i.eventProducer.ProduceByUpdate(cloudItem, diffBase)
+	diffBase.Update(cloudItem)
 }
 
-func (p *WANIP) OnUpdaterDeleted(lcuuids []string) {
-	p.eventProducer.ProduceByDelete(lcuuids)
-	// p.cache.DeleteWANIPs(lcuuids)
+func (i *WANIP) OnUpdaterDeleted(lcuuids []string) {
+	i.eventProducer.ProduceByDelete(lcuuids)
+	i.cache.DeleteWANIPs(lcuuids)
 }

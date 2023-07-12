@@ -38,7 +38,6 @@ func NewLBTargetServer(wholeCache *cache.Cache, cloudData []cloudmodel.LBTargetS
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -114,16 +113,4 @@ func (s *LBTargetServer) generateUpdateInfo(diffBase *cache.LBTargetServer, clou
 		return updateInfo, true
 	}
 	return nil, false
-}
-
-func (s *LBTargetServer) addCache(dbItems []*mysql.LBTargetServer) {
-	s.cache.AddLBTargetServers(dbItems)
-}
-
-func (s *LBTargetServer) updateCache(cloudItem *cloudmodel.LBTargetServer, diffBase *cache.LBTargetServer) {
-	diffBase.Update(cloudItem)
-}
-
-func (s *LBTargetServer) deleteCache(lcuuids []string) {
-	s.cache.DeleteLBTargetServers(lcuuids)
 }

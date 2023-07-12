@@ -119,7 +119,7 @@ func TestParseMetric(t *testing.T) {
 			output: "container_memory_usage_bytes",
 			db:     "ext_metrics",
 			table:  "prometheus.container_memory_usage_bytes",
-			alias:  "metrics.%s",
+			alias:  "`metrics.%s`",
 			prefix: prefixTag,
 		},
 	}
@@ -294,7 +294,7 @@ func TestPromReaderTransToSQL(t *testing.T) {
 		{
 			hints:    promqlHints{stepMs: 0, aggOp: "", matcher: "ext_metrics__metrics__prometheus_demo_cpu_usage_seconds_total"},
 			input:    "ext_metrics__metrics__prometheus_demo_cpu_usage_seconds_total",
-			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,metrics.demo_cpu_usage_seconds_total,`tag` FROM prometheus.demo_cpu_usage_seconds_total WHERE (time >= %d AND time <= %d)  ORDER BY timestamp desc LIMIT %s", startS, endS, limit),
+			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,`metrics.demo_cpu_usage_seconds_total`,`tag` FROM prometheus.demo_cpu_usage_seconds_total WHERE (time >= %d AND time <= %d)  ORDER BY timestamp desc LIMIT %s", startS, endS, limit),
 			ds:       "",
 			db:       "ext_metrics",
 			hasError: false,

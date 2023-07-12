@@ -25,6 +25,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/monitor"
@@ -178,7 +179,7 @@ func UpdateAnalyzer(
 	var dbUpdateMap = make(map[string]interface{})
 
 	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&analyzer); ret.Error != nil {
-		return nil, NewError(common.RESOURCE_NOT_FOUND, fmt.Sprintf("analyzer (%s) not found", lcuuid))
+		return nil, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("analyzer (%s) not found", lcuuid))
 	}
 
 	log.Infof("update analyzer (%s) config %v", analyzer.Name, analyzerUpdate)
@@ -226,7 +227,7 @@ func UpdateAnalyzer(
 		var azControllerConns []mysql.AZControllerConnection
 		mysql.Db.Where("region = ?", analyzerUpdate["REGION"]).Find(&azControllerConns)
 		if len(azControllerConns) == 0 {
-			return nil, NewError(common.INVALID_POST_DATA, fmt.Sprintf("no controller in region(%s)", analyzerUpdate["REGION"]))
+			return nil, NewError(httpcommon.INVALID_POST_DATA, fmt.Sprintf("no controller in region(%s)", analyzerUpdate["REGION"]))
 		}
 	}
 	// 修改区域和可用区
@@ -234,7 +235,7 @@ func UpdateAnalyzer(
 		azs := analyzerUpdate["AZS"].([]interface{})
 		if len(azs) > cfg.Spec.AZMaxPerServer {
 			return nil, NewError(
-				common.INVALID_POST_DATA,
+				httpcommon.INVALID_POST_DATA,
 				fmt.Sprintf(
 					"max az num associated analyzer is (%d)", cfg.Spec.AZMaxPerServer,
 				),
@@ -422,14 +423,14 @@ func DeleteAnalyzer(lcuuid string, m *monitor.AnalyzerCheck) (resp map[string]st
 	var vtapCount int64
 
 	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&analyzer); ret.Error != nil {
-		return map[string]string{}, NewError(common.RESOURCE_NOT_FOUND, fmt.Sprintf("analyzer (%s) not found", lcuuid))
+		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("analyzer (%s) not found", lcuuid))
 	}
 
 	log.Infof("delete analyzer (%s)", analyzer.Name)
 
 	mysql.Db.Where("analyzer_ip = ?", analyzer.IP).Count(&vtapCount)
 	if vtapCount > 0 {
-		return map[string]string{}, NewError(common.INVALID_POST_DATA, fmt.Sprintf("analyzer (%s) is being used by vtap", lcuuid))
+		return map[string]string{}, NewError(httpcommon.INVALID_POST_DATA, fmt.Sprintf("analyzer (%s) is being used by vtap", lcuuid))
 	}
 
 	mysql.Db.Delete(mysql.AZAnalyzerConnection{}, "analyzer_ip = ?", analyzer.IP)

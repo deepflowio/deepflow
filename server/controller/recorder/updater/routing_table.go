@@ -38,7 +38,6 @@ func NewRoutingTable(wholeCache *cache.Cache, cloudData []cloudmodel.RoutingTabl
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -82,16 +81,4 @@ func (t *RoutingTable) generateUpdateInfo(diffBase *cache.RoutingTable, cloudIte
 		return updateInfo, true
 	}
 	return nil, false
-}
-
-func (t *RoutingTable) addCache(dbItems []*mysql.RoutingTable) {
-	t.cache.AddRoutingTables(dbItems)
-}
-
-func (t *RoutingTable) updateCache(cloudItem *cloudmodel.RoutingTable, diffBase *cache.RoutingTable) {
-	diffBase.Update(cloudItem)
-}
-
-func (t *RoutingTable) deleteCache(lcuuids []string) {
-	t.cache.DeleteRoutingTables(lcuuids)
 }

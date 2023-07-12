@@ -38,7 +38,6 @@ func NewCEN(wholeCache *cache.Cache, cloudData []cloudmodel.CEN) *CEN {
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -95,16 +94,4 @@ func (c *CEN) generateUpdateInfo(diffBase *cache.CEN, cloudItem *cloudmodel.CEN)
 		return updateInfo, true
 	}
 	return nil, false
-}
-
-func (c *CEN) addCache(dbItems []*mysql.CEN) {
-	c.cache.AddCENs(dbItems)
-}
-
-func (c *CEN) updateCache(cloudItem *cloudmodel.CEN, diffBase *cache.CEN) {
-	diffBase.Update(cloudItem)
-}
-
-func (c *CEN) deleteCache(lcuuids []string) {
-	c.cache.DeleteCENs(lcuuids)
 }

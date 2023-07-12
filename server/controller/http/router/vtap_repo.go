@@ -27,7 +27,13 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 )
 
-func VtapRepoRouter(e *gin.Engine) {
+type VtapRepo struct{}
+
+func NewVtapRepo() *VtapRepo {
+	return new(VtapRepo)
+}
+
+func (vr *VtapRepo) RegisterTo(e *gin.Engine) {
 	e.GET("/v1/vtap-repo/", getVtapRepo)
 	e.POST("/v1/vtap-repo/", createVtapRepo)
 	e.DELETE("/v1/vtap-repo/:name/", deleteVtapRepo)

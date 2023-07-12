@@ -38,7 +38,7 @@ func Register(r interface{}) {
 	register.r = append(register.r, (r).(Registration))
 }
 
-func RegistRouter(mux *gin.Engine) {
+func RegisterTo(mux *gin.Engine) {
 	for _, registered := range register.r {
 		registered.Register(mux)
 	}

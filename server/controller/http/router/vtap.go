@@ -31,12 +31,19 @@ import (
 	"github.com/gin-gonic/gin/binding"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
-func VtapRouter(e *gin.Engine) {
+type Vtap struct{}
+
+func NewVtap() *Vtap {
+	return new(Vtap)
+}
+
+func (v *Vtap) RegisterTo(e *gin.Engine) {
 	e.GET("/v1/vtaps/:lcuuid/", getVtap)
 	e.GET("/v1/vtaps/", getVtaps)
 	e.POST("/v1/vtaps/", createVtap)
@@ -90,7 +97,7 @@ func createVtap(c *gin.Context) {
 	// 参数校验
 	err = c.ShouldBindBodyWith(&vtapCreate, binding.JSON)
 	if err != nil {
-		BadRequestResponse(c, common.INVALID_PARAMETERS, err.Error())
+		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
 		return
 	}
 
@@ -105,7 +112,7 @@ func updateVtap(c *gin.Context) {
 	// 参数校验
 	err = c.ShouldBindBodyWith(&vtapUpdate, binding.JSON)
 	if err != nil {
-		BadRequestResponse(c, common.INVALID_PARAMETERS, err.Error())
+		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
 		return
 	}
 
@@ -127,7 +134,7 @@ func batchUpdateVtap(c *gin.Context) {
 	vtapUpdateList := make(map[string][]model.VtapUpdate)
 	err = c.ShouldBindBodyWith(&vtapUpdateList, binding.JSON)
 	if err != nil {
-		BadRequestResponse(c, common.INVALID_PARAMETERS, err.Error())
+		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
 		return
 	}
 
@@ -137,7 +144,7 @@ func batchUpdateVtap(c *gin.Context) {
 
 	// 参数校验
 	if _, ok := updateMap["DATA"]; !ok {
-		BadRequestResponse(c, common.INVALID_PARAMETERS, "No DATA in request body")
+		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "No DATA in request body")
 	}
 
 	data, err := service.BatchUpdateVtap(updateMap["DATA"])
@@ -151,7 +158,7 @@ func updateVtapLicenseType(c *gin.Context) {
 	// 参数校验
 	err = c.ShouldBindBodyWith(&vtapUpdate, binding.JSON)
 	if err != nil {
-		BadRequestResponse(c, common.INVALID_PARAMETERS, err.Error())
+		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
 		return
 	}
 
@@ -172,7 +179,7 @@ func batchUpdateVtapLicenseType(c *gin.Context) {
 	vtapUpdateList := make(map[string][]model.VtapUpdate)
 	err = c.ShouldBindBodyWith(&vtapUpdateList, binding.JSON)
 	if err != nil {
-		BadRequestResponse(c, common.INVALID_PARAMETERS, err.Error())
+		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
 		return
 	}
 
@@ -182,7 +189,7 @@ func batchUpdateVtapLicenseType(c *gin.Context) {
 
 	// 参数校验
 	if _, ok := updateMap["DATA"]; !ok {
-		BadRequestResponse(c, common.INVALID_PARAMETERS, "No DATA in request body")
+		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "No DATA in request body")
 	}
 
 	data, err := service.BatchUpdateVtapLicenseType(updateMap["DATA"])
@@ -206,7 +213,7 @@ func batchDeleteVtap(c *gin.Context) {
 
 	// 参数校验
 	if _, ok := deleteMap["DATA"]; !ok {
-		BadRequestResponse(c, common.INVALID_PARAMETERS, "No DATA in request body")
+		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "No DATA in request body")
 		return
 	}
 
@@ -224,13 +231,13 @@ func rebalanceVtap(c *gin.Context) {
 		args["type"] = value
 		if args["type"] != "controller" && args["type"] != "analyzer" {
 			BadRequestResponse(
-				c, common.INVALID_PARAMETERS,
+				c, httpcommon.INVALID_PARAMETERS,
 				fmt.Sprintf("type (%s) is not supported", args["type"]),
 			)
 			return
 		}
 	} else {
-		BadRequestResponse(c, common.INVALID_PARAMETERS, "must specify type")
+		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "must specify type")
 		return
 	}
 	data, err := service.VTapRebalance(args)
@@ -243,12 +250,12 @@ func batchUpdateVtapTapMode(c *gin.Context) {
 
 	err = c.ShouldBindBodyWith(&vtapUpdateTapMode, binding.JSON)
 	if err != nil {
-		BadRequestResponse(c, common.INVALID_PARAMETERS, err.Error())
+		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
 		return
 	}
 
 	if len(vtapUpdateTapMode.VTapLcuuids) == 0 {
-		BadRequestResponse(c, common.INVALID_PARAMETERS, "VTAP_LCUUIDS cannot be empty")
+		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "VTAP_LCUUIDS cannot be empty")
 		return
 	}
 	data, err := service.BatchUpdateVtapTapMode(&vtapUpdateTapMode)
@@ -258,18 +265,18 @@ func batchUpdateVtapTapMode(c *gin.Context) {
 func getVtapCSV(c *gin.Context) {
 	value, ok := c.GetPostForm("CSV_HEADERS")
 	if !ok {
-		BadRequestResponse(c, common.INVALID_PARAMETERS, "can not not get form data(CSV_HEADERS)")
+		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "can not not get form data(CSV_HEADERS)")
 		return
 	}
 	var headers []model.CSVHeader
 	if err := json.Unmarshal([]byte(value), &headers); err != nil {
-		BadRequestResponse(c, common.INVALID_PARAMETERS, "parse form data(CSV_HEADERS) failed")
+		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "parse form data(CSV_HEADERS) failed")
 		return
 	}
 
 	vtaps, err := service.GetVtaps(nil)
 	if err != nil {
-		BadRequestResponse(c, common.SERVER_ERROR, "get vtaps failed")
+		BadRequestResponse(c, httpcommon.SERVER_ERROR, "get vtaps failed")
 		return
 	}
 
@@ -345,7 +352,7 @@ func getVtapCSVData(headerMap map[string]int, vtap *model.Vtap) []string {
 func getVTapPorts(c *gin.Context) {
 	count, err := service.GetVTapPortsCount()
 	if err != nil {
-		BadRequestResponse(c, common.SERVER_ERROR, err.Error())
+		BadRequestResponse(c, httpcommon.SERVER_ERROR, err.Error())
 		return
 	}
 	resp := map[string]int{

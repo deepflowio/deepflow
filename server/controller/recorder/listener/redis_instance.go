@@ -30,24 +30,24 @@ type RedisInstance struct {
 }
 
 func NewRedisInstance(c *cache.Cache, eq *queue.OverwriteQueue) *RedisInstance {
-	lisener := &RedisInstance{
+	listener := &RedisInstance{
 		cache:         c,
 		eventProducer: event.NewRedisInstance(&c.ToolDataSet, eq),
 	}
-	return lisener
+	return listener
 }
 
-func (p *RedisInstance) OnUpdaterAdded(addedDBItems []*mysql.RedisInstance) {
-	// p.cache.AddRedisInstances(addedDBItems)
-	p.eventProducer.ProduceByAdd(addedDBItems)
+func (ri *RedisInstance) OnUpdaterAdded(addedDBItems []*mysql.RedisInstance) {
+	ri.eventProducer.ProduceByAdd(addedDBItems)
+	ri.cache.AddRedisInstances(addedDBItems)
 }
 
-func (p *RedisInstance) OnUpdaterUpdated(cloudItem *cloudmodel.RedisInstance, diffBase *cache.RedisInstance) {
-	// diffBase.Update(cloudItem)
-	// p.cache.UpdateRedisInstance(cloudItem)
+func (ri *RedisInstance) OnUpdaterUpdated(cloudItem *cloudmodel.RedisInstance, diffBase *cache.RedisInstance) {
+	diffBase.Update(cloudItem)
+	ri.cache.UpdateRedisInstance(cloudItem)
 }
 
-func (p *RedisInstance) OnUpdaterDeleted(lcuuids []string) {
-	p.eventProducer.ProduceByDelete(lcuuids)
-	// p.cache.DeleteRedisInstances(lcuuids)
+func (ri *RedisInstance) OnUpdaterDeleted(lcuuids []string) {
+	ri.eventProducer.ProduceByDelete(lcuuids)
+	ri.cache.DeleteRedisInstances(lcuuids)
 }

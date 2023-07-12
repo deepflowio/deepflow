@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,4 +14,14 @@
  * limitations under the License.
  */
 
-package service
+package listener
+
+import (
+	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
+)
+
+type Listener[CT constraint.CloudModel, MT constraint.MySQLModel, BT constraint.DiffBase[MT]] interface {
+	OnUpdaterAdded(addedDBItems []*MT)
+	OnUpdaterUpdated(cloudItem *CT, diffBaseItem BT)
+	OnUpdaterDeleted(lcuuids []string)
+}

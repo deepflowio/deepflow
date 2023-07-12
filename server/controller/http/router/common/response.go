@@ -21,7 +21,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/deepflowio/deepflow/server/controller/common"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	servicecommon "github.com/deepflowio/deepflow/server/controller/http/service/common"
 )
 
@@ -67,19 +67,19 @@ func JsonResponse(c *gin.Context, data interface{}, err error) {
 		switch t := err.(type) {
 		case *servicecommon.ServiceError:
 			switch t.Status {
-			case common.RESOURCE_NOT_FOUND, common.INVALID_POST_DATA, common.RESOURCE_NUM_EXCEEDED,
-				common.SELECTED_RESOURCES_NUM_EXCEEDED, common.RESOURCE_ALREADY_EXIST,
-				common.PARAMETER_ILLEGAL, common.INVALID_PARAMETERS:
+			case httpcommon.RESOURCE_NOT_FOUND, httpcommon.INVALID_POST_DATA, httpcommon.RESOURCE_NUM_EXCEEDED,
+				httpcommon.SELECTED_RESOURCES_NUM_EXCEEDED, httpcommon.RESOURCE_ALREADY_EXIST,
+				httpcommon.PARAMETER_ILLEGAL, httpcommon.INVALID_PARAMETERS:
 				BadRequestResponse(c, t.Status, t.Message)
-			case common.SERVER_ERROR, common.CONFIG_PENDING:
+			case httpcommon.SERVER_ERROR, httpcommon.CONFIG_PENDING:
 				InternalErrorResponse(c, data, t.Status, t.Message)
-			case common.SERVICE_UNAVAILABLE:
+			case httpcommon.SERVICE_UNAVAILABLE:
 				ServiceUnavailableResponse(c, data, t.Status, t.Message)
 			}
 		default:
-			InternalErrorResponse(c, data, common.FAIL, err.Error())
+			InternalErrorResponse(c, data, httpcommon.FAIL, err.Error())
 		}
 	} else {
-		HttpResponse(c, 200, data, common.SUCCESS, "")
+		HttpResponse(c, 200, data, httpcommon.SUCCESS, "")
 	}
 }

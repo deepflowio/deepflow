@@ -27,23 +27,31 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/manager"
 )
 
-func DebugRouter(e *gin.Engine, m *manager.Manager, g *genesis.Genesis) {
-	e.GET("/v1/tasks/", getCloudBasicInfos(m))
-	e.GET("/v1/tasks/:lcuuid/", getCloudBasicInfo(m))
-	e.GET("/v1/info/:lcuuid/", getCloudResource(m))
-	e.GET("/v1/genesis/:type/", getGenesisSyncData(g, true))
-	e.GET("/v1/sync/:type/", getGenesisSyncData(g, false))
-	e.GET("/v1/agent-stats/:ip/", getAgentStats(g))
-	e.GET("/v1/kubernetes-info/:clusterID/", getGenesisKubernetesData(g))
-	e.GET("/v1/prometheus-info/:clusterID/", getGenesisPrometheusData(g))
-	e.GET("/v1/sub-tasks/:lcuuid/", getKubernetesGatherBasicInfos(m))
-	e.GET("/v1/kubernetes-gather-infos/:lcuuid/", getKubernetesGatherResources(m))
-	e.GET("/v1/recorders/:domainLcuuid/:subDomainLcuuid/cache/", getRecorderCache(m))
-	e.GET("/v1/recorders/:domainLcuuid/:subDomainLcuuid/cache/diff-bases/", getRecorderCacheDiffBaseDataSet(m))
-	e.GET("/v1/recorders/:domainLcuuid/:subDomainLcuuid/cache/tool-maps/", getRecorderCacheToolDataSet(m))
-	e.GET("/v1/recorders/:domainLcuuid/:subDomainLcuuid/cache/diff-bases/:resourceType/", getRecorderDiffBaseDataSetByResourceType(m))
-	e.GET("/v1/recorders/:domainLcuuid/:subDomainLcuuid/cache/diff-bases/:resourceType/:resourceLcuuid/", getRecorderDiffBase(m))
-	e.GET("/v1/recorders/:domainLcuuid/:subDomainLcuuid/cache/tool-maps/:field/", getRecorderCacheToolMap(m))
+type Debug struct {
+	m *manager.Manager
+	g *genesis.Genesis
+}
+
+func NewDebug(m *manager.Manager, g *genesis.Genesis) *Debug {
+	return &Debug{m: m, g: g}
+}
+
+func (d *Debug) RegisterTo(e *gin.Engine) {
+	e.GET("/v1/tasks/", getCloudBasicInfos(d.m))
+	e.GET("/v1/tasks/:lcuuid/", getCloudBasicInfo(d.m))
+	e.GET("/v1/info/:lcuuid/", getCloudResource(d.m))
+	e.GET("/v1/genesis/:type/", getGenesisSyncData(d.g, true))
+	e.GET("/v1/sync/:type/", getGenesisSyncData(d.g, false))
+	e.GET("/v1/agent-stats/:ip/", getAgentStats(d.g))
+	e.GET("/v1/kubernetes-info/:clusterID/", getGenesisKubernetesData(d.g))
+	e.GET("/v1/sub-tasks/:lcuuid/", getKubernetesGatherBasicInfos(d.m))
+	e.GET("/v1/kubernetes-gather-infos/:lcuuid/", getKubernetesGatherResources(d.m))
+	e.GET("/v1/recorders/:domainLcuuid/:subDomainLcuuid/cache/", getRecorderCache(d.m))
+	e.GET("/v1/recorders/:domainLcuuid/:subDomainLcuuid/cache/diff-bases/", getRecorderCacheDiffBaseDataSet(d.m))
+	e.GET("/v1/recorders/:domainLcuuid/:subDomainLcuuid/cache/tool-maps/", getRecorderCacheToolDataSet(d.m))
+	e.GET("/v1/recorders/:domainLcuuid/:subDomainLcuuid/cache/diff-bases/:resourceType/", getRecorderDiffBaseDataSetByResourceType(d.m))
+	e.GET("/v1/recorders/:domainLcuuid/:subDomainLcuuid/cache/diff-bases/:resourceType/:resourceLcuuid/", getRecorderDiffBase(d.m))
+	e.GET("/v1/recorders/:domainLcuuid/:subDomainLcuuid/cache/tool-maps/:field/", getRecorderCacheToolMap(d.m))
 }
 
 func getCloudBasicInfo(m *manager.Manager) gin.HandlerFunc {

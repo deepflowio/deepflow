@@ -19,13 +19,10 @@ package controller
 import (
 	"context"
 	"flag"
-	"fmt"
-	"io"
 	"os"
 	"strconv"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"
 
@@ -37,9 +34,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/election"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	"github.com/deepflowio/deepflow/server/controller/grpc"
+	"github.com/deepflowio/deepflow/server/controller/http"
 	"github.com/deepflowio/deepflow/server/controller/http/router"
-	"github.com/deepflowio/deepflow/server/controller/http/router/configuration"
-	resourcerouter "github.com/deepflowio/deepflow/server/controller/http/router/resource"
 	"github.com/deepflowio/deepflow/server/controller/manager"
 	"github.com/deepflowio/deepflow/server/controller/monitor"
 	"github.com/deepflowio/deepflow/server/controller/prometheus"
@@ -48,8 +44,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/statsd"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
-	trouter "github.com/deepflowio/deepflow/server/controller/trisolaris/server/http"
-	"github.com/deepflowio/deepflow/server/libs/logger"
 
 	_ "github.com/deepflowio/deepflow/server/controller/grpc/controller"
 	_ "github.com/deepflowio/deepflow/server/controller/grpc/synchronizer"
@@ -74,21 +68,9 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 	log.Infof("controller config:\n%s", string(bytes))
 	setGlobalConfig(cfg)
 
-	ginLogFile, _ := os.OpenFile(serverLogFile, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
-	gin.DefaultWriter = io.MultiWriter(ginLogFile, os.Stdout)
+	httpServer := http.NewServer(serverLogFile, cfg)
+	httpServer.Start()
 
-	// register router
-	r := gin.New()
-	r.Use(gin.Recovery())
-	r.Use(gin.LoggerWithFormatter(logger.GinLogFormat))
-	router.HealthRouter(r)
-	go func() {
-		if err := r.Run(fmt.Sprintf(":%d", cfg.ListenPort)); err != nil {
-			log.Errorf("startup service failed, err:%v\n", err)
-			time.Sleep(time.Second)
-			os.Exit(0)
-		}
-	}()
 	defer router.SetInitStageForHealthChecker(router.OK)
 
 	router.SetInitStageForHealthChecker("Election init")
@@ -154,6 +136,7 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 	t := trisolaris.NewTrisolaris(&cfg.TrisolarisCfg, mysql.Db)
 	go t.Start()
 
+	router.SetInitStageForHealthChecker("Prometheus init")
 	prometheus := prometheus.GetSingleton()
 	prometheus.SynchronizerCache.Start(ctx, &cfg.PrometheusCfg)
 	prometheus.Encoder.Init(ctx, &cfg.PrometheusCfg)
@@ -171,32 +154,17 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 	go checkAndStartMasterFunctions(cfg, ctx, tr, controllerCheck, analyzerCheck)
 
 	router.SetInitStageForHealthChecker("Register routers init")
-	router.ElectionRouter(r)
-	router.DebugRouter(r, m, g)
-	router.ControllerRouter(r, controllerCheck, cfg)
-	router.AnalyzerRouter(r, analyzerCheck, cfg)
-	router.VtapRouter(r)
-	router.VtapGroupRouter(r, cfg)
-	router.DataSourceRouter(r, cfg)
-	router.VTapGroupConfigRouter(r)
-	router.VTapInterface(r, cfg)
-	trouter.RegistRouter(r)
-	configuration.ConfigurationRouter(r)
-	registerResourceRouters(r, cfg)
-	router.VtapRepoRouter(r)
-	router.PluginRouter(r)
+	httpServer.SetControllerChecker(controllerCheck)
+	httpServer.SetAnalyzerChecker(analyzerCheck)
+	httpServer.SetGenesis(g)
+	httpServer.SetManager(m)
+	httpServer.RegisterRouters()
 
 	grpcStart(ctx, cfg)
 
 	if !cfg.ReportingDisabled {
 		go report.NewReportServer(mysql.Db).StartReporting()
 	}
-}
-
-func registerResourceRouters(r *gin.Engine, cfg *config.ControllerConfig) {
-	resourcerouter.DomainRouter(r, cfg)
-	resourcerouter.VPCRouter(r)
-	resourcerouter.ProcessRouter(r, &cfg.RedisCfg)
 }
 
 func grpcStart(ctx context.Context, cfg *config.ControllerConfig) {
