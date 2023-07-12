@@ -36,7 +36,7 @@ impl RefCountable for WasmCounter {
                 CounterValue::Unsigned(self.mem_size.swap(0, std::sync::atomic::Ordering::Relaxed)),
             ),
             (
-                "exe_dur",
+                "execute_duration",
                 CounterType::Gauged,
                 CounterValue::Unsigned(
                     self.exe_duration

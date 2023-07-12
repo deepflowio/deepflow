@@ -14,6 +14,11 @@
  * limitations under the License.
  */
 
+use std::{
+    sync::atomic::Ordering,
+    time::{SystemTime, UNIX_EPOCH},
+};
+
 use log::error;
 use public::l7_protocol::{CustomProtocol, L7Protocol};
 use serde::Serialize;
@@ -29,7 +34,11 @@ use crate::{
         Error, Result,
     },
     plugin::{
-        c_ffi::{ParseCtx, ParseInfo, ACTION_CONTINUE, ACTION_ERROR, ACTION_OK},
+        c_ffi::{
+            ParseCtx, ParseInfo, ACTION_CONTINUE, ACTION_ERROR, ACTION_OK, CHECK_PAYLOAD_FUNC_SYM,
+            PARSE_PAYLOAD_FUNC_SYM,
+        },
+        shared_obj::get_so_plug_metric_counter_map_key,
         CustomInfo,
     },
 };
@@ -52,6 +61,17 @@ impl L7ProtocolParserInterface for SoLog {
         let ctx = &ParseCtx::from((param, payload));
 
         for c in c_funcs.as_ref() {
+            let counter = param.so_plugin_counter_map.as_ref().and_then(|h| {
+                h.so_mertic
+                    .get(&get_so_plug_metric_counter_map_key(
+                        &c.name,
+                        CHECK_PAYLOAD_FUNC_SYM,
+                    ))
+                    .clone()
+            });
+            let start_time = SystemTime::now();
+            let start_time = start_time.duration_since(UNIX_EPOCH).unwrap();
+
             /*
                 call the func from so, correctness depends on plugin implementation.
 
@@ -63,12 +83,24 @@ impl L7ProtocolParserInterface for SoLog {
             */
             let res = unsafe { (c.check_payload)(ctx as *const ParseCtx) };
 
+            counter.map(|c| {
+                c.exe_duration.swap(
+                    {
+                        let end_time = SystemTime::now();
+                        let end_time = end_time.duration_since(UNIX_EPOCH).unwrap();
+                        (end_time - start_time).as_micros() as u64
+                    },
+                    Ordering::Relaxed,
+                )
+            });
+
             if res.proto != 0 {
                 self.proto_num = res.proto.into();
                 match std::str::from_utf8(&res.proto_name) {
                     Ok(s) => self.proto_str = s.to_owned(),
                     Err(e) => {
                         error!("read proto str from so plugin fail: {}", e);
+                        counter.map(|c| c.fail_cnt.fetch_add(1, Ordering::Relaxed));
                         return false;
                     }
                 }
@@ -93,6 +125,17 @@ impl L7ProtocolParserInterface for SoLog {
         let perf_stats = self.perf_stats.as_mut().unwrap();
 
         for c in c_funcs.as_ref() {
+            let counter = param.so_plugin_counter_map.as_ref().and_then(|h| {
+                h.so_mertic
+                    .get(&get_so_plug_metric_counter_map_key(
+                        &c.name,
+                        PARSE_PAYLOAD_FUNC_SYM,
+                    ))
+                    .clone()
+            });
+            let start_time = SystemTime::now();
+            let start_time = start_time.duration_since(UNIX_EPOCH).unwrap();
+
             /*
                 call the func from so, correctness depends on plugin implementation
 
@@ -108,6 +151,18 @@ impl L7ProtocolParserInterface for SoLog {
                     RESULT_LEN,
                 )
             };
+
+            counter.map(|c| {
+                c.exe_duration.swap(
+                    {
+                        let end_time = SystemTime::now();
+                        let end_time = end_time.duration_since(UNIX_EPOCH).unwrap();
+                        (end_time - start_time).as_micros() as u64
+                    },
+                    Ordering::Relaxed,
+                )
+            });
+
             match res.action {
                 ACTION_OK => {
                     if res.len == 0 {
@@ -118,6 +173,7 @@ impl L7ProtocolParserInterface for SoLog {
                             "so plugin {} return large result length {}",
                             c.name, res.len
                         );
+                        counter.map(|c| c.fail_cnt.fetch_add(1, Ordering::Relaxed));
                         return Err(Error::SoReturnUnexpectVal);
                     }
                     let mut v = vec![];
@@ -146,6 +202,7 @@ impl L7ProtocolParserInterface for SoLog {
                                 v.push(L7ProtocolInfo::CustomInfo(info));
                             }
                             Err(e) => {
+                                counter.map(|c| c.fail_cnt.fetch_add(1, Ordering::Relaxed));
                                 error!("so plugin {} convert l7 info fail: {}", c.name, e);
                             }
                         }
@@ -153,10 +210,14 @@ impl L7ProtocolParserInterface for SoLog {
                     return Ok(v);
                 }
                 ACTION_CONTINUE => continue,
-                ACTION_ERROR => return Err(Error::SoParseFail),
+                ACTION_ERROR => {
+                    counter.map(|c| c.fail_cnt.fetch_add(1, Ordering::Relaxed));
+                    return Err(Error::SoParseFail);
+                }
 
                 _ => {
                     error!("so plugin {} return unknown action {}", c.name, res.action);
+                    counter.map(|c| c.fail_cnt.fetch_add(1, Ordering::Relaxed));
                     return Err(Error::SoReturnUnexpectVal);
                 }
             }

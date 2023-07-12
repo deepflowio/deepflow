@@ -39,8 +39,8 @@ use crate::flow_generator::protocol_logs::{
     ProtobufRpcWrapLog, RedisLog, SofaRpcLog,
 };
 use crate::flow_generator::{LogMessageType, Result};
-use crate::plugin::c_ffi::SoPluginFunc;
 use crate::plugin::wasm::WasmVm;
+use crate::plugin::{c_ffi::SoPluginFunc, shared_obj::SoPluginCounterMap};
 
 use public::enums::IpProtocol;
 use public::l7_protocol::{CustomProtocol, L7Protocol, L7ProtocolEnum, ProtobufRpcProtocol};
@@ -423,6 +423,7 @@ pub struct ParseParam<'a> {
     // plugins
     pub wasm_vm: Option<Rc<RefCell<WasmVm>>>,
     pub so_func: Option<Rc<Vec<SoPluginFunc>>>,
+    pub so_plugin_counter_map: Option<Rc<SoPluginCounterMap>>,
 
     pub stats_counter: Option<Arc<FlowMapCounter>>,
 
@@ -458,6 +459,7 @@ impl From<(&MetaPacket<'_>, Rc<RefCell<L7PerfCache>>, bool)> for ParseParam<'_> 
 
             wasm_vm: None,
             so_func: None,
+            so_plugin_counter_map: None,
 
             stats_counter: None,
 
@@ -528,8 +530,13 @@ impl ParseParam<'_> {
         self.so_func = Some(so_func);
     }
 
-    pub fn set_counter(&mut self, stat: Arc<FlowMapCounter>) {
+    pub fn set_counter(
+        &mut self,
+        stat: Arc<FlowMapCounter>,
+        so_counter: Option<Rc<SoPluginCounterMap>>,
+    ) {
         self.stats_counter = Some(stat);
+        self.so_plugin_counter_map = so_counter;
     }
 
     pub fn set_buf_size(&mut self, buf_size: usize) {
