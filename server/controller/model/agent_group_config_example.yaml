@@ -927,6 +927,22 @@ vtap_group_id: g-xxxxxx
   ##   Turning on this feature will result in higher CPU consumption of deepflow-agent.
   #external-agent-http-proxy-compressed: false
 
+  ## Prometheus Extra Labels
+  ## Note: Support for getting extra labels from headers in http requests from remoteWrite.
+  #prometheus-extra-config:
+    ## Note: Prometheus Extra Labels Switch
+    #enabled: true
+    ## Note: Labels list. Labels in this list are sent.
+    #labels:
+      #- label1
+      #- label2
+    ## Note: The size limit of the parsed key
+    ## Default: 1024. Unit: B.
+    #labels-limit: 1024
+    ## Note: The size limit of the parsed value
+    ## Default: 4096. Unit: B.
+    #values-limit: 4096
+
   ########################
   ## eBPF Configuration ##
   ########################
