@@ -190,12 +190,12 @@ func TestPromReaderTransToSQL(t *testing.T) {
 			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,`auto_instance_1`,Percentile(`rtt_max`, 0) as `metrics.rtt_max` FROM vtap_flow_edge_port WHERE (time >= %d AND time <= %d) GROUP BY timestamp,`auto_instance_1` ORDER BY timestamp desc LIMIT %s", startS, endS, limit),
 			ds:       "1s",
 			db:       "flow_metrics",
-			hasError: false,
+			hasError: true,
 		},
 		{
 			hints:    promqlHints{stepMs: 0, aggOp: "", matcher: "demo_cpu_usage_seconds_total"},
 			input:    "demo_cpu_usage_seconds_total",
-			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,metrics.demo_cpu_usage_seconds_total,tag FROM prometheus.demo_cpu_usage_seconds_total WHERE (time >= %d AND time <= %d) ORDER BY time desc LIMIT %s", startS, endS, limit),
+			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,`metrics.demo_cpu_usage_seconds_total`,tag FROM prometheus.demo_cpu_usage_seconds_total WHERE (time >= %d AND time <= %d) ORDER BY time desc LIMIT %s", startS, endS, limit),
 			ds:       "",
 			db:       "",
 			hasError: false,
@@ -203,7 +203,7 @@ func TestPromReaderTransToSQL(t *testing.T) {
 		{
 			hints:    promqlHints{stepMs: 0, aggOp: "", matcher: "demo_cpu_usage_seconds_total"},
 			input:    "ext_metrics__metrics__prometheus_demo_cpu_usage_seconds_total",
-			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,metrics.demo_cpu_usage_seconds_total,tag FROM prometheus.demo_cpu_usage_seconds_total WHERE (time >= %d AND time <= %d) ORDER BY time desc LIMIT %s", startS, endS, limit),
+			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,`metrics.demo_cpu_usage_seconds_total`,tag FROM prometheus.demo_cpu_usage_seconds_total WHERE (time >= %d AND time <= %d) ORDER BY time desc LIMIT %s", startS, endS, limit),
 			ds:       "",
 			db:       "",
 			hasError: false,
@@ -264,15 +264,12 @@ func TestPromReaderTransToSQL(t *testing.T) {
 
 			if !p.hasError {
 				So(err, ShouldBeNil)
+				So(sql, ShouldEqual, p.output)
+				So(db, ShouldEqual, p.db)
+				So(ds, ShouldEqual, p.ds)
 			} else {
 				So(err, ShouldNotBeNil)
 			}
-
-			So(sql, ShouldEqual, p.output)
-			So(db, ShouldEqual, p.db)
-			So(ds, ShouldEqual, p.ds)
-			log.Info(sql)
-
 		}
 	})
 

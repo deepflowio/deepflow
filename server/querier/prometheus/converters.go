@@ -39,6 +39,7 @@ const (
 	PROMETHEUS_METRICS_NAME     = "__name__"
 	EXT_METRICS_NATIVE_TAG_NAME = "tag"
 	EXT_METRICS_TIME_COLUMNS    = "timestamp"
+	ENUM_TAG_SUFFIX             = "_enum"
 
 	TAP_SIDE_TAG_NAME      = "tap_side"
 	AUTO_INSTANCE_TAG_NAME = "auto_instance"
@@ -135,6 +136,8 @@ func PromReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (contxt 
 	metricsName := ""
 	table := ""
 	var groupLabels []string
+	// use map for duplicate tags removal
+	var expectedDeepFlowNativeTags map[string]string
 
 	// get metrics_name and all filter columns from query statement
 	isShowTagStatement := false
@@ -194,9 +197,15 @@ func PromReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (contxt 
 
 						// should append all labels in query & grouping clause
 						for _, g := range q.Hints.Grouping {
-							label := fmt.Sprintf("`%s`", convertToQuerierAllowedTagName(g))
-							groupLabels = append(groupLabels, label)
-							metrics = append(metrics, label)
+							tagName, tagAlias, _ := parsePromQLTag(prefixNone, db, g)
+
+							if tagAlias == "" {
+								groupLabels = append(groupLabels, tagName)
+								metrics = append(metrics, tagName)
+							} else {
+								groupLabels = append(groupLabels, tagAlias)
+								metrics = append(metrics, fmt.Sprintf("%s as %s", tagName, tagAlias))
+							}
 						}
 
 						// aggeration for metrics, assert aggOperator is not empty
@@ -221,7 +230,7 @@ func PromReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (contxt 
 					}
 
 					if db == DB_NAME_DEEPFLOW_SYSTEM {
-						metrics = append(metrics, fmt.Sprintf("metrics.%s", metricsName))
+						metrics = append(metrics, fmt.Sprintf("`metrics.%s`", metricsName))
 					} else if db == DB_NAME_EXT_METRICS {
 						// identify tag prefix as "tag_"
 						ctx = context.WithValue(ctx, ctxKeyPrefixType{}, prefixTag)
@@ -232,7 +241,19 @@ func PromReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (contxt 
 							table = fmt.Sprintf("%s.%s", realMetrics[0], realMetrics[1])
 							metricsName = realMetrics[1]
 						}
-						metrics = append(metrics, fmt.Sprintf("metrics.%s", metricsName))
+						metrics = append(metrics, fmt.Sprintf("`metrics.%s`", metricsName))
+
+						if len(q.Hints.Grouping) > 0 {
+							expectedDeepFlowNativeTags = make(map[string]string, len(q.Hints.Grouping)+len(q.Matchers))
+							for _, q := range q.Hints.Grouping {
+								tagName, tagAlias, isDeepFlowTag := parsePromQLTag(prefixTag, db, q)
+								if isDeepFlowTag {
+									expectedDeepFlowNativeTags[tagName] = tagAlias
+								}
+							}
+						} else {
+							expectedDeepFlowNativeTags = make(map[string]string, len(q.Matchers))
+						}
 					} else {
 						// To identify which columns belong to metrics, we prefix all metrics names with `metrics.`
 						metrics = append(metrics, fmt.Sprintf("%s as `metrics.%s`", aggMetrics, metricsName))
@@ -248,7 +269,19 @@ func PromReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (contxt 
 				// Prometheus native metrics: ${metricsName}
 				// identify prefix for tag names with "df_"
 				ctx = context.WithValue(ctx, ctxKeyPrefixType{}, prefixDeepFlow)
-				metrics = append(metrics, fmt.Sprintf("metrics.%s", metricsName))
+				metrics = append(metrics, fmt.Sprintf("`metrics.%s`", metricsName))
+
+				if len(q.Hints.Grouping) > 0 {
+					expectedDeepFlowNativeTags = make(map[string]string, len(q.Hints.Grouping)+len(q.Matchers))
+					for _, q := range q.Hints.Grouping {
+						tagName, tagAlias, isDeepFlowTag := parsePromQLTag(prefixDeepFlow, db, q)
+						if isDeepFlowTag {
+							expectedDeepFlowNativeTags[tagName] = tagAlias
+						}
+					}
+				} else {
+					expectedDeepFlowNativeTags = make(map[string]string, len(q.Matchers))
+				}
 			}
 			break
 		}
@@ -290,10 +323,22 @@ func PromReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (contxt 
 			// `edgeTable` storage data which contains both client and server-side, so metrics should cover both, else only one of them
 			// e.g.: auto_instance_0/auto_instance_1 in `vtap_app_edge_port`, auto_instance in `vtap_app_port`
 			if common.IsValueInSliceString(table, edgeTableNames) && tagName != clientTagName {
-				metrics = append(metrics, fmt.Sprintf("`%s`", clientTagName))
-				metrics = append(metrics, fmt.Sprintf("`%s`", serverTagName))
+				// tagType=int_enum/string_enum
+				if strings.Contains(tagType, ENUM_TAG_SUFFIX) {
+					clientTagName = fmt.Sprintf("Enum(`%s`) as `%s%s`", clientTagName, clientTagName, ENUM_TAG_SUFFIX)
+					serverTagName = fmt.Sprintf("Enum(`%s`) as `%s%s`", serverTagName, serverTagName, ENUM_TAG_SUFFIX)
+					metrics = append(metrics, clientTagName, serverTagName)
+				} else {
+					metrics = append(metrics, fmt.Sprintf("`%s`", clientTagName))
+					metrics = append(metrics, fmt.Sprintf("`%s`", serverTagName))
+				}
 			} else {
-				metrics = append(metrics, fmt.Sprintf("`%s`", tagName))
+				if strings.Contains(tagType, ENUM_TAG_SUFFIX) {
+					tagName = fmt.Sprintf("Enum(`%s`) as `%s%s`", tagName, tagName, ENUM_TAG_SUFFIX)
+					metrics = append(metrics, tagName)
+				} else {
+					metrics = append(metrics, fmt.Sprintf("`%s`", tagName))
+				}
 			}
 		}
 	} else if db == "" || db == chCommon.DB_NAME_EXT_METRICS || db == chCommon.DB_NAME_DEEPFLOW_SYSTEM {
@@ -318,22 +363,47 @@ func PromReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (contxt 
 		switch db {
 		case "", chCommon.DB_NAME_DEEPFLOW_SYSTEM:
 			if strings.HasPrefix(matcher.Name, config.Cfg.Prometheus.AutoTaggingPrefix) {
-				tagName := convertToQuerierAllowedTagName(removeDeepFlowPrefix(matcher.Name))
-				filters = append(filters, fmt.Sprintf("`%s` %s '%s'", tagName, operation, matcher.Value))
+				// deepflow universal tag for prometheus native metrics
+				tagName, tagAlias, _ := parsePromQLTag(prefixDeepFlow, db, matcher.Name)
+				if tagAlias != "" {
+					filters = append(filters, fmt.Sprintf("%s %s '%s'", tagAlias, operation, matcher.Value))
+				} else {
+					filters = append(filters, fmt.Sprintf("%s %s '%s'", tagName, operation, matcher.Value))
+				}
 				// when PromQL mention a deepflow universal tag, append into metrics
-				metrics = append(metrics, tagName)
+				expectedDeepFlowNativeTags[tagName] = tagAlias
 			} else {
+				// deepflow_system tag or prometheus native tags
 				filters = append(filters, fmt.Sprintf("`tag.%s` %s '%s'", matcher.Name, operation, matcher.Value))
 			}
-		default:
-			// deepflow metrics (vtap_app/flow_part/edge_part & ext_metrics)
+		case chCommon.DB_NAME_EXT_METRICS:
 			if strings.HasPrefix(matcher.Name, "tag_") {
+				// prometheus native tag for deepflow metrics
 				filters = append(filters, fmt.Sprintf("`tag.%s` %s '%s'", removeTagPrefix(matcher.Name), operation, matcher.Value))
 			} else {
-				// convert k8s label tag to query tag
-				tagName := convertToQuerierAllowedTagName(matcher.Name)
-				filters = append(filters, fmt.Sprintf("`%s` %s '%s'", tagName, operation, matcher.Value))
+				// deepflow universal tag for prometheus native metrics
+				tagName, tagAlias, _ := parsePromQLTag(prefixTag, db, matcher.Name)
+				if tagAlias != "" {
+					filters = append(filters, fmt.Sprintf("%s %s '%s'", tagAlias, operation, matcher.Value))
+				} else {
+					filters = append(filters, fmt.Sprintf("%s %s '%s'", tagName, operation, matcher.Value))
+				}
+				// when PromQL mention a deepflow universal tag, append into metrics
+				expectedDeepFlowNativeTags[tagName] = tagAlias
 			}
+		default:
+			// deepflow metrics (flow_metrics/flow_log)
+			tagName, _, _ := parsePromQLTag(prefixNone, db, matcher.Name)
+			filters = append(filters, fmt.Sprintf("%s %s '%s'", tagName, operation, matcher.Value))
+		}
+	}
+
+	// append deepflow native tags for prometheus metrics query
+	for tagName, tagAlias := range expectedDeepFlowNativeTags {
+		if tagAlias == "" {
+			metrics = append(metrics, tagName)
+		} else {
+			metrics = append(metrics, fmt.Sprintf("%s as %s", tagName, tagAlias))
 		}
 	}
 
@@ -474,12 +544,12 @@ func RespTransToProm(ctx context.Context, result *common.Result) (resp *prompb.R
 				if tagIndex > -1 && prefix == prefixDeepFlow {
 					// deepflow tag for prometheus metrics
 					pairs = append(pairs, prompb.Label{
-						Name:  appendDeepFlowPrefix(formatTagName(result.Columns[idx].(string))),
+						Name:  appendDeepFlowPrefix(extractEnumTag(formatTagName(result.Columns[idx].(string)))),
 						Value: getValue(values[idx]),
 					})
 				} else {
 					pairs = append(pairs, prompb.Label{
-						Name:  formatTagName(result.Columns[idx].(string)),
+						Name:  extractEnumTag(formatTagName(result.Columns[idx].(string))),
 						Value: getValue(values[idx]),
 					})
 				}
@@ -585,6 +655,73 @@ func isZero(value interface{}) bool {
 	default:
 		return false
 	}
+}
+
+func parseDeepFlowTag(prefixType prefix, tag string) (tagName string, tagAlias string) {
+	if enumAlias, ok := formatEnumTag(tag); ok {
+		return enumAlias, fmt.Sprintf("`%s%s`", tag, ENUM_TAG_SUFFIX)
+	} else {
+		tagName = fmt.Sprintf("`%s`", tag)
+	}
+	return tagName, tagAlias
+}
+
+func parsePrometheusTag(tag string) string {
+	return fmt.Sprintf("`tag.%s`", tag)
+}
+
+func parsePromQLTag(prefixType prefix, db, tag string) (tagName string, tagAlias string, isDeepFlowTag bool) {
+	switch prefixType {
+	case prefixTag:
+		// query ext_metrics/prometheus
+		if strings.HasPrefix(tag, "tag_") {
+			tagName = parsePrometheusTag(removeTagPrefix(tag))
+			isDeepFlowTag = false
+		} else {
+			tagName, tagAlias = parseDeepFlowTag(prefixType, convertToQuerierAllowedTagName(tag))
+			isDeepFlowTag = true
+		}
+	case prefixDeepFlow:
+		// query prometheus native metrics
+		if strings.HasPrefix(tag, config.Cfg.Prometheus.AutoTaggingPrefix) {
+			tagName, tagAlias = parseDeepFlowTag(prefixType, convertToQuerierAllowedTagName(removeDeepFlowPrefix(tag)))
+			isDeepFlowTag = true
+		} else {
+			tagName = parsePrometheusTag(removeTagPrefix(tag))
+			isDeepFlowTag = false
+		}
+	default:
+		// query deepflow native metrics (deepflow_system/flow_metrics/flow_log)
+		if db == chCommon.DB_NAME_DEEPFLOW_SYSTEM {
+			tagName = parsePrometheusTag(tag)
+		} else {
+			tagName, tagAlias = parseDeepFlowTag(prefixType, convertToQuerierAllowedTagName(tag))
+		}
+		isDeepFlowTag = true
+	}
+	// `tagAlias` return only when tag is `enum tag`
+	return
+}
+
+func extractEnumTag(tag string) string {
+	if strings.HasSuffix(tag, ENUM_TAG_SUFFIX) {
+		return strings.ReplaceAll(tag, ENUM_TAG_SUFFIX, "")
+	}
+	return tag
+}
+
+func formatEnumTag(tagName string) (string, bool) {
+	// parse when query client/server side enum tag
+	enumFile := strings.TrimSuffix(tagName, "_0")
+	enumFile = strings.TrimSuffix(enumFile, "_1")
+	if !common.IsValueInSliceString(tagName, tagdescription.NoLanguageTag) {
+		enumFile = fmt.Sprintf("%s.%s", enumFile, config.Cfg.Language)
+	}
+	_, exists := tagdescription.TAG_ENUMS[enumFile]
+	if exists {
+		return fmt.Sprintf("Enum(%s)", tagName), exists
+	}
+	return tagName, exists
 }
 
 func formatTagName(tagName string) (newTagName string) {
