@@ -35,7 +35,7 @@ import (
 func promReaderExecute(ctx context.Context, req *prompb.ReadRequest, debug bool) (resp *prompb.ReadResponse, sql string, duration float64, err error) {
 	// promrequest trans to sql
 	// pp.Println(req)
-	ctx, sql, db, datasource, err := promReaderTransToSQL(ctx, req)
+	ctx, sql, db, datasource, metricName, err := promReaderTransToSQL(ctx, req)
 	// fmt.Println(sql, db)
 	if err != nil {
 		return nil, "", 0, err
@@ -45,8 +45,10 @@ func promReaderExecute(ctx context.Context, req *prompb.ReadRequest, debug bool)
 	}
 	query_uuid := uuid.New()
 	// mark query comes from promql
-	//lint:ignore SA1029 use string as context key, ensure no `type` reference to app/prometheus
-	ctx = context.WithValue(ctx, "remote_read", true)
+	if db == "prometheus" {
+		//lint:ignore SA1029 use string as context key, ensure no `type` reference to app/prometheus
+		ctx = context.WithValue(ctx, "remote_read", true)
+	}
 	// if `api` pass `debug` or config debug, get debug info from querier
 	debugQuerier := debug || config.Cfg.Prometheus.RequestQueryWithDebug
 	args := common.QuerierParams{
@@ -108,7 +110,7 @@ func promReaderExecute(ctx context.Context, req *prompb.ReadRequest, debug bool)
 	}
 
 	// response trans to prom resp
-	resp, err = respTransToProm(ctx, result)
+	resp, err = respTransToProm(ctx, metricName, result)
 	if err != nil {
 		log.Error(err)
 		return nil, "", 0, err
