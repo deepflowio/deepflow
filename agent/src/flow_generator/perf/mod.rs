@@ -274,6 +274,14 @@ impl FlowLog {
         }
 
         if let Some(payload) = packet.get_l4_payload() {
+            let pkt_size = flow_config.l7_log_packet_size as usize;
+
+            let cut_payload = if pkt_size > payload.len() {
+                payload
+            } else {
+                &payload[..pkt_size]
+            };
+
             let mut param = ParseParam::from((
                 &*packet,
                 self.perf_cache.clone(),
@@ -296,7 +304,7 @@ impl FlowLog {
                 let Some(mut parser) = get_parser(L7ProtocolEnum::L7Protocol(*protocol)) else {
                     continue;
                 };
-                if parser.check_payload(payload, &param) {
+                if parser.check_payload(cut_payload, &param) {
                     self.l7_protocol_enum = parser.l7_protocol_enum();
 
                     // redis can not determine dirction by RESP protocol when pakcet is from ebpf, special treatment
