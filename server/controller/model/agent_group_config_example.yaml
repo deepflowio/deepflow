@@ -730,6 +730,16 @@ vtap_group_id: g-xxxxxx
     ##   FlowNode, FlowLog, etc.
     #memory-pool-size: 65536
 
+  ## Max size of batched buffer
+  ## Default: 131072. Range: [1024, +oo)
+  ## Note: Only TaggedFlow allocation is affected at the moment.
+  ##   Structs will be allocated in batch to minimalize malloc calls.
+  ##   Total memory size of a batch will not exceed this limit.
+  ##   A number larger than 128K is not recommended because the default
+  ##   MMAP_THRESHOLD is 128K, allocating chunks larger than 128K will
+  ##   result in calling mmap and more page faults.
+  #batched-buffer-size-limit: 131072
+
   #####################
   ## DPDK RecvEngine ##
   #####################

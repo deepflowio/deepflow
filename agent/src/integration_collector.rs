@@ -34,7 +34,10 @@ use hyper::{
 };
 use log::{debug, error, info, log_enabled, warn, Level};
 use prost::Message;
-use public::sender::{SendMessageType, Sendable};
+use public::{
+    buffer::{Allocator, BatchedBox},
+    sender::{SendMessageType, Sendable},
+};
 use tokio::{
     runtime::Runtime,
     select,
@@ -245,8 +248,8 @@ fn decode_otel_trace_data(
     policy_getter: Arc<PolicyGetter>,
     time_diff: i64,
     is_collect: bool,
-) -> Result<(Vec<u8>, Vec<Box<TaggedFlow>>), GenericError> {
-    let mut tagged_flow: Vec<Box<TaggedFlow>> = vec![];
+) -> Result<(Vec<u8>, Vec<BatchedBox<TaggedFlow>>), GenericError> {
+    let mut tagged_flow: Vec<BatchedBox<TaggedFlow>> = vec![];
     let mut d = TracesData::decode(data.as_slice())?;
     // 因为collector传过来traceData的全部resource都有"app.host.ip"的属性，所以只检查第一个resource有没有“app.host.ip”即可，
     // sdk传过来的traceData因没有该属性则要补上(key: “app.host.ip”, value: 对端IP)属性值
@@ -264,6 +267,7 @@ fn decode_otel_trace_data(
         }),
     };
 
+    let mut allocator = Allocator::new(16);
     for resource_span in d.resource_spans.iter_mut() {
         let mut otel_service = None;
         let mut otel_instance = None;
@@ -319,7 +323,7 @@ fn decode_otel_trace_data(
                         time_diff,
                     ) {
                         Some(f) => {
-                            tagged_flow.push(Box::new(f));
+                            tagged_flow.push(allocator.allocate_one_with(f));
                         }
                         None => continue,
                     }
@@ -555,7 +559,7 @@ async fn handler(
     req: Request<Body>,
     otel_sender: DebugSender<OpenTelemetry>,
     compressed_otel_sender: DebugSender<OpenTelemetryCompressed>,
-    otel_metrics_collect_sender: Option<DebugSender<Box<TaggedFlow>>>,
+    otel_metrics_collect_sender: Option<DebugSender<BatchedBox<TaggedFlow>>>,
     prometheus_sender: DebugSender<BoxedPrometheusExtra>,
     telegraf_sender: DebugSender<TelegrafMetric>,
     profile_sender: DebugSender<Profile>,
@@ -827,7 +831,7 @@ pub struct MetricServer {
     thread: Arc<Mutex<Option<JoinHandle<()>>>>,
     otel_sender: DebugSender<OpenTelemetry>,
     compressed_otel_sender: DebugSender<OpenTelemetryCompressed>,
-    otel_metrics_collect_sender: Option<DebugSender<Box<TaggedFlow>>>,
+    otel_metrics_collect_sender: Option<DebugSender<BatchedBox<TaggedFlow>>>,
     prometheus_sender: DebugSender<BoxedPrometheusExtra>,
     telegraf_sender: DebugSender<TelegrafMetric>,
     profile_sender: DebugSender<Profile>,
@@ -847,7 +851,7 @@ impl MetricServer {
         runtime: Arc<Runtime>,
         otel_sender: DebugSender<OpenTelemetry>,
         compressed_otel_sender: DebugSender<OpenTelemetryCompressed>,
-        otel_metrics_collect_sender: Option<DebugSender<Box<TaggedFlow>>>,
+        otel_metrics_collect_sender: Option<DebugSender<BatchedBox<TaggedFlow>>>,
         prometheus_sender: DebugSender<BoxedPrometheusExtra>,
         telegraf_sender: DebugSender<TelegrafMetric>,
         profile_sender: DebugSender<Profile>,

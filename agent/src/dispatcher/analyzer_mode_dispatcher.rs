@@ -48,7 +48,7 @@ use crate::{
     },
 };
 use public::{
-    buffer::{Allocator, FixedBuffer},
+    buffer::{Allocator, BatchedBuffer},
     debug::QueueDebugger,
     proto::trident::IfMacSource,
     queue::{self, bounded_with_debug, DebugSender, Receiver},
@@ -131,7 +131,7 @@ pub(super) struct AnalyzerPipeline {
 #[derive(Debug)]
 struct Packet {
     timestamp: Duration,
-    raw: FixedBuffer<u8>,
+    raw: BatchedBuffer<u8>,
     original_length: u32,
     raw_length: u32,
 }
@@ -547,15 +547,7 @@ impl AnalyzerModeDispatcher {
                 .rx_bytes
                 .fetch_add(packet.capture_length as u64, Ordering::Relaxed);
 
-            let mut buffer = match allocator.allocate(packet.data.len()) {
-                Some(buffer) => buffer,
-                None => {
-                    allocator = Allocator::new(self.raw_packet_block_size);
-                    // packet len is less than raw_packet_block_size (not less than 65536)
-                    allocator.allocate(packet.data.len()).unwrap()
-                }
-            };
-            buffer.as_mut().copy_from_slice(&packet.data);
+            let buffer = allocator.allocate_with(&packet.data);
             let info = Packet {
                 timestamp,
                 raw: buffer,

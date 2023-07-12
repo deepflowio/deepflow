@@ -38,8 +38,9 @@ use crate::flow_generator::{flow_map::Config, FlowMap, MetaAppProto};
 use crate::platform::PlatformSynchronizer;
 use crate::policy::PolicyGetter;
 use crate::utils::stats;
-use public::counter::{Counter, CounterType, CounterValue, OwnedCountable};
 use public::{
+    buffer::BatchedBox,
+    counter::{Counter, CounterType, CounterValue, OwnedCountable},
     debug::QueueDebugger,
     queue::{bounded_with_debug, DebugSender, Receiver},
     utils::bitmap::parse_u16_range_list_to_bitmap,
@@ -190,7 +191,7 @@ struct EbpfDispatcher {
 
     config: EbpfAccess,
     output: DebugSender<Box<MetaAppProto>>, // Send MetaAppProtos to the AppProtoLogsParser
-    flow_output: DebugSender<Box<TaggedFlow>>, // Send TaggedFlows to the QuadrupleGenerator
+    flow_output: DebugSender<BatchedBox<TaggedFlow>>, // Send TaggedFlows to the QuadrupleGenerator
     stats_collector: Arc<stats::Collector>,
 }
 
@@ -517,7 +518,7 @@ impl EbpfCollector {
         flow_map_config: FlowAccess,
         policy_getter: PolicyGetter,
         output: DebugSender<Box<MetaAppProto>>,
-        flow_output: DebugSender<Box<TaggedFlow>>,
+        flow_output: DebugSender<BatchedBox<TaggedFlow>>,
         proc_event_output: DebugSender<BoxedProcEvents>,
         queue_debugger: &QueueDebugger,
         stats_collector: Arc<stats::Collector>,

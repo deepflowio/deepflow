@@ -359,6 +359,8 @@ pub struct FlowConfig {
 
     pub rrt_tcp_timeout: usize, //micro sec
     pub rrt_udp_timeout: usize, //micro sec
+
+    pub batched_buffer_size_limit: usize,
 }
 
 impl From<&RuntimeConfig> for FlowConfig {
@@ -414,6 +416,7 @@ impl From<&RuntimeConfig> for FlowConfig {
             so_plugins: vec![],
             rrt_tcp_timeout: conf.yaml_config.rrt_tcp_timeout.as_micros() as usize,
             rrt_udp_timeout: conf.yaml_config.rrt_udp_timeout.as_micros() as usize,
+            batched_buffer_size_limit: conf.yaml_config.batched_buffer_size_limit,
         }
     }
 }

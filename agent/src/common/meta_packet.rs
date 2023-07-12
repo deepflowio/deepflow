@@ -54,14 +54,14 @@ use crate::{
 use npb_handler::NpbMode;
 use npb_pcap_policy::PolicyData;
 use public::{
-    buffer::FixedBuffer,
+    buffer::BatchedBuffer,
     utils::net::{is_unicast_link_local, MacAddr},
 };
 
 #[derive(Clone, Debug)]
 pub enum RawPacket<'a> {
     Borrowed(&'a [u8]),
-    Owned(FixedBuffer<u8>),
+    Owned(BatchedBuffer<u8>),
 }
 
 impl<'a> RawPacket<'a> {
@@ -90,8 +90,8 @@ impl<'a> From<&'a [u8]> for RawPacket<'a> {
     }
 }
 
-impl<'a> From<FixedBuffer<u8>> for RawPacket<'a> {
-    fn from(b: FixedBuffer<u8>) -> Self {
+impl<'a> From<BatchedBuffer<u8>> for RawPacket<'a> {
+    fn from(b: BatchedBuffer<u8>) -> Self {
         Self::Owned(b)
     }
 }

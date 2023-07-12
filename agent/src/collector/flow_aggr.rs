@@ -39,7 +39,10 @@ use crate::common::{
 use crate::config::handler::CollectorAccess;
 use crate::rpc::get_timestamp;
 use crate::utils::stats::{Counter, CounterType, CounterValue, RefCountable};
-use public::queue::{DebugSender, Error, Receiver};
+use public::{
+    buffer::BatchedBox,
+    queue::{DebugSender, Error, Receiver},
+};
 
 const MINUTE_SLOTS: usize = 2;
 const FLUSH_TIMEOUT: Duration = Duration::from_secs(2 * SECONDS_IN_MINUTE);
@@ -58,7 +61,7 @@ pub struct FlowAggrCounter {
 
 pub struct FlowAggrThread {
     id: usize,
-    input: Arc<Receiver<Arc<TaggedFlow>>>,
+    input: Arc<Receiver<Arc<BatchedBox<TaggedFlow>>>>,
     output: DebugSender<BoxedTaggedFlow>,
     config: CollectorAccess,
 
@@ -73,7 +76,7 @@ pub struct FlowAggrThread {
 impl FlowAggrThread {
     pub fn new(
         id: usize,
-        input: Receiver<Arc<TaggedFlow>>,
+        input: Receiver<Arc<BatchedBox<TaggedFlow>>>,
         output: DebugSender<BoxedTaggedFlow>,
         config: CollectorAccess,
         ntp_diff: Arc<AtomicI64>,
@@ -139,7 +142,7 @@ impl FlowAggrThread {
 }
 
 pub struct FlowAggr {
-    input: Arc<Receiver<Arc<TaggedFlow>>>,
+    input: Arc<Receiver<Arc<BatchedBox<TaggedFlow>>>>,
     output: ThrottlingQueue,
     slot_start_time: Duration,
     stashs: VecDeque<HashMap<u64, Box<TaggedFlow>>>,
@@ -161,7 +164,7 @@ impl FlowAggr {
     const MIN_STASH_CAPACITY: usize = 1024;
 
     pub fn new(
-        input: Arc<Receiver<Arc<TaggedFlow>>>,
+        input: Arc<Receiver<Arc<BatchedBox<TaggedFlow>>>>,
         output: DebugSender<BoxedTaggedFlow>,
         running: Arc<AtomicBool>,
         config: CollectorAccess,
@@ -190,7 +193,8 @@ impl FlowAggr {
         }
     }
 
-    fn minute_merge(&mut self, f: Arc<TaggedFlow>) {
+    fn minute_merge(&mut self, f: Arc<BatchedBox<TaggedFlow>>) {
+        let f = f.as_ref();
         let flow_time = f.flow.flow_stat_time;
         if flow_time < self.slot_start_time {
             debug!("flow drop before slot start time. flow stat time: {:?}, slot start time is {:?}, delay is {:?}", flow_time, self.slot_start_time, self.slot_start_time - flow_time);

@@ -117,6 +117,7 @@ use crate::common::proc_event::BoxedProcEvents;
 use public::netns::{self, links_by_name_regex_in_netns};
 use public::utils::net::link_by_name;
 use public::{
+    buffer::BatchedBox,
     debug::QueueDebugger,
     netns::NsFile,
     packet::MiniPacket,
@@ -1151,7 +1152,7 @@ impl AgentComponents {
     fn new_collector(
         id: usize,
         stats_collector: Arc<stats::Collector>,
-        flow_receiver: queue::Receiver<Box<TaggedFlow>>,
+        flow_receiver: queue::Receiver<BatchedBox<TaggedFlow>>,
         toa_info_sender: DebugSender<Box<(SocketAddr, SocketAddr)>>,
         l4_flow_aggr_sender: Option<DebugSender<BoxedTaggedFlow>>,
         metrics_sender: DebugSender<BoxedDocument>,
