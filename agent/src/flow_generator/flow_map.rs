@@ -73,6 +73,10 @@ use crate::{
     metric::document::TapSide,
     plugin::{
         c_ffi::SoPluginFunc,
+        shared_obj::{
+            get_all_so_func, get_so_plug_metric_counter_map_key, SoPluginCounter,
+            SoPluginCounterMap,
+        },
         wasm::{
             get_all_wasm_export_func_name, get_wasm_metric_counter_map_key, init_wasmtime,
             WasmCounter, WasmCounterMap, WasmVm,
@@ -143,6 +147,7 @@ pub struct FlowMap {
 
     wasm_vm: Option<Rc<RefCell<WasmVm>>>,
     so_plugin: Option<Rc<Vec<SoPluginFunc>>>,
+    so_plugin_counter_map: Option<Rc<SoPluginCounterMap>>,
 
     tcp_perf_pool: MemoryPool<TcpPerf>,
     flow_node_pool: MemoryPool<FlowNode>,
@@ -182,6 +187,7 @@ impl FlowMap {
                             vec![
                                 StatsOption::Tag("id", id.to_string()),
                                 StatsOption::Tag("plugin_name", name.clone()),
+                                StatsOption::Tag("plugin_type", "wasm".to_string()),
                                 StatsOption::Tag("export_func", func_name.to_string()),
                             ],
                         );
@@ -194,6 +200,37 @@ impl FlowMap {
                 h
             },
         });
+
+        let so_plugin_counter_map = if config.so_plugins.is_empty() {
+            None
+        } else {
+            Some(Rc::new(SoPluginCounterMap {
+                so_mertic: {
+                    let mut h = HashMap::new();
+                    for p in config.so_plugins.iter() {
+                        for func_name in get_all_so_func() {
+                            let counter = Arc::new(SoPluginCounter::default());
+                            // TODO: remove source when plugin remove
+                            stats_collector.register_countable(
+                                "flow-map",
+                                Countable::Ref(Arc::downgrade(&counter) as Weak<dyn RefCountable>),
+                                vec![
+                                    StatsOption::Tag("id", id.to_string()),
+                                    StatsOption::Tag("plugin_name", p.name.clone()),
+                                    StatsOption::Tag("plugin_type", "so".to_string()),
+                                    StatsOption::Tag("export_func", func_name.to_string()),
+                                ],
+                            );
+                            h.insert(
+                                get_so_plug_metric_counter_map_key(p.name.as_str(), func_name),
+                                counter,
+                            );
+                        }
+                    }
+                    h
+                },
+            }))
+        };
 
         stats_collector.register_countable(
             "flow-map",
@@ -280,6 +317,7 @@ impl FlowMap {
             } else {
                 Some(Rc::new(config.so_plugins.clone()))
             },
+            so_plugin_counter_map,
             tcp_perf_pool: MemoryPool::new(config.memory_pool_size),
             flow_node_pool: MemoryPool::new(config.memory_pool_size),
         }
@@ -1075,6 +1113,7 @@ impl FlowMap {
                 port,
                 self.wasm_vm.as_ref().map(|w| w.clone()),
                 self.so_plugin.as_ref().map(|s| s.clone()),
+                self.so_plugin_counter_map.as_ref().map(|p| p.clone()),
                 self.stats_counter.clone(),
                 match meta_packet.lookup_key.proto {
                     IpProtocol::Tcp => flow_config.rrt_tcp_timeout,

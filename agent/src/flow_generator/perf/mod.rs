@@ -36,9 +36,9 @@ use super::{
     protocol_logs::AppProtoHead,
 };
 
-use crate::common::l7_protocol_log::L7PerfCache;
 use crate::plugin::wasm::WasmVm;
 use crate::{common::flow::L7PerfStats, plugin::c_ffi::SoPluginFunc};
+use crate::{common::l7_protocol_log::L7PerfCache, plugin::shared_obj::SoPluginCounterMap};
 use crate::{
     common::{
         flow::{FlowPerfStats, L4Protocol, L7Protocol, PacketDirection, SignalSource},
@@ -192,6 +192,7 @@ pub struct FlowLog {
 
     wasm_vm: Option<Rc<RefCell<WasmVm>>>,
     so_plugin: Option<Rc<Vec<SoPluginFunc>>>,
+    so_plugin_counter: Option<Rc<SoPluginCounterMap>>,
     stats_counter: Arc<FlowMapCounter>,
     rrt_timeout: usize,
 }
@@ -282,7 +283,7 @@ impl FlowLog {
                 !is_parse_log,
                 log_parser_config,
             ));
-            param.set_counter(self.stats_counter.clone());
+            param.set_counter(self.stats_counter.clone(), self.so_plugin_counter.clone());
             param.set_rrt_timeout(self.rrt_timeout);
             param.set_buf_size(pkt_size);
             if let Some(vm) = self.wasm_vm.as_ref() {
@@ -379,7 +380,7 @@ impl FlowLog {
                 !is_parse_log,
                 log_parser_config,
             ));
-            param.set_counter(self.stats_counter.clone());
+            param.set_counter(self.stats_counter.clone(), self.so_plugin_counter.clone());
             param.set_rrt_timeout(self.rrt_timeout);
             param.set_buf_size(flow_config.l7_log_packet_size as usize);
             if let Some(p) = self.so_plugin.as_ref() {
@@ -423,6 +424,7 @@ impl FlowLog {
         server_port: u16,
         wasm_vm: Option<Rc<RefCell<WasmVm>>>,
         so_plugin: Option<Rc<Vec<SoPluginFunc>>>,
+        so_plugin_counter: Option<Rc<SoPluginCounterMap>>,
         stats_counter: Arc<FlowMapCounter>,
         rrt_timeout: usize,
     ) -> Option<Self> {
@@ -454,6 +456,7 @@ impl FlowLog {
             server_port: server_port,
             wasm_vm,
             so_plugin,
+            so_plugin_counter,
             stats_counter: stats_counter,
             rrt_timeout: rrt_timeout,
         })

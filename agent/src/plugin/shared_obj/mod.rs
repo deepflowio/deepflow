@@ -17,11 +17,14 @@
 #[cfg(test)]
 mod test;
 
+use std::collections::HashMap;
 use std::ffi::CStr;
 use std::ffi::CString;
+use std::sync::{atomic::AtomicU64, Arc};
 
 use libc::c_void;
 use md5::{Digest, Md5};
+use public::counter::{CounterType, CounterValue, RefCountable};
 
 use super::c_ffi::SoPluginFunc;
 use super::c_ffi::{CHECK_PAYLOAD_FUNC_SYM, INIT_FUNC_SYM, PARSE_PAYLOAD_FUNC_SYM};
@@ -90,4 +93,43 @@ pub fn load_plugin(plugin: &[u8], name: &String) -> Result<SoPluginFunc, String>
         check_payload: check_func,
         parse_payload: parse_func,
     })
+}
+
+#[derive(Debug, Default)]
+pub struct SoPluginCounter {
+    pub exe_duration: AtomicU64,
+    pub fail_cnt: AtomicU64,
+}
+
+impl RefCountable for SoPluginCounter {
+    fn get_counters(&self) -> Vec<public::counter::Counter> {
+        vec![
+            (
+                "execute_duration",
+                CounterType::Gauged,
+                CounterValue::Unsigned(
+                    self.exe_duration
+                        .swap(0, std::sync::atomic::Ordering::Relaxed),
+                ),
+            ),
+            (
+                "fail_cnt",
+                CounterType::Counted,
+                CounterValue::Unsigned(self.fail_cnt.swap(0, std::sync::atomic::Ordering::Relaxed)),
+            ),
+        ]
+    }
+}
+
+#[derive(Debug)]
+pub struct SoPluginCounterMap {
+    pub so_mertic: HashMap<String, Arc<SoPluginCounter>>,
+}
+
+pub fn get_so_plug_metric_counter_map_key(name: &str, func_name: &str) -> String {
+    format!("{}:{}", name, func_name)
+}
+
+pub fn get_all_so_func() -> [&'static str; 2] {
+    [CHECK_PAYLOAD_FUNC_SYM, PARSE_PAYLOAD_FUNC_SYM]
 }

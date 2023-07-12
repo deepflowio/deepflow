@@ -90,7 +90,7 @@ int parse_dns_request(unsigned char *buf, int buflen, dns_header *hdr,
                 return -1;
             }
 
-            if (len + name_off >= sizeof(question.name)) {
+            if (len + name_off +1 >= sizeof(question.name)) {
                 memcpy(&question.name[name_off], &buf[off],
                        sizeof(question.name) - name_off - 1);
                 off += len;
