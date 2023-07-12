@@ -68,7 +68,7 @@ use crate::{
     flow_generator::{protocol_logs::BoxAppProtoLogsData, PacketSequenceParser},
     handler::{NpbBuilder, PacketHandlerBuilder},
     integration_collector::{
-        MetricServer, OpenTelemetry, OpenTelemetryCompressed, Profile, PrometheusMetric,
+        BoxedPrometheusExtra, MetricServer, OpenTelemetry, OpenTelemetryCompressed, Profile,
         TelegrafMetric,
     },
     metric::document::BoxedDocument,
@@ -1068,7 +1068,7 @@ pub struct AgentComponents {
     pub stats_collector: Arc<stats::Collector>,
     pub external_metrics_server: MetricServer,
     pub otel_uniform_sender: UniformSenderThread<OpenTelemetry>,
-    pub prometheus_uniform_sender: UniformSenderThread<PrometheusMetric>,
+    pub prometheus_uniform_sender: UniformSenderThread<BoxedPrometheusExtra>,
     pub telegraf_uniform_sender: UniformSenderThread<TelegrafMetric>,
     pub profile_uniform_sender: UniformSenderThread<Profile>,
     pub packet_sequence_parsers: Vec<PacketSequenceParser>, // Enterprise Edition Feature: packet-sequence
@@ -2133,6 +2133,10 @@ impl AgentComponents {
             candidate_config.platform.epc_id,
             policy_getter,
             synchronizer.ntp_diff(),
+            candidate_config
+                .yaml_config
+                .prometheus_extra_labels_config
+                .clone(),
         );
 
         stats_collector.register_countable(
