@@ -36,10 +36,11 @@ import (
 )
 
 const (
-	PROMETHEUS_METRICS_NAME     = "__name__"
-	EXT_METRICS_NATIVE_TAG_NAME = "tag"
-	EXT_METRICS_TIME_COLUMNS    = "timestamp"
-	ENUM_TAG_SUFFIX             = "_enum"
+	PROMETHEUS_METRICS_NAME    = "__name__"
+	PROMETHEUS_NATIVE_TAG_NAME = "tag"
+	PROMETHEUS_TIME_COLUMNS    = "timestamp"
+	PROMETHEUS_METRIC_VALUE    = "value"
+	ENUM_TAG_SUFFIX            = "_enum"
 )
 
 const (
@@ -109,16 +110,16 @@ const (
 
 type ctxKeyPrefixType struct{}
 
-func promReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (context.Context, string, string, string, error) {
+func promReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (context.Context, string, string, string, string, error) {
 	// QPS Limit Check
 	// Both SetRate and Acquire are expanded by 1000 times, making it suitable for small QPS scenarios.
 	if !QPSLeakyBucket.Acquire(1000) {
-		return ctx, "", "", "", errors.New("Prometheus query rate exceeded!")
+		return ctx, "", "", "", "", errors.New("Prometheus query rate exceeded!")
 	}
 
 	queriers := req.Queries
 	if len(queriers) < 1 {
-		return ctx, "", "", "", errors.New("len(req.Queries) == 0, this feature is not yet implemented!")
+		return ctx, "", "", "", "", errors.New("len(req.Queries) == 0, this feature is not yet implemented!")
 	}
 	q := queriers[0]
 	startTime := q.Hints.StartMs / 1000
@@ -127,13 +128,13 @@ func promReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (context
 		endTime += 1
 	}
 
-	prefixType, metricName, db, table, dataPrecision, metricAlias, err := parseMetric(q.Matchers)
+	prefixType, metricName, db, table, dataPrecision, metricAlias, queryMetric, err := parseMetric(q.Matchers)
 	ctx = context.WithValue(ctx, ctxKeyPrefixType{}, prefixType)
 	if err != nil {
-		return ctx, "", "", "", err
+		return ctx, "", "", "", "", err
 	}
 
-	metricsArray := []string{fmt.Sprintf("toUnixTimestamp(time) AS %s", EXT_METRICS_TIME_COLUMNS)}
+	metricsArray := []string{fmt.Sprintf("toUnixTimestamp(time) AS %s", PROMETHEUS_TIME_COLUMNS)}
 	var groupBy []string
 	var metricWithAggFunc string
 	// use map for duplicate tags removal
@@ -147,7 +148,7 @@ func promReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (context
 	if isShowTagStatement {
 		tagsArray, err := showTags(ctx, db, table, startTime, endTime)
 		if err != nil {
-			return ctx, "", "", "", err
+			return ctx, "", "", "", "", err
 		}
 		// append all `SHOW tags`
 		metricsArray = append(metricsArray, tagsArray...)
@@ -156,16 +157,16 @@ func promReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (context
 			// DeepFlow native metrics needs aggregation for query
 			if len(q.Hints.Grouping) == 0 {
 				// not specific cardinality
-				return ctx, "", "", "", fmt.Errorf("unknown series")
+				return ctx, "", "", "", "", fmt.Errorf("unknown series")
 			}
 			if !q.Hints.By {
 				// not support for `without` operation
-				return ctx, "", "", "", fmt.Errorf("not support for 'without' clause for aggregation")
+				return ctx, "", "", "", "", fmt.Errorf("not support for 'without' clause for aggregation")
 			}
 
 			aggOperator := aggFunctions[q.Hints.Func]
 			if aggOperator == "" {
-				return ctx, "", "", "", fmt.Errorf("aggregation operator: %s is not supported yet", q.Hints.Func)
+				return ctx, "", "", "", "", fmt.Errorf("aggregation operator: %s is not supported yet", q.Hints.Func)
 			}
 
 			// time query per step
@@ -173,12 +174,12 @@ func promReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (context
 				// range query, aggregation for time step
 				// rebuild `time` in range query, replace `toUnixTimestamp(time) as timestamp`
 				// time(time, x) means aggregation with time by interval x
-				metricsArray[0] = fmt.Sprintf("time(time, %d) AS %s", q.Hints.StepMs/1e3, EXT_METRICS_TIME_COLUMNS)
+				metricsArray[0] = fmt.Sprintf("time(time, %d) AS %s", q.Hints.StepMs/1e3, PROMETHEUS_TIME_COLUMNS)
 			}
 
 			groupBy = make([]string, 0, len(q.Hints.Grouping)+1)
 			// instant query only aggerate to 1 timestamp point
-			groupBy = append(groupBy, EXT_METRICS_TIME_COLUMNS)
+			groupBy = append(groupBy, PROMETHEUS_TIME_COLUMNS)
 
 			// should append all labels in query & grouping clause
 			for _, groupLabel := range q.Hints.Grouping {
@@ -202,7 +203,7 @@ func promReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (context
 				metricWithAggFunc = aggOperator
 			case view.FUNCTION_COUNT:
 				if db != chCommon.DB_NAME_FLOW_LOG {
-					return ctx, "", "", "", fmt.Errorf("only supported Count for flow_log")
+					return ctx, "", "", "", "", fmt.Errorf("only supported Count for flow_log")
 				}
 				metricWithAggFunc = "Sum(`log_count`)" // will be append as `metrics.$metricsName` in below
 
@@ -228,19 +229,23 @@ func promReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (context
 	}
 
 	// append query field: 2. append metric name
-	if db == "" || db == chCommon.DB_NAME_EXT_METRICS || db == chCommon.DB_NAME_DEEPFLOW_SYSTEM || db == chCommon.DB_NAME_PROMETHEUS {
-		// append metricName as "`metrics.%s`"
-		metricsArray = append(metricsArray, fmt.Sprintf(metricAlias, metricName))
+	if db == "" || db == chCommon.DB_NAME_PROMETHEUS {
+		// append metricName `value`
+		metricsArray = append(metricsArray, metricAlias)
 		// append `tag` only for prometheus & ext_metrics & deepflow_system
-		metricsArray = append(metricsArray, fmt.Sprintf("`%s`", EXT_METRICS_NATIVE_TAG_NAME))
+		metricsArray = append(metricsArray, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
+	} else if db == chCommon.DB_NAME_EXT_METRICS || db == chCommon.DB_NAME_DEEPFLOW_SYSTEM {
+		metricsArray = append(metricsArray, fmt.Sprintf(metricAlias, metricName))
+		metricsArray = append(metricsArray, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
 	} else {
-		// append metricName as "%s as `metrics.%s`"
+		// for flow_metrics/flow_log/deepflow_system/ext_metrics
+		// append metricName as "%s as value"
 		if metricWithAggFunc != "" {
 			// only when query metric samples
-			metricsArray = append(metricsArray, fmt.Sprintf(metricAlias, metricWithAggFunc, metricName))
+			metricsArray = append(metricsArray, fmt.Sprintf(metricAlias, metricWithAggFunc))
 		} else {
 			// only when query series
-			metricsArray = append(metricsArray, fmt.Sprintf(metricAlias, metricName, metricName))
+			metricsArray = append(metricsArray, fmt.Sprintf(metricAlias, metricName))
 		}
 	}
 
@@ -253,7 +258,7 @@ func promReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (context
 		}
 		operation := getLabelMatcherType(matcher.Type)
 		if operation == "" {
-			return ctx, "", "", "", fmt.Errorf("unknown match type %v", matcher.Type)
+			return ctx, "", "", "", "", fmt.Errorf("unknown match type %v", matcher.Type)
 		}
 
 		tagName, tagAlias, isDeepFlowTag := parsePromQLTag(prefixType, db, matcher.Name)
@@ -295,16 +300,23 @@ func promReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (context
 	}
 
 	sql := parseToQuerierSQL(ctx, db, table, metricsArray, filters, groupBy)
-	return ctx, sql, db, dataPrecision, err
+	return ctx, sql, db, dataPrecision, queryMetric, err
 }
 
-func parseMetric(matchers []*prompb.LabelMatcher) (prefixType prefix, metricName string, db string, table string, dataPrecision string, metricAlias string, err error) {
+// return: prefixType, metricName, db, table, dataPrecision, metricAlias
+// prefixType: identified if use `tag_` or `df_` prefix in labels for prometheus native metrics
+// metricName: real metric in database
+// db table dataPrecision: database infomation
+// metricAlias: identified how to query metric alias in `select` clause
+// queryMetric: query metric in the input of label matcher
+func parseMetric(matchers []*prompb.LabelMatcher) (prefixType prefix, metricName string, db string, table string, dataPrecision string, metricAlias string, queryMetric string, err error) {
 	// get metric_name from the matchers
 	for _, matcher := range matchers {
 		if matcher.Name != PROMETHEUS_METRICS_NAME {
 			continue
 		}
 		metricName = matcher.Value
+		queryMetric = matcher.Value
 
 		if strings.Contains(metricName, "__") {
 			// DeepFlow native metrics: ${db}__${table}__${metricsName}
@@ -322,7 +334,7 @@ func parseMetric(matchers []*prompb.LabelMatcher) (prefixType prefix, metricName
 				metricName = metricsSplit[2]
 
 				if db == DB_NAME_DEEPFLOW_SYSTEM {
-					metricAlias = "`metrics.%s`"
+					metricAlias = "`metrics.%s` as value"
 				} else if db == DB_NAME_EXT_METRICS {
 					// identify tag prefix as "tag_"
 					prefixType = prefixTag
@@ -332,15 +344,15 @@ func parseMetric(matchers []*prompb.LabelMatcher) (prefixType prefix, metricName
 						table = fmt.Sprintf("%s.%s", realMetrics[0], realMetrics[1])
 						metricName = realMetrics[1]
 					}
-					metricAlias = "`metrics.%s`"
+					metricAlias = "`metrics.%s` as value"
 				} else if db == chCommon.DB_NAME_PROMETHEUS {
 					prefixType = prefixTag
 					// query `prometheus`.`samples` table, should query metrics
 					table = metricName
-					metricAlias = "value as `metrics.%s`"
+					metricAlias = "value"
 				} else {
-					// To identify which columns belong to metrics, we prefix all metrics names with `metrics.`
-					metricAlias = "%s as `metrics.%s`"
+					// To identify which columns belong to metrics, we identified all metric value as `value`
+					metricAlias = "%s as value"
 				}
 
 				// data precision only available for 'flow_metrics'
@@ -348,7 +360,7 @@ func parseMetric(matchers []*prompb.LabelMatcher) (prefixType prefix, metricName
 					dataPrecision = metricsSplit[3]
 				}
 			} else {
-				return prefixType, "", "", "", "", "", fmt.Errorf("unknown metrics %v", metricName)
+				return prefixType, "", "", "", "", "", "", fmt.Errorf("unknown metrics %v", metricName)
 			}
 		} else {
 			// Prometheus native metrics: ${metricsName}
@@ -356,7 +368,7 @@ func parseMetric(matchers []*prompb.LabelMatcher) (prefixType prefix, metricName
 			prefixType = prefixDeepFlow
 
 			// Prometheus native metrics only query `value` as metrics sample
-			metricAlias = "value as `metrics.%s`"
+			metricAlias = "value"
 			table = metricName
 		}
 		break
@@ -484,35 +496,33 @@ func parseToQuerierSQL(ctx context.Context, db string, table string, metrics []s
 		if len(groupBy) > 0 {
 			sqlBuilder.WriteString("GROUP BY " + strings.Join(groupBy, ","))
 		}
-		sqlBuilder.WriteString(fmt.Sprintf(" ORDER BY %s desc LIMIT %s", EXT_METRICS_TIME_COLUMNS, config.Cfg.Limit))
+		sqlBuilder.WriteString(fmt.Sprintf(" ORDER BY %s desc LIMIT %s", PROMETHEUS_TIME_COLUMNS, config.Cfg.Limit))
 		sql = sqlBuilder.String()
 	} else {
 		sql = fmt.Sprintf("SELECT %s FROM %s WHERE %s ORDER BY %s desc LIMIT %s", strings.Join(metrics, ","),
 			table, // equals prometheus metric name
 			strings.Join(filters, " AND "),
-			EXT_METRICS_TIME_COLUMNS, config.Cfg.Limit)
+			PROMETHEUS_TIME_COLUMNS, config.Cfg.Limit)
 	}
 	return
 }
 
 // querier result trans to Prom Response
-func respTransToProm(ctx context.Context, result *common.Result) (resp *prompb.ReadResponse, err error) {
+func respTransToProm(ctx context.Context, metricsName string, result *common.Result) (resp *prompb.ReadResponse, err error) {
 	tagIndex := -1
 	metricsIndex := -1
 	timeIndex := -1
 	otherTagCount := 0
-	metricsName := ""
 	tagsFieldIndex := make(map[int]bool, len(result.Columns))
 	prefix, _ := ctx.Value(ctxKeyPrefixType{}).(prefix) // ignore if key not exist
 	for i, tag := range result.Columns {
-		if tag == EXT_METRICS_NATIVE_TAG_NAME {
+		if tag == PROMETHEUS_NATIVE_TAG_NAME {
 			tagIndex = i
 		} else if strings.HasPrefix(tag.(string), "tag.") {
 			tagsFieldIndex[i] = true
-		} else if strings.HasPrefix(tag.(string), "metrics.") {
+		} else if tag == PROMETHEUS_METRIC_VALUE {
 			metricsIndex = i
-			metricsName = strings.TrimPrefix(tag.(string), "metrics.")
-		} else if tag == EXT_METRICS_TIME_COLUMNS {
+		} else if tag == PROMETHEUS_TIME_COLUMNS {
 			timeIndex = i
 		} else {
 			otherTagCount++
