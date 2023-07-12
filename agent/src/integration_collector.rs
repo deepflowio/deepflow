@@ -15,6 +15,7 @@
  */
 
 use std::collections::HashMap;
+use std::fmt::{self, Debug, Formatter};
 use std::io::{Read, Write};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, TcpStream};
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU16, AtomicU64, Ordering};
@@ -48,6 +49,7 @@ use crate::{
         lookup_key::LookupKey,
         TaggedFlow, Timestamp,
     },
+    config::PrometheusExtraConfig,
     exception::ExceptionHandler,
     flow_generator::protocol_logs::L7ResponseStatus,
     metric::document::TapSide,
@@ -122,16 +124,35 @@ impl Sendable for OpenTelemetryCompressed {
     }
 }
 
-/// Prometheus metrics, 格式是snappy压缩的pb数据
-/// 可以参考https://github.com/prometheus/prometheus/tree/main/documentation/examples/remote_storage/example_write_adapter来解析
-#[derive(Debug, PartialEq)]
-pub struct PrometheusMetric(Vec<u8>);
+/// Prometheus metrics, in snappy compressed petabytes of data
+/// You can refer to https://github.com/prometheus/prometheus/tree/main/documentation/examples/remote_storage/example_write_adapter to parse
+pub struct PrometheusExtra {
+    metrics: Vec<u8>,
+    extra_label_names: Vec<String>,
+    extra_label_values: Vec<String>,
+}
 
-impl Sendable for PrometheusMetric {
-    fn encode(mut self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
-        let length = self.0.len();
-        buf.append(&mut self.0);
-        Ok(length)
+impl Debug for PrometheusExtra {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_fmt(format_args!(
+            "PrometheusExtra {{ metrics's len: {}, extra_label_names: {:?}, extra_label_values: {:?}",
+            self.metrics.len(), self.extra_label_names, self.extra_label_values
+        ))
+    }
+}
+
+#[derive(Debug)]
+pub struct BoxedPrometheusExtra(pub Box<PrometheusExtra>);
+
+impl Sendable for BoxedPrometheusExtra {
+    fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
+        let pb_prometheus_metric = metric::PrometheusMetric {
+            metrics: self.0.metrics,
+            extra_label_names: self.0.extra_label_names,
+            extra_label_values: self.0.extra_label_values,
+        };
+        let _ = pb_prometheus_metric.encode(buf)?;
+        Ok(pb_prometheus_metric.encoded_len())
     }
 
     fn message_type(&self) -> SendMessageType {
@@ -535,7 +556,7 @@ async fn handler(
     otel_sender: DebugSender<OpenTelemetry>,
     compressed_otel_sender: DebugSender<OpenTelemetryCompressed>,
     otel_metrics_collect_sender: Option<DebugSender<Box<TaggedFlow>>>,
-    prometheus_sender: DebugSender<PrometheusMetric>,
+    prometheus_sender: DebugSender<BoxedPrometheusExtra>,
     telegraf_sender: DebugSender<TelegrafMetric>,
     profile_sender: DebugSender<Profile>,
     exception_handler: ExceptionHandler,
@@ -544,6 +565,7 @@ async fn handler(
     local_epc_id: u32,
     policy_getter: Arc<PolicyGetter>,
     time_diff: Arc<AtomicI64>,
+    prometheus_extra_config: Arc<PrometheusExtraConfig>,
 ) -> Result<Response<Body>, GenericError> {
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/") => {
@@ -606,6 +628,36 @@ async fn handler(
         }
         // Prometheus integration
         (&Method::POST, "/api/v1/prometheus") => {
+            let headers = req.headers();
+            let labels = &prometheus_extra_config.labels;
+            let labels_limit = prometheus_extra_config.labels_limit;
+            let values_limit = prometheus_extra_config.values_limit;
+            let mut labels_count = 0;
+            let mut values_count = 0;
+            let mut extra_label_names = vec![];
+            let mut extra_label_values = vec![];
+
+            if prometheus_extra_config.enabled {
+                for label in labels {
+                    if labels_count > labels_limit || values_count > values_limit {
+                        warn!("labels_count exceeds the labels limit:{} or values_count exceeds the values limit:{} ", labels_limit, values_limit);
+                        break;
+                    }
+                    if headers.contains_key(label) {
+                        let value = headers
+                            .get(label)
+                            .unwrap()
+                            .to_str()
+                            .unwrap_or_default()
+                            .to_string();
+                        labels_count += label.len() as u32;
+                        values_count += value.len() as u32;
+                        extra_label_names.push(label.to_string());
+                        extra_label_values.push(value);
+                    }
+                }
+            }
+
             let mut whole_body =
                 match aggregate_with_catch_exception(req.into_body(), &exception_handler).await {
                     Ok(b) => b,
@@ -615,7 +667,15 @@ async fn handler(
                 };
             let mut metric = vec![0u8; whole_body.remaining()];
             whole_body.copy_to_slice(metric.as_mut_slice());
-            if let Err(Error::Terminated(..)) = prometheus_sender.send(PrometheusMetric(metric)) {
+
+            let prometheus_with_extra = PrometheusExtra {
+                metrics: metric,
+                extra_label_names,
+                extra_label_values,
+            };
+            if let Err(Error::Terminated(..)) =
+                prometheus_sender.send(BoxedPrometheusExtra(Box::new(prometheus_with_extra)))
+            {
                 warn!("sender queue has terminated");
             }
 
@@ -765,7 +825,7 @@ pub struct MetricServer {
     otel_sender: DebugSender<OpenTelemetry>,
     compressed_otel_sender: DebugSender<OpenTelemetryCompressed>,
     otel_metrics_collect_sender: Option<DebugSender<Box<TaggedFlow>>>,
-    prometheus_sender: DebugSender<PrometheusMetric>,
+    prometheus_sender: DebugSender<BoxedPrometheusExtra>,
     telegraf_sender: DebugSender<TelegrafMetric>,
     profile_sender: DebugSender<Profile>,
     port: Arc<AtomicU16>,
@@ -776,6 +836,7 @@ pub struct MetricServer {
     local_epc_id: u32,
     policy_getter: Arc<PolicyGetter>,
     time_diff: Arc<AtomicI64>,
+    prometheus_extra_config: Arc<PrometheusExtraConfig>,
 }
 
 impl MetricServer {
@@ -784,7 +845,7 @@ impl MetricServer {
         otel_sender: DebugSender<OpenTelemetry>,
         compressed_otel_sender: DebugSender<OpenTelemetryCompressed>,
         otel_metrics_collect_sender: Option<DebugSender<Box<TaggedFlow>>>,
-        prometheus_sender: DebugSender<PrometheusMetric>,
+        prometheus_sender: DebugSender<BoxedPrometheusExtra>,
         telegraf_sender: DebugSender<TelegrafMetric>,
         profile_sender: DebugSender<Profile>,
         port: u16,
@@ -793,6 +854,7 @@ impl MetricServer {
         local_epc_id: u32,
         policy_getter: PolicyGetter,
         time_diff: Arc<AtomicI64>,
+        prometheus_extra_config: PrometheusExtraConfig,
     ) -> (Self, IntegrationCounter) {
         let counter = IntegrationCounter::default();
         (
@@ -814,6 +876,7 @@ impl MetricServer {
                 local_epc_id,
                 policy_getter: Arc::new(policy_getter),
                 time_diff,
+                prometheus_extra_config: Arc::new(prometheus_extra_config),
             },
             counter,
         )
@@ -854,6 +917,7 @@ impl MetricServer {
         let local_epc_id = self.local_epc_id.clone();
         let policy_getter = self.policy_getter.clone();
         let time_diff = self.time_diff.clone();
+        let prometheus_extra_config = self.prometheus_extra_config.clone();
         let (tx, mut rx) = mpsc::channel(8);
         self.runtime
             .spawn(Self::alive_check(monitor_port.clone(), tx.clone(), mon_rx));
@@ -914,6 +978,7 @@ impl MetricServer {
                     let local_epc_id = local_epc_id.clone();
                     let policy_getter = policy_getter.clone();
                     let time_diff = time_diff.clone();
+                    let prometheus_extra_config = prometheus_extra_config.clone();
                     let service = make_service_fn(move |conn: &AddrStream| {
                         let otel_sender = otel_sender.clone();
                         let compressed_otel_sender = compressed_otel_sender.clone();
@@ -928,6 +993,7 @@ impl MetricServer {
                         let local_epc_id = local_epc_id.clone();
                         let policy_getter = policy_getter.clone();
                         let time_diff = time_diff.clone();
+                        let prometheus_extra_config = prometheus_extra_config.clone();
                         async move {
                             Ok::<_, GenericError>(service_fn(move |req| {
                                 handler(
@@ -945,6 +1011,7 @@ impl MetricServer {
                                     local_epc_id,
                                     policy_getter.clone(),
                                     time_diff.clone(),
+                                    prometheus_extra_config.clone(),
                                 )
                             }))
                         }
