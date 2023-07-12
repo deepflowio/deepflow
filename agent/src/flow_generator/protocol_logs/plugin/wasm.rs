@@ -80,7 +80,10 @@ impl L7ProtocolParserInterface for WasmLog {
                         }
                     }
                     i.msg_type = param.direction.into();
-                    i.cal_rrt(param, None).map(|rrt| i.rrt = rrt);
+                    i.cal_rrt(param, None).map(|rrt| {
+                        i.rrt = rrt;
+                        perf_stats.update_rrt(rrt);
+                    });
                     L7ProtocolInfo::CustomInfo(i)
                 })
                 .collect();
