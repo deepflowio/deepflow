@@ -902,7 +902,7 @@ func GenTagColumns(code Code) []*ckdb.Column {
 	}
 
 	if code&Direction != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("role", ckdb.LowCardinalityString).SetComment("统计量对应的流方向. 0: ip为客户端, 1: ip为服务端"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("role", ckdb.UInt8).SetComment("统计量对应的流方向. 0: ip为客户端, 1: ip为服务端"))
 	}
 
 	if code&GPID != 0 {
