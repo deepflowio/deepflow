@@ -48,6 +48,7 @@ use super::{
     ConfigError, IngressFlavour, KubernetesPollerType, RuntimeConfig,
 };
 use crate::plugin::c_ffi::SoPluginFunc;
+#[cfg(target_os = "linux")]
 use crate::plugin::shared_obj::load_plugin;
 use crate::rpc::Session;
 use crate::{
@@ -2121,6 +2122,7 @@ impl ModuleConfig {
             }
         });
 
+        #[cfg(target_os = "linux")]
         rt.block_on(async {
             for i in self.yaml_config.so_plugins.iter() {
                 match session
