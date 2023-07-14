@@ -41,7 +41,9 @@ use crate::{
     flow_generator::protocol_logs::{decode_base64_to_string, L7ProtoRawDataType},
     utils::bytes::{read_u32_be, read_u32_le},
 };
+use cloud_platform::tingyun;
 use public::utils::net::h2pack;
+
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct HttpInfo {
     // 流是否结束，用于 http2 ebpf uprobe 处理.
@@ -953,6 +955,13 @@ impl HttpLog {
         None
     }
 
+    fn decode_tingyun(value: &str, id_type: u8) -> Option<String> {
+        if id_type != Self::TRACE_ID {
+            return None;
+        }
+        tingyun::decode_trace_id(value)
+    }
+
     fn decode_id(payload: &str, trace_key: &str, id_type: u8) -> Option<String> {
         let trace_type = TraceType::from(trace_key);
         match trace_type {
@@ -969,6 +978,7 @@ impl HttpLog {
                 */
                 decode_new_rpc_trace_context_with_type(payload.as_bytes(), id_type)
             }
+            TraceType::XTingyun => Self::decode_tingyun(payload, id_type),
         }
     }
 
