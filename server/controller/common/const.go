@@ -561,14 +561,16 @@ var VTapToChangeTapModes = map[int][]int{
 	VTAP_TYPE_HYPER_V:              []int{TAPMODE_LOCAL, TAPMODE_MIRROR},
 }
 
+type DataChanged string
+
 const (
-	VTAP_CHANGED          = "vtap"
-	ANALYZER_CHANGED      = "analyzer"
-	PLATFORM_DATA_CHANGED = "platform_data"
-	FLOW_ACL_CHANGED      = "flow_acl"
-	GROUP_CHANGED         = "group"
-	TAP_TYPE_CHANGED      = "tap_type"
-	SERVICE_CHANGED       = "service"
+	DATA_CHANGED_VTAP          DataChanged = "vtap"
+	DATA_CHANGED_ANALYZER      DataChanged = "analyzer"
+	DATA_CHANGED_PLATFORM_DATA DataChanged = "platform_data"
+	DATA_CHANGED_FLOW_ACL      DataChanged = "flow_acl"
+	DATA_CHANGED_GROUP         DataChanged = "group"
+	DATA_CHANGED_TAP_TYPE      DataChanged = "tap_type"
+	DATA_CHANGED_SERVICE       DataChanged = "service"
 )
 
 const (

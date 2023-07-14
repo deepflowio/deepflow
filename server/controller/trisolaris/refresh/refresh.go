@@ -51,13 +51,13 @@ func NewRefreshOP(db *gorm.DB, nodeIP string) *RefreshOP {
 
 var urlFormat = "http://%s:%d/v1/caches/?"
 
-func RefreshCache(dataTypes []string) {
+func RefreshCache(dataTypes []common.DataChanged) {
 	if refreshOP != nil {
 		go refreshOP.refreshCache(dataTypes)
 	}
 }
 
-func (r *RefreshOP) refreshCache(dataTypes []string) {
+func (r *RefreshOP) refreshCache(dataTypes []common.DataChanged) {
 	localControllerIPs := r.localRefreshIPs
 	remoteControllerIPs := r.remoteRefreshIPs
 	if len(dataTypes) == 0 || (len(localControllerIPs) == 0 && len(remoteControllerIPs) == 0) {
@@ -66,7 +66,7 @@ func (r *RefreshOP) refreshCache(dataTypes []string) {
 	log.Infof("refresh cache for trisolaris(%v %v)", localControllerIPs, remoteControllerIPs)
 	params := url.Values{}
 	for _, dataType := range dataTypes {
-		params.Add("type", dataType)
+		params.Add("type", string(dataType))
 	}
 	paramsEncode := params.Encode()
 	for _, controllerIP := range localControllerIPs {
