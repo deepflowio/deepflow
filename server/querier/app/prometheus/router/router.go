@@ -42,6 +42,11 @@ func PrometheusRouter(e *gin.Engine) {
 	e.GET("/prom/api/v1/series", promSeriesReader(prometheusService))
 	e.POST("/prom/api/v1/series", promSeriesReader(prometheusService))
 	e.GET("/prom/api/v1/label/:labelName/values", promTagValuesReader(prometheusService))
-
 	e.GET("/prom/api/v1/analysis", promQLAnalysis(prometheusService))
+
+	// not use "/prom/api/v1/adapter/:name", suitable for map[rouer key]counter in statsd
+	for _, v := range []string{"label", "query_range", "query", "series"} {
+		e.POST("/prom/api/v1/adapter/"+v, adaptPromQuery(prometheusService, v))
+		e.GET("/prom/api/v1/adapter/"+v, adaptPromQuery(prometheusService, v))
+	}
 }

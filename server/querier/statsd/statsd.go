@@ -102,3 +102,55 @@ func NewCounter() *Counter {
 }
 
 var QuerierCounter *Counter
+
+type ApiStats struct {
+	ApiTime    uint64
+	ApiTimeSum uint64
+	ApiTimeAvg uint64 `statsd:"api_time_avg"`
+	ApiTimeMax uint64 `statsd:"api_time_max"`
+	ApiCount   uint64 `statsd:"api_count"`
+}
+
+type ApiCounter struct {
+	api        *ApiStats
+	writeMutex *sync.Mutex
+	exited     bool
+}
+
+func (c *ApiCounter) Write(ac *ApiStats) {
+	go func() {
+		c.writeMutex.Lock()
+		defer c.writeMutex.Unlock()
+		c.api.ApiCount++
+
+		c.api.ApiTimeSum += ac.ApiTime
+		c.api.ApiTimeAvg = c.api.ApiTimeSum / c.api.ApiCount
+		if ac.ApiTime > c.api.ApiTimeMax {
+			c.api.ApiTimeMax = ac.ApiTime
+		}
+	}()
+}
+
+func (c *ApiCounter) GetCounter() interface{} {
+	counter := &ApiStats{}
+	counter, c.api = c.api, counter
+	return counter
+}
+
+func (c *ApiCounter) Close() {
+	c.exited = true
+}
+
+func (c *ApiCounter) Closed() bool {
+	return c.exited
+}
+
+func NewApiCounter() *ApiCounter {
+	return &ApiCounter{
+		exited:     false,
+		api:        &ApiStats{},
+		writeMutex: &sync.Mutex{},
+	}
+}
+
+var ApiCounters map[string]*ApiCounter
