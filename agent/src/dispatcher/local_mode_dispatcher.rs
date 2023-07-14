@@ -261,7 +261,7 @@ impl LocalModeDispatcher {
             }
             if base
                 .tap_interface_whitelist
-                .next_sync(meta_packet.lookup_key.timestamp)
+                .next_sync(meta_packet.lookup_key.timestamp.into())
             {
                 base.need_update_bpf.store(true, Ordering::Relaxed);
             }

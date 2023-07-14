@@ -19,7 +19,7 @@
 
 use std::cmp::Ordering;
 use std::fmt;
-use std::ops::{Add, AddAssign, Sub};
+use std::ops::{Add, AddAssign, Sub, SubAssign};
 use std::time::Duration;
 
 use serde::Serializer;
@@ -46,8 +46,8 @@ impl fmt::Debug for Timestamp {
 }
 
 impl Timestamp {
-    const NANOS_IN_MINUTE: u64 = Duration::from_secs(60).as_nanos() as u64;
     const NANOS_IN_SECOND: u64 = Duration::from_secs(1).as_nanos() as u64;
+    const NANOS_IN_MILLIS: u64 = Duration::from_millis(1).as_nanos() as u64;
     const NANOS_IN_MICROS: u64 = Duration::from_micros(1).as_nanos() as u64;
 
     pub const ZERO: Self = Self(0);
@@ -56,8 +56,24 @@ impl Timestamp {
         Self(nanos)
     }
 
+    pub const fn as_nanos(&self) -> u64 {
+        self.0
+    }
+
     pub const fn from_micros(micros: u64) -> Self {
         Self(micros * Self::NANOS_IN_MICROS)
+    }
+
+    pub const fn as_micros(&self) -> u64 {
+        self.0 / Self::NANOS_IN_MICROS
+    }
+
+    pub const fn from_millis(millis: u64) -> Self {
+        Self(millis * Self::NANOS_IN_MILLIS)
+    }
+
+    pub const fn as_millis(&self) -> u64 {
+        self.0 / Self::NANOS_IN_MILLIS
     }
 
     pub const fn from_secs(secs: u64) -> Self {
@@ -68,20 +84,16 @@ impl Timestamp {
         self.0 / Self::NANOS_IN_SECOND
     }
 
-    pub const fn as_micros(&self) -> u64 {
-        self.0 / Self::NANOS_IN_MICROS
-    }
-
-    pub const fn as_nanos(&self) -> u64 {
-        self.0
-    }
-
     pub const fn is_zero(&self) -> bool {
         self.0 == 0
     }
 
+    pub const fn round_to(&self, rhs: Self) -> Self {
+        Self(self.0 / rhs.0 * rhs.0)
+    }
+
     pub const fn round_to_minute(&self) -> Self {
-        Self(self.0 / Self::NANOS_IN_MINUTE * Self::NANOS_IN_MINUTE)
+        self.round_to(Timestamp::from_secs(60))
     }
 }
 
@@ -127,7 +139,18 @@ impl Add<Duration> for Timestamp {
 
 impl AddAssign for Timestamp {
     fn add_assign(&mut self, rhs: Self) {
-        self.0 += rhs.0
+        self.0 += rhs.0;
+    }
+}
+
+impl Sub for Timestamp {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        if self.0 < rhs.0 {
+            panic!("overflow when subtracting timestamp")
+        }
+        Self(self.0 - rhs.0)
     }
 }
 
@@ -143,10 +166,16 @@ impl Sub<Duration> for Timestamp {
     type Output = Self;
 
     fn sub(self, rhs: Duration) -> Self::Output {
-        if self.0 < rhs.as_nanos() as u64 {
+        self - Self::from(rhs)
+    }
+}
+
+impl SubAssign for Timestamp {
+    fn sub_assign(&mut self, rhs: Self) {
+        if self.0 < rhs.0 {
             panic!("overflow when subtracting timestamp")
         }
-        Self(self.0 - rhs.as_nanos() as u64)
+        self.0 -= rhs.0;
     }
 }
 

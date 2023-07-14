@@ -183,7 +183,7 @@ impl FlowMap {
         let packet_sequence_enabled = config.packet_sequence_flag > 0 && !from_ebpf;
         let time_window_size = {
             let max_timeout = config.flow_timeout.max;
-            let size = (config.packet_delay + max_timeout + Duration::from_secs(1)).as_secs();
+            let size = config.packet_delay.as_secs() + max_timeout.as_secs() + 1;
             size.next_power_of_two() as usize
         };
 
@@ -478,7 +478,7 @@ impl FlowMap {
                 // handle and remove timeout nodes
                 for node in nodes.drain(index..) {
                     let timeout = node.recent_time + node.timeout;
-                    self.node_removed_aftercare(&config, node, timeout, None);
+                    self.node_removed_aftercare(&config, node, timeout.into(), None);
                 }
                 if nodes.is_empty() {
                     node_map.remove(&flow_key);
@@ -537,7 +537,7 @@ impl FlowMap {
     }
 
     pub fn inject_meta_packet(&mut self, config: &Config, meta_packet: &mut MetaPacket) {
-        if !self.inject_flush_ticker(config, meta_packet.lookup_key.timestamp) {
+        if !self.inject_flush_ticker(config, meta_packet.lookup_key.timestamp.into()) {
             // 补充由于超时导致未查询策略，用于其它流程（如PCAP存储）
             #[cfg(target_os = "linux")]
             let local_epc_id = match config.ebpf.as_ref() {
@@ -603,7 +603,12 @@ impl FlowMap {
 
                 let node = &mut nodes[index];
                 // 1. 输出上一个统计周期的统计信息
-                self.node_updated_aftercare(&flow_config, node, pkt_timestamp, Some(meta_packet));
+                self.node_updated_aftercare(
+                    &flow_config,
+                    node,
+                    pkt_timestamp.into(),
+                    Some(meta_packet),
+                );
 
                 // 2. 更新Flow状态，判断是否已结束
                 // 设置timestamp_key为流的相同，time_set根据key来删除
@@ -619,7 +624,7 @@ impl FlowMap {
                     self.node_removed_aftercare(
                         &flow_config,
                         node,
-                        meta_packet.lookup_key.timestamp,
+                        meta_packet.lookup_key.timestamp.into(),
                         Some(meta_packet),
                     );
 
@@ -687,7 +692,7 @@ impl FlowMap {
         let mini_meta_packet = packet_sequence_block::MiniMetaPacket::new(
             node.tagged_flow.flow.flow_id,
             meta_packet.lookup_key.direction as u8,
-            meta_packet.lookup_key.timestamp,
+            meta_packet.lookup_key.timestamp.into(),
             meta_packet.payload_len,
             meta_packet.tcp_data.seq,
             meta_packet.tcp_data.ack,
@@ -730,7 +735,7 @@ impl FlowMap {
             if node.residual_request == 0 {
                 node.timeout = flow_config.flow_timeout.opening;
             } else {
-                node.timeout = config.log_parser.l7_log_session_aggr_timeout;
+                node.timeout = config.log_parser.l7_log_session_aggr_timeout.into();
             }
         }
 
@@ -798,7 +803,7 @@ impl FlowMap {
         false
     }
 
-    fn generate_flow_id(&mut self, timestamp: Duration, thread_id: u32) -> u64 {
+    fn generate_flow_id(&mut self, timestamp: Timestamp, thread_id: u32) -> u64 {
         self.total_flow += 1;
         (timestamp.as_nanos() as u64 >> 30 & TIMER_FLOW_ID_MASK) << 32
             | thread_id as u64 & THREAD_FLOW_ID_MASK << 24
@@ -1024,10 +1029,7 @@ impl FlowMap {
                 self.generate_flow_id(lookup_key.timestamp, self.id)
             },
             start_time: lookup_key.timestamp.into(),
-            flow_stat_time: Timestamp::from_nanos(
-                (lookup_key.timestamp.as_nanos() / TIME_UNIT.as_nanos() * TIME_UNIT.as_nanos())
-                    as u64,
-            ),
+            flow_stat_time: lookup_key.timestamp.round_to(TIME_UNIT.into()),
             vlan: meta_packet.vlan,
             eth_type: lookup_key.eth_type,
             queue_hash: meta_packet.queue_hash,
@@ -1067,7 +1069,7 @@ impl FlowMap {
         node.tagged_flow = tagged_flow;
         node.min_arrived_time = lookup_key.timestamp;
         node.recent_time = lookup_key.timestamp;
-        node.timeout = Duration::ZERO;
+        node.timeout = Timestamp::ZERO;
         node.packet_in_tick = true;
         node.policy_in_tick = policy_in_tick;
         node.flow_state = FlowState::Raw;
@@ -1179,10 +1181,7 @@ impl FlowMap {
         if !node.packet_in_tick {
             // FlowStatTime取整至统计时间的开始，只需要赋值一次，且使用包的时间戳
             node.packet_in_tick = true;
-            flow.flow_stat_time = Timestamp::from_nanos(
-                (pkt_timestamp.as_nanos() / STATISTICAL_INTERVAL.as_nanos()
-                    * STATISTICAL_INTERVAL.as_nanos()) as u64,
-            );
+            flow.flow_stat_time = pkt_timestamp.round_to(STATISTICAL_INTERVAL.into());
         }
 
         if !node.policy_in_tick[meta_packet.lookup_key.direction as usize] {
@@ -1446,7 +1445,7 @@ impl FlowMap {
         let mut reverse = false;
         if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
             // Initialize a timeout long enough for eBPF Flow to enable successful session aggregation.
-            node.timeout = config.log_parser.l7_log_session_aggr_timeout;
+            node.timeout = config.log_parser.l7_log_session_aggr_timeout.into();
         } else {
             reverse = self.update_l4_direction(meta_packet, &mut node, true);
 
@@ -2222,7 +2221,8 @@ pub fn _new_meta_packet<'a>() -> MetaPacket<'a> {
     packet.lookup_key = LookupKey {
         timestamp: SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap(),
+            .unwrap()
+            .into(),
         src_mac: MacAddr::from_str("12:34:56:78:9A:BC").unwrap(),
         dst_mac: MacAddr::from_str("21:43:65:87:A9:CB").unwrap(),
         eth_type: EthernetType::Ipv4,
@@ -2314,8 +2314,8 @@ mod tests {
         let mut packet1 = _new_meta_packet();
         packet1.tcp_data.flags = TcpFlags::RST;
         _reverse_meta_packet(&mut packet1);
-        packet1.lookup_key.timestamp += DEFAULT_DURATION;
-        let flush_timestamp = packet1.lookup_key.timestamp;
+        packet1.lookup_key.timestamp += DEFAULT_DURATION.into();
+        let flush_timestamp = packet1.lookup_key.timestamp.into();
         flow_map.inject_meta_packet(&config, &mut packet1);
 
         // 没到期删除，所以下游queue等不到flow
@@ -2354,9 +2354,9 @@ mod tests {
 
         let mut packet2 = _new_meta_packet();
         packet2.tcp_data.flags = TcpFlags::FIN_ACK;
-        packet2.lookup_key.timestamp += Duration::from_millis(10);
+        packet2.lookup_key.timestamp += Timestamp::from_millis(10);
         _reverse_meta_packet(&mut packet2);
-        let flush_timestamp = packet2.lookup_key.timestamp;
+        let flush_timestamp = packet2.lookup_key.timestamp.into();
         flow_map.inject_meta_packet(&config, &mut packet2);
 
         flow_map.inject_flush_ticker(&config, flush_timestamp);
@@ -2388,11 +2388,8 @@ mod tests {
         let mut packet1 = _new_meta_packet();
         packet1.tcp_data.seq = 1111;
         packet1.tcp_data.ack = 112;
-        packet1.lookup_key.timestamp = Duration::from_nanos(
-            (packet1.lookup_key.timestamp.as_nanos() / TIME_UNIT.as_nanos() * TIME_UNIT.as_nanos())
-                as u64,
-        );
-        let flush_timestamp = packet1.lookup_key.timestamp;
+        packet1.lookup_key.timestamp = packet1.lookup_key.timestamp.round_to(TIME_UNIT.into());
+        let flush_timestamp = packet1.lookup_key.timestamp.into();
         flow_map.inject_meta_packet(&config, &mut packet1);
 
         flow_map.inject_flush_ticker(&config, flush_timestamp);
@@ -2423,7 +2420,7 @@ mod tests {
 
         let mut packet1 = _new_meta_packet();
         packet1.tcp_data.flags = TcpFlags::SYN_ACK;
-        packet1.lookup_key.timestamp += Duration::from_millis(10);
+        packet1.lookup_key.timestamp += Timestamp::from_millis(10);
         _reverse_meta_packet(&mut packet1);
         packet1.tcp_data.seq = 1111;
         packet1.tcp_data.ack = 112;
@@ -2431,10 +2428,10 @@ mod tests {
 
         let mut packet2 = _new_meta_packet();
         packet2.tcp_data.flags = TcpFlags::ACK;
-        packet2.lookup_key.timestamp += 2 * Duration::from_millis(10);
+        packet2.lookup_key.timestamp += Timestamp::from_millis(10 * 2);
         packet2.tcp_data.seq = 112;
         packet2.tcp_data.ack = 1112;
-        let flush_timestamp = packet2.lookup_key.timestamp;
+        let flush_timestamp = packet2.lookup_key.timestamp.into();
         flow_map.inject_meta_packet(&config, &mut packet2);
 
         flow_map.inject_flush_ticker(&config, flush_timestamp);
@@ -2517,14 +2514,14 @@ mod tests {
 
         let mut packet1 = _new_meta_packet();
         packet1.tcp_data.flags = TcpFlags::SYN_ACK;
-        packet1.lookup_key.timestamp += Duration::from_millis(10);
+        packet1.lookup_key.timestamp += Timestamp::from_millis(10);
         _reverse_meta_packet(&mut packet1);
         flow_map.inject_meta_packet(&config, &mut packet1);
 
         let mut packet2 = _new_meta_packet();
         packet2.tcp_data.flags = TcpFlags::ACK;
-        packet2.lookup_key.timestamp += Duration::from_millis(10);
-        let flush_timestamp = packet2.lookup_key.timestamp;
+        packet2.lookup_key.timestamp += Timestamp::from_millis(10);
+        let flush_timestamp = packet2.lookup_key.timestamp.into();
         flow_map.inject_meta_packet(&config, &mut packet2);
 
         flow_map.inject_flush_ticker(&config, flush_timestamp);
@@ -2554,7 +2551,7 @@ mod tests {
         };
         let mut packet0 = _new_meta_packet();
         packet0.lookup_key.proto = IpProtocol::Udp;
-        let flush_timestamp = packet0.lookup_key.timestamp;
+        let flush_timestamp = packet0.lookup_key.timestamp.into();
         flow_map.inject_meta_packet(&config, &mut packet0);
 
         flow_map.inject_flush_ticker(&config, flush_timestamp);
@@ -2566,7 +2563,7 @@ mod tests {
 
         let mut packet1 = _new_meta_packet();
         packet1.lookup_key.eth_type = EthernetType::Arp;
-        let flush_timestamp = packet1.lookup_key.timestamp;
+        let flush_timestamp = packet1.lookup_key.timestamp.into();
         flow_map.inject_meta_packet(&config, &mut packet1);
 
         flow_map.inject_flush_ticker(&config, flush_timestamp);
@@ -2596,7 +2593,7 @@ mod tests {
         packet1.lookup_key.tap_type = TapType::Cloud;
         packet1.tcp_data.flags = TcpFlags::RST;
         _reverse_meta_packet(&mut packet1);
-        let flush_timestamp = packet1.lookup_key.timestamp;
+        let flush_timestamp = packet1.lookup_key.timestamp.into();
         flow_map.inject_meta_packet(&config, &mut packet1);
 
         flow_map.inject_flush_ticker(&config, flush_timestamp);
@@ -2624,7 +2621,7 @@ mod tests {
         packet3.lookup_key.l2_end_1 = false;
         packet3.tcp_data.flags = TcpFlags::RST;
         _reverse_meta_packet(&mut packet3);
-        let flush_timestamp = packet3.lookup_key.timestamp;
+        let flush_timestamp = packet3.lookup_key.timestamp.into();
         flow_map.inject_meta_packet(&config, &mut packet3);
 
         flow_map.inject_flush_ticker(&config, flush_timestamp);
@@ -2719,10 +2716,10 @@ mod tests {
         };
         // SYN
         let mut packet0 = _new_meta_packet();
-        packet0.lookup_key.timestamp = Duration::from_nanos(
-            (packet0.lookup_key.timestamp.as_nanos() / STATISTICAL_INTERVAL.as_nanos()
-                * STATISTICAL_INTERVAL.as_nanos()) as u64,
-        );
+        packet0.lookup_key.timestamp = packet0
+            .lookup_key
+            .timestamp
+            .round_to(STATISTICAL_INTERVAL.into());
         let flush_timestamp = packet0.lookup_key.timestamp;
         flow_map.inject_meta_packet(&config, &mut packet0);
 
@@ -2752,8 +2749,8 @@ mod tests {
         _reverse_meta_packet(&mut packet1);
         flow_map.inject_meta_packet(&config, &mut packet1);
 
-        flow_map.inject_flush_ticker(&config, flush_timestamp);
-        flow_map.inject_flush_ticker(&config, flush_timestamp + Duration::from_secs(10));
+        flow_map.inject_flush_ticker(&config, flush_timestamp.into());
+        flow_map.inject_flush_ticker(&config, (flush_timestamp + Duration::from_secs(10)).into());
 
         if let Ok(tagged_flow) = output_queue_receiver.recv(Some(TIME_UNIT)) {
             assert_eq!(tagged_flow.flow.close_type, CloseType::ClientHalfClose);
@@ -2765,16 +2762,16 @@ mod tests {
         let (module_config, mut flow_map, output_queue_receiver) = _new_flow_map_and_receiver(
             TridentType::TtProcess,
             Some(FlowTimeout {
-                opening: Duration::ZERO,
-                established: Duration::from_secs(300),
-                closing: Duration::ZERO,
-                established_rst: Duration::from_secs(30),
-                opening_rst: Duration::from_secs(1),
-                exception: Duration::from_secs(5),
-                closed_fin: Duration::ZERO,
-                single_direction: Duration::from_millis(10),
-                max: Duration::from_secs(300),
-                min: Duration::ZERO,
+                opening: Timestamp::ZERO,
+                established: Timestamp::from_secs(300),
+                closing: Timestamp::ZERO,
+                established_rst: Timestamp::from_secs(30),
+                opening_rst: Timestamp::from_secs(1),
+                exception: Timestamp::from_secs(5),
+                closed_fin: Timestamp::ZERO,
+                single_direction: Timestamp::from_millis(10),
+                max: Timestamp::from_secs(300),
+                min: Timestamp::ZERO,
             }),
             false,
         );
@@ -2794,7 +2791,7 @@ mod tests {
             .duration_since(time::UNIX_EPOCH)
             .unwrap();
         for mut packet in packets {
-            packet.lookup_key.timestamp = timestamp;
+            packet.lookup_key.timestamp = timestamp.into();
             packet.lookup_key.direction = if packet.lookup_key.dst_mac == dst_mac {
                 PacketDirection::ClientToServer
             } else {
@@ -2836,7 +2833,11 @@ mod tests {
         flow_map.inject_meta_packet(&config, &mut packet_1);
         flow_map.inject_flush_ticker(
             &config,
-            packet_0.lookup_key.timestamp.add(Duration::from_secs(120)),
+            packet_0
+                .lookup_key
+                .timestamp
+                .add(Duration::from_secs(120))
+                .into(),
         );
         let tagged_flow = output_queue_receiver.recv(Some(TIME_UNIT)).unwrap();
         assert_eq!(tagged_flow.flow.flow_metrics_peers[0].packet_count, 1);
@@ -2859,7 +2860,11 @@ mod tests {
         flow_map.inject_meta_packet(&config, &mut packet_1);
         flow_map.inject_flush_ticker(
             &config,
-            packet_0.lookup_key.timestamp.add(Duration::from_secs(120)),
+            packet_0
+                .lookup_key
+                .timestamp
+                .add(Duration::from_secs(120))
+                .into(),
         );
         let tagged_flow = output_queue_receiver.recv(Some(TIME_UNIT)).unwrap();
         assert_eq!(tagged_flow.flow.flow_metrics_peers[0].packet_count, 2);
@@ -2880,7 +2885,7 @@ mod tests {
         let capture = Capture::load_pcap("resources/test/flow_generator/http.pcap", None);
         let packets = capture.as_meta_packets();
 
-        flow_map.reset_start_time(packets[0].lookup_key.timestamp);
+        flow_map.reset_start_time(packets[0].lookup_key.timestamp.into());
         let dst_mac = packets[0].lookup_key.dst_mac;
         let timestamp = time::SystemTime::now()
             .duration_since(time::UNIX_EPOCH)
@@ -2888,8 +2893,9 @@ mod tests {
         for mut packet in packets {
             packet.lookup_key.timestamp = Duration::new(
                 timestamp.as_secs(),
-                packet.lookup_key.timestamp.subsec_nanos(),
-            );
+                Duration::from(packet.lookup_key.timestamp).subsec_nanos(),
+            )
+            .into();
             packet.lookup_key.direction = if packet.lookup_key.dst_mac == dst_mac {
                 PacketDirection::ClientToServer
             } else {
@@ -2925,12 +2931,12 @@ mod tests {
         );
         let packets = capture.as_meta_packets();
 
-        flow_map.reset_start_time(packets[0].lookup_key.timestamp);
+        flow_map.reset_start_time(packets[0].lookup_key.timestamp.into());
         let timestamp = time::SystemTime::now()
             .duration_since(time::UNIX_EPOCH)
             .unwrap();
         for mut packet in packets {
-            packet.lookup_key.timestamp = timestamp;
+            packet.lookup_key.timestamp = timestamp.into();
             flow_map.inject_meta_packet(&config, &mut packet);
         }
 
@@ -2951,17 +2957,17 @@ mod tests {
             }),
             Box::new(FlowNode {
                 timestamp_key: 60,
-                recent_time: Duration::from_secs(40),
+                recent_time: Timestamp::from_secs(40),
                 ..Default::default()
             }),
             Box::new(FlowNode {
                 timestamp_key: 60,
-                recent_time: Duration::from_secs(10),
+                recent_time: Timestamp::from_secs(10),
                 ..Default::default()
             }),
             Box::new(FlowNode {
                 timestamp_key: 60,
-                recent_time: Duration::from_secs(60),
+                recent_time: Timestamp::from_secs(60),
                 ..Default::default()
             }),
             Box::new(FlowNode {
@@ -2970,7 +2976,7 @@ mod tests {
             }),
             Box::new(FlowNode {
                 timestamp_key: 60,
-                recent_time: Duration::from_secs(60),
+                recent_time: Timestamp::from_secs(60),
                 ..Default::default()
             }),
             Box::new(FlowNode {
@@ -2979,12 +2985,12 @@ mod tests {
             }),
             Box::new(FlowNode {
                 timestamp_key: 60,
-                recent_time: Duration::from_secs(20),
+                recent_time: Timestamp::from_secs(20),
                 ..Default::default()
             }),
             Box::new(FlowNode {
                 timestamp_key: 60,
-                recent_time: Duration::from_secs(60),
+                recent_time: Timestamp::from_secs(60),
                 ..Default::default()
             }),
         ];

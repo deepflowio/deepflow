@@ -80,8 +80,8 @@ impl MetaAppProto {
         head: AppProtoHead,
     ) -> Option<Self> {
         let mut base_info = AppProtoLogsBaseInfo {
-            start_time: meta_packet.lookup_key.timestamp,
-            end_time: meta_packet.lookup_key.timestamp,
+            start_time: meta_packet.lookup_key.timestamp.into(),
+            end_time: meta_packet.lookup_key.timestamp.into(),
             flow_id: flow.flow.flow_id,
             vtap_id: flow.flow.flow_key.vtap_id,
             tap_type: flow.flow.flow_key.tap_type,

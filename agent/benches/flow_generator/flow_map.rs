@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use criterion::*;
 
 use deepflow_agent::{
-    _FlowMapConfig as Config, _TcpFlags as TcpFlags,
+    _FlowMapConfig as Config, _TcpFlags as TcpFlags, _Timestamp as Timestamp,
     _new_flow_map_and_receiver as new_flow_map_and_receiver, _new_meta_packet as new_meta_packet,
     _reverse_meta_packet as reverse_meta_packet,
 };
@@ -74,13 +74,13 @@ pub(super) fn bench(c: &mut Criterion) {
                 let dst_port = (i >> 16) as u16;
 
                 let mut pkt = new_meta_packet();
-                pkt.lookup_key.timestamp += Duration::from_nanos(100 * i);
+                pkt.lookup_key.timestamp += Timestamp::from_nanos(100 * i);
                 pkt.lookup_key.src_port = src_port;
                 pkt.lookup_key.dst_port = dst_port;
                 packets.push(pkt);
 
                 let mut pkt = new_meta_packet();
-                pkt.lookup_key.timestamp += Duration::from_nanos(100 * (i + 1));
+                pkt.lookup_key.timestamp += Timestamp::from_nanos(100 * (i + 1));
                 reverse_meta_packet(&mut pkt);
                 pkt.lookup_key.src_port = dst_port;
                 pkt.lookup_key.dst_port = src_port;
@@ -89,7 +89,7 @@ pub(super) fn bench(c: &mut Criterion) {
 
                 for k in 2..10 {
                     let mut pkt = new_meta_packet();
-                    pkt.lookup_key.timestamp += Duration::from_nanos(100 * (i + k));
+                    pkt.lookup_key.timestamp += Timestamp::from_nanos(100 * (i + k));
                     pkt.lookup_key.src_port = src_port;
                     pkt.lookup_key.dst_port = dst_port;
                     pkt.tcp_data.flags = TcpFlags::ACK;

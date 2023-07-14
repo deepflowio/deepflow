@@ -45,7 +45,7 @@ use crate::error;
 use crate::utils::bytes::{read_u16_be, read_u32_be};
 #[cfg(target_os = "linux")]
 use crate::{
-    common::ebpf::GO_HTTP2_UPROBE,
+    common::{ebpf::GO_HTTP2_UPROBE, Timestamp},
     ebpf::{
         MSG_REQUEST_END, MSG_RESPONSE_END, PACKET_KNAME_MAX_PADDING, SK_BPF_DATA, SOCK_DATA_HTTP2,
         SOCK_DATA_TLS_HTTP2, SOCK_DIR_RCV, SOCK_DIR_SND,
@@ -174,9 +174,9 @@ pub struct MetaPacket<'a> {
 impl<'a> MetaPacket<'a> {
     pub fn timestamp_adjust(&mut self, time_diff: i64) {
         if time_diff >= 0 {
-            self.lookup_key.timestamp += Duration::from_nanos(time_diff as u64);
+            self.lookup_key.timestamp += Timestamp::from_nanos(time_diff as u64);
         } else {
-            self.lookup_key.timestamp -= Duration::from_nanos(-time_diff as u64);
+            self.lookup_key.timestamp -= Timestamp::from_nanos(-time_diff as u64);
         }
     }
     pub fn is_tls(&self) -> bool {
@@ -422,6 +422,7 @@ impl<'a> MetaPacket<'a> {
         }
         None
     }
+
     pub fn update<P: AsRef<[u8]> + Into<RawPacket<'a>>>(
         &mut self,
         raw_packet: P,
@@ -450,7 +451,7 @@ impl<'a> MetaPacket<'a> {
         original_length: usize,
     ) -> error::Result<()> {
         let packet = raw_packet.as_ref();
-        self.lookup_key.timestamp = timestamp;
+        self.lookup_key.timestamp = timestamp.into();
         self.lookup_key.l2_end_0 = src_endpoint;
         self.lookup_key.l2_end_1 = dst_endpoint;
         self.packet_len = packet.len() as u32;
@@ -846,7 +847,7 @@ impl<'a> MetaPacket<'a> {
         let mut packet = MetaPacket::default();
 
         packet.lookup_key = LookupKey {
-            timestamp: Duration::from_micros(data.timestamp),
+            timestamp: Timestamp::from_micros(data.timestamp),
             src_ip,
             dst_ip,
             src_port,
