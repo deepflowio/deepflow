@@ -584,6 +584,7 @@ pub enum TraceType {
     Sw8,
     TraceParent,
     NewRpcTraceContext,
+    XTingyun,
     Customize(String),
 }
 
@@ -594,6 +595,7 @@ const TRACE_TYPE_UBER: &str = "uber-trace-id";
 const TRACE_TYPE_SW6: &str = "sw6";
 const TRACE_TYPE_SW8: &str = "sw8";
 const TRACE_TYPE_TRACE_PARENT: &str = "traceparent";
+const TRACE_TYPE_X_TINGYUN: &str = "x-tingyun";
 
 impl From<&str> for TraceType {
     // 参数支持如下两种格式：
@@ -613,6 +615,7 @@ impl From<&str> for TraceType {
             TRACE_TYPE_SW8 => TraceType::Sw8,
             TRACE_TYPE_TRACE_PARENT => TraceType::TraceParent,
             SOFA_NEW_RPC_TRACE_CTX_KEY => TraceType::NewRpcTraceContext,
+            TRACE_TYPE_X_TINGYUN => TraceType::XTingyun,
             _ if t.len() > 0 => TraceType::Customize(format_t.to_string()),
             _ => TraceType::Disabled,
         }
@@ -644,6 +647,7 @@ impl TraceType {
             TraceType::NewRpcTraceContext => {
                 context.to_ascii_lowercase() == SOFA_NEW_RPC_TRACE_CTX_KEY
             }
+            TraceType::XTingyun => context.to_ascii_lowercase() == TRACE_TYPE_X_TINGYUN,
             TraceType::Customize(tag) => context.to_ascii_lowercase() == tag.to_ascii_lowercase(),
             _ => false,
         }
@@ -658,6 +662,7 @@ impl TraceType {
             &TraceType::Sw8 => TRACE_TYPE_SW8.into(),
             &TraceType::TraceParent => TRACE_TYPE_TRACE_PARENT.into(),
             &TraceType::NewRpcTraceContext => SOFA_NEW_RPC_TRACE_CTX_KEY.into(),
+            &TraceType::XTingyun => TRACE_TYPE_X_TINGYUN.into(),
             &TraceType::Customize(ref tag) => tag.to_ascii_lowercase(),
             _ => "".into(),
         }
@@ -671,6 +676,7 @@ impl TraceType {
             TraceType::Sw6 => TRACE_TYPE_SW6.to_string(),
             TraceType::Sw8 => TRACE_TYPE_SW8.to_string(),
             TraceType::TraceParent => TRACE_TYPE_TRACE_PARENT.to_string(),
+            TraceType::XTingyun => TRACE_TYPE_X_TINGYUN.to_string(),
             TraceType::Customize(tag) => tag.to_string(),
             _ => "".to_string(),
         }
