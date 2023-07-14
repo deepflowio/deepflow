@@ -414,7 +414,7 @@ impl MysqlLog {
     }
 
     fn check(payload: &[u8], param: &ParseParam) -> bool {
-        if param.l4_protocol != IpProtocol::Tcp {
+        if param.l4_protocol != IpProtocol::TCP {
             return false;
         }
 
@@ -449,7 +449,7 @@ impl MysqlLog {
         trace_id: Option<&str>,
         info: &mut MysqlInfo,
     ) -> Result<bool> {
-        if proto != IpProtocol::Tcp {
+        if proto != IpProtocol::TCP {
             return Err(Error::InvalidIpProtocol);
         }
 

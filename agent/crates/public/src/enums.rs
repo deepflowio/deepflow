@@ -25,185 +25,99 @@ use serde::Serialize;
 /// EthernetType is an enumeration of ethernet type values, and acts as a decoder
 /// for any type it supports.
 #[derive(Serialize, Debug, PartialEq, Eq, Clone, Copy, PartialOrd, Ord)]
-pub enum EthernetType {
-    // EthernetTypeLLC is not an actual ethernet type.  It is instead a
-    // placeholder we use in Ethernet frames that use the 802.3 standard of
-    // srcmac|dstmac|length|LLC instead of srcmac|dstmac|ethertype.
-    Llc,
-    Ipv4,
-    Arp,
-    Ipv6,
-    TransparentEthernetBridging,
-    Dot1Q,
-    QinQ,
-    LinkLayerDiscovery,
-    Unknown(u16),
-}
+pub struct EthernetType(u16);
 
 impl EthernetType {
-    const LLC: u16 = 0;
-    const IPV4: u16 = 0x0800;
-    const ARP: u16 = 0x0806;
-    const IPV6: u16 = 0x86DD;
-    const DOT1Q: u16 = 0x8100;
-    const TRANSPARENT_ETHERNET_BRIDGING: u16 = 0x6558;
-    const QINQ: u16 = 0x88a8;
-    const LINKLAYER_DISCOVERY: u16 = 0x88cc;
+    pub const LLC: Self = Self(0);
+    pub const IPV4: Self = Self(0x0800);
+    pub const ARP: Self = Self(0x0806);
+    pub const IPV6: Self = Self(0x86DD);
+    pub const DOT1Q: Self = Self(0x8100);
+    pub const TRANSPARENT_ETHERNET_BRIDGING: Self = Self(0x6558);
+    pub const QINQ: Self = Self(0x88a8);
+    pub const LINK_LAYER_DISCOVERY: Self = Self(0x88cc);
 }
 
 impl Default for EthernetType {
     fn default() -> Self {
-        EthernetType::Llc
+        Self::LLC
     }
 }
 
 impl From<u16> for EthernetType {
     fn from(t: u16) -> Self {
-        match t {
-            EthernetType::IPV4 => Self::Ipv4,
-            EthernetType::ARP => Self::Arp,
-            EthernetType::IPV6 => Self::Ipv6,
-            EthernetType::DOT1Q => Self::Dot1Q,
-            EthernetType::TRANSPARENT_ETHERNET_BRIDGING => Self::TransparentEthernetBridging,
-            EthernetType::QINQ => Self::QinQ,
-            EthernetType::LINKLAYER_DISCOVERY => Self::LinkLayerDiscovery,
-            EthernetType::LLC => Self::Llc,
-            _ => Self::Unknown(t),
-        }
+        Self(t)
     }
 }
 
 impl From<EthernetType> for u16 {
     fn from(t: EthernetType) -> Self {
-        match t {
-            EthernetType::Ipv4 => EthernetType::IPV4,
-            EthernetType::Arp => EthernetType::ARP,
-            EthernetType::Ipv6 => EthernetType::IPV6,
-            EthernetType::Dot1Q => EthernetType::DOT1Q,
-            EthernetType::TransparentEthernetBridging => {
-                EthernetType::TRANSPARENT_ETHERNET_BRIDGING
-            }
-            EthernetType::QinQ => EthernetType::QINQ,
-            EthernetType::LinkLayerDiscovery => EthernetType::LINKLAYER_DISCOVERY,
-            EthernetType::Llc => EthernetType::LLC,
-            EthernetType::Unknown(t) => t,
-        }
+        t.0
     }
 }
 
 impl PartialEq<u16> for EthernetType {
     fn eq(&self, other: &u16) -> bool {
-        u16::from(*self).eq(other)
+        &self.0 == other
     }
 }
 
 impl PartialEq<EthernetType> for u16 {
     fn eq(&self, other: &EthernetType) -> bool {
-        u16::from(*other).eq(self)
+        self == &other.0
     }
 }
 
 // IPProtocol is an enumeration of IP protocol values, and acts as a decoder
 // for any type it supports.
 #[derive(Serialize, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
-pub enum IpProtocol {
-    Ipv6HopByHop,
-    Icmpv4,
-    Ipv4,
-    Tcp,
-    Udp,
-    Ipv6,
-    Ipv6Routing,
-    Ipv6Fragment,
-    Gre,
-    Esp,
-    Ah,
-    Icmpv6,
-    NoNextHeader,
-    Ipv6Destination,
-    Ipip,
-    Unknown(u8),
-}
+pub struct IpProtocol(u8);
 
 impl IpProtocol {
-    const IPV6_HOPBYHOP: u8 = 0;
-    const ICMPV4: u8 = 1;
-    const IPV4: u8 = 4;
-    const TCP: u8 = 6;
-    const UDP: u8 = 17;
-    const IPV6: u8 = 41;
-    const IPV6_ROUTING: u8 = 43;
-    const IPV6_FRAGMENT: u8 = 44;
-    const GRE: u8 = 47;
-    const ESP: u8 = 50;
-    const AH: u8 = 51;
-    const ICMPV6: u8 = 58;
-    const NO_NEXT_HEADER: u8 = 59;
-    const IPV6_DESTINATION: u8 = 60;
-    const IPIP: u8 = 94;
+    pub const IPV6_HOP_BY_HOP: Self = Self(0);
+    pub const ICMPV4: Self = Self(1);
+    pub const IPV4: Self = Self(4);
+    pub const TCP: Self = Self(6);
+    pub const UDP: Self = Self(17);
+    pub const IPV6: Self = Self(41);
+    pub const IPV6_ROUTING: Self = Self(43);
+    pub const IPV6_FRAGMENT: Self = Self(44);
+    pub const GRE: Self = Self(47);
+    pub const ESP: Self = Self(50);
+    pub const AH: Self = Self(51);
+    pub const ICMPV6: Self = Self(58);
+    pub const NO_NEXT_HEADER: Self = Self(59);
+    pub const IPV6_DESTINATION: Self = Self(60);
+    pub const IPIP: Self = Self(94);
 }
 
 impl Default for IpProtocol {
     fn default() -> Self {
-        IpProtocol::Unknown(0)
+        Self(0)
     }
 }
 
 impl From<u8> for IpProtocol {
     fn from(protocol: u8) -> Self {
-        match protocol {
-            Self::IPV6_HOPBYHOP => Self::Ipv6HopByHop,
-            Self::ICMPV4 => Self::Icmpv4,
-            Self::IPV4 => Self::Ipv4,
-            Self::TCP => Self::Tcp,
-            Self::UDP => Self::Udp,
-            Self::IPV6 => Self::Ipv6,
-            Self::ICMPV6 => Self::Icmpv6,
-            Self::GRE => Self::Gre,
-            Self::ESP => Self::Esp,
-            Self::AH => Self::Ah,
-            Self::IPV6_ROUTING => Self::Ipv6Routing,
-            Self::IPV6_FRAGMENT => Self::Ipv6Fragment,
-            Self::NO_NEXT_HEADER => Self::NoNextHeader,
-            Self::IPV6_DESTINATION => Self::Ipv6Destination,
-            Self::IPIP => Self::Ipip,
-            p => Self::Unknown(p),
-        }
+        Self(protocol)
     }
 }
 
 impl From<IpProtocol> for u8 {
     fn from(protocol: IpProtocol) -> Self {
-        match protocol {
-            IpProtocol::Tcp => IpProtocol::TCP,
-            IpProtocol::Udp => IpProtocol::UDP,
-            IpProtocol::Icmpv4 => IpProtocol::ICMPV4,
-            IpProtocol::Ipv4 => IpProtocol::IPV4,
-            IpProtocol::Ipv6 => IpProtocol::IPV6,
-            IpProtocol::Icmpv6 => IpProtocol::ICMPV6,
-            IpProtocol::Gre => IpProtocol::GRE,
-            IpProtocol::Ah => IpProtocol::AH,
-            IpProtocol::Esp => IpProtocol::ESP,
-            IpProtocol::Ipv6HopByHop => IpProtocol::IPV6_HOPBYHOP,
-            IpProtocol::Ipv6Routing => IpProtocol::IPV6_ROUTING,
-            IpProtocol::Ipv6Fragment => IpProtocol::IPV6_FRAGMENT,
-            IpProtocol::NoNextHeader => IpProtocol::NO_NEXT_HEADER,
-            IpProtocol::Ipv6Destination => IpProtocol::IPV6_DESTINATION,
-            IpProtocol::Ipip => IpProtocol::IPIP,
-            IpProtocol::Unknown(p) => p,
-        }
+        protocol.0
     }
 }
 
 impl PartialEq<u8> for IpProtocol {
     fn eq(&self, other: &u8) -> bool {
-        u8::from(*self).eq(other)
+        &self.0 == other
     }
 }
 
 impl PartialEq<IpProtocol> for u8 {
     fn eq(&self, other: &IpProtocol) -> bool {
-        u8::from(*other).eq(self)
+        self == &other.0
     }
 }
 
@@ -218,8 +132,8 @@ pub enum L4Protocol {
 impl From<IpProtocol> for L4Protocol {
     fn from(proto: IpProtocol) -> Self {
         match proto {
-            IpProtocol::Tcp => Self::Tcp,
-            IpProtocol::Udp => Self::Udp,
+            IpProtocol::TCP => Self::Tcp,
+            IpProtocol::UDP => Self::Udp,
             _ => Self::Unknown,
         }
     }
@@ -247,7 +161,6 @@ impl Default for L4Protocol {
 }
 
 #[derive(Serialize, Debug, Clone, Copy, Hash, PartialEq, Eq, Ord)]
-#[repr(u16)]
 pub enum TapType {
     Any,
     Idc(u8),
@@ -460,22 +373,32 @@ pub enum LinuxSllPacketType {
 
 #[cfg(test)]
 mod tests {
+    use std::mem::size_of;
+
     use super::*;
+
     #[test]
     fn assert_ethernet_type() {
-        let eth_type = EthernetType::Ipv6;
+        let eth_type = EthernetType::IPV6;
         let ipv6: u16 = eth_type.into();
         assert_eq!(eth_type, 0x86DDu16);
         assert_eq!(0x86DDu16, eth_type);
         assert_eq!(ipv6, 0x86DDu16);
-        assert_eq!(Ok(EthernetType::Arp), EthernetType::try_from(0x806u16));
+        assert_eq!(Ok(EthernetType::ARP), EthernetType::try_from(0x806u16));
     }
 
     #[test]
     fn assert_ip_protocol() {
-        let ip = IpProtocol::Icmpv6;
+        let ip = IpProtocol::ICMPV6;
         assert_eq!(ip, 58);
         assert_eq!(58, ip);
-        assert_eq!(Ok(IpProtocol::Udp), IpProtocol::try_from(17u8));
+        assert_eq!(Ok(IpProtocol::UDP), IpProtocol::try_from(17u8));
+    }
+
+    #[test]
+    fn check_type_sizes() {
+        assert_eq!(size_of::<EthernetType>(), 2);
+        assert_eq!(size_of::<IpProtocol>(), 1);
+        assert_eq!(size_of::<TapType>(), 2);
     }
 }

@@ -428,7 +428,7 @@ impl MqttLog {
     /// independent of protocol port" requires the first request packet to return true, the others are false,
     /// so only judge whether it is a legitimate "Connect" packet
     pub fn check_protocol(payload: &[u8], param: &ParseParam) -> bool {
-        if param.l4_protocol != IpProtocol::Tcp {
+        if param.l4_protocol != IpProtocol::TCP {
             return false;
         }
 
@@ -453,7 +453,7 @@ impl MqttLog {
     }
 
     fn parse(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
-        if param.l4_protocol != IpProtocol::Tcp {
+        if param.l4_protocol != IpProtocol::TCP {
             return Err(Error::InvalidIpProtocol);
         }
         self.status = L7ResponseStatus::Ok;

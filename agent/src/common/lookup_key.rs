@@ -199,15 +199,15 @@ impl LookupKey {
     }
 
     pub fn is_l2(&self) -> bool {
-        self.eth_type != EthernetType::Ipv4 && self.eth_type != EthernetType::Ipv6
+        self.eth_type != EthernetType::IPV4 && self.eth_type != EthernetType::IPV6
     }
 
     pub fn is_tcp(&self) -> bool {
-        self.proto == IpProtocol::Tcp
+        self.proto == IpProtocol::TCP
     }
 
     pub fn is_ipv4(&self) -> bool {
-        self.eth_type == EthernetType::Ipv4
+        self.eth_type == EthernetType::IPV4
     }
 }
 
