@@ -196,7 +196,8 @@ func (c *Cloud) run() {
 
 	cloudGatherInterval := c.getCloudGatherInterval()
 	ticker := time.NewTicker(time.Second * time.Duration(cloudGatherInterval))
-LOOP:
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-ticker.C:
@@ -210,20 +211,11 @@ LOOP:
 			c.taskCost.TaskCost[c.basicInfo.Lcuuid] = []int{int(time.Now().Sub(startTime).Seconds())}
 			statsd.MetaStatsd.RegisterStatsdTable(c)
 
-			// check if cloud sync timer changed
-			curCloudGatherInterval := c.getCloudGatherInterval()
-			if curCloudGatherInterval != cloudGatherInterval {
-				ticker.Stop()
-				log.Infof("cloud_gather_interval from %d changed to %d", cloudGatherInterval, curCloudGatherInterval)
-				cloudGatherInterval = curCloudGatherInterval
-				ticker = time.NewTicker(time.Second * time.Duration(cloudGatherInterval))
-			}
 		case <-c.cCtx.Done():
-			break LOOP
+			log.Infof("cloud (%s) stopped", c.basicInfo.Name)
+			return
 		}
 	}
-	log.Infof("cloud (%s) stopped", c.basicInfo.Name)
-	ticker.Stop()
 }
 
 func (c *Cloud) startKubernetesGatherTask() {
