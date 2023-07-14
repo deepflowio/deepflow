@@ -341,6 +341,17 @@ impl SofaRpcLog {
                 Ok(vec![L7ProtocolInfo::SofaRpcInfo(self.info.clone())])
             };
         }
+
+        // due to sofa is susceptible to mischeck, need to check the class name is ascii when is strict
+        if strict {
+            if (&payload[0..hdr.class_len as usize])
+                .iter()
+                .any(|b| !b.is_ascii())
+            {
+                return Err(Error::L7ProtocolUnknown);
+            };
+        }
+
         payload = &payload[hdr.class_len as usize..];
 
         if hdr.hdr_len != 0 {
