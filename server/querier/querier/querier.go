@@ -28,6 +28,7 @@ import (
 	yaml "gopkg.in/yaml.v2"
 
 	"github.com/deepflowio/deepflow/server/libs/logger"
+	"github.com/deepflowio/deepflow/server/libs/stats"
 	prometheus_router "github.com/deepflowio/deepflow/server/querier/app/prometheus/router"
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
@@ -82,11 +83,24 @@ func Start(configPath, serverLogFile string) {
 	router.QueryRouter(r)
 	profile_router.ProfileRouter(r, &cfg)
 	prometheus_router.PrometheusRouter(r)
+	registerRouterCounter(r.Routes())
 	// TODO: 增加router
 	if err := r.Run(fmt.Sprintf(":%d", cfg.ListenPort)); err != nil {
 		log.Errorf("startup service failed, err:%v\n", err)
 		statsd.QuerierCounter.Close()
 		os.Exit(0)
+	}
+}
+
+func registerRouterCounter(routers gin.RoutesInfo) {
+	statsd.ApiCounters = make(map[string]*statsd.ApiCounter, len(routers))
+	for _, v := range routers {
+		newCounter := statsd.NewApiCounter()
+		statsd.ApiCounters[v.Method+v.Path] = newCounter
+		statsd.RegisterCountableForIngester("querier_api_count", newCounter, stats.OptionStatTags{
+			"method": v.Method,
+			"path":   v.Path,
+		})
 	}
 }
 
@@ -128,11 +142,20 @@ func ErrHandle() gin.HandlerFunc {
 func StatdHandle() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		startTime := time.Now()
+		key := c.Request.Method + c.Request.URL.Path
 		c.Next()
 		statsd.QuerierCounter.WriteApi(
 			&statsd.ClickhouseCounter{
 				ApiTime: uint64(time.Since(startTime)),
 			},
 		)
+		// counters for per api
+		if counter, ok := statsd.ApiCounters[key]; ok {
+			counter.Write(
+				&statsd.ApiStats{
+					ApiTime: uint64(time.Since(startTime)),
+				},
+			)
+		}
 	}
 }
