@@ -176,7 +176,7 @@ impl NpbBuilder {
             packet_size += VLAN_HEADER_SIZE;
         }
 
-        vec![u8::from(IpProtocol::Tcp); packet_size]
+        vec![u8::from(IpProtocol::TCP); packet_size]
     }
 
     pub fn on_config_change(&mut self, config: &NpbConfig, queue_debugger: &QueueDebugger) {

@@ -170,7 +170,7 @@ impl L7ProtocolParserInterface for RedisLog {
         if !param.ebpf_type.is_raw_protocol() {
             return false;
         }
-        if param.l4_protocol != IpProtocol::Tcp {
+        if param.l4_protocol != IpProtocol::TCP {
             return false;
         }
 
@@ -261,7 +261,7 @@ impl RedisLog {
         is_from_ebpf: bool,
         info: &mut RedisInfo,
     ) -> Result<()> {
-        if proto != IpProtocol::Tcp {
+        if proto != IpProtocol::TCP {
             return Err(Error::InvalidIpProtocol);
         }
 

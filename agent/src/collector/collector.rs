@@ -820,7 +820,7 @@ impl Stash {
 // ignore the server for non-TCP/UDP traffic
 fn ignore_server_port(flow: &Flow, inactive_server_port_enabled: bool) -> bool {
     (!flow.is_active_service && !inactive_server_port_enabled)
-        || (flow.flow_key.proto != IpProtocol::Tcp && flow.flow_key.proto != IpProtocol::Udp)
+        || (flow.flow_key.proto != IpProtocol::TCP && flow.flow_key.proto != IpProtocol::UDP)
 }
 
 fn get_single_tagger(
@@ -836,7 +836,7 @@ fn get_single_tagger(
     let flow_key = &flow.flow_key;
     let side = &flow.flow_metrics_peers[ep];
     let has_mac = side.is_vip_interface || direction == Direction::LocalToLocal;
-    let is_ipv6 = flow.eth_type == EthernetType::Ipv6;
+    let is_ipv6 = flow.eth_type == EthernetType::IPV6;
 
     let ip = if !is_active_host && !config.inactive_ip_enabled {
         if is_ipv6 {
@@ -931,7 +931,7 @@ fn get_edge_tagger(
     let src_ep = &flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC];
     let dst_ep = &flow.flow_metrics_peers[FLOW_METRICS_PEER_DST];
 
-    let is_ipv6 = flow.eth_type == EthernetType::Ipv6;
+    let is_ipv6 = flow.eth_type == EthernetType::IPV6;
 
     let (src_ip, dst_ip) = {
         let (mut src_ip, mut dst_ip) = (
@@ -1338,7 +1338,7 @@ mod tests {
         let mut tagger = Tagger {
             l3_epc_id: l3_epc_id as i16,
             l3_epc_id1: l3_epc_id as i16,
-            protocol: IpProtocol::Tcp,
+            protocol: IpProtocol::TCP,
             server_port: port,
             direction: Direction::ClientToServer,
             code: Code::IP
@@ -1389,7 +1389,7 @@ mod tests {
         tagger.server_port ^= 0x8000;
         let key = StashKey::new(&tagger, Ipv4Addr::UNSPECIFIED.into(), None, 0);
         assert_eq!(map.insert(key), true);
-        tagger.protocol = IpProtocol::Icmpv6;
+        tagger.protocol = IpProtocol::ICMPV6;
         let key = StashKey::new(&tagger, Ipv4Addr::UNSPECIFIED.into(), None, 0);
         assert_eq!(map.insert(key), true);
         tagger.l3_epc_id ^= 0x1;

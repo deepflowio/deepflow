@@ -63,8 +63,8 @@ impl From<(&ParseParam<'_>, &[u8])> for ParseCtx {
             port_src: p.port_src,
             port_dst: p.port_dst,
             l4_protocol: match p.l4_protocol {
-                IpProtocol::Tcp => 6,
-                IpProtocol::Udp => 17,
+                IpProtocol::TCP => 6,
+                IpProtocol::UDP => 17,
                 _ => unreachable!(),
             },
             proto: 0,

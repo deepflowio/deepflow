@@ -349,13 +349,13 @@ fn fill_l7_stats(
         (
             IpAddr::from(Ipv4Addr::UNSPECIFIED),
             IpAddr::from(Ipv4Addr::UNSPECIFIED),
-            EthernetType::Ipv4,
+            EthernetType::IPV4,
         )
     } else {
         (
             IpAddr::from(Ipv6Addr::UNSPECIFIED),
             IpAddr::from(Ipv6Addr::UNSPECIFIED),
-            EthernetType::Ipv6,
+            EthernetType::IPV6,
         )
     };
     let mut l4_protocol = L4Protocol::Tcp;

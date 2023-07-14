@@ -88,7 +88,7 @@ impl FlowMapKey {
 
     pub(super) fn new(lookup_key: &LookupKey, tap_port: TapPort) -> Self {
         match lookup_key.eth_type {
-            EthernetType::Ipv4 | EthernetType::Ipv6 => {
+            EthernetType::IPV4 | EthernetType::IPV6 => {
                 let lhs = Self::l3_hash(lookup_key);
                 let rhs = ((u16::from(lookup_key.tap_type) as u64) << 24
                     | tap_port.ignore_nat_source())
@@ -96,7 +96,7 @@ impl FlowMapKey {
                     | Self::l4_hash(lookup_key);
                 Self { lhs, rhs }
             }
-            EthernetType::Arp => {
+            EthernetType::ARP => {
                 let lhs = Self::l3_hash(lookup_key);
                 let rhs = ((u16::from(lookup_key.tap_type) as u64) << 24
                     | tap_port.ignore_nat_source())
@@ -210,7 +210,7 @@ impl FlowNode {
         }
 
         // other ethernet type
-        if flow.eth_type != EthernetType::Ipv4 && meta_lookup_key.eth_type != EthernetType::Ipv6 {
+        if flow.eth_type != EthernetType::IPV4 && meta_lookup_key.eth_type != EthernetType::IPV6 {
             // direction = ClientToServer
             if flow_key.mac_src == meta_lookup_key.src_mac
                 && flow_key.mac_dst == meta_lookup_key.dst_mac

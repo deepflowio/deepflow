@@ -273,8 +273,8 @@ impl VmCtxBase {
         off += 4;
 
         match self.l4_protocol {
-            IpProtocol::Tcp => buf[off] = 6,
-            IpProtocol::Udp => buf[off] = 17,
+            IpProtocol::TCP => buf[off] = 6,
+            IpProtocol::UDP => buf[off] = 17,
             _ => unreachable!(),
         }
         buf[off + 1] = self.proto;

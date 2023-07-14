@@ -614,8 +614,8 @@ impl FlowMap {
                 // 设置timestamp_key为流的相同，time_set根据key来删除
                 meta_packet.flow_id = node.tagged_flow.flow.flow_id;
                 let flow_closed = match meta_packet.lookup_key.proto {
-                    IpProtocol::Tcp => self.update_tcp_node(config, node, meta_packet),
-                    IpProtocol::Udp => self.update_udp_node(config, node, meta_packet),
+                    IpProtocol::TCP => self.update_tcp_node(config, node, meta_packet),
+                    IpProtocol::UDP => self.update_udp_node(config, node, meta_packet),
                     _ => self.update_other_node(config, node, meta_packet),
                 };
 
@@ -949,7 +949,7 @@ impl FlowMap {
     fn l7_log_parse_enabled(config: &FlowConfig, lookup_key: &LookupKey) -> bool {
         // parse tap_type any or tap_type in config
         config.app_proto_log_enabled
-            && (lookup_key.proto == IpProtocol::Tcp || lookup_key.proto == IpProtocol::Udp)
+            && (lookup_key.proto == IpProtocol::TCP || lookup_key.proto == IpProtocol::UDP)
             && (config.l7_log_tap_types[u16::from(TapType::Any) as usize]
                 || lookup_key.tap_type <= TapType::Max
                     && config.l7_log_tap_types[u16::from(lookup_key.tap_type) as usize])
@@ -989,7 +989,7 @@ impl FlowMap {
         let lookup_key = &meta_packet.lookup_key;
         let is_active_service = if meta_packet.signal_source == SignalSource::EBPF {
             match lookup_key.proto {
-                IpProtocol::Tcp => true, // Tcp data coming from eBPF means it must be an active service
+                IpProtocol::TCP => true, // Tcp data coming from eBPF means it must be an active service
                 _ => false,
             }
         } else {
@@ -1157,8 +1157,8 @@ impl FlowMap {
                 self.so_plugin_counter_map.as_ref().map(|p| p.clone()),
                 self.stats_counter.clone(),
                 match meta_packet.lookup_key.proto {
-                    IpProtocol::Tcp => flow_config.rrt_tcp_timeout,
-                    IpProtocol::Udp => flow_config.rrt_udp_timeout,
+                    IpProtocol::TCP => flow_config.rrt_tcp_timeout,
+                    IpProtocol::UDP => flow_config.rrt_udp_timeout,
                     _ => 0,
                 },
             )
@@ -1523,8 +1523,8 @@ impl FlowMap {
         // there will not be use config.capacity to limit the addition of FlowNode
         self.stats_counter.new.fetch_add(1, Ordering::Relaxed);
         let mut node = match meta_packet.lookup_key.proto {
-            IpProtocol::Tcp => self.new_tcp_node(config, meta_packet),
-            IpProtocol::Udp => self.new_udp_node(config, meta_packet),
+            IpProtocol::TCP => self.new_tcp_node(config, meta_packet),
+            IpProtocol::UDP => self.new_udp_node(config, meta_packet),
             _ => self.new_other_node(config, meta_packet),
         };
 
@@ -1617,7 +1617,7 @@ impl FlowMap {
         );
 
         // Enterprise Edition Feature: packet-sequence
-        if self.packet_sequence_enabled && flow.flow_key.proto == IpProtocol::Tcp {
+        if self.packet_sequence_enabled && flow.flow_key.proto == IpProtocol::TCP {
             if let Some(block) = node.packet_sequence_block.take() {
                 if let Err(_) = self.packet_sequence_queue.as_ref().unwrap().send(block) {
                     warn!("packet sequence block to queue failed maybe queue have terminated");
@@ -1627,7 +1627,7 @@ impl FlowMap {
 
         let mut l7_stats = L7Stats::default();
         if config.collector_enabled
-            && (flow.flow_key.proto == IpProtocol::Tcp || flow.flow_key.proto == IpProtocol::Udp)
+            && (flow.flow_key.proto == IpProtocol::TCP || flow.flow_key.proto == IpProtocol::UDP)
         {
             if let Some(perf) = node.meta_flow_log.as_mut() {
                 perf.copy_and_reset_l4_perf_data(flow.reversed, &mut flow);
@@ -1659,7 +1659,7 @@ impl FlowMap {
         // 4. The application protocol cannot be identified
         // 5. The flow ends or the flow lasts more than 60 seconds
         // 6. The L7PerfStats is valuable
-        if flow.flow_key.proto == IpProtocol::Tcp
+        if flow.flow_key.proto == IpProtocol::TCP
             && flow.flow_perf_stats.is_some()
             && Self::l7_metrics_enabled(config)
         {
@@ -1715,7 +1715,7 @@ impl FlowMap {
                 return;
             }
             let mut l7_stats = L7Stats::default();
-            if flow.flow_key.proto == IpProtocol::Tcp || flow.flow_key.proto == IpProtocol::Udp {
+            if flow.flow_key.proto == IpProtocol::TCP || flow.flow_key.proto == IpProtocol::UDP {
                 if let Some(perf) = node.meta_flow_log.as_mut() {
                     perf.copy_and_reset_l4_perf_data(flow.reversed, flow);
                     let l7_timeout_count = self
@@ -1728,8 +1728,8 @@ impl FlowMap {
                     let flow_perf_stats = flow.flow_perf_stats.as_mut().unwrap();
                     flow_perf_stats.l7.sequential_merge(&l7_perf_stats);
                     flow_perf_stats.l7_protocol = l7_protocol;
-                    if flow.flow_key.proto == IpProtocol::Tcp
-                        || flow.flow_key.proto == IpProtocol::Udp
+                    if flow.flow_key.proto == IpProtocol::TCP
+                        || flow.flow_key.proto == IpProtocol::UDP
                     {
                         l7_stats.stats = l7_perf_stats;
                         l7_stats.endpoint = flow.last_endpoint.clone();
@@ -1750,7 +1750,7 @@ impl FlowMap {
             // 4. The application protocol cannot be identified
             // 5. The flow ends or the flow lasts more than 60 seconds
             // 6. The L7PerfStats is valuable
-            if flow.flow_key.proto == IpProtocol::Tcp
+            if flow.flow_key.proto == IpProtocol::TCP
                 && flow.flow_perf_stats.is_some()
                 && Self::l7_metrics_enabled(config)
             {
@@ -1826,7 +1826,7 @@ impl FlowMap {
         let flow_dst_key = ServiceKey::new(lookup_key.dst_ip, dst_l3_epc_id, lookup_key.dst_port);
         let (mut flow_src_score, mut flow_dst_score) = match lookup_key.proto {
             // TCP/UDP
-            IpProtocol::Tcp => {
+            IpProtocol::TCP => {
                 let flags = meta_packet.tcp_data.flags;
                 self.service_table.get_tcp_score(
                     is_first_packet,
@@ -1839,7 +1839,7 @@ impl FlowMap {
                     flow_dst_key,
                 )
             }
-            IpProtocol::Udp => self.service_table.get_udp_score(
+            IpProtocol::UDP => self.service_table.get_udp_score(
                 is_first_packet,
                 meta_packet.need_reverse_flow,
                 lookup_key.direction,
@@ -1905,7 +1905,7 @@ impl FlowMap {
         let flow_src_key = ServiceKey::new(flow_key.ip_src, src_epc_id, flow_key.port_src);
         let flow_dst_key = ServiceKey::new(flow_key.ip_dst, dst_epc_id, flow_key.port_dst);
         let (mut flow_src_score, mut flow_dst_score) = match flow_key.proto {
-            IpProtocol::Tcp => {
+            IpProtocol::TCP => {
                 let toa_sent_by_src = node.tagged_flow.flow.flow_metrics_peers[0].nat_source
                     == TapPort::NAT_SOURCE_TOA;
                 let toa_sent_by_dst = node.tagged_flow.flow.flow_metrics_peers[1].nat_source
@@ -1921,7 +1921,7 @@ impl FlowMap {
                     flow_dst_key,
                 )
             }
-            IpProtocol::Udp => self.service_table.get_udp_score(
+            IpProtocol::UDP => self.service_table.get_udp_score(
                 false,
                 false,
                 PacketDirection::ClientToServer,
@@ -2225,8 +2225,8 @@ pub fn _new_meta_packet<'a>() -> MetaPacket<'a> {
             .into(),
         src_mac: MacAddr::from_str("12:34:56:78:9A:BC").unwrap(),
         dst_mac: MacAddr::from_str("21:43:65:87:A9:CB").unwrap(),
-        eth_type: EthernetType::Ipv4,
-        proto: IpProtocol::Tcp,
+        eth_type: EthernetType::IPV4,
+        proto: IpProtocol::TCP,
         src_ip: Ipv4Addr::new(8, 8, 8, 8).into(),
         dst_ip: Ipv4Addr::new(114, 114, 114, 114).into(),
         src_port: 12345,
@@ -2550,7 +2550,7 @@ mod tests {
             ebpf: None,
         };
         let mut packet0 = _new_meta_packet();
-        packet0.lookup_key.proto = IpProtocol::Udp;
+        packet0.lookup_key.proto = IpProtocol::UDP;
         let flush_timestamp = packet0.lookup_key.timestamp.into();
         flow_map.inject_meta_packet(&config, &mut packet0);
 
@@ -2562,7 +2562,7 @@ mod tests {
         }
 
         let mut packet1 = _new_meta_packet();
-        packet1.lookup_key.eth_type = EthernetType::Arp;
+        packet1.lookup_key.eth_type = EthernetType::ARP;
         let flush_timestamp = packet1.lookup_key.timestamp.into();
         flow_map.inject_meta_packet(&config, &mut packet1);
 

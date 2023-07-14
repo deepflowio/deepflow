@@ -452,8 +452,8 @@ impl DnsLog {
             self.perf_stats = Some(L7PerfStats::default())
         };
         match proto {
-            IpProtocol::Udp => self.decode_payload(payload, info),
-            IpProtocol::Tcp => {
+            IpProtocol::UDP => self.decode_payload(payload, info),
+            IpProtocol::TCP => {
                 if payload.len() <= DNS_TCP_PAYLOAD_OFFSET {
                     let err_msg = format!("dns payload length error:{}", payload.len());
                     return Err(Error::DNSLogParseFailed(err_msg));
