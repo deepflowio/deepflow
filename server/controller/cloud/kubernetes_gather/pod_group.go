@@ -17,10 +17,11 @@
 package kubernetes_gather
 
 import (
+	"strings"
+
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"strings"
 
 	"github.com/bitly/go-simplejson"
 	mapset "github.com/deckarep/golang-set"
@@ -29,17 +30,19 @@ import (
 
 func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error) {
 	log.Debug("get podgroups starting")
-	podControllers := [4][]string{}
+	podControllers := [5][]string{}
 	podControllers[0] = k.k8sInfo["*v1.Deployment"]
 	podControllers[1] = k.k8sInfo["*v1.StatefulSet"]
 	podControllers[2] = k.k8sInfo["*v1.DaemonSet"]
-	podControllers[3] = k.k8sInfo["*v1.Pod"]
+	podControllers[3] = k.k8sInfo["*v1.CloneSet"]
+	podControllers[4] = k.k8sInfo["*v1.Pod"]
 	pgNameToTypeID := map[string]int{
 		"deployment":            common.POD_GROUP_DEPLOYMENT,
 		"statefulset":           common.POD_GROUP_STATEFULSET,
 		"replicaset":            common.POD_GROUP_RC,
 		"daemonset":             common.POD_GROUP_DAEMON_SET,
 		"replicationcontroller": common.POD_GROUP_REPLICASET_CONTROLLER,
+		"cloneset":              common.POD_GROUP_CLONESET,
 	}
 	for t, podController := range podControllers {
 		for _, c := range podController {
@@ -76,17 +79,20 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 				continue
 			}
 			serviceType := common.POD_GROUP_STATEFULSET
-			label := "statefulset" + namespace + ":" + name
+			label := "statefulset:" + namespace + ":" + name
 			replicas := cData.Get("spec").Get("replicas").MustInt()
 			switch t {
 			case 0:
 				serviceType = common.POD_GROUP_DEPLOYMENT
-				label = "deployment" + namespace + ":" + name
+				label = "deployment:" + namespace + ":" + name
 			case 2:
 				replicas = 0
 				serviceType = common.POD_GROUP_DAEMON_SET
-				label = "daemonset" + namespace + ":" + name
+				label = "daemonset:" + namespace + ":" + name
 			case 3:
+				serviceType = common.POD_GROUP_CLONESET
+				label = "cloneset:" + namespace + ":" + name
+			case 4:
 				replicas = 0
 				if metaData.Get("ownerReferences").GetIndex(0).Get("kind").MustString() == "InPlaceSet" {
 					uID = metaData.Get("ownerReferences").GetIndex(0).Get("uid").MustString()
@@ -95,8 +101,8 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 						log.Debugf("inplaceset pod (%s) abstract workload already existed", name)
 						continue
 					}
-					serviceType = 1
-					label = "inplaceset" + ":" + namespace + ":" + name
+					serviceType = common.POD_GROUP_DEPLOYMENT
+					label = "inplaceset:" + namespace + ":" + name
 				} else {
 					providerType := metaData.Get("labels").Get("virtual-kubelet.io/provider-cluster-type").MustString()
 					if providerType != "serverless" && providerType != "proprietary" {
