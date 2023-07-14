@@ -206,7 +206,7 @@ func (s *Synchronizer) prepare(req *trident.PrometheusLabelRequest) error {
 	}
 
 	if len(nonTargetKeyToCount) != 0 {
-		log.Warningf("target id not found, target key to request count: %+v", nonTargetKeyToCount)
+		log.Debugf("target id not found, target key to request count: %+v", nonTargetKeyToCount)
 	}
 
 	if metricNamesToE.Cardinality() == 0 && labelNamesToE.Cardinality() == 0 && labelValuesToE.Cardinality() == 0 &&
