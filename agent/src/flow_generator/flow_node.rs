@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use std::{net::IpAddr, sync::Arc, time::Duration};
+use std::{net::IpAddr, sync::Arc};
 
 use super::{perf::FlowLog, FlowState, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC};
 use crate::common::{
@@ -25,7 +25,7 @@ use crate::common::{
     lookup_key::LookupKey,
     meta_packet::MetaPacket,
     tagged_flow::TaggedFlow,
-    TapPort,
+    TapPort, Timestamp,
 };
 use public::{proto::common::TridentType, utils::net::MacAddr};
 
@@ -117,11 +117,11 @@ impl FlowMapKey {
 #[derive(Default)]
 pub struct FlowNode {
     pub tagged_flow: TaggedFlow,
-    pub min_arrived_time: Duration,
+    pub min_arrived_time: Timestamp,
     // 最近一个Packet的时间戳
-    pub recent_time: Duration,
+    pub recent_time: Timestamp,
     // 相对超时时间
-    pub timeout: Duration,
+    pub timeout: Timestamp,
     // 用作time_set比对的标识，等于FlowTimeKey的timestamp_key, 只有创建FlowNode和刷新更新流节点的超时才会更新
     pub timestamp_key: u64,
 

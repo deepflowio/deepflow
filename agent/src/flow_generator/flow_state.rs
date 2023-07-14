@@ -16,11 +16,10 @@
 
 use std::mem::{self, MaybeUninit};
 use std::rc::Rc;
-use std::time::Duration;
 
 use super::FlowTimeout;
 
-use crate::common::enums::TcpFlags;
+use crate::common::{enums::TcpFlags, Timestamp};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum FlowState {
@@ -50,13 +49,13 @@ pub enum FlowState {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct StateValue {
-    pub timeout: Duration,
+    pub timeout: Timestamp,
     pub state: FlowState,
     pub closed: bool,
 }
 
 impl StateValue {
-    pub fn new(timeout: Duration, state: FlowState, closed: bool) -> Self {
+    pub fn new(timeout: Timestamp, state: FlowState, closed: bool) -> Self {
         Self {
             timeout,
             state,
@@ -68,7 +67,7 @@ impl StateValue {
 impl Default for StateValue {
     fn default() -> Self {
         Self {
-            timeout: Duration::default(),
+            timeout: Timestamp::default(),
             state: FlowState::Raw,
             closed: false,
         }
@@ -784,9 +783,9 @@ mod tests {
             timestamp_key: get_timestamp(0).as_nanos() as u64,
 
             tagged_flow: Default::default(),
-            min_arrived_time: Duration::ZERO,
-            recent_time: Duration::ZERO,
-            timeout: Duration::ZERO,
+            min_arrived_time: Timestamp::ZERO,
+            recent_time: Timestamp::ZERO,
+            timeout: Timestamp::ZERO,
             flow_state: FlowState::Raw,
             meta_flow_log: None,
             policy_data_cache: Default::default(),
@@ -852,9 +851,9 @@ mod tests {
             timestamp_key: get_timestamp(0).as_nanos() as u64,
 
             tagged_flow: Default::default(),
-            min_arrived_time: Duration::ZERO,
-            recent_time: Duration::ZERO,
-            timeout: Duration::ZERO,
+            min_arrived_time: Timestamp::ZERO,
+            recent_time: Timestamp::ZERO,
+            timeout: Timestamp::ZERO,
             flow_state: FlowState::Raw,
             meta_flow_log: None,
             policy_data_cache: Default::default(),
@@ -928,7 +927,7 @@ mod tests {
         let capture = Capture::load_pcap(pcap_file, None);
         let packets = capture.as_meta_packets();
         let delta = packets.first().unwrap().lookup_key.timestamp;
-        let mut last_timestamp = Duration::ZERO;
+        let mut last_timestamp = Timestamp::ZERO;
         let ep = EndpointDataPov::new(Arc::new(EndpointData {
             src_info: EndpointInfo {
                 real_ip: Ipv4Addr::UNSPECIFIED.into(),
@@ -965,13 +964,13 @@ mod tests {
         for mut pkt in packets {
             pkt.endpoint_data.replace(ep.clone());
 
-            pkt.lookup_key.timestamp = get_timestamp(0) + (pkt.lookup_key.timestamp - delta);
+            pkt.lookup_key.timestamp = (pkt.lookup_key.timestamp - delta) + get_timestamp(0);
             last_timestamp = pkt.lookup_key.timestamp;
             flow_map.inject_meta_packet(&config, &mut pkt);
         }
 
-        flow_map.inject_flush_ticker(&config, last_timestamp);
-        flow_map.inject_flush_ticker(&config, last_timestamp + Duration::from_secs(600));
+        flow_map.inject_flush_ticker(&config, last_timestamp.into());
+        flow_map.inject_flush_ticker(&config, (last_timestamp + Timestamp::from_secs(600)).into());
 
         let mut tagged_flows = vec![];
         // 如果不设置超时，队列就会永远等待
@@ -1063,7 +1062,7 @@ mod tests {
 
         // expected output
         pub next_state: FlowState,
-        pub timeout: Duration,
+        pub timeout: Timestamp,
         pub closed: bool,
     }
 
