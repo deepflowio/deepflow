@@ -43,6 +43,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/stats/pb"
 	"github.com/deepflowio/deepflow/server/libs/utils"
 	"github.com/deepflowio/deepflow/server/libs/zerodoc"
+	mpb "github.com/deepflowio/deepflow/server/libs/zerodoc/pb"
 )
 
 var log = logging.MustGetLogger("ext_metrics.decoder")
@@ -126,6 +127,8 @@ func (d *Decoder) Run() {
 	d.initMetricsTable()
 	buffer := make([]interface{}, BUFFER_SIZE)
 	decoder := &codec.SimpleDecoder{}
+	prometheusMetric := &mpb.PrometheusMetric{}
+	extraLabels := &[]prompb.Label{}
 	for {
 		n := d.inQueue.Gets(buffer)
 		for i := 0; i < n; i++ {
@@ -142,7 +145,7 @@ func (d *Decoder) Run() {
 			if d.msgType == datatype.MESSAGE_TYPE_TELEGRAF {
 				d.handleTelegraf(recvBytes.VtapID, decoder)
 			} else if d.msgType == datatype.MESSAGE_TYPE_PROMETHEUS {
-				d.handlePrometheus(recvBytes.VtapID, decoder)
+				d.handlePrometheus(recvBytes.VtapID, decoder, prometheusMetric, extraLabels)
 			} else if d.msgType == datatype.MESSAGE_TYPE_DFSTATS {
 				d.handleDeepflowStats(recvBytes.VtapID, decoder)
 			}
@@ -173,9 +176,14 @@ func DecodeWriteRequest(compressed []byte) (*prompb.WriteRequest, error) {
 
 	return &req, nil
 }
-
-func (d *Decoder) handlePrometheus(vtapID uint16, decoder *codec.SimpleDecoder) {
+func prometheusMetricReset(m *mpb.PrometheusMetric) {
+	m.Metrics = m.Metrics[:0]
+	m.ExtraLabelNames = m.ExtraLabelNames[:0]
+	m.ExtraLabelValues = m.ExtraLabelValues[:0]
+}
+func (d *Decoder) handlePrometheus(vtapID uint16, decoder *codec.SimpleDecoder, prometheusMetric *mpb.PrometheusMetric, extraLabels *[]prompb.Label) {
 	for !decoder.IsEnd() {
+		prometheusMetricReset(prometheusMetric)
 		data := decoder.ReadBytes()
 		if decoder.Failed() {
 			if d.counter.ErrorCount == 0 {
@@ -184,7 +192,14 @@ func (d *Decoder) handlePrometheus(vtapID uint16, decoder *codec.SimpleDecoder) 
 			d.counter.ErrorCount++
 			return
 		}
-		req, err := DecodeWriteRequest(data)
+		if err := prometheusMetric.Unmarshal(data); err != nil {
+			if d.counter.ErrorCount == 0 {
+				log.Warningf("prometheus metric parse failed, err msg: %s", err)
+			}
+			d.counter.ErrorCount++
+			continue
+		}
+		req, err := DecodeWriteRequest(prometheusMetric.Metrics)
 		if err != nil {
 			if d.counter.ErrorCount == 0 {
 				log.Warningf("prometheus parse failed, err msg:%s", err)
@@ -192,8 +207,17 @@ func (d *Decoder) handlePrometheus(vtapID uint16, decoder *codec.SimpleDecoder) 
 			d.counter.ErrorCount++
 		}
 
-		for _, ts := range req.Timeseries {
-			d.sendPrometheus(vtapID, &ts)
+		*extraLabels = (*extraLabels)[:0]
+		for i := range prometheusMetric.ExtraLabelNames {
+			*extraLabels = append(*extraLabels, prompb.Label{
+				Name:  prometheusMetric.ExtraLabelNames[i],
+				Value: prometheusMetric.ExtraLabelValues[i],
+			})
+		}
+
+		for i := range req.Timeseries {
+			req.Timeseries[i].Labels = append(req.Timeseries[i].Labels, *extraLabels...)
+			d.sendPrometheus(vtapID, &req.Timeseries[i])
 		}
 	}
 }
