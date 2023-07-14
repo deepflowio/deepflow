@@ -144,6 +144,10 @@ func (c *Cloud) getCloudData() {
 	var cResource model.Resource
 	if c.basicInfo.Type != common.KUBERNETES {
 		var err error
+		lastResource := c.resource
+		if lastResource.ErrorState == common.RESOURCE_STATE_CODE_SUCCESS && lastResource.Verified && len(lastResource.VMs) > 0 {
+			c.resource.SubDomainResources = c.getSubDomainData(lastResource)
+		}
 		cResource, err = c.platform.GetCloudData()
 		// 这里因为任务内部没有对成功的状态赋值状态码，在这里统一处理了
 		if err == nil {

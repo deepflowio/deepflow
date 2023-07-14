@@ -42,7 +42,7 @@ type Recorder struct {
 	domainLcuuid string
 	domainName   string
 	cacheMng     *cache.CacheManager
-	canRefresh   chan bool // 一个recorder中需要保证，同一时间只有一个goroutine在操作cache
+	canRefresh   chan bool // 一个 recorder 中需要保证，同一时间只有一个 goroutine 在操作 cache
 	eventQueue   *queue.OverwriteQueue
 }
 
@@ -57,7 +57,7 @@ func NewRecorder(domainLcuuid string, cfg config.RecorderConfig, ctx context.Con
 	}
 }
 
-// recorder 开始，启动一个刷新cache的定时任务，保证cache能够在数据异常后自动恢复
+// recorder 开始，启动一个刷新 cache 的定时任务，保证 cache 能够在数据异常后自动恢复
 func (r *Recorder) Start() {
 	r.canRefresh <- true
 	go func() {

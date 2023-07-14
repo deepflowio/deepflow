@@ -154,7 +154,7 @@ func CreateVtapGroup(vtapGroupCreate model.VtapGroupCreate, cfg *config.Controll
 	}
 
 	response, _ := GetVtapGroups(map[string]interface{}{"lcuuid": lcuuid})
-	refresh.RefreshCache([]string{common.VTAP_CHANGED})
+	refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
 	return response[0], nil
 }
 
@@ -263,7 +263,7 @@ func UpdateVtapGroup(lcuuid string, vtapGroupUpdate map[string]interface{}, cfg 
 	mysql.Db.Model(&vtapGroup).Updates(dbUpdateMap)
 
 	response, _ := GetVtapGroups(map[string]interface{}{"lcuuid": lcuuid})
-	refresh.RefreshCache([]string{common.VTAP_CHANGED})
+	refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
 	return response[0], nil
 }
 
@@ -284,6 +284,6 @@ func DeleteVtapGroup(lcuuid string) (resp map[string]string, err error) {
 	mysql.Db.Model(&mysql.VTap{}).Where("vtap_group_lcuuid = ?", lcuuid).Update("vtap_group_lcuuid", defaultVtapGroup.Lcuuid)
 	mysql.Db.Delete(&vtapGroup)
 	mysql.Db.Where("vtap_group_lcuuid = ?", lcuuid).Delete(&mysql.VTapGroupConfiguration{})
-	refresh.RefreshCache([]string{common.VTAP_CHANGED})
+	refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
 	return map[string]string{"LCUUID": lcuuid}, nil
 }

@@ -17,7 +17,6 @@
 package recorder
 
 import (
-	"context"
 	"fmt"
 	"time"
 
@@ -101,7 +100,7 @@ func (t *SuiteTest) TestCleanDirtyData() {
 	assert.Equal(t.T(), 1, len(podServicePorts))
 	assert.Equal(t.T(), 1, len(podGroupPorts))
 
-	cleaner := NewResourceCleaner(nil, context.Background())
+	cleaner := GetSingletonCleaner()
 	cleaner.cleanDirtyData()
 	mysql.Db.Find(&subnets)
 	assert.Equal(t.T(), 0, len(subnets))

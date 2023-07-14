@@ -73,7 +73,7 @@ func (c *AnalyzerCheck) Start() {
 		for {
 			excludeIPs := <-c.ch
 			c.vtapAnalyzerAlloc(excludeIPs)
-			refresh.RefreshCache([]string{common.VTAP_CHANGED})
+			refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
 		}
 	}()
 }

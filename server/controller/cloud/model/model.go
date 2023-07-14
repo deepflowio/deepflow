@@ -148,6 +148,7 @@ type VInterface struct {
 	VPCLcuuid       string `json:"vpc_lcuuid"` // TODO not used
 	RegionLcuuid    string `json:"region_lcuuid" binding:"required"`
 	NetnsID         uint32 `json:"netns_id"`
+	VTapID          uint32 `json:"vtap_id" binding:"required"`
 	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
 }
 

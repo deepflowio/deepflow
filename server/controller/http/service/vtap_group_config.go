@@ -352,7 +352,7 @@ func CreateVTapGroupConfig(createData *model.VTapGroupConfiguration) (*mysql.VTa
 	lcuuid := uuid.New().String()
 	dbData.Lcuuid = &lcuuid
 	mysql.Db.Create(dbData)
-	refresh.RefreshCache([]string{common.VTAP_CHANGED})
+	refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
 	return dbData, nil
 }
 
@@ -368,7 +368,7 @@ func DeleteVTapGroupConfig(lcuuid string) (*mysql.VTapGroupConfiguration, error)
 		return nil, fmt.Errorf("vtap group configuration(%s) not found", lcuuid)
 	}
 	db.Delete(dbConfig)
-	refresh.RefreshCache([]string{common.VTAP_CHANGED})
+	refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
 	return dbConfig, nil
 }
 
@@ -388,7 +388,7 @@ func UpdateVTapGroupConfig(lcuuid string, updateData *model.VTapGroupConfigurati
 	if ret.Error != nil {
 		return nil, fmt.Errorf("save config failed, %s", ret.Error)
 	}
-	refresh.RefreshCache([]string{common.VTAP_CHANGED})
+	refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
 	return dbConfig, nil
 }
 
@@ -600,7 +600,7 @@ func UpdateVTapGroupAdvancedConfig(lcuuid string, updateData *model.VTapGroupCon
 	if string(b) == string(emptyData) {
 		b = nil
 	}
-	refresh.RefreshCache([]string{common.VTAP_CHANGED})
+	refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
 	return string(b), nil
 }
 
@@ -635,7 +635,7 @@ func CreateVTapGroupAdvancedConfig(createData *model.VTapGroupConfiguration) (st
 	if err != nil {
 		log.Error(err)
 	}
-	refresh.RefreshCache([]string{common.VTAP_CHANGED})
+	refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
 	return string(b), nil
 }
 
@@ -690,7 +690,7 @@ func DeleteVTapGroupConfigByFilter(args map[string]string) (string, error) {
 	if err != nil {
 		log.Error(err)
 	}
-	refresh.RefreshCache([]string{common.VTAP_CHANGED})
+	refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
 	return string(b), nil
 }
 

@@ -495,6 +495,7 @@ func GetHostNics(hosts []model.Host, domainName, uuidGenerate, portNameRegex str
 			retVInterfaces = append(retVInterfaces, model.VInterface{
 				Lcuuid:        vinterfaceLcuuid,
 				NetnsID:       vinterface.NetnsID,
+				VTapID:        vinterface.VtapID,
 				Type:          common.VIF_TYPE_LAN,
 				Mac:           vinterface.Mac,
 				DeviceType:    common.VIF_DEVICE_TYPE_HOST,

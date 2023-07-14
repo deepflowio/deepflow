@@ -31,7 +31,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/monitor/vtap"
 	"github.com/deepflowio/deepflow/server/controller/prometheus"
 	"github.com/deepflowio/deepflow/server/controller/recorder"
-	recorderdb "github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
@@ -92,7 +91,7 @@ func checkAndStartMasterFunctions(
 	vtapCheck := vtap.NewVTapCheck(cfg.MonitorCfg, ctx)
 	vtapRebalanceCheck := vtap.NewRebalanceCheck(cfg.MonitorCfg, ctx)
 	vtapLicenseAllocation := license.NewVTapLicenseAllocation(cfg.MonitorCfg, ctx)
-	resourceCleaner := recorder.NewResourceCleaner(&cfg.ManagerCfg.TaskCfg.RecorderCfg, ctx)
+	recorderResource := recorder.GetSingletonResource()
 	domainChecker := resoureservice.NewDomainCheck(ctx)
 	prometheus := prometheus.GetSingleton()
 
@@ -111,7 +110,7 @@ func checkAndStartMasterFunctions(
 				migrateMySQL(cfg)
 
 				// 启动资源ID管理器
-				err := recorderdb.IDMNG.Start()
+				err := recorderResource.IDManager.Start()
 				if err != nil {
 					log.Error("resource id mananger start failed")
 					time.Sleep(time.Second)
@@ -139,7 +138,7 @@ func checkAndStartMasterFunctions(
 				}
 
 				// 资源数据清理
-				resourceCleaner.Start()
+				recorderResource.Cleaner.Start()
 
 				// domain检查及自愈
 				domainChecker.Start()
@@ -164,11 +163,11 @@ func checkAndStartMasterFunctions(
 				// stop vtap license allocation and check
 				vtapLicenseAllocation.Stop()
 
-				resourceCleaner.Stop()
+				recorderResource.Cleaner.Stop()
 
 				domainChecker.Stop()
 
-				recorderdb.IDMNG.Stop()
+				recorderResource.IDManager.Stop()
 
 				prometheus.Encoder.Stop()
 			} else {

@@ -63,7 +63,7 @@ func (c *CEN) generateDBItemToAdd(cloudItem *cloudmodel.CEN) (*mysql.CEN, bool) 
 		Name:   cloudItem.Name,
 		Label:  cloudItem.Label,
 		Domain: c.cache.DomainLcuuid,
-		VPCIDs: common.IntArrayToString(vpcIDs),
+		VPCIDs: common.IntSliceToString(vpcIDs),
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
@@ -74,7 +74,7 @@ func (c *CEN) generateUpdateInfo(diffBase *cache.CEN, cloudItem *cloudmodel.CEN)
 	if diffBase.Name != cloudItem.Name {
 		updateInfo["name"] = cloudItem.Name
 	}
-	if !common.AreElementsSameInTwoArray(diffBase.VPCLcuuids, cloudItem.VPCLcuuids) {
+	if !common.ElementsSame(diffBase.VPCLcuuids, cloudItem.VPCLcuuids) {
 		vpcIDs := []int{}
 		for _, vpcLcuuid := range cloudItem.VPCLcuuids {
 			vpcID, exists := c.cache.ToolDataSet.GetVPCIDByLcuuid(vpcLcuuid)
@@ -87,7 +87,7 @@ func (c *CEN) generateUpdateInfo(diffBase *cache.CEN, cloudItem *cloudmodel.CEN)
 			}
 			vpcIDs = append(vpcIDs, vpcID)
 		}
-		updateInfo["epc_ids"] = common.IntArrayToString(vpcIDs)
+		updateInfo["epc_ids"] = common.IntSliceToString(vpcIDs)
 	}
 
 	if len(updateInfo) > 0 {

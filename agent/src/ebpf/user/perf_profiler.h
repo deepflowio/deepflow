@@ -41,7 +41,7 @@
 #define BIT_26_MAX_VAL	0x3ffffffU
 #define PID_MAX_VAL	BIT_26_MAX_VAL
 #define STACK_ID_MAX	BIT_26_MAX_VAL
-
+#define CPU_INVALID	0xFFF
 typedef struct {
 	union {
 		struct {
@@ -141,4 +141,5 @@ int start_continuous_profiler(int freq,
 void process_stack_trace_data_for_flame_graph(stack_trace_msg_t *val);
 void release_flame_graph_hash(void);
 int set_profiler_regex(const char *pattern);
+int set_profiler_cpu_aggregation(int flag);
 #endif /* DF_USER_PERF_PROFILER_H */

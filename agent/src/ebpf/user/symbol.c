@@ -46,6 +46,12 @@
 #endif
 #include "libGoReSym.h"
 
+/*
+ * When a process exits, save the symbol cache pids
+ * to be deleted.
+ */
+static struct symbol_cache_del_pids cache_del_pids;
+
 void free_uprobe_symbol(struct symbol_uprobe *u_sym,
 			struct tracer_probes_conf *conf)
 {
@@ -475,38 +481,84 @@ static inline void free_symbolizer_cache_kvp(struct symbolizer_cache_kvp *kv)
 		clib_mem_free((void *)kv->v.proc_info_p);
 }
 
-/* pid : The process ID (PID) that occurs when a process exits. */
+static inline void symbol_cache_pids_lock(void)
+{
+	while (__atomic_test_and_set(cache_del_pids.lock, __ATOMIC_ACQUIRE))
+		CLIB_PAUSE();
+}
+
+static inline void symbol_cache_pids_unlock(void)
+{
+	__atomic_clear(cache_del_pids.lock, __ATOMIC_RELEASE);
+}
+
+/*
+ * When a process exits, synchronize and update its corresponding
+ * symbol cache.
+ *
+ * @pid : The process ID (PID) that occurs when a process exits.
+ */
 void update_symbol_cache(pid_t pid)
 {
-	if (!enable_symbol_cache())
+	if (!enable_symbol_cache()) {
 		return;
+	}
 
-	/*
-	 * TODO(@jiping) Clean up using a synchronous approach.
-	 */
+	symbol_caches_hash_t *h = &syms_cache_hash;
+	struct symbolizer_cache_kvp kv;
+	kv.k.pid = (u64) pid;
+	kv.v.proc_info_p = 0;
+	kv.v.cache = 0;
+	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *)&kv,
+				      (symbol_caches_hash_kv *)&kv) == 0) {
+		int ret = VEC_OK;
 
-	//symbol_caches_hash_t *h = &syms_cache_hash;
-	//struct symbolizer_cache_kvp kv;
-	//kv.k.pid = (u64) pid;
-	//kv.v.proc_info_p = 0;
-	//kv.v.cache = 0;
-	//if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *)&kv,
-	//			      (symbol_caches_hash_kv *)&kv) == 0) {
-	//	if (kv.v.cache != 0) {
-	//		free_symbolizer_cache_kvp(&kv);
-	//	}
+		symbol_cache_pids_lock();
+		vec_add1(cache_del_pids.pid_caches, kv, ret);
+		if (ret != VEC_OK) {
+			ebpf_warning("vec add failed.\n");
+		}
+		symbol_cache_pids_unlock();
+	}
+}
 
-	//	if (symbol_caches_hash_add_del(h, (symbol_caches_hash_kv *) &kv,
-	//				       0 /* delete */ )) {
-	//		ebpf_warning("symbol_caches_hash_add_del() failed.(pid %d)\n",
-	//			     pid);
-	//	} else
-	//		__sync_fetch_and_add(&h->hash_elems_count, -1);
-	//}
+void exec_symbol_cache_update(void)
+{
+	symbol_caches_hash_t *h = &syms_cache_hash;
+	struct symbolizer_cache_kvp *kv;
+	symbol_cache_pids_lock();
+        vec_foreach(kv, cache_del_pids.pid_caches) {
+		free_symbolizer_cache_kvp(kv);
+		if (symbol_caches_hash_add_del(h, (symbol_caches_hash_kv *)kv,
+					       0 /* delete */ )) {
+			ebpf_warning("symbol_caches_hash_add_del() failed.(pid %d)\n",
+				     (pid_t)kv->k.pid);
+		} else {
+			__sync_fetch_and_add(&h->hash_elems_count, -1);
+		}
+	}
+	vec_free(cache_del_pids.pid_caches);
+	symbol_cache_pids_unlock();
 }
 
 static int init_symbol_cache(const char *name)
 {
+	/*
+	 * Thread-safe for cache_del_pids.pids
+	 */
+	cache_del_pids.lock =
+			clib_mem_alloc_aligned("pids_alloc_lock",
+					       CLIB_CACHE_LINE_BYTES,
+					       CLIB_CACHE_LINE_BYTES,
+					       NULL);
+	if (cache_del_pids.lock == NULL) {
+		ebpf_error("cache_del_pids.lock alloc memory failed.\n");
+		return (-1);
+	}
+
+	cache_del_pids.lock[0] = 0;
+	cache_del_pids.pid_caches = NULL;
+
 	symbol_caches_hash_t *h = &syms_cache_hash;
 	memset(h, 0, sizeof(*h));
 	u32 nbuckets = SYMBOLIZER_CACHES_HASH_BUCKETS_NUM;
@@ -779,11 +831,15 @@ static int free_symbolizer_kvp_cb(symbol_caches_hash_kv * kv, void *ctx)
 
 void release_symbol_caches(void)
 {
+	/* Update symbol_cache hash from cache_del_pids. */
+	exec_symbol_cache_update();
+
 	/* user symbol caches release */
 	u64 elems_count = 0;
 	symbol_caches_hash_t *h = &syms_cache_hash;
 	ebpf_info("Release symbol_caches %lu elements\n", h->hash_elems_count);
 
+	symbol_cache_pids_lock();
 	symbol_caches_hash_foreach_key_value_pair(h, free_symbolizer_kvp_cb,
 						  (void *)&elems_count);
 	print_hash_symbol_caches(h);
@@ -796,6 +852,7 @@ void release_symbol_caches(void)
 		bcc_free_symcache(k_resolver, -1);
 		k_resolver = NULL;
 	}
+	symbol_cache_pids_unlock();
 }
 
 #else /* defined AARCH64_MUSL */
