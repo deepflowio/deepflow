@@ -38,7 +38,6 @@ func NewVM(wholeCache *cache.Cache, cloudData []cloudmodel.VM) *VM {
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -118,17 +117,4 @@ func (m *VM) generateUpdateInfo(diffBase *cache.VM, cloudItem *cloudmodel.VM) (m
 		return updateInfo, true
 	}
 	return updateInfo, false
-}
-
-func (m *VM) addCache(dbItems []*mysql.VM) {
-	m.cache.AddVMs(dbItems)
-}
-
-func (m *VM) updateCache(cloudItem *cloudmodel.VM, diffBase *cache.VM) {
-	diffBase.Update(cloudItem)
-	m.cache.UpdateVM(cloudItem)
-}
-
-func (m *VM) deleteCache(lcuuids []string) {
-	m.cache.DeleteVMs(lcuuids)
 }

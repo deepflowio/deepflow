@@ -30,24 +30,24 @@ type RDSInstance struct {
 }
 
 func NewRDSInstance(c *cache.Cache, eq *queue.OverwriteQueue) *RDSInstance {
-	lisener := &RDSInstance{
+	listener := &RDSInstance{
 		cache:         c,
 		eventProducer: event.NewRDSInstance(&c.ToolDataSet, eq),
 	}
-	return lisener
+	return listener
 }
 
-func (p *RDSInstance) OnUpdaterAdded(addedDBItems []*mysql.RDSInstance) {
-	// p.cache.AddRDSInstances(addedDBItems)
-	p.eventProducer.ProduceByAdd(addedDBItems)
+func (r *RDSInstance) OnUpdaterAdded(addedDBItems []*mysql.RDSInstance) {
+	r.eventProducer.ProduceByAdd(addedDBItems)
+	r.cache.AddRDSInstances(addedDBItems)
 }
 
-func (p *RDSInstance) OnUpdaterUpdated(cloudItem *cloudmodel.RDSInstance, diffBase *cache.RDSInstance) {
-	// diffBase.Update(cloudItem)
-	// p.cache.UpdateRDSInstance(cloudItem)
+func (r *RDSInstance) OnUpdaterUpdated(cloudItem *cloudmodel.RDSInstance, diffBase *cache.RDSInstance) {
+	diffBase.Update(cloudItem)
+	r.cache.UpdateRDSInstance(cloudItem)
 }
 
-func (p *RDSInstance) OnUpdaterDeleted(lcuuids []string) {
-	p.eventProducer.ProduceByDelete(lcuuids)
-	// p.cache.DeleteRDSInstances(lcuuids)
+func (r *RDSInstance) OnUpdaterDeleted(lcuuids []string) {
+	r.eventProducer.ProduceByDelete(lcuuids)
+	r.cache.DeleteRDSInstances(lcuuids)
 }

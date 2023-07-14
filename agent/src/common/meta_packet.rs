@@ -403,7 +403,7 @@ impl<'a> MetaPacket<'a> {
         }
     }
 
-    // 目前仅支持获取UDP或TCP的Paylaod
+    // 目前仅支持获取UDP或TCP的Payload
     pub fn get_l4_payload(&self) -> Option<&[u8]> {
         if self.lookup_key.proto != IpProtocol::Tcp && self.lookup_key.proto != IpProtocol::Udp {
             return None;

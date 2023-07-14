@@ -38,7 +38,6 @@ func NewFloatingIP(wholeCache *cache.Cache, cloudData []cloudmodel.FloatingIP) *
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -108,16 +107,4 @@ func (f *FloatingIP) generateUpdateInfo(diffBase *cache.FloatingIP, cloudItem *c
 		updateInfo["region"] = cloudItem.RegionLcuuid
 	}
 	return updateInfo, len(updateInfo) > 0
-}
-
-func (f *FloatingIP) addCache(dbItems []*mysql.FloatingIP) {
-	f.cache.AddFloatingIPs(dbItems)
-}
-
-func (f *FloatingIP) updateCache(cloudItem *cloudmodel.FloatingIP, diffBase *cache.FloatingIP) {
-	diffBase.Update(cloudItem)
-}
-
-func (f *FloatingIP) deleteCache(lcuuids []string) {
-	f.cache.DeleteFloatingIPs(lcuuids)
 }

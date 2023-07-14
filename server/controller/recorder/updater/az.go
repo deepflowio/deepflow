@@ -37,7 +37,6 @@ func NewAZ(wholeCache *cache.Cache, cloudData []cloudmodel.AZ) *AZ {
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -72,16 +71,4 @@ func (z *AZ) generateUpdateInfo(diffBase *cache.AZ, cloudItem *cloudmodel.AZ) (m
 		return updateInfo, true
 	}
 	return nil, false
-}
-
-func (z *AZ) addCache(dbItems []*mysql.AZ) {
-	z.cache.AddAZs(dbItems)
-}
-
-func (z *AZ) updateCache(cloudItem *cloudmodel.AZ, diffBase *cache.AZ) {
-	diffBase.Update(cloudItem)
-}
-
-func (z *AZ) deleteCache(lcuuids []string) {
-	z.cache.DeleteAZs(lcuuids)
 }

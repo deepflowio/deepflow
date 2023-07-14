@@ -34,5 +34,3 @@ const (
 	TAP_PORT_CHOST    = "tap_port_chost"
 	TAP_PORT_POD_NODE = "tap_port_pod_node"
 )
-
-const MAX_LRU_ENTRY = 100000

@@ -88,6 +88,7 @@ pub enum ProtobufRpcProtocol {
 #[derive(Serialize, Debug, Clone, PartialEq, Hash, Eq)]
 pub enum CustomProtocol {
     Wasm(u8, String),
+    So(u8, String),
 }
 
 #[derive(Clone, Debug, PartialEq)]

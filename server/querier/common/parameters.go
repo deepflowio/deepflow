@@ -19,6 +19,7 @@ package common
 import (
 	"context"
 	"strings"
+	"time"
 )
 
 type QuerierParams struct {
@@ -62,4 +63,9 @@ func (p *TempoParams) SetFilters(filterStr string) {
 type KeyValue struct {
 	Key   string
 	Value string
+}
+
+type EntryValue struct {
+	Filter string
+	Time   time.Time
 }

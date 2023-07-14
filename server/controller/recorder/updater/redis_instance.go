@@ -38,7 +38,6 @@ func NewRedisInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RedisInsta
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -95,17 +94,4 @@ func (r *RedisInstance) generateUpdateInfo(diffBase *cache.RedisInstance, cloudI
 		return updateInfo, true
 	}
 	return nil, false
-}
-
-func (r *RedisInstance) addCache(dbItems []*mysql.RedisInstance) {
-	r.cache.AddRedisInstances(dbItems)
-}
-
-func (r *RedisInstance) updateCache(cloudItem *cloudmodel.RedisInstance, diffBase *cache.RedisInstance) {
-	diffBase.Update(cloudItem)
-	r.cache.UpdateRedisInstance(cloudItem)
-}
-
-func (r *RedisInstance) deleteCache(lcuuids []string) {
-	r.cache.DeleteRedisInstances(lcuuids)
 }

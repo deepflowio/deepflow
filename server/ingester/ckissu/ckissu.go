@@ -783,6 +783,15 @@ var ColumnAdd626 = []*ColumnAdds{
 	},
 }
 
+var ColumnAdd633 = []*ColumnAdds{
+	&ColumnAdds{
+		Dbs:         []string{"flow_metrics"},
+		Tables:      []string{"vtap_flow_port.1m", "vtap_flow_port.1m_local", "vtap_flow_port.1s", "vtap_flow_port.1s_local", "vtap_app_port.1m", "vtap_app_port.1m_local", "vtap_app_port.1s", "vtap_app_port.1s_local"},
+		ColumnNames: []string{"role"},
+		ColumnType:  ckdb.UInt8,
+	},
+}
+
 var TableRenames626 = []*TableRename{
 	&TableRename{
 		OldDb:     "event",
@@ -1058,7 +1067,19 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo, isEdgeTab
 		},
 	}
 
-	for _, version := range [][]*ColumnAdds{columnAddss612, columnAddss620, columnAddss623, columnAddss625} {
+	columnAddss633 := []*ColumnAdds{}
+	if !isEdgeTable {
+		columnAddss633 = []*ColumnAdds{
+			&ColumnAdds{
+				Dbs:         []string{d.db},
+				Tables:      []string{d.name, d.name + "_agg"},
+				ColumnNames: []string{"role"},
+				ColumnType:  ckdb.UInt8,
+			},
+		}
+	}
+
+	for _, version := range [][]*ColumnAdds{columnAddss612, columnAddss620, columnAddss623, columnAddss625, columnAddss633} {
 		for _, addrs := range version {
 			columnAdds = append(columnAdds, getColumnAdds(addrs)...)
 		}
@@ -1137,7 +1158,7 @@ func NewCKIssu(cfg *config.Config) (*Issu, error) {
 		datasourceInfo: make(map[string]*DatasourceInfo),
 	}
 
-	allVersionAdds := [][]*ColumnAdds{ColumnAdd610, ColumnAdd611, ColumnAdd612, ColumnAdd613, ColumnAdd615, ColumnAdd618, ColumnAdd620, ColumnAdd623, ColumnAdd625, ColumnAdd626}
+	allVersionAdds := [][]*ColumnAdds{ColumnAdd610, ColumnAdd611, ColumnAdd612, ColumnAdd613, ColumnAdd615, ColumnAdd618, ColumnAdd620, ColumnAdd623, ColumnAdd625, ColumnAdd626, ColumnAdd633}
 	i.columnAdds = []*ColumnAdd{}
 	for _, versionAdd := range allVersionAdds {
 		for _, adds := range versionAdd {

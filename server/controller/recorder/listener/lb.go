@@ -30,25 +30,25 @@ type LB struct {
 }
 
 func NewLB(c *cache.Cache, eq *queue.OverwriteQueue) *LB {
-	lisener := &LB{
+	listener := &LB{
 		cache:         c,
 		eventProducer: event.NewLB(&c.ToolDataSet, eq),
 	}
-	return lisener
+	return listener
 }
 
-func (p *LB) OnUpdaterAdded(addedDBItems []*mysql.LB) {
-	// p.cache.AddLBs(addedDBItems)
-	p.eventProducer.ProduceByAdd(addedDBItems)
+func (lb *LB) OnUpdaterAdded(addedDBItems []*mysql.LB) {
+	lb.eventProducer.ProduceByAdd(addedDBItems)
+	lb.cache.AddLBs(addedDBItems)
 }
 
-func (p *LB) OnUpdaterUpdated(cloudItem *cloudmodel.LB, diffBase *cache.LB) {
-	p.eventProducer.ProduceByUpdate(cloudItem, diffBase)
-	// diffBase.Update(cloudItem)
-	// p.cache.UpdateLB(cloudItem)
+func (lb *LB) OnUpdaterUpdated(cloudItem *cloudmodel.LB, diffBase *cache.LB) {
+	lb.eventProducer.ProduceByUpdate(cloudItem, diffBase)
+	diffBase.Update(cloudItem)
+	lb.cache.UpdateLB(cloudItem)
 }
 
-func (p *LB) OnUpdaterDeleted(lcuuids []string) {
-	p.eventProducer.ProduceByDelete(lcuuids)
-	// p.cache.DeleteLBs(lcuuids)
+func (lb *LB) OnUpdaterDeleted(lcuuids []string) {
+	lb.eventProducer.ProduceByDelete(lcuuids)
+	lb.cache.DeleteLBs(lcuuids)
 }

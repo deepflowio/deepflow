@@ -22,19 +22,19 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
-type Domain struct {
+type WholeDomain struct {
 	cache         *cache.Cache
 	eventProducer *event.Domain
 }
 
-func NewDomain(domainLcuuid string, c *cache.Cache, eq *queue.OverwriteQueue) *Domain {
-	lisener := &Domain{
+func NewWholeDomain(domainLcuuid string, c *cache.Cache, eq *queue.OverwriteQueue) *WholeDomain {
+	listener := &WholeDomain{
 		cache:         c,
 		eventProducer: event.NewDomain(domainLcuuid, &c.ToolDataSet, eq),
 	}
-	return lisener
+	return listener
 }
 
-func (p *Domain) OnUpdatersCompeleted() {
+func (p *WholeDomain) OnUpdatersCompleted() {
 	p.eventProducer.ProduceFromMySQL()
 }

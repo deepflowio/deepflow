@@ -439,9 +439,10 @@ impl Session {
         sync_grpc_call!(self, plugin, request, PLUGIN_ENDPOINT)
     }
 
-    pub async fn get_wasm_plugin(
+    pub async fn get_plugin(
         &self,
         name: &str,
+        plugin_type: PluginType,
         ctrl_ip: &str,
         ctrl_mac: &str,
     ) -> Result<Vec<u8>> {
@@ -449,7 +450,7 @@ impl Session {
             .plugin(trident::PluginRequest {
                 ctrl_ip: Some(ctrl_ip.into()),
                 ctrl_mac: Some(ctrl_mac.into()),
-                plugin_type: Some(PluginType::Wasm as i32),
+                plugin_type: Some(plugin_type as i32),
                 plugin_name: Some(name.into()),
             })
             .await?;

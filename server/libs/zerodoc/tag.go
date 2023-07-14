@@ -902,7 +902,7 @@ func GenTagColumns(code Code) []*ckdb.Column {
 	}
 
 	if code&Direction != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("direction", ckdb.LowCardinalityString).SetComment("统计量对应的流方向. c2s: ip为客户端, s2c: ip为服务端"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("role", ckdb.UInt8).SetComment("统计量对应的流方向. 0: ip为客户端, 1: ip为服务端"))
 	}
 
 	if code&GPID != 0 {
@@ -1112,9 +1112,10 @@ func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) {
 
 	if code&Direction != 0 {
 		if t.Direction.IsClientToServer() {
-			block.Write("c2s")
+			// 0: client, 1: server
+			block.Write(uint8(0))
 		} else {
-			block.Write("s2c")
+			block.Write(uint8(1))
 		}
 	}
 

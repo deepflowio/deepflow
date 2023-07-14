@@ -527,6 +527,7 @@ message NtpResponse {
 
 enum  PluginType {
     WASM = 1;
+    SO = 2;
 }
 
 message  PluginRequest  {

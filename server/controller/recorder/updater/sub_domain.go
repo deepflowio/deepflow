@@ -37,7 +37,6 @@ func NewSubDomain(wholeCache *cache.Cache, cloudData []cloudmodel.SubDomain) *Su
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -64,16 +63,4 @@ func (d *SubDomain) generateUpdateInfo(diffBase *cache.SubDomain, cloudItem *clo
 		updateInfo["name"] = cloudItem.Name
 	}
 	return updateInfo, len(updateInfo) > 0
-}
-
-func (d *SubDomain) addCache(dbItems []*mysql.SubDomain) {
-	d.cache.AddSubDomains(dbItems)
-}
-
-func (d *SubDomain) updateCache(cloudItem *cloudmodel.SubDomain, diffBase *cache.SubDomain) {
-	diffBase.Update(cloudItem)
-}
-
-func (d *SubDomain) deleteCache(lcuuids []string) {
-	d.cache.DeleteSubDomains(lcuuids)
 }

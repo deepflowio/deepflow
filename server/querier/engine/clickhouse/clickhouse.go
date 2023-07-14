@@ -21,13 +21,12 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	//"github.com/k0kubun/pp"
 	logging "github.com/op/go-logging"
 	"github.com/xwb1989/sqlparser"
 	"golang.org/x/exp/slices"
-
-	"github.com/deepflowio/deepflow/server/libs/lru"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
@@ -42,7 +41,7 @@ import (
 var log = logging.MustGetLogger("clickhouse")
 
 var DEFAULT_LIMIT = "10000"
-var LRUCache = lru.NewCache[string, string](common.MAX_LRU_ENTRY)
+var INVALID_PROMETHEUS_SUBQUERY_CACHE_ENTRY = "-1"
 
 type TargetLabelFilter struct {
 	OriginFilter string
@@ -616,11 +615,8 @@ func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
 	return nil
 }
 
-func (e *CHEngine) TransWhere(node *sqlparser.Where) error {
-	// 生成where的statement
-	whereStmt := Where{time: e.Model.Time}
-	// 解析ast树并生成view.Node结构
-	expr, err := e.parseWhere(node.Expr, &whereStmt, false)
+func (e *CHEngine) TransPrometheusTargetIDFilter(expr view.Node) (view.Node, error) {
+	// For all filter and hit target_id_list for target label, put them in cache
 	isRemoteRead := false
 	remoteRead := e.Context.Value("remote_read")
 	if remoteRead != nil {
@@ -634,46 +630,84 @@ func (e *CHEngine) TransWhere(node *sqlparser.Where) error {
 			trgetTransFilters[i] = trgetFilter.TransFilter
 		}
 		targetOriginFilterStr := strings.Join(trgetOriginFilters, " AND ")
-		targetFilter, ok := LRUCache.Get(targetOriginFilterStr)
+		prometheusSubqueryCache := GetPrometheusSubqueryCache()
+		targetFilter, ok := prometheusSubqueryCache.PrometheusSubqueryCache.Get(targetOriginFilterStr)
 		if ok {
-			rightExpr := &view.Expr{Value: targetFilter}
-			op := view.Operator{Type: view.AND}
-			expr = &view.BinaryExpr{Left: expr, Right: rightExpr, Op: &op}
-		} else {
-			sql := strings.Join(trgetTransFilters, " INTERSECT ")
-			chClient := client.Client{
-				Host:     config.Cfg.Clickhouse.Host,
-				Port:     config.Cfg.Clickhouse.Port,
-				UserName: config.Cfg.Clickhouse.User,
-				Password: config.Cfg.Clickhouse.Password,
-				DB:       "flow_tag",
-			}
-			targetLabelRst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
-			if err != nil {
-				return err
-			}
-			targetIDs := []string{}
-			for _, v := range targetLabelRst.Values {
-				targetID := v.([]interface{})[0]
-				targetIDInt := targetID.(int)
-				targetIDString := fmt.Sprintf("%d", targetIDInt)
-				targetIDs = append(targetIDs, targetIDString)
-			}
-			if len(targetIDs) > 0 && len(targetIDs) < config.Cfg.MaxTupleElement {
-				targetIDFilter := strings.Join(targetIDs, ",")
-				targetFilter := fmt.Sprintf("target_id IN (%s)", targetIDFilter)
-				rightExpr := &view.Expr{Value: targetFilter}
+			filter := targetFilter.Filter
+			filterTime := targetFilter.Time
+			timeout := time.Since(filterTime)
+			if filter != INVALID_PROMETHEUS_SUBQUERY_CACHE_ENTRY && timeout < time.Duration(config.Cfg.PrometheusIdSubqueryLruTimeout) {
+				rightExpr := &view.Expr{Value: targetFilter.Filter}
 				op := view.Operator{Type: view.AND}
 				expr = &view.BinaryExpr{Left: expr, Right: rightExpr, Op: &op}
-				LRUCache.Add(targetOriginFilterStr, targetFilter)
-			} else if len(targetIDs) >= config.Cfg.MaxTupleElement {
+				return expr, nil
+			} else if filter == INVALID_PROMETHEUS_SUBQUERY_CACHE_ENTRY {
+				sql := strings.Join(trgetTransFilters, " INTERSECT ")
 				targetFilter := fmt.Sprintf("target_id IN (%s)", sql)
 				rightExpr := &view.Expr{Value: targetFilter}
 				op := view.Operator{Type: view.AND}
 				expr = &view.BinaryExpr{Left: expr, Right: rightExpr, Op: &op}
+				return expr, nil
 			}
 		}
+
+		// lru timeout
+		sql := strings.Join(trgetTransFilters, " INTERSECT ")
+		chClient := client.Client{
+			Host:     config.Cfg.Clickhouse.Host,
+			Port:     config.Cfg.Clickhouse.Port,
+			UserName: config.Cfg.Clickhouse.User,
+			Password: config.Cfg.Clickhouse.Password,
+			DB:       "flow_tag",
+		}
+		targetLabelRst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
+		if err != nil {
+			return expr, err
+		}
+		targetIDs := []string{}
+		for _, v := range targetLabelRst.Values {
+			targetID := v.([]interface{})[0]
+			targetIDInt := targetID.(int)
+			targetIDString := fmt.Sprintf("%d", targetIDInt)
+			targetIDs = append(targetIDs, targetIDString)
+		}
+
+		// If the target_id_list is less than a predefined, configurable length (such as 1000),
+		// insert it into the cache; otherwise, use a subquery
+		if len(targetIDs) < config.Cfg.MaxCacheableEntrySize {
+			targetIDFilter := strings.Join(targetIDs, ",")
+			targetFilter := ""
+			if len(targetIDs) == 0 {
+				targetFilter = "1!=1"
+			} else {
+				targetFilter = fmt.Sprintf("target_id IN (%s)", targetIDFilter)
+			}
+			rightExpr := &view.Expr{Value: targetFilter}
+			op := view.Operator{Type: view.AND}
+			expr = &view.BinaryExpr{Left: expr, Right: rightExpr, Op: &op}
+			entryValue := common.EntryValue{Time: time.Now(), Filter: targetFilter}
+			prometheusSubqueryCache.PrometheusSubqueryCache.Add(targetOriginFilterStr, entryValue)
+		} else if len(targetIDs) >= config.Cfg.MaxCacheableEntrySize {
+			// When you find that you can't join the cache,
+			// insert a special value into the cache so that the next time you check the cache, you will find
+			entryValue := common.EntryValue{Time: time.Now(), Filter: INVALID_PROMETHEUS_SUBQUERY_CACHE_ENTRY}
+			prometheusSubqueryCache.PrometheusSubqueryCache.Add(targetOriginFilterStr, entryValue)
+
+			targetFilter := fmt.Sprintf("target_id IN (%s)", sql)
+			rightExpr := &view.Expr{Value: targetFilter}
+			op := view.Operator{Type: view.AND}
+			expr = &view.BinaryExpr{Left: expr, Right: rightExpr, Op: &op}
+		}
 	}
+	return expr, nil
+}
+
+func (e *CHEngine) TransWhere(node *sqlparser.Where) error {
+	// 生成where的statement
+	whereStmt := Where{time: e.Model.Time}
+	// 解析ast树并生成view.Node结构
+	expr, err := e.parseWhere(node.Expr, &whereStmt, false)
+	expr, err = e.TransPrometheusTargetIDFilter(expr)
 	filter := view.Filters{Expr: expr}
 	whereStmt.filter = &filter
 	e.Statements = append(e.Statements, &whereStmt)

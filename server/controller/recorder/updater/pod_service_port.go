@@ -38,7 +38,6 @@ func NewPodServicePort(wholeCache *cache.Cache, cloudData []cloudmodel.PodServic
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -80,16 +79,4 @@ func (p *PodServicePort) generateUpdateInfo(diffBase *cache.PodServicePort, clou
 		return updateInfo, true
 	}
 	return nil, false
-}
-
-func (p *PodServicePort) addCache(dbItems []*mysql.PodServicePort) {
-	p.cache.AddPodServicePorts(dbItems)
-}
-
-func (p *PodServicePort) updateCache(cloudItem *cloudmodel.PodServicePort, diffBase *cache.PodServicePort) {
-	diffBase.Update(cloudItem)
-}
-
-func (p *PodServicePort) deleteCache(lcuuids []string) {
-	p.cache.DeletePodServicePorts(lcuuids)
 }

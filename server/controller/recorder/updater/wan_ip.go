@@ -41,7 +41,6 @@ func NewWANIP(wholeCache *cache.Cache, domainToolDataSet *cache.ToolDataSet) *WA
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -63,9 +62,10 @@ func (i *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.WANIP, boo
 		))
 		return nil, false
 	}
-	subnetID, exists := i.cache.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
-	if !exists {
-		if i.domainToolDataSet != nil {
+	var subnetID int
+	if cloudItem.SubnetLcuuid != "" {
+		subnetID, exists = i.cache.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
+		if !exists && i.domainToolDataSet != nil {
 			subnetID, _ = i.domainToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
 		}
 	}
@@ -124,16 +124,4 @@ func (i *WANIP) generateUpdateInfo(diffBase *cache.WANIP, cloudItem *cloudmodel.
 	}
 
 	return updateInfo, len(updateInfo) > 0
-}
-
-func (i *WANIP) addCache(dbItems []*mysql.WANIP) {
-	i.cache.AddWANIPs(dbItems)
-}
-
-func (i *WANIP) updateCache(cloudItem *cloudmodel.IP, diffBase *cache.WANIP) {
-	diffBase.Update(cloudItem)
-}
-
-func (i *WANIP) deleteCache(lcuuids []string) {
-	i.cache.DeleteWANIPs(lcuuids)
 }

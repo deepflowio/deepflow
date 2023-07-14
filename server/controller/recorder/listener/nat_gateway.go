@@ -30,25 +30,25 @@ type NATGateway struct {
 }
 
 func NewNATGateway(c *cache.Cache, eq *queue.OverwriteQueue) *NATGateway {
-	lisener := &NATGateway{
+	listener := &NATGateway{
 		cache:         c,
 		eventProducer: event.NewNATGateway(&c.ToolDataSet, eq),
 	}
-	return lisener
+	return listener
 }
 
-func (p *NATGateway) OnUpdaterAdded(addedDBItems []*mysql.NATGateway) {
-	// p.cache.AddNATGateways(addedDBItems)
-	p.eventProducer.ProduceByAdd(addedDBItems)
+func (g *NATGateway) OnUpdaterAdded(addedDBItems []*mysql.NATGateway) {
+	g.eventProducer.ProduceByAdd(addedDBItems)
+	g.cache.AddNATGateways(addedDBItems)
 }
 
-func (p *NATGateway) OnUpdaterUpdated(cloudItem *cloudmodel.NATGateway, diffBase *cache.NATGateway) {
-	p.eventProducer.ProduceByUpdate(cloudItem, diffBase)
-	// diffBase.Update(cloudItem)
-	// p.cache.UpdateNATGateway(cloudItem)
+func (g *NATGateway) OnUpdaterUpdated(cloudItem *cloudmodel.NATGateway, diffBase *cache.NATGateway) {
+	g.eventProducer.ProduceByUpdate(cloudItem, diffBase)
+	diffBase.Update(cloudItem)
+	g.cache.UpdateNATGateway(cloudItem)
 }
 
-func (p *NATGateway) OnUpdaterDeleted(lcuuids []string) {
-	p.eventProducer.ProduceByDelete(lcuuids)
-	// p.cache.DeleteNATGateways(lcuuids)
+func (g *NATGateway) OnUpdaterDeleted(lcuuids []string) {
+	g.eventProducer.ProduceByDelete(lcuuids)
+	g.cache.DeleteNATGateways(lcuuids)
 }

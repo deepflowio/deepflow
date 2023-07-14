@@ -215,7 +215,7 @@ impl KrpcLog {
 
         let hdr_len = read_u16_be(&payload[2..]) as usize;
 
-        let pb_paylaod = if hdr_len + KRPC_FIX_HDR_LEN > payload.len() {
+        let pb_payload = if hdr_len + KRPC_FIX_HDR_LEN > payload.len() {
             // if hdr_len + KRPC_FIX_HDR_LEN > payload.len() likely ebpf not read full data from syscall, pb parse to the payload end.
             if strict {
                 return Err(Error::L7ProtocolUnknown);
@@ -226,7 +226,7 @@ impl KrpcLog {
         };
 
         let mut hdr = KrpcMeta::default();
-        if let Err(_) = hdr.merge(pb_paylaod) {
+        if let Err(_) = hdr.merge(pb_payload) {
             if strict {
                 return Err(Error::L7ProtocolUnknown);
             }

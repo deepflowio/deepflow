@@ -30,25 +30,25 @@ type Host struct {
 }
 
 func NewHost(c *cache.Cache, eq *queue.OverwriteQueue) *Host {
-	lisener := &Host{
+	listener := &Host{
 		cache:         c,
 		eventProducer: event.NewHost(&c.ToolDataSet, eq),
 	}
-	return lisener
+	return listener
 }
 
-func (p *Host) OnUpdaterAdded(addedDBItems []*mysql.Host) {
-	// p.cache.AddHosts(addedDBItems)
-	p.eventProducer.ProduceByAdd(addedDBItems)
+func (h *Host) OnUpdaterAdded(addedDBItems []*mysql.Host) {
+	h.eventProducer.ProduceByAdd(addedDBItems)
+	h.cache.AddHosts(addedDBItems)
 }
 
-func (p *Host) OnUpdaterUpdated(cloudItem *cloudmodel.Host, diffBase *cache.Host) {
-	p.eventProducer.ProduceByUpdate(cloudItem, diffBase)
-	// diffBase.Update(cloudItem)
-	// p.cache.UpdateHost(cloudItem)
+func (h *Host) OnUpdaterUpdated(cloudItem *cloudmodel.Host, diffBase *cache.Host) {
+	h.eventProducer.ProduceByUpdate(cloudItem, diffBase)
+	diffBase.Update(cloudItem)
+	h.cache.UpdateHost(cloudItem)
 }
 
-func (p *Host) OnUpdaterDeleted(lcuuids []string) {
-	p.eventProducer.ProduceByDelete(lcuuids)
-	// p.cache.DeleteHosts(lcuuids)
+func (h *Host) OnUpdaterDeleted(lcuuids []string) {
+	h.eventProducer.ProduceByDelete(lcuuids)
+	h.cache.DeleteHosts(lcuuids)
 }

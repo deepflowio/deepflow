@@ -38,7 +38,6 @@ func NewPodNode(wholeCache *cache.Cache, cloudData []cloudmodel.PodNode) *PodNod
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -105,17 +104,4 @@ func (n *PodNode) generateUpdateInfo(diffBase *cache.PodNode, cloudItem *cloudmo
 		return updateInfo, true
 	}
 	return nil, false
-}
-
-func (n *PodNode) addCache(dbItems []*mysql.PodNode) {
-	n.cache.AddPodNodes(dbItems)
-}
-
-func (n *PodNode) updateCache(cloudItem *cloudmodel.PodNode, diffBase *cache.PodNode) {
-	diffBase.Update(cloudItem)
-	n.cache.UpdatePodNode(cloudItem)
-}
-
-func (n *PodNode) deleteCache(lcuuids []string) {
-	n.cache.DeletePodNodes(lcuuids)
 }

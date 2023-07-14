@@ -37,7 +37,6 @@ func NewRegion(wholeCache *cache.Cache, cloudData []cloudmodel.Region) *Region {
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -67,16 +66,4 @@ func (r *Region) generateUpdateInfo(diffBase *cache.Region, cloudItem *cloudmode
 		return updateInfo, true
 	}
 	return nil, false
-}
-
-func (r *Region) addCache(dbItems []*mysql.Region) {
-	r.cache.AddRegions(dbItems)
-}
-
-func (r *Region) updateCache(cloudItem *cloudmodel.Region, diffBase *cache.Region) {
-	diffBase.Update(cloudItem)
-}
-
-func (r *Region) deleteCache(lcuuids []string) {
-	r.cache.DeleteRegions(lcuuids)
 }

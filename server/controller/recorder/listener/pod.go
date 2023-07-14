@@ -30,25 +30,25 @@ type Pod struct {
 }
 
 func NewPod(c *cache.Cache, eq *queue.OverwriteQueue) *Pod {
-	lisener := &Pod{
+	listener := &Pod{
 		cache:         c,
 		eventProducer: event.NewPod(&c.ToolDataSet, eq),
 	}
-	return lisener
+	return listener
 }
 
 func (p *Pod) OnUpdaterAdded(addedDBItems []*mysql.Pod) {
-	// p.cache.AddPods(addedDBItems)
 	p.eventProducer.ProduceByAdd(addedDBItems)
+	p.cache.AddPods(addedDBItems)
 }
 
 func (p *Pod) OnUpdaterUpdated(cloudItem *cloudmodel.Pod, diffBase *cache.Pod) {
 	p.eventProducer.ProduceByUpdate(cloudItem, diffBase)
-	// diffBase.Update(cloudItem)
-	// p.cache.UpdatePod(cloudItem)
+	diffBase.Update(cloudItem)
+	p.cache.UpdatePod(cloudItem)
 }
 
 func (p *Pod) OnUpdaterDeleted(lcuuids []string) {
 	p.eventProducer.ProduceByDelete(lcuuids)
-	// p.cache.DeletePods(lcuuids)
+	p.cache.DeletePods(lcuuids)
 }

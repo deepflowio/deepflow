@@ -20,6 +20,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
+	"github.com/deepflowio/deepflow/server/controller/recorder/listener"
 )
 
 // ResourceUpdater 实现资源进行新旧数据比对，并根据比对结果增删改资源
@@ -42,31 +43,32 @@ type DataGenerator[CT constraint.CloudModel, MT constraint.MySQLModel, BT constr
 	generateUpdateInfo(BT, *CT) (map[string]interface{}, bool)
 }
 
-type CacheHandler[CT constraint.CloudModel, MT constraint.MySQLModel, BT constraint.DiffBase[MT]] interface {
-	// 根据新增的db数据，更新cache
-	addCache([]*MT)
-	// 根据更新的db数据，更新cache
-	updateCache(*CT, BT)
-	// 根据删除的db数据，更新cache
-	deleteCache([]string)
-}
-
-type Callbacks[CT constraint.CloudModel, MT constraint.MySQLModel, BT constraint.DiffBase[MT]] struct {
-	onAdded   func(addedDBItems []*MT)
-	onUpdated func(cloudItem *CT, diffBaseItem BT)
-	onDeleted func(lcuuids []string)
-}
+// type Callbacks[CT constraint.CloudModel, MT constraint.MySQLModel, BT constraint.DiffBase[MT]] struct {
+// 	onAdded   func(addedDBItems []*MT)
+// 	onUpdated func(cloudItem *CT, diffBaseItem BT)
+// 	onDeleted func(lcuuids []string)
+// }
 
 type UpdaterBase[CT constraint.CloudModel, MT constraint.MySQLModel, BT constraint.DiffBase[MT]] struct {
-	cache             *cache.Cache              // 基于 Domain 或者 SubDomain 范围构造
-	domainToolDataSet *cache.ToolDataSet        // TODO ugly 基于 Domain 构造，仅当 Updater 资源属于 SubDomain 时使用
-	dbOperator        db.Operator[MT]           // 数据库操作对象
-	diffBaseData      map[string]BT             // 用于比对的旧资源数据
-	cloudData         []CT                      // 定时获取的新资源数据
-	dataGenerator     DataGenerator[CT, MT, BT] // 提供各类数据生成的方法
-	// TODO 移出updater
-	cacheHandler CacheHandler[CT, MT, BT] // 提供处理cache中特定资源的方法
-	callbacks    Callbacks[CT, MT, BT]
+	cache             *cache.Cache                    // 基于 Domain 或者 SubDomain 范围构造
+	domainToolDataSet *cache.ToolDataSet              // 基于 Domain 构造，仅当 Updater 资源属于 SubDomain 时使用
+	dbOperator        db.Operator[MT]                 // 数据库操作对象
+	diffBaseData      map[string]BT                   // 用于比对的旧资源数据
+	cloudData         []CT                            // 定时获取的新资源数据
+	dataGenerator     DataGenerator[CT, MT, BT]       // 提供各类数据生成的方法
+	listeners         []listener.Listener[CT, MT, BT] // 关注 Updater 的增删改操作行为及详情的监听器
+	// callbacks         Callbacks[CT, MT, BT]
+}
+
+// func (u *UpdaterBase[CT, MT, BT]) RegisterCallbacks(onAdded func(addedDBItems []*MT), onUpdated func(cloudItem *CT, diffBaseItem BT), onDeleted func(lcuuids []string)) {
+// 	u.callbacks.onAdded = onAdded
+// 	u.callbacks.onUpdated = onUpdated
+// 	u.callbacks.onDeleted = onDeleted
+// }
+
+func (u *UpdaterBase[CT, MT, BT]) RegisterListener(listener listener.Listener[CT, MT, BT]) ResourceUpdater {
+	u.listeners = append(u.listeners, listener)
+	return u
 }
 
 func (u *UpdaterBase[CT, MT, BT]) HandleAddAndUpdate() {
@@ -106,13 +108,6 @@ func (u *UpdaterBase[CT, MT, BT]) HandleDelete() {
 	}
 }
 
-func (u *UpdaterBase[CT, MT, BT]) RegisterCallbacks(onAdded func(addedDBItems []*MT), onUpdated func(cloudItem *CT, diffBaseItem BT), onDeleted func(lcuuids []string)) {
-	u.callbacks.onAdded = onAdded
-	u.callbacks.onUpdated = onUpdated
-	u.callbacks.onDeleted = onDeleted
-}
-
-// 创建资源，按序操作DB、cache、资源变更事件
 func (u *UpdaterBase[CT, MT, BT]) add(dbItemsToAdd []*MT) {
 	count := len(dbItemsToAdd)
 	offset := 1000
@@ -131,27 +126,17 @@ func (u *UpdaterBase[CT, MT, BT]) add(dbItemsToAdd []*MT) {
 }
 
 func (u *UpdaterBase[CT, MT, BT]) addPage(dbItemsToAdd []*MT) {
-	addedDBItems, ok := u.dbOperator.AddBatch(dbItemsToAdd)
-	if ok {
-		u.cacheHandler.addCache(addedDBItems)
-		if u.callbacks.onAdded != nil {
-			u.callbacks.onAdded(addedDBItems)
-		}
+	if addedDBItems, ok := u.dbOperator.AddBatch(dbItemsToAdd); ok {
+		u.notifyOnAdded(addedDBItems)
 	}
 }
 
-// 更新资源，按序操作DB、cache、资源变更事件
 func (u *UpdaterBase[CT, MT, BT]) update(cloudItem *CT, diffBase BT, updateInfo map[string]interface{}) {
-	_, ok := u.dbOperator.Update(diffBase.GetLcuuid(), updateInfo)
-	if ok {
-		if u.callbacks.onUpdated != nil {
-			u.callbacks.onUpdated(cloudItem, diffBase)
-		}
-		u.cacheHandler.updateCache(cloudItem, diffBase)
+	if _, ok := u.dbOperator.Update(diffBase.GetLcuuid(), updateInfo); ok {
+		u.notifyOnUpdated(cloudItem, diffBase)
 	}
 }
 
-// 删除资源，按序操作DB、cache、资源变更事件
 func (u *UpdaterBase[CT, MT, BT]) delete(lcuuids []string) {
 	count := len(lcuuids)
 	offset := 1000
@@ -171,9 +156,27 @@ func (u *UpdaterBase[CT, MT, BT]) delete(lcuuids []string) {
 
 func (u *UpdaterBase[CT, MT, BT]) deletePage(lcuuids []string) {
 	if u.dbOperator.DeleteBatch(lcuuids) {
-		if u.callbacks.onDeleted != nil {
-			u.callbacks.onDeleted(lcuuids)
-		}
-		u.cacheHandler.deleteCache(lcuuids)
+		u.notifyOnDeleted(lcuuids)
+	}
+}
+
+func (u *UpdaterBase[CT, MT, BT]) notifyOnAdded(addedDBItems []*MT) {
+	// u.callbacks.onAdded(addedDBItems)
+	for _, l := range u.listeners {
+		l.OnUpdaterAdded(addedDBItems)
+	}
+}
+
+func (u *UpdaterBase[CT, MT, BT]) notifyOnUpdated(cloudItem *CT, diffBaseItem BT) {
+	// u.callbacks.onUpdated(cloudItem, diffBaseItem)
+	for _, l := range u.listeners {
+		l.OnUpdaterUpdated(cloudItem, diffBaseItem)
+	}
+}
+
+func (u *UpdaterBase[CT, MT, BT]) notifyOnDeleted(lcuuids []string) {
+	// u.callbacks.onDeleted(lcuuids)
+	for _, l := range u.listeners {
+		l.OnUpdaterDeleted(lcuuids)
 	}
 }

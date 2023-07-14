@@ -38,7 +38,6 @@ func NewNetwork(wholeCache *cache.Cache, cloudData []cloudmodel.Network) *Networ
 		},
 	}
 	updater.dataGenerator = updater
-	updater.cacheHandler = updater
 	return updater
 }
 
@@ -113,17 +112,4 @@ func (n *Network) generateUpdateInfo(diffBase *cache.Network, cloudItem *cloudmo
 		return updateInfo, true
 	}
 	return nil, false
-}
-
-func (n *Network) addCache(dbItems []*mysql.Network) {
-	n.cache.AddNetworks(dbItems)
-}
-
-func (n *Network) updateCache(cloudItem *cloudmodel.Network, diffBase *cache.Network) {
-	diffBase.Update(cloudItem)
-	n.cache.UpdateNetwork(cloudItem)
-}
-
-func (n *Network) deleteCache(lcuuids []string) {
-	n.cache.DeleteNetworks(lcuuids)
 }
