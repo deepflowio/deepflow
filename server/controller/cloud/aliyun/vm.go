@@ -133,7 +133,6 @@ func (a *Aliyun) getVMs(region model.Region) (
 					Lcuuid:           ipLcuuid,
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               publicIP,
-					SubnetLcuuid:     common.NETWORK_ISP_LCUUID,
 					RegionLcuuid:     a.getRegionLcuuid(region.Lcuuid),
 				}
 				retIPs = append(retIPs, retIP)
@@ -250,7 +249,6 @@ func (a *Aliyun) getVMPorts(region model.Region) ([]model.VInterface, []model.IP
 					Lcuuid:           common.GenerateUUID(deviceLcuuid + publicIP),
 					VInterfaceLcuuid: publicPortLcuuid,
 					IP:               publicIP,
-					SubnetLcuuid:     common.GenerateUUID(common.NETWORK_ISP_LCUUID),
 					RegionLcuuid:     a.getRegionLcuuid(region.Lcuuid),
 				}
 				retIPs = append(retIPs, retIP)

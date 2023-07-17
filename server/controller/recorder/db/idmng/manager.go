@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,28 +14,29 @@
  * limitations under the License.
  */
 
-package db
+package idmng
 
 import (
 	"context"
-	"fmt"
-	"net"
 	"sort"
 	"sync"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"google.golang.org/grpc"
+	"github.com/op/go-logging"
 
-	api "github.com/deepflowio/deepflow/message/controller"
-	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	. "github.com/deepflowio/deepflow/server/controller/recorder/config"
 	. "github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 )
 
-var IDMNG *IDManager
+var log = logging.MustGetLogger("recorder.id")
+
+var (
+	idMNGOnce sync.Once
+	idMNG     *IDManager
+)
 
 type IDManager struct {
 	ctx                  context.Context
@@ -44,39 +45,42 @@ type IDManager struct {
 	inUse                bool
 }
 
-func InitIDManager(cfg *RecorderConfig, ctx context.Context) (err error) {
-	log.Info("init id mananger")
-	mCtx, mCancel := context.WithCancel(ctx)
-	IDMNG = &IDManager{
-		ctx:    mCtx,
-		cancel: mCancel,
-		resourceTypeToIDPool: map[string]IDPoolUpdater{
-			RESOURCE_TYPE_REGION_EN:        &IDPool[mysql.Region]{resourceType: RESOURCE_TYPE_REGION_EN, max: cfg.ResourceMaxID0},
-			RESOURCE_TYPE_AZ_EN:            &IDPool[mysql.AZ]{resourceType: RESOURCE_TYPE_AZ_EN, max: cfg.ResourceMaxID0},
-			RESOURCE_TYPE_HOST_EN:          &IDPool[mysql.Host]{resourceType: RESOURCE_TYPE_HOST_EN, max: cfg.ResourceMaxID0},
-			RESOURCE_TYPE_VPC_EN:           &IDPool[mysql.VPC]{resourceType: RESOURCE_TYPE_VPC_EN, max: cfg.ResourceMaxID0},
-			RESOURCE_TYPE_NETWORK_EN:       &IDPool[mysql.Network]{resourceType: RESOURCE_TYPE_NETWORK_EN, max: cfg.ResourceMaxID0},
-			RESOURCE_TYPE_POD_CLUSTER_EN:   &IDPool[mysql.PodCluster]{resourceType: RESOURCE_TYPE_POD_CLUSTER_EN, max: cfg.ResourceMaxID0},
-			RESOURCE_TYPE_POD_NAMESPACE_EN: &IDPool[mysql.PodNamespace]{resourceType: RESOURCE_TYPE_POD_NAMESPACE_EN, max: cfg.ResourceMaxID0},
+func GetSingleton() *IDManager {
+	idMNGOnce.Do(func() {
+		idMNG = &IDManager{}
+	})
+	return idMNG
+}
 
-			RESOURCE_TYPE_VM_EN:                &IDPool[mysql.VM]{resourceType: RESOURCE_TYPE_VM_EN, max: cfg.ResourceMaxID1},
-			RESOURCE_TYPE_VROUTER_EN:           &IDPool[mysql.VRouter]{resourceType: RESOURCE_TYPE_VROUTER_EN, max: cfg.ResourceMaxID1},
-			RESOURCE_TYPE_DHCP_PORT_EN:         &IDPool[mysql.DHCPPort]{resourceType: RESOURCE_TYPE_DHCP_PORT_EN, max: cfg.ResourceMaxID1},
-			RESOURCE_TYPE_RDS_INSTANCE_EN:      &IDPool[mysql.RDSInstance]{resourceType: RESOURCE_TYPE_RDS_INSTANCE_EN, max: cfg.ResourceMaxID1},
-			RESOURCE_TYPE_REDIS_INSTANCE_EN:    &IDPool[mysql.RedisInstance]{resourceType: RESOURCE_TYPE_REDIS_INSTANCE_EN, max: cfg.ResourceMaxID1},
-			RESOURCE_TYPE_NAT_GATEWAY_EN:       &IDPool[mysql.NATGateway]{resourceType: RESOURCE_TYPE_NAT_GATEWAY_EN, max: cfg.ResourceMaxID1},
-			RESOURCE_TYPE_LB_EN:                &IDPool[mysql.LB]{resourceType: RESOURCE_TYPE_LB_EN, max: cfg.ResourceMaxID1},
-			RESOURCE_TYPE_POD_NODE_EN:          &IDPool[mysql.PodNode]{resourceType: RESOURCE_TYPE_POD_NODE_EN, max: cfg.ResourceMaxID1},
-			RESOURCE_TYPE_POD_SERVICE_EN:       &IDPool[mysql.PodService]{resourceType: RESOURCE_TYPE_POD_SERVICE_EN, max: cfg.ResourceMaxID1},
-			RESOURCE_TYPE_POD_EN:               &IDPool[mysql.Pod]{resourceType: RESOURCE_TYPE_POD_EN, max: cfg.ResourceMaxID1},
-			RESOURCE_TYPE_POD_INGRESS_EN:       &IDPool[mysql.PodIngress]{resourceType: RESOURCE_TYPE_POD_INGRESS_EN, max: cfg.ResourceMaxID1},
-			RESOURCE_TYPE_POD_GROUP_EN:         &IDPool[mysql.PodGroup]{resourceType: RESOURCE_TYPE_POD_GROUP_EN, max: cfg.ResourceMaxID1},
-			RESOURCE_TYPE_POD_REPLICA_SET_EN:   &IDPool[mysql.PodReplicaSet]{resourceType: RESOURCE_TYPE_POD_REPLICA_SET_EN, max: cfg.ResourceMaxID1},
-			RESOURCE_TYPE_PROCESS_EN:           &IDPool[mysql.Process]{resourceType: RESOURCE_TYPE_PROCESS_EN, max: cfg.ResourceMaxID1},
-			RESOURCE_TYPE_PROMETHEUS_TARGET_EN: &IDPool[mysql.PrometheusTarget]{resourceType: RESOURCE_TYPE_PROMETHEUS_TARGET_EN, max: cfg.ResourceMaxID1},
-		},
+func (m *IDManager) Init(cfg *RecorderConfig) *IDManager {
+	log.Info("init id mananger")
+	idMNG.ctx, idMNG.cancel = context.WithCancel(context.Background())
+	idMNG.resourceTypeToIDPool = map[string]IDPoolUpdater{
+		RESOURCE_TYPE_REGION_EN:        &IDPool[mysql.Region]{resourceType: RESOURCE_TYPE_REGION_EN, max: cfg.ResourceMaxID0},
+		RESOURCE_TYPE_AZ_EN:            &IDPool[mysql.AZ]{resourceType: RESOURCE_TYPE_AZ_EN, max: cfg.ResourceMaxID0},
+		RESOURCE_TYPE_HOST_EN:          &IDPool[mysql.Host]{resourceType: RESOURCE_TYPE_HOST_EN, max: cfg.ResourceMaxID0},
+		RESOURCE_TYPE_VPC_EN:           &IDPool[mysql.VPC]{resourceType: RESOURCE_TYPE_VPC_EN, max: cfg.ResourceMaxID0},
+		RESOURCE_TYPE_NETWORK_EN:       &IDPool[mysql.Network]{resourceType: RESOURCE_TYPE_NETWORK_EN, max: cfg.ResourceMaxID0},
+		RESOURCE_TYPE_POD_CLUSTER_EN:   &IDPool[mysql.PodCluster]{resourceType: RESOURCE_TYPE_POD_CLUSTER_EN, max: cfg.ResourceMaxID0},
+		RESOURCE_TYPE_POD_NAMESPACE_EN: &IDPool[mysql.PodNamespace]{resourceType: RESOURCE_TYPE_POD_NAMESPACE_EN, max: cfg.ResourceMaxID0},
+
+		RESOURCE_TYPE_VM_EN:                &IDPool[mysql.VM]{resourceType: RESOURCE_TYPE_VM_EN, max: cfg.ResourceMaxID1},
+		RESOURCE_TYPE_VROUTER_EN:           &IDPool[mysql.VRouter]{resourceType: RESOURCE_TYPE_VROUTER_EN, max: cfg.ResourceMaxID1},
+		RESOURCE_TYPE_DHCP_PORT_EN:         &IDPool[mysql.DHCPPort]{resourceType: RESOURCE_TYPE_DHCP_PORT_EN, max: cfg.ResourceMaxID1},
+		RESOURCE_TYPE_RDS_INSTANCE_EN:      &IDPool[mysql.RDSInstance]{resourceType: RESOURCE_TYPE_RDS_INSTANCE_EN, max: cfg.ResourceMaxID1},
+		RESOURCE_TYPE_REDIS_INSTANCE_EN:    &IDPool[mysql.RedisInstance]{resourceType: RESOURCE_TYPE_REDIS_INSTANCE_EN, max: cfg.ResourceMaxID1},
+		RESOURCE_TYPE_NAT_GATEWAY_EN:       &IDPool[mysql.NATGateway]{resourceType: RESOURCE_TYPE_NAT_GATEWAY_EN, max: cfg.ResourceMaxID1},
+		RESOURCE_TYPE_LB_EN:                &IDPool[mysql.LB]{resourceType: RESOURCE_TYPE_LB_EN, max: cfg.ResourceMaxID1},
+		RESOURCE_TYPE_POD_NODE_EN:          &IDPool[mysql.PodNode]{resourceType: RESOURCE_TYPE_POD_NODE_EN, max: cfg.ResourceMaxID1},
+		RESOURCE_TYPE_POD_SERVICE_EN:       &IDPool[mysql.PodService]{resourceType: RESOURCE_TYPE_POD_SERVICE_EN, max: cfg.ResourceMaxID1},
+		RESOURCE_TYPE_POD_EN:               &IDPool[mysql.Pod]{resourceType: RESOURCE_TYPE_POD_EN, max: cfg.ResourceMaxID1},
+		RESOURCE_TYPE_POD_INGRESS_EN:       &IDPool[mysql.PodIngress]{resourceType: RESOURCE_TYPE_POD_INGRESS_EN, max: cfg.ResourceMaxID1},
+		RESOURCE_TYPE_POD_GROUP_EN:         &IDPool[mysql.PodGroup]{resourceType: RESOURCE_TYPE_POD_GROUP_EN, max: cfg.ResourceMaxID1},
+		RESOURCE_TYPE_POD_REPLICA_SET_EN:   &IDPool[mysql.PodReplicaSet]{resourceType: RESOURCE_TYPE_POD_REPLICA_SET_EN, max: cfg.ResourceMaxID1},
+		RESOURCE_TYPE_PROCESS_EN:           &IDPool[mysql.Process]{resourceType: RESOURCE_TYPE_PROCESS_EN, max: cfg.ResourceMaxID1},
+		RESOURCE_TYPE_PROMETHEUS_TARGET_EN: &IDPool[mysql.PrometheusTarget]{resourceType: RESOURCE_TYPE_PROMETHEUS_TARGET_EN, max: cfg.ResourceMaxID1},
 	}
-	return
+	return m
 }
 
 func (m *IDManager) Start() error {
@@ -103,11 +107,13 @@ func (m *IDManager) Stop() {
 	log.Info("resource id manager stopped")
 }
 
-// 定时刷新ID池，恢复/修复被永久删除的ID（页面删除domain/sub_domain，定时永久删除）
+// 定时刷新 ID 池，恢复/修复页面删除 domain/sub_domain、定时永久删除无效资源等操作释放的 ID
 func (m *IDManager) timedRefresh() {
 	log.Info("refresh id pools")
 	go func() {
 		ticker := time.NewTicker(time.Hour)
+		defer ticker.Stop()
+	LOOP:
 		for {
 			select {
 			case <-ticker.C:
@@ -118,6 +124,8 @@ func (m *IDManager) timedRefresh() {
 						continue
 					}
 				}
+			case <-m.ctx.Done():
+				break LOOP
 			}
 		}
 	}()
@@ -255,59 +263,4 @@ func (p *IDPool[MT]) recycle(ids []int) {
 	sort.IntSlice(ids).Sort()
 	p.usableIDs = append(p.usableIDs, ids...)
 	log.Infof("recycle %s ids: %v", p.resourceType, ids)
-}
-
-func GetIDs(resourceType string, count int) (ids []int, err error) {
-	host, _, grpcPort, err := common.GetMasterControllerHostPort()
-	if err != nil {
-		log.Error("get master controller host info failed")
-		return
-	}
-	grpcServer := net.JoinHostPort(host, fmt.Sprintf("%d", grpcPort))
-	conn, err := grpc.Dial(grpcServer, grpc.WithInsecure())
-	if err != nil {
-		log.Errorf("create grpc connection faild: %s", err.Error())
-		return
-	}
-	defer conn.Close()
-
-	client := api.NewControllerClient(conn)
-	uCount := uint32(count)
-	resp, err := client.GetResourceID(context.Background(), &api.GetResourceIDRequest{Type: &resourceType, Count: &uCount})
-	if err != nil {
-		log.Error("get %s id failed: %s", resourceType, err.Error())
-		return
-	}
-	for _, uID := range resp.GetIds() {
-		ids = append(ids, int(uID))
-	}
-	log.Infof("get %s ids: %v (expected count: %d, true count: %d)", resourceType, ids, count, len(ids))
-	return
-}
-
-func ReleaseIDs(resourceType string, ids []int) (err error) {
-	host, _, grpcPort, err := common.GetMasterControllerHostPort()
-	if err != nil {
-		log.Error("get master controller host info failed")
-		return
-	}
-	grpcServer := net.JoinHostPort(host, fmt.Sprintf("%d", grpcPort))
-	conn, err := grpc.Dial(grpcServer, grpc.WithInsecure())
-	if err != nil {
-		log.Errorf("create grpc connection faild: %s", err.Error())
-		return
-	}
-	defer conn.Close()
-
-	uIDs := make([]uint32, 0, len(ids))
-	for _, id := range ids {
-		uIDs = append(uIDs, uint32(id))
-	}
-	client := api.NewControllerClient(conn)
-	_, err = client.ReleaseResourceID(context.Background(), &api.ReleaseResourceIDRequest{Ids: uIDs, Type: &resourceType})
-	if err != nil {
-		log.Errorf("release %s id failed: %s", resourceType, err.Error())
-	}
-	log.Infof("release %s ids: %v (count: %d)", resourceType, ids, len(ids))
-	return
 }

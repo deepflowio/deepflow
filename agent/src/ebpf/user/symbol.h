@@ -44,6 +44,11 @@
 #define TASK_COMM_LEN 16
 #endif
 
+struct symbol_cache_del_pids {
+	struct symbolizer_cache_kvp *pid_caches;
+	volatile u32 *lock;
+};
+
 struct symbolizer_proc_info {
 	/* The process creation time since
 	 * system boot, (in milliseconds) */
@@ -153,6 +158,7 @@ void *get_symbol_cache(pid_t pid);
 int create_and_init_symbolizer_caches(void);
 void release_symbol_caches(void);
 u64 get_pid_stime(pid_t pid);
+void exec_symbol_cache_update(void);
 #endif
 void update_symbol_cache(pid_t pid);
 #endif /* _BPF_SYMBOL_H_ */

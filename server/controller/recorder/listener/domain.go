@@ -17,10 +17,16 @@
 package listener
 
 import (
+	"github.com/op/go-logging"
+
+	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/event"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
+
+var log = logging.MustGetLogger("recorder/listener")
 
 type WholeDomain struct {
 	cache         *cache.Cache
@@ -37,4 +43,9 @@ func NewWholeDomain(domainLcuuid string, c *cache.Cache, eq *queue.OverwriteQueu
 
 func (p *WholeDomain) OnUpdatersCompleted() {
 	p.eventProducer.ProduceFromMySQL()
+	if p.cache.Changed == true {
+		log.Infof("domain(%v) data changed, refresh platform data", p.cache.DomainLcuuid)
+		refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_PLATFORM_DATA})
+		p.cache.Changed = false
+	}
 }

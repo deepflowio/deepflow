@@ -14,9 +14,17 @@
  * limitations under the License.
  */
 
-package migration
+package metadata
 
-const (
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "6.3.1.24"
-)
+import "github.com/deepflowio/deepflow/message/trident"
+
+// GProcessInfoProto is only used to send to the ingester module.
+type GProcessInfoProto struct {
+	gprocessInfo []*trident.GProcessInfo
+}
+
+func newGProcessInfoProto(length int) *GProcessInfoProto {
+	return &GProcessInfoProto{
+		gprocessInfo: make([]*trident.GProcessInfo, 0, length),
+	}
+}

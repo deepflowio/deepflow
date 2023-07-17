@@ -256,7 +256,7 @@ func (w *PrometheusWriter) GetCounter() interface{} {
 }
 
 // This function can be called when the FlowTags in the batch are the same (e.g. Prometheus metrics).
-func (w *PrometheusWriter) WriteBatch(batch []interface{}, metricName string, timeSeries *prompb.TimeSeries, tsLabelNameIDs, tsLabelValueIDs []uint32) {
+func (w *PrometheusWriter) WriteBatch(batch []interface{}, metricName string, timeSeries *prompb.TimeSeries, extraLabels []prompb.Label, tsLabelNameIDs, tsLabelValueIDs []uint32) {
 	if len(batch) == 0 {
 		return
 	}
@@ -271,7 +271,7 @@ func (w *PrometheusWriter) WriteBatch(batch []interface{}, metricName string, ti
 		atomic.AddInt64(&w.counter.WriteErr, 1)
 		return
 	}
-	prometheusMetrics.GenerateNewFlowTags(w.flowTagWriter.Cache, metricName, timeSeries, tsLabelNameIDs, tsLabelValueIDs)
+	prometheusMetrics.GenerateNewFlowTags(w.flowTagWriter.Cache, metricName, timeSeries, extraLabels, tsLabelNameIDs, tsLabelValueIDs)
 	w.flowTagWriter.WriteFieldsAndFieldValuesInCache()
 
 	atomic.AddInt64(&w.counter.MetricsCount, int64(len(batch)))

@@ -325,6 +325,26 @@ impl Default for EbpfYamlConfig {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, rename_all = "kebab-case")]
+pub struct PrometheusExtraConfig {
+    pub enabled: bool,
+    pub labels: Vec<String>,
+    pub labels_limit: u32,
+    pub values_limit: u32,
+}
+
+impl Default for PrometheusExtraConfig {
+    fn default() -> Self {
+        PrometheusExtraConfig {
+            enabled: true,
+            labels: vec![],
+            labels_limit: 1024,
+            values_limit: 4096,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "kebab-case")]
 pub struct YamlConfig {
     #[serde(with = "LevelDef")]
     pub log_level: log::Level,
@@ -424,6 +444,7 @@ pub struct YamlConfig {
     pub rrt_tcp_timeout: Duration,
     #[serde(with = "humantime_serde")]
     pub rrt_udp_timeout: Duration,
+    pub prometheus_extra_config: PrometheusExtraConfig,
 }
 
 impl YamlConfig {
@@ -600,6 +621,19 @@ impl YamlConfig {
             .rrt_udp_timeout
             .max(Duration::from_secs(SLOT_WIDTH))
             .min(Duration::from_secs(300));
+
+        if c.prometheus_extra_config.labels_limit < 1024
+            || c.prometheus_extra_config.labels_limit > 1024 * 1024
+        {
+            c.prometheus_extra_config.labels_limit = 1024;
+        }
+
+        if c.prometheus_extra_config.values_limit < 4096
+            || c.prometheus_extra_config.values_limit > 4096 * 1024
+        {
+            c.prometheus_extra_config.values_limit = 4096;
+        }
+
         Ok(c)
     }
 
@@ -735,6 +769,7 @@ impl Default for YamlConfig {
             forward_capacity: 1 << 14,
             rrt_tcp_timeout: Duration::from_secs(1800),
             rrt_udp_timeout: Duration::from_secs(150),
+            prometheus_extra_config: PrometheusExtraConfig::default(),
         }
     }
 }

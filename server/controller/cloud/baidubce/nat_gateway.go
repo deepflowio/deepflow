@@ -96,7 +96,6 @@ func (b *BaiduBce) getNatGateways(region model.Region, vpcIdToLcuuid map[string]
 					Lcuuid:           common.GenerateUUID(vinterfaceLcuuid + ip),
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               ip,
-					SubnetLcuuid:     common.NETWORK_ISP_LCUUID,
 					RegionLcuuid:     region.Lcuuid,
 				}
 				retIPs = append(retIPs, retIP)

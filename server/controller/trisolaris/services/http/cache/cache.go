@@ -42,18 +42,18 @@ func PutCache(c *gin.Context) {
 	log.Debug(c.GetQueryArray("type"))
 	if changedTypes, ok := c.GetQueryArray("type"); ok {
 		for _, changedType := range changedTypes {
-			switch changedType {
-			case PLATFORM_DATA_CHANGED:
+			switch DataChanged(changedType) {
+			case DATA_CHANGED_PLATFORM_DATA:
 				trisolaris.PutPlatformData()
-			case ANALYZER_CHANGED:
+			case DATA_CHANGED_ANALYZER:
 				trisolaris.PutNodeInfo()
-			case VTAP_CHANGED:
+			case DATA_CHANGED_VTAP:
 				trisolaris.PutVTapCache()
-			case TAP_TYPE_CHANGED:
+			case DATA_CHANGED_TAP_TYPE:
 				trisolaris.PutTapType()
-			case FLOW_ACL_CHANGED:
+			case DATA_CHANGED_FLOW_ACL:
 				trisolaris.PutFlowACL()
-			case GROUP_CHANGED, SERVICE_CHANGED:
+			case DATA_CHANGED_GROUP, DATA_CHANGED_SERVICE:
 				trisolaris.PutGroup()
 			}
 		}

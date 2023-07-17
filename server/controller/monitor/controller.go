@@ -75,7 +75,7 @@ func (c *ControllerCheck) Start() {
 		for {
 			excludeIP := <-c.ch
 			c.vtapControllerAlloc(excludeIP)
-			refresh.RefreshCache([]string{common.VTAP_CHANGED})
+			refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_VTAP})
 		}
 	}()
 }

@@ -41,7 +41,7 @@ type PrometheusSampleInterface interface {
 	Columns(int) []*ckdb.Column
 	AppLabelLen() int
 	GenCKTable(string, string, int, *ckdb.ColdStorage, int) *ckdb.Table
-	GenerateNewFlowTags(*flow_tag.FlowTagCache, string, *prompb.TimeSeries, []uint32, []uint32)
+	GenerateNewFlowTags(*flow_tag.FlowTagCache, string, *prompb.TimeSeries, []prompb.Label, []uint32, []uint32)
 	VpcId() int32
 	PodNsId() uint16
 	Release()
@@ -140,7 +140,7 @@ func (m *PrometheusSampleMini) GenCKTable(cluster, storagePolicy string, ttl int
 }
 
 // Check if there is a TagName/TagValue/MetricsName not in fieldCache or fieldValueCache, and store the newly appeared item in cache.
-func (m *PrometheusSampleMini) GenerateNewFlowTags(cache *flow_tag.FlowTagCache, metricName string, timeSeries *prompb.TimeSeries, tsLabelNameIDs, tsLabelValueIDs []uint32) {
+func (m *PrometheusSampleMini) GenerateNewFlowTags(cache *flow_tag.FlowTagCache, metricName string, timeSeries *prompb.TimeSeries, extraLabels []prompb.Label, tsLabelNameIDs, tsLabelValueIDs []uint32) {
 	// reset temporary buffers
 	flowTagInfo := &cache.FlowTagInfoBuffer
 	*flowTagInfo = flow_tag.FlowTagInfo{
@@ -155,7 +155,14 @@ func (m *PrometheusSampleMini) GenerateNewFlowTags(cache *flow_tag.FlowTagCache,
 	// j is used for tsLabelNameIDs/tsLabelValueIDs index, will add 1 at first
 	j := -1
 	metricHasSkipped := false // prevent repeated judgment of the same string
-	for _, label := range timeSeries.Labels {
+	tsLen, extraLen := len(timeSeries.Labels), len(extraLabels)
+	var label *prompb.Label
+	for i := 0; i < tsLen+extraLen; i++ {
+		if i < tsLen {
+			label = &timeSeries.Labels[i]
+		} else {
+			label = &extraLabels[i-tsLen]
+		}
 		if !metricHasSkipped && label.Name == model.MetricNameLabel {
 			metricHasSkipped = true
 			continue
@@ -256,8 +263,8 @@ func (m *PrometheusSample) PodNsId() uint16 {
 }
 
 // Check if there is a TagName/TagValue/MetricsName not in fieldCache or fieldValueCache, and store the newly appeared item in cache.
-func (m *PrometheusSample) GenerateNewFlowTags(cache *flow_tag.FlowTagCache, metricName string, timeSeries *prompb.TimeSeries, tsLabelNameIDs, tsLabelValueIDs []uint32) {
-	m.PrometheusSampleMini.GenerateNewFlowTags(cache, metricName, timeSeries, tsLabelNameIDs, tsLabelValueIDs)
+func (m *PrometheusSample) GenerateNewFlowTags(cache *flow_tag.FlowTagCache, metricName string, timeSeries *prompb.TimeSeries, extraLabels []prompb.Label, tsLabelNameIDs, tsLabelValueIDs []uint32) {
+	m.PrometheusSampleMini.GenerateNewFlowTags(cache, metricName, timeSeries, extraLabels, tsLabelNameIDs, tsLabelValueIDs)
 }
 
 var prometheusSampleMiniPool = pool.NewLockFreePool(func() interface{} {

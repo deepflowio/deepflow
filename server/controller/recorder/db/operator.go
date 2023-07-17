@@ -23,6 +23,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
+	"github.com/deepflowio/deepflow/server/controller/recorder/db/idmng"
 )
 
 var log = logging.MustGetLogger("recorder.db")
@@ -66,7 +67,7 @@ func (o *OperatorBase[MT]) AddBatch(items []*MT) ([]*MT, bool) {
 		log.Errorf("add %s (lcuuids: %v) failed", o.resourceTypeName, lcuuidsToAdd)
 
 		if o.allocateID && len(allocatedIDs) > 0 {
-			ReleaseIDs(o.resourceTypeName, allocatedIDs)
+			idmng.ReleaseIDs(o.resourceTypeName, allocatedIDs)
 		}
 		return nil, false
 	}
@@ -220,7 +221,7 @@ func (o *OperatorBase[MT]) requestIDs(items []*MT) ([]*MT, []int, bool) {
 			}
 		}
 		if count > 0 {
-			ids, err := GetIDs(o.resourceTypeName, count)
+			ids, err := idmng.GetIDs(o.resourceTypeName, count)
 			if err != nil {
 				log.Errorf("%s request ids failed", o.resourceTypeName)
 				return itemsHasID, []int{}, false
@@ -246,7 +247,7 @@ func (o *OperatorBase[MT]) returnUsedIDs(deletedItems []*MT) {
 		for _, dbItem := range deletedItems {
 			ids = append(ids, (*dbItem).GetID())
 		}
-		err := ReleaseIDs(o.resourceTypeName, ids)
+		err := idmng.ReleaseIDs(o.resourceTypeName, ids)
 		if err != nil {
 			log.Errorf("%s release ids: %v failed", o.resourceTypeName, ids)
 		}

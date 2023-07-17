@@ -39,6 +39,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/stats"
 	"github.com/deepflowio/deepflow/server/libs/utils"
 	"github.com/deepflowio/deepflow/server/libs/zerodoc"
+	"github.com/deepflowio/deepflow/server/libs/zerodoc/pb"
 )
 
 var log = logging.MustGetLogger("prometheus.decoder")
@@ -172,6 +173,8 @@ func (d *Decoder) Run() {
 	promWriteRequest := &prompb.WriteRequest{}
 	decodeBuffer := []byte{}
 	decoder := &codec.SimpleDecoder{}
+	prometheusMetric := &pb.PrometheusMetric{}
+	extraLabels := &[]prompb.Label{}
 	for {
 		n := d.inQueue.Gets(buffer)
 		for i := 0; i < n; i++ {
@@ -185,7 +188,7 @@ func (d *Decoder) Run() {
 				continue
 			}
 			decoder.Init(recvBytes.Buffer[recvBytes.Begin:recvBytes.End])
-			d.handlePrometheusData(recvBytes.VtapID, decoder, &decodeBuffer, promWriteRequest)
+			d.handlePrometheusData(recvBytes.VtapID, decoder, &decodeBuffer, promWriteRequest, prometheusMetric, extraLabels)
 			receiver.ReleaseRecvBuffer(recvBytes)
 		}
 	}
@@ -208,9 +211,16 @@ func DecodeWriteRequest(compressed []byte, decodeBuffer *[]byte, req *prompb.Wri
 	return nil
 }
 
-func (d *Decoder) handlePrometheusData(vtapID uint16, decoder *codec.SimpleDecoder, decodeBuffer *[]byte, req *prompb.WriteRequest) {
+func prometheusMetricReset(m *pb.PrometheusMetric) {
+	m.Metrics = m.Metrics[:0]
+	m.ExtraLabelNames = m.ExtraLabelNames[:0]
+	m.ExtraLabelValues = m.ExtraLabelValues[:0]
+}
+
+func (d *Decoder) handlePrometheusData(vtapID uint16, decoder *codec.SimpleDecoder, decodeBuffer *[]byte, req *prompb.WriteRequest, prometheusMetric *pb.PrometheusMetric, extraLabels *[]prompb.Label) {
 	for !decoder.IsEnd() {
-		compressedData := decoder.ReadBytes()
+		prometheusMetricReset(prometheusMetric)
+		bytes := decoder.ReadBytes()
 		if decoder.Failed() {
 			if d.counter.ErrCount == 0 {
 				log.Errorf("prometheus decode failed, offset=%d len=%d", decoder.Offset(), len(decoder.Bytes()))
@@ -218,27 +228,43 @@ func (d *Decoder) handlePrometheusData(vtapID uint16, decoder *codec.SimpleDecod
 			d.counter.ErrCount++
 			return
 		}
-		err := DecodeWriteRequest(compressedData, decodeBuffer, req)
+
+		if err := prometheusMetric.Unmarshal(bytes); err != nil {
+			if d.counter.ErrCount == 0 {
+				log.Warningf("prometheus metric parse failed, err msg: %s", err)
+			}
+			d.counter.ErrCount++
+			continue
+		}
+
+		err := DecodeWriteRequest(prometheusMetric.Metrics, decodeBuffer, req)
 		if err != nil {
 			if d.counter.ErrCount == 0 {
 				log.Warningf("prometheus parse failed, err msg:%s", err)
 			}
 			d.counter.ErrCount++
 		}
+		*extraLabels = (*extraLabels)[:0]
+		for i := range prometheusMetric.ExtraLabelNames {
+			*extraLabels = append(*extraLabels, prompb.Label{
+				Name:  prometheusMetric.ExtraLabelNames[i],
+				Value: prometheusMetric.ExtraLabelValues[i],
+			})
+		}
 
 		for i := range req.Timeseries {
 			d.counter.TimeSeriesIn++
-			d.sendPrometheus(vtapID, &req.Timeseries[i])
+			d.sendPrometheus(vtapID, &req.Timeseries[i], *extraLabels)
 		}
 		req.ResetWithBufferReserved() // release memory as soon as possible
 	}
 }
 
-func (d *Decoder) sendPrometheus(vtapID uint16, ts *prompb.TimeSeries) {
+func (d *Decoder) sendPrometheus(vtapID uint16, ts *prompb.TimeSeries, extraLabels []prompb.Label) {
 	if d.debugEnabled {
 		log.Debugf("decoder %d vtap %d recv promtheus timeseries: %v", d.index, vtapID, ts)
 	}
-	isSlowItem, err := d.samplesBuilder.TimeSeriesToStore(vtapID, ts)
+	isSlowItem, err := d.samplesBuilder.TimeSeriesToStore(vtapID, ts, extraLabels)
 	if err != nil {
 		if d.counter.TimeSeriesErr == 0 {
 			log.Warning(err)
@@ -249,15 +275,15 @@ func (d *Decoder) sendPrometheus(vtapID uint16, ts *prompb.TimeSeries) {
 	builder := d.samplesBuilder
 	if isSlowItem {
 		d.counter.TimeSeriesSlow++
-		d.slowDecodeQueue.Put(AcquireSlowItem(vtapID, ts))
+		d.slowDecodeQueue.Put(AcquireSlowItem(vtapID, ts, extraLabels))
 		return
 	}
-	d.prometheusWriter.WriteBatch(builder.samplesBuffer, builder.metricName, builder.timeSeriesBuffer, builder.tsLabelNameIDsBuffer, builder.tsLabelValueIDsBuffer)
+	d.prometheusWriter.WriteBatch(builder.samplesBuffer, builder.metricName, builder.timeSeriesBuffer, extraLabels, builder.tsLabelNameIDsBuffer, builder.tsLabelValueIDsBuffer)
 	d.counter.OutCount += int64(len(builder.samplesBuffer))
 	d.counter.TimeSeriesOut++
 }
 
-func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID uint16, ts *prompb.TimeSeries) (bool, error) {
+func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID uint16, ts *prompb.TimeSeries, extraLabels []prompb.Label) (bool, error) {
 	if len(ts.Samples) == 0 {
 		b.counter.TimeSeriesInvaild++
 		return false, nil
@@ -290,7 +316,14 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID uint16, ts *prompb.T
 	}
 
 	metricHasSkipped := false
-	for _, l := range ts.Labels {
+	var l *prompb.Label
+	tsLen, extraLen := len(ts.Labels), len(extraLabels)
+	for i := 0; i < tsLen+extraLen; i++ {
+		if i < tsLen {
+			l = &ts.Labels[i]
+		} else {
+			l = &extraLabels[i-tsLen]
+		}
 		if !metricHasSkipped && l.Name == model.MetricNameLabel {
 			metricHasSkipped = true
 			continue

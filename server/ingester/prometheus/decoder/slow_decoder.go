@@ -56,11 +56,11 @@ var slowItemPool = pool.NewLockFreePool(func() interface{} {
 	return &SlowItem{}
 })
 
-func AcquireSlowItem(vtapId uint16, ts *prompb.TimeSeries) *SlowItem {
+func AcquireSlowItem(vtapId uint16, ts *prompb.TimeSeries, extraLabels []prompb.Label) *SlowItem {
 	s := slowItemPool.Get().(*SlowItem)
 	s.vtapID = vtapId
 
-	for _, l := range ts.Labels {
+	for _, l := range append(extraLabels, ts.Labels...) {
 		s.ts.Labels = append(s.ts.Labels, prompb.Label{
 			// ts *prompb.TimeSeries is from temporary memory, so needs to be cloned
 			Name:  strings.Clone(l.Name),
@@ -301,7 +301,7 @@ func (d *SlowDecoder) sendPrometheusSamples(vtapID uint16, ts *prompb.TimeSeries
 	if d.debugEnabled {
 		log.Debugf("slow decoder %d vtap %d recv promtheus timeseries: %v", d.index, vtapID, ts)
 	}
-	isSlowItem, err := d.samplesBuilder.TimeSeriesToStore(vtapID, ts)
+	isSlowItem, err := d.samplesBuilder.TimeSeriesToStore(vtapID, ts, nil)
 	if err != nil {
 		if d.counter.TimeSeriesErr == 0 {
 			log.Warning(err)
@@ -319,6 +319,7 @@ func (d *SlowDecoder) sendPrometheusSamples(vtapID uint16, ts *prompb.TimeSeries
 	d.prometheusWriter.WriteBatch(d.samplesBuilder.samplesBuffer,
 		d.samplesBuilder.metricName,
 		d.samplesBuilder.timeSeriesBuffer,
+		nil,
 		d.samplesBuilder.tsLabelNameIDsBuffer, d.samplesBuilder.tsLabelValueIDsBuffer)
 	d.counter.SampleOut += int64(len(d.samplesBuilder.samplesBuffer))
 	d.counter.TimeSeriesOut++
