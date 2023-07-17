@@ -43,7 +43,7 @@ func (e *SynchronizerEvent) GetLabelIDs(ctx context.Context, in *trident.Prometh
 	if len(in.GetRequestLabels()) != 0 || len(in.GetRequestTargets()) != 0 {
 		log.Debugf("PrometheusLabelResponse: %+v", resp)
 	}
-	log.Infof("counter detail: %+v", synchronizer.GetStatsdCounter())
+	log.Debugf("counter detail: %+v", synchronizer.GetStatsdCounter())
 	if err != nil {
 		log.Errorf("encode str error: %+v", err)
 		return &trident.PrometheusLabelResponse{}, nil
