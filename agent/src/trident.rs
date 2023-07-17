@@ -2133,10 +2133,7 @@ impl AgentComponents {
             candidate_config.platform.epc_id,
             policy_getter,
             synchronizer.ntp_diff(),
-            candidate_config
-                .yaml_config
-                .prometheus_extra_labels_config
-                .clone(),
+            candidate_config.yaml_config.prometheus_extra_config.clone(),
         );
 
         stats_collector.register_countable(
