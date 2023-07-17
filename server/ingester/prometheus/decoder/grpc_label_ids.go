@@ -213,7 +213,7 @@ func (t *PrometheusLabelTable) updatePrometheusLabels(resp *trident.PrometheusLa
 			}
 			value := labelInfo.GetValue()
 			valueId := labelInfo.GetValueId()
-			if value != "" && valueId != 0 {
+			if valueId != 0 {
 				t.labelValueIDs.Set(strings.Clone(value), valueId)
 			} else {
 				t.counter.LabelValueUnknown++
