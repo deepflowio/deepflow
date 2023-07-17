@@ -17,7 +17,7 @@
 #ifndef _BPF_PERF_READER_H_
 #define _BPF_PERF_READER_H_
 
-#include <poll.h>
+#include <sys/epoll.h>
 #include <bcc/perf_reader.h>
 
 struct perf_reader {
@@ -34,46 +34,51 @@ struct perf_reader {
 	int fd;
 };
 
-static inline bool
-reader_poll_wait(struct bpf_perf_reader *r, struct pollfd *pfds)
+static inline int
+__reader_epoll_wait(struct bpf_perf_reader *r,
+		    struct epoll_event *events, int timeout)
 {
-	int i;
-	for (i = 0; i < r->readers_count; ++i) {
-		pfds[i].fd = r->readers[i]->fd;
-		pfds[i].events = POLLIN;
-	}
+	int nfds = epoll_wait(r->epoll_fd, events, r->readers_count,
+			      timeout);
+	if (nfds == -1) {
+		ebpf_warning("epoll_wait() failed\n");
+		return ETR_EPOLL;
+        }
 
-	return (poll(pfds, r->readers_count, r->poll_timeout) > 0);
+	return nfds;
+}
+
+static inline int
+reader_epoll_wait(struct bpf_perf_reader *r,
+		  struct epoll_event *events)
+{
+	return __reader_epoll_wait(r, events, r->epoll_timeout);
 }
 
 static inline bool
-reader_poll_short_wait(struct bpf_perf_reader *r, struct pollfd *pfds)
+reader_epoll_short_wait(struct bpf_perf_reader *r,
+			struct epoll_event *events)
 {
-	int i;
-	for (i = 0; i < r->readers_count; ++i) {
-		pfds[i].fd = r->readers[i]->fd;
-		pfds[i].events = POLLIN;
-	}
-
-	return (poll(pfds, r->readers_count, 10) > 0);
+	return __reader_epoll_wait(r, events, EPOLL_SHORT_TIMEOUT);
 }
 
 static inline void
-reader_event_read(struct bpf_perf_reader *r, struct pollfd *pfds)
+reader_event_read(struct epoll_event *events,
+		  int nfds)
 {
 	int i;
-	for (i = 0; i < r->readers_count; ++i) {
-		if (pfds[i].revents & POLLIN)
-			perf_reader_event_read(r->readers[i]);
+	for (i = 0; i < nfds; ++i) {
+		perf_reader_event_read(events[i].data.ptr);
 	}
 }
 
 static inline void
-reader_event_read_polling(struct bpf_perf_reader *r, struct pollfd *pfds)
+reader_event_read_polling(struct epoll_event *events,
+			  int nfds)
 {
 	int i;
-	for (i = 0; i < r->readers_count; ++i) {
-		perf_reader_event_read(r->readers[i]);
+	for (i = 0; i < nfds; ++i) {
+		perf_reader_event_read(events[i].data.ptr);
 	}
 }
 

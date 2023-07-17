@@ -75,7 +75,7 @@
 #define MAX_CPU_NR      256
 
 /*
- * timeout (100ms), use for perf_reader_poll().
+ * timeout (100ms), use for perf reader epoll().
  */
 #define PERF_READER_TIMEOUT_DEF 100
 #define PERF_READER_NUM_MAX	16
@@ -285,7 +285,8 @@ struct bpf_perf_reader {
 	unsigned int perf_pages_cnt;		// ring-buffer set memory size (memory pages count)
 	perf_reader_raw_cb raw_cb;		// Used for perf ring-buffer receive callback.
 	perf_reader_lost_cb lost_cb;		// Callback for perf ring-buffer data loss.
-	int poll_timeout;			// perf poll timeout (ms)
+	int epoll_timeout;			// perf poll timeout (ms)
+	int epoll_fd;
 	struct bpf_tracer *tracer;
 };
 
@@ -505,7 +506,7 @@ int tracer_uprobes_update(struct bpf_tracer *tracer);
  * @lost_cb perf reader data lost callback
  * @pages_cnt How many memory pages are used for ring-buffer
  *            (system page size * pages_cnt)
- * @poll_timeout perf poll timeout
+ * @epoll_timeout perf epoll timeout
  *
  * @returns perf_reader address on success, NULL on error
  */
@@ -515,7 +516,7 @@ create_perf_buffer_reader(struct bpf_tracer *t,
 			  perf_reader_raw_cb raw_cb,
 			  perf_reader_lost_cb lost_cb,
 			  unsigned int pages_cnt,
-			  int poll_timeout);
+			  int epoll_timeout);
 void free_perf_buffer_reader(struct bpf_perf_reader *reader);
 int release_bpf_tracer(const char *name);
 void free_all_readers(struct bpf_tracer *t);

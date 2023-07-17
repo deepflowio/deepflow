@@ -19,6 +19,7 @@
 #include <sched.h>
 #include <sys/utsname.h>
 #include <sys/prctl.h>
+#include <sys/epoll.h>
 #include <bcc/libbpf.h>
 #include <bcc/perf_reader.h>
 #include "config.h"
@@ -412,7 +413,7 @@ void free_all_readers(struct bpf_tracer *t)
  * @lost_cb perf reader data lost callback
  * @pages_cnt How many memory pages are used for ring-buffer
  *            (system page size * pages_cnt)
- * @poll_timeout perf poll timeout
+ * @epoll_timeout perf epoll timeout
  *
  * @returns perf_reader address on success, NULL on error
  */
@@ -422,7 +423,7 @@ create_perf_buffer_reader(struct bpf_tracer *t,
 			  perf_reader_raw_cb raw_cb,
 			  perf_reader_lost_cb lost_cb,
 			  unsigned int pages_cnt,
-			  int poll_timeout)
+			  int epoll_timeout)
 {
 	if (t == NULL || map_name == NULL ||
 	    raw_cb == NULL || lost_cb == NULL) {
@@ -448,7 +449,7 @@ create_perf_buffer_reader(struct bpf_tracer *t,
 
 	reader->tracer = t;
 	reader->perf_pages_cnt = pages_cnt;
-	reader->poll_timeout = poll_timeout;
+	reader->epoll_timeout = epoll_timeout;
 
 	if (perf_reader_setup(reader))
                 goto failed;
@@ -1100,6 +1101,13 @@ static int perf_reader_setup(struct bpf_perf_reader *perf_reader)
 	int perf_fd, ret;
 	int reader_idx;
 	int pages_cnt = perf_reader->perf_pages_cnt;
+	perf_reader->epoll_fd = epoll_create1(0);
+	if (perf_reader->epoll_fd == -1) {
+		ebpf_error("epoll_create1(0) failed.\n");
+		return ETR_EPOLL;
+	}
+
+	struct epoll_event event;
 	for (i = 0; i < sys_cpus_count; i++) {
 		if (!cpu_online[i])
 			continue;
@@ -1130,6 +1138,14 @@ static int perf_reader_setup(struct bpf_perf_reader *perf_reader)
 		reader_idx = perf_reader->readers_count++;
 		perf_reader->reader_fds[reader_idx] = perf_fd;
 		perf_reader->readers[reader_idx] = reader;
+		event.data.fd = perf_fd;
+		event.data.ptr = reader;
+		event.events = EPOLLIN;
+		if (epoll_ctl(perf_reader->epoll_fd, EPOLL_CTL_ADD, perf_fd,
+			      &event) == -1) {
+			ebpf_error("epoll_ctl()");
+			return ETR_EPOLL;
+		}
 	}
 
 	perf_reader->map = map;

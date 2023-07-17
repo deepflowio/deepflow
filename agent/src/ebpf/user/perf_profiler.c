@@ -540,8 +540,8 @@ static void process_bpf_stacktraces(struct bpf_tracer *t,
 	const u64 sample_count_idx =
 	    using_map_set_a ? SAMPLE_CNT_A_IDX : SAMPLE_CNT_B_IDX;
 
-	struct pollfd pfds[r->readers_count];
-	bool has_event = reader_poll_wait(r, pfds);
+	struct epoll_event events[r->readers_count];
+	int nfds = reader_epoll_wait(r, events);
 
 	transfer_count++;
 	/* update map MAP_PROFILER_STATE_MAP */
@@ -612,7 +612,7 @@ static void process_bpf_stacktraces(struct bpf_tracer *t,
 		}
 	}
 
-	if (has_event) {
+	if (nfds > 0) {
 
 check_again:
 		if (unlikely(profiler_stop == 1))
@@ -622,7 +622,7 @@ check_again:
 		 * If there is data, the reader's callback
 		 * function will be called.
 		 */
-		reader_event_read(r, pfds);
+		reader_event_read(events, nfds);
 
 		/*
 		 * After the reader completes data reading, the work of
@@ -643,8 +643,8 @@ check_again:
 		if (bpf_table_get_value(t, MAP_PROFILER_STATE_MAP,
 					sample_count_idx, (void *)&sample_cnt_val)) {
 			if (sample_cnt_val > count) {
-				has_event = reader_poll_short_wait(r, pfds);
-				if (has_event)
+				nfds = reader_epoll_short_wait(r, events);
+				if (nfds > 0)
 					goto check_again;
 			}
 		}
@@ -730,7 +730,7 @@ static int create_profiler(struct bpf_tracer *tracer)
 					     reader_raw_cb,
 					     reader_lost_cb,
 					     PROFILE_PG_CNT_DEF,
-					     PROFILER_READER_POLL_TIMEOUT);
+					     PROFILER_READER_EPOLL_TIMEOUT);
 	if (reader_a == NULL)
 		return ETR_NORESOURCE;
 
@@ -739,7 +739,7 @@ static int create_profiler(struct bpf_tracer *tracer)
 					     reader_raw_cb,
 					     reader_lost_cb,
 					     PROFILE_PG_CNT_DEF,
-					     PROFILER_READER_POLL_TIMEOUT);
+					     PROFILER_READER_EPOLL_TIMEOUT);
 	if (reader_b == NULL) {
 		free_perf_buffer_reader(reader_a);
 		return ETR_NORESOURCE;
