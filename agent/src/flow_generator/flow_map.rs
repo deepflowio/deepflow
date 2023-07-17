@@ -46,8 +46,6 @@ use super::{
     THREAD_FLOW_ID_MASK, TIMER_FLOW_ID_MASK, TIME_UNIT,
 };
 
-#[cfg(target_os = "linux")]
-use crate::config::handler::EbpfConfig;
 use crate::{
     common::{
         endpoint::{
@@ -71,21 +69,25 @@ use crate::{
         FlowConfig, ModuleConfig, RuntimeConfig,
     },
     metric::document::TapSide,
+    plugin::wasm::{
+        get_all_wasm_export_func_name, get_wasm_metric_counter_map_key, init_wasmtime, WasmCounter,
+        WasmCounterMap, WasmVm,
+    },
+    policy::{Policy, PolicyGetter},
+    rpc::get_timestamp,
+    utils::stats::{self, Countable, StatsOption},
+    wasm_error,
+};
+#[cfg(target_os = "linux")]
+use crate::{
+    config::handler::EbpfConfig,
     plugin::{
         c_ffi::SoPluginFunc,
         shared_obj::{
             get_all_so_func, get_so_plug_metric_counter_map_key, SoPluginCounter,
             SoPluginCounterMap,
         },
-        wasm::{
-            get_all_wasm_export_func_name, get_wasm_metric_counter_map_key, init_wasmtime,
-            WasmCounter, WasmCounterMap, WasmVm,
-        },
     },
-    policy::{Policy, PolicyGetter},
-    rpc::get_timestamp,
-    utils::stats::{self, Countable, StatsOption},
-    wasm_error,
 };
 use public::{
     buffer::{Allocator, BatchedBox},
@@ -150,7 +152,9 @@ pub struct FlowMap {
     time_key_buffer: Option<Vec<(u64, FlowMapKey)>>,
 
     wasm_vm: Option<Rc<RefCell<WasmVm>>>,
+    #[cfg(target_os = "linux")]
     so_plugin: Option<Rc<Vec<SoPluginFunc>>>,
+    #[cfg(target_os = "linux")]
     so_plugin_counter_map: Option<Rc<SoPluginCounterMap>>,
 
     tcp_perf_pool: MemoryPool<TcpPerf>,
@@ -205,6 +209,7 @@ impl FlowMap {
             },
         });
 
+        #[cfg(target_os = "linux")]
         let so_plugin_counter_map = if config.so_plugins.is_empty() {
             None
         } else {
@@ -320,11 +325,13 @@ impl FlowMap {
                     Some(Rc::new(RefCell::new(vm)))
                 }
             },
+            #[cfg(target_os = "linux")]
             so_plugin: if config.so_plugins.is_empty() {
                 None
             } else {
                 Some(Rc::new(config.so_plugins.clone()))
             },
+            #[cfg(target_os = "linux")]
             so_plugin_counter_map,
             tcp_perf_pool: MemoryPool::new(config.memory_pool_size),
             flow_node_pool: MemoryPool::new(config.memory_pool_size),
@@ -1118,7 +1125,9 @@ impl FlowMap {
                 self.flow_perf_counter.clone(),
                 port,
                 self.wasm_vm.as_ref().map(|w| w.clone()),
+                #[cfg(target_os = "linux")]
                 self.so_plugin.as_ref().map(|s| s.clone()),
+                #[cfg(target_os = "linux")]
                 self.so_plugin_counter_map.as_ref().map(|p| p.clone()),
                 self.stats_counter.clone(),
                 match meta_packet.lookup_key.proto {

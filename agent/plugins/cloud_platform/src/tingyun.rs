@@ -14,9 +14,8 @@
  * limitations under the License.
  */
 
-package migration
+//! Enterprise Edition Feature: tingyun
 
-const (
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "6.3.1.24"
-)
+pub fn decode_trace_id(_: &str) -> Option<String> {
+    None
+}

@@ -36,9 +36,11 @@ use super::{
     protocol_logs::AppProtoHead,
 };
 
+use crate::common::flow::L7PerfStats;
+use crate::common::l7_protocol_log::L7PerfCache;
 use crate::plugin::wasm::WasmVm;
-use crate::{common::flow::L7PerfStats, plugin::c_ffi::SoPluginFunc};
-use crate::{common::l7_protocol_log::L7PerfCache, plugin::shared_obj::SoPluginCounterMap};
+#[cfg(target_os = "linux")]
+use crate::plugin::{c_ffi::SoPluginFunc, shared_obj::SoPluginCounterMap};
 use crate::{
     common::{
         flow::{FlowPerfStats, L4Protocol, L7Protocol, PacketDirection, SignalSource},
@@ -191,7 +193,9 @@ pub struct FlowLog {
     is_skip: bool,
 
     wasm_vm: Option<Rc<RefCell<WasmVm>>>,
+    #[cfg(target_os = "linux")]
     so_plugin: Option<Rc<Vec<SoPluginFunc>>>,
+    #[cfg(target_os = "linux")]
     so_plugin_counter: Option<Rc<SoPluginCounterMap>>,
     stats_counter: Arc<FlowMapCounter>,
     rrt_timeout: usize,
@@ -283,12 +287,16 @@ impl FlowLog {
                 !is_parse_log,
                 log_parser_config,
             ));
-            param.set_counter(self.stats_counter.clone(), self.so_plugin_counter.clone());
+            #[cfg(target_os = "linux")]
+            {
+                param.set_counter(self.stats_counter.clone(), self.so_plugin_counter.clone());
+            }
             param.set_rrt_timeout(self.rrt_timeout);
             param.set_buf_size(pkt_size);
             if let Some(vm) = self.wasm_vm.as_ref() {
                 param.set_wasm_vm(vm.clone());
             }
+            #[cfg(target_os = "linux")]
             if let Some(p) = self.so_plugin.as_ref() {
                 param.set_so_func(p.clone());
             }
@@ -380,9 +388,11 @@ impl FlowLog {
                 !is_parse_log,
                 log_parser_config,
             ));
+            #[cfg(target_os = "linux")]
             param.set_counter(self.stats_counter.clone(), self.so_plugin_counter.clone());
             param.set_rrt_timeout(self.rrt_timeout);
             param.set_buf_size(flow_config.l7_log_packet_size as usize);
+            #[cfg(target_os = "linux")]
             if let Some(p) = self.so_plugin.as_ref() {
                 param.set_so_func(p.clone());
             }
@@ -423,8 +433,8 @@ impl FlowLog {
         counter: Arc<FlowPerfCounter>,
         server_port: u16,
         wasm_vm: Option<Rc<RefCell<WasmVm>>>,
-        so_plugin: Option<Rc<Vec<SoPluginFunc>>>,
-        so_plugin_counter: Option<Rc<SoPluginCounterMap>>,
+        #[cfg(target_os = "linux")] so_plugin: Option<Rc<Vec<SoPluginFunc>>>,
+        #[cfg(target_os = "linux")] so_plugin_counter: Option<Rc<SoPluginCounterMap>>,
         stats_counter: Arc<FlowMapCounter>,
         rrt_timeout: usize,
     ) -> Option<Self> {
@@ -455,7 +465,9 @@ impl FlowLog {
             is_skip: false,
             server_port: server_port,
             wasm_vm,
+            #[cfg(target_os = "linux")]
             so_plugin,
+            #[cfg(target_os = "linux")]
             so_plugin_counter,
             stats_counter: stats_counter,
             rrt_timeout: rrt_timeout,

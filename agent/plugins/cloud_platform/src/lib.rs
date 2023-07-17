@@ -14,9 +14,4 @@
  * limitations under the License.
  */
 
-package migration
-
-const (
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "6.3.1.24"
-)
+pub mod tingyun;

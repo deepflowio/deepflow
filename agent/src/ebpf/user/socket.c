@@ -1546,7 +1546,7 @@ static void poller(void *t)
 			perf_reader = &tracer->readers[i];
 			perf_reader_poll(perf_reader->readers_count,
 					 perf_reader->readers,
-					 perf_reader->poll_timeout);
+					 perf_reader->epoll_timeout);
 		}
 #else
 		uint64_t data_len, rand_seed;
