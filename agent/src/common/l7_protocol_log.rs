@@ -40,6 +40,7 @@ use crate::flow_generator::protocol_logs::{
 };
 use crate::flow_generator::{LogMessageType, Result};
 use crate::plugin::wasm::WasmVm;
+#[cfg(target_os = "linux")]
 use crate::plugin::{c_ffi::SoPluginFunc, shared_obj::SoPluginCounterMap};
 
 use public::enums::IpProtocol;
@@ -422,7 +423,9 @@ pub struct ParseParam<'a> {
 
     // plugins
     pub wasm_vm: Option<Rc<RefCell<WasmVm>>>,
+    #[cfg(target_os = "linux")]
     pub so_func: Option<Rc<Vec<SoPluginFunc>>>,
+    #[cfg(target_os = "linux")]
     pub so_plugin_counter_map: Option<Rc<SoPluginCounterMap>>,
 
     pub stats_counter: Option<Arc<FlowMapCounter>>,
@@ -458,7 +461,9 @@ impl From<(&MetaPacket<'_>, Rc<RefCell<L7PerfCache>>, bool)> for ParseParam<'_> 
             l7_perf_cache: cache,
 
             wasm_vm: None,
+            #[cfg(target_os = "linux")]
             so_func: None,
+            #[cfg(target_os = "linux")]
             so_plugin_counter_map: None,
 
             stats_counter: None,
@@ -526,6 +531,7 @@ impl ParseParam<'_> {
         self.wasm_vm = Some(vm);
     }
 
+    #[cfg(target_os = "linux")]
     pub fn set_so_func(&mut self, so_func: Rc<Vec<SoPluginFunc>>) {
         self.so_func = Some(so_func);
     }
@@ -533,10 +539,13 @@ impl ParseParam<'_> {
     pub fn set_counter(
         &mut self,
         stat: Arc<FlowMapCounter>,
-        so_counter: Option<Rc<SoPluginCounterMap>>,
+        #[cfg(target_os = "linux")] so_counter: Option<Rc<SoPluginCounterMap>>,
     ) {
         self.stats_counter = Some(stat);
-        self.so_plugin_counter_map = so_counter;
+        #[cfg(target_os = "linux")]
+        {
+            self.so_plugin_counter_map = so_counter;
+        }
     }
 
     pub fn set_buf_size(&mut self, buf_size: usize) {

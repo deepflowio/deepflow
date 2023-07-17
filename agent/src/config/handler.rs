@@ -2119,6 +2119,9 @@ impl ModuleConfig {
         ctrl_mac: &str,
     ) {
         let mut wasm = vec![];
+        #[cfg(target_os = "windows")]
+        let so = vec![];
+        #[cfg(target_os = "linux")]
         let mut so = vec![];
         rt.block_on(async {
             for i in self.yaml_config.wasm_plugins.iter() {
