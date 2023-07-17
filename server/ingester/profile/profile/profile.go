@@ -72,7 +72,7 @@ func NewProfiler(msgType datatype.MessageType, config *config.Config, platformDa
 	for i := 0; i < config.DecoderQueueCount; i++ {
 		if platformDataManager != nil {
 			var err error
-			platformDatas[i], err = platformDataManager.NewPlatformInfoTable(false, "profile-"+msgType.String()+"-"+strconv.Itoa(i))
+			platformDatas[i], err = platformDataManager.NewPlatformInfoTable("profile-" + msgType.String() + "-" + strconv.Itoa(i))
 			if err != nil {
 				return nil, err
 			}

@@ -52,7 +52,7 @@ const (
 	QUEUE_CACHE_FLUSH_TIMEOUT = 3
 	DROP_DETECT_WINDOW_SIZE   = 1024
 	QUEUE_BATCH_NUM           = 16
-	LOG_INTERVAL              = 10
+	LOG_INTERVAL              = 60
 	RECORD_STATUS_TIMEOUT     = 30 // 每30秒记录下trident的活跃信息，platformData模块每分钟会上报trisolaris
 	SOCKET_READ_ERROR         = "maybe trident restart."
 	ONE_HOUR                  = 3600
@@ -837,8 +837,11 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 			continue
 		}
 		if r.handlers[baseHeader.Type] == nil {
+			if r.counter.Invalid == 0 {
+				log.Warningf("recv from %s, unregist message type %d", conn.RemoteAddr().String(), baseHeader.Type)
+			}
 			atomic.AddUint64(&r.counter.Invalid, 1)
-			log.Warningf("recv from %s, unregist message type %d", conn.RemoteAddr().String(), baseHeader.Type)
+			time.Sleep(10 * time.Second)
 			return
 		}
 

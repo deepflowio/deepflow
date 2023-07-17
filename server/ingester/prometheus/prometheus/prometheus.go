@@ -81,7 +81,7 @@ func NewPrometheusHandler(config *config.Config, recv *receiver.Receiver, platfo
 	slowPlatformDatas := make([]*grpc.PlatformInfoTable, queueCount)
 	for i := 0; i < queueCount; i++ {
 		var err error
-		platformDatas[i], err = platformDataManager.NewPlatformInfoTable(false, msgType.String()+"-"+strconv.Itoa(i))
+		platformDatas[i], err = platformDataManager.NewPlatformInfoTable(msgType.String() + "-" + strconv.Itoa(i))
 		if i == 0 {
 			debug.ServerRegisterSimple(ingesterctl.CMD_PLATFORMDATA_PROMETHEUS, platformDatas[i])
 		}
@@ -105,7 +105,7 @@ func NewPrometheusHandler(config *config.Config, recv *receiver.Receiver, platfo
 		if err != nil {
 			return nil, err
 		}
-		slowPlatformDatas[i], err = platformDataManager.NewPlatformInfoTable(false, "slow-prometheus-"+strconv.Itoa(i))
+		slowPlatformDatas[i], err = platformDataManager.NewPlatformInfoTable("slow-prometheus-" + strconv.Itoa(i))
 		slowDecoders[i] = decoder.NewSlowDecoder(
 			i,
 			slowPlatformDatas[i],

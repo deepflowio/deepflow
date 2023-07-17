@@ -147,17 +147,21 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 		bytes, _ = yaml.Marshal(prometheusConfig)
 		log.Infof("prometheus config:\n%s", string(bytes))
 
-		// 创建、修改、删除数据源及其存储时长
-		ds := datasource.NewDatasourceManager(cfg, flowMetricsConfig.CKReadTimeout)
-		ds.Start()
-		closers = append(closers, ds)
+		var issu *ckissu.Issu
+		if !cfg.StorageDisabled {
+			var err error
+			// 创建、修改、删除数据源及其存储时长
+			ds := datasource.NewDatasourceManager(cfg, flowMetricsConfig.CKReadTimeout)
+			ds.Start()
+			closers = append(closers, ds)
 
-		// clickhouse表结构变更处理
-		issu, err := ckissu.NewCKIssu(cfg)
-		checkError(err)
-		// If there is a table name change, do the table name update first
-		err = issu.RunRenameTable(ds)
-		checkError(err)
+			// clickhouse表结构变更处理
+			issu, err = ckissu.NewCKIssu(cfg)
+			checkError(err)
+			// If there is a table name change, do the table name update first
+			err = issu.RunRenameTable(ds)
+			checkError(err)
+		}
 
 		// platformData manager init
 		controllers := make([]net.IP, len(cfg.ControllerIPs))
@@ -175,59 +179,61 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 			cfg.NodeIP,
 			receiver)
 
-		// 写遥测数据
-		flowMetrics, err := flowmetrics.NewFlowMetrics(flowMetricsConfig, receiver, platformDataManager)
-		checkError(err)
-		flowMetrics.Start()
-		closers = append(closers, flowMetrics)
-
 		// 写流日志数据
 		flowLog, err := flowlog.NewFlowLog(flowLogConfig, receiver, platformDataManager)
 		checkError(err)
 		flowLog.Start()
 		closers = append(closers, flowLog)
 
-		// 写ext_metrics数据
-		extMetrics, err := ext_metrics.NewExtMetrics(extMetricsConfig, receiver, platformDataManager)
-		checkError(err)
-		extMetrics.Start()
-		closers = append(closers, extMetrics)
+		if !cfg.StorageDisabled {
+			// 写ext_metrics数据
+			extMetrics, err := ext_metrics.NewExtMetrics(extMetricsConfig, receiver, platformDataManager)
+			checkError(err)
+			extMetrics.Start()
+			closers = append(closers, extMetrics)
 
-		// write event data
-		event, err := event.NewEvent(eventConfig, shared.ResourceEventQueue, receiver, platformDataManager)
-		checkError(err)
-		event.Start()
-		closers = append(closers, event)
+			// 写遥测数据
+			flowMetrics, err := flowmetrics.NewFlowMetrics(flowMetricsConfig, receiver, platformDataManager)
+			checkError(err)
+			flowMetrics.Start()
+			closers = append(closers, flowMetrics)
 
-		// write pcap data
-		pcaper, err := pcap.NewPcaper(receiver, pcapConfig)
-		checkError(err)
-		pcaper.Start()
-		closers = append(closers, pcaper)
+			// write event data
+			event, err := event.NewEvent(eventConfig, shared.ResourceEventQueue, receiver, platformDataManager)
+			checkError(err)
+			event.Start()
+			closers = append(closers, event)
 
-		// write profile data
-		profile, err := profile.NewProfile(profileConfig, receiver, platformDataManager)
-		checkError(err)
-		profile.Start()
-		closers = append(closers, profile)
+			// write pcap data
+			pcaper, err := pcap.NewPcaper(receiver, pcapConfig)
+			checkError(err)
+			pcaper.Start()
+			closers = append(closers, pcaper)
 
-		// write prometheus data
-		prometheus, err := prometheus.NewPrometheusHandler(prometheusConfig, receiver, platformDataManager)
-		checkError(err)
-		prometheus.Start()
-		closers = append(closers, prometheus)
+			// write profile data
+			profile, err := profile.NewProfile(profileConfig, receiver, platformDataManager)
+			checkError(err)
+			profile.Start()
+			closers = append(closers, profile)
 
-		// 检查clickhouse的磁盘空间占用，达到阈值时，自动删除老数据
-		cm, err := ckmonitor.NewCKMonitor(cfg)
-		checkError(err)
-		cm.Start()
-		closers = append(closers, cm)
+			// write prometheus data
+			prometheus, err := prometheus.NewPrometheusHandler(prometheusConfig, receiver, platformDataManager)
+			checkError(err)
+			prometheus.Start()
+			closers = append(closers, prometheus)
 
-		// 初始化建表完成,再执行issu
-		time.Sleep(time.Second)
-		err = issu.Start()
-		checkError(err)
-		closers = append(closers, issu)
+			// 检查clickhouse的磁盘空间占用，达到阈值时，自动删除老数据
+			cm, err := ckmonitor.NewCKMonitor(cfg)
+			checkError(err)
+			cm.Start()
+			closers = append(closers, cm)
+
+			// 初始化建表完成,再执行issu
+			time.Sleep(time.Second)
+			err = issu.Start()
+			checkError(err)
+			closers = append(closers, issu)
+		}
 	}
 	// receiver后启动，防止启动后收到数据无法处理，而上报异常日志
 	receiver.Start()

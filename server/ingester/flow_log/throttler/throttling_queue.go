@@ -66,7 +66,15 @@ func (thq *ThrottlingQueue) SampleDisabled() bool {
 
 func (thq *ThrottlingQueue) flush() {
 	if thq.periodEmitCount > 0 {
-		thq.flowLogWriter.Put(thq.index, thq.sampleItems[:thq.periodEmitCount]...)
+		if thq.flowLogWriter != nil {
+			thq.flowLogWriter.Put(thq.index, thq.sampleItems[:thq.periodEmitCount]...)
+		} else {
+			for i := range thq.sampleItems[:thq.periodEmitCount] {
+				if tItem, ok := thq.sampleItems[i].(throttleItem); ok {
+					tItem.Release()
+				}
+			}
+		}
 	}
 }
 
@@ -112,7 +120,15 @@ func (thq *ThrottlingQueue) SendWithThrottling(flow interface{}) bool {
 func (thq *ThrottlingQueue) SendWithoutThrottling(flow interface{}) {
 	if flow == nil || len(thq.nonSampleItems) >= QUEUE_BATCH {
 		if len(thq.nonSampleItems) > 0 {
-			thq.flowLogWriter.Put(thq.index, thq.nonSampleItems...)
+			if thq.flowLogWriter != nil {
+				thq.flowLogWriter.Put(thq.index, thq.nonSampleItems...)
+			} else {
+				for i := range thq.nonSampleItems {
+					if tItem, ok := thq.nonSampleItems[i].(throttleItem); ok {
+						tItem.Release()
+					}
+				}
+			}
 			thq.nonSampleItems = thq.nonSampleItems[:0]
 		}
 	}
