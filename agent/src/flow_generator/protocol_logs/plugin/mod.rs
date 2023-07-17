@@ -28,13 +28,12 @@ use crate::{
     flow_generator::Result,
 };
 
-use self::{
-    custom_wrap::CustomWrapLog,
-    shared_obj::{get_so_parser, SoLog},
-    wasm::get_wasm_parser,
-};
+#[cfg(target_os = "linux")]
+use self::shared_obj::{get_so_parser, SoLog};
+use self::{custom_wrap::CustomWrapLog, wasm::get_wasm_parser};
 
 pub mod custom_wrap;
+#[cfg(target_os = "linux")]
 pub mod shared_obj;
 pub mod wasm;
 
@@ -42,6 +41,7 @@ pub mod wasm;
 #[enum_dispatch(L7ProtocolParserInterface)]
 pub enum CustomLog {
     WasmLog(WasmLog),
+    #[cfg(target_os = "linux")]
     SoLog(SoLog),
 }
 
@@ -49,15 +49,25 @@ pub fn get_custom_log_parser(proto: CustomProtocol) -> L7ProtocolParser {
     L7ProtocolParser::Custom(CustomWrapLog {
         parser: Some(match proto {
             CustomProtocol::Wasm(p, s) => CustomLog::WasmLog(get_wasm_parser(p, s)),
+            #[cfg(target_os = "linux")]
             CustomProtocol::So(p, s) => CustomLog::SoLog(get_so_parser(p, s)),
+            #[cfg(target_os = "windows")]
+            CustomProtocol::So(_, _) => todo!(),
         }),
     })
 }
 
+#[cfg(target_os = "linux")]
 #[inline(always)]
 fn all_plugin_log_parser() -> [CustomLog; 2] {
     [
         CustomLog::WasmLog(WasmLog::default()),
         CustomLog::SoLog(SoLog::default()),
     ]
+}
+
+#[cfg(target_os = "windows")]
+#[inline(always)]
+fn all_plugin_log_parser() -> [CustomLog; 1] {
+    [CustomLog::WasmLog(WasmLog::default())]
 }
