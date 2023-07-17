@@ -161,3 +161,8 @@ func (s *service) GetPrometheusLabelIDs(ctx context.Context, in *api.PrometheusL
 func (s *service) Plugin(r *api.PluginRequest, in api.Synchronizer_PluginServer) error {
 	return s.pluginEvent.Plugin(r, in)
 }
+
+func (s *service) GetUniversalTagNameMaps(ctx context.Context, in *api.UniversalTagNameMapsRequest) (*api.UniversalTagNameMapsResponse, error) {
+	// FIXME
+	return nil, nil
+}

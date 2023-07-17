@@ -19,6 +19,7 @@ service Synchronizer {
     rpc ShareGPIDLocalData(ShareGPIDSyncRequests) returns (ShareGPIDSyncRequests) {}
     rpc Plugin (PluginRequest) returns (stream PluginResponse) {}
     rpc GetPrometheusLabelIDs (PrometheusLabelRequest) returns (PrometheusLabelResponse) {}
+    rpc GetUniversalTagNameMaps (UniversalTagNameMapsRequest) returns (UniversalTagNameMapsResponse) {}
 }
 
 // debug service
@@ -863,4 +864,48 @@ message PrometheusLabelRequest {
 message PrometheusLabelResponse {
    repeated MetricLabelResponse response_label_ids = 1;
    repeated TargetResponse response_target_ids = 2;
+}
+
+message PodK8sLabelMap {
+    optional uint32 pod_id = 1;
+    repeated string label_name  = 2;
+    repeated string label_value = 3;
+}
+
+message DeviceMap {
+    optional uint32 id = 1;
+    repeated uint32 type = 2;
+    repeated string name = 3;
+}
+
+message VtapPortMap {
+    optional uint32 vtap_id = 1;
+    repeated uint32 tap_port = 2;
+    repeated string name = 3;
+}
+
+message IdNameMap {
+	optional uint32 id = 1;
+	optional string name = 2;
+}
+
+message UniversalTagNameMapsRequest {}
+
+message UniversalTagNameMapsResponse {
+	optional uint32 version = 1;
+	repeated PodK8sLabelMap pod_k8s_label_map = 2;
+	repeated IdNameMap region_map = 3;
+	repeated IdNameMap az_map = 4;
+	repeated IdNameMap node_type_map = 5;
+	repeated DeviceMap device_map = 6;
+	repeated IdNameMap pod_node_map = 7;
+	repeated IdNameMap pod_ns_map = 8;
+	repeated IdNameMap pod_group_map = 9;
+	repeated IdNameMap pod_map = 10;
+	repeated IdNameMap pod_cluster_map = 11;
+	repeated IdNameMap l3_epc__map = 12;
+	repeated IdNameMap subnet_map= 13;
+	repeated IdNameMap gprocess_map= 14;
+	repeated IdNameMap vtap_map= 15;
+	repeated VtapPortMap vtap_port_map= 16;
 }
