@@ -19,14 +19,18 @@ package exporter
 import (
 	"database/sql"
 	"fmt"
+	"net"
 	"regexp"
-	"time"
+	"strings"
 
-	"github.com/deepflowio/deepflow/server/ingester/common"
+	"golang.org/x/net/context"
+
+	"github.com/deepflowio/deepflow/message/trident"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/config"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/log_data"
-
-	clickhouse "github.com/ClickHouse/clickhouse-go/v2"
+	"github.com/deepflowio/deepflow/server/ingester/ingesterctl"
+	"github.com/deepflowio/deepflow/server/libs/debug"
+	"github.com/deepflowio/deepflow/server/libs/grpc"
 )
 
 type UniversalTags struct {
@@ -58,45 +62,6 @@ type UniversalTags struct {
 	TapPortName string
 }
 
-type Tag uint8
-
-const (
-	REGION Tag = iota
-	AZ
-	HOST
-	L3_DEVICE_TYPE
-	L3_DEVICE
-	POD_NODE
-	POD_NS
-	POD_GROUP
-	POD
-	POD_CLUSTER
-	L3_EPC
-	SUBNET
-	SERVICE
-	GPROCESS
-	VTAP
-	MAX_TAG_MAP_ID
-)
-
-var TagTableNames = []string{
-	REGION:         "region_map",
-	AZ:             "az_map",
-	HOST:           "",
-	L3_DEVICE_TYPE: "node_type_map",
-	L3_DEVICE:      "device_map",
-	POD_NODE:       "pod_node_map",
-	POD_NS:         "pod_ns_map",
-	POD_GROUP:      "pod_group_map",
-	POD:            "pod_map",
-	POD_CLUSTER:    "pod_cluster_map",
-	L3_EPC:         "l3_epc_map",
-	SUBNET:         "subnet_map",
-	SERVICE:        "",
-	GPROCESS:       "gprocess_map",
-	VTAP:           "vtap_map",
-}
-
 const (
 	TYPE_INTERNET       = 0
 	TYPE_VM             = 1
@@ -116,75 +81,100 @@ const (
 	TYPE_IP             = 255
 )
 
-func (t Tag) TableName() string {
-	return TagTableNames[t]
+// from clickhouse flow_tag.node_type_map
+var deviceTypeMap = map[uint32]string{
+	TYPE_INTERNET:       "internet_ip",
+	TYPE_VM:             "chost",
+	TYPE_VROUTER:        "router",
+	TYPE_HOST:           "host",
+	TYPE_DHCP_PORT:      "dhcpgw",
+	TYPE_POD:            "pod",
+	TYPE_POD_SERVICE:    "pod_service",
+	TYPE_REDIS_INSTANCE: "redis",
+	TYPE_RDS_INSTANCE:   "rds",
+	TYPE_POD_NODE:       "pod_node",
+	TYPE_LB:             "lb",
+	TYPE_NAT_GATEWAY:    "natgw",
+	TYPE_POD_GROUP:      "pod_group",
+	TYPE_SERVICE:        "service",
+	TYPE_GPROCESS:       "gprocess",
+	TYPE_IP:             "ip",
 }
 
-type UniversalTagMaps [MAX_TAG_MAP_ID]map[uint32]string
+type Labels map[string]string
+
+type UniversalTagMaps struct {
+	podK8SLabelMap map[uint32]Labels
+	regionMap      map[uint16]string
+	azMap          map[uint16]string
+	deviceMap      map[uint64]string //deviceId+deviceType -> deviceName
+	podNodeMap     map[uint32]string
+	podNsMap       map[uint16]string
+	podGroupMap    map[uint32]string
+	podMap         map[uint32]string
+	podClusterMap  map[uint16]string
+	l3EpcMap       map[uint32]string
+	subnetMap      map[uint16]string
+	gprocessMap    map[uint32]string
+	vtapMap        map[uint16]string
+}
 
 func (u *UniversalTagsManager) QueryUniversalTags(l7FlowLog *log_data.L7FlowLog) (*UniversalTags, *UniversalTags) {
 	tagMaps := u.universalTagMaps
-	tapPortName := u.tapPortNameMap[uint64(l7FlowLog.VtapID)<<32|uint64(l7FlowLog.TapPort)]
 	return &UniversalTags{
-			Region:       tagMaps[REGION][uint32(l7FlowLog.RegionID0)],
-			AZ:           tagMaps[AZ][uint32(l7FlowLog.AZID0)],
-			Host:         tagMaps[L3_DEVICE][uint32(TYPE_HOST)<<24|uint32(l7FlowLog.HostID0)],
-			L3DeviceType: tagMaps[L3_DEVICE_TYPE][uint32(l7FlowLog.L3DeviceType0)],
-			L3Device:     tagMaps[L3_DEVICE][uint32(l7FlowLog.L3DeviceID0)],
-			PodNode:      tagMaps[POD_NODE][uint32(l7FlowLog.PodNodeID0)],
-			PodNS:        tagMaps[POD_NS][uint32(l7FlowLog.PodNSID0)],
-			PodGroup:     tagMaps[POD_GROUP][uint32(l7FlowLog.PodGroupID0)],
-			Pod:          tagMaps[POD][uint32(l7FlowLog.PodID0)],
-			PodCluster:   tagMaps[POD_CLUSTER][uint32(l7FlowLog.PodClusterID0)],
-			L3Epc:        tagMaps[L3_EPC][uint32(l7FlowLog.L3EpcID0)],
-			Subnet:       tagMaps[SUBNET][uint32(l7FlowLog.SubnetID0)],
-			Service:      tagMaps[L3_DEVICE][uint32(uint32(TYPE_SERVICE)<<24|l7FlowLog.ServiceID0)],
-			GProcess:     tagMaps[GPROCESS][uint32(l7FlowLog.GPID0)],
-			Vtap:         tagMaps[VTAP][uint32(l7FlowLog.VtapID)],
+			Region:       tagMaps.regionMap[l7FlowLog.RegionID0],
+			AZ:           tagMaps.azMap[l7FlowLog.AZID0],
+			Host:         tagMaps.deviceMap[uint64(TYPE_HOST)<<32|uint64(l7FlowLog.HostID0)],
+			L3DeviceType: deviceTypeMap[uint32(l7FlowLog.L3DeviceType0)],
+			L3Device:     tagMaps.deviceMap[uint64(l7FlowLog.L3DeviceType0)<<32|uint64(l7FlowLog.L3DeviceID0)],
+			PodNode:      tagMaps.podNodeMap[l7FlowLog.PodNodeID0],
+			PodNS:        tagMaps.podNsMap[l7FlowLog.PodNSID0],
+			PodGroup:     tagMaps.podGroupMap[l7FlowLog.PodGroupID0],
+			Pod:          tagMaps.podMap[l7FlowLog.PodID0],
+			PodCluster:   tagMaps.podClusterMap[l7FlowLog.PodClusterID0],
+			L3Epc:        tagMaps.l3EpcMap[uint32(l7FlowLog.L3EpcID0)],
+			Subnet:       tagMaps.subnetMap[l7FlowLog.SubnetID0],
+			Service:      tagMaps.deviceMap[uint64(TYPE_SERVICE)<<32|uint64(l7FlowLog.ServiceID0)],
+			GProcess:     tagMaps.gprocessMap[l7FlowLog.GPID0],
+			Vtap:         tagMaps.vtapMap[l7FlowLog.VtapID],
 
-			CHost:      tagMaps[L3_DEVICE][uint32(TYPE_VM)<<24|uint32(l7FlowLog.L3DeviceID0)],
-			Router:     tagMaps[L3_DEVICE][uint32(TYPE_VROUTER)<<24|uint32(l7FlowLog.L3DeviceID0)],
-			DhcpGW:     tagMaps[L3_DEVICE][uint32(TYPE_DHCP_PORT)<<24|uint32(l7FlowLog.L3DeviceID0)],
-			PodService: tagMaps[L3_DEVICE][uint32(TYPE_POD_SERVICE)<<24|uint32(l7FlowLog.L3DeviceID0)],
-			Redis:      tagMaps[L3_DEVICE][uint32(TYPE_REDIS_INSTANCE)<<24|uint32(l7FlowLog.L3DeviceID0)],
-			RDS:        tagMaps[L3_DEVICE][uint32(TYPE_RDS_INSTANCE)<<24|uint32(l7FlowLog.L3DeviceID0)],
-			LB:         tagMaps[L3_DEVICE][uint32(TYPE_LB)<<24|uint32(l7FlowLog.L3DeviceID0)],
-
-			TapPortName: tapPortName,
+			CHost:      tagMaps.deviceMap[uint64(TYPE_VM)<<32|uint64(l7FlowLog.L3DeviceID0)],
+			Router:     tagMaps.deviceMap[uint64(TYPE_VROUTER)<<32|uint64(l7FlowLog.L3DeviceID0)],
+			DhcpGW:     tagMaps.deviceMap[uint64(TYPE_DHCP_PORT)<<32|uint64(l7FlowLog.L3DeviceID0)],
+			PodService: tagMaps.deviceMap[uint64(TYPE_POD_SERVICE)<<32|uint64(l7FlowLog.L3DeviceID0)],
+			Redis:      tagMaps.deviceMap[uint64(TYPE_REDIS_INSTANCE)<<32|uint64(l7FlowLog.L3DeviceID0)],
+			RDS:        tagMaps.deviceMap[uint64(TYPE_RDS_INSTANCE)<<32|uint64(l7FlowLog.L3DeviceID0)],
+			LB:         tagMaps.deviceMap[uint64(TYPE_LB)<<32|uint64(l7FlowLog.L3DeviceID0)],
 		}, &UniversalTags{
-			Region:       tagMaps[REGION][uint32(l7FlowLog.RegionID1)],
-			AZ:           tagMaps[AZ][uint32(l7FlowLog.AZID1)],
-			Host:         tagMaps[L3_DEVICE][uint32(TYPE_HOST)<<24|uint32(l7FlowLog.HostID1)],
-			L3DeviceType: tagMaps[L3_DEVICE_TYPE][uint32(l7FlowLog.L3DeviceType1)],
-			L3Device:     tagMaps[L3_DEVICE][uint32(l7FlowLog.L3DeviceID1)],
-			PodNode:      tagMaps[POD_NODE][uint32(l7FlowLog.PodNodeID1)],
-			PodNS:        tagMaps[POD_NS][uint32(l7FlowLog.PodNSID1)],
-			PodGroup:     tagMaps[POD_GROUP][uint32(l7FlowLog.PodGroupID1)],
-			Pod:          tagMaps[POD][uint32(l7FlowLog.PodID1)],
-			PodCluster:   tagMaps[POD_CLUSTER][uint32(l7FlowLog.PodClusterID1)],
-			L3Epc:        tagMaps[L3_EPC][uint32(l7FlowLog.L3EpcID1)],
-			Subnet:       tagMaps[SUBNET][uint32(l7FlowLog.SubnetID1)],
-			Service:      tagMaps[L3_DEVICE][uint32(TYPE_SERVICE<<24)|l7FlowLog.ServiceID1],
-			GProcess:     tagMaps[GPROCESS][uint32(l7FlowLog.GPID1)],
-			Vtap:         tagMaps[VTAP][uint32(l7FlowLog.VtapID)],
+			Region:       tagMaps.regionMap[l7FlowLog.RegionID1],
+			AZ:           tagMaps.azMap[l7FlowLog.AZID1],
+			Host:         tagMaps.deviceMap[uint64(TYPE_HOST)<<32|uint64(l7FlowLog.HostID1)],
+			L3DeviceType: deviceTypeMap[uint32(l7FlowLog.L3DeviceType1)],
+			L3Device:     tagMaps.deviceMap[uint64(l7FlowLog.L3DeviceType1)<<32|uint64(l7FlowLog.L3DeviceID1)],
+			PodNode:      tagMaps.podNodeMap[l7FlowLog.PodNodeID1],
+			PodNS:        tagMaps.podNsMap[l7FlowLog.PodNSID1],
+			PodGroup:     tagMaps.podGroupMap[l7FlowLog.PodGroupID1],
+			Pod:          tagMaps.podMap[l7FlowLog.PodID1],
+			PodCluster:   tagMaps.podClusterMap[l7FlowLog.PodClusterID1],
+			L3Epc:        tagMaps.l3EpcMap[uint32(l7FlowLog.L3EpcID1)],
+			Subnet:       tagMaps.subnetMap[l7FlowLog.SubnetID1],
+			Service:      tagMaps.deviceMap[uint64(TYPE_SERVICE)<<32|uint64(l7FlowLog.ServiceID1)],
+			GProcess:     tagMaps.gprocessMap[l7FlowLog.GPID1],
+			Vtap:         tagMaps.vtapMap[l7FlowLog.VtapID],
 
-			CHost:      tagMaps[L3_DEVICE][uint32(TYPE_VM)<<24|uint32(l7FlowLog.L3DeviceID1)],
-			Router:     tagMaps[L3_DEVICE][uint32(TYPE_VROUTER)<<24|uint32(l7FlowLog.L3DeviceID1)],
-			DhcpGW:     tagMaps[L3_DEVICE][uint32(TYPE_DHCP_PORT)<<24|uint32(l7FlowLog.L3DeviceID1)],
-			PodService: tagMaps[L3_DEVICE][uint32(TYPE_POD_SERVICE)<<24|uint32(l7FlowLog.L3DeviceID1)],
-			Redis:      tagMaps[L3_DEVICE][uint32(TYPE_REDIS_INSTANCE)<<24|uint32(l7FlowLog.L3DeviceID1)],
-			RDS:        tagMaps[L3_DEVICE][uint32(TYPE_RDS_INSTANCE)<<24|uint32(l7FlowLog.L3DeviceID1)],
-			LB:         tagMaps[L3_DEVICE][uint32(TYPE_LB)<<24|uint32(l7FlowLog.L3DeviceID1)],
-
-			TapPortName: tapPortName,
+			CHost:      tagMaps.deviceMap[uint64(TYPE_VM)<<32|uint64(l7FlowLog.L3DeviceID1)],
+			Router:     tagMaps.deviceMap[uint64(TYPE_VROUTER)<<32|uint64(l7FlowLog.L3DeviceID1)],
+			DhcpGW:     tagMaps.deviceMap[uint64(TYPE_DHCP_PORT)<<32|uint64(l7FlowLog.L3DeviceID1)],
+			PodService: tagMaps.deviceMap[uint64(TYPE_POD_SERVICE)<<32|uint64(l7FlowLog.L3DeviceID1)],
+			Redis:      tagMaps.deviceMap[uint64(TYPE_REDIS_INSTANCE)<<32|uint64(l7FlowLog.L3DeviceID1)],
+			RDS:        tagMaps.deviceMap[uint64(TYPE_RDS_INSTANCE)<<32|uint64(l7FlowLog.L3DeviceID1)],
+			LB:         tagMaps.deviceMap[uint64(TYPE_LB)<<32|uint64(l7FlowLog.L3DeviceID1)],
 		}
 }
 
 func (u *UniversalTagsManager) QueryCustomK8sLabels(podID uint32) Labels {
 	return u.podIDLabelsMap[podID]
 }
-
-type Labels map[string]string
 
 type UniversalTagsManager struct {
 	config           *config.Config
@@ -193,14 +183,13 @@ type UniversalTagsManager struct {
 	podIDLabelsMap   map[uint32]Labels
 	k8sLabelsRegexp  *regexp.Regexp
 
-	connection *sql.DB
+	connection              *sql.DB
+	grpcSession             *grpc.GrpcSession
+	versionUniversalTagMaps uint32
 }
 
 func NewUniversalTagsManager(config *config.Config) *UniversalTagsManager {
 	universalTagMaps := &UniversalTagMaps{}
-	for i := range universalTagMaps {
-		universalTagMaps[i] = make(map[uint32]string)
-	}
 	var k8sLabelsRegexp *regexp.Regexp
 	if config.Exporter.ExportCustomK8sLabelsRegexp != "" {
 		var err error
@@ -209,163 +198,119 @@ func NewUniversalTagsManager(config *config.Config) *UniversalTagsManager {
 			log.Warningf("OTLP exporter compile k8s label regexp pattern failed: %s", err)
 		}
 	}
-	return &UniversalTagsManager{
+	m := &UniversalTagsManager{
 		config:           config,
 		universalTagMaps: universalTagMaps,
 		tapPortNameMap:   make(map[uint64]string),
 		podIDLabelsMap:   make(map[uint32]Labels),
 		k8sLabelsRegexp:  k8sLabelsRegexp,
+		grpcSession:      &grpc.GrpcSession{},
 	}
+
+	runOnce := func() {
+		if err := m.Reload(); err != nil {
+			log.Warning(err)
+		}
+	}
+
+	controllers := make([]net.IP, len(config.Base.ControllerIPs))
+	for i, ipString := range config.Base.ControllerIPs {
+		controllers[i] = net.ParseIP(ipString)
+		if controllers[i].To4() != nil {
+			controllers[i] = controllers[i].To4()
+		}
+	}
+	m.grpcSession.Init(controllers, config.Base.ControllerPort, grpc.DEFAULT_SYNC_INTERVAL, config.Base.GrpcBufferSize, runOnce)
+	debug.ServerRegisterSimple(ingesterctl.CMD_OTLP_PLATFORMDATA, m)
+
+	return m
 }
 
 func (u *UniversalTagsManager) Start() {
-	ticker := time.NewTicker(time.Minute)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		if newTags, err := u.GetUniversalTagMaps(); err == nil {
-			for i := REGION; i < MAX_TAG_MAP_ID; i++ {
-				if newTags[i] != nil {
-					u.universalTagMaps[i] = newTags[i]
-				}
-				if u.universalTagMaps[i] == nil {
-					u.universalTagMaps[i] = make(map[uint32]string)
-				}
-			}
-		} else {
-			log.Warningf("update universall tag maps faile: %s", err)
-		}
-
-		if newTapPortMap, err := u.queryTapPortMap(); err == nil {
-			if newTapPortMap != nil {
-				u.tapPortNameMap = newTapPortMap
-			}
-		}
-
-		if newPodIdLabelsMap, err := u.queryPodIdLabelsMap(); err == nil {
-			if len(newPodIdLabelsMap) != 0 {
-				u.podIDLabelsMap = newPodIdLabelsMap
-			}
-		}
-	}
+	u.grpcSession.Start()
 }
 
-func (u *UniversalTagsManager) checkOrResetConnect() error {
-	var err error
-	if u.connection == nil {
-		u.connection, err = common.NewCKConnection(u.config.Base.CKDB.ActualAddrs[0], u.config.Base.CKDBAuth.Username, u.config.Base.CKDBAuth.Password)
-		if err != nil {
-			return err
+func (u *UniversalTagsManager) Close() {
+	u.grpcSession.Close()
+}
+
+func (u *UniversalTagsManager) Reload() error {
+	var response *trident.UniversalTagNameMapsResponse
+	err := u.grpcSession.Request(func(ctx context.Context, remote net.IP) error {
+		var err error
+		c := u.grpcSession.GetClient()
+		if c == nil {
+			return fmt.Errorf("can't get grpc client to %s", remote)
 		}
-		return nil
-	}
-	if err := u.connection.Ping(); err != nil {
-		if exception, ok := err.(*clickhouse.Exception); ok {
-			log.Warningf("[%d] %s \n%s\n", exception.Code, exception.Message, exception.StackTrace)
-		}
-		u.connection.Close()
-		u.connection = nil
+		client := trident.NewSynchronizerClient(c)
+		response, err = client.GetUniversalTagNameMaps(ctx, &trident.UniversalTagNameMapsRequest{})
+		return err
+	})
+	if err != nil {
 		return err
 	}
+
+	newVersion := response.GetVersion()
+	if newVersion == u.versionUniversalTagMaps {
+		return nil
+	}
+
+	u.universalTagMaps = u.GetUniversalTagMaps(response)
+
+	log.Infof("Event update rpc universalTagNames version %d -> %d", u.versionUniversalTagMaps, newVersion)
+	u.versionUniversalTagMaps = newVersion
+
 	return nil
 }
 
-func (u *UniversalTagsManager) GetUniversalTagMaps() (*UniversalTagMaps, error) {
-	if err := u.checkOrResetConnect(); err != nil {
-		return nil, err
+func (u *UniversalTagsManager) genU16KeyMap(idNames []*trident.IdNameMap) map[uint16]string {
+	m := make(map[uint16]string)
+	for i := range idNames {
+		m[uint16(idNames[i].GetId())] = idNames[i].GetName()
 	}
-	tagMaps := &UniversalTagMaps{}
-	var m map[uint32]string
-	var err error
-	for i := REGION; i < MAX_TAG_MAP_ID; i++ {
-		if i == L3_DEVICE_TYPE {
-			m, err = u.queryNodeTypeMap()
-		} else if i == L3_DEVICE {
-			m, err = u.queryDeviceMap()
-		} else {
-			m, err = u.queryMap(i.TableName())
-		}
-		if err == nil {
-			tagMaps[i] = m
-		}
-	}
-
-	return tagMaps, nil
+	return m
 }
 
-func (u *UniversalTagsManager) queryIDName(sql string) (map[uint32]string, error) {
+func (u *UniversalTagsManager) genU32KeyMap(idNames []*trident.IdNameMap) map[uint32]string {
 	m := make(map[uint32]string)
-	rows, err := u.connection.Query(sql)
-	if err != nil {
-		log.Warning(err)
-		return nil, err
+	for i := range idNames {
+		m[idNames[i].GetId()] = idNames[i].GetName()
 	}
-	var id uint64
-	var name string
-	for rows.Next() {
-		err := rows.Scan(&id, &name)
-		if err != nil {
-			log.Warning(err)
-			return nil, err
+	return m
+}
+
+func (u *UniversalTagsManager) GetUniversalTagMaps(response *trident.UniversalTagNameMapsResponse) *UniversalTagMaps {
+	tagMaps := &UniversalTagMaps{
+		podK8SLabelMap: make(map[uint32]Labels),
+		deviceMap:      make(map[uint64]string),
+	}
+
+	for _, podK8sLabel := range response.GetPodK8SLabelMap() {
+		labelMap := make(map[string]string)
+		for i, name := range podK8sLabel.GetLabelName() {
+			if u.isK8sLabelExport(name) {
+				labelMap[name] = podK8sLabel.GetLabelValue()[i]
+			}
 		}
-		m[uint32(id)] = name
+		tagMaps.podK8SLabelMap[podK8sLabel.GetPodId()] = labelMap
 	}
-	return m, err
-}
+	for _, device := range response.GetDeviceMap() {
+		tagMaps.deviceMap[uint64(device.GetType())<<32|uint64(device.GetId())] = device.GetName()
+	}
 
-func (u *UniversalTagsManager) queryMap(tableName string) (map[uint32]string, error) {
-	if tableName == "" {
-		return nil, fmt.Errorf("table is empty")
-	}
-	sql := fmt.Sprintf("SELECT id,name FROM flow_tag.`%s`", tableName)
-	return u.queryIDName(sql)
-}
+	tagMaps.regionMap = u.genU16KeyMap(response.GetRegionMap())
+	tagMaps.azMap = u.genU16KeyMap(response.GetAzMap())
+	tagMaps.podNodeMap = u.genU32KeyMap(response.GetPodNodeMap())
+	tagMaps.podNsMap = u.genU16KeyMap(response.GetPodNsMap())
+	tagMaps.podGroupMap = u.genU32KeyMap(response.GetPodGroupMap())
+	tagMaps.podMap = u.genU32KeyMap(response.GetPodMap())
+	tagMaps.podClusterMap = u.genU16KeyMap(response.GetPodClusterMap())
+	tagMaps.l3EpcMap = u.genU32KeyMap(response.GetL3EpcMap())
+	tagMaps.subnetMap = u.genU16KeyMap(response.GetSubnetMap())
+	tagMaps.gprocessMap = u.genU32KeyMap(response.GetGprocessMap())
+	tagMaps.vtapMap = u.genU16KeyMap(response.GetVtapMap())
 
-func (u *UniversalTagsManager) queryNodeTypeMap() (map[uint32]string, error) {
-	sql := fmt.Sprintf("SELECT resource_type,node_type FROM flow_tag.`node_type_map`")
-	return u.queryIDName(sql)
-}
-
-func (u *UniversalTagsManager) queryDeviceMap() (map[uint32]string, error) {
-	sql := fmt.Sprintf("SELECT devicetype,deviceid,name FROM flow_tag.`device_map`")
-	m := make(map[uint32]string)
-	rows, err := u.connection.Query(sql)
-	if err != nil {
-		log.Warning(err)
-		return nil, err
-	}
-	var dtype, id uint64
-	var name string
-	for rows.Next() {
-		err := rows.Scan(&dtype, &id, &name)
-		if err != nil {
-			log.Warning(err)
-			return nil, err
-		}
-		m[uint32((dtype<<24)|id)] = name
-	}
-	return m, err
-}
-
-func (u *UniversalTagsManager) queryTapPortMap() (map[uint64]string, error) {
-	sql := fmt.Sprintf("SELECT vtap_id,tap_port,name FROM flow_tag.`vtap_port_map`")
-	m := make(map[uint64]string)
-	rows, err := u.connection.Query(sql)
-	if err != nil {
-		log.Warning(err)
-		return nil, err
-	}
-	var vtapId, tapPort uint64
-	var name string
-	for rows.Next() {
-		err := rows.Scan(&vtapId, &tapPort, &name)
-		if err != nil {
-			log.Warning(err)
-			return nil, err
-		}
-		m[vtapId<<32|tapPort] = name
-	}
-	return m, err
+	return tagMaps
 }
 
 func (u *UniversalTagsManager) isK8sLabelExport(name string) bool {
@@ -381,30 +326,20 @@ func (u *UniversalTagsManager) isK8sLabelExport(name string) bool {
 	return false
 }
 
-func (u *UniversalTagsManager) queryPodIdLabelsMap() (map[uint32]Labels, error) {
-	sql := fmt.Sprintf("SELECT id,key,value FROM flow_tag.`pod_k8s_label_map`")
-	m := make(map[uint32]Labels)
-	rows, err := u.connection.Query(sql)
-	if err != nil {
-		log.Warning(err)
-		return nil, err
-	}
-	var podId uint64
-	var key, value string
-	for rows.Next() {
-		err := rows.Scan(&podId, &key, &value)
-		if err != nil {
-			log.Warning(err)
-			return nil, err
-		}
-		if !u.isK8sLabelExport(key) {
-			continue
-		}
-		if labels, ok := m[uint32(podId)]; ok {
-			labels[key] = value
-		} else {
-			m[uint32(podId)] = map[string]string{key: value}
-		}
-	}
-	return m, err
+func (u *UniversalTagsManager) HandleSimpleCommand(operate uint16, arg string) string {
+	sb := &strings.Builder{}
+	sb.WriteString(fmt.Sprintf("podK8SLabelMap: %+v\n", u.universalTagMaps.podK8SLabelMap))
+	sb.WriteString(fmt.Sprintf("regionMap: %+v\n", u.universalTagMaps.regionMap))
+
+	sb.WriteString(fmt.Sprintf("azMap: %+v\n", u.universalTagMaps.azMap))
+	sb.WriteString(fmt.Sprintf("deviceMap: %+v\n", u.universalTagMaps.deviceMap))
+	sb.WriteString(fmt.Sprintf("podNodeMap: %+v\n", u.universalTagMaps.podNodeMap))
+	sb.WriteString(fmt.Sprintf("podGroupMap: %+v\n", u.universalTagMaps.podGroupMap))
+	sb.WriteString(fmt.Sprintf("podMap: %+v\n", u.universalTagMaps.podMap))
+	sb.WriteString(fmt.Sprintf("podClusterMap: %+v\n", u.universalTagMaps.podClusterMap))
+	sb.WriteString(fmt.Sprintf("l3EpcMap: %+v\n", u.universalTagMaps.l3EpcMap))
+	sb.WriteString(fmt.Sprintf("subnetMap: %+v\n", u.universalTagMaps.subnetMap))
+	sb.WriteString(fmt.Sprintf("gprocessMap: %+v\n", u.universalTagMaps.gprocessMap))
+	sb.WriteString(fmt.Sprintf("vtapMap: %+v\n", u.universalTagMaps.vtapMap))
+	return sb.String()
 }
