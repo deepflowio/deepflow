@@ -16,6 +16,8 @@
 
 package mysql
 
+import "time"
+
 type ChRegion struct {
 	ID     int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	Name   string `gorm:"column:name;type:varchar(64);default:null" json:"NAME"`
@@ -464,4 +466,8 @@ type ChPrometheusTargetLabelLayout struct {
 	TargetID          int    `gorm:"primaryKey;column:target_id;type:int;not null" json:"TARGET_ID"`
 	TargetLabelNames  string `gorm:"column:target_label_names;type:text;not null" json:"TARGET_LABEL_NAMES"`
 	TargetLabelValues string `gorm:"column:target_label_values;type:text;not null" json:"TARGET_LABEL_VALUES"`
+}
+
+type ChViewChange struct {
+	UpdatedAt time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
 }

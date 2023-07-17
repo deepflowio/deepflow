@@ -23,6 +23,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	mapset "github.com/deckarep/golang-set"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +33,10 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/clickhouse"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
+
+var CHANGE_VIEW_TIME = time.Time{}
 
 func (c *TagRecorder) UpdateChDictionary() {
 	log.Info("tagrecorder update ch dictionary")
@@ -121,6 +125,96 @@ func (c *TagRecorder) UpdateChDictionary() {
 								log.Error(err)
 								connect.Close()
 								continue
+							}
+						}
+
+						// Get the current view in the database
+						views := []string{}
+						log.Infof(fmt.Sprintf("SHOW TABLES FROM %s LIKE '%%view'", c.cfg.ClickHouseCfg.Database))
+						if err := connect.Select(&views, fmt.Sprintf("SHOW TABLES FROM %s LIKE '%%view'", c.cfg.ClickHouseCfg.Database)); err != nil {
+							log.Error(err)
+							connect.Close()
+							continue
+						}
+
+						// Create the desired view
+						wantedViews := mapset.NewSet(CH_APP_LABEL_LIVE_VIEW, CH_TARGET_LABEL_LIVE_VIEW)
+						chViews := mapset.NewSet()
+						for _, view := range views {
+							chViews.Add(view)
+						}
+						addViews := wantedViews.Difference(chViews)
+						for _, view := range addViews.ToSlice() {
+							viewName := view.(string)
+							createSQL := CREATE_SQL_MAP[viewName]
+							_, err = connect.Exec(createSQL)
+							if err != nil {
+								log.Error(err)
+								connect.Close()
+								continue
+							}
+						}
+
+						// Check and update existing views
+						checkViews := chViews.Intersect(wantedViews)
+						for _, view := range checkViews.ToSlice() {
+							viewName := view.(string)
+							log.Info(viewName)
+							showSQL := fmt.Sprintf("SHOW CREATE TABLE %s.%s", c.cfg.ClickHouseCfg.Database, viewName)
+							viewSQL := make([]string, 0)
+							if err := connect.Select(&viewSQL, showSQL); err != nil {
+								log.Error(err)
+								connect.Close()
+								continue
+							}
+							createSQL := CREATE_SQL_MAP[viewName]
+							if createSQL == viewSQL[0] {
+								continue
+							}
+							log.Infof("update view %s", viewName)
+							log.Infof("exist view %s", viewSQL[0])
+							log.Infof("wanted view %s", createSQL)
+							dropSQL := fmt.Sprintf("DROP TABLE %s.%s", c.cfg.ClickHouseCfg.Database, viewName)
+							_, err = connect.Exec(dropSQL)
+							if err != nil {
+								log.Error(err)
+								connect.Close()
+								continue
+							}
+							_, err = connect.Exec(createSQL)
+							if err != nil {
+								log.Error(err)
+								connect.Close()
+								continue
+							}
+						}
+
+						// refresh live view
+						var chViewChange mysql.ChViewChange
+						err = mysql.Db.Unscoped().First(&chViewChange).Error
+						if err != nil {
+							log.Errorf(dbQueryResourceFailed("ch_view_change", err))
+						} else {
+							updatedAt := chViewChange.UpdatedAt
+							if !updatedAt.Equal(CHANGE_VIEW_TIME) {
+								log.Infof("refresh live view app_label_live_view in (%s: %d)", address.IP, clickHouseCfg.Port)
+								appLabelSql := "ALTER LIVE VIEW flow_tag.app_label_live_view REFRESH"
+								_, err = connect.Exec(appLabelSql)
+								if err != nil {
+									log.Error(err)
+									connect.Close()
+									continue
+								}
+
+								log.Infof("refresh live view target_label_live_view in (%s: %d)", address.IP, clickHouseCfg.Port)
+								targetLabelSql := "ALTER LIVE VIEW flow_tag.target_label_live_view REFRESH"
+								_, err = connect.Exec(targetLabelSql)
+								if err != nil {
+									log.Error(err)
+									connect.Close()
+									continue
+								}
+								CHANGE_VIEW_TIME = time.Now()
 							}
 						}
 
@@ -267,94 +361,11 @@ func (c *TagRecorder) UpdateChDictionary() {
 	return
 }
 
-func (c *TagRecorder) RefreshLiveView() {
-	log.Info("tagrecorder refresh live view")
-	kubeconfig := c.cfg.Kubeconfig
-	var config *rest.Config
-	var err error
-	if kubeconfig != "" {
-		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
-		if err != nil {
-			log.Error(err)
-			return
-		}
+func UpdateChangeView() {
+	err := mysql.Db.Exec("UPDATE ch_view_change SET updated_at = NOW()").Error
+	if err != nil {
+		log.Errorf("update ch_view_change failed: %s", err)
 	} else {
-		config, err = rest.InClusterConfig()
-		if err != nil {
-			log.Error(err)
-			return
-		}
-	}
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		log.Error(err)
-		return
-	}
-	ctx := context.Background()
-	namespace := os.Getenv(common.NAME_SPACE_KEY)
-	endpoints, err := clientset.CoreV1().Endpoints(namespace).List(ctx, metav1.ListOptions{})
-	if err != nil {
-		log.Error(err)
-		return
-	}
-	if len(endpoints.Items) == 0 {
-		log.Warningf("no endpoints in %s", namespace)
-		return
-	}
-	endpointName := c.cfg.ClickHouseCfg.Host
-	for _, endpoint := range endpoints.Items {
-		if endpoint.Name != endpointName {
-			continue
-		}
-		subsets := endpoint.Subsets
-		for _, subset := range subsets {
-			for _, address := range subset.Addresses {
-				clickHouseCfg := c.cfg.ClickHouseCfg
-				if strings.Contains(address.IP, ":") {
-					clickHouseCfg.Host = fmt.Sprintf("[%s]", address.IP)
-				} else {
-					clickHouseCfg.Host = address.IP
-				}
-				for _, port := range subset.Ports {
-					if port.Name == "tcp-port" {
-						clickHouseCfg.Port = uint32(port.Port)
-						connect, err := clickhouse.Connect(clickHouseCfg)
-						if err != nil {
-							continue
-						}
-						_, err = connect.Exec(CREATE_APP_LABEL_LIVE_VIEW_SQL)
-						if err != nil {
-							log.Error(err)
-							connect.Close()
-							continue
-						}
-						log.Infof("refresh live view app_label_live_view in (%s: %d)", address.IP, clickHouseCfg.Port)
-						appLabelSql := "ALTER LIVE VIEW flow_tag.app_label_live_view REFRESH"
-						_, err = connect.Exec(appLabelSql)
-						if err != nil {
-							log.Error(err)
-							connect.Close()
-							continue
-						}
-
-						_, err = connect.Exec(CREATE_TARGET_LABEL_LIVE_VIEW_SQL)
-						if err != nil {
-							log.Error(err)
-							connect.Close()
-							continue
-						}
-						log.Infof("refresh live view target_label_live_view in (%s: %d)", address.IP, clickHouseCfg.Port)
-						targetLabelSql := "ALTER LIVE VIEW flow_tag.target_label_live_view REFRESH"
-						_, err = connect.Exec(targetLabelSql)
-						if err != nil {
-							log.Error(err)
-							connect.Close()
-							continue
-						}
-						connect.Close()
-					}
-				}
-			}
-		}
+		log.Info("update ch_view_change success")
 	}
 }

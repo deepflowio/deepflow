@@ -165,6 +165,9 @@ const (
 	CH_PROMETHEUS_METRIC_NAME             = "prometheus_metric_name_map"
 	CH_PROMETHEUS_METRIC_APP_LABEL_LAYOUT = "prometheus_metric_app_label_layout_map"
 	CH_PROMETHEUS_TARGET_LABEL_LAYOUT     = "prometheus_target_label_layout_map"
+
+	CH_APP_LABEL_LIVE_VIEW    = "app_label_live_view"
+	CH_TARGET_LABEL_LIVE_VIEW = "target_label_live_view"
 )
 
 const (
@@ -589,16 +592,15 @@ const (
 )
 
 const (
-	CREATE_APP_LABEL_LIVE_VIEW_SQL = "CREATE LIVE VIEW IF NOT EXISTS flow_tag.app_label_live_view\n" +
+	CREATE_APP_LABEL_LIVE_VIEW_SQL = "CREATE LIVE VIEW flow_tag.app_label_live_view\n" +
 		"(\n" +
-		"    `metric_id` UInt64,\n" +
 		"    `label_name_id` UInt64,\n" +
 		"    `label_value_id` UInt64,\n" +
 		"    `label_value` String\n" +
 		") AS\n" +
 		"SELECT *\n" +
 		"FROM flow_tag.app_label_map"
-	CREATE_TARGET_LABEL_LIVE_VIEW_SQL = "CREATE LIVE VIEW IF NOT EXISTS flow_tag.target_label_live_view\n" +
+	CREATE_TARGET_LABEL_LIVE_VIEW_SQL = "CREATE LIVE VIEW flow_tag.target_label_live_view\n" +
 		"(\n" +
 		"    `metric_id` UInt64,\n" +
 		"    `label_name_id` UInt64,\n" +
@@ -703,6 +705,9 @@ var CREATE_SQL_MAP = map[string]string{
 	CH_APP_LABEL:                          CREATE_APP_LABEL_SQL,
 	CH_TARGET_LABEL:                       CREATE_TARGET_LABEL_SQL,
 	CH_PROMETHEUS_TARGET_LABEL_LAYOUT:     CREATE_PROMETHEUS_TARGET_LABEL_LAYOUT_DICTIONARY_SQL,
+
+	CH_APP_LABEL_LIVE_VIEW:    CREATE_APP_LABEL_LIVE_VIEW_SQL,
+	CH_TARGET_LABEL_LIVE_VIEW: CREATE_TARGET_LABEL_LIVE_VIEW_SQL,
 }
 
 var VTAP_TYPE_TO_DEVICE_TYPE = map[int]int{
