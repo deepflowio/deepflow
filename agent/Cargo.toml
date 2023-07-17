@@ -18,6 +18,7 @@ bytesize = "1.1.0"
 cadence = "0.27.0"
 chrono = "0.4"
 clap = { version = "3.2.8", features = ["derive"] }
+cloud_platform = { path = "plugins/cloud_platform" }
 dashmap = "5.3.3"
 dns-lookup = "1.0.8"
 elf = "0.4.0"
