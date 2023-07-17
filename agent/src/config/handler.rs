@@ -1287,6 +1287,13 @@ impl ConfigHandler {
             );
         }
 
+        if yaml_config.prometheus_extra_config != new_config.yaml_config.prometheus_extra_config {
+            info!(
+                "prometheus_extra_config set to {:?}",
+                new_config.yaml_config.prometheus_extra_config
+            );
+        }
+
         if *yaml_config != new_config.yaml_config {
             *yaml_config = new_config.yaml_config;
         }

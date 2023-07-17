@@ -644,7 +644,7 @@ async fn handler(
                         break;
                     }
                     if headers.contains_key(label) {
-                        let mut value = headers
+                        let value = headers
                             .get(label)
                             .unwrap()
                             .to_str()
@@ -652,10 +652,7 @@ async fn handler(
                             .to_string();
                         labels_count += label.len() as u32;
                         values_count += value.len() as u32;
-                        let mut label_str = label.to_string();
-                        value.push_str("test");
-                        label_str.push_str("test");
-                        extra_label_names.push(label_str);
+                        extra_label_names.push(label.to_string());
                         extra_label_values.push(value);
                     }
                 }
