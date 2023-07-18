@@ -15,7 +15,7 @@
  */
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     io::prelude::*,
     mem,
     ops::Deref,
@@ -35,9 +35,12 @@ use log::{debug, error, info, log_enabled, warn, Level};
 use parking_lot::RwLock;
 use tokio::{runtime::Runtime, task::JoinHandle};
 
-use super::resource_watcher::{GenericResourceWatcher, Watcher, WatcherConfig};
+use super::resource_watcher::{
+    default_resources, supported_resources, GenericResourceWatcher, GroupVersion, Resource,
+    Watcher, WatcherConfig,
+};
 use crate::{
-    config::{handler::PlatformAccess, IngressFlavour},
+    config::{handler::PlatformAccess, KubernetesResourceConfig},
     error::{Error, Result},
     exception::ExceptionHandler,
     platform::kubernetes::resource_watcher::ResourceWatcherFactory,
@@ -62,38 +65,6 @@ use public::proto::{
  *     最新数据，此时进行一次全量同步。
  */
 
-const RESOURCES: [&str; 11] = [
-    "nodes",
-    "namespaces",
-    "services",
-    "servicerules",
-    "deployments",
-    "pods",
-    "statefulsets",
-    "daemonsets",
-    "replicationcontrollers",
-    "replicasets",
-    "ingresses",
-];
-
-/*
-    PB_RESOURCES 和 PB_INGRESS 用于打包发送k8s信息填写的资源类型，控制器根据类型作为key进行存储, 因为Route/Ingress 可以用Ingress一起表示，
-    所以所有Ingress统一用*v1.Ingress。go里可以通过类型反射获取，然后控制器约定为key，rust还没好的方法获取，所以先手动填写，以后更新
-*/
-const PB_RESOURCES: [&str; 11] = [
-    "*v1.Node",
-    "*v1.Namespace",
-    "*v1.Service",
-    "*v1.ServiceRule",
-    "*v1.Deployment",
-    "*v1.Pod",
-    "*v1.StatefulSet",
-    "*v1.DaemonSet",
-    "*v1.ReplicationController",
-    "*v1.ReplicaSet",
-    "*v1.Ingress",
-];
-const PB_INGRESS: &str = "*v1.Ingress";
 const PB_VERSION_INFO: &str = "*version.Info";
 
 struct Context {
@@ -102,12 +73,18 @@ struct Context {
     version: AtomicU64,
 }
 
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+struct WatcherKey {
+    name: &'static str,
+    group: &'static str,
+}
+
 pub struct ApiWatcher {
     context: Arc<Context>,
     thread: Mutex<Option<thread::JoinHandle<()>>>,
     running: Arc<Mutex<bool>>,
     timer: Arc<Condvar>,
-    watchers: Arc<Mutex<HashMap<String, GenericResourceWatcher>>>,
+    watchers: Arc<Mutex<HashMap<WatcherKey, GenericResourceWatcher>>>,
     err_msgs: Arc<Mutex<Vec<String>>>,
     apiserver_version: Arc<Mutex<Info>>,
     session: Arc<Session>,
@@ -156,11 +133,18 @@ impl ApiWatcher {
             return None;
         }
 
-        self.watchers
-            .lock()
-            .unwrap()
-            .get(resource_name.as_ref())
-            .map(|watcher| watcher.entries())
+        let mut entries = vec![];
+        let watchers = self.watchers.lock().unwrap();
+        for (k, v) in watchers.iter() {
+            if k.name == resource_name.as_ref() {
+                entries.append(&mut v.entries())
+            }
+        }
+        if entries.is_empty() {
+            None
+        } else {
+            Some(entries)
+        }
     }
 
     pub fn get_server_version(&self) -> Option<String> {
@@ -254,15 +238,247 @@ impl ApiWatcher {
         self.session.reset_server_ip(controller_ips);
     }
 
+    async fn discover_resources(
+        client: &Client,
+        resource_config: &Vec<KubernetesResourceConfig>,
+        err_msgs: &Arc<Mutex<Vec<String>>>,
+    ) -> Result<Vec<Resource>> {
+        let mut resources = default_resources();
+        debug!("default resources are {:?}", resources);
+        let supported_resources = supported_resources();
+
+        let mut disabled_resources = HashSet::new();
+        for r in resource_config {
+            if r.disabled {
+                debug!("resource {} disabled", r.name);
+                disabled_resources.insert(r.name.clone());
+            }
+        }
+        let mut overridden_resources = HashSet::new();
+        for r in resource_config {
+            if disabled_resources.contains(&r.name) {
+                continue;
+            }
+            debug!("resource {} overridden", r.name);
+            overridden_resources.insert(r.name.clone());
+        }
+
+        // remove disabled or overridden entries
+        resources.retain(|r| {
+            !(disabled_resources.contains(&r.name as &str)
+                || overridden_resources.contains(&r.name as &str))
+        });
+
+        // add overridden entries
+        for r in resource_config {
+            if r.disabled {
+                continue;
+            }
+            let Some(index) = supported_resources.iter().position(|sr| &sr.name == &r.name) else {
+                warn!("resource {} not supported", r.name);
+                continue;
+            };
+            let sr = &supported_resources[index];
+            if r.group == "" && r.version == "" {
+                resources.push(sr.clone());
+                continue;
+            }
+            if r.version == "" {
+                let gv = sr
+                    .group_versions
+                    .iter()
+                    .filter_map(|gv| {
+                        if &gv.group == &r.group {
+                            Some(*gv)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                if gv.is_empty() {
+                    warn!("resource {} in group {} not supported", r.name, r.group);
+                } else {
+                    resources.push(Resource {
+                        group_versions: gv,
+                        ..sr.clone()
+                    });
+                }
+                continue;
+            }
+            let Some(index) = sr.group_versions.iter().position(|gv| &gv.group == &r.group && &gv.version == &r.version) else {
+                warn!("resource {} in group {}/{} not supported", r.name, r.group, r.version);
+                continue;
+            };
+            resources.push(Resource {
+                selected_gv: Some(sr.group_versions[index]),
+                ..sr.clone()
+            });
+        }
+        debug!("overridden resources are {:?}", resources);
+
+        // only support core/v1
+        let core_version = "v1";
+        let api_versions = client
+            .list_core_api_versions()
+            .await
+            .map_err(|e| Error::KubernetesApiWatcher(format!("{}", e)))?;
+        if !api_versions.versions.contains(&core_version.to_owned()) {
+            return Err(Error::KubernetesApiWatcher(format!(
+                "core api versions {:?} does not contain \"v1\"",
+                api_versions.versions
+            )));
+        }
+        let core_resources = client
+            .list_core_api_resources(core_version)
+            .await
+            .map_err(|e| Error::KubernetesApiWatcher(format!("{}", e)))?;
+        for api_resource in core_resources.resources {
+            let Some(index) = resources.iter().position(|r| &r.name == &api_resource.name && r.group_versions.iter().any(|gv| gv.group == "core")) else {
+                continue;
+            };
+            debug!(
+                "found {} api in group core/{}",
+                api_resource.name, core_version
+            );
+            resources[index].selected_gv = Some(GroupVersion {
+                group: "core",
+                version: core_version,
+            });
+        }
+
+        let interested_groups: HashSet<&'static str> = resources
+            .iter()
+            .filter(|r| r.selected_gv.is_none())
+            .flat_map(|r| r.group_versions.iter().map(|gv| gv.group))
+            .collect();
+        debug!("search for api in groups {:?}", interested_groups);
+        match client.list_api_groups().await {
+            Ok(api_groups) => {
+                for group in api_groups.groups {
+                    if !interested_groups.contains(&group.name as &str) {
+                        debug!("skipped group {}", group.name);
+                        continue;
+                    }
+                    let interested_versions: HashSet<&'static str> = resources
+                        .iter()
+                        .filter(|r| r.selected_gv.is_none())
+                        .flat_map(|r| {
+                            r.group_versions.iter().filter_map(|gv| {
+                                if gv.group == &group.name {
+                                    Some(gv.version)
+                                } else {
+                                    None
+                                }
+                            })
+                        })
+                        .collect();
+                    debug!(
+                        "search for api in group {} versions {:?}",
+                        group.name, interested_versions
+                    );
+                    for version in group.versions {
+                        if !interested_versions.contains(&version.version as &str) {
+                            debug!("skipped invalid version {}", version.version);
+                            continue;
+                        }
+                        let mut api_resources = client
+                            .list_api_group_resources(&version.group_version)
+                            .await;
+                        if api_resources.is_err() {
+                            debug!(
+                                "failed to get api resources from {}: {}",
+                                version.group_version,
+                                api_resources.unwrap_err()
+                            );
+                            // try one more time
+                            api_resources = client
+                                .list_api_group_resources(&version.group_version)
+                                .await;
+                            if api_resources.is_err() {
+                                continue;
+                            }
+                        }
+                        debug!("start to get api resources from {}", version.group_version);
+
+                        for api_resource in api_resources.unwrap().resources {
+                            let resource_name = api_resource.name;
+                            let Some(index) = resources.iter().position(|r| &r.name == &resource_name && r.group_versions.iter().any(|gv| gv.group == &group.name)) else {
+                                continue;
+                            };
+                            let Some(gv_index) = resources[index].group_versions.iter().position(|gv| gv.group == &group.name && gv.version == &version.version) else {
+                                debug!("skipped {} api in group {} with other version",
+                                    resource_name,
+                                    version.group_version
+                                );
+                                continue;
+                            };
+                            let resource = &mut resources[index];
+                            let gv = &resource.group_versions[gv_index];
+                            debug!(
+                                "found {} api in group {}",
+                                resource_name, version.group_version
+                            );
+                            if resource.selected_gv.is_none() {
+                                resource.selected_gv = Some(*gv);
+                            } else {
+                                let selected = &resource.selected_gv.as_ref().unwrap();
+                                if &gv != selected {
+                                    // must exist
+                                    let prev_index = resource
+                                        .group_versions
+                                        .iter()
+                                        .position(|g| &g == selected)
+                                        .unwrap();
+                                    // prior
+                                    if gv_index < prev_index {
+                                        debug!("use more suitable {} api in {}", resource_name, gv);
+                                        resource.selected_gv = Some(*gv);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Err(err) => {
+                // 检查支持的api列表，如果查不到就用默认的
+                let err_msg = format!("get server resources failed: {}, use defaults", err);
+                warn!("{}", err_msg);
+                err_msgs.lock().unwrap().push(err_msg);
+            }
+        }
+
+        // check required resources
+        for r in resources.iter_mut() {
+            if r.selected_gv.is_none() {
+                warn!("resource {} not found, use defaults", r.name);
+                r.selected_gv = Some(r.group_versions[0]);
+            }
+        }
+
+        for r in resources.iter() {
+            info!(
+                "will query resource {} from {}",
+                r.name,
+                r.selected_gv.unwrap()
+            );
+        }
+
+        Ok(resources)
+    }
+
     async fn set_up(
-        is_openshift_route: bool,
+        resource_config: &Vec<KubernetesResourceConfig>,
         runtime: &Runtime,
         apiserver_version: &Arc<Mutex<Info>>,
         err_msgs: &Arc<Mutex<Vec<String>>>,
         namespace: Option<&str>,
         stats_collector: &stats::Collector,
         watcher_config: &WatcherConfig,
-    ) -> Result<(HashMap<String, GenericResourceWatcher>, Vec<JoinHandle<()>>)> {
+    ) -> Result<(
+        HashMap<WatcherKey, GenericResourceWatcher>,
+        Vec<JoinHandle<()>>,
+    )> {
         let mut config = Config::infer().await.map_err(|e| {
             Error::KubernetesApiWatcher(format!("failed to infer kubernetes config: {}", e))
         })?;
@@ -286,250 +502,32 @@ impl ApiWatcher {
             }
         }
 
-        let api_version = client
-            .list_core_api_versions()
-            .await
-            .map_err(|e| Error::KubernetesApiWatcher(format!("{}", e)))?;
+        let resources = match Self::discover_resources(&client, resource_config, err_msgs).await {
+            Ok(r) => r,
+            Err(e) => {
+                return Err(Error::KubernetesApiWatcher(e.to_string()));
+            }
+        };
 
         let (mut watchers, mut task_handles) = (HashMap::new(), vec![]);
         let watcher_factory = ResourceWatcherFactory::new(client.clone(), runtime.handle().clone());
-        let mut ingress_groups = vec![];
-        for version in api_version.versions {
-            let core_resources = client
-                .list_core_api_resources(&version)
-                .await
-                .map_err(|e| Error::KubernetesApiWatcher(format!("{}", e)))?;
-            debug!("start to get api resources from {}", version);
-            for api_resource in core_resources.resources {
-                let resource_name = api_resource.name;
-                if !RESOURCES.iter().any(|&r| r == resource_name) {
-                    continue;
-                }
-                info!(
-                    "found {} api in group core/{}",
-                    resource_name.as_str(),
-                    version
-                );
-                if resource_name != RESOURCES[RESOURCES.len() - 1] {
-                    let index = RESOURCES.iter().position(|&r| r == resource_name).unwrap();
-                    if let Some(watcher) = watcher_factory.new_watcher(
-                        RESOURCES[index],
-                        PB_RESOURCES[index],
-                        namespace,
-                        stats_collector,
-                        watcher_config,
-                    ) {
-                        watchers.insert(resource_name, watcher);
-                    }
-                }
+        for r in resources {
+            let key = WatcherKey {
+                name: r.name,
+                group: r.selected_gv.as_ref().unwrap().group,
+            };
+            if let Some(watcher) =
+                watcher_factory.new_watcher(r, namespace, stats_collector, watcher_config)
+            {
+                watchers.insert(key, watcher);
             }
         }
-
-        match client.list_api_groups().await {
-            Ok(api_groups) => {
-                for group in api_groups.groups {
-                    let version = match group
-                        .preferred_version
-                        .as_ref()
-                        .or_else(|| group.versions.first())
-                    {
-                        Some(v) => v,
-                        None => {
-                            continue;
-                        }
-                    };
-                    let mut api_resources = client
-                        .list_api_group_resources(version.group_version.as_str())
-                        .await;
-                    if api_resources.is_err() {
-                        debug!(
-                            "failed to get api resources from {}: {}",
-                            version.group_version.as_str(),
-                            api_resources.unwrap_err()
-                        );
-                        // try one more time
-                        api_resources = client
-                            .list_api_group_resources(version.group_version.as_str())
-                            .await;
-                        if api_resources.is_err() {
-                            continue;
-                        }
-                    }
-                    debug!(
-                        "start to get api resources from {}",
-                        version.group_version.as_str()
-                    );
-
-                    for api_resource in api_resources.unwrap().resources {
-                        let resource_name = api_resource.name;
-                        if watchers.contains_key(&resource_name) {
-                            debug!(
-                                "found another {} api in group {}, skipped",
-                                resource_name.as_str(),
-                                version.group_version.as_str()
-                            );
-                            continue;
-                        }
-
-                        let Some(index) = RESOURCES.iter().position(|&r| r == resource_name) else {
-                            continue;
-                        };
-                        info!(
-                            "found {} api in group {}",
-                            resource_name.as_str(),
-                            version.group_version.as_str()
-                        );
-
-                        if resource_name == "ingresses" {
-                            ingress_groups.push(version.group_version.clone());
-                        } else if let Some(watcher) = watcher_factory.new_watcher(
-                            RESOURCES[index],
-                            PB_RESOURCES[index],
-                            namespace,
-                            stats_collector,
-                            watcher_config,
-                        ) {
-                            watchers.insert(resource_name, watcher);
-                        }
-                    }
-                }
-                let ingress_watcher = if is_openshift_route {
-                    watcher_factory.new_watcher(
-                        "routes",
-                        PB_INGRESS,
-                        namespace,
-                        stats_collector,
-                        watcher_config,
-                    )
-                } else if ingress_groups
-                    .iter()
-                    .any(|g| g.as_str() == "networking.k8s.io/v1")
-                {
-                    watcher_factory.new_watcher(
-                        "v1ingresses",
-                        PB_INGRESS,
-                        namespace,
-                        stats_collector,
-                        watcher_config,
-                    )
-                } else if ingress_groups
-                    .iter()
-                    .any(|g| g.as_str() == "networking.k8s.io/v1beta1")
-                {
-                    watcher_factory.new_watcher(
-                        "v1beta1ingresses",
-                        PB_INGRESS,
-                        namespace,
-                        stats_collector,
-                        watcher_config,
-                    )
-                } else if ingress_groups
-                    .iter()
-                    .any(|g| g.as_str() == "extensions/v1beta1")
-                {
-                    watcher_factory.new_watcher(
-                        "extv1beta1ingresses",
-                        PB_INGRESS,
-                        namespace,
-                        stats_collector,
-                        watcher_config,
-                    )
-                } else {
-                    None
-                };
-                if let Some(watcher) = ingress_watcher {
-                    // ingresses 排最后
-                    watchers.insert(String::from(RESOURCES[RESOURCES.len() - 1]), watcher);
-                }
-
-                {
-                    let mut err_msgs_lock = err_msgs.lock().unwrap();
-                    for &resource in RESOURCES[..RESOURCES.len() - 1].iter() {
-                        if resource == "servicerules" {
-                            // optional for pingan crd
-                            debug!("no service rules found");
-                            continue;
-                        }
-                        if !watchers.contains_key(resource) {
-                            let err_msg = format!("resource {} api not available", resource);
-                            warn!("{}", err_msg);
-                            err_msgs_lock.push(err_msg);
-                        }
-                    }
-                    if !watchers.contains_key(RESOURCES[RESOURCES.len() - 1]) {
-                        let err_msg = if is_openshift_route {
-                            String::from("resource routes api not available")
-                        } else {
-                            format!(
-                                "resource {} api not available",
-                                RESOURCES[RESOURCES.len() - 1]
-                            )
-                        };
-                        warn!("{}", err_msg);
-                        err_msgs_lock.push(err_msg);
-                    }
-                }
-
-                for watcher in watchers.values() {
-                    if let Some(handle) = watcher.start() {
-                        task_handles.push(handle);
-                    }
-                }
-
-                Ok((watchers, task_handles))
-            }
-            Err(err) => {
-                // 检查支持的api列表，如果查不到就用默认的
-                let err_msg = format!("get server resources failed: {}, use defaults", err);
-                warn!("{}", err_msg);
-                err_msgs.lock().unwrap().push(err_msg);
-
-                for (index, &resource) in RESOURCES.iter().enumerate() {
-                    if watchers.contains_key(resource) {
-                        continue;
-                    }
-                    if let Some(watcher) = watcher_factory.new_watcher(
-                        resource,
-                        PB_RESOURCES[index],
-                        namespace,
-                        stats_collector,
-                        watcher_config,
-                    ) {
-                        if let Some(handle) = watcher.start() {
-                            task_handles.push(handle);
-                        }
-                        watchers.insert(String::from(resource), watcher);
-                    }
-                }
-
-                let ingress_watcher = if is_openshift_route {
-                    watcher_factory.new_watcher(
-                        "routes",
-                        PB_INGRESS,
-                        namespace,
-                        stats_collector,
-                        watcher_config,
-                    )
-                } else {
-                    watcher_factory.new_watcher(
-                        "v1ingresses",
-                        PB_INGRESS,
-                        namespace,
-                        stats_collector,
-                        watcher_config,
-                    )
-                };
-
-                if let Some(watcher) = ingress_watcher {
-                    if let Some(handle) = watcher.start() {
-                        task_handles.push(handle);
-                    }
-                    watchers.insert(String::from("ingresses"), watcher);
-                }
-
-                Ok((watchers, task_handles))
+        for watcher in watchers.values() {
+            if let Some(handle) = watcher.start() {
+                task_handles.push(handle);
             }
         }
+        Ok((watchers, task_handles))
     }
 
     fn debug_k8s_request(request: &KubernetesApiSyncRequest, full_sync: bool) {
@@ -553,8 +551,8 @@ impl ApiWatcher {
         apiserver_version: &Arc<Mutex<Info>>,
         session: &Arc<Session>,
         err_msgs: &Arc<Mutex<Vec<String>>>,
-        watcher_versions: &mut HashMap<String, u64>,
-        resource_watchers: &Arc<Mutex<HashMap<String, GenericResourceWatcher>>>,
+        watcher_versions: &mut HashMap<WatcherKey, u64>,
+        resource_watchers: &Arc<Mutex<HashMap<WatcherKey, GenericResourceWatcher>>>,
         exception_handler: &ExceptionHandler,
         running_config: &Arc<RwLock<RunningConfig>>,
     ) {
@@ -592,10 +590,10 @@ impl ApiWatcher {
             }
             let resource_watchers_guard = resource_watchers.lock().unwrap();
             for watcher in resource_watchers_guard.values() {
-                let kind = watcher.kind();
+                let kind = watcher.pb_name();
                 for entry in watcher.entries() {
                     total_entries.push(KubernetesApiInfo {
-                        r#type: Some(kind.clone()),
+                        r#type: Some(kind.to_owned()),
                         compressed_info: Some(entry),
                         info: None,
                     });
@@ -659,10 +657,10 @@ impl ApiWatcher {
         }
         let resource_watchers_guard = resource_watchers.lock().unwrap();
         for watcher in resource_watchers_guard.values() {
-            let kind = watcher.kind();
+            let kind = watcher.pb_name();
             for entry in watcher.entries() {
                 total_entries.push(KubernetesApiInfo {
-                    r#type: Some(kind.clone()),
+                    r#type: Some(kind.to_owned()),
                     compressed_info: Some(entry),
                     info: None,
                 });
@@ -707,7 +705,7 @@ impl ApiWatcher {
         running: Arc<Mutex<bool>>,
         apiserver_version: Arc<Mutex<Info>>,
         err_msgs: Arc<Mutex<Vec<String>>>,
-        watchers: Arc<Mutex<HashMap<String, GenericResourceWatcher>>>,
+        watchers: Arc<Mutex<HashMap<WatcherKey, GenericResourceWatcher>>>,
         exception_handler: ExceptionHandler,
         stats_collector: Arc<stats::Collector>,
         running_config: Arc<RwLock<RunningConfig>>,
@@ -727,7 +725,7 @@ impl ApiWatcher {
 
         let (resource_watchers, task_handles) = loop {
             match context.runtime.block_on(Self::set_up(
-                context.config.load().ingress_flavour == IngressFlavour::Openshift,
+                &context.config.load().kubernetes_resources,
                 &context.runtime,
                 &apiserver_version,
                 &err_msgs,
@@ -781,7 +779,14 @@ impl ApiWatcher {
         let mut wait_count = 0;
         while !Self::ready_stop(&running, &timer, INIT_WAIT_INTERVAL) {
             let ws = resource_watchers.lock().unwrap();
-            if !ws.get("nodes").map(|w| w.ready()).unwrap_or(false) {
+            let mut ready = false;
+            for (k, v) in ws.iter() {
+                if k.name == "nodes" {
+                    ready = v.ready();
+                    break;
+                }
+            }
+            if !ready {
                 wait_count += 1;
                 if wait_count >= sync_interval.as_secs() / INIT_WAIT_INTERVAL.as_secs() {
                     break;

@@ -433,10 +433,58 @@ vtap_group_id: g-xxxxxx
   #    will trigger a `malloc_trim`.
   #kubernetes-api-memory-trim-percent: 100
 
-  ## Type of Ingress
-  ## Default: kubernetes. Options: kubernetes, openshift
-  ## Note: When deepflow-agent runs in the openshift environment, this value needs
-  ##   to be modified so that the correct API is used to query Ingress information.
+  ## K8s api resources
+  ## Note: Specify kubernetes resources to watch.
+  #    The schematics of entries in list is:
+  #    {
+  #        name: string
+  #        group: string
+  #        version: string
+  #        disabled: bool
+  #    }
+  #
+  #    Agent will watch the following resources by default:
+  #    - namespaces
+  #    - nodes
+  #    - pods
+  #    - replicationcontrollers
+  #    - services
+  #    - daemonsets
+  #    - deployments
+  #    - replicasets
+  #    - statefulsets
+  #    - ingresses
+  #
+  #    To disable a resource, add an entry to the list with `disabled: true`:
+  #
+  #        kubernetes-resources:
+  #        - name: services
+  #          disabled: true
+  #
+  #    To enable a resource, add an entry of this resource to the list. Be advised that
+  #    this setting overrides the default of the same resource. For example, to enable
+  #    `statefulsets` in both group `apps` (the default) and `apps.kruise.io` will require
+  #    two entries:
+  #
+  #        kubernetes-resources:
+  #        - name: statefulsets
+  #          group: apps
+  #        - name: statefulsets
+  #          group: apps.kruise.io
+  #          version: v1beta1
+  #
+  #    The old `ingress-flavour` setting is deprecated. Watching `routes` in openshift will
+  #    use these settings:
+  #
+  #        kubernetes-resources:
+  #        - name: ingresses
+  #          disabled: true
+  #        - name: routes
+  #
+  #kubernetes-resources: []
+
+  ## [Deprecated] Type of Ingress
+  ## Note: This config is deprecated. Use `kubernetes-resources` instead.
   #ingress-flavour: kubernetes
 
   ## Pod MAC/IP Address Query Method
