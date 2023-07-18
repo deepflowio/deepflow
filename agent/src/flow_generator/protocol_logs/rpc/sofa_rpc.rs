@@ -170,6 +170,21 @@ pub struct SofaRpcInfo {
     status: L7ResponseStatus,
 }
 
+impl SofaRpcInfo {
+    fn fill_with_trace_ctx(&mut self, ctx: String) {
+        let ctx = decode_new_rpc_trace_context(ctx.as_bytes());
+        if !ctx.trace_id.is_empty() {
+            self.trace_id = ctx.trace_id;
+        }
+        if !ctx.span_id.is_empty() {
+            self.span_id = ctx.span_id;
+        }
+        if !ctx.parent_span_id.is_empty() {
+            self.parent_span_id = ctx.parent_span_id;
+        }
+    }
+}
+
 impl L7ProtocolInfoInterface for SofaRpcInfo {
     fn session_id(&self) -> Option<u32> {
         Some(self.req_id)
@@ -231,34 +246,32 @@ impl From<SofaRpcInfo> for L7ProtocolSendLog {
 
 #[derive(Debug, Serialize)]
 pub struct SofaRpcLog {
-    info: SofaRpcInfo,
-    parsed: bool,
     #[serde(skip)]
     perf_stats: Option<L7PerfStats>,
 }
 
 impl Default for SofaRpcLog {
     fn default() -> Self {
-        Self {
-            info: SofaRpcInfo::default(),
-            perf_stats: None,
-            parsed: false,
-        }
+        Self { perf_stats: None }
     }
 }
 
 impl L7ProtocolParserInterface for SofaRpcLog {
     fn check_payload(&mut self, payload: &[u8], _: &ParseParam) -> bool {
-        self.parsed = self.parse_with_strict(payload, true).is_ok()
-            && self.info.msg_type == LogMessageType::Request
-            && self.info.cmd_code != CMD_CODE_HEARTBEAT;
-        self.parsed
+        let mut info = SofaRpcInfo::default();
+        self.parse(payload, true, &mut info).is_ok()
+            && info.msg_type == LogMessageType::Request
+            && info.cmd_code != CMD_CODE_HEARTBEAT
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
-        match self.parse_with_strict(payload, false) {
-            Ok(ret) => {
-                self.cal_perf(param);
+        let mut info = SofaRpcInfo::default();
+        match self.parse(payload, false, &mut info) {
+            Ok(mut ret) => {
+                match ret.get_mut(0).unwrap() {
+                    L7ProtocolInfo::SofaRpcInfo(s) => self.cal_perf(param, s),
+                    _ => unreachable!(),
+                }
                 Ok(ret)
             }
             Err(e) => Err(e),
@@ -267,11 +280,6 @@ impl L7ProtocolParserInterface for SofaRpcLog {
 
     fn protocol(&self) -> L7Protocol {
         L7Protocol::SofaRPC
-    }
-
-    fn reset(&mut self) {
-        self.parsed = false;
-        self.info = SofaRpcInfo::default();
     }
 
     fn parsable_on_udp(&self) -> bool {
@@ -284,50 +292,47 @@ impl L7ProtocolParserInterface for SofaRpcLog {
 }
 
 impl SofaRpcLog {
-    fn parse_with_strict(
+    fn parse(
         &mut self,
         mut payload: &[u8],
-        strict: bool,
+        check: bool,
+        info: &mut SofaRpcInfo,
     ) -> Result<Vec<L7ProtocolInfo>> {
-        if self.parsed {
-            return Ok(vec![L7ProtocolInfo::SofaRpcInfo(self.info.clone())]);
-        }
         if self.perf_stats.is_none() {
             self.perf_stats = Some(L7PerfStats::default())
         };
 
         let hdr = Hdr::try_from(payload)?;
-        self.info.proto = hdr.proto;
+        info.proto = hdr.proto;
         // now only support bolt v1
-        if self.info.proto != PROTO_BOLT_V1 {
+        if info.proto != PROTO_BOLT_V1 {
             return Err(Error::L7ProtocolUnknown);
         }
 
-        self.info.cmd_code = hdr.cmd_code;
-        if self.info.cmd_code == CMD_CODE_HEARTBEAT {
+        info.cmd_code = hdr.cmd_code;
+        if info.cmd_code == CMD_CODE_HEARTBEAT {
             // skip heartbeat
-            return if strict {
+            return if check {
                 Err(Error::L7ProtocolUnknown)
             } else {
                 Ok(vec![])
             };
         }
-        self.info.req_id = hdr.req_id;
-        self.info.msg_type = match hdr.typ {
+        info.req_id = hdr.req_id;
+        info.msg_type = match hdr.typ {
             TYPE_REQ => {
                 payload = &payload[REQ_HDR_LEN..];
-                self.info.req_len = hdr.content_len + (hdr.hdr_len as u32) + (hdr.class_len as u32);
+                info.req_len = hdr.content_len + (hdr.hdr_len as u32) + (hdr.class_len as u32);
                 LogMessageType::Request
             }
             TYPE_RESP => {
                 payload = &payload[RESP_HDR_LEN..];
-                self.info.resp_code = hdr.resp_code;
-                self.info.resp_len =
-                    hdr.content_len + (hdr.hdr_len as u32) + (hdr.class_len as u32);
-                if self.info.resp_code == 8 {
-                    self.info.status = L7ResponseStatus::ClientError;
-                } else if self.info.resp_code != 0 {
-                    self.info.status = L7ResponseStatus::ServerError;
+                info.resp_code = hdr.resp_code;
+                info.resp_len = hdr.content_len + (hdr.hdr_len as u32) + (hdr.class_len as u32);
+                if info.resp_code == 8 {
+                    info.status = L7ResponseStatus::ClientError;
+                } else if info.resp_code != 0 {
+                    info.status = L7ResponseStatus::ServerError;
                 }
                 LogMessageType::Response
             }
@@ -335,15 +340,15 @@ impl SofaRpcLog {
         };
 
         if hdr.class_len as usize > payload.len() {
-            return if strict {
+            return if check {
                 Err(Error::L7ProtocolUnknown)
             } else {
-                Ok(vec![L7ProtocolInfo::SofaRpcInfo(self.info.clone())])
+                Ok(vec![L7ProtocolInfo::SofaRpcInfo(info.clone())])
             };
         }
 
         // due to sofa is susceptible to mischeck, need to check the class name is ascii when is strict
-        if strict {
+        if check {
             // java class name is not empty
             if hdr.class_len == 0
                 || (&payload[0..hdr.class_len as usize]).iter().any(|b| {
@@ -360,7 +365,7 @@ impl SofaRpcLog {
             let hdr_len = hdr.hdr_len as usize;
             let hdr_payload = if hdr_len as usize > payload.len() {
                 // if hdr_len as usize > payload.len() likey ebpf not read full data from java process, parse hdr to payload end
-                if strict {
+                if check {
                     return Err(Error::L7ProtocolUnknown);
                 }
                 payload
@@ -369,49 +374,40 @@ impl SofaRpcLog {
             };
 
             let sofa_hdr = SofaHdr::from(hdr_payload);
-            self.info.target_serv = sofa_hdr.service;
-            self.info.method = sofa_hdr.method;
-            self.info.trace_id = sofa_hdr.trace_id;
+            info.target_serv = sofa_hdr.service;
+            info.method = sofa_hdr.method;
+            info.trace_id = sofa_hdr.trace_id;
 
-            if strict && (self.info.target_serv.is_empty() || self.info.method.is_empty()) {
+            if check && (info.target_serv.is_empty() || info.method.is_empty()) {
                 return Err(Error::L7ProtocolUnknown);
             }
 
             if !sofa_hdr.new_rpc_trace_context.is_empty() {
-                self.fill_with_trace_ctx(sofa_hdr.new_rpc_trace_context);
+                info.fill_with_trace_ctx(sofa_hdr.new_rpc_trace_context);
             }
         }
-        Ok(vec![L7ProtocolInfo::SofaRpcInfo(self.info.clone())])
-    }
-
-    fn fill_with_trace_ctx(&mut self, ctx: String) {
-        let ctx = decode_new_rpc_trace_context(ctx.as_bytes());
-        if !ctx.trace_id.is_empty() {
-            self.info.trace_id = ctx.trace_id;
-        }
-        if !ctx.span_id.is_empty() {
-            self.info.span_id = ctx.span_id;
-        }
-        if !ctx.parent_span_id.is_empty() {
-            self.info.parent_span_id = ctx.parent_span_id;
+        if check {
+            Ok(vec![])
+        } else {
+            Ok(vec![L7ProtocolInfo::SofaRpcInfo(info.clone())])
         }
     }
 
-    fn cal_perf(&mut self, param: &ParseParam) {
-        match self.info.msg_type {
+    fn cal_perf(&mut self, param: &ParseParam, info: &mut SofaRpcInfo) {
+        match info.msg_type {
             LogMessageType::Request => self.perf_stats.as_mut().unwrap().inc_req(),
             LogMessageType::Response => self.perf_stats.as_mut().unwrap().inc_resp(),
             _ => {}
         }
 
-        match self.info.status {
+        match info.status {
             L7ResponseStatus::ClientError => self.perf_stats.as_mut().unwrap().inc_req_err(),
             L7ResponseStatus::ServerError => self.perf_stats.as_mut().unwrap().inc_resp_err(),
             _ => {}
         }
 
-        self.info.cal_rrt(param, None).map(|rrt| {
-            self.info.rrt = rrt;
+        info.cal_rrt(param, None).map(|rrt| {
+            info.rrt = rrt;
             self.perf_stats.as_mut().unwrap().update_rrt(rrt);
         });
     }
