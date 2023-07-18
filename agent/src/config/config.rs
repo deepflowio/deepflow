@@ -21,11 +21,12 @@ use std::net::{IpAddr, ToSocketAddrs};
 use std::path::Path;
 use std::time::Duration;
 
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use md5::{Digest, Md5};
 use public::bitmap::Bitmap;
 use public::consts::NPB_DEFAULT_PORT;
 use public::utils::bitmap::parse_u16_range_list_to_bitmap;
+use regex::Regex;
 use serde::{
     de::{self, Unexpected},
     Deserialize, Deserializer,
@@ -611,6 +612,17 @@ impl YamlConfig {
         {
             c.prometheus_extra_config.values_limit = 4096;
         }
+
+        let mut valid_labels = vec![];
+        let re = Regex::new(r"^[a-zA-Z_][a-zA-Z0-9_]*$").unwrap();
+        for label in c.prometheus_extra_config.labels {
+            if re.is_match(&label) {
+                valid_labels.push(label);
+            } else {
+                debug!("invalid prometheus_extra_config label: {:?}", label);
+            }
+        }
+        c.prometheus_extra_config.labels = valid_labels;
 
         Ok(c)
     }
