@@ -538,7 +538,8 @@ func (b *PrometheusSamplesBuilder) fillUniversalTagSlow(m *dbwriter.PrometheusSa
 			t.PodID = info.PodID
 		}
 
-		if common.IsPodServiceIP(t.L3DeviceType, t.PodID, t.PodNodeID) {
+		// if it is just Pod Node, there is no need to match the service
+		if common.IsPodServiceIP(t.L3DeviceType, t.PodID, 0) {
 			t.ServiceID = b.platformData.QueryService(t.PodID, t.PodNodeID, uint32(t.PodClusterID), t.PodGroupID, t.L3EpcID, t.IsIPv6 == 1, t.IP, t.IP6, 0, 0)
 		}
 		t.AutoInstanceID, t.AutoInstanceType = common.GetAutoInstance(t.PodID, t.GPID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
