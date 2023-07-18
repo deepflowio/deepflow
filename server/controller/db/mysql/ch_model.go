@@ -444,7 +444,6 @@ type ChPrometheusMetricAPPLabelLayout struct {
 }
 
 type ChAPPLabel struct {
-	MetricID     int    `gorm:"primaryKey;column:metric_id;type:int;not null" json:"METRIC_ID"`
 	LabelNameID  int    `gorm:"primaryKey;column:label_name_id;type:int;not null" json:"LABEL_NAME_ID"`
 	LabelValueID int    `gorm:"primaryKey;column:label_value_id;type:int unsigned;not null" json:"LABEL_VALUE_ID"`
 	LabelValue   string `gorm:"column:label_value;type:varchar(256);not null" json:"LABEL_VALUE"`
@@ -455,7 +454,6 @@ func (ChAPPLabel) TableName() string {
 }
 
 type ChTargetLabel struct {
-	MetricID    int    `gorm:"primaryKey;column:metric_id;type:int;not null" json:"METRIC_ID"`
 	LabelNameID int    `gorm:"primaryKey;column:label_name_id;type:int;not null" json:"LABEL_NAME_ID"`
 	TargetID    int    `gorm:"primaryKey;column:target_id;type:int unsigned;not null" json:"TARGET_ID"`
 	LabelValue  string `gorm:"column:label_value;type:varchar(256);not null" json:"LABEL_VALUE"`
