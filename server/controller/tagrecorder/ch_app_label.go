@@ -17,8 +17,6 @@
 package tagrecorder
 
 import (
-	"golang.org/x/exp/slices"
-
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
@@ -50,46 +48,30 @@ func (l *ChAPPLabel) generateNewData() (map[PrometheusAPPLabelKey]mysql.ChAPPLab
 		return nil, false
 	}
 
-	metricNameIDMap, labelNameIDMap, valueNameIDMap, ok := l.generateNameIDData()
-	if !ok {
-		return nil, false
-	}
-
-	metricNameMap, ok := l.generateMerticNameData()
+	labelNameIDMap, valueNameIDMap, ok := l.generateNameIDData()
 	if !ok {
 		return nil, false
 	}
 
 	keyToItem := make(map[PrometheusAPPLabelKey]mysql.ChAPPLabel)
 	for _, prometheusMetricLabel := range prometheusMetricLabels {
-		metricName := prometheusMetricLabel.MetricName
-		if len(metricNameMap[metricName]) > 0 {
-
-			metricNameData := metricNameMap[metricName]
-			metricID := metricNameIDMap[metricName]
-			labelID := prometheusMetricLabel.LabelID
-			labelNameValueData := metricLabelIDNameValueMap[labelID]
-			labelName := labelNameValueData["label_name"]
-			indexOK := slices.Contains[string](metricNameData, labelName)
-
-			if indexOK {
-				labelNameID := labelNameIDMap[labelName]
-				labelValue := labelNameValueData["label_value"]
-				labelValueID := valueNameIDMap[labelValue]
-				keyToItem[PrometheusAPPLabelKey{MetricID: metricID, LabelNameID: labelNameID, LabelValueID: labelValueID}] = mysql.ChAPPLabel{
-					MetricID:     metricID,
-					LabelNameID:  labelNameID,
-					LabelValue:   labelValue,
-					LabelValueID: labelValueID,
-				}
-			}
+		labelID := prometheusMetricLabel.LabelID
+		labelNameValueData := metricLabelIDNameValueMap[labelID]
+		labelName := labelNameValueData["label_name"]
+		labelNameID := labelNameIDMap[labelName]
+		labelValue := labelNameValueData["label_value"]
+		labelValueID := valueNameIDMap[labelValue]
+		keyToItem[PrometheusAPPLabelKey{LabelNameID: labelNameID, LabelValueID: labelValueID}] = mysql.ChAPPLabel{
+			LabelNameID:  labelNameID,
+			LabelValue:   labelValue,
+			LabelValueID: labelValueID,
 		}
 	}
 	return keyToItem, true
 }
 
 func (l *ChAPPLabel) generateKey(dbItem mysql.ChAPPLabel) PrometheusAPPLabelKey {
-	return PrometheusAPPLabelKey{MetricID: dbItem.MetricID, LabelNameID: dbItem.LabelNameID, LabelValueID: dbItem.LabelValueID}
+	return PrometheusAPPLabelKey{LabelNameID: dbItem.LabelNameID, LabelValueID: dbItem.LabelValueID}
 }
 
 func (l *ChAPPLabel) generateUpdateInfo(oldItem, newItem mysql.ChAPPLabel) (map[string]interface{}, bool) {
@@ -101,22 +83,6 @@ func (l *ChAPPLabel) generateUpdateInfo(oldItem, newItem mysql.ChAPPLabel) (map[
 		return updateInfo, true
 	}
 	return nil, false
-}
-
-func (l *ChAPPLabel) generateMerticNameData() (map[string][]string, bool) {
-	metricNameMap := make(map[string][]string)
-	var prometheusMetricAPPLabelLayouts []mysql.PrometheusMetricAPPLabelLayout
-	err := mysql.Db.Unscoped().Find(&prometheusMetricAPPLabelLayouts).Error
-
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
-		return nil, false
-	}
-
-	for _, prometheusMetricAPPLabelLayout := range prometheusMetricAPPLabelLayouts {
-		metricNameMap[prometheusMetricAPPLabelLayout.MetricName] = append(metricNameMap[prometheusMetricAPPLabelLayout.MetricName], prometheusMetricAPPLabelLayout.APPLabelName)
-	}
-	return metricNameMap, true
 }
 
 func (l *ChAPPLabel) generateLabelIDNameValueData() (map[int]map[string]string, bool) {
@@ -135,37 +101,24 @@ func (l *ChAPPLabel) generateLabelIDNameValueData() (map[int]map[string]string, 
 	return metricLabelIDNameValueMap, true
 }
 
-func (l *ChAPPLabel) generateNameIDData() (map[string]int, map[string]int, map[string]int, bool) {
-	metricNameIDMap := make(map[string]int)
+func (l *ChAPPLabel) generateNameIDData() (map[string]int, map[string]int, bool) {
 	labelNameIDMap := make(map[string]int)
 	valueNameIDMap := make(map[string]int)
-	var prometheusMetricNames []mysql.PrometheusMetricName
 	var prometheusLabelNames []mysql.PrometheusLabelName
 	var prometheusLabelValues []mysql.PrometheusLabelValue
 
-	err := mysql.Db.Unscoped().Find(&prometheusMetricNames).Error
+	err := mysql.Db.Unscoped().Find(&prometheusLabelNames).Error
 
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
-		return nil, nil, nil, false
-	}
-
-	err = mysql.Db.Unscoped().Find(&prometheusLabelNames).Error
-
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
-		return nil, nil, nil, false
+		return nil, nil, false
 	}
 
 	err = mysql.Db.Unscoped().Find(&prometheusLabelValues).Error
 
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
-		return nil, nil, nil, false
-	}
-
-	for _, prometheusMetricName := range prometheusMetricNames {
-		metricNameIDMap[prometheusMetricName.Name] = prometheusMetricName.ID
+		return nil, nil, false
 	}
 
 	for _, prometheusLabelName := range prometheusLabelNames {
@@ -175,5 +128,5 @@ func (l *ChAPPLabel) generateNameIDData() (map[string]int, map[string]int, map[s
 	for _, prometheusLabelValue := range prometheusLabelValues {
 		valueNameIDMap[prometheusLabelValue.Value] = prometheusLabelValue.ID
 	}
-	return metricNameIDMap, labelNameIDMap, valueNameIDMap, true
+	return labelNameIDMap, valueNameIDMap, true
 }
