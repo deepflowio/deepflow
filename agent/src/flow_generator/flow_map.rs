@@ -90,6 +90,7 @@ use crate::{
     },
 };
 use public::{
+    buffer::{Allocator, BatchedBox},
     counter::{Counter, CounterType, CounterValue, RefCountable},
     debug::QueueDebugger,
     l7_protocol::L7ProtocolEnum,
@@ -115,8 +116,10 @@ pub struct FlowMap {
     //     https://github.com/tkaitchuck/aHash/blob/master/FAQ.md#how-is-ahash-so-fast
     //
     // Strangely, using AES reduces performance.
-    node_map: Option<AHashMap<FlowMapKey, Vec<Box<FlowNode>>>>,
-    time_set: Option<Vec<HashSet<FlowMapKey>>>,
+    node_map: Option<(
+        AHashMap<FlowMapKey, Vec<Box<FlowNode>>>,
+        Vec<HashSet<FlowMapKey>>,
+    )>,
     id: u32,
     state_machine_master: StateMachine,
     state_machine_slave: StateMachine,
@@ -130,9 +133,10 @@ pub struct FlowMap {
     total_flow: usize,
     time_set_slot_size: usize,
 
-    output_queue: DebugSender<Box<TaggedFlow>>,
+    tagged_flow_allocator: Allocator<TaggedFlow>,
+    output_queue: DebugSender<BatchedBox<TaggedFlow>>,
     out_log_queue: DebugSender<Box<MetaAppProto>>,
-    output_buffer: Vec<Box<TaggedFlow>>,
+    output_buffer: Vec<BatchedBox<TaggedFlow>>,
     protolog_buffer: Vec<Box<MetaAppProto>>,
     last_queue_flush: Duration,
     perf_cache: Rc<RefCell<L7PerfCache>>,
@@ -160,7 +164,7 @@ pub struct FlowMap {
 impl FlowMap {
     pub fn new(
         id: u32,
-        output_queue: DebugSender<Box<TaggedFlow>>,
+        output_queue: DebugSender<BatchedBox<TaggedFlow>>,
         policy_getter: PolicyGetter,
         app_proto_log_queue: DebugSender<Box<MetaAppProto>>,
         ntp_diff: Arc<AtomicI64>,
@@ -251,12 +255,12 @@ impl FlowMap {
         let system_time = get_timestamp(ntp_diff.load(Ordering::Relaxed));
         let start_time = system_time - config.packet_delay - Duration::from_secs(1);
         let time_set_slot_size = config.hash_slots as usize / time_window_size;
+
         Self {
-            node_map: Some(AHashMap::with_capacity(config.hash_slots as usize)),
-            time_set: Some(vec![
-                HashSet::with_capacity(time_set_slot_size);
-                time_window_size
-            ]),
+            node_map: Some((
+                AHashMap::with_capacity(config.hash_slots as usize),
+                vec![HashSet::with_capacity(time_set_slot_size); time_window_size],
+            )),
             id,
             state_machine_master: StateMachine::new_master(&config.flow_timeout),
             state_machine_slave: StateMachine::new_slave(&config.flow_timeout),
@@ -275,6 +279,10 @@ impl FlowMap {
             time_window_size,
             total_flow: 0,
             time_set_slot_size,
+            tagged_flow_allocator: {
+                let n = (config.batched_buffer_size_limit - 1) / mem::size_of::<TaggedFlow>();
+                Allocator::new(n.max(1))
+            },
             output_queue,
             out_log_queue: app_proto_log_queue,
             output_buffer: Vec::with_capacity(QUEUE_BATCH_SIZE),
@@ -376,20 +384,14 @@ impl FlowMap {
     }
 
     pub fn inject_flush_ticker(&mut self, config: &Config, mut timestamp: Duration) -> bool {
-        self.system_time = get_timestamp(self.ntp_diff.load(Ordering::Relaxed));
-        if timestamp.is_zero() {
-            timestamp = self.system_time;
+        let is_tick = timestamp.is_zero();
+        if is_tick {
+            timestamp = get_timestamp(self.ntp_diff.load(Ordering::Relaxed));
         } else if timestamp < self.start_time {
             self.stats_counter
                 .drop_by_window
                 .fetch_add(1, Ordering::Relaxed);
             return false;
-        } else {
-            // called from inject_meta_packet
-            self.stats_counter.packet_delay.fetch_max(
-                self.system_time.as_nanos() as i64 - timestamp.as_nanos() as i64,
-                Ordering::Relaxed,
-            );
         }
 
         let config = &config.flow;
@@ -398,6 +400,19 @@ impl FlowMap {
         if timestamp - config.packet_delay - TIME_UNIT < self.start_time {
             return true;
         }
+
+        self.system_time = if is_tick {
+            timestamp
+        } else {
+            // calculate packet delay only when window will be pushed forward
+            // to avoid calling `get_timestamp` for each packet
+            let ts = get_timestamp(self.ntp_diff.load(Ordering::Relaxed));
+            self.stats_counter.packet_delay.fetch_max(
+                ts.as_nanos() as i64 - timestamp.as_nanos() as i64,
+                Ordering::Relaxed,
+            );
+            ts
+        };
 
         self.stats_counter.flush_delay.fetch_max(
             self.system_time.as_nanos() as i64 - self.start_time.as_nanos() as i64,
@@ -418,12 +433,9 @@ impl FlowMap {
             Duration::from_nanos(next_start_time_in_unit * TIME_UNIT.as_nanos() as u64);
         timestamp = self.start_time - Duration::from_nanos(1);
 
-        let (mut node_map, mut time_set) = match self.node_map.take().zip(self.time_set.take()) {
-            Some(pair) => pair,
-            None => {
-                warn!("cannot get node map or time set");
-                return false;
-            }
+        let Some((mut node_map, mut time_set)) = self.node_map.take() else {
+            warn!("cannot get node map and time set");
+            return false;
         };
 
         let mut moved_key = self
@@ -503,8 +515,7 @@ impl FlowMap {
         Self::update_stats_counter(&self.stats_counter, node_map.len() as u64, 0);
 
         self.time_key_buffer.replace(moved_key);
-        self.node_map.replace(node_map);
-        self.time_set.replace(time_set);
+        self.node_map.replace((node_map, time_set));
 
         self.start_time_in_unit = next_start_time_in_unit;
         self.flush_queue(&config, timestamp);
@@ -532,12 +543,9 @@ impl FlowMap {
 
         let pkt_key = FlowMapKey::new(&meta_packet.lookup_key, meta_packet.tap_port);
 
-        let (mut node_map, mut time_set) = match self.node_map.take().zip(self.time_set.take()) {
-            Some(pair) => pair,
-            None => {
-                warn!("cannot get node map or time set");
-                return;
-            }
+        let Some((mut node_map, mut time_set)) = self.node_map.take() else {
+            warn!("cannot get node map and time set");
+            return;
         };
 
         let pkt_timestamp = meta_packet.lookup_key.timestamp;
@@ -575,8 +583,7 @@ impl FlowMap {
                     self.stats_counter
                         .total_scan
                         .fetch_add(max_depth as u64, Ordering::Relaxed);
-                    self.node_map.replace(node_map);
-                    self.time_set.replace(time_set);
+                    self.node_map.replace((node_map, time_set));
                     return;
                 };
                 self.stats_counter
@@ -635,8 +642,7 @@ impl FlowMap {
             }
         }
         Self::update_stats_counter(&self.stats_counter, node_map.len() as u64, max_depth as u64);
-        self.node_map.replace(node_map);
-        self.time_set.replace(time_set);
+        self.node_map.replace((node_map, time_set));
         // go实现只有插入node的时候，插入的节点数目大于ring buffer 的capacity 才会执行policy_getter,
         // rust 版本用了std的hashmap自动处理扩容，所以无需执行policy_gettelr
     }
@@ -1466,7 +1472,11 @@ impl FlowMap {
         }
     }
 
-    fn push_to_flow_stats_queue(&mut self, config: &FlowConfig, mut tagged_flow: Box<TaggedFlow>) {
+    fn push_to_flow_stats_queue(
+        &mut self,
+        config: &FlowConfig,
+        mut tagged_flow: BatchedBox<TaggedFlow>,
+    ) {
         // This field is required for logging when the flow is not finished. To avoid
         // double counting, it is assigned when the flow statistics are finished output
         //
@@ -1572,7 +1582,10 @@ impl FlowMap {
             .fetch_sub(1, Ordering::Relaxed);
         self.stats_counter.closed.fetch_add(1, Ordering::Relaxed);
 
-        self.push_to_flow_stats_queue(config, Box::new(node.tagged_flow.clone()));
+        let tagged_flow = self
+            .tagged_flow_allocator
+            .allocate_one_with(node.tagged_flow.clone());
+        self.push_to_flow_stats_queue(config, tagged_flow);
         if let Some(log) = node.meta_flow_log.take() {
             FlowLog::recycle(&mut self.tcp_perf_pool, *log);
         }
@@ -1615,7 +1628,10 @@ impl FlowMap {
                     );
                 }
             }
-            self.push_to_flow_stats_queue(config, Box::new(node.tagged_flow.clone()));
+            let tagged_flow = self
+                .tagged_flow_allocator
+                .allocate_one_with(node.tagged_flow.clone());
+            self.push_to_flow_stats_queue(config, tagged_flow);
             node.reset_flow_stat_info();
         }
     }
@@ -2020,7 +2036,7 @@ pub fn _new_flow_map_and_receiver(
     trident_type: TridentType,
     flow_timeout: Option<FlowTimeout>,
     ignore_idc_vlan: bool,
-) -> (ModuleConfig, FlowMap, Receiver<Box<TaggedFlow>>) {
+) -> (ModuleConfig, FlowMap, Receiver<BatchedBox<TaggedFlow>>) {
     let (_, mut policy_getter) = Policy::new(1, 0, 1 << 10, 1 << 14, false);
     policy_getter.disable();
     let queue_debugger = QueueDebugger::new();
@@ -2376,7 +2392,7 @@ mod tests {
             let total_flow = flow_map
                 .node_map
                 .as_ref()
-                .map(|map| map.len())
+                .map(|(map, _)| map.len())
                 .unwrap_or_default();
             assert_eq!(total_flow, 1);
         }
@@ -2734,7 +2750,7 @@ mod tests {
         flow_map.inject_flush_ticker(&config, timestamp.add(Duration::from_secs(120)));
 
         let tagged_flow = output_queue_receiver.recv(Some(TIME_UNIT)).unwrap();
-        let perf_stats = &tagged_flow.flow.flow_perf_stats.unwrap().tcp;
+        let perf_stats = &tagged_flow.flow.flow_perf_stats.as_ref().unwrap().tcp;
         assert_eq!(perf_stats.rtt_client_max, 114);
         assert_eq!(perf_stats.rtt_server_max, 44);
         assert_eq!(perf_stats.srt_max, 12);
@@ -2769,7 +2785,7 @@ mod tests {
         flow_map.inject_flush_ticker(&config, timestamp.add(Duration::from_secs(120)));
 
         let tagged_flow = output_queue_receiver.recv(Some(TIME_UNIT)).unwrap();
-        let perf_stats = &tagged_flow.flow.flow_perf_stats.unwrap().tcp;
+        let perf_stats = &tagged_flow.flow.flow_perf_stats.as_ref().unwrap().tcp;
         assert_eq!(perf_stats.counts_peers[0].zero_win_count, 0);
         assert_eq!(perf_stats.counts_peers[1].zero_win_count, 1);
     }

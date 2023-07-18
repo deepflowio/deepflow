@@ -80,6 +80,7 @@ use crate::{
 #[cfg(target_os = "linux")]
 use public::netns;
 use public::{
+    buffer::BatchedBox,
     netns::NsFile,
     proto::{
         common::TridentType,
@@ -587,7 +588,7 @@ pub struct DispatcherBuilder {
     tap_typer: Option<Arc<TapTyper>>,
     analyzer_dedup_disabled: Option<bool>,
     libvirt_xml_extractor: Option<Arc<LibvirtXmlExtractor>>,
-    flow_output_queue: Option<DebugSender<Box<TaggedFlow>>>,
+    flow_output_queue: Option<DebugSender<BatchedBox<TaggedFlow>>>,
     log_output_queue: Option<DebugSender<Box<MetaAppProto>>>,
     packet_sequence_output_queue:
         Option<DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>>, // Enterprise Edition Feature: packet-sequence
@@ -672,7 +673,7 @@ impl DispatcherBuilder {
         self
     }
 
-    pub fn flow_output_queue(mut self, v: DebugSender<Box<TaggedFlow>>) -> Self {
+    pub fn flow_output_queue(mut self, v: DebugSender<BatchedBox<TaggedFlow>>) -> Self {
         self.flow_output_queue = Some(v);
         self
     }

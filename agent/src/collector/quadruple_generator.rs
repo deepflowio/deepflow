@@ -46,7 +46,10 @@ use crate::utils::{
     possible_host::PossibleHost,
     stats::{Collector, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption},
 };
-use public::queue::{DebugSender, Error, Receiver};
+use public::{
+    buffer::BatchedBox,
+    queue::{DebugSender, Error, Receiver},
+};
 
 #[derive(Debug, Default)]
 pub struct QgCounter {
@@ -464,7 +467,7 @@ impl SubQuadGen {
     fn check_active(
         now: u64,
         possible_host: &mut PossibleHost,
-        tagged_flow: &Arc<TaggedFlow>,
+        tagged_flow: &TaggedFlow,
     ) -> (bool, bool) {
         (
             Self::check_active_host(
@@ -524,7 +527,7 @@ impl SubQuadGen {
 
     pub fn inject_flow(
         &mut self,
-        tagged_flow: Arc<TaggedFlow>,
+        tagged_flow: Arc<BatchedBox<TaggedFlow>>,
         flow_meter: &FlowMeter,
         app_meter: &AppMeter,
         id_maps: &[HashMap<u16, u16>; 2],
@@ -590,11 +593,11 @@ impl SubQuadGen {
 
 pub struct QuadrupleGeneratorThread {
     id: usize,
-    input: Arc<Receiver<Box<TaggedFlow>>>,
+    input: Arc<Receiver<BatchedBox<TaggedFlow>>>,
     second_output: DebugSender<Box<AccumulatedFlow>>,
     minute_output: DebugSender<Box<AccumulatedFlow>>,
     toa_info_output: DebugSender<Box<(SocketAddr, SocketAddr)>>,
-    flow_output: Option<DebugSender<Arc<TaggedFlow>>>, // Send TaggedFlows to FlowAggr, equal to None when processing eBPF data.
+    flow_output: Option<DebugSender<Arc<BatchedBox<TaggedFlow>>>>, // Send TaggedFlows to FlowAggr, equal to None when processing eBPF data.
     connection_lru_capacity: usize,
     metrics_type: MetricsType,
     second_delay_seconds: u64,
@@ -616,11 +619,11 @@ pub struct QuadrupleGeneratorThread {
 impl QuadrupleGeneratorThread {
     pub fn new(
         id: usize,
-        input: Receiver<Box<TaggedFlow>>,
+        input: Receiver<BatchedBox<TaggedFlow>>,
         second_output: DebugSender<Box<AccumulatedFlow>>,
         minute_output: DebugSender<Box<AccumulatedFlow>>,
         toa_info_output: DebugSender<Box<(SocketAddr, SocketAddr)>>,
-        flow_output: Option<DebugSender<Arc<TaggedFlow>>>,
+        flow_output: Option<DebugSender<Arc<BatchedBox<TaggedFlow>>>>,
         connection_lru_capacity: usize,
         metrics_type: MetricsType,
         second_delay_seconds: u64,
@@ -750,7 +753,7 @@ impl QuadrupleGeneratorThread {
 
 pub struct QuadrupleGenerator {
     id: usize,
-    input: Arc<Receiver<Box<TaggedFlow>>>,
+    input: Arc<Receiver<BatchedBox<TaggedFlow>>>,
     name: String,
 
     second_quad_gen: Option<SubQuadGen>,
@@ -759,7 +762,7 @@ pub struct QuadrupleGenerator {
 
     key: QgKey,
     id_maps: [HashMap<u16, u16>; 2],
-    output_flow: Option<DebugSender<Arc<TaggedFlow>>>, // Send TaggedFlows to FlowAggr, equal to None when processing eBPF data.
+    output_flow: Option<DebugSender<Arc<BatchedBox<TaggedFlow>>>>, // Send TaggedFlows to FlowAggr, equal to None when processing eBPF data.
 
     l7_metrics_enabled: Arc<AtomicBool>,
     vtap_flow_1s_enabled: Arc<AtomicBool>,
@@ -780,12 +783,12 @@ pub struct QuadrupleGenerator {
 impl QuadrupleGenerator {
     pub fn new(
         id: usize,
-        input: Arc<Receiver<Box<TaggedFlow>>>,
+        input: Arc<Receiver<BatchedBox<TaggedFlow>>>,
         second_output: DebugSender<Box<AccumulatedFlow>>,
         minute_output: DebugSender<Box<AccumulatedFlow>>,
         toa_info_output: DebugSender<Box<(SocketAddr, SocketAddr)>>,
         proc_sync_enable: bool,
-        flow_output: Option<DebugSender<Arc<TaggedFlow>>>,
+        flow_output: Option<DebugSender<Arc<BatchedBox<TaggedFlow>>>>,
         connection_lru_capacity: usize,
         metrics_type: MetricsType,
         second_delay_seconds: u64,
@@ -915,7 +918,11 @@ impl QuadrupleGenerator {
         }
     }
 
-    fn handle(&mut self, tagged_flow: Option<Arc<TaggedFlow>>, time_in_second: Duration) {
+    fn handle(
+        &mut self,
+        tagged_flow: Option<Arc<BatchedBox<TaggedFlow>>>,
+        time_in_second: Duration,
+    ) {
         let mut second_inject = false;
         let mut minute_inject = false;
         if let Some(s) = self.second_quad_gen.as_mut() {
@@ -1158,7 +1165,7 @@ impl QuadrupleGenerator {
         (flow_meter, app_meter)
     }
 
-    fn set_key(key: &mut [u8], tagged_flow: &Arc<TaggedFlow>) {
+    fn set_key(key: &mut [u8], tagged_flow: &TaggedFlow) {
         let src = &tagged_flow.flow.flow_metrics_peers[0];
         let dst = &tagged_flow.flow.flow_metrics_peers[1];
         let (tap_port, tap_port_type, tunnel_type) =
@@ -1205,7 +1212,7 @@ impl QuadrupleGenerator {
         }
     }
 
-    pub fn get_key(tagged_flow: &Arc<TaggedFlow>) -> QgKey {
+    pub fn get_key(tagged_flow: &TaggedFlow) -> QgKey {
         if tagged_flow.flow.eth_type == EthernetType::Ipv6 {
             let mut key: [u8; IPV6_LRU_KEY_SIZE] = [0; IPV6_LRU_KEY_SIZE];
             Self::set_key(&mut key, tagged_flow);
@@ -1244,13 +1251,13 @@ impl QuadrupleGenerator {
             match self.input.recv_all(&mut recv_batch, Some(RCV_TIMEOUT)) {
                 Ok(_) => {
                     for tagged_flow in recv_batch.drain(..) {
-                        let tagged_flow = Arc::from(tagged_flow);
+                        let tagged_flow = Arc::new(tagged_flow);
                         if self.output_flow.is_some() {
-                            send_batch.push(Arc::clone(&tagged_flow));
+                            send_batch.push(tagged_flow.clone());
                         }
                         if self.collector_enabled.load(Ordering::Relaxed) {
                             self.handle(
-                                Some(Arc::clone(&tagged_flow)),
+                                Some(tagged_flow.clone()),
                                 tagged_flow.flow.flow_stat_time.into(),
                             );
                         }
@@ -1302,9 +1309,9 @@ mod test {
 
     use super::*;
 
-    use public::{debug::QueueDebugger, queue};
+    use public::{buffer::Allocator, debug::QueueDebugger, queue};
 
-    fn new_acc_flow(tagged_flow: Arc<TaggedFlow>) -> AccumulatedFlow {
+    fn new_acc_flow(tagged_flow: Arc<BatchedBox<TaggedFlow>>) -> AccumulatedFlow {
         AccumulatedFlow {
             tagged_flow: tagged_flow.clone(),
             l7_protocol: L7Protocol::Unknown,
@@ -1350,17 +1357,18 @@ mod test {
                 .push_back(ConcurrentConnection::with_capacity((slots as usize) << 8));
         }
 
+        let mut allocator = Allocator::new(16);
         let mut tagged_flow = TaggedFlow::default();
         tagged_flow.flow.close_type = CloseType::ForcedReport;
         tagged_flow.flow.is_new_flow = true;
         tagged_flow.flow.flow_key.proto = IpProtocol::Tcp;
-        let tagged_flow_arc = Arc::new(tagged_flow);
+        let tagged_flow = Arc::new(allocator.allocate_one_with(tagged_flow));
         let flow_meter = FlowMeter::default();
         let app_meter = AppMeter::default();
         let id_maps = [HashMap::new(), HashMap::new()];
-        let mut key = QuadrupleGenerator::get_key(&tagged_flow_arc);
+        let mut key = QuadrupleGenerator::get_key(&tagged_flow);
         quad_gen.inject_flow(
-            tagged_flow_arc.clone(),
+            tagged_flow.clone(),
             &flow_meter,
             &app_meter,
             &id_maps,
@@ -1368,12 +1376,8 @@ mod test {
             &mut key,
         );
 
-        let mut tagged_flow = TaggedFlow::default();
-        tagged_flow.flow.close_type = CloseType::ForcedReport;
-        tagged_flow.flow.is_new_flow = true;
-        tagged_flow.flow.flow_key.proto = IpProtocol::Tcp;
         quad_gen.inject_flow(
-            tagged_flow_arc.clone(),
+            tagged_flow.clone(),
             &flow_meter,
             &app_meter,
             &id_maps,
@@ -1388,7 +1392,7 @@ mod test {
         };
         assert_eq!(
             quad_gen.stashs[10].v4_flows.get(&k).unwrap().flow_meter,
-            new_acc_flow(tagged_flow_arc.clone()).flow_meter
+            new_acc_flow(tagged_flow).flow_meter
         );
         let mut poss_host = PossibleHost::new(100);
         quad_gen.flush_all_flow(&mut poss_host);

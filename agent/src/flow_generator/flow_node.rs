@@ -27,8 +27,7 @@ use crate::common::{
     tagged_flow::TaggedFlow,
     TapPort,
 };
-use public::proto::common::TridentType;
-use public::utils::net::MacAddr;
+use public::{proto::common::TridentType, utils::net::MacAddr};
 
 use npb_pcap_policy::PolicyData;
 use packet_sequence_block::PacketSequenceBlock;

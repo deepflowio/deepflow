@@ -58,6 +58,7 @@ use crate::{
 };
 
 use public::{
+    buffer::BatchedBox,
     debug::QueueDebugger,
     netns::NsFile,
     packet::Packet,
@@ -97,7 +98,7 @@ pub(super) struct BaseDispatcher {
 
     pub(super) analyzer_dedup_disabled: bool,
 
-    pub(super) flow_output_queue: DebugSender<Box<TaggedFlow>>,
+    pub(super) flow_output_queue: DebugSender<BatchedBox<TaggedFlow>>,
     pub(super) log_output_queue: DebugSender<Box<MetaAppProto>>,
 
     pub(super) counter: Arc<PacketCounter>,
