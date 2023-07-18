@@ -783,15 +783,6 @@ var ColumnAdd626 = []*ColumnAdds{
 	},
 }
 
-var ColumnAdd633 = []*ColumnAdds{
-	&ColumnAdds{
-		Dbs:         []string{"flow_metrics"},
-		Tables:      []string{"vtap_flow_port.1m", "vtap_flow_port.1m_local", "vtap_flow_port.1s", "vtap_flow_port.1s_local", "vtap_app_port.1m", "vtap_app_port.1m_local", "vtap_app_port.1s", "vtap_app_port.1s_local"},
-		ColumnNames: []string{"role"},
-		ColumnType:  ckdb.UInt8,
-	},
-}
-
 var TableRenames626 = []*TableRename{
 	&TableRename{
 		OldDb:     "event",
@@ -807,6 +798,71 @@ var ColumnRenames626 = []*ColumnRenames{
 		Tables:         []string{"l7_packet", "l7_packet_local"},
 		OldColumnNames: []string{"pcap_count", "pcap_batch"},
 		NewColumnNames: []string{"packet_count", "packet_batch"},
+	},
+}
+
+var u32ColumnNameAdd633 = []string{"netns_id"}
+var u32ColumnNameEdgeAdd633 = []string{"netns_id_0", "netns_id_1"}
+var u8ColumnNameAdd633 = []string{"tag_source"}
+var u8ColumnNameEdgeAdd633 = []string{"tag_source_0", "tag_source_1"}
+var vtapAppPortTables = []string{
+	"vtap_app_port.1m", "vtap_app_port.1m_local",
+	"vtap_app_port.1s", "vtap_app_port.1s_local",
+}
+var vtapAppEdgePortTables = []string{
+	"vtap_app_edge_port.1m", "vtap_app_edge_port.1m_local",
+	"vtap_app_edge_port.1s", "vtap_app_edge_port.1s_local",
+}
+var l7FlowLogTables = []string{"l7_flow_log", "l7_flow_log_local"}
+
+var ColumnAdd633 = []*ColumnAdds{
+	&ColumnAdds{
+		Dbs:         []string{"flow_metrics"},
+		Tables:      []string{"vtap_flow_port.1m", "vtap_flow_port.1m_local", "vtap_flow_port.1s", "vtap_flow_port.1s_local", "vtap_app_port.1m", "vtap_app_port.1m_local", "vtap_app_port.1s", "vtap_app_port.1s_local"},
+		ColumnNames: []string{"role"},
+		ColumnType:  ckdb.UInt8,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"event"},
+		Tables:      []string{"event", "event_local", "perf_event", "perf_event_local"},
+		ColumnNames: u32ColumnNameAdd633,
+		ColumnType:  ckdb.UInt32,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_metrics"},
+		Tables:      vtapAppPortTables,
+		ColumnNames: u32ColumnNameAdd633,
+		ColumnType:  ckdb.UInt32,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_metrics"},
+		Tables:      vtapAppEdgePortTables,
+		ColumnNames: u32ColumnNameEdgeAdd633,
+		ColumnType:  ckdb.UInt32,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      l7FlowLogTables,
+		ColumnNames: u32ColumnNameEdgeAdd633,
+		ColumnType:  ckdb.UInt32,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_metrics"},
+		Tables:      flowMetricsTables,
+		ColumnNames: u8ColumnNameAdd633,
+		ColumnType:  ckdb.UInt8,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_metrics"},
+		Tables:      flowMetricsEdgeTables,
+		ColumnNames: u8ColumnNameEdgeAdd633,
+		ColumnType:  ckdb.UInt8,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l4_flow_log", "l4_flow_log_local", "l7_flow_log", "l7_flow_log_local"},
+		ColumnNames: u8ColumnNameEdgeAdd633,
+		ColumnType:  ckdb.UInt8,
 	},
 }
 
@@ -1069,13 +1125,35 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo, isEdgeTab
 
 	columnAddss633 := []*ColumnAdds{}
 	if !isEdgeTable {
-		columnAddss633 = []*ColumnAdds{
+		columnAddss633 = append(columnAddss633, []*ColumnAdds{
 			&ColumnAdds{
 				Dbs:         []string{d.db},
 				Tables:      []string{d.name, d.name + "_agg"},
 				ColumnNames: []string{"role"},
 				ColumnType:  ckdb.UInt8,
 			},
+		}...)
+
+	}
+	if isAppTable {
+		if isEdgeTable {
+			columnAddss633 = append(columnAddss633, []*ColumnAdds{
+				&ColumnAdds{
+					Dbs:         []string{d.db},
+					Tables:      []string{d.name, d.name + "_agg"},
+					ColumnNames: u32ColumnNameEdgeAdd633,
+					ColumnType:  ckdb.UInt32,
+				},
+			}...)
+		} else {
+			columnAddss633 = append(columnAddss633, []*ColumnAdds{
+				&ColumnAdds{
+					Dbs:         []string{d.db},
+					Tables:      []string{d.name, d.name + "_agg"},
+					ColumnNames: u32ColumnNameAdd633,
+					ColumnType:  ckdb.UInt32,
+				},
+			}...)
 		}
 	}
 
