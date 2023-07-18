@@ -260,7 +260,7 @@ impl_protocol_parser! {
         // http have two version but one parser, can not place in macro param.
         Custom(CustomWrapLog),
         DNS(DnsLog),
-        ProtobufRPC(Box<ProtobufRpcWrapLog>),
+        ProtobufRPC(ProtobufRpcWrapLog),
         SofaRPC(Box<SofaRpcLog>),
         MySQL(MysqlLog),
         Kafka(KafkaLog),
