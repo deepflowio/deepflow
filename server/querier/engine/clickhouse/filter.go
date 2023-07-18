@@ -798,11 +798,6 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 func GetPrometheusFilter(promTag, table, op, value string) (string, error) {
 	filter := ""
 	nameNoPreffix := strings.TrimPrefix(promTag, "tag.")
-	metricID, ok := Prometheus.MetricNameToID[table]
-	if !ok {
-		errorMessage := fmt.Sprintf("%s not found", table)
-		return filter, errors.New(errorMessage)
-	}
 	labelNameID, ok := Prometheus.LabelNameToID[nameNoPreffix]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", nameNoPreffix)
@@ -815,9 +810,9 @@ func GetPrometheusFilter(promTag, table, op, value string) (string, error) {
 			if appLabel.AppLabelName == nameNoPreffix {
 				isAppLabel = true
 				if strings.Contains(op, "match") {
-					filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM flow_tag.app_label_live_view WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s))", appLabel.appLabelColumnIndex, metricID, labelNameID, op, value)
+					filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM flow_tag.app_label_live_view WHERE label_name_id=%d and %s(label_value,%s))", appLabel.appLabelColumnIndex, labelNameID, op, value)
 				} else {
-					filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM flow_tag.app_label_live_view WHERE metric_id=%d and label_name_id=%d and label_value %s %s)", appLabel.appLabelColumnIndex, metricID, labelNameID, op, value)
+					filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM flow_tag.app_label_live_view WHERE label_name_id=%d and label_value %s %s)", appLabel.appLabelColumnIndex, labelNameID, op, value)
 				}
 				break
 			}
@@ -825,9 +820,9 @@ func GetPrometheusFilter(promTag, table, op, value string) (string, error) {
 	}
 	if !isAppLabel {
 		if strings.Contains(op, "match") {
-			filter = fmt.Sprintf("toUInt64(target_id) IN (SELECT target_id FROM flow_tag.target_label_live_view WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s))", metricID, labelNameID, op, value)
+			filter = fmt.Sprintf("toUInt64(target_id) IN (SELECT target_id FROM flow_tag.target_label_live_view WHERE label_name_id=%d and %s(label_value,%s))", labelNameID, op, value)
 		} else {
-			filter = fmt.Sprintf("toUInt64(target_id) IN (SELECT target_id FROM flow_tag.target_label_live_view WHERE metric_id=%d and label_name_id=%d and label_value %s %s)", metricID, labelNameID, op, value)
+			filter = fmt.Sprintf("toUInt64(target_id) IN (SELECT target_id FROM flow_tag.target_label_live_view WHERE label_name_id=%d and label_value %s %s)", labelNameID, op, value)
 		}
 	}
 	return filter, nil
@@ -838,11 +833,6 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 	sql := ""
 	isAppLabel := false
 	nameNoPreffix := strings.TrimPrefix(promTag, "tag.")
-	metricID, ok := Prometheus.MetricNameToID[table]
-	if !ok {
-		errorMessage := fmt.Sprintf("%s not found", table)
-		return filter, errors.New(errorMessage)
-	}
 	labelNameID, ok := Prometheus.LabelNameToID[nameNoPreffix]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", nameNoPreffix)
@@ -865,9 +855,9 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 
 				// lru timeout
 				if strings.Contains(op, "match") {
-					sql = fmt.Sprintf("SELECT label_value_id FROM flow_tag.app_label_live_view WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s) GROUP BY label_value_id", metricID, labelNameID, op, value)
+					sql = fmt.Sprintf("SELECT label_value_id FROM flow_tag.app_label_live_view WHERE label_name_id=%d and %s(label_value,%s) GROUP BY label_value_id", labelNameID, op, value)
 				} else {
-					sql = fmt.Sprintf("SELECT label_value_id FROM flow_tag.app_label_live_view WHERE metric_id=%d and label_name_id=%d and label_value %s %s GROUP BY label_value_id", metricID, labelNameID, op, value)
+					sql = fmt.Sprintf("SELECT label_value_id FROM flow_tag.app_label_live_view WHERE label_name_id=%d and label_value %s %s GROUP BY label_value_id", labelNameID, op, value)
 				}
 				chClient := client.Client{
 					Host:     config.Cfg.Clickhouse.Host,
@@ -898,9 +888,9 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 	if !isAppLabel {
 		transFilter := ""
 		if strings.Contains(op, "match") {
-			transFilter = fmt.Sprintf("SELECT target_id FROM flow_tag.target_label_live_view WHERE metric_id=%d and label_name_id=%d and %s(label_value,%s) GROUP BY target_id", metricID, labelNameID, op, value)
+			transFilter = fmt.Sprintf("SELECT target_id FROM flow_tag.target_label_live_view WHERE label_name_id=%d and %s(label_value,%s) GROUP BY target_id", labelNameID, op, value)
 		} else {
-			transFilter = fmt.Sprintf("SELECT target_id FROM flow_tag.target_label_live_view WHERE metric_id=%d and label_name_id=%d and label_value %s %s GROUP BY target_id", metricID, labelNameID, op, value)
+			transFilter = fmt.Sprintf("SELECT target_id FROM flow_tag.target_label_live_view WHERE label_name_id=%d and label_value %s %s GROUP BY target_id", labelNameID, op, value)
 		}
 		targetLabelFilter := TargetLabelFilter{OriginFilter: originFilter, TransFilter: transFilter}
 		e.TargetLabelFilters = append(e.TargetLabelFilters, targetLabelFilter)
