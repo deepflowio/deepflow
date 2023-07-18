@@ -66,6 +66,11 @@ use public::l7_protocol::{CustomProtocol, L7Protocol, L7ProtocolEnum, ProtobufRp
                          |_____next packet___|
 */
 
+macro_rules! count {
+    () => (0);
+    ($x:tt $($xs: tt)* ) => (1usize + count!($($xs)*));
+}
+
 macro_rules! impl_protocol_parser {
     (pub enum $name:ident { $($proto:ident($log_type:ty)),* $(,)? }) => {
         pub enum $name {
@@ -201,14 +206,14 @@ macro_rules! impl_protocol_parser {
             }
         }
 
-        pub fn get_all_protocol() -> Vec<L7ProtocolParser> {
-            Vec::from([
+        pub fn get_all_protocol() -> [L7ProtocolParser; 2 + count!($($proto)*)] {
+            [
                 L7ProtocolParser::Http(HttpLog::new_v1()),
                 L7ProtocolParser::Http(HttpLog::new_v2(false)),
                 $(
                     L7ProtocolParser::$proto(Default::default()),
                 )+
-            ])
+            ]
         }
     }
 }
@@ -265,7 +270,7 @@ impl_protocol_parser! {
         MySQL(MysqlLog),
         Kafka(KafkaLog),
         Redis(RedisLog),
-        PostgreSQL(Box<PostgresqlLog>),
+        PostgreSQL(PostgresqlLog),
         Dubbo(Box<DubboLog>),
         MQTT(MqttLog),
         // add protocol below
