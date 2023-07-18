@@ -28,7 +28,7 @@ type StaticConfig struct {
 	AfpacketBlocksEnabled            *bool                  `yaml:"afpacket-blocks-enabled,omitempty"`
 	AfpacketBlocks                   *int                   `yaml:"afpacket-blocks,omitempty"`
 	AnalyzerRawPacketBlockSize       *int                   `yaml:"analyzer-raw-packet-block-size,omitempty"`
-	BatchedBufferSizeLimit           *int                   `yaml:"batched-buffer-size-limit"`
+	BatchedBufferSizeLimit           *int                   `yaml:"batched-buffer-size-limit,omitempty"`
 	EnableDebugStats                 *bool                  `yaml:"enable-debug-stats,omitempty"`
 	AnalyzerDedupDisabled            *bool                  `yaml:"analyzer-dedup-disabled,omitempty"`
 	DefaultTapType                   *uint32                `yaml:"default-tap-type,omitempty"`
