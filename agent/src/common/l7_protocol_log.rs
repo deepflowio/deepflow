@@ -69,7 +69,7 @@ use public::l7_protocol::{CustomProtocol, L7Protocol, L7ProtocolEnum, ProtobufRp
 macro_rules! impl_protocol_parser {
     (pub enum $name:ident { $($proto:ident($log_type:ty)),* $(,)? }) => {
         pub enum $name {
-            Http(Box<HttpLog>),
+            Http(HttpLog),
             $($proto($log_type)),*
         }
 
@@ -174,8 +174,8 @@ macro_rules! impl_protocol_parser {
 
             fn try_from(value: &str) -> Result<Self, Self::Error> {
                 match value {
-                    "HTTP" => Ok(Self::Http(Box::new(HttpLog::new_v1()))),
-                    "HTTP2" => Ok(Self::Http(Box::new(HttpLog::new_v2(false)))),
+                    "HTTP" => Ok(Self::Http(HttpLog::new_v1())),
+                    "HTTP2" => Ok(Self::Http(HttpLog::new_v2(false))),
                     $(
                         stringify!($proto) => Ok(Self::$proto(Default::default())),
                     )*
@@ -187,9 +187,9 @@ macro_rules! impl_protocol_parser {
         pub fn get_parser(p: L7ProtocolEnum) -> Option<L7ProtocolParser> {
             match p {
                 L7ProtocolEnum::L7Protocol(p) => match p {
-                    L7Protocol::Http1 | L7Protocol::Http1TLS => Some(L7ProtocolParser::Http(Box::new(HttpLog::new_v1()))),
-                    L7Protocol::Http2 | L7Protocol::Http2TLS => Some(L7ProtocolParser::Http(Box::new(HttpLog::new_v2(false)))),
-                    L7Protocol::Grpc => Some(L7ProtocolParser::Http(Box::new(HttpLog::new_v2(true)))),
+                    L7Protocol::Http1 | L7Protocol::Http1TLS => Some(L7ProtocolParser::Http(HttpLog::new_v1())),
+                    L7Protocol::Http2 | L7Protocol::Http2TLS => Some(L7ProtocolParser::Http(HttpLog::new_v2(false))),
+                    L7Protocol::Grpc => Some(L7ProtocolParser::Http(HttpLog::new_v2(true))),
 
                     $(
                         L7Protocol::$proto => Some(L7ProtocolParser::$proto(Default::default())),
@@ -203,8 +203,8 @@ macro_rules! impl_protocol_parser {
 
         pub fn get_all_protocol() -> Vec<L7ProtocolParser> {
             Vec::from([
-                L7ProtocolParser::Http(Box::new(HttpLog::new_v1())),
-                L7ProtocolParser::Http(Box::new(HttpLog::new_v2(false))),
+                L7ProtocolParser::Http(HttpLog::new_v1()),
+                L7ProtocolParser::Http(HttpLog::new_v2(false)),
                 $(
                     L7ProtocolParser::$proto(Default::default()),
                 )+
