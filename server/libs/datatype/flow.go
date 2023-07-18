@@ -67,6 +67,7 @@ const (
 	CloseTypeServerQueueLack       // 17: 传输-服务端队列溢出
 	CloseTypeClientEstablishReset  // 18: 建连-客户端其他重置
 	CloseTypeServerEstablishReset  // 19: 建连-服务端其他重置
+	CloseTypeHeartBeat             // 20: 心跳
 	MaxCloseType
 )
 

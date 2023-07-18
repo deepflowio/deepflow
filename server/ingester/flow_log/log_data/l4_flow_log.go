@@ -814,7 +814,7 @@ func (k *KnowledgeGraph) FillL4(f *pb.Flow, isIPv6 bool, platformData *grpc.Plat
 }
 
 func getStatus(t datatype.CloseType, p layers.IPProtocol) datatype.LogMessageStatus {
-	if t == datatype.CloseTypeTCPFin || t == datatype.CloseTypeForcedReport ||
+	if t == datatype.CloseTypeTCPFin || t == datatype.CloseTypeForcedReport || t == datatype.CloseTypeHeartBeat ||
 		(p != layers.IPProtocolTCP && t == datatype.CloseTypeTimeout) {
 		return datatype.STATUS_OK
 	} else if t.IsClientError() {
