@@ -31,3 +31,8 @@ const (
 	SERVICE_UNAVAILABLE             = "SERVICE_UNAVAILABLE"
 	K8S_SET_VTAP_FAIL               = "K8S_SET_VTAP_FAIL"
 )
+
+const (
+	PATH_VM  = "/v2/vms"
+	PATH_POD = "/v2/pods"
+)

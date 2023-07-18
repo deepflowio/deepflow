@@ -1,0 +1,102 @@
+/**
+ * Copyright (c) 2023 Yunshan Networks
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package mysql
+
+import (
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/http/service/resource/common"
+)
+
+type VM struct {
+	DataProvider
+	dataTool *vmToolData
+}
+
+func NewVM() *VM {
+	dp := &VM{newDataProvider(ctrlrcommon.RESOURCE_TYPE_VM_EN), new(vmToolData)}
+	dp.setGenerator(dp)
+	return dp
+}
+
+func (v *VM) generate() (data []common.ResponseElem, err error) {
+	err = v.dataTool.Init().Load()
+	for _, item := range v.dataTool.vms {
+		data = append(data, v.generateOne(item))
+	}
+	return
+}
+
+func (v *VM) generateOne(item mysql.VM) common.ResponseElem {
+	d := MySQLModelToMap(item)
+	d["AZ_NAME"] = v.dataTool.azLcuuidToName[item.AZ]
+	d["REGION_NAME"] = v.dataTool.regionLcuuidToName[item.Region]
+	d["DOMAIN_NAME"] = v.dataTool.domainLcuuidToName[item.Domain]
+	d["EPC_NAME"] = v.dataTool.vpcIDToName[item.VPCID]
+	d["HOST_ID"] = v.dataTool.hostIPToID[item.LaunchServer]
+	return d
+}
+
+type vmToolData struct {
+	vms []mysql.VM
+
+	domainLcuuidToName map[string]string
+	regionLcuuidToName map[string]string
+	azLcuuidToName     map[string]string
+	vpcIDToName        map[int]string
+	hostIPToID         map[string]int
+}
+
+func (td *vmToolData) Init() *vmToolData {
+	td.domainLcuuidToName = make(map[string]string)
+	td.regionLcuuidToName = make(map[string]string)
+	td.azLcuuidToName = make(map[string]string)
+	td.vpcIDToName = make(map[int]string)
+	td.hostIPToID = make(map[string]int)
+	return td
+}
+
+func (td *vmToolData) Load() (err error) {
+	err = mysql.Db.Find(&td.vms).Error
+
+	var domains []mysql.Domain
+	err = mysql.Db.Select("lcuuid", "name").Find(&domains).Error
+	for _, item := range domains {
+		td.domainLcuuidToName[item.Lcuuid] = item.Name
+	}
+	var regions []mysql.Region
+	err = mysql.Db.Select("lcuuid", "name").Find(&regions).Error
+	for _, item := range regions {
+		td.regionLcuuidToName[item.Lcuuid] = item.Name
+	}
+	var azs []mysql.AZ
+	err = mysql.Db.Select("lcuuid", "name").Find(&azs).Error
+	for _, item := range azs {
+		td.azLcuuidToName[item.Lcuuid] = item.Name
+	}
+	var vpcs []mysql.VPC
+	err = mysql.Db.Select("id", "name").Find(&vpcs).Error
+	for _, item := range vpcs {
+		td.vpcIDToName[item.ID] = item.Name
+	}
+	var hosts []mysql.Host
+	err = mysql.Db.Select("id", "ip").Find(&hosts).Error
+	for _, item := range hosts {
+		td.hostIPToID[item.IP] = item.ID
+	}
+	return
+}

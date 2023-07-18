@@ -22,7 +22,7 @@ import (
 
 	"github.com/op/go-logging"
 
-	ctlrcommon "github.com/deepflowio/deepflow/server/controller/common"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/http/model"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/common"
@@ -172,7 +172,7 @@ func (u *userFilterConditionsGeneratorComponent) extractNonAdminID(urlInfo *mode
 
 func (u *userFilterConditionsGeneratorComponent) getUserPermittedResource(userID int) (*UserPermittedResource, error) {
 	body := make(map[string]interface{})
-	response, err := ctlrcommon.CURLPerform(
+	response, err := ctrlrcommon.CURLPerform(
 		"GET",
 		fmt.Sprintf(
 			"http://%s:%d/permission-user?permission_detail=1&my_self=1&user_id=%d&&resource_type=%s",

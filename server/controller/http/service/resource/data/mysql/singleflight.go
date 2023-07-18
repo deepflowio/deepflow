@@ -14,22 +14,31 @@
  * limitations under the License.
  */
 
-package constraint
+package mysql
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/http/model"
+	"strings"
+
+	"golang.org/x/sync/singleflight"
+
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 )
 
-// 各资源可支持的 query 字段定义
-type QueryModel interface {
-	model.VMQuery | model.PodQuery
-}
+var (
+	sfg singleflight.Group
+)
 
-// 各资源需要用于构建 redis 缓存 key 的 query 字段定义
-type QueryStoredInRedisModel interface {
-	model.VMQueryStoredInRedis | model.PodQueryStoredInRedis
-
-	GetIncludedFields() []string
-	GetUserID() int
-	GetFilterConditions() map[string]interface{}
+// TODO use
+func singleFlightFind[T constraint.MySQLModel](resourceType string, fields []string) ([]T, error) {
+	key := resourceType + ":" + strings.Join(fields, ",")
+	result, err, _ := sfg.Do(key, func() (interface{}, error) {
+		var r []T
+		err := mysql.Db.Select(fields).Find(&r).Error
+		if err != nil {
+			return r, err
+		}
+		return r, err
+	})
+	return result.([]T), err
 }

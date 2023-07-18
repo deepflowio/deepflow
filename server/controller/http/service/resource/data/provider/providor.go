@@ -14,22 +14,17 @@
  * limitations under the License.
  */
 
-package constraint
+package provider
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/http/model"
+	"github.com/deepflowio/deepflow/server/controller/http/service/resource/common"
 )
 
-// 各资源可支持的 query 字段定义
-type QueryModel interface {
-	model.VMQuery | model.PodQuery
+type DataProvider interface {
+	Get(*DataContext) ([]common.ResponseElem, error)
+	DataRefresher
 }
 
-// 各资源需要用于构建 redis 缓存 key 的 query 字段定义
-type QueryStoredInRedisModel interface {
-	model.VMQueryStoredInRedis | model.PodQueryStoredInRedis
-
-	GetIncludedFields() []string
-	GetUserID() int
-	GetFilterConditions() map[string]interface{}
+type DataRefresher interface {
+	Refresh(*DataContext) error
 }

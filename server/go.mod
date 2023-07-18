@@ -90,6 +90,7 @@ require (
 require (
 	github.com/aws/aws-sdk-go-v2/service/eks v1.26.0
 	github.com/go-redis/redis/v9 v9.0.0-rc.2
+	github.com/gorilla/schema v1.2.0
 	github.com/pyroscope-io/client v0.7.0
 	github.com/pyroscope-io/pyroscope v0.37.1
 	go.opentelemetry.io/collector/pdata v0.66.0
