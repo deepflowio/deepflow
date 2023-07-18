@@ -162,19 +162,13 @@ impl From<KrpcInfo> for L7ProtocolSendLog {
 
 #[derive(Debug, Serialize)]
 pub struct KrpcLog {
-    info: KrpcInfo,
     #[serde(skip)]
     perf_stats: Option<L7PerfStats>,
-    parsed: bool,
 }
 
 impl Default for KrpcLog {
     fn default() -> Self {
-        Self {
-            info: KrpcInfo::default(),
-            perf_stats: None,
-            parsed: false,
-        }
+        Self { perf_stats: None }
     }
 }
 
@@ -194,17 +188,8 @@ impl KrpcLog {
         &mut self,
         payload: &[u8],
         param: &ParseParam,
-        strict: bool,
+        check: bool,
     ) -> Result<Vec<L7ProtocolInfo>> {
-        if self.parsed {
-            return if self.info.is_heartbeat() {
-                Ok(vec![])
-            } else {
-                Ok(vec![L7ProtocolInfo::ProtobufRpcInfo(
-                    ProtobufRpcInfo::KrpcInfo(self.info.clone()),
-                )])
-            };
-        }
         if payload.len() < KRPC_FIX_HDR_LEN || &payload[..2] != b"KR" {
             return Err(Error::L7ProtocolUnknown);
         }
@@ -217,7 +202,7 @@ impl KrpcLog {
 
         let pb_payload = if hdr_len + KRPC_FIX_HDR_LEN > payload.len() {
             // if hdr_len + KRPC_FIX_HDR_LEN > payload.len() likely ebpf not read full data from syscall, pb parse to the payload end.
-            if strict {
+            if check {
                 return Err(Error::L7ProtocolUnknown);
             }
             &payload[KRPC_FIX_HDR_LEN..payload.len()]
@@ -227,34 +212,36 @@ impl KrpcLog {
 
         let mut hdr = KrpcMeta::default();
         if let Err(_) = hdr.merge(pb_payload) {
-            if strict {
+            if check {
                 return Err(Error::L7ProtocolUnknown);
             }
         }
 
-        self.info.fill_from_pb(hdr)?;
+        let mut info = KrpcInfo::default();
+
+        info.fill_from_pb(hdr)?;
 
         // filter heartbreat
-        if self.info.is_heartbeat() {
+        if info.is_heartbeat() || check {
             return Ok(vec![]);
         }
-        match self.info.msg_type {
+        match info.msg_type {
             LogMessageType::Request => self.perf_stats.as_mut().unwrap().inc_req(),
             LogMessageType::Response => {
                 self.perf_stats.as_mut().unwrap().inc_resp();
-                if self.info.ret_code != 0 {
+                if info.ret_code != 0 {
                     self.perf_stats.as_mut().unwrap().inc_resp_err();
                 }
             }
             _ => unreachable!(),
         }
 
-        self.info.cal_rrt(param, None).map(|rrt| {
-            self.info.rrt = rrt;
+        info.cal_rrt(param, None).map(|rrt| {
+            info.rrt = rrt;
             self.perf_stats.as_mut().unwrap().update_rrt(rrt);
         });
         Ok(vec![L7ProtocolInfo::ProtobufRpcInfo(
-            ProtobufRpcInfo::KrpcInfo(self.info.clone()),
+            ProtobufRpcInfo::KrpcInfo(info),
         )])
     }
 }
@@ -264,8 +251,15 @@ impl L7ProtocolParserInterface for KrpcLog {
         if !param.ebpf_type.is_raw_protocol() {
             return false;
         }
-        self.parsed = self.parse(payload, param, true).is_ok();
-        self.parsed && self.info.msg_type == LogMessageType::Request
+
+        if let Ok(info) = self.parse(payload, param, true) {
+            info.get(0).map_or(false, |info| {
+                info.app_proto_head()
+                    .map_or(false, |m| m.msg_type == LogMessageType::Request)
+            })
+        } else {
+            false
+        }
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
@@ -278,11 +272,6 @@ impl L7ProtocolParserInterface for KrpcLog {
 
     fn protobuf_rpc_protocol(&self) -> Option<ProtobufRpcProtocol> {
         Some(ProtobufRpcProtocol::Krpc)
-    }
-
-    fn reset(&mut self) {
-        self.parsed = false;
-        self.info = KrpcInfo::default();
     }
 
     fn parsable_on_udp(&self) -> bool {
