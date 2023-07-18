@@ -156,11 +156,6 @@ func GetPrometheusSingleTagTranslator(tag, table string) (string, string, error)
 	labelType := ""
 	TagTranslatorStr := ""
 	nameNoPreffix := strings.TrimPrefix(tag, "tag.")
-	metricID, ok := Prometheus.MetricNameToID[table]
-	if !ok {
-		errorMessage := fmt.Sprintf("%s not found", table)
-		return "", "", errors.New(errorMessage)
-	}
 	labelNameID, ok := Prometheus.LabelNameToID[nameNoPreffix]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", nameNoPreffix)
@@ -173,14 +168,14 @@ func GetPrometheusSingleTagTranslator(tag, table string) (string, string, error)
 			if appLabel.AppLabelName == nameNoPreffix {
 				isAppLabel = true
 				labelType = "app"
-				TagTranslatorStr = fmt.Sprintf("dictGet(flow_tag.app_label_map, 'label_value', (%d, %d, app_label_value_id_%d))", metricID, labelNameID, appLabel.appLabelColumnIndex)
+				TagTranslatorStr = fmt.Sprintf("dictGet(flow_tag.app_label_map, 'label_value', (%d, app_label_value_id_%d))", labelNameID, appLabel.appLabelColumnIndex)
 				break
 			}
 		}
 	}
 	if !isAppLabel {
 		labelType = "target"
-		TagTranslatorStr = fmt.Sprintf("dictGet(flow_tag.target_label_map, 'label_value', (%d, %d, target_id))", metricID, labelNameID)
+		TagTranslatorStr = fmt.Sprintf("dictGet(flow_tag.target_label_map, 'label_value', (%d, target_id))", labelNameID)
 	}
 	return TagTranslatorStr, labelType, nil
 }
@@ -188,17 +183,12 @@ func GetPrometheusSingleTagTranslator(tag, table string) (string, string, error)
 func GetPrometheusAllTagTranslator(table string) (string, error) {
 	tagTranslatorStr := ""
 	appLabelTranslatorStr := ""
-	metricID, ok := Prometheus.MetricNameToID[table]
-	if !ok {
-		errorMessage := fmt.Sprintf("%s not found", table)
-		return "", errors.New(errorMessage)
-	}
 	if appLabels, ok := Prometheus.MetricAppLabelLayout[table]; ok {
 		// appLabel
 		appLabelTranslatorSlice := []string{}
 		for _, appLabel := range appLabels {
 			if labelNameID, ok := Prometheus.LabelNameToID[appLabel.AppLabelName]; ok {
-				appLabelTranslator := fmt.Sprintf("'%s',dictGet(flow_tag.app_label_map, 'label_value', (%d, %d, app_label_value_id_%d))", appLabel.AppLabelName, metricID, labelNameID, appLabel.appLabelColumnIndex)
+				appLabelTranslator := fmt.Sprintf("'%s',dictGet(flow_tag.app_label_map, 'label_value', (%d, app_label_value_id_%d))", appLabel.AppLabelName, labelNameID, appLabel.appLabelColumnIndex)
 				appLabelTranslatorSlice = append(appLabelTranslatorSlice, appLabelTranslator)
 			}
 		}
