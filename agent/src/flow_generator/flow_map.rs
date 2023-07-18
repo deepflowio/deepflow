@@ -652,7 +652,7 @@ impl FlowMap {
         if node.packet_sequence_block.is_some() {
             if !node.packet_sequence_block.as_ref().unwrap().is_available(
                 config.packet_sequence_block_size,
-                (meta_packet.lookup_key.timestamp.as_secs() / MINUTE) as u32,
+                meta_packet.lookup_key.timestamp.as_secs() as u32,
             ) {
                 // if the packet_sequence_block is no enough to push one more packet, then send it to the queue
                 if let Err(_) = self
@@ -664,12 +664,12 @@ impl FlowMap {
                     warn!("packet sequence block to queue failed maybe queue have terminated");
                 }
                 node.packet_sequence_block = Some(Box::new(PacketSequenceBlock::new(
-                    (meta_packet.lookup_key.timestamp.as_secs() / MINUTE) as u32,
+                    meta_packet.lookup_key.timestamp.as_secs() as u32,
                 )));
             }
         } else {
             node.packet_sequence_block = Some(Box::new(PacketSequenceBlock::new(
-                (meta_packet.lookup_key.timestamp.as_secs() / MINUTE) as u32,
+                meta_packet.lookup_key.timestamp.as_secs() as u32,
             )));
         }
 
