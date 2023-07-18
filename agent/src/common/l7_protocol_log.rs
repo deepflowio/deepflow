@@ -261,7 +261,7 @@ impl_protocol_parser! {
         Custom(CustomWrapLog),
         DNS(DnsLog),
         ProtobufRPC(ProtobufRpcWrapLog),
-        SofaRPC(Box<SofaRpcLog>),
+        SofaRPC(SofaRpcLog),
         MySQL(MysqlLog),
         Kafka(KafkaLog),
         Redis(Box<RedisLog>),
