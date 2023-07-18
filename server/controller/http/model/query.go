@@ -24,6 +24,10 @@ type IncludedFieldsParam struct {
 	IncludedFields []string `schema:"field,omitempty"`
 }
 
+func (i IncludedFieldsParam) GetIncludedFields() []string {
+	return i.IncludedFields
+}
+
 // VMQuery defines supported field in query string, and uses tag (schema) to define the parameter name
 // 定义可支持 query 字段，使用 tag（schema）定义参数名
 type VMQuery struct {
