@@ -1057,6 +1057,7 @@ impl QuadrupleGenerator {
                     CloseType::ForcedReport
                     | CloseType::TcpFin
                     | CloseType::Unknown
+                    | CloseType::HeartBeat
                     | CloseType::Max => (),
                 }
             }

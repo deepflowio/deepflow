@@ -69,7 +69,8 @@ pub enum CloseType {
     ServerQueueLack = 17,       // 17: 传输-服务端队列溢出
     ClientEstablishReset = 18,  // 18: 建连-客户端其他重置
     ServerEstablishReset = 19,  // 19: 建连-服务端其他重置
-    Max = 20,
+    HeartBeat = 20,             // 20: 心跳
+    Max = 21,
 }
 
 impl CloseType {
@@ -997,6 +998,29 @@ impl Flow {
         self.direction_score = 0;
     }
 
+    fn is_heartbeat(&self) -> bool {
+        let src_tcp_flags = &self.flow_metrics_peers[FlowMetricsPeer::SRC as usize].total_tcp_flags;
+        let dst_tcp_flags = &self.flow_metrics_peers[FlowMetricsPeer::DST as usize].total_tcp_flags;
+
+        if src_tcp_flags.contains(TcpFlags::PSH) || dst_tcp_flags.contains(TcpFlags::PSH) {
+            return false;
+        }
+
+        // Sender:    Client                   Server
+        // TCP Flags: SYN
+        //                                     SYN-ACK
+        //            [ACK]
+        //            RST|RST-ACK
+        let is_heartbeat = src_tcp_flags.contains(TcpFlags::SYN | TcpFlags::RST_ACK)
+            && dst_tcp_flags.contains(TcpFlags::SYN_ACK);
+
+        // Sender:    Client                   Server
+        // TCP Flags: SYN
+        //            RST|RST-ACK
+        is_heartbeat
+            || (src_tcp_flags.contains(TcpFlags::SYN | TcpFlags::RST) && dst_tcp_flags.is_empty())
+    }
+
     pub fn update_close_type(&mut self, flow_state: FlowState) {
         self.close_type = match flow_state {
             FlowState::Exception => CloseType::Unknown,
@@ -1007,16 +1031,26 @@ impl Flow {
             FlowState::ClosingRx1 => CloseType::ClientHalfClose,
             FlowState::ClosingTx2 | FlowState::ClosingRx2 | FlowState::Closed => CloseType::TcpFin,
             FlowState::Reset => {
-                if self.flow_metrics_peers[FlowMetricsPeer::DST as usize]
-                    .total_tcp_flags
-                    .contains(TcpFlags::RST)
-                {
-                    CloseType::TcpServerRst
+                if self.is_heartbeat() {
+                    CloseType::HeartBeat
                 } else {
-                    CloseType::TcpClientRst
+                    if self.flow_metrics_peers[FlowMetricsPeer::DST as usize]
+                        .total_tcp_flags
+                        .contains(TcpFlags::RST)
+                    {
+                        CloseType::TcpServerRst
+                    } else {
+                        CloseType::TcpClientRst
+                    }
                 }
             }
-            FlowState::Syn1 | FlowState::ClientL4PortReuse => CloseType::ClientSourcePortReuse,
+            FlowState::Syn1 | FlowState::ClientL4PortReuse => {
+                if self.is_heartbeat() {
+                    CloseType::HeartBeat
+                } else {
+                    CloseType::ClientSourcePortReuse
+                }
+            }
             FlowState::ServerReset => CloseType::ServerReset,
             FlowState::SynAck1 => CloseType::ServerQueueLack,
             FlowState::ServerCandidateQueueLack => {
@@ -1030,13 +1064,17 @@ impl Flow {
                 }
             }
             FlowState::EstablishReset | FlowState::OpeningRst => {
-                if self.flow_metrics_peers[FlowMetricsPeer::DST as usize]
-                    .total_tcp_flags
-                    .contains(TcpFlags::RST)
-                {
-                    CloseType::ServerEstablishReset
+                if self.is_heartbeat() {
+                    CloseType::HeartBeat
                 } else {
-                    CloseType::ClientEstablishReset
+                    if self.flow_metrics_peers[FlowMetricsPeer::DST as usize]
+                        .total_tcp_flags
+                        .contains(TcpFlags::RST)
+                    {
+                        CloseType::ServerEstablishReset
+                    } else {
+                        CloseType::ClientEstablishReset
+                    }
                 }
             }
             _ => {
