@@ -344,9 +344,11 @@ impl SofaRpcLog {
 
         // due to sofa is susceptible to mischeck, need to check the class name is ascii when is strict
         if strict {
-            if (&payload[0..hdr.class_len as usize])
-                .iter()
-                .any(|b| !b.is_ascii())
+            // java class name is not empty
+            if hdr.class_len == 0
+                || (&payload[0..hdr.class_len as usize])
+                    .iter()
+                    .any(|b| !b.is_ascii())
             {
                 return Err(Error::L7ProtocolUnknown);
             };
