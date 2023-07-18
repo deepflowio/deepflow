@@ -264,7 +264,7 @@ impl_protocol_parser! {
         SofaRPC(SofaRpcLog),
         MySQL(MysqlLog),
         Kafka(KafkaLog),
-        Redis(Box<RedisLog>),
+        Redis(RedisLog),
         PostgreSQL(Box<PostgresqlLog>),
         Dubbo(Box<DubboLog>),
         MQTT(MqttLog),
