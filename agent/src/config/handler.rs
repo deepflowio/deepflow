@@ -44,8 +44,8 @@ use super::{
     OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME,
 };
 use super::{
-    config::{Config, PcapConfig, PortConfig, YamlConfig},
-    ConfigError, IngressFlavour, KubernetesPollerType, RuntimeConfig,
+    config::{Config, KubernetesResourceConfig, PcapConfig, PortConfig, YamlConfig},
+    ConfigError, KubernetesPollerType, RuntimeConfig,
 };
 use crate::plugin::c_ffi::SoPluginFunc;
 #[cfg(target_os = "linux")]
@@ -257,13 +257,13 @@ pub struct PlatformConfig {
     pub kubernetes_poller_type: KubernetesPollerType,
     pub vtap_id: u16,
     pub enabled: bool,
-    pub ingress_flavour: IngressFlavour,
     pub trident_type: TridentType,
     pub epc_id: u32,
     pub kubernetes_api_enabled: bool,
     pub kubernetes_api_list_limit: u32,
     pub kubernetes_api_list_interval: Duration,
     pub kubernetes_api_memory_trim_percent: Option<u8>,
+    pub kubernetes_resources: Vec<KubernetesResourceConfig>,
     pub max_memory: u64,
     pub namespace: Option<String>,
     pub thread_threshold: u32,
@@ -950,7 +950,6 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 kubernetes_poller_type: conf.yaml_config.kubernetes_poller_type,
                 vtap_id: conf.vtap_id as u16,
                 enabled: conf.platform_enabled,
-                ingress_flavour: conf.yaml_config.ingress_flavour,
                 trident_type: conf.trident_type,
                 epc_id: conf.epc_id,
                 kubernetes_api_enabled: conf.kubernetes_api_enabled,
@@ -961,6 +960,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 } else {
                     None
                 },
+                kubernetes_resources: conf.yaml_config.kubernetes_resources.clone(),
                 max_memory: conf.max_memory,
                 namespace: if conf.yaml_config.kubernetes_namespace.is_empty() {
                     None

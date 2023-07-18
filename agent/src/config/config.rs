@@ -344,6 +344,15 @@ impl Default for PrometheusExtraConfig {
     }
 }
 
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct KubernetesResourceConfig {
+    pub name: String,
+    pub group: String,
+    pub version: String,
+    pub disabled: bool,
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct YamlConfig {
@@ -392,7 +401,6 @@ pub struct YamlConfig {
     pub kubernetes_poller_type: KubernetesPollerType,
     pub decap_erspan: bool,
     pub analyzer_ip: String,
-    pub ingress_flavour: IngressFlavour,
     pub grpc_buffer_size: usize,
     #[serde(with = "humantime_serde")]
     pub l7_log_session_aggr_timeout: Duration,
@@ -403,6 +411,7 @@ pub struct YamlConfig {
     #[serde(with = "humantime_serde")]
     pub kubernetes_api_list_interval: Duration,
     pub kubernetes_api_memory_trim_percent: u8,
+    pub kubernetes_resources: Vec<KubernetesResourceConfig>,
     pub external_metrics_sender_queue_size: usize,
     pub l7_protocol_inference_max_fail_count: usize,
     pub l7_protocol_inference_ttl: usize,
@@ -725,7 +734,6 @@ impl Default for YamlConfig {
             kubernetes_poller_type: KubernetesPollerType::Adaptive,
             decap_erspan: false,
             analyzer_ip: "".into(),
-            ingress_flavour: IngressFlavour::Kubernetes,
             grpc_buffer_size: 5,
             l7_log_session_aggr_timeout: Duration::from_secs(120),
             tap_mac_script: "".into(),
@@ -734,6 +742,7 @@ impl Default for YamlConfig {
             kubernetes_api_list_limit: 1000,
             kubernetes_api_list_interval: Duration::from_secs(600),
             kubernetes_api_memory_trim_percent: 100,
+            kubernetes_resources: vec![],
             external_metrics_sender_queue_size: 1 << 12,
             l7_protocol_inference_max_fail_count: L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT,
             l7_protocol_inference_ttl: L7_PROTOCOL_INFERENCE_TTL,
@@ -942,13 +951,6 @@ pub enum KubernetesPollerType {
     Active,
     Passive,
     Sidecar,
-}
-
-#[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq)]
-#[serde(rename_all = "kebab-case")]
-pub enum IngressFlavour {
-    Kubernetes,
-    Openshift,
 }
 
 #[derive(Debug, Deserialize)]

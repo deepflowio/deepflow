@@ -16,7 +16,7 @@
 
 use std::{
     collections::HashMap,
-    fmt::Debug,
+    fmt::{self, Debug},
     io::{self, Write},
     sync::{
         atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
@@ -45,7 +45,7 @@ use k8s_openapi::{
 use kube::{
     api::ListParams,
     runtime::{self, watcher::Event},
-    Api, Client, Resource,
+    Api, Client, Resource as KubeResource,
 };
 use log::{debug, info, trace, warn};
 use openshift_openapi::api::route::v1::Route;
@@ -53,7 +53,10 @@ use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
 use tokio::{runtime::Handle, sync::Mutex, task::JoinHandle, time};
 
-use super::crd::pingan::ServiceRule;
+use super::crd::{
+    kruise::{CloneSet, StatefulSet as KruiseStatefulSet},
+    pingan::ServiceRule,
+};
 use crate::utils::stats::{
     self, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption,
 };
@@ -67,7 +70,7 @@ pub trait Watcher {
     fn start(&self) -> Option<JoinHandle<()>>;
     fn error(&self) -> Option<String>;
     fn entries(&self) -> Vec<Vec<u8>>;
-    fn kind(&self) -> String;
+    fn pb_name(&self) -> &str;
     fn version(&self) -> u64;
     fn ready(&self) -> bool;
 }
@@ -78,7 +81,6 @@ pub enum GenericResourceWatcher {
     Node(ResourceWatcher<Node>),
     Namespace(ResourceWatcher<Namespace>),
     Service(ResourceWatcher<Service>),
-    ServiceRule(ResourceWatcher<ServiceRule>),
     Deployment(ResourceWatcher<Deployment>),
     Pod(ResourceWatcher<Pod>),
     StatefulSet(ResourceWatcher<StatefulSet>),
@@ -89,6 +91,285 @@ pub enum GenericResourceWatcher {
     V1beta1Ingress(ResourceWatcher<networking::v1beta1::Ingress>),
     ExtV1beta1Ingress(ResourceWatcher<extensions::v1beta1::Ingress>),
     Route(ResourceWatcher<Route>),
+
+    // CRDs
+    ServiceRule(ResourceWatcher<ServiceRule>),
+    CloneSet(ResourceWatcher<CloneSet>),
+    KruiseStatefulSet(ResourceWatcher<KruiseStatefulSet>),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct GroupVersion {
+    pub group: &'static str,
+    pub version: &'static str,
+}
+
+impl fmt::Display for GroupVersion {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}/{}", self.group, self.version)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Resource {
+    pub name: &'static str,
+    pub pb_name: &'static str,
+    // supported group versions ordered by priority
+    pub group_versions: Vec<GroupVersion>,
+    // group version to use
+    pub selected_gv: Option<GroupVersion>,
+}
+
+impl fmt::Display for Resource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.selected_gv {
+            Some(gv) => write!(f, "{}/{}", gv, self.name),
+            None => write!(f, "{}: {:?}", self.name, self.group_versions),
+        }
+    }
+}
+
+pub fn default_resources() -> Vec<Resource> {
+    vec![
+        Resource {
+            name: "namespaces",
+            pb_name: "*v1.Namespace",
+            group_versions: vec![GroupVersion {
+                group: "core",
+                version: "v1",
+            }],
+            selected_gv: None,
+        },
+        Resource {
+            name: "nodes",
+            pb_name: "*v1.Node",
+            group_versions: vec![GroupVersion {
+                group: "core",
+                version: "v1",
+            }],
+            selected_gv: None,
+        },
+        Resource {
+            name: "pods",
+            pb_name: "*v1.Pod",
+            group_versions: vec![GroupVersion {
+                group: "core",
+                version: "v1",
+            }],
+            selected_gv: None,
+        },
+        Resource {
+            name: "replicationcontrollers",
+            pb_name: "*v1.ReplicationController",
+            group_versions: vec![GroupVersion {
+                group: "core",
+                version: "v1",
+            }],
+            selected_gv: None,
+        },
+        Resource {
+            name: "services",
+            pb_name: "*v1.Service",
+            group_versions: vec![GroupVersion {
+                group: "core",
+                version: "v1",
+            }],
+            selected_gv: None,
+        },
+        Resource {
+            name: "daemonsets",
+            pb_name: "*v1.DaemonSet",
+            group_versions: vec![GroupVersion {
+                group: "apps",
+                version: "v1",
+            }],
+            selected_gv: None,
+        },
+        Resource {
+            name: "deployments",
+            pb_name: "*v1.Deployment",
+            group_versions: vec![GroupVersion {
+                group: "apps",
+                version: "v1",
+            }],
+            selected_gv: None,
+        },
+        Resource {
+            name: "replicasets",
+            pb_name: "*v1.ReplicaSet",
+            group_versions: vec![GroupVersion {
+                group: "apps",
+                version: "v1",
+            }],
+            selected_gv: None,
+        },
+        Resource {
+            name: "statefulsets",
+            pb_name: "*v1.StatefulSet",
+            group_versions: vec![GroupVersion {
+                group: "apps",
+                version: "v1",
+            }],
+            selected_gv: None,
+        },
+        Resource {
+            name: "ingresses",
+            pb_name: "*v1.Ingress",
+            group_versions: vec![
+                GroupVersion {
+                    group: "networking.k8s.io",
+                    version: "v1",
+                },
+                GroupVersion {
+                    group: "networking.k8s.io",
+                    version: "v1beta1",
+                },
+                GroupVersion {
+                    group: "extensions",
+                    version: "v1beta1",
+                },
+            ],
+            selected_gv: None,
+        },
+    ]
+}
+
+pub fn supported_resources() -> Vec<Resource> {
+    vec![
+        Resource {
+            name: "namespaces",
+            pb_name: "*v1.Namespace",
+            group_versions: vec![GroupVersion {
+                group: "core",
+                version: "v1",
+            }],
+            selected_gv: None,
+        },
+        Resource {
+            name: "nodes",
+            pb_name: "*v1.Node",
+            group_versions: vec![GroupVersion {
+                group: "core",
+                version: "v1",
+            }],
+            selected_gv: None,
+        },
+        Resource {
+            name: "pods",
+            pb_name: "*v1.Pod",
+            group_versions: vec![GroupVersion {
+                group: "core",
+                version: "v1",
+            }],
+            selected_gv: None,
+        },
+        Resource {
+            name: "replicationcontrollers",
+            pb_name: "*v1.ReplicationController",
+            group_versions: vec![GroupVersion {
+                group: "core",
+                version: "v1",
+            }],
+            selected_gv: None,
+        },
+        Resource {
+            name: "services",
+            pb_name: "*v1.Service",
+            group_versions: vec![GroupVersion {
+                group: "core",
+                version: "v1",
+            }],
+            selected_gv: None,
+        },
+        Resource {
+            name: "daemonsets",
+            pb_name: "*v1.DaemonSet",
+            group_versions: vec![GroupVersion {
+                group: "apps",
+                version: "v1",
+            }],
+            selected_gv: None,
+        },
+        Resource {
+            name: "deployments",
+            pb_name: "*v1.Deployment",
+            group_versions: vec![GroupVersion {
+                group: "apps",
+                version: "v1",
+            }],
+            selected_gv: None,
+        },
+        Resource {
+            name: "replicasets",
+            pb_name: "*v1.ReplicaSet",
+            group_versions: vec![GroupVersion {
+                group: "apps",
+                version: "v1",
+            }],
+            selected_gv: None,
+        },
+        Resource {
+            name: "statefulsets",
+            pb_name: "*v1.StatefulSet",
+            group_versions: vec![
+                GroupVersion {
+                    group: "apps",
+                    version: "v1",
+                },
+                GroupVersion {
+                    group: "apps.kruise.io",
+                    version: "v1beta1",
+                },
+            ],
+            selected_gv: None,
+        },
+        Resource {
+            name: "ingresses",
+            pb_name: "*v1.Ingress",
+            group_versions: vec![
+                GroupVersion {
+                    group: "networking.k8s.io",
+                    version: "v1",
+                },
+                GroupVersion {
+                    group: "networking.k8s.io",
+                    version: "v1beta1",
+                },
+                GroupVersion {
+                    group: "extensions",
+                    version: "v1beta1",
+                },
+            ],
+            selected_gv: None,
+        },
+        Resource {
+            name: "routes",
+            pb_name: "*v1.Ingress",
+            group_versions: vec![GroupVersion {
+                group: "route.openshift.io",
+                version: "v1",
+            }],
+            selected_gv: None,
+        },
+        Resource {
+            name: "servicerules",
+            pb_name: "*v1.ServiceRule",
+            group_versions: vec![GroupVersion {
+                group: "crd.pingan.org",
+                version: "v1alpha1",
+            }],
+            selected_gv: None,
+        },
+        Resource {
+            name: "clonesets",
+            pb_name: "*v1.CloneSet",
+            group_versions: vec![GroupVersion {
+                group: "apps.kruise.io",
+                version: "v1alpha1",
+            }],
+            selected_gv: None,
+        },
+    ]
 }
 
 #[derive(Default)]
@@ -164,7 +445,7 @@ pub struct ResourceWatcher<K> {
     api: Api<K>,
     entries: Arc<Mutex<HashMap<String, Vec<u8>>>>,
     err_msg: Arc<Mutex<Option<String>>>,
-    kind: &'static str,
+    kind: Resource,
     version: Arc<AtomicU64>,
     runtime: Handle,
     ready: Arc<AtomicBool>,
@@ -178,7 +459,7 @@ struct Context<K> {
     entries: Arc<Mutex<HashMap<String, Vec<u8>>>>,
     version: Arc<AtomicU64>,
     api: Api<K>,
-    kind: &'static str,
+    kind: Resource,
     err_msg: Arc<Mutex<Option<String>>>,
     ready: Arc<AtomicBool>,
     stats_counter: Arc<WatcherCounter>,
@@ -190,13 +471,13 @@ struct Context<K> {
 
 impl<K> Watcher for ResourceWatcher<K>
 where
-    K: Clone + Debug + DeserializeOwned + Resource + Serialize + Trimmable,
+    K: Clone + Debug + DeserializeOwned + KubeResource + Serialize + Trimmable,
 {
     fn start(&self) -> Option<JoinHandle<()>> {
         let ctx = Context {
             entries: self.entries.clone(),
             version: self.version.clone(),
-            kind: self.kind,
+            kind: self.kind.clone(),
             err_msg: self.err_msg.clone(),
             ready: self.ready.clone(),
             api: self.api.clone(),
@@ -219,8 +500,8 @@ where
         self.err_msg.blocking_lock().take()
     }
 
-    fn kind(&self) -> String {
-        self.kind.to_string()
+    fn pb_name(&self) -> &str {
+        self.kind.pb_name
     }
 
     fn entries(&self) -> Vec<Vec<u8>> {
@@ -238,11 +519,11 @@ where
 
 impl<K> ResourceWatcher<K>
 where
-    K: Clone + Debug + DeserializeOwned + Resource + Serialize + Trimmable,
+    K: Clone + Debug + DeserializeOwned + KubeResource + Serialize + Trimmable,
 {
     pub fn new(
         api: Api<K>,
-        kind: &'static str,
+        kind: Resource,
         runtime: Handle,
         config: &WatcherConfig,
         listing: Arc<AtomicBool>,
@@ -505,7 +786,7 @@ where
         object: K,
         entries: &Arc<Mutex<HashMap<String, Vec<u8>>>>,
         version: &Arc<AtomicU64>,
-        kind: &str,
+        kind: &Resource,
     ) {
         let uid = object.meta().uid.clone();
         if let Some(uid) = uid {
@@ -846,14 +1127,14 @@ impl ResourceWatcherFactory {
 
     fn new_watcher_inner<K>(
         &self,
-        kind: &'static str,
+        kind: Resource,
         stats_collector: &stats::Collector,
         namespace: Option<&str>,
         config: &WatcherConfig,
     ) -> ResourceWatcher<K>
     where
-        K: Clone + Debug + DeserializeOwned + Resource + Serialize + Trimmable,
-        <K as Resource>::DynamicType: Default,
+        K: Clone + Debug + DeserializeOwned + KubeResource + Serialize + Trimmable,
+        <K as KubeResource>::DynamicType: Default,
     {
         let watcher = ResourceWatcher::new(
             match namespace {
@@ -875,92 +1156,146 @@ impl ResourceWatcherFactory {
 
     pub fn new_watcher(
         &self,
-        resource: &'static str,
-        kind: &'static str,
+        resource: Resource,
         namespace: Option<&str>,
         stats_collector: &stats::Collector,
         config: &WatcherConfig,
     ) -> Option<GenericResourceWatcher> {
-        let watcher =
-            match resource {
-                // 特定namespace不支持Node/Namespace资源
-                "nodes" => GenericResourceWatcher::Node(self.new_watcher_inner(
-                    kind,
-                    stats_collector,
-                    None,
-                    config,
-                )),
-                "namespaces" => GenericResourceWatcher::Namespace(self.new_watcher_inner(
-                    kind,
-                    stats_collector,
-                    None,
-                    config,
-                )),
-                "services" => GenericResourceWatcher::Service(self.new_watcher_inner(
-                    kind,
-                    stats_collector,
-                    namespace,
-                    config,
-                )),
-                "servicerules" => GenericResourceWatcher::ServiceRule(self.new_watcher_inner(
-                    kind,
-                    stats_collector,
-                    namespace,
-                    config,
-                )),
-                "deployments" => GenericResourceWatcher::Deployment(self.new_watcher_inner(
-                    kind,
-                    stats_collector,
-                    namespace,
-                    config,
-                )),
-                "pods" => GenericResourceWatcher::Pod(self.new_watcher_inner(
-                    kind,
-                    stats_collector,
-                    namespace,
-                    config,
-                )),
-                "statefulsets" => GenericResourceWatcher::StatefulSet(self.new_watcher_inner(
-                    kind,
+        let watcher = match resource.name {
+            // 特定namespace不支持Node/Namespace资源
+            "nodes" => GenericResourceWatcher::Node(self.new_watcher_inner(
+                resource,
+                stats_collector,
+                None,
+                config,
+            )),
+            "namespaces" => GenericResourceWatcher::Namespace(self.new_watcher_inner(
+                resource,
+                stats_collector,
+                None,
+                config,
+            )),
+            "services" => GenericResourceWatcher::Service(self.new_watcher_inner(
+                resource,
+                stats_collector,
+                namespace,
+                config,
+            )),
+            "deployments" => GenericResourceWatcher::Deployment(self.new_watcher_inner(
+                resource,
+                stats_collector,
+                namespace,
+                config,
+            )),
+            "pods" => GenericResourceWatcher::Pod(self.new_watcher_inner(
+                resource,
+                stats_collector,
+                namespace,
+                config,
+            )),
+            "statefulsets" => match resource.selected_gv.as_ref().unwrap() {
+                GroupVersion {
+                    group: "apps.kruise.io",
+                    version: "v1beta1",
+                } => GenericResourceWatcher::KruiseStatefulSet(self.new_watcher_inner(
+                    resource,
                     stats_collector,
                     namespace,
                     config,
                 )),
-                "daemonsets" => GenericResourceWatcher::DaemonSet(self.new_watcher_inner(
-                    kind,
+                GroupVersion {
+                    group: "apps",
+                    version: "v1",
+                } => GenericResourceWatcher::StatefulSet(self.new_watcher_inner(
+                    resource,
                     stats_collector,
                     namespace,
                     config,
                 )),
-                "replicationcontrollers" => GenericResourceWatcher::ReplicationController(
-                    self.new_watcher_inner(kind, stats_collector, namespace, config),
-                ),
-                "replicasets" => GenericResourceWatcher::ReplicaSet(self.new_watcher_inner(
-                    kind,
+                _ => {
+                    warn!(
+                        "unsupported resource {} group version {}",
+                        resource.name,
+                        resource.selected_gv.as_ref().unwrap()
+                    );
+                    return None;
+                }
+            },
+            "daemonsets" => GenericResourceWatcher::DaemonSet(self.new_watcher_inner(
+                resource,
+                stats_collector,
+                namespace,
+                config,
+            )),
+            "replicationcontrollers" => GenericResourceWatcher::ReplicationController(
+                self.new_watcher_inner(resource, stats_collector, namespace, config),
+            ),
+            "replicasets" => GenericResourceWatcher::ReplicaSet(self.new_watcher_inner(
+                resource,
+                stats_collector,
+                namespace,
+                config,
+            )),
+            "ingresses" => match resource.selected_gv.as_ref().unwrap() {
+                GroupVersion {
+                    group: "networking.k8s.io",
+                    version: "v1",
+                } => GenericResourceWatcher::V1Ingress(self.new_watcher_inner(
+                    resource,
                     stats_collector,
                     namespace,
                     config,
                 )),
-                "v1ingresses" => GenericResourceWatcher::V1Ingress(self.new_watcher_inner(
-                    kind,
+                GroupVersion {
+                    group: "networking.k8s.io",
+                    version: "v1beta1",
+                } => GenericResourceWatcher::V1beta1Ingress(self.new_watcher_inner(
+                    resource,
                     stats_collector,
                     namespace,
                     config,
                 )),
-                "v1beta1ingresses" => GenericResourceWatcher::V1beta1Ingress(
-                    self.new_watcher_inner(kind, stats_collector, namespace, config),
-                ),
-                "extv1beta1ingresses" => GenericResourceWatcher::ExtV1beta1Ingress(
-                    self.new_watcher_inner(kind, stats_collector, namespace, config),
-                ),
-                "routes" => GenericResourceWatcher::Route(self.new_watcher_inner(
-                    kind,
+                GroupVersion {
+                    group: "extensions",
+                    version: "v1beta1",
+                } => GenericResourceWatcher::ExtV1beta1Ingress(self.new_watcher_inner(
+                    resource,
                     stats_collector,
                     namespace,
                     config,
                 )),
-                _ => return None,
-            };
+                _ => {
+                    warn!(
+                        "unsupported resource {} group version {}",
+                        resource.name,
+                        resource.selected_gv.as_ref().unwrap()
+                    );
+                    return None;
+                }
+            },
+            "routes" => GenericResourceWatcher::Route(self.new_watcher_inner(
+                resource,
+                stats_collector,
+                namespace,
+                config,
+            )),
+            "servicerules" => GenericResourceWatcher::ServiceRule(self.new_watcher_inner(
+                resource,
+                stats_collector,
+                namespace,
+                config,
+            )),
+            "clonesets" => GenericResourceWatcher::CloneSet(self.new_watcher_inner(
+                resource,
+                stats_collector,
+                namespace,
+                config,
+            )),
+            _ => {
+                warn!("unsupported resource {}", resource.name);
+                return None;
+            }
+        };
 
         Some(watcher)
     }

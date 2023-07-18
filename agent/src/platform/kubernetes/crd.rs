@@ -15,7 +15,7 @@
  */
 use std::collections::BTreeMap;
 
-use k8s_openapi::{api::core::v1::ServicePort, apimachinery::pkg::apis::meta::v1::ObjectMeta};
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use kube_derive::CustomResource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -24,6 +24,8 @@ use super::resource_watcher::Trimmable;
 
 pub mod pingan {
     use super::*;
+
+    use k8s_openapi::api::core::v1::ServicePort;
 
     #[derive(CustomResource, Clone, Debug, Serialize, Deserialize, JsonSchema)]
     #[kube(
@@ -48,7 +50,7 @@ pub mod pingan {
             } else {
                 ""
             };
-            let mut sr = ServiceRule::new(name, self.spec);
+            let mut sr = Self::new(name, self.spec);
             sr.metadata = ObjectMeta {
                 uid: self.metadata.uid.take(),
                 name: self.metadata.name.take(),
@@ -58,6 +60,80 @@ pub mod pingan {
                 ..Default::default()
             };
             sr
+        }
+    }
+}
+
+pub mod kruise {
+    use super::*;
+
+    use k8s_openapi::{
+        api::core::v1::PodTemplateSpec, apimachinery::pkg::apis::meta::v1::LabelSelector,
+    };
+
+    #[derive(CustomResource, Clone, Debug, Serialize, Deserialize, JsonSchema)]
+    #[kube(
+        group = "apps.kruise.io",
+        version = "v1alpha1",
+        kind = "CloneSet",
+        namespaced
+    )]
+    #[serde(rename_all = "camelCase")]
+    pub struct CloneSetSpec {
+        pub relicas: Option<i32>,
+        pub selector: LabelSelector,
+        pub template: PodTemplateSpec,
+    }
+
+    impl Trimmable for CloneSet {
+        fn trim(mut self) -> Self {
+            let name = if let Some(name) = self.metadata.name.as_ref() {
+                name
+            } else {
+                ""
+            };
+            let mut cs = Self::new(name, self.spec);
+            cs.metadata = ObjectMeta {
+                uid: self.metadata.uid.take(),
+                name: self.metadata.name.take(),
+                namespace: self.metadata.namespace.take(),
+                labels: self.metadata.labels.take(),
+                ..Default::default()
+            };
+            cs
+        }
+    }
+
+    #[derive(CustomResource, Clone, Debug, Serialize, Deserialize, JsonSchema)]
+    #[kube(
+        group = "apps.kruise.io",
+        version = "v1beta1",
+        kind = "StatefulSet",
+        namespaced
+    )]
+    #[serde(rename_all = "camelCase")]
+    pub struct StatefulSetSpec {
+        pub relicas: Option<i32>,
+        pub selector: LabelSelector,
+        pub template: PodTemplateSpec,
+    }
+
+    impl Trimmable for StatefulSet {
+        fn trim(mut self) -> Self {
+            let name = if let Some(name) = self.metadata.name.as_ref() {
+                name
+            } else {
+                ""
+            };
+            let mut ss = Self::new(name, self.spec);
+            ss.metadata = ObjectMeta {
+                uid: self.metadata.uid.take(),
+                name: self.metadata.name.take(),
+                namespace: self.metadata.namespace.take(),
+                labels: self.metadata.labels.take(),
+                ..Default::default()
+            };
+            ss
         }
     }
 }
