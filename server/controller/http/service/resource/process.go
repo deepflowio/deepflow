@@ -33,7 +33,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func GetProcesses(c *gin.Context, redisConfig *redis.RedisConfig) (responseData []model.Process, err error) {
+func GetProcesses(c *gin.Context, redisConfig *redis.Config) (responseData []model.Process, err error) {
 	responseData, err = getProcesses()
 	return
 }
@@ -185,7 +185,7 @@ func getCache(c *gin.Context) ([]model.Process, error) {
 		log.Error(err)
 		return responseData, err
 	}
-	strCache, err := redis.RedisDB.ResourceAPI.Get(c, key).Result()
+	strCache, err := redis.GetClient().ResourceAPI.Get(c, key).Result()
 	if errors.Is(err, goredis.Nil) {
 		return responseData, nil
 	}
@@ -201,7 +201,7 @@ func getCache(c *gin.Context) ([]model.Process, error) {
 	return responseData, nil
 }
 
-func setCache(c *gin.Context, redisConfig *redis.RedisConfig, data []model.Process) error {
+func setCache(c *gin.Context, redisConfig *redis.Config, data []model.Process) error {
 	key, err := GenerateRedisKey(c.Request.Header, c.Request.URL)
 	if err != nil {
 		log.Error(err)
@@ -212,7 +212,7 @@ func setCache(c *gin.Context, redisConfig *redis.RedisConfig, data []model.Proce
 		log.Error(err)
 		return err
 	}
-	_, err = redis.RedisDB.ResourceAPI.Set(c, key, strCache, time.Duration(redisConfig.ResourceAPIExpireInterval)*time.Second).Result()
+	_, err = redis.GetClient().ResourceAPI.Set(c, key, strCache, time.Duration(redisConfig.ResourceAPIExpireInterval)*time.Second).Result()
 	if err != nil {
 		log.Error(err)
 		return err

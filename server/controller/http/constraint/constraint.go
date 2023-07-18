@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,17 +14,18 @@
  * limitations under the License.
  */
 
-package common
+package constraint
 
-var HEADER_KEY_X_USER_TYPE = "X-User-Type"
-var HEADER_KEY_X_USER_ID = "X-User-Id"
+import (
+	"github.com/deepflowio/deepflow/server/controller/http/model"
+)
 
-// TODO delete
-var REDIS_KEY_PREFIX_DEEPFLOW = "deepflow_"
-var REDIS_KEY_PREFIX_RESOURECE_API = "resource_api_"
-var REDIS_KEY_PREFIX_DIMENSION_RESOURCE = "dimension_resource_"
+// 各资源可支持的 query 字段定义
+type QueryModel interface {
+	model.VMQuery | model.PodQuery
+}
 
-var USER_TYPE_SUPER_ADMIN = 1
-var USER_TYPE_ADMIN = 2
-var USER_TYPE_TENANT = 5
-var USER_TYPE_READ_ONLY_ADMIN = 10 // TODO verify permission
+// 各资源需要用于构建 redis 缓存 key 的 query 字段定义
+type QueryStoredInRedisModel interface {
+	model.VMQueryStoredInRedis | model.PodQueryStoredInRedis
+}
