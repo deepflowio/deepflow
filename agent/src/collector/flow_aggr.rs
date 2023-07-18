@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{
     atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
     Arc,
@@ -44,10 +44,9 @@ use public::{
     queue::{DebugSender, Error, Receiver},
 };
 
-const MINUTE_SLOTS: usize = 2;
-const FLUSH_TIMEOUT: Duration = Duration::from_secs(2 * SECONDS_IN_MINUTE);
-const QUEUE_READ_TIMEOUT: Duration = Duration::from_secs(2);
-const TAPTYPE_MAX: usize = 256; // TapType::Max
+const TIMESTAMP_SLOT_COUNT: usize = SECONDS_IN_MINUTE as usize;
+const QUEUE_READ_TIMEOUT: Duration = Duration::from_secs(1); // Must be less than or equal to FLUSH_TIMEOUT
+const FLUSH_TIMEOUT: Duration = Duration::from_secs(1);
 
 #[derive(Debug, Default)]
 pub struct FlowAggrCounter {
@@ -145,8 +144,8 @@ pub struct FlowAggr {
     input: Arc<Receiver<Arc<BatchedBox<TaggedFlow>>>>,
     output: ThrottlingQueue,
     slot_start_time: Duration,
-    stashs: VecDeque<HashMap<u64, Box<TaggedFlow>>>,
-    history_length: VecDeque<usize>,
+    flow_stashs: HashMap<u64, Box<TaggedFlow>>,
+    timestamp_stashs: VecDeque<HashSet<u64>>,
     stash_init_capacity: usize,
 
     last_flush_time: Duration,
@@ -161,7 +160,8 @@ pub struct FlowAggr {
 impl FlowAggr {
     // record stash size in last N flushes to determine shrinking size
     const HISTORY_RECORD_COUNT: usize = 10;
-    const MIN_STASH_CAPACITY: usize = 1024;
+    const MIN_STASH_CAPACITY_SECOND: usize = 1024;
+    const MIN_STASH_CAPACITY: usize = Self::MIN_STASH_CAPACITY_SECOND * 60;
 
     pub fn new(
         input: Arc<Receiver<Arc<BatchedBox<TaggedFlow>>>>,
@@ -171,19 +171,16 @@ impl FlowAggr {
         ntp_diff: Arc<AtomicI64>,
         metrics: Arc<FlowAggrCounter>,
     ) -> Self {
-        let mut stashs = VecDeque::new();
-        let mut stash_init_capacity = 0;
-        for _ in 0..MINUTE_SLOTS {
-            let stash = HashMap::with_capacity(Self::MIN_STASH_CAPACITY);
-            stash_init_capacity = stash_init_capacity.max(stash.capacity());
-            stashs.push_front(stash);
+        let mut timestamp_stashs = VecDeque::with_capacity(TIMESTAMP_SLOT_COUNT);
+        for _ in 0..TIMESTAMP_SLOT_COUNT {
+            timestamp_stashs.push_back(HashSet::with_capacity(Self::MIN_STASH_CAPACITY_SECOND));
         }
         Self {
             input,
             output: ThrottlingQueue::new(output, config.clone()),
-            stashs,
-            history_length: [0; Self::HISTORY_RECORD_COUNT].into(),
-            stash_init_capacity,
+            flow_stashs: HashMap::with_capacity(Self::MIN_STASH_CAPACITY),
+            timestamp_stashs,
+            stash_init_capacity: Self::MIN_STASH_CAPACITY,
             slot_start_time: Duration::ZERO,
             last_flush_time: Duration::ZERO,
             config,
@@ -191,6 +188,17 @@ impl FlowAggr {
             metrics,
             ntp_diff,
         }
+    }
+
+    fn add(&mut self, time_slot: usize, f: &BatchedBox<TaggedFlow>) {
+        self.timestamp_stashs[time_slot].insert(f.flow.flow_id);
+        self.flow_stashs
+            .insert(f.flow.flow_id, Box::new(f.as_ref().clone()));
+    }
+
+    fn remove(&mut self, time_slot: usize, flow_id: &u64) -> Option<Box<TaggedFlow>> {
+        self.timestamp_stashs[time_slot].remove(flow_id);
+        self.flow_stashs.remove(flow_id)
     }
 
     fn minute_merge(&mut self, f: Arc<BatchedBox<TaggedFlow>>) {
@@ -204,14 +212,15 @@ impl FlowAggr {
             return;
         }
 
-        let mut slot = ((flow_time - self.slot_start_time).as_secs() / SECONDS_IN_MINUTE) as usize;
-        if slot >= MINUTE_SLOTS {
-            let flush_count = slot - MINUTE_SLOTS + 1;
+        let mut time_slot = (flow_time - self.slot_start_time).as_secs() as usize;
+        if time_slot >= TIMESTAMP_SLOT_COUNT {
+            let flush_count = time_slot - TIMESTAMP_SLOT_COUNT + 1;
             self.flush_slots(flush_count);
-            slot = MINUTE_SLOTS - 1;
+            time_slot = TIMESTAMP_SLOT_COUNT - 1;
         }
-        let slot_map = &mut self.stashs[slot];
-        if let Some(flow) = slot_map.get_mut(&f.flow.flow_id) {
+
+        let flow_id = f.flow.flow_id;
+        if let Some(flow) = self.flow_stashs.get_mut(&flow_id) {
             if flow.flow.reversed != f.flow.reversed {
                 flow.reverse();
                 if let Some(stats) = flow.flow.flow_perf_stats.as_mut() {
@@ -220,7 +229,7 @@ impl FlowAggr {
             }
             flow.sequential_merge(&f);
             if flow.flow.close_type != CloseType::ForcedReport {
-                if let Some(closed_flow) = slot_map.remove(&f.flow.flow_id) {
+                if let Some(closed_flow) = self.remove(time_slot, &flow_id) {
                     self.send_flow(closed_flow);
                 }
             }
@@ -228,13 +237,7 @@ impl FlowAggr {
             if f.flow.close_type != CloseType::ForcedReport {
                 self.send_flow(Box::new(f.as_ref().clone()));
             } else {
-                slot_map.insert(f.flow.flow_id, Box::new(f.as_ref().clone()));
-            }
-            // 收到flow下一分钟数据，则需要发送上一分钟的该flow
-            if slot > 0 {
-                if let Some(pre_flow) = self.stashs[slot - 1].remove(&f.flow.flow_id) {
-                    self.send_flow(pre_flow);
-                }
+                self.add(time_slot, f);
             }
         }
     }
@@ -262,12 +265,11 @@ impl FlowAggr {
         f.flow.acl_gids = Vec::from(acl_gids.list());
 
         if !f.flow.is_new_flow {
-            f.flow.start_time = f.flow.flow_stat_time.round_to_minute();
+            f.flow.start_time = f.flow.flow_stat_time;
         }
 
         if f.flow.close_type == CloseType::ForcedReport {
-            f.flow.end_time =
-                (f.flow.flow_stat_time + Duration::from_secs(SECONDS_IN_MINUTE)).round_to_minute();
+            f.flow.end_time = f.flow.flow_stat_time + Duration::from_secs(SECONDS_IN_MINUTE);
         }
         self.metrics.out.fetch_add(1, Ordering::Relaxed);
         if f.flow.hit_pcap_policy() {
@@ -282,39 +284,39 @@ impl FlowAggr {
     }
 
     fn flush_front_slot_and_rotate(&mut self) {
-        let mut slot_map = self.stashs.pop_front().unwrap();
+        let mut slot_map = self.timestamp_stashs.pop_front().unwrap();
 
-        self.history_length.rotate_right(1);
-        self.history_length[0] = slot_map.len();
-
-        for (_, v) in slot_map.drain() {
-            self.send_flow(v);
-        }
-
-        let stash_cap = slot_map.capacity();
-        if stash_cap > self.stash_init_capacity {
-            let max_history = self.history_length.iter().fold(0, |acc, n| acc.max(*n));
-            if stash_cap > 2 * max_history {
-                // shrink stash if its capacity is larger than 2 times of the max stash length in the past HISTORY_RECORD_COUNT flushes
-                self.metrics.stash_shrinks.fetch_add(1, Ordering::Relaxed);
-                slot_map.shrink_to(self.stash_init_capacity.max(2 * max_history));
+        for flow_id in slot_map.drain() {
+            if let Some(flow) = self.flow_stashs.remove(&flow_id) {
+                self.send_flow(flow);
             }
         }
 
-        self.stashs.push_back(slot_map);
+        let stash_cap = self.flow_stashs.capacity();
+        if stash_cap > self.stash_init_capacity {
+            let stash_len = self.flow_stashs.len();
+            if stash_cap > 2 * stash_len {
+                // shrink stash if its capacity is larger than 2 times of the max stash length in the past HISTORY_RECORD_COUNT flushes
+                self.metrics.stash_shrinks.fetch_add(1, Ordering::Relaxed);
+                self.flow_stashs
+                    .shrink_to(self.stash_init_capacity.max(2 * stash_len));
+            }
+        }
+
+        self.timestamp_stashs
+            .push_back(HashSet::with_capacity(Self::MIN_STASH_CAPACITY_SECOND));
         self.last_flush_time = get_timestamp(self.ntp_diff.load(Ordering::Relaxed));
-        self.slot_start_time += Duration::from_secs(SECONDS_IN_MINUTE);
+        self.slot_start_time += Duration::from_secs(1);
     }
 
     fn flush_slots(&mut self, slot_count: usize) {
-        for _ in 0..slot_count.min(MINUTE_SLOTS) {
+        for _ in 0..slot_count.min(TIMESTAMP_SLOT_COUNT) {
             self.flush_front_slot_and_rotate();
         }
 
         // 若移动数超过slot的数量后, 只需设置slot开始时间
-        if slot_count > MINUTE_SLOTS {
-            self.slot_start_time +=
-                Duration::from_secs(SECONDS_IN_MINUTE * (slot_count - MINUTE_SLOTS) as u64);
+        if slot_count > TIMESTAMP_SLOT_COUNT {
+            self.slot_start_time += Duration::from_secs((slot_count - TIMESTAMP_SLOT_COUNT) as u64);
             info!(
                 "now slot start time is {:?} have flushed minute slot count is {:?}",
                 self.slot_start_time, slot_count
@@ -323,18 +325,12 @@ impl FlowAggr {
     }
 
     fn calc_stash_counters(&self) {
-        let mut len = 0;
-        let mut cap = 0;
-        for s in self.stashs.iter() {
-            len += s.len();
-            cap += s.capacity();
-        }
         self.metrics
             .stash_total_len
-            .store(len as u64, Ordering::Relaxed);
+            .store(self.flow_stashs.len() as u64, Ordering::Relaxed);
         self.metrics
             .stash_total_capacity
-            .store(cap as u64, Ordering::Relaxed);
+            .store(self.flow_stashs.capacity() as u64, Ordering::Relaxed);
     }
 
     fn run(&mut self) {

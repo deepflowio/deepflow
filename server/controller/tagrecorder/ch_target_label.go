@@ -38,17 +38,6 @@ func NewChTargetLabel() *ChTargetLabel {
 }
 
 func (l *ChTargetLabel) generateNewData() (map[PrometheusTargetLabelKey]mysql.ChTargetLabel, bool) {
-	var prometheusMetricNames []mysql.PrometheusMetricName
-
-	err := mysql.Db.Unscoped().Find(&prometheusMetricNames).Error
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
-		return nil, false
-	}
-	metricNameTargetIDMap, ok := l.generateMetricTargetData()
-	if !ok {
-		return nil, false
-	}
 
 	targetLabelNameValueMap, ok := l.generateTargetData()
 	if !ok {
@@ -61,33 +50,26 @@ func (l *ChTargetLabel) generateNewData() (map[PrometheusTargetLabelKey]mysql.Ch
 	}
 
 	keyToItem := make(map[PrometheusTargetLabelKey]mysql.ChTargetLabel)
-	for _, prometheusMetricName := range prometheusMetricNames {
-		metricID := prometheusMetricName.ID
-		metricName := prometheusMetricName.Name
-		targetIDs := metricNameTargetIDMap[metricName]
-		for _, targetID := range targetIDs {
-			targetLabels := strings.Split(targetLabelNameValueMap[targetID], ", ")
-			for _, targetLabel := range targetLabels {
-				if len(strings.Split(targetLabel, ":")) >= 2 {
-					targetLabelItem := strings.SplitN(targetLabel, ":", 2)
-					labelNameID := metricLabelNameIDMap[targetLabelItem[0]]
-					labelValue := targetLabelItem[1]
-					keyToItem[PrometheusTargetLabelKey{MetricID: metricID, LabelNameID: labelNameID, TargetID: targetID}] = mysql.ChTargetLabel{
-						MetricID:    metricID,
-						LabelNameID: labelNameID,
-						LabelValue:  labelValue,
-						TargetID:    targetID,
-					}
+	for targetID, targetLabels := range targetLabelNameValueMap {
+		targetLabelSlice := strings.Split(targetLabels, ", ")
+		for _, targetLabel := range targetLabelSlice {
+			if len(strings.Split(targetLabel, ":")) >= 2 {
+				targetLabelItem := strings.SplitN(targetLabel, ":", 2)
+				labelNameID := metricLabelNameIDMap[targetLabelItem[0]]
+				labelValue := targetLabelItem[1]
+				keyToItem[PrometheusTargetLabelKey{LabelNameID: labelNameID, TargetID: targetID}] = mysql.ChTargetLabel{
+					LabelNameID: labelNameID,
+					LabelValue:  labelValue,
+					TargetID:    targetID,
 				}
 			}
 		}
-
 	}
 	return keyToItem, true
 }
 
 func (l *ChTargetLabel) generateKey(dbItem mysql.ChTargetLabel) PrometheusTargetLabelKey {
-	return PrometheusTargetLabelKey{MetricID: dbItem.MetricID, LabelNameID: dbItem.LabelNameID, TargetID: dbItem.TargetID}
+	return PrometheusTargetLabelKey{LabelNameID: dbItem.LabelNameID, TargetID: dbItem.TargetID}
 }
 
 func (l *ChTargetLabel) generateUpdateInfo(oldItem, newItem mysql.ChTargetLabel) (map[string]interface{}, bool) {
@@ -99,23 +81,6 @@ func (l *ChTargetLabel) generateUpdateInfo(oldItem, newItem mysql.ChTargetLabel)
 		return updateInfo, true
 	}
 	return nil, false
-}
-
-func (l *ChTargetLabel) generateMetricTargetData() (map[string][]int, bool) {
-	metricNameTargetIDMap := make(map[string][]int)
-	var prometheusMetricTargets []mysql.PrometheusMetricTarget
-	err := mysql.Db.Unscoped().Find(&prometheusMetricTargets).Error
-
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
-		return nil, false
-	}
-
-	for _, prometheusMetricTarget := range prometheusMetricTargets {
-		metricNameTargetIDMap[prometheusMetricTarget.MetricName] = append(metricNameTargetIDMap[prometheusMetricTarget.MetricName], prometheusMetricTarget.TargetID)
-	}
-
-	return metricNameTargetIDMap, true
 }
 
 func (l *ChTargetLabel) generateTargetData() (map[int]string, bool) {
