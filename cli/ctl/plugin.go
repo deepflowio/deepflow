@@ -61,7 +61,7 @@ func RegisterPluginCommand() *cobra.Command {
 			}
 		},
 	}
-	create.Flags().StringVarP(&createType, "type", "", "", "type of image file, currently supports: wasm")
+	create.Flags().StringVarP(&createType, "type", "", "", "type of image file, currently supports: wasm | so")
 	create.Flags().StringVarP(&image, "image", "", "", "plugin image to upload")
 	create.Flags().StringVarP(&name, "name", "", "", "specify a unique alias for image")
 	create.MarkFlagsRequiredTogether("type", "image", "name")
