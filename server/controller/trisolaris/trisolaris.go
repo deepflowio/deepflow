@@ -42,6 +42,10 @@ type Trisolaris struct {
 
 var trisolaris *Trisolaris
 
+func GetMetaData() *metadata.MetaData {
+	return trisolaris.metaData
+}
+
 func GetGVTapInfo() *vtap.VTapInfo {
 	return trisolaris.vTapInfo
 }
