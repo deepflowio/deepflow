@@ -52,7 +52,7 @@ type QuerierConfig struct {
 	PrometheusCacheUpdateInterval   int                   `default:"60" yaml:"prometheus-cache-update-interval"`
 	MaxCacheableEntrySize           int                   `default:"1000" yaml:"max-cacheable-entry-size"`
 	MaxPrometheusIdSubqueryLruEntry int                   `default:"8000" yaml:"max-prometheus-id-subquery-lru-entry"`
-	PrometheusIdSubqueryLruTimeout  int                   `default:"1800" yaml:"prometheus-id-subquery-lru-timeout"`
+	PrometheusIdSubqueryLruTimeout  int                   `default:"60" yaml:"prometheus-id-subquery-lru-timeout"`
 }
 
 type DeepflowApp struct {

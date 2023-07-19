@@ -263,12 +263,27 @@ func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 		innerFunction.Init()
 		m.AddTag(&innerFunction)
 		return innerAlias
+	case metrics.METRICS_TYPE_OTHER:
+		innerFunction := view.DefaultFunction{
+			Name:   view.FUNCTION_COUNT,
+			Fields: []view.Node{&view.Field{Value: "1"}},
+		}
+		innerAlias = innerFunction.SetAlias("_count_1", true)
+		innerFunction.SetFlag(view.METRICS_FLAG_INNER)
+		innerFunction.Init()
+		m.AddTag(&innerFunction)
+		return innerAlias
 	}
 	return ""
 }
 
 func (f *AggFunction) Trans(m *view.Model) view.Node {
-	outFunc := view.GetFunc(f.Name)
+	var outFunc view.Function
+	if m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_LAYERED && f.Name == view.FUNCTION_COUNT {
+		outFunc = &view.DefaultFunction{Name: view.FUNCTION_SUM}
+	} else {
+		outFunc = view.GetFunc(f.Name)
+	}
 	if len(f.Args) > 1 {
 		outFunc.SetArgs(f.Args[1:])
 	}
