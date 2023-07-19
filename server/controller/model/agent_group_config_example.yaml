@@ -837,6 +837,11 @@ vtap_group_id: g-xxxxxx
   ## wasm plugin need to load in agent
   #wasm-plugins: []
 
+  ## so plugin need to load in agent
+  ## Note: so plugin use dlopen flag RTLD_LOCAL and RTLD_LAZY to open the so file, it mean that
+  ## the so must solve the link problem by itself
+  #so-plugins: []
+
   #################
   ## L7 Protocol ##
   #################
