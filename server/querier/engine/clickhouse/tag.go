@@ -156,6 +156,11 @@ func GetPrometheusSingleTagTranslator(tag, table string) (string, string, error)
 	labelType := ""
 	TagTranslatorStr := ""
 	nameNoPreffix := strings.TrimPrefix(tag, "tag.")
+	metricID, ok := Prometheus.MetricNameToID[table]
+	if !ok {
+		errorMessage := fmt.Sprintf("%s not found", table)
+		return "", "", errors.New(errorMessage)
+	}
 	labelNameID, ok := Prometheus.LabelNameToID[nameNoPreffix]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", nameNoPreffix)
@@ -175,7 +180,7 @@ func GetPrometheusSingleTagTranslator(tag, table string) (string, string, error)
 	}
 	if !isAppLabel {
 		labelType = "target"
-		TagTranslatorStr = fmt.Sprintf("dictGet(flow_tag.target_label_map, 'label_value', (%d, target_id))", labelNameID)
+		TagTranslatorStr = fmt.Sprintf("dictGet(flow_tag.target_label_map, 'label_value', (%d, %d, target_id))", metricID, labelNameID)
 	}
 	return TagTranslatorStr, labelType, nil
 }

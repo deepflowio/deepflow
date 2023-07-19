@@ -346,9 +346,9 @@ impl SofaRpcLog {
         if strict {
             // java class name is not empty
             if hdr.class_len == 0
-                || (&payload[0..hdr.class_len as usize])
-                    .iter()
-                    .any(|b| !b.is_ascii())
+                || (&payload[0..hdr.class_len as usize]).iter().any(|b| {
+                    *b == 0 || b.is_ascii_whitespace() || b.is_ascii_control() || !b.is_ascii()
+                })
             {
                 return Err(Error::L7ProtocolUnknown);
             };
