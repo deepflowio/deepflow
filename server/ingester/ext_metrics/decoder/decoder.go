@@ -205,6 +205,7 @@ func (d *Decoder) handlePrometheus(vtapID uint16, decoder *codec.SimpleDecoder, 
 				log.Warningf("prometheus parse failed, err msg:%s", err)
 			}
 			d.counter.ErrorCount++
+			continue
 		}
 
 		*extraLabels = (*extraLabels)[:0]
