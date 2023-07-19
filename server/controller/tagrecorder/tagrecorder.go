@@ -130,7 +130,7 @@ func (c *TagRecorder) refresh(domainLcuuidToIconID map[string]int, resourceTypeT
 		if isUpdate {
 			go func() {
 				time.Sleep(time.Duration(c.cfg.TagRecorderCfg.DictionaryRefreshInterval+10) * time.Second)
-				c.RefreshLiveView()
+				UpdateChangeView()
 			}()
 		}
 	}

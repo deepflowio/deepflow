@@ -44,6 +44,7 @@ func (d *Debug) RegisterTo(e *gin.Engine) {
 	e.GET("/v1/sync/:type/", getGenesisSyncData(d.g, false))
 	e.GET("/v1/agent-stats/:ip/", getAgentStats(d.g))
 	e.GET("/v1/kubernetes-info/:clusterID/", getGenesisKubernetesData(d.g))
+	e.GET("/v1/prometheus-info/:clusterID/", getGenesisPrometheusData(d.g))
 	e.GET("/v1/sub-tasks/:lcuuid/", getKubernetesGatherBasicInfos(d.m))
 	e.GET("/v1/kubernetes-gather-infos/:lcuuid/", getKubernetesGatherResources(d.m))
 	e.GET("/v1/recorders/:domainLcuuid/:subDomainLcuuid/cache/", getRecorderCache(d.m))

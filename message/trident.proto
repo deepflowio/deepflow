@@ -874,8 +874,8 @@ message PodK8sLabelMap {
 
 message DeviceMap {
     optional uint32 id = 1;
-    repeated uint32 type = 2;
-    repeated string name = 3;
+    optional uint32 type = 2;
+    optional string name = 3;
 }
 
 message IdNameMap {
@@ -890,15 +890,14 @@ message UniversalTagNameMapsResponse {
 	repeated PodK8sLabelMap pod_k8s_label_map = 2;
 	repeated IdNameMap region_map = 3;
 	repeated IdNameMap az_map = 4;
-	repeated IdNameMap device_type_map = 5;
-	repeated DeviceMap device_map = 6;
-	repeated IdNameMap pod_node_map = 7;
-	repeated IdNameMap pod_ns_map = 8;
-	repeated IdNameMap pod_group_map = 9;
-	repeated IdNameMap pod_map = 10;
-	repeated IdNameMap pod_cluster_map = 11;
-	repeated IdNameMap l3_epc_map = 12;
-	repeated IdNameMap subnet_map= 13;
-	repeated IdNameMap gprocess_map= 14;
-	repeated IdNameMap vtap_map= 15;
+	repeated DeviceMap device_map = 5;
+	repeated IdNameMap pod_node_map = 6;
+	repeated IdNameMap pod_ns_map = 7;
+	repeated IdNameMap pod_group_map = 8;
+	repeated IdNameMap pod_map = 9;
+	repeated IdNameMap pod_cluster_map = 10;
+	repeated IdNameMap l3_epc_map = 11;
+	repeated IdNameMap subnet_map= 12;
+	repeated IdNameMap gprocess_map= 13;
+	repeated IdNameMap vtap_map= 14;
 }

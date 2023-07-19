@@ -1167,6 +1167,14 @@ CREATE TABLE IF NOT EXISTS alarm_policy (
     lower_threshold         DOUBLE,
     agg                     SMALLINT DEFAULT 0 COMMENT '0-聚合; 1-不聚合',
     delay                   SMALLINT DEFAULT 1 COMMENT '0-不延迟; 1-延迟',
+    threshold_critical      TEXT;
+    threshold_error         TEXT;
+    threshold_warning       TEXT;
+    trigger_nodata_event    TINYINT(1);
+    query_url               TEXT;
+    query_params            TEXT;
+    query_conditions        TEXT;
+    tag_conditions          TEXT;
     lcuuid                  CHAR(64)
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE alarm_policy;
@@ -1195,6 +1203,7 @@ CREATE TABLE IF NOT EXISTS alarm_event (
     end_value               TEXT,
     value_unit              CHAR(64),
     endpoint_results        TEXT,
+    event_level             INTEGER;
     lcuuid                  CHAR(64)
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE alarm_event;
@@ -1225,6 +1234,10 @@ CREATE TABLE IF NOT EXISTS alarm_endpoint (
     method                  CHAR(64),
     header                  TEXT,
     body                    TEXT,
+    push_cycle              INTEGER;
+    push_frequency          INTEGER;
+    push_level              TEXT;
+    push_level_disable      TEXT;
     lcuuid                  CHAR(64),
     created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at              TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -1826,7 +1839,7 @@ TRUNCATE TABLE go_genesis_lldp;
 
 CREATE TABLE IF NOT EXISTS go_genesis_vinterface (
     id                    INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    netns_id              INTEGER UNSIGNED DEFAULT 0, 
+    netns_id              INTEGER UNSIGNED DEFAULT 0,
     lcuuid                CHAR(64),
     name                  CHAR(64),
     mac                   CHAR(32),
@@ -2633,3 +2646,9 @@ CREATE TABLE IF NOT EXISTS ch_prometheus_target_label_layout (
     `updated_at`          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_prometheus_target_label_layout;
+
+CREATE TABLE IF NOT EXISTS ch_view_change (
+    `updated_at`          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_view_change;
+INSERT INTO ch_view_change () VALUES ();

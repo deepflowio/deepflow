@@ -243,7 +243,9 @@ func (d *Decoder) handlePrometheusData(vtapID uint16, decoder *codec.SimpleDecod
 				log.Warningf("prometheus parse failed, err msg:%s", err)
 			}
 			d.counter.ErrCount++
+			continue
 		}
+
 		*extraLabels = (*extraLabels)[:0]
 		for i := range prometheusMetric.ExtraLabelNames {
 			*extraLabels = append(*extraLabels, prompb.Label{
