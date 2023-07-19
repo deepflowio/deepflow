@@ -1779,6 +1779,16 @@ impl ConfigHandler {
                     "Kubernetes API enabled set to {}",
                     new_cfg.kubernetes_api_enabled
                 );
+                #[cfg(target_os = "linux")]
+                if new_cfg.kubernetes_api_enabled {
+                    callbacks.push(|_, components| {
+                        components.prometheus_targets_watcher.start();
+                    });
+                } else {
+                    callbacks.push(|_, components| {
+                        components.prometheus_targets_watcher.stop();
+                    });
+                }
             }
             #[cfg(target_os = "linux")]
             if old_cfg.prometheus_http_api_address != new_cfg.prometheus_http_api_address {
