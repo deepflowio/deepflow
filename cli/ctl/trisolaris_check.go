@@ -185,10 +185,18 @@ func regiterCommand() []*cobra.Command {
 		},
 	}
 
+	universalTagNameCmd := &cobra.Command{
+		Use:   "universal-tag-name",
+		Short: "get universal tag name map from deepflow-server",
+		Run: func(cmd *cobra.Command, args []string) {
+			universalTagName(cmd)
+		},
+	}
+
 	commands := []*cobra.Command{platformDataCmd, ipGroupsCmd, flowAclsCmd,
 		tapTypesCmd, configCmd, segmentsCmd, vpcIPCmd, skipInterfaceCmd,
 		localServersCmd, gpidAgentResponseCmd, gpidGlobalTableCmd, gpidAgentRequestCmd,
-		realGlobalCmd, ripToVipCmd, pluginCmd, agentCacheCmd, allCmd}
+		realGlobalCmd, ripToVipCmd, pluginCmd, agentCacheCmd, allCmd, universalTagNameCmd}
 	return commands
 }
 
@@ -667,4 +675,25 @@ func plugin(cmd *cobra.Command) {
 		return
 	}
 	fmt.Printf("save plugin(%s) success, md5=%s\n", fileName, md5)
+}
+
+func universalTagName(cmd *cobra.Command) {
+	conn := getConn(cmd)
+	if conn == nil {
+		return
+	}
+	defer conn.Close()
+	fmt.Printf("request trisolaris(%s), params(%+v)\n", conn.Target(), paramData)
+	client := trident.NewSynchronizerClient(conn)
+	resp, err := client.GetUniversalTagNameMaps(context.Background(), &trident.UniversalTagNameMapsRequest{})
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	b, err := json.MarshalIndent(resp, "", "\t")
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(string(b))
 }
