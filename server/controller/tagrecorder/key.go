@@ -129,6 +129,7 @@ type PrometheusAPPLabelKey struct {
 }
 
 type PrometheusTargetLabelKey struct {
+	MetricID    int
 	LabelNameID int
 	TargetID    int
 }
