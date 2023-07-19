@@ -297,6 +297,7 @@ func ReleaseEventStore(e *EventStore) {
 	*e = EventStore{}
 	e.AttributeNames = attributeNames
 	e.AttributeValues = attributeValues
+	e.IsIPv4 = true
 
 	eventPool.Put(e)
 }
