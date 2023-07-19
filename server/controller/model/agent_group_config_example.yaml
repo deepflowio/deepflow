@@ -947,10 +947,10 @@ vtap_group_id: g-xxxxxx
       #- label1
       #- label2
     ## Note: The size limit of the parsed key
-    ## Default: 1024. Unit: B.
+    ## Default: 1024. Unit: B. Range: [1024, 1048576]
     #labels-limit: 1024
     ## Note: The size limit of the parsed value
-    ## Default: 4096. Unit: B.
+    ## Default: 4096. Unit: B. Range: [4096, 4194304]
     #values-limit: 4096
 
   ########################
