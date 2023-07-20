@@ -19,8 +19,8 @@ package resource
 import (
 	"github.com/gin-gonic/gin"
 
-	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
-	. "github.com/deepflowio/deepflow/server/controller/http/service/resource"
+	"github.com/deepflowio/deepflow/server/controller/http/router/common"
+	"github.com/deepflowio/deepflow/server/controller/http/service/resource"
 )
 
 type VPC struct{}
@@ -38,6 +38,6 @@ func getVPCs(c *gin.Context) {
 	if value, ok := c.GetQuery("name"); ok {
 		args["name"] = value
 	}
-	data, err := GetVPCs(args)
-	JsonResponse(c, data, err)
+	data, err := resource.GetVPCs(args)
+	common.JsonResponse(c, data, err)
 }

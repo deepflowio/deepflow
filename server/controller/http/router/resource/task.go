@@ -14,17 +14,17 @@
  * limitations under the License.
  */
 
-package filter
+package resource
 
-import (
-	"github.com/op/go-logging"
+import "github.com/gin-gonic/gin"
 
-	"github.com/deepflowio/deepflow/server/controller/http/service/resource/common"
-)
+type Task struct{}
 
-var log = logging.MustGetLogger("http.service.resource.filter")
+func NewType() *Task {
+	return new(Task)
+}
 
-type Filter interface {
-	Filter(data []common.ResponseElem) ([]common.ResponseElem, error)
-	GetFilterConditions() common.FilterConditions
+func (t *Task) RegisterTo(e *gin.Engine) {
+	e.POST("/v1/task")
+	e.GET("/v1/task/:id")
 }

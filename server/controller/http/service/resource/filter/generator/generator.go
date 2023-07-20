@@ -64,7 +64,7 @@ func (f *FilterGeneratorComponent) SetNonAdminDropAll() {
 func (f *FilterGeneratorComponent) Generate(urlInfo *model.URLInfo, userInfo *model.UserInfo) (fs []filter.Filter, dropAll bool) {
 	if f, dropAll := f.conditionFilterGeneratorComponent.generate(urlInfo, userInfo); dropAll {
 		return fs, true
-	} else {
+	} else if f != nil {
 		fs = append(fs, f)
 	}
 	if f := f.fieldFilterGeneratorComponent.generate(urlInfo, userInfo); f != nil {
@@ -137,7 +137,7 @@ type userFilterConditionsGeneratorComponent struct {
 func (u *userFilterConditionsGeneratorComponent) generate(urlInfo *model.URLInfo, userInfo *model.UserInfo) (fc common.FilterConditions, dropAll bool) {
 	// Generates user filter conditions only when fpermit service is supported
 	// 仅当支持租户授权模块时，需要生成租户过滤条件
-	if !u.fpermitCfg.Enabled {
+	if !u.fpermitCfg.Enabled { // TODO use userinfo check ?
 		return nil, false
 	}
 	if u.nonAdminDropAll {
@@ -146,6 +146,9 @@ func (u *userFilterConditionsGeneratorComponent) generate(urlInfo *model.URLInfo
 	parentResources, dropAll := u.getUserPermittedParentResources(urlInfo, userInfo)
 	if dropAll {
 		return nil, true
+	}
+	if parentResources == nil || !parentResources.HasPermittedResource() {
+		return nil, false
 	}
 	return u.conditionConv.userPermittedResourceToConditions(parentResources)
 }

@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,17 +14,10 @@
  * limitations under the License.
  */
 
-package filter
+package resource
 
 import (
-	"github.com/op/go-logging"
-
-	"github.com/deepflowio/deepflow/server/controller/http/service/resource/common"
+	logging "github.com/op/go-logging"
 )
 
-var log = logging.MustGetLogger("http.service.resource.filter")
-
-type Filter interface {
-	Filter(data []common.ResponseElem) ([]common.ResponseElem, error)
-	GetFilterConditions() common.FilterConditions
-}
+var log = logging.MustGetLogger("http.service.resource")

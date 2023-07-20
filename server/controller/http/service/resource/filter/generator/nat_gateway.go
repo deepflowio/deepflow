@@ -46,5 +46,5 @@ func (p *NATGateway) userPermittedResourceToConditions(upr *UserPermittedResourc
 		VPCIDs: upr.VPCIDs,
 	}
 	dropAll := len(fcs.VPCIDs) == 0
-	return fcs.ToMapOmitEmpty(), dropAll
+	return fcs.ToMapOmitEmpty(fcs), dropAll
 }

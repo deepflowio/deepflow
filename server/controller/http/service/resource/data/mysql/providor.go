@@ -19,9 +19,9 @@ package mysql
 import (
 	"github.com/goccy/go-json"
 
+	"github.com/deepflowio/deepflow/server/controller/http/constraint"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/data/provider"
-	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 )
 
 type DataProvider struct {

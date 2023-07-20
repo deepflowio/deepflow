@@ -20,8 +20,8 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/deepflowio/deepflow/server/controller/db/redis"
-	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
-	. "github.com/deepflowio/deepflow/server/controller/http/service/resource"
+	"github.com/deepflowio/deepflow/server/controller/http/router/common"
+	"github.com/deepflowio/deepflow/server/controller/http/service/resource"
 )
 
 type Process struct {
@@ -38,7 +38,7 @@ func (p *Process) RegisterTo(e *gin.Engine) {
 
 func getProcesses(redisConfig *redis.Config) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
-		data, err := GetProcesses(c, redisConfig)
-		JsonResponse(c, data, err)
+		data, err := resource.GetProcesses(c, redisConfig)
+		common.JsonResponse(c, data, err)
 	})
 }

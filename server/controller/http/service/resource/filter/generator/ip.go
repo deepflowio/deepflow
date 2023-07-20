@@ -45,7 +45,7 @@ func (p *IP) conditionsMapToStruct(fcs common.FilterConditions) filter.Condition
 	c := filter.NewAND()
 	c.InitSkippedFields = []string{"IP_VERSION"}
 	c.Init(fcs)
-	c.TryAppendIntFieldCondition(NewIPVersionCondition("IP_VERSION", fcs["IP_VERSION"].([]int)))
+	c.TryAppendIntFieldCondition(NewIPVersionCondition("IP_VERSION", fcs["IP_VERSION"].([]float64)))
 	return c
 }
 
@@ -62,8 +62,8 @@ func (p *IP) userPermittedResourceToConditions(upr *UserPermittedResource) (comm
 
 	data := make(common.FilterConditions)
 	data[filter.LOGICAL_OR] = common.FilterConditions{
-		filter.LOGICAL_OR:  fc1.ToMapOmitEmpty(),
-		filter.LOGICAL_AND: fc2.ToMapOmitEmpty(),
+		filter.LOGICAL_OR:  fc1.ToMapOmitEmpty(fc1),
+		filter.LOGICAL_AND: fc2.ToMapOmitEmpty(fc2),
 	}
 	return data, dropAll
 }
@@ -90,11 +90,11 @@ func GetRelatedDeviceVMIDs(podNamespaceIDs []int) []int {
 }
 
 type IPVersionCondition struct {
-	filter.FieldConditionBase[int]
+	filter.FieldConditionBase[float64]
 }
 
-func NewIPVersionCondition(key string, value []int) *IPVersionCondition {
-	return &IPVersionCondition{filter.FieldConditionBase[int]{Key: key, Value: value}}
+func NewIPVersionCondition(key string, value []float64) *IPVersionCondition {
+	return &IPVersionCondition{filter.FieldConditionBase[float64]{Key: key, Value: value}}
 }
 
 const (

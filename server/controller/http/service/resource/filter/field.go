@@ -37,11 +37,16 @@ func (f *FieldFilter) SetExcludedFields(fields []string) {
 func (f *FieldFilter) Filter(data []common.ResponseElem) ([]common.ResponseElem, error) {
 	var result []common.ResponseElem
 	for _, elem := range data {
-		newElem := f.normalize(elem)
-		result = append(result, newElem)
+		result = append(result, f.normalize(elem))
 	}
-
 	return result, nil
+}
+
+func (f *FieldFilter) GetFilterConditions() common.FilterConditions {
+	result := make(common.FilterConditions)
+	result["IncludedFields"] = f.IncludedFields
+	result["ExcludedFields"] = f.ExcludedFields
+	return result
 }
 
 func (f *FieldFilter) normalize(elem common.ResponseElem) common.ResponseElem {

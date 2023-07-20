@@ -40,7 +40,7 @@ func (p *Network) conditionsMapToStruct(fcs common.FilterConditions) filter.Cond
 	c := filter.NewAND()
 	c.InitSkippedFields = []string{"ROUTER_ID"}
 	c.Init(fcs)
-	c.TryAppendIntFieldCondition(NewRouterIDCondition("ROUTER_ID", fcs["ROUTER_ID"].([]int)))
+	c.TryAppendIntFieldCondition(NewRouterIDCondition("ROUTER_ID", fcs["ROUTER_ID"].([]float64)))
 	return c
 }
 
@@ -55,21 +55,21 @@ func (p *Network) userPermittedResourceToConditions(upr *UserPermittedResource) 
 	}
 	fc.VPCIDs = append(fc.VPCIDs, GetRelatedVPCIDs(upr.PodNamespaceIDs)...)
 	fc.ISP = []int{PUBLIC_NETWORK_ISP}
-	return fc.ToMapOmitEmpty(), len(fc.VPCIDs) == 0
+	return fc.ToMapOmitEmpty(fc), len(fc.VPCIDs) == 0
 }
 
 type RouterIDCondition struct {
-	filter.FieldConditionBase[int]
+	filter.FieldConditionBase[float64]
 }
 
-func NewRouterIDCondition(key string, value []int) *RouterIDCondition {
-	return &RouterIDCondition{filter.FieldConditionBase[int]{Key: key, Value: value}}
+func NewRouterIDCondition(key string, value []float64) *RouterIDCondition {
+	return &RouterIDCondition{filter.FieldConditionBase[float64]{Key: key, Value: value}}
 }
 
 func (r *RouterIDCondition) Keep(v common.ResponseElem) bool {
 	subnets := v["ROUTERS"].([]map[string]interface{})
 	for _, item := range subnets {
-		if slices.Contains(r.Value, item["ID"].(int)) {
+		if slices.Contains(r.Value, item["ID"].(float64)) {
 			return true
 		}
 	}

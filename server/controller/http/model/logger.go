@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package resource
+package model
 
 import (
 	logging "github.com/op/go-logging"
 )
 
-var log = logging.MustGetLogger("service.resource")
+var log = logging.MustGetLogger("http.router.resource")

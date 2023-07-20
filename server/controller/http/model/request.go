@@ -36,15 +36,6 @@ type URLInfo struct {
 	FilterConditions common.FilterConditions // filter from query string
 }
 
-func NewURLInfo(u string, ifs []string, fcs common.FilterConditions, userID int) *URLInfo {
-	return &URLInfo{
-		RawString:        u,
-		IncludedFields:   ifs,
-		FilterConditions: fcs,
-		UserID:           userID,
-	}
-}
-
 func (u *URLInfo) String() string {
 	return u.RawString
 }

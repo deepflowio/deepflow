@@ -14,38 +14,22 @@
  * limitations under the License.
  */
 
-package redis
+package resource
 
 import (
-	"sync"
-
-	ctrlcommon "github.com/deepflowio/deepflow/server/controller/common"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/redis"
-	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/http/model"
-	mysqldp "github.com/deepflowio/deepflow/server/controller/http/service/resource/data/mysql"
+	"github.com/deepflowio/deepflow/server/controller/http/service/resource/data"
+	"github.com/deepflowio/deepflow/server/controller/http/service/resource/filter/generator"
 )
 
-var (
-	vmOnce sync.Once
-	vm     *VM
-)
-
-type VM struct {
-	DataProvider
+type AZ struct {
+	ServiceGet
 }
 
-func GetVM(cfg redis.Config) *VM {
-	vmOnce.Do(func() {
-		vm = &VM{
-			DataProvider: DataProvider{
-				resourceType: ctrlcommon.RESOURCE_TYPE_VM_EN,
-				next:         mysqldp.NewVM(),
-				client:       getClient(cfg),
-				keyConv:      newKeyConvertor[model.VMQueryStoredInRedis](),
-				urlPath:      httpcommon.PATH_VM,
-			},
-		}
-	})
-	return vm
+func NewAZGet(urlInfo *model.URLInfo, userInfo *model.UserInfo, redisCfg redis.Config) *AZ {
+	s := &AZ{newServiceGet(ctrlrcommon.RESOURCE_TYPE_AZ_EN, data.GetDataProvider(ctrlrcommon.RESOURCE_TYPE_AZ_EN, redisCfg))}
+	s.generateDataContext(urlInfo, userInfo, generator.NewAZ())
+	return s
 }
