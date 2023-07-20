@@ -46,6 +46,9 @@
 #endif
 #include "libGoReSym.h"
 
+static u64 add_symcache_count;
+static u64 free_symcache_count;
+
 /*
  * When a process exits, save the symbol cache pids
  * to be deleted.
@@ -464,8 +467,8 @@ uint64_t get_symbol_addr_from_binary(const char *bin, const char *symname)
 
 #ifndef AARCH64_MUSL
 static symbol_caches_hash_t syms_cache_hash;	// for user process symbol caches
-static void *k_resolver;		// for kernel symbol cache
-static u64 sys_btime_msecs;		// system boot time(milliseconds)
+static void *k_resolver;	// for kernel symbol cache
+static u64 sys_btime_msecs;	// system boot time(milliseconds)
 
 static bool inline enable_symbol_cache(void)
 {
@@ -474,11 +477,16 @@ static bool inline enable_symbol_cache(void)
 
 static inline void free_symbolizer_cache_kvp(struct symbolizer_cache_kvp *kv)
 {
-	if (kv->v.cache)
+	if (kv->v.cache) {
 		bcc_free_symcache((void *)kv->v.cache, kv->k.pid);
+		free_symcache_count++;
+		kv->v.cache = 0;
+	}
 
-	if (kv->v.proc_info_p)
+	if (kv->v.proc_info_p) {
 		clib_mem_free((void *)kv->v.proc_info_p);
+		kv->v.proc_info_p = 0;
+	}
 }
 
 static inline void symbol_cache_pids_lock(void)
@@ -509,8 +517,8 @@ void update_symbol_cache(pid_t pid)
 	kv.k.pid = (u64) pid;
 	kv.v.proc_info_p = 0;
 	kv.v.cache = 0;
-	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *)&kv,
-				      (symbol_caches_hash_kv *)&kv) == 0) {
+	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
+				      (symbol_caches_hash_kv *) & kv) == 0) {
 		int ret = VEC_OK;
 
 		symbol_cache_pids_lock();
@@ -527,12 +535,13 @@ void exec_symbol_cache_update(void)
 	symbol_caches_hash_t *h = &syms_cache_hash;
 	struct symbolizer_cache_kvp *kv;
 	symbol_cache_pids_lock();
-        vec_foreach(kv, cache_del_pids.pid_caches) {
+	vec_foreach(kv, cache_del_pids.pid_caches) {
 		free_symbolizer_cache_kvp(kv);
-		if (symbol_caches_hash_add_del(h, (symbol_caches_hash_kv *)kv,
+		if (symbol_caches_hash_add_del(h, (symbol_caches_hash_kv *) kv,
 					       0 /* delete */ )) {
-			ebpf_warning("symbol_caches_hash_add_del() failed.(pid %d)\n",
-				     (pid_t)kv->k.pid);
+			ebpf_warning
+			    ("symbol_caches_hash_add_del() failed.(pid %d)\n",
+			     (pid_t) kv->k.pid);
 		} else {
 			__sync_fetch_and_add(&h->hash_elems_count, -1);
 		}
@@ -547,10 +556,9 @@ static int init_symbol_cache(const char *name)
 	 * Thread-safe for cache_del_pids.pids
 	 */
 	cache_del_pids.lock =
-			clib_mem_alloc_aligned("pids_alloc_lock",
-					       CLIB_CACHE_LINE_BYTES,
-					       CLIB_CACHE_LINE_BYTES,
-					       NULL);
+	    clib_mem_alloc_aligned("pids_alloc_lock",
+				   CLIB_CACHE_LINE_BYTES,
+				   CLIB_CACHE_LINE_BYTES, NULL);
 	if (cache_del_pids.lock == NULL) {
 		ebpf_error("cache_del_pids.lock alloc memory failed.\n");
 		return (-1);
@@ -567,56 +575,6 @@ static int init_symbol_cache(const char *name)
 				       hash_memory_size);
 }
 
-/*
- * Called by get_pid_stime() and get_pid_stime_and_name(),
- * use for fetching pid start time or process name only.
- */
-static void add_proc_info_to_cache_hash(pid_t pid)
-{
-	ASSERT(pid >= 0);
-
-	symbol_caches_hash_t *h = &syms_cache_hash;
-	struct symbolizer_cache_kvp kv;
-	kv.k.pid = (u64) pid;
-	kv.k.pid = pid;
-	struct symbolizer_proc_info *p = clib_mem_alloc_aligned("sym_proc_info",
-						sizeof(struct symbolizer_proc_info),
-						0, NULL);
-	if (p == NULL) {
-		/* exit process */
-		ebpf_warning("Failed to build process information table.\n");
-		return;
-	}
-
-	p->stime = (u64) get_process_starttime_and_comm(pid,
-							p->comm,
-							sizeof(p->comm));
-	p->comm[sizeof(p->comm) - 1] = '\0';
-	if (p->stime == 0) {
-		clib_mem_free(p);
-		return;
-	}
-
-	kv.v.proc_info_p = pointer_to_uword(p);
-	/*
-	 * This is not meant for parsing, but rather for adding
-	 * process information to management, such as obtaining
-	 * the process's startup time or process name. The most
-	 * typical usage is for kernel processes (where all
-	 * kernel processes share the same kernel symbol cache),
-	 * without the need to establish a separate cache for
-	 * each kernel process.
-	 */
-	kv.v.cache = 0;
-	if (symbol_caches_hash_add_del
-	    (h, (symbol_caches_hash_kv *) & kv, 1 /* is_add */ )) {
-		ebpf_warning
-		    ("symbol_caches_hash_add_del() failed.(pid %d)\n", pid);
-		free_symbolizer_cache_kvp(&kv);
-	} else
-		__sync_fetch_and_add(&h->hash_elems_count, 1);
-}
-
 u64 get_pid_stime(pid_t pid)
 {
 	ASSERT(pid >= 0);
@@ -627,20 +585,12 @@ u64 get_pid_stime(pid_t pid)
 	if (pid == 0)
 		return sys_btime_msecs;
 
-	bool is_retry = true;
-retry:
 	kv.k.pid = (u64) pid;
 	kv.v.proc_info_p = 0;
 	kv.v.cache = 0;
 	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
 				      (symbol_caches_hash_kv *) & kv) == 0) {
 		return cache_process_stime(&kv);
-	}
-
-	if (is_retry) {
-		add_proc_info_to_cache_hash(pid);
-		is_retry = false;
-		goto retry;
 	}
 
 	return 0;
@@ -656,26 +606,54 @@ u64 get_pid_stime_and_name(pid_t pid, char *name)
 	if (pid == 0)
 		return sys_btime_msecs;
 
-	bool is_retry = true;
-retry:
 	kv.k.pid = (u64) pid;
 	kv.v.proc_info_p = 0;
 	kv.v.cache = 0;
 	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
 				      (symbol_caches_hash_kv *) & kv) == 0) {
-		if (name != NULL)
-			copy_process_name(&kv, name);
+		goto finish;
+	} else {
+		struct symbolizer_proc_info *p =
+		    clib_mem_alloc_aligned("sym_proc_info",
+					   sizeof(struct symbolizer_proc_info),
+					   0, NULL);
+		if (p == NULL) {
+			/* exit process */
+			ebpf_warning
+			    ("Failed to build process information table.\n");
+			return 0;
+		}
 
-		return cache_process_stime(&kv);
-	}
+		p->stime = (u64) get_process_starttime_and_comm(pid,
+								p->comm,
+								sizeof(p->
+								       comm));
+		p->comm[sizeof(p->comm) - 1] = '\0';
+		if (p->stime == 0) {
+			clib_mem_free(p);
+			return 0;
+		}
 
-	if (is_retry) {
-		add_proc_info_to_cache_hash(pid);
-		is_retry = false;
-		goto retry;
+		kv.v.proc_info_p = pointer_to_uword(p);
+		kv.v.cache = 0;
+		if (symbol_caches_hash_add_del
+		    (h, (symbol_caches_hash_kv *) & kv, 1 /* is_add */ )) {
+			ebpf_warning
+			    ("symbol_caches_hash_add_del() failed.(pid %d)\n",
+			     pid);
+			free_symbolizer_cache_kvp(&kv);
+			return 0;
+		} else
+			__sync_fetch_and_add(&h->hash_elems_count, 1);
 	}
 
 	return 0;
+
+finish:
+	if (name != NULL)
+		copy_process_name(&kv, name);
+
+	return cache_process_stime(&kv);
 }
 
 /*
@@ -689,7 +667,7 @@ retry:
  * user space stack trace (u_stack_trace_id), the PID is
  * the PID of the user process.
  */
-void *get_symbol_cache(pid_t pid)
+void *get_symbol_cache(pid_t pid, bool new_cache)
 {
 	ASSERT(pid >= 0);
 
@@ -717,7 +695,14 @@ void *get_symbol_cache(pid_t pid)
 				      (symbol_caches_hash_kv *) & kv) == 0) {
 		if (kv.v.cache)
 			return (void *)kv.v.cache;
+
+		if (!new_cache)
+			return NULL;
+
 		kv.v.cache = pointer_to_uword(bcc_symcache_new(pid, &lazy_opt));
+		if (kv.v.cache > 0)
+			add_symcache_count++;
+
 		if (symbol_caches_hash_add_del
 		    (h, (symbol_caches_hash_kv *) & kv, 1 /* is_add */ )) {
 			ebpf_warning
@@ -730,37 +715,7 @@ void *get_symbol_cache(pid_t pid)
 		return (void *)kv.v.cache;
 	}
 
-	kv.k.pid = pid;
-	struct symbolizer_proc_info *p = clib_mem_alloc_aligned("sym_proc_info",
-						sizeof(struct symbolizer_proc_info),
-						0, NULL);
-	if (p == NULL) {
-		/* exit process */
-		ebpf_warning("Failed to build process information table.\n");
-		return NULL;
-	}
-
-	p->stime = (u64) get_process_starttime_and_comm(pid,
-							p->comm,
-							sizeof(p->comm));
-	p->comm[sizeof(p->comm) - 1] = '\0';
-	if (p->stime == 0) {
-		clib_mem_free(p);
-		return NULL;
-	}
-
-	kv.v.proc_info_p = pointer_to_uword(p);
-	kv.v.cache = pointer_to_uword(bcc_symcache_new(pid, &lazy_opt));
-	if (symbol_caches_hash_add_del
-	    (h, (symbol_caches_hash_kv *) & kv, 1 /* is_add */ )) {
-		ebpf_warning
-		    ("symbol_caches_hash_add_del() failed.(pid %d)\n", pid);
-		free_symbolizer_cache_kvp(&kv);
-		return NULL;
-	} else
-		__sync_fetch_and_add(&h->hash_elems_count, 1);
-
-	return (void *)kv.v.cache;
+	return NULL;
 }
 
 int create_and_init_symbolizer_caches(void)
@@ -783,17 +738,22 @@ int create_and_init_symbolizer_caches(void)
 			struct symbolizer_cache_kvp sym;
 			sym.k.pid = pid;
 
-			struct symbolizer_proc_info *p = clib_mem_alloc_aligned("sym_proc_info",
-							sizeof(struct symbolizer_proc_info),
-							0, NULL);
+			struct symbolizer_proc_info *p =
+			    clib_mem_alloc_aligned("sym_proc_info",
+						   sizeof(struct
+							  symbolizer_proc_info),
+						   0, NULL);
 			if (p == NULL) {
 				/* exit process */
-				ebpf_error("Failed to build process information table.\n");
+				ebpf_error
+				    ("Failed to build process information table.\n");
 				return ETR_NOMEM;
 			}
 
-			p->stime = (u64) get_process_starttime_and_comm(pid, p->comm,
-									sizeof(p->comm));
+			p->stime =
+			    (u64) get_process_starttime_and_comm(pid, p->comm,
+								 sizeof(p->
+									comm));
 			p->comm[sizeof(p->comm) - 1] = '\0';
 			if (p->stime == 0) {
 				clib_mem_free(p);
@@ -809,9 +769,10 @@ int create_and_init_symbolizer_caches(void)
 				    ("symbol_caches_hash_add_del() failed.(pid %d)\n",
 				     pid);
 			} else {
-				ebpf_debug("Process '%s'(pid %d start time %lu) has been"
-					   " brought under management.\n",
-					   p->comm, pid, p->stime);
+				ebpf_debug
+				    ("Process '%s'(pid %d start time %lu) has been"
+				     " brought under management.\n", p->comm,
+				     pid, p->stime);
 				__sync_fetch_and_add(&h->hash_elems_count, 1);
 			}
 		}
@@ -844,8 +805,9 @@ void release_symbol_caches(void)
 						  (void *)&elems_count);
 	print_hash_symbol_caches(h);
 	symbol_caches_hash_free(h);
-	ebpf_info("Clear symbol_caches_hashmap[k:pid, v:symbol cache] %lu elems.\n",
-		  elems_count);
+	ebpf_info
+	    ("Clear symbol_caches_hashmap[k:pid, v:symbol cache] %lu elems.\n",
+	     elems_count);
 
 	/* kernel symbol caches release */
 	if (k_resolver) {
@@ -853,6 +815,18 @@ void release_symbol_caches(void)
 		k_resolver = NULL;
 	}
 	symbol_cache_pids_unlock();
+
+	ebpf_info
+	    ("+++ add_symcache_count : %lu free_symcache_count : %lu +++\n",
+	     add_symcache_count, free_symcache_count);
+
+	/*
+	 * The malloc_trim() function tries to reclaim unused memory blocks by
+	 * examining the top of memory blocks and then returns them to the system.
+	 * This helps reduce the amount of physical memory used by the process,
+	 * thus optimizing memory usage.
+	 */
+	//malloc_trim(0);
 }
 
 #else /* defined AARCH64_MUSL */
