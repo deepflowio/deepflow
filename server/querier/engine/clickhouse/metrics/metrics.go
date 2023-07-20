@@ -91,18 +91,18 @@ func NewReplaceMetrics(dbField string, condition string) *Metrics {
 	}
 }
 
-func NewCountAllMertic(table string) *Metrics {
+func NewCountAllMertic(table string, index int) *Metrics {
 	return NewMetrics(
-		0, "*",
+		index, "*",
 		"*", "", METRICS_TYPE_OTHER,
-		"metrics", []bool{true, true, true}, "", table, "",
+		"Other", []bool{true, true, true}, "", table, "",
 	)
 }
 
 func GetMetrics(field string, db string, table string, ctx context.Context) (*Metrics, bool) {
 	field = strings.Trim(field, "`")
 	if field == "*" {
-		return NewCountAllMertic(table), true
+		return NewCountAllMertic(table, 0), true
 	} else if db == "ext_metrics" || db == "deepflow_system" || table == "l7_flow_log" {
 		fieldSplit := strings.Split(field, ".")
 		if len(fieldSplit) > 1 {
@@ -194,7 +194,7 @@ func GetMetricsByDBTable(db string, table string, where string, ctx context.Cont
 					metrics[k] = v
 				}
 			}
-			loadsLen := len(loads) - 1
+			loadsLen := len(loads)
 			for k, v := range exts {
 				if _, ok := metrics[k]; !ok {
 					v.Index += loadsLen
@@ -202,7 +202,7 @@ func GetMetricsByDBTable(db string, table string, where string, ctx context.Cont
 				}
 			}
 			metrics["metrics"] = NewMetrics(
-				len(metrics)-1, "metrics",
+				len(metrics), "metrics",
 				"metrics", "", METRICS_TYPE_ARRAY,
 				"metrics", []bool{true, true, true}, "", table, "",
 			)
@@ -255,9 +255,6 @@ func GetMetricsDescriptionsByDBTable(db string, table string, where string, ctx 
 	for field, metrics := range allMetrics {
 		if db == "ext_metrics" || db == ckcommon.DB_NAME_PROMETHEUS || db == "deepflow_system" || (table == "l7_flow_log" && strings.Contains(field, "metrics.")) {
 			field = metrics.DisplayName
-		}
-		if field == "*" {
-			metrics.Index = len(allMetrics) - 1
 		}
 		values[metrics.Index] = []interface{}{
 			field, metrics.IsAgg, metrics.DisplayName, metrics.Unit, metrics.Type,
