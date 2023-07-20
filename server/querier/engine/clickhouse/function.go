@@ -552,7 +552,10 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 				nodeType = strings.TrimSuffix(nodeType, "_1")
 				f.Value = "'" + nodeType + "'"
 			} else {
-				f.Value = f.Args[0]
+				nodeType := strings.Trim(f.Args[0], "'")
+				nodeType = strings.TrimSuffix(nodeType, "0")
+				nodeType = strings.TrimSuffix(nodeType, "1")
+				f.Value = "'" + nodeType + "'"
 			}
 		}
 		return f.getViewNode()
