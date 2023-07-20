@@ -653,7 +653,7 @@ async fn handler(
                         labels_count += label.len() as u32;
                         values_count += value.len() as u32;
                         if labels_count > labels_limit || values_count > values_limit {
-                            warn!("labels_count exceeds the labels limit:{} or values_count exceeds the values limit:{} ", labels_limit, values_limit);
+                            debug!("labels_count exceeds the labels limit:{} or values_count exceeds the values limit:{} ", labels_limit, values_limit);
                             break;
                         }
                         extra_label_names.push(label.to_string());
