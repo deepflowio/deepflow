@@ -128,96 +128,6 @@ func (c *TagRecorder) UpdateChDictionary() {
 							}
 						}
 
-						// Get the current view in the database
-						views := []string{}
-						log.Infof(fmt.Sprintf("SHOW TABLES FROM %s LIKE '%%view'", c.cfg.ClickHouseCfg.Database))
-						if err := connect.Select(&views, fmt.Sprintf("SHOW TABLES FROM %s LIKE '%%view'", c.cfg.ClickHouseCfg.Database)); err != nil {
-							log.Error(err)
-							connect.Close()
-							continue
-						}
-
-						// Create the desired view
-						wantedViews := mapset.NewSet(CH_APP_LABEL_LIVE_VIEW, CH_TARGET_LABEL_LIVE_VIEW)
-						chViews := mapset.NewSet()
-						for _, view := range views {
-							chViews.Add(view)
-						}
-						addViews := wantedViews.Difference(chViews)
-						for _, view := range addViews.ToSlice() {
-							viewName := view.(string)
-							createSQL := CREATE_SQL_MAP[viewName]
-							_, err = connect.Exec(createSQL)
-							if err != nil {
-								log.Error(err)
-								connect.Close()
-								continue
-							}
-						}
-
-						// Check and update existing views
-						checkViews := chViews.Intersect(wantedViews)
-						for _, view := range checkViews.ToSlice() {
-							viewName := view.(string)
-							log.Info(viewName)
-							showSQL := fmt.Sprintf("SHOW CREATE TABLE %s.%s", c.cfg.ClickHouseCfg.Database, viewName)
-							viewSQL := make([]string, 0)
-							if err := connect.Select(&viewSQL, showSQL); err != nil {
-								log.Error(err)
-								connect.Close()
-								continue
-							}
-							createSQL := CREATE_SQL_MAP[viewName]
-							if createSQL == viewSQL[0] {
-								continue
-							}
-							log.Infof("update view %s", viewName)
-							log.Infof("exist view %s", viewSQL[0])
-							log.Infof("wanted view %s", createSQL)
-							dropSQL := fmt.Sprintf("DROP TABLE %s.%s", c.cfg.ClickHouseCfg.Database, viewName)
-							_, err = connect.Exec(dropSQL)
-							if err != nil {
-								log.Error(err)
-								connect.Close()
-								continue
-							}
-							_, err = connect.Exec(createSQL)
-							if err != nil {
-								log.Error(err)
-								connect.Close()
-								continue
-							}
-						}
-
-						// refresh live view
-						var chViewChange mysql.ChViewChange
-						err = mysql.Db.Unscoped().First(&chViewChange).Error
-						if err != nil {
-							log.Errorf(dbQueryResourceFailed("ch_view_change", err))
-						} else {
-							updatedAt := chViewChange.UpdatedAt
-							if !updatedAt.Equal(CHANGE_VIEW_TIME) {
-								log.Infof("refresh live view app_label_live_view in (%s: %d)", address.IP, clickHouseCfg.Port)
-								appLabelSql := "ALTER LIVE VIEW flow_tag.app_label_live_view REFRESH"
-								_, err = connect.Exec(appLabelSql)
-								if err != nil {
-									log.Error(err)
-									connect.Close()
-									continue
-								}
-
-								log.Infof("refresh live view target_label_live_view in (%s: %d)", address.IP, clickHouseCfg.Port)
-								targetLabelSql := "ALTER LIVE VIEW flow_tag.target_label_live_view REFRESH"
-								_, err = connect.Exec(targetLabelSql)
-								if err != nil {
-									log.Error(err)
-									connect.Close()
-									continue
-								}
-								CHANGE_VIEW_TIME = time.Now()
-							}
-						}
-
 						// 获取数据库中当前的字典
 						// Get the current dictionary in the database
 						dictionaries := []string{}
@@ -352,6 +262,97 @@ func (c *TagRecorder) UpdateChDictionary() {
 								continue
 							}
 						}
+
+						// Get the current view in the database
+						views := []string{}
+						log.Infof(fmt.Sprintf("SHOW TABLES FROM %s LIKE '%%view'", c.cfg.ClickHouseCfg.Database))
+						if err := connect.Select(&views, fmt.Sprintf("SHOW TABLES FROM %s LIKE '%%view'", c.cfg.ClickHouseCfg.Database)); err != nil {
+							log.Error(err)
+							connect.Close()
+							continue
+						}
+
+						// Create the desired view
+						wantedViews := mapset.NewSet(CH_APP_LABEL_LIVE_VIEW, CH_TARGET_LABEL_LIVE_VIEW)
+						chViews := mapset.NewSet()
+						for _, view := range views {
+							chViews.Add(view)
+						}
+						addViews := wantedViews.Difference(chViews)
+						for _, view := range addViews.ToSlice() {
+							viewName := view.(string)
+							createSQL := CREATE_SQL_MAP[viewName]
+							_, err = connect.Exec(createSQL)
+							if err != nil {
+								log.Error(err)
+								connect.Close()
+								continue
+							}
+						}
+
+						// Check and update existing views
+						checkViews := chViews.Intersect(wantedViews)
+						for _, view := range checkViews.ToSlice() {
+							viewName := view.(string)
+							log.Info(viewName)
+							showSQL := fmt.Sprintf("SHOW CREATE TABLE %s.%s", c.cfg.ClickHouseCfg.Database, viewName)
+							viewSQL := make([]string, 0)
+							if err := connect.Select(&viewSQL, showSQL); err != nil {
+								log.Error(err)
+								connect.Close()
+								continue
+							}
+							createSQL := CREATE_SQL_MAP[viewName]
+							if createSQL == viewSQL[0] {
+								continue
+							}
+							log.Infof("update view %s", viewName)
+							log.Infof("exist view %s", viewSQL[0])
+							log.Infof("wanted view %s", createSQL)
+							dropSQL := fmt.Sprintf("DROP TABLE %s.%s", c.cfg.ClickHouseCfg.Database, viewName)
+							_, err = connect.Exec(dropSQL)
+							if err != nil {
+								log.Error(err)
+								connect.Close()
+								continue
+							}
+							_, err = connect.Exec(createSQL)
+							if err != nil {
+								log.Error(err)
+								connect.Close()
+								continue
+							}
+						}
+
+						// refresh live view
+						var chViewChange mysql.ChViewChange
+						err = mysql.Db.Unscoped().First(&chViewChange).Error
+						if err != nil {
+							log.Errorf(dbQueryResourceFailed("ch_view_change", err))
+						} else {
+							updatedAt := chViewChange.UpdatedAt
+							if !updatedAt.Equal(CHANGE_VIEW_TIME) {
+								log.Infof("refresh live view app_label_live_view in (%s: %d)", address.IP, clickHouseCfg.Port)
+								appLabelSql := "ALTER LIVE VIEW flow_tag.app_label_live_view REFRESH"
+								_, err = connect.Exec(appLabelSql)
+								if err != nil {
+									log.Error(err)
+									connect.Close()
+									continue
+								}
+
+								log.Infof("refresh live view target_label_live_view in (%s: %d)", address.IP, clickHouseCfg.Port)
+								targetLabelSql := "ALTER LIVE VIEW flow_tag.target_label_live_view REFRESH"
+								_, err = connect.Exec(targetLabelSql)
+								if err != nil {
+									log.Error(err)
+									connect.Close()
+									continue
+								}
+								CHANGE_VIEW_TIME = time.Now()
+							}
+						}
+
 						connect.Close()
 					}
 				}
