@@ -47,7 +47,7 @@ func (p *VPC) userPermittedResourceToConditions(upr *UserPermittedResource) (com
 		IDs: upr.VPCIDs,
 	}
 	fc.IDs = append(fc.IDs, GetRelatedVPCIDs(upr.PodNamespaceIDs)...)
-	return fc.ToMapOmitEmpty(), len(fc.IDs) == 0
+	return fc.ToMapOmitEmpty(fc), len(fc.IDs) == 0
 }
 
 // TODO use singleflight

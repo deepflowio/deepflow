@@ -16,6 +16,12 @@
 
 package model
 
+import (
+	"strings"
+
+	"golang.org/x/exp/slices"
+)
+
 type RefreshCacheParam struct {
 	RefreshCache bool `schema:"refresh_cache,omitempty"`
 }
@@ -24,8 +30,23 @@ type IncludedFieldsParam struct {
 	IncludedFields []string `schema:"field,omitempty"`
 }
 
-func (i IncludedFieldsParam) GetIncludedFields() []string {
-	return i.IncludedFields
+func (i IncludedFieldsParam) GetIncludedFields() []string { // TODO should move
+	res := make([]string, 0)
+	for _, i := range i.IncludedFields {
+		res = append(res, strings.ToUpper(i))
+	}
+	slices.Sort(res)
+	return res
+}
+
+type AZQuery struct {
+	AZQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type AZQueryStoredInRedis struct {
+	AZQueryFilterConditions
+	IncludedFieldsParam
 }
 
 // VMQuery defines supported field in query string, and uses tag (schema) to define the parameter name

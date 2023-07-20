@@ -106,7 +106,10 @@ func (s *Server) RegisterRouters() {
 		configuration.NewConfiguration(),
 		router.NewVtapRepo(),
 		router.NewPlugin(),
+
+		// resource
 		resource.NewDomain(s.controllerConfig),
+		resource.NewVM(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
 		resource.NewVPC(),
 		resource.NewProcess(s.controllerConfig.RedisCfg),
 	} {

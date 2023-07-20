@@ -33,6 +33,13 @@ const (
 )
 
 const (
-	PATH_VM  = "/v2/vms"
-	PATH_POD = "/v2/pods"
+	PATH_AZ   = "/v2/azs/"
+	PATH_HOST = "/v2/hosts/"
+	PATH_VM   = "/v2/vms/"
+	PATH_POD  = "/v2/pods/"
+)
+
+const (
+	HEADER_KEY_X_USER_TYPE = "X-User-Type"
+	HEADER_KEY_X_USER_ID   = "X-User-Id"
 )

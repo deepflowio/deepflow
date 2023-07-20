@@ -45,5 +45,5 @@ func (p *DHCPPort) userPermittedResourceToConditions(upr *UserPermittedResource)
 		VPCIDs: upr.VPCIDs,
 	}
 
-	return fc.ToMapOmitEmpty(), len(fc.VPCIDs) == 0
+	return fc.ToMapOmitEmpty(fc), len(fc.VPCIDs) == 0
 }

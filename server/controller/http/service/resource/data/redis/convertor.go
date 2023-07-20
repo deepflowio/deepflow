@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/schema"
+	"golang.org/x/exp/slices"
 
 	"github.com/deepflowio/deepflow/server/controller/http/constraint"
 	"github.com/deepflowio/deepflow/server/controller/http/model"
@@ -118,7 +119,7 @@ type urlFormatterComponent[T constraint.QueryStoredInRedisModel] struct {
 }
 
 func newURLFormatter[T constraint.QueryStoredInRedisModel]() urlFormatter {
-	return &urlFormatterComponent[T]{urlQueryFormatterComponent[T]{}}
+	return &urlFormatterComponent[T]{urlQueryFormatterComponent[T]{decoder: schema.NewDecoder(), encoder: schema.NewEncoder()}}
 }
 
 func (uf *urlFormatterComponent[T]) format(u string) (string, error) {
@@ -127,7 +128,9 @@ func (uf *urlFormatterComponent[T]) format(u string) (string, error) {
 		return "", err
 	}
 	parsedURL.Path = strings.TrimSuffix(parsedURL.Path, "/")
-	parsedURL.RawQuery, err = uf.urlQueryFormatterComponent.format(parsedURL.RawQuery)
+	if parsedURL.RawQuery != "" {
+		parsedURL.RawQuery, err = uf.urlQueryFormatterComponent.format(parsedURL.RawQuery)
+	}
 	return parsedURL.String(), err
 }
 
@@ -136,15 +139,17 @@ func (uf *urlFormatterComponent[T]) urlStrToInfoStruct(u string) (*model.URLInfo
 	if err != nil {
 		return nil, err
 	}
-	obj, err := uf.urlQueryFormatterComponent.strToStruct(parsedURL.RawQuery)
-	if err != nil {
-		return nil, err
-	}
 	urlInfo := new(model.URLInfo)
 	urlInfo.RawString = parsedURL.String()
-	urlInfo.UserID = (*obj).GetUserID()
-	urlInfo.IncludedFields = (*obj).GetIncludedFields()
-	urlInfo.FilterConditions = (*obj).GetFilterConditions()
+	if parsedURL.RawQuery != "" {
+		obj, err := uf.urlQueryFormatterComponent.strToStruct(parsedURL.RawQuery)
+		if err != nil {
+			return nil, err
+		}
+		urlInfo.UserID = (*obj).GetUserID()
+		urlInfo.IncludedFields = (*obj).GetIncludedFields()
+		urlInfo.FilterConditions = (*obj).GetFilterConditions()
+	}
 	return urlInfo, nil
 }
 
@@ -167,12 +172,19 @@ func (qf *urlQueryFormatterComponent[T]) strToStruct(str string) (*T, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = qf.decoder.Decode(obj, values)
+	err = qf.decoder.Decode(obj, qf.sortValues(values))
 	return obj, err
 }
 
 func (qf *urlQueryFormatterComponent[T]) structToStr(obj *T) (string, error) {
 	values := make(url.Values)
-	err := qf.encoder.Encode(obj, values)
+	err := qf.encoder.Encode(obj, qf.sortValues(values))
 	return values.Encode(), err
+}
+
+func (qf *urlQueryFormatterComponent[T]) sortValues(v url.Values) url.Values {
+	for _, i := range v {
+		slices.Sort(i)
+	}
+	return v
 }

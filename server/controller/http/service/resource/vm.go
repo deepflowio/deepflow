@@ -14,38 +14,27 @@
  * limitations under the License.
  */
 
-package redis
+package resource
 
 import (
-	"sync"
-
-	ctrlcommon "github.com/deepflowio/deepflow/server/controller/common"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/redis"
-	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/http/model"
-	mysqldp "github.com/deepflowio/deepflow/server/controller/http/service/resource/data/mysql"
-)
-
-var (
-	vmOnce sync.Once
-	vm     *VM
+	"github.com/deepflowio/deepflow/server/controller/http/service/resource/data"
+	"github.com/deepflowio/deepflow/server/controller/http/service/resource/filter/generator"
 )
 
 type VM struct {
-	DataProvider
+	ServiceGet
 }
 
-func GetVM(cfg redis.Config) *VM {
-	vmOnce.Do(func() {
-		vm = &VM{
-			DataProvider: DataProvider{
-				resourceType: ctrlcommon.RESOURCE_TYPE_VM_EN,
-				next:         mysqldp.NewVM(),
-				client:       getClient(cfg),
-				keyConv:      newKeyConvertor[model.VMQueryStoredInRedis](),
-				urlPath:      httpcommon.PATH_VM,
-			},
-		}
-	})
-	return vm
+func NewVMGet(urlInfo *model.URLInfo, userInfo *model.UserInfo, redisCfg redis.Config, fpermitCfg config.FPermit) *VM {
+	log.Infof("request info: %#v, %#v", urlInfo, userInfo)
+	s := &VM{newServiceGet(
+		ctrlrcommon.RESOURCE_TYPE_VM_EN,
+		data.GetDataProvider(ctrlrcommon.RESOURCE_TYPE_VM_EN, redisCfg),
+	)}
+	s.generateDataContext(urlInfo, userInfo, generator.NewVM(fpermitCfg))
+	return s
 }

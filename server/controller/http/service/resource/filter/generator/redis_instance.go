@@ -46,5 +46,5 @@ func (p *RedisInstance) userPermittedResourceToConditions(upr *UserPermittedReso
 		VPCIDs: upr.VPCIDs,
 	}
 	dropAll := len(fcs.VPCIDs) == 0
-	return fcs.ToMapOmitEmpty(), dropAll
+	return fcs.ToMapOmitEmpty(fcs), dropAll
 }
