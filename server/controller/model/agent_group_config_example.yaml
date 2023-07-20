@@ -918,7 +918,7 @@ vtap_group_id: g-xxxxxx
   ## Note: Support for getting extra labels from headers in http requests from remoteWrite.
   #prometheus-extra-config:
     ## Note: Prometheus Extra Labels Switch
-    #enabled: true
+    #enabled: false
     ## Note: Labels list. Labels in this list are sent. Label is a string matching the regular expression [a-zA-Z_][a-zA-Z0-9_]*
     #labels:
       #- label1
