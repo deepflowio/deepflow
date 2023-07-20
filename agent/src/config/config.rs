@@ -336,7 +336,7 @@ pub struct PrometheusExtraConfig {
 impl Default for PrometheusExtraConfig {
     fn default() -> Self {
         PrometheusExtraConfig {
-            enabled: true,
+            enabled: false,
             labels: vec![],
             labels_limit: 1024,
             values_limit: 4096,
