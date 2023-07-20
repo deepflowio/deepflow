@@ -50,23 +50,69 @@ func (p *Process) ProduceByAdd(items []*mysql.Process) {
 	if err != nil {
 		log.Error(err)
 	}
-	var opts []eventapi.TagFieldOption
 	for _, item := range items {
 		description := fmt.Sprintf("agent %s report process %s cmdline %s",
 			processData[item.ID].VTapName, item.ProcessName, item.CommandLine)
+		opts := []eventapi.TagFieldOption{eventapi.TagDescription(description)}
 
 		switch t := processData[item.ID].ResourceType; t {
 		case common.VIF_DEVICE_TYPE_POD:
-			opts = append(opts, eventapi.TagPodID(processData[item.ID].ResourceID))
+			podID := processData[item.ID].ResourceID
+			info, err := p.ToolDataSet.GetPodInfoByID(podID)
+			if err != nil {
+				log.Error(err)
+			} else {
+				opts = append(opts, []eventapi.TagFieldOption{
+					eventapi.TagPodID(podID),
+					eventapi.TagRegionID(info.RegionID),
+					eventapi.TagAZID(info.AZID),
+					eventapi.TagVPCID(info.VPCID),
+					eventapi.TagPodClusterID(info.PodClusterID),
+					eventapi.TagPodGroupID(info.PodGroupID),
+					eventapi.TagPodNodeID(info.PodNodeID),
+					eventapi.TagPodNSID(info.PodNamespaceID),
+				}...)
+				if l3DeviceOpts, ok := getL3DeviceOptionsByPodNodeID(p.ToolDataSet, info.PodNodeID); ok {
+					opts = append(opts, l3DeviceOpts...)
+				}
+			}
+
 		case common.VIF_DEVICE_TYPE_POD_NODE:
-			opts = append(opts, eventapi.TagPodNodeID(processData[item.ID].ResourceID))
+			podNodeID := processData[item.ID].ResourceID
+			info, err := p.ToolDataSet.GetPodNodeInfoByID(podNodeID)
+			if err != nil {
+				log.Error(err)
+			} else {
+				opts = append(opts, []eventapi.TagFieldOption{
+					eventapi.TagPodNodeID(podNodeID),
+					eventapi.TagRegionID(info.RegionID),
+					eventapi.TagAZID(info.AZID),
+					eventapi.TagVPCID(info.VPCID),
+					eventapi.TagPodClusterID(info.PodClusterID),
+				}...)
+				if l3DeviceOpts, ok := getL3DeviceOptionsByPodNodeID(p.ToolDataSet, podNodeID); ok {
+					opts = append(opts, l3DeviceOpts...)
+				}
+			}
+
 		case common.VIF_DEVICE_TYPE_VM:
-			opts = append(opts, eventapi.TagL3DeviceID(processData[item.ID].ResourceID))
-			opts = append(opts, eventapi.TagL3DeviceType(processData[item.ID].ResourceType))
+			vmID := processData[item.ID].ResourceID
+			info, err := p.ToolDataSet.GetVMInfoByID(vmID)
+			if err != nil {
+				log.Error(err)
+			} else {
+				opts = append(opts, []eventapi.TagFieldOption{
+					eventapi.TagL3DeviceType(processData[item.ID].ResourceType),
+					eventapi.TagL3DeviceID(vmID),
+					eventapi.TagAZID(info.AZID),
+					eventapi.TagRegionID(info.RegionID),
+					eventapi.TagHostID(info.HostID),
+					eventapi.TagVPCID(info.VPCID),
+				}...)
+			}
 		default:
 			log.Error("cannot support type: %s", t)
 		}
-		opts = append(opts, eventapi.TagDescription(description))
 
 		p.createProcessAndEnqueue(
 			item.Lcuuid,
