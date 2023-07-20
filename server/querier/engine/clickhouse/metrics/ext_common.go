@@ -108,18 +108,25 @@ func GetPrometheusMetrics(db, table, where string, ctx context.Context) (map[str
 		log.Error(err)
 		return nil, err
 	}
+	index := 0
 	for _, metric := range allMetrics {
 		metricName := metric.DisplayName
-		for i, value := range prometheusTableRst.Values {
+		for _, value := range prometheusTableRst.Values {
 			tableName := value.([]interface{})[0].(string)
 			if tableName == "" {
 				continue
 			}
-			lm := NewMetrics(
-				i, metricName, metricName, "", METRICS_TYPE_COUNTER,
-				"metrics", []bool{true, true, true}, "", tableName, "",
-			)
+			var lm *Metrics
+			if metricName == "*" {
+				lm = NewCountAllMertic(tableName, index)
+			} else {
+				lm = NewMetrics(
+					index, metricName, metricName, "", METRICS_TYPE_COUNTER,
+					"metrics", []bool{true, true, true}, "", tableName, "",
+				)
+			}
 			loadMetrics[fmt.Sprintf("%s-%s", metricName, tableName)] = lm
+			index++
 		}
 	}
 	return loadMetrics, err
