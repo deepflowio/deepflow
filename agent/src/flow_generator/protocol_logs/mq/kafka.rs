@@ -213,7 +213,6 @@ impl From<KafkaInfo> for L7ProtocolSendLog {
 
 #[derive(Clone, Serialize, Default)]
 pub struct KafkaLog {
-    info: KafkaInfo,
     #[serde(skip)]
     perf_stats: Option<L7PerfStats>,
 }
@@ -226,7 +225,8 @@ impl L7ProtocolParserInterface for KafkaLog {
         {
             return false;
         }
-        let ok = self.request(payload, true).is_ok() && self.info.check();
+        let mut info = KafkaInfo::default();
+        let ok = self.request(payload, true, &mut info).is_ok() && info.check();
         self.reset();
         ok
     }
@@ -235,13 +235,14 @@ impl L7ProtocolParserInterface for KafkaLog {
         if self.perf_stats.is_none() {
             self.perf_stats = Some(L7PerfStats::default())
         };
-        Self::parse(self, payload, param.l4_protocol, param.direction)?;
+        let mut info = KafkaInfo::default();
+        Self::parse(self, payload, param.l4_protocol, param.direction, &mut info)?;
 
         // handle kafka status code
         {
             let mut log_cache = param.l7_perf_cache.borrow_mut();
-            if let Some(previous) = log_cache.rrt_cache.get(&self.info.cal_cache_key(param)) {
-                match (previous.msg_type, self.info.msg_type) {
+            if let Some(previous) = log_cache.rrt_cache.get(&info.cal_cache_key(param)) {
+                match (previous.msg_type, info.msg_type) {
                     (LogMessageType::Request, LogMessageType::Response)
                         if param.time > previous.time
                             && param.time - previous.time > param.rrt_timeout as u64 =>
@@ -251,6 +252,7 @@ impl L7ProtocolParserInterface for KafkaLog {
                                 req.api_key,
                                 req.api_version,
                                 read_i16_be(&payload[12..]),
+                                &mut info,
                             )
                         }
                     }
@@ -260,9 +262,10 @@ impl L7ProtocolParserInterface for KafkaLog {
                     {
                         if let Some(resp) = previous.kafka_info.as_ref() {
                             self.set_status_code(
-                                self.info.api_key,
-                                self.info.api_version,
+                                info.api_key,
+                                info.api_version,
                                 resp.code,
+                                &mut info,
                             )
                         }
                     }
@@ -271,20 +274,19 @@ impl L7ProtocolParserInterface for KafkaLog {
             }
         }
 
-        self.info
-            .cal_rrt(
-                param,
-                Some(KafkaInfoCache {
-                    api_key: self.info.api_key,
-                    api_version: self.info.api_version,
-                    code: read_i16_be(&payload[12..]),
-                }),
-            )
-            .map(|rrt| {
-                self.info.rrt = rrt;
-                self.perf_stats.as_mut().unwrap().update_rrt(rrt);
-            });
-        Ok(vec![L7ProtocolInfo::KafkaInfo(self.info.clone())])
+        info.cal_rrt(
+            param,
+            Some(KafkaInfoCache {
+                api_key: info.api_key,
+                api_version: info.api_version,
+                code: read_i16_be(&payload[12..]),
+            }),
+        )
+        .map(|rrt| {
+            info.rrt = rrt;
+            self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+        });
+        Ok(vec![L7ProtocolInfo::KafkaInfo(info)])
     }
 
     fn protocol(&self) -> L7Protocol {
@@ -293,10 +295,6 @@ impl L7ProtocolParserInterface for KafkaLog {
 
     fn parsable_on_udp(&self) -> bool {
         false
-    }
-
-    fn reset(&mut self) {
-        self.info = KafkaInfo::default();
     }
 
     fn perf_stats(&mut self) -> Option<L7PerfStats> {
@@ -311,9 +309,9 @@ impl KafkaLog {
     // ================================================================================
     // The protocol identification is strictly checked to avoid misidentification.
     // The log analysis is not strictly checked because there may be length truncation
-    fn request(&mut self, payload: &[u8], strict: bool) -> Result<()> {
+    fn request(&mut self, payload: &[u8], strict: bool, info: &mut KafkaInfo) -> Result<()> {
         let req_len = read_u32_be(payload);
-        self.info.req_msg_size = Some(req_len);
+        info.req_msg_size = Some(req_len);
         let client_id_len = read_u16_be(&payload[12..]) as usize;
         if payload.len() < KAFKA_REQ_HEADER_LEN + client_id_len {
             return Err(Error::KafkaLogParseFailed);
@@ -323,23 +321,22 @@ impl KafkaLog {
             return Err(Error::KafkaLogParseFailed);
         }
 
-        self.info.msg_type = LogMessageType::Request;
-        self.info.api_key = read_u16_be(&payload[4..]);
-        self.info.api_version = read_u16_be(&payload[6..]);
-        self.info.correlation_id = read_u32_be(&payload[8..]);
-        self.info.client_id =
-            String::from_utf8_lossy(&payload[14..14 + client_id_len]).into_owned();
+        info.msg_type = LogMessageType::Request;
+        info.api_key = read_u16_be(&payload[4..]);
+        info.api_version = read_u16_be(&payload[6..]);
+        info.correlation_id = read_u32_be(&payload[8..]);
+        info.client_id = String::from_utf8_lossy(&payload[14..14 + client_id_len]).into_owned();
 
-        if !self.info.client_id.is_ascii() {
+        if !info.client_id.is_ascii() {
             return Err(Error::KafkaLogParseFailed);
         }
         Ok(())
     }
 
-    fn response(&mut self, payload: &[u8]) -> Result<()> {
-        self.info.resp_msg_size = Some(read_u32_be(payload));
-        self.info.correlation_id = read_u32_be(&payload[4..]);
-        self.info.msg_type = LogMessageType::Response;
+    fn response(&mut self, payload: &[u8], info: &mut KafkaInfo) -> Result<()> {
+        info.resp_msg_size = Some(read_u32_be(payload));
+        info.correlation_id = read_u32_be(&payload[4..]);
+        info.msg_type = LogMessageType::Response;
         Ok(())
     }
 
@@ -348,6 +345,7 @@ impl KafkaLog {
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
+        info: &mut KafkaInfo,
     ) -> Result<()> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
@@ -357,11 +355,11 @@ impl KafkaLog {
         }
         match direction {
             PacketDirection::ClientToServer => {
-                self.request(payload, false)?;
+                self.request(payload, false, info)?;
                 self.perf_stats.as_mut().unwrap().inc_req();
             }
             PacketDirection::ServerToClient => {
-                self.response(payload)?;
+                self.response(payload, info)?;
                 self.perf_stats.as_mut().unwrap().inc_resp();
             }
         }
@@ -378,13 +376,19 @@ impl KafkaLog {
             error_code => INT16
             ...
     */
-    pub fn set_status_code(&mut self, api_key: u16, api_version: u16, code: i16) {
+    pub fn set_status_code(
+        &mut self,
+        api_key: u16,
+        api_version: u16,
+        code: i16,
+        info: &mut KafkaInfo,
+    ) {
         if api_key == KAFKA_FETCH && api_version >= 7 {
-            self.info.status_code = Some(code as i32);
+            info.status_code = Some(code as i32);
             if code == 0 {
-                self.info.status = L7ResponseStatus::Ok;
+                info.status = L7ResponseStatus::Ok;
             } else {
-                self.info.status = L7ResponseStatus::ServerError;
+                info.status = L7ResponseStatus::ServerError;
                 self.perf_stats.as_mut().unwrap().inc_resp_err();
             }
         }
@@ -432,9 +436,21 @@ mod tests {
             let param = &ParseParam::from((packet as &MetaPacket, log_cache.clone(), false));
 
             let is_kafka = kafka.check_payload(payload, param);
-            let _ = kafka.parse_payload(payload, param);
-
-            output.push_str(&format!("{:?} is_kafka: {}\r\n", kafka.info, is_kafka));
+            let info = kafka.parse_payload(payload, param);
+            if let Ok(mut info) = info {
+                match info.remove(0) {
+                    L7ProtocolInfo::KafkaInfo(i) => {
+                        output.push_str(&format!("{:?} is_kafka: {}\r\n", i, is_kafka));
+                    }
+                    _ => unreachable!(),
+                }
+            } else {
+                output.push_str(&format!(
+                    "{:?} is_kafka: {}\r\n",
+                    KafkaInfo::default(),
+                    is_kafka
+                ));
+            }
         }
         output
     }
