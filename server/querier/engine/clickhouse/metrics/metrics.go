@@ -91,19 +91,9 @@ func NewReplaceMetrics(dbField string, condition string) *Metrics {
 	}
 }
 
-func NewCountAllMertic(table string, index int) *Metrics {
-	return NewMetrics(
-		index, "*",
-		"*", "", METRICS_TYPE_OTHER,
-		"Other", []bool{true, true, true}, "", table, "",
-	)
-}
-
 func GetMetrics(field string, db string, table string, ctx context.Context) (*Metrics, bool) {
 	field = strings.Trim(field, "`")
-	if field == "*" {
-		return NewCountAllMertic(table, 0), true
-	} else if db == "ext_metrics" || db == "deepflow_system" || table == "l7_flow_log" {
+	if db == "ext_metrics" || db == "deepflow_system" || table == "l7_flow_log" {
 		fieldSplit := strings.Split(field, ".")
 		if len(fieldSplit) > 1 {
 			if fieldSplit[0] == "metrics" {
