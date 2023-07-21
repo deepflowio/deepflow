@@ -93,10 +93,6 @@ type Cache struct {
 	SubDomainLcuuid string
 	DiffBaseDataSet
 	ToolDataSet
-
-	// Set Changed to true if the resource database and cache are updated,
-	// used for cache update notifications to trisolaris module.
-	Changed bool
 }
 
 func NewCache(domainLcuuid string) *Cache {

@@ -18,11 +18,9 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/event"
-	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
@@ -64,9 +62,4 @@ func NewWholeSubDomain(domainLcuuid, subDomainLcuuid string, c *cache.Cache, eq 
 
 func (wsd *WholeSubDomain) OnUpdatersCompleted() {
 	wsd.eventProducer.ProduceFromMySQL()
-	if wsd.cache.Changed == true {
-		log.Infof("subdomain(%v) data changed, refresh platform data", wsd.cache.SubDomainLcuuid)
-		refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_PLATFORM_DATA})
-		wsd.cache.Changed = false
-	}
 }
