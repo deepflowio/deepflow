@@ -26,6 +26,7 @@ import (
 
 	"github.com/goccy/go-json"
 	"github.com/prometheus/prometheus/prompb"
+	"github.com/prometheus/prometheus/promql/parser"
 
 	"github.com/deepflowio/deepflow/server/libs/datastructure"
 	"github.com/deepflowio/deepflow/server/querier/common"
@@ -41,6 +42,9 @@ const (
 	PROMETHEUS_TIME_COLUMNS    = "timestamp"
 	PROMETHEUS_METRIC_VALUE    = "value"
 	ENUM_TAG_SUFFIX            = "_enum"
+
+	FUNCTION_TOPK    = "topk"
+	FUNCTION_BOTTOMK = "bottomk"
 )
 
 const (
@@ -85,14 +89,14 @@ var matcherRules = map[string]string{
 var aggFunctions = map[string]string{
 	"sum":          view.FUNCTION_SUM,
 	"avg":          view.FUNCTION_AVG,
-	"count":        view.FUNCTION_COUNT, // in querier should query Sum(log_count)
+	"count":        view.FUNCTION_COUNT,
 	"min":          view.FUNCTION_MIN,
 	"max":          view.FUNCTION_MAX,
 	"group":        "1", // all values in the resulting vector are 1
 	"stddev":       view.FUNCTION_STDDEV,
 	"stdvar":       "",                  // not supported
-	"topk":         "",                  // not supported in querier, but clickhouse does, FIXME: should supported in querier
-	"bottomk":      "",                  // not supported
+	"topk":         FUNCTION_TOPK,       // query sum value to avoid multiple values in one timestamp, it will aggregated by prometheus
+	"bottomk":      FUNCTION_BOTTOMK,    // query sum value to avoid multiple values in one timestamp, it will aggregated by prometheus
 	"count_values": view.FUNCTION_COUNT, // equals count() group by value in ck
 	"quantile":     "",                  // not supported, FIXME: should support histogram in querier, and calcul Pxx by histogram
 }
@@ -110,7 +114,7 @@ const (
 
 type ctxKeyPrefixType struct{}
 
-func promReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (context.Context, string, string, string, string, error) {
+func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (context.Context, string, string, string, string, error) {
 	// QPS Limit Check
 	// Both SetRate and Acquire are expanded by 1000 times, making it suitable for small QPS scenarios.
 	if !QPSLeakyBucket.Acquire(1000) {
@@ -135,6 +139,7 @@ func promReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (context
 	}
 
 	metricsArray := []string{fmt.Sprintf("toUnixTimestamp(time) AS %s", PROMETHEUS_TIME_COLUMNS)}
+	orderBy := []string{fmt.Sprintf("%s desc", PROMETHEUS_TIME_COLUMNS)}
 	var groupBy []string
 	var metricWithAggFunc string
 	// use map for duplicate tags removal
@@ -202,16 +207,31 @@ func promReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (context
 				// group
 				metricWithAggFunc = aggOperator
 			case view.FUNCTION_COUNT:
-				if db != chCommon.DB_NAME_FLOW_LOG {
-					return ctx, "", "", "", "", fmt.Errorf("only supported Count for flow_log")
-				}
-				metricWithAggFunc = "Sum(`log_count`)" // will be append as `metrics.$metricsName` in below
+				metricWithAggFunc = "Count(*)" // will be append as `metrics.$metricsName` in below
 
 				// count_values means count unique value
 				if q.Hints.Func == "count_values" {
 					metricsArray = append(metricsArray, fmt.Sprintf("`%s`", metricName)) // append original metric name
 					groupBy = append(groupBy, fmt.Sprintf("`%s`", metricName))
+				} else {
+					// for [Count], not calculate second times, just return Count(*) value
+					if p.interceptPrometheusExpr != nil {
+						_ = p.interceptPrometheusExpr(func(e *parser.AggregateExpr) error {
+							// Count(*) in deepflow already complete in clickhouse query
+							// so we don't need `Count` again, instead, `Sum` all `Count` result would be our expectation
+							// so, modify expr.Operation here to make prometheus engine do `Sum` for `values`
+							e.Op = parser.SUM
+							return nil
+						})
+					}
 				}
+			// in `topk`/`bottomk`, we `Sum` all value by grouping tag as datasource
+			case FUNCTION_TOPK:
+				metricWithAggFunc = fmt.Sprintf("Sum(`%s`)", metricName)
+				orderBy = append(orderBy, "value desc")
+			case FUNCTION_BOTTOMK:
+				metricWithAggFunc = fmt.Sprintf("Sum(`%s`)", metricName)
+				orderBy = append(orderBy, "value asc")
 			}
 		} else {
 			if len(q.Hints.Grouping) > 0 {
@@ -299,7 +319,7 @@ func promReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (context
 		}
 	}
 
-	sql := parseToQuerierSQL(ctx, db, table, metricsArray, filters, groupBy)
+	sql := parseToQuerierSQL(ctx, db, table, metricsArray, filters, groupBy, orderBy)
 	return ctx, sql, db, dataPrecision, queryMetric, err
 }
 
@@ -486,7 +506,7 @@ func parsePromQLTag(prefixType prefix, db, tag string) (tagName string, tagAlias
 	return
 }
 
-func parseToQuerierSQL(ctx context.Context, db string, table string, metrics []string, filters []string, groupBy []string) (sql string) {
+func parseToQuerierSQL(ctx context.Context, db string, table string, metrics []string, filters []string, groupBy []string, orderBy []string) (sql string) {
 	// order by DESC for get data completely, then scan data reversely for data combine(see func.RespTransToProm)
 	// querier will be called later, so there is no need to display the declaration db
 	if db != "" {
@@ -496,19 +516,19 @@ func parseToQuerierSQL(ctx context.Context, db string, table string, metrics []s
 		if len(groupBy) > 0 {
 			sqlBuilder.WriteString("GROUP BY " + strings.Join(groupBy, ","))
 		}
-		sqlBuilder.WriteString(fmt.Sprintf(" ORDER BY %s desc LIMIT %s", PROMETHEUS_TIME_COLUMNS, config.Cfg.Limit))
+		sqlBuilder.WriteString(fmt.Sprintf(" ORDER BY %s LIMIT %s", strings.Join(orderBy, ","), config.Cfg.Limit))
 		sql = sqlBuilder.String()
 	} else {
-		sql = fmt.Sprintf("SELECT %s FROM %s WHERE %s ORDER BY %s desc LIMIT %s", strings.Join(metrics, ","),
+		sql = fmt.Sprintf("SELECT %s FROM %s WHERE %s ORDER BY %s LIMIT %s", strings.Join(metrics, ","),
 			table, // equals prometheus metric name
 			strings.Join(filters, " AND "),
-			PROMETHEUS_TIME_COLUMNS, config.Cfg.Limit)
+			strings.Join(orderBy, ","), config.Cfg.Limit)
 	}
 	return
 }
 
 // querier result trans to Prom Response
-func respTransToProm(ctx context.Context, metricsName string, result *common.Result) (resp *prompb.ReadResponse, err error) {
+func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName string, result *common.Result) (resp *prompb.ReadResponse, err error) {
 	tagIndex := -1
 	metricsIndex := -1
 	timeIndex := -1
