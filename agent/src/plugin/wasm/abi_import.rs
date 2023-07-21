@@ -147,7 +147,7 @@ pub(super) fn vm_read_payload(mut caller: Caller<'_, StoreDataType>, b: i32, len
         wasm_error!(
             ctx.get_ins_name(),
             IMPORT_FUNC_VM_READ_CTX_BASE,
-            "vm read payload fail: buffer length too enough, require {} but buffer size is {}",
+            "vm read payload fail: buffer length not enough, require {} but buffer size is {}",
             payload_size,
             len
         );
