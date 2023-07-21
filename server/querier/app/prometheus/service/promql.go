@@ -69,10 +69,14 @@ import (
 const _SUCCESS = "success"
 
 // executors for prometheus query
-type prometheusExecutor struct{}
+type prometheusExecutor struct {
+	reader *prometheusReader
+}
 
 func NewPrometheusExecutor() *prometheusExecutor {
-	return &prometheusExecutor{}
+	return &prometheusExecutor{
+		reader: newPrometheusReader(),
+	}
 }
 
 // API Spec: https://prometheus.io/docs/prometheus/latest/querying/api/#instant-queries
@@ -96,11 +100,15 @@ func (p *prometheusExecutor) promQueryExecute(ctx context.Context, args *model.P
 
 	// instant query will hint default query range:
 	// query.lookback-delta: https://github.com/prometheus/prometheus/blob/main/cmd/prometheus/main.go#L398
-	queriable := &RemoteReadQuerierable{Args: args, Ctx: ctx, MatchMetricNameFunc: p.matchMetricName}
+	queriable := &RemoteReadQuerierable{Args: args, Ctx: ctx, MatchMetricNameFunc: p.matchMetricName, reader: p.reader}
 	qry, err := engine.NewInstantQuery(queriable, nil, args.Promql, queryTime)
 	if qry == nil || err != nil {
 		log.Error(err)
 		return nil, err
+	}
+	queriable.reader.interceptPrometheusExpr = func(handleExpr func(e *parser.AggregateExpr) error) error {
+		// `handleExpr` will called in `prometheus reader`
+		return p.beforePrometheusCalculate(qry, handleExpr)
 	}
 	res := qry.Exec(ctx)
 	if res.Err != nil {
@@ -147,11 +155,15 @@ func (p *prometheusExecutor) promQueryRangeExecute(ctx context.Context, args *mo
 		defer span.End()
 	}
 
-	queriable := &RemoteReadQuerierable{Args: args, Ctx: ctx, MatchMetricNameFunc: p.matchMetricName}
+	queriable := &RemoteReadQuerierable{Args: args, Ctx: ctx, MatchMetricNameFunc: p.matchMetricName, reader: p.reader}
 	qry, err := engine.NewRangeQuery(queriable, nil, args.Promql, start, end, step)
 	if qry == nil || err != nil {
 		log.Error(err)
 		return nil, err
+	}
+	queriable.reader.interceptPrometheusExpr = func(f func(e *parser.AggregateExpr) error) error {
+		// `handleExpr` will called in `prometheus reader`
+		return p.beforePrometheusCalculate(qry, f)
 	}
 	res := qry.Exec(ctx)
 	if res.Err != nil {
@@ -171,7 +183,7 @@ func (p *prometheusExecutor) promQueryRangeExecute(ctx context.Context, args *mo
 
 func (p *prometheusExecutor) promRemoteReadExecute(ctx context.Context, req *prompb.ReadRequest) (resp *prompb.ReadResponse, err error) {
 	// analysis for ReadRequest
-	result, _, _, err := promReaderExecute(ctx, req, false)
+	result, _, _, err := p.reader.promReaderExecute(ctx, req, false)
 	return result, err
 }
 
@@ -261,7 +273,7 @@ func (p *prometheusExecutor) series(ctx context.Context, args *model.PromQueryPa
 		return nil, err
 	}
 
-	querierable := &RemoteReadQuerierable{Args: args, Ctx: ctx, MatchMetricNameFunc: p.matchMetricName}
+	querierable := &RemoteReadQuerierable{Args: args, Ctx: ctx, MatchMetricNameFunc: p.matchMetricName, reader: p.reader}
 	q, err := querierable.Querier(ctx, timestamp.FromTime(start), timestamp.FromTime(end))
 	if err != nil {
 		log.Error(err)
@@ -309,4 +321,17 @@ func (p *prometheusExecutor) matchMetricName(matchers *[]*labels.Matcher) string
 		}
 	}
 	return metric
+}
+
+// handle promql Expression before prometheus calculate
+// TODO: add more pre-calculation to avoid re-calculate in prometheus
+func (p *prometheusExecutor) beforePrometheusCalculate(q promql.Query, f func(e *parser.AggregateExpr) error) error {
+	switch s := q.Statement().(type) {
+	case *parser.EvalStmt:
+		switch e := s.Expr.(type) {
+		case *parser.AggregateExpr:
+			return f(e)
+		}
+	}
+	return nil
 }

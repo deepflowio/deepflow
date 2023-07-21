@@ -38,16 +38,18 @@ type RemoteReadQuerierable struct {
 	MatchMetricNameFunc func(*[]*labels.Matcher) string
 	sql                 []string
 	query_time          []float64
+	reader              *prometheusReader
 }
 
 func (q *RemoteReadQuerierable) Querier(ctx context.Context, mint, maxt int64) (storage.Querier, error) {
-	return &RemoteReadQuerier{Args: q.Args, Ctx: q.Ctx, Querierable: q}, nil
+	return &RemoteReadQuerier{Args: q.Args, Ctx: q.Ctx, Querierable: q, reader: q.reader}, nil
 }
 
 type RemoteReadQuerier struct {
 	Args        *model.PromQueryParams
 	Ctx         context.Context
 	Querierable *RemoteReadQuerierable
+	reader      *prometheusReader
 }
 
 // For PromQL instant query
@@ -83,7 +85,7 @@ func (q *RemoteReadQuerier) Select(sortSeries bool, hints *storage.SelectHints, 
 		Queries:               []*prompb.Query{prompbQuery},
 		AcceptedResponseTypes: []prompb.ReadRequest_ResponseType{prompb.ReadRequest_STREAMED_XOR_CHUNKS},
 	}
-	resp, sql, query_time, err := promReaderExecute(q.Ctx, req, q.Args.Debug)
+	resp, sql, query_time, err := q.reader.promReaderExecute(q.Ctx, req, q.Args.Debug)
 	if err != nil {
 		log.Error(err)
 		return storage.ErrSeriesSet(err)
