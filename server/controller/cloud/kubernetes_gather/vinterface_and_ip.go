@@ -39,6 +39,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 	deviceUUIDToPodLcuuid := map[string]string{}
 	vinterfaceLcuuids := mapset.NewSet()
 	subnetLcuuidToCIDR := map[string]netaddr.IPPrefix{}
+	nodeSubnetLcuuidToCIDR := map[string]netaddr.IPPrefix{}
 	ipToVinterfaceLcuuid := map[string]string{}
 	podIPsMap := map[string]*model.IP{}
 	aggNoMaskV4Nets := []string{}
@@ -131,10 +132,6 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 		}
 	}
 
-	podSubnetLcuuid := ""
-	if len(k.podNetworkLcuuidCIDRs.cidrs) == 1 {
-		podSubnetLcuuid = common.GetUUID(k.podNetworkLcuuidCIDRs.networkLcuuid, uuid.Nil)
-	}
 	// 处理POD IP，生成port，ip，cidrs信息
 	for _, vItem := range vData {
 		if vItem.KubernetesClusterID != k.ClusterID {
@@ -208,11 +205,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 					continue
 				}
 				if netPrefix.Contains(ip) {
-					if podSubnetLcuuid != "" {
-						subnetLcuuid = podSubnetLcuuid
-					} else {
-						subnetLcuuid = common.GetUUID(k.podNetworkLcuuidCIDRs.networkLcuuid+podNetworkCIDR, uuid.Nil)
-					}
+					subnetLcuuid = common.GetUUID(k.podNetworkLcuuidCIDRs.networkLcuuid+podNetworkCIDR, uuid.Nil)
 					break
 				}
 			}
@@ -239,15 +232,16 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 						log.Warningf("vinterface,ip pod ip (%s) to cidr format not valid", ipString)
 					}
 					subnetLcuuid = common.GetUUID(k.podNetworkLcuuidCIDRs.networkLcuuid+rangePrefix.String(), uuid.Nil)
-					subnet := model.Subnet{
-						Lcuuid:        subnetLcuuid,
-						Name:          rangePrefix.String() + "_POD_NET",
-						CIDR:          rangePrefix.String(),
-						NetworkLcuuid: k.podNetworkLcuuidCIDRs.networkLcuuid,
-						VPCLcuuid:     k.VPCUuid,
+					if _, ok := subnetLcuuidToCIDR[subnetLcuuid]; !ok {
+						podSubnets = append(podSubnets, model.Subnet{
+							Lcuuid:        subnetLcuuid,
+							Name:          rangePrefix.String() + "_POD_NET",
+							CIDR:          rangePrefix.String(),
+							NetworkLcuuid: k.podNetworkLcuuidCIDRs.networkLcuuid,
+							VPCLcuuid:     k.VPCUuid,
+						})
+						subnetLcuuidToCIDR[subnetLcuuid] = rangePrefix
 					}
-					podSubnets = append(podSubnets, subnet)
-					subnetLcuuidToCIDR[subnetLcuuid] = rangePrefix
 				}
 			}
 			modelIP := model.IP{
@@ -268,13 +262,24 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 	for _, v := range subnetLcuuidToCIDR {
 		existCIDR = append(existCIDR, v)
 	}
-	for _, c := range k.podNetworkLcuuidCIDRs.cidrs {
-		cPrefix, err := netaddr.ParseIPPrefix(c)
+	for _, cidr := range k.podNetworkLcuuidCIDRs.cidrs {
+		cPrefix, err := netaddr.ParseIPPrefix(cidr)
 		if err != nil {
-			log.Errorf("vinterface,ip parse pod network cidr (%s) error: (%s)", c, err.Error())
+			log.Errorf("vinterface,ip parse pod network cidr (%s) error: (%s)", cidr, err.Error())
 			continue
 		}
 		existCIDR = append(existCIDR, cPrefix)
+
+		// 顺便生成已获取的 pod 子网
+		pSubnetLcuuid := common.GetUUID(k.podNetworkLcuuidCIDRs.networkLcuuid+cidr, uuid.Nil)
+		podSubnets = append(podSubnets, model.Subnet{
+			Lcuuid:        pSubnetLcuuid,
+			Name:          k.Name + "_POD_NET",
+			CIDR:          cidr,
+			NetworkLcuuid: k.podNetworkLcuuidCIDRs.networkLcuuid,
+			VPCLcuuid:     k.VPCUuid,
+		})
+		subnetLcuuidToCIDR[pSubnetLcuuid] = cPrefix
 	}
 	sort.Strings(aggNoMaskV4Nets)
 	sort.Strings(aggNoMaskV6Nets)
@@ -365,14 +370,13 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 	aggNoMaskNets := append(aggNoMaskV4Nets, aggNoMaskV6Nets...)
 	for _, ipPrefix := range noMaskCIDRs {
 		subnetLcuuid := common.GetUUID(k.podNetworkLcuuidCIDRs.networkLcuuid+"NO_MASK"+ipPrefix.String(), uuid.Nil)
-		subnet := model.Subnet{
+		podSubnets = append(podSubnets, model.Subnet{
 			Lcuuid:        subnetLcuuid,
 			Name:          ipPrefix.String() + "_POD_NET",
 			CIDR:          ipPrefix.String(),
 			NetworkLcuuid: k.podNetworkLcuuidCIDRs.networkLcuuid,
 			VPCLcuuid:     k.VPCUuid,
-		}
-		podSubnets = append(podSubnets, subnet)
+		})
 		ipNetPrefix, _ := netaddr.ParseIPPrefix(ipPrefix.String())
 		subnetLcuuidToCIDR[subnetLcuuid] = ipNetPrefix
 		// 将ip关联到聚合的子网
@@ -397,50 +401,10 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 		podIPs = append(podIPs, *v)
 	}
 
-	// 生成pod的子网
-	for i, pCIDR := range k.podNetworkLcuuidCIDRs.cidrs {
-		if i > 1 {
-			podSubnetLcuuid = common.GetUUID(k.podNetworkLcuuidCIDRs.networkLcuuid+pCIDR, uuid.Nil)
-		}
-		podSubnet := model.Subnet{
-			Lcuuid:        podSubnetLcuuid,
-			Name:          k.Name + "_POD_NET",
-			CIDR:          pCIDR,
-			NetworkLcuuid: k.podNetworkLcuuidCIDRs.networkLcuuid,
-			VPCLcuuid:     k.VPCUuid,
-		}
-		podSubnets = append(podSubnets, podSubnet)
-	}
-
-	// 将genesis API没有获取到的POD IP mac置为全0
-	for pIP, pLcuuid := range k.podIPToLcuuid {
-		vinterfaceLcuuid := common.GetUUID(pLcuuid+common.VIF_DEFAULT_MAC, uuid.Nil)
-		if !vinterfaceLcuuids.Contains(vinterfaceLcuuid) {
-			vinterface := model.VInterface{
-				Lcuuid:        vinterfaceLcuuid,
-				Type:          common.VIF_TYPE_LAN,
-				Mac:           common.VIF_DEFAULT_MAC,
-				DeviceType:    common.VIF_DEVICE_TYPE_POD,
-				DeviceLcuuid:  pLcuuid,
-				NetworkLcuuid: k.podNetworkLcuuidCIDRs.networkLcuuid,
-				VPCLcuuid:     k.VPCUuid,
-				RegionLcuuid:  k.RegionUuid,
-			}
-			podVInterfaces = append(podVInterfaces, vinterface)
-			vinterfaceLcuuids.Add(vinterfaceLcuuid)
-		}
-		modelIP := model.IP{
-			Lcuuid:           common.GetUUID(vinterfaceLcuuid+pLcuuid, uuid.Nil),
-			VInterfaceLcuuid: vinterfaceLcuuid,
-			IP:               pIP,
-			RegionLcuuid:     k.RegionUuid,
-			SubnetLcuuid:     common.GetUUID(k.podNetworkLcuuidCIDRs.networkLcuuid, uuid.Nil),
-		}
-		podIPs = append(podIPs, modelIP)
-	}
 	// 处理nodeIP，生成port，ip，cidrs信息
 	invalidNodeIPs := mapset.NewSet()
 	nodeVinterfaceLcuuids := mapset.NewSet()
+	nodeSubnetLcuuids := mapset.NewSet()
 	for _, vItem := range vData {
 		if vItem.KubernetesClusterID != k.ClusterID {
 			continue
@@ -497,7 +461,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 				if len(k.nodeNetworkLcuuidCIDRs.cidrs) == 1 {
 					k.nodeNetworkLcuuidCIDRs.cidrs = []string{rangePrefix.String()}
 				} else {
-					nodeCIDRs := []string{}
+					nodeCIDRs := map[string]string{}
 					switch {
 					case ipPrefix.IP().Is4():
 						for _, c := range k.nodeNetworkLcuuidCIDRs.cidrs {
@@ -507,7 +471,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 								continue
 							}
 							if nCIDR.IP().Is6() {
-								nodeCIDRs = append(nodeCIDRs, c)
+								nodeCIDRs[c] = ""
 							}
 						}
 					case ipPrefix.IP().Is6():
@@ -518,12 +482,12 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 								continue
 							}
 							if nCIDR.IP().Is4() {
-								nodeCIDRs = append(nodeCIDRs, c)
+								nodeCIDRs[c] = ""
 							}
 						}
 					}
-					nodeCIDRs = append(nodeCIDRs, rangePrefix.String())
-					k.nodeNetworkLcuuidCIDRs.cidrs = nodeCIDRs
+					nodeCIDRs[rangePrefix.String()] = ""
+					k.nodeNetworkLcuuidCIDRs.cidrs = cloudcommon.StringStringMapKeys(nodeCIDRs)
 				}
 				vinterfaceLcuuid := common.GetUUID(k.UuidGenerate+nMAC, uuid.Nil)
 				nodeLcuuid := k.nodeIPToLcuuid[ipPrefix.IP().String()]
@@ -547,7 +511,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               ipPrefix.IP().String(),
 					RegionLcuuid:     k.RegionUuid,
-					SubnetLcuuid:     common.GetUUID(k.nodeNetworkLcuuidCIDRs.networkLcuuid, uuid.Nil),
+					SubnetLcuuid:     common.GetUUID(k.nodeNetworkLcuuidCIDRs.networkLcuuid+rangePrefix.String(), uuid.Nil),
 				}
 				nodeIPs = append(nodeIPs, modelIP)
 				k8sNodeIPs.Remove(ipPrefix.IP().String())
@@ -589,7 +553,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 							continue
 						}
 						if podIPPrefix.Contains(hostip) {
-							nodeSubnetLcuuid = common.GetUUID(k.podNetworkLcuuidCIDRs.networkLcuuid, uuid.Nil)
+							nodeSubnetLcuuid = common.GetUUID(k.podNetworkLcuuidCIDRs.networkLcuuid+pCIDR, uuid.Nil)
 						}
 					}
 					if nodeSubnetLcuuid != "" {
@@ -616,14 +580,17 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 						continue
 					}
 					nodeSubnetLcuuid = common.GetUUID(k.nodeNetworkLcuuidCIDRs.networkLcuuid+cidr, uuid.Nil)
-					subnet := model.Subnet{
-						Lcuuid:        nodeSubnetLcuuid,
-						Name:          cidr + "_NODE_NET",
-						CIDR:          cidr,
-						NetworkLcuuid: networkLcuuid,
-						VPCLcuuid:     k.VPCUuid,
+					if !nodeSubnetLcuuids.Contains(nodeSubnetLcuuid) {
+						nodeSubnets = append(nodeSubnets, model.Subnet{
+							Lcuuid:        nodeSubnetLcuuid,
+							Name:          cidr + "_NODE_NET",
+							CIDR:          cidr,
+							NetworkLcuuid: networkLcuuid,
+							VPCLcuuid:     k.VPCUuid,
+						})
+						nodeSubnetLcuuids.Add(nodeSubnetLcuuid)
+						subnetLcuuidToCIDR[nodeSubnetLcuuid] = ipPrefix
 					}
-					nodeSubnets = append(nodeSubnets, subnet)
 				}
 
 				vinterfaceLcuuid := ""
@@ -659,13 +626,29 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 			}
 		}
 	}
+
+	// 以获取到的node ip为依据，生成node子网
+	for _, nCIDR := range k.nodeNetworkLcuuidCIDRs.cidrs {
+		nodeSubnetLcuuid := common.GetUUID(k.nodeNetworkLcuuidCIDRs.networkLcuuid+nCIDR, uuid.Nil)
+		nodeSubnets = append(nodeSubnets, model.Subnet{
+			Lcuuid:        nodeSubnetLcuuid,
+			Name:          k.Name + "_NODE_NET",
+			CIDR:          nCIDR,
+			NetworkLcuuid: k.nodeNetworkLcuuidCIDRs.networkLcuuid,
+			VPCLcuuid:     k.VPCUuid,
+		})
+		ipNetPrefix, _ := netaddr.ParseIPPrefix(nCIDR)
+		subnetLcuuidToCIDR[nodeSubnetLcuuid] = ipNetPrefix
+		nodeSubnetLcuuidToCIDR[nodeSubnetLcuuid] = ipNetPrefix
+	}
+
 	// 将genesis API没有获取到的容器节点IP mac置为全0
 	for nodeIP, nodeLcuuid := range k.nodeIPToLcuuid {
 		if !k8sNodeIPs.Contains(nodeIP) {
 			continue
 		}
 		vinterfaceLcuuid := common.GetUUID(k.nodeNetworkLcuuidCIDRs.networkLcuuid+nodeLcuuid+common.VIF_DEFAULT_MAC, uuid.Nil)
-		vinterface := model.VInterface{
+		nodeVInterfaces = append(nodeVInterfaces, model.VInterface{
 			Lcuuid:        vinterfaceLcuuid,
 			Type:          common.VIF_TYPE_WAN,
 			Mac:           common.VIF_DEFAULT_MAC,
@@ -674,32 +657,135 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 			NetworkLcuuid: k.nodeNetworkLcuuidCIDRs.networkLcuuid,
 			VPCLcuuid:     k.VPCUuid,
 			RegionLcuuid:  k.RegionUuid,
+		})
+		var nodeSubnetLcuuid string
+		nIPParse := netaddr.MustParseIP(nodeIP)
+		for nLcuuid, cPrefix := range nodeSubnetLcuuidToCIDR {
+			if cPrefix.Contains(nIPParse) {
+				nodeSubnetLcuuid = nLcuuid
+				break
+			}
 		}
-		nodeVInterfaces = append(nodeVInterfaces, vinterface)
-		modelIP := model.IP{
+		nodeIPs = append(nodeIPs, model.IP{
 			Lcuuid:           common.GetUUID(vinterfaceLcuuid+nodeIP, uuid.Nil),
 			VInterfaceLcuuid: vinterfaceLcuuid,
 			IP:               nodeIP,
 			RegionLcuuid:     k.RegionUuid,
-			SubnetLcuuid:     common.GetUUID(k.nodeNetworkLcuuidCIDRs.networkLcuuid, uuid.Nil),
-		}
-		nodeIPs = append(nodeIPs, modelIP)
+			SubnetLcuuid:     nodeSubnetLcuuid,
+		})
 	}
 
-	// 以获取到的node ip为依据，生成node子网
-	nodeSubnetLcuuid := common.GetUUID(k.nodeNetworkLcuuidCIDRs.networkLcuuid, uuid.Nil)
-	for i, nCIDR := range k.nodeNetworkLcuuidCIDRs.cidrs {
-		if i > 1 {
-			nodeSubnetLcuuid = common.GetUUID(k.nodeNetworkLcuuidCIDRs.networkLcuuid+nCIDR, uuid.Nil)
+	// 将genesis API没有获取到的POD IP mac置为全0
+	// 首先将 ip 关联到已有的 pod subnet
+	// 未关联到 subnet 的 ip 重新聚合为新的子网
+	podLcuuidToPodIP := map[string]netaddr.IP{}
+	podV4Cidrs := []netaddr.IPPrefix{}
+	podV6Cidrs := []netaddr.IPPrefix{}
+	for pIP, pLcuuid := range k.podIPToLcuuid {
+		// 过滤掉 hostnetwork 类型的 pod ip
+		if _, ok := k.nodeIPToLcuuid[pIP]; ok {
+			continue
 		}
-		nodeSubnet := model.Subnet{
-			Lcuuid:        nodeSubnetLcuuid,
-			Name:          k.Name + "_NODE_NET",
-			CIDR:          nCIDR,
-			NetworkLcuuid: k.nodeNetworkLcuuidCIDRs.networkLcuuid,
-			VPCLcuuid:     k.VPCUuid,
+		vinterfaceLcuuid := common.GetUUID(pLcuuid+common.VIF_DEFAULT_MAC, uuid.Nil)
+		if !vinterfaceLcuuids.Contains(vinterfaceLcuuid) {
+			vinterface := model.VInterface{
+				Lcuuid:        vinterfaceLcuuid,
+				Type:          common.VIF_TYPE_LAN,
+				Mac:           common.VIF_DEFAULT_MAC,
+				DeviceType:    common.VIF_DEVICE_TYPE_POD,
+				DeviceLcuuid:  pLcuuid,
+				NetworkLcuuid: k.podNetworkLcuuidCIDRs.networkLcuuid,
+				VPCLcuuid:     k.VPCUuid,
+				RegionLcuuid:  k.RegionUuid,
+			}
+			podVInterfaces = append(podVInterfaces, vinterface)
+			vinterfaceLcuuids.Add(vinterfaceLcuuid)
 		}
-		nodeSubnets = append(nodeSubnets, nodeSubnet)
+
+		var podSubnetLcuuid string
+		pIPParse := netaddr.MustParseIP(pIP)
+		for sLcuuid, cPrefix := range subnetLcuuidToCIDR {
+			if cPrefix.Contains(pIPParse) {
+				podSubnetLcuuid = sLcuuid
+				break
+			}
+		}
+		if podSubnetLcuuid == "" {
+			switch {
+			case pIPParse.Is4():
+				pV4Cidr, err := pIPParse.Prefix(32)
+				if err == nil {
+					podV4Cidrs = append(podV4Cidrs, pV4Cidr)
+				}
+			case pIPParse.Is6():
+				pV6Cidr, err := pIPParse.Prefix(128)
+				if err == nil {
+					podV6Cidrs = append(podV6Cidrs, pV6Cidr)
+				}
+			}
+			podLcuuidToPodIP[pLcuuid] = pIPParse
+			continue
+		}
+		modelIP := model.IP{
+			Lcuuid:           common.GetUUID(vinterfaceLcuuid+pLcuuid, uuid.Nil),
+			VInterfaceLcuuid: vinterfaceLcuuid,
+			IP:               pIP,
+			RegionLcuuid:     k.RegionUuid,
+			SubnetLcuuid:     podSubnetLcuuid,
+		}
+		podIPs = append(podIPs, modelIP)
+	}
+	var pV4cidrs, pV6cidrs []string
+	var pV4cidr, pV6cidr, pV4SLcuuid, pV6SLcuuid string
+	if len(podV4Cidrs) != 0 {
+		pV4cidrs = cloudcommon.AggregateCIDR(podV4Cidrs, 0)
+		if len(pV4cidrs) == 1 {
+			pV4cidr = pV4cidrs[0]
+			pV4SLcuuid = common.GetUUID(k.podNetworkLcuuidCIDRs.networkLcuuid+pV4cidr, uuid.Nil)
+			podSubnets = append(podSubnets, model.Subnet{
+				Lcuuid:        pV4SLcuuid,
+				Name:          k.Name + "_POD_NET",
+				CIDR:          pV4cidr,
+				NetworkLcuuid: k.podNetworkLcuuidCIDRs.networkLcuuid,
+				VPCLcuuid:     k.VPCUuid,
+			})
+		}
+	}
+	if len(podV6Cidrs) != 0 {
+		pV6cidrs = cloudcommon.AggregateCIDR(podV6Cidrs, 0)
+		if len(pV6cidrs) == 1 {
+			pV6cidr = pV6cidrs[0]
+			pV6SLcuuid = common.GetUUID(k.podNetworkLcuuidCIDRs.networkLcuuid+pV6cidr, uuid.Nil)
+			podSubnets = append(podSubnets, model.Subnet{
+				Lcuuid:        pV6SLcuuid,
+				Name:          k.Name + "_POD_NET",
+				CIDR:          pV6cidr,
+				NetworkLcuuid: k.podNetworkLcuuidCIDRs.networkLcuuid,
+				VPCLcuuid:     k.VPCUuid,
+			})
+		}
+	}
+	for lcuuid, ip := range podLcuuidToPodIP {
+		var sLcuuid string
+		vinterfaceLcuuid := common.GetUUID(lcuuid+common.VIF_DEFAULT_MAC, uuid.Nil)
+		switch {
+		case ip.Is4():
+			sLcuuid = pV4SLcuuid
+		case ip.Is6():
+			sLcuuid = pV6SLcuuid
+		}
+		if sLcuuid == "" {
+			log.Infof("vinterface,ip pod ip (%s) not found subnet", ip.String())
+			continue
+		}
+		modelIP := model.IP{
+			Lcuuid:           common.GetUUID(vinterfaceLcuuid+lcuuid, uuid.Nil),
+			VInterfaceLcuuid: vinterfaceLcuuid,
+			IP:               ip.String(),
+			RegionLcuuid:     k.RegionUuid,
+			SubnetLcuuid:     sLcuuid,
+		}
+		podIPs = append(podIPs, modelIP)
 	}
 
 	log.Debug("get vinterfaces,ips complete")
