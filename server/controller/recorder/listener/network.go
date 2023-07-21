@@ -34,14 +34,17 @@ func NewNetwork(c *cache.Cache) *Network {
 }
 
 func (n *Network) OnUpdaterAdded(addedDBItems []*mysql.Network) {
+	n.cache.Changed = true
 	n.cache.AddNetworks(addedDBItems)
 }
 
 func (n *Network) OnUpdaterUpdated(cloudItem *cloudmodel.Network, diffBase *cache.Network) {
+	n.cache.Changed = true
 	diffBase.Update(cloudItem)
 	n.cache.UpdateNetwork(cloudItem)
 }
 
 func (n *Network) OnUpdaterDeleted(lcuuids []string) {
+	n.cache.Changed = true
 	n.cache.DeleteNetworks(lcuuids)
 }

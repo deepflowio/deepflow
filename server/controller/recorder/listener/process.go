@@ -38,16 +38,19 @@ func NewProcess(c *cache.Cache, eq *queue.OverwriteQueue) *Process {
 }
 
 func (p *Process) OnUpdaterAdded(addedDBItems []*mysql.Process) {
+	p.cache.Changed = true
 	p.eventProducer.ProduceByAdd(addedDBItems)
 	p.cache.AddProcesses(addedDBItems)
 }
 
 func (p *Process) OnUpdaterUpdated(cloudItem *cloudmodel.Process, diffBase *cache.Process) {
+	p.cache.Changed = true
 	p.eventProducer.ProduceByUpdate(cloudItem, diffBase)
 	diffBase.Update(cloudItem)
 }
 
 func (p *Process) OnUpdaterDeleted(lcuuids []string) {
+	p.cache.Changed = true
 	p.eventProducer.ProduceByDelete(lcuuids)
 	p.cache.DeleteProcesses(lcuuids)
 }

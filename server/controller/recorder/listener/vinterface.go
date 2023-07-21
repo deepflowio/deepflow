@@ -33,14 +33,17 @@ func NewVInterface(c *cache.Cache) *VInterface {
 }
 
 func (i *VInterface) OnUpdaterAdded(addedDBItems []*mysql.VInterface) {
+	i.cache.Changed = true
 	i.cache.AddVInterfaces(addedDBItems)
 }
 
 func (i *VInterface) OnUpdaterUpdated(cloudItem *cloudmodel.VInterface, diffBase *cache.VInterface) {
+	i.cache.Changed = true
 	diffBase.Update(cloudItem)
 	i.cache.UpdateVInterface(cloudItem)
 }
 
 func (i *VInterface) OnUpdaterDeleted(lcuuids []string) {
+	i.cache.Changed = true
 	i.cache.DeleteVInterfaces(lcuuids)
 }

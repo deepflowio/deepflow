@@ -38,17 +38,20 @@ func NewPodNode(c *cache.Cache, eq *queue.OverwriteQueue) *PodNode {
 }
 
 func (n *PodNode) OnUpdaterAdded(addedDBItems []*mysql.PodNode) {
+	n.cache.Changed = true
 	n.eventProducer.ProduceByAdd(addedDBItems)
 	n.cache.AddPodNodes(addedDBItems)
 }
 
 func (n *PodNode) OnUpdaterUpdated(cloudItem *cloudmodel.PodNode, diffBase *cache.PodNode) {
+	n.cache.Changed = true
 	n.eventProducer.ProduceByUpdate(cloudItem, diffBase)
 	diffBase.Update(cloudItem)
 	n.cache.UpdatePodNode(cloudItem)
 }
 
 func (n *PodNode) OnUpdaterDeleted(lcuuids []string) {
+	n.cache.Changed = true
 	n.eventProducer.ProduceByDelete(lcuuids)
 	n.cache.DeletePodNodes(lcuuids)
 }

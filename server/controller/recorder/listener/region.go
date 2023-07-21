@@ -34,13 +34,16 @@ func NewRegion(c *cache.Cache) *Region {
 }
 
 func (r *Region) OnUpdaterAdded(addedDBItems []*mysql.Region) {
+	r.cache.Changed = true
 	r.cache.AddRegions(addedDBItems)
 }
 
 func (r *Region) OnUpdaterUpdated(cloudItem *cloudmodel.Region, diffBase *cache.Region) {
+	r.cache.Changed = true
 	diffBase.Update(cloudItem)
 }
 
 func (r *Region) OnUpdaterDeleted(lcuuids []string) {
+	r.cache.Changed = true
 	r.cache.DeleteRegions(lcuuids)
 }

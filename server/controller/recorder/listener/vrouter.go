@@ -38,17 +38,20 @@ func NewVRouter(c *cache.Cache, eq *queue.OverwriteQueue) *VRouter {
 }
 
 func (r *VRouter) OnUpdaterAdded(addedDBItems []*mysql.VRouter) {
+	r.cache.Changed = true
 	r.eventProducer.ProduceByAdd(addedDBItems)
 	r.cache.AddVRouters(addedDBItems)
 }
 
 func (r *VRouter) OnUpdaterUpdated(cloudItem *cloudmodel.VRouter, diffBase *cache.VRouter) {
+	r.cache.Changed = true
 	r.eventProducer.ProduceByUpdate(cloudItem, diffBase)
 	diffBase.Update(cloudItem)
 	r.cache.UpdateVRouter(cloudItem)
 }
 
 func (r *VRouter) OnUpdaterDeleted(lcuuids []string) {
+	r.cache.Changed = true
 	r.eventProducer.ProduceByDelete(lcuuids)
 	r.cache.DeleteVRouters(lcuuids)
 }

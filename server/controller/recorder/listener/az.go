@@ -34,13 +34,16 @@ func NewAZ(c *cache.Cache) *AZ {
 }
 
 func (a *AZ) OnUpdaterAdded(addedDBItems []*mysql.AZ) {
+	a.cache.Changed = true
 	a.cache.AddAZs(addedDBItems)
 }
 
 func (a *AZ) OnUpdaterUpdated(cloudItem *cloudmodel.AZ, diffBase *cache.AZ) {
+	a.cache.Changed = true
 	diffBase.Update(cloudItem)
 }
 
 func (a *AZ) OnUpdaterDeleted(lcuuids []string) {
+	a.cache.Changed = true
 	a.cache.DeleteAZs(lcuuids)
 }

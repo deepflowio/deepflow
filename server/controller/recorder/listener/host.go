@@ -38,17 +38,20 @@ func NewHost(c *cache.Cache, eq *queue.OverwriteQueue) *Host {
 }
 
 func (h *Host) OnUpdaterAdded(addedDBItems []*mysql.Host) {
+	h.cache.Changed = true
 	h.eventProducer.ProduceByAdd(addedDBItems)
 	h.cache.AddHosts(addedDBItems)
 }
 
 func (h *Host) OnUpdaterUpdated(cloudItem *cloudmodel.Host, diffBase *cache.Host) {
+	h.cache.Changed = true
 	h.eventProducer.ProduceByUpdate(cloudItem, diffBase)
 	diffBase.Update(cloudItem)
 	h.cache.UpdateHost(cloudItem)
 }
 
 func (h *Host) OnUpdaterDeleted(lcuuids []string) {
+	h.cache.Changed = true
 	h.eventProducer.ProduceByDelete(lcuuids)
 	h.cache.DeleteHosts(lcuuids)
 }

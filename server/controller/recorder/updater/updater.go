@@ -74,13 +74,11 @@ func (u *UpdaterBase[CT, MT, BT]) HandleAddAndUpdate() {
 			if ok {
 				log.Infof("to update (cloud item: %#v, diff base item: %#v)", cloudItem, diffBase)
 				u.update(&cloudItem, diffBase, updateInfo)
-				u.cache.Changed = true
 			}
 		}
 	}
 	if len(dbItemsToAdd) > 0 {
 		u.add(dbItemsToAdd)
-		u.cache.Changed = true
 	}
 }
 
@@ -94,7 +92,6 @@ func (u *UpdaterBase[CT, MT, BT]) HandleDelete() {
 	}
 	if len(lcuuidsOfBatchToDelete) > 0 {
 		u.delete(lcuuidsOfBatchToDelete)
-		u.cache.Changed = true
 	}
 }
 

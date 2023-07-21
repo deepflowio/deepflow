@@ -38,17 +38,20 @@ func NewVM(c *cache.Cache, eq *queue.OverwriteQueue) *VM {
 }
 
 func (vm *VM) OnUpdaterAdded(addedDBItems []*mysql.VM) {
+	vm.cache.Changed = true
 	vm.eventProducer.ProduceByAdd(addedDBItems)
 	vm.cache.AddVMs(addedDBItems)
 }
 
 func (vm *VM) OnUpdaterUpdated(cloudItem *cloudmodel.VM, diffBase *cache.VM) {
+	vm.cache.Changed = true
 	vm.eventProducer.ProduceByUpdate(cloudItem, diffBase)
 	diffBase.Update(cloudItem)
 	vm.cache.UpdateVM(cloudItem)
 }
 
 func (vm *VM) OnUpdaterDeleted(lcuuids []string) {
+	vm.cache.Changed = true
 	vm.eventProducer.ProduceByDelete(lcuuids)
 	vm.cache.DeleteVMs(lcuuids)
 }

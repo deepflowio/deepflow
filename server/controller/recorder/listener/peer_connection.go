@@ -34,13 +34,16 @@ func NewPeerConnection(c *cache.Cache) *PeerConnection {
 }
 
 func (c *PeerConnection) OnUpdaterAdded(addedDBItems []*mysql.PeerConnection) {
+	c.cache.Changed = true
 	c.cache.AddPeerConnections(addedDBItems)
 }
 
 func (c *PeerConnection) OnUpdaterUpdated(cloudItem *cloudmodel.PeerConnection, diffBase *cache.PeerConnection) {
+	c.cache.Changed = true
 	diffBase.Update(cloudItem)
 }
 
 func (c *PeerConnection) OnUpdaterDeleted(lcuuids []string) {
+	c.cache.Changed = true
 	c.cache.DeletePeerConnections(lcuuids)
 }
