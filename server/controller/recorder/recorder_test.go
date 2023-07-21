@@ -24,13 +24,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
-
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
 	"github.com/deepflowio/deepflow/server/controller/recorder/test"
+	"github.com/deepflowio/deepflow/server/controller/recorder/updater"
+	"github.com/google/uuid"
 )
 
 // const (
@@ -94,5 +95,56 @@ func TestMain(m *testing.M) {
 func clearDBFile() {
 	if _, err := os.Stat(TEST_DB_FILE); err == nil {
 		os.Remove(TEST_DB_FILE)
+	}
+}
+
+func Test_isPlatformDataChanged(t *testing.T) {
+	type args struct {
+		updatersInUpdateOrder []updater.ResourceUpdater
+	}
+	tests := []struct {
+		name       string
+		args       args
+		prepareRun func() []updater.ResourceUpdater
+		want       bool
+	}{
+		{
+			name: "pod changed",
+			prepareRun: func() []updater.ResourceUpdater {
+				cache := cache.NewCache("")
+				podUpdater := updater.NewPod(cache, nil)
+				podUpdater.Changed = true
+				updaters := []updater.ResourceUpdater{
+					podUpdater,
+					updater.NewPodNode(cache, nil),
+				}
+
+				return updaters
+			},
+			want: true,
+		},
+		{
+			name: "not changed",
+			prepareRun: func() []updater.ResourceUpdater {
+				cache := cache.NewCache("")
+				cenUpdater := updater.NewCEN(cache, nil)
+				cenUpdater.Changed = true
+				updaters := []updater.ResourceUpdater{
+					updater.NewPod(cache, nil),
+					cenUpdater,
+				}
+
+				return updaters
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.args.updatersInUpdateOrder = tt.prepareRun()
+			if got := isPlatformDataChanged(tt.args.updatersInUpdateOrder); got != tt.want {
+				t.Errorf("isPlatformDataChanged() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

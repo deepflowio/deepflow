@@ -31,6 +31,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
 	"github.com/deepflowio/deepflow/server/controller/recorder/listener"
 	"github.com/deepflowio/deepflow/server/controller/recorder/updater"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
@@ -167,6 +168,7 @@ func (r *Recorder) refreshDomain(cloudData cloudmodel.Resource) {
 	listener := listener.NewWholeDomain(r.domainLcuuid, r.cacheMng.DomainCache, r.eventQueue)
 	domainUpdatersInUpdateOrder := r.getDomainUpdatersInOrder(cloudData)
 	r.executeUpdaters(domainUpdatersInUpdateOrder)
+	r.notifyOnResourceChanged(domainUpdatersInUpdateOrder)
 	listener.OnUpdatersCompleted()
 	log.Infof("domain (lcuuid: %s, name: %s) refresh completed", r.domainLcuuid, r.domainName)
 }
@@ -291,6 +293,7 @@ func (r *Recorder) refreshSubDomains(cloudSubDomainResourceMap map[string]cloudm
 		listener := listener.NewWholeSubDomain(r.domainLcuuid, subDomainLcuuid, r.cacheMng.DomainCache, r.eventQueue)
 		subDomainUpdatersInUpdateOrder := r.getSubDomainUpdatersInOrder(subDomainLcuuid, subDomainResource, nil, nil)
 		r.executeUpdaters(subDomainUpdatersInUpdateOrder)
+		r.notifyOnResourceChanged(subDomainUpdatersInUpdateOrder)
 		listener.OnUpdatersCompleted()
 
 		log.Infof("sub_domain (lcuuid: %s) sync refresh completed", subDomainLcuuid)
@@ -373,6 +376,32 @@ func (r *Recorder) executeUpdaters(updatersInUpdateOrder []updater.ResourceUpdat
 	}
 	processUpdater.HandleDelete()
 	vmPodNodeConnectionUpdater.HandleDelete()
+}
+
+func (r *Recorder) notifyOnResourceChanged(updatersInUpdateOrder []updater.ResourceUpdater) {
+	platformDataChanged := isPlatformDataChanged(updatersInUpdateOrder)
+	if platformDataChanged {
+		log.Infof("domain(%v) data changed, refresh platform data", r.domainLcuuid)
+		refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_PLATFORM_DATA})
+	}
+}
+
+var platformDataResource = []string{
+	"mysql.Region", "mysql.AZ", "mysql.Host", "mysql.VM", "mysql.VInterface",
+	"mysql.VRouter", "mysql.Network", "mysql.PeerConnection",
+	"mysql.Pod", "mysql.PodNode", "mysql.Process",
+}
+
+func isPlatformDataChanged(updatersInUpdateOrder []updater.ResourceUpdater) bool {
+	platformDataChanged := false
+	for _, updater := range updatersInUpdateOrder {
+		for _, resource := range updater.GetMySQLModelString() {
+			if common.Contains(platformDataResource, resource) {
+				platformDataChanged = platformDataChanged || updater.GetChanged()
+			}
+		}
+	}
+	return platformDataChanged
 }
 
 func (r *Recorder) formatDomainStateInfo(domainResource cloudmodel.Resource) (state int, errMsg string) {
