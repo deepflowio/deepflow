@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,9 +14,16 @@
  * limitations under the License.
  */
 
-package migration
+package filter
 
-const (
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "6.3.1.33"
+import (
+	"github.com/op/go-logging"
+
+	"github.com/deepflowio/deepflow/server/controller/http/service/resource/common"
 )
+
+var log = logging.MustGetLogger("http.service.resource.filter")
+
+type Filter interface {
+	Filter(data []common.ResponseElem) ([]common.ResponseElem, error)
+}
