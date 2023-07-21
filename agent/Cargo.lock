@@ -1686,19 +1686,19 @@ dependencies = [
 [[package]]
 name = "kube"
 version = "0.74.0"
-source = "git+https://github.com/deepflowio/kube?tag=0.74.2#c423734b258393beb1019bd6896ea5b9f7df5e36"
+source = "git+https://github.com/deepflowio/kube?tag=0.74.3#01eab893a60300b90b32aabdc1fb6eea01e0e436"
 dependencies = [
  "k8s-openapi",
  "kube-client",
  "kube-core",
- "kube-derive 0.74.0 (git+https://github.com/deepflowio/kube?tag=0.74.2)",
+ "kube-derive 0.74.0 (git+https://github.com/deepflowio/kube?tag=0.74.3)",
  "kube-runtime",
 ]
 
 [[package]]
 name = "kube-client"
 version = "0.74.0"
-source = "git+https://github.com/deepflowio/kube?tag=0.74.2#c423734b258393beb1019bd6896ea5b9f7df5e36"
+source = "git+https://github.com/deepflowio/kube?tag=0.74.3#01eab893a60300b90b32aabdc1fb6eea01e0e436"
 dependencies = [
  "base64 0.13.0",
  "bytes 1.2.1",
@@ -1733,7 +1733,7 @@ dependencies = [
 [[package]]
 name = "kube-core"
 version = "0.74.0"
-source = "git+https://github.com/deepflowio/kube?tag=0.74.2#c423734b258393beb1019bd6896ea5b9f7df5e36"
+source = "git+https://github.com/deepflowio/kube?tag=0.74.3#01eab893a60300b90b32aabdc1fb6eea01e0e436"
 dependencies = [
  "chrono",
  "form_urlencoded",
@@ -1763,7 +1763,7 @@ dependencies = [
 [[package]]
 name = "kube-derive"
 version = "0.74.0"
-source = "git+https://github.com/deepflowio/kube?tag=0.74.2#c423734b258393beb1019bd6896ea5b9f7df5e36"
+source = "git+https://github.com/deepflowio/kube?tag=0.74.3#01eab893a60300b90b32aabdc1fb6eea01e0e436"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -1775,7 +1775,7 @@ dependencies = [
 [[package]]
 name = "kube-runtime"
 version = "0.74.0"
-source = "git+https://github.com/deepflowio/kube?tag=0.74.2#c423734b258393beb1019bd6896ea5b9f7df5e36"
+source = "git+https://github.com/deepflowio/kube?tag=0.74.3#01eab893a60300b90b32aabdc1fb6eea01e0e436"
 dependencies = [
  "ahash 0.7.6",
  "backoff",
