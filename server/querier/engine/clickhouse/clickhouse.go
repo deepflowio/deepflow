@@ -1322,7 +1322,6 @@ func LoadDbDescriptions(dbDescriptions map[string]interface{}) error {
 				if err != nil {
 					return err
 				}
-				loadMetrics["*"] = metrics.NewCountAllMertic(table, len(loadMetrics))
 				err = metrics.MergeMetrics(db, table, loadMetrics)
 				if err != nil {
 					return err
