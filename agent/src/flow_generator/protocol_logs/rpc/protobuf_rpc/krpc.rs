@@ -189,7 +189,8 @@ impl KrpcLog {
         payload: &[u8],
         param: &ParseParam,
         check: bool,
-    ) -> Result<Vec<L7ProtocolInfo>> {
+        info: &mut KrpcInfo,
+    ) -> Result<()> {
         if payload.len() < KRPC_FIX_HDR_LEN || &payload[..2] != b"KR" {
             return Err(Error::L7ProtocolUnknown);
         }
@@ -217,13 +218,11 @@ impl KrpcLog {
             }
         }
 
-        let mut info = KrpcInfo::default();
-
         info.fill_from_pb(hdr)?;
 
         // filter heartbreat
         if info.is_heartbeat() || check {
-            return Ok(vec![]);
+            return Ok(());
         }
         match info.msg_type {
             LogMessageType::Request => self.perf_stats.as_mut().unwrap().inc_req(),
@@ -240,9 +239,7 @@ impl KrpcLog {
             info.rrt = rrt;
             self.perf_stats.as_mut().unwrap().update_rrt(rrt);
         });
-        Ok(vec![L7ProtocolInfo::ProtobufRpcInfo(
-            ProtobufRpcInfo::KrpcInfo(info),
-        )])
+        Ok(())
     }
 }
 
@@ -252,18 +249,17 @@ impl L7ProtocolParserInterface for KrpcLog {
             return false;
         }
 
-        if let Ok(info) = self.parse(payload, param, true) {
-            info.get(0).map_or(false, |info| {
-                info.app_proto_head()
-                    .map_or(false, |m| m.msg_type == LogMessageType::Request)
-            })
-        } else {
-            false
-        }
+        let mut info = KrpcInfo::default();
+        self.parse(payload, param, true, &mut info).is_ok()
+            && info.msg_type == LogMessageType::Request
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
-        self.parse(payload, param, false)
+        let mut info = KrpcInfo::default();
+        self.parse(payload, param, false, &mut info)?;
+        Ok(vec![L7ProtocolInfo::ProtobufRpcInfo(
+            ProtobufRpcInfo::KrpcInfo(info),
+        )])
     }
 
     fn protocol(&self) -> L7Protocol {
