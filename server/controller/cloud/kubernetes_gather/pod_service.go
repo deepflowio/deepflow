@@ -17,11 +17,12 @@
 package kubernetes_gather
 
 import (
+	"strconv"
+	"strings"
+
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"strconv"
-	"strings"
 
 	"github.com/bitly/go-simplejson"
 	mapset "github.com/deckarep/golang-set"
@@ -35,188 +36,196 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 		"NodePort":  common.POD_SERVICE_TYPE_NODEPORT,
 		"ClusterIP": common.POD_SERVICE_TYPE_CLUSTERIP,
 	}
-	servicesArray := k.k8sInfo["*v1.Service"]
-	if serviceRules, ok := k.k8sInfo["*v1.ServiceRule"]; ok {
-		servicesArray = append(servicesArray, serviceRules...)
-	}
-	for _, s := range servicesArray {
-		sData, sErr := simplejson.NewJson([]byte(s))
-		if sErr != nil {
-			err = sErr
-			log.Errorf("service initialization simplejson error: (%s)", sErr.Error())
-			return
-		}
-		metaData, ok := sData.CheckGet("metadata")
-		if !ok {
-			log.Info("service metadata not found")
-			continue
-		}
-		uID := metaData.Get("uid").MustString()
-		if uID == "" {
-			log.Info("service uid not found")
-			continue
-		}
-		name := metaData.Get("name").MustString()
-		if name == "" {
-			log.Infof("service (%s) name not found", uID)
-			continue
-		}
-		namespace := metaData.Get("namespace").MustString()
-		namespaceLcuuid, ok := k.namespaceToLcuuid[namespace]
-		if !ok {
-			log.Infof("service (%s) namespace not found", name)
-			continue
-		}
-		selector := sData.Get("spec").Get("selector").MustMap()
-		if len(selector) == 0 {
-			log.Infof("service (%s) selector not found", name)
-			continue
-		}
-		selectorSlice := cloudcommon.StringInterfaceMapKVs(selector, ":")
-		selectorStrings := strings.Join(selectorSlice, ",")
-		specTypeString := sData.Get("spec").Get("type").MustString()
-		specType, ok := serviceTypes[specTypeString]
-		if !ok {
-			log.Infof("service (%s) type (%s) not support", name, specTypeString)
-			continue
-		}
-		clusterIP := sData.Get("spec").Get("clusterIP").MustString()
-		if clusterIP == "None" {
-			clusterIP = ""
-		}
-		labels := metaData.Get("labels").MustMap()
-		labelSlice := cloudcommon.StringInterfaceMapKVs(labels, ":")
-		labelString := strings.Join(labelSlice, ", ")
-		service := model.PodService{
-			Lcuuid:             uID,
-			Name:               name,
-			Label:              labelString,
-			Type:               specType,
-			Selector:           selectorStrings,
-			ServiceClusterIP:   clusterIP,
-			PodNamespaceLcuuid: namespaceLcuuid,
-			VPCLcuuid:          k.VPCUuid,
-			AZLcuuid:           k.azLcuuid,
-			RegionLcuuid:       k.RegionUuid,
-			PodClusterLcuuid:   common.GetUUID(k.UuidGenerate, uuid.Nil),
-		}
-		specPorts := sData.Get("spec").Get("ports")
-		var hasPodGroup bool
-		for i := range specPorts.MustArray() {
-			labels, fErr := metaData.Get("annotations").Get("field.cattle.io/targetWorkloadIds").String()
-			podGroupLcuuids := mapset.NewSet()
-			if fErr == nil && labels != "[]" && labels != "null" {
-				labelArray, lErr := simplejson.NewJson([]byte(labels))
-				if lErr != nil {
-					err = lErr
-					log.Errorf("service labels initialization simplejson error: (%s)", lErr.Error())
-					return
+	servicesArrays := [][]string{k.k8sInfo["*v1.Service"]}
+	servicesArrays = append(servicesArrays, k.k8sInfo["*v1.ServiceRule"])
+	for i, servicesArray := range servicesArrays {
+		for _, s := range servicesArray {
+			sData, sErr := simplejson.NewJson([]byte(s))
+			if sErr != nil {
+				err = sErr
+				log.Errorf("service initialization simplejson error: (%s)", sErr.Error())
+				return
+			}
+			metaData, ok := sData.CheckGet("metadata")
+			if !ok {
+				log.Info("service metadata not found")
+				continue
+			}
+			uID := metaData.Get("uid").MustString()
+			if uID == "" {
+				log.Info("service uid not found")
+				continue
+			}
+			name := metaData.Get("name").MustString()
+			if name == "" {
+				log.Infof("service (%s) name not found", uID)
+				continue
+			}
+			namespace := metaData.Get("namespace").MustString()
+			namespaceLcuuid, ok := k.namespaceToLcuuid[namespace]
+			if !ok {
+				log.Infof("service (%s) namespace not found", name)
+				continue
+			}
+			selector := sData.Get("spec").Get("selector").MustMap()
+			if len(selector) == 0 {
+				log.Infof("service (%s) selector not found", name)
+				continue
+			}
+			selectorSlice := cloudcommon.StringInterfaceMapKVs(selector, ":")
+			selectorStrings := strings.Join(selectorSlice, ",")
+			specTypeString := sData.Get("spec").Get("type").MustString()
+			specType, ok := serviceTypes[specTypeString]
+			if !ok {
+				log.Infof("service (%s) type (%s) not support", name, specTypeString)
+				continue
+			}
+			clusterIP := sData.Get("spec").Get("clusterIP").MustString()
+			if clusterIP == "None" {
+				clusterIP = ""
+			}
+			labels := metaData.Get("labels").MustMap()
+			switch i {
+			case 1:
+				if v, ok := labels[cloudcommon.SVC_RULE_RESOURCE_NAME]; ok {
+					delete(labels, cloudcommon.SVC_RULE_RESOURCE_NAME)
+					labels[cloudcommon.SVC_RULE_RESOURCE_NAME+"_servicerule"] = v
 				}
-				for i := range labelArray.MustArray() {
-					if groupLcuuids, ok := k.nsLabelToGroupLcuuids[namespace+labelArray.GetIndex(i).MustString()]; ok {
-						if groupLcuuids.Cardinality() > 0 {
-							podGroupLcuuids.Add(groupLcuuids)
+			}
+			labelSlice := cloudcommon.StringInterfaceMapKVs(labels, ":")
+			labelString := strings.Join(labelSlice, ", ")
+			service := model.PodService{
+				Lcuuid:             uID,
+				Name:               name,
+				Label:              labelString,
+				Type:               specType,
+				Selector:           selectorStrings,
+				ServiceClusterIP:   clusterIP,
+				PodNamespaceLcuuid: namespaceLcuuid,
+				VPCLcuuid:          k.VPCUuid,
+				AZLcuuid:           k.azLcuuid,
+				RegionLcuuid:       k.RegionUuid,
+				PodClusterLcuuid:   common.GetUUID(k.UuidGenerate, uuid.Nil),
+			}
+			specPorts := sData.Get("spec").Get("ports")
+			var hasPodGroup bool
+			for i := range specPorts.MustArray() {
+				labels, fErr := metaData.Get("annotations").Get("field.cattle.io/targetWorkloadIds").String()
+				podGroupLcuuids := mapset.NewSet()
+				if fErr == nil && labels != "[]" && labels != "null" {
+					labelArray, lErr := simplejson.NewJson([]byte(labels))
+					if lErr != nil {
+						err = lErr
+						log.Errorf("service labels initialization simplejson error: (%s)", lErr.Error())
+						return
+					}
+					for i := range labelArray.MustArray() {
+						if groupLcuuids, ok := k.nsLabelToGroupLcuuids[namespace+labelArray.GetIndex(i).MustString()]; ok {
+							if groupLcuuids.Cardinality() > 0 {
+								podGroupLcuuids.Add(groupLcuuids)
+							}
 						}
 					}
 				}
-			}
-			groupLcuuidsList := []mapset.Set{}
-			for key, v := range selector {
-				nsLabel := namespace + key + "_" + v.(string)
-				groupLcuuids, ok := k.nsLabelToGroupLcuuids[nsLabel]
-				if !ok {
+				groupLcuuidsList := []mapset.Set{}
+				for key, v := range selector {
+					nsLabel := namespace + key + "_" + v.(string)
+					groupLcuuids, ok := k.nsLabelToGroupLcuuids[nsLabel]
+					if !ok {
+						continue
+					}
+					groupLcuuidsList = append(groupLcuuidsList, groupLcuuids)
+				}
+				// 如果存在label匹配不到PodGroup，则认为找不到匹配的PodGroup
+				if len(groupLcuuidsList) != len(selector) {
 					continue
 				}
-				groupLcuuidsList = append(groupLcuuidsList, groupLcuuids)
-			}
-			// 如果存在label匹配不到PodGroup，则认为找不到匹配的PodGroup
-			if len(groupLcuuidsList) != len(selector) {
-				continue
-			}
 
-			// 各Label的PodGroup求交集，作为service关联的PodGroup
-			intersectGroupLcuuids := mapset.NewSet()
-			if len(groupLcuuidsList) == 1 {
-				intersectGroupLcuuids = groupLcuuidsList[0]
-			} else if len(groupLcuuidsList) > 1 {
-				intersectGroupLcuuids = groupLcuuidsList[0]
-				for _, lcuuids := range groupLcuuidsList[1:] {
-					intersectGroupLcuuids = intersectGroupLcuuids.Intersect(lcuuids)
+				// 各Label的PodGroup求交集，作为service关联的PodGroup
+				intersectGroupLcuuids := mapset.NewSet()
+				if len(groupLcuuidsList) == 1 {
+					intersectGroupLcuuids = groupLcuuidsList[0]
+				} else if len(groupLcuuidsList) > 1 {
+					intersectGroupLcuuids = groupLcuuidsList[0]
+					for _, lcuuids := range groupLcuuidsList[1:] {
+						intersectGroupLcuuids = intersectGroupLcuuids.Intersect(lcuuids)
+					}
 				}
-			}
-			if intersectGroupLcuuids.Cardinality() > 0 {
-				podGroupLcuuids = podGroupLcuuids.Union(intersectGroupLcuuids)
-			}
-			// 如果没有找到关联PodGroup，进入下一循环
-			if podGroupLcuuids.Cardinality() == 0 {
-				log.Infof("service (%s) pod group id not found", name)
-				continue
-			}
-			hasPodGroup = true
-
-			podTargetPorts := map[string]int{}
-			for _, pgLcuuid := range podGroupLcuuids.ToSlice() {
-				targetPorts, ok := k.pgLcuuidTopodTargetPorts[pgLcuuid.(string)]
-				if !ok {
+				if intersectGroupLcuuids.Cardinality() > 0 {
+					podGroupLcuuids = podGroupLcuuids.Union(intersectGroupLcuuids)
+				}
+				// 如果没有找到关联PodGroup，进入下一循环
+				if podGroupLcuuids.Cardinality() == 0 {
+					log.Infof("service (%s) pod group id not found", name)
 					continue
 				}
-				for name, port := range targetPorts {
-					podTargetPorts[name] = port
+				hasPodGroup = true
+
+				podTargetPorts := map[string]int{}
+				for _, pgLcuuid := range podGroupLcuuids.ToSlice() {
+					targetPorts, ok := k.pgLcuuidTopodTargetPorts[pgLcuuid.(string)]
+					if !ok {
+						continue
+					}
+					for name, port := range targetPorts {
+						podTargetPorts[name] = port
+					}
 				}
-			}
-			ports := specPorts.GetIndex(i)
-			var targetPort int
-			if targetPortString := ports.Get("targetPort").MustString(); targetPortString != "" {
-				targetPort = podTargetPorts[targetPortString]
-			}
-			if targetPort == 0 {
-				targetPort = ports.Get("targetPort").MustInt()
+				ports := specPorts.GetIndex(i)
+				var targetPort int
+				if targetPortString := ports.Get("targetPort").MustString(); targetPortString != "" {
+					targetPort = podTargetPorts[targetPortString]
+				}
 				if targetPort == 0 {
-					log.Infof("service (%s) target_port not match", name)
-					continue
+					targetPort = ports.Get("targetPort").MustInt()
+					if targetPort == 0 {
+						log.Infof("service (%s) target_port not match", name)
+						continue
+					}
 				}
-			}
-			nameToPort := map[string]int{}
-			nameToPort[ports.Get("name").MustString()] = ports.Get("port").MustInt()
-			uidToName := map[string]map[string]int{}
-			uidToName[uID] = nameToPort
-			k.nsServiceNameToService[namespace+name] = uidToName
-			key := strconv.Itoa(ports.Get("port").MustInt()) + ports.Get("protocol").MustString() + strconv.Itoa(ports.Get("nodePort").MustInt()) + strconv.Itoa(targetPort)
-			servicePort := model.PodServicePort{
-				Lcuuid:           common.GetUUID(uID+key, uuid.Nil),
-				Name:             ports.Get("name").MustString(),
-				Protocol:         strings.ToUpper(ports.Get("protocol").MustString()),
-				Port:             ports.Get("port").MustInt(),
-				TargetPort:       targetPort,
-				NodePort:         ports.Get("nodePort").MustInt(),
-				PodServiceLcuuid: uID,
-			}
-
-			// 在service确定有pod group的时候添加pod service port
-			servicePorts = append(servicePorts, servicePort)
-			for _, Lcuuid := range podGroupLcuuids.ToSlice() {
-				key := ports.Get("protocol").MustString() + strconv.Itoa(targetPort)
-				podGroupPort := model.PodGroupPort{
-					Lcuuid:           common.GetUUID(uID+Lcuuid.(string)+key, uuid.Nil),
+				nameToPort := map[string]int{}
+				nameToPort[ports.Get("name").MustString()] = ports.Get("port").MustInt()
+				uidToName := map[string]map[string]int{}
+				uidToName[uID] = nameToPort
+				k.nsServiceNameToService[namespace+name] = uidToName
+				key := strconv.Itoa(ports.Get("port").MustInt()) + ports.Get("protocol").MustString() + strconv.Itoa(ports.Get("nodePort").MustInt()) + strconv.Itoa(targetPort)
+				servicePort := model.PodServicePort{
+					Lcuuid:           common.GetUUID(uID+key, uuid.Nil),
 					Name:             ports.Get("name").MustString(),
-					Port:             targetPort,
 					Protocol:         strings.ToUpper(ports.Get("protocol").MustString()),
-					PodGroupLcuuid:   Lcuuid.(string),
+					Port:             ports.Get("port").MustInt(),
+					TargetPort:       targetPort,
+					NodePort:         ports.Get("nodePort").MustInt(),
 					PodServiceLcuuid: uID,
 				}
-				podGroupPorts = append(podGroupPorts, podGroupPort)
+
+				// 在service确定有pod group的时候添加pod service port
+				servicePorts = append(servicePorts, servicePort)
+				for _, Lcuuid := range podGroupLcuuids.ToSlice() {
+					key := ports.Get("protocol").MustString() + strconv.Itoa(targetPort)
+					podGroupPort := model.PodGroupPort{
+						Lcuuid:           common.GetUUID(uID+Lcuuid.(string)+key, uuid.Nil),
+						Name:             ports.Get("name").MustString(),
+						Port:             targetPort,
+						Protocol:         strings.ToUpper(ports.Get("protocol").MustString()),
+						PodGroupLcuuid:   Lcuuid.(string),
+						PodServiceLcuuid: uID,
+					}
+					podGroupPorts = append(podGroupPorts, podGroupPort)
+				}
+			}
+			if !hasPodGroup {
+				delete(k.nsServiceNameToService, namespace+name)
+				log.Infof("service (%s) pod group not found", name)
+				continue
+			}
+			services = append(services, service)
+			if clusterIP != "" && clusterIP != "None" {
+				serviceLcuuidToClusterIP[uID] = clusterIP
 			}
 		}
-		if !hasPodGroup {
-			delete(k.nsServiceNameToService, namespace+name)
-			log.Infof("service (%s) pod group not found", name)
-			continue
-		}
-		services = append(services, service)
-		if clusterIP != "" && clusterIP != "None" {
-			serviceLcuuidToClusterIP[uID] = clusterIP
-		}
 	}
+
 	serviceNetworkName := k.Name + "_SVC_NET"
 	serviceNetworkLcuuid := common.GetUUID(k.UuidGenerate+serviceNetworkName, uuid.Nil)
 	clusterIPs := cloudcommon.StringStringMapValues(serviceLcuuidToClusterIP)
