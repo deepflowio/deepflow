@@ -1774,6 +1774,12 @@ impl ConfigHandler {
                     new_cfg.kubernetes_api_memory_trim_percent
                 );
             }
+            if old_cfg.kubernetes_resources != new_cfg.kubernetes_resources {
+                info!(
+                    "Kubernetes resources set to {:?}",
+                    new_cfg.kubernetes_resources
+                );
+            }
             if old_cfg.kubernetes_api_enabled != new_cfg.kubernetes_api_enabled {
                 info!(
                     "Kubernetes API enabled set to {}",
@@ -1816,6 +1822,7 @@ impl ConfigHandler {
                         != new_cfg.kubernetes_api_list_interval
                     || old_cfg.kubernetes_api_memory_trim_percent
                         != new_cfg.kubernetes_api_memory_trim_percent
+                    || old_cfg.kubernetes_resources != new_cfg.kubernetes_resources
                     || old_cfg.max_memory != new_cfg.max_memory);
             #[cfg(target_os = "linux")]
             if restart_api_watcher {
