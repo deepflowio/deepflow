@@ -17,11 +17,12 @@
 package kubernetes_gather
 
 import (
+	"strconv"
+	"strings"
+
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"strconv"
-	"strings"
 
 	"github.com/bitly/go-simplejson"
 	uuid "github.com/satori/go.uuid"
