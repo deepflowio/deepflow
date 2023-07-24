@@ -879,9 +879,9 @@ impl HttpLog {
         }
         if key == &config.x_request_id {
             if direction == PacketDirection::ClientToServer {
-                self.info.x_request_id_0 = val.to_owned();
+                info.x_request_id_0 = val.to_owned();
             } else {
-                self.info.x_request_id_1 = val.to_owned();
+                info.x_request_id_1 = val.to_owned();
             }
         }
         if direction == PacketDirection::ClientToServer && key == &config.proxy_client {
