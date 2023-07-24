@@ -312,6 +312,12 @@ impl Default for BpfOptions {
 }
 
 impl BpfOptions {
+    // When using the default BPF filtering rules, it can support collecting traffic
+    // from up to 950 network ports simultaneously.
+    #[cfg(target_os = "linux")]
+    const MAX_TAP_INTERFACES: usize = 950;
+
+    // When tap_interfaces.len() exceeds 950, set bpf will report an error.
     #[cfg(target_os = "linux")]
     fn skip_tap_interface(
         &self,
@@ -325,26 +331,65 @@ impl BpfOptions {
             num: Extension::ExtInterfaceIndex,
         }));
 
-        let total = tap_interfaces.len();
-        for (i, iface) in tap_interfaces.iter().enumerate() {
-            let mut skip_true = (total - i) as u8;
-            if white_list.has(iface.if_index as usize) {
-                skip_true += 1;
-            }
-            bpf_syntax.push(BpfSyntax::JumpIf(JumpIf {
-                cond: JumpTest::JumpEqual,
-                val: iface.if_index,
-                skip_true,
-                ..Default::default()
-            }));
+        let count = tap_interfaces.len().min(Self::MAX_TAP_INTERFACES);
+        if tap_interfaces.len() > Self::MAX_TAP_INTERFACES {
+            error!(
+                "Tap_interfaces.len() exceeds {}, use only the top 950 of tap_interfaces.",
+                Self::MAX_TAP_INTERFACES
+            )
         }
 
-        bpf_syntax.push(BpfSyntax::RetConstant(RetConstant { val: 0 }));
-        bpf_syntax.push(BpfSyntax::RetConstant(RetConstant {
-            val: snap_len as u32,
-        }));
-        bpf_syntax.push(BpfSyntax::RetConstant(RetConstant { val: 65535 }));
+        // Jumpif skip field type is u8, with a maximum support of 255; Here,
+        // tap_interfaces needs to be split to support scenarios exceeding 255
+        let mut if_indices: Vec<u32> = tap_interfaces[..count].iter().map(|x| x.if_index).collect();
+        if_indices.sort();
+        let if_indices = if_indices.chunks((u8::MAX - 1) as usize);
+        for (i, x) in if_indices.clone().enumerate() {
+            let is_last = i == if_indices.len() - 1;
+            let total = x.len();
+            for (j, if_index) in x.iter().enumerate() {
+                let mut skip_true = (total - j) as u8;
+                if white_list.has(*if_index as usize) {
+                    skip_true += 1;
+                }
+                let mut skip_false = 0;
+                if j == total - 1 && !is_last {
+                    // Between two parts, when the current part processing ends,
+                    // it needs to jump 3 steps to another part, including:
+                    // 1. ret 0
+                    // 2. ret snap_len
+                    // 3. ret 65535
+                    //
+                    // Example:
+                    //      :
+                    //      :
+                    //      jeq #257,4
+                    //      jeq #258,3
+                    //      jeq #259,2
+                    //      jeq #260,1,3
+                    //      ret #0
+                    //      ret #65535
+                    //      ret #65535
+                    //      jeq #261,46
+                    //      jeq #262,45
+                    //      :
+                    //      :
+                    skip_false = 3;
+                }
+                bpf_syntax.push(BpfSyntax::JumpIf(JumpIf {
+                    cond: JumpTest::JumpEqual,
+                    val: *if_index,
+                    skip_true,
+                    skip_false,
+                }));
+            }
 
+            bpf_syntax.push(BpfSyntax::RetConstant(RetConstant { val: 0 }));
+            bpf_syntax.push(BpfSyntax::RetConstant(RetConstant {
+                val: snap_len as u32,
+            }));
+            bpf_syntax.push(BpfSyntax::RetConstant(RetConstant { val: 65535 }));
+        }
         return bpf_syntax;
     }
 
