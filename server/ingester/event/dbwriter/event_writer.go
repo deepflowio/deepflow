@@ -20,6 +20,7 @@ import (
 	logging "github.com/op/go-logging"
 
 	baseconfig "github.com/deepflowio/deepflow/server/ingester/config"
+	"github.com/deepflowio/deepflow/server/ingester/event/common"
 	"github.com/deepflowio/deepflow/server/ingester/event/config"
 	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowio/deepflow/server/ingester/pkg/ckwriter"
@@ -30,9 +31,7 @@ import (
 var log = logging.MustGetLogger("event.dbwriter")
 
 const (
-	EVENT_DB         = "event"
-	EVENT_TABLE      = "event"
-	PERF_EVENT_TABLE = "perf_event"
+	EVENT_DB = "event"
 )
 
 type ClusterNode struct {
@@ -66,6 +65,10 @@ func (w *EventWriter) Write(e *EventStore) {
 	w.ckWriter.Put(e)
 }
 
+func (w *EventWriter) WriteAlarmEvent(e *AlarmEventStore) {
+	w.ckWriter.Put(e)
+}
+
 func NewEventWriter(table string, decoderIndex int, config *config.Config) (*EventWriter, error) {
 	w := &EventWriter{
 		ckdbAddrs:         config.Base.CKDB.ActualAddrs,
@@ -75,7 +78,7 @@ func NewEventWriter(table string, decoderIndex int, config *config.Config) (*Eve
 		ckdbStoragePolicy: config.Base.CKDB.StoragePolicy,
 		ckdbColdStorages:  config.Base.GetCKDBColdStorages(),
 	}
-	if table == EVENT_TABLE {
+	if table == common.RESOURCE_EVENT.TableName() {
 		w.ttl = config.TTL
 		w.writerConfig = config.CKWriterConfig
 	} else {
@@ -91,7 +94,7 @@ func NewEventWriter(table string, decoderIndex int, config *config.Config) (*Eve
 	ckTable := GenEventCKTable(w.ckdbCluster, w.ckdbStoragePolicy, table, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, EVENT_DB, table))
 
 	ckwriter, err := ckwriter.NewCKWriter(w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
-		EVENT_TABLE, config.Base.CKDB.TimeZone, ckTable, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
+		table, config.Base.CKDB.TimeZone, ckTable, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
 	if err != nil {
 		return nil, err
 	}
