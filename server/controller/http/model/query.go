@@ -61,3 +61,103 @@ type PodQueryStoredInRedis struct {
 	PodQueryFilterConditions
 	IncludedFieldsParam
 }
+
+type PodReplicaSetQuery struct {
+	PodReplicaSetQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type PodReplicaSetQueryStoredInRedis struct {
+	PodReplicaSetQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type PodGroupQuery struct {
+	PodGroupQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type PodGroupQueryStoredInRedis struct {
+	PodGroupQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type PodGroupPortQuery struct {
+	PodGroupPortQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type PodGroupPortQueryStoredInRedis struct {
+	PodGroupPortQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type PodServiceQuery struct {
+	PodServiceQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type PodServiceQueryStoredInRedis struct {
+	PodServiceQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type PodServicePortQuery struct {
+	PodServicePortQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type PodServicePortQueryStoredInRedis struct {
+	PodServicePortQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type PodIngressQuery struct {
+	PodIngressQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type PodIngressQueryStoredInRedis struct {
+	PodIngressQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type PodIngressRuleQuery struct {
+	PodIngressRuleQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type PodIngressRuleQueryStoredInRedis struct {
+	PodIngressRuleQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type PodNodeQuery struct {
+	PodNodeQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type PodNodeQueryStoredInRedis struct {
+	PodNodeQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type PodNamespaceQuery struct {
+	PodNamespaceQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type PodNamespaceQueryStoredInRedis struct {
+	PodNamespaceQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type PodClusterQuery struct {
+	PodClusterQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type PodClusterQueryStoredInRedis struct {
+	PodClusterQueryFilterConditions
+	IncludedFieldsParam
+}
