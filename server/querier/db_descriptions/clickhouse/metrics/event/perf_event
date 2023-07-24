@@ -2,4 +2,5 @@
 log_count            ,                      , counter    , Throughput , 111
 bytes                , bytes                , counter    , Throughput , 111
 
-duration             , duration              , delay      , Delay     , 111
+duration             , duration             , delay      , Delay      , 111
+_                    ,                      , other      , Other      , 111    
