@@ -31,7 +31,7 @@ use crate::{
         enums::IpProtocol,
         flow::{L7PerfStats, L7Protocol, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
     },
     flow_generator::{
         error::{Error, Result},
@@ -215,7 +215,7 @@ impl L7ProtocolParserInterface for MqttLog {
         Self::check_protocol(payload, param)
     }
 
-    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         if self.perf_stats.is_none() {
             self.perf_stats = Some(L7PerfStats::default())
         };
@@ -240,7 +240,7 @@ impl L7ProtocolParserInterface for MqttLog {
                 unreachable!()
             }
         }
-        Ok(infos)
+        Ok(L7ParseResult::Multi(infos))
     }
 
     fn protocol(&self) -> L7Protocol {

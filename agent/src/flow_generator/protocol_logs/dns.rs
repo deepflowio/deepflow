@@ -18,6 +18,7 @@ use serde::Serialize;
 use super::pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response};
 use super::{consts::*, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
 use crate::common::flow::L7PerfStats;
+use crate::common::l7_protocol_log::L7ParseResult;
 use crate::{
     common::{
         enums::IpProtocol,
@@ -158,14 +159,14 @@ impl L7ProtocolParserInterface for DnsLog {
             && info.msg_type == LogMessageType::Request
     }
 
-    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         let mut info = DnsInfo::default();
         self.parse(payload, param.l4_protocol, &mut info)?;
         info.cal_rrt(param, None).map(|rrt| {
             info.rrt = rrt;
             self.perf_stats.as_mut().unwrap().update_rrt(rrt);
         });
-        Ok(vec![L7ProtocolInfo::DnsInfo(info)])
+        Ok(L7ParseResult::Single(L7ProtocolInfo::DnsInfo(info)))
     }
 
     fn protocol(&self) -> L7Protocol {
@@ -516,8 +517,8 @@ mod tests {
             let is_dns = dns.check_payload(payload, param);
             dns.reset();
             let info = dns.parse_payload(payload, param);
-            if let Ok(mut info) = info {
-                match info.remove(0) {
+            if let Ok(info) = info {
+                match info.unwarp_single() {
                     L7ProtocolInfo::DnsInfo(i) => {
                         output.push_str(&format!("{:?} is_dns: {}\r\n", i, is_dns));
                     }

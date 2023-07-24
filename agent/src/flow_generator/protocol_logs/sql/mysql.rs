@@ -23,6 +23,7 @@ use super::sql_check::is_mysql;
 use super::trim_head_comment_and_first_upper;
 
 use crate::common::flow::L7PerfStats;
+use crate::common::l7_protocol_log::L7ParseResult;
 use crate::flow_generator::protocol_logs::pb_adapter::TraceInfo;
 use crate::{
     common::{
@@ -242,7 +243,7 @@ impl L7ProtocolParserInterface for MysqlLog {
         Self::check(payload, param)
     }
 
-    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         let mut info = MysqlInfo::default();
         info.protocol_version = self.protocol_version;
         info.is_tls = param.is_tls();
@@ -265,13 +266,13 @@ impl L7ProtocolParserInterface for MysqlLog {
             &mut info,
         )? {
             // ignore greeting
-            return Ok(vec![]);
+            return Ok(L7ParseResult::None);
         }
         info.cal_rrt(param, None).map(|rrt| {
             info.rrt = rrt;
             self.perf_stats.as_mut().unwrap().update_rrt(rrt);
         });
-        Ok(vec![L7ProtocolInfo::MysqlInfo(info)])
+        Ok(L7ParseResult::Single(L7ProtocolInfo::MysqlInfo(info)))
     }
 
     fn parsable_on_udp(&self) -> bool {
@@ -613,8 +614,8 @@ mod tests {
                 &ParseParam::from((&*packet, log_cache.clone(), false)),
             );
 
-            if let Ok(mut info) = info {
-                match info.remove(0) {
+            if let Ok(info) = info {
+                match info.unwarp_single() {
                     L7ProtocolInfo::MysqlInfo(mut i) => {
                         i.rrt = 0;
                         output.push_str(&format!("{:?} is_mysql: {}\r\n", i, is_mysql));

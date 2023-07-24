@@ -25,7 +25,7 @@ use crate::{
     common::{
         flow::L7PerfStats,
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
     },
     flow_generator::{
         protocol_logs::{
@@ -254,12 +254,12 @@ impl L7ProtocolParserInterface for KrpcLog {
             && info.msg_type == LogMessageType::Request
     }
 
-    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         let mut info = KrpcInfo::default();
         self.parse(payload, param, false, &mut info)?;
-        Ok(vec![L7ProtocolInfo::ProtobufRpcInfo(
+        Ok(L7ParseResult::Single(L7ProtocolInfo::ProtobufRpcInfo(
             ProtobufRpcInfo::KrpcInfo(info),
-        )])
+        )))
     }
 
     fn protocol(&self) -> L7Protocol {
@@ -312,7 +312,7 @@ mod test {
         let mut req_info = parser
             .parse_payload(req_payload, req_param)
             .unwrap()
-            .remove(0);
+            .unwarp_single();
 
         if let L7ProtocolInfo::ProtobufRpcInfo(rpc_info) = &req_info {
             #[allow(irrefutable_let_patterns)]
@@ -339,7 +339,7 @@ mod test {
         let resp_info = parser
             .parse_payload(resp_payload, resp_param)
             .unwrap()
-            .remove(0);
+            .unwarp_single();
 
         if let L7ProtocolInfo::ProtobufRpcInfo(rpc_info) = &resp_info {
             #[allow(irrefutable_let_patterns)]

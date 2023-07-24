@@ -28,7 +28,7 @@ use crate::{
         flow::L7PerfStats,
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{
-            KafkaInfoCache, L7ProtocolParser, L7ProtocolParserInterface, ParseParam,
+            KafkaInfoCache, L7ParseResult, L7ProtocolParser, L7ProtocolParserInterface, ParseParam,
         },
     },
     flow_generator::{protocol_logs::pb_adapter::L7ProtocolSendLog, AppProtoHead, Result},

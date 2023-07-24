@@ -1336,8 +1336,16 @@ impl FlowMap {
                         // Here we determine whether to reverse flow.
                         self.rectify_flow_direction(node, meta_packet, is_first_packet);
                     }
-                    for i in info.into_iter() {
-                        self.write_to_app_proto_log(flow_config, node, &meta_packet, i);
+                    match info {
+                        crate::common::l7_protocol_log::L7ParseResult::Single(s) => {
+                            self.write_to_app_proto_log(flow_config, node, &meta_packet, s);
+                        }
+                        crate::common::l7_protocol_log::L7ParseResult::Multi(m) => {
+                            for i in m.into_iter() {
+                                self.write_to_app_proto_log(flow_config, node, &meta_packet, i);
+                            }
+                        }
+                        _ => {}
                     }
                 }
                 Err(Error::L7ReqNotFound(c)) => {
