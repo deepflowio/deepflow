@@ -72,7 +72,9 @@ fn get_req_param<'a>(
         parse_config: None,
         l7_perf_cache: rrt_cache.clone(),
         wasm_vm: Some(vm.clone()),
+        #[cfg(target_os = "linux")]
         so_func: None,
+        #[cfg(target_os = "linux")]
         so_plugin_counter_map: None,
         stats_counter: None,
         rrt_timeout: Duration::from_secs(10).as_micros() as usize,
@@ -106,7 +108,9 @@ fn get_resq_param<'a>(
         parse_config: None,
         l7_perf_cache: rrt_cache.clone(),
         wasm_vm: Some(vm.clone()),
+        #[cfg(target_os = "linux")]
         so_func: None,
+        #[cfg(target_os = "linux")]
         so_plugin_counter_map: None,
         stats_counter: None,
         rrt_timeout: Duration::from_secs(10).as_micros() as usize,
