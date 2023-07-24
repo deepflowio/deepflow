@@ -116,3 +116,4 @@ tap_type                    , tap_type                  , tag        , Cardinali
 vtap_id                     , vtap_id                   , tag        , Cardinality   , 111
 protocol                    , protocol                  , tag        , Cardinality   , 111
 server_port                 , server_port               , tag        , Cardinality   , 111
+_                           ,                           , other      , Other         , 111 

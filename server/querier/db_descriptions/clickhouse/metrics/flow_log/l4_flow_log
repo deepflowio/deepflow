@@ -128,3 +128,4 @@ host_1                      ,                      , tag        , Cardinality   
 chost_1                     ,                      , tag        , Cardinality    , 111
 region_1                    ,                      , tag        , Cardinality    , 111
 az_1                        ,                      , tag        , Cardinality    , 111
+_                           ,                      , other      , Other          , 111    
