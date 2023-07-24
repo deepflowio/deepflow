@@ -14,7 +14,12 @@
  * limitations under the License.
  */
 
+use std::collections::HashMap;
 use std::fmt;
+
+use regex::Regex;
+
+use super::{InterfaceInfo, Result};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum NsFile {
@@ -32,3 +37,13 @@ impl fmt::Display for NsFile {
 
 #[derive(Default)]
 pub struct NetNs;
+
+pub fn find_ns_files_by_regex(_: &Regex) -> Vec<NsFile> {
+    // TODO: implement this
+    vec![]
+}
+
+pub fn interfaces_linked_with(_: &Vec<NsFile>) -> Result<HashMap<NsFile, Vec<InterfaceInfo>>> {
+    // TODO: implement this
+    Ok(HashMap::new())
+}
