@@ -21,7 +21,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/http/model"
-	common "github.com/deepflowio/deepflow/server/controller/http/service/resource/common"
+	"github.com/deepflowio/deepflow/server/controller/http/service/resource/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/filter"
 )
 

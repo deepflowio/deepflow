@@ -31,9 +31,10 @@ use rand::prelude::{Rng, SeedableRng, SmallRng};
 use super::consts::*;
 
 use crate::collector::acc_flow::U16Set;
+use crate::common::Timestamp;
 use crate::common::{
     enums::TapType,
-    flow::CloseType,
+    flow::{CloseType, Flow},
     tagged_flow::{BoxedTaggedFlow, TaggedFlow},
 };
 use crate::config::handler::CollectorAccess;
@@ -201,9 +202,17 @@ impl FlowAggr {
         self.flow_stashs.remove(flow_id)
     }
 
+    fn calc_flow_start_time(f: &Flow) -> Timestamp {
+        let second_in_minute = f.start_time.as_secs() % SECONDS_IN_MINUTE;
+        Timestamp::from_secs(
+            (f.flow_stat_time.as_secs() - second_in_minute) / SECONDS_IN_MINUTE * SECONDS_IN_MINUTE
+                + second_in_minute,
+        )
+    }
+
     fn minute_merge(&mut self, f: Arc<BatchedBox<TaggedFlow>>) {
         let f = f.as_ref();
-        let flow_time = f.flow.flow_stat_time;
+        let flow_time = Self::calc_flow_start_time(&f.flow);
         if flow_time < self.slot_start_time {
             debug!("flow drop before slot start time. flow stat time: {:?}, slot start time is {:?}, delay is {:?}", flow_time, self.slot_start_time, self.slot_start_time - flow_time);
             self.metrics
@@ -265,11 +274,11 @@ impl FlowAggr {
         f.flow.acl_gids = Vec::from(acl_gids.list());
 
         if !f.flow.is_new_flow {
-            f.flow.start_time = f.flow.flow_stat_time;
+            f.flow.start_time = Self::calc_flow_start_time(&f.flow);
         }
 
         if f.flow.close_type == CloseType::ForcedReport {
-            f.flow.end_time = f.flow.flow_stat_time + Duration::from_secs(SECONDS_IN_MINUTE);
+            f.flow.end_time = f.flow.start_time + Duration::from_secs(SECONDS_IN_MINUTE);
         }
         self.metrics.out.fetch_add(1, Ordering::Relaxed);
         if f.flow.hit_pcap_policy() {

@@ -31,6 +31,10 @@ type UserIDParam struct {
 	UserID int `schema:"user_id,omitempty"`
 }
 
+func (u UserIDParam) GetUserID() int {
+	return u.UserID
+}
+
 // VMFilterConditions directly applied to vm http response model.
 type VMFilterConditions struct {
 	Convertor
@@ -45,6 +49,10 @@ type VMFilterConditions struct {
 	HostIDs          []int    `schema:"host_id,omitempty" json:"HOST_ID,omitempty"`
 	SubnetIDs        []int    `schema:"subnet_id,omitempty" json:"SUBNET_ID,omitempty"`
 	SecurityGroupIDs []int    `schema:"security_group_id,omitempty" json:"SECURITY_GROUP_ID,omitempty"`
+}
+
+func (v VMFilterConditions) GetFilterConditions() map[string]interface{} {
+	return v.ToMapOmitEmpty()
 }
 
 // PodQueryFilterConditions formed by http request query.
@@ -83,6 +91,10 @@ type PodFilterConditions struct {
 	HostIDs          []int    `schema:"host_id,omitempty" json:"HOST_ID,omitempty"`
 	RegionLcuuids    []string `schema:"region,omitempty" json:"REGION,omitempty"`
 	AZLcuuids        []string `schema:"az,omitempty" json:"AZ,omitempty"`
+}
+
+func (v PodFilterConditions) GetFilterConditions() map[string]interface{} {
+	return v.ToMapOmitEmpty()
 }
 
 // PodQueryFilterConditions formed by http request query.

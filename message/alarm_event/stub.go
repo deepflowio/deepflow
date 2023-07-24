@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,22 +14,6 @@
  * limitations under the License.
  */
 
-package constraint
+package alarm_event
 
-import (
-	"github.com/deepflowio/deepflow/server/controller/http/model"
-)
-
-// 各资源可支持的 query 字段定义
-type QueryModel interface {
-	model.VMQuery | model.PodQuery
-}
-
-// 各资源需要用于构建 redis 缓存 key 的 query 字段定义
-type QueryStoredInRedisModel interface {
-	model.VMQueryStoredInRedis | model.PodQueryStoredInRedis
-
-	GetIncludedFields() []string
-	GetUserID() int
-	GetFilterConditions() map[string]interface{}
-}
+//go:generate protoc --gofast_out=plugins=grpc:. -I.. ../alarm_event.proto

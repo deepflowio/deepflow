@@ -253,6 +253,9 @@ var (
 	}, {
 		input:  "SELECT Sum(log_count) as sum_log_count FROM l7_flow_log  WHERE `会话长度`>=893689408 ",
 		output: "SELECT SUM(1) AS `sum_log_count` FROM flow_log.`l7_flow_log` PREWHERE `会话长度` >= 893689408 LIMIT 10000",
+	}, {
+		input:  "select session_length AS `会话长度` from l7_flow_log where `session_length`<=392037",
+		output: "SELECT if(request_length>0,request_length,0)+if(response_length>0,response_length,0) AS `会话长度` FROM flow_log.`l7_flow_log` PREWHERE (if(request_length>0,request_length,0)+if(response_length>0,response_length,0) <= 392037) LIMIT 10000",
 	}}
 )
 
