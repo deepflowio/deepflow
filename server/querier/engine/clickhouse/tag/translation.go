@@ -971,5 +971,14 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				"",
 			)}
 	}
+	//session_length
+	tagResourceMap["session_length"] = map[string]*Tag{
+		"default": NewTag(
+			"if(request_length>0,request_length,0)+if(response_length>0,response_length,0)",
+			"",
+			"if(request_length>0,request_length,0)+if(response_length>0,response_length,0) %s %s",
+			"",
+		),
+	}
 	return tagResourceMap
 }
