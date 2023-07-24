@@ -17,6 +17,8 @@
 package updater
 
 import (
+	"reflect"
+
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -32,6 +34,8 @@ type ResourceUpdater interface {
 	HandleAddAndUpdate()
 	// 逐一检查 diff base 中的资源，若 sequence 不等于 cache 中的 sequence，则删除
 	HandleDelete()
+	GetChanged() bool
+	GetMySQLModelString() []string
 }
 
 type DataGenerator[CT constraint.CloudModel, MT constraint.MySQLModel, BT constraint.DiffBase[MT]] interface {
@@ -51,6 +55,10 @@ type UpdaterBase[CT constraint.CloudModel, MT constraint.MySQLModel, BT constrai
 	cloudData         []CT                            // 定时获取的新资源数据
 	dataGenerator     DataGenerator[CT, MT, BT]       // 提供各类数据生成的方法
 	listeners         []listener.Listener[CT, MT, BT] // 关注 Updater 的增删改操作行为及详情的监听器
+
+	// Set Changed to true if the resource database and cache are updated,
+	// used for cache update notifications to trisolaris module.
+	Changed bool
 }
 
 func (u *UpdaterBase[CT, MT, BT]) RegisterListener(listener listener.Listener[CT, MT, BT]) ResourceUpdater {
@@ -74,13 +82,11 @@ func (u *UpdaterBase[CT, MT, BT]) HandleAddAndUpdate() {
 			if ok {
 				log.Infof("to update (cloud item: %#v, diff base item: %#v)", cloudItem, diffBase)
 				u.update(&cloudItem, diffBase, updateInfo)
-				u.cache.Changed = true
 			}
 		}
 	}
 	if len(dbItemsToAdd) > 0 {
 		u.add(dbItemsToAdd)
-		u.cache.Changed = true
 	}
 }
 
@@ -94,8 +100,16 @@ func (u *UpdaterBase[CT, MT, BT]) HandleDelete() {
 	}
 	if len(lcuuidsOfBatchToDelete) > 0 {
 		u.delete(lcuuidsOfBatchToDelete)
-		u.cache.Changed = true
 	}
+}
+
+func (u *UpdaterBase[CT, MT, BT]) GetChanged() bool {
+	return u.Changed
+}
+
+func (u *UpdaterBase[CT, MT, BT]) GetMySQLModelString() []string {
+	var mt MT
+	return []string{reflect.TypeOf(mt).String()}
 }
 
 func (u *UpdaterBase[CT, MT, BT]) add(dbItemsToAdd []*MT) {
@@ -118,12 +132,14 @@ func (u *UpdaterBase[CT, MT, BT]) add(dbItemsToAdd []*MT) {
 func (u *UpdaterBase[CT, MT, BT]) addPage(dbItemsToAdd []*MT) {
 	if addedDBItems, ok := u.dbOperator.AddBatch(dbItemsToAdd); ok {
 		u.notifyOnAdded(addedDBItems)
+		u.Changed = true
 	}
 }
 
 func (u *UpdaterBase[CT, MT, BT]) update(cloudItem *CT, diffBase BT, updateInfo map[string]interface{}) {
 	if _, ok := u.dbOperator.Update(diffBase.GetLcuuid(), updateInfo); ok {
 		u.notifyOnUpdated(cloudItem, diffBase)
+		u.Changed = true
 	}
 }
 
@@ -147,6 +163,7 @@ func (u *UpdaterBase[CT, MT, BT]) delete(lcuuids []string) {
 func (u *UpdaterBase[CT, MT, BT]) deletePage(lcuuids []string) {
 	if u.dbOperator.DeleteBatch(lcuuids) {
 		u.notifyOnDeleted(lcuuids)
+		u.Changed = true
 	}
 }
 
