@@ -189,11 +189,12 @@ message ExtendedInfo {
     string service_name = 1;
     string client_ip = 2;
     uint32 request_id = 3;
-    string x_request_id = 4;
+    string x_request_id_0 = 4;
     string http_user_agent = 6;
     string http_referer = 7;
     string rpc_service = 8;
     string protocol_str = 9;
+    string x_request_id_1 = 10;
 
     repeated string attribute_names = 16;
     repeated string attribute_values= 17;
