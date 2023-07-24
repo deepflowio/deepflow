@@ -35,6 +35,7 @@ const (
 	DefaultPerfDecoderQueueSize  = 100000
 	DefaultEventTTL              = 720 // hour
 	DefaultPerfEventTTL          = 168 // hour
+	DefaultAlarmEventTTL         = 720 // hour
 )
 
 type Config struct {
@@ -47,6 +48,7 @@ type Config struct {
 	PerfDecoderQueueCount int                   `yaml:"perf-event-decoder-queue-count"`
 	PerfDecoderQueueSize  int                   `yaml:"perf-event-decoder-queue-size"`
 	PerfTTL               int                   `yaml:"perf-event-ttl"`
+	AlarmTTL              int                   `yaml:"alarm-event-ttl"`
 }
 
 type EventConfig struct {
@@ -72,6 +74,9 @@ func (c *Config) Validate() error {
 	if c.PerfTTL <= 0 {
 		c.TTL = DefaultPerfEventTTL
 	}
+	if c.AlarmTTL <= 0 {
+		c.TTL = DefaultAlarmEventTTL
+	}
 
 	return nil
 }
@@ -89,6 +94,7 @@ func Load(base *config.Config, path string) *Config {
 			PerfDecoderQueueCount: DefaultPerfDecoderQueueCount,
 			PerfDecoderQueueSize:  DefaultPerfDecoderQueueSize,
 			PerfTTL:               DefaultPerfEventTTL,
+			AlarmTTL:              DefaultAlarmEventTTL,
 		},
 	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {
