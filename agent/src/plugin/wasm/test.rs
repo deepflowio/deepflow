@@ -159,12 +159,12 @@ fn test_wasm_http_req() {
 
     let mut http = HttpLog::new_v1();
     let payload = "POST /test?a=1&b=2&c=test HTTP/1.1\r\nUser-Agent: deepflow\r\nreferer: aaa.com\r\nHost: abc.com\r\nContent-Type: application/json\r\n\r\n";
-    let mut info = http.parse_payload(payload.as_bytes(), &param).unwrap();
+    let info = http.parse_payload(payload.as_bytes(), &param).unwrap();
 
     let kv: HashMap<&str, &str> =
         HashMap::from_iter([("a", "1"), ("b", "2"), ("c", "test"), ("empty", "")]);
 
-    if let L7ProtocolInfo::HttpInfo(http) = info.remove(0) {
+    if let L7ProtocolInfo::HttpInfo(http) = info.unwarp_single() {
         let i: L7ProtocolSendLog = http.into();
         assert_eq!(
             i.trace_info
@@ -218,11 +218,11 @@ fn test_wasm_http_resp() {
 
     let mut http = HttpLog::new_v1();
     let payload = "HTTP/1.1 200 Ok\r\nContent-Type: application/json\r\n\r\n{\"data\":{\"user_id\":123, \"name\":\"kkk\"}}";
-    let mut info = http.parse_payload(payload.as_bytes(), &param).unwrap();
+    let info = http.parse_payload(payload.as_bytes(), &param).unwrap();
 
     let kv: HashMap<&str, &str> = HashMap::from_iter([("user_id", "123"), ("username", "kkk")]);
 
-    if let L7ProtocolInfo::HttpInfo(http) = info.remove(0) {
+    if let L7ProtocolInfo::HttpInfo(http) = info.unwarp_single() {
         let i: L7ProtocolSendLog = http.into();
         assert_eq!(
             i.trace_info
@@ -295,6 +295,7 @@ fn test_wasm_parse_payload_req() {
     let info1 = wasm_log
         .parse_payload(&payload[..], &param)
         .unwrap()
+        .unwarp_multi()
         .remove(0);
     if let L7ProtocolInfo::CustomInfo(ci) = info1 {
         assert_eq!(ci.req_len.unwrap(), 999);
@@ -323,6 +324,7 @@ fn test_wasm_parse_payload_req() {
     let info2 = wasm_log
         .parse_payload(&payload[..], &param)
         .unwrap()
+        .unwarp_multi()
         .remove(1);
 
     if let L7ProtocolInfo::CustomInfo(ci) = info2 {
@@ -362,6 +364,7 @@ fn test_wasm_parse_payload_resp() {
     let info1 = wasm_log
         .parse_payload(&payload[..], &param)
         .unwrap()
+        .unwarp_multi()
         .remove(0);
     if let L7ProtocolInfo::CustomInfo(ci) = info1 {
         assert_eq!(ci.req_len.unwrap(), 999);
@@ -390,6 +393,7 @@ fn test_wasm_parse_payload_resp() {
     let info2 = wasm_log
         .parse_payload(&payload[..], &param)
         .unwrap()
+        .unwarp_multi()
         .remove(1);
     if let L7ProtocolInfo::CustomInfo(ci) = info2 {
         assert_eq!(ci.req_len.unwrap(), 999);

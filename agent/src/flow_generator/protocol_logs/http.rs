@@ -27,6 +27,7 @@ use super::{consts::*, AppProtoHead, L7ResponseStatus};
 use super::{decode_new_rpc_trace_context_with_type, LogMessageType};
 
 use crate::common::flow::L7PerfStats;
+use crate::common::l7_protocol_log::L7ParseResult;
 use crate::{
     common::{
         ebpf::EbpfType,
@@ -376,7 +377,7 @@ impl L7ProtocolParserInterface for HttpLog {
         }
     }
 
-    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         let Some(config) = param.parse_config else {
             return Err(Error::NoParseConfig);
         };
@@ -399,14 +400,14 @@ impl L7ProtocolParserInterface for HttpLog {
             L7Protocol::Http2 | L7Protocol::Grpc => match param.ebpf_type {
                 EbpfType::GoHttp2Uprobe => {
                     self.parse_http2_go_uprobe(&config.l7_log_dynamic, payload, param, &mut info)?;
-                    return Ok(vec![L7ProtocolInfo::HttpInfo(info)]);
+                    return Ok(L7ParseResult::Single(L7ProtocolInfo::HttpInfo(info)));
                 }
                 _ => self.parse_http_v2(payload, param, &mut info)?,
             },
             _ => unreachable!(),
         }
 
-        Ok(vec![L7ProtocolInfo::HttpInfo(info)])
+        Ok(L7ParseResult::Single(L7ProtocolInfo::HttpInfo(info)))
     }
 
     fn protocol(&self) -> L7Protocol {
@@ -1270,16 +1271,16 @@ mod tests {
                 _ => unreachable!(),
             };
 
-            if let Ok(mut info) = http1.parse_payload(payload, param) {
+            if let Ok(info) = http1.parse_payload(payload, param) {
                 output.push_str(&format!(
                     "{:?} is_http: {}\n",
-                    get_http_info(info.remove(0)),
+                    get_http_info(info.unwarp_single()),
                     true
                 ));
-            } else if let Ok(mut info) = http2.parse_payload(payload, param) {
+            } else if let Ok(info) = http2.parse_payload(payload, param) {
                 output.push_str(&format!(
                     "{:?} is_http: {}\n",
-                    get_http_info(info.remove(0)),
+                    get_http_info(info.unwarp_single()),
                     true
                 ));
             } else {

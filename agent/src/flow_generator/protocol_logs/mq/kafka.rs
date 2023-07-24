@@ -20,7 +20,7 @@ use crate::{
         enums::IpProtocol,
         flow::{L7PerfStats, L7Protocol, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{KafkaInfoCache, L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{KafkaInfoCache, L7ParseResult, L7ProtocolParserInterface, ParseParam},
     },
     flow_generator::{
         error::{Error, Result},
@@ -231,7 +231,7 @@ impl L7ProtocolParserInterface for KafkaLog {
         ok
     }
 
-    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         if self.perf_stats.is_none() {
             self.perf_stats = Some(L7PerfStats::default())
         };
@@ -286,7 +286,7 @@ impl L7ProtocolParserInterface for KafkaLog {
             info.rrt = rrt;
             self.perf_stats.as_mut().unwrap().update_rrt(rrt);
         });
-        Ok(vec![L7ProtocolInfo::KafkaInfo(info)])
+        Ok(L7ParseResult::Single(L7ProtocolInfo::KafkaInfo(info)))
     }
 
     fn protocol(&self) -> L7Protocol {
@@ -437,8 +437,8 @@ mod tests {
 
             let is_kafka = kafka.check_payload(payload, param);
             let info = kafka.parse_payload(payload, param);
-            if let Ok(mut info) = info {
-                match info.remove(0) {
+            if let Ok(info) = info {
+                match info.unwarp_single() {
                     L7ProtocolInfo::KafkaInfo(i) => {
                         output.push_str(&format!("{:?} is_kafka: {}\r\n", i, is_kafka));
                     }

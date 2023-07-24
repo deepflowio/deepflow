@@ -26,7 +26,7 @@ use crate::{
         flow::L7Protocol,
         flow::{L7PerfStats, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
     },
     flow_generator::{
         error::{Error, Result},
@@ -178,7 +178,7 @@ impl L7ProtocolParserInterface for RedisLog {
         decode_asterisk(payload, true).is_some()
     }
 
-    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         if self.perf_stats.is_none() {
             self.perf_stats = Some(L7PerfStats::default())
         };
@@ -189,7 +189,7 @@ impl L7ProtocolParserInterface for RedisLog {
             info.rrt = rrt;
             self.perf_stats.as_mut().unwrap().update_rrt(rrt);
         });
-        Ok(vec![L7ProtocolInfo::RedisInfo(info)])
+        Ok(L7ParseResult::Single(L7ProtocolInfo::RedisInfo(info)))
     }
 
     fn protocol(&self) -> L7Protocol {
@@ -459,8 +459,8 @@ mod tests {
 
             let is_redis = redis.check_payload(payload, param);
 
-            let info = if let Ok(mut i) = redis.parse_payload(payload, param) {
-                match i.remove(0) {
+            let info = if let Ok(i) = redis.parse_payload(payload, param) {
+                match i.unwarp_single() {
                     L7ProtocolInfo::RedisInfo(r) => r,
                     _ => unreachable!(),
                 }

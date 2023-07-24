@@ -23,7 +23,7 @@ use crate::{
         enums::IpProtocol,
         flow::{L7PerfStats, L7Protocol, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
     },
     config::handler::{L7LogDynamicConfig, TraceType},
     flow_generator::{
@@ -235,7 +235,7 @@ impl L7ProtocolParserInterface for DubboLog {
         header.check()
     }
 
-    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         let Some(config) = param.parse_config else {
             return Err(Error::NoParseConfig);
         };
@@ -254,7 +254,7 @@ impl L7ProtocolParserInterface for DubboLog {
             info.rrt = rrt;
             self.perf_stats.as_mut().unwrap().update_rrt(rrt);
         });
-        Ok(vec![L7ProtocolInfo::DubboInfo(info)])
+        Ok(L7ParseResult::Single(L7ProtocolInfo::DubboInfo(info)))
     }
 
     fn protocol(&self) -> L7Protocol {
@@ -717,8 +717,8 @@ mod tests {
             let is_dubbo = dubbo.check_payload(payload, param);
 
             let i = dubbo.parse_payload(payload, param);
-            let info = if let Ok(mut info) = i {
-                match info.remove(0) {
+            let info = if let Ok(info) = i {
+                match info.unwarp_single() {
                     L7ProtocolInfo::DubboInfo(d) => d,
                     _ => unreachable!(),
                 }

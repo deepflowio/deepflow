@@ -24,7 +24,7 @@ use crate::{
     common::{
         flow::{L7PerfStats, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
     },
     flow_generator::{
         protocol_logs::{
@@ -177,13 +177,13 @@ impl L7ProtocolParserInterface for PostgresqlLog {
         self.parse(payload, param, true, &mut info).is_ok()
     }
 
-    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         let mut info = PostgreInfo::default();
         self.set_msg_type(param.direction, &mut info);
         info.is_tls = param.is_tls();
 
         if self.check_is_ssl_req(payload, &mut info) {
-            return Ok(vec![]);
+            return Ok(L7ParseResult::None);
         }
 
         if self.perf_stats.is_none() {
@@ -192,9 +192,9 @@ impl L7ProtocolParserInterface for PostgresqlLog {
 
         self.parse(payload, param, false, &mut info)?;
         Ok(if info.ignore {
-            vec![]
+            L7ParseResult::None
         } else {
-            vec![L7ProtocolInfo::PostgreInfo(info)]
+            L7ParseResult::Single(L7ProtocolInfo::PostgreInfo(info))
         })
     }
 
@@ -546,8 +546,8 @@ mod test {
         let req_param = &mut ParseParam::from((&p[0], log_cache.clone(), false));
         let req_payload = p[0].get_l4_payload().unwrap();
         assert_eq!((&mut parser).check_payload(req_payload, req_param), true);
-        let mut info = (&mut parser).parse_payload(req_payload, req_param).unwrap();
-        let mut req = info.swap_remove(0);
+        let info = (&mut parser).parse_payload(req_payload, req_param).unwrap();
+        let mut req = info.unwarp_single();
 
         (&mut parser).reset();
 
@@ -557,7 +557,7 @@ mod test {
         let resp = (&mut parser)
             .parse_payload(resp_payload, resp_param)
             .unwrap()
-            .swap_remove(0);
+            .unwarp_single();
 
         req.merge_log(resp).unwrap();
         if let L7ProtocolInfo::PostgreInfo(info) = req {

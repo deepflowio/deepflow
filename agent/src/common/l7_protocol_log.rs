@@ -166,11 +166,33 @@ impl_protocol_parser! {
     }
 }
 
+pub enum L7ParseResult {
+    Single(L7ProtocolInfo),
+    Multi(Vec<L7ProtocolInfo>),
+    None,
+}
+
+impl L7ParseResult {
+    pub fn unwarp_single(self) -> L7ProtocolInfo {
+        match self {
+            L7ParseResult::Single(s) => s,
+            _ => panic!("parse result is mutli but unwarp single"),
+        }
+    }
+
+    pub fn unwarp_multi(self) -> Vec<L7ProtocolInfo> {
+        match self {
+            L7ParseResult::Multi(m) => m,
+            _ => panic!("parse result is single but unwarp multi"),
+        }
+    }
+}
+
 #[enum_dispatch]
 pub trait L7ProtocolParserInterface {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool;
     // 协议解析
-    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>>;
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult>;
     // 返回协议号和协议名称，由于的bitmap使用u128，所以协议号不能超过128.
     // 其中 crates/public/src/l7_protocol.rs 里面的 pub const L7_PROTOCOL_xxx 是已实现的协议号.
     // ===========================================================================================
