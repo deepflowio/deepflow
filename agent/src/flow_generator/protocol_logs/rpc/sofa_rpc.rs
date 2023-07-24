@@ -25,7 +25,7 @@ use crate::{
     common::{
         flow::L7PerfStats,
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
     },
     flow_generator::{
         protocol_logs::{
@@ -264,15 +264,15 @@ impl L7ProtocolParserInterface for SofaRpcLog {
             && info.cmd_code != CMD_CODE_HEARTBEAT
     }
 
-    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         let mut info = SofaRpcInfo::default();
         match self.parse(payload, false, &mut info) {
-            Ok(mut ret) => {
-                match ret.get_mut(0).unwrap() {
-                    L7ProtocolInfo::SofaRpcInfo(s) => self.cal_perf(param, s),
-                    _ => unreachable!(),
+            Ok(ok) => {
+                if !ok {
+                    return Ok(L7ParseResult::None);
                 }
-                Ok(ret)
+                self.cal_perf(param, &mut info);
+                Ok(L7ParseResult::Single(L7ProtocolInfo::SofaRpcInfo(info)))
             }
             Err(e) => Err(e),
         }
@@ -292,12 +292,7 @@ impl L7ProtocolParserInterface for SofaRpcLog {
 }
 
 impl SofaRpcLog {
-    fn parse(
-        &mut self,
-        mut payload: &[u8],
-        check: bool,
-        info: &mut SofaRpcInfo,
-    ) -> Result<Vec<L7ProtocolInfo>> {
+    fn parse(&mut self, mut payload: &[u8], check: bool, info: &mut SofaRpcInfo) -> Result<bool> {
         if self.perf_stats.is_none() {
             self.perf_stats = Some(L7PerfStats::default())
         };
@@ -315,7 +310,7 @@ impl SofaRpcLog {
             return if check {
                 Err(Error::L7ProtocolUnknown)
             } else {
-                Ok(vec![])
+                Ok(false)
             };
         }
         info.req_id = hdr.req_id;
@@ -343,7 +338,7 @@ impl SofaRpcLog {
             return if check {
                 Err(Error::L7ProtocolUnknown)
             } else {
-                Ok(vec![L7ProtocolInfo::SofaRpcInfo(info.clone())])
+                Ok(true)
             };
         }
 
@@ -387,9 +382,9 @@ impl SofaRpcLog {
             }
         }
         if check {
-            Ok(vec![])
+            Ok(false)
         } else {
-            Ok(vec![L7ProtocolInfo::SofaRpcInfo(info.clone())])
+            Ok(true)
         }
     }
 
@@ -599,7 +594,7 @@ mod test {
         let req_info = parser
             .parse_payload(req_payload, req_param)
             .unwrap()
-            .remove(0);
+            .unwarp_single();
 
         if let L7ProtocolInfo::SofaRpcInfo(k) = &req_info {
             assert_eq!(k.msg_type, LogMessageType::Request);
@@ -624,7 +619,7 @@ mod test {
         let resp_info = parser
             .parse_payload(resp_payload, resp_param)
             .unwrap()
-            .remove(0);
+            .unwarp_single();
 
         if let L7ProtocolInfo::SofaRpcInfo(k) = &resp_info {
             assert_eq!(k.msg_type, LogMessageType::Response);
@@ -668,7 +663,7 @@ mod test {
         let req_info = parser
             .parse_payload(req_payload, req_param)
             .unwrap()
-            .remove(0);
+            .unwarp_single();
 
         if let L7ProtocolInfo::SofaRpcInfo(k) = &req_info {
             assert_eq!(k.msg_type, LogMessageType::Request);
@@ -693,7 +688,7 @@ mod test {
         let resp_info = parser
             .parse_payload(resp_payload, resp_param)
             .unwrap()
-            .remove(0);
+            .unwarp_single();
 
         if let L7ProtocolInfo::SofaRpcInfo(k) = &resp_info {
             assert_eq!(k.msg_type, LogMessageType::Response);

@@ -20,8 +20,7 @@ use serde::Serialize;
 use crate::{
     common::{
         flow::L7PerfStats,
-        l7_protocol_info::L7ProtocolInfo,
-        l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
     },
     flow_generator::Result,
 };
@@ -51,7 +50,7 @@ impl L7ProtocolParserInterface for ProtobufRpcWrapLog {
         false
     }
 
-    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         self.parser.as_mut().unwrap().parse_payload(payload, param)
     }
 

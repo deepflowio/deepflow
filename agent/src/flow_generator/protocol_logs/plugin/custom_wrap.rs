@@ -17,7 +17,7 @@
 use public::l7_protocol::L7Protocol;
 use serde::Serialize;
 
-use crate::common::l7_protocol_log::L7ProtocolParserInterface;
+use crate::common::l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface};
 
 use super::{all_plugin_log_parser, CustomLog};
 
@@ -45,7 +45,7 @@ impl L7ProtocolParserInterface for CustomWrapLog {
         &mut self,
         payload: &[u8],
         param: &crate::common::l7_protocol_log::ParseParam,
-    ) -> crate::flow_generator::Result<Vec<crate::common::l7_protocol_info::L7ProtocolInfo>> {
+    ) -> crate::flow_generator::Result<L7ParseResult> {
         self.parser.as_mut().unwrap().parse_payload(payload, param)
     }
 
