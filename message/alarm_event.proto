@@ -5,7 +5,7 @@ option go_package = "alarm_event";
 
 message AlarmEvent {
     optional string lcuuid = 1;
-    optional string status = 2;
+    optional string user = 2;
     optional uint32 timestamp = 3;
 
     optional uint32 policy_id = 4;
