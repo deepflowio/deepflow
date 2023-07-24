@@ -200,7 +200,11 @@ impl BaseDispatcher {
             ),
             &CString::new(bpf_options.get_bpf_syntax()).unwrap(),
         ) {
-            warn!("set_bpf failed: {}", e);
+            warn!(
+                "set_bpf failed with tap_interfaces count {}: {}",
+                tap_interfaces.len(),
+                e
+            );
         }
         #[cfg(target_os = "windows")]
         if let Err(e) = self
