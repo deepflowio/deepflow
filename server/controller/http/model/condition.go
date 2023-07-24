@@ -102,3 +102,164 @@ type PodQueryFilterConditions struct {
 	PodFilterConditions
 	UserIDParam
 }
+
+// PodGroupFilterConditions directly applied to pod http response model.
+type PodGroupFilterConditions struct {
+	Convertor
+
+	Lcuuids         []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
+	IDs             []int    `schema:"id,omitempty" json:"ID,omitempty"`
+	Names           []string `schema:"name,omitempty" json:"NAME,omitempty"`
+	PodNamespaceIDs []int    `schema:"pod_namespace_id,omitempty" json:"POD_NAMESPACE_ID,omitempty"`
+	VPCIDs          []int    `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
+}
+
+// PodGroupQueryFilterConditions formed by http request query.
+type PodGroupQueryFilterConditions struct {
+	PodGroupFilterConditions
+	UserIDParam
+}
+
+// PodGroupPortFilterConditions directly applied to pod http response model.
+type PodGroupPortFilterConditions struct {
+	Convertor
+
+	PodServiceIDs []int `schema:"pod_service_id,omitempty" json:"POD_SERVICE_ID,omitempty"`
+	PodGroupIDs   []int `schema:"pod_group_id,omitempty" json:"POD_GROUP_ID,omitempty"`
+}
+
+// PodGroupPortQueryFilterConditions formed by http request query.
+type PodGroupPortQueryFilterConditions struct {
+	PodGroupPortFilterConditions
+}
+
+// PodFilterPodReplicaSetFilterConditionsConditions directly applied to pod http response model.
+type PodReplicaSetFilterConditions struct {
+	Convertor
+
+	Lcuuids         []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
+	IDs             []int    `schema:"id,omitempty" json:"ID,omitempty"`
+	PodNamespaceIDs []int    `schema:"pod_namespace_id,omitempty" json:"POD_NAMESPACE_ID,omitempty"`
+	PodGroupIDs     []int    `schema:"pod_group_id,omitempty" json:"POD_GROUP_ID,omitempty"`
+	VPCIDs          []int    `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
+}
+
+// PodReplicaSetQueryFilterConditions formed by http request query.
+type PodReplicaSetQueryFilterConditions struct {
+	PodReplicaSetFilterConditions
+	UserIDParam
+}
+
+// PodServiceFilterConditions directly applied to pod http response model.
+type PodServiceFilterConditions struct {
+	Convertor
+
+	Lcuuids         []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
+	IDs             []int    `schema:"id,omitempty" json:"ID,omitempty"`
+	PodNamespaceIDs []int    `schema:"pod_namespace_id,omitempty" json:"POD_NAMESPACE_ID,omitempty"`
+	PodIngressIDs   []int    `schema:"pod_ingress_id,omitempty" json:"POD_INGRESS_ID,omitempty"`
+	VPCIDs          []int    `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
+}
+
+// PodServiceQueryFilterConditions formed by http request query.
+type PodServiceQueryFilterConditions struct {
+	PodServiceFilterConditions
+	UserIDParam
+}
+
+// PodServicePortFilterConditions directly applied to pod http response model.
+type PodServicePortFilterConditions struct {
+	Convertor
+
+	PodServiceIDs []int `schema:"pod_service_id,omitempty" json:"POD_SERVICE_ID,omitempty"`
+}
+
+// PodServicePortQueryFilterConditions formed by http request query.
+type PodServicePortQueryFilterConditions struct {
+	PodServicePortFilterConditions
+	UserIDParam
+}
+
+// PodIngressFilterConditions directly applied to pod http response model.
+type PodIngressFilterConditions struct {
+	Convertor
+
+	Lcuuids         []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
+	IDs             []int    `schema:"id,omitempty" json:"ID,omitempty"`
+	PodNamespaceIDs []int    `schema:"pod_namespace_id,omitempty" json:"POD_NAMESPACE_ID,omitempty"`
+	VPCIDs          []int    `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
+}
+
+// PodIngressQueryFilterConditions formed by http request query.
+type PodIngressQueryFilterConditions struct {
+	PodIngressFilterConditions
+	UserIDParam
+}
+
+// PodIngressRuleFilterConditions directly applied to pod http response model.
+type PodIngressRuleFilterConditions struct {
+	Convertor
+
+	PodIngressIDs     []int `schema:"pod_ingress_id,omitempty" json:"POD_INGRESS_ID,omitempty"`
+	PodServiceIDs     []int `schema:"pod_service_id,omitempty" json:"POD_SERVICE_ID,omitempty"`
+	PortPodServiceIDs []int `schema:"port_pod_service_id,omitempty" json:"PORT_POD_SERVICE_ID,omitempty"` // 实际含义同 pod_service_id，为全景图提供方便
+	Ports             []int `schema:"port,omitempty" json:"PORT,omitempty"`
+}
+
+// PodIngressRuleQueryFilterConditions formed by http request query.
+type PodIngressRuleQueryFilterConditions struct {
+	PodIngressRuleFilterConditions
+	UserIDParam
+}
+
+// PodFilterConditions directly applied to pod http response model.
+type PodNodeFilterConditions struct {
+	Convertor
+
+	Lcuuids       []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
+	IDs           []int    `schema:"id,omitempty" json:"ID,omitempty"`
+	IPs           []string `schema:"ip,omitempty" json:"IP,omitempty"`
+	PodClusterIDs []int    `schema:"pod_cluster_id,omitempty" json:"POD_CLUSTER_ID,omitempty"`
+	VPCIDs        []int    `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
+	RegionLcuuids []string `schema:"region,omitempty" json:"REGION,omitempty"`
+	AZLcuuids     []string `schema:"az,omitempty" json:"AZ,omitempty"`
+}
+
+// PodNodeQueryFilterConditions formed by http request query.
+type PodNodeQueryFilterConditions struct {
+	PodNodeFilterConditions
+	UserIDParam
+}
+
+// PodNamespaceFilterConditions directly applied to pod http response model.
+type PodNamespaceFilterConditions struct {
+	Convertor
+
+	Lcuuids       []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
+	IDs           []int    `schema:"id,omitempty" json:"ID,omitempty"`
+	PodClusterIDs []int    `schema:"pod_cluster_id,omitempty" json:"POD_CLUSTER_ID,omitempty"`
+	VPCIDs        []int    `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
+}
+
+// PodNamespaceQueryFilterConditions formed by http request query.
+type PodNamespaceQueryFilterConditions struct {
+	PodNamespaceFilterConditions
+	UserIDParam
+}
+
+// PodClusterFilterConditions directly applied to pod http response model.
+type PodClusterFilterConditions struct {
+	Convertor
+
+	Lcuuids []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
+	IDs     []int    `schema:"id,omitempty" json:"ID,omitempty"`
+	Names   []string `schema:"name,omitempty" json:"NAME,omitempty"`
+	VPCIDs  []int    `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
+	Domain  []string `schema:"domain,omitempty" json:"DOMAIN,omitempty"`
+}
+
+// PodNodeQueryFilterConditions formed by http request query.
+type PodClusterQueryFilterConditions struct {
+	PodClusterFilterConditions
+	UserIDParam
+}

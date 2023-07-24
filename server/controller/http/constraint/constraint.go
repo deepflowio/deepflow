@@ -22,12 +22,17 @@ import (
 
 // 各资源可支持的 query 字段定义
 type QueryModel interface {
-	model.VMQuery | model.PodQuery
+	model.VMQuery | model.PodQuery | model.PodReplicaSetQuery | model.PodGroupQuery | model.PodGroupPortQuery |
+		model.PodServiceQuery | model.PodServicePortQuery | model.PodIngressQuery | model.PodIngressRuleQuery |
+		model.PodNodeQuery | model.PodNamespaceQuery | model.PodClusterQuery
 }
 
 // 各资源需要用于构建 redis 缓存 key 的 query 字段定义
 type QueryStoredInRedisModel interface {
-	model.VMQueryStoredInRedis | model.PodQueryStoredInRedis
+	model.VMQueryStoredInRedis | model.PodQueryStoredInRedis | model.PodReplicaSetQueryStoredInRedis |
+		model.PodGroupQueryStoredInRedis | model.PodGroupPortQueryStoredInRedis | model.PodServiceQueryStoredInRedis |
+		model.PodServicePortQueryStoredInRedis | model.PodIngressQueryStoredInRedis | model.PodIngressRuleQueryStoredInRedis |
+		model.PodNodeQueryStoredInRedis | model.PodNamespaceQueryStoredInRedis | model.PodClusterQueryStoredInRedis
 
 	GetIncludedFields() []string
 	GetUserID() int
