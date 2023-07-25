@@ -134,7 +134,8 @@ func L7FlowLogToExportRequest(l7 *log_data.L7FlowLog, universalTagsManager *Univ
 
 	spanKind := tapSideToSpanKind(l7.TapSide)
 	if dataTypeBits&TRACING_INFO != 0 {
-		putStrWithoutEmpty(spanAttrs, "df.span.x_request_id", l7.XRequestId)
+		putStrWithoutEmpty(spanAttrs, "df.span.x_request_id_0", l7.XRequestId0)
+		putStrWithoutEmpty(spanAttrs, "df.span.x_request_id_1", l7.XRequestId1)
 		putIntWithoutZero(spanAttrs, "df.span.syscall_trace_id_request", int64(l7.SyscallTraceIDRequest))
 		putIntWithoutZero(spanAttrs, "df.span.syscall_trace_id_response", int64(l7.SyscallTraceIDResponse))
 		putIntWithoutZero(spanAttrs, "df.span.syscall_thread_0", int64(l7.SyscallThread0))

@@ -208,7 +208,8 @@ type L7FlowLog struct {
 	ResponseResult    string
 
 	HttpProxyClient string
-	XRequestId      string
+	XRequestId0     string
+	XRequestId1     string
 	TraceId         string
 	SpanId          string
 	ParentSpanId    string
@@ -255,7 +256,8 @@ func L7FlowLogColumns() []*ckdb.Column {
 		ckdb.NewColumn("response_result", ckdb.String).SetComment("响应结果, DNS解析地址"),
 
 		ckdb.NewColumn("http_proxy_client", ckdb.String).SetComment("HTTP代理客户端"),
-		ckdb.NewColumn("x_request_id", ckdb.String).SetComment("XRequestID"),
+		ckdb.NewColumn("x_request_id_0", ckdb.String).SetComment("XRequestID0"),
+		ckdb.NewColumn("x_request_id_1", ckdb.String).SetComment("XRequestID1"),
 		ckdb.NewColumn("trace_id", ckdb.String).SetComment("TraceID"),
 		ckdb.NewColumn("span_id", ckdb.String).SetComment("SpanID"),
 		ckdb.NewColumn("parent_span_id", ckdb.String).SetComment("ParentSpanID"),
@@ -298,7 +300,8 @@ func (h *L7FlowLog) WriteBlock(block *ckdb.Block) {
 		h.ResponseResult,
 
 		h.HttpProxyClient,
-		h.XRequestId,
+		h.XRequestId0,
+		h.XRequestId1,
 		h.TraceId,
 		h.SpanId,
 		h.ParentSpanId,
@@ -387,7 +390,8 @@ func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData) {
 			h.RequestId = &h.requestId
 		}
 		h.AppService = l.ExtInfo.ServiceName
-		h.XRequestId = l.ExtInfo.XRequestId
+		h.XRequestId0 = l.ExtInfo.XRequestId_0
+		h.XRequestId1 = l.ExtInfo.XRequestId_1
 		h.HttpProxyClient = l.ExtInfo.ClientIp
 		if l.ExtInfo.HttpUserAgent != "" {
 			h.AttributeNames = append(h.AttributeNames, "http_user_agent")

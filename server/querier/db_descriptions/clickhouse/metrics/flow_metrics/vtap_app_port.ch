@@ -12,3 +12,4 @@ timeout                     , 超时                 , 个   , 未采集到响�
 error_ratio                 , 异常比例             , %    , 异常请求的百分比，通过`异常 / 响应`计算得，即 `error / response`
 client_error_ratio          , 客户端异常比例       , %    , 客户端异常请求的百分比，通过`客户端异常 / 响应`计算得，即 `client_error / response`
 server_error_ratio          , 服务端异常比例       , %    , 客户端异常请求的百分比，通过`服务端异常 / 响应`计算得，即 `server_error / response`
+_                           , 行数                , 个   ,  

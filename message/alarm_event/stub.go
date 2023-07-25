@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 
-package common
+package alarm_event
 
-const (
-	CK_VERSION             = "v6.3.3.6" // 用于表示clickhouse的表版本号
-	DEFAULT_PCAP_DATA_PATH = "/var/lib/pcap"
-)
+//go:generate protoc --gofast_out=plugins=grpc:. -I.. ../alarm_event.proto

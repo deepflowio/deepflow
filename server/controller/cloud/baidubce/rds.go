@@ -174,7 +174,6 @@ func (b *BaiduBce) getRDSInstances(
 					Lcuuid:           common.GenerateUUID(vinterfaceLcuuid + rds.Endpoint.InetIp),
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               rds.Endpoint.InetIp,
-					SubnetLcuuid:     common.NETWORK_ISP_LCUUID,
 					RegionLcuuid:     region.Lcuuid,
 				})
 			}

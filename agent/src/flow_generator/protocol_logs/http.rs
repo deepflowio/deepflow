@@ -86,7 +86,9 @@ pub struct HttpInfo {
     #[serde(rename = "http_proxy_client", skip_serializing_if = "value_is_default")]
     pub client_ip: String,
     #[serde(skip_serializing_if = "value_is_default")]
-    pub x_request_id: String,
+    pub x_request_id_0: String,
+    #[serde(skip_serializing_if = "value_is_default")]
+    pub x_request_id_1: String,
 
     #[serde(rename = "request_length", skip_serializing_if = "Option::is_none")]
     pub req_content_length: Option<u32>,
@@ -204,8 +206,11 @@ impl HttpInfo {
         if self.span_id.is_empty() {
             self.span_id = other.span_id;
         }
-        if self.x_request_id.is_empty() {
-            self.x_request_id = other.x_request_id.clone();
+        if self.x_request_id_0.is_empty() {
+            self.x_request_id_0 = other.x_request_id_0.clone();
+        }
+        if self.x_request_id_1.is_empty() {
+            self.x_request_id_1 = other.x_request_id_1.clone();
         }
         self.attributes.extend(other.attributes);
         Ok(())
@@ -316,7 +321,8 @@ impl From<HttpInfo> for L7ProtocolSendLog {
             }),
             ext_info: Some(ExtendedInfo {
                 request_id: f.stream_id,
-                x_request_id: Some(f.x_request_id),
+                x_request_id_0: Some(f.x_request_id_0),
+                x_request_id_1: Some(f.x_request_id_1),
                 client_ip: Some(f.client_ip),
                 user_agent: f.user_agent,
                 referer: f.referer,
@@ -894,7 +900,11 @@ impl HttpLog {
             }
         }
         if key == &config.x_request_id {
-            self.info.x_request_id = val.to_owned();
+            if direction == PacketDirection::ClientToServer {
+                self.info.x_request_id_0 = val.to_owned();
+            } else {
+                self.info.x_request_id_1 = val.to_owned();
+            }
         }
         if direction == PacketDirection::ClientToServer && key == &config.proxy_client {
             self.info.client_ip = val.to_owned();
@@ -1357,7 +1367,9 @@ mod tests {
             parse_config: Some(&conf),
             l7_perf_cache: Rc::new(RefCell::new(L7PerfCache::new(1))),
             wasm_vm: None,
+            #[cfg(target_os = "linux")]
             so_func: None,
+            #[cfg(target_os = "linux")]
             so_plugin_counter_map: None,
             stats_counter: None,
             rrt_timeout: Duration::from_secs(10).as_micros() as usize,

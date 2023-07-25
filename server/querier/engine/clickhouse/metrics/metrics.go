@@ -91,6 +91,22 @@ func NewReplaceMetrics(dbField string, condition string) *Metrics {
 	}
 }
 
+func GetAggMetrics(field string, db string, table string, ctx context.Context) (*Metrics, bool) {
+	field = strings.Trim(field, "`")
+	if field == "_" {
+		return &Metrics{
+			Index:       0,
+			DBField:     "_",
+			DisplayName: "_",
+			Type:        METRICS_TYPE_OTHER,
+			Category:    "Other",
+			Permissions: []bool{true, true, true},
+			Table:       table,
+		}, true
+	}
+	return GetMetrics(field, db, table, ctx)
+}
+
 func GetMetrics(field string, db string, table string, ctx context.Context) (*Metrics, bool) {
 	field = strings.Trim(field, "`")
 	if db == "ext_metrics" || db == "deepflow_system" || table == "l7_flow_log" {
@@ -243,8 +259,13 @@ func GetMetricsDescriptionsByDBTable(db string, table string, where string, ctx 
 	} */
 	values := make([]interface{}, len(allMetrics))
 	for field, metrics := range allMetrics {
-		if db == "ext_metrics" || db == ckcommon.DB_NAME_PROMETHEUS || db == "deepflow_system" || (table == "l7_flow_log" && strings.Contains(field, "metrics.")) {
+		if db == "ext_metrics" || db == "deepflow_system" || (table == "l7_flow_log" && strings.Contains(field, "metrics.")) {
 			field = metrics.DisplayName
+		} else if db == ckcommon.DB_NAME_PROMETHEUS {
+			index := strings.LastIndex(field, "-")
+			if index != -1 {
+				field = field[:index]
+			}
 		}
 		values[metrics.Index] = []interface{}{
 			field, metrics.IsAgg, metrics.DisplayName, metrics.Unit, metrics.Type,
@@ -407,6 +428,9 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) erro
 		}
 		if rm, ok := replaceMetrics[name]; ok && value.DBField == "" {
 			value.Replace(rm)
+		}
+		if name == "_" {
+			value.IsAgg = true
 		}
 		metrics[name] = value
 	}

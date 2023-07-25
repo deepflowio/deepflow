@@ -62,8 +62,8 @@ type QingCloud struct {
 	regionIdToVxnetIds         map[string][]string
 	ZoneNames                  []string
 	vpcIdToCidr                map[string]string
-	vxnetIdToVPCLcuuid         map[string]string
-	vxnetIdToSubnetLcuuid      map[string]string
+	VxnetIdToVPCLcuuid         map[string]string
+	VxnetIdToSubnetLcuuid      map[string]string
 	defaultVxnetIDs            []string
 	HostNameToIP               map[string]string
 	vmIdToVPCLcuuid            map[string]string

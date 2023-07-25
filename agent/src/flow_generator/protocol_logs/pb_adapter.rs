@@ -53,7 +53,8 @@ pub struct ExtendedInfo {
     pub rpc_service: Option<String>,
     pub client_ip: Option<String>,
     pub request_id: Option<u32>,
-    pub x_request_id: Option<String>,
+    pub x_request_id_0: Option<String>,
+    pub x_request_id_1: Option<String>,
     pub user_agent: Option<String>,
     pub referer: Option<String>,
     pub protocol_str: Option<String>,
@@ -144,8 +145,11 @@ impl L7ProtocolSendLog {
             if let Some(s) = ext.request_id {
                 ext_info.request_id = s;
             }
-            if let Some(s) = ext.x_request_id {
-                ext_info.x_request_id = s.into();
+            if let Some(s) = ext.x_request_id_0 {
+                ext_info.x_request_id_0 = s.into();
+            }
+            if let Some(s) = ext.x_request_id_1 {
+                ext_info.x_request_id_1 = s.into();
             }
             if let Some(ua) = ext.user_agent {
                 ext_info.http_user_agent = ua;
