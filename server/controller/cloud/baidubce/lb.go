@@ -237,7 +237,6 @@ func (b *BaiduBce) getLBVInterfaceAndIPs(
 			Lcuuid:           common.GenerateUUID(vinterfaceLcuuid + publicIP),
 			VInterfaceLcuuid: vinterfaceLcuuid,
 			IP:               publicIP,
-			SubnetLcuuid:     common.NETWORK_ISP_LCUUID,
 			RegionLcuuid:     region.Lcuuid,
 		})
 	}

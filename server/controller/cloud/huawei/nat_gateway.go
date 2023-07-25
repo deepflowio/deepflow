@@ -101,7 +101,6 @@ func (h *HuaWei) getNATGateways() (
 						Lcuuid:           common.GenerateUUID(vifLcuuid + fip),
 						VInterfaceLcuuid: vifLcuuid,
 						IP:               fip,
-						SubnetLcuuid:     common.SUBNET_ISP_LCUUID,
 						RegionLcuuid:     ng.RegionLcuuid,
 					},
 				)

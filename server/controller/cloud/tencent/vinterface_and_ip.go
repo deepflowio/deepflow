@@ -111,7 +111,6 @@ func (t *Tencent) getVInterfacesAndIPs(region tencentRegion) ([]model.VInterface
 					Lcuuid:           common.GetUUID(deviceLcuuid+publicIP, uuid.Nil),
 					VInterfaceLcuuid: vLcuuid,
 					IP:               publicIP,
-					SubnetLcuuid:     common.GetUUID(common.NETWORK_ISP_LCUUID, uuid.Nil),
 					RegionLcuuid:     t.getRegionLcuuid(region.lcuuid),
 				})
 

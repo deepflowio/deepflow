@@ -116,7 +116,6 @@ func (a *Aws) getVInterfacesAndIPs(region awsRegion) ([]model.VInterface, []mode
 						Lcuuid:           common.GetUUID(vinterfaceLcuuid+publicIP, uuid.Nil),
 						VInterfaceLcuuid: vLcuuid,
 						IP:               publicIP,
-						SubnetLcuuid:     common.GetUUID(common.NETWORK_ISP_LCUUID, uuid.Nil),
 						RegionLcuuid:     a.getRegionLcuuid(region.lcuuid),
 					})
 

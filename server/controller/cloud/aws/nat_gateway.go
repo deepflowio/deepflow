@@ -98,7 +98,6 @@ func (a *Aws) getNatGateways(region awsRegion) ([]model.NATGateway, []model.VInt
 			natIPs = append(natIPs, model.IP{
 				IP:               ip,
 				VInterfaceLcuuid: vinterfaceLcuuid,
-				SubnetLcuuid:     common.SUBNET_ISP_LCUUID,
 				RegionLcuuid:     a.getRegionLcuuid(region.lcuuid),
 				Lcuuid:           common.GetUUID(vinterfaceLcuuid+ip, uuid.Nil),
 			})
