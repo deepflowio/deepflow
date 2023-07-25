@@ -35,6 +35,23 @@ func (u UserIDParam) GetUserID() int {
 	return u.UserID
 }
 
+type RegionFilterConditions struct {
+	Convertor
+
+	Lcuuids       []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
+	IDs           []int    `schema:"id,omitempty" json:"ID,omitempty"`
+	DomainLcuuids []string `schema:"domain,omitempty" json:"DOMAIN,omitempty"`
+}
+
+func (r RegionFilterConditions) GetFilterConditions() map[string]interface{} {
+	return r.ToMapOmitEmpty()
+}
+
+type RegionQueryFilterConditions struct {
+	RegionFilterConditions
+	UserIDParam
+}
+
 // VMFilterConditions directly applied to vm http response model.
 type VMFilterConditions struct {
 	Convertor
@@ -72,6 +89,134 @@ type HostFilterConditions struct {
 
 type HostQueryFilterConditions struct {
 	HostFilterConditions
+}
+
+type SecurityGroupFilterConditions struct {
+	Convertor
+
+	Lcuuids []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
+	IDs     []int    `schema:"id,omitempty" json:"ID,omitempty"`
+	VMIDs   []int    `schema:"vm_id,omitempty" json:"VM_ID,omitempty"`
+}
+
+type SecurityGroupRuleFilterConditions struct {
+	Convertor
+
+	VMIDs []int `schema:"security_group_id,omitempty" json:"SECURITY_GROUP_ID,omitempty"`
+}
+
+type NATGatewayFilterConditions struct {
+	Convertor
+
+	Lcuuids []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
+	IDs     []int    `schema:"id,omitempty" json:"ID,omitempty"`
+	VPCIDs  []int    `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
+}
+
+func (n NATGatewayFilterConditions) GetFilterConditions() map[string]interface{} {
+	return n.ToMapOmitEmpty()
+}
+
+type NATGatewayQueryFilterConditions struct {
+	NATGatewayFilterConditions
+	UserIDParam
+}
+
+type NATRuleFilterConditions struct {
+	Convertor
+
+	VPCIDs []int `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
+	NATIDs []int `schema:"nat_id,omitempty" json:"NAT_ID,omitempty"`
+}
+
+func (n NATRuleFilterConditions) GetFilterConditions() map[string]interface{} {
+	return n.ToMapOmitEmpty()
+}
+
+type LBFilterConditions struct {
+	Convertor
+
+	Lcuuids []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
+	IDs     []int    `schema:"id,omitempty" json:"ID,omitempty"`
+	VPCIDs  []int    `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
+}
+
+func (l LBFilterConditions) GetFilterConditions() map[string]interface{} {
+	return l.ToMapOmitEmpty()
+}
+
+type LBQueryFilterConditions struct {
+	LBFilterConditions
+	UserIDParam
+}
+
+type LBListenerFilterConditions struct {
+	Convertor
+
+	VPCIDs []int `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
+}
+
+func (l LBListenerFilterConditions) GetFilterConditions() map[string]interface{} {
+	return l.ToMapOmitEmpty()
+}
+
+type LBListenerQueryFilterConditions struct {
+	LBListenerFilterConditions
+	UserIDParam
+}
+
+type LBRuleFilterConditions struct {
+	Convertor
+
+	VPCIDs              []int `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
+	LBIDs               []int `schema:"lb_id,omitempty" json:"LB_ID,omitempty"`
+	LBListenerIDs       []int `schema:"lb_listener_id,omitempty" json:"LB_LISTENER_ID,omitempty"`
+	LBTargetServerTypes []int `schema:"lb_target_server_type,omitempty" json:"LB_TARGET_SERVER_TYPE,omitempty"`
+}
+
+func (l LBRuleFilterConditions) GetFilterConditions() map[string]interface{} {
+	return l.ToMapOmitEmpty()
+}
+
+type PeerConnectionFilterConditions struct {
+	Convertor
+
+	Lcuuids []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
+	IDs     []int    `schema:"id,omitempty" json:"ID,omitempty"`
+	VPCIDs  []int    `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
+}
+
+type CENFilterConditions struct {
+	Convertor
+
+	Lcuuids []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
+	IDs     []int    `schema:"id,omitempty" json:"ID,omitempty"`
+}
+
+type RDSInstanceFilterConditions struct {
+	Convertor
+
+	Lcuuids []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
+	IDs     []int    `schema:"id,omitempty" json:"ID,omitempty"`
+	VPCIDs  []int    `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
+}
+
+type RDSInstanceQueryFilterConditions struct {
+	RDSInstanceFilterConditions
+	UserIDParam
+}
+
+type RedisInstanceFilterConditions struct {
+	Convertor
+
+	Lcuuids []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
+	IDs     []int    `schema:"id,omitempty" json:"ID,omitempty"`
+	VPCIDs  []int    `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
+}
+
+type RedisInstanceQueryFilterConditions struct {
+	RedisInstanceFilterConditions
+	UserIDParam
 }
 
 // PodFilterConditions directly applied to pod http response model.
