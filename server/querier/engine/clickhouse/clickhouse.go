@@ -1218,10 +1218,12 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where, isCheck bool) (view
 			return right, err
 		}
 		op := view.Operator{Type: view.AND}
-		if left.ToString() == "" {
-			return right, nil
-		} else if right.ToString() == "" {
-			return left, nil
+		if !isCheck {
+			if left.ToString() == "" {
+				return right, nil
+			} else if right.ToString() == "" {
+				return left, nil
+			}
 		}
 		return &view.BinaryExpr{Left: left, Right: right, Op: &op}, nil
 	case *sqlparser.OrExpr:
