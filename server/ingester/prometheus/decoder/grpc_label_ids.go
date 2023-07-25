@@ -133,10 +133,11 @@ func NewPrometheusLabelTable(controllerIPs []string, port, rpcMaxMsgSize int) *P
 	log.Infof("New PrometheusLabelTable ips:%v port:%d rpcMaxMsgSize:%d", ips, port, rpcMaxMsgSize)
 	debug.ServerRegisterSimple(ingesterctl.CMD_PROMETHEUS_LABEL, t)
 	common.RegisterCountableForIngester("prometheus-label-request", t)
+	go t.UpdateTargetIdsRegularIntervals()
 	return t
 }
 
-func (t *PrometheusLabelTable) RequesteLabelIDs(request *trident.PrometheusLabelRequest) (*trident.PrometheusLabelResponse, error) {
+func (t *PrometheusLabelTable) RequestAndUpdateTargetLabelIDs(request *trident.PrometheusLabelRequest, updateLabelIds bool) (*trident.PrometheusLabelResponse, error) {
 	t.counter.RequestCount++
 	t.counter.RequestLabelsCount += int64(len(request.GetRequestLabels()))
 	var response *trident.PrometheusLabelResponse
@@ -158,22 +159,43 @@ func (t *PrometheusLabelTable) RequesteLabelIDs(request *trident.PrometheusLabel
 
 	t.counter.ResponseLabelsCount += int64(len(response.GetResponseLabelIds()))
 	t.counter.RequestTotalDelayNs += int64(time.Since(requestStart))
-	t.updatePrometheusLabels(response)
+	t.updatePrometheusTargetIds(response.GetResponseTargetIds())
+	if updateLabelIds {
+		t.updatePrometheusLabelIds(response.GetResponseLabelIds())
+	}
 
 	return response, nil
 }
 
-func (t *PrometheusLabelTable) RequesteAllLabelIDs() {
+func (t *PrometheusLabelTable) UpdateTargetIdsRegularIntervals() {
+	ticker := time.NewTicker(time.Hour)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		t.RequestAllTargetIDs()
+	}
+}
+
+func (t *PrometheusLabelTable) RequestAllTargetIDs() {
+	log.Info("prometheus request all target IDs start")
+	_, err := t.RequestAndUpdateTargetLabelIDs(&trident.PrometheusLabelRequest{}, false)
+	if err != nil {
+		log.Warning("request all prometheus target ids failed: %s", err)
+	}
+	log.Infof("prometheus request all target IDs end. %s", t.statsString())
+}
+
+func (t *PrometheusLabelTable) RequestAllLabelIDs() {
 	log.Info("prometheus request all label IDs start")
-	_, err := t.RequesteLabelIDs(&trident.PrometheusLabelRequest{})
+	_, err := t.RequestAndUpdateTargetLabelIDs(&trident.PrometheusLabelRequest{}, true)
 	if err != nil {
 		log.Warning("request all prometheus label ids failed: %s", err)
 	}
 	log.Infof("prometheus request all label IDs end. %s", t.statsString())
 }
 
-func (t *PrometheusLabelTable) updatePrometheusLabels(resp *trident.PrometheusLabelResponse) {
-	for _, target := range resp.GetResponseTargetIds() {
+func (t *PrometheusLabelTable) updatePrometheusTargetIds(targetIds []*trident.TargetResponse) {
+	for _, target := range targetIds {
 		targetId := target.GetTargetId()
 		if targetId == 0 {
 			if t.counter.TargetUnknown == 0 {
@@ -193,8 +215,10 @@ func (t *PrometheusLabelTable) updatePrometheusLabels(resp *trident.PrometheusLa
 			t.metricTargetPair.Set(metricTargetPairKey(metricId, targetId), struct{}{})
 		}
 	}
+}
 
-	for _, metric := range resp.GetResponseLabelIds() {
+func (t *PrometheusLabelTable) updatePrometheusLabelIds(labelIds []*trident.MetricLabelResponse) {
+	for _, metric := range labelIds {
 		metricName := metric.GetMetricName()
 		if metricName == "" {
 			t.counter.MetricUnknown++
@@ -430,7 +454,7 @@ func (t *PrometheusLabelTable) testString(request string) string {
 	}
 	req.RequestLabels = append(req.RequestLabels, metricReq)
 	req.RequestTargets = append(req.RequestTargets, targetReq)
-	resp, err := t.RequesteLabelIDs(req)
+	resp, err := t.RequestAndUpdateTargetLabelIDs(req, true)
 	if err != nil {
 		return fmt.Sprintf("request: %s\nresponse failed: %s", req, err)
 	}

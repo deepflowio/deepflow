@@ -118,7 +118,7 @@ func NewPrometheusHandler(config *config.Config, recv *receiver.Receiver, platfo
 }
 
 func (m *PrometheusHandler) Start() {
-	go m.prometheusLabelTable.RequesteAllLabelIDs()
+	go m.prometheusLabelTable.RequestAllLabelIDs()
 	for _, platformData := range m.PlatformDatas {
 		platformData.Start()
 	}
