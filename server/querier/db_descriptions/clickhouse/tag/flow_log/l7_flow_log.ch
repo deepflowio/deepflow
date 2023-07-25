@@ -82,7 +82,8 @@ trace_id                  , TraceID                  ,
 span_id                   , SpanID                   ,
 parent_span_id            , ParentSpanID             ,
 span_kind                 , Span 类型                , 取自 OpenTelemetry。
-x_request_id              , X-Request-ID             ,
+x_request_id_0            , 请求 X-Request-ID        ,
+x_request_id_1            , 响应 X-Request-ID        ,
 http_proxy_client         , HTTP 代理客户端          , 代理转换之前的真实客户端 IP。
 syscall_trace_id_request  , 请求 Syscall TraceID     ,
 syscall_trace_id_response , 响应 Syscall TraceID     ,
