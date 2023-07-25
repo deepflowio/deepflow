@@ -148,8 +148,8 @@ func (q *QingCloud) GetNetworks() ([]model.Network, []model.Subnet, error) {
 	}
 
 	q.regionIdToVxnetIds = regionIdToVxnetIds
-	q.vxnetIdToVPCLcuuid = vxnetIdToVPCLcuuid
-	q.vxnetIdToSubnetLcuuid = vxnetIdToSubnetLcuuid
+	q.VxnetIdToVPCLcuuid = vxnetIdToVPCLcuuid
+	q.VxnetIdToSubnetLcuuid = vxnetIdToSubnetLcuuid
 	log.Info("get networks complete")
 	return retNetworks, retSubnets, nil
 }
