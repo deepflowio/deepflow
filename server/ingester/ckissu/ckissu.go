@@ -864,6 +864,12 @@ var ColumnAdd633 = []*ColumnAdds{
 		ColumnNames: u8ColumnNameEdgeAdd633,
 		ColumnType:  ckdb.UInt8,
 	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l7_flow_log", "l7_flow_log_local"},
+		ColumnNames: []string{"x_request_id_0", "x_request_id_1"},
+		ColumnType:  ckdb.String,
+	},
 }
 
 func getTables(connect *sql.DB, db, tableName string) ([]string, error) {
