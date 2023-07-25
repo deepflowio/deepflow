@@ -870,6 +870,12 @@ var ColumnAdd633 = []*ColumnAdds{
 		ColumnNames: []string{"x_request_id_0", "x_request_id_1"},
 		ColumnType:  ckdb.String,
 	},
+	&ColumnAdds{
+		Dbs:         []string{"prometheus"},
+		Tables:      []string{"samples", "samples_local"},
+		ColumnNames: []string{"time_ms"},
+		ColumnType:  ckdb.DateTime64ms,
+	},
 }
 
 func getTables(connect *sql.DB, db, tableName string) ([]string, error) {

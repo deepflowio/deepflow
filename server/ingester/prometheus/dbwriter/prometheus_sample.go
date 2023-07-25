@@ -54,6 +54,7 @@ type PrometheusSample struct {
 
 type PrometheusSampleMini struct {
 	Timestamp        uint32 // s
+	TimestampMs      int64  // ms
 	MetricID         uint32
 	TargetID         uint32
 	AppLabelValueIDs []uint32
@@ -85,6 +86,7 @@ func (m *PrometheusSampleMini) PodNsId() uint16 {
 func (m *PrometheusSampleMini) WriteBlock(block *ckdb.Block) {
 	block.WriteDateTime(m.Timestamp)
 	block.Write(
+		m.TimestampMs,
 		m.MetricID,
 		m.TargetID,
 	)
@@ -99,6 +101,7 @@ func (m *PrometheusSampleMini) Columns(appLabelColumnCount int) []*ckdb.Column {
 	columns := []*ckdb.Column{}
 
 	columns = append(columns, ckdb.NewColumnWithGroupBy("time", ckdb.DateTime))
+	columns = append(columns, ckdb.NewColumn("time_ms", ckdb.DateTime64ms).SetComment("precision：ms"))
 	columns = append(columns,
 		ckdb.NewColumn("metric_id", ckdb.UInt32).SetComment("encoded ID of the metric name"),
 		ckdb.NewColumn("target_id", ckdb.UInt32).SetComment("the encoded ID of the target"),

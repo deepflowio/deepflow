@@ -408,6 +408,7 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID uint16, ts *prompb.T
 		if b.ignoreUniversalTag {
 			m := dbwriter.AcquirePrometheusSampleMini()
 			m.Timestamp = uint32(model.Time(s.Timestamp).Unix())
+			m.TimestampMs = s.Timestamp
 			m.MetricID = metricID
 			m.TargetID = targetID
 			m.AppLabelValueIDs = append(m.AppLabelValueIDs, b.appLabelValueIDsBuffer...)
@@ -416,6 +417,7 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID uint16, ts *prompb.T
 		} else {
 			m := dbwriter.AcquirePrometheusSample()
 			m.Timestamp = uint32(model.Time(s.Timestamp).Unix())
+			m.TimestampMs = s.Timestamp
 			m.MetricID = metricID
 			m.TargetID = targetID
 			m.AppLabelValueIDs = append(m.AppLabelValueIDs, b.appLabelValueIDsBuffer...)
