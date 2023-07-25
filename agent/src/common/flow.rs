@@ -69,7 +69,7 @@ pub enum CloseType {
     ServerQueueLack = 17,       // 17: 传输-服务端队列溢出
     ClientEstablishReset = 18,  // 18: 建连-客户端其他重置
     ServerEstablishReset = 19,  // 19: 建连-服务端其他重置
-    HeartBeat = 20,             // 20: 心跳
+    TcpFinClientRst = 20,       // 20: 正常结束-客户端重置
     Max = 21,
 }
 
@@ -1011,14 +1011,8 @@ impl Flow {
         //                                     SYN-ACK
         //            [ACK]
         //            RST|RST-ACK
-        let is_heartbeat = src_tcp_flags.contains(TcpFlags::SYN | TcpFlags::RST_ACK)
-            && dst_tcp_flags.contains(TcpFlags::SYN_ACK);
-
-        // Sender:    Client                   Server
-        // TCP Flags: SYN
-        //            RST|RST-ACK
-        is_heartbeat
-            || (src_tcp_flags.contains(TcpFlags::SYN | TcpFlags::RST) && dst_tcp_flags.is_empty())
+        src_tcp_flags.contains(TcpFlags::SYN | TcpFlags::RST_ACK)
+            && dst_tcp_flags.contains(TcpFlags::SYN_ACK)
     }
 
     pub fn update_close_type(&mut self, flow_state: FlowState) {
@@ -1032,7 +1026,7 @@ impl Flow {
             FlowState::ClosingTx2 | FlowState::ClosingRx2 | FlowState::Closed => CloseType::TcpFin,
             FlowState::Reset => {
                 if self.is_heartbeat() {
-                    CloseType::HeartBeat
+                    CloseType::TcpFinClientRst
                 } else {
                     if self.flow_metrics_peers[FlowMetricsPeer::DST as usize]
                         .total_tcp_flags
@@ -1046,7 +1040,7 @@ impl Flow {
             }
             FlowState::Syn1 | FlowState::ClientL4PortReuse => {
                 if self.is_heartbeat() {
-                    CloseType::HeartBeat
+                    CloseType::TcpFinClientRst
                 } else {
                     CloseType::ClientSourcePortReuse
                 }
@@ -1065,7 +1059,7 @@ impl Flow {
             }
             FlowState::EstablishReset | FlowState::OpeningRst => {
                 if self.is_heartbeat() {
-                    CloseType::HeartBeat
+                    CloseType::TcpFinClientRst
                 } else {
                     if self.flow_metrics_peers[FlowMetricsPeer::DST as usize]
                         .total_tcp_flags

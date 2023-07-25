@@ -75,7 +75,6 @@ func (t *Tencent) getNatGateways(region tencentRegion) ([]model.NATGateway, []mo
 					Lcuuid:           common.GetUUID(vinterfaceLcuuid+ip, uuid.Nil),
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               ip,
-					SubnetLcuuid:     common.NETWORK_ISP_LCUUID,
 					RegionLcuuid:     t.getRegionLcuuid(region.lcuuid),
 				})
 			}

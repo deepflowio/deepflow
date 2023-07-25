@@ -27,3 +27,4 @@ response_code        , response_code        , tag        , Cardinality     , 111
 response_result      , response_result      , tag        , Cardinality     , 111
 tap                  , tap_type             , tag        , Cardinality     , 111
 vtap                 , vtap_id              , tag        , Cardinality     , 111
+_                    ,                      , other      , Other           , 111 

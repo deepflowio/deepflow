@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"encoding/json"
+
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
 )
 
@@ -31,6 +32,7 @@ const (
 	METRICS_TYPE_QUOTIENT              // 商值，例如平均包长
 	METRICS_TYPE_TAG                   // tag，例如ip
 	METRICS_TYPE_ARRAY                 // 数组类型，不支持算子，select时需展开
+	METRICS_TYPE_OTHER                 // 只支持 count(_)
 )
 
 var METRICS_TYPE_NAME_MAP = map[string]int{
@@ -40,6 +42,7 @@ var METRICS_TYPE_NAME_MAP = map[string]int{
 	"percentage": METRICS_TYPE_PERCENTAGE,
 	"quotient":   METRICS_TYPE_QUOTIENT,
 	"tag":        METRICS_TYPE_TAG,
+	"other":      METRICS_TYPE_OTHER,
 }
 
 var METRICS_ARRAY_NAME_MAP = map[string][]string{
@@ -63,6 +66,7 @@ var METRICS_TYPE_UNLAY_FUNCTIONS = map[int][]string{
 	METRICS_TYPE_PERCENTAGE: []string{},
 	METRICS_TYPE_QUOTIENT:   []string{},
 	METRICS_TYPE_TAG:        []string{view.FUNCTION_UNIQ, view.FUNCTION_UNIQ_EXACT},
+	METRICS_TYPE_OTHER:      []string{view.FUNCTION_COUNT},
 }
 
 const (

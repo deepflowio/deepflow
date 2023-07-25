@@ -18,6 +18,7 @@ package clickhouse
 
 import (
 	"context"
+	"strconv"
 
 	//"github.com/k0kubun/pp"
 	"github.com/deepflowio/deepflow/server/querier/common"
@@ -39,6 +40,7 @@ import (
 
 var (
 	parseSQL = []struct {
+		index  string
 		input  string
 		output string
 		db     string
@@ -253,12 +255,27 @@ var (
 	}, {
 		input:  "SELECT Sum(log_count) as sum_log_count FROM l7_flow_log  WHERE `会话长度`>=893689408 ",
 		output: "SELECT SUM(1) AS `sum_log_count` FROM flow_log.`l7_flow_log` PREWHERE `会话长度` >= 893689408 LIMIT 10000",
-	}}
+	}, {
+		input:  "select session_length AS `会话长度` from l7_flow_log where `session_length`<=392037",
+		output: "SELECT if(request_length>0,request_length,0)+if(response_length>0,response_length,0) AS `会话长度` FROM flow_log.`l7_flow_log` PREWHERE (if(request_length>0,request_length,0)+if(response_length>0,response_length,0) <= 392037) LIMIT 10000",
+	}, {
+		index:  "count_1",
+		input:  "select Count(_) as a from l7_flow_log having a > 0 ",
+		output: "SELECT COUNT(1) AS `a` FROM flow_log.`l7_flow_log` HAVING a > 0 LIMIT 10000",
+	}, {
+		index:  "count_2",
+		input:  "select Count(_) from l7_flow_log having Count(_) > 0 ",
+		output: "SELECT COUNT(1) AS `Count(_)` FROM flow_log.`l7_flow_log` HAVING COUNT(1) > 0 LIMIT 10000",
+	}, {
+		index:  "count_3",
+		input:  "select Avg(`byte_tx`) AS `Avg(byte_tx)`,icon_id(chost_0) as `xx`, Count(_) as `c`, region_0 from vtap_flow_edge_port group by region_0 having `c` > 0 limit 1",
+		output: "SELECT `xx`, region_0, AVG(`_sum_byte_tx`) AS `Avg(byte_tx)`, SUM(`_count_1`) AS `c` FROM (WITH if(l3_device_type_0=1, dictGet(flow_tag.device_map, 'icon_id', (toUInt64(1),toUInt64(l3_device_id_0))), 0) AS `xx` SELECT `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, SUM(byte_tx) AS `_sum_byte_tx`, COUNT(1) AS `_count_1` FROM flow_metrics.`vtap_flow_edge_port` WHERE (region_id_0!=0) GROUP BY `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`) GROUP BY `xx`, `region_0` HAVING c > 0 LIMIT 1",
+		db:     "flow_metrics"}}
 )
 
 func TestGetSql(t *testing.T) {
 	Load()
-	for _, pcase := range parseSQL {
+	for i, pcase := range parseSQL {
 		if pcase.output == "" {
 			pcase.output = pcase.input
 		}
@@ -270,10 +287,17 @@ func TestGetSql(t *testing.T) {
 		e.Context = context.Background()
 		e.Init()
 		parser := parse.Parser{Engine: &e}
-		parser.ParseSQL(pcase.input)
+		err := parser.ParseSQL(pcase.input)
 		out := parser.Engine.ToSQLString()
 		if out != pcase.output {
-			t.Errorf("Parse \n\t%q \n get: \n\t %q \n want: \n\t %q", pcase.input, out, pcase.output)
+			caseIndex := pcase.index
+			if pcase.index == "" {
+				caseIndex = strconv.Itoa(i)
+			}
+			t.Errorf("\nParse [%s]\n\t%q \n get: \n\t%q \n want: \n\t%q", caseIndex, pcase.input, out, pcase.output)
+			if err != nil {
+				t.Errorf("\nerror %v", err)
+			}
 		}
 	}
 }

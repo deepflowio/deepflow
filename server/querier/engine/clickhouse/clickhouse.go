@@ -1150,7 +1150,7 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 		if fieldFunc != nil {
 			return fieldFunc, nil
 		}
-		metricStruct, ok := metrics.GetMetrics(field, e.DB, e.Table, e.Context)
+		metricStruct, ok := metrics.GetAggMetrics(field, e.DB, e.Table, e.Context)
 		if ok {
 			return &Field{Value: metricStruct.DBField}, nil
 		}

@@ -19,6 +19,8 @@ package metrics
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
@@ -108,18 +110,26 @@ func GetPrometheusMetrics(db, table, where string, ctx context.Context) (map[str
 		log.Error(err)
 		return nil, err
 	}
-	for _, metric := range allMetrics {
-		metricName := metric.DisplayName
-		for i, value := range prometheusTableRst.Values {
+	index := 0
+	for field, metric := range allMetrics {
+		metricType := METRICS_TYPE_COUNTER
+		isAgg := false
+		if field == "_" {
+			metricType = METRICS_TYPE_OTHER
+			isAgg = true
+		}
+		for _, value := range prometheusTableRst.Values {
 			tableName := value.([]interface{})[0].(string)
 			if tableName == "" {
 				continue
 			}
 			lm := NewMetrics(
-				i, metricName, metricName, "", METRICS_TYPE_COUNTER,
+				index, metric.DBField, metric.DisplayName, "", metricType,
 				"metrics", []bool{true, true, true}, "", tableName, "",
 			)
-			loadMetrics[fmt.Sprintf("%s-%s", metricName, tableName)] = lm
+			lm.IsAgg = isAgg
+			loadMetrics[strings.Join([]string{field, strconv.Itoa(index)}, "-")] = lm
+			index++
 		}
 	}
 	return loadMetrics, err
