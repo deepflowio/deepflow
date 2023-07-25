@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	DefaultPcapPartition = ckdb.TimeFuncFourHour
+	DefaultPcapPartition = ckdb.TimeFuncHour
 )
 
 type PcapStore struct {
