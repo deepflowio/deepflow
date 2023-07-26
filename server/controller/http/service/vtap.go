@@ -169,7 +169,7 @@ func GetVtaps(filter map[string]interface{}) (resp []model.Vtap, err error) {
 		switch vtap.Type {
 		case common.VTAP_TYPE_KVM, common.VTAP_TYPE_ESXI, common.VTAP_TYPE_WORKLOAD_V,
 			common.VTAP_TYPE_POD_HOST, common.VTAP_TYPE_POD_VM, common.VTAP_TYPE_HYPER_V,
-			common.VTAP_TYPE_WORKLOAD_P:
+			common.VTAP_TYPE_WORKLOAD_P, common.VTAP_TYPE_K8S_SIDECAR:
 			vtapResp.LaunchServer = vtap.LaunchServer
 			vtapResp.LaunchServerID = vtap.LaunchServerID
 			vtapResp.SyncedControllerAt = vtap.SyncedControllerAt.Format(common.GO_BIRTHDAY)
@@ -809,7 +809,7 @@ func updateVTapTapMode(lcuuid string, tapMode int) error {
 	updateMap := make(map[string]interface{})
 	switch vtap.Type {
 	case common.VTAP_TYPE_KVM, common.VTAP_TYPE_HYPER_V,
-		common.VTAP_TYPE_POD_HOST, common.VTAP_TYPE_POD_VM:
+		common.VTAP_TYPE_POD_HOST, common.VTAP_TYPE_POD_VM, common.VTAP_TYPE_K8S_SIDECAR:
 
 		if tapMode == common.TAPMODE_LOCAL || tapMode == common.TAPMODE_MIRROR {
 			updateMap["tap_mode"] = tapMode
@@ -892,7 +892,8 @@ func GetVTapPortsCount() (int, error) {
 	if err := mysql.Db.Find(&vtaps).Error; err != nil {
 		return 0, err
 	}
-	vtapHostIPs, vtapNodeIPs, pubVTapServers := mapset.NewSet(), mapset.NewSet(), mapset.NewSet()
+	vtapHostIPs, vtapNodeIPs := mapset.NewSet(), mapset.NewSet()
+	pubVTapServers, podVTapServers := mapset.NewSet(), mapset.NewSet()
 	for _, vtap := range vtaps {
 		if utils.Find([]int{common.VTAP_TYPE_KVM, common.VTAP_TYPE_ESXI}, vtap.Type) {
 			vtapHostIPs.Add(vtap.LaunchServer)
@@ -900,6 +901,8 @@ func GetVTapPortsCount() (int, error) {
 			vtapNodeIPs.Add(vtap.LaunchServer)
 		} else if utils.Find([]int{common.VTAP_TYPE_WORKLOAD_V}, vtap.Type) {
 			pubVTapServers.Add(vtap.LaunchServer)
+		} else if utils.Find([]int{common.VTAP_TYPE_K8S_SIDECAR}, vtap.Type) {
+			podVTapServers.Add(vtap.LaunchServer)
 		}
 	}
 
@@ -942,7 +945,7 @@ func GetVTapPortsCount() (int, error) {
 	}
 	pubVTapVIFs := mapset.NewSet()
 	for _, lanIP := range lanIPs {
-		if pubVTapServers.Contains(lanIP.IP) {
+		if pubVTapServers.Contains(lanIP.IP) || podVTapServers.Contains(lanIP.IP) {
 			pubVTapVIFs.Add(lanIP.VInterfaceID)
 		}
 	}
@@ -956,9 +959,10 @@ func GetVTapPortsCount() (int, error) {
 	for _, vif := range vinterfaces {
 		if vif.DeviceType == common.VIF_DEVICE_TYPE_VM && pubVTapVIFs.Contains(vif.ID) {
 			vtapVifCount++
-		}
-		if vif.DeviceType == common.VIF_DEVICE_TYPE_POD && vtapPodIDs.Contains(vif.DeviceID) {
-			vtapVifCount++
+		} else if vif.DeviceType == common.VIF_DEVICE_TYPE_POD {
+			if vtapPodIDs.Contains(vif.DeviceID) || pubVTapVIFs.Contains(vif.ID) {
+				vtapVifCount++
+			}
 		}
 	}
 
