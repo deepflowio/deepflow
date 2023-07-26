@@ -1260,6 +1260,7 @@ mod tests {
             l7_log_collect_nps_threshold: 10,
             l7_log_session_aggr_timeout: Duration::from_secs(10),
             l7_log_dynamic: config,
+            ..Default::default()
         };
         for packet in packets.iter_mut() {
             packet.lookup_key.direction = if packet.lookup_key.dst_port == first_dst_port {
@@ -1341,11 +1342,7 @@ mod tests {
                 return [hdr_p, key.as_bytes(), val.as_bytes()].concat();
             }
         }
-        let conf = LogParserConfig {
-            l7_log_collect_nps_threshold: 0,
-            l7_log_session_aggr_timeout: Duration::default(),
-            l7_log_dynamic: L7LogDynamicConfig::default(),
-        };
+        let conf = LogParserConfig::default();
         let param = &ParseParam {
             l4_protocol: IpProtocol::Tcp,
             ip_src: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
@@ -1536,11 +1533,7 @@ mod tests {
 
         let first_dst_port = packets[0].lookup_key.dst_port;
 
-        let config = LogParserConfig {
-            l7_log_collect_nps_threshold: 0,
-            l7_log_session_aggr_timeout: Duration::ZERO,
-            l7_log_dynamic: L7LogDynamicConfig::default(),
-        };
+        let config = LogParserConfig::default();
 
         for packet in packets.iter_mut() {
             if packet.lookup_key.dst_port == first_dst_port {

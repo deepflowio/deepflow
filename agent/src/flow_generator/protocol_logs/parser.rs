@@ -661,7 +661,13 @@ impl SessionAggregator {
                 while running.load(Ordering::Relaxed) {
                     match input_queue.recv_all(&mut batch_buffer, Some(RCV_TIMEOUT)) {
                         Ok(_) => {
+                            let config = config.load();
                             for app_proto in batch_buffer.drain(..) {
+                                if config.l7_log_ignore_tap_sides
+                                    [app_proto.base_info.tap_side as usize]
+                                {
+                                    continue;
+                                }
                                 session_queue.aggregate_session_and_send(Box::new(
                                     AppProtoLogsData {
                                         base_info: (*app_proto).base_info.clone(),
