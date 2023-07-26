@@ -24,7 +24,9 @@ import (
 type QueryModel interface {
 	model.VMQuery | model.PodQuery | model.PodReplicaSetQuery | model.PodGroupQuery | model.PodGroupPortQuery |
 		model.PodServiceQuery | model.PodServicePortQuery | model.PodIngressQuery | model.PodIngressRuleQuery |
-		model.PodNodeQuery | model.PodNamespaceQuery | model.PodClusterQuery
+		model.PodNodeQuery | model.PodNamespaceQuery | model.PodClusterQuery |
+		model.IPQuery | model.DHCPPortQuery | model.VRouterQuery | model.RoutingTableQuery |
+		model.NetworkQuery | model.VPCQuery
 }
 
 // 各资源需要用于构建 redis 缓存 key 的 query 字段定义
@@ -32,7 +34,9 @@ type QueryStoredInRedisModel interface {
 	model.VMQueryStoredInRedis | model.PodQueryStoredInRedis | model.PodReplicaSetQueryStoredInRedis |
 		model.PodGroupQueryStoredInRedis | model.PodGroupPortQueryStoredInRedis | model.PodServiceQueryStoredInRedis |
 		model.PodServicePortQueryStoredInRedis | model.PodIngressQueryStoredInRedis | model.PodIngressRuleQueryStoredInRedis |
-		model.PodNodeQueryStoredInRedis | model.PodNamespaceQueryStoredInRedis | model.PodClusterQueryStoredInRedis
+		model.PodNodeQueryStoredInRedis | model.PodNamespaceQueryStoredInRedis | model.PodClusterQueryStoredInRedis |
+		model.IPQueryStoredInRedis | model.DHCPPortQueryStoredInRedis | model.VRouterQueryStoredInRedis | model.RoutingTableQuery |
+		model.NetworkQueryStoredInRedis | model.VPCQueryStoredInRedis
 
 	GetIncludedFields() []string
 	GetUserID() int
