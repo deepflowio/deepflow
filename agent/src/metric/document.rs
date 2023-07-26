@@ -226,6 +226,10 @@ pub enum TapSide {
     App = SIDE_APP,
 }
 
+impl TapSide {
+    pub const MAX: Self = Self::ServerApp;
+}
+
 impl Default for TapSide {
     fn default() -> Self {
         TapSide::Rest
@@ -460,5 +464,20 @@ mod tests {
         assert_eq!(pb_doc.flags, 1);
         assert_eq!(pb_doc.tag.as_ref().unwrap().code, 3);
         assert_eq!(pb_doc.tag.unwrap().field.unwrap().l3_epc_id, 10);
+    }
+
+    #[test]
+    fn ensure_max_tap_side() {
+        let max_tap_side = TapSide::MAX;
+        for i in 0..=255 {
+            if let Ok(ts) = TapSide::try_from(i) {
+                assert!(
+                    ts as u8 <= max_tap_side as u8,
+                    "value of {:?} is larger than TapSide::MAX {:?}",
+                    ts,
+                    max_tap_side
+                );
+            }
+        }
     }
 }
