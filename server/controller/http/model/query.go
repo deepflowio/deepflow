@@ -52,6 +52,65 @@ type HostQueryStoredInRedis struct {
 	IncludedFieldsParam
 }
 
+type IPQuery struct {
+	IPQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type IPQueryStoredInRedis struct {
+	IPQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type DHCPPortQuery struct {
+	DHCPPortQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type DHCPPortQueryStoredInRedis struct {
+	DHCPPortQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type VRouterQuery struct {
+	VRouterQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type VRouterQueryStoredInRedis struct {
+	VRouterQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type RoutingTableQuery struct {
+	RoutingTableQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type RoutingTableQueryStoredInRedis struct {
+	RoutingTableQueryFilterConditions
+}
+
+type NetworkQuery struct {
+	NetworkQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type NetworkQueryStoredInRedis struct {
+	NetworkQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type VPCQuery struct {
+	VPCQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type VPCQueryStoredInRedis struct {
+	VPCQueryFilterConditions
+	IncludedFieldsParam
+}
+
 type PodQuery struct {
 	PodQueryStoredInRedis
 	RefreshCacheParam

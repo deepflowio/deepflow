@@ -219,6 +219,130 @@ type RedisInstanceQueryFilterConditions struct {
 	UserIDParam
 }
 
+// net resource
+// IPFilterConditions directly applied to pod http response model.
+type IPFilterConditions struct {
+	Convertor
+
+	IP         []string `schema:"ip,omitempty" json:"IP,omitempty"`
+	VPCIDs     []int    `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
+	SubnetIDs  []int    `schema:"subnet_id,omitempty" json:"SUBNET_ID,omitempty"`
+	IPTypes    []int    `schema:"ip_type,omitempty" json:"IP_TYPE,omitempty"`
+	IPVersions []int    `schema:"ip_version,omitempty" json:"IP_VERSION,omitempty"`
+	DeviceType []int    `schema:"device_type,omitempty" json:"DEVICE_TYPE,omitempty"`
+	DeviceIDs  []int    `schema:"device_id,omitempty" json:"DEVICE_ID,omitempty"`
+}
+
+func (v IPFilterConditions) GetFilterConditions() map[string]interface{} {
+	return v.ToMapOmitEmpty()
+}
+
+// IPQueryFilterConditions formed by http request query.
+type IPQueryFilterConditions struct {
+	IPFilterConditions
+	UserIDParam
+}
+
+// DHCPPortFilterConditions directly applied to pod http response model.
+type DHCPPortFilterConditions struct {
+	Convertor
+
+	Lcuuids []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
+	IDs     []int    `schema:"id,omitempty" json:"ID,omitempty"`
+	VPCIDs  []int    `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
+}
+
+func (v DHCPPortFilterConditions) GetFilterConditions() map[string]interface{} {
+	return v.ToMapOmitEmpty()
+}
+
+// DHCPPortQueryFilterConditions formed by http request query.
+type DHCPPortQueryFilterConditions struct {
+	DHCPPortFilterConditions
+	UserIDParam
+}
+
+// VRouterFilterConditions directly applied to pod http response model.
+type VRouterFilterConditions struct {
+	Convertor
+
+	Lcuuids   []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
+	IDs       []int    `schema:"id,omitempty" json:"ID,omitempty"`
+	SubnetIDs []int    `schema:"subnet_id,omitempty" json:"SUBNET_ID,omitempty"`
+	VPCIDs    []int    `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
+}
+
+func (v VRouterFilterConditions) GetFilterConditions() map[string]interface{} {
+	return v.ToMapOmitEmpty()
+}
+
+// VRouterQueryFilterConditions formed by http request query.
+type VRouterQueryFilterConditions struct {
+	VRouterFilterConditions
+	UserIDParam
+}
+
+// RoutingTableFilterConditions directly applied to pod http response model.
+type RoutingTableFilterConditions struct {
+	Convertor
+
+	RouterIDs []int `schema:"router_id,omitempty" json:"ROUTER_ID,omitempty"`
+}
+
+func (v RoutingTableFilterConditions) GetFilterConditions() map[string]interface{} {
+	return v.ToMapOmitEmpty()
+}
+
+// RoutingTableQueryFilterConditions formed by http request query.
+type RoutingTableQueryFilterConditions struct {
+	RoutingTableFilterConditions
+	UserIDParam
+}
+
+// NetworkFilterConditions directly applied to pod http response model.
+type NetworkFilterConditions struct {
+	Convertor
+
+	Lcuuids       []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
+	IDs           []int    `schema:"id,omitempty" json:"ID,omitempty"`
+	RouterIDs     []int    `schema:"router_id,omitempty" json:"ROUTER_ID,omitempty"`
+	VPCIDs        []int    `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
+	IPVersions    []int    `schema:"ip_version,omitempty" json:"IP_VERSION,omitempty"`
+	RegionLcuuids []string `schema:"region,omitempty" json:"REGION,omitempty"`
+	Domain        []string `schema:"domain,omitempty" json:"DOMAIN,omitempty"`
+	ISP           []int    `schema:"isp,omitempty" json:"ISP,omitempty"`
+}
+
+func (v NetworkFilterConditions) GetFilterConditions() map[string]interface{} {
+	return v.ToMapOmitEmpty()
+}
+
+// NetworkQueryFilterConditions formed by http request query.
+type NetworkQueryFilterConditions struct {
+	NetworkFilterConditions
+	UserIDParam
+}
+
+// VPCFilterConditions directly applied to pod http response model.
+type VPCFilterConditions struct {
+	Convertor
+
+	Lcuuids       []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
+	IDs           []int    `schema:"id,omitempty" json:"ID,omitempty"`
+	RegionLcuuids []string `schema:"region,omitempty" json:"REGION,omitempty"`
+	Domain        []string `schema:"domain,omitempty" json:"DOMAIN,omitempty"`
+}
+
+func (v VPCFilterConditions) GetFilterConditions() map[string]interface{} {
+	return v.ToMapOmitEmpty()
+}
+
+// VPCQueryFilterConditions formed by http request query.
+type VPCQueryFilterConditions struct {
+	VPCFilterConditions
+	UserIDParam
+}
+
 // PodFilterConditions directly applied to pod http response model.
 type PodFilterConditions struct {
 	Convertor
@@ -259,6 +383,10 @@ type PodGroupFilterConditions struct {
 	VPCIDs          []int    `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
 }
 
+func (v PodGroupQueryFilterConditions) GetFilterConditions() map[string]interface{} {
+	return v.ToMapOmitEmpty()
+}
+
 // PodGroupQueryFilterConditions formed by http request query.
 type PodGroupQueryFilterConditions struct {
 	PodGroupFilterConditions
@@ -271,6 +399,10 @@ type PodGroupPortFilterConditions struct {
 
 	PodServiceIDs []int `schema:"pod_service_id,omitempty" json:"POD_SERVICE_ID,omitempty"`
 	PodGroupIDs   []int `schema:"pod_group_id,omitempty" json:"POD_GROUP_ID,omitempty"`
+}
+
+func (v PodGroupPortQueryFilterConditions) GetFilterConditions() map[string]interface{} {
+	return v.ToMapOmitEmpty()
 }
 
 // PodGroupPortQueryFilterConditions formed by http request query.
@@ -287,6 +419,10 @@ type PodReplicaSetFilterConditions struct {
 	PodNamespaceIDs []int    `schema:"pod_namespace_id,omitempty" json:"POD_NAMESPACE_ID,omitempty"`
 	PodGroupIDs     []int    `schema:"pod_group_id,omitempty" json:"POD_GROUP_ID,omitempty"`
 	VPCIDs          []int    `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
+}
+
+func (v PodReplicaSetQueryFilterConditions) GetFilterConditions() map[string]interface{} {
+	return v.ToMapOmitEmpty()
 }
 
 // PodReplicaSetQueryFilterConditions formed by http request query.
@@ -306,6 +442,10 @@ type PodServiceFilterConditions struct {
 	VPCIDs          []int    `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
 }
 
+func (v PodServiceFilterConditions) GetFilterConditions() map[string]interface{} {
+	return v.ToMapOmitEmpty()
+}
+
 // PodServiceQueryFilterConditions formed by http request query.
 type PodServiceQueryFilterConditions struct {
 	PodServiceFilterConditions
@@ -317,6 +457,10 @@ type PodServicePortFilterConditions struct {
 	Convertor
 
 	PodServiceIDs []int `schema:"pod_service_id,omitempty" json:"POD_SERVICE_ID,omitempty"`
+}
+
+func (v PodServicePortFilterConditions) GetFilterConditions() map[string]interface{} {
+	return v.ToMapOmitEmpty()
 }
 
 // PodServicePortQueryFilterConditions formed by http request query.
@@ -335,6 +479,10 @@ type PodIngressFilterConditions struct {
 	VPCIDs          []int    `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
 }
 
+func (v PodIngressFilterConditions) GetFilterConditions() map[string]interface{} {
+	return v.ToMapOmitEmpty()
+}
+
 // PodIngressQueryFilterConditions formed by http request query.
 type PodIngressQueryFilterConditions struct {
 	PodIngressFilterConditions
@@ -349,6 +497,10 @@ type PodIngressRuleFilterConditions struct {
 	PodServiceIDs     []int `schema:"pod_service_id,omitempty" json:"POD_SERVICE_ID,omitempty"`
 	PortPodServiceIDs []int `schema:"port_pod_service_id,omitempty" json:"PORT_POD_SERVICE_ID,omitempty"` // 实际含义同 pod_service_id，为全景图提供方便
 	Ports             []int `schema:"port,omitempty" json:"PORT,omitempty"`
+}
+
+func (v PodIngressRuleFilterConditions) GetFilterConditions() map[string]interface{} {
+	return v.ToMapOmitEmpty()
 }
 
 // PodIngressRuleQueryFilterConditions formed by http request query.
@@ -370,6 +522,10 @@ type PodNodeFilterConditions struct {
 	AZLcuuids     []string `schema:"az,omitempty" json:"AZ,omitempty"`
 }
 
+func (v PodNodeFilterConditions) GetFilterConditions() map[string]interface{} {
+	return v.ToMapOmitEmpty()
+}
+
 // PodNodeQueryFilterConditions formed by http request query.
 type PodNodeQueryFilterConditions struct {
 	PodNodeFilterConditions
@@ -384,6 +540,10 @@ type PodNamespaceFilterConditions struct {
 	IDs           []int    `schema:"id,omitempty" json:"ID,omitempty"`
 	PodClusterIDs []int    `schema:"pod_cluster_id,omitempty" json:"POD_CLUSTER_ID,omitempty"`
 	VPCIDs        []int    `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
+}
+
+func (v PodNamespaceFilterConditions) GetFilterConditions() map[string]interface{} {
+	return v.ToMapOmitEmpty()
 }
 
 // PodNamespaceQueryFilterConditions formed by http request query.
@@ -401,6 +561,10 @@ type PodClusterFilterConditions struct {
 	Names   []string `schema:"name,omitempty" json:"NAME,omitempty"`
 	VPCIDs  []int    `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
 	Domain  []string `schema:"domain,omitempty" json:"DOMAIN,omitempty"`
+}
+
+func (v PodClusterFilterConditions) GetFilterConditions() map[string]interface{} {
+	return v.ToMapOmitEmpty()
 }
 
 // PodNodeQueryFilterConditions formed by http request query.
