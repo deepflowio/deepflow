@@ -382,6 +382,87 @@ func (r *VTapRegister) registerVTapByPodNode(db *gorm.DB) (*models.VTap, bool) {
 	return dbVTap, result
 }
 
+func (l *VTapLKData) LookUpVTapByPod(db *gorm.DB) *VTapLKResult {
+	lanVifIDs, lanVifIDToIP := l.getLanIPVIFIDs(db)
+	wanVifIDs, wanVifIDToIP := l.getWanIPVIFIDs(db)
+	vifIDs := make([]int, 0, len(lanVifIDs)+len(wanVifIDs))
+	if len(lanVifIDs) > 0 {
+		vifIDs = append(vifIDs, lanVifIDs...)
+	}
+	if len(wanVifIDs) > 0 {
+		vifIDs = append(vifIDs, wanVifIDs...)
+	}
+	if len(vifIDs) == 0 {
+		return nil
+	}
+
+	vifs, err := dbmgr.DBMgr[models.VInterface](db).GetBatchVInterfaceFromIDs(
+		l.ctrlMac,
+		l.region,
+		VIF_DEVICE_TYPE_POD,
+		vifIDs)
+	if err != nil || len(vifs) == 0 {
+		log.Errorf("failed to register agent(%s) by querying DB table vinterface(mac=%s, region=%s, devicetype=%d, vifid in (%v)) without finding data",
+			l.getKey(), l.ctrlMac, l.region, VIF_DEVICE_TYPE_POD, vifIDs)
+		if err != nil {
+			log.Error(err)
+		}
+		return nil
+	}
+	deviceIDs := make([]int, 0, len(vifs))
+	deviceIDToVifID := make(map[int]int)
+	for _, vif := range vifs {
+		deviceIDs = append(deviceIDs, vif.DeviceID)
+		deviceIDToVifID[vif.DeviceID] = vif.ID
+	}
+	pod, err := dbmgr.DBMgr[models.Pod](db).GetFirstFromBatchIDs(deviceIDs)
+	if err != nil {
+		log.Errorf("failed to register agent(%s) by querying DB table pod(id in %v) without finding data, err: %s", l.getKey(), deviceIDs, err)
+		return nil
+	}
+
+	var launchServer string
+	if vifID, ok := deviceIDToVifID[pod.ID]; ok {
+		launchServer = lanVifIDToIP[vifID]
+		if launchServer == "" {
+			launchServer = wanVifIDToIP[vifID]
+		}
+	}
+	vTapName := fmt.Sprintf("%s-K%d", pod.Name, pod.ID)
+	return &VTapLKResult{
+		VTapType:       VTAP_TYPE_K8S_SIDECAR,
+		LaunchServer:   launchServer,
+		LaunchServerID: pod.ID,
+		VTapName:       vTapName,
+		AZ:             pod.AZ,
+		Region:         pod.Region,
+		Lcuuid:         pod.Lcuuid,
+	}
+}
+
+func (r *VTapRegister) registerVTapByPod(db *gorm.DB) (*models.VTap, bool) {
+	vtapLKResult := r.LookUpVTapByPod(db)
+	if vtapLKResult == nil {
+		return nil, false
+	}
+	dbVTap := &models.VTap{
+		CtrlIP:          r.ctrlIP,
+		CtrlMac:         r.ctrlMac,
+		Type:            vtapLKResult.VTapType,
+		LaunchServer:    vtapLKResult.LaunchServer,
+		LaunchServerID:  vtapLKResult.LaunchServerID,
+		Name:            vtapLKResult.VTapName,
+		AZ:              vtapLKResult.AZ,
+		Region:          vtapLKResult.Region,
+		VtapGroupLcuuid: r.getVTapGroupLcuuid(db),
+		State:           VTAP_STATE_PENDING,
+		TapMode:         r.tapMode,
+		Lcuuid:          vtapLKResult.Lcuuid,
+	}
+	result := r.insertToDB(dbVTap, db)
+	return dbVTap, result
+}
+
 func (l *VTapLKData) getLanIPVIFIDs(db *gorm.DB) ([]int, map[int]string) {
 	lanIPMgr := dbmgr.DBMgr[models.LANIP](db)
 	lanIPs, err := lanIPMgr.GetBatchFromIPs(l.hostIPs)
@@ -704,6 +785,10 @@ func (r *VTapRegister) registerVTap(v *VTapInfo, done func()) {
 			if ok == true {
 				break
 			}
+			vtap, ok = r.registerVTapByPod(v.db)
+			if ok == true {
+				break
+			}
 			vtap, ok = r.registerLocalVTapByIP(v.db)
 		case TAPMODE_MIRROR:
 			vtap, ok = r.registerVTapByHost(v.db)
@@ -711,6 +796,10 @@ func (r *VTapRegister) registerVTap(v *VTapInfo, done func()) {
 				break
 			}
 			vtap, ok = r.registerVTapByPodNode(v.db)
+			if ok == true {
+				break
+			}
+			vtap, ok = r.registerVTapByPod(v.db)
 			if ok == true {
 				break
 			}

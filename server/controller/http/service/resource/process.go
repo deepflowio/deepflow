@@ -23,6 +23,7 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/gin-gonic/gin"
 	goredis "github.com/go-redis/redis/v9"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
@@ -30,7 +31,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/redis"
 	. "github.com/deepflowio/deepflow/server/controller/http/service/resource/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
-	"github.com/gin-gonic/gin"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
 
 func GetProcesses(c *gin.Context, redisConfig *redis.Config) (responseData []model.Process, err error) {
@@ -102,19 +103,24 @@ func GetProcessData(processes []*mysql.Process) (map[int]ProcessData, error) {
 		LaunchServerID int
 	}
 	vtapIDToInfo := make(map[int]vtapInfo, len(vtaps))
-	launchServerIDs := mapset.NewSet[int]()
+	vmLaunchServerIDs := mapset.NewSet[int]()
+	podNodeLaunchServerIDs := mapset.NewSet[int]()
 	for _, vtap := range vtaps {
 		vtapIDToInfo[vtap.ID] = vtapInfo{
 			Name:           vtap.Name,
 			Type:           vtap.Type,
 			LaunchServerID: vtap.LaunchServerID,
 		}
-		launchServerIDs.Add(vtap.LaunchServerID)
+		if utils.Find([]int{common.VTAP_TYPE_WORKLOAD_V, common.VTAP_TYPE_WORKLOAD_P}, vtap.Type) {
+			vmLaunchServerIDs.Add(vtap.LaunchServerID)
+		} else if utils.Find([]int{common.VTAP_TYPE_POD_HOST, common.VTAP_TYPE_POD_VM}, vtap.Type) {
+			podNodeLaunchServerIDs.Add(vtap.LaunchServerID)
+		}
 	}
 
 	// store vm info
 	var vms []mysql.VM
-	if err := mysql.Db.Where("id IN (?)", launchServerIDs.ToSlice()).Find(&vms).Error; err != nil {
+	if err := mysql.Db.Where("id IN (?)", vmLaunchServerIDs.ToSlice()).Find(&vms).Error; err != nil {
 		return nil, err
 	}
 	vmIDToName := make(map[int]string, len(vms))
@@ -124,7 +130,7 @@ func GetProcessData(processes []*mysql.Process) (map[int]ProcessData, error) {
 
 	// store pod node info
 	var podNodes []mysql.PodNode
-	if err := mysql.Db.Where("id IN (?)", launchServerIDs.ToSlice()).Find(&podNodes).Error; err != nil {
+	if err := mysql.Db.Where("id IN (?)", podNodeLaunchServerIDs.ToSlice()).Find(&podNodes).Error; err != nil {
 		return nil, err
 	}
 	podNodeIDToName := make(map[int]string, len(podNodes))

@@ -125,6 +125,7 @@ const (
 	VTAP_TYPE_POD_VM
 	VTAP_TYPE_TUNNEL_DECAPSULATION
 	VTAP_TYPE_HYPER_V
+	VTAP_TYPE_K8S_SIDECAR
 )
 
 var VTapTypeName = map[int]string{
@@ -137,6 +138,7 @@ var VTapTypeName = map[int]string{
 	VTAP_TYPE_POD_VM:               "K8S_VM",
 	VTAP_TYPE_TUNNEL_DECAPSULATION: "TUN_DECAP",
 	VTAP_TYPE_HYPER_V:              "HYPER_V",
+	VTAP_TYPE_K8S_SIDECAR:          "K8S_SIDECAR",
 }
 
 var VTapTypeChinese = map[int]string{
@@ -149,6 +151,7 @@ var VTapTypeChinese = map[int]string{
 	VTAP_TYPE_POD_VM:               "容器-V",
 	VTAP_TYPE_TUNNEL_DECAPSULATION: "隧道解封装",
 	VTAP_TYPE_HYPER_V:              "Hyper-V",
+	VTAP_TYPE_K8S_SIDECAR:          "K8s-Sidecar",
 }
 
 // need synchronized update with the cli
@@ -212,6 +215,7 @@ var VTAP_TYPE_TO_DEVICE_TYPE = map[int]int{
 	VTAP_TYPE_POD_VM:               VIF_DEVICE_TYPE_POD_NODE,
 	VTAP_TYPE_TUNNEL_DECAPSULATION: 0,
 	VTAP_TYPE_HYPER_V:              VIF_DEVICE_TYPE_HOST,
+	VTAP_TYPE_K8S_SIDECAR:          VIF_DEVICE_TYPE_POD,
 }
 
 const (
@@ -560,6 +564,7 @@ var VTapToChangeTapModes = map[int][]int{
 	VTAP_TYPE_POD_VM:               []int{TAPMODE_LOCAL, TAPMODE_MIRROR},
 	VTAP_TYPE_TUNNEL_DECAPSULATION: []int{TAPMODE_DECAP},
 	VTAP_TYPE_HYPER_V:              []int{TAPMODE_LOCAL, TAPMODE_MIRROR},
+	VTAP_TYPE_K8S_SIDECAR:          []int{TAPMODE_LOCAL, TAPMODE_MIRROR},
 }
 
 type DataChanged string
