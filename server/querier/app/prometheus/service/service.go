@@ -78,6 +78,10 @@ func (s *PrometheusService) PromQLAnalysis(ctx context.Context, metric string, t
 	return s.executor.promQLAnalysis(ctx, metric, targetLabels, appLabels, startTime, endTime)
 }
 
+func (s *PrometheusService) PromQLAdapter(m *model.PromQueryResponse) *model.PromQueryWrapper {
+	return s.executor.wrapResponse(m)
+}
+
 func durationMilliseconds(d time.Duration) int64 {
 	return int64(d / (time.Millisecond / time.Nanosecond))
 }

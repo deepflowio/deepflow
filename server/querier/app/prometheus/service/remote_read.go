@@ -34,11 +34,12 @@ import (
 )
 
 type prometheusReader struct {
+	slimit                  int
 	interceptPrometheusExpr func(func(e *parser.AggregateExpr) error) error
 }
 
-func newPrometheusReader() *prometheusReader {
-	return &prometheusReader{}
+func newPrometheusReader(slimit int) *prometheusReader {
+	return &prometheusReader{slimit: slimit}
 }
 
 func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.ReadRequest, debug bool) (resp *prompb.ReadResponse, sql string, duration float64, err error) {

@@ -565,8 +565,8 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 	// Scan all the results, determine the seriesID of each sample and the number of samples in each series,
 	// so that the size of the sample array in each series can be determined in advance.
 	maxPossibleSeries := len(result.Values)
-	if maxPossibleSeries > config.Cfg.Prometheus.SeriesLimit {
-		maxPossibleSeries = config.Cfg.Prometheus.SeriesLimit
+	if maxPossibleSeries > p.slimit {
+		maxPossibleSeries = p.slimit
 	}
 
 	seriesIndexMap := map[string]int32{}                            // the index in seriesArray, for each `tagsJsonStr`
@@ -604,7 +604,7 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 			sampleSeriesIndex[i] = index
 			seriesSampleCount[index]++
 		} else {
-			if len(seriesIndexMap) >= config.Cfg.Prometheus.SeriesLimit {
+			if len(seriesIndexMap) >= p.slimit {
 				sampleSeriesIndex[i] = -1
 				continue
 			}
