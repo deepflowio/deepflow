@@ -333,3 +333,5 @@ clickhouse指标量及算子特殊处理：
 - metrics, tag, attribute, packet_batch不支持AS
 - 自动分组相关限制
   - select自动分组的node_type或icon_id时，group需有自动分组名称，不能只有自动分组ID
+- HAVING中放带聚合函数的指标量过滤
+- WHERE中放不带聚合函数的指标量过滤
