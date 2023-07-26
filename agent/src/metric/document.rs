@@ -17,6 +17,7 @@
 use std::net::{IpAddr, Ipv4Addr};
 
 use bitflags::bitflags;
+use num_enum::TryFromPrimitive;
 use prost::Message;
 use serde::Serialize;
 
@@ -203,7 +204,7 @@ impl Direction {
     }
 }
 
-#[derive(Serialize, Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Serialize, Debug, PartialEq, Eq, Clone, Copy, TryFromPrimitive)]
 #[repr(u8)]
 pub enum TapSide {
     Rest = 0,
