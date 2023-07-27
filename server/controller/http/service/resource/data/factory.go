@@ -33,6 +33,8 @@ func GetDataProvider(resourceType string, redisCfg redis.Config) provider.DataPr
 		return mysqldp.NewHost()
 	case common.RESOURCE_TYPE_VM_EN:
 		return redisdp.GetVM(redisCfg)
+	case common.RESOURCE_TYPE_VINTERFACE_EN:
+		return redisdp.GetVInterface(redisCfg)
 	case common.RESOURCE_TYPE_POD_EN:
 		return redisdp.GetPod(redisCfg)
 	default:

@@ -129,6 +129,16 @@ type VPCQuery struct {
 
 type VPCQueryStoredInRedis struct {
 	VPCQueryFilterConditions
+	RefreshCacheParam
+}
+
+type VInterfaceQuery struct {
+	VInterfaceQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type VInterfaceQueryStoredInRedis struct {
+	VInterfaceQueryFilterConditions
 	IncludedFieldsParam
 }
 

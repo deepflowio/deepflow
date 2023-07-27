@@ -25,7 +25,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/data/provider"
 )
 
-var log = logging.MustGetLogger("service.resource.redis")
+var log = logging.MustGetLogger("service.resource.data.redis")
 
 var (
 	keyJoiner        = " "

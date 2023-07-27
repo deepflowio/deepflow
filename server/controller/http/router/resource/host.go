@@ -57,16 +57,6 @@ func (p *Host) Get(c *gin.Context) {
 		header.userInfo,
 		p.redisCfg,
 	)
-
-	if query.structData.RefreshCache {
-		data, err := service.RefreshCache()
-		common.JsonResponse(c, data, err)
-	} else {
-		data, err := service.Get()
-		common.JsonResponse(c, data, err)
-	}
-}
-
-func (p *Host) Update(c *gin.Context) {
-
+	data, err := service.Get()
+	common.JsonResponse(c, data, err)
 }

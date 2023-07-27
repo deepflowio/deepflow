@@ -42,17 +42,17 @@ func NewVM(fpermitCfg config.FPermit) *VM {
 }
 
 func (v *VM) conditionsMapToStruct(fcs common.FilterConditions) filter.Condition {
-	log.Info(fcs)
+	log.Info(fcs) // TODO delete
 	c := filter.NewAND()
 	c.InitSkippedFields = []string{"SUBNET_ID", "SECURITY_GROUP_ID"}
 	c.Init(fcs)
 	if sgIDs, ok := fcs["SECURITY_GROUP_ID"]; ok {
-		c.TryAppendIntFieldCondition(NewSecurityGroupIDCondition("SECURITY_GROUP_ID", sgIDs.([]float64)))
+		c.TryAppendIntFieldCondition(NewSecurityGroupIDCondition("SECURITY_GROUP_ID", sgIDs))
 	}
 	if networkIDs, ok := fcs["SUBNET_ID"]; ok {
-		c.TryAppendIntFieldCondition(NewSubnetIDCondition("SUBNET_ID", networkIDs.([]float64)))
+		c.TryAppendIntFieldCondition(NewSubnetIDCondition("SUBNET_ID", networkIDs))
 	}
-	log.Infof("%#v", c)
+	log.Infof("%#v", c) // TODO delete
 	return c
 }
 
@@ -92,8 +92,8 @@ type SubnetIDCondition struct {
 	filter.FieldConditionBase[float64]
 }
 
-func NewSubnetIDCondition(key string, value []float64) *SubnetIDCondition {
-	return &SubnetIDCondition{filter.FieldConditionBase[float64]{Key: key, Value: value}}
+func NewSubnetIDCondition(key string, value interface{}) *SubnetIDCondition {
+	return &SubnetIDCondition{filter.FieldConditionBase[float64]{Key: key, Value: filter.ConvertValueToSlice[float64](value)}}
 }
 
 func (p *SubnetIDCondition) Keep(v common.ResponseElem) bool {
@@ -110,8 +110,8 @@ type SecurityGroupIDCondition struct {
 	filter.FieldConditionBase[float64]
 }
 
-func NewSecurityGroupIDCondition(key string, value []float64) *SecurityGroupIDCondition {
-	return &SecurityGroupIDCondition{filter.FieldConditionBase[float64]{Key: key, Value: value}}
+func NewSecurityGroupIDCondition(key string, value interface{}) *SecurityGroupIDCondition {
+	return &SecurityGroupIDCondition{filter.FieldConditionBase[float64]{Key: key, Value: filter.ConvertValueToSlice[float64](value)}}
 }
 
 func (p *SecurityGroupIDCondition) Keep(v common.ResponseElem) bool {

@@ -33,10 +33,11 @@ const (
 )
 
 const (
-	PATH_AZ   = "/v2/azs/"
-	PATH_HOST = "/v2/hosts/"
-	PATH_VM   = "/v2/vms/"
-	PATH_POD  = "/v2/pods/"
+	PATH_AZ         = "/v2/azs/"
+	PATH_HOST       = "/v2/hosts/"
+	PATH_VM         = "/v2/vms/"
+	PATH_VINTERFACE = "/v2/vinterfaces/"
+	PATH_POD        = "/v2/pods/"
 )
 
 const (

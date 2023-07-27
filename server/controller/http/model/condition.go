@@ -38,7 +38,7 @@ func (u UserIDParam) GetUserID() int {
 }
 
 type RegionFilterConditions struct {
-	Convertor
+	Convertor `json:"-"`
 
 	Lcuuids       []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
 	IDs           []int    `schema:"id,omitempty" json:"ID,omitempty"`
@@ -59,7 +59,7 @@ type RegionQueryFilterConditions struct {
 }
 
 type AZFilterConditions struct {
-	Convertor
+	Convertor `json:"-"`
 
 	Lcuuids       []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
 	IDs           []int    `schema:"id,omitempty" json:"ID,omitempty"`
@@ -77,7 +77,7 @@ type AZQueryFilterConditions struct {
 
 // VMFilterConditions directly applied to vm http response model.
 type VMFilterConditions struct {
-	Convertor
+	Convertor `json:"-"`
 
 	Lcuuids          []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
 	IDs              []int    `schema:"id,omitempty" json:"ID,omitempty"`
@@ -103,7 +103,7 @@ type VMQueryFilterConditions struct {
 }
 
 type HostFilterConditions struct {
-	Convertor
+	Convertor `json:"-"`
 
 	Lcuuids []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
 	IDs     []int    `schema:"id,omitempty" json:"ID,omitempty"`
@@ -119,8 +119,25 @@ type HostQueryFilterConditions struct {
 	UserIDParam // field is reserved but not supported actually.
 }
 
+type VInterfaceFilterConditions struct {
+	Convertor `json:"-"`
+
+	Lcuuids     []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
+	DeviceIDs   []int    `schema:"device_id,omitempty" json:"DEVICE_ID,omitempty"`
+	DeviceTypes []int    `schema:"device_type,omitempty" json:"DEVICE_TYPE,omitempty"`
+	VPCIDs      []int    `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
+}
+
+func (v VInterfaceFilterConditions) GetFilterConditions() map[string]interface{} {
+	return v.ToMapOmitEmpty(v)
+}
+
+type VInterfaceQueryFilterConditions struct {
+	VInterfaceFilterConditions
+	UserIDParam
+}
 type SecurityGroupFilterConditions struct {
-	Convertor
+	Convertor `json:"-"`
 
 	Lcuuids []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
 	IDs     []int    `schema:"id,omitempty" json:"ID,omitempty"`
@@ -128,13 +145,13 @@ type SecurityGroupFilterConditions struct {
 }
 
 type SecurityGroupRuleFilterConditions struct {
-	Convertor
+	Convertor `json:"-"`
 
 	VMIDs []int `schema:"security_group_id,omitempty" json:"SECURITY_GROUP_ID,omitempty"`
 }
 
 type NATGatewayFilterConditions struct {
-	Convertor
+	Convertor `json:"-"`
 
 	Lcuuids []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
 	IDs     []int    `schema:"id,omitempty" json:"ID,omitempty"`
@@ -151,7 +168,7 @@ type NATGatewayQueryFilterConditions struct {
 }
 
 type NATRuleFilterConditions struct {
-	Convertor
+	Convertor `json:"-"`
 
 	VPCIDs []int `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
 	NATIDs []int `schema:"nat_id,omitempty" json:"NAT_ID,omitempty"`
@@ -162,7 +179,7 @@ func (n NATRuleFilterConditions) GetFilterConditions() map[string]interface{} {
 }
 
 type LBFilterConditions struct {
-	Convertor
+	Convertor `json:"-"`
 
 	Lcuuids []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
 	IDs     []int    `schema:"id,omitempty" json:"ID,omitempty"`
@@ -179,7 +196,7 @@ type LBQueryFilterConditions struct {
 }
 
 type LBListenerFilterConditions struct {
-	Convertor
+	Convertor `json:"-"`
 
 	VPCIDs []int `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
 }
@@ -194,7 +211,7 @@ type LBListenerQueryFilterConditions struct {
 }
 
 type LBRuleFilterConditions struct {
-	Convertor
+	Convertor `json:"-"`
 
 	VPCIDs              []int `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
 	LBIDs               []int `schema:"lb_id,omitempty" json:"LB_ID,omitempty"`
@@ -207,7 +224,7 @@ func (l LBRuleFilterConditions) GetFilterConditions() map[string]interface{} {
 }
 
 type PeerConnectionFilterConditions struct {
-	Convertor
+	Convertor `json:"-"`
 
 	Lcuuids []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
 	IDs     []int    `schema:"id,omitempty" json:"ID,omitempty"`
@@ -215,14 +232,14 @@ type PeerConnectionFilterConditions struct {
 }
 
 type CENFilterConditions struct {
-	Convertor
+	Convertor `json:"-"`
 
 	Lcuuids []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
 	IDs     []int    `schema:"id,omitempty" json:"ID,omitempty"`
 }
 
 type RDSInstanceFilterConditions struct {
-	Convertor
+	Convertor `json:"-"`
 
 	Lcuuids []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
 	IDs     []int    `schema:"id,omitempty" json:"ID,omitempty"`
@@ -235,7 +252,7 @@ type RDSInstanceQueryFilterConditions struct {
 }
 
 type RedisInstanceFilterConditions struct {
-	Convertor
+	Convertor `json:"-"`
 
 	Lcuuids []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
 	IDs     []int    `schema:"id,omitempty" json:"ID,omitempty"`

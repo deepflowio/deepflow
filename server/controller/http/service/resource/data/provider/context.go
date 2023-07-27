@@ -24,7 +24,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/filter/generator"
 )
 
-var log = logging.MustGetLogger("service.resource.redis")
+var log = logging.MustGetLogger("service.resource.data.provider")
 
 type DataContext struct {
 	URLInfo         *model.URLInfo            // use to generate redis key
