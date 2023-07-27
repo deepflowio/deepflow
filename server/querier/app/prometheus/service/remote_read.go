@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/prometheus/prometheus/prompb"
+	"github.com/prometheus/prometheus/promql/parser"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -32,10 +33,19 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse"
 )
 
-func promReaderExecute(ctx context.Context, req *prompb.ReadRequest, debug bool) (resp *prompb.ReadResponse, sql string, duration float64, err error) {
+type prometheusReader struct {
+	slimit                  int
+	interceptPrometheusExpr func(func(e *parser.AggregateExpr) error) error
+}
+
+func newPrometheusReader(slimit int) *prometheusReader {
+	return &prometheusReader{slimit: slimit}
+}
+
+func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.ReadRequest, debug bool) (resp *prompb.ReadResponse, sql string, duration float64, err error) {
 	// promrequest trans to sql
 	// pp.Println(req)
-	ctx, sql, db, datasource, metricName, err := promReaderTransToSQL(ctx, req)
+	ctx, sql, db, datasource, metricName, err := p.promReaderTransToSQL(ctx, req)
 	// fmt.Println(sql, db)
 	if err != nil {
 		return nil, "", 0, err
@@ -110,7 +120,7 @@ func promReaderExecute(ctx context.Context, req *prompb.ReadRequest, debug bool)
 	}
 
 	// response trans to prom resp
-	resp, err = respTransToProm(ctx, metricName, result)
+	resp, err = p.respTransToProm(ctx, metricName, result)
 	if err != nil {
 		log.Error(err)
 		return nil, "", 0, err

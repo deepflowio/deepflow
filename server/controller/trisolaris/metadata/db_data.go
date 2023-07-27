@@ -69,6 +69,10 @@ type DBDataCache struct {
 	pcapPolicies            []*models.PcapPolicy
 	cens                    []*models.CEN
 	processes               []*models.Process
+
+	podNSs    []*models.PodNamespace
+	vtaps     []*models.VTap
+	chDevices []*models.ChDevice
 }
 
 func newDBDataCache() *DBDataCache {
@@ -250,6 +254,18 @@ func (d *DBDataCache) GetCENs() []*models.CEN {
 
 func (d *DBDataCache) GetProcesses() []*models.Process {
 	return d.processes
+}
+
+func (d *DBDataCache) GetPodNSsIDAndName() []*models.PodNamespace {
+	return d.podNSs
+}
+
+func (d *DBDataCache) GetVTapsIDAndName() []*models.VTap {
+	return d.vtaps
+}
+
+func (d *DBDataCache) GetChDevicesIDTypeAndName() []*models.ChDevice {
+	return d.chDevices
 }
 
 func GetTapTypesFromDB(db *gorm.DB) []*models.TapType {
@@ -562,6 +578,27 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 	processes, err := dbmgr.DBMgr[models.Process](db).Gets()
 	if err == nil {
 		d.processes = processes
+	} else {
+		log.Error(err)
+	}
+
+	podNSs, err := dbmgr.DBMgr[models.PodNamespace](db).GetFields([]string{"id", "name"})
+	if err == nil {
+		d.podNSs = podNSs
+	} else {
+		log.Error(err)
+	}
+
+	vtaps, err := dbmgr.DBMgr[models.VTap](db).GetFields([]string{"id", "name"})
+	if err == nil {
+		d.vtaps = vtaps
+	} else {
+		log.Error(err)
+	}
+
+	chDevices, err := dbmgr.DBMgr[models.ChDevice](db).GetFields([]string{"devicetype", "deviceid", "name"})
+	if err == nil {
+		d.chDevices = chDevices
 	} else {
 		log.Error(err)
 	}

@@ -32,7 +32,7 @@ const (
 	METRICS_TYPE_QUOTIENT              // 商值，例如平均包长
 	METRICS_TYPE_TAG                   // tag，例如ip
 	METRICS_TYPE_ARRAY                 // 数组类型，不支持算子，select时需展开
-	METRICS_TYPE_OTHER                 // 只支持 count(*)
+	METRICS_TYPE_OTHER                 // 只支持 count(_)
 )
 
 var METRICS_TYPE_NAME_MAP = map[string]int{
@@ -42,6 +42,7 @@ var METRICS_TYPE_NAME_MAP = map[string]int{
 	"percentage": METRICS_TYPE_PERCENTAGE,
 	"quotient":   METRICS_TYPE_QUOTIENT,
 	"tag":        METRICS_TYPE_TAG,
+	"other":      METRICS_TYPE_OTHER,
 }
 
 var METRICS_ARRAY_NAME_MAP = map[string][]string{
@@ -139,3 +140,5 @@ var FLOW_LOG_CLOSE_TYPE_ESTABLISH_EXCEPTION_SERVER, _ = json.Marshal([]int{
 	FLOW_LOG_CLOSE_TYPE_SERVER_SYNACK_REPEAT, FLOW_LOG_CLOSE_TYPE_SERVER_RST,
 	FLOW_LOG_CLOSE_TYPE_SERVER_ESTABLISH_RST,
 })
+
+const COUNT_METRICS_NAME = "row"

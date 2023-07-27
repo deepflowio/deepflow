@@ -27,6 +27,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/libs/datastructure"
 	cfg "github.com/deepflowio/deepflow/server/querier/app/prometheus/config"
+	"github.com/deepflowio/deepflow/server/querier/app/prometheus/model"
 	"github.com/deepflowio/deepflow/server/querier/config"
 )
 
@@ -154,6 +155,7 @@ func TestParseMetric(t *testing.T) {
 }
 
 func TestPromReaderTransToSQL(t *testing.T) {
+	prometheusReader := &prometheusReader{}
 	endMs := time.Now().UnixMicro()
 	startMs := endMs - 5*60*1e3 // minus 5mins
 	endS := endMs / 1e3
@@ -225,7 +227,7 @@ func TestPromReaderTransToSQL(t *testing.T) {
 		{
 			hints:    promqlHints{stepMs: 0, aggOp: "count", grouping: []string{"auto_instance_0"}, matcher: "flow_log__l4_flow_log__rtt", by: true},
 			input:    "count(flow_log__l4_flow_log__rtt) by(auto_instance_0)",
-			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,`auto_instance_0`,Sum(`log_count`) as value FROM l4_flow_log WHERE (time >= %d AND time <= %d) GROUP BY timestamp,`auto_instance_0` ORDER BY timestamp desc LIMIT %s", startS, endS, limit),
+			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,`auto_instance_0`,Count(_) as value FROM l4_flow_log WHERE (time >= %d AND time <= %d) GROUP BY timestamp,`auto_instance_0` ORDER BY timestamp desc LIMIT %s", startS, endS, limit),
 			ds:       "",
 			db:       "flow_log",
 			hasError: false,
@@ -234,10 +236,10 @@ func TestPromReaderTransToSQL(t *testing.T) {
 		{
 			hints:    promqlHints{stepMs: 0, aggOp: "count", grouping: []string{"auto_instance"}, matcher: "flow_metrics__vtap_app_port__rrt__1m", by: true},
 			input:    "count(flow_metrics__vtap_app_port__rrt__1m) by(auto_instance)",
-			output:   "",
-			ds:       "",
-			db:       "",
-			hasError: true,
+			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,`auto_instance`,Count(_) as value FROM vtap_app_port WHERE (time >= %d AND time <= %d) GROUP BY timestamp,`auto_instance` ORDER BY timestamp desc LIMIT %s", startS, endS, limit),
+			ds:       "1m",
+			db:       "flow_metrics",
+			hasError: false,
 		},
 		{
 			hints:    promqlHints{stepMs: 0, aggOp: "min", grouping: []string{"auto_instance_0"}, matcher: "flow_log__l4_flow_log__rtt", by: true},
@@ -274,7 +276,7 @@ func TestPromReaderTransToSQL(t *testing.T) {
 		{
 			hints:    promqlHints{stepMs: 0, aggOp: "count_values", grouping: []string{"auto_instance_0"}, matcher: "flow_log__l4_flow_log__rtt", by: true},
 			input:    `count_values("service",flow_log__l4_flow_log__rtt)by(auto_instance_0)`,
-			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,`auto_instance_0`,`rtt`,Sum(`log_count`) as value FROM l4_flow_log WHERE (time >= %d AND time <= %d) GROUP BY timestamp,`auto_instance_0`,`rtt` ORDER BY timestamp desc LIMIT %s", startS, endS, limit),
+			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,`auto_instance_0`,`rtt`,Count(_) as value FROM l4_flow_log WHERE (time >= %d AND time <= %d) GROUP BY timestamp,`auto_instance_0`,`rtt` ORDER BY timestamp desc LIMIT %s", startS, endS, limit),
 			ds:       "",
 			db:       "flow_log",
 			hasError: false,
@@ -360,7 +362,7 @@ func TestPromReaderTransToSQL(t *testing.T) {
 				},
 			})
 
-			_, sql, db, ds, metricName, err := promReaderTransToSQL(ctx, &prompb.ReadRequest{Queries: queries})
+			_, sql, db, ds, metricName, err := prometheusReader.promReaderTransToSQL(ctx, &prompb.ReadRequest{Queries: queries})
 
 			if !p.hasError {
 				So(err, ShouldBeNil)
@@ -373,5 +375,16 @@ func TestPromReaderTransToSQL(t *testing.T) {
 			}
 		}
 	})
+}
 
+func TestParseQuerierSQL(t *testing.T) {
+	svc := NewPrometheusService()
+	args := model.PromQueryParams{
+		Promql:    "apiserver_admission_step_admission_duration_seconds_summary_count[10m]",
+		StartTime: "1690284145",
+		EndTime:   "1690284145",
+		Context:   context.Background(),
+	}
+	result, err := svc.PromInstantQueryService(&args, args.Context)
+	fmt.Println(err, result)
 }

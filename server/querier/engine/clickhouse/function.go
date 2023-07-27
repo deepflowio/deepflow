@@ -86,7 +86,7 @@ func GetAggFunc(name string, args []string, alias string, db string, table strin
 	if !ok {
 		return nil, 0, "", nil
 	}
-	metricStruct, ok := metrics.GetMetrics(field, db, table, ctx)
+	metricStruct, ok := metrics.GetAggMetrics(field, db, table, ctx)
 	if !ok {
 		return nil, 0, "", nil
 	}
@@ -324,7 +324,11 @@ func (f *AggFunction) Trans(m *view.Model) view.Node {
 		if f.Metrics.Condition != "" {
 			outFunc.SetCondition(f.Metrics.Condition)
 		}
-		outFunc.SetFields([]view.Node{&view.Field{Value: f.Metrics.DBField}})
+		field := f.Metrics.DBField
+		if f.Name == view.FUNCTION_COUNT {
+			field = "1"
+		}
+		outFunc.SetFields([]view.Node{&view.Field{Value: field}})
 	}
 	outFunc.SetFlag(view.METRICS_FLAG_OUTER)
 	outFunc.SetTime(m.Time)
@@ -552,7 +556,10 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 				nodeType = strings.TrimSuffix(nodeType, "_1")
 				f.Value = "'" + nodeType + "'"
 			} else {
-				f.Value = f.Args[0]
+				nodeType := strings.Trim(f.Args[0], "'")
+				nodeType = strings.TrimSuffix(nodeType, "0")
+				nodeType = strings.TrimSuffix(nodeType, "1")
+				f.Value = "'" + nodeType + "'"
 			}
 		}
 		return f.getViewNode()

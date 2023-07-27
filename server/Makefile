@@ -18,7 +18,7 @@ generated_libs = libs/hmap/idmap/ubig_id_map.go libs/hmap/idmap/ubig_id_map_test
 		 libs/hmap/lru/ubig_lru.go libs/hmap/lru/ubig_lru_test.go \
 		 libs/zerodoc/pooled_meters.go libs/kubernetes/watcher.gen.go
 
-proto = vendor/${MESSAGE}/common/common.pb.go vendor/${MESSAGE}/trident/trident.pb.go vendor/${MESSAGE}/controller/controller.pb.go libs/datatype/pb/flow_log.pb.go libs/zerodoc/pb/metric.pb.go libs/stats/pb/stats.pb.go
+proto = vendor/${MESSAGE}/common/common.pb.go vendor/${MESSAGE}/trident/trident.pb.go vendor/${MESSAGE}/controller/controller.pb.go vendor/${MESSAGE}/alarm_event/alarm_event.pb.go libs/datatype/pb/flow_log.pb.go libs/zerodoc/pb/metric.pb.go libs/stats/pb/stats.pb.go
 
 $(generated_libs): $(generate_sources)
 	go generate ./...
@@ -43,6 +43,14 @@ vendor/${MESSAGE}/controller/controller.pb.go: vendor/${MESSAGE}/controller.prot
 vendor/${MESSAGE}/controller.proto: vendor
 	cp -r ../message/controller.proto vendor/${MESSAGE}/
 	cp -r ../message/controller vendor/${MESSAGE}/
+
+vendor/${MESSAGE}/alarm_event/alarm_event.pb.go: vendor/${MESSAGE}/alarm_event.proto
+	cd vendor/${MESSAGE} && go generate alarm_event/stub.go
+
+vendor/${MESSAGE}/alarm_event.proto: vendor
+	cp -r ../message/alarm_event.proto vendor/${MESSAGE}/
+	cp -r ../message/alarm_event vendor/${MESSAGE}/
+
 
 libs/datatype/pb/flow_log.proto: vendor
 	cp -r $(shell go list -mod=readonly -e -f '{{.Dir}}' ${MESSAGE})/flow_log.proto libs/datatype/pb/

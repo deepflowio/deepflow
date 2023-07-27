@@ -31,6 +31,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
 	"github.com/deepflowio/deepflow/server/controller/recorder/listener"
 	"github.com/deepflowio/deepflow/server/controller/recorder/updater"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
@@ -167,6 +168,7 @@ func (r *Recorder) refreshDomain(cloudData cloudmodel.Resource) {
 	listener := listener.NewWholeDomain(r.domainLcuuid, r.cacheMng.DomainCache, r.eventQueue)
 	domainUpdatersInUpdateOrder := r.getDomainUpdatersInOrder(cloudData)
 	r.executeUpdaters(domainUpdatersInUpdateOrder)
+	r.notifyOnResourceChanged(domainUpdatersInUpdateOrder)
 	listener.OnUpdatersCompleted()
 	log.Infof("domain (lcuuid: %s, name: %s) refresh completed", r.domainLcuuid, r.domainName)
 }
@@ -213,8 +215,6 @@ func (r *Recorder) getDomainUpdatersInOrder(cloudData cloudmodel.Resource) []upd
 			listener.NewPodReplicaSet(r.cacheMng.DomainCache)),
 		updater.NewPod(r.cacheMng.DomainCache, cloudData.Pods).RegisterListener(
 			listener.NewPod(r.cacheMng.DomainCache, r.eventQueue)),
-		updater.NewProcess(r.cacheMng.DomainCache, cloudData.Processes).RegisterListener(
-			listener.NewProcess(r.cacheMng.DomainCache, r.eventQueue)),
 		updater.NewPrometheusTarget(r.cacheMng.DomainCache, cloudData.PrometheusTargets).RegisterListener(
 			listener.NewPrometheusTarget(r.cacheMng.DomainCache)),
 		updater.NewNetwork(r.cacheMng.DomainCache, cloudData.Networks).RegisterListener(
@@ -262,6 +262,8 @@ func (r *Recorder) getDomainUpdatersInOrder(cloudData cloudmodel.Resource) []upd
 		ip,
 		updater.NewVMPodNodeConnection(r.cacheMng.DomainCache, cloudData.VMPodNodeConnections).RegisterListener( // VMPodNodeConnection需放在最后
 			listener.NewVMPodNodeConnection(r.cacheMng.DomainCache)),
+		updater.NewProcess(r.cacheMng.DomainCache, cloudData.Processes).RegisterListener(
+			listener.NewProcess(r.cacheMng.DomainCache, r.eventQueue)),
 	}
 }
 
@@ -291,6 +293,7 @@ func (r *Recorder) refreshSubDomains(cloudSubDomainResourceMap map[string]cloudm
 		listener := listener.NewWholeSubDomain(r.domainLcuuid, subDomainLcuuid, r.cacheMng.DomainCache, r.eventQueue)
 		subDomainUpdatersInUpdateOrder := r.getSubDomainUpdatersInOrder(subDomainLcuuid, subDomainResource, nil, nil)
 		r.executeUpdaters(subDomainUpdatersInUpdateOrder)
+		r.notifyOnResourceChanged(subDomainUpdatersInUpdateOrder)
 		listener.OnUpdatersCompleted()
 
 		log.Infof("sub_domain (lcuuid: %s) sync refresh completed", subDomainLcuuid)
@@ -343,8 +346,6 @@ func (r *Recorder) getSubDomainUpdatersInOrder(subDomainLcuuid string, cloudData
 			listener.NewPodReplicaSet(subDomainCache)),
 		updater.NewPod(subDomainCache, cloudData.Pods).RegisterListener(
 			listener.NewPod(subDomainCache, r.eventQueue)),
-		updater.NewProcess(subDomainCache, cloudData.Processes).RegisterListener(
-			listener.NewProcess(subDomainCache, r.eventQueue)),
 		updater.NewNetwork(subDomainCache, cloudData.Networks).RegisterListener(
 			listener.NewNetwork(subDomainCache)),
 		updater.NewSubnet(subDomainCache, cloudData.Subnets).RegisterListener(
@@ -354,6 +355,8 @@ func (r *Recorder) getSubDomainUpdatersInOrder(subDomainLcuuid string, cloudData
 		ip,
 		updater.NewVMPodNodeConnection(subDomainCache, cloudData.VMPodNodeConnections).RegisterListener( // VMPodNodeConnection需放在最后
 			listener.NewVMPodNodeConnection(subDomainCache)),
+		updater.NewProcess(subDomainCache, cloudData.Processes).RegisterListener(
+			listener.NewProcess(subDomainCache, r.eventQueue)),
 	}
 }
 
@@ -365,12 +368,40 @@ func (r *Recorder) executeUpdaters(updatersInUpdateOrder []updater.ResourceUpdat
 	// 删除操作的顺序，是创建的逆序
 	// 特殊资源：VMPodNodeConnection虽然是末序创建，但需要末序删除，序号-1；
 	// 原因：避免数据量大时，此数据删除后，云服务器、容器节点还在，导致采集器类型变化
-	vmPodNodeConnectionUpdater := updatersInUpdateOrder[len(updatersInUpdateOrder)-1]
-	// 因VMPodNodeConnection是-1，特殊处理后，逆序删除从-2开始
-	for i := len(updatersInUpdateOrder) - 2; i >= 0; i-- {
+	processUpdater := updatersInUpdateOrder[len(updatersInUpdateOrder)-1]
+	vmPodNodeConnectionUpdater := updatersInUpdateOrder[len(updatersInUpdateOrder)-2]
+	// 因为 processUpdater 是 -1，VMPodNodeConnection 是 -2，特殊处理后，逆序删除从 -3 开始
+	for i := len(updatersInUpdateOrder) - 3; i >= 0; i-- {
 		updatersInUpdateOrder[i].HandleDelete()
 	}
+	processUpdater.HandleDelete()
 	vmPodNodeConnectionUpdater.HandleDelete()
+}
+
+func (r *Recorder) notifyOnResourceChanged(updatersInUpdateOrder []updater.ResourceUpdater) {
+	platformDataChanged := isPlatformDataChanged(updatersInUpdateOrder)
+	if platformDataChanged {
+		log.Infof("domain(%v) data changed, refresh platform data", r.domainLcuuid)
+		refresh.RefreshCache([]common.DataChanged{common.DATA_CHANGED_PLATFORM_DATA})
+	}
+}
+
+var platformDataResource = []string{
+	"mysql.Region", "mysql.AZ", "mysql.Host", "mysql.VM", "mysql.VInterface",
+	"mysql.VRouter", "mysql.Network", "mysql.PeerConnection",
+	"mysql.Pod", "mysql.PodNode", "mysql.Process",
+}
+
+func isPlatformDataChanged(updatersInUpdateOrder []updater.ResourceUpdater) bool {
+	platformDataChanged := false
+	for _, updater := range updatersInUpdateOrder {
+		for _, resource := range updater.GetMySQLModelString() {
+			if common.Contains(platformDataResource, resource) {
+				platformDataChanged = platformDataChanged || updater.GetChanged()
+			}
+		}
+	}
+	return platformDataChanged
 }
 
 func (r *Recorder) formatDomainStateInfo(domainResource cloudmodel.Resource) (state int, errMsg string) {

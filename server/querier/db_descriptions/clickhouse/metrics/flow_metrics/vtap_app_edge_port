@@ -13,3 +13,4 @@ timeout                     , timeout              , counter    , Error        ,
 error_ratio                 ,                      , percentage , Error        , 111
 client_error_ratio          ,                      , percentage , Error        , 111
 server_error_ratio          ,                      , percentage , Error        , 111
+row                         ,                      , other      , Other        , 111 

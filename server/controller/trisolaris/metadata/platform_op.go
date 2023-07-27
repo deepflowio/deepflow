@@ -361,16 +361,12 @@ func (p *PlatformDataOP) generateIngesterPlatformData() {
 	newIngesterPlatformData.setPlatformData(domainInterfaceProto.allCompleteInterfaces,
 		domainPeerConnProto.peerConns, domainCIDRProto.cidrs, gprocessInfo)
 	oldIngesterPlatformData := p.GetAllPlatformDataForIngester()
-	log.Info("weiqiang generateIngesterPlatformData")
 	if oldIngesterPlatformData.GetVersion() == 0 {
 		newIngesterPlatformData.setVersion(uint64(time.Now().Unix()))
 		p.updateAllPlatformDataForIngester(newIngesterPlatformData)
 	} else if !newIngesterPlatformData.equal(oldIngesterPlatformData) {
 		newIngesterPlatformData.setVersion(oldIngesterPlatformData.GetVersion() + 1)
 		p.updateAllPlatformDataForIngester(newIngesterPlatformData)
-	}
-	for _, ifs := range domainInterfaceProto.allCompleteInterfaces {
-		log.Infof("weiqiang %v, %v, %v, %v", ifs.Id, ifs.Mac, ifs.NetnsId, ifs.VtapId)
 	}
 
 	//生成所有完整数据

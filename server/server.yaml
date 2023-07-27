@@ -369,8 +369,11 @@ ingester:
   #  batch-size: 25600   # 多少行数据同时写入
   #  flush-timeout: 5   # 超时写入时间
 
-  ## event database data retention time(unit: hour)
+  ## resource event table data retention time(unit: hour)
   #event-ttl-hour: 720
+
+  ## alarm event table data retention time(unit: hour)
+  #alarm-event-ttl-hour: 720
 
   ## perf event data write config
   #perf-event-ck-writer:
@@ -379,7 +382,7 @@ ingester:
   #  batch-size: 25600   # 多少行数据同时写入
   #  flush-timeout: 5    # 超时写入时间
 
-  ## perf event database data retention time(unit: hour)
+  ## perf event table data retention time(unit: hour)
   #perf-event-ttl-hour: 168
 
   ## pcap data write config

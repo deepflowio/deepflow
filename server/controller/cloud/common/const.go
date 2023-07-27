@@ -49,3 +49,7 @@ const (
 	LB_MODEL_INTERNAL = 1 + iota
 	LB_MODEL_EXTERNAL
 )
+
+const (
+	SVC_RULE_RESOURCE_NAME = "virtual-kubelet.io/provider-resource-name"
+)

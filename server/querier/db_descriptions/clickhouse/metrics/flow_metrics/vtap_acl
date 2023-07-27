@@ -12,3 +12,4 @@ l3_byte_rx                  , l3_byte_rx           , counter    , L3 Throughput 
 l4_byte                     ,                      , counter    , L4 Throughput , 111
 l4_byte_tx                  , l4_byte_tx           , counter    , L4 Throughput , 111
 l4_byte_rx                  , l4_byte_rx           , counter    , L4 Throughput , 111
+row                         ,                      , other      , Other         , 111 

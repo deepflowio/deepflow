@@ -18,6 +18,9 @@ package synchronize
 
 import (
 	"fmt"
+	"hash/fnv"
+	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -27,6 +30,7 @@ import (
 	api "github.com/deepflowio/deepflow/message/trident"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/metadata"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/pushmanager"
 )
 
@@ -205,4 +209,134 @@ func (e *TSDBEvent) Push(r *api.SyncRequest, in api.Synchronizer_PushServer) err
 	}
 	log.Info("exit push", r.GetCtrlIp(), r.GetCtrlMac())
 	return err
+}
+
+var (
+	TagNameMapsVersion = uint32(time.Now().Unix()) + uint32(rand.Intn(10000))
+	TagNameMapsHash    uint64
+)
+
+func (e *TSDBEvent) GetUniversalTagNameMaps(ctx context.Context, in *api.UniversalTagNameMapsRequest) (*api.UniversalTagNameMapsResponse, error) {
+	dbCache := trisolaris.GetMetaData().GetDBDataCache()
+	resp := generateUniversalTagNameMaps(dbCache)
+
+	respStr, err := resp.Marshal()
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	h64 := fnv.New64()
+	h64.Write(respStr)
+	if h64.Sum64() != TagNameMapsHash {
+		TagNameMapsVersion += 1
+		TagNameMapsHash = h64.Sum64()
+	}
+	resp.Version = proto.Uint32(TagNameMapsVersion)
+
+	return resp, nil
+}
+
+func generateUniversalTagNameMaps(dbCache *metadata.DBDataCache) *api.UniversalTagNameMapsResponse {
+	resp := &api.UniversalTagNameMapsResponse{
+		DeviceMap:      make([]*api.DeviceMap, len(dbCache.GetChDevicesIDTypeAndName())),
+		PodK8SLabelMap: make([]*api.PodK8SLabelMap, len(dbCache.GetPods())),
+		PodMap:         make([]*api.IdNameMap, len(dbCache.GetPods())),
+		RegionMap:      make([]*api.IdNameMap, len(dbCache.GetRegions())),
+		AzMap:          make([]*api.IdNameMap, len(dbCache.GetAZs())),
+		PodNodeMap:     make([]*api.IdNameMap, len(dbCache.GetPodNodes())),
+		PodNsMap:       make([]*api.IdNameMap, len(dbCache.GetPodNSsIDAndName())),
+		PodGroupMap:    make([]*api.IdNameMap, len(dbCache.GetPodGroups())),
+		PodClusterMap:  make([]*api.IdNameMap, len(dbCache.GetPodClusters())),
+		L3EpcMap:       make([]*api.IdNameMap, len(dbCache.GetVPCs())),
+		SubnetMap:      make([]*api.IdNameMap, len(dbCache.GetSubnets())),
+		GprocessMap:    make([]*api.IdNameMap, len(dbCache.GetProcesses())),
+		VtapMap:        make([]*api.IdNameMap, len(dbCache.GetVTapsIDAndName())),
+	}
+	for i, pod := range dbCache.GetPods() {
+		var labelName, labelValue []string
+		for _, label := range strings.Split(pod.Label, ", ") {
+			if value := strings.Split(label, ":"); len(value) > 1 {
+				labelName = append(labelName, value[0])
+				labelValue = append(labelValue, value[1])
+			}
+		}
+		resp.PodK8SLabelMap[i] = &api.PodK8SLabelMap{
+			PodId:      proto.Uint32(uint32(pod.ID)),
+			LabelName:  labelName,
+			LabelValue: labelValue,
+		}
+		resp.PodMap[i] = &api.IdNameMap{
+			Id:   proto.Uint32(uint32(pod.ID)),
+			Name: proto.String(pod.Name),
+		}
+	}
+	for i, region := range dbCache.GetRegions() {
+		resp.RegionMap[i] = &api.IdNameMap{
+			Id:   proto.Uint32(uint32(region.ID)),
+			Name: proto.String(region.Name),
+		}
+	}
+	for i, az := range dbCache.GetAZs() {
+		resp.AzMap[i] = &api.IdNameMap{
+			Id:   proto.Uint32(uint32(az.ID)),
+			Name: proto.String(az.Name),
+		}
+	}
+	for i, podNode := range dbCache.GetPodNodes() {
+		resp.PodNodeMap[i] = &api.IdNameMap{
+			Id:   proto.Uint32(uint32(podNode.ID)),
+			Name: proto.String(podNode.Name),
+		}
+	}
+	for i, podNS := range dbCache.GetPodNSsIDAndName() {
+		resp.PodNsMap[i] = &api.IdNameMap{
+			Id:   proto.Uint32(uint32(podNS.ID)),
+			Name: proto.String(podNS.Name),
+		}
+	}
+	for i, podGroup := range dbCache.GetPodGroups() {
+		resp.PodGroupMap[i] = &api.IdNameMap{
+			Id:   proto.Uint32(uint32(podGroup.ID)),
+			Name: proto.String(podGroup.Name),
+		}
+	}
+	for i, podCluster := range dbCache.GetPodClusters() {
+		resp.PodClusterMap[i] = &api.IdNameMap{
+			Id:   proto.Uint32(uint32(podCluster.ID)),
+			Name: proto.String(podCluster.Name),
+		}
+	}
+	for i, vpc := range dbCache.GetVPCs() {
+		resp.L3EpcMap[i] = &api.IdNameMap{
+			Id:   proto.Uint32(uint32(vpc.ID)),
+			Name: proto.String(vpc.Name),
+		}
+	}
+	for i, subnet := range dbCache.GetSubnets() {
+		resp.SubnetMap[i] = &api.IdNameMap{
+			Id:   proto.Uint32(uint32(subnet.ID)),
+			Name: proto.String(subnet.Name),
+		}
+	}
+	for i, process := range dbCache.GetProcesses() {
+		resp.GprocessMap[i] = &api.IdNameMap{
+			Id:   proto.Uint32(uint32(process.ID)),
+			Name: proto.String(process.Name),
+		}
+	}
+	for i, vtap := range dbCache.GetVTapsIDAndName() {
+		resp.VtapMap[i] = &api.IdNameMap{
+			Id:   proto.Uint32(uint32(vtap.ID)),
+			Name: proto.String(vtap.Name),
+		}
+	}
+	for i, chDevice := range dbCache.GetChDevicesIDTypeAndName() {
+		resp.DeviceMap[i] = &api.DeviceMap{
+			Id:   proto.Uint32(uint32(chDevice.DeviceID)),
+			Type: proto.Uint32(uint32(chDevice.DeviceType)),
+			Name: proto.String(chDevice.Name),
+		}
+	}
+
+	return resp
 }

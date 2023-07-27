@@ -1150,7 +1150,7 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 		if fieldFunc != nil {
 			return fieldFunc, nil
 		}
-		metricStruct, ok := metrics.GetMetrics(field, e.DB, e.Table, e.Context)
+		metricStruct, ok := metrics.GetAggMetrics(field, e.DB, e.Table, e.Context)
 		if ok {
 			return &Field{Value: metricStruct.DBField}, nil
 		}
@@ -1218,10 +1218,12 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where, isCheck bool) (view
 			return right, err
 		}
 		op := view.Operator{Type: view.AND}
-		if left.ToString() == "" {
-			return right, nil
-		} else if right.ToString() == "" {
-			return left, nil
+		if !isCheck {
+			if left.ToString() == "" {
+				return right, nil
+			} else if right.ToString() == "" {
+				return left, nil
+			}
 		}
 		return &view.BinaryExpr{Left: left, Right: right, Op: &op}, nil
 	case *sqlparser.OrExpr:
@@ -1322,7 +1324,6 @@ func LoadDbDescriptions(dbDescriptions map[string]interface{}) error {
 				if err != nil {
 					return err
 				}
-				loadMetrics["*"] = metrics.NewCountAllMertic(table)
 				err = metrics.MergeMetrics(db, table, loadMetrics)
 				if err != nil {
 					return err

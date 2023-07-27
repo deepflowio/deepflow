@@ -62,6 +62,14 @@ func (i *IP) HandleDelete() {
 	i.lanIPUpdater.HandleDelete()
 }
 
+func (i *IP) GetChanged() bool {
+	return i.wanIPUpdater.Changed || i.lanIPUpdater.Changed
+}
+
+func (i *IP) GetMySQLModelString() []string {
+	return []string{i.wanIPUpdater.GetMySQLModelString()[0], i.lanIPUpdater.GetMySQLModelString()[0]}
+}
+
 func (i *IP) splitToWANAndLAN(cloudData []cloudmodel.IP) ([]cloudmodel.IP, []cloudmodel.IP) {
 	wanCloudData := []cloudmodel.IP{}
 	lanCloudData := []cloudmodel.IP{}

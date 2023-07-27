@@ -163,6 +163,5 @@ func (s *service) Plugin(r *api.PluginRequest, in api.Synchronizer_PluginServer)
 }
 
 func (s *service) GetUniversalTagNameMaps(ctx context.Context, in *api.UniversalTagNameMapsRequest) (*api.UniversalTagNameMapsResponse, error) {
-	// FIXME
-	return nil, nil
+	return s.tsdbEvent.GetUniversalTagNameMaps(ctx, in)
 }

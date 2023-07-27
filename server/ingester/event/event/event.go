@@ -40,6 +40,7 @@ type Event struct {
 	Config          *config.Config
 	ResourceEventor *Eventor
 	PerfEventor     *Eventor
+	AlarmEventor    *Eventor
 }
 
 type Eventor struct {
@@ -55,19 +56,23 @@ func NewEvent(config *config.Config, resourceEventQueue *queue.OverwriteQueue, r
 		return nil, err
 	}
 
-	perfEventor, err := NewEventor(config, recv, manager, platformDataManager)
+	perfEventor, err := NewPerfEventor(config, recv, manager, platformDataManager)
 	if err != nil {
 		return nil, err
 	}
+
+	alarmEventor, err := NewAlarmEventor(config, recv, manager)
+
 	return &Event{
 		Config:          config,
 		ResourceEventor: resourceEventor,
 		PerfEventor:     perfEventor,
+		AlarmEventor:    alarmEventor,
 	}, nil
 }
 
 func NewResouceEventor(eventQueue *queue.OverwriteQueue, eventType common.EventType, config *config.Config) (*Eventor, error) {
-	eventWriter, err := dbwriter.NewEventWriter(dbwriter.EVENT_TABLE, 0, config)
+	eventWriter, err := dbwriter.NewEventWriter(eventType.TableName(), 0, config)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +89,35 @@ func NewResouceEventor(eventQueue *queue.OverwriteQueue, eventType common.EventT
 	}, nil
 }
 
-func NewEventor(config *config.Config, recv *receiver.Receiver, manager *dropletqueue.Manager, platformDataManager *grpc.PlatformDataManager) (*Eventor, error) {
+func NewAlarmEventor(config *config.Config, recv *receiver.Receiver, manager *dropletqueue.Manager) (*Eventor, error) {
+	eventMsg := datatype.MESSAGE_TYPE_ALARM_EVENT
+	decodeQueues := manager.NewQueues(
+		"1-receive-to-decode-"+eventMsg.String(),
+		2<<17, // 128k, default alarm event queue-size
+		1,     // default alarm event queue-count
+		1,
+		libqueue.OptionFlushIndicator(3*time.Second),
+		libqueue.OptionRelease(func(p interface{}) { receiver.ReleaseRecvBuffer(p.(*receiver.RecvBuffer)) }))
+	recv.RegistHandler(eventMsg, decodeQueues, 1)
+
+	eventWriter, err := dbwriter.NewAlarmEventWriter(config)
+	if err != nil {
+		return nil, err
+	}
+	d := decoder.NewDecoder(
+		common.ALARM_EVENT,
+		queue.QueueReader(decodeQueues.FixedMultiQueue[0]),
+		eventWriter,
+		nil,
+		config,
+	)
+	return &Eventor{
+		Config:   config,
+		Decoders: []*decoder.Decoder{d},
+	}, nil
+}
+
+func NewPerfEventor(config *config.Config, recv *receiver.Receiver, manager *dropletqueue.Manager, platformDataManager *grpc.PlatformDataManager) (*Eventor, error) {
 	eventMsg := datatype.MESSAGE_TYPE_PROC_EVENT
 	queueCount := config.DecoderQueueCount
 	decodeQueues := manager.NewQueues(
@@ -99,7 +132,7 @@ func NewEventor(config *config.Config, recv *receiver.Receiver, manager *droplet
 	decoders := make([]*decoder.Decoder, queueCount)
 	platformDatas := make([]*grpc.PlatformInfoTable, queueCount)
 	for i := 0; i < queueCount; i++ {
-		eventWriter, err := dbwriter.NewEventWriter(dbwriter.PERF_EVENT_TABLE, i, config)
+		eventWriter, err := dbwriter.NewEventWriter(common.PERF_EVENT.TableName(), i, config)
 		if err != nil {
 			return nil, err
 		}
@@ -108,7 +141,7 @@ func NewEventor(config *config.Config, recv *receiver.Receiver, manager *droplet
 			return nil, err
 		}
 		decoders[i] = decoder.NewDecoder(
-			common.PROC_EVENT,
+			common.PERF_EVENT,
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
 			eventWriter,
 			platformDatas[i],
@@ -143,10 +176,12 @@ func (e *Eventor) Close() {
 func (e *Event) Start() {
 	e.ResourceEventor.Start()
 	e.PerfEventor.Start()
+	e.AlarmEventor.Start()
 }
 
 func (e *Event) Close() error {
-	e.ResourceEventor.Start()
+	e.ResourceEventor.Close()
 	e.PerfEventor.Close()
+	e.AlarmEventor.Close()
 	return nil
 }

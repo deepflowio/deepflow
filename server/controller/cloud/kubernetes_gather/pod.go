@@ -33,6 +33,7 @@ import (
 func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, err error) {
 	log.Debug("get pods starting")
 	podTypesMap := map[string]bool{
+		"CloneSet":              false,
 		"DaemonSet":             false,
 		"Deployment":            false,
 		"InPlaceSet":            false,

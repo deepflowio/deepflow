@@ -24,6 +24,10 @@ type IncludedFieldsParam struct {
 	IncludedFields []string `schema:"field,omitempty"`
 }
 
+func (i IncludedFieldsParam) GetIncludedFields() []string {
+	return i.IncludedFields
+}
+
 // VMQuery defines supported field in query string, and uses tag (schema) to define the parameter name
 // 定义可支持 query 字段，使用 tag（schema）定义参数名
 type VMQuery struct {
@@ -48,6 +52,65 @@ type HostQueryStoredInRedis struct {
 	IncludedFieldsParam
 }
 
+type IPQuery struct {
+	IPQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type IPQueryStoredInRedis struct {
+	IPQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type DHCPPortQuery struct {
+	DHCPPortQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type DHCPPortQueryStoredInRedis struct {
+	DHCPPortQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type VRouterQuery struct {
+	VRouterQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type VRouterQueryStoredInRedis struct {
+	VRouterQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type RoutingTableQuery struct {
+	RoutingTableQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type RoutingTableQueryStoredInRedis struct {
+	RoutingTableQueryFilterConditions
+}
+
+type NetworkQuery struct {
+	NetworkQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type NetworkQueryStoredInRedis struct {
+	NetworkQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type VPCQuery struct {
+	VPCQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type VPCQueryStoredInRedis struct {
+	VPCQueryFilterConditions
+	IncludedFieldsParam
+}
+
 type PodQuery struct {
 	PodQueryStoredInRedis
 	RefreshCacheParam
@@ -55,5 +118,105 @@ type PodQuery struct {
 
 type PodQueryStoredInRedis struct {
 	PodQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type PodReplicaSetQuery struct {
+	PodReplicaSetQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type PodReplicaSetQueryStoredInRedis struct {
+	PodReplicaSetQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type PodGroupQuery struct {
+	PodGroupQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type PodGroupQueryStoredInRedis struct {
+	PodGroupQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type PodGroupPortQuery struct {
+	PodGroupPortQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type PodGroupPortQueryStoredInRedis struct {
+	PodGroupPortQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type PodServiceQuery struct {
+	PodServiceQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type PodServiceQueryStoredInRedis struct {
+	PodServiceQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type PodServicePortQuery struct {
+	PodServicePortQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type PodServicePortQueryStoredInRedis struct {
+	PodServicePortQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type PodIngressQuery struct {
+	PodIngressQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type PodIngressQueryStoredInRedis struct {
+	PodIngressQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type PodIngressRuleQuery struct {
+	PodIngressRuleQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type PodIngressRuleQueryStoredInRedis struct {
+	PodIngressRuleQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type PodNodeQuery struct {
+	PodNodeQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type PodNodeQueryStoredInRedis struct {
+	PodNodeQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type PodNamespaceQuery struct {
+	PodNamespaceQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type PodNamespaceQueryStoredInRedis struct {
+	PodNamespaceQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type PodClusterQuery struct {
+	PodClusterQueryStoredInRedis
+	RefreshCacheParam
+}
+
+type PodClusterQueryStoredInRedis struct {
+	PodClusterQueryFilterConditions
 	IncludedFieldsParam
 }

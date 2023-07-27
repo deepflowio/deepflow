@@ -381,9 +381,10 @@ func (h *HTTPInfo) WriteToPB(p *pb.AppProtoLogsData, msgType LogMessageType) {
 		}
 
 		p.ExtInfo = &pb.ExtendedInfo{
-			ClientIp:   h.ClientIP,
-			RequestId:  h.StreamID,
-			XRequestId: h.XRequestId,
+			ClientIp:  h.ClientIP,
+			RequestId: h.StreamID,
+			// FIXME trident not support XRequestId1, always fill value to XRequestId_0
+			XRequestId_0: h.XRequestId,
 		}
 		p.ReqLen = int32(h.ReqContentLength)
 	}
@@ -393,7 +394,8 @@ func (h *HTTPInfo) WriteToPB(p *pb.AppProtoLogsData, msgType LogMessageType) {
 			if p.ExtInfo == nil {
 				p.ExtInfo = &pb.ExtendedInfo{}
 			}
-			p.ExtInfo.XRequestId = h.XRequestId
+			// FIXME trident not support XRequestId1, always fill value to XRequestId_0
+			p.ExtInfo.XRequestId_0 = h.XRequestId
 		}
 		p.RespLen = int32(h.RespContentLength)
 	}

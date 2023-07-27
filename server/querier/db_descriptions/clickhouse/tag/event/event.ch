@@ -43,5 +43,4 @@ event_type                 , 事件类型                   ,
 event_desc                 , 事件信息                   ,
 
 app_instance               , 应用实例                   ,
-vtap                       , 采集器                     ,
 signal_source              , 信号源                     ,
