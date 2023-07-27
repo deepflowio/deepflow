@@ -15,7 +15,7 @@
  */
 
 use std::{
-    collections::HashMap,
+    collections::{hash_map::Entry, HashMap},
     fmt::{self, Debug},
     io::{self, Write},
     sync::{
@@ -27,7 +27,7 @@ use std::{
 
 use enum_dispatch::enum_dispatch;
 use flate2::{write::ZlibEncoder, Compression};
-use futures::{StreamExt, TryStreamExt};
+use futures::StreamExt;
 use k8s_openapi::{
     api::{
         apps::v1::{
@@ -43,9 +43,9 @@ use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
 };
 use kube::{
-    api::ListParams,
-    runtime::{self, watcher::Event},
-    Api, Client, Resource as KubeResource,
+    api::{ListParams, WatchEvent},
+    error::ErrorResponse,
+    Api, Client, Error as ClientErr, Resource as KubeResource, ResourceExt,
 };
 use log::{debug, info, trace, warn};
 use openshift_openapi::api::route::v1::Route;
@@ -64,6 +64,8 @@ use crate::utils::stats::{
 const REFRESH_INTERVAL: Duration = Duration::from_secs(3600);
 const SLEEP_INTERVAL: Duration = Duration::from_secs(5);
 const SPIN_INTERVAL: Duration = Duration::from_millis(100);
+const HTTP_FORBIDDEN: u16 = 403;
+const HTTP_GONE: u16 = 410;
 
 #[enum_dispatch]
 pub trait Watcher {
@@ -542,26 +544,91 @@ where
         }
     }
 
+    // returns true if re-listing is required
+    async fn watch(ctx: &mut Context<K>, encoder: &mut ZlibEncoder<Vec<u8>>) -> bool {
+        loop {
+            let mut stream = match ctx
+                .api
+                .watch(
+                    &ListParams::default(),
+                    ctx.resource_version
+                        .as_ref()
+                        .map(|s| s as &str)
+                        .unwrap_or(""),
+                )
+                .await
+            {
+                Ok(s) => s.boxed(),
+                Err(e) => {
+                    warn!("{} watch failed: {:?}", ctx.kind, e);
+                    return false;
+                }
+            };
+            while let Some(ev) = stream.next().await {
+                match ev {
+                    Ok(event) => {
+                        match &event {
+                            WatchEvent::Added(o)
+                            | WatchEvent::Modified(o)
+                            | WatchEvent::Deleted(o) => {
+                                if let Some(version) = o.resource_version() {
+                                    if version != "" {
+                                        ctx.resource_version.replace(version);
+                                    }
+                                }
+                            }
+                            WatchEvent::Bookmark(_) => continue,
+                            WatchEvent::Error(e) => {
+                                if e.code == HTTP_FORBIDDEN {
+                                    warn!("{} watch error: {:?}", ctx.kind, e);
+                                } else {
+                                    debug!("{} watch error: {:?}", ctx.kind, e);
+                                }
+                                return e.code == HTTP_GONE;
+                            }
+                        }
+                        // handles add/modify/delete
+                        Self::resolve_event(&ctx, encoder, event).await;
+                    }
+                    Err(e) => {
+                        if std::matches!(
+                            e,
+                            ClientErr::Api(ErrorResponse {
+                                code: HTTP_FORBIDDEN,
+                                ..
+                            })
+                        ) {
+                            warn!("{} watch error: {:?}", ctx.kind, e);
+                        } else {
+                            debug!("{} watch error: {:?}", ctx.kind, e);
+                        }
+                        return false;
+                    }
+                }
+            }
+            // recreate watcher and resume watching
+            debug!("{} watch resuming", ctx.kind);
+        }
+    }
+
     async fn process(mut ctx: Context<K>) {
         let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
         Self::serialized_get_list_entry(&mut ctx, &mut encoder).await;
         ctx.ready.store(true, Ordering::Relaxed);
-        info!("{} watcher ready", ctx.kind);
+        info!("{} watcher initial list ready", ctx.kind);
 
         let mut last_update = SystemTime::now();
-        let mut stream = runtime::watcher(ctx.api.clone(), ListParams::default()).boxed();
 
-        // If the watch is successful, keep updating the entry with the watch. If the watch is not successful,
-        // update the entry with the full amount every 10 minutes.
+        info!("{} watcher start watching", ctx.kind);
         loop {
-            while let Ok(Some(event)) = stream.try_next().await {
-                Self::resolve_event(&ctx, &mut encoder, event).await;
-            }
-            if last_update.elapsed().unwrap() >= ctx.config.list_interval {
+            let need_relist = Self::watch(&mut ctx, &mut encoder).await;
+            time::sleep(SLEEP_INTERVAL).await;
+            // list and rewatch
+            if need_relist || last_update.elapsed().unwrap() >= ctx.config.list_interval {
+                debug!("{} watcher relisting", ctx.kind);
                 Self::full_sync(&mut ctx, &mut encoder).await;
                 last_update = SystemTime::now();
             }
-            time::sleep(SLEEP_INTERVAL).await;
         }
     }
 
@@ -748,15 +815,19 @@ where
         }
     }
 
-    async fn resolve_event(ctx: &Context<K>, encoder: &mut ZlibEncoder<Vec<u8>>, event: Event<K>) {
+    async fn resolve_event(
+        ctx: &Context<K>,
+        encoder: &mut ZlibEncoder<Vec<u8>>,
+        event: WatchEvent<K>,
+    ) {
         match event {
-            Event::Applied(object) => {
+            WatchEvent::Added(object) | WatchEvent::Modified(object) => {
                 Self::insert_object(encoder, object, &ctx.entries, &ctx.version, &ctx.kind).await;
                 ctx.stats_counter
                     .watch_applied
                     .fetch_add(1, Ordering::Relaxed);
             }
-            Event::Deleted(mut object) => {
+            WatchEvent::Deleted(mut object) => {
                 if let Some(uid) = object.meta_mut().uid.take() {
                     // 只有删除时检查是否需要更新版本号，其余消息直接更新map内容
                     if ctx.entries.lock().await.remove(&uid).is_some() {
@@ -767,17 +838,7 @@ where
                         .fetch_add(1, Ordering::Relaxed);
                 }
             }
-            Event::Restarted(mut objects) => {
-                // 按照语义重启后应该拿改key对应最新的state，所以只取restart的最后一个
-                // restarted 存储的是某个key对应的object在重启过程中不同状态
-                if let Some(object) = objects.pop() {
-                    Self::insert_object(encoder, object, &ctx.entries, &ctx.version, &ctx.kind)
-                        .await;
-                    ctx.stats_counter
-                        .watch_restarted
-                        .fetch_add(1, Ordering::Relaxed);
-                }
-            }
+            WatchEvent::Bookmark(_) | WatchEvent::Error(_) => unreachable!(),
         }
     }
 
@@ -806,7 +867,16 @@ where
                             return;
                         }
                     };
-                    entries.lock().await.insert(uid, compressed_object);
+                    let mut entries = entries.lock().await;
+                    match entries.entry(uid) {
+                        Entry::Occupied(o) if o.get() == &compressed_object => return,
+                        Entry::Occupied(mut o) => {
+                            o.insert(compressed_object);
+                        }
+                        Entry::Vacant(o) => {
+                            o.insert(compressed_object);
+                        }
+                    }
                     version.fetch_add(1, Ordering::SeqCst);
                 }
                 Err(e) => debug!(

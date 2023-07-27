@@ -16,6 +16,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
+    fmt,
     io::prelude::*,
     mem,
     ops::Deref,
@@ -77,6 +78,12 @@ struct Context {
 struct WatcherKey {
     name: &'static str,
     group: &'static str,
+}
+
+impl fmt::Display for WatcherKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}/{}", self.group, self.name)
+    }
 }
 
 pub struct ApiWatcher {
@@ -559,6 +566,7 @@ impl ApiWatcher {
         let version = &context.version;
         // 将缓存的entry 上报，如果没有则跳过
         let mut has_update = false;
+        let mut updated_versions = vec![];
         {
             let mut err_msgs_guard = err_msgs.lock().unwrap();
             let resource_watchers_guard = resource_watchers.lock().unwrap();
@@ -566,6 +574,10 @@ impl ApiWatcher {
                 if let Some(watcher) = resource_watchers_guard.get(resource) {
                     let new_version = watcher.version();
                     if new_version != *watcher_version {
+                        updated_versions.push(format!(
+                            "{}: v{} -> v{}",
+                            resource, watcher_version, new_version
+                        ));
                         *watcher_version = new_version;
                         has_update = true;
                     }
@@ -581,7 +593,11 @@ impl ApiWatcher {
         let mut pb_version = Some(version.load(Ordering::SeqCst));
         if has_update {
             version.fetch_add(1, Ordering::SeqCst);
-            info!("version updated to {}", version.load(Ordering::SeqCst));
+            info!(
+                "version updated to {} ({})",
+                version.load(Ordering::SeqCst),
+                updated_versions.join("; ")
+            );
             pb_version = Some(version.load(Ordering::SeqCst));
             if let Some(i) =
                 Self::parse_apiserver_version(apiserver_version.lock().unwrap().deref())
