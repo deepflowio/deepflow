@@ -147,10 +147,10 @@ func (q *QingCloud) GetVMs() ([]model.VM, []model.VMSecurityGroup, []model.Subne
 	q.defaultVxnetIDs = defaultVxnetIDs
 	q.vmIdToVPCLcuuid = vmIdToVPCLcuuid
 	for vxnetId, subnetLcuuid := range vxnetIdToSubnetLcuuid {
-		q.vxnetIdToSubnetLcuuid[vxnetId] = subnetLcuuid
+		q.VxnetIdToSubnetLcuuid[vxnetId] = subnetLcuuid
 	}
 	for vxnetId, vpcLcuuid := range vxnetIdToVPCLcuuid {
-		q.vxnetIdToVPCLcuuid[vxnetId] = vpcLcuuid
+		q.VxnetIdToVPCLcuuid[vxnetId] = vpcLcuuid
 	}
 	log.Info("get vms complete")
 	return retVMs, retVMSecurityGroups, retDefaultVxnetSubnets, nil
@@ -200,7 +200,7 @@ func (q *QingCloud) getVMVPCLcuuid(regionId, regionLcuuid string, vm *simplejson
 			retDefaultVxnetIDs = append(retDefaultVxnetIDs, vxnetId)
 			retVxnetIdToSubnetLcuuid[vxnetId] = subnetLcuuid
 		} else {
-			vpcLcuuid, ok := q.vxnetIdToVPCLcuuid[vxnetId]
+			vpcLcuuid, ok := q.VxnetIdToVPCLcuuid[vxnetId]
 			if !ok {
 				log.Debugf(
 					"vm (%s) vxnetId (%s) vpc not found",
@@ -259,7 +259,7 @@ func (q *QingCloud) GetVMNics() ([]model.VInterface, []model.IP, error) {
 				if index < len(q.defaultVxnetIDs) && q.defaultVxnetIDs[index] == vxnetId {
 					networkLcuuid = common.GenerateUUID(q.defaultVxnetName + regionLcuuid)
 					netType = common.VIF_TYPE_WAN
-				} else if _, ok := q.vxnetIdToVPCLcuuid[vxnetId]; !ok {
+				} else if _, ok := q.VxnetIdToVPCLcuuid[vxnetId]; !ok {
 					networkLcuuid = common.NETWORK_ISP_LCUUID
 					netType = common.VIF_TYPE_WAN
 				}
@@ -280,7 +280,7 @@ func (q *QingCloud) GetVMNics() ([]model.VInterface, []model.IP, error) {
 				// 生成内网IP
 				privateIP := nic.Get("private_ip").MustString()
 				if privateIP != "" {
-					subnetLcuuid, ok := q.vxnetIdToSubnetLcuuid[vxnetId]
+					subnetLcuuid, ok := q.VxnetIdToSubnetLcuuid[vxnetId]
 					if ok {
 						retIPs = append(retIPs, model.IP{
 							Lcuuid: common.GenerateUUID(
