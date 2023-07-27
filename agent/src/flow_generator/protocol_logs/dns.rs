@@ -518,7 +518,7 @@ mod tests {
             dns.reset();
             let info = dns.parse_payload(payload, param);
             if let Ok(info) = info {
-                match info.unwarp_single() {
+                match info.unwrap_single() {
                     L7ProtocolInfo::DnsInfo(i) => {
                         output.push_str(&format!("{:?} is_dns: {}\r\n", i, is_dns));
                     }

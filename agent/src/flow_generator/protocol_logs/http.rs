@@ -1275,13 +1275,13 @@ mod tests {
             if let Ok(info) = http1.parse_payload(payload, param) {
                 output.push_str(&format!(
                     "{:?} is_http: {}\n",
-                    get_http_info(info.unwarp_single()),
+                    get_http_info(info.unwrap_single()),
                     true
                 ));
             } else if let Ok(info) = http2.parse_payload(payload, param) {
                 output.push_str(&format!(
                     "{:?} is_http: {}\n",
-                    get_http_info(info.unwarp_single()),
+                    get_http_info(info.unwrap_single()),
                     true
                 ));
             } else {

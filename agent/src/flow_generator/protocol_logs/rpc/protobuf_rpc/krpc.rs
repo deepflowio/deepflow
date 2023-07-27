@@ -312,7 +312,7 @@ mod test {
         let mut req_info = parser
             .parse_payload(req_payload, req_param)
             .unwrap()
-            .unwarp_single();
+            .unwrap_single();
 
         if let L7ProtocolInfo::ProtobufRpcInfo(rpc_info) = &req_info {
             #[allow(irrefutable_let_patterns)]
@@ -339,7 +339,7 @@ mod test {
         let resp_info = parser
             .parse_payload(resp_payload, resp_param)
             .unwrap()
-            .unwarp_single();
+            .unwrap_single();
 
         if let L7ProtocolInfo::ProtobufRpcInfo(rpc_info) = &resp_info {
             #[allow(irrefutable_let_patterns)]

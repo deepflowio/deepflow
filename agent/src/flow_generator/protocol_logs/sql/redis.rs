@@ -460,7 +460,7 @@ mod tests {
             let is_redis = redis.check_payload(payload, param);
 
             let info = if let Ok(i) = redis.parse_payload(payload, param) {
-                match i.unwarp_single() {
+                match i.unwrap_single() {
                     L7ProtocolInfo::RedisInfo(r) => r,
                     _ => unreachable!(),
                 }

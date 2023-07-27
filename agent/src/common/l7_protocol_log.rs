@@ -173,17 +173,26 @@ pub enum L7ParseResult {
 }
 
 impl L7ParseResult {
-    pub fn unwarp_single(self) -> L7ProtocolInfo {
+    pub fn is_none(&self) -> bool {
         match self {
-            L7ParseResult::Single(s) => s,
-            _ => panic!("parse result is mutli but unwarp single"),
+            L7ParseResult::None => true,
+            _ => false,
         }
     }
 
-    pub fn unwarp_multi(self) -> Vec<L7ProtocolInfo> {
+    pub fn unwrap_single(self) -> L7ProtocolInfo {
+        match self {
+            L7ParseResult::Single(s) => s,
+            L7ParseResult::Multi(_) => panic!("parse result is mutli but unwrap single"),
+            L7ParseResult::None => panic!("parse result is none but unwrap single"),
+        }
+    }
+
+    pub fn unwrap_multi(self) -> Vec<L7ProtocolInfo> {
         match self {
             L7ParseResult::Multi(m) => m,
-            _ => panic!("parse result is single but unwarp multi"),
+            L7ParseResult::Single(_) => panic!("parse result is single but unwrap multi"),
+            L7ParseResult::None => panic!("parse result is none but unwrap multi"),
         }
     }
 }
