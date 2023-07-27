@@ -68,6 +68,13 @@ func NewPrometheusHandler(config *config.Config, recv *receiver.Receiver, platfo
 
 	prometheusLabelTable := decoder.NewPrometheusLabelTable(config.Base.ControllerIPs, int(config.Base.ControllerPort), config.LabelMsgMaxSize)
 
+	prometheusLabelTable.RequesteAllLabelIDs()
+	currentColumnIndexMax := prometheusLabelTable.GetMaxAppLabelColumnIndex()
+	initAppLabelColumnCount := config.AppLabelColumnMinCount
+	if initAppLabelColumnCount < currentColumnIndexMax {
+		initAppLabelColumnCount = currentColumnIndexMax
+	}
+
 	decoders := make([]*decoder.Decoder, queueCount)
 	platformDatas := make([]*grpc.PlatformInfoTable, queueCount)
 	slowDecoders := make([]*decoder.SlowDecoder, queueCount)
@@ -81,7 +88,7 @@ func NewPrometheusHandler(config *config.Config, recv *receiver.Receiver, platfo
 		if err != nil {
 			return nil, err
 		}
-		metricsWriter, err := dbwriter.NewPrometheusWriter(i, msgType.String(), dbwriter.PROMETHEUS_DB, config)
+		metricsWriter, err := dbwriter.NewPrometheusWriter(i, initAppLabelColumnCount, msgType.String(), dbwriter.PROMETHEUS_DB, config)
 		if err != nil {
 			return nil, err
 		}
@@ -94,7 +101,7 @@ func NewPrometheusHandler(config *config.Config, recv *receiver.Receiver, platfo
 			metricsWriter,
 			config,
 		)
-		slowMetricsWriter, err := dbwriter.NewPrometheusWriter(i, "slow-prometheus", dbwriter.PROMETHEUS_DB, config)
+		slowMetricsWriter, err := dbwriter.NewPrometheusWriter(i, initAppLabelColumnCount, "slow-prometheus", dbwriter.PROMETHEUS_DB, config)
 		if err != nil {
 			return nil, err
 		}
@@ -118,7 +125,6 @@ func NewPrometheusHandler(config *config.Config, recv *receiver.Receiver, platfo
 }
 
 func (m *PrometheusHandler) Start() {
-	go m.prometheusLabelTable.RequesteAllLabelIDs()
 	for _, platformData := range m.PlatformDatas {
 		platformData.Start()
 	}

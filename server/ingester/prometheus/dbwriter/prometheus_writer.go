@@ -99,7 +99,7 @@ type PrometheusWriter struct {
 	utils.Closable
 }
 
-func (w *PrometheusWriter) InitTable() error {
+func (w *PrometheusWriter) InitTable(appLabelCount int) error {
 	if w.ckdbConn == nil {
 		conn, err := common.NewCKConnections(w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword)
 		if err != nil {
@@ -109,7 +109,7 @@ func (w *PrometheusWriter) InitTable() error {
 	}
 	_, err := w.ckdbConn.Exec(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", PROMETHEUS_DB))
 
-	w.getOrCreateCkwriter(&PrometheusSample{PrometheusSampleMini: PrometheusSampleMini{AppLabelValueIDs: make([]uint32, 1)}})
+	w.getOrCreateCkwriter(&PrometheusSample{PrometheusSampleMini: PrometheusSampleMini{AppLabelValueIDs: make([]uint32, appLabelCount+1)}})
 	return err
 }
 
@@ -280,6 +280,7 @@ func (w *PrometheusWriter) WriteBatch(batch []interface{}, metricName string, ti
 
 func NewPrometheusWriter(
 	decoderIndex int,
+	initAppLabelCount int,
 	name string,
 	db string,
 	config *config.Config) (*PrometheusWriter, error) {
@@ -318,7 +319,7 @@ func NewPrometheusWriter(
 
 		counter: &Counter{},
 	}
-	if err := writer.InitTable(); err != nil {
+	if err := writer.InitTable(initAppLabelCount); err != nil {
 		return nil, err
 	}
 	common.RegisterCountableForIngester("prometheus_writer", writer, stats.OptionStatTags{"msg": name, "decoder_index": strconv.Itoa(decoderIndex)})
