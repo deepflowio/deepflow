@@ -207,17 +207,17 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 				// group
 				metricWithAggFunc = aggOperator
 			case view.FUNCTION_COUNT:
-				metricWithAggFunc = "Count(*)" // will be append as `metrics.$metricsName` in below
+				metricWithAggFunc = "Count(_)" // will be append as `metrics.$metricsName` in below
 
 				// count_values means count unique value
 				if q.Hints.Func == "count_values" {
 					metricsArray = append(metricsArray, fmt.Sprintf("`%s`", metricName)) // append original metric name
 					groupBy = append(groupBy, fmt.Sprintf("`%s`", metricName))
 				} else {
-					// for [Count], not calculate second times, just return Count(*) value
+					// for [Count], not calculate second times, just return Count(_) value
 					if p.interceptPrometheusExpr != nil {
 						_ = p.interceptPrometheusExpr(func(e *parser.AggregateExpr) error {
-							// Count(*) in deepflow already complete in clickhouse query
+							// Count(_) in deepflow already complete in clickhouse query
 							// so we don't need `Count` again, instead, `Sum` all `Count` result would be our expectation
 							// so, modify expr.Operation here to make prometheus engine do `Sum` for `values`
 							e.Op = parser.SUM
@@ -343,8 +343,8 @@ func parseMetric(matchers []*prompb.LabelMatcher) (prefixType prefix, metricName
 			// i.e.: flow_log__l4_flow_log__byte_rx
 			// DeepFlow native metrics(flow_metrics): ${db}__${table}__${metricsName}__${datasource}
 			// i.e.: flow_metrics__vtap_flow_port__byte_rx__1m
-			// Prometheus/InfluxDB integrated metrics: ext_metrics__metrics__${integratedSource}_${metricsName}
-			// i.e.: ext_metrics__metrics__prometheus_node_cpu_seconds_total
+			// Telegraf integrated metrics: ext_metrics__metrics__${integratedSource}_${inputTarget}__${metricsName}
+			// i.e.: ext_metrics__metrics__influxdb_cpu__usage_user
 			// Prometheus integrated metrics: prometheus__samples__${metricsName}
 			// i.e.: prometheus__samples__node_cpu_seconds_total
 			metricsSplit := strings.Split(metricName, "__")
@@ -362,7 +362,11 @@ func parseMetric(matchers []*prompb.LabelMatcher) (prefixType prefix, metricName
 					realMetrics := strings.SplitN(metricName, "_", 2)
 					if len(realMetrics) > 1 {
 						table = fmt.Sprintf("%s.%s", realMetrics[0], realMetrics[1])
-						metricName = realMetrics[1]
+						if realMetrics[0] == "influxdb" {
+							metricName = metricsSplit[3]
+						} else {
+							metricName = realMetrics[1]
+						}
 					}
 					metricAlias = "`metrics.%s` as value"
 				} else if db == chCommon.DB_NAME_PROMETHEUS {
@@ -376,7 +380,7 @@ func parseMetric(matchers []*prompb.LabelMatcher) (prefixType prefix, metricName
 				}
 
 				// data precision only available for 'flow_metrics'
-				if len(metricsSplit) > 3 {
+				if len(metricsSplit) > 3 && db == DB_NAME_FLOW_METRICS {
 					dataPrecision = metricsSplit[3]
 				}
 			} else {
