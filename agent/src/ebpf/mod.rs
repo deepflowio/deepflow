@@ -482,7 +482,27 @@ extern "C" {
      * key:
      *     `<process name + u_stack_id + k_stack_id + cpu>`.
      *
-     * The profiler startup will be set to ".*" by default.
+     * Using regular expressions, we match process names to establish
+     * symbol table caching for specific processes, rather than enabling
+     * symbol caching for all processes. This approach aims to reduce
+     * memory usage.
+     *
+     * For example:
+     *
+     *  "^(java|nginx|profiler|telegraf|mysqld|socket_tracer|.*deepflow.*)$"
+     *
+     * This regex pattern matches the process names: "java", "nginx", "profiler",
+     * "telegraf", "mysqld", "socket_tracer", and any process containing the
+     * substring "deepflow".
+     *
+     * By using this interface, you can customize the regular expression to
+     * match specific process names that you want to establish symbol table
+     * caching for, providing flexibility and control over which processes will
+     * have symbol caching enabled. This allows you to finetune the memory usage
+     * and profiling behavior of the profiler according to your requirements.
+     *
+     * The default expression is empty (''), indicating that no profile data will
+     * be generated.
      *
      * @pattern : Regular expression pattern. e.g. "^(java|nginx|.*ser.*)$"
      * @returns 0 on success, < 0 on error
