@@ -20,15 +20,17 @@ import (
 	"net"
 
 	basecommon "github.com/deepflowio/deepflow/server/ingester/common"
+	"github.com/deepflowio/deepflow/server/ingester/event/common"
 	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/pool"
 )
 
 const (
-	DefaultPartition    = ckdb.TimeFuncTwelveHour
-	IO_EVENT_TYPE_READ  = "read"
-	IO_EVENT_TYPE_WRITE = "write"
+	DefaultPartition          = ckdb.TimeFuncTwelveHour
+	DefaultPerfEventPartition = ckdb.TimeFuncHour
+	IO_EVENT_TYPE_READ        = "read"
+	IO_EVENT_TYPE_WRITE       = "write"
 )
 
 type SignalSource uint8
@@ -141,9 +143,9 @@ func (e *EventStore) WriteBlock(block *ckdb.Block) {
 
 func (e *EventStore) Table() string {
 	if e.HasMetrics {
-		return PERF_EVENT_TABLE
+		return common.PERF_EVENT.TableName()
 	}
-	return EVENT_TABLE
+	return common.RESOURCE_EVENT.TableName()
 }
 
 func (e *EventStore) Release() {
@@ -207,8 +209,10 @@ func GenEventCKTable(cluster, storagePolicy, table string, ttl int, coldStorage 
 	engine := ckdb.MergeTree
 	orderKeys := []string{"signal_source", "event_type", "l3_epc_id", "l3_device_type", "l3_device_id"}
 	hasMetrics := false
-	if table == PERF_EVENT_TABLE {
+	partition := DefaultPartition
+	if table == common.PERF_EVENT.TableName() {
 		hasMetrics = true
+		partition = DefaultPerfEventPartition
 	}
 
 	return &ckdb.Table{
@@ -219,7 +223,7 @@ func GenEventCKTable(cluster, storagePolicy, table string, ttl int, coldStorage 
 		Columns:         EventColumns(hasMetrics),
 		TimeKey:         timeKey,
 		TTL:             ttl,
-		PartitionFunc:   DefaultPartition,
+		PartitionFunc:   partition,
 		Engine:          engine,
 		Cluster:         cluster,
 		StoragePolicy:   storagePolicy,

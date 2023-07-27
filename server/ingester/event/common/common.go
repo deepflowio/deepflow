@@ -26,20 +26,23 @@ type EventType uint8
 
 const (
 	RESOURCE_EVENT EventType = iota
-	PROC_EVENT
+	PERF_EVENT
+	ALARM_EVENT
 )
 
 func (e EventType) String() string {
 	switch e {
 	case RESOURCE_EVENT:
-		return "resource_event"
-	case PROC_EVENT:
-		return "proc_event"
+		return "event"
+	case PERF_EVENT:
+		return "perf_event"
+	case ALARM_EVENT:
+		return "alarm_event"
 	default:
 		return "unknown_event"
 	}
 }
 
 func (e EventType) TableName() string {
-	return "event"
+	return e.String()
 }

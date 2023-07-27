@@ -29,6 +29,7 @@ type PromQueryParams struct {
 	EndTime           string
 	Step              string
 	Debug             bool
+	Slimit            string
 	Matchers          []string
 	Context           context.Context
 }
@@ -59,3 +60,16 @@ type PromQueryStats struct {
 }
 
 type errorType string
+
+type PromQueryWrapper struct {
+	OptStatus   string                     `json:"OPT_STATUS"`
+	Type        string                     `json:"TYPE"` // promql
+	Description string                     `json:"DESCRIPTION"`
+	Schemas     struct{}                   `json:"SCHEMAS"`
+	Data        [](map[string]interface{}) `json:"DATA"`
+}
+
+type WrapHistorySeries struct {
+	Toi   int64   `json:"toi"`
+	Value float64 `json:"value"`
+}
