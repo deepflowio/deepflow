@@ -55,7 +55,7 @@ func (q *QingCloud) GetNATGateways() (
 				return nil, nil, nil, nil, err
 			}
 
-			vpcLcuuid, ok := q.vxnetIdToVPCLcuuid[vxnetId]
+			vpcLcuuid, ok := q.VxnetIdToVPCLcuuid[vxnetId]
 			if !ok {
 				log.Infof("vxnet (%s) not in any vpc", vxnetId)
 				continue

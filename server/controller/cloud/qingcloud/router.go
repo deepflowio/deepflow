@@ -71,7 +71,7 @@ func (q *QingCloud) GetRouterAndTables() (
 					log.Infof("routing table (%s) vxnetId not found", routerId)
 					continue
 				}
-				vpcLcuuid, ok := q.vxnetIdToVPCLcuuid[vxnetId]
+				vpcLcuuid, ok := q.VxnetIdToVPCLcuuid[vxnetId]
 				if !ok {
 					log.Infof("routing table (%s) vxnetId (%s) vpc not found", routerId, vxnetId)
 					continue
