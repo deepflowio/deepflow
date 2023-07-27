@@ -106,12 +106,6 @@ impl MysqlInfo {
         if self.protocol_version == 0 {
             self.protocol_version = other.protocol_version
         }
-        if self.server_version.is_empty() {
-            self.server_version = other.server_version;
-        }
-        if self.server_thread_id == 0 {
-            self.server_thread_id = other.server_thread_id;
-        }
         match other.msg_type {
             LogMessageType::Request => {
                 self.command = other.command;
@@ -301,13 +295,12 @@ fn mysql_string(payload: &[u8]) -> String {
 }
 
 impl MysqlLog {
-    fn greeting(&mut self, payload: &[u8], info: &mut MysqlInfo) -> Result<()> {
+    fn greeting(&mut self, payload: &[u8]) -> Result<()> {
         let mut remain = payload.len();
         if remain < PROTOCOL_VERSION_LEN {
             return Err(Error::MysqlLogParseFailed);
         }
-        info.protocol_version = payload[PROTOCOL_VERSION_OFFSET];
-        self.protocol_version = info.protocol_version;
+        self.protocol_version = payload[PROTOCOL_VERSION_OFFSET];
         remain -= PROTOCOL_VERSION_LEN;
         let server_version_pos = payload[SERVER_VERSION_OFFSET..]
             .iter()
@@ -316,16 +309,10 @@ impl MysqlLog {
         if server_version_pos <= 0 {
             return Err(Error::MysqlLogParseFailed);
         }
-        info.server_version = String::from_utf8_lossy(
-            &payload[SERVER_VERSION_OFFSET..SERVER_VERSION_OFFSET + server_version_pos],
-        )
-        .into_owned();
         remain -= server_version_pos as usize;
         if remain < THREAD_ID_LEN + 1 {
             return Err(Error::MysqlLogParseFailed);
         }
-        let thread_id_offset = THREAD_ID_OFFSET_B + server_version_pos + 1;
-        info.server_thread_id = bytes::read_u32_le(&payload[thread_id_offset..]);
         Ok(())
     }
 
@@ -476,7 +463,7 @@ impl MysqlLog {
             LogMessageType::Request => self.request(&payload[offset..], trace_id, info)?,
             LogMessageType::Response => self.response(&payload[offset..], info)?,
             LogMessageType::Other => {
-                self.greeting(&payload[offset..], info)?;
+                self.greeting(&payload[offset..])?;
                 return Ok(true);
             }
             _ => return Err(Error::MysqlLogParseFailed),
@@ -595,6 +582,7 @@ mod tests {
         let mut mysql = MysqlLog::default();
         let mut output: String = String::new();
         let first_dst_port = packets[0].lookup_key.dst_port;
+        let mut previous_command = 0u8;
         for packet in packets.iter_mut() {
             packet.lookup_key.direction = if packet.lookup_key.dst_port == first_dst_port {
                 PacketDirection::ClientToServer
@@ -605,7 +593,6 @@ mod tests {
                 Some(p) => p,
                 None => continue,
             };
-            println!("***********************");
             let is_mysql = mysql.check_payload(
                 payload,
                 &ParseParam::from((packet as &MetaPacket, log_cache.clone(), false)),
@@ -617,19 +604,33 @@ mod tests {
             );
 
             if let Ok(info) = info {
-                match info.unwarp_single() {
+                if info.is_none() {
+                    let mut i = MysqlInfo::default();
+                    i.protocol_version = mysql.protocol_version;
+                    output.push_str(&format!("{:?} is_mysql: {}\r\n", i, is_mysql));
+                    previous_command = 0;
+                    continue;
+                }
+                match info.unwrap_single() {
                     L7ProtocolInfo::MysqlInfo(mut i) => {
+                        if i.app_proto_head().unwrap().msg_type == LogMessageType::Request {
+                            previous_command = i.command;
+                        } else {
+                            if previous_command != COM_QUERY {
+                                i.affected_rows = 0;
+                            }
+                            previous_command = 0;
+                        }
+
                         i.rrt = 0;
                         output.push_str(&format!("{:?} is_mysql: {}\r\n", i, is_mysql));
                     }
                     _ => unreachable!(),
                 }
             } else {
-                output.push_str(&format!(
-                    "{:?} is_mysql: {}\r\n",
-                    MysqlInfo::default(),
-                    is_mysql
-                ));
+                let mut i = MysqlInfo::default();
+                i.protocol_version = mysql.protocol_version;
+                output.push_str(&format!("{:?} is_mysql: {}\r\n", i, is_mysql));
             }
         }
         output
@@ -639,18 +640,18 @@ mod tests {
     fn check() {
         let files = vec![
             ("mysql-statement-id.pcap", "mysql-statement-id.result"),
-            // ("mysql-statement.pcap", "mysql-statement.result"),
-            // ("mysql.pcap", "mysql.result"),
-            // ("mysql-error.pcap", "mysql-error.result"),
-            // ("mysql-table-desc.pcap", "mysql-table-desc.result"),
-            // ("mysql-table-insert.pcap", "mysql-table-insert.result"),
-            // ("mysql-table-delete.pcap", "mysql-table-delete.result"),
-            // ("mysql-table-update.pcap", "mysql-table-update.result"),
-            // ("mysql-table-select.pcap", "mysql-table-select.result"),
-            // ("mysql-table-create.pcap", "mysql-table-create.result"),
-            // ("mysql-table-destroy.pcap", "mysql-table-destroy.result"),
-            // ("mysql-table-alter.pcap", "mysql-table-alter.result"),
-            // ("mysql-database.pcap", "mysql-database.result"),
+            ("mysql-statement.pcap", "mysql-statement.result"),
+            ("mysql.pcap", "mysql.result"),
+            ("mysql-error.pcap", "mysql-error.result"),
+            ("mysql-table-desc.pcap", "mysql-table-desc.result"),
+            ("mysql-table-insert.pcap", "mysql-table-insert.result"),
+            ("mysql-table-delete.pcap", "mysql-table-delete.result"),
+            ("mysql-table-update.pcap", "mysql-table-update.result"),
+            ("mysql-table-select.pcap", "mysql-table-select.result"),
+            ("mysql-table-create.pcap", "mysql-table-create.result"),
+            ("mysql-table-destroy.pcap", "mysql-table-destroy.result"),
+            ("mysql-table-alter.pcap", "mysql-table-alter.result"),
+            ("mysql-database.pcap", "mysql-database.result"),
         ];
 
         for item in files.iter() {

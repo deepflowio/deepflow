@@ -199,6 +199,11 @@ impl L7ProtocolParserInterface for SoLog {
                                     info.rrt = rrt;
                                     perf_stats.update_rrt(rrt);
                                 });
+                                if res.len == 1 {
+                                    return Ok(L7ParseResult::Single(L7ProtocolInfo::CustomInfo(
+                                        info,
+                                    )));
+                                }
                                 v.push(L7ProtocolInfo::CustomInfo(info));
                             }
                             Err(e) => {

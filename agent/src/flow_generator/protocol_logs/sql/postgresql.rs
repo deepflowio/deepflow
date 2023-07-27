@@ -547,7 +547,7 @@ mod test {
         let req_payload = p[0].get_l4_payload().unwrap();
         assert_eq!((&mut parser).check_payload(req_payload, req_param), true);
         let info = (&mut parser).parse_payload(req_payload, req_param).unwrap();
-        let mut req = info.unwarp_single();
+        let mut req = info.unwrap_single();
 
         (&mut parser).reset();
 
@@ -557,7 +557,7 @@ mod test {
         let resp = (&mut parser)
             .parse_payload(resp_payload, resp_param)
             .unwrap()
-            .unwarp_single();
+            .unwrap_single();
 
         req.merge_log(resp).unwrap();
         if let L7ProtocolInfo::PostgreInfo(info) = req {

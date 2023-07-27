@@ -716,7 +716,7 @@ mod tests {
 
             let i = dubbo.parse_payload(payload, param);
             let info = if let Ok(info) = i {
-                match info.unwarp_single() {
+                match info.unwrap_single() {
                     L7ProtocolInfo::DubboInfo(d) => d,
                     _ => unreachable!(),
                 }

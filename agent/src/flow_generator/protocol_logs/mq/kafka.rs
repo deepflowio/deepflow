@@ -438,7 +438,7 @@ mod tests {
             let is_kafka = kafka.check_payload(payload, param);
             let info = kafka.parse_payload(payload, param);
             if let Ok(info) = info {
-                match info.unwarp_single() {
+                match info.unwrap_single() {
                     L7ProtocolInfo::KafkaInfo(i) => {
                         output.push_str(&format!("{:?} is_kafka: {}\r\n", i, is_kafka));
                     }

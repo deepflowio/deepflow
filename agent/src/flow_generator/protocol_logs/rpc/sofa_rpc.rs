@@ -594,7 +594,7 @@ mod test {
         let req_info = parser
             .parse_payload(req_payload, req_param)
             .unwrap()
-            .unwarp_single();
+            .unwrap_single();
 
         if let L7ProtocolInfo::SofaRpcInfo(k) = &req_info {
             assert_eq!(k.msg_type, LogMessageType::Request);
@@ -619,7 +619,7 @@ mod test {
         let resp_info = parser
             .parse_payload(resp_payload, resp_param)
             .unwrap()
-            .unwarp_single();
+            .unwrap_single();
 
         if let L7ProtocolInfo::SofaRpcInfo(k) = &resp_info {
             assert_eq!(k.msg_type, LogMessageType::Response);
@@ -663,7 +663,7 @@ mod test {
         let req_info = parser
             .parse_payload(req_payload, req_param)
             .unwrap()
-            .unwarp_single();
+            .unwrap_single();
 
         if let L7ProtocolInfo::SofaRpcInfo(k) = &req_info {
             assert_eq!(k.msg_type, LogMessageType::Request);
@@ -688,7 +688,7 @@ mod test {
         let resp_info = parser
             .parse_payload(resp_payload, resp_param)
             .unwrap()
-            .unwarp_single();
+            .unwrap_single();
 
         if let L7ProtocolInfo::SofaRpcInfo(k) = &resp_info {
             assert_eq!(k.msg_type, LogMessageType::Response);
