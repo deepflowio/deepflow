@@ -93,11 +93,11 @@ func NewReplaceMetrics(dbField string, condition string) *Metrics {
 
 func GetAggMetrics(field string, db string, table string, ctx context.Context) (*Metrics, bool) {
 	field = strings.Trim(field, "`")
-	if field == "_" {
+	if field == COUNT_METRICS_NAME {
 		return &Metrics{
 			Index:       0,
-			DBField:     "_",
-			DisplayName: "_",
+			DBField:     COUNT_METRICS_NAME,
+			DisplayName: COUNT_METRICS_NAME,
 			Type:        METRICS_TYPE_OTHER,
 			Category:    "Other",
 			Permissions: []bool{true, true, true},
@@ -429,7 +429,7 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) erro
 		if rm, ok := replaceMetrics[name]; ok && value.DBField == "" {
 			value.Replace(rm)
 		}
-		if name == "_" {
+		if name == COUNT_METRICS_NAME {
 			value.IsAgg = true
 		}
 		metrics[name] = value
