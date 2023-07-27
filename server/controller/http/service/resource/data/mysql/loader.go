@@ -27,14 +27,39 @@ func Select[T constraint.MySQLModel](fields []string) ([]T, error) {
 	return result, err
 }
 
+// TODO SelectWhere
 func SelectWithQuery[T constraint.MySQLModel](fields []string, query interface{}, args ...interface{}) ([]T, error) {
 	var result []T
 	err := mysql.Db.Select(fields).Where(query, args...).Find(&result).Error
 	return result, err
 }
 
-func GetAll[T constraint.MySQLModel]() ([]T, error) {
+func GetAll[T any]() ([]T, error) {
 	var result []T
 	err := mysql.Db.Find(&result).Error
+	return result, err
+}
+
+func FindWhere[T any](query interface{}, args ...interface{}) ([]*T, error) {
+	var result []*T
+	err := mysql.Db.Where(query, args...).Find(&result).Error
+	return result, err
+}
+
+func Find[T any]() ([]*T, error) {
+	var result []*T
+	err := mysql.Db.Find(&result).Error
+	return result, err
+}
+
+func UnscopedFind[T any]() ([]T, error) {
+	var result []T
+	err := mysql.Db.Unscoped().Find(&result).Error
+	return result, err
+}
+
+func UnscopedOrderFind[T any](order interface{}) ([]T, error) {
+	var result []T
+	err := mysql.Db.Unscoped().Order(order).Find(&result).Error
 	return result, err
 }

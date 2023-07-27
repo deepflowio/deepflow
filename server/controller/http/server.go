@@ -109,7 +109,9 @@ func (s *Server) RegisterRouters() {
 
 		// resource
 		resource.NewDomain(s.controllerConfig),
+		resource.NewHost(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
 		resource.NewVM(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
+		resource.NewVInterface(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
 		resource.NewVPC(),
 		resource.NewProcess(s.controllerConfig.RedisCfg),
 	} {

@@ -234,3 +234,34 @@ func NewIN[T comparable](key string, value []interface{}) *IN[T] {
 		},
 	}
 }
+
+// TODO better
+func ConvertValueToSlice[T comparable](value interface{}) []T {
+	result := make([]T, 0)
+	t := reflect.TypeOf(value)
+	switch t.Kind() {
+	case reflect.Slice:
+		switch t.Elem().Kind() {
+		case reflect.Interface:
+			vs := value.([]interface{})
+			if len(vs) == 0 {
+				return result
+			}
+			switch vs[0].(type) {
+			case T:
+				return func(v []interface{}) []T {
+					r := make([]T, len(v))
+					for _, i := range v {
+						r = append(r, i.(T))
+					}
+					return r
+				}(vs)
+			}
+		default:
+			return result
+		}
+	default:
+		return result
+	}
+	return result
+}

@@ -28,29 +28,29 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource"
 )
 
-type VM struct {
+type VInterface struct {
 	httpCfg    httpCfg.Config
 	redisCfg   dbredis.Config
 	fpermitCfg config.FPermit
 }
 
-func NewVM(hCfg httpCfg.Config, rCfg dbredis.Config, fCfg config.FPermit) *VM {
-	return &VM{httpCfg: hCfg, redisCfg: rCfg, fpermitCfg: fCfg}
+func NewVInterface(hCfg httpCfg.Config, rCfg dbredis.Config, fCfg config.FPermit) *VInterface {
+	return &VInterface{httpCfg: hCfg, redisCfg: rCfg, fpermitCfg: fCfg}
 }
 
-func (p *VM) RegisterTo(ge *gin.Engine) {
-	ge.GET(httpcommon.PATH_VM, p.Get)
+func (p *VInterface) RegisterTo(ge *gin.Engine) {
+	ge.GET(httpcommon.PATH_VINTERFACE, p.Get)
 }
 
-func (p *VM) Get(c *gin.Context) {
+func (p *VInterface) Get(c *gin.Context) {
 	header := NewHeaderValidator(c.Request.Header, p.fpermitCfg)
-	query := NewQueryValidator[model.VMQuery](c.Request.URL.Query())
+	query := NewQueryValidator[model.VInterfaceQuery](c.Request.URL.Query())
 
 	if err := NewValidators(header, query).Validate(); err != nil {
 		common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
 		return
 	}
-	service := resource.NewVMGet(
+	service := resource.NewVInterfaceGet(
 		NewURLInfo(
 			c.Request.URL.String(),
 			query.structData,
