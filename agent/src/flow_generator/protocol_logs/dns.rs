@@ -155,18 +155,21 @@ impl L7ProtocolParserInterface for DnsLog {
             return false;
         }
         let mut info = DnsInfo::default();
-        self.parse(payload, param.l4_protocol, &mut info).is_ok()
-            && info.msg_type == LogMessageType::Request
+        self.parse(payload, &mut info, param).is_ok() && info.msg_type == LogMessageType::Request
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         let mut info = DnsInfo::default();
-        self.parse(payload, param.l4_protocol, &mut info)?;
+        self.parse(payload, &mut info, param)?;
         info.cal_rrt(param, None).map(|rrt| {
             info.rrt = rrt;
-            self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
         });
-        Ok(L7ParseResult::Single(L7ProtocolInfo::DnsInfo(info)))
+        if param.parse_log {
+            Ok(L7ParseResult::Single(L7ProtocolInfo::DnsInfo(info)))
+        } else {
+            Ok(L7ParseResult::None)
+        }
     }
 
     fn protocol(&self) -> L7Protocol {
@@ -395,10 +398,10 @@ impl DnsLog {
         if status_code == 0 {
             info.status = L7ResponseStatus::Ok;
         } else if status_code == 1 || status_code == 3 {
-            self.perf_stats.as_mut().unwrap().inc_req_err();
+            self.perf_stats.as_mut().map(|p| p.inc_req_err());
             info.status = L7ResponseStatus::ClientError;
         } else {
-            self.perf_stats.as_mut().unwrap().inc_resp_err();
+            self.perf_stats.as_mut().map(|p| p.inc_resp_err());
             info.status = L7ResponseStatus::ServerError;
         }
     }
@@ -433,18 +436,19 @@ impl DnsLog {
                 g_offset = self.decode_resource_record(payload, g_offset, info)?;
             }
 
-            self.perf_stats.as_mut().unwrap().inc_resp();
+            self.perf_stats.as_mut().map(|p| p.inc_resp());
             self.set_status(code, info);
             info.msg_type = LogMessageType::Response;
         } else {
-            self.perf_stats.as_mut().unwrap().inc_req();
+            self.perf_stats.as_mut().map(|p| p.inc_req());
         }
 
         Ok(())
     }
 
-    fn parse(&mut self, payload: &[u8], proto: IpProtocol, info: &mut DnsInfo) -> Result<()> {
-        if self.perf_stats.is_none() {
+    fn parse(&mut self, payload: &[u8], info: &mut DnsInfo, param: &ParseParam) -> Result<()> {
+        let proto = param.l4_protocol;
+        if self.perf_stats.is_none() && param.parse_perf {
             self.perf_stats = Some(L7PerfStats::default())
         };
         match proto {
@@ -513,7 +517,7 @@ mod tests {
             };
 
             let mut dns = DnsLog::default();
-            let param = &ParseParam::from((packet as &MetaPacket, log_cache.clone(), false));
+            let param = &ParseParam::new(packet as &MetaPacket, log_cache.clone(), true, true);
             let is_dns = dns.check_payload(payload, param);
             dns.reset();
             let info = dns.parse_payload(payload, param);
@@ -594,7 +598,7 @@ mod tests {
             }
             let _ = dns.parse_payload(
                 packet.get_l4_payload().unwrap(),
-                &ParseParam::from((&*packet, rrt_cache.clone(), true)),
+                &ParseParam::new(&*packet, rrt_cache.clone(), true, true),
             );
         }
         dns.perf_stats.unwrap()

@@ -74,8 +74,8 @@ pub(super) fn bench(c: &mut Criterion) {
             }
 
             let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(8)));
-            let req_param = ParseParam::from((&packets[0], rrt_cache.clone(), false));
-            let resp_param = ParseParam::from((&packets[1], rrt_cache.clone(), false));
+            let req_param = ParseParam::new(&packets[0], rrt_cache.clone(), true, true);
+            let resp_param = ParseParam::new(&packets[1], rrt_cache.clone(), true, true);
             let mut parser = HttpLog::new_v1();
 
             let first_dst_port = packets[0].lookup_key.dst_port;

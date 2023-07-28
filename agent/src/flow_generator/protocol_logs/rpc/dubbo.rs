@@ -239,22 +239,20 @@ impl L7ProtocolParserInterface for DubboLog {
         let Some(config) = param.parse_config else {
             return Err(Error::NoParseConfig);
         };
-        if self.perf_stats.is_none() {
+        if self.perf_stats.is_none() && param.parse_perf {
             self.perf_stats = Some(L7PerfStats::default())
         };
         let mut info = DubboInfo::default();
-        self.parse(
-            &config.l7_log_dynamic,
-            payload,
-            param.l4_protocol,
-            param.direction,
-            &mut info,
-        )?;
+        self.parse(&config.l7_log_dynamic, payload, &mut info, param)?;
         info.cal_rrt(param, None).map(|rrt| {
             info.rrt = rrt;
-            self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
         });
-        Ok(L7ParseResult::Single(L7ProtocolInfo::DubboInfo(info)))
+        if param.parse_log {
+            Ok(L7ParseResult::Single(L7ProtocolInfo::DubboInfo(info)))
+        } else {
+            Ok(L7ParseResult::None)
+        }
     }
 
     fn protocol(&self) -> L7Protocol {
@@ -263,12 +261,6 @@ impl L7ProtocolParserInterface for DubboLog {
 
     fn parsable_on_udp(&self) -> bool {
         false
-    }
-
-    fn reset(&mut self) {
-        *self = Self {
-            perf_stats: self.perf_stats.take(),
-        }
     }
 
     fn perf_stats(&mut self) -> Option<L7PerfStats> {
@@ -537,11 +529,11 @@ impl DubboLog {
         info.resp_status = match status_code {
             20 => L7ResponseStatus::Ok,
             30 | 40 | 90 => {
-                self.perf_stats.as_mut().unwrap().inc_req_err();
+                self.perf_stats.as_mut().map(|p| p.inc_req_err());
                 L7ResponseStatus::ClientError
             }
             31 | 50 | 60 | 70 | 80 | 100 => {
-                self.perf_stats.as_mut().unwrap().inc_resp_err();
+                self.perf_stats.as_mut().map(|p| p.inc_resp_err());
                 L7ResponseStatus::ServerError
             }
             _ => L7ResponseStatus::Ok,
@@ -563,13 +555,10 @@ impl DubboLog {
         &mut self,
         config: &L7LogDynamicConfig,
         payload: &[u8],
-        proto: IpProtocol,
-        direction: PacketDirection,
         info: &mut DubboInfo,
+        param: &ParseParam,
     ) -> Result<()> {
-        if proto != IpProtocol::Tcp {
-            return Err(Error::InvalidIpProtocol);
-        }
+        let direction = param.direction;
 
         let mut dubbo_header = DubboHeader::default();
         dubbo_header.parse_headers(payload)?;
@@ -577,11 +566,11 @@ impl DubboLog {
         match direction {
             PacketDirection::ClientToServer => {
                 self.request(&config, payload, &dubbo_header, info);
-                self.perf_stats.as_mut().unwrap().inc_req();
+                self.perf_stats.as_mut().map(|p| p.inc_req());
             }
             PacketDirection::ServerToClient => {
                 self.response(&dubbo_header, info);
-                self.perf_stats.as_mut().unwrap().inc_resp();
+                self.perf_stats.as_mut().map(|p| p.inc_resp());
             }
         }
         Ok(())
@@ -710,8 +699,8 @@ mod tests {
                 ..Default::default()
             };
             let mut dubbo = DubboLog::default();
-            let param =
-                &ParseParam::from((packet as &MetaPacket, log_cache.clone(), false, &config));
+            let param = &mut ParseParam::new(packet as &MetaPacket, log_cache.clone(), true, true);
+            param.set_log_parse_config(&config);
             let is_dubbo = dubbo.check_payload(payload, param);
 
             let i = dubbo.parse_payload(payload, param);
@@ -805,11 +794,10 @@ mod tests {
             } else {
                 packet.lookup_key.direction = PacketDirection::ServerToClient;
             }
+            let param = &mut ParseParam::new(&*packet, rrt_cache.clone(), true, true);
+            param.set_log_parse_config(&config);
             if packet.get_l4_payload().is_some() {
-                let _ = dubbo.parse_payload(
-                    packet.get_l4_payload().unwrap(),
-                    &ParseParam::from((&*packet, rrt_cache.clone(), true, &config)),
-                );
+                let _ = dubbo.parse_payload(packet.get_l4_payload().unwrap(), param);
             }
         }
         dubbo.perf_stats.unwrap()

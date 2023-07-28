@@ -186,12 +186,12 @@ impl L7ProtocolParserInterface for PostgresqlLog {
             return Ok(L7ParseResult::None);
         }
 
-        if self.perf_stats.is_none() {
+        if self.perf_stats.is_none() && param.parse_perf {
             self.perf_stats = Some(L7PerfStats::default())
         };
 
         self.parse(payload, param, false, &mut info)?;
-        Ok(if info.ignore {
+        Ok(if info.ignore || !param.parse_log {
             L7ParseResult::None
         } else {
             L7ParseResult::Single(L7ProtocolInfo::PostgreInfo(info))
@@ -258,7 +258,7 @@ impl PostgresqlLog {
             if !info.ignore && !check {
                 info.cal_rrt(param, None).map(|rrt| {
                     info.rrt = rrt;
-                    self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+                    self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
                 });
             }
             return Ok(());
@@ -285,7 +285,7 @@ impl PostgresqlLog {
                 info.context = strip_string_end_with_zero(data)?;
                 info.ignore = false;
                 if !check {
-                    self.perf_stats.as_mut().unwrap().inc_req();
+                    self.perf_stats.as_mut().map(|p| p.inc_req());
                 }
                 Ok(true)
             }
@@ -305,7 +305,7 @@ impl PostgresqlLog {
                         info.context = String::from_utf8_lossy(&data[..idx]).to_string();
                         if is_postgresql(&info.context) {
                             if !check {
-                                self.perf_stats.as_mut().unwrap().inc_req();
+                                self.perf_stats.as_mut().map(|p| p.inc_req());
                             }
                             return Ok(true);
                         }
@@ -360,7 +360,7 @@ impl PostgresqlLog {
                     info.affected_rows = row_eff.parse().unwrap_or(0);
                 }
                 if !check {
-                    self.perf_stats.as_mut().unwrap().inc_resp();
+                    self.perf_stats.as_mut().map(|p| p.inc_resp());
                 }
                 Ok(true)
             }
@@ -395,14 +395,14 @@ impl PostgresqlLog {
                     if !check {
                         match info.status {
                             L7ResponseStatus::ClientError => {
-                                self.perf_stats.as_mut().unwrap().inc_req_err();
+                                self.perf_stats.as_mut().map(|p| p.inc_req_err());
                             }
                             L7ResponseStatus::ServerError => {
-                                self.perf_stats.as_mut().unwrap().inc_resp_err();
+                                self.perf_stats.as_mut().map(|p| p.inc_resp_err());
                             }
                             _ => {}
                         }
-                        self.perf_stats.as_mut().unwrap().inc_resp();
+                        self.perf_stats.as_mut().map(|p| p.inc_resp());
                     }
                     return Ok(true);
                 }
@@ -543,7 +543,7 @@ mod test {
         p[1].lookup_key.direction = PacketDirection::ServerToClient;
 
         let mut parser = PostgresqlLog::default();
-        let req_param = &mut ParseParam::from((&p[0], log_cache.clone(), false));
+        let req_param = &mut ParseParam::new(&p[0], log_cache.clone(), true, true);
         let req_payload = p[0].get_l4_payload().unwrap();
         assert_eq!((&mut parser).check_payload(req_payload, req_param), true);
         let info = (&mut parser).parse_payload(req_payload, req_param).unwrap();
@@ -551,7 +551,7 @@ mod test {
 
         (&mut parser).reset();
 
-        let resp_param = &ParseParam::from((&p[1], log_cache.clone(), false));
+        let resp_param = &ParseParam::new(&p[1], log_cache.clone(), true, true);
         let resp_payload = p[1].get_l4_payload().unwrap();
         assert_eq!((&mut parser).check_payload(resp_payload, resp_param), false);
         let resp = (&mut parser)

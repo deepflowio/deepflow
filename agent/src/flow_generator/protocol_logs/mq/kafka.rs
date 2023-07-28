@@ -232,7 +232,7 @@ impl L7ProtocolParserInterface for KafkaLog {
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
-        if self.perf_stats.is_none() {
+        if self.perf_stats.is_none() && param.parse_perf {
             self.perf_stats = Some(L7PerfStats::default())
         };
         let mut info = KafkaInfo::default();
@@ -284,9 +284,13 @@ impl L7ProtocolParserInterface for KafkaLog {
         )
         .map(|rrt| {
             info.rrt = rrt;
-            self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
         });
-        Ok(L7ParseResult::Single(L7ProtocolInfo::KafkaInfo(info)))
+        if param.parse_log {
+            Ok(L7ParseResult::Single(L7ProtocolInfo::KafkaInfo(info)))
+        } else {
+            Ok(L7ParseResult::None)
+        }
     }
 
     fn protocol(&self) -> L7Protocol {
@@ -356,11 +360,11 @@ impl KafkaLog {
         match direction {
             PacketDirection::ClientToServer => {
                 self.request(payload, false, info)?;
-                self.perf_stats.as_mut().unwrap().inc_req();
+                self.perf_stats.as_mut().map(|p| p.inc_req());
             }
             PacketDirection::ServerToClient => {
                 self.response(payload, info)?;
-                self.perf_stats.as_mut().unwrap().inc_resp();
+                self.perf_stats.as_mut().map(|p| p.inc_resp());
             }
         }
         Ok(())
@@ -389,7 +393,7 @@ impl KafkaLog {
                 info.status = L7ResponseStatus::Ok;
             } else {
                 info.status = L7ResponseStatus::ServerError;
-                self.perf_stats.as_mut().unwrap().inc_resp_err();
+                self.perf_stats.as_mut().map(|p| p.inc_resp_err());
             }
         }
     }
@@ -433,7 +437,7 @@ mod tests {
             };
 
             let mut kafka = KafkaLog::default();
-            let param = &ParseParam::from((packet as &MetaPacket, log_cache.clone(), false));
+            let param = &ParseParam::new(packet as &MetaPacket, log_cache.clone(), true, true);
 
             let is_kafka = kafka.check_payload(payload, param);
             let info = kafka.parse_payload(payload, param);
@@ -530,7 +534,7 @@ mod tests {
             if packet.get_l4_payload().is_some() {
                 let _ = kafka.parse_payload(
                     packet.get_l4_payload().unwrap(),
-                    &ParseParam::from((&*packet, rrt_cache.clone(), true)),
+                    &ParseParam::new(&*packet, rrt_cache.clone(), true, true),
                 );
             }
         }

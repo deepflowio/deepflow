@@ -53,10 +53,9 @@ impl L7ProtocolParserInterface for WasmLog {
         let Some(vm) = param.wasm_vm.as_ref() else {
             return Err(Error::WasmParseFail);
         };
-        if self.perf_stats.is_none() {
+        if self.perf_stats.is_none() && param.parse_perf {
             self.perf_stats = Some(L7PerfStats::default());
         }
-        let perf_stats = self.perf_stats.as_mut().unwrap();
         let mut vm = vm.borrow_mut();
 
         if let Some(infos) = vm.on_parse_payload(payload, param, self.proto_num.unwrap()) {
@@ -66,23 +65,27 @@ impl L7ProtocolParserInterface for WasmLog {
                     i.proto = self.proto_num.unwrap();
                     i.proto_str = self.proto_str.clone();
                     match i.resp.status {
-                        L7ResponseStatus::ServerError => perf_stats.inc_req_err(),
-                        L7ResponseStatus::ClientError => perf_stats.inc_resp_err(),
+                        L7ResponseStatus::ServerError => {
+                            self.perf_stats.as_mut().map(|p| p.inc_req_err());
+                        }
+                        L7ResponseStatus::ClientError => {
+                            self.perf_stats.as_mut().map(|p| p.inc_resp_err());
+                        }
                         _ => {}
                     }
 
                     match param.direction {
                         PacketDirection::ClientToServer => {
-                            perf_stats.inc_req();
+                            self.perf_stats.as_mut().map(|p| p.inc_req());
                         }
                         PacketDirection::ServerToClient => {
-                            perf_stats.inc_resp();
+                            self.perf_stats.as_mut().map(|p| p.inc_resp());
                         }
                     }
                     i.msg_type = param.direction.into();
                     i.cal_rrt(param, None).map(|rrt| {
                         i.rrt = rrt;
-                        perf_stats.update_rrt(rrt);
+                        self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
                     });
                     L7ProtocolInfo::CustomInfo(i)
                 })

@@ -356,7 +356,7 @@ impl L7ProtocolParserInterface for HttpLog {
 
         let mut info = HttpInfo::default();
 
-        if self.perf_stats.is_none() {
+        if self.perf_stats.is_none() && param.parse_perf {
             self.perf_stats = Some(L7PerfStats::default())
         };
         // http2 有两个版本, 现在可以直接通过proto区分解析哪个版本的协议.
@@ -386,28 +386,35 @@ impl L7ProtocolParserInterface for HttpLog {
         info.proto = self.proto;
         info.is_tls = param.is_tls();
 
-        if self.perf_stats.is_none() {
+        if self.perf_stats.is_none() && param.parse_perf {
             self.perf_stats = Some(L7PerfStats::default())
         };
 
         match self.proto {
             L7Protocol::Http1 => {
                 self.parse_http_v1(payload, param, &mut info)?;
-                if !param.perf_only {
+                if param.parse_log {
                     self.wasm_hook(param, payload, &mut info);
                 }
             }
             L7Protocol::Http2 | L7Protocol::Grpc => match param.ebpf_type {
                 EbpfType::GoHttp2Uprobe => {
                     self.parse_http2_go_uprobe(&config.l7_log_dynamic, payload, param, &mut info)?;
-                    return Ok(L7ParseResult::Single(L7ProtocolInfo::HttpInfo(info)));
+                    if param.parse_log {
+                        return Ok(L7ParseResult::Single(L7ProtocolInfo::HttpInfo(info)));
+                    } else {
+                        return Ok(L7ParseResult::None);
+                    }
                 }
                 _ => self.parse_http_v2(payload, param, &mut info)?,
             },
             _ => unreachable!(),
         }
-
-        Ok(L7ParseResult::Single(L7ProtocolInfo::HttpInfo(info)))
+        if param.parse_log {
+            Ok(L7ParseResult::Single(L7ProtocolInfo::HttpInfo(info)))
+        } else {
+            Ok(L7ParseResult::None)
+        }
     }
 
     fn protocol(&self) -> L7Protocol {
@@ -479,13 +486,13 @@ impl HttpLog {
             && status_code <= HTTP_STATUS_CLIENT_ERROR_MAX
         {
             // http客户端请求存在错误
-            self.perf_stats.as_mut().unwrap().inc_req_err();
+            self.perf_stats.as_mut().map(|p| p.inc_req_err());
             info.status = L7ResponseStatus::ClientError;
         } else if status_code >= HTTP_STATUS_SERVER_ERROR_MIN
             && status_code <= HTTP_STATUS_SERVER_ERROR_MAX
         {
             // http服务端响应存在错误
-            self.perf_stats.as_mut().unwrap().inc_resp_err();
+            self.perf_stats.as_mut().map(|p| p.inc_resp_err());
             info.status = L7ResponseStatus::ServerError;
         } else {
             info.status = L7ResponseStatus::Ok;
@@ -553,16 +560,16 @@ impl HttpLog {
         }
 
         if info.is_req_end {
-            self.perf_stats.as_mut().unwrap().inc_req();
+            self.perf_stats.as_mut().map(|p| p.inc_req());
         }
         if info.is_resp_end {
-            self.perf_stats.as_mut().unwrap().inc_resp();
+            self.perf_stats.as_mut().map(|p| p.inc_resp());
         }
 
         if info.is_req_end || info.is_resp_end {
             info.cal_rrt(param, None).map(|rrt| {
                 info.rrt = rrt;
-                self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+                self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
             });
         }
 
@@ -599,7 +606,7 @@ impl HttpLog {
 
             info.msg_type = LogMessageType::Response;
 
-            self.perf_stats.as_mut().unwrap().inc_resp();
+            self.perf_stats.as_mut().map(|p| p.inc_resp());
             self.set_status(status_code, info);
         } else {
             // HTTP请求行：GET /background.png HTTP/1.0
@@ -612,15 +619,15 @@ impl HttpLog {
             info.version = get_http_request_version(version)?.to_owned();
 
             info.msg_type = LogMessageType::Request;
-            self.perf_stats.as_mut().unwrap().inc_req();
+            self.perf_stats.as_mut().map(|p| p.inc_req());
         }
 
         info.cal_rrt(param, None).map(|rrt| {
             info.rrt = rrt;
-            self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
         });
 
-        if param.perf_only {
+        if !param.parse_log {
             return Ok(());
         }
         let mut content_length: Option<u32> = None;
@@ -790,7 +797,7 @@ impl HttpLog {
                 if check_http_method(&info.method).is_err() {
                     return Err(Error::HttpHeaderParseFailed);
                 }
-                self.perf_stats.as_mut().unwrap().inc_req();
+                self.perf_stats.as_mut().map(|p| p.inc_req());
                 info.req_content_length = content_length;
             } else {
                 if let Some(code) = info.status_code {
@@ -801,7 +808,7 @@ impl HttpLog {
                 } else {
                     return Err(Error::HttpHeaderParseFailed);
                 }
-                self.perf_stats.as_mut().unwrap().inc_resp();
+                self.perf_stats.as_mut().map(|p| p.inc_resp());
                 info.resp_content_length = content_length;
             }
             info.version = String::from("2");
@@ -810,7 +817,7 @@ impl HttpLog {
             }
             info.cal_rrt(param, None).map(|rrt| {
                 info.rrt = rrt;
-                self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+                self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
             });
             return Ok(());
         }
@@ -1257,12 +1264,8 @@ mod tests {
             span_set.insert(TraceType::Sw8.to_checker_string());
             let mut http1 = HttpLog::new_v1();
             let mut http2 = HttpLog::new_v2(false);
-            let param = &ParseParam::from((
-                packet as &MetaPacket,
-                log_cache.clone(),
-                false,
-                parse_config,
-            ));
+            let param = &mut ParseParam::new(packet as &MetaPacket, log_cache.clone(), true, true);
+            param.set_log_parse_config(parse_config);
 
             let get_http_info = |i: L7ProtocolInfo| match i {
                 L7ProtocolInfo::HttpInfo(mut h) => {
@@ -1355,7 +1358,8 @@ mod tests {
             }),
             packet_seq: 0,
             time: 0,
-            perf_only: false,
+            parse_perf: true,
+            parse_log: true,
             parse_config: Some(&conf),
             l7_perf_cache: Rc::new(RefCell::new(L7PerfCache::new(1))),
             wasm_vm: None,
@@ -1545,8 +1549,8 @@ mod tests {
                 packet.lookup_key.direction = PacketDirection::ServerToClient;
             }
             if packet.get_l4_payload().is_some() {
-                let param = &ParseParam::from((&*packet, rrt_cache.clone(), true, &config));
-
+                let param = &mut ParseParam::new(&*packet, rrt_cache.clone(), true, true);
+                param.set_log_parse_config(&config);
                 let _ = http.parse_payload(packet.get_l4_payload().unwrap(), param);
             }
         }
