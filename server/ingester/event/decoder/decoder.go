@@ -408,6 +408,7 @@ func (d *Decoder) writeAlarmEvent(event *alarm_event.AlarmEvent) {
 	s.TriggerValue = event.GetTriggerValue()
 	s.ValueUnit = event.GetValueUnit()
 	s.EventLevel = event.GetEventLevel()
+	s.AlarmTarget = event.GetAlarmTarget()
 
 	d.eventWriter.WriteAlarmEvent(s)
 }
