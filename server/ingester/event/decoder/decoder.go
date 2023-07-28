@@ -25,6 +25,7 @@ import (
 
 	logging "github.com/op/go-logging"
 
+	"github.com/deepflowio/deepflow/message/alarm_event"
 	"github.com/deepflowio/deepflow/message/trident"
 	ingestercommon "github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/event/common"
@@ -123,30 +124,41 @@ func (d *Decoder) Run() {
 			case common.RESOURCE_EVENT:
 				event, ok := buffer[i].(*eventapi.ResourceEvent)
 				if !ok {
-					log.Warning("get decode queue data type wrong")
+					log.Warning("get resoure event decode queue data type wrong")
 					continue
 				}
 				d.handleResourceEvent(event)
 				event.Release()
-			case common.PROC_EVENT:
+			case common.PERF_EVENT:
 				if buffer[i] == nil {
 					continue
 				}
-				d.counter.InCount++
 				recvBytes, ok := buffer[i].(*receiver.RecvBuffer)
 				if !ok {
-					log.Warning("get decode queue data type wrong")
+					log.Warning("get proc event decode queue data type wrong")
 					continue
 				}
 				decoder.Init(recvBytes.Buffer[recvBytes.Begin:recvBytes.End])
-				d.handleProcEvent(recvBytes.VtapID, decoder)
+				d.handlePerfEvent(recvBytes.VtapID, decoder)
+				receiver.ReleaseRecvBuffer(recvBytes)
+			case common.ALARM_EVENT:
+				if buffer[i] == nil {
+					continue
+				}
+				recvBytes, ok := buffer[i].(*receiver.RecvBuffer)
+				if !ok {
+					log.Warning("get alarm event decode queue data type wrong")
+					continue
+				}
+				decoder.Init(recvBytes.Buffer[recvBytes.Begin:recvBytes.End])
+				d.handleAlarmEvent(decoder)
 				receiver.ReleaseRecvBuffer(recvBytes)
 			}
 		}
 	}
 }
 
-func (d *Decoder) WriteProcEvent(vtapId uint16, e *pb.ProcEvent) {
+func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 	s := dbwriter.AcquireEventStore()
 	s.HasMetrics = true
 	s.Time = uint32(time.Duration(e.StartTime) / time.Second)
@@ -208,7 +220,7 @@ func (d *Decoder) WriteProcEvent(vtapId uint16, e *pb.ProcEvent) {
 	d.eventWriter.Write(s)
 }
 
-func (d *Decoder) handleProcEvent(vtapId uint16, decoder *codec.SimpleDecoder) {
+func (d *Decoder) handlePerfEvent(vtapId uint16, decoder *codec.SimpleDecoder) {
 	for !decoder.IsEnd() {
 		bytes := decoder.ReadBytes()
 		if decoder.Failed() {
@@ -218,15 +230,16 @@ func (d *Decoder) handleProcEvent(vtapId uint16, decoder *codec.SimpleDecoder) {
 			d.counter.ErrorCount++
 			return
 		}
-		pbProcEvent := &pb.ProcEvent{}
-		if err := pbProcEvent.Unmarshal(bytes); err != nil {
+		pbPerfEvent := &pb.ProcEvent{}
+		if err := pbPerfEvent.Unmarshal(bytes); err != nil {
 			if d.counter.ErrorCount == 0 {
 				log.Errorf("proc event unmarshal failed, err: %s", err)
 			}
 			d.counter.ErrorCount++
 			continue
 		}
-		d.WriteProcEvent(vtapId, pbProcEvent)
+		d.counter.OutCount++
+		d.WritePerfEvent(vtapId, pbPerfEvent)
 	}
 }
 
@@ -346,5 +359,55 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 			s.L3EpcID,
 		)
 
+	d.counter.OutCount++
 	d.eventWriter.Write(s)
+}
+
+func (d *Decoder) handleAlarmEvent(decoder *codec.SimpleDecoder) {
+	for !decoder.IsEnd() {
+		bytes := decoder.ReadBytes()
+		if decoder.Failed() {
+			if d.counter.ErrorCount == 0 {
+				log.Errorf("alarm event decode failed, offset=%d len=%d", decoder.Offset(), len(decoder.Bytes()))
+			}
+			d.counter.ErrorCount++
+			return
+		}
+		pbAlarmEvent := &alarm_event.AlarmEvent{}
+		if err := pbAlarmEvent.Unmarshal(bytes); err != nil {
+			if d.counter.ErrorCount == 0 {
+				log.Errorf("alarm event unmarshal failed, err: %s", err)
+			}
+			d.counter.ErrorCount++
+			continue
+		}
+		d.counter.OutCount++
+		d.writeAlarmEvent(pbAlarmEvent)
+	}
+}
+
+func (d *Decoder) writeAlarmEvent(event *alarm_event.AlarmEvent) {
+	s := dbwriter.AcquireAlarmEventStore()
+	s.Time = event.GetTimestamp()
+	s.Lcuuid = event.GetLcuuid()
+	s.User = event.GetUser()
+
+	s.PolicyId = event.GetPolicyId()
+	s.PolicyName = event.GetPolicyName()
+	s.PolicyLevel = event.GetPolicyLevel()
+	s.PolicyAppType = event.GetPolicyAppType()
+	s.PolicySubType = event.GetPolicySubType()
+	s.PolicyContrastType = event.GetPolicyContrastType()
+	s.PolicyDataLevel = event.GetPolicyDataLevel()
+	s.PolicyTargetUid = event.GetPolicyTargetUid()
+	s.PolicyTargetName = event.GetPolicyTargetName()
+	s.PolicyGoTo = event.GetPolicyGoTo()
+	s.PolicyTargetField = event.GetPolicyTargetField()
+	s.PolicyEndpoints = event.GetPolicyEndpoints()
+	s.TriggerCondition = event.GetTriggerCondition()
+	s.TriggerValue = event.GetTriggerValue()
+	s.ValueUnit = event.GetValueUnit()
+	s.EventLevel = event.GetEventLevel()
+
+	d.eventWriter.WriteAlarmEvent(s)
 }

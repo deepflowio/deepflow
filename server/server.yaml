@@ -369,8 +369,11 @@ ingester:
   #  batch-size: 25600   # 多少行数据同时写入
   #  flush-timeout: 5   # 超时写入时间
 
-  ## event database data retention time(unit: hour)
+  ## resource event table data retention time(unit: hour)
   #event-ttl-hour: 720
+
+  ## alarm event table data retention time(unit: hour)
+  #alarm-event-ttl-hour: 720
 
   ## perf event data write config
   #perf-event-ck-writer:
@@ -379,7 +382,7 @@ ingester:
   #  batch-size: 25600   # 多少行数据同时写入
   #  flush-timeout: 5    # 超时写入时间
 
-  ## perf event database data retention time(unit: hour)
+  ## perf event table data retention time(unit: hour)
   #perf-event-ttl-hour: 168
 
   ## pcap data write config
@@ -426,9 +429,10 @@ ingester:
   ## prometheus label request/response msg max size (unit: bytes)
   #prometheus-label-msg-max-size: 104857600
 
-  # when prometheus requests labels, how many metric batch requests
+  ## when prometheus requests labels, how many metric batch requests
   #prometheus-label-request-metric-batch-count: 128
   #prometheus-app-label-column-increment: 4
+  #prometheus-app-label-column-min-count: 8
 
   ## Whether to ignore the writing of Universal Tag, the default is false, which means writing
   #prometheus-sample-ignore-universal-tag: false
@@ -492,7 +496,7 @@ ingester:
   ## size of unmarshall queue, defaults to 10240
   #unmarshall-queue-size: 10240
 
-  ## writer all queue limit max size
+  ## the maximum threshold for processing l4/l7 flow logs per second.(threshold for each flow log)
   #throttle: 50000
 
   ## 分别控制l4流日志, l7流日志，默认值为0，表示使用throttle的设置值.若非0，则使用设置值

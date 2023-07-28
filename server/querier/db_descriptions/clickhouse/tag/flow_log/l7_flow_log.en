@@ -82,7 +82,8 @@ trace_id                  , TraceID                       ,
 span_id                   , SpanID                        ,
 parent_span_id            , ParentSpanID                  ,
 span_kind                 , Span Kind                     , From OpenTelemetry.
-x_request_id              , X-Request-ID                  ,
+x_request_id_0            , Request X-Request-ID          ,
+x_request_id_1            , Response X-Request-ID         ,
 http_proxy_client         , HTTP Client IP                , Real client IP before proxy translate.
 syscall_trace_id_request  , Req Syscall TraceID           ,
 syscall_trace_id_response , Resp Syscall TraceID          ,

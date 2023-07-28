@@ -349,6 +349,9 @@ impl FlowAggr {
                 Ok(_) => {
                     let config = self.config.load();
                     for tagged_flow in batch.drain(..) {
+                        if config.l4_log_ignore_tap_sides[tagged_flow.flow.tap_side as usize] {
+                            continue;
+                        }
                         if config.l4_log_store_tap_types[u16::from(TapType::Any) as usize]
                             || config.l4_log_store_tap_types
                                 [u16::from(tagged_flow.flow.flow_key.tap_type) as usize]

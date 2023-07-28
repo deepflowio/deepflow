@@ -35,6 +35,7 @@ const (
 	DefaultLabelMsgMaxSize              = 100 << 20 // 100M
 	DefaultLabelRequestMetricBatchCount = 128
 	DefaultAppLabelColumnIncrement      = 4
+	DefaultAppLabelColumnMinCount       = 8
 )
 
 type Config struct {
@@ -46,6 +47,7 @@ type Config struct {
 	LabelMsgMaxSize              int                   `yaml:"prometheus-label-msg-max-size"`
 	LabelRequestMetricBatchCount int                   `yaml:"prometheus-label-request-metric-batch-count"`
 	AppLabelColumnIncrement      int                   `yaml:"prometheus-app-label-column-increment"`
+	AppLabelColumnMinCount       int                   `yaml:"prometheus-app-label-column-min-count"`
 	IgnoreUniversalTag           bool                  `yaml:"prometheus-sample-ignore-universal-tag"`
 }
 
@@ -69,6 +71,9 @@ func (c *Config) Validate() error {
 	if c.AppLabelColumnIncrement <= 0 {
 		c.AppLabelColumnIncrement = DefaultAppLabelColumnIncrement
 	}
+	if c.AppLabelColumnMinCount <= 0 {
+		c.AppLabelColumnMinCount = DefaultAppLabelColumnMinCount
+	}
 
 	return nil
 }
@@ -84,6 +89,7 @@ func Load(base *config.Config, path string) *Config {
 			LabelMsgMaxSize:              DefaultLabelMsgMaxSize,
 			LabelRequestMetricBatchCount: DefaultLabelRequestMetricBatchCount,
 			AppLabelColumnIncrement:      DefaultAppLabelColumnIncrement,
+			AppLabelColumnMinCount:       DefaultAppLabelColumnMinCount,
 		},
 	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {

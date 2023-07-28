@@ -62,15 +62,23 @@ func (td *hostToolData) init() *hostToolData {
 }
 
 func (td *hostToolData) load() (err error) {
-	err = mysql.Db.Find(&td.hosts).Error
+	td.hosts, err = GetAll[mysql.Host]()
+	if err != nil {
+		return err
+	}
 
-	var domains []mysql.Domain
-	err = mysql.Db.Select("lcuuid", "name").Find(&domains).Error
+	domains, err := Select[mysql.Domain]([]string{"lcuuid", "name"})
+	if err != nil {
+		return err
+	}
 	for _, item := range domains {
 		td.domainLcuuidToName[item.Lcuuid] = item.Name
 	}
-	var regions []mysql.Region
-	err = mysql.Db.Select("lcuuid", "name").Find(&regions).Error
+
+	regions, err := Select[mysql.Region]([]string{"lcuuid", "name"})
+	if err != nil {
+		return err
+	}
 	for _, item := range regions {
 		td.regionLcuuidToName[item.Lcuuid] = item.Name
 	}

@@ -69,6 +69,7 @@ func (c *client) get(key string) ([]common.ResponseElem, error) {
 }
 
 func (c *client) set(key string, data []common.ResponseElem) error {
+	log.Infof("redis set data, key: %s", key)
 	strCache, err := json.Marshal(data)
 	if err != nil {
 		return err

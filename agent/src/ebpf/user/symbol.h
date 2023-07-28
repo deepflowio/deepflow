@@ -154,7 +154,7 @@ uint64_t get_symbol_addr_from_binary(const char *bin, const char *symname);
 u64 get_pid_stime_and_name(pid_t pid, char *name);
 
 #ifndef AARCH64_MUSL
-void *get_symbol_cache(pid_t pid);
+void *get_symbol_cache(pid_t pid, bool new_cache);
 int create_and_init_symbolizer_caches(void);
 void release_symbol_caches(void);
 u64 get_pid_stime(pid_t pid);

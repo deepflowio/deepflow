@@ -63,6 +63,24 @@ static const char *k_err_tag = "[kernel stack trace error]";
 static const char *u_err_tag = "[user stack trace error]";
 static const char *lost_tag = "[stack trace lost]";
 
+/*
+ * To track the scenario where stack data is missing in the eBPF
+ * 'stack_map_*' table. This typically occurs due to the design of
+ * a double-buffered structure, where in one iteration of the
+ * perf buffer, some stack data remains unread, and during the
+ * current iteration, while processing this leftover data, it is
+ * discovered that the corresponding stack data has been cleared
+ * from the 'stack_map_*' table by the previous iteration, resulting
+ * in the loss of stack data. This situation is rare and difficult
+ * to occur.
+ */
+static u64 stack_table_data_miss;
+
+u64 get_stack_table_data_miss_count(void)
+{
+	return stack_table_data_miss;
+}
+
 int init_stack_str_hash(stack_str_hash_t * h, const char *name)
 {
 	memset(h, 0, sizeof(*h));
@@ -169,7 +187,7 @@ static char *symbol_name_fetch(pid_t pid, struct bcc_symbol *sym)
 	return ptr;
 }
 
-static char *resolve_addr(pid_t pid, u64 address)
+static char *resolve_addr(pid_t pid, u64 address, bool is_create)
 {
 	ASSERT(pid >= 0);
 
@@ -177,7 +195,7 @@ static char *resolve_addr(pid_t pid, u64 address)
 	char *ptr = NULL;
 	char format_str[32];
 	struct bcc_symbol sym;
-	void *resolver = get_symbol_cache(pid);
+	void *resolver = get_symbol_cache(pid, is_create);
 	if (resolver == NULL)
 		goto resolver_err;
 
@@ -239,7 +257,6 @@ static int get_stack_ips(struct bpf_tracer *t,
 	ASSERT(stack_id >= 0);
 
 	if (!bpf_table_get_value(t, stack_map_name, stack_id, (void *)ips)) {
-		ebpf_warning("Get map '%s' failed.\n", stack_map_name);
 		return ETR_NOTEXIST;
 	}
 
@@ -249,7 +266,10 @@ static int get_stack_ips(struct bpf_tracer *t,
 static char *build_stack_trace_string(struct bpf_tracer *t,
 				      const char *stack_map_name,
 				      pid_t pid,
-				      int stack_id, stack_str_hash_t *h)
+				      int stack_id,
+				      stack_str_hash_t *h,
+				      bool new_cache,
+				      int *ret_val)
 {
 	ASSERT(pid >= 0 && stack_id >= 0);
 
@@ -264,14 +284,15 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 
 	u64 ips[PERF_MAX_STACK_DEPTH];
 	memset(ips, 0, sizeof(ips));
-	if (get_stack_ips(t, stack_map_name, stack_id, ips)) {
-		ebpf_warning("Not get stack ips, pid %d map %s stack_id %u\n",
-			     pid, stack_map_name, stack_id);
+	int ret;
+	if ((ret = get_stack_ips(t, stack_map_name, stack_id, ips))) {
+		stack_table_data_miss++;
+		*ret_val = ret;
 		return NULL;
 	}
 
 	char *str = NULL;
-	int ret = VEC_OK;
+	ret = VEC_OK;
 	uword *symbol_array = NULL;
 	vec_validate_init_empty(symbol_array, PERF_MAX_STACK_DEPTH, 0, ret);
 	if (ret != VEC_OK)
@@ -282,7 +303,7 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 		if (ips[i] == 0 || ips[i] == sentinel_addr)
 			continue;
 
-		str = resolve_addr(pid, ips[i]);
+		str = resolve_addr(pid, ips[i], new_cache);
 		if (str) {
 			symbol_array[i] = pointer_to_uword(str);
 			folded_size += strlen(str);
@@ -328,7 +349,8 @@ folded_stack_trace_string(struct bpf_tracer *t,
 			  int stack_id,
 			  pid_t pid,
 			  const char *stack_map_name,
-			  stack_str_hash_t *h)
+			  stack_str_hash_t *h,
+			  bool new_cache)
 {
 	ASSERT(pid >= 0 && stack_id >= 0);
 
@@ -345,7 +367,12 @@ folded_stack_trace_string(struct bpf_tracer *t,
 	}
 
 	char *str = NULL;
-	str = build_stack_trace_string(t, stack_map_name, pid, stack_id, h);
+	int ret_val = 0;
+	str = build_stack_trace_string(t, stack_map_name, pid, stack_id,
+				       h, new_cache, &ret_val);
+
+	if (ret_val == ETR_NOTEXIST)
+		return NULL;
 
 	/*
 	 * The stringifier clears stack-ids out of the stack traces table
@@ -358,6 +385,9 @@ folded_stack_trace_string(struct bpf_tracer *t,
 		    ("stack_map_name %s, delete failed, stack-ID %d\n",
 		     stack_map_name, stack_id);
 	}
+
+	if (str == NULL)
+		return NULL;
 
 	kv.key = (u64) stack_id;
 	kv.value = pointer_to_uword(str);
@@ -399,7 +429,8 @@ char *
 resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 				struct stack_trace_key_t *v,
 				const char *stack_map_name,
-				stack_str_hash_t *h)
+				stack_str_hash_t *h,
+				bool new_cache)
 {
 	/*
 	 * We need to prepare a hashtable (stack_trace_strs) to record the results
@@ -424,14 +455,14 @@ resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	if (v->kernstack >= 0) {
 		k_trace_str = folded_stack_trace_string(t, v->kernstack,
 							0, stack_map_name,
-							h);
+							h, new_cache);
 	}
 
 	if (v->userstack >= 0) {
 		u_trace_str = folded_stack_trace_string(t, v->userstack,
 							v->tgid,
 							stack_map_name,
-							h);
+							h, new_cache);
 	}
 
 	/* trace_str = u_stack_str_fn() + ";" + k_stack_str_fn(); */

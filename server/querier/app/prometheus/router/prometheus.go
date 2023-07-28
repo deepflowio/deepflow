@@ -49,6 +49,7 @@ func adaptPromQuery(svc *service.PrometheusService, router string) gin.HandlerFu
 			args := model.PromQueryParams{
 				StartTime: c.Request.FormValue("time_start"),
 				EndTime:   c.Request.FormValue("time_end"),
+				Slimit:    c.Request.FormValue("SLIMIT"),
 				Context:   c.Request.Context(),
 			}
 			query := c.Request.FormValue("query")
@@ -70,10 +71,10 @@ func adaptPromQuery(svc *service.PrometheusService, router string) gin.HandlerFu
 			}
 		}
 		if err != nil {
-			c.JSON(500, &model.PromQueryResponse{Error: err.Error(), Status: _STATUS_FAIL})
+			c.JSON(500, svc.PromQLAdapter(&model.PromQueryResponse{Error: err.Error(), Status: _STATUS_FAIL}))
 			return
 		}
-		c.JSON(200, result)
+		c.JSON(200, svc.PromQLAdapter(result))
 	})
 }
 
@@ -88,6 +89,7 @@ func promQuery(svc *service.PrometheusService) gin.HandlerFunc {
 		// ref: https://github.com/prometheus/prometheus/blob/main/prompb/types.proto#L157
 		args.StartTime = c.Request.FormValue("time")
 		args.EndTime = c.Request.FormValue("time")
+		args.Slimit = c.Request.FormValue("slimit")
 		debug := c.Request.FormValue("debug")
 		args.Debug, _ = strconv.ParseBool(debug)
 		result, err := svc.PromInstantQueryService(&args, c.Request.Context())
@@ -107,6 +109,7 @@ func promQueryRange(svc *service.PrometheusService) gin.HandlerFunc {
 		args.StartTime = c.Request.FormValue("start")
 		args.EndTime = c.Request.FormValue("end")
 		args.Step = c.Request.FormValue("step")
+		args.Slimit = c.Request.FormValue("slimit")
 		debug := c.Request.FormValue("debug")
 		args.Debug, _ = strconv.ParseBool(debug)
 

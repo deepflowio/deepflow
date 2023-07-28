@@ -82,7 +82,8 @@ trace_id                  , trace_id                  , trace_id                
 span_id                   , span_id                   , span_id                    , string         ,                       , Tracing Info      , 111
 parent_span_id            , parent_span_id            , parent_span_id             , string         ,                       , Tracing Info      , 111
 span_kind                 , span_kind                 , span_kind                  , int_enum       , span_kind             , Tracing Info      , 111
-x_request_id              , x_request_id              , x_request_id               , string         ,                       , Tracing Info      , 111
+x_request_id_0            , x_request_id_0            , x_request_id_0             , string         ,                       , Tracing Info      , 111
+x_request_id_1            , x_request_id_1            , x_request_id_1             , string         ,                       , Tracing Info      , 111
 http_proxy_client         , http_proxy_client         , http_proxy_client          , string         ,                       , Tracing Info      , 111
 syscall_trace_id_request  , syscall_trace_id_request  , syscall_trace_id_request   , int            ,                       , Tracing Info      , 111
 syscall_trace_id_response , syscall_trace_id_response , syscall_trace_id_response  , int            ,                       , Tracing Info      , 111

@@ -186,7 +186,7 @@ profiler: .profiler
 .profiler: $(ELFFILES) $(LIBTRACE)
 	$(call msg,Current-DIR,,$(CURR))
 	$(Q)rm -rf samples/rust/profiler/src/ebpf.rs
-	$(Q)cp mod_profiler.rs samples/rust/profiler/src/ebpf.rs
+	$(Q)cp mod.rs samples/rust/profiler/src/ebpf.rs
 	$(Q)rm -rf samples/rust/profiler/target
 	@if [[ $(ARCH) == *"aarch64"* ]]; then \
             echo "  Architecture is aarch64"; \

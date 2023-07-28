@@ -242,6 +242,10 @@ func (t *PrometheusLabelTable) updatePrometheusLabels(resp *trident.PrometheusLa
 	}
 }
 
+func (t *PrometheusLabelTable) GetMaxAppLabelColumnIndex() int {
+	return int(getUInt64MapMaxValue(t.labelColumnIndexs))
+}
+
 func (t *PrometheusLabelTable) metricIDsString(filter string) string {
 	sb := &strings.Builder{}
 	sb.WriteString("\nmetricName                                                                                            metricId\n")

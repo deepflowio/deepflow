@@ -26,4 +26,5 @@ var log = logging.MustGetLogger("http.service.resource.filter")
 
 type Filter interface {
 	Filter(data []common.ResponseElem) ([]common.ResponseElem, error)
+	GetFilterConditions() common.FilterConditions
 }

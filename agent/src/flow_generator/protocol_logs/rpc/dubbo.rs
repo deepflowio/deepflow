@@ -647,7 +647,6 @@ pub fn get_req_param_len(payload: &[u8]) -> (usize, usize) {
 mod tests {
     use std::cell::RefCell;
     use std::path::Path;
-    use std::time::Duration;
     use std::{fs, rc::Rc};
 
     use super::*;
@@ -684,8 +683,6 @@ mod tests {
             };
 
             let config = LogParserConfig {
-                l7_log_collect_nps_threshold: 0,
-                l7_log_session_aggr_timeout: Duration::ZERO,
                 l7_log_dynamic: L7LogDynamicConfig::new(
                     "".to_owned(),
                     "".to_owned(),
@@ -698,6 +695,7 @@ mod tests {
                         TraceType::Sw8,
                     ],
                 ),
+                ..Default::default()
             };
             let mut dubbo = DubboLog::default();
             let param =
@@ -765,8 +763,6 @@ mod tests {
         let mut packets = capture.as_meta_packets();
 
         let config = LogParserConfig {
-            l7_log_collect_nps_threshold: 0,
-            l7_log_session_aggr_timeout: Duration::ZERO,
             l7_log_dynamic: L7LogDynamicConfig::new(
                 "".to_owned(),
                 "".to_owned(),
@@ -779,6 +775,7 @@ mod tests {
                     TraceType::Sw8,
                 ],
             ),
+            ..Default::default()
         };
 
         let first_dst_port = packets[0].lookup_key.dst_port;
