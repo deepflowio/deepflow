@@ -1238,6 +1238,7 @@ CREATE TABLE IF NOT EXISTS alarm_endpoint (
     push_frequency          INTEGER,
     push_level              TEXT,
     push_level_disable      TEXT,
+    send_title              TEXT,
     lcuuid                  CHAR(64),
     created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at              TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
