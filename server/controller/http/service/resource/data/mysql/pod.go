@@ -17,10 +17,12 @@
 package mysql
 
 import (
-	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
+	ctrlcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/common"
 )
+
+const PORT_DEFAULT_MAC = "00:00:00:00:00:00"
 
 type Pod struct {
 	DataProvider
@@ -28,7 +30,7 @@ type Pod struct {
 }
 
 func NewPod() *Pod {
-	dp := &Pod{newDataProvider(ctrlrcommon.RESOURCE_TYPE_POD_EN), new(podToolData)}
+	dp := &Pod{newDataProvider(ctrlcommon.RESOURCE_TYPE_POD_EN), new(podToolData)}
 	dp.setGenerator(dp)
 	return dp
 }
@@ -43,10 +45,15 @@ func (p *Pod) generate() (data []common.ResponseElem, err error) {
 
 func (p *Pod) generateOne(item mysql.Pod) common.ResponseElem {
 	d := MySQLModelToMap(item)
+	if v, ok := d["VPC_ID"]; ok {
+		d["EPC_ID"] = v
+		delete(d, "VPC_ID")
+	}
+	d["POD_REPLICA_SET_ID"] = item.PodReplicaSetID
+
 	d["AZ_NAME"] = p.dataTool.azLcuuidToName[item.AZ]
 	d["REGION_NAME"] = p.dataTool.regionLcuuidToName[item.Region]
 	d["SUBDOMAIN_NAME"] = p.dataTool.subDomainLcuuidToName[item.SubDomain]
-	d["DOMAIN_NAME"] = p.dataTool.domainLcuuidToName[item.Domain]
 	d["EPC_NAME"] = p.dataTool.vpcIDToName[item.VPCID]
 	d["POD_CLUSTER_NAME"] = p.dataTool.podClusterIDToName[item.PodClusterID]
 	d["POD_NAMESPACE_NAME"] = p.dataTool.podNamespaceIDToName[item.PodNamespaceID]
@@ -56,13 +63,53 @@ func (p *Pod) generateOne(item mysql.Pod) common.ResponseElem {
 	d["POD_GROUP_NAME"] = p.dataTool.podGroupIDToName[item.PodGroupID]
 	d["POD_GROUP_TYPE"] = p.dataTool.podGroupIDToType[item.PodGroupID]
 	d["POD_REPLICA_SET_NAME"] = p.dataTool.podReplicaSetIDToName[item.PodReplicaSetID]
+	d["IPS"] = p.dataTool.podIDToIPs[item.ID]
+	if p.dataTool.podIDToIPs[item.ID] == nil {
+		d["IPS"] = []interface{}{}
+	}
+	d["MACS"] = p.dataTool.podIDToMacs[item.ID]
+	if p.dataTool.podIDToMacs[item.ID] == nil {
+		d["MACS"] = []interface{}{}
+	}
+	d["INTERFACES"] = p.dataTool.podIDToInterfaces[item.ID]
+	if p.dataTool.podIDToInterfaces[item.ID] == nil {
+		d["INTERFACES"] = []interface{}{}
+	}
+
+	var podServices []interface{}
+	for _, podServiceID := range p.dataTool.podIDToPodServiceIDs[item.ID] {
+		podServices = append(podServices, map[string]interface{}{
+			"ID":   podServiceID,
+			"NAME": p.dataTool.podServiceIDToName[podServiceID],
+		})
+	}
+	d["POD_SERVICES"] = podServices
+	if podServices == nil {
+		d["POD_SERVICES"] = []interface{}{}
+	}
+
+	var subnetIDs []interface{}
+	for _, subnetID := range p.dataTool.podIDToSubnetIDs[item.ID] {
+		subnetIDs = append(subnetIDs, map[string]interface{}{
+			"ID": subnetID,
+		})
+	}
+	d["SUBNETS"] = subnetIDs
+	if subnetIDs == nil {
+		d["SUBNETS"] = []interface{}{}
+	}
+
+	vtap := p.dataTool.podIDToVTap[item.ID]
+	for k, v := range getVTapInfo(&vtap) {
+		d[k] = v
+	}
+
 	return d
 }
 
 type podToolData struct {
 	pods []mysql.Pod
 
-	domainLcuuidToName    map[string]string
 	subDomainLcuuidToName map[string]string
 	regionLcuuidToName    map[string]string
 	azLcuuidToName        map[string]string
@@ -78,15 +125,24 @@ type podToolData struct {
 	podGroupIDToType      map[int]int
 	podReplicaSetIDToName map[int]string
 	podIDToVInterfaceIDs  map[int][]int
+	vifIDToLANIPs         map[int][]string
+	vifIDToWANIPs         map[int][]string
 	podIDToIPs            map[int][]string
-	podIDToPodServiceIDs  map[int][]int
-	podIDToSubnetIDs      map[int][]int
+	podIDToHostID         map[int]int
+	podIDToMacs           map[int][]string
+	podIDToInterfaces     map[int][]interface{}
 
-	podIDToHostID map[int]int
+	podIDToSubnetIDs map[int][]int
+	vifIDToNetworkID map[int]int
+
+	podIDToPodServiceIDs map[int][]int
+	podGroupIDToPodIDs   map[int][]int
+
+	podIDToVTap       map[int]mysql.VTap
+	podNodeIDToPodIDs map[int][]int
 }
 
 func (td *podToolData) Init() *podToolData {
-	td.domainLcuuidToName = make(map[string]string)
 	td.subDomainLcuuidToName = make(map[string]string)
 	td.regionLcuuidToName = make(map[string]string)
 	td.azLcuuidToName = make(map[string]string)
@@ -102,77 +158,194 @@ func (td *podToolData) Init() *podToolData {
 	td.podGroupIDToType = make(map[int]int)
 	td.podReplicaSetIDToName = make(map[int]string)
 	td.podIDToVInterfaceIDs = make(map[int][]int)
+	td.vifIDToLANIPs = make(map[int][]string)
+	td.vifIDToWANIPs = make(map[int][]string)
 	td.podIDToIPs = make(map[int][]string)
-	td.podIDToPodServiceIDs = make(map[int][]int)
-	td.podIDToSubnetIDs = make(map[int][]int)
 	td.podIDToHostID = make(map[int]int)
+	td.podIDToMacs = make(map[int][]string)
+	td.podIDToInterfaces = make(map[int][]interface{})
+
+	td.podIDToSubnetIDs = make(map[int][]int)
+	td.vifIDToNetworkID = make(map[int]int)
+
+	td.podIDToPodServiceIDs = make(map[int][]int)
+	td.podGroupIDToPodIDs = make(map[int][]int)
+
+	td.podIDToVTap = make(map[int]mysql.VTap)
+
+	td.podNodeIDToPodIDs = make(map[int][]int)
+
 	return td
 }
 
 func (td *podToolData) Load() (err error) {
-	err = mysql.Db.Find(&td.pods).Error // TODO use db mng
+	err = mysql.Db.Unscoped().Find(&td.pods).Error // TODO use db mng
 
-	var domains []mysql.Domain
-	err = mysql.Db.Select("lcuuid", "name").Find(&domains).Error
-	for _, item := range domains {
-		td.domainLcuuidToName[item.Lcuuid] = item.Name
-	}
 	var subDomains []mysql.SubDomain
-	err = mysql.Db.Select("lcuuid", "name").Find(&subDomains).Error
+	err = mysql.Db.Unscoped().Select("lcuuid", "name").Find(&subDomains).Error
 	for _, item := range subDomains {
 		td.subDomainLcuuidToName[item.Lcuuid] = item.Name
 	}
 	var regions []mysql.Region
-	err = mysql.Db.Select("lcuuid", "name").Find(&regions).Error
+	err = mysql.Db.Unscoped().Select("lcuuid", "name").Find(&regions).Error
 	for _, item := range regions {
 		td.regionLcuuidToName[item.Lcuuid] = item.Name
 	}
 	var azs []mysql.AZ
-	err = mysql.Db.Select("lcuuid", "name").Find(&azs).Error
+	err = mysql.Db.Unscoped().Select("lcuuid", "name").Find(&azs).Error
 	for _, item := range azs {
 		td.azLcuuidToName[item.Lcuuid] = item.Name
 	}
 	var vpcs []mysql.VPC
-	err = mysql.Db.Select("id", "name").Find(&vpcs).Error
+	err = mysql.Db.Unscoped().Select("id", "name").Find(&vpcs).Error
 	for _, item := range vpcs {
 		td.vpcIDToName[item.ID] = item.Name
 	}
 	var podClusters []mysql.PodCluster
-	err = mysql.Db.Select("id", "name").Find(&podClusters).Error
+	err = mysql.Db.Unscoped().Select("id", "name").Find(&podClusters).Error
 	for _, item := range podClusters {
 		td.podClusterIDToName[item.ID] = item.Name
 	}
 	var podNamespaces []mysql.PodNamespace
-	err = mysql.Db.Select("id", "name").Find(&podNamespaces).Error
+	err = mysql.Db.Unscoped().Select("id", "name").Find(&podNamespaces).Error
 	for _, item := range podNamespaces {
 		td.podNamespaceIDToName[item.ID] = item.Name
 	}
 	var podNodes []mysql.PodNode
-	err = mysql.Db.Select("id", "name", "ip").Find(&podNodes).Error
+	err = mysql.Db.Unscoped().Select("id", "name", "ip").Find(&podNodes).Error
 	for _, item := range podNodes {
 		td.podNodeIDToName[item.ID] = item.Name
 		td.podNodeIDToIP[item.ID] = item.IP
 	}
 	var hosts []mysql.Host
-	err = mysql.Db.Select("id", "ip").Find(&hosts).Error
+	err = mysql.Db.Unscoped().Select("id", "ip").Find(&hosts).Error
 	for _, item := range hosts {
 		td.hostIPToID[item.IP] = item.ID
 	}
 	var podServices []mysql.PodService
-	err = mysql.Db.Select("id", "name").Find(&podServices).Error
+	err = mysql.Db.Unscoped().Select("id", "name").Find(&podServices).Error
 	for _, item := range podServices {
 		td.podServiceIDToName[item.ID] = item.Name
 	}
 	var podGroups []mysql.PodGroup
-	err = mysql.Db.Select("id", "name", "type").Find(&podGroups).Error
+	err = mysql.Db.Unscoped().Select("id", "name", "type").Find(&podGroups).Error
 	for _, item := range podGroups {
 		td.podGroupIDToName[item.ID] = item.Name
 		td.podGroupIDToType[item.ID] = item.Type
 	}
+
 	var podReplicaSets []mysql.PodReplicaSet
-	err = mysql.Db.Select("id", "name").Find(&podReplicaSets).Error
+	err = mysql.Db.Unscoped().Select("id", "name").Find(&podReplicaSets).Error
 	for _, item := range podReplicaSets {
 		td.podReplicaSetIDToName[item.ID] = item.Name
 	}
+
+	// set podIDToIPs
+	var podIDs []int
+	for _, pod := range td.pods {
+		podIDs = append(podIDs, pod.ID)
+		td.podNodeIDToPodIDs[pod.PodNodeID] = append(td.podNodeIDToPodIDs[pod.PodNodeID], pod.ID)
+	}
+	var vifs []mysql.VInterface
+	err = mysql.Db.Unscoped().Select("id", "deviceid", "subnetid", "mac").
+		Where(`devicetype = ? and deviceid in(?)`, ctrlcommon.VIF_DEVICE_TYPE_POD, podIDs).Find(&vifs).Error
+	for _, vif := range vifs {
+		td.podIDToVInterfaceIDs[vif.DeviceID] = append(td.podIDToVInterfaceIDs[vif.DeviceID], vif.ID)
+		td.vifIDToNetworkID[vif.ID] = vif.NetworkID
+	}
+	var lanIPs []mysql.LANIP
+	err = mysql.Db.Unscoped().Select("ip", "vifid").Find(&lanIPs).Error
+	// TODO(weiqiang): dedup
+	for _, lanIP := range lanIPs {
+		vifID := lanIP.VInterfaceID
+		td.vifIDToLANIPs[vifID] = append(td.vifIDToLANIPs[vifID], lanIP.IP)
+	}
+	var wanIPs []mysql.WANIP
+	err = mysql.Db.Unscoped().Select("ip", "vifid").Find(&wanIPs).Error
+	for _, wanIP := range wanIPs {
+		vifID := wanIP.VInterfaceID
+		td.vifIDToWANIPs[vifID] = append(td.vifIDToWANIPs[vifID], wanIP.IP)
+	}
+	for _, pod := range td.pods {
+		for _, vifID := range td.podIDToVInterfaceIDs[pod.ID] {
+			td.podIDToIPs[pod.ID] = append(td.podIDToIPs[pod.ID], td.vifIDToLANIPs[vifID]...)
+			td.podIDToIPs[pod.ID] = append(td.podIDToIPs[pod.ID], td.vifIDToWANIPs[vifID]...)
+		}
+	}
+
+	// set podIDToPodServiceIDs
+	podGroupIDs := make([]int, len(td.pods))
+	for i, pod := range td.pods {
+		podGroupIDs[i] = pod.PodGroupID
+		td.podGroupIDToPodIDs[pod.PodGroupID] = append(td.podGroupIDToPodIDs[pod.PodGroupID], pod.ID)
+	}
+	var podGroupPorts []mysql.PodGroupPort
+	err = mysql.Db.Unscoped().Select("pod_group_id", "pod_service_id").Find(&podGroupPorts).Error
+	// dedup
+	podIDToPodServiceIDMap := make(map[int]map[int]struct{})
+	for _, item := range podGroupPorts {
+		for _, podID := range td.podGroupIDToPodIDs[item.PodGroupID] {
+			if podIDToPodServiceIDMap[podID] == nil {
+				podIDToPodServiceIDMap[podID] = make(map[int]struct{})
+			}
+			podIDToPodServiceIDMap[podID][item.PodServiceID] = struct{}{}
+		}
+	}
+	for podID, podServiceIDs := range podIDToPodServiceIDMap {
+		for podServiceID := range podServiceIDs {
+			td.podIDToPodServiceIDs[podID] = append(td.podIDToPodServiceIDs[podID], podServiceID)
+		}
+	}
+
+	// set podIDToSubnetIDs
+	for _, pod := range td.pods {
+		for _, vifid := range td.podIDToVInterfaceIDs[pod.ID] {
+			td.podIDToSubnetIDs[pod.ID] = append(td.podIDToSubnetIDs[pod.ID], td.vifIDToNetworkID[vifid])
+		}
+	}
+
+	// set podIDToMacs
+	for _, vif := range vifs {
+		if vif.Mac != PORT_DEFAULT_MAC {
+			td.podIDToMacs[vif.DeviceID] = append(td.podIDToMacs[vif.DeviceID], vif.Mac)
+		}
+	}
+
+	// set podIDToInterfaces
+	for _, vif := range vifs {
+		mac := "null"
+		if vif.Mac != PORT_DEFAULT_MAC {
+			mac = vif.Mac
+		}
+		var ips []string
+		ips = append(ips, td.vifIDToLANIPs[vif.ID]...)
+		ips = append(ips, td.vifIDToWANIPs[vif.ID]...)
+
+		td.podIDToInterfaces[vif.DeviceID] = append(td.podIDToInterfaces[vif.DeviceID],
+			map[string]interface{}{
+				"MAC": mac,
+				"IPS": ips,
+			},
+		)
+	}
+
+	var vtaps []mysql.VTap
+	err = mysql.Db.Unscoped().Select("launch_server_id", "type", "id", "lcuuid",
+		"vtap_group_lcuuid", "vtap_lcuuid", "name", "state", "enable").Find(&vtaps).Error
+	for _, vtap := range vtaps {
+		deviceType := ctrlcommon.VTAP_TYPE_TO_DEVICE_TYPE[vtap.Type]
+		if deviceType == 0 || vtap.LaunchServerID == 0 {
+			continue
+		}
+		if deviceType == ctrlcommon.VIF_DEVICE_TYPE_HOST ||
+			deviceType == ctrlcommon.VIF_DEVICE_TYPE_VM {
+			continue
+		}
+
+		for _, podID := range td.podNodeIDToPodIDs[vtap.LaunchServerID] {
+			td.podIDToVTap[podID] = vtap
+		}
+	}
+
 	return
 }
