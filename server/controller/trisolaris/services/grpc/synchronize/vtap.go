@@ -141,8 +141,10 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 		AnalyzerPort:                  proto.Uint32(uint32(vtapConfig.AnalyzerPort)),
 		ProxyControllerPort:           proto.Uint32(uint32(vtapConfig.ProxyControllerPort)),
 		// 调整后采集器配置信息
-		L7LogStoreTapTypes: vtapConfig.ConvertedL7LogStoreTapTypes,
-		L4LogTapTypes:      vtapConfig.ConvertedL4LogTapTypes,
+		L7LogStoreTapTypes:  vtapConfig.ConvertedL7LogStoreTapTypes,
+		L4LogTapTypes:       vtapConfig.ConvertedL4LogTapTypes,
+		L4LogIgnoreTapSides: vtapConfig.ConvertedL4LogIgnoreTapSides,
+		L7LogIgnoreTapSides: vtapConfig.ConvertedL7LogIgnoreTapSides,
 		// 采集器其他配置
 		Enabled:           proto.Bool(Int2Bool(c.GetVTapEnabled())),
 		Host:              proto.String(c.GetVTapHost()),
@@ -492,8 +494,10 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string) *api.Config {
 		ProxyControllerPort:           proto.Uint32(uint32(vtapConfig.ProxyControllerPort)),
 		TapMode:                       &tapMode,
 		// 调整后采集器配置信息
-		L7LogStoreTapTypes: vtapConfig.ConvertedL7LogStoreTapTypes,
-		L4LogTapTypes:      vtapConfig.ConvertedL4LogTapTypes,
+		L7LogStoreTapTypes:  vtapConfig.ConvertedL7LogStoreTapTypes,
+		L4LogTapTypes:       vtapConfig.ConvertedL4LogTapTypes,
+		L4LogIgnoreTapSides: vtapConfig.ConvertedL4LogIgnoreTapSides,
+		L7LogIgnoreTapSides: vtapConfig.ConvertedL7LogIgnoreTapSides,
 	}
 	if vtapConfig.TapInterfaceRegex != "" {
 		configure.TapInterfaceRegex = proto.String(vtapConfig.TapInterfaceRegex)

@@ -111,13 +111,34 @@ func getTypeInfo(tapTypeValue int, idToTapTypeName map[int]string) *model.TypeIn
 	return typeInfo
 }
 
+// tapSideIDToName references feild l4_log_ignore_tap_sides of file agent_group_config_example.yaml.
+var tapSideIDToName = map[int]string{
+	0:  "Rest",
+	1:  "Client",
+	2:  "Server",
+	4:  "Local",
+	9:  "ClientNode",
+	10: "ServerNode",
+	17: "ClientHypervisor",
+	18: "ServerHypervisor",
+	25: "ClientGatewayHypervisor",
+	26: "ServerGatewayHypervisor",
+	33: "ClientGateway",
+	34: "ServerGateway",
+	41: "ClientProcess",
+	42: "ServerProcess",
+	48: "App",
+	49: "ClientApp",
+	50: "ServerApp",
+}
+
 func convertDBToJson(
 	sData *mysql.VTapGroupConfiguration,
 	tData *model.VTapGroupConfigurationResponse,
 	idToTapTypeName map[int]string,
 	lcuuidToDomain map[string]string) {
 
-	ignoreName := []string{"ID", "YamlConfig", "L4LogTapTypes",
+	ignoreName := []string{"ID", "YamlConfig", "L4LogTapTypes", "L4LogIgnoreTapSides", "L7LogIgnoreTapSides",
 		"L7LogStoreTapTypes", "DecapType", "Domains", "MaxCollectPps", "MaxNpbBps", "MaxTxBandwidth"}
 	copyStruct(sData, tData, ignoreName)
 	tData.L4LogTapTypes = []*model.TypeInfo{}
@@ -130,6 +151,34 @@ func convertDBToJson(
 			for _, tapTypeValue := range cL4LogTapTypes {
 				tData.L4LogTapTypes = append(tData.L4LogTapTypes,
 					getTypeInfo(tapTypeValue, idToTapTypeName))
+			}
+		} else {
+			log.Error(err)
+		}
+	}
+	if sData.L4LogIgnoreTapSides != nil {
+		tapSides, err := convertStrToIntList(*sData.L4LogIgnoreTapSides)
+		if err != nil {
+			log.Error(err)
+		} else {
+			for _, tapSideValue := range tapSides {
+				tData.L4LogIgnoreTapSides = append(tData.L4LogIgnoreTapSides,
+					&model.TapSideInfo{
+						ID:   tapSideValue,
+						Name: tapSideIDToName[tapSideValue],
+					})
+			}
+		}
+	}
+	if sData.L7LogIgnoreTapSides != nil {
+		tapSides, err := convertStrToIntList(*sData.L7LogIgnoreTapSides)
+		if err == nil {
+			for _, tapSideValue := range tapSides {
+				tData.L7LogIgnoreTapSides = append(tData.L7LogIgnoreTapSides,
+					&model.TapSideInfo{
+						ID:   tapSideValue,
+						Name: tapSideIDToName[tapSideValue],
+					})
 			}
 		} else {
 			log.Error(err)
@@ -197,7 +246,8 @@ func convertDBToJson(
 }
 
 func convertDBToYaml(sData *mysql.VTapGroupConfiguration, tData *model.VTapGroupConfiguration) {
-	ignoreName := []string{"ID", "VTapGroupLcuuid", "VTapGroupID", "Lcuuid", "YamlConfig", "L4LogTapTypes",
+	ignoreName := []string{"ID", "VTapGroupLcuuid", "VTapGroupID", "Lcuuid", "YamlConfig",
+		"L4LogTapTypes", "L4LogIgnoreTapSides", "L7LogIgnoreTapSides",
 		"L7LogStoreTapTypes", "DecapType", "Domains", "MaxCollectPps", "MaxNpbBps", "MaxTxBandwidth"}
 	copyStruct(sData, tData, ignoreName)
 	if sData.YamlConfig != nil {
@@ -214,6 +264,26 @@ func convertDBToYaml(sData *mysql.VTapGroupConfiguration, tData *model.VTapGroup
 		if err == nil {
 			for _, tapTypeValue := range cL4LogTapTypes {
 				tData.L4LogTapTypes = append(tData.L4LogTapTypes, tapTypeValue)
+			}
+		} else {
+			log.Error(err)
+		}
+	}
+	if sData.L4LogIgnoreTapSides != nil {
+		tapSides, err := convertStrToIntList(*sData.L4LogIgnoreTapSides)
+		if err == nil {
+			for _, tapSide := range tapSides {
+				tData.L4LogIgnoreTapSides = append(tData.L4LogIgnoreTapSides, tapSide)
+			}
+		} else {
+			log.Error(err)
+		}
+	}
+	if sData.L7LogIgnoreTapSides != nil {
+		tapSides, err := convertStrToIntList(*sData.L7LogIgnoreTapSides)
+		if err == nil {
+			for _, tapSide := range tapSides {
+				tData.L7LogIgnoreTapSides = append(tData.L7LogIgnoreTapSides, tapSide)
 			}
 		} else {
 			log.Error(err)
@@ -282,7 +352,8 @@ func convertYamlToDb(sData *model.VTapGroupConfiguration, tData *mysql.VTapGroup
 }
 
 func convertToDb(sData *model.VTapGroupConfiguration, tData *mysql.VTapGroupConfiguration) {
-	ignoreName := []string{"ID", "YamlConfig", "Lcuuid", "VTapGroupLcuuid", "VTapGroupID", "L4LogTapTypes",
+	ignoreName := []string{"ID", "YamlConfig", "Lcuuid", "VTapGroupLcuuid", "VTapGroupID",
+		"L4LogTapTypes", "L4LogIgnoreTapSides", "L7LogIgnoreTapSides",
 		"L7LogStoreTapTypes", "DecapType", "Domains", "MaxCollectPps", "MaxNpbBps", "MaxTxBandwidth"}
 	copyStruct(sData, tData, ignoreName)
 	if len(sData.L4LogTapTypes) > 0 {
@@ -290,6 +361,18 @@ func convertToDb(sData *model.VTapGroupConfiguration, tData *mysql.VTapGroupConf
 		tData.L4LogTapTypes = &cL4LogTapTypes
 	} else {
 		tData.L4LogTapTypes = nil
+	}
+	if len(sData.L4LogIgnoreTapSides) > 0 {
+		tapSides := convertIntSliceToString(sData.L4LogIgnoreTapSides)
+		tData.L4LogIgnoreTapSides = &tapSides
+	} else {
+		tData.L4LogIgnoreTapSides = nil
+	}
+	if len(sData.L7LogIgnoreTapSides) > 0 {
+		tapSides := convertIntSliceToString(sData.L7LogIgnoreTapSides)
+		tData.L7LogIgnoreTapSides = &tapSides
+	} else {
+		tData.L4LogIgnoreTapSides = nil
 	}
 	if len(sData.L7LogStoreTapTypes) > 0 {
 		cL7LogStoreTapTypes := convertIntSliceToString(sData.L7LogStoreTapTypes)
