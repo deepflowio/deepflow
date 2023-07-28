@@ -27,25 +27,25 @@ import (
 )
 
 var (
-	podOnce sync.Once
-	pod     *Pod
+	podGroupOnce sync.Once
+	podGroup     *PodGroup
 )
 
-type Pod struct {
+type PodGroup struct {
 	DataProvider
 }
 
-func GetPod(cfg redis.Config) *Pod {
-	podOnce.Do(func() {
-		pod = &Pod{
+func GetPodGroup(cfg redis.Config) *PodGroup {
+	podGroupOnce.Do(func() {
+		podGroup = &PodGroup{
 			DataProvider: DataProvider{
-				resourceType: ctrlrcommon.RESOURCE_TYPE_POD_EN,
-				next:         mysqldp.NewPod(),
+				resourceType: ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN,
+				next:         mysqldp.NewPodGroup(),
 				client:       getClient(cfg),
-				keyConv:      newKeyConvertor[model.PodQueryStoredInRedis](),
-				urlPath:      httpcommon.PATH_POD,
+				keyConv:      newKeyConvertor[model.PodGroupQueryStoredInRedis](),
+				urlPath:      httpcommon.PATH_POD_GROUP,
 			},
 		}
 	})
-	return pod
+	return podGroup
 }

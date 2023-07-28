@@ -35,7 +35,7 @@ func UnscopedSelect[T any](fields []string) ([]T, error) {
 // TODO SelectWhere
 func SelectWithQuery[T any](fields []string, query interface{}, args ...interface{}) ([]T, error) {
 	var result []T
-	err := mysql.Db.Select(fields).Where(query, args...).Find(&result).Error
+	err := mysql.Db.Unscoped().Select(fields).Where(query, args...).Find(&result).Error
 	return result, err
 }
 

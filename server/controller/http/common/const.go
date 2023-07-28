@@ -48,6 +48,15 @@ const (
 	PATH_PEER_CONNECTION     = "/v2/peer-connections/"
 	PATH_CEN                 = "/v2/cens/"
 	PATH_POD                 = "/v2/pods/"
+	PATH_POD_GROUP           = "/v2/pod-groups/"
+	PATH_POD_GROUP_PORT      = "/v2/pod-group-ports/"
+	PATH_POD_REPLICA_SET     = "/v2/pod-replica-sets/"
+	PATH_POD_SERVICE         = "/v2/pod-services/"
+	PATH_POD_SERVICE_PORT    = "/v2/pod-service-ports/"
+	PATH_POD_INGRESS         = "/v2/pod-ingresses/"
+	PATH_POD_INGRESS_RULE    = "/v2/pod-ingress-rules/"
+	PATH_POD_NODE            = "/v2/pod-nodes/"
+	PATH_POD_CLUSTER         = "/v2/pod-clusters/"
 )
 
 const (
