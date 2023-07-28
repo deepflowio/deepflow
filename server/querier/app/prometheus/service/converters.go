@@ -207,17 +207,17 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 				// group
 				metricWithAggFunc = aggOperator
 			case view.FUNCTION_COUNT:
-				metricWithAggFunc = "Count(_)" // will be append as `metrics.$metricsName` in below
+				metricWithAggFunc = "Count(row)" // will be append as `metrics.$metricsName` in below
 
 				// count_values means count unique value
 				if q.Hints.Func == "count_values" {
 					metricsArray = append(metricsArray, fmt.Sprintf("`%s`", metricName)) // append original metric name
 					groupBy = append(groupBy, fmt.Sprintf("`%s`", metricName))
 				} else {
-					// for [Count], not calculate second times, just return Count(_) value
+					// for [Count], not calculate second times, just return Count(row) value
 					if p.interceptPrometheusExpr != nil {
 						_ = p.interceptPrometheusExpr(func(e *parser.AggregateExpr) error {
-							// Count(_) in deepflow already complete in clickhouse query
+							// Count(row) in deepflow already complete in clickhouse query
 							// so we don't need `Count` again, instead, `Sum` all `Count` result would be our expectation
 							// so, modify expr.Operation here to make prometheus engine do `Sum` for `values`
 							e.Op = parser.SUM
