@@ -174,6 +174,9 @@ static __u32 __inline get_tcp_write_seq_from_fd(int fd)
 		return 0;
 
 	void *sock = get_socket_from_fd(fd, offset);
+	if (sock == NULL)
+		return 0;
+
 	__u32 tcp_seq = 0;
 	bpf_probe_read(&tcp_seq, sizeof(tcp_seq),
 		       sock + offset->tcp_sock__write_seq_offset);
@@ -1201,8 +1204,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 
 	if ((extra->source == DATA_SOURCE_GO_TLS_UPROBE ||
 	     extra->source == DATA_SOURCE_OPENSSL_UPROBE) ||
-	    (conn_info->direction == T_INGRESS &&
-	     conn_info->tuple.l4_protocol == IPPROTO_TCP)) {
+	    (conn_info->tuple.l4_protocol == IPPROTO_TCP)) {
 		/*
 		 * If the current state is TCPF_CLOSE_WAIT, the FIN frame already has been received.
 		 * However, it cannot be confirmed that it has been processed by the syscall,
@@ -1212,9 +1214,6 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 		 * This is because kernel 4.14 verify reports errors("R0 invalid mem access 'inv'").
 		 */
 		v->tcp_seq = tcp_seq;
-	} else if (conn_info->direction == T_EGRESS &&
-		   conn_info->tuple.l4_protocol == IPPROTO_TCP) {
-		v->tcp_seq = get_tcp_write_seq_from_fd(conn_info->fd) - syscall_len;
 	}
 
 	v->thread_trace_id = thread_trace_id;
@@ -1395,6 +1394,7 @@ TPPROG(sys_enter_write) (struct syscall_comm_enter_ctx *ctx) {
 	write_args.fd = fd;
 	write_args.buf = buf;
 	write_args.enter_ts = bpf_ktime_get_ns();
+	write_args.tcp_seq = get_tcp_write_seq_from_fd(fd);
 	active_write_args_map__update(&id, &write_args);
 
 	return 0;
@@ -1461,6 +1461,7 @@ TPPROG(sys_enter_sendto) (struct syscall_comm_enter_ctx *ctx) {
 	write_args.fd = sockfd;
 	write_args.buf = buf;
 	write_args.enter_ts = bpf_ktime_get_ns();
+	write_args.tcp_seq = get_tcp_write_seq_from_fd(sockfd);
 	active_write_args_map__update(&id, &write_args);
 
 	return 0;
@@ -1543,6 +1544,7 @@ KPROG(__sys_sendmsg) (struct pt_regs* ctx) {
 		write_args.iov = msghdr->msg_iov;
 		write_args.iovlen = msghdr->msg_iovlen;
 		write_args.enter_ts = bpf_ktime_get_ns();
+		write_args.tcp_seq = get_tcp_write_seq_from_fd(sockfd);
 		active_write_args_map__update(&id, &write_args);
 	}
 
@@ -1584,6 +1586,7 @@ KPROG(__sys_sendmmsg)(struct pt_regs* ctx) {
 		write_args.iovlen = msgvec[0].msg_hdr.msg_iovlen;
 		write_args.msg_len = (void *)msgvec_ptr + offsetof(typeof(struct mmsghdr), msg_len); //&msgvec[0].msg_len;
 		write_args.enter_ts = bpf_ktime_get_ns();
+		write_args.tcp_seq = get_tcp_write_seq_from_fd(sockfd);
 		active_write_args_map__update(&id, &write_args);
 	}
 
@@ -1723,6 +1726,7 @@ KPROG(do_writev) (struct pt_regs* ctx) {
 	write_args.iov = iov;
 	write_args.iovlen = iovlen;
 	write_args.enter_ts = bpf_ktime_get_ns();
+	write_args.tcp_seq = get_tcp_write_seq_from_fd(fd);
 	active_write_args_map__update(&id, &write_args);
 	return 0;
 }

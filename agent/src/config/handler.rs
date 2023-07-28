@@ -57,6 +57,7 @@ use crate::{
     exception::ExceptionHandler,
     flow_generator::{protocol_logs::SOFA_NEW_RPC_TRACE_CTX_KEY, FlowTimeout, TcpTimeout},
     handler::PacketHandlerBuilder,
+    metric::document::TapSide,
     trident::{AgentComponents, RunningMode},
     utils::{
         environment::{free_memory_check, k8s_mem_limit_for_deepflow, running_in_container},
@@ -132,6 +133,7 @@ pub struct CollectorConfig {
     pub vtap_flow_1s_enabled: bool,
     pub l4_log_collect_nps_threshold: u64,
     pub l4_log_store_tap_types: [bool; 256],
+    pub l4_log_ignore_tap_sides: [bool; TapSide::MAX as usize + 1],
     pub l7_metrics_enabled: bool,
     pub trident_type: TridentType,
     pub vtap_id: u16,
@@ -153,8 +155,15 @@ impl fmt::Debug for CollectorConfig {
                 &self
                     .l4_log_store_tap_types
                     .iter()
-                    .enumerate()
-                    .filter(|&(_, b)| *b)
+                    .filter(|&b| *b)
+                    .collect::<Vec<_>>(),
+            )
+            .field(
+                "l4_log_ignore_tap_sides",
+                &self
+                    .l4_log_ignore_tap_sides
+                    .iter()
+                    .filter(|&b| *b)
                     .collect::<Vec<_>>(),
             )
             .field(
@@ -473,6 +482,18 @@ pub struct LogParserConfig {
     pub l7_log_collect_nps_threshold: u64,
     pub l7_log_session_aggr_timeout: Duration,
     pub l7_log_dynamic: L7LogDynamicConfig,
+    pub l7_log_ignore_tap_sides: [bool; TapSide::MAX as usize + 1],
+}
+
+impl Default for LogParserConfig {
+    fn default() -> Self {
+        Self {
+            l7_log_collect_nps_threshold: 0,
+            l7_log_session_aggr_timeout: Duration::ZERO,
+            l7_log_dynamic: L7LogDynamicConfig::default(),
+            l7_log_ignore_tap_sides: [false; TapSide::MAX as usize + 1],
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -936,6 +957,14 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     }
                     tap_types
                 },
+                l4_log_ignore_tap_sides: {
+                    let mut tap_sides = [false; TapSide::MAX as usize + 1];
+                    for t in conf.l4_log_ignore_tap_sides.iter() {
+                        // TapSide values will be in range [0, TapSide::MAX]
+                        tap_sides[*t as usize] = true;
+                    }
+                    tap_sides
+                },
                 cloud_gateway_traffic: conf.yaml_config.cloud_gateway_traffic,
             },
             handler: HandlerConfig {
@@ -1019,6 +1048,14 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                         .map(|item| TraceType::from(item))
                         .collect(),
                 ),
+                l7_log_ignore_tap_sides: {
+                    let mut tap_sides = [false; TapSide::MAX as usize + 1];
+                    for t in conf.l7_log_ignore_tap_sides.iter() {
+                        // TapSide values will be in range [0, TapSide::MAX]
+                        tap_sides[*t as usize] = true;
+                    }
+                    tap_sides
+                },
             },
             debug: DebugConfig {
                 vtap_id: conf.vtap_id as u16,
