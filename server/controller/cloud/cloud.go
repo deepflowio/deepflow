@@ -104,7 +104,18 @@ func (c *Cloud) GetBasicInfo() model.BasicInfo {
 }
 
 func (c *Cloud) GetResource() model.Resource {
-	return c.resource
+	cResource := c.resource
+	if c.basicInfo.Type != common.KUBERNETES {
+		if cResource.ErrorState == common.RESOURCE_STATE_CODE_SUCCESS && cResource.Verified && len(cResource.VMs) > 0 {
+			cResource.SubDomainResources = c.getSubDomainData(cResource)
+		}
+	}
+
+	if cResource.Verified {
+		cResource = c.appendAddtionalResourcesData(cResource)
+		cResource = c.appendResourceProcess(cResource)
+	}
+	return cResource
 }
 
 func (c *Cloud) GetKubernetesGatherTaskMap() map[string]*KubernetesGatherTask {
@@ -144,10 +155,6 @@ func (c *Cloud) getCloudData() {
 	var cResource model.Resource
 	if c.basicInfo.Type != common.KUBERNETES {
 		var err error
-		lastResource := c.resource
-		if lastResource.ErrorState == common.RESOURCE_STATE_CODE_SUCCESS && lastResource.Verified && len(lastResource.VMs) > 0 {
-			c.resource.SubDomainResources = c.getSubDomainData(lastResource)
-		}
 		cResource, err = c.platform.GetCloudData()
 		// 这里因为任务内部没有对成功的状态赋值状态码，在这里统一处理了
 		if err == nil {
@@ -155,7 +162,6 @@ func (c *Cloud) getCloudData() {
 				cResource.Verified = true
 				cResource.ErrorState = common.RESOURCE_STATE_CODE_SUCCESS
 			}
-			cResource.SubDomainResources = c.getSubDomainData(cResource)
 		} else {
 			if cResource.ErrorState == 0 {
 				cResource.ErrorState = common.RESOURCE_STATE_CODE_EXCEPTION
@@ -174,11 +180,6 @@ func (c *Cloud) getCloudData() {
 			ErrorState:   cResource.ErrorState,
 			ErrorMessage: cResource.ErrorMessage,
 		}
-	}
-
-	if cResource.Verified {
-		cResource = c.appendAddtionalResourcesData(cResource)
-		cResource = c.appendResourceProcess(cResource)
 	}
 
 	c.resource = cResource
