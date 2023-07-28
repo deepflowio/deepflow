@@ -1011,7 +1011,7 @@ impl Flow {
         //                                     SYN-ACK
         //            [ACK]
         //            RST|RST-ACK
-        src_tcp_flags.contains(TcpFlags::SYN | TcpFlags::RST_ACK)
+        src_tcp_flags.contains(TcpFlags::SYN | TcpFlags::RST)
             && dst_tcp_flags.contains(TcpFlags::SYN_ACK)
     }
 
