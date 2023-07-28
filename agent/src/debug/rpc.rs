@@ -20,9 +20,12 @@ use bincode::{Decode, Encode};
 use parking_lot::RwLock;
 use tokio::runtime::Runtime;
 
-use crate::config::RuntimeConfig;
-use crate::exception::ExceptionHandler;
-use crate::rpc::{RunningConfig, Session, StaticConfig, Status, Synchronizer};
+use crate::{
+    config::RuntimeConfig,
+    exception::ExceptionHandler,
+    rpc::{Session, StaticConfig, Status, Synchronizer},
+    trident::AgentId,
+};
 use public::debug::{Error, Result};
 use public::proto::trident::SyncResponse;
 
@@ -30,7 +33,7 @@ pub struct RpcDebugger {
     session: Arc<Session>,
     status: Arc<RwLock<Status>>,
     config: Arc<StaticConfig>,
-    running_config: Arc<RwLock<RunningConfig>>,
+    agent_id: Arc<RwLock<AgentId>>,
     runtime: Arc<Runtime>,
 }
 
@@ -64,7 +67,7 @@ impl RpcDebugger {
         runtime: Arc<Runtime>,
         session: Arc<Session>,
         config: Arc<StaticConfig>,
-        running_config: Arc<RwLock<RunningConfig>>,
+        agent_id: Arc<RwLock<AgentId>>,
         status: Arc<RwLock<Status>>,
     ) -> Self {
         Self {
@@ -72,14 +75,14 @@ impl RpcDebugger {
             session,
             status,
             config,
-            running_config,
+            agent_id,
         }
     }
 
     async fn get_rpc_response(&self) -> Result<tonic::Response<SyncResponse>, tonic::Status> {
         let exception_handler = ExceptionHandler::default();
         let req = Synchronizer::generate_sync_request(
-            &self.running_config,
+            &self.agent_id,
             &self.config,
             &self.status,
             0,

@@ -806,14 +806,9 @@ impl DispatcherBuilder {
 
     pub fn build(mut self) -> Result<Dispatcher> {
         let netns = self.netns.unwrap_or_default();
+        // set ns before creating af packet socket
         #[cfg(target_os = "linux")]
-        let mut current_ns = None;
-        #[cfg(target_os = "linux")]
-        if netns != NsFile::Root {
-            current_ns = Some(netns::open_current_ns()?);
-            // set ns before creating af packet socket
-            let _ = netns::open_named_and_setns(&netns)?;
-        };
+        let _ = netns::open_named_and_setns(&netns)?;
         let options = self
             .options
             .ok_or(Error::ConfigIncomplete("no options".into()))?;
@@ -1039,9 +1034,7 @@ impl DispatcherBuilder {
         };
         dispatcher.init();
         #[cfg(target_os = "linux")]
-        if let Some(ns) = current_ns {
-            let _ = netns::setns(&ns, Some(netns::CURRENT_NS_PATH))?;
-        }
+        let _ = netns::reset_netns()?;
         Ok(Dispatcher {
             flavor: Mutex::new(Some(dispatcher)),
             terminated,

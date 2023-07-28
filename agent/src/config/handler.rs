@@ -78,7 +78,10 @@ use public::proto::{
     trident::{self, CaptureSocketType, Exception, IfMacSource, SocketType, TapMode},
 };
 #[cfg(target_os = "linux")]
-use public::{consts::NORMAL_EXIT_WITH_RESTART, netns};
+use public::{
+    consts::NORMAL_EXIT_WITH_RESTART,
+    netns::{self, NsFile},
+};
 
 use crate::utils::cgroups::is_kernel_available_for_cgroups;
 #[cfg(target_os = "windows")]
@@ -485,7 +488,7 @@ impl fmt::Debug for FlowConfig {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct LogParserConfig {
     pub l7_log_collect_nps_threshold: u64,
     pub l7_log_session_aggr_timeout: Duration,
@@ -501,6 +504,37 @@ impl Default for LogParserConfig {
             l7_log_dynamic: L7LogDynamicConfig::default(),
             l7_log_ignore_tap_sides: [false; TapSide::MAX as usize + 1],
         }
+    }
+}
+
+impl fmt::Debug for LogParserConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LogParserConfig")
+            .field(
+                "l7_log_collect_nps_threshold",
+                &self.l7_log_collect_nps_threshold,
+            )
+            .field(
+                "l7_log_session_aggr_timeout",
+                &self.l7_log_session_aggr_timeout,
+            )
+            .field("l7_log_dynamic", &self.l7_log_dynamic)
+            .field(
+                "l7_log_ignore_tap_sides",
+                &self
+                    .l7_log_ignore_tap_sides
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, b)| {
+                        if *b {
+                            TapSide::try_from(i as u8).ok()
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>(),
+            )
+            .finish()
     }
 }
 
@@ -1110,8 +1144,20 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     .l7_protocol_inference_max_fail_count,
                 l7_protocol_inference_ttl: conf.yaml_config.l7_protocol_inference_ttl,
                 ctrl_mac: if is_tt_workload(conf.trident_type) {
+                    // use host mac
+                    if let Err(e) = netns::open_named_and_setns(&NsFile::Root) {
+                        warn!("agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'.");
+                        warn!("setns error: {}", e);
+                        thread::sleep(Duration::from_secs(1));
+                        process::exit(-1);
+                    }
                     let (_, ctrl_mac) =
-                        get_ctrl_ip_and_mac(static_config.controller_ips[0].parse().unwrap());
+                        get_ctrl_ip_and_mac(&static_config.controller_ips[0].parse().unwrap());
+                    if let Err(e) = netns::reset_netns() {
+                        warn!("reset setns error: {}", e);
+                        thread::sleep(Duration::from_secs(1));
+                        process::exit(-1);
+                    };
                     ctrl_mac
                 } else {
                     MacAddr::ZERO

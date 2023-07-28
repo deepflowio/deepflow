@@ -19,7 +19,7 @@ mod session;
 mod synchronizer;
 
 pub(crate) use session::{Session, DEFAULT_TIMEOUT};
-pub(crate) use synchronizer::{RunningConfig, StaticConfig, Status, Synchronizer};
+pub(crate) use synchronizer::{StaticConfig, Status, Synchronizer};
 
 use std::time::{Duration, SystemTime};
 
