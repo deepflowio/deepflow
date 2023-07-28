@@ -43,5 +43,4 @@ event_type            , Event Type                   ,
 event_desc            , Event Message                ,
 
 app_instance          , Application Instance         ,
-vtap                  , DeepFlow Agent               ,
 signal_source         , Signal Source                ,

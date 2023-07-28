@@ -48,5 +48,5 @@ func (p *PodCluster) userPermittedResourceToConditions(upr *UserPermittedResourc
 	}
 
 	dropAll := (len(fcs.VPCIDs) == 0 && len(fcs.IDs) == 0)
-	return fcs.ToMapOmitEmpty(), dropAll
+	return fcs.ToMapOmitEmpty(fcs), dropAll
 }

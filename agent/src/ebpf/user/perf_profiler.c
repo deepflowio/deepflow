@@ -494,7 +494,7 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 
 		char *trace_str =
 			resolve_and_gen_stack_trace_str(t, v, stack_map_name,
-							stack_str_hash);
+							stack_str_hash, matched);
 		if (trace_str) {
 			/* append 1 byte for '\0' */
 			int str_len = strlen(trace_str) + 1;
@@ -587,20 +587,7 @@ static void process_bpf_stacktraces(struct bpf_tracer *t,
 	 *   u_stack_id + " as the key.
 	 *
 	 * Here is the key-value pair structure of the hashmap:
-	 * see perf_profiler.h
-	 * ```
-	 * typedef struct {
-	 * 	struct {
-	 *		u64 tgid: 26,
-	 *		    pid: 26, 
-	 *		    cpu: 12;
-	 *		u64 stime;
-	 *		u32 u_stack_id;
-	 *		u32 k_stack_id;
-	 *		} k;
-	 *	uword msg_ptr;
-	 * } stack_trace_msg_kv_t; 
-	 * ```
+	 * see perf_profiler.h (stack_trace_msg_kv_t)
 	 * This is the final form of the data. If the current stack trace message
 	 * is a match, we only need to increment the count field in the correspon-
 	 * ding value, thus avoiding duplicate parsing.
@@ -674,6 +661,15 @@ static void cp_reader_work(void *arg)
 	reader_b = &t->readers[1];
 
 	for (;;) {
+		/* 
+		 * Waiting for the regular expression to be configured
+		 * and start working. 
+		 */
+		if (unlikely(!regex_existed)) {
+			sleep(1);
+			continue;
+		}
+
 		if (unlikely(profiler_stop == 1))
 			goto exit;
 
@@ -752,7 +748,7 @@ static int create_profiler(struct bpf_tracer *tracer)
 	 * Use of void* is inherited from the BCC library. */
 	create_and_init_symbolizer_caches();
 
-	set_profiler_regex(".*");
+	set_profiler_regex("");
 	/*
 	 * Start a new thread to execute the data
 	 * reading of perf buffer.
@@ -820,7 +816,8 @@ static void print_cp_tracer_status(struct bpf_tracer *t)
 	}
 
 	ebpf_info("\n\n----------------------------\nrecv envent:\t%lu\n"
-		  "process-cnt:\t%lu\nkern_lost:\t%lu process_lost_count:\t%lu\n"
+		  "process-cnt:\t%lu\nkern_lost:\t%lu process_lost_count:\t%lu "
+		  "stack_table_data_miss:\t%lu\n"
 		  "stack_trace_lost:\t%lu\ntransfer_count:\t%lu "
 		  "iter_count_avg:\t%.2lf\nalloc_b:\t%lu bytes "
 		  "free_b:\t%lu bytes use:\t%lu bytes\n"
@@ -831,7 +828,8 @@ static void print_cp_tracer_status(struct bpf_tracer *t)
 		  " - iter_max_cnt:\t%lu\n"
 		  "----------------------------\n\n",
 		  atomic64_read(&t->recv), process_count, atomic64_read(&t->lost),
-		  get_process_lost_count(), stack_trace_lost, transfer_count,
+		  get_process_lost_count(), get_stack_table_data_miss_count(),
+		  stack_trace_lost, transfer_count,
 		  ((double)atomic64_read(&t->recv) / (double)transfer_count),
 		  alloc_b, free_b, alloc_b - free_b, output_count, sample_drop_cnt,
 		  output_err_cnt, iter_max_cnt);
@@ -1048,7 +1046,22 @@ int set_profiler_regex(const char *pattern)
 		return (-1);
 	}
 
+	/*
+	 * During the data processing, the thread responsible for matching reads the
+	 * regular expression, while the thread handling the regular expression upd-
+	 * ates is different. Synchronization is implemented to ensure protection and
+	 * coordination between these two threads.
+	 */
 	tracer_reader_lock(profiler_tracer);
+	if (*pattern == '\0') {
+		regex_existed = false;
+		ebpf_warning(LOG_CP_TAG "Set 'profiler_regex' pattern : '', an empty"
+			     " regular expression will not generate any stack data."
+			     "Please configure the regular expression for profiler.\n");
+		tracer_reader_unlock(profiler_tracer);
+		return (0);
+	}
+
 	if (regex_existed) {
 		regfree(&profiler_regex);
 	}

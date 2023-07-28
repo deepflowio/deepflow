@@ -43,11 +43,33 @@ func (v *VM) generate() (data []common.ResponseElem, err error) {
 
 func (v *VM) generateOne(item mysql.VM) common.ResponseElem {
 	d := MySQLModelToMap(item)
-	d["AZ_NAME"] = v.dataTool.azLcuuidToName[item.AZ]
-	d["REGION_NAME"] = v.dataTool.regionLcuuidToName[item.Region]
 	d["DOMAIN_NAME"] = v.dataTool.domainLcuuidToName[item.Domain]
+	d["REGION_NAME"] = v.dataTool.regionLcuuidToName[item.Region]
+	d["AZ_NAME"] = v.dataTool.azLcuuidToName[item.AZ]
 	d["EPC_NAME"] = v.dataTool.vpcIDToName[item.VPCID]
 	d["HOST_ID"] = v.dataTool.hostIPToID[item.LaunchServer]
+	d["HOST_NAME"] = v.dataTool.hostIPToName[item.LaunchServer]
+	d["POD_NODE_ID"] = ""
+	d["POD_NODE_NAME"] = ""
+	d["SECURITY_GROUPS"] = v.dataTool.vmIDToSecurityGroups[item.ID]
+	d["SECURITY_GROUP_COUNT"] = ""
+	networks := make([]map[string]interface{}, 0)
+	for _, item := range v.dataTool.vmIDToNetworkIDs[item.ID] {
+		networks = append(networks, map[string]interface{}{"ID": item, "NAME": v.dataTool.networkIDToName[item]})
+	}
+	d["SUBNETS"] = networks
+	d["LAN_IPS"] = ""
+	d["WAN_IPS"] = ""
+	d["ALL_IPS"] = ""
+	d["VIP"] = ""
+	d["INTERFACES"] = ""
+	d["INTERFACE_COUNT"] = ""
+	d["VTAP_NAME"] = ""
+	d["VTAP_ID"] = ""
+	d["VTAP_LCUUID"] = ""
+	d["VTAP_TYPE"] = ""
+	d["VTAP_GROUP_LCUUID"] = ""
+	d["VTAP_STATE"] = ""
 	return d
 }
 
@@ -58,7 +80,13 @@ type vmToolData struct {
 	regionLcuuidToName map[string]string
 	azLcuuidToName     map[string]string
 	vpcIDToName        map[int]string
-	hostIPToID         map[string]int
+	networkIDToName    map[int]string
+
+	hostIPToID   map[string]int
+	hostIPToName map[string]string
+
+	vmIDToNetworkIDs     map[int][]int
+	vmIDToSecurityGroups map[int][]map[string]interface{}
 }
 
 func (td *vmToolData) Init() *vmToolData {
@@ -66,37 +94,70 @@ func (td *vmToolData) Init() *vmToolData {
 	td.regionLcuuidToName = make(map[string]string)
 	td.azLcuuidToName = make(map[string]string)
 	td.vpcIDToName = make(map[int]string)
+	td.networkIDToName = make(map[int]string)
+
 	td.hostIPToID = make(map[string]int)
+	td.hostIPToName = make(map[string]string)
+
+	td.vmIDToNetworkIDs = make(map[int][]int)
+	td.vmIDToSecurityGroups = make(map[int][]map[string]interface{})
 	return td
 }
 
 func (td *vmToolData) Load() (err error) {
-	err = mysql.Db.Find(&td.vms).Error
+	td.vms, err = GetAll[mysql.VM]()
+	if err != nil {
+		return err
+	}
 
-	var domains []mysql.Domain
-	err = mysql.Db.Select("lcuuid", "name").Find(&domains).Error
+	domains, err := Select[mysql.Domain]([]string{"lcuuid", "name"})
+	if err != nil {
+		return err
+	}
 	for _, item := range domains {
 		td.domainLcuuidToName[item.Lcuuid] = item.Name
 	}
-	var regions []mysql.Region
-	err = mysql.Db.Select("lcuuid", "name").Find(&regions).Error
+
+	regions, err := Select[mysql.Region]([]string{"lcuuid", "name"})
+	if err != nil {
+		return err
+	}
 	for _, item := range regions {
 		td.regionLcuuidToName[item.Lcuuid] = item.Name
 	}
-	var azs []mysql.AZ
-	err = mysql.Db.Select("lcuuid", "name").Find(&azs).Error
+
+	azs, err := Select[mysql.AZ]([]string{"lcuuid", "name"})
+	if err != nil {
+		return err
+	}
 	for _, item := range azs {
 		td.azLcuuidToName[item.Lcuuid] = item.Name
 	}
-	var vpcs []mysql.VPC
-	err = mysql.Db.Select("id", "name").Find(&vpcs).Error
+
+	vpcs, err := Select[mysql.VPC]([]string{"id", "name"})
+	if err != nil {
+		return err
+	}
 	for _, item := range vpcs {
 		td.vpcIDToName[item.ID] = item.Name
 	}
-	var hosts []mysql.Host
-	err = mysql.Db.Select("id", "ip").Find(&hosts).Error
+
+	hosts, err := Select[mysql.Host]([]string{"id", "ip"})
+	if err != nil {
+		return err
+	}
 	for _, item := range hosts {
 		td.hostIPToID[item.IP] = item.ID
+		td.hostIPToName[item.IP] = item.Name
+	}
+
+	vmSGs, err := Select[mysql.VMSecurityGroup]([]string{"vm_id", "sg_id"})
+
+	if err != nil {
+		return err
+	}
+	for _, item := range vmSGs {
+		td.vmIDToSecurityGroups[item.VMID] = append(td.vmIDToSecurityGroups[item.VMID], map[string]interface{}{"ID": item.SecurityGroupID})
 	}
 	return
 }

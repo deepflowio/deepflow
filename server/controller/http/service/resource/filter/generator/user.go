@@ -111,6 +111,10 @@ type UserPermittedResource struct {
 	PodNamespaceIDs []int
 }
 
+func (u *UserPermittedResource) HasPermittedResource() bool {
+	return len(u.VPCIDs) != 0 || len(u.PodNamespaceIDs) != 0
+}
+
 func IsAdmin(userType int) bool {
 	if slices.Contains([]int{common.USER_TYPE_SUPER_ADMIN, common.USER_TYPE_ADMIN}, userType) {
 		return true

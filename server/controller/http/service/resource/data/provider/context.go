@@ -17,10 +17,14 @@
 package provider
 
 import (
+	"github.com/op/go-logging"
+
 	"github.com/deepflowio/deepflow/server/controller/http/model"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/filter/generator"
 )
+
+var log = logging.MustGetLogger("service.resource.redis")
 
 type DataContext struct {
 	URLInfo         *model.URLInfo            // use to generate redis key
@@ -52,6 +56,7 @@ func (c *DataContext) ApplyFilters(data []common.ResponseElem) ([]common.Respons
 	var err error
 	result := data
 	for _, f := range filters {
+		log.Info(f.GetFilterConditions())
 		result, err = f.Filter(result)
 		if err != nil {
 			return []common.ResponseElem{}, err

@@ -55,11 +55,12 @@ func (dp *DataProvider) Get(ctx *provider.DataContext) ([]common.ResponseElem, e
 	}
 
 	data, err = dp.client.get(key)
-	if err != nil {
+	if err != nil || len(data) == 0 {
 		data, err = dp.next.Get(ctx)
 		if err != nil {
-			dp.client.set(key, data)
+			return data, err
 		}
+		dp.client.set(key, data)
 	}
 	return data, err
 }

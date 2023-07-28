@@ -16,7 +16,7 @@
 
 use std::collections::HashMap;
 use std::io::{Error as IOError, ErrorKind, Result as IOResult};
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, Shutdown, SocketAddrV4, SocketAddrV6};
 #[cfg(unix)]
 use std::os::unix::io::FromRawFd;
 #[cfg(windows)]
@@ -27,7 +27,7 @@ use std::sync::{
     Arc, Mutex, RwLock, Weak,
 };
 use std::thread::{self, JoinHandle};
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 #[cfg(unix)]
 use libc::{c_int, socket, AF_INET, AF_INET6, SOCK_RAW};
@@ -345,10 +345,13 @@ struct TcpSender {
 
     dst_ip: IpAddr,
     remote: SockAddr,
+
+    last_connect: u32, // time in second
 }
 
 impl TcpSender {
-    const CONNECT_TIMEOUT: u64 = 100;
+    const CONNECT_TIMEOUT: u64 = 100; // time in millis
+    const CONNECT_INTERVAL: u32 = 10; // time in second
 
     fn new(dst_ip: &IpAddr, dst_port: u16) -> Self {
         let overlay_packet_offset = if dst_ip.is_ipv6() {
@@ -365,13 +368,11 @@ impl TcpSender {
                 IpAddr::V6(ip) => SockAddr::from(SocketAddrV6::new(ip.clone(), dst_port, 0, 0)),
             },
             dst_ip: dst_ip.clone(),
+            last_connect: 0,
         }
     }
 
-    fn connect_check(&mut self) -> IOResult<()> {
-        if self.socket.is_some() {
-            return Ok(());
-        }
+    fn connect(&mut self) -> IOResult<()> {
         let domain = if self.underlay_is_ipv6 {
             Domain::IPV6
         } else {
@@ -384,6 +385,24 @@ impl TcpSender {
         self.socket.replace(socket);
         info!("Npb TcpSender init with {}.", self.dst_ip);
         Ok(())
+    }
+
+    fn connect_check(&mut self) -> IOResult<()> {
+        if self.socket.is_some() {
+            return Ok(());
+        }
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as u32;
+        if self.last_connect + Self::CONNECT_INTERVAL > now {
+            return Err(IOError::new(
+                ErrorKind::Other,
+                "Waiting for reconnection time interval",
+            ));
+        }
+        self.last_connect = now;
+        self.connect()
     }
 
     fn send(
@@ -408,10 +427,21 @@ impl TcpSender {
         header.total_length = packet.len() as u16;
         let _ = header.encode(packet);
         let n = self.socket.as_ref().unwrap().send(packet);
-        if n.is_err() {
-            self.socket = None;
+        match n {
+            Ok(n) => Ok(n),
+            Err(e) => {
+                match e.kind() {
+                    // When the server receives slowly.
+                    ErrorKind::WouldBlock => {}
+                    _ => {
+                        if let Some(socket) = self.socket.take() {
+                            let _ = socket.shutdown(Shutdown::Both);
+                        }
+                    }
+                }
+                Err(e)
+            }
         }
-        return n;
     }
 
     fn close(&mut self) {}

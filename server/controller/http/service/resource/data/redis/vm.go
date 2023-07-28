@@ -43,7 +43,7 @@ func GetVM(cfg redis.Config) *VM {
 				next:         mysqldp.NewVM(),
 				client:       getClient(cfg),
 				keyConv:      newKeyConvertor[model.VMQueryStoredInRedis](),
-				urlPath:      httpcommon.PATH_POD,
+				urlPath:      httpcommon.PATH_VM,
 			},
 		}
 	})

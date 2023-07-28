@@ -50,7 +50,7 @@ func (p *PodNode) userPermittedResourceToConditions(upr *UserPermittedResource) 
 		PodClusterIDs: GetRelatedPodClusterIDs(upr.PodNamespaceIDs),
 	}
 	dropAll := (len(fc.VPCIDs) == 0 && len(fc.PodClusterIDs) == 0)
-	return fc.ToMapOmitEmpty(), dropAll
+	return fc.ToMapOmitEmpty(fc), dropAll
 }
 
 // TODO use singleflight

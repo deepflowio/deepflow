@@ -47,5 +47,5 @@ func (p *PodNamespace) userPermittedResourceToConditions(upr *UserPermittedResou
 		IDs:    upr.PodNamespaceIDs,
 	}
 	dropAll := (len(fcs.VPCIDs) == 0 && len(fcs.IDs) == 0)
-	return fcs.ToMapOmitEmpty(), dropAll
+	return fcs.ToMapOmitEmpty(fcs), dropAll
 }

@@ -14,10 +14,15 @@
  * limitations under the License.
  */
 
-package resource
+package metrics
 
-import (
-	logging "github.com/op/go-logging"
-)
+import ()
 
-var log = logging.MustGetLogger("service.resource")
+var ALARM_EVENT_METRICS = map[string]*Metrics{}
+
+var ALARM_EVENT_METRICS_REPLACE = map[string]*Metrics{}
+
+func GetAlarmEventMetrics() map[string]*Metrics {
+	// TODO: 特殊指标量修改
+	return ALARM_EVENT_METRICS
+}
