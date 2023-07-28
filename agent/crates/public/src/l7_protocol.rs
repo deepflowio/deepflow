@@ -42,6 +42,7 @@ pub enum L7Protocol {
 
     // NoSQL
     Redis = 80,
+    MongoDB = 81,
 
     // MQ
     Kafka = 100,
@@ -70,6 +71,7 @@ impl From<String> for L7Protocol {
             "mysql" => Self::MySQL,
             "postgresql" => Self::PostgreSQL,
             "redis" => Self::Redis,
+            "mongodb" => Self::MongoDB,
             "kafka" => Self::Kafka,
             "mqtt" => Self::MQTT,
             "dns" => Self::DNS,

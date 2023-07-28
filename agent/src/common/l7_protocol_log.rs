@@ -36,7 +36,7 @@ use crate::flow_generator::protocol_logs::plugin::custom_wrap::CustomWrapLog;
 use crate::flow_generator::protocol_logs::plugin::get_custom_log_parser;
 use crate::flow_generator::protocol_logs::{
     get_protobuf_rpc_parser, DnsLog, DubboLog, HttpLog, KafkaLog, MqttLog, MysqlLog, PostgresqlLog,
-    ProtobufRpcWrapLog, RedisLog, SofaRpcLog,
+    ProtobufRpcWrapLog, RedisLog, MongoDBLog, SofaRpcLog,
 };
 use crate::flow_generator::{LogMessageType, Result};
 use crate::plugin::wasm::WasmVm;
@@ -265,6 +265,7 @@ impl_protocol_parser! {
         MySQL(MysqlLog),
         Kafka(KafkaLog),
         Redis(Box<RedisLog>),
+        MongoDB(MongoDBLog),
         PostgreSQL(Box<PostgresqlLog>),
         Dubbo(Box<DubboLog>),
         MQTT(MqttLog),

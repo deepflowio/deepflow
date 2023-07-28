@@ -160,6 +160,7 @@ const (
 	L7_PROTOCOL_MYSQL        L7Protocol = 60
 	L7_PROTOCOL_POSTGRE      L7Protocol = 61
 	L7_PROTOCOL_REDIS        L7Protocol = 80
+	L7_PROTOCOL_MONGO        L7Protocol = 81
 	L7_PROTOCOL_KAFKA        L7Protocol = 100
 	L7_PROTOCOL_MQTT         L7Protocol = 101
 	L7_PROTOCOL_DNS          L7Protocol = 120

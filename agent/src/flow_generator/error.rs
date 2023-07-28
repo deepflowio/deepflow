@@ -55,6 +55,8 @@ pub enum Error {
     MysqlLogParseFailed,
     #[error("mysql perf parse failed")]
     MysqlPerfParseFailed,
+    #[error("mongodb log parse failed")]
+    MongoDBLogParseFailed,
     #[error("{0}")]
     DNSLogParseFailed(String),
     #[error("{0}")]

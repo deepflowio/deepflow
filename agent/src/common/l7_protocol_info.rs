@@ -26,7 +26,7 @@ use crate::{
     flow_generator::{
         protocol_logs::{
             pb_adapter::L7ProtocolSendLog, DnsInfo, DubboInfo, HttpInfo, KafkaInfo, MqttInfo,
-            MysqlInfo, PostgreInfo, ProtobufRpcInfo, RedisInfo, SofaRpcInfo,
+            MysqlInfo, PostgreInfo, ProtobufRpcInfo, RedisInfo, MongoDBInfo, SofaRpcInfo,
         },
         AppProtoHead, LogMessageType, Result,
     },
@@ -63,6 +63,7 @@ all_protocol_info!(
     HttpInfo(HttpInfo),
     MysqlInfo(MysqlInfo),
     RedisInfo(RedisInfo),
+    MongoDBInfo(MongoDBInfo),
     DubboInfo(DubboInfo),
     KafkaInfo(KafkaInfo),
     MqttInfo(MqttInfo),
