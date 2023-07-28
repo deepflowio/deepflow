@@ -45,8 +45,8 @@ use crate::platform::{ApiWatcher, GenericPoller};
 use crate::{
     config::handler::DebugAccess,
     policy::PolicySetter,
-    rpc::{RunningConfig, Session, StaticConfig, Status},
-    trident::RunningMode,
+    rpc::{Session, StaticConfig, Status},
+    trident::{AgentId, RunningMode},
     utils::command::get_hostname,
 };
 use public::debug::{send_to, Error, QueueDebugger, QueueMessage, Result, MAX_BUF_SIZE};
@@ -76,7 +76,7 @@ pub struct ConstructDebugCtx {
     pub poller: Arc<GenericPoller>,
     pub session: Arc<Session>,
     pub static_config: Arc<StaticConfig>,
-    pub running_config: Arc<RwLock<RunningConfig>>,
+    pub agent_id: Arc<RwLock<AgentId>>,
     pub status: Arc<RwLock<Status>>,
     pub policy_setter: PolicySetter,
 }
@@ -498,7 +498,7 @@ impl Debugger {
                 context.runtime.clone(),
                 context.session,
                 context.static_config,
-                context.running_config,
+                context.agent_id,
                 context.status,
             ),
             queue: Arc::new(QueueDebugger::new()),

@@ -44,7 +44,8 @@ use crate::{
         InterfaceEntry, LibvirtXmlExtractor,
     },
     policy::{PolicyGetter, PolicySetter},
-    rpc::{RunningConfig, Session},
+    rpc::Session,
+    trident::AgentId,
     utils::{
         command::{
             get_all_vm_xml, get_brctl_show, get_hostname, get_ip_address, get_ovs_interfaces,
@@ -86,7 +87,7 @@ pub(super) struct ProcessArgs {
     pub(super) extra_netns_regex: Arc<Mutex<Option<Regex>>>,
     pub(super) override_os_hostname: Arc<Option<String>>,
     pub(super) pid_netns_id_map: Arc<RwLock<HashMap<u32, u32>>>,
-    pub(super) running_config: Arc<RwLock<RunningConfig>>,
+    pub(super) agent_id: Arc<RwLock<AgentId>>,
 }
 
 #[derive(Default)]
@@ -127,14 +128,14 @@ pub struct PlatformSynchronizer {
     extra_netns_regex: Arc<Mutex<Option<Regex>>>,
     override_os_hostname: Arc<Option<String>>,
     pid_netns_id_map: Arc<RwLock<HashMap<u32, u32>>>,
-    running_config: Arc<RwLock<RunningConfig>>,
+    agent_id: Arc<RwLock<AgentId>>,
 }
 
 impl PlatformSynchronizer {
     pub fn new(
         runtime: Arc<Runtime>,
         config: PlatformAccess,
-        running_config: Arc<RwLock<RunningConfig>>,
+        agent_id: Arc<RwLock<AgentId>>,
         session: Arc<Session>,
         xml_extractor: Arc<LibvirtXmlExtractor>,
         exception_handler: ExceptionHandler,
@@ -155,7 +156,7 @@ impl PlatformSynchronizer {
         Self {
             runtime,
             config,
-            running_config,
+            agent_id,
             version: Arc::new(AtomicU64::new(
                 SystemTime::now()
                     .duration_since(SystemTime::UNIX_EPOCH)
@@ -193,8 +194,8 @@ impl PlatformSynchronizer {
         if !*running_lock {
             let config_guard = self.config.load();
             let err = format!(
-                "PlatformSynchronizer has already stopped with ctrl-ip:{} vtap-id:{}",
-                self.running_config.read().ctrl_ip,
+                "PlatformSynchronizer has already stopped with agent-id:{} vtap-id:{}",
+                self.agent_id.read(),
                 config_guard.vtap_id
             );
             debug!("{}", err);
@@ -216,8 +217,8 @@ impl PlatformSynchronizer {
         if *running_guard {
             let config_guard = self.config.load();
             let err = format!(
-                "PlatformSynchronizer has already running with ctrl-ip:{} vtap-id:{}",
-                self.running_config.read().ctrl_ip.clone(),
+                "PlatformSynchronizer has already running with agent-id:{} vtap-id:{}",
+                self.agent_id.read(),
                 config_guard.vtap_id
             );
             debug!("{}", err);
@@ -229,7 +230,7 @@ impl PlatformSynchronizer {
         let process_args = ProcessArgs {
             runtime: self.runtime.clone(),
             config: self.config.clone(),
-            running_config: self.running_config.clone(),
+            agent_id: self.agent_id.clone(),
             running: self.running.clone(),
             version: self.version.clone(),
             kubernetes_poller: self.kubernetes_poller.clone(),
@@ -292,23 +293,10 @@ impl PlatformSynchronizer {
 
         let mut raw_ip_netns = vec![];
         let mut raw_ip_addrs = vec![];
-        let current_ns = if netns.len() > 1 {
-            // for restore
-            let current_ns = netns::open_current_ns();
-            if let Err(e) = current_ns {
-                warn!("get self net namespace failed: {:?}", e);
-                return;
-            }
-            current_ns.ok()
-        } else {
-            None
-        };
         for ns in netns {
-            if ns != &NsFile::Root {
-                if let Err(e) = netns::open_named_and_setns(ns) {
-                    warn!("setns to {:?} failed: {}", ns, e);
-                    continue;
-                }
+            if let Err(e) = netns::open_named_and_setns(ns) {
+                warn!("setns to {:?} failed: {}", ns, e);
+                continue;
             }
             let raw_host_ip_addr = get_ip_address()
                 .map_err(|err| debug!("get_ip_address error:{}", err))
@@ -325,11 +313,9 @@ impl PlatformSynchronizer {
             raw_ip_netns.push(ns.to_string());
             raw_ip_addrs.push(raw_host_ip_addr.unwrap_or_default());
         }
-        if let Some(ns) = current_ns {
-            if let Err(e) = netns::setns(&ns, Some(netns::CURRENT_NS_PATH)) {
-                warn!("restore net namespace failed: {}", e);
-                return;
-            }
+        if let Err(e) = netns::reset_netns() {
+            warn!("restore net namespace failed: {}", e);
+            return;
         }
 
         let mut raw_all_vm_xml = None;
@@ -689,7 +675,7 @@ impl PlatformSynchronizer {
             let proc_scan_conf = &config_guard.os_proc_scan_conf;
             let cur_vtap_id = config_guard.vtap_id;
             let trident_type = config_guard.trident_type;
-            let ctrl_ip = args.running_config.read().ctrl_ip.clone();
+            let ctrl_ip = args.agent_id.read().ip.to_string();
             let poll_interval = config_guard.sync_interval;
             let kubernetes_cluster_id = config_guard.kubernetes_cluster_id.clone();
             let libvirt_xml_path = config_guard.libvirt_xml_path.clone();
@@ -825,7 +811,7 @@ impl PlatformSynchronizer {
 pub struct SocketSynchronizer {
     runtime: Arc<Runtime>,
     config: PlatformAccess,
-    running_config: Arc<RwLock<RunningConfig>>,
+    agent_id: Arc<RwLock<AgentId>>,
     stop_notify: Arc<Condvar>,
     session: Arc<Session>,
     running: Arc<Mutex<bool>>,
@@ -838,7 +824,7 @@ impl SocketSynchronizer {
     pub fn new(
         runtime: Arc<Runtime>,
         config: PlatformAccess,
-        running_config: Arc<RwLock<RunningConfig>>,
+        agent_id: Arc<RwLock<AgentId>>,
         policy_getter: Arc<Mutex<PolicyGetter>>,
         policy_setter: PolicySetter,
         session: Arc<Session>,
@@ -861,7 +847,7 @@ impl SocketSynchronizer {
         Self {
             runtime,
             config,
-            running_config,
+            agent_id,
             policy_getter,
             policy_setter,
             stop_notify: Arc::new(Condvar::new()),
@@ -887,7 +873,7 @@ impl SocketSynchronizer {
             runtime,
             running,
             config,
-            running_config,
+            agent_id,
             policy_getter,
             policy_setter,
             session,
@@ -897,7 +883,7 @@ impl SocketSynchronizer {
             self.runtime.clone(),
             self.running.clone(),
             self.config.clone(),
-            self.running_config.clone(),
+            self.agent_id.clone(),
             self.policy_getter.clone(),
             self.policy_setter,
             self.session.clone(),
@@ -912,7 +898,7 @@ impl SocketSynchronizer {
                     runtime,
                     running,
                     config,
-                    running_config,
+                    agent_id,
                     policy_getter,
                     policy_setter,
                     session,
@@ -930,7 +916,7 @@ impl SocketSynchronizer {
         runtime: Arc<Runtime>,
         running: Arc<Mutex<bool>>,
         config: PlatformAccess,
-        running_config: Arc<RwLock<RunningConfig>>,
+        agent_id: Arc<RwLock<AgentId>>,
         policy_getter: Arc<Mutex<PolicyGetter>>,
         policy_setter: PolicySetter,
         session: Arc<Session>,
@@ -957,8 +943,10 @@ impl SocketSynchronizer {
                     continue;
                 }
 
-                let ctrl_ip = running_config.read().ctrl_ip.clone();
-                let ctrl_mac = running_config.read().ctrl_mac.clone();
+                let (ctrl_ip, ctrl_mac) = {
+                    let id = agent_id.read();
+                    (id.ip.to_string(), id.mac.to_string())
+                };
                 let mut policy_getter = policy_getter.lock().unwrap();
 
                 let sock_entries = match get_all_socket(

@@ -67,7 +67,15 @@ pub fn check_read_link_ns() -> bool {
 }
 
 impl GenericPoller {
-    pub fn new(dest: IpAddr, config: PlatformAccess, extra_netns_regex: String) -> Self {
+    pub fn new(
+        dest: IpAddr,
+        config: PlatformAccess,
+        extra_netns_regex: String,
+        sidecar_mode: bool,
+    ) -> Self {
+        if sidecar_mode {
+            return SidecarPoller::new(dest).into();
+        }
         let (can_set_ns, can_read_link_ns) = (check_set_ns(), check_read_link_ns());
 
         if !can_set_ns || !can_read_link_ns {
@@ -106,7 +114,6 @@ impl GenericPoller {
             KubernetesPollerType::Passive => {
                 PassivePoller::new(sync_interval, config.clone()).into()
             }
-            KubernetesPollerType::Sidecar => SidecarPoller::new(dest).into(),
         }
     }
 }

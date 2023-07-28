@@ -56,9 +56,15 @@ struct Opts {
     #[clap(long)]
     check_privileges: bool,
 
-    /// grant capabilities including cap_net_admin, cap_net_raw,cap_net_bind_service
+    /// Grant capabilities including cap_net_admin, cap_net_raw,cap_net_bind_service
     #[clap(long)]
     add_cap: bool,
+
+    /// Run agent in sidecar mode.
+    /// Environment variable `CTRL_NETWORK_INTERFACE` must be specified and
+    /// optionally `K8S_POD_IP_FOR_DEEPFLOW` can be set to override ip address.
+    #[clap(long)]
+    sidecar: bool,
 }
 
 #[cfg(unix)]
@@ -105,6 +111,7 @@ fn main() -> Result<()> {
         } else {
             trident::RunningMode::Managed
         },
+        opts.sidecar,
     )?;
     wait_on_signals();
     t.stop();

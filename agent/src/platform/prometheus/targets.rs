@@ -33,7 +33,8 @@ use tokio::runtime::Runtime;
 use crate::{
     config::handler::PlatformAccess,
     exception::ExceptionHandler,
-    rpc::{RunningConfig, Session},
+    rpc::Session,
+    trident::AgentId,
     utils::{
         environment::{running_in_container, running_in_only_watch_k8s_mode},
         stats::{self, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption},
@@ -79,14 +80,14 @@ pub struct TargetsWatcher {
     session: Arc<Session>,
     exception_handler: ExceptionHandler,
     stats_collector: Arc<stats::Collector>,
-    running_config: Arc<RwLock<RunningConfig>>,
+    agent_id: Arc<RwLock<AgentId>>,
 }
 
 impl TargetsWatcher {
     pub fn new(
         runtime: Arc<Runtime>,
         config: PlatformAccess,
-        running_config: Arc<RwLock<RunningConfig>>,
+        agent_id: Arc<RwLock<AgentId>>,
         session: Arc<Session>,
         exception_handler: ExceptionHandler,
         stats_collector: Arc<stats::Collector>,
@@ -106,7 +107,7 @@ impl TargetsWatcher {
             thread: Mutex::new(None),
             session,
             running: Arc::new(AtomicBool::new(false)),
-            running_config,
+            agent_id,
             exception_handler,
             stats_collector,
         }
@@ -156,7 +157,7 @@ impl TargetsWatcher {
         let session = self.session.clone();
         let running = self.running.clone();
 
-        let running_config = self.running_config.clone();
+        let agent_id = self.agent_id.clone();
         let exception_handler = self.exception_handler.clone();
         let interval = config_guard.sync_interval;
         let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
@@ -171,7 +172,7 @@ impl TargetsWatcher {
                         &session,
                         &exception_handler,
                         &mut encoder,
-                        &running_config,
+                        &agent_id,
                     );
                     thread::sleep(interval);
                 }
@@ -191,7 +192,7 @@ impl TargetsWatcher {
         session: &Arc<Session>,
         exception_handler: &ExceptionHandler,
         encoder: &mut ZlibEncoder<Vec<u8>>,
-        running_config: &Arc<RwLock<RunningConfig>>,
+        agent_id: &Arc<RwLock<AgentId>>,
     ) {
         let config_guard = context.config.load();
         let api = config_guard.prometheus_http_api_address.clone() + API_TARGETS_ENDPOINT;
@@ -241,7 +242,7 @@ impl TargetsWatcher {
             cluster_id: Some(config_guard.kubernetes_cluster_id.to_string()),
             version: pb_version,
             vtap_id: Some(config_guard.vtap_id as u32),
-            source_ip: Some(running_config.read().ctrl_ip.clone()),
+            source_ip: Some(agent_id.read().ip.to_string()),
             error_msg: Some(err_msgs.join(";")),
             entries: total_entries,
         };

@@ -542,10 +542,10 @@ pub fn get_mac_by_name(src_interface: String) -> u32 {
     }
 }
 
-pub fn get_ctrl_ip_and_mac(dest: IpAddr) -> (IpAddr, MacAddr) {
+pub fn get_ctrl_ip_and_mac(dest: &IpAddr) -> (IpAddr, MacAddr) {
     // Steps to find ctrl ip and mac:
     // 1. If environment variable `ENV_INTERFACE_NAME` exists, use it as ctrl interface
-    //    a) Use environment variable `K8S_NODE_IP_FOR_DEEPFLOW` as ctrl ip if it exists
+    //    a) Use environment variable `K8S_POD_IP_FOR_DEEPFLOW` as ctrl ip if it exists
     //    b) If not, find addresses on the ctrl interface
     // 2. Use env.K8S_NODE_IP_FOR_DEEPFLOW as the ctrl_ip reported by deepflow-agent if available
     // 3. Find ctrl ip and mac from controller address
@@ -592,69 +592,61 @@ pub fn get_ctrl_ip_and_mac(dest: IpAddr) -> (IpAddr, MacAddr) {
         thread::sleep(Duration::from_secs(1));
         process::exit(-1);
     };
-    match get_k8s_local_node_ip() {
-        Some(ip) => {
-            let ctrl_mac = get_mac_by_ip(ip);
-            if ctrl_mac.is_err() {
-                error!(
-                    "failed getting ctrl_mac from {}: {:?}, deepflow-agent restart...",
-                    ip, ctrl_mac
-                );
-                thread::sleep(Duration::from_secs(1));
-                process::exit(-1);
-            }
-            (ip, ctrl_mac.unwrap())
-        }
-        None => {
-            // FIXME: Getting ctrl_ip and ctrl_mac sometimes fails, increase three retry opportunities to ensure access to ctrl_ip and ctrl_mac
-            'outer: for _ in 0..3 {
-                let tuple = get_route_src_ip_and_mac(&dest);
-                if tuple.is_err() {
-                    warn!(
-                        "failed getting control ip and mac from {}, because: {:?}, wait 1 second",
-                        dest, tuple,
-                    );
-                    thread::sleep(Duration::from_secs(1));
-                    continue;
-                }
-                let (ip, mac) = tuple.unwrap();
-                let links = link_list();
-                if links.is_err() {
-                    warn!(
-                        "failed getting local interfaces, because: {:?}, wait 1 second",
-                        links
-                    );
-                    thread::sleep(Duration::from_secs(1));
-                    continue;
-                }
-                // When the found IP is attached to a Down network card,
-                // use the public IP to check again to find the outgoing
-                // interface of the default route.
-                for link in links.unwrap().iter() {
-                    if link.mac_addr == mac {
-                        if !link.flags.contains(LinkFlags::UP) {
-                            let dest = if dest.is_ipv4() {
-                                DNS_HOST_IPV4
-                            } else {
-                                DNS_HOST_IPV6
-                            };
-                            let tuple = get_route_src_ip_and_mac(&dest);
-                            if tuple.is_err() {
-                                warn!("failed getting control ip and mac from {}, because: {:?}, wait 1 second", dest, tuple);
-                                continue 'outer;
-                            }
-                            return tuple.unwrap();
-                        }
-                        break;
-                    }
-                }
-
-                return (ip, mac);
-            }
-            error!("failed getting control ip and mac, deepflow-agent restart...");
-            process::exit(-1);
+    if let Some(ip) = get_k8s_local_node_ip() {
+        let ctrl_mac = get_mac_by_ip(ip);
+        if let Ok(mac) = ctrl_mac {
+            return (ip, mac);
         }
     }
+
+    // FIXME: Getting ctrl_ip and ctrl_mac sometimes fails, increase three retry opportunities to ensure access to ctrl_ip and ctrl_mac
+    'outer: for _ in 0..3 {
+        let tuple = get_route_src_ip_and_mac(dest);
+        if tuple.is_err() {
+            warn!(
+                "failed getting control ip and mac from {}, because: {:?}, wait 1 second",
+                dest, tuple,
+            );
+            thread::sleep(Duration::from_secs(1));
+            continue;
+        }
+        let (ip, mac) = tuple.unwrap();
+        let links = link_list();
+        if links.is_err() {
+            warn!(
+                "failed getting local interfaces, because: {:?}, wait 1 second",
+                links
+            );
+            thread::sleep(Duration::from_secs(1));
+            continue;
+        }
+        // When the found IP is attached to a Down network card,
+        // use the public IP to check again to find the outgoing
+        // interface of the default route.
+        for link in links.unwrap().iter() {
+            if link.mac_addr == mac {
+                if !link.flags.contains(LinkFlags::UP) {
+                    let dest = if dest.is_ipv4() {
+                        DNS_HOST_IPV4
+                    } else {
+                        DNS_HOST_IPV6
+                    };
+                    let tuple = get_route_src_ip_and_mac(&dest);
+                    if tuple.is_err() {
+                        warn!("failed getting control ip and mac from {}, because: {:?}, wait 1 second", dest, tuple);
+                        continue 'outer;
+                    }
+                    return tuple.unwrap();
+                }
+                break;
+            }
+        }
+
+        return (ip, mac);
+    }
+    error!("failed getting control ip and mac, deepflow-agent restart...");
+    thread::sleep(Duration::from_secs(1));
+    process::exit(-1);
 }
 
 //TODO Windows 相关

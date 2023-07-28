@@ -39,7 +39,7 @@ use flexi_logger::Duplicate;
 use flexi_logger::{
     colored_opt_format, Age, Cleanup, Criterion, FileSpec, Logger, LoggerHandle, Naming,
 };
-use log::{info, warn};
+use log::{debug, info, warn};
 #[cfg(target_os = "linux")]
 use regex::Regex;
 use tokio::runtime::{Builder, Runtime};
@@ -124,7 +124,7 @@ use public::{
     proto::trident::{self, Exception, IfMacSource, SocketType, TapMode},
     queue::{self, DebugSender},
     sender::SendMessageType,
-    utils::net::{get_route_src_ip, links_by_name_regex, MacAddr},
+    utils::net::{get_route_src_ip, links_by_name_regex, Link, MacAddr},
     LeakyBucket,
 };
 
@@ -203,6 +203,18 @@ CompileTime: {}",
 
 pub type TridentState = Arc<(Mutex<State>, Condvar)>;
 
+#[derive(Clone, Debug)]
+pub struct AgentId {
+    pub ip: IpAddr,
+    pub mac: MacAddr,
+}
+
+impl fmt::Display for AgentId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}/{}", self.ip, self.mac)
+    }
+}
+
 pub struct Trident {
     state: TridentState,
     handle: Option<JoinHandle<()>>,
@@ -213,6 +225,7 @@ impl Trident {
         config_path: P,
         version_info: &'static VersionInfo,
         agent_mode: RunningMode,
+        sidecar_mode: bool,
     ) -> Result<Trident> {
         let config = match agent_mode {
             RunningMode::Managed => {
@@ -340,6 +353,7 @@ impl Trident {
                 remote_log_config,
                 stats_collector,
                 config_path,
+                sidecar_mode,
             ) {
                 warn!(
                     "Launching deepflow-agent failed: {}, deepflow-agent restart...",
@@ -360,20 +374,46 @@ impl Trident {
         remote_log_config: RemoteLogConfig,
         stats_collector: Arc<stats::Collector>,
         config_path: Option<PathBuf>,
+        sidecar_mode: bool,
     ) -> Result<()> {
         info!("==================== Launching DeepFlow-Agent ====================");
         info!("Environment variables: {:?}", get_env());
 
-        let (ctrl_ip, ctrl_mac) = get_ctrl_ip_and_mac(config.controller_ips[0].parse()?);
+        let controller_ip: IpAddr = config.controller_ips[0].parse()?;
+
+        let (ctrl_ip, ctrl_mac) = get_ctrl_ip_and_mac(&controller_ip);
         if running_in_container() {
             info!(
                 "use K8S_NODE_IP_FOR_DEEPFLOW env ip as destination_ip({})",
                 ctrl_ip
             );
         }
+
+        let agent_id = if sidecar_mode {
+            AgentId {
+                ip: ctrl_ip.clone(),
+                mac: ctrl_mac,
+            }
+        } else {
+            // use host ip/mac as agent id if not in sidecar mode
+            if let Err(e) = netns::open_named_and_setns(&NsFile::Root) {
+                warn!("agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'.");
+                warn!("setns error: {}", e);
+                thread::sleep(Duration::from_secs(1));
+                process::exit(-1);
+            }
+            let (ip, mac) = get_ctrl_ip_and_mac(&controller_ip);
+            if let Err(e) = netns::reset_netns() {
+                warn!("reset setns error: {}", e);
+                thread::sleep(Duration::from_secs(1));
+                process::exit(-1);
+            };
+            AgentId { ip, mac }
+        };
+
         info!(
-            "agent running in {:?} mode, ctrl_ip {} ctrl_mac {}",
-            config.agent_mode, ctrl_ip, ctrl_mac
+            "agent {} running in {:?} mode, ctrl_ip {} ctrl_mac {}",
+            agent_id, config.agent_mode, ctrl_ip, ctrl_mac
         );
 
         let exception_handler = ExceptionHandler::default();
@@ -420,8 +460,7 @@ impl Trident {
             session.clone(),
             state.clone(),
             version_info,
-            ctrl_ip.to_string(),
-            ctrl_mac.to_string(),
+            agent_id,
             config_handler.static_config.controller_ips[0].clone(),
             config_handler.static_config.vtap_group_id_request.clone(),
             config_handler.static_config.kubernetes_cluster_id.clone(),
@@ -490,7 +529,7 @@ impl Trident {
             let syn = Arc::new(PlatformSynchronizer::new(
                 runtime.clone(),
                 config_handler.platform(),
-                synchronizer.running_config.clone(),
+                synchronizer.agent_id.clone(),
                 session.clone(),
                 ext.clone(),
                 exception_handler.clone(),
@@ -509,7 +548,7 @@ impl Trident {
         let platform_synchronizer = Arc::new(PlatformSynchronizer::new(
             runtime.clone(),
             config_handler.platform(),
-            synchronizer.running_config.clone(),
+            synchronizer.agent_id.clone(),
             session.clone(),
             exception_handler.clone(),
             config_handler.static_config.override_os_hostname.clone(),
@@ -525,7 +564,7 @@ impl Trident {
         let api_watcher = Arc::new(ApiWatcher::new(
             runtime.clone(),
             config_handler.platform(),
-            synchronizer.running_config.clone(),
+            synchronizer.agent_id.clone(),
             session.clone(),
             exception_handler.clone(),
             stats_collector.clone(),
@@ -666,6 +705,7 @@ impl Trident {
                         api_watcher.clone(),
                         vm_mac_addrs,
                         config_handler.static_config.agent_mode,
+                        sidecar_mode,
                         runtime.clone(),
                     )?;
 
@@ -762,6 +802,49 @@ impl Trident {
     }
 }
 
+#[cfg(target_os = "linux")]
+fn get_listener_links(conf: &DispatcherConfig, listener: &DispatcherListener) -> Vec<Link> {
+    let netns = listener.netns();
+    let interfaces = match links_by_name_regex_in_netns(&conf.tap_interface_regex, &netns) {
+        Err(e) => {
+            warn!("get interfaces by name regex in {:?} failed: {}", netns, e);
+            vec![]
+        }
+        Ok(links) => {
+            if links.is_empty() {
+                warn!(
+                    "tap-interface-regex({}) do not match any interface in {:?}, in local mode",
+                    conf.tap_interface_regex, netns,
+                );
+            }
+            links
+        }
+    };
+    debug!("tap interfaces in namespace {:?}: {:?}", netns, interfaces);
+    interfaces
+}
+
+#[cfg(not(target_os = "linux"))]
+fn get_listener_links(conf: &DispatcherConfig, _: &DispatcherListener) -> Vec<Link> {
+    let interfaces = match links_by_name_regex(&conf.tap_interface_regex) {
+        Err(e) => {
+            warn!("get interfaces by name regex failed: {}", e);
+            vec![]
+        }
+        Ok(links) => {
+            if links.is_empty() {
+                warn!(
+                    "tap-interface-regex({}) do not match any interface, in local mode",
+                    conf.tap_interface_regex
+                );
+            }
+            links
+        }
+    };
+    debug!("tap interfaces: {:?}", interfaces);
+    interfaces
+}
+
 fn dispatcher_listener_callback(
     conf: &DispatcherConfig,
     components: &mut AgentComponents,
@@ -772,55 +855,10 @@ fn dispatcher_listener_callback(
     match conf.tap_mode {
         TapMode::Local => {
             let if_mac_source = conf.if_mac_source;
-            let links = match links_by_name_regex(&conf.tap_interface_regex) {
-                Err(e) => {
-                    warn!("get interfaces by name regex failed: {}", e);
-                    vec![]
-                }
-                Ok(links) => {
-                    if links.is_empty() {
-                        warn!(
-                            "tap-interface-regex({}) do not match any interface, in local mode",
-                            conf.tap_interface_regex
-                        );
-                    }
-                    links
-                }
-            };
             for listener in components.dispatcher_listeners.iter() {
-                #[cfg(target_os = "linux")]
-                let netns = listener.netns();
-                #[cfg(target_os = "linux")]
-                if netns != NsFile::Root {
-                    let interfaces = match links_by_name_regex_in_netns(
-                        &conf.tap_interface_regex,
-                        &netns,
-                    ) {
-                        Err(e) => {
-                            warn!("get interfaces by name regex in {:?} failed: {}", netns, e);
-                            vec![]
-                        }
-                        Ok(links) => {
-                            if links.is_empty() {
-                                warn!(
-                                    "tap-interface-regex({}) do not match any interface in {:?}, in local mode",
-                                    conf.tap_interface_regex, netns,
-                                );
-                            }
-                            links
-                        }
-                    };
-                    info!("tap interface in namespace {:?}: {:?}", netns, interfaces);
-                    listener.on_tap_interface_change(
-                        &interfaces,
-                        if_mac_source,
-                        conf.trident_type,
-                        &blacklist,
-                    );
-                    continue;
-                }
+                let interfaces = get_listener_links(conf, listener);
                 listener.on_tap_interface_change(
-                    &links,
+                    &interfaces,
                     if_mac_source,
                     conf.trident_type,
                     &blacklist,
@@ -886,6 +924,8 @@ pub struct DomainNameListener {
     ips: Vec<String>,
     domain_names: Vec<String>,
 
+    sidecar_mode: bool,
+
     thread_handler: Option<JoinHandle<()>>,
     stopped: Arc<AtomicBool>,
 }
@@ -901,6 +941,7 @@ impl DomainNameListener {
         #[cfg(target_os = "linux")] prometheus_targets_watcher: Arc<TargetsWatcher>,
         domain_names: Vec<String>,
         ips: Vec<String>,
+        sidecar_mode: bool,
     ) -> DomainNameListener {
         Self {
             stats_collector: stats_collector.clone(),
@@ -913,6 +954,8 @@ impl DomainNameListener {
 
             domain_names: domain_names.clone(),
             ips: ips.clone(),
+
+            sidecar_mode,
 
             thread_handler: None,
             stopped: Arc::new(AtomicBool::new(false)),
@@ -960,6 +1003,8 @@ impl DomainNameListener {
         let domain_names = self.domain_names.clone();
         let stopped = self.stopped.clone();
 
+        let sidecar_mode = self.sidecar_mode;
+
         info!(
             "Resolve controller domain name {} {}",
             domain_names[0], ips[0]
@@ -991,17 +1036,31 @@ impl DomainNameListener {
                         }
 
                         if changed {
-                            let (ctrl_ip, ctrl_mac) = get_ctrl_ip_and_mac(ips[0].parse().unwrap());
+                            let (ctrl_ip, ctrl_mac) = get_ctrl_ip_and_mac(&ips[0].parse().unwrap());
                             info!(
                                 "use K8S_NODE_IP_FOR_DEEPFLOW env ip as destination_ip({})",
                                 ctrl_ip
                             );
+                            let agent_id = if sidecar_mode {
+                                AgentId { ip: ctrl_ip.clone(), mac: ctrl_mac }
+                            } else {
+                                // use host ip/mac as agent id if not in sidecar mode
+                                if let Err(e) = netns::open_named_and_setns(&NsFile::Root) {
+                                    warn!("agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'.");
+                                    warn!("setns error: {}", e);
+                                    thread::sleep(Duration::from_secs(1));
+                                    process::exit(-1);
+                                }
+                                let (ip, mac) = get_ctrl_ip_and_mac(&ips[0].parse().unwrap());
+                                if let Err(e) = netns::reset_netns() {
+                                    warn!("reset setns error: {}", e);
+                                    thread::sleep(Duration::from_secs(1));
+                                    process::exit(-1);
+                                };
+                                AgentId { ip, mac }
+                            };
 
-                            synchronizer.reset_session(
-                                ips.clone(),
-                                ctrl_ip.to_string(),
-                                ctrl_mac.to_string(),
-                            );
+                            synchronizer.reset_session(ips.clone(), agent_id);
                             platform_synchronizer.reset_session(ips.clone());
                             #[cfg(target_os = "linux")]
                             api_watcher.reset_session(ips.clone());
@@ -1043,13 +1102,14 @@ impl WatcherComponents {
         api_watcher: Arc<ApiWatcher>,
         exception_handler: ExceptionHandler,
         agent_mode: RunningMode,
+        sidecar_mode: bool,
         runtime: Arc<Runtime>,
     ) -> Result<Self> {
         let candidate_config = &config_handler.candidate_config;
         let prometheus_targets_watcher = Arc::new(TargetsWatcher::new(
             runtime.clone(),
             config_handler.platform(),
-            synchronizer.running_config.clone(),
+            synchronizer.agent_id.clone(),
             session.clone(),
             exception_handler.clone(),
             stats_collector.clone(),
@@ -1063,6 +1123,7 @@ impl WatcherComponents {
             prometheus_targets_watcher.clone(),
             config_handler.static_config.controller_domain_name.clone(),
             config_handler.static_config.controller_ips.clone(),
+            sidecar_mode,
         );
 
         info!("With ONLY_WATCH_K8S_RESOURCE and IN_CONTAINER environment variables set, the agent will only watch K8s resource");
@@ -1307,6 +1368,7 @@ impl AgentComponents {
         #[cfg(target_os = "linux")] api_watcher: Arc<ApiWatcher>,
         vm_mac_addrs: Vec<MacAddr>,
         agent_mode: RunningMode,
+        sidecar_mode: bool,
         runtime: Arc<Runtime>,
     ) -> Result<Self> {
         let static_config = &config_handler.static_config;
@@ -1405,6 +1467,7 @@ impl AgentComponents {
                 .dispatcher
                 .extra_netns_regex
                 .clone(),
+            sidecar_mode,
         ));
         #[cfg(target_os = "linux")]
         platform_synchronizer.set_kubernetes_poller(kubernetes_poller.clone());
@@ -1413,7 +1476,7 @@ impl AgentComponents {
         let prometheus_targets_watcher = Arc::new(TargetsWatcher::new(
             runtime.clone(),
             config_handler.platform(),
-            synchronizer.running_config.clone(),
+            synchronizer.agent_id.clone(),
             session.clone(),
             exception_handler.clone(),
             stats_collector.clone(),
@@ -1427,7 +1490,7 @@ impl AgentComponents {
             poller: kubernetes_poller.clone(),
             session: session.clone(),
             static_config: synchronizer.static_config.clone(),
-            running_config: synchronizer.running_config.clone(),
+            agent_id: synchronizer.agent_id.clone(),
             status: synchronizer.status.clone(),
             config: config_handler.debug(),
             policy_setter,
@@ -1451,7 +1514,7 @@ impl AgentComponents {
         let socket_synchronizer = SocketSynchronizer::new(
             runtime.clone(),
             config_handler.platform(),
-            synchronizer.running_config.clone(),
+            synchronizer.agent_id.clone(),
             Arc::new(Mutex::new(policy_getter)),
             policy_setter,
             session.clone(),
@@ -2203,6 +2266,7 @@ impl AgentComponents {
             prometheus_targets_watcher.clone(),
             config_handler.static_config.controller_domain_name.clone(),
             config_handler.static_config.controller_ips.clone(),
+            sidecar_mode,
         );
 
         let sender_config = config_handler.sender().load();
@@ -2492,6 +2556,7 @@ impl Components {
         #[cfg(target_os = "linux")] api_watcher: Arc<ApiWatcher>,
         vm_mac_addrs: Vec<MacAddr>,
         agent_mode: RunningMode,
+        sidecar_mode: bool,
         runtime: Arc<Runtime>,
     ) -> Result<Self> {
         #[cfg(target_os = "linux")]
@@ -2505,6 +2570,7 @@ impl Components {
                 api_watcher,
                 exception_handler,
                 agent_mode,
+                sidecar_mode,
                 runtime,
             )?;
             return Ok(Components::Watcher(components));
@@ -2524,6 +2590,7 @@ impl Components {
             api_watcher,
             vm_mac_addrs,
             agent_mode,
+            sidecar_mode,
             runtime,
         )?;
         return Ok(Components::Agent(components));
