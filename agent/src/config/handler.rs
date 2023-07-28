@@ -155,7 +155,8 @@ impl fmt::Debug for CollectorConfig {
                 &self
                     .l4_log_store_tap_types
                     .iter()
-                    .filter(|&b| *b)
+                    .enumerate()
+                    .filter(|&(_, b)| *b)
                     .collect::<Vec<_>>(),
             )
             .field(
@@ -163,7 +164,14 @@ impl fmt::Debug for CollectorConfig {
                 &self
                     .l4_log_ignore_tap_sides
                     .iter()
-                    .filter(|&b| *b)
+                    .enumerate()
+                    .filter_map(|(i, b)| {
+                        if *b {
+                            TapSide::try_from(i as u8).ok()
+                        } else {
+                            None
+                        }
+                    })
                     .collect::<Vec<_>>(),
             )
             .field(
@@ -1749,19 +1757,51 @@ impl ConfigHandler {
                 != new_config.collector.l4_log_store_tap_types
             {
                 info!(
-                    "collector config l4_log_store_tap_types change from {:?} to {:?}, will restart dispatcher",
-                    candidate_config.collector.l4_log_store_tap_types
-                                        .iter()
-                                        .enumerate()
-                                        .filter(|&(_, b)| *b)
-                                        .collect::<Vec<_>>(),
-                    new_config.collector.l4_log_store_tap_types
-                                        .iter()
-                                        .enumerate()
-                                        .filter(|&(_, b)| *b)
-                                        .collect::<Vec<_>>()
+                    "collector config l4_log_store_tap_types change from {:?} to {:?}",
+                    candidate_config
+                        .collector
+                        .l4_log_store_tap_types
+                        .iter()
+                        .enumerate()
+                        .filter(|&(_, b)| *b)
+                        .collect::<Vec<_>>(),
+                    new_config
+                        .collector
+                        .l4_log_store_tap_types
+                        .iter()
+                        .enumerate()
+                        .filter(|&(_, b)| *b)
+                        .collect::<Vec<_>>()
                 );
-                restart_dispatcher = true;
+            }
+            if candidate_config.collector.l4_log_ignore_tap_sides
+                != new_config.collector.l4_log_ignore_tap_sides
+            {
+                info!(
+                    "collector config l4_log_store_tap_types change from {:?} to {:?}",
+                    candidate_config
+                        .collector
+                        .l4_log_ignore_tap_sides
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(i, b)| if *b {
+                            TapSide::try_from(i as u8).ok()
+                        } else {
+                            None
+                        })
+                        .collect::<Vec<_>>(),
+                    new_config
+                        .collector
+                        .l4_log_ignore_tap_sides
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(i, b)| if *b {
+                            TapSide::try_from(i as u8).ok()
+                        } else {
+                            None
+                        })
+                        .collect::<Vec<_>>(),
+                );
             }
 
             if candidate_config.collector.vtap_id != new_config.collector.vtap_id {
@@ -1987,6 +2027,35 @@ impl ConfigHandler {
                 info!(
                     "l7 log collect nps threshold set to {}",
                     new_config.log_parser.l7_log_collect_nps_threshold
+                );
+            }
+            if candidate_config.log_parser.l7_log_ignore_tap_sides
+                != new_config.log_parser.l7_log_ignore_tap_sides
+            {
+                info!(
+                    "l7 log config l7_log_store_tap_types change from {:?} to {:?}",
+                    candidate_config
+                        .log_parser
+                        .l7_log_ignore_tap_sides
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(i, b)| if *b {
+                            TapSide::try_from(i as u8).ok()
+                        } else {
+                            None
+                        })
+                        .collect::<Vec<_>>(),
+                    new_config
+                        .log_parser
+                        .l7_log_ignore_tap_sides
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(i, b)| if *b {
+                            TapSide::try_from(i as u8).ok()
+                        } else {
+                            None
+                        })
+                        .collect::<Vec<_>>(),
                 );
             }
 
