@@ -243,7 +243,7 @@ impl L7ProtocolParserInterface for MysqlLog {
         let mut info = MysqlInfo::default();
         info.protocol_version = self.protocol_version;
         info.is_tls = param.is_tls();
-        if self.perf_stats.is_none() {
+        if self.perf_stats.is_none() && param.parse_perf {
             self.perf_stats = Some(L7PerfStats::default())
         };
         if self.parse(
@@ -266,9 +266,13 @@ impl L7ProtocolParserInterface for MysqlLog {
         }
         info.cal_rrt(param, None).map(|rrt| {
             info.rrt = rrt;
-            self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
         });
-        Ok(L7ParseResult::Single(L7ProtocolInfo::MysqlInfo(info)))
+        if param.parse_log {
+            Ok(L7ParseResult::Single(L7ProtocolInfo::MysqlInfo(info)))
+        } else {
+            Ok(L7ParseResult::None)
+        }
     }
 
     fn parsable_on_udp(&self) -> bool {
@@ -334,7 +338,7 @@ impl MysqlLog {
             COM_PING => {}
             _ => return Err(Error::MysqlLogParseFailed),
         }
-        self.perf_stats.as_mut().unwrap().inc_req();
+        self.perf_stats.as_mut().map(|p| p.inc_req());
         Ok(())
     }
 
@@ -396,7 +400,7 @@ impl MysqlLog {
                     info.error_message =
                         String::from_utf8_lossy(&payload[error_message_offset..]).into_owned();
                 }
-                self.perf_stats.as_mut().unwrap().inc_resp_err();
+                self.perf_stats.as_mut().map(|p| p.inc_resp_err());
             }
             MYSQL_RESPONSE_CODE_OK => {
                 info.status = L7ResponseStatus::Ok;
@@ -405,7 +409,7 @@ impl MysqlLog {
             }
             _ => (),
         }
-        self.perf_stats.as_mut().unwrap().inc_resp();
+        self.perf_stats.as_mut().map(|p| p.inc_resp());
         Ok(())
     }
 
@@ -595,12 +599,12 @@ mod tests {
             };
             let is_mysql = mysql.check_payload(
                 payload,
-                &ParseParam::from((packet as &MetaPacket, log_cache.clone(), false)),
+                &ParseParam::new(packet as &MetaPacket, log_cache.clone(), true, true),
             );
 
             let info = mysql.parse_payload(
                 payload,
-                &ParseParam::from((&*packet, log_cache.clone(), false)),
+                &ParseParam::new(&*packet, log_cache.clone(), true, true),
             );
 
             if let Ok(info) = info {
@@ -735,7 +739,7 @@ mod tests {
                 packet.lookup_key.direction = PacketDirection::ServerToClient;
             }
             if packet.get_l4_payload().is_some() {
-                let param = &ParseParam::from((&*packet, rrt_cache.clone(), true));
+                let param = &ParseParam::new(&*packet, rrt_cache.clone(), true, true);
                 let _ = mysql.parse_payload(packet.get_l4_payload().unwrap(), param);
             }
         }

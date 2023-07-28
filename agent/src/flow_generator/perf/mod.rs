@@ -269,6 +269,7 @@ impl FlowLog {
         log_parser_config: &LogParserConfig,
         packet: &mut MetaPacket,
         app_table: &mut AppTable,
+        is_parse_perf: bool,
         is_parse_log: bool,
         local_epc: i32,
         remote_epc: i32,
@@ -287,12 +288,13 @@ impl FlowLog {
                 &payload[..pkt_size]
             };
 
-            let mut param = ParseParam::from((
+            let mut param = ParseParam::new(
                 &*packet,
                 self.perf_cache.clone(),
-                !is_parse_log,
-                log_parser_config,
-            ));
+                is_parse_perf,
+                is_parse_log,
+            );
+            param.set_log_parse_config(log_parser_config);
             #[cfg(target_os = "linux")]
             {
                 param.set_counter(self.stats_counter.clone(), self.so_plugin_counter.clone());
@@ -370,6 +372,7 @@ impl FlowLog {
         log_parser_config: &LogParserConfig,
         packet: &mut MetaPacket,
         app_table: &mut AppTable,
+        is_parse_perf: bool,
         is_parse_log: bool,
         local_epc: i32,
         remote_epc: i32,
@@ -387,12 +390,13 @@ impl FlowLog {
         }
 
         if self.l7_protocol_log_parser.is_some() {
-            let param = &mut ParseParam::from((
+            let param = &mut ParseParam::new(
                 &*packet,
                 self.perf_cache.clone(),
-                !is_parse_log,
-                log_parser_config,
-            ));
+                is_parse_perf,
+                is_parse_log,
+            );
+            param.set_log_parse_config(log_parser_config);
             #[cfg(target_os = "linux")]
             param.set_counter(self.stats_counter.clone(), self.so_plugin_counter.clone());
             param.set_rrt_timeout(self.rrt_timeout);
@@ -420,6 +424,7 @@ impl FlowLog {
             log_parser_config,
             packet,
             app_table,
+            is_parse_perf,
             is_parse_log,
             local_epc,
             remote_epc,
@@ -511,6 +516,7 @@ impl FlowLog {
                 log_parser_config,
                 packet,
                 app_table,
+                l7_performance_enabled,
                 l7_log_parse_enabled,
                 local_epc,
                 remote_epc,

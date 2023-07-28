@@ -119,10 +119,9 @@ impl L7ProtocolParserInterface for SoLog {
         ctx.proto = self.proto_num.unwrap();
         let mut resp = [ParseInfo::default(); RESULT_LEN as usize];
 
-        if self.perf_stats.is_none() {
+        if self.perf_stats.is_none() && param.parse_perf {
             self.perf_stats = Some(L7PerfStats::default());
         }
-        let perf_stats = self.perf_stats.as_mut().unwrap();
 
         for c in c_funcs.as_ref() {
             let counter = param.so_plugin_counter_map.as_ref().and_then(|h| {
@@ -184,20 +183,28 @@ impl L7ProtocolParserInterface for SoLog {
                                 info.proto = self.proto_num.unwrap();
 
                                 match info.msg_type {
-                                    LogMessageType::Request => perf_stats.inc_req(),
-                                    LogMessageType::Response => perf_stats.inc_resp(),
+                                    LogMessageType::Request => {
+                                        self.perf_stats.as_mut().map(|p| p.inc_req());
+                                    }
+                                    LogMessageType::Response => {
+                                        self.perf_stats.as_mut().map(|p| p.inc_resp());
+                                    }
                                     _ => unreachable!(),
                                 }
 
                                 match info.resp.status {
-                                    L7ResponseStatus::ClientError => perf_stats.inc_req_err(),
-                                    L7ResponseStatus::ServerError => perf_stats.inc_resp_err(),
+                                    L7ResponseStatus::ClientError => {
+                                        self.perf_stats.as_mut().map(|p| p.inc_req_err());
+                                    }
+                                    L7ResponseStatus::ServerError => {
+                                        self.perf_stats.as_mut().map(|p| p.inc_resp_err());
+                                    }
                                     _ => {}
                                 }
 
                                 info.cal_rrt(param, None).map(|rrt| {
                                     info.rrt = rrt;
-                                    perf_stats.update_rrt(rrt);
+                                    self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
                                 });
                                 if res.len == 1 {
                                     return Ok(L7ParseResult::Single(L7ProtocolInfo::CustomInfo(

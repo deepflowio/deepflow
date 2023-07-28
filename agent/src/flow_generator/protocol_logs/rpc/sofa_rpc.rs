@@ -257,22 +257,26 @@ impl Default for SofaRpcLog {
 }
 
 impl L7ProtocolParserInterface for SofaRpcLog {
-    fn check_payload(&mut self, payload: &[u8], _: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
         let mut info = SofaRpcInfo::default();
-        self.parse(payload, true, &mut info).is_ok()
+        self.parse(payload, true, &mut info, param).is_ok()
             && info.msg_type == LogMessageType::Request
             && info.cmd_code != CMD_CODE_HEARTBEAT
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         let mut info = SofaRpcInfo::default();
-        match self.parse(payload, false, &mut info) {
+        match self.parse(payload, false, &mut info, param) {
             Ok(ok) => {
                 if !ok {
                     return Ok(L7ParseResult::None);
                 }
                 self.cal_perf(param, &mut info);
-                Ok(L7ParseResult::Single(L7ProtocolInfo::SofaRpcInfo(info)))
+                if param.parse_log {
+                    Ok(L7ParseResult::Single(L7ProtocolInfo::SofaRpcInfo(info)))
+                } else {
+                    Ok(L7ParseResult::None)
+                }
             }
             Err(e) => Err(e),
         }
@@ -292,8 +296,14 @@ impl L7ProtocolParserInterface for SofaRpcLog {
 }
 
 impl SofaRpcLog {
-    fn parse(&mut self, mut payload: &[u8], check: bool, info: &mut SofaRpcInfo) -> Result<bool> {
-        if self.perf_stats.is_none() {
+    fn parse(
+        &mut self,
+        mut payload: &[u8],
+        check: bool,
+        info: &mut SofaRpcInfo,
+        param: &ParseParam,
+    ) -> Result<bool> {
+        if self.perf_stats.is_none() && param.parse_perf {
             self.perf_stats = Some(L7PerfStats::default())
         };
 
@@ -390,20 +400,28 @@ impl SofaRpcLog {
 
     fn cal_perf(&mut self, param: &ParseParam, info: &mut SofaRpcInfo) {
         match info.msg_type {
-            LogMessageType::Request => self.perf_stats.as_mut().unwrap().inc_req(),
-            LogMessageType::Response => self.perf_stats.as_mut().unwrap().inc_resp(),
+            LogMessageType::Request => {
+                self.perf_stats.as_mut().map(|p| p.inc_req());
+            }
+            LogMessageType::Response => {
+                self.perf_stats.as_mut().map(|p| p.inc_resp());
+            }
             _ => {}
         }
 
         match info.status {
-            L7ResponseStatus::ClientError => self.perf_stats.as_mut().unwrap().inc_req_err(),
-            L7ResponseStatus::ServerError => self.perf_stats.as_mut().unwrap().inc_resp_err(),
+            L7ResponseStatus::ClientError => {
+                self.perf_stats.as_mut().map(|p| p.inc_req_err());
+            }
+            L7ResponseStatus::ServerError => {
+                self.perf_stats.as_mut().map(|p| p.inc_resp_err());
+            }
             _ => {}
         }
 
         info.cal_rrt(param, None).map(|rrt| {
             info.rrt = rrt;
-            self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
         });
     }
 }
@@ -588,7 +606,7 @@ mod test {
         p[1].lookup_key.direction = PacketDirection::ServerToClient;
         let mut parser = SofaRpcLog::default();
 
-        let req_param = &mut ParseParam::from((&p[0], log_cache.clone(), false));
+        let req_param = &mut ParseParam::new(&p[0], log_cache.clone(), true, true);
         let req_payload = p[0].get_l4_payload().unwrap();
         assert_eq!(parser.check_payload(req_payload, req_param), true);
         let req_info = parser
@@ -613,7 +631,7 @@ mod test {
 
         parser.reset();
 
-        let resp_param = &mut ParseParam::from((&p[1], log_cache.clone(), false));
+        let resp_param = &mut ParseParam::new(&p[1], log_cache.clone(), true, true);
         let resp_payload = p[1].get_l4_payload().unwrap();
 
         let resp_info = parser
@@ -657,7 +675,7 @@ mod test {
         p[1].lookup_key.direction = PacketDirection::ServerToClient;
         let mut parser = SofaRpcLog::default();
 
-        let req_param = &mut ParseParam::from((&p[0], log_cache.clone(), false));
+        let req_param = &mut ParseParam::new(&p[0], log_cache.clone(), true, true);
         let req_payload = p[0].get_l4_payload().unwrap();
         assert_eq!(parser.check_payload(req_payload, req_param), true);
         let req_info = parser
@@ -682,7 +700,7 @@ mod test {
 
         parser.reset();
 
-        let resp_param = &mut ParseParam::from((&p[1], log_cache.clone(), false));
+        let resp_param = &mut ParseParam::new(&p[1], log_cache.clone(), true, true);
         let resp_payload = p[1].get_l4_payload().unwrap();
 
         let resp_info = parser

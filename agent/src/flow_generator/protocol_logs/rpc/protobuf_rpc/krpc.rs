@@ -195,7 +195,7 @@ impl KrpcLog {
             return Err(Error::L7ProtocolUnknown);
         }
 
-        if self.perf_stats.is_none() {
+        if self.perf_stats.is_none() && param.parse_perf {
             self.perf_stats = Some(L7PerfStats::default())
         };
 
@@ -225,11 +225,13 @@ impl KrpcLog {
             return Ok(());
         }
         match info.msg_type {
-            LogMessageType::Request => self.perf_stats.as_mut().unwrap().inc_req(),
+            LogMessageType::Request => {
+                self.perf_stats.as_mut().map(|p| p.inc_req());
+            }
             LogMessageType::Response => {
-                self.perf_stats.as_mut().unwrap().inc_resp();
+                self.perf_stats.as_mut().map(|p| p.inc_resp());
                 if info.ret_code != 0 {
-                    self.perf_stats.as_mut().unwrap().inc_resp_err();
+                    self.perf_stats.as_mut().map(|p| p.inc_resp_err());
                 }
             }
             _ => unreachable!(),
@@ -237,7 +239,7 @@ impl KrpcLog {
 
         info.cal_rrt(param, None).map(|rrt| {
             info.rrt = rrt;
-            self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
         });
         Ok(())
     }
@@ -257,9 +259,13 @@ impl L7ProtocolParserInterface for KrpcLog {
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         let mut info = KrpcInfo::default();
         self.parse(payload, param, false, &mut info)?;
-        Ok(L7ParseResult::Single(L7ProtocolInfo::ProtobufRpcInfo(
-            ProtobufRpcInfo::KrpcInfo(info),
-        )))
+        if param.parse_log {
+            Ok(L7ParseResult::Single(L7ProtocolInfo::ProtobufRpcInfo(
+                ProtobufRpcInfo::KrpcInfo(info),
+            )))
+        } else {
+            Ok(L7ParseResult::None)
+        }
     }
 
     fn protocol(&self) -> L7Protocol {
@@ -306,7 +312,7 @@ mod test {
 
         let mut parser = KrpcLog::new();
 
-        let req_param = &mut ParseParam::from((&p[3], log_cache.clone(), false));
+        let req_param = &mut ParseParam::new(&p[3], log_cache.clone(), true, true);
         let req_payload = p[3].get_l4_payload().unwrap();
         assert_eq!(parser.check_payload(req_payload, req_param), true);
         let mut req_info = parser
@@ -333,7 +339,7 @@ mod test {
 
         parser.reset();
 
-        let resp_param = &mut ParseParam::from((&p[5], log_cache.clone(), false));
+        let resp_param = &mut ParseParam::new(&p[5], log_cache.clone(), true, true);
         let resp_payload = p[5].get_l4_payload().unwrap();
 
         let resp_info = parser

@@ -179,7 +179,7 @@ impl L7ProtocolParserInterface for RedisLog {
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
-        if self.perf_stats.is_none() {
+        if self.perf_stats.is_none() && param.parse_perf {
             self.perf_stats = Some(L7PerfStats::default())
         };
         let mut info = RedisInfo::default();
@@ -187,9 +187,13 @@ impl L7ProtocolParserInterface for RedisLog {
         self.parse(payload, param.l4_protocol, param.direction, &mut info)?;
         info.cal_rrt(param, None).map(|rrt| {
             info.rrt = rrt;
-            self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
         });
-        Ok(L7ParseResult::Single(L7ProtocolInfo::RedisInfo(info)))
+        if param.parse_log {
+            Ok(L7ParseResult::Single(L7ProtocolInfo::RedisInfo(info)))
+        } else {
+            Ok(L7ParseResult::None)
+        }
     }
 
     fn protocol(&self) -> L7Protocol {
@@ -217,12 +221,12 @@ impl RedisLog {
         };
         info.msg_type = LogMessageType::Request;
         info.request = context;
-        self.perf_stats.as_mut().unwrap().inc_req();
+        self.perf_stats.as_mut().map(|p| p.inc_req());
     }
 
     fn fill_response(&mut self, context: Vec<u8>, error_response: bool, info: &mut RedisInfo) {
         info.msg_type = LogMessageType::Response;
-        self.perf_stats.as_mut().unwrap().inc_resp();
+        self.perf_stats.as_mut().map(|p| p.inc_resp());
         if context.is_empty() {
             return;
         }
@@ -233,7 +237,7 @@ impl RedisLog {
             b'-' if error_response => {
                 info.error = context;
                 info.resp_status = L7ResponseStatus::ServerError;
-                self.perf_stats.as_mut().unwrap().inc_resp_err();
+                self.perf_stats.as_mut().map(|p| p.inc_resp_err());
             }
             _ => {}
         }
@@ -455,7 +459,7 @@ mod tests {
             };
 
             let mut redis = RedisLog::default();
-            let param = &ParseParam::from((packet as &MetaPacket, log_cache.clone(), false));
+            let param = &ParseParam::new(packet as &MetaPacket, log_cache.clone(), true, true);
 
             let is_redis = redis.check_payload(payload, param);
 
@@ -612,7 +616,7 @@ mod tests {
             if packet.get_l4_payload().is_some() {
                 let _ = redis.parse_payload(
                     packet.get_l4_payload().unwrap(),
-                    &ParseParam::from((&*packet, rrt_cache.clone(), true)),
+                    &ParseParam::new(&*packet, rrt_cache.clone(), true, true),
                 );
             }
         }

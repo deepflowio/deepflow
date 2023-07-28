@@ -340,7 +340,8 @@ pub struct ParseParam<'a> {
     // calculate from cap_seq, req and correspond resp may have same packet seq, non ebpf always 0
     pub packet_seq: u64,
     pub time: u64, // micro second
-    pub perf_only: bool,
+    pub parse_perf: bool,
+    pub parse_log: bool,
 
     pub parse_config: Option<&'a LogParserConfig>,
 
@@ -362,11 +363,13 @@ pub struct ParseParam<'a> {
     pub buf_size: u16,
 }
 
-// from packet, previous_log_info_cache, l7_log_packet_size, perf_only
-impl From<(&MetaPacket<'_>, Rc<RefCell<L7PerfCache>>, bool)> for ParseParam<'_> {
-    fn from(f: (&MetaPacket<'_>, Rc<RefCell<L7PerfCache>>, bool)) -> Self {
-        let (packet, cache, perf_only) = f;
-
+impl ParseParam<'_> {
+    pub fn new(
+        packet: &MetaPacket<'_>,
+        cache: Rc<RefCell<L7PerfCache>>,
+        parse_perf: bool,
+        parse_log: bool,
+    ) -> Self {
         let mut param = Self {
             l4_protocol: packet.lookup_key.proto,
             ip_src: packet.lookup_key.src_ip,
@@ -380,7 +383,8 @@ impl From<(&MetaPacket<'_>, Rc<RefCell<L7PerfCache>>, bool)> for ParseParam<'_> 
             packet_seq: packet.cap_seq,
             ebpf_param: None,
             time: packet.lookup_key.timestamp.as_micros() as u64,
-            perf_only,
+            parse_perf,
+            parse_log,
             parse_config: None,
 
             l7_perf_cache: cache,
@@ -421,30 +425,7 @@ impl From<(&MetaPacket<'_>, Rc<RefCell<L7PerfCache>>, bool)> for ParseParam<'_> 
     }
 }
 
-// from packet, previous_log_info_cache, perf_only, parse_config
-impl<'a>
-    From<(
-        &MetaPacket<'_>,
-        Rc<RefCell<L7PerfCache>>,
-        bool,
-        &'a LogParserConfig,
-    )> for ParseParam<'a>
-{
-    fn from(
-        f: (
-            &MetaPacket<'_>,
-            Rc<RefCell<L7PerfCache>>,
-            bool,
-            &'a LogParserConfig,
-        ),
-    ) -> Self {
-        let mut p = Self::from((f.0, f.1, f.2));
-        p.parse_config = Some(f.3);
-        p
-    }
-}
-
-impl ParseParam<'_> {
+impl<'a> ParseParam<'a> {
     pub fn is_tls(&self) -> bool {
         if let Some(ebpf_param) = self.ebpf_param.as_ref() {
             return ebpf_param.is_tls;
@@ -479,6 +460,10 @@ impl ParseParam<'_> {
 
     pub fn set_rrt_timeout(&mut self, t: usize) {
         self.rrt_timeout = t;
+    }
+
+    pub fn set_log_parse_config(&mut self, conf: &'a LogParserConfig) {
+        self.parse_config = Some(conf);
     }
 }
 
