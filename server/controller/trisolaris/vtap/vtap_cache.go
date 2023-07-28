@@ -40,15 +40,25 @@ import (
 
 type VTapConfig struct {
 	models.RVTapGroupConfiguration
-	ConvertedL4LogTapTypes      []uint32
-	ConvertedL7LogStoreTapTypes []uint32
-	ConvertedDecapType          []uint32
-	ConvertedDomains            []string
+	ConvertedL4LogTapTypes       []uint32
+	ConvertedL4LogIgnoreTapSides []uint32
+	ConvertedL7LogIgnoreTapSides []uint32
+	ConvertedL7LogStoreTapTypes  []uint32
+	ConvertedDecapType           []uint32
+	ConvertedDomains             []string
 }
 
 func (f *VTapConfig) convertData() {
 	var err error
 	f.ConvertedL4LogTapTypes, err = ConvertStrToU32List(f.L4LogTapTypes)
+	if err != nil {
+		log.Error(err)
+	}
+	f.ConvertedL4LogIgnoreTapSides, err = ConvertStrToU32List(f.L4LogIgnoreTapSides)
+	if err != nil {
+		log.Error(err)
+	}
+	f.ConvertedL7LogIgnoreTapSides, err = ConvertStrToU32List(f.L7LogIgnoreTapSides)
 	if err != nil {
 		log.Error(err)
 	}

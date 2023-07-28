@@ -1042,6 +1042,8 @@ type VTapGroupConfiguration struct {
 	CollectorEnabled              *int    `gorm:"column:collector_enabled;type:tinyint(1);default:null" json:"COLLECTOR_ENABLED"`       // 0: disabled 1:enabled
 	VTapFlow1sEnabled             *int    `gorm:"column:vtap_flow_1s_enabled;type:tinyint(1);default:null" json:"VTAP_FLOW_1S_ENABLED"` // 0: disabled 1:enabled
 	L4LogTapTypes                 *string `gorm:"column:l4_log_tap_types;type:text;default:null" json:"L4_LOG_TAP_TYPES"`               // tap type info, separate by ","
+	L4LogIgnoreTapSides           *string `gorm:"column:l4_log_ignore_tap_sides;type:text;default:null" json:"L4_LOG_IGNORE_TAP_SIDES"` // separate by ","
+	L7LogIgnoreTapSides           *string `gorm:"column:l7_log_ignore_tap_sides;type:text;default:null" json:"L7_LOG_IGNORE_TAP_SIDES"` // separate by ","
 	NpbDedupEnabled               *int    `gorm:"column:npb_dedup_enabled;type:tinyint(1);default:null" json:"NPB_DEDUP_ENABLED"`       // 0: disabled 1:enabled
 	PlatformEnabled               *int    `gorm:"column:platform_enabled;type:tinyint(1);default:null" json:"PLATFORM_ENABLED"`         // 0: disabled 1:enabled
 	IfMacSource                   *int    `gorm:"column:if_mac_source;type:int;default:null" json:"IF_MAC_SOURCE"`                      // 0: 接口MAC 1: 接口名称 2: 虚拟机MAC解析
@@ -1114,6 +1116,8 @@ type RVTapGroupConfiguration struct {
 	CollectorEnabled              int    `gorm:"column:collector_enabled;type:tinyint(1);default:null" json:"COLLECTOR_ENABLED"`       // 0: disabled 1:enabled
 	VTapFlow1sEnabled             int    `gorm:"column:vtap_flow_1s_enabled;type:tinyint(1);default:null" json:"VTAP_FLOW_1S_ENABLED"` // 0: disabled 1:enabled
 	L4LogTapTypes                 string `gorm:"column:l4_log_tap_types;type:text;default:null" json:"L4_LOG_TAP_TYPES"`               // tap type info, separate by ","
+	L4LogIgnoreTapSides           string `gorm:"column:l4_log_ignore_tap_sides;type:text;default:null" json:"L4_LOG_IGNORE_TAP_SIDES"` // separate by ","
+	L7LogIgnoreTapSides           string `gorm:"column:l7_log_ignore_tap_sides;type:text;default:null" json:"L7_LOG_IGNORE_TAP_SIDES"` // separate by ","
 	NpbDedupEnabled               int    `gorm:"column:npb_dedup_enabled;type:tinyint(1);default:null" json:"NPB_DEDUP_ENABLED"`       // 0: disabled 1:enabled
 	PlatformEnabled               int    `gorm:"column:platform_enabled;type:tinyint(1);default:null" json:"PLATFORM_ENABLED"`         // 0: disabled 1:enabled
 	IfMacSource                   int    `gorm:"column:if_mac_source;type:int;default:null" json:"IF_MAC_SOURCE"`                      // 0: 接口MAC 1: 接口名称 2: 虚拟机MAC解析
