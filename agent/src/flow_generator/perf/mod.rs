@@ -36,15 +36,14 @@ use super::{
     protocol_logs::AppProtoHead,
 };
 
-use crate::common::flow::L7PerfStats;
 use crate::common::l7_protocol_log::L7PerfCache;
+use crate::common::{flow::L7PerfStats, l7_protocol_log::L7ParseResult};
 use crate::plugin::wasm::WasmVm;
 #[cfg(target_os = "linux")]
 use crate::plugin::{c_ffi::SoPluginFunc, shared_obj::SoPluginCounterMap};
 use crate::{
     common::{
         flow::{FlowPerfStats, L4Protocol, L7Protocol, PacketDirection, SignalSource},
-        l7_protocol_info::L7ProtocolInfo,
         l7_protocol_log::{
             get_all_protocol, get_parser, L7ProtocolBitmap, L7ProtocolParser,
             L7ProtocolParserInterface, ParseParam,
@@ -212,7 +211,7 @@ impl FlowLog {
         parse_param: &ParseParam,
         local_epc: i32,
         remote_epc: i32,
-    ) -> Result<Vec<L7ProtocolInfo>> {
+    ) -> Result<L7ParseResult> {
         if self.is_skip {
             return Err(Error::L7ProtocolParseLimit);
         }
@@ -274,7 +273,7 @@ impl FlowLog {
         local_epc: i32,
         remote_epc: i32,
         checker: &L7ProtocolChecker,
-    ) -> Result<Vec<L7ProtocolInfo>> {
+    ) -> Result<L7ParseResult> {
         if self.is_skip {
             return Err(Error::L7ProtocolCheckLimit);
         }
@@ -340,15 +339,14 @@ impl FlowLog {
                     param.direction = packet.lookup_key.direction;
 
                     self.l7_protocol_log_parser = Some(Box::new(parser));
-                    let ret = self.l7_parse_log(
+                    return self.l7_parse_log(
                         flow_config,
                         packet,
                         app_table,
                         &param,
                         local_epc,
                         remote_epc,
-                    )?;
-                    return Ok(ret);
+                    );
                 }
             }
 
@@ -376,7 +374,7 @@ impl FlowLog {
         local_epc: i32,
         remote_epc: i32,
         checker: &L7ProtocolChecker,
-    ) -> Result<Vec<L7ProtocolInfo>> {
+    ) -> Result<L7ParseResult> {
         if packet.signal_source == SignalSource::EBPF && self.server_port != 0 {
             // if the packet from eBPF and it's server_port is not equal to 0, We can get the packet's
             // direction by comparing self.server_port with packet.lookup_key.dst_port When check_payload()
@@ -501,7 +499,7 @@ impl FlowLog {
         local_epc: i32,
         remote_epc: i32,
         checker: &L7ProtocolChecker,
-    ) -> Result<Vec<L7ProtocolInfo>> {
+    ) -> Result<L7ParseResult> {
         if let Some(l4) = self.l4.as_mut() {
             l4.parse(packet, is_first_packet_direction)?;
         }
@@ -519,7 +517,7 @@ impl FlowLog {
                 checker,
             );
         }
-        Ok(vec![])
+        Ok(L7ParseResult::None)
     }
 
     pub fn copy_and_reset_perf_data(

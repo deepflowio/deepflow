@@ -26,7 +26,7 @@ use crate::{
         flow::L7Protocol,
         flow::{L7PerfStats, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
     },
     flow_generator::{
         error::{Error, Result},
@@ -159,7 +159,6 @@ impl From<RedisInfo> for L7ProtocolSendLog {
 
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct RedisLog {
-    info: RedisInfo,
     #[serde(skip)]
     perf_stats: Option<L7PerfStats>,
 }
@@ -179,17 +178,18 @@ impl L7ProtocolParserInterface for RedisLog {
         decode_asterisk(payload, true).is_some()
     }
 
-    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
-        self.info.is_tls = param.is_tls();
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         if self.perf_stats.is_none() {
             self.perf_stats = Some(L7PerfStats::default())
         };
-        self.parse(payload, param.l4_protocol, param.direction)?;
-        self.info.cal_rrt(param, None).map(|rrt| {
-            self.info.rrt = rrt;
+        let mut info = RedisInfo::default();
+        info.is_tls = param.is_tls();
+        self.parse(payload, param.l4_protocol, param.direction, &mut info)?;
+        info.cal_rrt(param, None).map(|rrt| {
+            info.rrt = rrt;
             self.perf_stats.as_mut().unwrap().update_rrt(rrt);
         });
-        Ok(vec![L7ProtocolInfo::RedisInfo(self.info.clone())])
+        Ok(L7ParseResult::Single(L7ProtocolInfo::RedisInfo(info)))
     }
 
     fn protocol(&self) -> L7Protocol {
@@ -198,11 +198,6 @@ impl L7ProtocolParserInterface for RedisLog {
 
     fn parsable_on_udp(&self) -> bool {
         false
-    }
-
-    fn reset(&mut self) {
-        self.info = RedisInfo::default();
-        self.perf_stats = self.perf_stats.take();
     }
 
     fn perf_stats(&mut self) -> Option<L7PerfStats> {
@@ -215,29 +210,29 @@ impl RedisLog {
         *self = RedisLog::default();
     }
 
-    fn fill_request(&mut self, context: Vec<u8>) {
-        self.info.request_type = match (&context).iter().position(|&x| x == b' ') {
+    fn fill_request(&mut self, context: Vec<u8>, info: &mut RedisInfo) {
+        info.request_type = match (&context).iter().position(|&x| x == b' ') {
             Some(i) if i > 0 => Vec::from(&context[..i]),
             _ => context.clone(),
         };
-        self.info.msg_type = LogMessageType::Request;
-        self.info.request = context;
+        info.msg_type = LogMessageType::Request;
+        info.request = context;
         self.perf_stats.as_mut().unwrap().inc_req();
     }
 
-    fn fill_response(&mut self, context: Vec<u8>, error_response: bool) {
-        self.info.msg_type = LogMessageType::Response;
+    fn fill_response(&mut self, context: Vec<u8>, error_response: bool, info: &mut RedisInfo) {
+        info.msg_type = LogMessageType::Response;
         self.perf_stats.as_mut().unwrap().inc_resp();
         if context.is_empty() {
             return;
         }
 
-        self.info.resp_status = L7ResponseStatus::Ok;
+        info.resp_status = L7ResponseStatus::Ok;
         match context[0] {
-            b'+' => self.info.status = context,
+            b'+' => info.status = context,
             b'-' if error_response => {
-                self.info.error = context;
-                self.info.resp_status = L7ResponseStatus::ServerError;
+                info.error = context;
+                info.resp_status = L7ResponseStatus::ServerError;
                 self.perf_stats.as_mut().unwrap().inc_resp_err();
             }
             _ => {}
@@ -249,6 +244,7 @@ impl RedisLog {
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
+        info: &mut RedisInfo,
     ) -> Result<()> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
@@ -259,8 +255,10 @@ impl RedisLog {
                 .ok_or(Error::RedisLogParseFailed)?;
         match direction {
             // only parse the request with payload start with '*' which indicate is a command start, otherwise assume tcp fragment of request
-            PacketDirection::ClientToServer if payload[0] == b'*' => self.fill_request(context),
-            PacketDirection::ServerToClient => self.fill_response(context, error_response),
+            PacketDirection::ClientToServer if payload[0] == b'*' => {
+                self.fill_request(context, info)
+            }
+            PacketDirection::ServerToClient => self.fill_response(context, error_response, info),
             _ => {}
         };
         Ok(())
@@ -461,8 +459,16 @@ mod tests {
 
             let is_redis = redis.check_payload(payload, param);
 
-            let _ = redis.parse_payload(payload, param);
-            output.push_str(&format!("{} is_redis: {}\r\n", redis.info, is_redis));
+            let info = if let Ok(i) = redis.parse_payload(payload, param) {
+                match i.unwrap_single() {
+                    L7ProtocolInfo::RedisInfo(r) => r,
+                    _ => unreachable!(),
+                }
+            } else {
+                RedisInfo::default()
+            };
+
+            output.push_str(&format!("{} is_redis: {}\r\n", info, is_redis));
         }
         output
     }

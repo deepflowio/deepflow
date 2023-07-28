@@ -40,15 +40,23 @@ const COMMON_SQL_START: [&'static str; 19] = [
     "REVOKE",
 ];
 
-fn check_sql(first_upper: String, keywords: &[&'static str]) -> bool {
+pub(super) fn check_sql(first: &str, keywords: &[&'static str]) -> bool {
     for i in COMMON_SQL_START.iter() {
-        if first_upper.eq(*i) {
-            return true;
+        if first.len() == i.len() {
+            for (idx, c) in first.chars().enumerate() {
+                if c.to_ascii_uppercase() as u8 == i.as_bytes()[idx] {
+                    return true;
+                }
+            }
         }
     }
     for i in keywords.iter() {
-        if first_upper.eq(*i) {
-            return true;
+        if first.len() == i.len() {
+            for (idx, c) in first.chars().enumerate() {
+                if c.to_ascii_uppercase() as u8 == i.as_bytes()[idx] {
+                    return true;
+                }
+            }
         }
     }
     false
@@ -89,7 +97,7 @@ const POSTGRESQL_START: [&'static str; 16] = [
 ];
 
 pub(super) fn is_postgresql(sql: &String) -> bool {
-    if let Some(first) = trim_head_comment_and_first_upper(sql.as_str(), 12) {
+    if let Some(first) = trim_head_comment_and_get_first_word(sql.as_str(), 12) {
         check_sql(first, &POSTGRESQL_START)
     } else {
         false
@@ -137,7 +145,7 @@ const MYSQL_START: [&'static str; 14] = [
 ];
 
 pub(super) fn is_mysql(sql: &String) -> bool {
-    if let Some(first) = trim_head_comment_and_first_upper(sql.as_str(), 8) {
+    if let Some(first) = trim_head_comment_and_get_first_word(sql.as_str(), 8) {
         check_sql(first, &MYSQL_START)
     } else {
         false
@@ -157,10 +165,10 @@ pub(super) fn is_mysql(sql: &String) -> bool {
 
         reference: https://dev.mysql.com/doc/refman/5.6/en/comments.html
 */
-pub(super) fn trim_head_comment_and_first_upper(
+pub(super) fn trim_head_comment_and_get_first_word(
     mut sql: &str,
     first_word_max_len: usize,
-) -> Option<String> {
+) -> Option<&str> {
     sql = sql.trim_start();
     // if start with /*, strip all comment block before sql string.
     while sql.starts_with("/*") {
@@ -183,90 +191,99 @@ pub(super) fn trim_head_comment_and_first_upper(
     if let Some(idx) = sql.find(|c: char| !c.is_alphabetic()) {
         if idx <= first_word_max_len && idx != 0 {
             let (sub_sql, _) = sql.split_at(idx);
-            return Some(sub_sql.to_ascii_uppercase());
+            return Some(sub_sql);
         }
     } else if sql.len() <= first_word_max_len {
         // if not have word boundary, assume as single word
-        return Some(sql.to_ascii_uppercase());
+        return Some(sql);
     }
     None
 }
 
 #[cfg(test)]
 mod test_sql_check {
-    use crate::flow_generator::protocol_logs::sql::sql_check::trim_head_comment_and_first_upper;
+    use crate::flow_generator::protocol_logs::sql::sql_check::{
+        check_sql, trim_head_comment_and_get_first_word,
+    };
 
     #[test]
-    fn test_trim_head_comment_and_first_upper() {
+    fn test_trim_head_comment_and_get_first_word() {
+        assert!(check_sql(
+            trim_head_comment_and_get_first_word(r"sEleCt 1", 6).unwrap(),
+            &["SELECT"],
+        ));
+        assert!(check_sql(
+            trim_head_comment_and_get_first_word(r"sEleCt 1", 7).unwrap(),
+            &["SELECT"]
+        ));
+        assert_eq!(trim_head_comment_and_get_first_word(r"sEleCt 1", 5), None);
+        assert!(check_sql(
+            trim_head_comment_and_get_first_word(r"/* i am comment */SelecT 1", 6).unwrap(),
+            &["SELECT"]
+        ));
+        assert!(check_sql(
+            trim_head_comment_and_get_first_word(r"/* i am comment */ SelecT 1", 6).unwrap(),
+            &["SELECT",]
+        ));
+        assert!(check_sql(
+            trim_head_comment_and_get_first_word(
+                r"/* i am comment */ /*i am comment*/ SelecT 1",
+                6
+            )
+            .unwrap(),
+            &["SELECT"]
+        ));
+        assert!(check_sql(
+            trim_head_comment_and_get_first_word(r"/* i am comment */ /*i am comment*/SelecT 1", 6)
+                .unwrap(),
+            &["SELECT"]
+        ));
+        assert!(check_sql(
+            trim_head_comment_and_get_first_word(r"/* i am comment * /*/ SelecT 1", 6).unwrap(),
+            &["SELECT"]
+        ));
+        assert!(check_sql(
+            trim_head_comment_and_get_first_word(r"/* i am comment *  /**/  /**  */ SelecT 1", 6)
+                .unwrap(),
+            &["SELECT"]
+        ));
+        assert!(check_sql(
+            trim_head_comment_and_get_first_word(r"/* unable to parse */SelecT", 6).unwrap(),
+            &["SELECT"]
+        ));
+        assert!(check_sql(
+            trim_head_comment_and_get_first_word(r"/* able to parse */SelecT ", 6).unwrap(),
+            &["SELECT"]
+        ));
         assert_eq!(
-            trim_head_comment_and_first_upper(r"sEleCt 1", 6),
-            Some(String::from("SELECT"))
-        );
-        assert_eq!(
-            trim_head_comment_and_first_upper(r"sEleCt 1", 7),
-            Some(String::from("SELECT"))
-        );
-        assert_eq!(trim_head_comment_and_first_upper(r"sEleCt 1", 5), None);
-        assert_eq!(
-            trim_head_comment_and_first_upper(r"/* i am comment */SelecT 1", 6),
-            Some(String::from("SELECT"))
-        );
-        assert_eq!(
-            trim_head_comment_and_first_upper(r"/* i am comment */ SelecT 1", 6),
-            Some(String::from("SELECT"))
-        );
-        assert_eq!(
-            trim_head_comment_and_first_upper(r"/* i am comment */ /*i am comment*/ SelecT 1", 6),
-            Some(String::from("SELECT"))
-        );
-        assert_eq!(
-            trim_head_comment_and_first_upper(r"/* i am comment */ /*i am comment*/SelecT 1", 6),
-            Some(String::from("SELECT"))
-        );
-        assert_eq!(
-            trim_head_comment_and_first_upper(r"/* i am comment * /*/ SelecT 1", 6),
-            Some(String::from("SELECT"))
-        );
-        assert_eq!(
-            trim_head_comment_and_first_upper(r"/* i am comment *  /**/  /**  */ SelecT 1", 6),
-            Some(String::from("SELECT"))
-        );
-        assert_eq!(
-            trim_head_comment_and_first_upper(r"/* unable to parse */SelecT", 6),
-            Some(String::from("SELECT"))
-        );
-        assert_eq!(
-            trim_head_comment_and_first_upper(r"/* able to parse */SelecT ", 6),
-            Some(String::from("SELECT"))
-        );
-        assert_eq!(
-            trim_head_comment_and_first_upper(r"/* not a comment * / SelecT 1", 6),
+            trim_head_comment_and_get_first_word(r"/* not a comment * / SelecT 1", 6),
             None
         );
         assert_eq!(
-            trim_head_comment_and_first_upper(r"/ * not a comment */ SelecT 1", 6),
+            trim_head_comment_and_get_first_word(r"/ * not a comment */ SelecT 1", 6),
             None
         );
-        assert_eq!(
-            trim_head_comment_and_first_upper(
+        assert!(check_sql(
+            trim_head_comment_and_get_first_word(
                 r"/* i am comment /* */ syntax error /* i am comment */ SelecT 1",
                 6
-            ),
-            Some(String::from("SYNTAX"))
-        );
+            )
+            .unwrap(),
+            &["SYNTAX"]
+        ));
         assert_eq!(
-            trim_head_comment_and_first_upper(
+            trim_head_comment_and_get_first_word(
                 r"/* i am comment /* */ -- syntax error /* i am comment */ SelecT 1",
                 6
             ),
             None
         );
         assert_eq!(
-            trim_head_comment_and_first_upper(r"/ * not a comment *\/ SelecT 1", 6),
+            trim_head_comment_and_get_first_word(r"/ * not a comment *\/ SelecT 1", 6),
             None
         );
         assert_eq!(
-            trim_head_comment_and_first_upper(r"/ * not a comment  /*/*  */ SelecT 1", 6),
+            trim_head_comment_and_get_first_word(r"/ * not a comment  /*/*  */ SelecT 1", 6),
             None
         );
     }

@@ -27,7 +27,7 @@ use crate::{
     common::{
         flow::L7PerfStats,
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
     },
     flow_generator::{
         protocol_logs::{L7ResponseStatus, LogMessageType},
@@ -110,7 +110,7 @@ impl L7ProtocolParserInterface for SoLog {
         false
     }
 
-    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         let Some(c_funcs) = param.so_func.as_ref() else {
             return Err(Error::NoParseConfig);
         };
@@ -166,7 +166,7 @@ impl L7ProtocolParserInterface for SoLog {
             match res.action {
                 ACTION_OK => {
                     if res.len == 0 {
-                        return Ok(vec![]);
+                        return Ok(L7ParseResult::None);
                     }
                     if res.len > RESULT_LEN {
                         error!(
@@ -199,6 +199,11 @@ impl L7ProtocolParserInterface for SoLog {
                                     info.rrt = rrt;
                                     perf_stats.update_rrt(rrt);
                                 });
+                                if res.len == 1 {
+                                    return Ok(L7ParseResult::Single(L7ProtocolInfo::CustomInfo(
+                                        info,
+                                    )));
+                                }
                                 v.push(L7ProtocolInfo::CustomInfo(info));
                             }
                             Err(e) => {
@@ -207,7 +212,7 @@ impl L7ProtocolParserInterface for SoLog {
                             }
                         }
                     }
-                    return Ok(v);
+                    return Ok(L7ParseResult::Multi(v));
                 }
                 ACTION_CONTINUE => continue,
                 ACTION_ERROR => {

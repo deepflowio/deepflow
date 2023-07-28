@@ -66,90 +66,17 @@ use public::l7_protocol::{CustomProtocol, L7Protocol, L7ProtocolEnum, ProtobufRp
                          |_____next packet___|
 */
 
+macro_rules! count {
+    () => (0);
+    ($x:tt $($xs: tt)* ) => (1usize + count!($($xs)*));
+}
+
 macro_rules! impl_protocol_parser {
     (pub enum $name:ident { $($proto:ident($log_type:ty)),* $(,)? }) => {
+        #[enum_dispatch(L7ProtocolParserInterface)]
         pub enum $name {
-            Http(Box<HttpLog>),
+            Http(HttpLog),
             $($proto($log_type)),*
-        }
-
-        impl L7ProtocolParserInterface for $name {
-            fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
-                match self {
-                    Self::Http(p) => p.check_payload(payload, param),
-                    $(Self::$proto(p) => p.check_payload(payload, param)),*
-                }
-            }
-
-            fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
-                match self {
-                    Self::Http(p) => p.parse_payload(payload, param),
-                    $(Self::$proto(p) => p.parse_payload(payload, param)),*
-                }
-            }
-
-            fn protocol(&self) -> L7Protocol {
-                match self {
-                    Self::Http(p) => p.protocol(),
-                    $(Self::$proto(p) => p.protocol()),*
-                }
-            }
-
-            fn protobuf_rpc_protocol(&self) -> Option<ProtobufRpcProtocol> {
-                match self {
-                    Self::Http(_) => None,
-                    $(Self::$proto(p) => p.protobuf_rpc_protocol()),*
-                }
-            }
-
-            fn custom_protocol(&self) -> Option<CustomProtocol> {
-                match self {
-                    Self::Http(_) => None,
-                    $(Self::$proto(p) => p.custom_protocol()),*
-                }
-            }
-
-            fn l7_protocol_enum(&self) -> L7ProtocolEnum {
-                match self {
-                    Self::Http(p) => p.l7_protocol_enum(),
-                    $(Self::$proto(p) => p.l7_protocol_enum()),*
-                }
-            }
-
-            fn parsable_on_tcp(&self) -> bool {
-                match self {
-                    Self::Http(p) => p.parsable_on_tcp(),
-                    $(Self::$proto(p) => p.parsable_on_tcp()),*
-                }
-            }
-
-            fn parsable_on_udp(&self) -> bool {
-                match self {
-                    Self::Http(p) => p.parsable_on_udp(),
-                    $(Self::$proto(p) => p.parsable_on_udp()),*
-                }
-            }
-
-            fn parse_default(&self) -> bool {
-                match self {
-                    Self::Http(p) => p.parse_default(),
-                    $(Self::$proto(p) => p.parse_default()),*
-                }
-            }
-
-            fn reset(&mut self) {
-                match self {
-                    Self::Http(p) => p.reset(),
-                    $(Self::$proto(p) => p.reset()),*
-                }
-            }
-
-            fn perf_stats(&mut self) -> Option<L7PerfStats> {
-                match self {
-                    Self::Http(p) => p.perf_stats(),
-                    $(Self::$proto(p) => p.perf_stats()),*
-                }
-            }
         }
 
         impl L7ProtocolParser {
@@ -174,8 +101,8 @@ macro_rules! impl_protocol_parser {
 
             fn try_from(value: &str) -> Result<Self, Self::Error> {
                 match value {
-                    "HTTP" => Ok(Self::Http(Box::new(HttpLog::new_v1()))),
-                    "HTTP2" => Ok(Self::Http(Box::new(HttpLog::new_v2(false)))),
+                    "HTTP" => Ok(Self::Http(HttpLog::new_v1())),
+                    "HTTP2" => Ok(Self::Http(HttpLog::new_v2(false))),
                     $(
                         stringify!($proto) => Ok(Self::$proto(Default::default())),
                     )*
@@ -187,9 +114,9 @@ macro_rules! impl_protocol_parser {
         pub fn get_parser(p: L7ProtocolEnum) -> Option<L7ProtocolParser> {
             match p {
                 L7ProtocolEnum::L7Protocol(p) => match p {
-                    L7Protocol::Http1 | L7Protocol::Http1TLS => Some(L7ProtocolParser::Http(Box::new(HttpLog::new_v1()))),
-                    L7Protocol::Http2 | L7Protocol::Http2TLS => Some(L7ProtocolParser::Http(Box::new(HttpLog::new_v2(false)))),
-                    L7Protocol::Grpc => Some(L7ProtocolParser::Http(Box::new(HttpLog::new_v2(true)))),
+                    L7Protocol::Http1 | L7Protocol::Http1TLS => Some(L7ProtocolParser::Http(HttpLog::new_v1())),
+                    L7Protocol::Http2 | L7Protocol::Http2TLS => Some(L7ProtocolParser::Http(HttpLog::new_v2(false))),
+                    L7Protocol::Grpc => Some(L7ProtocolParser::Http(HttpLog::new_v2(true))),
 
                     $(
                         L7Protocol::$proto => Some(L7ProtocolParser::$proto(Default::default())),
@@ -201,50 +128,17 @@ macro_rules! impl_protocol_parser {
             }
         }
 
-        pub fn get_all_protocol() -> Vec<L7ProtocolParser> {
-            Vec::from([
-                L7ProtocolParser::Http(Box::new(HttpLog::new_v1())),
-                L7ProtocolParser::Http(Box::new(HttpLog::new_v2(false))),
+        pub fn get_all_protocol() -> [L7ProtocolParser; 2 + count!($($proto)*)] {
+            [
+                L7ProtocolParser::Http(HttpLog::new_v1()),
+                L7ProtocolParser::Http(HttpLog::new_v2(false)),
                 $(
                     L7ProtocolParser::$proto(Default::default()),
                 )+
-            ])
+            ]
         }
     }
 }
-
-/*
-macro expand result like:
-
-#[enum_dispatch]
-pub enum L7ProtocolParser {
-    HttpParser(HttpLog),
-    DnsParser(DnsLog),
-    MysqlParser(MysqlLog),
-    ...
-}
-
-pub fn get_parser(p: L7Protocol) -> Option<L7ProtocolParser> {
-    match p {
-        L7Protocol::Http1 => Some(L7ProtocolParser::HttpParser(HttpLog::new_v1())),
-        L7Protocol::Http2 => Some(L7ProtocolParser::HttpParser(HttpLog::new_v2())),
-        L7Protocol::Dns => Some(L7ProtocolParser::DnsParser(DnsLog::default())),
-        L7Protocol::Mysql => Some(L7ProtocolParser::MysqlParser(MysqlLog::default())),
-        ...
-
-    }
-}
-
-pub fn get_all_protocol() -> Vec<L7ProtocolParser> {
-    Vec::from([
-        L7ProtocolParser::HttpParser(HttpLog::new_v1()),
-        L7ProtocolParser::HttpParser(HttpLog::new_v2()),
-        L7ProtocolParser::DnsParser(DnsLog::default()),
-        L7ProtocolParser::MysqlParser(MysqlLog::default()),
-        ...
-    ])
-}
-*/
 
 // 内部实现的协议
 // log的具体结构和实现在 src/flow_generator/protocol_logs/** 下
@@ -260,15 +154,46 @@ impl_protocol_parser! {
         // http have two version but one parser, can not place in macro param.
         Custom(CustomWrapLog),
         DNS(DnsLog),
-        ProtobufRPC(Box<ProtobufRpcWrapLog>),
-        SofaRPC(Box<SofaRpcLog>),
+        ProtobufRPC(ProtobufRpcWrapLog),
+        SofaRPC(SofaRpcLog),
         MySQL(MysqlLog),
         Kafka(KafkaLog),
-        Redis(Box<RedisLog>),
-        PostgreSQL(Box<PostgresqlLog>),
-        Dubbo(Box<DubboLog>),
+        Redis(RedisLog),
+        PostgreSQL(PostgresqlLog),
+        Dubbo(DubboLog),
         MQTT(MqttLog),
         // add protocol below
+    }
+}
+
+pub enum L7ParseResult {
+    Single(L7ProtocolInfo),
+    Multi(Vec<L7ProtocolInfo>),
+    None,
+}
+
+impl L7ParseResult {
+    pub fn is_none(&self) -> bool {
+        match self {
+            L7ParseResult::None => true,
+            _ => false,
+        }
+    }
+
+    pub fn unwrap_single(self) -> L7ProtocolInfo {
+        match self {
+            L7ParseResult::Single(s) => s,
+            L7ParseResult::Multi(_) => panic!("parse result is mutli but unwrap single"),
+            L7ParseResult::None => panic!("parse result is none but unwrap single"),
+        }
+    }
+
+    pub fn unwrap_multi(self) -> Vec<L7ProtocolInfo> {
+        match self {
+            L7ParseResult::Multi(m) => m,
+            L7ParseResult::Single(_) => panic!("parse result is single but unwrap multi"),
+            L7ParseResult::None => panic!("parse result is none but unwrap multi"),
+        }
     }
 }
 
@@ -276,7 +201,7 @@ impl_protocol_parser! {
 pub trait L7ProtocolParserInterface {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool;
     // 协议解析
-    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>>;
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult>;
     // 返回协议号和协议名称，由于的bitmap使用u128，所以协议号不能超过128.
     // 其中 crates/public/src/l7_protocol.rs 里面的 pub const L7_PROTOCOL_xxx 是已实现的协议号.
     // ===========================================================================================
