@@ -33,7 +33,7 @@ use crate::common::flow::PacketDirection;
 use crate::common::l7_protocol_info::L7ProtocolInfo;
 use crate::common::l7_protocol_log::{EbpfParam, L7PerfCache};
 
-use crate::config::handler::{L7LogDynamicConfig, LogParserConfig};
+use crate::config::handler::LogParserConfig;
 use crate::flow_generator::protocol_logs::pb_adapter::L7ProtocolSendLog;
 use crate::flow_generator::protocol_logs::{get_wasm_parser, L7ResponseStatus, WasmLog};
 use crate::{
@@ -147,11 +147,7 @@ fn load_module() -> WasmVm {
 #[test]
 fn test_wasm_http_req() {
     let vm = Rc::new(RefCell::new(load_module()));
-    let config = LogParserConfig {
-        l7_log_collect_nps_threshold: 0,
-        l7_log_session_aggr_timeout: Duration::ZERO,
-        l7_log_dynamic: L7LogDynamicConfig::default(),
-    };
+    let config = LogParserConfig::default();
     let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
 
     let mut param = get_req_param(vm.clone(), rrt_cache.clone());
@@ -159,12 +155,12 @@ fn test_wasm_http_req() {
 
     let mut http = HttpLog::new_v1();
     let payload = "POST /test?a=1&b=2&c=test HTTP/1.1\r\nUser-Agent: deepflow\r\nreferer: aaa.com\r\nHost: abc.com\r\nContent-Type: application/json\r\n\r\n";
-    let mut info = http.parse_payload(payload.as_bytes(), &param).unwrap();
+    let info = http.parse_payload(payload.as_bytes(), &param).unwrap();
 
     let kv: HashMap<&str, &str> =
         HashMap::from_iter([("a", "1"), ("b", "2"), ("c", "test"), ("empty", "")]);
 
-    if let L7ProtocolInfo::HttpInfo(http) = info.remove(0) {
+    if let L7ProtocolInfo::HttpInfo(http) = info.unwrap_single() {
         let i: L7ProtocolSendLog = http.into();
         assert_eq!(
             i.trace_info
@@ -206,11 +202,7 @@ fn test_wasm_http_req() {
 #[test]
 fn test_wasm_http_resp() {
     let vm = Rc::new(RefCell::new(load_module()));
-    let config = LogParserConfig {
-        l7_log_collect_nps_threshold: 0,
-        l7_log_session_aggr_timeout: Duration::ZERO,
-        l7_log_dynamic: L7LogDynamicConfig::default(),
-    };
+    let config = LogParserConfig::default();
     let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
 
     let mut param = get_resq_param(vm.clone(), rrt_cache.clone());
@@ -218,11 +210,11 @@ fn test_wasm_http_resp() {
 
     let mut http = HttpLog::new_v1();
     let payload = "HTTP/1.1 200 Ok\r\nContent-Type: application/json\r\n\r\n{\"data\":{\"user_id\":123, \"name\":\"kkk\"}}";
-    let mut info = http.parse_payload(payload.as_bytes(), &param).unwrap();
+    let info = http.parse_payload(payload.as_bytes(), &param).unwrap();
 
     let kv: HashMap<&str, &str> = HashMap::from_iter([("user_id", "123"), ("username", "kkk")]);
 
-    if let L7ProtocolInfo::HttpInfo(http) = info.remove(0) {
+    if let L7ProtocolInfo::HttpInfo(http) = info.unwrap_single() {
         let i: L7ProtocolSendLog = http.into();
         assert_eq!(
             i.trace_info
@@ -295,6 +287,7 @@ fn test_wasm_parse_payload_req() {
     let info1 = wasm_log
         .parse_payload(&payload[..], &param)
         .unwrap()
+        .unwrap_multi()
         .remove(0);
     if let L7ProtocolInfo::CustomInfo(ci) = info1 {
         assert_eq!(ci.req_len.unwrap(), 999);
@@ -323,6 +316,7 @@ fn test_wasm_parse_payload_req() {
     let info2 = wasm_log
         .parse_payload(&payload[..], &param)
         .unwrap()
+        .unwrap_multi()
         .remove(1);
 
     if let L7ProtocolInfo::CustomInfo(ci) = info2 {
@@ -362,6 +356,7 @@ fn test_wasm_parse_payload_resp() {
     let info1 = wasm_log
         .parse_payload(&payload[..], &param)
         .unwrap()
+        .unwrap_multi()
         .remove(0);
     if let L7ProtocolInfo::CustomInfo(ci) = info1 {
         assert_eq!(ci.req_len.unwrap(), 999);
@@ -390,6 +385,7 @@ fn test_wasm_parse_payload_resp() {
     let info2 = wasm_log
         .parse_payload(&payload[..], &param)
         .unwrap()
+        .unwrap_multi()
         .remove(1);
     if let L7ProtocolInfo::CustomInfo(ci) = info2 {
         assert_eq!(ci.req_len.unwrap(), 999);

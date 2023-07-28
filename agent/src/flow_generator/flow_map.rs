@@ -64,10 +64,7 @@ use crate::{
         tap_port::TapPort,
         Timestamp,
     },
-    config::{
-        handler::{L7LogDynamicConfig, LogParserConfig},
-        FlowConfig, ModuleConfig, RuntimeConfig,
-    },
+    config::{handler::LogParserConfig, FlowConfig, ModuleConfig, RuntimeConfig},
     metric::document::TapSide,
     plugin::wasm::{
         get_all_wasm_export_func_name, get_wasm_metric_counter_map_key, init_wasmtime, WasmCounter,
@@ -1339,8 +1336,16 @@ impl FlowMap {
                         // Here we determine whether to reverse flow.
                         self.rectify_flow_direction(node, meta_packet, is_first_packet);
                     }
-                    for i in info.into_iter() {
-                        self.write_to_app_proto_log(flow_config, node, &meta_packet, i);
+                    match info {
+                        crate::common::l7_protocol_log::L7ParseResult::Single(s) => {
+                            self.write_to_app_proto_log(flow_config, node, &meta_packet, s);
+                        }
+                        crate::common::l7_protocol_log::L7ParseResult::Multi(m) => {
+                            for i in m.into_iter() {
+                                self.write_to_app_proto_log(flow_config, node, &meta_packet, i);
+                            }
+                        }
+                        _ => {}
                     }
                 }
                 Err(Error::L7ReqNotFound(c)) => {
@@ -2054,11 +2059,6 @@ pub fn _new_flow_map_and_receiver(
             ignore_idc_vlan: ignore_idc_vlan,
             flow_timeout: flow_timeout.unwrap_or(super::TcpTimeout::default().into()),
             ..(&RuntimeConfig::default()).into()
-        },
-        log_parser: LogParserConfig {
-            l7_log_collect_nps_threshold: 0,
-            l7_log_session_aggr_timeout: Duration::new(0, 0),
-            l7_log_dynamic: L7LogDynamicConfig::default(),
         },
         ..Default::default()
     };

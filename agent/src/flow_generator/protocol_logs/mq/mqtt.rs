@@ -31,7 +31,7 @@ use crate::{
         enums::IpProtocol,
         flow::{L7PerfStats, L7Protocol, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
     },
     flow_generator::{
         error::{Error, Result},
@@ -200,7 +200,6 @@ impl From<MqttInfo> for L7ProtocolSendLog {
 
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct MqttLog {
-    info: Vec<MqttInfo>,
     msg_type: LogMessageType,
     status: L7ResponseStatus,
     version: u8,
@@ -216,31 +215,32 @@ impl L7ProtocolParserInterface for MqttLog {
         Self::check_protocol(payload, param)
     }
 
-    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         if self.perf_stats.is_none() {
             self.perf_stats = Some(L7PerfStats::default())
         };
 
-        self.parse(payload, param.l4_protocol)?;
-        let mut v = vec![];
+        let mut infos = self.parse(payload, param.l4_protocol)?;
 
-        for i in self.info.iter() {
-            let mut info = i.clone();
+        for info in infos.iter_mut() {
+            if let L7ProtocolInfo::MqttInfo(info) = info {
+                // FIXME due to mqtt not parse and handle packet identity correctly, the rrt is incorrect now.
+                info.cal_rrt(param, None).map(|rrt| {
+                    info.rrt = rrt;
+                    self.perf_stats.as_mut().unwrap().update_rrt(rrt);
+                });
 
-            // FIXME due to mqtt not parse and handle packet identity correctly, the rrt is incorrect now.
-            info.cal_rrt(param, None).map(|rrt| {
-                info.rrt = rrt;
-                self.perf_stats.as_mut().unwrap().update_rrt(rrt);
-            });
+                info.msg_type = self.msg_type;
 
-            info.msg_type = self.msg_type;
-            v.push(L7ProtocolInfo::MqttInfo(info));
-            match param.direction {
-                PacketDirection::ClientToServer => self.perf_stats.as_mut().unwrap().inc_req(),
-                PacketDirection::ServerToClient => self.perf_stats.as_mut().unwrap().inc_resp(),
+                match param.direction {
+                    PacketDirection::ClientToServer => self.perf_stats.as_mut().unwrap().inc_req(),
+                    PacketDirection::ServerToClient => self.perf_stats.as_mut().unwrap().inc_resp(),
+                }
+            } else {
+                unreachable!()
             }
         }
-        Ok(v)
+        Ok(L7ParseResult::Multi(infos))
     }
 
     fn protocol(&self) -> L7Protocol {
@@ -264,14 +264,14 @@ impl L7ProtocolParserInterface for MqttLog {
 }
 
 impl MqttLog {
-    fn parse_mqtt_info(&mut self, mut payload: &[u8]) -> Result<()> {
+    fn parse_mqtt_info(&mut self, mut payload: &[u8]) -> Result<Vec<L7ProtocolInfo>> {
         // 现在只支持MQTT 3.1.1解析，不支持v5.0
         // Now only supports MQTT 3.1.1 parsing, not support v5.0
         if self.version != 0 && self.version != 4 {
             warn!("cannot parse packet, log parser only support to parse MQTT V3.1.1 packet");
             return Err(Error::MqttLogParseFailed);
         }
-
+        let mut infos = vec![];
         /*
            FIXME
            according to http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718025
@@ -394,7 +394,7 @@ impl MqttLog {
             }
 
             info.status = self.status;
-            self.info.push(info);
+            infos.push(L7ProtocolInfo::MqttInfo(info));
 
             if input.len() <= header.remaining_length as usize {
                 break;
@@ -402,10 +402,10 @@ impl MqttLog {
             payload = &input[header.remaining_length as usize..];
         }
 
-        if self.info.is_empty() {
+        if infos.is_empty() {
             return Err(Error::MqttLogParseFailed);
         }
-        Ok(())
+        Ok(infos)
     }
 
     /// 尽力而为解析判断是否为mqtt报文, 因为"不依赖端口判断协议实现"要求首个请求包返回true，其他为false，
@@ -438,12 +438,11 @@ impl MqttLog {
         false
     }
 
-    fn parse(&mut self, payload: &[u8], proto: IpProtocol) -> Result<()> {
+    fn parse(&mut self, payload: &[u8], proto: IpProtocol) -> Result<Vec<L7ProtocolInfo>> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
         }
         self.status = L7ResponseStatus::Ok;
-        self.info.clear();
 
         self.parse_mqtt_info(payload).map_err(|e| {
             self.status = L7ResponseStatus::Error;
@@ -826,13 +825,17 @@ mod tests {
                 Some(p) => p,
                 None => continue,
             };
-            let _ = mqtt.parse(payload, packet.lookup_key.proto);
+            let infos = mqtt.parse(payload, packet.lookup_key.proto).unwrap();
             let is_mqtt = MqttLog::check_protocol(
                 payload,
                 &ParseParam::from((packet as &MetaPacket, log_cache.clone(), false)),
             );
-            for i in mqtt.info.iter() {
-                output.push_str(&format!("{:?} is_mqtt: {}\r\n", i, is_mqtt));
+            for i in infos.iter() {
+                if let L7ProtocolInfo::MqttInfo(info) = i {
+                    output.push_str(&format!("{:?} is_mqtt: {}\r\n", info, is_mqtt));
+                } else {
+                    unreachable!()
+                }
             }
         }
         output

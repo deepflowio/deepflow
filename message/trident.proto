@@ -259,6 +259,8 @@ message Config {
     optional string  http_log_x_request_id = 307 [default = 'X-Request-ID'];
 
     // 新增全景图功能开关
+    repeated uint32 l4_log_ignore_tap_sides = 401;
+    repeated uint32 l7_log_ignore_tap_sides = 402;
     repeated uint32 l7_log_store_tap_types = 403;
     optional bool   l4_performance_enabled = 404 [default = true];
     optional bool   l7_metrics_enabled     = 405 [default = true];
