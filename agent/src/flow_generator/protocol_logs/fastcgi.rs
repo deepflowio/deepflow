@@ -419,19 +419,19 @@ impl L7ProtocolParserInterface for FastCGILog {
                     info.seq_off = off as u32;
                     if record.record_type == FCGI_STDOUT {
                         info.request_id = record.request_id as u32;
-                        if record_payload.starts_with(&[b'<']) {
-                            // skip the html response
-                            continue;
-                        }
+
+                        let mut is_hdr = false;
+
                         for i in parse_v1_headers(record_payload) {
                             let Some(col_index) = i.find(':') else {
-                                    continue;
-                                };
+                                break;
+                            };
 
                             if col_index + 1 >= i.len() {
-                                continue;
+                                break;
                             }
 
+                            is_hdr = true;
                             let key = &i[..col_index];
                             let value = &i[col_index + 1..];
 
@@ -447,10 +447,15 @@ impl L7ProtocolParserInterface for FastCGILog {
                             }
                         }
 
+                        if !is_hdr {
+                            continue;
+                        }
+
                         if info.status_code.is_none() {
                             info.status_code = Some(200);
                             self.set_status(200, &mut info);
                         }
+                        break 'l;
                     }
                 }
 
