@@ -36,6 +36,8 @@ pub enum L7Protocol {
     ProtobufRPC = 42,
     SofaRPC = 43,
 
+    FastCGI = 44,
+
     // SQL
     MySQL = 60,
     PostgreSQL = 61,
@@ -65,6 +67,7 @@ impl From<String> for L7Protocol {
             "dubbo" => Self::Dubbo,
             "grpc" => Self::Grpc,
             "protobufrpc" => Self::ProtobufRPC,
+            "fastcgi" => Self::FastCGI,
             "custom" => Self::Custom,
             "sofarpc" => Self::SofaRPC,
             "mysql" => Self::MySQL,
