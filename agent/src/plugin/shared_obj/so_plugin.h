@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+#ifndef SO_PLUGIN_C
+#define SO_PLUGIN_C
+
 #define EBPF_TYPE_TRACEPOINT 0
 #define EBPF_TYPE_TLS_UPROBE 1
 #define EBPF_TYPE_NONE 255
@@ -128,3 +131,5 @@ struct parse_result on_parse_payload(struct parse_ctx *ctx,
 
 // invoke after dlopen, only call once
 void init();
+
+#endif

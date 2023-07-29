@@ -32,6 +32,7 @@ use super::MetaPacket;
 
 use crate::config::handler::LogParserConfig;
 use crate::flow_generator::flow_map::FlowMapCounter;
+use crate::flow_generator::protocol_logs::fastcgi::FastCGILog;
 use crate::flow_generator::protocol_logs::plugin::custom_wrap::CustomWrapLog;
 use crate::flow_generator::protocol_logs::plugin::get_custom_log_parser;
 use crate::flow_generator::protocol_logs::{
@@ -168,6 +169,7 @@ impl_protocol_parser! {
         Redis(RedisLog),
         PostgreSQL(PostgresqlLog),
         Dubbo(DubboLog),
+        FastCGI(FastCGILog),
         MQTT(MqttLog),
         // add protocol below
     }
