@@ -16,6 +16,7 @@
 
 pub mod consts;
 pub(crate) mod dns;
+pub(crate) mod fastcgi;
 pub(crate) mod http;
 pub(crate) mod mq;
 mod parser;
