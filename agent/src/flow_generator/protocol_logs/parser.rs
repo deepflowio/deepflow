@@ -151,7 +151,7 @@ impl MetaAppProto {
         }
 
         if meta_packet.lookup_key.direction == PacketDirection::ClientToServer {
-            base_info.req_tcp_seq = meta_packet.tcp_data.seq;
+            base_info.req_tcp_seq = meta_packet.tcp_data.seq + l7_info.tcp_seq_offset();
 
             // ebpf info
             base_info.syscall_trace_id_request = meta_packet.syscall_trace_id;
@@ -167,7 +167,7 @@ impl MetaAppProto {
                 );
             }
 
-            base_info.resp_tcp_seq = meta_packet.tcp_data.seq;
+            base_info.resp_tcp_seq = meta_packet.tcp_data.seq + l7_info.tcp_seq_offset();
 
             // ebpf info
             base_info.syscall_trace_id_response = meta_packet.syscall_trace_id;
