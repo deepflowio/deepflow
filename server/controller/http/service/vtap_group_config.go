@@ -113,23 +113,23 @@ func getTypeInfo(tapTypeValue int, idToTapTypeName map[int]string) *model.TypeIn
 
 // tapSideIDToName references feild l4_log_ignore_tap_sides of file agent_group_config_example.yaml.
 var tapSideIDToName = map[int]string{
-	0:  "Rest",
-	1:  "Client",
-	2:  "Server",
-	4:  "Local",
-	9:  "ClientNode",
-	10: "ServerNode",
-	17: "ClientHypervisor",
-	18: "ServerHypervisor",
-	25: "ClientGatewayHypervisor",
-	26: "ServerGatewayHypervisor",
-	33: "ClientGateway",
-	34: "ServerGateway",
-	41: "ClientProcess",
-	42: "ServerProcess",
-	48: "App",
-	49: "ClientApp",
-	50: "ServerApp",
+	0:  "其他网卡",      // Rest
+	1:  "客户端网卡",     // Client
+	2:  "服务端网卡",     // Server
+	4:  "本机网卡",      // Local
+	9:  "客户端容器节点",   // ClientNode
+	10: "服务端容器节点",   // ServerNode
+	17: "客户端宿主机",    // ClientHypervisor
+	18: "服务端宿主机",    // ServerHypervisor
+	25: "客户端到网关宿主机", // ClientGatewayHypervisor
+	26: "网关宿主机到服务端", // ServerGatewayHypervisor
+	33: "客户端到网关",    // ClientGateway
+	34: "网关到服务端",    // ServerGateway
+	41: "客户端进程",     // ClientProcess
+	42: "服务端进程",     // ServerProcess
+	48: "应用",        // App
+	49: "客户端应用",     // ClientApp
+	50: "服务端应用",     // ServerApp
 }
 
 func convertDBToJson(
