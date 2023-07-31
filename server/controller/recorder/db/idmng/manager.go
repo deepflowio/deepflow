@@ -26,6 +26,7 @@ import (
 	"github.com/op/go-logging"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
 	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	. "github.com/deepflowio/deepflow/server/controller/recorder/config"
 	. "github.com/deepflowio/deepflow/server/controller/recorder/constraint"
@@ -169,7 +170,12 @@ func (p *IDPool[MT]) refresh() error {
 	log.Infof("refresh %s id pools started", p.resourceType)
 
 	var items []*MT
-	err := mysql.Db.Unscoped().Select("id").Find(&items).Error
+	var err error
+	if p.resourceType == RESOURCE_TYPE_PROCESS_EN {
+		items, err = query.FindInBatches[MT](mysql.Db.Unscoped().Select("id"))
+	} else {
+		err = mysql.Db.Unscoped().Select("id").Find(&items).Error
+	}
 	if err != nil {
 		log.Errorf("db query %s failed: %v", p.resourceType, err)
 		return err

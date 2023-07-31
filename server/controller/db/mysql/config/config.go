@@ -25,4 +25,5 @@ type MySqlConfig struct {
 	TimeOut                uint32 `default:"30" yaml:"timeout"`
 	DropDatabaseEnabled    bool   `default:"false" yaml:"drop-database-enabled"`
 	AutoIncrementIncrement uint32 `default:"1" yaml:"auto_increment_increment"`
+	ResultSetMax           uint32 `default:"100000" yaml:"result_set_max"`
 }

@@ -22,6 +22,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
 	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
@@ -1506,7 +1507,8 @@ func (c *Cache) DeleteProcesses(lcuuids []string) {
 func (c *Cache) refreshProcesses() {
 	log.Infof(refreshResource(RESOURCE_TYPE_PROCESS_EN))
 	var processes []*mysql.Process
-	if err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid).Find(&processes).Error; err != nil {
+	processes, err := query.FindInBatches[mysql.Process](mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid))
+	if err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_PROCESS_EN, err))
 		return
 	}
