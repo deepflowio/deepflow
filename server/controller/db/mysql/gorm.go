@@ -53,3 +53,7 @@ func Gorm(cfg MySqlConfig) *gorm.DB {
 	dsn := GetDSN(cfg, cfg.Database, cfg.TimeOut, false)
 	return GetGormDB(dsn)
 }
+
+func GetResultSetMax() int {
+	return int(DbConfig.ResultSetMax)
+}

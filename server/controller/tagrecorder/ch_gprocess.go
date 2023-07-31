@@ -18,6 +18,7 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
 )
 
 type ChGProcess struct {
@@ -37,8 +38,7 @@ func NewChGProcess(resourceTypeToIconID map[IconKey]int) *ChGProcess {
 }
 
 func (p *ChGProcess) generateNewData() (map[IDKey]mysql.ChGProcess, bool) {
-	var processes []mysql.Process
-	err := mysql.Db.Unscoped().Find(&processes).Error
+	processes, err := query.FindInBatches[mysql.Process](mysql.Db.Unscoped())
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false

@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder/config"
 )
 
@@ -105,7 +106,12 @@ func (b *UpdaterBase[MT, KT]) Refresh() {
 
 func (b *UpdaterBase[MT, KT]) generateOldData() (map[KT]MT, bool) {
 	var items []MT
-	err := mysql.Db.Unscoped().Find(&items).Error
+	var err error
+	if b.resourceTypeName == RESOURCE_TYPE_CH_GPROCESS {
+		items, err = query.FindInBatchesObj[MT](mysql.Db.Unscoped())
+	} else {
+		err = mysql.Db.Unscoped().Find(&items).Error
+	}
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(b.resourceTypeName, err))
 		return nil, false

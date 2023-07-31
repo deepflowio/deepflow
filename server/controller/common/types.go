@@ -26,4 +26,6 @@ type GlobalConfig struct {
 	HTTPNodePort int
 	GRPCPort     int
 	GRPCNodePort int
+
+	MySQLResultSetMax int
 }
