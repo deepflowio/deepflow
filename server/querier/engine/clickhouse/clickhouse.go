@@ -988,8 +988,8 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 			e.Statements = append(e.Statements, binFunction)
 			return nil
 		}
-		if e.DB == chCommon.DB_NAME_EXT_METRICS || e.DB == chCommon.DB_NAME_PROMETHEUS || e.DB == chCommon.DB_NAME_DEEPFLOW_SYSTEM {
-			funcName := strings.Trim(sqlparser.String(expr.Name), "`")
+		funcName := strings.Trim(sqlparser.String(expr.Name), "`")
+		if funcName != view.FUNCTION_COUNT && (e.DB == chCommon.DB_NAME_EXT_METRICS || e.DB == chCommon.DB_NAME_PROMETHEUS || e.DB == chCommon.DB_NAME_DEEPFLOW_SYSTEM) {
 			if _, ok := metrics.METRICS_FUNCTIONS_MAP[funcName]; ok {
 				if as == "" {
 					as = strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", "")
