@@ -281,17 +281,18 @@ func (q *QingCloud) GetVMNics() ([]model.VInterface, []model.IP, error) {
 				privateIP := nic.Get("private_ip").MustString()
 				if privateIP != "" {
 					subnetLcuuid, ok := q.VxnetIdToSubnetLcuuid[vxnetId]
-					if ok {
-						retIPs = append(retIPs, model.IP{
-							Lcuuid: common.GenerateUUID(
-								nicId + privateIP + strconv.Itoa(common.NETWORK_TYPE_LAN),
-							),
-							VInterfaceLcuuid: vinterfaceLcuuid,
-							IP:               privateIP,
-							SubnetLcuuid:     subnetLcuuid,
-							RegionLcuuid:     regionLcuuid,
-						})
+					if !ok {
+						subnetLcuuid = common.GenerateUUID(common.NETWORK_ISP_LCUUID)
 					}
+					retIPs = append(retIPs, model.IP{
+						Lcuuid: common.GenerateUUID(
+							nicId + privateIP + strconv.Itoa(common.NETWORK_TYPE_LAN),
+						),
+						VInterfaceLcuuid: vinterfaceLcuuid,
+						IP:               privateIP,
+						SubnetLcuuid:     subnetLcuuid,
+						RegionLcuuid:     regionLcuuid,
+					})
 				}
 				// 生成公网IP
 				publicIP := nic.Get("eip").Get("eip_addr").MustString()
