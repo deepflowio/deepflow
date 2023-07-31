@@ -44,17 +44,20 @@ use log::{debug, info, warn};
 use regex::Regex;
 use tokio::runtime::{Builder, Runtime};
 
-use crate::flow_generator::protocol_logs::SessionAggregator;
 #[cfg(target_os = "linux")]
 use crate::platform::prometheus::targets::TargetsWatcher;
 use crate::{
-    collector::Collector,
     collector::{
         flow_aggr::FlowAggrThread, quadruple_generator::QuadrupleGeneratorThread, CollectorThread,
         MetricsType,
     },
+    collector::{
+        l7_quadruple_generator::L7QuadrupleGeneratorThread, Collector, L7Collector,
+        L7CollectorThread,
+    },
     common::{
         enums::TapType,
+        flow::L7Stats,
         tagged_flow::{BoxedTaggedFlow, TaggedFlow},
         tap_types::TapTyper,
         FeatureFlags, DEFAULT_INGESTER_PORT, DEFAULT_LOG_RETENTION, DEFAULT_TRIDENT_CONF_FILE,
@@ -70,7 +73,9 @@ use crate::{
         self, recv_engine::bpf, BpfOptions, Dispatcher, DispatcherBuilder, DispatcherListener,
     },
     exception::ExceptionHandler,
-    flow_generator::{protocol_logs::BoxAppProtoLogsData, PacketSequenceParser},
+    flow_generator::{
+        protocol_logs::BoxAppProtoLogsData, protocol_logs::SessionAggregator, PacketSequenceParser,
+    },
     handler::{NpbBuilder, PacketHandlerBuilder},
     integration_collector::{
         BoxedPrometheusExtra, MetricServer, OpenTelemetry, OpenTelemetryCompressed, Profile,
@@ -1188,6 +1193,7 @@ pub struct AgentComponents {
     pub dispatcher_listeners: Vec<DispatcherListener>,
     pub session_aggrs: Vec<SessionAggregator>,
     pub collectors: Vec<CollectorThread>,
+    pub l7_collectors: Vec<L7CollectorThread>,
     pub l4_flow_uniform_sender: UniformSenderThread<BoxedTaggedFlow>,
     pub metrics_uniform_sender: UniformSenderThread<BoxedDocument>,
     pub l7_flow_uniform_sender: UniformSenderThread<BoxAppProtoLogsData>,
@@ -1235,7 +1241,7 @@ impl AgentComponents {
     fn new_collector(
         id: usize,
         stats_collector: Arc<stats::Collector>,
-        flow_receiver: queue::Receiver<BatchedBox<TaggedFlow>>,
+        flow_receiver: queue::Receiver<Arc<BatchedBox<TaggedFlow>>>,
         toa_info_sender: DebugSender<Box<(SocketAddr, SocketAddr)>>,
         l4_flow_aggr_sender: Option<DebugSender<BoxedTaggedFlow>>,
         metrics_sender: DebugSender<BoxedDocument>,
@@ -1375,6 +1381,109 @@ impl AgentComponents {
             second_collector,
             minute_collector,
         )
+    }
+
+    fn new_l7_collector(
+        id: usize,
+        stats_collector: Arc<stats::Collector>,
+        l7_stats_receiver: queue::Receiver<BatchedBox<L7Stats>>,
+        metrics_sender: DebugSender<BoxedDocument>,
+        metrics_type: MetricsType,
+        config_handler: &ConfigHandler,
+        queue_debugger: &QueueDebugger,
+        synchronizer: &Arc<Synchronizer>,
+    ) -> L7CollectorThread {
+        let yaml_config = &config_handler.candidate_config.yaml_config;
+
+        let (l7_second_sender, l7_second_receiver, counter) = queue::bounded_with_debug(
+            yaml_config.quadruple_queue_size,
+            "2-flow-with-meter-to-l7-second-collector",
+            queue_debugger,
+        );
+        stats_collector.register_countable(
+            "queue",
+            Countable::Owned(Box::new(counter)),
+            vec![
+                StatsOption::Tag(
+                    "module",
+                    "2-flow-with-meter-to-l7-second-collector".to_string(),
+                ),
+                StatsOption::Tag("index", id.to_string()),
+            ],
+        );
+        let (l7_minute_sender, l7_minute_receiver, counter) = queue::bounded_with_debug(
+            yaml_config.quadruple_queue_size,
+            "2-flow-with-meter-to-l7-minute-collector",
+            queue_debugger,
+        );
+        stats_collector.register_countable(
+            "queue",
+            Countable::Owned(Box::new(counter)),
+            vec![
+                StatsOption::Tag(
+                    "module",
+                    "2-flow-with-meter-to-l7-minute-collector".to_string(),
+                ),
+                StatsOption::Tag("index", id.to_string()),
+            ],
+        );
+
+        // FIXME: 应该让flowgenerator和dispatcher解耦，并提供Delay函数用于此处
+        // QuadrupleGenerator的Delay组成部分：
+        //   FlowGen中流统计数据固有的Delay：_FLOW_STAT_INTERVAL + packetDelay
+        //   FlowGen中InjectFlushTicker的额外Delay：_TIME_SLOT_UNIT
+        //   FlowGen中输出队列Flush的Delay：flushInterval
+        //   FlowGen中其它处理流程可能产生的Delay: 5s
+        let second_quadruple_tolerable_delay = (yaml_config.packet_delay.as_secs()
+            + 1
+            + yaml_config.flow.flush_interval.as_secs()
+            + COMMON_DELAY as u64)
+            + yaml_config.second_flow_extra_delay.as_secs();
+        // minute QG window is also pushed forward by flow stat time,
+        // therefore its delay should be 60 + second delay (including extra flow delay)
+        let minute_quadruple_tolerable_delay = 60 + second_quadruple_tolerable_delay;
+
+        let quadruple_generator = L7QuadrupleGeneratorThread::new(
+            id,
+            l7_stats_receiver,
+            l7_second_sender,
+            l7_minute_sender,
+            metrics_type,
+            second_quadruple_tolerable_delay,
+            minute_quadruple_tolerable_delay,
+            1 << 18, // possible_host_size
+            config_handler.collector(),
+            synchronizer.ntp_diff(),
+            stats_collector.clone(),
+        );
+
+        let (mut second_collector, mut minute_collector) = (None, None);
+        if metrics_type.contains(MetricsType::SECOND) {
+            second_collector = Some(L7Collector::new(
+                id as u32,
+                l7_second_receiver,
+                metrics_sender.clone(),
+                MetricsType::SECOND,
+                second_quadruple_tolerable_delay as u32 + COMMON_DELAY, // qg processing is delayed and requires the collector component to increase the window size
+                &stats_collector,
+                config_handler.collector(),
+                synchronizer.ntp_diff(),
+            ));
+        }
+        if metrics_type.contains(MetricsType::MINUTE) {
+            minute_collector = Some(L7Collector::new(
+                id as u32,
+                l7_minute_receiver,
+                metrics_sender,
+                MetricsType::MINUTE,
+                minute_quadruple_tolerable_delay as u32 + COMMON_DELAY, // qg processing is delayed and requires the collector component to increase the window size
+                &stats_collector,
+                config_handler.collector(),
+                synchronizer.ntp_diff(),
+            ));
+        }
+
+        L7CollectorThread::new(quadruple_generator, second_collector, minute_collector)
     }
 
     fn new(
@@ -1588,6 +1697,7 @@ impl AgentComponents {
         let mut dispatchers = vec![];
         let mut dispatcher_listeners = vec![];
         let mut collectors = vec![];
+        let mut l7_collectors = vec![];
         let mut session_aggrs = vec![];
         let mut packet_sequence_parsers = vec![]; // Enterprise Edition Feature: packet-sequence
 
@@ -1800,6 +1910,20 @@ impl AgentComponents {
                 ],
             );
 
+            let (l7_stats_sender, l7_stats_receiver, counter) = queue::bounded_with_debug(
+                yaml_config.flow_queue_size,
+                "1-l7-stats-to-quadruple-generator",
+                &queue_debugger,
+            );
+            stats_collector.register_countable(
+                "queue",
+                Countable::Owned(Box::new(counter)),
+                vec![
+                    StatsOption::Tag("module", "1-l7-stats-to-quadruple-generator".to_string()),
+                    StatsOption::Tag("index", i.to_string()),
+                ],
+            );
+
             // create and start app proto logs
             let (log_sender, log_receiver, counter) = queue::bounded_with_debug(
                 yaml_config.flow_queue_size,
@@ -1950,6 +2074,7 @@ impl AgentComponents {
                 .tap_typer(tap_typer.clone())
                 .analyzer_dedup_disabled(yaml_config.analyzer_dedup_disabled)
                 .flow_output_queue(flow_sender.clone())
+                .l7_stats_output_queue(l7_stats_sender.clone())
                 .log_output_queue(log_sender.clone())
                 .packet_sequence_output_queue(packet_sequence_sender) // Enterprise Edition Feature: packet-sequence
                 .stats_collector(stats_collector.clone())
@@ -2011,6 +2136,17 @@ impl AgentComponents {
                 &synchronizer,
             );
             collectors.push(collector);
+            let l7_collector = Self::new_l7_collector(
+                i,
+                stats_collector.clone(),
+                l7_stats_receiver,
+                metrics_sender.clone(),
+                MetricsType::SECOND | MetricsType::MINUTE,
+                config_handler,
+                &queue_debugger,
+                &synchronizer,
+            );
+            l7_collectors.push(l7_collector);
         }
         let proc_event_queue_name = "1-proc-event-to-sender";
         #[allow(unused)]
@@ -2061,7 +2197,9 @@ impl AgentComponents {
         #[allow(unused)]
         let mut ebpf_collector = None;
         #[cfg(target_os = "linux")]
-        if candidate_config.tap_mode != TapMode::Analyzer {
+        if !config_handler.ebpf().load().ebpf.disabled
+            && candidate_config.tap_mode != TapMode::Analyzer
+        {
             let (flow_sender, flow_receiver, counter) = queue::bounded_with_debug(
                 yaml_config.flow_queue_size,
                 "1-tagged-flow-to-quadruple-generator",
@@ -2072,6 +2210,20 @@ impl AgentComponents {
                 Countable::Owned(Box::new(counter)),
                 vec![
                     StatsOption::Tag("module", "1-tagged-flow-to-quadruple-generator".to_string()),
+                    StatsOption::Tag("index", ebpf_dispatcher_id.to_string()),
+                ],
+            );
+
+            let (l7_stats_sender, l7_stats_receiver, counter) = queue::bounded_with_debug(
+                yaml_config.flow_queue_size,
+                "1-l7-stats-to-quadruple-generator",
+                &queue_debugger,
+            );
+            stats_collector.register_countable(
+                "queue",
+                Countable::Owned(Box::new(counter)),
+                vec![
+                    StatsOption::Tag("module", "1-l7-stats-to-quadruple-generator".to_string()),
                     StatsOption::Tag("index", ebpf_dispatcher_id.to_string()),
                 ],
             );
@@ -2113,6 +2265,17 @@ impl AgentComponents {
             );
             session_aggrs.push(session_aggr);
             collectors.push(collector);
+            let l7_collector = Self::new_l7_collector(
+                ebpf_dispatcher_id,
+                stats_collector.clone(),
+                l7_stats_receiver,
+                metrics_sender.clone(),
+                MetricsType::SECOND | MetricsType::MINUTE,
+                config_handler,
+                &queue_debugger,
+                &synchronizer,
+            );
+            l7_collectors.push(l7_collector);
             ebpf_collector = EbpfCollector::new(
                 ebpf_dispatcher_id,
                 synchronizer.ntp_diff(),
@@ -2123,6 +2286,7 @@ impl AgentComponents {
                 policy_getter,
                 log_sender,
                 flow_sender,
+                l7_stats_sender,
                 proc_event_sender,
                 profile_sender.clone(),
                 &queue_debugger,
@@ -2160,32 +2324,31 @@ impl AgentComponents {
         );
 
         let otel_dispatcher_id = ebpf_dispatcher_id + 1;
-        let (otel_metrics_sender, otel_metrics_receiver, counter) = queue::bounded_with_debug(
+
+        let (l7_stats_sender, l7_stats_receiver, counter) = queue::bounded_with_debug(
             yaml_config.flow_queue_size,
-            "1-tagged-flow-to-quadruple-generator",
+            "1-l7-stats-to-quadruple-generator",
             &queue_debugger,
         );
         stats_collector.register_countable(
             "queue",
             Countable::Owned(Box::new(counter)),
             vec![
-                StatsOption::Tag("module", "1-otel-metrics-to-collector".to_string()),
+                StatsOption::Tag("module", "1-l7-stats-to-quadruple-generator".to_string()),
                 StatsOption::Tag("index", otel_dispatcher_id.to_string()),
             ],
         );
-        let collector = Self::new_collector(
+        let l7_collector = Self::new_l7_collector(
             otel_dispatcher_id,
             stats_collector.clone(),
-            otel_metrics_receiver,
-            toa_sender.clone(),
-            None,
+            l7_stats_receiver,
             metrics_sender.clone(),
             MetricsType::SECOND | MetricsType::MINUTE,
             config_handler,
             &queue_debugger,
             &synchronizer,
         );
-        collectors.push(collector);
+        l7_collectors.push(l7_collector);
 
         let prometheus_queue_name = "1-prometheus-to-sender";
         let (prometheus_sender, prometheus_receiver, counter) = queue::bounded_with_debug(
@@ -2257,7 +2420,7 @@ impl AgentComponents {
             runtime.clone(),
             otel_sender,
             compressed_otel_sender,
-            otel_metrics_sender,
+            l7_stats_sender,
             prometheus_sender,
             telegraf_sender,
             profile_sender,
@@ -2316,6 +2479,7 @@ impl AgentComponents {
             dispatchers,
             dispatcher_listeners,
             collectors,
+            l7_collectors,
             l4_flow_uniform_sender,
             metrics_uniform_sender,
             l7_flow_uniform_sender,
@@ -2416,6 +2580,10 @@ impl AgentComponents {
             collector.start();
         }
 
+        for collector in self.l7_collectors.iter_mut() {
+            collector.start();
+        }
+
         #[cfg(target_os = "linux")]
         if let Some(ebpf_collector) = self.ebpf_collector.as_mut() {
             ebpf_collector.start();
@@ -2465,6 +2633,10 @@ impl AgentComponents {
         }
 
         for q in self.collectors.iter_mut() {
+            join_handles.append(&mut q.notify_stop());
+        }
+
+        for q in self.l7_collectors.iter_mut() {
             join_handles.append(&mut q.notify_stop());
         }
 

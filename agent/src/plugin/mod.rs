@@ -454,6 +454,10 @@ impl L7ProtocolInfoInterface for CustomInfo {
     fn is_req_resp_end(&self) -> (bool, bool) {
         (self.is_req_end, self.is_resp_end)
     }
+
+    fn get_endpoint(&self) -> Option<String> {
+        None
+    }
 }
 
 impl From<CustomInfo> for L7ProtocolSendLog {

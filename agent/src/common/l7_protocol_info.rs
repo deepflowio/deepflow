@@ -89,6 +89,10 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
 
     fn is_tls(&self) -> bool;
 
+    fn get_endpoint(&self) -> Option<String> {
+        None
+    }
+
     fn skip_send(&self) -> bool {
         false
     }

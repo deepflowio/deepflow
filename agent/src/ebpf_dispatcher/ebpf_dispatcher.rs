@@ -26,6 +26,7 @@ use libc::{c_int, c_ulonglong};
 use log::{debug, error, info, warn};
 
 use super::{Error, Result};
+use crate::common::flow::L7Stats;
 use crate::common::l7_protocol_log::{
     get_all_protocol, L7ProtocolBitmap, L7ProtocolParserInterface,
 };
@@ -198,7 +199,8 @@ struct EbpfDispatcher {
 
     config: EbpfAccess,
     output: DebugSender<Box<MetaAppProto>>, // Send MetaAppProtos to the AppProtoLogsParser
-    flow_output: DebugSender<BatchedBox<TaggedFlow>>, // Send TaggedFlows to the QuadrupleGenerator
+    flow_output: DebugSender<Arc<BatchedBox<TaggedFlow>>>, // Send TaggedFlows to the QuadrupleGenerator
+    l7_stats_output: DebugSender<BatchedBox<L7Stats>>,     // Send L7Stats to the QuadrupleGenerator
     stats_collector: Arc<stats::Collector>,
 }
 
@@ -209,6 +211,7 @@ impl EbpfDispatcher {
         let mut flow_map = FlowMap::new(
             self.dispatcher_id as u32,
             self.flow_output.clone(),
+            self.l7_stats_output.clone(),
             self.policy_getter,
             self.output.clone(),
             self.time_diff.clone(),
@@ -623,7 +626,8 @@ impl EbpfCollector {
         collector_config: CollectorAccess,
         policy_getter: PolicyGetter,
         output: DebugSender<Box<MetaAppProto>>,
-        flow_output: DebugSender<BatchedBox<TaggedFlow>>,
+        flow_output: DebugSender<Arc<BatchedBox<TaggedFlow>>>,
+        l7_stats_output: DebugSender<BatchedBox<L7Stats>>,
         proc_event_output: DebugSender<BoxedProcEvents>,
         ebpf_profile_sender: DebugSender<Profile>,
         queue_debugger: &QueueDebugger,
@@ -660,6 +664,7 @@ impl EbpfCollector {
                 log_parser_config,
                 output,
                 flow_output,
+                l7_stats_output,
                 flow_map_config,
                 stats_collector,
                 collector_config,

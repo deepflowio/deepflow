@@ -210,6 +210,14 @@ impl L7ProtocolInfoInterface for SofaRpcInfo {
     fn is_tls(&self) -> bool {
         false
     }
+
+    fn get_endpoint(&self) -> Option<String> {
+        if !self.target_serv.is_empty() && !self.method.is_empty() {
+            Some(format!("{}/{}", self.target_serv, self.method))
+        } else {
+            None
+        }
+    }
 }
 
 impl From<SofaRpcInfo> for L7ProtocolSendLog {

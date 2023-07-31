@@ -20,7 +20,7 @@ use super::quadruple_generator::QgKey;
 
 use crate::common::flow::{L7Protocol, SignalSource};
 use crate::common::tagged_flow::TaggedFlow;
-use crate::metric::meter::{AppMeter, FlowMeter};
+use crate::metric::meter::FlowMeter;
 use public::buffer::BatchedBox;
 
 pub struct AccumulatedFlow {
@@ -31,7 +31,6 @@ pub struct AccumulatedFlow {
 
     pub id_maps: [HashMap<u16, u16>; 2],
     pub flow_meter: FlowMeter,
-    pub app_meter: AppMeter,
     pub key: QgKey,
     pub time_in_second: Duration,
     pub nat_real_ip_0: IpAddr,
@@ -44,8 +43,8 @@ impl fmt::Display for AccumulatedFlow {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "AccumulatedFlow: time: {:?}, flow_meter: {:?}, app_meter: {:?}, nat_real_ip_0: {:?}, nat_real_ip_1: {:?}, nat_real_port_0: {}, nat_real_port_1: {}", 
-            self.time_in_second, &self.flow_meter, &self.app_meter, &self.nat_real_ip_0, &self.nat_real_ip_1,  &self.nat_real_port_0, &self.nat_real_port_1,
+            "AccumulatedFlow: time: {:?}, flow_meter: {:?}, nat_real_ip_0: {:?}, nat_real_ip_1: {:?}, nat_real_port_0: {}, nat_real_port_1: {}", 
+            self.time_in_second, &self.flow_meter, &self.nat_real_ip_0, &self.nat_real_ip_1,  &self.nat_real_port_0, &self.nat_real_port_1,
         )
     }
 }
@@ -61,7 +60,6 @@ impl AccumulatedFlow {
         &mut self,
         time_in_second: Duration,
         flow_meter: &FlowMeter,
-        app_meter: &AppMeter,
         id_maps: &[HashMap<u16, u16>; 2],
         tagged_flow: &TaggedFlow,
     ) {
@@ -75,21 +73,6 @@ impl AccumulatedFlow {
                 for (k, v) in id_maps[i].iter() {
                     self.id_maps[i].insert(*k, *v);
                 }
-            }
-        }
-        // 相同服务端端口不同客户端端口的流L7Protocol可能不一致
-        // 未知应用的判断需要通过流结束原因和持续时间，所以同一个流的L7Protocol可能不同这里需要更新，原则如下：
-        // 1. unknown协议可以被任何协议覆盖
-        // 2. other可以被其他非unknown协议覆盖
-        if let Some(other_stats) = tagged_flow.flow.flow_perf_stats.as_ref() {
-            if other_stats.l7_protocol == self.l7_protocol {
-                self.app_meter.sequential_merge(app_meter);
-            } else if self.l7_protocol == L7Protocol::Unknown
-                || (self.l7_protocol == L7Protocol::Other
-                    && other_stats.l7_protocol != L7Protocol::Unknown)
-            {
-                self.l7_protocol = other_stats.l7_protocol;
-                self.app_meter = *app_meter;
             }
         }
     }

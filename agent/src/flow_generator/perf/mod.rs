@@ -37,7 +37,10 @@ use super::{
 };
 
 use crate::common::l7_protocol_log::L7PerfCache;
-use crate::common::{flow::L7PerfStats, l7_protocol_log::L7ParseResult};
+use crate::common::{
+    flow::{Flow, L7PerfStats},
+    l7_protocol_log::L7ParseResult,
+};
 use crate::plugin::wasm::WasmVm;
 #[cfg(target_os = "linux")]
 use crate::plugin::{c_ffi::SoPluginFunc, shared_obj::SoPluginCounterMap};
@@ -526,47 +529,35 @@ impl FlowLog {
         Ok(L7ParseResult::None)
     }
 
-    pub fn copy_and_reset_perf_data(
-        &mut self,
-        flow_reversed: bool,
-        l7_timeout_count: u32,
-        _: bool,
-        l7_performance_enabled: bool,
-    ) -> Option<FlowPerfStats> {
-        let mut stats = None;
+    pub fn copy_and_reset_l4_perf_data(&mut self, flow_reversed: bool, flow: &mut Flow) {
         if let Some(l4) = self.l4.as_mut() {
             if l4.data_updated() {
-                stats.replace(l4.copy_and_reset_data(flow_reversed));
+                let flow_perf_stats = l4.copy_and_reset_data(flow_reversed);
+                flow.flow_perf_stats.as_mut().unwrap().l4_protocol = flow_perf_stats.l4_protocol;
+                flow.flow_perf_stats.as_mut().unwrap().tcp = flow_perf_stats.tcp;
             }
         }
+    }
 
-        if l7_performance_enabled {
-            let default_l7_perf = L7PerfStats {
-                err_timeout: l7_timeout_count,
-                ..Default::default()
-            };
+    pub fn copy_and_reset_l7_perf_data(
+        &mut self,
+        l7_timeout_count: u32,
+    ) -> (L7PerfStats, L7Protocol) {
+        let default_l7_perf = L7PerfStats {
+            err_timeout: l7_timeout_count,
+            ..Default::default()
+        };
 
-            let l7_perf =
-                self.l7_protocol_log_parser
-                    .as_mut()
-                    .map_or(default_l7_perf.clone(), |l| {
-                        l.perf_stats().map_or(default_l7_perf, |mut p| {
-                            p.err_timeout = l7_timeout_count;
-                            p
-                        })
-                    });
+        let l7_perf = self
+            .l7_protocol_log_parser
+            .as_mut()
+            .map_or(default_l7_perf.clone(), |l| {
+                l.perf_stats().map_or(default_l7_perf, |mut p| {
+                    p.err_timeout = l7_timeout_count;
+                    p
+                })
+            });
 
-            if let Some(stats) = stats.as_mut() {
-                stats.l7 = l7_perf;
-                stats.l7_protocol = self.l7_protocol_enum.get_l7_protocol();
-            } else {
-                stats.replace(FlowPerfStats {
-                    l7: l7_perf,
-                    l7_protocol: self.l7_protocol_enum.get_l7_protocol(),
-                    ..Default::default()
-                });
-            }
-        }
-        stats
+        (l7_perf, self.l7_protocol_enum.get_l7_protocol())
     }
 }
