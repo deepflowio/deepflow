@@ -144,6 +144,14 @@ impl L7ProtocolInfoInterface for HttpInfo {
     fn is_req_resp_end(&self) -> (bool, bool) {
         (self.is_req_end, self.is_resp_end)
     }
+
+    fn get_endpoint(&self) -> Option<String> {
+        if self.is_grpc() {
+            Some(self.path.clone())
+        } else {
+            None
+        }
+    }
 }
 
 impl HttpInfo {
@@ -297,7 +305,7 @@ impl From<HttpInfo> for L7ProtocolSendLog {
                 f.path,
             )
         } else {
-            (f.method, f.path, f.host, String::new())
+            (f.method, f.path.clone(), f.host, String::new())
         };
 
         L7ProtocolSendLog {

@@ -66,7 +66,7 @@ use crate::config::handler::CollectorAccess;
 use crate::platform::GenericPoller;
 use crate::utils::environment::get_mac_by_name;
 use crate::{
-    common::{enums::TapType, FlowAclListener, TaggedFlow, TapTyper},
+    common::{enums::TapType, flow::L7Stats, FlowAclListener, TaggedFlow, TapTyper},
     config::{
         handler::{FlowAccess, LogParserAccess},
         DispatcherConfig,
@@ -634,7 +634,8 @@ pub struct DispatcherBuilder {
     tap_typer: Option<Arc<TapTyper>>,
     analyzer_dedup_disabled: Option<bool>,
     libvirt_xml_extractor: Option<Arc<LibvirtXmlExtractor>>,
-    flow_output_queue: Option<DebugSender<BatchedBox<TaggedFlow>>>,
+    flow_output_queue: Option<DebugSender<Arc<BatchedBox<TaggedFlow>>>>,
+    l7_stats_output_queue: Option<DebugSender<BatchedBox<L7Stats>>>,
     log_output_queue: Option<DebugSender<Box<MetaAppProto>>>,
     packet_sequence_output_queue:
         Option<DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>>, // Enterprise Edition Feature: packet-sequence
@@ -720,8 +721,13 @@ impl DispatcherBuilder {
         self
     }
 
-    pub fn flow_output_queue(mut self, v: DebugSender<BatchedBox<TaggedFlow>>) -> Self {
+    pub fn flow_output_queue(mut self, v: DebugSender<Arc<BatchedBox<TaggedFlow>>>) -> Self {
         self.flow_output_queue = Some(v);
+        self
+    }
+
+    pub fn l7_stats_output_queue(mut self, v: DebugSender<BatchedBox<L7Stats>>) -> Self {
+        self.l7_stats_output_queue = Some(v);
         self
     }
 
@@ -900,6 +906,10 @@ impl DispatcherBuilder {
                 .flow_output_queue
                 .take()
                 .ok_or(Error::ConfigIncomplete("no flow_output_queue".into()))?,
+            l7_stats_output_queue: self
+                .l7_stats_output_queue
+                .take()
+                .ok_or(Error::ConfigIncomplete("no l7_stats_output_queue".into()))?,
             log_output_queue: self
                 .log_output_queue
                 .take()

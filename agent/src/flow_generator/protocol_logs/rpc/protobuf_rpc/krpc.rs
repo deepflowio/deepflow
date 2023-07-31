@@ -127,6 +127,14 @@ impl L7ProtocolInfoInterface for KrpcInfo {
     fn is_tls(&self) -> bool {
         false
     }
+
+    fn get_endpoint(&self) -> Option<String> {
+        if !self.serv_id > 0 && !self.msg_id > 0 {
+            Some(format!("{}/{}", self.serv_id, self.msg_id))
+        } else {
+            None
+        }
+    }
 }
 
 impl From<KrpcInfo> for L7ProtocolSendLog {

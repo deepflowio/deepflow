@@ -45,6 +45,7 @@ use crate::{
         decapsulate::{TunnelInfo, TunnelType, TunnelTypeBitmap},
         endpoint::FeatureFlags,
         enums::{EthernetType, TapType},
+        flow::L7Stats,
         MetaPacket, TaggedFlow, TapTyper, DEFAULT_CONTROLLER_PORT, DEFAULT_INGESTER_PORT,
         ETH_HEADER_SIZE, FIELD_OFFSET_ETH_TYPE, VLAN_HEADER_SIZE, VLAN_ID_MASK,
     },
@@ -99,7 +100,8 @@ pub(super) struct BaseDispatcher {
 
     pub(super) analyzer_dedup_disabled: bool,
 
-    pub(super) flow_output_queue: DebugSender<BatchedBox<TaggedFlow>>,
+    pub(super) flow_output_queue: DebugSender<Arc<BatchedBox<TaggedFlow>>>,
+    pub(super) l7_stats_output_queue: DebugSender<BatchedBox<L7Stats>>,
     pub(super) log_output_queue: DebugSender<Box<MetaAppProto>>,
 
     pub(super) counter: Arc<PacketCounter>,

@@ -238,6 +238,7 @@ impl AnalyzerModeDispatcher {
 
         let npb_dedup_enabled = base.npb_dedup_enabled.clone();
         let flow_output_queue = base.flow_output_queue.clone();
+        let l7_stats_output_queue = base.l7_stats_output_queue.clone();
         let policy_getter = base.policy_getter;
         let log_output_queue = base.log_output_queue.clone();
         let ntp_diff = base.ntp_diff.clone();
@@ -257,6 +258,7 @@ impl AnalyzerModeDispatcher {
                     let mut flow_map = FlowMap::new(
                         id as u32,
                         flow_output_queue,
+                        l7_stats_output_queue,
                         policy_getter,
                         log_output_queue,
                         ntp_diff,
