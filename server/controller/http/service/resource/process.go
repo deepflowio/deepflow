@@ -25,6 +25,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
 	"github.com/deepflowio/deepflow/server/controller/db/redis"
 	. "github.com/deepflowio/deepflow/server/controller/http/service/resource/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
@@ -77,8 +78,8 @@ func getProcesses() ([]model.Process, error) {
 	}
 
 	// get processes
-	var processes []mysql.Process
-	if err := mysql.Db.Unscoped().Order("created_at DESC").Find(&processes).Error; err != nil {
+	processes, err := query.FindInBatchesObj[mysql.Process](mysql.Db.Unscoped().Order("created_at DESC"))
+	if err != nil {
 		return nil, err
 	}
 	var resp []model.Process

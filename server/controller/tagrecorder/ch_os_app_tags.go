@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
 )
 
 type ChOSAppTags struct {
@@ -38,8 +39,7 @@ func NewChOSAppTags() *ChOSAppTags {
 }
 
 func (o *ChOSAppTags) generateNewData() (map[OSAPPTagsKey]mysql.ChOSAppTags, bool) {
-	var processes []mysql.Process
-	err := mysql.Db.Unscoped().Find(&processes).Error
+	processes, err := query.FindInBatches[mysql.Process](mysql.Db.Unscoped())
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(o.resourceTypeName, err))
 		return nil, false
