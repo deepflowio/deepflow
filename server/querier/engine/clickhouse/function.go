@@ -82,6 +82,12 @@ func GetAggFunc(name string, args []string, alias string, db string, table strin
 	var levelFlag int
 	field := args[0]
 	field = strings.Trim(field, "`")
+
+	if name == view.FUNCTION_COUNT && field != metrics.COUNT_METRICS_NAME {
+		return nil, 0, "", fmt.Errorf("function [%s] not support metric [%s]",
+			view.FUNCTION_COUNT, metrics.COUNT_METRICS_NAME)
+	}
+
 	function, ok := metrics.METRICS_FUNCTIONS_MAP[name]
 	if !ok {
 		return nil, 0, "", nil
