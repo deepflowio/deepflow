@@ -711,13 +711,14 @@ var CREATE_SQL_MAP = map[string]string{
 }
 
 var VTAP_TYPE_TO_DEVICE_TYPE = map[int]int{
-	common.VTAP_TYPE_KVM:        common.VIF_DEVICE_TYPE_HOST,
-	common.VTAP_TYPE_ESXI:       common.VIF_DEVICE_TYPE_HOST,
-	common.VTAP_TYPE_WORKLOAD_V: common.VIF_DEVICE_TYPE_VM,
-	common.VTAP_TYPE_WORKLOAD_P: common.VIF_DEVICE_TYPE_VM,
-	common.VTAP_TYPE_POD_HOST:   common.VIF_DEVICE_TYPE_POD_NODE,
-	common.VTAP_TYPE_POD_VM:     common.VIF_DEVICE_TYPE_POD_NODE,
-	common.VTAP_TYPE_HYPER_V:    common.VIF_DEVICE_TYPE_HOST,
+	common.VTAP_TYPE_KVM:         common.VIF_DEVICE_TYPE_HOST,
+	common.VTAP_TYPE_ESXI:        common.VIF_DEVICE_TYPE_HOST,
+	common.VTAP_TYPE_WORKLOAD_V:  common.VIF_DEVICE_TYPE_VM,
+	common.VTAP_TYPE_WORKLOAD_P:  common.VIF_DEVICE_TYPE_VM,
+	common.VTAP_TYPE_POD_HOST:    common.VIF_DEVICE_TYPE_POD_NODE,
+	common.VTAP_TYPE_POD_VM:      common.VIF_DEVICE_TYPE_POD_NODE,
+	common.VTAP_TYPE_HYPER_V:     common.VIF_DEVICE_TYPE_HOST,
+	common.VTAP_TYPE_K8S_SIDECAR: common.VIF_DEVICE_TYPE_POD,
 }
 
 var RESOURCE_TYPE_TO_NODE_TYPE = map[int]string{
