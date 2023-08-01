@@ -19,6 +19,7 @@ package tagrecorder
 import (
 	"context"
 	"fmt"
+	"golang.org/x/exp/slices"
 	"os"
 	"sort"
 	"strconv"
@@ -107,12 +108,14 @@ func (c *TagRecorder) UpdateChDictionary() {
 						}
 						// 删除deepflow数据库
 						// Drop database deepflow
-						dropSql := "DROP DATABASE IF EXISTS deepflow"
-						_, err = connect.Exec(dropSql)
-						if err != nil {
-							log.Error(err)
-							connect.Close()
-							continue
+						if slices.Contains(databases, "deepflow") {
+							dropSql := "DROP DATABASE IF EXISTS deepflow"
+							_, err = connect.Exec(dropSql)
+							if err != nil {
+								log.Error(err)
+								connect.Close()
+								continue
+							}
 						}
 
 						sort.Strings(databases)
@@ -197,19 +200,25 @@ func (c *TagRecorder) UpdateChDictionary() {
 						// 删除不存在的字典
 						// Delete a dictionary that does not exist
 						delDicts := chDicts.Difference(wantedDicts)
+						var delDictError error
 						for _, dict := range delDicts.ToSlice() {
 							dropSQL := fmt.Sprintf("DROP DICTIONARY %s.%s", c.cfg.ClickHouseCfg.Database, dict)
 							_, err = connect.Exec(dropSQL)
 							if err != nil {
+								delDictError = err
 								log.Error(err)
-								connect.Close()
-								continue
+								break
 							}
+						}
+						if delDictError != nil {
+							connect.Close()
+							continue
 						}
 
 						// 创建期望的字典
 						// Creating the desired dictionary
 						addDicts := wantedDicts.Difference(chDicts)
+						var addDictError error
 						for _, dict := range addDicts.ToSlice() {
 							dictName := dict.(string)
 							chTable := "ch_" + strings.TrimSuffix(dictName, "_map")
@@ -220,24 +229,29 @@ func (c *TagRecorder) UpdateChDictionary() {
 							log.Info(createSQL)
 							_, err = connect.Exec(createSQL)
 							if err != nil {
+								addDictError = err
 								log.Error(err)
-								connect.Close()
-								continue
+								break
 							}
+						}
+						if addDictError != nil {
+							connect.Close()
+							continue
 						}
 
 						// 检查并更新已存在字典
 						// Check and update existing dictionaries
 						checkDicts := chDicts.Intersect(wantedDicts)
+						var updateDictError error
 						for _, dict := range checkDicts.ToSlice() {
 							dictName := dict.(string)
 							chTable := "ch_" + strings.TrimSuffix(dictName, "_map")
 							showSQL := fmt.Sprintf("SHOW CREATE DICTIONARY %s.%s", c.cfg.ClickHouseCfg.Database, dictName)
 							dictSQL := make([]string, 0)
 							if err := connect.Select(&dictSQL, showSQL); err != nil {
+								updateDictError = err
 								log.Error(err)
-								connect.Close()
-								continue
+								break
 							}
 							createSQL := CREATE_SQL_MAP[dictName]
 							mysqlPortStr := strconv.Itoa(int(c.cfg.MySqlCfg.Port))
@@ -251,16 +265,20 @@ func (c *TagRecorder) UpdateChDictionary() {
 							dropSQL := fmt.Sprintf("DROP DICTIONARY %s.%s", c.cfg.ClickHouseCfg.Database, dictName)
 							_, err = connect.Exec(dropSQL)
 							if err != nil {
+								updateDictError = err
 								log.Error(err)
-								connect.Close()
-								continue
+								break
 							}
 							_, err = connect.Exec(createSQL)
 							if err != nil {
+								updateDictError = err
 								log.Error(err)
-								connect.Close()
-								continue
+								break
 							}
+						}
+						if updateDictError != nil {
+							connect.Close()
+							continue
 						}
 
 						// Get the current view in the database
@@ -279,28 +297,34 @@ func (c *TagRecorder) UpdateChDictionary() {
 							chViews.Add(view)
 						}
 						addViews := wantedViews.Difference(chViews)
+						var addViewError error
 						for _, view := range addViews.ToSlice() {
 							viewName := view.(string)
 							createSQL := CREATE_SQL_MAP[viewName]
 							_, err = connect.Exec(createSQL)
 							if err != nil {
+								addViewError = err
 								log.Error(err)
-								connect.Close()
-								continue
+								break
 							}
+						}
+						if addViewError != nil {
+							connect.Close()
+							continue
 						}
 
 						// Check and update existing views
 						checkViews := chViews.Intersect(wantedViews)
+						var updateViewError error
 						for _, view := range checkViews.ToSlice() {
 							viewName := view.(string)
 							log.Info(viewName)
 							showSQL := fmt.Sprintf("SHOW CREATE TABLE %s.%s", c.cfg.ClickHouseCfg.Database, viewName)
 							viewSQL := make([]string, 0)
 							if err := connect.Select(&viewSQL, showSQL); err != nil {
+								updateViewError = err
 								log.Error(err)
-								connect.Close()
-								continue
+								break
 							}
 							createSQL := CREATE_SQL_MAP[viewName]
 							if createSQL == viewSQL[0] {
@@ -312,16 +336,20 @@ func (c *TagRecorder) UpdateChDictionary() {
 							dropSQL := fmt.Sprintf("DROP TABLE %s.%s", c.cfg.ClickHouseCfg.Database, viewName)
 							_, err = connect.Exec(dropSQL)
 							if err != nil {
+								updateViewError = err
 								log.Error(err)
-								connect.Close()
-								continue
+								break
 							}
 							_, err = connect.Exec(createSQL)
 							if err != nil {
+								updateViewError = err
 								log.Error(err)
-								connect.Close()
-								continue
+								break
 							}
+						}
+						if updateViewError != nil {
+							connect.Close()
+							continue
 						}
 
 						// refresh live view
