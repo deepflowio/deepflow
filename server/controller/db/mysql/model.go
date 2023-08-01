@@ -76,8 +76,8 @@ type Process struct {
 	Base           `gorm:"embedded"`
 	SoftDeleteBase `gorm:"embedded"`
 	Name           string    `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
-	VTapID         int       `gorm:"column:vtap_id;type:int;not null;default:0" json:"VTAP_ID"`
-	PID            int       `gorm:"column:pid;type:int;not null;default:0" json:"PID"`
+	VTapID         uint32    `gorm:"column:vtap_id;type:int;not null;default:0" json:"VTAP_ID"`
+	PID            uint64    `gorm:"column:pid;type:int;not null;default:0" json:"PID"`
 	ProcessName    string    `gorm:"column:process_name;type:varchar(256);default:''" json:"PROCESS_NAME"`
 	CommandLine    string    `gorm:"column:command_line;type:text" json:"COMMAND_LINE"`
 	UserName       string    `gorm:"column:user_name;type:varchar(256);default:''" json:"USER_NAME"`
@@ -624,6 +624,17 @@ type RedisInstance struct {
 	InternalHost   string `gorm:"column:internal_host;type:varchar(128);default:''" json:"INTERNAL_HOST"`
 	PublicHost     string `gorm:"column:public_host;type:varchar(128);default:''" json:"PUBLIC_HOST"`
 	UID            string `gorm:"column:uid;type:char(64);default:''" json:"UID"`
+}
+
+type VIP struct {
+	Base   `gorm:"embedded"`
+	IP     string `gorm:"column:ip;type:char(64);default:''" json:"IP"`
+	Domain string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
+	VTapID uint32 `gorm:"column:vtap_id;type:int;not null;default:0" json:"VTAP_ID"`
+}
+
+func (VIP) TableName() string {
+	return "vip"
 }
 
 type PodCluster struct {

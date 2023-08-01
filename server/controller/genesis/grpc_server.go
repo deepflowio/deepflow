@@ -414,6 +414,18 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *co
 		gSyncIPs = append(gSyncIPs, gIP)
 	}
 
+	gSyncVIPs := []*controller.GenesisSyncVIP{}
+	for _, vip := range gSyncData.VIPs {
+		vipData := vip
+		gVIP := &controller.GenesisSyncVIP{
+			Ip:     &vipData.IP,
+			Lcuuid: &vipData.Lcuuid,
+			NodeIp: &vipData.NodeIP,
+			VtapId: &vipData.VtapID,
+		}
+		gSyncVIPs = append(gSyncVIPs, gVIP)
+	}
+
 	gSyncHosts := []*controller.GenesisSyncHost{}
 	for _, host := range gSyncData.Hosts {
 		hostData := host
@@ -557,6 +569,7 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *co
 	return &controller.GenesisSharingSyncResponse{
 		Data: &controller.GenesisSyncData{
 			Ip:         gSyncIPs,
+			Vip:        gSyncVIPs,
 			Host:       gSyncHosts,
 			Lldp:       gSyncLldps,
 			Network:    gSyncNetworks,

@@ -65,6 +65,7 @@ const (
 	RESOURCE_TYPE_POD_EN                      = "pod"
 	RESOURCE_TYPE_PROCESS_EN                  = "process"
 	RESOURCE_TYPE_PROMETHEUS_TARGET_EN        = "prometheus_target"
+	RESOURCE_TYPE_VIP_EN                      = "vip"
 )
 
 const (
