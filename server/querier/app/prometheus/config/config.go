@@ -18,8 +18,9 @@ package config
 
 type Prometheus struct {
 	QPSLimit              int    `default:"100" yaml:"qps-limit"`
-	SeriesLimit           int    `default:"100" yaml:"series-limit"`
+	SeriesLimit           int    `default:"500" yaml:"series-limit"`
 	MaxSamples            int    `default:"50000000" yaml:"max-samples"`
 	AutoTaggingPrefix     string `default:"df_" yaml:"auto-tagging-prefix"`
 	RequestQueryWithDebug bool   `default:"false" yaml:"request-query-with-debug"`
+	ExternalTagCacheSize  int    `default:"1024" yaml:"external-tag-cache-size"`
 }
