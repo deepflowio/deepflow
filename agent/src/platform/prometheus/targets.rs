@@ -49,6 +49,7 @@ use public::{
 };
 
 const API_TARGETS_ENDPOINT: &str = "/api/v1/targets?state=active";
+const API_CONFIG_ENDPOINT: &str = "/api/v1/config";
 
 #[derive(Default)]
 pub struct TargetsCounter {
@@ -139,7 +140,7 @@ impl TargetsWatcher {
 
         if config_guard.prometheus_http_api_address.is_empty() {
             info!(
-                "prometheus watcher failed to start because prometheus_http_api_address is empty"
+                "prometheus watcher failed to start because prometheus_http_api_addresses are empty"
             );
             return;
         }
@@ -193,46 +194,27 @@ impl TargetsWatcher {
         running_config: &Arc<RwLock<RunningConfig>>,
     ) {
         let config_guard = context.config.load();
-        let api = config_guard.prometheus_http_api_address.clone() + API_TARGETS_ENDPOINT;
-
+        let api_addresses = config_guard.prometheus_http_api_address.clone();
         let mut total_entries = vec![];
         let mut err_msgs = vec![];
-
-        context.runtime.block_on(async {
-            match context.client.get(api).send().await {
-                Ok(resp) => {
-                    match resp.text().await {
-                        Ok(body) => {
-                            match compress_entry(encoder, body.trim().as_bytes()) {
-                                Ok(data) => {
-                                    context
-                                        .stats_counter
-                                        .compressed_length
-                                        .fetch_add(data.len() as u32, Ordering::Relaxed);
-                                    let entry = PrometheusApiInfo {
-                                        r#type: Some(API_TARGETS_ENDPOINT.to_string()),
-                                        compressed_info: Some(data),
-                                    };
-                                    total_entries.push(entry);
-                                }
-                                Err(e) => {
-                                    warn!("{}", e);
-                                    err_msgs.push(e.to_string());
-                                }
-                            };
-                        }
-                        Err(e) => {
-                            warn!("{}", e);
-                            err_msgs.push(e.to_string());
-                        }
-                    };
-                }
-                Err(e) => {
-                    warn!("{}", e);
-                    err_msgs.push(e.to_string());
-                }
-            }
-        });
+        for api in api_addresses {
+            Self::get_prometheus_api_info(
+                context,
+                api.clone(),
+                API_TARGETS_ENDPOINT,
+                encoder,
+                &mut total_entries,
+                &mut err_msgs,
+            );
+            Self::get_prometheus_api_info(
+                context,
+                api.clone(),
+                API_CONFIG_ENDPOINT,
+                encoder,
+                &mut total_entries,
+                &mut err_msgs,
+            );
+        }
 
         let version = &context.version;
         let pb_version = Some(version.load(Ordering::SeqCst));
@@ -259,5 +241,51 @@ impl TargetsWatcher {
                 error!("{}", err);
             }
         }
+    }
+
+    fn get_prometheus_api_info(
+        context: &mut Arc<Context>,
+        api_address: String,
+        api_endpoint: &str,
+        encoder: &mut ZlibEncoder<Vec<u8>>,
+        total_entries: &mut Vec<PrometheusApiInfo>,
+        err_msgs: &mut Vec<String>,
+    ) {
+        let api = api_address + api_endpoint;
+        context.runtime.block_on(async {
+            match context.client.get(api).send().await {
+                Ok(resp) => {
+                    match resp.text().await {
+                        Ok(body) => {
+                            match compress_entry(encoder, body.trim().as_bytes()) {
+                                Ok(data) => {
+                                    context
+                                        .stats_counter
+                                        .compressed_length
+                                        .fetch_add(data.len() as u32, Ordering::Relaxed);
+                                    let entry = PrometheusApiInfo {
+                                        r#type: Some(API_CONFIG_ENDPOINT.to_string()),
+                                        compressed_info: Some(data),
+                                    };
+                                    total_entries.push(entry);
+                                }
+                                Err(e) => {
+                                    warn!("{}", e);
+                                    err_msgs.push(e.to_string());
+                                }
+                            };
+                        }
+                        Err(e) => {
+                            warn!("{}", e);
+                            err_msgs.push(e.to_string());
+                        }
+                    };
+                }
+                Err(e) => {
+                    warn!("{}", e);
+                    err_msgs.push(e.to_string());
+                }
+            }
+        });
     }
 }

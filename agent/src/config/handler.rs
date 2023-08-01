@@ -269,7 +269,7 @@ pub struct OsProcScanConfig;
 pub struct PlatformConfig {
     pub sync_interval: Duration,
     pub kubernetes_cluster_id: String,
-    pub prometheus_http_api_address: String,
+    pub prometheus_http_api_address: Vec<String>,
     pub libvirt_xml_path: PathBuf,
     pub kubernetes_poller_type: KubernetesPollerType,
     pub vtap_id: u16,
@@ -1876,7 +1876,7 @@ impl ConfigHandler {
             #[cfg(target_os = "linux")]
             if old_cfg.prometheus_http_api_address != new_cfg.prometheus_http_api_address {
                 info!(
-                    "prometheus_http_api_address set to {}",
+                    "prometheus_http_api_addresses set to {:?}",
                     new_cfg.prometheus_http_api_address
                 );
                 if new_cfg.prometheus_http_api_address.is_empty() {
@@ -1884,6 +1884,9 @@ impl ConfigHandler {
                         components.prometheus_targets_watcher.stop();
                     });
                 } else {
+                    callbacks.push(|_, components| {
+                        components.prometheus_targets_watcher.stop();
+                    });
                     callbacks.push(|_, components| {
                         components.prometheus_targets_watcher.start();
                     });

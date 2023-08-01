@@ -266,7 +266,7 @@ message Config {
     optional bool   l7_metrics_enabled     = 405 [default = true];
     optional bool external_agent_http_proxy_enabled = 406 [default = false]; // 外部Agent数据HTTP代理开关
     optional uint32 external_agent_http_proxy_port = 407 [default = 38086]; // 外部Agent数据HTTP代理端口
-    optional string prometheus_http_api_address = 408 [default = ""];
+    repeated string prometheus_http_api_address = 408;
 
     optional uint32 packet_sequence_flag = 410 [default = 0];
 
