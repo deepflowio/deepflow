@@ -45,6 +45,13 @@ message GenesisSyncIP {
     optional uint32 vtap_id = 7;
 }
 
+message GenesisSyncVIP {
+    optional string ip = 1;
+    optional string lcuuid = 2;
+    optional string node_ip = 3;
+    optional uint32 vtap_id = 4;
+}
+
 message GenesisSyncHost {
     optional string lcuuid = 1;
     optional string hostname = 2;
@@ -151,6 +158,7 @@ message GenesisSyncData{
     repeated GenesisSyncVpc vpc = 7;
     repeated GenesisSyncVinterface vinterface = 8;
     repeated GenesisSyncProcess process = 9;
+    repeated GenesisSyncVIP vip = 10;
 }
 
 message GenesisSharingSyncRequest {

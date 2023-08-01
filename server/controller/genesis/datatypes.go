@@ -72,6 +72,7 @@ type PrometheusInfo struct {
 
 type GenesisSyncData struct {
 	IPLastSeens []model.GenesisIP
+	VIPs        []model.GenesisVIP
 	VMs         []model.GenesisVM
 	VPCs        []model.GenesisVpc
 	Hosts       []model.GenesisHost
@@ -83,6 +84,7 @@ type GenesisSyncData struct {
 }
 type GenesisSyncDataOperation struct {
 	IPlastseens *GenesisSyncTypeOperation[model.GenesisIP]
+	VIPs        *GenesisSyncTypeOperation[model.GenesisVIP]
 	VMs         *GenesisSyncTypeOperation[model.GenesisVM]
 	VPCs        *GenesisSyncTypeOperation[model.GenesisVpc]
 	Hosts       *GenesisSyncTypeOperation[model.GenesisHost]
@@ -93,7 +95,7 @@ type GenesisSyncDataOperation struct {
 	Processes   *GenesisSyncTypeOperation[model.GenesisProcess]
 }
 
-type GenesisSyncTypeOperation[T model.GenesisVinterface | model.GenesisVpc | model.GenesisHost | model.GenesisVM | model.GenesisNetwork | model.GenesisPort | model.GenesisLldp | model.GenesisIP | model.GenesisProcess] struct {
+type GenesisSyncTypeOperation[T model.GenesisVinterface | model.GenesisVpc | model.GenesisHost | model.GenesisVM | model.GenesisVIP | model.GenesisNetwork | model.GenesisPort | model.GenesisLldp | model.GenesisIP | model.GenesisProcess] struct {
 	mutex    sync.Mutex
 	lastSeen map[string]time.Time
 	dataDict map[string]T
@@ -239,6 +241,18 @@ func NewVMPlatformDataOperation(dataList []model.GenesisVM) *GenesisSyncTypeOper
 		vMap[data.Lcuuid] = data
 	}
 	return &GenesisSyncTypeOperation[model.GenesisVM]{
+		mutex:    sync.Mutex{},
+		lastSeen: map[string]time.Time{},
+		dataDict: vMap,
+	}
+}
+
+func NewVIPPlatformDataOperation(dataList []model.GenesisVIP) *GenesisSyncTypeOperation[model.GenesisVIP] {
+	vMap := map[string]model.GenesisVIP{}
+	for _, data := range dataList {
+		vMap[data.Lcuuid] = data
+	}
+	return &GenesisSyncTypeOperation[model.GenesisVIP]{
 		mutex:    sync.Mutex{},
 		lastSeen: map[string]time.Time{},
 		dataDict: vMap,
