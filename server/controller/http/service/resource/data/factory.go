@@ -19,6 +19,7 @@ package data
 import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/redis"
+	"github.com/deepflowio/deepflow/server/controller/http/service/resource/data/mysql"
 	mysqldp "github.com/deepflowio/deepflow/server/controller/http/service/resource/data/mysql"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/data/provider"
 	redisdp "github.com/deepflowio/deepflow/server/controller/http/service/resource/data/redis"
@@ -35,6 +36,14 @@ func GetDataProvider(resourceType string, redisCfg redis.Config) provider.DataPr
 		return redisdp.GetVM(redisCfg)
 	case common.RESOURCE_TYPE_VINTERFACE_EN:
 		return redisdp.GetVInterface(redisCfg)
+	case common.RESOURCE_TYPE_SECURITY_GROUP_EN:
+		return mysql.NewSecurityGroup()
+	case common.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN:
+		return mysql.NewSecurityGroupRule()
+	case common.RESOURCE_TYPE_NAT_GATEWAY_EN:
+		return mysql.NewNATGateway()
+	case common.RESOURCE_TYPE_NAT_RULE_EN:
+		return mysql.NewNATRule()
 	case common.RESOURCE_TYPE_POD_EN:
 		return redisdp.GetPod(redisCfg)
 	default:

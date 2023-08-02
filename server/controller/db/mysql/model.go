@@ -434,7 +434,7 @@ type SecurityGroup struct {
 	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
 	Label          string `gorm:"column:label;type:varchar(64);default:''" json:"LABEL"`
 	Alias          string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS"`
-	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID"`
+	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"EPC_ID"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
 	Topped         int    `gorm:"column:topped;type:int;default:0" json:"TOPPED"`
@@ -460,7 +460,7 @@ type NATGateway struct {
 	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
 	Label          string `gorm:"column:label;type:char(64);default:''" json:"LABEL"`
 	FloatingIPs    string `gorm:"column:floating_ips;type:text;default:''" json:"FLOATING_IPS"` // separated by ,
-	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID"`
+	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"EPC_ID"`
 	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"` // TODO delete in future
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`

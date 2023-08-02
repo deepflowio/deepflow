@@ -144,10 +144,28 @@ type SecurityGroupFilterConditions struct {
 	VMIDs   []int    `schema:"vm_id,omitempty" json:"VM_ID,omitempty"`
 }
 
+func (v SecurityGroupFilterConditions) GetFilterConditions() map[string]interface{} {
+	return v.ToMapOmitEmpty(v)
+}
+
+type SecurityGroupQueryFilterConditions struct {
+	SecurityGroupFilterConditions
+	UserIDParam
+}
+
 type SecurityGroupRuleFilterConditions struct {
 	Convertor `json:"-"`
 
-	VMIDs []int `schema:"security_group_id,omitempty" json:"SECURITY_GROUP_ID,omitempty"`
+	VMIDs []int `schema:"security_group_id,omitempty" json:"SG_ID,omitempty"`
+}
+
+func (v SecurityGroupRuleFilterConditions) GetFilterConditions() map[string]interface{} {
+	return v.ToMapOmitEmpty(v)
+}
+
+type SecurityGroupRuleQueryFilterConditions struct {
+	SecurityGroupRuleFilterConditions
+	UserIDParam
 }
 
 type NATGatewayFilterConditions struct {
@@ -176,6 +194,11 @@ type NATRuleFilterConditions struct {
 
 func (n NATRuleFilterConditions) GetFilterConditions() map[string]interface{} {
 	return n.ToMapOmitEmpty(n)
+}
+
+type NATRuleQueryFilterConditions struct {
+	NATRuleFilterConditions
+	UserIDParam
 }
 
 type LBFilterConditions struct {

@@ -225,7 +225,7 @@ func NewIN[T comparable](key string, value []interface{}) *IN[T] {
 		FieldConditionBase[T]{
 			key,
 			func(v []interface{}) []T {
-				r := make([]T, len(v))
+				r := make([]T, 0)
 				for _, i := range v {
 					r = append(r, i.(T))
 				}
@@ -250,7 +250,7 @@ func ConvertValueToSlice[T comparable](value interface{}) []T {
 			switch vs[0].(type) {
 			case T:
 				return func(v []interface{}) []T {
-					r := make([]T, len(v))
+					r := make([]T, 0)
 					for _, i := range v {
 						r = append(r, i.(T))
 					}

@@ -49,6 +49,8 @@ func (c *DataContext) SetFilterGenerator(fg generator.FilterGenerator) {
 }
 
 func (c *DataContext) ApplyFilters(data []common.ResponseElem) ([]common.ResponseElem, error) {
+	log.Infof("%#v", c.URLInfo) // TODO delete
+	log.Infof("%#v", c.UserInfo)
 	filters, dropAll := c.FilterGenerator.Generate(c.URLInfo, c.UserInfo)
 	if dropAll {
 		return []common.ResponseElem{}, nil
