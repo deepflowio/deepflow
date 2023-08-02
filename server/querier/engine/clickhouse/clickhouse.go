@@ -1261,11 +1261,9 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where, isCheck bool) (view
 		switch comparExpr.(type) {
 		case *sqlparser.ColName, *sqlparser.SQLVal:
 			whereTag := chCommon.ParseAlias(node.Left)
-			if ((e.DB == "ext_metrics" || e.DB == "deepflow_system") && strings.Contains(whereTag, "metrics.")) || e.DB == chCommon.DB_NAME_PROMETHEUS {
-				metricStruct, ok := metrics.GetMetrics(whereTag, e.DB, e.Table, e.Context)
-				if ok {
-					whereTag = metricStruct.DBField
-				}
+			metricStruct, ok := metrics.GetMetrics(whereTag, e.DB, e.Table, e.Context)
+			if ok {
+				whereTag = metricStruct.DBField
 			}
 			whereValue := sqlparser.String(node.Right)
 			stmt := GetWhere(whereTag, whereValue)
