@@ -350,6 +350,8 @@ func (r *Recorder) getSubDomainUpdatersInOrder(subDomainLcuuid string, cloudData
 			listener.NewNetwork(subDomainCache)),
 		updater.NewSubnet(subDomainCache, cloudData.Subnets).RegisterListener(
 			listener.NewSubnet(subDomainCache)),
+		updater.NewPrometheusTarget(subDomainCache, cloudData.PrometheusTargets).RegisterListener(
+			listener.NewPrometheusTarget(subDomainCache)),
 		updater.NewVInterface(subDomainCache, cloudData.VInterfaces, domainToolDataSet).RegisterListener(
 			listener.NewVInterface(subDomainCache)),
 		ip,
