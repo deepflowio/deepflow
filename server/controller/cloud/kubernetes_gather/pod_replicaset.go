@@ -17,10 +17,11 @@
 package kubernetes_gather
 
 import (
+	"strings"
+
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"strings"
 
 	"github.com/bitly/go-simplejson"
 	mapset "github.com/deckarep/golang-set"
@@ -90,8 +91,12 @@ func (k *KubernetesGather) getReplicaSetsAndReplicaSetControllers() (podRSs []mo
 			}
 			mLabels := rData.GetPath("spec", "template", "metadata", "labels").MustMap()
 			for key, v := range mLabels {
-				nsLabel := namespace + key + "_" + v.(string)
-				_, ok := k.nsLabelToGroupLcuuids[nsLabel]
+				vString, ok := v.(string)
+				if !ok {
+					vString = ""
+				}
+				nsLabel := namespace + key + "_" + vString
+				_, ok = k.nsLabelToGroupLcuuids[nsLabel]
 				if ok {
 					k.nsLabelToGroupLcuuids[nsLabel].Add(uID)
 				} else {
