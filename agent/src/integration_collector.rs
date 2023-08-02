@@ -247,7 +247,6 @@ fn decode_otel_trace_data(
     local_epc_id: u32,
     policy_getter: Arc<PolicyGetter>,
     time_diff: i64,
-    is_collect: bool,
 ) -> Result<(Vec<u8>, Vec<BatchedBox<TaggedFlow>>), GenericError> {
     let mut tagged_flow: Vec<BatchedBox<TaggedFlow>> = vec![];
     let mut d = TracesData::decode(data.as_slice())?;
@@ -310,23 +309,21 @@ fn decode_otel_trace_data(
             }
         }
         // collect otel metrics
-        if is_collect {
-            for scope_spans in resource_span.scope_spans.iter() {
-                for span in scope_spans.spans.iter() {
-                    match fill_tagged_flow(
-                        span,
-                        ip,
-                        policy_getter.clone(),
-                        local_epc_id,
-                        otel_service.clone(),
-                        otel_instance.clone(),
-                        time_diff,
-                    ) {
-                        Some(f) => {
-                            tagged_flow.push(allocator.allocate_one_with(f));
-                        }
-                        None => continue,
+        for scope_spans in resource_span.scope_spans.iter() {
+            for span in scope_spans.spans.iter() {
+                match fill_tagged_flow(
+                    span,
+                    ip,
+                    policy_getter.clone(),
+                    local_epc_id,
+                    otel_service.clone(),
+                    otel_instance.clone(),
+                    time_diff,
+                ) {
+                    Some(f) => {
+                        tagged_flow.push(allocator.allocate_one_with(f));
                     }
+                    None => continue,
                 }
             }
         }
@@ -559,7 +556,7 @@ async fn handler(
     req: Request<Body>,
     otel_sender: DebugSender<OpenTelemetry>,
     compressed_otel_sender: DebugSender<OpenTelemetryCompressed>,
-    otel_metrics_collect_sender: Option<DebugSender<BatchedBox<TaggedFlow>>>,
+    otel_metrics_sender: DebugSender<BatchedBox<TaggedFlow>>,
     prometheus_sender: DebugSender<BoxedPrometheusExtra>,
     telegraf_sender: DebugSender<TelegrafMetric>,
     profile_sender: DebugSender<Profile>,
@@ -596,17 +593,15 @@ async fn handler(
                 local_epc_id,
                 policy_getter,
                 time_diff,
-                otel_metrics_collect_sender.is_some(),
             )
             .map_err(|e| {
                 debug!("decode otel trace data error: {}", e);
                 e
             })?;
-            if let Some(sender) = otel_metrics_collect_sender {
-                if !decode_data.1.is_empty() {
-                    if let Err(Error::Terminated(..)) = sender.send_all(&mut decode_data.1) {
-                        warn!("sender queue has terminated");
-                    }
+            if !decode_data.1.is_empty() {
+                if let Err(Error::Terminated(..)) = otel_metrics_sender.send_all(&mut decode_data.1)
+                {
+                    warn!("sender queue has terminated");
                 }
             }
             if compressed {
@@ -828,7 +823,7 @@ pub struct MetricServer {
     thread: Arc<Mutex<Option<JoinHandle<()>>>>,
     otel_sender: DebugSender<OpenTelemetry>,
     compressed_otel_sender: DebugSender<OpenTelemetryCompressed>,
-    otel_metrics_collect_sender: Option<DebugSender<BatchedBox<TaggedFlow>>>,
+    otel_metrics_sender: DebugSender<BatchedBox<TaggedFlow>>,
     prometheus_sender: DebugSender<BoxedPrometheusExtra>,
     telegraf_sender: DebugSender<TelegrafMetric>,
     profile_sender: DebugSender<Profile>,
@@ -848,7 +843,7 @@ impl MetricServer {
         runtime: Arc<Runtime>,
         otel_sender: DebugSender<OpenTelemetry>,
         compressed_otel_sender: DebugSender<OpenTelemetryCompressed>,
-        otel_metrics_collect_sender: Option<DebugSender<BatchedBox<TaggedFlow>>>,
+        otel_metrics_sender: DebugSender<BatchedBox<TaggedFlow>>,
         prometheus_sender: DebugSender<BoxedPrometheusExtra>,
         telegraf_sender: DebugSender<TelegrafMetric>,
         profile_sender: DebugSender<Profile>,
@@ -869,7 +864,7 @@ impl MetricServer {
                 compressed: Arc::new(AtomicBool::new(compressed)),
                 otel_sender,
                 compressed_otel_sender,
-                otel_metrics_collect_sender,
+                otel_metrics_sender,
                 prometheus_sender,
                 telegraf_sender,
                 profile_sender,
@@ -907,7 +902,7 @@ impl MetricServer {
 
         let otel_sender = self.otel_sender.clone();
         let compressed_otel_sender = self.compressed_otel_sender.clone();
-        let otel_metrics_collect_sender = self.otel_metrics_collect_sender.clone();
+        let otel_metrics_sender = self.otel_metrics_sender.clone();
         let prometheus_sender = self.prometheus_sender.clone();
         let telegraf_sender = self.telegraf_sender.clone();
         let profile_sender = self.profile_sender.clone();
@@ -972,7 +967,7 @@ impl MetricServer {
 
                     let otel_sender = otel_sender.clone();
                     let compressed_otel_sender = compressed_otel_sender.clone();
-                    let otel_metrics_collect_sender = otel_metrics_collect_sender.clone();
+                    let otel_metrics_sender = otel_metrics_sender.clone();
                     let prometheus_sender = prometheus_sender.clone();
                     let telegraf_sender = telegraf_sender.clone();
                     let profile_sender = profile_sender.clone();
@@ -986,7 +981,7 @@ impl MetricServer {
                     let service = make_service_fn(move |conn: &AddrStream| {
                         let otel_sender = otel_sender.clone();
                         let compressed_otel_sender = compressed_otel_sender.clone();
-                        let otel_metrics_collect_sender = otel_metrics_collect_sender.clone();
+                        let otel_metrics_sender = otel_metrics_sender.clone();
                         let prometheus_sender = prometheus_sender.clone();
                         let telegraf_sender = telegraf_sender.clone();
                         let profile_sender = profile_sender.clone();
@@ -1005,7 +1000,7 @@ impl MetricServer {
                                     req,
                                     otel_sender.clone(),
                                     compressed_otel_sender.clone(),
-                                    otel_metrics_collect_sender.clone(),
+                                    otel_metrics_sender.clone(),
                                     prometheus_sender.clone(),
                                     telegraf_sender.clone(),
                                     profile_sender.clone(),
