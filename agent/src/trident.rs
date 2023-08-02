@@ -2049,37 +2049,33 @@ impl AgentComponents {
             true,
         );
 
-        let mut otel_metrics_collect_sender = None;
-        if config_handler.metric_server().load().enabled {
-            let otel_dispatcher_id = ebpf_dispatcher_id + 1;
-            let (otel_metrics_sender, otel_metrics_receiver, counter) = queue::bounded_with_debug(
-                yaml_config.flow_queue_size,
-                "1-tagged-flow-to-quadruple-generator",
-                &queue_debugger,
-            );
-            otel_metrics_collect_sender = Some(otel_metrics_sender);
-            stats_collector.register_countable(
-                "queue",
-                Countable::Owned(Box::new(counter)),
-                vec![
-                    StatsOption::Tag("module", "1-otel-metrics-to-collector".to_string()),
-                    StatsOption::Tag("index", otel_dispatcher_id.to_string()),
-                ],
-            );
-            let collector = Self::new_collector(
-                otel_dispatcher_id,
-                stats_collector.clone(),
-                otel_metrics_receiver,
-                toa_sender.clone(),
-                None,
-                metrics_sender.clone(),
-                MetricsType::SECOND | MetricsType::MINUTE,
-                config_handler,
-                &queue_debugger,
-                &synchronizer,
-            );
-            collectors.push(collector);
-        }
+        let otel_dispatcher_id = ebpf_dispatcher_id + 1;
+        let (otel_metrics_sender, otel_metrics_receiver, counter) = queue::bounded_with_debug(
+            yaml_config.flow_queue_size,
+            "1-tagged-flow-to-quadruple-generator",
+            &queue_debugger,
+        );
+        stats_collector.register_countable(
+            "queue",
+            Countable::Owned(Box::new(counter)),
+            vec![
+                StatsOption::Tag("module", "1-otel-metrics-to-collector".to_string()),
+                StatsOption::Tag("index", otel_dispatcher_id.to_string()),
+            ],
+        );
+        let collector = Self::new_collector(
+            otel_dispatcher_id,
+            stats_collector.clone(),
+            otel_metrics_receiver,
+            toa_sender.clone(),
+            None,
+            metrics_sender.clone(),
+            MetricsType::SECOND | MetricsType::MINUTE,
+            config_handler,
+            &queue_debugger,
+            &synchronizer,
+        );
+        collectors.push(collector);
 
         let prometheus_queue_name = "1-prometheus-to-sender";
         let (prometheus_sender, prometheus_receiver, counter) = queue::bounded_with_debug(
@@ -2171,7 +2167,7 @@ impl AgentComponents {
             runtime.clone(),
             otel_sender,
             compressed_otel_sender,
-            otel_metrics_collect_sender,
+            otel_metrics_sender,
             prometheus_sender,
             telegraf_sender,
             profile_sender,
