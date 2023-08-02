@@ -1,0 +1,6 @@
+# Value , DisplayName     , Description
+1       , Critical        ,
+2       , Error           ,
+3       , Warn            ,
+4       , NoData          ,
+5       , Normal          ,
