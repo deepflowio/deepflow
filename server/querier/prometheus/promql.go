@@ -25,6 +25,8 @@ import (
 	"time"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
+	"github.com/deepflowio/deepflow/server/querier/config"
+
 	//"github.com/k0kubun/pp"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/model/labels"
@@ -71,7 +73,7 @@ func PromQueryExecute(args *common.PromQueryParams, ctx context.Context) (result
 	opts := promql.EngineOpts{
 		Logger:                   nil,
 		Reg:                      nil,
-		MaxSamples:               100000,
+		MaxSamples:               config.Cfg.Prometheus.MaxSamples,
 		Timeout:                  100 * time.Second,
 		NoStepSubqueryIntervalFn: func(int64) int64 { return durationMilliseconds(1 * time.Minute) },
 		EnableAtModifier:         true,
@@ -90,17 +92,15 @@ func PromQueryExecute(args *common.PromQueryParams, ctx context.Context) (result
 	//pp.Println(res.Err)
 	//pp.Println(res)
 	//pp.Println(res.Value.(promql.Vector))
-	var resultType parser.ValueType
-	if res.Value == nil {
-		resultType = parser.ValueTypeNone
-	} else {
-		resultType = res.Value.Type()
+	if res.Err != nil {
+		log.Error(res.Err)
+		return nil, res.Err
 	}
-	return &common.PromQueryResponse{
-		Data: &common.PromQueryData{
-			ResultType: resultType,
-			Result:     res.Value,
-		}, Status: _SUCCESS}, err
+	result = &common.PromQueryResponse{
+		Data:   &common.PromQueryData{ResultType: res.Value.Type(), Result: res.Value},
+		Status: _SUCCESS,
+	}
+	return result, err
 }
 
 func durationMilliseconds(d time.Duration) int64 {
@@ -128,7 +128,7 @@ func PromQueryRangeExecute(args *common.PromQueryParams, ctx context.Context) (r
 	opts := promql.EngineOpts{
 		Logger:                   nil,
 		Reg:                      nil,
-		MaxSamples:               100000,
+		MaxSamples:               config.Cfg.Prometheus.MaxSamples,
 		Timeout:                  100 * time.Second,
 		NoStepSubqueryIntervalFn: func(int64) int64 { return durationMilliseconds(1 * time.Minute) },
 		EnableAtModifier:         true,
@@ -146,17 +146,15 @@ func PromQueryRangeExecute(args *common.PromQueryParams, ctx context.Context) (r
 	//pp.Println(res.Value.(promql.Matrix))
 	//pp.Println(res.Err)
 	//pp.Println(res)
-	var resultType parser.ValueType
-	if res.Value == nil {
-		resultType = parser.ValueTypeNone
-	} else {
-		resultType = res.Value.Type()
+	if res.Err != nil {
+		log.Error(res.Err)
+		return nil, res.Err
 	}
-	return &common.PromQueryResponse{
-		Data: &common.PromQueryData{
-			ResultType: resultType,
-			Result:     res.Value,
-		}, Status: _SUCCESS}, err
+	result = &common.PromQueryResponse{
+		Data:   &common.PromQueryData{ResultType: res.Value.Type(), Result: res.Value},
+		Status: _SUCCESS,
+	}
+	return result, err
 }
 
 func parseDuration(s string) (time.Duration, error) {
