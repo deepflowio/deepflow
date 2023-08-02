@@ -113,6 +113,10 @@ func (s *Server) RegisterRouters() {
 		resource.NewVM(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
 		resource.NewVInterface(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
 		resource.NewVPC(),
+		resource.NewSecurityGroup(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
+		resource.NewSecurityGroupRule(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
+		resource.NewNATGateway(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
+		resource.NewNATRule(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
 		resource.NewProcess(s.controllerConfig.RedisCfg),
 	} {
 		i.RegisterTo(s.engine)

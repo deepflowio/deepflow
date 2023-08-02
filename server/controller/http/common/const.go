@@ -33,11 +33,15 @@ const (
 )
 
 const (
-	PATH_AZ         = "/v2/azs/"
-	PATH_HOST       = "/v2/hosts/"
-	PATH_VM         = "/v2/vms/"
-	PATH_VINTERFACE = "/v2/vinterfaces/"
-	PATH_POD        = "/v2/pods/"
+	PATH_AZ                  = "/v2/azs/"
+	PATH_HOST                = "/v2/hosts/"
+	PATH_VM                  = "/v2/vms/"
+	PATH_VINTERFACE          = "/v2/vinterfaces/"
+	PATH_NAT_GATEWAY         = "/v2/nat-gateways/"
+	PATH_NAT_RULE            = "/v2/nat-rules/"
+	PATH_SECURITY_GROUP      = "/v2/security-groups/"
+	PATH_SECURITY_GROUP_RULE = "/v2/security-group-rules/"
+	PATH_POD                 = "/v2/pods/"
 )
 
 const (

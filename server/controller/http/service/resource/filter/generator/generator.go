@@ -117,14 +117,15 @@ func (c *conditionFilterGeneratorComponent) generate(urlInfo *model.URLInfo, use
 
 // combineFilterConditions combines filter conditions in url query and filter conditions extracted from user id
 func (c *conditionFilterGeneratorComponent) combineFilterConditions(urlFCs common.FilterConditions, userFCs common.FilterConditions) common.FilterConditions {
-	fcs := make(common.FilterConditions)
+	// fcs := make(common.FilterConditions)
 	if len(userFCs) != 0 {
 		urlFCs[filter.LOGICAL_OR] = userFCs
 	}
-	if len(urlFCs) != 0 {
-		fcs[filter.LOGICAL_AND] = urlFCs
-	}
-	return fcs
+	// if len(urlFCs) != 0 {
+	// 	fcs[filter.LOGICAL_AND] = urlFCs
+	// }
+	// return fcs
+	return urlFCs
 }
 
 type userFilterConditionsGeneratorComponent struct {

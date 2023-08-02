@@ -17,6 +17,8 @@
 package generator
 
 import (
+	"golang.org/x/exp/slices"
+
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/filter"
 )
@@ -32,11 +34,35 @@ func NewSecurityGroup() *SecurityGroup {
 }
 
 func (p *SecurityGroup) conditionsMapToStruct(fcs common.FilterConditions) filter.Condition {
+	log.Info(fcs)
 	c := filter.NewAND()
+	c.InitSkippedFields = []string{"VM_ID"}
 	c.Init(fcs)
+	if vmIDs, ok := fcs["VM_ID"]; ok {
+		c.TryAppendIntFieldCondition(NewVMIDCondition("VM_ID", vmIDs))
+	}
 	return c
 }
 
 func (p *SecurityGroup) userPermittedResourceToConditions(upr *UserPermittedResource) (common.FilterConditions, bool) {
 	return nil, false
+}
+
+type VMIDCondition struct {
+	filter.FieldConditionBase[float64]
+}
+
+func NewVMIDCondition(key string, value interface{}) *VMIDCondition {
+	return &VMIDCondition{filter.FieldConditionBase[float64]{Key: key, Value: filter.ConvertValueToSlice[float64](value)}}
+}
+
+func (p *VMIDCondition) Keep(v common.ResponseElem) bool {
+	log.Info(p.Value)
+	vms := v["VMS"].([]map[string]interface{})
+	for _, item := range vms {
+		if slices.Contains(p.Value, float64(item["ID"].(int))) {
+			return true
+		}
+	}
+	return false
 }

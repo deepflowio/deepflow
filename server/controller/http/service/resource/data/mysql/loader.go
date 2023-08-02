@@ -40,6 +40,12 @@ func GetAll[T any]() ([]T, error) {
 	return result, err
 }
 
+func FindWhereObj[T any](query interface{}, args ...interface{}) ([]T, error) {
+	var result []T
+	err := mysql.Db.Where(query, args...).Find(&result).Error
+	return result, err
+}
+
 func FindWhere[T any](query interface{}, args ...interface{}) ([]*T, error) {
 	var result []*T
 	err := mysql.Db.Where(query, args...).Find(&result).Error

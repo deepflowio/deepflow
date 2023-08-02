@@ -142,6 +142,26 @@ type VInterfaceQueryStoredInRedis struct {
 	IncludedFieldsParam
 }
 
+type SecurityGroupQuery struct {
+	SecurityGroupQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type SecurityGroupRuleQuery struct {
+	SecurityGroupRuleQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type NATGatewayQuery struct {
+	NATGatewayQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type NATRuleQuery struct {
+	NATRuleQueryFilterConditions
+	IncludedFieldsParam
+}
+
 type PodQuery struct {
 	PodQueryStoredInRedis
 	RefreshCacheParam
