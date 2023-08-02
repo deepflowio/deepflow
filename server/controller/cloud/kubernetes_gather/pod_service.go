@@ -133,7 +133,11 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 				}
 				groupLcuuidsList := []mapset.Set{}
 				for key, v := range selector {
-					nsLabel := namespace + key + "_" + v.(string)
+					vString, ok := v.(string)
+					if !ok {
+						vString = ""
+					}
+					nsLabel := namespace + key + "_" + vString
 					groupLcuuids, ok := k.nsLabelToGroupLcuuids[nsLabel]
 					if !ok {
 						continue

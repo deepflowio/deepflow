@@ -149,8 +149,12 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 			}
 			mLabels := cData.GetPath("spec", "template", "metadata", "labels").MustMap()
 			for key, v := range mLabels {
-				nsLabel := namespace + key + "_" + v.(string)
-				_, ok := k.nsLabelToGroupLcuuids[nsLabel]
+				vString, ok := v.(string)
+				if !ok {
+					vString = ""
+				}
+				nsLabel := namespace + key + "_" + vString
+				_, ok = k.nsLabelToGroupLcuuids[nsLabel]
 				if ok {
 					k.nsLabelToGroupLcuuids[nsLabel].Add(uID)
 				} else {
@@ -161,8 +165,12 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 			}
 			labels := metaData.Get("labels").MustMap()
 			for key, v := range labels {
-				nsL := namespace + key + "_" + v.(string)
-				_, ok := k.nsLabelToGroupLcuuids[nsL]
+				vString, ok := v.(string)
+				if !ok {
+					vString = ""
+				}
+				nsL := namespace + key + "_" + vString
+				_, ok = k.nsLabelToGroupLcuuids[nsL]
 				if ok {
 					k.nsLabelToGroupLcuuids[nsL].Add(uID)
 				} else {
@@ -252,8 +260,12 @@ func (k *KubernetesGather) getPodReplicationControllers() (podRCs []model.PodGro
 		}
 		labels := rData.GetPath("spec", "template", "metadata", "labels").MustMap()
 		for key, v := range labels {
-			nsLabel := namespace + key + "_" + v.(string)
-			_, ok := k.nsLabelToGroupLcuuids[nsLabel]
+			vString, ok := v.(string)
+			if !ok {
+				vString = ""
+			}
+			nsLabel := namespace + key + "_" + vString
+			_, ok = k.nsLabelToGroupLcuuids[nsLabel]
 			if ok {
 				k.nsLabelToGroupLcuuids[nsLabel].Add(uID)
 			} else {
