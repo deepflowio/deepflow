@@ -36,7 +36,6 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
-	dbredis "github.com/deepflowio/deepflow/server/controller/db/redis"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	httpCfg "github.com/deepflowio/deepflow/server/controller/http/config"
 	"github.com/deepflowio/deepflow/server/controller/http/model"
@@ -46,12 +45,11 @@ import (
 
 type SecurityGroupRule struct {
 	httpCfg    httpCfg.Config
-	redisCfg   dbredis.Config
 	fpermitCfg config.FPermit
 }
 
-func NewSecurityGroupRule(hCfg httpCfg.Config, rCfg dbredis.Config, fCfg config.FPermit) *SecurityGroupRule {
-	return &SecurityGroupRule{httpCfg: hCfg, redisCfg: rCfg, fpermitCfg: fCfg}
+func NewSecurityGroupRule(hCfg httpCfg.Config, fCfg config.FPermit) *SecurityGroupRule {
+	return &SecurityGroupRule{httpCfg: hCfg, fpermitCfg: fCfg}
 }
 
 func (p *SecurityGroupRule) RegisterTo(ge *gin.Engine) {
@@ -72,7 +70,6 @@ func (p *SecurityGroupRule) Get(c *gin.Context) {
 			query.structData,
 		),
 		header.userInfo,
-		p.redisCfg,
 	)
 	data, err := service.Get()
 	common.JsonResponse(c, data, err)

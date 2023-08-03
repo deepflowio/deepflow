@@ -309,10 +309,35 @@ const (
 	MICROSOFT_CH        = "微软云"
 	BAIDU_BCE_CH        = "百度云"
 	ESHORE_CH           = "亿迅云"
+
+	OPENSTACK_CH  = "OpenStack"
+	VSPHERE_CH    = "vSphere"
+	NSP_CH        = "NSP"
+	AWS_CH        = "AWS"
+	ZSTACK_CH     = "ZStack"
+	KUBERNETES_CH = "Kubernetes"
 )
 
 var DomainTypeToIconID = map[int]int{
 	KUBERNETES: 14,
+}
+
+// TODO delete tagrecorder dup definition
+var IconNameToDomainTypes = map[string][]int{
+	OPENSTACK_CH:        {OPENSTACK},
+	VSPHERE_CH:          {VSPHERE},
+	NSP_CH:              {NSP},
+	TENCENT_CH:          {TENCENT, TENCENT_TCE},
+	AWS_CH:              {AWS},
+	PINGAN_CH:           {PINGAN},
+	ZSTACK_CH:           {ZSTACK},
+	ALIYUN_CH:           {ALIYUN, APSARA_STACK},
+	KUBERNETES_CH:       {KUBERNETES},
+	HUAWEI_CH:           {HUAWEI, HUAWEI_PRIVATE},
+	QINGCLOUD_CH:        {QINGCLOUD, QINGCLOUD_PRIVATE},
+	MICROSOFT_CH:        {AZURE, CMB_CMDB, MICROSOFT_ACS},
+	KINGSOFT_PRIVATE_CH: {KINGSOFT_PRIVATE},
+	BAIDU_BCE_CH:        {BAIDU_BCE},
 }
 
 const (

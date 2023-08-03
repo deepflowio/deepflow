@@ -18,7 +18,6 @@ package resource
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/redis"
 	"github.com/deepflowio/deepflow/server/controller/http/model"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/data"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/filter/generator"
@@ -28,8 +27,8 @@ type Host struct {
 	ServiceGet
 }
 
-func NewHostGet(urlInfo *model.URLInfo, userInfo *model.UserInfo, redisCfg redis.Config) *Host {
-	s := &Host{newServiceGet(ctrlrcommon.RESOURCE_TYPE_HOST_EN, data.GetDataProvider(ctrlrcommon.RESOURCE_TYPE_HOST_EN, redisCfg))}
+func NewHostGet(urlInfo *model.URLInfo, userInfo *model.UserInfo) *Host {
+	s := &Host{newServiceGet(ctrlrcommon.RESOURCE_TYPE_HOST_EN, data.GetDataProvider(ctrlrcommon.RESOURCE_TYPE_HOST_EN, &data.RequiredConfigs{}))}
 	s.generateDataContext(urlInfo, userInfo, generator.NewHost())
 	return s
 }

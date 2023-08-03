@@ -506,7 +506,7 @@ type LB struct {
 	Label          string `gorm:"column:label;type:char(64);default:''" json:"LABEL"`
 	Model          int    `gorm:"column:model;type:int;default:0" json:"MODEL"` // 1.Internal 2.External
 	VIP            string `gorm:"column:vip;type:text;default:''" json:"VIP"`
-	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID"`
+	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"EPC_ID"`
 	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"` // TODO delete in future
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
@@ -538,7 +538,7 @@ type LBTargetServer struct {
 	Base         `gorm:"embedded"`
 	LBID         int    `gorm:"column:lb_id;type:int;default:0" json:"LB_ID"`
 	LBListenerID int    `gorm:"column:lb_listener_id;type:int;default:0" json:"LB_LISTENER_ID"`
-	VPCID        int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID"`
+	VPCID        int    `gorm:"column:epc_id;type:int;default:0" json:"EPC_ID"`
 	Type         int    `gorm:"column:type;type:int;default:0" json:"TYPE"` // 1.VM 2.IP
 	IP           string `gorm:"column:ip;type:char(64);default:''" json:"IP"`
 	VMID         int    `gorm:"column:vm_id;type:int;default:0" json:"VM_ID"`
@@ -567,8 +567,8 @@ type PeerConnection struct {
 	SoftDeleteBase `gorm:"embedded"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
 	Label          string `gorm:"column:label;type:char(64);default:''" json:"LABEL"`
-	LocalVPCID     int    `gorm:"column:local_epc_id;type:int;default:0" json:"LOCAL_VPC_ID"`
-	RemoteVPCID    int    `gorm:"column:remote_epc_id;type:int;default:0" json:"REMOTE_VPC_ID"`
+	LocalVPCID     int    `gorm:"column:local_epc_id;type:int;default:0" json:"LOCAL_EPC_ID"`
+	RemoteVPCID    int    `gorm:"column:remote_epc_id;type:int;default:0" json:"REMOTE_EPC_ID"`
 	LocalRegionID  int    `gorm:"column:local_region_id;type:int;default:0" json:"LOCAL_REGION_ID"`
 	RemoteRegionID int    `gorm:"column:remote_region_id;type:int;default:0" json:"REMOTE_REGION_ID"`
 	CreateMethod   int    `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
@@ -581,7 +581,7 @@ type CEN struct {
 	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
 	Label          string `gorm:"column:label;type:char(64);default:''" json:"LABEL"`
 	Alias          string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS"`
-	VPCIDs         string `gorm:"column:epc_ids;type:text;default:''" json:"VPC_IDS"` // separated by ,
+	VPCIDs         string `gorm:"column:epc_ids;type:text;default:''" json:"EPC_IDS"` // separated by ,
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
 }
 

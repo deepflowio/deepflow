@@ -51,11 +51,7 @@ func (r RegionFilterConditions) GetFilterConditions() map[string]interface{} {
 
 type RegionQueryFilterConditions struct {
 	RegionFilterConditions
-	Names         []string `schema:"name,omitempty" json:"NAME,omitempty"`
-	DomainLcuuids []string `schema:"domain,omitempty" json:"DOMAIN,omitempty"`
-	RegionLcuuids []string `schema:"region,omitempty" json:"REGION,omitempty"`
-	AnalyzerIPs   []string `schema:"analyzer_ip,omitempty" json:"ANALYZER_IP,omitempty"`
-	ControllerIPs []string `schema:"controller_ip,omitempty" json:"CONTROLLER_IP,omitempty"`
+	UserIDParam
 }
 
 type AZFilterConditions struct {
@@ -63,7 +59,11 @@ type AZFilterConditions struct {
 
 	Lcuuids       []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
 	IDs           []int    `schema:"id,omitempty" json:"ID,omitempty"`
+	Names         []string `schema:"name,omitempty" json:"NAME,omitempty"`
 	DomainLcuuids []string `schema:"domain,omitempty" json:"DOMAIN,omitempty"`
+	RegionLcuuids []string `schema:"region,omitempty" json:"REGION,omitempty"`
+	AnalyzerIPs   []string `schema:"analyzer_ip,omitempty" json:"ANALYZER_IP,omitempty"`
+	ControllerIPs []string `schema:"controller_ip,omitempty" json:"CONTROLLER_IP,omitempty"`
 }
 
 func (a AZFilterConditions) GetFilterConditions() map[string]interface{} {
@@ -246,12 +246,26 @@ func (l LBRuleFilterConditions) GetFilterConditions() map[string]interface{} {
 	return l.ToMapOmitEmpty(l)
 }
 
+type LBRuleQueryFilterConditions struct {
+	LBRuleFilterConditions
+	UserIDParam
+}
+
 type PeerConnectionFilterConditions struct {
 	Convertor `json:"-"`
 
 	Lcuuids []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
 	IDs     []int    `schema:"id,omitempty" json:"ID,omitempty"`
 	VPCIDs  []int    `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
+}
+
+func (l PeerConnectionFilterConditions) GetFilterConditions() map[string]interface{} {
+	return l.ToMapOmitEmpty(l)
+}
+
+type PeerConnectionQueryFilterConditions struct {
+	PeerConnectionFilterConditions
+	UserIDParam
 }
 
 type CENFilterConditions struct {
@@ -261,12 +275,25 @@ type CENFilterConditions struct {
 	IDs     []int    `schema:"id,omitempty" json:"ID,omitempty"`
 }
 
+func (l CENFilterConditions) GetFilterConditions() map[string]interface{} {
+	return l.ToMapOmitEmpty(l)
+}
+
+type CENQueryFilterConditions struct {
+	CENFilterConditions
+	UserIDParam
+}
+
 type RDSInstanceFilterConditions struct {
 	Convertor `json:"-"`
 
 	Lcuuids []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
 	IDs     []int    `schema:"id,omitempty" json:"ID,omitempty"`
 	VPCIDs  []int    `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
+}
+
+func (l RDSInstanceFilterConditions) GetFilterConditions() map[string]interface{} {
+	return l.ToMapOmitEmpty(l)
 }
 
 type RDSInstanceQueryFilterConditions struct {
@@ -280,6 +307,10 @@ type RedisInstanceFilterConditions struct {
 	Lcuuids []string `schema:"lcuuid,omitempty" json:"LCUUID,omitempty"`
 	IDs     []int    `schema:"id,omitempty" json:"ID,omitempty"`
 	VPCIDs  []int    `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
+}
+
+func (l RedisInstanceFilterConditions) GetFilterConditions() map[string]interface{} {
+	return l.ToMapOmitEmpty(l)
 }
 
 type RedisInstanceQueryFilterConditions struct {

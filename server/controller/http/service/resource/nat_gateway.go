@@ -19,7 +19,6 @@ package resource
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/db/redis"
 	"github.com/deepflowio/deepflow/server/controller/http/model"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/data"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/filter/generator"
@@ -29,8 +28,8 @@ type NATGateway struct {
 	ServiceGet
 }
 
-func NewNATGatewayGet(urlInfo *model.URLInfo, userInfo *model.UserInfo, redisCfg redis.Config, fpermitCfg config.FPermit) *NATGateway {
-	s := &NATGateway{newServiceGet(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, data.GetDataProvider(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, redisCfg))}
+func NewNATGatewayGet(urlInfo *model.URLInfo, userInfo *model.UserInfo, fpermitCfg config.FPermit) *NATGateway {
+	s := &NATGateway{newServiceGet(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, data.GetDataProvider(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, &data.RequiredConfigs{}))}
 	s.generateDataContext(urlInfo, userInfo, generator.NewNATGateway(fpermitCfg))
 	return s
 }

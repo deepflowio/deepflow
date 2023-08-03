@@ -27,34 +27,33 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource"
 )
 
-type NATGateway struct {
+type PeerConnection struct {
 	httpCfg    httpCfg.Config
 	fpermitCfg config.FPermit
 }
 
-func NewNATGateway(hCfg httpCfg.Config, fCfg config.FPermit) *NATGateway {
-	return &NATGateway{httpCfg: hCfg, fpermitCfg: fCfg}
+func NewPeerConnection(hCfg httpCfg.Config, fCfg config.FPermit) *PeerConnection {
+	return &PeerConnection{httpCfg: hCfg, fpermitCfg: fCfg}
 }
 
-func (p *NATGateway) RegisterTo(ge *gin.Engine) {
-	ge.GET(httpcommon.PATH_NAT_GATEWAY, p.Get)
+func (p *PeerConnection) RegisterTo(ge *gin.Engine) {
+	ge.GET(httpcommon.PATH_PEER_CONNECTION, p.Get)
 }
 
-func (p *NATGateway) Get(c *gin.Context) {
+func (p *PeerConnection) Get(c *gin.Context) {
 	header := NewHeaderValidator(c.Request.Header, p.fpermitCfg)
-	query := NewQueryValidator[model.NATGatewayQuery](c.Request.URL.Query())
+	query := NewQueryValidator[model.PeerConnectionQuery](c.Request.URL.Query())
 
 	if err := NewValidators(header, query).Validate(); err != nil {
 		common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
 		return
 	}
-	service := resource.NewNATGatewayGet(
+	service := resource.NewPeerConnectionGet(
 		NewURLInfo(
 			c.Request.URL.String(),
 			query.structData,
 		),
 		header.userInfo,
-		p.fpermitCfg,
 	)
 	data, err := service.Get()
 	common.JsonResponse(c, data, err)

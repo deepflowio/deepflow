@@ -33,14 +33,20 @@ const (
 )
 
 const (
+	PATH_REGION              = "/v2/regions/"
 	PATH_AZ                  = "/v2/azs/"
 	PATH_HOST                = "/v2/hosts/"
 	PATH_VM                  = "/v2/vms/"
 	PATH_VINTERFACE          = "/v2/vinterfaces/"
 	PATH_NAT_GATEWAY         = "/v2/nat-gateways/"
 	PATH_NAT_RULE            = "/v2/nat-rules/"
-	PATH_SECURITY_GROUP      = "/v2/security-groups/"
+	PATH_SECURITY_GROUP      = "/v2/lbs/"
 	PATH_SECURITY_GROUP_RULE = "/v2/security-group-rules/"
+	PATH_LB                  = "/v2/lbs/"
+	PATH_LB_LISTENER         = "/v2/lb-listeners/"
+	PATH_LB_RULE             = "/v2/lb-rules/"
+	PATH_PEER_CONNECTION     = "/v2/peer-connections/"
+	PATH_CEN                 = "/v2/cens/"
 	PATH_POD                 = "/v2/pods/"
 )
 

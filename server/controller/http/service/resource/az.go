@@ -18,7 +18,7 @@ package resource
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/redis"
+	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/http/model"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/data"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/filter/generator"
@@ -28,8 +28,8 @@ type AZ struct {
 	ServiceGet
 }
 
-func NewAZGet(urlInfo *model.URLInfo, userInfo *model.UserInfo, redisCfg redis.Config) *AZ {
-	s := &AZ{newServiceGet(ctrlrcommon.RESOURCE_TYPE_AZ_EN, data.GetDataProvider(ctrlrcommon.RESOURCE_TYPE_AZ_EN, redisCfg))}
+func NewAZGet(urlInfo *model.URLInfo, userInfo *model.UserInfo, webCfg config.DFWebService) *AZ {
+	s := &AZ{newServiceGet(ctrlrcommon.RESOURCE_TYPE_AZ_EN, data.GetDataProvider(ctrlrcommon.RESOURCE_TYPE_AZ_EN, &data.RequiredConfigs{WebService: webCfg}))}
 	s.generateDataContext(urlInfo, userInfo, generator.NewAZ())
 	return s
 }

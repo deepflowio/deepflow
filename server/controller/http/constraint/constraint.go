@@ -23,8 +23,9 @@ import (
 
 // 各资源可支持的 query 字段定义
 type QueryModel interface {
-	model.AZQuery | model.HostQuery | model.VMQuery | model.VInterfaceQuery |
+	model.RegionQuery | model.AZQuery | model.HostQuery | model.VMQuery | model.VInterfaceQuery |
 		model.SecurityGroupQuery | model.SecurityGroupRuleQuery | model.NATGatewayQuery | model.NATRuleQuery |
+		model.LBQuery | model.LBListenerQuery | model.LBRuleQuery | model.PeerConnectionQuery | model.CENQuery |
 		model.PodQuery | model.PodReplicaSetQuery | model.PodGroupQuery | model.PodGroupPortQuery |
 		model.PodServiceQuery | model.PodServicePortQuery | model.PodIngressQuery | model.PodIngressRuleQuery |
 		model.PodNodeQuery | model.PodNamespaceQuery | model.PodClusterQuery |
@@ -38,7 +39,7 @@ type QueryModel interface {
 
 // 各资源需要用于构建 redis 缓存 key 的 query 字段定义
 type QueryStoredInRedisModel interface {
-	model.AZQueryStoredInRedis | model.HostQueryStoredInRedis | model.VMQueryStoredInRedis | model.VInterfaceQueryStoredInRedis |
+	model.HostQueryStoredInRedis | model.VMQueryStoredInRedis | model.VInterfaceQueryStoredInRedis |
 		model.PodQueryStoredInRedis | model.PodReplicaSetQueryStoredInRedis |
 		model.PodGroupQueryStoredInRedis | model.PodGroupPortQueryStoredInRedis | model.PodServiceQueryStoredInRedis |
 		model.PodServicePortQueryStoredInRedis | model.PodIngressQueryStoredInRedis | model.PodIngressRuleQueryStoredInRedis |

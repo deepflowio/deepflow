@@ -20,7 +20,6 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
-	dbredis "github.com/deepflowio/deepflow/server/controller/db/redis"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	httpCfg "github.com/deepflowio/deepflow/server/controller/http/config"
 	"github.com/deepflowio/deepflow/server/controller/http/model"
@@ -30,12 +29,11 @@ import (
 
 type NATRule struct {
 	httpCfg    httpCfg.Config
-	redisCfg   dbredis.Config
 	fpermitCfg config.FPermit
 }
 
-func NewNATRule(hCfg httpCfg.Config, rCfg dbredis.Config, fCfg config.FPermit) *NATRule {
-	return &NATRule{httpCfg: hCfg, redisCfg: rCfg, fpermitCfg: fCfg}
+func NewNATRule(hCfg httpCfg.Config, fCfg config.FPermit) *NATRule {
+	return &NATRule{httpCfg: hCfg, fpermitCfg: fCfg}
 }
 
 func (p *NATRule) RegisterTo(ge *gin.Engine) {
@@ -56,7 +54,6 @@ func (p *NATRule) Get(c *gin.Context) {
 			query.structData,
 		),
 		header.userInfo,
-		p.redisCfg,
 		p.fpermitCfg,
 	)
 	data, err := service.Get()

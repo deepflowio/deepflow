@@ -61,4 +61,7 @@ const (
 	RESOURCE_TYPE_POD_EN                      = "pod"
 	RESOURCE_TYPE_PROCESS_EN                  = "process"
 	RESOURCE_TYPE_PROMETHEUS_TARGET_EN        = "prometheus_target"
+
+	// http api resource type
+	RESOURCE_TYPE_LB_RULE_EN = "lb_rule"
 )

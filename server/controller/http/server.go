@@ -109,14 +109,21 @@ func (s *Server) RegisterRouters() {
 
 		// resource
 		resource.NewDomain(s.controllerConfig),
+		resource.NewAZ(s.controllerConfig.HTTPCfg, s.controllerConfig.FPermit, s.controllerConfig.DFWebService),
+		resource.NewRegion(s.controllerConfig.HTTPCfg, s.controllerConfig.FPermit, s.controllerConfig.DFWebService),
 		resource.NewHost(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
 		resource.NewVM(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
 		resource.NewVInterface(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
 		resource.NewVPC(),
-		resource.NewSecurityGroup(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
-		resource.NewSecurityGroupRule(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
-		resource.NewNATGateway(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
-		resource.NewNATRule(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
+		resource.NewSecurityGroup(s.controllerConfig.HTTPCfg, s.controllerConfig.FPermit),
+		resource.NewSecurityGroupRule(s.controllerConfig.HTTPCfg, s.controllerConfig.FPermit),
+		resource.NewNATGateway(s.controllerConfig.HTTPCfg, s.controllerConfig.FPermit),
+		resource.NewNATRule(s.controllerConfig.HTTPCfg, s.controllerConfig.FPermit),
+		resource.NewLB(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
+		resource.NewLBListener(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
+		resource.NewLBRule(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
+		resource.NewPeerConnection(s.controllerConfig.HTTPCfg, s.controllerConfig.FPermit),
+		resource.NewCEN(s.controllerConfig.HTTPCfg, s.controllerConfig.FPermit),
 		resource.NewProcess(s.controllerConfig.RedisCfg),
 	} {
 		i.RegisterTo(s.engine)
