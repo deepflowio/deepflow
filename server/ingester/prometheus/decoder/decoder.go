@@ -68,6 +68,7 @@ type BuilderCounter struct {
 	MetricMiss        int64 `statsd:"metirc-miss"`
 	NameMiss          int64 `statsd:"name-miss"`
 	ValueMiss         int64 `statsd:"value-miss"`
+	NameValueMiss     int64 `statsd:"name-value-miss"`
 	ColumnMiss        int64 `statsd:"column-miss"`
 	TargetMiss        int64 `statsd:"target-miss"`
 	MetricTargetMiss  int64 `statsd:"metric-target-miss"`
@@ -339,6 +340,11 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID uint16, ts *prompb.T
 		valueID, ok := b.labelTable.QueryLabelValueID(l.Value)
 		if !ok {
 			b.counter.ValueMiss++
+			return true, nil
+		}
+
+		if !b.labelTable.QueryLabelNameValue(nameID, valueID) {
+			b.counter.NameValueMiss++
 			return true, nil
 		}
 

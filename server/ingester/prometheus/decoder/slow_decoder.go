@@ -262,7 +262,8 @@ func (d *SlowDecoder) TimeSeriesToLableIDRequest(ts *prompb.TimeSeries) (*triden
 			continue
 		}
 
-		if _, ok := d.labelTable.QueryLabelValueID(l.Value); !ok {
+		valueId, ok := d.labelTable.QueryLabelValueID(l.Value)
+		if !ok {
 			addLabel(labelReq, l.Name, l.Value)
 			continue
 		}
@@ -271,6 +272,12 @@ func (d *SlowDecoder) TimeSeriesToLableIDRequest(ts *prompb.TimeSeries) (*triden
 			addLabel(labelReq, l.Name, l.Value)
 			continue
 		}
+
+		if !d.labelTable.QueryLabelNameValue(nameId, valueId) {
+			addLabel(labelReq, l.Name, l.Value)
+			continue
+		}
+
 		if _, ok := d.labelTable.QueryColumnIndex(metricId, nameId); !ok {
 			addLabel(labelReq, l.Name, l.Value)
 		}
