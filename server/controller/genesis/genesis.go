@@ -423,10 +423,6 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 			log.Error("genesis api sharing k8s format timestr faild:" + err.Error())
 			return k8sResp, err
 		}
-		errorMsg := ret.GetErrorMsg()
-		if errorMsg != "" {
-			log.Warningf("cluster id (%s) Error: %s", clusterID, errorMsg)
-		}
 		if !epoch.After(k8sInfo.Epoch) {
 			continue
 		}
@@ -435,11 +431,15 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 		k8sInfo = KubernetesInfo{
 			Epoch:    epoch,
 			Entries:  entries,
-			ErrorMSG: errorMsg,
+			ErrorMSG: ret.GetErrorMsg(),
 		}
 	}
 	if !ok && !retFlag {
-		return k8sResp, errors.New("no vtap report cluster id:" + clusterID)
+		return k8sResp, errors.New("no vtap k8s report cluster id:" + clusterID)
+	}
+	if k8sInfo.ErrorMSG != "" {
+		log.Errorf("cluster id (%s) k8s info grpc Error: %s", clusterID, k8sInfo.ErrorMSG)
+		return k8sResp, errors.New(k8sInfo.ErrorMSG)
 	}
 
 	g.mutex.Lock()
