@@ -63,6 +63,7 @@ type AlarmEventStore struct {
 	ValueUnit          string
 	EventLevel         uint32
 	AlarmTarget        string
+	RegionId           uint16
 }
 
 func AlarmEventColumns() []*ckdb.Column {
@@ -88,6 +89,7 @@ func AlarmEventColumns() []*ckdb.Column {
 		ckdb.NewColumn("value_unit", ckdb.LowCardinalityString),
 		ckdb.NewColumn("event_level", ckdb.UInt32),
 		ckdb.NewColumn("alarm_target", ckdb.LowCardinalityString),
+		ckdb.NewColumn("region_id", ckdb.UInt16),
 	}
 }
 
@@ -113,6 +115,7 @@ func (e *AlarmEventStore) WriteBlock(block *ckdb.Block) {
 		e.ValueUnit,
 		e.EventLevel,
 		e.AlarmTarget,
+		e.RegionId,
 	)
 }
 

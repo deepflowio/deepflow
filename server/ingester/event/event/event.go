@@ -61,7 +61,7 @@ func NewEvent(config *config.Config, resourceEventQueue *queue.OverwriteQueue, r
 		return nil, err
 	}
 
-	alarmEventor, err := NewAlarmEventor(config, recv, manager)
+	alarmEventor, err := NewAlarmEventor(config, recv, manager, platformDataManager.GetMasterPlatformInfoTable())
 
 	return &Event{
 		Config:          config,
@@ -89,7 +89,7 @@ func NewResouceEventor(eventQueue *queue.OverwriteQueue, eventType common.EventT
 	}, nil
 }
 
-func NewAlarmEventor(config *config.Config, recv *receiver.Receiver, manager *dropletqueue.Manager) (*Eventor, error) {
+func NewAlarmEventor(config *config.Config, recv *receiver.Receiver, manager *dropletqueue.Manager, platformTable *grpc.PlatformInfoTable) (*Eventor, error) {
 	eventMsg := datatype.MESSAGE_TYPE_ALARM_EVENT
 	decodeQueues := manager.NewQueues(
 		"1-receive-to-decode-"+eventMsg.String(),
@@ -108,7 +108,7 @@ func NewAlarmEventor(config *config.Config, recv *receiver.Receiver, manager *dr
 		common.ALARM_EVENT,
 		queue.QueueReader(decodeQueues.FixedMultiQueue[0]),
 		eventWriter,
-		nil,
+		platformTable,
 		config,
 	)
 	return &Eventor{
