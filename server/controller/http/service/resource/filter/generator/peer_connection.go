@@ -37,7 +37,9 @@ func (p *PeerConnection) conditionsMapToStruct(fcs common.FilterConditions) filt
 	c := filter.NewAND()
 	c.InitSkippedFields = []string{"EPC_ID"}
 	c.Init(fcs)
-	c.TryAppendIntFieldCondition(NewVPCIDCondition("EPC_ID", fcs["EPC_ID"].([]float64)))
+	if vpcIDs, ok := fcs["EPC_ID"]; ok {
+		c.TryAppendIntFieldCondition(NewVPCIDCondition("EPC_ID", vpcIDs))
+	}
 	return c
 }
 
@@ -49,12 +51,12 @@ type VPCIDCondition struct {
 	filter.FieldConditionBase[float64]
 }
 
-func NewVPCIDCondition(key string, value []float64) *VPCIDCondition {
-	return &VPCIDCondition{filter.FieldConditionBase[float64]{Key: key, Value: value}}
+func NewVPCIDCondition(key string, value interface{}) *VPCIDCondition {
+	return &VPCIDCondition{filter.FieldConditionBase[float64]{Key: key, Value: filter.ConvertValueToSlice[float64](value)}}
 }
 
 func (p *VPCIDCondition) Keep(v common.ResponseElem) bool {
-	if slices.Contains(p.Value, v["REMOTE_EPC_ID"].(float64)) || slices.Contains(p.Value, v["LOCAL_EPC_ID"].(float64)) {
+	if slices.Contains(p.Value, float64(v["REMOTE_EPC_ID"].(int))) || slices.Contains(p.Value, float64(v["LOCAL_EPC_ID"].(int))) {
 		return true
 	}
 	return false

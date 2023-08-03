@@ -40,12 +40,12 @@ func (i IncludedFieldsParam) GetIncludedFields() []string { // TODO should move
 }
 
 type AZQuery struct {
-	AZQueryStoredInRedis
-	RefreshCacheParam
+	AZQueryFilterConditions
+	IncludedFieldsParam
 }
 
-type AZQueryStoredInRedis struct {
-	AZQueryFilterConditions
+type RegionQuery struct {
+	RegionQueryFilterConditions
 	IncludedFieldsParam
 }
 
@@ -159,6 +159,31 @@ type NATGatewayQuery struct {
 
 type NATRuleQuery struct {
 	NATRuleQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type LBQuery struct {
+	LBQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type LBListenerQuery struct {
+	LBListenerQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type LBRuleQuery struct {
+	LBRuleQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type PeerConnectionQuery struct {
+	PeerConnectionQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type CENQuery struct {
+	CENQueryFilterConditions
 	IncludedFieldsParam
 }
 

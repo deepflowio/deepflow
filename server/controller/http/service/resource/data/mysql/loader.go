@@ -18,17 +18,22 @@ package mysql
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/http/constraint"
 )
 
-func Select[T constraint.MySQLModel](fields []string) ([]T, error) {
+func Select[T any](fields []string) ([]T, error) {
 	var result []T
 	err := mysql.Db.Select(fields).Find(&result).Error
 	return result, err
 }
 
+func UnscopedSelect[T any](fields []string) ([]T, error) {
+	var result []T
+	err := mysql.Db.Unscoped().Select(fields).Find(&result).Error
+	return result, err
+}
+
 // TODO SelectWhere
-func SelectWithQuery[T constraint.MySQLModel](fields []string, query interface{}, args ...interface{}) ([]T, error) {
+func SelectWithQuery[T any](fields []string, query interface{}, args ...interface{}) ([]T, error) {
 	var result []T
 	err := mysql.Db.Select(fields).Where(query, args...).Find(&result).Error
 	return result, err

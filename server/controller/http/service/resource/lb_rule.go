@@ -19,22 +19,21 @@ package resource
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/db/redis"
 	"github.com/deepflowio/deepflow/server/controller/http/model"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/data"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/filter/generator"
 )
 
-type VM struct {
+type LBRule struct {
 	ServiceGet
 }
 
-func NewVMGet(urlInfo *model.URLInfo, userInfo *model.UserInfo, redisCfg redis.Config, fpermitCfg config.FPermit) *VM {
+func NewLBRuleGet(urlInfo *model.URLInfo, userInfo *model.UserInfo, fpermitCfg config.FPermit) *LBRule {
 	log.Infof("request info: %#v, %#v", urlInfo, userInfo)
-	s := &VM{newServiceGet(
-		ctrlrcommon.RESOURCE_TYPE_VM_EN,
-		data.GetDataProvider(ctrlrcommon.RESOURCE_TYPE_VM_EN, &data.RequiredConfigs{Redis: redisCfg}),
+	s := &LBRule{newServiceGet(
+		ctrlrcommon.RESOURCE_TYPE_LB_RULE_EN,
+		data.GetDataProvider(ctrlrcommon.RESOURCE_TYPE_LB_RULE_EN, &data.RequiredConfigs{}),
 	)}
-	s.generateDataContext(urlInfo, userInfo, generator.NewVM(fpermitCfg))
+	s.generateDataContext(urlInfo, userInfo, generator.NewLBRule(fpermitCfg))
 	return s
 }

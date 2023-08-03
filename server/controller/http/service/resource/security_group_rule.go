@@ -18,7 +18,6 @@ package resource
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/redis"
 	"github.com/deepflowio/deepflow/server/controller/http/model"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/data"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/filter/generator"
@@ -28,8 +27,8 @@ type SecurityGroupRule struct {
 	ServiceGet
 }
 
-func NewSecurityGroupRuleGet(urlInfo *model.URLInfo, userInfo *model.UserInfo, redisCfg redis.Config) *SecurityGroupRule {
-	s := &SecurityGroupRule{newServiceGet(ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN, data.GetDataProvider(ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN, redisCfg))}
+func NewSecurityGroupRuleGet(urlInfo *model.URLInfo, userInfo *model.UserInfo) *SecurityGroupRule {
+	s := &SecurityGroupRule{newServiceGet(ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN, data.GetDataProvider(ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN, &data.RequiredConfigs{}))}
 	s.generateDataContext(urlInfo, userInfo, generator.NewSecurityGroupRule())
 	return s
 }

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LIRegionSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,35 +27,38 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource"
 )
 
-type NATGateway struct {
-	httpCfg    httpCfg.Config
-	fpermitCfg config.FPermit
+type Region struct {
+	httpCfg       httpCfg.Config
+	fpermitCfg    config.FPermit
+	webServiceCfg config.DFWebService
 }
 
-func NewNATGateway(hCfg httpCfg.Config, fCfg config.FPermit) *NATGateway {
-	return &NATGateway{httpCfg: hCfg, fpermitCfg: fCfg}
+func NewRegion(hCfg httpCfg.Config, fCfg config.FPermit, webServiceCfg config.DFWebService) *Region {
+	return &Region{httpCfg: hCfg, fpermitCfg: fCfg, webServiceCfg: webServiceCfg}
 }
 
-func (p *NATGateway) RegisterTo(ge *gin.Engine) {
-	ge.GET(httpcommon.PATH_NAT_GATEWAY, p.Get)
+func (p *Region) RegisterTo(ge *gin.Engine) {
+	ge.GET(httpcommon.PATH_REGION, p.Get)
 }
 
-func (p *NATGateway) Get(c *gin.Context) {
+func (p *Region) Get(c *gin.Context) {
 	header := NewHeaderValidator(c.Request.Header, p.fpermitCfg)
-	query := NewQueryValidator[model.NATGatewayQuery](c.Request.URL.Query())
+	query := NewQueryValidator[model.RegionQuery](c.Request.URL.Query())
 
 	if err := NewValidators(header, query).Validate(); err != nil {
 		common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
 		return
 	}
-	service := resource.NewNATGatewayGet(
+	service := resource.NewRegionGet(
 		NewURLInfo(
 			c.Request.URL.String(),
 			query.structData,
 		),
 		header.userInfo,
-		p.fpermitCfg,
+		p.webServiceCfg,
 	)
+
 	data, err := service.Get()
 	common.JsonResponse(c, data, err)
+
 }

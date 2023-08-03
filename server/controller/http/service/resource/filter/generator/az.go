@@ -33,12 +33,17 @@ func NewAZ() *AZ {
 	g.SetConditionConvertor(g)
 	return g
 }
+
 func (p *AZ) conditionsMapToStruct(fcs common.FilterConditions) filter.Condition {
 	c := filter.NewAND()
 	c.InitSkippedFields = []string{"ANALYZER_IP", "CONTROLLER_IP"}
 	c.Init(fcs)
-	c.TryAppendStringFieldCondition(NewAnalyzerIPCondition("ANALYZER_IP", fcs["ANALYZER_IP"].([]string)))
-	c.TryAppendStringFieldCondition(NewControllerIPCondition("CONTROLLER_IP", fcs["CONTROLLER_IP"].([]string)))
+	if ips, ok := fcs["ANALYZER_IP"]; ok {
+		c.TryAppendStringFieldCondition(NewAnalyzerIPCondition("ANALYZER_IP", filter.ConvertValueToSlice[string](ips)))
+	}
+	if ips, ok := fcs["CONTROLLER_IP"]; ok {
+		c.TryAppendStringFieldCondition(NewControllerIPCondition("CONTROLLER_IP", filter.ConvertValueToSlice[string](ips)))
+	}
 	return c
 }
 

@@ -55,7 +55,6 @@ func (p *Host) Get(c *gin.Context) {
 			query.structData,
 		),
 		header.userInfo,
-		p.redisCfg,
 	)
 	data, err := service.Get()
 	common.JsonResponse(c, data, err)

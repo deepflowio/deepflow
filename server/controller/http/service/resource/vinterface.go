@@ -33,7 +33,7 @@ func NewVInterfaceGet(urlInfo *model.URLInfo, userInfo *model.UserInfo, redisCfg
 	log.Infof("request info: %#v, %#v", urlInfo, userInfo)
 	s := &VInterface{newServiceGet(
 		ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN,
-		data.GetDataProvider(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, redisCfg),
+		data.GetDataProvider(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, &data.RequiredConfigs{Redis: redisCfg}),
 	)}
 	s.generateDataContext(urlInfo, userInfo, generator.NewVInterface(fpermitCfg))
 	return s

@@ -20,6 +20,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
+	dbredis "github.com/deepflowio/deepflow/server/controller/db/redis"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	httpCfg "github.com/deepflowio/deepflow/server/controller/http/config"
 	"github.com/deepflowio/deepflow/server/controller/http/model"
@@ -27,28 +28,29 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource"
 )
 
-type NATGateway struct {
+type LBRule struct {
 	httpCfg    httpCfg.Config
+	redisCfg   dbredis.Config
 	fpermitCfg config.FPermit
 }
 
-func NewNATGateway(hCfg httpCfg.Config, fCfg config.FPermit) *NATGateway {
-	return &NATGateway{httpCfg: hCfg, fpermitCfg: fCfg}
+func NewLBRule(hCfg httpCfg.Config, rCfg dbredis.Config, fCfg config.FPermit) *LBRule {
+	return &LBRule{httpCfg: hCfg, redisCfg: rCfg, fpermitCfg: fCfg}
 }
 
-func (p *NATGateway) RegisterTo(ge *gin.Engine) {
-	ge.GET(httpcommon.PATH_NAT_GATEWAY, p.Get)
+func (p *LBRule) RegisterTo(ge *gin.Engine) {
+	ge.GET(httpcommon.PATH_LB_RULE, p.Get)
 }
 
-func (p *NATGateway) Get(c *gin.Context) {
+func (p *LBRule) Get(c *gin.Context) {
 	header := NewHeaderValidator(c.Request.Header, p.fpermitCfg)
-	query := NewQueryValidator[model.NATGatewayQuery](c.Request.URL.Query())
+	query := NewQueryValidator[model.LBRuleQuery](c.Request.URL.Query())
 
 	if err := NewValidators(header, query).Validate(); err != nil {
 		common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
 		return
 	}
-	service := resource.NewNATGatewayGet(
+	service := resource.NewLBRuleGet(
 		NewURLInfo(
 			c.Request.URL.String(),
 			query.structData,
