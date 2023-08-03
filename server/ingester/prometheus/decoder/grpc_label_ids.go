@@ -49,6 +49,10 @@ func targetIdKey(jobID, instanceID uint32) uint64 {
 	return uint64(jobID)<<JOBID_OFFSET | uint64(instanceID)
 }
 
+func nameValueKey(nameID, valueID uint32) uint64 {
+	return uint64(nameID)<<32 | uint64(valueID)
+}
+
 func metricTargetPairKey(metricID, targetID uint32) uint64 {
 	return uint64(metricID)<<METRICID_OFFSET | uint64(targetID)
 }
@@ -63,6 +67,11 @@ func (t *PrometheusLabelTable) QueryLabelNameID(labelName string) (uint32, bool)
 
 func (t *PrometheusLabelTable) QueryLabelValueID(labelValue string) (uint32, bool) {
 	return t.labelValueIDs.Get(labelValue)
+}
+
+func (t *PrometheusLabelTable) QueryLabelNameValue(nameId, valueId uint32) bool {
+	_, exists := t.labelNameValues.Get(nameValueKey(nameId, valueId))
+	return exists
 }
 
 func (t *PrometheusLabelTable) QueryColumnIndex(metricID, labelNameID uint32) (uint32, bool) {
@@ -103,6 +112,7 @@ type PrometheusLabelTable struct {
 	metricNameIDs     *hashmap.Map[string, uint32]
 	labelNameIDs      *hashmap.Map[string, uint32]
 	labelValueIDs     *hashmap.Map[string, uint32]
+	labelNameValues   *hashmap.Map[uint64, struct{}]
 	labelColumnIndexs *hashmap.Map[uint64, uint32]
 	targetIDs         *hashmap.Map[uint64, uint32]
 	metricTargetPair  *hashmap.Map[uint64, struct{}]
@@ -124,6 +134,7 @@ func NewPrometheusLabelTable(controllerIPs []string, port, rpcMaxMsgSize int) *P
 		metricNameIDs:     hashmap.New[string, uint32](),   // metricName => metricID
 		labelNameIDs:      hashmap.New[string, uint32](),   // labelName  => labelNameID
 		labelValueIDs:     hashmap.New[string, uint32](),   // labelValue => labelValueID
+		labelNameValues:   hashmap.New[uint64, struct{}](), // labelNameValue => exists
 		labelColumnIndexs: hashmap.New[uint64, uint32](),   // metricID + LabelNameID => columnIndex
 		targetIDs:         hashmap.New[uint64, uint32](),   // jobID + instanceID => targetID
 		metricTargetPair:  hashmap.New[uint64, struct{}](), // metricID + targetID => exists
@@ -223,6 +234,7 @@ func (t *PrometheusLabelTable) updatePrometheusLabels(resp *trident.PrometheusLa
 			} else if instanceId == 0 && name == model.InstanceLabel {
 				instanceId = valueId
 			}
+			t.labelNameValues.Set(nameValueKey(nameId, valueId), struct{}{})
 
 			cIndex := labelInfo.GetAppLabelColumnIndex()
 			t.labelColumnIndexs.Set(columnIndexKey(metricId, nameId), cIndex)
