@@ -189,7 +189,7 @@ impl Sendable for TelegrafMetric {
 
 /// java profile xxxx
 #[derive(Debug, PartialEq)]
-pub struct Profile(metric::Profile);
+pub struct Profile(pub metric::Profile);
 
 impl Sendable for Profile {
     fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
@@ -718,6 +718,7 @@ async fn handler(
                 IpAddr::V4(ip4) => ip4.octets().to_vec(),
                 IpAddr::V6(ip6) => ip6.octets().to_vec(),
             };
+            profile.event_type = metric::ProfileEventType::External.into();
             if let Some(content_type) = part.headers.get(CONTENT_TYPE) {
                 profile.content_type = content_type.as_bytes().to_vec();
             }

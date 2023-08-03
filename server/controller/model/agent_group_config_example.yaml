@@ -1137,6 +1137,20 @@ vtap_group_id: g-xxxxxx
     ## Note: Only collect IO events with delay exceeding this threshold, the default value is 1ms.
     #io-event-minimal-duration: 1ms
 
+    ## on-cpu profile configuration
+    #on-cpu-profile:
+      ## eBPF on-cpu Profile Switch
+      ## Default: false
+      #disabled: false
+
+      ## Sampling frequency
+      ## Default: 99
+      #frequency: 99
+
+      ## Sampling process name
+      ## Default: ^deepflow-.*
+      #regex: ^deepflow-.*
+
   ######################################
   ## Agent Running in Standalone Mode ##
   ######################################

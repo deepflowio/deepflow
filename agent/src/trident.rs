@@ -1948,6 +1948,26 @@ impl AgentComponents {
             true,
         );
 
+        let profile_queue_name = "1-profile-to-sender";
+        let (profile_sender, profile_receiver, counter) = queue::bounded_with_debug(
+            yaml_config.external_metrics_sender_queue_size,
+            profile_queue_name,
+            &queue_debugger,
+        );
+        stats_collector.register_countable(
+            "queue",
+            Countable::Owned(Box::new(counter)),
+            vec![StatsOption::Tag("module", profile_queue_name.to_string())],
+        );
+        let profile_uniform_sender = UniformSenderThread::new(
+            profile_queue_name,
+            Arc::new(profile_receiver),
+            config_handler.sender(),
+            stats_collector.clone(),
+            exception_handler.clone(),
+            true,
+        );
+
         let ebpf_dispatcher_id = dispatchers.len();
         #[cfg(target_os = "linux")]
         #[allow(unused)]
@@ -2015,6 +2035,7 @@ impl AgentComponents {
                 log_sender,
                 flow_sender,
                 proc_event_sender,
+                profile_sender.clone(),
                 &queue_debugger,
                 stats_collector.clone(),
                 platform_synchronizer.clone(),
@@ -2114,26 +2135,6 @@ impl AgentComponents {
         let telegraf_uniform_sender = UniformSenderThread::new(
             telegraf_queue_name,
             Arc::new(telegraf_receiver),
-            config_handler.sender(),
-            stats_collector.clone(),
-            exception_handler.clone(),
-            true,
-        );
-
-        let profile_queue_name = "1-profile-to-sender";
-        let (profile_sender, profile_receiver, counter) = queue::bounded_with_debug(
-            yaml_config.external_metrics_sender_queue_size,
-            profile_queue_name,
-            &queue_debugger,
-        );
-        stats_collector.register_countable(
-            "queue",
-            Countable::Owned(Box::new(counter)),
-            vec![StatsOption::Tag("module", profile_queue_name.to_string())],
-        );
-        let profile_uniform_sender = UniformSenderThread::new(
-            profile_queue_name,
-            Arc::new(profile_receiver),
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
