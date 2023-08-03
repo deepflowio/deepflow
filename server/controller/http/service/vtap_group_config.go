@@ -372,7 +372,7 @@ func convertToDb(sData *model.VTapGroupConfiguration, tData *mysql.VTapGroupConf
 		tapSides := convertIntSliceToString(sData.L7LogIgnoreTapSides)
 		tData.L7LogIgnoreTapSides = &tapSides
 	} else {
-		tData.L4LogIgnoreTapSides = nil
+		tData.L7LogIgnoreTapSides = nil
 	}
 	if len(sData.L7LogStoreTapTypes) > 0 {
 		cL7LogStoreTapTypes := convertIntSliceToString(sData.L7LogStoreTapTypes)
