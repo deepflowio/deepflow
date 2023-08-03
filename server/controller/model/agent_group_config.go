@@ -156,6 +156,12 @@ type EbpfKprobePortlist struct {
 	PortList string `yaml:"port-list,omitempty"`
 }
 
+type OnCpuProfile struct {
+	Disabled  *bool   `yaml:"disabled,omitempty"`
+	Frequency *int    `yaml:"frequency,omitempty"`
+	Regex     *string `yaml:"regex,omitempty"`
+}
+
 type EbpfConfig struct {
 	Disabled                *bool                              `yaml:"disabled,omitempty"`
 	LogFile                 *string                            `yaml:"log-file,omitempty"`
@@ -171,6 +177,7 @@ type EbpfConfig struct {
 	GoTracingTimeout        *int                               `yaml:"go-tracing-timeout,omitempty"`
 	IOEventCollectMode      *int                               `yaml:"io-event-collect-mode,omitempty"`
 	IOEventMinimalDuration  *string                            `yaml:"io-event-minimal-duration,omitempty"`
+	OnCpuProfile            *OnCpuProfile                      `yaml:"on-cpu-profile,omitempty"`
 }
 
 type OsProcRegex struct {

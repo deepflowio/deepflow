@@ -288,6 +288,24 @@ pub struct EbpfKprobePortlist {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, rename_all = "kebab-case")]
+pub struct OnCpuProfile {
+    pub disabled: bool,
+    pub frequency: u16,
+    pub regex: String,
+}
+
+impl Default for OnCpuProfile {
+    fn default() -> Self {
+        OnCpuProfile {
+            disabled: false,
+            frequency: 99,
+            regex: "^deepflow-.*".to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "kebab-case")]
 pub struct EbpfYamlConfig {
     pub disabled: bool,
     pub log_file: String,
@@ -305,6 +323,7 @@ pub struct EbpfYamlConfig {
     pub io_event_collect_mode: usize,
     #[serde(with = "humantime_serde")]
     pub io_event_minimal_duration: Duration,
+    pub on_cpu_profile: OnCpuProfile,
 }
 
 impl Default for EbpfYamlConfig {
@@ -324,6 +343,7 @@ impl Default for EbpfYamlConfig {
             go_tracing_timeout: 120,
             io_event_collect_mode: 1,
             io_event_minimal_duration: Duration::from_millis(1),
+            on_cpu_profile: OnCpuProfile::default(),
         }
     }
 }
