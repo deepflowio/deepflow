@@ -349,6 +349,10 @@ func (m *PlatformDataManager) NewPlatformInfoTable(isMaster bool, moudleName str
 	return m.slaveTables[index], nil
 }
 
+func (m *PlatformDataManager) GetMasterPlatformInfoTable() *PlatformInfoTable {
+	return m.masterTable
+}
+
 func NewPlatformInfoTable(ips []net.IP, port, index, rpcMaxMsgSize int, moduleName, nodeIP string, receiver *receiver.Receiver, isMaster bool, manager *PlatformDataManager) *PlatformInfoTable {
 	table := &PlatformInfoTable{
 		manager:  manager,
