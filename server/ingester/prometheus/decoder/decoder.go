@@ -485,6 +485,7 @@ func (b *PrometheusSamplesBuilder) fillUniversalTagSlow(m *dbwriter.PrometheusSa
 	t.VTAPID = vtapID
 	t.L3EpcID = datatype.EPC_FROM_INTERNET
 	var ip net.IP
+	var hasMatched bool
 	if podName != "" {
 		podInfo := b.platformData.QueryPodInfo(uint32(vtapID), podName)
 		if podInfo != nil {
@@ -492,16 +493,27 @@ func (b *PrometheusSamplesBuilder) fillUniversalTagSlow(m *dbwriter.PrometheusSa
 			t.PodID = podInfo.PodId
 			t.L3EpcID = podInfo.EpcId
 			ip = net.ParseIP(podInfo.Ip)
+			hasMatched = true
 		}
-	} else if instanceIP := getIPPartFromPrometheusInstanceString(instance); instanceIP != "" {
-		t.L3EpcID = b.platformData.QueryVtapEpc0(uint32(vtapID))
-		ip = net.ParseIP(instanceIP)
-	} else if fillWithVtapId {
+	}
+
+	if !hasMatched {
+		if instanceIP := getIPPartFromPrometheusInstanceString(instance); instanceIP != "" {
+			t.L3EpcID = b.platformData.QueryVtapEpc0(uint32(vtapID))
+			ip = net.ParseIP(instanceIP)
+			if ip != nil {
+				hasMatched = true
+			}
+		}
+	}
+
+	if !hasMatched && fillWithVtapId {
 		t.L3EpcID = b.platformData.QueryVtapEpc0(uint32(vtapID))
 		vtapInfo := b.platformData.QueryVtapInfo(uint32(vtapID))
 		if vtapInfo != nil {
 			ip = net.ParseIP(vtapInfo.Ip)
 			t.PodClusterID = uint16(vtapInfo.PodClusterId)
+			hasMatched = true
 		}
 	}
 
@@ -513,8 +525,6 @@ func (b *PrometheusSamplesBuilder) fillUniversalTagSlow(m *dbwriter.PrometheusSa
 			t.IsIPv6 = 1
 			t.IP6 = ip
 		}
-	} else {
-		return
 	}
 
 	var info *grpc.Info
