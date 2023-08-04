@@ -613,7 +613,9 @@ where
 
     async fn process(mut ctx: Context<K>) {
         let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
-        Self::serialized_get_list_entry(&mut ctx, &mut encoder).await;
+        while !Self::serialized_get_list_entry(&mut ctx, &mut encoder).await {
+            time::sleep(SLEEP_INTERVAL).await;
+        }
         ctx.ready.store(true, Ordering::Relaxed);
         info!("{} watcher initial list ready", ctx.kind);
 
@@ -641,15 +643,19 @@ where
         ctx.stats_counter.list_count.fetch_add(1, Ordering::Relaxed);
     }
 
-    async fn serialized_get_list_entry(ctx: &mut Context<K>, encoder: &mut ZlibEncoder<Vec<u8>>) {
+    async fn serialized_get_list_entry(
+        ctx: &mut Context<K>,
+        encoder: &mut ZlibEncoder<Vec<u8>>,
+    ) -> bool {
         while let Err(_) =
             ctx.listing
                 .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
         {
             time::sleep(SPIN_INTERVAL).await;
         }
-        Self::get_list_entry(ctx, encoder).await;
+        let r = Self::get_list_entry(ctx, encoder).await;
         ctx.listing.store(false, Ordering::SeqCst);
+        r
     }
 
     fn memory_trim(ctx: &mut Context<K>) {
@@ -709,7 +715,7 @@ where
 
     // calling list on multiple resources simultaneously may consume a lot of memory
     // use serialized_get_list_entry to avoid oom
-    async fn get_list_entry(ctx: &mut Context<K>, encoder: &mut ZlibEncoder<Vec<u8>>) {
+    async fn get_list_entry(ctx: &mut Context<K>, encoder: &mut ZlibEncoder<Vec<u8>>) -> bool {
         info!(
             "list {} entries with limit {}, memory trim percent: {:?}",
             ctx.kind, ctx.config.list_limit, ctx.config.memory_trim_percent,
@@ -730,7 +736,7 @@ where
                         ctx.stats_counter
                             .list_length
                             .fetch_add(total_count as u32, Ordering::Relaxed);
-                        return;
+                        return true;
                     }
                     debug!(
                         "{} list returns {} entries, {} remaining",
@@ -796,7 +802,7 @@ where
                                 .list_length
                                 .fetch_add(total_count as u32, Ordering::Relaxed);
                             Self::memory_trim(ctx);
-                            return;
+                            return true;
                         }
                         _ => (),
                     }
@@ -809,7 +815,7 @@ where
                     let msg = format!("{} watcher list failed: {}", ctx.kind, err);
                     warn!("{}", msg);
                     ctx.err_msg.lock().await.replace(msg);
-                    return;
+                    return false;
                 }
             }
         }

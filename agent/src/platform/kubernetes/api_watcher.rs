@@ -572,6 +572,14 @@ impl ApiWatcher {
             let resource_watchers_guard = resource_watchers.lock().unwrap();
             for (resource, watcher_version) in watcher_versions.iter_mut() {
                 if let Some(watcher) = resource_watchers_guard.get(resource) {
+                    if !watcher.ready() {
+                        err_msgs_guard.push(format!("{} watcher is not ready", resource));
+                        if let Some(msg) = watcher.error() {
+                            err_msgs_guard.push(msg);
+                        }
+                        continue;
+                    }
+
                     let new_version = watcher.version();
                     if new_version != *watcher_version {
                         updated_versions.push(format!(
@@ -795,13 +803,13 @@ impl ApiWatcher {
         let mut wait_count = 0;
         while !Self::ready_stop(&running, &timer, INIT_WAIT_INTERVAL) {
             let ws = resource_watchers.lock().unwrap();
-            let mut ready = false;
-            for (k, v) in ws.iter() {
-                if k.name == "nodes" {
-                    ready = v.ready();
-                    break;
+            let ready = ws.iter().all(|(n, v)| {
+                let r = v.ready();
+                if !r {
+                    debug!("{} watcher is not ready yet", n);
                 }
-            }
+                r
+            });
             if !ready {
                 wait_count += 1;
                 if wait_count >= sync_interval.as_secs() / INIT_WAIT_INTERVAL.as_secs() {
