@@ -1262,7 +1262,7 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where, isCheck bool) (view
 		case *sqlparser.ColName, *sqlparser.SQLVal:
 			whereTag := chCommon.ParseAlias(node.Left)
 			metricStruct, ok := metrics.GetMetrics(whereTag, e.DB, e.Table, e.Context)
-			if ok {
+			if ok && metricStruct.Type != metrics.METRICS_TYPE_TAG {
 				whereTag = metricStruct.DBField
 			}
 			whereValue := sqlparser.String(node.Right)
