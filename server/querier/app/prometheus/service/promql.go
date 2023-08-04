@@ -74,14 +74,28 @@ const _SUCCESS = "success"
 // executors for prometheus query
 type prometheusExecutor struct {
 	extraLabelCache *lru.Cache[string, string]
+	ticker          *time.Ticker
 }
 
 func NewPrometheusExecutor() *prometheusExecutor {
 	executor := &prometheusExecutor{
 		extraLabelCache: lru.NewCache[string, string](config.Cfg.Prometheus.ExternalTagCacheSize),
 	}
-	executor.loadExternalTagCache()
+	go executor.triggerLoadExternalTag()
 	return executor
+}
+
+func (p *prometheusExecutor) triggerLoadExternalTag() {
+	p.ticker = time.NewTicker(time.Duration(config.Cfg.Prometheus.ExternalTagLoadInterval) * time.Second)
+	defer func() {
+		p.ticker.Stop()
+		if err := recover(); err != nil {
+			go p.triggerLoadExternalTag()
+		}
+	}()
+	for range p.ticker.C {
+		p.loadExternalTagCache()
+	}
 }
 
 // API Spec: https://prometheus.io/docs/prometheus/latest/querying/api/#instant-queries
@@ -365,14 +379,23 @@ func (p *prometheusExecutor) loadExternalTagCache() {
 	data, err := tagdescription.GetTagDescriptions(chCommon.DB_NAME_FLOW_METRICS, VTAP_FLOW_PORT_TABLE, showTags, context.Background())
 	if err != nil {
 		log.Errorf("load external tag error when start up prometheus executor: %s", err)
+		return
 	}
-	for _, value := range data.Values {
-		values := value.([]interface{})
-		if values[4].(string) != "map_item" {
-			continue
+	if data != nil {
+		for _, value := range data.Values {
+			values := value.([]interface{})
+			// data.Columns definitions:
+			// "columns": ["name","client_name","server_name","display_name","type","category","operators","permissions","description","related_tag"]
+			// we need to get .[4] value, confirm len(values) >= 5
+			if values == nil || len(values) < 5 {
+				continue
+			}
+			if values[4].(string) != "map_item" {
+				continue
+			}
+			tag := values[0].(string)
+			p.addExtraLabelConvertion(formatTagName(tag), tag)
 		}
-		tag := values[0].(string)
-		p.addExtraLabelConvertion(formatTagName(tag), tag)
 	}
 }
 
