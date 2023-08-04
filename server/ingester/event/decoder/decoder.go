@@ -409,6 +409,7 @@ func (d *Decoder) writeAlarmEvent(event *alarm_event.AlarmEvent) {
 	s.ValueUnit = event.GetValueUnit()
 	s.EventLevel = event.GetEventLevel()
 	s.AlarmTarget = event.GetAlarmTarget()
+	s.RegionId = uint16(d.platformData.QueryRegionID())
 
 	d.eventWriter.WriteAlarmEvent(s)
 }

@@ -99,7 +99,7 @@ func NewSubnetIDCondition(key string, value interface{}) *SubnetIDCondition {
 func (p *SubnetIDCondition) Keep(v common.ResponseElem) bool {
 	subnets := v["SUBNETS"].([]map[string]interface{})
 	for _, item := range subnets {
-		if slices.Contains(p.Value, item["ID"].(float64)) {
+		if slices.Contains(p.Value, float64(item["ID"].(int))) {
 			return true
 		}
 	}
@@ -117,7 +117,7 @@ func NewSecurityGroupIDCondition(key string, value interface{}) *SecurityGroupID
 func (p *SecurityGroupIDCondition) Keep(v common.ResponseElem) bool {
 	sgs := v["SECURITY_GROUPS"].([]map[string]interface{})
 	for _, item := range sgs {
-		if slices.Contains(p.Value, item["ID"].(float64)) {
+		if slices.Contains(p.Value, float64(item["ID"].(int))) {
 			return true
 		}
 	}

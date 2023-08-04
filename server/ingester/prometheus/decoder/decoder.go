@@ -68,6 +68,7 @@ type BuilderCounter struct {
 	MetricMiss        int64 `statsd:"metirc-miss"`
 	NameMiss          int64 `statsd:"name-miss"`
 	ValueMiss         int64 `statsd:"value-miss"`
+	NameValueMiss     int64 `statsd:"name-value-miss"`
 	ColumnMiss        int64 `statsd:"column-miss"`
 	TargetMiss        int64 `statsd:"target-miss"`
 	MetricTargetMiss  int64 `statsd:"metric-target-miss"`
@@ -342,6 +343,11 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID uint16, ts *prompb.T
 			return true, nil
 		}
 
+		if !b.labelTable.QueryLabelNameValue(nameID, valueID) {
+			b.counter.NameValueMiss++
+			return true, nil
+		}
+
 		if podName == "" && l.Name == PROMETHEUS_POD {
 			podName = l.Value
 			podNameID = valueID
@@ -485,6 +491,7 @@ func (b *PrometheusSamplesBuilder) fillUniversalTagSlow(m *dbwriter.PrometheusSa
 	t.VTAPID = vtapID
 	t.L3EpcID = datatype.EPC_FROM_INTERNET
 	var ip net.IP
+	var hasMatched bool
 	if podName != "" {
 		podInfo := b.platformData.QueryPodInfo(uint32(vtapID), podName)
 		if podInfo != nil {
@@ -492,16 +499,27 @@ func (b *PrometheusSamplesBuilder) fillUniversalTagSlow(m *dbwriter.PrometheusSa
 			t.PodID = podInfo.PodId
 			t.L3EpcID = podInfo.EpcId
 			ip = net.ParseIP(podInfo.Ip)
+			hasMatched = true
 		}
-	} else if instanceIP := getIPPartFromPrometheusInstanceString(instance); instanceIP != "" {
-		t.L3EpcID = b.platformData.QueryVtapEpc0(uint32(vtapID))
-		ip = net.ParseIP(instanceIP)
-	} else if fillWithVtapId {
+	}
+
+	if !hasMatched {
+		if instanceIP := getIPPartFromPrometheusInstanceString(instance); instanceIP != "" {
+			t.L3EpcID = b.platformData.QueryVtapEpc0(uint32(vtapID))
+			ip = net.ParseIP(instanceIP)
+			if ip != nil {
+				hasMatched = true
+			}
+		}
+	}
+
+	if !hasMatched && fillWithVtapId {
 		t.L3EpcID = b.platformData.QueryVtapEpc0(uint32(vtapID))
 		vtapInfo := b.platformData.QueryVtapInfo(uint32(vtapID))
 		if vtapInfo != nil {
 			ip = net.ParseIP(vtapInfo.Ip)
 			t.PodClusterID = uint16(vtapInfo.PodClusterId)
+			hasMatched = true
 		}
 	}
 
@@ -513,8 +531,6 @@ func (b *PrometheusSamplesBuilder) fillUniversalTagSlow(m *dbwriter.PrometheusSa
 			t.IsIPv6 = 1
 			t.IP6 = ip
 		}
-	} else {
-		return
 	}
 
 	var info *grpc.Info

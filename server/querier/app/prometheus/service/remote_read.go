@@ -36,6 +36,8 @@ import (
 type prometheusReader struct {
 	slimit                  int
 	interceptPrometheusExpr func(func(e *parser.AggregateExpr) error) error
+	getExternalTagFromCache func(string) string
+	addExternalTagToCache   func(string, string)
 }
 
 func newPrometheusReader(slimit int) *prometheusReader {

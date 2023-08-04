@@ -39,7 +39,7 @@ func FindInBatches[T any](query *gorm.DB) ([]*T, error) {
 	pageIndex := 0
 	pageCount := mysql.GetResultSetMax()
 	pageData := make([]*T, 0)
-	for len(pageData) == 0 || len(pageData) == pageCount {
+	for pageIndex == 0 || len(pageData) == pageCount {
 		err := query.Find(&pageData).Limit(pageCount).Offset(pageIndex * pageCount).Error
 		if err != nil {
 			return []*T{}, err
@@ -56,7 +56,7 @@ func FindInBatchesObj[T any](query *gorm.DB) ([]T, error) { // TODO unify return
 	pageIndex := 0
 	pageCount := mysql.GetResultSetMax()
 	pageData := make([]T, 0)
-	for len(pageData) == 0 || len(pageData) == pageCount {
+	for pageIndex == 0 || len(pageData) == pageCount {
 		err := query.Find(&pageData).Limit(pageCount).Offset(pageIndex * pageCount).Error
 		if err != nil {
 			return []T{}, err

@@ -24,6 +24,7 @@ import (
 // 各资源可支持的 query 字段定义
 type QueryModel interface {
 	model.AZQuery | model.HostQuery | model.VMQuery | model.VInterfaceQuery |
+		model.SecurityGroupQuery | model.SecurityGroupRuleQuery | model.NATGatewayQuery | model.NATRuleQuery |
 		model.PodQuery | model.PodReplicaSetQuery | model.PodGroupQuery | model.PodGroupPortQuery |
 		model.PodServiceQuery | model.PodServicePortQuery | model.PodIngressQuery | model.PodIngressRuleQuery |
 		model.PodNodeQuery | model.PodNamespaceQuery | model.PodClusterQuery |
