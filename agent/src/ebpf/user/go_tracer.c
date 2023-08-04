@@ -158,6 +158,18 @@ static struct data_members offsets[] = {
 		.field_name = "StreamID",
 		.idx = OFFSET_IDX_STREAM_ID_HTTP2_FRAME_HEADER,
 		.default_offset = 8,
+	},
+	{
+		.structure = "golang.org/x/net/http2.Framer",
+		.field_name = "w",
+		.idx = OFFSET_IDX_HTTP2_FRAMER_W,
+		.default_offset = 112,
+	},
+	{
+		.structure = "google.golang.org/grpc/internal/transport.bufWriter",
+		.field_name = "conn",
+		.idx = OFFSET_IDX_BUFWRITTER_CONN,
+		.default_offset = 0,
 	}
 };
 
