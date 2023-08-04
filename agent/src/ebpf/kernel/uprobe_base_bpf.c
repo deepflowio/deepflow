@@ -117,6 +117,12 @@ struct __http2_buffer {
 	char info[HTTP2_BUFFER_INFO_SIZE + HTTP2_BUFFER_UESLESS];
 };
 
+struct __http2_dataframe {
+	__u32 stream_id;
+	__u32 data_len;
+	char data[HTTP2_BUFFER_INFO_SIZE];
+};
+
 #define SOCKET_DATA_HEADER offsetof(typeof(struct __socket_data), data)
 
 struct __http2_stack {
@@ -127,7 +133,10 @@ struct __http2_stack {
 				__u32 __unused_events_num;
 				__u32 __unused_len;
 				char __unused_header[SOCKET_DATA_HEADER];
-				struct __http2_buffer http2_buffer;
+				union{
+					struct __http2_buffer http2_buffer;
+					struct __http2_dataframe http2_dataframe;
+				};
 			} __attribute__((packed));
 		};
 		struct {
@@ -145,18 +154,6 @@ static __inline struct __http2_stack *get_http2_stack()
 {
 	int k0 = 0;
 	return bpf_map_lookup_elem(&NAME(http2_stack), &k0);
-}
-
-static __inline struct __http2_buffer *get_http2_buffer()
-{
-	struct __http2_stack *stack = get_http2_stack();
-	return stack ? (&(stack->http2_buffer)) : NULL;
-}
-
-static __inline struct __socket_data *get_http2_send_buffer()
-{
-	struct __http2_stack *stack = get_http2_stack();
-	return stack ? (&(stack->send_buffer)) : NULL;
 }
 
 static __inline void update_http2_tls(bool tls)
