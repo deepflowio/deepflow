@@ -901,10 +901,33 @@ int uprobe_go_http2Client_operateHeaders(struct pt_regs *ctx)
 	return submit_http2_headers(&headers);
 }
 
+static __inline int
+get_fd_from_grpc_http2_Framer_ctx(struct pt_regs *ctx,
+				  struct ebpf_proc_info *info)
+{
+	void *ptr = get_the_first_parameter(ctx, info);
+
+	struct go_interface io_writer_interface;
+	bpf_probe_read(&io_writer_interface, sizeof(io_writer_interface),
+		       ptr + info->offsets[OFFSET_IDX_HTTP2_FRAMER_W]);
+
+	struct go_interface conn_intf;
+	bpf_probe_read(&conn_intf, sizeof(conn_intf),
+		       io_writer_interface.ptr +
+			       info->offsets[OFFSET_IDX_BUFWRITTER_CONN]);
+
+	if (is_grpc_syscallConn_interface(&conn_intf, info)) {
+		bpf_probe_read(&conn_intf, sizeof(conn_intf), conn_intf.ptr);
+	}
+
+	return get_fd_from_tcp_or_tls_conn_interface(&conn_intf, info);
+}
+
 // grpc dataframe
 // func (fr *Framer) checkFrameOrder(f Frame) error
 SEC("uprobe/golang_org_x_net_http2_Framer_checkFrameOrder")
-static int uprobe_golang_org_x_net_http2_Framer_checkFrameOrder(struct pt_regs *ctx)
+static int
+uprobe_golang_org_x_net_http2_Framer_checkFrameOrder(struct pt_regs *ctx)
 {
 	__u64 id = bpf_get_current_pid_tgid();
 	pid_t pid = id >> 32;
@@ -914,28 +937,33 @@ static int uprobe_golang_org_x_net_http2_Framer_checkFrameOrder(struct pt_regs *
 		return 0;
 	}
 
-	void *Framer = (void *)PT_GO_REGS_PARM1(ctx);
+	// TODO: Use the offset obtained dynamically from user mode
+	int DataFrame_Type_offset = 1;
+	int DataFrame_StreamID_offset = 8;
+	int DataFrame_data_offset = 16;
 
 	struct go_interface Frame = { .type = PT_GO_REGS_PARM2(ctx),
 				      .ptr = (void *)PT_GO_REGS_PARM3(ctx) };
 
-	// DataFrame Type offset：1
 	uint8_t Type;
-	bpf_probe_read_user(&Type, sizeof(Type), (void *)Frame.ptr + 1);
+	bpf_probe_read_user(&Type, sizeof(Type),
+			    (void *)Frame.ptr + DataFrame_Type_offset);
 	if (Type != 0) {
 		return 0;
 	}
 
-	// DataFrame StreamID offset：8
 	__u32 StreamID;
-	bpf_probe_read_user(&StreamID, sizeof(StreamID), (void *)Frame.ptr + 8);
+	bpf_probe_read_user(&StreamID, sizeof(StreamID),
+			    (void *)Frame.ptr + DataFrame_StreamID_offset);
 
-	// DataFrame data offset: 16
 	struct go_slice data;
-	bpf_probe_read_user(&data, sizeof(data), (void *)Frame.ptr + 16);
+	bpf_probe_read_user(&data, sizeof(data),
+			    (void *)Frame.ptr + DataFrame_data_offset);
 
-	bpf_debug("grpc dataframe read: Framer=%llx StreamID=%d size=%d",
-		  Framer, StreamID, data.len);
+	int fd = get_fd_from_grpc_http2_Framer_ctx(ctx, info);
+
+	bpf_debug("grpc dataframe read: fd=%d StreamID=%d size=%d", fd,
+		  StreamID, data.len);
 
 	return 0;
 }
@@ -953,14 +981,15 @@ uprobe_golang_org_x_net_http2_Framer_WriteDataPadded(struct pt_regs *ctx)
 		return 0;
 	}
 
-	void *Framer = (void *)PT_GO_REGS_PARM1(ctx);
 	__u32 streamID = (__u32)PT_GO_REGS_PARM2(ctx);
 	struct go_slice data = { .ptr = (void *)PT_GO_REGS_PARM4(ctx),
 				 .len = PT_GO_REGS_PARM5(ctx),
 				 .cap = PT_GO_REGS_PARM6(ctx) };
 
-	bpf_debug("grpc dataframe write: Framer=%llx streamID=%d size=%d",
-		  Framer, streamID, data.len);
+	int fd = get_fd_from_grpc_http2_Framer_ctx(ctx, info);
+
+	bpf_debug("grpc dataframe write: fd=%d streamID=%d size=%d", fd,
+		  streamID, data.len);
 
 	return 0;
 }
