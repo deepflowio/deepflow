@@ -300,6 +300,20 @@ static struct symbol syms[] = {
 		.probe_func = "uprobe_go_http2Server_operateHeaders",
 		.is_probe_ret = false,
 	},
+	// grpc datafram read
+	{
+		.type = GO_UPROBE,
+		.symbol = "golang.org/x/net/http2.(*Framer).checkFrameOrder",
+		.probe_func = "uprobe_golang_org_x_net_http2_Framer_checkFrameOrder",
+		.is_probe_ret = false,
+	},
+	// grpc datafram write
+	{
+		.type = GO_UPROBE,
+		.symbol = "golang.org/x/net/http2.(*Framer).WriteDataPadded",
+		.probe_func = "uprobe_golang_org_x_net_http2_Framer_WriteDataPadded",
+		.is_probe_ret = false,
+	},
 };
 /* *INDENT-ON* */
 
