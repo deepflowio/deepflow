@@ -79,6 +79,10 @@ pub struct CustomInfo {
 
     pub trace: CustomInfoTrace,
 
+    pub need_protocol_merge: bool,
+    pub is_req_end: bool,
+    pub is_resp_end: bool,
+
     #[serde(skip)]
     pub attributes: Vec<KeyVal>,
 }
@@ -122,6 +126,8 @@ impl TryFrom<(&[u8], PacketDirection)> for CustomInfo {
                 val:    $(len) bytes
 
             ) x 2
+
+        need_protocol_merge: 1 byte, the msb indicate is need protocol merge, the lsb indicate is end, such as 1 000000 1
 
         has trace: 1 byte
 
@@ -272,6 +278,23 @@ impl TryFrom<(&[u8], PacketDirection)> for CustomInfo {
             }
         }
 
+        // need_protocol_merge
+        if off + 1 > buf.len() {
+            return Err(Error::WasmSerializeFail(
+                "buf len too short when parse need protocol merge".to_string(),
+            ));
+        }
+        info.need_protocol_merge = buf[off] & 128 != 0;
+
+        if info.need_protocol_merge {
+            let is_end = buf[off] & 1 != 0;
+            match dir {
+                PacketDirection::ClientToServer => info.is_req_end = is_end,
+                PacketDirection::ServerToClient => info.is_resp_end = is_end,
+            }
+        }
+        off += 1;
+
         // trace info
         if off + 1 > buf.len() {
             return Err(Error::WasmSerializeFail(
@@ -374,6 +397,14 @@ impl L7ProtocolInfoInterface for CustomInfo {
 
     fn is_tls(&self) -> bool {
         false
+    }
+
+    fn need_merge(&self) -> bool {
+        self.need_protocol_merge
+    }
+
+    fn is_req_resp_end(&self) -> (bool, bool) {
+        (self.is_req_end, self.is_resp_end)
     }
 }
 
