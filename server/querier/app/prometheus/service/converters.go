@@ -413,7 +413,7 @@ func showTags(ctx context.Context, db string, table string, startTime int64, end
 	} else {
 		data, err = tagdescription.GetTagDescriptions(db, table, fmt.Sprintf(showTags, db, table, startTime, endTime), ctx)
 	}
-	if err != nil {
+	if err != nil || data == nil {
 		return tagsArray, err
 	}
 
@@ -428,6 +428,9 @@ func showTags(ctx context.Context, db string, table string, startTime int64, end
 		// "columns": ["name","client_name","server_name","display_name","type","category","operators","permissions","description","related_tag"]
 		// i.e.: columns[i] defines name of values[i]
 		values := value.([]interface{})
+		if values == nil {
+			continue
+		}
 		tagName := values[0].(string)
 		if common.IsValueInSliceString(tagName, ignorableTagNames) {
 			continue
