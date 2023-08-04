@@ -196,6 +196,12 @@ static __inline void report_http2_header(struct pt_regs *ctx)
 	return;
 }
 
+static __inline void report_http2_dataframe(struct pt_regs *ctx)
+{
+	report_http2_header(ctx);
+	return;
+}
+
 static __inline bool
 http2_fill_common_socket_1(struct http2_header_data *data,
 			   struct __socket_data *send_buffer)
@@ -902,16 +908,149 @@ get_fd_from_grpc_http2_Framer_ctx(struct pt_regs *ctx,
 	return get_fd_from_tcp_or_tls_conn_interface(&conn_intf, info);
 }
 
+static __inline int fill_http2_dataframe_base(struct __http2_stack *stack,
+					      int fd, __u64 pid_tgid,
+					      enum traffic_direction direction)
+{
+	struct __socket_data *send_buffer = &(stack->send_buffer);
+
+	send_buffer->source = DATA_SOURCE_GO_HTTP2_DATAFRAME_UPROBE;
+	send_buffer->direction = direction;
+	int tgid = pid_tgid >> 32;
+
+#if 1
+	// The header contains the following fields, no need to report repeatedly
+	send_buffer->tgid = tgid;
+	send_buffer->pid = (__u32)pid_tgid;
+	send_buffer->timestamp = bpf_ktime_get_ns();
+	bpf_get_current_comm(send_buffer->comm, sizeof(send_buffer->comm));
+	send_buffer->tcp_seq = 0;
+	send_buffer->data_type = stack->tls ? PROTO_TLS_HTTP2 : PROTO_HTTP2;
+#endif
+
+	// Refer to the logic of process_data in socket_trace.c to
+	// obtain quintuple information
+	__u32 k0 = 0;
+	struct member_fields_offset *offset = members_offset__lookup(&k0);
+	if (!offset)
+		return -1;
+
+	if (unlikely(!offset->ready))
+		return -1;
+
+	send_buffer->tuple.l4_protocol = IPPROTO_TCP;
+	void *sk = get_socket_from_fd(fd, offset);
+
+	// fill in the port number
+	__be16 inet_dport;
+	__u16 inet_sport;
+	__u16 skc_family;
+	struct skc_flags_t {
+		unsigned char skc_reuse : 4;
+		unsigned char skc_reuseport : 1;
+		unsigned char skc_ipv6only : 1;
+		unsigned char skc_net_refcnt : 1;
+	};
+	struct skc_flags_t skc_flags;
+	bpf_probe_read(&skc_flags, sizeof(skc_flags),
+		       sk + offset->struct_sock_common_ipv6only_offset);
+	bpf_probe_read(&skc_family, sizeof(skc_family),
+		       sk + offset->struct_sock_family_offset);
+	bpf_probe_read(&inet_dport, sizeof(inet_dport),
+		       sk + offset->struct_sock_dport_offset);
+	bpf_probe_read(&inet_sport, sizeof(inet_sport),
+		       sk + offset->struct_sock_sport_offset);
+	send_buffer->tuple.dport = __bpf_ntohs(inet_dport);
+	send_buffer->tuple.num = inet_sport;
+
+	if (skc_family != PF_INET && skc_family != PF_INET6)
+		return -1;
+
+	if (skc_family == PF_INET6 && skc_flags.skc_ipv6only == 0) {
+		ipv4_mapped_on_ipv6_confirm(sk, skc_family, offset);
+	}
+
+	if (skc_family == PF_INET) {
+		bpf_probe_read(send_buffer->tuple.rcv_saddr, 4,
+			       sk + offset->struct_sock_saddr_offset);
+		bpf_probe_read(send_buffer->tuple.daddr, 4,
+			       sk + offset->struct_sock_daddr_offset);
+		send_buffer->tuple.addr_len = 4;
+	}
+
+	if (skc_family == PF_INET6) {
+		bpf_probe_read(send_buffer->tuple.rcv_saddr, 16,
+			       sk + offset->struct_sock_ip6saddr_offset);
+		bpf_probe_read(send_buffer->tuple.daddr, 16,
+			       sk + offset->struct_sock_ip6daddr_offset);
+		send_buffer->tuple.addr_len = 16;
+	}
+
+	// trace_conf, generator for socket_id
+	struct trace_conf_t *trace_conf = trace_conf_map__lookup(&k0);
+	if (trace_conf == NULL)
+		return -1;
+
+	struct trace_stats *trace_stats = trace_stats_map__lookup(&k0);
+	if (trace_stats == NULL)
+		return -1;
+
+	// Update and get socket_id
+	__u64 conn_key;
+	struct socket_info_t *socket_info_ptr;
+	conn_key = gen_conn_key_id((__u64)tgid, (__u64)fd);
+	socket_info_ptr = socket_info_map__lookup(&conn_key);
+	if (is_socket_info_valid(socket_info_ptr)) {
+		send_buffer->socket_id = socket_info_ptr->uid;
+	} else {
+		send_buffer->socket_id = trace_conf->socket_id + 1;
+		trace_conf->socket_id++;
+
+		struct socket_info_t sk_info = {
+			.uid = send_buffer->socket_id,
+		};
+
+		if (!socket_info_map__update(&conn_key, &sk_info)) {
+			__sync_fetch_and_add(&trace_stats->socket_map_count, 1);
+		}
+	}
+
+	return 0;
+}
+
+static __inline int fill_http2_dataframe_data(struct __http2_stack *stack,
+					      void *buffer, __u32 len,
+					      __u32 stream_id)
+{
+	struct __http2_dataframe *dataframe = &(stack->http2_dataframe);
+	struct __socket_data *send_buffer = &(stack->send_buffer);
+
+	__u32 count = 8 + len;
+	send_buffer->syscall_len = count;
+	send_buffer->data_len = count;
+
+	dataframe->stream_id = stream_id;
+	dataframe->data_len = len;
+
+#if 0
+	// FIXME: verification failed
+	if (len > 0 && len < HTTP2_DATAFRAME_DATA_SIZE) {
+		bpf_probe_read(dataframe->data, len, buffer);
+	}
+#endif
+	return 0;
+}
+
 // grpc dataframe
 // func (fr *Framer) checkFrameOrder(f Frame) error
 SEC("uprobe/golang_org_x_net_http2_Framer_checkFrameOrder")
 static int
 uprobe_golang_org_x_net_http2_Framer_checkFrameOrder(struct pt_regs *ctx)
 {
-	__u64 id = bpf_get_current_pid_tgid();
-	pid_t pid = id >> 32;
+	__u64 pid_tgid = bpf_get_current_pid_tgid();
+	pid_t tgid = pid_tgid >> 32;
 
-	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &pid);
+	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &tgid);
 	if (skip_http2_uprobe(info)) {
 		return 0;
 	}
@@ -931,8 +1070,8 @@ uprobe_golang_org_x_net_http2_Framer_checkFrameOrder(struct pt_regs *ctx)
 		return 0;
 	}
 
-	__u32 StreamID;
-	bpf_probe_read_user(&StreamID, sizeof(StreamID),
+	__u32 stream_id;
+	bpf_probe_read_user(&stream_id, sizeof(stream_id),
 			    (void *)Frame.ptr + DataFrame_StreamID_offset);
 
 	struct go_slice data;
@@ -941,8 +1080,23 @@ uprobe_golang_org_x_net_http2_Framer_checkFrameOrder(struct pt_regs *ctx)
 
 	int fd = get_fd_from_grpc_http2_Framer_ctx(ctx, info);
 
-	bpf_debug("grpc dataframe read: fd=%d StreamID=%d size=%d", fd,
-		  StreamID, data.len);
+	struct __http2_stack *stack = get_http2_stack();
+	if (!stack) {
+		return 0;
+	}
+
+	if (fill_http2_dataframe_base(stack, fd, pid_tgid, T_INGRESS)) {
+		return 0;
+	}
+
+	if (fill_http2_dataframe_data(stack, data.ptr, data.len, stream_id)) {
+		return 0;
+	}
+
+	report_http2_dataframe(ctx);
+
+	bpf_debug("grpc dataframe read: fd=%d stream_id=%d size=%d", fd,
+		  stream_id, data.len);
 
 	return 0;
 }
@@ -952,23 +1106,37 @@ SEC("uprobe/golang_org_x_net_http2_Framer_WriteDataPadded")
 static int
 uprobe_golang_org_x_net_http2_Framer_WriteDataPadded(struct pt_regs *ctx)
 {
-	__u64 id = bpf_get_current_pid_tgid();
-	pid_t pid = id >> 32;
+	__u64 pid_tgid = bpf_get_current_pid_tgid();
+	pid_t tgid = pid_tgid >> 32;
 
-	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &pid);
+	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &tgid);
 	if (skip_http2_uprobe(info)) {
 		return 0;
 	}
 
-	__u32 streamID = (__u32)PT_GO_REGS_PARM2(ctx);
+	__u32 stream_id = (__u32)PT_GO_REGS_PARM2(ctx);
 	struct go_slice data = { .ptr = (void *)PT_GO_REGS_PARM4(ctx),
 				 .len = PT_GO_REGS_PARM5(ctx),
 				 .cap = PT_GO_REGS_PARM6(ctx) };
 
 	int fd = get_fd_from_grpc_http2_Framer_ctx(ctx, info);
 
-	bpf_debug("grpc dataframe write: fd=%d streamID=%d size=%d", fd,
-		  streamID, data.len);
+	struct __http2_stack *stack = get_http2_stack();
+	if (!stack) {
+		return 0;
+	}
+
+	if (fill_http2_dataframe_base(stack, fd, pid_tgid, T_EGRESS)) {
+		return 0;
+	}
+
+	if (fill_http2_dataframe_data(stack, data.ptr, data.len, stream_id)) {
+		return 0;
+	}
+
+	report_http2_dataframe(ctx);
+	bpf_debug("grpc dataframe write: fd=%d stream_id=%d size=%d", fd,
+		  stream_id, data.len);
 
 	return 0;
 }

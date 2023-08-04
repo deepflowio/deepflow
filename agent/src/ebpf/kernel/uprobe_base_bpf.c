@@ -117,10 +117,14 @@ struct __http2_buffer {
 	char info[HTTP2_BUFFER_INFO_SIZE + HTTP2_BUFFER_UESLESS];
 };
 
+// The first 8 bytes are fixed headers,
+// and the total reported buffer does not exceed 1k
+#define HTTP2_DATAFRAME_DATA_SIZE (CAP_DATA_SIZE - 8)
+
 struct __http2_dataframe {
 	__u32 stream_id;
 	__u32 data_len;
-	char data[HTTP2_BUFFER_INFO_SIZE];
+	char data[HTTP2_DATAFRAME_DATA_SIZE + HTTP2_BUFFER_UESLESS];
 };
 
 #define SOCKET_DATA_HEADER offsetof(typeof(struct __socket_data), data)
