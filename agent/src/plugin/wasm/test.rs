@@ -79,7 +79,7 @@ fn get_req_param<'a>(
         so_plugin_counter_map: None,
         stats_counter: None,
         rrt_timeout: Duration::from_secs(10).as_micros() as usize,
-        buf_size: 0,
+        buf_size: 999,
     }
 }
 
@@ -116,7 +116,7 @@ fn get_resq_param<'a>(
         so_plugin_counter_map: None,
         stats_counter: None,
         rrt_timeout: Duration::from_secs(10).as_micros() as usize,
-        buf_size: 0,
+        buf_size: 999,
     }
 }
 
@@ -311,6 +311,9 @@ fn test_wasm_parse_payload_req() {
 
         assert_eq!(attr2.key.as_str(), "k2");
         assert_eq!(attr2.val.as_str(), "v2");
+
+        assert_eq!(ci.need_protocol_merge, true);
+        assert_eq!(ci.is_req_end, true);
     } else {
         unreachable!()
     }
@@ -341,6 +344,9 @@ fn test_wasm_parse_payload_req() {
 
         assert_eq!(attr2.key.as_str(), "k4");
         assert_eq!(attr2.val.as_str(), "v4");
+
+        assert_eq!(ci.need_protocol_merge, true);
+        assert_eq!(ci.is_req_end, true);
     } else {
         unreachable!()
     }
@@ -466,6 +472,8 @@ func checkReqCtx(baseCtx *sdk.ParseCtx) {
     sdk.Error("ebpf type: %v", baseCtx.EbpfType)
     sdk.Error("proc name: %v", baseCtx.ProcName)
     sdk.Error("time: %v", baseCtx.Time)
+    sdk.Error("flowid: %v", baseCtx.FlowID)
+    sdk.Error("buf_size: %v", baseCtx.BufSize)
     sdk.Error("payload: %v ", payload)
 
     checkEq("1.2.3.4", baseCtx.SrcIP.IP.String())
@@ -477,6 +485,8 @@ func checkReqCtx(baseCtx *sdk.ParseCtx) {
     checkEq(sdk.EbpfTypeTracePoint, baseCtx.EbpfType)
     checkEq("test_wasm", baseCtx.ProcName)
     checkEq(uint64(12345678), baseCtx.Time)
+    checkEq(uint64(1234567), baseCtx.FlowID)
+    checkEq(uint16(999), baseCtx.BufSize)
 }
 
 func checkRespCtx(baseCtx *sdk.ParseCtx) {
@@ -489,6 +499,8 @@ func checkRespCtx(baseCtx *sdk.ParseCtx) {
     sdk.Error("dir: %v", baseCtx.Direction)
     sdk.Error("ebpf type: %v", baseCtx.EbpfType)
     sdk.Error("time: %v", baseCtx.Time)
+    sdk.Error("flowid: %v", baseCtx.FlowID)
+    sdk.Error("buf_size: %v", baseCtx.BufSize)
     sdk.Error("p: %v ", payload)
 
     checkEq("5.6.7.8", baseCtx.SrcIP.IP.String())
@@ -500,6 +512,8 @@ func checkRespCtx(baseCtx *sdk.ParseCtx) {
     checkEq(sdk.EbpfTypeTracePoint, baseCtx.EbpfType)
     checkEq("test_wasm", baseCtx.ProcName)
     checkEq(uint64(12345678), baseCtx.Time)
+    checkEq(uint64(1234567), baseCtx.FlowID)
+    checkEq(uint16(999), baseCtx.BufSize)
 }
 
 type parser struct {
@@ -703,6 +717,8 @@ func (p parser) OnParsePayload(baseCtx *sdk.ParseCtx) sdk.ParseAction {
                         Val: "v2",
                     },
                 },
+                ProtocolMerge: true,
+                IsEnd:         true,
             },
             {
                 ReqLen:    &reqLen,
@@ -725,6 +741,8 @@ func (p parser) OnParsePayload(baseCtx *sdk.ParseCtx) sdk.ParseAction {
                         Val: "v4",
                     },
                 },
+                ProtocolMerge: true,
+                IsEnd:         true,
             },
         })
 
@@ -765,6 +783,8 @@ func (p parser) OnParsePayload(baseCtx *sdk.ParseCtx) sdk.ParseAction {
                         Val: "v2",
                     },
                 },
+                ProtocolMerge: true,
+                IsEnd:         true,
             },
             {
                 ReqLen:    &reqLen,
@@ -787,6 +807,8 @@ func (p parser) OnParsePayload(baseCtx *sdk.ParseCtx) sdk.ParseAction {
                         Val: "v4",
                     },
                 },
+                ProtocolMerge: true,
+                IsEnd:         true,
             },
         })
     default:
