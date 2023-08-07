@@ -1019,7 +1019,7 @@ static __inline int fill_http2_dataframe_base(struct __http2_stack *stack,
 }
 
 static __inline int fill_http2_dataframe_data(struct __http2_stack *stack,
-					      void *buffer, __u32 len,
+					      void *buffer, __u64 len,
 					      __u32 stream_id)
 {
 	struct __http2_dataframe *dataframe = &(stack->http2_dataframe);
@@ -1032,12 +1032,13 @@ static __inline int fill_http2_dataframe_data(struct __http2_stack *stack,
 	dataframe->stream_id = stream_id;
 	dataframe->data_len = len;
 
-#if 0
-	// FIXME: verification failed
-	if (len > 0 && len < HTTP2_DATAFRAME_DATA_SIZE) {
+	if (len < HTTP2_DATAFRAME_DATA_SIZE) {
 		bpf_probe_read(dataframe->data, len, buffer);
+	} else {
+		bpf_probe_read(dataframe->data, HTTP2_DATAFRAME_DATA_SIZE,
+			       buffer);
 	}
-#endif
+
 	return 0;
 }
 
