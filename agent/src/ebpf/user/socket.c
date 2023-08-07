@@ -15,6 +15,7 @@
  */
 
 #define _GNU_SOURCE
+#include <ctype.h>
 #include <arpa/inet.h>
 #include <sched.h>
 #include <sys/prctl.h>
@@ -2106,6 +2107,32 @@ void print_io_event_info(const char *data, int len)
 	return;
 }
 
+void print_uprobe_grpc_dataframe(const char *data, int len)
+{
+	int i;
+	struct {
+		__u32 stream_id;
+		__u32 data_len;
+		char data[1024];
+	} __attribute__((packed)) dataframe;
+
+	memcpy(&dataframe, data, len);
+	
+	fprintf(datadump_file, "stream_id=[%d]\n", dataframe.stream_id);
+	fprintf(datadump_file, "data_len=[%d]\n", dataframe.data_len);
+
+	for (i = 0; i < dataframe.data_len; ++i) {
+		if (!isprint(dataframe.data[i])) {
+			dataframe.data[i] = '.';
+		}
+	}
+	dataframe.data[dataframe.data_len] = '\0';
+
+	fprintf(datadump_file, "data=[%s]\n", dataframe.data);
+	fflush(datadump_file);
+	return;
+}
+
 void print_dns_info(const char *data, int len)
 {
 	//refer: https://www.binarytides.com/dns-query-code-in-c-with-winsock/
@@ -2421,6 +2448,8 @@ static void print_socket_data(struct socket_bpf_data *sd)
 			print_uprobe_http2_info(sd->cap_data, sd->cap_len);
 		} else if (sd->source == 4) {
 			print_io_event_info(sd->cap_data, sd->cap_len);
+		} else if (sd->source == 5) {
+			print_uprobe_grpc_dataframe(sd->cap_data, sd->cap_len);
 		} else {
 			int i, len = 0, __len;
 			char output_buf[OUTPUT_DATA_SIZE];
