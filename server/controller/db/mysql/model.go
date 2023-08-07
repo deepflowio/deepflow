@@ -1181,28 +1181,6 @@ type KubernetesCluster struct {
 	UpdatedTime time.Time `gorm:"column:updated_time;type:datetime" json:"UPDATED_TIME"`
 }
 
-type GoGenesisVInterface struct {
-	ID                  int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Lcuuid              string    `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
-	Name                string    `gorm:"column:name;type:char(64);default:null" json:"NAME"`
-	MAC                 string    `gorm:"column:mac;type:char(32);default:null" json:"MAC"`
-	IPS                 string    `gorm:"column:ips;type:text" json:"IPS"`
-	TapName             string    `gorm:"column:tap_name;type:char(64);default:null" json:"TAP_NAME"`
-	TapMAC              string    `gorm:"column:tap_mac;type:char(32);default:null" json:"TAP_MAC"`
-	DeviceLcuuid        string    `gorm:"column:device_lcuuid;type:char(64);default:null" json:"DEVICE_LCUUID"`
-	DeviceName          string    `gorm:"column:device_name;type:char(512);default:null" json:"DEVICE_NAME"`
-	DeviceType          string    `gorm:"column:device_type;type:char(64);default:null" json:"DEVICE_TYPE"`
-	HostIP              string    `gorm:"column:host_ip;type:char(48);default:null" json:"HOST_IP"`
-	NodeIP              string    `gorm:"column:node_ip;type:char(48);default:null" json:"NODE_IP"`
-	VTapID              int       `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
-	LastSeen            time.Time `gorm:"column:last_seen;type:datetime;default:NULL" json:"LAST_SEEN"`
-	KubernetesClusterID string    `gorm:"column:kubernetes_cluster_id;type:char(64);default:null" json:"KUBERNETES_CLUSTER_ID"`
-}
-
-func (GoGenesisVInterface) TableName() string {
-	return "go_genesis_vinterface"
-}
-
 type ACL struct {
 	ID           int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	BusinessID   int       `gorm:"column:business_id;type:int;not null" json:"BUSINESS_ID"`
