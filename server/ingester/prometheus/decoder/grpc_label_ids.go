@@ -94,7 +94,7 @@ type RequestCounter struct {
 	RequestLabelsCount  int64  `statsd:"request-labels-count"`
 	ResponseLabelsCount int64  `statsd:"response-labels-count"`
 	MetricUnknown       uint64 `statsd:"metric-unknown"`
-	TargetUnknown       uint64 `statsd:"target-unknown"`
+	TargetIdZero        uint64 `statsd:"target-id-zero"`
 	LabelNameUnknown    uint64 `statsd:"label-name-unknown"`
 	LabelValueUnknown   uint64 `statsd:"label-value-unknown"`
 }
@@ -187,19 +187,16 @@ func (t *PrometheusLabelTable) updatePrometheusLabels(resp *trident.PrometheusLa
 	for _, target := range resp.GetResponseTargetIds() {
 		targetId := target.GetTargetId()
 		if targetId == 0 {
-			if t.counter.TargetUnknown == 0 {
-				log.Warningf("prometheus label response target invalid: %s", target)
+			if t.counter.TargetIdZero == 0 {
+				log.Infof("prometheus label response target id 0: %s", target)
 			}
-			t.counter.TargetUnknown++
-			continue
+			t.counter.TargetIdZero++
 		}
 		jobId := target.GetJobId()
 		instanceId := target.GetInstanceId()
-		if jobId > 0 || instanceId > 0 {
-			t.labelValueIDs.Set(strings.Clone(target.GetJob()), jobId)
-			t.labelValueIDs.Set(strings.Clone(target.GetInstance()), instanceId)
-			t.targetIDs.Set(targetIdKey(jobId, instanceId), targetId)
-		}
+		t.labelValueIDs.Set(strings.Clone(target.GetJob()), jobId)
+		t.labelValueIDs.Set(strings.Clone(target.GetInstance()), instanceId)
+		t.targetIDs.Set(targetIdKey(jobId, instanceId), targetId)
 		for _, metricId := range target.GetMetricIds() {
 			t.metricTargetPair.Set(metricTargetPairKey(metricId, targetId), struct{}{})
 		}
@@ -242,10 +239,10 @@ func (t *PrometheusLabelTable) updatePrometheusLabels(resp *trident.PrometheusLa
 
 		targetId, ok := t.targetIDs.Get(targetIdKey(jobId, instanceId))
 		if !ok {
-			if t.counter.TargetUnknown == 0 {
+			if t.counter.TargetIdZero == 0 {
 				log.Warningf("prometheus label response label target invalid: jobId: %d, instanceId: %d, metric: %s", jobId, instanceId, metric)
 			}
-			t.counter.TargetUnknown++
+			t.counter.TargetIdZero++
 			continue
 		}
 		if _, ok := t.metricTargetPair.Get(metricTargetPairKey(metricId, targetId)); !ok {

@@ -300,7 +300,7 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID uint16, ts *prompb.T
 	b.labelColumnIndexsBuffer = b.labelColumnIndexsBuffer[:0]
 	b.appLabelValueIDsBuffer = b.appLabelValueIDsBuffer[:0]
 
-	metricName, podName, instance, job := "", "", "", ""
+	metricName, podName, instance := "", "", ""
 	var metricID, maxColumnIndex, podNameID, jobID, instanceID uint32
 	var ok bool
 
@@ -343,6 +343,7 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID uint16, ts *prompb.T
 			return true, nil
 		}
 
+		// the Controller needs to get all the Value lists contained in the Name for filtering when querying
 		if !b.labelTable.QueryLabelNameValue(nameID, valueID) {
 			b.counter.NameValueMiss++
 			return true, nil
@@ -355,7 +356,6 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID uint16, ts *prompb.T
 
 		var columnIndex uint32
 		if jobID == 0 && l.Name == model.JobLabel {
-			job = l.Value
 			jobID = valueID
 		} else if instanceID == 0 && l.Name == model.InstanceLabel {
 			instance = l.Value
@@ -376,9 +376,9 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID uint16, ts *prompb.T
 		}
 	}
 
-	if metricName == "" || (job == "" && instance == "") {
+	if metricName == "" {
 		b.counter.TimeSeriesInvaild++
-		return false, fmt.Errorf("prometheum metric name(%s) or job(%s) and instance(%s) is empty", metricName, job, instance)
+		return false, fmt.Errorf("prometheum metric name(%s) is empty", metricName)
 	}
 
 	targetID, ok := b.labelTable.QueryTargetID(jobID, instanceID)
