@@ -83,6 +83,7 @@ impl LocalModeDispatcher {
             let config = Config {
                 flow: &base.flow_map_config.load(),
                 log_parser: &base.log_parse_config.load(),
+                collector: &base.collector_config.load(),
                 #[cfg(target_os = "linux")]
                 ebpf: None,
             };

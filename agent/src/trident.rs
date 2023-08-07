@@ -1868,6 +1868,7 @@ impl AgentComponents {
                 .stats_collector(stats_collector.clone())
                 .flow_map_config(config_handler.flow())
                 .log_parse_config(config_handler.log_parser())
+                .collector_config(config_handler.collector())
                 .policy_getter(policy_getter)
                 .exception_handler(exception_handler.clone())
                 .ntp_diff(synchronizer.ntp_diff())
@@ -2031,6 +2032,7 @@ impl AgentComponents {
                 config_handler.ebpf(),
                 config_handler.log_parser(),
                 config_handler.flow(),
+                config_handler.collector(),
                 policy_getter,
                 log_sender,
                 flow_sender,

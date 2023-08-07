@@ -32,7 +32,7 @@ use crate::common::l7_protocol_log::{
 use crate::common::meta_packet::MetaPacket;
 use crate::common::proc_event::{BoxedProcEvents, EventType, ProcEvent};
 use crate::common::TaggedFlow;
-use crate::config::handler::{EbpfAccess, EbpfConfig, LogParserAccess};
+use crate::config::handler::{CollectorAccess, EbpfAccess, EbpfConfig, LogParserAccess};
 use crate::config::FlowAccess;
 use crate::ebpf::{
     self, set_allow_port_bitmap, set_bypass_port_bitmap, set_profiler_cpu_aggregation,
@@ -194,6 +194,7 @@ struct EbpfDispatcher {
     // GRPC配置
     log_parser_config: LogParserAccess,
     flow_map_config: FlowAccess,
+    collector_config: CollectorAccess,
 
     config: EbpfAccess,
     output: DebugSender<Box<MetaAppProto>>, // Send MetaAppProtos to the AppProtoLogsParser
@@ -223,6 +224,7 @@ impl EbpfDispatcher {
             let config = Config {
                 flow: &self.flow_map_config.load(),
                 log_parser: &self.log_parser_config.load(),
+                collector: &self.collector_config.load(),
                 ebpf: Some(&ebpf_config),
             };
 
@@ -578,6 +580,7 @@ impl EbpfCollector {
         config: EbpfAccess,
         log_parser_config: LogParserAccess,
         flow_map_config: FlowAccess,
+        collector_config: CollectorAccess,
         policy_getter: PolicyGetter,
         output: DebugSender<Box<MetaAppProto>>,
         flow_output: DebugSender<BatchedBox<TaggedFlow>>,
@@ -619,6 +622,7 @@ impl EbpfCollector {
                 flow_output,
                 flow_map_config,
                 stats_collector,
+                collector_config,
             },
             thread_handle: None,
             counter: EbpfCounter { rx: 0 },

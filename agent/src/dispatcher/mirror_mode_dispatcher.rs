@@ -391,6 +391,7 @@ impl MirrorModeDispatcher {
             let config = Config {
                 flow: &self.base.flow_map_config.load(),
                 log_parser: &self.base.log_parse_config.load(),
+                collector: &self.base.collector_config.load(),
                 #[cfg(target_os = "linux")]
                 ebpf: None,
             };
