@@ -44,7 +44,7 @@ type Profiler struct {
 
 func NewProfile(config *config.Config, recv *receiver.Receiver, platformDataManager *grpc.PlatformDataManager) (*Profile, error) {
 	manager := dropletqueue.NewManager(ingesterctl.INGESTERCTL_EXTMETRICS_QUEUE)
-	profileWriter, err := dbwriter.NewProfileWriter(datatype.MESSAGE_TYPE_PROFILE, config)
+	profileWriter, err := dbwriter.NewProfileWriter(datatype.MESSAGE_TYPE_PROFILE, 0, config)
 	if err != nil {
 		return nil, err
 	}
