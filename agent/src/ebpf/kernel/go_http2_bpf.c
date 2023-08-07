@@ -1054,7 +1054,10 @@ static __inline int fill_http2_dataframe_data(struct __http2_stack *stack,
 	dataframe->data_len = len;
 
 	if (len < HTTP2_DATAFRAME_DATA_SIZE) {
-		bpf_probe_read(dataframe->data, len, buffer);
+		// Make old eBPF validator happy
+		if (len > 0) {
+			bpf_probe_read(dataframe->data, len + 1, buffer);
+		}
 	} else {
 		bpf_probe_read(dataframe->data, HTTP2_DATAFRAME_DATA_SIZE,
 			       buffer);
@@ -1116,10 +1119,6 @@ uprobe_golang_org_x_net_http2_Framer_checkFrameOrder(struct pt_regs *ctx)
 	}
 
 	report_http2_dataframe(ctx);
-
-	bpf_debug("grpc dataframe read: fd=%d stream_id=%d size=%d", fd,
-		  stream_id, data.len);
-
 	return 0;
 }
 
@@ -1157,8 +1156,5 @@ uprobe_golang_org_x_net_http2_Framer_WriteDataPadded(struct pt_regs *ctx)
 	}
 
 	report_http2_dataframe(ctx);
-	bpf_debug("grpc dataframe write: fd=%d stream_id=%d size=%d", fd,
-		  stream_id, data.len);
-
 	return 0;
 }
