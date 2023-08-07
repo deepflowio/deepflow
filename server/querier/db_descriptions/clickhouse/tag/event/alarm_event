@@ -2,12 +2,14 @@
 time_str                   , time_str                  , time_str                  , time           ,                       , Timestamp       , 111
 time                       , time                      , time                      , time           ,                       , Flow Info       , 111
 
+region                     , region                    , region                    , resource       ,                       , Universal Tag   , 110
+
 lccuid                     , lccuid                    , lccuid                    , string         ,                       , Alarm Info      , 111
 user                       , user                      , user                      , string         ,                       , Alarm Info      , 111
 policy_id                  , policy_id                 , policy_id                 , int            ,                       , Alarm Info      , 111
 policy_name                , policy_name               , policy_name               , string         ,                       , Alarm Info      , 111
-policy_level               , policy_level              , policy_level              , int            ,                       , Alarm Info      , 111
-policy_app_type            , policy_app_type           , policy_app_type           , int            ,                       , Alarm Info      , 111
+policy_level               , policy_level              , policy_level              , int_enum       , policy_level          , Alarm Info      , 111
+policy_app_type            , policy_app_type           , policy_app_type           , int_enum       , policy_app_type       , Alarm Info      , 111
 policy_sub_type            , policy_sub_type           , policy_sub_type           , int            ,                       , Alarm Info      , 111
 policy_contrast_type       , policy_contrast_type      , policy_contrast_type      , int            ,                       , Alarm Info      , 111
 policy_data_level          , policy_data_level         , policy_data_level         , string         ,                       , Alarm Info      , 111

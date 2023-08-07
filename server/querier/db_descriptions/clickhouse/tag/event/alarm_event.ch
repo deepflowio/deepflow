@@ -1,6 +1,8 @@
 # Name                     , DisplayName                , Description
-time_str                   , 时间                       ,
-time                       , 时间                       , 将 end_time 取整到秒。
+time_str                   , 触发时间                    ,
+time                       , 触发时间                    , 将 end_time 取整到秒。
+
+region                     , 区域                       ,
 
 lccuid                     , lccuid                     ,
 user                       , user                       ,
