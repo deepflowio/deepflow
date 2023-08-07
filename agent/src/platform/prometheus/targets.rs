@@ -70,7 +70,6 @@ struct Context {
     runtime: Arc<Runtime>,
     version: AtomicU64,
     client: Arc<reqwest::Client>,
-    stats_counter: Arc<TargetsCounter>,
 }
 
 pub struct TargetsWatcher {
@@ -103,7 +102,6 @@ impl TargetsWatcher {
                 ),
                 runtime,
                 client: Arc::new(reqwest::Client::new()),
-                stats_counter: Default::default(),
             }),
             thread: Mutex::new(None),
             session,
@@ -116,7 +114,7 @@ impl TargetsWatcher {
 
     pub fn stop(&self) {
         if !self.running.swap(false, Ordering::Relaxed) {
-            info!("prometheus watcher  has already stopped");
+            info!("prometheus watcher has already stopped");
             return;
         }
 
@@ -149,9 +147,10 @@ impl TargetsWatcher {
             return;
         }
         let mut context = self.context.clone();
+        let counter = Arc::new(TargetsCounter::default());
         self.stats_collector.register_countable(
             "prometheus_targets_watcher",
-            Countable::Ref(Arc::downgrade(&context.stats_counter) as Weak<dyn RefCountable>),
+            Countable::Ref(Arc::downgrade(&counter) as Weak<dyn RefCountable>),
             vec![StatsOption::Tag("kind", API_TARGETS_ENDPOINT.to_string())],
         );
         let session = self.session.clone();
@@ -168,6 +167,7 @@ impl TargetsWatcher {
                 while running.load(Ordering::Relaxed) {
                     Self::process(
                         &mut context,
+                        &mut counter.clone(),
                         &session,
                         &exception_handler,
                         &mut encoder,
@@ -187,6 +187,7 @@ impl TargetsWatcher {
 
     fn process(
         context: &mut Arc<Context>,
+        counter: &mut Arc<TargetsCounter>,
         session: &Arc<Session>,
         exception_handler: &ExceptionHandler,
         encoder: &mut ZlibEncoder<Vec<u8>>,
@@ -205,8 +206,7 @@ impl TargetsWatcher {
                         Ok(body) => {
                             match compress_entry(encoder, body.trim().as_bytes()) {
                                 Ok(data) => {
-                                    context
-                                        .stats_counter
+                                    counter
                                         .compressed_length
                                         .fetch_add(data.len() as u32, Ordering::Relaxed);
                                     let entry = PrometheusApiInfo {
