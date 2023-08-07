@@ -40,6 +40,7 @@ type Issu struct {
 	columnRenames      []*ColumnRename
 	columnMods         []*ColumnMod
 	columnAdds         []*ColumnAdd
+	columnDrops        []*ColumnDrop
 	datasourceInfo     map[string]*DatasourceInfo
 	Connections        common.DBs
 	Addrs              []string
@@ -98,6 +99,18 @@ type ColumnAdds struct {
 	ColumnNames  []string
 	ColumnType   ckdb.ColumnType
 	DefaultValue string
+}
+
+type ColumnDrop struct {
+	Db         string
+	Table      string
+	ColumnName string
+}
+
+type ColumnDrops struct {
+	Dbs         []string
+	Tables      []string
+	ColumnNames []string
 }
 
 var TableRenames611 = []*TableRename{
@@ -890,6 +903,35 @@ var ColumnAdd633 = []*ColumnAdds{
 	},
 }
 
+var ColumnAdd635 = []*ColumnAdds{
+	&ColumnAdds{
+		Dbs:         []string{"profile"},
+		Tables:      []string{"in_process", "in_process_local"},
+		ColumnNames: []string{"compression_algo"},
+		ColumnType:  ckdb.LowCardinalityString,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"profile"},
+		Tables:      []string{"in_process", "in_process_local"},
+		ColumnNames: []string{"process_id"},
+		ColumnType:  ckdb.UInt32,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"profile"},
+		Tables:      []string{"in_process", "in_process_local"},
+		ColumnNames: []string{"process_start_time"},
+		ColumnType:  ckdb.DateTime64,
+	},
+}
+
+var ColumnDrops635 = []*ColumnDrops{
+	&ColumnDrops{
+		Dbs:         []string{"profile"},
+		Tables:      []string{"in_process", "in_process_local"},
+		ColumnNames: []string{"profile_node_id", "profile_parent_node_id"},
+	},
+}
+
 func getTables(connect *sql.DB, db, tableName string) ([]string, error) {
 	sql := fmt.Sprintf("SHOW TABLES IN %s", db)
 	rows, err := connect.Query(sql)
@@ -1260,7 +1302,7 @@ func NewCKIssu(cfg *config.Config) (*Issu, error) {
 		datasourceInfo: make(map[string]*DatasourceInfo),
 	}
 
-	allVersionAdds := [][]*ColumnAdds{ColumnAdd610, ColumnAdd611, ColumnAdd612, ColumnAdd613, ColumnAdd615, ColumnAdd618, ColumnAdd620, ColumnAdd623, ColumnAdd625, ColumnAdd626, ColumnAdd633}
+	allVersionAdds := [][]*ColumnAdds{ColumnAdd610, ColumnAdd611, ColumnAdd612, ColumnAdd613, ColumnAdd615, ColumnAdd618, ColumnAdd620, ColumnAdd623, ColumnAdd625, ColumnAdd626, ColumnAdd633, ColumnAdd635}
 	i.columnAdds = []*ColumnAdd{}
 	for _, versionAdd := range allVersionAdds {
 		for _, adds := range versionAdd {
@@ -1274,6 +1316,10 @@ func NewCKIssu(cfg *config.Config) (*Issu, error) {
 
 	for _, v := range [][]*ColumnRename{ColumnRename618, ColumnRename620, getColumnRenames(ColumnRename623), getColumnRenames(ColumnRenames626)} {
 		i.columnRenames = append(i.columnRenames, v...)
+	}
+
+	for _, v := range [][]*ColumnDrop{getColumnDrops(ColumnDrops635)} {
+		i.columnDrops = append(i.columnDrops, v...)
 	}
 
 	var err error
@@ -1506,6 +1552,57 @@ func (i *Issu) modColumn(connect *sql.DB, cm *ColumnMod) error {
 	return nil
 }
 
+func (i *Issu) dropColumn(connect *sql.DB, cm *ColumnDrop) error {
+	// drop index first
+	sql := fmt.Sprintf("ALTER TABLE %s.`%s` DROP INDEX %s_idx", cm.Db, cm.Table, cm.ColumnName)
+	log.Info("drop index: ", sql)
+	_, err := connect.Exec(sql)
+	if err != nil {
+		if strings.Contains(err.Error(), "Cannot find index") {
+			log.Infof("db: %s, table: %s error: %s", cm.Db, cm.Table, err)
+		} else if strings.Contains(err.Error(), "'DROP_INDEX' is not supported by storage Distributed") {
+			log.Infof("db: %s, table: %s info: %s", cm.Db, cm.Table, err)
+		} else {
+			log.Error(err)
+			return err
+		}
+	}
+
+	// then drop column
+	sql = fmt.Sprintf("ALTER TABLE %s.`%s` DROP COLUMN %s", cm.Db, cm.Table, cm.ColumnName)
+	log.Info("drop column: ", sql)
+	_, err = connect.Exec(sql)
+	if err != nil {
+		//If cannot find column, you need to skip the error
+		// Code: 10. DB::Exception: Received from localhost:9000. DB::Exception: Wrong column name. Cannot find column `span_kind` to modify.
+		if strings.Contains(err.Error(), "Cannot find column") {
+			log.Infof("db: %s, table: %s error: %s", cm.Db, cm.Table, err)
+			return nil
+		}
+		log.Error(err)
+		return err
+	}
+	return nil
+}
+
+func getColumnDrops(columnDrops []*ColumnDrops) []*ColumnDrop {
+	drops := []*ColumnDrop{}
+	for _, columnDrop := range columnDrops {
+		for _, d := range columnDrop.Dbs {
+			for _, table := range columnDrop.Tables {
+				for _, name := range columnDrop.ColumnNames {
+					drops = append(drops, &ColumnDrop{
+						Db:         d,
+						Table:      table,
+						ColumnName: name,
+					})
+				}
+			}
+		}
+	}
+	return drops
+}
+
 func (i *Issu) getTableVersion(connect *sql.DB, db, table string) (string, error) {
 	sql := fmt.Sprintf("SELECT comment FROM system.columns WHERE database='%s' AND table='%s' AND name='time'",
 		db, table)
@@ -1600,6 +1697,24 @@ func (i *Issu) modColumns(connect *sql.DB) ([]*ColumnMod, error) {
 	return dones, nil
 }
 
+func (i *Issu) dropColumns(connect *sql.DB) ([]*ColumnDrop, error) {
+	dones := []*ColumnDrop{}
+	for _, dropColumn := range i.columnDrops {
+		version, err := i.getTableVersion(connect, dropColumn.Db, dropColumn.Table)
+		if err != nil {
+			return dones, err
+		}
+		if version == common.CK_VERSION {
+			continue
+		}
+		if err := i.dropColumn(connect, dropColumn); err != nil {
+			return dones, err
+		}
+		dones = append(dones, dropColumn)
+	}
+	return dones, nil
+}
+
 func getColumnAdds(columnAdds *ColumnAdds) []*ColumnAdd {
 	adds := []*ColumnAdd{}
 	for _, db := range columnAdds.Dbs {
@@ -1675,6 +1790,11 @@ func (i *Issu) Start() error {
 			return errAdds
 		}
 
+		drops, errDrops := i.dropColumns(connect)
+		if errDrops != nil {
+			return errDrops
+		}
+
 		for _, cr := range renames {
 			if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
 				return err
@@ -1686,6 +1806,11 @@ func (i *Issu) Start() error {
 			}
 		}
 		for _, cr := range adds {
+			if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
+				return err
+			}
+		}
+		for _, cr := range drops {
 			if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
 				return err
 			}

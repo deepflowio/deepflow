@@ -39,6 +39,7 @@ import (
 	"github.com/op/go-logging"
 	"github.com/pyroscope-io/pyroscope/pkg/convert/jfr"
 	"github.com/pyroscope-io/pyroscope/pkg/convert/pprof"
+	pprofile "github.com/pyroscope-io/pyroscope/pkg/convert/profile"
 	"github.com/pyroscope-io/pyroscope/pkg/ingestion"
 	"github.com/pyroscope-io/pyroscope/pkg/storage/metadata"
 	"github.com/pyroscope-io/pyroscope/pkg/storage/segment"
@@ -48,14 +49,18 @@ var log = logging.MustGetLogger("profile.decoder")
 
 const (
 	BUFFER_SIZE = 1024
-)
 
-var InProcessCounter uint32
+	UNICODE_NULL = "\x00"
+)
 
 type Counter struct {
 	RawCount           int64 `statsd:"raw-count"`
 	JavaProfileCount   int64 `statsd:"java-profile-count"`
 	GolangProfileCount int64 `statsd:"golang-profile-count"`
+	EBPFProfileCount   int64 `statsd:"EBPF-profile-count"`
+
+	UncompressSize int64 `statsd:"uncompress-size"`
+	CompressedSize int64 `statsd:"compressed-size"`
 
 	TotalTime int64 `statsd:"total-time"`
 	AvgTime   int64 `statsd:"avg-time"`
@@ -69,6 +74,13 @@ var spyMap = map[string]string{
 	"phpspy":    "PHP",
 	"dotnetspy": "dotnet",
 	"nodespy":   "Node",
+	"eBPF":      "eBPF",
+}
+
+var eBPFEventType = map[pb.ProfileEventType]string{
+	pb.ProfileEventType_External:   "third-party",
+	pb.ProfileEventType_EbpfOnCpu:  "on-cpu",
+	pb.ProfileEventType_EbpfOffCpu: "off-cpu",
 }
 
 type Decoder struct {
@@ -108,7 +120,7 @@ func (d *Decoder) GetCounter() interface{} {
 func (d *Decoder) Run() {
 	common.RegisterCountableForIngester("decoder", d, stats.OptionStatTags{
 		"thread":   strconv.Itoa(d.index),
-		"msg_type": d.msgType.String()})
+		"msg_type": datatype.MESSAGE_TYPE_PROFILE.String()})
 	buffer := make([]interface{}, BUFFER_SIZE)
 	decoder := &codec.SimpleDecoder{}
 	for {
@@ -138,7 +150,7 @@ func (d *Decoder) handleProfileData(vtapID uint16, decoder *codec.SimpleDecoder)
 	for !decoder.IsEnd() {
 		profile := &pb.Profile{}
 		decoder.ReadPB(profile)
-		if decoder.Failed() {
+		if decoder.Failed() || profile == nil {
 			log.Errorf("profile data decode failed, offset=%d len=%d", decoder.Offset(), len(decoder.Bytes()))
 			return
 		}
@@ -149,6 +161,8 @@ func (d *Decoder) handleProfileData(vtapID uint16, decoder *codec.SimpleDecoder)
 			callBack:     d.profileWriter.Write,
 			platformData: d.platformData,
 			IP:           make([]byte, len(profile.Ip)),
+			observer:     &observer{},
+			Counter:      d.counter,
 		}
 		copy(parser.IP, profile.Ip[:len(profile.Ip)])
 
@@ -195,6 +209,20 @@ func (d *Decoder) handleProfileData(vtapID uint16, decoder *codec.SimpleDecoder)
 					log.Errorf("decode golang profile data failed, offset=%d len=%d", decoder.Offset(), len(decoder.Bytes()))
 					return
 				}
+			} else {
+				atomic.AddInt64(&d.counter.EBPFProfileCount, 1)
+				profile = d.filleBPFData(profile)
+				metadata := d.buildMetaData(profile)
+				parser.profileName = metadata.Key.AppName()
+				parser.processTracer = &processTracer{value: profile.Count, pid: profile.Pid, stime: int64(profile.Stime), eventType: eBPFEventType[profile.EventType]}
+				err := d.sendProfileData(&pprofile.RawProfile{
+					Format:  ingestion.FormatLines,
+					RawData: profile.Data,
+				}, profile.Format, parser, metadata)
+				if err != nil {
+					log.Errorf("decode golang profile data failed, offset=%d len=%d", decoder.Offset(), len(decoder.Bytes()))
+					return
+				}
 			}
 		case "speedscope", "tree", "trie", "lines":
 			// not implemented
@@ -203,11 +231,25 @@ func (d *Decoder) handleProfileData(vtapID uint16, decoder *codec.SimpleDecoder)
 	}
 }
 
+func (d *Decoder) filleBPFData(profile *pb.Profile) *pb.Profile {
+	profile.From = uint32(profile.Timestamp / 1e9) // ns to s
+	profile.Until = uint32(time.Now().Unix())
+	profile.Units = string(metadata.SamplesUnits)
+	profile.AggregationType = string(metadata.SumAggregationType)
+	profile.SpyName = "eBPF"
+	return profile
+}
+
 func (d *Decoder) buildMetaData(profile *pb.Profile) ingestion.Metadata {
 	var profileName string
 	var err error
 	if profile.Name == "" {
-		profileName = fmt.Sprintf("%s-%s", "profile-empty-service", generateUUID())
+		if profile.ProcessName != "" {
+			// if profile comes from eBPF, use processName as profileName
+			profileName = strings.Trim(profile.ProcessName, UNICODE_NULL)
+		} else {
+			profileName = fmt.Sprintf("%s-%s", "profile-empty-service", generateUUID())
+		}
 	} else {
 		profileName, err = url.QueryUnescape(profile.Name)
 		if err != nil {
@@ -217,11 +259,12 @@ func (d *Decoder) buildMetaData(profile *pb.Profile) ingestion.Metadata {
 	}
 	labels, err := segment.ParseKey(profileName)
 	if err != nil {
-		// 如果无法识别应用名称，直接使用 profile.Name 作为 app_service
-		// if recognise application name failed, use profile.Name as app_service
-		labels = &segment.Key{}
+		// 如果无法识别应用名称，直接使用 profileName 作为 app_service
+		// if recognise application name failed, use profileName as app_service
+		labelKey := make(map[string]string, 1)
+		labels = segment.NewKey(labelKey)
 		labels.Add("__name__", profileName)
-		log.Warning("parse profile labels wrong, got %s", profileName)
+		log.Warningf("parse profile labels wrong, got %s", profileName)
 	}
 	return ingestion.Metadata{
 		StartTime:       time.Unix(int64(profile.From), 0),

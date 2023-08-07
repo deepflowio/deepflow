@@ -17,11 +17,17 @@
 package dbwriter
 
 import (
+	"strconv"
+	"sync/atomic"
+
+	"github.com/deepflowio/deepflow/server/ingester/common"
 	baseconfig "github.com/deepflowio/deepflow/server/ingester/config"
+	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowio/deepflow/server/ingester/pkg/ckwriter"
 	"github.com/deepflowio/deepflow/server/ingester/profile/config"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
+	"github.com/deepflowio/deepflow/server/libs/stats"
 	"github.com/deepflowio/deepflow/server/libs/utils"
 	logging "github.com/op/go-logging"
 )
@@ -39,8 +45,8 @@ type ClusterNode struct {
 }
 
 type Counter struct {
-	MetricsCount int64 `statsd:"metrics-count"`
-	WriteErr     int64 `statsd:"write-err"`
+	ProfilesCount int64 `statsd:"profiles-count"`
+	WriteErr      int64 `statsd:"write-err"`
 }
 
 type ProfileWriter struct {
@@ -55,16 +61,28 @@ type ProfileWriter struct {
 	writerConfig      baseconfig.CKWriterConfig
 	ckdbWatcher       *baseconfig.Watcher
 	ckWriter          *ckwriter.CKWriter
+	flowTagWriter     *flow_tag.FlowTagWriter
 
 	counter *Counter
 	utils.Closable
 }
 
+func (p *ProfileWriter) GetCounter() interface{} {
+	var counter *Counter
+	counter, p.counter = p.counter, &Counter{}
+	return counter
+}
+
 func (p *ProfileWriter) Write(m interface{}) {
+	inProcess := m.(*InProcessProfile)
+	inProcess.GenerateFlowTags(p.flowTagWriter.Cache)
+	p.flowTagWriter.WriteFieldsAndFieldValuesInCache()
+
+	atomic.AddInt64(&p.counter.ProfilesCount, 1)
 	p.ckWriter.Put(m)
 }
 
-func NewProfileWriter(msgType datatype.MessageType, config *config.Config) (*ProfileWriter, error) {
+func NewProfileWriter(msgType datatype.MessageType, decoderIndex int, config *config.Config) (*ProfileWriter, error) {
 	writer := &ProfileWriter{
 		msgType:           msgType,
 		ckdbAddrs:         config.Base.CKDB.ActualAddrs,
@@ -76,18 +94,40 @@ func NewProfileWriter(msgType datatype.MessageType, config *config.Config) (*Pro
 		ttl:               config.ProfileTTL,
 		ckdbWatcher:       config.Base.CKDB.Watcher,
 		writerConfig:      config.CKWriterConfig,
+		counter:           &Counter{},
 	}
 	table := GenProfileCKTable(writer.ckdbCluster, PROFILE_DB, PROFILE_TABLE, writer.ckdbStoragePolicy, writer.ttl, ckdb.GetColdStorage(writer.ckdbColdStorages, PROFILE_DB, PROFILE_TABLE))
 	ckwriter, err := ckwriter.NewCKWriter(
-		writer.ckdbAddrs, writer.ckdbUsername, writer.ckdbPassword,
-		PROFILE_TABLE, config.Base.CKDB.TimeZone, table,
-		writer.writerConfig.QueueCount, writer.writerConfig.QueueSize,
-		writer.writerConfig.BatchSize, writer.writerConfig.FlushTimeout)
+		writer.ckdbAddrs,
+		writer.ckdbUsername,
+		writer.ckdbPassword,
+		PROFILE_TABLE,
+		config.Base.CKDB.TimeZone,
+		table,
+		writer.writerConfig.QueueCount,
+		writer.writerConfig.QueueSize,
+		writer.writerConfig.BatchSize,
+		writer.writerConfig.FlushTimeout)
 	if err != nil {
 		log.Error(err)
 		return nil, err
 	}
+
+	flowTagWriterConfig := baseconfig.CKWriterConfig{
+		QueueCount:   1,
+		QueueSize:    config.CKWriterConfig.QueueSize,
+		BatchSize:    config.CKWriterConfig.BatchSize,
+		FlushTimeout: config.CKWriterConfig.FlushTimeout,
+	}
+	flowTagWriter, err := flow_tag.NewFlowTagWriter(decoderIndex, msgType.String(), PROFILE_DB, writer.ttl, DefaultPartition, config.Base, &flowTagWriterConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	writer.ckWriter = ckwriter
+	writer.flowTagWriter = flowTagWriter
+
+	common.RegisterCountableForIngester("profile_writer", writer, stats.OptionStatTags{"msg": msgType.String(), "decoder_index": strconv.Itoa(decoderIndex)})
 	writer.ckWriter.Run()
 	return writer, nil
 }
