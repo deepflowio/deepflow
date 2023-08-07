@@ -146,7 +146,7 @@ func (e *Event) Start() {
 }
 
 func (e *Event) Close() error {
-	e.ResourceEventor.Start()
+	e.ResourceEventor.Close()
 	e.PerfEventor.Close()
 	return nil
 }

@@ -318,6 +318,11 @@ impl Default for BpfOptions {
 
 #[cfg(target_os = "linux")]
 impl BpfOptions {
+    // When using the default BPF filtering rules, it can support collecting traffic
+    // from up to 254 network ports simultaneously.
+    #[cfg(target_os = "linux")]
+    const MAX_TAP_INTERFACES: usize = 254;
+
     fn skip_tap_interface(
         &self,
         tap_interfaces: &Vec<Link>,
@@ -330,8 +335,16 @@ impl BpfOptions {
             num: Extension::ExtInterfaceIndex,
         }));
 
-        let total = tap_interfaces.len();
-        for (i, iface) in tap_interfaces.iter().enumerate() {
+        if tap_interfaces.len() > Self::MAX_TAP_INTERFACES {
+            error!(
+                "Tap_interfaces.len() exceeds {}, use only the top {} of tap_interfaces.",
+                Self::MAX_TAP_INTERFACES,
+                Self::MAX_TAP_INTERFACES
+            )
+        }
+
+        let total = tap_interfaces.len().min(Self::MAX_TAP_INTERFACES);
+        for (i, iface) in tap_interfaces[..total].iter().enumerate() {
             let mut skip_true = (total - i) as u8;
             if white_list.has(iface.if_index as usize) {
                 skip_true += 1;
