@@ -84,6 +84,9 @@ func (dp *DataProvider) refreshTriggeredByRecorder() error {
 
 func (dp *DataProvider) refreshAll() error {
 	data, err := dp.refreshBase()
+	if err != nil {
+		return err
+	}
 	keys, err := dp.client.keys(keyPrefix + "*")
 	if err != nil {
 		return err
@@ -110,8 +113,16 @@ func (dp *DataProvider) refreshAll() error {
 }
 
 func (dp *DataProvider) forceRefreshManually(ctx *provider.DataContext) error {
-	dp.refreshBase()
-	return dp.Delete(ctx)
+	data, err := dp.refreshBase()
+	if err != nil {
+		return err
+	}
+	key, err := dp.keyConv.dataCtxToStr(ctx)
+	if err != nil {
+		return err
+	}
+	dp.Delete(ctx)
+	return dp.client.set(key, data)
 }
 
 func (dp *DataProvider) refreshBase() ([]common.ResponseElem, error) {
