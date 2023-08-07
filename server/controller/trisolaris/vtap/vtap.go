@@ -864,6 +864,12 @@ func (v *VTapInfo) getVTapPodDomains(c *VTapCache) []string {
 		} else {
 			podDomains.Add(podNode.SubDomain)
 		}
+	} else if c.GetVTapType() == VTAP_TYPE_K8S_SIDECAR {
+		rawData := v.metaData.GetPlatformDataOP().GetRawData()
+		pod := rawData.GetPod(c.GetLaunchServerID())
+		if pod != nil {
+			podDomains.Add(pod.Domain)
+		}
 	}
 
 	if podDomains.Cardinality() != 0 {

@@ -119,6 +119,7 @@ type PlatformRawData struct {
 	domainIpToHostID    map[DomainIPKey]int
 	podServiceIDToPorts map[int][]*models.PodServicePort
 	idToPodNode         map[int]*models.PodNode
+	idToPod             map[int]*models.Pod
 	idToPodService      map[int]*models.PodService
 
 	vmIDToVifs            map[int]mapset.Set
@@ -195,6 +196,7 @@ func NewPlatformRawData() *PlatformRawData {
 		vInterfaceIDToIP:       make(map[int][]*trident.IpResource),
 		vInterfaceIDToSimpleIP: make(map[int][]*trident.IpResource),
 		idToPodNode:            make(map[int]*models.PodNode),
+		idToPod:                make(map[int]*models.Pod),
 		idToPodService:         make(map[int]*models.PodService),
 
 		vmIDToVifs:                    make(map[int]mapset.Set),
@@ -440,6 +442,7 @@ func (r *PlatformRawData) ConvertDBPod(dbDataCache *DBDataCache) {
 		return
 	}
 	for _, pod := range pods {
+		r.idToPod[pod.ID] = pod
 		r.podIDs.Add(pod.ID)
 		podIDs, ok := r.podNodeIDtoPodIDs[pod.PodNodeID]
 		if ok {
@@ -1250,6 +1253,10 @@ func (r *PlatformRawData) GetVMIDToPodNodeID() map[int]int {
 
 func (r *PlatformRawData) GetPodNode(podNodeID int) *models.PodNode {
 	return r.idToPodNode[podNodeID]
+}
+
+func (r *PlatformRawData) GetPod(podID int) *models.Pod {
+	return r.idToPod[podID]
 }
 
 func (r *PlatformRawData) GetSkipInterface(server string) []*trident.SkipInterface {

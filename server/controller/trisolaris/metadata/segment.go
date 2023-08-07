@@ -163,6 +163,8 @@ type Segment struct {
 	notVtapUsedSegments     []*trident.Segment
 	// vm所有vif的segment，包含vm上的pod pod_node
 	vmIDToSegments IDToNetworkMacs
+	// pod所有vif的segment
+	podIDToSegments IDToNetworkMacs
 	// 专属采集器remote segment
 	bmDedicatedRemoteSegments []*trident.Segment
 	podNodeIDToSegments       IDToNetworkMacs
@@ -240,6 +242,7 @@ func (s *Segment) generateBaseSegmentsFromDB(rawData *PlatformRawData) {
 	hostIDToSegments := newIDToNetworkMacs()
 	gatewayHostIDToSegments := newIDToNetworkMacs()
 	vmIDToSegments := newIDToNetworkMacs()
+	podIDToSegments := newIDToNetworkMacs()
 	podNodeIDToSegments := newIDToNetworkMacs()
 	vRouterLaunchServerToSegments := newServerToNetworkMacs()
 
@@ -286,6 +289,14 @@ func (s *Segment) generateBaseSegmentsFromDB(rawData *PlatformRawData) {
 		vmIDToSegments[vmID] = netWorkMacs
 	}
 
+	for podID, vifs := range rawData.podIDToVifs {
+		netWorkMacs := newNetworkMacs()
+		for vif := range vifs.Iter() {
+			netWorkMacs.add(vif)
+		}
+		podIDToSegments[podID] = netWorkMacs
+	}
+
 	for vmID, podVifs := range s.vmIDToPodNodeAllVifs {
 		netWorkMacs, ok := vmIDToSegments[vmID]
 		if ok == false {
@@ -323,6 +334,7 @@ func (s *Segment) generateBaseSegmentsFromDB(rawData *PlatformRawData) {
 	s.hostIDToSegments = hostIDToSegments
 	s.gatewayHostIDToSegments = gatewayHostIDToSegments
 	s.vmIDToSegments = vmIDToSegments
+	s.podIDToSegments = podIDToSegments
 	s.podNodeIDToSegments = podNodeIDToSegments
 	s.vRouterLaunchServerToSegments = vRouterLaunchServerToSegments
 }
@@ -385,6 +397,10 @@ func (s *Segment) GetLaunchServerSegments(launchServer string) []*trident.Segmen
 
 func (s *Segment) GetVMIDSegments(vmID int) []*trident.Segment {
 	return s.vmIDToSegments.getSegmentsByID(vmID, s)
+}
+
+func (s *Segment) GetPodIDSegments(podID int) []*trident.Segment {
+	return s.podIDToSegments.getSegmentsByID(podID, s)
 }
 
 func (s *Segment) GetHostIDSegments(hostID int) []*trident.Segment {
