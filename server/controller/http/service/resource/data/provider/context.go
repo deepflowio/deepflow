@@ -32,8 +32,8 @@ type DataContext struct {
 	FilterGenerator generator.FilterGenerator // generate filters from URLInfo and UserInfo
 }
 
-func NewDataContext() *DataContext {
-	return &DataContext{}
+func NewDataContext(url *model.URLInfo, user *model.UserInfo, fg generator.FilterGenerator) *DataContext {
+	return &DataContext{URLInfo: url, UserInfo: user, FilterGenerator: fg}
 }
 
 func (c *DataContext) SetURLInfo(u *model.URLInfo) {

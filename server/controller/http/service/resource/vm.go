@@ -35,6 +35,6 @@ func NewVMGet(urlInfo *model.URLInfo, userInfo *model.UserInfo, redisCfg redis.C
 		ctrlrcommon.RESOURCE_TYPE_VM_EN,
 		data.GetDataProvider(ctrlrcommon.RESOURCE_TYPE_VM_EN, &data.RequiredConfigs{Redis: redisCfg}),
 	)}
-	s.generateDataContext(urlInfo, userInfo, generator.NewVM(fpermitCfg))
+	s.generateDataContext(urlInfo, userInfo, generator.Get(s.resourceType, &generator.RequiredConfigs{FPermit: fpermitCfg}))
 	return s
 }

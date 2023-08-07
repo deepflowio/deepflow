@@ -25,6 +25,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator"
 	"github.com/deepflowio/deepflow/server/controller/election"
+	"github.com/deepflowio/deepflow/server/controller/http"
 	resoureservice "github.com/deepflowio/deepflow/server/controller/http/service/resource"
 	"github.com/deepflowio/deepflow/server/controller/monitor"
 	"github.com/deepflowio/deepflow/server/controller/monitor/license"
@@ -94,6 +95,7 @@ func checkAndStartMasterFunctions(
 	recorderResource := recorder.GetSingletonResource()
 	domainChecker := resoureservice.NewDomainCheck(ctx)
 	prometheus := prometheus.GetSingleton()
+	httpService := http.GetSingleton()
 
 	masterController := ""
 	thisIsMasterController := false
@@ -144,6 +146,8 @@ func checkAndStartMasterFunctions(
 				domainChecker.Start()
 
 				prometheus.Encoder.Start()
+
+				httpService.TaskManager.Start(ctx, cfg.FPermit, cfg.RedisCfg)
 			} else if thisIsMasterController {
 				thisIsMasterController = false
 				log.Infof("I am not the master controller anymore, new master controller is %s", newMasterController)
@@ -170,6 +174,8 @@ func checkAndStartMasterFunctions(
 				recorderResource.IDManager.Stop()
 
 				prometheus.Encoder.Stop()
+
+				httpService.TaskManager.Stop()
 			} else {
 				log.Infof(
 					"current master controller is %s, previous master controller is %s",
