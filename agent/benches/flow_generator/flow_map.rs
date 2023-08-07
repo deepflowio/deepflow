@@ -34,6 +34,7 @@ pub(super) fn bench(c: &mut Criterion) {
             let config = Config {
                 flow: &module_config.flow,
                 log_parser: &module_config.log_parser,
+                collector: &module_config.collector,
                 #[cfg(target_os = "linux")]
                 ebpf: None,
             };
@@ -61,6 +62,7 @@ pub(super) fn bench(c: &mut Criterion) {
             let config = Config {
                 flow: &module_config.flow,
                 log_parser: &module_config.log_parser,
+                collector: &module_config.collector,
                 #[cfg(target_os = "linux")]
                 ebpf: None,
             };

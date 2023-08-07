@@ -61,6 +61,7 @@ pub use recv_engine::{
 
 #[cfg(target_os = "linux")]
 use self::base_dispatcher::TapInterfaceWhitelist;
+use crate::config::handler::CollectorAccess;
 #[cfg(target_os = "linux")]
 use crate::platform::GenericPoller;
 use crate::utils::environment::get_mac_by_name;
@@ -640,6 +641,7 @@ pub struct DispatcherBuilder {
     stats_collector: Option<Arc<Collector>>,
     flow_map_config: Option<FlowAccess>,
     log_parse_config: Option<LogParserAccess>,
+    collector_config: Option<CollectorAccess>,
     policy_getter: Option<PolicyGetter>,
     #[cfg(target_os = "linux")]
     platform_poller: Option<Arc<GenericPoller>>,
@@ -749,6 +751,11 @@ impl DispatcherBuilder {
 
     pub fn log_parse_config(mut self, v: LogParserAccess) -> Self {
         self.log_parse_config = Some(v);
+        self
+    }
+
+    pub fn collector_config(mut self, v: CollectorAccess) -> Self {
+        self.collector_config = Some(v);
         self
     }
 
@@ -914,6 +921,10 @@ impl DispatcherBuilder {
                 .log_parse_config
                 .take()
                 .ok_or(Error::ConfigIncomplete("no log parse config".into()))?,
+            collector_config: self
+                .collector_config
+                .take()
+                .ok_or(Error::ConfigIncomplete("no collector config".into()))?,
             policy_getter: self
                 .policy_getter
                 .ok_or(Error::ConfigIncomplete("no policy".into()))?,

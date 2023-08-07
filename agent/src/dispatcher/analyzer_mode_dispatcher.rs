@@ -243,6 +243,7 @@ impl AnalyzerModeDispatcher {
         let ntp_diff = base.ntp_diff.clone();
         let flow_map_config = base.flow_map_config.clone();
         let log_parse_config = base.log_parse_config.clone();
+        let collector_config = base.collector_config.clone();
         let packet_sequence_output_queue = base.packet_sequence_output_queue.clone(); // Enterprise Edition Feature: packet-sequence
         let stats = base.stats.clone();
 
@@ -269,6 +270,7 @@ impl AnalyzerModeDispatcher {
                         let config = Config {
                             flow: &flow_map_config.load(),
                             log_parser: &log_parse_config.load(),
+                            collector: &collector_config.load(),
                             #[cfg(target_os = "linux")]
                             ebpf: None,
                         };

@@ -64,7 +64,10 @@ use crate::{
         tap_port::TapPort,
         Timestamp,
     },
-    config::{handler::LogParserConfig, FlowConfig, ModuleConfig, RuntimeConfig},
+    config::{
+        handler::{CollectorConfig, LogParserConfig},
+        FlowConfig, ModuleConfig, RuntimeConfig,
+    },
     metric::document::TapSide,
     plugin::wasm::{
         get_all_wasm_export_func_name, get_wasm_metric_counter_map_key, init_wasmtime, WasmCounter,
@@ -101,6 +104,7 @@ use packet_sequence_block::PacketSequenceBlock;
 pub struct Config<'a> {
     pub flow: &'a FlowConfig,
     pub log_parser: &'a LogParserConfig,
+    pub collector: &'a CollectorConfig,
     #[cfg(target_os = "linux")]
     pub ebpf: Option<&'a EbpfConfig>, // TODO: We only need its epc_id，epc_id is not only useful for ebpf, consider moving it to FlowConfig
 }
@@ -697,6 +701,7 @@ impl FlowMap {
         meta_packet: &mut MetaPacket,
     ) -> bool {
         let flow_config = config.flow;
+        let collector_config = config.collector;
         let flow_closed = self.update_tcp_flow(config, meta_packet, node);
         if flow_config.collector_enabled {
             let direction = meta_packet.lookup_key.direction == PacketDirection::ClientToServer;
@@ -720,7 +725,9 @@ impl FlowMap {
         }
 
         // Enterprise Edition Feature: packet-sequence
-        if self.packet_sequence_enabled {
+        if self.packet_sequence_enabled
+            && !collector_config.l4_log_ignore_tap_sides[node.tagged_flow.flow.tap_side as usize]
+        {
             self.append_to_block(flow_config, node, meta_packet);
         }
 
@@ -1072,6 +1079,10 @@ impl FlowMap {
         // 标签
         (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
         self.update_endpoint_and_policy_data(&mut node, meta_packet);
+        // Currently, only virtual traffic's tap_side is counted
+        node.tagged_flow
+            .flow
+            .set_tap_side(flow_config.trident_type, flow_config.cloud_gateway_traffic);
 
         Self::init_nat_info(&mut node.tagged_flow.flow, meta_packet);
 
@@ -1179,6 +1190,10 @@ impl FlowMap {
             }
             (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
             self.update_endpoint_and_policy_data(node, meta_packet);
+            // Currently, only virtual traffic's tap_side is counted
+            node.tagged_flow
+                .flow
+                .set_tap_side(config.flow.trident_type, config.flow.cloud_gateway_traffic);
         } else {
             // copy endpoint and policy data
             meta_packet.policy_data =
@@ -1360,6 +1375,7 @@ impl FlowMap {
 
     fn new_tcp_node(&mut self, config: &Config, meta_packet: &mut MetaPacket) -> Box<FlowNode> {
         let flow_config = &config.flow;
+        let collector_config = &config.collector;
         let mut node = self.init_flow(config, meta_packet);
         meta_packet.flow_id = node.tagged_flow.flow.flow_id;
         meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
@@ -1399,7 +1415,9 @@ impl FlowMap {
         }
 
         // Enterprise Edition Feature: packet-sequence
-        if self.packet_sequence_enabled {
+        if self.packet_sequence_enabled
+            && !collector_config.l4_log_ignore_tap_sides[node.tagged_flow.flow.tap_side as usize]
+        {
             self.append_to_block(flow_config, &mut node, meta_packet);
         }
         node
@@ -1482,14 +1500,6 @@ impl FlowMap {
         config: &FlowConfig,
         mut tagged_flow: BatchedBox<TaggedFlow>,
     ) {
-        // This field is required for logging when the flow is not finished. To avoid
-        // double counting, it is assigned when the flow statistics are finished output
-        //
-        // Currently, only virtual traffic's tap_side is counted
-        tagged_flow
-            .flow
-            .set_tap_side(config.trident_type, config.cloud_gateway_traffic);
-
         // Unknown application only counts metrics, and the judgment condition needs to consider
         // the flow's duration, so the value is assigned when the flow is finished
         //
@@ -2168,6 +2178,7 @@ mod tests {
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
             #[cfg(target_os = "linux")]
             ebpf: None,
         };
@@ -2203,6 +2214,7 @@ mod tests {
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
             #[cfg(target_os = "linux")]
             ebpf: None,
         };
@@ -2242,6 +2254,7 @@ mod tests {
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
             #[cfg(target_os = "linux")]
             ebpf: None,
         };
@@ -2271,6 +2284,7 @@ mod tests {
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
             #[cfg(target_os = "linux")]
             ebpf: None,
         };
@@ -2311,6 +2325,7 @@ mod tests {
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
             #[cfg(target_os = "linux")]
             ebpf: None,
         };
@@ -2366,6 +2381,7 @@ mod tests {
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
             #[cfg(target_os = "linux")]
             ebpf: None,
         };
@@ -2405,6 +2421,7 @@ mod tests {
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
             #[cfg(target_os = "linux")]
             ebpf: None,
         };
@@ -2440,6 +2457,7 @@ mod tests {
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
             #[cfg(target_os = "linux")]
             ebpf: None,
         };
@@ -2500,6 +2518,7 @@ mod tests {
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
             #[cfg(target_os = "linux")]
             ebpf: None,
         };
@@ -2567,6 +2586,7 @@ mod tests {
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
             #[cfg(target_os = "linux")]
             ebpf: None,
         };
@@ -2634,6 +2654,7 @@ mod tests {
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
             #[cfg(target_os = "linux")]
             ebpf: None,
         };
@@ -2677,6 +2698,7 @@ mod tests {
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
             #[cfg(target_os = "linux")]
             ebpf: None,
         };
@@ -2699,6 +2721,7 @@ mod tests {
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
             #[cfg(target_os = "linux")]
             ebpf: None,
         };
@@ -2722,6 +2745,7 @@ mod tests {
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
             #[cfg(target_os = "linux")]
             ebpf: None,
         };
@@ -2763,6 +2787,7 @@ mod tests {
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
             #[cfg(target_os = "linux")]
             ebpf: None,
         };
