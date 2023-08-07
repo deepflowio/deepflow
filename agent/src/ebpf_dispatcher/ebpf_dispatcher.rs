@@ -15,6 +15,7 @@
  */
 
 use std::ffi::CString;
+use std::slice;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
@@ -329,12 +330,9 @@ impl EbpfCollector {
             profile.k_stack_id = data.k_stack_id;
             profile.cpu = data.cpu;
             profile.count = data.count;
-            profile.data = Vec::from_raw_parts(
-                data.stack_data as *mut u8,
-                data.stack_data_len as usize,
-                data.stack_data_len as usize,
-            );
-
+            profile.data =
+                slice::from_raw_parts(data.stack_data as *mut u8, data.stack_data_len as usize)
+                    .to_vec();
             if let Err(e) = EBPF_PROFILE_SENDER.as_mut().unwrap().send(Profile(profile)) {
                 warn!("ebpf profile send error: {:?}", e);
             }
