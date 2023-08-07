@@ -1607,6 +1607,8 @@ CREATE TABLE IF NOT EXISTS vtap_group_configuration(
     l7_log_collect_nps_threshold   INTEGER,
     l7_metrics_enabled        TINYINT(1) COMMENT '0: disabled 1:enabled',
     l7_log_store_tap_types    TEXT COMMENT 'l7 log store tap types, separate by ","',
+    l4_log_ignore_tap_sides   TEXT COMMENT 'separate by ","',
+    l7_log_ignore_tap_sides   TEXT COMMENT 'separate by ","',
     decap_type                TEXT COMMENT 'separate by ","',
     capture_socket_type       INTEGER,
     capture_bpf               VARCHAR(512),

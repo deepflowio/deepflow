@@ -75,6 +75,7 @@ macro_rules! impl_protocol_parser {
     (pub enum $name:ident { $($proto:ident($log_type:ty)),* $(,)? }) => {
         #[enum_dispatch(L7ProtocolParserInterface)]
         pub enum $name {
+            Custom(CustomWrapLog),
             Http(HttpLog),
             $($proto($log_type)),*
         }
@@ -89,6 +90,7 @@ macro_rules! impl_protocol_parser {
                             _ => unreachable!()
                         }
                     },
+                    Self::Custom(_) => return "Custom",
                     $(
                         Self::$proto(_) => stringify!($proto),
                     )*
@@ -103,6 +105,7 @@ macro_rules! impl_protocol_parser {
                 match value {
                     "HTTP" => Ok(Self::Http(HttpLog::new_v1())),
                     "HTTP2" => Ok(Self::Http(HttpLog::new_v2(false))),
+                    "Custom"=>Ok(Self::Custom(Default::default())),
                     $(
                         stringify!($proto) => Ok(Self::$proto(Default::default())),
                     )*
@@ -128,8 +131,9 @@ macro_rules! impl_protocol_parser {
             }
         }
 
-        pub fn get_all_protocol() -> [L7ProtocolParser; 2 + count!($($proto)*)] {
+        pub fn get_all_protocol() -> [L7ProtocolParser; 3 + count!($($proto)*)] {
             [
+                L7ProtocolParser::Custom(Default::default()),
                 L7ProtocolParser::Http(HttpLog::new_v1()),
                 L7ProtocolParser::Http(HttpLog::new_v2(false)),
                 $(
@@ -152,7 +156,7 @@ macro_rules! impl_protocol_parser {
 impl_protocol_parser! {
     pub enum L7ProtocolParser {
         // http have two version but one parser, can not place in macro param.
-        Custom(CustomWrapLog),
+        // custom must in frist so can not place in macro
         DNS(DnsLog),
         ProtobufRPC(ProtobufRpcWrapLog),
         SofaRPC(SofaRpcLog),

@@ -2,6 +2,8 @@
 time_str                   , Time                       ,
 time                       , Time                       , Round end_time to seconds.
 
+region                     , Region                     ,
+
 lccuid                     , lccuid                     ,
 user                       , user                       ,
 policy_id                  , policy_id                  ,

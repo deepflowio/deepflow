@@ -142,6 +142,9 @@ pub struct VmCtxBase {
     pub(super) time: u64,
     pub(super) direction: PacketDirection,
     pub(super) process_kname: Option<String>,
+    pub(super) flow_id: u64,
+    pub(super) buf_size: u16,
+
     /*
         payload is from the payload: &[u8] in L7ProtocolParserInterface::check_payload() and L7ProtocolParserInterface::parse_payload(),
         it can not modify and drop.
@@ -176,6 +179,8 @@ impl From<(&ParseParam<'_>, u8, &[u8])> for VmCtxBase {
             } else {
                 None
             },
+            flow_id: p.flow_id,
+            buf_size: p.buf_size,
             /*
                 it is safe to use unsafe because VmParseCtx use in check, parse or other place will drop before the function call finish.
                 the lifetime of VmParseCtx always shorter than payload which from L7ProtocolParserInterface::check_payload() and L7ProtocolParserInterface::parse_payload().
@@ -218,10 +223,13 @@ impl VmCtxBase {
 
         proc name: 		$(proc name len) len
 
+        flow_id:     8 bytes
+
+        buf_size:    2 bytes, the config of l7_log_packet_size
     */
     fn serialize_to_bytes(&self, buf: &mut [u8]) -> Result<usize> {
         let serialize_len = if self.ip_src.is_ipv6() { 32 } else { 8 }
-            + 18
+            + 28
             + if let Some(proc_name) = self.process_kname.as_ref() {
                 proc_name.len()
             } else {
@@ -288,6 +296,12 @@ impl VmCtxBase {
             buf[off] = 0;
             off += 1
         }
+
+        write_u64_be(&mut buf[off..], self.flow_id);
+        off += 8;
+
+        write_u16_be(&mut buf[off..], self.buf_size);
+        off += 2;
 
         Ok(off)
     }

@@ -28,6 +28,7 @@ use std::time::{Duration, UNIX_EPOCH};
 extern "C" {
     fn print_dns_info(data: *mut c_char, len: c_uint);
     fn print_uprobe_http2_info(data: *mut c_char, len: c_uint);
+    fn print_uprobe_grpc_dataframe(data: *mut c_char, len: c_uint);
     fn print_io_event_info(data: *mut c_char, len: c_uint);
 }
 
@@ -246,6 +247,8 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
                 print_uprobe_http2_info((*sd).cap_data, (*sd).cap_len);
             } else if (*sd).source == 4 {
                 print_io_event_info((*sd).cap_data, (*sd).cap_len);
+            } else if (*sd).source == 5 {
+                print_uprobe_grpc_dataframe((*sd).cap_data, (*sd).cap_len);
             } else {
                 for x in data.into_iter() {
                     if x < 32 || x > 126 {
