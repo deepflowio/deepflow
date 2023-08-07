@@ -27,6 +27,7 @@ use std::time::{Duration, UNIX_EPOCH};
 extern "C" {
     fn print_dns_info(data: *mut c_char, len: c_uint);
     fn print_uprobe_http2_info(data: *mut c_char, len: c_uint);
+    fn print_uprobe_grpc_dataframe(data: *mut c_char, len: c_uint);
     fn print_io_event_info(data: *mut c_char, len: c_uint);
 }
 
