@@ -799,6 +799,12 @@ func (c *VTapCache) modifyVTapCache(v *VTapInfo) {
 		if ok == false {
 			log.Warningf("vtap(%s) not found VPCID", c.GetVTapHost())
 		}
+	} else if vTapType == VTAP_TYPE_K8S_SIDECAR {
+		pod := v.metaData.GetPlatformDataOP().GetRawData().GetPod(c.GetLaunchServerID())
+		if pod != nil {
+			c.podClusterID = pod.PodClusterID
+			c.VPCID = pod.VPCID
+		}
 	} else if vTapType == VTAP_TYPE_WORKLOAD_V || vTapType == VTAP_TYPE_WORKLOAD_P {
 		c.VPCID, ok = v.lcuuidToVPCID[c.GetLcuuid()]
 		if ok == false {

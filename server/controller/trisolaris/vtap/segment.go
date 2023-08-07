@@ -41,6 +41,8 @@ import (
    - 向容器-P，容器-V类型的采集器下发的local_segment，无需包含所在宿主机的接口列表
      - 所在运行环境中VM的接口列表
      - 所在运行环境中VM上运行容器节点及POD的接口列表
+   - 向K8s Sidecar类型的采集器下发的local_segment
+     - 所在运行环境（POD）的接口列表
    - 向隧道解封装类型的采集器无需下发local_segment和remote_egment
 */
 
@@ -78,6 +80,8 @@ func (v *VTapInfo) GenerateVTapLocalSegments(c *VTapCache) []*trident.Segment {
 			// 无关联获取pod_node所有segments包括(pod_node, pod)
 			localSegments = segment.GetPodNodeSegments(launchServerID)
 		}
+	} else if vtapType == VTAP_TYPE_K8S_SIDECAR {
+		localSegments = segment.GetPodIDSegments(launchServerID)
 	} else if Find[int](noLocalSegments, vtapType) {
 		// 专属采集器，隧道解封装采集器没有local segments
 		return localSegments

@@ -225,7 +225,8 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 
 func isOpenK8sSyn(vtapType int) bool {
 	switch vtapType {
-	case VTAP_TYPE_POD_VM, VTAP_TYPE_POD_HOST, VTAP_TYPE_WORKLOAD_V, VTAP_TYPE_WORKLOAD_P:
+	case VTAP_TYPE_POD_VM, VTAP_TYPE_POD_HOST, VTAP_TYPE_WORKLOAD_V, VTAP_TYPE_WORKLOAD_P,
+		VTAP_TYPE_K8S_SIDECAR:
 		return true
 	default:
 		return false
@@ -234,7 +235,7 @@ func isOpenK8sSyn(vtapType int) bool {
 
 func isPodVTap(vtapType int) bool {
 	switch vtapType {
-	case VTAP_TYPE_POD_VM, VTAP_TYPE_POD_HOST:
+	case VTAP_TYPE_POD_VM, VTAP_TYPE_POD_HOST, VTAP_TYPE_K8S_SIDECAR:
 		return true
 	default:
 		return false
