@@ -128,5 +128,5 @@ clean:
 test: $(ELFFILES) $(LIBTRACE)
 	$(Q)$(MAKE) -C test --no-print-directory
 
-.PHONY: all build clean tools test
+.PHONY: all build clean tools test rust-sample .socket-tracer .profiler
 

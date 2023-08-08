@@ -509,6 +509,10 @@ static __inline bool skip_http2_uprobe(struct ebpf_proc_info *info)
 		return true;
 	}
 
+	if (info->net_TCPConn_itab != 0) {
+		return false;
+	}
+
 	if (info->crypto_tls_Conn_itab != 0) {
 		return false;
 	}
