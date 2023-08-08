@@ -63,6 +63,7 @@ Kernel -->|eBPF| EbpfCollector
 EbpfCollector --> agent.queue.1
 EbpfCollector --> agent.queue.3
 EbpfCollector --> agent.queue.8 -->|ProcEvent| UniformSender.8 -->|"tcp(pb)"| event.decoder -->|EventStore| ingester.queue.4 --> event.dbwriter
+EbpfCollector --> agent.queue.9
 
 otel-collector -->|OTLP| IntegrationCollector
 otel-javaagent/sdk -->|OTLP| IntegrationCollector
@@ -108,6 +109,7 @@ QuadrupleGenerator --> queue.6([queue]) --> FlowAggr -->|"TaggedFlow (1m)"| thro
 FlowGenerator -->|MetaAppProto| queue.8([queue]) --> AppProtoLogsParser -->|AppProtoLogsData| throttler.1[throttler] -->|"L7FlowLog(AppProtoLogsData)"| queue.9([queue]) --> UniformSender.3[UniformSender]
 
 EbpfCollector -->|MetaPacket| queue.10([queue]) --> EbpfRunner -->|AppProtoLogsData| SessionAggr --> throttler.2[throttler] -->|"L7FlowLog(AppProtoLogsData)"| queue.9
+EbpfCollector -->|stack_profile_data| ebpf_on_cpu_callback -->|"Profile"| queue.9
 ```
 
 ## 1.3. Decoders In deepflow-server.ingester
