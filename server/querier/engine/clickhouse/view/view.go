@@ -18,9 +18,10 @@ package view
 
 import (
 	"bytes"
-	"github.com/deepflowio/deepflow/server/querier/common"
 	"strings"
 	"time"
+
+	"github.com/deepflowio/deepflow/server/querier/common"
 )
 
 /*
@@ -145,6 +146,7 @@ func NewTime() *Time {
 type View struct {
 	Model         *Model     //初始化view
 	SubViewLevels []*SubView //由RawView拆层
+	PreWhere      bool       // Whether to use prewhere
 }
 
 // 使用model初始化view
@@ -247,13 +249,14 @@ func (v *View) trans() {
 		// 计算层不拆层
 		// 里层tag+外层metric
 		sv := SubView{
-			Tags:    &Tags{tags: append(tagsLevelInner, metricsLevelMetrics...)},
-			Groups:  v.Model.Groups,
-			From:    v.Model.From,
-			Filters: v.Model.Filters,
-			Havings: v.Model.Havings,
-			Orders:  v.Model.Orders,
-			Limit:   v.Model.Limit,
+			Tags:     &Tags{tags: append(tagsLevelInner, metricsLevelMetrics...)},
+			Groups:   v.Model.Groups,
+			From:     v.Model.From,
+			Filters:  v.Model.Filters,
+			Havings:  v.Model.Havings,
+			Orders:   v.Model.Orders,
+			Limit:    v.Model.Limit,
+			PreWhere: v.PreWhere,
 		}
 		v.SubViewLevels = append(v.SubViewLevels, &sv)
 	} else if v.Model.MetricsLevelFlag == MODEL_METRICS_LEVEL_FLAG_LAYERED {
@@ -266,50 +269,54 @@ func (v *View) trans() {
 		// 计算层需要拆层
 		// 计算层里层
 		svInner := SubView{
-			Tags:    &Tags{tags: append(tagsLevelInner, metricsLevelInner...)}, // 计算层所有tag及里层算子
-			Groups:  &Groups{groups: groupsLevelInner},                         // group分层
-			From:    v.Model.From,                                              // 查询表
-			Filters: v.Model.Filters,                                           // 所有filter
-			Havings: &Filters{},
-			Orders:  &Orders{},
-			Limit:   &Limit{},
+			Tags:     &Tags{tags: append(tagsLevelInner, metricsLevelInner...)}, // 计算层所有tag及里层算子
+			Groups:   &Groups{groups: groupsLevelInner},                         // group分层
+			From:     v.Model.From,                                              // 查询表
+			Filters:  v.Model.Filters,                                           // 所有filter
+			Havings:  &Filters{},
+			Orders:   &Orders{},
+			Limit:    &Limit{},
+			PreWhere: v.PreWhere,
 		}
 		v.SubViewLevels = append(v.SubViewLevels, &svInner)
 		// 计算层外层
 		svMetrics := SubView{
-			Tags:    &Tags{tags: append(tagsLevelMetrics, metricsLevelMetrics...)}, // 计算层所有tag及外层算子
-			Groups:  &Groups{groups: groupsLevelMetrics},                           // group分层
-			From:    &Tables{},                                                     // 空table
-			Filters: &Filters{},                                                    // 空filter
-			Havings: v.Model.Havings,
-			Orders:  v.Model.Orders,
-			Limit:   v.Model.Limit,
+			Tags:     &Tags{tags: append(tagsLevelMetrics, metricsLevelMetrics...)}, // 计算层所有tag及外层算子
+			Groups:   &Groups{groups: groupsLevelMetrics},                           // group分层
+			From:     &Tables{},                                                     // 空table
+			Filters:  &Filters{},                                                    // 空filter
+			Havings:  v.Model.Havings,
+			Orders:   v.Model.Orders,
+			Limit:    v.Model.Limit,
+			PreWhere: v.PreWhere,
 		}
 		v.SubViewLevels = append(v.SubViewLevels, &svMetrics)
 	}
 	if metricsLevelTop != nil {
 		// 顶层，只保留指定tag，比如histogram
 		svOuter := SubView{
-			Tags:    &Tags{tags: metricsLevelTop}, // 所有翻译层tag
-			Groups:  &Groups{},                    // 空group
-			From:    &Tables{},                    // 空table
-			Filters: &Filters{},                   //空filter
-			Havings: &Filters{},
-			Orders:  &Orders{},
-			Limit:   &Limit{},
+			Tags:     &Tags{tags: metricsLevelTop}, // 所有翻译层tag
+			Groups:   &Groups{},                    // 空group
+			From:     &Tables{},                    // 空table
+			Filters:  &Filters{},                   //空filter
+			Havings:  &Filters{},
+			Orders:   &Orders{},
+			Limit:    &Limit{},
+			PreWhere: v.PreWhere,
 		}
 		v.SubViewLevels = append(v.SubViewLevels, &svOuter)
 	}
 }
 
 type SubView struct {
-	Tags    *Tags
-	Filters *Filters
-	From    *Tables
-	Groups  *Groups
-	Orders  *Orders
-	Limit   *Limit
-	Havings *Filters
+	Tags     *Tags
+	Filters  *Filters
+	From     *Tables
+	Groups   *Groups
+	Orders   *Orders
+	Limit    *Limit
+	Havings  *Filters
+	PreWhere bool
 }
 
 func (sv *SubView) GetWiths() []Node {
@@ -373,8 +380,10 @@ func (sv *SubView) WriteTo(buf *bytes.Buffer) {
 			buf.WriteString(" WHERE ")
 		} else if strings.HasPrefix(from, "flow_metrics") && !strings.HasSuffix(from, ".1m`") && !strings.HasSuffix(from, ".1s`") {
 			buf.WriteString(" WHERE ")
-		} else {
+		} else if sv.PreWhere {
 			buf.WriteString(" PREWHERE ")
+		} else {
+			buf.WriteString(" WHERE ")
 		}
 		sv.Filters.WriteTo(buf)
 	}
