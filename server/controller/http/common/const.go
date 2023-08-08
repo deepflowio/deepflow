@@ -40,7 +40,7 @@ const (
 	PATH_VINTERFACE          = "/v2/vinterfaces/"
 	PATH_NAT_GATEWAY         = "/v2/nat-gateways/"
 	PATH_NAT_RULE            = "/v2/nat-rules/"
-	PATH_SECURITY_GROUP      = "/v2/lbs/"
+	PATH_SECURITY_GROUP      = "/v2/security-groups/"
 	PATH_SECURITY_GROUP_RULE = "/v2/security-group-rules/"
 	PATH_LB                  = "/v2/lbs/"
 	PATH_LB_LISTENER         = "/v2/lb-listeners/"

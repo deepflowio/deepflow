@@ -518,16 +518,15 @@ func parseToQuerierSQL(ctx context.Context, db string, table string, metrics []s
 	// order by DESC for get data completely, then scan data reversely for data combine(see func.RespTransToProm)
 	// querier will be called later, so there is no need to display the declaration db
 	if db != "" {
-		// FIXME: if db is ext_metrics, only support for prometheus metrics now
 		sqlBuilder := strings.Builder{}
-		sqlBuilder.WriteString(fmt.Sprintf("SELECT %s FROM %s WHERE %s ", strings.Join(metrics, ","), table, strings.Join(filters, " AND ")))
+		sqlBuilder.WriteString(fmt.Sprintf("SELECT %s FROM `%s` WHERE %s ", strings.Join(metrics, ","), table, strings.Join(filters, " AND ")))
 		if len(groupBy) > 0 {
 			sqlBuilder.WriteString("GROUP BY " + strings.Join(groupBy, ","))
 		}
 		sqlBuilder.WriteString(fmt.Sprintf(" ORDER BY %s LIMIT %s", strings.Join(orderBy, ","), config.Cfg.Limit))
 		sql = sqlBuilder.String()
 	} else {
-		sql = fmt.Sprintf("SELECT %s FROM %s WHERE %s ORDER BY %s LIMIT %s", strings.Join(metrics, ","),
+		sql = fmt.Sprintf("SELECT %s FROM `%s` WHERE %s ORDER BY %s LIMIT %s", strings.Join(metrics, ","),
 			table, // equals prometheus metric name
 			strings.Join(filters, " AND "),
 			strings.Join(orderBy, ","), config.Cfg.Limit)
