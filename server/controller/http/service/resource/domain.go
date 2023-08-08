@@ -497,6 +497,7 @@ func DeleteDomain(lcuuid string) (map[string]string, error) { // TODO whether re
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.NATGateway{})
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.Process{})
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.PrometheusTarget{})
+	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.VIP{})
 	var sgs []mysql.SecurityGroup
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Find(&sgs)
 	sgIDs := make([]int, len(sgs))
