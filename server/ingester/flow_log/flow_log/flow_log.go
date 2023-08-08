@@ -124,6 +124,7 @@ func NewLogger(msgType datatype.MessageType, config *config.Config, platformData
 		}
 		throttlers[i] = throttler.NewThrottlingQueue(
 			throttle,
+			config.ThrottleBucket,
 			flowLogWriter,
 			int(flowLogId),
 		)
@@ -177,6 +178,7 @@ func NewL4FlowLogger(config *config.Config, platformDataManager *grpc.PlatformDa
 	for i := 0; i < queueCount; i++ {
 		throttlers[i] = throttler.NewThrottlingQueue(
 			throttle,
+			config.ThrottleBucket,
 			flowLogWriter,
 			int(common.L4_FLOW_ID),
 		)
@@ -233,6 +235,7 @@ func NewL7FlowLogger(config *config.Config, platformDataManager *grpc.PlatformDa
 		}
 		throttlers[i] = throttler.NewThrottlingQueue(
 			throttle,
+			config.ThrottleBucket,
 			flowLogWriter,
 			int(common.L7_FLOW_ID),
 		)
