@@ -206,6 +206,21 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 			retGenesisSyncData.IPLastSeens = append(retGenesisSyncData.IPLastSeens, gIP)
 		}
 
+		genesisSyncVIPs := genesisSyncData.GetVip()
+		for _, vip := range genesisSyncVIPs {
+			vtapID := vip.GetVtapId()
+			if _, ok := vtapIDMap[vtapID]; !ok {
+				continue
+			}
+			gVIP := model.GenesisVIP{
+				VtapID: vtapID,
+				IP:     vip.GetIp(),
+				Lcuuid: vip.GetLcuuid(),
+				NodeIP: vip.GetNodeIp(),
+			}
+			retGenesisSyncData.VIPs = append(retGenesisSyncData.VIPs, gVIP)
+		}
+
 		genesisSyncHosts := genesisSyncData.GetHost()
 		for _, host := range genesisSyncHosts {
 			if _, ok := vtapIDMap[host.GetVtapId()]; !ok {

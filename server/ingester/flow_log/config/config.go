@@ -30,6 +30,7 @@ var log = logging.MustGetLogger("flow_log.config")
 
 const (
 	DefaultThrottle          = 50000
+	DefaultThrottleBucket    = 8
 	DefaultDecoderQueueCount = 2
 	DefaultDecoderQueueSize  = 1 << 14
 	DefaultBrokerQueueSize   = 1 << 14
@@ -61,6 +62,7 @@ type Config struct {
 	Base              *config.Config
 	CKWriterConfig    config.CKWriterConfig `yaml:"flowlog-ck-writer"`
 	Throttle          int                   `yaml:"throttle"`
+	ThrottleBucket    int                   `yaml:"throttle-bucket"`
 	L4Throttle        int                   `yaml:"l4-throttle"`
 	L7Throttle        int                   `yaml:"l7-throttle"`
 	FlowLogTTL        FlowLogTTL            `yaml:"flow-log-ttl-hour"`
@@ -105,6 +107,7 @@ func Load(base *config.Config, path string) *Config {
 		FlowLog: Config{
 			Base:              base,
 			Throttle:          DefaultThrottle,
+			ThrottleBucket:    DefaultThrottleBucket,
 			DecoderQueueCount: DefaultDecoderQueueCount,
 			DecoderQueueSize:  DefaultDecoderQueueSize,
 			CKWriterConfig:    config.CKWriterConfig{QueueCount: 1, QueueSize: 1000000, BatchSize: 512000, FlushTimeout: 10},

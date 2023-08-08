@@ -55,6 +55,9 @@ func (s *SyncStorage) Renew(data GenesisSyncDataOperation) {
 	now := time.Now()
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+	if data.VIPs != nil {
+		s.genesisSyncInfo.VIPs.Renew(data.VIPs.Fetch(), now)
+	}
 	if data.VMs != nil {
 		s.genesisSyncInfo.VMs.Renew(data.VMs.Fetch(), now)
 	}
@@ -90,6 +93,10 @@ func (s *SyncStorage) Update(data GenesisSyncDataOperation, vtapID uint32) {
 	defer s.mutex.Unlock()
 
 	updateFlag := false
+	if data.VIPs != nil {
+		updateFlag = true
+		s.genesisSyncInfo.VIPs.Update(data.VIPs.Fetch(), now)
+	}
 	if data.VMs != nil {
 		updateFlag = true
 		s.genesisSyncInfo.VMs.Update(data.VMs.Fetch(), now)
@@ -143,6 +150,7 @@ func (s *SyncStorage) Update(data GenesisSyncDataOperation, vtapID uint32) {
 
 func (s *SyncStorage) fetch() {
 	s.channel <- GenesisSyncData{
+		VIPs:        s.genesisSyncInfo.VIPs.Fetch(),
 		VMs:         s.genesisSyncInfo.VMs.Fetch(),
 		VPCs:        s.genesisSyncInfo.VPCs.Fetch(),
 		Hosts:       s.genesisSyncInfo.Hosts.Fetch(),
@@ -161,6 +169,7 @@ func (s *SyncStorage) loadFromDatabase(ageTime time.Duration) {
 
 	now := time.Now()
 	s.genesisSyncInfo = GenesisSyncDataOperation{}
+	var vips []model.GenesisVIP
 	var vms []model.GenesisVM
 	var vpcs []model.GenesisVpc
 	var hosts []model.GenesisHost
@@ -170,6 +179,9 @@ func (s *SyncStorage) loadFromDatabase(ageTime time.Duration) {
 	var networks []model.GenesisNetwork
 	var vinterfaces []model.GenesisVinterface
 	var processes []model.GenesisProcess
+
+	s.genesisSyncInfo.VIPs = NewVIPPlatformDataOperation(vips)
+	s.genesisSyncInfo.VIPs.Load(now, ageTime)
 
 	s.genesisSyncInfo.VMs = NewVMPlatformDataOperation(vms)
 	s.genesisSyncInfo.VMs.Load(now, ageTime)
@@ -205,6 +217,7 @@ func (s *SyncStorage) storeToDatabase() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
+	s.genesisSyncInfo.VIPs.Save()
 	s.genesisSyncInfo.VMs.Save()
 	s.genesisSyncInfo.VPCs.Save()
 	s.genesisSyncInfo.Hosts.Save()
@@ -259,6 +272,7 @@ func (s *SyncStorage) run() {
 		now := time.Now()
 		hasChange := false
 		s.mutex.Lock()
+		hasChange = hasChange || s.genesisSyncInfo.VIPs.Age(now, ageTime)
 		hasChange = hasChange || s.genesisSyncInfo.VMs.Age(now, ageTime)
 		hasChange = hasChange || s.genesisSyncInfo.VPCs.Age(now, ageTime)
 		hasChange = hasChange || s.genesisSyncInfo.Lldps.Age(now, ageTime)

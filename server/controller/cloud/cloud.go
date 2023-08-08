@@ -108,6 +108,7 @@ func (c *Cloud) GetResource() model.Resource {
 	if c.basicInfo.Type != common.KUBERNETES {
 		if cResource.ErrorState == common.RESOURCE_STATE_CODE_SUCCESS && cResource.Verified && len(cResource.VMs) > 0 {
 			cResource.SubDomainResources = c.getSubDomainData(cResource)
+			cResource = c.appendResourceVIPs(cResource)
 		}
 	}
 
@@ -440,8 +441,8 @@ func (c *Cloud) appendResourceProcess(resource model.Resource) model.Resource {
 		process := model.Process{
 			Lcuuid:      sProcess.Lcuuid,
 			Name:        sProcess.Name,
-			VTapID:      int(sProcess.VtapID),
-			PID:         int(sProcess.PID),
+			VTapID:      sProcess.VtapID,
+			PID:         sProcess.PID,
 			NetnsID:     sProcess.NetnsID,
 			ProcessName: sProcess.ProcessName,
 			CommandLine: sProcess.CMDLine,
@@ -461,6 +462,39 @@ func (c *Cloud) appendResourceProcess(resource model.Resource) model.Resource {
 		process.SubDomainLcuuid = lcuuid
 		subDomainResource.Processes = append(subDomainResource.Processes, process)
 		resource.SubDomainResources[lcuuid] = subDomainResource
+	}
+	return resource
+}
+
+func (c *Cloud) appendResourceVIPs(resource model.Resource) model.Resource {
+
+	if genesis.GenesisService == nil {
+		log.Error("genesis service is nil")
+		return resource
+	}
+
+	genesisSyncData, err := genesis.GenesisService.GetGenesisSyncResponse()
+	if err != nil {
+		log.Error(err.Error())
+		return resource
+	}
+
+	vtapIDToLcuuid, err := GetVTapSubDomainMappingByDomain(c.basicInfo.Lcuuid)
+	if err != nil {
+		log.Errorf("domain (%s) add vip failed: %s", c.basicInfo.Name, err.Error())
+		return resource
+	}
+
+	for _, vip := range genesisSyncData.VIPs {
+		lcuuid, ok := vtapIDToLcuuid[int(vip.VtapID)]
+		if !ok || lcuuid != "" {
+			continue
+		}
+		resource.VIPs = append(resource.VIPs, model.VIP{
+			Lcuuid: vip.Lcuuid,
+			IP:     vip.IP,
+			VTapID: vip.VtapID,
+		})
 	}
 	return resource
 }

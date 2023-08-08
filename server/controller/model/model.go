@@ -654,6 +654,18 @@ func (GenesisIP) TableName() string {
 	return "go_genesis_ip"
 }
 
+type GenesisVIP struct {
+	ID     int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	VtapID uint32 `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
+	IP     string `gorm:"column:ip;type:char(64);default:null" json:"IP"`
+	Lcuuid string `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
+	NodeIP string `gorm:"column:node_ip;type:char(48);default:null" json:"NODE_IP"`
+}
+
+func (GenesisVIP) TableName() string {
+	return "go_genesis_vip"
+}
+
 type GenesisLldp struct {
 	ID                    int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	VtapID                uint32    `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
@@ -794,7 +806,7 @@ type Process struct {
 	VTapName     string `json:"VTAP_NAME"`
 	GPID         int    `json:"GPID"`
 	GPName       string `json:"GP_NAME"` // equal to process.process_name
-	PID          int    `json:"PID"`
+	PID          uint64 `json:"PID"`
 	ProcessName  string `json:"PROCESS_NAME"`
 	CommandLine  string `json:"CMD_LINE"`
 	UserName     string `json:"USER_NAME"`

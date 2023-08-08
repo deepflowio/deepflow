@@ -355,6 +355,15 @@ CREATE TABLE IF NOT EXISTS vinterface_ip (
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 DELETE FROM vinterface_ip;
 
+CREATE TABLE IF NOT EXISTS vip (
+    id          INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    lcuuid      CHAR(64),
+    ip          CHAR(64),
+    domain      CHAR(64) DEFAULT '',
+    vtap_id     INTEGER
+) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
+TRUNCATE TABLE vip;
+
 CREATE TABLE IF NOT EXISTS ip_resource (
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -1776,6 +1785,15 @@ CREATE TABLE IF NOT EXISTS go_genesis_vm (
     created_at      DATETIME
 ) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
 TRUNCATE TABLE go_genesis_vm;
+
+CREATE TABLE IF NOT EXISTS go_genesis_vip (
+    id          INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    lcuuid      CHAR(64),
+    ip          CHAR(64),
+    vtap_id     INTEGER,
+    node_ip     CHAR(48)
+) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
+TRUNCATE TABLE go_genesis_vip;
 
 CREATE TABLE IF NOT EXISTS go_genesis_vpc (
     id              INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,

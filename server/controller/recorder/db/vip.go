@@ -14,9 +14,29 @@
  * limitations under the License.
  */
 
-package migration
+package db
 
-const (
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "6.3.1.37"
+import (
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
+
+type VIP struct {
+	OperatorBase[mysql.VIP]
+}
+
+func NewVIP() *VIP {
+	operator := &VIP{
+		OperatorBase[mysql.VIP]{
+			resourceTypeName: common.RESOURCE_TYPE_VIP_EN,
+			softDelete:       false,
+			allocateID:       false,
+		},
+	}
+	operator.setter = operator
+	return operator
+}
+
+func (p *VIP) setDBItemID(dbItem *mysql.VIP, id int) {
+	dbItem.ID = id
+}

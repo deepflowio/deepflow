@@ -153,3 +153,4 @@ panic = 'abort'
 
 [profile.dev]
 panic = 'abort'
+debug-assertions = false
