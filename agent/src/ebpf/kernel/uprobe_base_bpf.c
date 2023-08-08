@@ -197,9 +197,9 @@ static __inline bool skip_http2_kprobe(void)
 	if (!info) {
 		return false;
 	}
-	// must have net_TCPConn_itab
-	if (!info->net_TCPConn_itab) {
-		return false;
+
+	if (info->net_TCPConn_itab) {
+		return true;
 	}
 	// HTTP2
 	if (info->crypto_tls_Conn_itab) {
