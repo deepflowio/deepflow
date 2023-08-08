@@ -42,7 +42,8 @@ func (d *Debug) RegisterTo(e *gin.Engine) {
 	e.GET("/v1/info/:lcuuid/", getCloudResource(d.m))
 	e.GET("/v1/genesis/:type/", getGenesisSyncData(d.g, true))
 	e.GET("/v1/sync/:type/", getGenesisSyncData(d.g, false))
-	e.GET("/v1/agent-stats/:ip/", getAgentStats(d.g))
+	e.GET("/v1/agent-stats/:ipOrID/", getAgentStats(d.g))
+	e.GET("/v1/genesis-storage/:vtapID/", getGenesisStorage(d.g))
 	e.GET("/v1/kubernetes-info/:clusterID/", getGenesisKubernetesData(d.g))
 	e.GET("/v1/prometheus-info/:clusterID/", getGenesisPrometheusData(d.g))
 	e.GET("/v1/sub-tasks/:lcuuid/", getKubernetesGatherBasicInfos(d.m))
@@ -153,7 +154,14 @@ func getRecorderCacheToolMap(m *manager.Manager) gin.HandlerFunc {
 
 func getAgentStats(g *genesis.Genesis) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
-		data, err := service.GetAgentStats(g, c.Param("ip"))
+		data, err := service.GetAgentStats(g, c.Param("ipOrID"))
+		JsonResponse(c, data, err)
+	})
+}
+
+func getGenesisStorage(g *genesis.Genesis) gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		data, err := service.GetGenesisAgentStorage(c.Param("vtapID"))
 		JsonResponse(c, data, err)
 	})
 }
