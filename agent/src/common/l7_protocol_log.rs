@@ -121,6 +121,9 @@ macro_rules! impl_protocol_parser {
                     L7Protocol::Http2 | L7Protocol::Http2TLS => Some(L7ProtocolParser::Http(HttpLog::new_v2(false))),
                     L7Protocol::Grpc => Some(L7ProtocolParser::Http(HttpLog::new_v2(true))),
 
+                    // in check_payload, need to get the default Custom and ProtobufRpc parser by L7Protocol.
+                    // due to Custom not in macro, need to define explicit
+                    L7Protocol::Custom => Some(L7ProtocolParser::Custom(CustomWrapLog::default())),
                     $(
                         L7Protocol::$proto => Some(L7ProtocolParser::$proto(Default::default())),
                     )+
