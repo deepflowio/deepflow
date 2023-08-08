@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 use std::slice;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
@@ -313,6 +313,7 @@ impl EbpfCollector {
         }
     }
 
+    #[cfg(target_arch = "x86_64")]
     extern "C" fn ebpf_on_cpu_callback(data: *mut ebpf::stack_profile_data) {
         unsafe {
             if !SWITCH || EBPF_PROFILE_SENDER.is_none() {
@@ -326,8 +327,12 @@ impl EbpfCollector {
             profile.stime = data.stime;
             profile.pid = data.pid;
             profile.tid = data.tid;
-            profile.thread_name = String::from_utf8_lossy(&data.comm).to_string();
-            profile.process_name = String::from_utf8_lossy(&data.process_name).to_string();
+            profile.thread_name = CStr::from_ptr(data.comm.as_ptr() as *const i8)
+                .to_string_lossy()
+                .into_owned();
+            profile.process_name = CStr::from_ptr(data.process_name.as_ptr() as *const i8)
+                .to_string_lossy()
+                .into_owned();
             profile.u_stack_id = data.u_stack_id;
             profile.k_stack_id = data.k_stack_id;
             profile.cpu = data.cpu;
@@ -335,6 +340,41 @@ impl EbpfCollector {
             profile.data =
                 slice::from_raw_parts(data.stack_data as *mut u8, data.stack_data_len as usize)
                     .to_vec();
+
+            if let Err(e) = EBPF_PROFILE_SENDER.as_mut().unwrap().send(Profile(profile)) {
+                warn!("ebpf profile send error: {:?}", e);
+            }
+        }
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    extern "C" fn ebpf_on_cpu_callback(data: *mut ebpf::stack_profile_data) {
+        unsafe {
+            if !SWITCH || EBPF_PROFILE_SENDER.is_none() {
+                return;
+            }
+            let mut profile = metric::Profile::default();
+            let data = &mut *data;
+            profile.sample_rate = ON_CPU_PROFILE_FREQUENCY;
+            profile.timestamp = data.timestamp;
+            profile.event_type = metric::ProfileEventType::EbpfOnCpu.into();
+            profile.stime = data.stime;
+            profile.pid = data.pid;
+            profile.tid = data.tid;
+            profile.thread_name = CStr::from_ptr(data.comm.as_ptr() as *const u8)
+                .to_string_lossy()
+                .into_owned();
+            profile.process_name = CStr::from_ptr(data.process_name.as_ptr() as *const u8)
+                .to_string_lossy()
+                .into_owned();
+            profile.u_stack_id = data.u_stack_id;
+            profile.k_stack_id = data.k_stack_id;
+            profile.cpu = data.cpu;
+            profile.count = data.count;
+            profile.data =
+                slice::from_raw_parts(data.stack_data as *mut u8, data.stack_data_len as usize)
+                    .to_vec();
+
             if let Err(e) = EBPF_PROFILE_SENDER.as_mut().unwrap().send(Profile(profile)) {
                 warn!("ebpf profile send error: {:?}", e);
             }

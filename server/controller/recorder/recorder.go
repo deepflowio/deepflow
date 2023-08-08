@@ -260,6 +260,8 @@ func (r *Recorder) getDomainUpdatersInOrder(cloudData cloudmodel.Resource) []upd
 		updater.NewFloatingIP(r.cacheMng.DomainCache, cloudData.FloatingIPs).RegisterListener(
 			listener.NewFloatingIP(r.cacheMng.DomainCache)),
 		ip,
+		updater.NewVIP(r.cacheMng.DomainCache, cloudData.VIPs).RegisterListener(
+			listener.NewVIP(r.cacheMng.DomainCache)),
 		updater.NewVMPodNodeConnection(r.cacheMng.DomainCache, cloudData.VMPodNodeConnections).RegisterListener( // VMPodNodeConnection需放在最后
 			listener.NewVMPodNodeConnection(r.cacheMng.DomainCache)),
 		updater.NewProcess(r.cacheMng.DomainCache, cloudData.Processes).RegisterListener(

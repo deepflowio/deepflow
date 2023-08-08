@@ -90,7 +90,7 @@ type ProcessData struct {
 
 func GetProcessData(processes []*mysql.Process) (map[int]ProcessData, error) {
 	// store vtap info
-	vtapIDs := mapset.NewSet[int]()
+	vtapIDs := mapset.NewSet[uint32]()
 	for _, item := range processes {
 		vtapIDs.Add(item.VTapID)
 	}
@@ -162,24 +162,25 @@ func GetProcessData(processes []*mysql.Process) (map[int]ProcessData, error) {
 		var deviceType, resourceID int
 		var resourceName string
 
+		pVTapID := int(process.VTapID)
 		if podID, ok := containerIDToPodID[process.ContainerID]; ok {
 			deviceType = common.VIF_DEVICE_TYPE_POD
 			resourceName = podIDToName[podID]
 			resourceID = podID
 		} else {
-			deviceType = common.VTAP_TYPE_TO_DEVICE_TYPE[vtapIDToInfo[process.VTapID].Type]
+			deviceType = common.VTAP_TYPE_TO_DEVICE_TYPE[vtapIDToInfo[pVTapID].Type]
 			if deviceType == common.VIF_DEVICE_TYPE_VM {
-				resourceName = vmIDToName[vtapIDToInfo[process.VTapID].LaunchServerID]
+				resourceName = vmIDToName[vtapIDToInfo[pVTapID].LaunchServerID]
 			} else if deviceType == common.VIF_DEVICE_TYPE_POD_NODE {
-				resourceName = podNodeIDToName[vtapIDToInfo[process.VTapID].LaunchServerID]
+				resourceName = podNodeIDToName[vtapIDToInfo[pVTapID].LaunchServerID]
 			}
-			resourceID = vtapIDToInfo[process.VTapID].LaunchServerID
+			resourceID = vtapIDToInfo[pVTapID].LaunchServerID
 		}
 		resp[process.ID] = ProcessData{
 			ResourceType: deviceType,
 			ResourceID:   resourceID,
 			ResourceName: resourceName,
-			VTapName:     vtapIDToInfo[process.VTapID].Name,
+			VTapName:     vtapIDToInfo[pVTapID].Name,
 		}
 	}
 	return resp, nil

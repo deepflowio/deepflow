@@ -48,7 +48,7 @@ func RegisterGenesisCommand() *cobra.Command {
 			syncInfo(cmd, syncType)
 		},
 	}
-	syncInfo.Flags().StringVarP(&syncType, "type", "t", "vinterface", "genesis sync type: 'vm | vpc | host | port | lldp | ip | network | vinterface | process'\ndefault: vinterface")
+	syncInfo.Flags().StringVarP(&syncType, "type", "t", "vinterface", "genesis sync type: 'vm | vpc | host | port | lldp | ip | vip | network | vinterface | process'\ndefault: vinterface")
 
 	var k8sType string
 	k8sInfo := &cobra.Command{
@@ -124,6 +124,8 @@ func syncInfo(cmd *cobra.Command, resType string) {
 		tableNetwork(response, table)
 	case "ip":
 		tableIp(response, table)
+	case "vip":
+		tableVip(response, table)
 	case "vinterface":
 		tableVinterface(response, table)
 	case "process":
@@ -288,6 +290,22 @@ func tableIp(response *simplejson.Json, table *tablewriter.Table) {
 		tableItem := []string{}
 		tableItem = append(tableItem, data.Get("IP").MustString())
 		tableItem = append(tableItem, strconv.Itoa(data.Get("MASKLEN").MustInt()))
+		tableItems = append(tableItems, tableItem)
+	}
+
+	table.AppendBulk(tableItems)
+	table.Render()
+}
+
+func tableVip(response *simplejson.Json, table *tablewriter.Table) {
+	table.SetHeader([]string{"IP", "VTAP_ID"})
+
+	tableItems := [][]string{}
+	for i := range response.Get("DATA").MustArray() {
+		data := response.Get("DATA").GetIndex(i)
+		tableItem := []string{}
+		tableItem = append(tableItem, data.Get("IP").MustString())
+		tableItem = append(tableItem, strconv.Itoa(data.Get("VTAP_ID").MustInt()))
 		tableItems = append(tableItems, tableItem)
 	}
 

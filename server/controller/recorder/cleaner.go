@@ -123,6 +123,7 @@ func (c *Cleaner) cleanDeletedData(retentionInterval int) {
 	forceDelete[mysql.PodReplicaSet](expiredAt)
 	forceDelete[mysql.Pod](expiredAt)
 	forceDelete[mysql.Process](expiredAt)
+	forceDelete[mysql.PrometheusTarget](expiredAt)
 	log.Info("clean soft deleted resources completed")
 }
 

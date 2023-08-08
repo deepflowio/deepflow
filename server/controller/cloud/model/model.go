@@ -161,6 +161,12 @@ type IP struct {
 	SubDomainLcuuid  string `json:"sub_domain_lcuuid"`
 }
 
+type VIP struct {
+	Lcuuid string `json:"lcuuid" binding:"required"`
+	IP     string `json:"ip" binding:"required"`
+	VTapID uint32 `json:"vtap_id" binding:"required"`
+}
+
 type FloatingIP struct {
 	Lcuuid        string `json:"lcuuid" binding:"required"`
 	IP            string `json:"ip" binding:"required"`
@@ -472,8 +478,8 @@ type Pod struct {
 type Process struct {
 	Lcuuid          string    `json:"lcuuid" binding:"required"`
 	Name            string    `json:"name"`
-	VTapID          int       `json:"vtap_id" binding:"required"`
-	PID             int       `json:"pid" binding:"required"`
+	VTapID          uint32    `json:"vtap_id" binding:"required"`
+	PID             uint64    `json:"pid" binding:"required"`
 	ProcessName     string    `json:"process_name" binding:"required"`
 	CommandLine     string    `json:"command_line"`
 	UserName        string    `json:"user_name"`
@@ -550,6 +556,7 @@ type Resource struct {
 	ThirdPartyDevices      []ThirdPartyDevice
 	VInterfaces            []VInterface
 	IPs                    []IP
+	VIPs                   []VIP
 	FloatingIPs            []FloatingIP
 	PodClusters            []PodCluster
 	PodNodes               []PodNode

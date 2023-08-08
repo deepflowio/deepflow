@@ -191,6 +191,8 @@ func getGenesisSyncData(g *genesis.Genesis, isLocal bool) gin.HandlerFunc {
 			data = ret.Vinterfaces
 		case "process":
 			data = ret.Processes
+		case "vip":
+			data = ret.VIPs
 		default:
 			err = errors.New("not found " + dataType + " data")
 		}
