@@ -433,17 +433,20 @@ static __inline enum message_type infer_http_message(const char *buf,
 	return MSG_UNKNOWN;
 }
 
+// When calling this function, count must be a constant, and at this time, the
+// compiler can optimize it into an immediate value and write it into the
+// instruction.
 static __inline void save_prev_data(const char *buf,
-				    struct conn_info_t *conn_info)
+				    struct conn_info_t *conn_info, size_t count)
 {
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
-		*(__u32 *) conn_info->socket_info_ptr->prev_data =
-		    *(__u32 *) buf;
-		conn_info->socket_info_ptr->prev_data_len = 4;
+		bpf_probe_read(conn_info->socket_info_ptr->prev_data, count,
+			       buf);
+		conn_info->socket_info_ptr->prev_data_len = count;
 		conn_info->socket_info_ptr->direction = conn_info->direction;
 	} else {
-		*(__u32 *) conn_info->prev_buf = *(__u32 *) buf;
-		conn_info->prev_count = 4;
+		bpf_probe_read(conn_info->prev_buf, count, buf);
+		conn_info->prev_count = count;
 	}
 }
 
@@ -452,15 +455,16 @@ static __inline void save_prev_data(const char *buf,
 static __inline void check_and_fetch_prev_data(struct conn_info_t *conn_info)
 {
 	if (conn_info->socket_info_ptr != NULL &&
-	    conn_info->socket_info_ptr->prev_data_len == 4) {
+	    conn_info->socket_info_ptr->prev_data_len > 0) {
 		/*
 		 * For adjacent read/write in the same direction.
 		 */
 		if (conn_info->direction ==
 		    conn_info->socket_info_ptr->direction) {
-			*(__u32 *) conn_info->prev_buf =
-			    *(__u32 *) conn_info->socket_info_ptr->prev_data;
-			conn_info->prev_count = 4;
+			bpf_probe_read(conn_info->prev_buf,
+				       sizeof(conn_info->prev_buf),
+				       conn_info->socket_info_ptr->prev_data);
+			conn_info->prev_count = conn_info->socket_info_ptr->prev_data_len;
 		}
 
 		/*
@@ -492,7 +496,7 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 	}
 
 	if (count == 4) {
-		save_prev_data(buf, conn_info);
+		save_prev_data(buf, conn_info, 4);
 		return MSG_PRESTORE;
 	}
 
@@ -1336,7 +1340,7 @@ static __inline enum message_type infer_kafka_message(const char *buf,
 	}
 
 	if (count == 4) {
-		save_prev_data(buf, conn_info);
+		save_prev_data(buf, conn_info, 4);
 		return MSG_PRESTORE;
 	}
 
@@ -1412,6 +1416,87 @@ static __inline enum message_type infer_kafka_message(const char *buf,
 
 	// kafka长连接的形式存在，数据开始捕获从类型推断完成开始进行。
 	// 此处数据（用于确认协议类型）丢弃不要，避免发给用户产生混乱。
+	return MSG_UNKNOWN;
+}
+
+struct fastcgi_header {
+	__u8 version;
+	__u8 type;
+	__u16 request_id;
+	__u16 content_length; // cannot be 0
+	__u8 padding_length;
+	__u8 __unused;
+} __attribute__((packed));
+
+#define FCGI_BEGIN_REQUEST 1
+#define FCGI_PARAMS 4
+#define FCGI_STDOUT 6
+
+static bool fastcgi_header_common_check(struct fastcgi_header *header)
+{
+	if (header->version != 1) {
+		return false;
+	}
+	if (header->padding_length >= 8) {
+		return false;
+	}
+
+	if ((__bpf_ntohs(header->content_length) + header->padding_length) %
+	    8) {
+		return false;
+	}
+	return true;
+}
+
+// NOTE: Nginx receives packets as much as possible in the form of TCP streams,
+// resulting in no way to find the location of the header. In this case,
+// protocol identification cannot be performed. The performance of the upper
+// layer is that php-fpm sends multiple responses continuously, but nginx can
+// only receive the first response.
+static __inline enum message_type
+infer_fastcgi_message(const char *buf, size_t count,
+		      struct conn_info_t *conn_info)
+{
+	if (count < 8 || !is_protocol_enabled(PROTO_FASTCGI)) {
+		return MSG_UNKNOWN;
+	}
+
+	struct fastcgi_header *header = NULL;
+	header = (struct fastcgi_header *)buf;
+
+	if (fastcgi_header_common_check(header) && count == 8 &&
+	    (header->type == FCGI_PARAMS || header->type == FCGI_STDOUT) &&
+	    __bpf_ntohs(header->content_length) != 0) {
+		save_prev_data(buf, conn_info, 8);
+		return MSG_PRESTORE;
+	}
+
+	if (fastcgi_header_common_check(header) && count > 8 &&
+	    __bpf_ntohs(header->content_length) != 0) {
+		if (header->type == FCGI_BEGIN_REQUEST) {
+			return MSG_REQUEST;
+		}
+		if (header->type == FCGI_STDOUT) {
+			return MSG_RESPONSE;
+		}
+	}
+
+	if (conn_info->prev_count != 8) {
+		return MSG_UNKNOWN;
+	}
+
+	header = (struct fastcgi_header *)conn_info->prev_buf;
+	if (__bpf_ntohs(header->content_length) + header->padding_length !=
+	    count) {
+		return MSG_UNKNOWN;
+	}
+
+	if (header->type == FCGI_BEGIN_REQUEST) {
+		return MSG_REQUEST;
+	}
+	if (header->type == FCGI_STDOUT) {
+		return MSG_RESPONSE;
+	}
 	return MSG_UNKNOWN;
 }
 
@@ -1599,6 +1684,16 @@ infer_protocol(struct ctx_info_s *ctx,
 				return inferred_message;
 			}
 			break;
+		case PROTO_FASTCGI:
+			if ((inferred_message.type =
+			     infer_fastcgi_message(infer_buf, count,
+						  conn_info)) != MSG_UNKNOWN) {
+				if (inferred_message.type == MSG_PRESTORE)
+					return inferred_message;
+				inferred_message.protocol = PROTO_FASTCGI;
+				return inferred_message;
+			}
+			break;		
 		case PROTO_SOFARPC:
 			if ((inferred_message.type =
 			     infer_sofarpc_message(infer_buf, count,
@@ -1719,6 +1814,16 @@ infer_protocol(struct ctx_info_s *ctx,
 		if (inferred_message.type == MSG_PRESTORE)
 			return inferred_message;
 		inferred_message.protocol = PROTO_KAFKA;
+#ifdef LINUX_VER_5_2_PLUS
+	} else if (skip_proto != PROTO_FASTCGI && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_fastcgi_message(infer_buf, count,
+					  conn_info)) != MSG_UNKNOWN) {
+		if (inferred_message.type == MSG_PRESTORE)
+			return inferred_message;
+		inferred_message.protocol = PROTO_FASTCGI;
 #ifdef LINUX_VER_5_2_PLUS
 	} else if (skip_proto != PROTO_SOFARPC && (inferred_message.type =
 #else

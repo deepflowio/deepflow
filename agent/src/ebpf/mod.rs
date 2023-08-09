@@ -55,6 +55,8 @@ pub const SOCK_DATA_DUBBO: u16 = 40;
 #[allow(dead_code)]
 pub const SOCK_DATA_SOFARPC: u16 = 43;
 #[allow(dead_code)]
+pub const SOCK_DATA_FASTCGI: u16 = 44;
+#[allow(dead_code)]
 pub const SOCK_DATA_MYSQL: u16 = 60;
 #[allow(dead_code)]
 pub const SOCK_DATA_POSTGRESQL: u16 = 61;

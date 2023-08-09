@@ -62,6 +62,7 @@ enum traffic_protocol {
 	PROTO_TLS_HTTP2 = 23,
 	PROTO_DUBBO = 40,
 	PROTO_SOFARPC = 43,
+	PROTO_FASTCGI = 44,
 	PROTO_MYSQL = 60,
 	PROTO_POSTGRESQL = 61,
 	PROTO_REDIS = 80,
@@ -78,6 +79,10 @@ struct protocol_message_t {
 
 #ifndef TASK_COMM_LEN
 #define TASK_COMM_LEN 16
+#endif
+
+#ifndef EBPF_CACHE_SIZE
+#define EBPF_CACHE_SIZE 8
 #endif
 
 #endif /* DF_BPF_COMMON_H */
