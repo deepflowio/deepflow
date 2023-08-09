@@ -25,10 +25,8 @@ const (
 )
 
 const (
-	DATABASE_PROFILE       = "profile"
-	TABLE_PROFILE          = "in_process"
-	PROFILE_LOCATION_STR   = "profile_location_str"
-	PROFILE_NODE_ID        = "profile_node_id"
-	PROFILE_PARENT_NODE_ID = "profile_parent_node_id"
-	PROFILE_VALUE          = "profile_value"
+	DATABASE_PROFILE     = "profile"
+	TABLE_PROFILE        = "in_process"
+	PROFILE_LOCATION_STR = "profile_location_str"
+	PROFILE_VALUE        = "profile_value"
 )
