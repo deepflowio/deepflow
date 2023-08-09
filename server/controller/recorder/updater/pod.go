@@ -55,14 +55,6 @@ func (p *Pod) generateDBItemToAdd(cloudItem *cloudmodel.Pod) (*mysql.Pod, bool) 
 		))
 		return nil, false
 	}
-	podNodeID, exists := p.cache.ToolDataSet.GetPodNodeIDByLcuuid(cloudItem.PodNodeLcuuid)
-	if !exists {
-		log.Errorf(resourceAForResourceBNotFound(
-			common.RESOURCE_TYPE_POD_NODE_EN, cloudItem.PodNodeLcuuid,
-			common.RESOURCE_TYPE_POD_EN, cloudItem.Lcuuid,
-		))
-		return nil, false
-	}
 	podNamespaceID, exists := p.cache.ToolDataSet.GetPodNamespaceIDByLcuuid(cloudItem.PodNamespaceLcuuid)
 	if !exists {
 		log.Errorf(resourceAForResourceBNotFound(
@@ -108,7 +100,7 @@ func (p *Pod) generateDBItemToAdd(cloudItem *cloudmodel.Pod) (*mysql.Pod, bool) 
 		State:           cloudItem.State,
 		PodClusterID:    podClusterID,
 		PodNamespaceID:  podNamespaceID,
-		PodNodeID:       podNodeID,
+		PodNodeID:       p.cache.ToolDataSet.GetPodNodeIDByLcuuid(cloudItem.PodNodeLcuuid),
 		PodReplicaSetID: podReplicaSetID,
 		PodGroupID:      podGroupID,
 		SubDomain:       cloudItem.SubDomainLcuuid,
@@ -138,15 +130,7 @@ func (p *Pod) generateUpdateInfo(diffBase *cache.Pod, cloudItem *cloudmodel.Pod)
 		updateInfo["epc_id"] = vpcID
 	}
 	if diffBase.PodNodeLcuuid != cloudItem.PodNodeLcuuid {
-		podNodeID, exists := p.cache.ToolDataSet.GetPodNodeIDByLcuuid(cloudItem.PodNodeLcuuid)
-		if !exists {
-			log.Errorf(resourceAForResourceBNotFound(
-				common.RESOURCE_TYPE_POD_NODE_EN, cloudItem.PodNodeLcuuid,
-				common.RESOURCE_TYPE_POD_EN, cloudItem.Lcuuid,
-			))
-			return nil, false
-		}
-		updateInfo["pod_node_id"] = podNodeID
+		updateInfo["pod_node_id"] = p.cache.ToolDataSet.GetPodNodeIDByLcuuid(cloudItem.PodNodeLcuuid)
 	}
 	if diffBase.PodReplicaSetLcuuid != cloudItem.PodReplicaSetLcuuid {
 		var podReplicaSetID int
