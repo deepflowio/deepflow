@@ -26,4 +26,5 @@ message AlarmEvent {
     optional uint32 event_level = 19;
     optional string alarm_target = 20;
     optional uint32 user_id = 21;
+    optional string uid_name = 22;
 }
