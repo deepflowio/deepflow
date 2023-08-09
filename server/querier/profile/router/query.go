@@ -42,6 +42,7 @@ func profileTracing(cfg *config.QuerierConfig) gin.HandlerFunc {
 			router.BadRequestResponse(c, common.INVALID_POST_DATA, err.Error())
 			return
 		}
+		profileTracing.Context = c.Request.Context()
 		result, debug, err := service.Tracing(profileTracing, cfg)
 		if err == nil && !profileTracing.Debug {
 			debug = nil
