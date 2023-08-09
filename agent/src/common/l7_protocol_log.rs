@@ -283,6 +283,9 @@ pub struct LogCache {
     pub msg_type: LogMessageType,
     pub time: u64,
     pub kafka_info: Option<KafkaInfoCache>,
+    // req_end, resp_end, merged
+    // set merged to true when req and resp merge once
+    pub multi_merge_info: Option<(bool, bool, bool)>,
 }
 
 pub struct L7PerfCache {

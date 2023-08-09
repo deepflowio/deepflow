@@ -566,15 +566,16 @@ impl HttpLog {
             self.perf_stats.as_mut().map(|p| p.inc_resp());
         }
 
-        if info.is_req_end || info.is_resp_end {
-            info.cal_rrt(param, None).map(|rrt| {
-                info.rrt = rrt;
-                self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-            });
-        }
-
         info.version = String::from("2");
         info.stream_id = Some(stream_id);
+
+        info.cal_rrt_for_multi_merge_log(param).map(|rrt| {
+            info.rrt = rrt;
+        });
+
+        if info.is_req_end || info.is_resp_end {
+            self.perf_stats.as_mut().map(|p| p.update_rrt(info.rrt));
+        }
         return Ok(());
     }
 
