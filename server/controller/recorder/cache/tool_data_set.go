@@ -782,7 +782,10 @@ func (t *ToolDataSet) addPodNode(item *mysql.PodNode) {
 
 func (t *ToolDataSet) updatePodNode(cloudItem *cloudmodel.PodNode) {
 	defer log.Info(updateToolMap(RESOURCE_TYPE_POD_NODE_EN, cloudItem.Lcuuid))
-	id, _ := t.GetPodNodeIDByLcuuid(cloudItem.Lcuuid)
+	id := t.GetPodNodeIDByLcuuid(cloudItem.Lcuuid)
+	if id == 0 {
+		return
+	}
 	info, err := t.GetPodNodeInfoByID(id)
 	if err != nil {
 		log.Error(err)
@@ -804,7 +807,10 @@ func (t *ToolDataSet) updatePodNode(cloudItem *cloudmodel.PodNode) {
 }
 
 func (t *ToolDataSet) deletePodNode(lcuuid string) {
-	id, _ := t.GetPodNodeIDByLcuuid(lcuuid)
+	id := t.GetPodNodeIDByLcuuid(lcuuid)
+	if id == 0 {
+		return
+	}
 	delete(t.podNodeIDToLcuuid, id)
 	delete(t.podNodeIDToInfo, id)
 	delete(t.podNodeLcuuidToID, lcuuid)
@@ -961,6 +967,7 @@ func (t *ToolDataSet) updatePod(cloudItem *cloudmodel.Pod) {
 		return
 	}
 	info.Name = cloudItem.Name
+	info.PodNodeID = t.GetPodNodeIDByLcuuid(cloudItem.PodNodeLcuuid)
 	if regionID, ok := t.GetRegionIDByLcuuid(cloudItem.RegionLcuuid); ok {
 		info.RegionID = regionID
 	}
@@ -975,9 +982,6 @@ func (t *ToolDataSet) updatePod(cloudItem *cloudmodel.Pod) {
 	}
 	if id, ok := t.GetPodNamespaceIDByLcuuid(cloudItem.PodNamespaceLcuuid); ok {
 		info.PodNamespaceID = id
-	}
-	if id, ok := t.GetPodNodeIDByLcuuid(cloudItem.PodNodeLcuuid); ok {
-		info.PodNodeID = id
 	}
 	if id, ok := t.GetPodGroupIDByLcuuid(cloudItem.PodGroupLcuuid); ok {
 		info.PodGroupID = id
@@ -1339,7 +1343,7 @@ func (t *ToolDataSet) GetDeviceIDByDeviceLcuuid(deviceType int, deviceLcuuid str
 	} else if deviceType == common.VIF_DEVICE_TYPE_REDIS_INSTANCE {
 		return t.GetRedisInstanceIDByLcuuid(deviceLcuuid)
 	} else if deviceType == common.VIF_DEVICE_TYPE_POD_NODE {
-		return t.GetPodNodeIDByLcuuid(deviceLcuuid)
+		return t.GetPodNodeIDByLcuuid(deviceLcuuid), true
 	} else if deviceType == common.VIF_DEVICE_TYPE_POD_SERVICE {
 		return t.GetPodServiceIDByLcuuid(deviceLcuuid)
 	} else if deviceType == common.VIF_DEVICE_TYPE_POD {
@@ -1497,20 +1501,23 @@ func (t *ToolDataSet) GetPodClusterIDByLcuuid(lcuuid string) (int, bool) {
 	}
 }
 
-func (t *ToolDataSet) GetPodNodeIDByLcuuid(lcuuid string) (int, bool) {
+func (t *ToolDataSet) GetPodNodeIDByLcuuid(lcuuid string) int {
+	if lcuuid == "" {
+		return 0
+	}
 	id, exists := t.podNodeLcuuidToID[lcuuid]
 	if exists {
-		return id, true
+		return id
 	}
 	log.Warning(cacheIDByLcuuidNotFound(RESOURCE_TYPE_POD_NODE_EN, lcuuid))
 	var podNode mysql.PodNode
 	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&podNode)
 	if result.RowsAffected == 1 {
 		t.addPodNode(&podNode)
-		return podNode.ID, true
+		return podNode.ID
 	} else {
 		log.Error(dbResourceByLcuuidNotFound(RESOURCE_TYPE_POD_NODE_EN, lcuuid))
-		return id, false
+		return 0
 	}
 }
 
