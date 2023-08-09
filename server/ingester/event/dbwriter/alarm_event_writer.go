@@ -46,24 +46,29 @@ type AlarmEventStore struct {
 	Lcuuid string
 	User   string
 
-	PolicyId           uint32
-	PolicyName         string
-	PolicyLevel        uint32
-	PolicyAppType      uint32
-	PolicySubType      uint32
-	PolicyContrastType uint32
-	PolicyDataLevel    string
-	PolicyTargetUid    string
-	PolicyTargetName   string
-	PolicyGoTo         string
-	PolicyTargetField  string
-	PolicyEndpoints    string
-	TriggerCondition   string
-	TriggerValue       int64
-	ValueUnit          string
-	EventLevel         uint32
-	AlarmTarget        string
-	RegionId           uint16
+	PolicyId                uint32
+	PolicyName              string
+	PolicyLevel             uint32
+	PolicyAppType           uint32
+	PolicySubType           uint32
+	PolicyContrastType      uint32
+	PolicyDataLevel         string
+	PolicyTargetUid         string
+	PolicyTargetName        string
+	PolicyGoTo              string
+	PolicyTargetField       string
+	PolicyEndpoints         string
+	TriggerCondition        string
+	TriggerValue            int64
+	ValueUnit               string
+	EventLevel              uint32
+	AlarmTarget             string
+	RegionId                uint16
+	PolicyQueryUrl          string
+	PolicyQueryConditions   string
+	PolicyThresholdCritical string
+	PolicyThresholdError    string
+	PolicyThresholdWarning  string
 }
 
 func AlarmEventColumns() []*ckdb.Column {
@@ -90,6 +95,11 @@ func AlarmEventColumns() []*ckdb.Column {
 		ckdb.NewColumn("event_level", ckdb.UInt32),
 		ckdb.NewColumn("alarm_target", ckdb.LowCardinalityString),
 		ckdb.NewColumn("region_id", ckdb.UInt16),
+		ckdb.NewColumn("policy_query_url", ckdb.String),
+		ckdb.NewColumn("policy_query_conditions", ckdb.String),
+		ckdb.NewColumn("policy_threshold_critical", ckdb.String),
+		ckdb.NewColumn("policy_threshold_error", ckdb.String),
+		ckdb.NewColumn("policy_threshold_warning", ckdb.String),
 	}
 }
 
@@ -116,6 +126,11 @@ func (e *AlarmEventStore) WriteBlock(block *ckdb.Block) {
 		e.EventLevel,
 		e.AlarmTarget,
 		e.RegionId,
+		e.PolicyQueryUrl,
+		e.PolicyQueryConditions,
+		e.PolicyThresholdCritical,
+		e.PolicyThresholdError,
+		e.PolicyThresholdWarning,
 	)
 }
 
@@ -127,7 +142,7 @@ func GenAlarmEventCKTable(cluster, storagePolicy string, ttl int, coldStorage *c
 	table := common.ALARM_EVENT.TableName()
 	timeKey := "time"
 	engine := ckdb.MergeTree
-	orderKeys := []string{"policy_id", "policy_name"}
+	orderKeys := []string{"time", "policy_id", "policy_name"}
 
 	return &ckdb.Table{
 		Version:         basecommon.CK_VERSION,
