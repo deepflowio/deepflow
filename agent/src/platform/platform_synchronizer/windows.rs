@@ -34,8 +34,8 @@ use crate::{
     config::handler::PlatformAccess,
     exception::ExceptionHandler,
     rpc::Session,
-    utils::command::{get_hostname, get_ip_address},
     trident::AgentId,
+    utils::command::{get_hostname, get_ip_address},
 };
 use public::proto::trident::{self, Exception};
 

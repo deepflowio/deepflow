@@ -412,7 +412,10 @@ impl Trident {
             AgentId { ip, mac }
         };
         #[cfg(target_os = "windows")]
-        let agent_id = AgentId { ip: ctrl_ip.clone(), mac: ctrl_mac };
+        let agent_id = AgentId {
+            ip: ctrl_ip.clone(),
+            mac: ctrl_mac,
+        };
 
         info!(
             "agent {} running in {:?} mode, ctrl_ip {} ctrl_mac {}",
