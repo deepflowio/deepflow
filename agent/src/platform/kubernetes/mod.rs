@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use std::{fs, net::IpAddr, os::unix::io::AsRawFd};
+use std::{fs, os::unix::io::AsRawFd};
 
 use arc_swap::access::Access;
 use enum_dispatch::enum_dispatch;
@@ -67,15 +67,7 @@ pub fn check_read_link_ns() -> bool {
 }
 
 impl GenericPoller {
-    pub fn new(
-        dest: IpAddr,
-        config: PlatformAccess,
-        extra_netns_regex: String,
-        sidecar_mode: bool,
-    ) -> Self {
-        if sidecar_mode {
-            return SidecarPoller::new(dest).into();
-        }
+    pub fn new(config: PlatformAccess, extra_netns_regex: String) -> Self {
         let (can_set_ns, can_read_link_ns) = (check_set_ns(), check_read_link_ns());
 
         if !can_set_ns || !can_read_link_ns {
