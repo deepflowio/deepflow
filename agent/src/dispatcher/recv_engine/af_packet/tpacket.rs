@@ -390,6 +390,10 @@ impl Tpacket {
         tpacket.set_version()?;
         tpacket.set_ring()?;
         tpacket.mmap_ring()?;
+        tpacket.set_bpf(vec![bpf::BpfSyntax::RetConstant(bpf::RetConstant {
+            val: 0,
+        })
+        .to_instruction()])?;
         Ok(tpacket)
     }
 }

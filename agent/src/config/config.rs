@@ -291,6 +291,7 @@ pub struct EbpfKprobePortlist {
 pub struct OnCpuProfile {
     pub disabled: bool,
     pub frequency: u16,
+    pub cpu: u16,
     pub regex: String,
 }
 
@@ -299,7 +300,8 @@ impl Default for OnCpuProfile {
         OnCpuProfile {
             disabled: false,
             frequency: 99,
-            regex: "^deepflow-.*".to_string(),
+            cpu: 0,
+            regex: "".to_string(),
         }
     }
 }

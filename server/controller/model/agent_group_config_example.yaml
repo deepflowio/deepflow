@@ -1147,9 +1147,13 @@ vtap_group_id: g-xxxxxx
       ## Default: 99
       #frequency: 99
 
+      ## CPUID will not be included in the aggregation of stack trace data.
+      ## Default: 0
+      #cpu: 0
+
       ## Sampling process name
-      ## Default: ^deepflow-.*
-      #regex: ^deepflow-.*
+      ## Default: ""
+      #regex:
 
   ######################################
   ## Agent Running in Standalone Mode ##

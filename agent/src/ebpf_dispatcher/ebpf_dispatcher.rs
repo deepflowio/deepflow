@@ -541,7 +541,7 @@ impl EbpfCollector {
                 );
 
                 // CPUID will not be included in the aggregation of stack trace data.
-                set_profiler_cpu_aggregation(0);
+                set_profiler_cpu_aggregation(on_cpu_profile_config.cpu as i32);
             }
 
             ebpf::bpf_tracer_finish();
