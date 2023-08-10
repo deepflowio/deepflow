@@ -389,6 +389,7 @@ impl Trident {
             );
         }
 
+        #[cfg(target_os = "linux")]
         let agent_id = if sidecar_mode {
             AgentId {
                 ip: ctrl_ip.clone(),
@@ -410,6 +411,8 @@ impl Trident {
             };
             AgentId { ip, mac }
         };
+        #[cfg(target_os = "windows")]
+        let agent_id = AgentId { ip: ctrl_ip.clone(), mac: ctrl_mac };
 
         info!(
             "agent {} running in {:?} mode, ctrl_ip {} ctrl_mac {}",
@@ -1003,6 +1006,7 @@ impl DomainNameListener {
         let domain_names = self.domain_names.clone();
         let stopped = self.stopped.clone();
 
+        #[cfg(target_os = "linux")]
         let sidecar_mode = self.sidecar_mode;
 
         info!(
@@ -1041,6 +1045,7 @@ impl DomainNameListener {
                                 "use K8S_NODE_IP_FOR_DEEPFLOW env ip as destination_ip({})",
                                 ctrl_ip
                             );
+                            #[cfg(target_os = "linux")]
                             let agent_id = if sidecar_mode {
                                 AgentId { ip: ctrl_ip.clone(), mac: ctrl_mac }
                             } else {
@@ -1059,6 +1064,8 @@ impl DomainNameListener {
                                 };
                                 AgentId { ip, mac }
                             };
+                            #[cfg(target_os = "windows")]
+                            let agent_id = AgentId { ip: ctrl_ip.clone(), mac: ctrl_mac };
 
                             synchronizer.reset_session(ips.clone(), agent_id);
                             platform_synchronizer.reset_session(ips.clone());
