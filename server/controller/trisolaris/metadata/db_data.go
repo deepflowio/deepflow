@@ -69,6 +69,7 @@ type DBDataCache struct {
 	pcapPolicies            []*models.PcapPolicy
 	cens                    []*models.CEN
 	processes               []*models.Process
+	vips                    []*models.VIP
 
 	podNSs    []*models.PodNamespace
 	vtaps     []*models.VTap
@@ -266,6 +267,10 @@ func (d *DBDataCache) GetVTapsIDAndName() []*models.VTap {
 
 func (d *DBDataCache) GetChDevicesIDTypeAndName() []*models.ChDevice {
 	return d.chDevices
+}
+
+func (d *DBDataCache) GetVIPs() []*models.VIP {
+	return d.vips
 }
 
 func GetTapTypesFromDB(db *gorm.DB) []*models.TapType {
@@ -589,7 +594,7 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 		log.Error(err)
 	}
 
-	vtaps, err := dbmgr.DBMgr[models.VTap](db).GetFields([]string{"id", "name"})
+	vtaps, err := dbmgr.DBMgr[models.VTap](db).GetFields([]string{"id", "name", "launch_server_id"})
 	if err == nil {
 		d.vtaps = vtaps
 	} else {
@@ -599,6 +604,13 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 	chDevices, err := dbmgr.DBMgr[models.ChDevice](db).GetFields([]string{"devicetype", "deviceid", "name"})
 	if err == nil {
 		d.chDevices = chDevices
+	} else {
+		log.Error(err)
+	}
+
+	vips, err := dbmgr.DBMgr[models.VIP](db).Gets()
+	if err == nil {
+		d.vips = vips
 	} else {
 		log.Error(err)
 	}
