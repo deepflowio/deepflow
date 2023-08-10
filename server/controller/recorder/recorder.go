@@ -161,7 +161,6 @@ func (r *Recorder) runNewRefreshWhole(cloudData cloudmodel.Resource) {
 
 func (r *Recorder) refreshDomain(cloudData cloudmodel.Resource) {
 	log.Infof("domain (lcuuid: %s, name: %s) refresh started", r.domainLcuuid, r.domainName)
-	r.updateDomainSyncedAt()
 
 	// 指定创建及更新操作的资源顺序
 	// 基本原则：无依赖资源优先；实时性需求高资源优先
@@ -170,6 +169,9 @@ func (r *Recorder) refreshDomain(cloudData cloudmodel.Resource) {
 	r.executeUpdaters(domainUpdatersInUpdateOrder)
 	r.notifyOnResourceChanged(domainUpdatersInUpdateOrder)
 	listener.OnUpdatersCompleted()
+
+	r.updateDomainSyncedAt(cloudData.SyncAt)
+
 	log.Infof("domain (lcuuid: %s, name: %s) refresh completed", r.domainLcuuid, r.domainName)
 }
 
@@ -290,13 +292,13 @@ func (r *Recorder) refreshSubDomains(cloudSubDomainResourceMap map[string]cloudm
 		}
 		log.Infof("sub_domain (lcuuid: %s) sync refresh started", subDomainLcuuid)
 
-		r.updateSubDomainSyncedAt(subDomainLcuuid)
-
 		listener := listener.NewWholeSubDomain(r.domainLcuuid, subDomainLcuuid, r.cacheMng.DomainCache, r.eventQueue)
 		subDomainUpdatersInUpdateOrder := r.getSubDomainUpdatersInOrder(subDomainLcuuid, subDomainResource, nil, nil)
 		r.executeUpdaters(subDomainUpdatersInUpdateOrder)
 		r.notifyOnResourceChanged(subDomainUpdatersInUpdateOrder)
 		listener.OnUpdatersCompleted()
+
+		r.updateSubDomainSyncedAt(subDomainLcuuid, subDomainResource.SyncAt)
 
 		log.Infof("sub_domain (lcuuid: %s) sync refresh completed", subDomainLcuuid)
 	}
@@ -477,28 +479,32 @@ func (r *Recorder) updateStateInfo(cloudData cloudmodel.Resource) {
 }
 
 // TODO 提供db操作接口
-func (r *Recorder) updateDomainSyncedAt() {
+func (r *Recorder) updateDomainSyncedAt(syncAt time.Time) {
+	if syncAt.IsZero() {
+		return
+	}
 	var domain mysql.Domain
 	err := mysql.Db.Where("lcuuid = ?", r.domainLcuuid).First(&domain).Error
 	if err != nil {
 		log.Errorf("get domain (lcuuid: %s) from db failed: %s", r.domainLcuuid, err)
 		return
 	}
-	now := time.Now()
-	domain.SyncedAt = &now
+	domain.SyncedAt = &syncAt
 	mysql.Db.Save(&domain)
 	log.Debugf("update domain (%+v)", domain)
 }
 
-func (r *Recorder) updateSubDomainSyncedAt(lcuuid string) {
+func (r *Recorder) updateSubDomainSyncedAt(lcuuid string, syncAt time.Time) {
+	if syncAt.IsZero() {
+		return
+	}
 	var subDomain mysql.SubDomain
 	err := mysql.Db.Where("lcuuid = ?", lcuuid).First(&subDomain).Error
 	if err != nil {
 		log.Errorf("get sub_domain (lcuuid: %s) from db failed: %s", lcuuid, err)
 		return
 	}
-	now := time.Now()
-	subDomain.SyncedAt = &now
+	subDomain.SyncedAt = &syncAt
 	mysql.Db.Save(&subDomain)
 	log.Debugf("update sub_domain (%+v)", subDomain)
 }

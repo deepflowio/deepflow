@@ -17,8 +17,10 @@
 package cloud
 
 import (
-	"inet.af/netaddr"
 	"net"
+	"time"
+
+	"inet.af/netaddr"
 
 	kubernetes_model "github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
@@ -95,6 +97,7 @@ func (c *Cloud) getSubDomainData(cResource model.Resource) map[string]model.SubD
 		// 生成SubDomainResource
 		subDomainResource := model.SubDomainResource{
 			Verified:               true,
+			SyncAt:                 time.Now(),
 			ErrorState:             kubernetesGatherResource.ErrorState,
 			ErrorMessage:           kubernetesGatherResource.ErrorMessage,
 			PodClusters:            podClusters,

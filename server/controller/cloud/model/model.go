@@ -503,6 +503,7 @@ type SubDomainResource struct {
 	Verified               bool `json:"verified"`
 	ErrorState             int
 	ErrorMessage           string
+	SyncAt                 time.Time
 	Networks               []Network
 	Subnets                []Subnet
 	VInterfaces            []VInterface
@@ -528,6 +529,7 @@ type Resource struct {
 	Verified               bool
 	ErrorState             int
 	ErrorMessage           string
+	SyncAt                 time.Time
 	SubDomains             []SubDomain
 	Regions                []Region
 	AZs                    []AZ
