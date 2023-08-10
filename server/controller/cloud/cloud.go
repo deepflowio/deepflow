@@ -183,6 +183,7 @@ func (c *Cloud) getCloudData() {
 		}
 	}
 
+	cResource.SyncAt = time.Now()
 	c.resource = cResource
 }
 
