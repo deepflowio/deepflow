@@ -100,7 +100,7 @@ use crate::{
 use crate::{
     ebpf_dispatcher::EbpfCollector,
     platform::{
-        kubernetes::{GenericPoller, Poller},
+        kubernetes::{GenericPoller, Poller, SidecarPoller},
         ApiWatcher, LibvirtXmlExtractor, SocketSynchronizer,
     },
     utils::{
@@ -530,7 +530,7 @@ impl Trident {
         monitor.start();
 
         #[cfg(target_os = "linux")]
-        let (libvirt_xml_extractor, platform_synchronizer) = {
+        let (libvirt_xml_extractor, platform_synchronizer, sidecar_poller) = {
             let ext = Arc::new(LibvirtXmlExtractor::new());
             let syn = Arc::new(PlatformSynchronizer::new(
                 runtime.clone(),
@@ -548,7 +548,17 @@ impl Trident {
                 HashMap::new(),
             ));
             ext.start();
-            (ext, syn)
+            let poller = if sidecar_mode {
+                let p: Arc<GenericPoller> = Arc::new(
+                    SidecarPoller::new(config_handler.static_config.controller_ips[0].parse()?)
+                        .into(),
+                );
+                syn.set_kubernetes_poller(p.clone());
+                Some(p)
+            } else {
+                None
+            };
+            (ext, syn, poller)
         };
         #[cfg(target_os = "windows")]
         let platform_synchronizer = Arc::new(PlatformSynchronizer::new(
@@ -707,6 +717,8 @@ impl Trident {
                         #[cfg(target_os = "linux")]
                         libvirt_xml_extractor.clone(),
                         platform_synchronizer.clone(),
+                        #[cfg(target_os = "linux")]
+                        sidecar_poller.clone(),
                         #[cfg(target_os = "linux")]
                         api_watcher.clone(),
                         vm_mac_addrs,
@@ -1375,6 +1387,7 @@ impl AgentComponents {
         remote_log_config: RemoteLogConfig,
         #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
         platform_synchronizer: Arc<PlatformSynchronizer>,
+        #[cfg(target_os = "linux")] sidecar_poller: Option<Arc<GenericPoller>>,
         #[cfg(target_os = "linux")] api_watcher: Arc<ApiWatcher>,
         vm_mac_addrs: Vec<MacAddr>,
         agent_mode: RunningMode,
@@ -1469,18 +1482,19 @@ impl AgentComponents {
         // TODO: packet handler builders
 
         #[cfg(target_os = "linux")]
-        let kubernetes_poller = Arc::new(GenericPoller::new(
-            config_handler.static_config.controller_ips[0].parse()?,
-            config_handler.platform(),
-            config_handler
-                .candidate_config
-                .dispatcher
-                .extra_netns_regex
-                .clone(),
-            sidecar_mode,
-        ));
-        #[cfg(target_os = "linux")]
-        platform_synchronizer.set_kubernetes_poller(kubernetes_poller.clone());
+        // sidecar poller is created before agent start to provide pod interface info for server
+        let kubernetes_poller = sidecar_poller.unwrap_or_else(|| {
+            let poller = Arc::new(GenericPoller::new(
+                config_handler.platform(),
+                config_handler
+                    .candidate_config
+                    .dispatcher
+                    .extra_netns_regex
+                    .clone(),
+            ));
+            platform_synchronizer.set_kubernetes_poller(poller.clone());
+            poller
+        });
 
         #[cfg(target_os = "linux")]
         let prometheus_targets_watcher = Arc::new(TargetsWatcher::new(
@@ -2563,6 +2577,7 @@ impl Components {
         remote_log_config: RemoteLogConfig,
         #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
         platform_synchronizer: Arc<PlatformSynchronizer>,
+        #[cfg(target_os = "linux")] sidecar_poller: Option<Arc<GenericPoller>>,
         #[cfg(target_os = "linux")] api_watcher: Arc<ApiWatcher>,
         vm_mac_addrs: Vec<MacAddr>,
         agent_mode: RunningMode,
@@ -2596,6 +2611,8 @@ impl Components {
             #[cfg(target_os = "linux")]
             libvirt_xml_extractor,
             platform_synchronizer,
+            #[cfg(target_os = "linux")]
+            sidecar_poller,
             #[cfg(target_os = "linux")]
             api_watcher,
             vm_mac_addrs,
