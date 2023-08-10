@@ -35,7 +35,7 @@ func RegisterGenesisCommand() *cobra.Command {
 		Use:   "genesis",
 		Short: "genesis operation commands",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("please run with 'sync | k8s | agent'.")
+			fmt.Println("please run with 'sync | k8s | agent | storage'.")
 		},
 	}
 
@@ -73,9 +73,18 @@ func RegisterGenesisCommand() *cobra.Command {
 	agentInfo := &cobra.Command{
 		Use:     "agent",
 		Short:   "genesis agent info",
-		Example: "deepflow-ctl genesis agent -i node_ip [host_ip]",
+		Example: "deepflow-ctl genesis agent -i node_ip [host_ip or vtap_id]",
 		Run: func(cmd *cobra.Command, args []string) {
 			agentInfo(cmd, args)
+		},
+	}
+
+	storageInfo := &cobra.Command{
+		Use:     "storage",
+		Short:   "genesis storage info",
+		Example: "deepflow-ctl genesis storage vtap_id",
+		Run: func(cmd *cobra.Command, args []string) {
+			storageInfo(cmd, args)
 		},
 	}
 
@@ -83,6 +92,7 @@ func RegisterGenesisCommand() *cobra.Command {
 	genesis.AddCommand(k8sInfo)
 	genesis.AddCommand(agentInfo)
 	genesis.AddCommand(prometheusInfo)
+	genesis.AddCommand(storageInfo)
 	return genesis
 }
 
@@ -406,27 +416,16 @@ func prometheusInfo(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	server := common.GetServerInfo(cmd)
-	url := fmt.Sprintf("http://%s:%d/v1/prometheus-info/%s/", server.IP, server.Port, args[0])
+	path := fmt.Sprintf("/v1/prometheus-info/%s/", args[0])
+	common.GetURLInfo(cmd, path)
+}
 
-	response, err := common.CURLPerform("GET", url, nil, "")
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+func storageInfo(cmd *cobra.Command, args []string) {
+	if len(args) == 0 {
+		fmt.Fprintf(os.Stderr, "must specify vtap id.\nExample: %s\n", cmd.Example)
 		return
 	}
 
-	responseByte, err := response.MarshalJSON()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return
-	}
-
-	var str bytes.Buffer
-	err = json.Indent(&str, responseByte, "", "    ")
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return
-	}
-
-	fmt.Println(str.String())
+	path := fmt.Sprintf("/v1/genesis-storage/%s/", args[0])
+	common.GetURLInfo(cmd, path)
 }

@@ -35,7 +35,7 @@ import (
 var log = logging.MustGetLogger("config")
 
 const (
-	DefaultContrallerIP             = "127.0.0.1"
+	DefaultControllerIP             = "127.0.0.1"
 	DefaultControllerPort           = 20035
 	DefaultCheckInterval            = 300 // clickhouse是异步删除
 	DefaultDiskUsedPercent          = 80
@@ -176,7 +176,7 @@ func (c *Config) Validate() error {
 	}
 
 	// should get node ip from ENV
-	if c.NodeIP == "" && c.ControllerIPs[0] == DefaultContrallerIP {
+	if c.NodeIP == "" && c.ControllerIPs[0] == DefaultControllerIP {
 		nodeIP, exist := os.LookupEnv(EnvK8sNodeIP)
 		if !exist {
 			log.Errorf("Can't get env %s", EnvK8sNodeIP)
@@ -357,7 +357,7 @@ func Load(path string) *Config {
 		LogFile:  "/var/log/deepflow/server.log",
 		LogLevel: "info",
 		Base: Config{
-			ControllerIPs:   []string{DefaultContrallerIP},
+			ControllerIPs:   []string{DefaultControllerIP},
 			ControllerPort:  DefaultControllerPort,
 			CKDBAuth:        Auth{"default", ""},
 			IngesterEnabled: true,

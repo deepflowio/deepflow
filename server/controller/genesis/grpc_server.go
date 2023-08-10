@@ -19,6 +19,7 @@ package genesis
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"sync"
 	"time"
 
@@ -89,14 +90,23 @@ func NewGenesisSynchronizerServer(cfg config.GenesisConfig, genesisSyncQueue, k8
 	}
 }
 
-func (g *SynchronizerServer) GetAgentStats(ip string) []TridentStats {
+func (g *SynchronizerServer) GetAgentStats(param string) []TridentStats {
 	result := []TridentStats{}
-	g.tridentStatsMap.Range(func(_, value interface{}) bool {
-		if ip == "" || value.(TridentStats).IP == ip {
-			result = append(result, value.(TridentStats))
+	vtapID, err := strconv.Atoi(param)
+	if err != nil {
+		s, ok := g.tridentStatsMap.Load(uint32(vtapID))
+		if !ok {
+			return result
 		}
-		return true
-	})
+		result = append(result, s.(TridentStats))
+	} else {
+		g.tridentStatsMap.Range(func(_, value interface{}) bool {
+			if param == "" || value.(TridentStats).IP == param {
+				result = append(result, value.(TridentStats))
+			}
+			return true
+		})
+	}
 	return result
 }
 

@@ -93,17 +93,14 @@ func (p *PodNode) ProduceByUpdate(cloudItem *cloudmodel.PodNode, diffBase *cache
 
 func (p *PodNode) ProduceByDelete(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		var id int
 		var name string
-		id, ok := p.ToolDataSet.GetPodNodeIDByLcuuid(lcuuid)
-		if ok {
+		id := p.ToolDataSet.GetPodNodeIDByLcuuid(lcuuid)
+		if id != 0 {
 			var err error
 			name, err = p.ToolDataSet.GetPodNodeNameByID(id)
 			if err != nil {
 				log.Errorf("%v, %v", idByLcuuidNotFound(p.resourceType, lcuuid), err)
 			}
-		} else {
-			log.Error(nameByIDNotFound(p.resourceType, id))
 		}
 
 		p.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, p.deviceType, id)

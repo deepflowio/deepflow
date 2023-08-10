@@ -17,6 +17,8 @@
 package router
 
 import (
+	"strconv"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
@@ -41,6 +43,7 @@ func executeQuery() gin.HandlerFunc {
 		args.Context = c.Request.Context()
 		args.Debug = c.Query("debug")
 		args.QueryUUID = c.Query("query_uuid")
+		args.PreWhere, _ = strconv.ParseBool(c.DefaultQuery("prewhere", "true"))
 		if args.QueryUUID == "" {
 			query_uuid := uuid.New()
 			args.QueryUUID = query_uuid.String()
