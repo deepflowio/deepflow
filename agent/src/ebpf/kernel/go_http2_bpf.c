@@ -1050,22 +1050,23 @@ static __inline int fill_http2_dataframe_data(struct __http2_stack *stack,
 	struct __http2_dataframe *dataframe = &(stack->http2_dataframe);
 	struct __socket_data *send_buffer = &(stack->send_buffer);
 
-	__u32 count = 8 + len;
-	send_buffer->syscall_len = count;
-	send_buffer->data_len = count;
-
 	dataframe->stream_id = stream_id;
-	dataframe->data_len = len;
+	dataframe->data_len = 0;
 
 	if (len < HTTP2_DATAFRAME_DATA_SIZE) {
 		// Make old eBPF validator happy
 		if (len > 0) {
 			bpf_probe_read(dataframe->data, len + 1, buffer);
+			dataframe->data_len = len;
 		}
 	} else {
 		bpf_probe_read(dataframe->data, HTTP2_DATAFRAME_DATA_SIZE,
 			       buffer);
+		dataframe->data_len = HTTP2_DATAFRAME_DATA_SIZE;
 	}
+
+	send_buffer->syscall_len = dataframe->data_len + 8;
+	send_buffer->data_len = dataframe->data_len + 8;
 
 	return 0;
 }
