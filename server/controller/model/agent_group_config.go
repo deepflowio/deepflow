@@ -159,6 +159,7 @@ type EbpfKprobePortlist struct {
 type OnCpuProfile struct {
 	Disabled  *bool   `yaml:"disabled,omitempty"`
 	Frequency *int    `yaml:"frequency,omitempty"`
+	Cpu       *int    `yaml:"cpu,omitempty"`
 	Regex     *string `yaml:"regex,omitempty"`
 }
 
