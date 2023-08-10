@@ -59,7 +59,7 @@ type CHEngine struct {
 	View               *view.View
 	Context            context.Context
 	TargetLabelFilters []TargetLabelFilter
-	PreWhere           bool
+	NoPreWhere         bool
 }
 
 func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map[string]interface{}, error) {
@@ -69,7 +69,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	var err error
 	sql := args.Sql
 	e.Context = args.Context
-	e.PreWhere = args.PreWhere
+	e.NoPreWhere = args.NoPreWhere
 	query_uuid := args.QueryUUID // FIXME: should be queryUUID
 	log.Debugf("query_uuid: %s | raw sql: %s", query_uuid, sql)
 	// Parse slimitSql
@@ -123,7 +123,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 			FormatLimit(e.Model)
 			// 使用Model生成View
 			e.View = view.NewView(e.Model)
-			e.View.PreWhere = e.PreWhere
+			e.View.NoPreWhere = e.NoPreWhere
 			chSql := e.ToSQLString()
 			callbacks := e.View.GetCallbacks()
 			debug.Sql = chSql
@@ -156,7 +156,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	FormatModel(e.Model)
 	// 使用Model生成View
 	e.View = view.NewView(e.Model)
-	e.View.PreWhere = e.PreWhere
+	e.View.NoPreWhere = e.NoPreWhere
 	chSql := e.ToSQLString()
 	callbacks := e.View.GetCallbacks()
 	debug.Sql = chSql
@@ -846,7 +846,6 @@ func (e *CHEngine) ToSQLString() string {
 		FormatLimit(e.Model)
 		// 使用Model生成View
 		e.View = view.NewView(e.Model)
-		e.View.PreWhere = true
 	}
 	// View生成clickhouse-sql
 	chSql := e.View.ToString()
