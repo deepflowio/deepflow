@@ -661,6 +661,9 @@ static void cp_reader_work(void *arg)
 	reader_b = &t->readers[1];
 
 	for (;;) {
+		if (unlikely(profiler_stop == 1))
+			goto exit;
+
 		/* 
 		 * Waiting for the regular expression to be configured
 		 * and start working. 
@@ -669,9 +672,6 @@ static void cp_reader_work(void *arg)
 			sleep(1);
 			continue;
 		}
-
-		if (unlikely(profiler_stop == 1))
-			goto exit;
 
 		tracer_reader_lock(t);
 		process_bpf_stacktraces(t, reader_a, reader_b);
@@ -1012,7 +1012,8 @@ void release_flame_graph_hash(void)
 		  test_fg_hash.hash_elems_count, test_fg_hash.hit_hash_count);
 
 	ebpf_info(LOG_CP_TAG "flame graph folded strings count %lu\n", elems_count);
-	fclose(folded_file);
+	if (folded_file)
+		fclose(folded_file);
 
 	stack_trace_msg_hash_free(&test_fg_hash);
 
