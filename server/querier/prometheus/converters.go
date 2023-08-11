@@ -110,7 +110,7 @@ const (
 
 type ctxKeyPrefixType struct{}
 
-func PromReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (contxt context.Context, sql string, db string, datasource string, err error) {
+func PromReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest, startTime int64, endTime int64) (contxt context.Context, sql string, db string, datasource string, err error) {
 	// QPS Limit Check
 	// Both SetRate and Acquire are expanded by 1000 times, making it suitable for small QPS scenarios.
 	if !QPSLeakyBucket.Acquire(1000) {
@@ -124,9 +124,8 @@ func PromReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (contxt 
 	}
 	q := queriers[0]
 	// pp.Println(q)
-
-	startTime := q.Hints.StartMs / 1000
-	endTime := q.Hints.EndMs / 1000
+	startTime = startTime / 1000
+	endTime = endTime / 1000
 	if q.EndTimestampMs%1000 > 0 {
 		endTime += 1
 	}
