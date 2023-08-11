@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,23 +14,38 @@
  * limitations under the License.
  */
 
-package resource
+package redis
 
 import (
-	ctrlcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/config"
+	"sync"
+
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/redis"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/http/model"
-	"github.com/deepflowio/deepflow/server/controller/http/service/resource/data"
-	"github.com/deepflowio/deepflow/server/controller/http/service/resource/filter/generator"
+	mysqldp "github.com/deepflowio/deepflow/server/controller/http/service/resource/data/mysql"
 )
 
-type VPC struct {
-	ServiceGet
+var (
+	ipOnce sync.Once
+	ip     *IP
+)
+
+type IP struct {
+	DataProvider
 }
 
-func NewVPCGet(urlInfo *model.URLInfo, userInfo *model.UserInfo, redisCfg redis.Config, fpermitCfg config.FPermit) *VPC {
-	s := &VPC{newServiceGet(ctrlcommon.RESOURCE_TYPE_VPC_EN, data.GetDataProvider(ctrlcommon.RESOURCE_TYPE_VPC_EN, &data.RequiredConfigs{}))}
-	s.generateDataContext(urlInfo, userInfo, generator.NewVPC(fpermitCfg))
-	return s
+func GetIP(cfg redis.Config) *IP {
+	ipOnce.Do(func() {
+		ip = &IP{
+			DataProvider: DataProvider{
+				resourceType: ctrlrcommon.RESOURCE_TYPE_IP_EN,
+				next:         mysqldp.NewIP(),
+				client:       getClient(cfg),
+				keyConv:      newKeyConvertor[model.IPQueryStoredInRedis](),
+				urlPath:      httpcommon.PATH_ALL_IP,
+			},
+		}
+	})
+	return ip
 }

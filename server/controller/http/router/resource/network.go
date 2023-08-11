@@ -28,28 +28,28 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource"
 )
 
-type VPC struct {
+type Network struct {
 	httpCfg    httpCfg.Config
 	redisCfg   dbredis.Config
 	fpermitCfg config.FPermit
 }
 
-func NewVPC(hCfg httpCfg.Config, rCfg dbredis.Config, fCfg config.FPermit) *VPC {
-	return &VPC{httpCfg: hCfg, redisCfg: rCfg, fpermitCfg: fCfg}
+func NewNetwork(hCfg httpCfg.Config, rCfg dbredis.Config, fCfg config.FPermit) *Network {
+	return &Network{httpCfg: hCfg, redisCfg: rCfg, fpermitCfg: fCfg}
 }
 
-func (p *VPC) RegisterTo(ge *gin.Engine) {
-	ge.GET(httpcommon.PATH_VPC, p.Get)
+func (p *Network) RegisterTo(ge *gin.Engine) {
+	ge.GET(httpcommon.PATH_NETWORK, p.Get)
 }
 
-func (p *VPC) Get(c *gin.Context) {
+func (p *Network) Get(c *gin.Context) {
 	header := NewHeaderValidator(c.Request.Header, p.fpermitCfg)
-	query := NewQueryValidator[model.VPCQuery](c.Request.URL.Query())
+	query := NewQueryValidator[model.NetworkQuery](c.Request.URL.Query())
 	if err := NewValidators(header, query).Validate(); err != nil {
 		common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
 		return
 	}
-	service := resource.NewVPCGet(
+	service := resource.NewNetworkGet(
 		NewURLInfo(
 			c.Request.URL.String(),
 			query.structData,
@@ -67,6 +67,6 @@ func (p *VPC) Get(c *gin.Context) {
 	}
 }
 
-func (p *VPC) Update(c *gin.Context) {
+func (p *Network) Update(c *gin.Context) {
 
 }

@@ -115,7 +115,9 @@ func (s *Server) RegisterRouters() {
 		resource.NewHost(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
 		resource.NewVM(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
 		resource.NewVInterface(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
-		resource.NewVPC(),
+		resource.NewVPC(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
+		resource.NewNetwork(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
+		resource.NewIP(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
 		resource.NewVRouter(s.controllerConfig.HTTPCfg, s.controllerConfig.FPermit),
 		resource.NewRoutingTable(s.controllerConfig.HTTPCfg, s.controllerConfig.FPermit),
 		resource.NewSecurityGroup(s.controllerConfig.HTTPCfg, s.controllerConfig.FPermit),
@@ -140,6 +142,7 @@ func (s *Server) RegisterRouters() {
 		resource.NewPodIngressRule(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
 		resource.NewPodNode(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
 		resource.NewPodCluster(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
+		resource.NewPodNamespace(s.controllerConfig.HTTPCfg, s.controllerConfig.RedisCfg, s.controllerConfig.FPermit),
 	} {
 		i.RegisterTo(s.engine)
 	}

@@ -90,6 +90,14 @@ func GetDataProvider(resourceType string, cfg *RequiredConfigs) provider.DataPro
 		return redisdp.GetPodNode(cfg.Redis)
 	case common.RESOURCE_TYPE_POD_CLUSTER_EN:
 		return redisdp.GetPodCluster(cfg.Redis)
+	case common.RESOURCE_TYPE_POD_NAMESPACE_EN:
+		return redisdp.GetPodNamespace(cfg.Redis)
+	case common.RESOURCE_TYPE_VPC_EN:
+		return mysql.NewVPC()
+	case common.RESOURCE_TYPE_NETWORK_EN:
+		return mysql.NewNetwork()
+	case common.RESOURCE_TYPE_IP_EN:
+		return redisdp.GetIP(cfg.Redis)
 
 	default:
 		return nil

@@ -115,7 +115,7 @@ type NetworkQueryStoredInRedis struct {
 
 type VPCQuery struct {
 	VPCQueryStoredInRedis
-	RefreshCacheParam
+	IncludedFieldsParam
 }
 
 type VPCQueryStoredInRedis struct {
