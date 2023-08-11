@@ -120,13 +120,15 @@ func (m *ExtMetrics) GenCKTable(cluster, storagePolicy string, ttl int, coldStor
 		// FIXME: Currently there is no virtual_table_name column in the deepflow_system database,
 		// but it will be unified in the future.
 		orderKeys = append(orderKeys, "virtual_table_name")
+		orderKeys = append(orderKeys, timeKey)
 
 		// order key in universal tags
 		orderKeys = append(orderKeys, "l3_epc_id")
 		orderKeys = append(orderKeys, "ip4")
 		orderKeys = append(orderKeys, "ip6")
+	} else {
+		orderKeys = append(orderKeys, timeKey)
 	}
-	orderKeys = append(orderKeys, timeKey)
 
 	return &ckdb.Table{
 		Database:        m.DatabaseName(),

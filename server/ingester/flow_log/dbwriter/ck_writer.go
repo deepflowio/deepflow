@@ -40,16 +40,17 @@ type FlowLogWriter struct {
 }
 
 func newFlowLogTable(id common.FlowLogID, columns []*ckdb.Column, engine ckdb.EngineType, cluster, storagePolicy string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
-	var orderKeys = []string{}
-	flowKeys := []string{"l3_epc_id_1", "ip4_1", "ip6_1", "l3_epc_id_0", "ip4_0", "ip6_0", "server_port"}
+	timeKey := id.TimeKey()
+	var orderKeys = []string{timeKey}
+	flowKeys := []string{"l3_epc_id_1", "ip4_1", "ip6_1", "server_port"}
 	switch id {
 	case common.L7_FLOW_ID:
-		orderKeys = []string{"l7_protocol"}
+		orderKeys = append(orderKeys, "l7_protocol")
 		orderKeys = append(orderKeys, flowKeys...)
 	case common.L4_FLOW_ID:
-		orderKeys = flowKeys
+		orderKeys = append(orderKeys, flowKeys...)
 	case common.L4_PACKET_ID:
-		orderKeys = []string{"flow_id", "vtap_id"}
+		orderKeys = append(orderKeys, "flow_id", "vtap_id")
 	default:
 		panic("unreachalable")
 	}
@@ -61,7 +62,7 @@ func newFlowLogTable(id common.FlowLogID, columns []*ckdb.Column, engine ckdb.En
 		LocalName:       id.String() + "_local",
 		GlobalName:      id.String(),
 		Columns:         columns,
-		TimeKey:         id.TimeKey(),
+		TimeKey:         timeKey,
 		Engine:          engine,
 		Cluster:         cluster,
 		StoragePolicy:   storagePolicy,
