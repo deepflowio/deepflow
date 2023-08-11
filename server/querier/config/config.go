@@ -66,11 +66,20 @@ type Clickhouse struct {
 }
 
 type Prometheus struct {
-	QPSLimit              int    `default:"100" yaml:"qps-limit"`
-	SeriesLimit           int    `default:"100" yaml:"series-limit"`
-	MaxSamples            int    `default:"50000000" yaml:"max-samples"`
-	AutoTaggingPrefix     string `default:"df_" yaml:"auto-tagging-prefix"`
-	RequestQueryWithDebug bool   `default:"false" yaml:"request-query-with-debug"`
+	QPSLimit              int             `default:"100" yaml:"qps-limit"`
+	SeriesLimit           int             `default:"100" yaml:"series-limit"`
+	MaxSamples            int             `default:"50000000" yaml:"max-samples"`
+	AutoTaggingPrefix     string          `default:"df_" yaml:"auto-tagging-prefix"`
+	RequestQueryWithDebug bool            `default:"false" yaml:"request-query-with-debug"`
+	Cache                 PrometheusCache `yaml:"cache"`
+}
+
+type PrometheusCache struct {
+	// cache config
+	Enabled                bool    `default:"true" yaml:"enabled"`
+	CacheItemSize          uint64  `default:"51200000" yaml:"cache-item-size"` // cache-item-size for each cache item, default: 50M
+	CacheMaxCount          int     `default:"1024" yaml:"cache-max-count"`     // cache-max-count for list of cache size
+	CacheMaxAllowDeviation float64 `default:"3600" yaml:"cache-max-allow-deviation"`
 }
 
 func (c *Config) expendEnv() {

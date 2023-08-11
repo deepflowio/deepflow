@@ -241,6 +241,12 @@ querier:
     max-samples: 50000000
     auto-tagging-prefix: df_
     request-query-with-debug: true
+    cache:
+      enabled: true
+      cache-item-size: 512000 # max size of cache item, unit: byte
+      cache-max-count: 1024 # max capacity of cache list
+      cache-max-allow-deviation: 3600 # max allow deviation between query time & cache time, unit:s 
+
 
 ingester:
   #ckdb:

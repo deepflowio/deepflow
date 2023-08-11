@@ -260,7 +260,7 @@ func TestPromReaderTransToSQL(t *testing.T) {
 				},
 			})
 
-			_, sql, db, ds, err := PromReaderTransToSQL(ctx, &prompb.ReadRequest{Queries: queries})
+			_, sql, db, ds, err := PromReaderTransToSQL(ctx, &prompb.ReadRequest{Queries: queries}, startMs, endMs)
 
 			if !p.hasError {
 				So(err, ShouldBeNil)
