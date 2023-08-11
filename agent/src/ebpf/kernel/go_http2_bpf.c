@@ -196,22 +196,24 @@ static __inline void report_http2_header(struct pt_regs *ctx)
 		return;
 	}
 
-	stack->events_num = 1;
-	stack->len = SOCKET_DATA_HEADER + stack->send_buffer.syscall_len;
-
-	__u32 send_size = (stack->len + 8) & 2047;
-	static const int SEND_SIZE_MAX =
-		sizeof(struct __socket_data) +
+	static const int BUF_DATA_OFFSET =
 		offsetof(typeof(struct __socket_data_buffer), data);
-	if (send_size < SEND_SIZE_MAX) {
+	static const int SEND_SIZE_MAX =
+		sizeof(struct __socket_data) + BUF_DATA_OFFSET;
+
+	stack->events_num = 1;
+	stack->len = SOCKET_DATA_HEADER + stack->send_buffer.data_len;
+
+	__u32 send_size = (stack->len + BUF_DATA_OFFSET) &
+		(sizeof(stack->send_buffer.data) - 1);
+
+	if (send_size < SEND_SIZE_MAX && send_size > 0) {
 		bpf_perf_event_output(ctx, &NAME(socket_data),
 				      BPF_F_CURRENT_CPU, stack, 1 + send_size);
 		return;
 	}
-	const __u32 diff = send_size - SEND_SIZE_MAX;
+
 	send_size = SEND_SIZE_MAX;
-	stack->len -= diff;
-	stack->send_buffer.data_len -= diff;
 	bpf_perf_event_output(ctx, &NAME(socket_data), BPF_F_CURRENT_CPU, stack,
 			      SEND_SIZE_MAX);
 	return;
@@ -417,7 +419,8 @@ http2_fill_buffer_and_send(struct http2_header_data *data,
 	buffer->header_len = data->name.len & 0x03FF;
 	buffer->value_len = data->value.len & 0x03FF;
 
-	__u32 count = 16 + buffer->header_len + buffer->value_len;
+	static const int BUF_OFFSET = offsetof(typeof(struct __http2_buffer), info);
+	__u32 count = BUF_OFFSET + buffer->header_len + buffer->value_len;
 	if (count > HTTP2_BUFFER_INFO_SIZE)
 		return;
 	send_buffer->syscall_len = count;
@@ -1065,8 +1068,9 @@ static __inline int fill_http2_dataframe_data(struct __http2_stack *stack,
 		dataframe->data_len = HTTP2_DATAFRAME_DATA_SIZE;
 	}
 
-	send_buffer->syscall_len = dataframe->data_len + 8;
-	send_buffer->data_len = dataframe->data_len + 8;
+	static const int OFFSET = offsetof(typeof(struct __http2_dataframe), data);
+	send_buffer->syscall_len = dataframe->data_len + OFFSET;
+	send_buffer->data_len = dataframe->data_len + OFFSET;
 
 	return 0;
 }

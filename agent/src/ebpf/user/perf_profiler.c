@@ -669,6 +669,7 @@ static void cp_reader_work(void *arg)
 		 * and start working. 
 		 */
 		if (unlikely(!regex_existed)) {
+			exec_symbol_cache_update();
 			sleep(1);
 			continue;
 		}
