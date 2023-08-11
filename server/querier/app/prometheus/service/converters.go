@@ -114,7 +114,7 @@ const (
 
 type ctxKeyPrefixType struct{}
 
-func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest) (context.Context, string, string, string, string, error) {
+func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb.ReadRequest, startTime int64, endTime int64) (context.Context, string, string, string, string, error) {
 	// QPS Limit Check
 	// Both SetRate and Acquire are expanded by 1000 times, making it suitable for small QPS scenarios.
 	if !QPSLeakyBucket.Acquire(1000) {
@@ -126,8 +126,8 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 		return ctx, "", "", "", "", errors.New("len(req.Queries) == 0, this feature is not yet implemented!")
 	}
 	q := queriers[0]
-	startTime := q.Hints.StartMs / 1000
-	endTime := q.Hints.EndMs / 1000
+	startTime = startTime / 1000
+	endTime = endTime / 1000
 	if q.EndTimestampMs%1000 > 0 {
 		endTime += 1
 	}

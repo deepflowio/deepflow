@@ -264,6 +264,11 @@ querier:
     request-query-with-debug: true
     external-tag-cache-size: 1024
     external-tag-load-interval: 300
+    cache:
+      enabled: true
+      cache-item-size: 512000 # max size of cache item, unit: byte
+      cache-max-count: 1024 # max capacity of cache list
+      cache-max-allow-deviation: 3600 # unit:s 
 
 ingester:
   ## whether Ingester store metrics/flow_log... to database
