@@ -438,7 +438,6 @@ pub struct WatcherConfig {
     pub list_limit: u32,
     pub list_interval: Duration,
     pub max_memory: u64,
-    pub memory_trim_percent: Option<u8>,
 }
 
 // 发生错误，需要重新构造实例
@@ -658,67 +657,12 @@ where
         r
     }
 
-    fn memory_trim(ctx: &mut Context<K>) {
-        #[cfg(all(target_os = "linux", target_env = "gnu"))]
-        if let Some(percent) = ctx.config.memory_trim_percent {
-            let process = match procfs::process::Process::myself() {
-                Ok(p) => p,
-                Err(e) => {
-                    warn!("Get self process failed: {}", e);
-                    return;
-                }
-            };
-            let status = match process.status() {
-                Ok(s) => s,
-                Err(e) => {
-                    warn!("Get process status failed: {}", e);
-                    return;
-                }
-            };
-            let max_memory = ctx.config.max_memory >> 10;
-            debug!(
-                "max memory: {}KB Rss: anon={}KB file={}KB shmem={}KB",
-                max_memory,
-                status.rssanon.unwrap_or_default(),
-                status.rssfile.unwrap_or_default(),
-                status.rssshmem.unwrap_or_default()
-            );
-            if max_memory
-                <= status.rssfile.unwrap_or_default() + status.rssshmem.unwrap_or_default()
-            {
-                warn!(
-                    "max memory {}KB is smaller than RssFile + RssShmem",
-                    max_memory
-                );
-                return;
-            }
-            let real_percent = status.rssanon.unwrap_or_default() * 100
-                / (max_memory
-                    - status.rssfile.unwrap_or_default()
-                    - status.rssshmem.unwrap_or_default());
-            if real_percent < percent as u64 {
-                debug!(
-                    "RssAnon percent is {} < {}, skip trimming",
-                    real_percent, percent
-                );
-                return;
-            }
-            unsafe {
-                if libc::malloc_trim(0) > 0 {
-                    debug!("malloc_trim released memory");
-                } else {
-                    debug!("malloc_trim cannot release memory");
-                }
-            }
-        }
-    }
-
     // calling list on multiple resources simultaneously may consume a lot of memory
     // use serialized_get_list_entry to avoid oom
     async fn get_list_entry(ctx: &mut Context<K>, encoder: &mut ZlibEncoder<Vec<u8>>) -> bool {
         info!(
-            "list {} entries with limit {}, memory trim percent: {:?}",
-            ctx.kind, ctx.config.list_limit, ctx.config.memory_trim_percent,
+            "list {} entries with limit {}",
+            ctx.kind, ctx.config.list_limit,
         );
         let mut all_entries = HashMap::new();
         let mut total_count = 0;
@@ -801,14 +745,11 @@ where
                             ctx.stats_counter
                                 .list_length
                                 .fetch_add(total_count as u32, Ordering::Relaxed);
-                            Self::memory_trim(ctx);
                             return true;
                         }
                         _ => (),
                     }
                     params.continue_token = object_list.metadata.continue_.take();
-
-                    Self::memory_trim(ctx);
                 }
                 Err(err) => {
                     ctx.stats_counter.list_error.fetch_add(1, Ordering::Relaxed);
