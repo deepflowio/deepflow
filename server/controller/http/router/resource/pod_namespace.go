@@ -28,28 +28,28 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource"
 )
 
-type VPC struct {
+type PodNamespace struct {
 	httpCfg    httpCfg.Config
 	redisCfg   dbredis.Config
 	fpermitCfg config.FPermit
 }
 
-func NewVPC(hCfg httpCfg.Config, rCfg dbredis.Config, fCfg config.FPermit) *VPC {
-	return &VPC{httpCfg: hCfg, redisCfg: rCfg, fpermitCfg: fCfg}
+func NewPodNamespace(hCfg httpCfg.Config, rCfg dbredis.Config, fCfg config.FPermit) *PodNamespace {
+	return &PodNamespace{httpCfg: hCfg, redisCfg: rCfg, fpermitCfg: fCfg}
 }
 
-func (p *VPC) RegisterTo(ge *gin.Engine) {
-	ge.GET(httpcommon.PATH_VPC, p.Get)
+func (p *PodNamespace) RegisterTo(ge *gin.Engine) {
+	ge.GET(httpcommon.PATH_POD_NAMESPACE, p.Get)
 }
 
-func (p *VPC) Get(c *gin.Context) {
+func (p *PodNamespace) Get(c *gin.Context) {
 	header := NewHeaderValidator(c.Request.Header, p.fpermitCfg)
-	query := NewQueryValidator[model.VPCQuery](c.Request.URL.Query())
+	query := NewQueryValidator[model.PodNamespaceQuery](c.Request.URL.Query())
 	if err := NewValidators(header, query).Validate(); err != nil {
 		common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
 		return
 	}
-	service := resource.NewVPCGet(
+	service := resource.NewPodNamespaceGet(
 		NewURLInfo(
 			c.Request.URL.String(),
 			query.structData,
@@ -67,6 +67,6 @@ func (p *VPC) Get(c *gin.Context) {
 	}
 }
 
-func (p *VPC) Update(c *gin.Context) {
+func (p *PodNamespace) Update(c *gin.Context) {
 
 }

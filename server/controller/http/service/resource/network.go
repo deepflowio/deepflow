@@ -25,12 +25,12 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/filter/generator"
 )
 
-type VPC struct {
+type Network struct {
 	ServiceGet
 }
 
-func NewVPCGet(urlInfo *model.URLInfo, userInfo *model.UserInfo, redisCfg redis.Config, fpermitCfg config.FPermit) *VPC {
-	s := &VPC{newServiceGet(ctrlcommon.RESOURCE_TYPE_VPC_EN, data.GetDataProvider(ctrlcommon.RESOURCE_TYPE_VPC_EN, &data.RequiredConfigs{}))}
-	s.generateDataContext(urlInfo, userInfo, generator.NewVPC(fpermitCfg))
+func NewNetworkGet(urlInfo *model.URLInfo, userInfo *model.UserInfo, redisCfg redis.Config, fpermitCfg config.FPermit) *Network {
+	s := &Network{newServiceGet(ctrlcommon.RESOURCE_TYPE_NETWORK_EN, data.GetDataProvider(ctrlcommon.RESOURCE_TYPE_NETWORK_EN, &data.RequiredConfigs{}))}
+	s.generateDataContext(urlInfo, userInfo, generator.NewNetwork(fpermitCfg))
 	return s
 }

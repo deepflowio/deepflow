@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,7 +17,7 @@
 package resource
 
 import (
-	ctrlcommon "github.com/deepflowio/deepflow/server/controller/common"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/redis"
 	"github.com/deepflowio/deepflow/server/controller/http/model"
@@ -25,12 +25,12 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/filter/generator"
 )
 
-type VPC struct {
+type IP struct {
 	ServiceGet
 }
 
-func NewVPCGet(urlInfo *model.URLInfo, userInfo *model.UserInfo, redisCfg redis.Config, fpermitCfg config.FPermit) *VPC {
-	s := &VPC{newServiceGet(ctrlcommon.RESOURCE_TYPE_VPC_EN, data.GetDataProvider(ctrlcommon.RESOURCE_TYPE_VPC_EN, &data.RequiredConfigs{}))}
-	s.generateDataContext(urlInfo, userInfo, generator.NewVPC(fpermitCfg))
+func NewIPGet(urlInfo *model.URLInfo, userInfo *model.UserInfo, redisCfg redis.Config, fpermitCfg config.FPermit) *IP {
+	s := &IP{newServiceGet(ctrlrcommon.RESOURCE_TYPE_IP_EN, data.GetDataProvider(ctrlrcommon.RESOURCE_TYPE_IP_EN, &data.RequiredConfigs{Redis: redisCfg}))}
+	s.generateDataContext(urlInfo, userInfo, generator.NewIP(fpermitCfg))
 	return s
 }

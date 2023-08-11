@@ -61,6 +61,10 @@ const (
 	PATH_POD_INGRESS_RULE    = "/v2/pod-ingress-rules/"
 	PATH_POD_NODE            = "/v2/pod-nodes/"
 	PATH_POD_CLUSTER         = "/v2/pod-clusters/"
+	PATH_POD_NAMESPACE       = "/v2/pod-namespaces/"
+	PATH_VPC                 = "/v2/epcs/"
+	PATH_NETWORK             = "/v2/subnets/"
+	PATH_ALL_IP              = "/v2/all-ips/"
 )
 
 const (
