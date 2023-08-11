@@ -202,7 +202,7 @@ func EventColumns(hasMetrics bool) []*ckdb.Column {
 func GenEventCKTable(cluster, storagePolicy, table string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
 	timeKey := "time"
 	engine := ckdb.MergeTree
-	orderKeys := []string{"signal_source", "event_type", "l3_epc_id", "l3_device_type", "l3_device_id"}
+	orderKeys := []string{timeKey, "signal_source", "event_type", "l3_epc_id", "l3_device_type", "l3_device_id"}
 	hasMetrics := false
 	if table == PERF_EVENT_TABLE {
 		hasMetrics = true
