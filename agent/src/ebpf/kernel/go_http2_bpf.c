@@ -203,7 +203,7 @@ static __inline void report_http2_header(struct pt_regs *ctx)
 	static const int SEND_SIZE_MAX =
 		sizeof(struct __socket_data) +
 		offsetof(typeof(struct __socket_data_buffer), data);
-	if (send_size < SEND_SIZE_MAX) {
+	if (send_size < SEND_SIZE_MAX && send_size > 0) {
 		bpf_perf_event_output(ctx, &NAME(socket_data),
 				      BPF_F_CURRENT_CPU, stack, 1 + send_size);
 		return;

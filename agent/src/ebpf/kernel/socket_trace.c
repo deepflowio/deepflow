@@ -1808,7 +1808,8 @@ TPPROG(sys_enter_close) (struct syscall_comm_enter_ctx *ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_enter_getppid
-// 此处tracepoint用于周期性的将驻留在缓存中还未发送的数据发给用户态接收程序处理。
+// Here, the tracepoint is used to periodically send the data residing in the cache but not
+// yet transmitted to the user-level receiving program for processing.
 TPPROG(sys_enter_getppid) (struct syscall_comm_enter_ctx *ctx) {
 	int k0 = 0;
 	struct __socket_data_buffer *v_buff = bpf_map_lookup_elem(&NAME(data_buf), &k0);
@@ -1819,15 +1820,19 @@ TPPROG(sys_enter_getppid) (struct syscall_comm_enter_ctx *ctx) {
 				__u32 buf_size = (v_buff->len +
 						  offsetof(typeof(struct __socket_data_buffer), data))
 						 & (sizeof(*v_buff) - 1);
-				if (buf_size >= sizeof(*v_buff))
-					bpf_perf_event_output(ctx, &NAME(socket_data),
-							      BPF_F_CURRENT_CPU, v_buff,
-							      sizeof(*v_buff));
-				else
-					/* 使用'buf_size + 1'代替'buf_size'，来规避（Linux 4.14.x）长度检查 */
+				if (buf_size < sizeof(*v_buff) && buf_size > 0) {
+					/* 
+					 * Use 'buf_size + 1' instead of 'buf_size' to circumvent
+					 * (Linux 4.14.x) length checks.
+					 */
 					bpf_perf_event_output(ctx, &NAME(socket_data),
 							      BPF_F_CURRENT_CPU, v_buff,
 							      buf_size + 1);
+				} else {
+					bpf_perf_event_output(ctx, &NAME(socket_data),
+							      BPF_F_CURRENT_CPU, v_buff,
+							      sizeof(*v_buff));
+				}
 
 				v_buff->events_num = 0;
 				v_buff->len = 0;				
@@ -1968,15 +1973,19 @@ static __inline int output_data_common(void *ctx) {
 	    ((sizeof(v_buff->data) - v_buff->len) < sizeof(*v))) {
 		__u32 buf_size = (v_buff->len + offsetof(typeof(struct __socket_data_buffer), data))
 				 & (sizeof(*v_buff) - 1);
-		if (buf_size >= sizeof(*v_buff))
-			bpf_perf_event_output(ctx, &NAME(socket_data),
-					      BPF_F_CURRENT_CPU, v_buff,
-					      sizeof(*v_buff));
-		else
-			/* 使用'buf_size + 1'代替'buf_size'，来规避（Linux 4.14.x）长度检查 */
+		if (buf_size < sizeof(*v_buff) && buf_size > 0) {
+			/*
+			 * Use 'buf_size + 1' instead of 'buf_size' to circumvent
+			 * (Linux 4.14.x) length checks.
+			 */
 			bpf_perf_event_output(ctx, &NAME(socket_data),
 					      BPF_F_CURRENT_CPU, v_buff,
 					      buf_size + 1);
+		} else {
+			bpf_perf_event_output(ctx, &NAME(socket_data),
+					      BPF_F_CURRENT_CPU, v_buff,
+					      sizeof(*v_buff));
+		}
 
 		v_buff->events_num = 0;
 		v_buff->len = 0;
