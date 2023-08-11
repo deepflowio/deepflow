@@ -161,7 +161,7 @@ func ProfileColumns() []*ckdb.Column {
 func GenProfileCKTable(cluster, dbName, tableName, storagePolicy string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
 	timeKey := "time"
 	engine := ckdb.MergeTree
-	orderKeys := []string{"app_service", "ip4", "ip6", timeKey}
+	orderKeys := []string{"app_service", timeKey, "ip4", "ip6"}
 
 	return &ckdb.Table{
 		Version:         basecommon.CK_VERSION,
