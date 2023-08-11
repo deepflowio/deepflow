@@ -47,6 +47,12 @@ func (p *Process) getDiffBaseByCloudItem(cloudItem *cloudmodel.Process) (diffBas
 }
 
 func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysql.Process, bool) {
+	// prevent database insert from failing
+	if len(cloudItem.Name) > 256 {
+		log.Warningf("process name too long: %v, command line: %v, pid: %v, domain: %v, subdomain: %v",
+			cloudItem.Name, cloudItem.CommandLine, cloudItem.PID, p.cache.DomainLcuuid, cloudItem.SubDomainLcuuid)
+		cloudItem.Name = cloudItem.Name[:256]
+	}
 	dbItem := &mysql.Process{
 		Name:        cloudItem.Name,
 		VTapID:      cloudItem.VTapID,
