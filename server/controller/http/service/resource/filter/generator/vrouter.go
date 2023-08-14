@@ -39,13 +39,16 @@ func (p *VRouter) conditionsMapToStruct(fcs common.FilterConditions) filter.Cond
 	c := filter.NewAND()
 	c.InitSkippedFields = []string{"SUBNET_ID"}
 	c.Init(fcs)
-	c.TryAppendIntFieldCondition(NewSubnetIDCondition("SUBNET_ID", fcs["SUBNET_ID"].([]float64)))
+	if networkIDs, ok := fcs["SUBNET_ID"]; ok {
+		c.TryAppendIntFieldCondition(NewSubnetIDCondition("SUBNET_ID", networkIDs))
+	}
 	return c
 }
 
 func (p *VRouter) userPermittedResourceToConditions(upr *UserPermittedResource) (common.FilterConditions, bool) {
-	fc := &model.VRouterFilterConditions{
+	fcs := &model.VRouterFilterConditions{
 		VPCIDs: upr.VPCIDs,
 	}
-	return fc.ToMapOmitEmpty(fc), len(fc.VPCIDs) == 0
+	dropAll := len(fcs.VPCIDs) == 0
+	return fcs.ToMapOmitEmpty(fcs), dropAll
 }

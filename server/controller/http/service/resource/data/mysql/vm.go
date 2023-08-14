@@ -17,10 +17,11 @@
 package mysql
 
 import (
+	"golang.org/x/exp/slices"
+
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/common"
-	"golang.org/x/exp/slices"
 )
 
 type VM struct {

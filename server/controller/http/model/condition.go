@@ -385,7 +385,8 @@ type VRouterQueryFilterConditions struct {
 type RoutingTableFilterConditions struct {
 	Convertor
 
-	RouterIDs []int `schema:"router_id,omitempty" json:"ROUTER_ID,omitempty"`
+	RouterIDs []int `schema:"router_id,omitempty" json:"VNET_ID,omitempty"`
+	VPCIDs    []int `schema:"epc_id,omitempty" json:"EPC_ID,omitempty"`
 }
 
 func (v RoutingTableFilterConditions) GetFilterConditions() map[string]interface{} {

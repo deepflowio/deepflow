@@ -26,6 +26,7 @@ type QueryModel interface {
 	model.RegionQuery | model.AZQuery | model.HostQuery | model.VMQuery | model.VInterfaceQuery |
 		model.SecurityGroupQuery | model.SecurityGroupRuleQuery | model.NATGatewayQuery | model.NATRuleQuery |
 		model.LBQuery | model.LBListenerQuery | model.LBRuleQuery | model.PeerConnectionQuery | model.CENQuery |
+		model.RDSInstanceQuery | model.RedisInstanceQuery |
 		model.PodQuery | model.PodReplicaSetQuery | model.PodGroupQuery | model.PodGroupPortQuery |
 		model.PodServiceQuery | model.PodServicePortQuery | model.PodIngressQuery | model.PodIngressRuleQuery |
 		model.PodNodeQuery | model.PodNamespaceQuery | model.PodClusterQuery |
@@ -44,8 +45,7 @@ type QueryStoredInRedisModel interface {
 		model.PodGroupQueryStoredInRedis | model.PodGroupPortQueryStoredInRedis | model.PodServiceQueryStoredInRedis |
 		model.PodServicePortQueryStoredInRedis | model.PodIngressQueryStoredInRedis | model.PodIngressRuleQueryStoredInRedis |
 		model.PodNodeQueryStoredInRedis | model.PodNamespaceQueryStoredInRedis | model.PodClusterQueryStoredInRedis |
-		model.IPQueryStoredInRedis | model.DHCPPortQueryStoredInRedis | model.VRouterQueryStoredInRedis | model.RoutingTableQuery |
-		model.NetworkQueryStoredInRedis | model.VPCQueryStoredInRedis
+		model.IPQueryStoredInRedis | model.DHCPPortQueryStoredInRedis | model.NetworkQueryStoredInRedis | model.VPCQueryStoredInRedis
 
 	GetIncludedFields() []string
 	GetUserID() int

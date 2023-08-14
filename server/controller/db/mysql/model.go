@@ -313,7 +313,7 @@ type VRouter struct {
 	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
 	Label          string `gorm:"column:label;type:char(64);default:''" json:"LABEL"`
 	Description    string `gorm:"column:description;type:varchar(256);default:''" json:"DESCRIPTION"`
-	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID"`
+	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"EPC_ID"`
 	GWLaunchServer string `gorm:"index:state_server_index;column:gw_launch_server;type:char(64);default:''" json:"GW_LAUNCH_SERVER"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
@@ -598,7 +598,7 @@ type RDSInstance struct {
 	Domain         string `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN"`
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
 	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"`
-	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID"`
+	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"EPC_ID"`
 	Type           int    `gorm:"column:type;type:int;default:0" json:"TYPE"` // 0. Unknown 1. MySQL 2. SqlServer 3. PPAS 4. PostgreSQL 5. MariaDB
 	Version        string `gorm:"column:version;type:char(64);default:''" json:"VERSION"`
 	Series         int    `gorm:"column:series;type:tinyint(1);not null;default:0" json:"SERIES"` // 0. Unknown 1. basic 2. HA
@@ -619,7 +619,7 @@ type RedisInstance struct {
 	Domain         string `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN"`
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
 	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"`
-	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID"`
+	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"EPC_ID"`
 	Version        string `gorm:"column:version;type:char(64);default:''" json:"VERSION"`
 	InternalHost   string `gorm:"column:internal_host;type:varchar(128);default:''" json:"INTERNAL_HOST"`
 	PublicHost     string `gorm:"column:public_host;type:varchar(128);default:''" json:"PUBLIC_HOST"`

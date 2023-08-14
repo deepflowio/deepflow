@@ -44,6 +44,10 @@ func GetDataProvider(resourceType string, cfg *RequiredConfigs) provider.DataPro
 		return redisdp.GetVM(cfg.Redis)
 	case common.RESOURCE_TYPE_VINTERFACE_EN:
 		return redisdp.GetVInterface(cfg.Redis)
+	case common.RESOURCE_TYPE_VROUTER_EN:
+		return mysql.NewVRouter()
+	case common.RESOURCE_TYPE_ROUTING_TABLE_EN:
+		return mysql.NewRoutingTable()
 	case common.RESOURCE_TYPE_SECURITY_GROUP_EN:
 		return mysql.NewSecurityGroup()
 	case common.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN:
@@ -62,6 +66,10 @@ func GetDataProvider(resourceType string, cfg *RequiredConfigs) provider.DataPro
 		return mysql.NewPeerConnection()
 	case common.RESOURCE_TYPE_CEN_EN:
 		return mysql.NewCEN()
+	case common.RESOURCE_TYPE_RDS_INSTANCE_EN:
+		return mysql.NewRDSInstance()
+	case common.RESOURCE_TYPE_REDIS_INSTANCE_EN:
+		return mysql.NewRedisInstance()
 	case common.RESOURCE_TYPE_POD_EN:
 		return redisdp.GetPod(cfg.Redis)
 	case common.RESOURCE_TYPE_POD_GROUP_EN:
