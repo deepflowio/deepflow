@@ -16,7 +16,7 @@
 
 use std::ffi::{CStr, CString};
 use std::slice;
-use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
@@ -32,7 +32,7 @@ use crate::common::l7_protocol_log::{
 };
 use crate::common::meta_packet::MetaPacket;
 use crate::common::proc_event::{BoxedProcEvents, EventType, ProcEvent};
-use crate::common::TaggedFlow;
+use crate::common::{FlowAclListener, TaggedFlow};
 use crate::config::handler::{CollectorAccess, EbpfAccess, EbpfConfig, LogParserAccess};
 use crate::config::FlowAccess;
 use crate::ebpf::{
@@ -48,7 +48,7 @@ use public::{
     buffer::BatchedBox,
     counter::{Counter, CounterType, CounterValue, OwnedCountable},
     debug::QueueDebugger,
-    proto::metric,
+    proto::{common::TridentType, metric},
     queue::{bounded_with_debug, DebugSender, Receiver},
     utils::bitmap::parse_u16_range_list_to_bitmap,
 };
@@ -189,6 +189,8 @@ struct EbpfDispatcher {
 
     receiver: Receiver<Box<MetaPacket<'static>>>,
 
+    pause: AtomicBool,
+
     // 策略查询
     policy_getter: PolicyGetter,
 
@@ -240,6 +242,10 @@ impl EbpfDispatcher {
                 continue;
             }
 
+            if self.pause.load(Ordering::Relaxed) {
+                continue;
+            }
+
             for mut packet in batch.drain(..) {
                 sync_counter.counter().rx += 1;
 
@@ -251,7 +257,7 @@ impl EbpfDispatcher {
     }
 }
 
-struct SyncEbpfDispatcher {
+pub struct SyncEbpfDispatcher {
     dispatcher: *mut EbpfDispatcher,
 }
 
@@ -261,6 +267,26 @@ unsafe impl Send for SyncEbpfDispatcher {}
 impl SyncEbpfDispatcher {
     fn dispatcher(&self) -> &mut EbpfDispatcher {
         unsafe { &mut *self.dispatcher }
+    }
+}
+
+impl FlowAclListener for SyncEbpfDispatcher {
+    fn flow_acl_change(
+        &mut self,
+        _: TridentType,
+        _: i32,
+        _: &Vec<Arc<crate::_IpGroupData>>,
+        _: &Vec<Arc<crate::_PlatformData>>,
+        _: &Vec<Arc<crate::common::policy::PeerConnection>>,
+        _: &Vec<Arc<crate::_Cidr>>,
+        _: &Vec<Arc<crate::_Acl>>,
+    ) -> Result<(), String> {
+        self.dispatcher().pause.store(false, Ordering::Relaxed);
+        Ok(())
+    }
+
+    fn id(&self) -> usize {
+        2
     }
 }
 
@@ -277,6 +303,7 @@ static mut PROC_EVENT_SENDER: Option<DebugSender<BoxedProcEvents>> = None;
 static mut EBPF_PROFILE_SENDER: Option<DebugSender<Profile>> = None;
 static mut PLATFORM_SYNC: Option<Arc<PlatformSynchronizer>> = None;
 static mut ON_CPU_PROFILE_FREQUENCY: u32 = 0;
+static mut TIME_DIFF: Option<Arc<AtomicI64>> = None;
 
 impl EbpfCollector {
     extern "C" fn ebpf_l7_callback(sd: *mut ebpf::SK_BPF_DATA) {
@@ -357,12 +384,13 @@ impl EbpfCollector {
             if !SWITCH || EBPF_PROFILE_SENDER.is_none() {
                 return;
             }
+            let time_diff = TIME_DIFF.as_ref().unwrap().load(Ordering::Relaxed);
             let mut profile = metric::Profile::default();
             let data = &mut *data;
             profile.sample_rate = ON_CPU_PROFILE_FREQUENCY;
-            profile.timestamp = data.timestamp;
+            profile.timestamp = (data.timestamp as i64 + time_diff) as u64;
             profile.event_type = metric::ProfileEventType::EbpfOnCpu.into();
-            profile.stime = data.stime;
+            profile.stime = (data.stime as i64 + time_diff) as u64;
             profile.pid = data.pid;
             profile.tid = data.tid;
             profile.thread_name = CStr::from_ptr(data.comm.as_ptr() as *const u8)
@@ -392,6 +420,7 @@ impl EbpfCollector {
         ebpf_profile_sender: DebugSender<Profile>,
         l7_protocol_enabled_bitmap: L7ProtocolBitmap,
         platform_sync: Arc<PlatformSynchronizer>,
+        time_diff: Arc<AtomicI64>,
     ) -> Result<()> {
         // ebpf内核模块初始化
         unsafe {
@@ -558,6 +587,7 @@ impl EbpfCollector {
             EBPF_PROFILE_SENDER = Some(ebpf_profile_sender);
             PLATFORM_SYNC = Some(platform_sync);
             ON_CPU_PROFILE_FREQUENCY = config.ebpf.on_cpu_profile.frequency as u32;
+            TIME_DIFF = Some(time_diff);
         }
 
         Ok(())
@@ -651,6 +681,7 @@ impl EbpfCollector {
             ebpf_profile_sender,
             ebpf_config.l7_protocol_enabled_bitmap,
             platform_sync,
+            time_diff.clone(),
         )?;
         Self::ebpf_on_config_change(ebpf::CAP_LEN_MAX);
 
@@ -669,6 +700,7 @@ impl EbpfCollector {
                 flow_map_config,
                 stats_collector,
                 collector_config,
+                pause: AtomicBool::new(true),
             },
             thread_handle: None,
             counter: EbpfCounter { rx: 0 },
@@ -681,7 +713,7 @@ impl EbpfCollector {
         }
     }
 
-    fn get_sync_dispatcher(&self) -> SyncEbpfDispatcher {
+    pub fn get_sync_dispatcher(&self) -> SyncEbpfDispatcher {
         SyncEbpfDispatcher {
             dispatcher: &self.thread_dispatcher as *const EbpfDispatcher as *mut EbpfDispatcher,
         }
