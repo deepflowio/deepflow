@@ -332,6 +332,54 @@ func (p *PlatformDataOP) generateCIDRs() {
 			dcProto.addSubOrDomainSimpleCIDR(networkDomain, simplecidr)
 		}
 	}
+
+	vips := dbDataCache.GetVIPs()
+	for _, vip := range vips {
+		network, ok := rawData.vipIDToNetwork[vip.ID]
+		if ok == false {
+			continue
+		}
+		prefix := fmt.Sprintf("%s/%d", vip.IP, GetDefaultMaskLen(vip.IP))
+		regionID := uint32(0)
+		if region, ok := uuidToRegion[network.Region]; ok {
+			regionID = uint32(region.ID)
+		}
+		azID := uint32(0)
+		if az, ok := uuidToAZ[network.AZ]; ok {
+			azID = uint32(az.ID)
+		}
+		tunnelID := network.TunnelID
+		if vpc, ok := idToVPC[network.VPCID]; ok {
+			if vpc.TunnelID != 0 {
+				tunnelID = vpc.TunnelID
+			}
+		}
+		cidrType := trident.CidrType_LAN
+		if network.NetType == NETWORK_TYPE_WAN {
+			cidrType = trident.CidrType_WAN
+		}
+		cidr := &trident.Cidr{
+			Prefix:   proto.String(prefix),
+			Type:     &cidrType,
+			EpcId:    proto.Int32(int32(network.VPCID)),
+			SubnetId: proto.Uint32(uint32(network.ID)),
+			RegionId: proto.Uint32(uint32(regionID)),
+			AzId:     proto.Uint32(uint32(azID)),
+			TunnelId: proto.Uint32(uint32(tunnelID)),
+			IsVip:    proto.Bool(true),
+		}
+		simplecidr := &trident.Cidr{
+			Prefix:   proto.String(prefix),
+			Type:     &cidrType,
+			EpcId:    proto.Int32(int32(network.VPCID)),
+			RegionId: proto.Uint32(uint32(regionID)),
+			TunnelId: proto.Uint32(uint32(tunnelID)),
+			IsVip:    proto.Bool(true),
+		}
+		dcProto.addCIDR(cidr)
+		dcProto.addSimpleCIDR(simplecidr)
+		dcProto.addDomainSimpleCIDR(vip.Domain, simplecidr)
+	}
 	p.updateDomainCIDRProto(dcProto)
 }
 
