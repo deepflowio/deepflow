@@ -154,7 +154,7 @@ func (d *SlowDecoder) Run() {
 		}
 
 		if len(req.GetRequestLabels()) > 0 || len(req.GetRequestTargets()) > 0 {
-			d.labelTable.RequesteLabelIDs(req)
+			d.labelTable.RequestLabelIDs(req)
 			d.counter.RequestCount++
 		}
 
