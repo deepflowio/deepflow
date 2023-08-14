@@ -399,7 +399,7 @@ impl L7ProtocolInfoInterface for CustomInfo {
                 self.resp.exception = w.resp.exception;
             }
 
-            if self.resp.status != L7ResponseStatus::default() {
+            if self.resp.status == L7ResponseStatus::default() {
                 self.resp.status = w.resp.status;
             }
 
