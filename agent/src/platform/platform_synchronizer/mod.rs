@@ -45,6 +45,8 @@ use public::proto::common::TridentType;
 #[cfg(target_os = "windows")]
 pub use windows_process::*;
 
+use crate::utils::environment::{is_tt_pod, is_tt_workload};
+
 #[cfg(target_os = "linux")]
 // return the (now_sec - sym_change_time) second
 pub(super) fn sym_uptime(now_sec: u64, path: &PathBuf) -> Result<u64, &'static str> {
@@ -67,11 +69,5 @@ pub fn dir_inode(path: &str) -> std::io::Result<u64> {
 
 // whether need to scan the process info
 pub fn process_info_enabled(t: TridentType) -> bool {
-    match t {
-        TridentType::TtPublicCloud
-        | TridentType::TtPhysicalMachine
-        | TridentType::TtHostPod
-        | TridentType::TtVmPod => true,
-        _ => false,
-    }
+    is_tt_workload(t) || is_tt_pod(t)
 }

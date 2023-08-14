@@ -421,7 +421,9 @@ pub fn is_tt_hyper_v(trident_type: TridentType) -> bool {
 }
 
 pub fn is_tt_pod(trident_type: TridentType) -> bool {
-    trident_type == TridentType::TtHostPod || trident_type == TridentType::TtVmPod
+    trident_type == TridentType::TtHostPod
+        || trident_type == TridentType::TtVmPod
+        || trident_type == TridentType::TtK8sSidecar
 }
 
 pub fn is_tt_process(trident_type: TridentType) -> bool {
