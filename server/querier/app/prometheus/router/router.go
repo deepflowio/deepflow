@@ -50,4 +50,7 @@ func PrometheusRouter(e *gin.Engine) {
 		e.POST("/prom/api/v1/adapter/"+v, packet_adapter.AdaptPromQuery(prometheusService, v))
 		e.GET("/prom/api/v1/adapter/"+v, packet_adapter.AdaptPromQuery(prometheusService, v))
 	}
+
+	e.GET("/prom/api/v1/parse", promQLParse(prometheusService))
+	e.GET("/prom/api/v1/addfilter", promQLAddFilters(prometheusService))
 }

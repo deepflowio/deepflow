@@ -167,3 +167,33 @@ func promQLAnalysis(svc *service.PrometheusService) gin.HandlerFunc {
 		c.JSON(200, result)
 	})
 }
+
+func promQLParse(svc *service.PrometheusService) gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		query := c.Query("query")
+		result, err := svc.PromQLParse(query)
+		if err != nil {
+			c.JSON(500, result)
+			return
+		}
+		c.JSON(200, result)
+	})
+}
+
+func promQLAddFilters(svc *service.PrometheusService) gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		query := c.Query("query")
+		filters, ok := c.GetQueryMap("filter")
+		if !ok {
+			// return query itself
+			c.JSON(200, &model.PromQueryWrapper{OptStatus: "success", Data: []map[string]interface{}{{"query": query}}})
+			return
+		}
+		result, err := svc.PromQLParseFilter(query, filters)
+		if err != nil {
+			c.JSON(500, result)
+			return
+		}
+		c.JSON(200, result)
+	})
+}

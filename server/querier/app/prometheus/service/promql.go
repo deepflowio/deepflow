@@ -349,6 +349,75 @@ func (p *prometheusExecutor) series(ctx context.Context, args *model.PromQueryPa
 	return &model.PromQueryResponse{Data: metrics, Status: _SUCCESS}, err
 }
 
+func (p *prometheusExecutor) parsePromQL(promQL string) (res *model.PromQueryWrapper, err error) {
+	res = &model.PromQueryWrapper{}
+	expr, err := parser.ParseExpr(promQL)
+	if err != nil {
+		res.OptStatus = "fail"
+		res.Description = err.Error()
+		return res, err
+	}
+	var db, tableName, metric, aggFunc string
+	parser.Inspect(expr, func(node parser.Node, path []parser.Node) error {
+		if vs, ok := node.(*parser.VectorSelector); ok {
+			pbMatchers := make([]*prompb.LabelMatcher, 0, 1)
+			for _, m := range vs.LabelMatchers {
+				if m.Name == PROMETHEUS_METRICS_NAME {
+					// metric name is only expected
+					pbMatchers = append(pbMatchers, &prompb.LabelMatcher{
+						Type:  prompb.LabelMatcher_EQ,
+						Name:  m.Name,
+						Value: m.Value,
+					})
+					_, _, db, tableName, _, _, metric, err = parseMetric(pbMatchers)
+					break
+				}
+			}
+		}
+		return nil
+	})
+	switch e := expr.(type) {
+	case *parser.AggregateExpr:
+		aggFunc = e.Op.String()
+	case *parser.Call:
+		aggFunc = e.Func.Name
+	}
+	res.OptStatus = _SUCCESS
+	res.Data = []map[string]interface{}{{"db": db, "table": tableName, "metric": metric, "aggFunc": aggFunc}}
+	return res, nil
+}
+
+func (p *prometheusExecutor) addExtraFilters(promQL string, filters map[string]string) (*model.PromQueryWrapper, error) {
+	res := &model.PromQueryWrapper{}
+	expr, err := parser.ParseExpr(promQL)
+	if err != nil {
+		res.OptStatus = "fail"
+		res.Description = err.Error()
+		return res, err
+	}
+
+	matchers := make([]*labels.Matcher, 0, len(filters))
+	for k, v := range filters {
+		matcher, err := labels.NewMatcher(labels.MatchEqual, k, v)
+		if err != nil {
+			res.OptStatus = "fail"
+			res.Description = err.Error()
+			return res, err
+		}
+		matchers = append(matchers, matcher)
+	}
+
+	parser.Inspect(expr, func(node parser.Node, path []parser.Node) error {
+		if vs, ok := node.(*parser.VectorSelector); ok {
+			vs.LabelMatchers = append(vs.LabelMatchers, matchers...)
+		}
+		return nil
+	})
+	res.OptStatus = _SUCCESS
+	res.Data = []map[string]interface{}{{"query": expr.String()}}
+	return res, nil
+}
+
 func (p *prometheusExecutor) matchMetricName(matchers *[]*labels.Matcher) string {
 	var metric string
 	for _, v := range *matchers {
