@@ -102,6 +102,8 @@ type StaticConfig struct {
 	RrtTcpTimeout                    *string                `yaml:"rrt-tcp-timeout,omitempty"`
 	RrtUdpTimeout                    *string                `yaml:"rrt-udp-timeout,omitempty"`
 	PrometheusExtraConfig            *PrometheusExtraConfig `yaml:"prometheus-extra-config,omitempty"`
+	NtpMaxInterval                   *string                `yaml:"ntp-max-interval,omitempty"`
+	NtpMinInterval                   *string                `yaml:"ntp-min-interval,omitempty"`
 }
 
 type XflowCollectorConfig struct {

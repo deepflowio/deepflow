@@ -1162,6 +1162,19 @@ vtap_group_id: g-xxxxxx
   ##   https://unix.stackexchange.com/questions/495854/processes-hanging-when-trying-to-access-a-file
   #check-core-file-disabled: false
 
+  #######################
+  ## NTP Configuration ##
+  #######################
+  ## Note:
+  ##   When the timestamp fallback exceeds this value, the agent will restart.
+  ## Default: 300s
+  #ntp-max-interval = 300s
+
+  ## Note:
+  ##   When the time difference exceeds this value, the timestamp will be corrected.
+  ## Default: 10s
+  #ntp-min-interval = 10s
+
   #################
   ## FeatureFlag ##
   #################

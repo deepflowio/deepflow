@@ -424,6 +424,10 @@ pub struct YamlConfig {
     #[serde(with = "humantime_serde")]
     pub rrt_udp_timeout: Duration,
     pub prometheus_extra_config: PrometheusExtraConfig,
+    #[serde(with = "humantime_serde")]
+    pub ntp_max_interval: Duration,
+    #[serde(with = "humantime_serde")]
+    pub ntp_min_interval: Duration,
 }
 
 impl YamlConfig {
@@ -755,6 +759,8 @@ impl Default for YamlConfig {
             rrt_tcp_timeout: Duration::from_secs(1800),
             rrt_udp_timeout: Duration::from_secs(150),
             prometheus_extra_config: PrometheusExtraConfig::default(),
+            ntp_max_interval: Duration::from_secs(300),
+            ntp_min_interval: Duration::from_secs(10),
         }
     }
 }

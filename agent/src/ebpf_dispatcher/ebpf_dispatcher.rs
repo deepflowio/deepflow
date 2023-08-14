@@ -15,7 +15,7 @@
  */
 
 use std::ffi::CString;
-use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
@@ -30,7 +30,7 @@ use crate::common::l7_protocol_log::{
 };
 use crate::common::meta_packet::MetaPacket;
 use crate::common::proc_event::{BoxedProcEvents, EventType, ProcEvent};
-use crate::common::TaggedFlow;
+use crate::common::{FlowAclListener, TaggedFlow};
 use crate::config::handler::{EbpfAccess, EbpfConfig, LogParserAccess};
 use crate::config::FlowAccess;
 use crate::ebpf::{self, set_allow_port_bitmap};
@@ -40,6 +40,7 @@ use crate::utils::stats;
 use public::counter::{Counter, CounterType, CounterValue, OwnedCountable};
 use public::{
     debug::QueueDebugger,
+    proto::common::TridentType,
     queue::{bounded_with_debug, DebugSender, Receiver},
     utils::bitmap::parse_u16_range_list_to_bitmap,
 };
@@ -180,6 +181,8 @@ struct EbpfDispatcher {
 
     receiver: Receiver<Box<MetaPacket<'static>>>,
 
+    pause: AtomicBool,
+
     // 策略查询
     policy_getter: PolicyGetter,
 
@@ -227,6 +230,10 @@ impl EbpfDispatcher {
                 continue;
             }
 
+            if self.pause.load(Ordering::Relaxed) {
+                continue;
+            }
+
             for mut packet in batch.drain(..) {
                 sync_counter.counter().rx += 1;
 
@@ -238,7 +245,7 @@ impl EbpfDispatcher {
     }
 }
 
-struct SyncEbpfDispatcher {
+pub struct SyncEbpfDispatcher {
     dispatcher: *mut EbpfDispatcher,
 }
 
@@ -248,6 +255,26 @@ unsafe impl Send for SyncEbpfDispatcher {}
 impl SyncEbpfDispatcher {
     fn dispatcher(&self) -> &mut EbpfDispatcher {
         unsafe { &mut *self.dispatcher }
+    }
+}
+
+impl FlowAclListener for SyncEbpfDispatcher {
+    fn flow_acl_change(
+        &mut self,
+        _: TridentType,
+        _: i32,
+        _: &Vec<Arc<crate::_IpGroupData>>,
+        _: &Vec<Arc<crate::_PlatformData>>,
+        _: &Vec<Arc<crate::common::policy::PeerConnection>>,
+        _: &Vec<Arc<crate::_Cidr>>,
+        _: &Vec<Arc<crate::_Acl>>,
+    ) -> Result<(), String> {
+        self.dispatcher().pause.store(false, Ordering::Relaxed);
+        Ok(())
+    }
+
+    fn id(&self) -> usize {
+        2
     }
 }
 
@@ -535,6 +562,7 @@ impl EbpfCollector {
                 flow_output,
                 flow_map_config,
                 stats_collector,
+                pause: AtomicBool::new(true),
             },
             thread_handle: None,
             counter: EbpfCounter { rx: 0 },
@@ -547,7 +575,7 @@ impl EbpfCollector {
         }
     }
 
-    fn get_sync_dispatcher(&self) -> SyncEbpfDispatcher {
+    pub fn get_sync_dispatcher(&self) -> SyncEbpfDispatcher {
         SyncEbpfDispatcher {
             dispatcher: &self.thread_dispatcher as *const EbpfDispatcher as *mut EbpfDispatcher,
         }

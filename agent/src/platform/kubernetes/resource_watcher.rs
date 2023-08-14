@@ -278,9 +278,10 @@ where
             while let Ok(Some(event)) = stream.try_next().await {
                 Self::resolve_event(&ctx, &mut encoder, event).await;
             }
-            if last_update.elapsed().unwrap() >= ctx.config.list_interval {
+            let now = SystemTime::now();
+            if now < last_update || last_update.elapsed().unwrap() >= ctx.config.list_interval {
                 Self::full_sync(&mut ctx, &mut encoder).await;
-                last_update = SystemTime::now();
+                last_update = now;
             }
             time::sleep(SLEEP_INTERVAL).await;
         }

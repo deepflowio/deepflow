@@ -618,7 +618,7 @@ impl TapInterfaceWhitelist {
         if now.is_zero() {
             now = get_timestamp(self.ntp_diff.load(Ordering::Relaxed));
         }
-        if now > self.last_sync && now - self.last_sync > Self::SYNC_INTERVAL {
+        if now > Self::SYNC_INTERVAL + self.last_sync {
             self.updated = false;
             self.last_sync = now;
             true

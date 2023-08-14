@@ -20,12 +20,12 @@ use std::{
     cmp::min,
     collections::HashMap,
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
         Arc, Mutex,
     },
     thread,
     thread::JoinHandle,
-    time::{Duration, SystemTime},
+    time::Duration,
 };
 
 use arc_swap::access::Access;
@@ -46,6 +46,7 @@ use crate::{
     config::handler::LogParserAccess,
     flow_generator::{Error::L7LogCanNotMerge, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC},
     metric::document::TapSide,
+    rpc::get_timestamp,
     utils::stats::{Counter, CounterType, CounterValue, RefCountable},
 };
 #[cfg(target_os = "linux")]
@@ -254,6 +255,11 @@ impl Throttle {
     fn acquire(&mut self, current: Duration) -> bool {
         self.period_count += 1;
 
+        // Local timestamp may be modified
+        if current < self.last_flush_time {
+            self.last_flush_time = current;
+        }
+
         if current > self.last_flush_time + self.interval || self.last_flush_time.is_zero() {
             self.tick(current);
         }
@@ -278,6 +284,7 @@ struct SessionQueue {
     counter: Arc<SessionAggrCounter>,
     output_queue: DebugSender<BoxAppProtoLogsData>,
     config: LogParserAccess,
+    ntp_diff: Arc<AtomicI64>,
 }
 
 impl SessionQueue {
@@ -285,6 +292,7 @@ impl SessionQueue {
         counter: Arc<SessionAggrCounter>,
         output_queue: DebugSender<BoxAppProtoLogsData>,
         config: LogParserAccess,
+        ntp_diff: Arc<AtomicI64>,
     ) -> Self {
         //l7_log_session_timeout 20s-300s ，window_size = 4-60，所以 SessionQueue.time_window 预分配内存
         let window_size =
@@ -296,6 +304,7 @@ impl SessionQueue {
             last_flush_time: Duration::ZERO,
             time_window: Some(time_window),
             config,
+            ntp_diff,
             window_size,
 
             throttle,
@@ -306,9 +315,11 @@ impl SessionQueue {
     }
 
     fn flush_one_slot(&mut self) {
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap();
+        let now = get_timestamp(self.ntp_diff.load(Ordering::Relaxed));
+        // If the local timestamp adjustment requires recalculating the interval
+        if now < self.last_flush_time {
+            self.last_flush_time = now - Duration::from_secs(1);
+        }
         // 每秒检测是否flush, 若超过2倍slot时间未收到数据，则发送1个slot的数据
         let interval = now.saturating_sub(self.last_flush_time);
         // mean subtracting overflow, but `self.last_flush_time` only assign by `now` local variable, so
@@ -611,6 +622,7 @@ pub struct SessionAggregator {
     thread: Mutex<Option<JoinHandle<()>>>,
     counter: Arc<SessionAggrCounter>,
     config: LogParserAccess,
+    ntp_diff: Arc<AtomicI64>,
 }
 
 impl SessionAggregator {
@@ -619,6 +631,7 @@ impl SessionAggregator {
         output_queue: DebugSender<BoxAppProtoLogsData>,
         id: u32,
         config: LogParserAccess,
+        ntp_diff: Arc<AtomicI64>,
     ) -> (Self, Arc<SessionAggrCounter>) {
         let counter: Arc<SessionAggrCounter> = Default::default();
         (
@@ -630,6 +643,7 @@ impl SessionAggregator {
                 thread: Mutex::new(None),
                 counter: counter.clone(),
                 config,
+                ntp_diff,
             },
             counter,
         )
@@ -646,11 +660,13 @@ impl SessionAggregator {
         let output_queue = self.output_queue.clone();
 
         let config = self.config.clone();
+        let ntp_diff = self.ntp_diff.clone();
 
         let thread = thread::Builder::new()
             .name("protocol-logs-parser".to_owned())
             .spawn(move || {
-                let mut session_queue = SessionQueue::new(counter, output_queue, config.clone());
+                let mut session_queue =
+                    SessionQueue::new(counter, output_queue, config.clone(), ntp_diff);
 
                 let mut batch_buffer = Vec::with_capacity(QUEUE_BATCH_SIZE);
 

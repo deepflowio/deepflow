@@ -379,9 +379,11 @@ impl<T: Sendable> UniformSender<T> {
             let now = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap();
-            if now > self.last_reconnect
-                && now - self.last_reconnect < Duration::from_secs(self.reconnect_interval as u64)
-            {
+            // If the local timestamp adjustment requires recalculating the interval
+            if self.last_reconnect > now {
+                self.last_reconnect = now;
+            }
+            if self.last_reconnect + Duration::from_secs(self.reconnect_interval as u64) > now {
                 return;
             }
 
