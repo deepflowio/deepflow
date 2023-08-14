@@ -407,6 +407,10 @@ impl L7ProtocolInfoInterface for CustomInfo {
                 self.resp.code = w.resp.code;
             }
 
+            if self.resp.result.is_empty() {
+                self.resp.result = w.resp.result;
+            }
+
             if self.resp_len.is_none() {
                 self.resp_len = w.resp_len;
             }
