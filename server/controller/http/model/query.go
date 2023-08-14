@@ -94,22 +94,13 @@ type DHCPPortQueryStoredInRedis struct {
 }
 
 type VRouterQuery struct {
-	VRouterQueryStoredInRedis
-	RefreshCacheParam
-}
-
-type VRouterQueryStoredInRedis struct {
 	VRouterQueryFilterConditions
 	IncludedFieldsParam
 }
 
 type RoutingTableQuery struct {
-	RoutingTableQueryStoredInRedis
-	RefreshCacheParam
-}
-
-type RoutingTableQueryStoredInRedis struct {
 	RoutingTableQueryFilterConditions
+	IncludedFieldsParam
 }
 
 type NetworkQuery struct {
@@ -184,6 +175,16 @@ type PeerConnectionQuery struct {
 
 type CENQuery struct {
 	CENQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type RDSInstanceQuery struct {
+	RDSInstanceQueryFilterConditions
+	IncludedFieldsParam
+}
+
+type RedisInstanceQuery struct {
+	RedisInstanceQueryFilterConditions
 	IncludedFieldsParam
 }
 

@@ -18,6 +18,7 @@ package generator
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/config"
+	"github.com/deepflowio/deepflow/server/controller/http/model"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource/filter"
 )
@@ -29,6 +30,7 @@ type RoutingTable struct {
 func NewRoutingTable(fpermitCfg config.FPermit) *RoutingTable {
 	g := new(RoutingTable)
 	g.SetFPermit(fpermitCfg)
+	g.SetParentResourceTypes([]string{FPERMIT_RESOURCE_TYPE_VPC})
 	g.SetConditionConvertor(g)
 	return g
 }
@@ -40,5 +42,9 @@ func (p *RoutingTable) conditionsMapToStruct(fcs common.FilterConditions) filter
 }
 
 func (p *RoutingTable) userPermittedResourceToConditions(upr *UserPermittedResource) (common.FilterConditions, bool) {
-	return nil, false
+	fcs := &model.RoutingTableFilterConditions{
+		VPCIDs: upr.VPCIDs,
+	}
+	dropAll := len(fcs.VPCIDs) == 0
+	return fcs.ToMapOmitEmpty(fcs), dropAll
 }
