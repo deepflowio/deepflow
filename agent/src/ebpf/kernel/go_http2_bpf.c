@@ -199,7 +199,8 @@ static __inline void report_http2_header(struct pt_regs *ctx)
 	static const int BUF_DATA_OFFSET =
 		offsetof(typeof(struct __socket_data_buffer), data);
 	static const int SEND_SIZE_MAX =
-		sizeof(struct __socket_data) + BUF_DATA_OFFSET;
+		offsetof(typeof(struct __socket_data), data) + CAP_DATA_SIZE +
+		BUF_DATA_OFFSET;
 
 	stack->events_num = 1;
 	stack->len = SOCKET_DATA_HEADER + stack->send_buffer.data_len;
@@ -210,12 +211,7 @@ static __inline void report_http2_header(struct pt_regs *ctx)
 	if (send_size < SEND_SIZE_MAX && send_size > 0) {
 		bpf_perf_event_output(ctx, &NAME(socket_data),
 				      BPF_F_CURRENT_CPU, stack, 1 + send_size);
-		return;
 	}
-
-	send_size = SEND_SIZE_MAX;
-	bpf_perf_event_output(ctx, &NAME(socket_data), BPF_F_CURRENT_CPU, stack,
-			      SEND_SIZE_MAX);
 	return;
 }
 
