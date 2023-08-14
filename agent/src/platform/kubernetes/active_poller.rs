@@ -157,8 +157,7 @@ impl ActivePoller {
                     Entry::Occupied(o) => {
                         let new_vs = o.into_mut();
 
-                        let mut absent =
-                            absent_count.entry(k.clone()).or_insert((0, HashMap::new()));
+                        let absent = absent_count.entry(k.clone()).or_insert((0, HashMap::new()));
                         absent.0 = 0;
                         // reset new interface absent count
                         for vs in new_vs.iter() {

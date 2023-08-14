@@ -132,6 +132,7 @@ struct conn_info_t {
 	__u8 skc_ipv6only : 1;
 	__u8 infer_reliable : 1; // Is protocol inference reliable?
 	__u8 padding : 6;
+	__u8 skc_state;
 	bool need_reconfirm; // socket l7协议类型是否需要再次确认。
 	bool keep_data_seq;  // 保持捕获数据的序列号不变为true，否则为false。
 	__u32 fd;

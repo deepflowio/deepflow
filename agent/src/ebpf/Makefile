@@ -102,16 +102,13 @@ rust-sample: $(ELFFILES) $(LIBTRACE)
 	$(call msg,Current-DIR,,$(CURR))
 	$(Q)rm -rf samples/rust/src/ebpf.rs
 	$(Q)cp mod.rs samples/rust/src/ebpf.rs
-	$(Q)rm -rf samples/rust/build.rs
 	$(Q)rm -rf samples/rust/target
 	@if [[ $(ARCH) == *"aarch64"* ]]; then \
             echo "  Architecture is aarch64"; \
-            cp samples/rust/build-aarch64.rs samples/rust/build.rs; \
             cd samples/rust/ && cargo build --release --target aarch64-unknown-linux-musl && cd ../../; \
             echo "  samples/rust/target/aarch64-unknown-linux-musl/release/rust_sample"; \
         elif [[ $(ARCH) == *"x86_64"* ]]; then \
             echo "  Architecture is x86_64"; \
-            cp samples/rust/build-x86.rs samples/rust/build.rs; \
             cd samples/rust/ && cargo build --release && cd ../../; \
             echo "  samples/rust/target/release/rust_sample"; \
         else \
