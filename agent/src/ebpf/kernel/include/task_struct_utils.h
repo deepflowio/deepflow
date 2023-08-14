@@ -146,7 +146,6 @@ static __inline void *infer_and_get_socket_from_fd(int fd_num,
 	}
 
 	if (file == NULL || !offset->task__files_offset) {
-		//bpf_debug("file == NULL\n");
 		return NULL;
 	}
 #ifdef LINUX_VER_5_2_PLUS
@@ -157,8 +156,6 @@ static __inline void *infer_and_get_socket_from_fd(int fd_num,
 		       file + STRUCT_FILES_PRIVATE_DATA_OFFSET);
 #endif
 	if (private_data == NULL) {
-		if (debug)
-			bpf_debug("private_data == NULL\n");
 		return NULL;
 	}
 
@@ -180,11 +177,6 @@ static __inline void *infer_and_get_socket_from_fd(int fd_num,
 	    check_file == file /*&& __socket.state == SS_CONNECTED */ ) {
 		return sk;
 	}
-
-	if (debug)
-		bpf_debug
-		    (" NULL __socket.type:%d __socket.file == file (%d)\n",
-		     socket_type, check_file == file);
 
 	return NULL;
 }

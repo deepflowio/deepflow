@@ -510,13 +510,23 @@ bool is_process(int pid)
 	if (fd < 0)
 		return false;
 
-	read(fd, buff, sizeof(buff));
+	memset(buff, 0, sizeof(buff));
+	if (read(fd, buff, sizeof(buff)) <= 0) {
+		ebpf_warning("Read file '%s' failed, errno %d\n",
+			     file, errno);
+		close(fd);
+		return false;
+	}
 	close(fd);
 
 	char *p = strstr(buff, "Tgid:");
+	if (p == NULL)
+		return false;
 	sscanf(p, "Tgid:\t%d", &read_tgid);
 
 	p = strstr(buff, "Pid:");
+	if (p == NULL)
+		return false;
 	sscanf(p, "Pid:\t%d", &read_pid);
 
 	if (read_tgid == -1 || read_pid == -1)

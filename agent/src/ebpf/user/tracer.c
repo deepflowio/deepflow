@@ -397,8 +397,8 @@ static struct ebpf_link *exec_attach_uprobe(struct ebpf_prog *prog,
 	ret = program__attach_uprobe(prog, isret, pid, bin_path, addr, ev_name,
 				     (void **)&link);
 	if (ret != 0) {
-		ebpf_warning("program__attach_uprobe failed, ev_name:%s.\n",
-			     ev_name);
+		ebpf_info("program__attach_uprobe failed, ev_name:%s.\n",
+			  ev_name);
 	}
 
 	return link;
