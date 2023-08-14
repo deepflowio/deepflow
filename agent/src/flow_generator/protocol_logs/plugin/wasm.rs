@@ -74,19 +74,40 @@ impl L7ProtocolParserInterface for WasmLog {
                         _ => {}
                     }
 
-                    match param.direction {
-                        PacketDirection::ClientToServer => {
-                            self.perf_stats.as_mut().map(|p| p.inc_req());
-                        }
-                        PacketDirection::ServerToClient => {
-                            self.perf_stats.as_mut().map(|p| p.inc_resp());
-                        }
-                    }
                     i.msg_type = param.direction.into();
-                    i.cal_rrt(param, None).map(|rrt| {
-                        i.rrt = rrt;
-                        self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-                    });
+
+                    if i.need_merge() {
+                        i.cal_rrt_for_multi_merge_log(param).map(|rrt| {
+                            i.rrt = rrt;
+                        });
+                        if i.is_req_end || i.is_resp_end {
+                            self.perf_stats.as_mut().map(|p| p.update_rrt(i.rrt));
+
+                            match param.direction {
+                                PacketDirection::ClientToServer => {
+                                    self.perf_stats.as_mut().map(|p| p.inc_req());
+                                }
+                                PacketDirection::ServerToClient => {
+                                    self.perf_stats.as_mut().map(|p| p.inc_resp());
+                                }
+                            }
+                        }
+                    } else {
+                        match param.direction {
+                            PacketDirection::ClientToServer => {
+                                self.perf_stats.as_mut().map(|p| p.inc_req());
+                            }
+                            PacketDirection::ServerToClient => {
+                                self.perf_stats.as_mut().map(|p| p.inc_resp());
+                            }
+                        }
+
+                        i.cal_rrt(param, None).map(|rrt| {
+                            i.rrt = rrt;
+                            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
+                        });
+                    }
+
                     L7ProtocolInfo::CustomInfo(i)
                 })
                 .collect();

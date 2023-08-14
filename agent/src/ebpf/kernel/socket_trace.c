@@ -495,12 +495,14 @@ static __inline int is_tcp_udp_data(void *sk,
 		return SOCK_CHECK_TYPE_ERROR;
 	}
 
-	unsigned char skc_state;
-	bpf_probe_read(&skc_state, sizeof(skc_state),
+	bpf_probe_read(&conn_info->skc_state, sizeof(conn_info->skc_state),
 		       (void *)sk + offset->struct_sock_skc_state_offset);
 
-	/* 如果连接尚未建立好，不处于ESTABLISHED或者CLOSE_WAIT状态，退出 */
-	if ((1 << skc_state) & ~(TCPF_ESTABLISHED | TCPF_CLOSE_WAIT)) {
+	/*
+	 * If the connection has not been established yet, and it is not in the
+	 * ESTABLISHED or CLOSE_WAIT state, exit.
+	 */
+	if ((1 << conn_info->skc_state) & ~(TCPF_ESTABLISHED | TCPF_CLOSE_WAIT)) {
 		return SOCK_CHECK_TYPE_ERROR;
 	}
 
@@ -582,11 +584,8 @@ static __inline void connect_submit(struct pt_regs *ctx, struct conn_info_t *v, 
 		return;
 	}
 
-	int ret = bpf_perf_event_output(ctx, &NAME(socket_data),
-					BPF_F_CURRENT_CPU, v,
-					128);
-
-	if (ret) bpf_debug("connect_submit: %d\n", ret);
+	bpf_perf_event_output(ctx, &NAME(socket_data),
+			      BPF_F_CURRENT_CPU, v, 128);
 }
 #endif
 
@@ -1055,8 +1054,8 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	if (trace_stats == NULL)
 		return SUBMIT_INVALID;
 
-	__u32 timeout = trace_conf->go_tracing_timeout;
-	struct trace_key_t trace_key = get_trace_key(timeout, true);
+	struct trace_key_t trace_key = get_trace_key(trace_conf->go_tracing_timeout,
+						     true);
 	struct trace_info_t *trace_info_ptr = trace_map__lookup(&trace_key);
 
 	struct socket_info_t *socket_info_ptr = conn_info->socket_info_ptr;
@@ -1078,7 +1077,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	// AAAA record To ensure that the call chain will not be broken.
 	if (conn_info->message_type != MSG_PRESTORE &&
 	    conn_info->message_type != MSG_RECONFIRM &&
-	    (timeout != 0 || extra->is_go_process == false) &&
+	    (trace_conf->go_tracing_timeout != 0 || extra->is_go_process == false) &&
 	    !(conn_info->protocol == PROTO_DNS &&
 	      conn_info->dns_q_type == DNS_AAAA_TYPE_ID))
 		trace_process(socket_info_ptr, conn_info, socket_id, pid_tgid,
@@ -1214,6 +1213,24 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 		 * This is because kernel 4.14 verify reports errors("R0 invalid mem access 'inv'").
 		 */
 		v->tcp_seq = tcp_seq;
+		if (tcp_seq == 0 && conn_info->fd > 0) {
+			if (conn_info->direction == T_INGRESS) {
+				tcp_seq = get_tcp_read_seq_from_fd(conn_info->fd);
+				/*
+				 * If the current state is TCPF_CLOSE_WAIT, the FIN
+				 * frame already has been received.
+				 * Since tcp_sock->copied_seq has done such an operation +1,
+				 * need to fix the value of tcp_seq.
+				 */
+				if ((1 << conn_info->skc_state) & TCPF_CLOSE_WAIT) {
+					tcp_seq--;
+				}
+			} else {
+				tcp_seq = get_tcp_write_seq_from_fd(conn_info->fd);
+			}
+
+			v->tcp_seq = tcp_seq - syscall_len;
+		}
 	}
 
 	v->thread_trace_id = thread_trace_id;
@@ -1808,7 +1825,8 @@ TPPROG(sys_enter_close) (struct syscall_comm_enter_ctx *ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_enter_getppid
-// 此处tracepoint用于周期性的将驻留在缓存中还未发送的数据发给用户态接收程序处理。
+// Here, the tracepoint is used to periodically send the data residing in the cache but not
+// yet transmitted to the user-level receiving program for processing.
 TPPROG(sys_enter_getppid) (struct syscall_comm_enter_ctx *ctx) {
 	int k0 = 0;
 	struct __socket_data_buffer *v_buff = bpf_map_lookup_elem(&NAME(data_buf), &k0);
@@ -1819,15 +1837,24 @@ TPPROG(sys_enter_getppid) (struct syscall_comm_enter_ctx *ctx) {
 				__u32 buf_size = (v_buff->len +
 						  offsetof(typeof(struct __socket_data_buffer), data))
 						 & (sizeof(*v_buff) - 1);
-				if (buf_size >= sizeof(*v_buff))
-					bpf_perf_event_output(ctx, &NAME(socket_data),
-							      BPF_F_CURRENT_CPU, v_buff,
-							      sizeof(*v_buff));
-				else
-					/* 使用'buf_size + 1'代替'buf_size'，来规避（Linux 4.14.x）长度检查 */
+				/* 
+				 * Note that when 'buf_size == 0', it indicates that the data being
+				 * sent is at its maximum value (sizeof(*v_buff)), and it should
+				 * be sent accordingly.
+				 */
+				if (buf_size < sizeof(*v_buff) && buf_size > 0) {
+					/* 
+					 * Use 'buf_size + 1' instead of 'buf_size' to circumvent
+					 * (Linux 4.14.x) length checks.
+					 */
 					bpf_perf_event_output(ctx, &NAME(socket_data),
 							      BPF_F_CURRENT_CPU, v_buff,
 							      buf_size + 1);
+				} else {
+					bpf_perf_event_output(ctx, &NAME(socket_data),
+							      BPF_F_CURRENT_CPU, v_buff,
+							      sizeof(*v_buff));
+				}
 
 				v_buff->events_num = 0;
 				v_buff->len = 0;				
@@ -1968,15 +1995,24 @@ static __inline int output_data_common(void *ctx) {
 	    ((sizeof(v_buff->data) - v_buff->len) < sizeof(*v))) {
 		__u32 buf_size = (v_buff->len + offsetof(typeof(struct __socket_data_buffer), data))
 				 & (sizeof(*v_buff) - 1);
-		if (buf_size >= sizeof(*v_buff))
-			bpf_perf_event_output(ctx, &NAME(socket_data),
-					      BPF_F_CURRENT_CPU, v_buff,
-					      sizeof(*v_buff));
-		else
-			/* 使用'buf_size + 1'代替'buf_size'，来规避（Linux 4.14.x）长度检查 */
+		/*
+		 * Note that when 'buf_size == 0', it indicates that the data being
+		 * sent is at its maximum value (sizeof(*v_buff)), and it should
+		 * be sent accordingly.
+		 */
+		if (buf_size < sizeof(*v_buff) && buf_size > 0) {
+			/*
+			 * Use 'buf_size + 1' instead of 'buf_size' to circumvent
+			 * (Linux 4.14.x) length checks.
+			 */
 			bpf_perf_event_output(ctx, &NAME(socket_data),
 					      BPF_F_CURRENT_CPU, v_buff,
 					      buf_size + 1);
+		} else {
+			bpf_perf_event_output(ctx, &NAME(socket_data),
+					      BPF_F_CURRENT_CPU, v_buff,
+					      sizeof(*v_buff));
+		}
 
 		v_buff->events_num = 0;
 		v_buff->len = 0;

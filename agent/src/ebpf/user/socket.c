@@ -612,6 +612,34 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 	struct mem_block_head *block_head;	// 申请内存块的指针
 
 	struct __socket_data_buffer *buf = (struct __socket_data_buffer *)raw;
+	int data_offset = offsetof(typeof(struct __socket_data_buffer), data);
+	if (raw_size < data_offset) {
+		ebpf_warning("The amount(%d) of received data is less than the "
+			     "minimum value(%d).\n", raw_size, data_offset);
+		return;
+	}
+
+	if (raw_size < (buf->len + data_offset)) {
+		ebpf_warning("There is an error in the received data length."
+			     "raw_size %d events_num %u data_len %u.\n",
+			     raw_size, buf->events_num, buf->len);
+		return;
+	}
+
+	if (buf->events_num <= 0 || buf->events_num > MAX_PKT_BURST) {
+		ebpf_warning("buf->events_num %u, invalid\n", buf->events_num);
+		return;
+	}
+
+	if (buf->len < (offsetof(typeof(struct __socket_data),
+				 data) * buf->events_num)) {
+		ebpf_warning("buf->len(%u) invalid, socket data head size %u, "
+			     "events_num %u\n", buf->len,
+			     offsetof(typeof(struct __socket_data), data),
+			     buf->events_num);
+		return;
+	}
+
 	int i, start = 0;
 	struct __socket_data *sd;
 

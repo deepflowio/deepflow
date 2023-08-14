@@ -29,7 +29,6 @@ import (
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/http/constraint"
 	"github.com/deepflowio/deepflow/server/controller/http/model"
-	svccommon "github.com/deepflowio/deepflow/server/controller/http/service/common"
 )
 
 type Validator interface {
@@ -73,21 +72,21 @@ func (h *HeaderValidator) Validate() error {
 	var err error
 	userType := h.header.Get(httpcommon.HEADER_KEY_X_USER_TYPE)
 	if userType == "" {
-		err = errors.New(fmt.Sprintf("no %s in request header", httpcommon.HEADER_KEY_X_USER_TYPE))
+		err = errors.New(fmt.Sprintf("header is invalid: no %s", httpcommon.HEADER_KEY_X_USER_TYPE))
 	} else {
 		h.userInfo.Type, err = strconv.Atoi(userType)
 	}
 	if err != nil {
-		return svccommon.NewError(httpcommon.INVALID_PARAMETERS, fmt.Sprintf("header is invalid: %s", err.Error()))
+		return err
 	}
 	userID := h.header.Get(httpcommon.HEADER_KEY_X_USER_ID)
 	if len(userID) == 0 {
-		err = errors.New(fmt.Sprintf("no %s in request header", httpcommon.HEADER_KEY_X_USER_ID))
+		err = errors.New(fmt.Sprintf("header is invalid: no %s", httpcommon.HEADER_KEY_X_USER_ID))
 	} else {
 		h.userInfo.ID, err = strconv.Atoi(userID)
 	}
 	if err != nil {
-		return svccommon.NewError(httpcommon.INVALID_PARAMETERS, fmt.Sprintf("header is invalid: %s", err.Error()))
+		return err
 	}
 	return nil
 }
@@ -107,7 +106,7 @@ func (q *QueryValidator[QT]) Validate() error {
 	}
 	err := schema.NewDecoder().Decode(q.structData, q.mapData)
 	if err != nil {
-		return svccommon.NewError(httpcommon.INVALID_PARAMETERS, fmt.Sprintf("query is invalid: %s", err.Error()))
+		return errors.New(fmt.Sprintf("query is invalid: %s", err.Error()))
 	}
 	return nil
 }

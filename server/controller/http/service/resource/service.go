@@ -34,16 +34,11 @@ func newServiceGet(resourceType string, dp provider.DataProvider) ServiceGet {
 }
 
 func (s *ServiceGet) generateDataContext(urlInfo *model.URLInfo, userInfo *model.UserInfo, fg generator.FilterGenerator) {
-	dCtx := provider.NewDataContext()
-	dCtx.SetURLInfo(urlInfo)
-	dCtx.SetUserInfo(userInfo)
-	dCtx.SetFilterGenerator(fg)
-	s.dataContext = dCtx
+	s.dataContext = provider.NewDataContext(urlInfo, userInfo, fg)
 }
 
-func (s *ServiceGet) RefreshCache() (map[string]int, error) {
-	// TODO call master controller to get a refresh task id
-	return map[string]int{"TASK_ID": 0}, nil
+func (s *ServiceGet) RefreshCache() (map[string]interface{}, error) {
+	return CreateTask(model.TaskCreate{ResourceType: s.resourceType, URLInfo: *s.dataContext.URLInfo, UserInfo: *s.dataContext.UserInfo})
 }
 
 func (s *ServiceGet) Get() ([]common.ResponseElem, error) {

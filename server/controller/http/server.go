@@ -108,6 +108,7 @@ func (s *Server) RegisterRouters() {
 		router.NewPlugin(),
 
 		// resource
+		resource.NewTask(),
 		resource.NewDomain(s.controllerConfig),
 		resource.NewAZ(s.controllerConfig.HTTPCfg, s.controllerConfig.FPermit, s.controllerConfig.DFWebService),
 		resource.NewRegion(s.controllerConfig.HTTPCfg, s.controllerConfig.FPermit, s.controllerConfig.DFWebService),
