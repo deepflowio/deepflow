@@ -84,6 +84,14 @@ func (s *PrometheusService) PromQLAdapter(m *model.PromQueryResponse) *model.Pro
 	return packet_wrapper.WrapResponse(m)
 }
 
+func (s *PrometheusService) PromQLParse(query string) (*model.PromQueryWrapper, error) {
+	return s.executor.parsePromQL(query)
+}
+
+func (s *PrometheusService) PromQLParseFilter(query string, filters map[string]string) (*model.PromQueryWrapper, error) {
+	return s.executor.addExtraFilters(query, filters)
+}
+
 func (s *PrometheusService) FormatData(data *model.PromQueryWrapper) *bytes.Buffer {
 	return packet_wrapper.FormatData(data)
 }
