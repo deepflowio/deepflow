@@ -226,7 +226,7 @@ func listAgent(cmd *cobra.Command, args []string, output string) {
 			}
 		}
 
-		cmdFormat := "%-8s %-*s %-10s %-16s %-18s %-8s %-*s %s\n"
+		cmdFormat := "%-8s %-*s %-10s %-18s %-18s %-8s %-*s %s\n"
 		fmt.Printf(cmdFormat, "ID", nameMaxSize, "NAME", "TYPE", "CTRL_IP", "CTRL_MAC", "STATE", groupMaxSize, "GROUP", "EXCEPTIONS")
 		for i := range response.Get("DATA").MustArray() {
 			vtap := response.Get("DATA").GetIndex(i)
@@ -440,7 +440,7 @@ func upgadeAgent(cmd *cobra.Command, args []string) {
 		fmt.Printf("get agent(%s) info failed, url: %s\n", vtapName, vtapURL)
 		return
 	}
-	if vtapType == int(common.VTAP_TYPE_POD_VM) || vtapType == int(common.VTAP_TYPE_POD_HOST) {
+	if vtapType == int(common.VTAP_TYPE_POD_VM) || vtapType == int(common.VTAP_TYPE_POD_HOST) || vtapType == int(common.VTAP_TYPE_K8S_SIDECAR) {
 		fmt.Printf("agent (%s) type is %v, not supported upgrade by cli\n", vtapName, common.VtapType(vtapType))
 		return
 	}

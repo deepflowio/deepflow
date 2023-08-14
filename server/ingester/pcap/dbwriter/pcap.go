@@ -97,7 +97,7 @@ func ReleasePcapStore(l *PcapStore) {
 func GenPcapCKTable(cluster, storagePolicy string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
 	timeKey := "time"
 	engine := ckdb.MergeTree
-	orderKeys := []string{"flow_id", "vtap_id", timeKey}
+	orderKeys := []string{"flow_id", timeKey, "vtap_id"}
 
 	return &ckdb.Table{
 		Version:         common.CK_VERSION,
