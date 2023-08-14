@@ -17,6 +17,7 @@
 package vtap
 
 import (
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -526,6 +527,26 @@ func (c *VTapCache) GetLaunchServer() string {
 	}
 
 	return ""
+}
+
+var regV = regexp.MustCompile("B_LC_RELEASE_v6_[12]")
+
+func (c *VTapCache) GetExternalAgentHTTPProxyEnabledConfig(v *VTapInfo) int {
+	if enabled, ok := v.vtapGroupLcuuidToEAHPEnabled[c.GetVTapGroupLcuuid()]; ok {
+		if enabled != nil {
+			return *enabled
+		}
+	}
+	if regV.MatchString(c.GetRevision()) {
+		return 0
+	}
+
+	config := c.GetVTapConfig()
+	if config == nil {
+		return 0
+	}
+
+	return config.ExternalAgentHTTPProxyEnabled
 }
 
 func (c *VTapCache) UpdateLaunchServer(launcherServer string) {

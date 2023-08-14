@@ -70,6 +70,7 @@ type VTapInfo struct {
 	vtapGroupShortIDToLcuuid       map[string]string
 	vtapGroupLcuuidToConfiguration map[string]*VTapConfig
 	vtapGroupLcuuidToLocalConfig   map[string]string
+	vtapGroupLcuuidToEAHPEnabled   map[string]*int
 	noVTapTapPortsMac              mapset.Set
 	kvmVTapCtrlIPToTapPorts        map[string]mapset.Set
 	kcData                         *KubernetesCluster
@@ -128,6 +129,7 @@ func NewVTapInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config) *
 		vtapGroupShortIDToLcuuid:       make(map[string]string),
 		vtapGroupLcuuidToConfiguration: make(map[string]*VTapConfig),
 		vtapGroupLcuuidToLocalConfig:   make(map[string]string),
+		vtapGroupLcuuidToEAHPEnabled:   make(map[string]*int),
 		noVTapTapPortsMac:              mapset.NewSet(),
 		kvmVTapCtrlIPToTapPorts:        make(map[string]mapset.Set),
 		kcData:                         newKubernetesCluster(db),
@@ -454,11 +456,13 @@ func (v *VTapInfo) convertConfig(configs []*models.VTapGroupConfiguration) {
 
 	vtapGroupLcuuidToConfiguration := make(map[string]*VTapConfig)
 	vtapGroupLcuuidToLocalConfig := make(map[string]string)
+	vtapGroupLcuuidToEAHPEnabled := make(map[string]*int)
 	typeOfDefaultConfig := reflect.ValueOf(DefaultVTapGroupConfig).Elem()
 	for _, config := range configs {
 		if config.VTapGroupLcuuid == nil {
 			continue
 		}
+		vtapGroupLcuuidToEAHPEnabled[*config.VTapGroupLcuuid] = config.ExternalAgentHTTPProxyEnabled
 		if config.YamlConfig != nil {
 			vtapGroupLcuuidToLocalConfig[*config.VTapGroupLcuuid] = *config.YamlConfig
 		} else {
@@ -501,6 +505,7 @@ func (v *VTapInfo) convertConfig(configs []*models.VTapGroupConfiguration) {
 	}
 	v.vtapGroupLcuuidToConfiguration = vtapGroupLcuuidToConfiguration
 	v.vtapGroupLcuuidToLocalConfig = vtapGroupLcuuidToLocalConfig
+	v.vtapGroupLcuuidToEAHPEnabled = vtapGroupLcuuidToEAHPEnabled
 }
 
 func (v *VTapInfo) GetVTapConfigFromShortID(shortID string) *VTapConfig {
