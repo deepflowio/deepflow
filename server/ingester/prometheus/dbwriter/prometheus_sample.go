@@ -114,12 +114,8 @@ func (m *PrometheusSampleMini) Columns(appLabelColumnCount int) []*ckdb.Column {
 func (m *PrometheusSampleMini) GenCKTable(cluster, storagePolicy string, ttl int, coldStorage *ckdb.ColdStorage, appLabelColumnCount int) *ckdb.Table {
 	timeKey := "time"
 	engine := ckdb.MergeTree
-
 	// order key
-	orderKeys := []string{}
-	orderKeys = append(orderKeys, "metric_id")
-	orderKeys = append(orderKeys, "target_id")
-	orderKeys = append(orderKeys, timeKey)
+	orderKeys := []string{"metric_id", timeKey, "target_id"}
 
 	return &ckdb.Table{
 		Version:         common.CK_VERSION,

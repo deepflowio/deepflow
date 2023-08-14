@@ -16,15 +16,49 @@
 
 package resource
 
-import "github.com/gin-gonic/gin"
+import (
+	"strconv"
+
+	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
+
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
+	"github.com/deepflowio/deepflow/server/controller/http/model"
+	"github.com/deepflowio/deepflow/server/controller/http/router/common"
+	"github.com/deepflowio/deepflow/server/controller/http/service/resource"
+)
 
 type Task struct{}
 
-func NewType() *Task {
+func NewTask() *Task {
 	return new(Task)
 }
 
 func (t *Task) RegisterTo(e *gin.Engine) {
-	e.POST("/v1/task")
-	e.GET("/v1/task/:id")
+	e.GET("/v1/tasks/", getTasks)
+	e.GET("/v1/tasks/:id/", getTask)
+
+	e.POST("/v1/tasks/", createTask) // used to control task id
+}
+
+func getTask(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	data, err := resource.GetTask(id)
+	common.JsonResponse(c, data, err)
+}
+
+func getTasks(c *gin.Context) {
+	data, err := resource.GetTasks()
+	common.JsonResponse(c, data, err)
+}
+
+func createTask(c *gin.Context) {
+	var body model.TaskCreate
+	err := c.ShouldBindBodyWith(&body, binding.JSON)
+	if err != nil {
+		common.BadRequestResponse(c, httpcommon.INVALID_POST_DATA, err.Error())
+		return
+	}
+	data, err := resource.CreateTask(body)
+	common.JsonResponse(c, data, err)
 }

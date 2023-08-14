@@ -65,6 +65,7 @@ func (a *AZ) generateOne(item mysql.AZ) common.ResponseElem {
 	d["ANALYZER_IPS"] = a.toolData.azLcuuidToAnalyzerIPs[item.Lcuuid]
 	d["CONTROLLER_IPS"] = a.toolData.azLcuuidToControllerIPs[item.Lcuuid]
 
+	// TODO extract common
 	d["CREATED_AT"] = item.CreatedAt.Format(ctrlrcommon.GO_BIRTHDAY)
 	d["UPDATED_AT"] = item.UpdatedAt.Format(ctrlrcommon.GO_BIRTHDAY)
 	return d

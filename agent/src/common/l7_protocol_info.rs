@@ -167,6 +167,7 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
                         msg_type: param.direction.into(),
                         time: param.time,
                         kafka_info,
+                        multi_merge_info:None,
                     },
                 );
 
@@ -201,6 +202,7 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
                             msg_type: param.direction.into(),
                             time: param.time,
                             kafka_info,
+                            multi_merge_info: None,
                         },
                     );
                     None
@@ -253,6 +255,7 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
                             msg_type: param.direction.into(),
                             time: param.time,
                             kafka_info,
+                            multi_merge_info: None,
                         },
                     );
                 }
@@ -267,6 +270,116 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
             }
         } else {
             error!("flow_id: {}, packet time 0", param.flow_id);
+            None
+        }
+    }
+
+    // must have request id
+    // the main different with cal_rrt() is need to push back to lru when session not end
+    fn cal_rrt_for_multi_merge_log(&self, param: &ParseParam) -> Option<u64> {
+        assert!(self.session_id().is_some());
+
+        let mut perf_cache = param.l7_perf_cache.borrow_mut();
+        let cache_key = self.cal_cache_key(param);
+        let previous_log_info = perf_cache.rrt_cache.pop(&cache_key);
+
+        let time = param.time;
+        let msg_type: LogMessageType = param.direction.into();
+        let timeout = param.rrt_timeout as u64;
+
+        if time == 0 {
+            error!("flow_id: {}, packet time 0", param.flow_id);
+            return None;
+        }
+
+        let (in_cached_req, timeout_count) = perf_cache
+            .timeout_cache
+            .get_or_insert_mut(param.flow_id, || (0, 0));
+
+        let (req_end, resp_end) = {
+            let (req_end, resp_end) = self.is_req_resp_end();
+            match param.direction {
+                PacketDirection::ClientToServer => (req_end, false),
+                PacketDirection::ServerToClient => (false, resp_end),
+            }
+        };
+
+        let Some(mut previous_log_info) = previous_log_info else {
+            if msg_type == LogMessageType::Request{
+                *in_cached_req += 1;
+            }
+            perf_cache.put(
+                cache_key,
+                LogCache {
+                    msg_type: param.direction.into(),
+                    time: param.time,
+                    kafka_info: None,
+                    multi_merge_info: Some((req_end,resp_end,false)),
+                },
+            );
+
+            param.stats_counter.as_ref().map(|f| {
+                f.l7_perf_cache_len
+                    .swap(perf_cache.rrt_cache.len() as u64, Ordering::Relaxed);
+                f.l7_timeout_cache_len
+                    .swap(perf_cache.timeout_cache.len() as u64, Ordering::Relaxed)
+
+            });
+            return None;
+        };
+
+        let (cache_req_end, cache_resp_end, merged) =
+            previous_log_info.multi_merge_info.as_mut().unwrap();
+
+        if req_end {
+            *cache_req_end = true;
+        }
+        if resp_end {
+            *cache_resp_end = true;
+        }
+
+        let (put_back, merged) = (!(*cache_req_end && *cache_resp_end), *merged);
+
+        if previous_log_info.msg_type != msg_type && !merged {
+            previous_log_info.multi_merge_info.as_mut().unwrap().2 = true;
+            if *in_cached_req > 0 {
+                *in_cached_req -= 1;
+            }
+        }
+
+        // if previous is req and current is resp, calculate the round trip time.
+        if (previous_log_info.msg_type == LogMessageType::Request
+            && msg_type == LogMessageType::Response
+            && time > previous_log_info.time) ||
+        // if previous is resp and current is req and previous time gt current time, likely ebpf disorder,
+        // calculate the round trip time.
+            (previous_log_info.msg_type == LogMessageType::Response
+            && msg_type == LogMessageType::Request
+            && previous_log_info.time > time)
+        {
+            let rrt = time.abs_diff(previous_log_info.time);
+
+            // timeout
+            let r = if rrt > timeout {
+                if !merged {
+                    *timeout_count += 1;
+                }
+                None
+            } else {
+                Some(rrt)
+            };
+
+            if put_back {
+                perf_cache.rrt_cache.put(cache_key, previous_log_info);
+            }
+            r
+        } else {
+            if previous_log_info.msg_type != msg_type && !merged {
+                *timeout_count += 1;
+            }
+            if put_back {
+                perf_cache.rrt_cache.put(cache_key, previous_log_info);
+            }
             None
         }
     }

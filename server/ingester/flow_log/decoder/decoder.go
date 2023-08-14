@@ -85,6 +85,7 @@ type Decoder struct {
 	fieldsBuf      []interface{}
 	fieldValuesBuf []interface{}
 	counter        *Counter
+	lastCounter    Counter // for OTLP debug
 	utils.Closable
 }
 
@@ -117,7 +118,12 @@ func (d *Decoder) GetCounter() interface{} {
 	if counter.Count > 0 {
 		counter.AvgTime = counter.TotalTime / counter.Count
 	}
+	d.lastCounter = *counter
 	return counter
+}
+
+func (d *Decoder) GetLastCounter() *Counter {
+	return &d.lastCounter
 }
 
 func (d *Decoder) Run() {
@@ -303,9 +309,11 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 	l := log_data.ProtoLogToL7FlowLog(proto, d.platformData)
 	l.AddReferenceCount()
 	if d.throttler.SendWithThrottling(l) {
-		d.fieldsBuf, d.fieldValuesBuf = d.fieldsBuf[:0], d.fieldValuesBuf[:0]
-		l.GenerateNewFlowTags(d.flowTagWriter.Cache)
-		d.flowTagWriter.WriteFieldsAndFieldValuesInCache()
+		if d.flowTagWriter != nil {
+			d.fieldsBuf, d.fieldValuesBuf = d.fieldsBuf[:0], d.fieldValuesBuf[:0]
+			l.GenerateNewFlowTags(d.flowTagWriter.Cache)
+			d.flowTagWriter.WriteFieldsAndFieldValuesInCache()
+		}
 		d.otlpExport(l)
 	} else {
 		dropped = true

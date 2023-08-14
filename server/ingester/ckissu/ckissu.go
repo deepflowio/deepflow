@@ -882,6 +882,12 @@ var ColumnAdd633 = []*ColumnAdds{
 		ColumnNames: []string{"region_id"},
 		ColumnType:  ckdb.UInt16,
 	},
+	&ColumnAdds{
+		Dbs:         []string{"event"},
+		Tables:      []string{"alarm_event", "alarm_event_local"},
+		ColumnNames: []string{"policy_query_url", "policy_query_conditions", "policy_threshold_critical", "policy_threshold_error", "policy_threshold_warning"},
+		ColumnType:  ckdb.String,
+	},
 }
 
 func getTables(connect *sql.DB, db, tableName string) ([]string, error) {

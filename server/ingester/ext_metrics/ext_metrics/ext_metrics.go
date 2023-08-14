@@ -96,7 +96,7 @@ func NewMetricsor(msgType datatype.MessageType, db string, config *config.Config
 	for i := 0; i < queueCount; i++ {
 		if platformDataEnabled {
 			var err error
-			platformDatas[i], err = platformDataManager.NewPlatformInfoTable(false, "ext-metrics-"+msgType.String()+"-"+strconv.Itoa(i))
+			platformDatas[i], err = platformDataManager.NewPlatformInfoTable("ext-metrics-" + msgType.String() + "-" + strconv.Itoa(i))
 			if i == 0 {
 				debug.ServerRegisterSimple(CMD_PLATFORMDATA_EXT_METRICS, platformDatas[i])
 			}

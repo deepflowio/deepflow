@@ -19,6 +19,7 @@ service Synchronizer {
     rpc ShareGPIDLocalData(ShareGPIDSyncRequests) returns (ShareGPIDSyncRequests) {}
     rpc Plugin (PluginRequest) returns (stream PluginResponse) {}
     rpc GetPrometheusLabelIDs (PrometheusLabelRequest) returns (PrometheusLabelResponse) {}
+    rpc GetPrometheusTargets (PrometheusTargetRequest) returns (PrometheusTargetResponse) {}
     rpc GetUniversalTagNameMaps (UniversalTagNameMapsRequest) returns (UniversalTagNameMapsResponse) {}
 }
 
@@ -866,6 +867,13 @@ message PrometheusLabelRequest {
 message PrometheusLabelResponse {
    repeated MetricLabelResponse response_label_ids = 1;
    repeated TargetResponse response_target_ids = 2;
+}
+
+message PrometheusTargetRequest{}
+
+message PrometheusTargetResponse {
+    optional uint32 version = 1;
+    repeated TargetResponse response_target_ids = 2;
 }
 
 message PodK8sLabelMap {

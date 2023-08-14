@@ -22,3 +22,8 @@ trigger_condition          , trigger_condition         , trigger_condition      
 trigger_value              , trigger_value             , trigger_value             , string         ,                       , Alarm Info      , 111
 event_level                , event_level               , event_level               , int_enum       , event_level           , Alarm Info      , 111
 alarm_target               , alarm_target              , alarm_target              , string         ,                       , Alarm Info      , 111
+policy_query_url           , policy_query_url          , policy_query_url          , string         ,                       , Alarm Info      , 111
+policy_query_conditions    , policy_query_conditions   , policy_query_conditions   , string         ,                       , Alarm Info      , 111
+policy_threshold_critical  , policy_threshold_critical , policy_threshold_critical , string         ,                       , Alarm Info      , 111
+policy_threshold_error     , policy_threshold_error    , policy_threshold_error    , string         ,                       , Alarm Info      , 111
+policy_threshold_warning   , policy_threshold_warning  , policy_threshold_warning  , string         ,                       , Alarm Info      , 111

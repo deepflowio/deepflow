@@ -136,7 +136,7 @@ func NewPerfEventor(config *config.Config, recv *receiver.Receiver, manager *dro
 		if err != nil {
 			return nil, err
 		}
-		platformDatas[i], err = platformDataManager.NewPlatformInfoTable(false, "event-"+eventMsg.String()+"-"+strconv.Itoa(i))
+		platformDatas[i], err = platformDataManager.NewPlatformInfoTable("event-" + eventMsg.String() + "-" + strconv.Itoa(i))
 		if err != nil {
 			return nil, err
 		}

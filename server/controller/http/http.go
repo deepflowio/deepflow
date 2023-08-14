@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2023 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,9 +14,28 @@
  * limitations under the License.
  */
 
-package common
+package http
 
-const (
-	CK_VERSION             = "v6.3.5.3" // 用于表示clickhouse的表版本号
-	DEFAULT_PCAP_DATA_PATH = "/var/lib/pcap"
+import (
+	"sync"
+
+	"github.com/deepflowio/deepflow/server/controller/http/service/resource/task"
 )
+
+var (
+	httpOnce sync.Once
+	http     *HTTP
+)
+
+type HTTP struct {
+	TaskManager *task.Manager
+}
+
+func GetSingleton() *HTTP {
+	httpOnce.Do(func() {
+		http = &HTTP{
+			TaskManager: task.GetManager(),
+		}
+	})
+	return http
+}

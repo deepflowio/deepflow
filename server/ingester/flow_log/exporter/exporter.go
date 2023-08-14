@@ -21,6 +21,7 @@ import (
 	"time"
 
 	logging "github.com/op/go-logging"
+	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.opentelemetry.io/collector/pdata/ptrace/ptraceotlp"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -29,12 +30,18 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/config"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/log_data"
+	"github.com/deepflowio/deepflow/server/ingester/ingesterctl"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
+	"github.com/deepflowio/deepflow/server/libs/debug"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 	"github.com/deepflowio/deepflow/server/libs/utils"
 )
 
 var log = logging.MustGetLogger("flow_log.exporter")
+
+const (
+	QUEUE_BATCH_COUNT = 1024
+)
 
 type OtlpExporter struct {
 	Addr                 string
@@ -44,9 +51,12 @@ type OtlpExporter struct {
 	grpcConns            []*grpc.ClientConn
 	universalTagsManager *UniversalTagsManager
 	config               *config.Config
-	counter              Counter
+	counter              *Counter
+	lastCounter          Counter
 	exportDataBits       uint32
 	exportDataTypeBits   uint32
+
+	utils.Closable
 }
 
 const (
@@ -143,15 +153,17 @@ func ExportedDataTypeBitsToString(bits uint32) string {
 type Counter struct {
 	RecvCounter          int64 `statsd:"recv-count"`
 	SendCounter          int64 `statsd:"send-count"`
+	SendBatchCounter     int64 `statsd:"send-batch-count"`
+	ExportUsedTimeNs     int64 `statsd:"export-used-time-ns"`
 	DropCounter          int64 `statsd:"drop-count"`
+	DropBatchCounter     int64 `statsd:"drop-batch-count"`
 	DropNoTraceIDCounter int64 `statsd:"drop-no-traceid-count"`
-	utils.Closable
 }
 
-func (c *Counter) GetCounter() interface{} {
+func (e *OtlpExporter) GetCounter() interface{} {
 	var counter Counter
-	counter, *c = *c, Counter{}
-
+	counter, *e.counter = *e.counter, Counter{}
+	e.lastCounter = counter
 	return &counter
 }
 
@@ -196,8 +208,10 @@ func NewOtlpExporter(config *config.Config) *OtlpExporter {
 		config:               config,
 		exportDataBits:       exportDataBits,
 		exportDataTypeBits:   exportDataTypeBits,
+		counter:              &Counter{},
 	}
-	common.RegisterCountableForIngester("exporter", &exporter.counter)
+	debug.ServerRegisterSimple(ingesterctl.CMD_OTLP_EXPORTER, exporter)
+	common.RegisterCountableForIngester("exporter", exporter)
 	log.Info("otlp exporter start")
 	return exporter
 }
@@ -223,21 +237,47 @@ func (e *OtlpExporter) Start() {
 }
 
 func (e *OtlpExporter) queueProcess(queueID int) {
+	var batchCount int
+	traces := ptrace.NewTraces()
+	flows := make([]interface{}, QUEUE_BATCH_COUNT)
+
 	ctx := context.Background()
 	if len(e.config.Exporter.GrpcHeaders) > 0 {
 		ctx = metadata.NewOutgoingContext(ctx, metadata.New(e.config.Exporter.GrpcHeaders))
 	}
-	flows := make([]interface{}, 1024)
 	for {
 		n := e.dataQueues.Gets(queue.HashKey(queueID), flows)
 		for _, flow := range flows[:n] {
 			if flow == nil {
+				if batchCount > 0 {
+					if err := e.grpcExport(ctx, queueID, ptraceotlp.NewExportRequestFromTraces(traces)); err == nil {
+						e.counter.SendCounter += int64(batchCount)
+					}
+					batchCount = 0
+					traces = ptrace.NewTraces()
+				}
 				continue
 			}
 			switch t := flow.(type) {
 			case (*log_data.L7FlowLog):
 				f := flow.(*log_data.L7FlowLog)
-				e.grpcExport(ctx, queueID, f)
+				if e.config.Exporter.ExportOnlyWithTraceID && f.TraceId == "" {
+					e.counter.DropNoTraceIDCounter++
+					e.counter.DropCounter++
+					f.Release()
+					continue
+				}
+
+				L7FlowLogToExportResourceSpans(f, e.universalTagsManager, e.exportDataTypeBits, traces.ResourceSpans().AppendEmpty())
+				batchCount++
+				if batchCount >= e.config.Exporter.ExportBatchCount {
+					if err := e.grpcExport(ctx, queueID, ptraceotlp.NewExportRequestFromTraces(traces)); err == nil {
+						e.counter.SendCounter += int64(batchCount)
+					}
+					batchCount = 0
+					traces = ptrace.NewTraces()
+				}
+
 				f.Release()
 			default:
 				log.Warningf("flow type(%T) unsupport", t)
@@ -247,32 +287,31 @@ func (e *OtlpExporter) queueProcess(queueID int) {
 	}
 }
 
-func (e *OtlpExporter) grpcExport(ctx context.Context, i int, f *log_data.L7FlowLog) {
-	if e.config.Exporter.ExportOnlyWithTraceID && f.TraceId == "" {
-		e.counter.DropNoTraceIDCounter++
-		e.counter.DropCounter++
-		return
-	}
-	req := L7FlowLogToExportRequest(f, e.universalTagsManager, e.exportDataTypeBits)
+func (e *OtlpExporter) grpcExport(ctx context.Context, i int, req ptraceotlp.ExportRequest) error {
+	now := time.Now()
+
 	if e.grpcExporters[i] == nil {
 		if err := e.newGrpcExporter(i); err != nil {
 			if e.counter.DropCounter == 0 {
-				log.Warning("new grpc exporter failed. err: %s", err)
+				log.Warningf("new grpc exporter failed. err: %s", err)
 			}
 			e.counter.DropCounter++
-			return
+			return err
 		}
 	}
 	_, err := e.grpcExporters[i].Export(ctx, req)
 	if err != nil {
 		if e.counter.DropCounter == 0 {
-			log.Warning("send grpc traces failed. err: %s", err)
+			log.Warningf("send grpc traces failed. err: %s", err)
 		}
 		e.counter.DropCounter++
 		e.grpcExporters[i] = nil
+		return err
 	} else {
-		e.counter.SendCounter++
+		e.counter.SendBatchCounter++
 	}
+	e.counter.ExportUsedTimeNs += int64(time.Since(now))
+	return nil
 }
 
 func (e *OtlpExporter) newGrpcExporter(i int) error {
@@ -290,4 +329,8 @@ func (e *OtlpExporter) newGrpcExporter(i int) error {
 	e.grpcConns[i] = conn
 	e.grpcExporters[i] = ptraceotlp.NewGRPCClient(conn)
 	return nil
+}
+
+func (e *OtlpExporter) HandleSimpleCommand(op uint16, arg string) string {
+	return fmt.Sprintf("last 10s counter: %+v", e.lastCounter)
 }

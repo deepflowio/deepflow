@@ -16,6 +16,7 @@ enum TridentType {
     TT_TUNNEL_DECAPSULATION = 9;           // Agent in a dedicated host to decap tunnel traffic
     TT_HYPER_V_COMPUTE = 10;               // Agent in Hyper-V Compute Node
     TT_HYPER_V_NETWORK = 11;               // Agent in Hyper-V Network Node
+    TT_K8S_SIDECAR = 12;                   // Agent in K8s POD
 }
 
 message KubernetesAPIInfo {
