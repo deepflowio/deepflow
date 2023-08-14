@@ -576,8 +576,8 @@ impl Labeler {
     }
 
     fn modify_internet_epc(&self, endpoint: &mut EndpointData) {
-        let mut src_data = &mut endpoint.src_info;
-        let mut dst_data = &mut endpoint.dst_info;
+        let src_data = &mut endpoint.src_info;
+        let dst_data = &mut endpoint.dst_info;
 
         if src_data.l3_epc_id == 0 {
             src_data.l3_epc_id = EPC_FROM_INTERNET;
