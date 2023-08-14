@@ -1837,6 +1837,11 @@ TPPROG(sys_enter_getppid) (struct syscall_comm_enter_ctx *ctx) {
 				__u32 buf_size = (v_buff->len +
 						  offsetof(typeof(struct __socket_data_buffer), data))
 						 & (sizeof(*v_buff) - 1);
+				/* 
+				 * Note that when 'buf_size == 0', it indicates that the data being
+				 * sent is at its maximum value (sizeof(*v_buff)), and it should
+				 * be sent accordingly.
+				 */
 				if (buf_size < sizeof(*v_buff) && buf_size > 0) {
 					/* 
 					 * Use 'buf_size + 1' instead of 'buf_size' to circumvent
@@ -1990,6 +1995,11 @@ static __inline int output_data_common(void *ctx) {
 	    ((sizeof(v_buff->data) - v_buff->len) < sizeof(*v))) {
 		__u32 buf_size = (v_buff->len + offsetof(typeof(struct __socket_data_buffer), data))
 				 & (sizeof(*v_buff) - 1);
+		/*
+		 * Note that when 'buf_size == 0', it indicates that the data being
+		 * sent is at its maximum value (sizeof(*v_buff)), and it should
+		 * be sent accordingly.
+		 */
 		if (buf_size < sizeof(*v_buff) && buf_size > 0) {
 			/*
 			 * Use 'buf_size + 1' instead of 'buf_size' to circumvent
