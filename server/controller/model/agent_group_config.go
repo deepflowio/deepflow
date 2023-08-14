@@ -110,6 +110,8 @@ type StaticConfig struct {
 	ExternalProfileIntegrationDisabled *bool                      `yaml:"external-profile-integration-disabled,omitempty"`
 	ExternalTraceIntegrationDisabled   *bool                      `yaml:"external-trace-integration-disabled,omitempty"`
 	ExternalMetricIntegrationDisabled  *bool                      `yaml:"external-metric-integration-disabled,omitempty"`
+	NtpMaxInterval                     *string                    `yaml:"ntp-max-interval,omitempty"`
+	NtpMinInterval                     *string                    `yaml:"ntp-min-interval,omitempty"`
 }
 
 type XflowCollectorConfig struct {

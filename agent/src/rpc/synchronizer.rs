@@ -25,7 +25,7 @@ use std::str::FromStr;
 use std::sync::{
     self,
     atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
-    Arc, Weak,
+    Arc, Condvar, Weak,
 };
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 #[cfg(unix)]
@@ -68,6 +68,7 @@ const DEFAULT_SYNC_INTERVAL: Duration = Duration::from_secs(60);
 const RPC_RETRY_INTERVAL: Duration = Duration::from_secs(60);
 const NANOS_IN_SECOND: i64 = Duration::from_secs(1).as_nanos() as i64;
 const SECOND: Duration = Duration::from_secs(1);
+const DEFAULT_NTP_MAX_INTERVAL: Duration = Duration::from_secs(60);
 
 pub struct StaticConfig {
     pub version_info: &'static VersionInfo,
@@ -122,6 +123,9 @@ pub struct Status {
     pub proxy_port: u16,
     pub sync_interval: Duration,
     pub ntp_enabled: bool,
+    pub first: bool,
+    pub ntp_max_interval: Duration,
+    pub ntp_min_interval: Duration,
 
     // GRPC数据
     pub local_epc: i32,
@@ -151,6 +155,9 @@ impl Default for Status {
             proxy_port: DEFAULT_CONTROLLER_PORT,
             sync_interval: DEFAULT_SYNC_INTERVAL,
             ntp_enabled: false,
+            first: true,
+            ntp_min_interval: Duration::from_secs(10),
+            ntp_max_interval: Duration::from_secs(300),
 
             local_epc: EPC_FROM_INTERNET,
             version_platform_data: 0,
@@ -404,12 +411,15 @@ impl Status {
     }
 }
 
+type NtpState = Arc<(sync::Mutex<bool>, Condvar)>;
+
 pub struct Synchronizer {
     pub static_config: Arc<StaticConfig>,
     pub agent_id: Arc<RwLock<AgentId>>,
     pub status: Arc<RwLock<Status>>,
 
     trident_state: TridentState,
+    ntp_state: NtpState,
 
     session: Arc<Session>,
     // 策略模块和NPB带宽检测会用到
@@ -430,6 +440,7 @@ pub struct Synchronizer {
 
 impl Synchronizer {
     const LOG_THRESHOLD: usize = 3;
+
     pub fn new(
         runtime: Arc<Runtime>,
         session: Arc<Session>,
@@ -459,6 +470,7 @@ impl Synchronizer {
             }),
             agent_id: Arc::new(RwLock::new(agent_id)),
             trident_state,
+            ntp_state: Arc::new((sync::Mutex::new(false), Condvar::new())),
             status: Default::default(),
             session,
             running: Arc::new(AtomicBool::new(false)),
@@ -649,6 +661,7 @@ impl Synchronizer {
         remote: (String, u16),
         mut resp: tp::SyncResponse,
         trident_state: &TridentState,
+        ntp_state: &NtpState,
         static_config: &Arc<StaticConfig>,
         status: &Arc<RwLock<Status>>,
         flow_acl_listener: &Arc<sync::Mutex<Vec<Box<dyn FlowAclListener>>>>,
@@ -697,30 +710,43 @@ impl Synchronizer {
 
         let (_, macs) = Self::parse_segment(runtime_config.tap_mode, &resp);
 
-        let mut status = status.write();
-        status.proxy_ip = if runtime_config.proxy_controller_ip.len() > 0 {
+        let mut status_guard = status.write();
+        status_guard.proxy_ip = if runtime_config.proxy_controller_ip.len() > 0 {
             Some(runtime_config.proxy_controller_ip.clone())
         } else {
             Some(static_config.controller_ip.clone())
         };
-        status.proxy_port = runtime_config.proxy_controller_port;
-        status.sync_interval = Duration::from_secs(runtime_config.sync_interval);
-        status.ntp_enabled = runtime_config.ntp_enabled;
-        let updated_platform = status.get_platform_data(&resp);
+        status_guard.proxy_port = runtime_config.proxy_controller_port;
+        status_guard.sync_interval = Duration::from_secs(runtime_config.sync_interval);
+        status_guard.ntp_enabled = runtime_config.ntp_enabled;
+        status_guard.ntp_max_interval = runtime_config.yaml_config.ntp_max_interval;
+        status_guard.ntp_min_interval = runtime_config.yaml_config.ntp_min_interval;
+        let updated_platform = status_guard.get_platform_data(&resp);
         if updated_platform {
-            status.modify_platform(&macs, &runtime_config);
+            status_guard.modify_platform(&macs, &runtime_config);
         }
-        let mut updated = status.get_ip_groups(&resp) || updated_platform;
-        updated = status.get_flow_acls(&resp) || updated;
-        updated = status.get_local_epc(&runtime_config) || updated;
+        let mut updated = status_guard.get_ip_groups(&resp) || updated_platform;
+        updated = status_guard.get_flow_acls(&resp) || updated;
+        updated = status_guard.get_local_epc(&runtime_config) || updated;
+        let wait_ntp = status_guard.ntp_enabled && status_guard.first;
+        drop(status_guard);
         if updated {
+            let (ntp_state, ncond) = &**ntp_state;
+            if wait_ntp {
+                let ntp_state_guard = ntp_state.lock().unwrap();
+                // Here, it is necessary to wait for the NTP synchronization timestamp to start
+                // collecting traffic and avoid using incorrect timestamps
+                drop(ncond.wait(ntp_state_guard).unwrap());
+            }
+            let status_guard = status.write();
             // 更新策略相关
             let last = SystemTime::now();
             info!("Grpc version ip-groups: {}, interfaces, peer-connections and cidrs: {}, flow-acls: {}",
-            status.version_groups, status.version_platform_data, status.version_acls);
+            status_guard.version_groups, status_guard.version_platform_data, status_guard.version_acls);
             let mut policy_error = false;
             for listener in flow_acl_listener.lock().unwrap().iter_mut() {
-                if let Err(e) = status.trigger_flow_acl(runtime_config.trident_type, listener) {
+                if let Err(e) = status_guard.trigger_flow_acl(runtime_config.trident_type, listener)
+                {
                     warn!("OnPolicyChange: {}.", e);
                     policy_error = true;
                 }
@@ -735,15 +761,17 @@ impl Synchronizer {
             info!("Grpc finish update cost {:?} on {} listener, {} ip-groups, {} interfaces, {} peer-connections, {} cidrs, {} flow-acls",
                 now.duration_since(last).unwrap_or(Duration::from_secs(0)),
                 flow_acl_listener.lock().unwrap().len(),
-                status.ip_groups.len(),
-                status.interfaces.len(),
-                status.peers.len(),
-                status.cidrs.len(),
-                status.acls.len(),
+                status_guard.ip_groups.len(),
+                status_guard.interfaces.len(),
+                status_guard.peers.len(),
+                status_guard.cidrs.len(),
+                status_guard.acls.len(),
             );
         }
-        let blacklist = status.get_blacklist(&resp);
-        drop(status);
+        let mut status_guard = status.write();
+        let blacklist = status_guard.get_blacklist(&resp);
+        status_guard.first = false;
+        drop(status_guard);
 
         let (trident_state, cvar) = &**trident_state;
         if !runtime_config.enabled {
@@ -779,6 +807,7 @@ impl Synchronizer {
         let flow_acl_listener = self.flow_acl_listener.clone();
         let exception_handler = self.exception_handler.clone();
         let ntp_diff = self.ntp_diff.clone();
+        let ntp_state = self.ntp_state.clone();
         self.threads.lock().push(self.runtime.spawn(async move {
             let mut grpc_failed_count = 0;
             while running.load(Ordering::SeqCst) {
@@ -862,6 +891,7 @@ impl Synchronizer {
                         session.get_current_server(),
                         message,
                         &trident_state,
+                        &ntp_state,
                         &static_config,
                         &status,
                         &flow_acl_listener,
@@ -917,14 +947,21 @@ impl Synchronizer {
         let status = self.status.clone();
         let running = self.running.clone();
         let ntp_diff = self.ntp_diff.clone();
+        let ntp_state = self.ntp_state.clone();
         self.runtime.spawn(async move {
             while running.load(Ordering::SeqCst) {
-                let (enabled, sync_interval) = {
+                let (enabled, sync_interval, max_interval, min_interval, first) = {
                     let reader = status.read();
-                    (reader.ntp_enabled, reader.sync_interval)
+                    (reader.ntp_enabled, reader.sync_interval, reader.ntp_max_interval.as_nanos() as i64, reader.ntp_min_interval.as_nanos() as i64, reader.first)
                 };
 
                 if !enabled {
+                    let diff = ntp_diff.load(Ordering::Relaxed);
+                    if diff > max_interval {
+                        warn!("Closing NTP causes the timestamp to fall back by {}s, and the agent needs to be restarted.", diff/NANOS_IN_SECOND);
+                        time::sleep(Duration::from_secs(1)).await;
+                        process::exit(NORMAL_EXIT_WITH_RESTART);
+                    }
                     ntp_diff.store(0, Ordering::Relaxed);
                     time::sleep(sync_interval).await;
                     continue;
@@ -995,11 +1032,29 @@ impl Synchronizer {
                 // Correct the received message's origin time using the actual
                 // transmit time.
                 resp_packet.ts_orig = NtpTime::from(&send_time).0;
-                let offset = resp_packet.offset(&recv_time);
-                ntp_diff.store(
-                    offset / NANOS_IN_SECOND * NANOS_IN_SECOND,
-                    Ordering::Relaxed,
-                );
+                let offset = resp_packet.offset(&recv_time) / NANOS_IN_SECOND * NANOS_IN_SECOND;
+                match ntp_diff.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |x| {
+                    if (x > offset && x - offset >= min_interval)
+                        || (offset > x && offset - x >= min_interval)
+                    {
+                        info!("NTP Set time offset {}s.", offset / NANOS_IN_SECOND);
+                        Some(offset)
+                    } else {
+                        None
+                    }
+                }) {
+                    Ok(last_offset) => {
+                        if !first && (last_offset > offset && last_offset - offset >= max_interval) {
+                            warn!("Openning NTP causes the timestamp to fall back by {}s, and the agent needs to be restarted.", offset/ NANOS_IN_SECOND);
+                            time::sleep(Duration::from_secs(1)).await;
+                            process::exit(NORMAL_EXIT_WITH_RESTART);
+                        }
+                    }
+                    _ =>{},
+                }
+
+                let (_, cond) = &*ntp_state;
+                cond.notify_all();
 
                 time::sleep(sync_interval).await;
             }
@@ -1199,6 +1254,7 @@ impl Synchronizer {
         let max_memory = self.max_memory.clone();
         let exception_handler = self.exception_handler.clone();
         let ntp_diff = self.ntp_diff.clone();
+        let ntp_state = self.ntp_state.clone();
         self.threads.lock().push(self.runtime.spawn(async move {
             let mut grpc_failed_count = 0;
             while running.load(Ordering::SeqCst) {
@@ -1257,6 +1313,7 @@ impl Synchronizer {
                     session.get_current_server(),
                     response.unwrap().into_inner(),
                     &trident_state,
+                    &ntp_state,
                     &static_config,
                     &status,
                     &flow_acl_listener,
@@ -1264,6 +1321,7 @@ impl Synchronizer {
                     &exception_handler,
                     &escape_tx,
                 );
+
                 let (new_revision, proxy_ip, proxy_port, new_sync_interval) = {
                     let status = status.read();
                     (

@@ -88,7 +88,12 @@ impl L7ProtocolParserInterface for SoLog {
                     {
                         let end_time = SystemTime::now();
                         let end_time = end_time.duration_since(UNIX_EPOCH).unwrap();
-                        (end_time - start_time).as_micros() as u64
+                        // Local timestamp may be modified
+                        if end_time > start_time {
+                            (end_time - start_time).as_micros() as u64
+                        } else {
+                            0
+                        }
                     },
                     Ordering::Relaxed,
                 )
@@ -156,7 +161,12 @@ impl L7ProtocolParserInterface for SoLog {
                     {
                         let end_time = SystemTime::now();
                         let end_time = end_time.duration_since(UNIX_EPOCH).unwrap();
-                        (end_time - start_time).as_micros() as u64
+                        // Local timestamp may be modified
+                        if end_time > start_time {
+                            (end_time - start_time).as_micros() as u64
+                        } else {
+                            0
+                        }
                     },
                     Ordering::Relaxed,
                 )
