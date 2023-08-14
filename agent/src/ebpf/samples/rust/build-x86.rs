@@ -31,6 +31,7 @@ fn set_build_libtrace() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-link-lib=static=bddisasm");
     println!("cargo:rustc-link-lib=static=dwarf");
     println!("cargo:rustc-link-lib=static=bcc_bpf");
+    println!("cargo:rustc-link-lib=static=bcc");
     println!("cargo:rustc-link-search=native=/usr/lib");
     println!("cargo:rustc-link-search=native=/usr/lib64");
     println!("cargo:rustc-link-lib=dylib=pthread");
