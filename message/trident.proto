@@ -869,7 +869,9 @@ message PrometheusLabelResponse {
    repeated TargetResponse response_target_ids = 2;
 }
 
-message PrometheusTargetRequest{}
+message PrometheusTargetRequest{
+    optional uint32 version = 1;
+}
 
 message PrometheusTargetResponse {
     optional uint32 version = 1;
