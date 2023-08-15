@@ -351,7 +351,7 @@ mod tests {
     fn test_af_packet_header_v2() {
         let mut raw: [u8; 1000] = [10; 1000];
         raw[50] = 10;
-        let mut v2 = Tpacket2Hdr::from((&mut raw) as *mut u8);
+        let v2 = Tpacket2Hdr::from((&mut raw) as *mut u8);
 
         unsafe {
             (*v2).tp_mac = 100;

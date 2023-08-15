@@ -344,15 +344,9 @@ int bpf_func_sched_process_exit(struct sched_comm_exit_ctx *ctx)
 		data.pid = pid;
 		data.meta.event_type = EVENT_TYPE_PROC_EXIT;
 		bpf_get_current_comm(data.name, sizeof(data.name));
-		int ret = bpf_perf_event_output(ctx, &NAME(socket_data),
-						BPF_F_CURRENT_CPU, &data,
-						sizeof(data));
-
-		if (ret) {
-			bpf_debug
-			    ("bpf_func_sched_process_exit event output failed: %d\n",
-			     ret);
-		}
+		bpf_perf_event_output(ctx, &NAME(socket_data),
+				      BPF_F_CURRENT_CPU, &data,
+				      sizeof(data));
 	}
 
 	bpf_map_delete_elem(&goroutines_map, &id);
@@ -368,13 +362,8 @@ int bpf_func_sched_process_fork(struct sched_comm_fork_ctx *ctx)
 	data.meta.event_type = EVENT_TYPE_PROC_EXEC;
 	data.pid = ctx->child_pid;
 	bpf_get_current_comm(data.name, sizeof(data.name));
-	int ret = bpf_perf_event_output(ctx, &NAME(socket_data),
-					BPF_F_CURRENT_CPU, &data, sizeof(data));
+	bpf_perf_event_output(ctx, &NAME(socket_data),
+			      BPF_F_CURRENT_CPU, &data, sizeof(data));
 
-	if (ret) {
-		bpf_debug(
-			"bpf_func_sys_exit_execve event output() failed: %d\n",
-			ret);
-	}
 	return 0;
 }
