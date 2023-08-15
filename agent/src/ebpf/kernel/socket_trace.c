@@ -450,11 +450,14 @@ static __inline int is_tcp_udp_data(void *sk,
 		return SOCK_CHECK_TYPE_ERROR;
 	}
 
-	unsigned char skc_state;
-	bpf_probe_read(&skc_state, sizeof(skc_state), (void *)sk + STRUCT_SOCK_SKC_STATE_OFFSET);
+	bpf_probe_read(&conn_info->skc_state, sizeof(conn_info->skc_state),
+		       (void *)sk + STRUCT_SOCK_SKC_STATE_OFFSET);
 
-	/* 如果连接尚未建立好，不处于ESTABLISHED或者CLOSE_WAIT状态，退出 */
-	if ((1 << skc_state) & ~(TCPF_ESTABLISHED | TCPF_CLOSE_WAIT)) {
+	/*
+	 * If the connection has not been established yet, and it is not in the
+	 * ESTABLISHED or CLOSE_WAIT state, exit.
+	 */
+	if ((1 << conn_info->skc_state) & ~(TCPF_ESTABLISHED | TCPF_CLOSE_WAIT)) {
 		return SOCK_CHECK_TYPE_ERROR;
 	}
 
@@ -529,11 +532,8 @@ static __inline void connect_submit(struct pt_regs *ctx, struct conn_info_t *v, 
 		return;
 	}
 
-	int ret = bpf_perf_event_output(ctx, &NAME(socket_data),
-					BPF_F_CURRENT_CPU, v,
-					128);
-
-	if (ret) bpf_debug("connect_submit: %d\n", ret);
+	bpf_perf_event_output(ctx, &NAME(socket_data),
+			      BPF_F_CURRENT_CPU, v, 128);
 }
 #endif
 
@@ -1053,6 +1053,24 @@ __data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 		 * This is because kernel 4.14 verify reports errors("R0 invalid mem access 'inv'").
 		 */
 		v->tcp_seq = tcp_seq;
+		if (tcp_seq == 0 && conn_info->fd > 0) {
+			if (conn_info->direction == T_INGRESS) {
+				tcp_seq = get_tcp_read_seq_from_fd(conn_info->fd);
+				/*
+				 * If the current state is TCPF_CLOSE_WAIT, the FIN
+				 * frame already has been received.
+				 * Since tcp_sock->copied_seq has done such an operation +1,
+				 * need to fix the value of tcp_seq.
+				 */
+				if ((1 << conn_info->skc_state) & TCPF_CLOSE_WAIT) {
+					tcp_seq--;
+				}
+			} else {
+				tcp_seq = get_tcp_write_seq_from_fd(conn_info->fd);
+			}
+
+			v->tcp_seq = tcp_seq - syscall_len;
+		}
 	}
 
 	v->thread_trace_id = thread_trace_id;
@@ -1616,15 +1634,24 @@ TPPROG(sys_enter_getppid) (struct syscall_comm_enter_ctx *ctx) {
 				__u32 buf_size = (v_buff->len +
 						  offsetof(typeof(struct __socket_data_buffer), data))
 						 & (sizeof(*v_buff) - 1);
-				if (buf_size >= sizeof(*v_buff))
-					bpf_perf_event_output(ctx, &NAME(socket_data),
-							      BPF_F_CURRENT_CPU, v_buff,
-							      sizeof(*v_buff));
-				else
-					/* 使用'buf_size + 1'代替'buf_size'，来规避（Linux 4.14.x）长度检查 */
+				/* 
+				 * Note that when 'buf_size == 0', it indicates that the data being
+				 * sent is at its maximum value (sizeof(*v_buff)), and it should
+				 * be sent accordingly.
+				 */
+				if (buf_size < sizeof(*v_buff) && buf_size > 0) {
+					/* 
+					 * Use 'buf_size + 1' instead of 'buf_size' to circumvent
+					 * (Linux 4.14.x) length checks.
+					 */
 					bpf_perf_event_output(ctx, &NAME(socket_data),
 							      BPF_F_CURRENT_CPU, v_buff,
 							      buf_size + 1);
+				} else {
+					bpf_perf_event_output(ctx, &NAME(socket_data),
+							      BPF_F_CURRENT_CPU, v_buff,
+							      sizeof(*v_buff));
+				}
 
 				v_buff->events_num = 0;
 				v_buff->len = 0;				
@@ -1750,15 +1777,24 @@ static __inline int output_data_common(void *ctx) {
 	    ((sizeof(v_buff->data) - v_buff->len) < sizeof(*v))) {
 		__u32 buf_size = (v_buff->len + offsetof(typeof(struct __socket_data_buffer), data))
 				 & (sizeof(*v_buff) - 1);
-		if (buf_size >= sizeof(*v_buff))
-			bpf_perf_event_output(ctx, &NAME(socket_data),
-					      BPF_F_CURRENT_CPU, v_buff,
-					      sizeof(*v_buff));
-		else
-			/* 使用'buf_size + 1'代替'buf_size'，来规避（Linux 4.14.x）长度检查 */
+		/*
+		 * Note that when 'buf_size == 0', it indicates that the data being
+		 * sent is at its maximum value (sizeof(*v_buff)), and it should
+		 * be sent accordingly.
+		 */
+		if (buf_size < sizeof(*v_buff) && buf_size > 0) {
+			/*
+			 * Use 'buf_size + 1' instead of 'buf_size' to circumvent
+			 * (Linux 4.14.x) length checks.
+			 */
 			bpf_perf_event_output(ctx, &NAME(socket_data),
 					      BPF_F_CURRENT_CPU, v_buff,
 					      buf_size + 1);
+		} else {
+			bpf_perf_event_output(ctx, &NAME(socket_data),
+					      BPF_F_CURRENT_CPU, v_buff,
+					      sizeof(*v_buff));
+		}
 
 		v_buff->events_num = 0;
 		v_buff->len = 0;
