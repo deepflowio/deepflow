@@ -112,13 +112,20 @@ func GetPrometheusNotNullFilter(name, table string, asTagMap map[string]string) 
 }
 
 func GetNotNullFilter(name string, asTagMap map[string]string, db, table string) (view.Node, bool) {
-	if db == chCommon.DB_NAME_PROMETHEUS {
-		return GetPrometheusNotNullFilter(name, table, asTagMap)
+	preAsTag, preASOK := asTagMap[name]
+	if preASOK {
+		if db == chCommon.DB_NAME_PROMETHEUS && strings.HasPrefix(preAsTag, "`tag.") {
+			return GetPrometheusNotNullFilter(name, table, asTagMap)
+		}
+	} else {
+		if db == chCommon.DB_NAME_PROMETHEUS && strings.HasPrefix(name, "`tag.") {
+			return GetPrometheusNotNullFilter(name, table, asTagMap)
+		}
 	}
+
 	tagItem, ok := tag.GetTag(strings.Trim(name, "`"), db, table, "default")
 	if !ok {
-		preAsTag, ok := asTagMap[name]
-		if ok {
+		if preASOK {
 			tagItem, ok = tag.GetTag(strings.Trim(preAsTag, "`"), db, table, "default")
 			if !ok {
 				preAsTag := strings.Trim(preAsTag, "`")
