@@ -496,12 +496,16 @@ type PodGroupQueryFilterConditions struct {
 type PodGroupPortFilterConditions struct {
 	Convertor
 
-	PodServiceIDs []int `schema:"pod_service_id,omitempty" json:"POD_SERVICE_ID,omitempty"`
+	PodServiceIDs []int `schema:"pod_service_id,required" json:"POD_SERVICE_ID,omitempty"`
 	PodGroupIDs   []int `schema:"pod_group_id,omitempty" json:"POD_GROUP_ID,omitempty"`
 }
 
 func (v PodGroupPortQueryFilterConditions) GetFilterConditions() map[string]interface{} {
 	return v.ToMapOmitEmpty(v)
+}
+
+func (v PodGroupPortQueryFilterConditions) GetUserID() int {
+	return 0
 }
 
 // PodGroupPortQueryFilterConditions formed by http request query.

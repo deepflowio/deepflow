@@ -27,25 +27,25 @@ import (
 )
 
 var (
-	podOnce sync.Once
-	pod     *Pod
+	podNodeOnce sync.Once
+	podNode     *PodNode
 )
 
-type Pod struct {
+type PodNode struct {
 	DataProvider
 }
 
-func GetPod(cfg redis.Config) *Pod {
-	podOnce.Do(func() {
-		pod = &Pod{
+func GetPodNode(cfg redis.Config) *PodNode {
+	podNodeOnce.Do(func() {
+		podNode = &PodNode{
 			DataProvider: DataProvider{
-				resourceType: ctrlrcommon.RESOURCE_TYPE_POD_EN,
-				next:         mysqldp.NewPod(),
+				resourceType: ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN,
+				next:         mysqldp.NewPodNode(),
 				client:       getClient(cfg),
-				keyConv:      newKeyConvertor[model.PodQueryStoredInRedis](),
-				urlPath:      httpcommon.PATH_POD,
+				keyConv:      newKeyConvertor[model.PodNodeQueryStoredInRedis](),
+				urlPath:      httpcommon.PATH_POD_NODE,
 			},
 		}
 	})
-	return pod
+	return podNode
 }

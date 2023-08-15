@@ -35,10 +35,10 @@ func NewTask() *Task {
 }
 
 func (t *Task) RegisterTo(e *gin.Engine) {
-	e.GET("/v1/tasks/", getTasks)
-	e.GET("/v1/tasks/:id/", getTask)
+	e.GET("/v1/resource-tasks/", getTasks)
+	e.GET("/v1/resource-tasks/:id/", getTask)
 
-	e.POST("/v1/tasks/", createTask) // used to control task id
+	e.POST("/v1/resource-tasks/", createTask) // used to control task id
 }
 
 func getTask(c *gin.Context) {

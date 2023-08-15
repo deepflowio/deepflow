@@ -46,7 +46,9 @@ type client struct {
 func getClient(cfg dbredis.Config) *client {
 	cliOnce.Do(func() {
 		ctx, cancel := context.WithCancel(context.Background())
-		cli = &client{db: dbredis.GetClient().ResourceAPI, ctx: ctx, cancel: cancel, cfg: cfg}
+		cli = &client{
+			db:  dbredis.GetClient().ResourceAPI,
+			ctx: ctx, cancel: cancel, cfg: cfg}
 	})
 	return cli
 }

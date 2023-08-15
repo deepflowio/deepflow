@@ -1320,7 +1320,7 @@ pub fn get_direction(
                     }
                 }
             }
-            TridentType::TtHostPod | TridentType::TtVmPod => {
+            TridentType::TtHostPod | TridentType::TtVmPod | TridentType::TtK8sSidecar => {
                 if is_ep {
                     if tunnel_tier == 0 {
                         return (Direction::ClientToServer, Direction::ServerToClient);
@@ -1489,16 +1489,10 @@ pub fn get_direction(
     let flow_key = &flow.flow_key;
 
     // Workload和容器采集器需采集loopback口流量
-    if flow_key.mac_src == flow_key.mac_dst {
-        match trident_type {
-            TridentType::TtPublicCloud
-            | TridentType::TtPhysicalMachine
-            | TridentType::TtHostPod
-            | TridentType::TtVmPod => {
-                return [Direction::None, Direction::LocalToLocal];
-            }
-            _ => (),
-        }
+    if flow_key.mac_src == flow_key.mac_dst
+        && (is_tt_workload(trident_type) || is_tt_pod(trident_type))
+    {
+        return [Direction::None, Direction::LocalToLocal];
     }
 
     // 全景图统计

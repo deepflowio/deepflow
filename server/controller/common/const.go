@@ -459,13 +459,8 @@ const (
 )
 
 const (
-	DATA_SOURCE_FLOW            = "flow"
-	DATA_SOURCE_APP             = "app"
-	DATA_SOURCE_L4_FLOW_LOG     = "flow_log.l4_flow_log"
-	DATA_SOURCE_L7_FLOW_LOG     = "flow_log.l7_flow_log"
-	DATA_SOURCE_L4_PACKAGE      = "flow_log.l4_packet"
-	DATA_SOURCE_L7_PACKAGE      = "flow_log.l7_packet"
-	DATA_SOURCE_DEEPFLOW_SYSTEM = "flow_log.deepflow_system"
+	DATA_SOURCE_FLOW = "flow_metrics.vtap_flow*"
+	DATA_SOURCE_APP  = "flow_metrics.vtap_app*"
 
 	DATA_SOURCE_STATE_EXCEPTION = 0
 	DATA_SOURCE_STATE_NORMAL    = 1

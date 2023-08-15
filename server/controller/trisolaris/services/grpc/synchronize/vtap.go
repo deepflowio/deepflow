@@ -135,7 +135,7 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 		KubernetesApiEnabled:          proto.Bool(false),
 		SysFreeMemoryLimit:            proto.Uint32(uint32(vtapConfig.SysFreeMemoryLimit)),
 		LogFileSize:                   proto.Uint32(uint32(vtapConfig.LogFileSize)),
-		ExternalAgentHttpProxyEnabled: proto.Bool(Int2Bool(vtapConfig.ExternalAgentHTTPProxyEnabled)),
+		ExternalAgentHttpProxyEnabled: proto.Bool(Int2Bool(c.GetExternalAgentHTTPProxyEnabledConfig(gVTapInfo))),
 		ExternalAgentHttpProxyPort:    proto.Uint32(uint32(vtapConfig.ExternalAgentHTTPProxyPort)),
 		PrometheusHttpApiAddress:      proto.String(vtapConfig.PrometheusHttpAPIAddress),
 		AnalyzerPort:                  proto.Uint32(uint32(vtapConfig.AnalyzerPort)),

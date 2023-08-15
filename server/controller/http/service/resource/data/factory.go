@@ -64,6 +64,25 @@ func GetDataProvider(resourceType string, cfg *RequiredConfigs) provider.DataPro
 		return mysql.NewCEN()
 	case common.RESOURCE_TYPE_POD_EN:
 		return redisdp.GetPod(cfg.Redis)
+	case common.RESOURCE_TYPE_POD_GROUP_EN:
+		return redisdp.GetPodGroup(cfg.Redis)
+	case common.RESOURCE_TYPE_POD_GROUP_PORT_EN:
+		return mysqldp.NewPodGroupPort()
+	case common.RESOURCE_TYPE_POD_REPLICA_SET_EN:
+		return redisdp.GetPodReplicaSet(cfg.Redis)
+	case common.RESOURCE_TYPE_POD_SERVICE_EN:
+		return redisdp.GetPodSerivce(cfg.Redis)
+	case common.RESOURCE_TYPE_POD_SERVICE_PORT_EN:
+		return mysqldp.NewPodServicePort()
+	case common.RESOURCE_TYPE_POD_INGRESS_EN:
+		return redisdp.GetPodIngress(cfg.Redis)
+	case common.RESOURCE_TYPE_POD_INGRESS_RULE_EN:
+		return mysql.NewPodIngressRule()
+	case common.RESOURCE_TYPE_POD_NODE_EN:
+		return redisdp.GetPodNode(cfg.Redis)
+	case common.RESOURCE_TYPE_POD_CLUSTER_EN:
+		return redisdp.GetPodCluster(cfg.Redis)
+
 	default:
 		return nil
 	}

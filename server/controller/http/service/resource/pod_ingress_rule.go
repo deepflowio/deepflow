@@ -14,38 +14,23 @@
  * limitations under the License.
  */
 
-package redis
+package resource
 
 import (
-	"sync"
-
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/redis"
-	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/http/model"
-	mysqldp "github.com/deepflowio/deepflow/server/controller/http/service/resource/data/mysql"
+	"github.com/deepflowio/deepflow/server/controller/http/service/resource/data"
+	"github.com/deepflowio/deepflow/server/controller/http/service/resource/filter/generator"
 )
 
-var (
-	podOnce sync.Once
-	pod     *Pod
-)
-
-type Pod struct {
-	DataProvider
+type PodIngressRule struct {
+	ServiceGet
 }
 
-func GetPod(cfg redis.Config) *Pod {
-	podOnce.Do(func() {
-		pod = &Pod{
-			DataProvider: DataProvider{
-				resourceType: ctrlrcommon.RESOURCE_TYPE_POD_EN,
-				next:         mysqldp.NewPod(),
-				client:       getClient(cfg),
-				keyConv:      newKeyConvertor[model.PodQueryStoredInRedis](),
-				urlPath:      httpcommon.PATH_POD,
-			},
-		}
-	})
-	return pod
+func NewPodIngressRuleGet(urlInfo *model.URLInfo, userInfo *model.UserInfo, redisCfg redis.Config, fpermitCfg config.FPermit) *PodIngressRule {
+	s := &PodIngressRule{newServiceGet(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, data.GetDataProvider(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, &data.RequiredConfigs{}))}
+	s.generateDataContext(urlInfo, userInfo, generator.NewPodIngressRule(fpermitCfg))
+	return s
 }
