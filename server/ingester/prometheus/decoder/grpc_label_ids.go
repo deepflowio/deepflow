@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/cornelk/hashmap"
+	"github.com/golang/protobuf/proto"
 	"github.com/prometheus/common/model"
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
@@ -167,7 +168,7 @@ func (t *PrometheusLabelTable) RequestAllTargetIDs() {
 			return fmt.Errorf("can't get grpc client to %s", remote)
 		}
 		client := trident.NewSynchronizerClient(c)
-		response, err = client.GetPrometheusTargets(ctx, &trident.PrometheusTargetRequest{})
+		response, err = client.GetPrometheusTargets(ctx, &trident.PrometheusTargetRequest{Version: proto.Uint32(t.targetVersion)})
 		return err
 	})
 	if err != nil {
