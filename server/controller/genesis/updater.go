@@ -848,13 +848,14 @@ func (v *GenesisSyncRpcUpdater) run() {
 			}
 		} else if info.msgType == genesiscommon.TYPE_UPDATE {
 			tridentType := info.message.GetTridentType()
-			if tridentType == tridentcommon.TridentType_TT_PHYSICAL_MACHINE {
+			switch tridentType {
+			case tridentcommon.TridentType_TT_PHYSICAL_MACHINE:
 				genesisSyncDataOper = v.UnmarshalWorkloadProtobuf(info, genesiscommon.DEVICE_TYPE_PHYSICAL_MACHINE)
-			} else if tridentType == tridentcommon.TridentType_TT_PUBLIC_CLOUD {
+			case tridentcommon.TridentType_TT_PUBLIC_CLOUD:
 				genesisSyncDataOper = v.UnmarshalWorkloadProtobuf(info, genesiscommon.DEVICE_TYPE_PUBLIC_CLOUD)
-			} else if tridentType == tridentcommon.TridentType_TT_HOST_POD || tridentType == tridentcommon.TridentType_TT_VM_POD {
+			case tridentcommon.TridentType_TT_HOST_POD, tridentcommon.TridentType_TT_VM_POD, tridentcommon.TridentType_TT_K8S_SIDECAR:
 				genesisSyncDataOper = v.UnmarshalKubernetesProtobuf(info)
-			} else {
+			default:
 				genesisSyncDataOper = v.UnmarshalProtobuf(info)
 			}
 			if info.vtapID != 0 {
