@@ -66,10 +66,10 @@ impl L7ProtocolParserInterface for WasmLog {
                     i.proto_str = self.proto_str.clone();
                     match i.resp.status {
                         L7ResponseStatus::ServerError => {
-                            self.perf_stats.as_mut().map(|p| p.inc_req_err());
+                            self.perf_stats.as_mut().map(|p| p.inc_resp_err());
                         }
                         L7ResponseStatus::ClientError => {
-                            self.perf_stats.as_mut().map(|p| p.inc_resp_err());
+                            self.perf_stats.as_mut().map(|p| p.inc_req_err());
                         }
                         _ => {}
                     }
