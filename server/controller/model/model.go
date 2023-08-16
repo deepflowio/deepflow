@@ -259,7 +259,7 @@ type DataSourceCreate struct {
 
 type DataSourceUpdate struct {
 	RetentionTime int    `json:"RETENTION_TIME" binding:"required,min=1"`
-	DisplayName   string `json:"DISPLAY_NAME" binding:"required,min=1,max=10"`
+	DisplayName   string `json:"DISPLAY_NAME"`
 }
 
 type LicenseConsumption struct {

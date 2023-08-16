@@ -136,7 +136,9 @@ func CreateDataSource(dataSourceCreate *model.DataSourceCreate, cfg *config.Cont
 		},
 	).First(&dataSource); ret.Error == nil {
 		return model.DataSource{}, NewError(
-			httpcommon.RESOURCE_ALREADY_EXIST, "data_source with same effect already exists",
+			httpcommon.RESOURCE_ALREADY_EXIST,
+			fmt.Sprintf("data_source with same effect(data_table_collection: %v, interval: %v) already exists",
+				dataSourceCreate.DataTableCollection, dataSourceCreate.Interval),
 		)
 	}
 
