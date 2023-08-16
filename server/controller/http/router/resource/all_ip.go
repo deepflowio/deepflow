@@ -28,28 +28,28 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource"
 )
 
-type IP struct {
+type AllIP struct {
 	httpCfg    httpCfg.Config
 	redisCfg   dbredis.Config
 	fpermitCfg config.FPermit
 }
 
-func NewIP(hCfg httpCfg.Config, rCfg dbredis.Config, fCfg config.FPermit) *IP {
-	return &IP{httpCfg: hCfg, redisCfg: rCfg, fpermitCfg: fCfg}
+func NewAllIP(hCfg httpCfg.Config, rCfg dbredis.Config, fCfg config.FPermit) *AllIP {
+	return &AllIP{httpCfg: hCfg, redisCfg: rCfg, fpermitCfg: fCfg}
 }
 
-func (p *IP) RegisterTo(ge *gin.Engine) {
-	ge.GET(httpcommon.PATH_IP, p.Get)
+func (p *AllIP) RegisterTo(ge *gin.Engine) {
+	ge.GET(httpcommon.PATH_ALL_IP, p.Get)
 }
 
-func (p *IP) Get(c *gin.Context) {
+func (p *AllIP) Get(c *gin.Context) {
 	header := NewHeaderValidator(c.Request.Header, p.fpermitCfg)
 	query := NewQueryValidator[model.IPQuery](c.Request.URL.Query())
 	if err := NewValidators(header, query).Validate(); err != nil {
 		common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
 		return
 	}
-	service := resource.NewIPGet(
+	service := resource.NewAllIPGet(
 		NewURLInfo(
 			c.Request.URL.String(),
 			query.structData,
@@ -67,6 +67,6 @@ func (p *IP) Get(c *gin.Context) {
 	}
 }
 
-func (p *IP) Update(c *gin.Context) {
+func (p *AllIP) Update(c *gin.Context) {
 
 }

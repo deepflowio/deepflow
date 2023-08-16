@@ -64,6 +64,8 @@ const (
 	PATH_POD_NAMESPACE       = "/v2/pod-namespaces"
 	PATH_VPC                 = "/v2/epcs"
 	PATH_NETWORK             = "/v2/subnets"
+	PATH_DHCP_PORT           = "/v2/dhcp-ports"
+	PATH_IP                  = "/v2/ips"
 	PATH_ALL_IP              = "/v2/all-ips"
 )
 

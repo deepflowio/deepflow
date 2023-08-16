@@ -27,25 +27,25 @@ import (
 )
 
 var (
-	ipOnce sync.Once
-	ip     *IP
+	allIPOnce sync.Once
+	allIP     *AllIP
 )
 
-type IP struct {
+type AllIP struct {
 	DataProvider
 }
 
-func GetIP(cfg redis.Config) *IP {
-	ipOnce.Do(func() {
-		ip = &IP{
+func GetAllIP(cfg redis.Config) *AllIP {
+	allIPOnce.Do(func() {
+		allIP = &AllIP{
 			DataProvider: DataProvider{
-				resourceType: ctrlrcommon.RESOURCE_TYPE_IP_EN,
-				next:         mysqldp.NewIP(),
+				resourceType: ctrlrcommon.RESOURCE_TYPE_ALL_IP_EN,
+				next:         mysqldp.NewAllIP(),
 				client:       getClient(cfg),
 				keyConv:      newKeyConvertor[model.IPQueryStoredInRedis](),
-				urlPath:      httpcommon.PATH_IP,
+				urlPath:      httpcommon.PATH_ALL_IP,
 			},
 		}
 	})
-	return ip
+	return allIP
 }

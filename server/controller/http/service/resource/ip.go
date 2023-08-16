@@ -34,3 +34,13 @@ func NewIPGet(urlInfo *model.URLInfo, userInfo *model.UserInfo, redisCfg redis.C
 	s.generateDataContext(urlInfo, userInfo, generator.NewIP(fpermitCfg))
 	return s
 }
+
+type AllIP struct {
+	ServiceGet
+}
+
+func NewAllIPGet(urlInfo *model.URLInfo, userInfo *model.UserInfo, redisCfg redis.Config, fpermitCfg config.FPermit) *AllIP {
+	s := &AllIP{newServiceGet(ctrlrcommon.RESOURCE_TYPE_ALL_IP_EN, data.GetDataProvider(ctrlrcommon.RESOURCE_TYPE_ALL_IP_EN, &data.RequiredConfigs{Redis: redisCfg}))}
+	s.generateDataContext(urlInfo, userInfo, generator.NewAllIP(fpermitCfg))
+	return s
+}

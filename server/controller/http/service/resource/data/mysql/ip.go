@@ -41,15 +41,15 @@ func NewIP() *IP {
 }
 
 func (p *IP) generate() ([]common.ResponseElem, error) {
-	data1, err := p.dataTool.wanIP.generate()
+	wanIP, err := p.dataTool.wanIP.generate()
 	if err != nil {
 		return nil, err
 	}
-	data2, err := p.dataTool.lanIP.generate()
+	lanIP, err := p.dataTool.lanIP.generate()
 	if err != nil {
 		return nil, err
 	}
-	return mergeResponses(data1, data2), nil
+	return mergeResponses(wanIP, lanIP), nil
 }
 
 func mergeResponses(resp1 []common.ResponseElem, resp2 []common.ResponseElem) []common.ResponseElem {

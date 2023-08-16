@@ -60,10 +60,6 @@ func (p *Network) generateOne(item mysql.Network) common.ResponseElem {
 	d["DOMAIN_NAME"] = p.dataTool.domainLcuuidToName[item.Domain]
 	d["EPC_NAME"] = p.dataTool.vpcIDToName[item.VPCID]
 	d["VM_COUNT"] = len(p.dataTool.vl2IDToVMIDs[item.ID])
-	// TODO(weiqiang): delete
-	if item.ID == 4126 {
-		log.Infof("weiqinag vl2IDToVMIDs: %#v", p.dataTool.vl2IDToVMIDs[item.ID])
-	}
 	d["POD_COUNT"] = len(p.dataTool.vl2IDToPodIDs[item.ID])
 
 	var routers []interface{}
@@ -110,20 +106,8 @@ func (p *Network) generateOne(item mysql.Network) common.ResponseElem {
 			continue
 		}
 		ipCount += len(p.dataTool.vifIDToWANIPs[vifID]) + len(p.dataTool.vifIDToLANIPs[vif.ID])
-		// TODO(weiqiang): delete
-		if item.ID == 4096 {
-			log.Infof("weiqinag ipCount: %v, %v, %v", ipCount, len(p.dataTool.vifIDToWANIPs[vifID]), len(p.dataTool.vifIDToLANIPs[vif.ID]))
-		}
 	}
 	d["IP_COUNT"] = ipCount
-	// TODO(weiqiang): delete
-	if item.ID == 4126 {
-		log.Infof("weiqinag ipCount: %v", ipCount)
-	}
-
-	// TODO(weiqiang):
-	// VM_COUNT
-	// IP_COUNT
 
 	return d
 }

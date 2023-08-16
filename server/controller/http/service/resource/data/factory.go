@@ -94,10 +94,14 @@ func GetDataProvider(resourceType string, cfg *RequiredConfigs) provider.DataPro
 		return redisdp.GetPodNamespace(cfg.Redis)
 	case common.RESOURCE_TYPE_VPC_EN:
 		return mysql.NewVPC()
+	case common.RESOURCE_TYPE_DHCP_PORT_EN:
+		return mysql.NewDHCPPort()
 	case common.RESOURCE_TYPE_NETWORK_EN:
 		return mysql.NewNetwork()
 	case common.RESOURCE_TYPE_IP_EN:
 		return redisdp.GetIP(cfg.Redis)
+	case common.RESOURCE_TYPE_ALL_IP_EN:
+		return redisdp.GetAllIP(cfg.Redis)
 
 	default:
 		return nil
