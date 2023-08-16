@@ -39,16 +39,11 @@ type Profile struct {
 type Profiler struct {
 	Decoders      []*decoder.Decoder
 	PlatformDatas []*grpc.PlatformInfoTable
-	ProfileWriter *dbwriter.ProfileWriter
 }
 
 func NewProfile(config *config.Config, recv *receiver.Receiver, platformDataManager *grpc.PlatformDataManager) (*Profile, error) {
-	manager := dropletqueue.NewManager(ingesterctl.INGESTERCTL_EXTMETRICS_QUEUE)
-	profileWriter, err := dbwriter.NewProfileWriter(datatype.MESSAGE_TYPE_PROFILE, 0, config)
-	if err != nil {
-		return nil, err
-	}
-	profiler, err := NewProfiler(datatype.MESSAGE_TYPE_PROFILE, config, platformDataManager, manager, recv, profileWriter)
+	manager := dropletqueue.NewManager(ingesterctl.INGESTERCTL_PROFILE_QUEUE)
+	profiler, err := NewProfiler(datatype.MESSAGE_TYPE_PROFILE, config, platformDataManager, manager, recv)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +52,7 @@ func NewProfile(config *config.Config, recv *receiver.Receiver, platformDataMana
 	}, nil
 }
 
-func NewProfiler(msgType datatype.MessageType, config *config.Config, platformDataManager *grpc.PlatformDataManager, manager *dropletqueue.Manager, recv *receiver.Receiver, profileWriter *dbwriter.ProfileWriter) (*Profiler, error) {
+func NewProfiler(msgType datatype.MessageType, config *config.Config, platformDataManager *grpc.PlatformDataManager, manager *dropletqueue.Manager, recv *receiver.Receiver) (*Profiler, error) {
 	decodeQueues := manager.NewQueues(
 		"1-receive-to-decode-"+msgType.String(),
 		config.DecoderQueueSize,
@@ -77,6 +72,10 @@ func NewProfiler(msgType datatype.MessageType, config *config.Config, platformDa
 				return nil, err
 			}
 		}
+		profileWriter, err := dbwriter.NewProfileWriter(datatype.MESSAGE_TYPE_PROFILE, i, config)
+		if err != nil {
+			return nil, err
+		}
 		decoders[i] = decoder.NewDecoder(
 			i,
 			msgType,
@@ -88,7 +87,6 @@ func NewProfiler(msgType datatype.MessageType, config *config.Config, platformDa
 	return &Profiler{
 		Decoders:      decoders,
 		PlatformDatas: platformDatas,
-		ProfileWriter: profileWriter,
 	}, nil
 }
 
