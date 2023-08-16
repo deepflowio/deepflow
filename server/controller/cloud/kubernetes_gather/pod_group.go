@@ -39,9 +39,9 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 	pgNameToTypeID := map[string]int{
 		"deployment":            common.POD_GROUP_DEPLOYMENT,
 		"statefulset":           common.POD_GROUP_STATEFULSET,
-		"replicaset":            common.POD_GROUP_RC,
+		"replicaset":            common.POD_GROUP_REPLICASET_CONTROLLER,
 		"daemonset":             common.POD_GROUP_DAEMON_SET,
-		"replicationcontroller": common.POD_GROUP_REPLICASET_CONTROLLER,
+		"replicationcontroller": common.POD_GROUP_RC,
 		"cloneset":              common.POD_GROUP_CLONESET,
 	}
 	for t, podController := range podControllers {
