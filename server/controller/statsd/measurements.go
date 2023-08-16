@@ -142,7 +142,7 @@ func GetResCount[T model.Resource | k8sgathermodel.KubernetesGatherResource](res
 		var rCount int
 		rKey := resAttr.Field(i).Name
 		switch rKey {
-		case "Verified", "ErrorState", "ErrorMessage":
+		case "Verified", "ErrorState", "ErrorMessage", "SyncAt":
 			continue
 		case "AZ", "VPC", "Region", "PodCluster", "PodNodeNetwork", "PodServiceNetwork", "PodNetwork":
 			rCount = 1
