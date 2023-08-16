@@ -136,9 +136,9 @@ impl TargetsWatcher {
             return;
         }
 
-        if config_guard.prometheus_http_api_address.is_empty() {
+        if config_guard.prometheus_http_api_addresses.is_empty() {
             info!(
-                "prometheus watcher failed to start because prometheus_http_api_address is empty"
+                "prometheus watcher failed to start because prometheus_http_api_addresses are empty"
             );
             return;
         }
@@ -195,11 +195,58 @@ impl TargetsWatcher {
         agent_id: &Arc<RwLock<AgentId>>,
     ) {
         let config_guard = context.config.load();
-        let api = config_guard.prometheus_http_api_address.clone() + API_TARGETS_ENDPOINT;
-
+        let api_addresses = config_guard.prometheus_http_api_addresses.clone();
         let mut total_entries = vec![];
         let mut err_msgs = vec![];
+        for api in api_addresses {
+            Self::get_prometheus_api_info(
+                context,
+                counter,
+                api,
+                API_TARGETS_ENDPOINT,
+                encoder,
+                &mut total_entries,
+                &mut err_msgs,
+            );
+        }
 
+        let version = &context.version;
+        let pb_version = Some(version.load(Ordering::SeqCst));
+
+        let msg = PrometheusApiSyncRequest {
+            cluster_id: Some(config_guard.kubernetes_cluster_id.to_string()),
+            version: pb_version,
+            vtap_id: Some(config_guard.vtap_id as u32),
+            source_ip: Some(agent_id.read().ip.to_string()),
+            error_msg: Some(err_msgs.join(";")),
+            entries: total_entries,
+        };
+
+        match context
+            .runtime
+            .block_on(session.grpc_prometheus_api_sync(msg))
+        {
+            Ok(_) => {
+                version.fetch_add(1, Ordering::SeqCst);
+            }
+            Err(e) => {
+                let err = format!("prometheus_api_sync grpc call failed: {}", e);
+                exception_handler.set(Exception::ControllerSocketError);
+                error!("{}", err);
+            }
+        }
+    }
+
+    fn get_prometheus_api_info(
+        context: &mut Arc<Context>,
+        counter: &mut Arc<TargetsCounter>,
+        api_address: String,
+        api_endpoint: &str,
+        encoder: &mut ZlibEncoder<Vec<u8>>,
+        total_entries: &mut Vec<PrometheusApiInfo>,
+        err_msgs: &mut Vec<String>,
+    ) {
+        let api = api_address + api_endpoint;
         context.runtime.block_on(async {
             match context.client.get(api).send().await {
                 Ok(resp) => {
@@ -234,31 +281,5 @@ impl TargetsWatcher {
                 }
             }
         });
-
-        let version = &context.version;
-        let pb_version = Some(version.load(Ordering::SeqCst));
-
-        let msg = PrometheusApiSyncRequest {
-            cluster_id: Some(config_guard.kubernetes_cluster_id.to_string()),
-            version: pb_version,
-            vtap_id: Some(config_guard.vtap_id as u32),
-            source_ip: Some(agent_id.read().ip.to_string()),
-            error_msg: Some(err_msgs.join(";")),
-            entries: total_entries,
-        };
-
-        match context
-            .runtime
-            .block_on(session.grpc_prometheus_api_sync(msg))
-        {
-            Ok(_) => {
-                version.fetch_add(1, Ordering::SeqCst);
-            }
-            Err(e) => {
-                let err = format!("prometheus_api_sync grpc call failed: {}", e);
-                exception_handler.set(Exception::ControllerSocketError);
-                error!("{}", err);
-            }
-        }
     }
 }
