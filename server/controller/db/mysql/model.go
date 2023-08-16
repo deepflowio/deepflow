@@ -1092,7 +1092,7 @@ type VTapGroupConfiguration struct {
 	HTTPLogXRequestID             *string `gorm:"column:http_log_x_request_id;type:char(64);default:null" json:"HTTP_LOG_X_REQUEST_ID"`
 	ExternalAgentHTTPProxyEnabled *int    `gorm:"column:external_agent_http_proxy_enabled;type:tinyint(1);default:null" json:"EXTERNAL_AGENT_HTTP_PROXY_ENABLED"`
 	ExternalAgentHTTPProxyPort    *int    `gorm:"column:external_agent_http_proxy_port;type:int;default:null" json:"EXTERNAL_AGENT_HTTP_PROXY_PORT"`
-	PrometheusHttpAPIAddress      *string `gorm:"column:prometheus_http_api_address;type:string;default:null" json:"PROMETHEUS_HTTP_API_ADDRESS"` // ip:port
+	PrometheusHttpAPIAddresses    *string `gorm:"column:prometheus_http_api_addresses;type:string;default:null" json:"PROMETHEUS_HTTP_API_ADDRESSES"` // ip:port, separate by ","
 	AnalyzerPort                  *int    `gorm:"column:analyzer_port;type:int;default:null" json:"ANALYZER_PORT"`
 	ProxyControllerPort           *int    `gorm:"column:proxy_controller_port;type:int;default:null" json:"PROXY_CONTROLLER_PORT"`
 	ProxyControllerIP             *string `gorm:"column:proxy_controller_ip;type:varchar(512);default:null" json:"PROXY_CONTROLLER_IP"`
@@ -1166,7 +1166,7 @@ type RVTapGroupConfiguration struct {
 	HTTPLogXRequestID             string `gorm:"column:http_log_x_request_id;type:char(64);default:null" json:"HTTP_LOG_X_REQUEST_ID"`
 	ExternalAgentHTTPProxyEnabled int    `gorm:"column:external_agent_http_proxy_enabled;type:tinyint(1);default:null" json:"EXTERNAL_AGENT_HTTP_PROXY_ENABLED"`
 	ExternalAgentHTTPProxyPort    int    `gorm:"column:external_agent_http_proxy_port;type:int;default:null" json:"EXTERNAL_AGENT_HTTP_PROXY_PORT"`
-	PrometheusHttpAPIAddress      string `gorm:"column:prometheus_http_api_address;type:string;default:null" json:"PROMETHEUS_HTTP_API_ADDRESS"` // ip:port
+	PrometheusHttpAPIAddresses    string `gorm:"column:prometheus_http_api_addresses;type:string;default:null" json:"PROMETHEUS_HTTP_API_ADDRESSES"` // ip:port, separate by ","
 	AnalyzerPort                  int    `gorm:"column:analyzer_port;type:int;default:null" json:"ANALYZER_PORT"`
 	ProxyControllerPort           int    `gorm:"column:proxy_controller_port;type:int;default:null" json:"PROXY_CONTROLLER_PORT"`
 	ProxyControllerIP             string `gorm:"column:proxy_controller_ip;type:varchar(512);default:null" json:"PROXY_CONTROLLER_IP"`
