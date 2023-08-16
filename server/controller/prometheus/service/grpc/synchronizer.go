@@ -37,7 +37,7 @@ func (e *SynchronizerEvent) GetLabelIDs(ctx context.Context, in *trident.Prometh
 	if len(in.GetRequestLabels()) != 0 || len(in.GetRequestTargets()) != 0 {
 		log.Debugf("PrometheusLabelRequest: %+v", in)
 	}
-	synchronizer := prometheus.NewSynchronizer()
+	synchronizer := prometheus.NewLabelSynchronizer()
 	resp, err := synchronizer.Sync(in)
 	statsd.GetPrometheusLabelIDsCounterSingleton().Fill(synchronizer.GetStatsdCounter())
 	if len(in.GetRequestLabels()) != 0 || len(in.GetRequestTargets()) != 0 {
@@ -47,6 +47,18 @@ func (e *SynchronizerEvent) GetLabelIDs(ctx context.Context, in *trident.Prometh
 	if err != nil {
 		log.Errorf("encode str error: %+v", err)
 		return &trident.PrometheusLabelResponse{}, nil
+	}
+	return resp, err
+}
+
+func (e *SynchronizerEvent) GetPrometheusTargets(ctx context.Context, in *trident.PrometheusTargetRequest) (*trident.PrometheusTargetResponse, error) {
+	resp, err := prometheus.NewTargetSynchronizer().GetTargets(in)
+	if err != nil {
+		log.Errorf("target error: %+v", err)
+		return &trident.PrometheusTargetResponse{}, nil
+	}
+	if in.GetVersion() != resp.GetVersion() {
+		log.Infof("target version update from %d to %d", in.GetVersion(), resp.GetVersion())
 	}
 	return resp, err
 }

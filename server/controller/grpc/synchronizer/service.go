@@ -159,8 +159,12 @@ func (s *service) GetPrometheusLabelIDs(ctx context.Context, in *api.PrometheusL
 }
 
 func (s *service) GetPrometheusTargets(ctx context.Context, in *api.PrometheusTargetRequest) (*api.PrometheusTargetResponse, error) {
-	// FIXME @zhengya
-	return &api.PrometheusTargetResponse{}, nil
+	startTime := time.Now()
+	defer func() {
+		statsd.AddGrpcCostStatsd(statsd.GetPrometheusTargets, int(time.Now().Sub(startTime).Milliseconds()))
+	}()
+	resp, err := s.prometheusEvent.GetPrometheusTargets(ctx, in)
+	return resp, err
 }
 
 func (s *service) Plugin(r *api.PluginRequest, in api.Synchronizer_PluginServer) error {
