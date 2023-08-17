@@ -42,13 +42,13 @@ func NewTSDBEvent() *TSDBEvent {
 	return &TSDBEvent{}
 }
 
-func (e *TSDBEvent) generateConfig(tsdbIP string) *api.Config {
+func (e *TSDBEvent) generateConfig(tsdbIP string) *api.AnalyzerConfig {
 	nodeInfo := trisolaris.GetGNodeInfo()
-	pcapDataRetention := nodeInfo.GetPcapDataRetention()
 	regionID := nodeInfo.GetRegionIDByTSDBIP(tsdbIP)
-	return &api.Config{
-		PcapDataRetention: proto.Uint32(pcapDataRetention),
-		RegionId:          &regionID,
+	analyzerID := nodeInfo.GetTSDBID(tsdbIP)
+	return &api.AnalyzerConfig{
+		RegionId:   &regionID,
+		AnalyzerId: &analyzerID,
 	}
 }
 
@@ -132,7 +132,7 @@ func (e *TSDBEvent) AnalyzerSync(ctx context.Context, in *api.SyncRequest) (*api
 		VersionGroups:           proto.Uint64(versionGroups),
 		VersionAcls:             proto.Uint64(versionPolicy),
 		DeepflowServerInstances: localServers,
-		Config:                  configure,
+		AnalyzerConfig:          configure,
 	}, nil
 }
 
@@ -187,7 +187,7 @@ func (e *TSDBEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 		VersionGroups:           proto.Uint64(versionGroups),
 		VersionAcls:             proto.Uint64(versionPolicy),
 		DeepflowServerInstances: localServers,
-		Config:                  configure,
+		AnalyzerConfig:          configure,
 	}, nil
 }
 
